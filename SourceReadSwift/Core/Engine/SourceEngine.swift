@@ -422,7 +422,16 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
             persistentState(for: source).ingestResponse(response)
             recordEvidence(source: source, stage: stage, request: request, response: response)
             await emitResponseObservation(response, request: request, source: source, stage: stage)
-            if !shouldUseWebViewFallback(source: source, response: response) {
+            // Nested Legado bridges must receive the complete response even
+            // for HTTP errors so source JS can inspect status/headers/body and
+            // decide how to recover. The top-level pipeline still reports
+            // ordinary 4xx/5xx loads as failures when no WebView fallback is
+            // configured.
+            let needsWebViewFallback = shouldUseWebViewFallback(source: source, response: response)
+            if (400...599).contains(response.statusCode), !needsWebViewFallback {
+                return .failure(.network("HTTP \(response.statusCode)"))
+            }
+            if !needsWebViewFallback {
                 return .success(response)
             }
         }

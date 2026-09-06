@@ -197,7 +197,10 @@ final class LegadoJavaCompatibilityTests: XCTestCase {
               status: get.status,
               ok: get.ok,
               finalUrl: get.finalUrl(),
+              propertyUrl: String(get.url),
+              callableUrl: get.url(),
               header: get.header('x-trace'),
+              propertyHeader: get.headers.get('x-trace'),
               postOK: post.json().ok
             })
             """)
@@ -216,7 +219,10 @@ final class LegadoJavaCompatibilityTests: XCTestCase {
         XCTAssertEqual(object["status"] as? Int, 206)
         XCTAssertEqual(object["ok"] as? Bool, true)
         XCTAssertEqual(object["finalUrl"] as? String, "https://fixture.local/get-final")
+        XCTAssertEqual(object["propertyUrl"] as? String, "https://fixture.local/get-final")
+        XCTAssertEqual(object["callableUrl"] as? String, "https://fixture.local/get-final")
         XCTAssertEqual(object["header"] as? String, "fixture")
+        XCTAssertEqual(object["propertyHeader"] as? String, "fixture")
         XCTAssertEqual(object["postOK"] as? Bool, true)
         XCTAssertEqual(requests.count, 2)
         XCTAssertTrue(requests[1].contains("https://fixture.local/api"))

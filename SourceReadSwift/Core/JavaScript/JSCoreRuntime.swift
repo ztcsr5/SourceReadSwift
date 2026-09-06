@@ -259,8 +259,14 @@ final class JSCoreRuntime {
         let fallback = exception.toString() ?? "JavaScript exception"
         let type = exception.forProperty("name")?.toString()?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty
         let message = exception.forProperty("message")?.toString()?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty ?? fallback
-        let stack = exception.forProperty("stack")?.toString()?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty
-            .map { String($0.prefix(4_096)) }
+        let rawStack = exception.forProperty("stack")?.toString()?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty
+        // JavaScriptCore does not guarantee that Error.stack starts with the
+        // error name. Android/Legado diagnostics do, and some iOS releases
+        // return only `global code@...`; prefix the bounded stack when needed.
+        let stack = rawStack.map { value -> String in
+            guard let type, !value.contains(type) else { return String(value.prefix(4_096)) }
+            return String("\(type): \(message)\n\(value)".prefix(4_096))
+        } ?? type.map { String("\($0): \(message)".prefix(4_096)) }
         return JavaScriptExceptionDetails(message: message, type: type, stack: stack)
     }
 
@@ -1286,6 +1292,53 @@ final class JSCoreRuntime {
           map.toString = function() { return JSON.stringify(map.toJSON()); };
           return map;
         }
+        function __bridgeCallableString(value) {
+          var text = String(value == null ? '' : value);
+          var callable = function() { return text; };
+          callable.valueOf = function() { return text; };
+          callable.toString = function() { return text; };
+          callable.toJSON = function() { return text; };
+          // Function objects are used so `response.url()` remains valid. Add
+          // the high-frequency String members as well, allowing legacy source
+          // code to treat the same value as a normal `response.url` string.
+          callable.length = text.length;
+          callable.charAt = function(index) { return text.charAt(index); };
+          callable.charCodeAt = function(index) { return text.charCodeAt(index); };
+          callable.indexOf = function(search, position) { return text.indexOf(String(search), position); };
+          callable.lastIndexOf = function(search, position) { return text.lastIndexOf(String(search), position); };
+          callable.includes = function(search, position) { return text.indexOf(String(search), position) >= 0; };
+          callable.startsWith = function(search, position) { return text.indexOf(String(search), position || 0) === (position || 0); };
+          callable.endsWith = function(search, length) {
+            var end = length == null ? text.length : Math.min(Number(length), text.length);
+            var start = end - String(search).length;
+            return start >= 0 && text.substring(start, end) === String(search);
+          };
+          callable.substring = function(start, end) { return text.substring(start, end); };
+          callable.substr = function(start, length) { return text.substr(start, length); };
+          callable.slice = function(start, end) { return text.slice(start, end); };
+          callable.split = function(separator, limit) { return text.split(separator, limit); };
+          callable.trim = function() { return text.trim(); };
+          callable.toLowerCase = function() { return text.toLowerCase(); };
+          callable.toUpperCase = function() { return text.toUpperCase(); };
+          callable.replace = function(search, replacement) { return text.replace(search, replacement); };
+          callable.match = function(pattern, flags) { return text.match(pattern, flags); };
+          return callable;
+        }
+        function __bridgeCallableHeaders(map) {
+          var callable = function() { return map; };
+          for (var key in map) if (Object.prototype.hasOwnProperty.call(map, key)) callable[key] = map[key];
+          callable.get = map.get;
+          callable.getIgnoreCase = map.getIgnoreCase;
+          callable.has = map.has;
+          callable.containsKey = map.containsKey;
+          callable.keys = map.keys;
+          callable.values = map.values;
+          callable.entries = map.entries;
+          callable.toJSON = map.toJSON;
+          callable.toString = map.toString;
+          callable.valueOf = function() { return map; };
+          return callable;
+        }
         function __bridgeCookies(headers) {
           var raw = '';
           for (var key in (headers || {})) if (String(key).toLowerCase() === 'set-cookie') raw = String(headers[key] || '');
@@ -1331,10 +1384,12 @@ final class JSCoreRuntime {
             text: function() { return bodyValue; },
             json: function() { return bodyValue.json(); },
             execute: function() { return response; },
-            url: function() { return finalUrl; },
+            // Keep both Android-style property access and the historical
+            // callable form: `response.url` and `response.url()`.
+            url: __bridgeCallableString(finalUrl),
             finalUrl: function() { return finalUrl; },
             header: function(name) { return headerMap.get(name); },
-            headers: function() { return headerMap; },
+            headers: __bridgeCallableHeaders(headerMap),
             cookies: function() { return __bridgeCookies(responseHeaders); },
             cookie: function() { return this.header('set-cookie') || this.header('cookie'); },
             // A number of Android/Flutter sources call `fetch(...).match(...)`

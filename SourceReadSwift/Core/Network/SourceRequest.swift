@@ -93,9 +93,6 @@ final class URLSessionSourceNetworkClient: SourceNetworkClient, @unchecked Senda
             // when Expires contains a comma. Parse each cookie value first,
             // then persist the complete response set for the next stage.
             await cookieStore.storeSetCookieHeaders(headers, for: http.url ?? request.url)
-            if (400...599).contains(http.statusCode) {
-                return .failure(.network("HTTP \(http.statusCode)"))
-            }
             return .success(SourceResponse(
                 url: http.url ?? request.url,
                 statusCode: http.statusCode,
