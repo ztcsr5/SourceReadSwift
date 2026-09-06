@@ -1689,13 +1689,34 @@ final class JSCoreRuntime {
         };
         java.getFile = function(path) {
           var value = String(path || '');
+          var info = function() {
+            return __nativeLegado.invoke({ method: 'fileInfo', args: [value] }) || {};
+          };
+          var children = function() {
+            return __nativeLegado.invoke({ method: 'listFiles', args: [value] }) || [];
+          };
           return {
             path: value,
-            exists: function() { return !!__nativeLegado.invoke({ method: 'fileExists', args: [value] }); },
-            isFile: function() { return !!__nativeLegado.invoke({ method: 'fileExists', args: [value] }); },
-            readText: function() { return java.readTxtFile(value); },
+            exists: function() { return !!info().exists; },
+            isFile: function() { return !!info().isFile; },
+            isDirectory: function() { return !!info().isDirectory; },
+            canRead: function() { return !!info().canRead; },
+            canWrite: function() { return !!info().canWrite; },
+            length: function() { return Number(info().length || 0); },
+            lastModified: function() { return Number(info().lastModified || 0); },
+            getName: function() { return String(info().name || ''); },
+            getPath: function() { return String(info().path || value); },
+            getAbsolutePath: function() { return String(info().absolutePath || value); },
+            getParent: function() { return String(info().parent || ''); },
+            getParentFile: function() { var parent = String(info().parent || ''); return parent ? java.getFile(parent) : null; },
+            list: function() { return children().map(function(path) { return java.getFile(path).getName(); }); },
+            listFiles: function() { return children().map(function(path) { return java.getFile(path); }); },
+            mkdirs: function() { return !!__nativeLegado.invoke({ method: 'makeDirectory', args: [value] }); },
+            mkdir: function() { return !!__nativeLegado.invoke({ method: 'makeDirectory', args: [value] }); },
+            readText: function(charset) { return java.readTxtFile(value, charset || 'utf-8'); },
             readBytes: function() { return java.readFile(value); },
-            delete: function() { return java.deleteFile(value); }
+            delete: function() { return java.deleteFile(value); },
+            toString: function() { return String(info().absolutePath || value); }
           };
         };
         java.deleteFile = function(path) {

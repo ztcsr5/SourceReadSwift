@@ -215,6 +215,12 @@ final class LegadoJavaHostBridge: NSObject, LegadoJavaHostExport {
             )
         case "fileExists":
             return services.fileExists(RuleExecutionContext.bridgeString(arguments.first))
+        case "fileInfo":
+            return services.fileInfo(RuleExecutionContext.bridgeString(arguments.first))
+        case "listFiles":
+            return services.listFiles(RuleExecutionContext.bridgeString(arguments.first))
+        case "makeDirectory":
+            return services.makeDirectory(RuleExecutionContext.bridgeString(arguments.first))
         case "deleteFile":
             return services.deleteFile(RuleExecutionContext.bridgeString(arguments.first))
         case "getZipStringContent":

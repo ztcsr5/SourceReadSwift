@@ -884,6 +884,68 @@ final class LegadoHostServices {
         return !isDirectory.boolValue
     }
 
+    /// Metadata facade for Android-style `java.getFile(path)` helpers.  Keep
+    /// the complete shape in one native call so repeated `exists()/length()`
+    /// checks do not each cross the JavaScriptCore bridge.
+    func fileInfo(_ path: String) -> NSDictionary {
+        guard let url = resolvedURL(path) else {
+            return [
+                "path": path,
+                "absolutePath": "",
+                "name": "",
+                "parent": "",
+                "exists": false,
+                "isFile": false,
+                "isDirectory": false,
+                "length": 0
+            ] as NSDictionary
+        }
+        var isDirectory = ObjCBool(false)
+        let exists = fileManager.fileExists(atPath: url.path, isDirectory: &isDirectory)
+        let attributes = exists ? (try? fileManager.attributesOfItem(atPath: url.path)) : nil
+        let length = (attributes?[.size] as? NSNumber)?.int64Value ?? 0
+        let modified = (attributes?[.modificationDate] as? Date)
+            .map { Int64($0.timeIntervalSince1970 * 1000) } ?? 0
+        return [
+            "path": url.path,
+            "absolutePath": url.path,
+            "name": url.lastPathComponent,
+            "parent": url.deletingLastPathComponent().path,
+            "exists": exists,
+            "isFile": exists && !isDirectory.boolValue,
+            "isDirectory": exists && isDirectory.boolValue,
+            "length": length,
+            "lastModified": modified,
+            "canRead": exists && fileManager.isReadableFile(atPath: url.path),
+            "canWrite": exists && fileManager.isWritableFile(atPath: url.path)
+        ] as NSDictionary
+    }
+
+    func listFiles(_ path: String) -> NSArray {
+        guard let url = resolvedURL(path), fileManager.fileExists(atPath: url.path) else {
+            return [] as NSArray
+        }
+        let resourceValues = try? url.resourceValues(forKeys: [.isDirectoryKey])
+        guard resourceValues?.isDirectory == true,
+              let values = try? fileManager.contentsOfDirectory(at: url, includingPropertiesForKeys: nil, options: [.skipsHiddenFiles]) else {
+            return [] as NSArray
+        }
+        return values.sorted { $0.lastPathComponent.localizedStandardCompare($1.lastPathComponent) == .orderedAscending }
+            .map(\.path) as NSArray
+    }
+
+    @discardableResult
+    func makeDirectory(_ path: String) -> Bool {
+        guard let url = resolvedURL(path, createParent: true) else { return false }
+        do {
+            try fileManager.createDirectory(at: url, withIntermediateDirectories: true)
+            return true
+        } catch {
+            executionContext.log("mkdirs failed: \(error.localizedDescription)")
+            return false
+        }
+    }
+
     @discardableResult
     func deleteFile(_ path: String) -> Bool {
         guard let url = resolvedURL(path) else { return false }

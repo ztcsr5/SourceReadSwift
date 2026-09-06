@@ -265,12 +265,28 @@ final class LegadoNativeBridgeTests: XCTestCase {
         let result = runtime.evaluate("""
             java.writeFile('compat-binary.bin', [0, 255, 1]);
             var file = java.getFile('compat-binary.bin');
-            var before = file.exists() && file.isFile() && file.readBytes().length === 3;
+            var before = file.exists() && file.isFile() && !file.isDirectory() && file.canRead() && file.canWrite() && file.length() === 3 && file.getName() === 'compat-binary.bin' && file.readBytes().length === 3;
             var removed = file.delete();
             [before, removed, file.exists()].join('|')
         """)
         guard case .success(let value) = result else { return XCTFail("expected success") }
         XCTAssertEqual(value, "true|true|false")
+    }
+
+    func testFilesystemDirectoryFacadeListsChildrenAndCreatesDirectories() throws {
+        let runtime = JSCoreRuntime()
+        let result = runtime.evaluate("""
+            var dir = java.getFile('compat-dir/sub');
+            var made = dir.mkdirs();
+            java.writeFile('compat-dir/sub/a.txt', 'a');
+            java.writeFile('compat-dir/sub/b.bin', [1, 2]);
+            var names = dir.list().join(',');
+            var files = dir.listFiles().map(function(item) { return item.getName() + ':' + item.isFile(); }).join(',');
+            var removed = dir.delete();
+            [made, dir.isDirectory(), names, files, removed, dir.exists()].join('|')
+        """)
+        guard case .success(let value) = result else { return XCTFail("expected success") }
+        XCTAssertEqual(value, "true|true|a.txt,b.bin|a.txt:true,b.bin:true|true|false")
     }
 
     func testImportScriptLoadsLocalSandboxHelper() throws {
