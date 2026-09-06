@@ -15,3 +15,5 @@
 - `reference-1.jpg`、`reference-2.jpg`：诊断日志列表
 - `reference-3.jpg`、`reference-4.jpg`：规则编辑器
 - `reference-5.jpg`、`reference-6.jpg`、`reference-7.jpg`：书源详情诊断
+
+- `reference-8.jpg`: 主页内容卡片、横向推荐列表和底部迷你播放器（补充视觉基线）
