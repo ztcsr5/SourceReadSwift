@@ -1,3 +1,4 @@
+import SwiftSoup
 import Foundation
 
 struct ContentParser {
@@ -176,3 +177,4 @@ struct ContentParser {
         return output
     }
 }
+
