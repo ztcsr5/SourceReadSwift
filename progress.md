@@ -2146,3 +2146,19 @@ Windows cannot run Xcode or a real ProMotion device. CI proves compilation/tests
 - `CachedRemoteImage` 的图片解码/预热下沉到 utility queue，列表滚动期间不再在主线程同步执行 `UIImage(data:)`；内存缓存仍保留并继续复用。
 - RSS 文章正文的 SwiftSoup 解析改为后台队列，缓存正文、网络正文和 fallback 均在回到 MainActor 前完成解析；章节切换代际校验继续生效，旧文章解析结果不会回写当前页面。
 - RSS 阅读页状态横幅动画已局部化，加载/缓存状态变化不再隐式驱动整棵 TextKit 视图动画。
+
+### Stage 24 性能收口完成证据
+
+- 长章节（2,500 段中文正文）分页/分隔回归已修正并纳入测试，10,000 段落位置映射使用二分查找。
+- TextKit 重建、分页 debounce、RSS/XML/HTML 解析和图片解码的主线程热路径已完成收口；自动翻页与朗读继续由同一代际协调器互斥，避免旧任务回写。
+- iOS build/XCTest：[run 34006047508](https://github.com/ztcsr5/read/actions/runs/34006047508) — success。
+- Unsigned IPA：[run 34006047507](https://github.com/ztcsr5/read/actions/runs/34006047507) — success；artifact `SourceReadSwift-unsigned-ipa`。
+- `CADisableMinimumFrameDurationOnPhone=true` 已保留；这只允许系统在支持的设备上使用 ProMotion，持续 120 FPS 仍需 iPhone Pro + Instruments 验收，不能由 Windows/CI 代替。
+
+### Stage 24 Rollback
+
+- 回滚本阶段性能提交（`c2b4e90` 及其前序 Stage 24 提交）即可恢复旧的 TextKit/分页/RSS 更新路径，不影响 Stage 23B 诊断闭环。
+
+### Next
+
+- Stage 25：扩大 Legado JavaScript/HTTP/Jsoup 兼容性，优先补齐跨 Search → Detail → TOC → Content 的动态状态、混合响应、bodyJs 多阶段链路和规则编辑器可视化预览，并为每个缺口补充脱敏本地 fixture 与 XCTest。
