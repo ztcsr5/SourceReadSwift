@@ -120,6 +120,10 @@ final class LegadoJavaHostBridge: NSObject, LegadoJavaHostExport {
     private let executionContext: RuleExecutionContext
     private let services: LegadoHostServices
 
+    /// Per-runtime sandbox exposed for test/diagnostic tooling without
+    /// leaking the host services object into JavaScript.
+    var sandboxURL: URL { services.sandboxURL }
+
     init(executionContext: RuleExecutionContext) {
         self.executionContext = executionContext
         self.services = LegadoHostServices(executionContext: executionContext)

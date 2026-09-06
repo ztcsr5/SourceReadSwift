@@ -848,7 +848,7 @@ final class LegadoHostServices {
     /// data without escaping the application container.
     @discardableResult
     func cacheFile(_ path: String, content: Any?) -> AnyObject {
-        guard let url = resolvedURL(path, createParent: true) else { return "" }
+        guard let url = resolvedURL(path, createParent: true) else { return NSString(string: "") }
         do {
             let data = data(from: content)
             try data.write(to: url, options: .atomic)
@@ -859,7 +859,7 @@ final class LegadoHostServices {
             return NSString(string: RuleExecutionContext.bridgeString(content))
         } catch {
             executionContext.log("cacheFile failed: \(error.localizedDescription)")
-            return ""
+            return NSString(string: "")
         }
     }
 
