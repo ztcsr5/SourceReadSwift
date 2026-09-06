@@ -260,6 +260,30 @@ final class LegadoNativeBridgeTests: XCTestCase {
         XCTAssertEqual(value, "VIP 1|true")
     }
 
+    func testFilesystemObjectAndBinaryWriteFacadeStayInSandbox() throws {
+        let runtime = JSCoreRuntime()
+        let result = runtime.evaluate("""
+            java.writeFile('compat-binary.bin', [0, 255, 1]);
+            var file = java.getFile('compat-binary.bin');
+            var before = file.exists() && file.isFile() && file.readBytes().length === 3;
+            var removed = file.delete();
+            [before, removed, file.exists()].join('|')
+        """)
+        guard case .success(let value) = result else { return XCTFail("expected success") }
+        XCTAssertEqual(value, "true|true|false")
+    }
+
+    func testImportScriptLoadsLocalSandboxHelper() throws {
+        let runtime = JSCoreRuntime()
+        let helperURL = runtime.sandboxURL.appendingPathComponent("local-helper.js")
+        try Data("function localHelper(){ return 'ok'; }".utf8).write(to: helperURL)
+        defer { try? FileManager.default.removeItem(at: helperURL) }
+
+        let result = runtime.evaluate("java.importScript('local-helper.js'); localHelper();")
+        guard case .success(let value) = result else { return XCTFail("expected success") }
+        XCTAssertEqual(value, "ok")
+    }
+
     func testFlutterLegadoUtilityAliasesAndJavaPackages() throws {
         let runtime = JSCoreRuntime()
         let result = runtime.evaluate("""

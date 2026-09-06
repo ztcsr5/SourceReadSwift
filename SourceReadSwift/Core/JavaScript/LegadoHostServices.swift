@@ -847,15 +847,41 @@ final class LegadoHostServices {
     /// variable. Keep it inside the per-app sandbox so sources can share helper
     /// data without escaping the application container.
     @discardableResult
-    func cacheFile(_ path: String, content: String) -> String {
+    func cacheFile(_ path: String, content: Any?) -> AnyObject {
         guard let url = resolvedURL(path, createParent: true) else { return "" }
         do {
-            try Data(content.utf8).write(to: url, options: .atomic)
-            return content
+            let data = data(from: content)
+            try data.write(to: url, options: .atomic)
+            // Preserve Legado's return shape: text callers receive their text,
+            // while byte-array callers keep an array instead of a JSON string.
+            if let text = content as? String { return text as NSString }
+            if let values = content as? NSArray { return values }
+            return NSString(string: RuleExecutionContext.bridgeString(content))
         } catch {
             executionContext.log("cacheFile failed: \(error.localizedDescription)")
             return ""
         }
+    }
+
+    /// Alias used by newer Android sources.  Both write paths share the same
+    /// sandbox and byte conversion rules so binary helper files round-trip.
+    @discardableResult
+    func writeFile(_ path: String, content: Any?) -> Bool {
+        guard let url = resolvedURL(path, createParent: true) else { return false }
+        do {
+            try data(from: content).write(to: url, options: .atomic)
+            return true
+        } catch {
+            executionContext.log("writeFile failed: \(error.localizedDescription)")
+            return false
+        }
+    }
+
+    func fileExists(_ path: String) -> Bool {
+        guard let url = resolvedURL(path) else { return false }
+        var isDirectory = ObjCBool(false)
+        guard fileManager.fileExists(atPath: url.path, isDirectory: &isDirectory) else { return false }
+        return !isDirectory.boolValue
     }
 
     @discardableResult

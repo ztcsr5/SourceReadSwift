@@ -2272,3 +2272,22 @@ Windows cannot run Xcode or a real ProMotion device. CI proves compilation/tests
 ### Rollback
 
 - 回滚本阶段单次提交即可恢复 Stage 27 的阅读器状态实现，不影响已通过的 Legado、EPUB、RSS 和诊断能力。
+
+## 2026-09-07 - Stage: Swift file-object parity with Flutter bridge
+
+### What was done
+- Added native `java.writeFile` with binary-safe `Any`/JS array conversion and the same sandbox boundary as existing cache/read APIs.
+- Added native `java.getFile(path)` object facade (`exists`, `isFile`, `readText`, `readBytes`, `delete`) so Android Legado helper scripts can keep their file-object idioms.
+- Changed `java.cacheFile` to preserve byte-array content instead of stringifying it at the JavaScriptCore boundary.
+- Made local `java.importScript(path)` load a sandbox helper file while retaining data-URL and HTTP-prefetched script support.
+- Added Swift XCTest coverage for binary file writes, file-object lifecycle, and local helper imports.
+
+### Verification
+- Extracted the Swift JavaScript prelude with `node ci-log/extract-prelude.js` (`175300` bytes).
+- `node --check ci-log/js-prelude-check.js` passed.
+- `git diff --check` passed with only the repository's existing Windows line-ending warnings.
+- Windows cannot run Xcode/UIKit/XCTest; GitHub Actions remains the compile/test and unsigned-IPA gate.
+
+### Remaining boundary
+- 7z/RAR decoders are intentionally reported as unsupported; ZIP remains the portable archive route.
+- Final runtime, filesystem permission, and 120 Hz behavior still require the next macOS Actions/device gate.

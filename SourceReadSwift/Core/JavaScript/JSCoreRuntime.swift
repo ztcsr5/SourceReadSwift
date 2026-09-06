@@ -14,6 +14,10 @@ final class JSCoreRuntime {
     private let jxNodeFactory: LegadoJXNodeFactoryBridge
     private var baseBridgeError: String? = nil
 
+    /// Exposes the per-runtime Legado sandbox to deterministic integration
+    /// tests and import tooling without leaking the host bridge object.
+    var sandboxURL: URL { javaHostBridge.sandboxURL }
+
     init(
         ajaxHandler: ((String) -> String)? = nil,
         executionContext: RuleExecutionContext = RuleExecutionContext()
@@ -1678,7 +1682,21 @@ final class JSCoreRuntime {
           return Number(java.ajax(url, headers).statusCode || 0);
         };
         java.cacheFile = function(path, content) {
-          return __nativeLegado.invoke({ method: 'cacheFile', args: [String(path || ''), content == null ? '' : String(content)] });
+          return __nativeLegado.invoke({ method: 'cacheFile', args: [String(path || ''), content == null ? '' : content] });
+        };
+        java.writeFile = function(path, content) {
+          return !!__nativeLegado.invoke({ method: 'writeFile', args: [String(path || ''), content == null ? '' : content] });
+        };
+        java.getFile = function(path) {
+          var value = String(path || '');
+          return {
+            path: value,
+            exists: function() { return !!__nativeLegado.invoke({ method: 'fileExists', args: [value] }); },
+            isFile: function() { return !!__nativeLegado.invoke({ method: 'fileExists', args: [value] }); },
+            readText: function() { return java.readTxtFile(value); },
+            readBytes: function() { return java.readFile(value); },
+            delete: function() { return java.deleteFile(value); }
+          };
         };
         java.deleteFile = function(path) {
           return !!__nativeLegado.invoke({ method: 'deleteFile', args: [String(path || '')] });
@@ -1691,6 +1709,9 @@ final class JSCoreRuntime {
             try { value = decodeURIComponent(value); } catch (_) {}
           } else if (/^https?:/i.test(value)) {
             value = String(java.ajax(value).body() || '');
+          } else {
+            var localScript = String(__nativeLegado.invoke({ method: 'readTxtFile', args: [value, 'utf-8'] }) || '');
+            if (localScript) value = localScript;
           }
           if (!value.trim()) return '';
           (0, eval)(value);
