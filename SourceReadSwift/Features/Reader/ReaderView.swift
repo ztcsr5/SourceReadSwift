@@ -63,9 +63,15 @@ struct ReaderView: View {
     @State private var autoScrollTask: Task<Void, Never>?
     @State private var sleepTimerTask: Task<Void, Never>?
     @State private var positionPersistTask: Task<Void, Never>?
+    @State private var pageLayoutTask: Task<Void, Never>?
     @State private var paragraphJumpRequest: ParagraphJumpRequest?
     @State private var pagedBlocksCache: [ReaderPageBlock] = []
     @State private var pagedBlocksCacheKey = ""
+    /// Page-to-paragraph mapping is immutable between layout-cache revisions.
+    /// Keep it in state instead of rebuilding an array with `compactMap` every
+    /// time SwiftUI reevaluates the reader body or a speech callback arrives.
+    @State private var positionMappingCache = ReaderPositionMapping(paragraphCount: 0)
+    @State private var positionMappingCacheKey = ""
     /// The reader may live in a split view or Stage Manager window. Keep the
     /// actual container size instead of using UIScreen.main, which describes
     /// the physical display and can be stale for the current scene.
@@ -73,7 +79,6 @@ struct ReaderView: View {
     @State private var sessionStartedAt = Date()
     @State private var previousIdleTimerDisabled = false
     @State private var visibleParagraphIndex = 0
-    @State private var lastVisibleParagraphUpdateAt = Date.distantPast
     @State private var readerContentFingerprint = ""
     @State private var speechPausedForScene = false
     @State private var autoScrollPausedForScene = false
@@ -230,7 +235,6 @@ struct ReaderView: View {
     private var readerLayoutKey: String {
         [
             readerModeRawValue,
-            backgroundRawValue,
             String(format: "%.1f", fontSize),
             String(format: "%.1f", lineSpacing),
             String(format: "%.1f", pagePadding),
@@ -243,10 +247,15 @@ struct ReaderView: View {
     }
 
     private var positionMapping: ReaderPositionMapping {
-        ReaderPositionMapping(
-            paragraphCount: content.paragraphs.count,
-            pageFirstParagraphs: pagedBlocks.compactMap(\.firstParagraphIndex)
-        )
+        guard positionMappingCacheKey == readerPageCacheKey else {
+            // A cache rebuild is scheduled by `onChange`; this fallback keeps
+            // a synchronous mode switch safe during that one transition.
+            return ReaderPositionMapping(
+                paragraphCount: content.paragraphs.count,
+                pageFirstParagraphs: pagedBlocks.compactMap(\.firstParagraphIndex)
+            )
+        }
+        return positionMappingCache
     }
 
     var body: some View {
@@ -346,11 +355,13 @@ struct ReaderView: View {
         }
         .onDisappear {
             positionPersistTask?.cancel()
+            pageLayoutTask?.cancel()
             persistReadingPosition(paragraphIndexOverride: currentParagraphIndexForPersistence())
             stopAutoScroll()
             sleepTimerTask?.cancel()
             sleepTimerTask = nil
             stopSpeechPlayback()
+            pageLayoutTask = nil
             restoreIdleTimerPreference()
             appState.releaseTabChromeHidden(owner: tabChromeOwner)
             appState.bookshelfStore.recordReadingSession(
@@ -405,8 +416,12 @@ struct ReaderView: View {
             // when the owner reuses the same reader identity.
             stopAutoScroll()
             stopSpeechPlayback()
+            pageLayoutTask?.cancel()
+            pageLayoutTask = nil
             pagedBlocksCache.removeAll()
             pagedBlocksCacheKey = ""
+            positionMappingCache = ReaderPositionMapping(paragraphCount: updatedContent.paragraphs.count)
+            positionMappingCacheKey = ""
             scrollParagraphTarget = 0
             pagedPageIndex = 0
             visibleParagraphIndex = 0
@@ -421,6 +436,12 @@ struct ReaderView: View {
         }
         .onChange(of: readerModeRawValue) { _ in
             UIImpactFeedbackGenerator(style: .light).impactOccurred()
+            // A mode switch changes the page model itself. Rebuild now so the
+            // first paged frame has a valid mapping; slider/rotation changes
+            // use the debounced path below.
+            pageLayoutTask?.cancel()
+            pageLayoutTask = nil
+            rebuildPagedBlocksCache()
             let paragraph = positionMapping.clampParagraph(visibleParagraphIndex)
             stopAutoScroll()
             stopSpeechPlayback()
@@ -433,14 +454,11 @@ struct ReaderView: View {
             jumpToParagraph(target)
         }
         .onChange(of: readerPageCacheKey) { _ in
-            rebuildPagedBlocksCache()
-            scrollParagraphTarget = positionMapping.clampParagraph(scrollParagraphTarget)
-            pagedPageIndex = min(max(pagedPageIndex, 0), positionMapping.maximumPageIndex)
-            scheduleReadingPositionPersistence(paragraphIndex: currentParagraphIndexForPersistence())
+            schedulePagedBlocksCacheRebuild()
         }
-        .animation(.spring(response: 0.26, dampingFraction: 0.86), value: showOverlay)
-        .animation(.spring(response: 0.3, dampingFraction: 0.88), value: showSettings)
-        .animation(.easeOut(duration: 0.18), value: statusMessage)
+        // Overlay/settings transitions are driven at their mutation sites.
+        // Keeping animation scoped there prevents a toolbar toggle from
+        // implicitly animating the native text surface and page layout.
         .onPreferenceChange(ReaderViewportSizePreferenceKey.self) { size in
             guard size.width > 1, size.height > 1, size != viewportSize else { return }
             viewportSize = size
@@ -669,26 +687,6 @@ struct ReaderView: View {
                 }
             }
             .readerSelectableText(textSelectionEnabled)
-    }
-
-    private func paragraphPositionReader(index: Int) -> some View {
-        GeometryReader { proxy in
-            Color.clear.preference(
-                key: ParagraphPositionPreferenceKey.self,
-                value: [ParagraphPosition(index: index, minY: proxy.frame(in: .named("readerScroll")).minY)]
-            )
-        }
-    }
-
-    private func shouldTrackParagraphPosition(_ index: Int) -> Bool {
-        index == 0
-            || index == visibleParagraphIndex
-            || index == speechController.currentParagraphIndex
-            || index % paragraphTrackingStride == 0
-    }
-
-    private var paragraphTrackingStride: Int {
-        ReaderPerformancePolicy.paragraphTrackingStride(paragraphCount: content.paragraphs.count)
     }
 
     private var readerOverlay: some View {
@@ -1647,6 +1645,7 @@ struct ReaderView: View {
         autoScrollTask = Task { [weak coordinator] in
             while !Task.isCancelled {
                 try? await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
+                guard !Task.isCancelled else { return }
                 await MainActor.run {
                     guard let coordinator,
                           coordinator.accepts(token, for: .autoScroll(generation: token)),
@@ -1710,27 +1709,6 @@ struct ReaderView: View {
 
     private func restoreIdleTimerPreference() {
         UIApplication.shared.isIdleTimerDisabled = previousIdleTimerDisabled
-    }
-
-    private func updateVisibleParagraph(from positions: [ParagraphPosition]) {
-        guard readerMode == .scroll, !autoScrollEnabled, !positions.isEmpty else { return }
-        let now = Date()
-        guard now.timeIntervalSince(lastVisibleParagraphUpdateAt) >= ReaderPerformancePolicy.visibleParagraphUpdateInterval else {
-            return
-        }
-        lastVisibleParagraphUpdateAt = now
-        let topInset = CGFloat(pagePadding)
-        let visible = positions
-            .filter { $0.minY >= topInset }
-            .min { $0.minY < $1.minY }
-            ?? positions
-                .filter { $0.minY < topInset }
-                .max { $0.minY < $1.minY }
-        guard let index = visible?.index,
-              index != visibleParagraphIndex,
-              content.paragraphs.indices.contains(index) else { return }
-        visibleParagraphIndex = index
-        scheduleReadingPositionPersistence(paragraphIndex: index)
     }
 
     /// Receives throttled visibility updates from the TextKit reader surface.
@@ -1807,31 +1785,37 @@ struct ReaderView: View {
     }
 
     private func paragraphIndex(forPage pageIndex: Int) -> Int {
-        guard !content.paragraphs.isEmpty else { return 0 }
-        let pages = pagedBlocks
-        guard !pages.isEmpty else { return 0 }
-        let safePage = min(max(pageIndex, 0), pages.count - 1)
-        return pages[safePage].firstParagraphIndex ?? 0
+        positionMapping.paragraph(forPage: pageIndex)
     }
 
     private func pageIndex(containingParagraph paragraphIndex: Int) -> Int {
-        let pages = pagedBlocks
-        guard !pages.isEmpty else { return 0 }
-        let safeParagraph = min(max(paragraphIndex, 0), max(content.paragraphs.count - 1, 0))
-        if let match = pages.first(where: { page in
-            guard let first = page.firstParagraphIndex, let last = page.lastParagraphIndex else {
-                return false
-            }
-            return safeParagraph >= first && safeParagraph <= last
-        }) {
-            return match.id
-        }
-        return min(max(safeParagraph, 0), pages.count - 1)
+        positionMapping.page(containingParagraph: paragraphIndex)
     }
 
     private func rebuildPagedBlocksCache() {
-        pagedBlocksCache = buildReaderPageBlocks()
-        pagedBlocksCacheKey = readerPageCacheKey
+        let cacheKey = readerPageCacheKey
+        let blocks = buildReaderPageBlocks()
+        pagedBlocksCache = blocks
+        pagedBlocksCacheKey = cacheKey
+        positionMappingCache = ReaderPositionMapping(
+            paragraphCount: content.paragraphs.count,
+            pageFirstParagraphs: blocks.compactMap(\.firstParagraphIndex)
+        )
+        positionMappingCacheKey = cacheKey
+    }
+
+    private func schedulePagedBlocksCacheRebuild() {
+        pageLayoutTask?.cancel()
+        let expectedKey = readerPageCacheKey
+        pageLayoutTask = Task { @MainActor in
+            try? await Task.sleep(nanoseconds: ReaderPerformancePolicy.pageLayoutDebounceNanoseconds)
+            guard !Task.isCancelled, readerPageCacheKey == expectedKey else { return }
+            rebuildPagedBlocksCache()
+            scrollParagraphTarget = positionMapping.clampParagraph(scrollParagraphTarget)
+            pagedPageIndex = min(max(pagedPageIndex, 0), positionMapping.maximumPageIndex)
+            scheduleReadingPositionPersistence(paragraphIndex: currentParagraphIndexForPersistence())
+            pageLayoutTask = nil
+        }
     }
 
     private func buildReaderPageBlocks() -> [ReaderPageBlock] {
@@ -1874,7 +1858,10 @@ struct ReaderView: View {
 
         for (index, paragraph) in content.paragraphs.enumerated() {
             let trimmed = paragraph.trimmingCharacters(in: .whitespacesAndNewlines)
-            let charCount = max(trimmed.count, 1)
+            // UTF-16 units are the same metric used by TextKit ranges and are
+            // substantially cheaper than grapheme-cluster counting for long
+            // CJK chapters.
+            let charCount = max(trimmed.utf16.count, 1)
             let lineCount = max(Int(ceil(Double(charCount) / Double(charsPerLine))), 1)
             let cost = lineCount * charsPerLine + paragraphBreakCost
             if !currentEntries.isEmpty && currentCost + cost > pageBudget {
@@ -1894,11 +1881,6 @@ struct ReaderView: View {
     }
 }
 
-private struct ParagraphPosition: Equatable {
-    let index: Int
-    let minY: CGFloat
-}
-
 private struct ReaderViewportSizePreferenceKey: PreferenceKey {
     static var defaultValue: CGSize = .zero
 
@@ -1907,14 +1889,6 @@ private struct ReaderViewportSizePreferenceKey: PreferenceKey {
         if candidate.width > 1, candidate.height > 1 {
             value = candidate
         }
-    }
-}
-
-private struct ParagraphPositionPreferenceKey: PreferenceKey {
-    static var defaultValue: [ParagraphPosition] = []
-
-    static func reduce(value: inout [ParagraphPosition], nextValue: () -> [ParagraphPosition]) {
-        value.append(contentsOf: nextValue())
     }
 }
 

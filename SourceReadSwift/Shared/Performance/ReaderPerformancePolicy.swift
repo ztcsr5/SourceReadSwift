@@ -85,6 +85,11 @@ enum ReaderPerformancePolicy {
     /// the display frame path.
     static let positionPersistenceDebounceNanoseconds: UInt64 = 700_000_000
 
+    /// Typography sliders can emit many values per second. Delay expensive
+    /// page-model rebuilding until the gesture settles while leaving the
+    /// current cached pages interactive.
+    static let pageLayoutDebounceNanoseconds: UInt64 = 120_000_000
+
     /// Visible-paragraph state is only used for resume/highlight bookkeeping;
     /// it does not need to follow every display-link tick. Throttling this
     /// update keeps PreferenceKey propagation off the 120 Hz rendering path.

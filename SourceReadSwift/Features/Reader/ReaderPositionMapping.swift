@@ -32,11 +32,19 @@ struct ReaderPositionMapping: Equatable, Sendable {
     func page(containingParagraph rawParagraph: Int?) -> Int {
         guard !pageFirstParagraphs.isEmpty else { return 0 }
         let paragraph = clampParagraph(rawParagraph)
-        var result = 0
-        for (index, firstParagraph) in pageFirstParagraphs.enumerated() {
-            if firstParagraph <= paragraph { result = index } else { break }
+        // Page starts are monotonic. A binary search keeps speech/highlight
+        // callbacks O(log n) even for chapters with thousands of pages.
+        var lower = 0
+        var upper = pageFirstParagraphs.count
+        while lower < upper {
+            let middle = lower + (upper - lower) / 2
+            if pageFirstParagraphs[middle] <= paragraph {
+                lower = middle + 1
+            } else {
+                upper = middle
+            }
         }
-        return result
+        return max(lower - 1, 0)
     }
 
     func target(for mode: ReaderMode, paragraph: Int?) -> Int {

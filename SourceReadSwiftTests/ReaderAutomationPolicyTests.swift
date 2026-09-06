@@ -98,4 +98,64 @@ final class ReaderAutomationPolicyTests: XCTestCase {
         XCTAssertEqual(result.paragraphRanges[2].length, "第二段".utf16.count)
         XCTAssertEqual(result.text.attribute(.font, at: result.paragraphRanges[0].location, effectiveRange: nil) as? UIFont, UIFont.systemFont(ofSize: 19))
     }
+
+    func testNativeReaderConfigurationSeparatesTypographyFromInsetsAndTheme() {
+        let base = NativeReaderTextView.Configuration(
+            title: "标题",
+            subtitle: nil,
+            paragraphs: ["正文"],
+            contentFingerprint: "fixture",
+            fontSize: 19,
+            lineSpacing: 8,
+            pagePadding: 24,
+            letterSpacing: 0,
+            paragraphSpacing: 16,
+            paragraphIndent: 0,
+            titleSpacing: 12,
+            footerHeight: 72,
+            textColor: .label,
+            highlightColor: .systemBlue,
+            animatedScrollDuration: 0.35
+        )
+        let themeChanged = NativeReaderTextView.Configuration(
+            title: "标题",
+            subtitle: nil,
+            paragraphs: ["正文"],
+            contentFingerprint: "fixture",
+            fontSize: 19,
+            lineSpacing: 8,
+            pagePadding: 24,
+            letterSpacing: 0,
+            paragraphSpacing: 16,
+            paragraphIndent: 0,
+            titleSpacing: 12,
+            footerHeight: 72,
+            textColor: .white,
+            highlightColor: .systemYellow,
+            animatedScrollDuration: 0.35
+        )
+        let insetChanged = NativeReaderTextView.Configuration(
+            title: "标题",
+            subtitle: nil,
+            paragraphs: ["正文"],
+            contentFingerprint: "fixture",
+            fontSize: 19,
+            lineSpacing: 8,
+            pagePadding: 30,
+            letterSpacing: 0,
+            paragraphSpacing: 16,
+            paragraphIndent: 0,
+            titleSpacing: 12,
+            footerHeight: 90,
+            textColor: .label,
+            highlightColor: .systemBlue,
+            animatedScrollDuration: 0.35
+        )
+
+        XCTAssertEqual(base.textLayoutSignature, themeChanged.textLayoutSignature)
+        XCTAssertNotEqual(base, themeChanged)
+        XCTAssertEqual(base.insetsSignature, themeChanged.insetsSignature)
+        XCTAssertNotEqual(base.insetsSignature, insetChanged.insetsSignature)
+        XCTAssertEqual(base.textLayoutSignature, insetChanged.textLayoutSignature)
+    }
 }

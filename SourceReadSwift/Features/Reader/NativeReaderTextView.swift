@@ -1,5 +1,6 @@
 import SwiftUI
 import UIKit
+import QuartzCore
 
 /// A TextKit-backed reader surface. SwiftUI remains responsible for the
 /// surrounding chrome, while UIKit owns the long-form text layout and scroll
@@ -58,7 +59,7 @@ struct NativeReaderTextView: UIViewRepresentable {
         context.coordinator.updateVisibleParagraphCallback(onVisibleParagraph)
         context.coordinator.update(textView: textView, configuration: configuration, scrollTarget: scrollTarget, scrollRequestKey: scrollRequestKey)
         context.coordinator.updateHighlight(currentParagraphIndex, in: textView, color: highlightColor)
-        textView.isSelectable = textSelectionEnabled
+        context.coordinator.updateSelection(textSelectionEnabled, in: textView)
     }
 
     private var configuration: Configuration {
@@ -99,6 +100,37 @@ struct NativeReaderTextView: UIViewRepresentable {
         let highlightColor: UIColor
         let animatedScrollDuration: Double
 
+        struct TextLayoutSignature: Equatable {
+            let contentFingerprint: String
+            let fontSize: Double
+            let lineSpacing: Double
+            let letterSpacing: Double
+            let paragraphSpacing: Double
+            let paragraphIndent: Double
+            let titleSpacing: Double
+        }
+
+        struct InsetsSignature: Equatable {
+            let pagePadding: Double
+            let footerHeight: Double
+        }
+
+        var textLayoutSignature: TextLayoutSignature {
+            TextLayoutSignature(
+                contentFingerprint: contentFingerprint,
+                fontSize: fontSize,
+                lineSpacing: lineSpacing,
+                letterSpacing: letterSpacing,
+                paragraphSpacing: paragraphSpacing,
+                paragraphIndent: paragraphIndent,
+                titleSpacing: titleSpacing
+            )
+        }
+
+        var insetsSignature: InsetsSignature {
+            InsetsSignature(pagePadding: pagePadding, footerHeight: footerHeight)
+        }
+
         static func == (lhs: Configuration, rhs: Configuration) -> Bool {
             lhs.contentFingerprint == rhs.contentFingerprint
                 && lhs.fontSize == rhs.fontSize
@@ -110,6 +142,8 @@ struct NativeReaderTextView: UIViewRepresentable {
                 && lhs.titleSpacing == rhs.titleSpacing
                 && lhs.footerHeight == rhs.footerHeight
                 && lhs.textColor.isEqual(rhs.textColor)
+                && lhs.highlightColor.isEqual(rhs.highlightColor)
+                && lhs.animatedScrollDuration == rhs.animatedScrollDuration
         }
     }
 
@@ -122,7 +156,10 @@ struct NativeReaderTextView: UIViewRepresentable {
         private var lastHighlightColor: UIColor?
         private var lastScrollRequestKey: String?
         private var lastVisibleParagraph = -1
-        private var lastVisibleUpdateAt = Date.distantPast
+        private var lastVisibleUpdateAt: CFTimeInterval = 0
+        private var didConfigureTextView = false
+        private var lastSelectionEnabled: Bool?
+        private var lastLayoutWidth: CGFloat?
 
         init(onVisibleParagraph: @escaping (Int) -> Void) {
             visibleParagraphCallback = onVisibleParagraph
@@ -130,6 +167,8 @@ struct NativeReaderTextView: UIViewRepresentable {
 
         func attach(_ textView: UITextView) {
             self.textView = textView
+            guard !didConfigureTextView else { return }
+            didConfigureTextView = true
             textView.delegate = self
             textView.scrollsToTop = true
         }
@@ -138,15 +177,34 @@ struct NativeReaderTextView: UIViewRepresentable {
             visibleParagraphCallback = callback
         }
 
+        func updateSelection(_ enabled: Bool, in textView: UITextView) {
+            guard lastSelectionEnabled != enabled else { return }
+            lastSelectionEnabled = enabled
+            textView.isSelectable = enabled
+        }
+
         func update(textView: UITextView, configuration newConfiguration: Configuration, scrollTarget: Int?, scrollRequestKey: String?) {
             attach(textView)
-            let contentChanged = configuration?.contentFingerprint != newConfiguration.contentFingerprint
-            if configuration != newConfiguration {
+            let previousConfiguration = configuration
+            let contentChanged = previousConfiguration?.contentFingerprint != newConfiguration.contentFingerprint
+            let textLayoutChanged = previousConfiguration?.textLayoutSignature != newConfiguration.textLayoutSignature
+            let insetsChanged = previousConfiguration?.insetsSignature != newConfiguration.insetsSignature
+            let textColorChanged = previousConfiguration?.textColor.isEqual(newConfiguration.textColor) != true
+            let widthChanged: Bool = {
+                guard textView.bounds.width > 1 else { return false }
+                guard let lastLayoutWidth else { return true }
+                return abs(lastLayoutWidth - textView.bounds.width) > 0.5
+            }()
+            configuration = newConfiguration
+
+            if textLayoutChanged || widthChanged {
                 let previousOffset = textView.contentOffset
-                configuration = newConfiguration
                 rebuild(textView: textView, configuration: newConfiguration)
+                if textView.bounds.width > 1 {
+                    lastLayoutWidth = textView.bounds.width
+                }
                 if textView.bounds.height > 0, !contentChanged {
-                    textView.setContentOffset(previousOffset, animated: false)
+                    setContentOffsetIfNeeded(previousOffset, in: textView)
                 }
                 // A new chapter needs its initial target; settings/theme
                 // changes preserve the existing offset and request key.
@@ -154,7 +212,14 @@ struct NativeReaderTextView: UIViewRepresentable {
                     lastScrollRequestKey = nil
                 }
                 lastVisibleParagraph = -1
-                lastVisibleUpdateAt = .distantPast
+                lastVisibleUpdateAt = 0
+            } else {
+                if insetsChanged {
+                    updateInsets(in: textView, configuration: newConfiguration)
+                }
+                if textColorChanged {
+                    updateBaseTextColor(in: textView, color: newConfiguration.textColor)
+                }
             }
             guard let scrollTarget,
                   newConfiguration.paragraphs.indices.contains(scrollTarget),
@@ -189,15 +254,57 @@ struct NativeReaderTextView: UIViewRepresentable {
             let result = ReaderNativeTextLayout.makeAttributedText(configuration: configuration)
             paragraphRanges = result.paragraphRanges
             lastHighlightedParagraph = -1
-            textView.textContainerInset = UIEdgeInsets(
+            updateInsets(in: textView, configuration: configuration)
+            // Avoid an implicit UIKit text replacement animation when a user
+            // changes typography or loads another chapter.
+            UIView.performWithoutAnimation {
+                textView.attributedText = result.text
+                textView.textColor = configuration.textColor
+            }
+            textView.setNeedsLayout()
+        }
+
+        private func updateInsets(in textView: UITextView, configuration: Configuration) {
+            let insets = UIEdgeInsets(
                 top: CGFloat(configuration.pagePadding),
                 left: CGFloat(configuration.pagePadding),
                 bottom: CGFloat(configuration.pagePadding + configuration.footerHeight),
                 right: CGFloat(configuration.pagePadding)
             )
-            textView.attributedText = result.text
-            textView.textColor = configuration.textColor
-            textView.setNeedsLayout()
+            guard textView.textContainerInset != insets else { return }
+            textView.textContainerInset = insets
+        }
+
+        private func updateBaseTextColor(in textView: UITextView, color: UIColor) {
+            guard textView.textStorage.length > 0 else {
+                textView.textColor = color
+                return
+            }
+            UIView.performWithoutAnimation {
+                let fullRange = NSRange(location: 0, length: textView.textStorage.length)
+                var updates: [(NSRange, UIColor)] = []
+                textView.textStorage.enumerateAttribute(.foregroundColor, in: fullRange) { value, range, _ in
+                    let alpha: CGFloat
+                    if let existing = value as? UIColor {
+                        alpha = existing.resolvedColor(with: textView.traitCollection).cgColor.alpha
+                    } else {
+                        alpha = 1
+                    }
+                    updates.append((range, color.withAlphaComponent(alpha)))
+                }
+                textView.textStorage.beginEditing()
+                for (range, updatedColor) in updates {
+                    textView.textStorage.addAttribute(.foregroundColor, value: updatedColor, range: range)
+                }
+                textView.textStorage.endEditing()
+                textView.textColor = color
+            }
+        }
+
+        private func setContentOffsetIfNeeded(_ offset: CGPoint, in textView: UITextView) {
+            let current = textView.contentOffset
+            guard abs(current.x - offset.x) > 0.5 || abs(current.y - offset.y) > 0.5 else { return }
+            textView.setContentOffset(offset, animated: false)
         }
 
         @discardableResult
@@ -211,6 +318,8 @@ struct NativeReaderTextView: UIViewRepresentable {
             let targetY = max(minimumY, rect.minY + textView.textContainerInset.top)
             let maximumY = max(minimumY, textView.contentSize.height - textView.bounds.height + textView.adjustedContentInset.bottom)
             let offset = CGPoint(x: 0, y: min(max(targetY, minimumY), maximumY))
+            let currentOffset = textView.contentOffset
+            guard abs(currentOffset.y - offset.y) > 0.5 else { return true }
             if animated {
                 UIView.animate(
                     withDuration: min(max(duration * 0.9, 0.25), 8),
@@ -229,8 +338,8 @@ struct NativeReaderTextView: UIViewRepresentable {
             guard let textView = scrollView as? UITextView,
                   let configuration,
                   !paragraphRanges.isEmpty else { return }
-            let now = Date()
-            guard now.timeIntervalSince(lastVisibleUpdateAt) >= 0.08 else { return }
+            let now = CACurrentMediaTime()
+            guard now - lastVisibleUpdateAt >= 0.08 else { return }
             lastVisibleUpdateAt = now
             let visibleRect = CGRect(
                 x: 0,

@@ -2106,3 +2106,37 @@ Windows cannot run Xcode or a real ProMotion device. CI proves compilation/tests
 ### Next
 
 - Stage 24 性能收口：SwiftUI 状态重建、TextKit 可见段落追踪、阅读位置 debounce、自动翻页/朗读互斥、图片解码下沉，并保留真机 120 Hz 验收位。
+
+## 2026-09-06 - Stage 24: 性能收口（第一批）
+
+### Implemented
+
+- NativeReaderTextView 的 Coordinator 现在只在排版签名或真实宽度变化时重建 TextKit 文本；字号/行距/字距/段距/缩进与章节内容保持独立签名，避免普通 SwiftUI 状态更新触发整段重排。
+- 主题切换改为原地更新 foregroundColor 并保留标题/副标题透明度；无意义的 `setContentOffset`、文本替换动画和 selectable 属性重复写入已去除。
+- 可见段落节流改用 `CACurrentMediaTime()`，取消中的自动滚动任务不再额外跳回 MainActor。
+- 阅读分页模型增加 120ms debounce：拖动字号、行距、窗口旋转时复用旧缓存，等待手势稳定后只重建一次，避免 120Hz 热路径同步分页。
+- `ReaderPositionMapping` 的段落→页面查询改为二分查找，并在 ReaderView 中缓存 page-to-paragraph mapping，朗读/翻页回调不再重复 `compactMap` 或线性扫描。
+- 分页成本估算统一使用 UTF-16 单元，与 TextKit range 口径一致，降低长 CJK 章节的计算开销；移除旧 GeometryReader 段落追踪死路径。
+- 移除 ReaderView 根节点范围动画，保留按钮/面板显式过渡，避免菜单状态变化带动正文树隐式动画。
+
+### Regression coverage
+
+- NativeReaderTextView 排版签名、主题/内边距变化隔离测试。
+- 大规模 10,000 段落分页映射二分查找测试。
+- 分页 debounce 范围测试。
+
+### Verification
+
+- `git diff --check` passed。
+- `node ci-log/extract-prelude.js` passed（当前提取长度待本阶段提交后更新）。
+- `node --check ci-log/js-prelude-check.js` passed。
+- Windows 无法运行 Xcode/UIKit/XCTest；Stage 24 的 iOS build/XCTest 与 unsigned IPA 需提交后由 GitHub Actions 验证。
+- 持续 120 Hz 仍需 ProMotion 真机 + Instruments；本阶段只清理主线程掉帧源，不宣称已实测 120 FPS。
+
+### Rollback
+
+- 回滚本阶段单个 Stage 24 commit 即可恢复旧的 TextKit 更新、分页缓存和 ReaderView 映射实现，不影响 Stage 23B 诊断修复闭环。
+
+### Next
+
+- 提交并等待两条 Actions；若编译/测试通过，进入 Stage 24 第二批：图片/HTML 解析后台化、RSS 阅读页滚动状态与长列表懒加载、真机 signpost 验收清单。
