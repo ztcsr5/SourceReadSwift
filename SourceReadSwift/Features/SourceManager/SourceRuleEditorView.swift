@@ -19,6 +19,7 @@ struct SourceRuleEditorView: View {
     @State private var previewOutput = ""
     @State private var previewMatchCount = 0
     @State private var previewStage: RulePreviewEvaluator.Stage?
+    @State private var previewValues: [String] = []
     @State private var previewEvidence: RulePreviewEvaluator.Evidence?
     @State private var previewLogs: [String] = []
     @State private var isPreviewing = false
@@ -139,6 +140,48 @@ struct SourceRuleEditorView: View {
                                 .frame(maxWidth: .infinity, alignment: .leading)
                                 .padding(10)
                                 .background(Color.secondary.opacity(0.08), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+                            if let stage = previewStage {
+                                VStack(alignment: .leading, spacing: 8) {
+                                    HStack(spacing: 8) {
+                                        Label("结构化结果", systemImage: "rectangle.grid.1x2")
+                                            .font(.caption.weight(.semibold))
+                                        Text("\(previewMatchCount) 条")
+                                            .font(.caption2.weight(.bold))
+                                            .foregroundStyle(.secondary)
+                                        Spacer()
+                                        Text(stage.rawValue)
+                                            .font(.caption2)
+                                            .foregroundStyle(.secondary)
+                                    }
+                                    let rows = previewRows
+                                    if rows.isEmpty {
+                                        Text("没有可视化匹配项")
+                                            .font(.caption)
+                                            .foregroundStyle(.secondary)
+                                    } else {
+                                        LazyVStack(alignment: .leading, spacing: 6) {
+                                            ForEach(rows) { row in
+                                                HStack(alignment: .top, spacing: 8) {
+                                                    Text("\(row.index + 1)")
+                                                        .font(.caption2.monospacedDigit())
+                                                        .foregroundStyle(.secondary)
+                                                        .frame(width: 22, alignment: .trailing)
+                                                    Text(row.value)
+                                                        .font(.caption.monospaced())
+                                                        .textSelection(.enabled)
+                                                        .frame(maxWidth: .infinity, alignment: .leading)
+                                                }
+                                                .padding(.vertical, 5)
+                                                .padding(.horizontal, 8)
+                                                .background(Color.accentColor.opacity(0.06), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+                                            }
+                                        }
+                                        .frame(maxHeight: 220)
+                                    }
+                                }
+                                .padding(10)
+                                .background(Color.secondary.opacity(0.05), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+                            }
                             if let evidence = previewEvidence {
                                 DisclosureGroup("预览证据") {
                                     VStack(alignment: .leading, spacing: 5) {
@@ -356,8 +399,15 @@ struct SourceRuleEditorView: View {
         previewOutput = ""
         previewMatchCount = 0
         previewStage = nil
+        previewValues = []
         previewEvidence = nil
         previewLogs = []
+    }
+
+    private var previewRows: [RulePreviewEvaluator.PreviewRow] {
+        previewValues.enumerated().map {
+            RulePreviewEvaluator.PreviewRow(index: $0.offset, value: $0.element)
+        }
     }
 
     private var currentRuleBinding: Binding<String> {
@@ -401,6 +451,7 @@ struct SourceRuleEditorView: View {
                 previewOutput = result.message
                 previewMatchCount = result.matchedCount
                 previewStage = result.stage
+                previewValues = result.values
                 previewEvidence = result.evidence
                 previewLogs = result.logs
                 previewHistory.insert(

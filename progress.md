@@ -2190,3 +2190,33 @@ Windows cannot run Xcode or a real ProMotion device. CI proves compilation/tests
 ### Rollback
 
 - 回滚本阶段提交即可移除 Stage 25 新增桥接与 fixture，不影响 Stage 24 性能收口和此前已验证的规则编辑器/诊断闭环。
+
+## 2026-09-06 - Stage 25 验收证据
+
+- iOS build/XCTest：run `34023435789` — success。
+- unsigned IPA：run `34023435832` — success；artifact `SourceReadSwift-unsigned-ipa`。
+- `7674e11` 的动态 token fixture 断言已按运行时契约固定：未知 `{{token}}` 在请求构建阶段保留，后续 `bodyJs` 写入后再展开。
+- Windows 侧仍只执行静态检查；未声称本机 Swift 编译或真机 120 Hz。
+
+## 2026-09-06 - Stage 26：Legado 边界兼容与规则可视化预览
+
+### Implemented
+
+- 修复 JSONPath 过滤器比较运算符解析顺序：`>=` / `<=` 不再被错误拆成单字符 `=`，并补齐数字边界、嵌套对象过滤和标量数组回归用例。
+- LegadoRuleAnalyzer 统一复用 ResponseFormatDetector，BOM、XSSI guard、`<pre>` 包裹和 HTML-escaped JSON 在运行时与规则预览中使用同一解析口径。
+- RulePreviewEvaluator 增加稳定的 `PreviewRow` 结构化结果，规则编辑器现在同时显示文本结果和带序号的可视化匹配卡片，避免 UI 再次拆分格式化字符串。
+- 预览卡片限制最大高度、支持复制/选择和阶段标识；不联网、不保存 Cookie，保留既有证据与执行日志。
+- 新增 JSONPath `>=` / `<`、嵌套 filter、标量列表、稳定预览行、BOM/XSSI 样本 XCTest。
+
+### Local verification
+
+- `git diff --check`：passed。
+- Windows 无 `swift` / `xcodebuild`；本阶段 iOS build/XCTest 与 unsigned IPA 由 GitHub Actions 验证。
+
+### Rollback
+
+- 回滚本阶段单个 commit 即可移除比较器修复、运行时解析统一和编辑器可视化卡片，不影响 Stage 25 的 Java/HTTP/字体兼容实现。
+
+### Next
+
+- 提交后等待 iOS build/XCTest 与 unsigned IPA；通过后进入 Stage 27：阅读器 UI 状态修复（菜单返回、章节跳转、系统字体、朗读从当前页首字、自动翻页）和真实 UI 回归清单。

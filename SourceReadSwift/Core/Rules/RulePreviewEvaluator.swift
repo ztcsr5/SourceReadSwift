@@ -29,6 +29,13 @@ struct RulePreviewEvaluator {
         let evidence: Evidence
         let logs: [String]
 
+        /// Stable rows for a visual preview.  Keeping the index beside each
+        /// value lets SwiftUI render deterministic cards without reparsing
+        /// the formatted message string.
+        var previewRows: [PreviewRow] {
+            values.enumerated().map { PreviewRow(index: $0.offset, value: $0.element) }
+        }
+
         var matchedCount: Int { values.count }
         var hasMatches: Bool { !values.isEmpty }
 
@@ -39,6 +46,13 @@ struct RulePreviewEvaluator {
             self.evidence = evidence
             self.logs = logs
         }
+    }
+
+    struct PreviewRow: Equatable, Identifiable, Sendable {
+        let index: Int
+        let value: String
+
+        var id: Int { index }
     }
 
     /// Deterministic evidence for the editor's offline preview.  Keeping the

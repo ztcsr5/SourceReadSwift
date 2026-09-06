@@ -251,6 +251,42 @@ final class JSONRuleExtractorTests: XCTestCase {
         XCTAssertEqual(notEquals.compactMap { $0["title"] as? String }, ["A", "C"])
     }
 
+    func testFilterPredicatesSupportGreaterLessAndMissingValues() throws {
+        let extractor = JSONRuleExtractor()
+        let object: [String: Any] = [
+            "data": [
+                "list": [
+                    ["title": "Low", "score": 2],
+                    ["title": "High", "score": 10],
+                    ["title": "Missing", "score": NSNull()]
+                ]
+            ]
+        ]
+
+        let high = extractor.list(from: object, rule: "$.data.list[?(@.score>=10)]")
+        let low = extractor.list(from: object, rule: "$.data.list[?(@.score<10)]")
+
+        XCTAssertEqual(high.compactMap { $0["title"] as? String }, ["High"])
+        XCTAssertEqual(low.compactMap { $0["title"] as? String }, ["Low"])
+    }
+
+    func testFilterPredicateSupportsNestedArrayPathAndScalarList() throws {
+        let extractor = JSONRuleExtractor()
+        let object: [String: Any] = [
+            "payload": [
+                "items": [
+                    ["meta": ["kind": "book"], "name": "A"],
+                    ["meta": ["kind": "note"], "name": "B"]
+                ],
+                "tags": ["one", "two"]
+            ]
+        ]
+
+        let books = extractor.list(from: object, rule: "$.payload.items[?(@.meta.kind=='book')]")
+        XCTAssertEqual(books.compactMap { $0["name"] as? String }, ["A"])
+        XCTAssertEqual(extractor.string(from: object, rule: "$.payload.tags[*]", fallbackKeys: []), "one\ntwo")
+    }
+
     func testRecursiveDescentFindsNestedBookLists() throws {
         let object: [String: Any] = [
             "payload": [

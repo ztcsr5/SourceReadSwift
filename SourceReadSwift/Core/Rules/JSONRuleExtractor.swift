@@ -363,7 +363,10 @@ struct JSONRuleExtractor {
     private func filterPredicate(_ part: String) -> (path: String, op: String?, expected: String?)? {
         guard part.hasPrefix("?(") && part.hasSuffix(")") else { return nil }
         let expression = String(part.dropFirst(2).dropLast()).trimmingCharacters(in: .whitespacesAndNewlines)
-        for op in ["!=", "==", "=", ">=", "<=", ">", "<"] {
+        // Match the two-character comparison operators before their one-
+        // character prefixes.  Otherwise `>=` is tokenized as `=` and the
+        // right-hand side starts with `>` (the same bug affects `<=`).
+        for op in ["!=", "==", ">=", "<=", "=", ">", "<"] {
             if let range = expression.range(of: op) {
                 return (String(expression[..<range.lowerBound]).trimmingCharacters(in: .whitespacesAndNewlines), op, String(expression[range.upperBound...]).trimmingCharacters(in: .whitespacesAndNewlines))
             }

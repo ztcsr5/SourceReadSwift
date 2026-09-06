@@ -60,4 +60,27 @@ final class RulePreviewEvaluatorTests: XCTestCase {
         XCTAssertTrue(result.logs.contains { $0.contains("preview.start") })
         XCTAssertTrue(result.logs.contains { $0.contains("extract.list") })
     }
+
+    func testPreviewRowsAreStableForVisualEditor() {
+        let result = RulePreviewEvaluator().preview(
+            sample: #"<ul><li>A</li><li>B</li></ul>"#,
+            ruleText: "li@text",
+            stage: .content
+        )
+
+        XCTAssertEqual(result.previewRows.map(\.index), [0, 1])
+        XCTAssertEqual(result.previewRows.map(\.value), ["A", "B"])
+        XCTAssertEqual(result.previewRows.map(\.id), [0, 1])
+    }
+
+    func testPreviewAcceptsBOMAndXSSIGuardedJSON() {
+        let result = RulePreviewEvaluator().preview(
+            sample: "\u{FEFF})]}',\n{\"items\":[{\"name\":\"A\"}]}\n",
+            ruleText: #"{"bookList":"$.items[*].name"}"#,
+            stage: .search
+        )
+
+        XCTAssertEqual(result.values, ["A"])
+        XCTAssertEqual(result.evidence.format, "JSON")
+    }
 }

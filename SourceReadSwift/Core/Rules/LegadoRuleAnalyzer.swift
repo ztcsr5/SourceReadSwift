@@ -117,9 +117,11 @@ final class LegadoRuleAnalyzer {
     }
 
     private func jsonObject(_ text: String) -> Any? {
-        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard trimmed.hasPrefix("{") || trimmed.hasPrefix("[") else { return nil }
-        return trimmed.data(using: .utf8).flatMap { try? JSONSerialization.jsonObject(with: $0) }
+        // Keep the analyzer's format decision aligned with the network
+        // decoder.  Legacy sources frequently prepend a BOM/XSSI guard or
+        // wrap JSON in `<pre>`; rejecting those here made preview and runtime
+        // disagree even though ResponseFormatDetector already handled them.
+        ResponseFormatDetector.jsonObject(from: text)
     }
 
     private func stringify(_ value: Any?) -> String {
