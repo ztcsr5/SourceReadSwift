@@ -590,6 +590,10 @@ private struct BookshelfCollectionView: View {
         return liveBooks.filter { $0.groupName == selectedGroupName }
     }
 
+    private var visibleBookIDs: Set<String> {
+        Set(liveDisplayBooks.map(\.id))
+    }
+
     var body: some View {
         ScrollView {
             LazyVStack(spacing: 12) {
@@ -697,31 +701,54 @@ private struct BookshelfCollectionView: View {
         }
         .safeAreaInset(edge: .bottom) {
             if isManaging {
-                HStack(spacing: 12) {
-                    Button(role: .destructive) { confirmBatchDelete = true } label: {
-                        Label("删除 \(selectedBookIDs.count) 本", systemImage: "trash")
-                            .frame(maxWidth: .infinity)
+                VStack(spacing: 8) {
+                    HStack(spacing: 14) {
+                        Button("全选") { selectedBookIDs = visibleBookIDs }
+                        Button("反选") { selectedBookIDs = visibleBookIDs.subtracting(selectedBookIDs) }
+                        Button("清空") { selectedBookIDs.removeAll() }
+                        Spacer()
+                        Text("已选 \(selectedBookIDs.count)")
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(.secondary)
                     }
-                    .buttonStyle(.bordered)
-                    .disabled(selectedBookIDs.isEmpty)
+                    .font(.caption.weight(.semibold))
 
-                    Menu {
-                        Button("移出分组") {
-                            appState.bookshelfStore.moveBooks(bookIDs: selectedBookIDs, toGroupName: nil)
+                    HStack(spacing: 10) {
+                        Button {
+                            appState.bookshelfStore.markUpdatesSeen(bookIDs: selectedBookIDs)
                             selectedBookIDs.removeAll()
+                        } label: {
+                            Label("标记已读", systemImage: "checkmark.circle")
+                                .frame(maxWidth: .infinity)
                         }
-                        ForEach(appState.bookshelfStore.groups) { group in
-                            Button(group.name) {
-                                appState.bookshelfStore.moveBooks(bookIDs: selectedBookIDs, toGroupName: group.name)
+                        .buttonStyle(.bordered)
+                        .disabled(selectedBookIDs.isEmpty)
+
+                        Button(role: .destructive) { confirmBatchDelete = true } label: {
+                            Label("删除", systemImage: "trash")
+                                .frame(maxWidth: .infinity)
+                        }
+                        .buttonStyle(.bordered)
+                        .disabled(selectedBookIDs.isEmpty)
+
+                        Menu {
+                            Button("移出分组") {
+                                appState.bookshelfStore.moveBooks(bookIDs: selectedBookIDs, toGroupName: nil)
                                 selectedBookIDs.removeAll()
                             }
+                            ForEach(appState.bookshelfStore.groups) { group in
+                                Button(group.name) {
+                                    appState.bookshelfStore.moveBooks(bookIDs: selectedBookIDs, toGroupName: group.name)
+                                    selectedBookIDs.removeAll()
+                                }
+                            }
+                        } label: {
+                            Label("移动", systemImage: "folder")
+                                .frame(maxWidth: .infinity)
                         }
-                    } label: {
-                        Label("移动", systemImage: "folder")
-                            .frame(maxWidth: .infinity)
+                        .buttonStyle(.borderedProminent)
+                        .disabled(selectedBookIDs.isEmpty || appState.bookshelfStore.groups.isEmpty)
                     }
-                    .buttonStyle(.borderedProminent)
-                    .disabled(selectedBookIDs.isEmpty || appState.bookshelfStore.groups.isEmpty)
                 }
                 .padding(.horizontal, AppTheme.pagePadding)
                 .padding(.vertical, 10)

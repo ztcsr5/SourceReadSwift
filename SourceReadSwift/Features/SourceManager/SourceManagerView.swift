@@ -327,46 +327,59 @@ struct SourceManagerView: View {
                 statusPill("仓库 \(sourceCounts.catalogs)", color: .purple)
                 statusPill("RSS \(sourceCounts.rss)", color: .orange)
             }
-            HStack(spacing: 8) {
+            LazyVGrid(columns: [GridItem(.flexible(), spacing: 8), GridItem(.flexible(), spacing: 8)], spacing: 8) {
                 Button {
                     UIImpactFeedbackGenerator(style: .medium).impactOccurred()
                     let enabled = appState.sourceStore.sources.filter(\.enabled)
                     batchCheck = SourceBatchCheckState(sources: enabled)
                 } label: {
-                    Label("检测启用书源", systemImage: "checkmark.seal")
+                    sourceActionTile("检测启用", systemImage: "checkmark.seal", tint: .green)
                 }
-                .buttonStyle(.borderedProminent)
-                .controlSize(.small)
-                .font(.subheadline.weight(.semibold))
                 .disabled(appState.sourceStore.sources.filter(\.enabled).isEmpty)
-                Spacer(minLength: 0)
-                Text("批量诊断")
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(.secondary)
+
+                Button {
+                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                    showImportSheet = true
+                } label: {
+                    sourceActionTile("导入书源", systemImage: "tray.and.arrow.down", tint: AppTheme.accent)
+                }
+                .accessibilityLabel("导入书源")
+
+                NavigationLink {
+                    SourceWritingView(server: appState.sourceWritingServer)
+                        .environmentObject(appState)
+                } label: {
+                    sourceActionTile("Web 写源", systemImage: "network", tint: .blue)
+                }
+                .accessibilityLabel("打开 Web 写源")
             }
-            Button {
-                UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                showImportSheet = true
-            } label: {
-                Label("导入书源", systemImage: "tray.and.arrow.down")
-                    .font(.caption.weight(.semibold))
-            }
-            .buttonStyle(.borderless)
-            .accessibilityLabel("导入书源")
-            NavigationLink {
-                SourceWritingView(server: appState.sourceWritingServer)
-                    .environmentObject(appState)
-            } label: {
-                Label("Web 写源", systemImage: "network")
-                    .font(.caption.weight(.semibold))
-            }
-            .buttonStyle(.borderless)
             Text("支持 JSON、URL、阅读分享链接、仓库、RSS，以及搜索 → 详情 → 目录 → 正文全链路测试。")
                 .font(.caption)
                 .foregroundStyle(.secondary)
         }
         .padding(14)
         .glassPanel(cornerRadius: 18, material: .thinMaterial, strokeOpacity: 0.08, shadowOpacity: 0.06)
+    }
+
+    private func sourceActionTile(_ title: String, systemImage: String, tint: Color) -> some View {
+        HStack(spacing: 7) {
+            Image(systemName: systemImage)
+                .font(.caption.weight(.bold))
+                .foregroundStyle(tint)
+            Text(title)
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.primary)
+                .lineLimit(1)
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 9)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(tint.opacity(0.10), in: RoundedRectangle(cornerRadius: 11, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 11, style: .continuous)
+                .stroke(tint.opacity(0.16), lineWidth: 0.7)
+        }
     }
 
     private var tabPicker: some View {

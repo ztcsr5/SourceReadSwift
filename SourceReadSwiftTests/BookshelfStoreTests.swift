@@ -215,6 +215,46 @@ final class BookshelfStoreTests: XCTestCase {
         try? FileManager.default.removeItem(at: root)
     }
 
+    func testBatchMarksOnlySelectedUpdatesAsSeen() throws {
+        let root = FileManager.default
+            .temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        let store = BookshelfStore(
+            persistence: BookshelfPersistence(fileManager: .default, rootURL: root),
+            groupPersistence: BookshelfGroupPersistence(fileManager: .default, rootURL: root)
+        )
+        let first = SearchBook(
+            name: "First",
+            author: "Author",
+            coverUrl: nil,
+            bookUrl: "https://example.com/first",
+            sourceName: "Example",
+            sourceUrl: "https://example.com",
+            intro: nil
+        )
+        let second = SearchBook(
+            name: "Second",
+            author: "Author",
+            coverUrl: nil,
+            bookUrl: "https://example.com/second",
+            sourceName: "Example",
+            sourceUrl: "https://example.com",
+            intro: nil
+        )
+        store.addOrUpdate(first)
+        store.addOrUpdate(second)
+        store.updateDetails(bookID: first.id, latestChapterTitle: "第一章", intro: nil, totalChapters: 3)
+        store.updateDetails(bookID: second.id, latestChapterTitle: "第二章", intro: nil, totalChapters: 4)
+
+        store.markUpdatesSeen(bookIDs: [first.id])
+
+        XCTAssertFalse(try XCTUnwrap(store.book(id: first.id)).hasUpdates)
+        XCTAssertTrue(try XCTUnwrap(store.book(id: second.id)).hasUpdates)
+        XCTAssertEqual(store.book(id: first.id)?.seenTotalChapters, 3)
+        XCTAssertNotEqual(store.book(id: second.id)?.seenTotalChapters, 4)
+        try? FileManager.default.removeItem(at: root)
+    }
+
     func testSwitchSourceKeepsBookshelfIdentityAndResetsProgress() throws {
         let root = FileManager.default.temporaryDirectory
             .appendingPathComponent(UUID().uuidString, isDirectory: true)

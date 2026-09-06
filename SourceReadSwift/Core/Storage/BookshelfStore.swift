@@ -77,6 +77,19 @@ final class BookshelfStore: ObservableObject {
         persist()
     }
 
+    func markUpdatesSeen(bookIDs: Set<String>) {
+        guard !bookIDs.isEmpty else { return }
+        var changed = false
+        for index in books.indices where bookIDs.contains(books[index].id) {
+            let value = books[index].totalChapters
+            if books[index].seenTotalChapters != value {
+                books[index].seenTotalChapters = value
+                changed = true
+            }
+        }
+        if changed { persist() }
+    }
+
     func switchSource(
         bookID: String,
         to searchBook: SearchBook,

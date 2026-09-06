@@ -73,7 +73,9 @@ struct SourceWritingView: View {
                         }
                         .buttonStyle(.bordered)
 
-                        Text("PC 无法打开时，先访问任一 /health 地址；返回 SOURCE_READ_SWIFT_WEB_OK 即表示局域网连通。请确认手机允许‘本地网络’权限，且路由器未开启 AP 隔离。")
+                        Text(server.localURLs.allSatisfy { $0.contains("127.0.0.1") }
+                             ? "当前只发现本机回环地址，电脑无法通过 Wi‑Fi 访问。请连接 Wi‑Fi，并在系统设置中允许本应用使用‘本地网络’。"
+                             : "PC 无法打开时，先访问任一 /health 地址；返回 SOURCE_READ_SWIFT_WEB_OK 即表示局域网连通。请确认手机允许‘本地网络’权限，且路由器未开启 AP 隔离。")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
@@ -199,6 +201,12 @@ struct SourceWritingView: View {
             server.sourceStore = appState.sourceStore
             // Auto start server
             server.start()
+        }
+        .onDisappear {
+            // The editor is intentionally scoped to this screen. Stopping the
+            // listener when the user leaves avoids a stale LAN endpoint and
+            // makes the next visit re-discover the current Wi‑Fi address.
+            server.stop()
         }
     }
 }
@@ -514,7 +522,11 @@ final class LightweightHTTPServer: ObservableObject {
     private func webURLs() -> [String] {
         var seen = Set<String>()
         var urls: [String] = []
-        for ip in getLocalIPAddresses() + [localIP, "127.0.0.1"] {
+        // Prefer Wi‑Fi/private IPv4 addresses.  Loopback is only a last-resort
+        // diagnostic endpoint and should not be presented ahead of a usable LAN
+        // address on devices with multiple interfaces.
+        let addresses = getLocalIPAddresses()
+        for ip in addresses + [localIP, "127.0.0.1"] {
             guard !ip.isEmpty, seen.insert(ip).inserted else { continue }
             urls.append("http://\(ip):\(port)")
         }

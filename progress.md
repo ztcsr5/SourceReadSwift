@@ -2247,3 +2247,28 @@ Windows cannot run Xcode or a real ProMotion device. CI proves compilation/tests
 ### Next
 
 - Actions 通过后进入 Stage 28：EPUB/RSS 阅读体验与 20+ UI 问题验收（底部遮挡、搜索模式、批量管理、设置/书源入口去重、顶部滚动样式），并建立逐项可复现清单。
+
+## 2026-09-06 - Stage 28：Flutter 功能收口与 UI 问题验收（提交前）
+
+### Implemented
+
+- 书架新增批量管理：全选、反选、清空、标记已读、移动分组和批量删除；操作栏使用 `safeAreaInset`，不再遮挡末尾内容。
+- 源管理状态卡片改为紧凑动作网格，合并导入、检测和 Web 写源入口，保留书源/仓库/RSS 数量状态。
+- Web 写源优先展示当前 Wi‑Fi/private IPv4；只有回环地址时明确提示电脑无法访问；离开页面自动停止监听，避免旧端口残留。
+- 新增 `docs/stage-28-acceptance.md`，将用户提出的 23 项问题映射到代码入口、测试证据和真机验收项。
+
+### Verification
+
+- `git diff --check` passed。
+- `node ci-log/extract-prelude.js` passed（174366 bytes）。
+- `node --check ci-log/js-prelude-check.js` passed。
+- Windows 无 Swift/Xcode/UIKit runtime；iOS 编译、XCTest、unsigned IPA 以 GitHub Actions 为准。
+
+### Release gate
+
+- 本阶段将作为一个完整大阶段提交并同时触发 `ios.yml` 与 `unsigned-ipa.yml`。
+- 通过后交付新的 unsigned IPA；持续 120 Hz、顶部标题折叠、外观切换和局域网访问仍需 iPhone 真机验收。
+
+### Rollback
+
+- 回滚本阶段单次提交即可恢复 Stage 27 的阅读器状态实现，不影响已通过的 Legado、EPUB、RSS 和诊断能力。
