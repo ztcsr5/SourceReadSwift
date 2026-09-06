@@ -7,15 +7,15 @@ final class SourceDiagnosticRepairAdvisorTests: XCTestCase {
             stage: .content,
             status: .failed,
             responseSummary: "正文选择器未命中",
-            responseStatusCode: 200,
             requestHeaders: ["Cookie": "session=secret"],
+            responseStatusCode: 200,
             executionLogs: ["token=secret-token"],
             failureCode: .parsing
         )
 
         let advice = SourceDiagnosticRepairAdvisor.advice(for: step)
 
-        XCTAssertEqual(advice.stage, .content)
+        XCTAssertEqual(advice.stage, SourceDiagnosticStage.content)
         XCTAssertEqual(advice.fieldName, "ruleContent")
         XCTAssertTrue(advice.title.contains("正文"))
         XCTAssertFalse(advice.suggestedSample.contains("secret"))
