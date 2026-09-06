@@ -245,13 +245,17 @@ final class BookshelfStoreTests: XCTestCase {
         store.addOrUpdate(second)
         store.updateDetails(bookID: first.id, latestChapterTitle: "第一章", intro: nil, totalChapters: 3)
         store.updateDetails(bookID: second.id, latestChapterTitle: "第二章", intro: nil, totalChapters: 4)
+        // A second metadata refresh creates unread updates relative to the
+        // initial snapshot established above.
+        store.updateDetails(bookID: first.id, latestChapterTitle: "第五章", intro: nil, totalChapters: 5)
+        store.updateDetails(bookID: second.id, latestChapterTitle: "第六章", intro: nil, totalChapters: 6)
 
         store.markUpdatesSeen(bookIDs: [first.id])
 
         XCTAssertFalse(try XCTUnwrap(store.book(id: first.id)).hasUpdates)
         XCTAssertTrue(try XCTUnwrap(store.book(id: second.id)).hasUpdates)
-        XCTAssertEqual(store.book(id: first.id)?.seenTotalChapters, 3)
-        XCTAssertNotEqual(store.book(id: second.id)?.seenTotalChapters, 4)
+        XCTAssertEqual(store.book(id: first.id)?.seenTotalChapters, 5)
+        XCTAssertNotEqual(store.book(id: second.id)?.seenTotalChapters, 6)
         try? FileManager.default.removeItem(at: root)
     }
 
