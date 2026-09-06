@@ -2079,3 +2079,30 @@ Windows cannot run Xcode or a real ProMotion device. CI proves compilation/tests
   Windows can only run the static checks (`git diff --check`, JS prelude
   extraction/syntax). Real iOS UI and sustained ProMotion 120 Hz remain device
   acceptance items.
+
+## 2026-09-06 - Stage 23B: 书源诊断到规则修复闭环
+
+### Implemented
+
+- 新增 `SourceDiagnosticRepairAdvisor`，按 Search / Detail / TOC / Content 失败阶段生成可执行修复建议、目标规则字段和脱敏本地样本。
+- 书源详情页在动态诊断失败后显示首个失败阶段、HTTP/响应证据和“定位到 ruleX”入口；进入规则编辑器时自动选中对应阶段并载入建议样本。
+- 批量诊断失败结果新增“修复规则”按钮，关闭批量报告后直接打开对应书源与失败阶段，不再需要手动回源列表查找。
+- 诊断证据区补充 request method/final URL、HTTP 状态、响应 headers、解码状态和摘要；报告文本导出附带修复字段与动作。
+- 增加 `SourceDiagnosticRepairAdvisorTests`，覆盖阶段映射、网络超时建议、脱敏样本和摘要输出。
+
+### Verification
+
+- `git diff --check` passed。
+- `node ci-log/extract-prelude.js` passed（167699 bytes）。
+- `node --check ci-log/js-prelude-check.js` passed。
+- iOS build/XCTest：[run 34002836295](https://github.com/ztcsr5/read/actions/runs/34002836295) — success。
+- Unsigned IPA：[run 34002836268](https://github.com/ztcsr5/read/actions/runs/34002836268) — success；artifact `SourceReadSwift-unsigned-ipa`。
+- Windows 未运行 Xcode/UIKit/XCTest；持续 120 Hz 仍需 ProMotion 真机和 Instruments 验证。
+
+### Rollback
+
+- 回滚 `41ff4f8` 与其父提交即可移除诊断修复闭环，不影响此前已通过的 Legado 引擎和规则编辑器能力。
+
+### Next
+
+- Stage 24 性能收口：SwiftUI 状态重建、TextKit 可见段落追踪、阅读位置 debounce、自动翻页/朗读互斥、图片解码下沉，并保留真机 120 Hz 验收位。
