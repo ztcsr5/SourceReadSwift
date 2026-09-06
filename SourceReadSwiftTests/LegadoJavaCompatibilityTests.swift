@@ -146,6 +146,44 @@ final class LegadoJavaCompatibilityTests: XCTestCase {
         XCTAssertEqual(object["bytes"] as? Int, 83)
     }
 
+    func testAjaxAllRetainsMixedStatusHeadersAndFinalURL() throws {
+        let context = RuleExecutionContext(responseHandler: { encoded in
+            let isError = encoded.contains("/error")
+            let body = isError ? "{\"error\":\"limited\"}" : "{\"ok\":true}"
+            return SourceResponse(
+                url: URL(string: isError ? "https://fixture.local/error-final" : "https://fixture.local/ok-final")!,
+                statusCode: isError ? 429 : 204,
+                headers: isError
+                    ? ["Retry-After": "30", "Content-Type": "application/json"]
+                    : ["X-Mode": "ok"],
+                body: body,
+                data: Data(body.utf8)
+            )
+        })
+        let runtime = JSCoreRuntime(executionContext: context)
+        let result = runtime.evaluate("""
+            var responses = java.ajaxAll(['https://fixture.local/ok', 'https://fixture.local/error']);
+            JSON.stringify({
+              statuses: [responses.get(0).status, responses.get(1).status],
+              oks: [responses.first().ok, responses.get(1).ok],
+              urls: [String(responses[0].url), responses.get(1).url()],
+              headers: [responses[0].headers.get('x-mode'), responses.get(1).header('retry-after')],
+              bodies: [responses[0].body(), responses.get(1).text()]
+            })
+            """)
+
+        guard case .success(let value) = result,
+              let data = value.data(using: .utf8),
+              let object = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+            return XCTFail("expected ajaxAll response result: \(result)")
+        }
+        XCTAssertEqual(object["statuses"] as? [Int], [204, 429])
+        XCTAssertEqual(object["oks"] as? [Bool], [true, false])
+        XCTAssertEqual(object["urls"] as? [String], ["https://fixture.local/ok-final", "https://fixture.local/error-final"])
+        XCTAssertEqual(object["headers"] as? [String], ["ok", "30"])
+        XCTAssertEqual(object["bodies"] as? [String], ["{\"ok\":true}", "{\"error\":\"limited\"}"])
+    }
+
     func testJSONPathFiltersAndRecursiveDescent() throws {
         let runtime = JSCoreRuntime()
         let json = """

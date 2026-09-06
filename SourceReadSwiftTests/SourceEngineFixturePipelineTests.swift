@@ -152,6 +152,36 @@ final class SourceEngineFixturePipelineTests: XCTestCase {
         XCTAssertTrue(emptyDiagnostics.events.contains { $0.stage == "search.empty" && $0.level == .warning })
     }
 
+    func testHTTPErrorRetainsResponseEvidenceForSourceRepair() async throws {
+        let source = BookSource(
+            bookSourceName: "HTTP error fixture",
+            bookSourceUrl: "https://fixture.example",
+            searchUrl: "https://fixture.example/rate?q={{key}}"
+        )
+        let network = FixtureNetworkClient(responses: [
+            "https://fixture.example/rate?q=swift": .http(
+                statusCode: 429,
+                headers: ["Content-Type": "application/json", "Retry-After": "30"],
+                body: #"{"error":"rate limited"}"#,
+                finalURL: "https://fixture.example/rate-limit"
+            )
+        ])
+        let engine = LegadoSourceEngine(network: network)
+
+        let result = await engine.searchBooks(source: source, keyword: "swift", page: 1)
+        guard case .failure(.network(let message)) = result else {
+            return XCTFail("expected HTTP failure, got \(result)")
+        }
+        XCTAssertEqual(message, "HTTP 429")
+
+        let evidence = try XCTUnwrap(engine.diagnosticEvidence(sourceURL: source.bookSourceUrl, stage: .search))
+        XCTAssertEqual(evidence.responseStatusCode, 429)
+        XCTAssertEqual(evidence.finalURL, "https://fixture.example/rate-limit")
+        XCTAssertEqual(evidence.responseHeaders["Retry-After"], "30")
+        XCTAssertTrue(evidence.responseHeaders["Content-Type"]?.contains("application/json") == true)
+        XCTAssertTrue(evidence.responseDecodedByteCount > 0)
+    }
+
     func testPaginationFixtureCombinesTOCAndContentPagesWithRenumberedIndexes() async throws {
         let source = try loadFixture(named: "legado-html-pagination-source")
         let detail = BookDetail(
@@ -222,10 +252,12 @@ private final class FixtureNetworkClient: SourceNetworkClient, @unchecked Sendab
     enum Payload: Sendable {
         case text(String)
         case json(String)
+        case http(statusCode: Int, headers: [String: String], body: String, finalURL: String?)
 
         var body: String {
             switch self {
             case .text(let value), .json(let value): return value
+            case .http(_, _, let value, _): return value
             }
         }
     }
@@ -258,12 +290,19 @@ private final class FixtureNetworkClient: SourceNetworkClient, @unchecked Sendab
         let body = payload.body
         let contentType = body.first == "{" || body.first == "[" ? "application/json" : "text/html"
         var headers = ["Content-Type": contentType]
+        var statusCode = 200
+        var responseURL = request.url
+        if case .http(let code, let customHeaders, _, let finalURL) = payload {
+            statusCode = code
+            headers.merge(customHeaders, uniquingKeysWith: { _, new in new })
+            if let finalURL, let url = URL(string: finalURL) { responseURL = url }
+        }
         if request.url.path.contains("cookie") {
             headers["Set-Cookie"] = "fixture=present; Path=/"
         }
         return .success(SourceResponse(
-            url: request.url,
-            statusCode: 200,
+            url: responseURL,
+            statusCode: statusCode,
             headers: headers,
             body: body,
             data: Data(body.utf8)
