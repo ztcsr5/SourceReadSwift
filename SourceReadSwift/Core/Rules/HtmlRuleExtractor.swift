@@ -49,9 +49,16 @@ struct HtmlRuleExtractor {
 
         if let alternatives = RuleOperatorSplitter.split(selectedRule, separator: "||") {
             for alternative in alternatives {
-                let value = try self.value(from: root, rule: alternative, fallback: nil, baseUrl: baseUrl, variables: variables)
-                if !value.isEmpty {
-                    return value
+                // A mixed Legado source may put JSONPath and CSS/XPath
+                // alternatives in the same field.  SwiftSoup rejects a
+                // JSONPath such as `$.payload`; treat that branch as a miss
+                // and continue to the next alternative instead of failing
+                // the whole HTML parse.
+                do {
+                    let value = try self.value(from: root, rule: alternative, fallback: nil, baseUrl: baseUrl, variables: variables)
+                    if !value.isEmpty { return value }
+                } catch {
+                    continue
                 }
             }
             return ""
@@ -121,9 +128,11 @@ struct HtmlRuleExtractor {
         }
         if let fallbackParts = RuleOperatorSplitter.split(materializedRule, separator: "||") {
             for part in fallbackParts {
-                let elements = try select(from: root, rule: part, baseUrl: baseUrl)
-                if !elements.isEmpty {
-                    return elements
+                do {
+                    let elements = try select(from: root, rule: part, baseUrl: baseUrl)
+                    if !elements.isEmpty { return elements }
+                } catch {
+                    continue
                 }
             }
             return []

@@ -56,7 +56,20 @@ struct ChapterListParser {
         do {
             let roots: [Element]
             if let initRule = htmlExtractor.firstRule(source.ruleToc, keys: ["init"]) {
-                roots = try htmlExtractor.select(response.body, baseUrl: response.url, listRule: initRule)
+                // A single Legado source may legitimately return JSON for one
+                // page and HTML for a later pagination page.  JSONPath init
+                // rules (for example `$.payload`) have no meaning in HTML;
+                // when that selector yields no nodes, keep parsing from the
+                // document root instead of turning a mixed page into an
+                // empty chapter list.
+                do {
+                    let initialized = try htmlExtractor.select(response.body, baseUrl: response.url, listRule: initRule)
+                    roots = initialized.isEmpty
+                        ? try htmlExtractor.select(response.body, baseUrl: response.url, listRule: "html")
+                        : initialized
+                } catch {
+                    roots = try htmlExtractor.select(response.body, baseUrl: response.url, listRule: "html")
+                }
             } else {
                 roots = try htmlExtractor.select(response.body, baseUrl: response.url, listRule: "html")
             }

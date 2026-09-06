@@ -1,0 +1,10 @@
+{
+  "payload": {
+    "book": {
+      "name": "Matrix Reader",
+      "author": "Fixture Author",
+      "intro": "Four stage compatibility fixture",
+      "toc": "/stage29/toc?page=1"
+    }
+  }
+}

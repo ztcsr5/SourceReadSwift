@@ -1,0 +1,9 @@
+{
+  "payload": {
+    "chapters": [
+      {"title": "第一章", "url": "/stage29/chapter/1"},
+      {"title": "第二章", "url": "/stage29/chapter/2"}
+    ],
+    "next": "/stage29/toc?page=2"
+  }
+}

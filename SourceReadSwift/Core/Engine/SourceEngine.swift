@@ -709,9 +709,13 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
         firstURL: URL,
         executionContext: RuleExecutionContext
     ) async -> Result<[BookChapter], SourceEngineError> {
-        var chapters = firstPage.chapters
-        var nextURLText = firstPage.nextTocUrl?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty
         let urlIdentity = SourcePaginationURLIdentity()
+        // Some APIs repeat the last item on every page.  Normalize and retain
+        // the first occurrence before pagination so the reader never exposes
+        // duplicate chapter rows, even when the duplicate URLs differ only by
+        // case, fragments or percent-encoding.
+        var chapters = deduplicatedChapters(firstPage.chapters, identity: urlIdentity)
+        var nextURLText = firstPage.nextTocUrl?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty
         var seenURLs: Set<String> = [urlIdentity.canonical(firstURL)]
         var pagesLoaded = 1
         let maxPages = 30
@@ -743,18 +747,37 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
 
             switch await loadWithOptionalWebViewFallback(request, source: source, stage: "toc.next.load") {
             case .success(let response):
-                seenURLs.insert(urlIdentity.canonical(response.url))
+                let responseCanonicalURL = urlIdentity.canonical(response.url)
+                // A redirect to a page already consumed by an earlier request
+                // is a pagination loop.  The current request URL is already in
+                // `seenURLs`, so only a *different* final URL is considered a
+                // duplicate redirect target.
+                if responseCanonicalURL != canonicalURL, seenURLs.contains(responseCanonicalURL) {
+                    stopReason = "duplicate-final-url"
+                    nextURLText = nil
+                    continue
+                }
+                seenURLs.insert(responseCanonicalURL)
                 let state = persistentState(for: source)
                 let transformedResponse = transformBodyIfNeeded(response, source: source, rules: [source.ruleToc], network: network, stateOverride: state, executionContext: executionContext)
                 switch parseChapterListPage(source: source, book: book, response: transformedResponse, executionContext: executionContext) {
                 case .success(let page):
+                    let uniquePageChapters = page.chapters.filter { chapter in
+                        let key = chapterURLIdentity(chapter.url, identity: urlIdentity)
+                        return !chapters.contains { chapterURLIdentity($0.url, identity: urlIdentity) == key }
+                    }
                     let offset = chapters.count
-                    chapters.append(contentsOf: page.chapters.map { chapter in
+                    // Rebuild indices from the retained sequence rather than
+                    // carrying the page-local index.  A page may contain
+                    // duplicates (for example chapter 2 appears again on
+                    // page 2); filtering it out must not leave a gap before
+                    // the next unique chapter.
+                    chapters.append(contentsOf: uniquePageChapters.enumerated().map { localIndex, chapter in
                         BookChapter(
                             title: chapter.title,
                             url: chapter.url,
                             bookUrl: chapter.bookUrl,
-                            index: offset + chapter.index,
+                            index: offset + localIndex,
                             isVip: chapter.isVip
                         )
                     })
@@ -834,7 +857,14 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
 
             switch await loadWithOptionalWebViewFallback(request, source: source, stage: "content.next.load") {
             case .success(let response):
-                seenURLs.insert(urlIdentity.canonical(response.url))
+                let responseCanonicalURL = urlIdentity.canonical(response.url)
+                if responseCanonicalURL != canonicalURL, seenURLs.contains(responseCanonicalURL) {
+                    stopReason = "duplicate-final-url"
+                    nextURLText = nil
+                    finalNextURL = nil
+                    continue
+                }
+                seenURLs.insert(responseCanonicalURL)
                 let state = persistentState(for: source)
                 let transformedResponse = transformBodyIfNeeded(response, source: source, rules: [source.ruleContent], network: network, stateOverride: state, executionContext: executionContext)
                 switch parseContentPage(
@@ -883,6 +913,32 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
             paragraphs: paragraphs,
             nextContentUrl: finalNextURL
         ))
+    }
+
+    private func chapterURLIdentity(_ value: String, identity: SourcePaginationURLIdentity) -> String {
+        identity.canonical(value)
+            ?? value.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+    }
+
+    private func deduplicatedChapters(
+        _ values: [BookChapter],
+        identity: SourcePaginationURLIdentity
+    ) -> [BookChapter] {
+        var seen: Set<String> = []
+        var output: [BookChapter] = []
+        output.reserveCapacity(values.count)
+        for chapter in values {
+            let key = chapterURLIdentity(chapter.url, identity: identity)
+            guard seen.insert(key).inserted else { continue }
+            output.append(BookChapter(
+                title: chapter.title,
+                url: chapter.url,
+                bookUrl: chapter.bookUrl,
+                index: output.count,
+                isVip: chapter.isVip
+            ))
+        }
+        return output
     }
 
     private func isEmptyPaginationError(_ error: SourceEngineError) -> Bool {

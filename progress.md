@@ -2291,3 +2291,27 @@ Windows cannot run Xcode or a real ProMotion device. CI proves compilation/tests
 ### Remaining boundary
 - 7z/RAR decoders are intentionally reported as unsupported; ZIP remains the portable archive route.
 - Final runtime, filesystem permission, and 120 Hz behavior still require the next macOS Actions/device gate.
+
+## 2026-09-07 - Stage 29：Legado 混合响应矩阵与诊断视觉参考（工作区完成）
+
+### Implemented
+
+- Search → Detail → TOC → Content 端到端 fixture 使用 JSON/HTML 混合响应，覆盖动态 Header、Cookie、bodyJs 阶段状态和分页。
+- TOC 分页按 canonical URL 去重，重复章节过滤后重新编号；重定向回已加载页面会记录 `duplicate-final-url` 并保留已有章节。
+- HTML 解析遇到 JSONPath/CSS/XPath 混合 fallback 时逐分支容错；JSONPath init 在后续 HTML 页面自动回退到 HTML 根节点。
+- Content 支持 JSON 首页 + HTML 后续正文页，保持正文段落顺序和分页终止状态。
+- 新增《docs/stage-29-acceptance.md》，把本轮补充图片中的诊断字段、规则编辑器四阶段结构、失败分类和脱敏验收固定成可审查清单。
+
+### Verification
+
+- `git diff --check`、`node ci-log/extract-prelude.js`、`node --check ci-log/js-prelude-check.js` 已通过。
+- Windows 无 Swift/Xcode/UIKit runtime；Stage 29 的 iOS build/XCTest 与 unsigned IPA 需提交后由 GitHub Actions 验证。
+- fixture 不访问公网，所有 URL 使用 `fixture.example`。
+
+### Rollback
+
+- 回滚 Stage 29 单次提交即可移除混合响应矩阵和视觉验收文档，不影响 Stage 28 及之前的阅读器、RSS、书源管理功能。
+
+### Next
+
+- 推送后读取两条 Actions 的首个失败点；通过后进入阅读器高级能力与视觉收口：滑动/覆盖/平移、自动阅读、朗读、系统字体、壁纸、跟手性和 App 图标。

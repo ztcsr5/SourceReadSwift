@@ -1756,6 +1756,45 @@ final class JSCoreRuntime {
           }
           return __asJavaList(out);
         };
+        // Android Legado exposes ajaxTestAll for source diagnostics.  Keep the
+        // call synchronous like ajaxAll, but return plain metadata objects so
+        // scripts can inspect status, headers and redirect targets without
+        // depending on JavaScriptCore's callable facade details.
+        java.ajaxTestAll = function(urls, timeout, skipRateLimit) {
+          var values = [];
+          if (urls && typeof urls.length === 'number' && typeof urls !== 'string') {
+            for (var i = 0; i < urls.length; i++) values.push(String(urls[i]));
+          } else if (urls != null) {
+            values.push(String(urls));
+          }
+          var out = [];
+          for (var i = 0; i < values.length; i++) {
+            var target = values[i] || '';
+            var response = java.ajax(target);
+            var statusCode = Number(response && (response.statusCode || response.status || response.code) || 0);
+            var headers = response && response.headers;
+            var headerMap = headers && typeof headers.toJSON === 'function' ? headers.toJSON() : (headers || {});
+            var finalUrl = response && typeof response.finalUrl === 'function' ? String(response.finalUrl()) : String(response && response.url || target);
+            var body = response && typeof response.body === 'function' ? String(response.body() || '') : String(response || '');
+            out.push({
+              url: target,
+              body: body,
+              code: statusCode,
+              status: statusCode,
+              statusCode: statusCode,
+              headers: headerMap,
+              finalUrl: finalUrl,
+              ok: statusCode >= 200 && statusCode < 300
+            });
+          }
+          return __asJavaList(out);
+        };
+        // These helpers are present in Android source corpora even when the
+        // host does not expose a persisted reader configuration.  Returning a
+        // stable empty object is preferable to an undefined bridge member and
+        // matches the Flutter compatibility contract.
+        java.getReadBookConfig = function() { return {}; };
+        java.getThemeMode = function() { return 'light'; };
         function __makeConnect(url) {
           var target = String(url || '');
           var config = { headers: {}, body: '', method: 'GET', doOutput: false, connectTimeout: 0, readTimeout: 0, response: null, output: null };
@@ -2722,6 +2761,9 @@ final class JSCoreRuntime {
         };
         if (typeof URL === 'undefined') URL = Packages.java.net.URL;
         if (typeof URI === 'undefined') URI = Packages.java.net.URI;
+        java.toURL = function(value, baseValue) {
+          return new Packages.java.net.URL(value == null ? '' : value, baseValue == null ? '' : baseValue);
+        };
         Packages.java.util = Packages.java.util || {};
         Packages.java.util.UUID = Packages.java.util.UUID || { randomUUID: java.randomUUID };
         Packages.java.util.Base64 = Packages.java.util.Base64 || {

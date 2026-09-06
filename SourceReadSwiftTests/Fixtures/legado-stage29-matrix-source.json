@@ -1,0 +1,36 @@
+{
+  "bookSourceName": "Stage 29 Matrix Fixture",
+  "bookSourceUrl": "https://fixture.example/stage29",
+  "searchUrl": "https://fixture.example/stage29/search?q={{key}}&page={{page}}",
+  "header": "{\"X-Stage-Token\":\"{{token}}\",\"X-Stage\":\"{{phase}}\"}",
+  "ruleSearch": {
+    "bookList": "$.payload.items",
+    "name": "$.title",
+    "author": "$.author.name",
+    "bookUrl": "$.links.detail",
+    "coverUrl": "$.cover",
+    "bodyJs": "java.put('token', 'detail-token'); java.put('phase', 'search'); return result;"
+  },
+  "ruleBookInfo": {
+    "init": "$.payload.book",
+    "name": "$.name",
+    "author": "$.author",
+    "intro": "$.intro",
+    "tocUrl": "$.toc",
+    "bodyJs": "java.put('token', 'toc-token'); java.put('phase', 'detail'); return result;"
+  },
+  "ruleToc": {
+    "init": "$.payload",
+    "chapterList": "div.chapter||$.chapters",
+    "chapterName": "a@text||$.title",
+    "chapterUrl": "a@href||$.url",
+    "nextTocUrl": "a.next@href||$.next",
+    "bodyJs": "java.put('token', 'content-token'); java.put('phase', 'toc'); return result;"
+  },
+  "ruleContent": {
+    "init": "$.payload",
+    "content": "article#content@html||$.content",
+    "nextContentUrl": "a.next@href||$.next",
+    "bodyJs": "java.put('phase', 'content'); return result;"
+  }
+}

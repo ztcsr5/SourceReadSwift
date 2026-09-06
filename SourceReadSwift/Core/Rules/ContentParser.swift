@@ -44,7 +44,18 @@ struct ContentParser {
 
         do {
             let rootRule = htmlExtractor.firstRule(source.ruleContent, keys: ["init"]) ?? "html"
-            let root = try htmlExtractor.select(response.body, baseUrl: response.url, listRule: rootRule).first
+            let root: Element?
+            do {
+                let initialized = try htmlExtractor.select(response.body, baseUrl: response.url, listRule: rootRule)
+                // Keep HTML pagination working when the same source uses a
+                // JSONPath init path for its first page.  The JSONPath has no
+                // HTML match, so fall back to the document root for HTML.
+                root = (initialized.isEmpty && rootRule != "html")
+                    ? try htmlExtractor.select(response.body, baseUrl: response.url, listRule: "html").first
+                    : initialized.first
+            } catch {
+                root = try htmlExtractor.select(response.body, baseUrl: response.url, listRule: "html").first
+            }
             guard let root else { return .failure(.empty("正文 HTML 为空")) }
             let chapterMap: [String: Any] = [
                 "title": chapter.title,
