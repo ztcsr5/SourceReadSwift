@@ -401,6 +401,8 @@ enum ReaderNativeTextLayout {
     }
 
     static func makeAttributedText(configuration: NativeReaderTextView.Configuration) -> Result {
+        let signpost = PerformanceSignpost.begin("reader.textLayout")
+        defer { PerformanceSignpost.end("reader.textLayout", id: signpost) }
         let output = NSMutableAttributedString(string: "")
         var ranges: [NSRange] = []
         let titleStyle = NSMutableParagraphStyle()
@@ -440,12 +442,29 @@ enum ReaderNativeTextLayout {
             .kern: configuration.letterSpacing,
             .paragraphStyle: paragraphStyle
         ]
+        // Build the chapter body as one plain string and apply one shared
+        // attribute run. Appending an attributed string for every paragraph
+        // creates thousands of temporary objects and fragmented layout runs
+        // for long novels; the ranges remain paragraph-addressable for speech
+        // highlighting and visibility tracking.
+        let bodyStart = output.length
+        var body = String()
+        var bodyLength = 0
         for paragraph in configuration.paragraphs {
-            let start = output.length
-            output.append(NSAttributedString(string: paragraph, attributes: paragraphAttributes))
+            let start = bodyStart + bodyLength
             ranges.append(NSRange(location: start, length: paragraph.utf16.count))
-            output.append(NSAttributedString(string: "\n\n", attributes: paragraphAttributes))
+            body.append(paragraph)
+            body.append("\n\n")
+            bodyLength += paragraph.utf16.count + 2
         }
+        if !body.isEmpty {
+            output.append(NSAttributedString(string: body))
+            output.addAttributes(
+                paragraphAttributes,
+                range: NSRange(location: bodyStart, length: bodyLength)
+            )
+        }
+        PerformanceSignpost.event("reader.textLayout.summary", "paragraphs=\(ranges.count), utf16=\(bodyLength)")
         return Result(text: output, paragraphRanges: ranges)
     }
 }

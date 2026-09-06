@@ -158,4 +158,33 @@ final class ReaderAutomationPolicyTests: XCTestCase {
         XCTAssertNotEqual(base.insetsSignature, insetChanged.insetsSignature)
         XCTAssertEqual(base.textLayoutSignature, insetChanged.textLayoutSignature)
     }
+
+    func testNativeReaderTextLayoutHandlesLongChaptersWithoutLosingParagraphRanges() {
+        let paragraphs = (0..<2_500).map { index in
+            "第\(index)段：这是用于长章节排版回归的中文正文。"
+        }
+        let configuration = NativeReaderTextView.Configuration(
+            title: "长章节",
+            subtitle: "性能回归",
+            paragraphs: paragraphs,
+            contentFingerprint: "long-fixture",
+            fontSize: 19,
+            lineSpacing: 8,
+            pagePadding: 24,
+            letterSpacing: 0,
+            paragraphSpacing: 16,
+            paragraphIndent: 0,
+            titleSpacing: 12,
+            footerHeight: 110,
+            textColor: .label,
+            highlightColor: .systemBlue,
+            animatedScrollDuration: 0.35
+        )
+
+        let result = ReaderNativeTextLayout.makeAttributedText(configuration: configuration)
+        XCTAssertEqual(result.paragraphRanges.count, paragraphs.count)
+        XCTAssertEqual(result.paragraphRanges.first?.length, paragraphs[0].utf16.count)
+        XCTAssertEqual(result.paragraphRanges.last?.length, paragraphs[2_499].utf16.count)
+        XCTAssertEqual(result.text.string.components(separatedBy: "\n\n").count, paragraphs.count + 2)
+    }
 }
