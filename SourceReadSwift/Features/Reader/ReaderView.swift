@@ -268,7 +268,12 @@ struct ReaderView: View {
             // UIKit owns the long-form scroll layout. Avoid invalidating the
             // whole reader tree for each appearance/highlight update; paged
             // modes still reset when their layout model changes.
-            .id(readerMode == .scroll ? "native-scroll-reader" : readerLayoutKey)
+            // Keep the identity tied to the committed page cache, not the
+            // live slider values. Re-keying the entire paged tree for every
+            // typography gesture discards SwiftUI's page views at 120 Hz and
+            // defeats the debounce above; the cache key changes once after
+            // the gesture settles.
+            .id(readerMode == .scroll ? "native-scroll-reader" : (pagedBlocksCacheKey.isEmpty ? "reader-page-placeholder" : pagedBlocksCacheKey))
             .contentShape(Rectangle())
             .simultaneousGesture(
                 SpatialTapGesture()

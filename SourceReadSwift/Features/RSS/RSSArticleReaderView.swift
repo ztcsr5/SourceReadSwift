@@ -515,6 +515,7 @@ struct RSSArticleReaderView: View {
             let decoded = await decodeAndParseOffMain(data: data, headers: headers)
             let html = decoded.html
             let parsed = decoded.paragraphs
+            try Task.checkCancellation()
             guard generation == loadGeneration, article.id == currentArticle.id else { return }
             if !parsed.isEmpty {
                 paragraphs = parsed
