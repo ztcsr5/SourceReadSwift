@@ -3,6 +3,85 @@ import UIKit
 @testable import SourceReadSwift
 
 final class ReaderAutomationPolicyTests: XCTestCase {
+    func testReaderChromeSettingsAlwaysExitsToOverlay() {
+        var chrome = ReaderChromeStateMachine()
+        XCTAssertEqual(chrome.mode, .hidden)
+
+        chrome.toggleOverlay()
+        XCTAssertEqual(chrome.mode, .overlay)
+
+        chrome.openSettings()
+        XCTAssertTrue(chrome.isSettingsVisible)
+        chrome.closeSettings()
+        XCTAssertEqual(chrome.mode, .overlay)
+        XCTAssertTrue(chrome.isOverlayVisible)
+
+        chrome.closeAll()
+        XCTAssertEqual(chrome.mode, .hidden)
+    }
+
+    func testReaderChromeInitialStateAndRepeatedCloseAreIdempotent() {
+        var chrome = ReaderChromeStateMachine()
+        chrome.setInitialOverlayVisible(true)
+        XCTAssertEqual(chrome.mode, .overlay)
+        chrome.closeSettings()
+        XCTAssertEqual(chrome.mode, .overlay)
+        chrome.closeAll()
+        chrome.closeAll()
+        XCTAssertEqual(chrome.mode, .hidden)
+    }
+
+    func testReaderChromeToggleFromSettingsReturnsToOverlayBeforeHiding() {
+        var chrome = ReaderChromeStateMachine()
+        chrome.openSettings()
+        XCTAssertEqual(chrome.mode, .settings)
+
+        // The view-level toggle is intentionally a two-step exit: the first
+        // tap closes settings, while the next tap hides the reader menu.
+        chrome.closeSettings()
+        XCTAssertEqual(chrome.mode, .overlay)
+        chrome.toggleOverlay()
+        XCTAssertEqual(chrome.mode, .hidden)
+    }
+
+    func testScrollTargetAccountsForContainerInsetAndClampsToContentBounds() {
+        let target = ReaderScrollPositionPolicy.targetContentOffsetY(
+            textRectMinY: 260,
+            textContainerInsetTop: 24,
+            boundsHeight: 400,
+            contentSizeHeight: 1_200,
+            adjustedContentInset: .init(top: 0, left: 0, bottom: 110, right: 0)
+        )
+        XCTAssertEqual(target, 236, accuracy: 0.001)
+
+        let first = ReaderScrollPositionPolicy.targetContentOffsetY(
+            textRectMinY: 0,
+            textContainerInsetTop: 24,
+            boundsHeight: 400,
+            contentSizeHeight: 1_200,
+            adjustedContentInset: .zero
+        )
+        XCTAssertEqual(first, 0, accuracy: 0.001)
+
+        let last = ReaderScrollPositionPolicy.targetContentOffsetY(
+            textRectMinY: 2_000,
+            textContainerInsetTop: 24,
+            boundsHeight: 400,
+            contentSizeHeight: 1_200,
+            adjustedContentInset: .init(top: 0, left: 0, bottom: 110, right: 0)
+        )
+        XCTAssertEqual(last, 910, accuracy: 0.001)
+
+        let topInset = ReaderScrollPositionPolicy.targetContentOffsetY(
+            textRectMinY: 12,
+            textContainerInsetTop: 24,
+            boundsHeight: 400,
+            contentSizeHeight: 1_200,
+            adjustedContentInset: .init(top: 20, left: 0, bottom: 0, right: 0)
+        )
+        XCTAssertEqual(topInset, -20, accuracy: 0.001)
+    }
+
     func testAdvancesWithinCurrentChapter() {
         XCTAssertEqual(
             ReaderAutomationPolicy.decision(currentTarget: 2, maximumTarget: 5, canAdvanceChapter: true),
@@ -48,6 +127,15 @@ final class ReaderAutomationPolicyTests: XCTestCase {
 
         XCTAssertEqual(queue.dequeue()?.index, 1)
         XCTAssertEqual(queue.dequeue()?.index, 2)
+        XCTAssertNil(queue.dequeue())
+    }
+
+    func testSpeechQueueIncludesTitleOnlyAtChapterStart() {
+        var queue = ReaderSpeechQueue()
+        queue.reset(title: "标题", paragraphs: ["正文"], startParagraphIndex: 0, includeTitle: true)
+
+        XCTAssertEqual(queue.dequeue()?.index, -1)
+        XCTAssertEqual(queue.dequeue()?.index, 0)
         XCTAssertNil(queue.dequeue())
     }
 

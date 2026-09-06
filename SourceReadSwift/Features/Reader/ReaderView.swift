@@ -45,12 +45,14 @@ struct ReaderView: View {
 
     @Environment(\.dismiss) private var dismiss
     @Environment(\.scenePhase) private var scenePhase
-    @State private var showOverlay = false
+    @State private var chromeState = ReaderChromeStateMachine()
     @State private var tabChromeOwner = UUID()
-    @State private var showSettings = false
     @State private var showChapterList = false
     @State private var showBookmarks = false
     @State private var settingsTab = 0
+
+    private var showOverlay: Bool { chromeState.isOverlayVisible }
+    private var showSettings: Bool { chromeState.isSettingsVisible }
     @State private var tocTab = 0
     @State private var tocQuery = ""
     @State private var tocReversed = false
@@ -335,7 +337,7 @@ struct ReaderView: View {
         }
         .onAppear {
             appState.acquireTabChromeHidden(owner: tabChromeOwner)
-            showOverlay = initialOverlayVisible
+            chromeState.setInitialOverlayVisible(initialOverlayVisible)
             sessionStartedAt = Date()
             rebuildPagedBlocksCache()
             readerContentFingerprint = makeContentFingerprint(content)
@@ -432,10 +434,10 @@ struct ReaderView: View {
             pagedPageIndex = 0
             visibleParagraphIndex = 0
             paragraphJumpRequest = nil
-            showSettings = false
+            closeSettingsPanel()
             showChapterList = false
             showBookmarks = false
-            showOverlay = initialOverlayVisible
+            chromeState.setInitialOverlayVisible(initialOverlayVisible)
             DispatchQueue.main.async {
                 rebuildPagedBlocksCache()
             }
@@ -736,8 +738,7 @@ struct ReaderView: View {
                     .disabled(onRequestBookDetail == nil)
 
                     Button {
-                        showOverlay = false
-                        showSettings = false
+                        closeReaderChrome()
                         onRequestSourceSwitch?()
                     } label: {
                         Label("换源", systemImage: "arrow.triangle.2.circlepath")
@@ -786,41 +787,38 @@ struct ReaderView: View {
                     toolButton(icon: "list.bullet", title: "目录") {
                         tocTab = 0
                         showChapterList = true
-                        showSettings = false
+                        closeSettingsPanel()
                     }
 
                     if let onRequestSourceSwitch {
                         toolButton(icon: "arrow.triangle.2.circlepath", title: "换源") {
-                            showOverlay = false
-                            showSettings = false
+                            closeReaderChrome()
                             onRequestSourceSwitch()
                         }
                     }
 
                     toolButton(icon: speechController.isPaused ? "play.fill" : (speechController.isSpeaking ? "pause.fill" : "speaker.wave.2"), title: speechController.isPaused ? "继续" : (speechController.isSpeaking ? "暂停" : "朗读")) {
                         toggleSpeech()
-                        showSettings = false
+                        closeSettingsPanel()
                     }
                     if speechController.isSpeaking {
                         toolButton(icon: "stop.fill", title: "停止") {
                             stopSpeechPlayback()
-                            showSettings = false
+                            closeSettingsPanel()
                         }
                     }
                     toolButton(icon: autoScrollEnabled ? "pause.fill" : "play.fill", title: autoScrollEnabled ? "暂停" : "自动") {
                         toggleAutoScroll()
-                        showSettings = false
+                        closeSettingsPanel()
                     }
                     if let onCacheNextChapters {
                         toolButton(icon: "square.and.arrow.down", title: "缓存") {
                             onCacheNextChapters()
-                            showSettings = false
+                            closeSettingsPanel()
                         }
                     }
                     toolButton(icon: "gearshape", title: "设置") {
-                        withAnimation(.easeOut(duration: 0.2)) {
-                            showSettings.toggle()
-                        }
+                        toggleSettingsPanel()
                     }
                 }
             }
@@ -878,7 +876,7 @@ struct ReaderView: View {
                     Spacer()
                     Button {
                         withAnimation(.easeOut(duration: 0.18)) {
-                            showSettings = false
+                            closeSettingsPanel()
                         }
                     } label: {
                         Image(systemName: "xmark")
@@ -893,7 +891,7 @@ struct ReaderView: View {
                 .padding(.top, 10)
                 .padding(.horizontal)
                 .contentShape(Rectangle())
-                .gesture(
+                .simultaneousGesture(
                     DragGesture(minimumDistance: 12)
                         .onEnded { value in
                             guard value.translation.height > 70,
@@ -916,7 +914,7 @@ struct ReaderView: View {
                     Spacer()
                     Button("完成") {
                         withAnimation(.easeOut(duration: 0.18)) {
-                            showSettings = false
+                            closeSettingsPanel()
                         }
                     }
                     .font(.subheadline.weight(.semibold))
@@ -952,7 +950,7 @@ struct ReaderView: View {
     private func closeSettingsPanel() {
         guard showSettings else { return }
         withAnimation(.easeOut(duration: 0.18)) {
-            showSettings = false
+            chromeState.closeSettings()
         }
     }
 
@@ -1252,7 +1250,7 @@ struct ReaderView: View {
                                     // Keep the reader chrome visible after a chapter
                                     // switch. Hiding it here made the next reader
                                     // render look like the root/home menu.
-                                    showOverlay = true
+                                    presentOverlay()
                                     onSelectChapter?(chapter)
                                 } label: {
                                     chapterRow(chapter)
@@ -1266,7 +1264,7 @@ struct ReaderView: View {
                             ForEach(Array(filteredNavigationEntries.enumerated()), id: \.element) { offset, entry in
                                 Button {
                                     showChapterList = false
-                                    showOverlay = true
+                                    presentOverlay()
                                     onSelectNavigationEntry?(entry)
                                 } label: {
                                     navigationEntryRow(entry, ordinal: offset)
@@ -1432,7 +1430,7 @@ struct ReaderView: View {
 
     private func jumpToBookmark(_ bookmark: ReaderBookmark) {
         showBookmarks = false
-        showOverlay = false
+        closeReaderChrome()
         if bookmark.chapterIndex == chapterIndex {
             jumpToParagraph(bookmark.paragraphIndex)
         } else {
@@ -1471,8 +1469,7 @@ struct ReaderView: View {
 
     private func selectRelativeChapter(offset: Int) {
         guard let target = chapters.first(where: { $0.index == chapterIndex + offset }) else { return }
-        showSettings = false
-        showOverlay = false
+        closeReaderChrome()
         stopAutoScroll()
         stopSpeechPlayback()
         onSelectChapter?(target)
@@ -1528,10 +1525,33 @@ struct ReaderView: View {
 
     private func toggleOverlay() {
         withAnimation(.easeOut(duration: 0.2)) {
-            showOverlay.toggle()
-            if !showOverlay {
-                showSettings = false
+            if chromeState.isSettingsVisible {
+                chromeState.closeSettings()
+            } else {
+                chromeState.toggleOverlay()
             }
+        }
+    }
+
+    private func presentOverlay() {
+        withAnimation(.easeOut(duration: 0.2)) {
+            chromeState.setInitialOverlayVisible(true)
+        }
+    }
+
+    private func toggleSettingsPanel() {
+        withAnimation(.easeOut(duration: 0.2)) {
+            if chromeState.isSettingsVisible {
+                chromeState.closeSettings()
+            } else {
+                chromeState.openSettings()
+            }
+        }
+    }
+
+    private func closeReaderChrome() {
+        withAnimation(.easeOut(duration: 0.2)) {
+            chromeState.closeAll()
         }
     }
 

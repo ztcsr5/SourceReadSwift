@@ -2220,3 +2220,30 @@ Windows cannot run Xcode or a real ProMotion device. CI proves compilation/tests
 ### Next
 
 - 提交后等待 iOS build/XCTest 与 unsigned IPA；通过后进入 Stage 27：阅读器 UI 状态修复（菜单返回、章节跳转、系统字体、朗读从当前页首字、自动翻页）和真实 UI 回归清单。
+
+## 2026-09-06 - Stage 27：阅读器状态与章节导航收口（工作区完成，待 Actions）
+
+### Implemented
+
+- 阅读器菜单与设置面板改为单一 `ReaderChromeStateMachine`，统一 X/完成/遮罩/下滑/动作切换出口；关闭设置后稳定回到阅读器菜单，不再把设置页卡成无法退出的状态。
+- 目录章节、EPUB 导航项、书签和相邻章节切换统一走 `presentOverlay` / `closeReaderChrome`，新章节不会继承主页菜单，也不会把阅读器控制条隐藏掉。
+- TextKit 段落跳转抽出 `ReaderScrollPositionPolicy`，将 `textContainerInset.top` 转换为滚动偏移并对顶部/底部安全留白做统一夹取；自动滚动与朗读高亮共用同一目标路径。
+- 朗读队列保持段落原始索引，过滤空段落；朗读从当前可见段落开始，只有显式从章节开头启动时才插入标题，章节切换后的播放代际不会被旧回调复活。
+- 自动滚动与朗读共享 `ReaderPlaybackCoordinator` 代际状态，互斥、可暂停/恢复，生命周期离开和场景切后台时统一取消或恢复。
+- NativeReaderTextView 继续使用 `UIFont.systemFont` 统一系统字体；正文和分页阅读器底部增加 footer 安全留白，避免底部操作栏遮挡末段文字。
+- 新增状态机、滚动偏移、朗读队列和长章节回归断言；保留真机 120 Hz 的 ProMotion/Instruments 验收位，不以 Windows 或 CI 冒充帧率实测。
+
+### Local verification
+
+- `git diff --check`：passed。
+- `node ci-log/extract-prelude.js`：passed（174366 bytes）。
+- `node --check ci-log/js-prelude-check.js`：passed。
+- Windows 无 Swift/Xcode/UIKit runtime；本阶段 iOS build/XCTest 与 unsigned IPA 需提交后由 GitHub Actions 验证。
+
+### Rollback
+
+- 回滚 Stage 27 提交即可恢复旧的双 Bool 阅读器 chrome 与旧段落偏移换算，不影响 Stage 26 Legado 解析和规则预览。
+
+### Next
+
+- Actions 通过后进入 Stage 28：EPUB/RSS 阅读体验与 20+ UI 问题验收（底部遮挡、搜索模式、批量管理、设置/书源入口去重、顶部滚动样式），并建立逐项可复现清单。

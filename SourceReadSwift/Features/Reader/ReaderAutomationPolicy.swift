@@ -1,6 +1,48 @@
 import Foundation
 import Combine
 
+/// Deterministic chrome state for the reader.  The previous implementation
+/// kept `showOverlay` and `showSettings` as two independent booleans; a
+/// delayed SwiftUI update could therefore leave the settings sheet visible
+/// after the menu had been dismissed (or vice versa).  A single state makes
+/// every exit path converge on one transition and is straightforward to test
+/// without rendering UIKit.
+enum ReaderChromeMode: Equatable {
+    case hidden
+    case overlay
+    case settings
+}
+
+struct ReaderChromeStateMachine: Equatable {
+    private(set) var mode: ReaderChromeMode = .hidden
+
+    var isOverlayVisible: Bool { mode != .hidden }
+    var isSettingsVisible: Bool { mode == .settings }
+
+    mutating func setInitialOverlayVisible(_ visible: Bool) {
+        mode = visible ? .overlay : .hidden
+    }
+
+    mutating func toggleOverlay() {
+        mode = mode == .hidden ? .overlay : .hidden
+    }
+
+    mutating func openSettings() {
+        mode = .settings
+    }
+
+    /// Closing settings intentionally returns to the reader menu.  This keeps
+    /// the reader action bar available while ensuring the settings surface is
+    /// never stranded above a hidden overlay.
+    mutating func closeSettings() {
+        if mode == .settings { mode = .overlay }
+    }
+
+    mutating func closeAll() {
+        mode = .hidden
+    }
+}
+
 /// Deterministic decisions for automatic reader advancement.
 /// Kept independent from SwiftUI so chapter-boundary behavior is testable on CI.
 enum ReaderAdvanceDecision: Equatable {

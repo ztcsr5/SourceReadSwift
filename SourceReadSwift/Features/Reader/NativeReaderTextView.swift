@@ -321,10 +321,14 @@ struct NativeReaderTextView: UIViewRepresentable {
             let range = paragraphRanges[index]
             let glyphRange = textView.layoutManager.glyphRange(forCharacterRange: range, actualCharacterRange: nil)
             let rect = textView.layoutManager.boundingRect(forGlyphRange: glyphRange, in: textView.textContainer)
-            let minimumY = -textView.adjustedContentInset.top
-            let targetY = max(minimumY, rect.minY + textView.textContainerInset.top)
-            let maximumY = max(minimumY, textView.contentSize.height - textView.bounds.height + textView.adjustedContentInset.bottom)
-            let offset = CGPoint(x: 0, y: min(max(targetY, minimumY), maximumY))
+            let targetY = ReaderScrollPositionPolicy.targetContentOffsetY(
+                textRectMinY: rect.minY,
+                textContainerInsetTop: textView.textContainerInset.top,
+                boundsHeight: textView.bounds.height,
+                contentSizeHeight: textView.contentSize.height,
+                adjustedContentInset: textView.adjustedContentInset
+            )
+            let offset = CGPoint(x: 0, y: targetY)
             let currentOffset = textView.contentOffset
             guard abs(currentOffset.y - offset.y) > 0.5 else { return true }
             if animated {
@@ -365,6 +369,31 @@ struct NativeReaderTextView: UIViewRepresentable {
             lastVisibleParagraph = index
             visibleParagraphCallback(index)
         }
+    }
+}
+
+/// Pure scroll-offset math used by the TextKit surface.  Text layout rects are
+/// expressed in the text-container coordinate system, while `contentOffset` is
+/// expressed in scroll-view coordinates.  `textContainerInset.top` is the
+/// visual breathing room between the viewport edge and the first glyph, so it
+/// must be subtracted when converting a glyph Y position to a scroll offset.
+/// Keeping that conversion here makes paragraph jumps, speech highlighting and
+/// automated scrolling use the same coordinate contract.
+enum ReaderScrollPositionPolicy {
+    static func targetContentOffsetY(
+        textRectMinY: CGFloat,
+        textContainerInsetTop: CGFloat,
+        boundsHeight: CGFloat,
+        contentSizeHeight: CGFloat,
+        adjustedContentInset: UIEdgeInsets
+    ) -> CGFloat {
+        let minimumY = -adjustedContentInset.top
+        let maximumY = max(
+            minimumY,
+            contentSizeHeight - boundsHeight + adjustedContentInset.bottom
+        )
+        let desiredY = textRectMinY - textContainerInsetTop
+        return min(max(desiredY, minimumY), maximumY)
     }
 }
 
