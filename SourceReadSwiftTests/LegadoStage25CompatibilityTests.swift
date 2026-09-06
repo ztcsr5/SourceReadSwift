@@ -169,7 +169,9 @@ final class LegadoStage25CompatibilityTests: XCTestCase {
         XCTAssertEqual(detail.tocUrl, "https://fixture.local/toc/1")
         XCTAssertEqual(chapters.first?.url, "https://fixture.local/chapter/1")
         XCTAssertEqual(content.paragraphs, ["正文"])
-        XCTAssertEqual(network.stageHeaders, ["", "search", "detail", "toc"])
+        // Unknown persistent placeholders are intentionally preserved by the
+        // request builder; once bodyJs stores the token, later stages expand it.
+        XCTAssertEqual(network.stageHeaders, ["{{token}}", "search", "detail", "toc"])
     }
 
     func testAjaxAllFetchResponseBytesAndJSONPathJsoupMix() throws {
