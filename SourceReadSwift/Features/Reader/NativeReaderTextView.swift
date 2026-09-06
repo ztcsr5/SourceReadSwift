@@ -101,6 +101,8 @@ struct NativeReaderTextView: UIViewRepresentable {
         let animatedScrollDuration: Double
 
         struct TextLayoutSignature: Equatable {
+            let title: String
+            let subtitle: String?
             let contentFingerprint: String
             let fontSize: Double
             let lineSpacing: Double
@@ -117,6 +119,8 @@ struct NativeReaderTextView: UIViewRepresentable {
 
         var textLayoutSignature: TextLayoutSignature {
             TextLayoutSignature(
+                title: title,
+                subtitle: subtitle,
                 contentFingerprint: contentFingerprint,
                 fontSize: fontSize,
                 lineSpacing: lineSpacing,
@@ -271,7 +275,10 @@ struct NativeReaderTextView: UIViewRepresentable {
                 bottom: CGFloat(configuration.pagePadding + configuration.footerHeight),
                 right: CGFloat(configuration.pagePadding)
             )
-            guard textView.textContainerInset != insets else { return }
+            guard textView.textContainerInset.top != insets.top
+                    || textView.textContainerInset.left != insets.left
+                    || textView.textContainerInset.bottom != insets.bottom
+                    || textView.textContainerInset.right != insets.right else { return }
             textView.textContainerInset = insets
         }
 
