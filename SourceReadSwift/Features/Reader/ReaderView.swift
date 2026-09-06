@@ -71,7 +71,6 @@ struct ReaderView: View {
     /// Keep it in state instead of rebuilding an array with `compactMap` every
     /// time SwiftUI reevaluates the reader body or a speech callback arrives.
     @State private var positionMappingCache = ReaderPositionMapping(paragraphCount: 0)
-    @State private var positionMappingCacheKey = ""
     /// The reader may live in a split view or Stage Manager window. Keep the
     /// actual container size instead of using UIScreen.main, which describes
     /// the physical display and can be stale for the current scene.
@@ -247,15 +246,18 @@ struct ReaderView: View {
     }
 
     private var positionMapping: ReaderPositionMapping {
-        guard positionMappingCacheKey == readerPageCacheKey else {
-            // A cache rebuild is scheduled by `onChange`; this fallback keeps
-            // a synchronous mode switch safe during that one transition.
-            return ReaderPositionMapping(
-                paragraphCount: content.paragraphs.count,
-                pageFirstParagraphs: pagedBlocks.compactMap(\.firstParagraphIndex)
-            )
+        if positionMappingCache.paragraphCount == content.paragraphs.count {
+            // A typography gesture may temporarily make the cache key stale;
+            // the old mapping is still valid until the debounced page rebuild
+            // commits and avoids compactMap work on every slider frame.
+            return positionMappingCache
         }
-        return positionMappingCache
+        // A first render may not have a page model yet. Keep a safe fallback
+        // for synchronous mode switches during that one transition.
+        return ReaderPositionMapping(
+            paragraphCount: content.paragraphs.count,
+            pageFirstParagraphs: pagedBlocks.compactMap(\.firstParagraphIndex)
+        )
     }
 
     var body: some View {
@@ -421,7 +423,6 @@ struct ReaderView: View {
             pagedBlocksCache.removeAll()
             pagedBlocksCacheKey = ""
             positionMappingCache = ReaderPositionMapping(paragraphCount: updatedContent.paragraphs.count)
-            positionMappingCacheKey = ""
             scrollParagraphTarget = 0
             pagedPageIndex = 0
             visibleParagraphIndex = 0
@@ -1801,7 +1802,6 @@ struct ReaderView: View {
             paragraphCount: content.paragraphs.count,
             pageFirstParagraphs: blocks.compactMap(\.firstParagraphIndex)
         )
-        positionMappingCacheKey = cacheKey
     }
 
     private func schedulePagedBlocksCacheRebuild() {
