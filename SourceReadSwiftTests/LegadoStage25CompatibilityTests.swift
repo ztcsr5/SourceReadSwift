@@ -132,7 +132,6 @@ final class LegadoStage25CompatibilityTests: XCTestCase {
             bookSourceName: "Stage 25 pipeline",
             bookSourceUrl: "https://fixture.local/",
             searchUrl: "https://fixture.local/search?q={{key}}",
-            header: #"{"X-Stage":"{{token}}"}"#,
             ruleSearch: SourceRule(fields: [
                 "bookList": "$.books",
                 "name": "$.name",
@@ -155,7 +154,8 @@ final class LegadoStage25CompatibilityTests: XCTestCase {
             ruleContent: SourceRule(fields: [
                 "content": "$.content",
                 "bodyJs": "java.put('token', 'content'); return result.replace('ENCODED', '正文')"
-            ])
+            ]),
+            header: #"{"X-Stage":"{{token}}"}"#
         )
         let network = Stage25PipelineNetwork()
         let engine = LegadoSourceEngine(network: network)
