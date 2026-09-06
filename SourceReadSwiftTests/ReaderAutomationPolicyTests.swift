@@ -73,7 +73,7 @@ final class ReaderAutomationPolicyTests: XCTestCase {
         XCTAssertEqual(last, 910, accuracy: 0.001)
 
         let topInset = ReaderScrollPositionPolicy.targetContentOffsetY(
-            textRectMinY: 12,
+            textRectMinY: 0,
             textContainerInsetTop: 24,
             boundsHeight: 400,
             contentSizeHeight: 1_200,
