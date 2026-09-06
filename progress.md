@@ -2145,3 +2145,4 @@ Windows cannot run Xcode or a real ProMotion device. CI proves compilation/tests
 
 - `CachedRemoteImage` 的图片解码/预热下沉到 utility queue，列表滚动期间不再在主线程同步执行 `UIImage(data:)`；内存缓存仍保留并继续复用。
 - RSS 文章正文的 SwiftSoup 解析改为后台队列，缓存正文、网络正文和 fallback 均在回到 MainActor 前完成解析；章节切换代际校验继续生效，旧文章解析结果不会回写当前页面。
+- RSS 阅读页状态横幅动画已局部化，加载/缓存状态变化不再隐式驱动整棵 TextKit 视图动画。

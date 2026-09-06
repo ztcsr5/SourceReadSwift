@@ -91,6 +91,7 @@ struct RSSArticleReaderView: View {
             if let statusMessage {
                 readerStatusBanner(statusMessage)
                     .transition(.move(edge: .top).combined(with: .opacity))
+                    .animation(.easeOut(duration: 0.18), value: statusMessage)
             }
         }
         .background(readerBackground.ignoresSafeArea())
@@ -140,7 +141,8 @@ struct RSSArticleReaderView: View {
                 }
             }
         }
-        .animation(.easeOut(duration: 0.18), value: statusMessage)
+        // Status-banner transitions are scoped to the banner itself; avoid
+        // animating the entire TextKit surface when loading state changes.
         .highRefreshRateSurface()
         .sheet(isPresented: $showSettings) {
             RSSReaderSettingsView(
