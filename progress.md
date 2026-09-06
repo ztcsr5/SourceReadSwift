@@ -2162,3 +2162,31 @@ Windows cannot run Xcode or a real ProMotion device. CI proves compilation/tests
 ### Next
 
 - Stage 25：扩大 Legado JavaScript/HTTP/Jsoup 兼容性，优先补齐跨 Search → Detail → TOC → Content 的动态状态、混合响应、bodyJs 多阶段链路和规则编辑器可视化预览，并为每个缺口补充脱敏本地 fixture 与 XCTest。
+
+## 2026-09-06 - Stage 25：Legado JavaScript/HTTP/字体兼容扩展（工作区完成，待 Actions）
+
+### Implemented
+
+- 新增 `QueryTTF.swift`：大端 TTF/OTF 解析，覆盖 `cmap` 0/4/6、`loca`、simple/composite `glyf`，并保持安卓 Legado 的坐标 delta 指纹、Unicode ↔ glyph 反查和空白字符判断。
+- `java.queryTTF` 支持 Base64、`data:` URL、HTTP 字体字节和句柄化查询；句柄缓存有上限，避免长时间阅读会话无限增长。
+- `java.createAsymmetricCrypto` 接入 Security.framework，支持常见 RSA PKCS#1/OAEP、PEM/DER/base64 和 PKCS#8 私钥回退解析。
+- `java.createSign` 接入有状态的 `initSign/initVerify/update/sign*/verify*`，覆盖 Base64、Hex、字节数组消息和常用 SHA-RSA/PSS 变体。
+- 增加 `java.getVerificationCode` 人工验证码缓存协议；缺失值显式记录 `verification-required`，不伪造 OCR 结果。
+- 增加 `java.unArchiveFile/un7zFile/unrarFile` 的显式 unsupported 分支；ZIP 路径保持现有 ZIPFoundation 实现。
+- 新增离线 Stage 25 XCTest：字体 cmap/glyf、RSA 加解密/签名、验证码/压缩包失败、四阶段动态 header/bodyJs、ajaxAll/Fetch bytes/JSONPath/Jsoup 混合链路。
+
+### Local verification
+
+- `git diff --check`：passed。
+- `node ci-log/extract-prelude.js`：passed（当前提取长度见命令输出）。
+- `node --check ci-log/js-prelude-check.js`：passed。
+- Windows 无 `swift`/`xcodebuild`，未在本机声称 Swift 编译或 XCTest 通过；新增 Stage 25 改动尚未提交前由 Actions 验证。
+
+### Release gate / Next
+
+- 本阶段提交后立即触发 `.github/workflows/ios.yml` 与 `.github/workflows/unsigned-ipa.yml`；记录 run ID、XCTest 结果和 IPA artifact。
+- 若 Actions 通过，进入 Stage 26：更多真实书源脱敏 fixture、Jsoup/JSONPath 边界和规则编辑器可视化预览；若失败，按 Actions 首个编译/测试错误回滚到本阶段前提交并修复。
+
+### Rollback
+
+- 回滚本阶段提交即可移除 Stage 25 新增桥接与 fixture，不影响 Stage 24 性能收口和此前已验证的规则编辑器/诊断闭环。

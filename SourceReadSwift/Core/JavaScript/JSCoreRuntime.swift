@@ -826,6 +826,71 @@ final class JSCoreRuntime {
         java.RSA_decrypt = function(value, key) { return java.rsaDecrypt(value, key); };
         java.RSA_encryptWithPrivate = function(value, key) { return String(__nativeLegado.invoke({ method: 'RSA_encryptWithPrivate', args: [String(value || ''), String(key || '')] }) || ''); };
         java.RSA_decryptWithPublic = function(value, key) { return String(__nativeLegado.invoke({ method: 'RSA_decryptWithPublic', args: [String(value || ''), String(key || '')] }) || ''); };
+        // Legado's newer factory APIs are stateful in Android.  Keep the
+        // state in the JS object while routing the cryptographic primitive to
+        // Security.framework; this supports both init/update/sign call-sites
+        // and the common direct sign(data, key) form.
+        java.createAsymmetricCrypto = function(transformation) {
+          var config = { transformation: String(transformation || 'RSA/ECB/PKCS1Padding'), key: '' };
+          function run(method, data, key) {
+            var actualKey = key == null || String(key) === '' ? config.key : String(key);
+            if (actualKey) config.key = actualKey;
+            return String(__nativeLegado.invoke({ method: method, args: [data == null ? '' : data, config.key, config.transformation] }) || '');
+          }
+          var api = {
+            setKey: function(key) { config.key = String(key || ''); return api; },
+            setPublicKey: function(key) { config.key = String(key || ''); return api; },
+            setPrivateKey: function(key) { config.key = String(key || ''); return api; },
+            init: function(key) { config.key = String(key || ''); return api; },
+            encrypt: function(data, key) { return run('asymmetricEncrypt', data, key); },
+            decrypt: function(data, key) { return run('asymmetricDecrypt', data, key); },
+            encryptBase64: function(data, key) { return run('asymmetricEncrypt', data, key); },
+            decryptBase64: function(data, key) { return run('asymmetricDecrypt', data, key); },
+            toString: function() { return config.transformation; }
+          };
+          return api;
+        };
+        java.createSign = function(algorithm) {
+          var config = { algorithm: String(algorithm || 'SHA256withRSA'), key: '', data: '' };
+          function sign(method, data, key, signature) {
+            var actualData = data == null ? config.data : data;
+            var actualKey = key == null || String(key) === '' ? config.key : String(key);
+            if (actualKey) config.key = actualKey;
+            var args = [actualData == null ? '' : actualData, config.key, config.algorithm];
+            if (signature !== undefined) args.push(signature);
+            return __nativeLegado.invoke({ method: method, args: args });
+          }
+          function chunkText(data) {
+            if (data && typeof data !== 'string' && data.length != null) {
+              return String(__native_bytesToString(__javaBytes(data)) || '');
+            }
+            return String(data == null ? '' : data);
+          }
+          function verifyCall(first, second, third) {
+            // Android's stateful API is normally:
+            //   initVerify(publicKey); update(message); verify(signature)
+            // Keep the direct three-argument overload as well.
+            if (arguments.length === 1) return String(sign('verify', config.data, config.key, first) || '') === 'true';
+            return String(sign('verify', first, third, second) || '') === 'true';
+          }
+          function verifyHexCall(first, second, third) {
+            if (arguments.length === 1) return String(sign('verifyHex', config.data, config.key, first) || '') === 'true';
+            return String(sign('verifyHex', first, third, second) || '') === 'true';
+          }
+          var api = {
+            initSign: function(key) { config.key = String(key || ''); config.data = ''; return api; },
+            initVerify: function(key) { config.key = String(key || ''); config.data = ''; return api; },
+            update: function(data) { config.data += chunkText(data); return api; },
+            sign: function(data, key) { return String(sign('sign', data, key) || ''); },
+            signBase64: function(data, key) { return String(sign('sign', data, key) || ''); },
+            signHex: function(data, key) { return String(sign('signHex', data, key) || ''); },
+            verify: verifyCall,
+            verifyBase64: verifyCall,
+            verifyHex: verifyHexCall,
+            toString: function() { return config.algorithm; }
+          };
+          return api;
+        };
         java.digestBase64Str = function(value, algorithm) { return java.base64Encode(__hexToJavaBytes(java.digestHex(value, algorithm || 'sha256'))); };
         java.uriEncode = function(value) { return java.encodeURI(value); };
         java.uriDecode = function(value) { return java.decodeURI(value); };
@@ -1839,10 +1904,45 @@ final class JSCoreRuntime {
         java.readTxtFile = function(path, charset) { return String(__nativeLegado.invoke({ method: 'readTxtFile', args: [String(path || ''), String(charset || 'utf-8')] }) || ''); };
         java.downloadFile = function(url, path) { return String(__nativeLegado.invoke({ method: 'downloadFile', args: [String(url || ''), String(path || '')] }) || ''); };
         java.unzipFile = function(path) { return String(__nativeLegado.invoke({ method: 'unzipFile', args: [String(path || '')] }) || ''); };
+        java.un7zFile = function(path) { return String(__nativeLegado.invoke({ method: 'un7zFile', args: [String(path || '')] }) || ''); };
+        java.unrarFile = function(path) { return String(__nativeLegado.invoke({ method: 'unrarFile', args: [String(path || '')] }) || ''); };
+        java.unArchiveFile = function(path) {
+          var text = String(path || ''), ext = text.toLowerCase();
+          if (ext.indexOf('.zip') === ext.length - 4) return java.unzipFile(text);
+          if (ext.indexOf('.7z') === ext.length - 3) return java.un7zFile(text);
+          if (ext.indexOf('.rar') === ext.length - 4) return java.unrarFile(text);
+          return '';
+        };
         java.getTxtInFolder = function(path) { return __nativeLegado.invoke({ method: 'getTxtInFolder', args: [String(path || '')] }); };
         java.getZipStringContent = function(path, entry, charset) { return String(__nativeLegado.invoke({ method: 'getZipStringContent', args: [String(path || ''), String(entry || ''), String(charset || 'utf-8')] }) || ''); };
         java.getZipByteArrayContent = function(path, entry) { return __nativeLegado.invoke({ method: 'getZipByteArrayContent', args: [String(path || ''), String(entry || '')] }); };
         java.getSandboxPath = function() { return String(__nativeLegado.invoke({ method: 'sandboxPath', args: [] }) || ''); };
+        java.getVerificationCode = function(imageUrl) {
+          return String(__nativeLegado.invoke({ method: 'getVerificationCode', args: [String(imageUrl || '')] }) || '');
+        };
+        java.queryTTF = function(value, options) {
+          if (value == null) return null;
+          var text = typeof value === 'string' ? value : '', encoded = value;
+          if (/^https?:/i.test(text)) {
+            var headers = options && options.headers ? options.headers : {};
+            encoded = java.base64Encode(java.ajaxBytes(text, headers));
+          } else if (/^data:/i.test(text)) {
+            var marker = text.indexOf('base64,');
+            encoded = marker >= 0 ? text.substring(marker + 7) : '';
+          } else if (typeof value === 'string') {
+            encoded = text;
+          }
+          if (!encoded) return null;
+          var handle = String(__nativeLegado.invoke({ method: 'queryTTFParse', args: [encoded] }) || '');
+          if (!handle) return null;
+          return {
+            getGlyfByUnicode: function(code) { return String(__nativeLegado.invoke({ method: 'queryTTFGlyfByUnicode', args: [handle, Number(code) || 0] }) || ''); },
+            getUnicodeByGlyf: function(glyf) { return Number(__nativeLegado.invoke({ method: 'queryTTFUnicodeByGlyf', args: [handle, String(glyf || '')] }) || 0); },
+            getGlyfIdByUnicode: function(code) { return Number(__nativeLegado.invoke({ method: 'queryTTFGlyfIdByUnicode', args: [handle, Number(code) || 0] }) || 0); },
+            isBlankUnicode: function(code) { return !!__nativeLegado.invoke({ method: 'queryTTFIsBlank', args: [handle, Number(code) || 0] }); },
+            handle: handle
+          };
+        };
         java.fetchCloudTTS = function(_) { return ''; };
         function __cipherArgs(third, fourth, fallback) {
           var thirdText = String(third == null ? '' : third);
@@ -3252,6 +3352,8 @@ final class JSCoreRuntime {
           globalThis.RSA_decrypt = function(value, key) { return java.RSA_decrypt(value, key); };
           globalThis.RSA_encryptWithPrivate = function(value, key) { return java.RSA_encryptWithPrivate(value, key); };
           globalThis.RSA_decryptWithPublic = function(value, key) { return java.RSA_decryptWithPublic(value, key); };
+          globalThis.queryTTF = function(value, options) { return java.queryTTF(value, options); };
+          globalThis.getVerificationCode = function(value) { return java.getVerificationCode(value); };
           globalThis.digestBase64Str = function(value, algorithm) { return java.digestBase64Str(value, algorithm); };
           globalThis.uriEncode = function(value) { return java.uriEncode(value); };
           globalThis.uriDecode = function(value) { return java.uriDecode(value); };

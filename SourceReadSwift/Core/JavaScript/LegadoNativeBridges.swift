@@ -277,6 +277,48 @@ final class LegadoJavaHostBridge: NSObject, LegadoJavaHostExport {
                 value: RuleExecutionContext.bridgeString(arguments.first),
                 key: RuleExecutionContext.bridgeString(arguments.count > 1 ? arguments[1] : "")
             )
+        case "asymmetricEncrypt", "asymmetricDecrypt":
+            return services.asymmetric(
+                operation: method,
+                transformation: arguments.count > 2 ? RuleExecutionContext.bridgeString(arguments[2]) : "RSA/ECB/PKCS1Padding",
+                value: arguments.first,
+                key: RuleExecutionContext.bridgeString(arguments.count > 1 ? arguments[1] : "")
+            )
+        case "sign", "signHex", "verify", "verifyHex":
+            return services.sign(
+                operation: method,
+                algorithmName: arguments.count > 2 ? RuleExecutionContext.bridgeString(arguments[2]) : "SHA256withRSA",
+                value: arguments.first,
+                key: RuleExecutionContext.bridgeString(arguments.count > 1 ? arguments[1] : ""),
+                signature: arguments.count > 3 ? arguments[3] : nil
+            )
+        case "queryTTFParse":
+            return services.queryTTFParse(arguments.first)
+        case "queryTTFGlyfByUnicode":
+            return services.queryTTFGlyfByUnicode(
+                RuleExecutionContext.bridgeString(arguments.first),
+                unicode: Int(RuleExecutionContext.bridgeString(arguments.count > 1 ? arguments[1] : "0")) ?? 0
+            )
+        case "queryTTFUnicodeByGlyf":
+            return services.queryTTFUnicodeByGlyf(
+                RuleExecutionContext.bridgeString(arguments.first),
+                glyph: RuleExecutionContext.bridgeString(arguments.count > 1 ? arguments[1] : "")
+            )
+        case "queryTTFGlyfIdByUnicode":
+            return services.queryTTFGlyfIdByUnicode(
+                RuleExecutionContext.bridgeString(arguments.first),
+                unicode: Int(RuleExecutionContext.bridgeString(arguments.count > 1 ? arguments[1] : "0")) ?? 0
+            )
+        case "queryTTFIsBlank":
+            return services.queryTTFIsBlank(
+                RuleExecutionContext.bridgeString(arguments.first),
+                unicode: Int(RuleExecutionContext.bridgeString(arguments.count > 1 ? arguments[1] : "0")) ?? 0
+            )
+        case "getVerificationCode":
+            return services.verificationCode(imageURL: RuleExecutionContext.bridgeString(arguments.first))
+        case "un7zFile", "unrarFile":
+            executionContext.recordBridgeFailure("java.\(method)", message: "archive format unsupported on this build; use ZIP or import a pre-extracted local fixture")
+            return ""
         case "sandboxPath":
             return services.sandboxURL.path
             default:

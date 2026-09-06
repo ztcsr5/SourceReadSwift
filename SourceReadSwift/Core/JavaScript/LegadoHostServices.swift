@@ -14,6 +14,9 @@ final class LegadoHostServices {
     private let executionContext: RuleExecutionContext
     private let fileManager: FileManager
     let sandboxURL: URL
+    private let queryTTFLock = NSLock()
+    private var queryTTFObjects: [String: QueryTTF] = [:]
+    private var queryTTFSequence = 0
 
     init(executionContext: RuleExecutionContext, fileManager: FileManager = .default) {
         self.executionContext = executionContext
@@ -185,9 +188,23 @@ final class LegadoHostServices {
         let attributes: [CFString: Any] = [
             kSecAttrKeyType: kSecAttrKeyTypeRSA,
             kSecAttrKeyClass: isPrivate ? kSecAttrKeyClassPrivate : kSecAttrKeyClassPublic,
-            kSecAttrKeySizeInBits: keyData.count * 8
+            kSecAttrKeySizeInBits: rsaKeySizeBits(keyData)
         ]
-        guard let secKey = SecKeyCreateWithData(keyData as CFData, attributes as CFDictionary, nil) else { return "" }
+        let secKey: SecKey?
+        if let direct = SecKeyCreateWithData(keyData as CFData, attributes as CFDictionary, nil) {
+            secKey = direct
+        } else if !isPrivate, let raw = unwrapRSAPublicKey(keyData) {
+            var fallback = attributes
+            fallback[kSecAttrKeySizeInBits] = rsaKeySizeBits(raw)
+            secKey = SecKeyCreateWithData(raw as CFData, fallback as CFDictionary, nil)
+        } else if isPrivate, let raw = unwrapRSAPrivateKey(keyData) {
+            var fallback = attributes
+            fallback[kSecAttrKeySizeInBits] = rsaKeySizeBits(raw)
+            secKey = SecKeyCreateWithData(raw as CFData, fallback as CFDictionary, nil)
+        } else {
+            secKey = nil
+        }
+        guard let secKey else { return "" }
         let algorithm: SecKeyAlgorithm = .rsaEncryptionPKCS1
         let decrypt = operation.localizedCaseInsensitiveContains("decrypt")
         if decrypt {
@@ -198,6 +215,294 @@ final class LegadoHostServices {
         guard let clear = value.data(using: .utf8), SecKeyIsAlgorithmSupported(secKey, .encrypt, algorithm),
               let cipher = SecKeyCreateEncryptedData(secKey, algorithm, clear as CFData, nil) as Data? else { return "" }
         return cipher.base64EncodedString()
+    }
+
+    // MARK: - Legado asymmetric crypto and signatures
+
+    /// Create an RSA-compatible operation using Apple's Security framework.
+    /// Legado exchanges strings as Base64 at this boundary, which keeps binary
+    /// ciphertext/signatures lossless through JavaScriptCore.
+    func asymmetric(operation: String, transformation: String, value: Any?, key: String) -> String {
+        guard let secKey = makeSecKey(key: key, isPrivate: operation.localizedCaseInsensitiveContains("private") ||
+                                      operation.localizedCaseInsensitiveContains("decrypt"),
+                                      operation: operation) else {
+            executionContext.recordBridgeFailure("java.createAsymmetricCrypto", message: "invalid RSA key")
+            return ""
+        }
+        let decrypt = operation.localizedCaseInsensitiveContains("decrypt")
+        let payload: Data
+        if decrypt {
+            let payloadText = RuleExecutionContext.bridgeString(value)
+            guard let decoded = Data(base64Encoded: Self.normalizedBase64(payloadText)) else {
+                executionContext.recordBridgeFailure("java.createAsymmetricCrypto", message: "ciphertext is not Base64")
+                return ""
+            }
+            payload = decoded
+        } else {
+            payload = data(from: value)
+        }
+        let algorithm = rsaEncryptionAlgorithm(transformation)
+        guard SecKeyIsAlgorithmSupported(secKey, decrypt ? .decrypt : .encrypt, algorithm) else {
+            executionContext.recordBridgeFailure("java.createAsymmetricCrypto", message: "unsupported RSA transformation")
+            return ""
+        }
+        let result: Data?
+        if decrypt {
+            result = SecKeyCreateDecryptedData(secKey, algorithm, payload as CFData, nil) as Data?
+        } else {
+            result = SecKeyCreateEncryptedData(secKey, algorithm, payload as CFData, nil) as Data?
+        }
+        guard let result else {
+            executionContext.recordBridgeFailure("java.createAsymmetricCrypto", message: decrypt ? "RSA decrypt failed" : "RSA encrypt failed")
+            return ""
+        }
+        return decrypt ? (String(data: result, encoding: .utf8) ?? result.base64EncodedString()) : result.base64EncodedString()
+    }
+
+    func sign(operation: String, algorithmName: String, value: Any?, key: String, signature: Any? = nil) -> String {
+        let verify = operation.localizedCaseInsensitiveContains("verify")
+        let isPrivate = !verify
+        guard let secKey = makeSecKey(key: key, isPrivate: isPrivate, operation: operation) else {
+            executionContext.recordBridgeFailure("java.createSign", message: "invalid RSA key")
+            return verify ? "false" : ""
+        }
+        let message = data(from: value)
+        let secAlgorithm = rsaSignatureAlgorithm(algorithmName)
+        guard SecKeyIsAlgorithmSupported(secKey, verify ? .verify : .sign, secAlgorithm) else {
+            executionContext.recordBridgeFailure("java.createSign", message: "unsupported signature algorithm (algorithmName)")
+            return verify ? "false" : ""
+        }
+        if verify {
+            let encoded = RuleExecutionContext.bridgeString(signature)
+            let signatureData: Data?
+            if operation.localizedCaseInsensitiveContains("hex") {
+                signatureData = Self.dataFromHex(encoded)
+            } else {
+                signatureData = Data(base64Encoded: Self.normalizedBase64(encoded))
+            }
+            guard let signatureData else { return "false" }
+            let valid = SecKeyVerifySignature(secKey, secAlgorithm, message as CFData, signatureData as CFData, nil)
+            return valid ? "true" : "false"
+        }
+        guard let output = SecKeyCreateSignature(secKey, secAlgorithm, message as CFData, nil) as Data? else {
+            executionContext.recordBridgeFailure("java.createSign", message: "RSA signing failed")
+            return ""
+        }
+        if operation.localizedCaseInsensitiveContains("hex") {
+            return output.map { String(format: "%02x", $0) }.joined()
+        }
+        return output.base64EncodedString()
+    }
+
+    private func makeSecKey(key: String, isPrivate: Bool, operation: String) -> SecKey? {
+        let keyData: Data
+        if key.contains("BEGIN") {
+            let body = key.components(separatedBy: .newlines)
+                .filter { !$0.contains("BEGIN") && !$0.contains("END") }
+                .joined()
+            guard let data = Data(base64Encoded: Self.normalizedBase64(body)) else { return nil }
+            keyData = data
+        } else if let data = Data(base64Encoded: Self.normalizedBase64(key)) {
+            keyData = data
+        } else { return nil }
+        let attributes: [CFString: Any] = [
+            kSecAttrKeyType: kSecAttrKeyTypeRSA,
+            kSecAttrKeyClass: isPrivate ? kSecAttrKeyClassPrivate : kSecAttrKeyClassPublic,
+            kSecAttrKeySizeInBits: rsaKeySizeBits(keyData)
+        ]
+        if let direct = SecKeyCreateWithData(keyData as CFData, attributes as CFDictionary, nil) { return direct }
+        if !isPrivate, let raw = unwrapRSAPublicKey(keyData) {
+            var fallback = attributes
+            fallback[kSecAttrKeySizeInBits] = rsaKeySizeBits(raw)
+            return SecKeyCreateWithData(raw as CFData, fallback as CFDictionary, nil)
+        }
+        if isPrivate, let raw = unwrapRSAPrivateKey(keyData) {
+            var fallback = attributes
+            fallback[kSecAttrKeySizeInBits] = rsaKeySizeBits(raw)
+            return SecKeyCreateWithData(raw as CFData, fallback as CFDictionary, nil)
+        }
+        return nil
+    }
+
+    private func rsaKeySizeBits(_ data: Data) -> Int {
+        let bytes = Array(data)
+        guard bytes.count >= 8 else { return max(512, bytes.count * 8) }
+        for index in 0..<(bytes.count - 2) where bytes[index] == 0x02 {
+            guard let (length, header) = derLength(bytes, at: index + 1),
+                  length >= 64, index + 1 + header + length <= bytes.count else { continue }
+            let start = index + 1 + header
+            let leading = bytes[start] == 0 ? 1 : 0
+            return max(512, (length - leading) * 8)
+        }
+        return max(512, bytes.count * 8)
+    }
+
+    private func derLength(_ bytes: [UInt8], at index: Int) -> (length: Int, header: Int)? {
+        guard index < bytes.count else { return nil }
+        let first = bytes[index]
+        if first & 0x80 == 0 { return (Int(first), 1) }
+        let count = Int(first & 0x7f)
+        guard count > 0, count <= 4, index + count < bytes.count else { return nil }
+        var length = 0
+        for offset in 0..<count { length = (length << 8) | Int(bytes[index + 1 + offset]) }
+        return (length, 1 + count)
+    }
+
+    /// Extract the PKCS#1 RSA private-key sequence nested in a PKCS#8
+    /// PrivateKeyInfo OCTET STRING.  The scan is intentionally conservative:
+    /// it only accepts a sequence whose first two children are INTEGERs and
+    /// whose second integer is large enough to be an RSA modulus.
+    private func unwrapRSAPrivateKey(_ data: Data) -> Data? {
+        let bytes = Array(data)
+        guard bytes.count > 16 else { return nil }
+        for index in 0..<(bytes.count - 4) where bytes[index] == 0x30 {
+            guard let (sequenceLength, sequenceHeader) = derLength(bytes, at: index + 1),
+                  index + 1 + sequenceHeader + sequenceLength <= bytes.count else { continue }
+            let start = index + 1 + sequenceHeader
+            guard bytes[start] == 0x02,
+                  let (_, firstHeader) = derLength(bytes, at: start + 1) else { continue }
+            guard let (firstLength, _) = derLength(bytes, at: start + 1) else { continue }
+            let second = start + 1 + firstHeader + firstLength
+            guard second < bytes.count, bytes[second] == 0x02,
+                  let (modulusLength, _) = derLength(bytes, at: second + 1),
+                  modulusLength >= 64 else { continue }
+            return Data(bytes[index..<(index + 1 + sequenceHeader + sequenceLength)])
+        }
+        return nil
+    }
+
+    /// Preserve binary arguments passed by Java/Legado byte-array APIs. A
+    /// Swift String remains UTF-8, while NSArray/Data/JSValue arrays are
+    /// interpreted as unsigned bytes instead of their JSON description.
+    private func data(from value: Any?) -> Data {
+        if value is NSArray || value is [Any] || value is [NSNumber] || value is [UInt8] || value is Data || value is JSValue {
+            return Data(bytes(from: value))
+        }
+        return Data(RuleExecutionContext.bridgeString(value).utf8)
+    }
+
+    private static func dataFromHex(_ value: String) -> Data? {
+        let text = value.components(separatedBy: .whitespacesAndNewlines).joined()
+        guard !text.isEmpty, text.count % 2 == 0 else { return nil }
+        var bytes: [UInt8] = []
+        bytes.reserveCapacity(text.count / 2)
+        var index = text.startIndex
+        while index < text.endIndex {
+            let end = text.index(index, offsetBy: 2)
+            guard let byte = UInt8(text[index..<end], radix: 16) else { return nil }
+            bytes.append(byte)
+            index = end
+        }
+        return Data(bytes)
+    }
+
+    private func unwrapRSAPublicKey(_ data: Data) -> Data? {
+        let bytes = Array(data)
+        guard bytes.count > 24 else { return nil }
+        for index in 0..<(bytes.count - 1) where bytes[index] == 0x03 {
+            let lengthByte = bytes[index + 1]
+            var header = 2
+            var length = Int(lengthByte)
+            if lengthByte & 0x80 != 0 {
+                let count = Int(lengthByte & 0x7f)
+                guard count > 0, count <= 4, index + 2 + count <= bytes.count else { continue }
+                header += count; length = 0
+                for item in bytes[(index + 2)..<(index + 2 + count)] { length = (length << 8) | Int(item) }
+            }
+            let payloadStart = index + header
+            guard payloadStart < bytes.count, length >= 1, payloadStart + length <= bytes.count,
+                  bytes[payloadStart] == 0 else { continue }
+            return Data(bytes[(payloadStart + 1)..<(payloadStart + length)])
+        }
+        return nil
+    }
+
+    private func rsaEncryptionAlgorithm(_ transformation: String) -> SecKeyAlgorithm {
+        let normalized = transformation.lowercased().replacingOccurrences(of: "-", with: "")
+        if normalized.contains("oaep") {
+            if normalized.contains("sha256") { return .rsaEncryptionOAEPSHA256 }
+            if normalized.contains("sha512") { return .rsaEncryptionOAEPSHA512 }
+            return .rsaEncryptionOAEPSHA1
+        }
+        return .rsaEncryptionPKCS1
+    }
+
+    private func rsaSignatureAlgorithm(_ algorithm: String) -> SecKeyAlgorithm {
+        let normalized = algorithm.lowercased().replacingOccurrences(of: "-", with: "")
+        if normalized.contains("pss") {
+            if normalized.contains("512") { return .rsaSignatureMessagePSSSHA512 }
+            if normalized.contains("384") { return .rsaSignatureMessagePSSSHA384 }
+            if normalized.contains("256") { return .rsaSignatureMessagePSSSHA256 }
+            return .rsaSignatureMessagePSSSHA1
+        }
+        if normalized.contains("512") { return .rsaSignatureMessagePKCS1v15SHA512 }
+        if normalized.contains("384") { return .rsaSignatureMessagePKCS1v15SHA384 }
+        if normalized.contains("256") { return .rsaSignatureMessagePKCS1v15SHA256 }
+        if normalized.contains("224") { return .rsaSignatureMessagePKCS1v15SHA224 }
+        if normalized.contains("sha1") { return .rsaSignatureMessagePKCS1v15SHA1 }
+        return .rsaSignatureMessagePKCS1v15SHA256
+    }
+
+    // MARK: - queryTTF
+
+    func queryTTFParse(_ value: Any?) -> String {
+        var bytes = bytes(from: value)
+        // JS sources commonly pass a Base64 font string (or a data: URL)
+        // while Java callers pass a byte array. Decode only when the raw
+        // argument does not already look like an sfnt payload.
+        if !looksLikeSFNT(bytes) {
+            let text = RuleExecutionContext.bridgeString(value)
+            let encoded = text.range(of: "base64,", options: [.caseInsensitive])
+                .map { String(text[$0.upperBound...]) } ?? text
+            if let decoded = Data(base64Encoded: Self.normalizedBase64(encoded)) {
+                bytes = Array(decoded)
+            }
+        }
+        guard !bytes.isEmpty else {
+            executionContext.recordBridgeFailure("java.queryTTF", message: "empty font payload")
+            return ""
+        }
+        let object = QueryTTF(data: Data(bytes))
+        queryTTFLock.lock(); defer { queryTTFLock.unlock() }
+        queryTTFSequence += 1
+        let handle = "ttf-\(queryTTFSequence)"
+        queryTTFObjects[handle] = object
+        if queryTTFObjects.count > 8 { queryTTFObjects.removeValue(forKey: queryTTFObjects.keys.sorted().first ?? "") }
+        return handle
+    }
+
+    private func looksLikeSFNT(_ bytes: [UInt8]) -> Bool {
+        guard bytes.count >= 4 else { return false }
+        return (bytes[0] == 0x00 && bytes[1] == 0x01 && bytes[2] == 0x00 && bytes[3] == 0x00)
+            || Array(bytes.prefix(4)) == Array("OTTO".utf8)
+            || Array(bytes.prefix(4)) == Array("true".utf8)
+            || Array(bytes.prefix(4)) == Array("typ1".utf8)
+    }
+
+    func queryTTFGlyfByUnicode(_ handle: String, unicode: Int) -> String {
+        queryTTFLock.lock(); let value = queryTTFObjects[handle]?.getGlyfByUnicode(unicode) ?? ""; queryTTFLock.unlock(); return value
+    }
+
+    func queryTTFUnicodeByGlyf(_ handle: String, glyph: String) -> Int {
+        queryTTFLock.lock(); let value = queryTTFObjects[handle]?.getUnicodeByGlyf(glyph) ?? 0; queryTTFLock.unlock(); return value
+    }
+
+    func queryTTFGlyfIdByUnicode(_ handle: String, unicode: Int) -> Int {
+        queryTTFLock.lock(); let value = queryTTFObjects[handle]?.getGlyfIdByUnicode(unicode) ?? 0; queryTTFLock.unlock(); return value
+    }
+
+    func queryTTFIsBlank(_ handle: String, unicode: Int) -> Bool {
+        queryTTFLock.lock(); let value = queryTTFObjects[handle]?.isBlankUnicode(unicode) ?? false; queryTTFLock.unlock(); return value
+    }
+
+    // Captcha recognition is intentionally not guessed.  Sources can provide
+    // a user-entered value through java.put("captcha:<url>", value); absent
+    // that value we return an empty string and leave an actionable diagnostic.
+    func verificationCode(imageURL: String) -> String {
+        let cached = executionContext.get("captcha:\(imageURL)")
+        if !cached.isEmpty { return cached }
+        executionContext.recordBridgeFailure("java.getVerificationCode", message: "verification-required")
+        return ""
     }
 
     /// Generic raw-byte cipher bridge used by CryptoJS WordArray shims and by

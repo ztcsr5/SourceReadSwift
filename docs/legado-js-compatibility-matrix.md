@@ -34,3 +34,27 @@
 1. 更完整的 `java.util.regex.Matcher`（`start/end/groupCount`）。
 2. Jsoup `Document` 的 `location`, `head`, `body`, `title` 与资源绝对 URL 回归。
 3. 真实书源样本脱敏后的 search/detail/toc/content 端到端 fixture。
+
+## Stage 25：跨阶段与字体/加密兼容性
+
+本阶段把安卓开源阅读高频但容易在 JavaScriptCore 上断链的能力接到同一条
+Swift 原生桥：
+
+| 类别 | API/行为 | 当前范围与证据 |
+|---|---|---|
+| RSA 工厂 | `java.createAsymmetricCrypto` 的 `setPublicKey/setPrivateKey/encryptBase64/decryptBase64` | Security.framework；PKCS#1/PKCS#8、PEM/DER/base64；离线 Stage 25 XCTest |
+| RSA 签名 | `java.createSign` 的 `initSign/initVerify/update/signBase64/signHex/verify*` | PKCS#1 v1.5 与 PSS 常用 SHA-1/224/256/384/512；离线 Stage 25 XCTest |
+| 反爬字体 | `java.queryTTF`、cmap 0/4/6、loca/glyf、复合 glyph、Unicode 反查 | `QueryTTF.swift`；坐标保持 Legado 的 delta 指纹格式；离线 fixture |
+| 验证码 | `java.getVerificationCode` | 仅读取 `captcha:<imageUrl>` 的人工缓存；无 OCR 猜测，缺失时记录 `verification-required` |
+| 压缩包 | `java.unArchiveFile`、`un7zFile`、`unrarFile` | ZIP 继续走 ZIPFoundation；7z/RAR 显式返回空值并记录 unsupported，避免伪造成功 |
+| 多阶段状态 | Search → Detail → TOC → Content 的 `bodyJs`、header/token、混合响应 | `LegadoStage25CompatibilityTests` 离线网络 fixture |
+| HTTP/DOM | `ajaxAll`、Fetch POST、响应 bytes/status/final URL/header、JSONPath + Jsoup 链 | `LegadoStage25CompatibilityTests` 离线网络 fixture |
+
+### 运行与发布边界
+
+- JavaScriptCore 回调仍是同步桥；字体 HTTP 获取复用现有 `RuleExecutionContext`
+  response/network handler，不在 JS 中直接打开网络。
+- 7z/RAR 不在当前 iOS 依赖中实现；书源应改用 ZIP、预解压资源或导入本地 fixture。
+- 验证码识别需要阅读器 UI/用户输入闭环；本阶段只固定缓存协议与可观测失败。
+- Windows 无法运行 Xcode/UIKit/XCTest；Stage 25 的 iOS 编译、XCTest 与 unsigned IPA
+  以 GitHub Actions 为准，真机 120 Hz 仍需 ProMotion 设备验收。
