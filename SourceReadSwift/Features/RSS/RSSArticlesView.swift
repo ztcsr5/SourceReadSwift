@@ -119,8 +119,14 @@ struct RSSArticlesView: View {
             if let http = response as? HTTPURLResponse, !(200..<400).contains(http.statusCode) {
                 throw URLError(.badServerResponse)
             }
-            let text = ResponseTextDecoder().decode(data: data, headers: [:])
-            let parsed = RSSFeedParser().parseArticles(from: text, sourceURL: source.sourceUrl)
+            let headers = (response as? HTTPURLResponse)?.allHeaderFields.reduce(into: [String: String]()) { result, item in
+                result[String(describing: item.key)] = String(describing: item.value)
+            } ?? [:]
+            // Feed XML can be large (and often contains content:encoded HTML).
+            // Keep decoding and regex parsing off the main actor so refreshing
+            // a feed cannot steal frames from the root navigation or reader.
+            let parsed = await parseFeedOffMain(data: data, headers: headers, sourceURL: source.sourceUrl)
+            try Task.checkCancellation()
             didLoadFeed = true
             if parsed.isEmpty {
                 errorMessage = "已加载响应，但没有识别到 RSS/Atom 文章。"
@@ -128,12 +134,33 @@ struct RSSArticlesView: View {
             articles = Array(parsed.prefix(100))
             appState.rssFeedCacheStore.save(articles, sourceURL: source.sourceUrl)
             showingStaleCache = false
+        } catch is CancellationError {
+            return
         } catch {
             if articles.isEmpty {
                 errorMessage = error.localizedDescription
             } else {
                 errorMessage = "网络不可用，正在显示离线缓存文章"
                 showingStaleCache = true
+            }
+        }
+    }
+
+    private func parseFeedOffMain(
+        data: Data,
+        headers: [String: String],
+        sourceURL: String
+    ) async -> [RSSArticlePreview] {
+        await withCheckedContinuation { continuation in
+            DispatchQueue.global(qos: .userInitiated).async {
+                autoreleasepool {
+                    let signpost = PerformanceSignpost.begin("rss.feed.load")
+                    let text = ResponseTextDecoder().decode(data: data, headers: headers)
+                    let articles = RSSFeedParser().parseArticles(from: text, sourceURL: sourceURL)
+                    PerformanceSignpost.event("rss.feed.summary", "source=\(sourceURL), articles=\(articles.count)")
+                    PerformanceSignpost.end("rss.feed.load", id: signpost)
+                    continuation.resume(returning: articles)
+                }
             }
         }
     }

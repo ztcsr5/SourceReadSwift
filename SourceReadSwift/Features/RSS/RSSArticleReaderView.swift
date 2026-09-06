@@ -506,8 +506,15 @@ struct RSSArticleReaderView: View {
             if let http = response as? HTTPURLResponse, !(200..<400).contains(http.statusCode) { throw URLError(.badServerResponse) }
             try Task.checkCancellation()
             guard generation == loadGeneration, article.id == currentArticle.id else { return }
-            let html = ResponseTextDecoder().decode(data: data, headers: [:])
-            let parsed = await parseParagraphsOffMain(html)
+            let headers = (response as? HTTPURLResponse)?.allHeaderFields.reduce(into: [String: String]()) { result, item in
+                result[String(describing: item.key)] = String(describing: item.value)
+            } ?? [:]
+            // Decoding can allocate a large HTML string before SwiftSoup sees
+            // it. Keep both the byte-to-text step and DOM parsing off the main
+            // actor so a long article never blocks the reader's scroll loop.
+            let decoded = await decodeAndParseOffMain(data: data, headers: headers)
+            let html = decoded.html
+            let parsed = decoded.paragraphs
             guard generation == loadGeneration, article.id == currentArticle.id else { return }
             if !parsed.isEmpty {
                 paragraphs = parsed
@@ -539,6 +546,24 @@ struct RSSArticleReaderView: View {
         await withCheckedContinuation { continuation in
             DispatchQueue.global(qos: .userInitiated).async {
                 continuation.resume(returning: RSSArticleContentParser().parseParagraphs(from: html))
+            }
+        }
+    }
+
+    private func decodeAndParseOffMain(
+        data: Data,
+        headers: [String: String]
+    ) async -> (html: String, paragraphs: [String]) {
+        await withCheckedContinuation { continuation in
+            DispatchQueue.global(qos: .userInitiated).async {
+                autoreleasepool {
+                    let signpost = PerformanceSignpost.begin("rss.article.parse")
+                    let html = ResponseTextDecoder().decode(data: data, headers: headers)
+                    let paragraphs = RSSArticleContentParser().parseParagraphs(from: html)
+                    PerformanceSignpost.event("rss.article.summary", "paragraphs=\(paragraphs.count)")
+                    PerformanceSignpost.end("rss.article.parse", id: signpost)
+                    continuation.resume(returning: (html: html, paragraphs: paragraphs))
+                }
             }
         }
     }
