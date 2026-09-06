@@ -4,6 +4,7 @@ import UniformTypeIdentifiers
 
 struct SourceRuleEditorView: View {
     let source: BookSource
+    let diagnosticStep: SourceDiagnosticStep?
     let onSave: (BookSource) -> Void
     let onCancel: () -> Void
 
@@ -30,8 +31,14 @@ struct SourceRuleEditorView: View {
     @State private var isImportingDraft = false
     @State private var draftMessage: String?
 
-    init(source: BookSource, onSave: @escaping (BookSource) -> Void, onCancel: @escaping () -> Void) {
+    init(
+        source: BookSource,
+        diagnosticStep: SourceDiagnosticStep? = nil,
+        onSave: @escaping (BookSource) -> Void,
+        onCancel: @escaping () -> Void
+    ) {
         self.source = source
+        self.diagnosticStep = diagnosticStep
         self.onSave = onSave
         self.onCancel = onCancel
         _searchURL = State(initialValue: source.searchUrl ?? "")
@@ -39,6 +46,11 @@ struct SourceRuleEditorView: View {
         _detailRule = State(initialValue: Self.text(source.ruleBookInfo))
         _tocRule = State(initialValue: Self.text(source.ruleToc))
         _contentRule = State(initialValue: Self.text(source.ruleContent))
+        if let diagnosticStep {
+            let stageIndex = SourceDiagnosticStage.allCases.firstIndex(of: diagnosticStep.stage) ?? 0
+            _selectedSection = State(initialValue: stageIndex)
+            _previewSample = State(initialValue: SourceDiagnosticRepairAdvisor.suggestedSample(for: diagnosticStep))
+        }
     }
 
     var body: some View {
@@ -52,6 +64,26 @@ struct SourceRuleEditorView: View {
                         Text("正文").tag(3)
                     }
                     .pickerStyle(.segmented)
+                }
+                if let diagnosticStep {
+                    let advice = SourceDiagnosticRepairAdvisor.advice(for: diagnosticStep)
+                    Section("诊断修复入口") {
+                        Label(advice.title, systemImage: "wrench.and.screwdriver")
+                            .font(.subheadline.weight(.semibold))
+                        Text(advice.summary)
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                        ForEach(Array(advice.actions.enumerated()), id: \.offset) { _, action in
+                            Label(action, systemImage: "checkmark.circle")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                        if let status = diagnosticStep.responseStatusCode {
+                            Text("HTTP \(status) · \(diagnosticStep.finalURL ?? diagnosticStep.requestSummary ?? "未记录 URL")")
+                                .font(.caption2.monospaced())
+                                .foregroundStyle(.tertiary)
+                        }
+                    }
                 }
                 Section("当前阶段说明") {
                     Label(stageHelp.title, systemImage: stageHelp.systemImage)

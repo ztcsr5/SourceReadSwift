@@ -14,7 +14,7 @@ struct SourceManagerView: View {
     @State private var showImportSheet = false
     @State private var openFileImporterAfterSheetDismiss = false
     @State private var sourceJSONEditor: SourceJSONEditorState?
-    @State private var sourceRuleEditor: BookSource?
+    @State private var sourceRuleEditor: SourceRuleEditorLaunch?
     @State private var jsonPreview: SourceJSONPreview?
     @State private var sourceTest: SourceTestState?
     @State private var batchCheck: SourceBatchCheckState?
@@ -23,10 +23,11 @@ struct SourceManagerView: View {
     @State private var sourceHistory: BookSource?
     @State private var sourceVisualDetail: BookSource?
     @State private var pendingDetailAction: SourceDetailAction?
+    @State private var pendingBatchRuleEditor: SourceRuleEditorLaunch?
 
     private enum SourceDetailAction {
         case test(BookSource)
-        case rules(BookSource)
+        case rules(BookSource, SourceDiagnosticStep?)
         case json(BookSource)
     }
 
@@ -41,9 +42,18 @@ struct SourceManagerView: View {
         pendingDetailAction = nil
         switch action {
         case .test(let source): sourceTest = SourceTestState(source: source)
-        case .rules(let source): sourceRuleEditor = source
+        case .rules(let source, let diagnosticStep):
+            sourceRuleEditor = SourceRuleEditorLaunch(source: source, diagnosticStep: diagnosticStep)
         case .json(let source): sourceJSONEditor = SourceJSONEditorState(title: source.bookSourceName, json: prettyJSON(source))
         case nil: break
+        }
+    }
+
+    private func presentPendingBatchRuleEditor() {
+        guard let launch = pendingBatchRuleEditor else { return }
+        pendingBatchRuleEditor = nil
+        DispatchQueue.main.async {
+            sourceRuleEditor = launch
         }
     }
     @State private var rssEditor: RSSSource?
@@ -166,7 +176,8 @@ struct SourceManagerView: View {
             }
             .sheet(item: $sourceRuleEditor) { source in
                 SourceRuleEditorView(
-                    source: source,
+                    source: source.source,
+                    diagnosticStep: source.diagnosticStep,
                     onSave: { updated in
                         do {
                             let data = try JSONEncoder().encode(updated)
@@ -188,7 +199,7 @@ struct SourceManagerView: View {
             .sheet(item: $sourceTest) { state in
                 sourceTestSheet(state)
             }
-            .sheet(item: $batchCheck) { state in
+            .sheet(item: $batchCheck, onDismiss: presentPendingBatchRuleEditor) { state in
                 batchCheckSheet(state)
             }
             .onDisappear {
@@ -207,7 +218,7 @@ struct SourceManagerView: View {
                     source: source,
                     health: appState.sourceHealthStore.record(for: source),
                     onTest: { routeFromDetail(.test(source)) },
-                    onEditRules: { routeFromDetail(.rules(source)) },
+                    onEditRules: { step in routeFromDetail(.rules(source, step)) },
                     onEditJSON: { routeFromDetail(.json(source)) }
                 )
                 .environmentObject(appState)
@@ -520,7 +531,7 @@ struct SourceManagerView: View {
                     sourceJSONEditor = SourceJSONEditorState(title: source.bookSourceName, json: prettyJSON(source))
                 }
                 Button("规则编辑") {
-                    sourceRuleEditor = source
+                    sourceRuleEditor = SourceRuleEditorLaunch(source: source)
                 }
                 if source.loginUrl?.nilIfEmpty != nil {
                     Button("打开登录页") {
@@ -1211,6 +1222,24 @@ struct SourceManagerView: View {
                                 Text("耗时 \(result.elapsedMilliseconds) ms")
                                     .font(.caption2.monospacedDigit())
                                     .foregroundStyle(.tertiary)
+                                if let failure = result.diagnosticReport?.firstFailure,
+                                   result.status != .passed {
+                                    Button {
+                                        pendingBatchRuleEditor = SourceRuleEditorLaunch(
+                                            source: state.sources.first(where: { $0.bookSourceUrl == result.sourceURL })
+                                                ?? BookSource(
+                                                    bookSourceName: result.sourceName,
+                                                    bookSourceUrl: result.sourceURL
+                                                ),
+                                            diagnosticStep: failure
+                                        )
+                                        batchCheck = nil
+                                    } label: {
+                                        Label("修复规则", systemImage: "wrench.and.screwdriver")
+                                            .font(.caption.weight(.semibold))
+                                    }
+                                    .buttonStyle(.bordered)
+                                }
                             }
                         }
                     }
@@ -1741,12 +1770,23 @@ private struct SourceJSONEditorState: Identifiable {
     var json: String
 }
 
+private struct SourceRuleEditorLaunch: Identifiable {
+    let id = UUID()
+    let source: BookSource
+    let diagnosticStep: SourceDiagnosticStep?
+
+    init(source: BookSource, diagnosticStep: SourceDiagnosticStep? = nil) {
+        self.source = source
+        self.diagnosticStep = diagnosticStep
+    }
+}
+
 private struct SourceVisualDetailView: View {
     @EnvironmentObject private var appState: AppState
     let source: BookSource
     let health: SourceHealthRecord?
     let onTest: () -> Void
-    let onEditRules: () -> Void
+    let onEditRules: (SourceDiagnosticStep?) -> Void
     let onEditJSON: () -> Void
     @Environment(\.dismiss) private var dismiss
     @State private var diagnosticKeyword = "斗破苍穹"
@@ -1879,12 +1919,41 @@ private struct SourceVisualDetailView: View {
                     }
                     .podcastCard()
 
+                    if let failure = visibleDiagnosticReport?.firstFailure {
+                        let advice = SourceDiagnosticRepairAdvisor.advice(for: failure)
+                        VStack(alignment: .leading, spacing: 9) {
+                            HStack(spacing: 8) {
+                                Image(systemName: "wrench.and.screwdriver.fill")
+                                    .foregroundStyle(.orange)
+                                Text("建议修复：\(advice.title)")
+                                    .font(.subheadline.weight(.semibold))
+                                Spacer()
+                                Text(failure.status.shortTitle)
+                                    .font(.caption2.weight(.bold))
+                                    .foregroundStyle(failure.status.color)
+                            }
+                            Text(advice.summary)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                                .lineLimit(3)
+                            Button {
+                                onEditRules(failure)
+                            } label: {
+                                Label("定位到 \(advice.fieldName)", systemImage: "arrow.right.circle")
+                                    .frame(maxWidth: .infinity)
+                            }
+                            .buttonStyle(.bordered)
+                        }
+                        .padding()
+                        .background(Color.orange.opacity(0.08), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                    }
+
                     VStack(spacing: 10) {
                         Button { onTest() } label: {
                             Label("运行全链路测试", systemImage: "play.circle.fill").frame(maxWidth: .infinity)
                         }
                         .buttonStyle(.borderedProminent)
-                        Button { onEditRules() } label: {
+                        Button { onEditRules(visibleDiagnosticReport?.firstFailure) } label: {
                             Label("编辑规则", systemImage: "slider.horizontal.3").frame(maxWidth: .infinity)
                         }
                         .buttonStyle(.bordered)
@@ -1910,7 +1979,9 @@ private struct SourceVisualDetailView: View {
     private var diagnosticEvidenceSection: some View {
         let steps = visibleDiagnosticReport?.steps ?? []
         let actionable = steps.filter { step in
-            !(step.executionLogs?.isEmpty ?? true) || !(step.javascript?.isEmpty ?? true)
+            step.requestMethod != nil || step.responseStatusCode != nil
+                || !(step.executionLogs?.isEmpty ?? true)
+                || !(step.javascript?.isEmpty ?? true)
         }
         if !actionable.isEmpty {
             DisclosureGroup("执行证据（\(actionable.count) 个阶段）") {
@@ -1919,6 +1990,29 @@ private struct SourceVisualDetailView: View {
                         VStack(alignment: .leading, spacing: 5) {
                             Text(step.stage.title)
                                 .font(.caption.weight(.semibold))
+                            if let method = step.requestMethod {
+                                Text("request: \(method) \(step.finalURL ?? step.requestSummary ?? "未记录 URL")")
+                                    .font(.caption2.monospaced())
+                                    .foregroundStyle(.secondary)
+                                    .textSelection(.enabled)
+                            }
+                            if let code = step.responseStatusCode {
+                                Text("response: HTTP \(code) · \(step.responseWasDecoded ? "decoded" : "raw")"
+                                    + (step.responseContentEncodings.map { " · \($0.joined(separator: ","))" } ?? ""))
+                                    .font(.caption2.monospaced())
+                                    .foregroundStyle(code >= 400 ? .red : .secondary)
+                            }
+                            if let headers = step.responseHeaders, !headers.isEmpty {
+                                Text("headers: \(headers.keys.sorted().joined(separator: ", "))")
+                                    .font(.caption2.monospaced())
+                                    .foregroundStyle(.tertiary)
+                            }
+                            if let body = step.responseSummary?.nilIfEmpty {
+                                Text("summary: \(body)")
+                                    .font(.caption2)
+                                    .foregroundStyle(.secondary)
+                                    .lineLimit(3)
+                            }
                             if let logs = step.executionLogs, !logs.isEmpty {
                                 ForEach(Array(logs.suffix(8).enumerated()), id: \.offset) { _, log in
                                     Text(log)

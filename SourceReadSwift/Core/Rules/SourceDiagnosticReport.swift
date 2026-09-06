@@ -391,6 +391,11 @@ struct SourceDiagnosticBatchReport: Identifiable, Codable, Hashable, Sendable {
             let status = report.overallStatus.rawValue
             let failure = report.firstFailure.map { " · firstFailure=\($0.stage.rawValue):\($0.status.rawValue)" } ?? ""
             lines.append("[\(status)] \(report.sourceName) · \(report.sourceURL)\(failure)")
+            if let failedStep = report.firstFailure {
+                let advice = SourceDiagnosticRepairAdvisor.advice(for: failedStep)
+                lines.append("  repair: \(advice.title) · field=\(advice.fieldName)")
+                lines.append("  actions: \(advice.actions.joined(separator: " | "))")
+            }
             for step in report.steps {
                 let count = step.matchCount > 0 ? " · results=\(step.matchCount)" : ""
                 let elapsed = step.elapsedMilliseconds.map { " · \($0) ms" } ?? ""
