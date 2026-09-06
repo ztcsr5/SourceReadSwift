@@ -473,7 +473,8 @@ struct RSSArticleReaderView: View {
         // network request below is still attempted and replaces the cache when
         // fresh content is available.
         if let cachedHTML = appState.rssArticleContentCacheStore.contentHTML(for: article) {
-            let cached = RSSArticleContentParser().parseParagraphs(from: cachedHTML)
+            let cached = await parseParagraphsOffMain(cachedHTML)
+            guard generation == loadGeneration else { return }
             if !cached.isEmpty {
                 paragraphs = cached
                 contentFingerprint = makeContentFingerprint(cached, articleID: article.id)
@@ -491,7 +492,7 @@ struct RSSArticleReaderView: View {
         }
         guard let link = article.link, let url = URL(string: link) else {
             if paragraphs.isEmpty {
-                paragraphs = fallbackParagraphs(for: article)
+                paragraphs = await fallbackParagraphs(for: article)
                 contentFingerprint = makeContentFingerprint(paragraphs, articleID: article.id)
             }
             statusMessage = paragraphs.isEmpty ? "该文章没有有效链接" : "已显示文章内容"
@@ -504,7 +505,7 @@ struct RSSArticleReaderView: View {
             try Task.checkCancellation()
             guard generation == loadGeneration, article.id == currentArticle.id else { return }
             let html = ResponseTextDecoder().decode(data: data, headers: [:])
-            let parsed = RSSArticleContentParser().parseParagraphs(from: html)
+            let parsed = await parseParagraphsOffMain(html)
             guard generation == loadGeneration, article.id == currentArticle.id else { return }
             if !parsed.isEmpty {
                 paragraphs = parsed
@@ -518,7 +519,7 @@ struct RSSArticleReaderView: View {
         catch {
             guard generation == loadGeneration, article.id == currentArticle.id else { return }
             if paragraphs.isEmpty {
-                paragraphs = fallbackParagraphs(for: article)
+                paragraphs = await fallbackParagraphs(for: article)
                 contentFingerprint = makeContentFingerprint(paragraphs, articleID: article.id)
                 requestPositionRestore(visibleParagraphIndex, generation: generation)
             }
@@ -532,8 +533,22 @@ struct RSSArticleReaderView: View {
         }
     }
 
-    private func fallbackParagraphs(for article: RSSArticlePreview) -> [String] {
-        article.contentHTML.map { RSSArticleContentParser().parseParagraphs(from: $0) } ?? article.description.map { RSSArticleContentParser().parseParagraphs(from: $0) } ?? []
+    private func parseParagraphsOffMain(_ html: String) async -> [String] {
+        await withCheckedContinuation { continuation in
+            DispatchQueue.global(qos: .userInitiated).async {
+                continuation.resume(returning: RSSArticleContentParser().parseParagraphs(from: html))
+            }
+        }
+    }
+
+    private func fallbackParagraphs(for article: RSSArticlePreview) async -> [String] {
+        if let html = article.contentHTML {
+            return await parseParagraphsOffMain(html)
+        }
+        if let description = article.description {
+            return await parseParagraphsOffMain(description)
+        }
+        return []
     }
 
     private func makeContentFingerprint(_ values: [String], articleID: String) -> String {

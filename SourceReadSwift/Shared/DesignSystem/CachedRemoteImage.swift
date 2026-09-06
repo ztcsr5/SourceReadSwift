@@ -54,13 +54,27 @@ struct CachedRemoteImage<Placeholder: View>: View {
             let (data, response) = try await URLSession.shared.data(for: request)
             guard !Task.isCancelled,
                   let http = response as? HTTPURLResponse,
-                  (200..<300).contains(http.statusCode),
-                  let decoded = UIImage(data: data) else { return }
+                  (200..<300).contains(http.statusCode) else { return }
+            // SwiftUI `.task` inherits the main actor from the view. Decode
+            // and decompress covers on a utility queue so a burst of rows
+            // cannot steal the reader/list's display frames.
+            guard let decoded = await Self.decodeImageOffMainThread(data),
+                  !Task.isCancelled else { return }
             ImageMemoryCache.shared.insert(decoded, for: url)
             await MainActor.run { image = decoded }
         } catch {
             // Keep the placeholder; a failed cover must never block list
             // scrolling or trigger a state-update loop.
+        }
+    }
+
+    private static func decodeImageOffMainThread(_ data: Data) async -> UIImage? {
+        await withCheckedContinuation { continuation in
+            DispatchQueue.global(qos: .utility).async {
+                autoreleasepool {
+                    continuation.resume(returning: UIImage(data: data)?.preparingForDisplay())
+                }
+            }
         }
     }
 }

@@ -2140,3 +2140,8 @@ Windows cannot run Xcode or a real ProMotion device. CI proves compilation/tests
 ### Next
 
 - 提交并等待两条 Actions；若编译/测试通过，进入 Stage 24 第二批：图片/HTML 解析后台化、RSS 阅读页滚动状态与长列表懒加载、真机 signpost 验收清单。
+
+### Stage 24 性能收口（第二批，工作区追加）
+
+- `CachedRemoteImage` 的图片解码/预热下沉到 utility queue，列表滚动期间不再在主线程同步执行 `UIImage(data:)`；内存缓存仍保留并继续复用。
+- RSS 文章正文的 SwiftSoup 解析改为后台队列，缓存正文、网络正文和 fallback 均在回到 MainActor 前完成解析；章节切换代际校验继续生效，旧文章解析结果不会回写当前页面。
