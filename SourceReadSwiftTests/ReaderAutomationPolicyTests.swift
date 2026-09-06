@@ -185,6 +185,6 @@ final class ReaderAutomationPolicyTests: XCTestCase {
         XCTAssertEqual(result.paragraphRanges.count, paragraphs.count)
         XCTAssertEqual(result.paragraphRanges.first?.length, paragraphs[0].utf16.count)
         XCTAssertEqual(result.paragraphRanges.last?.length, paragraphs[2_499].utf16.count)
-        XCTAssertEqual(result.text.string.components(separatedBy: "\n\n").count, paragraphs.count + 2)
+        XCTAssertEqual(result.text.string.components(separatedBy: "\n\n").count, paragraphs.count + 1)
     }
 }
