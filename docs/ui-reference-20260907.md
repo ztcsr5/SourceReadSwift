@@ -1,6 +1,6 @@
 # UI 参考图补充（2026-09-07）
 
-本目录保存用户补充的 7 张界面参考图，作为 SwiftUI 视觉验收基线。图片中的真实站点、URL、账号、Cookie、token 仅作视觉示例，不得复制到源码、fixture 或诊断报告。
+本目录保存用户补充的 8 张界面参考图，作为 SwiftUI 视觉验收基线。图片中的真实站点、URL、账号、Cookie、token 仅作视觉示例，不得复制到源码、fixture 或诊断报告。
 
 ## 视觉基线
 
@@ -17,3 +17,5 @@
 - `reference-5.jpg`、`reference-6.jpg`、`reference-7.jpg`：书源详情诊断
 
 - `reference-8.jpg`: 主页内容卡片、横向推荐列表和底部迷你播放器（补充视觉基线）
+
+
