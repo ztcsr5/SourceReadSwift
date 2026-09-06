@@ -21,6 +21,15 @@ final class ReaderPositionMappingTests: XCTestCase {
         XCTAssertEqual(mapping.paragraph(forPage: 99), 7)
     }
 
+    func testPageLookupHandlesLargeMonotonicMappings() {
+        let starts = stride(from: 0, to: 10_000, by: 5).map { $0 }
+        let mapping = ReaderPositionMapping(paragraphCount: 10_000, pageFirstParagraphs: starts)
+        XCTAssertEqual(mapping.page(containingParagraph: 0), 0)
+        XCTAssertEqual(mapping.page(containingParagraph: 4), 0)
+        XCTAssertEqual(mapping.page(containingParagraph: 5_001), 1_000)
+        XCTAssertEqual(mapping.page(containingParagraph: 9_999), 1_999)
+    }
+
     func testModeSwitchUsesOneParagraphPosition() {
         let mapping = ReaderPositionMapping(paragraphCount: 12, pageFirstParagraphs: [0, 4, 8])
         let paragraph = 6
