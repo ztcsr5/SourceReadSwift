@@ -72,3 +72,8 @@
 - `.github/workflows/unsigned-ipa.yml`：Release iphoneos unsigned app → IPA artifact
 
 如果任一失败，按首个编译/测试错误修复；不把 Windows 静态检查冒充 iOS 通过。
+
+## 当前结论
+
+- `f89910a` 已通过 `unsigned-ipa.yml`；`ios.yml` 同轮为 success。
+- Stage 31 已收口，下一阶段入口转入 Stage 32。

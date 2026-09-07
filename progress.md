@@ -2332,7 +2332,7 @@ Windows cannot run Xcode or a real ProMotion device. CI proves compilation/tests
 ### Next
 - 提交后让 Actions 跑一遍；如果 `cover` 翻页仍有体感问题，再继续收 `pageTurn`/`cover` 的动画与边界页表现。
 
-## 2026-09-08 - Stage 31：书源能力表快照与阅读器收尾开工（进行中）
+## 2026-09-08 - Stage 31：书源能力表快照与阅读器收尾（已收口）
 
 ### Implemented
 
@@ -2365,8 +2365,8 @@ Windows cannot run Xcode or a real ProMotion device. CI proves compilation/tests
 
 ### Stage 31 Next
 
-- 提交并推送 Stage 31，等待 iOS build/XCTest 与 unsigned IPA Actions；若失败，按首个 annotation 修复。
-- Actions 通过后进入 Stage 32：针对 C 级书源继续补 GBK/验证/加密/字体反爬 fixture，并继续真机反馈的阅读器跟手性收口。
+- iOS build / XCTest / unsigned IPA 已通过当前收口提交 `f89910a`，Stage 31 视为完成。
+- 进入 Stage 32：针对 C 级书源继续补 GBK / 登录验证 / 加密 / 字体反爬 fixture，并继续真机反馈的阅读器跟手性收口。
 
 ### Stage 31 iOS 16 compatibility fix
 
