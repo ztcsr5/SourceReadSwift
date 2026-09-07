@@ -2379,3 +2379,8 @@ Windows cannot run Xcode or a real ProMotion device. CI proves compilation/tests
 - iOS build 已再次通过；Unsigned IPA 已再次通过；当前仅剩 iOS XCTest 的 `build` job 在跑修复后的新提交。
 - 公开 annotations 指向两处具体回退：`LegadoCapabilityBankTests` 的 fixture 路径兜底和 `java.getFile(path)` 目录对象语义。
 - 已同步修正并提交，等待新的 Actions 终态确认。
+
+### Stage 31 latest local fix
+
+- `SourceReadSwift/Core/JavaScript/LegadoHostServices.swift` 的 `fileInfo(_:)` 已将 `isDirectory` 统一收敛为纯 `Bool`，移除对 `boolValue` 的依赖，避免 Swift 编译期再次落到同类错误。
+- 本地 `git diff --check` 通过；下一步是提交这次收口并重新触发 GitHub Actions，验证 iOS / unsigned IPA 是否重新恢复到绿色。

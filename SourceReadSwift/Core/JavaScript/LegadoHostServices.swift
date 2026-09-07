@@ -901,11 +901,8 @@ final class LegadoHostServices {
             ] as NSDictionary
         }
         let resourceValues = try? url.resourceValues(forKeys: [.isDirectoryKey, .isRegularFileKey])
-        var isDirectory = resourceValues?.isDirectory ?? false
+        let isDirectory = resourceValues?.isDirectory ?? false
         let exists = fileManager.fileExists(atPath: url.path)
-        if !exists {
-            isDirectory = false
-        }
         let attributes = exists ? (try? fileManager.attributesOfItem(atPath: url.path)) : nil
         let length = (attributes?[.size] as? NSNumber)?.int64Value ?? 0
         let modified = (attributes?[.modificationDate] as? Date)
@@ -916,8 +913,8 @@ final class LegadoHostServices {
             "name": url.lastPathComponent,
             "parent": url.deletingLastPathComponent().path,
             "exists": exists,
-            "isFile": exists && !isDirectory.boolValue,
-            "isDirectory": exists && isDirectory.boolValue,
+            "isFile": exists && !isDirectory,
+            "isDirectory": exists && isDirectory,
             "length": length,
             "lastModified": modified,
             "canRead": exists && fileManager.isReadableFile(atPath: url.path),
