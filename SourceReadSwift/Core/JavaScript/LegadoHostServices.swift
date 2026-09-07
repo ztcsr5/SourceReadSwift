@@ -879,9 +879,9 @@ final class LegadoHostServices {
 
     func fileExists(_ path: String) -> Bool {
         guard let url = resolvedURL(path) else { return false }
-        var isDirectory = ObjCBool(false)
-        guard fileManager.fileExists(atPath: url.path, isDirectory: &isDirectory) else { return false }
-        return !isDirectory.boolValue
+        var directoryFlag = ObjCBool(false)
+        guard fileManager.fileExists(atPath: url.path, isDirectory: &directoryFlag) else { return false }
+        return !directoryFlag.boolValue
     }
 
     /// Metadata facade for Android-style `java.getFile(path)` helpers.  Keep
@@ -900,9 +900,9 @@ final class LegadoHostServices {
                 "length": 0
             ] as NSDictionary
         }
-        let resourceValues = try? url.resourceValues(forKeys: [.isDirectoryKey, .isRegularFileKey])
-        let isDirectory = resourceValues?.isDirectory ?? false
-        let exists = fileManager.fileExists(atPath: url.path)
+        var directoryFlag = ObjCBool(false)
+        let exists = fileManager.fileExists(atPath: url.path, isDirectory: &directoryFlag)
+        let isDirectory = exists && directoryFlag.boolValue
         let attributes = exists ? (try? fileManager.attributesOfItem(atPath: url.path)) : nil
         let length = (attributes?[.size] as? NSNumber)?.int64Value ?? 0
         let modified = (attributes?[.modificationDate] as? Date)
@@ -926,8 +926,9 @@ final class LegadoHostServices {
         guard let url = resolvedURL(path), fileManager.fileExists(atPath: url.path) else {
             return [] as NSArray
         }
-        let resourceValues = try? url.resourceValues(forKeys: [.isDirectoryKey])
-        guard resourceValues?.isDirectory == true,
+        var directoryFlag = ObjCBool(false)
+        guard fileManager.fileExists(atPath: url.path, isDirectory: &directoryFlag),
+              directoryFlag.boolValue,
               let values = try? fileManager.contentsOfDirectory(at: url, includingPropertiesForKeys: nil, options: [.skipsHiddenFiles]) else {
             return [] as NSArray
         }

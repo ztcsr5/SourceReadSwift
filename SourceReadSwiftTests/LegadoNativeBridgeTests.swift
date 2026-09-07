@@ -280,10 +280,11 @@ final class LegadoNativeBridgeTests: XCTestCase {
             var made = dir.mkdirs();
             java.writeFile('compat-dir/sub/a.txt', 'a');
             java.writeFile('compat-dir/sub/b.bin', [1, 2]);
+            var isDirectory = dir.isDirectory();
             var names = dir.list().join(',');
             var files = dir.listFiles().map(function(item) { return item.getName() + ':' + item.isFile(); }).join(',');
             var removed = dir.delete();
-            [made, dir.isDirectory(), names, files, removed, dir.exists()].join('|')
+            [made, isDirectory, names, files, removed, dir.exists()].join('|')
         """)
         guard case .success(let value) = result else { return XCTFail("expected success") }
         XCTAssertEqual(value, "true|true|a.txt,b.bin|a.txt:true,b.bin:true|true|false")

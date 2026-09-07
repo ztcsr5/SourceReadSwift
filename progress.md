@@ -2384,3 +2384,4 @@ Windows cannot run Xcode or a real ProMotion device. CI proves compilation/tests
 
 - `SourceReadSwift/Core/JavaScript/LegadoHostServices.swift` 的 `fileInfo(_:)` 已将 `isDirectory` 统一收敛为纯 `Bool`，移除对 `boolValue` 的依赖，避免 Swift 编译期再次落到同类错误。
 - 本地 `git diff --check` 通过；下一步是提交这次收口并重新触发 GitHub Actions，验证 iOS / unsigned IPA 是否重新恢复到绿色。
+- `SourceReadSwiftTests/LegadoNativeBridgeTests.swift` 的目录 facade 断言改为先记录 `dir.isDirectory()`，再执行 `dir.delete()`，和目录生命周期分开验证。
