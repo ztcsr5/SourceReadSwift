@@ -1270,7 +1270,7 @@ struct ReaderView: View {
                 }
             }
         }
-        .presentationBackground(.clear)
+        .readerSheetPresentation()
         .presentationDetents([.medium, .large])
     }
 
@@ -1389,7 +1389,7 @@ struct ReaderView: View {
                     }
             }
         }
-        .presentationBackground(.clear)
+        .readerSheetPresentation()
         .presentationDetents([.medium, .large])
     }
 
@@ -1989,6 +1989,18 @@ private struct ReaderViewportSizePreferenceKey: PreferenceKey {
         let candidate = nextValue()
         if candidate.width > 1, candidate.height > 1 {
             value = candidate
+        }
+    }
+
+}
+
+private extension View {
+    @ViewBuilder
+    func readerSheetPresentation() -> some View {
+        if #available(iOS 16.4, *) {
+            self.presentationBackground(.clear)
+        } else {
+            self
         }
     }
 }

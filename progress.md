@@ -2367,3 +2367,9 @@ Windows cannot run Xcode or a real ProMotion device. CI proves compilation/tests
 
 - 提交并推送 Stage 31，等待 iOS build/XCTest 与 unsigned IPA Actions；若失败，按首个 annotation 修复。
 - Actions 通过后进入 Stage 32：针对 C 级书源继续补 GBK/验证/加密/字体反爬 fixture，并继续真机反馈的阅读器跟手性收口。
+
+### Stage 31 iOS 16 compatibility fix
+
+- `ReaderView` 中两个 sheet 的 `.presentationBackground(.clear)` 改为条件降级封装，只有 iOS 16.4+ 才走该 API，避免 `iOS 16.0` 目标在 GitHub Actions 上直接编译失败。
+- 本地静态检查继续通过：`git diff --check`、`node ci-log/extract-prelude.js`、`node --check ci-log/js-prelude-check.js`。
+- 下一步仍是等待 34164105164 / 34164105169 的 Actions 终态；若仍失败，按首个 annotation 继续修。
