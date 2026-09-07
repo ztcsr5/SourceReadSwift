@@ -59,6 +59,11 @@
 - `node ci-log/extract-prelude.js`
 - `node --check ci-log/js-prelude-check.js`
 
+## 本轮 Actions 修正
+
+- `LegadoCapabilityBankTests` 的 fixture 读取增加 bundle 根目录兜底，兼容 XcodeGen / test bundle 资源展开路径差异。
+- `java.getFile(path)` 的 `isDirectory()` 语义改为读取文件系统资源值，和 `mkdirs()` / `listFiles()` 的目录对象预期对齐。
+
 ## GitHub Actions 门禁
 
 本阶段提交后触发：

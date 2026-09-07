@@ -2373,3 +2373,9 @@ Windows cannot run Xcode or a real ProMotion device. CI proves compilation/tests
 - `ReaderView` 中两个 sheet 的 `.presentationBackground(.clear)` 改为条件降级封装，只有 iOS 16.4+ 才走该 API，避免 `iOS 16.0` 目标在 GitHub Actions 上直接编译失败。
 - 本地静态检查继续通过：`git diff --check`、`node ci-log/extract-prelude.js`、`node --check ci-log/js-prelude-check.js`。
 - 下一步仍是等待 34164105164 / 34164105169 的 Actions 终态；若仍失败，按首个 annotation 继续修。
+
+### Stage 31 Actions failure follow-up
+
+- iOS build 已再次通过；Unsigned IPA 已再次通过；当前仅剩 iOS XCTest 的 `build` job 在跑修复后的新提交。
+- 公开 annotations 指向两处具体回退：`LegadoCapabilityBankTests` 的 fixture 路径兜底和 `java.getFile(path)` 目录对象语义。
+- 已同步修正并提交，等待新的 Actions 终态确认。

@@ -900,8 +900,12 @@ final class LegadoHostServices {
                 "length": 0
             ] as NSDictionary
         }
-        var isDirectory = ObjCBool(false)
-        let exists = fileManager.fileExists(atPath: url.path, isDirectory: &isDirectory)
+        let resourceValues = try? url.resourceValues(forKeys: [.isDirectoryKey, .isRegularFileKey])
+        var isDirectory = resourceValues?.isDirectory ?? false
+        let exists = fileManager.fileExists(atPath: url.path)
+        if !exists {
+            isDirectory = false
+        }
         let attributes = exists ? (try? fileManager.attributesOfItem(atPath: url.path)) : nil
         let length = (attributes?[.size] as? NSNumber)?.int64Value ?? 0
         let modified = (attributes?[.modificationDate] as? Date)

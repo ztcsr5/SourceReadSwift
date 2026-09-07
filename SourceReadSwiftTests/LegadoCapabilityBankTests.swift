@@ -37,6 +37,7 @@ final class LegadoCapabilityBankTests: XCTestCase {
         let bundle = Bundle(for: Self.self)
         let url = try XCTUnwrap(
             bundle.url(forResource: "legado-capability-bank-20260908", withExtension: "json", subdirectory: "Fixtures")
+            ?? bundle.url(forResource: "legado-capability-bank-20260908", withExtension: "json")
         )
         let data = try Data(contentsOf: url)
         let raw = try JSONSerialization.jsonObject(with: data)
