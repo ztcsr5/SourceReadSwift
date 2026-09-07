@@ -57,6 +57,8 @@ struct ReaderView: View {
     @State private var tocQuery = ""
     @State private var tocReversed = false
     @State private var autoScrollEnabled = false
+    @State private var autoScrollAnchorTarget = 0
+    @State private var autoScrollAwaitingFirstTick = false
     /// Scroll mode targets paragraphs; paged/cover modes target pages.
     /// Keep these indices separate so a mode switch never interprets a page
     /// number as a paragraph (or vice versa).
@@ -83,6 +85,7 @@ struct ReaderView: View {
     @State private var readerContentFingerprint = ""
     @State private var speechPausedForScene = false
     @State private var autoScrollPausedForScene = false
+    @GestureState private var coverSwipeState = ReaderCoverSwipeState()
     @StateObject private var playbackCoordinator = ReaderPlaybackCoordinator()
     @StateObject private var speechController = ReaderSpeechController()
     @AppStorage("reader.fontSize") private var fontSize: Double = 19
@@ -535,7 +538,7 @@ struct ReaderView: View {
             currentParagraphIndex: speechController.currentParagraphIndex,
             scrollTarget: content.paragraphs.indices.contains(speechController.currentParagraphIndex)
                 ? speechController.currentParagraphIndex
-                : (content.paragraphs.indices.contains(scrollParagraphTarget) ? scrollParagraphTarget : nil),
+                : (autoScrollEnabled && !autoScrollAwaitingFirstTick && content.paragraphs.indices.contains(scrollParagraphTarget) ? scrollParagraphTarget : nil),
             scrollRequestKey: nativeScrollRequestKey,
             animatedScrollDuration: autoScrollEnabled ? max(ReaderAutomationPolicy.clampedDelay(autoScrollDelay) * 0.9, 0.25) : 0.35,
             textSelectionEnabled: textSelectionEnabled,
@@ -593,34 +596,66 @@ struct ReaderView: View {
     }
 
     private var coverPagedReaderContent: some View {
-        let safeIndex = min(max(pagedPageIndex, 0), max(pagedBlocks.count - 1, 0))
-        return ZStack {
-            if pagedBlocks.indices.contains(safeIndex) {
-                readerPage(for: pagedBlocks[safeIndex])
-                    .id(pagedBlocks[safeIndex].id)
-                    .transition(.asymmetric(
-                        insertion: .move(edge: .trailing).combined(with: .opacity),
-                        removal: .move(edge: .leading).combined(with: .opacity)
-                    ))
-            }
-        }
-        .simultaneousGesture(
-            DragGesture(minimumDistance: 24)
-                .onEnded { value in
-                    if value.translation.width < -42 {
-                        moveReaderTarget(to: pagedPageIndex + 1)
-                    } else if value.translation.width > 42 {
-                        moveReaderTarget(to: pagedPageIndex - 1)
-                    }
+        GeometryReader { proxy in
+            let width = max(proxy.size.width, 1)
+            let safeIndex = min(max(pagedPageIndex, 0), max(pagedBlocks.count - 1, 0))
+            let drag = coverSwipeState.isHorizontal ? coverSwipeState.translation : 0
+
+            ZStack {
+                if drag < 0, pagedBlocks.indices.contains(safeIndex + 1) {
+                    readerPage(for: pagedBlocks[safeIndex + 1])
+                        .id(pagedBlocks[safeIndex + 1].id)
+                        .offset(x: width + drag)
+                        .allowsHitTesting(false)
                 }
-        )
-        .animation(.easeInOut(duration: 0.22), value: pagedPageIndex)
-        .onChange(of: pagedPageIndex) { target in
-            updatePagedVisibleParagraph(pageIndex: target)
-        }
-        .onChange(of: speechController.currentParagraphIndex) { target in
-            guard target >= 0 else { return }
-            pagedPageIndex = pageIndex(containingParagraph: target)
+
+                if drag > 0, safeIndex > 0 {
+                    readerPage(for: pagedBlocks[safeIndex - 1])
+                        .id(pagedBlocks[safeIndex - 1].id)
+                        .offset(x: -width + drag)
+                        .allowsHitTesting(false)
+                }
+
+                if pagedBlocks.indices.contains(safeIndex) {
+                    readerPage(for: pagedBlocks[safeIndex])
+                        .id(pagedBlocks[safeIndex].id)
+                        .offset(x: drag)
+                }
+            }
+            .clipped()
+            .contentShape(Rectangle())
+            .simultaneousGesture(
+                DragGesture(minimumDistance: 12, coordinateSpace: .local)
+                    .updating($coverSwipeState) { value, state, _ in
+                        let horizontal = value.translation.width
+                        let vertical = value.translation.height
+                        let isHorizontal = abs(horizontal) > abs(vertical) * 1.15
+                        state = ReaderCoverSwipeState(
+                            translation: isHorizontal ? horizontal : 0,
+                            isHorizontal: isHorizontal
+                        )
+                    }
+                    .onEnded { value in
+                        guard let decision = ReaderPagedSwipePolicy.decision(
+                            horizontal: value.translation.width,
+                            vertical: value.translation.height
+                        ) else { return }
+                        switch decision {
+                        case .next:
+                            moveReaderTarget(to: pagedPageIndex + 1)
+                        case .previous:
+                            moveReaderTarget(to: pagedPageIndex - 1)
+                        }
+                    }
+            )
+            .animation(.interactiveSpring(response: 0.24, dampingFraction: 0.9, blendDuration: 0.08), value: pagedPageIndex)
+            .onChange(of: pagedPageIndex) { target in
+                updatePagedVisibleParagraph(pageIndex: target)
+            }
+            .onChange(of: speechController.currentParagraphIndex) { target in
+                guard target >= 0 else { return }
+                pagedPageIndex = pageIndex(containingParagraph: target)
+            }
         }
     }
 
@@ -747,7 +782,7 @@ struct ReaderView: View {
                 } label: {
                     Image(systemName: "ellipsis")
                         .font(.system(size: 17, weight: .semibold))
-                        .frame(width: 40, height: 40)
+                        .frame(width: 44, height: 44)
                         .background(.thinMaterial, in: Circle())
                 }
                 .buttonStyle(.plain)
@@ -857,7 +892,7 @@ struct ReaderView: View {
         } label: {
             Image(systemName: systemName)
                 .font(.system(size: 17, weight: .semibold))
-                .frame(width: 40, height: 40)
+                .frame(width: 44, height: 44)
                 .background(.thinMaterial, in: Circle())
                 .contentShape(Circle())
         }
@@ -865,86 +900,88 @@ struct ReaderView: View {
     }
 
     private var settingsPanel: some View {
-        VStack {
-            Spacer()
+        GeometryReader { proxy in
+            let maxHeight = min(max(proxy.size.height * 0.84, 560), 760)
+            let bottomPadding = max(proxy.safeAreaInsets.bottom, 14)
 
-            VStack(spacing: 16) {
-                HStack {
-                    Capsule()
-                        .fill(Color.secondary.opacity(0.35))
-                        .frame(width: 38, height: 5)
-                    Spacer()
-                    Button {
-                        withAnimation(.easeOut(duration: 0.18)) {
-                            closeSettingsPanel()
-                        }
-                    } label: {
-                        Image(systemName: "xmark")
-                            .font(.system(size: 13, weight: .bold))
-                            .foregroundStyle(.secondary)
-                            .frame(width: 30, height: 30)
-                            .background(Color.secondary.opacity(0.12), in: Circle())
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel("关闭阅读设置")
-                }
-                .padding(.top, 10)
-                .padding(.horizontal)
-                .contentShape(Rectangle())
-                .simultaneousGesture(
-                    DragGesture(minimumDistance: 12)
-                        .onEnded { value in
-                            guard value.translation.height > 70,
-                                  abs(value.translation.height) > abs(value.translation.width) else { return }
-                            closeSettingsPanel()
-                        }
-                )
-
-                Picker("设置", selection: $settingsTab) {
-                    Text("外观").tag(0)
-                    Text("排版").tag(1)
-                    Text("高级").tag(2)
-                }
-                .pickerStyle(.segmented)
-                .padding(.horizontal)
-
-                HStack {
-                    Text(settingsTab == 0 ? "外观" : (settingsTab == 1 ? "排版" : "高级"))
-                        .font(.headline)
-                    Spacer()
-                    Button("完成") {
-                        withAnimation(.easeOut(duration: 0.18)) {
-                            closeSettingsPanel()
-                        }
-                    }
-                    .font(.subheadline.weight(.semibold))
-                }
-                .padding(.horizontal)
-
-                ScrollView {
-                    VStack(alignment: .leading, spacing: 14) {
-                        switch settingsTab {
-                        case 0:
-                            appearanceSettings
-                        case 1:
-                            layoutSettings
-                        default:
-                            advancedSettings
-                        }
-                    }
-                    .padding(.horizontal)
-                    .padding(.bottom, 20)
-                }
-
+            VStack {
                 Spacer(minLength: 0)
+
+                VStack(spacing: 16) {
+                    HStack {
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text("阅读设置")
+                                .font(.headline.weight(.semibold))
+                            Text(settingsTab == 0 ? "外观和翻页感" : (settingsTab == 1 ? "字号与排版细节" : "阅读辅助与行为"))
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                        Spacer()
+                        Button {
+                            withAnimation(.easeOut(duration: 0.18)) {
+                                closeSettingsPanel()
+                            }
+                        } label: {
+                            Image(systemName: "xmark")
+                                .font(.system(size: 13, weight: .bold))
+                                .foregroundStyle(.secondary)
+                                .frame(width: 44, height: 44)
+                                .background(Color.secondary.opacity(0.12), in: Circle())
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel("关闭阅读设置")
+                    }
+                    .padding(.top, 10)
+                    .padding(.horizontal)
+                    .contentShape(Rectangle())
+                    .simultaneousGesture(
+                        DragGesture(minimumDistance: 12)
+                            .onEnded { value in
+                                guard value.translation.height > 70,
+                                      abs(value.translation.height) > abs(value.translation.width) else { return }
+                                closeSettingsPanel()
+                            }
+                    )
+
+                    Picker("设置", selection: $settingsTab) {
+                        Text("外观").tag(0)
+                        Text("排版").tag(1)
+                        Text("高级").tag(2)
+                    }
+                    .pickerStyle(.segmented)
+                    .padding(.horizontal)
+
+                    Text(settingsTab == 0 ? "连续滑动、平移翻页和覆盖翻页决定阅读的跟手感。" : (settingsTab == 1 ? "右侧可直接输入数值，精调字号、间距和边距。" : "这里保留不重复的阅读辅助功能。"))
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.horizontal)
+
+                    ScrollView(showsIndicators: false) {
+                        VStack(alignment: .leading, spacing: 14) {
+                            switch settingsTab {
+                            case 0:
+                                appearanceSettings
+                            case 1:
+                                layoutSettings
+                            default:
+                                advancedSettings
+                            }
+                        }
+                        .padding(.horizontal)
+                        .padding(.bottom, 22)
+                    }
+                }
+                .frame(maxWidth: .infinity)
+                .frame(height: maxHeight)
+                .glassPanel(cornerRadius: 28, material: .regularMaterial, strokeOpacity: colorScheme == .dark ? 0.08 : 0.12, shadowOpacity: colorScheme == .dark ? 0.35 : 0.18)
+                .contentShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
+                .padding(.horizontal, 12)
+                .padding(.bottom, bottomPadding)
+                .zIndex(3)
             }
-            .frame(maxWidth: .infinity)
-            .frame(height: 500)
-            .glassPanel(cornerRadius: 28, material: .regularMaterial, strokeOpacity: colorScheme == .dark ? 0.08 : 0.12, shadowOpacity: colorScheme == .dark ? 0.35 : 0.18)
-            .contentShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
-            .zIndex(3)
+            .ignoresSafeArea(edges: .bottom)
         }
-        .ignoresSafeArea(edges: .bottom)
     }
 
     private func closeSettingsPanel() {
@@ -958,9 +995,14 @@ struct ReaderView: View {
         Group {
             appearancePreview
 
-            Text("翻页模式")
-                .font(.subheadline.weight(.semibold))
-                .foregroundStyle(.secondary)
+            VStack(alignment: .leading, spacing: 6) {
+                Text("翻页模式")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(.secondary)
+                Text("连续滑动是纵向阅读，平移翻页是左右翻页，覆盖翻页更像单页过场。")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+            }
             Picker("翻页模式", selection: $readerModeRawValue) {
                 ForEach(ReaderMode.allCases) { mode in
                     Text(mode.title).tag(mode.rawValue)
@@ -1040,20 +1082,24 @@ struct ReaderView: View {
 
     private var layoutSettings: some View {
         VStack(alignment: .leading, spacing: 14) {
-            readerValueSlider("字号", value: $fontSize, range: 14...32, step: 1, unit: "pt", help: "正文文字大小，输入数值或拖动滑块")
-            readerValueSlider("行高", value: $lineSpacing, range: 2...18, step: 1, unit: "pt", help: "每行文字之间的垂直间距")
+            Text("右侧可直接输入数字，滑块只负责快速粗调。最低值已经放开到更紧凑的阅读布局。")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+
+            readerValueSlider("字号", value: $fontSize, range: 12...34, step: 1, unit: "pt", help: "正文文字大小，支持直接输入更小的数值")
+            readerValueSlider("行高", value: $lineSpacing, range: 0...18, step: 1, unit: "pt", help: "每行文字之间的垂直间距")
             readerValueSlider("字距", value: $letterSpacing, range: 0...4, step: 0.2, unit: "pt", help: "字符之间的水平间距")
-            readerValueSlider("段距", value: $paragraphSpacing, range: 8...32, step: 1, unit: "pt", help: "相邻段落之间的留白")
+            readerValueSlider("段距", value: $paragraphSpacing, range: 0...32, step: 1, unit: "pt", help: "相邻段落之间的留白")
             readerValueSlider("段首缩进", value: $paragraphIndent, range: 0...40, step: 2, unit: "pt", help: "每段第一行向右缩进")
             readerValueSlider("标题间距", value: $titleSpacing, range: 0...36, step: 2, unit: "pt", help: "章节标题与正文之间的留白")
-            readerValueSlider("左右间距", value: $pagePadding, range: 14...40, step: 1, unit: "pt", help: "正文距离屏幕左右边缘的距离")
-            readerValueSlider("底部留白", value: $footerHeight, range: 48...180, step: 8, unit: "pt", help: "为底部阅读操作预留的安全空间")
+            readerValueSlider("左右间距", value: $pagePadding, range: 10...40, step: 1, unit: "pt", help: "正文距离屏幕左右边缘的距离")
+            readerValueSlider("底部留白", value: $footerHeight, range: 40...180, step: 8, unit: "pt", help: "为底部阅读操作预留的安全空间")
         }
     }
 
     private var advancedSettings: some View {
         VStack(alignment: .leading, spacing: 14) {
-            Text("高级设置只保留不重复的阅读辅助功能。翻页、字号和自动翻页请在阅读器主菜单调整。")
+            Text("高级里只放阅读辅助，不再重复前面的翻页和字号入口。朗读速度只管语速，自动滚动在主阅读菜单。")
                 .font(.caption)
                 .foregroundStyle(.secondary)
 
@@ -1188,19 +1234,23 @@ struct ReaderView: View {
 
     private var chapterListSheet: some View {
         NavigationStack {
-            VStack(spacing: 0) {
-                Picker("目录", selection: $tocTab) {
-                    Text("目录").tag(0)
-                    Text("书签").tag(1)
-                }
-                .pickerStyle(.segmented)
-                .padding(.horizontal)
-                .padding(.top, 10)
+            ZStack {
+                readerBackdrop
 
-                if tocTab == 0 {
-                    tocList
-                } else {
-                    bookmarkList(includeAddButton: true)
+                VStack(spacing: 0) {
+                    Picker("目录", selection: $tocTab) {
+                        Text("目录").tag(0)
+                        Text("书签").tag(1)
+                    }
+                    .pickerStyle(.segmented)
+                    .padding(.horizontal)
+                    .padding(.top, 10)
+
+                    if tocTab == 0 {
+                        tocList
+                    } else {
+                        bookmarkList(includeAddButton: true)
+                    }
                 }
             }
             .navigationTitle(tocTab == 0 ? "目录" : "书签")
@@ -1220,6 +1270,7 @@ struct ReaderView: View {
                 }
             }
         }
+        .presentationBackground(.clear)
         .presentationDetents([.medium, .large])
     }
 
@@ -1276,6 +1327,8 @@ struct ReaderView: View {
                 }
             }
             .listStyle(.plain)
+            .scrollContentBackground(.hidden)
+            .background(background.color.opacity(background == .dark ? 0.88 : 0.78))
         }
     }
 
@@ -1322,17 +1375,21 @@ struct ReaderView: View {
 
     private var bookmarkSheet: some View {
         NavigationStack {
-            bookmarkList(includeAddButton: true)
-            .navigationTitle("书签")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("完成") {
-                        showBookmarks = false
+            ZStack {
+                readerBackdrop
+                bookmarkList(includeAddButton: true)
+                    .navigationTitle("书签")
+                    .navigationBarTitleDisplayMode(.inline)
+                    .toolbar {
+                        ToolbarItem(placement: .navigationBarTrailing) {
+                            Button("完成") {
+                                showBookmarks = false
+                            }
+                        }
                     }
-                }
             }
         }
+        .presentationBackground(.clear)
         .presentationDetents([.medium, .large])
     }
 
@@ -1414,6 +1471,8 @@ struct ReaderView: View {
             }
         }
         .listStyle(.insetGrouped)
+        .scrollContentBackground(.hidden)
+        .background(background.color.opacity(background == .dark ? 0.88 : 0.78))
     }
 
     private func bookmarkLocationText(_ bookmark: ReaderBookmark) -> String {
@@ -1520,7 +1579,12 @@ struct ReaderView: View {
     }
 
     private var currentReaderTarget: Int {
-        readerMode == .scroll ? visibleParagraphIndex : pagedPageIndex
+        switch readerMode {
+        case .scroll:
+            return autoScrollEnabled ? autoScrollAnchorTarget : visibleParagraphIndex
+        case .pageTurn, .cover:
+            return pagedPageIndex
+        }
     }
 
     private func toggleOverlay() {
@@ -1660,11 +1724,19 @@ struct ReaderView: View {
 
     private func startAutoScroll() {
         stopAutoScroll()
+        let currentTarget = ReaderAutomationPolicy.startingAutoScrollTarget(
+            mode: readerMode,
+            visibleParagraphIndex: visibleParagraphIndex,
+            pagedPageIndex: pagedPageIndex,
+            maximumTarget: maximumReaderTarget
+        )
+        let currentParagraph = positionMapping.paragraph(for: currentTarget, mode: readerMode)
+        autoScrollAnchorTarget = currentTarget
+        autoScrollAwaitingFirstTick = true
+        visibleParagraphIndex = currentParagraph
         autoScrollEnabled = true
-        let currentTarget = min(max(currentReaderTarget, 0), maximumReaderTarget)
         // Starting playback is not a navigation request. Leave TextKit at the
         // current pixel offset; only the next tick issues a paragraph jump.
-        visibleParagraphIndex = positionMapping.paragraph(for: currentTarget, mode: readerMode)
         let delay = ReaderAutomationPolicy.clampedDelay(autoScrollDelay)
         let coordinator = playbackCoordinator
         let token = coordinator.beginAutoScroll()
@@ -1682,12 +1754,15 @@ struct ReaderView: View {
                         canAdvanceChapter: canSelectRelativeChapter(offset: 1)
                     ) {
                     case .advance(let target):
+                        autoScrollAnchorTarget = target
+                        autoScrollAwaitingFirstTick = false
                         if readerMode == .scroll {
                             scrollParagraphTarget = target
                             visibleParagraphIndex = target
                             paragraphJumpRequest = ParagraphJumpRequest(index: target)
                         } else {
                             pagedPageIndex = target
+                            visibleParagraphIndex = positionMapping.paragraph(for: target, mode: readerMode)
                         }
                     case .nextChapter:
                         stopAutoScroll()
@@ -1706,6 +1781,7 @@ struct ReaderView: View {
             autoScrollPausedForScene = false
         }
         autoScrollEnabled = false
+        autoScrollAwaitingFirstTick = false
         autoScrollTask?.cancel()
         autoScrollTask = nil
         if case .autoScroll = playbackCoordinator.mode {

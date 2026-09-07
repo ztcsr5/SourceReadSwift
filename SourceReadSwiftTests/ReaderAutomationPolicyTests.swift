@@ -110,6 +110,39 @@ final class ReaderAutomationPolicyTests: XCTestCase {
         XCTAssertEqual(ReaderAutomationPolicy.clampedDelay(120), 30)
     }
 
+    func testAutoScrollStartSnapshotsVisibleParagraphInScrollMode() {
+        XCTAssertEqual(
+            ReaderAutomationPolicy.startingAutoScrollTarget(
+                mode: .scroll,
+                visibleParagraphIndex: 17,
+                pagedPageIndex: 3,
+                maximumTarget: 99
+            ),
+            17
+        )
+    }
+
+    func testAutoScrollStartSnapshotsCurrentPageInPagedModes() {
+        XCTAssertEqual(
+            ReaderAutomationPolicy.startingAutoScrollTarget(
+                mode: .pageTurn,
+                visibleParagraphIndex: 17,
+                pagedPageIndex: 8,
+                maximumTarget: 99
+            ),
+            8
+        )
+        XCTAssertEqual(
+            ReaderAutomationPolicy.startingAutoScrollTarget(
+                mode: .cover,
+                visibleParagraphIndex: 17,
+                pagedPageIndex: 6,
+                maximumTarget: 99
+            ),
+            6
+        )
+    }
+
     func testSpeechQueueFiltersEmptySegmentsAndPreservesIndexes() {
         var queue = ReaderSpeechQueue()
         queue.reset(title: " Title ", paragraphs: ["", "第一段", "  ", "第二段"])

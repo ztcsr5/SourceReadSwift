@@ -884,13 +884,47 @@ private struct AboutReadView: View {
     var body: some View {
         List {
             Section {
-                VStack(alignment: .leading, spacing: 10) {
-                    Text("SourceReadSwift")
-                        .font(.title2.bold())
-                    Text("Swift 原生重写版。UI 继续对齐旧 Flutter 的 iOS 播客风格，核心书源兼容走新的 Swift-native 引擎。")
+                VStack(alignment: .leading, spacing: 14) {
+                    HStack(spacing: 14) {
+                        RoundedRectangle(cornerRadius: 22, style: .continuous)
+                            .fill(
+                                LinearGradient(
+                                    colors: [
+                                        AppTheme.accent.opacity(0.95),
+                                        Color(red: 0.46, green: 0.54, blue: 1.0)
+                                    ],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                )
+                            )
+                            .frame(width: 56, height: 56)
+                            .overlay {
+                                Image(systemName: "book.closed.fill")
+                                    .font(.system(size: 25, weight: .semibold))
+                                    .foregroundStyle(.white)
+                            }
+                            .shadow(color: AppTheme.accent.opacity(0.25), radius: 10, x: 0, y: 6)
+
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("SourceReadSwift")
+                                .font(.title2.bold())
+                            Text("原生 Swift / SwiftUI 阅读器")
+                                .font(.subheadline.weight(.semibold))
+                                .foregroundStyle(AppTheme.accent)
+                        }
+                    }
+
+                    Text("从 Flutter 迁到原生 iOS 的阅读器正式版。主线已经固定为 Swift-native：书源兼容、阅读器、书架、源管理、备份恢复和 GitHub Actions 构建都在同一条产品线上持续收口。")
                         .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+
+                    HStack(spacing: 8) {
+                        aboutTag("Legado / JS 书源")
+                        aboutTag("EPUB / RSS / TXT")
+                        aboutTag("GitHub Actions 打包")
+                    }
                 }
-                .padding(.vertical, 4)
+                .padding(.vertical, 6)
             }
 
             Section("当前能力") {
@@ -898,13 +932,23 @@ private struct AboutReadView: View {
                 Label("发现页搜索、详情、目录、正文链路", systemImage: "magnifyingglass")
                 Label("书架持久化、阅读进度、书签", systemImage: "books.vertical")
                 Label("TXT 导入、自动分章、阅读设置持久化", systemImage: "doc.text")
+                Label("朗读、自动滚动、页翻 / 覆盖 / 连续滑动", systemImage: "speaker.wave.2")
             }
 
             Section("下一阶段") {
-                Text("继续补 EPUB、RSS 阅读页、书源详情测试、规则编辑、阅读器朗读/自动翻页和更完整的 Flutter 功能迁移。")
+                Text("继续补阅读器高级能力与视觉收口：更顺手的页翻 / 覆盖 / 连续滑动、自动阅读、系统字体、壁纸、跟手性，以及 Flutter 参考功能的最终迁移。")
                     .foregroundStyle(.secondary)
             }
         }
         .navigationTitle("关于阅读")
     }
+}
+
+private func aboutTag(_ title: String) -> some View {
+    Text(title)
+        .font(.caption.weight(.semibold))
+        .padding(.horizontal, 10)
+        .padding(.vertical, 6)
+        .background(AppTheme.accent.opacity(0.12), in: Capsule())
+        .foregroundStyle(AppTheme.accent)
 }

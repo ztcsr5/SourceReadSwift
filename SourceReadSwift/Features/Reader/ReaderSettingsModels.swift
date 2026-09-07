@@ -197,21 +197,23 @@ struct ReaderNumberInput: View {
     }
 
     var body: some View {
-        HStack(spacing: 6) {
-            TextField(title, text: $draft, onEditingChanged: { isEditing in
+        HStack(spacing: 8) {
+            TextField("", text: $draft, onEditingChanged: { isEditing in
                 if !isEditing { commit() }
             }, onCommit: commit)
             .keyboardType(.numbersAndPunctuation)
             .multilineTextAlignment(.trailing)
             .textFieldStyle(.roundedBorder)
-            .frame(width: 76)
+            .frame(width: 66)
             .focused($focused)
             .accessibilityLabel("输入\(title)")
 
             Text(unit)
-                .font(.caption)
+                .font(.caption2.weight(.semibold))
                 .foregroundStyle(.secondary)
+                .frame(minWidth: 20, alignment: .leading)
         }
+        .accessibilityElement(children: .combine)
         .onChange(of: value) { updated in
             let formatted = ReaderValueNormalizer.formatted(updated, step: step)
             if draft != formatted, !focused {

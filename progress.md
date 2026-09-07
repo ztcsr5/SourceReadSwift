@@ -2315,3 +2315,55 @@ Windows cannot run Xcode or a real ProMotion device. CI proves compilation/tests
 ### Next
 
 - 推送后读取两条 Actions 的首个失败点；通过后进入阅读器高级能力与视觉收口：滑动/覆盖/平移、自动阅读、朗读、系统字体、壁纸、跟手性和 App 图标。
+
+## 2026-09-08 - Stage 30：cover swipe 状态补齐（工作区完成，待 Actions）
+
+### What was done
+- 为 `ReaderView` 的 `cover` 翻页补上 `ReaderCoverSwipeState`，让 `@GestureState` 的拖拽状态有明确类型。
+- 维持 `ReaderPagedSwipePolicy` 的横向阈值判定，`cover` 模式继续使用现有左右拖拽手势和相邻页预览链路。
+
+### Verification
+- `git diff --check`：passed。
+- Windows 本机仍无 `swift` / `xcodebuild`，iOS 编译与真机验收继续依赖 GitHub Actions。
+
+### Notes
+- 这次是纯类型补齐，不改页面翻页语义；后续若要再收口，可继续看 `cover` / `pageTurn` 的视觉过场和跟手性。
+
+### Next
+- 提交后让 Actions 跑一遍；如果 `cover` 翻页仍有体感问题，再继续收 `pageTurn`/`cover` 的动画与边界页表现。
+
+## 2026-09-08 - Stage 31：书源能力表快照与阅读器收尾开工（进行中）
+
+### Implemented
+
+- 从 `D:\QQ游戏\已测试.json` 提取了 13 个书源的能力快照，确认 Search → Detail → TOC → Content 主链全部覆盖。
+- 生成可复跑的能力表脚本：`ci-log/generate-source-capability-table.js`。
+- 产出静态能力表：`docs/legado-source-capability-table-20260908.md`。
+
+### Snapshot
+
+- 主链：13/13
+- Explore：10/13
+- CookieJar：10/13
+- JS-heavy：8/13
+- POST-search：7/13
+- GBK：4/13
+- Login/CF-check：3/13
+- Crypto/AES/Base64：3/13
+- Font-obf/Image-text：3/13
+
+### Next
+
+- 把这份能力表接进 XCTest/fixture 回归矩阵，开始收口 Stage 31 的阅读器高级能力与书源兼容边界。
+
+### Stage 31 fixture/test closure（工作区补齐）
+
+- 已把 `D:\QQ游戏\已测试.json` 生成的 13 源能力表接进 `SourceReadSwiftTests/Fixtures/legado-capability-bank-20260908.json`。
+- 新增 `LegadoCapabilityBankTests`，在 XCTest 中固定 Search / Detail / TOC / Content = 13/13，以及 Explore、CookieJar、JS-heavy、POST-search、GBK、登录/验证、加密、字体反爬等复杂能力计数。
+- 新增 `docs/stage-31-acceptance.md`，把 Stage 31 的数据能力表、阅读器收口点、真机验收项和 Actions 门禁固定成可审查清单。
+- 本地检查继续通过：`git diff --check`、`node ci-log/extract-prelude.js`、`node --check ci-log/js-prelude-check.js`。
+
+### Stage 31 Next
+
+- 提交并推送 Stage 31，等待 iOS build/XCTest 与 unsigned IPA Actions；若失败，按首个 annotation 修复。
+- Actions 通过后进入 Stage 32：针对 C 级书源继续补 GBK/验证/加密/字体反爬 fixture，并继续真机反馈的阅读器跟手性收口。

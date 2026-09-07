@@ -1,5 +1,6 @@
-import Foundation
 import Combine
+import Foundation
+import CoreGraphics
 
 /// Deterministic chrome state for the reader.  The previous implementation
 /// kept `showOverlay` and `showSettings` as two independent booleans; a
@@ -72,6 +73,48 @@ struct ReaderAutomationPolicy {
         }
         return .advance(to: currentTarget + 1)
     }
+
+    /// Snapshot the reader cursor before automation starts.
+    /// The first auto-scroll tick should begin from what the user can see now,
+    /// not from a stale automation target left behind by a prior session.
+    static func startingAutoScrollTarget(
+        mode: ReaderMode,
+        visibleParagraphIndex: Int,
+        pagedPageIndex: Int,
+        maximumTarget: Int
+    ) -> Int {
+        let rawTarget: Int
+        switch mode {
+        case .scroll:
+            rawTarget = visibleParagraphIndex
+        case .pageTurn, .cover:
+            rawTarget = pagedPageIndex
+        }
+        return min(max(rawTarget, 0), maximumTarget)
+    }
+}
+
+enum ReaderPagedSwipeDecision: Equatable {
+    case previous
+    case next
+}
+
+enum ReaderPagedSwipePolicy {
+    static func decision(
+        horizontal: CGFloat,
+        vertical: CGFloat,
+        minimumDistance: CGFloat = 40,
+        axisBias: CGFloat = 1.15
+    ) -> ReaderPagedSwipeDecision? {
+        guard abs(horizontal) >= minimumDistance else { return nil }
+        guard abs(horizontal) > abs(vertical) * axisBias else { return nil }
+        return horizontal < 0 ? .next : .previous
+    }
+}
+
+struct ReaderCoverSwipeState: Equatable {
+    var translation: CGFloat = 0
+    var isHorizontal: Bool = false
 }
 
 /// The small, deterministic state machine shared by the reader's automation
