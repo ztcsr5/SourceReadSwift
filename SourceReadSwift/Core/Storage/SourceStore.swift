@@ -232,21 +232,8 @@ final class SourceStore: ObservableObject {
             sources = snapshot.sources
             rssSources = snapshot.rssSources
             catalogs = snapshot.catalogs
-            if sources.isEmpty {
-                sources = Self.defaultBookSources
-                _ = try? persistence.save(
-                    SourceLibrarySnapshot(
-                        sources: sources,
-                        rssSources: rssSources,
-                        catalogs: catalogs
-                    )
-                )
-            }
         } catch {
             lastError = error.localizedDescription
-            if sources.isEmpty {
-                sources = Self.defaultBookSources
-            }
         }
     }
 
