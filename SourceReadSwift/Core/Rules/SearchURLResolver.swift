@@ -22,7 +22,7 @@ struct SearchURLResolver {
                 of: #"\{\{cookie\.[^}]*\}\}"#,
                 with: "",
                 options: .regularExpression
-            )
+            ).trimmingCharacters(in: .whitespacesAndNewlines)
         }
         let isGBK = Self.isGBKEncoding(searchUrl: searchUrl, source: source)
         let scriptVariables = scriptVariables(source: source, keyword: keyword, page: page)
@@ -58,7 +58,7 @@ struct SearchURLResolver {
             )
         }
 
-        return .success(interpolated)
+        return .success(trimmed)
     }
 
     private func resolveEmbeddedScripts(
