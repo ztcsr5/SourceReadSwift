@@ -157,7 +157,7 @@ final class SourceEngineCLevelFixtureTests: XCTestCase {
         guard case .success(let text) = result else {
             return XCTFail("GBK URI encode failed: \(result)")
         }
-        XCTAssertTrue(text.contains("%"), "actual text was: [\(text)]")
+        XCTAssertTrue(text.uppercased().contains("%CE%E4%C9%F1"), "actual text was: [\(text)]")
     }
 
     func testXiWangZhongwenVerificationChallengeClassification() {

@@ -82,8 +82,10 @@ final class LegadoHostServices {
         if normalized.contains("gbk") || normalized.contains("gb2312") || normalized.contains("gb18030") {
             if let data = Self.encodeGbkData(value) {
                 return data.map { byte in
-                    let scalar = UnicodeScalar(byte)
-                    if CharacterSet.alphanumerics.contains(scalar) || "-._~".utf8.contains(byte) {
+                    let isAsciiAlphanumeric = (byte >= 0x30 && byte <= 0x39)
+                        || (byte >= 0x41 && byte <= 0x5A)
+                        || (byte >= 0x61 && byte <= 0x7A)
+                    if isAsciiAlphanumeric || "-._~".utf8.contains(byte) {
                         return String(UnicodeScalar(byte))
                     }
                     return String(format: "%%%02X", byte)
