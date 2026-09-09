@@ -115,30 +115,30 @@ final class Stage34ComprehensiveParityTests: XCTestCase {
         let runtime = JSCoreRuntime()
         
         // 1. Verify global org.jsoup.Jsoup without Packages prefix
-        let jsoupResult = runtime.evaluate("""
+        let jsoupResult = try? runtime.evaluate("""
         var doc = org.jsoup.Jsoup.parse('<div class="title"><h1>天道图书馆</h1></div>');
         doc.select('h1').text();
-        """)
+        """).get()
         XCTAssertEqual(jsoupResult, "天道图书馆")
 
         // 2. Verify book.setReverseToc and book.getReverseToc
-        let reverseTocResult = runtime.evaluate("""
+        let reverseTocResult = try? runtime.evaluate("""
         book.setReverseToc(true);
         var r1 = book.getReverseToc();
         book.setReverseToc(false);
         var r2 = book.getReverseToc();
         [r1, r2].join('|');
-        """)
+        """).get()
         XCTAssertEqual(reverseTocResult, "true|false")
 
         // 3. Verify chapter and book variables together (as used in browserSource.json)
-        let complexEval = runtime.evaluate("""
+        let complexEval = try? runtime.evaluate("""
         book.putVariable('customKey', '42');
         chapter.putVariable('nextUrl', 'https://example.com/c2.html');
         var r = org.jsoup.Jsoup.parse('<a href="https://example.com/c1.html">第一章</a>');
         var link = r.select('a').first().attr('href');
         [book.getVariable('customKey'), chapter.getVariable('nextUrl'), link].join('///');
-        """)
+        """).get()
         XCTAssertEqual(complexEval, "42///https://example.com/c2.html///https://example.com/c1.html")
     }
 
@@ -150,12 +150,14 @@ final class Stage34ComprehensiveParityTests: XCTestCase {
             title: "诡秘之主",
             author: "爱潜水的乌贼",
             coverURL: nil,
-            bookURL: "https://example.com/b1",
             sourceName: "起点中文",
             sourceURL: "https://example.com",
-            currentChapterTitle: "第100章 秘术导师",
+            bookURL: "https://example.com/b1",
+            intro: nil,
             latestChapterTitle: "第1432章 旅途的终点",
-            readingProgress: 0.12,
+            totalChapters: 1432,
+            currentChapterIndex: 99,
+            currentChapterTitle: "第100章 秘术导师",
             groupName: "玄幻"
         )
         let book2 = BookshelfBook(
@@ -163,12 +165,14 @@ final class Stage34ComprehensiveParityTests: XCTestCase {
             title: "道诡异仙",
             author: "狐尾的笔",
             coverURL: nil,
-            bookURL: "https://example.com/b2",
             sourceName: "起点中文",
             sourceURL: "https://example.com",
-            currentChapterTitle: nil,
+            bookURL: "https://example.com/b2",
+            intro: nil,
             latestChapterTitle: "第980章 大结局",
-            readingProgress: 0.0,
+            totalChapters: 980,
+            currentChapterIndex: 0,
+            currentChapterTitle: nil,
             groupName: "悬疑"
         )
 
@@ -192,8 +196,9 @@ final class Stage34ComprehensiveParityTests: XCTestCase {
             chapterIndex: 0,
             paragraphIndex: 2
         )
-        XCTAssertEqual(entry.id, "OEBPS/text/c01.xhtml#section-1")
         XCTAssertEqual(entry.title, "Chapter 1: An Unexpected Journey")
+        XCTAssertEqual(entry.sourcePath, "OEBPS/text/c01.xhtml")
+        XCTAssertEqual(entry.fragment, "section-1")
         XCTAssertEqual(entry.chapterIndex, 0)
         XCTAssertEqual(entry.paragraphIndex, 2)
     }
