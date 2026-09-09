@@ -698,6 +698,8 @@ final class LightweightHTTPServer: ObservableObject {
         ]'></textarea>
                 <button id="import-btn" onclick="performImport()">Import to iPhone</button>
                 <div class="actions">
+                    <button onclick="insertTemplate()">Insert template</button>
+                    <button onclick="formatJSON()">Format JSON</button>
                     <button onclick="refreshStatus()">Refresh status</button>
                     <button onclick="exportSources()">Export sources</button>
                 </div>
@@ -706,6 +708,50 @@ final class LightweightHTTPServer: ObservableObject {
             </div>
             <div id="toast" class="toast"></div>
             <script>
+                function insertTemplate() {
+                    const template = [
+                      {
+                        "bookSourceName": "自定义新书源",
+                        "bookSourceUrl": "https://example.com",
+                        "bookSourceType": 0,
+                        "enabled": true,
+                        "searchUrl": "https://example.com/search?q={{key}}",
+                        "ruleSearch": {
+                          "bookList": ".book-item",
+                          "name": ".title@text",
+                          "author": ".author@text",
+                          "bookUrl": "a@href"
+                        },
+                        "ruleToc": {
+                          "chapterList": "#chapters a",
+                          "chapterName": "text",
+                          "chapterUrl": "href"
+                        },
+                        "ruleContent": {
+                          "content": "#content@text"
+                        }
+                      }
+                    ];
+                    document.getElementById('json-input').value = JSON.stringify(template, null, 2);
+                    showToast('Template inserted.', true);
+                }
+
+                function formatJSON() {
+                    try {
+                        const input = document.getElementById('json-input');
+                        const text = input.value.trim();
+                        if (!text) {
+                            showToast('Input is empty.', false);
+                            return;
+                        }
+                        const parsed = JSON.parse(text);
+                        input.value = JSON.stringify(parsed, null, 2);
+                        showToast('JSON formatted.', true);
+                    } catch (e) {
+                        showToast('Format error: ' + e.message, false);
+                    }
+                }
+
                 function showToast(message, isSuccess) {
                     const toast = document.getElementById('toast');
                     toast.textContent = message;

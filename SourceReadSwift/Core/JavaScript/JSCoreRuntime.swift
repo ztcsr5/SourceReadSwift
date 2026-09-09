@@ -194,6 +194,11 @@ final class JSCoreRuntime {
                         return java.put('book.variable', book.variable);
                     };
                     book.putVariable = book.setVariable;
+                    book.setReverseToc = function(reverse) {
+                        book.reverseToc = Boolean(reverse);
+                        return book.reverseToc;
+                    };
+                    book.getReverseToc = function() { return Boolean(book.reverseToc); };
                 }
                 """
                 context.evaluateScript(injectScript)
@@ -2170,6 +2175,11 @@ final class JSCoreRuntime {
             return java.put('book.variable', book.variable);
           };
           book.putVariable = function(key, value) { return book.setVariable(key, value); };
+          book.setReverseToc = function(reverse) {
+            book.reverseToc = Boolean(reverse);
+            return book.reverseToc;
+          };
+          book.getReverseToc = function() { return Boolean(book.reverseToc); };
           book.variableMap = book.variableMap || {
             get: function(k) { return book.getVariable(k); },
             put: function(k,v) { return book.setVariable(k,v); },
@@ -3476,6 +3486,18 @@ final class JSCoreRuntime {
           globalThis.getCache = function(key) { return java.getCache(key); };
           globalThis.putField = function(key, value) { return java.putField(key, value); };
           globalThis.getField = function(key) { return java.getField(key); };
+          if (typeof globalThis.org === 'undefined') {
+            try { globalThis.org = Packages.org; } catch (_) {}
+          }
+          if (typeof globalThis.Jsoup === 'undefined') {
+            try { globalThis.Jsoup = Packages.org.jsoup.Jsoup; } catch (_) {}
+          }
+        }
+        if (typeof org === 'undefined') {
+          try { org = Packages.org; } catch (_) {}
+        }
+        if (typeof Jsoup === 'undefined') {
+          try { Jsoup = Packages.org.jsoup.Jsoup; } catch (_) {}
         }
         java.regex = java.regex || {};
         java.regex.replace = function(value, pattern, replacement) {

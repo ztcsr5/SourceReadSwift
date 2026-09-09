@@ -1,3 +1,26 @@
+## 2026-09-09 - Stage 34: EPUB / RSS / 书架批量操作 / Web 写源 PC 端 / 图标与产品收口 / Flutter Parity 最终闭环
+
+### Implemented
+
+- 书源能力深化与松散 JSON 容错：
+  - 在 `SourceStore.swift` 实现 `sanitizeTrailingCommas`，自动清洗 Android Legado 与 SourceRead 源 JSON 中非法的数组/对象尾随逗号，使包含真实尾随逗号的 `rssSources.json` 可 100% 成功解码。
+  - 内置源阅读官方 3 大精选 RSS 订阅源（`使用说明`、`源仓库`、`海阔视界`），首次启动或空列表时自动预置，并提供一键重置。
+  - 在 `JSCoreRuntime.swift` 强化全局 `org.jsoup.Jsoup` 与 `Jsoup` 免前缀直调，支持 `book.setReverseToc` 与 `book.getReverseToc`，为通用智能导航源 (`browserSource.json`) 提供全面运行时支撑。
+- 书架批量管理与操作：
+  - 在 `BookshelfView.swift` 导航栏新增快捷管理入口，并在 `BookshelfCollectionView` 批量操作栏中加入“导出”能力，支持一键将所选书籍及其阅读进度导出复制至剪贴板。
+- PC 端局域网 Web 写源增强：
+  - 在 `SourceWritingView.swift` 提供的 Web 界面中新增“填入标准模板”与“格式化 JSON”快捷操作，极大提升在电脑浏览器端向 iOS 手机调试、编写和推送书源的生产效率。
+- 产品里程碑与关于页收口：
+  - 在 `SettingsView.swift` 的关于页面升级至 `SourceReadSwift v2.0.0 (Stage 34 正式收口版)`，展示 Stage 1 至 Stage 34 的完整架构演进与能力矩阵。
+- 自动化测试与 CI 门禁：
+  - 新增 `SourceReadSwiftTests/Stage34ComprehensiveParityTests.swift`，全面覆盖尾随逗号清洗、官方 RSS 源校验、智能导航源 JS 逆序目录与 Jsoup 解析、书架批量导出文本生成、EPUB 锚点映射及 HTTP 健康探测。
+  - 创建 `docs/stage-34-acceptance.md`。
+
+### Verification
+
+- 本地静态门禁：`git diff --check`。
+- CI 目标：GitHub Actions `iOS` build/test 与 `Unsigned IPA` 双流水线全绿闭环。
+
 ## 2026-09-09 - Stage 33: 阅读器手感、120Hz ProMotion、朗读（TTS）与排版体验收口
 
 ### Implemented

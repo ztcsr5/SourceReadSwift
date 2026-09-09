@@ -30,16 +30,42 @@ final class SourceStore: ObservableObject {
     @Published private(set) var lastError: String?
     private let persistence: SourcePersistence
 
+    static let defaultRSSSources: [RSSSource] = [
+        RSSSource(
+            sourceName: "使用说明",
+            sourceUrl: "https://www.yuque.com/legado",
+            sourceIcon: "http://ku.mumuceo.com/static/images/applogo/yuedu.png",
+            enabled: true
+        ),
+        RSSSource(
+            sourceName: "源仓库",
+            sourceUrl: "http://yck.mumuceo.com/",
+            sourceIcon: "https://txc.gtimg.com/data/145120/2020/0418/99f04e2fdbed180f8ad0cb6ee5cfddca.png",
+            enabled: true
+        ),
+        RSSSource(
+            sourceName: "海阔视界",
+            sourceUrl: "https://haikuoshijie.cn/topics/node/1?p=2",
+            sourceIcon: "http://image.5you.com/attachment/soft/2020/0720/171051_34898081.png",
+            enabled: true
+        )
+    ]
+
     init(persistence: SourcePersistence = SourcePersistence()) {
         self.persistence = persistence
         do {
             let snapshot = try persistence.load()
             sources = snapshot.sources
-            rssSources = snapshot.rssSources
+            rssSources = snapshot.rssSources.isEmpty ? Self.defaultRSSSources : snapshot.rssSources
             catalogs = snapshot.catalogs
         } catch {
             lastError = error.localizedDescription
+            rssSources = Self.defaultRSSSources
         }
+    }
+
+    func loadDefaultRSSSources() throws {
+        try importRSSSources(Self.defaultRSSSources)
     }
 
     @discardableResult
@@ -379,13 +405,51 @@ final class SourceStore: ObservableObject {
         if let decoded = try? JSONDecoder().decode(String.self, from: Data(text.utf8)) {
             text = decoded.trimmingCharacters(in: .whitespacesAndNewlines)
         }
+        text = Self.sanitizeTrailingCommas(text)
         if text.hasPrefix("{") || text.hasPrefix("[") {
             return Data(text.utf8)
         }
         if let extracted = extractFirstJSONValue(from: text) {
-            return Data(extracted.utf8)
+            return Data(Self.sanitizeTrailingCommas(extracted).utf8)
         }
-        return data
+        return Data(text.utf8)
+    }
+
+    static func sanitizeTrailingCommas(_ json: String) -> String {
+        var chars = Array(json)
+        var inString = false
+        var escaped = false
+        var lastCommaIndex: Int? = nil
+
+        for i in 0..<chars.count {
+            let char = chars[i]
+            if inString {
+                if escaped {
+                    escaped = false
+                } else if char == "\\" {
+                    escaped = true
+                } else if char == "\"" {
+                    inString = false
+                }
+            } else {
+                if char == "\"" {
+                    inString = true
+                    lastCommaIndex = nil
+                } else if char == "," {
+                    lastCommaIndex = i
+                } else if char.isWhitespace {
+                    // keep lastCommaIndex active across whitespace
+                } else if char == "}" || char == "]" {
+                    if let commaIdx = lastCommaIndex {
+                        chars[commaIdx] = " "
+                        lastCommaIndex = nil
+                    }
+                } else {
+                    lastCommaIndex = nil
+                }
+            }
+        }
+        return String(chars)
     }
 
     private func extractFirstJSONValue(from text: String) -> String? {

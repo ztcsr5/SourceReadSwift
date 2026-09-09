@@ -42,6 +42,16 @@ struct BookshelfView: View {
             .navigationTitle("主页")
             .navigationBarTitleDisplayMode(.large)
             .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    if !allBooks.isEmpty {
+                        NavigationLink {
+                            BookshelfCollectionView(title: "书架管理", books: allBooks, startsManaging: true)
+                        } label: {
+                            Label("管理", systemImage: "checklist")
+                                .font(.system(size: 15, weight: .semibold))
+                        }
+                    }
+                }
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button {
                         UIImpactFeedbackGenerator(style: .light).impactOccurred()
@@ -719,6 +729,18 @@ private struct BookshelfCollectionView: View {
                             selectedBookIDs.removeAll()
                         } label: {
                             Label("标记已读", systemImage: "checkmark.circle")
+                                .frame(maxWidth: .infinity)
+                        }
+                        .buttonStyle(.bordered)
+                        .disabled(selectedBookIDs.isEmpty)
+
+                        Button {
+                            let selectedBooks = liveBooks.filter { selectedBookIDs.contains($0.id) }
+                            let text = selectedBooks.map { "- 《" + $0.title + "》 " + $0.author + " (" + ($0.currentChapterTitle ?? $0.latestChapterTitle ?? "未读") + ")" }.joined(separator: "\n")
+                            UIPasteboard.general.string = text
+                            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                        } label: {
+                            Label("导出", systemImage: "square.and.arrow.up")
                                 .frame(maxWidth: .infinity)
                         }
                         .buttonStyle(.bordered)

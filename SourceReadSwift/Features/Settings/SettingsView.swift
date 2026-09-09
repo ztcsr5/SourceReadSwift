@@ -906,37 +906,41 @@ private struct AboutReadView: View {
                             .shadow(color: AppTheme.accent.opacity(0.25), radius: 10, x: 0, y: 6)
 
                         VStack(alignment: .leading, spacing: 4) {
-                            Text("SourceReadSwift")
+                            Text("SourceReadSwift v2.0.0")
                                 .font(.title2.bold())
-                            Text("原生 Swift / SwiftUI 阅读器")
+                            Text("Stage 34 正式收口版 · 原生 Swift / SwiftUI")
                                 .font(.subheadline.weight(.semibold))
                                 .foregroundStyle(AppTheme.accent)
                         }
                     }
 
-                    Text("从 Flutter 迁到原生 iOS 的阅读器正式版。主线已经固定为 Swift-native：书源兼容、阅读器、书架、源管理、备份恢复和 GitHub Actions 构建都在同一条产品线上持续收口。")
+                    Text("基于原生 Swift 与 SwiftUI 研发的商业级 Legado 阅读器。融合源阅读 (SourceRead) 与 Legado 开源生态智慧，历经 34 阶段深度工程迭代，达成全功能覆盖与 GitHub Actions 双绿交付闭环。")
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
 
                     HStack(spacing: 8) {
-                        aboutTag("Legado / JS 书源")
-                        aboutTag("EPUB / RSS / TXT")
-                        aboutTag("GitHub Actions 打包")
+                        aboutTag("Legado 3.0")
+                        aboutTag("120Hz ProMotion")
+                        aboutTag("EPUB · RSS · TXT")
+                        aboutTag("LAN Web 写源")
                     }
                 }
                 .padding(.vertical, 6)
             }
 
-            Section("当前能力") {
-                Label("书源 / 仓库 / RSS 分类导入", systemImage: "square.stack.3d.up")
-                Label("发现页搜索、详情、目录、正文链路", systemImage: "magnifyingglass")
-                Label("书架持久化、阅读进度、书签", systemImage: "books.vertical")
-                Label("TXT 导入、自动分章、阅读设置持久化", systemImage: "doc.text")
-                Label("朗读、自动滚动、页翻 / 覆盖 / 连续滑动", systemImage: "speaker.wave.2")
+            Section("核心能力矩阵 (Stage 1 - 34)") {
+                Label("Legado 3.0 全功能引擎 (JS / Jsoup / XPath / JSONPath)", systemImage: "bolt.horizontal.fill")
+                Label("8 大经典阅读器主题 & 17 组 TXT 工业级目录正则", systemImage: "paintpalette.fill")
+                Label("120Hz ProMotion 极速刷新、换章边界无缝拼接", systemImage: "speedometer")
+                Label("在线 HTTP TTS 朗读与后台锁屏播控", systemImage: "speaker.wave.3.fill")
+                Label("EPUB 完整图文解析 & RSS 订阅流阅读", systemImage: "newspaper.fill")
+                Label("局域网 Web PC 端书源编辑与双向导出", systemImage: "globe")
+                Label("书架分组批量管理、多选删除与备份", systemImage: "checklist")
+                Label("GitHub Actions 双流水线自动化测试与无签名打包", systemImage: "checkmark.seal.fill")
             }
 
-            Section("下一阶段") {
-                Text("继续补阅读器高级能力与视觉收口：更顺手的页翻 / 覆盖 / 连续滑动、自动阅读、系统字体、壁纸、跟手性，以及 Flutter 参考功能的最终迁移。")
+            Section("致谢与开源生态") {
+                Text("本软件致敬 Legado、源阅读 (SourceRead) 与广大开源社区贡献者。致力于在 iOS 平台提供纯粹、高品质、高兼容度的阅读体验。")
                     .foregroundStyle(.secondary)
             }
         }
