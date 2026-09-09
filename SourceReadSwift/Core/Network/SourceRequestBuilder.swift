@@ -18,12 +18,7 @@ struct SourceRequestBuilder {
         page: Int,
         persistentValues: [String: String] = [:]
     ) -> SourceRequest {
-        let comment = source.raw["bookSourceComment"] ?? source.raw["comment"]
-        let isGBK = searchUrl.localizedCaseInsensitiveContains("charset=gb")
-            || searchUrl.localizedCaseInsensitiveContains("\"charset\":\"gb")
-            || searchUrl.localizedCaseInsensitiveContains("\"charset\": \"gb")
-            || comment?.localizedCaseInsensitiveContains("gbk") == true
-            || comment?.localizedCaseInsensitiveContains("gb2312") == true
+        let isGBK = SearchURLResolver.isGBKEncoding(searchUrl: searchUrl, source: source)
         let encodedKey = LegadoRuleResolver.percentEncode(keyword, charset: isGBK ? "gbk" : nil)
         let resolved = searchUrl
             .replacingOccurrences(of: "{{key}}", with: encodedKey)
@@ -418,7 +413,7 @@ struct SourceRequestBuilder {
             let form = interpolated
                 .sorted { $0.key < $1.key }
                 .map { key, value in
-                    "\(urlEncode(key))=\(urlEncode(value))"
+                    "\(urlEncodePreservingEscapes(key))=\(urlEncodePreservingEscapes(value))"
                 }
                 .joined(separator: "&")
             return Data(form.utf8)
@@ -489,7 +484,7 @@ struct SourceRequestBuilder {
 
         var output = text.replacingOccurrences(of: "&amp;", with: "&")
         for (key, value) in values where !key.isEmpty {
-            let encoded = urlEncode(value)
+            let encoded = urlEncodePreservingEscapes(value)
             output = output
                 .replacingOccurrences(of: "{{\(key)}}", with: encoded)
                 .replacingOccurrences(of: "{\(key)}", with: encoded)

@@ -67,6 +67,8 @@ struct NativeReaderTextView: UIViewRepresentable {
         textView.canCancelContentTouches = true
         textView.textContainer.lineFragmentPadding = 0
         textView.contentInsetAdjustmentBehavior = .never
+        textView.layoutManager.allowsNonContiguousLayout = true
+        textView.decelerationRate = .normal
         textView.setContentHuggingPriority(.defaultLow, for: .vertical)
         textView.setContentCompressionResistancePriority(.defaultLow, for: .vertical)
 

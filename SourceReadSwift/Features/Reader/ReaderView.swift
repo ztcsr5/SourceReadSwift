@@ -1895,6 +1895,18 @@ struct ReaderView: View {
         }
     }
 
+    private func selectChapter(index: Int) {
+        guard let target = chapters.first(where: { $0.index == index }) ?? (chapters.indices.contains(index) ? chapters[index] : nil) else { return }
+        closeReaderChrome()
+        stopAutoScroll()
+        stopSpeechPlayback()
+        if let onSelectChapterWithPosition {
+            onSelectChapterWithPosition(target, 0)
+        } else {
+            onSelectChapter?(target)
+        }
+    }
+
     private func handleReaderTap(at location: CGPoint) {
         guard !showSettings else { return }
         let size = effectiveViewportSize

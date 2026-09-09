@@ -33,7 +33,7 @@ extension View {
         cornerRadius: CGFloat = AppTheme.cardRadius,
         material: Material = .ultraThinMaterial,
         strokeOpacity: Double = 0.10,
-        shadowOpacity: Double = 0.12
+        shadowOpacity: Double = 0.08
     ) -> some View {
         background(material, in: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
             .overlay {
@@ -50,7 +50,16 @@ extension View {
                         lineWidth: 0.8
                     )
             }
-            .shadow(color: .black.opacity(shadowOpacity), radius: 22, x: 0, y: 10)
+            .shadow(color: .black.opacity(shadowOpacity), radius: 6, x: 0, y: 3)
+    }
+
+    func listRowCard(cornerRadius: CGFloat = 16) -> some View {
+        background(Color(uiColor: .secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                    .stroke(Color.primary.opacity(0.06), lineWidth: 0.8)
+            }
+            .shadow(color: .black.opacity(0.04), radius: 4, x: 0, y: 2)
     }
 
     func glassCircle(material: Material = .ultraThinMaterial) -> some View {
@@ -59,7 +68,7 @@ extension View {
                 Circle()
                     .stroke(Color.white.opacity(0.35), lineWidth: 0.8)
             }
-            .shadow(color: .black.opacity(0.10), radius: 14, x: 0, y: 8)
+            .shadow(color: .black.opacity(0.06), radius: 5, x: 0, y: 2)
     }
 }
 

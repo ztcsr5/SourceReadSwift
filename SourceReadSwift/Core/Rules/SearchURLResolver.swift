@@ -16,12 +16,7 @@ struct SearchURLResolver {
         }
 
         let sourceInterpolated = interpolateSourcePlaceholders(searchUrl, source: source)
-        let comment = source.raw["bookSourceComment"] ?? source.raw["comment"]
-        let isGBK = searchUrl.localizedCaseInsensitiveContains("charset=gb")
-            || searchUrl.localizedCaseInsensitiveContains("\"charset\":\"gb")
-            || searchUrl.localizedCaseInsensitiveContains("\"charset\": \"gb")
-            || comment?.localizedCaseInsensitiveContains("gbk") == true
-            || comment?.localizedCaseInsensitiveContains("gb2312") == true
+        let isGBK = Self.isGBKEncoding(searchUrl: searchUrl, source: source)
         let scriptVariables = scriptVariables(source: source, keyword: keyword, page: page)
         let interpolated = ruleResolver.interpolate(
             sourceInterpolated,
@@ -196,5 +191,23 @@ struct SearchURLResolver {
         values["header"] = source.header ?? ""
         values["customConfig"] = source.customConfig ?? ""
         return values
+    }
+
+    static func isGBKEncoding(searchUrl: String, source: BookSource) -> Bool {
+        let combined = [
+            searchUrl,
+            source.bookSourceUrl,
+            source.header,
+            source.customConfig,
+            source.raw["charset"],
+            source.raw["encoding"],
+            source.raw["bookSourceComment"],
+            source.raw["comment"]
+        ].compactMap { $0 }.joined(separator: " ").lowercased()
+
+        return combined.contains("gbk")
+            || combined.contains("gb2312")
+            || combined.contains("gb18030")
+            || combined.contains("cp936")
     }
 }

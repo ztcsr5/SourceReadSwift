@@ -133,17 +133,51 @@ struct SourceURLDirectiveParser {
     }
 
     private func splitURLAndJSONOptions(_ text: String) -> (url: String, options: [String: Any]?) {
-        guard let comma = text.firstIndex(of: ",") else {
+        guard let jsonStartRange = text.range(of: #",\s*\{"#, options: .regularExpression) else {
             return (text.trimmingCharacters(in: .whitespacesAndNewlines), nil)
         }
-        let url = String(text[..<comma]).trimmingCharacters(in: .whitespacesAndNewlines)
-        let optionText = String(text[text.index(after: comma)...]).trimmingCharacters(in: .whitespacesAndNewlines)
-        guard optionText.hasPrefix("{"),
-              let data = optionText.data(using: .utf8),
-              let options = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
-            return (text.trimmingCharacters(in: .whitespacesAndNewlines), nil)
+        let url = String(text[..<jsonStartRange.lowerBound]).trimmingCharacters(in: .whitespacesAndNewlines)
+        let optionText = String(text[text.index(after: jsonStartRange.lowerBound)...]).trimmingCharacters(in: .whitespacesAndNewlines)
+
+        // 1. Direct standard JSON
+        if let data = optionText.data(using: .utf8),
+           let options = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+            return (url, options)
         }
-        return (url, options)
+
+        // 2. Relaxed JSON: fix unquoted keys, single quotes, trailing commas
+        let sanitized = sanitizeRelaxedJSON(optionText)
+        if let data = sanitized.data(using: .utf8),
+           let options = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+            return (url, options)
+        }
+
+        // 3. Fallback: JavaScriptCore evaluation of object literal
+        if let options = evaluateJSObjectLiteral(optionText) {
+            return (url, options)
+        }
+
+        return (url, nil)
+    }
+
+    private func sanitizeRelaxedJSON(_ raw: String) -> String {
+        var s = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        s = s.replacingOccurrences(of: #"(?<=[\{,]\s*)([a-zA-Z_][a-zA-Z0-9_]*)\s*:"#, with: "\"$1\":", options: .regularExpression)
+        s = s.replacingOccurrences(of: #":\s*'([^']*)'"#, with: ": \"$1\"", options: .regularExpression)
+        s = s.replacingOccurrences(of: #",\s*\}"#, with: "}", options: .regularExpression)
+        return s
+    }
+
+    private func evaluateJSObjectLiteral(_ raw: String) -> [String: Any]? {
+        let runtime = JSCoreRuntime()
+        let script = "try { JSON.stringify(eval('(' + \(raw.debugDescription) + ')')); } catch(e) { '' }"
+        if case .success(let jsonString) = runtime.evaluate(script),
+           !jsonString.isEmpty,
+           let data = jsonString.data(using: .utf8),
+           let dict = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+            return dict
+        }
+        return nil
     }
 
     private func parseStringMap(_ text: String) -> [String: String] {

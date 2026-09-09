@@ -592,7 +592,10 @@ final class SourceStore: ObservableObject {
     }
 
     private func normalizeImportData(_ data: Data) throws -> Data {
-        guard var text = String(data: data, encoding: .utf8) else { return data }
+        let decodedText = String(data: data, encoding: .utf8)
+            ?? ResponseTextDecoder().decode(data: data, headers: [:])
+        guard !decodedText.isEmpty else { return data }
+        var text = decodedText
         text = text.trimmingCharacters(in: .whitespacesAndNewlines)
         if let decoded = try? JSONDecoder().decode(String.self, from: Data(text.utf8)) {
             text = decoded.trimmingCharacters(in: .whitespacesAndNewlines)

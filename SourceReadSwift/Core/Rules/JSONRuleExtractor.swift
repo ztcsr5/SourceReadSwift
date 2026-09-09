@@ -77,6 +77,12 @@ struct JSONRuleExtractor {
                     return stringify(evaluated)
                 }
             }
+            if trimmed.contains("{{") && trimmed.contains("}}") {
+                let interpolated = interpolateTemplate(trimmed, item: item, variables: variables)
+                if !interpolated.isEmpty {
+                    return interpolated
+                }
+            }
             if let value = value(from: item, path: rule, variables: variables) {
                 let text = stringify(value)
                 if !text.isEmpty {
@@ -196,6 +202,35 @@ struct JSONRuleExtractor {
             .components(separatedBy: CharacterSet(charactersIn: "@#"))
             .first?
             .trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private func interpolateTemplate(_ template: String, item: [String: Any], variables: [String: Any]) -> String {
+        var output = template
+        guard let regex = try? NSRegularExpression(pattern: #"\{\{\s*([^{}]+)\s*\}\}"#) else { return template }
+        let nsText = template as NSString
+        let matches = regex.matches(in: template, range: NSRange(location: 0, length: nsText.length))
+        for match in matches.reversed() {
+            guard match.numberOfRanges > 1 else { continue }
+            let keyRange = match.range(at: 1)
+            let fullRange = match.range(at: 0)
+            let key = nsText.substring(with: keyRange).trimmingCharacters(in: .whitespacesAndNewlines)
+            let val: String
+            if key.hasPrefix("$.") || key.hasPrefix("@json:") {
+                val = (value(from: item, path: key, variables: variables)).map { stringify($0) } ?? ""
+            } else if let direct = item[key] {
+                val = stringify(direct)
+            } else if let fromPath = value(from: item, path: key, variables: variables) {
+                val = stringify(fromPath)
+            } else if let varVal = variables[key] {
+                val = stringify(varVal)
+            } else {
+                val = ""
+            }
+            if let targetRange = Range(fullRange, in: output) {
+                output.replaceSubrange(targetRange, with: val)
+            }
+        }
+        return output
     }
 
     private func appendTransform(_ transform: (pattern: String, replacement: String)?, to path: String) -> String {

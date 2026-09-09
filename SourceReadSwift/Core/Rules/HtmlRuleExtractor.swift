@@ -83,7 +83,79 @@ struct HtmlRuleExtractor {
         if isDirectGetRule(rule) {
             return [materializedRule]
         }
-        let split = XPathRuleTranslator.valueRule(materializedRule) ?? splitSelectorAndAttribute(materializedRule)
+
+        // Try XPath translator first
+        if let xpathSplit = XPathRuleTranslator.valueRule(materializedRule) {
+            let targets = try select(from: root, rule: xpathSplit.selector, baseUrl: baseUrl)
+            let attrParts = xpathSplit.attribute.components(separatedBy: "##")
+            let attr = attrParts.first ?? "text"
+            if attr == "all" {
+                let joined = try targets.map { try $0.text() }.joined(separator: "\n")
+                let transformed = applyRegexTransforms(attrParts.dropFirst(), to: joined)
+                    .trimmingCharacters(in: .whitespacesAndNewlines)
+                return transformed.isEmpty ? [] : [transformed]
+            }
+            return try targets.compactMap { target in
+                let value = try attributeValue(from: target, attr: attr)
+                let trimmed = applyRegexTransforms(attrParts.dropFirst(), to: value)
+                    .trimmingCharacters(in: .whitespacesAndNewlines)
+                if ["href", "src", "url"].contains(attr.lowercased()), let baseUrl {
+                    let absolute = absolutize(trimmed, base: baseUrl)
+                    return absolute.isEmpty ? nil : absolute
+                }
+                return trimmed.isEmpty ? nil : trimmed
+            }
+        }
+
+        // Try Legado default syntax translator (class., id., tag., @ chaining)
+        if let translated = LegadoDefaultRuleTranslator.translateValueRule(materializedRule) {
+            var currentElements = [root]
+            for step in translated.steps {
+                guard !step.selector.isEmpty else { continue }
+                var nextElements: [Element] = []
+                for elem in currentElements {
+                    do {
+                        let selected = try elem.select(step.selector).array()
+                        if let index = step.index {
+                            let normalized = index >= 0 ? index : selected.count + index
+                            if selected.indices.contains(normalized) {
+                                nextElements.append(selected[normalized])
+                            }
+                        } else if let excl = step.excludeIndex {
+                            let normalizedExcl = excl >= 0 ? excl : selected.count + excl
+                            for (idx, item) in selected.enumerated() where idx != normalizedExcl {
+                                nextElements.append(item)
+                            }
+                        } else {
+                            nextElements.append(contentsOf: selected)
+                        }
+                    } catch {
+                        continue
+                    }
+                }
+                currentElements = nextElements
+            }
+
+            if translated.attribute == "all" {
+                let joined = try currentElements.map { try $0.text() }.joined(separator: "\n")
+                let transformed = applyRegexTransforms(translated.regexTransforms[...], to: joined)
+                    .trimmingCharacters(in: .whitespacesAndNewlines)
+                return transformed.isEmpty ? [] : [transformed]
+            }
+
+            return try currentElements.compactMap { target in
+                let value = try attributeValue(from: target, attr: translated.attribute)
+                let trimmed = applyRegexTransforms(translated.regexTransforms[...], to: value)
+                    .trimmingCharacters(in: .whitespacesAndNewlines)
+                if ["href", "src", "url"].contains(translated.attribute.lowercased()), let baseUrl {
+                    let absolute = absolutize(trimmed, base: baseUrl)
+                    return absolute.isEmpty ? nil : absolute
+                }
+                return trimmed.isEmpty ? nil : trimmed
+            }
+        }
+
+        let split = splitSelectorAndAttribute(materializedRule)
         let targets = try select(from: root, rule: split.selector, baseUrl: baseUrl)
         let attrParts = split.attribute.components(separatedBy: "##")
         let attr = attrParts.first ?? "text"
@@ -97,7 +169,7 @@ struct HtmlRuleExtractor {
             let value = try attributeValue(from: target, attr: attr)
             let trimmed = applyRegexTransforms(attrParts.dropFirst(), to: value)
                 .trimmingCharacters(in: .whitespacesAndNewlines)
-            if ["href", "src", "url"].contains(attr), let baseUrl {
+            if ["href", "src", "url"].contains(attr.lowercased()), let baseUrl {
                 let absolute = absolutize(trimmed, base: baseUrl)
                 return absolute.isEmpty ? nil : absolute
             }
@@ -106,19 +178,38 @@ struct HtmlRuleExtractor {
     }
 
     private func attributeValue(from target: Element, attr: String) throws -> String {
-        let value: String
-        if attr == "text" || attr == "text()" {
-            value = try target.text()
-        } else if attr == "ownText" || attr == "ownText()" {
-            value = try target.ownText()
-        } else if attr == "textNodes" {
-            value = try target.ownText()
-        } else if attr == "html" || attr == "html()" {
-            value = try target.html()
+        let normalizedAttr = attr.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        if normalizedAttr == "text" || normalizedAttr == "text()" {
+            if target.children().contains(where: { ["p", "br", "div", "li"].contains($0.tagName().lowercased()) }) {
+                if let html = try? target.html() {
+                    let withBreaks = html
+                        .replacingOccurrences(of: "(?i)<br\\s*/?>", with: "\n", options: .regularExpression)
+                        .replacingOccurrences(of: "(?i)</p\\s*>", with: "\n", options: .regularExpression)
+                        .replacingOccurrences(of: "(?i)</div\\s*>", with: "\n", options: .regularExpression)
+                    if let parsedDoc = try? SwiftSoup.parse(withBreaks) {
+                        return try parsedDoc.text()
+                    }
+                }
+            }
+            return try target.text()
+        } else if normalizedAttr == "owntext" || normalizedAttr == "owntext()" {
+            return try target.ownText()
+        } else if normalizedAttr == "textnodes" {
+            let nodes = target.textNodes()
+            if !nodes.isEmpty {
+                return nodes.map { $0.text().trimmingCharacters(in: .whitespacesAndNewlines) }
+                    .filter { !$0.isEmpty }
+                    .joined(separator: "\n")
+            }
+            return try target.text()
+        } else if normalizedAttr == "html" || normalizedAttr == "html()" {
+            return try target.html()
+        } else if normalizedAttr.hasPrefix("attr(") && normalizedAttr.hasSuffix(")") {
+            let inner = String(attr.dropFirst(5).dropLast()).trimmingCharacters(in: .whitespacesAndNewlines)
+            return try target.attr(inner)
         } else {
-            value = try target.attr(attr)
+            return try target.attr(attr)
         }
-        return value
     }
 
     func select(from root: Element, rule: String, baseUrl: URL? = nil) throws -> [Element] {
@@ -143,7 +234,53 @@ struct HtmlRuleExtractor {
                 .filter { !$0.isEmpty }
             return interleave(lists)
         }
-        let selector = XPathRuleTranslator.selectorRule(materializedRule) ?? cleanCSS(materializedRule)
+
+        if let xpathSelector = XPathRuleTranslator.selectorRule(materializedRule) {
+            let indexed = parseIndexedSelector(xpathSelector)
+            let elements: [Element]
+            do {
+                elements = try root.select(indexed.selector).array()
+            } catch {
+                return []
+            }
+            guard let index = indexed.index else { return elements }
+            let normalized = index >= 0 ? index : elements.count + index
+            guard elements.indices.contains(normalized) else { return [] }
+            return [elements[normalized]]
+        }
+
+        let steps = LegadoDefaultRuleTranslator.translateSelectorSteps(materializedRule)
+        if !steps.isEmpty {
+            var currentElements = [root]
+            for step in steps {
+                guard !step.selector.isEmpty else { continue }
+                var nextElements: [Element] = []
+                for elem in currentElements {
+                    do {
+                        let selected = try elem.select(step.selector).array()
+                        if let index = step.index {
+                            let normalized = index >= 0 ? index : selected.count + index
+                            if selected.indices.contains(normalized) {
+                                nextElements.append(selected[normalized])
+                            }
+                        } else if let excl = step.excludeIndex {
+                            let normalizedExcl = excl >= 0 ? excl : selected.count + excl
+                            for (idx, item) in selected.enumerated() where idx != normalizedExcl {
+                                nextElements.append(item)
+                            }
+                        } else {
+                            nextElements.append(contentsOf: selected)
+                        }
+                    } catch {
+                        continue
+                    }
+                }
+                currentElements = nextElements
+            }
+            return currentElements
+        }
+
+        let selector = cleanCSS(materializedRule)
         guard !selector.isEmpty else { return [root] }
         let indexed = parseIndexedSelector(selector)
         let elements: [Element]
