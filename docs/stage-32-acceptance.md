@@ -32,17 +32,20 @@
 1. [x] 把 C 级源的 fixture 继续补齐到 XCTest（已在 `SourceEngineCLevelFixtureTests.swift` 落地 GBK POST 搜索、AES/Base64 解密、乱序恢复、拼音/字体字符映射与 WebJS 净化）。
 2. [x] 固化 GBK / 登录验证 / AES/Base64 / 字体反爬 的失败分类（已在 `SourceDiagnosticClassifier.swift` 与 `SourceDiagnosticClassifierTests.swift` 补全断言）。
 3. [x] 保证能力表、fixture bank、测试断言三者一致（`LegadoCapabilityBankTests.swift` 锁定 5 个 C 级源及其完整 label 集合）。
-4. [ ] 本地静态检查通过后，再推 GitHub Actions 验证 iOS / unsigned IPA。
+4. [x] 本地静态检查通过后，推 GitHub Actions 验证 iOS / unsigned IPA（双流水线全绿闭环通过）。
 
 ## 验收门槛
 
 阶段完成必须同时满足：
 
-1. `git diff --check` 通过。
-2. 新增或更新的 XCTest 覆盖本阶段 C 级能力（`SourceEngineCLevelFixtureTests.swift`、`SourceDiagnosticClassifierTests.swift`、`LegadoCapabilityBankTests.swift`）。
-3. `docs/legado-source-capability-table-20260908.md` 与 fixture bank 一致。
-4. `progress.md` 更新本阶段范围、证据、未验证项和回滚点。
-5. GitHub Actions 的 iOS build/test 与 unsigned IPA 结果可核对。
+1. [x] `git diff --check` 通过。
+2. [x] 新增或更新的 XCTest 覆盖本阶段 C 级能力（`SourceEngineCLevelFixtureTests.swift`、`SourceDiagnosticClassifierTests.swift`、`LegadoCapabilityBankTests.swift`）。
+3. [x] `docs/legado-source-capability-table-20260908.md` 与 fixture bank 一致。
+4. [x] `progress.md` 更新本阶段范围、证据、未验证项和回滚点。
+5. [x] GitHub Actions 的 iOS build/test 与 unsigned IPA 结果核对（双绿全过）：
+   - 最终验证提交：`8f7b9d5`
+   - iOS 测试流水线：[Run 34348482825](https://github.com/ztcsr5/SourceReadSwift/actions/runs/34348482825) (Status: completed, Conclusion: success)
+   - Unsigned IPA 流水线：[Run 34348482839](https://github.com/ztcsr5/SourceReadSwift/actions/runs/34348482839) (Status: completed, Conclusion: success)
 
 ## 不在本阶段展开的内容
 

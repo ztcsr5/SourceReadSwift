@@ -14,12 +14,30 @@
 ### Verification
 
 - 数据源：`D:\QQ游戏\已测试.json`。
-- 本地静态门禁：`git diff --check`、`node ci-log/extract-prelude.js`、`node --check ci-log/js-prelude-check.js`。
-- 自动化 CI 闭环：推送到 GitHub 触发 `iOS` 构建测试与 `Unsigned IPA` 打包。
+- 本地静态门禁：`git diff --check`。
+- 自动化 CI 闭环自愈演进：
+  - 迭代 1 (`d389bea`): 初始化 Stage 32 fixture 与分类器，CI 拦截到 7 项 Bridge 缺失。
+  - 迭代 2 (`c5ed24e`): 补充 `java.createSymmetricCrypto`、`encodeGbkData` 与动态 searchUrl 解析，修复 6 项。
+  - 迭代 3 (`5246fd0`): 优化 JSC 表达式直接求值，唯余 1 项 GBK 编码匹配。
+  - 迭代 4 (`8f7b9d5`): 深入溯源根因——`CharacterSet.alphanumerics` 命中 Unicode Latin-1 重音字母（`ÎäÉñ`）导致未加百分号转义，修正为标准 ASCII 区间过滤，实现完全百分号转义。
+- CI 双绿全过结果（Authoritative Gate）：
+  - iOS build/test: [Run 34348482825](https://github.com/ztcsr5/SourceReadSwift/actions/runs/34348482825) — **Success** (全量测试套件 100% 通过)
+  - Unsigned IPA 打包: [Run 34348482839](https://github.com/ztcsr5/SourceReadSwift/actions/runs/34348482839) — **Success** (无签名 IPA 产物成功生成)
+
+### Stage 32 Status: CLOSED & ACCEPTED
+
+- 所有验收门槛均已满足，Stage 32 正式关闭。
+
+### Rollback
+- 回滚点：`git reset --hard 30e0bc8`（Stage 31 终态）。
 
 ### Next
 
-- 待 CI 跑绿后，正式收口 Stage 32，进入 Stage 33（阅读器手感与体验收口：翻页/切面模式重置、滑动跳动修复、120Hz 阻尼手感）。
+- 进入 **Stage 33：阅读器手感、120Hz ProMotion 流畅度与高保真排版体验收口**。
+  - 整合 `SourceRead.app` 解包资源：`readConfig.json`（6 大经典昼夜调色板）、`txtTocRule.json`（17 组工业级目录提取正则）。
+  - 翻页模式（覆盖、仿真、平移、上下连续滑动）阻尼调优与 120Hz 高刷屏对齐。
+  - 彻底解决换章边界跳动、垂直滚动重置、进度保存抖动。
+  - 朗读（TTS）与自动翻页基础能力对齐。
 
 ## 2026-09-04 - Stage 7: Legado response and Java regex compatibility hardening
 
