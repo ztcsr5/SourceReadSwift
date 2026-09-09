@@ -41,7 +41,7 @@ final class JSCoreRuntime {
         // JavaScriptCore can reject a first-read of an undeclared global inside
         // the large prelude; predeclaring them keeps the later `var x = x ||`
         // aliases source-compatible without relying on browser semantics.
-        context.evaluateScript("var java = {}; var cookie = {}; var CryptoJS = {}; var Packages = {}; var JXNode = function(value) { return __nativeJXNode.create(value); }; var src = ''; var html = ''; var body = ''; var result = ''; var baseUrl = '';")
+        context.evaluateScript("var java = {}; var cookie = {}; var CryptoJS = {}; var Packages = {}; var JXNode = function(value) { return __nativeJXNode.create(value); }; var src = '';")
         installBaseBridge()
     }
 
@@ -53,8 +53,6 @@ final class JSCoreRuntime {
         if effectiveVariables["src"] == nil {
             if let htmlVal = effectiveVariables["html"] ?? effectiveVariables["result"] {
                 effectiveVariables["src"] = htmlVal
-            } else {
-                effectiveVariables["src"] = ""
             }
         }
         executionContext.bind(effectiveVariables)
@@ -940,8 +938,12 @@ final class JSCoreRuntime {
         java.uuid = java.randomUUID;
         java.androidId = function() { return 'sourcereadswift-ios'; };
         function __defaultHtml() {
+          if (typeof result !== 'undefined' && String(result) !== '') return String(result);
+          if (typeof html !== 'undefined' && String(html) !== '') return String(html);
+          if (typeof src !== 'undefined' && String(src) !== '') return String(src);
           if (typeof result !== 'undefined') return String(result);
           if (typeof html !== 'undefined') return String(html);
+          if (typeof src !== 'undefined') return String(src);
           return '';
         }
         function __defaultBaseUrl() {

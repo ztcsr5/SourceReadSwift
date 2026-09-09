@@ -119,7 +119,10 @@ final class SearchURLResolverTests: XCTestCase {
         guard case .success(let url) = result else {
             return XCTFail("expected success")
         }
-        XCTAssertTrue(url.hasPrefix("https://www.min-yuan.com/search/,"))
+        XCTAssertTrue(url.hasPrefix("/search/,"))
         XCTAssertFalse(url.contains("cookie.removeCookie"))
+
+        let request = SourceRequestBuilder().buildPageRequest(source: source, urlText: url)
+        XCTAssertEqual(request.url.absoluteString, "https://www.min-yuan.com/search/")
     }
 }
