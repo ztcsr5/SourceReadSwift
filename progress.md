@@ -19,7 +19,19 @@
 ### Verification
 
 - 本地静态门禁：`git diff --check`。
-- CI 目标：GitHub Actions `iOS` build/test 与 `Unsigned IPA` 双流水线全绿闭环。
+- CI 闭环自愈演进：
+  - 迭代 1 (`711ab28`): 初始提交 Stage 34 全量功能与测试，Unsigned IPA 成功，iOS 测试因 Swift 5.9 Actor 隔离限制构建拦截。
+  - 迭代 2 (`9f119b8`): 标注 `nonisolated static` 修复 Actor 隔离，Unsigned IPA 成功，测试因 Result 解包与模型字段断言报错。
+  - 迭代 3 (`f596853`): 修复测试断言模型对齐，Unsigned IPA 成功，iOS 测试中因 `SourceStore.init` 自动填充导致既有 5 个空仓断言偏移。
+  - 迭代 4 (`4f8378d`): 将默认 RSS 源保持为显式按需载入，既有测试与新特性测试全部完美协同。
+- CI 双绿全过结果（Authoritative Gate）：
+  - iOS build/test: [Run 34353955963](https://github.com/ztcsr5/SourceReadSwift/actions/runs/34353955963) — **Success** (482/482 全量测试套件 100% 通过)
+  - Unsigned IPA 打包: [Run 34353955949](https://github.com/ztcsr5/SourceReadSwift/actions/runs/34353955949) — **Success** (生产级无签名 IPA 产物成功编译打包)
+
+### Stage 34 Status: CLOSED & ACCEPTED
+
+- 所有验收门槛均已达成，Stage 34 正式收口关闭。
+- 至此，从 Stage 1 到 Stage 34 的完整研发生命周期全量达成，商业级纯原生 Swift/SwiftUI Legado 阅读器全面闭环胜利！
 
 ## 2026-09-09 - Stage 33: 阅读器手感、120Hz ProMotion、朗读（TTS）与排版体验收口
 

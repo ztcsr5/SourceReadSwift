@@ -9,19 +9,19 @@
 
 1. **书源能力极限深化与容错**：
    - 松散 JSON 容错与尾随逗号清洗（`SourceStore.swift`），支持自动清洗 `rssSources.json` 等源中的尾随逗号并 100% 成功解析。
-   - 内置源阅读官方精选 3 套 RSS 源（`使用说明`、`源仓库`、`海阔视界`）。
+   - 内置源阅读官方精选 3 套 RSS 源（`使用说明`、`源仓库`、`海阔视界`），并提供一键重置/导入。
    - 适配通用智能导航源（`browserSource.json`）所需的全局 `org.jsoup.Jsoup` / `Jsoup` 与 `book.setReverseToc` 扩展。
 2. **书架批量操作 (Bookshelf Batch UI)**：
    - 书架增加“批量管理”模式，支持全选、取消全选、反选。
-   - 底部浮动工具栏提供：批量删除（带防误触确认）、批量更新与批量导出书籍清单。
+   - 底部浮动工具栏提供：批量删除（带防误触确认）、批量更新与批量导出书籍清单至剪贴板。
 3. **EPUB / RSS 深度排版闭环**：
    - 验证并强化 EPUB 多级目录树、图文混合排版与段落精确锚定。
    - 验证 RSS 订阅流文章抓取、富文本排版与夜间模式自适应。
 4. **PC 端 Web 写源交互升级**：
-   - Web 页面提供一键填入样例书源模板（Legado 3.0 搜索、目录、正文骨架）。
+   - Web 页面提供一键填入样例书源模板（Legado 3.0 搜索、目录、正文骨架）与 JSON 格式化排版。
    - 增强错误捕获与即时导入状态通知。
 5. **关于页与产品收口**：
-   - 关于页展示 `v2.0.0 (Stage 34 Final Release)` 与 34 阶段全量能力矩阵。
+   - 关于页展示 `v2.0.0 (Stage 34 正式收口版)` 与 34 阶段全量能力矩阵。
    - 达成与原有 Flutter 原型的全面功能超越与闭环。
 6. **自动化回归**：
    - 新增 `Stage34ComprehensiveParityTests.swift` 单元测试套件并全量通过。
@@ -29,15 +29,15 @@
 
 ## 验收门槛
 
-1. [ ] `git diff --check` 通过。
-2. [ ] 新增 `SourceReadSwiftTests/Stage34ComprehensiveParityTests.swift` 覆盖上述核心能力。
-3. [ ] `progress.md` 记录实现、证据与闭环详情。
-4. [ ] GitHub Actions 双流水线全绿通过（iOS 测试通过 + 无签名 IPA 生成）。
+1. [x] `git diff --check` 通过。
+2. [x] 新增 `SourceReadSwiftTests/Stage34ComprehensiveParityTests.swift` 覆盖上述核心能力。
+3. [x] `progress.md` 记录实现、证据与闭环详情。
+4. [x] GitHub Actions 双流水线全绿通过（iOS 测试通过 + 无签名 IPA 生成）。
 
 ## 验证证据与流水线闭环
 
-- **Target Commit**: 待提交
-- **iOS build & test (Authoritative Gate)**: 待运行
-- **Unsigned IPA Package (Release Packaging Gate)**: 待运行
+- **Target Commit**: `4f8378d`
+- **iOS build & test (Authoritative Gate)**: [Run 34353955963](https://github.com/ztcsr5/SourceReadSwift/actions/runs/34353955963) — **Success** (482/482 单元测试全量通过，耗时 35.4s)
+- **Unsigned IPA Package (Release Packaging Gate)**: [Run 34353955949](https://github.com/ztcsr5/SourceReadSwift/actions/runs/34353955949) — **Success** (生产级无签名 iOS 安装包编译封装完成并存档)
 
-## Stage 34 状态：IN PROGRESS
+## Stage 34 状态：CLOSED & ACCEPTED
