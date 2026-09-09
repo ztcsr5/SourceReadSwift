@@ -80,14 +80,15 @@ final class LegadoHostServices {
     func encodeURI(_ value: String, charset: String? = nil) -> String {
         let normalized = charset?.lowercased() ?? "utf-8"
         if normalized.contains("gbk") || normalized.contains("gb2312") || normalized.contains("gb18030") {
-            guard let data = Self.encodeGbkData(value) else { return value }
-            return data.map { byte in
-                let scalar = UnicodeScalar(byte)
-                if CharacterSet.alphanumerics.contains(scalar) || "-._~".utf8.contains(byte) {
-                    return String(UnicodeScalar(byte))
-                }
-                return String(format: "%%%02X", byte)
-            }.joined()
+            if let data = Self.encodeGbkData(value) {
+                return data.map { byte in
+                    let scalar = UnicodeScalar(byte)
+                    if CharacterSet.alphanumerics.contains(scalar) || "-._~".utf8.contains(byte) {
+                        return String(UnicodeScalar(byte))
+                    }
+                    return String(format: "%%%02X", byte)
+                }.joined()
+            }
         }
         var allowed = CharacterSet.alphanumerics
         allowed.insert(charactersIn: "-._~")
@@ -105,7 +106,10 @@ final class LegadoHostServices {
         let cfEncodings: [CFStringEncoding] = [
             CFStringEncoding(CFStringEncodings.GB_18030_2000.rawValue),
             CFStringEncoding(CFStringEncodings.GB_2312_80.rawValue),
-            CFStringEncoding(CFStringEncodings.EUC_CN.rawValue)
+            CFStringEncoding(CFStringEncodings.EUC_CN.rawValue),
+            CFStringEncoding(0x0631),
+            CFStringEncoding(0x0421),
+            CFStringEncoding(25)
         ]
         for cfEncoding in cfEncodings {
             var usedBufLen: CFIndex = 0
