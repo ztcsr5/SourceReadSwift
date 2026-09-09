@@ -14,10 +14,19 @@ final class SourceEngineCLevelFixtureTests: XCTestCase {
         let sourceData = try XCTUnwrap(sources.first { ($0["bookSourceName"] as? String) == "🔞🔲第一版主999" })
         let source = try JSONDecoder().decode(BookSource.self, from: JSONSerialization.data(withJSONObject: sourceData))
 
+        let resolveResult = SearchURLResolver().resolve(source: source, keyword: "修真", page: 1)
+        let resolvedSearchUrl: String
+        switch resolveResult {
+        case .success(let url):
+            resolvedSearchUrl = url
+        case .failure(let err):
+            return XCTFail("failed to resolve searchUrl: \(err)")
+        }
+
         let builder = SourceRequestBuilder()
         let request = builder.buildSearchRequest(
             source: source,
-            searchUrl: source.searchUrl ?? "",
+            searchUrl: resolvedSearchUrl,
             keyword: "修真",
             page: 1
         )
@@ -39,19 +48,20 @@ final class SourceEngineCLevelFixtureTests: XCTestCase {
 
         // 1. Test AES decryption with MD5 derived key & iv (matching source script logic)
         let aesScript = """
-        var secretText = 'U2FsdGVkX18xMjM0NTY3OKWM0JxM5A2ppliuYJJMeHs=';
         var keyInput = 'secret_pass_123';
         var code = java.md5Encode(keyInput);
         var iv = code.substring(0, 16);
         var key = code.substring(16);
         var crypto = java.createSymmetricCrypto("AES/CBC/PKCS7Padding", key, iv);
-        crypto != null;
+        var enc = crypto.encryptStr('测试第一版主密文正文');
+        var dec = crypto.decryptStr(enc);
+        dec;
         """
         let aesResult = runtime.evaluate(aesScript)
         guard case .success(let val) = aesResult else {
             return XCTFail("AES setup failed: \(aesResult)")
         }
-        XCTAssertEqual(val, "true")
+        XCTAssertEqual(val, "测试第一版主密文正文")
 
         // 2. Test Font Hex replacement logic: <i>&#xe800</i> -> #e800#
         let fontScript = """

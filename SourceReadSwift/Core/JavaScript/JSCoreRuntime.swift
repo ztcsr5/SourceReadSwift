@@ -2073,6 +2073,36 @@ final class JSCoreRuntime {
         java.cipherBase64DecodeToString = function(value, key, iv, transformation) {
           return __cipherBase64Decode(value, key, iv, transformation, 'AES/CBC/PKCS5Padding');
         };
+        java.createSymmetricCrypto = function(transformation, key, iv) {
+          var tf = String(transformation || 'AES/CBC/PKCS7Padding');
+          var k = key;
+          var v = iv;
+          var api = {
+            setKey: function(newKey) { k = newKey; return api; },
+            setIV: function(newIv) { v = newIv; return api; },
+            init: function(newKey, newIv) { if (newKey != null) k = newKey; if (newIv != null) v = newIv; return api; },
+            decryptStr: function(str) {
+              return __cipherBase64Decode(str, k, v, tf, tf);
+            },
+            decrypt: function(str) {
+              return __cipherBase64Decode(str, k, v, tf, tf);
+            },
+            encryptStr: function(str) {
+              return __cipherBase64Encode(str, k, v, tf, tf);
+            },
+            encrypt: function(str) {
+              return __cipherBase64Encode(str, k, v, tf, tf);
+            },
+            decryptBase64: function(str) {
+              return __cipherBase64Decode(str, k, v, tf, tf);
+            },
+            encryptBase64: function(str) {
+              return __cipherBase64Encode(str, k, v, tf, tf);
+            },
+            toString: function() { return tf; }
+          };
+          return api;
+        };
         java.setContent = function(value) {
           result = String(value == null ? '' : value);
           return String(__nativeRule.setContent(result));

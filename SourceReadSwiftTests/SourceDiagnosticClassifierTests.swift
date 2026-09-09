@@ -36,7 +36,8 @@ final class SourceDiagnosticClassifierTests: XCTestCase {
 
         // GBK / Charset
         XCTAssertEqual(SourceDiagnosticClassifier.kind(message: "GBK 编码解析失败", stage: "search"), .parsing)
-        XCTAssertEqual(SourceDiagnosticClassifier.kind(error: .rule("不支持 gb2312 编码"), stage: "toc"), .parsing)
+        XCTAssertEqual(SourceDiagnosticClassifier.kind(error: .rule("不支持 gb2312 编码"), stage: "toc"), .unsupported)
+        XCTAssertEqual(SourceDiagnosticClassifier.kind(error: .rule("gb2312 编码解析失败"), stage: "toc"), .parsing)
 
         // AES / Crypto / Base64
         XCTAssertEqual(SourceDiagnosticClassifier.kind(message: "AES decrypt failed", stage: "content"), .javascript)

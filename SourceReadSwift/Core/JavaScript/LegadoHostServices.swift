@@ -80,8 +80,7 @@ final class LegadoHostServices {
     func encodeURI(_ value: String, charset: String? = nil) -> String {
         let normalized = charset?.lowercased() ?? "utf-8"
         if normalized.contains("gbk") || normalized.contains("gb2312") || normalized.contains("gb18030") {
-            let encoding = Self.gbkEncoding
-            guard let data = value.data(using: encoding) else { return value }
+            guard let data = Self.encodeGbkData(value) else { return value }
             return data.map { byte in
                 let scalar = UnicodeScalar(byte)
                 if CharacterSet.alphanumerics.contains(scalar) || "-._~".utf8.contains(byte) {
@@ -96,8 +95,51 @@ final class LegadoHostServices {
     }
 
     func utf8ToGbk(_ value: String) -> NSArray {
-        guard let data = value.data(using: Self.gbkEncoding) else { return [] }
+        guard let data = Self.encodeGbkData(value) else { return [] }
         return data.map { NSNumber(value: $0) } as NSArray
+    }
+
+    static func encodeGbkData(_ value: String) -> Data? {
+        let cfString = value as CFString
+        let length = CFStringGetLength(cfString)
+        let cfEncodings: [CFStringEncoding] = [
+            CFStringEncoding(CFStringEncodings.GB_18030_2000.rawValue),
+            CFStringEncoding(CFStringEncodings.GB_2312_80.rawValue),
+            CFStringEncoding(CFStringEncodings.EUC_CN.rawValue)
+        ]
+        for cfEncoding in cfEncodings {
+            var usedBufLen: CFIndex = 0
+            let range = CFRange(location: 0, length: length)
+            let converted = CFStringGetBytes(
+                cfString,
+                range,
+                cfEncoding,
+                0,
+                false,
+                nil,
+                0,
+                &usedBufLen
+            )
+            if converted > 0 && usedBufLen > 0 {
+                var buffer = [UInt8](repeating: 0, count: usedBufLen)
+                CFStringGetBytes(
+                    cfString,
+                    range,
+                    cfEncoding,
+                    0,
+                    false,
+                    &buffer,
+                    usedBufLen,
+                    nil
+                )
+                return Data(buffer)
+            }
+        }
+        let nsEncoding = CFStringConvertEncodingToNSStringEncoding(CFStringEncoding(CFStringEncodings.GB_18030_2000.rawValue))
+        if let data = (value as NSString).data(using: nsEncoding) {
+            return data
+        }
+        return value.data(using: gbkEncoding)
     }
 
     func decodeText(_ data: Data, charset: String?) -> String {
