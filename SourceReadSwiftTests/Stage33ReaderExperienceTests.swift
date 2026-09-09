@@ -106,13 +106,13 @@ final class Stage33ReaderExperienceTests: XCTestCase {
         // 4. 淡雅黛紫
         let lavender = ReaderBackground.lavender
         XCTAssertEqual(lavender.dayBackgroundHex, 0xDBB8E2)
-        XCTAssertEqual(lavender.dayTextHex, 0x68516C)
+        XCTAssertEqual(lavender.dayTextHex, 0x5A4761)
         XCTAssertEqual(lavender.nightTextHex, 0xF6AEAE)
 
         // 5. 晴空天蓝
         let azure = ReaderBackground.azure
         XCTAssertEqual(azure.dayBackgroundHex, 0xABCEE0)
-        XCTAssertEqual(azure.dayTextHex, 0x3D4C54)
+        XCTAssertEqual(azure.dayTextHex, 0x345367)
         XCTAssertEqual(azure.nightTextHex, 0x90BFF5)
 
         // 6. 极夜纯黑
