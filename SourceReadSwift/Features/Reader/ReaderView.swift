@@ -88,14 +88,15 @@ struct ReaderView: View {
     @GestureState private var coverSwipeState = ReaderCoverSwipeState()
     @StateObject private var playbackCoordinator = ReaderPlaybackCoordinator()
     @StateObject private var speechController = ReaderSpeechController()
-    @AppStorage("reader.fontSize") private var fontSize: Double = 19
-    @AppStorage("reader.lineSpacing") private var lineSpacing: Double = 8
-    @AppStorage("reader.pagePadding") private var pagePadding: Double = 24
-    @AppStorage("reader.letterSpacing") private var letterSpacing: Double = 0
-    @AppStorage("reader.paragraphSpacing") private var paragraphSpacing: Double = 16
-    @AppStorage("reader.paragraphIndent") private var paragraphIndent: Double = 0
-    @AppStorage("reader.titleSpacing") private var titleSpacing: Double = 12
-    @AppStorage("reader.footerHeight") private var footerHeight: Double = 72
+    @AppStorage("reader.fontFamily") private var fontFamilyRawValue: String = ReaderFontFamily.system.rawValue
+    @AppStorage("reader.fontSize") private var fontSize: Double = ReaderTypographyDefaults.fontSize
+    @AppStorage("reader.lineSpacing") private var lineSpacing: Double = ReaderTypographyDefaults.lineSpacing
+    @AppStorage("reader.pagePadding") private var pagePadding: Double = ReaderTypographyDefaults.pagePadding
+    @AppStorage("reader.letterSpacing") private var letterSpacing: Double = ReaderTypographyDefaults.letterSpacing
+    @AppStorage("reader.paragraphSpacing") private var paragraphSpacing: Double = ReaderTypographyDefaults.paragraphSpacing
+    @AppStorage("reader.paragraphIndent") private var paragraphIndent: Double = ReaderTypographyDefaults.paragraphIndent
+    @AppStorage("reader.titleSpacing") private var titleSpacing: Double = ReaderTypographyDefaults.titleSpacing
+    @AppStorage("reader.footerHeight") private var footerHeight: Double = ReaderTypographyDefaults.footerHeight
     @AppStorage("reader.ttsRate") private var ttsRate: Double = 0.52
     @AppStorage("reader.autoScrollDelay") private var autoScrollDelay: Double = 2.0
     @AppStorage("reader.sleepTimerMinutes") private var sleepTimerMinutes: Int = 0
@@ -105,6 +106,10 @@ struct ReaderView: View {
     @AppStorage("reader.keepScreenAwake") private var keepScreenAwake = true
     @AppStorage("reader.preloadChapterCount") private var preloadChapterCount = ReaderPreloadPolicy.defaultCount
     @AppStorage("reader.textSelectionEnabled") private var textSelectionEnabled = false
+
+    private var fontFamily: ReaderFontFamily {
+        ReaderFontFamily(rawValue: fontFamilyRawValue) ?? .system
+    }
 
     private var background: ReaderBackground {
         ReaderBackground(rawValue: backgroundRawValue) ?? .paper
@@ -525,6 +530,7 @@ struct ReaderView: View {
             title: content.title,
             paragraphs: content.paragraphs,
             contentFingerprint: readerContentFingerprint,
+            fontFamily: fontFamily,
             fontSize: fontSize,
             lineSpacing: lineSpacing,
             pagePadding: pagePadding,
@@ -544,6 +550,14 @@ struct ReaderView: View {
             textSelectionEnabled: textSelectionEnabled,
             onVisibleParagraph: { index in
                 updateVisibleParagraph(index)
+            },
+            onNearBottom: {
+                onCacheNextChapters?()
+            },
+            onReachBottom: {
+                if canSelectRelativeChapter(offset: 1) {
+                    selectRelativeChapter(offset: 1)
+                }
             }
         )
         .ignoresSafeArea(.container, edges: .bottom)
@@ -1044,11 +1058,17 @@ struct ReaderView: View {
 
     private var appearancePreview: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("阅读预览")
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(background.textColor.opacity(0.64))
+            HStack {
+                Text("阅读预览")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(background.textColor.opacity(0.64))
+                Spacer()
+                Text("\(fontFamily.title) · \(Int(fontSize))pt · 缩进\(Int(paragraphIndent))pt")
+                    .font(.caption2)
+                    .foregroundStyle(background.textColor.opacity(0.55))
+            }
 
-            Text("夜色沉下来以后，文字应该安静、清楚、耐看。调整外观时，这里会立刻跟随字号、行距和背景变化。")
+            Text("　　夜色沉下来以后，文字应该安静、清楚、耐看。调整外观与排版时，这里会立刻跟随字体、字号、行距、段首缩进和背景变化。")
                 .font(.system(size: min(fontSize, 24), weight: .regular, design: .default))
                 .foregroundStyle(background.textColor)
                 .lineSpacing(lineSpacing)
@@ -1090,17 +1110,31 @@ struct ReaderView: View {
 
     private var layoutSettings: some View {
         VStack(alignment: .leading, spacing: 14) {
-            Text("右侧可直接输入数字，滑块只负责快速粗调。最低值已经放开到更紧凑的阅读布局。")
+            appearancePreview
+
+            VStack(alignment: .leading, spacing: 6) {
+                Text("字体")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(.secondary)
+                Picker("字体选择", selection: $fontFamilyRawValue) {
+                    ForEach(ReaderFontFamily.allCases) { item in
+                        Text(item.title).tag(item.rawValue)
+                    }
+                }
+                .pickerStyle(.segmented)
+            }
+
+            Text("右侧可直接输入数字，滑块只负责快速粗调。已采用市面主流小说默认两字缩进与舒适行距规范。")
                 .font(.caption)
                 .foregroundStyle(.secondary)
 
-            readerValueSlider("字号", value: $fontSize, range: 12...34, step: 1, unit: "pt", help: "正文文字大小，支持直接输入更小的数值")
-            readerValueSlider("行高", value: $lineSpacing, range: 0...18, step: 1, unit: "pt", help: "每行文字之间的垂直间距")
+            readerValueSlider("字号", value: $fontSize, range: 12...34, step: 1, unit: "pt", help: "正文文字大小，主流推荐 18-20pt")
+            readerValueSlider("行高", value: $lineSpacing, range: 0...18, step: 1, unit: "pt", help: "每行文字之间的垂直间距，主流推荐 8-10pt")
             readerValueSlider("字距", value: $letterSpacing, range: 0...4, step: 0.2, unit: "pt", help: "字符之间的水平间距")
-            readerValueSlider("段距", value: $paragraphSpacing, range: 0...32, step: 1, unit: "pt", help: "相邻段落之间的留白")
-            readerValueSlider("段首缩进", value: $paragraphIndent, range: 0...40, step: 2, unit: "pt", help: "每段第一行向右缩进")
-            readerValueSlider("标题间距", value: $titleSpacing, range: 0...36, step: 2, unit: "pt", help: "章节标题与正文之间的留白")
-            readerValueSlider("左右间距", value: $pagePadding, range: 10...40, step: 1, unit: "pt", help: "正文距离屏幕左右边缘的距离")
+            readerValueSlider("段距", value: $paragraphSpacing, range: 0...32, step: 1, unit: "pt", help: "相邻段落之间的留白，主流推荐 16pt")
+            readerValueSlider("段首缩进", value: $paragraphIndent, range: 0...50, step: 2, unit: "pt", help: "首行缩进（38pt 为标准 2 中文字符缩进）")
+            readerValueSlider("标题间距", value: $titleSpacing, range: 0...36, step: 2, unit: "pt", help: "章节标题与正文之间的留白，推荐 20pt")
+            readerValueSlider("左右间距", value: $pagePadding, range: 10...40, step: 1, unit: "pt", help: "正文距离屏幕左右边缘的距离，推荐 20pt")
             readerValueSlider("底部留白", value: $footerHeight, range: 40...180, step: 8, unit: "pt", help: "为底部阅读操作预留的安全空间")
         }
     }

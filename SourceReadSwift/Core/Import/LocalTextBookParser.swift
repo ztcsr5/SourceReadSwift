@@ -34,7 +34,8 @@ struct LocalTextBookParser {
                     chapters.append((currentTitle, currentParagraphs))
                     currentParagraphs = []
                 }
-                currentTitle = line
+                let cleanHeading = line.trimmingCharacters(in: CharacterSet(charactersIn: "# \t　"))
+                currentTitle = cleanHeading.isEmpty ? line : cleanHeading
                 hasDetectedHeading = true
             } else {
                 currentParagraphs.append(line)
@@ -46,6 +47,26 @@ struct LocalTextBookParser {
         }
 
         if !hasDetectedHeading || chapters.isEmpty {
+            // If the text is long and has no standard headings, split into logical parts
+            // so reading, pagination, and caching remain responsive and performant.
+            if lines.count > 80 {
+                let chunkSize = 60
+                var chunkedChapters: [LocalTextChapter] = []
+                var currentChunk: [String] = []
+                var partIndex = 1
+                for line in lines {
+                    currentChunk.append(line)
+                    if currentChunk.count >= chunkSize {
+                        chunkedChapters.append(LocalTextChapter(title: "第 \(partIndex) 部分", paragraphs: currentChunk, index: partIndex - 1))
+                        currentChunk = []
+                        partIndex += 1
+                    }
+                }
+                if !currentChunk.isEmpty {
+                    chunkedChapters.append(LocalTextChapter(title: "第 \(partIndex) 部分", paragraphs: currentChunk, index: partIndex - 1))
+                }
+                return chunkedChapters
+            }
             return [LocalTextChapter(title: "全文", paragraphs: lines, index: 0)]
         }
 
@@ -56,7 +77,8 @@ struct LocalTextBookParser {
 
     private static let compiledHeadingRegexes: [NSRegularExpression] = {
         let patterns = [
-            #"^[ \t　]{0,4}(?:序章|楔子|正文(?!完|结)|终章|后记|尾声|番外|第?\s{0,4}[\d零〇一二两三四五六七八九十百千万壹贰叁肆伍陆柒捌玖拾佰仟]+?\s{0,4}(?:章|节(?!课)|卷|集(?![合和])|部(?!分)|回(?![合来事去])|场(?![和合比电是])|篇(?!张))).{0,30}$"#,
+            #"^[ \t　]{0,4}#{1,6}[ \t　]*.{1,40}$"#,
+            #"^[ \t　]{0,4}#{0,6}[ \t　]*(?:序章|楔子|正文(?!完|结)|终章|后记|尾声|番外|第?\s{0,4}[\d零〇一二两三四五六七八九十百千万壹贰叁肆伍陆柒捌玖拾佰仟]+?\s{0,4}(?:章|节(?!课)|卷|集(?![合和])|部(?!分)|回(?![合来事去])|场(?![和合比电是])|篇(?!张))).{0,30}$"#,
             #"^[ \t　]{0,4}\d{1,5}[,.， 、_—\-].{1,30}$"#,
             #"^[ \t　]{0,4}[零〇一二两三四五六七八九十百千万壹贰叁肆伍陆柒捌玖拾佰仟]{1,8}[ 、_—\-].{1,30}$"#,
             #"^[ \t　]{0,4}正文[ 　]{1,4}.{0,20}$"#,

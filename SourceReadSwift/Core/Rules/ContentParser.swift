@@ -28,9 +28,30 @@ struct ContentParser {
             contentEncodings: response.contentEncodings
         )
         if ResponseFormatDetector.prefersJSON(body: body, headers: response.headers) {
-            return parseJSON(source: source, chapter: chapter, response: normalizedResponse, globalPurifyRules: globalPurifyRules)
+            let jsonResult = parseJSON(source: source, chapter: chapter, response: normalizedResponse, globalPurifyRules: globalPurifyRules)
+            switch jsonResult {
+            case .success:
+                return jsonResult
+            case .failure:
+                let htmlResult = parseHTML(source: source, chapter: chapter, response: normalizedResponse, globalPurifyRules: globalPurifyRules)
+                if case .success = htmlResult {
+                    return htmlResult
+                }
+                return jsonResult
+            }
+        } else {
+            let htmlResult = parseHTML(source: source, chapter: chapter, response: normalizedResponse, globalPurifyRules: globalPurifyRules)
+            switch htmlResult {
+            case .success:
+                return htmlResult
+            case .failure:
+                let jsonResult = parseJSON(source: source, chapter: chapter, response: normalizedResponse, globalPurifyRules: globalPurifyRules)
+                if case .success = jsonResult {
+                    return jsonResult
+                }
+                return htmlResult
+            }
         }
-        return parseHTML(source: source, chapter: chapter, response: normalizedResponse, globalPurifyRules: globalPurifyRules)
     }
 
     private func parseHTML(

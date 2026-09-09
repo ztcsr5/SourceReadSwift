@@ -13,6 +13,7 @@ struct NativeReaderTextView: UIViewRepresentable {
     /// paragraph in the middle of a long chapter without hashing that chapter
     /// during every SwiftUI body evaluation. It is optional for existing call sites.
     var contentFingerprint: String? = nil
+    var fontFamily: ReaderFontFamily = .system
     let fontSize: Double
     let lineSpacing: Double
     let pagePadding: Double
@@ -29,13 +30,27 @@ struct NativeReaderTextView: UIViewRepresentable {
     let animatedScrollDuration: Double
     let textSelectionEnabled: Bool
     let onVisibleParagraph: (Int) -> Void
+    var onNearBottom: (() -> Void)? = nil
+    var onReachBottom: (() -> Void)? = nil
 
     func makeCoordinator() -> Coordinator {
-        Coordinator(onVisibleParagraph: onVisibleParagraph)
+        Coordinator(
+            onVisibleParagraph: onVisibleParagraph,
+            onNearBottom: onNearBottom,
+            onReachBottom: onReachBottom
+        )
     }
 
     func makeUIView(context: Context) -> UITextView {
-        let textView = UITextView(frame: .zero)
+        let textView: UITextView
+        if #available(iOS 16.0, *) {
+            // Explicitly use TextKit 1 (usingTextLayoutManager: false) to guarantee
+            // synchronous layout sizing, stable contentSize, and avoid TextKit 2 compatibility
+            // layout glitches that cause rubber-band bouncing and main-thread stalls.
+            textView = UITextView(usingTextLayoutManager: false)
+        } else {
+            textView = UITextView(frame: .zero)
+        }
         textView.delegate = context.coordinator
         textView.backgroundColor = .clear
         textView.isEditable = false
@@ -50,13 +65,22 @@ struct NativeReaderTextView: UIViewRepresentable {
         textView.contentInsetAdjustmentBehavior = .never
         textView.setContentHuggingPriority(.defaultLow, for: .vertical)
         textView.setContentCompressionResistancePriority(.defaultLow, for: .vertical)
+
+        if #available(iOS 15.0, *) {
+            textView.layer.preferredFrameRateRange = CAFrameRateRange(minimum: 80, maximum: 120, preferred: 120)
+        }
+
         context.coordinator.attach(textView)
         context.coordinator.update(textView: textView, configuration: configuration, scrollTarget: scrollTarget, scrollRequestKey: scrollRequestKey)
         return textView
     }
 
     func updateUIView(_ textView: UITextView, context: Context) {
-        context.coordinator.updateVisibleParagraphCallback(onVisibleParagraph)
+        context.coordinator.updateCallbacks(
+            visibleParagraph: onVisibleParagraph,
+            nearBottom: onNearBottom,
+            reachBottom: onReachBottom
+        )
         context.coordinator.update(textView: textView, configuration: configuration, scrollTarget: scrollTarget, scrollRequestKey: scrollRequestKey)
         context.coordinator.updateHighlight(currentParagraphIndex, in: textView, color: highlightColor)
         context.coordinator.updateSelection(textSelectionEnabled, in: textView)
@@ -69,6 +93,7 @@ struct NativeReaderTextView: UIViewRepresentable {
             paragraphs: paragraphs,
             contentFingerprint: contentFingerprint?.nilIfEmpty
                 ?? [title, subtitle ?? "", String(paragraphs.count), String(paragraphs.first?.hashValue ?? 0), String(paragraphs.last?.hashValue ?? 0)].joined(separator: "|"),
+            fontFamily: fontFamily,
             fontSize: fontSize,
             lineSpacing: lineSpacing,
             pagePadding: pagePadding,
@@ -88,6 +113,7 @@ struct NativeReaderTextView: UIViewRepresentable {
         let subtitle: String?
         let paragraphs: [String]
         let contentFingerprint: String
+        let fontFamily: ReaderFontFamily
         let fontSize: Double
         let lineSpacing: Double
         let pagePadding: Double
@@ -104,6 +130,7 @@ struct NativeReaderTextView: UIViewRepresentable {
             let title: String
             let subtitle: String?
             let contentFingerprint: String
+            let fontFamily: ReaderFontFamily
             let fontSize: Double
             let lineSpacing: Double
             let letterSpacing: Double
@@ -122,6 +149,7 @@ struct NativeReaderTextView: UIViewRepresentable {
                 title: title,
                 subtitle: subtitle,
                 contentFingerprint: contentFingerprint,
+                fontFamily: fontFamily,
                 fontSize: fontSize,
                 lineSpacing: lineSpacing,
                 letterSpacing: letterSpacing,
@@ -137,6 +165,7 @@ struct NativeReaderTextView: UIViewRepresentable {
 
         static func == (lhs: Configuration, rhs: Configuration) -> Bool {
             lhs.contentFingerprint == rhs.contentFingerprint
+                && lhs.fontFamily == rhs.fontFamily
                 && lhs.fontSize == rhs.fontSize
                 && lhs.lineSpacing == rhs.lineSpacing
                 && lhs.pagePadding == rhs.pagePadding
@@ -154,6 +183,8 @@ struct NativeReaderTextView: UIViewRepresentable {
     final class Coordinator: NSObject, UITextViewDelegate, UIScrollViewDelegate {
         private weak var textView: UITextView?
         private var visibleParagraphCallback: (Int) -> Void
+        private var nearBottomCallback: (() -> Void)?
+        private var reachBottomCallback: (() -> Void)?
         private var configuration: Configuration?
         private var paragraphRanges: [NSRange] = []
         private var lastHighlightedParagraph = -1
@@ -165,8 +196,14 @@ struct NativeReaderTextView: UIViewRepresentable {
         private var lastSelectionEnabled: Bool?
         private var lastLayoutWidth: CGFloat?
 
-        init(onVisibleParagraph: @escaping (Int) -> Void) {
+        init(
+            onVisibleParagraph: @escaping (Int) -> Void,
+            onNearBottom: (() -> Void)? = nil,
+            onReachBottom: (() -> Void)? = nil
+        ) {
             visibleParagraphCallback = onVisibleParagraph
+            nearBottomCallback = onNearBottom
+            reachBottomCallback = onReachBottom
         }
 
         func attach(_ textView: UITextView) {
@@ -177,8 +214,14 @@ struct NativeReaderTextView: UIViewRepresentable {
             textView.scrollsToTop = true
         }
 
-        func updateVisibleParagraphCallback(_ callback: @escaping (Int) -> Void) {
-            visibleParagraphCallback = callback
+        func updateCallbacks(
+            visibleParagraph: @escaping (Int) -> Void,
+            nearBottom: (() -> Void)?,
+            reachBottom: (() -> Void)?
+        ) {
+            visibleParagraphCallback = visibleParagraph
+            nearBottomCallback = nearBottom
+            reachBottomCallback = reachBottom
         }
 
         func updateSelection(_ enabled: Bool, in textView: UITextView) {
@@ -265,7 +308,11 @@ struct NativeReaderTextView: UIViewRepresentable {
                 textView.attributedText = result.text
                 textView.textColor = configuration.textColor
             }
+            // Force synchronous layout pass so contentSize.height is accurate and
+            // never causes rubber-banding bounces while content remains below.
+            textView.layoutManager.ensureLayout(for: textView.textContainer)
             textView.setNeedsLayout()
+            textView.layoutIfNeeded()
         }
 
         private func updateInsets(in textView: UITextView, configuration: Configuration) {
@@ -349,6 +396,14 @@ struct NativeReaderTextView: UIViewRepresentable {
             guard let textView = scrollView as? UITextView,
                   let configuration,
                   !paragraphRanges.isEmpty else { return }
+
+            // Pre-cache trigger when approaching bottom (within 400pt)
+            let contentHeight = textView.contentSize.height
+            let visibleBottom = textView.contentOffset.y + textView.bounds.height
+            if contentHeight > 0 && visibleBottom >= contentHeight - 400 {
+                nearBottomCallback?()
+            }
+
             let now = CACurrentMediaTime()
             guard now - lastVisibleUpdateAt >= 0.08 else { return }
             lastVisibleUpdateAt = now
@@ -368,6 +423,15 @@ struct NativeReaderTextView: UIViewRepresentable {
             guard let index, index != lastVisibleParagraph else { return }
             lastVisibleParagraph = index
             visibleParagraphCallback(index)
+        }
+
+        func scrollViewDidEndDragging(_ scrollView: UIScrollView, willDecelerate decelerate: Bool) {
+            let contentHeight = scrollView.contentSize.height
+            let visibleBottom = scrollView.contentOffset.y + scrollView.bounds.height
+            // User intentionally dragged past chapter bottom by 35pt or more: trigger next chapter handoff!
+            if contentHeight > 0 && visibleBottom >= contentHeight + 35 {
+                reachBottomCallback?()
+            }
         }
     }
 }
@@ -439,7 +503,7 @@ enum ReaderNativeTextLayout {
         titleStyle.paragraphSpacing = CGFloat(configuration.paragraphSpacing + configuration.titleSpacing)
         titleStyle.alignment = .natural
         let titleAttributes: [NSAttributedString.Key: Any] = [
-            .font: UIFont.systemFont(ofSize: CGFloat(configuration.fontSize + 8), weight: .bold),
+            .font: configuration.fontFamily.uiFont(ofSize: CGFloat(configuration.fontSize + 8), weight: .bold),
             .foregroundColor: configuration.textColor,
             .paragraphStyle: titleStyle
         ]
@@ -450,7 +514,7 @@ enum ReaderNativeTextLayout {
             subtitleStyle.paragraphSpacing = CGFloat(configuration.titleSpacing)
             subtitleStyle.alignment = .natural
             let subtitleAttributes: [NSAttributedString.Key: Any] = [
-                .font: UIFont.systemFont(ofSize: max(CGFloat(configuration.fontSize - 5), 12), weight: .regular),
+                .font: configuration.fontFamily.uiFont(ofSize: max(CGFloat(configuration.fontSize - 5), 12), weight: .regular),
                 .foregroundColor: configuration.textColor.withAlphaComponent(0.62),
                 .paragraphStyle: subtitleStyle
             ]
@@ -466,7 +530,7 @@ enum ReaderNativeTextLayout {
         paragraphStyle.firstLineHeadIndent = CGFloat(configuration.paragraphIndent)
         paragraphStyle.alignment = .natural
         let paragraphAttributes: [NSAttributedString.Key: Any] = [
-            .font: UIFont.systemFont(ofSize: CGFloat(configuration.fontSize), weight: .regular),
+            .font: configuration.fontFamily.uiFont(ofSize: CGFloat(configuration.fontSize), weight: .regular),
             .foregroundColor: configuration.textColor,
             .kern: configuration.letterSpacing,
             .paragraphStyle: paragraphStyle
@@ -493,6 +557,20 @@ enum ReaderNativeTextLayout {
                 range: NSRange(location: bodyStart, length: bodyLength)
             )
         }
+
+        if !configuration.paragraphs.isEmpty {
+            let endMarkerStyle = NSMutableParagraphStyle()
+            endMarkerStyle.alignment = .center
+            endMarkerStyle.paragraphSpacingBefore = CGFloat(configuration.paragraphSpacing + 24)
+            endMarkerStyle.paragraphSpacing = CGFloat(configuration.paragraphSpacing + 8)
+            let endAttributes: [NSAttributedString.Key: Any] = [
+                .font: configuration.fontFamily.uiFont(ofSize: 13, weight: .regular),
+                .foregroundColor: configuration.textColor.withAlphaComponent(0.42),
+                .paragraphStyle: endMarkerStyle
+            ]
+            output.append(NSAttributedString(string: "——— 本章完 · 继续上拉进入下一章 ———\n", attributes: endAttributes))
+        }
+
         PerformanceSignpost.event("reader.textLayout.summary", "paragraphs=\(ranges.count), utf16=\(bodyLength)")
         return Result(text: output, paragraphRanges: ranges)
     }

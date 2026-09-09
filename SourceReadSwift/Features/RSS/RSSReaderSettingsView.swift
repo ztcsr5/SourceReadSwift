@@ -21,24 +21,32 @@ struct RSSReaderSettingsView: View {
                 VStack(alignment: .leading, spacing: 18) {
                     Text("外观")
                         .font(.headline)
-                    HStack(spacing: 12) {
-                        ForEach(ReaderBackground.allCases) { item in
-                            Button {
-                                backgroundRawValue = item.rawValue
-                            } label: {
-                                Circle()
-                                    .fill(item.color)
-                                    .frame(width: 42, height: 42)
-                                    .overlay {
-                                        Circle().stroke(
-                                            backgroundRawValue == item.rawValue ? AppTheme.accent : Color.secondary.opacity(0.25),
-                                            lineWidth: backgroundRawValue == item.rawValue ? 3 : 1
-                                        )
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 14) {
+                            ForEach(ReaderBackground.allCases) { item in
+                                Button {
+                                    backgroundRawValue = item.rawValue
+                                } label: {
+                                    VStack(spacing: 4) {
+                                        Circle()
+                                            .fill(item.color)
+                                            .frame(width: 42, height: 42)
+                                            .overlay {
+                                                Circle().stroke(
+                                                    backgroundRawValue == item.rawValue ? AppTheme.accent : Color.secondary.opacity(0.25),
+                                                    lineWidth: backgroundRawValue == item.rawValue ? 3 : 1
+                                                )
+                                            }
+                                        Text(item.title)
+                                            .font(.caption2)
+                                            .foregroundStyle(backgroundRawValue == item.rawValue ? AppTheme.accent : .secondary)
                                     }
+                                }
+                                .buttonStyle(.plain)
+                                .accessibilityLabel(item.title)
                             }
-                            .buttonStyle(.plain)
-                            .accessibilityLabel(item.title)
                         }
+                        .padding(.horizontal, 2)
                     }
 
                     Text("排版")

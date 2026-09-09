@@ -26,13 +26,36 @@ enum ResponseFormatDetector {
     static func prefersJSON(body: String, headers: [String: String]) -> Bool {
         let normalized = normalizedBody(body)
         guard !normalized.isEmpty else { return false }
+        let lower = normalized.lowercased()
+        let hasHTMLPrefix = lower.hasPrefix("<!doctype")
+            || lower.hasPrefix("<html")
+            || lower.hasPrefix("<?xml")
+            || lower.hasPrefix("<head")
+            || lower.hasPrefix("<body")
+            || lower.hasPrefix("<div")
+
         let contentType = headers.first { key, _ in
             key.caseInsensitiveCompare("Content-Type") == .orderedSame
         }?.value.lowercased() ?? ""
-        if contentType.contains("json") || contentType.contains("javascript") {
+        let hasJSONContentType = contentType.contains("json") || contentType.contains("javascript")
+
+        if hasHTMLPrefix && !hasJSONContentType {
+            return false
+        }
+
+        if hasJSONContentType {
             return jsonObject(from: normalized) != nil
         }
-        if jsonObject(from: normalized) != nil { return true }
+
+        // Without JSON Content-Type, only prefer JSON if the document itself
+        // directly starts with an object/array, a recognized pre wrapper, or an XSSI guard.
+        if normalized.hasPrefix("{") || normalized.hasPrefix("[") {
+            return jsonObject(from: normalized) != nil
+        }
+
+        if lower.hasPrefix("<pre") && jsonObject(from: normalized) != nil {
+            return true
+        }
 
         // Some endpoints prepend an anti-bot comment or XSSI guard.  Strip
         // only known guards, never arbitrary prose, before attempting JSON.
@@ -41,11 +64,22 @@ enum ResponseFormatDetector {
                 .drop(while: { $0 == "," || $0.isWhitespace })
             if jsonObject(from: String(candidate)) != nil { return true }
         }
+
+        // Form/query envelopes such as `data=%7B...%7D`
+        if normalized.hasPrefix("data=%7b") || normalized.hasPrefix("data=%7B") || normalized.hasPrefix("json=%5b") || normalized.hasPrefix("json=%5B") {
+            return jsonObject(from: normalized) != nil
+        }
+
         return false
     }
 
     static func looksLikeJSON(_ body: String) -> Bool {
-        jsonObject(from: body) != nil
+        let normalized = normalizedBody(body)
+        let lower = normalized.lowercased()
+        if lower.hasPrefix("<!doctype") || lower.hasPrefix("<html") || lower.hasPrefix("<?xml") {
+            return false
+        }
+        return jsonObject(from: normalized) != nil
     }
 
     /// Parses JSON wrapped in a `<pre>` element, an XSSI guard, or a BOM.

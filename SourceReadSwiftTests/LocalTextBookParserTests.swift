@@ -29,4 +29,20 @@ final class LocalTextBookParserTests: XCTestCase {
         XCTAssertEqual(book.chapters[1].title, "第二章 继续")
         XCTAssertEqual(book.chapters[1].paragraphs, ["第三段"])
     }
+
+    func testParsesMarkdownHeadingsIntoChapters() {
+        let text = """
+        # 第一章 启程
+        春风吹过山谷。
+        ## 第二章 征途
+        踏上未知的远方。
+        """
+        let book = LocalTextBookParser().parse(data: Data(text.utf8), fileName: "Novel.txt")
+
+        XCTAssertEqual(book.chapters.count, 2)
+        XCTAssertEqual(book.chapters[0].title, "第一章 启程")
+        XCTAssertEqual(book.chapters[0].paragraphs, ["春风吹过山谷。"])
+        XCTAssertEqual(book.chapters[1].title, "第二章 征途")
+        XCTAssertEqual(book.chapters[1].paragraphs, ["踏上未知的远方。"])
+    }
 }

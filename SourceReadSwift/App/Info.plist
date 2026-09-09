@@ -13,6 +13,10 @@
 	</dict>
 	<key>NSLocalNetworkUsageDescription</key>
 	<string>Used to import, export and manage book sources on the local network.</string>
+	<key>NSBonjourServices</key>
+	<array>
+		<string>_http._tcp</string>
+	</array>
 	<key>LSSupportsOpeningDocumentsInPlace</key>
 	<true/>
 	<key>UIFileSharingEnabled</key>

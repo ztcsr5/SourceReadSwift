@@ -34,10 +34,12 @@ final class ResponseFormatDetectorTests: XCTestCase {
 
     func testDoesNotClassifyOrdinaryHTMLOrMismatchedJSONAsJSON() {
         let html = "<html><body><div class=\"book\">No JSON here</div></body></html>"
+        let htmlWithScript = "<!DOCTYPE html><html><head><script>var _hmt = []; var config = {\"api\":\"/v1\"};</script></head><body><div class=\"book\">书名</div></body></html>"
         let malformed = "{\"data\":[1,2}"
 
         XCTAssertFalse(ResponseFormatDetector.prefersJSON(body: html, headers: ["Content-Type": "text/html"]))
         XCTAssertNil(ResponseFormatDetector.jsonObject(from: html))
+        XCTAssertFalse(ResponseFormatDetector.prefersJSON(body: htmlWithScript, headers: ["Content-Type": "text/html; charset=utf-8"]))
         XCTAssertFalse(ResponseFormatDetector.prefersJSON(body: malformed, headers: ["Content-Type": "application/json"]))
         XCTAssertNil(ResponseFormatDetector.jsonObject(from: malformed))
     }

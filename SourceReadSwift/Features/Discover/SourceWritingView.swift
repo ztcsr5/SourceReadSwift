@@ -252,9 +252,9 @@ struct SourceWritingView: View {
             server.start()
         }
         .onDisappear {
-            // Restore normal screen sleep
+            // Restore normal screen sleep when leaving view, but preserve server state
+            // so user can switch to WeChat/Notes to copy and share the link freely.
             UIApplication.shared.isIdleTimerDisabled = false
-            server.stop()
         }
     }
 }
@@ -279,11 +279,51 @@ final class LightweightHTTPServer: ObservableObject {
     private var listener: NWListener?
     private var connections: [NWConnection] = []
     private let lockQueue = DispatchQueue(label: "com.sourceread.server.lock")
+    private var backgroundTaskID: UIBackgroundTaskIdentifier = .invalid
     var onJSONReceived: ((String) -> Result<String, Error>)?
 
     init(sourceStore: SourceStore? = nil) {
         self.sourceStore = sourceStore
         self.localIP = getLocalIPAddresses().first ?? "127.0.0.1"
+        registerBackgroundKeepalive()
+    }
+
+    deinit {
+        NotificationCenter.default.removeObserver(self)
+        endBackgroundTask()
+    }
+
+    private func registerBackgroundKeepalive() {
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(handleDidEnterBackground),
+            name: UIApplication.didEnterBackgroundNotification,
+            object: nil
+        )
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(handleWillEnterForeground),
+            name: UIApplication.willEnterForegroundNotification,
+            object: nil
+        )
+    }
+
+    @objc private func handleDidEnterBackground() {
+        guard isRunning, backgroundTaskID == .invalid else { return }
+        backgroundTaskID = UIApplication.shared.beginBackgroundTask(withName: "SourceReadWebServerBackground") { [weak self] in
+            self?.endBackgroundTask()
+        }
+        log("应用切至后台，已开启后台网络保活")
+    }
+
+    @objc private func handleWillEnterForeground() {
+        endBackgroundTask()
+    }
+
+    private func endBackgroundTask() {
+        guard backgroundTaskID != .invalid else { return }
+        UIApplication.shared.endBackgroundTask(backgroundTaskID)
+        backgroundTaskID = .invalid
     }
 
     func refreshAddresses() {
@@ -364,6 +404,7 @@ final class LightweightHTTPServer: ObservableObject {
     }
 
     func stop() {
+        endBackgroundTask()
         listener?.cancel()
         listener = nil
         lockQueue.async { [weak self] in

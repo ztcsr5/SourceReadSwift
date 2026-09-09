@@ -146,6 +146,57 @@ enum ReaderMode: String, CaseIterable, Identifiable, Sendable {
     }
 }
 
+enum ReaderFontFamily: String, CaseIterable, Identifiable, Sendable {
+    case system
+    case songti
+    case kaiti
+    case rounded
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .system: return "系统默认"
+        case .songti: return "思源宋体"
+        case .kaiti: return "楷体"
+        case .rounded: return "圆体"
+        }
+    }
+
+    func uiFont(ofSize size: CGFloat, weight: UIFont.Weight = .regular) -> UIFont {
+        switch self {
+        case .system:
+            return UIFont.systemFont(ofSize: size, weight: weight)
+        case .songti:
+            if let font = UIFont(name: weight == .bold ? "SongtiSC-Bold" : "SongtiSC-Regular", size: size) {
+                return font
+            }
+            return UIFont.systemFont(ofSize: size, weight: weight)
+        case .kaiti:
+            if let font = UIFont(name: weight == .bold ? "KaitiSC-Bold" : "KaitiSC-Regular", size: size) {
+                return font
+            }
+            return UIFont.systemFont(ofSize: size, weight: weight)
+        case .rounded:
+            if let desc = UIFont.systemFont(ofSize: size, weight: weight).fontDescriptor.withDesign(.rounded) {
+                return UIFont(descriptor: desc, size: size)
+            }
+            return UIFont.systemFont(ofSize: size, weight: weight)
+        }
+    }
+}
+
+enum ReaderTypographyDefaults {
+    static let fontSize: Double = 19
+    static let lineSpacing: Double = 8
+    static let letterSpacing: Double = 0
+    static let paragraphSpacing: Double = 16
+    static let paragraphIndent: Double = 38 // 2 characters * 19pt
+    static let titleSpacing: Double = 20
+    static let pagePadding: Double = 20
+    static let footerHeight: Double = 72
+}
+
 enum ReaderTapAction: String, CaseIterable, Identifiable, Sendable {
     case previousPage
     case nextPage

@@ -60,4 +60,17 @@ final class ReaderSettingsModelsTests: XCTestCase {
         XCTAssertEqual(ReaderValueNormalizer.formatted(19, step: 1), "19")
         XCTAssertEqual(ReaderValueNormalizer.formatted(.nan, step: 1), "0")
     }
+
+    func testReaderFontFamilyAndTypographyDefaults() {
+        XCTAssertEqual(ReaderFontFamily.allCases.count, 4)
+        XCTAssertEqual(ReaderFontFamily.system.title, "系统默认")
+        XCTAssertEqual(ReaderFontFamily.songti.title, "思源宋体")
+        XCTAssertEqual(ReaderFontFamily.kaiti.title, "楷体")
+        XCTAssertEqual(ReaderFontFamily.rounded.title, "圆体")
+
+        XCTAssertEqual(ReaderTypographyDefaults.fontSize, 19)
+        XCTAssertEqual(ReaderTypographyDefaults.paragraphIndent, 38)
+        XCTAssertEqual(ReaderTypographyDefaults.pagePadding, 20)
+        XCTAssertEqual(ReaderTypographyDefaults.lineSpacing, 8)
+    }
 }

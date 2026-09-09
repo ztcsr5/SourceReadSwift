@@ -32,9 +32,30 @@ struct ChapterListParser {
             contentEncodings: response.contentEncodings
         )
         if ResponseFormatDetector.prefersJSON(body: normalized, headers: response.headers) {
-            return parseJSON(source: source, book: book, response: normalizedResponse)
+            let jsonResult = parseJSON(source: source, book: book, response: normalizedResponse)
+            switch jsonResult {
+            case .success:
+                return jsonResult
+            case .failure:
+                let htmlResult = parseHTML(source: source, book: book, response: normalizedResponse)
+                if case .success = htmlResult {
+                    return htmlResult
+                }
+                return jsonResult
+            }
+        } else {
+            let htmlResult = parseHTML(source: source, book: book, response: normalizedResponse)
+            switch htmlResult {
+            case .success:
+                return htmlResult
+            case .failure:
+                let jsonResult = parseJSON(source: source, book: book, response: normalizedResponse)
+                if case .success = jsonResult {
+                    return jsonResult
+                }
+                return htmlResult
+            }
         }
-        return parseHTML(source: source, book: book, response: normalizedResponse)
     }
 
     private func parseHTML(source: BookSource, book: BookDetail, response: SourceResponse) -> Result<ChapterListPage, SourceEngineError> {
