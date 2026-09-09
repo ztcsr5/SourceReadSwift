@@ -264,6 +264,47 @@ struct BookshelfReaderGatewayView: View {
             return
         }
 
+        // 1. FAST PATH: Instant-Open using cached chapters if available!
+        let cached = appState.chapterContentCacheStore.cachedChapters(
+            sourceURL: source.bookSourceUrl,
+            bookURL: activeBook.bookURL
+        )
+        if !cached.isEmpty {
+            let targetIndex = requestedChapterIndex ?? activeBook.currentChapterIndex
+            let target = cached.first(where: { $0.index == targetIndex }) ?? cached.first
+            if let target {
+                self.chapters = cached
+                self.selectedChapter = target
+
+                // Background silent refresh for new chapters and latest title
+                Task.detached(priority: .utility) { [appState, source, activeBook] in
+                    let searchBook = SearchBook(
+                        name: activeBook.title,
+                        author: activeBook.author,
+                        coverUrl: activeBook.coverURL,
+                        bookUrl: activeBook.bookURL,
+                        sourceName: activeBook.sourceName,
+                        sourceUrl: activeBook.sourceURL,
+                        intro: activeBook.intro
+                    )
+                    if let detailResult = try? await appState.engine.getBookDetail(source: source, book: searchBook).get() {
+                        if let loadedChapters = try? await appState.engine.getChapterList(source: source, book: detailResult).get() {
+                            await MainActor.run {
+                                appState.bookshelfStore.updateDetails(
+                                    bookID: activeBook.id,
+                                    latestChapterTitle: detailResult.latestChapter,
+                                    intro: detailResult.intro,
+                                    totalChapters: loadedChapters.count
+                                )
+                            }
+                        }
+                    }
+                }
+                return
+            }
+        }
+
+        // 2. SLOW PATH: First time load when cache is empty
         let searchBook = SearchBook(
             name: activeBook.title,
             author: activeBook.author,
@@ -437,11 +478,35 @@ struct BookshelfReaderGatewayView: View {
                             await engine.searchBooks(source: source, keyword: activeBook.title, page: 1)
                         } ?? .failure(.network("Source switch search timed out"))
                         guard case .success(let books) = result else { return nil }
-                        let match = books.first { candidate in
-                            candidate.name.localizedCaseInsensitiveContains(activeBook.title)
-                                || activeBook.title.localizedCaseInsensitiveContains(candidate.name)
-                        } ?? books.first
-                        guard let match else { return nil }
+                        let cleanTargetTitle = SearchBookMatcher.cleanTitle(activeBook.title)
+                        let cleanTargetAuthor = SearchBookMatcher.cleanAuthor(activeBook.author)
+
+                        func score(for b: SearchBook) -> Int {
+                            let title = SearchBookMatcher.cleanTitle(b.name)
+                            let author = SearchBookMatcher.cleanAuthor(b.author ?? "")
+                            let isExactTitle = (title == cleanTargetTitle)
+                            let isExactAuthor = (!cleanTargetAuthor.isEmpty && author == cleanTargetAuthor)
+
+                            // Discard spinoff/fanfic noise keywords if original title did not have them
+                            let noiseKeywords = ["同人", "续集", "前传", "后传", "外传", "之"]
+                            let containsNoise = noiseKeywords.contains { k in
+                                b.name.contains(k) && !activeBook.title.contains(k)
+                            }
+                            if containsNoise { return 0 }
+
+                            if isExactTitle && isExactAuthor { return 100 }
+                            if isExactTitle { return 80 }
+                            if isExactAuthor && b.name.hasPrefix(activeBook.title) { return 60 }
+                            if title == activeBook.title.lowercased() { return 70 }
+                            return 0
+                        }
+
+                        let sortedMatches = books
+                            .map { ($0, score(for: $0)) }
+                            .filter { $0.1 > 0 }
+                            .sorted { $0.1 > $1.1 }
+
+                        guard let match = sortedMatches.first?.0 else { return nil }
                         return SourceSwitchCandidate(source: source, book: match)
                     }
                 }

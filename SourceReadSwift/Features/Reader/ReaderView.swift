@@ -1,4 +1,5 @@
 import AVFoundation
+import PhotosUI
 import SwiftUI
 import UIKit
 
@@ -57,6 +58,9 @@ struct ReaderView: View {
     @State private var tabChromeOwner = UUID()
     @State private var showChapterList = false
     @State private var showBookmarks = false
+    @State private var showBookDetailSheet = false
+    @State private var selectedPhotoItem: PhotosPickerItem? = nil
+    @State private var backgroundWallpaperRevision = UUID()
     @State private var settingsTab = 0
 
     private var showOverlay: Bool { chromeState.isOverlayVisible }
@@ -362,6 +366,23 @@ struct ReaderView: View {
         .sheet(isPresented: $showBookmarks) {
             bookmarkSheet
         }
+        .sheet(isPresented: $showBookDetailSheet) {
+            NavigationStack {
+                if let shelfBook = appState.bookshelfStore.book(id: bookID) {
+                    BookDetailView(book: shelfBook.asSearchBook)
+                } else {
+                    BookDetailView(book: SearchBook(
+                        name: content.title,
+                        author: nil,
+                        coverUrl: nil,
+                        bookUrl: content.chapter.bookUrl,
+                        sourceName: "当前书源",
+                        sourceUrl: content.chapter.url,
+                        intro: nil
+                    ))
+                }
+            }
+        }
         .onAppear {
             appState.acquireTabChromeHidden(owner: tabChromeOwner)
             chromeState.setInitialOverlayVisible(initialOverlayVisible)
@@ -502,26 +523,34 @@ struct ReaderView: View {
 
     private var readerBackdrop: some View {
         ZStack {
-            background.color(isNight: colorScheme == .dark)
-            LinearGradient(
-                colors: [
-                    Color.white.opacity(background == .dark ? 0.02 : 0.16),
-                    Color.clear,
-                    Color.black.opacity(background == .dark ? 0.28 : 0.05)
-                ],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
-            RadialGradient(
-                colors: [
-                    AppTheme.accent.opacity(background == .dark ? 0.16 : 0.08),
-                    Color.clear
-                ],
-                center: .topTrailing,
-                startRadius: 20,
-                endRadius: 360
-            )
-            .blendMode(background == .dark ? .screen : .multiply)
+            if background == .custom, let image = ReaderCustomWallpaperStore.loadWallpaper() {
+                Image(uiImage: image)
+                    .resizable()
+                    .scaledToFill()
+                    .id(backgroundWallpaperRevision)
+                Color.black.opacity(colorScheme == .dark ? 0.60 : 0.28)
+            } else {
+                background.color(isNight: colorScheme == .dark)
+                LinearGradient(
+                    colors: [
+                        Color.white.opacity(background == .dark ? 0.02 : 0.16),
+                        Color.clear,
+                        Color.black.opacity(background == .dark ? 0.28 : 0.05)
+                    ],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+                RadialGradient(
+                    colors: [
+                        AppTheme.accent.opacity(background == .dark ? 0.16 : 0.08),
+                        Color.clear
+                    ],
+                    center: .topTrailing,
+                    startRadius: 20,
+                    endRadius: 360
+                )
+                .blendMode(background == .dark ? .screen : .multiply)
+            }
         }
         .ignoresSafeArea()
     }
@@ -743,15 +772,10 @@ struct ReaderView: View {
     }
 
     private func updateVisibleParagraphInScroll(_ index: Int) {
+        guard visibleParagraphIndex != index else { return }
         visibleParagraphIndex = index
         let resolved = resolvedReadingPosition(forFlatIndex: index)
-        appState.bookshelfStore.updateReadingProgress(
-            bookID: bookID,
-            chapterIndex: resolved.chapterIndex,
-            chapterTitle: resolved.chapterTitle,
-            totalChapters: totalChapters ?? chapters.count,
-            paragraphIndex: resolved.paragraphIndex
-        )
+        scheduleReadingPositionPersistence(paragraphIndex: resolved.paragraphIndex)
     }
 
     private var nativeScrollRequestKey: String {
@@ -961,11 +985,12 @@ struct ReaderView: View {
 
                 Menu {
                     Button {
+                        closeReaderChrome()
+                        showBookDetailSheet = true
                         onRequestBookDetail?()
                     } label: {
                         Label("书籍详情", systemImage: "info.circle")
                     }
-                    .disabled(onRequestBookDetail == nil)
 
                     Button {
                         closeReaderChrome()
@@ -985,24 +1010,26 @@ struct ReaderView: View {
             }
             .padding(.horizontal, 10)
             .padding(.vertical, 8)
-            .glassPanel(cornerRadius: 26, material: .ultraThinMaterial, strokeOpacity: background == .dark ? 0.09 : 0.12, shadowOpacity: background == .dark ? 0.42 : 0.14)
-            .padding(.horizontal, 14)
-            .padding(.top, 8)
+            .background(.regularMaterial)
+            .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+            .padding(.horizontal, 16)
+            .padding(.top, 4)
 
             Spacer()
 
             VStack(spacing: 12) {
-                HStack(spacing: 12) {
+                HStack(spacing: 14) {
                     toolButton(icon: "chevron.left", title: "上一章") {
                         selectRelativeChapter(offset: -1)
                     }
                     .disabled(!canSelectRelativeChapter(offset: -1))
 
-                    Text(progressTitle)
-                        .font(.system(size: 12, weight: .semibold))
-                        .foregroundStyle(chromeSecondaryForeground)
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 7)
+                    Slider(value: Binding(
+                        get: { Double(chapterIndex) },
+                        set: { selectChapter(index: Int($0)) }
+                    ), in: 0...Double(max((totalChapters ?? chapters.count) - 1, 0)), step: 1)
+                        .tint(AppTheme.accent)
+                        .padding(.horizontal, 8)
                         .frame(maxWidth: .infinity)
                         .background(.thinMaterial, in: Capsule())
 
@@ -1018,13 +1045,6 @@ struct ReaderView: View {
                         tocTab = 0
                         showChapterList = true
                         closeSettingsPanel()
-                    }
-
-                    if let onRequestSourceSwitch {
-                        toolButton(icon: "arrow.triangle.2.circlepath", title: "换源") {
-                            closeReaderChrome()
-                            onRequestSourceSwitch()
-                        }
                     }
 
                     toolButton(icon: speechController.isPaused ? "play.fill" : (speechController.isSpeaking ? "pause.fill" : "speaker.wave.2"), title: speechController.isPaused ? "继续" : (speechController.isSpeaking ? "暂停" : "朗读")) {
@@ -1234,6 +1254,30 @@ struct ReaderView: View {
                 }
                 .padding(.horizontal, 2)
             }
+
+            if background == .custom {
+                PhotosPicker(selection: $selectedPhotoItem, matching: .images) {
+                    HStack(spacing: 8) {
+                        Image(systemName: "photo.badge.plus")
+                        Text(ReaderCustomWallpaperStore.hasCustomWallpaper ? "更换自定义壁纸" : "从相册选择壁纸")
+                            .font(.subheadline.weight(.semibold))
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 10)
+                    .background(AppTheme.accent.opacity(0.12), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                    .foregroundStyle(AppTheme.accent)
+                }
+                .onChange(of: selectedPhotoItem) { item in
+                    guard let item else { return }
+                    Task {
+                        if let data = try? await item.loadTransferable(type: Data.self),
+                           let image = UIImage(data: data) {
+                            ReaderCustomWallpaperStore.saveWallpaper(image)
+                            backgroundWallpaperRevision = UUID()
+                        }
+                    }
+                }
+            }
         }
     }
 
@@ -1313,7 +1357,7 @@ struct ReaderView: View {
                 .background(Color(UIColor.tertiarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
 
             // 1. 段落差（段间距）- 放在最前面之一，用户反馈最高频查找项
-            readerValueSlider("段落差（段间距）", value: $paragraphSpacing, range: 0...32, step: 1, unit: "pt", help: "调整上下两段文字之间的留白高低。如果觉得段与段之间太紧凑或空隙太大，调这里（推荐 14~18pt）")
+            readerValueSlider("段落差（段间距）", value: $paragraphSpacing, range: 0...28, step: 1, unit: "pt", help: "调整上下两段文字之间的垂直留白。调到 0pt 为最紧凑贴近（推荐 4~8pt）")
 
             // 2. 正文字号
             readerValueSlider("正文字号", value: $fontSize, range: 12...34, step: 1, unit: "pt", help: "整体放大或缩小小说正文文字大小（主流阅读推荐 18~20pt）")

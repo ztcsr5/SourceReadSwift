@@ -7,6 +7,7 @@ struct BookshelfView: View {
     @State private var showFileImporter = false
     @State private var importMessage: String?
     @State private var isRefreshingBooks = false
+    @State private var selectedBookForDetail: BookshelfBook?
     @AppStorage("settings.themeMode") private var themeModeRawValue = ThemeMode.system.rawValue
 
     private var recentBooks: [BookshelfBook] {
@@ -26,7 +27,6 @@ struct BookshelfView: View {
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 30) {
                     readingSection
-                    updatesSection
                     shelfSection
                 }
                 .padding(.horizontal, AppTheme.pagePadding)
@@ -91,6 +91,18 @@ struct BookshelfView: View {
                     onCancel: { showFileImporter = false }
                 )
                 .ignoresSafeArea()
+            }
+            .sheet(item: $selectedBookForDetail) { book in
+                NavigationStack {
+                    BookDetailView(book: book.asSearchBook)
+                        .toolbar {
+                            ToolbarItem(placement: .cancellationAction) {
+                                Button("关闭") {
+                                    selectedBookForDetail = nil
+                                }
+                            }
+                        }
+                }
             }
         }
     }
@@ -414,6 +426,18 @@ struct BookshelfView: View {
             VStack(spacing: 0) {
                 HStack(spacing: 16) {
                     AsyncBookCover(urlString: book.coverURL, width: 78, height: 108)
+                        .overlay(alignment: .topTrailing) {
+                            if book.hasUpdates {
+                                Circle()
+                                    .fill(Color.red)
+                                    .frame(width: 12, height: 12)
+                                    .overlay {
+                                        Circle().stroke(Color.white, lineWidth: 1.5)
+                                    }
+                                    .offset(x: 4, y: -4)
+                                    .shadow(color: .red.opacity(0.6), radius: 4)
+                            }
+                        }
                         .shadow(color: .black.opacity(0.28), radius: 16, x: 0, y: 10)
 
                     VStack(alignment: .leading, spacing: 7) {
@@ -468,6 +492,11 @@ struct BookshelfView: View {
             UIImpactFeedbackGenerator(style: .light).impactOccurred()
         })
         .contextMenu {
+            Button {
+                selectedBookForDetail = book
+            } label: {
+                Label("书籍详情", systemImage: "info.circle")
+            }
             Button("从书架删除", role: .destructive) {
                 appState.bookshelfStore.remove(bookID: book.id)
             }
@@ -524,6 +553,18 @@ struct BookshelfView: View {
         } label: {
             HStack(spacing: 14) {
                 AsyncBookCover(urlString: book.coverURL, width: 52, height: 72)
+                    .overlay(alignment: .topTrailing) {
+                        if book.hasUpdates {
+                            Circle()
+                                .fill(Color.red)
+                                .frame(width: 10, height: 10)
+                                .overlay {
+                                    Circle().stroke(Color.white, lineWidth: 1.2)
+                                }
+                                .offset(x: 3, y: -3)
+                                .shadow(color: .red.opacity(0.5), radius: 3)
+                        }
+                    }
                 VStack(alignment: .leading, spacing: 5) {
                     Text(book.title)
                         .font(.headline)
@@ -552,6 +593,11 @@ struct BookshelfView: View {
             UIImpactFeedbackGenerator(style: .light).impactOccurred()
         })
         .contextMenu {
+            Button {
+                selectedBookForDetail = book
+            } label: {
+                Label("书籍详情", systemImage: "info.circle")
+            }
             Button("从书架删除", role: .destructive) {
                 appState.bookshelfStore.remove(bookID: book.id)
             }
@@ -580,6 +626,7 @@ private struct BookshelfCollectionView: View {
     @State private var isManaging = false
     @State private var selectedBookIDs: Set<String> = []
     @State private var confirmBatchDelete = false
+    @State private var selectedBookForDetail: BookshelfBook?
 
     init(title: String, books: [BookshelfBook], startsManaging: Bool = false) {
         self.title = title
@@ -653,6 +700,11 @@ private struct BookshelfCollectionView: View {
                             appState.bookshelfStore.markUpdatesSeen(bookID: book.id)
                         })
                         .contextMenu {
+                            Button {
+                                selectedBookForDetail = book
+                            } label: {
+                                Label("书籍详情", systemImage: "info.circle")
+                            }
                             if !appState.bookshelfStore.groups.isEmpty {
                                 Menu("移动到分组") {
                                     Button("全部") { appState.bookshelfStore.moveBooks(bookIDs: [book.id], toGroupName: nil) }
@@ -796,11 +848,35 @@ private struct BookshelfCollectionView: View {
         } message: {
             Text("将从书架删除 \(selectedBookIDs.count) 本书，阅读进度也会一并移除。")
         }
+        .sheet(item: $selectedBookForDetail) { book in
+            NavigationStack {
+                BookDetailView(book: book.asSearchBook)
+                    .toolbar {
+                        ToolbarItem(placement: .cancellationAction) {
+                            Button("关闭") {
+                                selectedBookForDetail = nil
+                            }
+                        }
+                    }
+            }
+        }
     }
 
     private func collectionBookLabel(_ book: BookshelfBook) -> some View {
         HStack(spacing: 14) {
             AsyncBookCover(urlString: book.coverURL, width: 58, height: 82)
+                .overlay(alignment: .topTrailing) {
+                    if book.hasUpdates {
+                        Circle()
+                            .fill(Color.red)
+                            .frame(width: 10, height: 10)
+                            .overlay {
+                                Circle().stroke(Color.white, lineWidth: 1.2)
+                            }
+                            .offset(x: 3, y: -3)
+                            .shadow(color: .red.opacity(0.5), radius: 3)
+                    }
+                }
             VStack(alignment: .leading, spacing: 5) {
                 Text(book.title).font(.headline).foregroundStyle(.primary).lineLimit(2)
                 Text(book.author).font(.subheadline).foregroundStyle(.secondary).lineLimit(1)

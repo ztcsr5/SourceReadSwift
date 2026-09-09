@@ -3,9 +3,13 @@ import UIKit
 
 struct DiscoverView: View {
     @EnvironmentObject private var appState: AppState
-    @StateObject private var viewModel = DiscoverViewModel()
+    @ObservedObject var viewModel: DiscoverViewModel
     @State private var pendingShelfAddBook: SearchBook?
     @State private var showSmartWebReader = false
+
+    init(viewModel: DiscoverViewModel? = nil) {
+        self._viewModel = ObservedObject(wrappedValue: viewModel ?? DiscoverViewModel())
+    }
 
     var body: some View {
         NavigationStack {

@@ -11,6 +11,7 @@ enum ReaderBackground: String, CaseIterable, Identifiable, Sendable {
     case white      // 纯净素白 (#FFFFFF)
     case gray       // 浅灰银质 (#F2F2F7)
     case dark       // 极夜纯黑 (#000000)
+    case custom     // 自定义壁纸
 
     var id: String { rawValue }
 
@@ -24,6 +25,7 @@ enum ReaderBackground: String, CaseIterable, Identifiable, Sendable {
         case .white: return "素白"
         case .gray: return "浅灰"
         case .dark: return "极黑"
+        case .custom: return "自定义"
         }
     }
 
@@ -65,6 +67,7 @@ enum ReaderBackground: String, CaseIterable, Identifiable, Sendable {
         case .white: return 0xFFFFFF
         case .gray: return 0xF2F2F7
         case .dark: return 0x000000
+        case .custom: return 0x1C1C1E
         }
     }
 
@@ -73,11 +76,12 @@ enum ReaderBackground: String, CaseIterable, Identifiable, Sendable {
         case .paper: return 0x63543C
         case .kraft: return 0x3E3422
         case .green: return 0x596C44
-        case .lavender: return 0x68516C
-        case .azure: return 0x3D4C54
-        case .white: return 0x000000
-        case .gray: return 0x1C1C1E
+        case .lavender: return 0x5A4761
+        case .azure: return 0x345367
+        case .white: return 0x18181A
+        case .gray: return 0x242426
         case .dark: return 0xFFFFFF
+        case .custom: return 0xFFFFFF
         }
     }
 
@@ -88,6 +92,7 @@ enum ReaderBackground: String, CaseIterable, Identifiable, Sendable {
         case .white: return 0x18181A
         case .gray: return 0x2C2C2E
         case .dark: return 0x000000
+        case .custom: return 0x1C1C1E
         }
     }
 
@@ -100,6 +105,7 @@ enum ReaderBackground: String, CaseIterable, Identifiable, Sendable {
         case .white: return 0xE0E0E0
         case .gray: return 0xF2F2F7
         case .dark: return 0xFFFFFF
+        case .custom: return 0xFFFFFF
         }
     }
 
@@ -107,8 +113,29 @@ enum ReaderBackground: String, CaseIterable, Identifiable, Sendable {
         if isNight { return false }
         switch self {
         case .paper, .kraft, .white, .gray: return true
-        case .green, .lavender, .azure, .dark: return false
+        case .green, .lavender, .azure, .dark, .custom: return false
         }
+    }
+}
+
+enum ReaderCustomWallpaperStore {
+    static var wallpaperURL: URL {
+        let docs = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+        return docs.appendingPathComponent("custom_reader_wallpaper.jpg")
+    }
+
+    static func saveWallpaper(_ image: UIImage) {
+        guard let data = image.jpegData(compressionQuality: 0.85) else { return }
+        try? data.write(to: wallpaperURL, options: .atomic)
+    }
+
+    static func loadWallpaper() -> UIImage? {
+        guard let data = try? Data(contentsOf: wallpaperURL) else { return nil }
+        return UIImage(data: data)
+    }
+
+    static var hasCustomWallpaper: Bool {
+        FileManager.default.fileExists(atPath: wallpaperURL.path)
     }
 }
 
@@ -146,27 +173,47 @@ enum ReaderMode: String, CaseIterable, Identifiable, Sendable {
     }
 }
 
-enum ReaderFontFamily: String, CaseIterable, Identifiable, Sendable {
+enum ReaderFontFamily: String, CaseIterable, Identifiable, Codable, Sendable {
     case system
+    case light
+    case bold
     case songti
-    case kaiti
-    case rounded
 
     var id: String { rawValue }
 
     var title: String {
         switch self {
-        case .system: return "系统默认"
-        case .songti: return "思源宋体"
-        case .kaiti: return "楷体"
-        case .rounded: return "圆体"
+        case .system: return "常规"
+        case .light: return "细体"
+        case .bold: return "粗体"
+        case .songti: return "宋体"
         }
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.singleValueContainer()
+        let raw = (try? container.decode(String.self)) ?? "system"
+        switch raw {
+        case "light": self = .light
+        case "bold": self = .bold
+        case "songti": self = .songti
+        default: self = .system
+        }
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.singleValueContainer()
+        try container.encode(rawValue)
     }
 
     func uiFont(ofSize size: CGFloat, weight: UIFont.Weight = .regular) -> UIFont {
         switch self {
         case .system:
             return UIFont.systemFont(ofSize: size, weight: weight)
+        case .light:
+            return UIFont.systemFont(ofSize: size, weight: .light)
+        case .bold:
+            return UIFont.systemFont(ofSize: size, weight: .bold)
         case .songti:
             let songtiNames = weight == .bold
                 ? ["Songti SC Bold", "SongtiSC-Bold", "STSongti-SC-Bold", "HiraMinProN-W6", "STSong"]
@@ -180,24 +227,6 @@ enum ReaderFontFamily: String, CaseIterable, Identifiable, Sendable {
                 return UIFont(descriptor: desc, size: size)
             }
             return UIFont.systemFont(ofSize: size, weight: weight)
-        case .kaiti:
-            let kaitiNames = weight == .bold
-                ? ["Kaiti SC Bold", "KaitiSC-Bold", "STKaiti-SC-Bold", "STKaiti", "KaiTi", "HiraMinProN-W6"]
-                : ["Kaiti SC Regular", "Kaiti SC", "KaitiSC-Regular", "STKaiti-SC-Regular", "STKaiti", "KaiTi", "HiraMinProN-W3"]
-            for name in kaitiNames {
-                if let font = UIFont(name: name, size: size) {
-                    return font
-                }
-            }
-            if let desc = UIFont.systemFont(ofSize: size, weight: weight).fontDescriptor.withDesign(.serif) {
-                return UIFont(descriptor: desc, size: size)
-            }
-            return UIFont.systemFont(ofSize: size, weight: weight)
-        case .rounded:
-            if let desc = UIFont.systemFont(ofSize: size, weight: weight).fontDescriptor.withDesign(.rounded) {
-                return UIFont(descriptor: desc, size: size)
-            }
-            return UIFont.systemFont(ofSize: size, weight: weight)
         }
     }
 
@@ -205,6 +234,10 @@ enum ReaderFontFamily: String, CaseIterable, Identifiable, Sendable {
         switch self {
         case .system:
             return .system(size: size, weight: weight, design: .default)
+        case .light:
+            return .system(size: size, weight: .light, design: .default)
+        case .bold:
+            return .system(size: size, weight: .bold, design: .default)
         case .songti:
             let songtiNames = weight == .bold
                 ? ["Songti SC Bold", "SongtiSC-Bold", "STSongti-SC-Bold", "HiraMinProN-W6"]
@@ -215,18 +248,6 @@ enum ReaderFontFamily: String, CaseIterable, Identifiable, Sendable {
                 }
             }
             return .system(size: size, weight: weight, design: .serif)
-        case .kaiti:
-            let kaitiNames = weight == .bold
-                ? ["Kaiti SC Bold", "KaitiSC-Bold", "STKaiti-SC-Bold", "STKaiti", "KaiTi", "HiraMinProN-W6"]
-                : ["Kaiti SC Regular", "Kaiti SC", "KaitiSC-Regular", "STKaiti-SC-Regular", "STKaiti", "KaiTi", "HiraMinProN-W3"]
-            for name in kaitiNames {
-                if UIFont(name: name, size: size) != nil {
-                    return .custom(name, size: size)
-                }
-            }
-            return .system(size: size, weight: weight, design: .serif)
-        case .rounded:
-            return .system(size: size, weight: weight, design: .rounded)
         }
     }
 }
@@ -235,7 +256,7 @@ enum ReaderTypographyDefaults {
     static let fontSize: Double = 19
     static let lineSpacing: Double = 8
     static let letterSpacing: Double = 0
-    static let paragraphSpacing: Double = 16
+    static let paragraphSpacing: Double = 6
     static let paragraphIndent: Double = 38 // 2 characters * 19pt
     static let titleSpacing: Double = 20
     static let pagePadding: Double = 20

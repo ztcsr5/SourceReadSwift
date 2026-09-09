@@ -520,8 +520,12 @@ struct NativeReaderTextView: UIViewRepresentable {
             }
 
             let now = CACurrentMediaTime()
-            guard now - lastVisibleUpdateAt >= 0.08 else { return }
+            guard now - lastVisibleUpdateAt >= 0.25 else { return }
             lastVisibleUpdateAt = now
+            updateVisibleParagraph(in: textView)
+        }
+
+        private func updateVisibleParagraph(in textView: UITextView) {
             let visibleRect = CGRect(
                 x: 0,
                 y: max(textView.contentOffset.y - textView.textContainerInset.top, 0),
@@ -541,6 +545,9 @@ struct NativeReaderTextView: UIViewRepresentable {
         }
 
         func scrollViewDidEndDragging(_ scrollView: UIScrollView, willDecelerate decelerate: Bool) {
+            if let textView = scrollView as? UITextView {
+                updateVisibleParagraph(in: textView)
+            }
             let offsetY = scrollView.contentOffset.y
             let contentHeight = scrollView.contentSize.height
             let visibleBottom = offsetY + scrollView.bounds.height
@@ -550,6 +557,12 @@ struct NativeReaderTextView: UIViewRepresentable {
             } else if contentHeight > 0 && visibleBottom >= contentHeight + 35 {
                 // User intentionally dragged past chapter bottom by 35pt or more: trigger next chapter handoff
                 reachBottomCallback?()
+            }
+        }
+
+        func scrollViewDidEndDecelerating(_ scrollView: UIScrollView) {
+            if let textView = scrollView as? UITextView {
+                updateVisibleParagraph(in: textView)
             }
         }
     }
@@ -568,15 +581,12 @@ enum ReaderScrollPositionPolicy {
         textContainerInsetTop: CGFloat,
         boundsHeight: CGFloat,
         contentSizeHeight: CGFloat,
-        adjustedContentInset: UIEdgeInsets
+        anchorRatio: Double = 0.08
     ) -> CGFloat {
-        let minimumY = -adjustedContentInset.top
-        let maximumY = max(
-            minimumY,
-            contentSizeHeight - boundsHeight + adjustedContentInset.bottom
-        )
-        let desiredY = textRectMinY - textContainerInsetTop
-        return min(max(desiredY, minimumY), maximumY)
+        let maxOffset = max(contentSizeHeight - boundsHeight, 0)
+        let anchorOffset = boundsHeight * CGFloat(anchorRatio)
+        let rawTarget = textRectMinY - textContainerInsetTop - anchorOffset
+        return min(max(rawTarget, 0), maxOffset)
     }
 }
 
@@ -617,16 +627,17 @@ enum ReaderNativeTextLayout {
         defer { PerformanceSignpost.end("reader.textLayout", id: signpost) }
         let output = NSMutableAttributedString(string: "")
         var ranges: [NSRange] = []
-        let titleStyle = NSMutableParagraphStyle()
-        titleStyle.lineSpacing = CGFloat(configuration.lineSpacing)
-        titleStyle.paragraphSpacing = CGFloat(configuration.paragraphSpacing + configuration.titleSpacing)
-        titleStyle.alignment = .natural
-        let titleAttributes: [NSAttributedString.Key: Any] = [
-            .font: configuration.fontFamily.uiFont(ofSize: CGFloat(configuration.fontSize + 8), weight: .bold),
-            .foregroundColor: configuration.textColor,
-            .paragraphStyle: titleStyle
-        ]
-        output.append(NSAttributedString(string: configuration.title + "\n", attributes: titleAttributes))
+        if let title = configuration.title.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty {
+            let titleStyle = NSMutableParagraphStyle()
+            titleStyle.paragraphSpacing = CGFloat(configuration.paragraphSpacing + configuration.titleSpacing)
+            titleStyle.alignment = .natural
+            let titleAttributes: [NSAttributedString.Key: Any] = [
+                .font: configuration.fontFamily.uiFont(ofSize: CGFloat(configuration.fontSize + 8), weight: .bold),
+                .foregroundColor: configuration.textColor,
+                .paragraphStyle: titleStyle
+            ]
+            output.append(NSAttributedString(string: title + "\n", attributes: titleAttributes))
+        }
 
         if let subtitle = configuration.subtitle?.trimmingCharacters(in: .whitespacesAndNewlines), !subtitle.isEmpty {
             let subtitleStyle = NSMutableParagraphStyle()
@@ -666,8 +677,8 @@ enum ReaderNativeTextLayout {
             let start = bodyStart + bodyLength
             ranges.append(NSRange(location: start, length: paragraph.utf16.count))
             body.append(paragraph)
-            body.append("\n\n")
-            bodyLength += paragraph.utf16.count + 2
+            body.append("\n")
+            bodyLength += paragraph.utf16.count + 1
         }
         if !body.isEmpty {
             output.append(NSAttributedString(string: body))
@@ -738,8 +749,8 @@ enum ReaderNativeTextLayout {
             let start = startingLocation + bodyLength
             ranges.append(NSRange(location: start, length: paragraph.utf16.count))
             body.append(paragraph)
-            body.append("\n\n")
-            bodyLength += paragraph.utf16.count + 2
+            body.append("\n")
+            bodyLength += paragraph.utf16.count + 1
         }
 
         if !body.isEmpty {

@@ -15,7 +15,7 @@ struct RootTabView: View {
                     BookshelfView()
                         .transition(.opacity)
                 case 1:
-                    DiscoverView()
+                    DiscoverView(viewModel: appState.discoverViewModel)
                         .transition(.opacity)
                 default:
                     SettingsView()

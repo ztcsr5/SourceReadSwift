@@ -16,6 +16,8 @@ final class AppState: ObservableObject {
     let sourceDiagnosticHistoryStore: SourceDiagnosticHistoryStore
     let sourceCookieStore: SourceCookieStore
     let sourceWritingServer: LightweightHTTPServer
+    let readingHistoryStore: ReadingHistoryStore
+    let discoverViewModel: DiscoverViewModel
     private let injectedEngine: SourceEngine?
     private var cancellables: Set<AnyCancellable> = []
     lazy var engine: SourceEngine = {
@@ -53,10 +55,13 @@ final class AppState: ObservableObject {
         sourceHealthStore: SourceHealthStore? = nil,
         sourceDiagnosticHistoryStore: SourceDiagnosticHistoryStore? = nil,
         sourceCookieStore: SourceCookieStore? = nil,
+        readingHistoryStore: ReadingHistoryStore? = nil,
+        discoverViewModel: DiscoverViewModel? = nil,
         engine: SourceEngine? = nil
     ) {
         self.sourceStore = sourceStore ?? SourceStore()
-        self.bookshelfStore = bookshelfStore ?? BookshelfStore()
+        let resolvedBookshelfStore = bookshelfStore ?? BookshelfStore()
+        self.bookshelfStore = resolvedBookshelfStore
         self.purifyRuleStore = purifyRuleStore ?? PurifyRuleStore()
         self.chapterContentCacheStore = chapterContentCacheStore ?? ChapterContentCacheStore()
         let resolvedChapterDownloadStore = chapterDownloadStore ?? ChapterDownloadStore()
@@ -69,7 +74,15 @@ final class AppState: ObservableObject {
         self.sourceDiagnosticHistoryStore = sourceDiagnosticHistoryStore ?? SourceDiagnosticHistoryStore()
         self.sourceCookieStore = sourceCookieStore ?? SourceCookieStore()
         self.sourceWritingServer = LightweightHTTPServer(sourceStore: self.sourceStore)
+        let resolvedReadingHistoryStore = readingHistoryStore ?? ReadingHistoryStore()
+        self.readingHistoryStore = resolvedReadingHistoryStore
+        let resolvedDiscoverViewModel = discoverViewModel ?? DiscoverViewModel()
+        self.discoverViewModel = resolvedDiscoverViewModel
         self.injectedEngine = engine
+        resolvedBookshelfStore.onBookRead = { [weak self] book in
+            self?.readingHistoryStore.record(book: book)
+        }
+        resolvedDiscoverViewModel.bind(appState: self)
         bindChildStores()
     }
 
@@ -209,6 +222,22 @@ final class AppState: ObservableObject {
             .store(in: &cancellables)
 
         sourceDiagnosticHistoryStore.objectWillChange
+            .sink { [weak self] _ in
+                Task { @MainActor [weak self] in
+                    self?.objectWillChange.send()
+                }
+            }
+            .store(in: &cancellables)
+
+        readingHistoryStore.objectWillChange
+            .sink { [weak self] _ in
+                Task { @MainActor [weak self] in
+                    self?.objectWillChange.send()
+                }
+            }
+            .store(in: &cancellables)
+
+        discoverViewModel.objectWillChange
             .sink { [weak self] _ in
                 Task { @MainActor [weak self] in
                     self?.objectWillChange.send()

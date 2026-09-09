@@ -22,7 +22,7 @@ struct BookDetailView: View {
     }
 
     private var displayedChapters: [BookChapter] {
-        Array((isAscending ? chapters : Array(chapters.reversed())).prefix(100))
+        Array((isAscending ? chapters : Array(chapters.reversed())).prefix(20))
     }
 
     var body: some View {
@@ -93,13 +93,7 @@ struct BookDetailView: View {
                     ForEach(isAscending ? chapters : Array(chapters.reversed())) { chapter in
                         NavigationLink {
                             ChapterLoadingView(
-                                bookID: {
-                                    if !appState.bookshelfStore.contains(book) {
-                                        appState.bookshelfStore.addOrUpdate(book)
-                                    }
-                                    appState.bookshelfStore.markReaderOpened(bookID: book.id)
-                                    return book.id
-                                }(),
+                                bookID: appState.bookshelfStore.contains(book) ? book.id : "\(book.sourceUrl)|\(book.bookUrl)",
                                 sourceUrl: book.sourceUrl,
                                 chapter: chapter,
                                 totalChapters: chapters.count,
@@ -154,7 +148,7 @@ struct BookDetailView: View {
     }
 
     private var chapterList: some View {
-        LazyVStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: 12) {
             HStack {
                 Text("目录")
                     .font(.title2.bold())
@@ -164,40 +158,45 @@ struct BookDetailView: View {
                     .foregroundStyle(.secondary)
             }
 
-            ForEach(displayedChapters) { chapter in
-                NavigationLink {
-                    ChapterLoadingView(
-                        bookID: {
-                            if !appState.bookshelfStore.contains(book) {
-                                appState.bookshelfStore.addOrUpdate(book)
-                            }
-                            appState.bookshelfStore.markReaderOpened(bookID: book.id)
-                            return book.id
-                        }(),
-                        sourceUrl: book.sourceUrl,
-                        chapter: chapter,
-                        totalChapters: chapters.count,
-                        chapters: chapters
-                    )
-                } label: {
-                    HStack {
-                        Text(chapter.title)
-                            .font(.body)
-                            .foregroundStyle(.primary)
-                            .lineLimit(1)
-                        Spacer()
-                        Image(systemName: "chevron.right")
-                            .font(.caption.weight(.bold))
-                            .foregroundStyle(.secondary)
+            VStack(spacing: 0) {
+                ForEach(Array(displayedChapters.enumerated()), id: \.element.id) { index, chapter in
+                    NavigationLink {
+                        ChapterLoadingView(
+                            bookID: appState.bookshelfStore.contains(book) ? book.id : "\(book.sourceUrl)|\(book.bookUrl)",
+                            sourceUrl: book.sourceUrl,
+                            chapter: chapter,
+                            totalChapters: chapters.count,
+                            chapters: chapters
+                        )
+                    } label: {
+                        HStack {
+                            Text(chapter.title)
+                                .font(.body)
+                                .foregroundStyle(.primary)
+                                .lineLimit(1)
+                            Spacer()
+                            Image(systemName: "chevron.right")
+                                .font(.caption.weight(.bold))
+                                .foregroundStyle(.tertiary)
+                        }
+                        .padding(.vertical, 12)
+                        .padding(.horizontal, 14)
+                        .contentShape(Rectangle())
                     }
-                    .podcastCard()
+                    .buttonStyle(.plain)
+                    .simultaneousGesture(TapGesture().onEnded {
+                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                        didOpenReader = true
+                    })
+
+                    if index < displayedChapters.count - 1 {
+                        Divider()
+                            .padding(.leading, 14)
+                    }
                 }
-                .buttonStyle(.plain)
-                .simultaneousGesture(TapGesture().onEnded {
-                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                    didOpenReader = true
-                })
             }
+            .background(Color(UIColor.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: AppTheme.cardRadius, style: .continuous))
+
             if chapters.count > displayedChapters.count {
                 Button {
                     showAllChapters = true

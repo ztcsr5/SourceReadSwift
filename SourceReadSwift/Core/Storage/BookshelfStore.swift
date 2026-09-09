@@ -10,6 +10,7 @@ final class BookshelfStore: ObservableObject {
     private let groupPersistence: BookshelfGroupPersistence
     private var persistenceBatchDepth = 0
     private var persistenceBatchDirty = false
+    var onBookRead: ((BookshelfBook) -> Void)?
 
     init(persistence: BookshelfPersistence = BookshelfPersistence(), groupPersistence: BookshelfGroupPersistence = BookshelfGroupPersistence()) {
         self.persistence = persistence
@@ -142,6 +143,9 @@ final class BookshelfStore: ObservableObject {
         books[index].lastReadAt = Date()
         moveToFront(index: index)
         persist()
+        if let updated = books.first {
+            onBookRead?(updated)
+        }
     }
 
     func markReaderOpened(bookID: String) {
@@ -150,6 +154,9 @@ final class BookshelfStore: ObservableObject {
         books[index].lastReadAt = Date()
         moveToFront(index: index)
         persist()
+        if let updated = books.first {
+            onBookRead?(updated)
+        }
     }
 
     func recordReadingSession(bookID: String, duration: TimeInterval) {
@@ -160,6 +167,9 @@ final class BookshelfStore: ObservableObject {
         books[index].lastReadAt = Date()
         moveToFront(index: index)
         persist()
+        if let updated = books.first {
+            onBookRead?(updated)
+        }
     }
 
     func remove(bookID: String) {

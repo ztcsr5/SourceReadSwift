@@ -375,23 +375,22 @@ enum ThemeMode: String, CaseIterable, Identifiable {
 
 struct ReadingHistoryView: View {
     @EnvironmentObject private var appState: AppState
+    @State private var confirmClearAll = false
 
-    private var books: [BookshelfBook] {
-        appState.bookshelfStore.books.sorted {
-            ($0.lastReadAt ?? $0.addedAt) > ($1.lastReadAt ?? $1.addedAt)
-        }
+    private var history: [ReadingHistoryItem] {
+        appState.readingHistoryStore.history
     }
 
     var body: some View {
         List {
-            if books.isEmpty {
+            if history.isEmpty {
                 VStack(spacing: 10) {
                     Image(systemName: "clock")
                         .font(.system(size: 40, weight: .semibold))
                         .foregroundStyle(AppTheme.accent)
                     Text("暂无阅读历史")
                         .font(.headline)
-                    Text("从发现页加入书架或导入 TXT 后，阅读记录会显示在这里。")
+                    Text("看书后会自动在此记录阅读进度，即使将书移出书架，历史记录也会独立保留。")
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                         .multilineTextAlignment(.center)
@@ -399,46 +398,73 @@ struct ReadingHistoryView: View {
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 42)
             } else {
-                ForEach(books) { book in
+                ForEach(history) { item in
                     NavigationLink {
-                        BookshelfReaderGatewayView(book: book)
+                        BookshelfReaderGatewayView(book: item.asBookshelfBook)
                     } label: {
-                        VStack(alignment: .leading, spacing: 6) {
-                            HStack {
-                                Text(book.title)
-                                    .font(.headline)
-                                    .lineLimit(1)
-                                Spacer()
-                                Text("\(Int(book.readingProgress * 100))%")
-                                    .font(.caption.weight(.semibold))
-                                    .foregroundStyle(AppTheme.accent)
-                            }
-                            Text(book.currentChapterTitle ?? book.latestChapterTitle ?? "尚未开始")
-                                .font(.subheadline)
-                                .foregroundStyle(.secondary)
-                                .lineLimit(1)
-                            HStack(spacing: 10) {
-                                Label("\(book.readingSessionCount ?? 0) 次", systemImage: "book")
-                                Label(readingDurationText(book.totalReadingSeconds ?? 0), systemImage: "timer")
-                            }
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                            if let lastReadAt = book.lastReadAt {
-                                Text(lastReadAt.formatted(date: .abbreviated, time: .shortened))
-                                    .font(.caption)
+                        HStack(spacing: 12) {
+                            AsyncBookCover(urlString: item.coverURL, width: 44, height: 60)
+                            VStack(alignment: .leading, spacing: 5) {
+                                HStack {
+                                    Text(item.title)
+                                        .font(.headline)
+                                        .lineLimit(1)
+                                    Spacer()
+                                    Text("\(Int(item.readingProgress * 100))%")
+                                        .font(.caption.weight(.semibold))
+                                        .foregroundStyle(AppTheme.accent)
+                                }
+                                Text(item.currentChapterTitle ?? "尚未开始")
+                                    .font(.subheadline)
                                     .foregroundStyle(.secondary)
+                                    .lineLimit(1)
+                                HStack(spacing: 10) {
+                                    Label("\(item.readingSessionCount) 次", systemImage: "book")
+                                    Label(readingDurationText(item.totalReadingSeconds), systemImage: "timer")
+                                    Spacer()
+                                    Text(item.lastReadAt.formatted(date: .abbreviated, time: .shortened))
+                                        .font(.caption2)
+                                        .foregroundStyle(.tertiary)
+                                }
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
                             }
                         }
                     }
-                    .swipeActions {
-                        Button("删除", role: .destructive) {
-                            appState.bookshelfStore.remove(bookID: book.id)
+                    .swipeActions(edge: .trailing) {
+                        Button("删除记录", role: .destructive) {
+                            appState.readingHistoryStore.remove(id: item.id)
+                        }
+                    }
+                    .swipeActions(edge: .leading) {
+                        if !appState.bookshelfStore.contains(item.asSearchBook) {
+                            Button {
+                                appState.bookshelfStore.addOrUpdate(item.asSearchBook)
+                            } label: {
+                                Label("加回书架", systemImage: "plus.circle")
+                            }
+                            .tint(AppTheme.accent)
                         }
                     }
                 }
             }
         }
         .navigationTitle("阅读历史")
+        .toolbar {
+            if !history.isEmpty {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button("清空") {
+                        confirmClearAll = true
+                    }
+                }
+            }
+        }
+        .confirmationDialog("确定清空全部阅读历史？", isPresented: $confirmClearAll, titleVisibility: .visible) {
+            Button("清空全部历史", role: .destructive) {
+                appState.readingHistoryStore.removeAll()
+            }
+            Button("取消", role: .cancel) {}
+        }
     }
 
     private func readingDurationText(_ seconds: TimeInterval) -> String {
@@ -913,41 +939,41 @@ private struct AboutReadView: View {
                             .shadow(color: AppTheme.accent.opacity(0.25), radius: 10, x: 0, y: 6)
 
                         VStack(alignment: .leading, spacing: 4) {
-                            Text("SourceReadSwift v2.0.0")
+                            Text("源阅读 (SourceRead)")
                                 .font(.title2.bold())
-                            Text("Stage 34 正式收口版 · 原生 Swift / SwiftUI")
+                            Text("版本 2.0.0 · 原生 iOS 设计")
                                 .font(.subheadline.weight(.semibold))
                                 .foregroundStyle(AppTheme.accent)
                         }
                     }
 
-                    Text("基于原生 Swift 与 SwiftUI 研发的商业级 Legado 阅读器。融合源阅读 (SourceRead) 与 Legado 开源生态智慧，历经 34 阶段深度工程迭代，达成全功能覆盖与 GitHub Actions 双绿交付闭环。")
+                    Text("源阅读是一款专为 iOS 精心打造的纯粹阅读器。遵循 Apple 原生设计哲学，提供 120Hz 满帧丝滑翻页、深度书源兼容、自适应出版级排版与多格式支持，让阅读回归最初的纯粹与宁静。")
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
 
                     HStack(spacing: 8) {
-                        aboutTag("Legado 3.0")
-                        aboutTag("120Hz ProMotion")
-                        aboutTag("EPUB · RSS · TXT")
-                        aboutTag("LAN Web 写源")
+                        aboutTag("120Hz 极速")
+                        aboutTag("开源书源")
+                        aboutTag("EPUB · TXT")
+                        aboutTag("纯净无扰")
                     }
                 }
                 .padding(.vertical, 6)
             }
 
-            Section("核心能力矩阵 (Stage 1 - 34)") {
-                Label("Legado 3.0 全功能引擎 (JS / Jsoup / XPath / JSONPath)", systemImage: "bolt.horizontal.fill")
-                Label("8 大经典阅读器主题 & 17 组 TXT 工业级目录正则", systemImage: "paintpalette.fill")
-                Label("120Hz ProMotion 极速刷新、换章边界无缝拼接", systemImage: "speedometer")
-                Label("在线 HTTP TTS 朗读与后台锁屏播控", systemImage: "speaker.wave.3.fill")
-                Label("EPUB 完整图文解析 & RSS 订阅流阅读", systemImage: "newspaper.fill")
-                Label("局域网 Web PC 端书源编辑与双向导出", systemImage: "globe")
-                Label("书架分组批量管理、多选删除与备份", systemImage: "checklist")
-                Label("GitHub Actions 双流水线自动化测试与无签名打包", systemImage: "checkmark.seal.fill")
+            Section("核心特色") {
+                Label("120Hz ProMotion 满帧丝滑无限滚动与翻页", systemImage: "speedometer")
+                Label("兼容 Legado 开源书源生态，一键精准换源", systemImage: "bolt.horizontal.fill")
+                Label("出版级中文排版引擎，支持自定义背景壁纸与原生字形", systemImage: "textformat.size")
+                Label("内置广告净化与规则体检，自动过滤正文杂质", systemImage: "wand.and.stars")
+                Label("TXT 智能目录识别、EPUB 图文精排与 RSS 资讯订阅", systemImage: "doc.text.fill")
+                Label("无线 Web 电脑直连写源，轻松调试与管理书源", systemImage: "globe")
+                Label("全离线书籍与章节缓存，随时随地畅快阅读", systemImage: "arrow.down.circle")
             }
 
-            Section("致谢与开源生态") {
-                Text("本软件致敬 Legado、源阅读 (SourceRead) 与广大开源社区贡献者。致力于在 iOS 平台提供纯粹、高品质、高兼容度的阅读体验。")
+            Section("致谢与声明") {
+                Text("感谢 Legado 与源阅读开源社区的无私奉献。\n\n免责声明：本应用为本地阅读与书源解析工具，本身不提供、不存储任何网络图书或数字版权内容。所有网络书源由用户自行添加或抓取自公开站点，相关内容版权归原作者所有。")
+                    .font(.footnote)
                     .foregroundStyle(.secondary)
             }
         }

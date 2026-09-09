@@ -78,9 +78,9 @@ final class Stage33ReaderExperienceTests: XCTestCase {
     // MARK: - 2. SourceRead Native Palettes (readConfig.json)
 
     func testSourceReadNativePalettesConfiguration() {
-        // Verify all 8 background palettes exist
+        // Verify all 9 background palettes exist (8 classic presets + custom wallpaper)
         let allCases = ReaderBackground.allCases
-        XCTAssertEqual(allCases.count, 8)
+        XCTAssertEqual(allCases.count, 9)
 
         // 1. 羊皮纸
         let paper = ReaderBackground.paper
@@ -122,6 +122,10 @@ final class Stage33ReaderExperienceTests: XCTestCase {
         XCTAssertEqual(dark.nightBackgroundHex, 0x000000)
         XCTAssertEqual(dark.nightTextHex, 0xFFFFFF)
         XCTAssertFalse(dark.darkStatusIcon(isNight: false))
+
+        // 7. 自定义壁纸
+        let custom = ReaderBackground.custom
+        XCTAssertEqual(custom.title, "自定义")
     }
 
     // MARK: - 3. SourceRead Online HTTP TTS Voice Engine (httpTTS.json)

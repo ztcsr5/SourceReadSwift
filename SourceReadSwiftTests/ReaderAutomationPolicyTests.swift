@@ -213,7 +213,7 @@ final class ReaderAutomationPolicyTests: XCTestCase {
 
         let result = ReaderNativeTextLayout.makeAttributedText(configuration: configuration)
         XCTAssertEqual(result.paragraphRanges.count, 3)
-        XCTAssertEqual(result.text.string, "标题\n第一段\n\n\n\n第二段\n\n")
+        XCTAssertEqual(result.text.string, "标题\n第一段\n\n第二段\n")
         XCTAssertEqual(result.paragraphRanges[0].length, "第一段".utf16.count)
         XCTAssertEqual(result.paragraphRanges[1].length, 0)
         XCTAssertEqual(result.paragraphRanges[2].length, "第二段".utf16.count)
@@ -306,6 +306,6 @@ final class ReaderAutomationPolicyTests: XCTestCase {
         XCTAssertEqual(result.paragraphRanges.count, paragraphs.count)
         XCTAssertEqual(result.paragraphRanges.first?.length, paragraphs[0].utf16.count)
         XCTAssertEqual(result.paragraphRanges.last?.length, paragraphs[2_499].utf16.count)
-        XCTAssertEqual(result.text.string.components(separatedBy: "\n\n").count, paragraphs.count + 1)
+        XCTAssertEqual(result.text.string.components(separatedBy: "\n").count, paragraphs.count + 3)
     }
 }

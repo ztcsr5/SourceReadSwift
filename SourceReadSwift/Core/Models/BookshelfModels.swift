@@ -74,6 +74,18 @@ struct BookshelfBook: Identifiable, Codable, Hashable, Sendable {
         totalChapters > max(seenTotalChapters ?? totalChapters, 0)
     }
 
+    var asSearchBook: SearchBook {
+        SearchBook(
+            name: title,
+            author: author,
+            coverUrl: coverURL,
+            bookUrl: bookURL,
+            sourceName: sourceName,
+            sourceUrl: sourceURL,
+            intro: intro
+        )
+    }
+
     init(
         id: String,
         title: String,
