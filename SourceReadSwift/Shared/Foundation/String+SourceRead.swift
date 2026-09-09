@@ -6,3 +6,10 @@ extension String {
     }
 }
 
+extension Optional where Wrapped == String {
+    var nilIfEmpty: String? {
+        guard let self, !self.isEmpty else { return nil }
+        return self
+    }
+}
+

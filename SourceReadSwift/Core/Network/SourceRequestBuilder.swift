@@ -18,11 +18,12 @@ struct SourceRequestBuilder {
         page: Int,
         persistentValues: [String: String] = [:]
     ) -> SourceRequest {
+        let comment = source.raw["bookSourceComment"] ?? source.raw["comment"]
         let isGBK = searchUrl.localizedCaseInsensitiveContains("charset=gb")
             || searchUrl.localizedCaseInsensitiveContains("\"charset\":\"gb")
             || searchUrl.localizedCaseInsensitiveContains("\"charset\": \"gb")
-            || source.bookSourceComment?.localizedCaseInsensitiveContains("gbk") == true
-            || source.bookSourceComment?.localizedCaseInsensitiveContains("gb2312") == true
+            || comment?.localizedCaseInsensitiveContains("gbk") == true
+            || comment?.localizedCaseInsensitiveContains("gb2312") == true
         let encodedKey = LegadoRuleResolver.percentEncode(keyword, charset: isGBK ? "gbk" : nil)
         let resolved = searchUrl
             .replacingOccurrences(of: "{{key}}", with: encodedKey)
