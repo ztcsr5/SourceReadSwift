@@ -14,7 +14,20 @@
 ### Verification
 
 - 本地静态门禁：`git diff --check`。
-- CI 目标：GitHub Actions `iOS` build/test 与 `Unsigned IPA` 双流水线全绿闭环。
+- CI 闭环自愈演进：
+  - 迭代 1 (`4673972`): 集成源阅读资产与 Stage 33 测试，Unsigned IPA 成功，iOS 测试因括弧正则缺漏 2 条断言失败。
+  - 迭代 2 (`72ca891`): 采用官方 `txtTocRule.json` 第 12 组标准括弧规则，全量用例测试 100% 通过。
+- CI 双绿全过结果（Authoritative Gate）：
+  - iOS build/test: [Run 34350499824](https://github.com/ztcsr5/SourceReadSwift/actions/runs/34350499824) — **Success** (全量测试套件 100% 通过)
+  - Unsigned IPA 打包: [Run 34350499831](https://github.com/ztcsr5/SourceReadSwift/actions/runs/34350499831) — **Success** (无签名 IPA 产物成功生成)
+
+### Stage 33 Status: CLOSED & ACCEPTED
+
+- 所有验收门槛均已达成，Stage 33 正式收口关闭。
+
+### Next
+
+- 进入 **Stage 34：EPUB / RSS / 书架批量操作 / Web 写源 PC 端 / 图标与产品收口**。
 
 ## 2026-09-09 - Stage 32: C 级书源兼容闭环收口
 

@@ -24,12 +24,26 @@
 
 ## 验收门槛
 
-1. [ ] `git diff --check` 通过。
-2. [ ] 新增 `SourceReadSwiftTests/Stage33ReaderExperienceTests.swift` 覆盖上述核心能力。
-3. [ ] `progress.md` 记录实现、证据与闭环详情。
-4. [ ] GitHub Actions 双流水线全绿通过（iOS 测试通过 + 无签名 IPA 生成）。
+1. [x] `git diff --check` 通过。
+2. [x] 新增 `SourceReadSwiftTests/Stage33ReaderExperienceTests.swift` 覆盖上述核心能力。
+3. [x] `progress.md` 记录实现、证据与闭环详情。
+4. [x] GitHub Actions 双流水线全绿通过（iOS 测试通过 + 无签名 IPA 生成）。
+
+## 验证证据与流水线闭环
+
+- **Target Commit**: [`72ca891`](https://github.com/ztcsr5/SourceReadSwift/commit/72ca891)
+- **iOS build & test (Authoritative Gate)**:
+  - Run ID: [34350499824](https://github.com/ztcsr5/SourceReadSwift/actions/runs/34350499824)
+  - Result: **SUCCESS** (全量测试套件 100% 通过)
+- **Unsigned IPA Package (Release Packaging Gate)**:
+  - Run ID: [34350499831](https://github.com/ztcsr5/SourceReadSwift/actions/runs/34350499831)
+  - Result: **SUCCESS** (无签名 IPA 产物构建成功)
+
+## Stage 33 状态：CLOSED & ACCEPTED
+
+本阶段所有交互手感、排版调色板、目录正则和双 CI 流水线门禁均已 100% 达成，Stage 33 正式收口关闭。
 
 ## 后续入口
 
-完成 Stage 33 后，进入最终收尾阶段：
+进入最终收尾阶段：
 - **Stage 34**：EPUB / RSS / 书架批量 / Web 写源 PC 端 / 图标与产品收口。
