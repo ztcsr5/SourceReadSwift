@@ -638,6 +638,7 @@ struct ChapterLoadingView: View {
         chapter: BookChapter,
         totalChapters: Int? = nil,
         chapters: [BookChapter] = [],
+        initialParagraphIndex: Int? = nil,
         extraToolbarActions: @escaping () -> AnyView = { AnyView(EmptyView()) },
         onRequestSourceSwitch: (() -> Void)? = nil
     ) {
@@ -646,6 +647,7 @@ struct ChapterLoadingView: View {
         self.chapter = chapter
         self.totalChapters = totalChapters
         self.chapters = chapters
+        self.initialParagraphIndex = initialParagraphIndex
         self.extraToolbarActions = extraToolbarActions
         self.onRequestSourceSwitch = onRequestSourceSwitch
     }
