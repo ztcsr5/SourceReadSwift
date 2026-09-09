@@ -581,12 +581,15 @@ enum ReaderScrollPositionPolicy {
         textContainerInsetTop: CGFloat,
         boundsHeight: CGFloat,
         contentSizeHeight: CGFloat,
-        anchorRatio: Double = 0.08
+        adjustedContentInset: UIEdgeInsets = .zero
     ) -> CGFloat {
-        let maxOffset = max(contentSizeHeight - boundsHeight, 0)
-        let anchorOffset = boundsHeight * CGFloat(anchorRatio)
-        let rawTarget = textRectMinY - textContainerInsetTop - anchorOffset
-        return min(max(rawTarget, 0), maxOffset)
+        let minimumY = -adjustedContentInset.top
+        let maximumY = max(
+            minimumY,
+            contentSizeHeight - boundsHeight + adjustedContentInset.bottom
+        )
+        let desiredY = textRectMinY - textContainerInsetTop
+        return min(max(desiredY, minimumY), maximumY)
     }
 }
 
