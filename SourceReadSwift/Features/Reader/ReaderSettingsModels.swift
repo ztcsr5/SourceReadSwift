@@ -168,13 +168,29 @@ enum ReaderFontFamily: String, CaseIterable, Identifiable, Sendable {
         case .system:
             return UIFont.systemFont(ofSize: size, weight: weight)
         case .songti:
-            if let font = UIFont(name: weight == .bold ? "SongtiSC-Bold" : "SongtiSC-Regular", size: size) {
-                return font
+            let songtiNames = weight == .bold
+                ? ["STSongti-SC-Bold", "Songti SC Bold", "SongtiSC-Bold", "STSong"]
+                : ["STSongti-SC-Regular", "Songti SC", "SongtiSC-Regular", "STSong", "STSongti-SC-Light"]
+            for name in songtiNames {
+                if let font = UIFont(name: name, size: size) {
+                    return font
+                }
+            }
+            if let desc = UIFont.systemFont(ofSize: size, weight: weight).fontDescriptor.withDesign(.serif) {
+                return UIFont(descriptor: desc, size: size)
             }
             return UIFont.systemFont(ofSize: size, weight: weight)
         case .kaiti:
-            if let font = UIFont(name: weight == .bold ? "KaitiSC-Bold" : "KaitiSC-Regular", size: size) {
-                return font
+            let kaitiNames = weight == .bold
+                ? ["STKaiti-SC-Bold", "Kaiti SC Bold", "KaitiSC-Bold", "STKaiti", "KaiTi"]
+                : ["STKaiti-SC-Regular", "Kaiti SC", "KaitiSC-Regular", "STKaiti", "KaiTi"]
+            for name in kaitiNames {
+                if let font = UIFont(name: name, size: size) {
+                    return font
+                }
+            }
+            if let desc = UIFont.systemFont(ofSize: size, weight: weight).fontDescriptor.withDesign(.serif) {
+                return UIFont(descriptor: desc, size: size)
             }
             return UIFont.systemFont(ofSize: size, weight: weight)
         case .rounded:

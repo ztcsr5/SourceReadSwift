@@ -2,6 +2,13 @@ import AVFoundation
 import SwiftUI
 import UIKit
 
+struct ContinuousAppendedSection: Equatable, Identifiable {
+    var id: Int { chapterIndex }
+    let chapterIndex: Int
+    let title: String
+    let paragraphs: [String]
+}
+
 struct ReaderView: View {
     @EnvironmentObject private var appState: AppState
     @Environment(\.colorScheme) private var colorScheme
@@ -84,6 +91,8 @@ struct ReaderView: View {
     @State private var previousIdleTimerDisabled = false
     @State private var visibleParagraphIndex = 0
     @State private var readerContentFingerprint = ""
+    @State private var appendedSections: [ContinuousAppendedSection] = []
+    @State private var isAppendingNextChapter = false
     @State private var speechPausedForScene = false
     @State private var autoScrollPausedForScene = false
     @GestureState private var coverSwipeState = ReaderCoverSwipeState()
@@ -156,14 +165,22 @@ struct ReaderView: View {
         currentParagraphIndexForPersistence()
     }
 
+    private var currentDisplayChapterIndex: Int {
+        if readerMode == .scroll && !appendedSections.isEmpty {
+            return resolvedReadingPosition(forFlatIndex: visibleParagraphIndex).chapterIndex
+        }
+        return chapterIndex
+    }
+
     private var progressTitle: String {
         var parts: [String] = []
+        let displayIndex = currentDisplayChapterIndex
         if let totalChapters, totalChapters > 0 {
-            let percentage = Int((Double(chapterIndex + 1) / Double(totalChapters) * 100).rounded())
-            parts.append("第 \(chapterIndex + 1) / \(totalChapters) 章")
+            let percentage = Int((Double(displayIndex + 1) / Double(totalChapters) * 100).rounded())
+            parts.append("第 \(displayIndex + 1) / \(totalChapters) 章")
             parts.append("\(percentage)%")
         } else {
-            parts.append("第 \(chapterIndex + 1) 章")
+            parts.append("第 \(displayIndex + 1) 章")
         }
         if readerMode != .scroll {
             let pageCount = max(pagedBlocks.count, 1)
@@ -357,7 +374,7 @@ struct ReaderView: View {
             applyIdleTimerPreference()
             scheduleSleepTimer()
             appState.bookshelfStore.markReaderOpened(bookID: bookID)
-            persistReadingPosition()
+            persistReadingPosition(paragraphIndexOverride: initial.paragraph)
             if autoplaySpeechOnAppear {
                 onSpeechAutoplayConsumed?()
                 DispatchQueue.main.async {
@@ -526,11 +543,52 @@ struct ReaderView: View {
         }
     }
 
+    private var scrollModeParagraphs: [String] {
+        guard !appendedSections.isEmpty else { return content.paragraphs }
+        var result = content.paragraphs
+        for section in appendedSections {
+            result.append("——— \(section.title) ———")
+            result.append(contentsOf: section.paragraphs)
+        }
+        return result
+    }
+
+    private var scrollContentFingerprint: String {
+        let baseCount = content.paragraphs.count
+        let appendedCount = appendedSections.count
+        let lastChapter = appendedSections.last?.chapterIndex ?? chapterIndex
+        let lastParagraphsCount = appendedSections.last?.paragraphs.count ?? baseCount
+        return "\(chapterIndex)|\(baseCount)|\(appendedCount)|\(lastChapter)|\(lastParagraphsCount)"
+    }
+
+    private func resolvedReadingPosition(forFlatIndex index: Int) -> (chapterIndex: Int, chapterTitle: String, paragraphIndex: Int) {
+        if index < content.paragraphs.count {
+            return (chapterIndex, content.title, max(index, 0))
+        }
+        var offset = content.paragraphs.count
+        for section in appendedSections {
+            if index == offset {
+                return (section.chapterIndex, section.title, 0)
+            }
+            offset += 1
+            let count = section.paragraphs.count
+            if index < offset + count {
+                return (section.chapterIndex, section.title, index - offset)
+            }
+            offset += count
+        }
+        if let last = appendedSections.last {
+            return (last.chapterIndex, last.title, max(last.paragraphs.count - 1, 0))
+        }
+        return (chapterIndex, content.title, max(content.paragraphs.count - 1, 0))
+    }
+
     private var scrollReaderContent: some View {
         NativeReaderTextView(
             title: content.title,
-            paragraphs: content.paragraphs,
-            contentFingerprint: readerContentFingerprint,
+            paragraphs: scrollModeParagraphs,
+            contentFingerprint: scrollContentFingerprint,
+            isAppendedUpdate: !appendedSections.isEmpty,
             fontFamily: fontFamily,
             fontSize: fontSize,
             lineSpacing: lineSpacing,
@@ -547,10 +605,14 @@ struct ReaderView: View {
                 ? speechController.currentParagraphIndex
                 : (content.paragraphs.indices.contains(scrollParagraphTarget) ? scrollParagraphTarget : nil),
             scrollRequestKey: nativeScrollRequestKey,
-            animatedScrollDuration: autoScrollEnabled ? max(ReaderAutomationPolicy.clampedDelay(autoScrollDelay) * 0.9, 0.25) : 0.35,
+            animatedScrollDuration: autoScrollEnabled ? max(ReaderAutomationPolicy.clampedDelay(autoScrollDelay) * 0.9, 0.25) : 0,
             textSelectionEnabled: textSelectionEnabled,
+            showChapterEndBadge: false,
             onVisibleParagraph: { index in
                 updateVisibleParagraphInScroll(index)
+            },
+            onNearBottom: {
+                appendNextChapterIfPossible()
             },
             onReachTop: {
                 if canSelectRelativeChapter(offset: -1) {
@@ -559,10 +621,7 @@ struct ReaderView: View {
                 }
             },
             onReachBottom: {
-                if canSelectRelativeChapter(offset: 1) {
-                    UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-                    selectRelativeChapter(offset: 1, startAtEnd: false)
-                }
+                appendNextChapterIfPossible()
             }
         )
         .ignoresSafeArea(.container, edges: .bottom)
@@ -573,15 +632,114 @@ struct ReaderView: View {
                 }
             }
         }
+        .onChange(of: chapterIndex) { _ in
+            appendedSections.removeAll()
+            isAppendingNextChapter = false
+        }
+        .onChange(of: readerModeRawValue) { _ in
+            appendedSections.removeAll()
+            isAppendingNextChapter = false
+        }
         .onChange(of: speechController.currentParagraphIndex) { target in
             guard target >= 0 else { return }
             scheduleReadingPositionPersistence(paragraphIndex: target)
         }
     }
 
+    private func appendNextChapterIfPossible() {
+        guard readerMode == .scroll, !isAppendingNextChapter else { return }
+        guard appendedSections.count < 3 else { return }
+
+        let nextIndex = (appendedSections.last?.chapterIndex ?? chapterIndex) + 1
+        let maxCount = totalChapters ?? chapters.count
+        guard nextIndex < maxCount else { return }
+
+        onCacheNextChapters?()
+
+        // 1. Check local text chapters
+        if let book = appState.bookshelfStore.book(id: bookID),
+           let localChapters = book.localChapters,
+           localChapters.indices.contains(nextIndex) {
+            let nextLocal = localChapters[nextIndex]
+            isAppendingNextChapter = true
+            appendedSections.append(ContinuousAppendedSection(
+                chapterIndex: nextIndex,
+                title: nextLocal.title,
+                paragraphs: nextLocal.paragraphs
+            ))
+            isAppendingNextChapter = false
+            return
+        }
+
+        // 2. Check online book chapters
+        guard let nextChapter = chapters.first(where: { $0.index == nextIndex }) else { return }
+        let sourceURL = appState.bookshelfStore.book(id: bookID)?.sourceURL
+            ?? (bookID.contains("|") ? String(bookID.split(separator: "|")[0]) : nil)
+        guard let sourceURL, let source = appState.sourceStore.source(for: sourceURL) else { return }
+        let purifyRules = appState.purifyRuleStore.enabledPatterns
+
+        if let cached = appState.chapterContentCacheStore.content(
+            sourceURL: source.bookSourceUrl,
+            chapter: nextChapter,
+            purifyRules: purifyRules
+        ) {
+            appendedSections.append(ContinuousAppendedSection(
+                chapterIndex: nextIndex,
+                title: nextChapter.title,
+                paragraphs: cached.paragraphs
+            ))
+            // Pre-load the chapter after this one in background so it's ready ahead of time!
+            let followingIndex = nextIndex + 1
+            if followingIndex < maxCount,
+               let followingChapter = chapters.first(where: { $0.index == followingIndex }),
+               !appState.chapterContentCacheStore.isCached(sourceURL: source.bookSourceUrl, chapter: followingChapter, purifyRules: purifyRules) {
+                Task {
+                    let engine = appState.engine
+                    let result = await AsyncTimeout.run(seconds: 8) {
+                        await engine.getContent(source: source, chapter: followingChapter)
+                    }
+                    if case .success(let loaded) = result {
+                        await MainActor.run {
+                            appState.chapterContentCacheStore.save(loaded, sourceURL: source.bookSourceUrl, purifyRules: purifyRules)
+                        }
+                    }
+                }
+            }
+            return
+        }
+
+        // 3. Not in cache: fetch in background Task
+        isAppendingNextChapter = true
+        Task {
+            let engine = appState.engine
+            let result = await AsyncTimeout.run(seconds: 12) {
+                await engine.getContent(source: source, chapter: nextChapter)
+            }
+            await MainActor.run {
+                self.isAppendingNextChapter = false
+                guard self.readerMode == .scroll else { return }
+                if case .success(let loaded) = result {
+                    self.appState.chapterContentCacheStore.save(loaded, sourceURL: source.bookSourceUrl, purifyRules: purifyRules)
+                    self.appendedSections.append(ContinuousAppendedSection(
+                        chapterIndex: nextIndex,
+                        title: nextChapter.title,
+                        paragraphs: loaded.paragraphs
+                    ))
+                }
+            }
+        }
+    }
+
     private func updateVisibleParagraphInScroll(_ index: Int) {
         visibleParagraphIndex = index
-        updateVisibleParagraph(index)
+        let resolved = resolvedReadingPosition(forFlatIndex: index)
+        appState.bookshelfStore.updateReadingProgress(
+            bookID: bookID,
+            chapterIndex: resolved.chapterIndex,
+            chapterTitle: resolved.chapterTitle,
+            totalChapters: totalChapters ?? chapters.count,
+            paragraphIndex: resolved.paragraphIndex
+        )
     }
 
     private var nativeScrollRequestKey: String {
@@ -1990,16 +2148,27 @@ struct ReaderView: View {
     }
 
     private func persistReadingPosition(paragraphIndexOverride: Int? = nil) {
+        let saveChapterIndex: Int
+        let saveChapterTitle: String
         let paragraphIndex: Int
-        if let paragraphIndexOverride {
-            paragraphIndex = min(max(paragraphIndexOverride, 0), max(content.paragraphs.count - 1, 0))
+        if readerMode == .scroll && !appendedSections.isEmpty {
+            let resolved = resolvedReadingPosition(forFlatIndex: visibleParagraphIndex)
+            saveChapterIndex = resolved.chapterIndex
+            saveChapterTitle = resolved.chapterTitle
+            paragraphIndex = paragraphIndexOverride ?? resolved.paragraphIndex
         } else {
-            paragraphIndex = currentParagraphIndexForPersistence()
+            saveChapterIndex = chapterIndex
+            saveChapterTitle = content.title
+            if let paragraphIndexOverride {
+                paragraphIndex = min(max(paragraphIndexOverride, 0), max(content.paragraphs.count - 1, 0))
+            } else {
+                paragraphIndex = currentParagraphIndexForPersistence()
+            }
         }
         appState.bookshelfStore.updateReadingProgress(
             bookID: bookID,
-            chapterIndex: chapterIndex,
-            chapterTitle: content.title,
+            chapterIndex: saveChapterIndex,
+            chapterTitle: saveChapterTitle,
             totalChapters: totalChapters ?? 0,
             paragraphIndex: paragraphIndex
         )
@@ -2019,6 +2188,10 @@ struct ReaderView: View {
         guard !content.paragraphs.isEmpty else { return 0 }
         switch readerMode {
         case .scroll:
+            if !appendedSections.isEmpty {
+                let resolved = resolvedReadingPosition(forFlatIndex: visibleParagraphIndex)
+                return resolved.paragraphIndex
+            }
             return min(max(visibleParagraphIndex, 0), content.paragraphs.count - 1)
         case .pageTurn, .cover:
             return paragraphIndex(forPage: pagedPageIndex)

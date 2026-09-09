@@ -70,11 +70,15 @@ struct SearchResultParser {
             var books: [SearchBook] = []
             let variables: [String: Any] = ["source": source]
             for element in elements {
-                let name = try htmlExtractor.value(from: element, rule: firstRule(rule, keys: ["name", "bookName"]), fallback: "a@text", baseUrl: response.url, variables: variables)
-                let bookUrl = try htmlExtractor.value(from: element, rule: firstRule(rule, keys: ["bookUrl", "url"]), fallback: "a@href", baseUrl: response.url, variables: variables)
+                let rawName = try htmlExtractor.value(from: element, rule: firstRule(rule, keys: ["name", "bookName"]), fallback: "a@text", baseUrl: response.url, variables: variables)
+                let name = rawName.components(separatedBy: .newlines).first(where: { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty })?.trimmingCharacters(in: .whitespacesAndNewlines) ?? rawName
+                let rawBookUrl = try htmlExtractor.value(from: element, rule: firstRule(rule, keys: ["bookUrl", "url"]), fallback: "a@href", baseUrl: response.url, variables: variables)
+                let bookUrl = rawBookUrl.components(separatedBy: .newlines).first(where: { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty })?.trimmingCharacters(in: .whitespacesAndNewlines) ?? rawBookUrl
                 guard !name.isEmpty, !bookUrl.isEmpty else { continue }
-                let author = try htmlExtractor.value(from: element, rule: firstRule(rule, keys: ["author"]), fallback: nil, baseUrl: response.url, variables: variables).nilIfEmpty
-                let cover = try htmlExtractor.value(from: element, rule: firstRule(rule, keys: ["coverUrl", "cover"]), fallback: "img@src", baseUrl: response.url, variables: variables).nilIfEmpty
+                let rawAuthor = try htmlExtractor.value(from: element, rule: firstRule(rule, keys: ["author"]), fallback: nil, baseUrl: response.url, variables: variables).nilIfEmpty
+                let author = rawAuthor?.components(separatedBy: .newlines).first(where: { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty })?.trimmingCharacters(in: .whitespacesAndNewlines) ?? rawAuthor
+                let rawCover = try htmlExtractor.value(from: element, rule: firstRule(rule, keys: ["coverUrl", "cover"]), fallback: "img@src", baseUrl: response.url, variables: variables).nilIfEmpty
+                let cover = rawCover?.components(separatedBy: .newlines).first(where: { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty })?.trimmingCharacters(in: .whitespacesAndNewlines) ?? rawCover
                 books.append(SearchBook(
                     name: name,
                     author: author,

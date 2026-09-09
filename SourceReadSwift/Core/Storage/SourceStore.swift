@@ -65,13 +65,13 @@ final class SourceStore: ObservableObject {
                     "bookList": "ul.flex li",
                     "name": "h2@text",
                     "author": ".li_bottom a[href*='/author/']@text",
-                    "bookUrl": "a[href^='/']:not([href*='/author/'])@href",
+                    "bookUrl": ".w100 a@href||h2 a@href||a[href^='/']:not([href*='/author/'])@href",
                     "coverUrl": "img@crs||img@src",
                     "intro": ".indent@text",
                     "kind": ".img_span span@text"
                 ]),
                 ruleBookInfo: SourceRule(fields: [
-                    "name": ".novel_info_title h1@text",
+                    "name": ".novel_info_title h1@text||h1@text",
                     "author": ".novel_info_title a[href*='/author/']@text",
                     "coverUrl": ".novel_info_main img@src",
                     "intro": ".novel_info_main .indent@text",
@@ -98,60 +98,31 @@ final class SourceStore: ObservableObject {
                 weight: 95,
                 searchUrl: "https://www.6yzw.org/search.php?q={{key}}",
                 ruleSearch: SourceRule(fields: [
-                    "bookList": ".box.hot .col-12",
+                    "bookList": "div.col-12.col-md-6",
                     "name": "h3 a@text##\\[.*?\\]##",
-                    "author": ".book_other.0@text##^作者：##",
+                    "author": ".book_other:contains(作者) span@text||.book_other:contains(作者)@text##作者：##",
                     "bookUrl": "dt a@href",
                     "coverUrl": "dt img@src",
-                    "lastChapter": ".book_other.3 a@text"
+                    "lastChapter": ".book_other:contains(最新章节) a@text"
                 ]),
                 ruleBookInfo: SourceRule(fields: [
-                    "name": ".info h1@text",
-                    "author": ".info li.0 a@text",
-                    "coverUrl": "img.img-thumbnail@src",
-                    "intro": "#intro_pc@ownText",
-                    "lastChapter": ".info li.3 a@text"
+                    "name": ".info h1@text||h1@text",
+                    "author": ".info li:contains(作者) a@text||.book_other:contains(作者) a@text",
+                    "coverUrl": "img.img-thumbnail@src||dt img@src",
+                    "intro": "#intro_pc@ownText||.intro@text",
+                    "lastChapter": ".info li:contains(最新) a@text"
                 ]),
                 ruleToc: SourceRule(fields: [
-                    "chapterList": ".book_list2 li a",
+                    "chapterList": "ul.row li.col-md-3 a||.col-md-3 a||.book_list2 li a",
                     "chapterName": "@text",
                     "chapterUrl": "@href"
                 ]),
                 ruleContent: SourceRule(fields: [
-                    "content": ".font_max@html##<br>&nbsp;&nbsp;&nbsp;&nbsp;第\\(\\d+/\\d+\\)页<br>|<br>##",
-                    "nextContentUrl": "text.下一章@href"
+                    "content": "article@html||.font_max@html||#content@html",
+                    "nextContentUrl": "a:contains(下一章)@href||#next1@href",
+                    "replaceRegex": "##第\\(\\d+/\\d+\\)页##"
                 ]),
                 header: "{\"User-Agent\":\"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36\"}"
-            ),
-            BookSource(
-                bookSourceName: "飘天文学",
-                bookSourceUrl: "https://www.piaotia.com",
-                bookSourceGroup: "官方精选",
-                bookSourceType: 0,
-                enabled: true,
-                weight: 90,
-                searchUrl: "https://www.piaotia.com/modules/article/search.php?searchkey={{key}}&searchtype=articlename,{\"charset\":\"gbk\"}",
-                ruleSearch: SourceRule(fields: [
-                    "bookList": "table.grid tr!0",
-                    "name": "td.odd:nth-child(1) a@text",
-                    "author": "td.odd:nth-child(3)@text",
-                    "bookUrl": "td.odd:nth-child(1) a@href",
-                    "lastChapter": "td.even:nth-child(2) a@text"
-                ]),
-                ruleBookInfo: SourceRule(fields: [
-                    "name": "h1@text",
-                    "author": "td:contains(作 者)@text##作.*者：",
-                    "intro": ".intro@text",
-                    "tocUrl": "a:contains(完整目录)@href"
-                ]),
-                ruleToc: SourceRule(fields: [
-                    "chapterList": ".centent ul li a",
-                    "chapterName": "text",
-                    "chapterUrl": "href"
-                ]),
-                ruleContent: SourceRule(fields: [
-                    "content": "#content@html"
-                ])
             ),
             BookSource(
                 bookSourceName: "无极小说",
@@ -159,60 +130,34 @@ final class SourceStore: ObservableObject {
                 bookSourceGroup: "官方精选",
                 bookSourceType: 0,
                 enabled: true,
-                weight: 85,
+                weight: 90,
                 searchUrl: "https://www.wjxsw.net/search.php?q={{key}}",
                 ruleSearch: SourceRule(fields: [
-                    "bookList": ".box.hot .col-12 dl",
-                    "name": "dd h3 a@text",
-                    "author": "dd:contains(作者) span@text",
+                    "bookList": "div.col-12.col-md-6",
+                    "name": "h3 a@text##\\[.*?\\]##",
+                    "author": ".book_other:contains(作者) span@text||.book_other:contains(作者)@text##作者：##",
                     "bookUrl": "dt a@href",
                     "coverUrl": "dt img@src",
-                    "lastChapter": "dd:contains(最新章节) a@text"
+                    "lastChapter": ".book_other:contains(最新章节) a@text"
                 ]),
                 ruleBookInfo: SourceRule(fields: [
-                    "name": "h1@text||meta[property=og:novel:book_name]@content",
-                    "author": "meta[property=og:novel:author]@content",
-                    "intro": "meta[property=og:description]@content",
-                    "coverUrl": "meta[property=og:image]@content"
+                    "name": ".info h1@text||h1@text",
+                    "author": ".info li:contains(作者) a@text||.book_other:contains(作者) a@text",
+                    "coverUrl": "img.img-thumbnail@src||dt img@src",
+                    "intro": "#intro_pc@ownText||.intro@text",
+                    "lastChapter": ".info li:contains(最新) a@text"
                 ]),
                 ruleToc: SourceRule(fields: [
-                    "chapterList": ".book_list li a",
-                    "chapterName": "text",
-                    "chapterUrl": "href"
+                    "chapterList": "ul.row li.col-md-3 a||.col-md-3 a||.book_list li a",
+                    "chapterName": "@text",
+                    "chapterUrl": "@href"
                 ]),
                 ruleContent: SourceRule(fields: [
-                    "content": "#content@html||.content@html||#bodybox@html"
-                ])
-            ),
-            BookSource(
-                bookSourceName: "久久小说网",
-                bookSourceUrl: "https://www.aijjxs.com",
-                bookSourceGroup: "官方精选",
-                bookSourceType: 0,
-                enabled: true,
-                weight: 80,
-                searchUrl: "https://www.aijjxs.com/e/search/index.php,{\"method\":\"POST\",\"body\":\"show=title%2Cwriter&keyboard={{key}}\"}",
-                ruleSearch: SourceRule(fields: [
-                    "bookList": ".txt-list li",
-                    "name": "span.s2 a@text",
-                    "author": "span.s4@text",
-                    "bookUrl": "span.s2 a@href",
-                    "lastChapter": "span.s3 a@text"
+                    "content": "article@html||.font_max@html||#content@html",
+                    "nextContentUrl": "a:contains(下一章)@href||#next1@href",
+                    "replaceRegex": "##第\\(\\d+/\\d+\\)页##"
                 ]),
-                ruleBookInfo: SourceRule(fields: [
-                    "name": "h1@text",
-                    "author": ".info span:contains(作 者)@text##作.*者：",
-                    "intro": ".intro@text",
-                    "tocUrl": ".btn-group a:contains(点击阅读)@href"
-                ]),
-                ruleToc: SourceRule(fields: [
-                    "chapterList": ".section-box li a",
-                    "chapterName": "text",
-                    "chapterUrl": "href"
-                ]),
-                ruleContent: SourceRule(fields: [
-                    "content": "#content@html"
-                ])
+                header: "{\"User-Agent\":\"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36\"}"
             )
         ]
     }

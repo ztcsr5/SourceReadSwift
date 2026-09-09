@@ -39,4 +39,22 @@ final class SearchBookMatcherTests: XCTestCase {
         let lower = SearchBook(name: "测试书", author: nil, coverUrl: nil, bookUrl: "https://a.example/Novel/a", sourceName: "A", sourceUrl: "https://a.example", intro: nil)
         XCTAssertEqual(SearchBookMatcher.deduplicated([upper, lower]).count, 2)
     }
+
+    func testExactSearchMatchesCleanedTitleTagsAndAuthorPrefixes() {
+        let books = [
+            SearchBook(name: "【完结】斗破苍穹txt下载", author: "作者：天蚕土豆", coverUrl: nil, bookUrl: "/1", sourceName: "A", sourceUrl: "https://a", intro: nil),
+            SearchBook(name: "斗破苍穹 (精校版)", author: "天蚕土豆 著", coverUrl: nil, bookUrl: "/2", sourceName: "B", sourceUrl: "https://b", intro: nil),
+            SearchBook(name: "斗破苍穹之大主宰", author: "其他作者", coverUrl: nil, bookUrl: "/3", sourceName: "C", sourceUrl: "https://c", intro: nil)
+        ]
+        let resultTitle = SearchBookMatcher.filteredAndRanked(books, keyword: "斗破苍穹", exact: true)
+        XCTAssertTrue(resultTitle.contains { $0.bookUrl == "/1" })
+        XCTAssertTrue(resultTitle.contains { $0.bookUrl == "/2" })
+        XCTAssertFalse(resultTitle.contains { $0.bookUrl == "/3" })
+
+        let resultAuthor = SearchBookMatcher.filteredAndRanked(books, keyword: "天蚕土豆", exact: true)
+        XCTAssertTrue(resultAuthor.contains { $0.bookUrl == "/1" })
+        XCTAssertTrue(resultAuthor.contains { $0.bookUrl == "/2" })
+        XCTAssertFalse(resultAuthor.contains { $0.bookUrl == "/3" })
+    }
 }
+

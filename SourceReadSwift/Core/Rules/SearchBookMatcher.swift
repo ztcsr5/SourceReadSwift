@@ -11,6 +11,46 @@ enum SearchBookMatcher {
             .lowercased()
     }
 
+    static func cleanTitle(_ value: String) -> String {
+        var s = normalized(value)
+        s = s.replacingOccurrences(of: #"(?:\[|【|\(|（)[^】\)\]]*?(?:完结|连载|精校|全本|全集|校对|txt|更新|免费|完|合集|修复|修仙|玄幻|都市|科幻|网游|历史|言情|同人)[^】\)\]]*?(?:\]|】|\)|）)"#, with: "", options: .regularExpression)
+        s = s.replacingOccurrences(of: #"^\[[^\]]+\]"#, with: "", options: .regularExpression)
+        s = s.replacingOccurrences(of: #"^【[^】]+】"#, with: "", options: .regularExpression)
+        s = s.replacingOccurrences(of: #"(?:txt下载|txt|最新章节|全文阅读|全集|全本|精校版|校对版|无弹窗)$"#, with: "", options: .regularExpression)
+        s = s.replacingOccurrences(of: #"[《》「」『』【】\[\]\(\)（）]"#, with: "", options: .regularExpression)
+        return s.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    static func cleanAuthor(_ value: String) -> String {
+        var s = normalized(value)
+        s = s.replacingOccurrences(of: #"^(?:作者|作\s*者)[:：\s]*"#, with: "", options: .regularExpression)
+        s = s.replacingOccurrences(of: #"\s*著$"#, with: "", options: .regularExpression)
+        s = s.replacingOccurrences(of: #"[《》「」『』【】\[\]\(\)（）]"#, with: "", options: .regularExpression)
+        return s.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    static func isExactMatch(book: SearchBook, query: String) -> Bool {
+        let normName = normalized(book.name)
+        let cleanedName = cleanTitle(book.name)
+        let normAuthor = normalized(book.author ?? "")
+        let cleanedAuthor = cleanAuthor(book.author ?? "")
+
+        if normName == query || cleanedName == query {
+            return true
+        }
+        if !normAuthor.isEmpty && (normAuthor == query || cleanedAuthor == query) {
+            return true
+        }
+        if normName.hasPrefix(query) {
+            let suffix = normName.dropFirst(query.count)
+            if suffix.isEmpty { return true }
+            if let firstChar = suffix.first, " (（[【:：-_/·.t".contains(firstChar) {
+                return true
+            }
+        }
+        return false
+    }
+
     static func filteredAndRanked(
         _ books: [SearchBook],
         keyword: String,
@@ -24,7 +64,9 @@ enum SearchBookMatcher {
         let matched = unique.filter { book in
             let name = normalized(book.name)
             let author = normalized(book.author ?? "")
-            if exact { return name == query || author == query }
+            if exact {
+                return isExactMatch(book: book, query: query)
+            }
             return name.contains(query) || author.contains(query)
         }
 
@@ -70,11 +112,15 @@ enum SearchBookMatcher {
 
     private static func score(_ book: SearchBook, query: String) -> Int {
         let name = normalized(book.name)
+        let cleanedName = cleanTitle(book.name)
         let author = normalized(book.author ?? "")
-        if name == query { return 400 }
-        if name.hasPrefix(query) { return 300 }
-        if name.contains(query) { return 200 }
-        if author == query { return 150 }
+        let cleanedAuthor = cleanAuthor(book.author ?? "")
+        if name == query { return 500 }
+        if cleanedName == query { return 450 }
+        if name.hasPrefix(query) { return 350 }
+        if cleanedName.hasPrefix(query) { return 300 }
+        if name.contains(query) { return 250 }
+        if author == query || cleanedAuthor == query { return 200 }
         if author.contains(query) { return 100 }
         return 0
     }

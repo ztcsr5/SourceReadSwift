@@ -94,4 +94,39 @@ final class SearchResultParserTests: XCTestCase {
         XCTAssertEqual(book.name, "Title")
         XCTAssertEqual(book.bookUrl, "https://example.com/book/1")
     }
+
+    func testHTMLSearchSanitizesMultilineURL() throws {
+        let source = BookSource(
+            bookSourceName: "Test",
+            bookSourceUrl: "https://example.com",
+            ruleSearch: SourceRule(fields: [
+                "bookList": ".book",
+                "name": "h2 a@text",
+                "bookUrl": "a@href"
+            ])
+        )
+        let response = SourceResponse(
+            url: URL(string: "https://example.com/search?q=a")!,
+            statusCode: 200,
+            headers: [:],
+            body: """
+            <html><body>
+              <div class="book">
+                <a href="/book/1"><img src="/1.jpg"></a>
+                <h2><a href="/book/1">My Novel</a></h2>
+              </div>
+            </body></html>
+            """,
+            data: Data()
+        )
+
+        let result = SearchResultParser().parse(source: source, response: response)
+
+        guard case .success(let books) = result, let book = books.first else {
+            return XCTFail("expected parsed book")
+        }
+        XCTAssertEqual(book.bookUrl, "https://example.com/book/1")
+        XCTAssertFalse(book.bookUrl.contains("\n"))
+    }
 }
+

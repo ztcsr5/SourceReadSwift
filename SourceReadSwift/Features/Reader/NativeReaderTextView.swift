@@ -13,6 +13,7 @@ struct NativeReaderTextView: UIViewRepresentable {
     /// paragraph in the middle of a long chapter without hashing that chapter
     /// during every SwiftUI body evaluation. It is optional for existing call sites.
     var contentFingerprint: String? = nil
+    var isAppendedUpdate: Bool = false
     var fontFamily: ReaderFontFamily = .system
     let fontSize: Double
     let lineSpacing: Double
@@ -29,7 +30,9 @@ struct NativeReaderTextView: UIViewRepresentable {
     let scrollRequestKey: String?
     let animatedScrollDuration: Double
     let textSelectionEnabled: Bool
+    var showChapterEndBadge: Bool = false
     let onVisibleParagraph: (Int) -> Void
+    var onNearBottom: (() -> Void)? = nil
     var onReachTop: (() -> Void)? = nil
     var onReachBottom: (() -> Void)? = nil
 
@@ -37,7 +40,8 @@ struct NativeReaderTextView: UIViewRepresentable {
         Coordinator(
             onVisibleParagraph: onVisibleParagraph,
             onReachTop: onReachTop,
-            onReachBottom: onReachBottom
+            onReachBottom: onReachBottom,
+            onNearBottom: onNearBottom
         )
     }
 
@@ -75,7 +79,8 @@ struct NativeReaderTextView: UIViewRepresentable {
         context.coordinator.updateCallbacks(
             visibleParagraph: onVisibleParagraph,
             reachTop: onReachTop,
-            reachBottom: onReachBottom
+            reachBottom: onReachBottom,
+            nearBottom: onNearBottom
         )
         context.coordinator.update(textView: textView, configuration: configuration, scrollTarget: scrollTarget, scrollRequestKey: scrollRequestKey)
         context.coordinator.updateHighlight(currentParagraphIndex, in: textView, color: highlightColor)
@@ -89,6 +94,7 @@ struct NativeReaderTextView: UIViewRepresentable {
             paragraphs: paragraphs,
             contentFingerprint: contentFingerprint?.nilIfEmpty
                 ?? [title, subtitle ?? "", String(paragraphs.count), String(paragraphs.first?.hashValue ?? 0), String(paragraphs.last?.hashValue ?? 0)].joined(separator: "|"),
+            isAppendedUpdate: isAppendedUpdate,
             fontFamily: fontFamily,
             fontSize: fontSize,
             lineSpacing: lineSpacing,
@@ -101,7 +107,7 @@ struct NativeReaderTextView: UIViewRepresentable {
             textColor: textColor,
             highlightColor: highlightColor,
             animatedScrollDuration: animatedScrollDuration,
-            showChapterEndBadge: true
+            showChapterEndBadge: showChapterEndBadge
         )
     }
 
@@ -110,6 +116,7 @@ struct NativeReaderTextView: UIViewRepresentable {
         let subtitle: String?
         let paragraphs: [String]
         let contentFingerprint: String
+        let isAppendedUpdate: Bool
         let fontFamily: ReaderFontFamily
         let fontSize: Double
         let lineSpacing: Double
@@ -129,6 +136,7 @@ struct NativeReaderTextView: UIViewRepresentable {
             subtitle: String? = nil,
             paragraphs: [String],
             contentFingerprint: String,
+            isAppendedUpdate: Bool = false,
             fontFamily: ReaderFontFamily = .system,
             fontSize: Double,
             lineSpacing: Double,
@@ -147,6 +155,7 @@ struct NativeReaderTextView: UIViewRepresentable {
             self.subtitle = subtitle
             self.paragraphs = paragraphs
             self.contentFingerprint = contentFingerprint
+            self.isAppendedUpdate = isAppendedUpdate
             self.fontFamily = fontFamily
             self.fontSize = fontSize
             self.lineSpacing = lineSpacing
@@ -216,6 +225,7 @@ struct NativeReaderTextView: UIViewRepresentable {
                 && lhs.highlightColor.isEqual(rhs.highlightColor)
                 && lhs.animatedScrollDuration == rhs.animatedScrollDuration
                 && lhs.showChapterEndBadge == rhs.showChapterEndBadge
+                && lhs.isAppendedUpdate == rhs.isAppendedUpdate
         }
     }
 
@@ -224,6 +234,7 @@ struct NativeReaderTextView: UIViewRepresentable {
         private var visibleParagraphCallback: (Int) -> Void
         private var reachTopCallback: (() -> Void)?
         private var reachBottomCallback: (() -> Void)?
+        private var nearBottomCallback: (() -> Void)?
         private var configuration: Configuration?
         private var paragraphRanges: [NSRange] = []
         private var lastHighlightedParagraph = -1
@@ -235,15 +246,18 @@ struct NativeReaderTextView: UIViewRepresentable {
         private var lastSelectionEnabled: Bool?
         private var lastLayoutWidth: CGFloat?
         private var hasAppliedInitialScrollTarget = false
+        private var didFireNearBottom = false
 
         init(
             onVisibleParagraph: @escaping (Int) -> Void,
             onReachTop: (() -> Void)? = nil,
-            onReachBottom: (() -> Void)? = nil
+            onReachBottom: (() -> Void)? = nil,
+            onNearBottom: (() -> Void)? = nil
         ) {
             visibleParagraphCallback = onVisibleParagraph
             reachTopCallback = onReachTop
             reachBottomCallback = onReachBottom
+            nearBottomCallback = onNearBottom
         }
 
         func attach(_ textView: UITextView) {
@@ -257,11 +271,13 @@ struct NativeReaderTextView: UIViewRepresentable {
         func updateCallbacks(
             visibleParagraph: @escaping (Int) -> Void,
             reachTop: (() -> Void)?,
-            reachBottom: (() -> Void)?
+            reachBottom: (() -> Void)?,
+            nearBottom: (() -> Void)?
         ) {
             visibleParagraphCallback = visibleParagraph
             reachTopCallback = reachTop
             reachBottomCallback = reachBottom
+            nearBottomCallback = nearBottom
         }
 
         func updateSelection(_ enabled: Bool, in textView: UITextView) {
@@ -277,6 +293,7 @@ struct NativeReaderTextView: UIViewRepresentable {
             let textLayoutChanged = previousConfiguration?.textLayoutSignature != newConfiguration.textLayoutSignature
             let insetsChanged = previousConfiguration?.insetsSignature != newConfiguration.insetsSignature
             let textColorChanged = previousConfiguration?.textColor.isEqual(newConfiguration.textColor) != true
+            let isAppend = newConfiguration.isAppendedUpdate
             let widthChanged: Bool = {
                 guard textView.bounds.width > 1 else { return false }
                 guard let lastLayoutWidth else { return true }
@@ -290,14 +307,17 @@ struct NativeReaderTextView: UIViewRepresentable {
                 if textView.bounds.width > 1 {
                     lastLayoutWidth = textView.bounds.width
                 }
-                if textView.bounds.height > 0, !contentChanged {
+                if textView.bounds.height > 0 && (!contentChanged || isAppend) {
                     setContentOffsetIfNeeded(previousOffset, in: textView)
                 }
                 // A new chapter needs its initial target; settings/theme
-                // changes preserve the existing offset and request key.
-                if contentChanged {
+                // changes or appends preserve the existing offset and request key.
+                if contentChanged && !isAppend {
                     lastScrollRequestKey = nil
                     hasAppliedInitialScrollTarget = (scrollTarget == nil || scrollTarget == 0)
+                }
+                if isAppend {
+                    didFireNearBottom = false
                 }
                 lastVisibleParagraph = -1
                 lastVisibleUpdateAt = 0
@@ -309,6 +329,7 @@ struct NativeReaderTextView: UIViewRepresentable {
                     updateBaseTextColor(in: textView, color: newConfiguration.textColor)
                 }
             }
+            guard !isAppend else { return }
             guard let scrollTarget,
                   newConfiguration.paragraphs.indices.contains(scrollTarget),
                   scrollRequestKey != lastScrollRequestKey else { return }
@@ -413,6 +434,7 @@ struct NativeReaderTextView: UIViewRepresentable {
                 return false
             }
             textView.layoutIfNeeded()
+            textView.layoutManager.ensureLayout(for: textView.textContainer)
             let range = paragraphRanges[index]
             let glyphRange = textView.layoutManager.glyphRange(forCharacterRange: range, actualCharacterRange: nil)
             let rect = textView.layoutManager.boundingRect(forGlyphRange: glyphRange, in: textView.textContainer)
@@ -426,6 +448,7 @@ struct NativeReaderTextView: UIViewRepresentable {
             let offset = CGPoint(x: 0, y: targetY)
             let currentOffset = textView.contentOffset
             hasAppliedInitialScrollTarget = true
+            lastScrollRequestKey = configuration?.contentFingerprint
             guard abs(currentOffset.y - offset.y) > 0.5 else { return true }
             if animated {
                 UIView.animate(
@@ -448,6 +471,19 @@ struct NativeReaderTextView: UIViewRepresentable {
 
             guard scrollView.isTracking || scrollView.isDragging || scrollView.isDecelerating || hasAppliedInitialScrollTarget else {
                 return
+            }
+
+            let offsetY = scrollView.contentOffset.y
+            let contentHeight = scrollView.contentSize.height
+            let visibleBottom = offsetY + scrollView.bounds.height
+
+            if contentHeight > 0 && visibleBottom >= contentHeight - 650 {
+                if !didFireNearBottom {
+                    didFireNearBottom = true
+                    nearBottomCallback?()
+                }
+            } else if visibleBottom < contentHeight - 900 {
+                didFireNearBottom = false
             }
 
             let now = CACurrentMediaTime()
