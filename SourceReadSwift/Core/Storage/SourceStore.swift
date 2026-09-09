@@ -56,11 +56,10 @@ final class SourceStore: ObservableObject {
         do {
             let snapshot = try persistence.load()
             sources = snapshot.sources
-            rssSources = snapshot.rssSources.isEmpty ? Self.defaultRSSSources : snapshot.rssSources
+            rssSources = snapshot.rssSources
             catalogs = snapshot.catalogs
         } catch {
             lastError = error.localizedDescription
-            rssSources = Self.defaultRSSSources
         }
     }
 
