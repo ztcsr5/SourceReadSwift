@@ -100,7 +100,8 @@ struct NativeReaderTextView: UIViewRepresentable {
             footerHeight: footerHeight,
             textColor: textColor,
             highlightColor: highlightColor,
-            animatedScrollDuration: animatedScrollDuration
+            animatedScrollDuration: animatedScrollDuration,
+            showChapterEndBadge: true
         )
     }
 
@@ -121,6 +122,45 @@ struct NativeReaderTextView: UIViewRepresentable {
         let textColor: UIColor
         let highlightColor: UIColor
         let animatedScrollDuration: Double
+        let showChapterEndBadge: Bool
+
+        init(
+            title: String,
+            subtitle: String? = nil,
+            paragraphs: [String],
+            contentFingerprint: String,
+            fontFamily: ReaderFontFamily = .system,
+            fontSize: Double,
+            lineSpacing: Double,
+            pagePadding: Double,
+            letterSpacing: Double,
+            paragraphSpacing: Double,
+            paragraphIndent: Double,
+            titleSpacing: Double,
+            footerHeight: Double,
+            textColor: UIColor,
+            highlightColor: UIColor,
+            animatedScrollDuration: Double,
+            showChapterEndBadge: Bool = false
+        ) {
+            self.title = title
+            self.subtitle = subtitle
+            self.paragraphs = paragraphs
+            self.contentFingerprint = contentFingerprint
+            self.fontFamily = fontFamily
+            self.fontSize = fontSize
+            self.lineSpacing = lineSpacing
+            self.pagePadding = pagePadding
+            self.letterSpacing = letterSpacing
+            self.paragraphSpacing = paragraphSpacing
+            self.paragraphIndent = paragraphIndent
+            self.titleSpacing = titleSpacing
+            self.footerHeight = footerHeight
+            self.textColor = textColor
+            self.highlightColor = highlightColor
+            self.animatedScrollDuration = animatedScrollDuration
+            self.showChapterEndBadge = showChapterEndBadge
+        }
 
         struct TextLayoutSignature: Equatable {
             let title: String
@@ -133,6 +173,7 @@ struct NativeReaderTextView: UIViewRepresentable {
             let paragraphSpacing: Double
             let paragraphIndent: Double
             let titleSpacing: Double
+            let showChapterEndBadge: Bool
         }
 
         struct InsetsSignature: Equatable {
@@ -151,7 +192,8 @@ struct NativeReaderTextView: UIViewRepresentable {
                 letterSpacing: letterSpacing,
                 paragraphSpacing: paragraphSpacing,
                 paragraphIndent: paragraphIndent,
-                titleSpacing: titleSpacing
+                titleSpacing: titleSpacing,
+                showChapterEndBadge: showChapterEndBadge
             )
         }
 
@@ -173,6 +215,7 @@ struct NativeReaderTextView: UIViewRepresentable {
                 && lhs.textColor.isEqual(rhs.textColor)
                 && lhs.highlightColor.isEqual(rhs.highlightColor)
                 && lhs.animatedScrollDuration == rhs.animatedScrollDuration
+                && lhs.showChapterEndBadge == rhs.showChapterEndBadge
         }
     }
 
@@ -554,7 +597,7 @@ enum ReaderNativeTextLayout {
             )
         }
 
-        if !configuration.paragraphs.isEmpty {
+        if configuration.showChapterEndBadge, !configuration.paragraphs.isEmpty {
             let endMarkerStyle = NSMutableParagraphStyle()
             endMarkerStyle.alignment = .center
             endMarkerStyle.paragraphSpacingBefore = CGFloat(configuration.paragraphSpacing + 24)
