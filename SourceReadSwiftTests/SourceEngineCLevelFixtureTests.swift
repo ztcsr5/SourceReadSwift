@@ -153,16 +153,11 @@ final class SourceEngineCLevelFixtureTests: XCTestCase {
     func testXiWangZhongwenGBKUriEncoding() throws {
         let runtime = JSCoreRuntime()
         // Tests `java.encodeURI(key, "gbk")`
-        let script = """
-        var key = '武神';
-        var encoded = java.encodeURI(key, 'gbk');
-        encoded;
-        """
-        let result = runtime.evaluate(script)
+        let result = runtime.evaluate("java.encodeURI('武神', 'gbk')")
         guard case .success(let text) = result else {
             return XCTFail("GBK URI encode failed: \(result)")
         }
-        XCTAssertTrue(text.contains("%"), "expected percent-encoded GBK string")
+        XCTAssertTrue(text.contains("%"), "actual text was: [\(text)]")
     }
 
     func testXiWangZhongwenVerificationChallengeClassification() {
