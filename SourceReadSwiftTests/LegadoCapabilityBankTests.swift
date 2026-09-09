@@ -33,6 +33,55 @@ final class LegadoCapabilityBankTests: XCTestCase {
         XCTAssertEqual(counts["Paging"], 13)
     }
 
+    func testCapabilityBankSnapshotLocksExpectedCLevelSources() throws {
+        let sources = try loadFixture()
+        let cLevelSources = sources.filter { ($0["complexity"] as? String) == "C" }
+        XCTAssertEqual(cLevelSources.count, 5)
+
+        let names = cLevelSources.compactMap { $0["bookSourceName"] as? String }.sorted()
+        XCTAssertEqual(names, [
+            "📪第一版主820",
+            "🔞🔲第一版主999",
+            "希望中文",
+            "风读小说",
+            "要撸小说"
+        ].sorted())
+
+        let expectedLabels: [String: Set<String>] = [
+            "🔞🔲第一版主999": [
+                "Search", "Detail", "TOC", "Content",
+                "Explore", "POST-search", "CookieJar", "JS-heavy",
+                "Login/CF-check", "Crypto/AES/Base64", "Font-obf/Image-text",
+                "Paging", "GBK"
+            ],
+            "📪第一版主820": [
+                "Search", "Detail", "TOC", "Content",
+                "Explore", "POST-search", "CookieJar", "JS-heavy",
+                "Login/CF-check", "Crypto/AES/Base64", "Font-obf/Image-text",
+                "Paging", "GBK"
+            ],
+            "要撸小说": [
+                "Search", "Detail", "TOC", "Content",
+                "Explore", "POST-search", "JS-heavy",
+                "Crypto/AES/Base64", "Paging"
+            ],
+            "希望中文": [
+                "Search", "Detail", "TOC", "Content",
+                "POST-search", "CookieJar", "JS-heavy",
+                "Login/CF-check", "Paging", "GBK"
+            ],
+            "风读小说": [
+                "Search", "Detail", "TOC", "Content",
+                "Explore", "JS-heavy", "Font-obf/Image-text", "Paging"
+            ]
+        ]
+
+        for source in cLevelSources {
+            let name = try XCTUnwrap(source["bookSourceName"] as? String)
+            XCTAssertEqual(Set(labels(for: source)), expectedLabels[name])
+        }
+    }
+
     private func loadFixture() throws -> [[String: Any]] {
         let bundle = Bundle(for: Self.self)
         let url = try XCTUnwrap(

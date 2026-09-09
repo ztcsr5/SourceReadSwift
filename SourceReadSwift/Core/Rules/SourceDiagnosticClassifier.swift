@@ -13,7 +13,7 @@ enum SourceDiagnosticClassifier {
         if containsAny(value, ["测试关键词为空", "empty keyword", "invalid input"]) {
             return .invalidInput
         }
-        if containsAny(value, ["cloudflare", "cf-chl", "challenge-platform", "captcha", "人机验证", "安全验证", "验证页面"]) {
+        if containsAny(value, ["cloudflare", "cf-chl", "challenge-platform", "captcha", "人机验证", "安全验证", "验证页面", "请输入验证码", "verification", "getverificationcode", "actyzm"]) {
             return .verification
         }
         if containsAny(value, ["401", "unauthorized", "未登录", "登录后", "cookie", "需要登录", "session expired", "请先登录"]) {
@@ -31,10 +31,10 @@ enum SourceDiagnosticClassifier {
         if containsAny(value, ["unsupported", "不支持", "未实现"]) {
             return .unsupported
         }
-        if containsAny(value, ["javascript", "js error", "脚本", "exception"]) {
+        if containsAny(value, ["javascript", "js error", "脚本", "exception", "aes", "decrypt", "symmetriccrypto", "乱序"]) {
             return .javascript
         }
-        if containsAny(value, ["parse", "parser", "rule", "解析", "规则", "jsonpath", "xpath", "selector"]) {
+        if containsAny(value, ["parse", "parser", "rule", "解析", "规则", "jsonpath", "xpath", "selector", "gbk", "gb2312", "gb18030", "queryttf", "font-obf", "反爬"]) {
             return .parsing
         }
         if resultCount > 0 { return .unknown }
@@ -51,10 +51,12 @@ enum SourceDiagnosticClassifier {
         case .network(let message):
             let candidate = kind(message: message, stage: stage)
             return candidate == .network ? .network : candidate
-        case .rule:
-            return .parsing
-        case .javascript:
-            return .javascript
+        case .rule(let message):
+            let candidate = kind(message: message, stage: stage)
+            return candidate == .network ? .parsing : candidate
+        case .javascript(let message):
+            let candidate = kind(message: message, stage: stage)
+            return candidate == .network ? .javascript : candidate
         case .blocked:
             return .blocked
         case .empty:

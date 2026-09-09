@@ -27,4 +27,23 @@ final class SourceDiagnosticClassifierTests: XCTestCase {
         XCTAssertNil(step.failureCode)
         XCTAssertFalse(step.retryable)
     }
+
+    func testClassifiesCLevelFailureTaxonomy() {
+        // Verification / CAPTCHA / CF
+        XCTAssertEqual(SourceDiagnosticClassifier.kind(message: "请输入验证码：", stage: "search"), .verification)
+        XCTAssertEqual(SourceDiagnosticClassifier.kind(error: .javascript("getVerificationCode failed"), stage: "content"), .verification)
+        XCTAssertEqual(SourceDiagnosticClassifier.status(message: "触发人机验证 actyzm", stage: "search"), .verificationRequired)
+
+        // GBK / Charset
+        XCTAssertEqual(SourceDiagnosticClassifier.kind(message: "GBK 编码解析失败", stage: "search"), .parsing)
+        XCTAssertEqual(SourceDiagnosticClassifier.kind(error: .rule("不支持 gb2312 编码"), stage: "toc"), .parsing)
+
+        // AES / Crypto / Base64
+        XCTAssertEqual(SourceDiagnosticClassifier.kind(message: "AES decrypt failed", stage: "content"), .javascript)
+        XCTAssertEqual(SourceDiagnosticClassifier.kind(error: .javascript("createSymmetricCrypto error"), stage: "content"), .javascript)
+        XCTAssertEqual(SourceDiagnosticClassifier.kind(message: "段落乱序恢复异常", stage: "content"), .javascript)
+
+        // Font obfuscation
+        XCTAssertEqual(SourceDiagnosticClassifier.kind(message: "queryTTF 字体反爬解析错误", stage: "content"), .parsing)
+    }
 }

@@ -1,3 +1,26 @@
+## 2026-09-09 - Stage 32: C 级书源兼容闭环收口
+
+### Implemented
+
+- 新增 `SourceReadSwiftTests/SourceEngineCLevelFixtureTests.swift`，针对 `D:\QQ游戏\已测试.json` 中的 5 个 C 级高难源落地离线 Engine-Level XCTest Fixture：
+  - `🔞🔲第一版主999` & `📪第一版主820`：GBK POST 检索指令生成、AES CBC PKCS7Padding 解密、Base64 乱序段落恢复、拼音/字体字符映射；
+  - `要撸小说`：Base64 密文正文提取与 `java.base64Decode` 解密还原；
+  - `希望中文`：GBK URI 转码与验证码挑战（`请输入验证码`）识别断言；
+  - `风读小说`：`webJs` 字体图片清洗（`/asset/fonts/*.png`）与广告段落净化。
+- 增强 `SourceDiagnosticClassifier.swift`，明确固化验证码（`getVerificationCode`、`actyzm`）、GBK 字符集解码、AES/Base64 解密与字体反爬的失败分类，并在 `SourceDiagnosticClassifierTests.swift` 补充覆盖用例。
+- 在 `SourceReadSwiftTests/LegadoCapabilityBankTests.swift` 中对齐锁定 5 个 C 级源及其能力标签集。
+- 更新 `docs/stage-32-acceptance.md`。
+
+### Verification
+
+- 数据源：`D:\QQ游戏\已测试.json`。
+- 本地静态门禁：`git diff --check`、`node ci-log/extract-prelude.js`、`node --check ci-log/js-prelude-check.js`。
+- 自动化 CI 闭环：推送到 GitHub 触发 `iOS` 构建测试与 `Unsigned IPA` 打包。
+
+### Next
+
+- 待 CI 跑绿后，正式收口 Stage 32，进入 Stage 33（阅读器手感与体验收口：翻页/切面模式重置、滑动跳动修复、120Hz 阻尼手感）。
+
 ## 2026-09-04 - Stage 7: Legado response and Java regex compatibility hardening
 
 ### Implemented
