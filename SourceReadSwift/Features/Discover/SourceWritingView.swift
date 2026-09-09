@@ -343,16 +343,18 @@ final class LightweightHTTPServer: ObservableObject {
         lastError = nil
         localIP = getLocalIPAddresses().first ?? "127.0.0.1"
 
-        let parameters = NWParameters.tcp
+        let tcpOptions = NWProtocolTCP.Options()
+        tcpOptions.enableKeepalive = true
+        tcpOptions.noDelay = true
+        let parameters = NWParameters(tls: nil, tcp: tcpOptions)
         parameters.allowLocalEndpointReuse = true
-        parameters.includePeerToPeer = true
+        parameters.includePeerToPeer = false
 
         let candidates = [port] + (1122...1132).map(UInt16.init).filter { $0 != port }
         var lastStartError: Error?
         for candidate in candidates {
             do {
                 let l = try NWListener(using: parameters, on: NWEndpoint.Port(rawValue: candidate) ?? 8080)
-                l.service = NWListener.Service(name: "SourceRead", type: "_http._tcp")
                 listener = l
                 port = candidate
                 lastStartError = nil
@@ -420,6 +422,7 @@ final class LightweightHTTPServer: ObservableObject {
     }
 
     private func handleNewConnection(_ connection: NWConnection) {
+        log("收到来自 \(connection.endpoint) 的新连接")
         lockQueue.async { [weak self] in
             self?.connections.append(connection)
         }
@@ -641,9 +644,13 @@ final class LightweightHTTPServer: ObservableObject {
         var seen = Set<String>()
         var urls: [String] = []
         let addresses = getLocalIPAddresses()
-        for ip in addresses + [localIP, "127.0.0.1"] {
-            guard !ip.isEmpty, seen.insert(ip).inserted else { continue }
+        for ip in addresses {
+            guard !ip.isEmpty, ip != "127.0.0.1", seen.insert(ip).inserted else { continue }
             urls.append("http://\(ip):\(port)")
+        }
+        if urls.isEmpty {
+            let fallback = (localIP != "127.0.0.1" && !localIP.isEmpty) ? localIP : "127.0.0.1"
+            urls.append("http://\(fallback):\(port)")
         }
         return urls
     }
@@ -1100,7 +1107,14 @@ private func getLocalIPAddresses() -> [String] {
                         nil, socklen_t(0), NI_NUMERICHOST)
             let ip = String(cString: hostname)
             if ip != "127.0.0.1" && !ip.isEmpty {
-                // Prioritize standard Wi-Fi (en0, en1) and hotspot/tethering (bridge100, ap0, pdp_ip0)
+                // Ignore cellular data (pdp_ip), VPNs (utun), and AirDrop (awdl/llw)
+                guard !name.hasPrefix("pdp_ip"),
+                      !name.hasPrefix("utun"),
+                      !name.hasPrefix("awdl"),
+                      !name.hasPrefix("llw"),
+                      !name.hasPrefix("ipsec") else { continue }
+
+                // Prioritize standard Wi-Fi (en0, en1) and hotspot/tethering (bridge100, ap0)
                 if name.hasPrefix("en") || name.hasPrefix("bridge") || name.hasPrefix("ap") {
                     primary.append(ip)
                 } else {

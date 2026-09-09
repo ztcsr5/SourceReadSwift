@@ -121,13 +121,25 @@ struct SourceRequestBuilder {
     }
 
     private func resolveURL(_ text: String, base: String) -> URL {
-        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        var trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        while trimmed.hasSuffix("|") || trimmed.hasSuffix("#") {
+            trimmed = String(trimmed.dropLast()).trimmingCharacters(in: .whitespacesAndNewlines)
+        }
         if let absolute = URL(string: trimmed), absolute.scheme != nil {
             return absolute
         }
-        if let baseURL = URL(string: base),
-           let relative = URL(string: trimmed, relativeTo: baseURL)?.absoluteURL {
-            return relative
+        if let encoded = trimmed.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed.union(.urlPathAllowed)),
+           let absolute = URL(string: encoded), absolute.scheme != nil {
+            return absolute
+        }
+        if let baseURL = URL(string: base) {
+            if let relative = URL(string: trimmed, relativeTo: baseURL)?.absoluteURL {
+                return relative
+            }
+            if let encoded = trimmed.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed.union(.urlPathAllowed)),
+               let relative = URL(string: encoded, relativeTo: baseURL)?.absoluteURL {
+                return relative
+            }
         }
         return URL(string: base) ?? URL(string: "https://invalid.local")!
     }

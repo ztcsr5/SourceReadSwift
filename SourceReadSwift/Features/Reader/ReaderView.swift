@@ -88,6 +88,13 @@ struct ReaderView: View {
     @GestureState private var coverSwipeState = ReaderCoverSwipeState()
     @StateObject private var playbackCoordinator = ReaderPlaybackCoordinator()
     @StateObject private var speechController = ReaderSpeechController()
+    struct ContinuousAppendedSection: Equatable {
+        let chapterIndex: Int
+        let title: String
+        let paragraphs: [String]
+    }
+    @State private var appendedSections: [ContinuousAppendedSection] = []
+    @State private var isAppendingNextChapter = false
     @AppStorage("reader.fontFamily") private var fontFamilyRawValue: String = ReaderFontFamily.system.rawValue
     @AppStorage("reader.fontSize") private var fontSize: Double = ReaderTypographyDefaults.fontSize
     @AppStorage("reader.lineSpacing") private var lineSpacing: Double = ReaderTypographyDefaults.lineSpacing
@@ -525,11 +532,30 @@ struct ReaderView: View {
         }
     }
 
+    private var scrollModeParagraphs: [String] {
+        guard readerMode == .scroll, !appendedSections.isEmpty else {
+            return content.paragraphs
+        }
+        var combined = content.paragraphs
+        for section in appendedSections {
+            combined.append("——— \(section.title) ———")
+            combined.append(contentsOf: section.paragraphs)
+        }
+        return combined
+    }
+
+    private var scrollContentFingerprint: String {
+        guard readerMode == .scroll, !appendedSections.isEmpty else {
+            return readerContentFingerprint
+        }
+        return "\(readerContentFingerprint)-appended-\(appendedSections.count)-\(appendedSections.last?.chapterIndex ?? 0)"
+    }
+
     private var scrollReaderContent: some View {
         NativeReaderTextView(
             title: content.title,
-            paragraphs: content.paragraphs,
-            contentFingerprint: readerContentFingerprint,
+            paragraphs: scrollModeParagraphs,
+            contentFingerprint: scrollContentFingerprint,
             fontFamily: fontFamily,
             fontSize: fontSize,
             lineSpacing: lineSpacing,
@@ -549,15 +575,13 @@ struct ReaderView: View {
             animatedScrollDuration: autoScrollEnabled ? max(ReaderAutomationPolicy.clampedDelay(autoScrollDelay) * 0.9, 0.25) : 0.35,
             textSelectionEnabled: textSelectionEnabled,
             onVisibleParagraph: { index in
-                updateVisibleParagraph(index)
+                updateVisibleParagraphInScroll(index)
             },
             onNearBottom: {
-                onCacheNextChapters?()
+                appendNextChapterIfPossible()
             },
             onReachBottom: {
-                if canSelectRelativeChapter(offset: 1) {
-                    selectRelativeChapter(offset: 1)
-                }
+                appendNextChapterIfPossible()
             }
         )
         .ignoresSafeArea(.container, edges: .bottom)
@@ -568,9 +592,119 @@ struct ReaderView: View {
                 }
             }
         }
+        .onChange(of: chapterIndex) { _ in
+            appendedSections.removeAll()
+        }
         .onChange(of: speechController.currentParagraphIndex) { target in
             guard target >= 0 else { return }
             scheduleReadingPositionPersistence(paragraphIndex: target)
+        }
+    }
+
+    private func appendNextChapterIfPossible() {
+        guard readerMode == .scroll, !isAppendingNextChapter else { return }
+        let nextIndex = chapterIndex + appendedSections.count + 1
+        let maxCount = totalChapters ?? chapters.count
+        guard nextIndex < maxCount else { return }
+
+        onCacheNextChapters?()
+
+        // 1. Check local text chapters
+        if let book = appState.bookshelfStore.book(id: bookID),
+           let localChapters = book.localChapters,
+           localChapters.indices.contains(nextIndex) {
+            let nextLocal = localChapters[nextIndex]
+            isAppendingNextChapter = true
+            withAnimation(.easeInOut(duration: 0.15)) {
+                appendedSections.append(ContinuousAppendedSection(
+                    chapterIndex: nextIndex,
+                    title: nextLocal.title,
+                    paragraphs: nextLocal.paragraphs
+                ))
+                isAppendingNextChapter = false
+            }
+            return
+        }
+
+        // 2. Check online book cached chapters
+        if chapters.indices.contains(nextIndex),
+           let book = appState.bookshelfStore.book(id: bookID),
+           let source = appState.sourceStore.source(for: book.sourceURL) {
+            let nextChapter = chapters[nextIndex]
+            let purifyRules = appState.purifyRuleStore.enabledPatterns
+            if let cached = appState.chapterContentCacheStore.content(
+                sourceURL: source.bookSourceUrl,
+                chapter: nextChapter,
+                purifyRules: purifyRules
+            ) {
+                isAppendingNextChapter = true
+                withAnimation(.easeInOut(duration: 0.15)) {
+                    appendedSections.append(ContinuousAppendedSection(
+                        chapterIndex: nextIndex,
+                        title: nextChapter.title,
+                        paragraphs: cached.paragraphs
+                    ))
+                    isAppendingNextChapter = false
+                }
+                return
+            }
+
+            isAppendingNextChapter = true
+            Task {
+                let engine = appState.engine
+                let result = await engine.getContent(source: source, chapter: nextChapter)
+                await MainActor.run {
+                    self.isAppendingNextChapter = false
+                    if case .success(let loaded) = result {
+                        self.appState.chapterContentCacheStore.save(loaded, sourceURL: source.bookSourceUrl, purifyRules: purifyRules)
+                        withAnimation(.easeInOut(duration: 0.15)) {
+                            self.appendedSections.append(ContinuousAppendedSection(
+                                chapterIndex: nextIndex,
+                                title: nextChapter.title,
+                                paragraphs: loaded.paragraphs
+                            ))
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private func updateVisibleParagraphInScroll(_ index: Int) {
+        visibleParagraphIndex = index
+        guard !appendedSections.isEmpty else {
+            updateVisibleParagraph(index)
+            return
+        }
+        var remaining = index
+        if remaining < content.paragraphs.count {
+            updateVisibleParagraph(remaining)
+            return
+        }
+        remaining -= content.paragraphs.count
+        for section in appendedSections {
+            if remaining == 0 {
+                appState.bookshelfStore.updateReadingProgress(
+                    bookID: bookID,
+                    chapterIndex: section.chapterIndex,
+                    chapterTitle: section.title,
+                    totalChapters: totalChapters ?? chapters.count,
+                    paragraphIndex: 0
+                )
+                return
+            }
+            remaining -= 1
+            if remaining < section.paragraphs.count {
+                appState.bookshelfStore.updateReadingProgress(
+                    bookID: bookID,
+                    chapterIndex: section.chapterIndex,
+                    chapterTitle: section.title,
+                    totalChapters: totalChapters ?? chapters.count,
+                    paragraphIndex: remaining
+                )
+                return
+            }
+            remaining -= section.paragraphs.count
         }
     }
 
@@ -1124,18 +1258,36 @@ struct ReaderView: View {
                 .pickerStyle(.segmented)
             }
 
-            Text("右侧可直接输入数字，滑块只负责快速粗调。已采用市面主流小说默认两字缩进与舒适行距规范。")
+            Text("💡 排版说明：每项均标明具体作用与推荐值。右侧可点数字直接输入，滑块用于快速滑动粗调。已采用主流小说标准排版规范。")
                 .font(.caption)
                 .foregroundStyle(.secondary)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 8)
+                .background(Color(UIColor.tertiarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
 
-            readerValueSlider("字号", value: $fontSize, range: 12...34, step: 1, unit: "pt", help: "正文文字大小，主流推荐 18-20pt")
-            readerValueSlider("行高", value: $lineSpacing, range: 0...18, step: 1, unit: "pt", help: "每行文字之间的垂直间距，主流推荐 8-10pt")
-            readerValueSlider("字距", value: $letterSpacing, range: 0...4, step: 0.2, unit: "pt", help: "字符之间的水平间距")
-            readerValueSlider("段距", value: $paragraphSpacing, range: 0...32, step: 1, unit: "pt", help: "相邻段落之间的留白，主流推荐 16pt")
-            readerValueSlider("段首缩进", value: $paragraphIndent, range: 0...50, step: 2, unit: "pt", help: "首行缩进（38pt 为标准 2 中文字符缩进）")
-            readerValueSlider("标题间距", value: $titleSpacing, range: 0...36, step: 2, unit: "pt", help: "章节标题与正文之间的留白，推荐 20pt")
-            readerValueSlider("左右间距", value: $pagePadding, range: 10...40, step: 1, unit: "pt", help: "正文距离屏幕左右边缘的距离，推荐 20pt")
-            readerValueSlider("底部留白", value: $footerHeight, range: 40...180, step: 8, unit: "pt", help: "为底部阅读操作预留的安全空间")
+            // 1. 段落差（段间距）- 放在最前面之一，用户反馈最高频查找项
+            readerValueSlider("段落差（段间距）", value: $paragraphSpacing, range: 0...32, step: 1, unit: "pt", help: "调整上下两段文字之间的留白高低。如果觉得段与段之间太紧凑或空隙太大，调这里（推荐 14~18pt）")
+
+            // 2. 正文字号
+            readerValueSlider("正文字号", value: $fontSize, range: 12...34, step: 1, unit: "pt", help: "整体放大或缩小小说正文文字大小（主流阅读推荐 18~20pt）")
+
+            // 3. 行距（行高间距）
+            readerValueSlider("行距（行高间距）", value: $lineSpacing, range: 0...18, step: 1, unit: "pt", help: "同一段落内上下每一行文字之间的垂直间隙与呼吸感（推荐 8~10pt）")
+
+            // 4. 段首缩进
+            readerValueSlider("段首缩进", value: $paragraphIndent, range: 0...50, step: 2, unit: "pt", help: "每个段落第一行开头的缩进空格。38pt 刚好为标准空两个汉字")
+
+            // 5. 字间距（字距）
+            readerValueSlider("字间距（字距）", value: $letterSpacing, range: 0...4, step: 0.2, unit: "pt", help: "同一行中每个汉字左右之间的紧凑度（推荐 0~0.5pt）")
+
+            // 6. 屏幕边距（左右留白）
+            readerValueSlider("屏幕边距（左右留白）", value: $pagePadding, range: 10...40, step: 1, unit: "pt", help: "正文文字距离手机屏幕左右两侧边缘的距离，防止文字贴边（推荐 18~22pt）")
+
+            // 7. 章节标题间距
+            readerValueSlider("章节标题间距", value: $titleSpacing, range: 0...36, step: 2, unit: "pt", help: "大章节标题（如“第一章”）与正文第一行之间的垂直留白高度（推荐 18~24pt）")
+
+            // 8. 底部安全留白
+            readerValueSlider("底部安全留白", value: $footerHeight, range: 40...180, step: 8, unit: "pt", help: "屏幕最底部向上预留的安全空隙，防止手势遮挡最后一行正文（推荐 80~100pt）")
         }
     }
 
@@ -1145,7 +1297,7 @@ struct ReaderView: View {
                 .font(.caption)
                 .foregroundStyle(.secondary)
 
-            readerValueSlider("朗读速度", value: $ttsRate, range: 0.35...0.65, step: 0.01, unit: "倍速", help: "从当前可见段落开始朗读，不会跳回章节开头")
+            readerValueSlider("朗读速度", value: $ttsRate, range: 0.35...0.65, step: 0.01, unit: "倍速", help: "调整语音朗读语速（0.35x ~ 0.65x），从当前可见段落开始朗读，不会跳回章节开头")
 
             Text("睡眠定时")
                 .font(.subheadline.weight(.semibold))
@@ -1182,12 +1334,21 @@ struct ReaderView: View {
         unit: String,
         help: String
     ) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
-            HStack(spacing: 10) {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(alignment: .center, spacing: 8) {
                 Text(title)
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(.secondary)
+                    .font(.subheadline.weight(.bold))
+                    .foregroundStyle(.primary)
+
+                Text("\(ReaderValueNormalizer.formatted(value.wrappedValue, step: step)) \(unit)")
+                    .font(.caption.weight(.bold))
+                    .foregroundStyle(AppTheme.accent)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 3)
+                    .background(AppTheme.accent.opacity(0.12), in: Capsule())
+
                 Spacer()
+
                 ReaderNumberInput(
                     title: title,
                     value: value,
@@ -1196,11 +1357,64 @@ struct ReaderView: View {
                     unit: unit
                 )
             }
-            Slider(value: value, in: range, step: step)
-            Text(help)
-                .font(.caption2)
-                .foregroundStyle(.secondary)
+
+            // 醒目的功能说明卡片，让用户清楚知道每一项调整的是什么，告别盲测
+            HStack(alignment: .top, spacing: 6) {
+                Image(systemName: "info.circle.fill")
+                    .font(.caption2)
+                    .foregroundStyle(AppTheme.accent.opacity(0.85))
+                    .padding(.top, 1)
+
+                Text(help)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 6)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(Color.primary.opacity(0.04), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+
+            HStack(spacing: 12) {
+                Button {
+                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                    value.wrappedValue = max(range.lowerBound, (value.wrappedValue - step))
+                } label: {
+                    Image(systemName: "minus.circle.fill")
+                        .font(.system(size: 22))
+                        .foregroundStyle(value.wrappedValue <= range.lowerBound ? .secondary.opacity(0.3) : AppTheme.accent)
+                }
+                .disabled(value.wrappedValue <= range.lowerBound)
+                .buttonStyle(.plain)
+
+                Slider(value: value, in: range, step: step)
+
+                Button {
+                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                    value.wrappedValue = min(range.upperBound, (value.wrappedValue + step))
+                } label: {
+                    Image(systemName: "plus.circle.fill")
+                        .font(.system(size: 22))
+                        .foregroundStyle(value.wrappedValue >= range.upperBound ? .secondary.opacity(0.3) : AppTheme.accent)
+                }
+                .disabled(value.wrappedValue >= range.upperBound)
+                .buttonStyle(.plain)
+            }
+
+            HStack {
+                Text("范围：\(ReaderValueNormalizer.formatted(range.lowerBound, step: step)) ~ \(ReaderValueNormalizer.formatted(range.upperBound, step: step)) \(unit)")
+                    .font(.caption2)
+                    .foregroundStyle(.tertiary)
+                Spacer()
+            }
         }
+        .padding(12)
+        .background(Color(UIColor.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .stroke(Color.primary.opacity(0.06), lineWidth: 0.8)
+        }
+        .padding(.vertical, 2)
     }
 
     private var tapZoneSettings: some View {
@@ -1323,32 +1537,38 @@ struct ReaderView: View {
                 .disableAutocorrection(true)
                 .padding(.horizontal, 12)
                 .frame(height: 38)
-                .background(Color(.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                .background(background.textColor.opacity(0.06), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                .overlay {
+                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        .stroke(background.textColor.opacity(0.12), lineWidth: 0.8)
+                }
+                .foregroundStyle(background.textColor)
                 .padding(.horizontal)
                 .padding(.top, 10)
 
             List {
                 if chapters.isEmpty && navigationEntries.isEmpty {
                     Text("当前章节没有可切换目录")
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(background.textColor.opacity(0.6))
+                        .listRowBackground(Color.clear)
                 } else if filteredChapters.isEmpty && filteredNavigationEntries.isEmpty {
                     Text("没有匹配章节")
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(background.textColor.opacity(0.6))
+                        .listRowBackground(Color.clear)
                 } else {
                     if !filteredChapters.isEmpty {
                         Section("章节") {
                             ForEach(filteredChapters) { chapter in
                                 Button {
                                     showChapterList = false
-                                    // Keep the reader chrome visible after a chapter
-                                    // switch. Hiding it here made the next reader
-                                    // render look like the root/home menu.
                                     presentOverlay()
                                     onSelectChapter?(chapter)
                                 } label: {
                                     chapterRow(chapter)
                                 }
                                 .disabled(onSelectChapter == nil || chapter.index == chapterIndex)
+                                .listRowBackground(Color.clear)
+                                .listRowSeparatorTint(background.textColor.opacity(0.12))
                             }
                         }
                     }
@@ -1363,6 +1583,8 @@ struct ReaderView: View {
                                     navigationEntryRow(entry, ordinal: offset)
                                 }
                                 .disabled(onSelectNavigationEntry == nil || entry.chapterIndex == nil)
+                                .listRowBackground(Color.clear)
+                                .listRowSeparatorTint(background.textColor.opacity(0.12))
                             }
                         }
                     }
@@ -1370,7 +1592,7 @@ struct ReaderView: View {
             }
             .listStyle(.plain)
             .scrollContentBackground(.hidden)
-            .background(background.color.opacity(background == .dark ? 0.88 : 0.78))
+            .background(background.color.opacity(background == .dark ? 0.92 : 0.82))
         }
     }
 
@@ -1378,10 +1600,10 @@ struct ReaderView: View {
         HStack(spacing: 12) {
             Text("\(chapter.index + 1)")
                 .font(.caption.weight(.semibold))
-                .foregroundStyle(chapter.index == chapterIndex ? AppTheme.accent : .secondary)
+                .foregroundStyle(chapter.index == chapterIndex ? AppTheme.accent : background.textColor.opacity(0.55))
                 .frame(width: 42, alignment: .leading)
             Text(chapter.title)
-                .foregroundStyle(chapter.index == chapterIndex ? AppTheme.accent : .primary)
+                .foregroundStyle(chapter.index == chapterIndex ? AppTheme.accent : background.textColor)
                 .fontWeight(chapter.index == chapterIndex ? .semibold : .regular)
                 .lineLimit(1)
             Spacer()
@@ -1396,22 +1618,22 @@ struct ReaderView: View {
         HStack(spacing: 12) {
             Text("\(ordinal + 1)")
                 .font(.caption.weight(.semibold))
-                .foregroundStyle(.secondary)
+                .foregroundStyle(background.textColor.opacity(0.55))
                 .frame(width: 42, alignment: .leading)
             VStack(alignment: .leading, spacing: 3) {
                 Text(entry.title)
-                    .foregroundStyle(.primary)
+                    .foregroundStyle(background.textColor)
                     .lineLimit(1)
                 if let chapterIndex = entry.chapterIndex {
                     Text("第 \(chapterIndex + 1) 章" + (entry.paragraphIndex.map { " · 第 \($0 + 1) 段" } ?? ""))
                         .font(.caption2)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(background.textColor.opacity(0.6))
                 }
             }
             Spacer()
             Image(systemName: "arrow.down.right")
                 .font(.caption)
-                .foregroundStyle(.tertiary)
+                .foregroundStyle(background.textColor.opacity(0.4))
         }
     }
 
@@ -1471,7 +1693,7 @@ struct ReaderView: View {
                                 VStack(alignment: .leading, spacing: 5) {
                                     Text(bookmark.chapterTitle)
                                         .font(.headline)
-                                        .foregroundStyle(.primary)
+                                        .foregroundStyle(background.textColor)
                                     HStack(spacing: 6) {
                                         Text(bookmarkLocationText(bookmark))
                                         Text(bookmark.createdAt.formatted(date: .abbreviated, time: .shortened))
@@ -1485,10 +1707,10 @@ struct ReaderView: View {
                                         }
                                     }
                                     .font(.caption2.weight(.semibold))
-                                    .foregroundStyle(isCurrentBookmark(bookmark) ? AppTheme.accent : .secondary)
+                                    .foregroundStyle(isCurrentBookmark(bookmark) ? AppTheme.accent : background.textColor.opacity(0.55))
                                     Text(bookmark.snippet)
                                         .font(.caption)
-                                        .foregroundStyle(.secondary)
+                                        .foregroundStyle(background.textColor.opacity(0.6))
                                         .lineLimit(2)
                                 }
                                 Spacer()
@@ -1498,11 +1720,13 @@ struct ReaderView: View {
                                 } else {
                                     Image(systemName: "chevron.right")
                                         .font(.caption.weight(.bold))
-                                        .foregroundStyle(.tertiary)
+                                        .foregroundStyle(background.textColor.opacity(0.35))
                                 }
                             }
                         }
                         .disabled(bookmark.chapterIndex != chapterIndex && onSelectChapter == nil)
+                        .listRowBackground(Color.clear)
+                        .listRowSeparatorTint(background.textColor.opacity(0.12))
                         .swipeActions {
                             Button("删除", role: .destructive) {
                                 appState.bookshelfStore.removeBookmark(bookID: bookID, bookmarkID: bookmark.id)
@@ -1512,9 +1736,9 @@ struct ReaderView: View {
                 }
             }
         }
-        .listStyle(.insetGrouped)
+        .listStyle(.plain)
         .scrollContentBackground(.hidden)
-        .background(background.color.opacity(background == .dark ? 0.88 : 0.78))
+        .background(background.color.opacity(background == .dark ? 0.92 : 0.82))
     }
 
     private func bookmarkLocationText(_ bookmark: ReaderBookmark) -> String {

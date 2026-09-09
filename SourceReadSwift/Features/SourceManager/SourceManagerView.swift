@@ -345,6 +345,20 @@ struct SourceManagerView: View {
                 }
                 .accessibilityLabel("导入书源")
 
+                Button {
+                    UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                    do {
+                        try appState.sourceStore.loadDefaultBookSources()
+                        importMessage = "已成功导入官方精选优质书源！"
+                        importError = nil
+                    } catch {
+                        importError = "导入精选书源失败：\(error.localizedDescription)"
+                    }
+                } label: {
+                    sourceActionTile("精选书源", systemImage: "sparkles", tint: .orange)
+                }
+                .accessibilityLabel("导入官方精选书源")
+
                 NavigationLink {
                     SourceWritingView(server: appState.sourceWritingServer)
                         .environmentObject(appState)
@@ -964,6 +978,23 @@ struct SourceManagerView: View {
                     .padding(.horizontal)
 
                 VStack(spacing: 10) {
+                    Button {
+                        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                        do {
+                            try appState.sourceStore.loadDefaultBookSources()
+                            importMessage = "已成功导入官方精选优质书源！"
+                            importError = nil
+                            showImportSheet = false
+                        } catch {
+                            importError = "导入精选书源失败：\(error.localizedDescription)"
+                        }
+                    } label: {
+                        Label("一键导入官方精选书源", systemImage: "sparkles")
+                            .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .tint(.orange)
+
                     Button {
                         pasteFromClipboard()
                     } label: {

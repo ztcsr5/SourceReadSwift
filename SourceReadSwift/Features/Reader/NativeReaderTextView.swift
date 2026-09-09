@@ -595,6 +595,23 @@ enum ReaderNativeTextLayout {
                 paragraphAttributes,
                 range: NSRange(location: bodyStart, length: bodyLength)
             )
+
+            // Special styling for continuous chapter dividers
+            for (idx, paragraph) in configuration.paragraphs.enumerated() {
+                if paragraph.hasPrefix("——— ") && paragraph.hasSuffix(" ———") {
+                    let range = ranges[idx]
+                    let dividerStyle = NSMutableParagraphStyle()
+                    dividerStyle.alignment = .center
+                    dividerStyle.paragraphSpacingBefore = CGFloat(configuration.paragraphSpacing + 36)
+                    dividerStyle.paragraphSpacing = CGFloat(configuration.paragraphSpacing + 18)
+                    let dividerAttrs: [NSAttributedString.Key: Any] = [
+                        .font: configuration.fontFamily.uiFont(ofSize: CGFloat(configuration.fontSize + 4), weight: .bold),
+                        .foregroundColor: configuration.textColor,
+                        .paragraphStyle: dividerStyle
+                    ]
+                    output.addAttributes(dividerAttrs, range: range)
+                }
+            }
         }
 
         if configuration.showChapterEndBadge, !configuration.paragraphs.isEmpty {

@@ -129,12 +129,14 @@ struct BookshelfView: View {
             } else {
                 ScrollView(.horizontal, showsIndicators: false) {
                     LazyHStack(spacing: 14) {
-                        ForEach(recentBooks.prefix(8)) { book in
+                        ForEach(recentBooks.prefix(10)) { book in
                             heroCard(book)
                         }
                     }
+                    .padding(.horizontal, AppTheme.pagePadding)
                     .padding(.vertical, 4)
                 }
+                .padding(.horizontal, -AppTheme.pagePadding)
             }
         }
     }
@@ -400,10 +402,8 @@ struct BookshelfView: View {
             }
         }
 
-        if refreshed > 0 || failed > 0 {
-            importMessage = "刷新完成：成功 \(refreshed)，失败 \(failed)。"
-        } else {
-            importMessage = "没有需要刷新的在线书籍。"
+        if refreshed > 0 {
+            UIImpactFeedbackGenerator(style: .light).impactOccurred()
         }
     }
 

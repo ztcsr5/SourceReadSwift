@@ -51,6 +51,137 @@ final class SourceStore: ObservableObject {
         )
     ]
 
+    nonisolated static let defaultBookSourcesJSON = """
+    [
+      {
+        "bookSourceName": "久久小说网",
+        "bookSourceUrl": "https://www.aijjxs.com",
+        "bookSourceGroup": "官方精选",
+        "bookSourceType": 0,
+        "enabled": true,
+        "weight": 100,
+        "searchUrl": "https://www.aijjxs.com/search.php?q={{key}}",
+        "ruleSearch": {
+          "bookList": ".txt-list li",
+          "name": "span.s2 a@text",
+          "author": "span.s4@text",
+          "bookUrl": "span.s2 a@href",
+          "lastChapter": "span.s3 a@text"
+        },
+        "ruleBookInfo": {
+          "name": "h1@text",
+          "author": ".info span:contains(作 者)@text##作.*者：",
+          "intro": ".intro@text",
+          "tocUrl": ".btn-group a:contains(点击阅读)@href"
+        },
+        "ruleToc": {
+          "chapterList": ".section-box li a",
+          "chapterName": "text",
+          "chapterUrl": "href"
+        },
+        "ruleContent": {
+          "content": "#content@html"
+        }
+      },
+      {
+        "bookSourceName": "快眼看书",
+        "bookSourceUrl": "https://www.bookhai.com",
+        "bookSourceGroup": "官方精选",
+        "bookSourceType": 0,
+        "enabled": true,
+        "weight": 95,
+        "searchUrl": "https://www.bookhai.com/search.php?q={{key}}",
+        "ruleSearch": {
+          "bookList": ".txt-list li",
+          "name": "span.s2 a@text",
+          "author": "span.s4@text",
+          "bookUrl": "span.s2 a@href",
+          "lastChapter": "span.s3 a@text"
+        },
+        "ruleBookInfo": {
+          "name": "h1@text",
+          "author": ".info span:contains(作 者)@text##作.*者：",
+          "intro": ".intro@text",
+          "tocUrl": ".btn-group a:contains(点击阅读)@href"
+        },
+        "ruleToc": {
+          "chapterList": ".section-box li a",
+          "chapterName": "text",
+          "chapterUrl": "href"
+        },
+        "ruleContent": {
+          "content": "#content@html"
+        }
+      },
+      {
+        "bookSourceName": "无极小说",
+        "bookSourceUrl": "https://www.wjxsw.net",
+        "bookSourceGroup": "官方精选",
+        "bookSourceType": 0,
+        "enabled": true,
+        "weight": 90,
+        "searchUrl": "https://www.wjxsw.net/search.php?q={{key}}",
+        "ruleSearch": {
+          "bookList": ".txt-list li",
+          "name": "span.s2 a@text",
+          "author": "span.s4@text",
+          "bookUrl": "span.s2 a@href"
+        },
+        "ruleBookInfo": {
+          "name": "h1@text",
+          "author": ".info span:contains(作 者)@text##作.*者：",
+          "intro": ".intro@text"
+        },
+        "ruleToc": {
+          "chapterList": ".section-box li a",
+          "chapterName": "text",
+          "chapterUrl": "href"
+        },
+        "ruleContent": {
+          "content": "#content@html"
+        }
+      },
+      {
+        "bookSourceName": "飘天文学",
+        "bookSourceUrl": "http://www.piaotia.com",
+        "bookSourceGroup": "官方精选",
+        "bookSourceType": 0,
+        "enabled": true,
+        "weight": 85,
+        "searchUrl": "http://www.piaotia.com/modules/article/search.php?searchkey={{key}}&searchtype=articlename,{\"charset\":\"gbk\"}",
+        "ruleSearch": {
+          "bookList": "table.grid tr!0",
+          "name": "td.odd:nth-child(1) a@text",
+          "author": "td.odd:nth-child(3)@text",
+          "bookUrl": "td.odd:nth-child(1) a@href",
+          "lastChapter": "td.even:nth-child(2) a@text"
+        },
+        "ruleBookInfo": {
+          "name": "h1@text",
+          "author": "td:contains(作 者)@text##作.*者：",
+          "intro": ".intro@text",
+          "tocUrl": "a:contains(完整目录)@href"
+        },
+        "ruleToc": {
+          "chapterList": ".centent ul li a",
+          "chapterName": "text",
+          "chapterUrl": "href"
+        },
+        "ruleContent": {
+          "content": "#content@html"
+        }
+      }
+    ]
+    """
+
+    nonisolated static var defaultBookSources: [BookSource] {
+        guard let data = defaultBookSourcesJSON.data(using: .utf8),
+              let sources = try? JSONDecoder().decode([BookSource].self, from: data) else {
+            return []
+        }
+        return sources
+    }
+
     init(persistence: SourcePersistence = SourcePersistence()) {
         self.persistence = persistence
         do {
@@ -58,9 +189,20 @@ final class SourceStore: ObservableObject {
             sources = snapshot.sources
             rssSources = snapshot.rssSources
             catalogs = snapshot.catalogs
+            if sources.isEmpty {
+                sources = Self.defaultBookSources
+                _ = try? persistence.save(sources: sources, rssSources: rssSources, catalogs: catalogs)
+            }
         } catch {
             lastError = error.localizedDescription
+            if sources.isEmpty {
+                sources = Self.defaultBookSources
+            }
         }
+    }
+
+    func loadDefaultBookSources() throws {
+        try importSources(Self.defaultBookSources)
     }
 
     func loadDefaultRSSSources() throws {

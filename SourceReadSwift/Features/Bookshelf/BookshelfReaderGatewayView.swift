@@ -30,6 +30,7 @@ struct BookshelfReaderGatewayView: View {
     var body: some View {
         gatewayContent
         .task {
+            appState.bookshelfStore.markReaderOpened(bookID: book.id)
             appState.bookshelfStore.markUpdatesSeen(bookID: book.id)
             applyInitialBookmarkIfNeeded()
             applyInitialChapterIfNeeded()

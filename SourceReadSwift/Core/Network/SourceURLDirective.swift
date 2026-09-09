@@ -49,6 +49,9 @@ struct SourceURLDirectiveParser {
 
         let split = splitURLAndJSONOptions(working)
         working = split.url
+        while working.hasSuffix("|") || working.hasSuffix("#") {
+            working = String(working.dropLast()).trimmingCharacters(in: .whitespacesAndNewlines)
+        }
         if let options = split.options {
             for key in ["headers", "header", "bookSourceHeader"] {
                 headers.merge(parseHeadersOption(options[key]), uniquingKeysWith: { _, new in new })

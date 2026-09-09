@@ -310,9 +310,18 @@ final class BookshelfStore: ObservableObject {
     }
 
     var recentBooks: [BookshelfBook] {
-        books
+        let withReadTime = books
             .filter { $0.lastReadAt != nil }
             .sorted { ($0.lastReadAt ?? .distantPast) > ($1.lastReadAt ?? .distantPast) }
+        if withReadTime.count >= 2 || books.isEmpty {
+            return withReadTime
+        }
+        var combined = withReadTime
+        let seenIDs = Set(combined.map(\.id))
+        for b in books where !seenIDs.contains(b.id) {
+            combined.append(b)
+        }
+        return combined
     }
 
     var updatedBooks: [BookshelfBook] {

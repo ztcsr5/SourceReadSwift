@@ -146,7 +146,12 @@ struct HtmlRuleExtractor {
         let selector = XPathRuleTranslator.selectorRule(materializedRule) ?? cleanCSS(materializedRule)
         guard !selector.isEmpty else { return [root] }
         let indexed = parseIndexedSelector(selector)
-        let elements = try root.select(indexed.selector).array()
+        let elements: [Element]
+        do {
+            elements = try root.select(indexed.selector).array()
+        } catch {
+            return []
+        }
         guard let index = indexed.index else { return elements }
         let normalized = index >= 0 ? index : elements.count + index
         guard elements.indices.contains(normalized) else { return [] }
@@ -367,10 +372,18 @@ struct HtmlRuleExtractor {
     }
 
     func absolutize(_ text: String, base: URL) -> String {
-        if let url = URL(string: text), url.scheme != nil {
+        var clean = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        while clean.hasSuffix("|") || clean.hasSuffix("#") {
+            clean = String(clean.dropLast()).trimmingCharacters(in: .whitespacesAndNewlines)
+        }
+        if let url = URL(string: clean), url.scheme != nil {
             return url.absoluteString
         }
-        return URL(string: text, relativeTo: base)?.absoluteURL.absoluteString ?? text
+        if let encoded = clean.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed.union(.urlPathAllowed)),
+           let url = URL(string: encoded, relativeTo: base) {
+            return url.absoluteURL.absoluteString
+        }
+        return URL(string: clean, relativeTo: base)?.absoluteURL.absoluteString ?? clean
     }
 
     private func interleave<T>(_ lists: [[T]]) -> [T] {

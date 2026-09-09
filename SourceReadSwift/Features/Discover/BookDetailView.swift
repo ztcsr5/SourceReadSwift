@@ -93,7 +93,13 @@ struct BookDetailView: View {
                     ForEach(isAscending ? chapters : Array(chapters.reversed())) { chapter in
                         NavigationLink {
                             ChapterLoadingView(
-                                bookID: appState.bookshelfStore.contains(book) ? book.id : nil,
+                                bookID: {
+                                    if !appState.bookshelfStore.contains(book) {
+                                        appState.bookshelfStore.addOrUpdate(book)
+                                    }
+                                    appState.bookshelfStore.markReaderOpened(bookID: book.id)
+                                    return book.id
+                                }(),
                                 sourceUrl: book.sourceUrl,
                                 chapter: chapter,
                                 totalChapters: chapters.count,
@@ -161,7 +167,13 @@ struct BookDetailView: View {
             ForEach(displayedChapters) { chapter in
                 NavigationLink {
                     ChapterLoadingView(
-                        bookID: appState.bookshelfStore.contains(book) ? book.id : nil,
+                        bookID: {
+                            if !appState.bookshelfStore.contains(book) {
+                                appState.bookshelfStore.addOrUpdate(book)
+                            }
+                            appState.bookshelfStore.markReaderOpened(bookID: book.id)
+                            return book.id
+                        }(),
                         sourceUrl: book.sourceUrl,
                         chapter: chapter,
                         totalChapters: chapters.count,
