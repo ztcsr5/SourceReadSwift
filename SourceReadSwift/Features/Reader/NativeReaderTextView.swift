@@ -66,10 +66,6 @@ struct NativeReaderTextView: UIViewRepresentable {
         textView.setContentHuggingPriority(.defaultLow, for: .vertical)
         textView.setContentCompressionResistancePriority(.defaultLow, for: .vertical)
 
-        if #available(iOS 15.0, *) {
-            textView.layer.preferredFrameRateRange = CAFrameRateRange(minimum: 80, maximum: 120, preferred: 120)
-        }
-
         context.coordinator.attach(textView)
         context.coordinator.update(textView: textView, configuration: configuration, scrollTarget: scrollTarget, scrollRequestKey: scrollRequestKey)
         return textView
