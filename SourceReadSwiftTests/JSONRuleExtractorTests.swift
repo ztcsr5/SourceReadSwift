@@ -303,4 +303,26 @@ final class JSONRuleExtractorTests: XCTestCase {
 
         XCTAssertEqual(list.compactMap { $0["name"] as? String }, ["A", "B"])
     }
+
+    func testMultiVolumeChapterListFlattening() throws {
+        let object: [String: Any] = [
+            "data": [
+                "chapterListWithVolume": [
+                    [
+                        ["chapter_title": "第一章 初始", "chapter_id": "101"],
+                        ["chapter_title": "第二章 进阶", "chapter_id": "102"]
+                    ],
+                    [
+                        ["chapter_title": "第三章 终局", "chapter_id": "103"]
+                    ]
+                ]
+            ]
+        ]
+
+        let extractor = JSONRuleExtractor()
+        let list = extractor.list(from: object, rule: "$.data.chapterListWithVolume[*].*")
+
+        XCTAssertEqual(list.count, 3)
+        XCTAssertEqual(list.compactMap { $0["chapter_title"] as? String }, ["第一章 初始", "第二章 进阶", "第三章 终局"])
+    }
 }

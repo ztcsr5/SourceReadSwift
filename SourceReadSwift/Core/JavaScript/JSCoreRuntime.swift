@@ -41,7 +41,7 @@ final class JSCoreRuntime {
         // JavaScriptCore can reject a first-read of an undeclared global inside
         // the large prelude; predeclaring them keeps the later `var x = x ||`
         // aliases source-compatible without relying on browser semantics.
-        context.evaluateScript("var java = {}; var cookie = {}; var CryptoJS = {}; var Packages = {}; var JXNode = function(value) { return __nativeJXNode.create(value); };")
+        context.evaluateScript("var java = {}; var cookie = {}; var CryptoJS = {}; var Packages = {}; var JXNode = function(value) { return __nativeJXNode.create(value); }; var src = ''; var html = ''; var body = ''; var result = ''; var baseUrl = '';")
         installBaseBridge()
     }
 
@@ -49,11 +49,19 @@ final class JSCoreRuntime {
         if let baseBridgeError {
             return .failure(.javascript("Legado bridge prelude failed: \(baseBridgeError)"))
         }
-        executionContext.bind(variables)
+        var effectiveVariables = variables
+        if effectiveVariables["src"] == nil {
+            if let htmlVal = effectiveVariables["html"] ?? effectiveVariables["result"] {
+                effectiveVariables["src"] = htmlVal
+            } else {
+                effectiveVariables["src"] = ""
+            }
+        }
+        executionContext.bind(effectiveVariables)
         let normalization = LegadoJavaScriptCompatibility.normalize(script)
         let executableScript = normalization.normalizedScript
         context.exception = nil
-        for (key, value) in variables {
+        for (key, value) in effectiveVariables {
             var jsCompatibleValue = value
             if let source = value as? BookSource {
                 var map = source.raw

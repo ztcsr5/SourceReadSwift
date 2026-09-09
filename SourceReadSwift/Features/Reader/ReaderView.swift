@@ -176,6 +176,13 @@ struct ReaderView: View {
         return chapterIndex
     }
 
+    private var currentDisplayChapterTitle: String {
+        if readerMode == .scroll && !appendedSections.isEmpty {
+            return resolvedReadingPosition(forFlatIndex: visibleParagraphIndex).chapterTitle
+        }
+        return content.title
+    }
+
     private var progressTitle: String {
         var parts: [String] = []
         let displayIndex = currentDisplayChapterIndex
@@ -655,12 +662,7 @@ struct ReaderView: View {
             onNearBottom: {
                 appendNextChapterIfPossible()
             },
-            onReachTop: {
-                if canSelectRelativeChapter(offset: -1) {
-                    UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-                    selectRelativeChapter(offset: -1, startAtEnd: true)
-                }
-            },
+            onReachTop: nil,
             onReachBottom: {
                 appendNextChapterIfPossible()
             }
@@ -689,7 +691,7 @@ struct ReaderView: View {
 
     private func appendNextChapterIfPossible() {
         guard readerMode == .scroll, !isAppendingNextChapter else { return }
-        guard appendedSections.count < 3 else { return }
+        guard appendedSections.count < 50 else { return }
 
         let nextIndex = (appendedSections.last?.chapterIndex ?? chapterIndex) + 1
         let maxCount = totalChapters ?? chapters.count
@@ -959,7 +961,7 @@ struct ReaderView: View {
                 }
 
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(content.title)
+                    Text(currentDisplayChapterTitle)
                         .font(.system(size: 16, weight: .semibold))
                         .foregroundStyle(chromeForeground)
                         .lineLimit(1)

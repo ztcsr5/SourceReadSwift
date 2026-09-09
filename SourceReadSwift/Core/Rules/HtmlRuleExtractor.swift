@@ -509,6 +509,7 @@ struct HtmlRuleExtractor {
         var variables: [String: Any] = [
             "result": rootHtml,
             "html": rootHtml,
+            "src": rootHtml,
             "baseUrl": baseUrl?.absoluteString ?? ""
         ]
         for (k, v) in extraVariables {

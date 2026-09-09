@@ -37,7 +37,22 @@ struct JSONRuleExtractor {
                 return array
             }
             if let array = selected as? [Any] {
-                return array.compactMap { $0 as? [String: Any] }
+                var flattened: [[String: Any]] = []
+                func extractDicts(_ item: Any) {
+                    if let dict = item as? [String: Any] {
+                        flattened.append(dict)
+                    } else if let subArray = arrayValues(item) {
+                        for sub in subArray {
+                            extractDicts(sub)
+                        }
+                    }
+                }
+                for item in array {
+                    extractDicts(item)
+                }
+                if !flattened.isEmpty {
+                    return flattened
+                }
             }
             if let dict = selected as? [String: Any] {
                 return [dict]
@@ -54,7 +69,22 @@ struct JSONRuleExtractor {
                     return array
                 }
                 if let array = decoded as? [Any] {
-                    return array.compactMap { $0 as? [String: Any] }
+                    var flattened: [[String: Any]] = []
+                    func extractDicts(_ item: Any) {
+                        if let dict = item as? [String: Any] {
+                            flattened.append(dict)
+                        } else if let subArray = arrayValues(item) {
+                            for sub in subArray {
+                                extractDicts(sub)
+                            }
+                        }
+                    }
+                    for item in array {
+                        extractDicts(item)
+                    }
+                    if !flattened.isEmpty {
+                        return flattened
+                    }
                 }
                 if let dict = decoded as? [String: Any] {
                     return [dict]
@@ -346,7 +376,13 @@ struct JSONRuleExtractor {
 
         if let array = arrayValues(current) {
             if part == "*" {
-                return walk(array, parts: parts, index: index + 1)
+                let mapped = array.compactMap { element -> Any? in
+                    walk(element, parts: parts, index: index + 1)
+                }
+                if mapped.isEmpty { return nil }
+                var flattened: [Any] = []
+                mapped.forEach { appendFlattened($0, to: &flattened) }
+                return flattened
             }
             if let number = Int(part) {
                 let resolved = number < 0 ? array.count + number : number

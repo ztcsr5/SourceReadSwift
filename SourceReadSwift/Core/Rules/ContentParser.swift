@@ -4,8 +4,10 @@ import Foundation
 struct ContentParser {
     private let htmlExtractor: HtmlRuleExtractor
     private let jsonExtractor: JSONRuleExtractor
+    private let executionContext: RuleExecutionContext
 
     init(executionContext: RuleExecutionContext = RuleExecutionContext()) {
+        self.executionContext = executionContext
         self.htmlExtractor = HtmlRuleExtractor(executionContext: executionContext)
         self.jsonExtractor = JSONRuleExtractor(executionContext: executionContext)
     }
@@ -87,10 +89,15 @@ struct ContentParser {
             ]
             let variables: [String: Any] = [
                 "source": source,
-                "chapter": chapterMap
+                "chapter": chapterMap,
+                "src": response.body,
+                "html": response.body,
+                "body": response.body,
+                "baseUrl": response.url.absoluteString,
+                "result": response.body
             ]
             let raw = try htmlExtractor.value(from: root, rule: contentRule, fallback: nil, baseUrl: response.url, variables: variables)
-            let cleaned = applyContentTransforms(raw, rule: source.ruleContent, globalPurifyRules: globalPurifyRules)
+            let cleaned = applyContentTransforms(raw, rule: source.ruleContent, globalPurifyRules: globalPurifyRules, variables: variables)
             let paragraphs = splitParagraphs(cleaned)
             let next = try htmlExtractor.value(
                 from: root,
@@ -126,7 +133,12 @@ struct ContentParser {
         ]
         let variables: [String: Any] = [
             "source": source,
-            "chapter": chapterMap
+            "chapter": chapterMap,
+            "src": response.body,
+            "html": response.body,
+            "body": response.body,
+            "baseUrl": response.url.absoluteString,
+            "result": response.body
         ]
         let rootObject: Any
         if let initRule = htmlExtractor.firstRule(rule, keys: ["init"]),
@@ -146,7 +158,8 @@ struct ContentParser {
         } else {
             content = nil
         }
-        let paragraphs = splitParagraphs(applyContentTransforms(content ?? "", rule: rule, globalPurifyRules: globalPurifyRules))
+        let cleaned = applyContentTransforms(content ?? "", rule: rule, globalPurifyRules: globalPurifyRules, variables: variables)
+        let paragraphs = splitParagraphs(cleaned)
         let next: String?
         if let dict = rootObject as? [String: Any] {
             next = jsonExtractor.string(
@@ -186,15 +199,20 @@ struct ContentParser {
         return output
     }
 
-    private func applyContentTransforms(_ text: String, rule: SourceRule?, globalPurifyRules: [String]) -> String {
+    private func applyContentTransforms(
+        _ text: String,
+        rule: SourceRule?,
+        globalPurifyRules: [String],
+        variables: [String: Any] = [:]
+    ) -> String {
         var output = text
         let transformKeys = ["replaceRegex", "replace", "purify", "purifyRegex"]
         for key in transformKeys {
             guard let value = rule?.fields[key]?.trimmingCharacters(in: .whitespacesAndNewlines),
                   !value.isEmpty else { continue }
-            output = PurifyRuleEvaluator.apply(rule: value, to: output)
+            output = PurifyRuleEvaluator.apply(rule: value, to: output, variables: variables, executionContext: executionContext)
         }
-        output = PurifyRuleEvaluator.apply(rules: globalPurifyRules, to: output)
+        output = PurifyRuleEvaluator.apply(rules: globalPurifyRules, to: output, variables: variables, executionContext: executionContext)
         return output
     }
 }

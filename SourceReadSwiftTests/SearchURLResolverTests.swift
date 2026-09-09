@@ -106,4 +106,20 @@ final class SearchURLResolverTests: XCTestCase {
         }
         XCTAssertEqual(url, "https://example.com/search?q=abc%20def")
     }
+
+    func testResolveStripsCookieMacrosBeforeRelativeResolution() throws {
+        let source = BookSource(
+            bookSourceName: "小原文学网",
+            bookSourceUrl: "https://www.min-yuan.com",
+            searchUrl: "{{cookie.removeCookie(source.key)}}\n/search/,{\n  \"body\": \"searchkey={{key}}\",\n  \"method\": \"POST\"\n}"
+        )
+
+        let result = SearchURLResolver().resolve(source: source, keyword: "剑来", page: 1)
+
+        guard case .success(let url) = result else {
+            return XCTFail("expected success")
+        }
+        XCTAssertTrue(url.hasPrefix("https://www.min-yuan.com/search/,"))
+        XCTAssertFalse(url.contains("cookie.removeCookie"))
+    }
 }

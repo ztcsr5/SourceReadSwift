@@ -15,11 +15,18 @@ struct SearchURLResolver {
             return .failure(.invalidSource("searchUrl \u{4e3a}\u{7a7a}"))
         }
 
-        let sourceInterpolated = interpolateSourcePlaceholders(searchUrl, source: source)
+        var cleaned = sourceInterpolated
+        if cleaned.contains("{{cookie.") {
+            cleaned = cleaned.replacingOccurrences(
+                of: #"\{\{cookie\.[^}]*\}\}"#,
+                with: "",
+                options: .regularExpression
+            )
+        }
         let isGBK = Self.isGBKEncoding(searchUrl: searchUrl, source: source)
         let scriptVariables = scriptVariables(source: source, keyword: keyword, page: page)
         let interpolated = ruleResolver.interpolate(
-            sourceInterpolated,
+            cleaned,
             keyword: keyword,
             page: page,
             baseUrl: source.bookSourceUrl,

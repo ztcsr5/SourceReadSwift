@@ -161,17 +161,17 @@ final class SourceStore: ObservableObject {
             ),
             BookSource(
                 bookSourceName: "新笔趣阁CC",
-                bookSourceUrl: "https://www.xbqg.cc",
+                bookSourceUrl: "https://www.xbshu.com",
                 bookSourceGroup: "官方精选",
                 bookSourceType: 0,
                 enabled: true,
                 weight: 88,
-                searchUrl: "https://www.xbqg.cc/search.php?q={{key}}",
+                searchUrl: "https://www.xbshu.com/search.php?q={{key}}",
                 ruleSearch: SourceRule(fields: [
                     "bookList": "div.col-12.col-md-6",
                     "name": "h3 a@text##\\[.*?\\]##",
                     "author": ".book_other:contains(作者) span@text||.book_other:contains(作者)@text##作者：##",
-                    "bookUrl": "dt a@href",
+                    "bookUrl": "dt a@href||h3 a@href",
                     "coverUrl": "dt img@src",
                     "lastChapter": ".book_other:contains(最新章节) a@text"
                 ]),
@@ -183,7 +183,7 @@ final class SourceStore: ObservableObject {
                     "lastChapter": ".info li:contains(最新) a@text"
                 ]),
                 ruleToc: SourceRule(fields: [
-                    "chapterList": "ul.row li.col-md-3 a||.book_list li a||.col-md-3 a",
+                    "chapterList": "ul.row li.col-md-3 a||.book_list li a||.col-md-3 a||#list a||dd a",
                     "chapterName": "@text",
                     "chapterUrl": "@href"
                 ]),
@@ -244,7 +244,42 @@ final class SourceStore: ObservableObject {
         self.persistence = persistence
         do {
             let snapshot = try persistence.load()
-            sources = snapshot.sources.filter { !$0.bookSourceUrl.contains("6yzw.org") }
+            sources = snapshot.sources.map { source in
+                if source.bookSourceUrl.contains("xbqg.cc") {
+                    return BookSource(
+                        bookSourceName: source.bookSourceName,
+                        bookSourceUrl: "https://www.xbshu.com",
+                        bookSourceGroup: source.bookSourceGroup,
+                        bookSourceType: source.bookSourceType,
+                        enabled: source.enabled,
+                        weight: source.weight,
+                        customOrder: source.customOrder,
+                        searchUrl: "https://www.xbshu.com/search.php?q={{key}}",
+                        ruleSearch: SourceRule(fields: [
+                            "bookList": "div.col-12.col-md-6",
+                            "name": "h3 a@text##\\[.*?\\]##",
+                            "author": ".book_other:contains(作者) span@text||.book_other:contains(作者)@text##作者：##",
+                            "bookUrl": "dt a@href||h3 a@href",
+                            "coverUrl": "dt img@src",
+                            "lastChapter": ".book_other:contains(最新章节) a@text"
+                        ]),
+                        ruleBookInfo: source.ruleBookInfo,
+                        ruleToc: SourceRule(fields: [
+                            "chapterList": "ul.row li.col-md-3 a||.book_list li a||.col-md-3 a||#list a||dd a",
+                            "chapterName": "@text",
+                            "chapterUrl": "@href"
+                        ]),
+                        ruleContent: source.ruleContent,
+                        header: source.header,
+                        loginUrl: source.loginUrl,
+                        loginCheckJs: source.loginCheckJs,
+                        bookSourceComment: source.bookSourceComment,
+                        customConfig: source.customConfig,
+                        raw: source.raw
+                    )
+                }
+                return source
+            }.filter { !$0.bookSourceUrl.contains("6yzw.org") }
             rssSources = snapshot.rssSources
             catalogs = snapshot.catalogs
         } catch {

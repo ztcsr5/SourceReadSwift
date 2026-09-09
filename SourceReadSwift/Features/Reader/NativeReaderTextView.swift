@@ -553,11 +553,8 @@ struct NativeReaderTextView: UIViewRepresentable {
             let offsetY = scrollView.contentOffset.y
             let contentHeight = scrollView.contentSize.height
             let visibleBottom = offsetY + scrollView.bounds.height
-            // User intentionally dragged past chapter top by 35pt or more: trigger previous chapter handoff
-            if offsetY <= -35 {
-                reachTopCallback?()
-            } else if contentHeight > 0 && visibleBottom >= contentHeight + 35 {
-                // User intentionally dragged past chapter bottom by 35pt or more: trigger next chapter handoff
+            // Bottom overscroll triggers append next chapter if needed
+            if contentHeight > 0 && visibleBottom >= contentHeight + 40 {
                 reachBottomCallback?()
             }
         }
