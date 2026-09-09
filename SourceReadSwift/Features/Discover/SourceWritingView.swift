@@ -465,7 +465,7 @@ final class LightweightHTTPServer: ObservableObject {
             respondWithSourceStore(connection: connection) { store in
                 let count = store?.sources.count ?? 0
                 let enabledCount = store?.sources.filter(\.enabled).count ?? 0
-                let body = #"{"ok":true,"service":"source-writing","port":#(self.port),"sourceCount":#(count),"enabledSourceCount":#(enabledCount)}"#
+                let body = #"{"ok":true,"service":"source-writing","port":\#(self.port),"sourceCount":\#(count),"enabledSourceCount":\#(enabledCount)}"#
                 self.sendResponse(connection: connection, statusCode: 200, statusText: "OK", contentType: "application/json; charset=utf-8", body: body)
             }
         } else if method == "GET" && path == "/api/sources" {
@@ -506,10 +506,10 @@ final class LightweightHTTPServer: ObservableObject {
             switch result {
             case .success(let message):
                 self.log("导入成功：\(message)")
-                self.sendResponse(connection: connection, statusCode: 200, statusText: "OK", contentType: "application/json; charset=utf-8", body: #"{"ok":true,"message":"#(self.jsonEscape(message))"}"#)
+                self.sendResponse(connection: connection, statusCode: 200, statusText: "OK", contentType: "application/json; charset=utf-8", body: #"{"ok":true,"message":"\#(self.jsonEscape(message))"}"#)
             case .failure(let error):
                 self.log("导入失败：\(error.localizedDescription)")
-                self.sendResponse(connection: connection, statusCode: 400, statusText: "Bad Request", contentType: "application/json; charset=utf-8", body: #"{"ok":false,"error":"#(self.jsonEscape(error.localizedDescription))"}"#)
+                self.sendResponse(connection: connection, statusCode: 400, statusText: "Bad Request", contentType: "application/json; charset=utf-8", body: #"{"ok":false,"error":"\#(self.jsonEscape(error.localizedDescription))"}"#)
             }
         }
     }
