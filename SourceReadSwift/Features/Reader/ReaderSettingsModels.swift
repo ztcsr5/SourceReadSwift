@@ -157,7 +157,7 @@ enum ReaderFontFamily: String, CaseIterable, Identifiable, Sendable {
     var title: String {
         switch self {
         case .system: return "系统默认"
-        case .songti: return "宋体"
+        case .songti: return "思源宋体"
         case .kaiti: return "楷体"
         case .rounded: return "圆体"
         }
