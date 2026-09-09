@@ -24,9 +24,12 @@
   - 迭代 2 (`9f119b8`): 标注 `nonisolated static` 修复 Actor 隔离，Unsigned IPA 成功，测试因 Result 解包与模型字段断言报错。
   - 迭代 3 (`f596853`): 修复测试断言模型对齐，Unsigned IPA 成功，iOS 测试中因 `SourceStore.init` 自动填充导致既有 5 个空仓断言偏移。
   - 迭代 4 (`4f8378d`): 将默认 RSS 源保持为显式按需载入，既有测试与新特性测试全部完美协同。
+- Web 写源与局域网网络传输深度加固与自愈：
+  - 根因定位：iOS NWConnection 在 `.contentProcessed` 中提前调用 `connection.cancel()` 触发 TCP RST，导致电脑 Chrome/Edge 报错 `ERR_CONNECTION_RESET` 或空响应白屏；手机自动息屏使进程挂起导致电脑连接超时；以及 Windows 代理/安全软件发送绝对 URI (`http://...`) 导致 404。
+  - 彻底解决：发送响应时显式标记 `contentContext: .finalMessage` 与 `isComplete: true`，实现优雅 TCP FIN 挥手；引入 `UIApplication.shared.isIdleTimerDisabled` 常亮防休眠保护；重构 `getLocalIPAddresses()` 优先排序私网网段并支持热点；升级为全功能中英双语 SourceRead Web Studio 并增加设置页直达入口。
 - CI 双绿全过结果（Authoritative Gate）：
-  - iOS build/test: [Run 34353955963](https://github.com/ztcsr5/SourceReadSwift/actions/runs/34353955963) — **Success** (482/482 全量测试套件 100% 通过)
-  - Unsigned IPA 打包: [Run 34353955949](https://github.com/ztcsr5/SourceReadSwift/actions/runs/34353955949) — **Success** (生产级无签名 IPA 产物成功编译打包)
+  - iOS build/test: [Run 34357258152](https://github.com/ztcsr5/SourceReadSwift/actions/runs/34357258152) — **Success** (484/484 全量测试套件 100% 通过)
+  - Unsigned IPA 打包: [Run 34357258190](https://github.com/ztcsr5/SourceReadSwift/actions/runs/34357258190) — **Success** (生产级无签名 IPA 产物成功编译打包)
 
 ### Stage 34 Status: CLOSED & ACCEPTED
 

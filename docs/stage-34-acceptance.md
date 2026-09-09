@@ -36,8 +36,8 @@
 
 ## 验证证据与流水线闭环
 
-- **Target Commit**: `4f8378d`
-- **iOS build & test (Authoritative Gate)**: [Run 34353955963](https://github.com/ztcsr5/SourceReadSwift/actions/runs/34353955963) — **Success** (482/482 单元测试全量通过，耗时 35.4s)
-- **Unsigned IPA Package (Release Packaging Gate)**: [Run 34353955949](https://github.com/ztcsr5/SourceReadSwift/actions/runs/34353955949) — **Success** (生产级无签名 iOS 安装包编译封装完成并存档)
+- **Target Commit**: `94e8a26`
+- **iOS build & test (Authoritative Gate)**: [Run 34357258152](https://github.com/ztcsr5/SourceReadSwift/actions/runs/34357258152) — **Success** (484/484 单元测试全量通过，覆盖代理绝对 URI 归一化、无 CR 换行兼容、书源全能力与 34 阶段全量用例)
+- **Unsigned IPA Package (Release Packaging Gate)**: [Run 34357258190](https://github.com/ztcsr5/SourceReadSwift/actions/runs/34357258190) — **Success** (生产级无签名 iOS 安装包编译封装完成并存档)
 
 ## Stage 34 状态：CLOSED & ACCEPTED
