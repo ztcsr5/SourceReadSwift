@@ -15,6 +15,7 @@ struct SearchURLResolver {
             return .failure(.invalidSource("searchUrl \u{4e3a}\u{7a7a}"))
         }
 
+        let sourceInterpolated = interpolateSourcePlaceholders(searchUrl, source: source)
         var cleaned = sourceInterpolated
         if cleaned.contains("{{cookie.") {
             cleaned = cleaned.replacingOccurrences(
