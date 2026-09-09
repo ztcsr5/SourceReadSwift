@@ -253,9 +253,9 @@ final class SourceStore: ObservableObject {
                         bookSourceType: source.bookSourceType,
                         enabled: source.enabled,
                         weight: source.weight,
-                        customOrder: source.customOrder,
                         searchUrl: "https://www.xbshu.com/search.php?q={{key}}",
-                        ruleSearch: SourceRule(fields: [
+                        exploreUrl: source.exploreUrl,
+                        ruleSearch: source.ruleSearch ?? SourceRule(fields: [
                             "bookList": "div.col-12.col-md-6",
                             "name": "h3 a@text##\\[.*?\\]##",
                             "author": ".book_other:contains(作者) span@text||.book_other:contains(作者)@text##作者：##",
@@ -270,10 +270,10 @@ final class SourceStore: ObservableObject {
                             "chapterUrl": "@href"
                         ]),
                         ruleContent: source.ruleContent,
+                        ruleExplore: source.ruleExplore,
                         header: source.header,
                         loginUrl: source.loginUrl,
                         loginCheckJs: source.loginCheckJs,
-                        bookSourceComment: source.bookSourceComment,
                         customConfig: source.customConfig,
                         raw: source.raw
                     )
