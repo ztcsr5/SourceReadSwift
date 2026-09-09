@@ -30,7 +30,7 @@ final class SourceStore: ObservableObject {
     @Published private(set) var lastError: String?
     private let persistence: SourcePersistence
 
-    static let defaultRSSSources: [RSSSource] = [
+    nonisolated static let defaultRSSSources: [RSSSource] = [
         RSSSource(
             sourceName: "使用说明",
             sourceUrl: "https://www.yuque.com/legado",
@@ -415,7 +415,7 @@ final class SourceStore: ObservableObject {
         return Data(text.utf8)
     }
 
-    static func sanitizeTrailingCommas(_ json: String) -> String {
+    nonisolated static func sanitizeTrailingCommas(_ json: String) -> String {
         var chars = Array(json)
         var inString = false
         var escaped = false
