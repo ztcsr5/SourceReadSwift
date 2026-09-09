@@ -2,9 +2,9 @@ import Foundation
 import SwiftSoup
 
 struct LegadoRuleStep: Equatable {
-    let selector: String
-    let index: Int?
-    let excludeIndex: Int?
+    var selector: String
+    var index: Int?
+    var excludeIndex: Int?
 }
 
 struct LegadoTranslatedValueRule: Equatable {
@@ -30,6 +30,13 @@ enum LegadoDefaultRuleTranslator {
         return false
     }
 
+    static func isIndexToken(_ token: String) -> Bool {
+        let trimmed = token.trimmingCharacters(in: .whitespacesAndNewlines)
+        if Int(trimmed) != nil { return true }
+        if trimmed.hasPrefix("!") && Int(trimmed.dropFirst()) != nil { return true }
+        return false
+    }
+
     static func normalizeAttributeName(_ attr: String) -> String {
         var clean = attr.trimmingCharacters(in: .whitespacesAndNewlines)
         if clean.lowercased().hasPrefix("@attr:") {
@@ -47,6 +54,7 @@ enum LegadoDefaultRuleTranslator {
     /// - `tag.p.0@text##regex##replacement`
     /// - `div.box@tag.a@src`
     /// - `class.content@textNodes`
+    /// - `.chapter@1@href`
     static func translateValueRule(_ rawRule: String) -> LegadoTranslatedValueRule? {
         var working = rawRule.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !working.isEmpty else { return nil }
@@ -73,7 +81,7 @@ enum LegadoDefaultRuleTranslator {
         guard !rawSegments.isEmpty else { return nil }
 
         let lastSegment = rawSegments.last!
-        let hasAttributeAtEnd = isAttributeToken(lastSegment) || (!isSelectorToken(lastSegment) && rawSegments.count > 1)
+        let hasAttributeAtEnd = isAttributeToken(lastSegment) || (!isSelectorToken(lastSegment) && !isIndexToken(lastSegment) && rawSegments.count > 1)
 
         let selectorSegments: [String]
         let attribute: String
@@ -90,7 +98,7 @@ enum LegadoDefaultRuleTranslator {
         if selectorSegments.isEmpty {
             steps = [LegadoRuleStep(selector: "", index: nil, excludeIndex: nil)]
         } else {
-            steps = selectorSegments.compactMap(parseSingleStep)
+            steps = parseSteps(from: selectorSegments)
         }
 
         return LegadoTranslatedValueRule(steps: steps, attribute: attribute, regexTransforms: transforms)
@@ -113,7 +121,74 @@ enum LegadoDefaultRuleTranslator {
             .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
             .filter { !$0.isEmpty }
 
-        return segments.compactMap(parseSingleStep)
+        return parseSteps(from: segments)
+    }
+
+    static func parseSteps(from rawSegments: [String]) -> [LegadoRuleStep] {
+        var steps: [LegadoRuleStep] = []
+        for segment in rawSegments {
+            let trimmed = segment.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !trimmed.isEmpty else { continue }
+
+            if let intVal = Int(trimmed) {
+                if !steps.isEmpty {
+                    steps[steps.count - 1].index = intVal
+                } else {
+                    steps.append(LegadoRuleStep(selector: "", index: intVal, excludeIndex: nil))
+                }
+                continue
+            }
+            if trimmed.hasPrefix("!"), let exclVal = Int(trimmed.dropFirst()) {
+                if !steps.isEmpty {
+                    steps[steps.count - 1].excludeIndex = exclVal
+                } else {
+                    steps.append(LegadoRuleStep(selector: "", index: nil, excludeIndex: exclVal))
+                }
+                continue
+            }
+
+            if let parsed = parseSingleStep(trimmed) {
+                steps.append(parsed)
+            }
+        }
+        return steps
+    }
+
+    static func executeSteps(_ steps: [LegadoRuleStep], on root: Element) -> [Element] {
+        var currentElements = [root]
+        for step in steps {
+            var nextElements: [Element] = []
+            for elem in currentElements {
+                do {
+                    if step.selector.isEmpty {
+                        nextElements.append(elem)
+                    } else {
+                        let selected = try elem.select(step.selector).array()
+                        nextElements.append(contentsOf: selected)
+                    }
+                } catch {
+                    continue
+                }
+            }
+            if let index = step.index {
+                let normalized = index >= 0 ? index : nextElements.count + index
+                if nextElements.indices.contains(normalized) {
+                    currentElements = [nextElements[normalized]]
+                } else {
+                    currentElements = []
+                }
+            } else if let excl = step.excludeIndex {
+                let normalizedExcl = excl >= 0 ? excl : nextElements.count + excl
+                var filtered: [Element] = []
+                for (idx, item) in nextElements.enumerated() where idx != normalizedExcl {
+                    filtered.append(item)
+                }
+                currentElements = filtered
+            } else {
+                currentElements = nextElements
+            }
+        }
+        return currentElements
     }
 
     private static func isSelectorToken(_ token: String) -> Bool {

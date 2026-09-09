@@ -109,32 +109,7 @@ struct HtmlRuleExtractor {
 
         // Try Legado default syntax translator (class., id., tag., @ chaining)
         if let translated = LegadoDefaultRuleTranslator.translateValueRule(materializedRule) {
-            var currentElements = [root]
-            for step in translated.steps {
-                guard !step.selector.isEmpty else { continue }
-                var nextElements: [Element] = []
-                for elem in currentElements {
-                    do {
-                        let selected = try elem.select(step.selector).array()
-                        if let index = step.index {
-                            let normalized = index >= 0 ? index : selected.count + index
-                            if selected.indices.contains(normalized) {
-                                nextElements.append(selected[normalized])
-                            }
-                        } else if let excl = step.excludeIndex {
-                            let normalizedExcl = excl >= 0 ? excl : selected.count + excl
-                            for (idx, item) in selected.enumerated() where idx != normalizedExcl {
-                                nextElements.append(item)
-                            }
-                        } else {
-                            nextElements.append(contentsOf: selected)
-                        }
-                    } catch {
-                        continue
-                    }
-                }
-                currentElements = nextElements
-            }
+            let currentElements = LegadoDefaultRuleTranslator.executeSteps(translated.steps, on: root)
 
             if translated.attribute == "all" {
                 let joined = try currentElements.map { try $0.text() }.joined(separator: "\n")
@@ -251,33 +226,7 @@ struct HtmlRuleExtractor {
 
         let steps = LegadoDefaultRuleTranslator.translateSelectorSteps(materializedRule)
         if !steps.isEmpty {
-            var currentElements = [root]
-            for step in steps {
-                guard !step.selector.isEmpty else { continue }
-                var nextElements: [Element] = []
-                for elem in currentElements {
-                    do {
-                        let selected = try elem.select(step.selector).array()
-                        if let index = step.index {
-                            let normalized = index >= 0 ? index : selected.count + index
-                            if selected.indices.contains(normalized) {
-                                nextElements.append(selected[normalized])
-                            }
-                        } else if let excl = step.excludeIndex {
-                            let normalizedExcl = excl >= 0 ? excl : selected.count + excl
-                            for (idx, item) in selected.enumerated() where idx != normalizedExcl {
-                                nextElements.append(item)
-                            }
-                        } else {
-                            nextElements.append(contentsOf: selected)
-                        }
-                    } catch {
-                        continue
-                    }
-                }
-                currentElements = nextElements
-            }
-            return currentElements
+            return LegadoDefaultRuleTranslator.executeSteps(steps, on: root)
         }
 
         let selector = cleanCSS(materializedRule)

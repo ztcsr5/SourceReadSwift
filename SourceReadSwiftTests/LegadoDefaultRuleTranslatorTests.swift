@@ -95,7 +95,7 @@ final class LegadoDefaultRuleTranslatorTests: XCTestCase {
     func testResponseTextDecoderGBK() {
         let decoder = ResponseTextDecoder()
         // "斗破苍穹" in GB18030 / GBK hex: B6 B7 C6 C6 B2 D4 C7 ED
-        let gbkBytes: [UInt8] = [0xB6, 0xB7, 0xC6, 0xC6, 0xB2, 0xD4, 0xC7, 0xED]
+        let gbkBytes: [UInt8] = [0xB6, 0xB7, 0xC6, 0xC6, 0xB2, 0xD4, 0xF1, 0xB7]
         let data = Data(gbkBytes)
         let decoded = decoder.decode(data: data, headers: [:], preferredCharset: "gbk")
         XCTAssertEqual(decoded, "斗破苍穹")
