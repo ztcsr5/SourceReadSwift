@@ -16,12 +16,18 @@ struct SearchURLResolver {
         }
 
         let sourceInterpolated = interpolateSourcePlaceholders(searchUrl, source: source)
+        let isGBK = searchUrl.localizedCaseInsensitiveContains("charset=gb")
+            || searchUrl.localizedCaseInsensitiveContains("\"charset\":\"gb")
+            || searchUrl.localizedCaseInsensitiveContains("\"charset\": \"gb")
+            || source.bookSourceComment?.localizedCaseInsensitiveContains("gbk") == true
+            || source.bookSourceComment?.localizedCaseInsensitiveContains("gb2312") == true
         let scriptVariables = scriptVariables(source: source, keyword: keyword, page: page)
         let interpolated = ruleResolver.interpolate(
             sourceInterpolated,
             keyword: keyword,
             page: page,
-            baseUrl: source.bookSourceUrl
+            baseUrl: source.bookSourceUrl,
+            charset: isGBK ? "gbk" : nil
         )
 
         let trimmed = interpolated.trimmingCharacters(in: .whitespacesAndNewlines)

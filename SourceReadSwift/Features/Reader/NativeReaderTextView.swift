@@ -30,13 +30,13 @@ struct NativeReaderTextView: UIViewRepresentable {
     let animatedScrollDuration: Double
     let textSelectionEnabled: Bool
     let onVisibleParagraph: (Int) -> Void
-    var onNearBottom: (() -> Void)? = nil
+    var onReachTop: (() -> Void)? = nil
     var onReachBottom: (() -> Void)? = nil
 
     func makeCoordinator() -> Coordinator {
         Coordinator(
             onVisibleParagraph: onVisibleParagraph,
-            onNearBottom: onNearBottom,
+            onReachTop: onReachTop,
             onReachBottom: onReachBottom
         )
     }
@@ -74,7 +74,7 @@ struct NativeReaderTextView: UIViewRepresentable {
     func updateUIView(_ textView: UITextView, context: Context) {
         context.coordinator.updateCallbacks(
             visibleParagraph: onVisibleParagraph,
-            nearBottom: onNearBottom,
+            reachTop: onReachTop,
             reachBottom: onReachBottom
         )
         context.coordinator.update(textView: textView, configuration: configuration, scrollTarget: scrollTarget, scrollRequestKey: scrollRequestKey)
@@ -222,7 +222,7 @@ struct NativeReaderTextView: UIViewRepresentable {
     final class Coordinator: NSObject, UITextViewDelegate, UIScrollViewDelegate {
         private weak var textView: UITextView?
         private var visibleParagraphCallback: (Int) -> Void
-        private var nearBottomCallback: (() -> Void)?
+        private var reachTopCallback: (() -> Void)?
         private var reachBottomCallback: (() -> Void)?
         private var configuration: Configuration?
         private var paragraphRanges: [NSRange] = []
@@ -234,14 +234,15 @@ struct NativeReaderTextView: UIViewRepresentable {
         private var didConfigureTextView = false
         private var lastSelectionEnabled: Bool?
         private var lastLayoutWidth: CGFloat?
+        private var hasAppliedInitialScrollTarget = false
 
         init(
             onVisibleParagraph: @escaping (Int) -> Void,
-            onNearBottom: (() -> Void)? = nil,
+            onReachTop: (() -> Void)? = nil,
             onReachBottom: (() -> Void)? = nil
         ) {
             visibleParagraphCallback = onVisibleParagraph
-            nearBottomCallback = onNearBottom
+            reachTopCallback = onReachTop
             reachBottomCallback = onReachBottom
         }
 
@@ -255,11 +256,11 @@ struct NativeReaderTextView: UIViewRepresentable {
 
         func updateCallbacks(
             visibleParagraph: @escaping (Int) -> Void,
-            nearBottom: (() -> Void)?,
+            reachTop: (() -> Void)?,
             reachBottom: (() -> Void)?
         ) {
             visibleParagraphCallback = visibleParagraph
-            nearBottomCallback = nearBottom
+            reachTopCallback = reachTop
             reachBottomCallback = reachBottom
         }
 
@@ -296,6 +297,7 @@ struct NativeReaderTextView: UIViewRepresentable {
                 // changes preserve the existing offset and request key.
                 if contentChanged {
                     lastScrollRequestKey = nil
+                    hasAppliedInitialScrollTarget = (scrollTarget == nil || scrollTarget == 0)
                 }
                 lastVisibleParagraph = -1
                 lastVisibleUpdateAt = 0
@@ -402,7 +404,14 @@ struct NativeReaderTextView: UIViewRepresentable {
 
         @discardableResult
         private func scrollToParagraph(_ index: Int, in textView: UITextView, animated: Bool, duration: Double) -> Bool {
-            guard paragraphRanges.indices.contains(index), textView.bounds.height > 0 else { return false }
+            guard paragraphRanges.indices.contains(index) else { return false }
+            if textView.bounds.height <= 0 {
+                DispatchQueue.main.async { [weak self, weak textView] in
+                    guard let self, let textView else { return }
+                    self.scrollToParagraph(index, in: textView, animated: animated, duration: duration)
+                }
+                return false
+            }
             textView.layoutIfNeeded()
             let range = paragraphRanges[index]
             let glyphRange = textView.layoutManager.glyphRange(forCharacterRange: range, actualCharacterRange: nil)
@@ -416,6 +425,7 @@ struct NativeReaderTextView: UIViewRepresentable {
             )
             let offset = CGPoint(x: 0, y: targetY)
             let currentOffset = textView.contentOffset
+            hasAppliedInitialScrollTarget = true
             guard abs(currentOffset.y - offset.y) > 0.5 else { return true }
             if animated {
                 UIView.animate(
@@ -436,11 +446,8 @@ struct NativeReaderTextView: UIViewRepresentable {
                   let configuration,
                   !paragraphRanges.isEmpty else { return }
 
-            // Pre-cache trigger when approaching bottom (within 400pt)
-            let contentHeight = textView.contentSize.height
-            let visibleBottom = textView.contentOffset.y + textView.bounds.height
-            if contentHeight > 0 && visibleBottom >= contentHeight - 400 {
-                nearBottomCallback?()
+            guard scrollView.isTracking || scrollView.isDragging || scrollView.isDecelerating || hasAppliedInitialScrollTarget else {
+                return
             }
 
             let now = CACurrentMediaTime()
@@ -465,10 +472,14 @@ struct NativeReaderTextView: UIViewRepresentable {
         }
 
         func scrollViewDidEndDragging(_ scrollView: UIScrollView, willDecelerate decelerate: Bool) {
+            let offsetY = scrollView.contentOffset.y
             let contentHeight = scrollView.contentSize.height
-            let visibleBottom = scrollView.contentOffset.y + scrollView.bounds.height
-            // User intentionally dragged past chapter bottom by 35pt or more: trigger next chapter handoff!
-            if contentHeight > 0 && visibleBottom >= contentHeight + 35 {
+            let visibleBottom = offsetY + scrollView.bounds.height
+            // User intentionally dragged past chapter top by 35pt or more: trigger previous chapter handoff
+            if offsetY <= -35 {
+                reachTopCallback?()
+            } else if contentHeight > 0 && visibleBottom >= contentHeight + 35 {
+                // User intentionally dragged past chapter bottom by 35pt or more: trigger next chapter handoff
                 reachBottomCallback?()
             }
         }

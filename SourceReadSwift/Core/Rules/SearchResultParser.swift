@@ -85,6 +85,31 @@ struct SearchResultParser {
                     intro: nil
                 ))
             }
+            if elements.isEmpty {
+                let document = try SwiftSoup.parse(response.body, response.url.absoluteString)
+                let detailRule = source.ruleBookInfo
+                let variables: [String: Any] = ["source": source]
+                let name = (try? htmlExtractor.value(from: document, rule: firstRule(detailRule, keys: ["name", "bookName"]), fallback: nil, baseUrl: response.url, variables: variables))?.nilIfEmpty
+                    ?? (try? document.select("meta[property=og:novel:book_name]").attr("content")).nilIfEmpty
+                    ?? (try? document.select("meta[property=og:title]").attr("content")).nilIfEmpty
+                if let name, !name.isEmpty {
+                    let author = (try? htmlExtractor.value(from: document, rule: firstRule(detailRule, keys: ["author"]), fallback: nil, baseUrl: response.url, variables: variables))?.nilIfEmpty
+                        ?? (try? document.select("meta[property=og:novel:author]").attr("content")).nilIfEmpty
+                    let cover = (try? htmlExtractor.value(from: document, rule: firstRule(detailRule, keys: ["coverUrl", "cover"]), fallback: nil, baseUrl: response.url, variables: variables))?.nilIfEmpty
+                        ?? (try? document.select("meta[property=og:image]").attr("content")).nilIfEmpty
+                    let intro = (try? htmlExtractor.value(from: document, rule: firstRule(detailRule, keys: ["intro", "introduction"]), fallback: nil, baseUrl: response.url, variables: variables))?.nilIfEmpty
+                        ?? (try? document.select("meta[property=og:description]").attr("content")).nilIfEmpty
+                    return .success([SearchBook(
+                        name: name,
+                        author: author,
+                        coverUrl: cover,
+                        bookUrl: response.url.absoluteString,
+                        sourceName: source.bookSourceName,
+                        sourceUrl: source.bookSourceUrl,
+                        intro: intro
+                    )])
+                }
+            }
             return books.isEmpty ? .failure(.empty("搜索解析结果为空")) : .success(books)
         } catch {
             return .failure(.rule(error.localizedDescription))

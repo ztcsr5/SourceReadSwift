@@ -331,10 +331,12 @@ struct ChapterLoadingView: View {
     let chapter: BookChapter
     var totalChapters: Int? = nil
     var chapters: [BookChapter] = []
+    var initialParagraphIndex: Int? = nil
     var extraToolbarActions: () -> AnyView = { AnyView(EmptyView()) }
     var onRequestSourceSwitch: (() -> Void)?
     @State private var content: ChapterContent?
     @State private var currentChapter: BookChapter?
+    @State private var currentParagraphIndex: Int? = nil
     @State private var errorMessage: String?
     @State private var isUsingStaleCache = false
     @State private var isCachingNext = false
@@ -475,6 +477,7 @@ struct ChapterLoadingView: View {
             chapterIndex: effectiveChapter.index,
             totalChapters: totalChapters,
             chapters: chapters,
+            initialParagraphIndex: currentParagraphIndex ?? (effectiveChapter.index == chapter.index ? initialParagraphIndex : nil),
             statusMessage: isUsingStaleCache ? "网络加载失败，正在显示本地缓存副本" : nil,
             extraToolbarActions: extraToolbarActions,
             onRequestSourceSwitch: onRequestSourceSwitch,
@@ -482,6 +485,15 @@ struct ChapterLoadingView: View {
             onSelectChapter: { selected in
                 showReaderChromeAfterChapterSelection = true
                 currentChapter = selected
+                currentParagraphIndex = nil
+                content = nil
+                errorMessage = nil
+                isUsingStaleCache = false
+            },
+            onSelectChapterWithPosition: { selected, targetParagraph in
+                showReaderChromeAfterChapterSelection = true
+                currentChapter = selected
+                currentParagraphIndex = targetParagraph
                 content = nil
                 errorMessage = nil
                 isUsingStaleCache = false

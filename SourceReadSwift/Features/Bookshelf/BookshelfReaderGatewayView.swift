@@ -11,6 +11,7 @@ struct BookshelfReaderGatewayView: View {
     @State private var chapters: [BookChapter] = []
     @State private var selectedChapter: BookChapter?
     @State private var selectedLocalChapterIndex: Int?
+    @State private var selectedLocalParagraphIndex: Int?
     @State private var errorMessage: String?
     @State private var showSourceSwitcher = false
     @State private var sourceSwitchState = SourceSwitchState()
@@ -59,6 +60,7 @@ struct BookshelfReaderGatewayView: View {
                 )
             )
         } else if let selectedChapter {
+            let storedParagraph = currentBook.currentChapterIndex == selectedChapter.index ? currentBook.currentParagraphIndex : nil
             return AnyView(
                 ChapterLoadingView(
                     bookID: book.id,
@@ -66,6 +68,7 @@ struct BookshelfReaderGatewayView: View {
                     chapter: selectedChapter,
                     totalChapters: chapters.count,
                     chapters: chapters,
+                    initialParagraphIndex: storedParagraph,
                     extraToolbarActions: {
                         AnyView(
                             Button {
@@ -170,7 +173,7 @@ struct BookshelfReaderGatewayView: View {
             )
         }
         let storedParagraph = currentBook.currentChapterIndex == safeIndex ? currentBook.currentParagraphIndex : nil
-        let initialParagraphIndex = storedParagraph
+        let initialParagraphIndex = selectedLocalParagraphIndex ?? storedParagraph
         return ReaderView(
             bookID: book.id,
             content: ChapterContent(
@@ -190,11 +193,24 @@ struct BookshelfReaderGatewayView: View {
             onSelectChapter: { chapter in
                 showReaderChromeAfterChapterSelection = true
                 selectedLocalChapterIndex = chapter.index
+                selectedLocalParagraphIndex = nil
                 appState.bookshelfStore.updateReadingProgress(
                     bookID: book.id,
                     chapterIndex: chapter.index,
                     chapterTitle: chapter.title,
                     totalChapters: chapters.count
+                )
+            },
+            onSelectChapterWithPosition: { chapter, targetParagraph in
+                showReaderChromeAfterChapterSelection = true
+                selectedLocalChapterIndex = chapter.index
+                selectedLocalParagraphIndex = targetParagraph
+                appState.bookshelfStore.updateReadingProgress(
+                    bookID: book.id,
+                    chapterIndex: chapter.index,
+                    chapterTitle: chapter.title,
+                    totalChapters: chapters.count,
+                    paragraphIndex: targetParagraph == Int.max ? nil : targetParagraph
                 )
             },
             onSelectNavigationEntry: { entry in

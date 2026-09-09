@@ -18,9 +18,15 @@ struct SourceRequestBuilder {
         page: Int,
         persistentValues: [String: String] = [:]
     ) -> SourceRequest {
+        let isGBK = searchUrl.localizedCaseInsensitiveContains("charset=gb")
+            || searchUrl.localizedCaseInsensitiveContains("\"charset\":\"gb")
+            || searchUrl.localizedCaseInsensitiveContains("\"charset\": \"gb")
+            || source.bookSourceComment?.localizedCaseInsensitiveContains("gbk") == true
+            || source.bookSourceComment?.localizedCaseInsensitiveContains("gb2312") == true
+        let encodedKey = LegadoRuleResolver.percentEncode(keyword, charset: isGBK ? "gbk" : nil)
         let resolved = searchUrl
-            .replacingOccurrences(of: "{{key}}", with: keyword.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? keyword)
-            .replacingOccurrences(of: "{{keyword}}", with: keyword.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? keyword)
+            .replacingOccurrences(of: "{{key}}", with: encodedKey)
+            .replacingOccurrences(of: "{{keyword}}", with: encodedKey)
             .replacingOccurrences(of: "{{page}}", with: String(page))
 
         return buildRequest(

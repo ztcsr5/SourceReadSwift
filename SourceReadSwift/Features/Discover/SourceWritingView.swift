@@ -494,23 +494,25 @@ final class LightweightHTTPServer: ObservableObject {
     private func handleHttpRequest(_ request: LightweightHTTPRequest, connection: NWConnection) {
         let method = request.method
         let path = request.path
+        let keepAlive = request.headers["connection"]?.lowercased() != "close"
+        log("HTTP 请求: \(method) \(path)")
 
         if method == "OPTIONS" {
-            sendResponse(connection: connection, statusCode: 204, statusText: "No Content", contentType: "text/plain; charset=utf-8", body: "")
+            sendResponse(connection: connection, statusCode: 204, statusText: "No Content", contentType: "text/plain; charset=utf-8", body: "", keepAlive: keepAlive)
         } else if method == "GET" && (path == "/" || path == "/index.html" || path.isEmpty) {
             let html = getWebPageHtml()
-            sendResponse(connection: connection, statusCode: 200, statusText: "OK", contentType: "text/html; charset=utf-8", body: html)
+            sendResponse(connection: connection, statusCode: 200, statusText: "OK", contentType: "text/html; charset=utf-8", body: html, keepAlive: keepAlive)
         } else if (method == "GET" || method == "HEAD") && path == "/health" {
             let healthBody = "SOURCE_READ_SWIFT_WEB_OK\nREAD_SOURCE_WEB_OK port=\(port)"
-            sendResponse(connection: connection, statusCode: 200, statusText: "OK", contentType: "text/plain; charset=utf-8", body: healthBody, includeBody: method != "HEAD")
+            sendResponse(connection: connection, statusCode: 200, statusText: "OK", contentType: "text/plain; charset=utf-8", body: healthBody, includeBody: method != "HEAD", keepAlive: keepAlive)
         } else if (method == "GET" || method == "HEAD") && path == "/favicon.ico" {
-            sendResponse(connection: connection, statusCode: 204, statusText: "No Content", contentType: "image/x-icon", body: "", includeBody: false)
+            sendResponse(connection: connection, statusCode: 204, statusText: "No Content", contentType: "image/x-icon", body: "", includeBody: false, keepAlive: keepAlive)
         } else if method == "GET" && path == "/api/status" {
             respondWithSourceStore(connection: connection) { store in
                 let count = store?.sources.count ?? 0
                 let enabledCount = store?.sources.filter(\.enabled).count ?? 0
                 let body = #"{"ok":true,"service":"source-writing","port":\#(self.port),"sourceCount":\#(count),"enabledSourceCount":\#(enabledCount)}"#
-                self.sendResponse(connection: connection, statusCode: 200, statusText: "OK", contentType: "application/json; charset=utf-8", body: body)
+                self.sendResponse(connection: connection, statusCode: 200, statusText: "OK", contentType: "application/json; charset=utf-8", body: body, keepAlive: keepAlive)
             }
         } else if method == "GET" && path == "/api/sources" {
             respondWithSourceStore(connection: connection) { store in
@@ -520,27 +522,27 @@ final class LightweightHTTPServer: ObservableObject {
                     total: sources.count,
                     enabledCount: sources.filter(\.enabled).count,
                     data: sources
-                ))
+                ), keepAlive: keepAlive)
             }
         } else if method == "GET" && path == "/api/sources/export" {
             respondWithSourceStore(connection: connection) { store in
                 let snapshot = store?.backupSnapshot() ?? SourceLibrarySnapshot()
-                self.sendJSON(connection: connection, value: snapshot)
+                self.sendJSON(connection: connection, value: snapshot, keepAlive: keepAlive)
             }
         } else if method == "POST" && (path == "/api/sources/import" || path == "/import") {
             guard let body = String(data: request.body, encoding: .utf8) else {
-                sendResponse(connection: connection, statusCode: 400, statusText: "Bad Request", contentType: "application/json; charset=utf-8", body: #"{"ok":false,"error":"Request body must be UTF-8 JSON"}"#)
+                sendResponse(connection: connection, statusCode: 400, statusText: "Bad Request", contentType: "application/json; charset=utf-8", body: #"{"ok":false,"error":"Request body must be UTF-8 JSON"}"#, keepAlive: keepAlive)
                 return
             }
-            importSourceJSON(body.trimmingCharacters(in: .whitespacesAndNewlines), connection: connection)
+            importSourceJSON(body.trimmingCharacters(in: .whitespacesAndNewlines), connection: connection, keepAlive: keepAlive)
         } else {
-            sendResponse(connection: connection, statusCode: 404, statusText: "Not Found", contentType: "text/plain; charset=utf-8", body: "Not Found")
+            sendResponse(connection: connection, statusCode: 404, statusText: "Not Found", contentType: "text/plain; charset=utf-8", body: "Not Found", keepAlive: keepAlive)
         }
     }
 
-    private func importSourceJSON(_ text: String, connection: NWConnection? = nil) {
+    private func importSourceJSON(_ text: String, connection: NWConnection? = nil, keepAlive: Bool = true) {
         guard let onJSONReceived else {
-            if let connection { sendResponse(connection: connection, statusCode: 500, statusText: "Internal Error", contentType: "text/plain; charset=utf-8", body: "No import handler registered") }
+            if let connection { sendResponse(connection: connection, statusCode: 500, statusText: "Internal Error", contentType: "text/plain; charset=utf-8", body: "No import handler registered", keepAlive: keepAlive) }
             return
         }
         DispatchQueue.main.async { [weak self] in
@@ -550,10 +552,10 @@ final class LightweightHTTPServer: ObservableObject {
             switch result {
             case .success(let message):
                 self.log("导入成功：\(message)")
-                self.sendResponse(connection: connection, statusCode: 200, statusText: "OK", contentType: "application/json; charset=utf-8", body: #"{"ok":true,"message":"\#(self.jsonEscape(message))"}"#)
+                self.sendResponse(connection: connection, statusCode: 200, statusText: "OK", contentType: "application/json; charset=utf-8", body: #"{"ok":true,"message":"\#(self.jsonEscape(message))"}"#, keepAlive: keepAlive)
             case .failure(let error):
                 self.log("导入失败：\(error.localizedDescription)")
-                self.sendResponse(connection: connection, statusCode: 400, statusText: "Bad Request", contentType: "application/json; charset=utf-8", body: #"{"ok":false,"error":"\#(self.jsonEscape(error.localizedDescription))"}"#)
+                self.sendResponse(connection: connection, statusCode: 400, statusText: "Bad Request", contentType: "application/json; charset=utf-8", body: #"{"ok":false,"error":"\#(self.jsonEscape(error.localizedDescription))"}"#, keepAlive: keepAlive)
             }
         }
     }
@@ -565,14 +567,14 @@ final class LightweightHTTPServer: ObservableObject {
         }
     }
 
-    private func sendJSON<T: Encodable>(connection: NWConnection, value: T) {
+    private func sendJSON<T: Encodable>(connection: NWConnection, value: T, keepAlive: Bool = true) {
         do {
             let encoder = JSONEncoder()
             encoder.outputFormatting = [.sortedKeys, .prettyPrinted]
             let data = try encoder.encode(value)
-            sendResponse(connection: connection, statusCode: 200, statusText: "OK", contentType: "application/json; charset=utf-8", body: String(decoding: data, as: UTF8.self))
+            sendResponse(connection: connection, statusCode: 200, statusText: "OK", contentType: "application/json; charset=utf-8", body: String(decoding: data, as: UTF8.self), keepAlive: keepAlive)
         } catch {
-            sendResponse(connection: connection, statusCode: 500, statusText: "Internal Error", contentType: "application/json; charset=utf-8", body: #"{"ok":false,"error":"encoding failed"}"#)
+            sendResponse(connection: connection, statusCode: 500, statusText: "Internal Error", contentType: "application/json; charset=utf-8", body: #"{"ok":false,"error":"encoding failed"}"#, keepAlive: keepAlive)
         }
     }
 
@@ -588,41 +590,42 @@ final class LightweightHTTPServer: ObservableObject {
         statusText: String,
         contentType: String,
         body: String,
-        includeBody: Bool = true
+        includeBody: Bool = true,
+        keepAlive: Bool = true
     ) {
         let responseBodyData = body.data(using: .utf8) ?? Data()
-        let responseHeader = """
-        HTTP/1.1 \(statusCode) \(statusText)\r
-        Content-Type: \(contentType)\r
-        Content-Length: \(responseBodyData.count)\r
-        Access-Control-Allow-Origin: *\r
-        Access-Control-Allow-Methods: GET, HEAD, POST, OPTIONS\r
-        Access-Control-Allow-Headers: Content-Type\r
-        Access-Control-Max-Age: 600\r
-        Connection: close\r
-        \r
-        """
+        let bodyLength = includeBody ? responseBodyData.count : 0
+        let connectionHeader = keepAlive ? "keep-alive" : "close"
+        let headerLines = [
+            "HTTP/1.1 \(statusCode) \(statusText)",
+            "Content-Type: \(contentType)",
+            "Content-Length: \(bodyLength)",
+            "Connection: \(connectionHeader)",
+            "Access-Control-Allow-Origin: *",
+            "Access-Control-Allow-Methods: GET, HEAD, POST, OPTIONS",
+            "Access-Control-Allow-Headers: Content-Type",
+            "Access-Control-Max-Age: 600",
+            "\r\n"
+        ]
+        let headerString = headerLines.joined(separator: "\r\n")
 
-        var responseData = responseHeader.data(using: .utf8) ?? Data()
+        var responseData = headerString.data(using: .utf8) ?? Data()
         if includeBody {
             responseData.append(responseBodyData)
         }
 
-        // Critical: pass contentContext: .finalMessage and isComplete: true.
-        // This instructs the TCP stack to transmit all bytes and then send a graceful FIN packet.
-        // Calling connection.cancel() inside completion immediately sends a TCP RST (reset)
-        // which causes Chrome/Edge to display "ERR_CONNECTION_RESET" or "ERR_EMPTY_RESPONSE" (打开啥也没有).
         connection.send(
             content: responseData,
-            contentContext: .finalMessage,
+            contentContext: keepAlive ? .defaultMessage : .finalMessage,
             isComplete: true,
             completion: .contentProcessed { [weak self] error in
                 if let error = error {
                     self?.log("发送响应错误: \(error)")
+                } else {
+                    self?.log("已发送响应: \(statusCode) \(statusText)")
                 }
-                // Allow TCP FIN handshake to flush completely before tearing down
-                DispatchQueue.global().asyncAfter(deadline: .now() + 1.5) {
-                    connection.cancel()
+                if keepAlive {
+                    self?.receiveRequest(on: connection, accumulated: Data())
                 }
             }
         )

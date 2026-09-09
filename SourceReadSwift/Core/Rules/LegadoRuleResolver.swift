@@ -1,10 +1,33 @@
 import Foundation
+import CoreFoundation
 
 struct LegadoRuleResolver {
-    func interpolate(_ text: String, keyword: String? = nil, page: Int? = nil, baseUrl: String? = nil) -> String {
+    static func percentEncode(_ text: String, charset: String? = nil) -> String {
+        let normalized = charset?.lowercased().replacingOccurrences(of: "-", with: "") ?? "utf8"
+        if normalized == "gbk" || normalized == "gb2312" || normalized == "gb18030" {
+            let cfEncoding = CFStringEncoding(CFStringEncodings.GB_18030_2000.rawValue)
+            let nsEncoding = CFStringConvertEncodingToNSStringEncoding(cfEncoding)
+            let stringEncoding = String.Encoding(rawValue: nsEncoding)
+            if let data = text.data(using: stringEncoding) {
+                return data.map { byte in
+                    if (byte >= 0x41 && byte <= 0x5A) || // A-Z
+                       (byte >= 0x61 && byte <= 0x7A) || // a-z
+                       (byte >= 0x30 && byte <= 0x39) || // 0-9
+                       byte == 0x2D || byte == 0x5F || byte == 0x2E || byte == 0x7E {
+                        return String(UnicodeScalar(byte))
+                    } else {
+                        return String(format: "%%%02X", byte)
+                    }
+                }.joined()
+            }
+        }
+        return text.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? text
+    }
+
+    func interpolate(_ text: String, keyword: String? = nil, page: Int? = nil, baseUrl: String? = nil, charset: String? = nil) -> String {
         var output = text
         if let keyword {
-            let encoded = keyword.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? keyword
+            let encoded = Self.percentEncode(keyword, charset: charset)
             output = output.replacingOccurrences(of: "{{key}}", with: encoded)
             output = output.replacingOccurrences(of: "{{keyword}}", with: encoded)
             output = output.replacingOccurrences(of: "{key}", with: encoded)

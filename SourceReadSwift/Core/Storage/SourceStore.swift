@@ -51,135 +51,178 @@ final class SourceStore: ObservableObject {
         )
     ]
 
-    nonisolated static let defaultBookSourcesJSON = """
-    [
-      {
-        "bookSourceName": "久久小说网",
-        "bookSourceUrl": "https://www.aijjxs.com",
-        "bookSourceGroup": "官方精选",
-        "bookSourceType": 0,
-        "enabled": true,
-        "weight": 100,
-        "searchUrl": "https://www.aijjxs.com/search.php?q={{key}}",
-        "ruleSearch": {
-          "bookList": ".txt-list li",
-          "name": "span.s2 a@text",
-          "author": "span.s4@text",
-          "bookUrl": "span.s2 a@href",
-          "lastChapter": "span.s3 a@text"
-        },
-        "ruleBookInfo": {
-          "name": "h1@text",
-          "author": ".info span:contains(作 者)@text##作.*者：",
-          "intro": ".intro@text",
-          "tocUrl": ".btn-group a:contains(点击阅读)@href"
-        },
-        "ruleToc": {
-          "chapterList": ".section-box li a",
-          "chapterName": "text",
-          "chapterUrl": "href"
-        },
-        "ruleContent": {
-          "content": "#content@html"
-        }
-      },
-      {
-        "bookSourceName": "快眼看书",
-        "bookSourceUrl": "https://www.bookhai.com",
-        "bookSourceGroup": "官方精选",
-        "bookSourceType": 0,
-        "enabled": true,
-        "weight": 95,
-        "searchUrl": "https://www.bookhai.com/search.php?q={{key}}",
-        "ruleSearch": {
-          "bookList": ".txt-list li",
-          "name": "span.s2 a@text",
-          "author": "span.s4@text",
-          "bookUrl": "span.s2 a@href",
-          "lastChapter": "span.s3 a@text"
-        },
-        "ruleBookInfo": {
-          "name": "h1@text",
-          "author": ".info span:contains(作 者)@text##作.*者：",
-          "intro": ".intro@text",
-          "tocUrl": ".btn-group a:contains(点击阅读)@href"
-        },
-        "ruleToc": {
-          "chapterList": ".section-box li a",
-          "chapterName": "text",
-          "chapterUrl": "href"
-        },
-        "ruleContent": {
-          "content": "#content@html"
-        }
-      },
-      {
-        "bookSourceName": "无极小说",
-        "bookSourceUrl": "https://www.wjxsw.net",
-        "bookSourceGroup": "官方精选",
-        "bookSourceType": 0,
-        "enabled": true,
-        "weight": 90,
-        "searchUrl": "https://www.wjxsw.net/search.php?q={{key}}",
-        "ruleSearch": {
-          "bookList": ".txt-list li",
-          "name": "span.s2 a@text",
-          "author": "span.s4@text",
-          "bookUrl": "span.s2 a@href"
-        },
-        "ruleBookInfo": {
-          "name": "h1@text",
-          "author": ".info span:contains(作 者)@text##作.*者：",
-          "intro": ".intro@text"
-        },
-        "ruleToc": {
-          "chapterList": ".section-box li a",
-          "chapterName": "text",
-          "chapterUrl": "href"
-        },
-        "ruleContent": {
-          "content": "#content@html"
-        }
-      },
-      {
-        "bookSourceName": "飘天文学",
-        "bookSourceUrl": "http://www.piaotia.com",
-        "bookSourceGroup": "官方精选",
-        "bookSourceType": 0,
-        "enabled": true,
-        "weight": 85,
-        "searchUrl": "http://www.piaotia.com/modules/article/search.php?searchkey={{key}}&searchtype=articlename,{\"charset\":\"gbk\"}",
-        "ruleSearch": {
-          "bookList": "table.grid tr!0",
-          "name": "td.odd:nth-child(1) a@text",
-          "author": "td.odd:nth-child(3)@text",
-          "bookUrl": "td.odd:nth-child(1) a@href",
-          "lastChapter": "td.even:nth-child(2) a@text"
-        },
-        "ruleBookInfo": {
-          "name": "h1@text",
-          "author": "td:contains(作 者)@text##作.*者：",
-          "intro": ".intro@text",
-          "tocUrl": "a:contains(完整目录)@href"
-        },
-        "ruleToc": {
-          "chapterList": ".centent ul li a",
-          "chapterName": "text",
-          "chapterUrl": "href"
-        },
-        "ruleContent": {
-          "content": "#content@html"
-        }
-      }
-    ]
-    """
-
     nonisolated static var defaultBookSources: [BookSource] {
-        guard let data = defaultBookSourcesJSON.data(using: .utf8),
-              let sources = try? JSONDecoder().decode([BookSource].self, from: data) else {
-            return []
+        [
+            BookSource(
+                bookSourceName: "新版笔趣阁",
+                bookSourceUrl: "https://www.biquge8.xyz",
+                bookSourceGroup: "官方精选",
+                bookSourceType: 0,
+                enabled: true,
+                weight: 100,
+                searchUrl: "https://www.biquge8.xyz/search?keyword={{key}}",
+                ruleSearch: SourceRule(fields: [
+                    "bookList": "ul.flex li",
+                    "name": "h2@text",
+                    "author": ".li_bottom a[href*='/author/']@text",
+                    "bookUrl": "a[href^='/']:not([href*='/author/'])@href",
+                    "coverUrl": "img@crs||img@src",
+                    "intro": ".indent@text",
+                    "kind": ".img_span span@text"
+                ]),
+                ruleBookInfo: SourceRule(fields: [
+                    "name": ".novel_info_title h1@text",
+                    "author": ".novel_info_title a[href*='/author/']@text",
+                    "coverUrl": ".novel_info_main img@src",
+                    "intro": ".novel_info_main .indent@text",
+                    "kind": ".novel_info_title p span.0@text",
+                    "lastChapter": ".to100 a@text"
+                ]),
+                ruleToc: SourceRule(fields: [
+                    "chapterList": ".chapter_list li a",
+                    "chapterName": "@text",
+                    "chapterUrl": "@href"
+                ]),
+                ruleContent: SourceRule(fields: [
+                    "content": "#bodybox@html||#article@html||#content@html",
+                    "nextContentUrl": "#next_page@href"
+                ]),
+                header: "{\"User-Agent\":\"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36\"}"
+            ),
+            BookSource(
+                bookSourceName: "六月中文网",
+                bookSourceUrl: "https://www.6yzw.org/",
+                bookSourceGroup: "官方精选",
+                bookSourceType: 0,
+                enabled: true,
+                weight: 95,
+                searchUrl: "https://www.6yzw.org/search.php?q={{key}}",
+                ruleSearch: SourceRule(fields: [
+                    "bookList": ".box.hot .col-12",
+                    "name": "h3 a@text##\\[.*?\\]##",
+                    "author": ".book_other.0@text##^作者：##",
+                    "bookUrl": "dt a@href",
+                    "coverUrl": "dt img@src",
+                    "lastChapter": ".book_other.3 a@text"
+                ]),
+                ruleBookInfo: SourceRule(fields: [
+                    "name": ".info h1@text",
+                    "author": ".info li.0 a@text",
+                    "coverUrl": "img.img-thumbnail@src",
+                    "intro": "#intro_pc@ownText",
+                    "lastChapter": ".info li.3 a@text"
+                ]),
+                ruleToc: SourceRule(fields: [
+                    "chapterList": ".book_list2 li a",
+                    "chapterName": "@text",
+                    "chapterUrl": "@href"
+                ]),
+                ruleContent: SourceRule(fields: [
+                    "content": ".font_max@html##<br>&nbsp;&nbsp;&nbsp;&nbsp;第\\(\\d+/\\d+\\)页<br>|<br>##",
+                    "nextContentUrl": "text.下一章@href"
+                ]),
+                header: "{\"User-Agent\":\"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36\"}"
+            ),
+            BookSource(
+                bookSourceName: "飘天文学",
+                bookSourceUrl: "https://www.piaotia.com",
+                bookSourceGroup: "官方精选",
+                bookSourceType: 0,
+                enabled: true,
+                weight: 90,
+                searchUrl: "https://www.piaotia.com/modules/article/search.php?searchkey={{key}}&searchtype=articlename,{\"charset\":\"gbk\"}",
+                ruleSearch: SourceRule(fields: [
+                    "bookList": "table.grid tr!0",
+                    "name": "td.odd:nth-child(1) a@text",
+                    "author": "td.odd:nth-child(3)@text",
+                    "bookUrl": "td.odd:nth-child(1) a@href",
+                    "lastChapter": "td.even:nth-child(2) a@text"
+                ]),
+                ruleBookInfo: SourceRule(fields: [
+                    "name": "h1@text",
+                    "author": "td:contains(作 者)@text##作.*者：",
+                    "intro": ".intro@text",
+                    "tocUrl": "a:contains(完整目录)@href"
+                ]),
+                ruleToc: SourceRule(fields: [
+                    "chapterList": ".centent ul li a",
+                    "chapterName": "text",
+                    "chapterUrl": "href"
+                ]),
+                ruleContent: SourceRule(fields: [
+                    "content": "#content@html"
+                ])
+            ),
+            BookSource(
+                bookSourceName: "无极小说",
+                bookSourceUrl: "https://www.wjxsw.net",
+                bookSourceGroup: "官方精选",
+                bookSourceType: 0,
+                enabled: true,
+                weight: 85,
+                searchUrl: "https://www.wjxsw.net/search.php?q={{key}}",
+                ruleSearch: SourceRule(fields: [
+                    "bookList": ".box.hot .col-12 dl",
+                    "name": "dd h3 a@text",
+                    "author": "dd:contains(作者) span@text",
+                    "bookUrl": "dt a@href",
+                    "coverUrl": "dt img@src",
+                    "lastChapter": "dd:contains(最新章节) a@text"
+                ]),
+                ruleBookInfo: SourceRule(fields: [
+                    "name": "h1@text||meta[property=og:novel:book_name]@content",
+                    "author": "meta[property=og:novel:author]@content",
+                    "intro": "meta[property=og:description]@content",
+                    "coverUrl": "meta[property=og:image]@content"
+                ]),
+                ruleToc: SourceRule(fields: [
+                    "chapterList": ".book_list li a",
+                    "chapterName": "text",
+                    "chapterUrl": "href"
+                ]),
+                ruleContent: SourceRule(fields: [
+                    "content": "#content@html||.content@html||#bodybox@html"
+                ])
+            ),
+            BookSource(
+                bookSourceName: "久久小说网",
+                bookSourceUrl: "https://www.aijjxs.com",
+                bookSourceGroup: "官方精选",
+                bookSourceType: 0,
+                enabled: true,
+                weight: 80,
+                searchUrl: "https://www.aijjxs.com/e/search/index.php,{\"method\":\"POST\",\"body\":\"show=title%2Cwriter&keyboard={{key}}\"}",
+                ruleSearch: SourceRule(fields: [
+                    "bookList": ".txt-list li",
+                    "name": "span.s2 a@text",
+                    "author": "span.s4@text",
+                    "bookUrl": "span.s2 a@href",
+                    "lastChapter": "span.s3 a@text"
+                ]),
+                ruleBookInfo: SourceRule(fields: [
+                    "name": "h1@text",
+                    "author": ".info span:contains(作 者)@text##作.*者：",
+                    "intro": ".intro@text",
+                    "tocUrl": ".btn-group a:contains(点击阅读)@href"
+                ]),
+                ruleToc: SourceRule(fields: [
+                    "chapterList": ".section-box li a",
+                    "chapterName": "text",
+                    "chapterUrl": "href"
+                ]),
+                ruleContent: SourceRule(fields: [
+                    "content": "#content@html"
+                ])
+            )
+        ]
+    }
+
+    nonisolated static var defaultBookSourcesJSON: String {
+        guard let data = try? JSONEncoder().encode(defaultBookSources),
+              let json = String(data: data, encoding: .utf8) else {
+            return "[]"
         }
-        return sources
+        return json
     }
 
     init(persistence: SourcePersistence = SourcePersistence()) {
