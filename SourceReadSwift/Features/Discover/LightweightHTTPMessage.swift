@@ -25,10 +25,16 @@ enum LightweightHTTPParseResult {
 enum LightweightHTTPParser {
     static let maximumHeaderBytes = 64 * 1024
     static let maximumBodyBytes = 2 * 1024 * 1024
-    private static let headerDelimiter = Data([13, 10, 13, 10])
+    private static let crlfHeaderDelimiter = Data([13, 10, 13, 10])
+    private static let lfHeaderDelimiter = Data([10, 10])
 
     static func parse(_ data: Data) -> LightweightHTTPParseResult {
-        guard let delimiterRange = data.range(of: headerDelimiter) else {
+        let delimiterRange: Range<Data.Index>
+        if let crlfRange = data.range(of: crlfHeaderDelimiter) {
+            delimiterRange = crlfRange
+        } else if let lfRange = data.range(of: lfHeaderDelimiter) {
+            delimiterRange = lfRange
+        } else {
             if data.count > maximumHeaderBytes {
                 return .failure(statusCode: 431, message: "Request headers too large")
             }
@@ -43,7 +49,7 @@ enum LightweightHTTPParser {
         guard let headerText = String(data: data[..<delimiterRange.lowerBound], encoding: .utf8) else {
             return .failure(statusCode: 400, message: "Invalid UTF-8 request headers")
         }
-        let headerLines = headerText.components(separatedBy: "\r\n")
+        let headerLines = headerText.replacingOccurrences(of: "\r\n", with: "\n").components(separatedBy: "\n")
         guard let requestLine = headerLines.first, !requestLine.isEmpty else {
             return .failure(statusCode: 400, message: "Empty request")
         }
@@ -54,7 +60,20 @@ enum LightweightHTTPParser {
 
         let method = requestParts[0].uppercased()
         let target = String(requestParts[1])
-        let path = target.split(separator: "?", maxSplits: 1).first.map(String.init) ?? target
+        var rawPath = target.split(separator: "?", maxSplits: 1).first.map(String.init) ?? target
+        if rawPath.contains("://") {
+            if let url = URL(string: rawPath), !url.path.isEmpty {
+                rawPath = url.path
+            } else if let schemeEnd = rawPath.range(of: "://") {
+                let afterScheme = rawPath[schemeEnd.upperBound...]
+                if let slashIdx = afterScheme.firstIndex(of: "/") {
+                    rawPath = String(afterScheme[slashIdx...])
+                } else {
+                    rawPath = "/"
+                }
+            }
+        }
+        let path = rawPath.isEmpty ? "/" : rawPath
 
         var headers: [String: String] = [:]
         for line in headerLines.dropFirst() where !line.isEmpty {

@@ -16,17 +16,29 @@ struct SourceWritingView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 24) {
                 // Header card
-                VStack(alignment: .leading, spacing: 12) {
+                VStack(alignment: .leading, spacing: 14) {
                     HStack {
                         Image(systemName: "globe")
                             .font(.system(size: 32, weight: .bold))
                             .foregroundStyle(server.isRunning ? .green : .secondary)
-                        
-                        Text("Web 写源服务")
-                            .font(.title2.bold())
-                        
+
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Web 写源服务")
+                                .font(.title2.bold())
+                            if server.isRunning {
+                                HStack(spacing: 6) {
+                                    Circle()
+                                        .fill(Color.green)
+                                        .frame(width: 8, height: 8)
+                                    Text("局域网服务运行中 · 屏幕常亮保护中")
+                                        .font(.caption)
+                                        .foregroundStyle(.green)
+                                }
+                            }
+                        }
+
                         Spacer()
-                        
+
                         Toggle("", isOn: Binding(
                             get: { server.isRunning || server.isStarting },
                             set: { newValue in
@@ -40,42 +52,69 @@ struct SourceWritingView: View {
                         .toggleStyle(SwitchToggleStyle(tint: AppTheme.accent))
                         .labelsHidden()
                     }
-                    
-                    Text(server.isRunning ? "服务已启动，请在电脑浏览器中访问下方地址进行书源录入：" : "服务已停止。开启服务后，可在局域网内的电脑上直接编辑并推送书源规则。")
+
+                    Text(server.isRunning
+                         ? "服务已启动！请保持手机在此页面（已自动常亮防休眠），在同一 Wi-Fi 下的电脑浏览器输入下方地址："
+                         : "服务已停止。开启服务后，可在局域网内的电脑浏览器上直接编写、调试、格式化并一键推送到手机。")
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
-                    
+
                     if server.isRunning {
                         VStack(alignment: .leading, spacing: 8) {
                             ForEach(server.localURLs, id: \.self) { url in
-                                Text(url)
-                                    .font(.system(.callout, design: .monospaced))
-                                    .fontWeight(.semibold)
-                                    .foregroundStyle(AppTheme.accent)
-                                    .textSelection(.enabled)
+                                HStack {
+                                    Text(url)
+                                        .font(.system(.callout, design: .monospaced))
+                                        .fontWeight(.semibold)
+                                        .foregroundStyle(AppTheme.accent)
+                                        .textSelection(.enabled)
+                                    Spacer()
+                                    Button {
+                                        UIPasteboard.general.string = url
+                                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                                    } label: {
+                                        Image(systemName: "doc.on.doc")
+                                            .font(.caption)
+                                            .foregroundStyle(.secondary)
+                                    }
+                                }
+                                .padding(.vertical, 4)
                             }
                         }
-                        .padding(.vertical, 8)
+                        .padding(.vertical, 4)
 
-                        Button {
-                            UIPasteboard.general.string = server.localURLs.joined(separator: "\n")
-                        } label: {
-                            Label("Copy server address", systemImage: "doc.on.doc")
-                                .frame(maxWidth: .infinity)
+                        HStack(spacing: 12) {
+                            Button {
+                                UIPasteboard.general.string = server.localURLs.joined(separator: "\n")
+                                UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                            } label: {
+                                Label("复制访问地址", systemImage: "doc.on.doc")
+                                    .frame(maxWidth: .infinity)
+                            }
+                            .buttonStyle(.bordered)
+
+                            Button {
+                                server.refreshAddresses()
+                                UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                            } label: {
+                                Label("刷新地址", systemImage: "arrow.clockwise")
+                                    .frame(maxWidth: .infinity)
+                            }
+                            .buttonStyle(.bordered)
                         }
-                        .buttonStyle(.bordered)
 
                         Button {
                             UIPasteboard.general.string = server.healthURLs.joined(separator: "\n")
+                            UIImpactFeedbackGenerator(style: .light).impactOccurred()
                         } label: {
-                            Label("复制健康检查地址", systemImage: "stethoscope")
+                            Label("复制健康检查地址 (/health)", systemImage: "stethoscope")
                                 .frame(maxWidth: .infinity)
                         }
                         .buttonStyle(.bordered)
 
                         Text(server.localURLs.allSatisfy { $0.contains("127.0.0.1") }
-                             ? "当前只发现本机回环地址，电脑无法通过 Wi‑Fi 访问。请连接 Wi‑Fi，并在系统设置中允许本应用使用‘本地网络’。"
-                             : "PC 无法打开时，先访问任一 /health 地址；返回 SOURCE_READ_SWIFT_WEB_OK 即表示局域网连通。请确认手机允许‘本地网络’权限，且路由器未开启 AP 隔离。")
+                             ? "⚠️ 当前只发现本机回环地址，电脑无法通过 Wi‑Fi 访问。请让手机连接 Wi‑Fi，并在系统设置中允许本应用使用‘本地网络’。"
+                             : "💡 PC 无法打开时，先访问任一 /health 地址；返回 SOURCE_READ_SWIFT_WEB_OK 即表示局域网连通。请确认手机已允许‘本地网络’权限，且路由器未开启 AP 隔离。")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
@@ -89,7 +128,7 @@ struct SourceWritingView: View {
                 .padding(20)
                 .background(Color(.secondarySystemBackground))
                 .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
-                
+
                 // Status notifications
                 if let importStatus {
                     HStack {
@@ -103,7 +142,7 @@ struct SourceWritingView: View {
                     .background(Color.green.opacity(0.1))
                     .clipShape(RoundedRectangle(cornerRadius: 12))
                 }
-                
+
                 if let importError {
                     HStack {
                         Image(systemName: "exclamationmark.triangle.fill")
@@ -116,24 +155,33 @@ struct SourceWritingView: View {
                     .background(Color.red.opacity(0.1))
                     .clipShape(RoundedRectangle(cornerRadius: 12))
                 }
-                
+
                 // Log Messages
                 VStack(alignment: .leading, spacing: 14) {
-                    Text("运行日志")
-                        .font(.headline)
-                    
+                    HStack {
+                        Text("运行日志")
+                            .font(.headline)
+                        Spacer()
+                        if !server.logMessages.isEmpty {
+                            Button("清空") {
+                                server.clearLogs()
+                            }
+                            .font(.caption)
+                        }
+                    }
+
                     if server.logMessages.isEmpty {
-                        Text("暂无日志")
+                        Text("暂无日志，等待电脑连接...")
                             .font(.subheadline)
                             .foregroundStyle(.secondary)
-                            .frame(maxWidth: .infinity, minHeight: 120, alignment: .center)
+                            .frame(maxWidth: .infinity, minHeight: 100, alignment: .center)
                             .background(Color(.secondarySystemBackground).opacity(0.5))
                             .clipShape(RoundedRectangle(cornerRadius: 12))
                     } else {
                         VStack(alignment: .leading, spacing: 8) {
-                            ForEach(server.logMessages, id: \.self) { log in
+                            ForEach(server.logMessages.prefix(15), id: \.self) { log in
                                 Text(log)
-                                    .font(.system(size: 13, design: .monospaced))
+                                    .font(.system(size: 12, design: .monospaced))
                                     .foregroundStyle(.secondary)
                                     .lineLimit(2)
                             }
@@ -146,22 +194,23 @@ struct SourceWritingView: View {
                         Button {
                             UIPasteboard.general.string = server.logMessages.joined(separator: "\n")
                         } label: {
-                            Label("Copy logs", systemImage: "doc.on.doc")
+                            Label("复制全部日志", systemImage: "doc.on.doc")
                                 .frame(maxWidth: .infinity)
                         }
                         .buttonStyle(.bordered)
                     }
                 }
-                
+
                 // Instructions
                 VStack(alignment: .leading, spacing: 14) {
-                    Text("使用说明")
+                    Text("使用指引")
                         .font(.headline)
-                    
+
                     VStack(alignment: .leading, spacing: 12) {
-                        Label("确保手机和电脑连接在同一个 Wi-Fi 网络（局域网）下。", systemImage: "wifi")
-                        Label("打开电脑浏览器，在地址栏输入上方显示的 IP 地址和端口号。", systemImage: "macbook.and.iphone")
-                        Label("在网页中粘贴您的 JSON 规则，然后点击“立即导入到手机”即可自动同步并保存。", systemImage: "square.and.arrow.down")
+                        Label("确保 iPhone 和电脑连接在同一个 Wi-Fi 或连接手机个人热点。", systemImage: "wifi")
+                        Label("打开电脑浏览器（Chrome/Edge/Safari），输入上方显示的地址。", systemImage: "macbook.and.iphone")
+                        Label("在网页中可直接填入标准模板、格式化校验 JSON、导出手机已有书源或推送新源。", systemImage: "square.and.arrow.down")
+                        Label("当前页面已开启常亮保护，请勿手动锁屏以保证服务持续响应。", systemImage: "sun.max")
                     }
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
@@ -170,9 +219,12 @@ struct SourceWritingView: View {
             .padding(AppTheme.pagePadding)
         }
         .pageBackground()
-        .navigationTitle("Web 写源")
+        .navigationTitle("Web 写源与传输")
         .navigationBarTitleDisplayMode(.inline)
         .onAppear {
+            // Prevent screen sleep while user is editing on PC
+            UIApplication.shared.isIdleTimerDisabled = true
+
             server.onJSONReceived = { jsonText in
                 do {
                     let report = try appState.sourceStore.importJSON(jsonText)
@@ -180,7 +232,6 @@ struct SourceWritingView: View {
                     DispatchQueue.main.async {
                         self.importStatus = msg
                         self.importError = nil
-                        // auto clear after 5s
                         DispatchQueue.main.asyncAfter(deadline: .now() + 5) {
                             if self.importStatus == msg {
                                 self.importStatus = nil
@@ -197,15 +248,12 @@ struct SourceWritingView: View {
                     return .failure(error)
                 }
             }
-            // Keep the web API backed by the same in-memory source store.
             server.sourceStore = appState.sourceStore
-            // Auto start server
             server.start()
         }
         .onDisappear {
-            // The editor is intentionally scoped to this screen. Stopping the
-            // listener when the user leaves avoids a stale LAN endpoint and
-            // makes the next visit re-discover the current Wi‑Fi address.
+            // Restore normal screen sleep
+            UIApplication.shared.isIdleTimerDisabled = false
             server.stop()
         }
     }
@@ -232,25 +280,40 @@ final class LightweightHTTPServer: ObservableObject {
     private var connections: [NWConnection] = []
     private let lockQueue = DispatchQueue(label: "com.sourceread.server.lock")
     var onJSONReceived: ((String) -> Result<String, Error>)?
-    
+
     init(sourceStore: SourceStore? = nil) {
         self.sourceStore = sourceStore
         self.localIP = getLocalIPAddresses().first ?? "127.0.0.1"
     }
-    
+
+    func refreshAddresses() {
+        let addresses = getLocalIPAddresses()
+        self.localIP = addresses.first ?? "127.0.0.1"
+        self.localURLs = self.webURLs()
+        self.log("已刷新网络接口，当前地址：\(self.localURLs.joined(separator: ", "))")
+    }
+
+    func clearLogs() {
+        self.logMessages.removeAll()
+    }
+
     func start() {
         guard !isRunning, !isStarting else { return }
         isStarting = true
         lastError = nil
         localIP = getLocalIPAddresses().first ?? "127.0.0.1"
+
         let parameters = NWParameters.tcp
         parameters.allowLocalEndpointReuse = true
         parameters.includePeerToPeer = true
+
         let candidates = [port] + (1122...1132).map(UInt16.init).filter { $0 != port }
         var lastStartError: Error?
         for candidate in candidates {
             do {
-                listener = try NWListener(using: parameters, on: NWEndpoint.Port(rawValue: candidate) ?? 8080)
+                let l = try NWListener(using: parameters, on: NWEndpoint.Port(rawValue: candidate) ?? 8080)
+                l.service = NWListener.Service(name: "SourceRead", type: "_http._tcp")
+                listener = l
                 port = candidate
                 lastStartError = nil
                 break
@@ -262,8 +325,8 @@ final class LightweightHTTPServer: ObservableObject {
 
         guard listener != nil else {
             isStarting = false
-            lastError = "无法创建 Listener：\(lastStartError?.localizedDescription ?? "端口不可用")"
-            log(lastError ?? "无法创建 Listener")
+            lastError = "无法创建网络监听：\(lastStartError?.localizedDescription ?? "端口不可用")"
+            log(lastError ?? "无法创建网络监听")
             return
         }
 
@@ -299,7 +362,7 @@ final class LightweightHTTPServer: ObservableObject {
 
         listener?.start(queue: DispatchQueue.global(qos: .userInitiated))
     }
-    
+
     func stop() {
         listener?.cancel()
         listener = nil
@@ -314,7 +377,7 @@ final class LightweightHTTPServer: ObservableObject {
         isStarting = false
         localURLs = []
     }
-    
+
     private func handleNewConnection(_ connection: NWConnection) {
         lockQueue.async { [weak self] in
             self?.connections.append(connection)
@@ -334,16 +397,16 @@ final class LightweightHTTPServer: ObservableObject {
         connection.start(queue: DispatchQueue.global(qos: .default))
         receiveRequest(on: connection, accumulated: Data())
     }
-    
+
     private func receiveRequest(on connection: NWConnection, accumulated: Data) {
         connection.receive(minimumIncompleteLength: 1, maximumLength: 65536) { [weak self] data, context, isComplete, error in
             guard let self = self else { return }
             if let error = error {
-                self.log("连接接收错误: \(error)")
+                self.log("连接读取错误: \(error)")
                 connection.cancel()
                 return
             }
-            
+
             guard let data = data, !data.isEmpty else {
                 if isComplete {
                     connection.cancel()
@@ -372,10 +435,13 @@ final class LightweightHTTPServer: ObservableObject {
 
     private static func statusText(for statusCode: Int) -> String {
         switch statusCode {
+        case 200: return "OK"
         case 204: return "No Content"
         case 400: return "Bad Request"
+        case 404: return "Not Found"
         case 413: return "Payload Too Large"
         case 431: return "Request Header Fields Too Large"
+        case 500: return "Internal Server Error"
         case 501: return "Not Implemented"
         default: return "Error"
         }
@@ -383,14 +449,11 @@ final class LightweightHTTPServer: ObservableObject {
 
     private func handleHttpRequest(_ request: LightweightHTTPRequest, connection: NWConnection) {
         let method = request.method
-        // Browsers append cache-busting query items and routinely probe for
-        // `/favicon.ico`. Route on the URL path only so `/api/status?ts=...`
-        // remains compatible with the same lightweight server.
         let path = request.path
-        
+
         if method == "OPTIONS" {
             sendResponse(connection: connection, statusCode: 204, statusText: "No Content", contentType: "text/plain; charset=utf-8", body: "")
-        } else if method == "GET" && (path == "/" || path == "/index.html") {
+        } else if method == "GET" && (path == "/" || path == "/index.html" || path.isEmpty) {
             let html = getWebPageHtml()
             sendResponse(connection: connection, statusCode: 200, statusText: "OK", contentType: "text/html; charset=utf-8", body: html)
         } else if (method == "GET" || method == "HEAD") && path == "/health" {
@@ -400,7 +463,9 @@ final class LightweightHTTPServer: ObservableObject {
             sendResponse(connection: connection, statusCode: 204, statusText: "No Content", contentType: "image/x-icon", body: "", includeBody: false)
         } else if method == "GET" && path == "/api/status" {
             respondWithSourceStore(connection: connection) { store in
-                let body = #"{"ok":true,"service":"source-writing","port":\#(self.port),"sourceCount":\#(store?.sources.count ?? 0),"enabledSourceCount":\#(store?.sources.filter(\.enabled).count ?? 0)}"#
+                let count = store?.sources.count ?? 0
+                let enabledCount = store?.sources.filter(\.enabled).count ?? 0
+                let body = #"{"ok":true,"service":"source-writing","port":#(self.port),"sourceCount":#(count),"enabledSourceCount":#(enabledCount)}"#
                 self.sendResponse(connection: connection, statusCode: 200, statusText: "OK", contentType: "application/json; charset=utf-8", body: body)
             }
         } else if method == "GET" && path == "/api/sources" {
@@ -428,7 +493,7 @@ final class LightweightHTTPServer: ObservableObject {
             sendResponse(connection: connection, statusCode: 404, statusText: "Not Found", contentType: "text/plain; charset=utf-8", body: "Not Found")
         }
     }
-    
+
     private func importSourceJSON(_ text: String, connection: NWConnection? = nil) {
         guard let onJSONReceived else {
             if let connection { sendResponse(connection: connection, statusCode: 500, statusText: "Internal Error", contentType: "text/plain; charset=utf-8", body: "No import handler registered") }
@@ -441,10 +506,10 @@ final class LightweightHTTPServer: ObservableObject {
             switch result {
             case .success(let message):
                 self.log("导入成功：\(message)")
-                self.sendResponse(connection: connection, statusCode: 200, statusText: "OK", contentType: "application/json; charset=utf-8", body: #"{"ok":true,"message":"\#(self.jsonEscape(message))"}"#)
+                self.sendResponse(connection: connection, statusCode: 200, statusText: "OK", contentType: "application/json; charset=utf-8", body: #"{"ok":true,"message":"#(self.jsonEscape(message))"}"#)
             case .failure(let error):
                 self.log("导入失败：\(error.localizedDescription)")
-                self.sendResponse(connection: connection, statusCode: 400, statusText: "Bad Request", contentType: "application/json; charset=utf-8", body: #"{"ok":false,"error":"\#(self.jsonEscape(error.localizedDescription))"}"#)
+                self.sendResponse(connection: connection, statusCode: 400, statusText: "Bad Request", contentType: "application/json; charset=utf-8", body: #"{"ok":false,"error":"#(self.jsonEscape(error.localizedDescription))"}"#)
             }
         }
     }
@@ -459,7 +524,7 @@ final class LightweightHTTPServer: ObservableObject {
     private func sendJSON<T: Encodable>(connection: NWConnection, value: T) {
         do {
             let encoder = JSONEncoder()
-            encoder.outputFormatting = [.sortedKeys]
+            encoder.outputFormatting = [.sortedKeys, .prettyPrinted]
             let data = try encoder.encode(value)
             sendResponse(connection: connection, statusCode: 200, statusText: "OK", contentType: "application/json; charset=utf-8", body: String(decoding: data, as: UTF8.self))
         } catch {
@@ -493,20 +558,32 @@ final class LightweightHTTPServer: ObservableObject {
         Connection: close\r
         \r
         """
-        
+
         var responseData = responseHeader.data(using: .utf8) ?? Data()
         if includeBody {
             responseData.append(responseBodyData)
         }
-        
-        connection.send(content: responseData, completion: .contentProcessed { [weak self] error in
-            if let error = error {
-                self?.log("发送响应错误: \(error)")
+
+        // Critical: pass contentContext: .finalMessage and isComplete: true.
+        // This instructs the TCP stack to transmit all bytes and then send a graceful FIN packet.
+        // Calling connection.cancel() inside completion immediately sends a TCP RST (reset)
+        // which causes Chrome/Edge to display "ERR_CONNECTION_RESET" or "ERR_EMPTY_RESPONSE" (打开啥也没有).
+        connection.send(
+            content: responseData,
+            contentContext: .finalMessage,
+            isComplete: true,
+            completion: .contentProcessed { [weak self] error in
+                if let error = error {
+                    self?.log("发送响应错误: \(error)")
+                }
+                // Allow TCP FIN handshake to flush completely before tearing down
+                DispatchQueue.global().asyncAfter(deadline: .now() + 1.5) {
+                    connection.cancel()
+                }
             }
-            connection.cancel()
-        })
+        )
     }
-    
+
     private func log(_ message: String) {
         let formatter = DateFormatter()
         formatter.dateFormat = "HH:mm:ss"
@@ -522,9 +599,6 @@ final class LightweightHTTPServer: ObservableObject {
     private func webURLs() -> [String] {
         var seen = Set<String>()
         var urls: [String] = []
-        // Prefer Wi‑Fi/private IPv4 addresses.  Loopback is only a last-resort
-        // diagnostic endpoint and should not be presented ahead of a usable LAN
-        // address on devices with multiple interfaces.
         let addresses = getLocalIPAddresses()
         for ip in addresses + [localIP, "127.0.0.1"] {
             guard !ip.isEmpty, seen.insert(ip).inserted else { continue }
@@ -540,173 +614,266 @@ final class LightweightHTTPServer: ObservableObject {
     private func stableWebPageHtml() -> String {
         return """
         <!DOCTYPE html>
-        <html lang="en">
+        <html lang="zh-CN">
         <head>
             <meta charset="utf-8">
             <meta name="viewport" content="width=device-width, initial-scale=1.0">
-            <title>SourceRead Web Source Import</title>
+            <title>源阅读 Web 写源与管理后台 · SourceRead Studio</title>
             <style>
                 :root {
-                    --primary: #5c50ec;
-                    --bg: #f5f5f8;
-                    --card: rgba(255,255,255,.84);
-                    --text: #16161d;
-                    --muted: #6f6f7a;
-                    --border: rgba(92,80,236,.18);
+                    --primary: #4f46e5;
+                    --primary-hover: #4338ca;
+                    --bg: #f8fafc;
+                    --card: #ffffff;
+                    --text: #0f172a;
+                    --muted: #64748b;
+                    --border: #e2e8f0;
+                    --success: #10b981;
+                    --error: #ef4444;
+                    --code-bg: #f1f5f9;
                 }
+                @media (prefers-color-scheme: dark) {
+                    :root {
+                        --bg: #0b0f19;
+                        --card: #151d2e;
+                        --text: #f8fafc;
+                        --muted: #94a3b8;
+                        --border: #1e293b;
+                        --code-bg: #0f172a;
+                    }
+                }
+                * { box-sizing: border-box; margin: 0; padding: 0; }
                 body {
                     min-height: 100vh;
-                    margin: 0;
-                    padding: 24px;
-                    box-sizing: border-box;
-                    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", sans-serif;
-                    background:
-                        radial-gradient(circle at top left, rgba(92,80,236,.20), transparent 32rem),
-                        radial-gradient(circle at bottom right, rgba(88,186,255,.18), transparent 30rem),
-                        var(--bg);
+                    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+                    background: var(--bg);
                     color: var(--text);
+                    display: flex;
+                    flex-direction: column;
+                    align-items: center;
+                    padding: 24px 16px;
+                    line-height: 1.5;
+                }
+                .container {
+                    max-width: 860px;
+                    width: 100%;
+                    background: var(--card);
+                    border: 1px solid var(--border);
+                    border-radius: 20px;
+                    box-shadow: 0 10px 40px rgba(0,0,0,0.06);
+                    padding: 28px;
+                }
+                .header {
+                    display: flex;
+                    align-items: center;
+                    justify-content: space-between;
+                    margin-bottom: 20px;
+                    padding-bottom: 16px;
+                    border-bottom: 1px solid var(--border);
+                }
+                .brand {
+                    display: flex;
+                    align-items: center;
+                    gap: 12px;
+                }
+                .brand-icon {
+                    width: 40px;
+                    height: 40px;
+                    border-radius: 10px;
+                    background: linear-gradient(135deg, #4f46e5, #06b6d4);
                     display: flex;
                     align-items: center;
                     justify-content: center;
+                    color: white;
+                    font-weight: 900;
+                    font-size: 20px;
                 }
-                .container {
-                    max-width: 720px;
-                    width: 100%;
-                    padding: 28px;
-                    box-sizing: border-box;
-                    border-radius: 28px;
-                    background: var(--card);
-                    border: 1px solid rgba(255,255,255,.62);
-                    box-shadow: 0 28px 80px rgba(20,20,40,.12);
-                    backdrop-filter: blur(28px) saturate(1.45);
-                    -webkit-backdrop-filter: blur(28px) saturate(1.45);
-                }
-                h1 {
-                    margin: 0 0 8px;
-                    font-size: 28px;
-                    line-height: 1.15;
-                    letter-spacing: -.6px;
-                }
-                .subtitle {
-                    margin: 0 0 22px;
-                    color: var(--muted);
-                    font-size: 14px;
-                    line-height: 1.65;
-                }
-                .pill {
-                    display: inline-flex;
-                    margin-bottom: 14px;
-                    padding: 7px 11px;
-                    border-radius: 999px;
-                    background: rgba(92,80,236,.10);
-                    color: var(--primary);
-                    font-size: 12px;
+                .brand-title h1 {
+                    font-size: 20px;
                     font-weight: 700;
                 }
-                .actions {
-                    display: grid;
-                    grid-template-columns: 1fr 1fr;
-                    gap: 10px;
-                    margin-top: 12px;
-                }
-                .actions button {
-                    margin-top: 0;
-                    padding: 12px 14px;
+                .brand-title p {
                     font-size: 13px;
-                    background: rgba(92,80,236,.10);
-                    color: var(--primary);
-                    box-shadow: none;
-                }
-                .status {
-                    margin: 14px 0 0;
-                    padding: 11px 13px;
-                    border-radius: 14px;
-                    background: rgba(92,80,236,.07);
                     color: var(--muted);
+                }
+                .badge {
+                    display: inline-flex;
+                    align-items: center;
+                    gap: 6px;
+                    padding: 6px 12px;
+                    border-radius: 999px;
+                    background: rgba(16, 185, 129, 0.12);
+                    color: var(--success);
                     font-size: 12px;
-                    line-height: 1.5;
-                    white-space: pre-wrap;
+                    font-weight: 600;
+                }
+                .badge-dot {
+                    width: 8px;
+                    height: 8px;
+                    border-radius: 50%;
+                    background: var(--success);
+                    box-shadow: 0 0 8px var(--success);
+                    animation: pulse 2s infinite;
+                }
+                @keyframes pulse {
+                    0% { opacity: 0.6; }
+                    50% { opacity: 1; }
+                    100% { opacity: 0.6; }
+                }
+                .editor-wrapper {
+                    position: relative;
+                    margin-bottom: 16px;
                 }
                 textarea {
                     width: 100%;
-                    min-height: 330px;
-                    padding: 18px;
+                    min-height: 380px;
+                    padding: 16px;
                     border: 1px solid var(--border);
-                    border-radius: 20px;
-                    font-family: Menlo, Monaco, Consolas, "Courier New", monospace;
-                    font-size: 13px;
-                    line-height: 1.55;
-                    box-sizing: border-box;
-                    resize: vertical;
-                    background: rgba(255,255,255,.74);
+                    border-radius: 14px;
+                    background: var(--code-bg);
                     color: var(--text);
+                    font-family: "Fira Code", Menlo, Monaco, Consolas, monospace;
+                    font-size: 13px;
+                    line-height: 1.6;
+                    resize: vertical;
+                    outline: none;
+                    transition: border-color 0.2s, box-shadow 0.2s;
                 }
                 textarea:focus {
-                    outline: none;
                     border-color: var(--primary);
-                    box-shadow: 0 0 0 4px rgba(92,80,236,.12);
+                    box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.15);
+                }
+                .toolbar {
+                    display: flex;
+                    flex-wrap: wrap;
+                    gap: 10px;
+                    margin-bottom: 18px;
                 }
                 button {
-                    width: 100%;
-                    margin-top: 18px;
-                    padding: 16px 18px;
-                    border: 0;
-                    border-radius: 18px;
-                    background-color: var(--primary);
-                    color: white;
-                    font-size: 15px;
-                    font-weight: 800;
+                    padding: 10px 16px;
+                    border-radius: 10px;
+                    font-size: 13px;
+                    font-weight: 600;
                     cursor: pointer;
-                    box-shadow: 0 14px 30px rgba(92,80,236,.24);
-                    transition: transform .16s ease, opacity .16s ease;
+                    border: 1px solid var(--border);
+                    background: var(--card);
+                    color: var(--text);
+                    transition: all 0.15s ease;
+                    display: inline-flex;
+                    align-items: center;
+                    gap: 6px;
                 }
-                button:active { transform: scale(.985); }
-                button:disabled { opacity: .55; cursor: wait; }
+                button:hover {
+                    background: var(--border);
+                }
+                button.btn-primary {
+                    background: var(--primary);
+                    border-color: var(--primary);
+                    color: white;
+                    flex: 1;
+                    min-width: 200px;
+                    justify-content: center;
+                    font-size: 14px;
+                    padding: 12px 20px;
+                }
+                button.btn-primary:hover {
+                    background: var(--primary-hover);
+                }
+                button:disabled {
+                    opacity: 0.6;
+                    cursor: not-allowed;
+                }
+                .status-box {
+                    background: var(--code-bg);
+                    border: 1px solid var(--border);
+                    border-radius: 10px;
+                    padding: 12px 16px;
+                    font-size: 12px;
+                    color: var(--muted);
+                    margin-bottom: 16px;
+                    display: flex;
+                    align-items: center;
+                    justify-content: space-between;
+                }
+                .footer {
+                    margin-top: 24px;
+                    text-align: center;
+                    font-size: 12px;
+                    color: var(--muted);
+                }
                 .toast {
                     position: fixed;
-                    top: -100px;
-                    left: 50%;
-                    transform: translateX(-50%);
-                    padding: 16px 24px;
-                    border-radius: 16px;
+                    top: 24px;
+                    right: 24px;
+                    padding: 14px 22px;
+                    border-radius: 12px;
                     color: white;
-                    font-weight: 700;
-                    box-shadow: 0 10px 30px rgba(0,0,0,.15);
-                    transition: all .35s cubic-bezier(.2,.8,.2,1);
-                    z-index: 1000;
-                    text-align: center;
-                    min-width: 300px;
+                    font-size: 14px;
+                    font-weight: 600;
+                    box-shadow: 0 10px 30px rgba(0,0,0,0.15);
+                    transform: translateY(-50px);
+                    opacity: 0;
+                    transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+                    z-index: 9999;
+                    pointer-events: none;
                 }
-                .toast.success { background-color: #10b981; }
-                .toast.error { background-color: #ef4444; }
-                .toast.show { top: 24px; }
-                .footer { margin-top: 16px; color: var(--muted); font-size: 12px; text-align: center; }
+                .toast.show {
+                    transform: translateY(0);
+                    opacity: 1;
+                }
+                .toast.success { background: var(--success); }
+                .toast.error { background: var(--error); }
             </style>
         </head>
         <body>
             <div class="container">
-                <div class="pill">LAN source writer</div>
-                <h1>Web Source Import</h1>
-                <p class="subtitle">Paste Legado 3.0 JSON, iOS-compatible JSON, or a JSON source array. The content will be imported into the iPhone app.</p>
-                <textarea id="json-input" placeholder='Paste JSON book source here, for example:
-        [
-          {
-            "bookSourceName": "Example",
-            "bookSourceUrl": "https://example.invalid",
-            "searchUrl": "https://example.invalid/search?q={{key}}"
-          }
-        ]'></textarea>
-                <button id="import-btn" onclick="performImport()">Import to iPhone</button>
-                <div class="actions">
-                    <button onclick="insertTemplate()">Insert template</button>
-                    <button onclick="formatJSON()">Format JSON</button>
-                    <button onclick="refreshStatus()">Refresh status</button>
-                    <button onclick="exportSources()">Export sources</button>
+                <div class="header">
+                    <div class="brand">
+                        <div class="brand-icon">源</div>
+                        <div class="brand-title">
+                            <h1>源阅读 Web 写源与管理后台</h1>
+                            <p>SourceRead Web Studio · 局域网高速传输</p>
+                        </div>
+                    </div>
+                    <div class="badge">
+                        <div class="badge-dot"></div>
+                        <span id="badge-text">已连接 iPhone</span>
+                    </div>
                 </div>
-                <div id="status" class="status">Status not loaded yet.</div>
-                <div class="footer">Keep this page and the iPhone on the same Wi-Fi. API: <code>/api/status</code> · <code>/api/sources</code> · <code>/api/sources/export</code></div>
+
+                <div class="toolbar">
+                    <button type="button" onclick="insertTemplate()">📝 填入标准模板 (Legado 3.0)</button>
+                    <button type="button" onclick="formatJSON()">✨ 格式化 JSON</button>
+                    <button type="button" onclick="minifyJSON()">📦 压缩 JSON</button>
+                    <button type="button" onclick="exportSources()">📥 导出手机全部书源</button>
+                    <button type="button" onclick="clearInput()">🗑️ 清空</button>
+                </div>
+
+                <div class="editor-wrapper">
+                    <textarea id="json-input" placeholder="在此粘贴 Legado 3.0 书源规则 JSON，或点击上方“填入标准模板”进行编辑..."></textarea>
+                </div>
+
+                <div style="display: flex; gap: 12px; margin-bottom: 16px;">
+                    <button id="import-btn" class="btn-primary" onclick="performImport()">
+                        🚀 立即导入到手机 (Import to iPhone)
+                    </button>
+                    <button type="button" onclick="refreshStatus()">
+                        🔄 刷新状态
+                    </button>
+                </div>
+
+                <div id="status-box" class="status-box">
+                    <span id="status-text">正在探测 iPhone 服务状态...</span>
+                    <span id="status-meta">Port: --</span>
+                </div>
+
+                <div class="footer">
+                    提示：请保持手机屏幕常亮并处于 Web 写源页面 · 本机与 iPhone 需在同一 Wi-Fi 或热点下
+                </div>
             </div>
+
             <div id="toast" class="toast"></div>
+
             <script>
                 function insertTemplate() {
                     const template = [
@@ -733,22 +900,41 @@ final class LightweightHTTPServer: ObservableObject {
                       }
                     ];
                     document.getElementById('json-input').value = JSON.stringify(template, null, 2);
-                    showToast('Template inserted.', true);
+                    showToast('已填入标准 Legado 3.0 书源模板', true);
                 }
 
                 function formatJSON() {
+                    const input = document.getElementById('json-input');
+                    const text = input.value.trim();
+                    if (!text) {
+                        showToast('请输入或粘贴 JSON 内容', false);
+                        return;
+                    }
                     try {
-                        const input = document.getElementById('json-input');
-                        const text = input.value.trim();
-                        if (!text) {
-                            showToast('Input is empty.', false);
-                            return;
-                        }
                         const parsed = JSON.parse(text);
                         input.value = JSON.stringify(parsed, null, 2);
-                        showToast('JSON formatted.', true);
+                        showToast('JSON 格式化成功', true);
                     } catch (e) {
-                        showToast('Format error: ' + e.message, false);
+                        showToast('JSON 语法错误: ' + e.message, false);
+                    }
+                }
+
+                function minifyJSON() {
+                    const input = document.getElementById('json-input');
+                    const text = input.value.trim();
+                    if (!text) return;
+                    try {
+                        const parsed = JSON.parse(text);
+                        input.value = JSON.stringify(parsed);
+                        showToast('JSON 压缩完成', true);
+                    } catch (e) {
+                        showToast('压缩失败: ' + e.message, false);
+                    }
+                }
+
+                function clearInput() {
+                    if (confirm('确认清空当前编辑区内容？')) {
+                        document.getElementById('json-input').value = '';
                     }
                 }
 
@@ -756,74 +942,79 @@ final class LightweightHTTPServer: ObservableObject {
                     const toast = document.getElementById('toast');
                     toast.textContent = message;
                     toast.className = 'toast ' + (isSuccess ? 'success' : 'error') + ' show';
-                    setTimeout(() => toast.classList.remove('show'), 4000);
-                }
-
-                function setStatus(message) {
-                    document.getElementById('status').textContent = message;
+                    setTimeout(() => toast.classList.remove('show'), 3500);
                 }
 
                 async function refreshStatus() {
-                    setStatus('Loading source status...');
+                    const statusText = document.getElementById('status-text');
+                    const statusMeta = document.getElementById('status-meta');
+                    const badgeText = document.getElementById('badge-text');
                     try {
-                        const response = await fetch('/api/status', { cache: 'no-store' });
-                        const payload = await response.json();
-                        if (!response.ok || !payload.ok) throw new Error(payload.error || ('HTTP ' + response.status));
-                        setStatus('Online · port ' + payload.port + '\\nSources: ' + payload.sourceCount + ' total · ' + payload.enabledSourceCount + ' enabled');
-                    } catch (error) {
-                        setStatus('Status unavailable: ' + error);
+                        const res = await fetch('/api/status', { cache: 'no-store' });
+                        if (!res.ok) throw new Error('HTTP ' + res.status);
+                        const data = await res.json();
+                        statusText.textContent = '在线 · 手机已有书源 ' + data.sourceCount + ' 个（' + data.enabledSourceCount + ' 个已启用）';
+                        statusMeta.textContent = 'Port: ' + data.port;
+                        badgeText.textContent = '已连接 iPhone (' + data.sourceCount + ' 源)';
+                    } catch (err) {
+                        statusText.textContent = '服务在线 · 状态更新中 (' + err.message + ')';
+                        statusMeta.textContent = 'Port: OK';
                     }
                 }
 
                 async function exportSources() {
                     try {
-                        const response = await fetch('/api/sources/export', { cache: 'no-store' });
-                        if (!response.ok) throw new Error('HTTP ' + response.status);
-                        const blob = await response.blob();
-                        const anchor = document.createElement('a');
-                        anchor.href = URL.createObjectURL(blob);
-                        anchor.download = 'sourceread-sources-' + new Date().toISOString().slice(0, 10) + '.json';
-                        anchor.click();
-                        URL.revokeObjectURL(anchor.href);
-                        showToast('Sources exported.', true);
-                    } catch (error) {
-                        showToast('Export failed: ' + error, false);
+                        const res = await fetch('/api/sources/export', { cache: 'no-store' });
+                        if (!res.ok) throw new Error('HTTP ' + res.status);
+                        const blob = await res.blob();
+                        const a = document.createElement('a');
+                        a.href = URL.createObjectURL(blob);
+                        a.download = 'SourceRead-Backup-' + new Date().toISOString().slice(0,10) + '.json';
+                        a.click();
+                        URL.revokeObjectURL(a.href);
+                        showToast('手机书源已成功导出到电脑', true);
+                    } catch (err) {
+                        showToast('导出失败: ' + err.message, false);
                     }
                 }
 
-                function performImport() {
-                    const text = document.getElementById('json-input').value.trim();
+                async function performImport() {
+                    const input = document.getElementById('json-input');
+                    const text = input.value.trim();
                     if (!text) {
-                        showToast('Please paste JSON source content.', false);
+                        showToast('请先输入或粘贴书源 JSON', false);
                         return;
                     }
                     const btn = document.getElementById('import-btn');
                     btn.disabled = true;
-                    btn.textContent = 'Importing...';
-                    fetch('/api/sources/import', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: text
-                    })
-                    .then(async res => {
-                        const responseText = await res.text();
+                    btn.textContent = '正在传输至手机...';
+                    try {
+                        const res = await fetch('/api/sources/import', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: text
+                        });
+                        const resText = await res.text();
                         let payload;
-                        try { payload = JSON.parse(responseText); } catch (_) { payload = null; }
+                        try { payload = JSON.parse(resText); } catch (_) { payload = null; }
                         if (res.ok && (!payload || payload.ok !== false)) {
-                            showToast(payload && payload.message ? payload.message : responseText, true);
-                            document.getElementById('json-input').value = '';
+                            const msg = (payload && payload.message) ? payload.message : '书源已成功保存到手机！';
+                            showToast(msg, true);
+                            input.value = '';
                         } else {
-                            showToast('Import failed: ' + (payload && payload.error ? payload.error : responseText), false);
+                            const err = (payload && payload.error) ? payload.error : resText;
+                            showToast('导入失败: ' + err, false);
                         }
-                    })
-                    .catch(err => showToast('Network error: ' + err, false))
-                    .finally(() => {
+                    } catch (err) {
+                        showToast('网络传输失败: ' + err.message, false);
+                    } finally {
                         btn.disabled = false;
-                        btn.textContent = 'Import to iPhone';
+                        btn.textContent = '🚀 立即导入到手机 (Import to iPhone)';
                         refreshStatus();
-                    });
+                    }
                 }
 
+                // Initial status ping
                 refreshStatus();
             </script>
         </body>
@@ -843,16 +1034,22 @@ private struct WebSourceListResponse: Encodable {
 }
 
 private func getLocalIPAddresses() -> [String] {
-    var wifi: [String] = []
-    var others: [String] = []
+    var primary: [String] = []
+    var secondary: [String] = []
     var ifaddr: UnsafeMutablePointer<ifaddrs>?
     guard getifaddrs(&ifaddr) == 0 else { return [] }
     guard let firstAddr = ifaddr else { return [] }
-    
+
     for ptr in sequence(first: firstAddr, next: { $0.pointee.ifa_next }) {
         let interface = ptr.pointee
         guard let addr = interface.ifa_addr else { continue }
-        
+
+        let flags = Int32(interface.ifa_flags)
+        // Must be active (UP and RUNNING) and NOT loopback
+        guard (flags & IFF_UP) == IFF_UP else { continue }
+        guard (flags & IFF_RUNNING) == IFF_RUNNING else { continue }
+        guard (flags & IFF_LOOPBACK) == 0 else { continue }
+
         let addrFamily = addr.pointee.sa_family
         if addrFamily == UInt8(AF_INET) {
             let name = String(cString: interface.ifa_name)
@@ -861,16 +1058,28 @@ private func getLocalIPAddresses() -> [String] {
                         &hostname, socklen_t(hostname.count),
                         nil, socklen_t(0), NI_NUMERICHOST)
             let ip = String(cString: hostname)
-            if ip != "127.0.0.1" {
-                if name == "en0" || name.hasPrefix("en") {
-                    wifi.append(ip)
+            if ip != "127.0.0.1" && !ip.isEmpty {
+                // Prioritize standard Wi-Fi (en0, en1) and hotspot/tethering (bridge100, ap0, pdp_ip0)
+                if name.hasPrefix("en") || name.hasPrefix("bridge") || name.hasPrefix("ap") {
+                    primary.append(ip)
                 } else {
-                    others.append(ip)
+                    secondary.append(ip)
                 }
             }
         }
     }
     freeifaddrs(ifaddr)
+
+    // Sort so standard LAN subnets (192.168.x.x, 172.x.x.x, 10.x.x.x) appear first
+    func rank(_ ip: String) -> Int {
+        if ip.hasPrefix("192.168.") { return 0 }
+        if ip.hasPrefix("172.") { return 1 }
+        if ip.hasPrefix("10.") { return 2 }
+        return 3
+    }
+
     var seen = Set<String>()
-    return (wifi + others).filter { seen.insert($0).inserted }
+    let sortedPrimary = primary.sorted { rank($0) < rank($1) }
+    let sortedSecondary = secondary.sorted { rank($0) < rank($1) }
+    return (sortedPrimary + sortedSecondary).filter { seen.insert($0).inserted }
 }

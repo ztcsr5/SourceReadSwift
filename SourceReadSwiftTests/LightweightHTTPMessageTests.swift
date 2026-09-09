@@ -48,4 +48,23 @@ final class LightweightHTTPMessageTests: XCTestCase {
         XCTAssertEqual(parsed.headers["host"], "localhost")
         XCTAssertTrue(parsed.body.isEmpty)
     }
+
+    func testParserHandlesAbsoluteURIsFromProxies() {
+        let request = Data("GET http://192.168.1.10:8080/api/status?v=1 HTTP/1.1\r\nHost: 192.168.1.10:8080\r\n\r\n".utf8)
+        guard case .complete(let parsed) = LightweightHTTPParser.parse(request) else {
+            return XCTFail("absolute URI request should parse")
+        }
+        XCTAssertEqual(parsed.method, "GET")
+        XCTAssertEqual(parsed.path, "/api/status")
+        XCTAssertEqual(parsed.query, "v=1")
+    }
+
+    func testParserAcceptsLFOnlyHeaderDelimiter() {
+        let request = Data("GET /index.html HTTP/1.1\nHost: 127.0.0.1\n\n".utf8)
+        guard case .complete(let parsed) = LightweightHTTPParser.parse(request) else {
+            return XCTFail("LF delimiter request should parse")
+        }
+        XCTAssertEqual(parsed.method, "GET")
+        XCTAssertEqual(parsed.path, "/index.html")
+    }
 }
