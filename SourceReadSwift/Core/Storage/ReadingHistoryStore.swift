@@ -1,4 +1,4 @@
-﻿import Foundation
+import Foundation
 
 struct ReadingHistoryItem: Identifiable, Codable, Hashable, Sendable {
     let id: String
@@ -57,7 +57,7 @@ struct ReadingHistoryItem: Identifiable, Codable, Hashable, Sendable {
 
 struct ReadingHistoryPersistence: Sendable {
     private let fileManager: FileManager
-    private let fileName = reading_history.json
+    private let fileName = "reading_history.json"
     private let rootURL: URL?
 
     init(fileManager: FileManager = .default, rootURL: URL? = nil) {
@@ -94,7 +94,7 @@ struct ReadingHistoryPersistence: Sendable {
             appropriateFor: nil,
             create: true
         )
-        return base.appendingPathComponent(SourceReadSwift, isDirectory: true)
+        return base.appendingPathComponent("SourceReadSwift", isDirectory: true)
             .appendingPathComponent(fileName)
     }
 }
@@ -109,7 +109,7 @@ final class ReadingHistoryStore: ObservableObject {
     init(persistence: ReadingHistoryPersistence = ReadingHistoryPersistence()) {
         self.persistence = persistence
         do {
-            history = try persistence.load().sorted { .lastReadAt > .lastReadAt }
+            history = try persistence.load().sorted { $0.lastReadAt > $1.lastReadAt }
         } catch {
             lastError = error.localizedDescription
         }
@@ -132,7 +132,7 @@ final class ReadingHistoryStore: ObservableObject {
         incrementSession: Bool = false
     ) {
         let now = Date()
-        if let idx = history.firstIndex(where: { .id == bookID }) {
+        if let idx = history.firstIndex(where: { $0.id == bookID }) {
             var item = history[idx]
             item.title = title
             item.author = author
@@ -204,7 +204,7 @@ final class ReadingHistoryStore: ObservableObject {
     }
 
     func remove(id: String) {
-        guard let idx = history.firstIndex(where: { .id == id }) else { return }
+        guard let idx = history.firstIndex(where: { $0.id == id }) else { return }
         history.remove(at: idx)
         persist()
     }
