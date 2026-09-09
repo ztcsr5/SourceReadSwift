@@ -3,37 +3,130 @@ import SwiftUI
 import UIKit
 
 enum ReaderBackground: String, CaseIterable, Identifiable, Sendable {
-    case paper
-    case green
-    case gray
-    case dark
+    case paper      // 羊皮纸暖黄 (#EBD9BB)
+    case kraft      // 复古牛皮 (#DDC090)
+    case green      // 豆沙青绿 (#C2D8AA)
+    case lavender   // 淡雅黛紫 (#DBB8E2)
+    case azure      // 晴空天蓝 (#ABCEE0)
+    case white      // 纯净素白 (#FFFFFF)
+    case gray       // 浅灰银质 (#F2F2F7)
+    case dark       // 极夜纯黑 (#000000)
 
     var id: String { rawValue }
 
     var title: String {
         switch self {
-        case .paper: return "纸张"
-        case .green: return "护眼"
+        case .paper: return "羊皮纸"
+        case .kraft: return "牛皮纸"
+        case .green: return "豆沙绿"
+        case .lavender: return "黛紫"
+        case .azure: return "青空"
+        case .white: return "素白"
         case .gray: return "浅灰"
-        case .dark: return "深色"
+        case .dark: return "极黑"
         }
     }
 
     var color: Color {
-        switch self {
-        case .paper: return Color(red: 0.96, green: 0.93, blue: 0.86)
-        case .green: return Color(red: 0.88, green: 0.94, blue: 0.86)
-        case .gray: return Color(.systemGray6)
-        case .dark: return Color(red: 0.12, green: 0.12, blue: 0.13)
-        }
+        color(isNight: false)
     }
 
     var textColor: Color {
-        self == .dark ? .white.opacity(0.9) : .primary
+        textColor(isNight: false)
     }
 
     var uiTextColor: UIColor {
-        self == .dark ? UIColor.white.withAlphaComponent(0.92) : UIColor.label
+        uiTextColor(isNight: false)
+    }
+
+    func color(isNight: Bool) -> Color {
+        Color(hex: isNight ? nightBackgroundHex : dayBackgroundHex)
+    }
+
+    func textColor(isNight: Bool) -> Color {
+        Color(hex: isNight ? nightTextHex : dayTextHex)
+    }
+
+    func uiColor(isNight: Bool) -> UIColor {
+        UIColor(hex: isNight ? nightBackgroundHex : dayBackgroundHex)
+    }
+
+    func uiTextColor(isNight: Bool) -> UIColor {
+        UIColor(hex: isNight ? nightTextHex : dayTextHex)
+    }
+
+    var dayBackgroundHex: UInt32 {
+        switch self {
+        case .paper: return 0xEBD9BB
+        case .kraft: return 0xDDC090
+        case .green: return 0xC2D8AA
+        case .lavender: return 0xDBB8E2
+        case .azure: return 0xABCEE0
+        case .white: return 0xFFFFFF
+        case .gray: return 0xF2F2F7
+        case .dark: return 0x000000
+        }
+    }
+
+    var dayTextHex: UInt32 {
+        switch self {
+        case .paper: return 0x63543C
+        case .kraft: return 0x3E3422
+        case .green: return 0x596C44
+        case .lavender: return 0x68516C
+        case .azure: return 0x3D4C54
+        case .white: return 0x000000
+        case .gray: return 0x1C1C1E
+        case .dark: return 0xFFFFFF
+        }
+    }
+
+    var nightBackgroundHex: UInt32 {
+        switch self {
+        case .paper: return 0x1E2021
+        case .kraft, .green, .lavender, .azure: return 0x3C3F43
+        case .white: return 0x18181A
+        case .gray: return 0x2C2C2E
+        case .dark: return 0x000000
+        }
+    }
+
+    var nightTextHex: UInt32 {
+        switch self {
+        case .paper, .kraft: return 0xDCDFE1
+        case .green: return 0x88C16F
+        case .lavender: return 0xF6AEAE
+        case .azure: return 0x90BFF5
+        case .white: return 0xE0E0E0
+        case .gray: return 0xF2F2F7
+        case .dark: return 0xFFFFFF
+        }
+    }
+
+    func darkStatusIcon(isNight: Bool) -> Bool {
+        if isNight { return false }
+        switch self {
+        case .paper, .kraft, .white, .gray: return true
+        case .green, .lavender, .azure, .dark: return false
+        }
+    }
+}
+
+fileprivate extension Color {
+    init(hex: UInt32, opacity: Double = 1.0) {
+        let red = Double((hex >> 16) & 0xff) / 255.0
+        let green = Double((hex >> 8) & 0xff) / 255.0
+        let blue = Double(hex & 0xff) / 255.0
+        self.init(.sRGB, red: red, green: green, blue: blue, opacity: opacity)
+    }
+}
+
+fileprivate extension UIColor {
+    convenience init(hex: UInt32, alpha: CGFloat = 1.0) {
+        let red = CGFloat((hex >> 16) & 0xff) / 255.0
+        let green = CGFloat((hex >> 8) & 0xff) / 255.0
+        let blue = CGFloat(hex & 0xff) / 255.0
+        self.init(red: red, green: green, blue: blue, alpha: alpha)
     }
 }
 

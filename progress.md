@@ -1,3 +1,21 @@
+## 2026-09-09 - Stage 33: 阅读器手感、120Hz ProMotion、朗读（TTS）与排版体验收口
+
+### Implemented
+
+- 深度整合 `SourceRead.app` 解包核心资产：
+  - `readConfig.json`：在 `ReaderSettingsModels.swift` 扩展 `ReaderBackground` 补全 6 大原生排版主题调色板（羊皮纸暖黄 `#EBD9BB`、复古牛皮 `#DDC090`、豆沙青绿 `#C2D8AA`、淡雅黛紫 `#DBB8E2`、晴空天蓝 `#ABCEE0`、纯净素白 `#FFFFFF`、浅灰银质 `#F2F2F7`、极夜纯黑 `#000000`），并支持昼夜双模式色彩与文字对比度自适应。
+  - `txtTocRule.json`：在 `LocalTextBookParser.swift` 引入源阅读 17 组标准工业级目录切分正则引擎，支持中文大写数字、阿拉伯数字、特殊符号括弧（`【〔〖「『〈［`）、双标题、前言后记尾声等全格式识别。
+  - `httpTTS.json`：在 `ReaderAutomationPolicy.swift` 建立 `HttpTTSVoice` 模型与 URL 模板求值引擎，支持通过 `JSCoreRuntime` 动态评估 `{{java.encodeURI(...)}}`、语速参数及 POST 音频流提取。
+- 优化 `ReaderView.swift`：
+  - 阅读设置面板中将背景调色板重构为横向滑动条并展示主题中文名，选中状态实时触感反馈。
+  - `scrollReaderContent` 统一遵循选定主题的 `uiTextColor` 与昼夜模式。
+- 新增 `SourceReadSwiftTests/Stage33ReaderExperienceTests.swift` 单元测试套件，全面覆盖 17 组目录正则提取、8 套主题调色板、HTTP TTS 模板解析及 120Hz 帧率决策。
+
+### Verification
+
+- 本地静态门禁：`git diff --check`。
+- CI 目标：GitHub Actions `iOS` build/test 与 `Unsigned IPA` 双流水线全绿闭环。
+
 ## 2026-09-09 - Stage 32: C 级书源兼容闭环收口
 
 ### Implemented

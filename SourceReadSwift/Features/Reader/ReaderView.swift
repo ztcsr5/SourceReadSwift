@@ -478,7 +478,7 @@ struct ReaderView: View {
 
     private var readerBackdrop: some View {
         ZStack {
-            background.color
+            background.color(isNight: colorScheme == .dark)
             LinearGradient(
                 colors: [
                     Color.white.opacity(background == .dark ? 0.02 : 0.16),
@@ -533,7 +533,7 @@ struct ReaderView: View {
             paragraphIndent: paragraphIndent,
             titleSpacing: titleSpacing,
             footerHeight: footerHeight,
-            textColor: background == .dark ? UIColor.white.withAlphaComponent(0.9) : UIColor.label,
+            textColor: background.uiTextColor(isNight: colorScheme == .dark),
             highlightColor: AppTheme.accentUIColor.withAlphaComponent(background == .dark ? 0.22 : 0.12),
             currentParagraphIndex: speechController.currentParagraphIndex,
             scrollTarget: content.paragraphs.indices.contains(speechController.currentParagraphIndex)
@@ -1014,22 +1014,30 @@ struct ReaderView: View {
             Text("背景颜色")
                 .font(.subheadline.weight(.semibold))
                 .foregroundStyle(.secondary)
-            HStack(spacing: 12) {
-                ForEach(ReaderBackground.allCases) { item in
-                    Button {
-                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                        backgroundRawValue = item.rawValue
-                    } label: {
-                        Circle()
-                            .fill(item.color)
-                            .frame(width: 44, height: 44)
-                            .overlay {
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 14) {
+                    ForEach(ReaderBackground.allCases) { item in
+                        Button {
+                            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                            backgroundRawValue = item.rawValue
+                        } label: {
+                            VStack(spacing: 4) {
                                 Circle()
-                                    .stroke(background == item ? AppTheme.accent : Color.secondary.opacity(0.25), lineWidth: background == item ? 3 : 1)
+                                    .fill(item.color(isNight: colorScheme == .dark))
+                                    .frame(width: 40, height: 40)
+                                    .overlay {
+                                        Circle()
+                                            .stroke(background == item ? AppTheme.accent : Color.secondary.opacity(0.25), lineWidth: background == item ? 3 : 1)
+                                    }
+                                Text(item.title)
+                                    .font(.caption2)
+                                    .foregroundStyle(background == item ? AppTheme.accent : .secondary)
                             }
+                        }
+                        .accessibilityLabel(item.title)
                     }
-                    .accessibilityLabel(item.title)
                 }
+                .padding(.horizontal, 2)
             }
         }
     }

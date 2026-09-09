@@ -236,3 +236,84 @@ struct ReaderSpeechQueue: Equatable {
         nextIndex = 0
     }
 }
+
+/// An online HTTP TTS voice configuration model compatible with Legado/SourceRead httpTTS.json
+struct HttpTTSVoice: Identifiable, Equatable, Hashable, Sendable {
+    let id: Int
+    let name: String
+    let url: String
+
+    var isPost: Bool {
+        url.contains("\"method\": \"POST\"") || url.contains("\"method\":\"POST\"")
+    }
+
+    /// Default production preset voices extracted from SourceRead httpTTS.json
+    static let defaultVoices: [HttpTTSVoice] = [
+        HttpTTSVoice(
+            id: -1,
+            name: "度丫丫 (亲切女声)",
+            url: #"http://tts.baidu.com/text2audio,{"method":"POST","body":"tex={{java.encodeURI(java.encodeURI(speakText))}}&spd={{(speakSpeed + 5) / 10 + 4}}&per=4&cuid=baidu_speech_demo&idx=1&cod=2&lan=zh&ctp=1&pdt=301&vol=5&aue=6&pit=5&_res_tag_=audio"}"#
+        ),
+        HttpTTSVoice(
+            id: -6,
+            name: "度小宇 (质感男声)",
+            url: #"http://tts.baidu.com/text2audio,{"method":"POST","body":"tex={{java.encodeURI(java.encodeURI(speakText))}}&spd={{(speakSpeed + 5) / 10 + 4}}&per=2&cuid=baidu_speech_demo&idx=1&cod=2&lan=zh&ctp=1&pdt=301&vol=5&aue=6&pit=5&_res_tag_=audio"}"#
+        ),
+        HttpTTSVoice(
+            id: -90,
+            name: "标准女声 (播音)",
+            url: #"http://tts.baidu.com/text2audio,{"method":"POST","body":"tex={{java.encodeURI(java.encodeURI(speakText))}}&spd={{(speakSpeed + 5) / 10 + 4}}&per=100&cuid=baidu_speech_demo&idx=1&cod=2&lan=zh&ctp=1&pdt=160&vol=5&aue=6&pit=5&_res_tag_=audio"}"#
+        ),
+        HttpTTSVoice(
+            id: -86,
+            name: "百度解说 (影视旁白)",
+            url: #"http://tts.baidu.com/text2audio,{"method":"POST","body":"tex={{java.encodeURI(java.encodeURI(speakText))}}&spd={{(speakSpeed + 5) / 10 + 4}}&per=4123&cuid=baidu_speech_demo&idx=1&cod=2&lan=zh&ctp=1&pdt=12&vol=5&aue=6&pit=5&_res_tag_=audio"}"#
+        )
+    ]
+
+    /// Resolves the Legado HTTP TTS request template by evaluating embedded JS expressions.
+    func resolveRequest(
+        speakText: String,
+        speakSpeed: Int = 5,
+        runtime: JSCoreRuntime = JSCoreRuntime()
+    ) -> (url: URL, body: String?, headers: [String: String])? {
+        var evaluated = url
+        let pattern = #"\{\{([^\}]+)\}\}"#
+        guard let regex = try? NSRegularExpression(pattern: pattern) else { return nil }
+        let nsString = evaluated as NSString
+        let matches = regex.matches(in: evaluated, range: NSRange(location: 0, length: nsString.length))
+
+        var replacements: [(range: NSRange, replacement: String)] = []
+        for match in matches {
+            let exprRange = match.range(at: 1)
+            let expr = nsString.substring(with: exprRange)
+            let escapedText = speakText
+                .replacingOccurrences(of: "\\", with: "\\\\")
+                .replacingOccurrences(of: "'", with: "\\'")
+                .replacingOccurrences(of: "\n", with: " ")
+            let jsScript = "var speakText = '\(escapedText)'; var speakSpeed = \(speakSpeed); \(expr);"
+            if case .success(let value) = runtime.evaluate(jsScript) {
+                replacements.append((match.range, value))
+            }
+        }
+        for rep in replacements.reversed() {
+            evaluated = (evaluated as NSString).replacingCharacters(in: rep.range, with: rep.replacement)
+        }
+
+        let parts = evaluated.components(separatedBy: ",{")
+        guard let base = parts.first?.trimmingCharacters(in: .whitespacesAndNewlines),
+              let targetURL = URL(string: base) else { return nil }
+
+        var body: String? = nil
+        var headers: [String: String] = ["User-Agent": "Mozilla/5.0 SourceReadSwift iOS"]
+
+        if parts.count > 1, let jsonData = ("{" + parts[1]).data(using: .utf8),
+           let dict = try? JSONSerialization.jsonObject(with: jsonData) as? [String: Any] {
+            if let postBody = dict["body"] as? String {
+                body = postBody
+                headers["Content-Type"] = "application/x-www-form-urlencoded"
+            }
+        }
+        return (targetURL, body, headers)
+    }
+}

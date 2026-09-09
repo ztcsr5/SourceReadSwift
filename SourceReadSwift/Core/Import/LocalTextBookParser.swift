@@ -54,16 +54,33 @@ struct LocalTextBookParser {
         }
     }
 
-    private func isChapterHeading(_ line: String) -> Bool {
-        let trimmed = line.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard trimmed.count <= 48 else { return false }
+    private static let compiledHeadingRegexes: [NSRegularExpression] = {
         let patterns = [
-            #"^第[0-9零〇一二三四五六七八九十百千万两]+[章节卷回部集].*"#,
-            #"^[Cc]hapter\s+[0-9IVXLC]+.*"#,
-            #"^[0-9]{1,4}[、.．]\s*\S.*"#
+            #"^[ \t　]{0,4}(?:序章|楔子|正文(?!完|结)|终章|后记|尾声|番外|第?\s{0,4}[\d零〇一二两三四五六七八九十百千万壹贰叁肆伍陆柒捌玖拾佰仟]+?\s{0,4}(?:章|节(?!课)|卷|集(?![合和])|部(?!分)|回(?![合来事去])|场(?![和合比电是])|篇(?!张))).{0,30}$"#,
+            #"^[ \t　]{0,4}\d{1,5}[,.， 、_—\-].{1,30}$"#,
+            #"^[ \t　]{0,4}[零〇一二两三四五六七八九十百千万壹贰叁肆伍陆柒捌玖拾佰仟]{1,8}[ 、_—\-].{1,30}$"#,
+            #"^[ \t　]{0,4}正文[ 　]{1,4}.{0,20}$"#,
+            #"^[ \t　]{0,4}(?:[Cc]hapter|[Ss]ection|[Pp]art|ＰＡＲＴ|[Nn][oO]\.|[Ee]pisode|(?:内容|文章)?简介|文案|前言|序章|楔子|正文(?!完|结)|终章|后记|尾声|番外)\s{0,4}\d{1,4}.{0,30}$"#,
+            #"[【〔〖「『〈［\[](?:第|[Cc]hapter)[\d零〇一二两三四五六七八九十百千万壹贰叁肆伍陆柒捌玖拾佰仟]{1,10}[章节].{0,20}$"#,
+            #"^[ \t　]{0,4}(?:[☆★✦✧].{1,30}|(?:内容|文章)?简介|文案|前言|序章|楔子|正文(?!完|结)|终章|后记|尾声|番外)[ 　]{0,4}$"#,
+            #"^[ \t　]{0,4}(?:(?:内容|文章)?简介|文案|前言|序章|楔子|正文(?!完|结)|终章|后记|尾声|番外|[卷章][\d零〇一二两三四五六七八九十百千万壹贰叁肆伍陆柒捌玖拾佰仟]{1,8})[ 　]{0,4}.{0,30}$"#,
+            #"^.{1,20}[(（][\d零〇一二两三四五六七八九十百千万壹贰叁肆伍陆柒捌玖拾佰仟]{1,8}[)）][ 　\t]{0,4}$"#,
+            #"^[ \t　]{0,4}第\s*[\d零〇一二三四五六七八九十百千万壹贰叁肆伍陆柒捌玖拾佰仟]+\s*[章节卷回部集篇话話].{0,30}$"#,
+            #"^[Cc]hapter\s+[0-9IVXLCivxlc]+.*$"#
         ]
-        return patterns.contains { pattern in
-            trimmed.range(of: pattern, options: .regularExpression) != nil
+        return patterns.compactMap { try? NSRegularExpression(pattern: $0, options: [.caseInsensitive]) }
+    }()
+
+    func isChapterHeading(_ line: String) -> Bool {
+        Self.matchesChapterHeading(line)
+    }
+
+    static func matchesChapterHeading(_ line: String) -> Bool {
+        let trimmed = line.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard trimmed.count <= 48, !trimmed.isEmpty else { return false }
+        let range = NSRange(trimmed.startIndex..<trimmed.endIndex, in: trimmed)
+        return compiledHeadingRegexes.contains { regex in
+            regex.firstMatch(in: trimmed, options: [], range: range) != nil
         }
     }
 }
