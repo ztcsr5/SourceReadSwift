@@ -90,13 +90,13 @@ final class SourceStore: ObservableObject {
                 header: "{\"User-Agent\":\"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36\"}"
             ),
             BookSource(
-                bookSourceName: "六月中文网",
-                bookSourceUrl: "https://www.6yzw.org/",
+                bookSourceName: "笔趣米",
+                bookSourceUrl: "https://www.biqumi.com",
                 bookSourceGroup: "官方精选",
                 bookSourceType: 0,
                 enabled: true,
                 weight: 95,
-                searchUrl: "https://www.6yzw.org/search.php?q={{key}}",
+                searchUrl: "https://www.biqumi.com/search.php?q={{key}}",
                 ruleSearch: SourceRule(fields: [
                     "bookList": "div.col-12.col-md-6",
                     "name": "h3 a@text##\\[.*?\\]##",
@@ -113,7 +113,7 @@ final class SourceStore: ObservableObject {
                     "lastChapter": ".info li:contains(最新) a@text"
                 ]),
                 ruleToc: SourceRule(fields: [
-                    "chapterList": "ul.row li.col-md-3 a||.col-md-3 a||.book_list2 li a",
+                    "chapterList": "ul.row li.col-md-3 a||.book_list2 li a||.col-md-3 a",
                     "chapterName": "@text",
                     "chapterUrl": "@href"
                 ]),
@@ -148,7 +148,77 @@ final class SourceStore: ObservableObject {
                     "lastChapter": ".info li:contains(最新) a@text"
                 ]),
                 ruleToc: SourceRule(fields: [
-                    "chapterList": "ul.row li.col-md-3 a||.col-md-3 a||.book_list li a",
+                    "chapterList": "ul.row li.col-md-3 a||.book_list li a||.col-md-3 a",
+                    "chapterName": "@text",
+                    "chapterUrl": "@href"
+                ]),
+                ruleContent: SourceRule(fields: [
+                    "content": "article@html||.font_max@html||#content@html",
+                    "nextContentUrl": "a:contains(下一章)@href||#next1@href",
+                    "replaceRegex": "##第\\(\\d+/\\d+\\)页##"
+                ]),
+                header: "{\"User-Agent\":\"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36\"}"
+            ),
+            BookSource(
+                bookSourceName: "新笔趣阁CC",
+                bookSourceUrl: "https://www.xbqg.cc",
+                bookSourceGroup: "官方精选",
+                bookSourceType: 0,
+                enabled: true,
+                weight: 88,
+                searchUrl: "https://www.xbqg.cc/search.php?q={{key}}",
+                ruleSearch: SourceRule(fields: [
+                    "bookList": "div.col-12.col-md-6",
+                    "name": "h3 a@text##\\[.*?\\]##",
+                    "author": ".book_other:contains(作者) span@text||.book_other:contains(作者)@text##作者：##",
+                    "bookUrl": "dt a@href",
+                    "coverUrl": "dt img@src",
+                    "lastChapter": ".book_other:contains(最新章节) a@text"
+                ]),
+                ruleBookInfo: SourceRule(fields: [
+                    "name": ".info h1@text||h1@text",
+                    "author": ".info li:contains(作者) a@text||.book_other:contains(作者) a@text",
+                    "coverUrl": "img.img-thumbnail@src||dt img@src",
+                    "intro": "#intro_pc@ownText||.intro@text",
+                    "lastChapter": ".info li:contains(最新) a@text"
+                ]),
+                ruleToc: SourceRule(fields: [
+                    "chapterList": "ul.row li.col-md-3 a||.book_list li a||.col-md-3 a",
+                    "chapterName": "@text",
+                    "chapterUrl": "@href"
+                ]),
+                ruleContent: SourceRule(fields: [
+                    "content": "article@html||.font_max@html||#content@html",
+                    "nextContentUrl": "a:contains(下一章)@href||#next1@href",
+                    "replaceRegex": "##第\\(\\d+/\\d+\\)页##"
+                ]),
+                header: "{\"User-Agent\":\"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36\"}"
+            ),
+            BookSource(
+                bookSourceName: "笔趣阁5",
+                bookSourceUrl: "https://www.biquge5.com",
+                bookSourceGroup: "官方精选",
+                bookSourceType: 0,
+                enabled: true,
+                weight: 85,
+                searchUrl: "https://www.biquge5.com/search.php?q={{key}}",
+                ruleSearch: SourceRule(fields: [
+                    "bookList": "div.col-12.col-md-6",
+                    "name": "h3 a@text##\\[.*?\\]##",
+                    "author": ".book_other:contains(作者) span@text||.book_other:contains(作者)@text##作者：##",
+                    "bookUrl": "dt a@href",
+                    "coverUrl": "dt img@src",
+                    "lastChapter": ".book_other:contains(最新章节) a@text"
+                ]),
+                ruleBookInfo: SourceRule(fields: [
+                    "name": ".info h1@text||h1@text",
+                    "author": ".info li:contains(作者) a@text||.book_other:contains(作者) a@text",
+                    "coverUrl": "img.img-thumbnail@src||dt img@src",
+                    "intro": "#intro_pc@ownText||.intro@text",
+                    "lastChapter": ".info li:contains(最新) a@text"
+                ]),
+                ruleToc: SourceRule(fields: [
+                    "chapterList": "ul.row li.col-md-3 a||.book_list li a||.col-md-3 a",
                     "chapterName": "@text",
                     "chapterUrl": "@href"
                 ]),
@@ -174,7 +244,7 @@ final class SourceStore: ObservableObject {
         self.persistence = persistence
         do {
             let snapshot = try persistence.load()
-            sources = snapshot.sources
+            sources = snapshot.sources.filter { !$0.bookSourceUrl.contains("6yzw.org") }
             rssSources = snapshot.rssSources
             catalogs = snapshot.catalogs
         } catch {

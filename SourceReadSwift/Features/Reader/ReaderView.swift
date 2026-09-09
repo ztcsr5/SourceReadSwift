@@ -262,6 +262,7 @@ struct ReaderView: View {
     private var readerLayoutKey: String {
         [
             readerModeRawValue,
+            fontFamilyRawValue,
             String(format: "%.1f", fontSize),
             String(format: "%.1f", lineSpacing),
             String(format: "%.1f", pagePadding),
@@ -583,6 +584,16 @@ struct ReaderView: View {
         return (chapterIndex, content.title, max(content.paragraphs.count - 1, 0))
     }
 
+    private var activeScrollTarget: Int? {
+        if speechController.currentParagraphIndex >= 0 {
+            return speechController.currentParagraphIndex
+        }
+        if let jump = paragraphJumpRequest {
+            return jump.index
+        }
+        return nil
+    }
+
     private var scrollReaderContent: some View {
         NativeReaderTextView(
             title: content.title,
@@ -601,14 +612,15 @@ struct ReaderView: View {
             textColor: background.uiTextColor(isNight: colorScheme == .dark),
             highlightColor: AppTheme.accentUIColor.withAlphaComponent(background == .dark ? 0.22 : 0.12),
             currentParagraphIndex: speechController.currentParagraphIndex,
-            scrollTarget: content.paragraphs.indices.contains(speechController.currentParagraphIndex)
-                ? speechController.currentParagraphIndex
-                : (content.paragraphs.indices.contains(scrollParagraphTarget) ? scrollParagraphTarget : nil),
+            scrollTarget: activeScrollTarget,
             scrollRequestKey: nativeScrollRequestKey,
             animatedScrollDuration: autoScrollEnabled ? max(ReaderAutomationPolicy.clampedDelay(autoScrollDelay) * 0.9, 0.25) : 0,
             textSelectionEnabled: textSelectionEnabled,
             showChapterEndBadge: false,
             onVisibleParagraph: { index in
+                if paragraphJumpRequest != nil {
+                    paragraphJumpRequest = nil
+                }
                 updateVisibleParagraphInScroll(index)
             },
             onNearBottom: {
@@ -848,7 +860,7 @@ struct ReaderView: View {
                 VStack(alignment: .leading, spacing: CGFloat(paragraphSpacing)) {
                     if page.includesTitle {
                         Text(content.title)
-                            .font(.system(size: fontSize + 8, weight: .bold, design: .default))
+                            .font(fontFamily.swiftUIFont(size: CGFloat(fontSize + 8), weight: .bold))
                             .foregroundStyle(background.textColor)
                             .padding(.bottom, CGFloat(titleSpacing))
                             .readerSelectableText(textSelectionEnabled)
@@ -899,7 +911,7 @@ struct ReaderView: View {
 
     private func paragraphText(_ paragraph: String, index: Int) -> some View {
         Text(paragraph)
-            .font(.system(size: fontSize, weight: .regular, design: .default))
+            .font(fontFamily.swiftUIFont(size: CGFloat(fontSize), weight: .regular))
             .foregroundStyle(background.textColor)
             .kerning(letterSpacing)
             .lineSpacing(lineSpacing)

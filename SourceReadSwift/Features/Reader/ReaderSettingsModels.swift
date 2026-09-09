@@ -157,7 +157,7 @@ enum ReaderFontFamily: String, CaseIterable, Identifiable, Sendable {
     var title: String {
         switch self {
         case .system: return "系统默认"
-        case .songti: return "思源宋体"
+        case .songti: return "宋体"
         case .kaiti: return "楷体"
         case .rounded: return "圆体"
         }
@@ -169,8 +169,8 @@ enum ReaderFontFamily: String, CaseIterable, Identifiable, Sendable {
             return UIFont.systemFont(ofSize: size, weight: weight)
         case .songti:
             let songtiNames = weight == .bold
-                ? ["STSongti-SC-Bold", "Songti SC Bold", "SongtiSC-Bold", "STSong"]
-                : ["STSongti-SC-Regular", "Songti SC", "SongtiSC-Regular", "STSong", "STSongti-SC-Light"]
+                ? ["Songti SC Bold", "SongtiSC-Bold", "STSongti-SC-Bold", "HiraMinProN-W6", "STSong"]
+                : ["Songti SC Regular", "Songti SC", "SongtiSC-Regular", "STSongti-SC-Regular", "HiraMinProN-W3", "STSongti-SC-Light"]
             for name in songtiNames {
                 if let font = UIFont(name: name, size: size) {
                     return font
@@ -182,8 +182,8 @@ enum ReaderFontFamily: String, CaseIterable, Identifiable, Sendable {
             return UIFont.systemFont(ofSize: size, weight: weight)
         case .kaiti:
             let kaitiNames = weight == .bold
-                ? ["STKaiti-SC-Bold", "Kaiti SC Bold", "KaitiSC-Bold", "STKaiti", "KaiTi"]
-                : ["STKaiti-SC-Regular", "Kaiti SC", "KaitiSC-Regular", "STKaiti", "KaiTi"]
+                ? ["Kaiti SC Bold", "KaitiSC-Bold", "STKaiti-SC-Bold", "STKaiti", "KaiTi", "HiraMinProN-W6"]
+                : ["Kaiti SC Regular", "Kaiti SC", "KaitiSC-Regular", "STKaiti-SC-Regular", "STKaiti", "KaiTi", "HiraMinProN-W3"]
             for name in kaitiNames {
                 if let font = UIFont(name: name, size: size) {
                     return font
@@ -198,6 +198,35 @@ enum ReaderFontFamily: String, CaseIterable, Identifiable, Sendable {
                 return UIFont(descriptor: desc, size: size)
             }
             return UIFont.systemFont(ofSize: size, weight: weight)
+        }
+    }
+
+    func swiftUIFont(size: CGFloat, weight: Font.Weight = .regular) -> Font {
+        switch self {
+        case .system:
+            return .system(size: size, weight: weight, design: .default)
+        case .songti:
+            let songtiNames = weight == .bold
+                ? ["Songti SC Bold", "SongtiSC-Bold", "STSongti-SC-Bold", "HiraMinProN-W6"]
+                : ["Songti SC Regular", "Songti SC", "SongtiSC-Regular", "STSongti-SC-Regular", "HiraMinProN-W3"]
+            for name in songtiNames {
+                if UIFont(name: name, size: size) != nil {
+                    return .custom(name, size: size)
+                }
+            }
+            return .system(size: size, weight: weight, design: .serif)
+        case .kaiti:
+            let kaitiNames = weight == .bold
+                ? ["Kaiti SC Bold", "KaitiSC-Bold", "STKaiti-SC-Bold", "STKaiti", "KaiTi", "HiraMinProN-W6"]
+                : ["Kaiti SC Regular", "Kaiti SC", "KaitiSC-Regular", "STKaiti-SC-Regular", "STKaiti", "KaiTi", "HiraMinProN-W3"]
+            for name in kaitiNames {
+                if UIFont(name: name, size: size) != nil {
+                    return .custom(name, size: size)
+                }
+            }
+            return .system(size: size, weight: weight, design: .serif)
+        case .rounded:
+            return .system(size: size, weight: weight, design: .rounded)
         }
     }
 }

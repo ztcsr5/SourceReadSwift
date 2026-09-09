@@ -303,24 +303,41 @@ struct NativeReaderTextView: UIViewRepresentable {
 
             if textLayoutChanged || widthChanged {
                 let previousOffset = textView.contentOffset
-                rebuild(textView: textView, configuration: newConfiguration)
-                if textView.bounds.width > 1 {
-                    lastLayoutWidth = textView.bounds.width
+                let canFastAppend = isAppend
+                    && !widthChanged
+                    && previousConfiguration != nil
+                    && newConfiguration.fontFamily == previousConfiguration!.fontFamily
+                    && newConfiguration.fontSize == previousConfiguration!.fontSize
+                    && newConfiguration.lineSpacing == previousConfiguration!.lineSpacing
+                    && newConfiguration.letterSpacing == previousConfiguration!.letterSpacing
+                    && newConfiguration.paragraphSpacing == previousConfiguration!.paragraphSpacing
+                    && newConfiguration.paragraphIndent == previousConfiguration!.paragraphIndent
+                    && newConfiguration.titleSpacing == previousConfiguration!.titleSpacing
+                    && newConfiguration.paragraphs.count > (previousConfiguration?.paragraphs.count ?? 0)
+                    && !paragraphRanges.isEmpty
+
+                if canFastAppend, let prevConfig = previousConfiguration {
+                    appendNewParagraphs(from: prevConfig.paragraphs.count, to: newConfiguration, in: textView)
+                } else {
+                    rebuild(textView: textView, configuration: newConfiguration)
+                    if textView.bounds.width > 1 {
+                        lastLayoutWidth = textView.bounds.width
+                    }
+                    if textView.bounds.height > 0 && (!contentChanged || isAppend) {
+                        setContentOffsetIfNeeded(previousOffset, in: textView)
+                    }
+                    // A new chapter needs its initial target; settings/theme
+                    // changes or appends preserve the existing offset and request key.
+                    if contentChanged && !isAppend {
+                        lastScrollRequestKey = nil
+                        hasAppliedInitialScrollTarget = (scrollTarget == nil || scrollTarget == 0)
+                    }
+                    if isAppend {
+                        didFireNearBottom = false
+                    }
+                    lastVisibleParagraph = -1
+                    lastVisibleUpdateAt = 0
                 }
-                if textView.bounds.height > 0 && (!contentChanged || isAppend) {
-                    setContentOffsetIfNeeded(previousOffset, in: textView)
-                }
-                // A new chapter needs its initial target; settings/theme
-                // changes or appends preserve the existing offset and request key.
-                if contentChanged && !isAppend {
-                    lastScrollRequestKey = nil
-                    hasAppliedInitialScrollTarget = (scrollTarget == nil || scrollTarget == 0)
-                }
-                if isAppend {
-                    didFireNearBottom = false
-                }
-                lastVisibleParagraph = -1
-                lastVisibleUpdateAt = 0
             } else {
                 if insetsChanged {
                     updateInsets(in: textView, configuration: newConfiguration)
@@ -417,6 +434,23 @@ struct NativeReaderTextView: UIViewRepresentable {
             }
         }
 
+        private func appendNewParagraphs(from oldParagraphCount: Int, to newConfig: Configuration, in textView: UITextView) {
+            guard oldParagraphCount < newConfig.paragraphs.count else { return }
+            let newParagraphs = Array(newConfig.paragraphs[oldParagraphCount...])
+            let chunkResult = ReaderNativeTextLayout.makeAttributedChunk(
+                paragraphs: newParagraphs,
+                startingLocation: textView.textStorage.length,
+                configuration: newConfig
+            )
+            textView.textStorage.beginEditing()
+            textView.textStorage.append(chunkResult.text)
+            textView.textStorage.endEditing()
+            paragraphRanges.append(contentsOf: chunkResult.paragraphRanges)
+            didFireNearBottom = false
+            lastVisibleParagraph = -1
+            lastVisibleUpdateAt = 0
+        }
+
         private func setContentOffsetIfNeeded(_ offset: CGPoint, in textView: UITextView) {
             let current = textView.contentOffset
             guard abs(current.x - offset.x) > 0.5 || abs(current.y - offset.y) > 0.5 else { return }
@@ -448,7 +482,6 @@ struct NativeReaderTextView: UIViewRepresentable {
             let offset = CGPoint(x: 0, y: targetY)
             let currentOffset = textView.contentOffset
             hasAppliedInitialScrollTarget = true
-            lastScrollRequestKey = configuration?.contentFingerprint
             guard abs(currentOffset.y - offset.y) > 0.5 else { return true }
             if animated {
                 UIView.animate(
@@ -675,6 +708,65 @@ enum ReaderNativeTextLayout {
         }
 
         PerformanceSignpost.event("reader.textLayout.summary", "paragraphs=\(ranges.count), utf16=\(bodyLength)")
+        return Result(text: output, paragraphRanges: ranges)
+    }
+
+    static func makeAttributedChunk(
+        paragraphs: [String],
+        startingLocation: Int,
+        configuration: NativeReaderTextView.Configuration
+    ) -> Result {
+        let output = NSMutableAttributedString(string: "")
+        var ranges: [NSRange] = []
+
+        let paragraphStyle = NSMutableParagraphStyle()
+        paragraphStyle.lineSpacing = CGFloat(configuration.lineSpacing)
+        paragraphStyle.paragraphSpacing = CGFloat(configuration.paragraphSpacing)
+        paragraphStyle.headIndent = 0
+        paragraphStyle.firstLineHeadIndent = CGFloat(configuration.paragraphIndent)
+        paragraphStyle.alignment = .natural
+        let paragraphAttributes: [NSAttributedString.Key: Any] = [
+            .font: configuration.fontFamily.uiFont(ofSize: CGFloat(configuration.fontSize), weight: .regular),
+            .foregroundColor: configuration.textColor,
+            .kern: configuration.letterSpacing,
+            .paragraphStyle: paragraphStyle
+        ]
+
+        var body = String()
+        var bodyLength = 0
+        for paragraph in paragraphs {
+            let start = startingLocation + bodyLength
+            ranges.append(NSRange(location: start, length: paragraph.utf16.count))
+            body.append(paragraph)
+            body.append("\n\n")
+            bodyLength += paragraph.utf16.count + 2
+        }
+
+        if !body.isEmpty {
+            output.append(NSAttributedString(string: body))
+            output.addAttributes(
+                paragraphAttributes,
+                range: NSRange(location: 0, length: bodyLength)
+            )
+
+            // Divider styling for continuous chapter titles
+            for (idx, paragraph) in paragraphs.enumerated() {
+                if paragraph.hasPrefix("——— ") && paragraph.hasSuffix(" ———") {
+                    let range = NSRange(location: ranges[idx].location - startingLocation, length: ranges[idx].length)
+                    let dividerStyle = NSMutableParagraphStyle()
+                    dividerStyle.alignment = .center
+                    dividerStyle.paragraphSpacingBefore = CGFloat(configuration.paragraphSpacing + 36)
+                    dividerStyle.paragraphSpacing = CGFloat(configuration.paragraphSpacing + 18)
+                    let dividerAttrs: [NSAttributedString.Key: Any] = [
+                        .font: configuration.fontFamily.uiFont(ofSize: CGFloat(configuration.fontSize + 4), weight: .bold),
+                        .foregroundColor: configuration.textColor,
+                        .paragraphStyle: dividerStyle
+                    ]
+                    output.addAttributes(dividerAttrs, range: range)
+                }
+            }
+        }
+
         return Result(text: output, paragraphRanges: ranges)
     }
 }
