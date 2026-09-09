@@ -927,7 +927,7 @@ private struct PressableScaleButtonStyle: ButtonStyle {
     }
 }
 
-private struct AsyncBookCover: View {
+struct AsyncBookCover: View {
     let urlString: String?
     let width: CGFloat
     let height: CGFloat
