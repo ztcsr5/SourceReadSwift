@@ -140,7 +140,7 @@ struct BookDetailView: View {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("Z-Library 全球图书源")
                         .font(.headline)
-                    Text("格式：\(book.kind ?? "EPUB")  ·  点击即可高速下载并进入沉浸阅读")
+                    Text("格式：EPUB  ·  点击即可高速下载并进入沉浸阅读")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
@@ -297,23 +297,23 @@ struct BookDetailView: View {
             isLoading = true
             defer { isLoading = false }
             detail = BookDetail(
-                bookUrl: book.bookUrl,
                 name: book.name,
                 author: book.author,
                 coverUrl: book.coverUrl,
+                bookUrl: book.bookUrl,
+                tocUrl: nil,
+                sourceName: book.sourceName,
+                sourceUrl: book.sourceUrl,
                 intro: book.intro,
-                category: book.kind ?? "EPUB",
-                status: "完结",
-                latestChapter: book.lastChapter ?? "全本",
-                wordCount: nil,
-                updateTime: nil,
-                catalogUrl: nil
+                latestChapter: "全本"
             )
             chapters = [
                 BookChapter(
                     title: "全本阅读 (EPUB)",
                     url: book.bookUrl,
-                    index: 0
+                    bookUrl: book.bookUrl,
+                    index: 0,
+                    isVip: false
                 )
             ]
             return

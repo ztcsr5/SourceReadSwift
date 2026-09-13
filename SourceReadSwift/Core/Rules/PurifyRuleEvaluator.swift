@@ -59,11 +59,17 @@ struct PurifyRuleEvaluator {
 
             if clean.contains("##") {
                 let parts = clean.components(separatedBy: "##")
-                return replaceRegex(
-                    pattern: parts.first ?? "",
-                    replacement: parts.dropFirst().first ?? "",
-                    in: output
-                )
+                if clean.hasPrefix("##") {
+                    let pattern = parts.count > 1 ? parts[1] : ""
+                    let replacement = parts.count > 2 ? parts[2] : ""
+                    return replaceRegex(pattern: pattern, replacement: replacement, in: output)
+                } else {
+                    return replaceRegex(
+                        pattern: parts.first ?? "",
+                        replacement: parts.dropFirst().first ?? "",
+                        in: output
+                    )
+                }
             }
             return replaceRegex(pattern: clean, replacement: "", in: output)
         }

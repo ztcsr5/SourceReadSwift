@@ -84,6 +84,27 @@ struct HtmlRuleExtractor {
             return [materializedRule]
         }
 
+        if let jsonRange = materializedRule.range(of: "@json:") {
+            let left = String(materializedRule[..<jsonRange.lowerBound]).trimmingCharacters(in: .whitespacesAndNewlines)
+            let right = String(materializedRule[jsonRange.upperBound...]).trimmingCharacters(in: .whitespacesAndNewlines)
+            let rawText: String
+            if !left.isEmpty {
+                rawText = (try? valuesForSingleRule(from: root, rule: left, baseUrl: baseUrl))?.joined(separator: "\n") ?? ""
+            } else {
+                rawText = (try? root.outerHtml()) ?? ""
+            }
+            if let obj = ResponseFormatDetector.jsonObject(from: rawText) {
+                if let val = JSONRuleExtractor().value(from: obj, path: right) {
+                    if let arr = val as? [Any] {
+                        return arr.map { JSONRuleExtractor().stringify($0) }.filter { !$0.isEmpty }
+                    }
+                    let str = JSONRuleExtractor().stringify(val)
+                    return str.isEmpty ? [] : [str]
+                }
+            }
+            return []
+        }
+
         // Try XPath translator first
         if let xpathSplit = XPathRuleTranslator.valueRule(materializedRule) {
             let targets = try select(from: root, rule: xpathSplit.selector, baseUrl: baseUrl)

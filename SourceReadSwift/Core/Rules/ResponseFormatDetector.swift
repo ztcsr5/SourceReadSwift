@@ -23,7 +23,15 @@ enum ResponseFormatDetector {
         return value
     }
 
-    static func prefersJSON(body: String, headers: [String: String]) -> Bool {
+    static func prefersJSON(body: String, headers: [String: String], rule: String? = nil) -> Bool {
+        if let rule {
+            let trimmedRule = rule.trimmingCharacters(in: .whitespacesAndNewlines)
+            if trimmedRule.hasPrefix("$.") || trimmedRule.hasPrefix("@json:") || trimmedRule.contains("JSON.parse") {
+                if jsonObject(from: body) != nil {
+                    return true
+                }
+            }
+        }
         let normalized = normalizedBody(body)
         guard !normalized.isEmpty else { return false }
         let lower = normalized.lowercased()
@@ -55,6 +63,11 @@ enum ResponseFormatDetector {
 
         if lower.hasPrefix("<pre") && jsonObject(from: normalized) != nil {
             return true
+        }
+
+        // Detect JSONP or variable assignment
+        if unwrapJSONP(normalized) != nil || unwrapVarAssignment(normalized) != nil {
+            return jsonObject(from: normalized) != nil
         }
 
         // Some endpoints prepend an anti-bot comment or XSSI guard.  Strip
@@ -126,11 +139,37 @@ enum ResponseFormatDetector {
         return firstBalancedJSONValue(in: candidate)
     }
 
+    private static func unwrapJSONP(_ input: String) -> String? {
+        guard let openParen = input.firstIndex(of: "("),
+              let closeParen = input.lastIndex(of: ")"),
+              openParen < closeParen else { return nil }
+        let prefix = input[..<openParen].trimmingCharacters(in: .whitespacesAndNewlines)
+        guard prefix.range(of: #"^[a-zA-Z0-9_$.]+$"#, options: .regularExpression) != nil else { return nil }
+        let inner = input[input.index(after: openParen)..<closeParen].trimmingCharacters(in: .whitespacesAndNewlines)
+        return (inner.hasPrefix("{") || inner.hasPrefix("[")) ? inner : nil
+    }
+
+    private static func unwrapVarAssignment(_ input: String) -> String? {
+        guard let equals = input.firstIndex(of: "=") else { return nil }
+        let prefix = input[..<equals].trimmingCharacters(in: .whitespacesAndNewlines)
+        guard prefix.range(of: #"^(?:var|let|const|window\.[a-zA-Z0-9_$]+)\s+[a-zA-Z0-9_$]+$"#, options: .regularExpression) != nil
+                || prefix.range(of: #"^window\.[a-zA-Z0-9_$]+$"#, options: .regularExpression) != nil else { return nil }
+        var inner = input[input.index(after: equals)...].trimmingCharacters(in: .whitespacesAndNewlines)
+        if inner.hasSuffix(";") { inner.removeLast() }
+        inner = inner.trimmingCharacters(in: .whitespacesAndNewlines)
+        return (inner.hasPrefix("{") || inner.hasPrefix("[")) ? inner : nil
+    }
+
     /// Removes wrappers commonly emitted by JSONP and JavaScript bootstrap
     /// endpoints while keeping extraction conservative. The balanced scanner
     /// ensures a prose prefix/suffix cannot be mistaken for source data.
     private static func stripKnownWrapper(from input: String) -> String {
         var value = normalizedBody(input)
+        if let jsonp = unwrapJSONP(value) {
+            value = jsonp
+        } else if let varAssigned = unwrapVarAssignment(value) {
+            value = varAssigned
+        }
         for prefix in xssiPrefixes where value.hasPrefix(prefix) {
             value = String(value.dropFirst(prefix.count))
                 .trimmingCharacters(in: .whitespacesAndNewlines)

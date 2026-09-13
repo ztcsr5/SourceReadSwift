@@ -29,7 +29,8 @@ struct ContentParser {
             bodyWasDecoded: response.bodyWasDecoded,
             contentEncodings: response.contentEncodings
         )
-        if ResponseFormatDetector.prefersJSON(body: body, headers: response.headers) {
+        let contentRuleStr = htmlExtractor.firstRule(source.ruleContent, keys: ["content", "bookContent"])
+        if ResponseFormatDetector.prefersJSON(body: body, headers: response.headers, rule: contentRuleStr) {
             let jsonResult = parseJSON(source: source, chapter: chapter, response: normalizedResponse, globalPurifyRules: globalPurifyRules)
             switch jsonResult {
             case .success:
@@ -147,16 +148,23 @@ struct ContentParser {
         } else {
             rootObject = object
         }
-        let content: String?
-        if let dict = rootObject as? [String: Any] {
+        var content: String?
+        if let rule = contentRule, !rule.isEmpty {
+            if let extracted = jsonExtractor.value(from: rootObject, path: rule, variables: variables) {
+                let text = jsonExtractor.stringify(extracted)
+                if !text.isEmpty { content = text }
+            }
+        }
+        if content == nil, let dict = rootObject as? [String: Any] {
             content = jsonExtractor.string(
                 from: dict,
                 rule: contentRule,
-                fallbackKeys: ["content", "bookContent", "text", "body"],
+                fallbackKeys: ["content", "bookContent", "text", "body", "chapter_content"],
                 variables: variables
             )
-        } else {
-            content = nil
+        } else if content == nil {
+            let text = jsonExtractor.stringify(rootObject)
+            if !text.isEmpty { content = text }
         }
         let cleaned = applyContentTransforms(content ?? "", rule: rule, globalPurifyRules: globalPurifyRules, variables: variables)
         let paragraphs = splitParagraphs(cleaned)

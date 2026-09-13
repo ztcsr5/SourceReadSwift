@@ -22,7 +22,8 @@ struct SearchResultParser {
             bodyWasDecoded: response.bodyWasDecoded,
             contentEncodings: response.contentEncodings
         )
-        if ResponseFormatDetector.prefersJSON(body: normalized, headers: response.headers) {
+        let listRule = firstRule(source.ruleSearch, keys: ["bookList", "list", "books"])
+        if ResponseFormatDetector.prefersJSON(body: normalized, headers: response.headers, rule: listRule) {
             let jsonResult = parseJSON(source: source, response: normalizedResponse)
             switch jsonResult {
             case .success:

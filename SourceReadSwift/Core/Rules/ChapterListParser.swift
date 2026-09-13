@@ -31,7 +31,8 @@ struct ChapterListParser {
             bodyWasDecoded: response.bodyWasDecoded,
             contentEncodings: response.contentEncodings
         )
-        if ResponseFormatDetector.prefersJSON(body: normalized, headers: response.headers) {
+        let listRule = htmlExtractor.firstRule(source.ruleToc, keys: ["chapterList", "tocList", "list"])
+        if ResponseFormatDetector.prefersJSON(body: normalized, headers: response.headers, rule: listRule) {
             let jsonResult = parseJSON(source: source, book: book, response: normalizedResponse)
             switch jsonResult {
             case .success:

@@ -449,6 +449,18 @@ final class JSCoreRuntime {
         }
         let getString: @convention(block) (String, String, String) -> String = { html, rule, baseUrl in
             do {
+                let trimmedRule = rule.trimmingCharacters(in: .whitespacesAndNewlines)
+                if trimmedRule.hasPrefix("$.") || trimmedRule.hasPrefix("@json:") || ResponseFormatDetector.looksLikeJSON(html) {
+                    if let object = ResponseFormatDetector.jsonObject(from: html) {
+                        if let dict = object as? [String: Any] {
+                            let val = JSONRuleExtractor().string(from: dict, rule: trimmedRule, fallbackKeys: [trimmedRule])
+                            if let val, !val.isEmpty { return val }
+                        }
+                        if let val = JSONRuleExtractor().value(from: object, path: trimmedRule) {
+                            return String(describing: val)
+                        }
+                    }
+                }
                 let safeBaseUrl = baseUrl.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "http://localhost/" : baseUrl
                 let document = try SwiftSoup.parse(html, safeBaseUrl)
                 return try Self.extractString(from: document, rule: rule, baseUrl: URL(string: safeBaseUrl))
@@ -458,6 +470,14 @@ final class JSCoreRuntime {
         }
         let getStringList: @convention(block) (String, String, String) -> NSArray = { html, rule, baseUrl in
             do {
+                let trimmedRule = rule.trimmingCharacters(in: .whitespacesAndNewlines)
+                if trimmedRule.hasPrefix("$.") || trimmedRule.hasPrefix("@json:") || ResponseFormatDetector.looksLikeJSON(html) {
+                    if let object = ResponseFormatDetector.jsonObject(from: html) {
+                        if let list = JSONRuleExtractor().value(from: object, path: trimmedRule) as? [Any] {
+                            return list.map { String(describing: $0) } as NSArray
+                        }
+                    }
+                }
                 let safeBaseUrl = baseUrl.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "http://localhost/" : baseUrl
                 let document = try SwiftSoup.parse(html, safeBaseUrl)
                 let values = try Self.extractStringList(from: document, rule: rule, baseUrl: URL(string: safeBaseUrl))
