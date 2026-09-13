@@ -2095,7 +2095,6 @@ final class JSCoreRuntime {
         java.getThemeConfigMap = function() { return {}; };
         java.readBookConfig = function() { return ''; };
         java.refreshTocUrl = function() { return ''; };
-        java.getStrResponse = function() { return ''; };
         function __cipherArgs(third, fourth, fallback) {
           var thirdText = String(third == null ? '' : third);
           var looksLikeTransformation = thirdText.indexOf('/') >= 0 || /^(AES|DES|DESEDE|TRIPLEDES)/i.test(thirdText);

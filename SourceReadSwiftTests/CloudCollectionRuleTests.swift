@@ -120,8 +120,8 @@ final class CloudCollectionRuleTests: XCTestCase {
             var plain = "Hello Legado 3.0";
             var enc = java.cipherEncodeToBase64String(plain, "242ccb8230d709e1", "0123456789abcdef", "AES/CBC/PKCS5Padding");
             // Prefix 16-byte IV to ciphertext bytes
-            var ivBytes = __native_stringToBytes("0123456789abcdef");
-            var encBytes = __native_base64DecodeBytes(enc);
+            var ivBytes = java.strToBytes("0123456789abcdef");
+            var encBytes = java.base64DecodeToByteArray(enc);
             var combined = ivBytes.concat(encBytes);
             var combinedB64 = java.base64Encode(combined);
             res = decode(combinedB64);
