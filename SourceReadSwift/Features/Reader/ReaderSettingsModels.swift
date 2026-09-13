@@ -2,7 +2,7 @@ import Foundation
 import SwiftUI
 import UIKit
 
-enum ReaderBackground: String, CaseIterable, Identifiable, Sendable {
+enum ReaderBackground: String, CaseIterable, Identifiable, Codable, Sendable {
     case paper      // 羊皮纸暖黄 (#EBD9BB)
     case kraft      // 复古牛皮 (#DDC090)
     case green      // 豆沙青绿 (#C2D8AA)
@@ -157,7 +157,7 @@ fileprivate extension UIColor {
     }
 }
 
-enum ReaderMode: String, CaseIterable, Identifiable, Sendable {
+enum ReaderMode: String, CaseIterable, Identifiable, Codable, Sendable {
     case scroll
     case pageTurn
     case cover

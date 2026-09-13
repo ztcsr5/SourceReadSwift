@@ -2,11 +2,11 @@ import Foundation
 
 /// Z-Library 全球图书源引擎（多节点动态容灾、内置账号轮询、eAPI 检索与直链高速下载）
 /// 移植自 cmbok_app 的 ZlibraryService 核心架构
-public actor ZlibraryEngine {
-    public static let shared = ZlibraryEngine()
+actor ZlibraryEngine {
+    static let shared = ZlibraryEngine()
 
-    public static let sourceName = "Z-Library"
-    public static let sourceUrl = "https://z-library.sk"
+    static let sourceName = "Z-Library"
+    static let sourceUrl = "https://z-library.sk"
 
     private static let kSavedDomainKey = "zlibrary_active_domain"
     private static let kSavedCandidatesKey = "zlibrary_candidates"
@@ -63,12 +63,12 @@ public actor ZlibraryEngine {
     }
 
     /// 获取当前生效域名
-    public func currentDomain() -> String {
+    func currentDomain() -> String {
         activeDomain
     }
 
     /// 后台启动动态镜像池测速选优与云端镜像列表拉取
-    public func refreshCandidatesAndProbe() async {
+    func refreshCandidatesAndProbe() async {
         guard !isProbing else { return }
         isProbing = true
         defer { isProbing = false }
@@ -181,7 +181,7 @@ public actor ZlibraryEngine {
     }
 
     /// 搜索图书
-    public func search(keyword: String, page: Int = 1) async -> Result<[SearchBook], SourceEngineError> {
+    func search(keyword: String, page: Int = 1) async -> Result<[SearchBook], SourceEngineError> {
         let query = keyword.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !query.isEmpty else { return .success([]) }
 
@@ -255,7 +255,7 @@ public actor ZlibraryEngine {
     }
 
     /// 获取下载链接
-    public func fetchDownloadURL(bookID: String, hash: String) async -> Result<URL, SourceEngineError> {
+    func fetchDownloadURL(bookID: String, hash: String) async -> Result<URL, SourceEngineError> {
         let auth = await ensureAuthToken()
         let domain = activeDomain
 
@@ -298,7 +298,7 @@ public actor ZlibraryEngine {
     }
 
     /// 下载 EPUB 文件并保存到本地临时目录
-    public func downloadBook(bookID: String, hash: String, title: String) async throws -> URL {
+    func downloadBook(bookID: String, hash: String, title: String) async throws -> URL {
         let linkResult = await fetchDownloadURL(bookID: bookID, hash: hash)
         guard case .success(let downloadURL) = linkResult else {
             if case .failure(let error) = linkResult {

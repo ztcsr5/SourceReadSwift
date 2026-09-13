@@ -1,14 +1,14 @@
 import Foundation
 import SwiftUI
 
-public struct BookReaderOverride: Codable, Equatable, Sendable {
-    public var readerMode: ReaderMode?
-    public var fontFamily: ReaderFontFamily?
-    public var fontSize: CGFloat?
-    public var lineSpacing: CGFloat?
-    public var background: ReaderBackground?
+struct BookReaderOverride: Codable, Equatable, Sendable {
+    var readerMode: ReaderMode?
+    var fontFamily: ReaderFontFamily?
+    var fontSize: CGFloat?
+    var lineSpacing: CGFloat?
+    var background: ReaderBackground?
 
-    public init(
+    init(
         readerMode: ReaderMode? = nil,
         fontFamily: ReaderFontFamily? = nil,
         fontSize: CGFloat? = nil,
@@ -22,14 +22,14 @@ public struct BookReaderOverride: Codable, Equatable, Sendable {
         self.background = background
     }
 
-    public var hasAnyOverride: Bool {
+    var hasAnyOverride: Bool {
         readerMode != nil || fontFamily != nil || fontSize != nil || lineSpacing != nil || background != nil
     }
 }
 
 @MainActor
-public final class ReaderOverrideStore: ObservableObject {
-    public static let shared = ReaderOverrideStore()
+final class ReaderOverrideStore: ObservableObject {
+    static let shared = ReaderOverrideStore()
 
     private let storageKey = "book_reader_overrides_v1"
     @Published private var overrides: [String: BookReaderOverride] = [:]
@@ -41,11 +41,11 @@ public final class ReaderOverrideStore: ObservableObject {
         }
     }
 
-    public func override(for bookID: String) -> BookReaderOverride? {
+    func override(for bookID: String) -> BookReaderOverride? {
         overrides[bookID]
     }
 
-    public func setOverride(_ override: BookReaderOverride, for bookID: String) {
+    func setOverride(_ override: BookReaderOverride, for bookID: String) {
         if override.hasAnyOverride {
             overrides[bookID] = override
         } else {
@@ -54,7 +54,7 @@ public final class ReaderOverrideStore: ObservableObject {
         save()
     }
 
-    public func clearOverride(for bookID: String) {
+    func clearOverride(for bookID: String) {
         overrides.removeValue(forKey: bookID)
         save()
     }

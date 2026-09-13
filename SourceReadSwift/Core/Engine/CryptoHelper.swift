@@ -1,8 +1,8 @@
 import Foundation
 import CommonCrypto
 
-public struct CryptoHelper {
-    public static func aesDecrypt(data: Data, key: Data, iv: Data) -> Data? {
+struct CryptoHelper {
+    static func aesDecrypt(data: Data, key: Data, iv: Data) -> Data? {
         let keyLength = key.count
         guard keyLength == kCCKeySizeAES128 || keyLength == kCCKeySizeAES192 || keyLength == kCCKeySizeAES256 else {
             return nil
@@ -40,7 +40,7 @@ public struct CryptoHelper {
         return buffer
     }
 
-    public static func aesDecryptBase64(base64: String, keyText: String, ivText: String) -> String? {
+    static func aesDecryptBase64(base64: String, keyText: String, ivText: String) -> String? {
         guard let data = Data(base64Encoded: base64),
               let key = keyText.data(using: .utf8),
               let iv = ivText.data(using: .utf8) else { return nil }

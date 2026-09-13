@@ -2478,7 +2478,7 @@ private struct ReaderPageEntry: Equatable {
     let text: String
 }
 
-private struct ReaderPageBlock: Identifiable, Equatable {
+struct ReaderPageBlock: Identifiable, Equatable {
     let id: Int
     let includesTitle: Bool
     let paragraphs: [ReaderPageEntry]

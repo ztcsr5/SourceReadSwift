@@ -4,17 +4,17 @@ import UIKit
 
 /// iOS 原生 3D 仿真翻页控制器（Page Curl）
 /// 基于 UIPageViewController 实现 120Hz 硬件加速纸张卷曲、物理背面阴影与手势交互
-public struct PageCurlReaderView<Content: View>: UIViewControllerRepresentable {
-    public let pages: [ReaderPageBlock]
-    @Binding public var currentPageIndex: Int
-    public let onPageChanged: ((Int) -> Void)?
-    public let pageBuilder: (ReaderPageBlock) -> Content
+struct PageCurlReaderView<Item: Identifiable, Content: View>: UIViewControllerRepresentable {
+    let pages: [Item]
+    @Binding var currentPageIndex: Int
+    let onPageChanged: ((Int) -> Void)?
+    let pageBuilder: (Item) -> Content
 
-    public init(
-        pages: [ReaderPageBlock],
+    init(
+        pages: [Item],
         currentPageIndex: Binding<Int>,
         onPageChanged: ((Int) -> Void)? = nil,
-        @ViewBuilder pageBuilder: @escaping (ReaderPageBlock) -> Content
+        @ViewBuilder pageBuilder: @escaping (Item) -> Content
     ) {
         self.pages = pages
         self._currentPageIndex = currentPageIndex
@@ -22,11 +22,11 @@ public struct PageCurlReaderView<Content: View>: UIViewControllerRepresentable {
         self.pageBuilder = pageBuilder
     }
 
-    public func makeCoordinator() -> Coordinator {
+    func makeCoordinator() -> Coordinator {
         Coordinator(self)
     }
 
-    public func makeUIViewController(context: Context) -> UIPageViewController {
+    func makeUIViewController(context: Context) -> UIPageViewController {
         let pvc = UIPageViewController(
             transitionStyle: .pageCurl,
             navigationOrientation: .horizontal,
@@ -43,7 +43,7 @@ public struct PageCurlReaderView<Content: View>: UIViewControllerRepresentable {
         return pvc
     }
 
-    public func updateUIViewController(_ uiViewController: UIPageViewController, context: Context) {
+    func updateUIViewController(_ uiViewController: UIPageViewController, context: Context) {
         context.coordinator.parent = self
         guard let currentVC = uiViewController.viewControllers?.first as? PageHostingController<Content> else { return }
         if currentVC.pageIndex != currentPageIndex, pages.indices.contains(currentPageIndex) {
@@ -53,7 +53,7 @@ public struct PageCurlReaderView<Content: View>: UIViewControllerRepresentable {
         }
     }
 
-    public final class Coordinator: NSObject, UIPageViewControllerDataSource, UIPageViewControllerDelegate {
+    final class Coordinator: NSObject, UIPageViewControllerDataSource, UIPageViewControllerDelegate {
         var parent: PageCurlReaderView
 
         init(_ parent: PageCurlReaderView) {
@@ -64,14 +64,14 @@ public struct PageCurlReaderView<Content: View>: UIViewControllerRepresentable {
             guard parent.pages.indices.contains(index) else {
                 return UIViewController()
             }
-            let block = parent.pages[index]
-            let view = parent.pageBuilder(block)
+            let item = parent.pages[index]
+            let view = parent.pageBuilder(item)
             let hc = PageHostingController(rootView: view, pageIndex: index)
             hc.view.backgroundColor = .clear
             return hc
         }
 
-        public func pageViewController(
+        func pageViewController(
             _ pageViewController: UIPageViewController,
             viewControllerBefore viewController: UIViewController
         ) -> UIViewController? {
@@ -81,7 +81,7 @@ public struct PageCurlReaderView<Content: View>: UIViewControllerRepresentable {
             return self.viewController(at: prev)
         }
 
-        public func pageViewController(
+        func pageViewController(
             _ pageViewController: UIPageViewController,
             viewControllerAfter viewController: UIViewController
         ) -> UIViewController? {
@@ -91,7 +91,7 @@ public struct PageCurlReaderView<Content: View>: UIViewControllerRepresentable {
             return self.viewController(at: next)
         }
 
-        public func pageViewController(
+        func pageViewController(
             _ pageViewController: UIPageViewController,
             didFinishAnimating finished: Bool,
             previousViewControllers: [UIViewController],
