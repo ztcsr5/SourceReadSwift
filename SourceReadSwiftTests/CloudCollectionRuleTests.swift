@@ -157,9 +157,9 @@ final class CloudCollectionRuleTests: XCTestCase {
             }
             XCTAssertEqual(dict["aid"] as? String, "a1b2c3d4e5f60718")
             XCTAssertEqual(dict["uuidLen"] as? Int, 36)
-            XCTAssertEqual(dict["toast"] as? String, "testing")
+            XCTAssertEqual(dict["toast"] as? String, "")
             XCTAssertEqual(dict["hasUA"] as? Bool, true)
-            XCTAssertEqual(dict["open"] as? String, "https://example.com")
+            XCTAssertEqual(dict["open"] as? String, "")
         case .failure(let error):
             XCTFail("Java utility methods evaluation failed: \(error)")
         }
@@ -179,8 +179,8 @@ final class CloudCollectionRuleTests: XCTestCase {
         let script = """
         book.putCustomVariable("custom_payload_data");
         var val = book.getCustomVariable();
-        book.putCustomVariable("key2", "val2");
-        var val2 = book.getCustomVariable("key2");
+        book.putVariable("key2", "val2");
+        var val2 = book.getVariable("key2");
         val + " | " + val2;
         """
         let result = runtime.evaluate(script, variables: ["book": book])

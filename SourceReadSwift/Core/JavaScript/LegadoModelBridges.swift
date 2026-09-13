@@ -20,7 +20,7 @@ import JavaScriptCore
     func putVariable(_ key: String, _ value: String)
     func getVariable(_ key: String) -> String
     func putCustomVariable(_ value: String)
-    func getCustomVariable(_ key: String) -> String
+    func getCustomVariable() -> String
 }
 
 final class LegadoSearchBookBridge: NSObject, LegadoSearchBookExport {
@@ -31,7 +31,7 @@ final class LegadoSearchBookBridge: NSObject, LegadoSearchBookExport {
     func putVariable(_ key: String, _ value: String) { variables[key] = value; variable = value }
     func getVariable(_ key: String) -> String { variables[key] ?? "" }
     func putCustomVariable(_ value: String) { variables["custom"] = value }
-    func getCustomVariable(_ key: String) -> String { variables[key] ?? variables["custom"] ?? "" }
+    func getCustomVariable() -> String { variables["custom"] ?? "" }
     init(book: SearchBook) {
         bookUrl = book.bookUrl; origin = book.sourceUrl; originName = book.sourceName
         name = book.name; author = book.author ?? ""; coverUrl = book.coverUrl ?? ""; intro = book.intro ?? ""
@@ -45,7 +45,7 @@ final class LegadoSearchBookBridge: NSObject, LegadoSearchBookExport {
     func putVariable(_ key: String, _ value: String)
     func getVariable(_ key: String) -> String
     func putCustomVariable(_ value: String)
-    func getCustomVariable(_ key: String) -> String
+    func getCustomVariable() -> String
     func getName() -> String
     func getTitle() -> String
     func getUrl() -> String
@@ -61,7 +61,7 @@ final class LegadoBookChapterBridge: NSObject, LegadoBookChapterExport {
     func putVariable(_ key: String, _ value: String) { variables[key] = value; variable = value }
     func getVariable(_ key: String) -> String { variables[key] ?? "" }
     func putCustomVariable(_ value: String) { variables["custom"] = value }
-    func getCustomVariable(_ key: String) -> String { variables[key] ?? variables["custom"] ?? "" }
+    func getCustomVariable() -> String { variables["custom"] ?? "" }
     func getName() -> String { title }
     func getTitle() -> String { title }
     func getUrl() -> String { url }

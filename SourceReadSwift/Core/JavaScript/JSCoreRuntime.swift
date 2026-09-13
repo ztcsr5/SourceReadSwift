@@ -2084,6 +2084,18 @@ final class JSCoreRuntime {
           };
         };
         java.fetchCloudTTS = function(_) { return ''; };
+        java.androidId = function() { return 'a1b2c3d4e5f60718'; };
+        java.randomUUID = function() {
+          return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+            var r = Math.random() * 16 | 0, v = c === 'x' ? r : (r & 0x3 | 0x8);
+            return v.toString(16);
+          });
+        };
+        java.getReadBookConfigMap = function() { return {}; };
+        java.getThemeConfigMap = function() { return {}; };
+        java.readBookConfig = function() { return ''; };
+        java.refreshTocUrl = function() { return ''; };
+        java.getStrResponse = function() { return ''; };
         function __cipherArgs(third, fourth, fallback) {
           var thirdText = String(third == null ? '' : third);
           var looksLikeTransformation = thirdText.indexOf('/') >= 0 || /^(AES|DES|DESEDE|TRIPLEDES)/i.test(thirdText);
@@ -2321,132 +2333,6 @@ final class JSCoreRuntime {
           };
         }
         __installSourceAndBook();
-        var Arrays = {
-          copyOfRange: function(arr, start, end) {
-            if (!arr) return [];
-            return Array.prototype.slice.call(arr, start, end);
-          }
-        };
-        var Base64 = {
-          getDecoder: function() {
-            return {
-              decode: function(s) {
-                return __asJavaList(__native_base64DecodeBytes(String(s == null ? '' : s)));
-              }
-            };
-          },
-          getUrlDecoder: function() {
-            return {
-              decode: function(s) {
-                return __asJavaList(__native_base64DecodeBytes(String(s == null ? '' : s).replace(/-/g, '+').replace(/_/g, '/')));
-              }
-            };
-          },
-          getEncoder: function() {
-            return {
-              encode: function(bytes) { return java.base64Encode(bytes); },
-              encodeToString: function(bytes) { return java.base64Encode(bytes); }
-            };
-          },
-          getUrlEncoder: function() {
-            return {
-              encode: function(bytes) { return java.base64UrlEncode(bytes); },
-              encodeToString: function(bytes) { return java.base64UrlEncode(bytes); }
-            };
-          }
-        };
-        function SecretKeySpec(key, algo) {
-          if (!(this instanceof SecretKeySpec)) return new SecretKeySpec(key, algo);
-          this.key = (key && key.key) ? key.key : key;
-          this.algo = algo;
-        }
-        function IvParameterSpec(iv) {
-          if (!(this instanceof IvParameterSpec)) return new IvParameterSpec(iv);
-          this.iv = (iv && iv.iv) ? iv.iv : iv;
-        }
-        function PKCS8EncodedKeySpec(keyBytes) {
-          if (!(this instanceof PKCS8EncodedKeySpec)) return new PKCS8EncodedKeySpec(keyBytes);
-          this.key = keyBytes;
-        }
-        function X509EncodedKeySpec(keyBytes) {
-          if (!(this instanceof X509EncodedKeySpec)) return new X509EncodedKeySpec(keyBytes);
-          this.key = keyBytes;
-        }
-        var Cipher = {
-          getInstance: function(transformation) {
-            return java.createSymmetricCrypto(transformation);
-          },
-          ENCRYPT_MODE: 1,
-          DECRYPT_MODE: 2
-        };
-        if (!String.prototype.getBytes) {
-          String.prototype.getBytes = function(charset) {
-            return __native_stringToBytes(this);
-          };
-        }
-        Packages = (typeof Packages !== 'undefined' && Packages) || {};
-        Packages.java = Packages.java || {};
-        Packages.java.lang = Packages.java.lang || { String: String };
-        Packages.java.util = Packages.java.util || { Arrays: Arrays, Base64: Base64, UUID: { randomUUID: function() { return java.randomUUID(); } } };
-        Packages.java.io = Packages.java.io || {};
-        Packages.java.security = Packages.java.security || {
-          KeyFactory: {
-            getInstance: function() {
-              return {
-                generatePrivate: function(spec) { return (spec && spec.key) ? spec.key : spec; },
-                generatePublic: function(spec) { return (spec && spec.key) ? spec.key : spec; }
-              };
-            }
-          },
-          Signature: {
-            getInstance: function(algo) { return java.createSign(algo); }
-          },
-          MessageDigest: {
-            getInstance: function(algo) {
-              var data = '';
-              return {
-                update: function(bytes) { data += (bytes && bytes.length != null && typeof bytes !== 'string') ? __native_bytesToString(bytes) : String(bytes || ''); },
-                digest: function(bytes) {
-                  if (bytes) this.update(bytes);
-                  var hex = java.digestHex(data, algo || 'md5');
-                  return __hexToJavaBytes(hex);
-                }
-              };
-            }
-          }
-        };
-        Packages.java.security.spec = Packages.java.security.spec || {
-          PKCS8EncodedKeySpec: PKCS8EncodedKeySpec,
-          X509EncodedKeySpec: X509EncodedKeySpec
-        };
-        Packages.javax = Packages.javax || {};
-        Packages.javax.crypto = Packages.javax.crypto || { Cipher: Cipher };
-        Packages.javax.crypto.spec = Packages.javax.crypto.spec || {
-          SecretKeySpec: SecretKeySpec,
-          IvParameterSpec: IvParameterSpec
-        };
-        Packages.okhttp3 = Packages.okhttp3 || {
-          Request: function() {},
-          client: function() {}
-        };
-        function JavaImporter() {
-          if (!(this instanceof JavaImporter)) return new JavaImporter();
-          this.importPackage = function() {};
-          this.importClass = function() {};
-          this.Base64 = Base64;
-          this.Cipher = Cipher;
-          this.SecretKeySpec = SecretKeySpec;
-          this.IvParameterSpec = IvParameterSpec;
-          this.Arrays = Arrays;
-          this.KeyFactory = Packages.java.security.KeyFactory;
-          this.Signature = Packages.java.security.Signature;
-          this.PKCS8EncodedKeySpec = PKCS8EncodedKeySpec;
-          this.X509EncodedKeySpec = X509EncodedKeySpec;
-          this.MessageDigest = Packages.java.security.MessageDigest;
-          this.UUID = Packages.java.util.UUID;
-        }
-        globalThis.JavaImporter = JavaImporter;
-        if (typeof window !== 'undefined') window.JavaImporter = JavaImporter;
         function base64Encode(value) { return java.base64Encode(value); }
         function base64Decode(value) { return java.base64Decode(value); }
         function unbase64(value) { return java.base64Decode(value); }
@@ -3076,6 +2962,30 @@ final class JSCoreRuntime {
           }
         };
         Packages.java.security = Packages.java.security || {};
+        Packages.java.security.spec = Packages.java.security.spec || {};
+        Packages.java.security.spec.PKCS8EncodedKeySpec = Packages.java.security.spec.PKCS8EncodedKeySpec || function(key) {
+          if (!(this instanceof Packages.java.security.spec.PKCS8EncodedKeySpec)) return new Packages.java.security.spec.PKCS8EncodedKeySpec(key);
+          this.key = key;
+          this.bytes = key && key.length != null ? Array.prototype.slice.call(key) : [];
+          this.getEncoded = function() { return this.bytes; };
+        };
+        Packages.java.security.spec.X509EncodedKeySpec = Packages.java.security.spec.X509EncodedKeySpec || function(key) {
+          if (!(this instanceof Packages.java.security.spec.X509EncodedKeySpec)) return new Packages.java.security.spec.X509EncodedKeySpec(key);
+          this.key = key;
+          this.bytes = key && key.length != null ? Array.prototype.slice.call(key) : [];
+          this.getEncoded = function() { return this.bytes; };
+        };
+        Packages.java.security.KeyFactory = Packages.java.security.KeyFactory || {
+          getInstance: function(algo) {
+            return {
+              generatePrivate: function(spec) { return spec && spec.key ? spec.key : spec; },
+              generatePublic: function(spec) { return spec && spec.key ? spec.key : spec; }
+            };
+          }
+        };
+        Packages.java.security.Signature = Packages.java.security.Signature || {
+          getInstance: function(algo) { return java.createSign(algo); }
+        };
         Packages.java.security.MessageDigest = Packages.java.security.MessageDigest || {
           getInstance: function(algorithm) {
             var name = String(algorithm || 'SHA-256');
@@ -3103,6 +3013,12 @@ final class JSCoreRuntime {
         Packages.javax.crypto = Packages.javax.crypto || {};
         Packages.javax.crypto.spec = Packages.javax.crypto.spec || {};
         Packages.javax.crypto.spec.SecretKeySpec = Packages.javax.crypto.spec.SecretKeySpec || function(value, algorithm) {
+          if (!(this instanceof Packages.javax.crypto.spec.SecretKeySpec)) {
+            var ctor = Packages.javax.crypto.spec.SecretKeySpec;
+            var obj = Object.create(ctor.prototype || Object.prototype);
+            ctor.apply(obj, arguments);
+            return obj;
+          }
           var start = 0;
           var length = value && value.length != null ? value.length : 0;
           var name = algorithm;
@@ -3117,6 +3033,12 @@ final class JSCoreRuntime {
           this.getEncoded = function() { return this.bytes; };
         };
         Packages.javax.crypto.spec.IvParameterSpec = Packages.javax.crypto.spec.IvParameterSpec || function(value) {
+          if (!(this instanceof Packages.javax.crypto.spec.IvParameterSpec)) {
+            var ctor = Packages.javax.crypto.spec.IvParameterSpec;
+            var obj = Object.create(ctor.prototype || Object.prototype);
+            ctor.apply(obj, arguments);
+            return obj;
+          }
           var start = arguments.length >= 3 ? Math.max(0, Number(arguments[1] || 0)) : 0;
           var length = arguments.length >= 3 ? Math.max(0, Number(arguments[2] || 0)) : (value && value.length != null ? value.length : 0);
           var source = value && value.length != null ? Array.prototype.slice.call(value) : [];
@@ -3131,8 +3053,8 @@ final class JSCoreRuntime {
             return {
               init: function(mode, keySpec, ivSpec) {
                 state.mode = Number(mode || 2);
-                state.key = keySpec && keySpec.bytes ? keySpec.bytes : (keySpec && keySpec.getEncoded ? keySpec.getEncoded() : keySpec);
-                state.iv = ivSpec && ivSpec.bytes ? ivSpec.bytes : (ivSpec && ivSpec.getIV ? ivSpec.getIV() : []);
+                state.key = keySpec && keySpec.bytes ? keySpec.bytes : (keySpec && keySpec.getEncoded ? keySpec.getEncoded() : (keySpec && keySpec.key ? keySpec.key : keySpec));
+                state.iv = ivSpec && ivSpec.bytes ? ivSpec.bytes : (ivSpec && ivSpec.getIV ? ivSpec.getIV() : (ivSpec && ivSpec.iv ? ivSpec.iv : []));
                 return this;
               },
               update: function(value) { return this.doFinal(value); },
@@ -3491,16 +3413,22 @@ final class JSCoreRuntime {
         Packages.javax.crypto.Cipher.__javaSimpleName = 'Cipher';
         function JavaImporter() {
           var importer = {
-            importPackage: function(packageRef) {
-              if (packageRef && typeof packageRef === 'object') {
-                for (var key in packageRef) if (/^[A-Za-z_$][\\w$]*$/.test(key)) importer[key] = packageRef[key];
+            importPackage: function() {
+              for (var a = 0; a < arguments.length; a++) {
+                var packageRef = arguments[a];
+                if (packageRef && typeof packageRef === 'object') {
+                  for (var key in packageRef) if (/^[A-Za-z_$][\w$]*$/.test(key)) importer[key] = packageRef[key];
+                }
               }
               return importer;
             },
-            importClass: function(classRef) {
-              var name = classRef && classRef.__javaSimpleName ? String(classRef.__javaSimpleName) : '';
-              if (name) importer[name] = classRef;
-              return classRef;
+            importClass: function() {
+              for (var a = 0; a < arguments.length; a++) {
+                var classRef = arguments[a];
+                var name = classRef && classRef.__javaSimpleName ? String(classRef.__javaSimpleName) : '';
+                if (name) importer[name] = classRef;
+              }
+              return importer;
             },
             String: Packages.java.lang.String,
             Integer: Packages.java.lang.Integer,
@@ -3520,8 +3448,16 @@ final class JSCoreRuntime {
             InflaterInputStream: Packages.java.util.zip.InflaterInputStream,
             GZIPInputStream: Packages.java.util.zip.GZIPInputStream,
             Jsoup: Packages.org.jsoup.Jsoup,
-            Base64: Packages.java.util.Base64
+            Base64: Packages.java.util.Base64,
+            UUID: Packages.java.util.UUID,
+            KeyFactory: Packages.java.security.KeyFactory,
+            Signature: Packages.java.security.Signature,
+            PKCS8EncodedKeySpec: (Packages.java.security.spec && Packages.java.security.spec.PKCS8EncodedKeySpec),
+            X509EncodedKeySpec: (Packages.java.security.spec && Packages.java.security.spec.X509EncodedKeySpec)
           };
+          for (var i = 0; i < arguments.length; i++) {
+            importer.importPackage(arguments[i]);
+          }
           return importer;
         }
         function importClass(value) {
@@ -3529,12 +3465,17 @@ final class JSCoreRuntime {
           if (name && typeof globalThis !== 'undefined') globalThis[name] = value;
           return value;
         }
-        function importPackage(value) {
-          if (value && typeof value === 'object' && typeof globalThis !== 'undefined') {
-            for (var key in value) if (/^[A-Za-z_$][\\w$]*$/.test(key)) globalThis[key] = value[key];
+        function importPackage() {
+          for (var a = 0; a < arguments.length; a++) {
+            var value = arguments[a];
+            if (value && typeof value === 'object' && typeof globalThis !== 'undefined') {
+              for (var key in value) if (/^[A-Za-z_$][\w$]*$/.test(key)) globalThis[key] = value[key];
+            }
           }
-          return value;
+          return arguments[0];
         }
+        globalThis.JavaImporter = JavaImporter;
+        if (typeof window !== 'undefined') window.JavaImporter = JavaImporter;
         var org = Packages.org;
         function __selectorWithIndex(selector, index) {
           if (index === undefined || index === null || isNaN(Number(index))) return String(selector || '');
