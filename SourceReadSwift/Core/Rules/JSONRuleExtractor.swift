@@ -335,7 +335,7 @@ struct JSONRuleExtractor {
         guard !transforms.isEmpty else { return path }
         var res = path
         for t in transforms {
-            res += "##(t.pattern)##(t.replacement)"
+            res += "##\(t.pattern)##\(t.replacement)"
         }
         return res
     }
@@ -367,9 +367,9 @@ struct JSONRuleExtractor {
                     if let q = quote {
                         token.append(c)
                         if escaped { escaped = false }
-                        else if c == "\" { escaped = true }
+                        else if c == "\\" { escaped = true }
                         else if c == q { quote = nil }
-                    } else if c == """ || c == "'" {
+                    } else if c == "\"" || c == "'" {
                         quote = c; token.append(c)
                     } else if c == "[" {
                         depth += 1; token.append(c)
