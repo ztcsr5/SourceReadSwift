@@ -3417,7 +3417,7 @@ final class JSCoreRuntime {
               for (var a = 0; a < arguments.length; a++) {
                 var packageRef = arguments[a];
                 if (packageRef && typeof packageRef === 'object') {
-                  for (var key in packageRef) if (/^[A-Za-z_$][\w$]*$/.test(key)) importer[key] = packageRef[key];
+                  for (var key in packageRef) if (/^[A-Za-z_$][A-Za-z0-9_$]*$/.test(key)) importer[key] = packageRef[key];
                 }
               }
               return importer;
@@ -3469,7 +3469,7 @@ final class JSCoreRuntime {
           for (var a = 0; a < arguments.length; a++) {
             var value = arguments[a];
             if (value && typeof value === 'object' && typeof globalThis !== 'undefined') {
-              for (var key in value) if (/^[A-Za-z_$][\w$]*$/.test(key)) globalThis[key] = value[key];
+              for (var key in value) if (/^[A-Za-z_$][A-Za-z0-9_$]*$/.test(key)) globalThis[key] = value[key];
             }
           }
           return arguments[0];
