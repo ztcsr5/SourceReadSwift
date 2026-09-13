@@ -2473,7 +2473,7 @@ private struct ParagraphJumpRequest: Equatable {
     let index: Int
 }
 
-private struct ReaderPageEntry: Equatable {
+struct ReaderPageEntry: Equatable {
     let index: Int
     let text: String
 }
