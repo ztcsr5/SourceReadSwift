@@ -6,6 +6,7 @@ struct DiscoverView: View {
     @ObservedObject var viewModel: DiscoverViewModel
     @State private var pendingShelfAddBook: SearchBook?
     @State private var showSmartWebReader = false
+    @State private var selectedAggregatedBookForSources: AggregatedSearchBook? = nil
 
     init(viewModel: DiscoverViewModel? = nil) {
         self._viewModel = ObservedObject(wrappedValue: viewModel ?? DiscoverViewModel())
@@ -66,6 +67,42 @@ struct DiscoverView: View {
             }
             .sheet(isPresented: $showSmartWebReader) {
                 SmartWebReaderView()
+            }
+            .sheet(item: $selectedAggregatedBookForSources) { aggregated in
+                NavigationStack {
+                    List {
+                        Section {
+                            ForEach(aggregated.sources) { sourceBook in
+                                NavigationLink {
+                                    BookDetailView(book: sourceBook, availableSources: aggregated.sources)
+                                } label: {
+                                    VStack(alignment: .leading, spacing: 4) {
+                                        HStack {
+                                            Text(sourceBook.sourceName)
+                                                .font(.headline)
+                                            Spacer()
+                                            if let latest = sourceBook.lastChapter {
+                                                Text(latest)
+                                                    .font(.caption)
+                                                    .foregroundStyle(.secondary)
+                                                    .lineLimit(1)
+                                            }
+                                        }
+                                        Text(sourceBook.bookUrl)
+                                            .font(.caption2)
+                                            .foregroundStyle(.tertiary)
+                                            .lineLimit(1)
+                                    }
+                                    .padding(.vertical, 4)
+                                }
+                            }
+                        } header: {
+                            Text("共 \(aggregated.sources.count) 个书源提供《\(aggregated.name)》")
+                        }
+                    }
+                    .navigationTitle("选择书源")
+                    .navigationBarTitleDisplayMode(.inline)
+                }
             }
         }
     }
@@ -206,22 +243,40 @@ struct DiscoverView: View {
 
     private var resultsList: some View {
         LazyVStack(spacing: 14) {
-            HStack {
-                Text("已检测 \(viewModel.checkedSourceCount)/\(viewModel.enabledSourceCount) 个源 · 命中 \(viewModel.hitSourceCount) 个源 · 结果 \(viewModel.totalResultCount) 条\(viewModel.filterSummary)")
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(.secondary)
-                Spacer()
-                if viewModel.isSearching {
-                    HStack(spacing: 8) {
-                        ProgressView()
-                            .controlSize(.small)
-                        Button("取消") {
-                            viewModel.cancelSearch()
-                        }
+            VStack(spacing: 8) {
+                HStack {
+                    Text("已检测 \(viewModel.checkedSourceCount)/\(viewModel.enabledSourceCount) 个源 · 命中 \(viewModel.hitSourceCount) 个源 · 结果 \(viewModel.totalResultCount) 条\(viewModel.filterSummary)")
                         .font(.caption.weight(.semibold))
-                        .buttonStyle(.bordered)
-                        .controlSize(.mini)
+                        .foregroundStyle(.secondary)
+                    Spacer()
+                    if viewModel.isSearching {
+                        HStack(spacing: 6) {
+                            ProgressView()
+                                .controlSize(.small)
+                            Button("取消") {
+                                viewModel.cancelSearch()
+                            }
+                            .font(.caption.weight(.semibold))
+                            .buttonStyle(.bordered)
+                            .controlSize(.mini)
+                        }
                     }
+                }
+
+                HStack {
+                    Text(viewModel.displayMode == .aggregated
+                        ? "聚合为 \(viewModel.aggregatedResults.count) 部书籍"
+                        : "按书源分组显示")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                    Spacer()
+                    Picker("展示方式", selection: $viewModel.displayMode) {
+                        ForEach(SearchDisplayMode.allCases) { mode in
+                            Text(mode.title).tag(mode)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+                    .frame(width: 170)
                 }
             }
 
@@ -241,23 +296,141 @@ struct DiscoverView: View {
                 .foregroundStyle(.secondary)
             }
 
-            ForEach(viewModel.groupedResults) { group in
-                VStack(alignment: .leading, spacing: 10) {
-                    HStack(spacing: 6) {
-                        Image(systemName: "books.vertical")
-                        Text(group.source)
-                            .font(.subheadline.weight(.bold))
-                        Text("\(group.books.count) 条")
-                            .font(.caption.weight(.semibold))
-                            .foregroundStyle(.secondary)
-                    }
-                    .foregroundStyle(AppTheme.accent)
-                    ForEach(group.books) { book in
-                        searchResultCard(book)
+            if viewModel.displayMode == .aggregated {
+                ForEach(viewModel.aggregatedResults) { item in
+                    aggregatedBookCard(item)
+                }
+            } else {
+                ForEach(viewModel.groupedResults) { group in
+                    VStack(alignment: .leading, spacing: 10) {
+                        HStack(spacing: 6) {
+                            Image(systemName: "books.vertical")
+                            Text(group.source)
+                                .font(.subheadline.weight(.bold))
+                            Text("\(group.books.count) 条")
+                                .font(.caption.weight(.semibold))
+                                .foregroundStyle(.secondary)
+                        }
+                        .foregroundStyle(AppTheme.accent)
+                        ForEach(group.books) { book in
+                            searchResultCard(book)
+                        }
                     }
                 }
             }
         }
+    }
+
+    private func aggregatedBookCard(_ item: AggregatedSearchBook) -> some View {
+        HStack(alignment: .top, spacing: 12) {
+            NavigationLink {
+                BookDetailView(book: item.primaryBook, availableSources: item.sources)
+            } label: {
+                HStack(alignment: .top, spacing: 12) {
+                    aggregatedCover(item.coverUrl)
+
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text(item.name)
+                            .font(.system(size: 17, weight: .bold))
+                            .foregroundStyle(.primary)
+                            .lineLimit(1)
+
+                        HStack(spacing: 8) {
+                            Text(item.author ?? "作者未知")
+                                .font(.subheadline)
+                                .foregroundStyle(.secondary)
+                                .lineLimit(1)
+
+                            HStack(spacing: 3) {
+                                Image(systemName: "books.vertical.fill")
+                                    .font(.system(size: 10))
+                                Text("\(item.sourceCount) 源")
+                                    .font(.system(size: 11, weight: .semibold))
+                            }
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 2)
+                            .background(Color.blue.opacity(0.12), in: Capsule())
+                            .foregroundStyle(.blue)
+                        }
+
+                        if let latest = item.latestChapter, !latest.isEmpty {
+                            Text("最新：\(latest)")
+                                .font(.caption)
+                                .foregroundStyle(AppTheme.accent)
+                                .lineLimit(1)
+                        }
+
+                        if let intro = item.intro, !intro.isEmpty {
+                            Text(intro)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                                .lineLimit(2)
+                        }
+                    }
+                }
+            }
+            .buttonStyle(.plain)
+            .simultaneousGesture(TapGesture().onEnded {
+                UIImpactFeedbackGenerator(style: .light).impactOccurred()
+            })
+
+            Spacer(minLength: 0)
+
+            VStack(spacing: 12) {
+                Button {
+                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                    if !appState.bookshelfStore.contains(item.primaryBook) {
+                        pendingShelfAddBook = item.primaryBook
+                    }
+                } label: {
+                    Image(systemName: appState.bookshelfStore.contains(item.primaryBook) ? "checkmark.circle.fill" : "plus.circle")
+                        .font(.title2)
+                        .foregroundStyle(appState.bookshelfStore.contains(item.primaryBook) ? Color.green : AppTheme.accent)
+                        .frame(width: 36, height: 36)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(appState.bookshelfStore.contains(item.primaryBook) ? "已在书架" : "加入书架")
+
+                if item.sourceCount > 1 {
+                    Button {
+                        selectedAggregatedBookForSources = item
+                    } label: {
+                        Text("换源")
+                            .font(.system(size: 11, weight: .medium))
+                            .foregroundStyle(.secondary)
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 4)
+                            .background(Color(.systemGray5), in: Capsule())
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+        }
+        .podcastCard()
+    }
+
+    @ViewBuilder
+    private func aggregatedCover(_ coverUrl: String?) -> some View {
+        if let coverUrl, let url = URL(string: coverUrl) {
+            CachedRemoteImage(url: url) {
+                aggregatedCoverPlaceholder
+            }
+            .frame(width: 74, height: 98)
+            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+        } else {
+            aggregatedCoverPlaceholder
+                .frame(width: 74, height: 98)
+        }
+    }
+
+    private var aggregatedCoverPlaceholder: some View {
+        RoundedRectangle(cornerRadius: 12, style: .continuous)
+            .fill(Color.blue.opacity(0.12))
+            .overlay {
+                Image(systemName: "book")
+                    .font(.title)
+                    .foregroundStyle(.blue)
+            }
     }
 
     private func searchResultCard(_ book: SearchBook) -> some View {
@@ -291,9 +464,36 @@ struct DiscoverView: View {
 
 }
 
+enum SearchDisplayMode: String, CaseIterable, Identifiable {
+    case aggregated
+    case bySource
+
+    var id: String { rawValue }
+    var title: String {
+        switch self {
+        case .aggregated: return "按书聚合"
+        case .bySource: return "按书源"
+        }
+    }
+}
+
+struct AggregatedSearchBook: Identifiable {
+    var id: String { "\(name.lowercased())|\(author?.lowercased() ?? "")" }
+    let name: String
+    let author: String?
+    let coverUrl: String?
+    let intro: String?
+    let latestChapter: String?
+    let sources: [SearchBook]
+
+    var sourceCount: Int { sources.count }
+    var primaryBook: SearchBook { sources.first! }
+}
+
 @MainActor
 final class DiscoverViewModel: ObservableObject {
     @Published var keyword = ""
+    @Published var displayMode: SearchDisplayMode = .aggregated
     @Published var matchMode: SearchMatchMode = .exact
     @Published var resultFilterScope: SearchResultFilterScope = .all
     @Published var resultFilter = ""
@@ -330,6 +530,45 @@ final class DiscoverViewModel: ObservableObject {
                 if $0.source == $1.source { return $0.id < $1.id }
                 return $0.source.localizedStandardCompare($1.source) == .orderedAscending
             }
+    }
+
+    var aggregatedResults: [AggregatedSearchBook] {
+        var groups: [String: [SearchBook]] = [:]
+        var orderedKeys: [String] = []
+
+        for book in results {
+            let cleanName = book.name.trimmingCharacters(in: .whitespacesAndNewlines)
+            let cleanAuthor = (book.author ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+            let key = "\(cleanName.lowercased())|\(cleanAuthor.lowercased())"
+
+            if groups[key] == nil {
+                groups[key] = []
+                orderedKeys.append(key)
+            }
+            if !groups[key]!.contains(where: { $0.sourceUrl == book.sourceUrl && $0.bookUrl == book.bookUrl }) {
+                groups[key]!.append(book)
+            }
+        }
+
+        return orderedKeys.compactMap { key -> AggregatedSearchBook? in
+            guard let list = groups[key], !list.isEmpty else { return nil }
+            let bestBook = list.first(where: { !($0.coverUrl ?? "").isEmpty && !($0.intro ?? "").isEmpty })
+                ?? list.first(where: { !($0.coverUrl ?? "").isEmpty })
+                ?? list[0]
+
+            let bestLatest = list.compactMap(\.lastChapter).first(where: { !$0.isEmpty })
+            let bestIntro = list.compactMap(\.intro).first(where: { !$0.isEmpty })
+            let bestCover = list.compactMap(\.coverUrl).first(where: { !$0.isEmpty })
+
+            return AggregatedSearchBook(
+                name: bestBook.name,
+                author: bestBook.author,
+                coverUrl: bestCover,
+                intro: bestIntro,
+                latestChapter: bestLatest,
+                sources: list
+            )
+        }
     }
 
     private weak var appState: AppState?

@@ -6,9 +6,10 @@ struct SourceRequestBuilder {
     func buildPageRequest(
         source: BookSource,
         urlText: String,
+        baseURL: String? = nil,
         persistentValues: [String: String] = [:]
     ) -> SourceRequest {
-        buildRequest(source: source, resolvedText: urlText, persistentValues: persistentValues)
+        buildRequest(source: source, resolvedText: urlText, baseURL: baseURL, persistentValues: persistentValues)
     }
 
     func buildSearchRequest(
@@ -28,6 +29,7 @@ struct SourceRequestBuilder {
         return buildRequest(
             source: source,
             resolvedText: resolved,
+            baseURL: nil,
             keyword: keyword,
             page: page,
             persistentValues: persistentValues
@@ -37,6 +39,7 @@ struct SourceRequestBuilder {
     private func buildRequest(
         source: BookSource,
         resolvedText: String,
+        baseURL: String? = nil,
         keyword: String? = nil,
         page: Int? = nil,
         persistentValues: [String: String] = [:]
@@ -47,7 +50,8 @@ struct SourceRequestBuilder {
         // component is expanded at its own boundary below instead.
         let directive = directiveParser.parse(resolvedText)
         let resolvedURLText = interpolateURLValues(directive.urlText, values: persistentValues)
-        let url = resolveURL(resolvedURLText, base: source.bookSourceUrl)
+        let effectiveBase = (baseURL?.nilIfEmpty) ?? source.bookSourceUrl
+        let url = resolveURL(resolvedURLText, base: effectiveBase)
         let sourceOptions = requestOptions(
             source,
             keyword: keyword,

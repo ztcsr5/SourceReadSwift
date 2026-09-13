@@ -101,6 +101,17 @@ final class SourceDiagnosticHistoryStore: ObservableObject {
         persist()
     }
 
+    func recordBatch(_ newEntries: [SourceDiagnosticHistoryRecord]) {
+        guard !newEntries.isEmpty else { return }
+        for entry in newEntries {
+            records[entry.sourceURL, default: []].insert(entry, at: 0)
+            if records[entry.sourceURL]!.count > limit {
+                records[entry.sourceURL] = Array(records[entry.sourceURL]!.prefix(limit))
+            }
+        }
+        persist()
+    }
+
     func records(for source: BookSource) -> [SourceDiagnosticHistoryRecord] {
         records[source.bookSourceUrl] ?? []
     }

@@ -454,11 +454,7 @@ struct ReaderView: View {
                     autoScrollPausedForScene = true
                     stopAutoScroll(clearScenePause: false)
                 }
-                if speechController.isSpeaking && !speechController.isPaused {
-                    speechController.pause()
-                    playbackCoordinator.pauseSpeech()
-                    speechPausedForScene = true
-                }
+                // Speech continues playing in background / screen lock
             } else {
                 if autoScrollPausedForScene {
                     autoScrollPausedForScene = false
@@ -705,6 +701,9 @@ struct ReaderView: View {
         .onChange(of: speechController.currentParagraphIndex) { target in
             guard target >= 0 else { return }
             scheduleReadingPositionPersistence(paragraphIndex: target)
+            if readerMode == .scroll {
+                paragraphJumpRequest = ParagraphJumpRequest(index: target)
+            }
         }
     }
 
@@ -970,19 +969,17 @@ struct ReaderView: View {
 
     private func pageSurface<Content: View>(@ViewBuilder content: () -> Content) -> some View {
         content()
-            .padding(CGFloat(pagePadding))
+            .padding(.horizontal, CGFloat(pagePadding))
+            .padding(.top, max(CGFloat(pagePadding), 54))
+            .padding(.bottom, CGFloat(pagePadding))
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
             .background {
                 if readerMode == .cover {
-                    RoundedRectangle(cornerRadius: 18, style: .continuous)
-                        .fill(background.color.opacity(background == .dark ? 0.92 : 0.98))
-                        .overlay {
-                            RoundedRectangle(cornerRadius: 18, style: .continuous)
-                                .stroke(Color.white.opacity(background == .dark ? 0.08 : 0.35), lineWidth: 0.8)
-                        }
-                        .shadow(color: .black.opacity(background == .dark ? 0.42 : 0.14), radius: 24, x: -8, y: 2)
-                        .padding(.vertical, 8)
-                        .padding(.horizontal, 4)
+                    Rectangle()
+                        .fill(background.color)
+                        .shadow(color: .black.opacity(background == .dark ? 0.45 : 0.22), radius: 14, x: -6, y: 0)
+                } else {
+                    background.color
                 }
             }
     }
@@ -1033,6 +1030,14 @@ struct ReaderView: View {
                     }
                 }
 
+                if let onRequestSourceSwitch {
+                    chromeIconButton(systemName: "arrow.triangle.2.circlepath") {
+                        closeReaderChrome()
+                        onRequestSourceSwitch()
+                    }
+                    .accessibilityLabel("换源")
+                }
+
                 chromeIconButton(systemName: isCurrentChapterBookmarked ? "bookmark.fill" : "bookmark") {
                     toggleCurrentBookmark(openList: false)
                 }
@@ -1072,8 +1077,8 @@ struct ReaderView: View {
             Spacer()
 
             VStack(spacing: 12) {
-                HStack(spacing: 14) {
-                    toolButton(icon: "chevron.left", title: "上一章") {
+                HStack(spacing: 10) {
+                    navChapterButton(icon: "chevron.left", title: "上一章") {
                         selectRelativeChapter(offset: -1)
                     }
                     .disabled(!canSelectRelativeChapter(offset: -1))
@@ -1083,18 +1088,17 @@ struct ReaderView: View {
                         set: { selectChapter(index: Int($0)) }
                     ), in: 0...Double(max((totalChapters ?? chapters.count) - 1, 0)), step: 1)
                         .tint(AppTheme.accent)
-                        .padding(.horizontal, 8)
+                        .padding(.horizontal, 10)
                         .frame(maxWidth: .infinity)
                         .background(.thinMaterial, in: Capsule())
 
-                    toolButton(icon: "chevron.right", title: "下一章") {
+                    navChapterButton(icon: "chevron.right", title: "下一章") {
                         selectRelativeChapter(offset: 1)
                     }
                     .disabled(!canSelectRelativeChapter(offset: 1))
                 }
 
-                HStack(spacing: 10) {
-
+                HStack(spacing: 8) {
                     toolButton(icon: "list.bullet", title: "目录") {
                         tocTab = 0
                         showChapterList = true
@@ -1136,20 +1140,38 @@ struct ReaderView: View {
         .foregroundStyle(chromeForeground)
     }
 
+    private func navChapterButton(icon: String, title: String, action: @escaping () -> Void) -> some View {
+        Button {
+            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+            action()
+        } label: {
+            VStack(spacing: 4) {
+                Image(systemName: icon)
+                    .font(.system(size: 15, weight: .semibold))
+                Text(title)
+                    .font(.system(size: 10, weight: .medium))
+            }
+            .frame(width: 54, height: 48)
+            .background(Color.secondary.opacity(0.12), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+            .contentShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+        }
+        .buttonStyle(.plain)
+    }
+
     private func toolButton(icon: String, title: String, action: @escaping () -> Void) -> some View {
         Button {
             UIImpactFeedbackGenerator(style: .light).impactOccurred()
             action()
         } label: {
-            VStack(spacing: 5) {
+            VStack(spacing: 4) {
                 Image(systemName: icon)
-                    .font(.system(size: 18, weight: .semibold))
+                    .font(.system(size: 17, weight: .semibold))
                 Text(title)
                     .font(.system(size: 10, weight: .medium))
             }
             .frame(maxWidth: .infinity)
-            .frame(height: 50)
-            .contentShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+            .frame(height: 48)
+            .contentShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
         }
         .buttonStyle(.plain)
     }
@@ -1997,6 +2019,12 @@ struct ReaderView: View {
     }
 
     private func runTapAction(_ action: ReaderTapAction) {
+        if readerMode == .scroll {
+            if action == .menu {
+                toggleOverlay()
+            }
+            return
+        }
         switch action {
         case .previousPage:
             moveReaderTarget(to: currentReaderTarget - 1)
@@ -2134,7 +2162,11 @@ struct ReaderView: View {
                     )
                 }
                 coordinator.stop()
-                onSpeechFinished?()
+                if let onSpeechFinished {
+                    onSpeechFinished()
+                } else if canSelectRelativeChapter(offset: 1) {
+                    selectRelativeChapter(offset: 1)
+                }
             }
         }
         speechPausedForScene = false

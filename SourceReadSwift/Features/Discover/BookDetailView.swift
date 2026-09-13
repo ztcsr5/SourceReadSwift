@@ -3,7 +3,9 @@ import UIKit
 
 struct BookDetailView: View {
     @EnvironmentObject private var appState: AppState
-    let book: SearchBook
+    let initialBook: SearchBook
+    var availableSources: [SearchBook] = []
+    @State private var book: SearchBook
     @State private var detail: BookDetail?
     @State private var chapters: [BookChapter] = []
     @State private var isLoading = false
@@ -37,6 +39,10 @@ struct BookDetailView: View {
                 )
                     .podcastCard()
 
+                if availableSources.count > 1 {
+                    sourceSwitchBar
+                }
+
                 if isLoading {
                     VStack(spacing: 14) {
                         ProgressView()
@@ -57,6 +63,9 @@ struct BookDetailView: View {
                     if book.sourceName == "Z-Library" || book.bookUrl.hasPrefix("zlib://") {
                         zlibraryActionCard
                     } else {
+                        if !chapters.isEmpty {
+                            downloadSection
+                        }
                         chapterList
                     }
                 }
@@ -428,6 +437,139 @@ struct BookDetailView: View {
             showAddAfterPreviewPrompt = true
         }
     }
+
+    init(book: SearchBook, availableSources: [SearchBook] = []) {
+        self.initialBook = book
+        self.availableSources = availableSources
+        self._book = State(initialValue: book)
+    }
+
+    private var sourceSwitchBar: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "arrow.triangle.2.circlepath")
+                .foregroundStyle(AppTheme.accent)
+            Text("当前书源：\(book.sourceName)")
+                .font(.subheadline.weight(.semibold))
+            Spacer()
+            Menu {
+                ForEach(availableSources) { srcBook in
+                    Button {
+                        guard srcBook.sourceUrl != book.sourceUrl || srcBook.bookUrl != book.bookUrl else { return }
+                        book = srcBook
+                        Task {
+                            await reload()
+                        }
+                    } label: {
+                        HStack {
+                            Text(srcBook.sourceName)
+                            if srcBook.sourceUrl == book.sourceUrl && srcBook.bookUrl == book.bookUrl {
+                                Image(systemName: "checkmark")
+                            }
+                        }
+                    }
+                }
+            } label: {
+                HStack(spacing: 4) {
+                    Text("换源 (\(availableSources.count))")
+                        .font(.caption.weight(.semibold))
+                    Image(systemName: "chevron.down")
+                        .font(.caption2)
+                }
+                .padding(.horizontal, 10)
+                .padding(.vertical, 5)
+                .background(Color(.systemGray5), in: Capsule())
+            }
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 10)
+        .background(Color(UIColor.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+    }
+
+    private var downloadSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                Image(systemName: "arrow.down.circle.fill")
+                    .foregroundStyle(AppTheme.accent)
+                Text("批量离线缓存")
+                    .font(.headline)
+                Spacer()
+                if isDownloading {
+                    ProgressView()
+                        .controlSize(.small)
+                    Button("停止") {
+                        appState.chapterDownloadCoordinator.cancel(bookID: book.id)
+                    }
+                    .font(.caption.weight(.semibold))
+                    .buttonStyle(.bordered)
+                    .controlSize(.mini)
+                }
+            }
+
+            if let record = downloadRecord {
+                VStack(alignment: .leading, spacing: 4) {
+                    ProgressView(value: Double(record.completedCount), total: Double(max(record.chapterCount, 1)))
+                        .tint(AppTheme.accent)
+                    HStack {
+                        Text("已缓存 \(record.completedCount)/\(record.chapterCount) 章")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        if record.failedCount > 0 {
+                            Text("(\(record.failedCount) 章失败)")
+                                .font(.caption)
+                                .foregroundStyle(.red)
+                        }
+                        Spacer()
+                    }
+                }
+            }
+
+            HStack(spacing: 12) {
+                Button {
+                    downloadChapters(limit: 50)
+                } label: {
+                    Label("缓存后50章", systemImage: "arrow.down.to.line")
+                        .font(.subheadline.weight(.semibold))
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 8)
+                }
+                .buttonStyle(.bordered)
+                .disabled(chapters.isEmpty || isDownloading)
+
+                Button {
+                    downloadChapters(limit: nil)
+                } label: {
+                    Label("全本缓存", systemImage: "arrow.down.circle")
+                        .font(.subheadline.weight(.semibold))
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 8)
+                }
+                .buttonStyle(.borderedProminent)
+                .disabled(chapters.isEmpty || isDownloading)
+            }
+        }
+        .podcastCard()
+    }
+
+    private func downloadChapters(limit: Int?) {
+        guard !chapters.isEmpty,
+              let source = appState.sourceStore.source(for: book.sourceUrl) else { return }
+        let targets: [BookChapter]
+        if let limit {
+            targets = Array(chapters.prefix(limit))
+        } else {
+            targets = chapters
+        }
+        appState.chapterDownloadCoordinator.start(
+            bookID: book.id,
+            source: source,
+            title: book.name,
+            chapters: targets,
+            engine: appState.engine,
+            cacheStore: appState.chapterContentCacheStore,
+            purifyRules: appState.purifyRuleStore.enabledPatterns
+        )
+    }
+
 }
 
 struct ChapterLoadingView: View {

@@ -57,15 +57,46 @@ struct ContentParser {
         }
     }
 
+    private static let commonNovelContentSelectors = [
+        "#content", "#chaptercontent", "#BookText", "#htmlContent",
+        ".read-content", ".content", ".showtxt", "#txt", "#nr",
+        ".novelcontent", "article", "div.entry-content", ".text-content",
+        "#novelcontent", "#chapter-content"
+    ]
+
+    private func extractFallbackParagraphs(from body: String, baseUrl: URL, title: String) -> [String] {
+        if let document = try? SwiftSoup.parse(body, baseUrl.absoluteString) {
+            for junk in ["script", "style", "noscript", "nav", "header", "footer", "form", "aside", ".ad", ".advert"] {
+                try? document.select(junk).remove()
+            }
+            for selector in Self.commonNovelContentSelectors {
+                if let elem = try? document.select(selector).first {
+                    let html = (try? elem.html()) ?? ""
+                    let clean = html
+                        .replacingOccurrences(of: "<br\\s*/?>", with: "\n", options: .regularExpression)
+                        .replacingOccurrences(of: "</p>", with: "\n", options: .caseInsensitive)
+                    let text = ((try? SwiftSoup.parse(clean).text()) ?? (try? elem.text()) ?? "")
+                    let paragraphs = splitParagraphs(text)
+                    if !paragraphs.isEmpty && paragraphs.joined().count >= 30 {
+                        return paragraphs
+                    }
+                }
+            }
+        }
+        let article = SmartWebArticleExtractor.extract(html: body, fallbackTitle: title)
+        if !article.paragraphs.isEmpty && article.paragraphs.joined().count >= 30 {
+            return article.paragraphs
+        }
+        return []
+    }
+
     private func parseHTML(
         source: BookSource,
         chapter: BookChapter,
         response: SourceResponse,
         globalPurifyRules: [String]
     ) -> Result<ChapterContent, SourceEngineError> {
-        guard let contentRule = htmlExtractor.firstRule(source.ruleContent, keys: ["content", "bookContent"]) else {
-            return .failure(.rule("ruleContent.content 为空"))
-        }
+        let contentRule = htmlExtractor.firstRule(source.ruleContent, keys: ["content", "bookContent"])
 
         do {
             let rootRule = htmlExtractor.firstRule(source.ruleContent, keys: ["init"]) ?? "html"
@@ -97,20 +128,36 @@ struct ContentParser {
                 "baseUrl": response.url.absoluteString,
                 "result": response.body
             ]
-            let raw = try htmlExtractor.value(from: root, rule: contentRule, fallback: nil, baseUrl: response.url, variables: variables)
-            let cleaned = applyContentTransforms(raw, rule: source.ruleContent, globalPurifyRules: globalPurifyRules, variables: variables)
-            let paragraphs = splitParagraphs(cleaned)
-            let next = try htmlExtractor.value(
+
+            var paragraphs: [String] = []
+            if let contentRule, !contentRule.isEmpty {
+                if let raw = try? htmlExtractor.value(from: root, rule: contentRule, fallback: nil, baseUrl: response.url, variables: variables) {
+                    let cleaned = applyContentTransforms(raw, rule: source.ruleContent, globalPurifyRules: globalPurifyRules, variables: variables)
+                    paragraphs = splitParagraphs(cleaned)
+                }
+            }
+
+            // Four-level fallback: if paragraphs are empty, try common novel containers and SmartWebArticleExtractor
+            if paragraphs.isEmpty {
+                paragraphs = extractFallbackParagraphs(from: response.body, baseUrl: response.url, title: chapter.title)
+            }
+
+            let next = try? htmlExtractor.value(
                 from: root,
                 rule: htmlExtractor.firstRule(source.ruleContent, keys: ["nextContentUrl"]),
                 fallback: nil,
                 baseUrl: response.url,
                 variables: variables
             ).nilIfEmpty
+
             return paragraphs.isEmpty
                 ? .failure(.empty("正文解析结果为空"))
                 : .success(ChapterContent(chapter: chapter, title: chapter.title, paragraphs: paragraphs, nextContentUrl: next))
         } catch {
+            let fallback = extractFallbackParagraphs(from: response.body, baseUrl: response.url, title: chapter.title)
+            if !fallback.isEmpty {
+                return .success(ChapterContent(chapter: chapter, title: chapter.title, paragraphs: fallback, nextContentUrl: nil))
+            }
             return .failure(.rule(error.localizedDescription))
         }
     }

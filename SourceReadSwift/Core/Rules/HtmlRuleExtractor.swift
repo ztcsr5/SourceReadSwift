@@ -47,6 +47,29 @@ struct HtmlRuleExtractor {
             return try evaluateJS(rule: trimmed, rootHtml: try root.outerHtml(), baseUrl: baseUrl, extraVariables: variables)
         }
 
+        // Support chained JavaScript rules: Selector@js:script or Selector<js>script</js>
+        if let jsRange = trimmed.range(of: "@js:"), jsRange.lowerBound > trimmed.startIndex {
+            let prefix = String(trimmed[..<jsRange.lowerBound]).trimmingCharacters(in: .whitespacesAndNewlines)
+            let script = String(trimmed[jsRange.lowerBound...]).trimmingCharacters(in: .whitespacesAndNewlines)
+            let extracted = try self.value(from: root, rule: prefix, fallback: nil, baseUrl: baseUrl, variables: variables)
+            var chainedVariables = variables
+            chainedVariables["result"] = extracted
+            chainedVariables["src"] = extracted
+            chainedVariables["html"] = extracted
+            return try evaluateJS(rule: script, rootHtml: extracted, baseUrl: baseUrl, extraVariables: chainedVariables)
+        }
+
+        if let jsStart = trimmed.range(of: "<js>"), jsStart.lowerBound > trimmed.startIndex {
+            let prefix = String(trimmed[..<jsStart.lowerBound]).trimmingCharacters(in: .whitespacesAndNewlines)
+            let script = String(trimmed[jsStart.lowerBound...]).trimmingCharacters(in: .whitespacesAndNewlines)
+            let extracted = try self.value(from: root, rule: prefix, fallback: nil, baseUrl: baseUrl, variables: variables)
+            var chainedVariables = variables
+            chainedVariables["result"] = extracted
+            chainedVariables["src"] = extracted
+            chainedVariables["html"] = extracted
+            return try evaluateJS(rule: script, rootHtml: extracted, baseUrl: baseUrl, extraVariables: chainedVariables)
+        }
+
         if let alternatives = RuleOperatorSplitter.split(selectedRule, separator: "||") {
             for alternative in alternatives {
                 // A mixed Legado source may put JSONPath and CSS/XPath

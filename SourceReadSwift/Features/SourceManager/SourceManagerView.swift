@@ -25,6 +25,14 @@ struct SourceManagerView: View {
     @State private var pendingDetailAction: SourceDetailAction?
     @State private var pendingBatchRuleEditor: SourceRuleEditorLaunch?
 
+    private enum SourceFilterTag: String, CaseIterable, Sendable {
+        case all = "全部"
+        case enabled = "已启用"
+        case disabled = "已停用"
+        case failed = "异常/失效"
+    }
+    @State private var selectedFilterTag: SourceFilterTag = .all
+
     private enum SourceDetailAction {
         case test(BookSource)
         case rules(BookSource, SourceDiagnosticStep?)
@@ -68,9 +76,25 @@ struct SourceManagerView: View {
     @State private var pendingDeleteRSSURLs: Set<String> = []
 
     private var filteredBookSources: [BookSource] {
+        var list = appState.sourceStore.sources
+        switch selectedFilterTag {
+        case .all:
+            break
+        case .enabled:
+            list = list.filter { $0.enabled }
+        case .disabled:
+            list = list.filter { !$0.enabled }
+        case .failed:
+            list = list.filter {
+                if let health = appState.sourceHealthStore.record(for: $0) {
+                    return health.status != .passed && health.status != .warning
+                }
+                return false
+            }
+        }
         let keyword = normalizedSearchText
-        guard !keyword.isEmpty else { return appState.sourceStore.sources }
-        return appState.sourceStore.sources.filter {
+        guard !keyword.isEmpty else { return list }
+        return list.filter {
             [$0.bookSourceName, $0.bookSourceUrl, $0.bookSourceGroup ?? "", $0.searchUrl ?? ""]
                 .contains { $0.lowercased().contains(keyword) }
         }
@@ -443,6 +467,8 @@ struct SourceManagerView: View {
             sectionHeader(title: "书源", count: appState.sourceStore.sources.count)
             if isManagingBookSources {
                 bookSourceBatchToolbar
+            } else {
+                filterPillsRow
             }
             if appState.sourceStore.sources.isEmpty {
                 EmptyStateCard(systemImage: "tray", title: "暂无书源", message: "点击上方“导入书源”导入 JSON，或打开 Web 写源创建书源")
@@ -1289,6 +1315,22 @@ struct SourceManagerView: View {
                     }
                 }
                 .listStyle(.plain)
+
+                let currentSummary = batchCheck ?? state
+                let failedCount = currentSummary.failedCount + currentSummary.loginRequiredCount + currentSummary.verificationRequiredCount + currentSummary.blockedCount
+                if failedCount > 0 {
+                    Button(role: .destructive) {
+                        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                        disableFailedSources(from: currentSummary)
+                    } label: {
+                        Label("一键禁用所有失败书源 (\(failedCount) 个)", systemImage: "bolt.slash.fill")
+                            .font(.subheadline.weight(.semibold))
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 8)
+                    }
+                    .buttonStyle(.bordered)
+                    .tint(.red)
+                }
             }
             .padding()
             .navigationTitle("批量测试")
@@ -1296,9 +1338,33 @@ struct SourceManagerView: View {
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
                     Menu {
-                        Button("复制文本报告") {
-                            UIPasteboard.general.string = batchCheckExportText(batchCheck ?? state)
+                        Button {
+                            let current = batchCheck ?? state
+                            let md = SourceDiagnosticReportExporter.generateMarkdownReport(from: current.diagnosticReport, totalCount: current.sources.count)
+                            let (mdURL, _) = SourceDiagnosticReportExporter.createExportFiles(markdownText: md, jsonData: nil)
+                            shareFiles([mdURL])
+                        } label: {
+                            Label("导出检测报告文件 (.md)", systemImage: "doc.plaintext")
                         }
+
+                        Button {
+                            let current = batchCheck ?? state
+                            let data = try? current.diagnosticReport.exportJSON()
+                            let (_, jsonURL) = SourceDiagnosticReportExporter.createExportFiles(markdownText: "", jsonData: data)
+                            if let jsonURL {
+                                shareFiles([jsonURL])
+                            }
+                        } label: {
+                            Label("导出诊断数据包 (.json)", systemImage: "curlybraces")
+                        }
+
+                        Divider()
+
+                        Button("复制 Markdown 报告") {
+                            let current = batchCheck ?? state
+                            UIPasteboard.general.string = SourceDiagnosticReportExporter.generateMarkdownReport(from: current.diagnosticReport, totalCount: current.sources.count)
+                        }
+
                         Button("复制 JSON 报告") {
                             let report = (batchCheck ?? state).diagnosticReport
                             if let data = try? report.exportJSON() {
@@ -1330,6 +1396,34 @@ struct SourceManagerView: View {
             .background(color.opacity(0.12))
             .foregroundStyle(color)
             .clipShape(Capsule())
+    }
+
+    private func shareFiles(_ urls: [URL]) {
+        guard let windowScene = UIApplication.shared.connectedScenes.first(where: { $0.activationState == .foregroundActive }) as? UIWindowScene
+                ?? UIApplication.shared.connectedScenes.first as? UIWindowScene,
+              let rootVC = windowScene.windows.first(where: { $0.isKeyWindow })?.rootViewController else { return }
+        let activityVC = UIActivityViewController(activityItems: urls, applicationActivities: nil)
+        if let popover = activityVC.popoverPresentationController {
+            popover.sourceView = rootVC.view
+            popover.sourceRect = CGRect(x: rootVC.view.bounds.midX, y: rootVC.view.bounds.midY, width: 0, height: 0)
+            popover.permittedArrowDirections = []
+        }
+        rootVC.present(activityVC, animated: true)
+    }
+
+    private func disableFailedSources(from state: SourceBatchCheckState) {
+        let failedURLs = Set(state.results.filter { $0.status != .passed && $0.status != .warning }.map(\.sourceURL))
+        guard !failedURLs.isEmpty else { return }
+        var count = 0
+        var updated = appState.sourceStore.sources
+        for i in 0..<updated.count {
+            if failedURLs.contains(updated[i].bookSourceUrl) && updated[i].enabled {
+                updated[i].enabled = false
+                count += 1
+            }
+        }
+        appState.sourceStore.replaceAll(updated)
+        importMessage = "已一键禁用 \(count) 个异常/失败书源"
     }
 
     private func batchCheckExportText(_ state: SourceBatchCheckState) -> String {
@@ -1450,12 +1544,25 @@ struct SourceManagerView: View {
 
         let engine = appState.engine
         let deepCheck = state.deepCheckFirstResult
-        // Network-bound diagnostics used to run strictly serially. Keep a
-        // small bounded fan-out so a bad source cannot make a 30-source check
-        // feel frozen, while avoiding an unbounded request burst.
+        var workingState = state
+        var pendingHealthRecords: [SourceHealthRecord] = []
+        var pendingHistoryRecords: [SourceDiagnosticHistoryRecord] = []
+        var lastUIUpdateTime = Date()
+
+        func flushPendingRecords() {
+            if !pendingHealthRecords.isEmpty {
+                appState.sourceHealthStore.recordBatch(pendingHealthRecords)
+                pendingHealthRecords.removeAll(keepingCapacity: true)
+            }
+            if !pendingHistoryRecords.isEmpty {
+                appState.sourceDiagnosticHistoryStore.recordBatch(pendingHistoryRecords)
+                pendingHistoryRecords.removeAll(keepingCapacity: true)
+            }
+        }
+
         for batch in state.sources.chunked(into: 4) {
-            guard !Task.isCancelled else { return }
-            guard batchCheck?.id == sessionID else { return }
+            guard !Task.isCancelled else { break }
+            guard batchCheck?.id == sessionID else { break }
             await withTaskGroup(of: BatchCheckOutcome.self) { group in
                 for source in batch {
                     group.addTask {
@@ -1473,17 +1580,13 @@ struct SourceManagerView: View {
                         group.cancelAll()
                         return
                     }
-                    guard var latest = batchCheck, latest.id == sessionID else {
+                    guard batchCheck?.id == sessionID else {
                         group.cancelAll()
                         return
                     }
                     var result = outcome.result
                     if let report = outcome.diagnosticReport {
                         let status = SourceBatchCheckStatus(report.overallStatus)
-                        // `evaluateBatchSource` may append login-check
-                        // evidence to the compact row.  Keep that suffix
-                        // while deriving the stage/status from the full
-                        // report instead of compressing it back to Search.
                         let message = result.message.nilIfEmpty
                             ?? Self.batchResultMessage(report: report, fallback: "书源未返回诊断摘要")
                         result = SourceBatchCheckResult(
@@ -1496,67 +1599,90 @@ struct SourceManagerView: View {
                             diagnosticReport: report
                         )
                     }
-                    latest.checkedCount += 1
-                    latest.results.append(result)
+                    workingState.checkedCount += 1
+                    workingState.results.append(result)
                     if let report = outcome.diagnosticReport {
-                        latest.diagnosticReports[outcome.source.bookSourceUrl] = report
+                        workingState.diagnosticReports[outcome.source.bookSourceUrl] = report
                     }
-                    latest.results.sort { lhs, rhs in
-                        if lhs.status.priority != rhs.status.priority {
-                            return lhs.status.priority < rhs.status.priority
-                        }
-                        if lhs.elapsedMilliseconds != rhs.elapsedMilliseconds {
-                            return lhs.elapsedMilliseconds > rhs.elapsedMilliseconds
-                        }
-                        return lhs.sourceName.localizedCaseInsensitiveCompare(rhs.sourceName) == .orderedAscending
-                    }
-                    guard batchCheck?.id == sessionID, !Task.isCancelled else {
-                        group.cancelAll()
-                        return
-                    }
-                    batchCheck = latest
 
                     if let login = outcome.login {
-                        appState.sourceDiagnosticHistoryStore.record(
+                        pendingHistoryRecords.append(SourceDiagnosticHistoryRecord(
                             sourceURL: result.sourceURL,
                             sourceName: result.sourceName,
                             stage: "batch.login",
                             status: login.status,
                             message: login.message
-                        )
+                        ))
                     }
-                    appState.sourceHealthStore.record(
-                        source: outcome.source,
+                    pendingHealthRecords.append(SourceHealthRecord(
+                        sourceURL: outcome.source.bookSourceUrl,
+                        sourceName: outcome.source.bookSourceName,
                         status: result.status.healthStatus,
                         message: result.message,
                         keyword: keyword,
-                        resultCount: outcome.resultCount
-                    )
-                    appState.sourceDiagnosticHistoryStore.record(
-                        source: outcome.source,
+                        resultCount: outcome.resultCount,
+                        testedAt: Date()
+                    ))
+                    pendingHistoryRecords.append(SourceDiagnosticHistoryRecord(
+                        sourceURL: outcome.source.bookSourceUrl,
+                        sourceName: outcome.source.bookSourceName,
                         stage: "batch.search",
                         status: outcome.result.status.healthStatus,
                         message: outcome.result.message,
                         resultCount: outcome.resultCount
-                    )
+                    ))
                     if let report = outcome.diagnosticReport {
-                        appState.sourceDiagnosticHistoryStore.record(
-                            source: outcome.source,
+                        pendingHistoryRecords.append(SourceDiagnosticHistoryRecord(
+                            sourceURL: outcome.source.bookSourceUrl,
+                            sourceName: outcome.source.bookSourceName,
                             stage: "batch.pipeline",
                             status: report.overallStatus,
                             message: Self.batchResultMessage(report: report, fallback: result.message)
-                        )
+                        ))
+                    }
+
+                    if pendingHealthRecords.count >= 50 {
+                        flushPendingRecords()
+                    }
+
+                    let now = Date()
+                    if now.timeIntervalSince(lastUIUpdateTime) >= 0.25 {
+                        lastUIUpdateTime = now
+                        var currentDisplay = workingState
+                        currentDisplay.results.sort { lhs, rhs in
+                            if lhs.status.priority != rhs.status.priority {
+                                return lhs.status.priority < rhs.status.priority
+                            }
+                            if lhs.elapsedMilliseconds != rhs.elapsedMilliseconds {
+                                return lhs.elapsedMilliseconds > rhs.elapsedMilliseconds
+                            }
+                            return lhs.sourceName.localizedCaseInsensitiveCompare(rhs.sourceName) == .orderedAscending
+                        }
+                        batchCheck = currentDisplay
                     }
                 }
             }
         }
 
+        flushPendingRecords()
+
         guard !Task.isCancelled,
-              var finished = batchCheck,
-              finished.id == sessionID else { return }
-        finished.isRunning = false
-        finished.finishedAt = Date()
-        batchCheck = finished
+              batchCheck?.id == sessionID else {
+            flushPendingRecords()
+            return
+        }
+        workingState.results.sort { lhs, rhs in
+            if lhs.status.priority != rhs.status.priority {
+                return lhs.status.priority < rhs.status.priority
+            }
+            if lhs.elapsedMilliseconds != rhs.elapsedMilliseconds {
+                return lhs.elapsedMilliseconds > rhs.elapsedMilliseconds
+            }
+            return lhs.sourceName.localizedCaseInsensitiveCompare(rhs.sourceName) == .orderedAscending
+        }
+        workingState.isRunning = false
+        workingState.finishedAt = Date()
+        batchCheck = workingState
     }
 
     private static func evaluateBatchSource(
@@ -2096,6 +2222,29 @@ private struct SourceVisualDetailView: View {
                 }
             }
             .font(.caption)
+        }
+    }
+
+    private var filterPillsRow: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 8) {
+                ForEach(SourceFilterTag.allCases, id: \.self) { tag in
+                    Button {
+                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                        selectedFilterTag = tag
+                    } label: {
+                        Text(tag.rawValue)
+                            .font(.caption.weight(selectedFilterTag == tag ? .bold : .medium))
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 6)
+                            .background(selectedFilterTag == tag ? AppTheme.accent : Color.secondary.opacity(0.12))
+                            .foregroundStyle(selectedFilterTag == tag ? Color.white : Color.primary)
+                            .clipShape(Capsule())
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .padding(.vertical, 2)
         }
     }
 

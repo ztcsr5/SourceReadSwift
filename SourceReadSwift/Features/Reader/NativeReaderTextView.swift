@@ -397,8 +397,9 @@ struct NativeReaderTextView: UIViewRepresentable {
         }
 
         private func updateInsets(in textView: UITextView, configuration: Configuration) {
+            let topInset = max(CGFloat(configuration.pagePadding), 54)
             let insets = UIEdgeInsets(
-                top: CGFloat(configuration.pagePadding),
+                top: topInset,
                 left: CGFloat(configuration.pagePadding),
                 bottom: CGFloat(configuration.pagePadding + configuration.footerHeight),
                 right: CGFloat(configuration.pagePadding)

@@ -299,6 +299,7 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
         let request = requestBuilder.buildPageRequest(
             source: source,
             urlText: chapter.url,
+            baseURL: chapter.bookUrl.nilIfEmpty ?? source.bookSourceUrl,
             persistentValues: executionState.snapshot()
         )
         let globalPurifyRules = await purifyRules()
@@ -538,6 +539,8 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
     private func shouldUseWebView(source: BookSource) -> Bool {
         if source.raw["webView"]?.lowercased() == "true" { return true }
         if source.raw["bookSourceType"]?.lowercased().contains("web") == true { return true }
+        if let webJs = source.ruleContent?.fields["webJs"], webJs.contains("webView") { return true }
+        if let customConfig = source.customConfig, customConfig.contains("\"webView\": true") || customConfig.contains("\"webView\":true") { return true }
         return false
     }
 
@@ -856,6 +859,7 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
             let request = requestBuilder.buildPageRequest(
                 source: source,
                 urlText: currentNext,
+                baseURL: chapter.bookUrl.nilIfEmpty ?? firstURL.absoluteString,
                 persistentValues: persistentState(for: source).snapshot()
             )
             let absolute = request.url.absoluteString

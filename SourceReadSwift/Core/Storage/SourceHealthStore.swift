@@ -55,6 +55,14 @@ final class SourceHealthStore: ObservableObject {
         persist()
     }
 
+    func recordBatch(_ newRecords: [SourceHealthRecord]) {
+        guard !newRecords.isEmpty else { return }
+        for record in newRecords {
+            records[record.sourceURL] = record
+        }
+        persist()
+    }
+
     func record(for source: BookSource) -> SourceHealthRecord? {
         records[source.bookSourceUrl]
     }

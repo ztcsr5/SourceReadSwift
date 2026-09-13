@@ -95,18 +95,53 @@ struct ChapterListParser {
             } else {
                 roots = try htmlExtractor.select(response.body, baseUrl: response.url, listRule: "html")
             }
-            let elements = try roots.flatMap { root in
+            var elements = try roots.flatMap { root in
                 try htmlExtractor.select(from: root, rule: listRule, baseUrl: response.url)
             }
+            if elements.isEmpty {
+                let fallbackSelectors = [
+                    ".listmain dd a",
+                    "#list dd a",
+                    ".catalog dd a",
+                    ".chapters a",
+                    "ul.chapter-list li a",
+                    "div#list-chapterAll a",
+                    ".section-box li a",
+                    "#chapterlist li a",
+                    ".dir-list li a",
+                    "div.read-section a",
+                    "#chapters-list a",
+                    ".chapter-list a"
+                ]
+                for selector in fallbackSelectors {
+                    let candidates = try roots.flatMap { root in
+                        try htmlExtractor.select(from: root, rule: selector, baseUrl: response.url)
+                    }
+                    if !candidates.isEmpty {
+                        elements = candidates
+                        break
+                    }
+                }
+            }
+
             let nameRule = htmlExtractor.firstRule(source.ruleToc, keys: ["chapterName", "name", "title"])
             let urlRule = htmlExtractor.firstRule(source.ruleToc, keys: ["chapterUrl", "url"])
             let nextRule = htmlExtractor.firstRule(source.ruleToc, keys: ["nextTocUrl", "nextChapterUrl", "nextUrl"])
 
-            let chapters = try elements.enumerated().compactMap { index, element -> BookChapter? in
+            var chapters = try elements.enumerated().compactMap { index, element -> BookChapter? in
                 let title = try htmlExtractor.value(from: element, rule: nameRule, fallback: "a@text", baseUrl: response.url, variables: variables)
                 let url = try htmlExtractor.value(from: element, rule: urlRule, fallback: "a@href", baseUrl: response.url, variables: variables)
                 guard !title.isEmpty, !url.isEmpty else { return nil }
                 return BookChapter(title: title, url: url, bookUrl: book.bookUrl, index: index, isVip: false)
+            }
+            if chapters.isEmpty && !elements.isEmpty {
+                chapters = elements.enumerated().compactMap { index, element in
+                    let title = (try? element.text())?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+                    let rawHref = (try? element.attr("href"))?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+                    guard !title.isEmpty, !rawHref.isEmpty else { return nil }
+                    let absUrl = htmlExtractor.absolutize(rawHref, base: response.url)
+                    return BookChapter(title: title, url: absUrl, bookUrl: book.bookUrl, index: index, isVip: false)
+                }
             }
             var next: String?
             for root in roots {
