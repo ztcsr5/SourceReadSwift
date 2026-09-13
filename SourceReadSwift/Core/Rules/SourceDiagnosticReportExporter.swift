@@ -3,20 +3,20 @@ import UIKit
 
 /// 书源批量体检报告导出器
 /// 负责将批量体检结果整理为详尽分类的 Markdown 报告与 JSON 数据包，并生成导出文件
-public enum SourceDiagnosticReportExporter {
+enum SourceDiagnosticReportExporter {
 
-    public struct DiagnosticSummary: Sendable {
-        public let totalCount: Int
-        public let checkedCount: Int
-        public let passedCount: Int
-        public let warningCount: Int
-        public let failedCount: Int
-        public let loginRequiredCount: Int
-        public let verificationRequiredCount: Int
-        public let blockedCount: Int
-        public let generatedAt: Date
+    struct DiagnosticSummary: Sendable {
+        let totalCount: Int
+        let checkedCount: Int
+        let passedCount: Int
+        let warningCount: Int
+        let failedCount: Int
+        let loginRequiredCount: Int
+        let verificationRequiredCount: Int
+        let blockedCount: Int
+        let generatedAt: Date
 
-        public init(
+        init(
             totalCount: Int,
             checkedCount: Int,
             passedCount: Int,
@@ -38,24 +38,24 @@ public enum SourceDiagnosticReportExporter {
             self.generatedAt = generatedAt
         }
 
-        public var passRate: Double {
+        var passRate: Double {
             guard checkedCount > 0 else { return 0.0 }
             return Double(passedCount) / Double(checkedCount) * 100.0
         }
     }
 
-    public struct CategorizedFailure: Identifiable, Sendable {
-        public var id: String { "\(category.rawValue)|\(sourceURL)" }
-        public let category: FailureCategory
-        public let sourceName: String
-        public let sourceURL: String
-        public let stage: SourceDiagnosticStage?
-        public let statusCode: Int?
-        public let message: String
-        public let suggestion: String
+    struct CategorizedFailure: Identifiable, Sendable {
+        var id: String { "\(category.rawValue)|\(sourceURL)" }
+        let category: FailureCategory
+        let sourceName: String
+        let sourceURL: String
+        let stage: SourceDiagnosticStage?
+        let statusCode: Int?
+        let message: String
+        let suggestion: String
     }
 
-    public enum FailureCategory: String, CaseIterable, Sendable {
+    enum FailureCategory: String, CaseIterable, Sendable {
         case networkTimeout = "域名失效 / 连接超时"
         case antiBotShield = "Cloudflare / 反爬验证码拦截"
         case contentEmpty = "正文解析为空 / 规则失效"
@@ -64,7 +64,7 @@ public enum SourceDiagnosticReportExporter {
         case authRequired = "需账号登录"
         case other = "其他异常"
 
-        public var icon: String {
+        var icon: String {
             switch self {
             case .networkTimeout: return "🌐"
             case .antiBotShield: return "🛡️"
@@ -76,7 +76,7 @@ public enum SourceDiagnosticReportExporter {
             }
         }
 
-        public var defaultSolution: String {
+        var defaultSolution: String {
             switch self {
             case .networkTimeout:
                 return "源站域名已下线、无法连接或触发 DNS 污染。建议：1. 检查是否需开启网络代理；2. 尝试更换该站备用镜像域名；3. 无可用镜像则建议禁用该书源。"
@@ -97,7 +97,7 @@ public enum SourceDiagnosticReportExporter {
     }
 
     /// 根据单条测试报告分析所属失败分类
-    public static func classify(
+    static func classify(
         report: SourceDiagnosticReport
     ) -> (category: FailureCategory, suggestion: String) {
         let step = report.firstFailure
@@ -135,7 +135,7 @@ public enum SourceDiagnosticReportExporter {
     }
 
     /// 从 SourceDiagnosticBatchReport 导出完整的 Markdown 检测报告
-    public static func generateMarkdownReport(from batch: SourceDiagnosticBatchReport, totalCount: Int? = nil) -> String {
+    static func generateMarkdownReport(from batch: SourceDiagnosticBatchReport, totalCount: Int? = nil) -> String {
         let formatter = DateFormatter()
         formatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
         let dateString = formatter.string(from: batch.finishedAt)
@@ -229,7 +229,7 @@ public enum SourceDiagnosticReportExporter {
     }
 
     /// 将报告写入临时文件，供 UIActivityViewController / ShareLink 分享与导出
-    public static func createExportFiles(
+    static func createExportFiles(
         markdownText: String,
         jsonData: Data?
     ) -> (markdownURL: URL, jsonURL: URL?) {

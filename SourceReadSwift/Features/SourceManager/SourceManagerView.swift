@@ -462,6 +462,29 @@ struct SourceManagerView: View {
         }
     }
 
+    private var filterPillsRow: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 8) {
+                ForEach(SourceFilterTag.allCases, id: \.self) { tag in
+                    Button {
+                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                        selectedFilterTag = tag
+                    } label: {
+                        Text(tag.rawValue)
+                            .font(.caption.weight(selectedFilterTag == tag ? .bold : .medium))
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 6)
+                            .background(selectedFilterTag == tag ? AppTheme.accent : Color.secondary.opacity(0.12))
+                            .foregroundStyle(selectedFilterTag == tag ? Color.white : Color.primary)
+                            .clipShape(Capsule())
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .padding(.vertical, 2)
+        }
+    }
+
     private var bookSourceContent: some View {
         VStack(alignment: .leading, spacing: 10) {
             sectionHeader(title: "书源", count: appState.sourceStore.sources.count)
@@ -1414,16 +1437,8 @@ struct SourceManagerView: View {
     private func disableFailedSources(from state: SourceBatchCheckState) {
         let failedURLs = Set(state.results.filter { $0.status != .passed && $0.status != .warning }.map(\.sourceURL))
         guard !failedURLs.isEmpty else { return }
-        var count = 0
-        var updated = appState.sourceStore.sources
-        for i in 0..<updated.count {
-            if failedURLs.contains(updated[i].bookSourceUrl) && updated[i].enabled {
-                updated[i].enabled = false
-                count += 1
-            }
-        }
-        appState.sourceStore.replaceAll(updated)
-        importMessage = "已一键禁用 \(count) 个异常/失败书源"
+        appState.sourceStore.setEnabled(false, for: failedURLs)
+        importMessage = "已一键禁用 \(failedURLs.count) 个异常/失败书源"
     }
 
     private func batchCheckExportText(_ state: SourceBatchCheckState) -> String {
@@ -2222,29 +2237,6 @@ private struct SourceVisualDetailView: View {
                 }
             }
             .font(.caption)
-        }
-    }
-
-    private var filterPillsRow: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 8) {
-                ForEach(SourceFilterTag.allCases, id: \.self) { tag in
-                    Button {
-                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                        selectedFilterTag = tag
-                    } label: {
-                        Text(tag.rawValue)
-                            .font(.caption.weight(selectedFilterTag == tag ? .bold : .medium))
-                            .padding(.horizontal, 12)
-                            .padding(.vertical, 6)
-                            .background(selectedFilterTag == tag ? AppTheme.accent : Color.secondary.opacity(0.12))
-                            .foregroundStyle(selectedFilterTag == tag ? Color.white : Color.primary)
-                            .clipShape(Capsule())
-                    }
-                    .buttonStyle(.plain)
-                }
-            }
-            .padding(.vertical, 2)
         }
     }
 
