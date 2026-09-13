@@ -115,6 +115,7 @@ struct ReaderView: View {
     @AppStorage("reader.autoScrollDelay") private var autoScrollDelay: Double = 2.0
     @AppStorage("reader.sleepTimerMinutes") private var sleepTimerMinutes: Int = 0
     @AppStorage("reader.background") private var backgroundRawValue: String = ReaderBackground.paper.rawValue
+    @State private var isPerBookOverride: Bool = false
     @AppStorage("reader.mode") private var readerModeRawValue: String = ReaderMode.scroll.rawValue
     @AppStorage("reader.tapZones") private var tapZonesRawValue: String = ReaderTapAction.defaultRawValue
     @AppStorage("reader.keepScreenAwake") private var keepScreenAwake = true
@@ -205,7 +206,7 @@ struct ReaderView: View {
         switch readerMode {
         case .scroll:
             return positionMapping.maximumParagraphIndex
-        case .pageTurn, .cover:
+        case .pageTurn, .cover, .pageCurl:
             return positionMapping.maximumPageIndex
         }
     }
@@ -391,6 +392,14 @@ struct ReaderView: View {
             }
         }
         .onAppear {
+            if let ov = ReaderOverrideStore.shared.override(for: bookID) {
+                isPerBookOverride = true
+                if let mode = ov.readerMode { readerModeRawValue = mode.rawValue }
+                if let font = ov.fontFamily { fontFamilyRawValue = font.rawValue }
+                if let size = ov.fontSize { fontSize = size }
+                if let spacing = ov.lineSpacing { lineSpacing = spacing }
+                if let bg = ov.background { backgroundRawValue = bg.rawValue }
+            }
             appState.acquireTabChromeHidden(owner: tabChromeOwner)
             chromeState.setInitialOverlayVisible(initialOverlayVisible)
             sessionStartedAt = Date()
@@ -511,6 +520,16 @@ struct ReaderView: View {
             scrollParagraphTarget = paragraph
             pagedPageIndex = positionMapping.page(containingParagraph: paragraph)
             persistReadingPosition(paragraphIndexOverride: paragraph)
+            if isPerBookOverride {
+                let ov = BookReaderOverride(
+                    readerMode: ReaderMode(rawValue: readerModeRawValue),
+                    fontFamily: ReaderFontFamily(rawValue: fontFamilyRawValue),
+                    fontSize: fontSize,
+                    lineSpacing: lineSpacing,
+                    background: ReaderBackground(rawValue: backgroundRawValue)
+                )
+                ReaderOverrideStore.shared.setOverride(ov, for: bookID)
+            }
         }
         .onChange(of: initialParagraphIndex) { target in
             guard let target, content.paragraphs.indices.contains(target) else { return }
@@ -792,10 +811,30 @@ struct ReaderView: View {
 
     @ViewBuilder
     private var pagedReaderContent: some View {
-        if readerMode == .cover {
+        switch readerMode {
+        case .cover:
             coverPagedReaderContent
-        } else {
+        case .pageCurl:
+            pageCurlReaderContent
+        default:
             horizontalPagedReaderContent
+        }
+    }
+
+    private var pageCurlReaderContent: some View {
+        PageCurlReaderView(
+            pages: pagedBlocks,
+            currentPageIndex: $pagedPageIndex,
+            onPageChanged: { target in
+                updatePagedVisibleParagraph(pageIndex: target)
+            },
+            pageBuilder: { page in
+                readerPage(for: page)
+            }
+        )
+        .onChange(of: speechController.currentParagraphIndex) { target in
+            guard target >= 0 else { return }
+            pagedPageIndex = pageIndex(containingParagraph: target)
         }
     }
 
@@ -823,10 +862,17 @@ struct ReaderView: View {
             let drag = coverSwipeState.isHorizontal ? coverSwipeState.translation : 0
 
             ZStack {
+                if drag <= 0, pagedBlocks.indices.contains(safeIndex) {
+                    readerPage(for: pagedBlocks[safeIndex])
+                        .id(pagedBlocks[safeIndex].id)
+                        .offset(x: drag * 0.15)
+                }
+
                 if drag < 0, pagedBlocks.indices.contains(safeIndex + 1) {
                     readerPage(for: pagedBlocks[safeIndex + 1])
                         .id(pagedBlocks[safeIndex + 1].id)
                         .offset(x: width + drag)
+                        .shadow(color: .black.opacity(0.25), radius: 10, x: -6, y: 0)
                         .allowsHitTesting(false)
                 }
 
@@ -834,13 +880,19 @@ struct ReaderView: View {
                     readerPage(for: pagedBlocks[safeIndex - 1])
                         .id(pagedBlocks[safeIndex - 1].id)
                         .offset(x: -width + drag)
+                        .shadow(color: .black.opacity(0.25), radius: 10, x: 6, y: 0)
                         .allowsHitTesting(false)
                 }
 
-                if pagedBlocks.indices.contains(safeIndex) {
+                if drag > 0, pagedBlocks.indices.contains(safeIndex) {
                     readerPage(for: pagedBlocks[safeIndex])
                         .id(pagedBlocks[safeIndex].id)
-                        .offset(x: drag)
+                        .offset(x: drag * 0.15)
+                }
+
+                if drag == 0, pagedBlocks.indices.contains(safeIndex) {
+                    readerPage(for: pagedBlocks[safeIndex])
+                        .id(pagedBlocks[safeIndex].id)
                 }
             }
             .clipped()
@@ -1227,6 +1279,27 @@ struct ReaderView: View {
             }
             .pickerStyle(.segmented)
             .padding(.bottom, 8)
+
+            Toggle("仅对本书生效独立配置", isOn: Binding(
+                get: { isPerBookOverride },
+                set: { enabled in
+                    isPerBookOverride = enabled
+                    if enabled {
+                        let ov = BookReaderOverride(
+                            readerMode: ReaderMode(rawValue: readerModeRawValue),
+                            fontFamily: ReaderFontFamily(rawValue: fontFamilyRawValue),
+                            fontSize: fontSize,
+                            lineSpacing: lineSpacing,
+                            background: ReaderBackground(rawValue: backgroundRawValue)
+                        )
+                        ReaderOverrideStore.shared.setOverride(ov, for: bookID)
+                    } else {
+                        ReaderOverrideStore.shared.clearOverride(for: bookID)
+                    }
+                }
+            ))
+            .font(.subheadline.weight(.semibold))
+            .padding(.vertical, 4)
 
             Text("背景颜色")
                 .font(.subheadline.weight(.semibold))
@@ -2263,7 +2336,7 @@ struct ReaderView: View {
                 return resolved.paragraphIndex
             }
             return min(max(visibleParagraphIndex, 0), content.paragraphs.count - 1)
-        case .pageTurn, .cover:
+        case .pageTurn, .cover, .pageCurl:
             return paragraphIndex(forPage: pagedPageIndex)
         }
     }

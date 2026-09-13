@@ -435,7 +435,14 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
                 return .success(response)
             }
         }
-        guard shouldUseWebView(source: source) else {
+        let shouldFallback: Bool
+        if let raw = primary.value {
+            let response = ResponseBodyDecoder().normalize(raw, preferredCharset: request.expectedCharset)
+            shouldFallback = shouldUseWebViewFallback(source: source, response: response)
+        } else {
+            shouldFallback = shouldUseWebView(source: source)
+        }
+        guard shouldFallback else {
             return primary
         }
 
@@ -535,15 +542,22 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
     }
 
     private func shouldUseWebViewFallback(source: BookSource, response: SourceResponse) -> Bool {
-        guard shouldUseWebView(source: source) else { return false }
+        if shouldUseWebView(source: source) { return true }
         let text = response.body.lowercased()
-        if text.isEmpty { return true }
+        if (400...599).contains(response.statusCode) && (text.isEmpty || response.statusCode == 403 || response.statusCode == 503) {
+            return true
+        }
         return text.contains("cloudflare")
             || text.contains("cf-challenge")
+            || text.contains("cf-browser-verification")
+            || text.contains("turnstile")
+            || text.contains("just a moment")
+            || text.contains("ddos-guard")
+            || text.contains("attention required")
             || text.contains("captcha")
-            || text.contains("\u{5b89}\u{5168}\u{9a8c}\u{8bc1}")
-            || text.contains("\u{767e}\u{5ea6}\u{5b89}\u{5168}\u{9a8c}\u{8bc1}")
-            || text.contains("\u{4eba}\u{673a}\u{9a8c}\u{8bc1}")
+            || text.contains("安全验证")
+            || text.contains("百度安全验证")
+            || text.contains("人机验证")
     }
 
     private func webViewDelay(source: BookSource) -> TimeInterval {

@@ -23,7 +23,9 @@ final class WebViewFallback: NSObject, WKNavigationDelegate {
                 }
                 self.navigationDelay = max(0.25, min(delay, 30))
                 let configuration = WKWebViewConfiguration()
-                let webView = WKWebView(frame: .zero, configuration: configuration)
+                configuration.defaultWebpagePreferences.allowsContentJavaScript = true
+                let webView = WKWebView(frame: CGRect(x: 0, y: 0, width: 375, height: 667), configuration: configuration)
+                webView.customUserAgent = "Mozilla/5.0 (iPhone; CPU iPhone OS 17_4 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.4 Mobile/15E148 Safari/604.1"
                 webView.navigationDelegate = self
                 self.webView = webView
                 webView.load(URLRequest(url: url))
@@ -73,11 +75,28 @@ final class WebViewFallback: NSObject, WKNavigationDelegate {
         delayTask?.cancel()
         delayTask = Task { @MainActor [weak self, weak webView] in
             guard let self, let webView else { return }
-            try? await Task.sleep(nanoseconds: UInt64(self.navigationDelay * 1_000_000_000))
-            guard !Task.isCancelled else { return }
-            let html = try? await webView.evaluateJavaScript("document.documentElement.outerHTML") as? String
+            // If the page is a Cloudflare / anti-bot challenge, poll until completed or timeout
+            var attempts = 0
+            var finalHtml = ""
+            while attempts < 12, !Task.isCancelled {
+                attempts += 1
+                try? await Task.sleep(nanoseconds: UInt64(max(0.4, self.navigationDelay) * 1_000_000_000))
+                guard !Task.isCancelled else { return }
+                let html = (try? await webView.evaluateJavaScript("document.documentElement.outerHTML") as? String) ?? ""
+                let lower = html.lowercased()
+                let isChallenge = lower.contains("cf-browser-verification")
+                    || lower.contains("just a moment")
+                    || lower.contains("challenge-running")
+                    || lower.contains("turnstile")
+                    || lower.contains("cf-challenge")
+                if !isChallenge && !html.isEmpty {
+                    finalHtml = html
+                    break
+                }
+                finalHtml = html
+            }
             await self.syncCookies(from: webView)
-            self.finish(.success(html ?? ""))
+            self.finish(.success(finalHtml))
         }
     }
 

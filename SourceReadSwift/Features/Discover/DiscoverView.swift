@@ -467,6 +467,13 @@ final class DiscoverViewModel: ObservableObject {
         var hitSources = Set<String>()
         var failures: [String] = []
 
+        // 并发执行 Z-Library 全球图书源检索
+        let zlibSearchTask = Task { () -> [SearchBook] in
+            let res = await ZlibraryEngine.shared.search(keyword: keyword, page: 1)
+            if case .success(let b) = res { return b }
+            return []
+        }
+
         for batch in sources.chunked(into: 12) {
             guard activeSearchID == searchID, searchGeneration == generation, !Task.isCancelled else { return }
             await withTaskGroup(of: (BookSource, Result<[SearchBook], SourceEngineError>).self) { group in
@@ -511,6 +518,14 @@ final class DiscoverViewModel: ObservableObject {
             applyResultFilter()
             totalResultCount = allBooks.count
             hitSourceCount = hitSources.count
+        }
+
+        // 汇总 Z-Library 检索结果
+        let zlibBooks = await zlibSearchTask.value
+        if !zlibBooks.isEmpty {
+            hitSources.insert("Z-Library")
+            allBooks.append(contentsOf: zlibBooks)
+            rawResults = allBooks
         }
 
         guard activeSearchID == searchID, searchGeneration == generation else { return }

@@ -54,7 +54,11 @@ struct BookDetailView: View {
                     )
                 } else if let detail {
                     detailCard(detail)
-                    chapterList
+                    if book.sourceName == "Z-Library" || book.bookUrl.hasPrefix("zlib://") {
+                        zlibraryActionCard
+                    } else {
+                        chapterList
+                    }
                 }
             }
             .padding(AppTheme.pagePadding)
@@ -121,6 +125,84 @@ struct BookDetailView: View {
             Button("暂不加入", role: .cancel) {}
         } message: {
             Text("如果这本书符合预期，可以加入书架，后续会记录阅读进度和更新状态。")
+        }
+    }
+
+    @State private var isDownloadingZlib = false
+    @State private var zlibDownloadError: String?
+
+    private var zlibraryActionCard: some View {
+        VStack(spacing: 16) {
+            HStack(spacing: 12) {
+                Image(systemName: "books.vertical.fill")
+                    .font(.system(size: 28))
+                    .foregroundStyle(AppTheme.accent)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Z-Library 全球图书源")
+                        .font(.headline)
+                    Text("格式：\(book.kind ?? "EPUB")  ·  点击即可高速下载并进入沉浸阅读")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                Spacer()
+            }
+
+            if let zlibDownloadError {
+                Text(zlibDownloadError)
+                    .font(.caption)
+                    .foregroundStyle(.red)
+            }
+
+            Button {
+                Task {
+                    await downloadAndOpenZlibBook()
+                }
+            } label: {
+                HStack {
+                    if isDownloadingZlib {
+                        ProgressView()
+                            .tint(.white)
+                            .padding(.trailing, 6)
+                        Text("正在高速下载中...")
+                    } else {
+                        Image(systemName: "arrow.down.circle.fill")
+                        Text(appState.bookshelfStore.contains(book) ? "已在书架，重新下载/阅读" : "立即下载并加入书架")
+                    }
+                }
+                .font(.headline)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 14)
+                .background(AppTheme.accent, in: RoundedRectangle(cornerRadius: AppTheme.cardRadius, style: .continuous))
+                .foregroundStyle(.white)
+            }
+            .buttonStyle(.plain)
+            .disabled(isDownloadingZlib)
+        }
+        .podcastCard()
+    }
+
+    private func downloadAndOpenZlibBook() async {
+        guard !isDownloadingZlib else { return }
+        isDownloadingZlib = true
+        zlibDownloadError = nil
+        defer { isDownloadingZlib = false }
+
+        let raw = book.bookUrl.replacingOccurrences(of: "zlib://", with: "")
+        let parts = raw.split(separator: "/")
+        guard parts.count >= 2 else {
+            zlibDownloadError = "无效的图书链接"
+            return
+        }
+        let bookID = String(parts[0])
+        let hash = String(parts[1])
+
+        do {
+            let fileURL = try await ZlibraryEngine.shared.downloadBook(bookID: bookID, hash: hash, title: book.name)
+            let parsed = try LocalEPUBBookParser().parse(fileURL: fileURL)
+            appState.bookshelfStore.addLocalTextBook(parsed)
+            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+        } catch {
+            zlibDownloadError = "下载失败：\(error.localizedDescription)"
         }
     }
 
@@ -211,6 +293,32 @@ struct BookDetailView: View {
 
     private func load() async {
         guard detail == nil, !isLoading else { return }
+        if book.sourceName == "Z-Library" || book.bookUrl.hasPrefix("zlib://") {
+            isLoading = true
+            defer { isLoading = false }
+            detail = BookDetail(
+                bookUrl: book.bookUrl,
+                name: book.name,
+                author: book.author,
+                coverUrl: book.coverUrl,
+                intro: book.intro,
+                category: book.kind ?? "EPUB",
+                status: "完结",
+                latestChapter: book.lastChapter ?? "全本",
+                wordCount: nil,
+                updateTime: nil,
+                catalogUrl: nil
+            )
+            chapters = [
+                BookChapter(
+                    title: "全本阅读 (EPUB)",
+                    url: book.bookUrl,
+                    index: 0
+                )
+            ]
+            return
+        }
+
         guard let source = appState.sourceStore.source(for: book.sourceUrl) else {
             errorMessage = "找不到书源：\(book.sourceName)"
             return

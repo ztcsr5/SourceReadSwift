@@ -161,6 +161,7 @@ enum ReaderMode: String, CaseIterable, Identifiable, Sendable {
     case scroll
     case pageTurn
     case cover
+    case pageCurl
 
     var id: String { rawValue }
 
@@ -169,6 +170,7 @@ enum ReaderMode: String, CaseIterable, Identifiable, Sendable {
         case .scroll: return "滑动"
         case .pageTurn: return "平移"
         case .cover: return "覆盖"
+        case .pageCurl: return "仿真"
         }
     }
 }
