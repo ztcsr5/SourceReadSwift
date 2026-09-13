@@ -9,6 +9,30 @@ struct SearchBook: Identifiable, Codable, Hashable, Sendable {
     let sourceName: String
     let sourceUrl: String
     let intro: String?
+    let kind: String?
+    let lastChapter: String?
+
+    init(
+        name: String,
+        author: String?,
+        coverUrl: String?,
+        bookUrl: String,
+        sourceName: String,
+        sourceUrl: String,
+        intro: String?,
+        kind: String? = nil,
+        lastChapter: String? = nil
+    ) {
+        self.name = name
+        self.author = author
+        self.coverUrl = coverUrl
+        self.bookUrl = bookUrl
+        self.sourceName = sourceName
+        self.sourceUrl = sourceUrl
+        self.intro = intro
+        self.kind = kind
+        self.lastChapter = lastChapter
+    }
 }
 
 struct BookDetail: Identifiable, Codable, Hashable, Sendable {

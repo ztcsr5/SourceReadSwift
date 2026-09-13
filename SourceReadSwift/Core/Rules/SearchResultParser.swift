@@ -80,6 +80,8 @@ struct SearchResultParser {
                 let author = rawAuthor?.components(separatedBy: .newlines).first(where: { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty })?.trimmingCharacters(in: .whitespacesAndNewlines) ?? rawAuthor
                 let rawCover = try htmlExtractor.value(from: element, rule: firstRule(rule, keys: ["coverUrl", "cover"]), fallback: "img@src", baseUrl: response.url, variables: variables).nilIfEmpty
                 let cover = rawCover?.components(separatedBy: .newlines).first(where: { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty })?.trimmingCharacters(in: .whitespacesAndNewlines) ?? rawCover
+                let kind = try? htmlExtractor.value(from: element, rule: firstRule(rule, keys: ["kind"]), fallback: nil, baseUrl: response.url, variables: variables).nilIfEmpty
+                let lastChapter = try? htmlExtractor.value(from: element, rule: firstRule(rule, keys: ["lastChapter"]), fallback: nil, baseUrl: response.url, variables: variables).nilIfEmpty
                 books.append(SearchBook(
                     name: name,
                     author: author,
@@ -87,7 +89,9 @@ struct SearchResultParser {
                     bookUrl: bookUrl,
                     sourceName: source.bookSourceName,
                     sourceUrl: source.bookSourceUrl,
-                    intro: nil
+                    intro: nil,
+                    kind: kind,
+                    lastChapter: lastChapter
                 ))
             }
             if elements.isEmpty {
@@ -172,6 +176,18 @@ struct SearchResultParser {
                     from: item,
                     rule: firstRule(rule, keys: ["intro"]),
                     fallbackKeys: ["intro", "desc", "description"],
+                    variables: variables
+                ),
+                kind: extractor.string(
+                    from: item,
+                    rule: firstRule(rule, keys: ["kind"]),
+                    fallbackKeys: ["kind", "category", "tag", "tags"],
+                    variables: variables
+                ),
+                lastChapter: extractor.string(
+                    from: item,
+                    rule: firstRule(rule, keys: ["lastChapter"]),
+                    fallbackKeys: ["lastChapter", "latestChapter", "last_chapter_title"],
                     variables: variables
                 )
             )
