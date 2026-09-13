@@ -160,7 +160,7 @@ struct JSONRuleExtractor {
         if let jsRange = trimmed.range(of: "@js:") {
             let left = String(trimmed[..<jsRange.lowerBound]).trimmingCharacters(in: .whitespacesAndNewlines)
             let right = String(trimmed[jsRange.upperBound...]).trimmingCharacters(in: .whitespacesAndNewlines)
-            let intermediate = left.isEmpty ? object : value(from: object, path: left, variables: variables)
+            let intermediate: Any? = left.isEmpty ? object : value(from: object, path: left, variables: variables)
             if let intermediate {
                 return evaluateRawJS(script: right, object: intermediate, extraVariables: variables)
             }
@@ -169,7 +169,7 @@ struct JSONRuleExtractor {
         if let jsStartRange = trimmed.range(of: "<js>"), let jsEndRange = trimmed.range(of: "</js>") {
             let left = String(trimmed[..<jsStartRange.lowerBound]).trimmingCharacters(in: .whitespacesAndNewlines)
             let jsCode = String(trimmed[jsStartRange.upperBound..<jsEndRange.lowerBound])
-            let intermediate = left.isEmpty ? object : value(from: object, path: left, variables: variables)
+            let intermediate: Any? = left.isEmpty ? object : value(from: object, path: left, variables: variables)
             if let intermediate {
                 return evaluateRawJS(script: jsCode, object: intermediate, extraVariables: variables)
             }
@@ -180,7 +180,7 @@ struct JSONRuleExtractor {
         if let jsonRange = trimmed.range(of: "@json:") {
             let left = String(trimmed[..<jsonRange.lowerBound]).trimmingCharacters(in: .whitespacesAndNewlines)
             let right = String(trimmed[jsonRange.upperBound...]).trimmingCharacters(in: .whitespacesAndNewlines)
-            let intermediate = left.isEmpty ? object : value(from: object, path: left, variables: variables)
+            let intermediate: Any? = left.isEmpty ? object : value(from: object, path: left, variables: variables)
             if let intermediate {
                 var nextObj: Any = intermediate
                 if let str = intermediate as? String,
