@@ -726,12 +726,12 @@ final class JSCoreRuntime {
         java.decodeURI = function(value) { return __native_urlDecode(String(value)); };
         java.decodeURIComponent = java.decodeURI;
         java.base64Encode = function(value) {
-          if (value && typeof value !== 'string' && value.length != null) return __native_base64EncodeBytes(value);
+          if (value && typeof value !== 'string' && !(value instanceof String) && value.length != null) return __native_base64EncodeBytes(value);
           return __native_base64Encode(String(value));
         };
         java.base64Decode = function(value) { return __native_base64Decode(String(value)); };
         java.base64DecodeToByteArray = function(value) {
-          var encoded = value && value.length != null && typeof value !== 'string'
+          var encoded = value && value.length != null && typeof value !== 'string' && !(value instanceof String)
             ? String(__native_bytesToString(__javaBytes(value)) || '')
             : String(value == null ? '' : value);
           return __asJavaList(__native_base64DecodeBytes(encoded));
@@ -1074,6 +1074,9 @@ final class JSCoreRuntime {
           return out;
         }
         function __javaBytes(value) {
+          if (typeof value === 'string' || value instanceof String) {
+            return Array.prototype.slice.call(__native_stringToBytes(String(value)));
+          }
           return __javaArray(value).map(function(item) { return Number(item == null ? 0 : item) & 255; });
         }
         function __hexToJavaBytes(value) {
@@ -2117,7 +2120,7 @@ final class JSCoreRuntime {
         java.aesEncodeToBase64String = function(a,b,c,d) { return __aes('aesEncodeToBase64String',a,b,c,d); };
         function __cipherBase64Encode(value, key, third, fourth, fallback) {
           var normalized = __cipherArgs(third, fourth, fallback);
-          var plain = value && value.length != null && typeof value !== 'string' ? value : __native_stringToBytes(String(value == null ? '' : value));
+          var plain = value && value.length != null && typeof value !== 'string' && !(value instanceof String) ? value : __native_stringToBytes(String(value == null ? '' : value));
           var encrypted = __nativeLegado.invoke({ method: 'cipherEncryptBytes', args: [plain, key, normalized.transformation, normalized.iv] });
           return __native_base64EncodeBytes(encrypted && encrypted.length != null ? encrypted : []);
         }
@@ -2125,7 +2128,7 @@ final class JSCoreRuntime {
           var actualKey = (key && key.key) ? key.key : key;
           var normalized = __cipherArgs(third, fourth, fallback);
           var actualIv = (normalized.iv && normalized.iv.iv) ? normalized.iv.iv : normalized.iv;
-          var decoded = (value && value.length != null && typeof value !== 'string')
+          var decoded = (value && value.length != null && typeof value !== 'string' && !(value instanceof String))
             ? value
             : __native_base64DecodeBytes(String(value == null ? '' : value));
           var plain = __nativeLegado.invoke({ method: 'cipherDecryptBytes', args: [decoded, actualKey, normalized.transformation, actualIv] });
@@ -2627,21 +2630,20 @@ final class JSCoreRuntime {
         Packages.java = Packages.java || {};
         Packages.java.lang = Packages.java.lang || {};
         Packages.java.lang.String = Packages.java.lang.String || function(value, charset) {
-          if (value && typeof value !== 'string' && value.length != null) {
+          var str;
+          if (value && typeof value !== 'string' && !(value instanceof String) && value.length != null) {
             var decoded = charset == null ? __native_bytesToString(value) : __native_bytesToStringCharset(value, String(charset));
-            var result = new String(String(decoded || ''));
-            result.getBytes = function(charset) {
-              var name = charset == null ? '' : String(charset);
-              return __asJavaList(name ? __native_stringToBytesCharset(String(result), name) : __native_stringToBytes(String(result)));
-            };
-            return result;
+            str = String(decoded || '');
+          } else {
+            str = String(value == null ? '' : value);
           }
-          var result = new String(String(value == null ? '' : value));
-          result.getBytes = function(charset) {
-            var name = charset == null ? '' : String(charset);
-            return __asJavaList(name ? __native_stringToBytesCharset(String(result), name) : __native_stringToBytes(String(result)));
-          };
-          return result;
+          if (this instanceof Packages.java.lang.String) {
+            var obj = new String(str);
+            obj.toString = function() { return str; };
+            obj.valueOf = function() { return str; };
+            return obj;
+          }
+          return str;
         };
         Packages.java.lang.String.valueOf = function(value) { return String(value == null ? 'null' : value); };
         Packages.java.lang.String.format = function(format) {
@@ -2922,10 +2924,10 @@ final class JSCoreRuntime {
           DEFAULT: 0,
           getEncoder: function() {
             return { encodeToString: function(value) {
-              var bytes = value && value.length != null && typeof value !== 'string' ? value : __native_stringToBytes(String(value == null ? '' : value));
+              var bytes = value && value.length != null && typeof value !== 'string' && !(value instanceof String) ? value : __native_stringToBytes(String(value == null ? '' : value));
               return __native_base64EncodeBytes(bytes);
             }, encode: function(value) {
-              var bytes = value && value.length != null && typeof value !== 'string' ? value : __native_stringToBytes(String(value == null ? '' : value));
+              var bytes = value && value.length != null && typeof value !== 'string' && !(value instanceof String) ? value : __native_stringToBytes(String(value == null ? '' : value));
               // java.util.Base64.Encoder.encode(byte[]) returns the ASCII
               // bytes of the encoded payload (not the original input bytes).
               return __asJavaList(__native_stringToBytes(__native_base64EncodeBytes(__javaBytes(bytes))));
@@ -2939,19 +2941,19 @@ final class JSCoreRuntime {
           },
           getDecoder: function() {
             return { decode: function(value) {
-              var encoded = value && value.length != null && typeof value !== 'string'
+              var encoded = value && value.length != null && typeof value !== 'string' && !(value instanceof String)
                 ? String(__native_bytesToString(__javaBytes(value)) || '')
                 : String(value == null ? '' : value);
               return java.base64DecodeToByteArray(encoded);
             } };
           },
-          encodeToString: function(value) { return value && value.length != null ? __native_base64EncodeBytes(value) : java.base64Encode(String(value || '')); },
+          encodeToString: function(value) { return value && value.length != null && typeof value !== 'string' && !(value instanceof String) ? __native_base64EncodeBytes(value) : java.base64Encode(String(value || '')); },
           encode: function(value) {
-            var encoded = __native_base64EncodeBytes(value && value.length != null ? __javaBytes(value) : []);
+            var encoded = __native_base64EncodeBytes(value && value.length != null && typeof value !== 'string' && !(value instanceof String) ? __javaBytes(value) : []);
             return __asJavaList(__native_stringToBytes(encoded));
           },
           decode: function(value) {
-            var encoded = value && value.length != null && typeof value !== 'string'
+            var encoded = value && value.length != null && typeof value !== 'string' && !(value instanceof String)
               ? String(__native_bytesToString(__javaBytes(value)) || '')
               : String(value == null ? '' : value);
             return java.base64DecodeToByteArray(encoded);
