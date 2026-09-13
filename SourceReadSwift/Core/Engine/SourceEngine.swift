@@ -436,7 +436,7 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
             }
         }
         let shouldFallback: Bool
-        if let raw = primary.value {
+        if case .success(let raw) = primary {
             let response = ResponseBodyDecoder().normalize(raw, preferredCharset: request.expectedCharset)
             shouldFallback = shouldUseWebViewFallback(source: source, response: response)
         } else {
