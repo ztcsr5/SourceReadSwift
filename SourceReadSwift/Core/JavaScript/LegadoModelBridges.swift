@@ -18,6 +18,9 @@ import JavaScriptCore
     var wordCount: String { get set }
     var variable: String { get set }
     func putVariable(_ key: String, _ value: String)
+    func getVariable(_ key: String) -> String
+    func putCustomVariable(_ value: String)
+    func getCustomVariable(_ key: String) -> String
 }
 
 final class LegadoSearchBookBridge: NSObject, LegadoSearchBookExport {
@@ -26,6 +29,9 @@ final class LegadoSearchBookBridge: NSObject, LegadoSearchBookExport {
     var latestChapterTitle = ""; var wordCount = ""; var variable = ""
     private var variables: [String: String] = [:]
     func putVariable(_ key: String, _ value: String) { variables[key] = value; variable = value }
+    func getVariable(_ key: String) -> String { variables[key] ?? "" }
+    func putCustomVariable(_ value: String) { variables["custom"] = value }
+    func getCustomVariable(_ key: String) -> String { variables[key] ?? variables["custom"] ?? "" }
     init(book: SearchBook) {
         bookUrl = book.bookUrl; origin = book.sourceUrl; originName = book.sourceName
         name = book.name; author = book.author ?? ""; coverUrl = book.coverUrl ?? ""; intro = book.intro ?? ""
@@ -37,6 +43,9 @@ final class LegadoSearchBookBridge: NSObject, LegadoSearchBookExport {
     var url: String { get set }; var title: String { get set }; var bookUrl: String { get set }
     var index: Int { get set }; var resourceUrl: String { get set }; var tag: String { get set }; var variable: String { get set }
     func putVariable(_ key: String, _ value: String)
+    func getVariable(_ key: String) -> String
+    func putCustomVariable(_ value: String)
+    func getCustomVariable(_ key: String) -> String
     func getName() -> String
     func getTitle() -> String
     func getUrl() -> String
@@ -50,6 +59,9 @@ final class LegadoBookChapterBridge: NSObject, LegadoBookChapterExport {
     var url = ""; var title = ""; var bookUrl = ""; var index = 0; var resourceUrl = ""; var tag = ""; var variable = ""
     private var variables: [String: String] = [:]
     func putVariable(_ key: String, _ value: String) { variables[key] = value; variable = value }
+    func getVariable(_ key: String) -> String { variables[key] ?? "" }
+    func putCustomVariable(_ value: String) { variables["custom"] = value }
+    func getCustomVariable(_ key: String) -> String { variables[key] ?? variables["custom"] ?? "" }
     func getName() -> String { title }
     func getTitle() -> String { title }
     func getUrl() -> String { url }

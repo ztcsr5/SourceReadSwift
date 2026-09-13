@@ -26,26 +26,34 @@ struct SearchURLResolver {
         }
         let isGBK = Self.isGBKEncoding(searchUrl: searchUrl, source: source)
         let scriptVariables = scriptVariables(source: source, keyword: keyword, page: page)
-        let interpolated = ruleResolver.interpolate(
-            cleaned,
-            keyword: keyword,
-            page: page,
-            baseUrl: source.bookSourceUrl,
-            charset: isGBK ? "gbk" : nil
-        )
+        let trimmedCleaned = cleaned.trimmingCharacters(in: .whitespacesAndNewlines)
 
+        func postProcess(_ result: String) -> String {
+            ruleResolver.interpolate(
+                result,
+                keyword: keyword,
+                page: page,
+                baseUrl: source.bookSourceUrl,
+                charset: isGBK ? "gbk" : nil
+            )
+        }
+
+        if trimmedCleaned.hasPrefix("@js:") {
+            let script = String(trimmedCleaned.dropFirst(4))
+            let evalResult = evaluateScript(script, source: source, variables: scriptVariables, persistentState: persistentState, network: network, executionContext: executionContext)
+            return evalResult.map(postProcess)
+        }
+
+        if trimmedCleaned.hasPrefix("<js>"), trimmedCleaned.hasSuffix("</js>") {
+            let start = trimmedCleaned.index(trimmedCleaned.startIndex, offsetBy: 4)
+            let end = trimmedCleaned.index(trimmedCleaned.endIndex, offsetBy: -5)
+            let script = String(trimmedCleaned[start..<end])
+            let evalResult = evaluateScript(script, source: source, variables: scriptVariables, persistentState: persistentState, network: network, executionContext: executionContext)
+            return evalResult.map(postProcess)
+        }
+
+        let interpolated = postProcess(cleaned)
         let trimmed = interpolated.trimmingCharacters(in: .whitespacesAndNewlines)
-        if trimmed.hasPrefix("@js:") {
-            let script = String(trimmed.dropFirst(4))
-            return evaluateScript(script, source: source, variables: scriptVariables, persistentState: persistentState, network: network, executionContext: executionContext)
-        }
-
-        if trimmed.hasPrefix("<js>"), trimmed.hasSuffix("</js>") {
-            let start = trimmed.index(trimmed.startIndex, offsetBy: 4)
-            let end = trimmed.index(trimmed.endIndex, offsetBy: -5)
-            let script = String(trimmed[start..<end])
-            return evaluateScript(script, source: source, variables: scriptVariables, persistentState: persistentState, network: network, executionContext: executionContext)
-        }
 
         if trimmed.contains("<js>"), trimmed.contains("</js>") {
             return resolveEmbeddedScripts(
@@ -55,7 +63,7 @@ struct SearchURLResolver {
                 persistentState: persistentState,
                 network: network,
                 executionContext: executionContext
-            )
+            ).map(postProcess)
         }
 
         return .success(trimmed)

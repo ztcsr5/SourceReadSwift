@@ -41,7 +41,7 @@ final class JSCoreRuntime {
         // JavaScriptCore can reject a first-read of an undeclared global inside
         // the large prelude; predeclaring them keeps the later `var x = x ||`
         // aliases source-compatible without relying on browser semantics.
-        context.evaluateScript("var java = {}; var cookie = {}; var CryptoJS = {}; var Packages = {}; var JXNode = function(value) { return __nativeJXNode.create(value); }; var src = '';")
+        context.evaluateScript("var java = {}; var cookie = {}; var CryptoJS = {}; var Packages = {}; var JXNode = function(value) { return __nativeJXNode.create(value); }; var JavaImporter = function() {}; var src = '';")
         installBaseBridge()
     }
 
@@ -949,14 +949,38 @@ final class JSCoreRuntime {
         java.currentTimeMillis = java.getTime;
         java.now = java.getTime;
         java.randomUUID = function() {
-          return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+          var uuidStr = 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
             var r = Math.random() * 16 | 0;
             var v = c === 'x' ? r : (r & 0x3 | 0x8);
             return v.toString(16);
           });
+          return {
+            toString: function() { return uuidStr; },
+            replace: function(a, b) { return uuidStr.replace(a, b); },
+            toLowerCase: function() { return uuidStr.toLowerCase(); },
+            toUpperCase: function() { return uuidStr.toUpperCase(); }
+          };
         };
         java.uuid = java.randomUUID;
-        java.androidId = function() { return 'sourcereadswift-ios'; };
+        java.androidId = function() { return 'a1b2c3d4e5f60718'; };
+        java.toast = function(msg) { java.log(String(msg)); return msg; };
+        java.longToast = function(msg) { java.log(String(msg)); return msg; };
+        java.openUrl = function(url) { return url; };
+        java.startBrowser = function(url, title) { return url; };
+        java.startBrowserAwait = function(url, title) { return url; };
+        java.showBrowser = function(url) { return url; };
+        java.getWebViewUA = function() { return 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1'; };
+        java.getReadBookConfigMap = function() { return {}; };
+        java.getThemeConfigMap = function() { return {}; };
+        java.readBookConfig = function() { return {}; };
+        java.refreshTocUrl = function() {};
+        java.refreshBookUrl = function() {};
+        java.refreshExplore = function() {};
+        java.refreshBookInfo = function() {};
+        java.upLoginData = function() {};
+        java.getStrResponse = function(url, headers) { return java.ajax(url); };
+        java.initUrl = function(url) { return url; };
+        java.htmlFormat = function(html) { return String(html == null ? '' : html); };
         function __defaultHtml() {
           if (typeof result !== 'undefined' && String(result) !== '') return String(result);
           if (typeof html !== 'undefined' && String(html) !== '') return String(html);
@@ -2087,9 +2111,13 @@ final class JSCoreRuntime {
           return __native_base64EncodeBytes(encrypted && encrypted.length != null ? encrypted : []);
         }
         function __cipherBase64Decode(value, key, third, fourth, fallback) {
+          var actualKey = (key && key.key) ? key.key : key;
           var normalized = __cipherArgs(third, fourth, fallback);
-          var decoded = __native_base64DecodeBytes(String(value == null ? '' : value));
-          var plain = __nativeLegado.invoke({ method: 'cipherDecryptBytes', args: [decoded, key, normalized.transformation, normalized.iv] });
+          var actualIv = (normalized.iv && normalized.iv.iv) ? normalized.iv.iv : normalized.iv;
+          var decoded = (value && value.length != null && typeof value !== 'string')
+            ? value
+            : __native_base64DecodeBytes(String(value == null ? '' : value));
+          var plain = __nativeLegado.invoke({ method: 'cipherDecryptBytes', args: [decoded, actualKey, normalized.transformation, actualIv] });
           return __native_bytesToString(plain && plain.length != null ? plain : []);
         }
         java.desEncodeToBase64String = function(value, key, iv, transformation) {
@@ -2110,12 +2138,38 @@ final class JSCoreRuntime {
         };
         java.createSymmetricCrypto = function(transformation, key, iv) {
           var tf = String(transformation || 'AES/CBC/PKCS7Padding');
-          var k = key;
-          var v = iv;
+          var k = (key && key.key) ? key.key : key;
+          var v = (iv && iv.iv) ? iv.iv : iv;
+          var cipherMode = 2;
           var api = {
-            setKey: function(newKey) { k = newKey; return api; },
-            setIV: function(newIv) { v = newIv; return api; },
-            init: function(newKey, newIv) { if (newKey != null) k = newKey; if (newIv != null) v = newIv; return api; },
+            setKey: function(newKey) { k = (newKey && newKey.key) ? newKey.key : newKey; return api; },
+            setIV: function(newIv) { v = (newIv && newIv.iv) ? newIv.iv : newIv; return api; },
+            init: function(modeOrKey, maybeKeyOrIv, maybeIv) {
+              if (arguments.length >= 3) {
+                cipherMode = Number(modeOrKey) || 2;
+                var realKey = (maybeKeyOrIv && maybeKeyOrIv.key) ? maybeKeyOrIv.key : maybeKeyOrIv;
+                var realIv = (maybeIv && maybeIv.iv) ? maybeIv.iv : maybeIv;
+                if (realKey != null) k = realKey;
+                if (realIv != null) v = realIv;
+              } else if (arguments.length === 2) {
+                if (typeof modeOrKey === 'number') {
+                  cipherMode = modeOrKey;
+                  var realKey = (maybeKeyOrIv && maybeKeyOrIv.key) ? maybeKeyOrIv.key : maybeKeyOrIv;
+                  if (realKey != null) k = realKey;
+                } else {
+                  var realKey = (modeOrKey && modeOrKey.key) ? modeOrKey.key : modeOrKey;
+                  var realIv = (maybeKeyOrIv && maybeKeyOrIv.iv) ? maybeKeyOrIv.iv : maybeKeyOrIv;
+                  if (realKey != null) k = realKey;
+                  if (realIv != null) v = realIv;
+                }
+              } else if (arguments.length === 1 && modeOrKey != null) {
+                k = (modeOrKey && modeOrKey.key) ? modeOrKey.key : modeOrKey;
+              }
+              return api;
+            },
+            doFinal: function(data) {
+              return cipherMode === 1 ? api.encrypt(data) : api.decryptStr(data);
+            },
             decryptStr: function(str) {
               return __cipherBase64Decode(str, k, v, tf, tf);
             },
@@ -2205,6 +2259,14 @@ final class JSCoreRuntime {
             return java.put('book.variable', book.variable);
           };
           book.putVariable = function(key, value) { return book.setVariable(key, value); };
+          book.putCustomVariable = function(key, value) {
+            if (arguments.length === 1) return book.setVariable('custom', key);
+            return book.setVariable(key, value);
+          };
+          book.getCustomVariable = function(key) {
+            if (arguments.length === 0 || key == null) return book.getVariable('custom');
+            return book.getVariable(key);
+          };
           book.setReverseToc = function(reverse) {
             book.reverseToc = Boolean(reverse);
             return book.reverseToc;
@@ -2239,6 +2301,14 @@ final class JSCoreRuntime {
             return java.put('chapter.variable', chapter.variable);
           };
           chapter.putVariable = function(key, value) { return chapter.setVariable(key, value); };
+          chapter.putCustomVariable = function(key, value) {
+            if (arguments.length === 1) return chapter.setVariable('custom', key);
+            return chapter.setVariable(key, value);
+          };
+          chapter.getCustomVariable = function(key) {
+            if (arguments.length === 0 || key == null) return chapter.getVariable('custom');
+            return chapter.getVariable(key);
+          };
           chapter.variableMap = chapter.variableMap || {
             get: function(k) { return chapter.getVariable(k); },
             put: function(k,v) { return chapter.setVariable(k,v); },
@@ -2251,6 +2321,132 @@ final class JSCoreRuntime {
           };
         }
         __installSourceAndBook();
+        var Arrays = {
+          copyOfRange: function(arr, start, end) {
+            if (!arr) return [];
+            return Array.prototype.slice.call(arr, start, end);
+          }
+        };
+        var Base64 = {
+          getDecoder: function() {
+            return {
+              decode: function(s) {
+                return __asJavaList(__native_base64DecodeBytes(String(s == null ? '' : s)));
+              }
+            };
+          },
+          getUrlDecoder: function() {
+            return {
+              decode: function(s) {
+                return __asJavaList(__native_base64DecodeBytes(String(s == null ? '' : s).replace(/-/g, '+').replace(/_/g, '/')));
+              }
+            };
+          },
+          getEncoder: function() {
+            return {
+              encode: function(bytes) { return java.base64Encode(bytes); },
+              encodeToString: function(bytes) { return java.base64Encode(bytes); }
+            };
+          },
+          getUrlEncoder: function() {
+            return {
+              encode: function(bytes) { return java.base64UrlEncode(bytes); },
+              encodeToString: function(bytes) { return java.base64UrlEncode(bytes); }
+            };
+          }
+        };
+        function SecretKeySpec(key, algo) {
+          if (!(this instanceof SecretKeySpec)) return new SecretKeySpec(key, algo);
+          this.key = (key && key.key) ? key.key : key;
+          this.algo = algo;
+        }
+        function IvParameterSpec(iv) {
+          if (!(this instanceof IvParameterSpec)) return new IvParameterSpec(iv);
+          this.iv = (iv && iv.iv) ? iv.iv : iv;
+        }
+        function PKCS8EncodedKeySpec(keyBytes) {
+          if (!(this instanceof PKCS8EncodedKeySpec)) return new PKCS8EncodedKeySpec(keyBytes);
+          this.key = keyBytes;
+        }
+        function X509EncodedKeySpec(keyBytes) {
+          if (!(this instanceof X509EncodedKeySpec)) return new X509EncodedKeySpec(keyBytes);
+          this.key = keyBytes;
+        }
+        var Cipher = {
+          getInstance: function(transformation) {
+            return java.createSymmetricCrypto(transformation);
+          },
+          ENCRYPT_MODE: 1,
+          DECRYPT_MODE: 2
+        };
+        if (!String.prototype.getBytes) {
+          String.prototype.getBytes = function(charset) {
+            return __native_stringToBytes(this);
+          };
+        }
+        Packages = (typeof Packages !== 'undefined' && Packages) || {};
+        Packages.java = Packages.java || {};
+        Packages.java.lang = Packages.java.lang || { String: String };
+        Packages.java.util = Packages.java.util || { Arrays: Arrays, Base64: Base64, UUID: { randomUUID: function() { return java.randomUUID(); } } };
+        Packages.java.io = Packages.java.io || {};
+        Packages.java.security = Packages.java.security || {
+          KeyFactory: {
+            getInstance: function() {
+              return {
+                generatePrivate: function(spec) { return (spec && spec.key) ? spec.key : spec; },
+                generatePublic: function(spec) { return (spec && spec.key) ? spec.key : spec; }
+              };
+            }
+          },
+          Signature: {
+            getInstance: function(algo) { return java.createSign(algo); }
+          },
+          MessageDigest: {
+            getInstance: function(algo) {
+              var data = '';
+              return {
+                update: function(bytes) { data += (bytes && bytes.length != null && typeof bytes !== 'string') ? __native_bytesToString(bytes) : String(bytes || ''); },
+                digest: function(bytes) {
+                  if (bytes) this.update(bytes);
+                  var hex = java.digestHex(data, algo || 'md5');
+                  return __hexToJavaBytes(hex);
+                }
+              };
+            }
+          }
+        };
+        Packages.java.security.spec = Packages.java.security.spec || {
+          PKCS8EncodedKeySpec: PKCS8EncodedKeySpec,
+          X509EncodedKeySpec: X509EncodedKeySpec
+        };
+        Packages.javax = Packages.javax || {};
+        Packages.javax.crypto = Packages.javax.crypto || { Cipher: Cipher };
+        Packages.javax.crypto.spec = Packages.javax.crypto.spec || {
+          SecretKeySpec: SecretKeySpec,
+          IvParameterSpec: IvParameterSpec
+        };
+        Packages.okhttp3 = Packages.okhttp3 || {
+          Request: function() {},
+          client: function() {}
+        };
+        function JavaImporter() {
+          if (!(this instanceof JavaImporter)) return new JavaImporter();
+          this.importPackage = function() {};
+          this.importClass = function() {};
+          this.Base64 = Base64;
+          this.Cipher = Cipher;
+          this.SecretKeySpec = SecretKeySpec;
+          this.IvParameterSpec = IvParameterSpec;
+          this.Arrays = Arrays;
+          this.KeyFactory = Packages.java.security.KeyFactory;
+          this.Signature = Packages.java.security.Signature;
+          this.PKCS8EncodedKeySpec = PKCS8EncodedKeySpec;
+          this.X509EncodedKeySpec = X509EncodedKeySpec;
+          this.MessageDigest = Packages.java.security.MessageDigest;
+          this.UUID = Packages.java.util.UUID;
+        }
+        globalThis.JavaImporter = JavaImporter;
+        if (typeof window !== 'undefined') window.JavaImporter = JavaImporter;
         function base64Encode(value) { return java.base64Encode(value); }
         function base64Decode(value) { return java.base64Decode(value); }
         function unbase64(value) { return java.base64Decode(value); }

@@ -483,14 +483,21 @@ struct HtmlRuleExtractor {
         while clean.hasSuffix("|") || clean.hasSuffix("#") {
             clean = String(clean.dropLast()).trimmingCharacters(in: .whitespacesAndNewlines)
         }
+        var optionsSuffix = ""
+        if let commaRange = clean.range(of: ",{") ?? clean.range(of: ", {") {
+            optionsSuffix = String(clean[commaRange.lowerBound...])
+            clean = String(clean[..<commaRange.lowerBound]).trimmingCharacters(in: .whitespacesAndNewlines)
+        }
+        let absolutized: String
         if let url = URL(string: clean), url.scheme != nil {
-            return url.absoluteString
+            absolutized = url.absoluteString
+        } else if let encoded = clean.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed.union(.urlPathAllowed)),
+                  let url = URL(string: encoded, relativeTo: base) {
+            absolutized = url.absoluteURL.absoluteString
+        } else {
+            absolutized = URL(string: clean, relativeTo: base)?.absoluteURL.absoluteString ?? clean
         }
-        if let encoded = clean.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed.union(.urlPathAllowed)),
-           let url = URL(string: encoded, relativeTo: base) {
-            return url.absoluteURL.absoluteString
-        }
-        return URL(string: clean, relativeTo: base)?.absoluteURL.absoluteString ?? clean
+        return absolutized + optionsSuffix
     }
 
     private func interleave<T>(_ lists: [[T]]) -> [T] {

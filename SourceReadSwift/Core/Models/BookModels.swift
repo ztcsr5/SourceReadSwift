@@ -19,7 +19,7 @@ struct SearchBook: Identifiable, Codable, Hashable, Sendable {
         bookUrl: String,
         sourceName: String,
         sourceUrl: String,
-        intro: String?,
+        intro: String? = nil,
         kind: String? = nil,
         lastChapter: String? = nil
     ) {
