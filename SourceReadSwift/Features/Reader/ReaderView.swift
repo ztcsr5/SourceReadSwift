@@ -594,7 +594,7 @@ struct ReaderView: View {
         switch readerMode {
         case .scroll:
             scrollReaderContent
-        case .pageTurn, .cover:
+        case .pageTurn, .cover, .pageCurl:
             pagedReaderContent
         }
     }
@@ -1947,7 +1947,7 @@ struct ReaderView: View {
         case .scroll:
             scrollParagraphTarget = safeIndex
             paragraphJumpRequest = ParagraphJumpRequest(index: safeIndex)
-        case .pageTurn, .cover:
+        case .pageTurn, .cover, .pageCurl:
             pagedPageIndex = pageIndex(containingParagraph: safeIndex)
         }
         persistReadingPosition(paragraphIndexOverride: safeIndex)
@@ -2030,7 +2030,7 @@ struct ReaderView: View {
         switch readerMode {
         case .scroll:
             return autoScrollEnabled ? autoScrollAnchorTarget : visibleParagraphIndex
-        case .pageTurn, .cover:
+        case .pageTurn, .cover, .pageCurl:
             return pagedPageIndex
         }
     }

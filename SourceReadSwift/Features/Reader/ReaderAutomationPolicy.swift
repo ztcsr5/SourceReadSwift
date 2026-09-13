@@ -87,7 +87,7 @@ struct ReaderAutomationPolicy {
         switch mode {
         case .scroll:
             rawTarget = visibleParagraphIndex
-        case .pageTurn, .cover:
+        case .pageTurn, .cover, .pageCurl:
             rawTarget = pagedPageIndex
         }
         return min(max(rawTarget, 0), maximumTarget)
