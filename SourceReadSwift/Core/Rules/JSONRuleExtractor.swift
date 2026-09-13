@@ -256,7 +256,7 @@ struct JSONRuleExtractor {
     }
 
     private func extractPutDirectives(from rule: String) -> [(key: String, valueRule: String)] {
-        guard let regex = try? NSRegularExpression(pattern: #"(?i)@put:{([^}]*)}"#) else { return [] }
+        guard let regex = try? NSRegularExpression(pattern: #"(?i)@put:\{([^}]*)\}"#) else { return [] }
         let range = NSRange(rule.startIndex..<rule.endIndex, in: rule)
         return regex.matches(in: rule, range: range).flatMap { match -> [(key: String, valueRule: String)] in
             guard let bodyRange = Range(match.range(at: 1), in: rule) else { return [] }
@@ -272,11 +272,11 @@ struct JSONRuleExtractor {
     }
 
     private func removePutDirectives(from rule: String) -> String {
-        rule.replacingOccurrences(of: #"(?i)@put:{[^}]*}"#, with: "", options: .regularExpression)
+        rule.replacingOccurrences(of: #"(?i)@put:\{[^}]*\}"#, with: "", options: .regularExpression)
     }
 
     private func replaceGetDirectives(in rule: String) -> String {
-        guard let regex = try? NSRegularExpression(pattern: #"(?i)@get:{([^}]*)}"#) else { return rule }
+        guard let regex = try? NSRegularExpression(pattern: #"(?i)@get:\{([^}]*)\}"#) else { return rule }
         var output = rule
         let matches = regex.matches(in: rule, range: NSRange(rule.startIndex..<rule.endIndex, in: rule)).reversed()
         for match in matches {
@@ -302,7 +302,7 @@ struct JSONRuleExtractor {
 
     private func interpolateTemplate(_ template: String, item: [String: Any], variables: [String: Any]) -> String {
         var output = template
-        guard let regex = try? NSRegularExpression(pattern: #"{{s*([^{}]+)s*}}"#) else { return template }
+        guard let regex = try? NSRegularExpression(pattern: #"\{\{\s*([^{}]+)\s*\}\}"#) else { return template }
         let nsText = template as NSString
         let matches = regex.matches(in: template, range: NSRange(location: 0, length: nsText.length))
         for match in matches.reversed() {
@@ -575,8 +575,8 @@ struct JSONRuleExtractor {
             output.removeFirst()
         }
         output = output
-            .replacingOccurrences(of: #"(?i)@put:{[^}]*}"#, with: "", options: .regularExpression)
-            .replacingOccurrences(of: #"(?i)@get:{([^}]*)}"#, with: "$1", options: .regularExpression)
+            .replacingOccurrences(of: #"(?i)@put:\{[^}]*\}"#, with: "", options: .regularExpression)
+            .replacingOccurrences(of: #"(?i)@get:\{([^}]*)\}"#, with: "$1", options: .regularExpression)
         if output.hasPrefix("@json:") {
             output = String(output.dropFirst(6)).trimmingCharacters(in: .whitespacesAndNewlines)
         }
