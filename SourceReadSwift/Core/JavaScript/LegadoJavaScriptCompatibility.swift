@@ -149,6 +149,18 @@ enum LegadoJavaScriptCompatibility {
                     } else if word == "async", shouldStripAsync(in: chars, end: end) {
                         features.insert("async")
                         for position in start..<end { output[position] = " " }
+                    } else if word == "let" {
+                        features.insert("let-to-var")
+                        output[start] = "v"
+                        output[start + 1] = "a"
+                        output[start + 2] = "r"
+                    } else if word == "const" {
+                        features.insert("const-to-var")
+                        output[start] = "v"
+                        output[start + 1] = "a"
+                        output[start + 2] = "r"
+                        output[start + 3] = " "
+                        output[start + 4] = " "
                     }
                     if !word.isEmpty { previousSignificant = word.last }
                     index = end - 1

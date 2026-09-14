@@ -127,7 +127,16 @@ struct SourceRequestBuilder {
     }
 
     private func resolveURL(_ text: String, base: String) -> URL {
+        var cleanBase = base.trimmingCharacters(in: .whitespacesAndNewlines)
+        if let hashIdx = cleanBase.firstIndex(of: "#") {
+            cleanBase = String(cleanBase[..<hashIdx]).trimmingCharacters(in: .whitespacesAndNewlines)
+        }
         var trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmed.contains("\n") || trimmed.contains("\r") {
+            if let firstLine = trimmed.components(separatedBy: .newlines).first(where: { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }) {
+                trimmed = firstLine.trimmingCharacters(in: .whitespacesAndNewlines)
+            }
+        }
         while trimmed.hasSuffix("|") || trimmed.hasSuffix("#") {
             trimmed = String(trimmed.dropLast()).trimmingCharacters(in: .whitespacesAndNewlines)
         }
@@ -138,7 +147,8 @@ struct SourceRequestBuilder {
            let absolute = URL(string: encoded), absolute.scheme != nil {
             return absolute
         }
-        if let baseURL = URL(string: base) {
+        let effectiveBaseURL = URL(string: cleanBase) ?? cleanBase.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed.union(.urlPathAllowed)).flatMap { URL(string: $0) }
+        if let baseURL = effectiveBaseURL {
             if let relative = URL(string: trimmed, relativeTo: baseURL)?.absoluteURL {
                 return relative
             }
@@ -147,7 +157,7 @@ struct SourceRequestBuilder {
                 return relative
             }
         }
-        return URL(string: base) ?? URL(string: "https://invalid.local")!
+        return effectiveBaseURL ?? URL(string: "https://invalid.local")!
     }
 
     private func sourceHeaders(_ source: BookSource, persistentValues: [String: String] = [:]) -> [String: String] {
@@ -305,7 +315,11 @@ struct SourceRequestBuilder {
     }
 
     private func applyDefaultNavigationHeaders(to headers: inout [String: String], sourceBase: String) {
-        guard let baseURL = URL(string: sourceBase), let host = baseURL.host else { return }
+        var cleanBase = sourceBase.trimmingCharacters(in: .whitespacesAndNewlines)
+        if let hashIdx = cleanBase.firstIndex(of: "#") {
+            cleanBase = String(cleanBase[..<hashIdx]).trimmingCharacters(in: .whitespacesAndNewlines)
+        }
+        guard let baseURL = URL(string: cleanBase), let host = baseURL.host else { return }
         let scheme = baseURL.scheme ?? "https"
         let origin = "\(scheme)://\(host)"
         if !containsHeader(headers, "Referer") {

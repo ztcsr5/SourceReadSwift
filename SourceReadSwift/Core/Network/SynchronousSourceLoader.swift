@@ -3,11 +3,12 @@ import Foundation
 struct SynchronousSourceLoader {
     private let requestBuilder = SourceRequestBuilder()
 
+    private static let sessionDelegate = InsecureTrustSessionDelegate()
     private static let session: URLSession = {
         let configuration = URLSessionConfiguration.ephemeral
         configuration.urlCache = nil
         configuration.requestCachePolicy = .reloadIgnoringLocalCacheData
-        return URLSession(configuration: configuration)
+        return URLSession(configuration: configuration, delegate: sessionDelegate, delegateQueue: nil)
     }()
 
     func load(

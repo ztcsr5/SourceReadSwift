@@ -7,6 +7,17 @@ enum SourceHealthStatus: String, Codable, Hashable, Sendable {
     case requiresLogin
     case verificationRequired
     case blocked
+
+    var localizedLabel: String {
+        switch self {
+        case .passed: return "通过 (PASS)"
+        case .warning: return "警告 (WARN)"
+        case .failed: return "失败 (FAIL)"
+        case .requiresLogin: return "需登录 (LOGIN)"
+        case .verificationRequired: return "验证拦截 (VERIFY)"
+        case .blocked: return "访问受限 (BLOCK)"
+        }
+    }
 }
 
 struct SourceHealthRecord: Identifiable, Codable, Equatable, Sendable {

@@ -52,7 +52,19 @@ struct SearchURLResolver {
             return evalResult.map(postProcess)
         }
 
-        let interpolated = postProcess(cleaned)
+        var resolvedCleaned = cleaned
+        if resolvedCleaned.contains("{{") && resolvedCleaned.contains("}}") {
+            resolvedCleaned = resolveEmbeddedBracesScripts(
+                resolvedCleaned,
+                source: source,
+                variables: scriptVariables,
+                persistentState: persistentState,
+                network: network,
+                executionContext: executionContext
+            )
+        }
+
+        let interpolated = postProcess(resolvedCleaned)
         let trimmed = interpolated.trimmingCharacters(in: .whitespacesAndNewlines)
 
         if trimmed.contains("<js>"), trimmed.contains("</js>") {
@@ -89,6 +101,60 @@ struct SearchURLResolver {
             }
         }
         return .success(output)
+    }
+
+    private func resolveEmbeddedBracesScripts(
+        _ text: String,
+        source: BookSource,
+        variables: [String: Any],
+        persistentState: RulePersistentState,
+        network: SourceNetworkClient?,
+        executionContext: RuleExecutionContext?
+    ) -> String {
+        var output = text
+        let pattern = #"\{\{((?:[^{}]|(?!\}\}))+)\}\}"#
+        guard let regex = try? NSRegularExpression(pattern: pattern) else { return output }
+
+        var searchRange = NSRange(output.startIndex..<output.endIndex, in: output)
+        while let match = regex.firstMatch(in: output, range: searchRange) {
+            guard let fullRange = Range(match.range, in: output),
+                  let innerRange = Range(match.range(at: 1), in: output) else { break }
+            let expr = String(output[innerRange]).trimmingCharacters(in: .whitespacesAndNewlines)
+            let lower = expr.lowercased()
+            if lower == "key" || lower == "keyword" || lower == "page" || lower == "baseurl"
+                || lower.hasPrefix("page+") || lower.hasPrefix("page-") || lower.hasPrefix("page*") || lower.hasPrefix("page/") {
+                let nextStart = fullRange.upperBound
+                if nextStart < output.endIndex {
+                    searchRange = NSRange(nextStart..<output.endIndex, in: output)
+                    continue
+                } else {
+                    break
+                }
+            }
+
+            let evalResult = evaluateScript(
+                expr,
+                source: source,
+                variables: variables,
+                persistentState: persistentState,
+                network: network,
+                executionContext: executionContext
+            )
+            let replacement: String
+            switch evalResult {
+            case .success(let val):
+                if val == "undefined" || val == "null" {
+                    replacement = ""
+                } else {
+                    replacement = val
+                }
+            case .failure:
+                replacement = ""
+            }
+            output.replaceSubrange(fullRange, with: replacement)
+            searchRange = NSRange(output.startIndex..<output.endIndex, in: output)
+        }
+        return output.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
     private func evaluateScript(

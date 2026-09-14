@@ -39,8 +39,9 @@ struct LegadoRuleResolver {
             output = output.replacingOccurrences(of: "{page}", with: String(page))
         }
         if let baseUrl {
-            output = output.replacingOccurrences(of: "{{baseUrl}}", with: baseUrl)
-            output = output.replacingOccurrences(of: "{baseUrl}", with: baseUrl)
+            let cleanBase = baseUrl.components(separatedBy: "#").first?.trimmingCharacters(in: .whitespacesAndNewlines) ?? baseUrl
+            output = output.replacingOccurrences(of: "{{baseUrl}}", with: cleanBase)
+            output = output.replacingOccurrences(of: "{baseUrl}", with: cleanBase)
         }
         return output
     }

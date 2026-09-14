@@ -125,4 +125,38 @@ final class SearchURLResolverTests: XCTestCase {
         let request = SourceRequestBuilder().buildPageRequest(source: source, urlText: url)
         XCTAssertEqual(request.url.absoluteString, "https://www.min-yuan.com/search/")
     }
+
+    func testResolveInlineScriptSideEffectsAndTrim() throws {
+        let source = BookSource(
+            bookSourceName: "搬文屋",
+            bookSourceUrl: "https://www.banwenwu.com",
+            searchUrl: "{{url=source.getKey();cookie.removeCookie(url)}}\n/modules/article/search.php?searchkey={{key}}"
+        )
+
+        let result = SearchURLResolver().resolve(source: source, keyword: "宿命之环", page: 1)
+        guard case .success(let url) = result else {
+            return XCTFail("expected success")
+        }
+        XCTAssertFalse(url.contains("cookie.removeCookie"))
+        XCTAssertFalse(url.contains("source.getKey"))
+        XCTAssertTrue(url.hasPrefix("/modules/article/search.php?searchkey="))
+
+        let request = SourceRequestBuilder().buildPageRequest(source: source, urlText: url)
+        XCTAssertEqual(request.url.path, "/modules/article/search.php")
+    }
+
+    func testResolveBaseUrlWithFragment() throws {
+        let source = BookSource(
+            bookSourceName: "快眼看书",
+            bookSourceUrl: "http://www.kyxsw.org#🎃",
+            searchUrl: "{{baseUrl}}/search.html?keyword={{key}}"
+        )
+
+        let result = SearchURLResolver().resolve(source: source, keyword: "凡人", page: 1)
+        guard case .success(let url) = result else {
+            return XCTFail("expected success")
+        }
+        XCTAssertFalse(url.contains("#"))
+        XCTAssertTrue(url.hasPrefix("http://www.kyxsw.org/search.html?keyword="))
+    }
 }

@@ -1568,22 +1568,35 @@ private struct BatchCheckCoordinatorObserver<Content: View>: View {
                             if let report = currentOrSavedBatchReport() {
                                 do {
                                     let md = SourceDiagnosticReportExporter.generateMarkdownReport(from: report, totalCount: report.totalCount)
+                                    let csv = SourceDiagnosticReportExporter.generateCSVReport(from: report)
                                     let data = try? report.exportJSON()
-                                    let (mdURL, _) = try SourceDiagnosticReportExporter.saveToDocuments(markdownText: md, jsonData: data, reportDate: report.finishedAt)
+                                    let (mdURL, csvURL, _) = try SourceDiagnosticReportExporter.saveToDocuments(markdownText: md, csvText: csv, jsonData: data, reportDate: report.finishedAt)
                                     UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-                                    batchCheckExportNotice = "✅ 报告已成功存入「文件」App：\n我的 iPhone -> 轻阅 -> Reports -> \(mdURL.lastPathComponent)"
+                                    batchCheckExportNotice = "✅ 诊断报告已存入「文件」App：\n轻阅/Reports/\(csvURL?.lastPathComponent ?? mdURL.lastPathComponent)"
                                 } catch {
                                     batchCheckExportNotice = "❌ 保存失败：\(error.localizedDescription)"
                                 }
                             }
                         } label: {
-                            Label("保存报告到「文件」App (直接落盘)", systemImage: "folder.badge.plus")
+                            Label("保存全部文件到「文件」App (落盘 .csv / .md / .json)", systemImage: "folder.badge.plus")
+                        }
+
+                        Button {
+                            if let report = currentOrSavedBatchReport() {
+                                let csv = SourceDiagnosticReportExporter.generateCSVReport(from: report)
+                                let (_, csvURL, _) = SourceDiagnosticReportExporter.createExportFiles(markdownText: "", csvText: csv, jsonData: nil)
+                                if let csvURL {
+                                    shareFiles([csvURL])
+                                }
+                            }
+                        } label: {
+                            Label("系统分享 / AirDrop (.csv 数据表格)", systemImage: "tablecells")
                         }
 
                         Button {
                             if let report = currentOrSavedBatchReport() {
                                 let md = SourceDiagnosticReportExporter.generateMarkdownReport(from: report, totalCount: report.totalCount)
-                                let (mdURL, _) = SourceDiagnosticReportExporter.createExportFiles(markdownText: md, jsonData: nil)
+                                let (mdURL, _, _) = SourceDiagnosticReportExporter.createExportFiles(markdownText: md, jsonData: nil)
                                 shareFiles([mdURL])
                             }
                         } label: {
@@ -1593,7 +1606,7 @@ private struct BatchCheckCoordinatorObserver<Content: View>: View {
                         Button {
                             if let report = currentOrSavedBatchReport() {
                                 let data = try? report.exportJSON()
-                                let (_, jsonURL) = SourceDiagnosticReportExporter.createExportFiles(markdownText: "", jsonData: data)
+                                let (_, _, jsonURL) = SourceDiagnosticReportExporter.createExportFiles(markdownText: "", jsonData: data)
                                 if let jsonURL {
                                     shareFiles([jsonURL])
                                 }
@@ -1613,6 +1626,14 @@ private struct BatchCheckCoordinatorObserver<Content: View>: View {
                             }
                         } label: {
                             Label("复制精简看板 (适合发微信/群聊)", systemImage: "list.bullet.clipboard")
+                        }
+
+                        Button("复制 CSV 表格数据 (可粘贴入 Excel)") {
+                            if let report = currentOrSavedBatchReport() {
+                                UIPasteboard.general.string = SourceDiagnosticReportExporter.generateCSVReport(from: report)
+                                UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                                batchCheckExportNotice = "✅ CSV 表格数据已复制到剪贴板，支持直接粘贴入 Excel / Numbers"
+                            }
                         }
 
                         Button("复制完整 Markdown 报告") {

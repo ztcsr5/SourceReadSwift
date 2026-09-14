@@ -58,12 +58,31 @@ protocol SourceNetworkClient: Sendable {
     func load(_ request: SourceRequest) async -> Result<SourceResponse, SourceEngineError>
 }
 
+/// Allows book source HTTP requests to connect to community novel hosts with
+/// expired, self-signed, or Let's Encrypt certificates, matching Android Legado's
+/// default OkHttpClient `trustAllCerts` behavior.
+final class InsecureTrustSessionDelegate: NSObject, URLSessionDelegate, Sendable {
+    func urlSession(
+        _ session: URLSession,
+        didReceive challenge: URLAuthenticationChallenge,
+        completionHandler: @escaping (URLSession.AuthChallengeDisposition, URLCredential?) -> Void
+    ) {
+        if challenge.protectionSpace.authenticationMethod == NSURLAuthenticationMethodServerTrust,
+           let serverTrust = challenge.protectionSpace.serverTrust {
+            completionHandler(.useCredential, URLCredential(trust: serverTrust))
+            return
+        }
+        completionHandler(.performDefaultHandling, nil)
+    }
+}
+
 final class URLSessionSourceNetworkClient: SourceNetworkClient, @unchecked Sendable {
+    private static let sessionDelegate = InsecureTrustSessionDelegate()
     private static let defaultSession: URLSession = {
         let configuration = URLSessionConfiguration.ephemeral
         configuration.urlCache = nil
         configuration.requestCachePolicy = .reloadIgnoringLocalCacheData
-        return URLSession(configuration: configuration)
+        return URLSession(configuration: configuration, delegate: sessionDelegate, delegateQueue: nil)
     }()
 
     private let session: URLSession
