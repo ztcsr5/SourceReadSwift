@@ -58,10 +58,15 @@ struct ContentParser {
     }
 
     private static let commonNovelContentSelectors = [
-        "#content", "#chaptercontent", "#BookText", "#htmlContent",
-        ".read-content", ".content", ".showtxt", "#txt", "#nr",
+        "#content", "#chaptercontent", "#chapterContent", "#BookText", "#htmlContent",
+        ".read-content", ".content", ".showtxt", "#txt", "#nr", "#nr1", "#nr_word",
         ".novelcontent", "article", "div.entry-content", ".text-content",
-        "#novelcontent", "#chapter-content"
+        "#novelcontent", "#chapter-content", "#chapter_content", "#content_text",
+        ".content-wrap", "#articlecontent", "#article-content", ".readcontent",
+        ".read-body", ".reading-content", ".reader-content", ".bookcontent",
+        ".book-content", "#booktxt", "#booktext", "#book-text", ".yd_text2",
+        "#main-text", ".post-content", "#textcontent", ".txtcontent", "#contenttxt",
+        ".read_content", "div#content", "div#chaptercontent"
     ]
 
     private func extractFallbackParagraphs(from body: String, baseUrl: URL, title: String) -> [String] {

@@ -57,7 +57,9 @@ struct SourceBatchDiagnosticRunner: Sendable {
                     timeout: timeout
                 )
             }) {
-                return enrichedReport(execution.result.report)
+                let report = enrichedReport(execution.result.report)
+                (self.engine as? SourceDiagnosticEvidenceProvider)?.resetDiagnosticEvidence(sourceURL: source.bookSourceUrl)
+                return report
             }
 
             return timeoutReport(
@@ -100,13 +102,15 @@ struct SourceBatchDiagnosticRunner: Sendable {
             )
         }
 
-        return enrichedReport(SourceDiagnosticReport(
+        let report = enrichedReport(SourceDiagnosticReport(
             sourceName: source.bookSourceName,
             sourceURL: source.bookSourceUrl,
             keyword: cleanKeyword,
             startedAt: startedAt,
             steps: [step]
         ))
+        (self.engine as? SourceDiagnosticEvidenceProvider)?.resetDiagnosticEvidence(sourceURL: source.bookSourceUrl)
+        return report
     }
 
     private func enrichedReport(_ report: SourceDiagnosticReport) -> SourceDiagnosticReport {
@@ -125,7 +129,7 @@ struct SourceBatchDiagnosticRunner: Sendable {
                 elapsedMilliseconds: step.elapsedMilliseconds,
                 failureClassification: step.failureClassification,
                 requestMethod: evidence.requestMethod,
-                requestBody: evidence.requestBody,
+                requestBody: evidence.requestBody.map { $0.count > 1000 ? String($0.prefix(1000)) + "..." : $0 },
                 requestHeaders: evidence.requestHeaders,
                 responseStatusCode: evidence.responseStatusCode,
                 responseHeaders: evidence.responseHeaders,
@@ -136,7 +140,7 @@ struct SourceBatchDiagnosticRunner: Sendable {
                 responseContentEncodings: evidence.responseContentEncodings,
                 responseWasDecoded: evidence.responseWasDecoded,
                 javascript: evidence.javascript,
-                executionLogs: evidence.executionLogs,
+                executionLogs: evidence.executionLogs.map { Array($0.suffix(20)) },
                 retryCount: step.retryCount,
                 failureCode: step.failureCode,
                 retryable: step.retryable

@@ -37,6 +37,14 @@ enum ReaderBackground: String, CaseIterable, Identifiable, Codable, Sendable {
         textColor(isNight: false)
     }
 
+    func dynamicColor(isNight: Bool) -> Color {
+        color(isNight: isNight)
+    }
+
+    func dynamicTextColor(isNight: Bool) -> Color {
+        textColor(isNight: isNight)
+    }
+
     var uiTextColor: UIColor {
         uiTextColor(isNight: false)
     }

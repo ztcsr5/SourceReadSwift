@@ -111,7 +111,20 @@ struct ChapterListParser {
                     ".dir-list li a",
                     "div.read-section a",
                     "#chapters-list a",
-                    ".chapter-list a"
+                    ".chapter-list a",
+                    ".catalog-list a",
+                    "#list-chapter a",
+                    ".volume-list a",
+                    ".mulu a",
+                    "#mulu a",
+                    ".dir-box a",
+                    ".chapter-item a",
+                    ".book-chapter-list a",
+                    "#chapter_list a",
+                    ".chapterlist a",
+                    "div.catalog a",
+                    "div.chapterlist a",
+                    ".mu-box a"
                 ]
                 for selector in fallbackSelectors {
                     let candidates = try roots.flatMap { root in

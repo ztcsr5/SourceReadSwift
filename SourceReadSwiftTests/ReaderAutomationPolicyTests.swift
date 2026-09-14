@@ -52,7 +52,7 @@ final class ReaderAutomationPolicyTests: XCTestCase {
             contentSizeHeight: 1_200,
             adjustedContentInset: .init(top: 0, left: 0, bottom: 110, right: 0)
         )
-        XCTAssertEqual(target, 236, accuracy: 0.001)
+        XCTAssertEqual(target, 260, accuracy: 0.001)
 
         let first = ReaderScrollPositionPolicy.targetContentOffsetY(
             textRectMinY: 0,
@@ -79,7 +79,7 @@ final class ReaderAutomationPolicyTests: XCTestCase {
             contentSizeHeight: 1_200,
             adjustedContentInset: .init(top: 20, left: 0, bottom: 0, right: 0)
         )
-        XCTAssertEqual(topInset, -20, accuracy: 0.001)
+        XCTAssertEqual(topInset, 0, accuracy: 0.001)
     }
 
     func testAdvancesWithinCurrentChapter() {

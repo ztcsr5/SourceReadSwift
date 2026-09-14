@@ -195,7 +195,7 @@ extension SourceEngine {
         case .failure(let error):
             return failure(error, stage: .toc, start: tocStarted)
         case .success(let value):
-            chapters = value
+            chapters = Array(value.prefix(10))
             if value.isEmpty {
                 return failure(.empty("目录为空"), stage: .toc, start: tocStarted)
             }

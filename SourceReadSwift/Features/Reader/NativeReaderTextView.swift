@@ -249,6 +249,7 @@ struct NativeReaderTextView: UIViewRepresentable {
         private var lastLayoutWidth: CGFloat?
         private var hasAppliedInitialScrollTarget = false
         private var didFireNearBottom = false
+        private var isProgrammaticScrolling = false
 
         init(
             onVisibleParagraph: @escaping (Int) -> Void,
@@ -397,7 +398,20 @@ struct NativeReaderTextView: UIViewRepresentable {
         }
 
         private func updateInsets(in textView: UITextView, configuration: Configuration) {
-            let topInset = max(CGFloat(configuration.pagePadding), 54)
+            let safeTop: CGFloat = {
+                if let window = textView.window {
+                    return window.safeAreaInsets.top
+                }
+                if textView.safeAreaInsets.top > 0 {
+                    return textView.safeAreaInsets.top
+                }
+                if let scene = UIApplication.shared.connectedScenes.first(where: { $0.activationState == .foregroundActive }) as? UIWindowScene,
+                   let keyWindow = scene.windows.first(where: { $0.isKeyWindow }) {
+                    return keyWindow.safeAreaInsets.top
+                }
+                return 47
+            }()
+            let topInset = max(safeTop + max(CGFloat(configuration.pagePadding), 20), 76)
             let insets = UIEdgeInsets(
                 top: topInset,
                 left: CGFloat(configuration.pagePadding),
@@ -463,6 +477,7 @@ struct NativeReaderTextView: UIViewRepresentable {
         @discardableResult
         private func scrollToParagraph(_ index: Int, in textView: UITextView, animated: Bool, duration: Double) -> Bool {
             guard paragraphRanges.indices.contains(index) else { return false }
+            guard !textView.isTracking && !textView.isDragging else { return false }
             if textView.bounds.height <= 0 {
                 DispatchQueue.main.async { [weak self, weak textView] in
                     guard let self, let textView else { return }
@@ -475,6 +490,21 @@ struct NativeReaderTextView: UIViewRepresentable {
             let range = paragraphRanges[index]
             let glyphRange = textView.layoutManager.glyphRange(forCharacterRange: range, actualCharacterRange: nil)
             let rect = textView.layoutManager.boundingRect(forGlyphRange: glyphRange, in: textView.textContainer)
+
+            // When animating (such as speech playback or auto-scroll advance):
+            // Check if the target paragraph is ALREADY comfortably visible on screen.
+            // If it is already visible in the reading area, DO NOT SCROLL to avoid shaking/jitter!
+            if animated {
+                let glyphTopInViewport = rect.minY - textView.contentOffset.y + textView.textContainerInset.top
+                let glyphBottomInViewport = rect.maxY - textView.contentOffset.y + textView.textContainerInset.top
+                let safeTop = textView.textContainerInset.top + 16
+                let safeBottom = textView.bounds.height - textView.textContainerInset.bottom - 48
+                if glyphTopInViewport >= safeTop && glyphBottomInViewport <= safeBottom {
+                    hasAppliedInitialScrollTarget = true
+                    return true
+                }
+            }
+
             let targetY = ReaderScrollPositionPolicy.targetContentOffsetY(
                 textRectMinY: rect.minY,
                 textContainerInsetTop: textView.textContainerInset.top,
@@ -487,12 +517,15 @@ struct NativeReaderTextView: UIViewRepresentable {
             hasAppliedInitialScrollTarget = true
             guard abs(currentOffset.y - offset.y) > 0.5 else { return true }
             if animated {
+                isProgrammaticScrolling = true
                 UIView.animate(
                     withDuration: min(max(duration * 0.9, 0.25), 8),
                     delay: 0,
-                    options: [.curveLinear, .beginFromCurrentState, .allowUserInteraction, .allowAnimatedContent]
+                    options: [.curveEaseInOut, .beginFromCurrentState, .allowUserInteraction, .allowAnimatedContent]
                 ) {
                     textView.setContentOffset(offset, animated: false)
+                } completion: { [weak self] _ in
+                    self?.isProgrammaticScrolling = false
                 }
             } else {
                 textView.setContentOffset(offset, animated: false)
@@ -504,6 +537,8 @@ struct NativeReaderTextView: UIViewRepresentable {
             guard let textView = scrollView as? UITextView,
                   let configuration,
                   !paragraphRanges.isEmpty else { return }
+
+            guard !isProgrammaticScrolling else { return }
 
             guard scrollView.isTracking || scrollView.isDragging || scrollView.isDecelerating || hasAppliedInitialScrollTarget else {
                 return
@@ -531,7 +566,7 @@ struct NativeReaderTextView: UIViewRepresentable {
         private func updateVisibleParagraph(in textView: UITextView) {
             let visibleRect = CGRect(
                 x: 0,
-                y: max(textView.contentOffset.y - textView.textContainerInset.top, 0),
+                y: max(textView.contentOffset.y, 0),
                 width: textView.bounds.width,
                 height: textView.bounds.height
             )
@@ -588,7 +623,7 @@ enum ReaderScrollPositionPolicy {
             minimumY,
             contentSizeHeight - boundsHeight + adjustedContentInset.bottom
         )
-        let desiredY = textRectMinY - textContainerInsetTop
+        let desiredY = textRectMinY
         return min(max(desiredY, minimumY), maximumY)
     }
 }

@@ -529,6 +529,7 @@ struct ReaderView: View {
         }
         .onChange(of: initialParagraphIndex) { target in
             guard let target, content.paragraphs.indices.contains(target) else { return }
+            guard target != visibleParagraphIndex else { return }
             jumpToParagraph(target)
         }
         .onChange(of: readerPageCacheKey) { _ in
@@ -585,6 +586,14 @@ struct ReaderView: View {
         background == .dark ? .white.opacity(0.62) : .secondary
     }
 
+    private var readerThemeTextColor: Color {
+        background.textColor(isNight: colorScheme == .dark)
+    }
+
+    private var readerThemeBackground: Color {
+        background.color(isNight: colorScheme == .dark)
+    }
+
     @ViewBuilder
     private var readerContent: some View {
         switch readerMode {
@@ -636,7 +645,7 @@ struct ReaderView: View {
     }
 
     private var activeScrollTarget: Int? {
-        if speechController.currentParagraphIndex >= 0 {
+        if speechController.isSpeaking, speechController.currentParagraphIndex >= 0 {
             return speechController.currentParagraphIndex
         }
         if let jump = paragraphJumpRequest {
@@ -665,7 +674,7 @@ struct ReaderView: View {
             currentParagraphIndex: speechController.currentParagraphIndex,
             scrollTarget: activeScrollTarget,
             scrollRequestKey: nativeScrollRequestKey,
-            animatedScrollDuration: autoScrollEnabled ? max(ReaderAutomationPolicy.clampedDelay(autoScrollDelay) * 0.9, 0.25) : 0,
+            animatedScrollDuration: autoScrollEnabled ? max(ReaderAutomationPolicy.clampedDelay(autoScrollDelay) * 0.9, 0.25) : (speechController.isSpeaking ? 0.35 : 0),
             textSelectionEnabled: textSelectionEnabled,
             showChapterEndBadge: false,
             onVisibleParagraph: { index in
@@ -701,9 +710,6 @@ struct ReaderView: View {
         .onChange(of: speechController.currentParagraphIndex) { target in
             guard target >= 0 else { return }
             scheduleReadingPositionPersistence(paragraphIndex: target)
-            if readerMode == .scroll {
-                paragraphJumpRequest = ParagraphJumpRequest(index: target)
-            }
         }
     }
 
@@ -938,7 +944,7 @@ struct ReaderView: View {
                     if page.includesTitle {
                         Text(content.title)
                             .font(fontFamily.swiftUIFont(size: CGFloat(fontSize + 8), weight: .bold))
-                            .foregroundStyle(background.textColor)
+                            .foregroundStyle(readerThemeTextColor)
                             .padding(.bottom, CGFloat(titleSpacing))
                             .readerSelectableText(textSelectionEnabled)
                     }
@@ -970,16 +976,16 @@ struct ReaderView: View {
     private func pageSurface<Content: View>(@ViewBuilder content: () -> Content) -> some View {
         content()
             .padding(.horizontal, CGFloat(pagePadding))
-            .padding(.top, max(CGFloat(pagePadding), 54))
+            .padding(.top, max(CGFloat(pagePadding) + 36, 76))
             .padding(.bottom, CGFloat(pagePadding))
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
             .background {
                 if readerMode == .cover {
                     Rectangle()
-                        .fill(background.color)
+                        .fill(readerThemeBackground)
                         .shadow(color: .black.opacity(background == .dark ? 0.45 : 0.22), radius: 14, x: -6, y: 0)
                 } else {
-                    background.color
+                    readerThemeBackground
                 }
             }
     }
@@ -987,7 +993,7 @@ struct ReaderView: View {
     private func paragraphText(_ paragraph: String, index: Int) -> some View {
         Text(paragraph)
             .font(fontFamily.swiftUIFont(size: CGFloat(fontSize), weight: .regular))
-            .foregroundStyle(background.textColor)
+            .foregroundStyle(readerThemeTextColor)
             .kerning(letterSpacing)
             .lineSpacing(lineSpacing)
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -1383,22 +1389,22 @@ struct ReaderView: View {
             HStack {
                 Text("阅读预览")
                     .font(.caption.weight(.semibold))
-                    .foregroundStyle(background.textColor.opacity(0.64))
+                    .foregroundStyle(readerThemeTextColor.opacity(0.64))
                 Spacer()
                 Text("\(fontFamily.title) · \(Int(fontSize))pt · 缩进\(Int(paragraphIndent))pt")
                     .font(.caption2)
-                    .foregroundStyle(background.textColor.opacity(0.55))
+                    .foregroundStyle(readerThemeTextColor.opacity(0.55))
             }
 
             Text("　　夜色沉下来以后，文字应该安静、清楚、耐看。调整外观与排版时，这里会立刻跟随字体、字号、行距、段首缩进和背景变化。")
                 .font(.system(size: min(fontSize, 24), weight: .regular, design: .default))
-                .foregroundStyle(background.textColor)
+                .foregroundStyle(readerThemeTextColor)
                 .lineSpacing(lineSpacing)
                 .lineLimit(4)
         }
         .padding(14)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(background.color, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .background(readerThemeBackground, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
         .overlay {
             RoundedRectangle(cornerRadius: 18, style: .continuous)
                 .stroke(Color.primary.opacity(background == .dark ? 0.12 : 0.06), lineWidth: 0.8)
@@ -1414,7 +1420,7 @@ struct ReaderView: View {
                     .lineLimit(2)
                 Spacer(minLength: 0)
             }
-            .foregroundStyle(background.textColor)
+            .foregroundStyle(readerThemeTextColor)
             .padding(.horizontal, 14)
             .padding(.vertical, 10)
             .background(.regularMaterial, in: Capsule())
@@ -1725,23 +1731,23 @@ struct ReaderView: View {
                 .disableAutocorrection(true)
                 .padding(.horizontal, 12)
                 .frame(height: 38)
-                .background(background.textColor.opacity(0.06), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                .background(readerThemeTextColor.opacity(0.08), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
                 .overlay {
                     RoundedRectangle(cornerRadius: 12, style: .continuous)
-                        .stroke(background.textColor.opacity(0.12), lineWidth: 0.8)
+                        .stroke(readerThemeTextColor.opacity(0.15), lineWidth: 0.8)
                 }
-                .foregroundStyle(background.textColor)
+                .foregroundStyle(readerThemeTextColor)
                 .padding(.horizontal)
                 .padding(.top, 10)
 
             List {
                 if chapters.isEmpty && navigationEntries.isEmpty {
                     Text("当前章节没有可切换目录")
-                        .foregroundStyle(background.textColor.opacity(0.6))
+                        .foregroundStyle(readerThemeTextColor.opacity(0.6))
                         .listRowBackground(Color.clear)
                 } else if filteredChapters.isEmpty && filteredNavigationEntries.isEmpty {
                     Text("没有匹配章节")
-                        .foregroundStyle(background.textColor.opacity(0.6))
+                        .foregroundStyle(readerThemeTextColor.opacity(0.6))
                         .listRowBackground(Color.clear)
                 } else {
                     if !filteredChapters.isEmpty {
@@ -1756,7 +1762,7 @@ struct ReaderView: View {
                                 }
                                 .disabled(onSelectChapter == nil || chapter.index == chapterIndex)
                                 .listRowBackground(Color.clear)
-                                .listRowSeparatorTint(background.textColor.opacity(0.12))
+                                .listRowSeparatorTint(readerThemeTextColor.opacity(0.15))
                             }
                         }
                     }
@@ -1772,7 +1778,7 @@ struct ReaderView: View {
                                 }
                                 .disabled(onSelectNavigationEntry == nil || entry.chapterIndex == nil)
                                 .listRowBackground(Color.clear)
-                                .listRowSeparatorTint(background.textColor.opacity(0.12))
+                                .listRowSeparatorTint(readerThemeTextColor.opacity(0.15))
                             }
                         }
                     }
@@ -1780,7 +1786,7 @@ struct ReaderView: View {
             }
             .listStyle(.plain)
             .scrollContentBackground(.hidden)
-            .background(background.color.opacity(background == .dark ? 0.92 : 0.82))
+            .background(Color.clear)
         }
     }
 
@@ -1788,10 +1794,10 @@ struct ReaderView: View {
         HStack(spacing: 12) {
             Text("\(chapter.index + 1)")
                 .font(.caption.weight(.semibold))
-                .foregroundStyle(chapter.index == chapterIndex ? AppTheme.accent : background.textColor.opacity(0.55))
+                .foregroundStyle(chapter.index == chapterIndex ? AppTheme.accent : readerThemeTextColor.opacity(0.55))
                 .frame(width: 42, alignment: .leading)
             Text(chapter.title)
-                .foregroundStyle(chapter.index == chapterIndex ? AppTheme.accent : background.textColor)
+                .foregroundStyle(chapter.index == chapterIndex ? AppTheme.accent : readerThemeTextColor)
                 .fontWeight(chapter.index == chapterIndex ? .semibold : .regular)
                 .lineLimit(1)
             Spacer()
@@ -1806,22 +1812,22 @@ struct ReaderView: View {
         HStack(spacing: 12) {
             Text("\(ordinal + 1)")
                 .font(.caption.weight(.semibold))
-                .foregroundStyle(background.textColor.opacity(0.55))
+                .foregroundStyle(readerThemeTextColor.opacity(0.55))
                 .frame(width: 42, alignment: .leading)
             VStack(alignment: .leading, spacing: 3) {
                 Text(entry.title)
-                    .foregroundStyle(background.textColor)
+                    .foregroundStyle(readerThemeTextColor)
                     .lineLimit(1)
                 if let chapterIndex = entry.chapterIndex {
                     Text("第 \(chapterIndex + 1) 章" + (entry.paragraphIndex.map { " · 第 \($0 + 1) 段" } ?? ""))
                         .font(.caption2)
-                        .foregroundStyle(background.textColor.opacity(0.6))
+                        .foregroundStyle(readerThemeTextColor.opacity(0.6))
                 }
             }
             Spacer()
             Image(systemName: "arrow.down.right")
                 .font(.caption)
-                .foregroundStyle(background.textColor.opacity(0.4))
+                .foregroundStyle(readerThemeTextColor.opacity(0.4))
         }
     }
 
@@ -1881,7 +1887,7 @@ struct ReaderView: View {
                                 VStack(alignment: .leading, spacing: 5) {
                                     Text(bookmark.chapterTitle)
                                         .font(.headline)
-                                        .foregroundStyle(background.textColor)
+                                        .foregroundStyle(readerThemeTextColor)
                                     HStack(spacing: 6) {
                                         Text(bookmarkLocationText(bookmark))
                                         Text(bookmark.createdAt.formatted(date: .abbreviated, time: .shortened))
@@ -1895,10 +1901,10 @@ struct ReaderView: View {
                                         }
                                     }
                                     .font(.caption2.weight(.semibold))
-                                    .foregroundStyle(isCurrentBookmark(bookmark) ? AppTheme.accent : background.textColor.opacity(0.55))
+                                    .foregroundStyle(isCurrentBookmark(bookmark) ? AppTheme.accent : readerThemeTextColor.opacity(0.55))
                                     Text(bookmark.snippet)
                                         .font(.caption)
-                                        .foregroundStyle(background.textColor.opacity(0.6))
+                                        .foregroundStyle(readerThemeTextColor.opacity(0.6))
                                         .lineLimit(2)
                                 }
                                 Spacer()
@@ -1908,13 +1914,13 @@ struct ReaderView: View {
                                 } else {
                                     Image(systemName: "chevron.right")
                                         .font(.caption.weight(.bold))
-                                        .foregroundStyle(background.textColor.opacity(0.35))
+                                        .foregroundStyle(readerThemeTextColor.opacity(0.35))
                                 }
                             }
                         }
                         .disabled(bookmark.chapterIndex != chapterIndex && onSelectChapter == nil)
                         .listRowBackground(Color.clear)
-                        .listRowSeparatorTint(background.textColor.opacity(0.12))
+                        .listRowSeparatorTint(readerThemeTextColor.opacity(0.15))
                         .swipeActions {
                             Button("删除", role: .destructive) {
                                 appState.bookshelfStore.removeBookmark(bookID: bookID, bookmarkID: bookmark.id)
@@ -1926,7 +1932,7 @@ struct ReaderView: View {
         }
         .listStyle(.plain)
         .scrollContentBackground(.hidden)
-        .background(background.color.opacity(background == .dark ? 0.92 : 0.82))
+        .background(Color.clear)
     }
 
     private func bookmarkLocationText(_ bookmark: ReaderBookmark) -> String {
@@ -1964,6 +1970,7 @@ struct ReaderView: View {
     private func jumpToParagraph(_ paragraphIndex: Int?) {
         guard let paragraphIndex else { return }
         let safeIndex = min(max(paragraphIndex, 0), max(content.paragraphs.count - 1, 0))
+        guard safeIndex != visibleParagraphIndex else { return }
         visibleParagraphIndex = safeIndex
         switch readerMode {
         case .scroll:

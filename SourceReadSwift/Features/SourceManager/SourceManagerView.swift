@@ -1563,6 +1563,7 @@ struct SourceManagerView: View {
         var pendingHealthRecords: [SourceHealthRecord] = []
         var pendingHistoryRecords: [SourceDiagnosticHistoryRecord] = []
         var lastUIUpdateTime = Date()
+        var lastFlushTime = Date()
 
         func flushPendingRecords() {
             if !pendingHealthRecords.isEmpty {
@@ -1656,24 +1657,15 @@ struct SourceManagerView: View {
                         ))
                     }
 
-                    if pendingHealthRecords.count >= 50 {
+                    let now = Date()
+                    if now.timeIntervalSince(lastFlushTime) >= 3.0 || pendingHealthRecords.count >= 150 {
+                        lastFlushTime = now
                         flushPendingRecords()
                     }
 
-                    let now = Date()
-                    if now.timeIntervalSince(lastUIUpdateTime) >= 0.25 {
+                    if now.timeIntervalSince(lastUIUpdateTime) >= 0.75 {
                         lastUIUpdateTime = now
-                        var currentDisplay = workingState
-                        currentDisplay.results.sort { lhs, rhs in
-                            if lhs.status.priority != rhs.status.priority {
-                                return lhs.status.priority < rhs.status.priority
-                            }
-                            if lhs.elapsedMilliseconds != rhs.elapsedMilliseconds {
-                                return lhs.elapsedMilliseconds > rhs.elapsedMilliseconds
-                            }
-                            return lhs.sourceName.localizedCaseInsensitiveCompare(rhs.sourceName) == .orderedAscending
-                        }
-                        batchCheck = currentDisplay
+                        batchCheck = workingState
                     }
                 }
             }
@@ -1755,6 +1747,7 @@ struct SourceManagerView: View {
             resultCount: result.resultCount,
             diagnosticReport: result.diagnosticReport
         )
+        (engine as? SourceDiagnosticEvidenceProvider)?.resetDiagnosticEvidence(sourceURL: source.bookSourceUrl)
         return BatchCheckOutcome(
             source: source,
             result: finalResult,
