@@ -7,8 +7,7 @@ import CommonCrypto
 final class JSCoreRuntime {
     private let context: JSContext
     private let ajaxHandler: ((String) -> String)?
-    private var fallbackContext: RuleExecutionContext?
-    private weak var executionContext: RuleExecutionContext?
+    private let executionContext: RuleExecutionContext
     private let javaHostBridge: LegadoJavaHostBridge
     private let ruleHostBridge: LegadoRuleHostBridge
     private let jsoupBridge: LegadoJsoupBridge
@@ -30,16 +29,8 @@ final class JSCoreRuntime {
     ) {
         self.context = JSContext()!
         self.ajaxHandler = ajaxHandler
-        let effectiveContext: RuleExecutionContext
-        if let executionContext {
-            self.executionContext = executionContext
-            effectiveContext = executionContext
-        } else {
-            let fallback = RuleExecutionContext()
-            self.fallbackContext = fallback
-            self.executionContext = fallback
-            effectiveContext = fallback
-        }
+        let effectiveContext = executionContext ?? RuleExecutionContext()
+        self.executionContext = effectiveContext
         self.javaHostBridge = LegadoJavaHostBridge(executionContext: effectiveContext)
         self.ruleHostBridge = LegadoRuleHostBridge(executionContext: effectiveContext)
         self.jsoupBridge = LegadoJsoupBridge(executionContext: effectiveContext)
