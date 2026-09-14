@@ -52,9 +52,7 @@ final class JSCoreRuntime {
             context.setObject("", forKeyedSubscript: "src" as NSString)
             context.setObject("", forKeyedSubscript: "result" as NSString)
             context.setObject("", forKeyedSubscript: "html" as NSString)
-            context.setObject(nil, forKeyedSubscript: "chapter" as NSString)
-            context.setObject(nil, forKeyedSubscript: "book" as NSString)
-            context.setObject(nil, forKeyedSubscript: "source" as NSString)
+            context.setObject("", forKeyedSubscript: "content" as NSString)
             evaluateLock.unlock()
         }
         if let baseBridgeError {
