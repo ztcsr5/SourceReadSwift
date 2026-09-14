@@ -23,6 +23,8 @@ struct SourceBatchDiagnosticRunner: Sendable {
         page: Int = 1,
         timeout: TimeInterval = 10
     ) async -> SourceDiagnosticReport {
+        var mutableEngine = engine
+        mutableEngine.allowWebViewFallback = false
         let startedAt = Date()
         let cleanKeyword = keyword.trimmingCharacters(in: .whitespacesAndNewlines)
         (engine as? SourceDiagnosticEvidenceProvider)?.resetDiagnosticEvidence(sourceURL: source.bookSourceUrl)
@@ -165,7 +167,7 @@ struct SourceBatchDiagnosticRunner: Sendable {
         deepCheck: Bool,
         page: Int = 1,
         timeout: TimeInterval = 10,
-        batchSize: Int = 4,
+        batchSize: Int = SandboxEnvironment.recommendedBatchConcurrency,
         progress: (@Sendable (Int, SourceDiagnosticReport) async -> Void)? = nil
     ) async -> SourceDiagnosticBatchReport {
         let startedAt = Date()

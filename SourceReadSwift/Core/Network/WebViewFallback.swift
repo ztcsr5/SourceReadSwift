@@ -14,7 +14,10 @@ final class WebViewFallback: NSObject, WKNavigationDelegate {
     }
 
     func load(url: URL, delay: TimeInterval = 3) async -> Result<String, SourceEngineError> {
-        await withTaskCancellationHandler(operation: {
+        if SandboxEnvironment.isLiveContainer {
+            return .failure(.network("沙盒环境（LiveContainer）不支持后台无头 WebKit 渲染，请在书源规则中关闭 webView 或使用内置网页登录"))
+        }
+        return await withTaskCancellationHandler(operation: {
             await withCheckedContinuation { continuation in
                 self.continuation = continuation
                 if Task.isCancelled {

@@ -16,10 +16,22 @@ final class RuleExecutionContext: @unchecked Sendable {
     private var recordedLogs: [String] = []
     private var javascriptEvidence: [SourceJavaScriptEvidence] = []
     private var executionStage: String?
+    private var cachedRuntime: JSCoreRuntime?
 
     var networkHandler: NetworkHandler?
     var responseHandler: ResponseHandler?
     var logHandler: LogHandler?
+
+    func jsRuntime(ajaxHandler: @escaping (String) -> String) -> JSCoreRuntime {
+        lock.lock()
+        defer { lock.unlock() }
+        if let cached = cachedRuntime {
+            return cached
+        }
+        let runtime = JSCoreRuntime(ajaxHandler: ajaxHandler, executionContext: self)
+        cachedRuntime = runtime
+        return runtime
+    }
 
     init(
         initialValues: [String: Any] = [:],

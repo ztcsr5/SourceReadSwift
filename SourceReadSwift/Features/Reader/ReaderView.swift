@@ -800,6 +800,7 @@ struct ReaderView: View {
     private func updateVisibleParagraphInScroll(_ index: Int) {
         guard visibleParagraphIndex != index else { return }
         visibleParagraphIndex = index
+        scrollParagraphTarget = index
         let resolved = resolvedReadingPosition(forFlatIndex: index)
         scheduleReadingPositionPersistence(paragraphIndex: resolved.paragraphIndex)
     }
@@ -1688,13 +1689,7 @@ struct ReaderView: View {
                 readerBackdrop
 
                 VStack(spacing: 0) {
-                    Picker("目录", selection: $tocTab) {
-                        Text("目录").tag(0)
-                        Text("书签").tag(1)
-                    }
-                    .pickerStyle(.segmented)
-                    .padding(.horizontal)
-                    .padding(.top, 10)
+                    customTocSegmentedPicker
 
                     if tocTab == 0 {
                         tocList
@@ -1711,17 +1706,59 @@ struct ReaderView: View {
                         Button(tocReversed ? "倒序" : "顺序") {
                             tocReversed.toggle()
                         }
+                        .foregroundStyle(readerThemeTextColor)
                     }
                 }
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button("完成") {
                         showChapterList = false
                     }
+                    .foregroundStyle(readerThemeTextColor)
                 }
             }
+            .toolbarBackground(readerThemeBackground, for: .navigationBar)
+            .toolbarColorScheme(background == .dark ? .dark : .light, for: .navigationBar)
         }
-        .readerSheetPresentation()
+        .readerSheetPresentation(color: readerThemeBackground)
         .presentationDetents([.medium, .large])
+        .tint(AppTheme.accent)
+        .preferredColorScheme(background == .dark ? .dark : .light)
+    }
+
+    private var customTocSegmentedPicker: some View {
+        HStack(spacing: 0) {
+            tocTabButton(title: "目录", tag: 0)
+            tocTabButton(title: "书签", tag: 1)
+        }
+        .padding(3)
+        .background(readerThemeTextColor.opacity(background == .dark ? 0.16 : 0.08), in: Capsule())
+        .overlay {
+            Capsule()
+                .stroke(readerThemeTextColor.opacity(0.12), lineWidth: 0.8)
+        }
+        .padding(.horizontal)
+        .padding(.top, 10)
+    }
+
+    private func tocTabButton(title: String, tag: Int) -> some View {
+        Button {
+            withAnimation(.spring(response: 0.25, dampingFraction: 0.8)) {
+                tocTab = tag
+            }
+        } label: {
+            Text(title)
+                .font(.subheadline.weight(tocTab == tag ? .semibold : .regular))
+                .foregroundStyle(tocTab == tag ? .white : readerThemeTextColor.opacity(0.75))
+                .frame(maxWidth: .infinity)
+                .frame(height: 32)
+                .background {
+                    if tocTab == tag {
+                        Capsule()
+                            .fill(AppTheme.accent)
+                    }
+                }
+        }
+        .buttonStyle(.plain)
     }
 
     private var tocList: some View {
@@ -1751,7 +1788,7 @@ struct ReaderView: View {
                         .listRowBackground(Color.clear)
                 } else {
                     if !filteredChapters.isEmpty {
-                        Section("章节") {
+                        Section {
                             ForEach(filteredChapters) { chapter in
                                 Button {
                                     showChapterList = false
@@ -1764,10 +1801,14 @@ struct ReaderView: View {
                                 .listRowBackground(Color.clear)
                                 .listRowSeparatorTint(readerThemeTextColor.opacity(0.15))
                             }
+                        } header: {
+                            Text("章节")
+                                .font(.footnote.weight(.semibold))
+                                .foregroundStyle(readerThemeTextColor.opacity(0.65))
                         }
                     }
                     if !filteredNavigationEntries.isEmpty {
-                        Section("页面内目录") {
+                        Section {
                             ForEach(Array(filteredNavigationEntries.enumerated()), id: \.element) { offset, entry in
                                 Button {
                                     showChapterList = false
@@ -1780,6 +1821,10 @@ struct ReaderView: View {
                                 .listRowBackground(Color.clear)
                                 .listRowSeparatorTint(readerThemeTextColor.opacity(0.15))
                             }
+                        } header: {
+                            Text("页面内目录")
+                                .font(.footnote.weight(.semibold))
+                                .foregroundStyle(readerThemeTextColor.opacity(0.65))
                         }
                     }
                 }
@@ -1843,12 +1888,17 @@ struct ReaderView: View {
                             Button("完成") {
                                 showBookmarks = false
                             }
+                            .foregroundStyle(readerThemeTextColor)
                         }
                     }
             }
+            .toolbarBackground(readerThemeBackground, for: .navigationBar)
+            .toolbarColorScheme(background == .dark ? .dark : .light, for: .navigationBar)
         }
-        .readerSheetPresentation()
+        .readerSheetPresentation(color: readerThemeBackground)
         .presentationDetents([.medium, .large])
+        .tint(AppTheme.accent)
+        .preferredColorScheme(background == .dark ? .dark : .light)
     }
 
     private func bookmarkList(includeAddButton: Bool) -> some View {
@@ -1861,24 +1911,29 @@ struct ReaderView: View {
                         isCurrentChapterBookmarked ? "取消当前段落书签" : "加入当前段落书签",
                         systemImage: isCurrentChapterBookmarked ? "bookmark.slash" : "bookmark"
                     )
+                    .foregroundStyle(AppTheme.accent)
                 }
+                .listRowBackground(Color.clear)
+                .listRowSeparatorTint(readerThemeTextColor.opacity(0.15))
             }
 
             if bookmarks.isEmpty {
                 Text("暂无书签")
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(readerThemeTextColor.opacity(0.6))
+                    .listRowBackground(Color.clear)
             } else {
                 Section {
                     HStack {
                         Label("\(bookmarks.count) 个书签", systemImage: "bookmark")
                         Spacer()
                         Text("本章 \(currentChapterBookmarkCount)")
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(readerThemeTextColor.opacity(0.6))
                     }
                     .font(.caption.weight(.semibold))
+                    .foregroundStyle(readerThemeTextColor.opacity(0.75))
                 }
-
-                Section("我的书签") {
+                .listRowBackground(Color.clear)
+                Section {
                     ForEach(sortedBookmarks) { bookmark in
                         Button {
                             jumpToBookmark(bookmark)
@@ -1927,6 +1982,10 @@ struct ReaderView: View {
                             }
                         }
                     }
+                } header: {
+                    Text("我的书签")
+                        .font(.footnote.weight(.semibold))
+                        .foregroundStyle(readerThemeTextColor.opacity(0.65))
                 }
             }
         }
@@ -2408,13 +2467,13 @@ struct ReaderView: View {
     }
 
     private func schedulePagedBlocksCacheRebuild() {
+        guard readerMode != .scroll else { return }
         pageLayoutTask?.cancel()
         let expectedKey = readerPageCacheKey
         pageLayoutTask = Task { @MainActor in
             try? await Task.sleep(nanoseconds: ReaderPerformancePolicy.pageLayoutDebounceNanoseconds)
             guard !Task.isCancelled, readerPageCacheKey == expectedKey else { return }
             rebuildPagedBlocksCache()
-            scrollParagraphTarget = positionMapping.clampParagraph(scrollParagraphTarget)
             pagedPageIndex = min(max(pagedPageIndex, 0), positionMapping.maximumPageIndex)
             scheduleReadingPositionPersistence(paragraphIndex: currentParagraphIndexForPersistence())
             pageLayoutTask = nil
@@ -2498,9 +2557,9 @@ private struct ReaderViewportSizePreferenceKey: PreferenceKey {
 
 private extension View {
     @ViewBuilder
-    func readerSheetPresentation() -> some View {
+    func readerSheetPresentation(color: Color = .clear) -> some View {
         if #available(iOS 16.4, *) {
-            self.presentationBackground(.clear)
+            self.presentationBackground(color)
         } else {
             self
         }

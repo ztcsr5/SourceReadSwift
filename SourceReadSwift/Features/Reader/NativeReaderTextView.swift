@@ -67,7 +67,7 @@ struct NativeReaderTextView: UIViewRepresentable {
         textView.canCancelContentTouches = true
         textView.textContainer.lineFragmentPadding = 0
         textView.contentInsetAdjustmentBehavior = .never
-        textView.layoutManager.allowsNonContiguousLayout = true
+        textView.layoutManager.allowsNonContiguousLayout = false
         textView.decelerationRate = .normal
         textView.setContentHuggingPriority(.defaultLow, for: .vertical)
         textView.setContentCompressionResistancePriority(.defaultLow, for: .vertical)
@@ -331,7 +331,8 @@ struct NativeReaderTextView: UIViewRepresentable {
                     }
                     // A new chapter needs its initial target; settings/theme
                     // changes or appends preserve the existing offset and request key.
-                    if contentChanged && !isAppend {
+                    let isDifferentChapter = previousConfiguration?.title != newConfiguration.title
+                    if isDifferentChapter && !isAppend {
                         lastScrollRequestKey = nil
                         hasAppliedInitialScrollTarget = (scrollTarget == nil || scrollTarget == 0)
                     }
@@ -353,8 +354,8 @@ struct NativeReaderTextView: UIViewRepresentable {
             guard let scrollTarget,
                   newConfiguration.paragraphs.indices.contains(scrollTarget),
                   scrollRequestKey != lastScrollRequestKey else { return }
-            guard scrollToParagraph(scrollTarget, in: textView, animated: newConfiguration.animatedScrollDuration > 0, duration: newConfiguration.animatedScrollDuration) else { return }
             lastScrollRequestKey = scrollRequestKey
+            _ = scrollToParagraph(scrollTarget, in: textView, animated: newConfiguration.animatedScrollDuration > 0, duration: newConfiguration.animatedScrollDuration)
         }
 
         func updateHighlight(_ paragraphIndex: Int, in textView: UITextView, color: UIColor) {
@@ -497,21 +498,32 @@ struct NativeReaderTextView: UIViewRepresentable {
             if animated {
                 let glyphTopInViewport = rect.minY - textView.contentOffset.y + textView.textContainerInset.top
                 let glyphBottomInViewport = rect.maxY - textView.contentOffset.y + textView.textContainerInset.top
-                let safeTop = textView.textContainerInset.top + 16
-                let safeBottom = textView.bounds.height - textView.textContainerInset.bottom - 48
+                let safeTop = max(0, textView.textContainerInset.top - 8)
+                let safeBottom = textView.bounds.height - textView.textContainerInset.bottom - 32
                 if glyphTopInViewport >= safeTop && glyphBottomInViewport <= safeBottom {
                     hasAppliedInitialScrollTarget = true
                     return true
                 }
             }
 
-            let targetY = ReaderScrollPositionPolicy.targetContentOffsetY(
-                textRectMinY: rect.minY,
-                textContainerInsetTop: textView.textContainerInset.top,
-                boundsHeight: textView.bounds.height,
-                contentSizeHeight: textView.contentSize.height,
-                adjustedContentInset: textView.adjustedContentInset
-            )
+            let targetY: CGFloat
+            if animated {
+                // Smooth reading follow: position the target paragraph comfortably at ~28% of the viewport height,
+                // so the user has visual continuity of surrounding text without violent jumping to the very top.
+                let targetViewportY = max(textView.textContainerInset.top + 20, textView.bounds.height * 0.28)
+                let idealY = rect.minY + textView.textContainerInset.top - targetViewportY
+                let minY = -textView.adjustedContentInset.top
+                let maxY = max(minY, textView.contentSize.height - textView.bounds.height + textView.adjustedContentInset.bottom)
+                targetY = min(max(idealY, minY), maxY)
+            } else {
+                targetY = ReaderScrollPositionPolicy.targetContentOffsetY(
+                    textRectMinY: rect.minY,
+                    textContainerInsetTop: textView.textContainerInset.top,
+                    boundsHeight: textView.bounds.height,
+                    contentSizeHeight: textView.contentSize.height,
+                    adjustedContentInset: textView.adjustedContentInset
+                )
+            }
             let offset = CGPoint(x: 0, y: targetY)
             let currentOffset = textView.contentOffset
             hasAppliedInitialScrollTarget = true
@@ -564,10 +576,11 @@ struct NativeReaderTextView: UIViewRepresentable {
         }
 
         private func updateVisibleParagraph(in textView: UITextView) {
+            let containerY = max(0, textView.contentOffset.y - textView.textContainerInset.top)
             let visibleRect = CGRect(
                 x: 0,
-                y: max(textView.contentOffset.y, 0),
-                width: textView.bounds.width,
+                y: containerY,
+                width: max(textView.bounds.width - textView.textContainerInset.left - textView.textContainerInset.right, 1),
                 height: textView.bounds.height
             )
             let glyphRange = textView.layoutManager.glyphRange(forBoundingRect: visibleRect, in: textView.textContainer)

@@ -778,12 +778,12 @@ struct JSONRuleExtractor {
         extraVariables: [String: Any]
     ) -> Any? {
         let source = extraVariables["source"] as? BookSource
-        let runtime = JSCoreRuntime(ajaxHandler: { urlText in
+        let runtime = executionContext.jsRuntime(ajaxHandler: { urlText in
             if let source {
                 return SynchronousSourceLoader().load(urlText: urlText, source: source)
             }
             return ""
-        }, executionContext: executionContext)
+        })
 
         var variables: [String: Any] = [
             "result": object

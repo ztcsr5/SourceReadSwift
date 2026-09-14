@@ -1229,7 +1229,7 @@ struct SourceManagerView: View {
     private func batchCheckSheet(_ state: SourceBatchCheckState) -> some View {
         NavigationStack {
             VStack(alignment: .leading, spacing: 14) {
-                Text("将并发测试 \(state.sources.count) 个书源（每批最多 4 个）。默认会在搜索通过后继续验证首条结果的详情、目录和正文，避免只测搜索造成假绿。")
+                Text("将并发测试 \(state.sources.count) 个书源（每批最多 \(SandboxEnvironment.recommendedBatchConcurrency) 个）。默认会在搜索通过后继续验证首条结果的详情、目录和正文，避免只测搜索造成假绿。")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
 
@@ -1576,7 +1576,12 @@ struct SourceManagerView: View {
             }
         }
 
-        for batch in state.sources.chunked(into: 4) {
+        engine.allowWebViewFallback = false
+        defer {
+            engine.allowWebViewFallback = true
+        }
+
+        for batch in state.sources.chunked(into: SandboxEnvironment.recommendedBatchConcurrency) {
             guard !Task.isCancelled else { break }
             guard batchCheck?.id == sessionID else { break }
             await withTaskGroup(of: BatchCheckOutcome.self) { group in

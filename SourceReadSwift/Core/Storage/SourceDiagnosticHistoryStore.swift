@@ -166,15 +166,13 @@ struct SourceDiagnosticHistoryPersistence {
 
     func save(_ records: [String: [SourceDiagnosticHistoryRecord]]) throws {
         let url = try storageURL()
-        try fileManager.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.sortedKeys]
-        try encoder.encode(records).write(to: url, options: [.atomic])
+        let data = try encoder.encode(records)
+        try AppStorageDirectory.safeWrite(data, to: url, fileManager: fileManager)
     }
 
     private func storageURL() throws -> URL {
-        if let rootURL { return rootURL.appendingPathComponent(fileName) }
-        let base = try fileManager.url(for: .applicationSupportDirectory, in: .userDomainMask, appropriateFor: nil, create: true)
-        return base.appendingPathComponent("SourceReadSwift", isDirectory: true).appendingPathComponent(fileName)
+        AppStorageDirectory.appStorageURL(fileName: fileName, fileManager: fileManager, rootURL: rootURL)
     }
 }

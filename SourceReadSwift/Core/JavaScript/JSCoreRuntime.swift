@@ -13,6 +13,7 @@ final class JSCoreRuntime {
     private let jsoupBridge: LegadoJsoupBridge
     private let jxNodeFactory: LegadoJXNodeFactoryBridge
     private var baseBridgeError: String? = nil
+    private let evaluateLock = NSRecursiveLock()
 
     /// Exposes the per-runtime Legado sandbox to deterministic integration
     /// tests and import tooling without leaking the host bridge object.
@@ -46,6 +47,8 @@ final class JSCoreRuntime {
     }
 
     func evaluate(_ script: String, variables: [String: Any] = [:]) -> Result<String, SourceEngineError> {
+        evaluateLock.lock()
+        defer { evaluateLock.unlock() }
         if let baseBridgeError {
             return .failure(.javascript("Legado bridge prelude failed: \(baseBridgeError)"))
         }

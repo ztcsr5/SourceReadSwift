@@ -1,11 +1,19 @@
 import Foundation
 
 protocol SourceEngine: Sendable {
+    var allowWebViewFallback: Bool { get set }
     func searchBooks(source: BookSource, keyword: String, page: Int) async -> Result<[SearchBook], SourceEngineError>
     func getBookDetail(source: BookSource, book: SearchBook) async -> Result<BookDetail, SourceEngineError>
     func getChapterList(source: BookSource, book: BookDetail) async -> Result<[BookChapter], SourceEngineError>
     func getContent(source: BookSource, chapter: BookChapter) async -> Result<ChapterContent, SourceEngineError>
     func verifyLogin(source: BookSource) async -> Result<SourceLoginVerification, SourceEngineError>
+}
+
+extension SourceEngine {
+    var allowWebViewFallback: Bool {
+        get { true }
+        set { }
+    }
 }
 
 struct SourceLoginVerification: Equatable, Sendable {
@@ -65,6 +73,21 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
     private var evidence: [String: [SourceDiagnosticStage: SourceDiagnosticEvidence]] = [:]
     private let requestBuilder = SourceRequestBuilder()
     private let searchURLResolver = SearchURLResolver()
+    private let fallbackLock = NSLock()
+    private var _allowWebViewFallback: Bool = true
+
+    var allowWebViewFallback: Bool {
+        get {
+            fallbackLock.lock()
+            defer { fallbackLock.unlock() }
+            return _allowWebViewFallback
+        }
+        set {
+            fallbackLock.lock()
+            defer { fallbackLock.unlock() }
+            _allowWebViewFallback = newValue
+        }
+    }
 
     init(
         network: SourceNetworkClient? = nil,
@@ -537,6 +560,7 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
     }
 
     private func shouldUseWebView(source: BookSource) -> Bool {
+        guard !SandboxEnvironment.isLiveContainer && allowWebViewFallback else { return false }
         if source.raw["webView"]?.lowercased() == "true" { return true }
         if source.raw["bookSourceType"]?.lowercased().contains("web") == true { return true }
         if let webJs = source.ruleContent?.fields["webJs"], webJs.contains("webView") { return true }
@@ -545,6 +569,7 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
     }
 
     private func shouldUseWebViewFallback(source: BookSource, response: SourceResponse) -> Bool {
+        guard !SandboxEnvironment.isLiveContainer && allowWebViewFallback else { return false }
         if shouldUseWebView(source: source) { return true }
         let text = response.body.lowercased()
         if (400...599).contains(response.statusCode) && (text.isEmpty || response.statusCode == 403 || response.statusCode == 503) {
