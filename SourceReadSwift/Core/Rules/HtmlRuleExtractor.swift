@@ -608,7 +608,8 @@ struct HtmlRuleExtractor {
 
         if script.contains("##") {
             if let lineBreakRange = script.range(of: "\n##", options: .backwards) {
-                let regexText = String(script[lineBreakRange.upperBound - 2...]).trimmingCharacters(in: .whitespacesAndNewlines)
+                let hashStart = script.index(after: lineBreakRange.lowerBound)
+                let regexText = String(script[hashStart...]).trimmingCharacters(in: .whitespacesAndNewlines)
                 script = String(script[..<lineBreakRange.lowerBound]).trimmingCharacters(in: .whitespacesAndNewlines)
                 trailingRegexParts = Array(regexText.components(separatedBy: "##").dropFirst())
             } else if let hashRange = script.range(of: "##", options: .backwards) {

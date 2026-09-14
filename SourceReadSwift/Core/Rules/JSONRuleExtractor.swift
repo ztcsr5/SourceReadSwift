@@ -797,7 +797,8 @@ struct JSONRuleExtractor {
 
         if script.contains("##") {
             if let lineBreak = script.range(of: "\n##", options: .backwards) {
-                let regexText = String(script[lineBreak.upperBound - 2...]).trimmingCharacters(in: .whitespacesAndNewlines)
+                let hashStart = script.index(after: lineBreak.lowerBound)
+                let regexText = String(script[hashStart...]).trimmingCharacters(in: .whitespacesAndNewlines)
                 script = String(script[..<lineBreak.lowerBound]).trimmingCharacters(in: .whitespacesAndNewlines)
                 let parts = regexText.components(separatedBy: "##").dropFirst()
                 var index = parts.startIndex

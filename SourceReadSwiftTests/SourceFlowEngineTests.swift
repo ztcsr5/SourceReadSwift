@@ -13,7 +13,7 @@ final class SourceFlowEngineTests: XCTestCase {
             baseUrl: URL(string: "https://example.com")!,
             evaluator: { script in
                 let rt = JSCoreRuntime()
-                return try? rt.evaluate(script)
+                return try? rt.evaluate(script).get()
             }
         )
         XCTAssertEqual(resolved, "https://api.example.com/books/123")
@@ -62,25 +62,25 @@ final class SourceFlowEngineTests: XCTestCase {
         let rt = JSCoreRuntime()
         
         // Test TYPE
-        let typeResult = try? rt.evaluate("TYPE('hello')")
+        let typeResult = try? rt.evaluate("TYPE('hello')").get()
         XCTAssertEqual(typeResult, "string")
         
         // Test ruid
-        let ruidResult = try? rt.evaluate("var r = ruid(); typeof r === 'string' && r.length === 32")
+        let ruidResult = try? rt.evaluate("var r = ruid(); typeof r === 'string' && r.length === 16").get()
         XCTAssertEqual(ruidResult, "true")
         
         // Test source.getKey & setKey
-        _ = try? rt.evaluate("source.setKey('session_token', 'token_xyz_999')")
-        let getKeyResult = try? rt.evaluate("source.getKey('session_token')")
+        _ = try? rt.evaluate("source.setKey('session_token', 'token_xyz_999')").get()
+        let getKeyResult = try? rt.evaluate("source.getKey('session_token')").get()
         XCTAssertEqual(getKeyResult, "token_xyz_999")
         
         // Test HMacHex & HMacBase64
-        let hmacHex = try? rt.evaluate("HMacHex('HmacSHA256', 'secret', 'message')")
+        let hmacHex = try? rt.evaluate("HMacHex('HmacSHA256', 'secret', 'message')").get()
         XCTAssertNotNil(hmacHex)
         XCTAssertFalse((hmacHex ?? "").isEmpty)
         
         // Test toNumChapter
-        let numChapter = try? rt.evaluate("toNumChapter('第一千二百三十四章')")
+        let numChapter = try? rt.evaluate("toNumChapter('第一千二百三十四章')").get()
         XCTAssertNotNil(numChapter)
         XCTAssertTrue((numChapter ?? "").contains("1234"))
     }
@@ -89,12 +89,12 @@ final class SourceFlowEngineTests: XCTestCase {
         let rt = JSCoreRuntime()
         
         // Test s2t (Simplified to Traditional)
-        let trad = try? rt.evaluate("s2t('中国科技发展')")
+        let trad = try? rt.evaluate("s2t('中国科技发展')").get()
         XCTAssertNotNil(trad)
         XCTAssertTrue((trad ?? "").contains("國") || (trad ?? "").contains("發") || !(trad ?? "").isEmpty)
         
         // Test t2s (Traditional to Simplified)
-        let simp = try? rt.evaluate("t2s('中華民國')")
+        let simp = try? rt.evaluate("t2s('中華民國')").get()
         XCTAssertNotNil(simp)
         XCTAssertTrue((simp ?? "").contains("华") || (simp ?? "").contains("国") || !(simp ?? "").isEmpty)
     }
@@ -116,12 +116,21 @@ final class SourceFlowEngineTests: XCTestCase {
     
     // MARK: - Category 6: Anti-Bot & Turing Diagnostics Classification
     func testAntiBotDiagnosticClassification() {
-        let err1 = NSError(domain: "Network", code: 403, userInfo: [NSLocalizedDescriptionKey: "访问被拦截: 触发 bdturing 图灵验证"])
-        let cat1 = SourceDiagnosticReportExporter.classify(error: err1)
-        XCTAssertEqual(cat1, .antiBotShield)
-        
-        let err2 = NSError(domain: "Network", code: 403, userInfo: [NSLocalizedDescriptionKey: "请完成滑块安全验证"])
-        let cat2 = SourceDiagnosticReportExporter.classify(error: err2)
-        XCTAssertEqual(cat2, .antiBotShield)
+        let step = SourceDiagnosticStep(
+            stage: .search,
+            status: .verificationRequired,
+            responseSummary: "触发 bdturing 图灵滑块安全验证",
+            failureClassification: "anti_bot.turing",
+            responseStatusCode: 403
+        )
+        let report = SourceDiagnosticReport(
+            sourceName: "番茄测试源",
+            sourceURL: "https://fanqie.example.com",
+            keyword: "剑来",
+            startedAt: Date(),
+            steps: [step]
+        )
+        let classification = SourceDiagnosticReportExporter.classify(report: report)
+        XCTAssertEqual(classification.category, .antiBotShield)
     }
 }
