@@ -52,7 +52,7 @@ final class SourceHealthStore: ObservableObject {
             resultCount: resultCount,
             testedAt: Date()
         )
-        persist()
+        persistSync()
     }
 
     func recordBatch(_ newRecords: [SourceHealthRecord], persistImmediately: Bool = true) {
@@ -61,7 +61,7 @@ final class SourceHealthStore: ObservableObject {
             records[record.sourceURL] = record
         }
         if persistImmediately {
-            persist()
+            persistAsync()
         }
     }
 
@@ -70,10 +70,19 @@ final class SourceHealthStore: ObservableObject {
     }
 
     func flushToDisk() {
-        persist()
+        persistAsync()
     }
 
-    private func persist() {
+    private func persistSync() {
+        do {
+            try persistence.save(records)
+            lastError = nil
+        } catch {
+            lastError = error.localizedDescription
+        }
+    }
+
+    private func persistAsync() {
         let snapshot = records
         let persistence = self.persistence
         Task.detached(priority: .utility) {

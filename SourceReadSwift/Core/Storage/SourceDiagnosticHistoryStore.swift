@@ -98,7 +98,7 @@ final class SourceDiagnosticHistoryStore: ObservableObject {
         if records[sourceURL]!.count > limit {
             records[sourceURL] = Array(records[sourceURL]!.prefix(limit))
         }
-        persist()
+        persistSync()
     }
 
     func recordBatch(_ newEntries: [SourceDiagnosticHistoryRecord], persistImmediately: Bool = true) {
@@ -110,7 +110,7 @@ final class SourceDiagnosticHistoryStore: ObservableObject {
             }
         }
         if persistImmediately {
-            persist()
+            persistAsync()
         }
     }
 
@@ -120,12 +120,12 @@ final class SourceDiagnosticHistoryStore: ObservableObject {
 
     func clear(for source: BookSource) {
         records.removeValue(forKey: source.bookSourceUrl)
-        persist()
+        persistSync()
     }
 
     func clearAll() {
         records.removeAll()
-        persist()
+        persistSync()
     }
 
     func exportText(for source: BookSource) -> String {
@@ -141,10 +141,19 @@ final class SourceDiagnosticHistoryStore: ObservableObject {
     }
 
     func flushToDisk() {
-        persist()
+        persistAsync()
     }
 
-    private func persist() {
+    private func persistSync() {
+        do {
+            try persistence.save(records)
+            lastError = nil
+        } catch {
+            lastError = error.localizedDescription
+        }
+    }
+
+    private func persistAsync() {
         let snapshot = records
         let persistence = self.persistence
         Task.detached(priority: .utility) {
