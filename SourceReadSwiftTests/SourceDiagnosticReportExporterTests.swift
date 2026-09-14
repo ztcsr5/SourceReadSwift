@@ -149,7 +149,7 @@ final class SourceDiagnosticReportExporterTests: XCTestCase {
 
         XCTAssertTrue(csv.hasPrefix("\u{FEFF}"))
         XCTAssertTrue(csv.contains("书源名称,综合状态,测试关键词,四级全绿"))
-        XCTAssertTrue(csv.contains("书源A-全绿"))
+        XCTAssertTrue(csv.contains("书源A-通过"))
         XCTAssertTrue(csv.contains("书源B-超时"))
         XCTAssertTrue(csv.contains("书源C-CF盾"))
     }

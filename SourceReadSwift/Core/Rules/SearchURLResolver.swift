@@ -143,7 +143,8 @@ struct SearchURLResolver {
             let replacement: String
             switch evalResult {
             case .success(let val):
-                if val == "undefined" || val == "null" {
+                let trimmedVal = val.trimmingCharacters(in: .whitespacesAndNewlines)
+                if trimmedVal == "undefined" || trimmedVal == "null" || trimmedVal == "true" || trimmedVal == "false" || expr.contains(";") || expr.contains("=") {
                     replacement = ""
                 } else {
                     replacement = val
