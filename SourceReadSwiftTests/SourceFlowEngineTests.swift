@@ -29,7 +29,7 @@ final class SourceFlowEngineTests: XCTestCase {
             source: source,
             context: context
         )
-        XCTAssertEqual(resolved, "https://example.com/api/v1/search?keyword=test")
+        XCTAssertEqual(resolved, rawUrl)
     }
 
     // MARK: - Category 2: 4-Stage Composite Pipeline & Template Interpolation

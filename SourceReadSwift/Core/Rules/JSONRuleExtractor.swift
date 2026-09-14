@@ -808,7 +808,7 @@ struct JSONRuleExtractor {
                     if !pattern.isEmpty { trailingRegex.append((pattern, replacement)) }
                     index = parts.index(index, offsetBy: 2, limitedBy: parts.endIndex) ?? parts.endIndex
                 }
-            } else if let hashRange = script.range(of: "##", options: .backwards) {
+            } else if let hashRange = script.range(of: "##") {
                 let regexText = String(script[hashRange.lowerBound...]).trimmingCharacters(in: .whitespacesAndNewlines)
                 let parts = regexText.components(separatedBy: "##").dropFirst()
                 if parts.count >= 2 {

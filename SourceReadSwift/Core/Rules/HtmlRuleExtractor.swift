@@ -46,9 +46,15 @@ struct HtmlRuleExtractor {
 
         // Stage 1: Template Interpolation {{...}}
         if trimmed.contains("{{") && trimmed.contains("}}") {
-            trimmed = try interpolateTemplate(trimmed, root: root, baseUrl: baseUrl, variables: variables)
+            let interpolated = try interpolateTemplate(trimmed, root: root, baseUrl: baseUrl, variables: variables)
                 .trimmingCharacters(in: .whitespacesAndNewlines)
-            if trimmed.isEmpty { return "" }
+            if LegadoRuleResolver().isJavaScriptRule(interpolated) {
+                return try evaluateJSWithTrailingRegex(rule: interpolated, rootHtml: try root.outerHtml(), baseUrl: baseUrl, extraVariables: variables)
+            }
+            if !interpolated.isEmpty {
+                return interpolated
+            }
+            return ""
         }
 
         if LegadoRuleResolver().isJavaScriptRule(trimmed) {
@@ -612,7 +618,7 @@ struct HtmlRuleExtractor {
                 let regexText = String(script[hashStart...]).trimmingCharacters(in: .whitespacesAndNewlines)
                 script = String(script[..<lineBreakRange.lowerBound]).trimmingCharacters(in: .whitespacesAndNewlines)
                 trailingRegexParts = Array(regexText.components(separatedBy: "##").dropFirst())
-            } else if let hashRange = script.range(of: "##", options: .backwards) {
+            } else if let hashRange = script.range(of: "##") {
                 let regexText = String(script[hashRange.lowerBound...]).trimmingCharacters(in: .whitespacesAndNewlines)
                 let parts = regexText.components(separatedBy: "##").dropFirst()
                 if parts.count >= 2 {

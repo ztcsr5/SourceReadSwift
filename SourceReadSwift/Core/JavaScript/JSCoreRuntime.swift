@@ -153,29 +153,36 @@ final class JSCoreRuntime {
                 context.evaluateScript(injectScript)
             } else if key == "source" {
                 let injectScript = """
-                if (typeof source !== 'undefined' && source !== null) {
-                    source.getKey = function(key) {
-                        if (key != null && String(key).length > 0) return cookie.getKey(key) || source.getVariable(key) || '';
-                        return source.key || source.bookSourceUrl || source.sourceUrl || '';
-                    };
-                    source.setKey = function(key, val) { return cookie.setKey(key, val); };
-                    source.sourceUrl = source.sourceUrl || source.bookSourceUrl || source.key || '';
-                    source.sourceName = source.sourceName || source.bookSourceName || '';
-                    source.bookSourceComment = source.bookSourceComment || source.comment || '';
-                    source.bookSourceUrlName = source.bookSourceUrlName || source.urlName || source.sourceName || '';
-                    source.loginUrl = source.loginUrl || '';
-                    source.loginCheckJs = source.loginCheckJs || '';
-                    source.getName = function() { return source.bookSourceName || source.sourceName || ''; };
-                    source.getUrl = function() { return source.bookSourceUrl || source.sourceUrl || source.key || ''; };
-                    source.getSourceUrl = source.getUrl;
+                    if (!source.__vars) source.__vars = {};
                     source.getVariable = function(key) {
-                        if (arguments.length > 0 && key != null && String(key) !== '') return java.getVar('source.variable.' + String(key));
-                        return source.variable || java.getVar('source.variable') || '';
+                        if (arguments.length > 0 && key != null && String(key) !== '') {
+                            return (source.__vars && source.__vars[String(key)] != null) ? source.__vars[String(key)] : (java.getVar ? (java.getVar('source.variable.' + String(key)) || '') : '');
+                        }
+                        return source.variable || (java.getVar ? (java.getVar('source.variable') || '') : '') || '';
                     };
                     source.setVariable = function(key, value) {
-                        if (arguments.length > 1) return java.put('source.variable.' + String(key), value == null ? '' : String(value));
+                        if (!source.__vars) source.__vars = {};
+                        if (arguments.length > 1) {
+                            source.__vars[String(key)] = value == null ? '' : String(value);
+                            if (typeof java !== 'undefined' && java.put) {
+                                try { java.put('source.variable.' + String(key), source.__vars[String(key)]); } catch(e) {}
+                            }
+                            return source.__vars[String(key)];
+                        }
                         source.variable = key == null ? '' : String(key);
-                        return java.put('source.variable', source.variable);
+                        if (typeof java !== 'undefined' && java.put) {
+                            try { java.put('source.variable', source.variable); } catch(e) {}
+                        }
+                        return source.variable;
+                    };
+                    source.getKey = function(key) {
+                        if (arguments.length > 0 && key != null && String(key).length > 0) return source.getVariable(key);
+                        return source.key || source.bookSourceUrl || source.sourceUrl || '';
+                    };
+                    source.setKey = function(key, val) {
+                        if (arguments.length > 1) return source.setVariable(key, val);
+                        source.key = key == null ? '' : String(key);
+                        return source.key;
                     };
                     source.getVariableMap = function() {
                         var parsed = {};
@@ -2274,11 +2281,37 @@ final class JSCoreRuntime {
         };
         function __installSourceAndBook() {
           if (typeof source === 'undefined' || source === null) source = {};
+          if (!source.__vars) source.__vars = {};
+          source.getVariable = function(key) {
+            if (arguments.length > 0 && key != null && String(key) !== '') {
+              return (source.__vars && source.__vars[String(key)] != null) ? source.__vars[String(key)] : (java.getVar ? (java.getVar('source.variable.' + String(key)) || '') : '');
+            }
+            return source.variable || (java.getVar ? (java.getVar('source.variable') || '') : '') || '';
+          };
+          source.setVariable = function(key, value) {
+            if (!source.__vars) source.__vars = {};
+            if (arguments.length > 1) {
+              source.__vars[String(key)] = value == null ? '' : String(value);
+              if (typeof java !== 'undefined' && java.put) {
+                try { java.put('source.variable.' + String(key), source.__vars[String(key)]); } catch(e) {}
+              }
+              return source.__vars[String(key)];
+            }
+            source.variable = key == null ? '' : String(key);
+            if (typeof java !== 'undefined' && java.put) {
+              try { java.put('source.variable', source.variable); } catch(e) {}
+            }
+            return source.variable;
+          };
           source.getKey = function(key) {
-            if (key != null && String(key).length > 0) return cookie.getKey(key) || source.getVariable(key) || '';
+            if (arguments.length > 0 && key != null && String(key).length > 0) return source.getVariable(key);
             return source.key || source.bookSourceUrl || source.sourceUrl || '';
           };
-          source.setKey = function(key, val) { return cookie.setKey(key, val); };
+          source.setKey = function(key, val) {
+            if (arguments.length > 1) return source.setVariable(key, val);
+            source.key = key == null ? '' : String(key);
+            return source.key;
+          };
           source.sourceUrl = source.sourceUrl || source.bookSourceUrl || source.key || '';
           source.sourceName = source.sourceName || source.bookSourceName || '';
           source.bookSourceComment = source.bookSourceComment || source.comment || '';
@@ -2288,15 +2321,6 @@ final class JSCoreRuntime {
           source.getName = function() { return source.bookSourceName || source.sourceName || ''; };
           source.getUrl = function() { return source.bookSourceUrl || source.sourceUrl || source.key || ''; };
           source.getSourceUrl = source.getUrl;
-          source.getVariable = function(key) {
-            if (arguments.length > 0 && key != null && String(key) !== '') return java.getVar('source.variable.' + String(key));
-            return source.variable || java.getVar('source.variable') || '';
-          };
-          source.setVariable = function(key, value) {
-            if (arguments.length > 1) return java.put('source.variable.' + String(key), value == null ? '' : String(value));
-            source.variable = key == null ? '' : String(key);
-            return java.put('source.variable', source.variable);
-          };
           source.getVariableMap = function() {
             var parsed = {};
             try { parsed = JSON.parse(source.getVariable() || '{}'); } catch (_) {}
