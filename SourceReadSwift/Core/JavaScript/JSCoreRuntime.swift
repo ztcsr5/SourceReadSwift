@@ -153,6 +153,7 @@ final class JSCoreRuntime {
                 context.evaluateScript(injectScript)
             } else if key == "source" {
                 let injectScript = """
+                if (typeof source !== 'undefined' && source !== null) {
                     if (!source.__vars) source.__vars = {};
                     source.getVariable = function(key) {
                         if (arguments.length > 0 && key != null && String(key) !== '') {
