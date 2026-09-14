@@ -8,23 +8,26 @@ final class SourceFlowEngineTests: XCTestCase {
     // MARK: - Category 1: Dynamic JavaScript URL Resolution
     func testDynamicURLResolverWithSimpleJS() {
         let rawUrl = "@js:'https://api.example.com/books/' + (100 + 23)"
+        let source = BookSource(bookSourceName: "DynamicTest", bookSourceUrl: "https://example.com")
+        let context = RuleExecutionContext()
         let resolved = DynamicURLResolver.resolve(
-            urlString: rawUrl,
-            baseUrl: URL(string: "https://example.com")!,
-            evaluator: { script in
-                let rt = JSCoreRuntime()
-                return try? rt.evaluate(script).get()
-            }
+            rawUrl,
+            baseUrl: "https://example.com",
+            source: source,
+            context: context
         )
         XCTAssertEqual(resolved, "https://api.example.com/books/123")
     }
     
     func testDynamicURLResolverPreservesNormalURL() {
         let rawUrl = "/api/v1/search?keyword=test"
+        let source = BookSource(bookSourceName: "NormalTest", bookSourceUrl: "https://example.com")
+        let context = RuleExecutionContext()
         let resolved = DynamicURLResolver.resolve(
-            urlString: rawUrl,
-            baseUrl: URL(string: "https://example.com")!,
-            evaluator: { _ in nil }
+            rawUrl,
+            baseUrl: "https://example.com",
+            source: source,
+            context: context
         )
         XCTAssertEqual(resolved, "https://example.com/api/v1/search?keyword=test")
     }
@@ -101,17 +104,14 @@ final class SourceFlowEngineTests: XCTestCase {
 
     // MARK: - Category 5: GBK Character Set Detection
     func testGBKCharsetDetection() {
-        var source = BookSource.empty()
+        let defaultSource = BookSource(bookSourceName: "默认源", bookSourceUrl: "https://example.com")
+        XCTAssertFalse(SearchURLResolver.isGBKEncoding(searchUrl: "https://example.com/search", source: defaultSource))
         
-        // Default utf-8
-        XCTAssertFalse(SearchURLResolver.isGBKEncoding(source: source))
+        let gbkSource = BookSource(bookSourceName: "GBK源", bookSourceUrl: "https://example.com", raw: ["charset": "gbk"])
+        XCTAssertTrue(SearchURLResolver.isGBKEncoding(searchUrl: "https://example.com/search", source: gbkSource))
         
-        // With gbk charset
-        source.charset = "gbk"
-        XCTAssertTrue(SearchURLResolver.isGBKEncoding(source: source))
-        
-        source.charset = "gb2312"
-        XCTAssertTrue(SearchURLResolver.isGBKEncoding(source: source))
+        let gb2312Source = BookSource(bookSourceName: "GB2312源", bookSourceUrl: "https://example.com", raw: ["charset": "gb2312"])
+        XCTAssertTrue(SearchURLResolver.isGBKEncoding(searchUrl: "https://example.com/search", source: gb2312Source))
     }
     
     // MARK: - Category 6: Anti-Bot & Turing Diagnostics Classification
