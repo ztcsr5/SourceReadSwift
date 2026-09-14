@@ -1295,9 +1295,9 @@ struct SourceManagerView: View {
     }
 
     private var batchCheckSheet: some View {
-        NavigationStack {
+        let coordinator = appState.batchCheckCoordinator
+        return NavigationStack {
             VStack(alignment: .leading, spacing: 14) {
-                let coordinator = appState.batchCheckCoordinator
                 let targetCount = coordinator.isRunning ? coordinator.totalCount : coordinator.activeSources.count
 
                 Text("将并发测试 \(targetCount) 个书源（每批最多 \(SandboxEnvironment.recommendedBatchConcurrency) 个）。默认会在搜索通过后继续验证首条结果的详情、目录和正文，避免只测搜索造成假绿。")

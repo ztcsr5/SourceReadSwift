@@ -196,7 +196,7 @@ final class SourceBatchCheckCoordinator: ObservableObject {
                     case .passed: self.passedCount += 1
                     case .warning: self.warningCount += 1
                     case .failed: self.failedCount += 1
-                    case .loginRequired: self.loginRequiredCount += 1
+                    case .requiresLogin: self.loginRequiredCount += 1
                     case .verificationRequired: self.verificationRequiredCount += 1
                     case .blocked: self.blockedCount += 1
                     }
@@ -319,7 +319,7 @@ final class SourceBatchCheckCoordinator: ObservableObject {
         let searchStep = report.steps.first(where: { $0.stage == .search })
         let elapsed = max(0, Int(Date().timeIntervalSince(startedAt) * 1_000))
         let baseStatus = SourceBatchCheckStatus(report.overallStatus)
-        let message = [loginMessage, report.firstFailure?.step.responseSummary, searchStep?.responseSummary]
+        let message = [loginMessage, report.firstFailure?.responseSummary, searchStep?.responseSummary]
             .compactMap { $0?.nilIfEmpty }
             .first ?? batchResultMessage(report: report, fallback: "完成测试")
 
@@ -342,9 +342,9 @@ final class SourceBatchCheckCoordinator: ObservableObject {
 
     private static func batchResultMessage(report: SourceDiagnosticReport, fallback: String) -> String {
         if let failure = report.firstFailure {
-            let advice = SourceDiagnosticRepairAdvisor.advice(for: failure.step)
-            let classification = failure.step.failureClassification?.nilIfEmpty.map { " (\($0))" } ?? ""
-            return "[\(failure.step.stage.title)失败] \(advice.title)\(classification)"
+            let advice = SourceDiagnosticRepairAdvisor.advice(for: failure)
+            let classification = failure.failureClassification?.nilIfEmpty.map { " (\($0))" } ?? ""
+            return "[\(failure.stage.title)失败] \(advice.title)\(classification)"
         }
         if let search = report.steps.first(where: { $0.stage == .search }), search.matchCount > 0 {
             return "全链路测试通过，搜索匹配 \(search.matchCount) 条"
@@ -418,8 +418,8 @@ final class SourceBatchCheckCoordinator: ObservableObject {
                     sourceName: item.sourceName,
                     sourceURL: item.sourceURL,
                     status: SourceBatchCheckStatus(item.overallStatus),
-                    message: item.firstFailure?.step.responseSummary ?? searchStep?.responseSummary ?? "历史诊断记录",
-                    elapsedMilliseconds: item.elapsedMilliseconds,
+                    message: item.firstFailure?.responseSummary ?? searchStep?.responseSummary ?? "历史诊断记录",
+                    elapsedMilliseconds: item.steps.compactMap(\.elapsedMilliseconds).reduce(0, +),
                     resultCount: searchStep?.matchCount ?? 0,
                     diagnosticReport: item
                 ))
