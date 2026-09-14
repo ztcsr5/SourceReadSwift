@@ -1576,9 +1576,9 @@ struct SourceManagerView: View {
             }
         }
 
-        engine.allowWebViewFallback = false
+        (engine as? SourceWebViewFallbackControllable)?.allowWebViewFallback = false
         defer {
-            engine.allowWebViewFallback = true
+            (engine as? SourceWebViewFallbackControllable)?.allowWebViewFallback = true
         }
 
         for batch in state.sources.chunked(into: SandboxEnvironment.recommendedBatchConcurrency) {

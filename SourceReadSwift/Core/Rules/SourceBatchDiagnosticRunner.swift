@@ -23,8 +23,7 @@ struct SourceBatchDiagnosticRunner: Sendable {
         page: Int = 1,
         timeout: TimeInterval = 10
     ) async -> SourceDiagnosticReport {
-        var mutableEngine = engine
-        mutableEngine.allowWebViewFallback = false
+        (engine as? SourceWebViewFallbackControllable)?.allowWebViewFallback = false
         let startedAt = Date()
         let cleanKeyword = keyword.trimmingCharacters(in: .whitespacesAndNewlines)
         (engine as? SourceDiagnosticEvidenceProvider)?.resetDiagnosticEvidence(sourceURL: source.bookSourceUrl)

@@ -1,7 +1,6 @@
 import Foundation
 
 protocol SourceEngine: Sendable {
-    var allowWebViewFallback: Bool { get set }
     func searchBooks(source: BookSource, keyword: String, page: Int) async -> Result<[SearchBook], SourceEngineError>
     func getBookDetail(source: BookSource, book: SearchBook) async -> Result<BookDetail, SourceEngineError>
     func getChapterList(source: BookSource, book: BookDetail) async -> Result<[BookChapter], SourceEngineError>
@@ -9,11 +8,8 @@ protocol SourceEngine: Sendable {
     func verifyLogin(source: BookSource) async -> Result<SourceLoginVerification, SourceEngineError>
 }
 
-extension SourceEngine {
-    var allowWebViewFallback: Bool {
-        get { true }
-        set { }
-    }
+protocol SourceWebViewFallbackControllable: AnyObject {
+    var allowWebViewFallback: Bool { get set }
 }
 
 struct SourceLoginVerification: Equatable, Sendable {
@@ -62,7 +58,7 @@ extension SourceEngine {
     }
 }
 
-final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, @unchecked Sendable {
+final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, SourceWebViewFallbackControllable, @unchecked Sendable {
     private let network: SourceNetworkClient
     private let diagnostics: DiagnosticSink
     private let cookieStore: SourceCookieStore
