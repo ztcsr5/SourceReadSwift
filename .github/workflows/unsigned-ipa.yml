@@ -60,7 +60,8 @@ jobs:
           mkdir -p unsigned-ipa/Payload
           cp -R "$APP_PATH" unsigned-ipa/Payload/
           ditto -c -k --keepParent unsigned-ipa/Payload SourceReadSwift-unsigned.ipa
-          ls -lh SourceReadSwift-unsigned.ipa
+          cp SourceReadSwift-unsigned.ipa SourceReadSwift-1.0.0-unsigned.ipa
+          ls -lh SourceReadSwift*.ipa
 
       - name: Summarize IPA artifact
         run: |
@@ -70,8 +71,9 @@ jobs:
           echo "IPA size: ${SIZE_BYTES} bytes"
           echo "IPA SHA-256: ${SHA256}"
           {
-            echo "## Unsigned IPA"
-            echo "- file: `SourceReadSwift-unsigned.ipa`"
+            echo "## Unsigned IPA (v1.0.0)"
+            echo "- file: `SourceReadSwift-1.0.0-unsigned.ipa`"
+            echo "- alias: `SourceReadSwift-unsigned.ipa`"
             echo "- size: ${SIZE_BYTES} bytes"
             echo "- SHA-256: `${SHA256}`"
           } >> "$GITHUB_STEP_SUMMARY"
@@ -80,5 +82,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: SourceReadSwift-unsigned-ipa
-          path: SourceReadSwift-unsigned.ipa
+          path: |
+            SourceReadSwift-unsigned.ipa
+            SourceReadSwift-1.0.0-unsigned.ipa
           if-no-files-found: error

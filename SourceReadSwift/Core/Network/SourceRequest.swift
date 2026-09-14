@@ -61,7 +61,7 @@ protocol SourceNetworkClient: Sendable {
 /// Allows book source HTTP requests to connect to community novel hosts with
 /// expired, self-signed, or Let's Encrypt certificates, matching Android Legado's
 /// default OkHttpClient `trustAllCerts` behavior.
-final class InsecureTrustSessionDelegate: NSObject, URLSessionDelegate, Sendable {
+final class InsecureTrustSessionDelegate: NSObject, URLSessionDelegate, URLSessionTaskDelegate, Sendable {
     func urlSession(
         _ session: URLSession,
         didReceive challenge: URLAuthenticationChallenge,
@@ -73,6 +73,45 @@ final class InsecureTrustSessionDelegate: NSObject, URLSessionDelegate, Sendable
             return
         }
         completionHandler(.performDefaultHandling, nil)
+    }
+
+    func urlSession(
+        _ session: URLSession,
+        task: URLSessionTask,
+        didReceive challenge: URLAuthenticationChallenge,
+        completionHandler: @escaping (URLSession.AuthChallengeDisposition, URLCredential?) -> Void
+    ) {
+        if challenge.protectionSpace.authenticationMethod == NSURLAuthenticationMethodServerTrust,
+           let serverTrust = challenge.protectionSpace.serverTrust {
+            completionHandler(.useCredential, URLCredential(trust: serverTrust))
+            return
+        }
+        completionHandler(.performDefaultHandling, nil)
+    }
+
+    func urlSession(
+        _ session: URLSession,
+        task: URLSessionTask,
+        willPerformHTTPRedirection response: HTTPURLResponse,
+        newRequest request: URLRequest,
+        completionHandler: @escaping (URLRequest?) -> Void
+    ) {
+        // Novel hosts frequently return non-ASCII Location headers (e.g. unencoded Chinese queries)
+        // or redirect to mirror domains. Foundation throws NSURLErrorBadURL (-1000) if the Location
+        // header contains non-ASCII bytes or special characters. We sanitize it here.
+        var sanitized = request
+        if let location = response.allHeaderFields["Location"] as? String ?? response.allHeaderFields["location"] as? String {
+            let trimmedLocation = location.trimmingCharacters(in: .whitespacesAndNewlines)
+            if let originalURL = response.url,
+               let resolved = URL(string: trimmedLocation, relativeTo: originalURL)?.absoluteURL {
+                sanitized.url = resolved
+            } else if let originalURL = response.url,
+                      let encoded = trimmedLocation.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed.union(.urlPathAllowed)),
+                      let resolved = URL(string: encoded, relativeTo: originalURL)?.absoluteURL {
+                sanitized.url = resolved
+            }
+        }
+        completionHandler(sanitized)
     }
 }
 

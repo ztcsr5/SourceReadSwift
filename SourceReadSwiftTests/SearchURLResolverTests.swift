@@ -159,4 +159,48 @@ final class SearchURLResolverTests: XCTestCase {
         XCTAssertFalse(url.contains("#"))
         XCTAssertTrue(url.hasPrefix("http://www.kyxsw.org/search.html?keyword="))
     }
+
+    func testResolveSourceUrlWithFragmentPlaceholder() throws {
+        let source = BookSource(
+            bookSourceName: "无限小说",
+            bookSourceUrl: "http://m.wenxuesk.info#🎃",
+            searchUrl: "{{sourceUrl}}/modules/article/search.php?searchkey={{key}}"
+        )
+
+        XCTAssertEqual(source.cleanSourceURL, "http://m.wenxuesk.info")
+
+        let result = SearchURLResolver().resolve(source: source, keyword: "重生", page: 1)
+        guard case .success(let url) = result else {
+            return XCTFail("expected success")
+        }
+        XCTAssertFalse(url.contains("#"))
+        XCTAssertEqual(url, "http://m.wenxuesk.info/modules/article/search.php?searchkey=%E9%87%8D%E7%94%9F")
+    }
+
+    func testBuildRequestFixesFragmentPathConcatenation() throws {
+        let source = BookSource(
+            bookSourceName: "棉花糖",
+            bookSourceUrl: "https://www.mhtxs.la#🎃",
+            searchUrl: "https://www.mhtxs.la#🎃/search.php?keyword={{key}}"
+        )
+
+        let request = SourceRequestBuilder().buildSearchRequest(
+            source: source,
+            searchUrl: source.searchUrl!,
+            keyword: "重生",
+            page: 1
+        )
+        XCTAssertEqual(request.url.scheme, "https")
+        XCTAssertEqual(request.url.host, "www.mhtxs.la")
+        XCTAssertEqual(request.url.path, "/search.php")
+        XCTAssertFalse(request.url.absoluteString.contains("#"))
+    }
+
+    func testAppVersionSemantics() {
+        XCTAssertEqual(AppVersion.versionString, "1.0.0")
+        XCTAssertEqual(AppVersion.epic, 1)
+        XCTAssertEqual(AppVersion.major, 0)
+        XCTAssertEqual(AppVersion.minor, 0)
+        XCTAssertTrue(AppVersion.displayString.contains("1.0.0"))
+    }
 }

@@ -33,7 +33,7 @@ struct SearchURLResolver {
                 result,
                 keyword: keyword,
                 page: page,
-                baseUrl: source.bookSourceUrl,
+                baseUrl: source.cleanSourceURL,
                 charset: isGBK ? "gbk" : nil
             )
         }
@@ -254,17 +254,19 @@ struct SearchURLResolver {
             "keyword": keyword,
             "key": keyword,
             "page": page,
-            "baseUrl": source.bookSourceUrl,
+            "baseUrl": source.cleanSourceURL,
             "source": sourceMap
         ]
     }
 
     private func sourceVariableMap(source: BookSource) -> [String: String] {
         var values = source.raw
+        let cleanBase = source.cleanSourceURL
         values["bookSourceName"] = source.bookSourceName
         values["sourceName"] = source.bookSourceName
-        values["bookSourceUrl"] = source.bookSourceUrl
-        values["sourceUrl"] = source.bookSourceUrl
+        values["bookSourceUrl"] = cleanBase
+        values["sourceUrl"] = cleanBase
+        values["baseUrl"] = cleanBase
         values["bookSourceGroup"] = source.bookSourceGroup ?? ""
         values["sourceGroup"] = source.bookSourceGroup ?? ""
         values["bookSourceType"] = String(source.bookSourceType)

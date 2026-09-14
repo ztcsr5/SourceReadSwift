@@ -3,6 +3,16 @@ import Foundation
 struct BookSource: Identifiable, Codable, Hashable, Sendable {
     var id: String { bookSourceUrl }
 
+    /// Base URL stripped of any fragment annotations (e.g. `#tag`, `#🎃`, `#备用`)
+    /// matching Android Legado's `cleanUrl` / base request URL behavior.
+    var cleanSourceURL: String {
+        let trimmed = bookSourceUrl.trimmingCharacters(in: .whitespacesAndNewlines)
+        if let hashIdx = trimmed.firstIndex(of: "#") {
+            return String(trimmed[..<hashIdx]).trimmingCharacters(in: .whitespacesAndNewlines)
+        }
+        return trimmed
+    }
+
     let bookSourceName: String
     let bookSourceUrl: String
     let bookSourceGroup: String?

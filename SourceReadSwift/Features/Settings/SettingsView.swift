@@ -941,7 +941,7 @@ private struct AboutReadView: View {
                         VStack(alignment: .leading, spacing: 4) {
                             Text("源阅读 (SourceRead)")
                                 .font(.title2.bold())
-                            Text("版本 2.0.0 · 原生 iOS 设计")
+                            Text("\(AppVersion.displayString) · 原生 iOS 设计")
                                 .font(.subheadline.weight(.semibold))
                                 .foregroundStyle(AppTheme.accent)
                         }

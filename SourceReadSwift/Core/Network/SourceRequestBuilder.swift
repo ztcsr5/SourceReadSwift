@@ -50,7 +50,7 @@ struct SourceRequestBuilder {
         // component is expanded at its own boundary below instead.
         let directive = directiveParser.parse(resolvedText)
         let resolvedURLText = interpolateURLValues(directive.urlText, values: persistentValues)
-        let effectiveBase = (baseURL?.nilIfEmpty) ?? source.bookSourceUrl
+        let effectiveBase = (baseURL?.nilIfEmpty) ?? source.cleanSourceURL
         let url = resolveURL(resolvedURLText, base: effectiveBase)
         let sourceOptions = requestOptions(
             source,
@@ -137,8 +137,22 @@ struct SourceRequestBuilder {
                 trimmed = firstLine.trimmingCharacters(in: .whitespacesAndNewlines)
             }
         }
+        // Strip accidental fragment injection from corrupted baseUrl concatenation (e.g. `http://host#tag/path`)
+        if let hashIdx = trimmed.firstIndex(of: "#"),
+           let slashAfterHash = trimmed[hashIdx...].firstIndex(of: "/") {
+            let prefix = trimmed[..<hashIdx]
+            let suffix = trimmed[slashAfterHash...]
+            trimmed = String(prefix) + String(suffix)
+        }
         while trimmed.hasSuffix("|") || trimmed.hasSuffix("#") {
             trimmed = String(trimmed.dropLast()).trimmingCharacters(in: .whitespacesAndNewlines)
+        }
+        // Strip any remaining fragment containing non-ASCII/emojis/spaces to prevent URLSession bad URL errors
+        if let hashIdx = trimmed.firstIndex(of: "#") {
+            let fragment = trimmed[hashIdx...]
+            if fragment.unicodeScalars.contains(where: { $0.value > 127 }) || fragment.contains(" ") {
+                trimmed = String(trimmed[..<hashIdx]).trimmingCharacters(in: .whitespacesAndNewlines)
+            }
         }
         if let absolute = URL(string: trimmed), absolute.scheme != nil {
             return absolute

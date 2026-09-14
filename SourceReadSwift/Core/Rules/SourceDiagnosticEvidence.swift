@@ -104,6 +104,29 @@ struct SourceDiagnosticEvidence: Sendable {
         self.executionLogs = executionLogs
     }
 
+    init(
+        request: SourceRequest,
+        error: SourceEngineError,
+        javascript: [SourceJavaScriptEvidence] = [],
+        executionLogs: [String] = []
+    ) {
+        self.requestMethod = request.method.rawValue
+        self.requestBody = request.body.flatMap { String(data: $0, encoding: .utf8) }
+        self.requestHeaders = request.headers
+        self.responseStatusCode = 0
+        self.responseHeaders = [:]
+        self.cookieSummary = request.headers.first { key, _ in
+            key.caseInsensitiveCompare("Cookie") == .orderedSame
+        }?.value
+        self.finalURL = request.url.absoluteString
+        self.responseEncodedByteCount = nil
+        self.responseDecodedByteCount = 0
+        self.responseContentEncodings = []
+        self.responseWasDecoded = false
+        self.javascript = javascript
+        self.executionLogs = executionLogs.isEmpty ? ["Failed: \(error.displayMessage)"] : executionLogs
+    }
+
     func with(
         javascript: [SourceJavaScriptEvidence],
         executionLogs: [String]? = nil

@@ -143,9 +143,24 @@ extension SourceEngine {
             return SourcePipelineExecution(result: makeResult(), error: error)
         }
 
+        func isTransientNetworkFailure(_ error: SourceEngineError) -> Bool {
+            let msg = error.displayMessage.lowercased()
+            return msg.contains("超时") || msg.contains("timed out")
+                || msg.contains("connection was lost") || msg.contains("connection lost")
+                || msg.contains("502") || msg.contains("503") || msg.contains("520")
+                || msg.contains("reset by peer")
+        }
+
         let searchStarted = Date()
-        let search = await AsyncTimeout.run(seconds: timeout) { await self.searchBooks(source: source, keyword: cleanKeyword, page: page) }
+        var search = await AsyncTimeout.run(seconds: timeout) { await self.searchBooks(source: source, keyword: cleanKeyword, page: page) }
             ?? .failure(.network("搜索超时（超过 \(Int(timeout)) 秒）"))
+        var searchRetried = false
+        if case .failure(let error) = search, isTransientNetworkFailure(error) {
+            try? await Task.sleep(nanoseconds: 300_000_000)
+            search = await AsyncTimeout.run(seconds: timeout) { await self.searchBooks(source: source, keyword: cleanKeyword, page: page) }
+                ?? .failure(.network("搜索超时（超过 \(Int(timeout)) 秒）"))
+            searchRetried = true
+        }
         switch search {
         case .failure(let error):
             return failure(error, stage: .search, start: searchStarted)
@@ -162,13 +177,21 @@ extension SourceEngine {
                 matchCount: books.count,
                 elapsedMilliseconds: elapsed(searchStarted),
                 failureClassification: nil,
-                failureCode: nil
+                failureCode: nil,
+                retryCount: searchRetried ? 1 : 0
             ))
             guard let first = books.first else { return failure(.empty("搜索结果为空"), stage: .search, start: searchStarted) }
 
             let detailStarted = Date()
-            let detailResult = await AsyncTimeout.run(seconds: timeout) { await self.getBookDetail(source: source, book: first) }
+            var detailResult = await AsyncTimeout.run(seconds: timeout) { await self.getBookDetail(source: source, book: first) }
                 ?? .failure(.network("详情超时（超过 \(Int(timeout)) 秒）"))
+            var detailRetried = false
+            if case .failure(let error) = detailResult, isTransientNetworkFailure(error) {
+                try? await Task.sleep(nanoseconds: 300_000_000)
+                detailResult = await AsyncTimeout.run(seconds: timeout) { await self.getBookDetail(source: source, book: first) }
+                    ?? .failure(.network("详情超时（超过 \(Int(timeout)) 秒）"))
+                detailRetried = true
+            }
             switch detailResult {
             case .failure(let error):
                 return failure(error, stage: .detail, start: detailStarted, count: 0)
@@ -180,7 +203,8 @@ extension SourceEngine {
                     requestSummary: value.bookUrl,
                     responseSummary: "详情：\(value.name)",
                     matchCount: 1,
-                    elapsedMilliseconds: elapsed(detailStarted)
+                    elapsedMilliseconds: elapsed(detailStarted),
+                    retryCount: detailRetried ? 1 : 0
                 ))
             }
         }
@@ -189,8 +213,15 @@ extension SourceEngine {
             return SourcePipelineExecution(result: makeResult(), error: .empty("详情结果为空"))
         }
         let tocStarted = Date()
-        let tocResult = await AsyncTimeout.run(seconds: timeout) { await self.getChapterList(source: source, book: detail, maxPages: 1) }
+        var tocResult = await AsyncTimeout.run(seconds: timeout) { await self.getChapterList(source: source, book: detail, maxPages: 1) }
             ?? .failure(.network("目录超时（超过 \(Int(timeout)) 秒）"))
+        var tocRetried = false
+        if case .failure(let error) = tocResult, isTransientNetworkFailure(error) {
+            try? await Task.sleep(nanoseconds: 300_000_000)
+            tocResult = await AsyncTimeout.run(seconds: timeout) { await self.getChapterList(source: source, book: detail, maxPages: 1) }
+                ?? .failure(.network("目录超时（超过 \(Int(timeout)) 秒）"))
+            tocRetried = true
+        }
         switch tocResult {
         case .failure(let error):
             return failure(error, stage: .toc, start: tocStarted)
@@ -206,7 +237,8 @@ extension SourceEngine {
                 responseSummary: "目录 \(value.count) 章",
                 matchCount: value.count,
                 elapsedMilliseconds: elapsed(tocStarted),
-                failureClassification: nil
+                failureClassification: nil,
+                retryCount: tocRetried ? 1 : 0
             ))
         }
 
@@ -214,8 +246,15 @@ extension SourceEngine {
             return SourcePipelineExecution(result: makeResult(), error: .empty("目录为空"))
         }
         let contentStarted = Date()
-        let contentResult = await AsyncTimeout.run(seconds: timeout) { await self.getContent(source: source, chapter: firstChapter, maxPages: 1) }
+        var contentResult = await AsyncTimeout.run(seconds: timeout) { await self.getContent(source: source, chapter: firstChapter, maxPages: 1) }
             ?? .failure(.network("正文超时（超过 \(Int(timeout)) 秒）"))
+        var contentRetried = false
+        if case .failure(let error) = contentResult, isTransientNetworkFailure(error) {
+            try? await Task.sleep(nanoseconds: 300_000_000)
+            contentResult = await AsyncTimeout.run(seconds: timeout) { await self.getContent(source: source, chapter: firstChapter, maxPages: 1) }
+                ?? .failure(.network("正文超时（超过 \(Int(timeout)) 秒）"))
+            contentRetried = true
+        }
         switch contentResult {
         case .failure(let error):
             return failure(error, stage: .content, start: contentStarted, count: 0)
@@ -230,7 +269,8 @@ extension SourceEngine {
                 matchCount: value.paragraphs.count,
                 elapsedMilliseconds: elapsed(contentStarted),
                 failureClassification: isEmptyContent ? "empty-result" : nil,
-                failureCode: isEmptyContent ? .emptyResult : nil
+                failureCode: isEmptyContent ? .emptyResult : nil,
+                retryCount: contentRetried ? 1 : 0
             ))
             if isEmptyContent {
                 return SourcePipelineExecution(result: makeResult(), error: .empty("正文为空"))

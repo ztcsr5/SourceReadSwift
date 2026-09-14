@@ -490,6 +490,9 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
             shouldFallback = shouldUseWebView(source: source)
         }
         guard shouldFallback else {
+            if case .failure(let error) = primary {
+                recordFailureEvidence(source: source, stage: stage, request: request, error: error)
+            }
             return primary
         }
 
@@ -515,6 +518,7 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
             recordEvidence(source: source, stage: stage, request: request, response: response)
             return .success(response)
         case .failure(let error):
+            recordFailureEvidence(source: source, stage: stage, request: request, error: error)
             return .failure(error)
         }
     }
@@ -559,6 +563,39 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
         }
         let javascript = evidence[key]?[normalizedStage]?.javascript ?? []
         evidence[key, default: [:]][normalizedStage] = SourceDiagnosticEvidence(request: request, response: response, javascript: javascript)
+        evidenceLock.unlock()
+    }
+
+    private func recordFailureEvidence(
+        source: BookSource,
+        stage: String,
+        request: SourceRequest,
+        error: SourceEngineError
+    ) {
+        let normalizedStage: SourceDiagnosticStage?
+        if stage.lowercased().hasPrefix("search") {
+            normalizedStage = .search
+        } else if stage.lowercased().hasPrefix("detail") {
+            normalizedStage = .detail
+        } else if stage.lowercased().hasPrefix("toc") {
+            normalizedStage = .toc
+        } else if stage.lowercased().hasPrefix("content") {
+            normalizedStage = .content
+        } else {
+            normalizedStage = nil
+        }
+        guard let normalizedStage else { return }
+        let key = source.bookSourceUrl.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        evidenceLock.lock()
+        if evidence.count > 50 {
+            evidence.removeAll()
+        }
+        let javascript = evidence[key]?[normalizedStage]?.javascript ?? []
+        evidence[key, default: [:]][normalizedStage] = SourceDiagnosticEvidence(
+            request: request,
+            error: error,
+            javascript: javascript
+        )
         evidenceLock.unlock()
     }
 
