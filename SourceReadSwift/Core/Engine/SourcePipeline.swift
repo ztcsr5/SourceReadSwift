@@ -177,8 +177,8 @@ extension SourceEngine {
                 matchCount: books.count,
                 elapsedMilliseconds: elapsed(searchStarted),
                 failureClassification: nil,
-                failureCode: nil,
-                retryCount: searchRetried ? 1 : 0
+                retryCount: searchRetried ? 1 : 0,
+                failureCode: nil
             ))
             guard let first = books.first else { return failure(.empty("搜索结果为空"), stage: .search, start: searchStarted) }
 
@@ -269,8 +269,8 @@ extension SourceEngine {
                 matchCount: value.paragraphs.count,
                 elapsedMilliseconds: elapsed(contentStarted),
                 failureClassification: isEmptyContent ? "empty-result" : nil,
-                failureCode: isEmptyContent ? .emptyResult : nil,
-                retryCount: contentRetried ? 1 : 0
+                retryCount: contentRetried ? 1 : 0,
+                failureCode: isEmptyContent ? .emptyResult : nil
             ))
             if isEmptyContent {
                 return SourcePipelineExecution(result: makeResult(), error: .empty("正文为空"))
