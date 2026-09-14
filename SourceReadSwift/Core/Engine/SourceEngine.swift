@@ -207,9 +207,16 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
                 persistentState: executionState
             )
         }
+        let resolvedBookUrl = DynamicURLResolver.resolve(
+            book.bookUrl,
+            baseUrl: source.cleanSourceURL,
+            source: source,
+            variables: ["book": book],
+            context: executionContext
+        )
         let request = requestBuilder.buildPageRequest(
             source: source,
-            urlText: book.bookUrl,
+            urlText: resolvedBookUrl,
             persistentValues: executionState.snapshot()
         )
         switch await loadWithOptionalWebViewFallback(request, source: source, stage: "detail.load") {
@@ -259,9 +266,16 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
             )
         }
         let tocURL = book.tocUrl?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty ?? book.bookUrl
+        let resolvedTocURL = DynamicURLResolver.resolve(
+            tocURL,
+            baseUrl: source.cleanSourceURL,
+            source: source,
+            variables: ["book": book],
+            context: executionContext
+        )
         let request = requestBuilder.buildPageRequest(
             source: source,
-            urlText: tocURL,
+            urlText: resolvedTocURL,
             persistentValues: executionState.snapshot()
         )
         switch await loadWithOptionalWebViewFallback(request, source: source, stage: "toc.load") {
@@ -340,9 +354,16 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
                 persistentState: executionState
             )
         }
+        let resolvedChapterUrl = DynamicURLResolver.resolve(
+            chapter.url,
+            baseUrl: chapter.bookUrl.nilIfEmpty ?? source.cleanSourceURL,
+            source: source,
+            variables: ["chapter": chapter],
+            context: executionContext
+        )
         let request = requestBuilder.buildPageRequest(
             source: source,
-            urlText: chapter.url,
+            urlText: resolvedChapterUrl,
             baseURL: chapter.bookUrl.nilIfEmpty ?? source.bookSourceUrl,
             persistentValues: executionState.snapshot()
         )

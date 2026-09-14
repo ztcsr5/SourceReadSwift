@@ -55,7 +55,7 @@ struct LegadoRuleResolver {
 
     func isJavaScriptRule(_ rule: String) -> Bool {
         let trimmed = rule.trimmingCharacters(in: .whitespacesAndNewlines)
-        return trimmed.hasPrefix("@js:") || trimmed.hasPrefix("<js>") || trimmed.contains("java.")
+        return trimmed.hasPrefix("@js:") || trimmed.hasPrefix("<js>") || trimmed.hasPrefix("java.")
     }
 
     private func replaceArithmeticExpressions(in text: String, page: Int) -> String {

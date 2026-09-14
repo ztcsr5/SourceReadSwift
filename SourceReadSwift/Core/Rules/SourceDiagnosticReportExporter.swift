@@ -95,7 +95,7 @@ enum SourceDiagnosticReportExporter {
             case .httpError:
                 return "服务器返回 404 (页面不存在)、400 (请求错误) 或 5xx 服务端故障。建议检查接口路径是否变动或需要特定 Referer。"
             case .antiBotShield:
-                return "受到 Cloudflare 5秒盾、人机验证或 Turnstile 拦截。建议：1. 在书源中配置 {\"webView\": true} 走无头浏览器加载；2. 或在书源管理中长按书源进入「登录/过盾」手动完成一次人机验证。"
+                return "受到 Cloudflare 盾、字节跳动图灵滑块 (Bdturing) 或平台安全风控拦截。番茄/起点等官方源采用高强度客户端风控保护；系统推荐在书库中优先使用收录该书的优质转码源（如梧桐中文、笔趣阁等聚合转码源）；对于 Cloudflare 网页源可配置 {\"webView\": true} 加载。"
             case .contentEmpty:
                 return "搜索与目录正常，但正文提取结果为空。建议：1. 书源正文 CSS 选择器可能过期，需检查网页 DOM 结构调整 content 规则；2. 轻阅内置四级通用提取机制会自动兜底大部分常规网文小说排版。"
             case .tocEmpty:
@@ -126,12 +126,20 @@ enum SourceDiagnosticReportExporter {
 
         if report.overallStatus == .verificationRequired || report.overallStatus == .blocked
             || msg.contains("cloudflare") || msg.contains("captcha") || msg.contains("challenge")
-            || msg.contains("人机验证") || msg.contains("安全验证") || code == 403 {
+            || msg.contains("人机验证") || msg.contains("安全验证") || code == 403
+            || msg.contains("bdturing") || msg.contains("turing") || msg.contains("滑块") {
             return (.antiBotShield, FailureCategory.antiBotShield.defaultSolution)
         }
 
         if msg.contains("certificate") || msg.contains("ssl") || msg.contains("不受信任") || msg.contains("证书") || msg.contains("handshake") {
             return (.sslError, FailureCategory.sslError.defaultSolution)
+        }
+
+        if msg.contains("重定向地址无效") || msg.contains("已关停") || msg.contains("已下线")
+            || msg.contains("无法连接到服务器") || msg.contains("timeout") || msg.contains("超时")
+            || msg.contains("connection refused") || msg.contains("cannot connect")
+            || msg.contains("未能连接") || msg.contains("网络错误") || msg.contains("timed out") {
+            return (.networkTimeout, FailureCategory.networkTimeout.defaultSolution)
         }
 
         if msg.contains("bad url") || msg.contains("invalid url") || msg.contains("unsupported url") || msg.contains("url无效") || msg.contains("url 格式") {
@@ -145,11 +153,6 @@ enum SourceDiagnosticReportExporter {
 
         if code == 404 || code == 400 || (code >= 500 && code < 600) || msg.contains("404") || msg.contains("400 bad request") {
             return (.httpError, FailureCategory.httpError.defaultSolution)
-        }
-
-        if msg.contains("timeout") || msg.contains("超时") || msg.contains("connection refused")
-            || msg.contains("cannot connect") || msg.contains("未能连接") || msg.contains("网络错误") || msg.contains("timed out") {
-            return (.networkTimeout, FailureCategory.networkTimeout.defaultSolution)
         }
 
         if step?.stage == .content || msg.contains("正文") || msg.contains("content") {

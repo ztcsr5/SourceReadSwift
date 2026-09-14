@@ -123,7 +123,7 @@ struct SettingsView: View {
                     NavigationLink {
                         AboutReadView()
                     } label: {
-                        Label("关于阅读", systemImage: "info.circle")
+                        Label("关于纸间", systemImage: "info.circle")
                     }
                 }
 
@@ -939,15 +939,15 @@ private struct AboutReadView: View {
                             .shadow(color: AppTheme.accent.opacity(0.25), radius: 10, x: 0, y: 6)
 
                         VStack(alignment: .leading, spacing: 4) {
-                            Text("源阅读 (SourceRead)")
+                            Text("纸间 (InPage)")
                                 .font(.title2.bold())
-                            Text("\(AppVersion.displayString) · 原生 iOS 设计")
+                            Text("\(AppVersion.displayString) · 源流引擎驱动")
                                 .font(.subheadline.weight(.semibold))
                                 .foregroundStyle(AppTheme.accent)
                         }
                     }
 
-                    Text("源阅读是一款专为 iOS 精心打造的纯粹阅读器。遵循 Apple 原生设计哲学，提供 120Hz 满帧丝滑翻页、深度书源兼容、自适应出版级排版与多格式支持，让阅读回归最初的纯粹与宁静。")
+                    Text("「纸间」是一款专为 iOS 精心打造的纯粹阅读器。遵循 Apple 原生设计哲学，由「源流 (SourceFlow)」深度书源引擎强力驱动，提供 120Hz 满帧丝滑翻页、全网 JSON 书源深度解析、自适应出版级排版与多格式支持，让阅读回归最初的纯粹与宁静。")
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
 
@@ -977,7 +977,7 @@ private struct AboutReadView: View {
                     .foregroundStyle(.secondary)
             }
         }
-        .navigationTitle("关于阅读")
+        .navigationTitle("关于纸间")
     }
 }
 

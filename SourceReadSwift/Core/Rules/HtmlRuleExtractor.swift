@@ -42,9 +42,17 @@ struct HtmlRuleExtractor {
         let selectedRule = rule ?? fallback
         guard let selectedRule, !selectedRule.isEmpty else { return "" }
 
-        let trimmed = selectedRule.trimmingCharacters(in: .whitespacesAndNewlines)
+        var trimmed = selectedRule.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        // Stage 1: Template Interpolation {{...}}
+        if trimmed.contains("{{") && trimmed.contains("}}") {
+            trimmed = try interpolateTemplate(trimmed, root: root, baseUrl: baseUrl, variables: variables)
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+            if trimmed.isEmpty { return "" }
+        }
+
         if LegadoRuleResolver().isJavaScriptRule(trimmed) {
-            return try evaluateJS(rule: trimmed, rootHtml: try root.outerHtml(), baseUrl: baseUrl, extraVariables: variables)
+            return try evaluateJSWithTrailingRegex(rule: trimmed, rootHtml: try root.outerHtml(), baseUrl: baseUrl, extraVariables: variables)
         }
 
         // Support chained JavaScript rules: Selector@js:script or Selector<js>script</js>
@@ -56,7 +64,7 @@ struct HtmlRuleExtractor {
             chainedVariables["result"] = extracted
             chainedVariables["src"] = extracted
             chainedVariables["html"] = extracted
-            return try evaluateJS(rule: script, rootHtml: extracted, baseUrl: baseUrl, extraVariables: chainedVariables)
+            return try evaluateJSWithTrailingRegex(rule: script, rootHtml: extracted, baseUrl: baseUrl, extraVariables: chainedVariables)
         }
 
         if let jsStart = trimmed.range(of: "<js>"), jsStart.lowerBound > trimmed.startIndex {
@@ -67,16 +75,11 @@ struct HtmlRuleExtractor {
             chainedVariables["result"] = extracted
             chainedVariables["src"] = extracted
             chainedVariables["html"] = extracted
-            return try evaluateJS(rule: script, rootHtml: extracted, baseUrl: baseUrl, extraVariables: chainedVariables)
+            return try evaluateJSWithTrailingRegex(rule: script, rootHtml: extracted, baseUrl: baseUrl, extraVariables: chainedVariables)
         }
 
-        if let alternatives = RuleOperatorSplitter.split(selectedRule, separator: "||") {
+        if let alternatives = RuleOperatorSplitter.split(trimmed, separator: "||") {
             for alternative in alternatives {
-                // A mixed Legado source may put JSONPath and CSS/XPath
-                // alternatives in the same field.  SwiftSoup rejects a
-                // JSONPath such as `$.payload`; treat that branch as a miss
-                // and continue to the next alternative instead of failing
-                // the whole HTML parse.
                 do {
                     let value = try self.value(from: root, rule: alternative, fallback: nil, baseUrl: baseUrl, variables: variables)
                     if !value.isEmpty { return value }
@@ -87,14 +90,14 @@ struct HtmlRuleExtractor {
             return ""
         }
 
-        if let mergeParts = RuleOperatorSplitter.split(selectedRule, separator: "%%") {
+        if let mergeParts = RuleOperatorSplitter.split(trimmed, separator: "%%") {
             let lists = try mergeParts
                 .map { try valuesForSingleRule(from: root, rule: $0, baseUrl: baseUrl) }
                 .filter { !$0.isEmpty }
             return interleave(lists).joined(separator: "\n")
         }
 
-        let values = try valuesForSingleRule(from: root, rule: selectedRule, baseUrl: baseUrl)
+        let values = try valuesForSingleRule(from: root, rule: trimmed, baseUrl: baseUrl)
         return values.joined(separator: "\n")
     }
 
@@ -506,6 +509,9 @@ struct HtmlRuleExtractor {
         while clean.hasSuffix("|") || clean.hasSuffix("#") {
             clean = String(clean.dropLast()).trimmingCharacters(in: .whitespacesAndNewlines)
         }
+        if clean.hasPrefix("@js:") || clean.hasPrefix("<js>") {
+            return clean
+        }
         var optionsSuffix = ""
         if let commaRange = clean.range(of: ",{") ?? clean.range(of: ", {") {
             optionsSuffix = String(clean[commaRange.lowerBound...])
@@ -532,6 +538,100 @@ struct HtmlRuleExtractor {
             }
         }
         return output
+    }
+
+    private func interpolateTemplate(
+        _ template: String,
+        root: Element,
+        baseUrl: URL?,
+        variables: [String: Any]
+    ) throws -> String {
+        var output = template
+        guard let regex = try? NSRegularExpression(pattern: #"\{\{\s*([^{}]+)\s*\}\}"#) else { return template }
+        let nsText = template as NSString
+        let matches = regex.matches(in: template, range: NSRange(location: 0, length: nsText.length))
+        for match in matches.reversed() {
+            guard match.numberOfRanges > 1 else { continue }
+            let keyRange = match.range(at: 1)
+            let fullRange = match.range(at: 0)
+            let expr = nsText.substring(with: keyRange).trimmingCharacters(in: .whitespacesAndNewlines)
+            var val = ""
+            if expr.hasPrefix("@@") {
+                let subRule = String(expr.dropFirst(2)).trimmingCharacters(in: .whitespacesAndNewlines)
+                val = (try? self.value(from: root, rule: subRule, fallback: nil, baseUrl: baseUrl, variables: variables)) ?? ""
+            } else if expr.hasPrefix("@css:") || expr.hasPrefix("@xpath:") || expr.hasPrefix("class.") || expr.hasPrefix("tag.") || expr.hasPrefix("id.") || expr.hasPrefix(".") || expr.hasPrefix("#") {
+                val = (try? self.value(from: root, rule: expr, fallback: nil, baseUrl: baseUrl, variables: variables)) ?? ""
+            } else if expr.hasPrefix("$.") || expr.hasPrefix("@json:") {
+                let jsonPath = expr.hasPrefix("@json:") ? String(expr.dropFirst(6)) : expr
+                if let data = try? root.outerHtml().data(using: .utf8),
+                   let obj = try? JSONSerialization.jsonObject(with: data, options: [.fragmentsAllowed]),
+                   let extracted = JSONRuleExtractor().value(from: obj, path: jsonPath) {
+                    val = JSONRuleExtractor().stringify(extracted)
+                }
+            } else if expr == "key" || expr == "keyword" {
+                val = (variables["key"] as? String) ?? (variables["keyword"] as? String) ?? ""
+            } else if expr == "page" {
+                val = "\(variables["page"] ?? 1)"
+            } else if let varVal = variables[expr] {
+                val = String(describing: varVal)
+            } else {
+                val = (try? self.value(from: root, rule: expr, fallback: nil, baseUrl: baseUrl, variables: variables)) ?? ""
+            }
+            if let targetRange = Range(fullRange, in: output) {
+                output.replaceSubrange(targetRange, with: val)
+            }
+        }
+        return output
+    }
+
+    private func evaluateJSWithTrailingRegex(
+        rule: String,
+        rootHtml: String,
+        baseUrl: URL?,
+        extraVariables: [String: Any]
+    ) throws -> String {
+        var script = rule.trimmingCharacters(in: .whitespacesAndNewlines)
+        if script.hasPrefix("@js:") {
+            script = String(script.dropFirst(4)).trimmingCharacters(in: .whitespacesAndNewlines)
+        } else if script.hasPrefix("<js>") && script.contains("</js>") {
+            let start = script.index(script.startIndex, offsetBy: 4)
+            let end = script.range(of: "</js>")?.lowerBound ?? script.endIndex
+            let rest = String(script[script.range(of: "</js>")!.upperBound...])
+            script = String(script[start..<end]) + rest
+        }
+
+        var trailingRegexParts: [String] = []
+        if script.hasPrefix("##") {
+            trailingRegexParts = Array(script.components(separatedBy: "##").dropFirst())
+            return applyRegexTransforms(trailingRegexParts[...], to: rootHtml)
+        }
+
+        if script.contains("##") {
+            if let lineBreakRange = script.range(of: "\n##", options: .backwards) {
+                let regexText = String(script[lineBreakRange.upperBound - 2...]).trimmingCharacters(in: .whitespacesAndNewlines)
+                script = String(script[..<lineBreakRange.lowerBound]).trimmingCharacters(in: .whitespacesAndNewlines)
+                trailingRegexParts = Array(regexText.components(separatedBy: "##").dropFirst())
+            } else if let hashRange = script.range(of: "##", options: .backwards) {
+                let regexText = String(script[hashRange.lowerBound...]).trimmingCharacters(in: .whitespacesAndNewlines)
+                let parts = regexText.components(separatedBy: "##").dropFirst()
+                if parts.count >= 2 {
+                    script = String(script[..<hashRange.lowerBound]).trimmingCharacters(in: .whitespacesAndNewlines)
+                    trailingRegexParts = Array(parts)
+                }
+            }
+        }
+
+        let jsResult: String
+        if script.isEmpty {
+            jsResult = rootHtml
+        } else {
+            jsResult = try evaluateJS(rule: script, rootHtml: rootHtml, baseUrl: baseUrl, extraVariables: extraVariables)
+        }
+
+        if !trailingRegexParts.isEmpty {
+            return applyRegexTransforms(trailingRegexParts[...], to: jsResult)
+        }
+        return jsResult
     }
 
     private func evaluateJS(

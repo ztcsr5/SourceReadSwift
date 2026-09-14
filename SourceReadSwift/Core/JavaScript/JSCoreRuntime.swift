@@ -46,7 +46,7 @@ final class JSCoreRuntime {
         // JavaScriptCore can reject a first-read of an undeclared global inside
         // the large prelude; predeclaring them keeps the later `var x = x ||`
         // aliases source-compatible without relying on browser semantics.
-        context.evaluateScript("var java = {}; var cookie = {}; var CryptoJS = {}; var Packages = {}; var JXNode = function(value) { return __nativeJXNode.create(value); }; var JavaImporter = function() {}; var src = ''; var id = ''; var type = ''; var TYPE = ''; var ruid = ''; var form = {}; var result = ''; var baseUrl = '';")
+        context.evaluateScript("var java = {}; var cookie = {}; var CryptoJS = {}; var Packages = {}; var JXNode = function(value) { return __nativeJXNode.create(value); }; var JavaImporter = function() {}; var src = ''; var id = ''; var type = ''; var TYPE = function(v) { return v != null ? (typeof v) : ''; }; var ruid = function(len, upper) { len = len || 16; var chars = '0123456789abcdef'; var res = ''; for (var i = 0; i < len; i++) res += chars[Math.floor(Math.random() * chars.length)]; return upper ? res.toUpperCase() : res; }; var form = {}; var result = ''; var baseUrl = '';")
         installBaseBridge()
     }
 
@@ -60,8 +60,6 @@ final class JSCoreRuntime {
                 context.setObject("", forKeyedSubscript: "content" as NSString)
                 context.setObject("", forKeyedSubscript: "id" as NSString)
                 context.setObject("", forKeyedSubscript: "type" as NSString)
-                context.setObject("", forKeyedSubscript: "TYPE" as NSString)
-                context.setObject("", forKeyedSubscript: "ruid" as NSString)
                 evaluateLock.unlock()
             }
         if let baseBridgeError {
@@ -156,7 +154,11 @@ final class JSCoreRuntime {
             } else if key == "source" {
                 let injectScript = """
                 if (typeof source !== 'undefined' && source !== null) {
-                    source.getKey = function() { return source.key || source.bookSourceUrl || source.sourceUrl || ''; };
+                    source.getKey = function(key) {
+                        if (key != null && String(key).length > 0) return cookie.getKey(key) || source.getVariable(key) || '';
+                        return source.key || source.bookSourceUrl || source.sourceUrl || '';
+                    };
+                    source.setKey = function(key, val) { return cookie.setKey(key, val); };
                     source.sourceUrl = source.sourceUrl || source.bookSourceUrl || source.key || '';
                     source.sourceName = source.sourceName || source.bookSourceName || '';
                     source.bookSourceComment = source.bookSourceComment || source.comment || '';
@@ -954,9 +956,36 @@ final class JSCoreRuntime {
         java.digestBase64Str = function(value, algorithm) { return java.base64Encode(__hexToJavaBytes(java.digestHex(value, algorithm || 'sha256'))); };
         java.uriEncode = function(value) { return java.encodeURI(value); };
         java.uriDecode = function(value) { return java.decodeURI(value); };
-        java.t2s = function(value) { return String(value == null ? '' : value); };
-        java.s2t = java.t2s;
-        java.toNumChapter = java.t2s;
+        java.t2s = function(value) { return String(__nativeLegado.invoke({ method: 't2s', args: [String(value == null ? '' : value)] }) || ''); };
+        java.s2t = function(value) { return String(__nativeLegado.invoke({ method: 's2t', args: [String(value == null ? '' : value)] }) || ''); };
+        globalThis.t2s = java.t2s;
+        globalThis.s2t = java.s2t;
+        java.toNumChapter = function(text) {
+          if (text == null) return '';
+          var s = String(text);
+          var cnNums = { '零': 0, '一': 1, '二': 2, '两': 2, '三': 3, '四': 4, '五': 5, '六': 6, '七': 7, '八': 8, '九': 9 };
+          var cnUnits = { '十': 10, '百': 100, '千': 1000, '万': 10000 };
+          function parseChineseNumber(str) {
+            var total = 0, num = 0;
+            for (var i = 0; i < str.length; i++) {
+              var ch = str[i];
+              if (cnNums[ch] !== undefined) {
+                num = cnNums[ch];
+              } else if (cnUnits[ch] !== undefined) {
+                var unit = cnUnits[ch];
+                if (num === 0 && unit === 10) num = 1;
+                total += num * unit;
+                num = 0;
+              }
+            }
+            return total + num;
+          }
+          return s.replace(/第([零一二两三四五六七八九十百千]+)章/g, function(match, p1) {
+            var val = parseChineseNumber(p1);
+            return '第' + (val || p1) + '章';
+          });
+        };
+        globalThis.toNumChapter = java.toNumChapter;
         java.timeFormatUTC = function(timestamp) { return new Date(timestamp == null ? Date.now() : Number(timestamp)).toISOString().replace('T', ' ').substring(0, 19); };
         java.putCache = function(key, value) { return cache.put(key, value); };
         java.getCache = function(key) { return cache.get(key); };
@@ -965,8 +994,14 @@ final class JSCoreRuntime {
         java.getFromCache = java.getCache;
         java.putInCache = java.putCache;
         java.HMacHex = function(value, algorithm, key) { return __native_hmacHex(String(value || ''), String(algorithm || 'HmacSHA1'), String(key || '')); };
+        java.hMacHex = java.HMacHex;
+        globalThis.HMacHex = java.HMacHex;
+        globalThis.hMacHex = java.HMacHex;
         java.hmacSHA256 = function(value, key) { return java.HMacHex(value, 'HmacSHA256', key); };
         java.HMacBase64 = function(value, algorithm, key) { return __native_hmacBase64(String(value || ''), String(algorithm || 'HmacSHA1'), String(key || '')); };
+        java.hMacBase64 = java.HMacBase64;
+        globalThis.HMacBase64 = java.HMacBase64;
+        globalThis.hMacBase64 = java.HMacBase64;
         java.timeFormat = function(timestamp, format) {
           return __native_timeFormat(Number(timestamp), String(format || 'yyyy-MM-dd HH:mm:ss'));
         };
@@ -2027,6 +2062,7 @@ final class JSCoreRuntime {
         if (typeof cookie === 'undefined' || cookie === null) cookie = {};
         cookie.getCookie = java.getCookie;
         cookie.getKey = function(url, key) {
+          if (arguments.length === 1) { key = url; url = __defaultBaseUrl(); }
           var name = String(key || '');
           var header = java.getCookie(url);
           var parts = header.split(';');
@@ -2037,6 +2073,7 @@ final class JSCoreRuntime {
           }
           return '';
         };
+        cookie.get = cookie.getKey;
         cookie.setCookie = function(url, value) {
           if (arguments.length < 2) { value = url; url = __defaultBaseUrl(); }
           cookieHeader = String(value || '');
@@ -2237,7 +2274,11 @@ final class JSCoreRuntime {
         };
         function __installSourceAndBook() {
           if (typeof source === 'undefined' || source === null) source = {};
-          source.getKey = function() { return source.key || source.bookSourceUrl || source.sourceUrl || ''; };
+          source.getKey = function(key) {
+            if (key != null && String(key).length > 0) return cookie.getKey(key) || source.getVariable(key) || '';
+            return source.key || source.bookSourceUrl || source.sourceUrl || '';
+          };
+          source.setKey = function(key, val) { return cookie.setKey(key, val); };
           source.sourceUrl = source.sourceUrl || source.bookSourceUrl || source.key || '';
           source.sourceName = source.sourceName || source.bookSourceName || '';
           source.bookSourceComment = source.bookSourceComment || source.comment || '';

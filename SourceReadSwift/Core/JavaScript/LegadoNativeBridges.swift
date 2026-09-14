@@ -200,6 +200,16 @@ final class LegadoJavaHostBridge: NSObject, LegadoJavaHostExport {
                 RuleExecutionContext.bridgeString(arguments.first),
                 charset: arguments.count > 1 ? RuleExecutionContext.bridgeString(arguments[1]) : nil
             )
+        case "t2s":
+            let text = RuleExecutionContext.bridgeString(arguments.first)
+            let mutable = NSMutableString(string: text)
+            CFStringTransform(mutable, nil, "Hant-Hans" as CFString, false)
+            return mutable as String
+        case "s2t":
+            let text = RuleExecutionContext.bridgeString(arguments.first)
+            let mutable = NSMutableString(string: text)
+            CFStringTransform(mutable, nil, "Hans-Hant" as CFString, false)
+            return mutable as String
         case "cacheFile":
             guard let path = arguments.first else { return "" }
             let content = arguments.count > 1 ? arguments[1] : ""

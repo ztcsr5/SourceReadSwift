@@ -75,8 +75,9 @@ struct SourceRequestBuilder {
         headers["Accept", default: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"]
         applyDefaultNavigationHeaders(to: &headers, sourceBase: source.bookSourceUrl)
 
+        let isGBK = (charset?.lowercased() ?? "").contains("gb") || (charset?.lowercased() ?? "").contains("cp936")
         let body = directive.body.map {
-            interpolateData($0, values: persistentValues, headers: headers)
+            interpolateData($0, values: persistentValues, headers: headers, isGBK: isGBK)
         } ?? sourceOptions.body
         let timeout = resolvedTimeout(
             directive: directive,
@@ -488,10 +489,16 @@ struct SourceRequestBuilder {
         }
     }
 
-    private func interpolateData(_ data: Data, values: [String: String], headers: [String: String]) -> Data {
-        guard !values.isEmpty,
-              let text = String(data: data, encoding: .utf8) else { return data }
-        return Data(interpolateBodyText(text, values: values, headers: headers).utf8)
+    private func interpolateData(_ data: Data, values: [String: String], headers: [String: String], isGBK: Bool = false) -> Data {
+        let decodedText = String(data: data, encoding: .utf8)
+            ?? (isGBK ? (String(data: data, encoding: LegadoHostServices.gbkEncoding) ?? String(data: data, encoding: .isoLatin1)) : nil)
+            ?? String(data: data, encoding: .isoLatin1)
+        guard let text = decodedText, !values.isEmpty else { return data }
+        let interpolated = interpolateBodyText(text, values: values, headers: headers, isGBK: isGBK)
+        if isGBK, let gbkData = LegadoHostServices.encodeGbkData(interpolated) {
+            return gbkData
+        }
+        return Data(interpolated.utf8)
     }
 
     /// Interpolate dynamic Legado values without corrupting JSON/XML bodies.
@@ -501,7 +508,8 @@ struct SourceRequestBuilder {
     private func interpolateBodyText(
         _ text: String,
         values: [String: String],
-        headers: [String: String]
+        headers: [String: String],
+        isGBK: Bool = false
     ) -> String {
         let contentType = headers.first {
             $0.key.caseInsensitiveCompare("Content-Type") == .orderedSame
@@ -516,7 +524,7 @@ struct SourceRequestBuilder {
 
         var output = text.replacingOccurrences(of: "&amp;", with: "&")
         for (key, value) in values where !key.isEmpty {
-            let encoded = urlEncodePreservingEscapes(value)
+            let encoded = urlEncodePreservingEscapes(value, isGBK: isGBK)
             output = output
                 .replacingOccurrences(of: "{{\(key)}}", with: encoded)
                 .replacingOccurrences(of: "{\(key)}", with: encoded)
@@ -553,8 +561,13 @@ struct SourceRequestBuilder {
         return value.addingPercentEncoding(withAllowedCharacters: allowed) ?? value
     }
 
-    private func urlEncodePreservingEscapes(_ value: String) -> String {
-        let bytes = Array(value.utf8)
+    private func urlEncodePreservingEscapes(_ value: String, isGBK: Bool = false) -> String {
+        let bytes: [UInt8]
+        if isGBK, let gbkData = LegadoHostServices.encodeGbkData(value) {
+            bytes = Array(gbkData)
+        } else {
+            bytes = Array(value.utf8)
+        }
         let hex = Array("0123456789ABCDEF".utf8)
         var output = ""
         output.reserveCapacity(value.utf8.count)

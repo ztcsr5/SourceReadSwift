@@ -1237,7 +1237,7 @@ final class LegadoHostServices {
         return remainder == 0 ? value : value + String(repeating: "=", count: 4 - remainder)
     }
 
-    private static let gbkEncoding = String.Encoding(
+    static let gbkEncoding = String.Encoding(
         rawValue: CFStringConvertEncodingToNSStringEncoding(CFStringEncoding(CFStringEncodings.GB_18030_2000.rawValue))
     )
 

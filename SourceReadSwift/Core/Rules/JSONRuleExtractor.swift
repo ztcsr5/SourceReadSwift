@@ -98,8 +98,15 @@ struct JSONRuleExtractor {
         if let rule {
             let trimmed = rule.trimmingCharacters(in: .whitespacesAndNewlines)
             if trimmed.contains("{{") && trimmed.contains("}}") {
-                let interpolated = interpolateTemplate(trimmed, item: item, variables: variables)
-                if !interpolated.isEmpty {
+                let interpolated = interpolateTemplate(trimmed, item: item, variables: variables).trimmingCharacters(in: .whitespacesAndNewlines)
+                if interpolated.hasPrefix("@js:") || interpolated.hasPrefix("<js>") || interpolated.contains("@js:") || interpolated.contains("<js>") || interpolated.contains("$.") || interpolated.contains("@json:") || interpolated.contains("##") {
+                    if let value = value(from: item, path: interpolated, variables: variables) {
+                        let text = stringify(value)
+                        if !text.isEmpty {
+                            return text
+                        }
+                    }
+                } else if !interpolated.isEmpty {
                     return interpolated
                 }
             }
@@ -763,13 +770,66 @@ struct JSONRuleExtractor {
     ) -> Any? {
         var script = rule.trimmingCharacters(in: .whitespacesAndNewlines)
         if script.hasPrefix("@js:") {
-            script = String(script.dropFirst(4))
-        } else if script.hasPrefix("<js>") && script.hasSuffix("</js>") {
+            script = String(script.dropFirst(4)).trimmingCharacters(in: .whitespacesAndNewlines)
+        } else if script.hasPrefix("<js>") && script.contains("</js>") {
             let start = script.index(script.startIndex, offsetBy: 4)
-            let end = script.index(script.endIndex, offsetBy: -5)
-            script = String(script[start..<end])
+            let end = script.range(of: "</js>")?.lowerBound ?? script.endIndex
+            let rest = String(script[script.range(of: "</js>")!.upperBound...])
+            script = String(script[start..<end]) + rest
         }
-        return evaluateRawJS(script: script, object: object, extraVariables: extraVariables)
+
+        var trailingRegex: [(pattern: String, replacement: String)] = []
+        if script.hasPrefix("##") {
+            let parts = script.components(separatedBy: "##").dropFirst()
+            var index = parts.startIndex
+            while index < parts.endIndex {
+                let pattern = parts[index]
+                let replacement = parts.index(after: index) < parts.endIndex ? parts[parts.index(after: index)] : ""
+                if !pattern.isEmpty { trailingRegex.append((pattern, replacement)) }
+                index = parts.index(index, offsetBy: 2, limitedBy: parts.endIndex) ?? parts.endIndex
+            }
+            var text = stringify(object)
+            for t in trailingRegex {
+                text = text.replacingOccurrences(of: t.pattern, with: t.replacement, options: .regularExpression)
+            }
+            return text
+        }
+
+        if script.contains("##") {
+            if let lineBreak = script.range(of: "\n##", options: .backwards) {
+                let regexText = String(script[lineBreak.upperBound - 2...]).trimmingCharacters(in: .whitespacesAndNewlines)
+                script = String(script[..<lineBreak.lowerBound]).trimmingCharacters(in: .whitespacesAndNewlines)
+                let parts = regexText.components(separatedBy: "##").dropFirst()
+                var index = parts.startIndex
+                while index < parts.endIndex {
+                    let pattern = parts[index]
+                    let replacement = parts.index(after: index) < parts.endIndex ? parts[parts.index(after: index)] : ""
+                    if !pattern.isEmpty { trailingRegex.append((pattern, replacement)) }
+                    index = parts.index(index, offsetBy: 2, limitedBy: parts.endIndex) ?? parts.endIndex
+                }
+            } else if let hashRange = script.range(of: "##", options: .backwards) {
+                let regexText = String(script[hashRange.lowerBound...]).trimmingCharacters(in: .whitespacesAndNewlines)
+                let parts = regexText.components(separatedBy: "##").dropFirst()
+                if parts.count >= 2 {
+                    script = String(script[..<hashRange.lowerBound]).trimmingCharacters(in: .whitespacesAndNewlines)
+                    var index = parts.startIndex
+                    while index < parts.endIndex {
+                        let pattern = parts[index]
+                        let replacement = parts.index(after: index) < parts.endIndex ? parts[parts.index(after: index)] : ""
+                        if !pattern.isEmpty { trailingRegex.append((pattern, replacement)) }
+                        index = parts.index(index, offsetBy: 2, limitedBy: parts.endIndex) ?? parts.endIndex
+                    }
+                }
+            }
+        }
+
+        let jsResult = evaluateRawJS(script: script, object: object, extraVariables: extraVariables)
+        guard !trailingRegex.isEmpty, let jsResult else { return jsResult }
+        var text = stringify(jsResult)
+        for t in trailingRegex {
+            text = text.replacingOccurrences(of: t.pattern, with: t.replacement, options: .regularExpression)
+        }
+        return text
     }
 
     func evaluateRawJS(

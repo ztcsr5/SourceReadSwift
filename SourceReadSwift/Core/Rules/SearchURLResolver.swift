@@ -284,6 +284,8 @@ struct SearchURLResolver {
             source.bookSourceUrl,
             source.header,
             source.customConfig,
+            source.ruleSearch?.raw,
+            source.ruleSearch?.fields["charset"],
             source.raw["charset"],
             source.raw["encoding"],
             source.raw["bookSourceComment"],

@@ -111,6 +111,13 @@ final class InsecureTrustSessionDelegate: NSObject, URLSessionDelegate, URLSessi
                 sanitized.url = resolved
             }
         }
+        guard let targetURL = sanitized.url,
+              let scheme = targetURL.scheme?.lowercased(),
+              scheme == "http" || scheme == "https" else {
+            // Abort redirect to invalid or non-HTTP scheme, deliver current response
+            completionHandler(nil)
+            return
+        }
         completionHandler(sanitized)
     }
 }
@@ -171,6 +178,15 @@ final class URLSessionSourceNetworkClient: SourceNetworkClient, @unchecked Senda
                 bodyWasDecoded: decoded.wasDecoded,
                 contentEncodings: decoded.encodings
             ))
+        } catch let urlError as URLError {
+            if urlError.code == .badURL {
+                return .failure(.network("源站重定向地址无效或目标域名已关停"))
+            } else if urlError.code == .timedOut {
+                return .failure(.network("连接超时"))
+            } else if urlError.code == .cannotFindHost || urlError.code == .cannotConnectToHost {
+                return .failure(.network("无法连接到服务器或域名已下线"))
+            }
+            return .failure(.network(urlError.localizedDescription))
         } catch {
             return .failure(.network(error.localizedDescription))
         }
