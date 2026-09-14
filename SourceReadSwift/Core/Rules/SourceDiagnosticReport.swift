@@ -427,6 +427,7 @@ struct SourceDiagnosticBatchReport: Identifiable, Codable, Hashable, Sendable {
                 }
             }
         }
+        return lines.joined(separator: "\n")
     }
 }
 
