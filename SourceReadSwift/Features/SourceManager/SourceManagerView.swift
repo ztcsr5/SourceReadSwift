@@ -1226,9 +1226,18 @@ struct SourceManagerView: View {
         .presentationDetents([.medium, .large])
     }
 
+private struct BatchCheckCoordinatorObserver<Content: View>: View {
+    @ObservedObject var coordinator: SourceBatchCheckCoordinator
+    @ViewBuilder let content: (SourceBatchCheckCoordinator) -> Content
+
+    var body: some View {
+        content(coordinator)
+    }
+}
+
     @ViewBuilder
     private var batchCheckStatusBanner: some View {
-        let coordinator = appState.batchCheckCoordinator
+        BatchCheckCoordinatorObserver(coordinator: appState.batchCheckCoordinator) { coordinator in
         if coordinator.isRunning {
             Button {
                 showBatchCheckSheet = true
@@ -1321,14 +1330,15 @@ struct SourceManagerView: View {
             }
             .buttonStyle(.plain)
         }
+        }
     }
 
     private var batchCheckSheet: some View {
-        let coordinator = appState.batchCheckCoordinator
-        let sourcesToTest = resolvedBatchSources
-        let targetCount = coordinator.isRunning ? coordinator.totalCount : sourcesToTest.count
+        BatchCheckCoordinatorObserver(coordinator: appState.batchCheckCoordinator) { coordinator in
+            let sourcesToTest = resolvedBatchSources
+            let targetCount = coordinator.isRunning ? coordinator.totalCount : sourcesToTest.count
 
-        return NavigationStack {
+            NavigationStack {
             VStack(alignment: .leading, spacing: 14) {
                 Text("当前将测试 \(targetCount) 个书源（并发 \(SandboxEnvironment.recommendedBatchConcurrency) 个）。")
                     .font(.footnote)
@@ -1634,6 +1644,7 @@ struct SourceManagerView: View {
             }
         }
         .presentationDetents([.medium, .large])
+        }
     }
 
     private func currentOrSavedBatchReport() -> SourceDiagnosticBatchReport? {

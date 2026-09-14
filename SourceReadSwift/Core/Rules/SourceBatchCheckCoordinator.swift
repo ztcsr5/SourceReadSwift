@@ -24,7 +24,7 @@ final class SourceBatchCheckCoordinator: ObservableObject {
     @Published private(set) var verificationRequiredCount: Int = 0
     @Published private(set) var blockedCount: Int = 0
     @Published private(set) var results: [SourceBatchCheckResult] = []
-    @Published private(set) var diagnosticReports: [String: SourceDiagnosticReport] = [:]
+    private(set) var diagnosticReports: [String: SourceDiagnosticReport] = [:]
     @Published private(set) var lastSavedReport: SourceDiagnosticBatchReport? = nil
     @Published private(set) var startedAt: Date? = nil
     @Published private(set) var finishedAt: Date? = nil
@@ -135,6 +135,33 @@ final class SourceBatchCheckCoordinator: ObservableObject {
         var lastUIUpdateTime = Date()
         var loopCount = 0
 
+        var localChecked = 0
+        var localPassed = 0
+        var localSearchPassed = 0
+        var localWarning = 0
+        var localFailed = 0
+        var localLoginRequired = 0
+        var localVerificationRequired = 0
+        var localBlocked = 0
+        var latestSourceName = ""
+
+        func syncUI() {
+            guard self.checkedCount != localChecked || !pendingResults.isEmpty else { return }
+            self.checkedCount = localChecked
+            self.passedCount = localPassed
+            self.searchPassedCount = localSearchPassed
+            self.warningCount = localWarning
+            self.failedCount = localFailed
+            self.loginRequiredCount = localLoginRequired
+            self.verificationRequiredCount = localVerificationRequired
+            self.blockedCount = localBlocked
+            self.currentSourceName = latestSourceName
+            if !pendingResults.isEmpty {
+                self.results.append(contentsOf: pendingResults)
+                pendingResults.removeAll(keepingCapacity: true)
+            }
+        }
+
         func flushPending(isFinal: Bool = false) {
             if !pendingHealthRecords.isEmpty {
                 healthStore.recordBatch(pendingHealthRecords, persistImmediately: isFinal)
@@ -176,6 +203,8 @@ final class SourceBatchCheckCoordinator: ObservableObject {
                     if let report = outcome.diagnosticReport {
                         let status = SourceBatchCheckStatus(report.overallStatus)
                         let message = result.message.nilIfEmpty ?? Self.batchResultMessage(report: report, fallback: "书源未返回诊断摘要")
+                        // Passed sources don't need duplicate report objects in results array
+                        let retainedReport = report.overallStatus == .passed ? nil : report
                         result = SourceBatchCheckResult(
                             sourceName: result.sourceName,
                             sourceURL: result.sourceURL,
@@ -183,29 +212,30 @@ final class SourceBatchCheckCoordinator: ObservableObject {
                             message: message,
                             elapsedMilliseconds: result.elapsedMilliseconds,
                             resultCount: report.steps.first(where: { $0.stage == .search })?.matchCount ?? result.resultCount,
-                            diagnosticReport: report
+                            diagnosticReport: retainedReport
                         )
                     }
 
-                    self.checkedCount += 1
-                    self.currentSourceName = outcome.source.bookSourceName
+                    localChecked += 1
+                    latestSourceName = outcome.source.bookSourceName
                     pendingResults.append(result)
                     if let report = outcome.diagnosticReport {
-                        self.diagnosticReports[outcome.source.bookSourceUrl] = report
+                        // Store lightweight version for passed sources to prune heavy JavaScript strings & logs
+                        self.diagnosticReports[outcome.source.bookSourceUrl] = report.slimmedForBatchRetention()
                     }
 
-                    // Count statistics
+                    // Count statistics locally
                     switch result.status {
-                    case .passed: self.passedCount += 1
-                    case .warning: self.warningCount += 1
-                    case .failed: self.failedCount += 1
-                    case .requiresLogin: self.loginRequiredCount += 1
-                    case .verificationRequired: self.verificationRequiredCount += 1
-                    case .blocked: self.blockedCount += 1
+                    case .passed: localPassed += 1
+                    case .warning: localWarning += 1
+                    case .failed: localFailed += 1
+                    case .requiresLogin: localLoginRequired += 1
+                    case .verificationRequired: localVerificationRequired += 1
+                    case .blocked: localBlocked += 1
                     }
 
                     if result.resultCount > 0 {
-                        self.searchPassedCount += 1
+                        localSearchPassed += 1
                     }
 
                     // Record health
@@ -256,11 +286,10 @@ final class SourceBatchCheckCoordinator: ObservableObject {
                     }
 
                     let now = Date()
-                    // Throttle SwiftUI List array mutations (every 250ms or 12 items) to keep the UI smooth
+                    // Throttle SwiftUI mutations (every 250ms or 12 items) to keep the UI smooth and prevent Task floods
                     if now.timeIntervalSince(lastUIUpdateTime) >= 0.25 || pendingResults.count >= 12 {
                         lastUIUpdateTime = now
-                        self.results.append(contentsOf: pendingResults)
-                        pendingResults.removeAll(keepingCapacity: true)
+                        syncUI()
                     }
 
                     // Non-blocking background checkpoint at most once every 45 seconds
@@ -268,25 +297,21 @@ final class SourceBatchCheckCoordinator: ObservableObject {
                         lastCheckpointTime = now
                         flushPending(isFinal: false)
                         self.saveIncrementalReport()
+                        URLCache.shared.removeAllCachedResponses()
                     }
                 }
             }
 
-            // Flush pending results for this batch chunk
-            if !pendingResults.isEmpty {
-                self.results.append(contentsOf: pendingResults)
-                pendingResults.removeAll(keepingCapacity: true)
-            }
+            // Sync UI and release network cache per chunk
+            syncUI()
+            URLCache.shared.removeAllCachedResponses()
         }
 
-        if !pendingResults.isEmpty {
-            self.results.append(contentsOf: pendingResults)
-            pendingResults.removeAll()
-        }
-
+        syncUI()
         flushPending(isFinal: true)
         healthStore.flushToDisk()
         historyStore.flushToDisk()
+        URLCache.shared.removeAllCachedResponses()
 
         guard !Task.isCancelled, activeSessionID == sessionID else {
             endBackgroundExecution()

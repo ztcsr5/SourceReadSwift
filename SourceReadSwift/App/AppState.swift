@@ -246,12 +246,5 @@ final class AppState: ObservableObject {
             }
             .store(in: &cancellables)
 
-        batchCheckCoordinator.objectWillChange
-            .sink { [weak self] _ in
-                Task { @MainActor [weak self] in
-                    self?.objectWillChange.send()
-                }
-            }
-            .store(in: &cancellables)
     }
 }

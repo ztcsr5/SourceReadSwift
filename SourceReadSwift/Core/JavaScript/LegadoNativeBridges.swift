@@ -117,14 +117,14 @@ final class LegadoTagBridge: NSObject, LegadoTagExport {
 /// Small command bridge used by the compatibility prelude. Public `java.*` names stay
 /// identical to Legado while the actual state and side effects live in native Swift.
 final class LegadoJavaHostBridge: NSObject, LegadoJavaHostExport {
-    private let executionContext: RuleExecutionContext
+    private weak var executionContext: RuleExecutionContext?
     private let services: LegadoHostServices
 
     /// Per-runtime sandbox exposed for test/diagnostic tooling without
     /// leaking the host services object into JavaScript.
     var sandboxURL: URL { services.sandboxURL }
 
-    init(executionContext: RuleExecutionContext) {
+    init(executionContext: RuleExecutionContext?) {
         self.executionContext = executionContext
         self.services = LegadoHostServices(executionContext: executionContext)
         super.init()
@@ -147,33 +147,33 @@ final class LegadoJavaHostBridge: NSObject, LegadoJavaHostExport {
             switch method {
         case "put":
             guard let key = arguments.first else { return "" }
-            return executionContext.put(arguments.dropFirst().first, for: RuleExecutionContext.bridgeString(key))
+            return executionContext?.put(arguments.dropFirst().first, for: RuleExecutionContext.bridgeString(key)) ?? ""
         case "get":
             guard let key = arguments.first else { return "" }
-            return executionContext.get(RuleExecutionContext.bridgeString(key))
+            return executionContext?.get(RuleExecutionContext.bridgeString(key)) ?? ""
         case "remove":
             guard let key = arguments.first else { return false }
-            executionContext.remove(RuleExecutionContext.bridgeString(key))
+            executionContext?.remove(RuleExecutionContext.bridgeString(key))
             return true
         case "setContent":
             let content = RuleExecutionContext.bridgeString(arguments.first)
-            executionContext.setValue(content, for: "result")
+            executionContext?.setValue(content, for: "result")
             return content
         case "getContent":
-            return executionContext.string(for: "result")
+            return executionContext?.string(for: "result") ?? ""
         case "setCookie":
             let url = arguments.count > 1
                 ? RuleExecutionContext.bridgeString(arguments[0])
-                : executionContext.string(for: "baseUrl")
+                : (executionContext?.string(for: "baseUrl") ?? "")
             let cookie = RuleExecutionContext.bridgeString(arguments.count > 1 ? arguments[1] : arguments.first)
             return services.setCookie(url: url, value: cookie)
         case "getCookie":
-            let url = arguments.first.map(RuleExecutionContext.bridgeString) ?? executionContext.string(for: "baseUrl")
+            let url = arguments.first.map(RuleExecutionContext.bridgeString) ?? (executionContext?.string(for: "baseUrl") ?? "")
             let key = arguments.count > 1 ? RuleExecutionContext.bridgeString(arguments[1]) : nil
             return services.cookie(url: url, key: key)
         case "log":
             let message = RuleExecutionContext.bridgeString(arguments.first)
-            executionContext.log(message)
+            executionContext?.log(message)
             return message
         case "ajaxAll":
             let urls: [String]
@@ -182,7 +182,7 @@ final class LegadoJavaHostBridge: NSObject, LegadoJavaHostExport {
             } else {
                 urls = arguments.map { RuleExecutionContext.bridgeString($0) }
             }
-            return urls.map { executionContext.networkHandler?($0) ?? "" } as NSArray
+            return urls.map { executionContext?.networkHandler?($0) ?? "" } as NSArray
         case "downloadFile":
             guard arguments.count >= 2 else { return "" }
             return services.downloadFile(
@@ -336,12 +336,12 @@ final class LegadoJavaHostBridge: NSObject, LegadoJavaHostExport {
         case "getVerificationCode":
             return services.verificationCode(imageURL: RuleExecutionContext.bridgeString(arguments.first))
         case "un7zFile", "unrarFile":
-            executionContext.recordBridgeFailure("java.\(method)", message: "archive format unsupported on this build; use ZIP or import a pre-extracted local fixture")
+            executionContext?.recordBridgeFailure("java.\(method)", message: "archive format unsupported on this build; use ZIP or import a pre-extracted local fixture")
             return ""
         case "sandboxPath":
             return services.sandboxURL.path
             default:
-                executionContext.recordBridgeFailure("java.\(method)", message: "unsupported host method")
+                executionContext?.recordBridgeFailure("java.\(method)", message: "unsupported host method")
                 return ""
             }
         }()
@@ -420,9 +420,9 @@ final class LegadoJavaHostBridge: NSObject, LegadoJavaHostExport {
 }
 
 final class LegadoRuleHostBridge: NSObject, LegadoRuleHostExport {
-    private let executionContext: RuleExecutionContext
+    private weak var executionContext: RuleExecutionContext?
 
-    init(executionContext: RuleExecutionContext) {
+    init(executionContext: RuleExecutionContext?) {
         self.executionContext = executionContext
         super.init()
     }
@@ -432,27 +432,27 @@ final class LegadoRuleHostBridge: NSObject, LegadoRuleHostExport {
     }
 
     func getElements(_ rule: String) -> LegadoElementsBridge {
-        let html = executionContext.string(for: "result")
-        let baseURL = executionContext.string(for: "baseUrl")
+        let html = executionContext?.string(for: "result") ?? ""
+        let baseURL = executionContext?.string(for: "baseUrl") ?? ""
         do {
             let document = try SwiftSoup.parse(html, normalizedBaseURL(baseURL))
             let selector = normalizedSelector(rule)
             let elements = selector.isEmpty ? [document] : Array(try document.select(selector))
             return LegadoElementsBridge(elements: elements, baseURL: baseURL)
         } catch {
-            executionContext.recordBridgeFailure("rule.getElements", message: error.localizedDescription)
-            executionContext.log("Rule getElements failed: \(rule) - \(error.localizedDescription)")
+            executionContext?.recordBridgeFailure("rule.getElements", message: error.localizedDescription)
+            executionContext?.log("Rule getElements failed: \(rule) - \(error.localizedDescription)")
             return LegadoElementsBridge(elements: [], baseURL: baseURL)
         }
     }
 
     func setContent(_ content: String) -> String {
-        executionContext.setValue(content, for: "result")
+        executionContext?.setValue(content, for: "result")
         return content
     }
 
     func content() -> String {
-        executionContext.string(for: "result")
+        executionContext?.string(for: "result") ?? ""
     }
 }
 
@@ -462,15 +462,15 @@ final class LegadoRuleHostBridge: NSObject, LegadoRuleHostExport {
 }
 
 final class LegadoJsoupBridge: NSObject, LegadoJsoupExport {
-    private let executionContext: RuleExecutionContext
+    private weak var executionContext: RuleExecutionContext?
 
-    init(executionContext: RuleExecutionContext) {
+    init(executionContext: RuleExecutionContext?) {
         self.executionContext = executionContext
         super.init()
     }
 
     func parse(_ html: String) -> LegadoElementBridge {
-        parse(html: html, baseURL: executionContext.string(for: "baseUrl"))
+        parse(html: html, baseURL: executionContext?.string(for: "baseUrl") ?? "")
     }
 
     func parseWithBase(_ payload: JSValue) -> LegadoElementBridge {
@@ -488,8 +488,8 @@ final class LegadoJsoupBridge: NSObject, LegadoJsoupExport {
             let document = try SwiftSoup.parse(html, normalizedBaseURL(baseURL))
             return LegadoElementBridge(element: document, baseURL: baseURL)
         } catch {
-            executionContext.recordBridgeFailure("jsoup.parse", message: error.localizedDescription)
-            executionContext.log("Jsoup.parse failed: \(error.localizedDescription)")
+            executionContext?.recordBridgeFailure("jsoup.parse", message: error.localizedDescription)
+            executionContext?.log("Jsoup.parse failed: \(error.localizedDescription)")
             let document = try! SwiftSoup.parse("", normalizedBaseURL(baseURL))
             return LegadoElementBridge(element: document, baseURL: baseURL)
         }
@@ -571,12 +571,12 @@ final class LegadoJXNodeBridge: NSObject, LegadoJXNodeExport {
 }
 
 final class LegadoJXNodeFactoryBridge: NSObject, LegadoJXNodeFactoryExport {
-    private let executionContext: RuleExecutionContext
-    init(executionContext: RuleExecutionContext) { self.executionContext = executionContext; super.init() }
+    private weak var executionContext: RuleExecutionContext?
+    init(executionContext: RuleExecutionContext?) { self.executionContext = executionContext; super.init() }
 
     func create(_ value: JSValue) -> LegadoJXNodeBridge {
         let object = value.toObject() ?? NSNull()
-        let base = executionContext.string(for: "baseUrl")
+        let base = executionContext?.string(for: "baseUrl") ?? ""
         if let node = object as? LegadoJXNodeBridge { return node }
         if let element = object as? LegadoElementBridge { return LegadoJXNodeBridge(value: element, baseURL: base) }
         return LegadoJXNodeBridge(value: object, baseURL: base)

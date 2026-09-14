@@ -11,14 +11,14 @@ import Security
 /// Native services required by Legado JavaScript sources.  All filesystem access is
 /// constrained to the app container; relative paths live under Documents/LegadoSandbox.
 final class LegadoHostServices {
-    private let executionContext: RuleExecutionContext
+    private weak var executionContext: RuleExecutionContext?
     private let fileManager: FileManager
     let sandboxURL: URL
     private let queryTTFLock = NSLock()
     private var queryTTFObjects: [String: QueryTTF] = [:]
     private var queryTTFSequence = 0
 
-    init(executionContext: RuleExecutionContext, fileManager: FileManager = .default) {
+    init(executionContext: RuleExecutionContext?, fileManager: FileManager = .default) {
         self.executionContext = executionContext
         self.fileManager = fileManager
         let documents = fileManager.urls(for: .documentDirectory, in: .userDomainMask).first
@@ -30,7 +30,7 @@ final class LegadoHostServices {
     // MARK: - Cookie
 
     func cookie(url rawURL: String, key: String?) -> String {
-        let contextHeader = executionContext.string(for: "cookieHeader")
+        let contextHeader = executionContext?.string(for: "cookieHeader") ?? ""
         guard let url = URL(string: rawURL),
               let cookies = HTTPCookieStorage.shared.cookies(for: url) else {
             if let key, !key.isEmpty {
@@ -51,7 +51,7 @@ final class LegadoHostServices {
 
     @discardableResult
     func setCookie(url rawURL: String, value: String) -> String {
-        let existing = executionContext.string(for: "cookieHeader").nilIfEmpty
+        let existing = executionContext?.string(for: "cookieHeader").nilIfEmpty
         // `cookie.setCookie` receives a request Cookie header, not a single
         // Set-Cookie response field. Parse every pair and ignore attributes
         // such as Path/Domain so `sid=1; theme=dark` keeps both values.
@@ -60,7 +60,7 @@ final class LegadoHostServices {
             .map { "\($0.name)=\($0.value)" }
             .joined(separator: "; ")
         let merged = CookieHeaderParser.merge(pairs.isEmpty ? value : pairs, into: existing)
-        executionContext.setValue(merged, for: "cookieHeader")
+        executionContext?.setValue(merged, for: "cookieHeader")
         guard let url = URL(string: rawURL), !value.isEmpty else { return merged }
         for pair in CookieHeaderParser.pairs(fromCookieHeader: value)
             .filter({ !Self.cookieAttributes.contains($0.name.lowercased()) }) {

@@ -42,7 +42,22 @@ final class RuleExecutionContext: @unchecked Sendable {
     func resetRuntime() {
         lock.lock()
         defer { lock.unlock() }
+        cachedRuntime?.collectGarbage()
         cachedRuntime = nil
+    }
+
+    func cleanUp() {
+        lock.lock()
+        defer { lock.unlock() }
+        cachedRuntime?.collectGarbage()
+        cachedRuntime = nil
+        values.removeAll(keepingCapacity: false)
+        recordedLogs.removeAll(keepingCapacity: false)
+        javascriptEvidence.removeAll(keepingCapacity: false)
+    }
+
+    deinit {
+        cleanUp()
     }
 
     init(
