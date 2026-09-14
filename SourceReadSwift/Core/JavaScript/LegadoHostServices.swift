@@ -211,7 +211,7 @@ final class LegadoHostServices {
             }
             return String(data: Data(output), encoding: .utf8) ?? Data(output).base64EncodedString()
         } catch {
-            executionContext.log("AES failed: \(error.localizedDescription)")
+            executionContext?.log("AES failed: \(error.localizedDescription)")
             return operation.localizedCaseInsensitiveContains("bytearray") ? ([] as NSArray) : ""
         }
     }
@@ -274,7 +274,7 @@ final class LegadoHostServices {
         guard let secKey = makeSecKey(key: key, isPrivate: operation.localizedCaseInsensitiveContains("private") ||
                                       operation.localizedCaseInsensitiveContains("decrypt"),
                                       operation: operation) else {
-            executionContext.recordBridgeFailure("java.createAsymmetricCrypto", message: "invalid RSA key")
+            executionContext?.recordBridgeFailure("java.createAsymmetricCrypto", message: "invalid RSA key")
             return ""
         }
         let decrypt = operation.localizedCaseInsensitiveContains("decrypt")
@@ -282,7 +282,7 @@ final class LegadoHostServices {
         if decrypt {
             let payloadText = RuleExecutionContext.bridgeString(value)
             guard let decoded = Data(base64Encoded: Self.normalizedBase64(payloadText)) else {
-                executionContext.recordBridgeFailure("java.createAsymmetricCrypto", message: "ciphertext is not Base64")
+                executionContext?.recordBridgeFailure("java.createAsymmetricCrypto", message: "ciphertext is not Base64")
                 return ""
             }
             payload = decoded
@@ -291,7 +291,7 @@ final class LegadoHostServices {
         }
         let algorithm = rsaEncryptionAlgorithm(transformation)
         guard SecKeyIsAlgorithmSupported(secKey, decrypt ? .decrypt : .encrypt, algorithm) else {
-            executionContext.recordBridgeFailure("java.createAsymmetricCrypto", message: "unsupported RSA transformation")
+            executionContext?.recordBridgeFailure("java.createAsymmetricCrypto", message: "unsupported RSA transformation")
             return ""
         }
         let result: Data?
@@ -301,7 +301,7 @@ final class LegadoHostServices {
             result = SecKeyCreateEncryptedData(secKey, algorithm, payload as CFData, nil) as Data?
         }
         guard let result else {
-            executionContext.recordBridgeFailure("java.createAsymmetricCrypto", message: decrypt ? "RSA decrypt failed" : "RSA encrypt failed")
+            executionContext?.recordBridgeFailure("java.createAsymmetricCrypto", message: decrypt ? "RSA decrypt failed" : "RSA encrypt failed")
             return ""
         }
         return decrypt ? (String(data: result, encoding: .utf8) ?? result.base64EncodedString()) : result.base64EncodedString()
@@ -311,13 +311,13 @@ final class LegadoHostServices {
         let verify = operation.localizedCaseInsensitiveContains("verify")
         let isPrivate = !verify
         guard let secKey = makeSecKey(key: key, isPrivate: isPrivate, operation: operation) else {
-            executionContext.recordBridgeFailure("java.createSign", message: "invalid RSA key")
+            executionContext?.recordBridgeFailure("java.createSign", message: "invalid RSA key")
             return verify ? "false" : ""
         }
         let message = data(from: value)
         let secAlgorithm = rsaSignatureAlgorithm(algorithmName)
         guard SecKeyIsAlgorithmSupported(secKey, verify ? .verify : .sign, secAlgorithm) else {
-            executionContext.recordBridgeFailure("java.createSign", message: "unsupported signature algorithm (algorithmName)")
+            executionContext?.recordBridgeFailure("java.createSign", message: "unsupported signature algorithm (algorithmName)")
             return verify ? "false" : ""
         }
         if verify {
@@ -333,7 +333,7 @@ final class LegadoHostServices {
             return valid ? "true" : "false"
         }
         guard let output = SecKeyCreateSignature(secKey, secAlgorithm, message as CFData, nil) as Data? else {
-            executionContext.recordBridgeFailure("java.createSign", message: "RSA signing failed")
+            executionContext?.recordBridgeFailure("java.createSign", message: "RSA signing failed")
             return ""
         }
         if operation.localizedCaseInsensitiveContains("hex") {
@@ -507,7 +507,7 @@ final class LegadoHostServices {
             }
         }
         guard !bytes.isEmpty else {
-            executionContext.recordBridgeFailure("java.queryTTF", message: "empty font payload")
+            executionContext?.recordBridgeFailure("java.queryTTF", message: "empty font payload")
             return ""
         }
         let object = QueryTTF(data: Data(bytes))
@@ -547,9 +547,9 @@ final class LegadoHostServices {
     // a user-entered value through java.put("captcha:<url>", value); absent
     // that value we return an empty string and leave an actionable diagnostic.
     func verificationCode(imageURL: String) -> String {
-        let cached = executionContext.get("captcha:\(imageURL)")
+        let cached = executionContext?.get("captcha:\(imageURL)") ?? ""
         if !cached.isEmpty { return cached }
-        executionContext.recordBridgeFailure("java.getVerificationCode", message: "verification-required")
+        executionContext?.recordBridgeFailure("java.getVerificationCode", message: "verification-required")
         return ""
     }
 
@@ -599,7 +599,7 @@ final class LegadoHostServices {
             }
             return output.map { NSNumber(value: $0) } as NSArray
         } catch {
-            executionContext.log("\(kind) cipher failed: \(error.localizedDescription)")
+            executionContext?.log("\(kind) cipher failed: \(error.localizedDescription)")
             return []
         }
     }
@@ -631,7 +631,7 @@ final class LegadoHostServices {
             let plain = try aes.decrypt(ciphertext)
             return plain.map { NSNumber(value: $0) } as NSArray
         } catch {
-            executionContext.log("AES passphrase decrypt failed: \(error.localizedDescription)")
+            executionContext?.log("AES passphrase decrypt failed: \(error.localizedDescription)")
             return []
         }
     }
@@ -654,7 +654,7 @@ final class LegadoHostServices {
             return (Array("Salted__".utf8) + salt + ciphertext)
                 .map { NSNumber(value: $0) } as NSArray
         } catch {
-            executionContext.log("AES passphrase encrypt failed: \(error.localizedDescription)")
+            executionContext?.log("AES passphrase encrypt failed: \(error.localizedDescription)")
             return []
         }
     }
@@ -725,7 +725,7 @@ final class LegadoHostServices {
                 capacity *= 2
             }
         }
-        executionContext.log("InflaterInputStream failed to decode payload")
+        executionContext?.log("InflaterInputStream failed to decode payload")
         return []
     }
 
@@ -737,7 +737,7 @@ final class LegadoHostServices {
     func gunzip(_ value: Any?) -> NSArray {
         let input = bytes(from: value)
         guard let payload = gzipPayload(input) else {
-            executionContext.log("GZIPInputStream rejected an invalid gzip envelope")
+            executionContext?.log("GZIPInputStream rejected an invalid gzip envelope")
             return []
         }
         if let output = zlibInflate(payload, rawDeflate: true) {
@@ -767,7 +767,7 @@ final class LegadoHostServices {
             }
             capacity *= 2
         }
-        executionContext.log("GZIPInputStream failed to decode payload")
+        executionContext?.log("GZIPInputStream failed to decode payload")
         return []
     }
 
@@ -906,7 +906,7 @@ final class LegadoHostServices {
             if let values = content as? NSArray { return values }
             return NSString(string: RuleExecutionContext.bridgeString(content))
         } catch {
-            executionContext.log("cacheFile failed: \(error.localizedDescription)")
+            executionContext?.log("cacheFile failed: \(error.localizedDescription)")
             return NSString(string: "")
         }
     }
@@ -920,7 +920,7 @@ final class LegadoHostServices {
             try data(from: content).write(to: url, options: .atomic)
             return true
         } catch {
-            executionContext.log("writeFile failed: \(error.localizedDescription)")
+            executionContext?.log("writeFile failed: \(error.localizedDescription)")
             return false
         }
     }
@@ -991,7 +991,7 @@ final class LegadoHostServices {
             try fileManager.createDirectory(at: url, withIntermediateDirectories: true)
             return true
         } catch {
-            executionContext.log("mkdirs failed: \(error.localizedDescription)")
+            executionContext?.log("mkdirs failed: \(error.localizedDescription)")
             return false
         }
     }
@@ -1005,7 +1005,7 @@ final class LegadoHostServices {
             }
             return true
         } catch {
-            executionContext.log("deleteFile failed: \(error.localizedDescription)")
+            executionContext?.log("deleteFile failed: \(error.localizedDescription)")
             return false
         }
     }
@@ -1021,7 +1021,7 @@ final class LegadoHostServices {
                 try data.write(to: destination, options: .atomic)
                 output = destination.path
             } catch {
-                self.executionContext.log("downloadFile failed: \(error.localizedDescription)")
+                self.executionContext?.log("downloadFile failed: \(error.localizedDescription)")
             }
         }.resume()
         _ = semaphore.wait(timeout: .now() + 30)
@@ -1036,7 +1036,7 @@ final class LegadoHostServices {
             try fileManager.unzipItem(at: archiveURL, to: destination)
             return destination.path
         } catch {
-            executionContext.log("unzipFile failed: \(error.localizedDescription)")
+            executionContext?.log("unzipFile failed: \(error.localizedDescription)")
             return ""
         }
     }
@@ -1062,7 +1062,7 @@ final class LegadoHostServices {
             _ = try archive.extract(entry) { data.append($0) }
             return data
         } catch {
-            executionContext.log("ZIP read failed: \(error.localizedDescription)")
+            executionContext?.log("ZIP read failed: \(error.localizedDescription)")
             return nil
         }
     }

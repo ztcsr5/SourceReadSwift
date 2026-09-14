@@ -590,11 +590,11 @@ final class JSCoreRuntime {
         }
         let post: @convention(block) (String, String, String) -> String = { url, body, headers in
             let requestText = weakSelf?.requestText(url: url, body: body, headers: headers, includeStoredBody: true) ?? "\(url)@Body:\(body)"
-            if let response = weakSelf?.executionContext.responseHandler?(requestText) {
-                weakSelf?.executionContext.ingestResponse(response)
+            if let response = weakSelf?.executionContext?.responseHandler?(requestText) {
+                weakSelf?.executionContext?.ingestResponse(response)
                 return response.body
             }
-            return weakSelf?.executionContext.networkHandler?(requestText) ?? ajaxHandler?(requestText) ?? ""
+            return weakSelf?.executionContext?.networkHandler?(requestText) ?? ajaxHandler?(requestText) ?? ""
         }
         let postResponse: @convention(block) (String, String, String) -> NSDictionary = { url, body, headers in
             guard let runtime = weakSelf else { return [:] }
@@ -636,10 +636,10 @@ final class JSCoreRuntime {
             return ["body": value, "url": url, "statusCode": 200, "headers": [:]] as NSDictionary
         }
         let put: @convention(block) (String, String) -> String = { key, value in
-            weakSelf?.executionContext.put(value, for: key) ?? value
+            weakSelf?.executionContext?.put(value, for: key) ?? value
         }
         let getStore: @convention(block) (String) -> String = { key in
-            weakSelf?.executionContext.get(key) ?? ""
+            weakSelf?.executionContext?.get(key) ?? ""
         }
         let removeElements: @convention(block) (String, String) -> String = { html, selector in
             do {
