@@ -29,9 +29,9 @@ final class SourceDiagnosticReportExporterTests: XCTestCase {
                 SourceDiagnosticStep(
                     stage: .search,
                     status: .failed,
-                    responseStatusCode: 504,
                     responseSummary: "The request timed out. 连接超时",
-                    failureClassification: "network.timeout"
+                    failureClassification: "network.timeout",
+                    responseStatusCode: 504
                 )
             ]
         )
@@ -45,9 +45,9 @@ final class SourceDiagnosticReportExporterTests: XCTestCase {
                 SourceDiagnosticStep(
                     stage: .search,
                     status: .verificationRequired,
-                    responseStatusCode: 403,
                     responseSummary: "Cloudflare Turnstile challenge detected 人机验证",
-                    failureClassification: "anti_bot.cloudflare"
+                    failureClassification: "anti_bot.cloudflare",
+                    responseStatusCode: 403
                 )
             ]
         )
