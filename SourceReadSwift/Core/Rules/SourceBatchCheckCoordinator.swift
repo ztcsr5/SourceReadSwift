@@ -27,7 +27,7 @@ final class SourceBatchCheckCoordinator: ObservableObject {
     @Published private(set) var lastSavedReport: SourceDiagnosticBatchReport? = nil
     @Published private(set) var startedAt: Date? = nil
     @Published private(set) var finishedAt: Date? = nil
-    @Published private(set) var keyword: String = "我的"
+    @Published private(set) var keyword: String = "斗破苍穹"
     @Published private(set) var deepCheck: Bool = true
     @Published var activeSources: [BookSource] = []
 
@@ -45,8 +45,12 @@ final class SourceBatchCheckCoordinator: ObservableObject {
         return min(1.0, max(0.0, Double(checkedCount) / Double(totalCount)))
     }
 
+    var searchPassedCount: Int {
+        results.filter { $0.resultCount > 0 }.count
+    }
+
     var summaryText: String {
-        "已测 \(checkedCount)/\(totalCount) · 正常 \(passedCount) · 警告 \(warningCount) · 异常 \(failedCount + loginRequiredCount + verificationRequiredCount + blockedCount)"
+        "已测 \(checkedCount)/\(totalCount) · 四级全绿 \(passedCount) · 搜书可用 \(searchPassedCount) · 异常 \(failedCount + loginRequiredCount + verificationRequiredCount + blockedCount)"
     }
 
     // MARK: - Lifecycle Controls

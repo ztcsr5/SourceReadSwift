@@ -68,7 +68,7 @@ final class SourceDiagnosticReportExporterTests: XCTestCase {
         XCTAssertTrue(text.contains("测试关键词：《修真》"))
         XCTAssertTrue(text.contains("检测总数：3 / 3 个书源"))
         XCTAssertTrue(text.contains("综合通过率：33.3%"))
-        XCTAssertTrue(text.contains("🟢 正常可用 (PASS): 1 (33.3%)"))
+        XCTAssertTrue(text.contains("🟢 四级全绿 (PASS): 1 (33.3%)"))
         XCTAssertTrue(text.contains("🔴 访问失败 (FAIL): 1 (33.3%)"))
         XCTAssertTrue(text.contains("🟣 验证码/盾 (VERIFY): 1 (33.3%)"))
         XCTAssertTrue(text.contains("⚠️ 主要异常分类："))

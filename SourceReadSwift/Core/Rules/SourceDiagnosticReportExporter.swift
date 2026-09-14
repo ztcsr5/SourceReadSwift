@@ -147,6 +147,9 @@ enum SourceDiagnosticReportExporter {
         let login = batch.reports.filter { $0.overallStatus == .requiresLogin }.count
         let verify = batch.reports.filter { $0.overallStatus == .verificationRequired }.count
         let blocked = batch.reports.filter { $0.overallStatus == .blocked }.count
+        let searchPassed = batch.reports.filter { r in
+            (r.steps.first(where: { $0.stage == .search })?.matchCount ?? 0) > 0
+        }.count
         let passRate = batch.reports.isEmpty ? 0.0 : (Double(passed) / Double(batch.reports.count) * 100.0)
 
         var md = ""
@@ -154,12 +157,15 @@ enum SourceDiagnosticReportExporter {
         md += "- **体检时间**: \(dateString)\n"
         md += "- **测试关键词**: 《\(batch.keyword)》\n"
         md += "- **检测总数**: \(batch.reports.count) / \(total) 个书源\n"
-        md += "- **综合通过率**: \(String(format: "%.1f", passRate))%\n\n"
+        md += "- **综合通过率**: 四级全绿 \(String(format: "%.1f", passRate))% · 搜书可用 \(percentage(searchPassed, total: batch.reports.count))\n\n"
 
         md += "### 📊 状态分布看板\n\n"
         md += "| 状态指标 | 数量 | 占比 | 简评 |\n"
         md += "| :--- | :--- | :--- | :--- |\n"
-        md += "| 🟢 **PASS (完全健康)** | \(passed) | \(percentage(passed, total: batch.reports.count)) | 搜索、详情、目录、正文四级全绿 |\n"
+        md += "| 🟢 **PASS (四级全绿)** | \(passed) | \(percentage(passed, total: batch.reports.count)) | 搜索、详情、目录、正文四级全绿可正常阅读 |\n"
+        if searchPassed > passed {
+            md += "| 🔵 **SEARCH (搜书可用)** | \(searchPassed) | \(percentage(searchPassed, total: batch.reports.count)) | 搜索接口能正常检索到书籍列表 |\n"
+        }
         md += "| 🟡 **WARN (轻微异常)** | \(warning) | \(percentage(warning, total: batch.reports.count)) | 存在截断或部分字段缺失，但不影响阅读 |\n"
         md += "| 🔴 **FAIL (解析失败)** | \(failed) | \(percentage(failed, total: batch.reports.count)) | 域名失效、404 或解析规则出错 |\n"
         md += "| 🟠 **LOGIN (需登录)** | \(login) | \(percentage(login, total: batch.reports.count)) | 站点需要提供账号凭据 |\n"
@@ -231,6 +237,9 @@ enum SourceDiagnosticReportExporter {
 
         let total = totalCount ?? batch.reports.count
         let passed = batch.reports.filter { $0.overallStatus == .passed }.count
+        let searchPassed = batch.reports.filter { r in
+            (r.steps.first(where: { $0.stage == .search })?.matchCount ?? 0) > 0
+        }.count
         let warning = batch.reports.filter { $0.overallStatus == .warning }.count
         let failed = batch.reports.filter { $0.overallStatus == .failed }.count
         let login = batch.reports.filter { $0.overallStatus == .requiresLogin }.count
@@ -245,7 +254,10 @@ enum SourceDiagnosticReportExporter {
         text += "📊 检测总数：\(batch.reports.count) / \(total) 个书源\n"
         text += "📈 综合通过率：\(String(format: "%.1f", passRate))%\n"
         text += "-------------------------\n"
-        text += "🟢 正常可用 (PASS): \(passed) (\(percentage(passed, total: batch.reports.count)))\n"
+        text += "🟢 四级全绿 (PASS): \(passed) (\(percentage(passed, total: batch.reports.count)))\n"
+        if searchPassed > passed {
+            text += "🔵 搜书可用 (SEARCH): \(searchPassed) (\(percentage(searchPassed, total: batch.reports.count)))\n"
+        }
         text += "🟡 轻微异常 (WARN): \(warning) (\(percentage(warning, total: batch.reports.count)))\n"
         text += "🔴 访问失败 (FAIL): \(failed) (\(percentage(failed, total: batch.reports.count)))\n"
         if verify > 0 {

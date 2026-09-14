@@ -17,8 +17,17 @@ struct SourceManagerView: View {
     @State private var sourceRuleEditor: SourceRuleEditorLaunch?
     @State private var jsonPreview: SourceJSONPreview?
     @State private var sourceTest: SourceTestState?
+    private enum BatchCheckScope: String, CaseIterable, Identifiable {
+        case enabled = "已启用"
+        case all = "全部书源"
+        case selected = "当前选定"
+
+        var id: String { rawValue }
+    }
+
     @State private var showBatchCheckSheet = false
-    @State private var batchCheckKeyword = "我的"
+    @State private var batchCheckScope: BatchCheckScope = .enabled
+    @State private var batchCheckKeyword = "斗破苍穹"
     @State private var batchCheckDeepCheck = true
     @State private var batchCheckExportNotice: String?
     @State private var sourceLogin: BookSource?
@@ -99,6 +108,24 @@ struct SourceManagerView: View {
         return list.filter {
             [$0.bookSourceName, $0.bookSourceUrl, $0.bookSourceGroup ?? "", $0.searchUrl ?? ""]
                 .contains { $0.lowercased().contains(keyword) }
+        }
+    }
+
+    private var resolvedBatchSources: [BookSource] {
+        let coordinator = appState.batchCheckCoordinator
+        if coordinator.isRunning {
+            return coordinator.activeSources
+        }
+        switch batchCheckScope {
+        case .selected:
+            let selected = appState.sourceStore.sources.filter { selectedBookSourceURLs.contains($0.bookSourceUrl) }
+            if !selected.isEmpty { return selected }
+            if !coordinator.activeSources.isEmpty { return coordinator.activeSources }
+            return appState.sourceStore.sources.filter(\.enabled)
+        case .enabled:
+            return appState.sourceStore.sources.filter(\.enabled)
+        case .all:
+            return appState.sourceStore.sources
         }
     }
 
@@ -353,8 +380,8 @@ struct SourceManagerView: View {
             LazyVGrid(columns: [GridItem(.flexible(), spacing: 8), GridItem(.flexible(), spacing: 8)], spacing: 8) {
                 Button {
                     UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-                    let enabled = appState.sourceStore.sources.filter(\.enabled)
-                    appState.batchCheckCoordinator.activeSources = enabled
+                    batchCheckScope = .enabled
+                    appState.batchCheckCoordinator.activeSources = appState.sourceStore.sources.filter(\.enabled)
                     showBatchCheckSheet = true
                 } label: {
                     sourceActionTile("检测启用", systemImage: "checkmark.seal", tint: .green)
@@ -643,6 +670,7 @@ struct SourceManagerView: View {
 
                 Button("批量测试") {
                     UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                    batchCheckScope = .selected
                     let selected = appState.sourceStore.sources.filter { selectedBookSourceURLs.contains($0.bookSourceUrl) }
                     appState.batchCheckCoordinator.activeSources = selected
                     showBatchCheckSheet = true
@@ -1297,11 +1325,12 @@ struct SourceManagerView: View {
 
     private var batchCheckSheet: some View {
         let coordinator = appState.batchCheckCoordinator
+        let sourcesToTest = resolvedBatchSources
+        let targetCount = coordinator.isRunning ? coordinator.totalCount : sourcesToTest.count
+
         return NavigationStack {
             VStack(alignment: .leading, spacing: 14) {
-                let targetCount = coordinator.isRunning ? coordinator.totalCount : coordinator.activeSources.count
-
-                Text("将并发测试 \(targetCount) 个书源（每批最多 \(SandboxEnvironment.recommendedBatchConcurrency) 个）。默认会在搜索通过后继续验证首条结果的详情、目录和正文，避免只测搜索造成假绿。")
+                Text("当前将测试 \(targetCount) 个书源（并发 \(SandboxEnvironment.recommendedBatchConcurrency) 个）。")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
 
@@ -1316,12 +1345,58 @@ struct SourceManagerView: View {
                 .background(AppTheme.accent.opacity(0.08), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
 
                 if !coordinator.isRunning {
-                    TextField("测试关键词", text: $batchCheckKeyword)
-                        .textFieldStyle(.roundedBorder)
-                        .textInputAutocapitalization(.never)
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("测试范围")
+                            .font(.caption.weight(.bold))
+                            .foregroundStyle(.secondary)
+                        Picker("测试范围", selection: $batchCheckScope) {
+                            Text("已启用 (\(appState.sourceStore.sources.filter(\.enabled).count))").tag(BatchCheckScope.enabled)
+                            Text("全部 (\(appState.sourceStore.sources.count))").tag(BatchCheckScope.all)
+                            if !selectedBookSourceURLs.isEmpty {
+                                Text("选定 (\(selectedBookSourceURLs.count))").tag(BatchCheckScope.selected)
+                            }
+                        }
+                        .pickerStyle(.segmented)
+                    }
 
-                    Toggle("搜索通过后深测首条结果", isOn: $batchCheckDeepCheck)
-                        .font(.subheadline.weight(.semibold))
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("测试关键词")
+                            .font(.caption.weight(.bold))
+                            .foregroundStyle(.secondary)
+                        TextField("测试关键词", text: $batchCheckKeyword)
+                            .textFieldStyle(.roundedBorder)
+                            .textInputAutocapitalization(.never)
+
+                        ScrollView(.horizontal, showsIndicators: false) {
+                            HStack(spacing: 6) {
+                                ForEach(["斗破苍穹", "剑来", "诡秘之主", "凡人修仙传", "深空彼岸"], id: \.self) { kw in
+                                    Button {
+                                        batchCheckKeyword = kw
+                                    } label: {
+                                        Text(kw)
+                                            .font(.caption2.weight(.medium))
+                                            .padding(.horizontal, 8)
+                                            .padding(.vertical, 4)
+                                            .background(batchCheckKeyword == kw ? AppTheme.accent.opacity(0.18) : Color(uiColor: .tertiarySystemFill), in: Capsule())
+                                            .foregroundStyle(batchCheckKeyword == kw ? AppTheme.accent : .primary)
+                                    }
+                                    .buttonStyle(.plain)
+                                }
+                            }
+                        }
+                    }
+
+                    VStack(alignment: .leading, spacing: 4) {
+                        Toggle("搜索通过后深测首条结果", isOn: $batchCheckDeepCheck)
+                            .font(.subheadline.weight(.semibold))
+
+                        Text(batchCheckDeepCheck
+                            ? "🔬 四级深度体检：搜书 ➔ 详情 ➔ 目录 ➔ 正文全部绿灯才判定为 PASS，排查最严格，杜绝正文空白假绿源（全绿通过率一般在 30%~50% 之间）。"
+                            : "⚡ 快速体检：仅验证搜索接口是否返回书籍，速度快，通过数最高（通常可达 400+ 个）。"
+                        )
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                    }
                 }
 
                 HStack {
@@ -1342,9 +1417,6 @@ struct SourceManagerView: View {
                     } else {
                         Button {
                             UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-                            let sourcesToTest = coordinator.activeSources.isEmpty
-                                ? appState.sourceStore.sources.filter(\.enabled)
-                                : coordinator.activeSources
                             coordinator.start(
                                 sources: sourcesToTest,
                                 keyword: batchCheckKeyword,
@@ -1354,11 +1426,11 @@ struct SourceManagerView: View {
                                 historyStore: appState.sourceDiagnosticHistoryStore
                             )
                         } label: {
-                            Label(coordinator.activeSources.isEmpty ? "测试所有启用书源" : "开始批量测试 (\(coordinator.activeSources.count) 个)", systemImage: "play.circle")
+                            Label("开始批量体检 (\(sourcesToTest.count) 个书源)", systemImage: "play.circle")
                                 .frame(maxWidth: .infinity)
                         }
                         .buttonStyle(.borderedProminent)
-                        .disabled(coordinator.activeSources.isEmpty && appState.sourceStore.sources.filter(\.enabled).isEmpty)
+                        .disabled(sourcesToTest.isEmpty)
                     }
                 }
 
@@ -1368,17 +1440,23 @@ struct SourceManagerView: View {
                 }
 
                 if !coordinator.results.isEmpty {
-                    HStack(spacing: 8) {
-                        sourceCheckSummaryPill(title: "PASS", count: coordinator.passedCount, color: .green)
-                        sourceCheckSummaryPill(title: "WARN", count: coordinator.warningCount, color: .orange)
-                        sourceCheckSummaryPill(title: "FAIL", count: coordinator.failedCount, color: .red)
-                        sourceCheckSummaryPill(title: "LOGIN", count: coordinator.loginRequiredCount, color: .orange)
-                        sourceCheckSummaryPill(title: "VERIFY", count: coordinator.verificationRequiredCount, color: .purple)
-                        sourceCheckSummaryPill(title: "BLOCK", count: coordinator.blockedCount, color: .red.opacity(0.8))
-                        Spacer()
-                        Text("\(coordinator.checkedCount)/\(coordinator.totalCount)")
-                            .font(.caption.weight(.bold))
-                            .foregroundStyle(.secondary)
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 8) {
+                            sourceCheckSummaryPill(title: "四级全绿", count: coordinator.passedCount, color: .green)
+                            let searchPassed = coordinator.searchPassedCount
+                            if batchCheckDeepCheck && searchPassed > coordinator.passedCount {
+                                sourceCheckSummaryPill(title: "搜书可用", count: searchPassed, color: .blue)
+                            }
+                            sourceCheckSummaryPill(title: "WARN", count: coordinator.warningCount, color: .orange)
+                            sourceCheckSummaryPill(title: "FAIL", count: coordinator.failedCount, color: .red)
+                            sourceCheckSummaryPill(title: "LOGIN", count: coordinator.loginRequiredCount, color: .orange)
+                            sourceCheckSummaryPill(title: "VERIFY", count: coordinator.verificationRequiredCount, color: .purple)
+                            sourceCheckSummaryPill(title: "BLOCK", count: coordinator.blockedCount, color: .red.opacity(0.8))
+                            Spacer()
+                            Text("\(coordinator.checkedCount)/\(coordinator.totalCount)")
+                                .font(.caption.weight(.bold))
+                                .foregroundStyle(.secondary)
+                        }
                     }
                 }
 
@@ -1625,6 +1703,8 @@ struct SourceManagerView: View {
         let failedURLs = Set(results.filter { $0.status != .passed && $0.status != .warning }.map(\.sourceURL))
         guard !failedURLs.isEmpty else { return }
         appState.sourceStore.setEnabled(false, for: failedURLs)
+        let remaining = appState.sourceStore.sources.filter(\.enabled).count
+        batchCheckExportNotice = "已一键禁用 \(failedURLs.count) 个异常书源，当前剩余已启用书源 \(remaining) 个。若需复测被禁用的书源，可在上方将测试范围切换为「全部书源」。"
         importMessage = "已一键禁用 \(failedURLs.count) 个异常/失败书源"
     }
 
