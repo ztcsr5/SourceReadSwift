@@ -185,6 +185,15 @@ final class JSCoreRuntime {
                         source.key = key == null ? '' : String(key);
                         return source.key;
                     };
+                    source.sourceUrl = source.sourceUrl || source.bookSourceUrl || source.key || '';
+                    source.sourceName = source.sourceName || source.bookSourceName || '';
+                    source.bookSourceComment = source.bookSourceComment || source.comment || '';
+                    source.bookSourceUrlName = source.bookSourceUrlName || source.urlName || source.sourceName || '';
+                    source.loginUrl = source.loginUrl || '';
+                    source.loginCheckJs = source.loginCheckJs || '';
+                    source.getName = function() { return source.bookSourceName || source.sourceName || ''; };
+                    source.getUrl = function() { return source.bookSourceUrl || source.sourceUrl || source.key || ''; };
+                    source.getSourceUrl = source.getUrl;
                     source.getVariableMap = function() {
                         var parsed = {};
                         try { parsed = JSON.parse(source.getVariable() || '{}'); } catch (_) {}
