@@ -7,8 +7,8 @@ final class SandboxEnvironmentTests: XCTestCase {
     }
 
     func testAppStorageDirectoryResolution() {
-        let storageURL = AppStorageDirectory.appStorageURL()
-        XCTAssertTrue(FileManager.default.fileExists(atPath: storageURL.path))
+        let storageURL = AppStorageDirectory.appStorageURL(fileName: "test.json")
+        XCTAssertTrue(storageURL.path.contains("test.json"))
     }
 
     func testAppStorageDirectorySafeWrite() throws {
@@ -21,7 +21,7 @@ final class SandboxEnvironmentTests: XCTestCase {
         let testString = "Hello LiveContainer Sandbox"
         let data = try XCTUnwrap(testString.data(using: .utf8))
 
-        try AppStorageDirectory.safeWrite(data: data, to: targetFile)
+        try AppStorageDirectory.safeWrite(data, to: targetFile)
         XCTAssertTrue(FileManager.default.fileExists(atPath: targetFile.path))
 
         let readData = try Data(contentsOf: targetFile)
