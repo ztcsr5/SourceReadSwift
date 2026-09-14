@@ -527,6 +527,9 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
         guard let normalizedStage else { return }
         let key = source.bookSourceUrl.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
         evidenceLock.lock()
+        if evidence.count > 50 {
+            evidence.removeAll()
+        }
         let javascript = evidence[key]?[normalizedStage]?.javascript ?? []
         evidence[key, default: [:]][normalizedStage] = SourceDiagnosticEvidence(request: request, response: response, javascript: javascript)
         evidenceLock.unlock()
@@ -1092,6 +1095,9 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
         stateLock.lock()
         defer { stateLock.unlock() }
         if let state = states[key] { return state }
+        if states.count > 100 {
+            states.removeAll()
+        }
         let state = RulePersistentState()
         states[key] = state
         return state

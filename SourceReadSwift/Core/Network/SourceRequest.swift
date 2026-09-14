@@ -59,11 +59,18 @@ protocol SourceNetworkClient: Sendable {
 }
 
 final class URLSessionSourceNetworkClient: SourceNetworkClient, @unchecked Sendable {
+    private static let defaultSession: URLSession = {
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.urlCache = nil
+        configuration.requestCachePolicy = .reloadIgnoringLocalCacheData
+        return URLSession(configuration: configuration)
+    }()
+
     private let session: URLSession
     private let cookieStore: SourceCookieStore
 
-    init(session: URLSession = .shared, cookieStore: SourceCookieStore = SourceCookieStore()) {
-        self.session = session
+    init(session: URLSession? = nil, cookieStore: SourceCookieStore = SourceCookieStore()) {
+        self.session = session ?? Self.defaultSession
         self.cookieStore = cookieStore
     }
 
@@ -86,9 +93,12 @@ final class URLSessionSourceNetworkClient: SourceNetworkClient, @unchecked Senda
             let headers = http.allHeaderFields.reduce(into: [String: String]()) { result, item in
                 result[String(describing: item.key)] = String(describing: item.value)
             }
-            let decoded = ResponseBodyDecoder().decodeResult(data: data, headers: headers)
-            let decodedData = decoded.data
-            let text = ResponseTextDecoder().decode(data: decodedData, headers: headers, preferredCharset: request.expectedCharset)
+            let (text, decodedData, decoded) = autoreleasepool { () -> (String, Data, ResponseBodyDecoder.DecodeResult) in
+                let decoded = ResponseBodyDecoder().decodeResult(data: data, headers: headers)
+                let decodedData = decoded.data
+                let text = ResponseTextDecoder().decode(data: decodedData, headers: headers, preferredCharset: request.expectedCharset)
+                return (text, decodedData, decoded)
+            }
             // Foundation does not reliably parse a combined Set-Cookie field
             // when Expires contains a comma. Parse each cookie value first,
             // then persist the complete response set for the next stage.

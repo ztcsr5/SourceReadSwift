@@ -48,7 +48,15 @@ final class JSCoreRuntime {
 
     func evaluate(_ script: String, variables: [String: Any] = [:]) -> Result<String, SourceEngineError> {
         evaluateLock.lock()
-        defer { evaluateLock.unlock() }
+        defer {
+            context.setObject("", forKeyedSubscript: "src" as NSString)
+            context.setObject("", forKeyedSubscript: "result" as NSString)
+            context.setObject("", forKeyedSubscript: "html" as NSString)
+            context.setObject(nil, forKeyedSubscript: "chapter" as NSString)
+            context.setObject(nil, forKeyedSubscript: "book" as NSString)
+            context.setObject(nil, forKeyedSubscript: "source" as NSString)
+            evaluateLock.unlock()
+        }
         if let baseBridgeError {
             return .failure(.javascript("Legado bridge prelude failed: \(baseBridgeError)"))
         }
@@ -261,6 +269,12 @@ final class JSCoreRuntime {
         ))
         synchronizeExecutionContextFromJavaScript()
         return .success(result.toString())
+    }
+
+    func collectGarbage() {
+        evaluateLock.lock()
+        defer { evaluateLock.unlock() }
+        JSGarbageCollect(context.jsGlobalContextRef)
     }
 
     private struct JavaScriptExceptionDetails {

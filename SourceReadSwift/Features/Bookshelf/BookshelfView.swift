@@ -221,15 +221,6 @@ struct BookshelfView: View {
             }
             .buttonStyle(.plain)
             Spacer()
-            if !allBooks.isEmpty {
-                NavigationLink {
-                    BookshelfCollectionView(title: "书架", books: allBooks, startsManaging: true)
-                } label: {
-                    Label("批量管理", systemImage: "checkmark.circle")
-                        .font(.subheadline.weight(.semibold))
-                }
-                .buttonStyle(.bordered)
-            }
         }
     }
 

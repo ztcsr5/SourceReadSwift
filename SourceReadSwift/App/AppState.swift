@@ -18,6 +18,7 @@ final class AppState: ObservableObject {
     let sourceWritingServer: LightweightHTTPServer
     let readingHistoryStore: ReadingHistoryStore
     let discoverViewModel: DiscoverViewModel
+    lazy var batchCheckCoordinator: SourceBatchCheckCoordinator = SourceBatchCheckCoordinator()
     private let injectedEngine: SourceEngine?
     private var cancellables: Set<AnyCancellable> = []
     lazy var engine: SourceEngine = {
@@ -238,6 +239,14 @@ final class AppState: ObservableObject {
             .store(in: &cancellables)
 
         discoverViewModel.objectWillChange
+            .sink { [weak self] _ in
+                Task { @MainActor [weak self] in
+                    self?.objectWillChange.send()
+                }
+            }
+            .store(in: &cancellables)
+
+        batchCheckCoordinator.objectWillChange
             .sink { [weak self] _ in
                 Task { @MainActor [weak self] in
                     self?.objectWillChange.send()

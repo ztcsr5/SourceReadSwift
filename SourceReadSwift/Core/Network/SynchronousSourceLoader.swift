@@ -3,6 +3,13 @@ import Foundation
 struct SynchronousSourceLoader {
     private let requestBuilder = SourceRequestBuilder()
 
+    private static let session: URLSession = {
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.urlCache = nil
+        configuration.requestCachePolicy = .reloadIgnoringLocalCacheData
+        return URLSession(configuration: configuration)
+    }()
+
     func load(
         urlText: String,
         source: BookSource,
@@ -55,7 +62,7 @@ struct SynchronousSourceLoader {
         let semaphore = DispatchSemaphore(value: 0)
         let resultBox = SynchronousLoadResultBox()
 
-        URLSession.shared.dataTask(with: urlRequest) { data, response, _ in
+        Self.session.dataTask(with: urlRequest) { data, response, _ in
             var headers: [String: String] = [:]
             var finalURL: URL?
             var statusCode = 200
@@ -99,19 +106,21 @@ struct SynchronousSourceLoader {
             let merged = CookieHeaderParser.merge(setCookie, into: previous)
             if !merged.isEmpty { persistentState.put(merged, for: "cookieHeader") }
         }
-        let decoded = ResponseBodyDecoder().decodeResult(data: result.data, headers: result.headers)
-        let decodedData = decoded.data
-        let body = ResponseTextDecoder().decode(data: decodedData, headers: result.headers, preferredCharset: request.expectedCharset)
-        return SourceResponse(
-            url: responseURL,
-            statusCode: result.statusCode,
-            headers: result.headers,
-            body: body,
-            data: decodedData,
-            encodedByteCount: decoded.wasDecoded ? result.data.count : nil,
-            bodyWasDecoded: decoded.wasDecoded,
-            contentEncodings: decoded.encodings
-        )
+        return autoreleasepool {
+            let decoded = ResponseBodyDecoder().decodeResult(data: result.data, headers: result.headers)
+            let decodedData = decoded.data
+            let body = ResponseTextDecoder().decode(data: decodedData, headers: result.headers, preferredCharset: request.expectedCharset)
+            return SourceResponse(
+                url: responseURL,
+                statusCode: result.statusCode,
+                headers: result.headers,
+                body: body,
+                data: decodedData,
+                encodedByteCount: decoded.wasDecoded ? result.data.count : nil,
+                bodyWasDecoded: decoded.wasDecoded,
+                contentEncodings: decoded.encodings
+            )
+        }
     }
 }
 

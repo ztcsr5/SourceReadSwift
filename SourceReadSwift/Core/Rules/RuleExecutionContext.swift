@@ -33,6 +33,18 @@ final class RuleExecutionContext: @unchecked Sendable {
         return runtime
     }
 
+    func collectGarbage() {
+        lock.lock()
+        defer { lock.unlock() }
+        cachedRuntime?.collectGarbage()
+    }
+
+    func resetRuntime() {
+        lock.lock()
+        defer { lock.unlock() }
+        cachedRuntime = nil
+    }
+
     init(
         initialValues: [String: Any] = [:],
         persistentState: RulePersistentState = RulePersistentState(),
