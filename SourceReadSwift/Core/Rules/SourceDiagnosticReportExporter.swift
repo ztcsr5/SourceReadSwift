@@ -197,13 +197,14 @@ enum SourceDiagnosticReportExporter {
         }.count
 
         let passRate = batch.reports.isEmpty ? 0.0 : (Double(passed) / Double(batch.reports.count) * 100.0)
+        let passRateStr = String(format: "%.1f", passRate)
 
         var md = ""
         md += "# 📖 轻阅书源全身体检诊断报告\n\n"
         md += "- **体检时间**: \(dateString)\n"
         md += "- **测试关键词**: 《\(batch.keyword)》\n"
         md += "- **检测总数**: \(batch.reports.count) / \(total) 个书源\n"
-        md += "- **综合通过率**: 四级全绿 \(String(format: \"%.1f\", passRate))% · 搜书可用 \(percentage(searchPassed, total: batch.reports.count))\n\n"
+        md += "- **综合通过率**: 四级全绿 \(passRateStr)% · 搜书可用 \(percentage(searchPassed, total: batch.reports.count))\n\n"
 
         md += "### 🌪️ 四阶段漏斗流转分析\n\n"
         md += "| 测试阶段 | 通过书源数 | 阶段通过率 | 相比上一阶段留存 | 说明 |\n"
@@ -215,7 +216,7 @@ enum SourceDiagnosticReportExporter {
         md += "| 3️⃣ **目录 (TOC)** | \(tocPassed) | \(percentage(tocPassed, total: batch.reports.count)) | \(tocRetention) | 成功抓取有效章节目录列表 (≥1 章) |\n"
         let contentRetention = tocPassed > 0 ? percentage(contentPassed, total: tocPassed) : "0.0%"
         md += "| 4️⃣ **正文 (Content)** | \(contentPassed) | \(percentage(contentPassed, total: batch.reports.count)) | \(contentRetention) | 成功提取第一章正文文字 (≥20 字) |\n"
-        md += "| 🟢 **四级全绿** | \(passed) | \(String(format: \"%.1f%%\", passRate)) | - | 全流程无任何报错与异常 |\n\n"
+        md += "| 🟢 **四级全绿** | \(passed) | \(passRateStr)% | - | 全流程无任何报错与异常 |\n\n"
 
         md += "### 📊 状态分布看板\n\n"
         md += "| 状态指标 | 数量 | 占比 | 简评 |\n"
@@ -315,13 +316,14 @@ enum SourceDiagnosticReportExporter {
         let verify = batch.reports.filter { $0.overallStatus == .verificationRequired }.count
         let blocked = batch.reports.filter { $0.overallStatus == .blocked }.count
         let passRate = batch.reports.isEmpty ? 0.0 : (Double(passed) / Double(batch.reports.count) * 100.0)
+        let passRateStr = String(format: "%.1f", passRate)
 
         var text = ""
         text += "【轻阅】书源体检精简看板\n"
         text += "📅 体检时间：\(dateString)\n"
         text += "🔍 测试关键词：《\(batch.keyword)》\n"
         text += "📊 检测总数：\(batch.reports.count) / \(total) 个书源\n"
-        text += "📈 综合通过率：\(String(format: \"%.1f\", passRate))%\n"
+        text += "📈 综合通过率：\(passRateStr)%\n"
         text += "-------------------------\n"
         text += "🌪️ 四阶段漏斗流转：\n"
         text += "• 1. 搜索通过: \(searchPassed) (\(percentage(searchPassed, total: batch.reports.count)))\n"
