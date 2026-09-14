@@ -223,9 +223,104 @@ enum SourceDiagnosticReportExporter {
         return md
     }
 
+    /// 生成精简统计看板（适合发微信/群聊，不卡死剪贴板与第三方聊天软件）
+    static func generateBriefSummaryText(from batch: SourceDiagnosticBatchReport, totalCount: Int? = nil) -> String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
+        let dateString = formatter.string(from: batch.finishedAt)
+
+        let total = totalCount ?? batch.reports.count
+        let passed = batch.reports.filter { $0.overallStatus == .passed }.count
+        let warning = batch.reports.filter { $0.overallStatus == .warning }.count
+        let failed = batch.reports.filter { $0.overallStatus == .failed }.count
+        let login = batch.reports.filter { $0.overallStatus == .requiresLogin }.count
+        let verify = batch.reports.filter { $0.overallStatus == .verificationRequired }.count
+        let blocked = batch.reports.filter { $0.overallStatus == .blocked }.count
+        let passRate = batch.reports.isEmpty ? 0.0 : (Double(passed) / Double(batch.reports.count) * 100.0)
+
+        var text = ""
+        text += "【轻阅】书源体检精简看板\n"
+        text += "📅 体检时间：\(dateString)\n"
+        text += "🔍 测试关键词：《\(batch.keyword)》\n"
+        text += "📊 检测总数：\(batch.reports.count) / \(total) 个书源\n"
+        text += "📈 综合通过率：\(String(format: "%.1f", passRate))%\n"
+        text += "-------------------------\n"
+        text += "🟢 正常可用 (PASS): \(passed) (\(percentage(passed, total: batch.reports.count)))\n"
+        text += "🟡 轻微异常 (WARN): \(warning) (\(percentage(warning, total: batch.reports.count)))\n"
+        text += "🔴 访问失败 (FAIL): \(failed) (\(percentage(failed, total: batch.reports.count)))\n"
+        if verify > 0 {
+            text += "🟣 验证码/盾 (VERIFY): \(verify) (\(percentage(verify, total: batch.reports.count)))\n"
+        }
+        if login > 0 {
+            text += "🟠 需要登录 (LOGIN): \(login) (\(percentage(login, total: batch.reports.count)))\n"
+        }
+        if blocked > 0 {
+            text += "⚫ 访问受限 (BLOCK): \(blocked) (\(percentage(blocked, total: batch.reports.count)))\n"
+        }
+
+        let failures = batch.reports.filter { $0.overallStatus != .passed }
+        if failures.isEmpty {
+            text += "-------------------------\n"
+            text += "🎉 完美！所有被检测书源均通过测试，无异常书源。\n"
+        } else {
+            var catCounts: [FailureCategory: Int] = [:]
+            for r in failures {
+                let (cat, _) = classify(report: r)
+                catCounts[cat, default: 0] += 1
+            }
+            let sortedCats = FailureCategory.allCases.compactMap { cat -> (FailureCategory, Int)? in
+                guard let c = catCounts[cat], c > 0 else { return nil }
+                return (cat, c)
+            }.sorted { $0.1 > $1.1 }
+
+            if !sortedCats.isEmpty {
+                text += "-------------------------\n"
+                text += "⚠️ 主要异常分类：\n"
+                for (cat, count) in sortedCats.prefix(5) {
+                    text += "• \(cat.icon) \(cat.rawValue): \(count) 个\n"
+                }
+            }
+            text += "-------------------------\n"
+            text += "💡 建议：可在轻阅批量测试界面点击「一键禁用所有失败书源」，秒级过滤失效书源提升检索速度。"
+        }
+        return text
+    }
+
     private static func percentage(_ count: Int, total: Int) -> String {
         guard total > 0 else { return "0.0%" }
         return String(format: "%.1f%%", Double(count) / Double(total) * 100.0)
+    }
+
+    /// 将报告直接持久化保存至 App 的 Documents/Reports 目录，用户可在 iOS 自带「文件」App -> 「我的 iPhone/iPad」 -> 「轻阅」 中直接查看
+    @discardableResult
+    static func saveToDocuments(
+        markdownText: String,
+        jsonData: Data?,
+        reportDate: Date = Date()
+    ) throws -> (markdownURL: URL, jsonURL: URL?) {
+        guard let documentsDir = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first else {
+            throw NSError(domain: "SourceDiagnosticReportExporter", code: 1, userInfo: [NSLocalizedDescriptionKey: "无法访问应用文档目录"])
+        }
+        let reportsDir = documentsDir.appendingPathComponent("Reports", isDirectory: true)
+        if !FileManager.default.fileExists(atPath: reportsDir.path) {
+            try FileManager.default.createDirectory(at: reportsDir, withIntermediateDirectories: true)
+        }
+
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyyMMdd_HHmmss"
+        let timestamp = formatter.string(from: reportDate)
+
+        let mdURL = reportsDir.appendingPathComponent("轻阅书源体检报告_\(timestamp).md")
+        try markdownText.data(using: .utf8)?.write(to: mdURL, options: .atomic)
+
+        var jsonURL: URL? = nil
+        if let jsonData {
+            let jURL = reportsDir.appendingPathComponent("轻阅书源诊断数据_\(timestamp).json")
+            try jsonData.write(to: jURL, options: .atomic)
+            jsonURL = jURL
+        }
+
+        return (mdURL, jsonURL)
     }
 
     /// 将报告写入临时文件，供 UIActivityViewController / ShareLink 分享与导出

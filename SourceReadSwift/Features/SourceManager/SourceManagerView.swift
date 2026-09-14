@@ -20,6 +20,7 @@ struct SourceManagerView: View {
     @State private var showBatchCheckSheet = false
     @State private var batchCheckKeyword = "我的"
     @State private var batchCheckDeepCheck = true
+    @State private var batchCheckExportNotice: String?
     @State private var sourceLogin: BookSource?
     @State private var sourceHistory: BookSource?
     @State private var sourceVisualDetail: BookSource?
@@ -1381,6 +1382,26 @@ struct SourceManagerView: View {
                     }
                 }
 
+                if let notice = batchCheckExportNotice {
+                    HStack(spacing: 8) {
+                        Image(systemName: notice.starts(with: "❌") ? "exclamationmark.triangle.fill" : "checkmark.circle.fill")
+                            .foregroundStyle(notice.starts(with: "❌") ? .red : .green)
+                        Text(notice)
+                            .font(.caption)
+                            .lineLimit(3)
+                        Spacer()
+                        Button {
+                            batchCheckExportNotice = nil
+                        } label: {
+                            Image(systemName: "xmark")
+                                .font(.caption2.weight(.bold))
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                    .padding(10)
+                    .background(AppTheme.cardBackground, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+                }
+
                 List {
                     let results = coordinator.results
                     if results.isEmpty {
@@ -1456,17 +1477,33 @@ struct SourceManagerView: View {
                 ToolbarItem(placement: .confirmationAction) {
                     Menu {
                         Button {
-                            if let report = coordinator.lastSavedReport ?? makeCurrentBatchReport() {
+                            if let report = currentOrSavedBatchReport() {
+                                do {
+                                    let md = SourceDiagnosticReportExporter.generateMarkdownReport(from: report, totalCount: report.totalCount)
+                                    let data = try? report.exportJSON()
+                                    let (mdURL, _) = try SourceDiagnosticReportExporter.saveToDocuments(markdownText: md, jsonData: data, reportDate: report.finishedAt)
+                                    UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                                    batchCheckExportNotice = "✅ 报告已成功存入「文件」App：\n我的 iPhone -> 轻阅 -> Reports -> \(mdURL.lastPathComponent)"
+                                } catch {
+                                    batchCheckExportNotice = "❌ 保存失败：\(error.localizedDescription)"
+                                }
+                            }
+                        } label: {
+                            Label("保存报告到「文件」App (直接落盘)", systemImage: "folder.badge.plus")
+                        }
+
+                        Button {
+                            if let report = currentOrSavedBatchReport() {
                                 let md = SourceDiagnosticReportExporter.generateMarkdownReport(from: report, totalCount: report.totalCount)
                                 let (mdURL, _) = SourceDiagnosticReportExporter.createExportFiles(markdownText: md, jsonData: nil)
                                 shareFiles([mdURL])
                             }
                         } label: {
-                            Label("导出检测报告文件 (.md)", systemImage: "doc.plaintext")
+                            Label("系统分享 / AirDrop (.md 报告)", systemImage: "square.and.arrow.up")
                         }
 
                         Button {
-                            if let report = coordinator.lastSavedReport ?? makeCurrentBatchReport() {
+                            if let report = currentOrSavedBatchReport() {
                                 let data = try? report.exportJSON()
                                 let (_, jsonURL) = SourceDiagnosticReportExporter.createExportFiles(markdownText: "", jsonData: data)
                                 if let jsonURL {
@@ -1474,21 +1511,36 @@ struct SourceManagerView: View {
                                 }
                             }
                         } label: {
-                            Label("导出诊断数据包 (.json)", systemImage: "curlybraces")
+                            Label("系统分享 / AirDrop (.json 数据包)", systemImage: "curlybraces")
                         }
 
                         Divider()
 
-                        Button("复制 Markdown 报告") {
-                            if let report = coordinator.lastSavedReport ?? makeCurrentBatchReport() {
+                        Button {
+                            if let report = currentOrSavedBatchReport() {
+                                let summary = SourceDiagnosticReportExporter.generateBriefSummaryText(from: report, totalCount: report.totalCount)
+                                UIPasteboard.general.string = summary
+                                UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                                batchCheckExportNotice = "✅ 精简看板已复制！约 20 行，可直接粘贴发微信/群聊，不卡死应用。"
+                            }
+                        } label: {
+                            Label("复制精简看板 (适合发微信/群聊)", systemImage: "list.bullet.clipboard")
+                        }
+
+                        Button("复制完整 Markdown 报告") {
+                            if let report = currentOrSavedBatchReport() {
                                 UIPasteboard.general.string = SourceDiagnosticReportExporter.generateMarkdownReport(from: report, totalCount: report.totalCount)
+                                UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                                batchCheckExportNotice = "✅ 完整 Markdown 报告已复制到剪贴板"
                             }
                         }
 
-                        Button("复制 JSON 报告") {
-                            if let report = coordinator.lastSavedReport ?? makeCurrentBatchReport(),
+                        Button("复制完整 JSON 诊断包") {
+                            if let report = currentOrSavedBatchReport(),
                                let data = try? report.exportJSON() {
                                 UIPasteboard.general.string = String(data: data, encoding: .utf8)
+                                UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                                batchCheckExportNotice = "✅ 完整 JSON 数据已复制到剪贴板"
                             }
                         }
                     } label: {
@@ -1504,6 +1556,14 @@ struct SourceManagerView: View {
             }
         }
         .presentationDetents([.medium, .large])
+    }
+
+    private func currentOrSavedBatchReport() -> SourceDiagnosticBatchReport? {
+        let coordinator = appState.batchCheckCoordinator
+        if !coordinator.results.isEmpty, let current = makeCurrentBatchReport() {
+            return current
+        }
+        return coordinator.lastSavedReport
     }
 
     private func makeCurrentBatchReport() -> SourceDiagnosticBatchReport? {
@@ -1548,13 +1608,17 @@ struct SourceManagerView: View {
         guard let windowScene = UIApplication.shared.connectedScenes.first(where: { $0.activationState == .foregroundActive }) as? UIWindowScene
                 ?? UIApplication.shared.connectedScenes.first as? UIWindowScene,
               let rootVC = windowScene.windows.first(where: { $0.isKeyWindow })?.rootViewController else { return }
+        var topVC = rootVC
+        while let presented = topVC.presentedViewController, !presented.isBeingDismissed {
+            topVC = presented
+        }
         let activityVC = UIActivityViewController(activityItems: urls, applicationActivities: nil)
         if let popover = activityVC.popoverPresentationController {
-            popover.sourceView = rootVC.view
-            popover.sourceRect = CGRect(x: rootVC.view.bounds.midX, y: rootVC.view.bounds.midY, width: 0, height: 0)
+            popover.sourceView = topVC.view
+            popover.sourceRect = CGRect(x: topVC.view.bounds.midX, y: topVC.view.bounds.midY, width: 0, height: 0)
             popover.permittedArrowDirections = []
         }
-        rootVC.present(activityVC, animated: true)
+        topVC.present(activityVC, animated: true)
     }
 
     private func disableFailedSources(from results: [SourceBatchCheckResult]) {
