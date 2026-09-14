@@ -189,7 +189,7 @@ extension SourceEngine {
             return SourcePipelineExecution(result: makeResult(), error: .empty("详情结果为空"))
         }
         let tocStarted = Date()
-        let tocResult = await AsyncTimeout.run(seconds: timeout) { await self.getChapterList(source: source, book: detail) }
+        let tocResult = await AsyncTimeout.run(seconds: timeout) { await self.getChapterList(source: source, book: detail, maxPages: 1) }
             ?? .failure(.network("目录超时（超过 \(Int(timeout)) 秒）"))
         switch tocResult {
         case .failure(let error):
@@ -214,7 +214,7 @@ extension SourceEngine {
             return SourcePipelineExecution(result: makeResult(), error: .empty("目录为空"))
         }
         let contentStarted = Date()
-        let contentResult = await AsyncTimeout.run(seconds: timeout) { await self.getContent(source: source, chapter: firstChapter) }
+        let contentResult = await AsyncTimeout.run(seconds: timeout) { await self.getContent(source: source, chapter: firstChapter, maxPages: 1) }
             ?? .failure(.network("正文超时（超过 \(Int(timeout)) 秒）"))
         switch contentResult {
         case .failure(let error):

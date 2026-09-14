@@ -101,7 +101,7 @@ final class SourceDiagnosticHistoryStore: ObservableObject {
         persist()
     }
 
-    func recordBatch(_ newEntries: [SourceDiagnosticHistoryRecord]) {
+    func recordBatch(_ newEntries: [SourceDiagnosticHistoryRecord], persistImmediately: Bool = true) {
         guard !newEntries.isEmpty else { return }
         for entry in newEntries {
             records[entry.sourceURL, default: []].insert(entry, at: 0)
@@ -109,7 +109,9 @@ final class SourceDiagnosticHistoryStore: ObservableObject {
                 records[entry.sourceURL] = Array(records[entry.sourceURL]!.prefix(limit))
             }
         }
-        persist()
+        if persistImmediately {
+            persist()
+        }
     }
 
     func records(for source: BookSource) -> [SourceDiagnosticHistoryRecord] {
@@ -138,12 +140,19 @@ final class SourceDiagnosticHistoryStore: ObservableObject {
         return lines.joined(separator: "\n")
     }
 
+    func flushToDisk() {
+        persist()
+    }
+
     private func persist() {
-        do {
-            try persistence.save(records)
-            lastError = nil
-        } catch {
-            lastError = error.localizedDescription
+        let snapshot = records
+        let persistence = self.persistence
+        Task.detached(priority: .utility) {
+            do {
+                try persistence.save(snapshot)
+            } catch {
+                // Non-critical background persistence error
+            }
         }
     }
 }

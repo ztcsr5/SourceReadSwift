@@ -55,24 +55,33 @@ final class SourceHealthStore: ObservableObject {
         persist()
     }
 
-    func recordBatch(_ newRecords: [SourceHealthRecord]) {
+    func recordBatch(_ newRecords: [SourceHealthRecord], persistImmediately: Bool = true) {
         guard !newRecords.isEmpty else { return }
         for record in newRecords {
             records[record.sourceURL] = record
         }
-        persist()
+        if persistImmediately {
+            persist()
+        }
     }
 
     func record(for source: BookSource) -> SourceHealthRecord? {
         records[source.bookSourceUrl]
     }
 
+    func flushToDisk() {
+        persist()
+    }
+
     private func persist() {
-        do {
-            try persistence.save(records)
-            lastError = nil
-        } catch {
-            lastError = error.localizedDescription
+        let snapshot = records
+        let persistence = self.persistence
+        Task.detached(priority: .utility) {
+            do {
+                try persistence.save(snapshot)
+            } catch {
+                // Non-critical background persistence error
+            }
         }
     }
 }

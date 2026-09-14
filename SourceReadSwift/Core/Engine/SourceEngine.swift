@@ -4,8 +4,20 @@ protocol SourceEngine: Sendable {
     func searchBooks(source: BookSource, keyword: String, page: Int) async -> Result<[SearchBook], SourceEngineError>
     func getBookDetail(source: BookSource, book: SearchBook) async -> Result<BookDetail, SourceEngineError>
     func getChapterList(source: BookSource, book: BookDetail) async -> Result<[BookChapter], SourceEngineError>
+    func getChapterList(source: BookSource, book: BookDetail, maxPages: Int) async -> Result<[BookChapter], SourceEngineError>
     func getContent(source: BookSource, chapter: BookChapter) async -> Result<ChapterContent, SourceEngineError>
+    func getContent(source: BookSource, chapter: BookChapter, maxPages: Int) async -> Result<ChapterContent, SourceEngineError>
     func verifyLogin(source: BookSource) async -> Result<SourceLoginVerification, SourceEngineError>
+}
+
+extension SourceEngine {
+    func getChapterList(source: BookSource, book: BookDetail, maxPages: Int) async -> Result<[BookChapter], SourceEngineError> {
+        await getChapterList(source: source, book: book)
+    }
+
+    func getContent(source: BookSource, chapter: BookChapter, maxPages: Int) async -> Result<ChapterContent, SourceEngineError> {
+        await getContent(source: source, chapter: chapter)
+    }
 }
 
 protocol SourceWebViewFallbackControllable: AnyObject {
@@ -214,6 +226,10 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
     }
 
     func getChapterList(source: BookSource, book: BookDetail) async -> Result<[BookChapter], SourceEngineError> {
+        await getChapterList(source: source, book: book, maxPages: 30)
+    }
+
+    func getChapterList(source: BookSource, book: BookDetail, maxPages: Int) async -> Result<[BookChapter], SourceEngineError> {
         let executionState = persistentState(for: source)
         let executionContext = RuleExecutionContext(persistentState: executionState, logHandler: { [diagnostics] message in
             Task { await diagnostics.emit(.init(level: .info, stage: "toc.js", sourceName: source.bookSourceName, message: message)) }
@@ -260,7 +276,7 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
                     canonicalURL: SourcePaginationURLIdentity().canonical(response.url),
                     pagesLoaded: 0,
                     retainedItemCount: 0,
-                    maxPages: 30
+                    maxPages: maxPages
                 )
             }
             guard case .success(let firstPage) = parsed else {
@@ -271,6 +287,7 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
                 source: source,
                 book: book,
                 firstURL: response.url,
+                maxPages: maxPages,
                 executionContext: executionContext
             )
         case .failure(let error):
@@ -290,6 +307,10 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
     }
 
     func getContent(source: BookSource, chapter: BookChapter) async -> Result<ChapterContent, SourceEngineError> {
+        await getContent(source: source, chapter: chapter, maxPages: 8)
+    }
+
+    func getContent(source: BookSource, chapter: BookChapter, maxPages: Int) async -> Result<ChapterContent, SourceEngineError> {
         let executionState = persistentState(for: source)
         let executionContext = RuleExecutionContext(persistentState: executionState, logHandler: { [diagnostics] message in
             Task { await diagnostics.emit(.init(level: .info, stage: "content.js", sourceName: source.bookSourceName, message: message)) }
@@ -343,7 +364,7 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
                     canonicalURL: SourcePaginationURLIdentity().canonical(response.url),
                     pagesLoaded: 0,
                     retainedItemCount: 0,
-                    maxPages: 8
+                    maxPages: maxPages
                 )
             }
             guard case .success(let firstPage) = parsed else { return parsed }
@@ -352,6 +373,7 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
                 source: source,
                 chapter: chapter,
                 firstURL: response.url,
+                maxPages: maxPages,
                 globalPurifyRules: globalPurifyRules,
                 executionContext: executionContext
             )
@@ -748,6 +770,7 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
         source: BookSource,
         book: BookDetail,
         firstURL: URL,
+        maxPages: Int = 30,
         executionContext: RuleExecutionContext
     ) async -> Result<[BookChapter], SourceEngineError> {
         let urlIdentity = SourcePaginationURLIdentity()
@@ -756,10 +779,12 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
         // duplicate chapter rows, even when the duplicate URLs differ only by
         // case, fragments or percent-encoding.
         var chapters = deduplicatedChapters(firstPage.chapters, identity: urlIdentity)
+        guard maxPages > 1 else {
+            return chapters.isEmpty ? .failure(.empty("Chapter list is empty")) : .success(chapters)
+        }
         var nextURLText = firstPage.nextTocUrl?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty
         var seenURLs: Set<String> = [urlIdentity.canonical(firstURL)]
         var pagesLoaded = 1
-        let maxPages = 30
         var stopReason: String? = nextURLText == nil ? "no-next-url" : nil
         var attemptedURL = nextURLText
         var attemptedCanonicalURL = nextURLText.flatMap(urlIdentity.canonical)
@@ -858,16 +883,17 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
         source: BookSource,
         chapter: BookChapter,
         firstURL: URL,
+        maxPages: Int = 8,
         globalPurifyRules: [String],
         executionContext: RuleExecutionContext
     ) async -> Result<ChapterContent, SourceEngineError> {
+        guard maxPages > 1 else { return .success(firstPage) }
         var paragraphs = firstPage.paragraphs
         var nextURLText = firstPage.nextContentUrl?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty
         let urlIdentity = SourcePaginationURLIdentity()
         var seenURLs: Set<String> = [urlIdentity.canonical(firstURL)]
         var finalNextURL = nextURLText
         var pagesLoaded = 1
-        let maxPages = 8
         var stopReason: String? = nextURLText == nil ? "no-next-url" : nil
         var attemptedURL = nextURLText
         var attemptedCanonicalURL = nextURLText.flatMap(urlIdentity.canonical)

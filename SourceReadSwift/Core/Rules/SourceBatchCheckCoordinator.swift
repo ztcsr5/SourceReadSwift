@@ -17,6 +17,7 @@ final class SourceBatchCheckCoordinator: ObservableObject {
     @Published private(set) var totalCount: Int = 0
     @Published private(set) var currentSourceName: String = ""
     @Published private(set) var passedCount: Int = 0
+    @Published private(set) var searchPassedCount: Int = 0
     @Published private(set) var warningCount: Int = 0
     @Published private(set) var failedCount: Int = 0
     @Published private(set) var loginRequiredCount: Int = 0
@@ -43,10 +44,6 @@ final class SourceBatchCheckCoordinator: ObservableObject {
     var progressFraction: Double {
         guard totalCount > 0 else { return 0.0 }
         return min(1.0, max(0.0, Double(checkedCount) / Double(totalCount)))
-    }
-
-    var searchPassedCount: Int {
-        results.filter { $0.resultCount > 0 }.count
     }
 
     var summaryText: String {
@@ -78,6 +75,7 @@ final class SourceBatchCheckCoordinator: ObservableObject {
         totalCount = sources.count
         currentSourceName = sources.first?.bookSourceName ?? ""
         passedCount = 0
+        searchPassedCount = 0
         warningCount = 0
         failedCount = 0
         loginRequiredCount = 0
@@ -132,20 +130,21 @@ final class SourceBatchCheckCoordinator: ObservableObject {
 
         var pendingHealthRecords: [SourceHealthRecord] = []
         var pendingHistoryRecords: [SourceDiagnosticHistoryRecord] = []
-        var lastFlushTime = Date()
+        var pendingResults: [SourceBatchCheckResult] = []
+        var lastCheckpointTime = Date()
         var lastUIUpdateTime = Date()
         var loopCount = 0
 
-        func flushPending(forceSaveReport: Bool = false) {
+        func flushPending(isFinal: Bool = false) {
             if !pendingHealthRecords.isEmpty {
-                healthStore.recordBatch(pendingHealthRecords)
+                healthStore.recordBatch(pendingHealthRecords, persistImmediately: isFinal)
                 pendingHealthRecords.removeAll(keepingCapacity: true)
             }
             if !pendingHistoryRecords.isEmpty {
-                historyStore.recordBatch(pendingHistoryRecords)
+                historyStore.recordBatch(pendingHistoryRecords, persistImmediately: isFinal)
                 pendingHistoryRecords.removeAll(keepingCapacity: true)
             }
-            if forceSaveReport {
+            if isFinal {
                 self.saveIncrementalReport()
             }
         }
@@ -190,7 +189,7 @@ final class SourceBatchCheckCoordinator: ObservableObject {
 
                     self.checkedCount += 1
                     self.currentSourceName = outcome.source.bookSourceName
-                    self.results.append(result)
+                    pendingResults.append(result)
                     if let report = outcome.diagnosticReport {
                         self.diagnosticReports[outcome.source.bookSourceUrl] = report
                     }
@@ -203,6 +202,10 @@ final class SourceBatchCheckCoordinator: ObservableObject {
                     case .requiresLogin: self.loginRequiredCount += 1
                     case .verificationRequired: self.verificationRequiredCount += 1
                     case .blocked: self.blockedCount += 1
+                    }
+
+                    if result.resultCount > 0 {
+                        self.searchPassedCount += 1
                     }
 
                     // Record health
@@ -253,22 +256,39 @@ final class SourceBatchCheckCoordinator: ObservableObject {
                     }
 
                     let now = Date()
-                    if now.timeIntervalSince(lastFlushTime) >= 3.0 || pendingHealthRecords.count >= 20 {
-                        lastFlushTime = now
-                        flushPending(forceSaveReport: true)
+                    // Throttle SwiftUI List array mutations (every 250ms or 12 items) to keep the UI smooth
+                    if now.timeIntervalSince(lastUIUpdateTime) >= 0.25 || pendingResults.count >= 12 {
+                        lastUIUpdateTime = now
+                        self.results.append(contentsOf: pendingResults)
+                        pendingResults.removeAll(keepingCapacity: true)
                     }
 
-                    if now.timeIntervalSince(lastUIUpdateTime) >= 0.8 {
-                        lastUIUpdateTime = now
+                    // Non-blocking background checkpoint at most once every 45 seconds
+                    if now.timeIntervalSince(lastCheckpointTime) >= 45.0 {
+                        lastCheckpointTime = now
+                        flushPending(isFinal: false)
+                        self.saveIncrementalReport()
                     }
                 }
             }
+
+            // Flush pending results for this batch chunk
+            if !pendingResults.isEmpty {
+                self.results.append(contentsOf: pendingResults)
+                pendingResults.removeAll(keepingCapacity: true)
+            }
         }
 
-        flushPending(forceSaveReport: true)
+        if !pendingResults.isEmpty {
+            self.results.append(contentsOf: pendingResults)
+            pendingResults.removeAll()
+        }
+
+        flushPending(isFinal: true)
+        healthStore.flushToDisk()
+        historyStore.flushToDisk()
 
         guard !Task.isCancelled, activeSessionID == sessionID else {
-            flushPending(forceSaveReport: true)
             endBackgroundExecution()
             return
         }
@@ -386,12 +406,17 @@ final class SourceBatchCheckCoordinator: ObservableObject {
             reports: currentReports
         )
         self.lastSavedReport = batchReport
-        do {
-            let data = try batchReport.exportJSON()
-            let url = AppStorageDirectory.appStorageURL(fileName: reportFileName)
-            try AppStorageDirectory.safeWrite(data, to: url)
-        } catch {
-            // Non-critical background save error
+        let fileName = self.reportFileName
+        Task.detached(priority: .utility) {
+            do {
+                let encoder = JSONEncoder()
+                encoder.dateEncodingStrategy = .iso8601
+                let data = try encoder.encode(batchReport)
+                let url = AppStorageDirectory.appStorageURL(fileName: fileName)
+                try AppStorageDirectory.safeWrite(data, to: url)
+            } catch {
+                // Non-critical background save error
+            }
         }
     }
 
@@ -412,6 +437,9 @@ final class SourceBatchCheckCoordinator: ObservableObject {
             self.totalCount = report.totalCount
             self.checkedCount = report.totalCount
             self.passedCount = report.passedCount
+            self.searchPassedCount = report.reports.filter { r in
+                (r.steps.first(where: { $0.stage == .search })?.matchCount ?? 0) > 0
+            }.count
             self.warningCount = report.warningCount
             self.failedCount = report.failedCount
             var reconstructed: [SourceBatchCheckResult] = []

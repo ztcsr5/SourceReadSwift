@@ -47,14 +47,15 @@ final class JSCoreRuntime {
     }
 
     func evaluate(_ script: String, variables: [String: Any] = [:]) -> Result<String, SourceEngineError> {
-        evaluateLock.lock()
-        defer {
-            context.setObject("", forKeyedSubscript: "src" as NSString)
-            context.setObject("", forKeyedSubscript: "result" as NSString)
-            context.setObject("", forKeyedSubscript: "html" as NSString)
-            context.setObject("", forKeyedSubscript: "content" as NSString)
-            evaluateLock.unlock()
-        }
+        return autoreleasepool {
+            evaluateLock.lock()
+            defer {
+                context.setObject("", forKeyedSubscript: "src" as NSString)
+                context.setObject("", forKeyedSubscript: "result" as NSString)
+                context.setObject("", forKeyedSubscript: "html" as NSString)
+                context.setObject("", forKeyedSubscript: "content" as NSString)
+                evaluateLock.unlock()
+            }
         if let baseBridgeError {
             return .failure(.javascript("Legado bridge prelude failed: \(baseBridgeError)"))
         }
@@ -268,6 +269,7 @@ final class JSCoreRuntime {
         synchronizeExecutionContextFromJavaScript()
         return .success(result.toString())
     }
+}
 
     func collectGarbage() {
         evaluateLock.lock()
