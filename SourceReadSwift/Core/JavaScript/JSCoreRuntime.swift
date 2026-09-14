@@ -25,18 +25,17 @@ final class JSCoreRuntime {
 
     init(
         ajaxHandler: ((String) -> String)? = nil,
-        executionContext: RuleExecutionContext? = nil
+        executionContext: RuleExecutionContext = RuleExecutionContext()
     ) {
         self.context = JSContext()!
         self.ajaxHandler = ajaxHandler
-        let effectiveContext = executionContext ?? RuleExecutionContext()
-        self.executionContext = effectiveContext
-        self.javaHostBridge = LegadoJavaHostBridge(executionContext: effectiveContext)
-        self.ruleHostBridge = LegadoRuleHostBridge(executionContext: effectiveContext)
-        self.jsoupBridge = LegadoJsoupBridge(executionContext: effectiveContext)
-        self.jxNodeFactory = LegadoJXNodeFactoryBridge(executionContext: effectiveContext)
-        if effectiveContext.networkHandler == nil {
-            effectiveContext.networkHandler = ajaxHandler
+        self.executionContext = executionContext
+        self.javaHostBridge = LegadoJavaHostBridge(executionContext: executionContext)
+        self.ruleHostBridge = LegadoRuleHostBridge(executionContext: executionContext)
+        self.jsoupBridge = LegadoJsoupBridge(executionContext: executionContext)
+        self.jxNodeFactory = LegadoJXNodeFactoryBridge(executionContext: executionContext)
+        if executionContext.networkHandler == nil {
+            executionContext.networkHandler = ajaxHandler
         }
         context.setObject(javaHostBridge, forKeyedSubscript: "__nativeLegado" as NSString)
         context.setObject(ruleHostBridge, forKeyedSubscript: "__nativeRule" as NSString)
@@ -70,7 +69,7 @@ final class JSCoreRuntime {
                 effectiveVariables["src"] = htmlVal
             }
         }
-        executionContext?.bind(effectiveVariables)
+        executionContext.bind(effectiveVariables)
         let normalization = LegadoJavaScriptCompatibility.normalize(script)
         let executableScript = normalization.normalizedScript
         context.exception = nil
@@ -228,48 +227,48 @@ final class JSCoreRuntime {
         guard let result = context.evaluateScript(executableScript) else {
             if let exception = context.exception {
                 let details = javascriptExceptionDetails(exception)
-                executionContext?.recordJavaScript(SourceJavaScriptEvidence(
+                executionContext.recordJavaScript(SourceJavaScriptEvidence(
                     originalScript: normalization.originalScript,
                     normalizedScript: executableScript,
                     features: normalization.features,
                     exception: details.message,
                     succeeded: false,
-                    stage: executionContext?.currentExecutionStage,
+                    stage: executionContext.currentExecutionStage,
                     exceptionType: details.type,
                     stackTrace: details.stack
                 ))
                 return .failure(.javascript(exception.toString() ?? details.message))
             }
-            executionContext?.recordJavaScript(SourceJavaScriptEvidence(
+            executionContext.recordJavaScript(SourceJavaScriptEvidence(
                 originalScript: normalization.originalScript,
                 normalizedScript: executableScript,
                 features: normalization.features,
                 succeeded: true,
-                stage: executionContext?.currentExecutionStage
+                stage: executionContext.currentExecutionStage
             ))
             return .success("")
         }
         if let exception = context.exception {
             let details = javascriptExceptionDetails(exception)
             context.exception = nil
-            executionContext?.recordJavaScript(SourceJavaScriptEvidence(
+            executionContext.recordJavaScript(SourceJavaScriptEvidence(
                 originalScript: normalization.originalScript,
                 normalizedScript: executableScript,
                 features: normalization.features,
                 exception: details.message,
                 succeeded: false,
-                stage: executionContext?.currentExecutionStage,
+                stage: executionContext.currentExecutionStage,
                 exceptionType: details.type,
                 stackTrace: details.stack
             ))
             return .failure(.javascript(exception.toString() ?? details.message))
         }
-        executionContext?.recordJavaScript(SourceJavaScriptEvidence(
+        executionContext.recordJavaScript(SourceJavaScriptEvidence(
             originalScript: normalization.originalScript,
             normalizedScript: executableScript,
             features: normalization.features,
             succeeded: true,
-            stage: executionContext?.currentExecutionStage
+            stage: executionContext.currentExecutionStage
         ))
         synchronizeExecutionContextFromJavaScript()
         return .success(result.toString())
@@ -312,7 +311,7 @@ final class JSCoreRuntime {
             guard let value = context.objectForKeyedSubscript(key),
                   !value.isUndefined,
                   !value.isNull else { continue }
-            executionContext?.setValue(value.toObject(), for: key)
+            executionContext.setValue(value.toObject(), for: key)
         }
     }
 
@@ -531,11 +530,11 @@ final class JSCoreRuntime {
         let ajaxResponse: @convention(block) (String, String) -> NSDictionary = { url, headers in
             guard let runtime = weakSelf else { return [:] }
             let requestText = runtime.requestText(url: url, body: nil, headers: headers, includeStoredBody: false)
-            if let response = runtime.executionContext?.responseHandler?(requestText) {
-                runtime.executionContext?.ingestResponse(response)
+            if let response = runtime.executionContext.responseHandler?(requestText) {
+                runtime.executionContext.ingestResponse(response)
                 return responseMetadata(response)
             }
-            if let handler = runtime.executionContext?.networkHandler {
+            if let handler = runtime.executionContext.networkHandler {
                 let body = handler(requestText)
                 return ["body": body, "url": url, "statusCode": 200, "headers": [:]] as NSDictionary
             }
@@ -543,62 +542,62 @@ final class JSCoreRuntime {
                 let body = handler(requestText)
                 return ["body": body, "url": url, "statusCode": 200, "headers": [:]] as NSDictionary
             }
-            runtime.executionContext?.recordBridgeFailure("java.ajax", message: "no response or network handler")
+            runtime.executionContext.recordBridgeFailure("java.ajax", message: "no response or network handler")
             let body = ""
             return ["body": body, "url": url, "statusCode": 200, "headers": [:]] as NSDictionary
         }
         let ajaxBytes: @convention(block) (String, String) -> NSArray = { url, headers in
             guard let runtime = weakSelf else { return [] }
             let requestText = runtime.requestText(url: url, body: nil, headers: headers, includeStoredBody: false)
-            if let response = runtime.executionContext?.responseHandler?(requestText) {
-                runtime.executionContext?.ingestResponse(response)
+            if let response = runtime.executionContext.responseHandler?(requestText) {
+                runtime.executionContext.ingestResponse(response)
                 if !response.data.isEmpty {
                     return response.data.map { NSNumber(value: $0) } as NSArray
                 }
                 return Array(response.body.utf8).map { NSNumber(value: $0) } as NSArray
             }
-            if let handler = runtime.executionContext?.networkHandler {
+            if let handler = runtime.executionContext.networkHandler {
                 return Array(handler(requestText).utf8).map { NSNumber(value: $0) } as NSArray
             }
             if let handler = ajaxHandler {
                 return Array(handler(requestText).utf8).map { NSNumber(value: $0) } as NSArray
             }
-            runtime.executionContext?.recordBridgeFailure("java.ajaxBytes", message: "no response or network handler")
+            runtime.executionContext.recordBridgeFailure("java.ajaxBytes", message: "no response or network handler")
             let body = ""
             return Array(body.utf8).map { NSNumber(value: $0) } as NSArray
         }
         let ajax: @convention(block) (String, String) -> String = { url, headers in
             guard let runtime = weakSelf else { return "" }
             let requestText = runtime.requestText(url: url, body: nil, headers: headers, includeStoredBody: false)
-            if let response = runtime.executionContext?.responseHandler?(requestText) {
-                runtime.executionContext?.ingestResponse(response)
+            if let response = runtime.executionContext.responseHandler?(requestText) {
+                runtime.executionContext.ingestResponse(response)
                 return response.body
             }
-            if let handler = runtime.executionContext?.networkHandler { return handler(requestText) }
+            if let handler = runtime.executionContext.networkHandler { return handler(requestText) }
             if let handler = ajaxHandler { return handler(requestText) }
-            runtime.executionContext?.recordBridgeFailure("java.ajax", message: "no response or network handler")
+            runtime.executionContext.recordBridgeFailure("java.ajax", message: "no response or network handler")
             return ""
         }
         let post: @convention(block) (String, String, String) -> String = { url, body, headers in
             let requestText = weakSelf?.requestText(url: url, body: body, headers: headers, includeStoredBody: true) ?? "\(url)@Body:\(body)"
-            if let response = weakSelf?.executionContext?.responseHandler?(requestText) {
-                weakSelf?.executionContext?.ingestResponse(response)
+            if let response = weakSelf?.executionContext.responseHandler?(requestText) {
+                weakSelf?.executionContext.ingestResponse(response)
                 return response.body
             }
-            return weakSelf?.executionContext?.networkHandler?(requestText) ?? ajaxHandler?(requestText) ?? ""
+            return weakSelf?.executionContext.networkHandler?(requestText) ?? ajaxHandler?(requestText) ?? ""
         }
         let postResponse: @convention(block) (String, String, String) -> NSDictionary = { url, body, headers in
             guard let runtime = weakSelf else { return [:] }
             let requestText = runtime.requestText(url: url, body: body, headers: headers, includeStoredBody: true)
-            if let response = runtime.executionContext?.responseHandler?(requestText) {
-                runtime.executionContext?.ingestResponse(response)
+            if let response = runtime.executionContext.responseHandler?(requestText) {
+                runtime.executionContext.ingestResponse(response)
                 return responseMetadata(response)
             }
             let value: String
-            if let handler = runtime.executionContext?.networkHandler { value = handler(requestText) }
+            if let handler = runtime.executionContext.networkHandler { value = handler(requestText) }
             else if let handler = ajaxHandler { value = handler(requestText) }
             else {
-                runtime.executionContext?.recordBridgeFailure("java.post", message: "no response or network handler")
+                runtime.executionContext.recordBridgeFailure("java.post", message: "no response or network handler")
                 value = ""
             }
             return ["body": value, "url": url, "statusCode": 200, "headers": [:]] as NSDictionary
@@ -613,24 +612,24 @@ final class JSCoreRuntime {
                 method: method,
                 forceMethodDirective: forceMethodDirective
             )
-            if let response = runtime.executionContext?.responseHandler?(requestText) {
-                runtime.executionContext?.ingestResponse(response)
+            if let response = runtime.executionContext.responseHandler?(requestText) {
+                runtime.executionContext.ingestResponse(response)
                 return responseMetadata(response)
             }
             let value: String
-            if let handler = runtime.executionContext?.networkHandler { value = handler(requestText) }
+            if let handler = runtime.executionContext.networkHandler { value = handler(requestText) }
             else if let handler = ajaxHandler { value = handler(requestText) }
             else {
-                runtime.executionContext?.recordBridgeFailure("java.request", message: "no response or network handler")
+                runtime.executionContext.recordBridgeFailure("java.request", message: "no response or network handler")
                 value = ""
             }
             return ["body": value, "url": url, "statusCode": 200, "headers": [:]] as NSDictionary
         }
         let put: @convention(block) (String, String) -> String = { key, value in
-            weakSelf?.executionContext?.put(value, for: key) ?? value
+            weakSelf?.executionContext.put(value, for: key) ?? value
         }
         let getStore: @convention(block) (String) -> String = { key in
-            weakSelf?.executionContext?.get(key) ?? ""
+            weakSelf?.executionContext.get(key) ?? ""
         }
         let removeElements: @convention(block) (String, String) -> String = { html, selector in
             do {
@@ -3813,7 +3812,7 @@ final class JSCoreRuntime {
     private func mergedHeaders(_ explicitHeaders: String) -> [String: String] {
         var headers: [String: String] = [:]
         for key in ["headers", "header", "bookSourceHeader"] {
-            headers.merge(parseStringMap(executionContext?.get(key) ?? ""), uniquingKeysWith: { _, new in new })
+            headers.merge(parseStringMap(executionContext.get(key)), uniquingKeysWith: { _, new in new })
         }
         headers.merge(parseStringMap(explicitHeaders), uniquingKeysWith: { _, new in new })
         return headers
@@ -3825,7 +3824,7 @@ final class JSCoreRuntime {
         }
         guard includeStoredBody else { return nil }
         for key in ["body", "requestBody", "postBody", "params"] {
-            let value = executionContext?.get(key) ?? ""
+            let value = executionContext.get(key)
             if !value.isEmpty {
                 return normalizedBody(value)
             }
