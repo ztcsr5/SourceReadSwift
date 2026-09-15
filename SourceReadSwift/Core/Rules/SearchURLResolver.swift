@@ -217,7 +217,7 @@ struct SearchURLResolver {
                 )
             }
         )
-        return JSCoreRuntime(ajaxHandler: { urlText in
+        let runtime = JSCoreRuntime(ajaxHandler: { urlText in
             if let network {
                 return SynchronousSourceNetworkBridge.loadBody(
                     urlText: urlText,
@@ -234,6 +234,7 @@ struct SearchURLResolver {
                 cookieHeader: persistentState.get("cookieHeader").nilIfEmpty,
                 persistentValues: persistentState.snapshot(),
                 persistentState: persistentState
+            )
         }, executionContext: context)
         if let jsLib = source.raw["jsLib"], !jsLib.isEmpty {
             _ = runtime.evaluate(jsLib)
