@@ -23,12 +23,16 @@ struct DynamicURLResolver {
         guard isJS else { return rawURL }
 
         let script: String
+        var chainedSubrule: String? = nil
         if trimmed.hasPrefix("@js:") {
             script = String(trimmed.dropFirst(4)).trimmingCharacters(in: .whitespacesAndNewlines)
-        } else if trimmed.hasPrefix("<js>") && trimmed.contains("</js>") {
+        } else if trimmed.hasPrefix("<js>"), let endRange = trimmed.range(of: "</js>") {
             let start = trimmed.index(trimmed.startIndex, offsetBy: 4)
-            let end = trimmed.range(of: "</js>")?.lowerBound ?? trimmed.endIndex
-            script = String(trimmed[start..<end]).trimmingCharacters(in: .whitespacesAndNewlines)
+            script = String(trimmed[start..<endRange.lowerBound]).trimmingCharacters(in: .whitespacesAndNewlines)
+            let remaining = String(trimmed[endRange.upperBound...]).trimmingCharacters(in: .whitespacesAndNewlines)
+            if !remaining.isEmpty {
+                chainedSubrule = remaining
+            }
         } else {
             script = trimmed
         }
@@ -49,7 +53,23 @@ struct DynamicURLResolver {
         let evalResult = runtime.evaluate(script, variables: jsVariables)
         switch evalResult {
         case .success(let evaluated):
-            let resultText = evaluated.trimmingCharacters(in: .whitespacesAndNewlines)
+            var resultText = evaluated.trimmingCharacters(in: .whitespacesAndNewlines)
+            if let chained = chainedSubrule, !chained.isEmpty {
+                if chained.hasPrefix("$.") || chained.hasPrefix("@json:") {
+                    var jsonTarget: Any = resultText
+                    if let data = resultText.data(using: .utf8),
+                       let parsed = try? JSONSerialization.jsonObject(with: data, options: [.fragmentsAllowed]) {
+                        jsonTarget = parsed
+                    }
+                    let jsonExtractor = JSONRuleExtractor(executionContext: context)
+                    if let val = jsonExtractor.value(from: jsonTarget, path: chained, variables: variables) {
+                        resultText = jsonExtractor.stringify(val).trimmingCharacters(in: .whitespacesAndNewlines)
+                    }
+                }
+            }
+            if resultText.lowercased().hasPrefix("javascript:") || resultText == "#" {
+                return ""
+            }
             if !resultText.isEmpty && resultText != "undefined" && resultText != "null" {
                 // If the JS returned a relative path, absolutize against baseUrl
                 if let baseURLObj = URL(string: baseUrl) {

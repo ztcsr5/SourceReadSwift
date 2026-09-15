@@ -75,7 +75,7 @@ struct SearchResultParser {
                 let name = rawName.components(separatedBy: .newlines).first(where: { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty })?.trimmingCharacters(in: .whitespacesAndNewlines) ?? rawName
                 let rawBookUrl = try htmlExtractor.value(from: element, rule: firstRule(rule, keys: ["bookUrl", "url"]), fallback: "a@href", baseUrl: response.url, variables: variables)
                 let bookUrl = rawBookUrl.components(separatedBy: .newlines).first(where: { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty })?.trimmingCharacters(in: .whitespacesAndNewlines) ?? rawBookUrl
-                guard !name.isEmpty, !bookUrl.isEmpty else { continue }
+                guard !name.isEmpty, !bookUrl.isEmpty, !bookUrl.lowercased().hasPrefix("javascript:"), bookUrl != "#" else { continue }
                 let rawAuthor = try htmlExtractor.value(from: element, rule: firstRule(rule, keys: ["author"]), fallback: nil, baseUrl: response.url, variables: variables).nilIfEmpty
                 let author = rawAuthor?.components(separatedBy: .newlines).first(where: { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty })?.trimmingCharacters(in: .whitespacesAndNewlines) ?? rawAuthor
                 let rawCover = try htmlExtractor.value(from: element, rule: firstRule(rule, keys: ["coverUrl", "cover"]), fallback: "img@src", baseUrl: response.url, variables: variables).nilIfEmpty
@@ -154,7 +154,9 @@ struct SearchResultParser {
                 fallbackKeys: ["bookUrl", "url", "link", "book_url", "id"],
                 variables: variables
             )
-            guard let name, let url else { return nil }
+            guard let name, let url, !url.isEmpty, !url.lowercased().hasPrefix("javascript:"), url != "#" else { return nil }
+            let absBookUrl = htmlExtractor.absolutize(url, base: response.url)
+            guard !absBookUrl.isEmpty else { return nil }
             return SearchBook(
                 name: name,
                 author: extractor.string(
@@ -169,7 +171,7 @@ struct SearchResultParser {
                     fallbackKeys: ["cover", "coverUrl", "img", "image"],
                     variables: variables
                 ),
-                bookUrl: htmlExtractor.absolutize(url, base: response.url),
+                bookUrl: absBookUrl,
                 sourceName: source.bookSourceName,
                 sourceUrl: source.bookSourceUrl,
                 intro: extractor.string(

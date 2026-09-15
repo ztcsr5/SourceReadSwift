@@ -133,4 +133,46 @@ final class SourceFlowEngineTests: XCTestCase {
         let classification = SourceDiagnosticReportExporter.classify(report: report)
         XCTAssertEqual(classification.category, .antiBotShield)
     }
+
+    // MARK: - Chained <js> Rules & URL Safety
+    func testChainedJSToJSONRule() {
+        let rule = "<js>var list = {'turl': 'https://example.com/chapters'}; JSON.stringify(list)</js>$.turl"
+        let source = BookSource(bookSourceName: "测试源", bookSourceUrl: "https://example.com")
+        let context = RuleExecutionContext()
+        let resolved = DynamicURLResolver.resolve(rule, baseUrl: "https://example.com", source: source, context: context)
+        XCTAssertEqual(resolved, "https://example.com/chapters")
+    }
+
+    func testChainedJSToHtmlRule() throws {
+        let extractor = HtmlRuleExtractor(executionContext: RuleExecutionContext())
+        let doc = try SwiftSoup.parse("<div>initial</div>", "https://example.com")
+        let rule = "<js>'<div class=\"news_details\"><li>唐家三少</li></div>'</js>class.news_details@tag.li.0@text"
+        let result = try extractor.value(from: doc, rule: rule, fallback: nil, baseUrl: URL(string: "https://example.com"))
+        XCTAssertEqual(result, "唐家三少")
+    }
+
+    func testJSCoreRuntimeGlobalDollarAndSourceKey() {
+        let rt = JSCoreRuntime()
+        // Test $ global variable
+        let evalDollar = try? rt.evaluate("typeof $").get()
+        XCTAssertEqual(evalDollar, "function")
+
+        // Test iid global variable
+        let evalIid = try? rt.evaluate("typeof iid").get()
+        XCTAssertEqual(evalIid, "string")
+
+        // Test source.getKey() retains raw fragment
+        let source = BookSource(bookSourceName: "玄幻文学", bookSourceUrl: "https://m.xhwx6.com#")
+        let evalKey = try? rt.evaluate("source.getKey()", variables: ["source": source]).get()
+        XCTAssertEqual(evalKey, "https://m.xhwx6.com#")
+    }
+
+    func testDiscardJavascriptAndAnchorUrls() {
+        let extractor = HtmlRuleExtractor(executionContext: RuleExecutionContext())
+        guard let base = URL(string: "http://dict.cn") else { return }
+        XCTAssertEqual(extractor.absolutize("javascript:void(0);", base: base), "")
+        XCTAssertEqual(extractor.absolutize("javascript:;", base: base), "")
+        XCTAssertEqual(extractor.absolutize("#", base: base), "")
+    }
 }
+

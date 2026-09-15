@@ -515,6 +515,9 @@ struct HtmlRuleExtractor {
         while clean.hasSuffix("|") || clean.hasSuffix("#") {
             clean = String(clean.dropLast()).trimmingCharacters(in: .whitespacesAndNewlines)
         }
+        if clean.lowercased().hasPrefix("javascript:") || clean == "#" || clean.isEmpty {
+            return ""
+        }
         if clean.hasPrefix("@js:") || clean.hasPrefix("<js>") {
             return clean
         }
@@ -597,13 +600,17 @@ struct HtmlRuleExtractor {
         extraVariables: [String: Any]
     ) throws -> String {
         var script = rule.trimmingCharacters(in: .whitespacesAndNewlines)
+        var chainedSubrule: String? = nil
         if script.hasPrefix("@js:") {
             script = String(script.dropFirst(4)).trimmingCharacters(in: .whitespacesAndNewlines)
-        } else if script.hasPrefix("<js>") && script.contains("</js>") {
+        } else if script.hasPrefix("<js>"), let endRange = script.range(of: "</js>") {
             let start = script.index(script.startIndex, offsetBy: 4)
-            let end = script.range(of: "</js>")?.lowerBound ?? script.endIndex
-            let rest = String(script[script.range(of: "</js>")!.upperBound...])
-            script = String(script[start..<end]) + rest
+            let jsCode = String(script[start..<endRange.lowerBound]).trimmingCharacters(in: .whitespacesAndNewlines)
+            let remaining = String(script[endRange.upperBound...]).trimmingCharacters(in: .whitespacesAndNewlines)
+            script = jsCode
+            if !remaining.isEmpty {
+                chainedSubrule = remaining
+            }
         }
 
         var trailingRegexParts: [String] = []
@@ -635,10 +642,44 @@ struct HtmlRuleExtractor {
             jsResult = try evaluateJS(rule: script, rootHtml: rootHtml, baseUrl: baseUrl, extraVariables: extraVariables)
         }
 
+        var currentResult = jsResult
         if !trailingRegexParts.isEmpty {
-            return applyRegexTransforms(trailingRegexParts[...], to: jsResult)
+            currentResult = applyRegexTransforms(trailingRegexParts[...], to: currentResult)
         }
-        return jsResult
+
+        if let chained = chainedSubrule, !chained.isEmpty {
+            if chained.hasPrefix("##") {
+                let parts = Array(chained.components(separatedBy: "##").dropFirst())
+                return applyRegexTransforms(parts[...], to: currentResult)
+            } else if chained.hasPrefix("$.") || chained.hasPrefix("@json:") {
+                var jsonTarget: Any = currentResult
+                if let data = currentResult.data(using: .utf8),
+                   let parsed = try? JSONSerialization.jsonObject(with: data, options: [.fragmentsAllowed]) {
+                    jsonTarget = parsed
+                }
+                let jsonExtractor = JSONRuleExtractor(executionContext: executionContext)
+                if let val = jsonExtractor.value(from: jsonTarget, path: chained, variables: extraVariables) {
+                    return jsonExtractor.stringify(val)
+                }
+            } else if chained.hasPrefix("<js>") || chained.hasPrefix("@js:") {
+                var chainedVariables = extraVariables
+                chainedVariables["result"] = currentResult
+                chainedVariables["src"] = currentResult
+                chainedVariables["html"] = currentResult
+                return try evaluateJSWithTrailingRegex(rule: chained, rootHtml: currentResult, baseUrl: baseUrl, extraVariables: chainedVariables)
+            } else if let doc = try? SwiftSoup.parse(currentResult, baseUrl?.absoluteString ?? "") {
+                var chainedVariables = extraVariables
+                chainedVariables["result"] = currentResult
+                chainedVariables["src"] = currentResult
+                chainedVariables["html"] = currentResult
+                let subVal = try self.value(from: doc, rule: chained, fallback: nil, baseUrl: baseUrl, variables: chainedVariables)
+                if !subVal.isEmpty {
+                    return subVal
+                }
+            }
+        }
+
+        return currentResult
     }
 
     private func evaluateJS(

@@ -46,7 +46,7 @@ final class JSCoreRuntime {
         // JavaScriptCore can reject a first-read of an undeclared global inside
         // the large prelude; predeclaring them keeps the later `var x = x ||`
         // aliases source-compatible without relying on browser semantics.
-        context.evaluateScript("var java = {}; var cookie = {}; var CryptoJS = {}; var Packages = {}; var JXNode = function(value) { return __nativeJXNode.create(value); }; var JavaImporter = function() {}; var src = ''; var id = ''; var type = ''; var TYPE = function(v) { return v != null ? (typeof v) : ''; }; var ruid = function(len, upper) { len = len || 16; var chars = '0123456789abcdef'; var res = ''; for (var i = 0; i < len; i++) res += chars[Math.floor(Math.random() * chars.length)]; return upper ? res.toUpperCase() : res; }; var form = {}; var result = ''; var baseUrl = '';")
+        context.evaluateScript("var java = {}; var cookie = {}; var CryptoJS = {}; var Packages = {}; var JXNode = function(value) { return __nativeJXNode.create(value); }; var $ = function(value) { return JXNode(value); }; var JavaImporter = function() {}; var src = ''; var id = ''; var iid = ''; var varid = ''; var variid = ''; var type = ''; var TYPE = function(v) { return v != null ? (typeof v) : ''; }; var ruid = function(len, upper) { len = len || 16; var chars = '0123456789abcdef'; var res = ''; for (var i = 0; i < len; i++) res += chars[Math.floor(Math.random() * chars.length)]; return upper ? res.toUpperCase() : res; }; var form = {}; var result = ''; var baseUrl = '';")
         installBaseBridge()
     }
 
@@ -177,7 +177,7 @@ final class JSCoreRuntime {
                         return source.variable;
                     };
                     source.getKey = function(key) {
-                        if (arguments.length > 0 && key != null && String(key).length > 0) return source.getVariable(key);
+                        if (arguments.length > 0 && key != null && String(key).trim().length > 0) return source.getVariable(key);
                         return source.key || source.bookSourceUrl || source.sourceUrl || '';
                     };
                     source.setKey = function(key, val) {
