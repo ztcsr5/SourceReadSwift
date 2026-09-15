@@ -149,17 +149,68 @@ struct ChapterListParser {
 
             var chapters = try elements.enumerated().compactMap { index, element -> BookChapter? in
                 let title = try htmlExtractor.value(from: element, rule: nameRule, fallback: "a@text", baseUrl: response.url, variables: variables)
-                let url = try htmlExtractor.value(from: element, rule: urlRule, fallback: "a@href", baseUrl: response.url, variables: variables)
-                guard !title.isEmpty, !url.isEmpty else { return nil }
-                return BookChapter(title: title, url: url, bookUrl: book.bookUrl, index: index, isVip: false)
+                let rawUrl = try htmlExtractor.value(from: element, rule: urlRule, fallback: "a@href", baseUrl: response.url, variables: variables)
+                let absUrl = htmlExtractor.absolutize(rawUrl, base: response.url)
+                guard isValidChapter(title: title, url: absUrl, pageURL: response.url, bookURL: book.bookUrl) else { return nil }
+                return BookChapter(title: title, url: absUrl, bookUrl: book.bookUrl, index: index, isVip: false)
             }
             if chapters.isEmpty && !elements.isEmpty {
                 chapters = elements.enumerated().compactMap { index, element in
                     let title = (try? element.text())?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
                     let rawHref = (try? element.attr("href"))?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-                    guard !title.isEmpty, !rawHref.isEmpty else { return nil }
                     let absUrl = htmlExtractor.absolutize(rawHref, base: response.url)
+                    guard isValidChapter(title: title, url: absUrl, pageURL: response.url, bookURL: book.bookUrl) else { return nil }
                     return BookChapter(title: title, url: absUrl, bookUrl: book.bookUrl, index: index, isVip: false)
+                }
+            }
+            if chapters.isEmpty {
+                var candidateSelectors: [String] = []
+                if listRule.contains(".1") {
+                    candidateSelectors.append(listRule.replacingOccurrences(of: ".1", with: ".0"))
+                    candidateSelectors.append(listRule.replacingOccurrences(of: ".1", with: ""))
+                }
+                candidateSelectors.append(contentsOf: [
+                    ".listmain dd a",
+                    "#list dd a",
+                    ".catalog dd a",
+                    ".chapters a",
+                    "ul.chapter-list li a",
+                    "div#list-chapterAll a",
+                    ".section-box li a",
+                    "#chapterlist li a",
+                    ".dir-list li a",
+                    "div.read-section a",
+                    "#chapters-list a",
+                    ".chapter-list a",
+                    ".catalog-list a",
+                    "#list-chapter a",
+                    ".volume-list a",
+                    ".mulu a",
+                    "#mulu a",
+                    ".dir-box a",
+                    ".chapter-item a",
+                    ".book-chapter-list a",
+                    "#chapter_list a",
+                    ".chapterlist a",
+                    "div.catalog a",
+                    "div.chapterlist a",
+                    ".mu-box a"
+                ])
+                for sel in candidateSelectors {
+                    guard let altElements = try? roots.flatMap({ root in
+                        try htmlExtractor.select(from: root, rule: sel, baseUrl: response.url)
+                    }), !altElements.isEmpty else { continue }
+                    let altChapters = altElements.enumerated().compactMap { index, element -> BookChapter? in
+                        let title = ((try? htmlExtractor.value(from: element, rule: nameRule, fallback: "a@text", baseUrl: response.url, variables: variables)) ?? (try? element.text()) ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+                        let rawUrl = ((try? htmlExtractor.value(from: element, rule: urlRule, fallback: "a@href", baseUrl: response.url, variables: variables)) ?? (try? element.attr("href")) ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+                        let absUrl = htmlExtractor.absolutize(rawUrl, base: response.url)
+                        guard isValidChapter(title: title, url: absUrl, pageURL: response.url, bookURL: book.bookUrl) else { return nil }
+                        return BookChapter(title: title, url: absUrl, bookUrl: book.bookUrl, index: index, isVip: false)
+                    }
+                    if !altChapters.isEmpty {
+                        chapters = altChapters
+                        break
+                    }
                 }
             }
             var next: String?
@@ -228,9 +279,11 @@ struct ChapterListParser {
                 variables: variables
             )
             guard let title, let rawUrl, !title.isEmpty, !rawUrl.isEmpty else { return nil }
+            let absUrl = htmlExtractor.absolutize(rawUrl, base: response.url)
+            guard isValidChapter(title: title, url: absUrl, pageURL: response.url, bookURL: book.bookUrl) else { return nil }
             return BookChapter(
                 title: title,
-                url: htmlExtractor.absolutize(rawUrl, base: response.url),
+                url: absUrl,
                 bookUrl: book.bookUrl,
                 index: index,
                 isVip: false
@@ -252,6 +305,41 @@ struct ChapterListParser {
         return chapters.isEmpty
             ? .failure(.empty("JSON chapter list is empty"))
             : .success(ChapterListPage(chapters: chapters, nextTocUrl: next))
+    }
+
+    private func isValidChapter(title: String, url: String, pageURL: URL, bookURL: String) -> Bool {
+        let trimmedTitle = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmedURL = url.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedTitle.isEmpty, !trimmedURL.isEmpty else { return false }
+
+        // Filter dummy / non-chapter URLs
+        if trimmedURL == "!" || trimmedURL == "#" || trimmedURL.lowercased().hasPrefix("javascript:") {
+            return false
+        }
+        if trimmedURL.hasSuffix("/!") || trimmedURL.hasSuffix("/#") {
+            return false
+        }
+        // Filter dummy navigation button titles
+        let dummyTitles: Set<String> = [
+            "倒序", "正序", "目录", "展开", "收起", "查看目录", "加入书架",
+            "上一页", "下一页", "查看全部", "返回目录", "书架", "书签"
+        ]
+        if dummyTitles.contains(trimmedTitle) {
+            return false
+        }
+        // Check if URL is same as the page itself without chapter path
+        if trimmedURL == pageURL.absoluteString || trimmedURL == pageURL.absoluteString + "/" {
+            return false
+        }
+        if let u = URL(string: trimmedURL), let b = URL(string: bookURL) {
+            if u.host == pageURL.host && u.path == pageURL.path && u.query == pageURL.query && u.fragment == nil {
+                return false
+            }
+            if u.host == b.host && u.path == b.path && u.query == b.query && u.fragment == nil {
+                return false
+            }
+        }
+        return true
     }
 }
 

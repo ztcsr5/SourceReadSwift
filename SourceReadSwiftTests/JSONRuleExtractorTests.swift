@@ -325,4 +325,34 @@ final class JSONRuleExtractorTests: XCTestCase {
         XCTAssertEqual(list.count, 3)
         XCTAssertEqual(list.compactMap { $0["chapter_title"] as? String }, ["第一章 初始", "第二章 进阶", "第三章 终局"])
     }
+
+    func testURLTemplateInterpolationNotTreatedAsJSONPath() throws {
+        let item: [String: Any] = [
+            "id": "7549045718187510846",
+            "source": "fanqie"
+        ]
+        let extractor = JSONRuleExtractor()
+        let rule = "https://www.mowan.lol/api/book/detail?source={{$.source}}&book_id={{$.id}}##comment"
+        let result = extractor.string(from: item, rule: rule, fallbackKeys: ["id"])
+        XCTAssertEqual(result, "https://www.mowan.lol/api/book/detail?source=fanqie&book_id=7549045718187510846")
+    }
+
+    func testCaseInsensitiveFallbackKey() throws {
+        let item: [String: Any] = [
+            "chaptername": "第一章 初始"
+        ]
+        let extractor = JSONRuleExtractor()
+        let result = extractor.string(from: item, rule: nil, fallbackKeys: ["chapterName"])
+        XCTAssertEqual(result, "第一章 初始")
+    }
+
+    func testEvaluateRawJSPreservesObjectAsResult() throws {
+        let item: [String: Any] = [
+            "source_id": "42078"
+        ]
+        let extractor = JSONRuleExtractor()
+        let rule = "$.source_id@js:\"https://www.duokan.com/hs/v0/android/fiction/book/\"+result"
+        let result = extractor.string(from: item, rule: rule, fallbackKeys: [], variables: ["result": "{\"total\": 100}"])
+        XCTAssertEqual(result, "https://www.duokan.com/hs/v0/android/fiction/book/42078")
+    }
 }

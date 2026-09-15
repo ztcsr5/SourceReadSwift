@@ -99,7 +99,14 @@ struct JSONRuleExtractor {
             let trimmed = rule.trimmingCharacters(in: .whitespacesAndNewlines)
             if trimmed.contains("{{") && trimmed.contains("}}") {
                 let interpolated = interpolateTemplate(trimmed, item: item, variables: variables).trimmingCharacters(in: .whitespacesAndNewlines)
-                if interpolated.hasPrefix("@js:") || interpolated.hasPrefix("<js>") || interpolated.contains("@js:") || interpolated.contains("<js>") || interpolated.contains("$.") || interpolated.contains("@json:") || interpolated.contains("##") {
+                // If the interpolated template is already a URL or relative path:
+                if interpolated.hasPrefix("http://") || interpolated.hasPrefix("https://") || interpolated.hasPrefix("/") {
+                    let cleanedURL = splitTransforms(interpolated).path
+                    if !cleanedURL.isEmpty {
+                        return cleanedURL
+                    }
+                }
+                if interpolated.hasPrefix("@js:") || interpolated.hasPrefix("<js>") || interpolated.contains("@js:") || interpolated.contains("<js>") || interpolated.contains("$.") || interpolated.contains("@json:") {
                     if let value = value(from: item, path: interpolated, variables: variables) {
                         let text = stringify(value)
                         if !text.isEmpty {
@@ -107,7 +114,7 @@ struct JSONRuleExtractor {
                         }
                     }
                 } else if !interpolated.isEmpty {
-                    return interpolated
+                    return splitTransforms(interpolated).path
                 }
             }
             if let value = value(from: item, path: rule, variables: variables) {
@@ -119,6 +126,15 @@ struct JSONRuleExtractor {
         }
         for key in fallbackKeys {
             if let value = item[key] {
+                let text = stringify(value)
+                if !text.isEmpty {
+                    return text
+                }
+            }
+            // Case-insensitive fallback: e.g. "chaptername" vs "chapterName"
+            let lowerKey = key.lowercased()
+            if let matchKey = item.keys.first(where: { $0.lowercased() == lowerKey }),
+               let value = item[matchKey] {
                 let text = stringify(value)
                 if !text.isEmpty {
                     return text
@@ -851,17 +867,34 @@ struct JSONRuleExtractor {
             "result": object
         ]
 
-        if JSONSerialization.isValidJSONObject(object) {
+        if let dict = object as? [String: Any] {
+            // Also expose item keys directly in JS scope if non-colliding
+            for (k, v) in dict {
+                if variables[k] == nil {
+                    variables[k] = v
+                }
+            }
+            if let data = try? JSONSerialization.data(withJSONObject: dict, options: []),
+               let jsonStr = String(data: data, encoding: .utf8) {
+                variables["html"] = jsonStr
+                variables["src"] = jsonStr
+            }
+        } else if JSONSerialization.isValidJSONObject(object) {
             if let data = try? JSONSerialization.data(withJSONObject: object, options: []),
                let jsonStr = String(data: data, encoding: .utf8) {
                 variables["html"] = jsonStr
+                variables["src"] = jsonStr
             }
         } else {
-            variables["html"] = stringify(object)
+            let str = stringify(object)
+            variables["html"] = str
+            variables["src"] = str
         }
 
         for (k, v) in extraVariables {
-            variables[k] = v
+            if variables[k] == nil {
+                variables[k] = v
+            }
         }
 
         let evaluated = runtime.evaluate(script, variables: variables)

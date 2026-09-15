@@ -209,7 +209,7 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
         }
         let resolvedBookUrl = DynamicURLResolver.resolve(
             book.bookUrl,
-            baseUrl: source.cleanSourceURL,
+            baseUrl: book.bookUrl.nilIfEmpty ?? source.cleanSourceURL,
             source: source,
             variables: ["book": book],
             context: executionContext
@@ -268,7 +268,7 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
         let tocURL = book.tocUrl?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty ?? book.bookUrl
         let resolvedTocURL = DynamicURLResolver.resolve(
             tocURL,
-            baseUrl: source.cleanSourceURL,
+            baseUrl: book.bookUrl.nilIfEmpty ?? book.tocUrl?.nilIfEmpty ?? source.cleanSourceURL,
             source: source,
             variables: ["book": book],
             context: executionContext

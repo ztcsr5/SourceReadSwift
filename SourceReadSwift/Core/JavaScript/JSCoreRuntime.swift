@@ -767,6 +767,19 @@ final class JSCoreRuntime {
         }
         if (typeof window === 'undefined' || window === null) window = globalThis;
         if (typeof document === 'undefined' || document === null) document = {};
+        (function() {
+          var origMatch = String.prototype.match;
+          String.prototype.match = function(re) {
+            var res = origMatch.call(this, re);
+            if (!res && re instanceof RegExp && !re.flags.includes('i')) {
+              try {
+                var caseInsensitive = new RegExp(re.source, re.flags + 'i');
+                return origMatch.call(this, caseInsensitive);
+              } catch(e) {}
+            }
+            return res;
+          };
+        })();
         var __cache_store = (typeof __cache_store !== 'undefined' && __cache_store) || {};
         var __field_store = (typeof __field_store !== 'undefined' && __field_store) || {};
         var cache = {
