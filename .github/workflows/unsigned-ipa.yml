@@ -59,21 +59,19 @@ jobs:
           rm -rf unsigned-ipa
           mkdir -p unsigned-ipa/Payload
           cp -R "$APP_PATH" unsigned-ipa/Payload/
-          ditto -c -k --keepParent unsigned-ipa/Payload SourceReadSwift-unsigned.ipa
-          cp SourceReadSwift-unsigned.ipa SourceReadSwift-1.0.0-unsigned.ipa
+          ditto -c -k --keepParent unsigned-ipa/Payload SourceReadSwift-1.0.0-unsigned.ipa
           ls -lh SourceReadSwift*.ipa
 
       - name: Summarize IPA artifact
         run: |
           set -euo pipefail
-          SIZE_BYTES="$(stat -f%z SourceReadSwift-unsigned.ipa)"
-          SHA256="$(shasum -a 256 SourceReadSwift-unsigned.ipa | awk '{print $1}')"
+          SIZE_BYTES="$(stat -f%z SourceReadSwift-1.0.0-unsigned.ipa)"
+          SHA256="$(shasum -a 256 SourceReadSwift-1.0.0-unsigned.ipa | awk '{print $1}')"
           echo "IPA size: ${SIZE_BYTES} bytes"
           echo "IPA SHA-256: ${SHA256}"
           {
             echo "## Unsigned IPA (v1.0.0)"
             echo "- file: `SourceReadSwift-1.0.0-unsigned.ipa`"
-            echo "- alias: `SourceReadSwift-unsigned.ipa`"
             echo "- size: ${SIZE_BYTES} bytes"
             echo "- SHA-256: `${SHA256}`"
           } >> "$GITHUB_STEP_SUMMARY"
@@ -81,8 +79,6 @@ jobs:
       - name: Upload unsigned IPA
         uses: actions/upload-artifact@v4
         with:
-          name: SourceReadSwift-unsigned-ipa
-          path: |
-            SourceReadSwift-unsigned.ipa
-            SourceReadSwift-1.0.0-unsigned.ipa
+          name: SourceReadSwift-1.0.0-unsigned-ipa
+          path: SourceReadSwift-1.0.0-unsigned.ipa
           if-no-files-found: error
