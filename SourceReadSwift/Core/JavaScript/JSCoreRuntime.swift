@@ -303,6 +303,15 @@ final class JSCoreRuntime {
             stage: executionContext.currentExecutionStage
         ))
         synchronizeExecutionContextFromJavaScript()
+        if result.isArray || result.toString() == "[object Object]" {
+            if let stringifyFunc = context.objectForKeyedSubscript("JSON" as NSString)?.objectForKeyedSubscript("stringify" as NSString),
+               let jsonValue = stringifyFunc.call(withArguments: [result]),
+               !jsonValue.isUndefined && !jsonValue.isNull,
+               let jsonStr = jsonValue.toString(),
+               jsonStr != "undefined" {
+                return .success(jsonStr)
+            }
+        }
         return .success(result.toString())
     }
 }

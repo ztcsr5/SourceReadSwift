@@ -269,7 +269,7 @@ final class LegadoJavaScriptCompatibilityTests: XCTestCase {
             bookSourceName: "IXDZS Test",
             bookSourceUrl: "https://ixdzs.com",
             ruleToc: SourceRule(fields: [
-                "chapterList": "<js>\nvar bidMatch = baseUrl.match(/read\\/(\\d+)/);\nif (!bidMatch) return [];\n[{title: 'Cap ' + bidMatch[1], url: '/read/' + bidMatch[1] + '/p1.html'}];\n</js>",
+                "chapterList": "<js>\nvar bidMatch = baseUrl.match(/read\\/(\\d+)/);\nif (!bidMatch) return [];\nreturn [{title: 'Cap ' + bidMatch[1], url: '/read/' + bidMatch[1] + '/p1.html'}];\n</js>",
                 "chapterName": "title",
                 "chapterUrl": "url"
             ])
