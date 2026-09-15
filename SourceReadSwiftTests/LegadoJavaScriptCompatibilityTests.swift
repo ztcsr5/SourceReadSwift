@@ -295,10 +295,10 @@ final class LegadoJavaScriptCompatibilityTests: XCTestCase {
         )
         let result = parser.parse(source: source, book: book, response: response)
         switch result {
-        case .success(let page):
-            XCTAssertEqual(page.chapters.count, 1)
-            XCTAssertEqual(page.chapters.first?.title, "Cap 12345")
-            XCTAssertEqual(page.chapters.first?.url, "https://ixdzs.com/read/12345/p1.html")
+        case .success(let chapters):
+            XCTAssertEqual(chapters.count, 1)
+            XCTAssertEqual(chapters.first?.title, "Cap 12345")
+            XCTAssertEqual(chapters.first?.url, "https://ixdzs.com/read/12345/p1.html")
         case .failure(let error):
             XCTFail("Failed to parse chapter list: \(error)")
         }
