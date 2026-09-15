@@ -140,12 +140,13 @@ final class XbsBookSourceAdapterTests: XCTestCase {
         )
 
         let parser = BookDetailParser(executionContext: executionContext)
+        let json = "{\"data\": {\"book_name\": \"十日终焉\"}}"
         let jsonResponse = SourceResponse(
             url: URL(string: "https://fanqienovel.com/page/detail")!,
             statusCode: 200,
             headers: [:],
-            text: "{\"data\": {\"book_name\": \"十日终焉\"}}",
-            data: Data()
+            body: json,
+            data: Data(json.utf8)
         )
 
         let searchBook = SearchBook(name: "十日终焉", bookUrl: "https://fanqienovel.com/page/detail", sourceUrl: source.bookSourceUrl)

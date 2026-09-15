@@ -328,12 +328,13 @@ final class LegadoJavaCompatibilityTests: XCTestCase {
             return "{\"code\": 0, \"data\": {\"name\": \"爱下测试\"}}"
         }, responseHandler: { urlText in
             requests.append(urlText)
+            let json = "{\"code\": 0, \"data\": {\"name\": \"爱下测试\"}}"
             return SourceResponse(
                 url: URL(string: "https://fixture.local/api")!,
                 statusCode: 200,
                 headers: ["Content-Type": "application/json"],
-                text: "{\"code\": 0, \"data\": {\"name\": \"爱下测试\"}}",
-                data: Data()
+                body: json,
+                data: Data(json.utf8)
             )
         })
         let runtime = JSCoreRuntime(executionContext: context)
