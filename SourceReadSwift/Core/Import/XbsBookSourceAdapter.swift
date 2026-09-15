@@ -29,11 +29,11 @@ struct XbsBookSourceAdapter: Sendable {
     }
 
     static func isEncryptedXbs(_ data: Data) -> Bool {
-        guard data.count >= 16 else { return false }
-        guard let sample = xxteaDecrypt(data: data.prefix(64), key: defaultKey) else {
+        guard data.count >= 16, data.count % 4 == 0 else { return false }
+        guard let decrypted = xxteaDecrypt(data: data, key: defaultKey) else {
             return false
         }
-        if let str = String(data: sample, encoding: .utf8) {
+        if let str = String(data: decrypted.prefix(128), encoding: .utf8) {
             let trimmed = str.trimmingCharacters(in: .whitespacesAndNewlines)
             return trimmed.hasPrefix("{") || trimmed.hasPrefix("[")
         }
