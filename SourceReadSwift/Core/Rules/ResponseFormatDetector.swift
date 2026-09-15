@@ -24,14 +24,6 @@ enum ResponseFormatDetector {
     }
 
     static func prefersJSON(body: String, headers: [String: String], rule: String? = nil) -> Bool {
-        if let rule {
-            let trimmedRule = rule.trimmingCharacters(in: .whitespacesAndNewlines)
-            if trimmedRule.hasPrefix("$.") || trimmedRule.hasPrefix("@json:") || trimmedRule.contains("JSON.parse") {
-                if jsonObject(from: body) != nil {
-                    return true
-                }
-            }
-        }
         let normalized = normalizedBody(body)
         guard !normalized.isEmpty else { return false }
         let lower = normalized.lowercased()
@@ -49,6 +41,15 @@ enum ResponseFormatDetector {
 
         if hasHTMLPrefix && !hasJSONContentType {
             return false
+        }
+
+        if let rule {
+            let trimmedRule = rule.trimmingCharacters(in: .whitespacesAndNewlines)
+            if trimmedRule.hasPrefix("$.") || trimmedRule.hasPrefix("@json:") || trimmedRule.contains("JSON.parse") {
+                if jsonObject(from: normalized) != nil {
+                    return true
+                }
+            }
         }
 
         if hasJSONContentType {
@@ -100,7 +101,12 @@ enum ResponseFormatDetector {
     /// object/array candidate is considered, so prose around a response is
     /// never silently treated as source data.
     static func jsonObject(from body: String) -> Any? {
-        var value = normalizedBody(body)
+        let normalized = normalizedBody(body)
+        let lower = normalized.lowercased()
+        if lower.hasPrefix("<!doctype") && !lower.hasPrefix("<pre") {
+            return nil
+        }
+        var value = normalized
         value = stripKnownWrapper(from: value)
         if let object = parseJSON(value) { return object }
 

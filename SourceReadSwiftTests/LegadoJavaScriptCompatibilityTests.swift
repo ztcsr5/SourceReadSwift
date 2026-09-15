@@ -251,6 +251,53 @@ final class LegadoJavaScriptCompatibilityTests: XCTestCase {
         XCTAssertTrue(javascript.features.contains("promise"))
         XCTAssertFalse(javascript.normalizedScript.contains("async function"))
     }
+
+    func testSourceEngineJSLibPreloadingAndExecutionContextBinding() throws {
+        let source = BookSource(
+            bookSourceName: "Test Lib Source",
+            bookSourceUrl: "https://mowan.example.com",
+            raw: ["jsLib": "function CustomGlobalHelper(x) { return 'helper_' + x; }"]
+        )
+        let context = RuleExecutionContext(source: source)
+        let runtime = context.jsRuntime(ajaxHandler: { _ in "" })
+        let res = try unwrap(runtime.evaluate("CustomGlobalHelper('success')"))
+        XCTAssertEqual(res, "helper_success")
+    }
+
+    func testChapterListParserJSExtractionWithBaseUrl() throws {
+        let source = BookSource(
+            bookSourceName: "IXDZS Test",
+            bookSourceUrl: "https://ixdzs.com",
+            ruleToc: [
+                "chapterList": "<js>\nvar bidMatch = baseUrl.match(/read\\/(\\d+)/);\nif (!bidMatch) return [];\n[{title: 'Cap ' + bidMatch[1], url: '/read/' + bidMatch[1] + '/p1.html'}];\n</js>",
+                "chapterName": "title",
+                "chapterUrl": "url"
+            ]
+        )
+        let book = BookDetail(
+            name: "Test Book",
+            bookUrl: "https://ixdzs.com/read/12345/p1.html",
+            sourceName: source.bookSourceName,
+            sourceUrl: source.bookSourceUrl
+        )
+        let parser = ChapterListParser()
+        let response = SourceResponse(
+            url: URL(string: "https://ixdzs.com/read/12345/")!,
+            statusCode: 200,
+            headers: ["Content-Type": "application/json"],
+            body: "{}",
+            data: Data("{}".utf8)
+        )
+        let result = parser.parse(source: source, book: book, response: response)
+        switch result {
+        case .success(let page):
+            XCTAssertEqual(page.chapters.count, 1)
+            XCTAssertEqual(page.chapters.first?.title, "Cap 12345")
+            XCTAssertEqual(page.chapters.first?.url, "https://ixdzs.com/read/12345/p1.html")
+        case .failure(let error):
+            XCTFail("Failed to parse chapter list: \(error)")
+        }
+    }
 }
 
 private extension LegadoJavaScriptCompatibilityTests {

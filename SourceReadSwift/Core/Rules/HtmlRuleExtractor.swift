@@ -86,8 +86,12 @@ struct HtmlRuleExtractor {
 
         if let alternatives = RuleOperatorSplitter.split(trimmed, separator: "||") {
             for alternative in alternatives {
+                let trimmedAlt = alternative.trimmingCharacters(in: .whitespacesAndNewlines)
+                if trimmedAlt.hasPrefix("$.") || trimmedAlt.hasPrefix("@json:") {
+                    continue
+                }
                 do {
-                    let value = try self.value(from: root, rule: alternative, fallback: nil, baseUrl: baseUrl, variables: variables)
+                    let value = try self.value(from: root, rule: trimmedAlt, fallback: nil, baseUrl: baseUrl, variables: variables)
                     if !value.isEmpty { return value }
                 } catch {
                     continue
@@ -247,8 +251,12 @@ struct HtmlRuleExtractor {
         }
         if let fallbackParts = RuleOperatorSplitter.split(materializedRule, separator: "||") {
             for part in fallbackParts {
+                let trimmedPart = part.trimmingCharacters(in: .whitespacesAndNewlines)
+                if trimmedPart.hasPrefix("$.") || trimmedPart.hasPrefix("@json:") || LegadoRuleResolver().isJavaScriptRule(trimmedPart) {
+                    continue
+                }
                 do {
-                    let elements = try select(from: root, rule: part, baseUrl: baseUrl)
+                    let elements = try select(from: root, rule: trimmedPart, baseUrl: baseUrl)
                     if !elements.isEmpty { return elements }
                 } catch {
                     continue

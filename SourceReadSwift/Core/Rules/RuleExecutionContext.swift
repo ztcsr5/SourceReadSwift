@@ -21,6 +21,7 @@ final class RuleExecutionContext: @unchecked Sendable {
     var networkHandler: NetworkHandler?
     var responseHandler: ResponseHandler?
     var logHandler: LogHandler?
+    var source: BookSource?
 
     func jsRuntime(ajaxHandler: @escaping (String) -> String) -> JSCoreRuntime {
         lock.lock()
@@ -29,6 +30,9 @@ final class RuleExecutionContext: @unchecked Sendable {
             return cached
         }
         let runtime = JSCoreRuntime(ajaxHandler: ajaxHandler, executionContext: self)
+        if let jsLib = source?.raw["jsLib"], !jsLib.isEmpty {
+            _ = runtime.evaluate(jsLib)
+        }
         cachedRuntime = runtime
         return runtime
     }
@@ -63,17 +67,22 @@ final class RuleExecutionContext: @unchecked Sendable {
     init(
         initialValues: [String: Any] = [:],
         persistentState: RulePersistentState = RulePersistentState(),
+        source: BookSource? = nil,
         networkHandler: NetworkHandler? = nil,
         responseHandler: ResponseHandler? = nil,
         logHandler: LogHandler? = nil,
         stage: String? = nil
     ) {
+        self.source = source ?? (initialValues["source"] as? BookSource)
         self.networkHandler = networkHandler
         self.responseHandler = responseHandler
         self.logHandler = logHandler
         self.executionStage = stage
         self.persistentState = persistentState
         bind(initialValues)
+        if let source {
+            bind(["source": source])
+        }
     }
 
     /// The production engine sets this to `search`, `detail`, `toc`, or

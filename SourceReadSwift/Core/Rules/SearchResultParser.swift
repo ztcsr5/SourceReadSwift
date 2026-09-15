@@ -23,7 +23,8 @@ struct SearchResultParser {
             contentEncodings: response.contentEncodings
         )
         let listRule = firstRule(source.ruleSearch, keys: ["bookList", "list", "books"])
-        if ResponseFormatDetector.prefersJSON(body: normalized, headers: response.headers, rule: listRule) {
+        let isJSRule = listRule.map { LegadoRuleResolver().isJavaScriptRule($0) } ?? false
+        if isJSRule || ResponseFormatDetector.prefersJSON(body: normalized, headers: response.headers, rule: listRule) {
             let jsonResult = parseJSON(source: source, response: normalizedResponse)
             switch jsonResult {
             case .success:
@@ -65,20 +66,89 @@ struct SearchResultParser {
             } else {
                 roots = try htmlExtractor.select(response.body, baseUrl: response.url, listRule: "html")
             }
-            let elements = try roots.flatMap { root in
+            var elements = try roots.flatMap { root in
                 try htmlExtractor.select(from: root, rule: listRule, baseUrl: response.url)
             }
+            if elements.isEmpty {
+                let fallbackSelectors = [
+                    "table.cytable tr:gt(0)",
+                    ".cytable tr:gt(0)",
+                    "table.cytable tr",
+                    ".cytable tr",
+                    "table.grid tr:gt(0)",
+                    "table.grid tr",
+                    "table.list tr:gt(0)",
+                    "table.list tr",
+                    "table tr:has(a)",
+                    ".book-item",
+                    ".search-item",
+                    ".search-list-item",
+                    ".so-item",
+                    ".s-item",
+                    ".list-item",
+                    "ul.list li",
+                    ".bookbox",
+                    ".booklist li",
+                    ".se-result",
+                    ".se-result-item",
+                    ".result-item",
+                    ".search-result",
+                    ".search-result-item",
+                    ".item",
+                    "div.bookbox"
+                ]
+                for selector in fallbackSelectors {
+                    let candidates = try roots.flatMap { root in
+                        try htmlExtractor.select(from: root, rule: selector, baseUrl: response.url)
+                    }
+                    if !candidates.isEmpty {
+                        elements = candidates
+                        break
+                    }
+                }
+            }
+
             var books: [SearchBook] = []
-            let variables: [String: Any] = ["source": source]
+            let variables: [String: Any] = [
+                "source": source,
+                "baseUrl": response.url.absoluteString,
+                "result": response.body,
+                "body": response.body,
+                "src": response.body,
+                "html": response.body
+            ]
             for element in elements {
-                let rawName = try htmlExtractor.value(from: element, rule: firstRule(rule, keys: ["name", "bookName"]), fallback: "a@text", baseUrl: response.url, variables: variables)
-                let name = rawName.components(separatedBy: .newlines).first(where: { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty })?.trimmingCharacters(in: .whitespacesAndNewlines) ?? rawName
-                let rawBookUrl = try htmlExtractor.value(from: element, rule: firstRule(rule, keys: ["bookUrl", "url"]), fallback: "a@href", baseUrl: response.url, variables: variables)
-                let bookUrl = rawBookUrl.components(separatedBy: .newlines).first(where: { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty })?.trimmingCharacters(in: .whitespacesAndNewlines) ?? rawBookUrl
-                guard !name.isEmpty, !bookUrl.isEmpty, !bookUrl.lowercased().hasPrefix("javascript:"), bookUrl != "#" else { continue }
-                let rawAuthor = try htmlExtractor.value(from: element, rule: firstRule(rule, keys: ["author"]), fallback: nil, baseUrl: response.url, variables: variables).nilIfEmpty
-                let author = rawAuthor?.components(separatedBy: .newlines).first(where: { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty })?.trimmingCharacters(in: .whitespacesAndNewlines) ?? rawAuthor
-                let rawCover = try htmlExtractor.value(from: element, rule: firstRule(rule, keys: ["coverUrl", "cover"]), fallback: "img@src", baseUrl: response.url, variables: variables).nilIfEmpty
+                var rawName = (try? htmlExtractor.value(from: element, rule: firstRule(rule, keys: ["name", "bookName"]), fallback: nil, baseUrl: response.url, variables: variables))?.nilIfEmpty
+                if rawName == nil {
+                    rawName = (try? htmlExtractor.value(from: element, rule: "a.track@text", fallback: nil, baseUrl: response.url, variables: variables))?.nilIfEmpty
+                        ?? (try? htmlExtractor.value(from: element, rule: "td:eq(1) a@text", fallback: nil, baseUrl: response.url, variables: variables))?.nilIfEmpty
+                        ?? (try? htmlExtractor.value(from: element, rule: "a@text", fallback: nil, baseUrl: response.url, variables: variables))?.nilIfEmpty
+                        ?? (try? element.select("a").first()?.text())?.nilIfEmpty
+                }
+                let name = rawName?.components(separatedBy: .newlines).first(where: { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty })?.trimmingCharacters(in: .whitespacesAndNewlines) ?? rawName
+
+                var rawBookUrl = (try? htmlExtractor.value(from: element, rule: firstRule(rule, keys: ["bookUrl", "url"]), fallback: nil, baseUrl: response.url, variables: variables))?.nilIfEmpty
+                if rawBookUrl == nil {
+                    rawBookUrl = (try? htmlExtractor.value(from: element, rule: "a.track@href", fallback: nil, baseUrl: response.url, variables: variables))?.nilIfEmpty
+                        ?? (try? htmlExtractor.value(from: element, rule: "td:eq(1) a@href", fallback: nil, baseUrl: response.url, variables: variables))?.nilIfEmpty
+                        ?? (try? htmlExtractor.value(from: element, rule: "a@href", fallback: nil, baseUrl: response.url, variables: variables))?.nilIfEmpty
+                        ?? (try? element.select("a").first()?.attr("href"))?.nilIfEmpty
+                }
+                let bookUrl = rawBookUrl?.components(separatedBy: .newlines).first(where: { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty })?.trimmingCharacters(in: .whitespacesAndNewlines) ?? rawBookUrl
+
+                guard let name, !name.isEmpty, let bookUrl, !bookUrl.isEmpty, !bookUrl.lowercased().hasPrefix("javascript:"), bookUrl != "#" else { continue }
+                let absBookUrl = htmlExtractor.absolutize(bookUrl, base: response.url)
+                guard !absBookUrl.isEmpty else { continue }
+
+                var author = (try? htmlExtractor.value(from: element, rule: firstRule(rule, keys: ["author"]), fallback: nil, baseUrl: response.url, variables: variables))?.nilIfEmpty
+                if author == nil {
+                    author = (try? htmlExtractor.value(from: element, rule: "td:eq(0) a@text", fallback: nil, baseUrl: response.url, variables: variables))?.nilIfEmpty
+                        ?? (try? htmlExtractor.value(from: element, rule: "td:eq(0)@text", fallback: nil, baseUrl: response.url, variables: variables))?.nilIfEmpty
+                        ?? (try? htmlExtractor.value(from: element, rule: "a[href*=author]@text", fallback: nil, baseUrl: response.url, variables: variables))?.nilIfEmpty
+                }
+                author = author?.components(separatedBy: .newlines).first(where: { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty })?.trimmingCharacters(in: .whitespacesAndNewlines) ?? author
+
+                let rawCover = try? htmlExtractor.value(from: element, rule: firstRule(rule, keys: ["coverUrl", "cover"]), fallback: "img@src", baseUrl: response.url, variables: variables).nilIfEmpty
                 let cover = rawCover?.components(separatedBy: .newlines).first(where: { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty })?.trimmingCharacters(in: .whitespacesAndNewlines) ?? rawCover
                 let kind = try? htmlExtractor.value(from: element, rule: firstRule(rule, keys: ["kind"]), fallback: nil, baseUrl: response.url, variables: variables).nilIfEmpty
                 let lastChapter = try? htmlExtractor.value(from: element, rule: firstRule(rule, keys: ["lastChapter"]), fallback: nil, baseUrl: response.url, variables: variables).nilIfEmpty
@@ -86,7 +156,7 @@ struct SearchResultParser {
                     name: name,
                     author: author,
                     coverUrl: cover,
-                    bookUrl: bookUrl,
+                    bookUrl: absBookUrl,
                     sourceName: source.bookSourceName,
                     sourceUrl: source.bookSourceUrl,
                     intro: nil,
@@ -97,7 +167,6 @@ struct SearchResultParser {
             if elements.isEmpty {
                 let document = try SwiftSoup.parse(response.body, response.url.absoluteString)
                 let detailRule = source.ruleBookInfo
-                let variables: [String: Any] = ["source": source]
                 let name = (try? htmlExtractor.value(from: document, rule: firstRule(detailRule, keys: ["name", "bookName"]), fallback: nil, baseUrl: response.url, variables: variables))?.nilIfEmpty
                     ?? (try? document.select("meta[property=og:novel:book_name]").attr("content"))?.nilIfEmpty
                     ?? (try? document.select("meta[property=og:title]").attr("content"))?.nilIfEmpty
@@ -126,20 +195,32 @@ struct SearchResultParser {
     }
 
     private func parseJSON(source: BookSource, response: SourceResponse) -> Result<[SearchBook], SourceEngineError> {
-        guard let object = ResponseFormatDetector.jsonObject(from: response.body) else {
-            return .failure(.rule("JSON 解析失败"))
-        }
+        let variables: [String: Any] = [
+            "source": source,
+            "baseUrl": response.url.absoluteString,
+            "result": response.body,
+            "body": response.body,
+            "src": response.body,
+            "html": response.body
+        ]
         let extractor = jsonExtractor
         let rule = source.ruleSearch
-        let rootObject: Any
-        if let initRule = firstRule(rule, keys: ["init"]),
-           let initialized = extractor.value(from: object, path: initRule, variables: ["source": source]) {
-            rootObject = initialized
-        } else {
-            rootObject = object
-        }
         let listRule = firstRule(rule, keys: ["bookList", "list", "books"])
-        let variables: [String: Any] = ["source": source]
+        let isJSRule = listRule.map { LegadoRuleResolver().isJavaScriptRule($0) } ?? false
+
+        let rootObject: Any
+        if let object = ResponseFormatDetector.jsonObject(from: response.body) {
+            if let initRule = firstRule(rule, keys: ["init"]),
+               let initialized = extractor.value(from: object, path: initRule, variables: variables) {
+                rootObject = initialized
+            } else {
+                rootObject = object
+            }
+        } else if isJSRule {
+            rootObject = response.body
+        } else {
+            return .failure(.rule("JSON 解析失败"))
+        }
         let candidates = extractor.list(from: rootObject, rule: listRule, variables: variables).prefix(120)
         let books = candidates.compactMap { item -> SearchBook? in
             let name = extractor.string(

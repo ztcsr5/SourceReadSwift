@@ -63,4 +63,11 @@ final class ResponseFormatDetectorTests: XCTestCase {
         XCTAssertEqual((ResponseFormatDetector.jsonObject(from: numeric) as? [String: Any])?["title"] as? String, "A 书")
         XCTAssertEqual((ResponseFormatDetector.jsonObject(from: encodedEnvelope) as? [String: Any])?["title"] as? String, "Encoded")
     }
+
+    func testDoctypeHtmlWithEmbeddedJsonAndJsonRuleDoesNotPreferJson() {
+        let htmlWithDoctype = "<!DOCTYPE html><html><head><title>Search</title></head><body data-info='{\"recommendid\":123}'><div class=\"book\">书名</div></body></html>"
+        XCTAssertFalse(ResponseFormatDetector.prefersJSON(body: htmlWithDoctype, headers: ["Content-Type": "text/html"], rule: "$.books"))
+        XCTAssertFalse(ResponseFormatDetector.prefersJSON(body: htmlWithDoctype, headers: ["Content-Type": "text/html"], rule: "<js>JSON.parse(result)</js>"))
+        XCTAssertNil(ResponseFormatDetector.jsonObject(from: htmlWithDoctype))
+    }
 }

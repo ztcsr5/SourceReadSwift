@@ -32,7 +32,8 @@ struct ChapterListParser {
             contentEncodings: response.contentEncodings
         )
         let listRule = htmlExtractor.firstRule(source.ruleToc, keys: ["chapterList", "tocList", "list"])
-        if ResponseFormatDetector.prefersJSON(body: normalized, headers: response.headers, rule: listRule) {
+        let isJSRule = listRule.map { LegadoRuleResolver().isJavaScriptRule($0) } ?? false
+        if isJSRule || ResponseFormatDetector.prefersJSON(body: normalized, headers: response.headers, rule: listRule) {
             let jsonResult = parseJSON(source: source, book: book, response: normalizedResponse)
             switch jsonResult {
             case .success:
@@ -69,7 +70,12 @@ struct ChapterListParser {
         ]
         let variables: [String: Any] = [
             "source": source,
-            "book": bookMap
+            "book": bookMap,
+            "baseUrl": response.url.absoluteString,
+            "result": response.body,
+            "body": response.body,
+            "src": response.body,
+            "html": response.body
         ]
         guard let listRule = htmlExtractor.firstRule(source.ruleToc, keys: ["chapterList", "tocList", "list"]) else {
             return .failure(.rule("ruleToc.chapterList is empty"))
@@ -171,9 +177,6 @@ struct ChapterListParser {
     }
 
     private func parseJSON(source: BookSource, book: BookDetail, response: SourceResponse) -> Result<ChapterListPage, SourceEngineError> {
-        guard let object = ResponseFormatDetector.jsonObject(from: response.body) else {
-            return .failure(.rule("JSON parse failed"))
-        }
         let bookMap: [String: Any] = [
             "name": book.name,
             "author": book.author ?? "",
@@ -183,16 +186,29 @@ struct ChapterListParser {
         ]
         let variables: [String: Any] = [
             "source": source,
-            "book": bookMap
+            "book": bookMap,
+            "baseUrl": response.url.absoluteString,
+            "result": response.body,
+            "body": response.body,
+            "src": response.body,
+            "html": response.body
         ]
-        let rootObject: Any
-        if let initRule = htmlExtractor.firstRule(source.ruleToc, keys: ["init"]),
-           let initialized = jsonExtractor.value(from: object, path: initRule, variables: variables) {
-            rootObject = initialized
-        } else {
-            rootObject = object
-        }
         let listRule = htmlExtractor.firstRule(source.ruleToc, keys: ["chapterList", "tocList", "list"])
+        let isJSRule = listRule.map { LegadoRuleResolver().isJavaScriptRule($0) } ?? false
+
+        let rootObject: Any
+        if let object = ResponseFormatDetector.jsonObject(from: response.body) {
+            if let initRule = htmlExtractor.firstRule(source.ruleToc, keys: ["init"]),
+               let initialized = jsonExtractor.value(from: object, path: initRule, variables: variables) {
+                rootObject = initialized
+            } else {
+                rootObject = object
+            }
+        } else if isJSRule {
+            rootObject = response.body
+        } else {
+            return .failure(.rule("JSON parse failed"))
+        }
         let items = jsonExtractor.list(from: rootObject, rule: listRule, variables: variables)
         let nameRule = htmlExtractor.firstRule(source.ruleToc, keys: ["chapterName", "name", "title"])
         let urlRule = htmlExtractor.firstRule(source.ruleToc, keys: ["chapterUrl", "url"])

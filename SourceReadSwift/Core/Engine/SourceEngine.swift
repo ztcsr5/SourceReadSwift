@@ -111,7 +111,7 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
 
     func searchBooks(source: BookSource, keyword: String, page: Int) async -> Result<[SearchBook], SourceEngineError> {
         let executionState = persistentState(for: source)
-        let executionContext = RuleExecutionContext(persistentState: executionState, logHandler: { [diagnostics] message in
+        let executionContext = RuleExecutionContext(persistentState: executionState, source: source, logHandler: { [diagnostics] message in
             Task { await diagnostics.emit(.init(level: .info, stage: "search.js", sourceName: source.bookSourceName, message: message)) }
         })
         defer { executionContext.cleanUp() }
@@ -182,7 +182,7 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
 
     func getBookDetail(source: BookSource, book: SearchBook) async -> Result<BookDetail, SourceEngineError> {
         let executionState = persistentState(for: source)
-        let executionContext = RuleExecutionContext(persistentState: executionState, logHandler: { [diagnostics] message in
+        let executionContext = RuleExecutionContext(persistentState: executionState, source: source, logHandler: { [diagnostics] message in
             Task { await diagnostics.emit(.init(level: .info, stage: "detail.js", sourceName: source.bookSourceName, message: message)) }
         })
         defer { executionContext.cleanUp() }
@@ -240,7 +240,7 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
 
     func getChapterList(source: BookSource, book: BookDetail, maxPages: Int) async -> Result<[BookChapter], SourceEngineError> {
         let executionState = persistentState(for: source)
-        let executionContext = RuleExecutionContext(persistentState: executionState, logHandler: { [diagnostics] message in
+        let executionContext = RuleExecutionContext(persistentState: executionState, source: source, logHandler: { [diagnostics] message in
             Task { await diagnostics.emit(.init(level: .info, stage: "toc.js", sourceName: source.bookSourceName, message: message)) }
         })
         defer { executionContext.cleanUp() }
@@ -329,7 +329,7 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
 
     func getContent(source: BookSource, chapter: BookChapter, maxPages: Int) async -> Result<ChapterContent, SourceEngineError> {
         let executionState = persistentState(for: source)
-        let executionContext = RuleExecutionContext(persistentState: executionState, logHandler: { [diagnostics] message in
+        let executionContext = RuleExecutionContext(persistentState: executionState, source: source, logHandler: { [diagnostics] message in
             Task { await diagnostics.emit(.init(level: .info, stage: "content.js", sourceName: source.bookSourceName, message: message)) }
         })
         defer { executionContext.cleanUp() }

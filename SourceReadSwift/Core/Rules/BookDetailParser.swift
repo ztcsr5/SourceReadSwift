@@ -71,7 +71,12 @@ struct BookDetailParser {
             ]
             let variables: [String: Any] = [
                 "source": source,
-                "book": bookMap
+                "book": bookMap,
+                "baseUrl": response.url.absoluteString,
+                "result": response.body,
+                "body": response.body,
+                "src": response.body,
+                "html": response.body
             ]
             let name = try htmlExtractor.value(
                 from: root,
@@ -170,7 +175,12 @@ struct BookDetailParser {
         ]
         let variables: [String: Any] = [
             "source": source,
-            "book": bookMap
+            "book": bookMap,
+            "baseUrl": response.url.absoluteString,
+            "result": response.body,
+            "body": response.body,
+            "src": response.body,
+            "html": response.body
         ]
         let name = jsonExtractor.string(
             from: dict,

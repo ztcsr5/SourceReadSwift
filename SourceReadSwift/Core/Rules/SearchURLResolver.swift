@@ -178,6 +178,7 @@ struct SearchURLResolver {
         let context = sharedContext ?? RuleExecutionContext(
             initialValues: ["source": source, "baseUrl": source.bookSourceUrl],
             persistentState: persistentState,
+            source: source,
             networkHandler: { urlText in
                 if let network {
                     return SynchronousSourceNetworkBridge.loadBody(
@@ -217,7 +218,10 @@ struct SearchURLResolver {
                 )
             }
         )
-        let runtime = JSCoreRuntime(ajaxHandler: { urlText in
+        if context.source == nil {
+            context.source = source
+        }
+        let runtime = context.jsRuntime(ajaxHandler: { urlText in
             if let network {
                 return SynchronousSourceNetworkBridge.loadBody(
                     urlText: urlText,
@@ -235,7 +239,7 @@ struct SearchURLResolver {
                 persistentValues: persistentState.snapshot(),
                 persistentState: persistentState
             )
-        }, executionContext: context)
+        })
         if let jsLib = source.raw["jsLib"], !jsLib.isEmpty {
             _ = runtime.evaluate(jsLib)
         }
