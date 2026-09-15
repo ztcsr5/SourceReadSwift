@@ -149,7 +149,14 @@ final class XbsBookSourceAdapterTests: XCTestCase {
             data: Data(json.utf8)
         )
 
-        let searchBook = SearchBook(name: "十日终焉", bookUrl: "https://fanqienovel.com/page/detail", sourceUrl: source.bookSourceUrl)
+        let searchBook = SearchBook(
+            name: "十日终焉",
+            author: "杀虫队队员",
+            coverUrl: nil,
+            bookUrl: "https://fanqienovel.com/page/detail",
+            sourceName: source.bookSourceName,
+            sourceUrl: source.bookSourceUrl
+        )
         let result = parser.parse(source: source, book: searchBook, response: jsonResponse)
 
         guard case .success(let detail) = result else {
