@@ -4,8 +4,8 @@ import Foundation
 /// Performs XXTEA decryption, parses XBS JSON models, applies strict health/safety
 /// filters (excluding video, comic, and dead/compromised domains), and maps rules into
 /// standard `BookSource` instances.
-public struct XbsBookSourceAdapter: Sendable {
-    public static let defaultKey: [UInt8] = [
+struct XbsBookSourceAdapter: Sendable {
+    static let defaultKey: [UInt8] = [
         0xe5, 0x87, 0xbc, 0xe8, 0xa4, 0x86, 0xe6, 0xbb,
         0xbf, 0xe9, 0x87, 0x91, 0xe6, 0xba, 0xa1, 0xe5
     ]
@@ -18,7 +18,7 @@ public struct XbsBookSourceAdapter: Sendable {
 
     // MARK: - Format Detection
 
-    public static func isXbsData(_ data: Data) -> Bool {
+    static func isXbsData(_ data: Data) -> Bool {
         if isEncryptedXbs(data) {
             return true
         }
@@ -28,7 +28,7 @@ public struct XbsBookSourceAdapter: Sendable {
         return false
     }
 
-    public static func isEncryptedXbs(_ data: Data) -> Bool {
+    static func isEncryptedXbs(_ data: Data) -> Bool {
         guard data.count >= 16 else { return false }
         guard let sample = xxteaDecrypt(data: data.prefix(64), key: defaultKey) else {
             return false
@@ -40,7 +40,7 @@ public struct XbsBookSourceAdapter: Sendable {
         return false
     }
 
-    public static func isXbsJSON(_ text: String) -> Bool {
+    static func isXbsJSON(_ text: String) -> Bool {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard trimmed.hasPrefix("{") || trimmed.hasPrefix("[") else { return false }
         return (trimmed.contains("\"searchBook\"") || trimmed.contains("\"chapterList\"") || trimmed.contains("\"chapterContent\""))
@@ -51,7 +51,7 @@ public struct XbsBookSourceAdapter: Sendable {
 
     private static let delta: UInt32 = 0x9E3779B9
 
-    public static func xxteaDecrypt(data: Data, key: [UInt8] = defaultKey) -> Data? {
+    static func xxteaDecrypt(data: Data, key: [UInt8] = defaultKey) -> Data? {
         guard data.count >= 8 else { return nil }
         let n = data.count / 4
         guard n > 0 else { return nil }
@@ -103,7 +103,7 @@ public struct XbsBookSourceAdapter: Sendable {
 
     // MARK: - Public Import & Conversion
 
-    public static func importSources(from data: Data) -> [BookSource] {
+    static func importSources(from data: Data) -> [BookSource] {
         if isEncryptedXbs(data), let decrypted = xxteaDecrypt(data: data) {
             if let lastBrace = decrypted.range(of: Data("}".utf8), options: .backwards) {
                 let validData = decrypted.subdata(in: 0..<lastBrace.upperBound)
@@ -121,7 +121,7 @@ public struct XbsBookSourceAdapter: Sendable {
         return []
     }
 
-    public static func importSources(from jsonText: String) -> [BookSource] {
+    static func importSources(from jsonText: String) -> [BookSource] {
         guard let data = jsonText.data(using: .utf8),
               let jsonObject = try? JSONSerialization.jsonObject(with: data) else {
             return []
@@ -156,7 +156,7 @@ public struct XbsBookSourceAdapter: Sendable {
         return results.sorted { $0.weight > $1.weight }
     }
 
-    public static func adaptSingleSource(name: String, dict: [String: Any]) -> BookSource? {
+    static func adaptSingleSource(name: String, dict: [String: Any]) -> BookSource? {
         let sourceName = ((dict["sourceName"] as? String)?.nilIfEmpty ?? name).trimmingCharacters(in: .whitespacesAndNewlines)
         guard !sourceName.isEmpty else { return nil }
 
