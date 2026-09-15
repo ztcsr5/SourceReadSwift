@@ -79,13 +79,13 @@ final class XbsBookSourceAdapterTests: XCTestCase {
             },
             "chapterList": {
               "host": "https://www.dbxsz.com",
-              "list": "//div[@id=\"all-chapter\"]//a",
+              "list": "//div[@id='all-chapter']//a",
               "title": "//@title",
               "url": "//@href"
             },
             "chapterContent": {
               "host": "https://www.dbxsz.com",
-              "content": "//*[@id=\"cont-body\"]"
+              "content": "//*[@id='cont-body']"
             }
           },
           "坏源番茄": {
@@ -120,8 +120,8 @@ final class XbsBookSourceAdapterTests: XCTestCase {
         XCTAssertEqual(dubo.searchUrl, "https://www.dbxsz.com/plus/search.php?q={{key}}")
         XCTAssertEqual(dubo.ruleSearch?.fields["bookList"], "//tbody/tr")
         XCTAssertEqual(dubo.ruleSearch?.fields["name"], "//td[1]/a/@title")
-        XCTAssertEqual(dubo.ruleToc?.fields["chapterList"], "//div[@id=\"all-chapter\"]//a")
-        XCTAssertEqual(dubo.ruleContent?.fields["content"], "//*[@id=\"cont-body\"]")
+        XCTAssertEqual(dubo.ruleToc?.fields["chapterList"], "//div[@id='all-chapter']//a")
+        XCTAssertEqual(dubo.ruleContent?.fields["content"], "//*[@id='cont-body']")
         XCTAssertEqual(dubo.bookSourceGroup, "香色闺阁")
         XCTAssertEqual(dubo.weight, 7777)
     }
