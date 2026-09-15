@@ -212,6 +212,9 @@ final class JSCoreRuntime {
                 }
                 """
                 context.evaluateScript(injectScript)
+                if let source = value as? BookSource, let jsLib = source.raw["jsLib"], !jsLib.isEmpty {
+                    context.evaluateScript(jsLib)
+                }
             } else if key == "book" {
                 let injectScript = """
                 if (typeof book !== 'undefined' && book !== null) {
