@@ -268,17 +268,22 @@ final class LegadoJavaScriptCompatibilityTests: XCTestCase {
         let source = BookSource(
             bookSourceName: "IXDZS Test",
             bookSourceUrl: "https://ixdzs.com",
-            ruleToc: [
+            ruleToc: SourceRule(fields: [
                 "chapterList": "<js>\nvar bidMatch = baseUrl.match(/read\\/(\\d+)/);\nif (!bidMatch) return [];\n[{title: 'Cap ' + bidMatch[1], url: '/read/' + bidMatch[1] + '/p1.html'}];\n</js>",
                 "chapterName": "title",
                 "chapterUrl": "url"
-            ]
+            ])
         )
         let book = BookDetail(
             name: "Test Book",
+            author: nil,
+            coverUrl: nil,
             bookUrl: "https://ixdzs.com/read/12345/p1.html",
+            tocUrl: nil,
             sourceName: source.bookSourceName,
-            sourceUrl: source.bookSourceUrl
+            sourceUrl: source.bookSourceUrl,
+            intro: nil,
+            latestChapter: nil
         )
         let parser = ChapterListParser()
         let response = SourceResponse(
