@@ -196,7 +196,14 @@ struct XbsBookSourceAdapter: Sendable {
                 if let str = v as? String, headersDict[k] == nil { headersDict[k] = str }
             }
         }
-        let headerString: String? = headersDict.isEmpty ? nil : (try? JSONSerialization.data(withJSONObject: headersDict).flatMap { String(data: $0, encoding: .utf8) })
+        let headerString: String?
+        if !headersDict.isEmpty,
+           let jsonData = try? JSONSerialization.data(withJSONObject: headersDict),
+           let jsonStr = String(data: jsonData, encoding: .utf8) {
+            headerString = jsonStr
+        } else {
+            headerString = nil
+        }
 
         let searchUrl = buildSearchUrl(searchBook: searchBook, defaultHost: host)
         let ruleSearch = buildSearchRule(searchBook: searchBook)

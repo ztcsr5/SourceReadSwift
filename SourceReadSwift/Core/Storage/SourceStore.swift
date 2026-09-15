@@ -304,7 +304,7 @@ final class SourceStore: ObservableObject {
                 try importSources(adapted)
                 let added = max(0, sources.count - existingCount)
                 let updated = max(0, adapted.count - added)
-                return SourceImportReport(added: added, updated: updated, skipped: 0, failed: 0)
+                return SourceImportReport(addedBookSources: added, updatedBookSources: updated)
             }
         }
         return try importJSONData(Data(text.utf8))
@@ -337,7 +337,7 @@ final class SourceStore: ObservableObject {
                 try importSources(adapted)
                 let added = max(0, sources.count - existingCount)
                 let updated = max(0, adapted.count - added)
-                return SourceImportReport(added: added, updated: updated, skipped: 0, failed: 0)
+                return SourceImportReport(addedBookSources: added, updatedBookSources: updated)
             }
         }
         let normalized = try normalizeImportData(stripUTF8BOM(data))
