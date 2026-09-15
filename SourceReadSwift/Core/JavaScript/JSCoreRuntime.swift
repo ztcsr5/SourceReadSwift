@@ -214,6 +214,12 @@ final class JSCoreRuntime {
                 context.evaluateScript(injectScript)
                 if let source = value as? BookSource, let jsLib = source.raw["jsLib"], !jsLib.isEmpty {
                     context.evaluateScript(jsLib)
+                } else if let dict = value as? [String: Any], let jsLib = dict["jsLib"] as? String, !jsLib.isEmpty {
+                    context.evaluateScript(jsLib)
+                } else if let dict = value as? [String: String], let jsLib = dict["jsLib"], !jsLib.isEmpty {
+                    context.evaluateScript(jsLib)
+                } else if let dict = value as? NSDictionary, let jsLib = dict["jsLib"] as? String, !jsLib.isEmpty {
+                    context.evaluateScript(jsLib)
                 }
             } else if key == "book" {
                 let injectScript = """
@@ -2064,6 +2070,35 @@ final class JSCoreRuntime {
           return api;
         }
         java.connect = __makeConnect;
+        java.ajax = function(url, headers) {
+          var target = String(url || '');
+          var headerText = __bridgeString(headers || '');
+          return __bridgeResponse('', target, __native_ajaxResponse(target, headerText));
+        };
+        java.ajaxBytes = function(url, headers) {
+          var target = String(url || '');
+          var headerText = __bridgeString(headers || '');
+          return __asJavaList(__native_ajaxBytes(target, headerText));
+        };
+        java.post = function(url, body, headers) {
+          var target = String(url || '');
+          var outgoingBody = __bridgeString(body == null ? '' : body);
+          var headerText = __bridgeString(headers || '');
+          return __bridgeResponse('', target, __native_postResponse(target, outgoingBody, headerText));
+        };
+        java.get = function(url, headers) {
+          if (arguments.length === 1 && !/^https?:\\/\\//i.test(String(url))) {
+            return java.getVar(url);
+          }
+          return java.ajax(url, headers);
+        };
+        java.request = function(url, body, headers, method) {
+          var target = String(url || '');
+          var outgoingBody = __bridgeString(body == null ? '' : body);
+          var headerText = __bridgeString(headers || '');
+          var reqMethod = String(method || 'GET').toUpperCase();
+          return __bridgeResponse('', target, __native_requestResponse(target, outgoingBody, headerText, reqMethod, true));
+        };
         java.log = function(value) {
           return String(__nativeLegado.invoke({ method: 'log', args: [__bridgeString(value)] }) || '');
         };

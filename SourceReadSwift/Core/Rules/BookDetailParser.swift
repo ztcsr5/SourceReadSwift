@@ -4,10 +4,12 @@ import SwiftSoup
 struct BookDetailParser {
     private let htmlExtractor: HtmlRuleExtractor
     private let jsonExtractor: JSONRuleExtractor
+    private let executionContext: RuleExecutionContext
 
     init(executionContext: RuleExecutionContext = RuleExecutionContext()) {
         self.htmlExtractor = HtmlRuleExtractor(executionContext: executionContext)
         self.jsonExtractor = JSONRuleExtractor(executionContext: executionContext)
+        self.executionContext = executionContext
     }
 
     func parse(source: BookSource, book: SearchBook, response: SourceResponse) -> Result<BookDetail, SourceEngineError> {
@@ -106,13 +108,20 @@ struct BookDetailParser {
                 baseUrl: response.url,
                 variables: variables
             ).nilIfEmpty
-            let tocUrl = try htmlExtractor.value(
-                from: root,
-                rule: htmlExtractor.firstRule(rule, keys: ["tocUrl", "chapterUrl", "catalogUrl", "chapterListUrl"]),
-                fallback: nil,
-                baseUrl: response.url,
-                variables: variables
-            ).nilIfEmpty
+            let rawTocRule = htmlExtractor.firstRule(rule, keys: ["tocUrl", "chapterUrl", "catalogUrl", "chapterListUrl"])
+            let tocUrl: String?
+            if let rawTocRule, isURLTemplate(rawTocRule) {
+                let resolved = resolveTocTemplate(rawTocRule, base: response.url, source: source, variables: variables)
+                tocUrl = resolved.nilIfEmpty
+            } else {
+                tocUrl = try htmlExtractor.value(
+                    from: root,
+                    rule: rawTocRule,
+                    fallback: nil,
+                    baseUrl: response.url,
+                    variables: variables
+                ).nilIfEmpty
+            }
 
             return .success(BookDetail(
                 name: name,
@@ -193,13 +202,20 @@ struct BookDetailParser {
             fallbackKeys: ["latestChapter", "lastChapter", "last"],
             variables: variables
         )?.nilIfEmpty
-        let rawTocUrl = jsonExtractor.string(
-            from: dict,
-            rule: htmlExtractor.firstRule(rule, keys: ["tocUrl", "chapterUrl", "catalogUrl", "chapterListUrl"]),
-            fallbackKeys: ["tocUrl", "chapterUrl", "catalogUrl", "chapterListUrl", "toc_url", "chapter_url"],
-            variables: variables
-        )?.nilIfEmpty
-        let tocUrl = rawTocUrl.flatMap { resolveURL($0, base: response.url) }
+        let rawTocRule = htmlExtractor.firstRule(rule, keys: ["tocUrl", "chapterUrl", "catalogUrl", "chapterListUrl"])
+        let tocUrl: String?
+        if let rawTocRule, isURLTemplate(rawTocRule) {
+            let resolved = resolveTocTemplate(rawTocRule, base: response.url, source: source, variables: variables)
+            tocUrl = resolved.nilIfEmpty
+        } else {
+            let rawTocUrl = jsonExtractor.string(
+                from: dict,
+                rule: rawTocRule,
+                fallbackKeys: ["tocUrl", "chapterUrl", "catalogUrl", "chapterListUrl", "toc_url", "chapter_url"],
+                variables: variables
+            )?.nilIfEmpty
+            tocUrl = rawTocUrl.flatMap { resolveURL($0, base: response.url) }
+        }
 
         return .success(BookDetail(
             name: name,
@@ -212,6 +228,39 @@ struct BookDetailParser {
             intro: intro,
             latestChapter: latest
         ))
+    }
+
+    private func isURLTemplate(_ rule: String) -> Bool {
+        let trimmed = rule.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.hasPrefix("http://")
+            || trimmed.hasPrefix("https://")
+            || trimmed.hasPrefix("@js:")
+            || trimmed.hasPrefix("<js>")
+            || trimmed.contains("@get:")
+            || (trimmed.contains("{{") && trimmed.contains("}}"))
+    }
+
+    private func resolveTocTemplate(_ template: String, base: URL, source: BookSource, variables: [String: Any]) -> String {
+        var resolved = template
+        let pattern = #"(?i)@get:\{?([^}@]*)?\}?"#
+        if let regex = try? NSRegularExpression(pattern: pattern) {
+            let matches = regex.matches(in: resolved, range: NSRange(resolved.startIndex..<resolved.endIndex, in: resolved)).reversed()
+            for match in matches {
+                guard let fullRange = Range(match.range(at: 0), in: resolved),
+                      let keyRange = Range(match.range(at: 1), in: resolved) else { continue }
+                let key = String(resolved[keyRange]).trimmingCharacters(in: .whitespacesAndNewlines)
+                let val = executionContext.get(key)
+                resolved.replaceSubrange(fullRange, with: val)
+            }
+        }
+        let dynamicResolved = DynamicURLResolver.resolve(
+            resolved,
+            baseUrl: base.absoluteString,
+            source: source,
+            variables: variables,
+            context: executionContext
+        )
+        return resolveURL(dynamicResolved, base: base) ?? dynamicResolved
     }
 
     private func resolveURL(_ text: String, base: URL) -> String? {

@@ -234,8 +234,11 @@ struct SearchURLResolver {
                 cookieHeader: persistentState.get("cookieHeader").nilIfEmpty,
                 persistentValues: persistentState.snapshot(),
                 persistentState: persistentState
-            )
         }, executionContext: context)
+        if let jsLib = source.raw["jsLib"], !jsLib.isEmpty {
+            _ = runtime.evaluate(jsLib)
+        }
+        return runtime
     }
 
     private func interpolateSourcePlaceholders(_ text: String, source: BookSource) -> String {

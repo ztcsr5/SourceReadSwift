@@ -355,6 +355,7 @@ struct HtmlRuleExtractor {
         for directive in putDirectives {
             let value = try value(from: root, rule: directive.valueRule, fallback: nil, baseUrl: baseUrl)
             directiveStore.put(directive.key, value: value)
+            executionContext.put(value, for: directive.key)
         }
         output = removePutDirectives(from: output)
         output = replaceGetDirectives(in: output)

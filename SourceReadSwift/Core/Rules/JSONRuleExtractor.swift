@@ -249,6 +249,7 @@ struct JSONRuleExtractor {
         for directive in extractPutDirectives(from: output) {
             if let value = value(from: object, path: directive.valueRule) {
                 directiveStore.put(directive.key, value: value)
+                executionContext.put(stringify(value), for: directive.key)
             }
         }
         output = removePutDirectives(from: output)

@@ -337,6 +337,7 @@ struct SourceManagerView: View {
                         .item,
                         UTType(importedAs: "com.edc21.sourceread.source-json"),
                         UTType(filenameExtension: "json") ?? .json,
+                        UTType(filenameExtension: "xbs") ?? .data,
                         UTType(filenameExtension: "txt") ?? .plainText,
                         UTType(filenameExtension: "text") ?? .text
                     ],
@@ -1920,11 +1921,16 @@ private struct BatchCheckCoordinatorObserver<Content: View>: View {
             request.setValue("Mozilla/5.0 SourceReadSwift", forHTTPHeaderField: "User-Agent")
             request.setValue("application/json,text/plain,*/*", forHTTPHeaderField: "Accept")
             let (data, _) = try await URLSession.shared.data(for: request)
-            let decoded = ResponseTextDecoder().decode(data: data, headers: [:])
-            if looksLikeCloudflareChallenge(decoded) {
-                throw SourceImportError.challengePage
+            let report: SourceImportReport
+            if XbsBookSourceAdapter.isXbsData(data) {
+                report = try appState.sourceStore.importJSONData(data)
+            } else {
+                let decoded = ResponseTextDecoder().decode(data: data, headers: [:])
+                if looksLikeCloudflareChallenge(decoded) {
+                    throw SourceImportError.challengePage
+                }
+                report = try appState.sourceStore.importJSON(decoded)
             }
-            let report = try appState.sourceStore.importJSON(decoded)
             if let catalogURL {
                 appState.sourceStore.recordCatalogImport(url: catalogURL, report: report)
             }
@@ -1947,8 +1953,13 @@ private struct BatchCheckCoordinatorObserver<Content: View>: View {
             }
             let file = try PickedDocumentAccess.data(from: url)
             let data = file.data
-            let text = ResponseTextDecoder().decode(data: data, headers: [:])
-            let report = try appState.sourceStore.importJSON(text)
+            let report: SourceImportReport
+            if XbsBookSourceAdapter.isXbsData(data) {
+                report = try appState.sourceStore.importJSONData(data)
+            } else {
+                let text = ResponseTextDecoder().decode(data: data, headers: [:])
+                report = try appState.sourceStore.importJSON(text)
+            }
             importError = nil
             importMessage = "文件 \(report.userMessage)"
             showImportSheet = false

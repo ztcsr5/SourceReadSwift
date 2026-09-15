@@ -320,4 +320,41 @@ final class LegadoJavaCompatibilityTests: XCTestCase {
         XCTAssertTrue(requests[0].contains("@Body:q=1"))
         XCTAssertTrue(requests[0].contains("\"X-Test\":\"1\""))
     }
+
+    func testJavaPostAndAjaxWithResponseBody() throws {
+        var requests: [String] = []
+        let context = RuleExecutionContext(networkHandler: { urlText in
+            requests.append(urlText)
+            return "{\"code\": 0, \"data\": {\"name\": \"爱下测试\"}}"
+        }, responseHandler: { urlText in
+            requests.append(urlText)
+            return SourceResponse(
+                url: URL(string: "https://fixture.local/api")!,
+                statusCode: 200,
+                headers: ["Content-Type": "application/json"],
+                text: "{\"code\": 0, \"data\": {\"name\": \"爱下测试\"}}",
+                data: Data()
+            )
+        })
+        let runtime = JSCoreRuntime(executionContext: context)
+        let result = runtime.evaluate("""
+            var res = java.post('https://fixture.local/api', '{\"bookId\": 123}', '{\"Content-Type\": \"application/json\"}');
+            var parsed = JSON.parse(res.body());
+            var resAjax = java.ajax('https://fixture.local/api');
+            JSON.stringify({
+              name: parsed.data.name,
+              statusCode: res.statusCode(),
+              ajaxCode: resAjax.statusCode(),
+              ajaxBodyLength: resAjax.body().length
+            })
+            """)
+        guard case .success(let value) = result,
+              let data = value.data(using: .utf8),
+              let object = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+            return XCTFail("expected java.post result")
+        }
+        XCTAssertEqual(object["name"] as? String, "爱下测试")
+        XCTAssertEqual(object["statusCode"] as? Int, 200)
+        XCTAssertEqual(object["ajaxCode"] as? Int, 200)
+    }
 }

@@ -28,6 +28,10 @@ struct SourceImportLinkParser {
             return SourceImportInput(kind: .json, value: importJSON)
         }
 
+        if let xbsURL = extractXbsURL(from: trimmed) {
+            return SourceImportInput(kind: .url, value: xbsURL)
+        }
+
         if let importURL = extractImportURL(from: trimmed) {
             return SourceImportInput(kind: .url, value: importURL)
         }
@@ -124,6 +128,24 @@ struct SourceImportLinkParser {
 
     private static func trimURLToken(_ raw: String) -> String {
         raw.trimmingCharacters(in: CharacterSet.whitespacesAndNewlines.union(trailingPunctuation))
+    }
+
+    private static func extractXbsURL(from text: String) -> String? {
+        guard let range = text.range(of: "xbs://", options: .caseInsensitive) else { return nil }
+        let tail = String(text[range.upperBound...]).trimmingCharacters(in: .whitespacesAndNewlines)
+        if tail.lowercased().hasPrefix("http://") || tail.lowercased().hasPrefix("https://") {
+            return normalizeExtractedURL(tail)
+        }
+        if let components = URLComponents(string: "xbs://" + tail) {
+            let queryItems = components.queryItems ?? []
+            for key in ["url", "src", "link"] {
+                if let val = queryItems.first(where: { $0.name.lowercased() == key })?.value,
+                   let normalized = normalizeExtractedURL(val) {
+                    return normalized
+                }
+            }
+        }
+        return extractHTTPURL(from: tail)
     }
 
     private static let trailingPunctuation = CharacterSet(charactersIn: ".,;:!?)])}>\"'\u{FF0C}\u{3002}\u{FF1B}\u{FF1A}\u{FF01}\u{FF1F}\u{FF09}\u{3011}\u{300B}\u{3001}")

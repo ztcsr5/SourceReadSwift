@@ -145,7 +145,7 @@ final class RuleExecutionContext: @unchecked Sendable {
     }
 
     func get(_ key: String) -> String {
-        persistentState.get(key)
+        string(for: key)
     }
 
     func remove(_ key: String) {

@@ -297,7 +297,17 @@ final class SourceStore: ObservableObject {
 
     @discardableResult
     func importJSON(_ text: String) throws -> SourceImportReport {
-        try importJSONData(Data(text.utf8))
+        if XbsBookSourceAdapter.isXbsJSON(text) {
+            let adapted = XbsBookSourceAdapter.importSources(from: text)
+            if !adapted.isEmpty {
+                let existingCount = sources.count
+                try importSources(adapted)
+                let added = max(0, sources.count - existingCount)
+                let updated = max(0, adapted.count - added)
+                return SourceImportReport(added: added, updated: updated, skipped: 0, failed: 0)
+            }
+        }
+        return try importJSONData(Data(text.utf8))
     }
 
     @discardableResult
@@ -320,6 +330,16 @@ final class SourceStore: ObservableObject {
 
     @discardableResult
     func importJSONData(_ data: Data) throws -> SourceImportReport {
+        if XbsBookSourceAdapter.isXbsData(data) {
+            let adapted = XbsBookSourceAdapter.importSources(from: data)
+            if !adapted.isEmpty {
+                let existingCount = sources.count
+                try importSources(adapted)
+                let added = max(0, sources.count - existingCount)
+                let updated = max(0, adapted.count - added)
+                return SourceImportReport(added: added, updated: updated, skipped: 0, failed: 0)
+            }
+        }
         let normalized = try normalizeImportData(stripUTF8BOM(data))
         let decoder = JSONDecoder()
         if let items = try? decoder.decode([AnySourceImportItem].self, from: normalized) {
