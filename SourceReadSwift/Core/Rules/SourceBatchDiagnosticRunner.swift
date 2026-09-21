@@ -120,15 +120,34 @@ struct SourceBatchDiagnosticRunner: Sendable {
             guard let evidence = provider.diagnosticEvidence(sourceURL: report.sourceURL, stage: step.stage) else {
                 return step
             }
+            var status = step.status
+            var summary = step.responseSummary
+            var failureClass = step.failureClassification
+            var failureCode = step.failureCode
+
+            if status != .passed {
+                if let sniffed = SourceDiagnosticClassifier.sniffSnippet(
+                    snippet: evidence.responseSnippet,
+                    statusCode: evidence.responseStatusCode,
+                    decodedByteCount: evidence.responseDecodedByteCount,
+                    stage: step.stage.rawValue
+                ) {
+                    status = sniffed.status
+                    failureClass = sniffed.classification
+                    failureCode = sniffed.kind
+                    summary = sniffed.summary
+                }
+            }
+
             return SourceDiagnosticStep(
                 id: step.id,
                 stage: step.stage,
-                status: step.status,
+                status: status,
                 requestSummary: step.requestSummary,
-                responseSummary: step.responseSummary,
+                responseSummary: summary,
                 matchCount: step.matchCount,
                 elapsedMilliseconds: step.elapsedMilliseconds,
-                failureClassification: step.failureClassification,
+                failureClassification: failureClass,
                 requestMethod: evidence.requestMethod,
                 requestBody: evidence.requestBody.map { $0.count > 1000 ? String($0.prefix(1000)) + "..." : $0 },
                 requestHeaders: evidence.requestHeaders,
@@ -143,8 +162,10 @@ struct SourceBatchDiagnosticRunner: Sendable {
                 javascript: evidence.javascript,
                 executionLogs: Array(evidence.executionLogs.suffix(20)),
                 retryCount: step.retryCount,
-                failureCode: step.failureCode,
-                retryable: step.retryable
+                failureCode: failureCode,
+                retryable: step.retryable,
+                responseSnippet: evidence.responseSnippet,
+                ruleSummary: evidence.ruleSummary
             )
         }
         return SourceDiagnosticReport(

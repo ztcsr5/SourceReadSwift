@@ -272,8 +272,9 @@ struct SearchURLResolver {
         let cleanBase = source.cleanSourceURL
         values["bookSourceName"] = source.bookSourceName
         values["sourceName"] = source.bookSourceName
-        values["bookSourceUrl"] = cleanBase
-        values["sourceUrl"] = cleanBase
+        values["bookSourceUrl"] = source.bookSourceUrl
+        values["sourceUrl"] = source.bookSourceUrl
+        values["cleanSourceUrl"] = cleanBase
         values["baseUrl"] = cleanBase
         values["bookSourceGroup"] = source.bookSourceGroup ?? ""
         values["sourceGroup"] = source.bookSourceGroup ?? ""

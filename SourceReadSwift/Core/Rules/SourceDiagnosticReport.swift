@@ -76,6 +76,8 @@ struct SourceDiagnosticStep: Identifiable, Codable, Hashable, Sendable {
     let retryCount: Int
     let failureCode: SourceDiagnosticFailureKind?
     let retryable: Bool
+    let responseSnippet: String?
+    let ruleSummary: String?
 
     private enum CodingKeys: String, CodingKey {
         case id, stage, status, requestSummary, responseSummary, matchCount,
@@ -83,7 +85,8 @@ struct SourceDiagnosticStep: Identifiable, Codable, Hashable, Sendable {
              requestBody, requestHeaders, responseStatusCode, responseHeaders,
              cookieSummary, finalURL, responseEncodedByteCount,
              responseDecodedByteCount, responseContentEncodings, responseWasDecoded,
-             javascript, executionLogs, retryCount, failureCode, retryable
+             javascript, executionLogs, retryCount, failureCode, retryable,
+             responseSnippet, ruleSummary
     }
 
     init(
@@ -110,7 +113,9 @@ struct SourceDiagnosticStep: Identifiable, Codable, Hashable, Sendable {
         executionLogs: [String]? = nil,
         retryCount: Int = 0,
         failureCode: SourceDiagnosticFailureKind? = nil,
-        retryable: Bool? = nil
+        retryable: Bool? = nil,
+        responseSnippet: String? = nil,
+        ruleSummary: String? = nil
     ) {
         self.id = id
         self.stage = stage
@@ -136,6 +141,8 @@ struct SourceDiagnosticStep: Identifiable, Codable, Hashable, Sendable {
         self.retryCount = max(0, retryCount)
         self.failureCode = failureCode
         self.retryable = retryable ?? failureCode?.isRetryable ?? false
+        self.responseSnippet = responseSnippet.map(SourceDiagnosticRedactor.value)
+        self.ruleSummary = ruleSummary
     }
 
     init(from decoder: Decoder) throws {
@@ -164,7 +171,9 @@ struct SourceDiagnosticStep: Identifiable, Codable, Hashable, Sendable {
             executionLogs: try container.decodeIfPresent([String].self, forKey: .executionLogs),
             retryCount: try container.decodeIfPresent(Int.self, forKey: .retryCount) ?? 0,
             failureCode: try container.decodeIfPresent(SourceDiagnosticFailureKind.self, forKey: .failureCode),
-            retryable: try container.decodeIfPresent(Bool.self, forKey: .retryable)
+            retryable: try container.decodeIfPresent(Bool.self, forKey: .retryable),
+            responseSnippet: try container.decodeIfPresent(String.self, forKey: .responseSnippet),
+            ruleSummary: try container.decodeIfPresent(String.self, forKey: .ruleSummary)
         )
     }
 }
@@ -462,7 +471,9 @@ extension SourceDiagnosticReport {
                 executionLogs: nil,
                 retryCount: step.retryCount,
                 failureCode: step.failureCode,
-                retryable: step.retryable
+                retryable: step.retryable,
+                responseSnippet: nil,
+                ruleSummary: step.ruleSummary
             )
         }
         return SourceDiagnosticReport(

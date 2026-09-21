@@ -1742,28 +1742,31 @@ private struct BatchCheckCoordinatorObserver<Content: View>: View {
     }
 
     private func importSources() {
-        do {
-            let parsed = SourceImportLinkParser.parse(importText)
-            let report: SourceImportReport
-            switch parsed.kind {
-            case .empty:
-                throw SourceImportError.empty
-            case .json:
-                report = try appState.sourceStore.importJSON(parsed.value)
-            case .url:
-                throw SourceImportError.urlImportRequired(parsed.value)
-            case .unsupportedScheme:
-                throw SourceImportError.unsupportedScheme
-            case .unknown:
-                throw SourceImportError.unknownInput
+        Task { @MainActor in
+            do {
+                let parsed = SourceImportLinkParser.parse(importText)
+                let report: SourceImportReport
+                switch parsed.kind {
+                case .empty:
+                    throw SourceImportError.empty
+                case .json:
+                    importMessage = "正在导入书源..."
+                    report = try await appState.sourceStore.importJSONAsync(parsed.value)
+                case .url:
+                    throw SourceImportError.urlImportRequired(parsed.value)
+                case .unsupportedScheme:
+                    throw SourceImportError.unsupportedScheme
+                case .unknown:
+                    throw SourceImportError.unknownInput
+                }
+                importText = ""
+                importError = nil
+                importMessage = report.userMessage
+                showImportSheet = false
+            } catch {
+                importMessage = nil
+                importError = error.localizedDescription
             }
-            importText = ""
-            importError = nil
-            importMessage = report.userMessage
-            showImportSheet = false
-        } catch {
-            importMessage = nil
-            importError = error.localizedDescription
         }
     }
 
@@ -1923,13 +1926,13 @@ private struct BatchCheckCoordinatorObserver<Content: View>: View {
             let (data, _) = try await URLSession.shared.data(for: request)
             let report: SourceImportReport
             if XbsBookSourceAdapter.isXbsData(data) {
-                report = try appState.sourceStore.importJSONData(data)
+                report = try await appState.sourceStore.importJSONDataAsync(data)
             } else {
                 let decoded = ResponseTextDecoder().decode(data: data, headers: [:])
                 if looksLikeCloudflareChallenge(decoded) {
                     throw SourceImportError.challengePage
                 }
-                report = try appState.sourceStore.importJSON(decoded)
+                report = try await appState.sourceStore.importJSONDataAsync(data)
             }
             if let catalogURL {
                 appState.sourceStore.recordCatalogImport(url: catalogURL, report: report)
@@ -1945,27 +1948,24 @@ private struct BatchCheckCoordinatorObserver<Content: View>: View {
     }
 
     private func importFile(_ result: Result<[URL], Error>) {
-        do {
-            guard let url = try result.get().first else {
+        Task { @MainActor in
+            do {
+                guard let url = try result.get().first else {
+                    importMessage = nil
+                    importError = "导入失败：没有选择文件。"
+                    return
+                }
+                importMessage = "正在解析并导入书源文件..."
+                let file = try PickedDocumentAccess.data(from: url)
+                let data = file.data
+                let report = try await appState.sourceStore.importJSONDataAsync(data)
+                importError = nil
+                importMessage = "文件 \(report.userMessage)"
+                showImportSheet = false
+            } catch {
                 importMessage = nil
-                importError = "导入失败：没有选择文件。"
-                return
+                importError = error.localizedDescription
             }
-            let file = try PickedDocumentAccess.data(from: url)
-            let data = file.data
-            let report: SourceImportReport
-            if XbsBookSourceAdapter.isXbsData(data) {
-                report = try appState.sourceStore.importJSONData(data)
-            } else {
-                let text = ResponseTextDecoder().decode(data: data, headers: [:])
-                report = try appState.sourceStore.importJSON(text)
-            }
-            importError = nil
-            importMessage = "文件 \(report.userMessage)"
-            showImportSheet = false
-        } catch {
-            importMessage = nil
-            importError = error.localizedDescription
         }
     }
 

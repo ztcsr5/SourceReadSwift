@@ -174,5 +174,104 @@ final class SourceFlowEngineTests: XCTestCase {
         XCTAssertEqual(extractor.absolutize("javascript:;", base: base), "")
         XCTAssertEqual(extractor.absolutize("#", base: base), "")
     }
+
+    // MARK: - Byte-Level Comma Sanitizer & Fast-Path Import
+    func testByteLevelSanitizeTrailingCommas() {
+        let malformedJSON = "{\"items\": [{\"name\": \"test1\", }, {\"name\": \"test2\",}, ], \"count\": 2, }"
+        let sanitized = SourceStore.sanitizeTrailingCommas(malformedJSON)
+        XCTAssertFalse(sanitized.contains(", }"))
+        XCTAssertFalse(sanitized.contains(",}"))
+        XCTAssertFalse(sanitized.contains(", ]"))
+
+        let parsed = try? JSONSerialization.jsonObject(with: Data(sanitized.utf8)) as? [String: Any]
+        XCTAssertNotNil(parsed)
+        XCTAssertEqual(parsed?["count"] as? Int, 2)
+    }
+
+    func testFastPathBookSourceImport() throws {
+        let store = SourceStore()
+        let json = """
+        [
+            {
+                "bookSourceName": "极速源1",
+                "bookSourceUrl": "https://fast1.example.com",
+                "searchUrl": "https://fast1.example.com/search?k={{key}}"
+            },
+            {
+                "bookSourceName": "极速源2",
+                "bookSourceUrl": "https://fast2.example.com",
+                "searchUrl": "https://fast2.example.com/search?k={{key}}"
+            }
+        ]
+        """
+        let report = try store.importJSON(json)
+        XCTAssertGreaterThanOrEqual(report.totalAdded + report.totalUpdated, 2)
+        XCTAssertNotNil(store.source(for: "https://fast1.example.com"))
+        XCTAssertNotNil(store.source(for: "https://fast2.example.com"))
+    }
+
+    // MARK: - Hash Fragment Preservation in Source Variables
+    func testSourceVariableMapPreservesHashFragment() {
+        let sourceWithHash = BookSource(
+            bookSourceName: "爱下小说（优）",
+            bookSourceUrl: "https://apiv2hans.aixdzs.com##@secret123",
+            searchUrl: "https://apiv2hans.aixdzs.com/search"
+        )
+        let rt = JSCoreRuntime()
+        let result = try? rt.evaluate("source.getKey()", variables: ["source": sourceWithHash]).get()
+        XCTAssertEqual(result, "https://apiv2hans.aixdzs.com##@secret123")
+    }
+
+    func testJSCoreRegexHashFallbackWhenHashMissing() {
+        let rt = JSCoreRuntime()
+        // Script trying to match delimiter # on a string without #
+        let script = "var str = 'https://example.com'; var m = str.match(/([^\\#]+)\\#/); m ? m[1] : 'fallback'"
+        let result = try? rt.evaluate(script).get()
+        // With our fallback, m matches the capture group so it doesn't return null
+        XCTAssertEqual(result, "https://example.com")
+    }
+
+    // MARK: - Deep Diagnostic Sniffing (WAF, 5s Shield, API Errors)
+    func testSniffSnippetRegionalWAF() {
+        let wafHTML = "<!DOCTYPE html><html><head><title>地区拦截</title></head><body>WAF Blocked</body></html>"
+        let sniffed = SourceDiagnosticClassifier.sniffSnippet(snippet: wafHTML, statusCode: 403, stage: "search")
+        XCTAssertNotNil(sniffed)
+        XCTAssertEqual(sniffed?.kind, .blocked)
+        XCTAssertEqual(sniffed?.status, .blocked)
+        XCTAssertTrue(sniffed?.classification.contains("地区拦截") == true)
+    }
+
+    func testSniffSnippetCloudflareShield() {
+        let cfHTML = "<!DOCTYPE html><html><head><title>Just a moment...</title></head><body>cf-chl-bypass</body></html>"
+        let sniffed = SourceDiagnosticClassifier.sniffSnippet(snippet: cfHTML, statusCode: 403, stage: "search")
+        XCTAssertNotNil(sniffed)
+        XCTAssertEqual(sniffed?.kind, .blocked)
+        XCTAssertTrue(sniffed?.classification.contains("5秒盾") == true)
+    }
+
+    func testSniffSnippetAPIBusinessError() {
+        let apiJSON = "{\"code\":\"1055\",\"message\":\"1055:没有该小说呢！\",\"data\":{}}"
+        let sniffed = SourceDiagnosticClassifier.sniffSnippet(snippet: apiJSON, statusCode: 200, stage: "search")
+        XCTAssertNotNil(sniffed)
+        XCTAssertEqual(sniffed?.kind, .emptyResult)
+        XCTAssertEqual(sniffed?.status, .warning)
+        XCTAssertTrue(sniffed?.summary.contains("没有该小说呢！") == true)
+    }
+
+    func testSniffSnippetEmptyStream() {
+        let sniffed = SourceDiagnosticClassifier.sniffSnippet(snippet: "", statusCode: 200, decodedByteCount: 19, stage: "search")
+        XCTAssertNotNil(sniffed)
+        XCTAssertEqual(sniffed?.kind, .emptyResult)
+        XCTAssertTrue(sniffed?.summary.contains("19 字节") == true)
+    }
+
+    // MARK: - Background KeepAlive Manager
+    func testBackgroundKeepAliveManagerLifecycle() {
+        let manager = BackgroundKeepAliveManager.shared
+        manager.start(reason: "UnitTest")
+        XCTAssertTrue(manager.isActive)
+        manager.stop()
+        XCTAssertFalse(manager.isActive)
+    }
 }
 

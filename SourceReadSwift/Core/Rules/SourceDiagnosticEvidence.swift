@@ -78,12 +78,15 @@ struct SourceDiagnosticEvidence: Sendable {
     let responseWasDecoded: Bool
     let javascript: [SourceJavaScriptEvidence]
     let executionLogs: [String]
+    let responseSnippet: String?
+    let ruleSummary: String?
 
     init(
         request: SourceRequest,
         response: SourceResponse,
         javascript: [SourceJavaScriptEvidence] = [],
-        executionLogs: [String] = []
+        executionLogs: [String] = [],
+        ruleSummary: String? = nil
     ) {
         self.requestMethod = request.method.rawValue
         self.requestBody = request.body.flatMap { String(data: $0, encoding: .utf8) }
@@ -102,13 +105,20 @@ struct SourceDiagnosticEvidence: Sendable {
         self.responseWasDecoded = response.bodyWasDecoded
         self.javascript = javascript
         self.executionLogs = executionLogs
+        self.ruleSummary = ruleSummary
+
+        let rawSnippet = String(data: response.data.prefix(1500), encoding: .utf8)
+            ?? ResponseTextDecoder().decode(data: Data(response.data.prefix(1500)), headers: response.headers)
+        let trimmed = rawSnippet.trimmingCharacters(in: .whitespacesAndNewlines)
+        self.responseSnippet = trimmed.isEmpty ? nil : String(trimmed.prefix(1000))
     }
 
     init(
         request: SourceRequest,
         error: SourceEngineError,
         javascript: [SourceJavaScriptEvidence] = [],
-        executionLogs: [String] = []
+        executionLogs: [String] = [],
+        ruleSummary: String? = nil
     ) {
         self.requestMethod = request.method.rawValue
         self.requestBody = request.body.flatMap { String(data: $0, encoding: .utf8) }
@@ -125,11 +135,15 @@ struct SourceDiagnosticEvidence: Sendable {
         self.responseWasDecoded = false
         self.javascript = javascript
         self.executionLogs = executionLogs.isEmpty ? ["Failed: \(error.displayMessage)"] : executionLogs
+        self.responseSnippet = "Error: \(error.displayMessage)"
+        self.ruleSummary = ruleSummary
     }
 
     func with(
         javascript: [SourceJavaScriptEvidence],
-        executionLogs: [String]? = nil
+        executionLogs: [String]? = nil,
+        ruleSummary: String? = nil,
+        responseSnippet: String? = nil
     ) -> SourceDiagnosticEvidence {
         SourceDiagnosticEvidence(
             requestMethod: requestMethod,
@@ -144,7 +158,9 @@ struct SourceDiagnosticEvidence: Sendable {
             responseContentEncodings: responseContentEncodings,
             responseWasDecoded: responseWasDecoded,
             javascript: javascript,
-            executionLogs: executionLogs ?? self.executionLogs
+            executionLogs: executionLogs ?? self.executionLogs,
+            responseSnippet: responseSnippet ?? self.responseSnippet,
+            ruleSummary: ruleSummary ?? self.ruleSummary
         )
     }
 
@@ -161,7 +177,9 @@ struct SourceDiagnosticEvidence: Sendable {
         responseContentEncodings: [String],
         responseWasDecoded: Bool,
         javascript: [SourceJavaScriptEvidence],
-        executionLogs: [String]
+        executionLogs: [String],
+        responseSnippet: String?,
+        ruleSummary: String?
     ) {
         self.requestMethod = requestMethod
         self.requestBody = requestBody
@@ -176,6 +194,8 @@ struct SourceDiagnosticEvidence: Sendable {
         self.responseWasDecoded = responseWasDecoded
         self.javascript = javascript
         self.executionLogs = executionLogs
+        self.responseSnippet = responseSnippet
+        self.ruleSummary = ruleSummary
     }
 }
 

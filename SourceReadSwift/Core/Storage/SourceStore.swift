@@ -340,8 +340,31 @@ final class SourceStore: ObservableObject {
                 return SourceImportReport(addedBookSources: added, updatedBookSources: updated)
             }
         }
-        let normalized = try normalizeImportData(stripUTF8BOM(data))
+
+        let cleanData = stripUTF8BOM(data)
         let decoder = JSONDecoder()
+
+        // 1. Fast-Path: attempt direct parsing first (avoids megabytes of string allocation)
+        if let items = try? decoder.decode([AnySourceImportItem].self, from: cleanData) {
+            return try importItems(items)
+        }
+        if let wrapped = try? decoder.decode(WrappedSourceImportItems.self, from: cleanData),
+           !wrapped.items.isEmpty {
+            return try importItems(wrapped.items)
+        }
+
+        // 2. Fast byte-level trailing comma removal
+        let sanitizedData = Self.sanitizeTrailingCommasData(cleanData)
+        if let items = try? decoder.decode([AnySourceImportItem].self, from: sanitizedData) {
+            return try importItems(items)
+        }
+        if let wrapped = try? decoder.decode(WrappedSourceImportItems.self, from: sanitizedData),
+           !wrapped.items.isEmpty {
+            return try importItems(wrapped.items)
+        }
+
+        // 3. Fallback: string normalization and substring extraction
+        let normalized = try normalizeImportData(cleanData)
         if let items = try? decoder.decode([AnySourceImportItem].self, from: normalized) {
             return try importItems(items)
         }
@@ -351,6 +374,55 @@ final class SourceStore: ObservableObject {
         }
         let item = try decoder.decode(AnySourceImportItem.self, from: normalized)
         return try importItems([item])
+    }
+
+    @discardableResult
+    func importJSONDataAsync(_ data: Data) async throws -> SourceImportReport {
+        if XbsBookSourceAdapter.isXbsData(data) {
+            let adapted = XbsBookSourceAdapter.importSources(from: data)
+            if !adapted.isEmpty {
+                let existingCount = sources.count
+                try importSources(adapted)
+                let added = max(0, sources.count - existingCount)
+                let updated = max(0, adapted.count - added)
+                return SourceImportReport(addedBookSources: added, updatedBookSources: updated)
+            }
+        }
+
+        let cleanData = stripUTF8BOM(data)
+        // Perform heavy JSON decoding off the main thread
+        let decodedItems: [AnySourceImportItem] = try await Task.detached(priority: .userInitiated) {
+            let decoder = JSONDecoder()
+            if let items = try? decoder.decode([AnySourceImportItem].self, from: cleanData) {
+                return items
+            }
+            if let wrapped = try? decoder.decode(WrappedSourceImportItems.self, from: cleanData), !wrapped.items.isEmpty {
+                return wrapped.items
+            }
+            let sanitized = Self.sanitizeTrailingCommasData(cleanData)
+            if let items = try? decoder.decode([AnySourceImportItem].self, from: sanitized) {
+                return items
+            }
+            if let wrapped = try? decoder.decode(WrappedSourceImportItems.self, from: sanitized), !wrapped.items.isEmpty {
+                return wrapped.items
+            }
+            let normalized = try Self.normalizeDataStatic(cleanData)
+            if let items = try? decoder.decode([AnySourceImportItem].self, from: normalized) {
+                return items
+            }
+            if let wrapped = try? decoder.decode(WrappedSourceImportItems.self, from: normalized), !wrapped.items.isEmpty {
+                return wrapped.items
+            }
+            let single = try decoder.decode(AnySourceImportItem.self, from: normalized)
+            return [single]
+        }.value
+
+        return try self.importItems(decodedItems)
+    }
+
+    @discardableResult
+    func importJSONAsync(_ text: String) async throws -> SourceImportReport {
+        try await importJSONDataAsync(Data(text.utf8))
     }
 
     func importSources(_ imported: [BookSource]) throws {
@@ -647,6 +719,10 @@ final class SourceStore: ObservableObject {
     }
 
     private func normalizeImportData(_ data: Data) throws -> Data {
+        try Self.normalizeDataStatic(data)
+    }
+
+    nonisolated static func normalizeDataStatic(_ data: Data) throws -> Data {
         let decodedText = String(data: data, encoding: .utf8)
             ?? ResponseTextDecoder().decode(data: data, headers: [:])
         guard !decodedText.isEmpty else { return data }
@@ -659,20 +735,65 @@ final class SourceStore: ObservableObject {
         if text.hasPrefix("{") || text.hasPrefix("[") {
             return Data(text.utf8)
         }
-        if let extracted = extractFirstJSONValue(from: text) {
+        if let extracted = extractFirstJSONValueStatic(from: text) {
             return Data(Self.sanitizeTrailingCommas(extracted).utf8)
         }
         return Data(text.utf8)
     }
 
-    nonisolated static func sanitizeTrailingCommas(_ json: String) -> String {
-        var chars = Array(json)
+    nonisolated static func sanitizeTrailingCommasData(_ data: Data) -> Data {
+        var bytes = [UInt8](data)
         var inString = false
         var escaped = false
         var lastCommaIndex: Int? = nil
 
-        for i in 0..<chars.count {
-            let char = chars[i]
+        for i in 0..<bytes.count {
+            let byte = bytes[i]
+            if inString {
+                if escaped {
+                    escaped = false
+                } else if byte == 0x5C { // '\\'
+                    escaped = true
+                } else if byte == 0x22 { // '"'
+                    inString = false
+                }
+            } else {
+                if byte == 0x22 { // '"'
+                    inString = true
+                    lastCommaIndex = nil
+                } else if byte == 0x2C { // ','
+                    lastCommaIndex = i
+                } else if byte == 0x20 || byte == 0x09 || byte == 0x0A || byte == 0x0D {
+                    // whitespace: keep lastCommaIndex active
+                } else if byte == 0x7D || byte == 0x5D { // '}' or ']'
+                    if let commaIdx = lastCommaIndex {
+                        bytes[commaIdx] = 0x20 // replace trailing comma with space
+                        lastCommaIndex = nil
+                    }
+                } else {
+                    lastCommaIndex = nil
+                }
+            }
+        }
+        return Data(bytes)
+    }
+
+    nonisolated static func sanitizeTrailingCommas(_ json: String) -> String {
+        guard let data = json.data(using: .utf8) else { return json }
+        let sanitized = sanitizeTrailingCommasData(data)
+        return String(data: sanitized, encoding: .utf8) ?? json
+    }
+
+    nonisolated static func extractFirstJSONValueStatic(from text: String) -> String? {
+        guard let start = text.firstIndex(where: { $0 == "{" || $0 == "[" }) else { return nil }
+        let open = text[start]
+        let close: Character = open == "{" ? "}" : "]"
+        var depth = 0
+        var inString = false
+        var escaped = false
+        var index = start
+        while index < text.endIndex {
+            let char = text[index]
             if inString {
                 if escaped {
                     escaped = false
@@ -681,60 +802,26 @@ final class SourceStore: ObservableObject {
                 } else if char == "\"" {
                     inString = false
                 }
-            } else {
-                if char == "\"" {
-                    inString = true
-                    lastCommaIndex = nil
-                } else if char == "," {
-                    lastCommaIndex = i
-                } else if char.isWhitespace {
-                    // keep lastCommaIndex active across whitespace
-                } else if char == "}" || char == "]" {
-                    if let commaIdx = lastCommaIndex {
-                        chars[commaIdx] = " "
-                        lastCommaIndex = nil
-                    }
-                } else {
-                    lastCommaIndex = nil
+                index = text.index(after: index)
+                continue
+            }
+            if char == "\"" {
+                inString = true
+            } else if char == open {
+                depth += 1
+            } else if char == close {
+                depth -= 1
+                if depth == 0 {
+                    return String(text[start...index])
                 }
             }
+            index = text.index(after: index)
         }
-        return String(chars)
+        return nil
     }
 
     private func extractFirstJSONValue(from text: String) -> String? {
-        let chars = Array(text)
-        for start in chars.indices where chars[start] == "{" || chars[start] == "[" {
-            let open = chars[start]
-            let close: Character = open == "{" ? "}" : "]"
-            var depth = 0
-            var inString = false
-            var escaped = false
-            for index in start..<chars.count {
-                let char = chars[index]
-                if inString {
-                    if escaped {
-                        escaped = false
-                    } else if char == "\\" {
-                        escaped = true
-                    } else if char == "\"" {
-                        inString = false
-                    }
-                    continue
-                }
-                if char == "\"" {
-                    inString = true
-                } else if char == open {
-                    depth += 1
-                } else if char == close {
-                    depth -= 1
-                    if depth == 0 {
-                        return String(chars[start...index])
-                    }
-                }
-            }
-        }
-        return nil
+        Self.extractFirstJSONValueStatic(from: text)
     }
 }
 

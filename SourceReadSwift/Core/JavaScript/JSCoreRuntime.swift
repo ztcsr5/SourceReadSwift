@@ -771,11 +771,21 @@ final class JSCoreRuntime {
           var origMatch = String.prototype.match;
           String.prototype.match = function(re) {
             var res = origMatch.call(this, re);
-            if (!res && re instanceof RegExp && !re.flags.includes('i')) {
-              try {
-                var caseInsensitive = new RegExp(re.source, re.flags + 'i');
-                return origMatch.call(this, caseInsensitive);
-              } catch(e) {}
+            if (!res && re instanceof RegExp) {
+              if (!re.flags.includes('i')) {
+                try {
+                  var caseInsensitive = new RegExp(re.source, re.flags + 'i');
+                  var ciRes = origMatch.call(this, caseInsensitive);
+                  if (ciRes) return ciRes;
+                } catch(e) {}
+              }
+              if (re.source.indexOf('\\#') !== -1 || re.source.indexOf('#') !== -1) {
+                try {
+                  var withoutHash = new RegExp(re.source.replace(/\\?#/g, ''), re.flags);
+                  var noHashRes = origMatch.call(this, withoutHash);
+                  if (noHashRes) return noHashRes;
+                } catch(e) {}
+              }
             }
             return res;
           };

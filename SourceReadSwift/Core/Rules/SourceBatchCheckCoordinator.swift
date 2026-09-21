@@ -34,7 +34,6 @@ final class SourceBatchCheckCoordinator: ObservableObject {
 
     private var activeSessionID = UUID()
     private var activeTask: Task<Void, Never>? = nil
-    private var backgroundTaskID: UIBackgroundTaskIdentifier = .invalid
     private let reportFileName = "last_batch_test_report.json"
 
     init() {
@@ -404,19 +403,11 @@ final class SourceBatchCheckCoordinator: ObservableObject {
     // MARK: - Background Task Handling
 
     private func beginBackgroundExecution() {
-        endBackgroundExecution()
-        backgroundTaskID = UIApplication.shared.beginBackgroundTask(withName: "SourceBatchCheckCoordinator") { [weak self] in
-            Task { @MainActor [weak self] in
-                self?.stop()
-            }
-        }
+        BackgroundKeepAliveManager.shared.start(reason: "书源批量全链路体检")
     }
 
     private func endBackgroundExecution() {
-        if backgroundTaskID != .invalid {
-            UIApplication.shared.endBackgroundTask(backgroundTaskID)
-            backgroundTaskID = .invalid
-        }
+        BackgroundKeepAliveManager.shared.stop()
     }
 
     // MARK: - Persistence & Recovery

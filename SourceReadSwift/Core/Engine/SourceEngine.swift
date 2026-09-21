@@ -583,7 +583,24 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
             evidence.removeAll()
         }
         let javascript = evidence[key]?[normalizedStage]?.javascript ?? []
-        evidence[key, default: [:]][normalizedStage] = SourceDiagnosticEvidence(request: request, response: response, javascript: javascript)
+        let ruleSummary: String? = {
+            switch normalizedStage {
+            case .search:
+                return source.ruleSearch?.fields["bookList"].map { "bookList: \($0)" }
+            case .detail:
+                return source.ruleBookInfo?.fields["name"].map { "name: \($0)" }
+            case .toc:
+                return source.ruleToc?.fields["chapterList"].map { "chapterList: \($0)" }
+            case .content:
+                return source.ruleContent?.fields["content"].map { "content: \($0)" }
+            }
+        }()
+        evidence[key, default: [:]][normalizedStage] = SourceDiagnosticEvidence(
+            request: request,
+            response: response,
+            javascript: javascript,
+            ruleSummary: ruleSummary
+        )
         evidenceLock.unlock()
     }
 
@@ -612,10 +629,23 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
             evidence.removeAll()
         }
         let javascript = evidence[key]?[normalizedStage]?.javascript ?? []
+        let ruleSummary: String? = {
+            switch normalizedStage {
+            case .search:
+                return source.ruleSearch?.fields["bookList"].map { "bookList: \($0)" }
+            case .detail:
+                return source.ruleBookInfo?.fields["name"].map { "name: \($0)" }
+            case .toc:
+                return source.ruleToc?.fields["chapterList"].map { "chapterList: \($0)" }
+            case .content:
+                return source.ruleContent?.fields["content"].map { "content: \($0)" }
+            }
+        }()
         evidence[key, default: [:]][normalizedStage] = SourceDiagnosticEvidence(
             request: request,
             error: error,
-            javascript: javascript
+            javascript: javascript,
+            ruleSummary: ruleSummary
         )
         evidenceLock.unlock()
     }
