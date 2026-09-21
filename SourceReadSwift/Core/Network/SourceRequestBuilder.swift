@@ -71,9 +71,10 @@ struct SourceRequestBuilder {
         }
         mergeHeaders(directive.headers, into: &headers)
         headers = headers.mapValues { interpolatePersistentValues($0, values: persistentValues) }
-        headers["User-Agent", default: "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 Mobile/15E148"]
+        headers["User-Agent", default: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"]
         headers["Accept", default: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"]
-        applyDefaultNavigationHeaders(to: &headers, sourceBase: source.bookSourceUrl)
+        let isPostOrPut = (directive.method == .post || directive.method == .put || directive.body != nil || sourceOptions.body != nil || sourceOptions.method == .post || sourceOptions.method == .put)
+        applyDefaultNavigationHeaders(to: &headers, sourceBase: source.bookSourceUrl, isPostOrPut: isPostOrPut)
 
         let isGBK = (charset?.lowercased() ?? "").contains("gb") || (charset?.lowercased() ?? "").contains("cp936")
         let body = directive.body.map {
@@ -108,14 +109,34 @@ struct SourceRequestBuilder {
            let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
             return stringMap(object)
         }
+        let relaxed = decoded
+            .replacingOccurrences(of: #"(?<=[\{,]\s*)([a-zA-Z_][a-zA-Z0-9_\-]*)\s*:"#, with: "\"$1\":", options: .regularExpression)
+            .replacingOccurrences(of: #":\s*'([^']*)'"#, with: ": \"$1\"", options: .regularExpression)
+            .replacingOccurrences(of: #",\s*\}"#, with: "}", options: .regularExpression)
+        if let relaxedData = relaxed.data(using: .utf8),
+           let object = try? JSONSerialization.jsonObject(with: relaxedData) as? [String: Any] {
+            return stringMap(object)
+        }
         return decoded
             .split(whereSeparator: { $0 == "\n" || $0 == "\r" || $0 == ";" })
             .reduce(into: [:]) { result, line in
                 let value = String(line)
                 let parts = value.split(separator: ":", maxSplits: 1).map(String.init)
                 guard parts.count == 2 else { return }
-                let key = parts[0].trimmingCharacters(in: .whitespacesAndNewlines)
-                let headerValue = parts[1].trimmingCharacters(in: .whitespacesAndNewlines)
+                var key = parts[0].trimmingCharacters(in: .whitespacesAndNewlines)
+                while key.hasPrefix("{") || key.hasPrefix("\"") || key.hasPrefix("'") {
+                    key = String(key.dropFirst()).trimmingCharacters(in: .whitespacesAndNewlines)
+                }
+                while key.hasSuffix("}") || key.hasSuffix("\"") || key.hasSuffix("'") {
+                    key = String(key.dropLast()).trimmingCharacters(in: .whitespacesAndNewlines)
+                }
+                var headerValue = parts[1].trimmingCharacters(in: .whitespacesAndNewlines)
+                while headerValue.hasPrefix("\"") || headerValue.hasPrefix("'") {
+                    headerValue = String(headerValue.dropFirst()).trimmingCharacters(in: .whitespacesAndNewlines)
+                }
+                while headerValue.hasSuffix("}") || headerValue.hasSuffix("\"") || headerValue.hasSuffix("'") {
+                    headerValue = String(headerValue.dropLast()).trimmingCharacters(in: .whitespacesAndNewlines)
+                }
                 guard !key.isEmpty else { return }
                 result[key] = decodeEscapes(headerValue)
             }
@@ -123,7 +144,15 @@ struct SourceRequestBuilder {
 
     private func stringMap(_ object: [String: Any]) -> [String: String] {
         object.reduce(into: [:]) { result, item in
-            result[item.key] = stringify(item.value)
+            var cleanKey = item.key.trimmingCharacters(in: .whitespacesAndNewlines)
+            while cleanKey.hasPrefix("{") || cleanKey.hasPrefix("\"") || cleanKey.hasPrefix("'") {
+                cleanKey = String(cleanKey.dropFirst()).trimmingCharacters(in: .whitespacesAndNewlines)
+            }
+            while cleanKey.hasSuffix("}") || cleanKey.hasSuffix("\"") || cleanKey.hasSuffix("'") {
+                cleanKey = String(cleanKey.dropLast()).trimmingCharacters(in: .whitespacesAndNewlines)
+            }
+            guard !cleanKey.isEmpty else { return }
+            result[cleanKey] = stringify(item.value)
         }
     }
 
@@ -329,7 +358,7 @@ struct SourceRequestBuilder {
         return number >= 100 ? number / 1_000 : number
     }
 
-    private func applyDefaultNavigationHeaders(to headers: inout [String: String], sourceBase: String) {
+    private func applyDefaultNavigationHeaders(to headers: inout [String: String], sourceBase: String, isPostOrPut: Bool = false) {
         var cleanBase = sourceBase.trimmingCharacters(in: .whitespacesAndNewlines)
         if let hashIdx = cleanBase.firstIndex(of: "#") {
             cleanBase = String(cleanBase[..<hashIdx]).trimmingCharacters(in: .whitespacesAndNewlines)
@@ -340,7 +369,7 @@ struct SourceRequestBuilder {
         if !containsHeader(headers, "Referer") {
             headers["Referer"] = "\(origin)/"
         }
-        if !containsHeader(headers, "Origin") {
+        if isPostOrPut && !containsHeader(headers, "Origin") {
             headers["Origin"] = origin
         }
     }

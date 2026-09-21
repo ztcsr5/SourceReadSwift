@@ -135,15 +135,15 @@ enum SourceDiagnosticReportExporter {
             return (.sslError, FailureCategory.sslError.defaultSolution)
         }
 
-        if msg.contains("重定向地址无效") || msg.contains("已关停") || msg.contains("已下线")
-            || msg.contains("无法连接到服务器") || msg.contains("timeout") || msg.contains("超时")
-            || msg.contains("connection refused") || msg.contains("cannot connect")
-            || msg.contains("未能连接") || msg.contains("网络错误") || msg.contains("timed out") {
-            return (.networkTimeout, FailureCategory.networkTimeout.defaultSolution)
+        if msg.contains("bad url") || msg.contains("invalid url") || msg.contains("unsupported url") || msg.contains("url无效") || msg.contains("url 格式") || msg.contains("-1000") {
+            return (.badURL, FailureCategory.badURL.defaultSolution)
         }
 
-        if msg.contains("bad url") || msg.contains("invalid url") || msg.contains("unsupported url") || msg.contains("url无效") || msg.contains("url 格式") {
-            return (.badURL, FailureCategory.badURL.defaultSolution)
+        if msg.contains("无法连接到服务器") || msg.contains("timeout") || msg.contains("超时")
+            || msg.contains("connection refused") || msg.contains("cannot connect")
+            || msg.contains("未能连接") || msg.contains("网络错误") || msg.contains("timed out")
+            || msg.contains("域名未解析") || msg.contains("cannotfindhost") {
+            return (.networkTimeout, FailureCategory.networkTimeout.defaultSolution)
         }
 
         if msg.contains("javascript") || msg.contains("syntaxerror") || msg.contains("referenceerror")

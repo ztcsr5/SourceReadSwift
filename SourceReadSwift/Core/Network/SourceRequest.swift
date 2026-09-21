@@ -100,17 +100,41 @@ final class InsecureTrustSessionDelegate: NSObject, URLSessionDelegate, URLSessi
         // or redirect to mirror domains. Foundation throws NSURLErrorBadURL (-1000) if the Location
         // header contains non-ASCII bytes or special characters. We sanitize it here.
         var sanitized = request
-        if let location = response.allHeaderFields["Location"] as? String ?? response.allHeaderFields["location"] as? String {
-            let trimmedLocation = location.trimmingCharacters(in: .whitespacesAndNewlines)
-            if let originalURL = response.url,
-               let resolved = URL(string: trimmedLocation, relativeTo: originalURL)?.absoluteURL {
-                sanitized.url = resolved
-            } else if let originalURL = response.url,
-                      let encoded = trimmedLocation.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed.union(.urlPathAllowed)),
-                      let resolved = URL(string: encoded, relativeTo: originalURL)?.absoluteURL {
-                sanitized.url = resolved
+        // 1. Foundation automatically strips custom and sensitive headers on cross-domain redirect.
+        // Re-inject the original request headers (User-Agent, Cookie, Referer, Accept) so target mirrors accept the request.
+        if let originalHeaders = task.originalRequest?.allHTTPHeaderFields {
+            for (key, value) in originalHeaders {
+                if sanitized.value(forHTTPHeaderField: key) == nil {
+                    sanitized.setValue(value, forHTTPHeaderField: key)
+                }
             }
         }
+        if sanitized.value(forHTTPHeaderField: "User-Agent") == nil {
+            sanitized.setValue("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36", forHTTPHeaderField: "User-Agent")
+        }
+
+        // 2. Parse and sanitize target Location
+        if let location = response.allHeaderFields["Location"] as? String ?? response.allHeaderFields["location"] as? String {
+            let trimmedLocation = location.trimmingCharacters(in: .whitespacesAndNewlines)
+            let base = response.url ?? task.originalRequest?.url
+            var targetURL: URL? = nil
+            if let base {
+                targetURL = URL(string: trimmedLocation, relativeTo: base)?.absoluteURL
+            }
+            if targetURL == nil {
+                if let encoded = trimmedLocation.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed.union(.urlPathAllowed)) {
+                    if let base {
+                        targetURL = URL(string: encoded, relativeTo: base)?.absoluteURL
+                    } else {
+                        targetURL = URL(string: encoded)
+                    }
+                }
+            }
+            if let targetURL {
+                sanitized.url = targetURL
+            }
+        }
+
         guard let targetURL = sanitized.url,
               let scheme = targetURL.scheme?.lowercased(),
               scheme == "http" || scheme == "https" else {
@@ -151,44 +175,69 @@ final class URLSessionSourceNetworkClient: SourceNetworkClient, @unchecked Senda
         }
 
         do {
-            let (data, response) = try await session.data(for: urlRequest)
+            let (data, response) = try await session.data(for: urlRequest, delegate: Self.sessionDelegate)
             guard let http = response as? HTTPURLResponse else {
                 return .failure(.network("响应不是 HTTPURLResponse"))
             }
-            let headers = http.allHeaderFields.reduce(into: [String: String]()) { result, item in
-                result[String(describing: item.key)] = String(describing: item.value)
-            }
-            let (text, decodedData, decoded) = autoreleasepool { () -> (String, Data, ResponseBodyDecoder.DecodeResult) in
-                let decoded = ResponseBodyDecoder().decodeResult(data: data, headers: headers)
-                let decodedData = decoded.data
-                let text = ResponseTextDecoder().decode(data: decodedData, headers: headers, preferredCharset: request.expectedCharset)
-                return (text, decodedData, decoded)
-            }
-            // Foundation does not reliably parse a combined Set-Cookie field
-            // when Expires contains a comma. Parse each cookie value first,
-            // then persist the complete response set for the next stage.
-            await cookieStore.storeSetCookieHeaders(headers, for: http.url ?? request.url)
-            return .success(SourceResponse(
-                url: http.url ?? request.url,
-                statusCode: http.statusCode,
-                headers: headers,
-                body: text,
-                data: decodedData,
-                encodedByteCount: decoded.wasDecoded ? data.count : nil,
-                bodyWasDecoded: decoded.wasDecoded,
-                contentEncodings: decoded.encodings
-            ))
+            return await processResponse(data: data, http: http, request: request)
         } catch let urlError as URLError {
+            // 1. Automatic HTTP Fallback when HTTPS fails with TLS/certificate/connection error
+            if request.url.scheme?.lowercased() == "https",
+               (urlError.code == .secureConnectionFailed ||
+                urlError.code == .serverCertificateUntrusted ||
+                urlError.code == .serverCertificateHasBadDate ||
+                urlError.code == .serverCertificateNotYetValid ||
+                urlError.code == .serverCertificateHasUnknownRoot ||
+                urlError.code == .cannotConnectToHost ||
+                urlError.code == .networkConnectionLost) {
+                if let httpURL = URL(string: request.url.absoluteString.replacingOccurrences(of: "https://", with: "http://", options: .anchored)) {
+                    var httpReq = urlRequest
+                    httpReq.url = httpURL
+                    if let (data, response) = try? await session.data(for: httpReq, delegate: Self.sessionDelegate),
+                       let http = response as? HTTPURLResponse,
+                       (200...399).contains(http.statusCode) {
+                        return await processResponse(data: data, http: http, request: request)
+                    }
+                }
+            }
+
             if urlError.code == .badURL {
-                return .failure(.network("源站重定向地址无效或目标域名已关停"))
+                return .failure(.network("URL 格式非法或解析异常 (-1000)"))
             } else if urlError.code == .timedOut {
                 return .failure(.network("连接超时"))
             } else if urlError.code == .cannotFindHost || urlError.code == .cannotConnectToHost {
-                return .failure(.network("无法连接到服务器或域名已下线"))
+                return .failure(.network("无法连接到服务器或域名未解析"))
             }
             return .failure(.network(urlError.localizedDescription))
         } catch {
             return .failure(.network(error.localizedDescription))
         }
+    }
+
+    private func processResponse(
+        data: Data,
+        http: HTTPURLResponse,
+        request: SourceRequest
+    ) async -> Result<SourceResponse, SourceEngineError> {
+        let headers = http.allHeaderFields.reduce(into: [String: String]()) { result, item in
+            result[String(describing: item.key)] = String(describing: item.value)
+        }
+        let (text, decodedData, decoded) = autoreleasepool { () -> (String, Data, ResponseBodyDecoder.DecodeResult) in
+            let decoded = ResponseBodyDecoder().decodeResult(data: data, headers: headers)
+            let decodedData = decoded.data
+            let text = ResponseTextDecoder().decode(data: decodedData, headers: headers, preferredCharset: request.expectedCharset)
+            return (text, decodedData, decoded)
+        }
+        await cookieStore.storeSetCookieHeaders(headers, for: http.url ?? request.url)
+        return .success(SourceResponse(
+            url: http.url ?? request.url,
+            statusCode: http.statusCode,
+            headers: headers,
+            body: text,
+            data: decodedData,
+            encodedByteCount: decoded.wasDecoded ? data.count : nil,
+            bodyWasDecoded: decoded.wasDecoded,
+            contentEncodings: decoded.encodings
+        ))
     }
 }

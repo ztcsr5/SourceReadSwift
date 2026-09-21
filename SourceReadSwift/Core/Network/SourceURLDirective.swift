@@ -193,6 +193,11 @@ struct SourceURLDirectiveParser {
            let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
             return stringMap(object)
         }
+        let relaxed = sanitizeRelaxedJSON(trimmed)
+        if let data = relaxed.data(using: .utf8),
+           let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+            return stringMap(object)
+        }
         let pairs = trimmed
             .split(whereSeparator: { $0 == "\n" || $0 == "\r" || $0 == ";" })
             .map { String($0).trimmingCharacters(in: .whitespacesAndNewlines) }
@@ -200,8 +205,20 @@ struct SourceURLDirectiveParser {
             let separator: Character = line.contains(":") ? ":" : "="
             let parts = line.split(separator: separator, maxSplits: 1).map(String.init)
             guard parts.count == 2 else { return }
-            let key = parts[0].trimmingCharacters(in: .whitespacesAndNewlines)
-            let value = parts[1].trimmingCharacters(in: .whitespacesAndNewlines)
+            var key = parts[0].trimmingCharacters(in: .whitespacesAndNewlines)
+            while key.hasPrefix("{") || key.hasPrefix("\"") || key.hasPrefix("'") {
+                key = String(key.dropFirst()).trimmingCharacters(in: .whitespacesAndNewlines)
+            }
+            while key.hasSuffix("}") || key.hasSuffix("\"") || key.hasSuffix("'") {
+                key = String(key.dropLast()).trimmingCharacters(in: .whitespacesAndNewlines)
+            }
+            var value = parts[1].trimmingCharacters(in: .whitespacesAndNewlines)
+            while value.hasPrefix("\"") || value.hasPrefix("'") {
+                value = String(value.dropFirst()).trimmingCharacters(in: .whitespacesAndNewlines)
+            }
+            while value.hasSuffix("}") || value.hasSuffix("\"") || value.hasSuffix("'") {
+                value = String(value.dropLast()).trimmingCharacters(in: .whitespacesAndNewlines)
+            }
             guard !key.isEmpty else { return }
             result[key] = decodeEscapes(value)
         }
@@ -219,7 +236,15 @@ struct SourceURLDirectiveParser {
 
     private func stringMap(_ object: [String: Any]) -> [String: String] {
         object.reduce(into: [:]) { result, item in
-            result[item.key] = stringify(item.value)
+            var cleanKey = item.key.trimmingCharacters(in: .whitespacesAndNewlines)
+            while cleanKey.hasPrefix("{") || cleanKey.hasPrefix("\"") || cleanKey.hasPrefix("'") {
+                cleanKey = String(cleanKey.dropFirst()).trimmingCharacters(in: .whitespacesAndNewlines)
+            }
+            while cleanKey.hasSuffix("}") || cleanKey.hasSuffix("\"") || cleanKey.hasSuffix("'") {
+                cleanKey = String(cleanKey.dropLast()).trimmingCharacters(in: .whitespacesAndNewlines)
+            }
+            guard !cleanKey.isEmpty else { return }
+            result[cleanKey] = stringify(item.value)
         }
     }
 
