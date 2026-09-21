@@ -662,6 +662,7 @@ final class LegadoJXNodeFactoryBridge: NSObject, LegadoJXNodeFactoryExport {
     func hasAttr(_ name: String) -> Bool
     func removeAttr(_ name: String) -> LegadoElementBridge
     func parent() -> LegadoElementBridge?
+    func parentNode() -> LegadoElementBridge?
     func parents() -> LegadoElementsBridge
     func children() -> LegadoElementsBridge
     func append(_ html: String) -> LegadoElementBridge
@@ -768,6 +769,10 @@ final class LegadoElementBridge: NSObject, LegadoElementExport {
     func parent() -> LegadoElementBridge? {
         guard let parent = element.parent() else { return nil }
         return LegadoElementBridge(element: parent, baseURL: baseURL)
+    }
+
+    func parentNode() -> LegadoElementBridge? {
+        parent()
     }
 
     func parents() -> LegadoElementsBridge {

@@ -67,7 +67,8 @@ struct BookDetailParser {
                 "author": book.author ?? "",
                 "coverUrl": book.coverUrl ?? "",
                 "bookUrl": book.bookUrl,
-                "intro": book.intro ?? ""
+                "intro": book.intro ?? "",
+                "kind": book.kind ?? ""
             ]
             let variables: [String: Any] = [
                 "source": source,
@@ -171,7 +172,8 @@ struct BookDetailParser {
             "author": book.author ?? "",
             "coverUrl": book.coverUrl ?? "",
             "bookUrl": book.bookUrl,
-            "intro": book.intro ?? ""
+            "intro": book.intro ?? "",
+            "kind": book.kind ?? ""
         ]
         let variables: [String: Any] = [
             "source": source,
@@ -242,6 +244,13 @@ struct BookDetailParser {
 
     private func isURLTemplate(_ rule: String) -> Bool {
         let trimmed = rule.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmed.hasPrefix(".") || trimmed.hasPrefix("#") || trimmed.hasPrefix("//")
+            || trimmed.hasPrefix("tag.") || trimmed.hasPrefix("class.") || trimmed.hasPrefix("id.")
+            || trimmed.hasPrefix("center") || trimmed.hasPrefix("div") || trimmed.hasPrefix("ul")
+            || trimmed.hasPrefix("table") || trimmed.hasPrefix("p") || trimmed.hasPrefix("a:")
+            || trimmed.hasPrefix("a@") || trimmed.hasPrefix("span") {
+            return false
+        }
         return trimmed.hasPrefix("http://")
             || trimmed.hasPrefix("https://")
             || trimmed.hasPrefix("@js:")

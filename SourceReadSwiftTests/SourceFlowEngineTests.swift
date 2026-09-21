@@ -266,5 +266,52 @@ final class SourceFlowEngineTests: XCTestCase {
         manager.stop()
         XCTAssertFalse(manager.isActive)
     }
+
+    // MARK: - Dataset Research Unlocked Features
+    func testDynamicURLResolverWithJSONPathInterpolation() {
+        let rawUrl = "https://reader.browser.miui.com/api/v2/chapter/list/{{$..bookId}}"
+        let source = BookSource(bookSourceName: "小米阅读", bookSourceUrl: "https://reader.browser.miui.com")
+        let context = RuleExecutionContext()
+        let detailJSON = "{\"data\": {\"bookId\": 44439, \"name\": \"重生\"}}"
+        let resolved = DynamicURLResolver.resolve(
+            rawUrl,
+            baseUrl: "https://reader.browser.miui.com",
+            source: source,
+            variables: ["result": detailJSON, "body": detailJSON],
+            context: context
+        )
+        XCTAssertEqual(resolved, "https://reader.browser.miui.com/api/v2/chapter/list/44439")
+    }
+
+    func testDynamicURLResolverCleansDoubleDomain() {
+        let rawUrl = "http://m.tingroom.com/http://m.tingroom.com/?mid=3&aid=316735"
+        let source = BookSource(bookSourceName: "英语资源", bookSourceUrl: "http://m.tingroom.com")
+        let context = RuleExecutionContext()
+        let resolved = DynamicURLResolver.resolve(
+            rawUrl,
+            baseUrl: "http://m.tingroom.com",
+            source: source,
+            variables: [:],
+            context: context
+        )
+        XCTAssertEqual(resolved, "http://m.tingroom.com/?mid=3&aid=316735")
+    }
+
+    func testLegadoElementParentNodeSupport() throws {
+        let html = "<div><h2>Volume 1</h2><p><a class='chapter' href='/c1'>Chapter 1</a></p></div>"
+        let doc = try SwiftSoup.parse(html, "https://example.com")
+        guard let aElem = try doc.select("a.chapter").first() else {
+            return XCTFail("Missing a.chapter")
+        }
+        let bridge = LegadoElementBridge(element: aElem, baseURL: "https://example.com")
+        XCTAssertEqual(bridge.parentNode()?.tagName(), "p")
+        XCTAssertEqual(bridge.parentNode()?.parentNode()?.tagName(), "div")
+    }
+
+    func testJSCoreStringParentNodeFallback() {
+        let rt = JSCoreRuntime()
+        let result = try? rt.evaluate("'test'.parentNode()").get()
+        XCTAssertEqual(result, "")
+    }
 }
 

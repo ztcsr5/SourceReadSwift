@@ -19,9 +19,9 @@ struct DynamicURLResolver {
             trimmed = String(trimmed.dropFirst(6)).trimmingCharacters(in: .whitespacesAndNewlines)
         }
 
-        // Support @get:{key} or @get:key variable interpolation
-        if trimmed.contains("@get:") {
-            let pattern = #"(?i)@get:\{?([^}@]*)?\}?"#
+        // Support @get:{key} or @get:key or @get:%7Bkey%7D variable interpolation
+        if trimmed.lowercased().contains("@get:") {
+            let pattern = #"(?i)@get:(?:\{|%7b)?([^%}&@\s]*)?(?:\}|%7d)?"#
             if let regex = try? NSRegularExpression(pattern: pattern) {
                 let matches = regex.matches(in: trimmed, range: NSRange(trimmed.startIndex..<trimmed.endIndex, in: trimmed)).reversed()
                 for match in matches {
@@ -31,6 +31,16 @@ struct DynamicURLResolver {
                     let val = context.get(key)
                     trimmed.replaceSubrange(fullRange, with: val)
                 }
+            }
+        }
+
+        // Strip accidental double domain concatenation, e.g. `http://domain/http://domain/path`
+        if let regex = try? NSRegularExpression(pattern: #"^https?://[^/]+/(https?://.+)$"#) {
+            let nsText = trimmed as NSString
+            if let match = regex.firstMatch(in: trimmed, range: NSRange(location: 0, length: nsText.length)),
+               match.numberOfRanges > 1,
+               let innerRange = Range(match.range(at: 1), in: trimmed) {
+                trimmed = String(trimmed[innerRange])
             }
         }
 
@@ -60,10 +70,30 @@ struct DynamicURLResolver {
                               let fullRange = Range(match.range(at: 0), in: trimmed),
                               let codeRange = Range(match.range(at: 1), in: trimmed) else { continue }
                         let script = String(trimmed[codeRange]).trimmingCharacters(in: .whitespacesAndNewlines)
-                        let evalResult = runtime.evaluate(script, variables: jsVariables)
-                        if case .success(let evaluated) = evalResult {
+                        var evaluatedValue: String? = nil
+
+                        // 1. If script is a JSONPath (starts with $), extract from response JSON or variables
+                        if script.hasPrefix("$") {
+                            let jsonExtractor = JSONRuleExtractor(executionContext: context)
+                            if let bodyStr = jsVariables["body"] as? String ?? jsVariables["result"] as? String,
+                               let jsonObj = ResponseFormatDetector.jsonObject(from: bodyStr) {
+                                evaluatedValue = jsonExtractor.string(from: jsonObj, rule: script)
+                            } else if let dict = jsVariables["book"] as? [String: Any] {
+                                evaluatedValue = jsonExtractor.string(from: dict, rule: script)
+                            }
+                        }
+
+                        // 2. If not JSONPath or JSONPath yielded nil, try JS evaluation
+                        if evaluatedValue == nil {
+                            let evalResult = runtime.evaluate(script, variables: jsVariables)
+                            if case .success(let evaluated) = evalResult {
+                                evaluatedValue = evaluated
+                            }
+                        }
+
+                        if let evaluated = evaluatedValue {
                             let cleanEval = evaluated.trimmingCharacters(in: .whitespacesAndNewlines)
-                            if cleanEval != "undefined" && cleanEval != "null" {
+                            if !cleanEval.isEmpty && cleanEval != "undefined" && cleanEval != "null" {
                                 trimmed.replaceSubrange(fullRange, with: cleanEval)
                             }
                         }
@@ -92,6 +122,16 @@ struct DynamicURLResolver {
                 // Strip trailing ## comment if present
                 if let hashRange = trimmed.range(of: "##") {
                     trimmed = String(trimmed[..<hashRange.lowerBound]).trimmingCharacters(in: .whitespacesAndNewlines)
+                }
+
+                // Clean double domain again after template substitution
+                if let regex = try? NSRegularExpression(pattern: #"^https?://[^/]+/(https?://.+)$"#) {
+                    let nsText = trimmed as NSString
+                    if let match = regex.firstMatch(in: trimmed, range: NSRange(location: 0, length: nsText.length)),
+                       match.numberOfRanges > 1,
+                       let innerRange = Range(match.range(at: 1), in: trimmed) {
+                        trimmed = String(trimmed[innerRange])
+                    }
                 }
 
                 if !trimmed.hasPrefix("http://") && !trimmed.hasPrefix("https://") {

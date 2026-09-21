@@ -46,7 +46,7 @@ final class JSCoreRuntime {
         // JavaScriptCore can reject a first-read of an undeclared global inside
         // the large prelude; predeclaring them keeps the later `var x = x ||`
         // aliases source-compatible without relying on browser semantics.
-        context.evaluateScript("var java = {}; var cookie = {}; var CryptoJS = {}; var Packages = {}; var JXNode = function(value) { return __nativeJXNode.create(value); }; var $ = function(value) { return JXNode(value); }; var JavaImporter = function() {}; var src = ''; var id = ''; var iid = ''; var varid = ''; var variid = ''; var type = ''; var TYPE = function(v) { return v != null ? (typeof v) : ''; }; var ruid = function(len, upper) { len = len || 16; var chars = '0123456789abcdef'; var res = ''; for (var i = 0; i < len; i++) res += chars[Math.floor(Math.random() * chars.length)]; return upper ? res.toUpperCase() : res; }; var form = {}; var result = ''; var baseUrl = '';")
+        context.evaluateScript("var java = {}; var cookie = {}; var CryptoJS = {}; var Packages = {}; var JXNode = function(value) { return __nativeJXNode.create(value); }; var $ = function(value) { return JXNode(value); }; var JavaImporter = function() {}; var src = ''; var id = ''; var iid = ''; var varid = ''; var variid = ''; var type = ''; var TYPE = function(v) { return v != null ? (typeof v) : ''; }; var ruid = function(len, upper) { len = len || 16; var chars = '0123456789abcdef'; var res = ''; for (var i = 0; i < len; i++) res += chars[Math.floor(Math.random() * chars.length)]; return upper ? res.toUpperCase() : res; }; var form = {}; var result = ''; var baseUrl = ''; String.prototype.parentNode = function() { return null; };")
         installBaseBridge()
     }
 
@@ -212,14 +212,18 @@ final class JSCoreRuntime {
                 }
                 """
                 context.evaluateScript(injectScript)
-                if let source = value as? BookSource, let jsLib = source.raw["jsLib"], !jsLib.isEmpty {
-                    context.evaluateScript(jsLib)
-                } else if let dict = value as? [String: Any], let jsLib = dict["jsLib"] as? String, !jsLib.isEmpty {
-                    context.evaluateScript(jsLib)
-                } else if let dict = value as? [String: String], let jsLib = dict["jsLib"], !jsLib.isEmpty {
-                    context.evaluateScript(jsLib)
-                } else if let dict = value as? NSDictionary, let jsLib = dict["jsLib"] as? String, !jsLib.isEmpty {
-                    context.evaluateScript(jsLib)
+                let rawLib: String? = {
+                    if let source = value as? BookSource { return source.raw["jsLib"] }
+                    if let dict = value as? [String: Any] { return dict["jsLib"] as? String }
+                    if let dict = value as? [String: String] { return dict["jsLib"] }
+                    if let dict = value as? NSDictionary { return dict["jsLib"] as? String }
+                    return nil
+                }()
+                if let rawLib, !rawLib.isEmpty {
+                    let sanitized = rawLib
+                        .replacingOccurrences(of: #"(?m)^\s*let\s+"#, with: "var ", options: .regularExpression)
+                        .replacingOccurrences(of: #"(?m)^\s*const\s+"#, with: "var ", options: .regularExpression)
+                    context.evaluateScript(sanitized)
                 }
             } else if key == "book" {
                 let injectScript = """
