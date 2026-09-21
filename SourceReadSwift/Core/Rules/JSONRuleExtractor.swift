@@ -90,9 +90,25 @@ struct JSONRuleExtractor {
     }
 
     func string(
+        from object: Any,
+        rule: String?,
+        fallbackKeys: [String] = [],
+        variables: [String: Any] = [:]
+    ) -> String? {
+        if let dict = object as? [String: Any] {
+            return string(from: dict, rule: rule, fallbackKeys: fallbackKeys, variables: variables)
+        }
+        if let rule, let extracted = value(from: object, path: rule, variables: variables) {
+            let text = stringify(extracted)
+            return text.isEmpty ? nil : text
+        }
+        return nil
+    }
+
+    func string(
         from item: [String: Any],
         rule: String?,
-        fallbackKeys: [String],
+        fallbackKeys: [String] = [],
         variables: [String: Any] = [:]
     ) -> String? {
         if let rule {

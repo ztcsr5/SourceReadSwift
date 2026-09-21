@@ -77,9 +77,9 @@ struct DynamicURLResolver {
                             let jsonExtractor = JSONRuleExtractor(executionContext: context)
                             if let bodyStr = jsVariables["body"] as? String ?? jsVariables["result"] as? String,
                                let jsonObj = ResponseFormatDetector.jsonObject(from: bodyStr) {
-                                evaluatedValue = jsonExtractor.string(from: jsonObj, rule: script)
+                                evaluatedValue = jsonExtractor.string(from: jsonObj, rule: script, fallbackKeys: [], variables: jsVariables)
                             } else if let dict = jsVariables["book"] as? [String: Any] {
-                                evaluatedValue = jsonExtractor.string(from: dict, rule: script)
+                                evaluatedValue = jsonExtractor.string(from: dict, rule: script, fallbackKeys: [], variables: jsVariables)
                             }
                         }
 
