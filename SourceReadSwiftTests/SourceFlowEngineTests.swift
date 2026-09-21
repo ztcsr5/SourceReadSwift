@@ -223,15 +223,6 @@ final class SourceFlowEngineTests: XCTestCase {
         XCTAssertEqual(result, "https://apiv2hans.aixdzs.com##@secret123")
     }
 
-    func testJSCoreRegexHashFallbackWhenHashMissing() {
-        let rt = JSCoreRuntime()
-        // Script trying to match delimiter # on a string without #
-        let script = "var str = 'https://example.com'; var m = str.match(/([^\\#]+)\\#/); m ? m[1] : 'fallback'"
-        let result = try? rt.evaluate(script).get()
-        // With our fallback, m matches the capture group so it doesn't return null
-        XCTAssertEqual(result, "https://example.com")
-    }
-
     // MARK: - Deep Diagnostic Sniffing (WAF, 5s Shield, API Errors)
     func testSniffSnippetRegionalWAF() {
         let wafHTML = "<!DOCTYPE html><html><head><title>地区拦截</title></head><body>WAF Blocked</body></html>"

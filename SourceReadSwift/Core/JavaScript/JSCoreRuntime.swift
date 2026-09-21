@@ -779,13 +779,6 @@ final class JSCoreRuntime {
                   if (ciRes) return ciRes;
                 } catch(e) {}
               }
-              if (re.source.indexOf('\\#') !== -1 || re.source.indexOf('#') !== -1) {
-                try {
-                  var withoutHash = new RegExp(re.source.replace(/\\?#/g, ''), re.flags);
-                  var noHashRes = origMatch.call(this, withoutHash);
-                  if (noHashRes) return noHashRes;
-                } catch(e) {}
-              }
             }
             return res;
           };
