@@ -188,6 +188,7 @@ final class SourceFlowEngineTests: XCTestCase {
         XCTAssertEqual(parsed?["count"] as? Int, 2)
     }
 
+    @MainActor
     func testFastPathBookSourceImport() throws {
         let store = SourceStore()
         let json = """
@@ -266,6 +267,7 @@ final class SourceFlowEngineTests: XCTestCase {
     }
 
     // MARK: - Background KeepAlive Manager
+    @MainActor
     func testBackgroundKeepAliveManagerLifecycle() {
         let manager = BackgroundKeepAliveManager.shared
         manager.start(reason: "UnitTest")
