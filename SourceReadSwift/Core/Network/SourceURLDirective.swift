@@ -144,7 +144,7 @@ struct SourceURLDirectiveParser {
             return (text.trimmingCharacters(in: .whitespacesAndNewlines), nil)
         }
         let url = String(text[..<jsonStartRange.lowerBound]).trimmingCharacters(in: .whitespacesAndNewlines)
-        let optionText = String(text[text.index(after: jsonStartRange.lowerBound)...]).trimmingCharacters(in: .whitespacesAndNewlines)
+        let optionText = String(text[jsonStartRange.lowerBound...].dropFirst()).trimmingCharacters(in: .whitespacesAndNewlines)
 
         // 1. Direct standard JSON
         if let data = optionText.data(using: .utf8),

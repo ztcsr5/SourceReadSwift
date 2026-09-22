@@ -385,11 +385,17 @@ struct HtmlRuleExtractor {
         }
         let evaluated = runtime.evaluate(script, variables: variables)
         if let jsValue = runtime.context.objectForKeyedSubscript("result") {
-            if let array = jsValue.toArray() {
+            if let bridge = jsValue.toObject() as? LegadoElementsBridge {
+                return bridge.elements
+            } else if let bridge = jsValue.toObject() as? LegadoElementBridge {
+                return [bridge.element]
+            } else if let array = jsValue.toArray() {
                 var foundElements: [Element] = []
                 for item in array {
                     if let bridge = item as? LegadoElementBridge {
                         foundElements.append(bridge.element)
+                    } else if let bridge = item as? LegadoElementsBridge {
+                        foundElements.append(contentsOf: bridge.elements)
                     } else if let el = item as? Element {
                         foundElements.append(el)
                     }

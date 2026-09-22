@@ -17,6 +17,7 @@ struct DynamicURLResolver {
         // Strip leading @json: if present
         if trimmed.hasPrefix("@json:") {
             trimmed = String(trimmed.dropFirst(6)).trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !trimmed.isEmpty else { return "" }
         }
 
         // Support @get:{key} or @get:key or @get:%7Bkey%7D variable interpolation
@@ -46,17 +47,20 @@ struct DynamicURLResolver {
         }
 
         // Strip accidental double domain concatenation, e.g. `http://domain/http://domain/path` or `http://domainhttp://domain/path`
-        if let secondSchemeRange = trimmed.range(of: "https?://", options: .regularExpression, range: trimmed.index(after: trimmed.startIndex)..<trimmed.endIndex) {
-            trimmed = String(trimmed[secondSchemeRange.lowerBound...])
+        if trimmed.count > 8 {
+            let searchStart = trimmed.index(trimmed.startIndex, offsetBy: 7)
+            if let secondSchemeRange = trimmed.range(of: "https?://", options: .regularExpression, range: searchStart..<trimmed.endIndex) {
+                trimmed = String(trimmed[secondSchemeRange.lowerBound...])
+            }
         }
 
         // Strip preceding URL path if it accidentally prepended a base domain to an embedded JS directive
-        if let jsIdx = trimmed.range(of: "/@js:")?.lowerBound {
-            trimmed = String(trimmed[trimmed.index(after: jsIdx)...])
-        } else if let jsIdx = trimmed.range(of: "/<js>")?.lowerBound {
-            trimmed = String(trimmed[trimmed.index(after: jsIdx)...])
-        } else if let jsIdx = trimmed.range(of: "\n@js:")?.lowerBound {
-            trimmed = String(trimmed[trimmed.index(after: jsIdx)...]).trimmingCharacters(in: .whitespacesAndNewlines)
+        if let jsRange = trimmed.range(of: "/@js:") {
+            trimmed = String(trimmed[jsRange.lowerBound...].dropFirst())
+        } else if let jsRange = trimmed.range(of: "/<js>") {
+            trimmed = String(trimmed[jsRange.lowerBound...].dropFirst())
+        } else if let jsRange = trimmed.range(of: "\n@js:") {
+            trimmed = String(trimmed[jsRange.lowerBound...].dropFirst()).trimmingCharacters(in: .whitespacesAndNewlines)
         }
 
         // 1. Resolve embedded {{ ... }} templates FIRST (even inside @js: blocks, like params={'id':{{$.id}}})
@@ -158,9 +162,8 @@ struct DynamicURLResolver {
             if let regex = try? NSRegularExpression(pattern: #"^https?://[^/]+/(https?://.+)$"#) {
                 let nsText = trimmed as NSString
                 if let match = regex.firstMatch(in: trimmed, range: NSRange(location: 0, length: nsText.length)),
-                   match.numberOfRanges > 1,
-                   let innerRange = Range(match.range(at: 1), in: trimmed) {
-                    trimmed = String(trimmed[innerRange])
+                   match.numberOfRanges > 1 {
+                    trimmed = nsText.substring(with: match.range(at: 1))
                 }
             }
 

@@ -24,7 +24,7 @@ struct SourceRequestBuilder {
         let resolvedText: String
         if let jsonStartRange = searchUrl.range(of: #",\s*\{"#, options: .regularExpression) {
             let basePart = String(searchUrl[..<jsonStartRange.lowerBound]).trimmingCharacters(in: .whitespacesAndNewlines)
-            let optionPart = String(searchUrl[searchUrl.index(after: jsonStartRange.lowerBound)...]).trimmingCharacters(in: .whitespacesAndNewlines)
+            let optionPart = String(searchUrl[jsonStartRange.lowerBound...].dropFirst()).trimmingCharacters(in: .whitespacesAndNewlines)
             let resolvedBase = basePart
                 .replacingOccurrences(of: "{{key}}", with: encodedKey)
                 .replacingOccurrences(of: "{{keyword}}", with: encodedKey)
@@ -183,13 +183,19 @@ struct SourceRequestBuilder {
             cleanBase = String(cleanBase[..<hashIdx]).trimmingCharacters(in: .whitespacesAndNewlines)
         }
         var trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else {
+            return URL(string: cleanBase) ?? URL(string: "https://invalid.local")!
+        }
         if trimmed.contains("\n") || trimmed.contains("\r") {
             if let firstLine = trimmed.components(separatedBy: .newlines).first(where: { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }) {
                 trimmed = firstLine.trimmingCharacters(in: .whitespacesAndNewlines)
             }
         }
-        if let secondSchemeRange = trimmed.range(of: "https?://", options: .regularExpression, range: trimmed.index(after: trimmed.startIndex)..<trimmed.endIndex) {
-            trimmed = String(trimmed[secondSchemeRange.lowerBound...])
+        if trimmed.count > 8 {
+            let searchStart = trimmed.index(trimmed.startIndex, offsetBy: 7)
+            if let secondSchemeRange = trimmed.range(of: "https?://", options: .regularExpression, range: searchStart..<trimmed.endIndex) {
+                trimmed = String(trimmed[secondSchemeRange.lowerBound...])
+            }
         }
         if let parsed = URL(string: cleanBase), parsed.scheme != nil, parsed.host != nil {
             if parsed.path.isEmpty || parsed.path == "/" {

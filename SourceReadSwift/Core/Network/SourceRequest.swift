@@ -253,31 +253,33 @@ final class URLSessionSourceNetworkClient: SourceNetworkClient, @unchecked Senda
 
     private func extractHtmlRedirect(from body: String) -> String? {
         guard body.count < 4096 else { return nil }
+        let nsBody = body as NSString
+        let fullRange = NSRange(location: 0, length: nsBody.length)
 
         // 1. Meta refresh: <meta http-equiv="refresh" content="1;url=...">
         let metaPattern = #"(?i)<meta[^>]+http-equiv\s*=\s*['"]?refresh['"]?[^>]+content\s*=\s*['"]?\s*\d+\s*;\s*url\s*=\s*([^'"\s>]+)['"]?"#
         if let regex = try? NSRegularExpression(pattern: metaPattern),
-           let match = regex.firstMatch(in: body, range: NSRange(body.startIndex..., in: body)),
-           let urlRange = Range(match.range(at: 1), in: body) {
-            let target = String(body[urlRange]).trimmingCharacters(in: CharacterSet(charactersIn: "'\" \t\r\n"))
+           let match = regex.firstMatch(in: body, range: fullRange),
+           match.numberOfRanges > 1 {
+            let target = nsBody.substring(with: match.range(at: 1)).trimmingCharacters(in: CharacterSet(charactersIn: "'\" \t\r\n"))
             if !target.isEmpty { return target }
         }
 
         // Reverse order: <meta content="0;url=..." http-equiv="refresh">
         let metaPattern2 = #"(?i)<meta[^>]+content\s*=\s*['"]?\s*\d+\s*;\s*url\s*=\s*([^'"\s>]+)['"]?[^>]+http-equiv\s*=\s*['"]?refresh['"]?"#
         if let regex = try? NSRegularExpression(pattern: metaPattern2),
-           let match = regex.firstMatch(in: body, range: NSRange(body.startIndex..., in: body)),
-           let urlRange = Range(match.range(at: 1), in: body) {
-            let target = String(body[urlRange]).trimmingCharacters(in: CharacterSet(charactersIn: "'\" \t\r\n"))
+           let match = regex.firstMatch(in: body, range: fullRange),
+           match.numberOfRanges > 1 {
+            let target = nsBody.substring(with: match.range(at: 1)).trimmingCharacters(in: CharacterSet(charactersIn: "'\" \t\r\n"))
             if !target.isEmpty { return target }
         }
 
         // 2. JS location redirect: location.href = '...', window.location = '...'
         let jsPattern = #"(?i)(?:window\.)?location(?:\.href)?\s*=\s*['"]([^'"]+)['"]"#
         if let regex = try? NSRegularExpression(pattern: jsPattern),
-           let match = regex.firstMatch(in: body, range: NSRange(body.startIndex..., in: body)),
-           let urlRange = Range(match.range(at: 1), in: body) {
-            let target = String(body[urlRange]).trimmingCharacters(in: .whitespacesAndNewlines)
+           let match = regex.firstMatch(in: body, range: fullRange),
+           match.numberOfRanges > 1 {
+            let target = nsBody.substring(with: match.range(at: 1)).trimmingCharacters(in: .whitespacesAndNewlines)
             if !target.isEmpty && (target.hasPrefix("/") || target.hasPrefix("http") || target.contains(".php") || target.contains(".html") || target.contains("?")) {
                 return target
             }
@@ -286,9 +288,9 @@ final class URLSessionSourceNetworkClient: SourceNetworkClient, @unchecked Senda
         // JS location.replace("...")
         let jsReplacePattern = #"(?i)(?:window\.)?location\.replace\s*\(\s*['"]([^'"]+)['"]\s*\)"#
         if let regex = try? NSRegularExpression(pattern: jsReplacePattern),
-           let match = regex.firstMatch(in: body, range: NSRange(body.startIndex..., in: body)),
-           let urlRange = Range(match.range(at: 1), in: body) {
-            let target = String(body[urlRange]).trimmingCharacters(in: .whitespacesAndNewlines)
+           let match = regex.firstMatch(in: body, range: fullRange),
+           match.numberOfRanges > 1 {
+            let target = nsBody.substring(with: match.range(at: 1)).trimmingCharacters(in: .whitespacesAndNewlines)
             if !target.isEmpty && (target.hasPrefix("/") || target.hasPrefix("http") || target.contains(".php") || target.contains(".html") || target.contains("?")) {
                 return target
             }
@@ -335,8 +337,11 @@ final class URLSessionSourceNetworkClient: SourceNetworkClient, @unchecked Senda
         }
 
         // Strip accidental double domain prefix, e.g. "http://domain.comhttp://target.com/..."
-        if let secondSchemeRange = trimmed.range(of: "https?://", options: .regularExpression, range: trimmed.index(after: trimmed.startIndex)..<trimmed.endIndex) {
-            trimmed = String(trimmed[secondSchemeRange.lowerBound...])
+        if trimmed.count > 8 {
+            let searchStart = trimmed.index(trimmed.startIndex, offsetBy: 7)
+            if let secondSchemeRange = trimmed.range(of: "https?://", options: .regularExpression, range: searchStart..<trimmed.endIndex) {
+                trimmed = String(trimmed[secondSchemeRange.lowerBound...])
+            }
         }
 
         // Handle protocol-relative URL: //example.com/path

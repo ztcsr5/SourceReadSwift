@@ -110,6 +110,15 @@ final class JSCoreRuntime {
                 bridge.tocUrl = book.tocUrl ?? ""
                 bridge.latestChapterTitle = book.latestChapter ?? ""
                 jsCompatibleValue = bridge
+            } else if let elements = value as? [SwiftSoup.Element] {
+                let base = (effectiveVariables["baseUrl"] as? String) ?? ""
+                jsCompatibleValue = LegadoElementsBridge(elements: elements, baseURL: base)
+            } else if let elements = value as? SwiftSoup.Elements {
+                let base = (effectiveVariables["baseUrl"] as? String) ?? ""
+                jsCompatibleValue = LegadoElementsBridge(elements: Array(elements), baseURL: base)
+            } else if let element = value as? SwiftSoup.Element {
+                let base = (effectiveVariables["baseUrl"] as? String) ?? ""
+                jsCompatibleValue = LegadoElementBridge(element: element, baseURL: base)
             }
             context.setObject(jsCompatibleValue, forKeyedSubscript: key as NSString)
             

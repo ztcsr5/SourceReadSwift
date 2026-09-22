@@ -55,6 +55,12 @@ struct JSONRuleExtractor {
                         let text = bridge.text()
                         let href = (try? bridge.element.attr("href")) ?? ""
                         flattened.append(["name": text, "title": text, "url": href, "chapterUrl": href, "href": href, "n": text, "u": href])
+                    } else if let bridges = item as? LegadoElementsBridge {
+                        for el in bridges.elements {
+                            let text = (try? el.text()) ?? ""
+                            let href = (try? el.attr("href")) ?? ""
+                            flattened.append(["name": text, "title": text, "url": href, "chapterUrl": href, "href": href, "n": text, "u": href])
+                        }
                     } else if let subArray = arrayValues(item) {
                         for sub in subArray {
                             extractDicts(sub)
@@ -215,7 +221,11 @@ struct JSONRuleExtractor {
                 intermediate = val
             } else if let str = object as? String, !str.hasPrefix("{") && !str.hasPrefix("[") {
                 let base = (variables["baseUrl"] as? String).flatMap { URL(string: $0) } ?? URL(string: "http://localhost/")!
-                intermediate = try? HtmlRuleExtractor(executionContext: executionContext).select(str, baseUrl: base, listRule: left)
+                if let els = try? HtmlRuleExtractor(executionContext: executionContext).select(str, baseUrl: base, listRule: left) {
+                    intermediate = LegadoElementsBridge(elements: els, baseURL: base.absoluteString)
+                } else {
+                    intermediate = nil
+                }
             } else {
                 intermediate = nil
             }
@@ -234,7 +244,11 @@ struct JSONRuleExtractor {
                 intermediate = val
             } else if let str = object as? String, !str.hasPrefix("{") && !str.hasPrefix("[") {
                 let base = (variables["baseUrl"] as? String).flatMap { URL(string: $0) } ?? URL(string: "http://localhost/")!
-                intermediate = try? HtmlRuleExtractor(executionContext: executionContext).select(str, baseUrl: base, listRule: left)
+                if let els = try? HtmlRuleExtractor(executionContext: executionContext).select(str, baseUrl: base, listRule: left) {
+                    intermediate = LegadoElementsBridge(elements: els, baseURL: base.absoluteString)
+                } else {
+                    intermediate = nil
+                }
             } else {
                 intermediate = nil
             }
@@ -908,8 +922,16 @@ struct JSONRuleExtractor {
             return ""
         })
 
+        var convertedObject = object
+        let baseStr = (extraVariables["baseUrl"] as? String) ?? ""
+        if let elements = object as? [Element] {
+            convertedObject = LegadoElementsBridge(elements: elements, baseURL: baseStr)
+        } else if let el = object as? Element {
+            convertedObject = LegadoElementBridge(element: el, baseURL: baseStr)
+        }
+
         var variables: [String: Any] = [
-            "result": object
+            "result": convertedObject
         ]
 
         // Apply extraVariables first so root document and caller context take precedence
@@ -948,6 +970,13 @@ struct JSONRuleExtractor {
         }
 
         let evaluated = runtime.evaluate(script, variables: variables)
+        if let jsValue = runtime.context.objectForKeyedSubscript("result") {
+            if let bridge = jsValue.toObject() as? LegadoElementsBridge {
+                return bridge
+            } else if let bridge = jsValue.toObject() as? LegadoElementBridge {
+                return bridge
+            }
+        }
         if case .failure(.javascript) = evaluated, script.contains("return") {
             if case .success(let val) = runtime.evaluate("(function(){\(script)})()", variables: variables) {
                 return val
