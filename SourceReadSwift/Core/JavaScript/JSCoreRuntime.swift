@@ -793,6 +793,18 @@ final class JSCoreRuntime {
             return res;
           };
         })();
+        (function() {
+          var _origJSONParse = JSON.parse;
+          JSON.parse = function(text, reviver) {
+            if (text !== null && typeof text === 'object') {
+              return text;
+            }
+            if (typeof text !== 'string') {
+              text = String(text);
+            }
+            return _origJSONParse.call(JSON, text, reviver);
+          };
+        })();
         var __cache_store = (typeof __cache_store !== 'undefined' && __cache_store) || {};
         var __field_store = (typeof __field_store !== 'undefined' && __field_store) || {};
         var cache = {
@@ -1103,12 +1115,15 @@ final class JSCoreRuntime {
         java.initUrl = function(url) { return url; };
         java.htmlFormat = function(html) { return String(html == null ? '' : html); };
         function __defaultHtml() {
-          if (typeof result !== 'undefined' && String(result) !== '') return String(result);
-          if (typeof html !== 'undefined' && String(html) !== '') return String(html);
-          if (typeof src !== 'undefined' && String(src) !== '') return String(src);
-          if (typeof result !== 'undefined') return String(result);
-          if (typeof html !== 'undefined') return String(html);
-          if (typeof src !== 'undefined') return String(src);
+          if (typeof src === 'string' && src.length > 0) return src;
+          if (typeof html === 'string' && html.length > 0) return html;
+          if (typeof result === 'string' && result.length > 0) return result;
+          if (typeof result !== 'undefined' && result !== null && typeof result !== 'object') return String(result);
+          if (typeof html !== 'undefined' && html !== null) return String(html);
+          if (typeof src !== 'undefined' && src !== null) return String(src);
+          if (typeof result !== 'undefined' && result !== null) {
+            try { return JSON.stringify(result); } catch (_) { return String(result); }
+          }
           return '';
         }
         function __defaultBaseUrl() {

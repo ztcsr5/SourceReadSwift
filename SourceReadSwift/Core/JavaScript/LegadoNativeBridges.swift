@@ -714,8 +714,8 @@ final class LegadoJXNodeFactoryBridge: NSObject, LegadoJXNodeFactoryExport {
 }
 
 final class LegadoElementBridge: NSObject, LegadoElementExport {
-    fileprivate let element: SwiftSoup.Element
-    fileprivate let baseURL: String
+    let element: SwiftSoup.Element
+    let baseURL: String
 
     init(element: SwiftSoup.Element, baseURL: String) {
         self.element = element
@@ -1054,8 +1054,8 @@ final class LegadoElementBridge: NSObject, LegadoElementExport {
 }
 
 final class LegadoElementsBridge: NSObject, LegadoElementsExport {
-    fileprivate var elements: [SwiftSoup.Element]
-    fileprivate let baseURL: String
+    var elements: [SwiftSoup.Element]
+    let baseURL: String
 
     init(elements: [SwiftSoup.Element], baseURL: String) {
         self.elements = elements

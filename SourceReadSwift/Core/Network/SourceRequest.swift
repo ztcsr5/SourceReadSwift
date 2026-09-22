@@ -130,6 +130,9 @@ final class URLSessionSourceNetworkClient: SourceNetworkClient, @unchecked Senda
         let maxRedirects = 10
 
         while redirectCount <= maxRedirects {
+            if currentURL.scheme?.lowercased() == "data" {
+                return handleDataURL(currentURL)
+            }
             var urlRequest = URLRequest(url: currentURL, timeoutInterval: request.timeout)
             urlRequest.httpMethod = currentMethod.rawValue
             urlRequest.httpBody = currentBody
@@ -218,15 +221,123 @@ final class URLSessionSourceNetworkClient: SourceNetworkClient, @unchecked Senda
                 continue
             }
 
+            // Check for HTML meta-refresh or location redirect on HTTP 200
+            if http.statusCode == 200, data.count < 4096 {
+                let respHeaders = http.allHeaderFields.reduce(into: [String: String]()) { res, item in
+                    res[String(describing: item.key)] = String(describing: item.value)
+                }
+                let peekText = ResponseTextDecoder().decode(data: data, headers: respHeaders, preferredCharset: request.expectedCharset)
+                if let redirectTarget = extractHtmlRedirect(from: peekText),
+                   let nextURL = resolveRedirectLocation(redirectTarget, relativeTo: currentURL),
+                   nextURL != currentURL {
+                    redirectCount += 1
+                    if redirectCount <= maxRedirects {
+                        await cookieStore.storeSetCookieHeaders(respHeaders, for: currentURL)
+                        currentHeaders["Referer"] = currentURL.absoluteString
+                        currentMethod = .get
+                        currentBody = nil
+                        currentHeaders.removeValue(forKey: "Content-Type")
+                        currentHeaders.removeValue(forKey: "Content-Length")
+                        currentHeaders.removeValue(forKey: "Origin")
+                        currentURL = nextURL
+                        continue
+                    }
+                }
+            }
+
             return await processResponse(data: data, http: http, request: request)
         }
 
         return .failure(.network("重定向超出最大限制"))
     }
 
+    private func extractHtmlRedirect(from body: String) -> String? {
+        guard body.count < 4096 else { return nil }
+
+        // 1. Meta refresh: <meta http-equiv="refresh" content="1;url=...">
+        let metaPattern = #"(?i)<meta[^>]+http-equiv\s*=\s*['"]?refresh['"]?[^>]+content\s*=\s*['"]?\s*\d+\s*;\s*url\s*=\s*([^'"\s>]+)['"]?"#
+        if let regex = try? NSRegularExpression(pattern: metaPattern),
+           let match = regex.firstMatch(in: body, range: NSRange(body.startIndex..., in: body)),
+           let urlRange = Range(match.range(at: 1), in: body) {
+            let target = String(body[urlRange]).trimmingCharacters(in: CharacterSet(charactersIn: "'\" \t\r\n"))
+            if !target.isEmpty { return target }
+        }
+
+        // Reverse order: <meta content="0;url=..." http-equiv="refresh">
+        let metaPattern2 = #"(?i)<meta[^>]+content\s*=\s*['"]?\s*\d+\s*;\s*url\s*=\s*([^'"\s>]+)['"]?[^>]+http-equiv\s*=\s*['"]?refresh['"]?"#
+        if let regex = try? NSRegularExpression(pattern: metaPattern2),
+           let match = regex.firstMatch(in: body, range: NSRange(body.startIndex..., in: body)),
+           let urlRange = Range(match.range(at: 1), in: body) {
+            let target = String(body[urlRange]).trimmingCharacters(in: CharacterSet(charactersIn: "'\" \t\r\n"))
+            if !target.isEmpty { return target }
+        }
+
+        // 2. JS location redirect: location.href = '...', window.location = '...'
+        let jsPattern = #"(?i)(?:window\.)?location(?:\.href)?\s*=\s*['"]([^'"]+)['"]"#
+        if let regex = try? NSRegularExpression(pattern: jsPattern),
+           let match = regex.firstMatch(in: body, range: NSRange(body.startIndex..., in: body)),
+           let urlRange = Range(match.range(at: 1), in: body) {
+            let target = String(body[urlRange]).trimmingCharacters(in: .whitespacesAndNewlines)
+            if !target.isEmpty && (target.hasPrefix("/") || target.hasPrefix("http") || target.contains(".php") || target.contains(".html") || target.contains("?")) {
+                return target
+            }
+        }
+
+        // JS location.replace("...")
+        let jsReplacePattern = #"(?i)(?:window\.)?location\.replace\s*\(\s*['"]([^'"]+)['"]\s*\)"#
+        if let regex = try? NSRegularExpression(pattern: jsReplacePattern),
+           let match = regex.firstMatch(in: body, range: NSRange(body.startIndex..., in: body)),
+           let urlRange = Range(match.range(at: 1), in: body) {
+            let target = String(body[urlRange]).trimmingCharacters(in: .whitespacesAndNewlines)
+            if !target.isEmpty && (target.hasPrefix("/") || target.hasPrefix("http") || target.contains(".php") || target.contains(".html") || target.contains("?")) {
+                return target
+            }
+        }
+
+        return nil
+    }
+
+    private func handleDataURL(_ url: URL) -> Result<SourceResponse, SourceEngineError> {
+        let urlString = url.absoluteString
+        guard let commaIndex = urlString.firstIndex(of: ",") else {
+            return .failure(.network("无效的 data URL"))
+        }
+        let meta = String(urlString[..<commaIndex])
+        let payload = String(urlString[urlString.index(after: commaIndex)...])
+        let isBase64 = meta.contains(";base64")
+        let data: Data
+        if isBase64 {
+            let clean = payload.replacingOccurrences(of: "\n", with: "")
+                .replacingOccurrences(of: "\r", with: "")
+                .trimmingCharacters(in: .whitespaces)
+            data = Data(base64Encoded: clean) ?? payload.data(using: .utf8) ?? Data()
+        } else {
+            data = payload.removingPercentEncoding?.data(using: .utf8) ?? payload.data(using: .utf8) ?? Data()
+        }
+        let text = String(data: data, encoding: .utf8) ?? String(decoding: data, as: UTF8.self)
+        return .success(SourceResponse(
+            url: url,
+            statusCode: 200,
+            headers: ["Content-Type": "text/html; charset=utf-8"],
+            body: text,
+            data: data
+        ))
+    }
+
     private func resolveRedirectLocation(_ location: String, relativeTo base: URL) -> URL? {
         var trimmed = location.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return nil }
+
+        if trimmed.contains("\n") || trimmed.contains("\r") {
+            if let firstLine = trimmed.components(separatedBy: .newlines).first(where: { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }) {
+                trimmed = firstLine.trimmingCharacters(in: .whitespacesAndNewlines)
+            }
+        }
+
+        // Strip accidental double domain prefix, e.g. "http://domain.comhttp://target.com/..."
+        if let secondSchemeRange = trimmed.range(of: "https?://", options: .regularExpression, range: trimmed.index(after: trimmed.startIndex)..<trimmed.endIndex) {
+            trimmed = String(trimmed[secondSchemeRange.lowerBound...])
+        }
 
         // Handle protocol-relative URL: //example.com/path
         if trimmed.hasPrefix("//") {

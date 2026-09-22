@@ -23,7 +23,7 @@ struct SearchResultParser {
             contentEncodings: response.contentEncodings
         )
         let listRule = firstRule(source.ruleSearch, keys: ["bookList", "list", "books"])
-        let isJSRule = listRule.map { LegadoRuleResolver().isJavaScriptRule($0) } ?? false
+        let isJSRule = listRule.map { LegadoRuleResolver().isJavaScriptRule($0) || $0.contains("<js>") || $0.contains("@js:") } ?? false
         if isJSRule || ResponseFormatDetector.prefersJSON(body: normalized, headers: response.headers, rule: listRule) {
             let jsonResult = parseJSON(source: source, response: normalizedResponse)
             switch jsonResult {
@@ -206,7 +206,7 @@ struct SearchResultParser {
         let extractor = jsonExtractor
         let rule = source.ruleSearch
         let listRule = firstRule(rule, keys: ["bookList", "list", "books"])
-        let isJSRule = listRule.map { LegadoRuleResolver().isJavaScriptRule($0) } ?? false
+        let isJSRule = listRule.map { LegadoRuleResolver().isJavaScriptRule($0) || $0.contains("<js>") || $0.contains("@js:") } ?? false
 
         let rootObject: Any
         if let object = ResponseFormatDetector.jsonObject(from: response.body) {

@@ -21,14 +21,28 @@ struct SourceRequestBuilder {
     ) -> SourceRequest {
         let isGBK = SearchURLResolver.isGBKEncoding(searchUrl: searchUrl, source: source)
         let encodedKey = LegadoRuleResolver.percentEncode(keyword, charset: isGBK ? "gbk" : nil)
-        let resolved = searchUrl
+        let directiveParts = directiveParser.splitURLAndJSONOptions(searchUrl)
+        let urlText = directiveParts.url
             .replacingOccurrences(of: "{{key}}", with: encodedKey)
             .replacingOccurrences(of: "{{keyword}}", with: encodedKey)
             .replacingOccurrences(of: "{{page}}", with: String(page))
 
+        let resolvedText: String
+        if let options = directiveParts.options {
+            let isJSON = options.localizedCaseInsensitiveContains("application/json") || options.contains("\"keyword\"") || options.contains("\"key\"")
+            let keyForOptions = isJSON ? keyword : encodedKey
+            let resolvedOptions = options
+                .replacingOccurrences(of: "{{key}}", with: keyForOptions)
+                .replacingOccurrences(of: "{{keyword}}", with: keyForOptions)
+                .replacingOccurrences(of: "{{page}}", with: String(page))
+            resolvedText = "\(urlText),\(resolvedOptions)"
+        } else {
+            resolvedText = urlText
+        }
+
         return buildRequest(
             source: source,
-            resolvedText: resolved,
+            resolvedText: resolvedText,
             baseURL: nil,
             keyword: keyword,
             page: page,
@@ -169,6 +183,16 @@ struct SourceRequestBuilder {
         if trimmed.contains("\n") || trimmed.contains("\r") {
             if let firstLine = trimmed.components(separatedBy: .newlines).first(where: { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }) {
                 trimmed = firstLine.trimmingCharacters(in: .whitespacesAndNewlines)
+            }
+        }
+        if let secondSchemeRange = trimmed.range(of: "https?://", options: .regularExpression, range: trimmed.index(after: trimmed.startIndex)..<trimmed.endIndex) {
+            trimmed = String(trimmed[secondSchemeRange.lowerBound...])
+        }
+        if let parsed = URL(string: cleanBase), parsed.scheme != nil, parsed.host != nil {
+            if parsed.path.isEmpty || parsed.path == "/" {
+                if !cleanBase.hasSuffix("/") {
+                    cleanBase += "/"
+                }
             }
         }
         // Strip accidental fragment injection from corrupted baseUrl concatenation (e.g. `http://host#tag/path`)
@@ -417,13 +441,13 @@ struct SourceRequestBuilder {
         return nil
     }
 
-    private func interpolate(_ text: String, keyword: String?, page: Int?) -> String {
+    private func interpolate(_ text: String, keyword: String?, page: Int?, urlEncodeKeyword: Bool = true) -> String {
         var output = text
         if let keyword {
-            let encoded = keyword.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? keyword
+            let keyToUse = urlEncodeKeyword ? (keyword.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? keyword) : keyword
             output = output
-                .replacingOccurrences(of: "{{key}}", with: encoded)
-                .replacingOccurrences(of: "{{keyword}}", with: encoded)
+                .replacingOccurrences(of: "{{key}}", with: keyToUse)
+                .replacingOccurrences(of: "{{keyword}}", with: keyToUse)
         }
         if let page {
             output = output.replacingOccurrences(of: "{{page}}", with: String(page))
@@ -450,22 +474,19 @@ struct SourceRequestBuilder {
         if let text = value as? String {
             // Preserve persistent placeholders until the body boundary so
             // form values are encoded exactly once (JSON stays untouched).
-            let interpolated = interpolate(text, keyword: keyword, page: page)
+            let contentType = headers.first { $0.key.caseInsensitiveCompare("Content-Type") == .orderedSame }?.value ?? ""
+            let trimmedText = text.trimmingCharacters(in: .whitespacesAndNewlines)
+            let isJSON = contentType.localizedCaseInsensitiveContains("application/json") || trimmedText.hasPrefix("{") || trimmedText.hasPrefix("[")
+            let interpolated = interpolate(text, keyword: keyword, page: page, urlEncodeKeyword: !isJSON)
             return Data(interpolateBodyText(interpolated, values: persistentValues, headers: headers).utf8)
         }
         if let object = value as? [String: Any] {
-            let interpolated = object.reduce(into: [String: String]()) { result, item in
-                result[item.key] = interpolatePersistentValues(
-                    interpolate(stringify(item.value), keyword: keyword, page: page),
-                    values: persistentValues
-                )
-            }
             let contentType = headers.first { $0.key.caseInsensitiveCompare("Content-Type") == .orderedSame }?.value ?? ""
             if contentType.localizedCaseInsensitiveContains("application/json") {
                 let jsonObject = object.reduce(into: [String: Any]()) { result, item in
                     if let stringValue = item.value as? String {
                         result[item.key] = interpolatePersistentValues(
-                            interpolate(stringValue, keyword: keyword, page: page),
+                            interpolate(stringValue, keyword: keyword, page: page, urlEncodeKeyword: false),
                             values: persistentValues
                         )
                     } else {
@@ -475,6 +496,12 @@ struct SourceRequestBuilder {
                 if let data = try? JSONSerialization.data(withJSONObject: jsonObject, options: [.sortedKeys]) {
                     return data
                 }
+            }
+            let interpolated = object.reduce(into: [String: String]()) { result, item in
+                result[item.key] = interpolatePersistentValues(
+                    interpolate(stringify(item.value), keyword: keyword, page: page),
+                    values: persistentValues
+                )
             }
             let form = interpolated
                 .sorted { $0.key < $1.key }

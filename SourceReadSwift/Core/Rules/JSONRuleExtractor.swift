@@ -46,6 +46,14 @@ struct JSONRuleExtractor {
                 func extractDicts(_ item: Any) {
                     if let dict = item as? [String: Any] {
                         flattened.append(dict)
+                    } else if let el = item as? SwiftSoup.Element {
+                        let text = (try? el.text()) ?? ""
+                        let href = (try? el.attr("href")) ?? ""
+                        flattened.append(["name": text, "title": text, "url": href, "chapterUrl": href, "href": href, "n": text, "u": href])
+                    } else if let bridge = item as? LegadoElementBridge {
+                        let text = bridge.text()
+                        let href = (try? bridge.element.attr("href")) ?? ""
+                        flattened.append(["name": text, "title": text, "url": href, "chapterUrl": href, "href": href, "n": text, "u": href])
                     } else if let subArray = arrayValues(item) {
                         for sub in subArray {
                             extractDicts(sub)
@@ -199,7 +207,17 @@ struct JSONRuleExtractor {
         if let jsRange = trimmed.range(of: "@js:") {
             let left = String(trimmed[..<jsRange.lowerBound]).trimmingCharacters(in: .whitespacesAndNewlines)
             let right = String(trimmed[jsRange.upperBound...]).trimmingCharacters(in: .whitespacesAndNewlines)
-            let intermediate: Any? = left.isEmpty ? object : value(from: object, path: left, variables: variables)
+            let intermediate: Any?
+            if left.isEmpty {
+                intermediate = object
+            } else if let val = value(from: object, path: left, variables: variables) {
+                intermediate = val
+            } else if let str = object as? String, !str.hasPrefix("{") && !str.hasPrefix("[") {
+                let base = (variables["baseUrl"] as? String).flatMap { URL(string: $0) } ?? URL(string: "http://localhost/")!
+                intermediate = try? HtmlRuleExtractor(executionContext: executionContext).select(str, baseUrl: base, listRule: left)
+            } else {
+                intermediate = nil
+            }
             if let intermediate {
                 return evaluateRawJS(script: right, object: intermediate, extraVariables: variables)
             }
@@ -208,7 +226,17 @@ struct JSONRuleExtractor {
         if let jsStartRange = trimmed.range(of: "<js>"), let jsEndRange = trimmed.range(of: "</js>") {
             let left = String(trimmed[..<jsStartRange.lowerBound]).trimmingCharacters(in: .whitespacesAndNewlines)
             let jsCode = String(trimmed[jsStartRange.upperBound..<jsEndRange.lowerBound])
-            let intermediate: Any? = left.isEmpty ? object : value(from: object, path: left, variables: variables)
+            let intermediate: Any?
+            if left.isEmpty {
+                intermediate = object
+            } else if let val = value(from: object, path: left, variables: variables) {
+                intermediate = val
+            } else if let str = object as? String, !str.hasPrefix("{") && !str.hasPrefix("[") {
+                let base = (variables["baseUrl"] as? String).flatMap { URL(string: $0) } ?? URL(string: "http://localhost/")!
+                intermediate = try? HtmlRuleExtractor(executionContext: executionContext).select(str, baseUrl: base, listRule: left)
+            } else {
+                intermediate = nil
+            }
             if let intermediate {
                 return evaluateRawJS(script: jsCode, object: intermediate, extraVariables: variables)
             }
@@ -883,33 +911,38 @@ struct JSONRuleExtractor {
             "result": object
         ]
 
+        // Apply extraVariables first so root document and caller context take precedence
+        for (k, v) in extraVariables {
+            variables[k] = v
+        }
+
+        // If extraVariables did not provide html/src, populate from object
+        if variables["html"] == nil {
+            if let dict = object as? [String: Any] {
+                if let data = try? JSONSerialization.data(withJSONObject: dict, options: []),
+                   let jsonStr = String(data: data, encoding: .utf8) {
+                    variables["html"] = jsonStr
+                    variables["src"] = jsonStr
+                }
+            } else if JSONSerialization.isValidJSONObject(object) {
+                if let data = try? JSONSerialization.data(withJSONObject: object, options: []),
+                   let jsonStr = String(data: data, encoding: .utf8) {
+                    variables["html"] = jsonStr
+                    variables["src"] = jsonStr
+                }
+            } else {
+                let str = stringify(object)
+                variables["html"] = str
+                variables["src"] = str
+            }
+        }
+
         if let dict = object as? [String: Any] {
             // Also expose item keys directly in JS scope if non-colliding
             for (k, v) in dict {
                 if variables[k] == nil {
                     variables[k] = v
                 }
-            }
-            if let data = try? JSONSerialization.data(withJSONObject: dict, options: []),
-               let jsonStr = String(data: data, encoding: .utf8) {
-                variables["html"] = jsonStr
-                variables["src"] = jsonStr
-            }
-        } else if JSONSerialization.isValidJSONObject(object) {
-            if let data = try? JSONSerialization.data(withJSONObject: object, options: []),
-               let jsonStr = String(data: data, encoding: .utf8) {
-                variables["html"] = jsonStr
-                variables["src"] = jsonStr
-            }
-        } else {
-            let str = stringify(object)
-            variables["html"] = str
-            variables["src"] = str
-        }
-
-        for (k, v) in extraVariables {
-            if variables[k] == nil {
-                variables[k] = v
             }
         }
 

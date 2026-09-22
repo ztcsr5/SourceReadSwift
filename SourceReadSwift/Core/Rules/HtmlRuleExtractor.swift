@@ -249,29 +249,73 @@ struct HtmlRuleExtractor {
         if materializedRule.isEmpty {
             return [root]
         }
-        if let fallbackParts = RuleOperatorSplitter.split(materializedRule, separator: "||") {
+
+        var isReversed = false
+        var workingRule = materializedRule.trimmingCharacters(in: .whitespacesAndNewlines)
+        if workingRule.hasPrefix("-") {
+            isReversed = true
+            workingRule = String(workingRule.dropFirst()).trimmingCharacters(in: .whitespacesAndNewlines)
+        } else if workingRule.hasPrefix("+") {
+            workingRule = String(workingRule.dropFirst()).trimmingCharacters(in: .whitespacesAndNewlines)
+        }
+
+        func finish(_ elements: [Element]) -> [Element] {
+            isReversed ? elements.reversed() : elements
+        }
+
+        // Handle JS rules inside select
+        if workingRule.hasPrefix("@js:") {
+            let script = String(workingRule.dropFirst(4)).trimmingCharacters(in: .whitespacesAndNewlines)
+            if let jsElements = executeJSElements(script: script, root: root, baseUrl: baseUrl) {
+                return finish(jsElements)
+            }
+        } else if workingRule.hasPrefix("<js>"), let endRange = workingRule.range(of: "</js>") {
+            let start = workingRule.index(workingRule.startIndex, offsetBy: 4)
+            let script = String(workingRule[start..<endRange.lowerBound]).trimmingCharacters(in: .whitespacesAndNewlines)
+            let remaining = String(workingRule[endRange.upperBound...]).trimmingCharacters(in: .whitespacesAndNewlines)
+            if remaining.isEmpty {
+                if let jsElements = executeJSElements(script: script, root: root, baseUrl: baseUrl) {
+                    return finish(jsElements)
+                }
+            } else {
+                let htmlOutput = (try? evaluateJS(rule: script, rootHtml: try root.outerHtml(), baseUrl: baseUrl, extraVariables: [:])) ?? ""
+                if !htmlOutput.isEmpty, let doc = try? SwiftSoup.parse(htmlOutput, baseUrl?.absoluteString ?? "") {
+                    let subElements = try select(from: doc, rule: remaining, baseUrl: baseUrl)
+                    return finish(subElements)
+                }
+            }
+        } else if let jsStartRange = workingRule.range(of: "<js>"), let jsEndRange = workingRule.range(of: "</js>") {
+            let prefix = String(workingRule[..<jsStartRange.lowerBound]).trimmingCharacters(in: .whitespacesAndNewlines)
+            let script = String(workingRule[jsStartRange.upperBound..<jsEndRange.lowerBound]).trimmingCharacters(in: .whitespacesAndNewlines)
+            let initialElements = try select(from: root, rule: prefix, baseUrl: baseUrl)
+            if let jsElements = executeJSElements(script: script, elements: initialElements, root: root, baseUrl: baseUrl) {
+                return finish(jsElements)
+            }
+        }
+
+        if let fallbackParts = RuleOperatorSplitter.split(workingRule, separator: "||") {
             for part in fallbackParts {
                 let trimmedPart = part.trimmingCharacters(in: .whitespacesAndNewlines)
-                if trimmedPart.hasPrefix("$.") || trimmedPart.hasPrefix("@json:") || LegadoRuleResolver().isJavaScriptRule(trimmedPart) {
+                if trimmedPart.hasPrefix("$.") || trimmedPart.hasPrefix("@json:") {
                     continue
                 }
                 do {
                     let elements = try select(from: root, rule: trimmedPart, baseUrl: baseUrl)
-                    if !elements.isEmpty { return elements }
+                    if !elements.isEmpty { return finish(elements) }
                 } catch {
                     continue
                 }
             }
             return []
         }
-        if let mergeParts = RuleOperatorSplitter.split(materializedRule, separator: "%%") {
+        if let mergeParts = RuleOperatorSplitter.split(workingRule, separator: "%%") {
             let lists = try mergeParts
                 .map { try select(from: root, rule: $0, baseUrl: baseUrl) }
                 .filter { !$0.isEmpty }
-            return interleave(lists)
+            return finish(interleave(lists))
         }
 
-        if let xpathSelector = XPathRuleTranslator.selectorRule(materializedRule) {
+        if let xpathSelector = XPathRuleTranslator.selectorRule(workingRule) {
             let indexed = parseIndexedSelector(xpathSelector)
             let elements: [Element]
             do {
@@ -279,19 +323,29 @@ struct HtmlRuleExtractor {
             } catch {
                 return []
             }
-            guard let index = indexed.index else { return elements }
-            let normalized = index >= 0 ? index : elements.count + index
-            guard elements.indices.contains(normalized) else { return [] }
-            return [elements[normalized]]
+            var filtered = elements
+            if let excl = indexed.excludeIndex {
+                let norm = excl >= 0 ? excl : filtered.count + excl
+                if filtered.indices.contains(norm) { filtered.remove(at: norm) }
+            }
+            if let index = indexed.index {
+                let normalized = index >= 0 ? index : filtered.count + index
+                guard filtered.indices.contains(normalized) else { return [] }
+                filtered = [filtered[normalized]]
+            }
+            return finish(filtered)
         }
 
-        let steps = LegadoDefaultRuleTranslator.translateSelectorSteps(materializedRule)
+        let steps = LegadoDefaultRuleTranslator.translateSelectorSteps(workingRule)
         if !steps.isEmpty {
-            return LegadoDefaultRuleTranslator.executeSteps(steps, on: root)
+            let executed = LegadoDefaultRuleTranslator.executeSteps(steps, on: root)
+            if !executed.isEmpty {
+                return finish(executed)
+            }
         }
 
-        let selector = cleanCSS(materializedRule)
-        guard !selector.isEmpty else { return [root] }
+        let selector = cleanCSS(workingRule)
+        guard !selector.isEmpty else { return finish([root]) }
         let indexed = parseIndexedSelector(selector)
         let elements: [Element]
         do {
@@ -299,10 +353,55 @@ struct HtmlRuleExtractor {
         } catch {
             return []
         }
-        guard let index = indexed.index else { return elements }
-        let normalized = index >= 0 ? index : elements.count + index
-        guard elements.indices.contains(normalized) else { return [] }
-        return [elements[normalized]]
+        var filtered = elements
+        if let excl = indexed.excludeIndex {
+            let norm = excl >= 0 ? excl : filtered.count + excl
+            if filtered.indices.contains(norm) { filtered.remove(at: norm) }
+        }
+        if let index = indexed.index {
+            let normalized = index >= 0 ? index : filtered.count + index
+            guard filtered.indices.contains(normalized) else { return [] }
+            filtered = [filtered[normalized]]
+        }
+        return finish(filtered)
+    }
+
+    private func executeJSElements(
+        script: String,
+        elements: [Element]? = nil,
+        root: Element,
+        baseUrl: URL?
+    ) -> [Element]? {
+        let runtime = executionContext.jsRuntime()
+        var variables: [String: Any] = [
+            "baseUrl": baseUrl?.absoluteString ?? "",
+            "src": (try? root.outerHtml()) ?? "",
+            "html": (try? root.outerHtml()) ?? ""
+        ]
+        if let elements {
+            variables["result"] = LegadoElementsBridge(elements: elements, baseURL: baseUrl?.absoluteString ?? "")
+        } else {
+            variables["result"] = LegadoElementsBridge(elements: [root], baseURL: baseUrl?.absoluteString ?? "")
+        }
+        let evaluated = runtime.evaluate(script, variables: variables)
+        if let jsValue = runtime.context.objectForKeyedSubscript("result") {
+            if let array = jsValue.toArray() {
+                var foundElements: [Element] = []
+                for item in array {
+                    if let bridge = item as? LegadoElementBridge {
+                        foundElements.append(bridge.element)
+                    } else if let el = item as? Element {
+                        foundElements.append(el)
+                    }
+                }
+                if !foundElements.isEmpty { return foundElements }
+            }
+        }
+        if case .success(let val) = evaluated, !val.isEmpty,
+           let doc = try? SwiftSoup.parse(val, baseUrl?.absoluteString ?? "") {
+            return doc.body()?.children().array()
+        }
+        return nil
     }
 
     private func splitSelectorAndAttribute(_ rule: String) -> (selector: String, attribute: String) {
@@ -315,30 +414,28 @@ struct HtmlRuleExtractor {
         return (selector, attribute)
     }
 
-    private func parseIndexedSelector(_ selector: String) -> (selector: String, index: Int?) {
+    private func parseIndexedSelector(_ selector: String) -> (selector: String, index: Int?, excludeIndex: Int?) {
         let trimmed = selector.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard let regex = try? NSRegularExpression(pattern: #"^(.*?)(?:@(-?\d+)|:eq\((-?\d+)\))$"#) else {
-            return (trimmed, nil)
+        if let exclMatch = trimmed.range(of: #"(?:\[!(-?\d+)\]|!(-?\d+))$"#, options: .regularExpression) {
+            let matchedStr = String(trimmed[exclMatch])
+            let digits = matchedStr.replacingOccurrences(of: "[", with: "")
+                .replacingOccurrences(of: "]", with: "")
+                .replacingOccurrences(of: "!", with: "")
+            let sel = String(trimmed[..<exclMatch.lowerBound]).trimmingCharacters(in: .whitespacesAndNewlines)
+            return (sel, nil, Int(digits))
         }
-        let range = NSRange(trimmed.startIndex..<trimmed.endIndex, in: trimmed)
-        guard let match = regex.firstMatch(in: trimmed, range: range) else {
-            return (trimmed, nil)
+        if let idxMatch = trimmed.range(of: #"(?:\[(-?\d+)\]|@(-?\d+)|:eq\((-?\d+)\))$"#, options: .regularExpression) {
+            let matchedStr = String(trimmed[idxMatch])
+            let clean = matchedStr
+                .replacingOccurrences(of: "[", with: "")
+                .replacingOccurrences(of: "]", with: "")
+                .replacingOccurrences(of: "@", with: "")
+                .replacingOccurrences(of: ":eq(", with: "")
+                .replacingOccurrences(of: ")", with: "")
+            let sel = String(trimmed[..<idxMatch.lowerBound]).trimmingCharacters(in: .whitespacesAndNewlines)
+            return (sel, Int(clean), nil)
         }
-        let selectorRange = match.range(at: 1)
-        let firstIndexRange = match.range(at: 2)
-        let secondIndexRange = match.range(at: 3)
-        guard let cssRange = Range(selectorRange, in: trimmed) else {
-            return (trimmed, nil)
-        }
-        let rawIndex: String?
-        if let range = Range(firstIndexRange, in: trimmed) {
-            rawIndex = String(trimmed[range])
-        } else if let range = Range(secondIndexRange, in: trimmed) {
-            rawIndex = String(trimmed[range])
-        } else {
-            rawIndex = nil
-        }
-        return (String(trimmed[cssRange]).trimmingCharacters(in: .whitespacesAndNewlines), rawIndex.flatMap(Int.init))
+        return (trimmed, nil, nil)
     }
 
     private func applyRegexTransforms(_ rawParts: ArraySlice<String>, to value: String) -> String {

@@ -112,6 +112,9 @@ enum LegadoDefaultRuleTranslator {
     /// - `.chapter@1@href`
     static func translateValueRule(_ rawRule: String) -> LegadoTranslatedValueRule? {
         var working = rawRule.trimmingCharacters(in: .whitespacesAndNewlines)
+        if working.hasPrefix("+") || working.hasPrefix("-") {
+            working = String(working.dropFirst()).trimmingCharacters(in: .whitespacesAndNewlines)
+        }
         guard !working.isEmpty else { return nil }
 
         // Strip @css: or css: prefix if present
@@ -163,6 +166,9 @@ enum LegadoDefaultRuleTranslator {
     /// e.g. `id.list@tag.dd@tag.a` -> steps: [`#list`, `dd`, `a`]
     static func translateSelectorSteps(_ rawRule: String) -> [LegadoRuleStep] {
         var working = rawRule.trimmingCharacters(in: .whitespacesAndNewlines)
+        if working.hasPrefix("+") || working.hasPrefix("-") {
+            working = String(working.dropFirst()).trimmingCharacters(in: .whitespacesAndNewlines)
+        }
         guard !working.isEmpty else { return [] }
 
         let lower = working.lowercased()
@@ -271,8 +277,18 @@ enum LegadoDefaultRuleTranslator {
         var indices: [Int]? = nil
         var excludeIndices: [Int]? = nil
 
-        // Check for exclude index: `class.item!0` or `tag.tr!-1` or `tag.li.!0:1:-1`
-        if let exclRange = step.range(of: #"!(?:-?\d+(?::[^\s@]+)*)$"#, options: .regularExpression) {
+        // Check for bracket index: `class.nav-tabs[0]` or `.row[-1]` or `tag.a[1:3]` or `tr[!0]`
+        if let bracketRange = step.range(of: #"\[(!?-?\d+(?::[^\s@]+)*)\]$"#, options: .regularExpression) {
+            let inner = String(step[bracketRange].dropFirst().dropLast())
+            if let parsed = parseIndexList(inner) {
+                if parsed.isExclude {
+                    excludeIndices = parsed.indices
+                } else {
+                    indices = parsed.indices
+                }
+                step = String(step[..<bracketRange.lowerBound]).trimmingCharacters(in: .whitespacesAndNewlines)
+            }
+        } else if let exclRange = step.range(of: #"!(?:-?\d+(?::[^\s@]+)*)$"#, options: .regularExpression) {
             let exclStr = String(step[exclRange].dropFirst())
             if let parsed = parseIndexList(exclStr) {
                 excludeIndices = parsed.indices

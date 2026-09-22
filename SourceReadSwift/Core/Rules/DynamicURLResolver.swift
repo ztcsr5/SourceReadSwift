@@ -39,14 +39,15 @@ struct DynamicURLResolver {
             .replacingOccurrences(of: "%7B%7B", with: "{{", options: .caseInsensitive)
             .replacingOccurrences(of: "%7D%7D", with: "}}", options: .caseInsensitive)
 
-        // Strip accidental double domain concatenation, e.g. `http://domain/http://domain/path`
-        if let regex = try? NSRegularExpression(pattern: #"^https?://[^/]+/(https?://.+)$"#) {
-            let nsText = trimmed as NSString
-            if let match = regex.firstMatch(in: trimmed, range: NSRange(location: 0, length: nsText.length)),
-               match.numberOfRanges > 1,
-               let innerRange = Range(match.range(at: 1), in: trimmed) {
-                trimmed = String(trimmed[innerRange])
+        if trimmed.contains("\n") || trimmed.contains("\r") {
+            if let firstLine = trimmed.components(separatedBy: .newlines).first(where: { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }) {
+                trimmed = firstLine.trimmingCharacters(in: .whitespacesAndNewlines)
             }
+        }
+
+        // Strip accidental double domain concatenation, e.g. `http://domain/http://domain/path` or `http://domainhttp://domain/path`
+        if let secondSchemeRange = trimmed.range(of: "https?://", options: .regularExpression, range: trimmed.index(after: trimmed.startIndex)..<trimmed.endIndex) {
+            trimmed = String(trimmed[secondSchemeRange.lowerBound...])
         }
 
         // Strip preceding URL path if it accidentally prepended a base domain to an embedded JS directive

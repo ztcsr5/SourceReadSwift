@@ -32,8 +32,9 @@ struct ChapterListParser {
             contentEncodings: response.contentEncodings
         )
         let listRule = htmlExtractor.firstRule(source.ruleToc, keys: ["chapterList", "tocList", "list"])
-        let isJSRule = listRule.map { LegadoRuleResolver().isJavaScriptRule($0) } ?? false
-        if isJSRule || ResponseFormatDetector.prefersJSON(body: normalized, headers: response.headers, rule: listRule) {
+        let isJSRule = listRule.map { LegadoRuleResolver().isJavaScriptRule($0) || $0.contains("<js>") || $0.contains("@js:") } ?? false
+        let prefersJSON = isJSRule || ResponseFormatDetector.prefersJSON(body: normalized, headers: response.headers, rule: listRule)
+        if prefersJSON {
             let jsonResult = parseJSON(source: source, book: book, response: normalizedResponse)
             switch jsonResult {
             case .success:
@@ -245,7 +246,7 @@ struct ChapterListParser {
             "html": response.body
         ]
         let listRule = htmlExtractor.firstRule(source.ruleToc, keys: ["chapterList", "tocList", "list"])
-        let isJSRule = listRule.map { LegadoRuleResolver().isJavaScriptRule($0) } ?? false
+        let isJSRule = listRule.map { LegadoRuleResolver().isJavaScriptRule($0) || $0.contains("<js>") || $0.contains("@js:") } ?? false
 
         let rootObject: Any
         if let object = ResponseFormatDetector.jsonObject(from: response.body) {
@@ -269,13 +270,13 @@ struct ChapterListParser {
             let title = jsonExtractor.string(
                 from: item,
                 rule: nameRule,
-                fallbackKeys: ["chapterName", "name", "title", "chapterTitle"],
+                fallbackKeys: ["chapterName", "name", "title", "chapterTitle", "n", "text"],
                 variables: variables
             )
             let rawUrl = jsonExtractor.string(
                 from: item,
                 rule: urlRule,
-                fallbackKeys: ["chapterUrl", "url", "link", "id", "cid"],
+                fallbackKeys: ["chapterUrl", "url", "link", "id", "cid", "u", "href"],
                 variables: variables
             )
             guard let title, let rawUrl, !title.isEmpty, !rawUrl.isEmpty else { return nil }

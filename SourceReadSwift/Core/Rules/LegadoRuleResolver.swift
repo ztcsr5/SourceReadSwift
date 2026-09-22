@@ -54,7 +54,10 @@ struct LegadoRuleResolver {
     }
 
     func isJavaScriptRule(_ rule: String) -> Bool {
-        let trimmed = rule.trimmingCharacters(in: .whitespacesAndNewlines)
+        var trimmed = rule.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmed.hasPrefix("+") || trimmed.hasPrefix("-") {
+            trimmed = String(trimmed.dropFirst()).trimmingCharacters(in: .whitespacesAndNewlines)
+        }
         return trimmed.hasPrefix("@js:") || trimmed.hasPrefix("<js>") || trimmed.hasPrefix("java.")
     }
 
