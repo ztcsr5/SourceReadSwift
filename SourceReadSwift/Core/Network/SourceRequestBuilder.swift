@@ -71,8 +71,12 @@ struct SourceRequestBuilder {
         }
         mergeHeaders(directive.headers, into: &headers)
         headers = headers.mapValues { interpolatePersistentValues($0, values: persistentValues) }
-        headers["User-Agent", default: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"]
-        headers["Accept", default: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"]
+        if !containsHeader(headers, "User-Agent") {
+            headers["User-Agent"] = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+        }
+        if !containsHeader(headers, "Accept") {
+            headers["Accept"] = "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
+        }
         let isPostOrPut = (directive.method == .post || directive.method == .put || directive.body != nil || sourceOptions.body != nil || sourceOptions.method == .post || sourceOptions.method == .put)
         applyDefaultNavigationHeaders(to: &headers, sourceBase: source.bookSourceUrl, isPostOrPut: isPostOrPut)
 

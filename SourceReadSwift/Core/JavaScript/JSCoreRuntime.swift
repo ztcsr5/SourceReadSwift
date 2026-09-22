@@ -515,38 +515,44 @@ final class JSCoreRuntime {
         }
         let getString: @convention(block) (String, String, String) -> String = { html, rule, baseUrl in
             do {
-                let trimmedRule = rule.trimmingCharacters(in: .whitespacesAndNewlines)
-                if trimmedRule.hasPrefix("$.") || trimmedRule.hasPrefix("@json:") || ResponseFormatDetector.looksLikeJSON(html) {
+                var cleanRule = rule.trimmingCharacters(in: .whitespacesAndNewlines)
+                if cleanRule.hasPrefix("$.") || cleanRule.hasPrefix("@json:") || ResponseFormatDetector.looksLikeJSON(html) {
                     if let object = ResponseFormatDetector.jsonObject(from: html) {
                         if let dict = object as? [String: Any] {
-                            let val = JSONRuleExtractor().string(from: dict, rule: trimmedRule, fallbackKeys: [trimmedRule])
+                            let val = JSONRuleExtractor().string(from: dict, rule: cleanRule, fallbackKeys: [cleanRule])
                             if let val, !val.isEmpty { return val }
                         }
-                        if let val = JSONRuleExtractor().value(from: object, path: trimmedRule) {
+                        if let val = JSONRuleExtractor().value(from: object, path: cleanRule) {
                             return String(describing: val)
                         }
                     }
                 }
+                while cleanRule.hasPrefix("@") && !cleanRule.hasPrefix("@css:") && !cleanRule.hasPrefix("@xpath:") && !cleanRule.hasPrefix("@json:") && !cleanRule.hasPrefix("@js:") {
+                    cleanRule = String(cleanRule.dropFirst()).trimmingCharacters(in: .whitespacesAndNewlines)
+                }
                 let safeBaseUrl = baseUrl.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "http://localhost/" : baseUrl
                 let document = try SwiftSoup.parse(html, safeBaseUrl)
-                return try Self.extractString(from: document, rule: rule, baseUrl: URL(string: safeBaseUrl))
+                return try Self.extractString(from: document, rule: cleanRule, baseUrl: URL(string: safeBaseUrl))
             } catch {
                 return ""
             }
         }
         let getStringList: @convention(block) (String, String, String) -> NSArray = { html, rule, baseUrl in
             do {
-                let trimmedRule = rule.trimmingCharacters(in: .whitespacesAndNewlines)
-                if trimmedRule.hasPrefix("$.") || trimmedRule.hasPrefix("@json:") || ResponseFormatDetector.looksLikeJSON(html) {
+                var cleanRule = rule.trimmingCharacters(in: .whitespacesAndNewlines)
+                if cleanRule.hasPrefix("$.") || cleanRule.hasPrefix("@json:") || ResponseFormatDetector.looksLikeJSON(html) {
                     if let object = ResponseFormatDetector.jsonObject(from: html) {
-                        if let list = JSONRuleExtractor().value(from: object, path: trimmedRule) as? [Any] {
+                        if let list = JSONRuleExtractor().value(from: object, path: cleanRule) as? [Any] {
                             return list.map { String(describing: $0) } as NSArray
                         }
                     }
                 }
+                while cleanRule.hasPrefix("@") && !cleanRule.hasPrefix("@css:") && !cleanRule.hasPrefix("@xpath:") && !cleanRule.hasPrefix("@json:") && !cleanRule.hasPrefix("@js:") {
+                    cleanRule = String(cleanRule.dropFirst()).trimmingCharacters(in: .whitespacesAndNewlines)
+                }
                 let safeBaseUrl = baseUrl.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "http://localhost/" : baseUrl
                 let document = try SwiftSoup.parse(html, safeBaseUrl)
-                let values = try Self.extractStringList(from: document, rule: rule, baseUrl: URL(string: safeBaseUrl))
+                let values = try Self.extractStringList(from: document, rule: cleanRule, baseUrl: URL(string: safeBaseUrl))
                 return values as NSArray
             } catch {
                 return [] as NSArray

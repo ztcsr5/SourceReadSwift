@@ -96,53 +96,11 @@ final class InsecureTrustSessionDelegate: NSObject, URLSessionDelegate, URLSessi
         newRequest request: URLRequest,
         completionHandler: @escaping (URLRequest?) -> Void
     ) {
-        // Novel hosts frequently return non-ASCII Location headers (e.g. unencoded Chinese queries)
-        // or redirect to mirror domains. Foundation throws NSURLErrorBadURL (-1000) if the Location
-        // header contains non-ASCII bytes or special characters. We sanitize it here.
-        var sanitized = request
-        // 1. Foundation automatically strips custom and sensitive headers on cross-domain redirect.
-        // Re-inject the original request headers (User-Agent, Cookie, Referer, Accept) so target mirrors accept the request.
-        if let originalHeaders = task.originalRequest?.allHTTPHeaderFields {
-            for (key, value) in originalHeaders {
-                if sanitized.value(forHTTPHeaderField: key) == nil {
-                    sanitized.setValue(value, forHTTPHeaderField: key)
-                }
-            }
-        }
-        if sanitized.value(forHTTPHeaderField: "User-Agent") == nil {
-            sanitized.setValue("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36", forHTTPHeaderField: "User-Agent")
-        }
-
-        // 2. Parse and sanitize target Location
-        if let location = response.allHeaderFields["Location"] as? String ?? response.allHeaderFields["location"] as? String {
-            let trimmedLocation = location.trimmingCharacters(in: .whitespacesAndNewlines)
-            let base = response.url ?? task.originalRequest?.url
-            var targetURL: URL? = nil
-            if let base {
-                targetURL = URL(string: trimmedLocation, relativeTo: base)?.absoluteURL
-            }
-            if targetURL == nil {
-                if let encoded = trimmedLocation.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed.union(.urlPathAllowed)) {
-                    if let base {
-                        targetURL = URL(string: encoded, relativeTo: base)?.absoluteURL
-                    } else {
-                        targetURL = URL(string: encoded)
-                    }
-                }
-            }
-            if let targetURL {
-                sanitized.url = targetURL
-            }
-        }
-
-        guard let targetURL = sanitized.url,
-              let scheme = targetURL.scheme?.lowercased(),
-              scheme == "http" || scheme == "https" else {
-            // Abort redirect to invalid or non-HTTP scheme, deliver current response
-            completionHandler(nil)
-            return
-        }
-        completionHandler(sanitized)
+        // Disabling automatic redirects gives us full control over redirect loops,
+        // mirroring OkHttp's RetryAndFollowUpInterceptor in Android Legado.
+        // It prevents CFNetwork from prematurely failing with kCFURLErrorBadURL (-1000)
+        // when Location headers contain GBK bytes, unencoded spaces, or cross-domain redirects.
+        completionHandler(nil)
     }
 }
 
@@ -164,54 +122,143 @@ final class URLSessionSourceNetworkClient: SourceNetworkClient, @unchecked Senda
     }
 
     func load(_ request: SourceRequest) async -> Result<SourceResponse, SourceEngineError> {
-        var urlRequest = URLRequest(url: request.url, timeoutInterval: request.timeout)
-        urlRequest.httpMethod = request.method.rawValue
-        urlRequest.httpBody = request.body
-        for (key, value) in request.headers {
-            urlRequest.setValue(value, forHTTPHeaderField: key)
-        }
-        if request.headers["Cookie"] == nil, let cookieHeader = await cookieStore.cookieHeader(for: request.url) {
-            urlRequest.setValue(cookieHeader, forHTTPHeaderField: "Cookie")
-        }
+        var currentURL = request.url
+        var currentMethod = request.method
+        var currentBody = request.body
+        var currentHeaders = request.headers
+        var redirectCount = 0
+        let maxRedirects = 10
 
-        do {
-            let (data, response) = try await session.data(for: urlRequest, delegate: Self.sessionDelegate)
-            guard let http = response as? HTTPURLResponse else {
-                return .failure(.network("响应不是 HTTPURLResponse"))
+        while redirectCount <= maxRedirects {
+            var urlRequest = URLRequest(url: currentURL, timeoutInterval: request.timeout)
+            urlRequest.httpMethod = currentMethod.rawValue
+            urlRequest.httpBody = currentBody
+            for (key, value) in currentHeaders {
+                urlRequest.setValue(value, forHTTPHeaderField: key)
             }
-            return await processResponse(data: data, http: http, request: request)
-        } catch let urlError as URLError {
-            // 1. Automatic HTTP Fallback when HTTPS fails with TLS/certificate/connection error
-            if request.url.scheme?.lowercased() == "https",
-               (urlError.code == .secureConnectionFailed ||
-                urlError.code == .serverCertificateUntrusted ||
-                urlError.code == .serverCertificateHasBadDate ||
-                urlError.code == .serverCertificateNotYetValid ||
-                urlError.code == .serverCertificateHasUnknownRoot ||
-                urlError.code == .cannotConnectToHost ||
-                urlError.code == .networkConnectionLost) {
-                if let httpURL = URL(string: request.url.absoluteString.replacingOccurrences(of: "https://", with: "http://", options: .anchored)) {
-                    var httpReq = urlRequest
-                    httpReq.url = httpURL
-                    if let (data, response) = try? await session.data(for: httpReq, delegate: Self.sessionDelegate),
-                       let http = response as? HTTPURLResponse,
-                       (200...399).contains(http.statusCode) {
-                        return await processResponse(data: data, http: http, request: request)
+            if currentHeaders["Cookie"] == nil, let cookieHeader = await cookieStore.cookieHeader(for: currentURL) {
+                urlRequest.setValue(cookieHeader, forHTTPHeaderField: "Cookie")
+            }
+
+            var responseData: Data? = nil
+            var httpResponse: HTTPURLResponse? = nil
+
+            do {
+                let (data, response) = try await session.data(for: urlRequest, delegate: Self.sessionDelegate)
+                if let http = response as? HTTPURLResponse {
+                    responseData = data
+                    httpResponse = http
+                } else {
+                    return .failure(.network("响应不是 HTTPURLResponse"))
+                }
+            } catch let urlError as URLError {
+                // 1. Automatic HTTP Fallback when HTTPS fails with TLS/certificate/connection error
+                if currentURL.scheme?.lowercased() == "https",
+                   (urlError.code == .secureConnectionFailed ||
+                    urlError.code == .serverCertificateUntrusted ||
+                    urlError.code == .serverCertificateHasBadDate ||
+                    urlError.code == .serverCertificateNotYetValid ||
+                    urlError.code == .serverCertificateHasUnknownRoot ||
+                    urlError.code == .cannotConnectToHost ||
+                    urlError.code == .networkConnectionLost) {
+                    if let httpURL = URL(string: currentURL.absoluteString.replacingOccurrences(of: "https://", with: "http://", options: .anchored)) {
+                        currentURL = httpURL
+                        continue
                     }
                 }
+
+                if urlError.code == .badURL {
+                    return .failure(.network("URL 格式非法或解析异常 (-1000)"))
+                } else if urlError.code == .timedOut {
+                    return .failure(.network("连接超时"))
+                } else if urlError.code == .cannotFindHost || urlError.code == .cannotConnectToHost {
+                    return .failure(.network("无法连接到服务器或域名未解析"))
+                }
+                return .failure(.network(urlError.localizedDescription))
+            } catch {
+                return .failure(.network(error.localizedDescription))
             }
 
-            if urlError.code == .badURL {
-                return .failure(.network("URL 格式非法或解析异常 (-1000)"))
-            } else if urlError.code == .timedOut {
-                return .failure(.network("连接超时"))
-            } else if urlError.code == .cannotFindHost || urlError.code == .cannotConnectToHost {
-                return .failure(.network("无法连接到服务器或域名未解析"))
+            guard let data = responseData, let http = httpResponse else {
+                return .failure(.network("响应不是 HTTPURLResponse"))
             }
-            return .failure(.network(urlError.localizedDescription))
-        } catch {
-            return .failure(.network(error.localizedDescription))
+
+            // Check for 3xx redirect
+            if (300...399).contains(http.statusCode),
+               let location = http.allHeaderFields["Location"] as? String ?? http.allHeaderFields["location"] as? String,
+               !location.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                redirectCount += 1
+                if redirectCount > maxRedirects {
+                    return .failure(.network("重定向次数过多 (\(redirectCount))"))
+                }
+
+                guard let nextURL = resolveRedirectLocation(location, relativeTo: currentURL) else {
+                    return .failure(.network("重定向地址无效: \(location)"))
+                }
+
+                // Preserve / store cookies from redirect response
+                let respHeaders = http.allHeaderFields.reduce(into: [String: String]()) { res, item in
+                    res[String(describing: item.key)] = String(describing: item.value)
+                }
+                await cookieStore.storeSetCookieHeaders(respHeaders, for: currentURL)
+
+                // Update Referer
+                currentHeaders["Referer"] = currentURL.absoluteString
+
+                // HTTP RFC 7231: switch POST/PUT to GET on 301, 302, 303
+                if http.statusCode == 301 || http.statusCode == 302 || http.statusCode == 303 {
+                    currentMethod = .get
+                    currentBody = nil
+                    currentHeaders.removeValue(forKey: "Content-Type")
+                    currentHeaders.removeValue(forKey: "Content-Length")
+                    currentHeaders.removeValue(forKey: "Origin")
+                }
+
+                currentURL = nextURL
+                continue
+            }
+
+            return await processResponse(data: data, http: http, request: request)
         }
+
+        return .failure(.network("重定向超出最大限制"))
+    }
+
+    private func resolveRedirectLocation(_ location: String, relativeTo base: URL) -> URL? {
+        var trimmed = location.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return nil }
+
+        // Handle protocol-relative URL: //example.com/path
+        if trimmed.hasPrefix("//") {
+            let scheme = base.scheme ?? "http"
+            trimmed = "\(scheme):\(trimmed)"
+        }
+
+        // 1. Direct standard URL resolution
+        if let direct = URL(string: trimmed, relativeTo: base)?.absoluteURL,
+           let scheme = direct.scheme?.lowercased(), scheme == "http" || scheme == "https" {
+            return direct
+        }
+
+        // 2. Percent-encode unencoded non-ASCII or special characters (spaces, unicode)
+        var allowed = CharacterSet.urlQueryAllowed
+        allowed.formUnion(.urlPathAllowed)
+        allowed.formUnion(.urlHostAllowed)
+        allowed.insert("#")
+        allowed.insert(":")
+        allowed.insert("?")
+        allowed.insert("&")
+        allowed.insert("=")
+        allowed.insert("/")
+
+        if let encoded = trimmed.addingPercentEncoding(withAllowedCharacters: allowed) {
+            if let resolved = URL(string: encoded, relativeTo: base)?.absoluteURL,
+               let scheme = resolved.scheme?.lowercased(), scheme == "http" || scheme == "https" {
+                return resolved
+            }
+        }
+
+        return nil
     }
 
     private func processResponse(

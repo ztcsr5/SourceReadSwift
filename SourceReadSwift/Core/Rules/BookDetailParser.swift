@@ -120,13 +120,19 @@ struct BookDetailParser {
                 let resolved = resolveTocTemplate(rawTocRule, base: response.url, source: source, variables: variables)
                 tocUrl = resolved.nilIfEmpty
             } else {
-                tocUrl = try htmlExtractor.value(
+                let extracted = try htmlExtractor.value(
                     from: root,
                     rule: rawTocRule,
                     fallback: nil,
                     baseUrl: response.url,
                     variables: variables
                 ).nilIfEmpty
+                if let extracted, isURLTemplate(extracted) {
+                    let resolved = resolveTocTemplate(extracted, base: response.url, source: source, variables: variables)
+                    tocUrl = resolved.nilIfEmpty
+                } else {
+                    tocUrl = extracted.flatMap { resolveURL($0, base: response.url) }
+                }
             }
 
             return .success(BookDetail(
@@ -226,7 +232,16 @@ struct BookDetailParser {
                 fallbackKeys: ["tocUrl", "chapterUrl", "catalogUrl", "chapterListUrl", "toc_url", "chapter_url"],
                 variables: variables
             )?.nilIfEmpty
-            tocUrl = rawTocUrl.flatMap { resolveURL($0, base: response.url) }
+            if let rawTocUrl {
+                if isURLTemplate(rawTocUrl) {
+                    let resolved = resolveTocTemplate(rawTocUrl, base: response.url, source: source, variables: variables)
+                    tocUrl = resolved.nilIfEmpty
+                } else {
+                    tocUrl = resolveURL(rawTocUrl, base: response.url)
+                }
+            } else {
+                tocUrl = nil
+            }
         }
 
         return .success(BookDetail(
@@ -257,6 +272,7 @@ struct BookDetailParser {
             || trimmed.hasPrefix("<js>")
             || trimmed.contains("@get:")
             || (trimmed.contains("{{") && trimmed.contains("}}"))
+            || (trimmed.lowercased().contains("%7b%7b") && trimmed.lowercased().contains("%7d%7d"))
     }
 
     private func resolveTocTemplate(_ template: String, base: URL, source: BookSource, variables: [String: Any]) -> String {
@@ -278,13 +294,21 @@ struct BookDetailParser {
             source: source,
             variables: variables,
             context: executionContext
-        )
+        ).trimmingCharacters(in: .whitespacesAndNewlines)
+
+        if dynamicResolved.isEmpty || dynamicResolved.hasPrefix("@js:") || dynamicResolved.hasPrefix("<js>") {
+            return ""
+        }
+
         return resolveURL(dynamicResolved, base: base) ?? dynamicResolved
     }
 
     private func resolveURL(_ text: String, base: URL) -> String? {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return nil }
+        if trimmed.hasPrefix("@js:") || trimmed.hasPrefix("<js>") {
+            return nil
+        }
         if let absolute = URL(string: trimmed), absolute.scheme != nil {
             return absolute.absoluteString
         }
