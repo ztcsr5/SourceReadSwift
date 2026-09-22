@@ -1,4 +1,5 @@
 import Foundation
+import SwiftSoup
 
 final class JSONRuleDirectiveStore {
     private var values: [String: Any] = [:]

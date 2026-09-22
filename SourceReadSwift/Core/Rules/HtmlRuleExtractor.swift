@@ -372,7 +372,9 @@ struct HtmlRuleExtractor {
         root: Element,
         baseUrl: URL?
     ) -> [Element]? {
-        let runtime = executionContext.jsRuntime()
+        let runtime = executionContext.jsRuntime(ajaxHandler: { urlText in
+            return (try? SourceRequest.load(URL(string: urlText)!, method: .get).get().body) ?? ""
+        })
         var variables: [String: Any] = [
             "baseUrl": baseUrl?.absoluteString ?? "",
             "src": (try? root.outerHtml()) ?? "",

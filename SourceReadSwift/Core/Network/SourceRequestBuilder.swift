@@ -21,23 +21,26 @@ struct SourceRequestBuilder {
     ) -> SourceRequest {
         let isGBK = SearchURLResolver.isGBKEncoding(searchUrl: searchUrl, source: source)
         let encodedKey = LegadoRuleResolver.percentEncode(keyword, charset: isGBK ? "gbk" : nil)
-        let directiveParts = directiveParser.splitURLAndJSONOptions(searchUrl)
-        let urlText = directiveParts.url
-            .replacingOccurrences(of: "{{key}}", with: encodedKey)
-            .replacingOccurrences(of: "{{keyword}}", with: encodedKey)
-            .replacingOccurrences(of: "{{page}}", with: String(page))
-
         let resolvedText: String
-        if let options = directiveParts.options {
-            let isJSON = options.localizedCaseInsensitiveContains("application/json") || options.contains("\"keyword\"") || options.contains("\"key\"")
+        if let jsonStartRange = searchUrl.range(of: #",\s*\{"#, options: .regularExpression) {
+            let basePart = String(searchUrl[..<jsonStartRange.lowerBound]).trimmingCharacters(in: .whitespacesAndNewlines)
+            let optionPart = String(searchUrl[searchUrl.index(after: jsonStartRange.lowerBound)...]).trimmingCharacters(in: .whitespacesAndNewlines)
+            let resolvedBase = basePart
+                .replacingOccurrences(of: "{{key}}", with: encodedKey)
+                .replacingOccurrences(of: "{{keyword}}", with: encodedKey)
+                .replacingOccurrences(of: "{{page}}", with: String(page))
+            let isJSON = optionPart.localizedCaseInsensitiveContains("application/json") || optionPart.contains("\"keyword\"") || optionPart.contains("\"key\"")
             let keyForOptions = isJSON ? keyword : encodedKey
-            let resolvedOptions = options
+            let resolvedOptions = optionPart
                 .replacingOccurrences(of: "{{key}}", with: keyForOptions)
                 .replacingOccurrences(of: "{{keyword}}", with: keyForOptions)
                 .replacingOccurrences(of: "{{page}}", with: String(page))
-            resolvedText = "\(urlText),\(resolvedOptions)"
+            resolvedText = "\(resolvedBase),\(resolvedOptions)"
         } else {
-            resolvedText = urlText
+            resolvedText = searchUrl
+                .replacingOccurrences(of: "{{key}}", with: encodedKey)
+                .replacingOccurrences(of: "{{keyword}}", with: encodedKey)
+                .replacingOccurrences(of: "{{page}}", with: String(page))
         }
 
         return buildRequest(
