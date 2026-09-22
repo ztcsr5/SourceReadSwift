@@ -5,7 +5,7 @@ import CryptoKit
 import CommonCrypto
 
 final class JSCoreRuntime {
-    private let context: JSContext
+    let context: JSContext
     private let ajaxHandler: ((String) -> String)?
     private let executionContext: RuleExecutionContext
     private let javaHostBridge: LegadoJavaHostBridge
