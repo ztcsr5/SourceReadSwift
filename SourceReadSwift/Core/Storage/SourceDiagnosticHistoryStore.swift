@@ -98,7 +98,7 @@ final class SourceDiagnosticHistoryStore: ObservableObject {
         if let list = records[sourceURL], list.count > limit {
             records[sourceURL] = Array(list.prefix(limit))
         }
-        persistAsync()
+        persistSync()
     }
 
     func recordBatch(_ newEntries: [SourceDiagnosticHistoryRecord], persistImmediately: Bool = true) {
@@ -110,7 +110,7 @@ final class SourceDiagnosticHistoryStore: ObservableObject {
             }
         }
         if persistImmediately {
-            persistAsync()
+            persistSync()
         }
     }
 

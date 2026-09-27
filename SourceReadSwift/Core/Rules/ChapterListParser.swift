@@ -116,6 +116,8 @@ struct ChapterListParser {
                     ".section-box li a",
                     "#chapterlist li a",
                     ".dir-list li a",
+                    ".dir-list a",
+                    ".dir-list dd a",
                     "div.read-section a",
                     "#chapters-list a",
                     ".chapter-list a",
@@ -180,6 +182,8 @@ struct ChapterListParser {
                     ".section-box li a",
                     "#chapterlist li a",
                     ".dir-list li a",
+                    ".dir-list a",
+                    ".dir-list dd a",
                     "div.read-section a",
                     "#chapters-list a",
                     ".chapter-list a",
@@ -337,7 +341,10 @@ struct ChapterListParser {
                 return false
             }
             if u.host == b.host && u.path == b.path && u.query == b.query && u.fragment == nil {
-                return false
+                let dummyDetailTitles: Set<String> = ["书籍详情", "返回详情", "返回封面", "封面", "返回"]
+                if b.path.hasSuffix("/") || b.path.isEmpty || b.path == "/" || dummyDetailTitles.contains(trimmedTitle) {
+                    return false
+                }
             }
         }
         return true

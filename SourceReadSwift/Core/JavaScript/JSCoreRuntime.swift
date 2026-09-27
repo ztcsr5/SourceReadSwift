@@ -837,7 +837,11 @@ final class JSCoreRuntime {
           var _origJSONParse = JSON.parse;
           JSON.parse = function(text, reviver) {
             if (text !== null && typeof text === 'object') {
-              return text;
+              if (text instanceof String) {
+                text = String(text);
+              } else {
+                return text;
+              }
             }
             if (typeof text !== 'string') {
               text = String(text);
