@@ -15,9 +15,7 @@ struct PurifyRuleEvaluator {
             if script.hasPrefix("@js:") {
                 script = String(script.dropFirst(4))
             } else if script.hasPrefix("<js>") && script.hasSuffix("</js>") {
-                let start = script.index(script.startIndex, offsetBy: 4)
-                let end = script.index(script.endIndex, offsetBy: -5)
-                script = String(script[start..<end])
+                script = String(script.dropFirst(4).dropLast(5))
             }
             var jsVars = variables
             jsVars["result"] = text

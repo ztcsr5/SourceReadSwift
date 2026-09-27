@@ -313,5 +313,32 @@ final class SourceFlowEngineTests: XCTestCase {
         let result = try? rt.evaluate("'test'.parentNode()").get()
         XCTAssertEqual(result, "")
     }
+
+    func testDynamicURLResolverWithMultipleTemplatesAndChineseChars() {
+        let rawUrl = "https://example.com/search?title={{$.name}}&author={{$.author}}&tag={{$.tag}}"
+        let source = BookSource(bookSourceName: "中文测试源", bookSourceUrl: "https://example.com")
+        let context = RuleExecutionContext()
+        let json = #"{"name": "斗破苍穹", "author": "天蚕土豆", "tag": "玄幻"}"#
+        let resolved = DynamicURLResolver.resolve(
+            rawUrl,
+            baseUrl: "https://example.com",
+            source: source,
+            variables: ["result": json, "body": json],
+            context: context
+        )
+        XCTAssertEqual(resolved, "https://example.com/search?title=斗破苍穹&author=天蚕土豆&tag=玄幻")
+    }
+
+    private struct CustomUnbridgeableStruct {
+        let title: String
+        let count: Int
+    }
+
+    func testJSCoreRuntimeWithArbitrarySwiftStructDoesNotCrash() {
+        let rt = JSCoreRuntime()
+        let custom = CustomUnbridgeableStruct(title: "测试自定义结构体", count: 42)
+        let result = try? rt.evaluate("typeof custom === 'string'", variables: ["custom": custom]).get()
+        XCTAssertEqual(result, "true")
+    }
 }
 

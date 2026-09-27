@@ -161,7 +161,7 @@ enum SourceDiagnosticClassifier {
                 let msgVal = obj["message"] ?? obj["msg"] ?? obj["info"] ?? obj["error"]
                 if let code = codeVal {
                     let codeStr = String(describing: code)
-                    let msgStr = (msgVal as? String) ?? (msgVal != nil ? String(describing: msgVal!) : "")
+                    let msgStr = (msgVal as? String) ?? msgVal.map { String(describing: $0) } ?? ""
                     // Check if non-success code
                     if !["0", "200", "true", "success"].contains(codeStr.lowercased()) {
                         if ["1055"].contains(codeStr) || containsAny(msgStr.lowercased(), ["没有该小说", "未找到", "无结果", "no novel", "not found"]) {

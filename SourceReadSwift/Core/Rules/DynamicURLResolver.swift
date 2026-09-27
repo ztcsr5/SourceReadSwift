@@ -24,14 +24,15 @@ struct DynamicURLResolver {
         if trimmed.lowercased().contains("@get:") {
             let pattern = #"(?i)@get:(?:\{|%7b)?([^%}&@\s]*)?(?:\}|%7d)?"#
             if let regex = try? NSRegularExpression(pattern: pattern) {
-                let matches = regex.matches(in: trimmed, range: NSRange(trimmed.startIndex..<trimmed.endIndex, in: trimmed)).reversed()
-                for match in matches {
-                    guard let fullRange = Range(match.range(at: 0), in: trimmed),
-                          let keyRange = Range(match.range(at: 1), in: trimmed) else { continue }
-                    let key = String(trimmed[keyRange]).trimmingCharacters(in: .whitespacesAndNewlines)
+                let mText = NSMutableString(string: trimmed)
+                let matches = regex.matches(in: trimmed, range: NSRange(location: 0, length: mText.length))
+                for match in matches.reversed() {
+                    guard match.numberOfRanges > 1 else { continue }
+                    let key = mText.substring(with: match.range(at: 1)).trimmingCharacters(in: .whitespacesAndNewlines)
                     let val = context.get(key)
-                    trimmed.replaceSubrange(fullRange, with: val)
+                    mText.replaceCharacters(in: match.range(at: 0), with: val)
                 }
+                trimmed = mText as String
             }
         }
 
@@ -47,7 +48,7 @@ struct DynamicURLResolver {
         }
 
         // Strip accidental double domain concatenation, e.g. `http://domain/http://domain/path` or `http://domainhttp://domain/path`
-        if trimmed.count > 8 {
+        if (trimmed.hasPrefix("http://") || trimmed.hasPrefix("https://")) && trimmed.count > 8 {
             let searchStart = trimmed.index(trimmed.startIndex, offsetBy: 7)
             if let secondSchemeRange = trimmed.range(of: "https?://", options: .regularExpression, range: searchStart..<trimmed.endIndex) {
                 trimmed = String(trimmed[secondSchemeRange.lowerBound...])
@@ -79,13 +80,11 @@ struct DynamicURLResolver {
             }
 
             if let regex = try? NSRegularExpression(pattern: #"\{\{([\s\S]*?)\}\}"#) {
-                let nsText = trimmed as NSString
-                let matches = regex.matches(in: trimmed, range: NSRange(location: 0, length: nsText.length))
+                let mText = NSMutableString(string: trimmed)
+                let matches = regex.matches(in: trimmed, range: NSRange(location: 0, length: mText.length))
                 for match in matches.reversed() {
-                    guard match.numberOfRanges > 1,
-                          let fullRange = Range(match.range(at: 0), in: trimmed),
-                          let codeRange = Range(match.range(at: 1), in: trimmed) else { continue }
-                    let script = String(trimmed[codeRange]).trimmingCharacters(in: .whitespacesAndNewlines)
+                    guard match.numberOfRanges > 1 else { continue }
+                    let script = mText.substring(with: match.range(at: 1)).trimmingCharacters(in: .whitespacesAndNewlines)
                     var evaluatedValue: String? = nil
 
                     // If script is a JSONPath (starts with $), extract from response JSON or variables
@@ -109,10 +108,11 @@ struct DynamicURLResolver {
                     if let evaluated = evaluatedValue {
                         let cleanEval = evaluated.trimmingCharacters(in: .whitespacesAndNewlines)
                         if !cleanEval.isEmpty && cleanEval != "undefined" && cleanEval != "null" {
-                            trimmed.replaceSubrange(fullRange, with: cleanEval)
+                            mText.replaceCharacters(in: match.range(at: 0), with: cleanEval)
                         }
                     }
                 }
+                trimmed = mText as String
             }
         }
 
@@ -135,21 +135,20 @@ struct DynamicURLResolver {
                 }
 
                 if let regex = try? NSRegularExpression(pattern: #"<js>([\s\S]*?)</js>"#) {
-                    let nsText = trimmed as NSString
-                    let matches = regex.matches(in: trimmed, range: NSRange(location: 0, length: nsText.length))
+                    let mText = NSMutableString(string: trimmed)
+                    let matches = regex.matches(in: trimmed, range: NSRange(location: 0, length: mText.length))
                     for match in matches.reversed() {
-                        guard match.numberOfRanges > 1,
-                              let fullRange = Range(match.range(at: 0), in: trimmed),
-                              let codeRange = Range(match.range(at: 1), in: trimmed) else { continue }
-                        let script = String(trimmed[codeRange]).trimmingCharacters(in: .whitespacesAndNewlines)
+                        guard match.numberOfRanges > 1 else { continue }
+                        let script = mText.substring(with: match.range(at: 1)).trimmingCharacters(in: .whitespacesAndNewlines)
                         let evalResult = runtime.evaluate(script, variables: jsVariables)
                         if case .success(let evaluated) = evalResult {
                             let cleanEval = evaluated.trimmingCharacters(in: .whitespacesAndNewlines)
                             if cleanEval != "undefined" && cleanEval != "null" {
-                                trimmed.replaceSubrange(fullRange, with: cleanEval)
+                                mText.replaceCharacters(in: match.range(at: 0), with: cleanEval)
                             }
                         }
                     }
+                    trimmed = mText as String
                 }
             }
 
@@ -167,11 +166,6 @@ struct DynamicURLResolver {
                 }
             }
 
-            if !trimmed.hasPrefix("http://") && !trimmed.hasPrefix("https://") {
-                if let baseURLObj = URL(string: baseUrl) {
-                    return HtmlRuleExtractor(executionContext: context).absolutize(trimmed, base: baseURLObj)
-                }
-            }
             return trimmed
         }
 

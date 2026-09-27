@@ -40,9 +40,7 @@ enum LegadoJavaScriptCompatibility {
         }
         value = value.trimmingCharacters(in: .whitespacesAndNewlines)
         if value.hasPrefix("<js>"), value.hasSuffix("</js>") {
-            let start = value.index(value.startIndex, offsetBy: 4)
-            let end = value.index(value.endIndex, offsetBy: -5)
-            value = String(value[start..<end])
+            value = String(value.dropFirst(4).dropLast(5))
         }
         return value
     }

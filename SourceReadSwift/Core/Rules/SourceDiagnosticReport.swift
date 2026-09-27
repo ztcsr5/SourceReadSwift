@@ -200,7 +200,7 @@ struct SourceDiagnosticReport: Identifiable, Codable, Hashable, Sendable {
         self.keyword = keyword
         self.startedAt = startedAt
         self.steps = steps.sorted { lhs, rhs in
-            SourceDiagnosticStage.allCases.firstIndex(of: lhs.stage)! < SourceDiagnosticStage.allCases.firstIndex(of: rhs.stage)!
+            (SourceDiagnosticStage.allCases.firstIndex(of: lhs.stage) ?? 0) < (SourceDiagnosticStage.allCases.firstIndex(of: rhs.stage) ?? 0)
         }
     }
 

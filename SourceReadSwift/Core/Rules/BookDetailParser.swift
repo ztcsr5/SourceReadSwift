@@ -279,14 +279,15 @@ struct BookDetailParser {
         var resolved = template
         let pattern = #"(?i)@get:\{?([^}@]*)?\}?"#
         if let regex = try? NSRegularExpression(pattern: pattern) {
-            let matches = regex.matches(in: resolved, range: NSRange(resolved.startIndex..<resolved.endIndex, in: resolved)).reversed()
-            for match in matches {
-                guard let fullRange = Range(match.range(at: 0), in: resolved),
-                      let keyRange = Range(match.range(at: 1), in: resolved) else { continue }
-                let key = String(resolved[keyRange]).trimmingCharacters(in: .whitespacesAndNewlines)
+            let mText = NSMutableString(string: resolved)
+            let matches = regex.matches(in: resolved, range: NSRange(location: 0, length: mText.length))
+            for match in matches.reversed() {
+                guard match.numberOfRanges > 1 else { continue }
+                let key = mText.substring(with: match.range(at: 1)).trimmingCharacters(in: .whitespacesAndNewlines)
                 let val = executionContext.get(key)
-                resolved.replaceSubrange(fullRange, with: val)
+                mText.replaceCharacters(in: match.range(at: 0), with: val)
             }
+            resolved = mText as String
         }
         let dynamicResolved = DynamicURLResolver.resolve(
             resolved,

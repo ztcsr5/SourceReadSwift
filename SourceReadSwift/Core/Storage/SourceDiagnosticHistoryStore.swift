@@ -95,18 +95,18 @@ final class SourceDiagnosticHistoryStore: ObservableObject {
             resultCount: resultCount
         )
         records[sourceURL, default: []].insert(entry, at: 0)
-        if records[sourceURL]!.count > limit {
-            records[sourceURL] = Array(records[sourceURL]!.prefix(limit))
+        if let list = records[sourceURL], list.count > limit {
+            records[sourceURL] = Array(list.prefix(limit))
         }
-        persistSync()
+        persistAsync()
     }
 
     func recordBatch(_ newEntries: [SourceDiagnosticHistoryRecord], persistImmediately: Bool = true) {
         guard !newEntries.isEmpty else { return }
         for entry in newEntries {
             records[entry.sourceURL, default: []].insert(entry, at: 0)
-            if records[entry.sourceURL]!.count > limit {
-                records[entry.sourceURL] = Array(records[entry.sourceURL]!.prefix(limit))
+            if let list = records[entry.sourceURL], list.count > limit {
+                records[entry.sourceURL] = Array(list.prefix(limit))
             }
         }
         if persistImmediately {

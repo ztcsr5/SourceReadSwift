@@ -45,9 +45,7 @@ struct SearchURLResolver {
         }
 
         if trimmedCleaned.hasPrefix("<js>"), trimmedCleaned.hasSuffix("</js>") {
-            let start = trimmedCleaned.index(trimmedCleaned.startIndex, offsetBy: 4)
-            let end = trimmedCleaned.index(trimmedCleaned.endIndex, offsetBy: -5)
-            let script = String(trimmedCleaned[start..<end])
+            let script = String(trimmedCleaned.dropFirst(4).dropLast(5))
             let evalResult = evaluateScript(script, source: source, variables: scriptVariables, persistentState: persistentState, network: network, executionContext: executionContext)
             return evalResult.map(postProcess)
         }

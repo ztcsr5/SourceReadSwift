@@ -185,8 +185,11 @@ enum ResponseFormatDetector {
         if value.lowercased().hasPrefix("<pre"),
            let end = value.firstIndex(of: ">"),
            let close = value.range(of: "</pre>", options: .caseInsensitive) {
-            value = String(value[value.index(after: end)..<close.lowerBound])
-                .trimmingCharacters(in: .whitespacesAndNewlines)
+            let afterEnd = value.index(after: end)
+            if afterEnd <= close.lowerBound {
+                value = String(value[afterEnd..<close.lowerBound])
+                    .trimmingCharacters(in: .whitespacesAndNewlines)
+            }
         }
         return value
     }

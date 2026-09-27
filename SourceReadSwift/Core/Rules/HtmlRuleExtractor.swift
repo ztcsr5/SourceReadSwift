@@ -513,15 +513,14 @@ struct HtmlRuleExtractor {
 
     private func replaceGetDirectives(in rule: String) -> String {
         guard let regex = try? NSRegularExpression(pattern: #"(?i)@get:\{([^}]*)\}"#) else { return rule }
-        var output = rule
-        let matches = regex.matches(in: rule, range: NSRange(rule.startIndex..<rule.endIndex, in: rule)).reversed()
-        for match in matches {
-            guard let fullRange = Range(match.range(at: 0), in: output),
-                  let keyRange = Range(match.range(at: 1), in: output) else { continue }
-            let key = String(output[keyRange]).trimmingCharacters(in: .whitespacesAndNewlines)
-            output.replaceSubrange(fullRange, with: directiveStore.get(key))
+        let mText = NSMutableString(string: rule)
+        let matches = regex.matches(in: rule, range: NSRange(location: 0, length: mText.length))
+        for match in matches.reversed() {
+            guard match.numberOfRanges > 1 else { continue }
+            let key = mText.substring(with: match.range(at: 1)).trimmingCharacters(in: .whitespacesAndNewlines)
+            mText.replaceCharacters(in: match.range(at: 0), with: directiveStore.get(key))
         }
-        return output
+        return mText as String
     }
 
     private func unquote(_ value: String) -> String {
@@ -667,15 +666,14 @@ struct HtmlRuleExtractor {
         baseUrl: URL?,
         variables: [String: Any]
     ) throws -> String {
-        var output = template
         guard let regex = try? NSRegularExpression(pattern: #"\{\{\s*([^{}]+)\s*\}\}"#) else { return template }
-        let nsText = template as NSString
-        let matches = regex.matches(in: template, range: NSRange(location: 0, length: nsText.length))
+        let mText = NSMutableString(string: template)
+        let matches = regex.matches(in: template, range: NSRange(location: 0, length: mText.length))
         for match in matches.reversed() {
             guard match.numberOfRanges > 1 else { continue }
             let keyRange = match.range(at: 1)
             let fullRange = match.range(at: 0)
-            let expr = nsText.substring(with: keyRange).trimmingCharacters(in: .whitespacesAndNewlines)
+            let expr = mText.substring(with: keyRange).trimmingCharacters(in: .whitespacesAndNewlines)
             var val = ""
             if expr.hasPrefix("@@") {
                 let subRule = String(expr.dropFirst(2)).trimmingCharacters(in: .whitespacesAndNewlines)
@@ -698,11 +696,9 @@ struct HtmlRuleExtractor {
             } else {
                 val = (try? self.value(from: root, rule: expr, fallback: nil, baseUrl: baseUrl, variables: variables)) ?? ""
             }
-            if let targetRange = Range(fullRange, in: output) {
-                output.replaceSubrange(targetRange, with: val)
-            }
+            mText.replaceCharacters(in: fullRange, with: val)
         }
-        return output
+        return mText as String
     }
 
     private func evaluateJSWithTrailingRegex(
@@ -804,9 +800,7 @@ struct HtmlRuleExtractor {
         if script.hasPrefix("@js:") {
             script = String(script.dropFirst(4))
         } else if script.hasPrefix("<js>") && script.hasSuffix("</js>") {
-            let start = script.index(script.startIndex, offsetBy: 4)
-            let end = script.index(script.endIndex, offsetBy: -5)
-            script = String(script[start..<end])
+            script = String(script.dropFirst(4).dropLast(5))
         }
 
         let source = extraVariables["source"] as? BookSource

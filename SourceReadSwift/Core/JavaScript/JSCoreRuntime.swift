@@ -46,8 +46,81 @@ final class JSCoreRuntime {
         // JavaScriptCore can reject a first-read of an undeclared global inside
         // the large prelude; predeclaring them keeps the later `var x = x ||`
         // aliases source-compatible without relying on browser semantics.
-        context.evaluateScript("var java = {}; var cookie = {}; var CryptoJS = {}; var Packages = {}; var JXNode = function(value) { return __nativeJXNode.create(value); }; var $ = function(value) { return JXNode(value); }; var JavaImporter = function() {}; var src = ''; var id = ''; var iid = ''; var varid = ''; var variid = ''; var type = ''; var TYPE = function(v) { return v != null ? (typeof v) : ''; }; var ruid = function(len, upper) { len = len || 16; var chars = '0123456789abcdef'; var res = ''; for (var i = 0; i < len; i++) res += chars[Math.floor(Math.random() * chars.length)]; return upper ? res.toUpperCase() : res; }; var form = {}; var result = ''; var baseUrl = ''; String.prototype.parentNode = function() { return null; };")
+        context.evaluateScript("var java = {}; var cookie = {}; var CryptoJS = {}; var Packages = {}; var JXNode = function(value) { return __nativeJXNode.create(value); }; var $ = function(value) { return JXNode(value); }; var JavaImporter = function() {}; var src = ''; var id = ''; var iid = ''; var varid = ''; var variid = ''; var type = ''; var TYPE = function(v) { return v != null ? (typeof v) : ''; }; var ruid = function(len, upper) { len = len || 16; var chars = '0123456789abcdef'; var res = ''; for (var i = 0; i < len; i++) res += chars[Math.floor(Math.random() * chars.length)]; return upper ? res.toUpperCase() : res; }; var form = {}; var result = ''; var baseUrl = ''; String.prototype.parentNode = function() { return ''; };")
         installBaseBridge()
+    }
+
+    private func makeJSCompatibleValue(_ value: Any, baseUrl: String) -> Any {
+        if let source = value as? BookSource {
+            var map = source.raw
+            map["bookSourceName"] = source.bookSourceName
+            map["sourceName"] = source.bookSourceName
+            map["bookSourceUrl"] = source.bookSourceUrl
+            map["sourceUrl"] = source.bookSourceUrl
+            map["bookSourceGroup"] = source.bookSourceGroup ?? ""
+            map["sourceGroup"] = source.bookSourceGroup ?? ""
+            map["bookSourceType"] = String(source.bookSourceType)
+            map["weight"] = String(source.weight)
+            map["searchUrl"] = source.searchUrl ?? ""
+            map["exploreUrl"] = source.exploreUrl ?? ""
+            map["header"] = source.header ?? ""
+            map["customConfig"] = source.customConfig ?? ""
+            map["bookSourceComment"] = source.raw["bookSourceComment"] ?? source.raw["comment"] ?? ""
+            map["bookSourceUrlName"] = source.raw["bookSourceUrlName"] ?? source.raw["urlName"] ?? ""
+            map["loginUrl"] = source.loginUrl ?? source.raw["loginUrl"] ?? ""
+            map["loginCheckJs"] = source.loginCheckJs ?? source.raw["loginCheckJs"] ?? ""
+            return map
+        } else if let chapter = value as? BookChapter {
+            return LegadoBookChapterBridge(chapter: chapter)
+        } else if let book = value as? SearchBook {
+            return LegadoSearchBookBridge(book: book)
+        } else if let book = value as? BookDetail {
+            let bridge = LegadoSearchBookBridge(book: SearchBook(
+                name: book.name, author: book.author, coverUrl: book.coverUrl,
+                bookUrl: book.bookUrl, sourceName: book.sourceName, sourceUrl: book.sourceUrl, intro: book.intro
+            ))
+            bridge.tocUrl = book.tocUrl ?? ""
+            bridge.latestChapterTitle = book.latestChapter ?? ""
+            return bridge
+        } else if let elements = value as? [SwiftSoup.Element] {
+            return LegadoElementsBridge(elements: elements, baseURL: baseUrl)
+        } else if let elements = value as? SwiftSoup.Elements {
+            return LegadoElementsBridge(elements: Array(elements), baseURL: baseUrl)
+        } else if let element = value as? SwiftSoup.Element {
+            return LegadoElementBridge(element: element, baseURL: baseUrl)
+        } else if let node = value as? SwiftSoup.Node {
+            return (try? node.outerHtml()) ?? ""
+        } else if let bridge = value as? LegadoElementsBridge {
+            return bridge
+        } else if let bridge = value as? LegadoElementBridge {
+            return bridge
+        } else if let bridge = value as? LegadoSearchBookBridge {
+            return bridge
+        } else if let bridge = value as? LegadoBookChapterBridge {
+            return bridge
+        } else if let str = value as? String {
+            return str
+        } else if let num = value as? NSNumber {
+            return num
+        } else if let b = value as? Bool {
+            return b
+        } else if let d = value as? Double {
+            return d
+        } else if let i = value as? Int {
+            return i
+        } else if let dict = value as? [String: Any] {
+            var sanitized: [String: Any] = [:]
+            for (k, v) in dict {
+                sanitized[k] = makeJSCompatibleValue(v, baseUrl: baseUrl)
+            }
+            return sanitized
+        } else if let arr = value as? [Any] {
+            return arr.map { makeJSCompatibleValue($0, baseUrl: baseUrl) }
+        } else if let obj = value as? NSObject {
+            return obj
+        } else {
+            return String(describing: value)
+        }
     }
 
     func evaluate(_ script: String, variables: [String: Any] = [:]) -> Result<String, SourceEngineError> {
@@ -75,51 +148,9 @@ final class JSCoreRuntime {
         let normalization = LegadoJavaScriptCompatibility.normalize(script)
         let executableScript = normalization.normalizedScript
         context.exception = nil
+        let baseStr = (effectiveVariables["baseUrl"] as? String) ?? ""
         for (key, value) in effectiveVariables {
-            var jsCompatibleValue = value
-            if let source = value as? BookSource {
-                var map = source.raw
-                map["bookSourceName"] = source.bookSourceName
-                map["sourceName"] = source.bookSourceName
-                map["bookSourceUrl"] = source.bookSourceUrl
-                map["sourceUrl"] = source.bookSourceUrl
-                map["bookSourceGroup"] = source.bookSourceGroup ?? ""
-                map["sourceGroup"] = source.bookSourceGroup ?? ""
-                map["bookSourceType"] = String(source.bookSourceType)
-                map["weight"] = String(source.weight)
-                map["searchUrl"] = source.searchUrl ?? ""
-                map["exploreUrl"] = source.exploreUrl ?? ""
-                map["header"] = source.header ?? ""
-                map["customConfig"] = source.customConfig ?? ""
-                // Android Legado exposes these metadata fields directly on `source`.
-                // Keep them in the JS object even when Swift stores them in raw.
-                map["bookSourceComment"] = source.raw["bookSourceComment"] ?? source.raw["comment"] ?? ""
-                map["bookSourceUrlName"] = source.raw["bookSourceUrlName"] ?? source.raw["urlName"] ?? ""
-                map["loginUrl"] = source.loginUrl ?? source.raw["loginUrl"] ?? ""
-                map["loginCheckJs"] = source.loginCheckJs ?? source.raw["loginCheckJs"] ?? ""
-                jsCompatibleValue = map
-            } else if let chapter = value as? BookChapter {
-                jsCompatibleValue = LegadoBookChapterBridge(chapter: chapter)
-            } else if let book = value as? SearchBook {
-                jsCompatibleValue = LegadoSearchBookBridge(book: book)
-            } else if let book = value as? BookDetail {
-                let bridge = LegadoSearchBookBridge(book: SearchBook(
-                    name: book.name, author: book.author, coverUrl: book.coverUrl,
-                    bookUrl: book.bookUrl, sourceName: book.sourceName, sourceUrl: book.sourceUrl, intro: book.intro
-                ))
-                bridge.tocUrl = book.tocUrl ?? ""
-                bridge.latestChapterTitle = book.latestChapter ?? ""
-                jsCompatibleValue = bridge
-            } else if let elements = value as? [SwiftSoup.Element] {
-                let base = (effectiveVariables["baseUrl"] as? String) ?? ""
-                jsCompatibleValue = LegadoElementsBridge(elements: elements, baseURL: base)
-            } else if let elements = value as? SwiftSoup.Elements {
-                let base = (effectiveVariables["baseUrl"] as? String) ?? ""
-                jsCompatibleValue = LegadoElementsBridge(elements: Array(elements), baseURL: base)
-            } else if let element = value as? SwiftSoup.Element {
-                let base = (effectiveVariables["baseUrl"] as? String) ?? ""
-                jsCompatibleValue = LegadoElementBridge(element: element, baseURL: base)
-            }
+            let jsCompatibleValue = makeJSCompatibleValue(value, baseUrl: baseStr)
             context.setObject(jsCompatibleValue, forKeyedSubscript: key as NSString)
             
             if key == "chapter" {

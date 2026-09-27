@@ -360,15 +360,14 @@ struct JSONRuleExtractor {
 
     private func replaceGetDirectives(in rule: String) -> String {
         guard let regex = try? NSRegularExpression(pattern: #"(?i)@get:\{([^}]*)\}"#) else { return rule }
-        var output = rule
-        let matches = regex.matches(in: rule, range: NSRange(rule.startIndex..<rule.endIndex, in: rule)).reversed()
-        for match in matches {
-            guard let fullRange = Range(match.range(at: 0), in: output),
-                  let keyRange = Range(match.range(at: 1), in: output) else { continue }
-            let key = String(output[keyRange]).trimmingCharacters(in: .whitespacesAndNewlines)
-            output.replaceSubrange(fullRange, with: stringify(directiveStore.get(key) ?? ""))
+        let mText = NSMutableString(string: rule)
+        let matches = regex.matches(in: rule, range: NSRange(location: 0, length: mText.length))
+        for match in matches.reversed() {
+            guard match.numberOfRanges > 1 else { continue }
+            let key = mText.substring(with: match.range(at: 1)).trimmingCharacters(in: .whitespacesAndNewlines)
+            mText.replaceCharacters(in: match.range(at: 0), with: stringify(directiveStore.get(key) ?? ""))
         }
-        return output
+        return mText as String
     }
 
     private func directGetKey(from rule: String) -> String? {
@@ -384,15 +383,14 @@ struct JSONRuleExtractor {
     }
 
     private func interpolateTemplate(_ template: String, item: [String: Any], variables: [String: Any]) -> String {
-        var output = template
         guard let regex = try? NSRegularExpression(pattern: #"\{\{\s*([^{}]+)\s*\}\}"#) else { return template }
-        let nsText = template as NSString
-        let matches = regex.matches(in: template, range: NSRange(location: 0, length: nsText.length))
+        let mText = NSMutableString(string: template)
+        let matches = regex.matches(in: template, range: NSRange(location: 0, length: mText.length))
         for match in matches.reversed() {
             guard match.numberOfRanges > 1 else { continue }
             let keyRange = match.range(at: 1)
             let fullRange = match.range(at: 0)
-            let key = nsText.substring(with: keyRange).trimmingCharacters(in: .whitespacesAndNewlines)
+            let key = mText.substring(with: keyRange).trimmingCharacters(in: .whitespacesAndNewlines)
             let val: String
             if key.hasPrefix("$.") || key.hasPrefix("@json:") {
                 val = (value(from: item, path: key, variables: variables)).map { stringify($0) } ?? ""
@@ -407,11 +405,9 @@ struct JSONRuleExtractor {
             } else {
                 val = ""
             }
-            if let targetRange = Range(fullRange, in: output) {
-                output.replaceSubrange(targetRange, with: val)
-            }
+            mText.replaceCharacters(in: fullRange, with: val)
         }
-        return output
+        return mText as String
     }
 
     private func appendTransforms(_ transforms: [RegexTransform], to path: String) -> String {
@@ -936,7 +932,9 @@ struct JSONRuleExtractor {
 
         // Apply extraVariables first so root document and caller context take precedence
         for (k, v) in extraVariables {
-            variables[k] = v
+            if k != "result" {
+                variables[k] = v
+            }
         }
 
         // If extraVariables did not provide html/src, populate from object
