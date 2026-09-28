@@ -42,7 +42,8 @@ final class SearchResultParserExploreTests: XCTestCase {
             url: URL(string: "https://example.com/explore")!,
             statusCode: 200,
             headers: [:],
-            body: html
+            body: html,
+            data: Data(html.utf8)
         )
 
         let parser = SearchResultParser()
@@ -93,7 +94,8 @@ final class SearchResultParserExploreTests: XCTestCase {
             url: URL(string: "https://example.com/explore")!,
             statusCode: 200,
             headers: [:],
-            body: html
+            body: html,
+            data: Data(html.utf8)
         )
 
         let parser = SearchResultParser()

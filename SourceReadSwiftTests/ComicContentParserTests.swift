@@ -45,7 +45,7 @@ final class ComicContentParserTests: XCTestCase {
             <img data-original="https://cdn.example.com/manga/p3.jpeg" alt="p3" />
         </div>
         """
-        let content = ChapterContent(chapter: chapter, title: "第3话", paragraphs: [], nextContentUrl: nil, rawText: html)
+        let content = ChapterContent(chapter: chapter, title: "第3话", paragraphs: [html], nextContentUrl: nil)
         let pages = ComicContentParser.parsePages(from: content)
 
         XCTAssertEqual(pages.count, 3)
@@ -57,7 +57,7 @@ final class ComicContentParserTests: XCTestCase {
     func testParseJSONArray() {
         let chapter = BookChapter(title: "第4话", url: "https://example.com/c4", bookUrl: "https://example.com/b1", index: 3, isVip: false)
         let json = "[\"https://cdn.example.com/p1.jpg\", \"https://cdn.example.com/p2.jpg\"]"
-        let content = ChapterContent(chapter: chapter, title: "第4话", paragraphs: [], nextContentUrl: nil, rawText: json)
+        let content = ChapterContent(chapter: chapter, title: "第4话", paragraphs: [json], nextContentUrl: nil)
         let pages = ComicContentParser.parsePages(from: content)
 
         XCTAssertEqual(pages.count, 2)
