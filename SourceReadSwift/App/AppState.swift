@@ -85,6 +85,7 @@ final class AppState: ObservableObject {
         }
         resolvedDiscoverViewModel.bind(appState: self)
         bindChildStores()
+        resolvedBookshelfStore.seedOnboardingBookIfNeeded()
     }
 
     func record(_ event: DiagnosticEvent) {

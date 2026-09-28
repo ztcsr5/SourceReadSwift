@@ -230,6 +230,18 @@ struct ReaderSpeechQueue: Equatable {
         return (paragraphIndexes[index], segments[index])
     }
 
+    var totalSegments: Int { segments.count }
+    var currentSegmentPosition: Int { nextIndex }
+
+    mutating func stepBack() -> (index: Int, text: String)? {
+        guard nextIndex > 1 else {
+            nextIndex = 0
+            return dequeue()
+        }
+        nextIndex = max(nextIndex - 2, 0)
+        return dequeue()
+    }
+
     mutating func clear() {
         segments = []
         paragraphIndexes = []

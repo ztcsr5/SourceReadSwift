@@ -971,6 +971,29 @@ private struct AboutReadView: View {
                 Label("全离线书籍与章节缓存，随时随地畅快阅读", systemImage: "arrow.down.circle")
             }
 
+            Section("合规与条款") {
+                NavigationLink {
+                    PrivacyLegalHubView()
+                } label: {
+                    Label("隐私政策与法律条款中心", systemImage: "shield.checkered")
+                }
+                NavigationLink {
+                    PrivacyPolicyDetailView()
+                } label: {
+                    Label("隐私政策 (Privacy Policy)", systemImage: "hand.raised")
+                }
+                NavigationLink {
+                    UserAgreementDetailView()
+                } label: {
+                    Label("用户服务协议 (Terms)", systemImage: "doc.text")
+                }
+                NavigationLink {
+                    OpenSourceLicensesDetailView()
+                } label: {
+                    Label("开源许可与致谢 (Licenses)", systemImage: "curlybraces")
+                }
+            }
+
             Section("致谢与声明") {
                 Text("感谢 Legado 与源阅读开源社区的无私奉献。\n\n免责声明：本应用为本地阅读与书源解析工具，本身不提供、不存储任何网络图书或数字版权内容。所有网络书源由用户自行添加或抓取自公开站点，相关内容版权归原作者所有。")
                     .font(.footnote)

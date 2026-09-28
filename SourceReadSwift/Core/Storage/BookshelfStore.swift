@@ -49,6 +49,20 @@ final class BookshelfStore: ObservableObject {
         persist()
     }
 
+    /// 首次启动或空书架时引导填充预置经典读物，提升开箱即用品质并满足 App Store 审核准则
+    func seedOnboardingBookIfNeeded(force: Bool = false) {
+        let hasSeededKey = "bookshelf.hasSeededOnboardingBook.v1"
+        if !force && UserDefaults.standard.bool(forKey: hasSeededKey) {
+            return
+        }
+        guard books.isEmpty else { return }
+        let welcomeBook = OnboardingClassicBook.makeWelcomeBook()
+        let bookshelfBook = BookshelfBook(localTextBook: welcomeBook)
+        books.insert(bookshelfBook, at: 0)
+        persist()
+        UserDefaults.standard.set(true, forKey: hasSeededKey)
+    }
+
     func book(id: String) -> BookshelfBook? {
         books.first { $0.id == id }
     }

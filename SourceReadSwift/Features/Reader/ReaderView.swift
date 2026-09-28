@@ -1,4 +1,5 @@
 import AVFoundation
+import MediaPlayer
 import PhotosUI
 import SwiftUI
 import UIKit
@@ -2613,11 +2614,19 @@ final class ReaderSpeechController: NSObject, ObservableObject, AVSpeechSynthesi
     private var queue = ReaderSpeechQueue()
     private var rate: Float = 0.52
     private var activeUtterance: AVSpeechUtterance?
+    private var currentTitle: String = ""
+    private var remoteCommandsConfigured = false
     var onFinished: (() -> Void)?
 
     override init() {
         super.init()
         synthesizer.delegate = self
+        setupAudioInterruptionObserver()
+    }
+
+    deinit {
+        NotificationCenter.default.removeObserver(self)
+        teardownRemoteCommands()
     }
 
     func speak(
@@ -2635,6 +2644,8 @@ final class ReaderSpeechController: NSObject, ObservableObject, AVSpeechSynthesi
             includeTitle: includeTitle
         )
         self.rate = rate
+        self.currentTitle = title
+        setupRemoteCommands()
         try? AVAudioSession.sharedInstance().setCategory(.playback, mode: .spokenAudio, options: [.duckOthers])
         try? AVAudioSession.sharedInstance().setActive(true, options: [])
         isSpeaking = true
@@ -2647,6 +2658,7 @@ final class ReaderSpeechController: NSObject, ObservableObject, AVSpeechSynthesi
         guard isSpeaking else { return }
         synthesizer.pauseSpeaking(at: .word)
         isPaused = true
+        updateNowPlayingInfo()
     }
 
     func resume() {
@@ -2655,10 +2667,29 @@ final class ReaderSpeechController: NSObject, ObservableObject, AVSpeechSynthesi
             synthesizer.continueSpeaking()
         }
         isPaused = false
+        updateNowPlayingInfo()
     }
 
     func stop() {
         stop(clearCompletion: true)
+    }
+
+    func skipNext() {
+        guard isSpeaking else { return }
+        synthesizer.stopSpeaking(at: .immediate)
+        activeUtterance = nil
+        speakNext()
+    }
+
+    func skipPrevious() {
+        guard isSpeaking else { return }
+        synthesizer.stopSpeaking(at: .immediate)
+        activeUtterance = nil
+        guard let segment = queue.stepBack() else {
+            speakNext()
+            return
+        }
+        playSegment(segment)
     }
 
     private func stop(clearCompletion: Bool) {
@@ -2672,6 +2703,7 @@ final class ReaderSpeechController: NSObject, ObservableObject, AVSpeechSynthesi
         currentParagraphIndex = -1
         lastFinishedParagraphIndex = -1
         queue.clear()
+        MPNowPlayingInfoCenter.default().nowPlayingInfo = nil
     }
 
     private func speakNext() {
@@ -2683,15 +2715,134 @@ final class ReaderSpeechController: NSObject, ObservableObject, AVSpeechSynthesi
             isPaused = false
             currentParagraphIndex = -1
             queue.clear()
+            MPNowPlayingInfoCenter.default().nowPlayingInfo = nil
             completion?()
             return
         }
+        playSegment(segment)
+    }
+
+    private func playSegment(_ segment: (index: Int, text: String)) {
         currentParagraphIndex = segment.index
         let utterance = AVSpeechUtterance(string: segment.text)
         utterance.voice = AVSpeechSynthesisVoice(language: "zh-CN")
         utterance.rate = rate
         activeUtterance = utterance
         synthesizer.speak(utterance)
+        updateNowPlayingInfo()
+    }
+
+    private func updateNowPlayingInfo() {
+        var info = [String: Any]()
+        info[MPMediaItemPropertyTitle] = currentTitle.isEmpty ? "正文朗读" : currentTitle
+        info[MPMediaItemPropertyArtist] = "纸间语音朗读"
+        info[MPMediaItemPropertyAlbumTitle] = "纸间 (SourceRead)"
+        info[MPNowPlayingInfoPropertyPlaybackRate] = isPaused ? 0.0 : (isSpeaking ? 1.0 : 0.0)
+        let total = queue.totalSegments
+        let current = queue.currentSegmentPosition
+        if total > 0 {
+            info[MPMediaItemPropertyPlaybackDuration] = Double(total)
+            info[MPNowPlayingInfoPropertyElapsedPlaybackTime] = Double(max(current - 1, 0))
+        }
+        MPNowPlayingInfoCenter.default().nowPlayingInfo = info
+    }
+
+    private func setupRemoteCommands() {
+        guard !remoteCommandsConfigured else { return }
+        remoteCommandsConfigured = true
+        let commandCenter = MPRemoteCommandCenter.shared()
+
+        commandCenter.playCommand.isEnabled = true
+        commandCenter.playCommand.addTarget { [weak self] _ in
+            Task { @MainActor [weak self] in
+                self?.resume()
+            }
+            return .success
+        }
+
+        commandCenter.pauseCommand.isEnabled = true
+        commandCenter.pauseCommand.addTarget { [weak self] _ in
+            Task { @MainActor [weak self] in
+                self?.pause()
+            }
+            return .success
+        }
+
+        commandCenter.togglePlayPauseCommand.isEnabled = true
+        commandCenter.togglePlayPauseCommand.addTarget { [weak self] _ in
+            Task { @MainActor [weak self] in
+                guard let self else { return }
+                if self.isPaused {
+                    self.resume()
+                } else if self.isSpeaking {
+                    self.pause()
+                }
+            }
+            return .success
+        }
+
+        commandCenter.nextTrackCommand.isEnabled = true
+        commandCenter.nextTrackCommand.addTarget { [weak self] _ in
+            Task { @MainActor [weak self] in
+                self?.skipNext()
+            }
+            return .success
+        }
+
+        commandCenter.previousTrackCommand.isEnabled = true
+        commandCenter.previousTrackCommand.addTarget { [weak self] _ in
+            Task { @MainActor [weak self] in
+                self?.skipPrevious()
+            }
+            return .success
+        }
+    }
+
+    private func teardownRemoteCommands() {
+        guard remoteCommandsConfigured else { return }
+        let commandCenter = MPRemoteCommandCenter.shared()
+        commandCenter.playCommand.removeTarget(nil)
+        commandCenter.pauseCommand.removeTarget(nil)
+        commandCenter.togglePlayPauseCommand.removeTarget(nil)
+        commandCenter.nextTrackCommand.removeTarget(nil)
+        commandCenter.previousTrackCommand.removeTarget(nil)
+        remoteCommandsConfigured = false
+    }
+
+    private func setupAudioInterruptionObserver() {
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(handleAudioInterruption(_:)),
+            name: AVAudioSession.interruptionNotification,
+            object: AVAudioSession.sharedInstance()
+        )
+    }
+
+    @objc private func handleAudioInterruption(_ notification: Notification) {
+        guard let userInfo = notification.userInfo,
+              let typeValue = userInfo[AVAudioSessionInterruptionTypeKey] as? UInt,
+              let type = AVAudioSession.InterruptionType(rawValue: typeValue) else {
+            return
+        }
+
+        Task { @MainActor [weak self] in
+            guard let self else { return }
+            switch type {
+            case .began:
+                if self.isSpeaking && !self.isPaused {
+                    self.pause()
+                }
+            case .ended:
+                if let optionsValue = userInfo[AVAudioSessionInterruptionOptionKey] as? UInt {
+                    let options = AVAudioSession.InterruptionOptions(rawValue: optionsValue)
+                    if options.contains(.shouldResume) && self.isSpeaking && self.isPaused {
+                        self.resume()
+                    }
+                }
+            @unknown default:
+                break
+            }
+        }
     }
 
     func speechSynthesizer(_ synthesizer: AVSpeechSynthesizer, didFinish utterance: AVSpeechUtterance) {
@@ -2712,6 +2863,7 @@ final class ReaderSpeechController: NSObject, ObservableObject, AVSpeechSynthesi
             self.currentParagraphIndex = -1
             self.queue.clear()
             self.onFinished = nil
+            MPNowPlayingInfoCenter.default().nowPlayingInfo = nil
         }
     }
 }
