@@ -78,9 +78,9 @@ final class Stage33ReaderExperienceTests: XCTestCase {
     // MARK: - 2. SourceRead Native Palettes (readConfig.json)
 
     func testSourceReadNativePalettesConfiguration() {
-        // Verify all 9 background palettes exist (8 classic presets + custom wallpaper)
+        // Verify all 10 background palettes exist (8 classic presets + eink + custom wallpaper)
         let allCases = ReaderBackground.allCases
-        XCTAssertEqual(allCases.count, 9)
+        XCTAssertEqual(allCases.count, 10)
 
         // 1. 羊皮纸
         let paper = ReaderBackground.paper
@@ -123,7 +123,13 @@ final class Stage33ReaderExperienceTests: XCTestCase {
         XCTAssertEqual(dark.nightTextHex, 0xFFFFFF)
         XCTAssertFalse(dark.darkStatusIcon(isNight: false))
 
-        // 7. 自定义壁纸
+        // 7. 水墨屏
+        let eink = ReaderBackground.eink
+        XCTAssertEqual(eink.title, "水墨屏")
+        XCTAssertEqual(eink.dayBackgroundHex, 0xFFFFFF)
+        XCTAssertEqual(eink.dayTextHex, 0x000000)
+
+        // 8. 自定义壁纸
         let custom = ReaderBackground.custom
         XCTAssertEqual(custom.title, "自定义")
     }
