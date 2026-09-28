@@ -305,8 +305,8 @@ struct SearchResultParser {
                     return value
                 }
             }
-            if !rule.raw.isEmpty && rule.fields.isEmpty {
-                return rule.raw
+            if let raw = rule.raw, !raw.isEmpty, rule.fields.isEmpty {
+                return raw
             }
         }
         if let fallback {
@@ -315,8 +315,8 @@ struct SearchResultParser {
                     return value
                 }
             }
-            if !fallback.raw.isEmpty && fallback.fields.isEmpty {
-                return fallback.raw
+            if let raw = fallback.raw, !raw.isEmpty, fallback.fields.isEmpty {
+                return raw
             }
         }
         return nil
