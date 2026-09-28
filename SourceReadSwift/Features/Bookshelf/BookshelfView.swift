@@ -7,6 +7,7 @@ struct BookshelfView: View {
     @State private var showFileImporter = false
     @State private var importMessage: String?
     @State private var isRefreshingBooks = false
+    @State private var isImportingBook = false
     @State private var selectedBookForDetail: BookshelfBook?
     @AppStorage("settings.themeMode") private var themeModeRawValue = ThemeMode.system.rawValue
 
@@ -102,6 +103,27 @@ struct BookshelfView: View {
                                 }
                             }
                         }
+                }
+            }
+            .overlay {
+                if isImportingBook {
+                    ZStack {
+                        Color.black.opacity(0.35)
+                            .ignoresSafeArea()
+                        VStack(spacing: 16) {
+                            ProgressView()
+                                .scaleEffect(1.3)
+                                .tint(.white)
+                            Text("正在智能分章与构建目录...")
+                                .font(.system(size: 15, weight: .medium))
+                                .foregroundColor(.white)
+                        }
+                        .padding(24)
+                        .background(.ultraThinMaterial)
+                        .cornerRadius(18)
+                        .shadow(color: .black.opacity(0.15), radius: 12)
+                    }
+                    .transition(.opacity.combined(with: .scale(scale: 0.95)))
                 }
             }
         }
@@ -300,23 +322,43 @@ struct BookshelfView: View {
     }
 
     private func importLocalBook(_ result: Result<[URL], Error>) {
-        do {
-            guard let url = try result.get().first else {
-                importMessage = "导入失败：没有选择文件。"
-                return
+        guard !isImportingBook else { return }
+        isImportingBook = true
+        Task {
+            defer {
+                Task { @MainActor in
+                    isImportingBook = false
+                }
             }
-            let localURL = try PickedDocumentAccess.copiedURL(from: url)
-            let parsed: LocalTextBook
-            if localURL.pathExtension.localizedCaseInsensitiveCompare("epub") == .orderedSame {
-                parsed = try LocalEPUBBookParser().parse(fileURL: localURL)
-            } else {
-                let data = try Data(contentsOf: localURL)
-                parsed = LocalTextBookParser().parse(data: data, fileName: localURL.lastPathComponent)
+            do {
+                guard let url = try result.get().first else {
+                    await MainActor.run {
+                        HapticFeedback.error()
+                        importMessage = "导入失败：没有选择文件。"
+                    }
+                    return
+                }
+                let localURL = try PickedDocumentAccess.copiedURL(from: url)
+                let parsed: LocalTextBook = try await Task.detached(priority: .userInitiated) {
+                    if localURL.pathExtension.localizedCaseInsensitiveCompare("epub") == .orderedSame {
+                        return try LocalEPUBBookParser().parse(fileURL: localURL)
+                    } else {
+                        let data = try Data(contentsOf: localURL)
+                        return LocalTxtSmartDivider().divide(data: data, fileName: localURL.lastPathComponent)
+                    }
+                }.value
+
+                await MainActor.run {
+                    appState.bookshelfStore.addLocalTextBook(parsed)
+                    HapticFeedback.success()
+                    importMessage = "已导入《\(parsed.title)》，共 \(parsed.chapters.count) 章、\(parsed.paragraphs.count) 段。"
+                }
+            } catch {
+                await MainActor.run {
+                    HapticFeedback.error()
+                    importMessage = "导入失败：\(error.localizedDescription)"
+                }
             }
-            appState.bookshelfStore.addLocalTextBook(parsed)
-            importMessage = "已导入《\(parsed.title)》，共 \(parsed.chapters.count) 章、\(parsed.paragraphs.count) 段。"
-        } catch {
-            importMessage = "导入失败：\(error.localizedDescription)"
         }
     }
 

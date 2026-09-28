@@ -129,6 +129,11 @@ struct SettingsView: View {
                         Label("离线章节", systemImage: "arrow.down.circle")
                     }
                     NavigationLink {
+                        CookieManagerView(cookieStore: appState.sourceCookieStore)
+                    } label: {
+                        Label("会话与 Cookie 管理", systemImage: "network.badge.shield.half.filled")
+                    }
+                    NavigationLink {
                         AboutReadView()
                     } label: {
                         Label("关于纸间", systemImage: "info.circle")

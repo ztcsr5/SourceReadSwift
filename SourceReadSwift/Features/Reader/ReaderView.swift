@@ -122,6 +122,10 @@ struct ReaderView: View {
     @AppStorage("reader.keepScreenAwake") private var keepScreenAwake = true
     @AppStorage("reader.preloadChapterCount") private var preloadChapterCount = ReaderPreloadPolicy.defaultCount
     @AppStorage("reader.textSelectionEnabled") private var textSelectionEnabled = false
+    @AppStorage("reading.dailyGoalMinutes") private var dailyGoalMinutes: Int = 30
+    @AppStorage("reading.lastGoalCelebratedDate") private var lastGoalCelebratedDate: String = ""
+    @State private var showGoalCelebrationToast = false
+    @State private var streakDaysCount = 1
 
     private var fontFamily: ReaderFontFamily {
         ReaderFontFamily(rawValue: fontFamilyRawValue) ?? .system
@@ -356,6 +360,27 @@ struct ReaderView: View {
                 settingsPanel
                     .zIndex(2)
                     .transition(.move(edge: .bottom).combined(with: .opacity))
+            }
+
+            if showGoalCelebrationToast {
+                VStack {
+                    HStack(spacing: 8) {
+                        Text("🎉")
+                            .font(.system(size: 16))
+                        Text("今日阅读目标达成！已连续阅读 \(streakDaysCount) 天")
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundColor(.white)
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 10)
+                    .background(Color.black.opacity(0.85))
+                    .clipShape(Capsule())
+                    .shadow(color: .black.opacity(0.2), radius: 8, y: 4)
+                    .padding(.top, 50)
+                    .transition(.move(edge: .top).combined(with: .opacity))
+                    Spacer()
+                }
+                .zIndex(10)
             }
         }
         .background {
@@ -2476,7 +2501,30 @@ struct ReaderView: View {
             try? await Task.sleep(nanoseconds: ReaderPerformancePolicy.positionPersistenceDebounceNanoseconds)
             guard !Task.isCancelled else { return }
             persistReadingPosition(paragraphIndexOverride: paragraphIndex)
+            checkDailyReadingGoal()
             positionPersistTask = nil
+        }
+    }
+
+    private func checkDailyReadingGoal() {
+        let todayKey = Date().formatted(date: .numeric, time: .omitted)
+        guard lastGoalCelebratedDate != todayKey else { return }
+        let goalSeconds = Double(dailyGoalMinutes) * 60.0
+        guard goalSeconds > 0 else { return }
+        let summary = ReadingStatsSummary(history: appState.readingHistoryStore.history)
+        let activeSeconds = Date().timeIntervalSince(sessionStartedAt)
+        if (summary.todayReadingSeconds + activeSeconds) >= goalSeconds {
+            lastGoalCelebratedDate = todayKey
+            streakDaysCount = max(1, summary.streakDays)
+            withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+                showGoalCelebrationToast = true
+            }
+            HapticFeedback.success()
+            DispatchQueue.main.asyncAfter(deadline: .now() + 4.0) {
+                withAnimation(.easeOut(duration: 0.3)) {
+                    showGoalCelebrationToast = false
+                }
+            }
         }
     }
 

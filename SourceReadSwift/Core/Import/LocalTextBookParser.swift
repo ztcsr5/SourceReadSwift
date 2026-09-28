@@ -2,20 +2,7 @@ import Foundation
 
 struct LocalTextBookParser {
     func parse(data: Data, fileName: String) -> LocalTextBook {
-        let text = ResponseTextDecoder().decode(data: data, headers: [:])
-        let title = URL(fileURLWithPath: fileName).deletingPathExtension().lastPathComponent.nilIfEmpty ?? "Local Book"
-        let lines = text
-            .replacingOccurrences(of: "\r\n", with: "\n")
-            .replacingOccurrences(of: "\r", with: "\n")
-            .components(separatedBy: "\n")
-            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
-            .filter { !$0.isEmpty }
-        let chapters = splitChapters(lines: lines, fallbackText: text)
-        return LocalTextBook(
-            title: title,
-            author: "Local",
-            chapters: chapters
-        )
+        LocalTxtSmartDivider().divide(data: data, fileName: fileName)
     }
 
     private func splitChapters(lines: [String], fallbackText: String) -> [LocalTextChapter] {
