@@ -682,7 +682,7 @@ private struct BookshelfCollectionView: View {
         guard !query.isEmpty else { return base }
         return base.filter {
             $0.title.lowercased().contains(query) ||
-            ($0.author?.lowercased().contains(query) ?? false)
+            $0.author.lowercased().contains(query)
         }
     }
 
