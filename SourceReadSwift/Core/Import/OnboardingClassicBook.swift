@@ -2,8 +2,8 @@ import Foundation
 
 /// 纸间开箱即用的新手引导与经典公版书内置数据源
 /// 确保用户首次安装及 App Store 审核人员初次打开应用时，无需外部网络与外部文件即可立即体验出版级排版与流畅阅读
-public enum OnboardingClassicBook {
-    public static func makeWelcomeBook() -> LocalTextBook {
+enum OnboardingClassicBook {
+    static func makeWelcomeBook() -> LocalTextBook {
         let chapters: [LocalTextChapter] = [
             LocalTextChapter(
                 title: "第壹章 · 纸间入门指南与交互手势",

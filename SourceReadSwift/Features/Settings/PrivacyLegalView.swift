@@ -1,10 +1,8 @@
 import SwiftUI
 
 /// App Store 审核准则（Guideline 5.1.1 / 5.1.2）合规隐私与法律条款中心
-public struct PrivacyLegalHubView: View {
-    public init() {}
-
-    public var body: some View {
+struct PrivacyLegalHubView: View {
+    var body: some View {
         List {
             Section("合规与条款") {
                 NavigationLink {
@@ -53,10 +51,8 @@ public struct PrivacyLegalHubView: View {
 }
 
 /// 隐私政策正文
-public struct PrivacyPolicyDetailView: View {
-    public init() {}
-
-    public var body: some View {
+struct PrivacyPolicyDetailView: View {
+    var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
                 Text("纸间（SourceRead）隐私政策")
@@ -110,10 +106,8 @@ public struct PrivacyPolicyDetailView: View {
 }
 
 /// 用户服务协议正文
-public struct UserAgreementDetailView: View {
-    public init() {}
-
-    public var body: some View {
+struct UserAgreementDetailView: View {
+    var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
                 Text("纸间（SourceRead）用户服务协议")
@@ -160,10 +154,8 @@ public struct UserAgreementDetailView: View {
 }
 
 /// 技术与版权免责声明
-public struct DisclaimerDetailView: View {
-    public init() {}
-
-    public var body: some View {
+struct DisclaimerDetailView: View {
+    var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
                 Text("技术与版权免责声明")
@@ -200,10 +192,8 @@ public struct DisclaimerDetailView: View {
 }
 
 /// 开源软件许可与致谢
-public struct OpenSourceLicensesDetailView: View {
-    public init() {}
-
-    public var body: some View {
+struct OpenSourceLicensesDetailView: View {
+    var body: some View {
         List {
             Section("开源致敬") {
                 Text("「纸间」的诞生离不开全球优秀开源社区的卓越贡献。在此向以下杰出的开源项目及贡献者致以崇高的敬意：")
