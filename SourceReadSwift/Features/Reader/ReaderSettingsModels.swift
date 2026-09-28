@@ -191,6 +191,9 @@ enum ReaderFontFamily: String, CaseIterable, Identifiable, Codable, Sendable {
     case light
     case bold
     case songti
+    case kaiti
+    case rounded
+    case custom
 
     var id: String { rawValue }
 
@@ -200,6 +203,9 @@ enum ReaderFontFamily: String, CaseIterable, Identifiable, Codable, Sendable {
         case .light: return "细体"
         case .bold: return "粗体"
         case .songti: return "宋体"
+        case .kaiti: return "楷体"
+        case .rounded: return "圆体"
+        case .custom: return "自定义"
         }
     }
 
@@ -210,6 +216,9 @@ enum ReaderFontFamily: String, CaseIterable, Identifiable, Codable, Sendable {
         case "light": self = .light
         case "bold": self = .bold
         case "songti": self = .songti
+        case "kaiti": self = .kaiti
+        case "rounded": self = .rounded
+        case "custom": self = .custom
         default: self = .system
         }
     }
@@ -219,7 +228,7 @@ enum ReaderFontFamily: String, CaseIterable, Identifiable, Codable, Sendable {
         try container.encode(rawValue)
     }
 
-    func uiFont(ofSize size: CGFloat, weight: UIFont.Weight = .regular) -> UIFont {
+    func uiFont(ofSize size: CGFloat, weight: UIFont.Weight = .regular, customPostScriptName: String? = nil) -> UIFont {
         switch self {
         case .system:
             return UIFont.systemFont(ofSize: size, weight: weight)
@@ -240,10 +249,34 @@ enum ReaderFontFamily: String, CaseIterable, Identifiable, Codable, Sendable {
                 return UIFont(descriptor: desc, size: size)
             }
             return UIFont.systemFont(ofSize: size, weight: weight)
+        case .kaiti:
+            let kaitiNames = weight == .bold
+                ? ["Kaiti SC Bold", "KaitiSC-Bold", "STKaiti-SC-Bold", "STKaiti"]
+                : ["Kaiti SC Regular", "Kaiti SC", "KaitiSC-Regular", "STKaiti-SC-Regular", "STKaiti", "KaiTi"]
+            for name in kaitiNames {
+                if let font = UIFont(name: name, size: size) {
+                    return font
+                }
+            }
+            if let desc = UIFont.systemFont(ofSize: size, weight: weight).fontDescriptor.withDesign(.serif) {
+                return UIFont(descriptor: desc, size: size)
+            }
+            return UIFont.systemFont(ofSize: size, weight: weight)
+        case .rounded:
+            if let desc = UIFont.systemFont(ofSize: size, weight: weight).fontDescriptor.withDesign(.rounded) {
+                return UIFont(descriptor: desc, size: size)
+            }
+            return UIFont.systemFont(ofSize: size, weight: weight)
+        case .custom:
+            let psName = customPostScriptName ?? UserDefaults.standard.string(forKey: "reader.customFontPostScriptName")
+            if let psName, !psName.isEmpty, let font = UIFont(name: psName, size: size) {
+                return font
+            }
+            return UIFont.systemFont(ofSize: size, weight: weight)
         }
     }
 
-    func swiftUIFont(size: CGFloat, weight: Font.Weight = .regular) -> Font {
+    func swiftUIFont(size: CGFloat, weight: Font.Weight = .regular, customPostScriptName: String? = nil) -> Font {
         switch self {
         case .system:
             return .system(size: size, weight: weight, design: .default)
@@ -261,6 +294,24 @@ enum ReaderFontFamily: String, CaseIterable, Identifiable, Codable, Sendable {
                 }
             }
             return .system(size: size, weight: weight, design: .serif)
+        case .kaiti:
+            let kaitiNames = weight == .bold
+                ? ["Kaiti SC Bold", "KaitiSC-Bold", "STKaiti-SC-Bold", "STKaiti"]
+                : ["Kaiti SC Regular", "Kaiti SC", "KaitiSC-Regular", "STKaiti-SC-Regular", "STKaiti"]
+            for name in kaitiNames {
+                if UIFont(name: name, size: size) != nil {
+                    return .custom(name, size: size)
+                }
+            }
+            return .system(size: size, weight: weight, design: .serif)
+        case .rounded:
+            return .system(size: size, weight: weight, design: .rounded)
+        case .custom:
+            let psName = customPostScriptName ?? UserDefaults.standard.string(forKey: "reader.customFontPostScriptName")
+            if let psName, !psName.isEmpty, UIFont(name: psName, size: size) != nil {
+                return .custom(psName, size: size)
+            }
+            return .system(size: size, weight: weight, design: .default)
         }
     }
 }

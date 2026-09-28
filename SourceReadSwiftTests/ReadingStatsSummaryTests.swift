@@ -53,6 +53,10 @@ final class ReadingStatsSummaryTests: XCTestCase {
         XCTAssertEqual(summary.averageProgress, 0.5, accuracy: 0.001)
         XCTAssertEqual(summary.mostReadBook?.id, "remote")
         XCTAssertEqual(summary.recentBooks.map(\.id), ["remote", "local"])
+        XCTAssertEqual(summary.estimatedWordsRead, Int((720.0 / 60.0) * 380.0))
+        XCTAssertEqual(summary.weeklyDistribution.count, 7)
+        XCTAssertGreaterThanOrEqual(summary.streakDays, 1)
+        XCTAssertEqual(summary.todayReadingSeconds, 720)
     }
 
     func testEmptyStatsAreZero() {
@@ -62,5 +66,9 @@ final class ReadingStatsSummaryTests: XCTestCase {
         XCTAssertEqual(summary.averageProgress, 0)
         XCTAssertNil(summary.mostReadBook)
         XCTAssertTrue(summary.recentBooks.isEmpty)
+        XCTAssertEqual(summary.estimatedWordsRead, 0)
+        XCTAssertEqual(summary.streakDays, 0)
+        XCTAssertEqual(summary.todayReadingSeconds, 0)
+        XCTAssertEqual(summary.weeklyDistribution.count, 7)
     }
 }

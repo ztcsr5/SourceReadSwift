@@ -41,6 +41,14 @@ struct SettingsView: View {
                     }
                 }
 
+                Section("排版与字体") {
+                    NavigationLink {
+                        CustomFontManagementView()
+                    } label: {
+                        Label("字体管理与自定义导入", systemImage: "textformat")
+                    }
+                }
+
                 Section("内容设置") {
                     NavigationLink {
                         SourceManagerView()
@@ -484,9 +492,19 @@ struct ReadingHistoryView: View {
 
 struct ReadingStatsView: View {
     @EnvironmentObject private var appState: AppState
+    @AppStorage("reading.dailyGoalMinutes") private var dailyGoalMinutes: Int = 30
 
     private var summary: ReadingStatsSummary {
         ReadingStatsSummary(books: appState.bookshelfStore.books)
+    }
+
+    private var todayMinutes: Int {
+        Int(summary.todayReadingSeconds / 60)
+    }
+
+    private var goalProgress: Double {
+        guard dailyGoalMinutes > 0 else { return 0 }
+        return min(max(Double(todayMinutes) / Double(dailyGoalMinutes), 0), 1.0)
     }
 
     var body: some View {
@@ -496,26 +514,94 @@ struct ReadingStatsView: View {
             } else {
                 Section {
                     VStack(alignment: .leading, spacing: 14) {
-                        Text("阅读概览")
-                            .font(.headline)
-                        HStack(spacing: 12) {
-                            statCard("总时长", value: durationText(summary.totalReadingSeconds), icon: "timer")
-                            statCard("阅读次数", value: "\(summary.totalSessions)", icon: "book")
+                        HStack(spacing: 16) {
+                            ZStack {
+                                Circle()
+                                    .stroke(Color.secondary.opacity(0.2), lineWidth: 7)
+                                    .frame(width: 58, height: 58)
+                                Circle()
+                                    .trim(from: 0, to: goalProgress)
+                                    .stroke(AppTheme.accent, style: StrokeStyle(lineWidth: 7, lineCap: .round))
+                                    .frame(width: 58, height: 58)
+                                    .rotationEffect(.degrees(-90))
+                                    .animation(.easeInOut(duration: 0.4), value: goalProgress)
+                                Text("\(Int(goalProgress * 100))%")
+                                    .font(.system(size: 13, weight: .bold, design: .rounded))
+                                    .foregroundStyle(.primary)
+                            }
+
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("今日阅读 \(todayMinutes) 分钟")
+                                    .font(.headline)
+                                Text(goalProgress >= 1.0 ? "🎉 今日目标已达成！保持专注！" : "目标 \(dailyGoalMinutes) 分钟 · 还差 \(max(0, dailyGoalMinutes - todayMinutes)) 分钟")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                            Spacer()
                         }
-                        HStack(spacing: 12) {
-                            statCard("平均进度", value: "\(Int(summary.averageProgress * 100))%", icon: "chart.line.uptrend.xyaxis")
-                            statCard("书签", value: "\(summary.totalBookmarks)", icon: "bookmark")
+                        .padding(.vertical, 4)
+
+                        HStack(spacing: 10) {
+                            statCard("今日阅读", value: "\(todayMinutes) 分钟", icon: "flame.fill", tint: .orange)
+                            statCard("连续阅读", value: "\(summary.streakDays) 天", icon: "calendar.badge.clock", tint: .red)
+                        }
+                        HStack(spacing: 10) {
+                            statCard("累计时长", value: durationText(summary.totalReadingSeconds), icon: "timer", tint: AppTheme.accent)
+                            statCard("估算字数", value: formatWordCount(summary.estimatedWordsRead), icon: "character.book.closed", tint: .purple)
+                        }
+                        HStack(spacing: 10) {
+                            statCard("阅读次数", value: "\(summary.totalSessions) 次", icon: "book", tint: .green)
+                            statCard("平均进度", value: "\(Int(summary.averageProgress * 100))%", icon: "chart.line.uptrend.xyaxis", tint: .blue)
                         }
                     }
                     .padding(.vertical, 4)
+                } header: {
+                    Text("阅读概览")
+                }
+
+                Section {
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text("近 7 天阅读时长")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+
+                        let maxSeconds = max(summary.weeklyDistribution.map(\.seconds).max() ?? 1, 60)
+                        HStack(alignment: .bottom, spacing: 8) {
+                            ForEach(summary.weeklyDistribution) { item in
+                                VStack(spacing: 6) {
+                                    let mins = Int(item.seconds / 60)
+                                    Text(mins > 0 ? "\(mins)" : "")
+                                        .font(.system(size: 10, weight: .semibold, design: .rounded))
+                                        .foregroundStyle(item.isToday ? AppTheme.accent : .secondary)
+                                        .frame(height: 12)
+
+                                    let barHeight = max(6, CGFloat(item.seconds / maxSeconds) * 72)
+                                    RoundedRectangle(cornerRadius: 4, style: .continuous)
+                                        .fill(item.isToday ? AppTheme.accent : Color.secondary.opacity(0.25))
+                                        .frame(height: barHeight)
+
+                                    Text(item.dayLabel)
+                                        .font(.caption2)
+                                        .fontWeight(item.isToday ? .bold : .regular)
+                                        .foregroundStyle(item.isToday ? AppTheme.accent : .secondary)
+                                }
+                                .frame(maxWidth: .infinity)
+                            }
+                        }
+                        .frame(height: 110, alignment: .bottom)
+                        .padding(.top, 4)
+                    }
+                    .padding(.vertical, 6)
+                } header: {
+                    Text("阅读趋势")
                 }
 
                 Section("书架构成") {
-                    metricRow("书架书籍", value: "\(summary.totalBooks)")
-                    metricRow("在线书籍", value: "\(summary.remoteBooks)")
-                    metricRow("本地导入", value: "\(summary.localBooks)")
-                    metricRow("已阅读", value: "\(summary.readBooks)")
-                    metricRow("有书签", value: "\(summary.bookmarkedBooks)")
+                    metricRow("书架书籍", value: "\(summary.totalBooks) 本")
+                    metricRow("在线书籍", value: "\(summary.remoteBooks) 本")
+                    metricRow("本地导入", value: "\(summary.localBooks) 本")
+                    metricRow("已阅读", value: "\(summary.readBooks) 本")
+                    metricRow("有书签", value: "\(summary.bookmarkedBooks) 本 (共 \(summary.totalBookmarks) 处)")
                 }
 
                 if let mostReadBook = summary.mostReadBook {
@@ -527,7 +613,7 @@ struct ReadingStatsView: View {
                                 Text(mostReadBook.title)
                                     .font(.headline)
                                     .lineLimit(1)
-                                Text("\(durationText(mostReadBook.totalReadingSeconds ?? 0)) / \(mostReadBook.readingSessionCount ?? 0) 次")
+                                Text("\(durationText(mostReadBook.totalReadingSeconds ?? 0)) · 共阅读 \(mostReadBook.readingSessionCount ?? 0) 次")
                                     .font(.caption)
                                     .foregroundStyle(.secondary)
                             }
@@ -571,7 +657,7 @@ struct ReadingStatsView: View {
                 .foregroundStyle(AppTheme.accent)
             Text("暂无统计")
                 .font(.headline)
-            Text("打开书籍阅读后，这里会汇总阅读时长、次数、进度和书签。")
+            Text("打开书籍阅读后，这里会汇总阅读时长、次数、趋势图表与书签。")
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
@@ -580,22 +666,24 @@ struct ReadingStatsView: View {
         .padding(.vertical, 42)
     }
 
-    private func statCard(_ title: String, value: String, icon: String) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Image(systemName: icon)
-                .font(.headline)
-                .foregroundStyle(AppTheme.accent)
+    private func statCard(_ title: String, value: String, icon: String, tint: Color = AppTheme.accent) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 6) {
+                Image(systemName: icon)
+                    .font(.caption.bold())
+                    .foregroundStyle(tint)
+                Text(title)
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+            }
             Text(value)
-                .font(.title3.bold())
+                .font(.system(size: 15, weight: .bold, design: .rounded))
                 .lineLimit(1)
                 .minimumScaleFactor(0.7)
-            Text(title)
-                .font(.caption)
-                .foregroundStyle(.secondary)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(12)
-        .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .padding(10)
+        .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
     }
 
     private func metricRow(_ title: String, value: String) -> some View {
@@ -611,7 +699,18 @@ struct ReadingStatsView: View {
         let minutes = Int(seconds / 60)
         if minutes < 1 { return "少于 1 分钟" }
         if minutes < 60 { return "\(minutes) 分钟" }
-        return String(format: "%.1f 小时", Double(minutes) / 60.0)
+        let hours = Double(minutes) / 60.0
+        return String(format: "%.1f 小时", hours)
+    }
+
+    private func formatWordCount(_ words: Int) -> String {
+        if words < 1000 {
+            return "\(words) 字"
+        } else if words < 10000 {
+            return String(format: "%.1f 千字", Double(words) / 1000.0)
+        } else {
+            return String(format: "%.1f 万字", Double(words) / 10000.0)
+        }
     }
 }
 

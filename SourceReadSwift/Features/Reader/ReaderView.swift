@@ -1457,16 +1457,49 @@ struct ReaderView: View {
         VStack(alignment: .leading, spacing: 14) {
             appearancePreview
 
-            VStack(alignment: .leading, spacing: 6) {
-                Text("字体")
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(.secondary)
-                Picker("字体选择", selection: $fontFamilyRawValue) {
-                    ForEach(ReaderFontFamily.allCases) { item in
-                        Text(item.title).tag(item.rawValue)
+            VStack(alignment: .leading, spacing: 8) {
+                HStack {
+                    Text("字体")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                    Spacer()
+                    NavigationLink {
+                        CustomFontManagementView()
+                    } label: {
+                        HStack(spacing: 4) {
+                            Text("字体管理 / 导入")
+                            Image(systemName: "chevron.right")
+                        }
+                        .font(.caption)
+                        .foregroundStyle(AppTheme.accent)
                     }
                 }
-                .pickerStyle(.segmented)
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 8) {
+                        ForEach(ReaderFontFamily.allCases) { item in
+                            Button {
+                                fontFamilyRawValue = item.rawValue
+                                HapticFeedback.light()
+                            } label: {
+                                Text(item.title)
+                                    .font(item.swiftUIFont(size: 14))
+                                    .padding(.horizontal, 12)
+                                    .padding(.vertical, 6)
+                                    .background(
+                                        fontFamilyRawValue == item.rawValue
+                                            ? AppTheme.accent
+                                            : Color(UIColor.tertiarySystemGroupedBackground)
+                                    )
+                                    .foregroundColor(
+                                        fontFamilyRawValue == item.rawValue ? .white : .primary
+                                    )
+                                    .clipShape(Capsule())
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                    .padding(.vertical, 2)
+                }
             }
 
             Text("💡 排版说明：每项均标明具体作用与推荐值。右侧可点数字直接输入，滑块用于快速滑动粗调。已采用主流小说标准排版规范。")

@@ -105,6 +105,7 @@ struct ReaderBookmarksView: View {
 
 struct OfflineChapterCacheView: View {
     @EnvironmentObject private var appState: AppState
+    @State private var exportShareURL: IdentifiableURL?
 
     private var grouped: [CacheSection] {
         let map = Dictionary(grouping: appState.chapterContentCacheStore.entries, by: \.bookURL)
@@ -157,7 +158,20 @@ struct OfflineChapterCacheView: View {
                             }
                         }
                     } header: {
-                        Text(bookTitle(for: section.bookURL))
+                        HStack {
+                            Text(bookTitle(for: section.bookURL))
+                            Spacer()
+                            Button {
+                                exportBook(section: section)
+                            } label: {
+                                HStack(spacing: 3) {
+                                    Image(systemName: "square.and.arrow.up")
+                                    Text("导出 TXT")
+                                }
+                                .font(.caption2.weight(.semibold))
+                                .foregroundStyle(AppTheme.accent)
+                            }
+                        }
                     } footer: {
                         Text("\(section.entries.count) 章 · \(byteText(section.entries.reduce(0) { $0 + $1.estimatedByteCount }))")
                     }
@@ -166,6 +180,32 @@ struct OfflineChapterCacheView: View {
         }
         .navigationTitle("离线章节")
         .listStyle(.insetGrouped)
+        .sheet(item: $exportShareURL) { item in
+            ShareSheet(items: [item.url])
+        }
+    }
+
+    private func exportBook(section: CacheSection) {
+        let matchedBook = appState.bookshelfStore.books.first(where: { $0.bookURL == section.bookURL })
+            ?? BookshelfBook(
+                title: bookTitle(for: section.bookURL),
+                author: "未知作者",
+                sourceName: "离线缓存",
+                sourceURL: "",
+                bookURL: section.bookURL
+            )
+        let chapters = section.entries.map { entry in
+            ChapterContent(
+                chapter: BookChapter(title: entry.title, url: entry.chapterURL, index: entry.chapterIndex ?? 0),
+                title: entry.title,
+                paragraphs: entry.paragraphs,
+                nextContentUrl: nil
+            )
+        }
+        if let url = try? BookExportService().exportBookToPlainText(book: matchedBook, cachedChapters: chapters) {
+            exportShareURL = IdentifiableURL(url: url)
+            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+        }
     }
 
     private struct CacheSection: Identifiable {
