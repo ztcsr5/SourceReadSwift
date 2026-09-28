@@ -1122,6 +1122,21 @@ struct ReaderView: View {
                             stopSpeechPlayback()
                             closeSettingsPanel()
                         }
+                        if sleepTimerMinutes == -1 {
+                            Text("播完当章")
+                                .font(.caption2.weight(.semibold))
+                                .foregroundStyle(AppTheme.accent)
+                                .padding(.horizontal, 6)
+                                .padding(.vertical, 3)
+                                .background(AppTheme.accent.opacity(0.12), in: Capsule())
+                        } else if sleepTimerMinutes > 0 {
+                            Text("\(sleepTimerMinutes)分")
+                                .font(.caption2.weight(.semibold))
+                                .foregroundStyle(AppTheme.accent)
+                                .padding(.horizontal, 6)
+                                .padding(.vertical, 3)
+                                .background(AppTheme.accent.opacity(0.12), in: Capsule())
+                        }
                     }
                     toolButton(icon: autoScrollEnabled ? "pause.fill" : "play.fill", title: autoScrollEnabled ? "暂停" : "自动") {
                         toggleAutoScroll()
@@ -1500,6 +1515,7 @@ struct ReaderView: View {
                 .foregroundStyle(.secondary)
             Picker("睡眠定时", selection: $sleepTimerMinutes) {
                 Text("关闭").tag(0)
+                Text("播完当章").tag(-1)
                 Text("15 分钟").tag(15)
                 Text("30 分钟").tag(30)
                 Text("60 分钟").tag(60)
@@ -2229,6 +2245,11 @@ struct ReaderView: View {
                     )
                 }
                 coordinator.stop()
+                if sleepTimerMinutes == -1 {
+                    sleepTimerMinutes = 0
+                    appState.record(DiagnosticEvent(level: .info, stage: "reader.sleepTimer", sourceName: currentChapterTitle, message: "睡眠定时已生效：当前章节播放完毕已自动停止"))
+                    return
+                }
                 if let onSpeechFinished {
                     onSpeechFinished()
                 } else if canSelectRelativeChapter(offset: 1) {

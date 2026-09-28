@@ -248,4 +248,70 @@ final class AppState: ObservableObject {
             .store(in: &cancellables)
 
     }
+
+    // MARK: - Centralized App Data Backup & Restore
+
+    func makeAppDataBackupSnapshot() -> AppDataBackupSnapshot {
+        let keys = [
+            "reader.fontSize", "reader.lineSpacing", "reader.pagePadding", "reader.letterSpacing",
+            "reader.paragraphSpacing", "reader.paragraphIndent", "reader.titleSpacing", "reader.footerHeight",
+            "reader.ttsRate", "reader.autoScrollDelay", "reader.sleepTimerMinutes", "reader.background",
+            "reader.mode", "reader.tapZones", "reader.keepScreenAwake", "reader.preloadChapterCount",
+            "reader.textSelectionEnabled", "settings.themeMode"
+        ]
+        let defaults = UserDefaults.standard
+        let doubleKeys: Set<String> = [
+            "reader.fontSize", "reader.lineSpacing", "reader.pagePadding", "reader.letterSpacing",
+            "reader.paragraphSpacing", "reader.paragraphIndent", "reader.titleSpacing", "reader.footerHeight",
+            "reader.ttsRate", "reader.autoScrollDelay"
+        ]
+        let integerKeys: Set<String> = ["reader.sleepTimerMinutes", "reader.preloadChapterCount"]
+        let boolKeys: Set<String> = ["reader.keepScreenAwake", "reader.textSelectionEnabled"]
+        let preferences = Dictionary(uniqueKeysWithValues: keys.compactMap { key -> (String, BackupPreferenceValue)? in
+            guard let value = defaults.object(forKey: key) else { return nil }
+            if doubleKeys.contains(key) {
+                return (key, .double((value as? NSNumber)?.doubleValue ?? (value as? Double) ?? 0))
+            }
+            if integerKeys.contains(key) {
+                return (key, .integer((value as? NSNumber)?.intValue ?? (value as? Int) ?? 0))
+            }
+            if boolKeys.contains(key) {
+                return (key, .bool((value as? NSNumber)?.boolValue ?? (value as? Bool) ?? false))
+            }
+            if let string = value as? String { return (key, .string(string)) }
+            return nil
+        })
+        return AppDataBackupSnapshot(
+            bookshelf: bookshelfStore.backupSnapshot(),
+            sources: sourceStore.backupSnapshot(),
+            purifyRules: purifyRuleStore.backupSnapshot(),
+            rssState: rssArticleStateStore.backupSnapshot(),
+            readerPreferences: preferences
+        )
+    }
+
+    func restoreAppDataBackup(_ snapshot: AppDataBackupSnapshot) throws {
+        let previousSnapshot = makeAppDataBackupSnapshot()
+        try AppDataBackupRestorer.restore(
+            snapshot,
+            previous: previousSnapshot,
+            restoreBookshelf: { [weak self] in self?.bookshelfStore.restore($0) ?? false },
+            restoreSources: { [weak self] in self?.sourceStore.restore($0) ?? false },
+            restorePurifyRules: { [weak self] in self?.purifyRuleStore.restore($0) ?? false },
+            restoreRSSState: { [weak self] in self?.rssArticleStateStore.restore($0) },
+            restorePreferences: { [weak self] in self?.restoreReaderPreferences($0) }
+        )
+    }
+
+    func restoreReaderPreferences(_ preferences: [String: BackupPreferenceValue]) {
+        let defaults = UserDefaults.standard
+        for (key, value) in preferences {
+            switch value {
+            case .string(let val): defaults.set(val, forKey: key)
+            case .double(let val): defaults.set(val, forKey: key)
+            case .integer(let val): defaults.set(val, forKey: key)
+            case .bool(let val): defaults.set(val, forKey: key)
+            }
+        }
+    }
 }

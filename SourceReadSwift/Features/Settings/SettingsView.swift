@@ -128,8 +128,15 @@ struct SettingsView: View {
                 }
 
                 Section("数据") {
+                    NavigationLink {
+                        WebDAVSyncView()
+                            .environmentObject(appState)
+                    } label: {
+                        Label("WebDAV 云端同步与备份", systemImage: "icloud.and.arrow.up")
+                    }
+
                     Button {
-                        backupDocument = AppDataBackupDocument(snapshot: appDataBackupSnapshot())
+                        backupDocument = AppDataBackupDocument(snapshot: appState.makeAppDataBackupSnapshot())
                         showBackupExporter = true
                     } label: {
                         Label("导出完整数据", systemImage: "externaldrive.badge.icloud")
@@ -645,8 +652,28 @@ private struct RuleHealthView: View {
                 }
             }
 
+            if !sourceStats.problemSources.isEmpty {
+                Section("快捷操作") {
+                    Button(role: .destructive) {
+                        let problemURLs = Set(sourceStats.problemSources.map(\.bookSourceUrl))
+                        appState.sourceStore.setEnabled(false, for: problemURLs)
+                        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                    } label: {
+                        Label("一键禁用问题书源 (\(sourceStats.problemSources.count))", systemImage: "xmark.circle")
+                    }
+
+                    Button {
+                        let allURLs = Set(appState.sourceStore.sources.map(\.bookSourceUrl))
+                        appState.sourceStore.setEnabled(true, for: allURLs)
+                        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                    } label: {
+                        Label("一键启用全部书源", systemImage: "checkmark.circle")
+                    }
+                }
+            }
+
             Section("说明") {
-                Text("这里先做本地规则体检：识别缺 searchUrl、目录规则、正文规则的源。后续再补自动净化、规则迁移和批量修复。")
+                Text("规则体检自动识别缺搜索地址、目录规则或正文规则的书源，并提供一键禁用，避免在多源聚合搜索时浪费网络请求。")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
             }
@@ -964,7 +991,9 @@ private struct AboutReadView: View {
             Section("核心特色") {
                 Label("120Hz ProMotion 满帧丝滑无限滚动与翻页", systemImage: "speedometer")
                 Label("兼容 Legado 开源书源生态，一键精准换源", systemImage: "bolt.horizontal.fill")
-                Label("出版级中文排版引擎，支持自定义背景壁纸与原生字形", systemImage: "textformat.size")
+                Label("出版级中文排版引擎，支持水墨屏与自定义壁纸字形", systemImage: "textformat.size")
+                Label("WebDAV 云端多端自动同步与安全冷备份", systemImage: "icloud.and.arrow.up")
+                Label("后台听书、锁屏控制中心、智能定时与播完当章", systemImage: "headphones")
                 Label("内置广告净化与规则体检，自动过滤正文杂质", systemImage: "wand.and.stars")
                 Label("TXT 智能目录识别、EPUB 图文精排与 RSS 资讯订阅", systemImage: "doc.text.fill")
                 Label("无线 Web 电脑直连写源，轻松调试与管理书源", systemImage: "globe")

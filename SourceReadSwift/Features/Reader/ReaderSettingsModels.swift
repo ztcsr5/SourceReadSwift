@@ -11,6 +11,7 @@ enum ReaderBackground: String, CaseIterable, Identifiable, Codable, Sendable {
     case white      // 纯净素白 (#FFFFFF)
     case gray       // 浅灰银质 (#F2F2F7)
     case dark       // 极夜纯黑 (#000000)
+    case eink       // 电子水墨 (#FFFFFF / #000000 高对比度)
     case custom     // 自定义壁纸
 
     var id: String { rawValue }
@@ -25,6 +26,7 @@ enum ReaderBackground: String, CaseIterable, Identifiable, Codable, Sendable {
         case .white: return "素白"
         case .gray: return "浅灰"
         case .dark: return "极黑"
+        case .eink: return "水墨屏"
         case .custom: return "自定义"
         }
     }
@@ -72,7 +74,7 @@ enum ReaderBackground: String, CaseIterable, Identifiable, Codable, Sendable {
         case .green: return 0xC2D8AA
         case .lavender: return 0xDBB8E2
         case .azure: return 0xABCEE0
-        case .white: return 0xFFFFFF
+        case .white, .eink: return 0xFFFFFF
         case .gray: return 0xF2F2F7
         case .dark: return 0x000000
         case .custom: return 0x1C1C1E
@@ -88,6 +90,7 @@ enum ReaderBackground: String, CaseIterable, Identifiable, Codable, Sendable {
         case .azure: return 0x345367
         case .white: return 0x18181A
         case .gray: return 0x242426
+        case .eink: return 0x000000
         case .dark: return 0xFFFFFF
         case .custom: return 0xFFFFFF
         }
@@ -99,7 +102,7 @@ enum ReaderBackground: String, CaseIterable, Identifiable, Codable, Sendable {
         case .kraft, .green, .lavender, .azure: return 0x3C3F43
         case .white: return 0x18181A
         case .gray: return 0x2C2C2E
-        case .dark: return 0x000000
+        case .dark, .eink: return 0x000000
         case .custom: return 0x1C1C1E
         }
     }
@@ -112,7 +115,7 @@ enum ReaderBackground: String, CaseIterable, Identifiable, Codable, Sendable {
         case .azure: return 0x90BFF5
         case .white: return 0xE0E0E0
         case .gray: return 0xF2F2F7
-        case .dark: return 0xFFFFFF
+        case .dark, .eink: return 0xFFFFFF
         case .custom: return 0xFFFFFF
         }
     }
@@ -120,7 +123,7 @@ enum ReaderBackground: String, CaseIterable, Identifiable, Codable, Sendable {
     func darkStatusIcon(isNight: Bool) -> Bool {
         if isNight { return false }
         switch self {
-        case .paper, .kraft, .white, .gray: return true
+        case .paper, .kraft, .white, .gray, .eink: return true
         case .green, .lavender, .azure, .dark, .custom: return false
         }
     }
