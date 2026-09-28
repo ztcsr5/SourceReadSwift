@@ -1,10 +1,10 @@
 import Foundation
 import UIKit
 
-public struct BookExportService: Sendable {
-    public init() {}
+struct BookExportService: Sendable {
+    init() {}
 
-    public func exportBookToPlainText(
+    func exportBookToPlainText(
         book: BookshelfBook,
         cachedChapters: [ChapterContent],
         includeIntro: Bool = true

@@ -3,19 +3,19 @@ import UIKit
 import CoreText
 import UniformTypeIdentifiers
 
-public struct CustomFontItem: Identifiable, Hashable, Codable, Sendable {
-    public var id: String { fileName }
-    public let fileName: String
-    public let displayName: String
-    public let postScriptName: String
-    public let fileSize: Int64
-    public let dateAdded: Date
+struct CustomFontItem: Identifiable, Hashable, Codable, Sendable {
+    var id: String { fileName }
+    let fileName: String
+    let displayName: String
+    let postScriptName: String
+    let fileSize: Int64
+    let dateAdded: Date
 
-    public var formattedSize: String {
+    var formattedSize: String {
         ByteCountFormatter.string(fromByteCount: fileSize, countStyle: .file)
     }
 
-    public init(
+    init(
         fileName: String,
         displayName: String,
         postScriptName: String,
@@ -31,15 +31,15 @@ public struct CustomFontItem: Identifiable, Hashable, Codable, Sendable {
 }
 
 @MainActor
-public final class CustomFontManager: ObservableObject {
-    public static let shared = CustomFontManager()
+final class CustomFontManager: ObservableObject {
+    static let shared = CustomFontManager()
 
-    @Published public private(set) var installedFonts: [CustomFontItem] = []
-    @Published public private(set) var lastErrorMessage: String?
+    @Published private(set) var installedFonts: [CustomFontItem] = []
+    @Published private(set) var lastErrorMessage: String?
 
-    public let fontsDirectory: URL
+    let fontsDirectory: URL
 
-    public init(fileManager: FileManager = .default) {
+    init(fileManager: FileManager = .default) {
         let appSupport = fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
             ?? fileManager.temporaryDirectory
         let dir = appSupport
@@ -50,7 +50,7 @@ public final class CustomFontManager: ObservableObject {
         reloadAndRegisterFonts()
     }
 
-    public func reloadAndRegisterFonts() {
+    func reloadAndRegisterFonts() {
         let fm = FileManager.default
         guard let files = try? fm.contentsOfDirectory(at: fontsDirectory, includingPropertiesForKeys: [.fileSizeKey, .creationDateKey]) else {
             installedFonts = []
@@ -72,9 +72,8 @@ public final class CustomFontManager: ObservableObject {
     }
 
     @discardableResult
-    public func registerFont(at url: URL) -> CustomFontItem? {
+    func registerFont(at url: URL) -> CustomFontItem? {
         var error: Unmanaged<CFError>?
-        // CTFontManagerRegisterFontsForURL returns true on fresh register, or false if already registered.
         _ = CTFontManagerRegisterFontsForURL(url as CFURL, .process, &error)
 
         guard let provider = CGDataProvider(url: url as CFURL),
@@ -97,7 +96,7 @@ public final class CustomFontManager: ObservableObject {
         )
     }
 
-    public func importFont(from sourceURL: URL) throws -> CustomFontItem {
+    func importFont(from sourceURL: URL) throws -> CustomFontItem {
         let shouldStop = sourceURL.startAccessingSecurityScopedResource()
         defer {
             if shouldStop {
@@ -132,7 +131,7 @@ public final class CustomFontManager: ObservableObject {
         return item
     }
 
-    public func deleteFont(_ item: CustomFontItem) {
+    func deleteFont(_ item: CustomFontItem) {
         let fileURL = fontsDirectory.appendingPathComponent(item.fileName)
         var error: Unmanaged<CFError>?
         CTFontManagerUnregisterFontsForURL(fileURL as CFURL, .process, &error)
@@ -140,7 +139,7 @@ public final class CustomFontManager: ObservableObject {
         reloadAndRegisterFonts()
     }
 
-    public func uiFont(postScriptName: String, size: CGFloat, weight: UIFont.Weight = .regular) -> UIFont? {
+    func uiFont(postScriptName: String, size: CGFloat, weight: UIFont.Weight = .regular) -> UIFont? {
         if let font = UIFont(name: postScriptName, size: size) {
             return font
         }

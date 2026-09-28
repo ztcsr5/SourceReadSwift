@@ -1,13 +1,13 @@
 import Foundation
 
-public struct DayReadingStat: Identifiable, Equatable, Sendable {
-    public var id: String { dayLabel }
-    public let dayLabel: String
-    public let date: Date
-    public let seconds: TimeInterval
-    public let isToday: Bool
+struct DayReadingStat: Identifiable, Equatable, Sendable {
+    var id: String { dayLabel }
+    let dayLabel: String
+    let date: Date
+    let seconds: TimeInterval
+    let isToday: Bool
 
-    public init(dayLabel: String, date: Date, seconds: TimeInterval, isToday: Bool) {
+    init(dayLabel: String, date: Date, seconds: TimeInterval, isToday: Bool) {
         self.dayLabel = dayLabel
         self.date = date
         self.seconds = seconds
@@ -15,24 +15,24 @@ public struct DayReadingStat: Identifiable, Equatable, Sendable {
     }
 }
 
-public struct ReadingStatsSummary: Equatable, Sendable {
-    public let totalBooks: Int
-    public let localBooks: Int
-    public let remoteBooks: Int
-    public let readBooks: Int
-    public let bookmarkedBooks: Int
-    public let totalBookmarks: Int
-    public let totalSessions: Int
-    public let totalReadingSeconds: TimeInterval
-    public let averageProgress: Double
-    public let mostReadBook: BookshelfBook?
-    public let recentBooks: [BookshelfBook]
-    public let estimatedWordsRead: Int
-    public let todayReadingSeconds: TimeInterval
-    public let streakDays: Int
-    public let weeklyDistribution: [DayReadingStat]
+struct ReadingStatsSummary: Equatable, Sendable {
+    let totalBooks: Int
+    let localBooks: Int
+    let remoteBooks: Int
+    let readBooks: Int
+    let bookmarkedBooks: Int
+    let totalBookmarks: Int
+    let totalSessions: Int
+    let totalReadingSeconds: TimeInterval
+    let averageProgress: Double
+    let mostReadBook: BookshelfBook?
+    let recentBooks: [BookshelfBook]
+    let estimatedWordsRead: Int
+    let todayReadingSeconds: TimeInterval
+    let streakDays: Int
+    let weeklyDistribution: [DayReadingStat]
 
-    public init(books: [BookshelfBook], referenceDate: Date = Date()) {
+    init(books: [BookshelfBook], referenceDate: Date = Date()) {
         totalBooks = books.count
         localBooks = books.filter { $0.sourceURL.hasPrefix("local://") }.count
         remoteBooks = totalBooks - localBooks

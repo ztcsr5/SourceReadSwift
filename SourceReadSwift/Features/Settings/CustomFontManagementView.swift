@@ -1,7 +1,7 @@
 import SwiftUI
 import UniformTypeIdentifiers
 
-public struct CustomFontManagementView: View {
+struct CustomFontManagementView: View {
     @StateObject private var fontManager = CustomFontManager.shared
     @AppStorage("reader.fontFamily") private var fontFamilyRawValue: String = ReaderFontFamily.system.rawValue
     @AppStorage("reader.customFontPostScriptName") private var customFontPostScriptName: String = ""
@@ -21,7 +21,7 @@ public struct CustomFontManagementView: View {
         return types
     }
 
-    public init() {}
+    init() {}
 
     public var body: some View {
         List {
