@@ -47,14 +47,14 @@ final class CustomFontAndExportTests: XCTestCase {
         )
 
         let chapter1 = ChapterContent(
-            chapter: BookChapter(title: "第一章 山边小村", url: "https://example.com/1", index: 0),
+            chapter: BookChapter(title: "第一章 山边小村", url: "https://example.com/1", bookUrl: book.bookURL, index: 0, isVip: false),
             title: "第一章 山边小村",
             paragraphs: ["二愣子睁开眼，天刚蒙蒙亮。", "村口的鸡叫了三遍。"],
             nextContentUrl: nil
         )
 
         let chapter2 = ChapterContent(
-            chapter: BookChapter(title: "第二章 离家", url: "https://example.com/2", index: 1),
+            chapter: BookChapter(title: "第二章 离家", url: "https://example.com/2", bookUrl: book.bookURL, index: 1, isVip: false),
             title: "第二章 离家",
             paragraphs: ["三叔骑着毛驴来了。", "包裹很轻，心思很重。"],
             nextContentUrl: nil

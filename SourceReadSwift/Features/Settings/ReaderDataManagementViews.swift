@@ -188,15 +188,24 @@ struct OfflineChapterCacheView: View {
     private func exportBook(section: CacheSection) {
         let matchedBook = appState.bookshelfStore.books.first(where: { $0.bookURL == section.bookURL })
             ?? BookshelfBook(
+                id: section.bookURL,
                 title: bookTitle(for: section.bookURL),
                 author: "未知作者",
+                coverURL: nil,
                 sourceName: "离线缓存",
                 sourceURL: "",
-                bookURL: section.bookURL
+                bookURL: section.bookURL,
+                intro: nil
             )
         let chapters = section.entries.map { entry in
             ChapterContent(
-                chapter: BookChapter(title: entry.title, url: entry.chapterURL, index: entry.chapterIndex ?? 0),
+                chapter: BookChapter(
+                    title: entry.title,
+                    url: entry.chapterURL,
+                    bookUrl: entry.bookURL,
+                    index: entry.chapterIndex ?? 0,
+                    isVip: false
+                ),
                 title: entry.title,
                 paragraphs: entry.paragraphs,
                 nextContentUrl: nil
