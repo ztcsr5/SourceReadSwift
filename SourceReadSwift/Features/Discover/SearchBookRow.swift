@@ -12,19 +12,25 @@ struct SearchBookRow: View {
 
             VStack(alignment: .leading, spacing: 6) {
                 Text(book.name)
-                    .font(.title3.bold())
+                    .font(.system(size: 16, weight: .bold))
                     .foregroundStyle(.primary)
                     .lineLimit(2)
 
-                Text(book.author ?? "作者未知")
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
+                HStack(spacing: 8) {
+                    Text(book.author ?? "作者未知")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
 
-                Text(book.sourceName)
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(.blue)
-                    .lineLimit(1)
+                    Text(book.sourceName)
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(Color.accentColor)
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .background(Color.accentColor.opacity(0.12))
+                        .clipShape(Capsule())
+                        .lineLimit(1)
+                }
 
                 if let intro = book.intro, !intro.isEmpty {
                     Text(intro)
@@ -33,9 +39,9 @@ struct SearchBookRow: View {
                         .lineLimit(2)
                 } else {
                     Text(book.bookUrl)
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(.secondary)
-                        .lineLimit(2)
+                        .font(.caption)
+                        .foregroundStyle(.tertiary)
+                        .lineLimit(1)
                 }
             }
 

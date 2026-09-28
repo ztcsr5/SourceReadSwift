@@ -660,6 +660,7 @@ private struct BookshelfCollectionView: View {
     @State private var selectedBookIDs: Set<String> = []
     @State private var confirmBatchDelete = false
     @State private var selectedBookForDetail: BookshelfBook?
+    @State private var searchKeyword = ""
 
     init(title: String, books: [BookshelfBook], startsManaging: Bool = false) {
         self.title = title
@@ -676,8 +677,13 @@ private struct BookshelfCollectionView: View {
     }
 
     private var liveDisplayBooks: [BookshelfBook] {
-        guard let selectedGroupName else { return liveBooks }
-        return liveBooks.filter { $0.groupName == selectedGroupName }
+        let base = selectedGroupName == nil ? liveBooks : liveBooks.filter { $0.groupName == selectedGroupName }
+        let query = searchKeyword.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        guard !query.isEmpty else { return base }
+        return base.filter {
+            $0.title.lowercased().contains(query) ||
+            ($0.author?.lowercased().contains(query) ?? false)
+        }
     }
 
     private var visibleBookIDs: Set<String> {
@@ -687,6 +693,31 @@ private struct BookshelfCollectionView: View {
     var body: some View {
         ScrollView {
             LazyVStack(spacing: 12) {
+                HStack(spacing: 8) {
+                    Image(systemName: "magnifyingglass")
+                        .font(.system(size: 14))
+                        .foregroundStyle(.secondary)
+                    TextField("搜索书名或作者", text: $searchKeyword)
+                        .font(.system(size: 14))
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled(true)
+                    if !searchKeyword.isEmpty {
+                        Button {
+                            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                            searchKeyword = ""
+                        } label: {
+                            Image(systemName: "xmark.circle.fill")
+                                .font(.system(size: 14))
+                                .foregroundStyle(.secondary)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+                .padding(.horizontal, 12)
+                .frame(height: 38)
+                .background(AppTheme.elevatedCard)
+                .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+
                 if !appState.bookshelfStore.groups.isEmpty {
                     ScrollView(.horizontal, showsIndicators: false) {
                         HStack(spacing: 8) {

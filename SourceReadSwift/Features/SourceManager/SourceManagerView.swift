@@ -6,6 +6,7 @@ struct SourceManagerView: View {
     @EnvironmentObject private var appState: AppState
     @State private var selectedTab: SourceManagerTab = .bookSources
     @State private var searchText = ""
+    @State private var debouncedSearchText = ""
     @State private var importText = ""
     @State private var importURL = ""
     @State private var importError: String?
@@ -148,7 +149,7 @@ struct SourceManagerView: View {
     }
 
     private var normalizedSearchText: String {
-        searchText.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        debouncedSearchText.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
     }
 
     private var currentTabCount: Int {
@@ -459,10 +460,32 @@ struct SourceManagerView: View {
                 .foregroundStyle(.secondary)
             TextField("搜索名称、地址、分组", text: $searchText)
                 .textInputAutocapitalization(.never)
+                .autocorrectionDisabled(true)
+
+            if !searchText.isEmpty {
+                Button {
+                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                    searchText = ""
+                    debouncedSearchText = ""
+                } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .foregroundStyle(.secondary)
+                }
+                .buttonStyle(.plain)
+            }
         }
         .padding(12)
         .background(AppTheme.elevatedCard)
         .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .task(id: searchText) {
+            if searchText.isEmpty {
+                debouncedSearchText = ""
+                return
+            }
+            try? await Task.sleep(nanoseconds: 120_000_000)
+            guard !Task.isCancelled else { return }
+            debouncedSearchText = searchText
+        }
     }
 
     @ViewBuilder

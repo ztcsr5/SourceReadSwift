@@ -1838,19 +1838,38 @@ struct ReaderView: View {
 
     private var tocList: some View {
         VStack(spacing: 8) {
-            TextField("筛选章节名或序号", text: $tocQuery)
-                .textInputAutocapitalization(.never)
-                .disableAutocorrection(true)
-                .padding(.horizontal, 12)
-                .frame(height: 38)
-                .background(readerThemeTextColor.opacity(0.08), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-                .overlay {
-                    RoundedRectangle(cornerRadius: 12, style: .continuous)
-                        .stroke(readerThemeTextColor.opacity(0.15), lineWidth: 0.8)
+            HStack(spacing: 8) {
+                Image(systemName: "magnifyingglass")
+                    .font(.system(size: 14))
+                    .foregroundStyle(readerThemeTextColor.opacity(0.6))
+
+                TextField("筛选章节名或序号", text: $tocQuery)
+                    .font(.system(size: 14))
+                    .textInputAutocapitalization(.never)
+                    .autocorrectionDisabled(true)
+                    .foregroundStyle(readerThemeTextColor)
+
+                if !tocQuery.isEmpty {
+                    Button {
+                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                        tocQuery = ""
+                    } label: {
+                        Image(systemName: "xmark.circle.fill")
+                            .font(.system(size: 14))
+                            .foregroundStyle(readerThemeTextColor.opacity(0.6))
+                    }
+                    .buttonStyle(.plain)
                 }
-                .foregroundStyle(readerThemeTextColor)
-                .padding(.horizontal)
-                .padding(.top, 10)
+            }
+            .padding(.horizontal, 12)
+            .frame(height: 38)
+            .background(readerThemeTextColor.opacity(0.08), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .stroke(readerThemeTextColor.opacity(0.15), lineWidth: 0.8)
+            }
+            .padding(.horizontal)
+            .padding(.top, 10)
 
             List {
                 if chapters.isEmpty && navigationEntries.isEmpty {
@@ -2511,7 +2530,7 @@ struct ReaderView: View {
         guard lastGoalCelebratedDate != todayKey else { return }
         let goalSeconds = Double(dailyGoalMinutes) * 60.0
         guard goalSeconds > 0 else { return }
-        let summary = ReadingStatsSummary(history: appState.readingHistoryStore.history)
+        let summary = ReadingStatsSummary(books: appState.bookshelfStore.books)
         let activeSeconds = Date().timeIntervalSince(sessionStartedAt)
         if (summary.todayReadingSeconds + activeSeconds) >= goalSeconds {
             lastGoalCelebratedDate = todayKey

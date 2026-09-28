@@ -135,15 +135,10 @@ struct DiscoverView: View {
             TextField("搜索书名或作者", text: $viewModel.keyword)
                 .font(.system(size: 16, weight: .semibold))
                 .textInputAutocapitalization(.never)
+                .autocorrectionDisabled(true)
                 .submitLabel(.search)
                 .onSubmit {
                     viewModel.startSearch()
-                }
-                .toolbar {
-                    ToolbarItemGroup(placement: .keyboard) {
-                        Spacer()
-                        Button("Done") { dismissKeyboard() }
-                    }
                 }
 
             if !viewModel.keyword.isEmpty {
@@ -434,7 +429,7 @@ struct DiscoverView: View {
     }
 
     private func searchResultCard(_ book: SearchBook) -> some View {
-        HStack(alignment: .top, spacing: 10) {
+        HStack(alignment: .center, spacing: 12) {
             NavigationLink {
                 BookDetailView(book: book)
             } label: {
