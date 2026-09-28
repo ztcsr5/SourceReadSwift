@@ -213,10 +213,12 @@ final class SearchURLResolverTests: XCTestCase {
     }
 
     func testAppVersionSemantics() {
-        XCTAssertEqual(AppVersion.versionString, "1.0.0")
+        XCTAssertEqual(AppVersion.versionString, "\(AppVersion.epic).\(AppVersion.major).\(AppVersion.minor)")
         XCTAssertEqual(AppVersion.epic, 1)
         XCTAssertEqual(AppVersion.major, 0)
-        XCTAssertEqual(AppVersion.minor, 0)
-        XCTAssertTrue(AppVersion.displayString.contains("1.0.0"))
+        XCTAssertEqual(AppVersion.minor, 1)
+        XCTAssertEqual(AppVersion.build, 2)
+        XCTAssertTrue(AppVersion.displayString.contains(AppVersion.versionString))
+        XCTAssertTrue(AppVersion.fullDisplayString.contains("Build 2"))
     }
 }
