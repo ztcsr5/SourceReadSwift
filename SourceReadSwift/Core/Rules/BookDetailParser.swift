@@ -220,10 +220,14 @@ struct BookDetailParser {
             fallbackKeys: ["latestChapter", "lastChapter", "last"],
             variables: variables
         )?.nilIfEmpty
+        var jsonVariables = variables
+        jsonVariables["result"] = dict
+        jsonVariables["data"] = dict
+        jsonVariables["json"] = dict
         let rawTocRule = htmlExtractor.firstRule(rule, keys: ["tocUrl", "chapterUrl", "catalogUrl", "chapterListUrl"])
         let tocUrl: String?
         if let rawTocRule, isURLTemplate(rawTocRule) {
-            let resolved = resolveTocTemplate(rawTocRule, base: response.url, source: source, variables: variables)
+            let resolved = resolveTocTemplate(rawTocRule, base: response.url, source: source, variables: jsonVariables)
             tocUrl = resolved.nilIfEmpty
         } else {
             let rawTocUrl = jsonExtractor.string(
@@ -234,7 +238,7 @@ struct BookDetailParser {
             )?.nilIfEmpty
             if let rawTocUrl {
                 if isURLTemplate(rawTocUrl) {
-                    let resolved = resolveTocTemplate(rawTocUrl, base: response.url, source: source, variables: variables)
+                    let resolved = resolveTocTemplate(rawTocUrl, base: response.url, source: source, variables: jsonVariables)
                     tocUrl = resolved.nilIfEmpty
                 } else {
                     tocUrl = resolveURL(rawTocUrl, base: response.url)

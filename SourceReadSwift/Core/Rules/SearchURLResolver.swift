@@ -29,13 +29,14 @@ struct SearchURLResolver {
         let trimmedCleaned = cleaned.trimmingCharacters(in: .whitespacesAndNewlines)
 
         func postProcess(_ result: String) -> String {
-            ruleResolver.interpolate(
+            let interpolated = ruleResolver.interpolate(
                 result,
                 keyword: keyword,
                 page: page,
                 baseUrl: source.cleanSourceURL,
                 charset: isGBK ? "gbk" : nil
             )
+            return normalizePathDoubleSlashes(interpolated)
         }
 
         if trimmedCleaned.hasPrefix("@js:") {
@@ -76,7 +77,24 @@ struct SearchURLResolver {
             ).map(postProcess)
         }
 
-        return .success(trimmed)
+        return .success(normalizePathDoubleSlashes(trimmed))
+    }
+
+    private func normalizePathDoubleSlashes(_ urlString: String) -> String {
+        guard let schemeRange = urlString.range(of: "^https?://", options: .regularExpression) else {
+            return urlString
+        }
+        let afterScheme = urlString[schemeRange.upperBound...]
+        guard let slashIndex = afterScheme.firstIndex(of: "/") else {
+            return urlString
+        }
+        let prefix = String(urlString[..<slashIndex])
+        let pathAndBeyond = String(urlString[slashIndex...])
+        let queryOrHashIdx = pathAndBeyond.firstIndex(where: { $0 == "?" || $0 == "#" }) ?? pathAndBeyond.endIndex
+        let pathPart = String(pathAndBeyond[..<queryOrHashIdx])
+        let suffix = String(pathAndBeyond[queryOrHashIdx...])
+        let collapsedPath = pathPart.replacingOccurrences(of: "/{2,}", with: "/", options: .regularExpression)
+        return prefix + collapsedPath + suffix
     }
 
     private func resolveEmbeddedScripts(

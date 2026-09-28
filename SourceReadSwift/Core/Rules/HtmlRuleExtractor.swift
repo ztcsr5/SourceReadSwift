@@ -49,7 +49,7 @@ struct HtmlRuleExtractor {
             let interpolated = try interpolateTemplate(trimmed, root: root, baseUrl: baseUrl, variables: variables)
                 .trimmingCharacters(in: .whitespacesAndNewlines)
             if LegadoRuleResolver().isJavaScriptRule(interpolated) {
-                return try evaluateJSWithTrailingRegex(rule: interpolated, rootHtml: try root.outerHtml(), baseUrl: baseUrl, extraVariables: variables)
+                return try evaluateJSWithTrailingRegex(rule: interpolated, rootHtml: try root.outerHtml(), rootElement: root, baseUrl: baseUrl, extraVariables: variables)
             }
             if !interpolated.isEmpty {
                 return interpolated
@@ -58,30 +58,52 @@ struct HtmlRuleExtractor {
         }
 
         if LegadoRuleResolver().isJavaScriptRule(trimmed) {
-            return try evaluateJSWithTrailingRegex(rule: trimmed, rootHtml: try root.outerHtml(), baseUrl: baseUrl, extraVariables: variables)
+            return try evaluateJSWithTrailingRegex(rule: trimmed, rootHtml: try root.outerHtml(), rootElement: root, baseUrl: baseUrl, extraVariables: variables)
         }
 
         // Support chained JavaScript rules: Selector@js:script or Selector<js>script</js>
         if let jsRange = trimmed.range(of: "@js:"), jsRange.lowerBound > trimmed.startIndex {
             let prefix = String(trimmed[..<jsRange.lowerBound]).trimmingCharacters(in: .whitespacesAndNewlines)
             let script = String(trimmed[jsRange.lowerBound...]).trimmingCharacters(in: .whitespacesAndNewlines)
-            let extracted = try self.value(from: root, rule: prefix, fallback: nil, baseUrl: baseUrl, variables: variables)
-            var chainedVariables = variables
-            chainedVariables["result"] = extracted
-            chainedVariables["src"] = extracted
-            chainedVariables["html"] = extracted
-            return try evaluateJSWithTrailingRegex(rule: script, rootHtml: extracted, baseUrl: baseUrl, extraVariables: chainedVariables)
+            let elements = (try? self.select(root, selector: prefix)) ?? []
+            if let first = elements.first {
+                var chainedVariables = variables
+                let baseStr = baseUrl?.absoluteString ?? ""
+                chainedVariables["result"] = elements.count == 1 ? LegadoElementBridge(element: first, baseURL: baseStr) : LegadoElementsBridge(elements: elements, baseURL: baseStr)
+                let extractedHtml = (try? first.outerHtml()) ?? ""
+                chainedVariables["src"] = extractedHtml
+                chainedVariables["html"] = extractedHtml
+                return try evaluateJSWithTrailingRegex(rule: script, rootHtml: extractedHtml, rootElement: first, baseUrl: baseUrl, extraVariables: chainedVariables)
+            } else {
+                let extracted = try self.value(from: root, rule: prefix, fallback: nil, baseUrl: baseUrl, variables: variables)
+                var chainedVariables = variables
+                chainedVariables["result"] = extracted
+                chainedVariables["src"] = extracted
+                chainedVariables["html"] = extracted
+                return try evaluateJSWithTrailingRegex(rule: script, rootHtml: extracted, rootElement: nil, baseUrl: baseUrl, extraVariables: chainedVariables)
+            }
         }
 
         if let jsStart = trimmed.range(of: "<js>"), jsStart.lowerBound > trimmed.startIndex {
             let prefix = String(trimmed[..<jsStart.lowerBound]).trimmingCharacters(in: .whitespacesAndNewlines)
             let script = String(trimmed[jsStart.lowerBound...]).trimmingCharacters(in: .whitespacesAndNewlines)
-            let extracted = try self.value(from: root, rule: prefix, fallback: nil, baseUrl: baseUrl, variables: variables)
-            var chainedVariables = variables
-            chainedVariables["result"] = extracted
-            chainedVariables["src"] = extracted
-            chainedVariables["html"] = extracted
-            return try evaluateJSWithTrailingRegex(rule: script, rootHtml: extracted, baseUrl: baseUrl, extraVariables: chainedVariables)
+            let elements = (try? self.select(root, selector: prefix)) ?? []
+            if let first = elements.first {
+                var chainedVariables = variables
+                let baseStr = baseUrl?.absoluteString ?? ""
+                chainedVariables["result"] = elements.count == 1 ? LegadoElementBridge(element: first, baseURL: baseStr) : LegadoElementsBridge(elements: elements, baseURL: baseStr)
+                let extractedHtml = (try? first.outerHtml()) ?? ""
+                chainedVariables["src"] = extractedHtml
+                chainedVariables["html"] = extractedHtml
+                return try evaluateJSWithTrailingRegex(rule: script, rootHtml: extractedHtml, rootElement: first, baseUrl: baseUrl, extraVariables: chainedVariables)
+            } else {
+                let extracted = try self.value(from: root, rule: prefix, fallback: nil, baseUrl: baseUrl, variables: variables)
+                var chainedVariables = variables
+                chainedVariables["result"] = extracted
+                chainedVariables["src"] = extracted
+                chainedVariables["html"] = extracted
+                return try evaluateJSWithTrailingRegex(rule: script, rootHtml: extracted, rootElement: nil, baseUrl: baseUrl, extraVariables: chainedVariables)
+            }
         }
 
         if let alternatives = RuleOperatorSplitter.split(trimmed, separator: "||") {
@@ -704,6 +726,7 @@ struct HtmlRuleExtractor {
     private func evaluateJSWithTrailingRegex(
         rule: String,
         rootHtml: String,
+        rootElement: Element? = nil,
         baseUrl: URL?,
         extraVariables: [String: Any]
     ) throws -> String {
@@ -747,7 +770,7 @@ struct HtmlRuleExtractor {
         if script.isEmpty {
             jsResult = rootHtml
         } else {
-            jsResult = try evaluateJS(rule: script, rootHtml: rootHtml, baseUrl: baseUrl, extraVariables: extraVariables)
+            jsResult = try evaluateJS(rule: script, rootHtml: rootHtml, rootElement: rootElement, baseUrl: baseUrl, extraVariables: extraVariables)
         }
 
         var currentResult = jsResult
@@ -774,7 +797,7 @@ struct HtmlRuleExtractor {
                 chainedVariables["result"] = currentResult
                 chainedVariables["src"] = currentResult
                 chainedVariables["html"] = currentResult
-                return try evaluateJSWithTrailingRegex(rule: chained, rootHtml: currentResult, baseUrl: baseUrl, extraVariables: chainedVariables)
+                return try evaluateJSWithTrailingRegex(rule: chained, rootHtml: currentResult, rootElement: nil, baseUrl: baseUrl, extraVariables: chainedVariables)
             } else if let doc = try? SwiftSoup.parse(currentResult, baseUrl?.absoluteString ?? "") {
                 var chainedVariables = extraVariables
                 chainedVariables["result"] = currentResult
@@ -793,6 +816,7 @@ struct HtmlRuleExtractor {
     private func evaluateJS(
         rule: String,
         rootHtml: String,
+        rootElement: Element? = nil,
         baseUrl: URL?,
         extraVariables: [String: Any]
     ) throws -> String {
@@ -811,12 +835,17 @@ struct HtmlRuleExtractor {
             return ""
         })
 
+        let baseStr = baseUrl?.absoluteString ?? ""
         var variables: [String: Any] = [
-            "result": rootHtml,
             "html": rootHtml,
             "src": rootHtml,
-            "baseUrl": baseUrl?.absoluteString ?? ""
+            "baseUrl": baseStr
         ]
+        if let rootElement {
+            variables["result"] = LegadoElementBridge(element: rootElement, baseURL: baseStr)
+        } else {
+            variables["result"] = rootHtml
+        }
         for (k, v) in extraVariables {
             variables[k] = v
         }

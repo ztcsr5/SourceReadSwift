@@ -383,4 +383,56 @@ final class LegadoNativeBridgeTests: XCTestCase {
         XCTAssertEqual(value, "Fixture|https://example.com/source|Book|Author|https://example.com/book|Chapter 1|4")
     }
 
+    func testLegadoElementBridgeToStringAndParentNodeSelectTraversal() throws {
+        let html = """
+        <div class="volume">
+          <h2>第一卷 觉醒</h2>
+          <div class="box1">
+            <div class="box2">
+              <div class="chapter"><a href="/c1.html">第一章 重生</a></div>
+            </div>
+          </div>
+        </div>
+        """
+        let runtime = JSCoreRuntime()
+        let script = """
+        var doc = org.jsoup.Jsoup.parse(html, baseUrl);
+        var ch = doc.select('.chapter').first();
+        var vol = ch.parentNode().parentNode().parentNode();
+        vol.select('h2').text() + ' ' + ch.text();
+        """
+        let result = runtime.evaluate(script, variables: ["html": html, "baseUrl": "https://example.com/"])
+        guard case .success(let value) = result else { return XCTFail("expected success") }
+        XCTAssertEqual(value, "第一卷 觉醒 第一章 重生")
+    }
+
+    func testDynamicURLResolverEvaluatesJSONPathOnNativeDictAndNestedFallback() throws {
+        let source = BookSource(
+            bookSourceName: "免费追书",
+            bookSourceUrl: "https://cxb-pro.cread.com",
+            searchUrl: "https://cxb-pro.cread.com/search"
+        )
+        let context = RuleExecutionContext()
+
+        // 1. Direct dictionary in result
+        let resolvedDirect = DynamicURLResolver.resolve(
+            "https://cxb-pro.cread.com/cx/itf/getvolume?bookId={{$.bookId}}",
+            baseUrl: "https://cxb-pro.cread.com/",
+            source: source,
+            variables: ["result": ["bookId": "80003311", "bookName": "李重生的重生路"]],
+            context: context
+        )
+        XCTAssertEqual(resolvedDirect, "https://cxb-pro.cread.com/cx/itf/getvolume?bookId=80003311")
+
+        // 2. Nested dictionary with single-dot rule requiring deep scan fallback
+        let resolvedNested = DynamicURLResolver.resolve(
+            "https://wechat.idejian.com/api/wechat/allcatalog/{{$.bookInfo.bookId}}?bookId={{$.bookInfo.bookId}}&page=1",
+            baseUrl: "https://wechat.idejian.com/",
+            source: source,
+            variables: ["result": ["status": 200, "data": ["bookInfo": ["bookId": "12577745"]]]],
+            context: context
+        )
+        XCTAssertEqual(resolvedNested, "https://wechat.idejian.com/api/wechat/allcatalog/12577745?bookId=12577745&page=1")
+    }
+
 }

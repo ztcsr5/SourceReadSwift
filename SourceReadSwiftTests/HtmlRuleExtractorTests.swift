@@ -310,4 +310,27 @@ final class HtmlRuleExtractorTests: XCTestCase {
 
         XCTAssertEqual(value, "https://example.com/a,b:c")
     }
+
+    func testHtmlRuleExtractorElementJavaScriptRuleWithParentNodeAndSelect() throws {
+        let html = """
+        <div class="volume">
+          <h2>第一卷 异界</h2>
+          <div class="nested">
+            <div class="chapter"><a href="/c1.html">第1章 降临</a></div>
+          </div>
+        </div>
+        """
+        let doc = try SwiftSoup.parse(html)
+        let chapterEl = try doc.select(".chapter").first()!
+        let extractor = HtmlRuleExtractor()
+
+        let scriptRule = "@js:\nvar title = result.parentNode().parentNode();\nresult = title.select('h2').text() + ' ' + result.text()"
+        let value = try extractor.value(
+            from: chapterEl,
+            rule: scriptRule,
+            baseUrl: URL(string: "https://example.com/book/1")!
+        )
+
+        XCTAssertEqual(value, "第一卷 异界 第1章 降临")
+    }
 }

@@ -221,24 +221,46 @@ struct SourceRequestBuilder {
                 trimmed = String(trimmed[..<hashIdx]).trimmingCharacters(in: .whitespacesAndNewlines)
             }
         }
+        trimmed = normalizePathDoubleSlashes(trimmed)
         if let absolute = URL(string: trimmed), absolute.scheme != nil {
-            return absolute
+            let normalized = normalizePathDoubleSlashes(absolute.absoluteString)
+            return URL(string: normalized) ?? absolute
         }
         if let encoded = trimmed.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed.union(.urlPathAllowed)),
            let absolute = URL(string: encoded), absolute.scheme != nil {
-            return absolute
+            let normalized = normalizePathDoubleSlashes(absolute.absoluteString)
+            return URL(string: normalized) ?? absolute
         }
         let effectiveBaseURL = URL(string: cleanBase) ?? cleanBase.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed.union(.urlPathAllowed)).flatMap { URL(string: $0) }
         if let baseURL = effectiveBaseURL {
             if let relative = URL(string: trimmed, relativeTo: baseURL)?.absoluteURL {
-                return relative
+                let normalized = normalizePathDoubleSlashes(relative.absoluteString)
+                return URL(string: normalized) ?? relative
             }
             if let encoded = trimmed.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed.union(.urlPathAllowed)),
                let relative = URL(string: encoded, relativeTo: baseURL)?.absoluteURL {
-                return relative
+                let normalized = normalizePathDoubleSlashes(relative.absoluteString)
+                return URL(string: normalized) ?? relative
             }
         }
         return effectiveBaseURL ?? URL(string: "https://invalid.local")!
+    }
+
+    private func normalizePathDoubleSlashes(_ urlString: String) -> String {
+        guard let schemeRange = urlString.range(of: "^https?://", options: .regularExpression) else {
+            return urlString
+        }
+        let afterScheme = urlString[schemeRange.upperBound...]
+        guard let slashIndex = afterScheme.firstIndex(of: "/") else {
+            return urlString
+        }
+        let prefix = String(urlString[..<slashIndex])
+        let pathAndBeyond = String(urlString[slashIndex...])
+        let queryOrHashIdx = pathAndBeyond.firstIndex(where: { $0 == "?" || $0 == "#" }) ?? pathAndBeyond.endIndex
+        let pathPart = String(pathAndBeyond[..<queryOrHashIdx])
+        let suffix = String(pathAndBeyond[queryOrHashIdx...])
+        let collapsedPath = pathPart.replacingOccurrences(of: "/{2,}", with: "/", options: .regularExpression)
+        return prefix + collapsedPath + suffix
     }
 
     private func sourceHeaders(_ source: BookSource, persistentValues: [String: String] = [:]) -> [String: String] {

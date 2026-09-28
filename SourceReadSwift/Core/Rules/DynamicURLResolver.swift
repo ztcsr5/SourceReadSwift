@@ -90,9 +90,28 @@ struct DynamicURLResolver {
                     // If script is a JSONPath (starts with $), extract from response JSON or variables
                     if script.hasPrefix("$") {
                         let jsonExtractor = JSONRuleExtractor(executionContext: context)
-                        if let bodyStr = jsVariables["body"] as? String ?? jsVariables["result"] as? String,
-                           let jsonObj = ResponseFormatDetector.jsonObject(from: bodyStr) {
-                            evaluatedValue = jsonExtractor.string(from: jsonObj, rule: script, fallbackKeys: [], variables: jsVariables)
+                        var targetObject: Any? = nil
+                        if let dict = jsVariables["result"] as? [String: Any] {
+                            targetObject = dict
+                        } else if let arr = jsVariables["result"] as? [Any] {
+                            targetObject = arr
+                        } else if let dict = jsVariables["data"] as? [String: Any] {
+                            targetObject = dict
+                        } else if let dict = jsVariables["body"] as? [String: Any] {
+                            targetObject = dict
+                        } else if let bodyStr = jsVariables["body"] as? String ?? jsVariables["result"] as? String {
+                            targetObject = ResponseFormatDetector.jsonObject(from: bodyStr)
+                        } else if let dict = jsVariables["book"] as? [String: Any] {
+                            targetObject = dict
+                        }
+
+                        if let targetObject {
+                            evaluatedValue = jsonExtractor.string(from: targetObject, rule: script, fallbackKeys: [], variables: jsVariables)
+                            // Fallback to recursive scan ($..) if top-level property not found and rule uses single dot ($.prop)
+                            if evaluatedValue == nil && script.hasPrefix("$.") && !script.hasPrefix("$..") {
+                                let deepRule = "$.." + script.dropFirst(2)
+                                evaluatedValue = jsonExtractor.string(from: targetObject, rule: String(deepRule), fallbackKeys: [], variables: jsVariables)
+                            }
                         } else if let dict = jsVariables["book"] as? [String: Any] {
                             evaluatedValue = jsonExtractor.string(from: dict, rule: script, fallbackKeys: [], variables: jsVariables)
                         }

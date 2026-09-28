@@ -167,7 +167,7 @@ final class SearchURLResolverTests: XCTestCase {
             searchUrl: "{{sourceUrl}}/modules/article/search.php?searchkey={{key}}"
         )
 
-        XCTAssertEqual(source.cleanSourceURL, "http://m.wenxuesk.info")
+        XCTAssertEqual(source.cleanSourceURL, "http://m.wenxuesk.info/")
 
         let result = SearchURLResolver().resolve(source: source, keyword: "重生", page: 1)
         guard case .success(let url) = result else {
@@ -175,6 +175,22 @@ final class SearchURLResolverTests: XCTestCase {
         }
         XCTAssertFalse(url.contains("#"))
         XCTAssertEqual(url, "http://m.wenxuesk.info/modules/article/search.php?searchkey=%E9%87%8D%E7%94%9F")
+    }
+
+    func testResolveBaseUrlWithoutLeadingSlash() throws {
+        let source = BookSource(
+            bookSourceName: "八一中文",
+            bookSourceUrl: "https://www.blxs.la",
+            searchUrl: "{{baseUrl}}modules/article/search.php?searchkey={{key}}"
+        )
+
+        XCTAssertEqual(source.cleanSourceURL, "https://www.blxs.la/")
+
+        let result = SearchURLResolver().resolve(source: source, keyword: "重生", page: 1)
+        guard case .success(let url) = result else {
+            return XCTFail("expected success")
+        }
+        XCTAssertEqual(url, "https://www.blxs.la/modules/article/search.php?searchkey=%E9%87%8D%E7%94%9F")
     }
 
     func testBuildRequestFixesFragmentPathConcatenation() throws {

@@ -647,6 +647,7 @@ final class LegadoJXNodeFactoryBridge: NSObject, LegadoJXNodeFactoryExport {
     func select(_ selector: String) -> LegadoElementsBridge
     func `is`(_ selector: String) -> Bool
     func text() -> String
+    func toString() -> String
     func text(_ value: String) -> LegadoElementBridge
     func ownText() -> String
     func hasText() -> Bool
@@ -722,6 +723,9 @@ final class LegadoElementBridge: NSObject, LegadoElementExport {
         self.baseURL = baseURL
         super.init()
     }
+
+    override var description: String { (try? element.outerHtml()) ?? "" }
+    func toString() -> String { (try? element.outerHtml()) ?? "" }
 
     func tagName() -> String { element.tagName() }
     func tagName(_ value: String) -> LegadoElementBridge { _ = try? element.tagName(value); return self }
@@ -1051,6 +1055,7 @@ final class LegadoElementBridge: NSObject, LegadoElementExport {
     func addAt(_ index: Int, _ element: LegadoElementBridge) -> LegadoElementsBridge
     func array() -> NSArray
     func toArray() -> NSArray
+    func toString() -> String
 }
 
 final class LegadoElementsBridge: NSObject, LegadoElementsExport {
@@ -1062,6 +1067,9 @@ final class LegadoElementsBridge: NSObject, LegadoElementsExport {
         self.baseURL = baseURL
         super.init()
     }
+
+    override var description: String { elements.compactMap { try? $0.outerHtml() }.joined(separator: "\n") }
+    func toString() -> String { elements.compactMap { try? $0.outerHtml() }.joined(separator: "\n") }
 
     var length: Int { elements.count }
     func size() -> Int { elements.count }

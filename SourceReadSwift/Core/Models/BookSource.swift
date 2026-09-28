@@ -5,12 +5,23 @@ struct BookSource: Identifiable, Codable, Hashable, Sendable {
 
     /// Base URL stripped of any fragment annotations (e.g. `#tag`, `#🎃`, `#备用`)
     /// matching Android Legado's `cleanUrl` / base request URL behavior.
+    /// In Legado (OkHttp), origin root domains (e.g. `https://www.blxs.la`) canonically
+    /// end with a trailing slash (`https://www.blxs.la/`), which rule authors rely on
+    /// when constructing relative URLs like `{{baseUrl}}modules/...`.
     var cleanSourceURL: String {
         let trimmed = bookSourceUrl.trimmingCharacters(in: .whitespacesAndNewlines)
+        let baseWithoutHash: String
         if let hashIdx = trimmed.firstIndex(of: "#") {
-            return String(trimmed[..<hashIdx]).trimmingCharacters(in: .whitespacesAndNewlines)
+            baseWithoutHash = String(trimmed[..<hashIdx]).trimmingCharacters(in: .whitespacesAndNewlines)
+        } else {
+            baseWithoutHash = trimmed
         }
-        return trimmed
+        if let parsed = URL(string: baseWithoutHash), parsed.scheme != nil, parsed.host != nil {
+            if parsed.path.isEmpty || parsed.path == "/" {
+                return baseWithoutHash.hasSuffix("/") ? baseWithoutHash : (baseWithoutHash + "/")
+            }
+        }
+        return baseWithoutHash
     }
 
     let bookSourceName: String

@@ -205,8 +205,19 @@ final class URLSessionSourceNetworkClient: SourceNetworkClient, @unchecked Senda
                 }
                 await cookieStore.storeSetCookieHeaders(respHeaders, for: currentURL)
 
-                // Update Referer
-                currentHeaders["Referer"] = currentURL.absoluteString
+                // Update Referer and Origin for redirected requests
+                if let nextHost = nextURL.host?.lowercased(),
+                   let currentHost = currentURL.host?.lowercased(),
+                   nextHost != currentHost {
+                    // Cross-domain redirect: set Referer to the target domain's origin to satisfy WAF and anti-hotlink checks
+                    let nextScheme = nextURL.scheme ?? "https"
+                    currentHeaders["Referer"] = "\(nextScheme)://\(nextURL.host ?? "")/"
+                    if currentHeaders["Origin"] != nil {
+                        currentHeaders["Origin"] = "\(nextScheme)://\(nextURL.host ?? "")"
+                    }
+                } else {
+                    currentHeaders["Referer"] = currentURL.absoluteString
+                }
 
                 // HTTP RFC 7231: switch POST/PUT to GET on 301, 302, 303
                 if http.statusCode == 301 || http.statusCode == 302 || http.statusCode == 303 {
@@ -233,7 +244,17 @@ final class URLSessionSourceNetworkClient: SourceNetworkClient, @unchecked Senda
                     redirectCount += 1
                     if redirectCount <= maxRedirects {
                         await cookieStore.storeSetCookieHeaders(respHeaders, for: currentURL)
-                        currentHeaders["Referer"] = currentURL.absoluteString
+                        if let nextHost = nextURL.host?.lowercased(),
+                           let currentHost = currentURL.host?.lowercased(),
+                           nextHost != currentHost {
+                            let nextScheme = nextURL.scheme ?? "https"
+                            currentHeaders["Referer"] = "\(nextScheme)://\(nextURL.host ?? "")/"
+                            if currentHeaders["Origin"] != nil {
+                                currentHeaders["Origin"] = "\(nextScheme)://\(nextURL.host ?? "")"
+                            }
+                        } else {
+                            currentHeaders["Referer"] = currentURL.absoluteString
+                        }
                         currentMethod = .get
                         currentBody = nil
                         currentHeaders.removeValue(forKey: "Content-Type")
