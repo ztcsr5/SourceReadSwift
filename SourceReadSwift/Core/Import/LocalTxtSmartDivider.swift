@@ -138,7 +138,15 @@ struct LocalTxtSmartDivider {
 
     func isChapterHeading(_ line: String) -> Bool {
         let trimmed = line.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard trimmed.count <= 50, !trimmed.isEmpty else { return false }
+        guard trimmed.count <= 60, !trimmed.isEmpty else { return false }
+
+        let range = NSRange(trimmed.startIndex..<trimmed.endIndex, in: trimmed)
+
+        // Custom regex override if provided
+        if case .custom(let pattern) = mode,
+           let customRegex = try? NSRegularExpression(pattern: pattern, options: [.caseInsensitive]) {
+            return customRegex.firstMatch(in: trimmed, options: [], range: range) != nil
+        }
 
         // Fast O(1) prefix check: 98% of novel lines start with non-heading characters
         guard let firstChar = trimmed.first else { return false }
@@ -153,14 +161,6 @@ struct LocalTxtSmartDivider {
 
         guard allowedPrefixes.contains(firstChar) else {
             return false
-        }
-
-        let range = NSRange(trimmed.startIndex..<trimmed.endIndex, in: trimmed)
-
-        // Custom regex override if provided
-        if case .custom(let pattern) = mode,
-           let customRegex = try? NSRegularExpression(pattern: pattern, options: [.caseInsensitive]) {
-            return customRegex.firstMatch(in: trimmed, options: [], range: range) != nil
         }
 
         return Self.compiledHeadingRegexes.contains { regex in
