@@ -25,7 +25,7 @@ final class AudioBookPlaybackCoordinator: ObservableObject {
     private var timeObserverToken: Any?
     private var sleepTimer: Timer?
     private var currentArtwork: MPMediaItemArtwork?
-    private weak var currentEngine: SourceEngine?
+    private var currentEngine: SourceEngine?
 
     var currentChapter: BookChapter? {
         guard chapters.indices.contains(currentChapterIndex) else { return nil }
