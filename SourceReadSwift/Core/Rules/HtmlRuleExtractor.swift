@@ -65,7 +65,7 @@ struct HtmlRuleExtractor {
         if let jsRange = trimmed.range(of: "@js:"), jsRange.lowerBound > trimmed.startIndex {
             let prefix = String(trimmed[..<jsRange.lowerBound]).trimmingCharacters(in: .whitespacesAndNewlines)
             let script = String(trimmed[jsRange.lowerBound...]).trimmingCharacters(in: .whitespacesAndNewlines)
-            let elements = (try? self.select(root, selector: prefix)) ?? []
+            let elements = (try? self.select(from: root, rule: prefix, baseUrl: baseUrl)) ?? []
             if let first = elements.first {
                 var chainedVariables = variables
                 let baseStr = baseUrl?.absoluteString ?? ""
@@ -87,7 +87,7 @@ struct HtmlRuleExtractor {
         if let jsStart = trimmed.range(of: "<js>"), jsStart.lowerBound > trimmed.startIndex {
             let prefix = String(trimmed[..<jsStart.lowerBound]).trimmingCharacters(in: .whitespacesAndNewlines)
             let script = String(trimmed[jsStart.lowerBound...]).trimmingCharacters(in: .whitespacesAndNewlines)
-            let elements = (try? self.select(root, selector: prefix)) ?? []
+            let elements = (try? self.select(from: root, rule: prefix, baseUrl: baseUrl)) ?? []
             if let first = elements.first {
                 var chainedVariables = variables
                 let baseStr = baseUrl?.absoluteString ?? ""
