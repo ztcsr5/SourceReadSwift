@@ -1,5 +1,41 @@
 import Foundation
 
+enum BookSourceKind: Int, Codable, CaseIterable, Identifiable, Sendable {
+    case text = 0
+    case audio = 1
+    case comic = 2
+    case video = 3
+
+    var id: Int { rawValue }
+
+    var displayName: String {
+        switch self {
+        case .text: return "小说"
+        case .audio: return "听书"
+        case .comic: return "漫画"
+        case .video: return "视频"
+        }
+    }
+
+    var badgeText: String {
+        switch self {
+        case .text: return "文"
+        case .audio: return "听"
+        case .comic: return "漫"
+        case .video: return "视"
+        }
+    }
+
+    var systemImage: String {
+        switch self {
+        case .text: return "book.closed"
+        case .audio: return "headphones"
+        case .comic: return "photo.on.rectangle.angled"
+        case .video: return "play.tv"
+        }
+    }
+}
+
 struct SearchBook: Identifiable, Codable, Hashable, Sendable {
     var id: String { "\(sourceUrl)|\(bookUrl)" }
     let name: String

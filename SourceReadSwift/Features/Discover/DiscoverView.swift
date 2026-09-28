@@ -572,21 +572,25 @@ struct DiscoverView: View {
         guard let target = detectedClipboardSourceURL else { return }
         isImportingClipboardSource = true
         Task {
-            if target.hasPrefix("http") {
-                let count = await appState.sourceStore.importFromURL(target)
+            do {
+                let report: SourceImportReport
+                if target.hasPrefix("http"), let url = URL(string: target) {
+                    let (data, _) = try await URLSession.shared.data(from: url)
+                    report = try await appState.sourceStore.importJSONDataAsync(data)
+                } else {
+                    report = try await appState.sourceStore.importJSONAsync(target)
+                }
+                let count = report.totalAdded + report.totalUpdated
                 await MainActor.run {
                     isImportingClipboardSource = false
                     detectedClipboardSourceURL = nil
                     clipboardImportToast = count > 0 ? "已成功导入 \(count) 个书源" : "未解析到有效书源"
                     UIImpactFeedbackGenerator(style: .medium).impactOccurred()
                 }
-            } else {
-                let count = await appState.sourceStore.importSources(fromJSON: target)
+            } catch {
                 await MainActor.run {
                     isImportingClipboardSource = false
-                    detectedClipboardSourceURL = nil
-                    clipboardImportToast = count > 0 ? "已成功导入 \(count) 个书源" : "未解析到有效书源"
-                    UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                    clipboardImportToast = "导入失败：\(error.localizedDescription)"
                 }
             }
         }

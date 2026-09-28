@@ -28,6 +28,7 @@ struct BookSource: Identifiable, Codable, Hashable, Sendable {
     let bookSourceUrl: String
     let bookSourceGroup: String?
     let bookSourceType: Int
+    var sourceKind: BookSourceKind { BookSourceKind(rawValue: bookSourceType) ?? .text }
     let enabled: Bool
     let weight: Int
     let searchUrl: String?

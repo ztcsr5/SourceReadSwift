@@ -16,12 +16,15 @@ struct BookDetailView: View {
     @State private var isAscending = true
     @State private var showAllChapters = false
     @State private var showAudioPlayer = false
+    @State private var showComicReader = false
+    @State private var showVideoPlayer = false
+    @State private var selectedChapterIndexForReader = 0
 
-    private var isAudioBook: Bool {
+    private var sourceKind: BookSourceKind {
         if let source = appState.sourceStore.source(for: book.sourceUrl) {
-            return source.bookSourceType == 1
+            return source.sourceKind
         }
-        return false
+        return .text
     }
 
     private var downloadRecord: ChapterDownloadRecord? {
@@ -72,10 +75,17 @@ struct BookDetailView: View {
                     if book.sourceName == "Z-Library" || book.bookUrl.hasPrefix("zlib://") {
                         zlibraryActionCard
                     } else {
-                        if isAudioBook {
+                        switch sourceKind {
+                        case .audio:
                             audioBookActionCard
-                        } else if !chapters.isEmpty {
-                            downloadSection
+                        case .comic:
+                            comicActionCard
+                        case .video:
+                            videoActionCard
+                        case .text:
+                            if !chapters.isEmpty {
+                                downloadSection
+                            }
                         }
                         chapterList
                     }
@@ -120,6 +130,30 @@ struct BookDetailView: View {
         }
         .sheet(isPresented: $showAudioPlayer) {
             AudioBookPlayerView()
+        }
+        .fullScreenCover(isPresented: $showComicReader) {
+            if let source = appState.sourceStore.source(for: book.sourceUrl) {
+                ComicReaderView(
+                    bookID: appState.bookshelfStore.contains(book) ? book.id : "\(book.sourceUrl)|\(book.bookUrl)",
+                    bookTitle: book.name,
+                    source: source,
+                    initialChapterIndex: selectedChapterIndexForReader,
+                    chapters: chapters,
+                    engine: appState.engine
+                )
+            }
+        }
+        .fullScreenCover(isPresented: $showVideoPlayer) {
+            if let source = appState.sourceStore.source(for: book.sourceUrl) {
+                VideoPlayerView(
+                    bookID: appState.bookshelfStore.contains(book) ? book.id : "\(book.sourceUrl)|\(book.bookUrl)",
+                    bookTitle: book.name,
+                    source: source,
+                    initialChapterIndex: selectedChapterIndexForReader,
+                    chapters: chapters,
+                    engine: appState.engine
+                )
+            }
         }
         .onAppear {
             promptToAddAfterPreviewIfNeeded()
@@ -284,6 +318,78 @@ struct BookDetailView: View {
         .podcastCard()
     }
 
+    private var comicActionCard: some View {
+        Button {
+            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+            selectedChapterIndexForReader = 0
+            showComicReader = true
+        } label: {
+            HStack(spacing: 14) {
+                ZStack {
+                    Circle()
+                        .fill(Color.orange)
+                        .frame(width: 48, height: 48)
+                    Image(systemName: "photo.on.rectangle.angled")
+                        .font(.title3)
+                        .foregroundStyle(.white)
+                }
+
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("漫画连载专区")
+                        .font(.headline)
+                        .foregroundStyle(.primary)
+                    Text("支持条漫瀑布流、双向翻页与高精双指缩放")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+
+                Spacer()
+
+                Image(systemName: "book.pages.fill")
+                    .font(.title2)
+                    .foregroundStyle(Color.orange)
+            }
+            .padding(.vertical, 4)
+        }
+        .podcastCard()
+    }
+
+    private var videoActionCard: some View {
+        Button {
+            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+            selectedChapterIndexForReader = 0
+            showVideoPlayer = true
+        } label: {
+            HStack(spacing: 14) {
+                ZStack {
+                    Circle()
+                        .fill(Color.red)
+                        .frame(width: 48, height: 48)
+                    Image(systemName: "play.tv")
+                        .font(.title3)
+                        .foregroundStyle(.white)
+                }
+
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("影视视频专区")
+                        .font(.headline)
+                        .foregroundStyle(.primary)
+                    Text("支持手势调光控音、无级倍速与剧集选集")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+
+                Spacer()
+
+                Image(systemName: "play.circle.fill")
+                    .font(.title2)
+                    .foregroundStyle(Color.red)
+            }
+            .padding(.vertical, 4)
+        }
+        .podcastCard()
+    }
+
     private var chapterList: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
@@ -297,7 +403,8 @@ struct BookDetailView: View {
 
             VStack(spacing: 0) {
                 ForEach(Array(displayedChapters.enumerated()), id: \.element.id) { index, chapter in
-                    if isAudioBook {
+                    switch sourceKind {
+                    case .audio:
                         Button {
                             UIImpactFeedbackGenerator(style: .light).impactOccurred()
                             if let source = appState.sourceStore.source(for: book.sourceUrl) {
@@ -329,7 +436,58 @@ struct BookDetailView: View {
                             .contentShape(Rectangle())
                         }
                         .buttonStyle(.plain)
-                    } else {
+
+                    case .comic:
+                        Button {
+                            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                            selectedChapterIndexForReader = chapter.index
+                            showComicReader = true
+                        } label: {
+                            HStack {
+                                Image(systemName: "photo.on.rectangle.angled")
+                                    .font(.caption)
+                                    .foregroundStyle(.orange)
+                                Text(chapter.title)
+                                    .font(.body)
+                                    .foregroundStyle(.primary)
+                                    .lineLimit(1)
+                                Spacer()
+                                Image(systemName: "chevron.right")
+                                    .font(.caption.weight(.bold))
+                                    .foregroundStyle(.tertiary)
+                            }
+                            .padding(.vertical, 12)
+                            .padding(.horizontal, 14)
+                            .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+
+                    case .video:
+                        Button {
+                            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                            selectedChapterIndexForReader = chapter.index
+                            showVideoPlayer = true
+                        } label: {
+                            HStack {
+                                Image(systemName: "play.tv")
+                                    .font(.caption)
+                                    .foregroundStyle(.red)
+                                Text(chapter.title)
+                                    .font(.body)
+                                    .foregroundStyle(.primary)
+                                    .lineLimit(1)
+                                Spacer()
+                                Image(systemName: "play.fill")
+                                    .font(.caption)
+                                    .foregroundStyle(.red)
+                            }
+                            .padding(.vertical, 12)
+                            .padding(.horizontal, 14)
+                            .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+
+                    case .text:
                         NavigationLink {
                             ChapterLoadingView(
                                 bookID: appState.bookshelfStore.contains(book) ? book.id : "\(book.sourceUrl)|\(book.bookUrl)",

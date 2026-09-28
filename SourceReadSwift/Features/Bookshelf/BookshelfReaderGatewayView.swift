@@ -60,27 +60,54 @@ struct BookshelfReaderGatewayView: View {
                 )
             )
         } else if let selectedChapter {
-            if let source = appState.sourceStore.source(for: currentBook.sourceURL), source.bookSourceType == 1 {
-                return AnyView(
-                    AudioBookPlayerView()
-                        .onAppear {
-                            let searchBook = SearchBook(
-                                name: currentBook.title,
-                                author: currentBook.author,
-                                coverUrl: currentBook.coverURL,
-                                bookUrl: currentBook.bookURL,
-                                sourceName: source.bookSourceName,
-                                sourceUrl: source.bookSourceUrl
-                            )
-                            AudioBookPlaybackCoordinator.shared.startBook(
-                                book: searchBook,
-                                source: source,
-                                chapters: chapters,
-                                initialChapterIndex: selectedChapter.index,
-                                engine: appState.engine
-                            )
-                        }
-                )
+            if let source = appState.sourceStore.source(for: currentBook.sourceURL) {
+                switch source.sourceKind {
+                case .audio:
+                    return AnyView(
+                        AudioBookPlayerView()
+                            .onAppear {
+                                let searchBook = SearchBook(
+                                    name: currentBook.title,
+                                    author: currentBook.author,
+                                    coverUrl: currentBook.coverURL,
+                                    bookUrl: currentBook.bookURL,
+                                    sourceName: source.bookSourceName,
+                                    sourceUrl: source.bookSourceUrl
+                                )
+                                AudioBookPlaybackCoordinator.shared.startBook(
+                                    book: searchBook,
+                                    source: source,
+                                    chapters: chapters,
+                                    initialChapterIndex: selectedChapter.index,
+                                    engine: appState.engine
+                                )
+                            }
+                    )
+                case .comic:
+                    return AnyView(
+                        ComicReaderView(
+                            bookID: book.id,
+                            bookTitle: currentBook.title,
+                            source: source,
+                            initialChapterIndex: selectedChapter.index,
+                            chapters: chapters,
+                            engine: appState.engine
+                        )
+                    )
+                case .video:
+                    return AnyView(
+                        VideoPlayerView(
+                            bookID: book.id,
+                            bookTitle: currentBook.title,
+                            source: source,
+                            initialChapterIndex: selectedChapter.index,
+                            chapters: chapters,
+                            engine: appState.engine
+                        )
+                    )
+                case .text:
+                    break
+                }
             }
             let storedParagraph = currentBook.currentChapterIndex == selectedChapter.index ? currentBook.currentParagraphIndex : nil
             return AnyView(
