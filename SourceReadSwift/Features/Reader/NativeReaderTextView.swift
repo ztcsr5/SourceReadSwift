@@ -752,6 +752,18 @@ enum ReaderNativeTextLayout {
                         .paragraphStyle: dividerStyle
                     ]
                     output.addAttributes(dividerAttrs, range: range)
+                } else if paragraph.hasPrefix("[img]") && paragraph.hasSuffix("[/img]") {
+                    let range = ranges[idx]
+                    let imgStyle = NSMutableParagraphStyle()
+                    imgStyle.alignment = .center
+                    imgStyle.paragraphSpacingBefore = CGFloat(configuration.paragraphSpacing + 8)
+                    imgStyle.paragraphSpacing = CGFloat(configuration.paragraphSpacing + 8)
+                    let imgAttrs: [NSAttributedString.Key: Any] = [
+                        .font: configuration.fontFamily.uiFont(ofSize: max(CGFloat(configuration.fontSize - 2), 12), weight: .medium),
+                        .foregroundColor: configuration.textColor.withAlphaComponent(0.65),
+                        .paragraphStyle: imgStyle
+                    ]
+                    output.addAttributes(imgAttrs, range: range)
                 }
             }
         }

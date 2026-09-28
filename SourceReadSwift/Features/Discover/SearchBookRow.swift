@@ -30,6 +30,8 @@ struct SearchBookRow: View {
                         .background(Color.accentColor.opacity(0.12))
                         .clipShape(Capsule())
                         .lineLimit(1)
+                        .fixedSize(horizontal: true, vertical: false)
+                        .layoutPriority(1)
                 }
 
                 if let intro = book.intro, !intro.isEmpty {

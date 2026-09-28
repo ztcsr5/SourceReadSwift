@@ -661,6 +661,7 @@ private struct BookshelfCollectionView: View {
     @State private var confirmBatchDelete = false
     @State private var selectedBookForDetail: BookshelfBook?
     @State private var searchKeyword = ""
+    @State private var debouncedSearchKeyword = ""
 
     init(title: String, books: [BookshelfBook], startsManaging: Bool = false) {
         self.title = title
@@ -678,7 +679,7 @@ private struct BookshelfCollectionView: View {
 
     private var liveDisplayBooks: [BookshelfBook] {
         let base = selectedGroupName == nil ? liveBooks : liveBooks.filter { $0.groupName == selectedGroupName }
-        let query = searchKeyword.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        let query = debouncedSearchKeyword.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
         guard !query.isEmpty else { return base }
         return base.filter {
             $0.title.lowercased().contains(query) ||
@@ -705,6 +706,7 @@ private struct BookshelfCollectionView: View {
                         Button {
                             UIImpactFeedbackGenerator(style: .light).impactOccurred()
                             searchKeyword = ""
+                            debouncedSearchKeyword = ""
                         } label: {
                             Image(systemName: "xmark.circle.fill")
                                 .font(.system(size: 14))
@@ -786,6 +788,7 @@ private struct BookshelfCollectionView: View {
             }
             .padding(AppTheme.pagePadding)
         }
+        .scrollDismissesKeyboard(.interactively)
         .pageBackground()
         .navigationTitle(title)
         .navigationBarTitleDisplayMode(.large)
@@ -923,6 +926,15 @@ private struct BookshelfCollectionView: View {
                         }
                     }
             }
+        }
+        .task(id: searchKeyword) {
+            if searchKeyword.isEmpty {
+                debouncedSearchKeyword = ""
+                return
+            }
+            try? await Task.sleep(nanoseconds: 120_000_000)
+            guard !Task.isCancelled else { return }
+            debouncedSearchKeyword = searchKeyword
         }
     }
 

@@ -184,4 +184,47 @@ final class ContentParserTests: XCTestCase {
         }
         XCTAssertEqual(content.paragraphs, ["FoundInSrc: https://example.com/book/1/1.html"])
     }
+
+    func testHTMLContentPreservesImagesAsTokens() throws {
+        let source = BookSource(
+            bookSourceName: "TestImg",
+            bookSourceUrl: "https://example.com",
+            ruleContent: SourceRule(fields: [
+                "content": ".content@html"
+            ])
+        )
+        let chapter = BookChapter(
+            title: "Chapter 1",
+            url: "https://example.com/book/1/1.html",
+            bookUrl: "https://example.com/book/1",
+            index: 0,
+            isVip: false
+        )
+        let response = SourceResponse(
+            url: URL(string: chapter.url)!,
+            statusCode: 200,
+            headers: [:],
+            body: """
+            <html><body>
+              <div class="content">
+                <p>前文段落</p>
+                <p><img src="https://img.example.com/cover1.jpg" alt="插图" /></p>
+                <p>后文段落</p>
+              </div>
+            </body></html>
+            """,
+            data: Data()
+        )
+
+        let result = ContentParser().parse(source: source, chapter: chapter, response: response)
+
+        guard case .success(let content) = result else {
+            return XCTFail("expected parsed content")
+        }
+        XCTAssertEqual(content.paragraphs, [
+            "前文段落",
+            "[img]https://img.example.com/cover1.jpg[/img]",
+            "后文段落"
+        ])
+    }
 }

@@ -101,23 +101,11 @@ struct BookDetailView: View {
             await load()
         }
         .sheet(isPresented: $showAllChapters) {
-            NavigationStack {
-                List {
-                    ForEach(isAscending ? chapters : Array(chapters.reversed())) { chapter in
-                        NavigationLink {
-                            ChapterLoadingView(
-                                bookID: appState.bookshelfStore.contains(book) ? book.id : "\(book.sourceUrl)|\(book.bookUrl)",
-                                sourceUrl: book.sourceUrl,
-                                chapter: chapter,
-                                totalChapters: chapters.count,
-                                chapters: chapters
-                            )
-                        } label: { Text(chapter.title).lineLimit(1) }
-                    }
-                }
-                .navigationTitle("完整目录")
-                .navigationBarTitleDisplayMode(.inline)
-            }
+            BookDetailAllChaptersView(
+                chapters: chapters,
+                book: book,
+                bookID: appState.bookshelfStore.contains(book) ? book.id : "\(book.sourceUrl)|\(book.bookUrl)"
+            )
         }
         .onAppear {
             promptToAddAfterPreviewIfNeeded()
@@ -901,3 +889,114 @@ struct ChapterLoadingView: View {
         self.onRequestSourceSwitch = onRequestSourceSwitch
     }
 }
+
+private struct BookDetailAllChaptersView: View {
+    @Environment(\.dismiss) private var dismiss
+    let chapters: [BookChapter]
+    let book: SearchBook
+    let bookID: String
+    @State private var query = ""
+    @State private var debouncedQuery = ""
+    @State private var isAscending = true
+
+    private var filteredChapters: [BookChapter] {
+        let q = debouncedQuery.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        let base = isAscending ? chapters : Array(chapters.reversed())
+        guard !q.isEmpty else { return base }
+        return base.filter {
+            $0.title.lowercased().contains(q) || "\($0.index + 1)".contains(q)
+        }
+    }
+
+    var body: some View {
+        NavigationStack {
+            VStack(spacing: 8) {
+                HStack(spacing: 8) {
+                    Image(systemName: "magnifyingglass")
+                        .font(.system(size: 14))
+                        .foregroundStyle(.secondary)
+                    TextField("筛选章节名或序号", text: $query)
+                        .font(.system(size: 14))
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled(true)
+                    if !query.isEmpty {
+                        Button {
+                            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                            query = ""
+                            debouncedQuery = ""
+                        } label: {
+                            Image(systemName: "xmark.circle.fill")
+                                .font(.system(size: 14))
+                                .foregroundStyle(.secondary)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+                .padding(.horizontal, 12)
+                .frame(height: 38)
+                .background(Color(.systemGray6))
+                .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                .padding(.horizontal)
+                .padding(.top, 6)
+
+                List {
+                    if filteredChapters.isEmpty {
+                        Text("没有匹配章节")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                            .frame(maxWidth: .infinity, alignment: .center)
+                            .listRowBackground(Color.clear)
+                    } else {
+                        ForEach(filteredChapters) { chapter in
+                            NavigationLink {
+                                ChapterLoadingView(
+                                    bookID: bookID,
+                                    sourceUrl: book.sourceUrl,
+                                    chapter: chapter,
+                                    totalChapters: chapters.count,
+                                    chapters: chapters
+                                )
+                            } label: {
+                                HStack(spacing: 12) {
+                                    Text("\(chapter.index + 1)")
+                                        .font(.caption.weight(.semibold).monospacedDigit())
+                                        .foregroundStyle(.secondary)
+                                        .frame(width: 48, alignment: .leading)
+                                    Text(chapter.title)
+                                        .font(.system(size: 15))
+                                        .lineLimit(1)
+                                }
+                            }
+                        }
+                    }
+                }
+                .listStyle(.plain)
+                .scrollDismissesKeyboard(.interactively)
+            }
+            .task(id: query) {
+                if query.isEmpty {
+                    debouncedQuery = ""
+                    return
+                }
+                try? await Task.sleep(nanoseconds: 120_000_000)
+                guard !Task.isCancelled else { return }
+                debouncedQuery = query
+            }
+            .navigationTitle("完整目录 (\(chapters.count) 章)")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button(isAscending ? "倒序" : "正序") {
+                        withAnimation { isAscending.toggle() }
+                    }
+                }
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button("完成") {
+                        dismiss()
+                    }
+                }
+            }
+        }
+    }
+}
+

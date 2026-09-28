@@ -68,6 +68,8 @@ struct ReaderView: View {
     private var showSettings: Bool { chromeState.isSettingsVisible }
     @State private var tocTab = 0
     @State private var tocQuery = ""
+    @State private var debouncedTocQuery = ""
+    @State private var selectedIllustrationURL: URL? = nil
     @State private var tocReversed = false
     @State private var autoScrollEnabled = false
     @State private var autoScrollAnchorTarget = 0
@@ -217,7 +219,7 @@ struct ReaderView: View {
     }
 
     private var filteredChapters: [BookChapter] {
-        let query = tocQuery.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        let query = debouncedTocQuery.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
         var result = chapters.filter { chapter in
             query.isEmpty
                 || chapter.title.lowercased().contains(query)
@@ -230,7 +232,7 @@ struct ReaderView: View {
     }
 
     private var filteredNavigationEntries: [LocalTextNavigationEntry] {
-        let query = tocQuery.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        let query = debouncedTocQuery.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
         var result = navigationEntries.filter { entry in
             query.isEmpty
                 || entry.title.lowercased().contains(query)
@@ -399,6 +401,12 @@ struct ReaderView: View {
         }
         .sheet(isPresented: $showBookmarks) {
             bookmarkSheet
+        }
+        .sheet(item: Binding(
+            get: { selectedIllustrationURL.map { IdentifiableReaderURL(url: $0) } },
+            set: { selectedIllustrationURL = $0?.url }
+        )) { item in
+            IllustrationZoomViewer(url: item.url)
         }
         .sheet(isPresented: $showBookDetailSheet) {
             NavigationStack {
@@ -1017,7 +1025,21 @@ struct ReaderView: View {
             }
     }
 
+    @ViewBuilder
     private func paragraphText(_ paragraph: String, index: Int) -> some View {
+        if paragraph.hasPrefix("[img]") && paragraph.hasSuffix("[/img]") {
+            let rawURL = String(paragraph.dropFirst(5).dropLast(6)).trimmingCharacters(in: .whitespacesAndNewlines)
+            if let url = URL(string: rawURL) {
+                illustrationCard(url: url)
+            } else {
+                standardParagraphText(paragraph, index: index)
+            }
+        } else {
+            standardParagraphText(paragraph, index: index)
+        }
+    }
+
+    private func standardParagraphText(_ paragraph: String, index: Int) -> some View {
         Text(paragraph)
             .font(fontFamily.swiftUIFont(size: CGFloat(fontSize), weight: .regular))
             .foregroundStyle(readerThemeTextColor)
@@ -1033,6 +1055,49 @@ struct ReaderView: View {
                 }
             }
             .readerSelectableText(textSelectionEnabled)
+    }
+
+    private func illustrationCard(url: URL) -> some View {
+        Button {
+            selectedIllustrationURL = url
+            HapticFeedback.light()
+        } label: {
+            VStack(spacing: 8) {
+                CachedRemoteImage(url: url) {
+                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        .fill(readerThemeTextColor.opacity(0.06))
+                        .frame(height: 180)
+                        .overlay {
+                            VStack(spacing: 8) {
+                                Image(systemName: "photo")
+                                    .font(.title2)
+                                    .foregroundStyle(readerThemeTextColor.opacity(0.4))
+                                Text("加载插图中...")
+                                    .font(.caption)
+                                    .foregroundStyle(readerThemeTextColor.opacity(0.4))
+                            }
+                        }
+                }
+                .scaledToFit()
+                .frame(maxHeight: 260)
+                .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                .overlay {
+                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        .stroke(readerThemeTextColor.opacity(0.12), lineWidth: 0.8)
+                }
+
+                HStack(spacing: 4) {
+                    Image(systemName: "arrow.up.left.and.arrow.down.right")
+                        .font(.system(size: 10))
+                    Text("点击查看插图大图")
+                        .font(.system(size: 11))
+                }
+                .foregroundStyle(readerThemeTextColor.opacity(0.45))
+            }
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 8)
+        }
+        .buttonStyle(.plain)
     }
 
     private var readerOverlay: some View {
@@ -1853,6 +1918,7 @@ struct ReaderView: View {
                     Button {
                         UIImpactFeedbackGenerator(style: .light).impactOccurred()
                         tocQuery = ""
+                        debouncedTocQuery = ""
                     } label: {
                         Image(systemName: "xmark.circle.fill")
                             .font(.system(size: 14))
@@ -1896,7 +1962,7 @@ struct ReaderView: View {
                                 .listRowSeparatorTint(readerThemeTextColor.opacity(0.15))
                             }
                         } header: {
-                            Text("章节")
+                            Text("章节 (\(filteredChapters.count))")
                                 .font(.footnote.weight(.semibold))
                                 .foregroundStyle(readerThemeTextColor.opacity(0.65))
                         }
@@ -1926,15 +1992,25 @@ struct ReaderView: View {
             .listStyle(.plain)
             .scrollContentBackground(.hidden)
             .background(Color.clear)
+            .scrollDismissesKeyboard(.interactively)
+        }
+        .task(id: tocQuery) {
+            if tocQuery.isEmpty {
+                debouncedTocQuery = ""
+                return
+            }
+            try? await Task.sleep(nanoseconds: 120_000_000)
+            guard !Task.isCancelled else { return }
+            debouncedTocQuery = tocQuery
         }
     }
 
     private func chapterRow(_ chapter: BookChapter) -> some View {
         HStack(spacing: 12) {
             Text("\(chapter.index + 1)")
-                .font(.caption.weight(.semibold))
+                .font(.caption.weight(.semibold).monospacedDigit())
                 .foregroundStyle(chapter.index == chapterIndex ? AppTheme.accent : readerThemeTextColor.opacity(0.55))
-                .frame(width: 42, alignment: .leading)
+                .frame(width: 48, alignment: .leading)
             Text(chapter.title)
                 .foregroundStyle(chapter.index == chapterIndex ? AppTheme.accent : readerThemeTextColor)
                 .fontWeight(chapter.index == chapterIndex ? .semibold : .regular)
@@ -1950,9 +2026,9 @@ struct ReaderView: View {
     private func navigationEntryRow(_ entry: LocalTextNavigationEntry, ordinal: Int) -> some View {
         HStack(spacing: 12) {
             Text("\(ordinal + 1)")
-                .font(.caption.weight(.semibold))
+                .font(.caption.weight(.semibold).monospacedDigit())
                 .foregroundStyle(readerThemeTextColor.opacity(0.55))
-                .frame(width: 42, alignment: .leading)
+                .frame(width: 48, alignment: .leading)
             VStack(alignment: .leading, spacing: 3) {
                 Text(entry.title)
                     .foregroundStyle(readerThemeTextColor)
@@ -2844,6 +2920,10 @@ final class ReaderSpeechController: NSObject, ObservableObject, AVSpeechSynthesi
     }
 
     private func playSegment(_ segment: (index: Int, text: String)) {
+        if segment.text.hasPrefix("[img]") && segment.text.hasSuffix("[/img]") {
+            speakNext()
+            return
+        }
         currentParagraphIndex = segment.index
         let utterance = AVSpeechUtterance(string: segment.text)
         utterance.voice = AVSpeechSynthesisVoice(language: "zh-CN")
@@ -2988,3 +3068,92 @@ final class ReaderSpeechController: NSObject, ObservableObject, AVSpeechSynthesi
         }
     }
 }
+
+private struct IdentifiableReaderURL: Identifiable {
+    var id: String { url.absoluteString }
+    let url: URL
+}
+
+private struct IllustrationZoomViewer: View {
+    @Environment(\.dismiss) private var dismiss
+    let url: URL
+    @State private var scale: CGFloat = 1.0
+    @State private var lastScale: CGFloat = 1.0
+    @State private var offset: CGSize = .zero
+    @State private var lastOffset: CGSize = .zero
+
+    var body: some View {
+        NavigationStack {
+            ZStack {
+                Color.black.ignoresSafeArea()
+
+                CachedRemoteImage(url: url) {
+                    ProgressView()
+                        .tint(.white)
+                }
+                .scaledToFit()
+                .scaleEffect(scale)
+                .offset(offset)
+                .gesture(
+                    MagnificationGesture()
+                        .onChanged { value in
+                            scale = max(lastScale * value, 1.0)
+                        }
+                        .onEnded { _ in
+                            lastScale = scale
+                            if scale <= 1.0 {
+                                offset = .zero
+                                lastOffset = .zero
+                            }
+                        }
+                )
+                .simultaneousGesture(
+                    DragGesture()
+                        .onChanged { value in
+                            if scale > 1.0 {
+                                offset = CGSize(
+                                    width: lastOffset.width + value.translation.width,
+                                    height: lastOffset.height + value.translation.height
+                                )
+                            }
+                        }
+                        .onEnded { _ in
+                            if scale > 1.0 {
+                                lastOffset = offset
+                            }
+                        }
+                )
+                .onTapGesture(count: 2) {
+                    withAnimation(.spring()) {
+                        if scale > 1.0 {
+                            scale = 1.0
+                            lastScale = 1.0
+                            offset = .zero
+                            lastOffset = .zero
+                        } else {
+                            scale = 2.5
+                            lastScale = 2.5
+                        }
+                    }
+                }
+            }
+            .navigationTitle("插图查看")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("关闭") { dismiss() }
+                        .foregroundStyle(.white)
+                }
+                ToolbarItem(placement: .primaryAction) {
+                    ShareLink(item: url) {
+                        Image(systemName: "square.and.arrow.up")
+                            .foregroundStyle(.white)
+                    }
+                }
+            }
+            .toolbarBackground(.black, for: .navigationBar)
+            .toolbarColorScheme(.dark, for: .navigationBar)
+        }
+    }
+}
+

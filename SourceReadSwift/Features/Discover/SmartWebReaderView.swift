@@ -36,6 +36,7 @@ struct SmartWebReaderView: View {
                         HStack(spacing: 8) {
                             TextField("粘贴小说网页地址", text: $address)
                                 .textInputAutocapitalization(.never)
+                                .autocorrectionDisabled(true)
                                 .keyboardType(.URL)
                                 .textFieldStyle(.roundedBorder)
                             Button("打开") { loadPage() }

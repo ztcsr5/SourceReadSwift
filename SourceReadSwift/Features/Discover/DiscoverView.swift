@@ -191,6 +191,7 @@ struct DiscoverView: View {
 
                 TextField(viewModel.resultFilterScope.placeholder, text: $viewModel.resultFilter)
                     .textInputAutocapitalization(.never)
+                    .autocorrectionDisabled(true)
                     .padding(.horizontal, 12)
                     .frame(height: 42)
                     .background(Color(.systemGray6), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
@@ -346,6 +347,8 @@ struct DiscoverView: View {
                             .padding(.vertical, 2)
                             .background(Color.blue.opacity(0.12), in: Capsule())
                             .foregroundStyle(.blue)
+                            .fixedSize(horizontal: true, vertical: false)
+                            .layoutPriority(1)
                         }
 
                         if let latest = item.latestChapter, !latest.isEmpty {
@@ -429,7 +432,7 @@ struct DiscoverView: View {
     }
 
     private func searchResultCard(_ book: SearchBook) -> some View {
-        HStack(alignment: .center, spacing: 12) {
+        HStack(alignment: .top, spacing: 12) {
             NavigationLink {
                 BookDetailView(book: book)
             } label: {
