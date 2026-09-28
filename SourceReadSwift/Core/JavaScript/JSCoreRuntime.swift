@@ -46,7 +46,7 @@ final class JSCoreRuntime {
         // JavaScriptCore can reject a first-read of an undeclared global inside
         // the large prelude; predeclaring them keeps the later `var x = x ||`
         // aliases source-compatible without relying on browser semantics.
-        context.evaluateScript("var java = {}; var cookie = {}; var CryptoJS = {}; var Packages = {}; var JXNode = function(value) { return __nativeJXNode.create(value); }; var $ = function(value) { return JXNode(value); }; var JavaImporter = function() {}; var src = ''; var id = ''; var iid = ''; var varid = ''; var variid = ''; var type = ''; var TYPE = function(v) { return v != null ? (typeof v) : ''; }; var ruid = function(len, upper) { len = len || 16; var chars = '0123456789abcdef'; var res = ''; for (var i = 0; i < len; i++) res += chars[Math.floor(Math.random() * chars.length)]; return upper ? res.toUpperCase() : res; }; var form = {}; var result = ''; var baseUrl = ''; String.prototype.parentNode = function() { try { var el = __nativeJsoup.parse(this); return el ? el.parentNode() : null; } catch(e) { return null; } }; String.prototype.select = function(sel) { try { var el = __nativeJsoup.parse(this); return el ? el.select(sel) : null; } catch(e) { return null; } };")
+        context.evaluateScript("var java = {}; var cookie = {}; var CryptoJS = {}; var Packages = {}; var JXNode = function(value) { return __nativeJXNode.create(value); }; var $ = function(value) { return JXNode(value); }; var JavaImporter = function() {}; var src = ''; var id = ''; var iid = ''; var varid = ''; var variid = ''; var type = ''; var TYPE = function(v) { return v != null ? (typeof v) : ''; }; var ruid = function(len, upper) { len = len || 16; var chars = '0123456789abcdef'; var res = ''; for (var i = 0; i < len; i++) res += chars[Math.floor(Math.random() * chars.length)]; return upper ? res.toUpperCase() : res; }; var form = {}; var result = ''; var baseUrl = ''; String.prototype.parentNode = function() { try { var el = __nativeJsoup.parse(this); var p = el ? el.parentNode() : null; return (p !== null && typeof p !== 'undefined') ? p : ''; } catch(e) { return ''; } }; String.prototype.select = function(sel) { try { var el = __nativeJsoup.parse(this); var res = el ? el.select(sel) : null; return (res !== null && typeof res !== 'undefined') ? res : ''; } catch(e) { return ''; } };")
         installBaseBridge()
     }
 
@@ -153,6 +153,35 @@ final class JSCoreRuntime {
             let jsCompatibleValue = makeJSCompatibleValue(value, baseUrl: baseStr)
             context.setObject(jsCompatibleValue, forKeyedSubscript: key as NSString)
             
+            if key == "result" {
+                context.evaluateScript("""
+                if (typeof result !== 'undefined' && result !== null && typeof result === 'object') {
+                    (function(obj) {
+                        var proto = Object.getPrototypeOf(obj);
+                        if (proto && !proto._hasStringMethods) {
+                            proto._hasStringMethods = true;
+                            var stringMethods = [
+                                'replace', 'replaceAll', 'match', 'matchAll', 'search',
+                                'split', 'slice', 'substring', 'substr',
+                                'trim', 'trimStart', 'trimEnd',
+                                'toLowerCase', 'toUpperCase',
+                                'indexOf', 'lastIndexOf', 'includes', 'startsWith', 'endsWith',
+                                'charAt', 'charCodeAt'
+                            ];
+                            stringMethods.forEach(function(name) {
+                                if (!proto[name] && typeof String.prototype[name] === 'function') {
+                                    proto[name] = function() {
+                                        var s = this.toString();
+                                        return String.prototype[name].apply(s, arguments);
+                                    };
+                                }
+                            });
+                        }
+                    })(result);
+                }
+                """)
+            }
+
             if key == "chapter" {
                 let injectScript = """
                 if (typeof chapter !== 'undefined' && chapter !== null) {
