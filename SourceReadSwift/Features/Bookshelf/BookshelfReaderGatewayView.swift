@@ -60,6 +60,28 @@ struct BookshelfReaderGatewayView: View {
                 )
             )
         } else if let selectedChapter {
+            if let source = appState.sourceStore.source(for: currentBook.sourceURL), source.bookSourceType == 1 {
+                return AnyView(
+                    AudioBookPlayerView()
+                        .onAppear {
+                            let searchBook = SearchBook(
+                                name: currentBook.title,
+                                author: currentBook.author,
+                                coverUrl: currentBook.coverURL,
+                                bookUrl: currentBook.bookURL,
+                                sourceName: source.bookSourceName,
+                                sourceUrl: source.bookSourceUrl
+                            )
+                            AudioBookPlaybackCoordinator.shared.startBook(
+                                book: searchBook,
+                                source: source,
+                                chapters: chapters,
+                                initialChapterIndex: selectedChapter.index,
+                                engine: appState.engine
+                            )
+                        }
+                )
+            }
             let storedParagraph = currentBook.currentChapterIndex == selectedChapter.index ? currentBook.currentParagraphIndex : nil
             return AnyView(
                 ChapterLoadingView(

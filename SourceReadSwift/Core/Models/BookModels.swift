@@ -84,6 +84,10 @@ struct ChapterContent: Codable, Hashable, Sendable {
     let title: String
     let paragraphs: [String]
     let nextContentUrl: String?
+
+    var text: String {
+        paragraphs.joined(separator: "\n")
+    }
 }
 
 struct ReaderBookmark: Identifiable, Codable, Hashable, Sendable {

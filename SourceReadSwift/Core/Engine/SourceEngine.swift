@@ -2,6 +2,7 @@ import Foundation
 
 protocol SourceEngine: Sendable {
     func searchBooks(source: BookSource, keyword: String, page: Int) async -> Result<[SearchBook], SourceEngineError>
+    func exploreBooks(source: BookSource, url: String, page: Int) async -> Result<[SearchBook], SourceEngineError>
     func getBookDetail(source: BookSource, book: SearchBook) async -> Result<BookDetail, SourceEngineError>
     func getChapterList(source: BookSource, book: BookDetail) async -> Result<[BookChapter], SourceEngineError>
     func getChapterList(source: BookSource, book: BookDetail, maxPages: Int) async -> Result<[BookChapter], SourceEngineError>
@@ -11,6 +12,10 @@ protocol SourceEngine: Sendable {
 }
 
 extension SourceEngine {
+    func exploreBooks(source: BookSource, url: String, page: Int) async -> Result<[SearchBook], SourceEngineError> {
+        .failure(.rule("Explore not supported"))
+    }
+
     func getChapterList(source: BookSource, book: BookDetail, maxPages: Int) async -> Result<[BookChapter], SourceEngineError> {
         await getChapterList(source: source, book: book)
     }
@@ -176,6 +181,78 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
             return parsed
         case .failure(let error):
             await emitFailure(error, stage: "search.load", source: source, details: ["url": request.url.absoluteString])
+            return .failure(error)
+        }
+    }
+
+    func exploreBooks(source: BookSource, url: String, page: Int) async -> Result<[SearchBook], SourceEngineError> {
+        let executionState = persistentState(for: source)
+        let executionContext = RuleExecutionContext(persistentState: executionState, source: source, logHandler: { [diagnostics] message in
+            Task { await diagnostics.emit(.init(level: .info, stage: "explore.js", sourceName: source.bookSourceName, message: message)) }
+        })
+        defer { executionContext.cleanUp() }
+        executionContext.setExecutionStage("explore")
+        executionContext.networkHandler = { [network] encoded in
+            self.syncLoad(
+                encoded: encoded,
+                source: source,
+                network: network,
+                cookieHeader: executionContext.string(for: "cookieHeader"),
+                persistentValues: executionState.snapshot(),
+                persistentState: executionState
+            )
+        }
+        executionContext.responseHandler = { [network] encoded in
+            SynchronousSourceNetworkBridge.loadResponse(
+                urlText: encoded,
+                source: source,
+                network: network,
+                cookieHeader: executionContext.string(for: "cookieHeader"),
+                persistentValues: executionState.snapshot(),
+                persistentState: executionState
+            )
+        }
+        await diagnostics.emit(.init(
+            level: .info,
+            stage: "explore.prepare",
+            sourceName: source.bookSourceName,
+            message: "准备分类发现",
+            details: ["url": url, "page": String(page)]
+        ))
+
+        let request = requestBuilder.buildExploreRequest(
+            source: source,
+            exploreUrl: url,
+            page: page,
+            persistentValues: executionState.snapshot()
+        )
+        switch await loadWithOptionalWebViewFallback(request, source: source, stage: "explore.load") {
+        case .success(let response):
+            let transformedResponse = transformBodyIfNeeded(
+                response,
+                source: source,
+                rules: [source.ruleExplore, source.ruleSearch],
+                network: network,
+                stateOverride: executionState,
+                executionContext: executionContext
+            )
+            recordJavaScriptEvidence(source: source, stage: "explore", context: executionContext)
+            guard !transformedResponse.body.isEmpty else {
+                let error = SourceEngineError.empty("分类发现响应为空")
+                await emitFailure(error, stage: "explore.empty", source: source, details: ["url": transformedResponse.url.absoluteString])
+                return .failure(error)
+            }
+            let parsed = SearchResultParser(executionContext: executionContext).parse(
+                source: source,
+                response: transformedResponse,
+                ruleOverride: source.ruleExplore
+            )
+            if case .failure(let error) = parsed {
+                await emitFailure(error, stage: "explore.parse", source: source, details: ["url": transformedResponse.url.absoluteString])
+            }
+            return parsed
+        case .failure(let error):
+            await emitFailure(error, stage: "explore.load", source: source, details: ["url": request.url.absoluteString])
             return .failure(error)
         }
     }

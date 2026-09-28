@@ -53,6 +53,32 @@ struct SourceRequestBuilder {
         )
     }
 
+    func buildExploreRequest(
+        source: BookSource,
+        exploreUrl: String,
+        page: Int,
+        persistentValues: [String: String] = [:]
+    ) -> SourceRequest {
+        let pageStr = String(page)
+        let pageMinus1Str = String(max(1, page - 1))
+        let resolved = exploreUrl
+            .replacingOccurrences(of: "{{page}}", with: pageStr)
+            .replacingOccurrences(of: "{{page-1}}", with: pageMinus1Str)
+            .replacingOccurrences(of: "{{page - 1}}", with: pageMinus1Str)
+            .replacingOccurrences(of: "{{page+1}}", with: String(page + 1))
+            .replacingOccurrences(of: "{{page + 1}}", with: String(page + 1))
+            .replacingOccurrences(of: "{{baseUrl}}", with: source.cleanSourceURL)
+
+        return buildRequest(
+            source: source,
+            resolvedText: resolved,
+            baseURL: nil,
+            keyword: nil,
+            page: page,
+            persistentValues: persistentValues
+        )
+    }
+
     private func buildRequest(
         source: BookSource,
         resolvedText: String,

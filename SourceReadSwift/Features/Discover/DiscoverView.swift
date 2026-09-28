@@ -4,9 +4,27 @@ import UIKit
 struct DiscoverView: View {
     @EnvironmentObject private var appState: AppState
     @ObservedObject var viewModel: DiscoverViewModel
+    @StateObject private var exploreViewModel = ExploreViewModel()
+    @State private var selectedTab: DiscoverTab = .search
     @State private var pendingShelfAddBook: SearchBook?
     @State private var showSmartWebReader = false
     @State private var selectedAggregatedBookForSources: AggregatedSearchBook? = nil
+    @State private var detectedClipboardSourceURL: String? = nil
+    @State private var isImportingClipboardSource = false
+    @State private var clipboardImportToast: String? = nil
+
+    enum DiscoverTab: String, CaseIterable, Identifiable {
+        case search = "全网搜索"
+        case explore = "分类发现"
+
+        var id: String { rawValue }
+        var icon: String {
+            switch self {
+            case .search: return "magnifyingglass"
+            case .explore: return "safari"
+            }
+        }
+    }
 
     init(viewModel: DiscoverViewModel? = nil) {
         self._viewModel = ObservedObject(wrappedValue: viewModel ?? DiscoverViewModel())
@@ -15,9 +33,23 @@ struct DiscoverView: View {
     var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(alignment: .leading, spacing: 26) {
-                    bookSearchTab
+                VStack(alignment: .leading, spacing: 20) {
+                    if detectedClipboardSourceURL != nil {
+                        clipboardSourceBanner
+                    }
 
+                    Picker("发现模式", selection: $selectedTab) {
+                        ForEach(DiscoverTab.allCases) { tab in
+                            Text(tab.rawValue).tag(tab)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+
+                    if selectedTab == .search {
+                        bookSearchTab
+                    } else {
+                        bookExploreTab
+                    }
                 }
                 .padding(.horizontal, AppTheme.pagePadding)
                 .padding(.bottom, 22)
@@ -27,6 +59,11 @@ struct DiscoverView: View {
                 dismissKeyboard()
             }
             .scrollDismissesKeyboard(.interactively)
+            .refreshable {
+                if selectedTab == .explore {
+                    await exploreViewModel.refresh()
+                }
+            }
             .pageBackground()
             .navigationTitle("发现")
             .navigationBarTitleDisplayMode(.large)
@@ -42,6 +79,21 @@ struct DiscoverView: View {
             }
             .task {
                 viewModel.bind(appState: appState)
+                exploreViewModel.bind(appState: appState)
+                checkClipboard()
+            }
+            .onAppear {
+                checkClipboard()
+            }
+            .alert("书源导入结果", isPresented: Binding(
+                get: { clipboardImportToast != nil },
+                set: { if !$0 { clipboardImportToast = nil } }
+            )) {
+                Button("确定", role: .cancel) { clipboardImportToast = nil }
+            } message: {
+                if let msg = clipboardImportToast {
+                    Text(msg)
+                }
             }
             .confirmationDialog(
                 "加入书架？",
@@ -458,6 +510,239 @@ struct DiscoverView: View {
             .accessibilityLabel(appState.bookshelfStore.contains(book) ? "已在书架" : "加入书架")
         }
         .podcastCard()
+    }
+
+    // MARK: - Clipboard Source Auto-Detection
+
+    private var clipboardSourceBanner: some View {
+        HStack(spacing: 12) {
+            Image(systemName: "link.badge.plus")
+                .font(.title3)
+                .foregroundStyle(AppTheme.accent)
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text("检测到剪贴板中的书源")
+                    .font(.subheadline.weight(.semibold))
+                Text(detectedClipboardSourceURL ?? "")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+            }
+
+            Spacer()
+
+            if isImportingClipboardSource {
+                ProgressView()
+                    .controlSize(.small)
+            } else {
+                Button("导入") {
+                    importClipboardSource()
+                }
+                .font(.caption.weight(.bold))
+                .padding(.horizontal, 10)
+                .padding(.vertical, 5)
+                .background(AppTheme.accent, in: Capsule())
+                .foregroundStyle(.white)
+
+                Button {
+                    detectedClipboardSourceURL = nil
+                } label: {
+                    Image(systemName: "xmark")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
+            }
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 10)
+        .background(Color(UIColor.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+    }
+
+    private func checkClipboard() {
+        guard let text = UIPasteboard.general.string?.trimmingCharacters(in: .whitespacesAndNewlines), !text.isEmpty else { return }
+        if text == detectedClipboardSourceURL { return }
+        if (text.hasPrefix("http://") || text.hasPrefix("https://")) && (text.contains(".json") || text.contains("source") || text.contains("yuedu") || text.contains("legado") || text.contains("book")) {
+            detectedClipboardSourceURL = text
+        } else if text.hasPrefix("[") && text.contains("bookSourceName") {
+            detectedClipboardSourceURL = text
+        }
+    }
+
+    private func importClipboardSource() {
+        guard let target = detectedClipboardSourceURL else { return }
+        isImportingClipboardSource = true
+        Task {
+            if target.hasPrefix("http") {
+                let count = await appState.sourceStore.importFromURL(target)
+                await MainActor.run {
+                    isImportingClipboardSource = false
+                    detectedClipboardSourceURL = nil
+                    clipboardImportToast = count > 0 ? "已成功导入 \(count) 个书源" : "未解析到有效书源"
+                    UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                }
+            } else {
+                let count = await appState.sourceStore.importSources(fromJSON: target)
+                await MainActor.run {
+                    isImportingClipboardSource = false
+                    detectedClipboardSourceURL = nil
+                    clipboardImportToast = count > 0 ? "已成功导入 \(count) 个书源" : "未解析到有效书源"
+                    UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                }
+            }
+        }
+    }
+
+    // MARK: - Explore Tab
+
+    private var bookExploreTab: some View {
+        VStack(alignment: .leading, spacing: 18) {
+            if exploreViewModel.availableSources.isEmpty {
+                EmptyStateCard(
+                    systemImage: "compass.drawing",
+                    title: "暂无可探索的书源",
+                    message: "当前启用的书源中未配置分类发现规则(exploreUrl)。您可以在书源管理中导入更多精品书源。"
+                )
+            } else {
+                sourceSelectorSection
+
+                categorySelectorSection
+
+                exploreBooksSection
+            }
+        }
+    }
+
+    private var sourceSelectorSection: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 8) {
+                ForEach(exploreViewModel.availableSources) { source in
+                    let isSelected = exploreViewModel.selectedSource?.id == source.id
+                    Button {
+                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                        exploreViewModel.selectSource(source)
+                    } label: {
+                        HStack(spacing: 4) {
+                            if source.bookSourceType == 1 {
+                                Image(systemName: "headphones")
+                                    .font(.caption2)
+                            }
+                            Text(source.bookSourceName)
+                                .font(.subheadline.weight(isSelected ? .semibold : .regular))
+                        }
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 7)
+                        .background(
+                            isSelected ? AppTheme.accent : Color(UIColor.secondarySystemGroupedBackground),
+                            in: Capsule()
+                        )
+                        .foregroundStyle(isSelected ? .white : .primary)
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .padding(.vertical, 2)
+        }
+    }
+
+    private var categorySelectorSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            if exploreViewModel.groups.count > 1 {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 6) {
+                        ForEach(exploreViewModel.groups, id: \.self) { grp in
+                            let isSelected = exploreViewModel.selectedGroup == grp
+                            Button {
+                                UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                                exploreViewModel.selectGroup(grp)
+                            } label: {
+                                Text(grp)
+                                    .font(.caption.weight(isSelected ? .bold : .regular))
+                                    .padding(.horizontal, 10)
+                                    .padding(.vertical, 4)
+                                    .background(isSelected ? Color.accentColor.opacity(0.15) : Color.clear, in: RoundedRectangle(cornerRadius: 6))
+                                    .foregroundStyle(isSelected ? AppTheme.accent : .secondary)
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                }
+            }
+
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 8) {
+                    ForEach(exploreViewModel.filteredCategories) { cat in
+                        let isSelected = exploreViewModel.selectedCategory?.id == cat.id
+                        Button {
+                            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                            exploreViewModel.selectCategory(cat)
+                        } label: {
+                            Text(cat.title)
+                                .font(.footnote.weight(isSelected ? .semibold : .regular))
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 6)
+                                .background(
+                                    isSelected ? Color.primary.opacity(0.12) : Color(UIColor.tertiarySystemGroupedBackground),
+                                    in: RoundedRectangle(cornerRadius: 8, style: .continuous)
+                                )
+                                .foregroundStyle(isSelected ? Color.primary : .secondary)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+                .padding(.vertical, 2)
+            }
+        }
+    }
+
+    private var exploreBooksSection: some View {
+        VStack(spacing: 12) {
+            if exploreViewModel.isLoading && exploreViewModel.books.isEmpty {
+                VStack(spacing: 16) {
+                    ProgressView()
+                        .controlSize(.large)
+                    Text("正在加载精选分类...")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                }
+                .frame(maxWidth: .infinity, minHeight: 200)
+                .podcastCard()
+            } else if let error = exploreViewModel.errorMessage, exploreViewModel.books.isEmpty {
+                EmptyStateCard(
+                    systemImage: "exclamationmark.triangle",
+                    title: "加载失败",
+                    message: error
+                )
+                Button("重试") {
+                    exploreViewModel.loadBooks(page: 1)
+                }
+                .buttonStyle(.borderedProminent)
+                .frame(maxWidth: .infinity)
+            } else if exploreViewModel.books.isEmpty {
+                EmptyStateCard(
+                    systemImage: "tray",
+                    title: "暂无书籍",
+                    message: "当前分类下未找到相关小说"
+                )
+            } else {
+                ForEach(exploreViewModel.books) { book in
+                    searchResultCard(book)
+                        .onAppear {
+                            exploreViewModel.loadNextPageIfNeeded(currentItem: book)
+                        }
+                }
+
+                if exploreViewModel.isLoadingMore {
+                    HStack(spacing: 8) {
+                        ProgressView()
+                        Text("正在加载更多...")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                    .padding(.vertical, 12)
+                    .frame(maxWidth: .infinity)
+                }
+            }
+        }
     }
 
 }

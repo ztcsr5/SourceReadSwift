@@ -15,6 +15,15 @@ struct BookDetailView: View {
     @State private var showAddAfterPreviewPrompt = false
     @State private var isAscending = true
     @State private var showAllChapters = false
+    @State private var showAudioPlayer = false
+
+    private var isAudioBook: Bool {
+        if let source = appState.sourceStore.source(for: book.sourceUrl) {
+            return source.bookSourceType == 1
+        }
+        return false
+    }
+
     private var downloadRecord: ChapterDownloadRecord? {
         appState.chapterDownloadStore.record(bookID: book.id)
     }
@@ -63,7 +72,9 @@ struct BookDetailView: View {
                     if book.sourceName == "Z-Library" || book.bookUrl.hasPrefix("zlib://") {
                         zlibraryActionCard
                     } else {
-                        if !chapters.isEmpty {
+                        if isAudioBook {
+                            audioBookActionCard
+                        } else if !chapters.isEmpty {
                             downloadSection
                         }
                         chapterList
@@ -106,6 +117,9 @@ struct BookDetailView: View {
                 book: book,
                 bookID: appState.bookshelfStore.contains(book) ? book.id : "\(book.sourceUrl)|\(book.bookUrl)"
             )
+        }
+        .sheet(isPresented: $showAudioPlayer) {
+            AudioBookPlayerView()
         }
         .onAppear {
             promptToAddAfterPreviewIfNeeded()
@@ -226,6 +240,50 @@ struct BookDetailView: View {
         .podcastCard()
     }
 
+    private var audioBookActionCard: some View {
+        Button {
+            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+            if let source = appState.sourceStore.source(for: book.sourceUrl) {
+                AudioBookPlaybackCoordinator.shared.startBook(
+                    book: book,
+                    source: source,
+                    chapters: chapters,
+                    initialChapterIndex: 0,
+                    engine: appState.engine
+                )
+                showAudioPlayer = true
+            }
+        } label: {
+            HStack(spacing: 14) {
+                ZStack {
+                    Circle()
+                        .fill(AppTheme.accent)
+                        .frame(width: 48, height: 48)
+                    Image(systemName: "headphones")
+                        .font(.title3)
+                        .foregroundStyle(.white)
+                }
+
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("有声书收听专区")
+                        .font(.headline)
+                        .foregroundStyle(.primary)
+                    Text("支持后台锁屏播放、定时暂停与多倍速调节")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+
+                Spacer()
+
+                Image(systemName: "play.circle.fill")
+                    .font(.title2)
+                    .foregroundStyle(AppTheme.accent)
+            }
+            .padding(.vertical, 4)
+        }
+        .podcastCard()
+    }
+
     private var chapterList: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
@@ -239,34 +297,68 @@ struct BookDetailView: View {
 
             VStack(spacing: 0) {
                 ForEach(Array(displayedChapters.enumerated()), id: \.element.id) { index, chapter in
-                    NavigationLink {
-                        ChapterLoadingView(
-                            bookID: appState.bookshelfStore.contains(book) ? book.id : "\(book.sourceUrl)|\(book.bookUrl)",
-                            sourceUrl: book.sourceUrl,
-                            chapter: chapter,
-                            totalChapters: chapters.count,
-                            chapters: chapters
-                        )
-                    } label: {
-                        HStack {
-                            Text(chapter.title)
-                                .font(.body)
-                                .foregroundStyle(.primary)
-                                .lineLimit(1)
-                            Spacer()
-                            Image(systemName: "chevron.right")
-                                .font(.caption.weight(.bold))
-                                .foregroundStyle(.tertiary)
+                    if isAudioBook {
+                        Button {
+                            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                            if let source = appState.sourceStore.source(for: book.sourceUrl) {
+                                AudioBookPlaybackCoordinator.shared.startBook(
+                                    book: book,
+                                    source: source,
+                                    chapters: chapters,
+                                    initialChapterIndex: chapter.index,
+                                    engine: appState.engine
+                                )
+                                showAudioPlayer = true
+                            }
+                        } label: {
+                            HStack {
+                                Image(systemName: "headphones")
+                                    .font(.caption)
+                                    .foregroundStyle(AppTheme.accent)
+                                Text(chapter.title)
+                                    .font(.body)
+                                    .foregroundStyle(.primary)
+                                    .lineLimit(1)
+                                Spacer()
+                                Image(systemName: "play.circle")
+                                    .font(.body)
+                                    .foregroundStyle(AppTheme.accent)
+                            }
+                            .padding(.vertical, 12)
+                            .padding(.horizontal, 14)
+                            .contentShape(Rectangle())
                         }
-                        .padding(.vertical, 12)
-                        .padding(.horizontal, 14)
-                        .contentShape(Rectangle())
+                        .buttonStyle(.plain)
+                    } else {
+                        NavigationLink {
+                            ChapterLoadingView(
+                                bookID: appState.bookshelfStore.contains(book) ? book.id : "\(book.sourceUrl)|\(book.bookUrl)",
+                                sourceUrl: book.sourceUrl,
+                                chapter: chapter,
+                                totalChapters: chapters.count,
+                                chapters: chapters
+                            )
+                        } label: {
+                            HStack {
+                                Text(chapter.title)
+                                    .font(.body)
+                                    .foregroundStyle(.primary)
+                                    .lineLimit(1)
+                                Spacer()
+                                Image(systemName: "chevron.right")
+                                    .font(.caption.weight(.bold))
+                                    .foregroundStyle(.tertiary)
+                            }
+                            .padding(.vertical, 12)
+                            .padding(.horizontal, 14)
+                            .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                        .simultaneousGesture(TapGesture().onEnded {
+                            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                            didOpenReader = true
+                        })
                     }
-                    .buttonStyle(.plain)
-                    .simultaneousGesture(TapGesture().onEnded {
-                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                        didOpenReader = true
-                    })
 
                     if index < displayedChapters.count - 1 {
                         Divider()
