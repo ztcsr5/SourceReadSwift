@@ -142,7 +142,7 @@ struct QuoteCardView: View {
             }
             .sheet(isPresented: $showShareSheet) {
                 if let img = renderedImageToShare {
-                    ShareSheet(activityItems: [img])
+                    ShareSheet(items: [img])
                 }
             }
         }
