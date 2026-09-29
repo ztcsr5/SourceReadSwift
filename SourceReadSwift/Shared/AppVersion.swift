@@ -11,9 +11,9 @@ public enum AppVersion {
     /// 大版本
     public static let major: Int = 0
     /// 小版本
-    public static let minor: Int = 11
+    public static let minor: Int = 12
     /// 内部构建号
-    public static let build: Int = 12
+    public static let build: Int = 13
 
     /// 标准语义化版本号：1.0.0
     public static var versionString: String {

@@ -143,6 +143,9 @@ struct ComicReaderView: View {
             LazyVStack(spacing: 0) {
                 ForEach(pages) { page in
                     ComicPageImageView(url: page.url, pageNumber: page.id + 1, totalPages: pages.count)
+                        .onAppear {
+                            currentPageIndex = page.id
+                        }
                 }
 
                 // Next chapter trigger card
@@ -388,33 +391,18 @@ private struct ComicPageImageView: View {
     var body: some View {
         ZStack {
             if let imageURL = URL(string: url) {
-                AsyncImage(url: imageURL) { phase in
-                    switch phase {
-                    case .success(let image):
-                        image
-                            .resizable()
-                            .scaledToFit()
-                    case .failure:
+                CachedRemoteImage(url: imageURL, contentMode: .fit) {
+                    ZStack {
+                        Color.white.opacity(0.04)
                         VStack(spacing: 8) {
-                            Image(systemName: "photo.badge.exclamationmark")
-                                .font(.largeTitle)
-                                .foregroundStyle(.white.opacity(0.4))
-                            Text("第 \(pageNumber) 页加载失败")
-                                .font(.caption)
-                                .foregroundStyle(.white.opacity(0.6))
-                        }
-                        .frame(maxWidth: .infinity, minHeight: 280)
-                        .background(Color.white.opacity(0.05))
-                    case .empty:
-                        ZStack {
-                            Color.white.opacity(0.05)
                             ProgressView()
-                                .tint(.white)
+                                .tint(.white.opacity(0.7))
+                            Text("P \(pageNumber)")
+                                .font(.caption2.monospacedDigit())
+                                .foregroundStyle(.white.opacity(0.4))
                         }
-                        .frame(maxWidth: .infinity, minHeight: 280)
-                    @unknown default:
-                        Color.clear
                     }
+                    .frame(maxWidth: .infinity, minHeight: 320)
                 }
             }
         }
