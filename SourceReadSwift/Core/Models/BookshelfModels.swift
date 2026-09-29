@@ -27,6 +27,7 @@ struct BookshelfBook: Identifiable, Codable, Hashable, Sendable {
     var totalReadingSeconds: TimeInterval?
     /// Optional user-managed bookshelf group. Nil means the default "全部" view.
     var groupName: String?
+    var isPinned: Bool = false
     var addedAt: Date
 
     private enum CodingKeys: String, CodingKey {
@@ -34,7 +35,7 @@ struct BookshelfBook: Identifiable, Codable, Hashable, Sendable {
              localContent, localChapters, localNavigationEntries, latestChapterTitle,
              totalChapters, seenTotalChapters, currentChapterIndex, currentChapterTitle,
              currentParagraphIndex, bookmarks, lastReadAt, lastOpenedAt,
-             readingSessionCount, totalReadingSeconds, groupName, addedAt
+             readingSessionCount, totalReadingSeconds, groupName, isPinned, addedAt
     }
 
     init(from decoder: Decoder) throws {
@@ -62,6 +63,7 @@ struct BookshelfBook: Identifiable, Codable, Hashable, Sendable {
         readingSessionCount = try c.decodeIfPresent(Int.self, forKey: .readingSessionCount)
         totalReadingSeconds = try c.decodeIfPresent(TimeInterval.self, forKey: .totalReadingSeconds)
         groupName = try c.decodeIfPresent(String.self, forKey: .groupName)
+        isPinned = try c.decodeIfPresent(Bool.self, forKey: .isPinned) ?? false
         addedAt = try c.decodeIfPresent(Date.self, forKey: .addedAt) ?? Date()
     }
 
@@ -110,6 +112,7 @@ struct BookshelfBook: Identifiable, Codable, Hashable, Sendable {
         readingSessionCount: Int? = nil,
         totalReadingSeconds: TimeInterval? = nil,
         groupName: String? = nil,
+        isPinned: Bool = false,
         addedAt: Date = Date()
     ) {
         self.id = id
@@ -135,6 +138,7 @@ struct BookshelfBook: Identifiable, Codable, Hashable, Sendable {
         self.readingSessionCount = readingSessionCount
         self.totalReadingSeconds = totalReadingSeconds
         self.groupName = groupName
+        self.isPinned = isPinned
         self.addedAt = addedAt
     }
 

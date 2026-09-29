@@ -17,6 +17,7 @@ final class BookshelfStore: ObservableObject {
         self.groupPersistence = groupPersistence
         do {
             books = try persistence.load()
+            sortBooksWithPinnedOrder()
             groups = try groupPersistence.load().sorted { $0.sortOrder < $1.sortOrder }
         } catch {
             lastError = error.localizedDescription
@@ -352,10 +353,33 @@ final class BookshelfStore: ObservableObject {
         books.filter(\.hasUpdates)
     }
 
+    func togglePin(bookID: String) {
+        guard let index = books.firstIndex(where: { $0.id == bookID }) else { return }
+        books[index].isPinned.toggle()
+        sortBooksWithPinnedOrder()
+        persist()
+    }
+
+    private func sortBooksWithPinnedOrder() {
+        books.sort { b1, b2 in
+            if b1.isPinned != b2.isPinned {
+                return b1.isPinned && !b2.isPinned
+            }
+            let t1 = b1.lastReadAt ?? b1.addedAt
+            let t2 = b2.lastReadAt ?? b2.addedAt
+            return t1 > t2
+        }
+    }
+
     private func moveToFront(index: Int) {
-        guard books.indices.contains(index), index != 0 else { return }
+        guard books.indices.contains(index) else { return }
         let item = books.remove(at: index)
-        books.insert(item, at: 0)
+        if item.isPinned {
+            books.insert(item, at: 0)
+        } else {
+            let firstUnpinnedIndex = books.firstIndex(where: { !$0.isPinned }) ?? books.count
+            books.insert(item, at: firstUnpinnedIndex)
+        }
     }
 
     private func persist() {

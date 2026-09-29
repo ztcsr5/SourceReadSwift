@@ -30,8 +30,8 @@ targets:
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.edc21.SourceReadSwift
-        MARKETING_VERSION: "1.0.8"
-        CURRENT_PROJECT_VERSION: "9"
+        MARKETING_VERSION: "1.0.9"
+        CURRENT_PROJECT_VERSION: "10"
         INFOPLIST_FILE: SourceReadSwift/App/Info.plist
         CODE_SIGN_ENTITLEMENTS: SourceReadSwift/SourceReadSwift.entitlements
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
@@ -42,7 +42,7 @@ targets:
       path: SourceReadSwift/App/Info.plist
       properties:
         CFBundleDisplayName: 纸间
-        CFBundleShortVersionString: "1.0.7"
+        CFBundleShortVersionString: "1.0.9"
         CFBundleVersion: "8"
         CADisableMinimumFrameDurationOnPhone: true
         UILaunchScreen: {}

@@ -610,6 +610,12 @@ struct BookshelfView: View {
             } label: {
                 Label("书籍详情", systemImage: "info.circle")
             }
+            Button {
+                UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                appState.bookshelfStore.togglePin(bookID: book.id)
+            } label: {
+                Label(book.isPinned ? "取消置顶" : "置顶书籍", systemImage: book.isPinned ? "pin.slash" : "pin")
+            }
             Button("从书架删除", role: .destructive) {
                 appState.bookshelfStore.remove(bookID: book.id)
             }
@@ -666,6 +672,17 @@ struct BookshelfView: View {
         } label: {
             HStack(spacing: 14) {
                 AsyncBookCover(urlString: book.coverURL, width: 52, height: 72)
+                    .overlay(alignment: .topLeading) {
+                        if book.isPinned {
+                            Image(systemName: "pin.fill")
+                                .font(.system(size: 7, weight: .bold))
+                                .foregroundStyle(.white)
+                                .padding(4)
+                                .background(AppTheme.accent, in: Circle())
+                                .offset(x: -2, y: -2)
+                                .shadow(radius: 2)
+                        }
+                    }
                     .overlay(alignment: .topTrailing) {
                         if book.hasUpdates {
                             Circle()
@@ -679,10 +696,20 @@ struct BookshelfView: View {
                         }
                     }
                 VStack(alignment: .leading, spacing: 5) {
-                    Text(book.title)
-                        .font(.headline)
-                        .foregroundStyle(.primary)
-                        .lineLimit(1)
+                    HStack(spacing: 5) {
+                        if book.isPinned {
+                            Text("置顶")
+                                .font(.system(size: 9, weight: .bold))
+                                .foregroundStyle(AppTheme.accent)
+                                .padding(.horizontal, 4)
+                                .padding(.vertical, 1)
+                                .background(AppTheme.accent.opacity(0.12), in: RoundedRectangle(cornerRadius: 3))
+                        }
+                        Text(book.title)
+                            .font(.headline)
+                            .foregroundStyle(.primary)
+                            .lineLimit(1)
+                    }
                     Text(book.author)
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
@@ -705,11 +732,31 @@ struct BookshelfView: View {
         .simultaneousGesture(TapGesture().onEnded {
             UIImpactFeedbackGenerator(style: .light).impactOccurred()
         })
+        .swipeActions(edge: .leading) {
+            Button {
+                UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                appState.bookshelfStore.togglePin(bookID: book.id)
+            } label: {
+                Label(book.isPinned ? "取消置顶" : "置顶", systemImage: book.isPinned ? "pin.slash.fill" : "pin.fill")
+            }
+            .tint(.orange)
+        }
+        .swipeActions(edge: .trailing) {
+            Button("删除", role: .destructive) {
+                appState.bookshelfStore.remove(bookID: book.id)
+            }
+        }
         .contextMenu {
             Button {
                 selectedBookForDetail = book
             } label: {
                 Label("书籍详情", systemImage: "info.circle")
+            }
+            Button {
+                UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                appState.bookshelfStore.togglePin(bookID: book.id)
+            } label: {
+                Label(book.isPinned ? "取消置顶" : "置顶书籍", systemImage: book.isPinned ? "pin.slash" : "pin")
             }
             if !appState.bookshelfStore.groups.isEmpty {
                 Menu("移动到分组") {
@@ -742,6 +789,17 @@ struct BookshelfView: View {
                         .overlay {
                             RoundedRectangle(cornerRadius: 12, style: .continuous)
                                 .stroke(Color.white.opacity(0.12), lineWidth: 0.8)
+                        }
+                        .overlay(alignment: .topLeading) {
+                            if book.isPinned {
+                                Image(systemName: "pin.fill")
+                                    .font(.system(size: 8, weight: .bold))
+                                    .foregroundStyle(.white)
+                                    .padding(4)
+                                    .background(AppTheme.accent, in: Circle())
+                                    .offset(x: 4, y: 4)
+                                    .shadow(radius: 2)
+                            }
                         }
                         .shadow(color: .black.opacity(colorScheme == .dark ? 0.35 : 0.12), radius: 6, x: 0, y: 4)
 
@@ -800,6 +858,12 @@ struct BookshelfView: View {
                 selectedBookForDetail = book
             } label: {
                 Label("书籍详情", systemImage: "info.circle")
+            }
+            Button {
+                UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                appState.bookshelfStore.togglePin(bookID: book.id)
+            } label: {
+                Label(book.isPinned ? "取消置顶" : "置顶书籍", systemImage: book.isPinned ? "pin.slash" : "pin")
             }
             if !appState.bookshelfStore.groups.isEmpty {
                 Menu("移动到分组") {

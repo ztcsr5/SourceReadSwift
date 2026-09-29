@@ -385,6 +385,24 @@ struct ReaderView: View {
                 }
                 .zIndex(10)
             }
+
+            if !showOverlay && speechController.isSpeaking {
+                VStack {
+                    Spacer()
+                    floatingSpeechCapsule
+                        .padding(.bottom, 24)
+                        .transition(.move(edge: .bottom).combined(with: .opacity))
+                }
+                .zIndex(5)
+            } else if !showOverlay && autoScrollEnabled {
+                VStack {
+                    Spacer()
+                    floatingAutoScrollCapsule
+                        .padding(.bottom, 24)
+                        .transition(.move(edge: .bottom).combined(with: .opacity))
+                }
+                .zIndex(5)
+            }
         }
         .background {
             GeometryReader { proxy in
@@ -2384,6 +2402,147 @@ struct ReaderView: View {
         if openList {
             showBookmarks = true
         }
+    }
+
+    private var floatingSpeechCapsule: some View {
+        HStack(spacing: 12) {
+            Button {
+                toggleSpeech()
+            } label: {
+                Image(systemName: speechController.isPaused ? "play.circle.fill" : "pause.circle.fill")
+                    .font(.system(size: 26))
+                    .foregroundStyle(AppTheme.accent)
+            }
+            .buttonStyle(.plain)
+
+            VStack(alignment: .leading, spacing: 2) {
+                HStack(spacing: 4) {
+                    Image(systemName: speechController.isPaused ? "speaker.slash" : "waveform")
+                        .font(.system(size: 11, weight: .bold))
+                        .foregroundStyle(AppTheme.accent)
+                    Text(speechController.isPaused ? "朗读已暂停" : "AI 语音朗读中")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(.primary)
+                }
+
+                if speechController.currentParagraphIndex >= 0 && speechController.currentParagraphIndex < content.paragraphs.count {
+                    Text(content.paragraphs[speechController.currentParagraphIndex])
+                        .font(.system(size: 10))
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                        .frame(maxWidth: 160, alignment: .leading)
+                }
+            }
+
+            HStack(spacing: 8) {
+                Button {
+                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                    speechController.skipPrevious()
+                } label: {
+                    Image(systemName: "backward.end.fill")
+                        .font(.system(size: 13))
+                        .foregroundStyle(.primary.opacity(0.8))
+                }
+                .buttonStyle(.plain)
+
+                Button {
+                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                    speechController.skipNext()
+                } label: {
+                    Image(systemName: "forward.end.fill")
+                        .font(.system(size: 13))
+                        .foregroundStyle(.primary.opacity(0.8))
+                }
+                .buttonStyle(.plain)
+
+                Divider()
+                    .frame(height: 14)
+
+                Button {
+                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                    stopSpeechPlayback()
+                } label: {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 12, weight: .bold))
+                        .foregroundStyle(.secondary)
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 8)
+        .background(.ultraThinMaterial, in: Capsule())
+        .overlay(Capsule().stroke(Color.primary.opacity(0.08), lineWidth: 0.8))
+        .shadow(color: .black.opacity(colorScheme == .dark ? 0.35 : 0.12), radius: 10, y: 5)
+    }
+
+    private var floatingAutoScrollCapsule: some View {
+        HStack(spacing: 12) {
+            Button {
+                toggleAutoScroll()
+            } label: {
+                Image(systemName: autoScrollEnabled ? "pause.circle.fill" : "play.circle.fill")
+                    .font(.system(size: 24))
+                    .foregroundStyle(AppTheme.accent)
+            }
+            .buttonStyle(.plain)
+
+            VStack(alignment: .leading, spacing: 2) {
+                HStack(spacing: 4) {
+                    Image(systemName: "arrow.down.circle")
+                        .font(.system(size: 11, weight: .bold))
+                        .foregroundStyle(AppTheme.accent)
+                    Text("自动滚屏中")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(.primary)
+                }
+                Text(String(format: "%.1f 秒/屏", autoScrollDelay))
+                    .font(.system(size: 10))
+                    .foregroundStyle(.secondary)
+            }
+
+            HStack(spacing: 8) {
+                Button {
+                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                    autoScrollDelay = min(ReaderAutomationPolicy.maxDelay, autoScrollDelay + 0.5)
+                } label: {
+                    Image(systemName: "minus")
+                        .font(.system(size: 12, weight: .bold))
+                        .padding(4)
+                        .background(Color.primary.opacity(0.06), in: Circle())
+                }
+                .buttonStyle(.plain)
+
+                Button {
+                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                    autoScrollDelay = max(ReaderAutomationPolicy.minDelay, autoScrollDelay - 0.5)
+                } label: {
+                    Image(systemName: "plus")
+                        .font(.system(size: 12, weight: .bold))
+                        .padding(4)
+                        .background(Color.primary.opacity(0.06), in: Circle())
+                }
+                .buttonStyle(.plain)
+
+                Divider()
+                    .frame(height: 14)
+
+                Button {
+                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                    toggleAutoScroll()
+                } label: {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 12, weight: .bold))
+                        .foregroundStyle(.secondary)
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 8)
+        .background(.ultraThinMaterial, in: Capsule())
+        .overlay(Capsule().stroke(Color.primary.opacity(0.08), lineWidth: 0.8))
+        .shadow(color: .black.opacity(colorScheme == .dark ? 0.35 : 0.12), radius: 10, y: 5)
     }
 
     private func toggleSpeech() {
