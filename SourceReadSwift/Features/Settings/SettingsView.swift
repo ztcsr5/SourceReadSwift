@@ -1084,8 +1084,8 @@ private struct AboutReadView: View {
 
                     HStack(spacing: 8) {
                         aboutTag("120Hz 极速")
+                        aboutTag("全媒体生态")
                         aboutTag("开源书源")
-                        aboutTag("EPUB · TXT")
                         aboutTag("纯净无扰")
                     }
                 }
@@ -1093,11 +1093,14 @@ private struct AboutReadView: View {
             }
 
             Section("核心特色") {
+                Label("小说 · 有声书 · 漫画 · 影视 四维全媒介生态", systemImage: "play.rectangle.on.rectangle")
                 Label("120Hz ProMotion 满帧丝滑无限滚动与翻页", systemImage: "speedometer")
-                Label("兼容 Legado 开源书源生态，一键精准换源", systemImage: "bolt.horizontal.fill")
+                Label("兼容 Legado 开源书源生态，一键精准全网换源", systemImage: "bolt.horizontal.fill")
+                Label("漫画高性能图片流、快速翻页器与夜间柔和调光", systemImage: "photo.stack")
+                Label("影视全屏播放、手势快进快退与防误触锁屏模式", systemImage: "tv")
+                Label("后台有声书播放、全局悬浮迷你胶囊与睡眠定时", systemImage: "headphones")
                 Label("出版级中文排版引擎，支持水墨屏与自定义壁纸字形", systemImage: "textformat.size")
                 Label("WebDAV 云端多端自动同步与安全冷备份", systemImage: "icloud.and.arrow.up")
-                Label("后台听书、锁屏控制中心、智能定时与播完当章", systemImage: "headphones")
                 Label("内置广告净化与规则体检，自动过滤正文杂质", systemImage: "wand.and.stars")
                 Label("TXT 智能目录识别、EPUB 图文精排与 RSS 资讯订阅", systemImage: "doc.text.fill")
                 Label("无线 Web 电脑直连写源，轻松调试与管理书源", systemImage: "globe")

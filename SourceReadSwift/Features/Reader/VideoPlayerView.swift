@@ -32,6 +32,21 @@ struct VideoPlayerView: View {
     @State private var isScreenLocked = false
     @State private var isAspectFill = false
     @AppStorage("video_dimming_level") private var videoDimmingLevel: Double = 0.0
+    @State private var episodeSearchText = ""
+    @State private var isEpisodeListReversed = false
+
+    private var filteredEpisodeIndices: [Int] {
+        let indices = Array(chapters.indices)
+        let ordered = isEpisodeListReversed ? Array(indices.reversed()) : indices
+        guard !episodeSearchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            return ordered
+        }
+        let query = episodeSearchText.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        return ordered.filter { idx in
+            let chapter = chapters[idx]
+            return chapter.title.lowercased().contains(query) || "\(idx + 1)".contains(query)
+        }
+    }
 
     private let speedOptions: [Float] = [0.5, 0.75, 1.0, 1.25, 1.5, 2.0]
 
@@ -443,7 +458,7 @@ struct VideoPlayerView: View {
     private var episodeDrawerSheet: some View {
         NavigationStack {
             List {
-                ForEach(chapters.indices, id: \.self) { idx in
+                ForEach(filteredEpisodeIndices, id: \.self) { idx in
                     let chapter = chapters[idx]
                     Button {
                         loadVideo(at: idx)
@@ -467,9 +482,24 @@ struct VideoPlayerView: View {
                     }
                 }
             }
-            .navigationTitle("剧集列表 (\(chapters.count)集)")
+            .searchable(text: $episodeSearchText, prompt: "搜索集数或标题")
+            .navigationTitle("剧集列表 (\(chapters.count) 集)")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button {
+                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                        withAnimation(.easeInOut(duration: 0.2)) {
+                            isEpisodeListReversed.toggle()
+                        }
+                    } label: {
+                        Image(systemName: "arrow.up.arrow.down")
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(isEpisodeListReversed ? Color.accentColor : .secondary)
+                    }
+                    .accessibilityLabel("正序倒序切换")
+                }
+
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button("完成") {
                         showEpisodeDrawer = false

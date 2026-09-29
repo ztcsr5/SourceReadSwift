@@ -7,6 +7,21 @@ struct AudioBookPlayerView: View {
     @State private var dragSliderValue: Double = 0
     @State private var showChapterDrawer = false
     @State private var showSleepTimerDialog = false
+    @State private var chapterSearchText = ""
+    @State private var isChapterListReversed = false
+
+    private var filteredChapterIndices: [Int] {
+        let indices = Array(coordinator.chapters.indices)
+        let ordered = isChapterListReversed ? Array(indices.reversed()) : indices
+        guard !chapterSearchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            return ordered
+        }
+        let query = chapterSearchText.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        return ordered.filter { idx in
+            let chapter = coordinator.chapters[idx]
+            return chapter.title.lowercased().contains(query) || "\(idx + 1)".contains(query)
+        }
+    }
 
     private let speedOptions: [Float] = [0.75, 1.0, 1.25, 1.5, 1.75, 2.0]
 
@@ -386,7 +401,7 @@ struct AudioBookPlayerView: View {
     private var audioChapterDrawer: some View {
         NavigationStack {
             List {
-                ForEach(coordinator.chapters.indices, id: \.self) { idx in
+                ForEach(filteredChapterIndices, id: \.self) { idx in
                     let chapter = coordinator.chapters[idx]
                     Button {
                         coordinator.playChapter(at: idx)
@@ -414,9 +429,24 @@ struct AudioBookPlayerView: View {
                     }
                 }
             }
-            .navigationTitle("有声节目单")
+            .searchable(text: $chapterSearchText, prompt: "搜索集数或标题")
+            .navigationTitle("有声节目单 (\(coordinator.chapters.count) 回)")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button {
+                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                        withAnimation(.easeInOut(duration: 0.2)) {
+                            isChapterListReversed.toggle()
+                        }
+                    } label: {
+                        Image(systemName: "arrow.up.arrow.down")
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(isChapterListReversed ? Color.accentColor : .secondary)
+                    }
+                    .accessibilityLabel("正序倒序切换")
+                }
+
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button("完成") {
                         showChapterDrawer = false
