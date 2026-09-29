@@ -152,7 +152,15 @@ struct BookshelfView: View {
                         }
                     }
                 }
-                ToolbarItem(placement: .navigationBarTrailing) {
+                ToolbarItemGroup(placement: .navigationBarTrailing) {
+                    NavigationLink {
+                        ReadingStatsView()
+                    } label: {
+                        Image(systemName: "chart.bar.xaxis")
+                            .font(.system(size: 16, weight: .semibold))
+                    }
+                    .accessibilityLabel("阅读统计看板")
+
                     Button {
                         UIImpactFeedbackGenerator(style: .light).impactOccurred()
                         showFileImporter = true

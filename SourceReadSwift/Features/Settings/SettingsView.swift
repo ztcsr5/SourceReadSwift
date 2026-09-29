@@ -546,6 +546,26 @@ struct ReadingStatsView: View {
                         }
                         .padding(.vertical, 4)
 
+                        HStack(spacing: 6) {
+                            Text("目标")
+                                .font(.caption2.bold())
+                                .foregroundStyle(.secondary)
+                            ForEach([15, 30, 45, 60, 90], id: \.self) { mins in
+                                Button {
+                                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                                    dailyGoalMinutes = mins
+                                } label: {
+                                    Text("\(mins)分")
+                                        .font(.caption2.weight(.medium))
+                                        .padding(.horizontal, 8)
+                                        .padding(.vertical, 4)
+                                        .background(dailyGoalMinutes == mins ? AppTheme.accent : Color.secondary.opacity(0.12), in: Capsule())
+                                        .foregroundStyle(dailyGoalMinutes == mins ? .white : .primary)
+                                }
+                                .buttonStyle(.plain)
+                            }
+                        }
+
                         HStack(spacing: 10) {
                             statCard("今日阅读", value: "\(todayMinutes) 分钟", icon: "flame.fill", tint: .orange)
                             statCard("连续阅读", value: "\(summary.streakDays) 天", icon: "calendar.badge.clock", tint: .red)
@@ -595,10 +615,106 @@ struct ReadingStatsView: View {
                         }
                         .frame(height: 110, alignment: .bottom)
                         .padding(.top, 4)
+
+                        let weeklyTotal = summary.weeklyDistribution.reduce(0) { $0 + $1.seconds }
+                        let activeDays = summary.weeklyDistribution.filter { $0.seconds > 60 }.count
+                        HStack {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("本周累计")
+                                    .font(.caption2)
+                                    .foregroundStyle(.secondary)
+                                Text(durationText(weeklyTotal))
+                                    .font(.subheadline.weight(.semibold))
+                            }
+                            Spacer()
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("日均时长")
+                                    .font(.caption2)
+                                    .foregroundStyle(.secondary)
+                                Text(durationText(weeklyTotal / 7.0))
+                                    .font(.subheadline.weight(.semibold))
+                            }
+                            Spacer()
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("活跃天数")
+                                    .font(.caption2)
+                                    .foregroundStyle(.secondary)
+                                Text("\(activeDays)/7 天")
+                                    .font(.subheadline.weight(.semibold))
+                                    .foregroundStyle(AppTheme.accent)
+                            }
+                        }
+                        .padding(.top, 6)
                     }
                     .padding(.vertical, 6)
                 } header: {
                     Text("阅读趋势")
+                }
+
+                Section("多维媒介生态") {
+                    let total = max(1, summary.totalBooks)
+                    let audioCount = appState.bookshelfStore.books.filter { mediaKind(for: $0) == .audio }.count
+                    let comicCount = appState.bookshelfStore.books.filter { mediaKind(for: $0) == .comic }.count
+                    let videoCount = appState.bookshelfStore.books.filter { mediaKind(for: $0) == .video }.count
+                    let novelCount = max(0, summary.totalBooks - audioCount - comicCount - videoCount)
+
+                    VStack(alignment: .leading, spacing: 10) {
+                        GeometryReader { geo in
+                            HStack(spacing: 2) {
+                                RoundedRectangle(cornerRadius: 3)
+                                    .fill(Color.blue)
+                                    .frame(width: max(4, geo.size.width * CGFloat(novelCount) / CGFloat(total)))
+                                RoundedRectangle(cornerRadius: 3)
+                                    .fill(Color.green)
+                                    .frame(width: max(4, geo.size.width * CGFloat(audioCount) / CGFloat(total)))
+                                RoundedRectangle(cornerRadius: 3)
+                                    .fill(Color.purple)
+                                    .frame(width: max(4, geo.size.width * CGFloat(comicCount) / CGFloat(total)))
+                                RoundedRectangle(cornerRadius: 3)
+                                    .fill(Color.red)
+                                    .frame(width: max(4, geo.size.width * CGFloat(videoCount) / CGFloat(total)))
+                            }
+                        }
+                        .frame(height: 8)
+                        .padding(.vertical, 2)
+
+                        LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 8) {
+                            formatPill(title: "小说文本", count: novelCount, percent: Int(Double(novelCount)/Double(total)*100), color: .blue, icon: "book.fill")
+                            formatPill(title: "有声听书", count: audioCount, percent: Int(Double(audioCount)/Double(total)*100), color: .green, icon: "headphones")
+                            formatPill(title: "漫画画册", count: comicCount, percent: Int(Double(comicCount)/Double(total)*100), color: .purple, icon: "character.book.closed.fill")
+                            formatPill(title: "影视视频", count: videoCount, percent: Int(Double(videoCount)/Double(total)*100), color: .red, icon: "play.tv.fill")
+                        }
+                    }
+                    .padding(.vertical, 4)
+                }
+
+                Section("阅读成就勋章") {
+                    LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
+                        ForEach(badges) { badge in
+                            HStack(spacing: 10) {
+                                ZStack {
+                                    Circle()
+                                        .fill(badge.isUnlocked ? badge.tint.opacity(0.18) : Color.secondary.opacity(0.1))
+                                        .frame(width: 38, height: 38)
+                                    Image(systemName: badge.icon)
+                                        .font(.system(size: 16, weight: .semibold))
+                                        .foregroundStyle(badge.isUnlocked ? badge.tint : .secondary.opacity(0.4))
+                                }
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(badge.title)
+                                        .font(.caption.weight(.bold))
+                                        .foregroundStyle(badge.isUnlocked ? .primary : .secondary)
+                                    Text(badge.subtitle)
+                                        .font(.system(size: 10))
+                                        .foregroundStyle(.secondary)
+                                }
+                                Spacer(minLength: 0)
+                            }
+                            .padding(8)
+                            .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+                        }
+                    }
+                    .padding(.vertical, 4)
                 }
 
                 Section("书架构成") {
@@ -716,6 +832,57 @@ struct ReadingStatsView: View {
         } else {
             return String(format: "%.1f 万字", Double(words) / 10000.0)
         }
+    }
+
+    private struct ReadingBadge: Identifiable {
+        let id: String
+        let title: String
+        let subtitle: String
+        let icon: String
+        let isUnlocked: Bool
+        let tint: Color
+    }
+
+    private var badges: [ReadingBadge] {
+        let has1Hour = summary.totalReadingSeconds >= 3600
+        let has5Books = summary.totalBooks >= 5
+        let has3DayStreak = summary.streakDays >= 3
+        let audioCount = appState.bookshelfStore.books.filter { mediaKind(for: $0) == .audio }.count
+        let comicCount = appState.bookshelfStore.books.filter { mediaKind(for: $0) == .comic }.count
+        let videoCount = appState.bookshelfStore.books.filter { mediaKind(for: $0) == .video }.count
+        let textCount = max(0, summary.totalBooks - audioCount - comicCount - videoCount)
+        let activeKinds = [textCount > 0, audioCount > 0, comicCount > 0, videoCount > 0].filter { $0 }.count
+        let isMultiFormat = activeKinds >= 2
+
+        return [
+            ReadingBadge(id: "1h", title: "初入书海", subtitle: "阅读超 1 小时", icon: "sparkles", isUnlocked: has1Hour, tint: .orange),
+            ReadingBadge(id: "streak", title: "持之以恒", subtitle: "连续阅读 3 天", icon: "flame.fill", isUnlocked: has3DayStreak, tint: .red),
+            ReadingBadge(id: "5books", title: "博览群书", subtitle: "藏书超 5 部", icon: "books.vertical.fill", isUnlocked: has5Books, tint: .blue),
+            ReadingBadge(id: "multi", title: "多维读者", subtitle: "多媒介探索", icon: "cube.transparent.fill", isUnlocked: isMultiFormat, tint: .purple)
+        ]
+    }
+
+    private func mediaKind(for book: BookshelfBook) -> BookSourceKind? {
+        appState.sourceStore.source(for: book.sourceURL)?.sourceKind
+    }
+
+    private func formatPill(title: String, count: Int, percent: Int, color: Color, icon: String) -> some View {
+        HStack(spacing: 8) {
+            Image(systemName: icon)
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(color)
+            VStack(alignment: .leading, spacing: 1) {
+                Text(title)
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                Text("\(count) 部 · \(percent)%")
+                    .font(.caption.weight(.bold))
+                    .foregroundStyle(.primary)
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(8)
+        .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
     }
 }
 
