@@ -15,19 +15,11 @@ struct DiscoverView: View {
     @AppStorage("discover_search_history") private var searchHistoryJSON: String = "[]"
 
     private var searchHistory: [String] {
-        get {
-            guard let data = searchHistoryJSON.data(using: .utf8),
-                  let list = try? JSONDecoder().decode([String].self, from: data) else {
-                return []
-            }
-            return list
+        guard let data = searchHistoryJSON.data(using: .utf8),
+              let list = try? JSONDecoder().decode([String].self, from: data) else {
+            return []
         }
-        set {
-            if let data = try? JSONEncoder().encode(newValue),
-               let str = String(data: data, encoding: .utf8) {
-                searchHistoryJSON = str
-            }
-        }
+        return list
     }
 
     private var hotKeywords: [String] {
@@ -52,12 +44,15 @@ struct DiscoverView: View {
         if current.count > 10 {
             current = Array(current.prefix(10))
         }
-        searchHistory = current
+        if let data = try? JSONEncoder().encode(current),
+           let str = String(data: data, encoding: .utf8) {
+            searchHistoryJSON = str
+        }
     }
 
     private func clearSearchHistory() {
         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-        searchHistory = []
+        searchHistoryJSON = "[]"
     }
 
     enum DiscoverTab: String, CaseIterable, Identifiable {
