@@ -301,6 +301,24 @@ final class AudioBookPlaybackCoordinator: ObservableObject {
         }
     }
 
+    func stop() {
+        pause()
+        if let token = timeObserverToken {
+            player?.removeTimeObserver(token)
+            timeObserverToken = nil
+        }
+        player = nil
+        currentBook = nil
+        currentSource = nil
+        currentAudioURL = nil
+        currentTime = 0
+        duration = 0
+        sleepTimer?.invalidate()
+        sleepTimer = nil
+        sleepTimerMinutesRemaining = nil
+        MPNowPlayingInfoCenter.default().nowPlayingInfo = nil
+    }
+
     func seek(to seconds: Double) {
         let targetTime = CMTime(seconds: max(0, min(seconds, duration)), preferredTimescale: CMTimeScale(NSEC_PER_SEC))
         player?.seek(to: targetTime, toleranceBefore: .zero, toleranceAfter: .zero) { [weak self] _ in
