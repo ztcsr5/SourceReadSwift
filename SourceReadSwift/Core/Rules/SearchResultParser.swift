@@ -120,7 +120,7 @@ struct SearchResultParser {
                 "html": response.body
             ]
             for element in elements {
-                var rawName = (try? htmlExtractor.value(from: element, rule: firstRule(rule, keys: ["name", "bookName"]), fallback: nil, baseUrl: response.url, variables: variables))?.nilIfEmpty
+                var rawName = (try? htmlExtractor.value(from: element, rule: firstRule(rule, fallback: source.ruleSearch, keys: ["name", "bookName"]), fallback: nil, baseUrl: response.url, variables: variables))?.nilIfEmpty
                 if rawName == nil {
                     rawName = (try? htmlExtractor.value(from: element, rule: "a.track@text", fallback: nil, baseUrl: response.url, variables: variables))?.nilIfEmpty
                         ?? (try? htmlExtractor.value(from: element, rule: "td:eq(1) a@text", fallback: nil, baseUrl: response.url, variables: variables))?.nilIfEmpty
@@ -129,7 +129,7 @@ struct SearchResultParser {
                 }
                 let name = rawName?.components(separatedBy: .newlines).first(where: { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty })?.trimmingCharacters(in: .whitespacesAndNewlines) ?? rawName
 
-                var rawBookUrl = (try? htmlExtractor.value(from: element, rule: firstRule(rule, keys: ["bookUrl", "url"]), fallback: nil, baseUrl: response.url, variables: variables))?.nilIfEmpty
+                var rawBookUrl = (try? htmlExtractor.value(from: element, rule: firstRule(rule, fallback: source.ruleSearch, keys: ["bookUrl", "url"]), fallback: nil, baseUrl: response.url, variables: variables))?.nilIfEmpty
                 if rawBookUrl == nil {
                     rawBookUrl = (try? htmlExtractor.value(from: element, rule: "a.track@href", fallback: nil, baseUrl: response.url, variables: variables))?.nilIfEmpty
                         ?? (try? htmlExtractor.value(from: element, rule: "td:eq(1) a@href", fallback: nil, baseUrl: response.url, variables: variables))?.nilIfEmpty
@@ -142,7 +142,7 @@ struct SearchResultParser {
                 let absBookUrl = htmlExtractor.absolutize(bookUrl, base: response.url)
                 guard !absBookUrl.isEmpty else { continue }
 
-                var author = (try? htmlExtractor.value(from: element, rule: firstRule(rule, keys: ["author"]), fallback: nil, baseUrl: response.url, variables: variables))?.nilIfEmpty
+                var author = (try? htmlExtractor.value(from: element, rule: firstRule(rule, fallback: source.ruleSearch, keys: ["author"]), fallback: nil, baseUrl: response.url, variables: variables))?.nilIfEmpty
                 if author == nil {
                     author = (try? htmlExtractor.value(from: element, rule: "td:eq(0) a@text", fallback: nil, baseUrl: response.url, variables: variables))?.nilIfEmpty
                         ?? (try? htmlExtractor.value(from: element, rule: "td:eq(0)@text", fallback: nil, baseUrl: response.url, variables: variables))?.nilIfEmpty
@@ -150,10 +150,11 @@ struct SearchResultParser {
                 }
                 author = author?.components(separatedBy: .newlines).first(where: { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty })?.trimmingCharacters(in: .whitespacesAndNewlines) ?? author
 
-                let rawCover = try? htmlExtractor.value(from: element, rule: firstRule(rule, keys: ["coverUrl", "cover"]), fallback: "img@src", baseUrl: response.url, variables: variables).nilIfEmpty
+                let rawCover = try? htmlExtractor.value(from: element, rule: firstRule(rule, fallback: source.ruleSearch, keys: ["coverUrl", "cover"]), fallback: "img@src", baseUrl: response.url, variables: variables).nilIfEmpty
                 let cover = rawCover?.components(separatedBy: .newlines).first(where: { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty })?.trimmingCharacters(in: .whitespacesAndNewlines) ?? rawCover
-                let kind = try? htmlExtractor.value(from: element, rule: firstRule(rule, keys: ["kind"]), fallback: nil, baseUrl: response.url, variables: variables).nilIfEmpty
-                let lastChapter = try? htmlExtractor.value(from: element, rule: firstRule(rule, keys: ["lastChapter"]), fallback: nil, baseUrl: response.url, variables: variables).nilIfEmpty
+                let intro = try? htmlExtractor.value(from: element, rule: firstRule(rule, fallback: source.ruleSearch, keys: ["intro"]), fallback: nil, baseUrl: response.url, variables: variables).nilIfEmpty
+                let kind = try? htmlExtractor.value(from: element, rule: firstRule(rule, fallback: source.ruleSearch, keys: ["kind"]), fallback: nil, baseUrl: response.url, variables: variables).nilIfEmpty
+                let lastChapter = try? htmlExtractor.value(from: element, rule: firstRule(rule, fallback: source.ruleSearch, keys: ["lastChapter"]), fallback: nil, baseUrl: response.url, variables: variables).nilIfEmpty
                 books.append(SearchBook(
                     name: name,
                     author: author,
@@ -161,7 +162,7 @@ struct SearchResultParser {
                     bookUrl: absBookUrl,
                     sourceName: source.bookSourceName,
                     sourceUrl: source.bookSourceUrl,
-                    intro: nil,
+                    intro: intro,
                     kind: kind,
                     lastChapter: lastChapter
                 ))
