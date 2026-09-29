@@ -19,7 +19,7 @@ struct AudioBookPlayerView: View {
     }
 
     private var isCurrentTimeBookmarked: Bool {
-        guard let bookID = coordinator.currentBookID else { return }
+        guard let bookID = coordinator.currentBookID else { return false }
         let currentSec = Int(coordinator.currentTime)
         return currentBookBookmarks.contains { b in
             b.chapterIndex == coordinator.currentChapterIndex && abs((b.paragraphIndex ?? 0) - currentSec) <= 3
