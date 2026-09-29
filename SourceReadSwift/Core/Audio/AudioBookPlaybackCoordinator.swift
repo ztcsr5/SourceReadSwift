@@ -20,13 +20,15 @@ final class AudioBookPlaybackCoordinator: ObservableObject {
     @Published var errorMessage: String?
     @Published var sleepTimerMinutesRemaining: Int?
     @Published var stopAtChapterEnd: Bool = false
+    @Published var currentBookID: String?
+    @Published var isFadeOutEnabled: Bool = true
 
     private var player: AVPlayer?
     private var timeObserverToken: Any?
     private var sleepTimer: Timer?
+    private var fadeTimer: Timer?
     private var currentArtwork: MPMediaItemArtwork?
     private var currentEngine: SourceEngine?
-    private var currentBookID: String?
     private var pendingResumeSeconds: Double?
     private var bookshelfStore: BookshelfStore?
     private var lastPersistedSecond: Int = 0
@@ -52,6 +54,7 @@ final class AudioBookPlaybackCoordinator: ObservableObject {
             player?.removeTimeObserver(token)
         }
         sleepTimer?.invalidate()
+        fadeTimer?.invalidate()
         NotificationCenter.default.removeObserver(self)
     }
 
@@ -198,9 +201,12 @@ final class AudioBookPlaybackCoordinator: ObservableObject {
         playChapter(at: self.currentChapterIndex)
     }
 
-    func playChapter(at index: Int) {
+    func playChapter(at index: Int, resumeSeconds: Double? = nil) {
         guard chapters.indices.contains(index) else { return }
         currentChapterIndex = index
+        if let resumeSeconds, resumeSeconds > 0 {
+            pendingResumeSeconds = resumeSeconds
+        }
         let chapter = chapters[index]
         isLoading = true
         errorMessage = nil
@@ -316,6 +322,9 @@ final class AudioBookPlaybackCoordinator: ObservableObject {
     }
 
     func play() {
+        fadeTimer?.invalidate()
+        fadeTimer = nil
+        player?.volume = 1.0
         player?.play()
         player?.rate = playbackRate
         isPlaying = true
@@ -323,10 +332,46 @@ final class AudioBookPlaybackCoordinator: ObservableObject {
     }
 
     func pause() {
+        fadeTimer?.invalidate()
+        fadeTimer = nil
         player?.pause()
         isPlaying = false
         persistProgressIfNeeded()
         updateNowPlayingInfo()
+    }
+
+    func fadeOutAndPause(duration: TimeInterval = 8.0, completion: (() -> Void)? = nil) {
+        fadeTimer?.invalidate()
+        fadeTimer = nil
+        guard let player = self.player, isPlaying, isFadeOutEnabled else {
+            self.pause()
+            completion?()
+            return
+        }
+
+        let initialVolume = player.volume
+        let steps = 16
+        let interval = duration / Double(steps)
+        var currentStep = 0
+
+        fadeTimer = Timer.scheduledTimer(withTimeInterval: interval, repeats: true) { [weak self] timer in
+            Task { @MainActor [weak self] in
+                guard let self, let player = self.player else {
+                    timer.invalidate()
+                    return
+                }
+                currentStep += 1
+                let progress = Float(currentStep) / Float(steps)
+                player.volume = max(0, initialVolume * (1.0 - progress))
+                if currentStep >= steps {
+                    timer.invalidate()
+                    self.fadeTimer = nil
+                    self.pause()
+                    player.volume = initialVolume
+                    completion?()
+                }
+            }
+        }
     }
 
     func togglePlayPause() {
@@ -338,6 +383,8 @@ final class AudioBookPlaybackCoordinator: ObservableObject {
     }
 
     func stop() {
+        fadeTimer?.invalidate()
+        fadeTimer = nil
         pause()
         if let token = timeObserverToken {
             player?.removeTimeObserver(token)
@@ -347,11 +394,16 @@ final class AudioBookPlaybackCoordinator: ObservableObject {
         currentBook = nil
         currentSource = nil
         currentAudioURL = nil
+        currentBookID = nil
+        bookshelfStore = nil
+        pendingResumeSeconds = nil
+        lastPersistedSecond = 0
         currentTime = 0
         duration = 0
         sleepTimer?.invalidate()
         sleepTimer = nil
         sleepTimerMinutesRemaining = nil
+        stopAtChapterEnd = false
         MPNowPlayingInfoCenter.default().nowPlayingInfo = nil
     }
 
@@ -420,10 +472,14 @@ final class AudioBookPlaybackCoordinator: ObservableObject {
                     return
                 }
                 if current <= 1 {
-                    self.pause()
                     self.sleepTimerMinutesRemaining = nil
                     timer.invalidate()
                     self.sleepTimer = nil
+                    if self.isFadeOutEnabled {
+                        self.fadeOutAndPause(duration: 8.0)
+                    } else {
+                        self.pause()
+                    }
                 } else {
                     self.sleepTimerMinutesRemaining = current - 1
                 }
