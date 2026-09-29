@@ -1,4 +1,5 @@
 import SwiftUI
+import AVKit
 
 struct AudioBookPlayerView: View {
     @Environment(\.dismiss) private var dismiss
@@ -374,6 +375,14 @@ struct AudioBookPlayerView: View {
 
             Spacer()
 
+            // AirPlay Route Picker
+            AirPlayRoutePickerView()
+                .frame(width: 32, height: 32)
+                .background(.ultraThinMaterial, in: Circle())
+                .accessibilityLabel("音频输出设备")
+
+            Spacer()
+
             // Sleep Timer
             Button {
                 showSleepTimerDialog = true
@@ -469,3 +478,21 @@ struct AudioBookPlayerView: View {
         }
     }
 }
+
+// MARK: - Native AirPlay Route Picker
+struct AirPlayRoutePickerView: UIViewRepresentable {
+    var tintColor: UIColor = .label
+
+    func makeUIView(context: Context) -> AVRoutePickerView {
+        let picker = AVRoutePickerView()
+        picker.tintColor = tintColor
+        picker.activeTintColor = .systemBlue
+        picker.prioritizesVideoDevices = false
+        return picker
+    }
+
+    func updateUIView(_ uiView: AVRoutePickerView, context: Context) {
+        uiView.tintColor = tintColor
+    }
+}
+

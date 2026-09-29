@@ -26,6 +26,10 @@ final class AudioBookPlaybackCoordinator: ObservableObject {
     private var sleepTimer: Timer?
     private var currentArtwork: MPMediaItemArtwork?
     private var currentEngine: SourceEngine?
+    private var currentBookID: String?
+    private var pendingResumeSeconds: Double?
+    private var bookshelfStore: BookshelfStore?
+    private var lastPersistedSecond: Int = 0
 
     var currentChapter: BookChapter? {
         guard chapters.indices.contains(currentChapterIndex) else { return nil }
@@ -173,16 +177,22 @@ final class AudioBookPlaybackCoordinator: ObservableObject {
     // MARK: - Playback Control
 
     func startBook(
+        bookID: String? = nil,
         book: SearchBook,
         source: BookSource,
         chapters: [BookChapter],
         initialChapterIndex: Int = 0,
-        engine: SourceEngine
+        initialPositionSeconds: Double? = nil,
+        engine: SourceEngine,
+        bookshelfStore: BookshelfStore? = nil
     ) {
+        self.currentBookID = bookID
         self.currentBook = book
         self.currentSource = source
         self.chapters = chapters
         self.currentEngine = engine
+        self.bookshelfStore = bookshelfStore
+        self.pendingResumeSeconds = initialPositionSeconds
         self.currentChapterIndex = max(0, min(initialChapterIndex, chapters.count - 1))
         loadCoverArtwork(url: book.coverUrl)
         playChapter(at: self.currentChapterIndex)
@@ -274,7 +284,13 @@ final class AudioBookPlaybackCoordinator: ObservableObject {
             if let currentItem = self.player?.currentItem, currentItem.duration.isNumeric {
                 self.duration = currentItem.duration.seconds
                 self.isLoading = false
+
+                if let pending = self.pendingResumeSeconds, pending > 0, pending < self.duration {
+                    self.seek(to: pending)
+                    self.pendingResumeSeconds = nil
+                }
             }
+            self.persistProgressIfNeeded()
             self.updateNowPlayingInfo()
         }
 
@@ -283,6 +299,19 @@ final class AudioBookPlaybackCoordinator: ObservableObject {
         isPlaying = true
         isLoading = false
         updateNowPlayingInfo()
+    }
+
+    private func persistProgressIfNeeded() {
+        guard let bookID = currentBookID, let bookshelfStore else { return }
+        let currentSec = Int(currentTime)
+        guard abs(currentSec - lastPersistedSecond) >= 3 else { return }
+        lastPersistedSecond = currentSec
+        bookshelfStore.updateReadingProgress(
+            bookID: bookID,
+            chapterIndex: currentChapterIndex,
+            chapterTitle: currentChapter?.title,
+            paragraphIndex: currentSec
+        )
     }
 
     func play() {
@@ -295,6 +324,7 @@ final class AudioBookPlaybackCoordinator: ObservableObject {
     func pause() {
         player?.pause()
         isPlaying = false
+        persistProgressIfNeeded()
         updateNowPlayingInfo()
     }
 

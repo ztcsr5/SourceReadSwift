@@ -75,11 +75,14 @@ struct BookshelfReaderGatewayView: View {
                                     sourceUrl: source.bookSourceUrl
                                 )
                                 AudioBookPlaybackCoordinator.shared.startBook(
+                                    bookID: currentBook.id,
                                     book: searchBook,
                                     source: source,
                                     chapters: chapters,
                                     initialChapterIndex: selectedChapter.index,
-                                    engine: appState.engine
+                                    initialPositionSeconds: currentBook.currentParagraphIndex.map { Double($0) },
+                                    engine: appState.engine,
+                                    bookshelfStore: appState.bookshelfStore
                                 )
                             }
                     )
