@@ -45,4 +45,15 @@ final class DiscoverViewModelTests: XCTestCase {
         XCTAssertFalse(viewModel.isSearching)
         XCTAssertFalse(viewModel.hasSearchState)
     }
+
+    func testSelectSourceKindUpdatesFilter() {
+        let viewModel = DiscoverViewModel()
+        XCTAssertNil(viewModel.selectedSourceKind)
+
+        viewModel.selectSourceKind(.audio)
+        XCTAssertEqual(viewModel.selectedSourceKind, .audio)
+
+        viewModel.selectSourceKind(nil)
+        XCTAssertNil(viewModel.selectedSourceKind)
+    }
 }

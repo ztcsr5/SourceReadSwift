@@ -3,6 +3,7 @@ import UIKit
 
 struct SearchBookRow: View {
     let book: SearchBook
+    var sourceKind: BookSourceKind? = nil
     var onAdd: (() -> Void)?
     var isInBookshelf = false
 
@@ -21,6 +22,20 @@ struct SearchBookRow: View {
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
+
+                    if let sourceKind, sourceKind != .text {
+                        HStack(spacing: 3) {
+                            Image(systemName: sourceKind.systemImage)
+                                .font(.system(size: 9, weight: .bold))
+                            Text(sourceKind.displayName)
+                                .font(.system(size: 10, weight: .bold))
+                        }
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .background(kindBadgeColor(sourceKind))
+                        .clipShape(Capsule())
+                    }
 
                     Text(book.sourceName)
                         .font(.system(size: 11, weight: .semibold))
@@ -85,5 +100,14 @@ struct SearchBookRow: View {
                     .font(.title)
                     .foregroundStyle(.blue)
             }
+    }
+
+    private func kindBadgeColor(_ kind: BookSourceKind) -> Color {
+        switch kind {
+        case .audio: return Color.purple
+        case .comic: return Color.orange
+        case .video: return Color.red
+        case .text: return Color.blue
+        }
     }
 }

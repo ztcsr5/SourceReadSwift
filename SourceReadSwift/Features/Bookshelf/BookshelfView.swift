@@ -10,6 +10,8 @@ struct BookshelfView: View {
     @State private var isImportingBook = false
     @State private var selectedBookForDetail: BookshelfBook?
     @AppStorage("settings.themeMode") private var themeModeRawValue = ThemeMode.system.rawValue
+    @AppStorage("bookshelf.isGridMode") private var isGridMode = true
+    @State private var selectedMainGroup: String? = nil
 
     private var recentBooks: [BookshelfBook] {
         appState.bookshelfStore.recentBooks
@@ -21,6 +23,13 @@ struct BookshelfView: View {
 
     private var allBooks: [BookshelfBook] {
         appState.bookshelfStore.books
+    }
+
+    private var displayedShelfBooks: [BookshelfBook] {
+        if let selectedMainGroup {
+            return allBooks.filter { $0.groupName == selectedMainGroup }
+        }
+        return allBooks
     }
 
     var body: some View {
@@ -212,13 +221,46 @@ struct BookshelfView: View {
     }
 
     private var shelfSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: 14) {
             shelfHeader
+
+            if !appState.bookshelfStore.groups.isEmpty {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 8) {
+                        mainGroupChip("全部", isSelected: selectedMainGroup == nil) {
+                            selectedMainGroup = nil
+                        }
+                        ForEach(appState.bookshelfStore.groups) { group in
+                            mainGroupChip(group.name, isSelected: selectedMainGroup == group.name) {
+                                selectedMainGroup = group.name
+                            }
+                        }
+                    }
+                    .padding(.horizontal, 2)
+                    .padding(.vertical, 2)
+                }
+            }
+
             if allBooks.isEmpty {
                 compactEmptyState(icon: "books.vertical", title: "书架还是空的", message: "支持 TXT、EPUB 与在线书源书籍")
+            } else if displayedShelfBooks.isEmpty {
+                compactEmptyState(icon: "folder", title: "该分组暂无书籍", message: "可在“管理”中长按书籍分配至此分组")
+            } else if isGridMode {
+                LazyVGrid(
+                    columns: [
+                        GridItem(.flexible(), spacing: 14),
+                        GridItem(.flexible(), spacing: 14),
+                        GridItem(.flexible(), spacing: 14)
+                    ],
+                    spacing: 18
+                ) {
+                    ForEach(displayedShelfBooks) { book in
+                        bookshelfGridCard(book)
+                    }
+                }
             } else {
                 LazyVStack(spacing: 14) {
-                    ForEach(allBooks) { book in
+                    ForEach(displayedShelfBooks) { book in
                         bookshelfRow(book)
                     }
                 }
@@ -232,18 +274,56 @@ struct BookshelfView: View {
                 BookshelfCollectionView(title: "书架", books: allBooks)
             } label: {
                 HStack(spacing: 7) {
-                Text("书架")
-                    .font(.system(size: 22, weight: .bold))
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 15, weight: .bold))
-                    .foregroundStyle(.secondary)
+                    Text("书架")
+                        .font(.system(size: 22, weight: .bold))
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 15, weight: .bold))
+                        .foregroundStyle(.secondary)
                 }
                 .foregroundStyle(.primary)
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
+
             Spacer()
+
+            if !allBooks.isEmpty {
+                Button {
+                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                    withAnimation(.spring(response: 0.32, dampingFraction: 0.8)) {
+                        isGridMode.toggle()
+                    }
+                } label: {
+                    Image(systemName: isGridMode ? "rectangle.grid.1x2" : "square.grid.2x2")
+                        .font(.system(size: 15, weight: .medium))
+                        .foregroundStyle(.secondary)
+                        .frame(width: 32, height: 32)
+                        .background(Color.secondary.opacity(0.12), in: Circle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(isGridMode ? "切换为列表视图" : "切换为网格视图")
+            }
         }
+    }
+
+    private func mainGroupChip(_ name: String, isSelected: Bool, action: @escaping () -> Void) -> some View {
+        Button(action: {
+            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+            action()
+        }) {
+            Text(name)
+                .font(.system(size: 13, weight: isSelected ? .semibold : .regular))
+                .padding(.horizontal, 14)
+                .padding(.vertical, 7)
+                .background(isSelected ? AppTheme.accent : AppTheme.card, in: Capsule())
+                .foregroundStyle(isSelected ? Color.white : Color.primary)
+                .overlay {
+                    if !isSelected {
+                        Capsule().stroke(Color.primary.opacity(0.06), lineWidth: 0.8)
+                    }
+                }
+        }
+        .buttonStyle(.plain)
     }
 
     @ViewBuilder
@@ -631,6 +711,108 @@ struct BookshelfView: View {
             } label: {
                 Label("书籍详情", systemImage: "info.circle")
             }
+            if !appState.bookshelfStore.groups.isEmpty {
+                Menu("移动到分组") {
+                    Button("移出分组") {
+                        appState.bookshelfStore.moveBooks(bookIDs: [book.id], toGroupName: nil)
+                    }
+                    ForEach(appState.bookshelfStore.groups) { group in
+                        Button(group.name) {
+                            appState.bookshelfStore.moveBooks(bookIDs: [book.id], toGroupName: group.name)
+                        }
+                    }
+                }
+            }
+            Button("从书架删除", role: .destructive) {
+                appState.bookshelfStore.remove(bookID: book.id)
+            }
+        }
+    }
+
+    private func bookshelfGridCard(_ book: BookshelfBook) -> some View {
+        NavigationLink {
+            BookshelfReaderGatewayView(book: book)
+        } label: {
+            VStack(alignment: .leading, spacing: 8) {
+                ZStack(alignment: .topTrailing) {
+                    AsyncBookCover(urlString: book.coverURL, width: nil, height: 145)
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 145)
+                        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                        .overlay {
+                            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                .stroke(Color.white.opacity(0.12), lineWidth: 0.8)
+                        }
+                        .shadow(color: .black.opacity(colorScheme == .dark ? 0.35 : 0.12), radius: 6, x: 0, y: 4)
+
+                    if book.hasUpdates {
+                        Circle()
+                            .fill(Color.red)
+                            .frame(width: 10, height: 10)
+                            .overlay {
+                                Circle().stroke(Color.white, lineWidth: 1.5)
+                            }
+                            .offset(x: 2, y: -2)
+                            .shadow(color: .red.opacity(0.6), radius: 3)
+                    }
+
+                    if let current = book.currentChapterTitle {
+                        VStack {
+                            Spacer()
+                            HStack {
+                                Text(current)
+                                    .font(.system(size: 9, weight: .medium))
+                                    .foregroundStyle(.white)
+                                    .lineLimit(1)
+                                    .padding(.horizontal, 6)
+                                    .padding(.vertical, 3)
+                                    .background(.ultraThinMaterial.opacity(0.95))
+                                    .background(Color.black.opacity(0.45))
+                                    .clipShape(Capsule())
+                                Spacer()
+                            }
+                            .padding(5)
+                        }
+                    }
+                }
+
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(book.title)
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(.primary)
+                        .lineLimit(2)
+                        .multilineTextAlignment(.leading)
+                        .frame(height: 34, alignment: .topLeading)
+
+                    Text(book.author.isEmpty ? (book.groupName ?? "未知作者") : book.author)
+                        .font(.system(size: 11))
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                }
+            }
+        }
+        .buttonStyle(PressableScaleButtonStyle())
+        .simultaneousGesture(TapGesture().onEnded {
+            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+        })
+        .contextMenu {
+            Button {
+                selectedBookForDetail = book
+            } label: {
+                Label("书籍详情", systemImage: "info.circle")
+            }
+            if !appState.bookshelfStore.groups.isEmpty {
+                Menu("移动到分组") {
+                    Button("移出分组") {
+                        appState.bookshelfStore.moveBooks(bookIDs: [book.id], toGroupName: nil)
+                    }
+                    ForEach(appState.bookshelfStore.groups) { group in
+                        Button(group.name) {
+                            appState.bookshelfStore.moveBooks(bookIDs: [book.id], toGroupName: group.name)
+                        }
+                    }
+                }
+            }
             Button("从书架删除", role: .destructive) {
                 appState.bookshelfStore.remove(bookID: book.id)
             }
@@ -1005,7 +1187,7 @@ private struct PressableScaleButtonStyle: ButtonStyle {
 
 struct AsyncBookCover: View {
     let urlString: String?
-    let width: CGFloat
+    var width: CGFloat? = nil
     let height: CGFloat
 
     var body: some View {
@@ -1017,6 +1199,7 @@ struct AsyncBookCover: View {
             }
         }
         .frame(width: width, height: height)
+        .frame(maxWidth: width == nil ? .infinity : nil)
         .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
     }
 

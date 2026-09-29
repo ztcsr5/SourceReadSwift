@@ -4,6 +4,7 @@ import SwiftUI
 @MainActor
 final class ExploreViewModel: ObservableObject {
     @Published var selectedSource: BookSource?
+    @Published var selectedSourceKind: BookSourceKind? = nil
     @Published var selectedCategory: ExploreCategory?
     @Published var selectedGroup: String?
     @Published var categories: [ExploreCategory] = []
@@ -29,8 +30,26 @@ final class ExploreViewModel: ObservableObject {
 
     var availableSources: [BookSource] {
         guard let appState else { return [] }
-        return appState.sourceStore.sources.filter { source in
+        let all = appState.sourceStore.sources.filter { source in
             source.enabled && !(source.exploreUrl ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        }
+        guard let selectedSourceKind else { return all }
+        return all.filter { $0.sourceKind == selectedSourceKind }
+    }
+
+    func selectSourceKind(_ kind: BookSourceKind?) {
+        selectedSourceKind = kind
+        if let current = selectedSource, availableSources.contains(where: { $0.id == current.id }) {
+            return
+        }
+        if let first = availableSources.first {
+            selectSource(first)
+        } else {
+            selectedSource = nil
+            categories = []
+            books = []
+            selectedCategory = nil
+            errorMessage = "该类型暂无配置分类发现的书源"
         }
     }
 

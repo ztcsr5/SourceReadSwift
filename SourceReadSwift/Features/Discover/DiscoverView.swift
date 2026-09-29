@@ -45,6 +45,8 @@ struct DiscoverView: View {
                     }
                     .pickerStyle(.segmented)
 
+                    mediumFilterPillBar
+
                     if selectedTab == .search {
                         bookSearchTab
                     } else {
@@ -157,6 +159,61 @@ struct DiscoverView: View {
                 }
             }
         }
+    }
+
+    private var currentSourceKind: BookSourceKind? {
+        selectedTab == .search ? viewModel.selectedSourceKind : exploreViewModel.selectedSourceKind
+    }
+
+    private var mediumFilterPillBar: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 8) {
+                mediumPill(title: "全部", icon: "square.grid.2x2", isSelected: currentSourceKind == nil) {
+                    setMediumFilter(nil)
+                }
+                ForEach(BookSourceKind.allCases) { kind in
+                    mediumPill(
+                        title: kind.displayName,
+                        icon: kind.systemImage,
+                        isSelected: currentSourceKind == kind
+                    ) {
+                        setMediumFilter(kind)
+                    }
+                }
+            }
+            .padding(.horizontal, 2)
+            .padding(.vertical, 2)
+        }
+    }
+
+    private func setMediumFilter(_ kind: BookSourceKind?) {
+        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+        if selectedTab == .search {
+            viewModel.selectSourceKind(kind)
+        } else {
+            exploreViewModel.selectSourceKind(kind)
+        }
+    }
+
+    private func mediumPill(title: String, icon: String, isSelected: Bool, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            HStack(spacing: 5) {
+                Image(systemName: icon)
+                    .font(.system(size: 12, weight: .semibold))
+                Text(title)
+                    .font(.system(size: 13, weight: isSelected ? .semibold : .regular))
+            }
+            .padding(.horizontal, 13)
+            .padding(.vertical, 7)
+            .background(isSelected ? AppTheme.accent : Color(UIColor.secondarySystemGroupedBackground), in: Capsule())
+            .foregroundStyle(isSelected ? Color.white : Color.primary)
+            .overlay {
+                if !isSelected {
+                    Capsule().stroke(Color.primary.opacity(0.06), lineWidth: 0.8)
+                }
+            }
+        }
+        .buttonStyle(.plain)
     }
 
     private var bookSearchTab: some View {
@@ -488,7 +545,7 @@ struct DiscoverView: View {
             NavigationLink {
                 BookDetailView(book: book)
             } label: {
-                SearchBookRow(book: book)
+                SearchBookRow(book: book, sourceKind: viewModel.sourceKind(for: book))
             }
             .buttonStyle(.plain)
             .simultaneousGesture(TapGesture().onEnded {
@@ -784,6 +841,7 @@ final class DiscoverViewModel: ObservableObject {
     @Published var matchMode: SearchMatchMode = .exact
     @Published var resultFilterScope: SearchResultFilterScope = .all
     @Published var resultFilter = ""
+    @Published var selectedSourceKind: BookSourceKind? = nil
     @Published var results: [SearchBook] = []
     private var unfilteredResults: [SearchBook] = []
     var hasUnfilteredResults: Bool { !unfilteredResults.isEmpty }
@@ -927,9 +985,30 @@ final class DiscoverViewModel: ObservableObject {
     }
 
     func applyResultFilter() {
-        // Search results are already deduplicated by the source search. This only
-        // changes the visible projection, so changing the filter never re-runs IO.
-        results = SearchResultFilter.apply(unfilteredResults, query: resultFilter, scope: resultFilterScope)
+        var base = unfilteredResults
+        if let kind = selectedSourceKind {
+            base = base.filter { book in
+                sourceKind(for: book) == kind
+            }
+        }
+        results = SearchResultFilter.apply(base, query: resultFilter, scope: resultFilterScope)
+    }
+
+    func sourceKind(for book: SearchBook) -> BookSourceKind {
+        if let source = appState?.sourceStore.source(for: book.sourceUrl) {
+            return source.sourceKind
+        }
+        return .text
+    }
+
+    func selectSourceKind(_ kind: BookSourceKind?) {
+        guard selectedSourceKind != kind else { return }
+        selectedSourceKind = kind
+        applyResultFilter()
+        if !keyword.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            lastSubmittedKeyword = ""
+            startSearch()
+        }
     }
 
     func applyMatchMode() {
@@ -981,10 +1060,16 @@ final class DiscoverViewModel: ObservableObject {
             }
         }
 
-        let sources = appState.sourceStore.sources.filter(\.enabled)
+        let sources = appState.sourceStore.sources.filter { source in
+            guard source.enabled else { return false }
+            if let kind = selectedSourceKind {
+                return source.sourceKind == kind
+            }
+            return true
+        }
         enabledSourceCount = sources.count
         guard !sources.isEmpty else {
-            errorMessage = "没有可用书源，请先到书源管理导入书源。"
+            errorMessage = selectedSourceKind != nil ? "未找到启用的\(selectedSourceKind!.displayName)书源，请在书源管理中导入或启用相应源。" : "没有可用书源，请先到书源管理导入书源。"
             return
         }
 
@@ -993,8 +1078,10 @@ final class DiscoverViewModel: ObservableObject {
         var hitSources = Set<String>()
         var failures: [String] = []
 
-        // 并发执行 Z-Library 全球图书源检索
+        // 并发执行 Z-Library 全球图书源检索（纯文本小说）
+        let shouldSearchZlib = selectedSourceKind == nil || selectedSourceKind == .text
         let zlibSearchTask = Task { () -> [SearchBook] in
+            guard shouldSearchZlib else { return [] }
             let res = await ZlibraryEngine.shared.search(keyword: keyword, page: 1)
             if case .success(let b) = res { return b }
             return []

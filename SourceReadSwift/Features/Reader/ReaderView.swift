@@ -60,6 +60,7 @@ struct ReaderView: View {
     @State private var showChapterList = false
     @State private var showBookmarks = false
     @State private var showBookDetailSheet = false
+    @State private var quoteCardBookmark: ReaderBookmark? = nil
     @State private var selectedPhotoItem: PhotosPickerItem? = nil
     @State private var backgroundWallpaperRevision = UUID()
     @State private var settingsTab = 0
@@ -401,6 +402,15 @@ struct ReaderView: View {
         }
         .sheet(isPresented: $showBookmarks) {
             bookmarkSheet
+        }
+        .sheet(item: $quoteCardBookmark) { bookmark in
+            let shelfBook = appState.bookshelfStore.book(id: bookID)
+            QuoteCardView(
+                quote: bookmark.snippet.isEmpty ? bookmark.chapterTitle : bookmark.snippet,
+                bookTitle: shelfBook?.title ?? content.title,
+                author: shelfBook?.author ?? "",
+                chapterTitle: bookmark.chapterTitle
+            )
         }
         .sheet(item: Binding(
             get: { selectedIllustrationURL.map { IdentifiableReaderURL(url: $0) } },
@@ -2146,8 +2156,26 @@ struct ReaderView: View {
                         .disabled(bookmark.chapterIndex != chapterIndex && onSelectChapter == nil)
                         .listRowBackground(Color.clear)
                         .listRowSeparatorTint(readerThemeTextColor.opacity(0.15))
-                        .swipeActions {
+                        .swipeActions(edge: .leading) {
+                            Button {
+                                quoteCardBookmark = bookmark
+                            } label: {
+                                Label("卡片", systemImage: "quote.bubble.fill")
+                            }
+                            .tint(AppTheme.accent)
+                        }
+                        .swipeActions(edge: .trailing) {
                             Button("删除", role: .destructive) {
+                                appState.bookshelfStore.removeBookmark(bookID: bookID, bookmarkID: bookmark.id)
+                            }
+                        }
+                        .contextMenu {
+                            Button {
+                                quoteCardBookmark = bookmark
+                            } label: {
+                                Label("生成金句卡片", systemImage: "quote.bubble")
+                            }
+                            Button("删除书签", role: .destructive) {
                                 appState.bookshelfStore.removeBookmark(bookID: bookID, bookmarkID: bookmark.id)
                             }
                         }

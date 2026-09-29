@@ -35,6 +35,8 @@ struct ReaderBookmarksView: View {
         }
     }
 
+    @State private var selectedQuoteBookmark: (book: BookshelfBook, bookmark: ReaderBookmark)? = nil
+
     var body: some View {
         List {
             if sections.isEmpty {
@@ -59,8 +61,26 @@ struct ReaderBookmarksView: View {
                                         .lineLimit(2)
                                 }
                             }
-                            .swipeActions {
+                            .swipeActions(edge: .leading) {
+                                Button {
+                                    selectedQuoteBookmark = (section.book, bookmark)
+                                } label: {
+                                    Label("卡片", systemImage: "quote.bubble.fill")
+                                }
+                                .tint(AppTheme.accent)
+                            }
+                            .swipeActions(edge: .trailing) {
                                 Button("删除", role: .destructive) {
+                                    appState.bookshelfStore.removeBookmark(bookID: section.book.id, bookmarkID: bookmark.id)
+                                }
+                            }
+                            .contextMenu {
+                                Button {
+                                    selectedQuoteBookmark = (section.book, bookmark)
+                                } label: {
+                                    Label("生成金句卡片", systemImage: "quote.bubble")
+                                }
+                                Button("删除书签", role: .destructive) {
                                     appState.bookshelfStore.removeBookmark(bookID: section.book.id, bookmarkID: bookmark.id)
                                 }
                             }
@@ -71,6 +91,19 @@ struct ReaderBookmarksView: View {
         }
         .navigationTitle("书签")
         .listStyle(.insetGrouped)
+        .sheet(isPresented: Binding(
+            get: { selectedQuoteBookmark != nil },
+            set: { if !$0 { selectedQuoteBookmark = nil } }
+        )) {
+            if let pair = selectedQuoteBookmark {
+                QuoteCardView(
+                    quote: pair.bookmark.snippet.isEmpty ? pair.bookmark.chapterTitle : pair.bookmark.snippet,
+                    bookTitle: pair.book.title,
+                    author: pair.book.author,
+                    chapterTitle: pair.bookmark.chapterTitle
+                )
+            }
+        }
     }
 
     private struct BookmarkSection: Identifiable {
