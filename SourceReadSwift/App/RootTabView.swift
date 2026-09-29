@@ -63,46 +63,63 @@ struct RootTabView: View {
         Button {
             showFullAudioPlayer = true
         } label: {
-            HStack(spacing: 12) {
-                AsyncBookCover(urlString: audioCoordinator.currentBook?.coverUrl, width: 38, height: 48)
+            VStack(spacing: 0) {
+                HStack(spacing: 12) {
+                    AsyncBookCover(urlString: audioCoordinator.currentBook?.coverUrl, width: 38, height: 48)
 
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(audioCoordinator.currentBook?.name ?? "有声书播放中")
-                        .font(.system(size: 13, weight: .semibold))
-                        .foregroundStyle(.primary)
-                        .lineLimit(1)
-                    Text(audioCoordinator.currentChapter?.title ?? "正在缓冲音频...")
-                        .font(.system(size: 11))
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(audioCoordinator.currentBook?.name ?? "有声书播放中")
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundStyle(.primary)
+                            .lineLimit(1)
+                        Text(audioCoordinator.currentChapter?.title ?? "正在缓冲音频...")
+                            .font(.system(size: 11))
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                    }
+
+                    Spacer()
+
+                    Button {
+                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                        audioCoordinator.togglePlayPause()
+                    } label: {
+                        Image(systemName: audioCoordinator.isPlaying ? "pause.fill" : "play.fill")
+                            .font(.system(size: 16, weight: .bold))
+                            .foregroundStyle(AppTheme.accent)
+                            .frame(width: 32, height: 32)
+                    }
+                    .buttonStyle(.plain)
+
+                    Button {
+                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                        audioCoordinator.stop()
+                    } label: {
+                        Image(systemName: "xmark")
+                            .font(.system(size: 12, weight: .bold))
+                            .foregroundStyle(.secondary)
+                            .frame(width: 28, height: 28)
+                    }
+                    .buttonStyle(.plain)
                 }
+                .padding(.horizontal, 14)
+                .padding(.top, 7)
+                .padding(.bottom, 5)
 
-                Spacer()
-
-                Button {
-                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                    audioCoordinator.togglePlayPause()
-                } label: {
-                    Image(systemName: audioCoordinator.isPlaying ? "pause.fill" : "play.fill")
-                        .font(.system(size: 16, weight: .bold))
-                        .foregroundStyle(AppTheme.accent)
-                        .frame(width: 32, height: 32)
+                // Track Progress Line
+                GeometryReader { geo in
+                    ZStack(alignment: .leading) {
+                        Capsule()
+                            .fill(Color.secondary.opacity(0.15))
+                        Capsule()
+                            .fill(AppTheme.accent)
+                            .frame(width: max(0, min(geo.size.width * CGFloat(audioCoordinator.progress), geo.size.width)))
+                    }
                 }
-                .buttonStyle(.plain)
-
-                Button {
-                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                    audioCoordinator.stop()
-                } label: {
-                    Image(systemName: "xmark")
-                        .font(.system(size: 12, weight: .bold))
-                        .foregroundStyle(.secondary)
-                        .frame(width: 28, height: 28)
-                }
-                .buttonStyle(.plain)
+                .frame(height: 2.5)
+                .padding(.horizontal, 14)
+                .padding(.bottom, 4)
             }
-            .padding(.horizontal, 14)
-            .padding(.vertical, 7)
             .glassPanel(cornerRadius: 18, material: .ultraThinMaterial, strokeOpacity: 0.10, shadowOpacity: 0.14)
             .padding(.horizontal, 12)
         }

@@ -34,6 +34,8 @@ struct ComicReaderView: View {
     @State private var showChrome = true
     @State private var showChapterDrawer = false
     @State private var currentPageIndex: Int = 0
+    @State private var scrollTargetIndex: Int?
+    @AppStorage("comic_dimming_level") private var dimmingLevel: Double = 0.0
 
     init(
         bookID: String,
@@ -92,6 +94,11 @@ struct ComicReaderView: View {
                         }
                     }
             }
+            if dimmingLevel > 0 {
+                Color.black.opacity(dimmingLevel)
+                    .ignoresSafeArea()
+                    .allowsHitTesting(false)
+            }
 
             if showChrome {
                 chromeOverlay
@@ -139,34 +146,44 @@ struct ComicReaderView: View {
     }
 
     private var verticalScrollView: some View {
-        ScrollView {
-            LazyVStack(spacing: 0) {
-                ForEach(pages) { page in
-                    ComicPageImageView(url: page.url, pageNumber: page.id + 1, totalPages: pages.count)
-                        .onAppear {
-                            currentPageIndex = page.id
-                        }
-                }
-
-                // Next chapter trigger card
-                if currentChapterIndex + 1 < chapters.count {
-                    Button {
-                        loadChapter(at: currentChapterIndex + 1)
-                    } label: {
-                        HStack {
-                            Text("下一话：\(chapters[currentChapterIndex + 1].title)")
-                            Image(systemName: "chevron.down")
-                        }
-                        .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(.white.opacity(0.8))
-                        .padding(.vertical, 32)
-                        .frame(maxWidth: .infinity)
+        ScrollViewReader { proxy in
+            ScrollView {
+                LazyVStack(spacing: 0) {
+                    ForEach(pages) { page in
+                        ComicPageImageView(url: page.url, pageNumber: page.id + 1, totalPages: pages.count)
+                            .id(page.id)
+                            .onAppear {
+                                currentPageIndex = page.id
+                            }
                     }
-                } else {
-                    Text("全本完结")
-                        .font(.footnote)
-                        .foregroundStyle(.white.opacity(0.5))
-                        .padding(.vertical, 32)
+
+                    // Next chapter trigger card
+                    if currentChapterIndex + 1 < chapters.count {
+                        Button {
+                            loadChapter(at: currentChapterIndex + 1)
+                        } label: {
+                            HStack {
+                                Text("下一话：\(chapters[currentChapterIndex + 1].title)")
+                                Image(systemName: "chevron.down")
+                            }
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(.white.opacity(0.8))
+                            .padding(.vertical, 32)
+                            .frame(maxWidth: .infinity)
+                        }
+                    } else {
+                        Text("全本完结")
+                            .font(.footnote)
+                            .foregroundStyle(.white.opacity(0.5))
+                            .padding(.vertical, 32)
+                    }
+                }
+            }
+            .onChange(of: scrollTargetIndex) { target in
+                if let target = target {
+                    withAnimation(.easeInOut(duration: 0.25)) {
+                        proxy.scrollTo(target, anchor: .top)
+                    }
                 }
             }
         }
@@ -253,6 +270,60 @@ struct ComicReaderView: View {
 
             // Bottom Bar
             VStack(spacing: 12) {
+                // Page Scrubber Slider
+                if pages.count > 1 {
+                    HStack(spacing: 12) {
+                        Text("\(currentPageIndex + 1)")
+                            .font(.caption2.monospacedDigit().weight(.semibold))
+                            .foregroundStyle(.white.opacity(0.85))
+                            .frame(width: 32, alignment: .trailing)
+
+                        Slider(
+                            value: Binding(
+                                get: { Double(currentPageIndex) },
+                                set: { val in
+                                    let target = Int(val.rounded())
+                                    if target != currentPageIndex && target < pages.count {
+                                        currentPageIndex = target
+                                        scrollTargetIndex = target
+                                    }
+                                }
+                            ),
+                            in: 0...Double(max(pages.count - 1, 1)),
+                            step: 1
+                        )
+                        .tint(AppTheme.accent)
+
+                        Text("\(pages.count) P")
+                            .font(.caption2.monospacedDigit().weight(.semibold))
+                            .foregroundStyle(.white.opacity(0.5))
+                            .frame(width: 40, alignment: .leading)
+                    }
+                }
+
+                // Brightness & Dimming Control Bar
+                HStack(spacing: 12) {
+                    Image(systemName: "sun.min.fill")
+                        .font(.caption2)
+                        .foregroundStyle(.white.opacity(0.5))
+
+                    Slider(
+                        value: Binding(
+                            get: { 1.0 - dimmingLevel },
+                            set: { dimmingLevel = max(0.0, min(1.0 - $0, 0.8)) }
+                        ),
+                        in: 0.2...1.0
+                    )
+                    .tint(.yellow.opacity(0.85))
+
+                    Image(systemName: "sun.max.fill")
+                        .font(.caption2)
+                        .foregroundStyle(.yellow)
+                }
+
+                Divider()
+                    .background(Color.white.opacity(0.12))
+
                 HStack(spacing: 20) {
                     Button {
                         if currentChapterIndex > 0 {
@@ -270,10 +341,30 @@ struct ComicReaderView: View {
 
                     Spacer()
 
-                    if !pages.isEmpty {
-                        Text("\(currentPageIndex + 1) / \(pages.count) P")
-                            .font(.caption.monospacedDigit())
-                            .foregroundStyle(.white.opacity(0.7))
+                    // Quick Jump to start or end
+                    Button {
+                        currentPageIndex = 0
+                        scrollTargetIndex = 0
+                    } label: {
+                        Text("首页")
+                            .font(.caption2.weight(.medium))
+                            .foregroundStyle(.white.opacity(0.75))
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 4)
+                            .background(Color.white.opacity(0.12), in: Capsule())
+                    }
+
+                    Button {
+                        let last = max(pages.count - 1, 0)
+                        currentPageIndex = last
+                        scrollTargetIndex = last
+                    } label: {
+                        Text("末页")
+                            .font(.caption2.weight(.medium))
+                            .foregroundStyle(.white.opacity(0.75))
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 4)
+                            .background(Color.white.opacity(0.12), in: Capsule())
                     }
 
                     Spacer()
@@ -293,7 +384,7 @@ struct ComicReaderView: View {
                     .disabled(currentChapterIndex + 1 >= chapters.count)
                 }
             }
-            .padding(.horizontal, 24)
+            .padding(.horizontal, 20)
             .padding(.vertical, 14)
             .background(.ultraThinMaterial)
         }

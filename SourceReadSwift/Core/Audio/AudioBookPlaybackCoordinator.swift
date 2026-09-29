@@ -32,6 +32,11 @@ final class AudioBookPlaybackCoordinator: ObservableObject {
         return chapters[currentChapterIndex]
     }
 
+    var progress: Double {
+        guard duration > 0 else { return 0 }
+        return max(0, min(currentTime / duration, 1.0))
+    }
+
     private init() {
         setupAudioSession()
         setupRemoteCommandCenter()
