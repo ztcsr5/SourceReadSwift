@@ -95,6 +95,24 @@ struct ComicReaderView: View {
 
             if showChrome {
                 chromeOverlay
+            } else if !pages.isEmpty {
+                VStack {
+                    Spacer()
+                    HStack {
+                        Spacer()
+                        Text("\(currentPageIndex + 1) / \(pages.count) P")
+                            .font(.system(size: 11, weight: .semibold).monospacedDigit())
+                            .foregroundStyle(.white.opacity(0.85))
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 5)
+                            .background(.ultraThinMaterial.opacity(0.85), in: Capsule())
+                            .overlay(Capsule().stroke(Color.white.opacity(0.12), lineWidth: 0.8))
+                            .padding(.trailing, 16)
+                            .padding(.bottom, 20)
+                    }
+                }
+                .transition(.opacity)
+                .zIndex(2)
             }
         }
         .task {

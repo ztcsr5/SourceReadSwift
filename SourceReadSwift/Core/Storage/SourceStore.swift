@@ -228,6 +228,104 @@ final class SourceStore: ObservableObject {
                     "replaceRegex": "##第\\(\\d+/\\d+\\)页##"
                 ]),
                 header: "{\"User-Agent\":\"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36\"}"
+            ),
+            BookSource(
+                bookSourceName: "天空影视 (官方精选)",
+                bookSourceUrl: "https://api.tiankongapi.com",
+                bookSourceGroup: "官方精选",
+                bookSourceType: 3,
+                enabled: true,
+                weight: 120,
+                searchUrl: "https://api.tiankongapi.com/api.php/provide/vod/at/json?wd={{key}}",
+                ruleSearch: SourceRule(fields: [
+                    "bookList": "$.list[*]",
+                    "name": "$.vod_name",
+                    "author": "$.vod_director||$.vod_actor",
+                    "coverUrl": "$.vod_pic",
+                    "intro": "$.vod_content",
+                    "kind": "$.type_name",
+                    "lastChapter": "$.vod_remarks",
+                    "bookUrl": "https://api.tiankongapi.com/api.php/provide/vod/at/json?ac=detail&ids={{$.vod_id}}"
+                ]),
+                ruleBookInfo: SourceRule(fields: [
+                    "name": "$.list[0].vod_name",
+                    "author": "$.list[0].vod_director",
+                    "coverUrl": "$.list[0].vod_pic",
+                    "intro": "$.list[0].vod_content",
+                    "kind": "$.list[0].type_name",
+                    "lastChapter": "$.list[0].vod_remarks"
+                ]),
+                ruleToc: SourceRule(fields: [
+                    "chapterList": "$.list[0].vod_play_url@js:result ? result.split('#').filter(function(x){return x && x.indexOf('$')!==-1;}).map(function(x){var p=x.split('$');return {name:p[0],url:p[1]};}) : []",
+                    "chapterName": "name",
+                    "chapterUrl": "url"
+                ]),
+                ruleContent: SourceRule(fields: [
+                    "content": "$.url||@text"
+                ]),
+                header: "{\"User-Agent\":\"Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15\"}"
+            ),
+            BookSource(
+                bookSourceName: "包子漫画 (官方精选)",
+                bookSourceUrl: "https://cn.baozimh.com",
+                bookSourceGroup: "官方精选",
+                bookSourceType: 2,
+                enabled: true,
+                weight: 110,
+                searchUrl: "https://cn.baozimh.com/search?q={{key}}",
+                ruleSearch: SourceRule(fields: [
+                    "bookList": "div.comics-card",
+                    "name": "a.comics-card__title@text||h3@text",
+                    "author": "small.comics-card__sub-title@text",
+                    "coverUrl": "amp-img@src||img@src",
+                    "bookUrl": "a.comics-card__poster@href||a@href"
+                ]),
+                ruleBookInfo: SourceRule(fields: [
+                    "name": "h1.comics-detail__title@text",
+                    "author": "h2.comics-detail__author@text",
+                    "coverUrl": "div.pure-u-1-1 amp-img@src||img@src",
+                    "intro": "p.comics-detail__desc@text"
+                ]),
+                ruleToc: SourceRule(fields: [
+                    "chapterList": "div#chapter-items div.pure-u-1-2 a||div.pure-g a",
+                    "chapterName": "span@text||@text",
+                    "chapterUrl": "@href"
+                ]),
+                ruleContent: SourceRule(fields: [
+                    "content": "div.comic-contain amp-img@src||div.comic-contain img@src"
+                ]),
+                header: "{\"User-Agent\":\"Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15\"}"
+            ),
+            BookSource(
+                bookSourceName: "520听书网 (官方精选)",
+                bookSourceUrl: "https://www.ting520.net",
+                bookSourceGroup: "官方精选",
+                bookSourceType: 1,
+                enabled: true,
+                weight: 100,
+                searchUrl: "https://www.ting520.net/search.php?searchtype=name&searchword={{key}}",
+                ruleSearch: SourceRule(fields: [
+                    "bookList": "ul.list-works li",
+                    "name": "h3.list-book-dt a@text",
+                    "author": "span.book-author@text",
+                    "coverUrl": "img@src",
+                    "bookUrl": "h3.list-book-dt a@href"
+                ]),
+                ruleBookInfo: SourceRule(fields: [
+                    "name": "div.book-title h1@text",
+                    "author": "span.author a@text",
+                    "coverUrl": "div.book-cover img@src",
+                    "intro": "div.book-intro@text"
+                ]),
+                ruleToc: SourceRule(fields: [
+                    "chapterList": "ul#playlist li a",
+                    "chapterName": "@text",
+                    "chapterUrl": "@href"
+                ]),
+                ruleContent: SourceRule(fields: [
+                    "content": "audio@src||source@src||#jp_audio_0@src"
+                ]),
+                header: "{\"User-Agent\":\"Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15\"}"
             )
         ]
     }

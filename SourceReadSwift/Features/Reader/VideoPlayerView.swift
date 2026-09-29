@@ -9,6 +9,7 @@ struct VideoPlayerView: View {
     let bookTitle: String
     let source: BookSource
     let initialChapterIndex: Int
+    var initialPositionSeconds: Double? = nil
     let chapters: [BookChapter]
     let engine: SourceEngine
 
@@ -26,6 +27,8 @@ struct VideoPlayerView: View {
     @State private var showEpisodeDrawer = false
     @State private var controlsTimer: Timer?
     @State private var timeObserverToken: Any?
+    @State private var didResumePosition = false
+    @State private var seekFeedback: (isForward: Bool, text: String)? = nil
 
     private let speedOptions: [Float] = [0.5, 0.75, 1.0, 1.25, 1.5, 2.0]
 
@@ -34,6 +37,7 @@ struct VideoPlayerView: View {
         bookTitle: String,
         source: BookSource,
         initialChapterIndex: Int,
+        initialPositionSeconds: Double? = nil,
         chapters: [BookChapter],
         engine: SourceEngine
     ) {
@@ -41,6 +45,7 @@ struct VideoPlayerView: View {
         self.bookTitle = bookTitle
         self.source = source
         self.initialChapterIndex = initialChapterIndex
+        self.initialPositionSeconds = initialPositionSeconds
         self.chapters = chapters
         self.engine = engine
         self._currentChapterIndex = State(initialValue: initialChapterIndex)
@@ -58,14 +63,52 @@ struct VideoPlayerView: View {
             if let player {
                 VideoPlayer(player: player)
                     .ignoresSafeArea()
-                    .onTapGesture {
-                        withAnimation(.easeInOut(duration: 0.2)) {
-                            showControls.toggle()
-                            if showControls {
-                                scheduleHideControls()
-                            }
+                    .overlay {
+                        HStack(spacing: 0) {
+                            Color.clear
+                                .contentShape(Rectangle())
+                                .onTapGesture(count: 2) {
+                                    triggerSeekGesture(forward: false, amount: 10)
+                                }
+                                .onTapGesture(count: 1) {
+                                    toggleControls()
+                                }
+                                .frame(maxWidth: .infinity)
+
+                            Color.clear
+                                .contentShape(Rectangle())
+                                .onTapGesture(count: 1) {
+                                    toggleControls()
+                                }
+                                .frame(width: 100)
+
+                            Color.clear
+                                .contentShape(Rectangle())
+                                .onTapGesture(count: 2) {
+                                    triggerSeekGesture(forward: true, amount: 10)
+                                }
+                                .onTapGesture(count: 1) {
+                                    toggleControls()
+                                }
+                                .frame(maxWidth: .infinity)
                         }
                     }
+            }
+
+            if let feedback = seekFeedback {
+                VStack(spacing: 8) {
+                    Image(systemName: feedback.isForward ? "goforward.10" : "gobackward.10")
+                        .font(.system(size: 38, weight: .semibold))
+                        .foregroundStyle(.white)
+                    Text(feedback.text)
+                        .font(.subheadline.bold())
+                        .foregroundStyle(.white)
+                }
+                .padding(.horizontal, 24)
+                .padding(.vertical, 16)
+                .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 16))
+                .transition(.scale.combined(with: .opacity))
+                .zIndex(4)
             }
 
             if isLoading {
@@ -363,18 +406,58 @@ struct VideoPlayerView: View {
             }
         }
 
-        let interval = CMTime(seconds: 0.5, preferredTimescale: CMTimeScale(NSEC_PER_SEC))
+        let interval = CMTime(seconds: 1.0, preferredTimescale: CMTimeScale(NSEC_PER_SEC))
         timeObserverToken = newPlayer.addPeriodicTimeObserver(forInterval: interval, queue: .main) { time in
             self.currentTime = time.seconds
             if let currentItem = self.player?.currentItem, currentItem.duration.isNumeric {
                 self.duration = currentItem.duration.seconds
             }
+            if let bookID = self.bookID, !bookID.isEmpty, let chapter = self.currentChapter {
+                self.appState.bookshelfStore.updateReadingProgress(
+                    bookID: bookID,
+                    chapterIndex: self.currentChapterIndex,
+                    chapterTitle: chapter.title,
+                    totalChapters: self.chapters.count,
+                    paragraphIndex: Int(time.seconds)
+                )
+            }
+        }
+
+        if let initialPositionSeconds, initialPositionSeconds > 0, !didResumePosition {
+            didResumePosition = true
+            seek(to: initialPositionSeconds)
         }
 
         newPlayer.play()
         newPlayer.rate = playbackRate
         isPlaying = true
         scheduleHideControls()
+    }
+
+    private func toggleControls() {
+        withAnimation(.easeInOut(duration: 0.2)) {
+            showControls.toggle()
+            if showControls {
+                scheduleHideControls()
+            }
+        }
+    }
+
+    private func triggerSeekGesture(forward: Bool, amount: Double) {
+        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+        let target = forward ? currentTime + amount : currentTime - amount
+        seek(to: target)
+        withAnimation(.spring(response: 0.25, dampingFraction: 0.7)) {
+            seekFeedback = (isForward: forward, text: forward ? "快进 10 秒" : "快退 10 秒")
+        }
+        Task {
+            try? await Task.sleep(nanoseconds: 700_000_000)
+            await MainActor.run {
+                withAnimation(.easeOut(duration: 0.2)) {
+                    self.seekFeedback = nil
+                }
+            }
+        }
     }
 
     private func togglePlayPause() {

@@ -101,6 +101,7 @@ struct BookshelfReaderGatewayView: View {
                             bookTitle: currentBook.title,
                             source: source,
                             initialChapterIndex: selectedChapter.index,
+                            initialPositionSeconds: currentBook.currentParagraphIndex.map { Double($0) },
                             chapters: chapters,
                             engine: appState.engine
                         )
