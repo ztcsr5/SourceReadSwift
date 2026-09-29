@@ -53,7 +53,7 @@ enum ReaderAdvanceDecision: Equatable {
 }
 
 struct ReaderAutomationPolicy {
-    public static let minDelay: Double = 0.5
+    public static let minDelay: Double = 0.25
     public static let maxDelay: Double = 30.0
 
     /// Keep automation responsive without allowing a malformed persisted value
