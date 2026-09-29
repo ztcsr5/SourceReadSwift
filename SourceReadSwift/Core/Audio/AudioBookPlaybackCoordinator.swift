@@ -310,6 +310,7 @@ final class AudioBookPlaybackCoordinator: ObservableObject {
             bookID: bookID,
             chapterIndex: currentChapterIndex,
             chapterTitle: currentChapter?.title,
+            totalChapters: max(chapters.count, currentChapterIndex + 1),
             paragraphIndex: currentSec
         )
     }
