@@ -11,7 +11,27 @@ struct BookshelfView: View {
     @State private var selectedBookForDetail: BookshelfBook?
     @AppStorage("settings.themeMode") private var themeModeRawValue = ThemeMode.system.rawValue
     @AppStorage("bookshelf.isGridMode") private var isGridMode = true
+    @AppStorage("bookshelf.sortMode") private var sortModeRawValue = BookshelfSortMode.recentRead.rawValue
     @State private var selectedMainGroup: String? = nil
+    @State private var searchKeyword = ""
+    @State private var selectedMediaFilter: String? = nil
+
+    enum BookshelfSortMode: String, CaseIterable, Identifiable {
+        case recentRead = "最近阅读"
+        case added = "最近添加"
+        case title = "书名排序"
+        case progress = "阅读进度"
+
+        var id: String { rawValue }
+        var icon: String {
+            switch self {
+            case .recentRead: return "clock"
+            case .added: return "calendar.badge.plus"
+            case .title: return "textformat.abc"
+            case .progress: return "chart.bar.fill"
+            }
+        }
+    }
 
     private var recentBooks: [BookshelfBook] {
         appState.bookshelfStore.recentBooks
@@ -25,11 +45,81 @@ struct BookshelfView: View {
         appState.bookshelfStore.books
     }
 
-    private var displayedShelfBooks: [BookshelfBook] {
-        if let selectedMainGroup {
-            return allBooks.filter { $0.groupName == selectedMainGroup }
+    private func mediaKind(for book: BookshelfBook) -> BookSourceKind? {
+        if book.sourceURL.hasPrefix("local://") { return nil }
+        return appState.sourceStore.source(for: book.sourceURL)?.sourceKind
+    }
+
+    private func formatTag(for book: BookshelfBook) -> (title: String, color: Color, icon: String)? {
+        if book.sourceURL == "local://text" || book.sourceURL.hasPrefix("local://") {
+            if book.id.contains(".epub") || book.title.hasSuffix(".epub") {
+                return ("EPUB", .indigo, "doc.richtext")
+            }
+            return ("TXT", .blue, "doc.text")
         }
-        return allBooks
+        guard let source = appState.sourceStore.source(for: book.sourceURL) else { return nil }
+        switch source.sourceKind {
+        case .audio:
+            return ("有声", .green, "headphones")
+        case .comic:
+            return ("漫画", .purple, "character.book.closed.fill")
+        case .video:
+            return ("影视", .red, "play.tv.fill")
+        case .text:
+            return nil
+        }
+    }
+
+    private var displayedShelfBooks: [BookshelfBook] {
+        var list = allBooks
+
+        if let selectedMainGroup {
+            list = list.filter { $0.groupName == selectedMainGroup }
+        }
+
+        if let selectedMediaFilter {
+            switch selectedMediaFilter {
+            case "local":
+                list = list.filter { $0.sourceURL.hasPrefix("local://") }
+            case "comic":
+                list = list.filter { mediaKind(for: $0) == .comic }
+            case "audio":
+                list = list.filter { mediaKind(for: $0) == .audio }
+            case "video":
+                list = list.filter { mediaKind(for: $0) == .video }
+            case "novel":
+                list = list.filter { !($0.sourceURL.hasPrefix("local://")) && (mediaKind(for: $0) == .text || mediaKind(for: $0) == nil) }
+            default:
+                break
+            }
+        }
+
+        let query = searchKeyword.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        if !query.isEmpty {
+            list = list.filter {
+                $0.title.lowercased().contains(query) ||
+                $0.author.lowercased().contains(query)
+            }
+        }
+
+        let mode = BookshelfSortMode(rawValue: sortModeRawValue) ?? .recentRead
+        return list.sorted { lhs, rhs in
+            if lhs.isPinned != rhs.isPinned {
+                return lhs.isPinned && !rhs.isPinned
+            }
+            switch mode {
+            case .recentRead:
+                let lDate = lhs.lastReadAt ?? lhs.addedAt
+                let rDate = rhs.lastReadAt ?? rhs.addedAt
+                return lDate > rDate
+            case .added:
+                return lhs.addedAt > rhs.addedAt
+            case .title:
+                return lhs.title.localizedStandardCompare(rhs.title) == .orderedAscending
+            case .progress:
+                return lhs.readingProgress > rhs.readingProgress
+            }
+        }
     }
 
     var body: some View {
@@ -220,16 +310,66 @@ struct BookshelfView: View {
         }
     }
 
+    private var shelfSearchBar: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "magnifyingglass")
+                .font(.system(size: 14))
+                .foregroundStyle(.secondary)
+            TextField("在书架中搜索书名或作者...", text: $searchKeyword)
+                .font(.system(size: 14))
+                .textInputAutocapitalization(.never)
+                .autocorrectionDisabled(true)
+            if !searchKeyword.isEmpty {
+                Button {
+                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                    searchKeyword = ""
+                } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .font(.system(size: 14))
+                        .foregroundStyle(.secondary)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("清空搜索")
+            }
+        }
+        .padding(.horizontal, 12)
+        .frame(height: 38)
+        .background(AppTheme.elevatedCard)
+        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+    }
+
     private var shelfSection: some View {
         VStack(alignment: .leading, spacing: 14) {
             shelfHeader
 
-            if !appState.bookshelfStore.groups.isEmpty {
+            if !allBooks.isEmpty {
+                shelfSearchBar
+
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 8) {
-                        mainGroupChip("全部", isSelected: selectedMainGroup == nil) {
+                        mainGroupChip("全部", isSelected: selectedMainGroup == nil && selectedMediaFilter == nil) {
                             selectedMainGroup = nil
+                            selectedMediaFilter = nil
                         }
+
+                        // Media format quick filters
+                        mainGroupChip("小说", isSelected: selectedMediaFilter == "novel") {
+                            selectedMediaFilter = selectedMediaFilter == "novel" ? nil : "novel"
+                        }
+                        mainGroupChip("漫画", isSelected: selectedMediaFilter == "comic") {
+                            selectedMediaFilter = selectedMediaFilter == "comic" ? nil : "comic"
+                        }
+                        mainGroupChip("有声", isSelected: selectedMediaFilter == "audio") {
+                            selectedMediaFilter = selectedMediaFilter == "audio" ? nil : "audio"
+                        }
+                        mainGroupChip("影视", isSelected: selectedMediaFilter == "video") {
+                            selectedMediaFilter = selectedMediaFilter == "video" ? nil : "video"
+                        }
+                        mainGroupChip("本地", isSelected: selectedMediaFilter == "local") {
+                            selectedMediaFilter = selectedMediaFilter == "local" ? nil : "local"
+                        }
+
+                        // Custom user groups
                         ForEach(appState.bookshelfStore.groups) { group in
                             mainGroupChip(group.name, isSelected: selectedMainGroup == group.name) {
                                 selectedMainGroup = group.name
@@ -244,7 +384,7 @@ struct BookshelfView: View {
             if allBooks.isEmpty {
                 compactEmptyState(icon: "books.vertical", title: "书架还是空的", message: "支持 TXT、EPUB 与在线书源书籍")
             } else if displayedShelfBooks.isEmpty {
-                compactEmptyState(icon: "folder", title: "该分组暂无书籍", message: "可在“管理”中长按书籍分配至此分组")
+                compactEmptyState(icon: "folder", title: "没有符合筛选的书籍", message: "尝试清空搜索词或切换分组与类型")
             } else if isGridMode {
                 LazyVGrid(
                     columns: [
@@ -288,6 +428,28 @@ struct BookshelfView: View {
             Spacer()
 
             if !allBooks.isEmpty {
+                Menu {
+                    ForEach(BookshelfSortMode.allCases) { mode in
+                        Button {
+                            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                            sortModeRawValue = mode.rawValue
+                        } label: {
+                            if sortModeRawValue == mode.rawValue {
+                                Label(mode.rawValue, systemImage: "checkmark")
+                            } else {
+                                Label(mode.rawValue, systemImage: mode.icon)
+                            }
+                        }
+                    }
+                } label: {
+                    Image(systemName: "arrow.up.arrow.down")
+                        .font(.system(size: 15, weight: .medium))
+                        .foregroundStyle(.secondary)
+                        .frame(width: 32, height: 32)
+                        .background(Color.secondary.opacity(0.12), in: Circle())
+                }
+                .accessibilityLabel("排序方式")
+
                 Button {
                     UIImpactFeedbackGenerator(style: .light).impactOccurred()
                     withAnimation(.spring(response: 0.32, dampingFraction: 0.8)) {
@@ -705,6 +867,18 @@ struct BookshelfView: View {
                                 .padding(.vertical, 1)
                                 .background(AppTheme.accent.opacity(0.12), in: RoundedRectangle(cornerRadius: 3))
                         }
+                        if let tag = formatTag(for: book) {
+                            HStack(spacing: 2) {
+                                Image(systemName: tag.icon)
+                                    .font(.system(size: 8))
+                                Text(tag.title)
+                                    .font(.system(size: 9, weight: .bold))
+                            }
+                            .foregroundStyle(tag.color)
+                            .padding(.horizontal, 4)
+                            .padding(.vertical, 1)
+                            .background(tag.color.opacity(0.12), in: RoundedRectangle(cornerRadius: 3))
+                        }
                         Text(book.title)
                             .font(.headline)
                             .foregroundStyle(.primary)
@@ -828,6 +1002,27 @@ struct BookshelfView: View {
                                     .background(Color.black.opacity(0.45))
                                     .clipShape(Capsule())
                                 Spacer()
+                            }
+                            .padding(5)
+                        }
+                    }
+
+                    if let tag = formatTag(for: book) {
+                        VStack {
+                            Spacer()
+                            HStack {
+                                Spacer()
+                                HStack(spacing: 3) {
+                                    Image(systemName: tag.icon)
+                                        .font(.system(size: 7, weight: .bold))
+                                    Text(tag.title)
+                                        .font(.system(size: 8, weight: .bold))
+                                }
+                                .foregroundStyle(.white)
+                                .padding(.horizontal, 5)
+                                .padding(.vertical, 2.5)
+                                .background(tag.color.opacity(0.88), in: Capsule())
+                                .shadow(color: .black.opacity(0.3), radius: 2)
                             }
                             .padding(5)
                         }
