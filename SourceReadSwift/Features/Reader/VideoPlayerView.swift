@@ -29,6 +29,9 @@ struct VideoPlayerView: View {
     @State private var timeObserverToken: Any?
     @State private var didResumePosition = false
     @State private var seekFeedback: (isForward: Bool, text: String)? = nil
+    @State private var isScreenLocked = false
+    @State private var isAspectFill = false
+    @AppStorage("video_dimming_level") private var videoDimmingLevel: Double = 0.0
 
     private let speedOptions: [Float] = [0.5, 0.75, 1.0, 1.25, 1.5, 2.0]
 
@@ -62,37 +65,54 @@ struct VideoPlayerView: View {
 
             if let player {
                 VideoPlayer(player: player)
+                    .aspectRatio(contentMode: isAspectFill ? .fill : .fit)
                     .ignoresSafeArea()
                     .overlay {
-                        HStack(spacing: 0) {
-                            Color.clear
-                                .contentShape(Rectangle())
-                                .onTapGesture(count: 2) {
-                                    triggerSeekGesture(forward: false, amount: 10)
-                                }
-                                .onTapGesture(count: 1) {
-                                    toggleControls()
-                                }
-                                .frame(maxWidth: .infinity)
+                        if !isScreenLocked {
+                            HStack(spacing: 0) {
+                                Color.clear
+                                    .contentShape(Rectangle())
+                                    .onTapGesture(count: 2) {
+                                        triggerSeekGesture(forward: false, amount: 10)
+                                    }
+                                    .onTapGesture(count: 1) {
+                                        toggleControls()
+                                    }
+                                    .frame(maxWidth: .infinity)
 
-                            Color.clear
-                                .contentShape(Rectangle())
-                                .onTapGesture(count: 1) {
-                                    toggleControls()
-                                }
-                                .frame(width: 100)
+                                Color.clear
+                                    .contentShape(Rectangle())
+                                    .onTapGesture(count: 1) {
+                                        toggleControls()
+                                    }
+                                    .frame(width: 100)
 
+                                Color.clear
+                                    .contentShape(Rectangle())
+                                    .onTapGesture(count: 2) {
+                                        triggerSeekGesture(forward: true, amount: 10)
+                                    }
+                                    .onTapGesture(count: 1) {
+                                        toggleControls()
+                                    }
+                                    .frame(maxWidth: .infinity)
+                            }
+                        } else {
                             Color.clear
                                 .contentShape(Rectangle())
-                                .onTapGesture(count: 2) {
-                                    triggerSeekGesture(forward: true, amount: 10)
+                                .onTapGesture {
+                                    withAnimation(.easeInOut(duration: 0.2)) {
+                                        showControls.toggle()
+                                    }
                                 }
-                                .onTapGesture(count: 1) {
-                                    toggleControls()
-                                }
-                                .frame(maxWidth: .infinity)
                         }
                     }
+            }
+
+            if videoDimmingLevel > 0 {
+                Color.black.opacity(videoDimmingLevel)
+                    .ignoresSafeArea()
+                    .allowsHitTesting(false)
             }
 
             if let feedback = seekFeedback {
@@ -138,7 +158,29 @@ struct VideoPlayerView: View {
                 .padding()
             }
 
-            if showControls {
+            if isScreenLocked && showControls {
+                HStack {
+                    Button {
+                        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                        withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                            isScreenLocked = false
+                            showControls = true
+                        }
+                    } label: {
+                        Image(systemName: "lock.fill")
+                            .font(.system(size: 18, weight: .bold))
+                            .foregroundStyle(.yellow)
+                            .frame(width: 46, height: 46)
+                            .background(.ultraThinMaterial, in: Circle())
+                            .overlay(Circle().stroke(Color.yellow.opacity(0.4), lineWidth: 1.5))
+                            .shadow(color: .black.opacity(0.35), radius: 8)
+                    }
+                    .padding(.leading, 24)
+                    Spacer()
+                }
+                .transition(.opacity)
+                .zIndex(5)
+            } else if !isScreenLocked && showControls {
                 controlsOverlay
             }
         }
@@ -185,6 +227,21 @@ struct VideoPlayerView: View {
 
                 Spacer()
 
+                // Aspect Ratio Toggle
+                Button {
+                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                    withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                        isAspectFill.toggle()
+                    }
+                } label: {
+                    Image(systemName: isAspectFill ? "arrow.down.right.and.arrow.up.left" : "arrow.up.left.and.arrow.down.right")
+                        .font(.footnote.weight(.semibold))
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 6)
+                        .background(.ultraThinMaterial, in: Capsule())
+                }
+
                 // Episode List
                 Button {
                     showEpisodeDrawer = true
@@ -205,20 +262,69 @@ struct VideoPlayerView: View {
 
             Spacer()
 
-            // Center Play / Pause
-            Button {
-                togglePlayPause()
-                scheduleHideControls()
-            } label: {
-                ZStack {
-                    Circle()
-                        .fill(.ultraThinMaterial)
-                        .frame(width: 64, height: 64)
-                    Image(systemName: isPlaying ? "pause.fill" : "play.fill")
-                        .font(.title)
+            // Center Controls
+            HStack {
+                Button {
+                    UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                    withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                        isScreenLocked = true
+                        showControls = false
+                    }
+                } label: {
+                    Image(systemName: "lock.open.fill")
+                        .font(.system(size: 16, weight: .semibold))
                         .foregroundStyle(.white)
-                        .offset(x: isPlaying ? 0 : 2)
+                        .frame(width: 42, height: 42)
+                        .background(.ultraThinMaterial, in: Circle())
                 }
+                .padding(.leading, 24)
+
+                Spacer()
+
+                HStack(spacing: 36) {
+                    Button {
+                        triggerSeekGesture(forward: false, amount: 10)
+                        scheduleHideControls()
+                    } label: {
+                        Image(systemName: "gobackward.10")
+                            .font(.title2.weight(.medium))
+                            .foregroundStyle(.white)
+                            .frame(width: 44, height: 44)
+                            .background(.ultraThinMaterial, in: Circle())
+                    }
+
+                    Button {
+                        togglePlayPause()
+                        scheduleHideControls()
+                    } label: {
+                        ZStack {
+                            Circle()
+                                .fill(.ultraThinMaterial)
+                                .frame(width: 68, height: 68)
+                            Image(systemName: isPlaying ? "pause.fill" : "play.fill")
+                                .font(.title)
+                                .foregroundStyle(.white)
+                                .offset(x: isPlaying ? 0 : 2)
+                        }
+                    }
+
+                    Button {
+                        triggerSeekGesture(forward: true, amount: 10)
+                        scheduleHideControls()
+                    } label: {
+                        Image(systemName: "goforward.10")
+                            .font(.title2.weight(.medium))
+                            .foregroundStyle(.white)
+                            .frame(width: 44, height: 44)
+                            .background(.ultraThinMaterial, in: Circle())
+                    }
+                }
+
+                Spacer()
+
+                Color.clear
+                    .frame(width: 42, height: 42)
+                    .padding(.trailing, 24)
             }
 
             Spacer()
@@ -298,6 +404,28 @@ struct VideoPlayerView: View {
                         .font(.caption.monospacedDigit())
                         .foregroundStyle(.white.opacity(0.8))
                 }
+
+                // Dimmer slider
+                HStack(spacing: 12) {
+                    Image(systemName: "sun.min.fill")
+                        .font(.caption2)
+                        .foregroundStyle(.white.opacity(0.5))
+
+                    Slider(
+                        value: Binding(
+                            get: { 1.0 - videoDimmingLevel },
+                            set: { videoDimmingLevel = max(0.0, min(1.0 - $0, 0.8)) }
+                        ),
+                        in: 0.2...1.0
+                    )
+                    .tint(.yellow.opacity(0.85))
+
+                    Image(systemName: "sun.max.fill")
+                        .font(.caption2)
+                        .foregroundStyle(.yellow)
+                }
+                .padding(.horizontal, 4)
+                .padding(.top, 2)
             }
             .padding(.horizontal, 20)
             .padding(.bottom, 24)
