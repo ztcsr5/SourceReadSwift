@@ -53,11 +53,14 @@ enum ReaderAdvanceDecision: Equatable {
 }
 
 struct ReaderAutomationPolicy {
+    public static let minDelay: Double = 0.5
+    public static let maxDelay: Double = 30.0
+
     /// Keep automation responsive without allowing a malformed persisted value
     /// to create a busy loop (or an animation that effectively never moves).
     static func clampedDelay(_ rawValue: Double) -> Double {
         guard rawValue.isFinite else { return 2.0 }
-        return min(max(rawValue, 0.25), 30)
+        return min(max(rawValue, minDelay), maxDelay)
     }
 
     static func decision(
