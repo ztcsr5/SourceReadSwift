@@ -12,6 +12,53 @@ struct DiscoverView: View {
     @State private var detectedClipboardSourceURL: String? = nil
     @State private var isImportingClipboardSource = false
     @State private var clipboardImportToast: String? = nil
+    @AppStorage("discover_search_history") private var searchHistoryJSON: String = "[]"
+
+    private var searchHistory: [String] {
+        get {
+            guard let data = searchHistoryJSON.data(using: .utf8),
+                  let list = try? JSONDecoder().decode([String].self, from: data) else {
+                return []
+            }
+            return list
+        }
+        set {
+            if let data = try? JSONEncoder().encode(newValue),
+               let str = String(data: data, encoding: .utf8) {
+                searchHistoryJSON = str
+            }
+        }
+    }
+
+    private var hotKeywords: [String] {
+        switch currentSourceKind {
+        case .some(.comic):
+            return ["海贼王", "咒术回战", "一拳超人", "火影忍者", "间谍过家家", "进击的巨人", "电锯人", "死神"]
+        case .some(.audio):
+            return ["凡人修仙传", "鬼吹灯", "雪中悍刀行", "盗墓笔记", "大奉打更人", "吞噬星空", "三体", "剑来"]
+        case .some(.video):
+            return ["三体", "庆余年", "狂飙", "繁花", "星际穿越", "流浪地球", "奥本海默", "沙丘"]
+        default:
+            return ["诡秘之主", "凡人修仙传", "三体", "剑来", "斗罗大陆", "遮天", "红楼梦", "西游记", "三国演义", "水浒传"]
+        }
+    }
+
+    private func saveSearchKeyword(_ keyword: String) {
+        let trimmed = keyword.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+        var current = searchHistory
+        current.removeAll(where: { $0 == trimmed })
+        current.insert(trimmed, at: 0)
+        if current.count > 10 {
+            current = Array(current.prefix(10))
+        }
+        searchHistory = current
+    }
+
+    private func clearSearchHistory() {
+        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+        searchHistory = []
+    }
 
     enum DiscoverTab: String, CaseIterable, Identifiable {
         case search = "全网搜索"
@@ -247,6 +294,7 @@ struct DiscoverView: View {
                 .autocorrectionDisabled(true)
                 .submitLabel(.search)
                 .onSubmit {
+                    saveSearchKeyword(viewModel.keyword)
                     viewModel.startSearch()
                 }
 
@@ -336,14 +384,98 @@ struct DiscoverView: View {
         } else if viewModel.results.isEmpty, viewModel.wasCancelled {
             EmptyStateCard(systemImage: "pause.circle", title: "搜索已取消", message: "再次提交关键词可以重新搜索。")
         } else if viewModel.results.isEmpty {
-            Text("输入书名后，会从启用的小说书源里搜索")
-                .font(.system(size: 15, weight: .regular))
-                .foregroundStyle(.secondary)
-                .multilineTextAlignment(.center)
-                .frame(maxWidth: .infinity, minHeight: 250)
+            searchInitialStateView
         } else {
             resultsList
         }
+    }
+
+    private var searchInitialStateView: some View {
+        VStack(alignment: .leading, spacing: 22) {
+            // Search History Section
+            if !searchHistory.isEmpty {
+                VStack(alignment: .leading, spacing: 12) {
+                    HStack {
+                        Label("搜索历史", systemImage: "clock")
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundStyle(.secondary)
+
+                        Spacer()
+
+                        Button {
+                            clearSearchHistory()
+                        } label: {
+                            Image(systemName: "trash")
+                                .font(.system(size: 13))
+                                .foregroundStyle(.secondary)
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel("清空搜索历史")
+                    }
+
+                    FlowLayout(spacing: 8) {
+                        ForEach(searchHistory, id: \.self) { item in
+                            Button {
+                                UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                                viewModel.keyword = item
+                                saveSearchKeyword(item)
+                                viewModel.startSearch()
+                            } label: {
+                                Text(item)
+                                    .font(.system(size: 13, weight: .medium))
+                                    .foregroundStyle(.primary)
+                                    .padding(.horizontal, 12)
+                                    .padding(.vertical, 6)
+                                    .background(Color(UIColor.secondarySystemGroupedBackground), in: Capsule())
+                                    .overlay(Capsule().stroke(Color.primary.opacity(0.06), lineWidth: 0.8))
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                }
+            }
+
+            // Trending / Hot Searches Section
+            VStack(alignment: .leading, spacing: 12) {
+                Label("热门推荐", systemImage: "flame.fill")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(.secondary)
+
+                FlowLayout(spacing: 8) {
+                    ForEach(hotKeywords, id: \.self) { item in
+                        Button {
+                            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                            viewModel.keyword = item
+                            saveSearchKeyword(item)
+                            viewModel.startSearch()
+                        } label: {
+                            HStack(spacing: 4) {
+                                Text(item)
+                                    .font(.system(size: 13, weight: .medium))
+                                    .foregroundStyle(.primary)
+                            }
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 6)
+                            .background(Color(UIColor.secondarySystemGroupedBackground), in: Capsule())
+                            .overlay(Capsule().stroke(Color.primary.opacity(0.06), lineWidth: 0.8))
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+            }
+
+            // Hint Text
+            HStack {
+                Spacer()
+                Text("输入书名、作者或关键词，从启用的源流书源中全网检索")
+                    .font(.caption)
+                    .foregroundStyle(.tertiary)
+                    .multilineTextAlignment(.center)
+                Spacer()
+            }
+            .padding(.top, 16)
+        }
+        .padding(.vertical, 12)
     }
 
     private var resultsList: some View {
