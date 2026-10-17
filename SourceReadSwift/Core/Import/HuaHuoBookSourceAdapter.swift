@@ -4,11 +4,11 @@ import Foundation
 /// Automatically detects and normalizes HuaHuo's specialized rule fields
 /// (e.g., `exploreBookList`, `searchCoverUrl`, `infoTocUrl`, `nextContentUrl`)
 /// into standard Legado `BookSource` models.
-public struct HuaHuoBookSourceAdapter: Sendable {
+struct HuaHuoBookSourceAdapter: Sendable {
 
     // MARK: - Format Detection
 
-    public static func isHuaHuoJSON(_ text: String) -> Bool {
+    static func isHuaHuoJSON(_ text: String) -> Bool {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard trimmed.hasPrefix("{") || trimmed.hasPrefix("[") else { return false }
         
@@ -29,19 +29,19 @@ public struct HuaHuoBookSourceAdapter: Sendable {
         return hasHuaHuoRuleKeys && hasRuleContainers
     }
 
-    public static func isHuaHuoData(_ data: Data) -> Bool {
+    static func isHuaHuoData(_ data: Data) -> Bool {
         guard let text = String(data: data, encoding: .utf8) else { return false }
         return isHuaHuoJSON(text)
     }
 
     // MARK: - Import & Conversion
 
-    public static func importSources(from text: String) -> [BookSource] {
+    static func importSources(from text: String) -> [BookSource] {
         guard let data = text.data(using: .utf8) else { return [] }
         return importSources(from: data)
     }
 
-    public static func importSources(from data: Data) -> [BookSource] {
+    static func importSources(from data: Data) -> [BookSource] {
         let decoder = JSONDecoder()
         
         if let array = try? decoder.decode([HuaHuoRawSource].self, from: data) {
@@ -57,7 +57,7 @@ public struct HuaHuoBookSourceAdapter: Sendable {
         return []
     }
 
-    public static func adapt(raw: HuaHuoRawSource) -> BookSource? {
+    static func adapt(raw: HuaHuoRawSource) -> BookSource? {
         let name = raw.sourceName?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty
             ?? raw.name?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty
             ?? "花火导入源"
@@ -155,72 +155,73 @@ public struct HuaHuoBookSourceAdapter: Sendable {
 
 // MARK: - HuaHuo Raw Codable Models
 
-public struct HuaHuoRawSource: Codable, Sendable {
-    public var sourceName: String?
-    public var name: String?
-    public var sourceUrl: String?
-    public var url: String?
-    public var sourceGroup: String?
-    public var searchUrl: String?
-    public var exploreUrl: String?
-    public var header: String?
-    public var loginUrl: String?
-    public var ruleExplore: HuaHuoRawExploreRule?
-    public var ruleSearch: HuaHuoRawSearchRule?
-    public var ruleBookInfo: HuaHuoRawBookInfoRule?
-    public var ruleToc: HuaHuoRawTocRule?
-    public var ruleContent: HuaHuoRawContentRule?
+struct HuaHuoRawSource: Codable, Sendable {
+    var sourceName: String?
+    var name: String?
+    var sourceUrl: String?
+    var url: String?
+    var sourceGroup: String?
+    var searchUrl: String?
+    var exploreUrl: String?
+    var header: String?
+    var loginUrl: String?
+    var ruleExplore: HuaHuoRawExploreRule?
+    var ruleSearch: HuaHuoRawSearchRule?
+    var ruleBookInfo: HuaHuoRawBookInfoRule?
+    var ruleToc: HuaHuoRawTocRule?
+    var ruleContent: HuaHuoRawContentRule?
 }
 
-public struct HuaHuoRawExploreRule: Codable, Sendable {
-    public var exploreBookList: String?
-    public var exploreName: String?
-    public var exploreAuthor: String?
-    public var exploreIntro: String?
-    public var exploreKind: String?
-    public var exploreLastChapter: String?
-    public var exploreBookUrl: String?
-    public var exploreCoverUrl: String?
-    public var exploreWordCount: String?
+struct HuaHuoRawExploreRule: Codable, Sendable {
+    var exploreBookList: String?
+    var exploreName: String?
+    var exploreAuthor: String?
+    var exploreIntro: String?
+    var exploreKind: String?
+    var exploreLastChapter: String?
+    var exploreBookUrl: String?
+    var exploreCoverUrl: String?
+    var exploreWordCount: String?
 }
 
-public struct HuaHuoRawSearchRule: Codable, Sendable {
-    public var searchBookList: String?
-    public var searchName: String?
-    public var searchAuthor: String?
-    public var searchIntro: String?
-    public var searchKind: String?
-    public var searchLastChapter: String?
-    public var searchBookUrl: String?
-    public var searchCoverUrl: String?
-    public var searchWordCount: String?
+struct HuaHuoRawSearchRule: Codable, Sendable {
+    var searchBookList: String?
+    var searchName: String?
+    var searchAuthor: String?
+    var searchIntro: String?
+    var searchKind: String?
+    var searchLastChapter: String?
+    var searchBookUrl: String?
+    var searchCoverUrl: String?
+    var searchWordCount: String?
 }
 
-public struct HuaHuoRawBookInfoRule: Codable, Sendable {
-    public var infoName: String?
-    public var infoAuthor: String?
-    public var infoIntro: String?
-    public var infoKind: String?
-    public var infoLastChapter: String?
-    public var infoUpdateTime: String?
-    public var infoCoverUrl: String?
-    public var infoTocUrl: String?
-    public var infoWordCount: String?
+struct HuaHuoRawBookInfoRule: Codable, Sendable {
+    var infoName: String?
+    var infoAuthor: String?
+    var infoIntro: String?
+    var infoKind: String?
+    var infoLastChapter: String?
+    var infoUpdateTime: String?
+    var infoCoverUrl: String?
+    var infoTocUrl: String?
+    var infoWordCount: String?
 }
 
-public struct HuaHuoRawTocRule: Codable, Sendable {
-    public var tocList: String?
-    public var tocName: String?
-    public var tocUrl: String?
-    public var isVip: String?
-    public var tocUpdateTime: String?
-    public var nextTocUrl: String?
+struct HuaHuoRawTocRule: Codable, Sendable {
+    var tocList: String?
+    var tocName: String?
+    var tocUrl: String?
+    var isVip: String?
+    var tocUpdateTime: String?
+    var nextTocUrl: String?
 }
 
-public struct HuaHuoRawContentRule: Codable, Sendable {
-    public var content: String?
-    public var nextContentUrl: String?
-    public var webJs: String?
-    public var sourceRegex: String?
-    public var replaceRegex: String?
+struct HuaHuoRawContentRule: Codable, Sendable {
+    var content: String?
+    var nextContentUrl: String?
+    var webJs: String?
+    var sourceRegex: String?
+    var replaceRegex: String?
 }
+

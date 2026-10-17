@@ -2,11 +2,11 @@ import Foundation
 
 /// Service for detecting restricted, compromised, or sensitive domains and titles
 /// to prevent malicious site redirects and ensure App Store compliance.
-public struct B18PlusService: Sendable {
-    public static let shared = B18PlusService()
+struct B18PlusService: Sendable {
+    static let shared = B18PlusService()
 
     /// Pre-compiled set of sensitive domain keywords and host patterns.
-    public let blockedTerms: Set<String> = [
+    let blockedTerms: Set<String> = [
         "00ui",
         "01bz",
         "11banzhu",
@@ -217,10 +217,10 @@ public struct B18PlusService: Sendable {
         "zongcaixiaoshuo2"
     ]
 
-    public init() {}
+    init() {}
 
     /// Verifies if a given book source URL or novel title matches a restricted domain/keyword.
-    public func isRestricted(url: String, name: String = "") -> Bool {
+    func isRestricted(url: String, name: String = "") -> Bool {
         let lowerUrl = url.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
         let lowerName = name.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
 

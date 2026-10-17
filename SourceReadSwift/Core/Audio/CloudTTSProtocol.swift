@@ -4,18 +4,18 @@ import CryptoKit
 /// Cloud TTS authentication and protocol helper.
 /// Supports constructing RFC1123 timestamped HMAC-SHA256 authentication URLs
 /// for cloud speech services such as iFlyTek (科大讯飞) without external dependencies.
-public struct CloudTTSProtocol: Sendable {
+struct CloudTTSProtocol: Sendable {
 
-    public struct XunfeiConfig: Sendable, Equatable {
-        public var appId: String
-        public var apiKey: String
-        public var apiSecret: String
-        public var voiceName: String
-        public var speed: Int
-        public var volume: Int
-        public var pitch: Int
+    struct XunfeiConfig: Sendable, Equatable {
+        var appId: String
+        var apiKey: String
+        var apiSecret: String
+        var voiceName: String
+        var speed: Int
+        var volume: Int
+        var pitch: Int
 
-        public init(
+        init(
             appId: String,
             apiKey: String,
             apiSecret: String,
@@ -35,7 +35,7 @@ public struct CloudTTSProtocol: Sendable {
     }
 
     /// Generates a signed WebSocket connection URL for iFlyTek TTS API v2.
-    public static func createXunfeiAuthURL(config: XunfeiConfig, date: Date = Date()) -> URL? {
+    static func createXunfeiAuthURL(config: XunfeiConfig, date: Date = Date()) -> URL? {
         let host = "tts-api.xfyun.cn"
         let path = "/v2/tts"
 
@@ -67,7 +67,7 @@ public struct CloudTTSProtocol: Sendable {
     }
 
     /// Constructs the initial JSON frame payload for text-to-speech synthesis.
-    public static func createSynthesisPayload(text: String, config: XunfeiConfig) -> Data? {
+    static func createSynthesisPayload(text: String, config: XunfeiConfig) -> Data? {
         let textBase64 = Data(text.utf8).base64EncodedString()
         let payload: [String: Any] = [
             "common": ["app_id": config.appId],

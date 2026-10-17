@@ -2,10 +2,10 @@ import Foundation
 
 /// Adapter for HaiKuoShiJie (海阔视界) book and content source formats.
 /// Parses HaiKuo JSON rule exports and maps them into standard Legado `BookSource` models.
-public struct HaiKuoShiJieSourceAdapter: Sendable {
+struct HaiKuoShiJieSourceAdapter: Sendable {
 
     /// JS bridge code that can be injected into WKWebView to listen for HaiKuo rule imports.
-    public static let webInjectionScript = """
+    static let webInjectionScript = """
     window.fy_bridge_app = {
         importRule: function(obj) {
             if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.haikuoImportRule) {
@@ -17,7 +17,7 @@ public struct HaiKuoShiJieSourceAdapter: Sendable {
 
     // MARK: - Format Detection
 
-    public static func isHaiKuoJSON(_ text: String) -> Bool {
+    static func isHaiKuoJSON(_ text: String) -> Bool {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard trimmed.hasPrefix("{") || trimmed.hasPrefix("[") else { return false }
         
@@ -32,19 +32,19 @@ public struct HaiKuoShiJieSourceAdapter: Sendable {
         return hasTitleAndUrl && hasHaiKuoIdentifiers
     }
 
-    public static func isHaiKuoData(_ data: Data) -> Bool {
+    static func isHaiKuoData(_ data: Data) -> Bool {
         guard let text = String(data: data, encoding: .utf8) else { return false }
         return isHaiKuoJSON(text)
     }
 
     // MARK: - Import & Conversion
 
-    public static func importSources(from text: String) -> [BookSource] {
+    static func importSources(from text: String) -> [BookSource] {
         guard let data = text.data(using: .utf8) else { return [] }
         return importSources(from: data)
     }
 
-    public static func importSources(from data: Data) -> [BookSource] {
+    static func importSources(from data: Data) -> [BookSource] {
         guard let jsonObject = try? JSONSerialization.jsonObject(with: data) else {
             return []
         }
@@ -59,7 +59,7 @@ public struct HaiKuoShiJieSourceAdapter: Sendable {
         return []
     }
 
-    public static func adapt(dict: [String: Any]) -> BookSource? {
+    static func adapt(dict: [String: Any]) -> BookSource? {
         let title = (dict["title"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty
             ?? (dict["name"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty
             ?? "海阔视界源"
