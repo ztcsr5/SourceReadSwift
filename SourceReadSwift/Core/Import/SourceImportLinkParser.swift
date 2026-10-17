@@ -54,7 +54,7 @@ struct SourceImportLinkParser {
 
     private static func containsImportScheme(_ text: String) -> Bool {
         let lower = text.lowercased()
-        return lower.contains("yuedu://") || lower.contains("legado://")
+        return lower.contains("yuedu://") || lower.contains("legado://") || lower.contains("huahuo://") || lower.contains("haikuo://")
     }
 
     private static func extractImportURL(from text: String) -> String? {
@@ -96,11 +96,10 @@ struct SourceImportLinkParser {
     }
 
     private static func findImportSchemeRange(in text: String) -> Range<String.Index>? {
-        if let range = text.range(of: "yuedu://", options: .caseInsensitive) {
-            return range
-        }
-        if let range = text.range(of: "legado://", options: .caseInsensitive) {
-            return range
+        for scheme in ["yuedu://", "legado://", "huahuo://", "haikuo://"] {
+            if let range = text.range(of: scheme, options: .caseInsensitive) {
+                return range
+            }
         }
         return nil
     }

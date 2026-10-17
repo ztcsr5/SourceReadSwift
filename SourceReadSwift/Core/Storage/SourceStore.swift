@@ -53,6 +53,7 @@ final class SourceStore: ObservableObject {
 
     nonisolated static var defaultBookSources: [BookSource] {
         [
+            BuiltinBrowserSourceProvider.defaultBrowserSource,
             BookSource(
                 bookSourceName: "新版笔趣阁",
                 bookSourceUrl: "https://www.biquge8.xyz",
@@ -405,6 +406,26 @@ final class SourceStore: ObservableObject {
                 return SourceImportReport(addedBookSources: added, updatedBookSources: updated)
             }
         }
+        if HuaHuoBookSourceAdapter.isHuaHuoJSON(text) {
+            let adapted = HuaHuoBookSourceAdapter.importSources(from: text)
+            if !adapted.isEmpty {
+                let existingCount = sources.count
+                try importSources(adapted)
+                let added = max(0, sources.count - existingCount)
+                let updated = max(0, adapted.count - added)
+                return SourceImportReport(addedBookSources: added, updatedBookSources: updated)
+            }
+        }
+        if HaiKuoShiJieSourceAdapter.isHaiKuoJSON(text) {
+            let adapted = HaiKuoShiJieSourceAdapter.importSources(from: text)
+            if !adapted.isEmpty {
+                let existingCount = sources.count
+                try importSources(adapted)
+                let added = max(0, sources.count - existingCount)
+                let updated = max(0, adapted.count - added)
+                return SourceImportReport(addedBookSources: added, updatedBookSources: updated)
+            }
+        }
         return try importJSONData(Data(text.utf8))
     }
 
@@ -430,6 +451,26 @@ final class SourceStore: ObservableObject {
     func importJSONData(_ data: Data) throws -> SourceImportReport {
         if XbsBookSourceAdapter.isXbsData(data) {
             let adapted = XbsBookSourceAdapter.importSources(from: data)
+            if !adapted.isEmpty {
+                let existingCount = sources.count
+                try importSources(adapted)
+                let added = max(0, sources.count - existingCount)
+                let updated = max(0, adapted.count - added)
+                return SourceImportReport(addedBookSources: added, updatedBookSources: updated)
+            }
+        }
+        if HuaHuoBookSourceAdapter.isHuaHuoData(data) {
+            let adapted = HuaHuoBookSourceAdapter.importSources(from: data)
+            if !adapted.isEmpty {
+                let existingCount = sources.count
+                try importSources(adapted)
+                let added = max(0, sources.count - existingCount)
+                let updated = max(0, adapted.count - added)
+                return SourceImportReport(addedBookSources: added, updatedBookSources: updated)
+            }
+        }
+        if HaiKuoShiJieSourceAdapter.isHaiKuoData(data) {
+            let adapted = HaiKuoShiJieSourceAdapter.importSources(from: data)
             if !adapted.isEmpty {
                 let existingCount = sources.count
                 try importSources(adapted)

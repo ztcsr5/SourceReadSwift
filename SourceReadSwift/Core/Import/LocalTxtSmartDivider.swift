@@ -17,6 +17,68 @@ struct LocalTxtSmartDivider {
         return divide(text: text, fileName: fileName)
     }
 
+    // MARK: - Streaming Division for Large Files (512KB Buffer)
+
+    static let streamingBufferSize: Int = 512 * 1024
+
+    /// Memory-safe streaming divider for large files (e.g., 10MB - 100MB) using 512KB chunks
+    /// without loading the entire text into memory at once.
+    func divideStreaming(fileURL: URL, encoding: String.Encoding = .utf8) throws -> LocalTextBook {
+        let fileHandle = try FileHandle(forReadingFrom: fileURL)
+        defer { try? fileHandle.close() }
+
+        let totalSize = try FileManager.default.attributesOfItem(atPath: fileURL.path)[.size] as? UInt64 ?? 0
+        guard totalSize > 0 else {
+            return LocalTextBook(title: fileURL.deletingPathExtension().lastPathComponent, author: "Local", chapters: [])
+        }
+
+        var chapters: [(title: String, paragraphs: [String])] = []
+        var currentTitle = "引子"
+        var currentParagraphs: [String] = []
+        var currentOffset: UInt64 = 0
+        var leftoverLine: String = ""
+
+        while currentOffset < totalSize {
+            fileHandle.seek(toFileOffset: currentOffset)
+            let chunkData = fileHandle.readData(ofLength: Self.streamingBufferSize)
+            if chunkData.isEmpty { break }
+
+            let chunkString = (String(data: chunkData, encoding: encoding) ?? String(data: chunkData, encoding: .utf8)) ?? ""
+            let combined = leftoverLine + chunkString
+            var lines = combined.components(separatedBy: .newlines)
+            leftoverLine = lines.popLast() ?? ""
+
+            for line in lines {
+                let trimmed = line.trimmingCharacters(in: .whitespacesAndNewlines)
+                guard !trimmed.isEmpty else { continue }
+
+                if isChapterHeading(trimmed) {
+                    if !currentParagraphs.isEmpty {
+                        chapters.append((currentTitle, currentParagraphs))
+                        currentParagraphs = []
+                    }
+                    currentTitle = trimmed
+                } else {
+                    currentParagraphs.append(formatParagraph(trimmed))
+                }
+            }
+            currentOffset += UInt64(chunkData.count)
+        }
+
+        if !leftoverLine.isEmpty {
+            currentParagraphs.append(formatParagraph(leftoverLine))
+        }
+        if !currentParagraphs.isEmpty {
+            chapters.append((currentTitle, currentParagraphs))
+        }
+
+        let title = fileURL.deletingPathExtension().lastPathComponent
+        let mappedChapters = chapters.enumerated().map { index, item in
+            LocalTextChapter(title: item.title, paragraphs: item.paragraphs, index: index)
+        }
+        return LocalTextBook(title: title, author: "Local", chapters: mappedChapters.isEmpty ? [LocalTextChapter(title: "全文", paragraphs: [], index: 0)] : mappedChapters)
+    }
+
     func divide(text: String, fileName: String) -> LocalTextBook {
         let title = URL(fileURLWithPath: fileName).deletingPathExtension().lastPathComponent.nilIfEmpty ?? "Local Book"
         let chapters = parseChapters(from: text)

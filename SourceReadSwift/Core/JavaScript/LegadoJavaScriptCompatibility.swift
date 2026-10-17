@@ -56,7 +56,7 @@ enum LegadoJavaScriptCompatibility {
         if containsToken(lower, "urlsearchparams") { features.insert("URLSearchParams") }
         if containsToken(lower, "queuemicrotask") { features.insert("queueMicrotask") }
         if containsToken(lower, "settimeout") { features.insert("setTimeout") }
-        for name in ["ajax", "ajaxall", "post", "fetch", "connect", "importscript", "postform", "ajax_bytes"] {
+        for name in ["ajax", "ajaxall", "post", "fetch", "connect", "importscript", "postform", "ajax_bytes", "base64encode", "base64decode", "md5encode", "timeformat", "getstringlist"] {
             if lower.range(of: "java.\(name)") != nil { features.insert("java.\(name)") }
         }
         return features

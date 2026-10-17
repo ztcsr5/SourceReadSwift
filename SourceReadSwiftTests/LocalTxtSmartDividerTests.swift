@@ -84,4 +84,23 @@ final class LocalTxtSmartDividerTests: XCTestCase {
         XCTAssertEqual(book.chapters[0].title, "第 1 部分")
         XCTAssertEqual(book.chapters[1].title, "第 2 部分")
     }
+
+    func testStreamingDivision() throws {
+        let tempURL = FileManager.default.temporaryDirectory.appendingPathComponent("StreamingTest_\(UUID().uuidString).txt")
+        let content = """
+        第1章 初入江湖
+        少年策马出城。
+        第2章 风起云涌
+        天地变色。
+        """
+        try content.write(to: tempURL, atomically: true, encoding: .utf8)
+        defer { try? FileManager.default.removeItem(at: tempURL) }
+
+        let divider = LocalTxtSmartDivider()
+        let book = try divider.divideStreaming(fileURL: tempURL)
+
+        XCTAssertEqual(book.chapters.count, 2)
+        XCTAssertEqual(book.chapters[0].title, "第1章 初入江湖")
+        XCTAssertEqual(book.chapters[1].title, "第2章 风起云涌")
+    }
 }
