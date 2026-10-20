@@ -403,4 +403,92 @@ final class JSONRuleExtractorTests: XCTestCase {
         let result = extractor.string(from: item, rule: rule, fallbackKeys: [], variables: ["result": "{\"total\": 100}"])
         XCTAssertEqual(result, "https://www.duokan.com/hs/v0/android/fiction/book/42078")
     }
+
+    func testUnionSelectorAndQuotedKeys() throws {
+        let extractor = JSONRuleExtractor()
+        let object: [String: Any] = [
+            "data": [
+                "a": ["title": "A"],
+                "b": ["title": "B"],
+                "a,b": ["title": "Comma"],
+                "a.b:c": ["title": "Dotted"],
+                "a@b": ["title": "At"]
+            ]
+        ]
+
+        XCTAssertEqual(extractor.value(from: object, path: "$.data[a,b].title") as? [String], ["A", "B"])
+        XCTAssertEqual(extractor.value(from: object, path: "$.data['a,b'].title") as? String, "Comma")
+        XCTAssertEqual(extractor.value(from: object, path: "$.data['a.b:c'].title") as? String, "Dotted")
+        XCTAssertEqual(extractor.value(from: object, path: "$.data['a@b'].title") as? String, "At")
+        XCTAssertEqual(extractor.value(from: object, path: "$.data.a@title") as? String, "A")
+    }
+
+    func testFilterFunctionsAndNestedLogicalExpressions() throws {
+        let extractor = JSONRuleExtractor()
+        let object: [String: Any] = [
+            "list": [
+                ["title": "Alpha", "name": "A", "tags": ["x", "y"], "a": 1, "b": 2, "c": 3],
+                ["title": "Beta", "name": "B", "tags": ["x"], "a": 1, "b": 0, "c": 3],
+                ["title": "Gamma", "name": "C", "tags": ["x", "y", "z"], "a": 0, "b": 2, "c": 4]
+            ]
+        ]
+
+        XCTAssertEqual(
+            extractor.value(from: object, path: "$.list[?((@.a==1||@.b==2)&&@.c==3)].name") as? [String],
+            ["A", "B"]
+        )
+        XCTAssertEqual(
+            extractor.value(from: object, path: "$.list[?(length(@.tags)>=2)].name") as? [String],
+            ["A", "C"]
+        )
+        XCTAssertEqual(
+            extractor.value(from: object, path: "$.list[?(match(@.title,'^A'))].title") as? String,
+            "Alpha"
+        )
+        XCTAssertEqual(
+            extractor.value(from: object, path: "$.list[?(match(@.title,'/^b/i'))].title") as? String,
+            "Beta"
+        )
+    }
+
+    func testFilterNumericStringComparisonAndStrictNotEquals() throws {
+        let extractor = JSONRuleExtractor()
+        let object: [String: Any] = [
+            "list": [
+                ["n": "10", "name": "string-ten"],
+                ["n": 9, "name": "number-nine"],
+                ["n": "1", "name": "string-one"],
+                ["n": 1, "name": "number-one"]
+            ]
+        ]
+
+        XCTAssertEqual(
+            extractor.value(from: object, path: "$.list[?(@.n>=10)].name") as? [String],
+            ["string-ten"]
+        )
+        XCTAssertEqual(
+            extractor.value(from: object, path: "$.list[?(@.n!=1)].name") as? [String],
+            ["string-ten", "number-nine", "string-one"]
+        )
+    }
+
+    func testSliceSelectorSupportsNegativeStep() throws {
+        let extractor = JSONRuleExtractor()
+        let object: [String: Any] = ["list": ["a", "b", "c", "d"]]
+
+        XCTAssertEqual(extractor.value(from: object, path: "$.list[1:3]") as? [String], ["b", "c"])
+        XCTAssertEqual(extractor.value(from: object, path: "$.list[::-1]") as? [String], ["d", "c", "b", "a"])
+    }
+
+    func testJSONPrefixDecodesEmbeddedPayloadBeforeFiltering() throws {
+        let extractor = JSONRuleExtractor()
+        let object: [String: Any] = [
+            "payload": "{\"items\":[{\"ok\":true,\"name\":\"A\"},{\"ok\":false,\"name\":\"B\"}]}"
+        ]
+
+        XCTAssertEqual(
+            extractor.value(from: object, path: "@json:$.payload.items[?(@.ok==true)].name") as? String,
+            "A"
+        )
+    }
 }

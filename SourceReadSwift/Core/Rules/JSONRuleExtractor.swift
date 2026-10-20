@@ -32,6 +32,13 @@ struct JSONRuleExtractor {
         let expected: String?
     }
 
+    private enum FilterLiteral {
+        case bool(Bool)
+        case number(Double)
+        case string(String)
+        indirect case array([FilterLiteral])
+    }
+
     private typealias RegexTransform = RuleRegexTransform
 
     private let directiveStore: JSONRuleDirectiveStore
@@ -713,7 +720,7 @@ struct JSONRuleExtractor {
         }
         if output.hasPrefix("$..") {
             output.removeFirst()
-            return output
+            return replacingLastTopLevelAt(in: output)
         }
         if output.hasPrefix("$.") {
             output.removeFirst(2)
@@ -735,18 +742,59 @@ struct JSONRuleExtractor {
         } else if output.hasPrefix("@") {
             output.removeFirst()
         }
-        if !output.contains("[?"),
-           let atIndex = output.lastIndex(of: "@"),
-           atIndex != output.startIndex {
-            output.replaceSubrange(atIndex...atIndex, with: ".")
+        if !output.contains("[?"), !output.contains("(") {
+            output = replacingLastTopLevelAt(in: output)
         }
         return output.trimmingCharacters(in: CharacterSet(charactersIn: ". "))
     }
 
+
+    /// Replaces the last `@` separator that is outside quoted keys and
+    /// bracket/function expressions. Keys such as `['a@b']` must survive
+    /// normalization unchanged.
+    private func replacingLastTopLevelAt(in text: String) -> String {
+        var lastAt: String.Index?
+        var index = text.startIndex
+        var quote: Character?
+        var escaped = false
+        var bracketDepth = 0
+        var parenDepth = 0
+        while index < text.endIndex {
+            let character = text[index]
+            if escaped {
+                escaped = false
+            } else if character == "\\" {
+                escaped = true
+            } else if let activeQuote = quote {
+                if character == activeQuote { quote = nil }
+            } else if character == "\"" || character == "'" {
+                quote = character
+            } else {
+                switch character {
+                case "[": bracketDepth += 1
+                case "]": bracketDepth = max(0, bracketDepth - 1)
+                case "(": parenDepth += 1
+                case ")": parenDepth = max(0, parenDepth - 1)
+                default: break
+                }
+                if character == "@", bracketDepth == 0, parenDepth == 0 {
+                    lastAt = index
+                }
+            }
+            index = text.index(after: index)
+        }
+        guard let at = lastAt, at != text.startIndex else { return text }
+        var output = text
+        output.replaceSubrange(at...at, with: ".")
+        return output
+    }
     private func tokenize(_ path: String) -> [String] {
         var parts: [String] = []
         var buffer = ""
         var index = path.startIndex
+        var quote: Character?
+        var escaped = false
+        var parenDepth = 0
         func flush() {
             let value = buffer.trimmingCharacters(in: .whitespacesAndNewlines)
             if !value.isEmpty { parts.append(value) }
@@ -757,23 +805,23 @@ struct JSONRuleExtractor {
             if character == "[" {
                 flush()
                 var depth = 1
-                var quote: Character?
-                var escaped = false
+                var bracketQuote: Character?
+                var bracketEscaped = false
                 var cursor = path.index(after: index)
                 var token = ""
                 while cursor < path.endIndex, depth > 0 {
                     let current = path[cursor]
-                    if let activeQuote = quote {
+                    if let activeQuote = bracketQuote {
                         token.append(current)
-                        if escaped {
-                            escaped = false
+                        if bracketEscaped {
+                            bracketEscaped = false
                         } else if current == "\\" {
-                            escaped = true
+                            bracketEscaped = true
                         } else if current == activeQuote {
-                            quote = nil
+                            bracketQuote = nil
                         }
                     } else if current == "\"" || current == "'" {
-                        quote = current
+                        bracketQuote = current
                         token.append(current)
                     } else if current == "[" {
                         depth += 1
@@ -788,12 +836,44 @@ struct JSONRuleExtractor {
                 }
                 let trimmed = token.trimmingCharacters(in: .whitespacesAndNewlines)
                 if !trimmed.isEmpty {
-                    parts.append(unquote(trimmed))
+                    // Keep quotes and commas intact; walk() interprets union
+                    // lists and quoted keys with their original delimiters.
+                    parts.append(trimmed)
                 }
                 index = cursor
                 continue
             }
-            if character == "." || character == "/" {
+            if let activeQuote = quote {
+                buffer.append(character)
+                if escaped {
+                    escaped = false
+                } else if character == "\\" {
+                    escaped = true
+                } else if character == activeQuote {
+                    quote = nil
+                }
+                index = path.index(after: index)
+                continue
+            }
+            if character == "\"" || character == "'" {
+                quote = character
+                buffer.append(character)
+                index = path.index(after: index)
+                continue
+            }
+            if character == "(" {
+                parenDepth += 1
+                buffer.append(character)
+                index = path.index(after: index)
+                continue
+            }
+            if character == ")" {
+                parenDepth = max(0, parenDepth - 1)
+                buffer.append(character)
+                index = path.index(after: index)
+                continue
+            }
+            if (character == "." || character == "/"), parenDepth == 0 {
                 flush()
                 if character == "." {
                     let next = path.index(after: index)
@@ -824,6 +904,31 @@ struct JSONRuleExtractor {
             node = decoded
         }
 
+        if let call = parseFunctionCall(part) {
+            guard let transformed = applyFunction(name: call.name, arguments: call.arguments, to: node) else {
+                return nil
+            }
+            return walk(transformed, parts: parts, index: index + 1)
+        }
+
+        if let union = unionSegments(part) {
+            var collected: [Any] = []
+            let remaining = Array(parts[(index + 1)...])
+            for segment in union {
+                guard !segment.isEmpty else { continue }
+                if let resolved = walk(node, parts: [segment] + remaining, index: 0) {
+                    var items: [Any] = []
+                    appendFlattened(resolved, to: &items)
+                    // rjpath UnionSelector applies distinct(); keep the first
+                    // occurrence so later stages see one copy per node.
+                    for item in items where !collected.contains(where: { rjEqualsStrict($0, item) }) {
+                        collected.append(item)
+                    }
+                }
+            }
+            return collected.isEmpty ? nil : collected
+        }
+
         if part == "**" {
             var matches: [Any] = []
             if let direct = walk(node, parts: parts, index: index + 1) {
@@ -838,24 +943,65 @@ struct JSONRuleExtractor {
         }
 
         if part.hasPrefix("?(") && part.hasSuffix(")") {
-            guard let array = arrayValues(node) else { return nil }
             let expression = String(part.dropFirst(2).dropLast())
-            let filtered = array.filter { matchesFilterExpression($0, expression: expression) }
-            return walk(filtered, parts: parts, index: index + 1)
+            if let array = arrayValues(node) {
+                let filtered = array.filter { matchesFilterExpression($0, expression: expression) }
+                return walk(filtered, parts: parts, index: index + 1)
+            }
+            if let dictionary = node as? [String: Any] {
+                // rjpath FilterSelector on a JsonObject keeps only entries
+                // whose value is itself an object. Swift dictionaries have no
+                // stable order, so sort keys to keep output deterministic.
+                let filtered = dictionary.keys.sorted().compactMap { key -> Any? in
+                    guard let value = dictionary[key], value is [String: Any],
+                          matchesFilterExpression(value, expression: expression) else {
+                        return nil
+                    }
+                    return value
+                }
+                return walk(filtered, parts: parts, index: index + 1)
+            }
+            return nil
         }
 
-        if let array = arrayValues(node), part.contains(":") {
+        if let array = arrayValues(node), !isQuotedPathPart(part), part.contains(":") {
             let sliceParts = part.components(separatedBy: ":")
-            if sliceParts.count == 2 {
-                let count = array.count
+            if sliceParts.count == 2 || sliceParts.count == 3 {
                 let startRaw = sliceParts[0].trimmingCharacters(in: .whitespaces)
                 let endRaw = sliceParts[1].trimmingCharacters(in: .whitespaces)
-                let startIndex = startRaw.isEmpty ? 0 : (Int(startRaw) ?? 0)
-                let endIndex = endRaw.isEmpty ? count : (Int(endRaw) ?? count)
-                let resolvedStart = max(0, min(count, startIndex < 0 ? count + startIndex : startIndex))
-                let resolvedEnd = max(0, min(count, endIndex < 0 ? count + endIndex : endIndex))
-                if resolvedStart <= resolvedEnd {
-                    let sliced = Array(array[resolvedStart..<resolvedEnd])
+                let stepRaw = sliceParts.count == 3 ? sliceParts[2].trimmingCharacters(in: .whitespaces) : ""
+                let startValue = startRaw.isEmpty ? nil : Int(startRaw)
+                let endValue = endRaw.isEmpty ? nil : Int(endRaw)
+                let stepValue = stepRaw.isEmpty ? nil : Int(stepRaw)
+                let partsAreNumeric = (startRaw.isEmpty || startValue != nil)
+                    && (endRaw.isEmpty || endValue != nil)
+                    && (stepRaw.isEmpty || stepValue != nil)
+                if partsAreNumeric {
+                    let step = stepValue ?? 1
+                    guard step != 0 else { return nil }
+                    let count = array.count
+                    var indices: [Int] = []
+                    if step > 0 {
+                        var cursor = startValue ?? 0
+                        if cursor < 0 { cursor += count }
+                        var limit = endValue ?? count
+                        if limit < 0 { limit += count }
+                        while cursor < limit && cursor < count {
+                            if cursor >= 0 { indices.append(cursor) }
+                            cursor += step
+                        }
+                    } else {
+                        var cursor = startValue ?? (count - 1)
+                        if cursor < 0 { cursor += count }
+                        // rjpath keeps the original `end` value for the
+                        // negative-step loop condition (no size adjustment).
+                        let limit = endValue ?? -1
+                        while cursor > limit && cursor >= 0 {
+                            if cursor < count { indices.append(cursor) }
+                            cursor += step
+                        }
+                    }
+                    let sliced = indices.map { array[$0] }
                     return walk(sliced, parts: parts, index: index + 1)
                 }
             }
@@ -873,7 +1019,7 @@ struct JSONRuleExtractor {
                 }
                 return walk(flattened, parts: parts, index: index + 1)
             }
-            guard let value = lookup(dictionary, key: part) else { return nil }
+            guard let value = lookup(dictionary, key: unquoteKey(part)) else { return nil }
             return walk(value, parts: parts, index: index + 1)
         }
 
@@ -885,7 +1031,7 @@ struct JSONRuleExtractor {
                 mapped.forEach { appendFlattened($0, to: &flattened) }
                 return flattened.count == 1 ? flattened[0] : flattened
             }
-            if let number = Int(part) {
+            if let number = Int(unquoteKey(part)) {
                 let resolved = number < 0 ? array.count + number : number
                 guard array.indices.contains(resolved) else { return nil }
                 return walk(array[resolved], parts: parts, index: index + 1)
@@ -897,6 +1043,283 @@ struct JSONRuleExtractor {
             return flattened.count == 1 ? flattened[0] : flattened
         }
         return nil
+    }
+
+    private func unquoteKey(_ raw: String) -> String {
+        let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard trimmed.count >= 2,
+              let first = trimmed.first,
+              let last = trimmed.last,
+              (first == "\"" && last == "\"") || (first == "'" && last == "'") else {
+            return trimmed
+        }
+        var inner = String(trimmed.dropFirst().dropLast())
+        inner = inner.replacingOccurrences(of: "\\\\", with: "\\")
+        inner = inner.replacingOccurrences(of: "\\" + String(first), with: String(first))
+        return inner
+    }
+
+    private func splitTopLevelCommas(_ text: String) -> [String] {
+        var output: [String] = []
+        var current = ""
+        var quote: Character?
+        var escaped = false
+        var parenDepth = 0
+        var bracketDepth = 0
+        var braceDepth = 0
+        for character in text {
+            if escaped {
+                current.append(character)
+                escaped = false
+                continue
+            }
+            if character == "\\" {
+                current.append(character)
+                escaped = true
+                continue
+            }
+            if let activeQuote = quote {
+                current.append(character)
+                if character == activeQuote { quote = nil }
+                continue
+            }
+            if character == "\"" || character == "'" {
+                quote = character
+                current.append(character)
+                continue
+            }
+            switch character {
+            case "(": parenDepth += 1
+            case ")": parenDepth = max(0, parenDepth - 1)
+            case "[": bracketDepth += 1
+            case "]": bracketDepth = max(0, bracketDepth - 1)
+            case "{": braceDepth += 1
+            case "}": braceDepth = max(0, braceDepth - 1)
+            default: break
+            }
+            if character == ",", parenDepth == 0, bracketDepth == 0, braceDepth == 0 {
+                output.append(current.trimmingCharacters(in: .whitespacesAndNewlines))
+                current = ""
+                continue
+            }
+            current.append(character)
+        }
+        output.append(current.trimmingCharacters(in: .whitespacesAndNewlines))
+        return output
+    }
+
+    private func unionSegments(_ part: String) -> [String]? {
+        guard part.contains(","), !part.hasPrefix("?(") else { return nil }
+        guard !looksLikeNumericSlice(part) else { return nil }
+        let pieces = splitTopLevelCommas(part)
+        guard pieces.count > 1 else { return nil }
+        return pieces
+    }
+
+    private func looksLikeNumericSlice(_ part: String) -> Bool {
+        guard part.contains(":"), !isQuotedPathPart(part) else { return false }
+        let pieces = part.components(separatedBy: ":")
+        guard pieces.count == 2 || pieces.count == 3 else { return false }
+        return pieces.allSatisfy { piece in
+            let trimmed = piece.trimmingCharacters(in: .whitespaces)
+            return trimmed.isEmpty || Int(trimmed) != nil
+        }
+    }
+
+    private func isQuotedPathPart(_ part: String) -> Bool {
+        let trimmed = part.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard trimmed.count >= 2, let first = trimmed.first, let last = trimmed.last else {
+            return false
+        }
+        return (first == "'" && last == "'") || (first == "\"" && last == "\"")
+    }
+
+    private func parseFunctionCall(
+        _ rawPart: String,
+        unquoteArguments: Bool = true
+    ) -> (name: String, arguments: [String])? {
+        let part = rawPart.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard part.hasSuffix(")"), let open = part.firstIndex(of: "(") else { return nil }
+        let name = String(part[..<open]).trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        let supported = [
+            "length", "count", "match", "search", "value",
+            // Project extensions:
+            "size", "min", "max", "sum", "avg", "keys", "first", "last",
+            "concat", "append", "index"
+        ]
+        guard supported.contains(name) else { return nil }
+        let argStart = part.index(after: open)
+        let argEnd = part.index(before: part.endIndex)
+        guard argStart <= argEnd else { return (name, []) }
+        let argText = String(part[argStart..<argEnd]).trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !argText.isEmpty else { return (name, []) }
+        let arguments = splitTopLevelCommas(argText).map { piece -> String in
+            let trimmed = piece.trimmingCharacters(in: .whitespacesAndNewlines)
+            return unquoteArguments ? unquoteKey(trimmed) : trimmed
+        }
+        return (name, arguments)
+    }
+
+    private func applyFunction(name: String, arguments: [String], to node: Any) -> Any? {
+        switch name {
+        case "length":
+            return sizeOf(node) ?? 0
+        case "size":
+            return sizeOf(node)
+        case "count":
+            if node is String || node is NSNumber || node is Bool || node is NSNull { return 1 }
+            if let array = arrayValues(node) { return array.count }
+            if let dictionary = node as? [String: Any] { return dictionary.count }
+            return 1
+        case "value":
+            return node
+        case "match":
+            if arguments.count >= 2 {
+                return regexMatches(primitiveContent(arguments[0]), expression: arguments[1])
+            }
+            guard let pattern = arguments.first else { return false }
+            return rawRegexContains(stringify(node), pattern: pattern)
+        case "search":
+            if arguments.count >= 2 {
+                return primitiveContent(arguments[0]).contains(arguments[1])
+            }
+            guard let needle = arguments.first else { return false }
+            return stringify(node).contains(needle)
+        case "keys":
+            guard let dictionary = node as? [String: Any] else { return nil }
+            return Array(dictionary.keys)
+        case "first":
+            return arrayValues(node)?.first
+        case "last":
+            return arrayValues(node)?.last
+        case "min", "max", "sum", "avg":
+            guard let array = arrayValues(node) else { return nil }
+            let numbers = array.compactMap { numericDouble($0) }
+            guard numbers.count == array.count, !numbers.isEmpty else { return nil }
+            switch name {
+            case "min": return numbers.min()
+            case "max": return numbers.max()
+            case "sum": return numbers.reduce(0, +)
+            default: return numbers.reduce(0, +) / Double(numbers.count)
+            }
+        case "concat", "append":
+            let argument = arguments.first ?? ""
+            if let array = arrayValues(node) { return array + [argument as Any] }
+            if let text = node as? String { return text + argument }
+            return nil
+        case "index":
+            guard let array = arrayValues(node), let argument = arguments.first else { return nil }
+            return array.firstIndex { literalEquals($0, .string(argument)) }
+        default:
+            return nil
+        }
+    }
+
+    private func sizeOf(_ value: Any) -> Int? {
+        if let array = arrayValues(value) { return array.count }
+        if let dictionary = value as? [String: Any] { return dictionary.count }
+        if let text = value as? String { return text.utf16.count }
+        return nil
+    }
+
+    private func numericDouble(_ value: Any) -> Double? {
+        if let number = value as? NSNumber {
+            if String(cString: number.objCType) == "c" { return nil }
+            return number.doubleValue
+        }
+        if let text = value as? String {
+            return Double(text.trimmingCharacters(in: .whitespacesAndNewlines))
+        }
+        return nil
+    }
+
+    private func boolValue(_ value: Any) -> Bool? {
+        if let number = value as? NSNumber {
+            if String(cString: number.objCType) == "c" { return number.boolValue }
+            return nil
+        }
+        if let boolean = value as? Bool { return boolean }
+        if let text = value as? String {
+            switch text.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() {
+            case "true": return true
+            case "false": return false
+            default: return nil
+            }
+        }
+        return nil
+    }
+
+    private func parseFilterLiteral(_ raw: String) -> FilterLiteral {
+        let text = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !text.isEmpty else { return .string("") }
+        if text.count >= 2,
+           let first = text.first,
+           let last = text.last,
+           (first == "\"" && last == "\"") || (first == "'" && last == "'") {
+            return .string(unescapeQuoted(String(text.dropFirst().dropLast())))
+        }
+        // rjpath does not special-case `null`: an unquoted `null` is the
+        // literal string "null", so `@.missing == null` stays false.
+        switch text.lowercased() {
+        case "true": return .bool(true)
+        case "false": return .bool(false)
+        default: break
+        }
+        if text.hasPrefix("["), text.hasSuffix("]") {
+            let inner = String(text.dropFirst().dropLast())
+            let pieces = splitTopLevelCommas(inner).filter { !$0.isEmpty }
+            return .array(pieces.map { parseFilterLiteral($0) })
+        }
+        if let number = Double(text) { return .number(number) }
+        return .string(text)
+    }
+
+    private func unescapeQuoted(_ value: String) -> String {
+        var output = ""
+        var escaped = false
+        for character in value {
+            if escaped {
+                switch character {
+                case "n": output.append("\n")
+                case "t": output.append("\t")
+                case "r": output.append("\r")
+                default: output.append(character)
+                }
+                escaped = false
+            } else if character == "\\" {
+                escaped = true
+            } else {
+                output.append(character)
+            }
+        }
+        if escaped { output.append("\\") }
+        return output
+    }
+
+    private func literalEquals(_ actual: Any, _ literal: FilterLiteral) -> Bool {
+        switch literal {
+        case .bool(let expected):
+            if let boolean = boolValue(actual) { return boolean == expected }
+            return false
+        case .number(let expected):
+            if let number = numericDouble(actual) { return number == expected }
+            return false
+        case .string(let expected):
+            if let boolean = boolValue(actual), isBooleanValue(actual) {
+                return (boolean ? "true" : "false") == expected.lowercased()
+            }
+            return stringify(actual) == expected
+        case .array(let items):
+            guard let array = arrayValues(actual), array.count == items.count else { return false }
+            return zip(array, items).allSatisfy { literalEquals($0.0, $0.1) }
+        }
+    }
+
+    private func isBooleanValue(_ value: Any) -> Bool {
+        if let number = value as? NSNumber {
+            return String(cString: number.objCType) == "c"
+        }
+        return value is Bool
     }
 
     private func lookup(_ dictionary: [String: Any], key: String) -> Any? {
@@ -943,6 +1366,9 @@ struct JSONRuleExtractor {
         let andParts = splitLogical(trimmed, separator: "&&")
         if andParts.count > 1 {
             return andParts.allSatisfy { matchesFilterExpression(value, expression: $0) }
+        }
+        if let inner = stripOuterParentheses(trimmed) {
+            return matchesFilterExpression(value, expression: inner)
         }
         guard let clause = parseFilterClause(trimmed) else { return false }
         return matchesClause(value, clause: clause)
@@ -1019,6 +1445,41 @@ struct JSONRuleExtractor {
         return output
     }
 
+    /// Strips one pair of outer parentheses only when they enclose the whole
+    /// expression; mirrors rjpath parseComparisonExpression's grouping branch.
+    private func stripOuterParentheses(_ expression: String) -> String? {
+        let trimmed = expression.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard trimmed.count >= 2, trimmed.hasPrefix("("), trimmed.hasSuffix(")") else {
+            return nil
+        }
+        var depth = 0
+        var quote: Character?
+        var escaped = false
+        var index = trimmed.startIndex
+        while index < trimmed.endIndex {
+            let character = trimmed[index]
+            if escaped {
+                escaped = false
+            } else if character == "\\" {
+                escaped = true
+            } else if let activeQuote = quote {
+                if character == activeQuote { quote = nil }
+            } else if character == "\"" || character == "'" {
+                quote = character
+            } else if character == "(" {
+                depth += 1
+            } else if character == ")" {
+                depth -= 1
+                if depth == 0, trimmed.index(after: index) != trimmed.endIndex {
+                    return nil
+                }
+            }
+            index = trimmed.index(after: index)
+        }
+        guard depth == 0 else { return nil }
+        return String(trimmed.dropFirst().dropLast())
+    }
+
     private func parseFilterClause(_ expression: String) -> FilterClause? {
         let trimmed = expression.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return nil }
@@ -1076,43 +1537,301 @@ struct JSONRuleExtractor {
     }
 
     private func matchesClause(_ value: Any, clause: FilterClause) -> Bool {
-        var key = clause.path.trimmingCharacters(in: .whitespacesAndNewlines)
-        if key.hasPrefix("@.") {
-            key = String(key.dropFirst(2))
-        } else if key == "@" {
-            key = ""
-        }
-        let actual: Any?
-        if key.isEmpty {
-            actual = value
-        } else {
-            actual = valueForSinglePath(from: value, path: key)
-        }
-        guard let actual, !(actual is NSNull) else { return false }
+        let expression = clause.path.trimmingCharacters(in: .whitespacesAndNewlines)
         guard let op = clause.op, let expected = clause.expected else {
-            return truthy(actual)
+            return matchesBareFilter(value, expression: expression)
         }
-        let lhs = stringify(actual)
-        let rhs = unquote(expected.trimmingCharacters(in: .whitespacesAndNewlines))
-        if op == "=~" {
-            return regexMatches(lhs, expression: rhs)
-        }
-        if let leftNumber = Double(lhs), let rightNumber = Double(rhs) {
-            switch op {
-            case "==", "=": return leftNumber == rightNumber
-            case "!=": return leftNumber != rightNumber
-            case ">": return leftNumber > rightNumber
-            case "<": return leftNumber < rightNumber
-            case ">=": return leftNumber >= rightNumber
-            case "<=": return leftNumber <= rightNumber
-            default: return false
-            }
-        }
+        let lhs = evaluateFilterValue(expression, node: value) ?? NSNull()
+        let rhs = evaluateFilterValue(expected, node: value) ?? NSNull()
         switch op {
-        case "==", "=": return lhs == rhs
-        case "!=": return lhs != rhs
-        default: return false
+        case "=~":
+            // Project extension: slash-delimited regex with optional flags.
+            return regexMatches(primitiveContent(lhs), expression: unquote(expected))
+        case "==", "=":
+            return rjEquals(lhs, rhs)
+        case "!=":
+            // rjpath NotEquals compares JsonElement values directly, without
+            // the numeric/boolean coercion used by Equals.
+            return !rjEqualsStrict(lhs, rhs)
+        case ">":
+            if isPrimitiveJSON(lhs), isPrimitiveJSON(rhs) {
+                return comparePrimitiveValues(lhs, rhs) > 0
+            }
+            guard let comparison = rjCompare(lhs, rhs) else { return false }
+            return comparison > 0
+        case "<":
+            if isPrimitiveJSON(lhs), isPrimitiveJSON(rhs) {
+                return comparePrimitiveValues(lhs, rhs) < 0
+            }
+            guard let comparison = rjCompare(lhs, rhs) else { return false }
+            return comparison < 0
+        case ">=":
+            if rjEqualsStrict(lhs, rhs) { return true }
+            guard let comparison = rjCompare(lhs, rhs) else { return false }
+            return comparison >= 0
+        case "<=":
+            if rjEqualsStrict(lhs, rhs) { return true }
+            guard let comparison = rjCompare(lhs, rhs) else { return false }
+            return comparison <= 0
+        default:
+            return false
         }
+    }
+
+    /// rjpath `parseFilterExpression` fallback: property truthiness, `@`,
+    /// function filters, and string-value filters.
+    private func matchesBareFilter(_ value: Any, expression: String) -> Bool {
+        let trimmed = expression.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return false }
+        if let call = parseFunctionCall(trimmed, unquoteArguments: false) {
+            let arguments = call.arguments.map { evaluateFilterValue($0, node: value) ?? NSNull() }
+            guard let result = applyFilterFunction(name: call.name, arguments: arguments) else {
+                return false
+            }
+            return filterTruthy(result)
+        }
+        if trimmed.hasPrefix("@.") {
+            let actual = filterPropertyValue(value, name: String(trimmed.dropFirst(2)))
+            return filterTruthy(actual)
+        }
+        if trimmed == "@" { return true }
+        guard isPrimitiveJSON(value) else { return false }
+        return primitiveContent(value) == unquote(trimmed)
+    }
+
+    /// Evaluate a value expression inside a filter (`@.field`, `@`,
+    /// `length(@.field)`, `match(@.title,'x')`, literals).
+    private func evaluateFilterValue(_ raw: String, node: Any) -> Any? {
+        let expression = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !expression.isEmpty else { return nil }
+        if expression.hasPrefix("@.") {
+            return filterPropertyValue(node, name: String(expression.dropFirst(2)))
+        }
+        if expression == "@" { return node }
+        if let call = parseFunctionCall(expression, unquoteArguments: false) {
+            let arguments = call.arguments.map { evaluateFilterValue($0, node: node) ?? NSNull() }
+            return applyFilterFunction(name: call.name, arguments: arguments)
+        }
+        return filterLiteralValue(parseFilterLiteral(expression))
+    }
+
+    /// rjpath `PropertyValueExpression`: objects return the property or
+    /// JsonNull; every other node type returns the node itself.
+    private func filterPropertyValue(_ node: Any, name: String) -> Any {
+        let key = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !key.isEmpty else { return node }
+        guard let dictionary = node as? [String: Any] else { return node }
+        if let direct = dictionary[key] { return direct }
+        if key.contains(".") || key.contains("[") {
+            if let nested = valueForSinglePath(from: node, path: key) { return nested }
+        }
+        if let value = lookup(dictionary, key: key) { return value }
+        return NSNull()
+    }
+
+    private func filterLiteralValue(_ literal: FilterLiteral) -> Any {
+        switch literal {
+        case .bool(let value): return value
+        case .number(let value): return value
+        case .string(let value): return value
+        case .array(let items): return items.map { filterLiteralValue($0) }
+        }
+    }
+
+    private func isPrimitiveJSON(_ value: Any) -> Bool {
+        if value is NSNull { return false }
+        if value is String || value is Bool { return true }
+        return value is NSNumber
+    }
+
+    private func primitiveContent(_ value: Any) -> String {
+        if let text = value as? String { return text }
+        // On Apple platforms every Bool bridges to NSNumber and `as? Bool`
+        // also succeeds for plain numbers, so NSNumber must be inspected
+        // first: objCType == "c" is the only reliable boolean marker.
+        if let number = value as? NSNumber {
+            if String(cString: number.objCType) == "c" {
+                return number.boolValue ? "true" : "false"
+            }
+            return stringify(number)
+        }
+        if let boolean = value as? Bool { return boolean ? "true" : "false" }
+        return stringify(value)
+    }
+
+    /// rjpath `Equals`: numeric coercion first, then boolean, then content.
+    private func rjEquals(_ lhs: Any, _ rhs: Any) -> Bool {
+        if isPrimitiveJSON(lhs), isPrimitiveJSON(rhs) {
+            if let leftNumber = numericDouble(lhs), let rightNumber = numericDouble(rhs) {
+                return leftNumber == rightNumber
+            }
+            if let leftBoolean = boolValue(lhs), let rightBoolean = boolValue(rhs) {
+                return leftBoolean == rightBoolean
+            }
+            return primitiveContent(lhs) == primitiveContent(rhs)
+        }
+        return rjEqualsStrict(lhs, rhs)
+    }
+
+    /// Type-preserving equality used by `!=`, `<=`, `>=` and structural
+    /// comparison. Mirrors kotlinx JsonElement equality: numbers are numbers,
+    /// strings are strings, booleans are booleans.
+    private func rjEqualsStrict(_ lhs: Any, _ rhs: Any) -> Bool {
+        if lhs is NSNull || rhs is NSNull {
+            return lhs is NSNull && rhs is NSNull
+        }
+        if isBooleanValue(lhs) || isBooleanValue(rhs) {
+            guard isBooleanValue(lhs), isBooleanValue(rhs) else { return false }
+            return boolValue(lhs) == boolValue(rhs)
+        }
+        if let leftNumber = lhs as? NSNumber {
+            guard let rightNumber = rhs as? NSNumber else { return false }
+            return leftNumber.doubleValue == rightNumber.doubleValue
+        }
+        if let leftText = lhs as? String {
+            guard let rightText = rhs as? String else { return false }
+            return leftText == rightText
+        }
+        if let leftArray = lhs as? [Any] {
+            guard let rightArray = rhs as? [Any], leftArray.count == rightArray.count else {
+                return false
+            }
+            return zip(leftArray, rightArray).allSatisfy { rjEqualsStrict($0.0, $0.1) }
+        }
+        if let leftObject = lhs as? [String: Any] {
+            guard let rightObject = rhs as? [String: Any],
+                  leftObject.count == rightObject.count else { return false }
+            for (key, leftValue) in leftObject {
+                guard let rightValue = rightObject[key], rjEqualsStrict(leftValue, rightValue) else {
+                    return false
+                }
+            }
+            return true
+        }
+        return false
+    }
+
+    /// `<` / `>` primitive branch: both numbers, else both booleans, else
+    /// lexicographic string content.
+    private func comparePrimitiveValues(_ lhs: Any, _ rhs: Any) -> Int {
+        if let leftNumber = numericDouble(lhs), let rightNumber = numericDouble(rhs) {
+            return leftNumber < rightNumber ? -1 : (leftNumber > rightNumber ? 1 : 0)
+        }
+        if let leftBoolean = boolValue(lhs), let rightBoolean = boolValue(rhs) {
+            if leftBoolean == rightBoolean { return 0 }
+            return leftBoolean ? 1 : -1
+        }
+        let leftText = primitiveContent(lhs)
+        let rightText = primitiveContent(rhs)
+        return leftText < rightText ? -1 : (leftText > rightText ? 1 : 0)
+    }
+
+    /// rjpath `compareJsonElements` used by `<=`, `>=` and by `<` / `>` for
+    /// non-primitive operands. Note the OR-number rule: if either side parses
+    /// as a number, the other side defaults to 0.0.
+    private func rjCompare(_ lhs: Any, _ rhs: Any) -> Int? {
+        let leftNull = lhs is NSNull
+        let rightNull = rhs is NSNull
+        if leftNull || rightNull {
+            return (leftNull && rightNull) ? 0 : nil
+        }
+        if isPrimitiveJSON(lhs), isPrimitiveJSON(rhs) {
+            let leftNumber = numericDouble(lhs)
+            let rightNumber = numericDouble(rhs)
+            if leftNumber != nil || rightNumber != nil {
+                let leftValue = leftNumber ?? 0
+                let rightValue = rightNumber ?? 0
+                return leftValue < rightValue ? -1 : (leftValue > rightValue ? 1 : 0)
+            }
+            if let leftBoolean = boolValue(lhs), let rightBoolean = boolValue(rhs) {
+                if leftBoolean == rightBoolean { return 0 }
+                return leftBoolean ? 1 : -1
+            }
+            let leftText = primitiveContent(lhs)
+            let rightText = primitiveContent(rhs)
+            return leftText < rightText ? -1 : (leftText > rightText ? 1 : 0)
+        }
+        if let leftArray = lhs as? [Any], let rightArray = rhs as? [Any] {
+            if leftArray.count != rightArray.count {
+                return leftArray.count < rightArray.count ? -1 : 1
+            }
+            for (leftValue, rightValue) in zip(leftArray, rightArray) {
+                if let comparison = rjCompare(leftValue, rightValue), comparison != 0 {
+                    return comparison
+                }
+            }
+            return 0
+        }
+        if let leftObject = lhs as? [String: Any], let rightObject = rhs as? [String: Any] {
+            if leftObject.count != rightObject.count {
+                return leftObject.count < rightObject.count ? -1 : 1
+            }
+            let leftKeys = leftObject.keys.sorted()
+            let rightKeys = rightObject.keys.sorted()
+            for (leftKey, rightKey) in zip(leftKeys, rightKeys) where leftKey != rightKey {
+                return leftKey < rightKey ? -1 : 1
+            }
+            for key in leftKeys {
+                let leftValue = leftObject[key] ?? NSNull()
+                let rightValue = rightObject[key] ?? NSNull()
+                if let comparison = rjCompare(leftValue, rightValue), comparison != 0 {
+                    return comparison
+                }
+            }
+            return 0
+        }
+        return nil
+    }
+
+    /// FunctionFilterExpression / PropertyFilterExpression truthiness.
+    private func filterTruthy(_ value: Any) -> Bool {
+        if value is NSNull { return false }
+        if let text = value as? String { return !text.isEmpty }
+        if let number = value as? NSNumber {
+            if String(cString: number.objCType) == "c" { return number.boolValue }
+            return number.doubleValue != 0
+        }
+        if let boolean = value as? Bool { return boolean }
+        if let array = arrayValues(value) { return !array.isEmpty }
+        if let dictionary = value as? [String: Any] { return !dictionary.isEmpty }
+        return false
+    }
+
+    /// Official rjpath functions used inside filter expressions.
+    private func applyFilterFunction(name: String, arguments: [Any]) -> Any? {
+        switch name {
+        case "length":
+            guard let value = arguments.first else { return 0 }
+            // Kotlin String.length counts UTF-16 code units, not graphemes.
+            if let text = value as? String { return Double(text.utf16.count) }
+            if let array = arrayValues(value) { return Double(array.count) }
+            if let dictionary = value as? [String: Any] { return Double(dictionary.count) }
+            return 0
+        case "count":
+            guard let value = arguments.first else { return 1 }
+            if value is String || value is NSNumber || value is Bool || value is NSNull {
+                return 1
+            }
+            if let array = arrayValues(value) { return Double(array.count) }
+            if let dictionary = value as? [String: Any] { return Double(dictionary.count) }
+            return 1
+        case "match":
+            guard arguments.count >= 2 else { return false }
+            return regexMatches(primitiveContent(arguments[0]), expression: primitiveContent(arguments[1]))
+        case "search":
+            guard arguments.count >= 2 else { return false }
+            return primitiveContent(arguments[0]).contains(primitiveContent(arguments[1]))
+        case "value":
+            return arguments.first ?? NSNull()
+        default:
+            return nil
+        }
+    }
+
+    private func rawRegexContains(_ text: String, pattern: String) -> Bool {
+        guard let regex = try? NSRegularExpression(pattern: pattern, options: []) else { return false }
+        let range = NSRange(location: 0, length: (text as NSString).length)
+        return regex.firstMatch(in: text, options: [], range: range) != nil
     }
 
     private func regexMatches(_ text: String, expression: String) -> Bool {
@@ -1131,18 +1850,7 @@ struct JSONRuleExtractor {
     }
 
     private func truthy(_ value: Any) -> Bool {
-        if value is NSNull { return false }
-        if let number = value as? NSNumber {
-            if String(cString: number.objCType) == "c" { return number.boolValue }
-            return number.doubleValue != 0
-        }
-        if let text = value as? String {
-            let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
-            return !trimmed.isEmpty && trimmed.lowercased() != "false" && trimmed != "0"
-        }
-        if let array = value as? [Any] { return !array.isEmpty }
-        if let dictionary = value as? [String: Any] { return !dictionary.isEmpty }
-        return true
+        filterTruthy(value)
     }
 
     // MARK: - Transforms
