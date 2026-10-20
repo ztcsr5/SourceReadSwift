@@ -226,9 +226,7 @@ struct JSONRuleExtractor {
         }
 
         if let direct = directGetDirective(in: rule) {
-            let stored = directiveValue(for: direct.key)
-            let transforms = splitTransforms(direct.trailing).transforms
-            return applyTransforms(transforms, to: stored)
+            return resolvedDirectGet(direct)
         }
 
         let directiveResult = applyDirectives(from: object, path: rule, variables: variables)
@@ -479,15 +477,54 @@ struct JSONRuleExtractor {
         let trimmed = rule.trimmingCharacters(in: .whitespacesAndNewlines)
         guard trimmed.lowercased().hasPrefix("@get:") else { return nil }
         let markerEnd = trimmed.index(trimmed.startIndex, offsetBy: 5)
-        guard markerEnd < trimmed.endIndex, trimmed[markerEnd] == "{" else { return nil }
-        guard let closing = RuleDirectiveParser.matchingBrace(in: trimmed, from: markerEnd) else { return nil }
-        let keyStart = trimmed.index(after: markerEnd)
-        let key = unquote(String(trimmed[keyStart..<closing]).trimmingCharacters(in: .whitespacesAndNewlines))
+        var after = markerEnd
+        while after < trimmed.endIndex, trimmed[after].isWhitespace {
+            after = trimmed.index(after: after)
+        }
+        let key: String
+        let trailingStart: String.Index
+        if after < trimmed.endIndex, trimmed[after] == "{" {
+            guard let closing = RuleDirectiveParser.matchingBrace(in: trimmed, from: after) else { return nil }
+            key = unquote(String(trimmed[trimmed.index(after: after)..<closing])
+                .trimmingCharacters(in: .whitespacesAndNewlines))
+            trailingStart = trimmed.index(after: closing)
+        } else {
+            var cursor = after
+            while cursor < trimmed.endIndex, isBareDirectiveKeyCharacter(trimmed[cursor]) {
+                cursor = trimmed.index(after: cursor)
+            }
+            key = unquote(String(trimmed[after..<cursor])
+                .trimmingCharacters(in: .whitespacesAndNewlines))
+            trailingStart = cursor
+        }
         guard !key.isEmpty else { return nil }
-        let trailing = String(trimmed[trimmed.index(after: closing)...])
+        let trailing = String(trimmed[trailingStart...])
             .trimmingCharacters(in: .whitespacesAndNewlines)
-        guard trailing.isEmpty || trailing.hasPrefix("##") else { return nil }
+        // `@js:`, `<js>` and `@text` style suffixes continue the rule;
+        // they are not literal text appended to the stored value.
+        if trailing.hasPrefix("@") || trailing.hasPrefix("<js>") { return nil }
         return (key, trailing)
+    }
+
+    /// Applies a leading `@get` directive.  An empty suffix returns the stored
+    /// value unchanged (preserving native arrays/objects), a `##` suffix runs
+    /// the regex transform, and any other suffix is literal text such as
+    /// `/book/1` or `?token=@get:{token}`.
+    private func resolvedDirectGet(_ direct: (key: String, trailing: String)) -> Any {
+        let stored = directiveValue(for: direct.key)
+        if direct.trailing.isEmpty {
+            return stored
+        }
+        if direct.trailing.hasPrefix("##") {
+            let transforms = splitTransforms(direct.trailing).transforms
+            return applyTransforms(transforms, to: stored)
+        }
+        let suffix = replaceGetDirectives(in: direct.trailing)
+        return stringify(stored) + suffix
+    }
+
+    private func isBareDirectiveKeyCharacter(_ character: Character) -> Bool {
+        character.isLetter || character.isNumber || character == "_" || character == "-" || character == "$"
     }
 
     private func directGetKey(from rule: String) -> String? {
@@ -517,6 +554,13 @@ struct JSONRuleExtractor {
             _ = executionContext.put(storedValue, for: put.key)
         }
         var cleaned = removePutDirectives(from: path)
+        let afterPuts = cleaned.trimmingCharacters(in: .whitespacesAndNewlines)
+        // A same-rule `@put:{k:...}@get:{k}` is a value template.  Without
+        // this branch the substituted value would be re-parsed as a JSON path.
+        if afterPuts.lowercased().hasPrefix("@get:"),
+           let direct = directGetDirective(in: afterPuts) {
+            return .value(resolvedDirectGet(direct))
+        }
         cleaned = replaceGetDirectives(in: cleaned)
         return .path(cleaned)
     }

@@ -637,4 +637,54 @@ final class JSONRuleExtractorTests: XCTestCase {
         XCTAssertEqual(extractor.value(from: object, path: "$.data.Name") as? String, "upper")
         XCTAssertNil(extractor.value(from: object, path: "$.data.NAME"))
     }
+
+    func testSameRulePutAndGetReturnsStoredValue() throws {
+        let extractor = JSONRuleExtractor()
+        let object: [String: Any] = ["data": ["token": "abc123"]]
+
+        let value = extractor.value(
+            from: object,
+            path: "@put:{token:$.data.token}@get:{token}"
+        ) as? String
+
+        XCTAssertEqual(value, "abc123")
+    }
+
+    func testDirectGetSupportsLiteralSuffixTemplate() throws {
+        let extractor = JSONRuleExtractor()
+        let object: [String: Any] = [
+            "data": ["toc": "/toc/1", "token": "abc123"]
+        ]
+
+        _ = extractor.value(from: object, path: "@put:{toc:$.data.toc,token:$.data.token}$.data")
+        let value = extractor.value(
+            from: object,
+            path: "@get:{toc}?token=@get:{token}"
+        ) as? String
+
+        XCTAssertEqual(value, "/toc/1?token=abc123")
+    }
+
+    func testDirectGetAppliesRegexTransformToStoredValue() throws {
+        let extractor = JSONRuleExtractor()
+        let object: [String: Any] = ["data": ["url": "https://example.com"]]
+
+        _ = extractor.value(from: object, path: "@put:{url:$.data.url}$.data.url")
+        let value = extractor.value(
+            from: object,
+            path: #"@get:{url}##^https://##http://##"#
+        ) as? String
+
+        XCTAssertEqual(value, "http://example.com")
+    }
+
+    func testDirectGetSupportsBareKeyWithLiteralSuffix() throws {
+        let extractor = JSONRuleExtractor()
+        let object: [String: Any] = ["data": ["url": "https://example.com"]]
+
+        _ = extractor.value(from: object, path: "@put:{url:$.data.url}$.data.url")
+        let value = extractor.value(from: object, path: "@get:url/book/1") as? String
+
+        XCTAssertEqual(value, "https://example.com/book/1")
+    }
 }

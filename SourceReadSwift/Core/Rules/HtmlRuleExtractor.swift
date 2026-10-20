@@ -138,11 +138,16 @@ struct HtmlRuleExtractor {
     }
 
     private func valuesForSingleRule(from root: Element, rule: String, baseUrl: URL?) throws -> [String] {
-        let materializedRule = try applyDirectives(root: root, rule: rule, baseUrl: baseUrl)
+        let materialized = try applyDirectives(root: root, rule: rule, baseUrl: baseUrl)
+        let materializedRule = materialized.text
         if materializedRule.isEmpty {
             return []
         }
-        if isDirectGetRule(rule) {
+        // A rule such as `@put:{host:.host@text}@get:{host}/book/1` is a
+        // directive template, not a CSS selector.  `applyDirectives` resolves
+        // it to the final string and marks it, so the value must not be fed
+        // back into selector parsing.
+        if materialized.isDirectValue {
             return [materializedRule]
         }
 
@@ -271,7 +276,7 @@ struct HtmlRuleExtractor {
     }
 
     func select(from root: Element, rule: String, baseUrl: URL? = nil) throws -> [Element] {
-        let materializedRule = try applyDirectives(root: root, rule: rule, baseUrl: baseUrl)
+        let materializedRule = try applyDirectives(root: root, rule: rule, baseUrl: baseUrl).text
         if materializedRule.isEmpty {
             return [root]
         }
@@ -477,7 +482,15 @@ struct HtmlRuleExtractor {
         )
     }
 
-    private func applyDirectives(root: Element, rule: String, baseUrl: URL?) throws -> String {
+    /// Result of applying `@put` / `@get` to one rule.
+    private struct MaterializedDirectiveRule {
+        let text: String
+        /// True when the rule was a directive template (`@get:{key}` plus an
+        /// optional suffix) whose final text is a value, not a selector.
+        let isDirectValue: Bool
+    }
+
+    private func applyDirectives(root: Element, rule: String, baseUrl: URL?) throws -> MaterializedDirectiveRule {
         var output = rule
         let putDirectives = extractPutDirectives(from: output)
         for directive in putDirectives {
@@ -486,26 +499,69 @@ struct HtmlRuleExtractor {
             executionContext.put(value, for: directive.key)
         }
         output = removePutDirectives(from: output)
-        output = replaceGetDirectives(in: output)
-        if output.lowercased().hasPrefix("@get:") {
-            let key = String(output.dropFirst(5))
-                .components(separatedBy: CharacterSet(charactersIn: "@#"))
-                .first?
-                .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-            return storedDirectiveValue(for: key)
+        let afterPuts = output.trimmingCharacters(in: .whitespacesAndNewlines)
+        // A leading `@get` makes the whole rule a value template.  Legado
+        // allows literal suffixes (`@get:{host}/book/1`) and regex transforms
+        // (`@get:{url}##pattern##replacement`) after the directive.
+        if afterPuts.lowercased().hasPrefix("@get:"),
+           let resolved = resolveLeadingGetDirective(in: afterPuts) {
+            return MaterializedDirectiveRule(text: resolved, isDirectValue: true)
         }
-        return output.trimmingCharacters(in: .whitespacesAndNewlines)
+        output = replaceGetDirectives(in: output)
+        return MaterializedDirectiveRule(
+            text: output.trimmingCharacters(in: .whitespacesAndNewlines),
+            isDirectValue: false
+        )
     }
 
-    private func isDirectGetRule(_ rule: String) -> Bool {
-        let trimmed = rule.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard trimmed.lowercased().hasPrefix("@get:") else { return false }
-        return !trimmed.contains("@text")
-            && !trimmed.contains("@href")
-            && !trimmed.contains("@src")
-            && !trimmed.contains("@html")
-            && !trimmed.contains("@ownText")
-            && !trimmed.contains("##")
+    /// Resolves `@get:{key}` / `@get:key` when it starts a rule.  The suffix
+    /// is either a `##` transform chain or literal text (URL suffix/template);
+    /// both apply to the stored value instead of becoming a CSS selector.
+    private func resolveLeadingGetDirective(in rule: String) -> String? {
+        let markerEnd = rule.index(rule.startIndex, offsetBy: 5)
+        var after = markerEnd
+        while after < rule.endIndex, rule[after].isWhitespace {
+            after = rule.index(after: after)
+        }
+        let key: String
+        let remainder: String
+        if after < rule.endIndex, rule[after] == "{" {
+            guard let closing = RuleDirectiveParser.matchingBrace(in: rule, from: after) else {
+                return nil
+            }
+            key = RuleDirectiveParser.unquote(
+                String(rule[rule.index(after: after)..<closing])
+                    .trimmingCharacters(in: .whitespacesAndNewlines)
+            )
+            remainder = String(rule[rule.index(after: closing)...])
+        } else {
+            var cursor = after
+            while cursor < rule.endIndex, isBareDirectiveKeyCharacter(rule[cursor]) {
+                cursor = rule.index(after: cursor)
+            }
+            key = RuleDirectiveParser.unquote(
+                String(rule[after..<cursor]).trimmingCharacters(in: .whitespacesAndNewlines)
+            )
+            remainder = String(rule[cursor...])
+        }
+        guard !key.isEmpty else { return nil }
+        let stored = storedDirectiveValue(for: key)
+        let trailing = remainder.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trailing.isEmpty { return stored }
+        if trailing.hasPrefix("##") {
+            let parts = trailing.components(separatedBy: "##")
+            return applyRegexTransforms(parts.dropFirst(), to: stored)
+        }
+        // `@js:`, `<js>`, `@text`, `@href`, ... are rule continuations,
+        // not literal suffixes; let the normal rule pipeline handle them.
+        if trailing.hasPrefix("@") || trailing.hasPrefix("<js>") {
+            return nil
+        }
+        return stored + replaceGetDirectives(in: remainder)
+    }
+
+    private func isBareDirectiveKeyCharacter(_ character: Character) -> Bool {
+        character.isLetter || character.isNumber || character == "_" || character == "-" || character == "$"
     }
 
     private func extractPutDirectives(from rule: String) -> [(key: String, valueRule: String)] {

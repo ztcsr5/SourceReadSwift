@@ -348,4 +348,74 @@ final class HtmlRuleExtractorTests: XCTestCase {
 
         XCTAssertEqual(value, "第一卷 异界 第1章 降临")
     }
+
+    func testSameRulePutAndGetReturnsDirectiveValue() throws {
+        let document = try SwiftSoup.parse("""
+        <html><body><span class="host">https://example.com</span></body></html>
+        """)
+        let extractor = HtmlRuleExtractor()
+
+        let value = try extractor.value(
+            from: document,
+            rule: "@put:{host:.host@text}@get:{host}",
+            baseUrl: URL(string: "https://example.com/search")!
+        )
+
+        XCTAssertEqual(value, "https://example.com")
+    }
+
+    func testSameRulePutAndGetWithLiteralSuffix() throws {
+        let document = try SwiftSoup.parse("""
+        <html><body><span class="host">https://example.com</span></body></html>
+        """)
+        let extractor = HtmlRuleExtractor()
+
+        let value = try extractor.value(
+            from: document,
+            rule: "@put:{host:.host@text}@get:{host}/book/1",
+            baseUrl: URL(string: "https://example.com/search")!
+        )
+
+        XCTAssertEqual(value, "https://example.com/book/1")
+    }
+
+    func testDirectGetAppliesRegexTransformToStoredValue() throws {
+        let document = try SwiftSoup.parse("""
+        <html><body><span class="host">https://example.com</span></body></html>
+        """)
+        let extractor = HtmlRuleExtractor()
+
+        _ = try extractor.value(
+            from: document,
+            rule: "@put:{host:.host@text}.host@text",
+            baseUrl: URL(string: "https://example.com/search")!
+        )
+        let value = try extractor.value(
+            from: document,
+            rule: #"@get:{host}##^https://##http://##"#,
+            baseUrl: URL(string: "https://example.com/search")!
+        )
+
+        XCTAssertEqual(value, "http://example.com")
+    }
+
+    func testDirectGetSupportsBareKeyWithLiteralSuffix() throws {
+        let document = try SwiftSoup.parse("""
+        <html><body><span class="host">https://example.com</span></body></html>
+        """)
+        let extractor = HtmlRuleExtractor()
+
+        _ = try extractor.value(
+            from: document,
+            rule: "@put:{host:.host@text}.host@text",
+            baseUrl: URL(string: "https://example.com/search")!
+        )
+        let value = try extractor.value(
+            from: document,
+            rule: "@get:host/book/1",
+            baseUrl: URL(string: "https://example.com/search")!
+        )
+
+        XCTAssertEqual(value, "https://example.com/book/1")
+    }
 }
