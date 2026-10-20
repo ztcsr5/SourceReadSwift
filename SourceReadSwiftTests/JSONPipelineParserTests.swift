@@ -304,8 +304,8 @@ final class JSONPipelineParserTests: XCTestCase {
         guard case .success(let page) = result else {
             return XCTFail("expected success, got \(result)")
         }
-        XCTAssertEqual(page.chapters.map(\.title), ["初始化章"])
-        XCTAssertEqual(page.chapters.first?.url, "https://api.example.com/c/init-1")
+        XCTAssertEqual(page.map(\.title), ["初始化章"])
+        XCTAssertEqual(page.first?.url, "https://api.example.com/c/init-1")
     }
 
     func testParseJSONContentDecodesStringifiedInitContainer() throws {
@@ -397,7 +397,74 @@ final class JSONPipelineParserTests: XCTestCase {
         guard case .success(let page) = result else {
             return XCTFail("expected success, got \(result)")
         }
-        XCTAssertEqual(page.chapters.map(\.title), ["原始章"])
-        XCTAssertEqual(page.chapters.first?.url, "https://api.example.com/c/raw-1")
+        XCTAssertEqual(page.map(\.title), ["原始章"])
+        XCTAssertEqual(page.first?.url, "https://api.example.com/c/raw-1")
+    }
+
+    func testParseJSONBookDetailRunsJSInitAgainstNonJSONBody() throws {
+        let source = BookSource(
+            bookSourceName: "Detail Raw Init",
+            bookSourceUrl: "https://api.example.com",
+            ruleBookInfo: SourceRule(fields: [
+                "init": #"@js:JSON.stringify({data:{name:result.split('|')[0],toc:result.split('|')[1],intro:'详情简介'}})"#,
+                "name": "$.data.name",
+                "tocUrl": "$.data.toc",
+                "intro": "$.data.intro"
+            ])
+        )
+        let book = SearchBook(
+            name: "旧名",
+            author: nil,
+            coverUrl: nil,
+            bookUrl: "https://api.example.com/book/1",
+            sourceName: source.bookSourceName,
+            sourceUrl: source.bookSourceUrl
+        )
+        let response = SourceResponse(
+            url: URL(string: "https://api.example.com/book/1")!,
+            statusCode: 200,
+            headers: [:],
+            body: "原始详情|/book/1/toc",
+            data: Data()
+        )
+
+        let result = BookDetailParser().parse(source: source, book: book, response: response)
+        guard case .success(let detail) = result else {
+            return XCTFail("expected success, got \(result)")
+        }
+        XCTAssertEqual(detail.name, "原始详情")
+        XCTAssertEqual(detail.tocUrl, "https://api.example.com/book/1/toc")
+        XCTAssertEqual(detail.intro, "详情简介")
+    }
+
+    func testParseJSONContentRunsJSInitAgainstNonJSONBody() throws {
+        let source = BookSource(
+            bookSourceName: "Content Raw Init",
+            bookSourceUrl: "https://api.example.com",
+            ruleContent: SourceRule(fields: [
+                "init": #"@js:JSON.stringify({data:{body:result.split('|')[0]}})"#,
+                "content": "$.data.body"
+            ])
+        )
+        let chapter = BookChapter(
+            title: "第一章",
+            url: "https://api.example.com/c/raw-1",
+            bookUrl: "https://api.example.com/book/1",
+            index: 0,
+            isVip: false
+        )
+        let response = SourceResponse(
+            url: URL(string: chapter.url)!,
+            statusCode: 200,
+            headers: [:],
+            body: "原始正文|ignored",
+            data: Data()
+        )
+
+        let result = ContentParser().parse(source: source, chapter: chapter, response: response)
+        guard case .success(let content) = result else {
+            return XCTFail("expected success, got \(result)")
+        }
+        XCTAssertEqual(content.paragraphs, ["原始正文"])
     }
 }

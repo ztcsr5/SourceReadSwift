@@ -229,6 +229,81 @@ final class SourceEngineFixturePipelineTests: XCTestCase {
         XCTAssertTrue(events.contains { $0.stage == "content.load.response" && $0.details["status"] == "200" })
     }
 
+    /// Regression for the full Legado JSON-init chain: each stage receives an
+    /// opaque (non-JSON) body, a JavaScript `init` synthesizes the JSON
+    /// container, and state written by the search URL script (login token)
+    /// must survive into detail/TOC/content and their request headers.
+    func testOpaqueJSONInitChainCarriesLoginStateAcrossAllStages() async throws {
+        let source = BookSource(
+            bookSourceName: "Fixture JSON Init Chain",
+            bookSourceUrl: "https://fixture.example/chain",
+            searchUrl: #"@js:java.put('source.login.token','chain-token'); return 'https://fixture.example/chain/search?q=' + key;"#,
+            ruleSearch: SourceRule(fields: [
+                "init": #"@js:JSON.stringify({payload:{items:[{title:'Chain Reader',url:'/chain/book/1'}]}})"#,
+                "bookList": "$.payload.items",
+                "name": "$.title",
+                "bookUrl": "$.url"
+            ]),
+            ruleBookInfo: SourceRule(fields: [
+                "init": #"@js:JSON.stringify({payload:{name:'Chain Reader',toc:'/chain/toc/1',intro:source.getLoginInfoMap().get('token')}})"#,
+                "name": "$.payload.name",
+                "tocUrl": "$.payload.toc",
+                "intro": "$.payload.intro"
+            ]),
+            ruleToc: SourceRule(fields: [
+                "init": #"@js:var second=String(baseUrl).indexOf('/toc/2')>=0;return JSON.stringify(second?{payload:{chapters:[{title:'二',url:'/chain/content/2'}]}}:{payload:{chapters:[{title:'一',url:'/chain/content/1'}],next:'/chain/toc/2'}});"#,
+                "chapterList": "$.payload.chapters",
+                "chapterName": "$.title",
+                "chapterUrl": "$.url",
+                "nextTocUrl": "$.payload.next"
+            ]),
+            ruleContent: SourceRule(fields: [
+                "init": #"@js:var second=String(baseUrl).indexOf('/content/2')>=0;return JSON.stringify(second?{payload:{content:'页二'}}:{payload:{content:'页一',next:'/chain/content/2'}});"#,
+                "content": "$.payload.content",
+                "nextContentUrl": "$.payload.next"
+            ]),
+            header: #"{"X-Chain-Token":"{{source.login.token}}"}"#
+        )
+        let searchURL = "https://fixture.example/chain/search?q=swift"
+        let bookURL = "https://fixture.example/chain/book/1"
+        let toc1URL = "https://fixture.example/chain/toc/1"
+        let toc2URL = "https://fixture.example/chain/toc/2"
+        let content1URL = "https://fixture.example/chain/content/1"
+        let content2URL = "https://fixture.example/chain/content/2"
+        let network = FixtureNetworkClient(responses: [
+            searchURL: .text("opaque-search"),
+            bookURL: .text("opaque-detail"),
+            toc1URL: .text("opaque-toc-1"),
+            toc2URL: .text("opaque-toc-2"),
+            content1URL: .text("opaque-content-1"),
+            content2URL: .text("opaque-content-2")
+        ])
+        let engine = LegadoSourceEngine(network: network)
+
+        let books = try await unwrap(engine.searchBooks(source: source, keyword: "swift", page: 1))
+        XCTAssertEqual(books.map(\.name), ["Chain Reader"])
+        XCTAssertEqual(books.first?.bookUrl, bookURL)
+
+        let detail = try await unwrap(engine.getBookDetail(source: source, book: try XCTUnwrap(books.first)))
+        XCTAssertEqual(detail.name, "Chain Reader")
+        XCTAssertEqual(detail.tocUrl, toc1URL)
+        XCTAssertEqual(detail.intro, "chain-token")
+
+        let chapters = try await unwrap(engine.getChapterList(source: source, book: detail))
+        XCTAssertEqual(chapters.map(\.title), ["一", "二"])
+        XCTAssertEqual(chapters.map(\.index), [0, 1])
+        XCTAssertEqual(chapters.map(\.url), [content1URL, content2URL])
+
+        let content = try await unwrap(engine.getContent(source: source, chapter: try XCTUnwrap(chapters.first)))
+        XCTAssertEqual(content.paragraphs, ["页一", "页二"])
+        XCTAssertNil(content.nextContentUrl)
+
+        XCTAssertEqual(network.requestedURLs, [searchURL, bookURL, toc1URL, toc2URL, content1URL, content2URL])
+        XCTAssertEqual(network.requests.count, 6)
+        for request in network.requests {
+            XCTAssertEqual(request.headers["X-Chain-Token"], "chain-token", "missing token for \(request.url.absoluteString)")
+        }
+    }
     private func loadFixture(named name: String) throws -> BookSource {
         let bundle = Bundle(for: Self.self)
         let url = try XCTUnwrap(

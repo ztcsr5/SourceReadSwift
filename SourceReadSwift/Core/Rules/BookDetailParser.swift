@@ -24,7 +24,15 @@ struct BookDetailParser {
             bodyWasDecoded: response.bodyWasDecoded,
             contentEncodings: response.contentEncodings
         )
-        if ResponseFormatDetector.prefersJSON(body: normalized, headers: response.headers) {
+        // Legado evaluates a JavaScript `init` before the field rules.  A JS
+        // init may synthesize a JSON container from a non-JSON body, so route
+        // those sources through the JSON pipeline first (the HTML parser still
+        // runs as a fallback when the script yields nothing usable).
+        let initRule = htmlExtractor.firstRule(source.ruleBookInfo, keys: ["init"])
+        let initIsJS = initRule.map {
+            LegadoRuleResolver().isJavaScriptRule($0) || $0.contains("<js>") || $0.contains("@js:")
+        } ?? false
+        if initIsJS || ResponseFormatDetector.prefersJSON(body: normalized, headers: response.headers) {
             let jsonResult = parseJSON(source: source, book: book, response: normalizedResponse)
             switch jsonResult {
             case .success:
@@ -152,9 +160,6 @@ struct BookDetailParser {
     }
 
     private func parseJSON(source: BookSource, book: SearchBook, response: SourceResponse) -> Result<BookDetail, SourceEngineError> {
-        guard let object = ResponseFormatDetector.jsonObject(from: response.body) else {
-            return .failure(.rule("JSON 解析失败"))
-        }
         let rule = source.ruleBookInfo
         let bookMap: [String: Any] = [
             "name": book.name,
@@ -177,15 +182,29 @@ struct BookDetailParser {
             "src": response.body,
             "html": response.body
         ]
+        let initRule = htmlExtractor.firstRule(rule, keys: ["init"])
+        let initIsJS = initRule.map {
+            LegadoRuleResolver().isJavaScriptRule($0) || $0.contains("<js>") || $0.contains("@js:")
+        } ?? false
         let rootObject: Any
-        if let initRule = htmlExtractor.firstRule(rule, keys: ["init"]),
-           let initialized = jsonExtractor.value(from: object, path: initRule, variables: variables) {
-            // JavaScript rules return strings.  When an `init` script builds a
-            // JSON container (`JSON.stringify(...)`), parse it so the field
-            // rules keep operating on an object instead of a string.
+        if let object = ResponseFormatDetector.jsonObject(from: response.body) {
+            if let initRule,
+               let initialized = jsonExtractor.value(from: object, path: initRule, variables: variables) {
+                // JavaScript rules return strings.  When an `init` script builds a
+                // JSON container (`JSON.stringify(...)`), parse it so the field
+                // rules keep operating on an object instead of a string.
+                rootObject = ResponseFormatDetector.jsonContainer(from: initialized)
+            } else {
+                rootObject = object
+            }
+        } else if let initRule, initIsJS,
+                  let initialized = jsonExtractor.value(from: response.body, path: initRule, variables: variables) {
+            // Legado runs `init` before the field rules.  A JavaScript init can
+            // turn a non-JSON payload (opaque text, wrapped fragments, HTML
+            // shell) into a JSON container, so do not reject the body first.
             rootObject = ResponseFormatDetector.jsonContainer(from: initialized)
         } else {
-            rootObject = object
+            return .failure(.rule("JSON 解析失败"))
         }
 
         let dict: [String: Any]
