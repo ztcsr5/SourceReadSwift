@@ -22,6 +22,14 @@ struct SourceImportReport: Equatable, Sendable {
     }
 }
 
+/// Outcome of a smart import that may have gone through the network.
+struct SourceSmartImportResult: Sendable {
+    let input: SourceImportInput
+    let report: SourceImportReport
+    /// Final URL after redirects, or nil when the input was pasted JSON.
+    let downloadedFrom: URL?
+}
+
 @MainActor
 final class SourceStore: ObservableObject {
     @Published private(set) var sources: [BookSource] = []
@@ -415,6 +423,51 @@ final class SourceStore: ObservableObject {
             throw SourceImportError.unknownInput
         }
         return parsed
+    }
+
+    /// Smart import that also handles HTTP(S) URLs and reader import links.
+    ///
+    /// The download step is injected so tests can exercise status handling,
+    /// size limits and challenge detection without hitting the network. The
+    /// same entry point serves the paste field, the URL field and catalog rows,
+    /// so all three paths share one validation chain.
+    @discardableResult
+    func importSmartInputAsync(
+        _ input: String,
+        downloader: any SourceImportDownloading = SourceImportDownloader()
+    ) async throws -> SourceSmartImportResult {
+        let parsed = SourceImportLinkParser.parse(input)
+        switch parsed.kind {
+        case .empty:
+            throw SourceImportError.empty
+        case .json:
+            let report = try await importJSONAsync(parsed.value)
+            return SourceSmartImportResult(input: parsed, report: report, downloadedFrom: nil)
+        case .url:
+            let payload: SourceImportPayload
+            switch await downloader.download(from: parsed.value) {
+            case .success(let value):
+                payload = value
+            case .failure(let error):
+                throw error
+            }
+            let report: SourceImportReport
+            do {
+                report = try await importJSONDataAsync(payload.data)
+            } catch {
+                // JSONDecoder only accepts UTF-8. GBK/Big5 exports arrive as
+                // raw legacy bytes with a decoded text field alongside them, so
+                // retry from the charset-decoded string before giving up.
+                let textData = Data(payload.text.utf8)
+                guard !payload.text.isEmpty, textData != payload.data else { throw error }
+                report = try await importJSONDataAsync(textData)
+            }
+            return SourceSmartImportResult(input: parsed, report: report, downloadedFrom: payload.url)
+        case .unsupportedScheme:
+            throw SourceImportError.unsupportedScheme
+        case .unknown:
+            throw SourceImportError.unknownInput
+        }
     }
 
     @discardableResult
@@ -1116,25 +1169,43 @@ private struct WrappedSourceImportItems: Decodable {
     }
 }
 
-enum SourceImportError: LocalizedError {
+enum SourceImportError: Error, LocalizedError, Equatable, Sendable {
     case empty
     case urlImportRequired(String)
     case unsupportedScheme
     case unknownInput
     case challengePage
+    case invalidURL(String)
+    case httpStatus(Int)
+    case responseTooLarge(Int)
+    case emptyResponse
+    case notSourceJSON
+    case network(String)
 
     var errorDescription: String? {
         switch self {
         case .empty:
-            return "No valid book source was found."
+            return "没有找到有效的书源。"
         case .urlImportRequired(let url):
-            return "URL import requires downloading first: \(url)"
+            return "需要先下载该 URL：\(url)"
         case .unsupportedScheme:
-            return "Import link was recognized, but no src/url parameter was found."
+            return "识别到导入链接，但没有找到 src/url 参数。"
         case .unknownInput:
-            return "Input is not recognized as JSON, an HTTP URL, or a reader import link."
+            return "输入无法识别：既不是 JSON、HTTP URL，也不是阅读导入链接。"
         case .challengePage:
-            return "The downloaded content is a Cloudflare or JavaScript challenge page, not source JSON."
+            return "下载到的是 Cloudflare/JavaScript 验证页，不是书源 JSON。请在浏览器完成验证后复制 JSON 内容导入。"
+        case .invalidURL(let raw):
+            return "URL 无效：\(raw)"
+        case .httpStatus(let code):
+            return "服务器返回 HTTP \(code)，没有返回书源内容。"
+        case .responseTooLarge(let bytes):
+            return "响应过大（\(bytes) 字节），已拒绝导入。"
+        case .emptyResponse:
+            return "服务器返回空内容。"
+        case .notSourceJSON:
+            return "下载内容是网页而不是书源 JSON，可能是错误页、登录页或需要验证。"
+        case .network(let message):
+            return "下载失败：\(message)"
         }
     }
 }

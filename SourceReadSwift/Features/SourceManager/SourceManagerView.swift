@@ -1766,30 +1766,7 @@ private struct BatchCheckCoordinatorObserver<Content: View>: View {
 
     private func importSources() {
         Task { @MainActor in
-            do {
-                let parsed = SourceImportLinkParser.parse(importText)
-                let report: SourceImportReport
-                switch parsed.kind {
-                case .empty:
-                    throw SourceImportError.empty
-                case .json:
-                    importMessage = "正在导入书源..."
-                    report = try await appState.sourceStore.importJSONAsync(parsed.value)
-                case .url:
-                    throw SourceImportError.urlImportRequired(parsed.value)
-                case .unsupportedScheme:
-                    throw SourceImportError.unsupportedScheme
-                case .unknown:
-                    throw SourceImportError.unknownInput
-                }
-                importText = ""
-                importError = nil
-                importMessage = report.userMessage
-                showImportSheet = false
-            } catch {
-                importMessage = nil
-                importError = error.localizedDescription
-            }
+            await performImport(text: importText, catalogURL: nil)
         }
     }
 
@@ -1916,13 +1893,7 @@ private struct BatchCheckCoordinatorObserver<Content: View>: View {
     }
 
     private func importSourcesSmart() async {
-        let parsed = SourceImportLinkParser.parse(importText)
-        if parsed.kind == .url {
-            importURL = parsed.value
-            await importFromURL()
-            return
-        }
-        importSources()
+        await performImport(text: importText, catalogURL: nil)
     }
 
     private func importCatalog(_ catalog: SourceCatalog) async {
@@ -1937,32 +1908,36 @@ private struct BatchCheckCoordinatorObserver<Content: View>: View {
     }
 
     private func importFromURL(catalogURL: String? = nil) async {
+        await performImport(text: importURL, catalogURL: catalogURL)
+    }
+
+    /// Single import path for pasted JSON, reader import links and HTTP URLs.
+    ///
+    /// Downloading, HTTP status validation, size limits, challenge detection and
+    /// charset decoding live in `SourceImportDownloader`. The paste field, the
+    /// URL field and catalog rows all funnel through here so they cannot drift.
+    private func performImport(text: String, catalogURL: String?) async {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else {
+            importMessage = nil
+            importError = "请输入书源 JSON、URL 或导入链接。"
+            return
+        }
+        importMessage = "正在识别并导入书源..."
+        importError = nil
         do {
-            let text = importURL.trimmingCharacters(in: .whitespacesAndNewlines)
-            guard let url = URL(string: normalizeImportURL(text)) else {
-                importError = "URL 无效"
-                return
-            }
-            var request = URLRequest(url: url)
-            request.setValue("Mozilla/5.0 SourceReadSwift", forHTTPHeaderField: "User-Agent")
-            request.setValue("application/json,text/plain,*/*", forHTTPHeaderField: "Accept")
-            let (data, _) = try await URLSession.shared.data(for: request)
-            let report: SourceImportReport
-            if XbsBookSourceAdapter.isXbsData(data) {
-                report = try await appState.sourceStore.importJSONDataAsync(data)
-            } else {
-                let decoded = ResponseTextDecoder().decode(data: data, headers: [:])
-                if looksLikeCloudflareChallenge(decoded) {
-                    throw SourceImportError.challengePage
-                }
-                report = try await appState.sourceStore.importJSONDataAsync(data)
-            }
+            let result = try await appState.sourceStore.importSmartInputAsync(trimmed)
             if let catalogURL {
-                appState.sourceStore.recordCatalogImport(url: catalogURL, report: report)
+                appState.sourceStore.recordCatalogImport(url: catalogURL, report: result.report)
             }
-            importURL = ""
-            importError = nil
-            importMessage = "URL \(report.userMessage)"
+            if result.input.kind == .url {
+                importURL = ""
+            } else {
+                importText = ""
+            }
+            importMessage = result.input.kind == .url
+                ? "URL \(result.report.userMessage)"
+                : result.report.userMessage
             showImportSheet = false
         } catch {
             importMessage = nil
@@ -1999,20 +1974,6 @@ private struct BatchCheckCoordinatorObserver<Content: View>: View {
         return (books, catalogs, rss, books + catalogs + rss)
     }
 
-    private func normalizeImportURL(_ value: String) -> String {
-        if value.contains("github.com"), value.contains("/blob/") {
-            return value
-                .replacingOccurrences(of: "https://github.com/", with: "https://raw.githubusercontent.com/")
-                .replacingOccurrences(of: "/blob/", with: "/")
-        }
-        return value
-    }
-
-    private func looksLikeCloudflareChallenge(_ text: String) -> Bool {
-        let lower = text.lowercased()
-        return lower.contains("cloudflare")
-            && (lower.contains("challenge-platform") || lower.contains("cf-chl") || lower.contains("checking your browser"))
-    }
 
     private func prettyJSON<T: Encodable>(_ value: T) -> String {
         let encoder = JSONEncoder()
