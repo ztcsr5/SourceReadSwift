@@ -1,3 +1,4 @@
+import Foundation
 import SwiftUI
 
 struct RootTabView: View {
@@ -58,13 +59,32 @@ struct RootTabView: View {
         .sheet(isPresented: $showFullAudioPlayer) {
             AudioBookPlayerView()
         }
-        .sheet(item: $verificationCoordinator.request) { request in
+        .sheet(item: verificationRequestBinding) { request in
             VerificationCodeSheet(
                 request: request,
                 onSubmit: { verificationCoordinator.submit(id: request.id, code: $0) },
                 onCancel: { verificationCoordinator.cancel(id: request.id) }
             )
         }
+    }
+
+    /// Unit tests drive VerificationCodeCoordinator directly.  Presenting the
+    /// real sheet in the test host focuses a TextField, and the simulator
+    /// keyboard can block the main actor long enough to starve the test's
+    /// timeout assertions.  Keep the coordinator contract intact and suppress
+    /// only the UI presentation under XCTest.
+    private var verificationRequestBinding: Binding<VerificationCodeRequest?> {
+        Binding(
+            get: {
+                isRunningUnitTests ? nil : verificationCoordinator.request
+            },
+            set: { verificationCoordinator.request = $0 }
+        )
+    }
+
+    private var isRunningUnitTests: Bool {
+        ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil
+            || NSClassFromString("XCTestCase") != nil
     }
 
     private var miniAudioPlayerBar: some View {

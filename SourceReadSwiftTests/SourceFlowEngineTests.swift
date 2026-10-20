@@ -350,6 +350,103 @@ final class SourceFlowEngineTests: XCTestCase {
         )
     }
 
+    // MARK: - DynamicURLResolver Legado Chain Regression
+    func testDynamicURLResolverMultilineJSONPathChainWithRawBody() {
+        let source = BookSource(bookSourceName: "原始响应测试", bookSourceUrl: "https://api.example.com")
+        let context = RuleExecutionContext()
+        let body = #"{"data":{"book":{"id":98765,"name":"测试书"}}}"#
+        let rule = """
+        $.data.book.id
+        @js:
+        "https://api.example.com/toc/" + result + "/chapters"
+        """
+        let resolved = DynamicURLResolver.resolve(
+            rule,
+            baseUrl: "https://api.example.com",
+            source: source,
+            variables: ["result": body, "body": body],
+            context: context
+        )
+        XCTAssertEqual(resolved, "https://api.example.com/toc/98765/chapters")
+    }
+
+    func testDynamicURLResolverInlineJSAfterLiteralURL() {
+        let source = BookSource(bookSourceName: "内联脚本测试", bookSourceUrl: "https://api.example.com")
+        let context = RuleExecutionContext()
+        let rule = "https://api.example.com/books@js:result + '/chapters?page=' + (2 + 1)"
+        let resolved = DynamicURLResolver.resolve(
+            rule,
+            baseUrl: "https://api.example.com",
+            source: source,
+            context: context
+        )
+        XCTAssertEqual(resolved, "https://api.example.com/books/chapters?page=3")
+    }
+
+    func testDynamicURLResolverInlineJSRegexTransform() {
+        let source = BookSource(bookSourceName: "正则转换测试", bookSourceUrl: "https://cdn.example.com")
+        let context = RuleExecutionContext()
+        let body = #"{"data":{"url":"https://cdn.example.com/book/123?from=list"}}"#
+        let rule = #"$.data.url@js:result##book/\d+##toc/456"#
+        let resolved = DynamicURLResolver.resolve(
+            rule,
+            baseUrl: "https://cdn.example.com",
+            source: source,
+            variables: ["result": body, "body": body],
+            context: context
+        )
+        XCTAssertEqual(resolved, "https://cdn.example.com/toc/456?from=list")
+    }
+
+    func testDynamicURLResolverInlineJSRegexReplaceFirstUsesMatchedTextOnly() {
+        let source = BookSource(bookSourceName: "首匹配测试", bookSourceUrl: "https://cdn.example.com")
+        let context = RuleExecutionContext()
+        let body = #"{"data":{"url":"https://cdn.example.com/prefix-123-suffix-456-end"}}"#
+        let rule = #"$.data.url@js:result##\d+##X##first"#
+        let resolved = DynamicURLResolver.resolve(
+            rule,
+            baseUrl: "https://cdn.example.com",
+            source: source,
+            variables: ["result": body, "body": body],
+            context: context
+        )
+        // Legado's fourth `##` field replaces only the first match and returns the
+        // replacement of that matched text (not the surrounding string).
+        XCTAssertEqual(resolved, "https://cdn.example.com/X")
+    }
+
+    func testRuleTransformParserReplaceFirstNoMatchReturnsEmptyString() {
+        let transform = RuleRegexTransform(pattern: "zzz", replacement: "X", replaceFirst: true)
+        XCTAssertEqual(RuleTransformParser.apply(transform, to: "abc-123"), "")
+    }
+
+    func testDynamicURLResolverFullJSWithStructuredResult() {
+        let source = BookSource(bookSourceName: "完整脚本测试", bookSourceUrl: "https://api.example.com")
+        let context = RuleExecutionContext()
+        let rule = "@js:'https://api.example.com/search?q=' + result.keyword + '&page=' + (result.page + 1)"
+        let resolved = DynamicURLResolver.resolve(
+            rule,
+            baseUrl: "https://api.example.com",
+            source: source,
+            variables: ["result": ["keyword": "swift", "page": 2]],
+            context: context
+        )
+        XCTAssertEqual(resolved, "https://api.example.com/search?q=swift&page=3")
+    }
+
+    func testDynamicURLResolverInterpolatesNestedJSONPath() {
+        let source = BookSource(bookSourceName: "嵌套模板测试", bookSourceUrl: "https://api.example.com")
+        let context = RuleExecutionContext()
+        let body = #"{"data":{"id":321,"title":"模板"}}"#
+        let resolved = DynamicURLResolver.resolve(
+            "https://api.example.com/books/{{$.data.id}}/chapters",
+            baseUrl: "https://api.example.com",
+            source: source,
+            variables: ["result": body, "body": body],
+            context: context
+        )
+        XCTAssertEqual(resolved, "https://api.example.com/books/321/chapters")
+    }
     private struct CustomUnbridgeableStruct {
         let title: String
         let count: Int

@@ -462,9 +462,11 @@ final class JSONRuleExtractorTests: XCTestCase {
             ]
         ]
 
+        // A filter that yields exactly one projection collapses to that scalar,
+        // matching AnalyzeByJSonPath.getString's jayway-read semantics.
         XCTAssertEqual(
-            extractor.value(from: object, path: "$.list[?(@.n>=10)].name") as? [String],
-            ["string-ten"]
+            extractor.value(from: object, path: "$.list[?(@.n>=10)].name") as? String,
+            "string-ten"
         )
         XCTAssertEqual(
             extractor.value(from: object, path: "$.list[?(@.n!=1)].name") as? [String],
@@ -515,8 +517,8 @@ final class JSONRuleExtractorTests: XCTestCase {
             ["Alpha", "Beta", "Gamma"]
         )
         XCTAssertEqual(
-            extractor.value(from: object, path: "$.list[?(@.tags anyof ['x'])].name") as? [String],
-            ["Alpha"]
+            extractor.value(from: object, path: "$.list[?(@.tags anyof ['x'])].name") as? String,
+            "Alpha"
         )
         XCTAssertEqual(
             extractor.value(from: object, path: "$.list[?(@.tags noneof ['x'])].name") as? [String],
@@ -527,12 +529,12 @@ final class JSONRuleExtractorTests: XCTestCase {
             ["Alpha", "Beta", "Gamma"]
         )
         XCTAssertEqual(
-            extractor.value(from: object, path: "$.list[?(@.tags size 2)].name") as? [String],
-            ["Alpha"]
+            extractor.value(from: object, path: "$.list[?(@.tags size 2)].name") as? String,
+            "Alpha"
         )
         XCTAssertEqual(
-            extractor.value(from: object, path: "$.list[?(@.tags empty true)].name") as? [String],
-            ["Gamma"]
+            extractor.value(from: object, path: "$.list[?(@.tags empty true)].name") as? String,
+            "Gamma"
         )
         XCTAssertEqual(
             extractor.value(from: object, path: "$.list[?(@.type exists true)].name") as? [String],
