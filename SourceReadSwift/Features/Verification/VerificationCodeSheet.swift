@@ -47,7 +47,7 @@ struct VerificationCodeSheet: View {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("取消", action: onCancel)
                 }
-                ToolbarItem(placement: .topBarLeading) {
+                ToolbarItem(placement: .navigationBarTrailing) {
                     Button {
                         reloadToken += 1
                     } label: {
