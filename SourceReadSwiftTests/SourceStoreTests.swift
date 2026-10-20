@@ -775,4 +775,35 @@ final class SourceStoreTests: XCTestCase {
         XCTAssertEqual(store.catalogs.count, 0)
         try? FileManager.default.removeItem(at: root)
     }
+
+    // MARK: - Legacy encoding normalization
+
+    func testNormalizeDataStaticDecodesGBKToUTF8() throws {
+        let json = #"[{"bookSourceName":"中文书源","bookSourceUrl":"https://gbk.example","searchUrl":"https://gbk.example/s?q={{keyword}}"}]"#
+        let gbkData = try XCTUnwrap(LegadoCharset.encode(json, charset: "gbk"))
+        XCTAssertNil(String(data: gbkData, encoding: .utf8))
+
+        let normalized = try SourceStore.normalizeDataStatic(gbkData)
+        XCTAssertEqual(String(data: normalized, encoding: .utf8), json)
+    }
+
+    func testSanitizeTrailingCommasLeavesLegacyEncodedBytesUntouched() throws {
+        let json = #"[{"bookSourceName":"中文书源"}]"#
+        let gbkData = try XCTUnwrap(LegadoCharset.encode(json, charset: "gbk"))
+        XCTAssertEqual(SourceStore.sanitizeTrailingCommasData(gbkData), gbkData)
+    }
+
+    func testStoreImportsGBKDataDirectly() async throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        let store = SourceStore(persistence: SourcePersistence(fileManager: .default, rootURL: root))
+        let json = #"[{"bookSourceName":"中文书源","bookSourceUrl":"https://gbk.example","searchUrl":"https://gbk.example/s?q={{keyword}}"}]"#
+        let gbkData = try XCTUnwrap(LegadoCharset.encode(json, charset: "gbk"))
+
+        _ = try await store.importJSONDataAsync(gbkData)
+
+        XCTAssertEqual(store.sources.map(\.bookSourceName), ["中文书源"])
+        XCTAssertEqual(store.sources.map(\.bookSourceUrl), ["https://gbk.example"])
+        try? FileManager.default.removeItem(at: root)
+    }
 }

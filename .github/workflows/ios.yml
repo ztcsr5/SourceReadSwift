@@ -65,6 +65,7 @@ jobs:
             -scheme SourceReadSwift \
             -destination "id=$DEVICE_ID" \
             CODE_SIGNING_ALLOWED=NO \
+            -parallel-testing-enabled NO \
             test 2>&1 | tee xcodebuild-test.log
 
       - name: Summarize test failure

@@ -487,7 +487,7 @@ final class SourceStore: ObservableObject {
     /// source object. Keeping this in one place is what stops the sync and
     /// async paths from drifting apart.
     private nonisolated static func decodeImportItems(from data: Data) throws -> [AnySourceImportItem] {
-        let cleanData = stripUTF8BOMStatic(data)
+        let cleanData = Self.utf8NormalizedImportData(Self.stripUTF8BOMStatic(data))
         let decoder = JSONDecoder()
 
         // 1. Fast path: direct parsing first (avoids megabytes of string allocation).
@@ -873,14 +873,30 @@ final class SourceStore: ObservableObject {
         return data.dropFirst(3)
     }
 
+    /// Normalizes legacy-encoded import payloads to UTF-8 before the first
+    /// JSON decode attempt.
+    ///
+    /// `JSONDecoder` is not a strict UTF-8 gate on every Foundation build: it
+    /// can accept GBK bytes and discard the undecodable ones, which turns a
+    /// source name into an empty string and imports it as "未命名书源" before
+    /// the charset fallback ever runs. Checking validity up front keeps the
+    /// fast path allocation-free for UTF-8 exports and makes the legacy path
+    /// deterministic for both pasted data and downloaded files.
+    nonisolated static func utf8NormalizedImportData(_ data: Data) -> Data {
+        guard String(data: data, encoding: .utf8) == nil else { return data }
+        let text = ResponseTextDecoder().decode(data: data, headers: [:])
+        guard !text.isEmpty else { return data }
+        return Data(text.utf8)
+    }
+
     private func normalizeImportData(_ data: Data) throws -> Data {
         try Self.normalizeDataStatic(data)
     }
 
     nonisolated static func normalizeDataStatic(_ data: Data) throws -> Data {
-        let decodedText = String(data: data, encoding: .utf8)
-            ?? ResponseTextDecoder().decode(data: data, headers: [:])
-        guard !decodedText.isEmpty else { return data }
+        let normalizedData = Self.utf8NormalizedImportData(data)
+        guard let decodedText = String(data: normalizedData, encoding: .utf8),
+              !decodedText.isEmpty else { return data }
         var text = decodedText
         text = text.trimmingCharacters(in: .whitespacesAndNewlines)
         if let decoded = try? JSONDecoder().decode(String.self, from: Data(text.utf8)) {
@@ -897,6 +913,10 @@ final class SourceStore: ObservableObject {
     }
 
     nonisolated static func sanitizeTrailingCommasData(_ data: Data) -> Data {
+        // The scanner below only understands ASCII structure. Legacy CJK trail
+        // bytes can be 0x5C/0x5D/0x7D, so scanning before UTF-8 normalization
+        // can swallow a closing quote or a real bracket and corrupt the body.
+        guard String(data: data, encoding: .utf8) != nil else { return data }
         var bytes = [UInt8](data)
         var inString = false
         var escaped = false
