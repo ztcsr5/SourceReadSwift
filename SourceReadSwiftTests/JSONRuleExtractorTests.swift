@@ -602,5 +602,7 @@ final class JSONRuleExtractorTests: XCTestCase {
         XCTAssertEqual(extractor.string(from: item, rule: "@js:result.price*2"), "20")
         XCTAssertEqual(extractor.string(from: item, rule: "{{1+1}}"), "2")
         XCTAssertEqual(extractor.string(from: item, rule: "{{1.5}}"), "1.5")
+        XCTAssertEqual(extractor.string(from: item, rule: "{{$.price}}"), "10")
+        XCTAssertEqual(extractor.string(from: item, rule: "$.price"), "10")
     }
 }

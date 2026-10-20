@@ -41,7 +41,16 @@ struct DynamicURLResolver {
             .replacingOccurrences(of: "%7B%7B", with: "{{", options: .caseInsensitive)
             .replacingOccurrences(of: "%7D%7D", with: "}}", options: .caseInsensitive)
 
-        if trimmed.contains("\n") || trimmed.contains("\r") {
+        // Legado rules can span multiple lines when a template or JSONPath is
+        // followed by an `@js:` segment on the next line (for example
+        // `$.book_id\n@js:\n"https://.../"+result`).  Only collapse a plain
+        // multi-line URL; never truncate a rule that carries script or
+        // template semantics.
+        let carriesRuleSyntax = trimmed.contains("@js:")
+            || trimmed.contains("<js>")
+            || trimmed.contains("{{")
+            || trimmed.lowercased().contains("@get:")
+        if !carriesRuleSyntax, trimmed.contains("\n") || trimmed.contains("\r") {
             if let firstLine = trimmed.components(separatedBy: .newlines).first(where: { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }) {
                 trimmed = firstLine.trimmingCharacters(in: .whitespacesAndNewlines)
             }
@@ -60,8 +69,6 @@ struct DynamicURLResolver {
             trimmed = String(trimmed[jsRange.lowerBound...].dropFirst())
         } else if let jsRange = trimmed.range(of: "/<js>") {
             trimmed = String(trimmed[jsRange.lowerBound...].dropFirst())
-        } else if let jsRange = trimmed.range(of: "\n@js:") {
-            trimmed = String(trimmed[jsRange.lowerBound...].dropFirst()).trimmingCharacters(in: .whitespacesAndNewlines)
         }
 
         // 1. Resolve embedded {{ ... }} templates FIRST (even inside @js: blocks, like params={'id':{{$.id}}})
@@ -171,6 +178,70 @@ struct DynamicURLResolver {
                 }
             }
 
+            // A normal URL/template or JSONPath followed by an inline
+            // `@js:` chain (Legado `makeUpRule` semantics).  Evaluate the
+            // left side first, expose it as `result`, then run the script.
+            if let jsRange = trimmed.range(of: "@js:") {
+                let left = String(trimmed[..<jsRange.lowerBound])
+                    .trimmingCharacters(in: .whitespacesAndNewlines)
+                var script = String(trimmed[jsRange.upperBound...])
+                    .trimmingCharacters(in: .whitespacesAndNewlines)
+                var trailingParts: [String] = []
+                if let hashRange = script.range(of: "##") {
+                    trailingParts = Array(script[hashRange.lowerBound...]
+                        .components(separatedBy: "##")
+                        .dropFirst())
+                    script = String(script[..<hashRange.lowerBound])
+                        .trimmingCharacters(in: .whitespacesAndNewlines)
+                }
+
+                let runtime = context.jsRuntime(ajaxHandler: { urlText in
+                    SynchronousSourceLoader().load(urlText: urlText, source: source)
+                })
+                var jsVariables: [String: Any] = [
+                    "baseUrl": baseUrl,
+                    "source": source
+                ]
+                for (k, v) in variables {
+                    jsVariables[k] = v
+                }
+
+                var chainedResult: Any = variables["result"] ?? variables["body"] ?? ""
+                if !left.isEmpty {
+                    if left.hasPrefix("$") || left.lowercased().hasPrefix("@json:") {
+                        if let target = Self.jsonTarget(from: variables),
+                           let value = JSONRuleExtractor(executionContext: context)
+                            .value(from: target, path: left, variables: variables) {
+                            chainedResult = value
+                        } else {
+                            chainedResult = ""
+                        }
+                    } else {
+                        chainedResult = left
+                    }
+                }
+                jsVariables["result"] = chainedResult
+
+                guard case .success(let evaluatedRaw) = runtime.evaluate(script, variables: jsVariables) else {
+                    return ""
+                }
+                var evaluated = evaluatedRaw.trimmingCharacters(in: .whitespacesAndNewlines)
+                if !trailingParts.isEmpty,
+                   let transform = RuleTransformParser.transform(fromTrailingParts: trailingParts[...]) {
+                    evaluated = RuleTransformParser.apply(transform, to: evaluated)
+                }
+                if evaluated.isEmpty || evaluated == "undefined" || evaluated == "null" || evaluated == "#" {
+                    return ""
+                }
+                if evaluated.lowercased().hasPrefix("javascript:") {
+                    return ""
+                }
+                if let baseURLObj = URL(string: baseUrl) {
+                    return HtmlRuleExtractor(executionContext: context).absolutize(evaluated, base: baseURLObj)
+                }
+                return evaluated
+            }
+
             // Strip trailing ## comment if present
             if let hashRange = trimmed.range(of: "##") {
                 trimmed = String(trimmed[..<hashRange.lowerBound]).trimmingCharacters(in: .whitespacesAndNewlines)
@@ -248,5 +319,28 @@ struct DynamicURLResolver {
         case .failure:
             return ""
         }
+    }
+
+    /// Picks the object that JSONPath segments in a URL rule should run
+    /// against.  Parsers usually pass a decoded object as `result`, but some
+    /// call sites only provide the raw response body.
+    private static func jsonTarget(from variables: [String: Any]) -> Any? {
+        if let value = variables["result"], JSONSerialization.isValidJSONObject(value) {
+            return value
+        }
+        if let value = variables["data"], JSONSerialization.isValidJSONObject(value) {
+            return value
+        }
+        if let value = variables["body"], JSONSerialization.isValidJSONObject(value) {
+            return value
+        }
+        if let body = variables["body"] as? String ?? variables["result"] as? String,
+           let parsed = ResponseFormatDetector.jsonObject(from: body) {
+            return parsed
+        }
+        if let book = variables["book"] as? [String: Any] {
+            return book
+        }
+        return nil
     }
 }

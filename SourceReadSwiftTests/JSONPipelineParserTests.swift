@@ -211,4 +211,38 @@ final class JSONPipelineParserTests: XCTestCase {
         }
         XCTAssertEqual(content.paragraphs, ["第一段", "第二段"])
     }
+
+    func testParseJSONBookDetailInitReceivesBookAndBaseURLContext() throws {
+        let source = BookSource(
+            bookSourceName: "JS Init",
+            bookSourceUrl: "https://api.example.com",
+            ruleBookInfo: SourceRule(fields: [
+                "init": #"@js:JSON.stringify({data:{name:book.name, toc:baseUrl + "/toc"}})"#,
+                "name": "$.data.name",
+                "tocUrl": "$.data.toc"
+            ])
+        )
+        let book = SearchBook(
+            name: "上下文书名",
+            author: nil,
+            coverUrl: nil,
+            bookUrl: "https://api.example.com/book/1",
+            sourceName: source.bookSourceName,
+            sourceUrl: source.bookSourceUrl
+        )
+        let response = SourceResponse(
+            url: URL(string: book.bookUrl)!,
+            statusCode: 200,
+            headers: [:],
+            body: #"{"data":{"name":"原始名"}}"#,
+            data: Data()
+        )
+
+        let result = BookDetailParser().parse(source: source, book: book, response: response)
+        guard case .success(let detail) = result else {
+            return XCTFail("expected success")
+        }
+        XCTAssertEqual(detail.name, "上下文书名")
+        XCTAssertEqual(detail.tocUrl, "https://api.example.com/book/1/toc")
+    }
 }

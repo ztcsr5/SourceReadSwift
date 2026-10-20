@@ -155,10 +155,40 @@ struct BookDetailParser {
         guard let object = ResponseFormatDetector.jsonObject(from: response.body) else {
             return .failure(.rule("JSON 解析失败"))
         }
+        let rule = source.ruleBookInfo
+        let bookMap: [String: Any] = [
+            "name": book.name,
+            "author": book.author ?? "",
+            "coverUrl": book.coverUrl ?? "",
+            "bookUrl": book.bookUrl,
+            "intro": book.intro ?? "",
+            "kind": book.kind ?? ""
+        ]
+        // `init` is a normal Legado rule and can be JavaScript.  Build the
+        // same context that the field rules receive (`book`, `baseUrl`,
+        // `result`, ...) before evaluating it; otherwise a JS init that reads
+        // `book` or `baseUrl` fails while the field rules succeed.
+        let variables: [String: Any] = [
+            "source": source,
+            "book": bookMap,
+            "baseUrl": response.url.absoluteString,
+            "result": response.body,
+            "body": response.body,
+            "src": response.body,
+            "html": response.body
+        ]
         let rootObject: Any
-        if let initRule = htmlExtractor.firstRule(source.ruleBookInfo, keys: ["init"]),
-           let initialized = jsonExtractor.value(from: object, path: initRule, variables: ["source": source]) {
-            rootObject = initialized
+        if let initRule = htmlExtractor.firstRule(rule, keys: ["init"]),
+           let initialized = jsonExtractor.value(from: object, path: initRule, variables: variables) {
+            // JavaScript rules return strings.  When an `init` script builds a
+            // JSON container (`JSON.stringify(...)`), parse it so the field
+            // rules keep operating on an object instead of a string.
+            if let text = initialized as? String,
+               let parsed = ResponseFormatDetector.jsonObject(from: text) {
+                rootObject = parsed
+            } else {
+                rootObject = initialized
+            }
         } else {
             rootObject = object
         }
@@ -171,25 +201,6 @@ struct BookDetailParser {
         } else {
             return .failure(.empty("JSON 详情为空"))
         }
-
-        let rule = source.ruleBookInfo
-        let bookMap: [String: Any] = [
-            "name": book.name,
-            "author": book.author ?? "",
-            "coverUrl": book.coverUrl ?? "",
-            "bookUrl": book.bookUrl,
-            "intro": book.intro ?? "",
-            "kind": book.kind ?? ""
-        ]
-        let variables: [String: Any] = [
-            "source": source,
-            "book": bookMap,
-            "baseUrl": response.url.absoluteString,
-            "result": response.body,
-            "body": response.body,
-            "src": response.body,
-            "html": response.body
-        ]
         let name = jsonExtractor.string(
             from: dict,
             rule: htmlExtractor.firstRule(rule, keys: ["name", "bookName"]),
@@ -274,6 +285,7 @@ struct BookDetailParser {
             || trimmed.hasPrefix("https://")
             || trimmed.hasPrefix("@js:")
             || trimmed.hasPrefix("<js>")
+            || trimmed.contains("@js:")
             || trimmed.contains("@get:")
             || (trimmed.contains("{{") && trimmed.contains("}}"))
             || (trimmed.lowercased().contains("%7b%7b") && trimmed.lowercased().contains("%7d%7d"))

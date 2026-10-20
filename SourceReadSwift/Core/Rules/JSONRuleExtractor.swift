@@ -108,13 +108,13 @@ struct JSONRuleExtractor {
         }
         for key in fallbackKeys {
             if let value = item[key] {
-                let text = stringify(value)
+                let text = stringifyJSResult(value)
                 if !text.isEmpty { return text }
             }
             let lowerKey = key.lowercased()
             if let matchKey = item.keys.first(where: { $0.lowercased() == lowerKey }),
                let value = item[matchKey] {
-                let text = stringify(value)
+                let text = stringifyJSResult(value)
                 if !text.isEmpty { return text }
             }
         }
@@ -2072,13 +2072,13 @@ struct JSONRuleExtractor {
             let key = mText.substring(with: keyRange).trimmingCharacters(in: .whitespacesAndNewlines)
             let val: String
             if key.hasPrefix("$.") || key.hasPrefix("@json:") {
-                val = (value(from: item, path: key, variables: variables)).map { stringify($0) } ?? ""
+                val = (value(from: item, path: key, variables: variables)).map { stringifyJSResult($0) } ?? ""
             } else if let direct = item[key] {
-                val = stringify(direct)
+                val = stringifyJSResult(direct)
             } else if let fromPath = value(from: item, path: key, variables: variables) {
-                val = stringify(fromPath)
+                val = stringifyJSResult(fromPath)
             } else if let varVal = variables[key] {
-                val = stringify(varVal)
+                val = stringifyJSResult(varVal)
             } else if let jsValue = evaluateRawJS(script: key, object: item, extraVariables: variables) {
                 // Legado treats `{{...}}` as a JavaScript rule.  Keep the
                 // direct-key and JSONPath lookups above for the common

@@ -329,6 +329,27 @@ final class SourceFlowEngineTests: XCTestCase {
         XCTAssertEqual(resolved, "https://example.com/search?title=斗破苍穹&author=天蚕土豆&tag=玄幻")
     }
 
+    func testDynamicURLResolverPreservesMultilineJSChain() {
+        let source = BookSource(bookSourceName: "番茄测试", bookSourceUrl: "https://fanqienovel.com")
+        let context = RuleExecutionContext()
+        let rule = """
+        $.book_id
+        @js:
+        "https://fanqienovel.com/api/reader/directory/detail?bookId=" + result
+        """
+        let resolved = DynamicURLResolver.resolve(
+            rule,
+            baseUrl: "https://fanqienovel.com",
+            source: source,
+            variables: ["result": ["book_id": "123456"]],
+            context: context
+        )
+        XCTAssertEqual(
+            resolved,
+            "https://fanqienovel.com/api/reader/directory/detail?bookId=123456"
+        )
+    }
+
     private struct CustomUnbridgeableStruct {
         let title: String
         let count: Int
