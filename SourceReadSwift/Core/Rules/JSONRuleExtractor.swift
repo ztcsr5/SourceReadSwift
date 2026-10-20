@@ -465,195 +465,22 @@ struct JSONRuleExtractor {
 
     // MARK: - Directives (@put / @get)
 
-    private func directiveSpans(
-        in rule: String,
-        marker: String
-    ) -> [(range: Range<String.Index>, body: String)] {
-        var spans: [(range: Range<String.Index>, body: String)] = []
-        let lowered = rule.lowercased()
-        let loweredMarker = marker.lowercased()
-        var searchStart = rule.startIndex
-        while searchStart < rule.endIndex,
-              let markerRange = lowered.range(of: loweredMarker, range: searchStart..<rule.endIndex) {
-            let braceStart = markerRange.upperBound
-            guard braceStart < rule.endIndex, rule[braceStart] == "{" else {
-                searchStart = braceStart
-                continue
-            }
-            var depth = 0
-            var quote: Character?
-            var escaped = false
-            var cursor = braceStart
-            var endIndex: String.Index?
-            while cursor < rule.endIndex {
-                let character = rule[cursor]
-                if escaped {
-                    escaped = false
-                } else if character == "\\" {
-                    escaped = true
-                } else if let activeQuote = quote {
-                    if character == activeQuote { quote = nil }
-                } else if character == "\"" || character == "'" {
-                    quote = character
-                } else if character == "{" {
-                    depth += 1
-                } else if character == "}" {
-                    depth -= 1
-                    if depth == 0 {
-                        endIndex = rule.index(after: cursor)
-                        break
-                    }
-                }
-                cursor = rule.index(after: cursor)
-            }
-            guard let end = endIndex else { break }
-            let bodyStart = rule.index(after: braceStart)
-            let bodyEnd = rule.index(before: end)
-            let body = String(rule[bodyStart..<bodyEnd])
-            spans.append((markerRange.lowerBound..<end, body))
-            searchStart = end
-        }
-        return spans
-    }
-
     private func extractPutDirectives(from rule: String) -> [(key: String, valueRule: String)] {
-        directiveSpans(in: rule, marker: "@put:").compactMap { parsePutBody($0.body) }
+        RuleDirectiveParser.putPairs(in: rule)
     }
 
     private func removePutDirectives(from rule: String) -> String {
-        let spans = directiveSpans(in: rule, marker: "@put:")
-        guard !spans.isEmpty else { return rule }
-        var output = rule
-        for span in spans.reversed() {
-            output.removeSubrange(span.range)
-        }
-        return output.trimmingCharacters(in: .whitespacesAndNewlines)
+        RuleDirectiveParser.removingPuts(from: rule)
     }
-
-    private func parsePutBody(_ rawBody: String) -> (key: String, valueRule: String)? {
-        let body = rawBody.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !body.isEmpty else { return nil }
-        // directiveSpans strips the outer braces, so re-wrap the body before
-        // asking JSONSerialization to parse the key/value pair.
-        if let data = ("{" + body + "}").data(using: .utf8),
-           let object = try? JSONSerialization.jsonObject(with: data, options: [.fragmentsAllowed]),
-           let dictionary = object as? [String: Any],
-           dictionary.count == 1,
-           let pair = dictionary.first {
-            return (pair.key, stringify(pair.value))
-        }
-        if body.hasPrefix("{"),
-           let data = body.data(using: .utf8),
-           let object = try? JSONSerialization.jsonObject(with: data, options: [.fragmentsAllowed]),
-           let dictionary = object as? [String: Any],
-           dictionary.count == 1,
-           let pair = dictionary.first {
-            return (pair.key, stringify(pair.value))
-        }
-        var quote: Character?
-        var escaped = false
-        var depth = 0
-        var separator: String.Index?
-        var index = body.startIndex
-        while index < body.endIndex {
-            let character = body[index]
-            if escaped {
-                escaped = false
-            } else if character == "\\" {
-                escaped = true
-            } else if let activeQuote = quote {
-                if character == activeQuote { quote = nil }
-            } else if character == "\"" || character == "'" {
-                quote = character
-            } else if character == "{" || character == "[" || character == "(" {
-                depth += 1
-            } else if character == "}" || character == "]" || character == ")" {
-                depth = max(0, depth - 1)
-            } else if character == ":", depth == 0 {
-                separator = index
-                break
-            }
-            index = body.index(after: index)
-        }
-        if let separator {
-            let key = unquote(String(body[..<separator]).trimmingCharacters(in: .whitespacesAndNewlines))
-            let valueRule = String(body[body.index(after: separator)...])
-                .trimmingCharacters(in: .whitespacesAndNewlines)
-            guard !key.isEmpty else { return nil }
-            return (key, valueRule)
-        }
-        let key = unquote(body)
-        return key.isEmpty ? nil : (key, "")
-    }
-
     private func replaceGetDirectives(in rule: String) -> String {
-        var output = ""
-        var index = rule.startIndex
-        let lowered = rule.lowercased()
-        while index < rule.endIndex {
-            guard let range = lowered.range(of: "@get:", range: index..<rule.endIndex) else {
-                output.append(contentsOf: rule[index...])
-                break
-            }
-            output.append(contentsOf: rule[index..<range.lowerBound])
-            let after = range.upperBound
-            if after < rule.endIndex, rule[after] == "{" {
-                if let closing = matchingBrace(in: rule, from: after) {
-                    let bodyStart = rule.index(after: after)
-                    let key = unquote(String(rule[bodyStart..<closing]).trimmingCharacters(in: .whitespacesAndNewlines))
-                    output.append(stringify(directiveValue(for: key)))
-                    index = rule.index(after: closing)
-                    continue
-                }
-            }
-            var cursor = after
-            while cursor < rule.endIndex {
-                let character = rule[cursor]
-                if character == "." || character == "/" || character == "[" || character == "@" || character.isWhitespace {
-                    break
-                }
-                cursor = rule.index(after: cursor)
-            }
-            let key = unquote(String(rule[after..<cursor]).trimmingCharacters(in: .whitespacesAndNewlines))
-            output.append(stringify(directiveValue(for: key)))
-            index = cursor
-        }
-        return output
+        RuleDirectiveParser.replacingGets(in: rule) { stringify(directiveValue(for: $0)) }
     }
-
-    private func matchingBrace(in text: String, from open: String.Index) -> String.Index? {
-        guard open < text.endIndex, text[open] == "{" else { return nil }
-        var depth = 0
-        var quote: Character?
-        var escaped = false
-        var cursor = open
-        while cursor < text.endIndex {
-            let character = text[cursor]
-            if escaped {
-                escaped = false
-            } else if character == "\\" {
-                escaped = true
-            } else if let activeQuote = quote {
-                if character == activeQuote { quote = nil }
-            } else if character == "\"" || character == "'" {
-                quote = character
-            } else if character == "{" {
-                depth += 1
-            } else if character == "}" {
-                depth -= 1
-                if depth == 0 { return cursor }
-            }
-            cursor = text.index(after: cursor)
-        }
-        return nil
-    }
-
     private func directGetDirective(in rule: String) -> (key: String, trailing: String)? {
         let trimmed = rule.trimmingCharacters(in: .whitespacesAndNewlines)
         guard trimmed.lowercased().hasPrefix("@get:") else { return nil }
         let markerEnd = trimmed.index(trimmed.startIndex, offsetBy: 5)
         guard markerEnd < trimmed.endIndex, trimmed[markerEnd] == "{" else { return nil }
-        guard let closing = matchingBrace(in: trimmed, from: markerEnd) else { return nil }
+        guard let closing = RuleDirectiveParser.matchingBrace(in: trimmed, from: markerEnd) else { return nil }
         let keyStart = trimmed.index(after: markerEnd)
         let key = unquote(String(trimmed[keyStart..<closing]).trimmingCharacters(in: .whitespacesAndNewlines))
         guard !key.isEmpty else { return nil }

@@ -509,35 +509,15 @@ struct HtmlRuleExtractor {
     }
 
     private func extractPutDirectives(from rule: String) -> [(key: String, valueRule: String)] {
-        guard let regex = try? NSRegularExpression(pattern: #"(?i)@put:\{([^}]*)\}"#) else { return [] }
-        let range = NSRange(rule.startIndex..<rule.endIndex, in: rule)
-        return regex.matches(in: rule, range: range).flatMap { match -> [(key: String, valueRule: String)] in
-            guard let bodyRange = Range(match.range(at: 1), in: rule) else { return [] }
-            return splitTopLevel(String(rule[bodyRange]), separator: ",")
-                .compactMap { entry in
-                    let parts = splitTopLevel(entry, separator: ":", maxSplits: 1)
-                    guard parts.count == 2 else { return nil }
-                    let key = unquote(parts[0].trimmingCharacters(in: .whitespacesAndNewlines))
-                    let valueRule = unquote(parts[1].trimmingCharacters(in: .whitespacesAndNewlines))
-                    return key.isEmpty || valueRule.isEmpty ? nil : (key, valueRule)
-                }
-        }
+        RuleDirectiveParser.putPairs(in: rule).filter { !$0.valueRule.isEmpty }
     }
 
     private func removePutDirectives(from rule: String) -> String {
-        rule.replacingOccurrences(of: #"(?i)@put:\{[^}]*\}"#, with: "", options: .regularExpression)
+        RuleDirectiveParser.removingPuts(from: rule)
     }
 
     private func replaceGetDirectives(in rule: String) -> String {
-        guard let regex = try? NSRegularExpression(pattern: #"(?i)@get:\{([^}]*)\}"#) else { return rule }
-        let mText = NSMutableString(string: rule)
-        let matches = regex.matches(in: rule, range: NSRange(location: 0, length: mText.length))
-        for match in matches.reversed() {
-            guard match.numberOfRanges > 1 else { continue }
-            let key = mText.substring(with: match.range(at: 1)).trimmingCharacters(in: .whitespacesAndNewlines)
-            mText.replaceCharacters(in: match.range(at: 0), with: storedDirectiveValue(for: key))
-        }
-        return mText as String
+        RuleDirectiveParser.replacingGets(in: rule) { storedDirectiveValue(for: $0) }
     }
 
     /// Reads `@put` values from the current stage first, then from the
@@ -643,11 +623,10 @@ struct HtmlRuleExtractor {
         } else if lower.hasPrefix("css:") {
             output = String(output.dropFirst(4))
         }
-        return output
-            .replacingOccurrences(of: "&&", with: " ")
-            .replacingOccurrences(of: #"(?i)@put:\{[^}]*\}"#, with: "", options: .regularExpression)
-            .replacingOccurrences(of: #"(?i)@get:\{[^}]*\}"#, with: "", options: .regularExpression)
-            .trimmingCharacters(in: .whitespacesAndNewlines)
+        var cleaned = output.replacingOccurrences(of: "&&", with: " ")
+        cleaned = RuleDirectiveParser.removingPuts(from: cleaned)
+        cleaned = RuleDirectiveParser.replacingGets(in: cleaned) { _ in "" }
+        return cleaned.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
     func absolutize(_ text: String, base: URL) -> String {

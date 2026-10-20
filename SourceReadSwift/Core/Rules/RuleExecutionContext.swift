@@ -330,9 +330,16 @@ final class RulePersistentState: @unchecked Sendable {
     func keys(withPrefix prefix: String) -> [String] {
         guard !prefix.isEmpty else { return [] }
         lock.lock(); defer { lock.unlock() }
-        return values.keys.filter { $0.hasPrefix(prefix) }.sorted()
+        // `putObject` can be the only writer for a native `@put` value, so a
+        // values-only enumeration would hide those keys from
+        // `source.getVariable` / `Object.keys` style lookups.
+        return Set(values.keys.filter { $0.hasPrefix(prefix) })
+            .union(objects.keys.filter { $0.hasPrefix(prefix) })
+            .sorted()
     }
 
+    /// String view used for `{{placeholder}}` expansion.  Native objects are
+    /// exposed through `object(for:)`; this snapshot stays JSON-friendly.
     func snapshot() -> [String: String] {
         lock.lock(); defer { lock.unlock() }
         return values
