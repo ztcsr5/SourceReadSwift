@@ -392,11 +392,21 @@ final class HtmlRuleExtractorTests: XCTestCase {
         )
         let value = try extractor.value(
             from: document,
-            rule: #"@get:{host}##^https://##http://##"#,
+            rule: #"@get:{host}##^https://##http://"#,
             baseUrl: URL(string: "https://example.com/search")!
         )
 
         XCTAssertEqual(value, "http://example.com")
+
+        // Legado's four-field form (`##pattern##replacement###`) returns
+        // `matcher.group(0).replaceFirst(...)`: only the first match with the
+        // replacement applied, not the whole input string.
+        let firstMatch = try extractor.value(
+            from: document,
+            rule: #"@get:{host}##^https://(.*)$##$1###"#,
+            baseUrl: URL(string: "https://example.com/search")!
+        )
+        XCTAssertEqual(firstMatch, "example.com")
     }
 
     func testDirectGetSupportsBareKeyWithLiteralSuffix() throws {

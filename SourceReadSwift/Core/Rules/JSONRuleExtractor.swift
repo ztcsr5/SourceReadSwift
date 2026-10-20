@@ -885,7 +885,12 @@ struct JSONRuleExtractor {
         return parts
     }
 
-    private func walk(_ current: Any, parts: [String], index: Int) -> Any? {
+    private func walk(
+        _ current: Any,
+        parts: [String],
+        index: Int,
+        mapMemberOverArrays: Bool = true
+    ) -> Any? {
         guard index < parts.count else { return current }
         let part = parts[index]
 
@@ -900,7 +905,12 @@ struct JSONRuleExtractor {
             guard let transformed = applyFunction(name: call.name, arguments: call.arguments, to: node) else {
                 return nil
             }
-            return walk(transformed, parts: parts, index: index + 1)
+            return walk(
+                transformed,
+                parts: parts,
+                index: index + 1,
+                mapMemberOverArrays: mapMemberOverArrays
+            )
         }
 
         if let union = unionSegments(part) {
@@ -908,7 +918,12 @@ struct JSONRuleExtractor {
             let remaining = Array(parts[(index + 1)...])
             for segment in union {
                 guard !segment.isEmpty else { continue }
-                if let resolved = walk(node, parts: [segment] + remaining, index: 0) {
+                if let resolved = walk(
+                    node,
+                    parts: [segment] + remaining,
+                    index: 0,
+                    mapMemberOverArrays: mapMemberOverArrays
+                ) {
                     var items: [Any] = []
                     appendFlattened(resolved, to: &items)
                     // rjpath UnionSelector applies distinct(); keep the first
@@ -923,11 +938,29 @@ struct JSONRuleExtractor {
 
         if part == "**" {
             var matches: [Any] = []
-            if let direct = walk(node, parts: parts, index: index + 1) {
+            // Jayway's deep scan applies the remaining path at the current
+            // node and then at every descendant.  This extractor additionally
+            // maps a bare member step over array elements so sources like
+            // `$.data.groups.books.title` work; applying that shorthand while
+            // scanning descendants would emit every nested match twice
+            // (`$..name` -> A,B,A,B).  The deep-scan remainder therefore runs
+            // with the shorthand disabled and lets the descendant visit
+            // produce the match, which is exactly Jayway's behavior.
+            if let direct = walk(
+                node,
+                parts: parts,
+                index: index + 1,
+                mapMemberOverArrays: false
+            ) {
                 appendFlattened(direct, to: &matches)
             }
             for child in children(of: node) {
-                if let nested = walk(child, parts: parts, index: index) {
+                if let nested = walk(
+                    child,
+                    parts: parts,
+                    index: index,
+                    mapMemberOverArrays: mapMemberOverArrays
+                ) {
                     appendFlattened(nested, to: &matches)
                 }
             }
@@ -938,7 +971,12 @@ struct JSONRuleExtractor {
             let expression = String(part.dropFirst(2).dropLast())
             if let array = arrayValues(node) {
                 let filtered = array.filter { matchesFilterExpression($0, expression: expression) }
-                return walk(filtered, parts: parts, index: index + 1)
+                return walk(
+                    filtered,
+                    parts: parts,
+                    index: index + 1,
+                    mapMemberOverArrays: mapMemberOverArrays
+                )
             }
             if let dictionary = node as? [String: Any] {
                 // rjpath FilterSelector on a JsonObject keeps only entries
@@ -951,7 +989,12 @@ struct JSONRuleExtractor {
                     }
                     return value
                 }
-                return walk(filtered, parts: parts, index: index + 1)
+                return walk(
+                    filtered,
+                    parts: parts,
+                    index: index + 1,
+                    mapMemberOverArrays: mapMemberOverArrays
+                )
             }
             return nil
         }
@@ -994,7 +1037,12 @@ struct JSONRuleExtractor {
                         }
                     }
                     let sliced = indices.map { array[$0] }
-                    return walk(sliced, parts: parts, index: index + 1)
+                    return walk(
+                        sliced,
+                        parts: parts,
+                        index: index + 1,
+                        mapMemberOverArrays: mapMemberOverArrays
+                    )
                 }
             }
         }
@@ -1009,15 +1057,32 @@ struct JSONRuleExtractor {
                         flattened.append(value)
                     }
                 }
-                return walk(flattened, parts: parts, index: index + 1)
+                return walk(
+                    flattened,
+                    parts: parts,
+                    index: index + 1,
+                    mapMemberOverArrays: mapMemberOverArrays
+                )
             }
             guard let value = lookup(dictionary, key: unquoteKey(part)) else { return nil }
-            return walk(value, parts: parts, index: index + 1)
+            return walk(
+                value,
+                parts: parts,
+                index: index + 1,
+                mapMemberOverArrays: mapMemberOverArrays
+            )
         }
 
         if let array = arrayValues(node) {
             if part == "*" {
-                let mapped = array.compactMap { walk($0, parts: parts, index: index + 1) }
+                let mapped = array.compactMap {
+                    walk(
+                        $0,
+                        parts: parts,
+                        index: index + 1,
+                        mapMemberOverArrays: mapMemberOverArrays
+                    )
+                }
                 if mapped.isEmpty { return nil }
                 var flattened: [Any] = []
                 mapped.forEach { appendFlattened($0, to: &flattened) }
@@ -1026,9 +1091,17 @@ struct JSONRuleExtractor {
             if let number = Int(unquoteKey(part)) {
                 let resolved = number < 0 ? array.count + number : number
                 guard array.indices.contains(resolved) else { return nil }
-                return walk(array[resolved], parts: parts, index: index + 1)
+                return walk(
+                    array[resolved],
+                    parts: parts,
+                    index: index + 1,
+                    mapMemberOverArrays: mapMemberOverArrays
+                )
             }
-            let mapped = array.compactMap { walk($0, parts: parts, index: index) }
+            guard mapMemberOverArrays else { return nil }
+            let mapped = array.compactMap {
+                walk($0, parts: parts, index: index, mapMemberOverArrays: mapMemberOverArrays)
+            }
             if mapped.isEmpty { return nil }
             var flattened: [Any] = []
             mapped.forEach { appendFlattened($0, to: &flattened) }

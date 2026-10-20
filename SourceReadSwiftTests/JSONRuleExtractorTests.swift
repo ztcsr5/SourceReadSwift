@@ -672,10 +672,18 @@ final class JSONRuleExtractorTests: XCTestCase {
         _ = extractor.value(from: object, path: "@put:{url:$.data.url}$.data.url")
         let value = extractor.value(
             from: object,
-            path: #"@get:{url}##^https://##http://##"#
+            path: #"@get:{url}##^https://##http://"#
         ) as? String
 
         XCTAssertEqual(value, "http://example.com")
+
+        // Four-field form: Legado extracts the first match and applies the
+        // replacement to that match only (see AnalyzeRule.replaceRegex).
+        let firstMatch = extractor.value(
+            from: object,
+            path: #"@get:{url}##^https://(.*)$##$1###"#
+        ) as? String
+        XCTAssertEqual(firstMatch, "example.com")
     }
 
     func testDirectGetSupportsBareKeyWithLiteralSuffix() throws {
@@ -727,6 +735,23 @@ final class JSONRuleExtractorTests: XCTestCase {
         XCTAssertEqual(extractor.stringList(from: object, rule: "{$..name}"), ["A\nB"])
     }
 
+    func testRecursiveDescentVisitsArrayElementsExactlyOnce() throws {
+        let extractor = JSONRuleExtractor()
+        let object: [String: Any] = [
+            "list": [["name": "A"], ["name": "B"], [["name": "C"]]]
+        ]
+
+        // Jayway's `$..name` visits every node once (object members first,
+        // then array elements).  The extractor maps a bare member step over
+        // array elements for `$.a.b` compatibility, so the deep-scan
+        // remainder disables that shorthand and each node contributes once.
+        XCTAssertEqual(extractor.string(from: object, rule: "$..name"), "A\nB\nC")
+        XCTAssertEqual(extractor.stringList(from: object, rule: "$..name"), ["A", "B", "C"])
+        XCTAssertEqual(extractor.value(from: object, path: "$..name") as? [String], ["A", "B", "C"])
+
+        // Index selectors still run at the array node itself.
+        XCTAssertEqual(extractor.value(from: object, path: "$..[0].name") as? [String], ["A", "C"])
+    }
     func testStringListMatchesLegadoElementSemantics() throws {
         let extractor = JSONRuleExtractor()
         let object: [String: Any] = [
