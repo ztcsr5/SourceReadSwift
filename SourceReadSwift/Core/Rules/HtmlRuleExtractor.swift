@@ -14,6 +14,28 @@ final class RuleDirectiveStore {
         value(for: key) ?? ""
     }
 
+    func value(for key: String) -> String? {
+        values[key.trimmingCharacters(in: .whitespacesAndNewlines)]
+    }
+}
+
+struct HtmlRuleExtractor {
+    private let directiveStore: RuleDirectiveStore
+    private let executionContext: RuleExecutionContext
+
+    init(
+        directiveStore: RuleDirectiveStore = RuleDirectiveStore(),
+        executionContext: RuleExecutionContext = RuleExecutionContext()
+    ) {
+        self.directiveStore = directiveStore
+        self.executionContext = executionContext
+    }
+
+    func select(_ html: String, baseUrl: URL, listRule: String) throws -> [Element] {
+        let document = try SwiftSoup.parse(html, baseUrl.absoluteString)
+        return try select(from: document, rule: listRule, baseUrl: baseUrl)
+    }
+
     func value(
         from root: Element,
         rule: String?,
