@@ -352,6 +352,16 @@ struct ReaderView: View {
                     .transition(.move(edge: .top).combined(with: .opacity))
             }
 
+            // Cloud TTS failures fall back to the system voice. Keep the
+            // reason on screen (instead of a transient toast) so a silent
+            // keychain/network failure never looks like the app ignored the
+            // user's engine selection.
+            if let speechErrorMessage = speechController.lastErrorMessage {
+                readerSpeechErrorBanner(message: speechErrorMessage)
+                    .transition(.move(edge: .top).combined(with: .opacity))
+                    .zIndex(4)
+            }
+
             if showSettings {
                 Color.black.opacity(0.18)
                     .ignoresSafeArea()
@@ -1570,6 +1580,44 @@ struct ReaderView: View {
             Spacer()
         }
         .allowsHitTesting(false)
+    }
+
+    private func readerSpeechErrorBanner(message: String) -> some View {
+        VStack {
+            HStack(alignment: .top, spacing: 10) {
+                Image(systemName: "waveform.badge.exclamationmark")
+                    .font(.system(size: 15, weight: .semibold))
+                Text(message)
+                    .font(.footnote.weight(.semibold))
+                    .lineLimit(3)
+                    .multilineTextAlignment(.leading)
+                    .fixedSize(horizontal: false, vertical: true)
+                Spacer(minLength: 0)
+                Button {
+                    speechController.lastErrorMessage = nil
+                } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundStyle(.secondary)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("关闭语音错误提示")
+            }
+            .foregroundStyle(readerThemeTextColor)
+            .padding(.horizontal, 14)
+            .padding(.vertical, 10)
+            .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .stroke(Color.orange.opacity(0.45), lineWidth: 0.8)
+            }
+            .padding(.horizontal, 18)
+            .padding(.top, statusMessage == nil ? 12 : 58)
+
+            Spacer()
+        }
+        .animation(.easeInOut(duration: 0.2), value: message)
+        .accessibilityIdentifier("reader.speechErrorBanner")
     }
 
     private var layoutSettings: some View {
