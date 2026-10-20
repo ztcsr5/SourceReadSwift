@@ -440,22 +440,32 @@ final class JSCoreRuntimeTests: XCTestCase {
         let runtime = JSCoreRuntime()
         let script = """
         var map = source.getLoginInfoMap();
+        var emptyBefore = map.isEmpty();
+        var keysBefore = Object.keys(map).join(',');
         map['密钥'] = 'KEY-1';
+        var emptyAfter = map.isEmpty();
+        var keysAfter = Object.keys(map).join(',');
         var bracket = map['密钥'];
         var getter = map.get('密钥');
         var contains = map.containsKey('密钥');
+        map.put('blank', '');
+        var blankContains = map.containsKey('blank');
+        map.remove('blank');
         source.putLoginInfo({'token': 'T-2'});
         var token = source.getLoginInfoMap()['token'];
         source.setLoginInfo('device', 'D-3');
         var device = source.getLoginInfoMap()['device'];
+        var keysAll = Object.keys(source.getLoginInfoMap()).sort().join(',');
         source.removeLoginInfo();
         var cleared = String(source.getLoginInfoMap()['密钥'] || '');
-        [bracket, getter, contains, token, device, cleared].join('|');
+        var emptyCleared = source.getLoginInfoMap().isEmpty();
+        var keysCleared = Object.keys(source.getLoginInfoMap()).join(',');
+        [emptyBefore, keysBefore, emptyAfter, keysAfter, bracket, getter, contains, blankContains, token, device, keysAll, cleared, emptyCleared, keysCleared].join('|');
         """
         let result = runtime.evaluate(script, variables: ["source": source])
         guard case .success(let value) = result else {
             return XCTFail("expected success: \(result)")
         }
-        XCTAssertEqual(value, "KEY-1|KEY-1|true|T-2|D-3|")
+        XCTAssertEqual(value, "true||false|密钥|KEY-1|KEY-1|true|true|T-2|D-3|device,token,密钥||true|")
     }
 }

@@ -179,6 +179,17 @@ final class RuleExecutionContext: @unchecked Sendable {
         persistentState.removePrefix(prefix)
     }
 
+    /// Enumerates every variable sharing a prefix.  Legado login maps need
+    /// real key enumeration for `isEmpty()` and `Object.keys()`.
+    func keys(withPrefix prefix: String) -> [String] {
+        guard !prefix.isEmpty else { return [] }
+        lock.lock()
+        let memoryKeys = values.keys.filter { $0.hasPrefix(prefix) }
+        lock.unlock()
+        let persistentKeys = persistentState.keys(withPrefix: prefix)
+        return Array(Set(memoryKeys).union(persistentKeys)).sorted()
+    }
+
     func persistentSnapshot() -> [String: String] { persistentState.snapshot() }
 
     /// Import response cookies into the same state used by `java.put/get`.
@@ -274,6 +285,12 @@ final class RulePersistentState: @unchecked Sendable {
         let keys = values.keys.filter { $0.hasPrefix(prefix) }
         for key in keys { values.removeValue(forKey: key) }
         lock.unlock()
+    }
+
+    func keys(withPrefix prefix: String) -> [String] {
+        guard !prefix.isEmpty else { return [] }
+        lock.lock(); defer { lock.unlock() }
+        return values.keys.filter { $0.hasPrefix(prefix) }.sorted()
     }
 
     func snapshot() -> [String: String] {

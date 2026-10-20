@@ -275,32 +275,75 @@ final class JSCoreRuntime {
                         };
                     };
                     source.getLoginInfoMap = function() {
+                        var loginPrefix = 'source.login.';
+                        var loginKeys = function() {
+                            var list = java.keysWithPrefix(loginPrefix);
+                            var out = [];
+                            if (!list) return out;
+                            var count = Number(list.length != null ? list.length : (list.count || 0));
+                            if (!isFinite(count) || count < 0) count = 0;
+                            for (var i = 0; i < count; i++) {
+                                var full = String(list[i]);
+                                if (full.indexOf(loginPrefix) === 0) out.push(full.substring(loginPrefix.length));
+                            }
+                            return out;
+                        };
+                        var hasLoginKey = function(k) {
+                            var key = String(k == null ? '' : k);
+                            var keys = loginKeys();
+                            for (var i = 0; i < keys.length; i++) {
+                                if (keys[i] === key) return true;
+                            }
+                            return false;
+                        };
                         var loginMap = {
-                            get: function(k) { return java.getVar('source.login.' + String(k == null ? '' : k)); },
-                            put: function(k, v) { java.put('source.login.' + String(k == null ? '' : k), v == null ? '' : String(v)); return v; },
-                            remove: function(k) { var key = 'source.login.' + String(k == null ? '' : k); var old = java.getVar(key); java.removeVar(key); return old; },
-                            containsKey: function(k) { return String(java.getVar('source.login.' + String(k == null ? '' : k)) || '') !== ''; },
-                            isEmpty: function() { return true; }
+                            get: function(k) { return java.getVar(loginPrefix + String(k == null ? '' : k)); },
+                            put: function(k, v) { java.put(loginPrefix + String(k == null ? '' : k), v == null ? '' : String(v)); return v; },
+                            remove: function(k) { var key = loginPrefix + String(k == null ? '' : k); var old = java.getVar(key); java.removeVar(key); return old; },
+                            containsKey: function(k) { return hasLoginKey(k); },
+                            isEmpty: function() { return loginKeys().length === 0; }
                         };
                         if (typeof Proxy !== 'undefined') {
                             return new Proxy(loginMap, {
                                 get: function(target, prop) {
                                     if (prop in target) return target[prop];
                                     if (typeof prop === 'symbol') return undefined;
-                                    return java.getVar('source.login.' + String(prop));
+                                    return java.getVar(loginPrefix + String(prop));
                                 },
                                 set: function(target, prop, value) {
                                     if (prop in target) { target[prop] = value; return true; }
-                                    java.put('source.login.' + String(prop), value == null ? '' : String(value));
+                                    java.put(loginPrefix + String(prop), value == null ? '' : String(value));
                                     return true;
                                 },
                                 has: function(target, prop) {
-                                    return (prop in target) || String(java.getVar('source.login.' + String(prop)) || '') !== '';
+                                    if (prop in target) return true;
+                                    if (typeof prop === 'symbol') return false;
+                                    return hasLoginKey(prop);
                                 },
                                 deleteProperty: function(target, prop) {
                                     if (prop in target) { delete target[prop]; return true; }
-                                    java.removeVar('source.login.' + String(prop));
+                                    if (typeof prop === 'symbol') return true;
+                                    java.removeVar(loginPrefix + String(prop));
                                     return true;
+                                },
+                                ownKeys: function(target) {
+                                    var keys = [];
+                                    var own = Object.getOwnPropertyNames(target);
+                                    for (var i = 0; i < own.length; i++) {
+                                        if (typeof target[own[i]] !== 'function') keys.push(own[i]);
+                                    }
+                                    var login = loginKeys();
+                                    for (var j = 0; j < login.length; j++) {
+                                        if (keys.indexOf(login[j]) < 0) keys.push(login[j]);
+                                    }
+                                    return keys;
+                                },
+                                getOwnPropertyDescriptor: function(target, prop) {
+                                    var own = Object.getOwnPropertyDescriptor(target, prop);
+                                    if (own) return own;
+                                    if (typeof prop === 'symbol') return undefined;
+                                    if (!hasLoginKey(prop)) return undefined;
+                                    return { value: java.getVar(loginPrefix + String(prop)), writable: true, enumerable: true, configurable: true };
                                 }
                             });
                         }
@@ -1961,6 +2004,15 @@ final class JSCoreRuntime {
         java.removePrefix = function(prefix) {
           return !!__nativeLegado.invoke({ method: 'removePrefix', args: [String(prefix || '')] });
         };
+        java.keysWithPrefix = function(prefix) {
+          var list = __nativeLegado.invoke({ method: 'keysWithPrefix', args: [String(prefix || '')] });
+          var out = [];
+          if (!list) return out;
+          var count = Number(list.length != null ? list.length : (list.count || 0));
+          if (!isFinite(count) || count < 0) count = 0;
+          for (var i = 0; i < count; i++) out.push(String(list[i]));
+          return out;
+        };
         java.ajax = function(url, headers) {
           var target = String(url);
           return __bridgeResponse('', target, __native_ajaxResponse(target, __bridgeString(headers || '')));
@@ -2566,36 +2618,79 @@ final class JSCoreRuntime {
             };
           };
           source.getLoginInfoMap = function() {
-            var loginMap = {
-              get: function(k) { return java.getVar('source.login.' + String(k == null ? '' : k)); },
-              put: function(k, v) { java.put('source.login.' + String(k == null ? '' : k), v == null ? '' : String(v)); return v; },
-              remove: function(k) { var key = 'source.login.' + String(k == null ? '' : k); var old = java.getVar(key); java.removeVar(key); return old; },
-              containsKey: function(k) { return String(java.getVar('source.login.' + String(k == null ? '' : k)) || '') !== ''; },
-              isEmpty: function() { return true; }
-            };
-            if (typeof Proxy !== 'undefined') {
-              return new Proxy(loginMap, {
-                get: function(target, prop) {
-                  if (prop in target) return target[prop];
-                  if (typeof prop === 'symbol') return undefined;
-                  return java.getVar('source.login.' + String(prop));
-                },
-                set: function(target, prop, value) {
-                  if (prop in target) { target[prop] = value; return true; }
-                  java.put('source.login.' + String(prop), value == null ? '' : String(value));
-                  return true;
-                },
-                has: function(target, prop) {
-                  return (prop in target) || String(java.getVar('source.login.' + String(prop)) || '') !== '';
-                },
-                deleteProperty: function(target, prop) {
-                  if (prop in target) { delete target[prop]; return true; }
-                  java.removeVar('source.login.' + String(prop));
-                  return true;
-                }
-              });
-            }
-            return loginMap;
+              var loginPrefix = 'source.login.';
+              var loginKeys = function() {
+                  var list = java.keysWithPrefix(loginPrefix);
+                  var out = [];
+                  if (!list) return out;
+                  var count = Number(list.length != null ? list.length : (list.count || 0));
+                  if (!isFinite(count) || count < 0) count = 0;
+                  for (var i = 0; i < count; i++) {
+                      var full = String(list[i]);
+                      if (full.indexOf(loginPrefix) === 0) out.push(full.substring(loginPrefix.length));
+                  }
+                  return out;
+              };
+              var hasLoginKey = function(k) {
+                  var key = String(k == null ? '' : k);
+                  var keys = loginKeys();
+                  for (var i = 0; i < keys.length; i++) {
+                      if (keys[i] === key) return true;
+                  }
+                  return false;
+              };
+              var loginMap = {
+                  get: function(k) { return java.getVar(loginPrefix + String(k == null ? '' : k)); },
+                  put: function(k, v) { java.put(loginPrefix + String(k == null ? '' : k), v == null ? '' : String(v)); return v; },
+                  remove: function(k) { var key = loginPrefix + String(k == null ? '' : k); var old = java.getVar(key); java.removeVar(key); return old; },
+                  containsKey: function(k) { return hasLoginKey(k); },
+                  isEmpty: function() { return loginKeys().length === 0; }
+              };
+              if (typeof Proxy !== 'undefined') {
+                  return new Proxy(loginMap, {
+                      get: function(target, prop) {
+                          if (prop in target) return target[prop];
+                          if (typeof prop === 'symbol') return undefined;
+                          return java.getVar(loginPrefix + String(prop));
+                      },
+                      set: function(target, prop, value) {
+                          if (prop in target) { target[prop] = value; return true; }
+                          java.put(loginPrefix + String(prop), value == null ? '' : String(value));
+                          return true;
+                      },
+                      has: function(target, prop) {
+                          if (prop in target) return true;
+                          if (typeof prop === 'symbol') return false;
+                          return hasLoginKey(prop);
+                      },
+                      deleteProperty: function(target, prop) {
+                          if (prop in target) { delete target[prop]; return true; }
+                          if (typeof prop === 'symbol') return true;
+                          java.removeVar(loginPrefix + String(prop));
+                          return true;
+                      },
+                      ownKeys: function(target) {
+                          var keys = [];
+                          var own = Object.getOwnPropertyNames(target);
+                          for (var i = 0; i < own.length; i++) {
+                              if (typeof target[own[i]] !== 'function') keys.push(own[i]);
+                          }
+                          var login = loginKeys();
+                          for (var j = 0; j < login.length; j++) {
+                              if (keys.indexOf(login[j]) < 0) keys.push(login[j]);
+                          }
+                          return keys;
+                      },
+                      getOwnPropertyDescriptor: function(target, prop) {
+                          var own = Object.getOwnPropertyDescriptor(target, prop);
+                          if (own) return own;
+                          if (typeof prop === 'symbol') return undefined;
+                          if (!hasLoginKey(prop)) return undefined;
+                          return { value: java.getVar(loginPrefix + String(prop)), writable: true, enumerable: true, configurable: true };
+                      }
+                  });
+              }
+              return loginMap;
           };
           source.putLoginInfo = function(map) {
             if (!map) return false;
