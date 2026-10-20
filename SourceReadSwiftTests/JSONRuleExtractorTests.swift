@@ -722,7 +722,70 @@ final class JSONRuleExtractorTests: XCTestCase {
         ]
 
         XCTAssertEqual(extractor.string(from: object, rule: "{$..name}"), "A\nB")
-        XCTAssertEqual(extractor.stringList(from: object, rule: "{$..name}"), ["A", "B"])
+        // Legado's getStringList adds a successful innerRule substitution as
+        // exactly one element instead of splitting it on newlines.
+        XCTAssertEqual(extractor.stringList(from: object, rule: "{$..name}"), ["A\nB"])
+    }
+
+    func testStringListMatchesLegadoElementSemantics() throws {
+        let extractor = JSONRuleExtractor()
+        let object: [String: Any] = [
+            "items": ["A\nB", "C"],
+            "single": "X\nY"
+        ]
+
+        XCTAssertEqual(extractor.stringList(from: object, rule: "$.items[*]"), ["A\nB", "C"])
+        XCTAssertEqual(extractor.stringList(from: object, rule: "$.single"), ["X\nY"])
+        XCTAssertEqual(extractor.stringList(from: object, rule: "{$..single}"), ["X\nY"])
+    }
+
+    func testStringListSplitsLegadoOperatorsBeforeExpandingInnerRules() throws {
+        let extractor = JSONRuleExtractor()
+        let object: [String: Any] = [
+            "title": "A",
+            "id": "B",
+            "single": "X\nY",
+            "left": ["1", "2"],
+            "right": ["x", "y"]
+        ]
+
+        // `AnalyzeByJSonPath.getStringList` splits on the first top-level
+        // operator first, so an inner rule in each branch stays one element
+        // instead of being glued into a single `A&&B` string.
+        XCTAssertEqual(
+            extractor.stringList(from: object, rule: "{$..title}&&{$..id}"),
+            ["A", "B"]
+        )
+        XCTAssertEqual(
+            extractor.stringList(from: object, rule: "{$..missing}||{$..id}"),
+            ["B"]
+        )
+        XCTAssertEqual(
+            extractor.stringList(from: object, rule: "{$..title}||{$..id}"),
+            ["A"]
+        )
+        XCTAssertEqual(
+            extractor.stringList(from: object, rule: "$.left[*]&&$.right[*]"),
+            ["1", "2", "x", "y"]
+        )
+        XCTAssertEqual(
+            extractor.stringList(from: object, rule: "$.left[*]%%$.right[*]"),
+            ["1", "x", "2", "y"]
+        )
+        XCTAssertEqual(
+            extractor.stringList(from: object, rule: "$.single&&$.id"),
+            ["X\nY", "B"]
+        )
+    }
+
+    func testInnerRuleRequiresDollarDotPrefix() throws {
+        let extractor = JSONRuleExtractor()
+        let object: [String: Any] = ["name": "T"]
+
+        // Legado matches `innerRule("{$.")`; `{$?` is not an inner rule and
+        // must fall through to normal path evaluation instead of expanding.
+        XCTAssertNil(extractor.string(from: object, rule: "{$?name}"))
+        XCTAssertEqual(extractor.stringList(from: object, rule: "{$?name}"), [])
     }
 
     func testUnresolvedOrUnbalancedInnerRuleFallsBackToPathEvaluation() throws {

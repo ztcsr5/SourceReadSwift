@@ -128,6 +128,50 @@ struct JSONRuleExtractor {
     ) -> [String] {
         let trimmed = rule?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
         guard !trimmed.isEmpty else { return [] }
+
+        // `AnalyzeByJSonPath.getStringList` never splits plain strings: each
+        // JSONPath match (and each successful `{$...}` inner-rule replacement)
+        // becomes exactly one element, even when the text contains newlines.
+        let split = splitTransforms(trimmed)
+        let pathPart = split.path.trimmingCharacters(in: .whitespacesAndNewlines)
+        let isScriptRule = trimmed.contains("@js:")
+            || trimmed.hasPrefix("<js>")
+            || trimmed.contains("<js>")
+
+        // Legado splits the rule on the first top-level `&&`, `||` or `%%`
+        // *before* evaluating any branch, and each branch keeps its own list
+        // shape: `&&` concatenates, `||` keeps the first non-empty list and
+        // `%%` interleaves element-wise.  Expanding `{$...}` across the whole
+        // rule first would turn `{$..title}&&{$..id}` into one glued string.
+        if !isScriptRule, let operation = RuleOperatorSplitter.firstOperator(in: pathPart) {
+            let lists = operation.parts.map {
+                stringList(from: object, rule: $0, variables: variables)
+            }
+            var merged: [String] = []
+            switch operation.op {
+            case "||":
+                merged = lists.first(where: { !$0.isEmpty }) ?? []
+            case "%%":
+                if let first = lists.first {
+                    for index in first.indices {
+                        for list in lists where index < list.count {
+                            merged.append(list[index])
+                        }
+                    }
+                }
+            default:
+                for list in lists { merged.append(contentsOf: list) }
+            }
+            return applyTransforms(split.transforms, to: merged)
+        }
+
+        if !isScriptRule, pathPart.contains("{$."),
+           let expanded = expandInnerJSONRules(in: pathPart, object: object, variables: variables) {
+            let transformed = applyTransforms(split.transforms, to: expanded)
+            let text = stringifyJSResult(transformed)
+            return text.isEmpty ? [] : [text]
+        }
+
         guard let selected = value(from: object, path: trimmed, variables: variables) else {
             return []
         }
@@ -329,12 +373,12 @@ struct JSONRuleExtractor {
         variables: [String: Any],
         depth: Int = 0
     ) -> String? {
-        guard depth < 16, rule.contains("{$") else { return nil }
+        guard depth < 16, rule.contains("{$.") else { return nil }
         var output = ""
         var index = rule.startIndex
         var replaced = false
         while index < rule.endIndex {
-            guard let start = rule.range(of: "{$", range: index..<rule.endIndex) else {
+            guard let start = rule.range(of: "{$.", range: index..<rule.endIndex) else {
                 output += rule[index...]
                 break
             }
@@ -509,6 +553,8 @@ struct JSONRuleExtractor {
             return text.isEmpty ? [] : [text]
         }
         if let array = value as? [Any] {
+            // `AnalyzeByJSonPath.getStringList` adds every element with
+            // `toString()`; it never splits element text on newlines.
             return array.flatMap { listValues(from: $0) }
         }
         if let array = value as? [[String: Any]] {
@@ -518,9 +564,7 @@ struct JSONRuleExtractor {
             if let decoded = decodeJSONValue(text), !(decoded is String) {
                 return listValues(from: decoded)
             }
-            return text.components(separatedBy: "\n")
-                .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
-                .filter { !$0.isEmpty }
+            return text.isEmpty ? [] : [text]
         }
         let text = stringify(value)
         return text.isEmpty ? [] : [text]
@@ -1872,6 +1916,17 @@ struct JSONRuleExtractor {
     private func splitTransforms(_ rawRule: String) -> (path: String, transforms: [RegexTransform]) {
         let split = RuleTransformParser.split(rawRule)
         return (split.path, split.transform.map { [$0] } ?? [])
+    }
+
+    private func applyTransforms(_ transforms: [RegexTransform], to list: [String]) -> [String] {
+        guard !transforms.isEmpty else { return list }
+        return list.map { item in
+            var text = item
+            for transform in transforms {
+                text = RuleTransformParser.apply(transform, to: text)
+            }
+            return text
+        }
     }
 
     private func applyTransforms(_ transforms: [RegexTransform], to value: Any) -> Any {

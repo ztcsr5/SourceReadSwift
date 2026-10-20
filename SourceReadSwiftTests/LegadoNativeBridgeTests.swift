@@ -164,6 +164,33 @@ final class LegadoNativeBridgeTests: XCTestCase {
         XCTAssertEqual(analyzer.executionContext.string(for: "result"), json)
     }
 
+    func testAnalyzerStringListKeepsLegadoInnerRuleElementSemantics() throws {
+        let analyzer = LegadoRuleAnalyzer()
+        let json = #"{"list":[{"name":"A"},{"name":"B"}],"single":"X\nY"}"#
+
+        // `AnalyzeByJSonPath.getStringList` adds a successful `{$...}`
+        // substitution as one element; plain JSONPath selections keep one
+        // element per match and never split on newlines.
+        XCTAssertEqual(analyzer.stringList(content: json, rule: "{$..name}", baseURL: nil), ["A\nB"])
+        XCTAssertEqual(analyzer.stringList(content: json, rule: "$.single", baseURL: nil), ["X\nY"])
+        XCTAssertEqual(analyzer.stringList(content: json, rule: "$.list[*].name", baseURL: nil), ["A", "B"])
+
+        // Top-level operators are resolved before inner-rule expansion; each
+        // branch keeps its own list shape.
+        XCTAssertEqual(
+            analyzer.stringList(content: json, rule: "{$..name}&&$.single", baseURL: nil),
+            ["A\nB", "X\nY"]
+        )
+        XCTAssertEqual(
+            analyzer.stringList(content: json, rule: "$.missing||$.list[*].name", baseURL: nil),
+            ["A", "B"]
+        )
+        XCTAssertEqual(
+            analyzer.stringList(content: json, rule: "$.list[*].name%%$.list[*].name", baseURL: nil),
+            ["A", "A", "B", "B"]
+        )
+    }
+
     func testNativeJavaABIExposesFilesystemAndCryptoMethods() throws {
         let runtime = JSCoreRuntime()
         let result = runtime.evaluate("[typeof java.aesEncodeToString, typeof java.readTxtFile, typeof java.getZipStringContent, typeof java.downloadFile, typeof java.utf8ToGbk].join('|')")

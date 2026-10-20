@@ -61,10 +61,12 @@ final class LegadoRuleAnalyzer {
             }
             return value.isEmpty ? [] : [value]
         }
-        if let json = jsonObject(content), let value = jsonExtractor.value(from: json, path: rule, variables: variables) {
-            if let list = value as? [Any] { return list.map(stringify).filter { !$0.isEmpty } }
-            let text = stringify(value)
-            return text.isEmpty ? [] : [text]
+        if let json = jsonObject(content) {
+            // Delegate to `AnalyzeByJSonPath.getStringList` semantics: a
+            // successful `{$...}` inner-rule substitution is one element even
+            // when it contains newlines, while plain JSONPath selections keep
+            // one element per match.
+            return jsonExtractor.stringList(from: json, rule: rule, variables: variables)
         }
         do {
             let root = try SwiftSoup.parse(content, baseURL?.absoluteString ?? "http://localhost/")
