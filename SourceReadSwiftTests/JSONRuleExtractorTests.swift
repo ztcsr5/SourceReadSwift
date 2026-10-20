@@ -34,6 +34,13 @@ final class JSONRuleExtractorTests: XCTestCase {
         XCTAssertEqual(extractor.string(from: list[0], rule: "BookId", fallbackKeys: []), "1209977")
     }
 
+    func testSameLevelAndRulesKeepMergeSemantics() throws {
+        let object: [String: Any] = ["a": "A", "b": "B"]
+        let extractor = JSONRuleExtractor()
+
+        XCTAssertEqual(extractor.stringList(from: object, rule: "a&&b"), ["A", "B"])
+    }
+
     func testExtractBracketNotationPath() throws {
         let title = "\u{6597}\u{7834}\u{82cd}\u{7a79}"
         let object: [String: Any] = [

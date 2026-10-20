@@ -271,9 +271,29 @@ struct JSONRuleExtractor {
         }
 
         if let operation = RuleOperatorSplitter.firstOperator(in: pathPart) {
-            let values = operation.parts.compactMap {
+            let directValues = operation.parts.map {
                 evaluateBranch($0, object: object, variables: variables)
             }
+            // Legado chains rules like "Data&&Books" as nested traversal when a
+            // later part cannot resolve against the original object. Rules whose
+            // parts all resolve at the same level keep the merge semantics.
+            if operation.op == "&&",
+               directValues.dropFirst().contains(where: { $0 == nil }) {
+                var current: Any? = object
+                var chained = true
+                for part in operation.parts {
+                    guard let base = current,
+                          let next = evaluateBranch(part, object: base, variables: variables) else {
+                        chained = false
+                        break
+                    }
+                    current = next
+                }
+                if chained, let final = current {
+                    return applyTransforms(transforms, to: final)
+                }
+            }
+            let values = directValues.compactMap { $0 }
             guard let merged = merge(values: values, operation: operation.op) else { return nil }
             return applyTransforms(transforms, to: merged)
         }
@@ -521,6 +541,15 @@ struct JSONRuleExtractor {
     private func parsePutBody(_ rawBody: String) -> (key: String, valueRule: String)? {
         let body = rawBody.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !body.isEmpty else { return nil }
+        // directiveSpans strips the outer braces, so re-wrap the body before
+        // asking JSONSerialization to parse the key/value pair.
+        if let data = ("{" + body + "}").data(using: .utf8),
+           let object = try? JSONSerialization.jsonObject(with: data, options: [.fragmentsAllowed]),
+           let dictionary = object as? [String: Any],
+           dictionary.count == 1,
+           let pair = dictionary.first {
+            return (pair.key, stringify(pair.value))
+        }
         if body.hasPrefix("{"),
            let data = body.data(using: .utf8),
            let object = try? JSONSerialization.jsonObject(with: data, options: [.fragmentsAllowed]),
@@ -858,7 +887,7 @@ struct JSONRuleExtractor {
                 if mapped.isEmpty { return nil }
                 var flattened: [Any] = []
                 mapped.forEach { appendFlattened($0, to: &flattened) }
-                return flattened
+                return flattened.count == 1 ? flattened[0] : flattened
             }
             if let number = Int(part) {
                 let resolved = number < 0 ? array.count + number : number
@@ -869,7 +898,7 @@ struct JSONRuleExtractor {
             if mapped.isEmpty { return nil }
             var flattened: [Any] = []
             mapped.forEach { appendFlattened($0, to: &flattened) }
-            return flattened
+            return flattened.count == 1 ? flattened[0] : flattened
         }
         return nil
     }
