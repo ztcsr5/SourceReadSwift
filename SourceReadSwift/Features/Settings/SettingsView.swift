@@ -49,6 +49,14 @@ struct SettingsView: View {
                     }
                 }
 
+                Section("语音朗读") {
+                    NavigationLink {
+                        TTSSettingsView()
+                    } label: {
+                        Label("朗读引擎与云端凭据", systemImage: "waveform")
+                    }
+                }
+
                 Section("内容设置") {
                     NavigationLink {
                         SourceManagerView()

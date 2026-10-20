@@ -116,6 +116,7 @@ struct ReaderView: View {
     @AppStorage("reader.titleSpacing") private var titleSpacing: Double = ReaderTypographyDefaults.titleSpacing
     @AppStorage("reader.footerHeight") private var footerHeight: Double = ReaderTypographyDefaults.footerHeight
     @AppStorage("reader.ttsRate") private var ttsRate: Double = 0.52
+    @AppStorage("reader.ttsEngine") private var ttsEngineRawValue: String = TTSEngineKind.local.rawValue
     @AppStorage("reader.autoScrollDelay") private var autoScrollDelay: Double = 2.0
     @AppStorage("reader.sleepTimerMinutes") private var sleepTimerMinutes: Int = 0
     @AppStorage("reader.background") private var backgroundRawValue: String = ReaderBackground.paper.rawValue
@@ -2608,7 +2609,8 @@ struct ReaderView: View {
             paragraphs: content.paragraphs,
             startParagraphIndex: startParagraph,
             includeTitle: false,
-            rate: Float(ttsRate)
+            rate: Float(ttsRate),
+            engine: TTSEngineKind(rawValue: ttsEngineRawValue) ?? .local
         )
     }
 
@@ -3000,11 +3002,29 @@ final class ReaderSpeechController: NSObject, ObservableObject, AVSpeechSynthesi
     private var activeUtterance: AVSpeechUtterance?
     private var currentTitle: String = ""
     private var remoteCommandsConfigured = false
+    private let cloudCredentialsStore = CloudTTSCredentialsStore()
+    private let cloudClient = CloudTTSClient()
+    private let cloudPlayer = CloudTTSPlayer()
+    private var cloudTask: Task<Void, Never>?
+    private var cloudGeneration = 0
+    private var engineKind: TTSEngineKind = .local
+    private var activeSegment: (index: Int, text: String)?
+    @Published var lastErrorMessage: String?
     var onFinished: (() -> Void)?
 
     override init() {
         super.init()
         synthesizer.delegate = self
+        cloudPlayer.onFinish = { [weak self] in
+            Task { @MainActor in
+                self?.handleCloudSegmentFinished()
+            }
+        }
+        cloudPlayer.onError = { [weak self] error in
+            Task { @MainActor in
+                self?.handleCloudPlaybackError(error)
+            }
+        }
         setupAudioInterruptionObserver()
     }
 
@@ -3018,9 +3038,16 @@ final class ReaderSpeechController: NSObject, ObservableObject, AVSpeechSynthesi
         paragraphs: [String],
         startParagraphIndex: Int = 0,
         includeTitle: Bool = true,
-        rate: Float
+        rate: Float,
+        engine: TTSEngineKind = .local
     ) {
         stop(clearCompletion: false)
+        var resolvedEngine = engine
+        if resolvedEngine == .cloud && !cloudCredentialsStore.isConfigured {
+            lastErrorMessage = "未配置讯飞云端语音凭据，已回退系统语音"
+            resolvedEngine = .local
+        }
+        engineKind = resolvedEngine
         queue.reset(
             title: title,
             paragraphs: paragraphs,
@@ -3040,6 +3067,12 @@ final class ReaderSpeechController: NSObject, ObservableObject, AVSpeechSynthesi
 
     func pause() {
         guard isSpeaking else { return }
+        if engineKind == .cloud {
+            cloudPlayer.pause()
+            isPaused = true
+            updateNowPlayingInfo()
+            return
+        }
         synthesizer.pauseSpeaking(at: .word)
         isPaused = true
         updateNowPlayingInfo()
@@ -3047,6 +3080,12 @@ final class ReaderSpeechController: NSObject, ObservableObject, AVSpeechSynthesi
 
     func resume() {
         guard isSpeaking else { return }
+        if engineKind == .cloud {
+            cloudPlayer.resume()
+            isPaused = false
+            updateNowPlayingInfo()
+            return
+        }
         if synthesizer.isPaused {
             synthesizer.continueSpeaking()
         }
@@ -3060,6 +3099,12 @@ final class ReaderSpeechController: NSObject, ObservableObject, AVSpeechSynthesi
 
     func skipNext() {
         guard isSpeaking else { return }
+        if engineKind == .cloud {
+            cancelCloudPlayback()
+            activeSegment = nil
+            speakNext()
+            return
+        }
         synthesizer.stopSpeaking(at: .immediate)
         activeUtterance = nil
         speakNext()
@@ -3067,6 +3112,16 @@ final class ReaderSpeechController: NSObject, ObservableObject, AVSpeechSynthesi
 
     func skipPrevious() {
         guard isSpeaking else { return }
+        if engineKind == .cloud {
+            cancelCloudPlayback()
+            activeSegment = nil
+            guard let segment = queue.stepBack() else {
+                speakNext()
+                return
+            }
+            playSegment(segment)
+            return
+        }
         synthesizer.stopSpeaking(at: .immediate)
         activeUtterance = nil
         guard let segment = queue.stepBack() else {
@@ -3077,6 +3132,9 @@ final class ReaderSpeechController: NSObject, ObservableObject, AVSpeechSynthesi
     }
 
     private func stop(clearCompletion: Bool) {
+        cancelCloudPlayback()
+        activeSegment = nil
+        lastErrorMessage = nil
         synthesizer.stopSpeaking(at: .immediate)
         activeUtterance = nil
         if clearCompletion {
@@ -3095,6 +3153,8 @@ final class ReaderSpeechController: NSObject, ObservableObject, AVSpeechSynthesi
             let completion = onFinished
             onFinished = nil
             synthesizer.stopSpeaking(at: .immediate)
+            cloudPlayer.stop()
+            activeSegment = nil
             isSpeaking = false
             isPaused = false
             currentParagraphIndex = -1
@@ -3112,12 +3172,86 @@ final class ReaderSpeechController: NSObject, ObservableObject, AVSpeechSynthesi
             return
         }
         currentParagraphIndex = segment.index
+        activeSegment = segment
+        if engineKind == .cloud {
+            playCloudSegment(segment)
+            return
+        }
         let utterance = AVSpeechUtterance(string: segment.text)
         utterance.voice = AVSpeechSynthesisVoice(language: "zh-CN")
         utterance.rate = rate
         activeUtterance = utterance
         synthesizer.speak(utterance)
         updateNowPlayingInfo()
+    }
+
+    private func cancelCloudPlayback() {
+        cloudGeneration += 1
+        cloudTask?.cancel()
+        cloudTask = nil
+        cloudPlayer.stop()
+    }
+
+    private func playCloudSegment(_ segment: (index: Int, text: String)) {
+        guard let credentials = cloudCredentialsStore.load(), credentials.isConfigured else {
+            lastErrorMessage = "未配置讯飞云端语音凭据，已回退系统语音"
+            engineKind = .local
+            playSegment(segment)
+            return
+        }
+        cancelCloudPlayback()
+        let generation = cloudGeneration
+        updateNowPlayingInfo()
+        cloudTask = Task { [weak self] in
+            guard let self else { return }
+            do {
+                let audio = try await self.cloudClient.synthesize(text: segment.text, credentials: credentials)
+                guard !Task.isCancelled else { return }
+                await MainActor.run {
+                    guard self.cloudGeneration == generation, self.isSpeaking else { return }
+                    do {
+                        try self.cloudPlayer.play(data: audio)
+                        if self.isPaused {
+                            self.cloudPlayer.pause()
+                        }
+                    } catch {
+                        self.handleCloudFailure(error, generation: generation)
+                    }
+                }
+            } catch {
+                guard !Task.isCancelled else { return }
+                await MainActor.run {
+                    self.handleCloudFailure(error, generation: generation)
+                }
+            }
+        }
+    }
+
+    private func handleCloudSegmentFinished() {
+        guard isSpeaking, engineKind == .cloud else { return }
+        if let index = activeSegment?.index, index >= 0 {
+            lastFinishedParagraphIndex = index
+        }
+        activeSegment = nil
+        speakNext()
+    }
+
+    private func handleCloudPlaybackError(_ error: Error) {
+        guard isSpeaking, engineKind == .cloud else { return }
+        handleCloudFailure(error, generation: cloudGeneration)
+    }
+
+    private func handleCloudFailure(_ error: Error, generation: Int) {
+        guard generation == cloudGeneration, isSpeaking else { return }
+        cloudPlayer.stop()
+        let message = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
+        lastErrorMessage = "云端语音不可用，已回退系统语音：\(message)"
+        engineKind = .local
+        if let segment = activeSegment {
+            playSegment(segment)
+        } else {
+            speakNext()
+        }
     }
 
     private func updateNowPlayingInfo() {
