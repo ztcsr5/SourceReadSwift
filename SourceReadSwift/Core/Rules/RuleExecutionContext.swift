@@ -167,6 +167,18 @@ final class RuleExecutionContext: @unchecked Sendable {
         persistentState.remove(key)
     }
 
+    /// Removes every scoped variable sharing a prefix.  Legado sources use
+    /// `source.removeLoginInfo()` to clear the `source.login.*` namespace;
+    /// without prefix enumeration those credentials survive a re-login.
+    func removePrefix(_ prefix: String) {
+        guard !prefix.isEmpty else { return }
+        lock.lock()
+        let keys = values.keys.filter { $0.hasPrefix(prefix) }
+        for key in keys { values.removeValue(forKey: key) }
+        lock.unlock()
+        persistentState.removePrefix(prefix)
+    }
+
     func persistentSnapshot() -> [String: String] { persistentState.snapshot() }
 
     /// Import response cookies into the same state used by `java.put/get`.
@@ -254,6 +266,14 @@ final class RulePersistentState: @unchecked Sendable {
 
     func remove(_ key: String) {
         lock.lock(); values.removeValue(forKey: key); lock.unlock()
+    }
+
+    func removePrefix(_ prefix: String) {
+        guard !prefix.isEmpty else { return }
+        lock.lock()
+        let keys = values.keys.filter { $0.hasPrefix(prefix) }
+        for key in keys { values.removeValue(forKey: key) }
+        lock.unlock()
     }
 
     func snapshot() -> [String: String] {

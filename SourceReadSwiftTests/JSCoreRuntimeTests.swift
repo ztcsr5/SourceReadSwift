@@ -434,4 +434,28 @@ final class JSCoreRuntimeTests: XCTestCase {
         }
         XCTAssertEqual(value, "0|Two|true|3|true")
     }
+
+    func testLoginInfoMapSupportsBracketAccessPutAndPrefixRemoval() throws {
+        let source = BookSource(bookSourceName: "login-source", bookSourceUrl: "https://example.com")
+        let runtime = JSCoreRuntime()
+        let script = """
+        var map = source.getLoginInfoMap();
+        map['密钥'] = 'KEY-1';
+        var bracket = map['密钥'];
+        var getter = map.get('密钥');
+        var contains = map.containsKey('密钥');
+        source.putLoginInfo({'token': 'T-2'});
+        var token = source.getLoginInfoMap()['token'];
+        source.setLoginInfo('device', 'D-3');
+        var device = source.getLoginInfoMap()['device'];
+        source.removeLoginInfo();
+        var cleared = String(source.getLoginInfoMap()['密钥'] || '');
+        [bracket, getter, contains, token, device, cleared].join('|');
+        """
+        let result = runtime.evaluate(script, variables: ["source": source])
+        guard case .success(let value) = result else {
+            return XCTFail("expected success: \(result)")
+        }
+        XCTAssertEqual(value, "KEY-1|KEY-1|true|T-2|D-3|")
+    }
 }

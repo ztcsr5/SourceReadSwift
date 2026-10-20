@@ -155,6 +155,10 @@ final class LegadoJavaHostBridge: NSObject, LegadoJavaHostExport {
             guard let key = arguments.first else { return false }
             executionContext?.remove(RuleExecutionContext.bridgeString(key))
             return true
+        case "removePrefix":
+            guard let prefix = arguments.first else { return false }
+            executionContext?.removePrefix(RuleExecutionContext.bridgeString(prefix))
+            return true
         case "setContent":
             let content = RuleExecutionContext.bridgeString(arguments.first)
             executionContext?.setValue(content, for: "result")
