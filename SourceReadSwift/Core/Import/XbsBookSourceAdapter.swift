@@ -220,6 +220,7 @@ struct XbsBookSourceAdapter: Sendable {
 
         var raw: [String: String] = [:]
         raw["xbsOrigin"] = "true"
+        raw["sourceFormat"] = BookSourceFormat.xbs.rawValue
         raw["miniAppVersion"] = dict["miniAppVersion"] as? String ?? ""
         if let lastModify = dict["lastModifyTime"] as? String {
             raw["lastModifyTime"] = lastModify

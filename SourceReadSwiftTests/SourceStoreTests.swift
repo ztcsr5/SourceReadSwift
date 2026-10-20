@@ -492,4 +492,148 @@ final class SourceStoreTests: XCTestCase {
         XCTAssertEqual(candidates.map(\.bookSourceName), ["High Pattern", "Low Pattern", "Fallback"])
         try? FileManager.default.removeItem(at: root)
     }
+
+    // MARK: - Specialized adapter dispatch (sync/async parity)
+
+    func testAsyncImportHuaHuoSourceUsesSpecializedAdapter() async throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        let store = SourceStore(persistence: SourcePersistence(fileManager: .default, rootURL: root))
+        let json = """
+        [
+          {
+            "sourceName": "花火测试源",
+            "sourceUrl": "https://huahuo.test.org",
+            "sourceGroup": "精品推荐",
+            "searchUrl": "https://huahuo.test.org/search?q={{key}}",
+            "ruleSearch": {
+              "searchBookList": "ul.list li",
+              "searchName": ".name@text",
+              "searchAuthor": ".author@text",
+              "searchBookUrl": ".link@href"
+            },
+            "ruleToc": {
+              "tocList": "#chapters a",
+              "tocName": "text",
+              "tocUrl": "href"
+            },
+            "ruleContent": {
+              "content": "#art-content@text"
+            }
+          }
+        ]
+        """
+
+        let report = try await store.importJSONDataAsync(Data(json.utf8))
+
+        XCTAssertEqual(report.addedBookSources, 1)
+        let source = try XCTUnwrap(store.source(for: "https://huahuo.test.org"))
+        XCTAssertEqual(source.sourceFormat, .huahuo)
+        XCTAssertEqual(source.ruleSearch?.fields["bookList"], "ul.list li")
+        XCTAssertEqual(source.ruleToc?.fields["chapterList"], "#chapters a")
+        XCTAssertEqual(source.ruleContent?.fields["content"], "#art-content@text")
+        try? FileManager.default.removeItem(at: root)
+    }
+
+    func testAsyncImportHaiKuoSourceUsesSpecializedAdapter() async throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        let store = SourceStore(persistence: SourcePersistence(fileManager: .default, rootURL: root))
+        let json = """
+        [
+          {
+            "title": "海阔小说源",
+            "url": "https://haikuo.novel.org",
+            "group": "海阔影视",
+            "search_url": "https://haikuo.novel.org/s?wd={{key}}",
+            "search_rule": ".search-results li",
+            "find_url": "https://haikuo.novel.org/category",
+            "find_rule": ".category-list li",
+            "ua": "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X)"
+          }
+        ]
+        """
+
+        let report = try await store.importJSONDataAsync(Data(json.utf8))
+
+        XCTAssertEqual(report.addedBookSources, 1)
+        let source = try XCTUnwrap(store.source(for: "https://haikuo.novel.org"))
+        XCTAssertEqual(source.sourceFormat, .haikuo)
+        XCTAssertEqual(source.searchUrl, "https://haikuo.novel.org/s?wd={{key}}")
+        XCTAssertEqual(source.ruleSearch?.fields["bookList"], ".search-results li")
+        XCTAssertEqual(source.ruleExplore?.fields["bookList"], ".category-list li")
+        XCTAssertTrue(source.header?.contains("iPhone") == true)
+        try? FileManager.default.removeItem(at: root)
+    }
+
+    func testSyncAndAsyncImportsProduceIdenticalSpecializedSources() async throws {
+        let rootA = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        let rootB = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        let syncStore = SourceStore(persistence: SourcePersistence(fileManager: .default, rootURL: rootA))
+        let asyncStore = SourceStore(persistence: SourcePersistence(fileManager: .default, rootURL: rootB))
+        let json = """
+        [
+          {
+            "sourceName": "花火对等源",
+            "sourceUrl": "https://huahuo.parity.org",
+            "sourceGroup": "对等",
+            "searchUrl": "https://huahuo.parity.org/search?q={{key}}",
+            "ruleSearch": {
+              "searchBookList": ".item",
+              "searchName": ".title@text",
+              "searchBookUrl": "a@href"
+            },
+            "ruleToc": {
+              "tocList": ".chapter a",
+              "tocName": "text",
+              "tocUrl": "href"
+            },
+            "ruleContent": {
+              "content": "#content@text"
+            }
+          }
+        ]
+        """
+
+        try syncStore.importJSON(json)
+        _ = try await asyncStore.importJSONDataAsync(Data(json.utf8))
+
+        XCTAssertEqual(syncStore.sources.map(\.bookSourceUrl), asyncStore.sources.map(\.bookSourceUrl))
+        XCTAssertEqual(syncStore.sources.map(\.sourceFormat), asyncStore.sources.map(\.sourceFormat))
+        XCTAssertEqual(syncStore.sources.map(\.ruleSearch), asyncStore.sources.map(\.ruleSearch))
+        XCTAssertEqual(syncStore.sources.map(\.ruleToc), asyncStore.sources.map(\.ruleToc))
+        XCTAssertEqual(syncStore.sources.map(\.ruleContent), asyncStore.sources.map(\.ruleContent))
+        try? FileManager.default.removeItem(at: rootA)
+        try? FileManager.default.removeItem(at: rootB)
+    }
+
+    func testAsyncImportGenericLegadoJSONKeepsLegadoFormat() async throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        let store = SourceStore(persistence: SourcePersistence(fileManager: .default, rootURL: root))
+        let json = """
+        [
+          {
+            "bookSourceName": "通用 Legado 源",
+            "bookSourceUrl": "https://legado.async.example",
+            "bookSourceGroup": "普通分组",
+            "searchUrl": "/search?q={{key}}",
+            "ruleSearch": {
+              "bookList": "data.list",
+              "name": "title",
+              "bookUrl": "url"
+            }
+          }
+        ]
+        """
+
+        _ = try await store.importJSONDataAsync(Data(json.utf8))
+
+        let source = try XCTUnwrap(store.source(for: "https://legado.async.example"))
+        XCTAssertEqual(source.sourceFormat, .legado)
+        XCTAssertEqual(source.ruleSearch?.fields["bookList"], "data.list")
+        try? FileManager.default.removeItem(at: root)
+    }
 }

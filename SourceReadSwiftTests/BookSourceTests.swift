@@ -391,4 +391,97 @@ final class BookSourceTests: XCTestCase {
         XCTAssertEqual(source.ruleContent?.fields["content"], ".content@html")
         XCTAssertEqual(source.ruleContent?.fields["nextContentUrl"], ".next@href")
     }
+
+    // MARK: - Format identity
+
+    func testSourceFormatUsesExplicitRawMarker() {
+        let source = BookSource(
+            bookSourceName: "花火源",
+            bookSourceUrl: "https://format.example.com",
+            raw: ["sourceFormat": "huahuo"]
+        )
+
+        XCTAssertEqual(source.sourceFormat, .huahuo)
+        XCTAssertEqual(source.displayBadges.first, "花火")
+    }
+
+    func testSourceFormatFallsBackToXbsOrigin() {
+        let source = BookSource(
+            bookSourceName: "香色源",
+            bookSourceUrl: "https://xbs.example.com",
+            raw: ["xbsOrigin": "true"]
+        )
+
+        XCTAssertEqual(source.sourceFormat, .xbs)
+    }
+
+    func testSourceFormatRecognizesBuiltinBrowserSource() {
+        let source = BookSource(
+            bookSourceName: "内置导航源",
+            bookSourceUrl: BuiltinBrowserSourceProvider.browserSourceUrl
+        )
+
+        XCTAssertEqual(source.sourceFormat, .builtin)
+    }
+
+    func testSourceFormatDefaultsToLegado() {
+        let source = BookSource(
+            bookSourceName: "普通源",
+            bookSourceUrl: "https://plain.example.com"
+        )
+
+        XCTAssertEqual(source.sourceFormat, .legado)
+    }
+
+    func testDisplayBadgesIncludeSearchCapabilityOnlyWhenSearchRuleExists() {
+        let searchable = BookSource(
+            bookSourceName: "可搜索源",
+            bookSourceUrl: "https://searchable.example.com",
+            ruleSearch: SourceRule(fields: ["bookList": ".item"])
+        )
+        let browseOnly = BookSource(
+            bookSourceName: "仅浏览源",
+            bookSourceUrl: "https://browse.example.com"
+        )
+
+        XCTAssertEqual(searchable.displayBadges, ["Legado", "可搜索"])
+        XCTAssertEqual(browseOnly.displayBadges, ["Legado"])
+    }
+
+    func testSourceFormatSurvivesEncodeDecode() throws {
+        let source = BookSource(
+            bookSourceName: "海阔源",
+            bookSourceUrl: "https://roundtrip.example.com",
+            raw: ["sourceFormat": "haikuo"]
+        )
+
+        let decoded = try JSONDecoder().decode(BookSource.self, from: JSONEncoder().encode(source))
+
+        XCTAssertEqual(decoded.sourceFormat, .haikuo)
+        XCTAssertEqual(decoded.raw["sourceFormat"], "haikuo")
+    }
+
+    func testUpdatingRulesAndEnabledPreserveSourceFormat() {
+        let source = BookSource(
+            bookSourceName: "花火更新源",
+            bookSourceUrl: "https://update.example.com",
+            searchUrl: "https://update.example.com/search?q={{key}}",
+            ruleSearch: SourceRule(fields: ["bookList": ".old"]),
+            raw: ["sourceFormat": "huahuo"]
+        )
+
+        let rulesUpdated = source.updatingRules(
+            searchURL: "https://update.example.com/search?q={{key}}",
+            search: #"{"bookList":".new"}"#,
+            detail: "",
+            toc: "",
+            content: ""
+        )
+        let disabled = source.updatingEnabled(false)
+
+        XCTAssertEqual(rulesUpdated.sourceFormat, .huahuo)
+        XCTAssertEqual(rulesUpdated.ruleSearch?.fields["bookList"], ".new")
+        XCTAssertEqual(disabled.sourceFormat, .huahuo)
+        XCTAssertFalse(disabled.enabled)
+    }
 }

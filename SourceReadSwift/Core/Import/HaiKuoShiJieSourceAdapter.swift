@@ -111,7 +111,8 @@ struct HaiKuoShiJieSourceAdapter: Sendable {
             ruleToc: nil,
             ruleContent: nil,
             ruleExplore: exploreFields.isEmpty ? nil : SourceRule(fields: exploreFields),
-            header: headerStr
+            header: headerStr,
+            raw: ["sourceFormat": BookSourceFormat.haikuo.rawValue]
         )
     }
 }

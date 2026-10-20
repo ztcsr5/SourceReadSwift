@@ -1,5 +1,23 @@
 import Foundation
 
+enum BookSourceFormat: String, Codable, Hashable, Sendable, CaseIterable {
+    case legado
+    case huahuo
+    case haikuo
+    case xbs
+    case builtin
+
+    var badgeTitle: String {
+        switch self {
+        case .legado: return "Legado"
+        case .huahuo: return "花火"
+        case .haikuo: return "海阔"
+        case .xbs: return "香色"
+        case .builtin: return "内置"
+        }
+    }
+}
+
 struct BookSource: Identifiable, Codable, Hashable, Sendable {
     var id: String { bookSourceUrl }
 
@@ -43,6 +61,31 @@ struct BookSource: Identifiable, Codable, Hashable, Sendable {
     let loginCheckJs: String?
     let customConfig: String?
     let raw: [String: String]
+
+    /// Format identity survives persistence and updates. Older exports without
+    /// an explicit marker fall back to their structural fingerprints.
+    var sourceFormat: BookSourceFormat {
+        if let stored = raw["sourceFormat"]?.trimmingCharacters(in: .whitespacesAndNewlines),
+           let format = BookSourceFormat(rawValue: stored.lowercased()) {
+            return format
+        }
+        if raw["xbsOrigin"]?.caseInsensitiveCompare("true") == .orderedSame {
+            return .xbs
+        }
+        if BuiltinBrowserSourceProvider.isBrowserSource(url: bookSourceUrl) {
+            return .builtin
+        }
+        return .legado
+    }
+
+    /// UI badges are model-level so every source list renders the same truth.
+    var displayBadges: [String] {
+        var badges = [sourceFormat.badgeTitle]
+        if ruleSearch != nil {
+            badges.append("可搜索")
+        }
+        return badges
+    }
 
     enum CodingKeys: String, CodingKey {
         case bookSourceName

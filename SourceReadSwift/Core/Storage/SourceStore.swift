@@ -396,37 +396,7 @@ final class SourceStore: ObservableObject {
 
     @discardableResult
     func importJSON(_ text: String) throws -> SourceImportReport {
-        if XbsBookSourceAdapter.isXbsJSON(text) {
-            let adapted = XbsBookSourceAdapter.importSources(from: text)
-            if !adapted.isEmpty {
-                let existingCount = sources.count
-                try importSources(adapted)
-                let added = max(0, sources.count - existingCount)
-                let updated = max(0, adapted.count - added)
-                return SourceImportReport(addedBookSources: added, updatedBookSources: updated)
-            }
-        }
-        if HuaHuoBookSourceAdapter.isHuaHuoJSON(text) {
-            let adapted = HuaHuoBookSourceAdapter.importSources(from: text)
-            if !adapted.isEmpty {
-                let existingCount = sources.count
-                try importSources(adapted)
-                let added = max(0, sources.count - existingCount)
-                let updated = max(0, adapted.count - added)
-                return SourceImportReport(addedBookSources: added, updatedBookSources: updated)
-            }
-        }
-        if HaiKuoShiJieSourceAdapter.isHaiKuoJSON(text) {
-            let adapted = HaiKuoShiJieSourceAdapter.importSources(from: text)
-            if !adapted.isEmpty {
-                let existingCount = sources.count
-                try importSources(adapted)
-                let added = max(0, sources.count - existingCount)
-                let updated = max(0, adapted.count - added)
-                return SourceImportReport(addedBookSources: added, updatedBookSources: updated)
-            }
-        }
-        return try importJSONData(Data(text.utf8))
+        try importJSONData(Data(text.utf8))
     }
 
     @discardableResult
@@ -449,35 +419,8 @@ final class SourceStore: ObservableObject {
 
     @discardableResult
     func importJSONData(_ data: Data) throws -> SourceImportReport {
-        if XbsBookSourceAdapter.isXbsData(data) {
-            let adapted = XbsBookSourceAdapter.importSources(from: data)
-            if !adapted.isEmpty {
-                let existingCount = sources.count
-                try importSources(adapted)
-                let added = max(0, sources.count - existingCount)
-                let updated = max(0, adapted.count - added)
-                return SourceImportReport(addedBookSources: added, updatedBookSources: updated)
-            }
-        }
-        if HuaHuoBookSourceAdapter.isHuaHuoData(data) {
-            let adapted = HuaHuoBookSourceAdapter.importSources(from: data)
-            if !adapted.isEmpty {
-                let existingCount = sources.count
-                try importSources(adapted)
-                let added = max(0, sources.count - existingCount)
-                let updated = max(0, adapted.count - added)
-                return SourceImportReport(addedBookSources: added, updatedBookSources: updated)
-            }
-        }
-        if HaiKuoShiJieSourceAdapter.isHaiKuoData(data) {
-            let adapted = HaiKuoShiJieSourceAdapter.importSources(from: data)
-            if !adapted.isEmpty {
-                let existingCount = sources.count
-                try importSources(adapted)
-                let added = max(0, sources.count - existingCount)
-                let updated = max(0, adapted.count - added)
-                return SourceImportReport(addedBookSources: added, updatedBookSources: updated)
-            }
+        if let adapted = Self.specializedBookSources(from: data) {
+            return try importAdaptedBookSources(adapted)
         }
 
         let cleanData = stripUTF8BOM(data)
@@ -517,15 +460,13 @@ final class SourceStore: ObservableObject {
 
     @discardableResult
     func importJSONDataAsync(_ data: Data) async throws -> SourceImportReport {
-        if XbsBookSourceAdapter.isXbsData(data) {
-            let adapted = XbsBookSourceAdapter.importSources(from: data)
-            if !adapted.isEmpty {
-                let existingCount = sources.count
-                try importSources(adapted)
-                let added = max(0, sources.count - existingCount)
-                let updated = max(0, adapted.count - added)
-                return SourceImportReport(addedBookSources: added, updatedBookSources: updated)
-            }
+        // Adapters are pure Sendable transforms. Run the whole dispatch off the
+        // main actor so encrypted XBS payloads and large exports never hitch the UI.
+        let adapted = await Task.detached(priority: .userInitiated) {
+            SourceStore.specializedBookSources(from: data)
+        }.value
+        if let adapted {
+            return try importAdaptedBookSources(adapted)
         }
 
         let cleanData = stripUTF8BOM(data)
@@ -557,6 +498,35 @@ final class SourceStore: ObservableObject {
         }.value
 
         return try self.importItems(decodedItems)
+    }
+
+    /// Single source of truth for specialized import adapters.
+    ///
+    /// Sync and async imports must never drift: every adapter is probed here in
+    /// the same order. `nil` means "no specialized format matched", so generic
+    /// Legado JSON decoding still gets its chance.
+    nonisolated static func specializedBookSources(from data: Data) -> [BookSource]? {
+        if XbsBookSourceAdapter.isXbsData(data) {
+            let adapted = XbsBookSourceAdapter.importSources(from: data)
+            if !adapted.isEmpty { return adapted }
+        }
+        if HuaHuoBookSourceAdapter.isHuaHuoData(data) {
+            let adapted = HuaHuoBookSourceAdapter.importSources(from: data)
+            if !adapted.isEmpty { return adapted }
+        }
+        if HaiKuoShiJieSourceAdapter.isHaiKuoData(data) {
+            let adapted = HaiKuoShiJieSourceAdapter.importSources(from: data)
+            if !adapted.isEmpty { return adapted }
+        }
+        return nil
+    }
+
+    private func importAdaptedBookSources(_ adapted: [BookSource]) throws -> SourceImportReport {
+        let existingCount = sources.count
+        try importSources(adapted)
+        let added = max(0, sources.count - existingCount)
+        let updated = max(0, adapted.count - added)
+        return SourceImportReport(addedBookSources: added, updatedBookSources: updated)
     }
 
     @discardableResult

@@ -78,4 +78,27 @@ final class HuaHuoBookSourceAdapterTests: XCTestCase {
         XCTAssertEqual(source.ruleToc?.fields["chapterList"], "#chapters a")
         XCTAssertEqual(source.ruleContent?.fields["content"], "#art-content@text")
     }
+
+    func testHuaHuoAdaptationMarksSourceFormat() {
+        let sampleJSON = """
+        [
+            {
+                "sourceName": "花火格式源",
+                "sourceUrl": "https://huahuo.format.org",
+                "searchUrl": "https://huahuo.format.org/search?q={{key}}",
+                "ruleSearch": {
+                    "searchBookList": ".item",
+                    "searchName": ".name@text",
+                    "searchBookUrl": "a@href"
+                }
+            }
+        ]
+        """
+
+        let sources = HuaHuoBookSourceAdapter.importSources(from: sampleJSON)
+
+        XCTAssertEqual(sources.count, 1)
+        XCTAssertEqual(sources.first?.raw["sourceFormat"], "huahuo")
+        XCTAssertEqual(sources.first?.sourceFormat, .huahuo)
+    }
 }

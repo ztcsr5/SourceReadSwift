@@ -148,7 +148,8 @@ struct HuaHuoBookSourceAdapter: Sendable {
             ruleContent: contentFields.isEmpty ? nil : SourceRule(fields: contentFields),
             ruleExplore: exploreFields.isEmpty ? nil : SourceRule(fields: exploreFields),
             header: raw.header,
-            loginUrl: raw.loginUrl
+            loginUrl: raw.loginUrl,
+            raw: ["sourceFormat": BookSourceFormat.huahuo.rawValue]
         )
     }
 }

@@ -623,7 +623,7 @@ struct SourceManagerView: View {
             subtitle: source.bookSourceUrl,
             group: source.bookSourceGroup,
             enabled: source.enabled,
-            badges: source.ruleSearch == nil ? [] : ["可搜索"],
+            badges: source.displayBadges,
             health: appState.sourceHealthStore.record(for: source),
             primaryAction: {
                 sourceVisualDetail = source
@@ -800,8 +800,8 @@ struct SourceManagerView: View {
                         .lineLimit(2)
                     HStack(spacing: 8) {
                         statusBadge(source.enabled ? "启用" : "停用", color: source.enabled ? .green : .gray)
-                        if source.ruleSearch != nil {
-                            statusBadge("可搜索", color: .blue)
+                        ForEach(source.displayBadges, id: \.self) { badge in
+                            statusBadge(badge, color: badge == source.sourceFormat.badgeTitle ? .purple : .blue)
                         }
                     }
                 }
