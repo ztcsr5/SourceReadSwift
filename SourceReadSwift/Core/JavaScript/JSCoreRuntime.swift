@@ -438,6 +438,12 @@ final class JSCoreRuntime {
         let urlDecode: @convention(block) (String) -> String = { value in
             value.removingPercentEncoding ?? value
         }
+        let urlEncodeCharset: @convention(block) (String, String) -> String = { value, charset in
+            LegadoCharset.percentEncode(value, charset: charset, extraAllowed: "-._*") ?? value
+        }
+        let urlDecodeCharset: @convention(block) (String, String) -> String = { value, charset in
+            LegadoCharset.percentDecode(value, charset: charset) ?? value
+        }
         let base64Encode: @convention(block) (String) -> String = { value in
             Data(value.utf8).base64EncodedString()
         }
@@ -792,6 +798,8 @@ final class JSCoreRuntime {
 
         context.setObject(urlEncode, forKeyedSubscript: "__native_urlEncode" as NSString)
         context.setObject(urlDecode, forKeyedSubscript: "__native_urlDecode" as NSString)
+        context.setObject(urlEncodeCharset, forKeyedSubscript: "__native_urlEncodeCharset" as NSString)
+        context.setObject(urlDecodeCharset, forKeyedSubscript: "__native_urlDecodeCharset" as NSString)
         context.setObject(base64Encode, forKeyedSubscript: "__native_base64Encode" as NSString)
         context.setObject(base64EncodeBytes, forKeyedSubscript: "__native_base64EncodeBytes" as NSString)
         context.setObject(base64Decode, forKeyedSubscript: "__native_base64Decode" as NSString)
@@ -891,12 +899,20 @@ final class JSCoreRuntime {
         if (typeof JXNode === 'undefined' || JXNode === null) JXNode = function(value) { return __nativeJXNode.create(value); };
         JXNode.create = function(value) { return __nativeJXNode.create(value); };
         var jxNode = function(value) { return __nativeJXNode.create(value); };
-        java.urlEncode = function(value) { return __native_urlEncode(String(value)); };
+        java.urlEncode = function(value, charset) {
+          var text = String(value);
+          if (charset == null || String(charset) === '') return __native_urlEncode(text);
+          return __native_urlEncodeCharset(text, String(charset));
+        };
         java.encodeURI = function(value, charset) {
           return String(__nativeLegado.invoke({ method: 'encodeURI', args: [String(value), charset == null ? '' : String(charset)] }) || '');
         };
-        java.encodeURIComponent = java.urlEncode;
-        java.decodeURI = function(value) { return __native_urlDecode(String(value)); };
+        java.encodeURIComponent = function(value, charset) { return java.urlEncode(value, charset); };
+        java.decodeURI = function(value, charset) {
+          var text = String(value);
+          if (charset == null || String(charset) === '') return __native_urlDecode(text);
+          return __native_urlDecodeCharset(text, String(charset));
+        };
         java.decodeURIComponent = java.decodeURI;
         java.base64Encode = function(value) {
           if (value && typeof value !== 'string' && !(value instanceof String) && value.length != null) return __native_base64EncodeBytes(value);
@@ -1100,8 +1116,8 @@ final class JSCoreRuntime {
           return api;
         };
         java.digestBase64Str = function(value, algorithm) { return java.base64Encode(__hexToJavaBytes(java.digestHex(value, algorithm || 'sha256'))); };
-        java.uriEncode = function(value) { return java.encodeURI(value); };
-        java.uriDecode = function(value) { return java.decodeURI(value); };
+        java.uriEncode = function(value, charset) { return java.encodeURI(value, charset); };
+        java.uriDecode = function(value, charset) { return java.decodeURI(value, charset); };
         java.t2s = function(value) { return String(__nativeLegado.invoke({ method: 't2s', args: [String(value == null ? '' : value)] }) || ''); };
         java.s2t = function(value) { return String(__nativeLegado.invoke({ method: 's2t', args: [String(value == null ? '' : value)] }) || ''); };
         globalThis.t2s = java.t2s;
@@ -3168,10 +3184,10 @@ final class JSCoreRuntime {
           this.toURL = function() { return url; };
         };
         Packages.java.net.URLEncoder = Packages.java.net.URLEncoder || {
-          encode: function(value, charset) { return java.urlEncode(String(value == null ? '' : value)).replace(/%20/g, '+'); }
+          encode: function(value, charset) { return java.urlEncode(String(value == null ? '' : value), charset).replace(/%20/g, '+'); }
         };
         Packages.java.net.URLDecoder = Packages.java.net.URLDecoder || {
-          decode: function(value, charset) { return java.decodeURI(String(value == null ? '' : value).replace(/\\+/g, '%20')); }
+          decode: function(value, charset) { return java.decodeURI(String(value == null ? '' : value).replace(/\\+/g, '%20'), charset); }
         };
         if (typeof URL === 'undefined') URL = Packages.java.net.URL;
         if (typeof URI === 'undefined') URI = Packages.java.net.URI;
@@ -4188,27 +4204,11 @@ final class JSCoreRuntime {
     }
 
     private static func data(for value: String, charset: String) -> Data {
-        switch normalizedCharset(charset) {
-        case "utf16", "utf16le": return value.data(using: .utf16LittleEndian) ?? Data(value.utf8)
-        case "utf16be": return value.data(using: .utf16BigEndian) ?? Data(value.utf8)
-        case "ascii": return value.data(using: .ascii) ?? Data(value.utf8)
-        case "latin1", "iso88591": return value.data(using: .isoLatin1) ?? Data(value.utf8)
-        default: return Data(value.utf8)
-        }
+        LegadoCharset.encode(value, charset: charset) ?? Data(value.utf8)
     }
 
     private static func string(from data: Data, charset: String) -> String {
-        switch normalizedCharset(charset) {
-        case "utf16", "utf16le": return String(data: data, encoding: .utf16LittleEndian) ?? ""
-        case "utf16be": return String(data: data, encoding: .utf16BigEndian) ?? ""
-        case "ascii": return String(data: data, encoding: .ascii) ?? ""
-        case "latin1", "iso88591": return String(data: data, encoding: .isoLatin1) ?? ""
-        default: return String(data: data, encoding: .utf8) ?? ""
-        }
-    }
-
-    private static func normalizedCharset(_ charset: String) -> String {
-        charset.lowercased().replacingOccurrences(of: "-", with: "").replacingOccurrences(of: "_", with: "")
+        LegadoCharset.decode(data, charset: charset) ?? ""
     }
 
     private static func normalizedBase64(_ value: String) -> String {

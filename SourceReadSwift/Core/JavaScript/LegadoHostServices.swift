@@ -78,23 +78,7 @@ final class LegadoHostServices {
     // MARK: - Text/encoding
 
     func encodeURI(_ value: String, charset: String? = nil) -> String {
-        let normalized = charset?.lowercased() ?? "utf-8"
-        if normalized.contains("gbk") || normalized.contains("gb2312") || normalized.contains("gb18030") {
-            if let data = Self.encodeGbkData(value) {
-                return data.map { byte in
-                    let isAsciiAlphanumeric = (byte >= 0x30 && byte <= 0x39)
-                        || (byte >= 0x41 && byte <= 0x5A)
-                        || (byte >= 0x61 && byte <= 0x7A)
-                    if isAsciiAlphanumeric || "-._~".utf8.contains(byte) {
-                        return String(UnicodeScalar(byte))
-                    }
-                    return String(format: "%%%02X", byte)
-                }.joined()
-            }
-        }
-        var allowed = CharacterSet.alphanumerics
-        allowed.insert(charactersIn: "-._~")
-        return value.addingPercentEncoding(withAllowedCharacters: allowed) ?? value
+        LegadoCharset.percentEncode(value, charset: charset, extraAllowed: "-._~") ?? value
     }
 
     func utf8ToGbk(_ value: String) -> NSArray {
@@ -149,18 +133,17 @@ final class LegadoHostServices {
     }
 
     func decodeText(_ data: Data, charset: String?) -> String {
-        let name = charset?.lowercased().trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-        let encoding: String.Encoding
-        if name.contains("gbk") || name.contains("gb2312") || name.contains("gb18030") {
-            encoding = Self.gbkEncoding
-        } else if name.contains("utf-16") {
-            encoding = .utf16
-        } else if name.contains("big5") {
-            encoding = String.Encoding(rawValue: CFStringConvertEncodingToNSStringEncoding(CFStringEncoding(CFStringEncodings.big5.rawValue)))
-        } else {
-            encoding = .utf8
+        // Preserve the previous BOM-aware UTF-16 behaviour for file/ZIP
+        // entries; the JS bridge itself keeps using explicit little-endian.
+        let normalized = charset?
+            .lowercased()
+            .replacingOccurrences(of: "-", with: "")
+            .replacingOccurrences(of: "_", with: "") ?? ""
+        if normalized == "utf16" || normalized == "unicode",
+           let text = String(data: data, encoding: .utf16) {
+            return text
         }
-        return String(data: data, encoding: encoding)
+        return LegadoCharset.decode(data, charset: charset)
             ?? String(data: data, encoding: .utf8)
             ?? ""
     }
