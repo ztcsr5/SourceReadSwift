@@ -288,6 +288,10 @@ struct JSONRuleExtractor {
             return applyTransforms(transforms, to: merged)
         }
 
+        if let expanded = expandInnerJSONRules(in: pathPart, object: object, variables: variables) {
+            return applyTransforms(transforms, to: expanded)
+        }
+
         guard let selected = valueForSinglePath(from: object, path: pathPart) else { return nil }
         return applyTransforms(transforms, to: selected)
     }
@@ -307,7 +311,91 @@ struct JSONRuleExtractor {
         if part.hasPrefix("@js:") || part.hasPrefix("<js>") || part.contains("@js:") {
             return evaluateNormalSegment(part, object: object, variables: variables)
         }
+        if let expanded = expandInnerJSONRules(in: part, object: object, variables: variables) {
+            return expanded
+        }
         return valueForSinglePath(from: object, path: part)
+    }
+
+    /// Legado's `AnalyzeByJSonPath.getString` replaces every balanced
+    /// `{$...}` inner rule before evaluating the JSONPath.  The replacement
+    /// is textual: `prefix{$..title}suffix` becomes `prefixTitleSuffix`, and
+    /// any rule that produced at least one replacement is returned as-is
+    /// instead of being parsed as a path again.  Unresolved inner rules stay
+    /// verbatim, matching `RuleAnalyzer.innerRule`.
+    private func expandInnerJSONRules(
+        in rule: String,
+        object: Any,
+        variables: [String: Any],
+        depth: Int = 0
+    ) -> String? {
+        guard depth < 16, rule.contains("{$") else { return nil }
+        var output = ""
+        var index = rule.startIndex
+        var replaced = false
+        while index < rule.endIndex {
+            guard let start = rule.range(of: "{$", range: index..<rule.endIndex) else {
+                output += rule[index...]
+                break
+            }
+            output += rule[index..<start.lowerBound]
+            guard let close = matchingInnerRuleBrace(in: rule, from: start.lowerBound) else {
+                output += rule[start.lowerBound...]
+                break
+            }
+            let contentStart = rule.index(after: start.lowerBound)
+            let inner = String(rule[contentStart..<close])
+            if let substituted = string(from: object, rule: inner, variables: variables),
+               !substituted.isEmpty {
+                output += substituted
+                replaced = true
+            } else {
+                output += rule[start.lowerBound...close]
+            }
+            index = rule.index(after: close)
+        }
+        return replaced ? output : nil
+    }
+
+    /// Finds the `}` matching the `{` at `openIndex`.  Mirrors
+    /// `RuleAnalyzer.chompCodeBalanced`: quotes suppress structural
+    /// characters, brackets always nest, braces only nest outside brackets,
+    /// and a backslash always escapes the next character.
+    private func matchingInnerRuleBrace(
+        in text: String,
+        from openIndex: String.Index
+    ) -> String.Index? {
+        var index = openIndex
+        var braceDepth = 0
+        var bracketDepth = 0
+        var inSingleQuote = false
+        var inDoubleQuote = false
+        var escaped = false
+        while index < text.endIndex {
+            let character = text[index]
+            if escaped {
+                escaped = false
+            } else if character == "\\" {
+                escaped = true
+            } else if character == "'" && !inDoubleQuote {
+                inSingleQuote.toggle()
+            } else if character == "\"" && !inSingleQuote {
+                inDoubleQuote.toggle()
+            } else if inSingleQuote || inDoubleQuote {
+                // Quoted JSONPath literals may contain braces and brackets.
+            } else if character == "[" {
+                bracketDepth += 1
+            } else if character == "]" {
+                bracketDepth = max(0, bracketDepth - 1)
+            } else if bracketDepth == 0, character == "{" {
+                braceDepth += 1
+            } else if bracketDepth == 0, character == "}" {
+                braceDepth -= 1
+                if braceDepth == 0 { return index }
+            }
+            index = text.index(after: index)
+        }
+        return nil
     }
 
     private func merge(values: [Any], operation: String) -> Any? {

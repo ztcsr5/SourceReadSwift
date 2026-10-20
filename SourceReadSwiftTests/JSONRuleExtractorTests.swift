@@ -687,4 +687,74 @@ final class JSONRuleExtractorTests: XCTestCase {
 
         XCTAssertEqual(value, "https://example.com/book/1")
     }
+
+    func testInnerRuleSubstitutionReturnsLiteralText() throws {
+        let extractor = JSONRuleExtractor()
+        let object: [String: Any] = [
+            "data": ["title": "斗破苍穹", "id": 765]
+        ]
+
+        XCTAssertEqual(extractor.string(from: object, rule: "{$..title}"), "斗破苍穹")
+        XCTAssertEqual(extractor.string(from: object, rule: "book/{$..id}.html"), "book/765.html")
+    }
+
+    func testInnerRuleAppliesRegexTransformAfterSubstitution() throws {
+        let extractor = JSONRuleExtractor()
+        let object: [String: Any] = ["data": ["title": "<b>斗破苍穹</b>"]]
+
+        XCTAssertEqual(extractor.string(from: object, rule: "{$..title}##<[^>]+>##"), "斗破苍穹")
+    }
+
+    func testInnerRuleBranchesExpandIndependently() throws {
+        let extractor = JSONRuleExtractor()
+        let object: [String: Any] = [
+            "data": ["title": "斗破苍穹", "id": 765]
+        ]
+
+        XCTAssertEqual(extractor.string(from: object, rule: "{$..title}&&{$..id}"), "斗破苍穹\n765")
+        XCTAssertEqual(extractor.string(from: object, rule: "{$..missing}||{$..id}"), "765")
+    }
+
+    func testInnerRuleJoinsMultipleMatchesWithNewline() throws {
+        let extractor = JSONRuleExtractor()
+        let object: [String: Any] = [
+            "list": [["name": "A"], ["name": "B"]]
+        ]
+
+        XCTAssertEqual(extractor.string(from: object, rule: "{$..name}"), "A\nB")
+        XCTAssertEqual(extractor.stringList(from: object, rule: "{$..name}"), ["A", "B"])
+    }
+
+    func testUnresolvedOrUnbalancedInnerRuleFallsBackToPathEvaluation() throws {
+        let extractor = JSONRuleExtractor()
+        let object: [String: Any] = ["data": ["title": "T"]]
+
+        XCTAssertNil(extractor.value(from: object, path: "{$..missing}"))
+        XCTAssertNil(extractor.value(from: object, path: "{$..title"))
+        XCTAssertEqual(extractor.value(from: object, path: "{$..title}") as? String, "T")
+    }
+
+    func testInnerRuleResolvesRecursiveDescentAndKeepsTrailingText() throws {
+        let extractor = JSONRuleExtractor()
+        let object: [String: Any] = [
+            "data": ["title": "T", "meta": ["title": "M"]]
+        ]
+
+        XCTAssertEqual(extractor.string(from: object, rule: "{$..title}x"), "T\nMx")
+    }
+
+    func testInnerRuleKeepsBracesInsideQuotedFilterLiterals() throws {
+        let extractor = JSONRuleExtractor()
+        let object: [String: Any] = [
+            "list": [
+                ["name": "A", "tag": "x}y"],
+                ["name": "B", "tag": "z"]
+            ]
+        ]
+
+        XCTAssertEqual(
+            extractor.string(from: object, rule: "{$..list[?(@.tag=='x}y')].name}"),
+            "A"
+        )
+    }
 }
