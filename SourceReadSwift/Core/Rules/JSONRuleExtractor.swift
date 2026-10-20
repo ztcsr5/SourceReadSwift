@@ -1961,8 +1961,12 @@ struct JSONRuleExtractor {
                 val = stringify(fromPath)
             } else if let varVal = variables[key] {
                 val = stringify(varVal)
-            } else if key.contains("java.") || key.contains("+") || key.contains("?") {
-                val = evaluateRawJS(script: key, object: item, extraVariables: variables).map { stringify($0) } ?? ""
+            } else if let jsValue = evaluateRawJS(script: key, object: item, extraVariables: variables) {
+                // Legado treats `{{...}}` as a JavaScript rule.  Keep the
+                // direct-key and JSONPath lookups above for the common
+                // `{{key}}` / `{{$.field}}` templates, then evaluate any
+                // remaining expression with `result` bound to the item.
+                val = stringify(jsValue)
             } else {
                 val = ""
             }
@@ -2120,6 +2124,18 @@ struct JSONRuleExtractor {
         if let dict = value as? [String: Any] {
             for key in ["p", "content", "text", "body", "title", "name"] {
                 if let v = dict[key] { return stringify(v) }
+            }
+            // Legado's `getString` calls `toString()` on a map result, so an
+            // unknown object must still yield content instead of an empty
+            // string.  Sorted keys keep the output deterministic for tests and
+            // for `##regex##replacement` transforms applied afterwards.
+            if JSONSerialization.isValidJSONObject(dict),
+               let data = try? JSONSerialization.data(
+                   withJSONObject: dict,
+                   options: [.sortedKeys, .fragmentsAllowed]
+               ),
+               let text = String(data: data, encoding: .utf8) {
+                return text
             }
             return ""
         }

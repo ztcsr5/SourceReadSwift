@@ -539,4 +539,23 @@ final class JSONRuleExtractorTests: XCTestCase {
             ["Alpha", "Beta", "Gamma"]
         )
     }
+
+    func testUnknownDictionaryStringifiesAsCompactJSON() throws {
+        let extractor = JSONRuleExtractor()
+        let item: [String: Any] = [
+            "meta": ["b": "x", "a": 1],
+            "plain": "text"
+        ]
+
+        XCTAssertEqual(extractor.string(from: item, rule: "$.meta"), #"{"a":1,"b":"x"}"#)
+        XCTAssertEqual(extractor.string(from: item, rule: "$.plain"), "text")
+    }
+
+    func testDoubleBraceTemplateEvaluatesJavaScriptExpression() throws {
+        let extractor = JSONRuleExtractor()
+        let item: [String: Any] = ["price": 10, "name": "A"]
+
+        XCTAssertEqual(extractor.string(from: item, rule: "价格:{{result.price*2}}"), "价格:20")
+        XCTAssertEqual(extractor.string(from: item, rule: "{{result.name}}"), "A")
+    }
 }
