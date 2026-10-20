@@ -11,7 +11,11 @@ final class RuleDirectiveStore {
     }
 
     func get(_ key: String) -> String {
-        values[key.trimmingCharacters(in: .whitespacesAndNewlines)] ?? ""
+        value(for: key) ?? ""
+    }
+
+    func value(for key: String) -> String? {
+        values[key.trimmingCharacters(in: .whitespacesAndNewlines)]
     }
 }
 
@@ -488,7 +492,7 @@ struct HtmlRuleExtractor {
                 .components(separatedBy: CharacterSet(charactersIn: "@#"))
                 .first?
                 .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-            return directiveStore.get(key)
+            return storedDirectiveValue(for: key)
         }
         return output.trimmingCharacters(in: .whitespacesAndNewlines)
     }
@@ -531,9 +535,21 @@ struct HtmlRuleExtractor {
         for match in matches.reversed() {
             guard match.numberOfRanges > 1 else { continue }
             let key = mText.substring(with: match.range(at: 1)).trimmingCharacters(in: .whitespacesAndNewlines)
-            mText.replaceCharacters(in: match.range(at: 0), with: directiveStore.get(key))
+            mText.replaceCharacters(in: match.range(at: 0), with: storedDirectiveValue(for: key))
         }
         return mText as String
+    }
+
+    /// Reads `@put` values from the current stage first, then from the
+    /// source-scoped persistent state so a later stage can use a value that
+    /// was stored while parsing search results or a book detail page.
+    private func storedDirectiveValue(for key: String) -> String {
+        let trimmed = key.trimmingCharacters(in: .whitespacesAndNewlines)
+        if let value = directiveStore.value(for: trimmed) { return value }
+        if let value = executionContext.storedValue(for: trimmed) {
+            return RuleExecutionContext.bridgeString(value)
+        }
+        return ""
     }
 
     private func unquote(_ value: String) -> String {

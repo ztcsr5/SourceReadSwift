@@ -35,6 +35,22 @@ final class HtmlRuleExtractorTests: XCTestCase {
         XCTAssertEqual(value, "https://example.com/book/1")
     }
 
+    func testPutAndGetDirectivesPersistAcrossExtractorInstances() throws {
+        let document = try SwiftSoup.parse("""
+        <html><body><span class="host">https://example.com</span></body></html>
+        """)
+        let state = RulePersistentState()
+        let baseURL = URL(string: "https://example.com/search")!
+
+        let first = HtmlRuleExtractor(executionContext: RuleExecutionContext(persistentState: state))
+        _ = try first.value(from: document, rule: "@put:{host:.host@text}span@text", baseUrl: baseURL)
+
+        let second = HtmlRuleExtractor(executionContext: RuleExecutionContext(persistentState: state))
+        let value = try second.value(from: document, rule: "@get:{host}/book/1", baseUrl: baseURL)
+
+        XCTAssertEqual(value, "https://example.com/book/1")
+    }
+
     func testRegexTransformCleansExtractedValue() throws {
         let document = try SwiftSoup.parse("""
         <html><body>
@@ -288,7 +304,6 @@ final class HtmlRuleExtractorTests: XCTestCase {
 
         XCTAssertEqual(value, "https://example.com/book/1")
     }
-
     func testPutDirectiveSplitsQuotedCommaAndColonSafely() throws {
         let document = try SwiftSoup.parse("""
         <html><body>

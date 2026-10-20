@@ -669,7 +669,7 @@ struct JSONRuleExtractor {
 
     private func directiveValue(for key: String) -> Any {
         if let value = directiveStore.get(key) { return value }
-        if let value = executionContext.value(for: key) { return value }
+        if let value = executionContext.storedValue(for: key) { return value }
         return NSNull()
     }
 
@@ -1311,12 +1311,10 @@ struct JSONRuleExtractor {
         return value is Bool
     }
 
+    /// rjpath `PropertyValueExpression` performs an exact key lookup; no
+    /// case-insensitive fallback is allowed here.
     private func lookup(_ dictionary: [String: Any], key: String) -> Any? {
-        if let value = dictionary[key] { return value }
-        if let value = dictionary[key.lowercased()] { return value }
-        if let value = dictionary[key.uppercased()] { return value }
-        let lowered = key.lowercased()
-        return dictionary.first(where: { $0.key.lowercased() == lowered })?.value
+        dictionary[key]
     }
 
     private func children(of value: Any) -> [Any] {

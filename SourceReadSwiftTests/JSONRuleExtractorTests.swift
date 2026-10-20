@@ -223,6 +223,25 @@ final class JSONRuleExtractorTests: XCTestCase {
         XCTAssertEqual(value?.first?["title"] as? String, "A")
     }
 
+    func testPutGetDirectivesPersistAcrossExecutionContexts() throws {
+        let state = RulePersistentState()
+        let object: [String: Any] = [
+            "data": [
+                "token": "abc123",
+                "items": [["id": 1], ["id": 2]]
+            ]
+        ]
+
+        let first = JSONRuleExtractor(executionContext: RuleExecutionContext(persistentState: state))
+        _ = first.value(from: object, path: "@put:{token:$.data.token,items:$.data.items}$.data.token")
+
+        let second = JSONRuleExtractor(executionContext: RuleExecutionContext(persistentState: state))
+        XCTAssertEqual(second.value(from: [:], path: "@get:{token}") as? String, "abc123")
+        let items = second.value(from: [:], path: "@get:{items}") as? [[String: Any]]
+        XCTAssertEqual(items?.count, 2)
+        XCTAssertEqual(items?.first?["id"] as? Int, 1)
+    }
+
     func testPutDirectiveSplitsQuotedJSONRuleSafely() throws {
         let extractor = JSONRuleExtractor()
         let object: [String: Any] = [
@@ -606,5 +625,16 @@ final class JSONRuleExtractorTests: XCTestCase {
         XCTAssertEqual(extractor.string(from: item, rule: "{{1.5}}"), "1.5")
         XCTAssertEqual(extractor.string(from: item, rule: "{{$.price}}"), "10")
         XCTAssertEqual(extractor.string(from: item, rule: "$.price"), "10")
+    }
+
+    func testJSONPathPropertyLookupIsCaseSensitiveLikeRJPath() throws {
+        let extractor = JSONRuleExtractor()
+        let object: [String: Any] = [
+            "data": ["Name": "upper", "name": "lower"]
+        ]
+
+        XCTAssertEqual(extractor.value(from: object, path: "$.data.name") as? String, "lower")
+        XCTAssertEqual(extractor.value(from: object, path: "$.data.Name") as? String, "upper")
+        XCTAssertNil(extractor.value(from: object, path: "$.data.NAME"))
     }
 }

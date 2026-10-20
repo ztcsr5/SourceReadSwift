@@ -137,6 +137,21 @@ final class RuleExecutionContext: @unchecked Sendable {
         return values[key]
     }
 
+    /// Reads a value that may have been produced by an earlier stage.  The
+    /// in-memory dictionary preserves native types; `RulePersistentState`
+    /// keeps both the JS-visible string and the original object so native
+    /// `@put` values survive a new execution context.
+    func storedValue(for key: String) -> Any? {
+        lock.lock()
+        if let value = values[key] {
+            lock.unlock()
+            return value
+        }
+        lock.unlock()
+        if let object = persistentState.object(for: key) { return object }
+        return persistentState.storedString(for: key)
+    }
+
     func string(for key: String) -> String {
         lock.lock()
         defer { lock.unlock() }
@@ -153,6 +168,7 @@ final class RuleExecutionContext: @unchecked Sendable {
         values[key] = value ?? ""
         lock.unlock()
         persistentState.put(text, for: key)
+        persistentState.putObject(value ?? "", for: key)
         return text
     }
 
@@ -265,6 +281,7 @@ final class RuleExecutionContext: @unchecked Sendable {
 final class RulePersistentState: @unchecked Sendable {
     private let lock = NSLock()
     private var values: [String: String] = [:]
+    private var objects: [String: Any] = [:]
 
     func put(_ value: String, for key: String) {
         lock.lock(); values[key] = value; lock.unlock()
@@ -275,15 +292,38 @@ final class RulePersistentState: @unchecked Sendable {
         return values[key] ?? ""
     }
 
+    /// Native `@put` values keep their original type across stages; the
+    /// JS-visible string form remains in `values` for `java.get`.
+    func putObject(_ value: Any, for key: String) {
+        lock.lock(); objects[key] = value; lock.unlock()
+    }
+
+    func object(for key: String) -> Any? {
+        lock.lock(); defer { lock.unlock() }
+        return objects[key]
+    }
+
+    func storedString(for key: String) -> String? {
+        lock.lock(); defer { lock.unlock() }
+        return values[key]
+    }
+
     func remove(_ key: String) {
-        lock.lock(); values.removeValue(forKey: key); lock.unlock()
+        lock.lock()
+        values.removeValue(forKey: key)
+        objects.removeValue(forKey: key)
+        lock.unlock()
     }
 
     func removePrefix(_ prefix: String) {
         guard !prefix.isEmpty else { return }
         lock.lock()
-        let keys = values.keys.filter { $0.hasPrefix(prefix) }
-        for key in keys { values.removeValue(forKey: key) }
+        let keys = Set(values.keys.filter { $0.hasPrefix(prefix) })
+            .union(objects.keys.filter { $0.hasPrefix(prefix) })
+        for key in keys {
+            values.removeValue(forKey: key)
+            objects.removeValue(forKey: key)
+        }
         lock.unlock()
     }
 
