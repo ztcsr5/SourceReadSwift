@@ -636,4 +636,143 @@ final class SourceStoreTests: XCTestCase {
         XCTAssertEqual(source.ruleSearch?.fields["bookList"], "data.list")
         try? FileManager.default.removeItem(at: root)
     }
+
+    func testImportsNestedDataBookSourcesEnvelope() throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        let store = SourceStore(persistence: SourcePersistence(fileManager: .default, rootURL: root))
+        let json = """
+        {
+          "code": 0,
+          "message": "ok",
+          "data": {
+            "bookSources": [
+              {
+                "bookSourceName": "Nested Data Source",
+                "bookSourceUrl": "https://nested-data.example",
+                "searchUrl": "/search?q={{key}}"
+              }
+            ]
+          }
+        }
+        """
+
+        try store.importJSON(json)
+
+        XCTAssertEqual(store.sources.map(\.bookSourceName), ["Nested Data Source"])
+        XCTAssertEqual(store.catalogs.count, 0)
+        try? FileManager.default.removeItem(at: root)
+    }
+
+    func testImportsBookSourceListAndSourceListEnvelopes() throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        let store = SourceStore(persistence: SourcePersistence(fileManager: .default, rootURL: root))
+        let json = """
+        {
+          "bookSourceList": [
+            { "bookSourceName": "List A", "bookSourceUrl": "https://list-a.example" }
+          ],
+          "sourceList": [
+            { "bookSourceName": "List B", "bookSourceUrl": "https://list-b.example" }
+          ]
+        }
+        """
+
+        try store.importJSON(json)
+
+        XCTAssertEqual(store.sources.count, 1)
+        XCTAssertEqual(store.sources.first?.bookSourceName, "List A")
+        try? FileManager.default.removeItem(at: root)
+    }
+
+    func testImportsResultRowsEnvelope() throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        let store = SourceStore(persistence: SourcePersistence(fileManager: .default, rootURL: root))
+        let json = """
+        {
+          "result": {
+            "rows": [
+              {
+                "bookSourceName": "Row Source",
+                "bookSourceUrl": "https://rows.example",
+                "ruleToc": { "chapterList": "ul li" }
+              }
+            ]
+          }
+        }
+        """
+
+        try store.importJSON(json)
+
+        XCTAssertEqual(store.sources.map(\.bookSourceName), ["Row Source"])
+        XCTAssertNotNil(store.sources.first?.ruleToc)
+        try? FileManager.default.removeItem(at: root)
+    }
+
+    func testImportsNestedSingleBookSourceEnvelope() throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        let store = SourceStore(persistence: SourcePersistence(fileManager: .default, rootURL: root))
+        let json = """
+        {
+          "data": {
+            "bookSource": {
+              "bookSourceName": "Nested Single",
+              "bookSourceUrl": "https://nested-single.example"
+            }
+          }
+        }
+        """
+
+        try store.importJSON(json)
+
+        XCTAssertEqual(store.sources.map(\.bookSourceName), ["Nested Single"])
+        try? FileManager.default.removeItem(at: root)
+    }
+
+    func testClassifiesAliasOnlyBookSourceInsteadOfCatalog() throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        let store = SourceStore(persistence: SourcePersistence(fileManager: .default, rootURL: root))
+        let json = """
+        [
+          {
+            "name": "Alias Source",
+            "url": "https://alias.example",
+            "searchUrl": "/search?q={{key}}",
+            "ruleSearch": { "bookList": "data.list", "name": "title" }
+          }
+        ]
+        """
+
+        try store.importJSON(json)
+
+        XCTAssertEqual(store.sources.map(\.bookSourceName), ["Alias Source"])
+        XCTAssertEqual(store.catalogs.count, 0)
+        XCTAssertNotNil(store.sources.first?.ruleSearch)
+        try? FileManager.default.removeItem(at: root)
+    }
+
+    func testClassifiesGenericDialectRuleObjectAsBookSource() throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        let store = SourceStore(persistence: SourcePersistence(fileManager: .default, rootURL: root))
+        let json = """
+        [
+          {
+            "name": "Dialect Source",
+            "url": "https://dialect.example",
+            "search": { "path": "/search", "list": "data" }
+          }
+        ]
+        """
+
+        try store.importJSON(json)
+
+        XCTAssertEqual(store.sources.map(\.bookSourceName), ["Dialect Source"])
+        XCTAssertEqual(store.catalogs.count, 0)
+        try? FileManager.default.removeItem(at: root)
+    }
 }

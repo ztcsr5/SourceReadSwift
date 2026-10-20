@@ -422,40 +422,51 @@ final class SourceStore: ObservableObject {
         if let adapted = Self.specializedBookSources(from: data) {
             return try importAdaptedBookSources(adapted)
         }
+        return try importItems(Self.decodeImportItems(from: data))
+    }
 
-        let cleanData = stripUTF8BOM(data)
+    /// Shared JSON import decoder for the sync and async entry points.
+    ///
+    /// Order matters: a plain array, then an envelope, then the same two passes
+    /// after byte-level trailing-comma repair, then text normalization. The
+    /// envelope pass must precede the single-object fallback so nested shapes
+    /// such as `{ "data": { "bookSources": [...] } }` are not mistaken for one
+    /// source object. Keeping this in one place is what stops the sync and
+    /// async paths from drifting apart.
+    private nonisolated static func decodeImportItems(from data: Data) throws -> [AnySourceImportItem] {
+        let cleanData = stripUTF8BOMStatic(data)
         let decoder = JSONDecoder()
 
-        // 1. Fast-Path: attempt direct parsing first (avoids megabytes of string allocation)
+        // 1. Fast path: direct parsing first (avoids megabytes of string allocation).
         if let items = try? decoder.decode([AnySourceImportItem].self, from: cleanData) {
-            return try importItems(items)
+            return items
         }
         if let wrapped = try? decoder.decode(WrappedSourceImportItems.self, from: cleanData),
            !wrapped.items.isEmpty {
-            return try importItems(wrapped.items)
+            return wrapped.items
         }
 
-        // 2. Fast byte-level trailing comma removal
-        let sanitizedData = Self.sanitizeTrailingCommasData(cleanData)
+        // 2. Fast byte-level trailing comma removal.
+        let sanitizedData = sanitizeTrailingCommasData(cleanData)
         if let items = try? decoder.decode([AnySourceImportItem].self, from: sanitizedData) {
-            return try importItems(items)
+            return items
         }
         if let wrapped = try? decoder.decode(WrappedSourceImportItems.self, from: sanitizedData),
            !wrapped.items.isEmpty {
-            return try importItems(wrapped.items)
+            return wrapped.items
         }
 
-        // 3. Fallback: string normalization and substring extraction
-        let normalized = try normalizeImportData(cleanData)
+        // 3. Fallback: string normalization and substring extraction.
+        let normalized = try normalizeDataStatic(cleanData)
         if let items = try? decoder.decode([AnySourceImportItem].self, from: normalized) {
-            return try importItems(items)
+            return items
         }
         if let wrapped = try? decoder.decode(WrappedSourceImportItems.self, from: normalized),
            !wrapped.items.isEmpty {
-            return try importItems(wrapped.items)
+            return wrapped.items
         }
         let item = try decoder.decode(AnySourceImportItem.self, from: normalized)
-        return try importItems([item])
+        return [item]
     }
 
     @discardableResult
@@ -469,32 +480,10 @@ final class SourceStore: ObservableObject {
             return try importAdaptedBookSources(adapted)
         }
 
-        let cleanData = stripUTF8BOM(data)
-        // Perform heavy JSON decoding off the main thread
-        let decodedItems: [AnySourceImportItem] = try await Task.detached(priority: .userInitiated) {
-            let decoder = JSONDecoder()
-            if let items = try? decoder.decode([AnySourceImportItem].self, from: cleanData) {
-                return items
-            }
-            if let wrapped = try? decoder.decode(WrappedSourceImportItems.self, from: cleanData), !wrapped.items.isEmpty {
-                return wrapped.items
-            }
-            let sanitized = Self.sanitizeTrailingCommasData(cleanData)
-            if let items = try? decoder.decode([AnySourceImportItem].self, from: sanitized) {
-                return items
-            }
-            if let wrapped = try? decoder.decode(WrappedSourceImportItems.self, from: sanitized), !wrapped.items.isEmpty {
-                return wrapped.items
-            }
-            let normalized = try Self.normalizeDataStatic(cleanData)
-            if let items = try? decoder.decode([AnySourceImportItem].self, from: normalized) {
-                return items
-            }
-            if let wrapped = try? decoder.decode(WrappedSourceImportItems.self, from: normalized), !wrapped.items.isEmpty {
-                return wrapped.items
-            }
-            let single = try decoder.decode(AnySourceImportItem.self, from: normalized)
-            return [single]
+        // Decode off the main actor; the same static decoder is used by the
+        // sync path so wrappers, BOM handling, and sanitizing never drift.
+        let decodedItems = try await Task.detached(priority: .userInitiated) {
+            try SourceStore.decodeImportItems(from: data)
         }.value
 
         return try self.importItems(decodedItems)
@@ -822,6 +811,10 @@ final class SourceStore: ObservableObject {
     }
 
     private func stripUTF8BOM(_ data: Data) -> Data {
+        Self.stripUTF8BOMStatic(data)
+    }
+
+    nonisolated static func stripUTF8BOMStatic(_ data: Data) -> Data {
         let bom = Data([0xEF, 0xBB, 0xBF])
         guard data.starts(with: bom) else { return data }
         return data.dropFirst(3)
@@ -971,36 +964,88 @@ private struct AnySourceImportItem: Decodable {
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: DynamicCodingKey.self)
         let keys = Set(container.allKeys.map(\.stringValue))
+        let loweredKeys = Set(keys.map { $0.lowercased() })
         let sourceUrl = (try? container.decode(String.self, forKey: DynamicCodingKey("sourceUrl"))) ?? ""
         let url = (try? container.decode(String.self, forKey: DynamicCodingKey("url"))) ?? ""
         let group = (try? container.decode(String.self, forKey: DynamicCodingKey("sourceGroup"))) ?? ""
         let comment = (try? container.decode(String.self, forKey: DynamicCodingKey("sourceComment"))) ?? ""
         let combined = [sourceUrl, url, group, comment].joined(separator: " ").lowercased()
 
-        if keys.contains("bookSourceName")
-            || keys.contains("bookSourceUrl")
-            || keys.contains("searchUrl")
-            || keys.contains("ruleSearch")
-            || keys.contains("rulesSearch")
-            || keys.contains("ruleToc")
-            || keys.contains("rulesToc")
-            || keys.contains("ruleBookContent") {
-            kind = .bookSource
-        } else if keys.contains("ruleArticles")
-            || keys.contains("ruleTitle")
-            || keys.contains("sortUrl")
-            || combined.contains("rss")
+        // RSS exports have their own rule vocabulary. Check them before the
+        // generic `rule*` heuristic so a feed is never imported as a book
+        // source just because it carries ruleTitle / ruleContent.
+        let rssMarkers: Set<String> = [
+            "rulearticles", "ruleartical", "sorturl", "rulenextpage",
+            "rulepubdate", "ruledescription", "ruleimage", "rulelink"
+        ]
+        let hasRSSMarker = !loweredKeys.intersection(rssMarkers).isEmpty
+        let looksLikeFeed = combined.contains("rss")
             || combined.contains("feed")
-            || combined.contains("atom") {
+            || combined.contains("atom")
+
+        // Any Legado book-source rule field is a stronger signal than `name`
+        // or a URL that happens to end in `.json`. This list covers structured
+        // rules, the legacy flat `ruleSearchList` family, and request/header
+        // fields only book sources carry.
+        let bookMarkers: Set<String> = [
+            "booksourcename", "booksourceurl", "booksourcegroup", "booksourcetype",
+            "searchurl", "searchurl2", "exploreurl", "rulebookinfo", "rulesbookinfo",
+            "rulebook", "ruletoc", "rulestoc", "rulecontent", "rulescontent",
+            "rulebookcontent", "rulebookcontentreplace", "ruleexplore", "rulesexplore",
+            "rulesearch", "rulessearch", "rulesearchurl", "rulefindurl",
+            "rulesearchlist", "rulesearchname", "rulesearchauthor", "rulesearchintroduce",
+            "rulesearchkind", "rulesearchnoteurl", "rulesearchcoverurl", "rulesearchlastchapter",
+            "rulebookname", "rulebookauthor", "ruleintroduce", "rulebookkind",
+            "rulecoverurl", "rulebooklastchapter", "rulechapterurl",
+            "rulechapterlist", "rulechaptername", "rulecontenturl", "rulechapterurlnext",
+            "rulefindlist", "rulefindname", "rulefindauthor", "rulefindintroduce",
+            "rulefindkind", "rulefindnoteurl", "rulefindcoverurl", "rulefindlastchapter",
+            "loginurl", "logincheckjs", "booksourceheader"
+        ]
+        let hasBookMarker = !loweredKeys.intersection(bookMarkers).isEmpty
+
+        // Dialect tolerance: a source that pairs a name/URL with rule-shaped
+        // keys (`ruleXxx`, `search`, `chapterList`, `toc`, ...) is still a book
+        // source even when its exact field names are not in the list above.
+        let hasNameOrUrl = loweredKeys.contains("booksourcename")
+            || loweredKeys.contains("booksourceurl")
+            || loweredKeys.contains("sourcename")
+            || loweredKeys.contains("sourceurl")
+            || loweredKeys.contains("name")
+            || loweredKeys.contains("url")
+        let hasRuleShapedKey = loweredKeys.contains { key in
+            key.hasPrefix("rule")
+                || key.hasPrefix("rules")
+                || key.contains("searchurl")
+                || key == "search"
+                || key.contains("chapterlist")
+                || key == "toc"
+                || key.contains("bookinfo")
+        }
+
+        // Catalog objects are small and closed: name/url/importUrl plus display
+        // metadata. Anything carrying rules or a request URL is not a catalog.
+        let catalogKeys: Set<String> = [
+            "name", "url", "sourcename", "sourceurl", "importurl", "singleurl",
+            "icon", "sourceicon", "group", "sourcegroup", "comment", "sourcecomment",
+            "enabled", "importedcount", "laststatus", "lastimportedat"
+        ]
+        let onlyCatalogKeys = loweredKeys.isSubset(of: catalogKeys)
+        let jsonSuffixedURL = sourceUrl.lowercased().hasSuffix(".json")
+            || url.lowercased().hasSuffix(".json")
+
+        if hasRSSMarker || looksLikeFeed {
             kind = .rss
-        } else if keys.contains("importUrl")
-            || keys.contains("singleUrl")
+        } else if hasBookMarker || (hasRuleShapedKey && hasNameOrUrl) {
+            kind = .bookSource
+        } else if loweredKeys.contains("importurl")
+            || loweredKeys.contains("singleurl")
             || combined.contains("shuyuan")
             || combined.contains("书源")
-            || sourceUrl.lowercased().hasSuffix(".json")
-            || url.lowercased().hasSuffix(".json") {
-            kind = .catalog
-        } else if keys.contains("sourceName") || keys.contains("name") {
+            || combined.contains("源仓库")
+            || combined.contains("catalog")
+            || (onlyCatalogKeys && hasNameOrUrl)
+            || (jsonSuffixedURL && !hasRuleShapedKey) {
             kind = .catalog
         } else {
             kind = .unknown
@@ -1018,40 +1063,56 @@ private struct AnySourceImportItem: Decodable {
 private struct WrappedSourceImportItems: Decodable {
     let items: [AnySourceImportItem]
 
-    enum CodingKeys: String, CodingKey {
-        case sources
-        case bookSources
-        case bookSource
-        case data
-        case list
-        case items
-    }
+    /// Container keys seen in Legado exports, third-party repositories, and
+    /// HTTP API responses. The first non-empty array wins, so mixed envelopes
+    /// do not depend on JSON key order.
+    private static let arrayKeys = [
+        "sources", "bookSources", "bookSourceList", "sourceList",
+        "list", "items", "rows", "records", "result", "data"
+    ]
+    /// Envelopes that wrap the real payload one or more levels deep.
+    private static let nestedKeys = ["data", "result", "payload", "response"]
+    /// Single-object wrappers (`{"bookSource": {...}}`).
+    private static let singleKeys = [
+        "bookSource", "source", "data", "sources", "bookSources", "items", "list"
+    ]
+    /// Guards against a maliciously deep `{data:{data:{...}}}` payload.
+    private static let maxDepth = 4
 
     init(from decoder: Decoder) throws {
-        let container = try decoder.container(keyedBy: CodingKeys.self)
-        if let values = try? container.decode([AnySourceImportItem].self, forKey: .sources) {
-            items = values
-        } else if let values = try? container.decode([AnySourceImportItem].self, forKey: .bookSources) {
-            items = values
-        } else if let values = try? container.decode([AnySourceImportItem].self, forKey: .bookSource) {
-            items = values
-        } else if let values = try? container.decode([AnySourceImportItem].self, forKey: .data) {
-            items = values
-        } else if let values = try? container.decode([AnySourceImportItem].self, forKey: .list) {
-            items = values
-        } else if let values = try? container.decode([AnySourceImportItem].self, forKey: .items) {
-            items = values
-        } else if let value = try? container.decode(AnySourceImportItem.self, forKey: .bookSource) {
-            items = [value]
-        } else if let value = try? container.decode(AnySourceImportItem.self, forKey: .data) {
-            items = [value]
-        } else if let value = try? container.decode(AnySourceImportItem.self, forKey: .sources) {
-            items = [value]
-        } else if let value = try? container.decode(AnySourceImportItem.self, forKey: .bookSources) {
-            items = [value]
-        } else {
-            items = []
+        let container = try decoder.container(keyedBy: DynamicCodingKey.self)
+        items = Self.decodeItems(from: container, depth: 0)
+    }
+
+    private static func decodeItems(
+        from container: KeyedDecodingContainer<DynamicCodingKey>,
+        depth: Int
+    ) -> [AnySourceImportItem] {
+        for key in arrayKeys {
+            if let values = try? container.decode([AnySourceImportItem].self, forKey: DynamicCodingKey(key)),
+               !values.isEmpty {
+                return values
+            }
         }
+
+        if depth < maxDepth {
+            for key in nestedKeys {
+                guard let nested = try? container.nestedContainer(
+                    keyedBy: DynamicCodingKey.self,
+                    forKey: DynamicCodingKey(key)
+                ) else { continue }
+                let values = decodeItems(from: nested, depth: depth + 1)
+                if !values.isEmpty { return values }
+            }
+        }
+
+        for key in singleKeys {
+            if let value = try? container.decode(AnySourceImportItem.self, forKey: DynamicCodingKey(key)),
+               value.kind != .unknown {
+                return [value]
+            }
+        }
+        return []
     }
 }
 
