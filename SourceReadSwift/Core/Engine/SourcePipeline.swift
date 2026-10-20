@@ -88,7 +88,9 @@ extension SourceEngine {
         source: BookSource,
         keyword: String,
         page: Int = 1,
-        timeout: TimeInterval = 20
+        timeout: TimeInterval = 20,
+        tocMaxPages: Int = 30,
+        contentMaxPages: Int = 8
     ) async -> SourcePipelineExecution {
         let startedAt = Date()
         let cleanKeyword = keyword.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -213,12 +215,12 @@ extension SourceEngine {
             return SourcePipelineExecution(result: makeResult(), error: .empty("详情结果为空"))
         }
         let tocStarted = Date()
-        var tocResult = await AsyncTimeout.run(seconds: timeout) { await self.getChapterList(source: source, book: detail, maxPages: 1) }
+        var tocResult = await AsyncTimeout.run(seconds: timeout) { await self.getChapterList(source: source, book: detail, maxPages: tocMaxPages) }
             ?? .failure(.network("目录超时（超过 \(Int(timeout)) 秒）"))
         var tocRetried = false
         if case .failure(let error) = tocResult, isTransientNetworkFailure(error) {
             try? await Task.sleep(nanoseconds: 300_000_000)
-            tocResult = await AsyncTimeout.run(seconds: timeout) { await self.getChapterList(source: source, book: detail, maxPages: 1) }
+            tocResult = await AsyncTimeout.run(seconds: timeout) { await self.getChapterList(source: source, book: detail, maxPages: tocMaxPages) }
                 ?? .failure(.network("目录超时（超过 \(Int(timeout)) 秒）"))
             tocRetried = true
         }
@@ -226,7 +228,7 @@ extension SourceEngine {
         case .failure(let error):
             return failure(error, stage: .toc, start: tocStarted)
         case .success(let value):
-            chapters = Array(value.prefix(10))
+            chapters = value
             if value.isEmpty {
                 return failure(.empty("目录为空"), stage: .toc, start: tocStarted)
             }
@@ -246,12 +248,12 @@ extension SourceEngine {
             return SourcePipelineExecution(result: makeResult(), error: .empty("目录为空"))
         }
         let contentStarted = Date()
-        var contentResult = await AsyncTimeout.run(seconds: timeout) { await self.getContent(source: source, chapter: firstChapter, maxPages: 1) }
+        var contentResult = await AsyncTimeout.run(seconds: timeout) { await self.getContent(source: source, chapter: firstChapter, maxPages: contentMaxPages) }
             ?? .failure(.network("正文超时（超过 \(Int(timeout)) 秒）"))
         var contentRetried = false
         if case .failure(let error) = contentResult, isTransientNetworkFailure(error) {
             try? await Task.sleep(nanoseconds: 300_000_000)
-            contentResult = await AsyncTimeout.run(seconds: timeout) { await self.getContent(source: source, chapter: firstChapter, maxPages: 1) }
+            contentResult = await AsyncTimeout.run(seconds: timeout) { await self.getContent(source: source, chapter: firstChapter, maxPages: contentMaxPages) }
                 ?? .failure(.network("正文超时（超过 \(Int(timeout)) 秒）"))
             contentRetried = true
         }
@@ -285,9 +287,18 @@ extension SourceEngine {
         source: BookSource,
         keyword: String,
         page: Int = 1,
-        timeout: TimeInterval = 20
+        timeout: TimeInterval = 20,
+        tocMaxPages: Int = 30,
+        contentMaxPages: Int = 8
     ) async -> SourcePipelineExecution {
-        let execution = await runPipelineExecution(source: source, keyword: keyword, page: page, timeout: timeout)
+        let execution = await runPipelineExecution(
+            source: source,
+            keyword: keyword,
+            page: page,
+            timeout: timeout,
+            tocMaxPages: tocMaxPages,
+            contentMaxPages: contentMaxPages
+        )
         guard let provider = self as? SourceDiagnosticEvidenceProvider else { return execution }
         let report = execution.result.report
         let enrichedSteps = report.steps.map { step in
@@ -342,9 +353,18 @@ extension SourceEngine {
         source: BookSource,
         keyword: String,
         page: Int = 1,
-        timeout: TimeInterval = 20
+        timeout: TimeInterval = 20,
+        tocMaxPages: Int = 30,
+        contentMaxPages: Int = 8
     ) async -> Result<SourcePipelineResult, SourceEngineError> {
-        let execution = await runPipelineExecution(source: source, keyword: keyword, page: page, timeout: timeout)
+        let execution = await runPipelineExecution(
+            source: source,
+            keyword: keyword,
+            page: page,
+            timeout: timeout,
+            tocMaxPages: tocMaxPages,
+            contentMaxPages: contentMaxPages
+        )
         if let error = execution.error { return .failure(error) }
         return .success(execution.result)
     }

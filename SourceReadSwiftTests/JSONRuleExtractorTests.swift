@@ -558,4 +558,49 @@ final class JSONRuleExtractorTests: XCTestCase {
         XCTAssertEqual(extractor.string(from: item, rule: "价格:{{result.price*2}}"), "价格:20")
         XCTAssertEqual(extractor.string(from: item, rule: "{{result.name}}"), "A")
     }
+
+    func testTemplateWithTrailingJSSegmentReceivesInterpolatedResult() throws {
+        let extractor = JSONRuleExtractor()
+        let item: [String: Any] = [
+            "category_name": "玄幻",
+            "status": "连载中",
+            "update_time": "2024-01-01",
+            "name": "A",
+            "ascii": "ab"
+        ]
+
+        XCTAssertEqual(
+            extractor.string(
+                from: item,
+                rule: #"{{$.category_name}},{{$.status}},{{$.update_time}}@js:result.replace(/连载中/,"连载")"#
+            ),
+            "玄幻,连载,2024-01-01"
+        )
+        XCTAssertEqual(
+            extractor.string(from: item, rule: "{{$.name}}-{{$.ascii}}@js:result.toUpperCase()"),
+            "A-AB"
+        )
+        XCTAssertEqual(
+            extractor.string(from: item, rule: #"{{$.name}}<js>result + "!"</js>"#),
+            "A!"
+        )
+    }
+
+    func testJSONPathWithTrailingJSSegmentStillWorks() throws {
+        let extractor = JSONRuleExtractor()
+        let item: [String: Any] = ["bookid": "1234567"]
+
+        XCTAssertEqual(extractor.string(from: item, rule: #"$.bookid@js:result + "x""#), "1234567x")
+    }
+
+    func testJavaScriptNumericFormattingMatchesLegado() throws {
+        let extractor = JSONRuleExtractor()
+        let item: [String: Any] = ["price": 10]
+
+        XCTAssertEqual(extractor.string(from: item, rule: "@js:1+1"), "2")
+        XCTAssertEqual(extractor.string(from: item, rule: "@js:1.5"), "1.5")
+        XCTAssertEqual(extractor.string(from: item, rule: "@js:result.price*2"), "20")
+        XCTAssertEqual(extractor.string(from: item, rule: "{{1+1}}"), "2")
+        XCTAssertEqual(extractor.string(from: item, rule: "{{1.5}}"), "1.5")
+    }
 }

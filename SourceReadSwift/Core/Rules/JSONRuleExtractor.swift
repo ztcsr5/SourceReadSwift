@@ -75,7 +75,7 @@ struct JSONRuleExtractor {
         let trimmed = rule?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
         guard !trimmed.isEmpty else { return nil }
         if let extracted = value(from: object, path: trimmed, variables: variables) {
-            let text = stringify(extracted)
+            let text = stringifyJSResult(extracted)
             return text.isEmpty ? nil : text
         }
         return nil
@@ -90,30 +90,19 @@ struct JSONRuleExtractor {
         if let rule {
             let trimmed = rule.trimmingCharacters(in: .whitespacesAndNewlines)
             if trimmed.contains("{{") && trimmed.contains("}}") {
-                let interpolated = interpolateTemplate(trimmed, item: item, variables: variables)
-                    .trimmingCharacters(in: .whitespacesAndNewlines)
-                if interpolated.hasPrefix("http://") || interpolated.hasPrefix("https://") || interpolated.hasPrefix("/") {
-                    let cleanedURL = splitTransforms(interpolated).path
-                    if !cleanedURL.isEmpty {
-                        return cleanedURL
+                if let evaluated = evaluateTemplateSegments(trimmed, item: item, variables: variables) {
+                    let text = stringifyJSResult(evaluated).trimmingCharacters(in: .whitespacesAndNewlines)
+                    if !text.isEmpty {
+                        if text.hasPrefix("http://") || text.hasPrefix("https://") || text.hasPrefix("/") {
+                            let cleanedURL = splitTransforms(text).path
+                            if !cleanedURL.isEmpty { return cleanedURL }
+                        }
+                        return text
                     }
-                }
-                if interpolated.hasPrefix("@js:")
-                    || interpolated.hasPrefix("<js>")
-                    || interpolated.contains("@js:")
-                    || interpolated.contains("<js>")
-                    || interpolated.contains("$.")
-                    || interpolated.contains("@json:") {
-                    if let value = value(from: item, path: interpolated, variables: variables) {
-                        let text = stringify(value)
-                        if !text.isEmpty { return text }
-                    }
-                } else if !interpolated.isEmpty {
-                    return splitTransforms(interpolated).path
                 }
             }
             if let value = value(from: item, path: rule, variables: variables) {
-                let text = stringify(value)
+                let text = stringifyJSResult(value)
                 if !text.isEmpty { return text }
             }
         }
@@ -1943,6 +1932,135 @@ struct JSONRuleExtractor {
         return text
     }
 
+    /// Splits a rule into normal template segments and JavaScript segments.
+    ///
+    /// Legado's `JS_PATTERN` treats `@js:` anywhere in a rule as the start of a
+    /// JavaScript segment, and `<js>...</js>` as an inline script.  A template
+    /// such as `{{$.a}},{{$.b}}@js:result.replace(...)` therefore evaluates the
+    /// interpolated text first and passes it to the script as `result`.
+    private func splitTemplateJSSegments(_ rule: String) -> [SourceSegment] {
+        var segments: [SourceSegment] = []
+        var remaining = rule
+
+        while !remaining.isEmpty {
+            let atRange = remaining.range(of: "@js:")
+            let tagRange = remaining.range(of: "<js>")
+            let markerStart: String.Index
+            let isAtSyntax: Bool
+            switch (atRange, tagRange) {
+            case let (at?, tag?):
+                if at.lowerBound < tag.lowerBound {
+                    markerStart = at.lowerBound
+                    isAtSyntax = true
+                } else {
+                    markerStart = tag.lowerBound
+                    isAtSyntax = false
+                }
+            case let (at?, nil):
+                markerStart = at.lowerBound
+                isAtSyntax = true
+            case let (nil, tag?):
+                markerStart = tag.lowerBound
+                isAtSyntax = false
+            case (nil, nil):
+                let text = remaining
+                if !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                    segments.append(.normal(text))
+                }
+                return segments
+            }
+
+            let before = String(remaining[..<markerStart])
+            if !before.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                segments.append(.normal(before))
+            }
+
+            if isAtSyntax {
+                let codeStart = remaining.index(markerStart, offsetBy: 4)
+                let tail = String(remaining[codeStart...])
+                let nextAt = tail.range(of: "@js:")
+                let nextTag = tail.range(of: "<js>")
+                let cut: String.Index
+                switch (nextAt, nextTag) {
+                case let (at?, tag?):
+                    cut = min(at.lowerBound, tag.lowerBound)
+                case let (at?, nil):
+                    cut = at.lowerBound
+                case let (nil, tag?):
+                    cut = tag.lowerBound
+                case (nil, nil):
+                    cut = tail.endIndex
+                }
+                let code = String(tail[..<cut]).trimmingCharacters(in: .whitespacesAndNewlines)
+                if !code.isEmpty { segments.append(.js(code)) }
+                remaining = String(tail[cut...])
+            } else {
+                let codeStart = remaining.index(markerStart, offsetBy: 4)
+                guard let end = remaining.range(of: "</js>", range: codeStart..<remaining.endIndex) else {
+                    let code = String(remaining[codeStart...]).trimmingCharacters(in: .whitespacesAndNewlines)
+                    if !code.isEmpty { segments.append(.js(code)) }
+                    return segments
+                }
+                let code = String(remaining[codeStart..<end.lowerBound]).trimmingCharacters(in: .whitespacesAndNewlines)
+                if !code.isEmpty { segments.append(.js(code)) }
+                remaining = String(remaining[end.upperBound...])
+            }
+        }
+        return segments
+    }
+
+    /// Evaluates a `{{...}}` template together with trailing `@js:` / `<js>`
+    /// segments.  The interpolated text becomes `result` for the script, which
+    /// is how Legado chains `{{}}` and `@js:` in one rule.
+    private func evaluateTemplateSegments(
+        _ rule: String,
+        item: [String: Any],
+        variables: [String: Any]
+    ) -> Any? {
+        let segments = splitTemplateJSSegments(rule)
+        guard !segments.isEmpty else { return nil }
+        var current: Any = item
+        for segment in segments {
+            switch segment {
+            case .normal(let text):
+                let interpolated = interpolateTemplate(text, item: item, variables: variables)
+                let split = splitTransforms(interpolated)
+                if split.transforms.isEmpty {
+                    current = split.path
+                } else {
+                    current = applyTransforms(split.transforms, to: split.path)
+                }
+            case .js(let code):
+                guard let next = evaluateRawJS(script: code, object: current, extraVariables: variables) else {
+                    return nil
+                }
+                current = next
+            }
+        }
+        return current
+    }
+
+    /// Legado's `makeUpRule` formats JavaScript results as follows: `null` is
+    /// skipped, strings are inserted verbatim, integral doubles use `%.0f`,
+    /// and everything else uses `toString()`.  `NSNumber` would otherwise
+    /// render `2.0` for the integer `2`.
+    func stringifyJSResult(_ value: Any) -> String {
+        if value is NSNull { return "" }
+        if let string = value as? String { return string }
+        if let number = value as? NSNumber {
+            if CFGetTypeID(number) == CFBooleanGetTypeID() {
+                return number.boolValue ? "true" : "false"
+            }
+            let doubleValue = number.doubleValue
+            if doubleValue.isFinite,
+               doubleValue.truncatingRemainder(dividingBy: 1) == 0,
+               abs(doubleValue) < 1e15 {
+                return String(format: "%.0f", doubleValue)
+            }
+            return number.stringValue
+        }
+        return stringify(value)
+    }
     private func interpolateTemplate(_ template: String, item: [String: Any], variables: [String: Any]) -> String {
         guard let regex = try? NSRegularExpression(pattern: #"\{\{\s*([^{}]+)\s*\}\}"#) else { return template }
         let mText = NSMutableString(string: template)
@@ -1966,7 +2084,7 @@ struct JSONRuleExtractor {
                 // direct-key and JSONPath lookups above for the common
                 // `{{key}}` / `{{$.field}}` templates, then evaluate any
                 // remaining expression with `result` bound to the item.
-                val = stringify(jsValue)
+                val = stringifyJSResult(jsValue)
             } else {
                 val = ""
             }
