@@ -21,16 +21,15 @@ struct TTSSettingsView: View {
     private let client = CloudTTSClient()
 
     private var engine: TTSEngineKind {
-        get { TTSEngineKind(rawValue: engineRawValue) ?? .local }
-        set { engineRawValue = newValue.rawValue }
+        TTSEngineKind(rawValue: engineRawValue) ?? .local
     }
 
     var body: some View {
         Form {
             Section {
                 Picker("朗读引擎", selection: Binding(
-                    get: { self.engine },
-                    set: { self.engine = $0 }
+                    get: { TTSEngineKind(rawValue: engineRawValue) ?? .local },
+                    set: { engineRawValue = $0.rawValue }
                 )) {
                     ForEach(TTSEngineKind.allCases) { kind in
                         Text(kind.title).tag(kind)
