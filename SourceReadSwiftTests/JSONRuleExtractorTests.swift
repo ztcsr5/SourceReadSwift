@@ -178,7 +178,7 @@ final class JSONRuleExtractorTests: XCTestCase {
             fallbackKeys: []
         )
 
-        XCTAssertEqual(value, "A\nC\nB\nD")
+        XCTAssertEqual(value, "A\nB\nC\nD")
     }
 
     func testPutAndGetDirectivesShareJSONValuesAcrossRules() throws {
@@ -344,6 +344,47 @@ final class JSONRuleExtractorTests: XCTestCase {
         let extractor = JSONRuleExtractor()
         let result = extractor.string(from: item, rule: nil, fallbackKeys: ["chapterName"])
         XCTAssertEqual(result, "第一章 初始")
+    }
+
+    func testRegexTransformReplaceAllKeepsLegadoSemantics() throws {
+        let extractor = JSONRuleExtractor()
+        let object: [String: Any] = ["text": "a a a"]
+
+        XCTAssertEqual(extractor.value(from: object, path: "$.text##a##b") as? String, "b b b")
+        XCTAssertEqual(extractor.value(from: object, path: "$.text##xyz##b") as? String, "a a a")
+        XCTAssertEqual(extractor.value(from: object, path: "$.text##a##b###") as? String, "b")
+        XCTAssertEqual(extractor.value(from: object, path: "$.text##xyz##b###") as? String, "")
+    }
+
+    func testInvalidRegexTransformFallsBackLikeLegado() throws {
+        let extractor = JSONRuleExtractor()
+        let object: [String: Any] = ["text": "a(b"]
+
+        // Invalid pattern, replace-all: literal replacement.
+        XCTAssertEqual(extractor.value(from: object, path: "$.text##a(##X") as? String, "Xb")
+        // Invalid pattern, replace-first: return the replacement.
+        XCTAssertEqual(extractor.value(from: object, path: "$.text##a(##X###") as? String, "X")
+    }
+
+    func testFilterExpressionKeepsNestedLogicalOperators() throws {
+        let extractor = JSONRuleExtractor()
+        let object: [String: Any] = [
+            "list": [
+                ["a": 1, "b": 2, "name": "match"],
+                ["a": 1, "b": 3, "name": "miss"],
+                ["a": 2, "b": 2, "name": "miss2"]
+            ]
+        ]
+
+        let value = extractor.value(from: object, path: "$.list[?(@.a==1&&@.b==2)].name") as? String
+        XCTAssertEqual(value, "match")
+    }
+
+    func testListReturnsEmptyForMissingPath() throws {
+        let extractor = JSONRuleExtractor()
+        let object: [String: Any] = ["data": ["books": [["title": "A"]]]]
+
+        XCTAssertTrue(extractor.list(from: object, rule: "$.data.missing").isEmpty)
     }
 
     func testEvaluateRawJSPreservesObjectAsResult() throws {
