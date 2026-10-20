@@ -14,6 +14,14 @@ enum ReaderBackground: String, CaseIterable, Identifiable, Codable, Sendable {
     case eink       // 电子水墨 (#FFFFFF / #000000 高对比度)
     case custom     // 自定义壁纸
 
+    // Sakura 主题调色板（与 SakuraThemeCatalog CSS 一一对应）
+    case sakuraClassic
+    case sakuraDark
+    case sakuraSolarized
+    case sakuraEarthly
+    case sakuraInk
+    case sakuraVader
+
     var id: String { rawValue }
 
     var title: String {
@@ -28,6 +36,12 @@ enum ReaderBackground: String, CaseIterable, Identifiable, Codable, Sendable {
         case .dark: return "极黑"
         case .eink: return "水墨屏"
         case .custom: return "自定义"
+        case .sakuraClassic: return "樱白"
+        case .sakuraDark: return "夜樱"
+        case .sakuraSolarized: return "暖阳"
+        case .sakuraEarthly: return "大地"
+        case .sakuraInk: return "墨白"
+        case .sakuraVader: return "深渊"
         }
     }
 
@@ -78,6 +92,12 @@ enum ReaderBackground: String, CaseIterable, Identifiable, Codable, Sendable {
         case .gray: return 0xF2F2F7
         case .dark: return 0x000000
         case .custom: return 0x1C1C1E
+        case .sakuraClassic: return 0xF9F9F9
+        case .sakuraDark: return 0x222222
+        case .sakuraSolarized: return 0x002B36
+        case .sakuraEarthly: return 0xFFFFFF
+        case .sakuraInk: return 0xFFFFFF
+        case .sakuraVader: return 0x120C0E
         }
     }
 
@@ -93,6 +113,12 @@ enum ReaderBackground: String, CaseIterable, Identifiable, Codable, Sendable {
         case .eink: return 0x000000
         case .dark: return 0xFFFFFF
         case .custom: return 0xFFFFFF
+        case .sakuraClassic: return 0x4A4A4A
+        case .sakuraDark: return 0xC9C9C9
+        case .sakuraSolarized: return 0x839496
+        case .sakuraEarthly: return 0x222222
+        case .sakuraInk: return 0x262626
+        case .sakuraVader: return 0xD9D8DC
         }
     }
 
@@ -104,6 +130,12 @@ enum ReaderBackground: String, CaseIterable, Identifiable, Codable, Sendable {
         case .gray: return 0x2C2C2E
         case .dark, .eink: return 0x000000
         case .custom: return 0x1C1C1E
+        case .sakuraClassic: return 0x1C1C1E
+        case .sakuraDark: return 0x222222
+        case .sakuraSolarized: return 0x002B36
+        case .sakuraEarthly: return 0x18211D
+        case .sakuraInk: return 0x000000
+        case .sakuraVader: return 0x120C0E
         }
     }
 
@@ -117,14 +149,46 @@ enum ReaderBackground: String, CaseIterable, Identifiable, Codable, Sendable {
         case .gray: return 0xF2F2F7
         case .dark, .eink: return 0xFFFFFF
         case .custom: return 0xFFFFFF
+        case .sakuraClassic: return 0xD8D8D8
+        case .sakuraDark: return 0xC9C9C9
+        case .sakuraSolarized: return 0x839496
+        case .sakuraEarthly: return 0xD3DAD5
+        case .sakuraInk: return 0xFFFFFF
+        case .sakuraVader: return 0xD9D8DC
         }
     }
 
     func darkStatusIcon(isNight: Bool) -> Bool {
         if isNight { return false }
         switch self {
-        case .paper, .kraft, .white, .gray, .eink: return true
-        case .green, .lavender, .azure, .dark, .custom: return false
+        case .paper, .kraft, .white, .gray, .eink,
+             .sakuraClassic, .sakuraEarthly, .sakuraInk: return true
+        case .green, .lavender, .azure, .dark, .custom,
+             .sakuraDark, .sakuraSolarized, .sakuraVader: return false
+        }
+    }
+
+    /// 与 SakuraThemeCatalog 的 CSS 主题一一映射；非 Sakura 调色板返回 nil。
+    var sakuraTheme: SakuraThemeCatalog.Theme? {
+        switch self {
+        case .sakuraClassic: return .classic
+        case .sakuraDark: return .dark
+        case .sakuraSolarized: return .solarized
+        case .sakuraEarthly: return .earthly
+        case .sakuraInk: return .ink
+        case .sakuraVader: return .vader
+        default: return nil
+        }
+    }
+
+    init(sakuraTheme: SakuraThemeCatalog.Theme) {
+        switch sakuraTheme {
+        case .classic: self = .sakuraClassic
+        case .dark: self = .sakuraDark
+        case .solarized: self = .sakuraSolarized
+        case .earthly: self = .sakuraEarthly
+        case .ink: self = .sakuraInk
+        case .vader: self = .sakuraVader
         }
     }
 }
