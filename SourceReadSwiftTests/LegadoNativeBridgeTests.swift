@@ -191,6 +191,21 @@ final class LegadoNativeBridgeTests: XCTestCase {
         )
     }
 
+    func testAnalyzerStringListKeepsHTMLNodeBoundaries() throws {
+        let analyzer = LegadoRuleAnalyzer()
+        let html = "<div class='c'>A<span>X</span>B</div><div class='c'>C</div>"
+
+        // One selected node = one list element, even when its text contains
+        // newlines.  `AnalyzeByJSoup.getStringList` never splits node text.
+        XCTAssertEqual(
+            analyzer.stringList(content: html, rule: ".c@textNodes", baseURL: nil),
+            ["A\nB", "C"]
+        )
+        XCTAssertEqual(
+            analyzer.string(content: html, rule: ".c@textNodes", baseURL: nil),
+            "A\nB\nC"
+        )
+    }
     func testNativeJavaABIExposesFilesystemAndCryptoMethods() throws {
         let runtime = JSCoreRuntime()
         let result = runtime.evaluate("[typeof java.aesEncodeToString, typeof java.readTxtFile, typeof java.getZipStringContent, typeof java.downloadFile, typeof java.utf8ToGbk].join('|')")

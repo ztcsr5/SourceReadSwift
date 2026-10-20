@@ -70,10 +70,12 @@ final class LegadoRuleAnalyzer {
         }
         do {
             let root = try SwiftSoup.parse(content, baseURL?.absoluteString ?? "http://localhost/")
-            let value = try htmlExtractor.value(from: root, rule: rule, baseUrl: baseURL, variables: variables)
-            return value.components(separatedBy: "\n").map {
-                $0.trimmingCharacters(in: .whitespacesAndNewlines)
-            }.filter { !$0.isEmpty }
+            // `AnalyzeByJSoup.getStringList` keeps one element per selected
+            // node.  Splitting the joined string on newlines would destroy
+            // node boundaries for `@textNodes` and multi-paragraph content.
+            return try htmlExtractor.stringList(from: root, rule: rule, baseUrl: baseURL, variables: variables)
+                .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+                .filter { !$0.isEmpty }
         } catch {
             executionContext.log("RuleAnalyzer list failed: \(error.localizedDescription)")
             return []

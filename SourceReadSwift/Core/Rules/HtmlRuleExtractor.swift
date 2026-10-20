@@ -14,28 +14,6 @@ final class RuleDirectiveStore {
         value(for: key) ?? ""
     }
 
-    func value(for key: String) -> String? {
-        values[key.trimmingCharacters(in: .whitespacesAndNewlines)]
-    }
-}
-
-struct HtmlRuleExtractor {
-    private let directiveStore: RuleDirectiveStore
-    private let executionContext: RuleExecutionContext
-
-    init(
-        directiveStore: RuleDirectiveStore = RuleDirectiveStore(),
-        executionContext: RuleExecutionContext = RuleExecutionContext()
-    ) {
-        self.directiveStore = directiveStore
-        self.executionContext = executionContext
-    }
-
-    func select(_ html: String, baseUrl: URL, listRule: String) throws -> [Element] {
-        let document = try SwiftSoup.parse(html, baseUrl.absoluteString)
-        return try select(from: document, rule: listRule, baseUrl: baseUrl)
-    }
-
     func value(
         from root: Element,
         rule: String?,
@@ -43,71 +21,58 @@ struct HtmlRuleExtractor {
         baseUrl: URL? = nil,
         variables: [String: Any] = [:]
     ) throws -> String {
-        let selectedRule = rule ?? fallback
-        guard let selectedRule, !selectedRule.isEmpty else { return "" }
+        try stringList(
+            from: root,
+            rule: rule,
+            fallback: fallback,
+            baseUrl: baseUrl,
+            variables: variables
+        ).joined(separator: "\n")
+    }
 
-        var trimmed = selectedRule.trimmingCharacters(in: .whitespacesAndNewlines)
+    /// Legado `AnalyzeByJSoup.getStringList` equivalent.
+    ///
+    /// Node boundaries are preserved: one selected element yields exactly one
+    /// string even when its text contains newlines (for example `@textNodes`
+    /// or `<br>`-separated paragraphs).  Only the top-level `&&`, `||` and
+    /// `%%` operators merge lists.
+    func stringList(
+        from root: Element,
+        rule: String?,
+        fallback: String? = nil,
+        baseUrl: URL? = nil,
+        variables: [String: Any] = [:]
+    ) throws -> [String] {
+        let selectedRule = rule ?? fallback
+        guard let selectedRule, !selectedRule.isEmpty else { return [] }
+
+        let trimmed = selectedRule.trimmingCharacters(in: .whitespacesAndNewlines)
 
         // Stage 1: Template Interpolation {{...}}
         if trimmed.contains("{{") && trimmed.contains("}}") {
             let interpolated = try interpolateTemplate(trimmed, root: root, baseUrl: baseUrl, variables: variables)
                 .trimmingCharacters(in: .whitespacesAndNewlines)
             if LegadoRuleResolver().isJavaScriptRule(interpolated) {
-                return try evaluateJSWithTrailingRegex(rule: interpolated, rootHtml: try root.outerHtml(), rootElement: root, baseUrl: baseUrl, extraVariables: variables)
+                let value = try evaluateJSWithTrailingRegex(rule: interpolated, rootHtml: try root.outerHtml(), rootElement: root, baseUrl: baseUrl, extraVariables: variables)
+                return value.isEmpty ? [] : [value]
             }
-            if !interpolated.isEmpty {
-                return interpolated
-            }
-            return ""
+            return interpolated.isEmpty ? [] : [interpolated]
         }
 
         if LegadoRuleResolver().isJavaScriptRule(trimmed) {
-            return try evaluateJSWithTrailingRegex(rule: trimmed, rootHtml: try root.outerHtml(), rootElement: root, baseUrl: baseUrl, extraVariables: variables)
+            let value = try evaluateJSWithTrailingRegex(rule: trimmed, rootHtml: try root.outerHtml(), rootElement: root, baseUrl: baseUrl, extraVariables: variables)
+            return value.isEmpty ? [] : [value]
         }
 
         // Support chained JavaScript rules: Selector@js:script or Selector<js>script</js>
         if let jsRange = trimmed.range(of: "@js:"), jsRange.lowerBound > trimmed.startIndex {
-            let prefix = String(trimmed[..<jsRange.lowerBound]).trimmingCharacters(in: .whitespacesAndNewlines)
-            let script = String(trimmed[jsRange.lowerBound...]).trimmingCharacters(in: .whitespacesAndNewlines)
-            let elements = (try? self.select(from: root, rule: prefix, baseUrl: baseUrl)) ?? []
-            if let first = elements.first {
-                var chainedVariables = variables
-                let baseStr = baseUrl?.absoluteString ?? ""
-                chainedVariables["result"] = elements.count == 1 ? LegadoElementBridge(element: first, baseURL: baseStr) : LegadoElementsBridge(elements: elements, baseURL: baseStr)
-                let extractedHtml = (try? first.outerHtml()) ?? ""
-                chainedVariables["src"] = extractedHtml
-                chainedVariables["html"] = extractedHtml
-                return try evaluateJSWithTrailingRegex(rule: script, rootHtml: extractedHtml, rootElement: first, baseUrl: baseUrl, extraVariables: chainedVariables)
-            } else {
-                let extracted = try self.value(from: root, rule: prefix, fallback: nil, baseUrl: baseUrl, variables: variables)
-                var chainedVariables = variables
-                chainedVariables["result"] = extracted
-                chainedVariables["src"] = extracted
-                chainedVariables["html"] = extracted
-                return try evaluateJSWithTrailingRegex(rule: script, rootHtml: extracted, rootElement: nil, baseUrl: baseUrl, extraVariables: chainedVariables)
-            }
+            let value = try evaluateChainedJavaScript(trimmed: trimmed, jsRange: jsRange, root: root, baseUrl: baseUrl, variables: variables)
+            return value.isEmpty ? [] : [value]
         }
 
         if let jsStart = trimmed.range(of: "<js>"), jsStart.lowerBound > trimmed.startIndex {
-            let prefix = String(trimmed[..<jsStart.lowerBound]).trimmingCharacters(in: .whitespacesAndNewlines)
-            let script = String(trimmed[jsStart.lowerBound...]).trimmingCharacters(in: .whitespacesAndNewlines)
-            let elements = (try? self.select(from: root, rule: prefix, baseUrl: baseUrl)) ?? []
-            if let first = elements.first {
-                var chainedVariables = variables
-                let baseStr = baseUrl?.absoluteString ?? ""
-                chainedVariables["result"] = elements.count == 1 ? LegadoElementBridge(element: first, baseURL: baseStr) : LegadoElementsBridge(elements: elements, baseURL: baseStr)
-                let extractedHtml = (try? first.outerHtml()) ?? ""
-                chainedVariables["src"] = extractedHtml
-                chainedVariables["html"] = extractedHtml
-                return try evaluateJSWithTrailingRegex(rule: script, rootHtml: extractedHtml, rootElement: first, baseUrl: baseUrl, extraVariables: chainedVariables)
-            } else {
-                let extracted = try self.value(from: root, rule: prefix, fallback: nil, baseUrl: baseUrl, variables: variables)
-                var chainedVariables = variables
-                chainedVariables["result"] = extracted
-                chainedVariables["src"] = extracted
-                chainedVariables["html"] = extracted
-                return try evaluateJSWithTrailingRegex(rule: script, rootHtml: extracted, rootElement: nil, baseUrl: baseUrl, extraVariables: chainedVariables)
-            }
+            let value = try evaluateChainedJavaScript(trimmed: trimmed, jsRange: jsStart, root: root, baseUrl: baseUrl, variables: variables)
+            return value.isEmpty ? [] : [value]
         }
 
         if let alternatives = RuleOperatorSplitter.split(trimmed, separator: "||") {
@@ -117,26 +82,52 @@ struct HtmlRuleExtractor {
                     continue
                 }
                 do {
-                    let value = try self.value(from: root, rule: trimmedAlt, fallback: nil, baseUrl: baseUrl, variables: variables)
-                    if !value.isEmpty { return value }
+                    let values = try stringList(from: root, rule: trimmedAlt, fallback: nil, baseUrl: baseUrl, variables: variables)
+                    if !values.isEmpty { return values }
                 } catch {
                     continue
                 }
             }
-            return ""
+            return []
         }
 
         if let mergeParts = RuleOperatorSplitter.split(trimmed, separator: "%%") {
             let lists = try mergeParts
-                .map { try valuesForSingleRule(from: root, rule: $0, baseUrl: baseUrl) }
+                .map { try stringList(from: root, rule: $0, fallback: nil, baseUrl: baseUrl, variables: variables) }
                 .filter { !$0.isEmpty }
-            return interleave(lists).joined(separator: "\n")
+            return interleave(lists)
         }
 
-        let values = try valuesForSingleRule(from: root, rule: trimmed, baseUrl: baseUrl)
-        return values.joined(separator: "\n")
+        return try valuesForSingleRule(from: root, rule: trimmed, baseUrl: baseUrl)
     }
 
+    private func evaluateChainedJavaScript(
+        trimmed: String,
+        jsRange: Range<String.Index>,
+        root: Element,
+        baseUrl: URL?,
+        variables: [String: Any]
+    ) throws -> String {
+        let prefix = String(trimmed[..<jsRange.lowerBound]).trimmingCharacters(in: .whitespacesAndNewlines)
+        let script = String(trimmed[jsRange.lowerBound...]).trimmingCharacters(in: .whitespacesAndNewlines)
+        let elements = (try? self.select(from: root, rule: prefix, baseUrl: baseUrl)) ?? []
+        if let first = elements.first {
+            var chainedVariables = variables
+            let baseStr = baseUrl?.absoluteString ?? ""
+            chainedVariables["result"] = elements.count == 1 ? LegadoElementBridge(element: first, baseURL: baseStr) : LegadoElementsBridge(elements: elements, baseURL: baseStr)
+            let extractedHtml = (try? first.outerHtml()) ?? ""
+            chainedVariables["src"] = extractedHtml
+            chainedVariables["html"] = extractedHtml
+            return try evaluateJSWithTrailingRegex(rule: script, rootHtml: extractedHtml, rootElement: first, baseUrl: baseUrl, extraVariables: chainedVariables)
+        } else {
+            let extracted = try self.value(from: root, rule: prefix, fallback: nil, baseUrl: baseUrl, variables: variables)
+            var chainedVariables = variables
+            chainedVariables["result"] = extracted
+            chainedVariables["src"] = extracted
+            chainedVariables["html"] = extracted
+            return try evaluateJSWithTrailingRegex(rule: script, rootHtml: extracted, rootElement: nil, baseUrl: baseUrl, extraVariables: chainedVariables)
+        }
+    }
     private func valuesForSingleRule(from root: Element, rule: String, baseUrl: URL?) throws -> [String] {
         let materialized = try applyDirectives(root: root, rule: rule, baseUrl: baseUrl)
         let materializedRule = materialized.text

@@ -162,6 +162,36 @@ final class HtmlRuleExtractorTests: XCTestCase {
         XCTAssertEqual(try elements.map { try $0.text() }, ["第一章", "第二章", "第三章", "第四章"])
     }
 
+    func testStringListPreservesNodeBoundariesAndInnerNewlines() throws {
+        let document = try SwiftSoup.parse("""
+        <html><body>
+          <div class="c">A<span>X</span>B</div>
+          <div class="c">C</div>
+        </body></html>
+        """)
+
+        let extractor = HtmlRuleExtractor()
+
+        // Legado `getStringList` adds one element per selected node.  A
+        // `@textNodes` value that already contains newlines stays a single
+        // element instead of being split into two.
+        XCTAssertEqual(
+            try extractor.stringList(from: document, rule: ".c@textNodes"),
+            ["A\nB", "C"]
+        )
+        XCTAssertEqual(
+            try extractor.value(from: document, rule: ".c@textNodes"),
+            "A\nB\nC"
+        )
+        XCTAssertEqual(
+            try extractor.stringList(from: document, rule: ".missing||.c@textNodes"),
+            ["A\nB", "C"]
+        )
+        XCTAssertEqual(
+            try extractor.stringList(from: document, rule: ".c@textNodes%%.c@textNodes"),
+            ["A\nB", "A\nB", "C", "C"]
+        )
+    }
     func testListFallbackUsesFirstNonEmptySelector() throws {
         let html = """
         <html><body>
