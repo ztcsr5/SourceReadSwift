@@ -44,7 +44,7 @@ final class HtmlRuleExtractorTests: XCTestCase {
 
         let value = try HtmlRuleExtractor().value(
             from: document,
-            rule: ".book .title@text##\\[完结\\] ## ## 最新章节##",
+            rule: ".book .title@text##\\[完结\\] | 最新章节##",
             baseUrl: URL(string: "https://example.com/search")!
         )
 

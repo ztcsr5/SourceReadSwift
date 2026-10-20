@@ -467,19 +467,10 @@ struct HtmlRuleExtractor {
     }
 
     private func applyRegexTransforms(_ rawParts: ArraySlice<String>, to value: String) -> String {
-        let parts = Array(rawParts)
-        guard !parts.isEmpty else { return value }
-        var output = value
-        var index = 0
-        while index < parts.count {
-            let pattern = parts[index]
-            let replacement = index + 1 < parts.count ? parts[index + 1] : ""
-            if !pattern.isEmpty {
-                output = output.replacingOccurrences(of: pattern, with: replacement, options: .regularExpression)
-            }
-            index += 2
-        }
-        return output
+        RuleTransformParser.apply(
+            RuleTransformParser.transform(fromTrailingParts: rawParts),
+            to: value
+        )
     }
 
     private func applyDirectives(root: Element, rule: String, baseUrl: URL?) throws -> String {
@@ -759,7 +750,7 @@ struct HtmlRuleExtractor {
             } else if let hashRange = script.range(of: "##") {
                 let regexText = String(script[hashRange.lowerBound...]).trimmingCharacters(in: .whitespacesAndNewlines)
                 let parts = regexText.components(separatedBy: "##").dropFirst()
-                if parts.count >= 2 {
+                if !parts.isEmpty {
                     script = String(script[..<hashRange.lowerBound]).trimmingCharacters(in: .whitespacesAndNewlines)
                     trailingRegexParts = Array(parts)
                 }

@@ -32,11 +32,7 @@ struct JSONRuleExtractor {
         let expected: String?
     }
 
-    struct RegexTransform {
-        let pattern: String
-        let replacement: String
-        let replaceFirst: Bool
-    }
+    private typealias RegexTransform = RuleRegexTransform
 
     private let directiveStore: JSONRuleDirectiveStore
     private let executionContext: RuleExecutionContext
@@ -1152,13 +1148,8 @@ struct JSONRuleExtractor {
     // MARK: - Transforms
 
     private func splitTransforms(_ rawRule: String) -> (path: String, transforms: [RegexTransform]) {
-        let parts = rawRule.components(separatedBy: "##")
-        guard parts.count > 1 else { return (rawRule, []) }
-        let path = parts[0]
-        let pattern = parts[1]
-        let replacement = parts.count > 2 ? parts[2] : ""
-        guard !pattern.isEmpty else { return (path, []) }
-        return (path, [RegexTransform(pattern: pattern, replacement: replacement, replaceFirst: parts.count > 3)])
+        let split = RuleTransformParser.split(rawRule)
+        return (split.path, split.transform.map { [$0] } ?? [])
     }
 
     private func applyTransforms(_ transforms: [RegexTransform], to value: Any) -> Any {
@@ -1171,42 +1162,7 @@ struct JSONRuleExtractor {
         }
         var text = stringify(value)
         for transform in transforms {
-            guard let regex = try? NSRegularExpression(pattern: transform.pattern) else {
-                if transform.replaceFirst {
-                    text = transform.replacement
-                } else {
-                    text = text.replacingOccurrences(of: transform.pattern, with: transform.replacement)
-                }
-                continue
-            }
-            let fullRange = NSRange(location: 0, length: (text as NSString).length)
-            if transform.replaceFirst {
-                let source = text as NSString
-                guard let match = regex.firstMatch(in: text, options: [], range: fullRange) else {
-                    text = ""
-                    continue
-                }
-                let matched = source.substring(with: match.range)
-                let matchedRange = NSRange(location: 0, length: (matched as NSString).length)
-                guard let inner = regex.firstMatch(in: matched, options: [], range: matchedRange) else {
-                    text = ""
-                    continue
-                }
-                let expanded = regex.replacementString(
-                    for: inner,
-                    in: matched,
-                    offset: 0,
-                    template: transform.replacement
-                )
-                text = (matched as NSString).replacingCharacters(in: inner.range, with: expanded)
-            } else {
-                text = regex.stringByReplacingMatches(
-                    in: text,
-                    options: [],
-                    range: fullRange,
-                    withTemplate: transform.replacement
-                )
-            }
+            text = RuleTransformParser.apply(transform, to: text)
         }
         return text
     }
@@ -1266,21 +1222,12 @@ struct JSONRuleExtractor {
             script = String(script[start..<end]) + rest
         }
 
-        var trailingRegex: [(pattern: String, replacement: String)] = []
+        var trailingTransform: RuleRegexTransform?
         if script.hasPrefix("##") {
-            let parts = script.components(separatedBy: "##").dropFirst()
-            var index = parts.startIndex
-            while index < parts.endIndex {
-                let pattern = parts[index]
-                let replacement = parts.index(after: index) < parts.endIndex ? parts[parts.index(after: index)] : ""
-                if !pattern.isEmpty { trailingRegex.append((pattern, replacement)) }
-                index = parts.index(index, offsetBy: 2, limitedBy: parts.endIndex) ?? parts.endIndex
-            }
-            var text = stringify(object)
-            for t in trailingRegex {
-                text = text.replacingOccurrences(of: t.pattern, with: t.replacement, options: .regularExpression)
-            }
-            return text
+            trailingTransform = RuleTransformParser.transform(
+                fromTrailingParts: script.components(separatedBy: "##").dropFirst()
+            )
+            return RuleTransformParser.apply(trailingTransform, to: stringify(object))
         }
 
         if script.contains("##") {
@@ -1288,37 +1235,23 @@ struct JSONRuleExtractor {
                 let hashStart = script.index(after: lineBreak.lowerBound)
                 let regexText = String(script[hashStart...]).trimmingCharacters(in: .whitespacesAndNewlines)
                 script = String(script[..<lineBreak.lowerBound]).trimmingCharacters(in: .whitespacesAndNewlines)
-                let parts = regexText.components(separatedBy: "##").dropFirst()
-                var index = parts.startIndex
-                while index < parts.endIndex {
-                    let pattern = parts[index]
-                    let replacement = parts.index(after: index) < parts.endIndex ? parts[parts.index(after: index)] : ""
-                    if !pattern.isEmpty { trailingRegex.append((pattern, replacement)) }
-                    index = parts.index(index, offsetBy: 2, limitedBy: parts.endIndex) ?? parts.endIndex
-                }
+                trailingTransform = RuleTransformParser.transform(
+                    fromTrailingParts: regexText.components(separatedBy: "##").dropFirst()
+                )
             } else if let hashRange = script.range(of: "##") {
                 let regexText = String(script[hashRange.lowerBound...]).trimmingCharacters(in: .whitespacesAndNewlines)
                 let parts = regexText.components(separatedBy: "##").dropFirst()
-                if parts.count >= 2 {
+                if !parts.isEmpty {
                     script = String(script[..<hashRange.lowerBound]).trimmingCharacters(in: .whitespacesAndNewlines)
-                    var index = parts.startIndex
-                    while index < parts.endIndex {
-                        let pattern = parts[index]
-                        let replacement = parts.index(after: index) < parts.endIndex ? parts[parts.index(after: index)] : ""
-                        if !pattern.isEmpty { trailingRegex.append((pattern, replacement)) }
-                        index = parts.index(index, offsetBy: 2, limitedBy: parts.endIndex) ?? parts.endIndex
-                    }
+                    trailingTransform = RuleTransformParser.transform(fromTrailingParts: parts)
                 }
             }
         }
 
         let jsResult = evaluateRawJS(script: script, object: object, extraVariables: extraVariables)
-        guard !trailingRegex.isEmpty, let jsResult else { return jsResult }
-        var text = stringify(jsResult)
-        for t in trailingRegex {
-            text = text.replacingOccurrences(of: t.pattern, with: t.replacement, options: .regularExpression)
-        }
-        return text
+        guard let jsResult else { return nil }
+        guard trailingTransform != nil else { return jsResult }
+        return RuleTransformParser.apply(trailingTransform, to: stringify(jsResult))
     }
 
     func evaluateRawJS(
