@@ -45,7 +45,11 @@ enum ResponseFormatDetector {
 
         if let rule {
             let trimmedRule = rule.trimmingCharacters(in: .whitespacesAndNewlines)
-            if trimmedRule.hasPrefix("$.") || trimmedRule.hasPrefix("@json:") || trimmedRule.contains("JSON.parse") {
+            let lowerRule = trimmedRule.lowercased()
+            // `$..` and `$[` are JSONPath prefixes too; `@Json:` is
+            // case-insensitive in Legado rules.
+            if lowerRule.hasPrefix("$.") || lowerRule.hasPrefix("$[")
+                || lowerRule.hasPrefix("@json:") || trimmedRule.contains("JSON.parse") {
                 if jsonObject(from: normalized) != nil {
                     return true
                 }

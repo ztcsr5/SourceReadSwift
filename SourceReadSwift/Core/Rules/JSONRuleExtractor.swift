@@ -1529,6 +1529,22 @@ struct JSONRuleExtractor {
                             return (op, index..<end)
                         }
                     }
+                    // Jayway word operators. They are only recognized when
+                    // surrounded by whitespace (or at the expression edge), so
+                    // property names such as `index`, `sizeHint`, or `inside`
+                    // never turn into operators.
+                    for op in ["subsetof", "noneof", "contains", "exists", "anyof", "empty", "size", "nin", "in"] {
+                        guard expression[index...].hasPrefix(op) else { continue }
+                        let beforeOK = index == expression.startIndex
+                            || expression[expression.index(before: index)].isWhitespace
+                        let end = expression.index(index, offsetBy: op.count)
+                        let afterOK = end == expression.endIndex
+                            || expression[end].isWhitespace
+                            || expression[end] == "["
+                        if beforeOK, afterOK {
+                            return (op, index..<end)
+                        }
+                    }
                 }
             }
             index = expression.index(after: index)
@@ -1573,9 +1589,61 @@ struct JSONRuleExtractor {
             if rjEqualsStrict(lhs, rhs) { return true }
             guard let comparison = rjCompare(lhs, rhs) else { return false }
             return comparison <= 0
+        case "in":
+            guard let values = arrayValues(rhs) else { return false }
+            return values.contains { rjEquals(lhs, $0) }
+        case "nin":
+            guard let values = arrayValues(rhs) else { return true }
+            return !values.contains { rjEquals(lhs, $0) }
+        case "subsetof":
+            guard let left = arrayValues(lhs), let right = arrayValues(rhs) else { return false }
+            return left.allSatisfy { item in right.contains { rjEquals(item, $0) } }
+        case "anyof":
+            guard let left = arrayValues(lhs), let right = arrayValues(rhs) else { return false }
+            return left.contains { item in right.contains { rjEquals(item, $0) } }
+        case "noneof":
+            guard let left = arrayValues(lhs), let right = arrayValues(rhs) else { return true }
+            return !left.contains { item in right.contains { rjEquals(item, $0) } }
+        case "contains":
+            return filterContains(lhs, rhs)
+        case "size":
+            guard let size = filterSize(lhs), let expectedSize = numericDouble(rhs) else { return false }
+            return Double(size) == expectedSize
+        case "empty":
+            let isEmpty = isEmptyValue(lhs)
+            if let expectedEmpty = boolValue(rhs) { return isEmpty == expectedEmpty }
+            return isEmpty
+        case "exists":
+            let exists = !(lhs is NSNull)
+            if let expectedExists = boolValue(rhs) { return exists == expectedExists }
+            return exists
         default:
             return false
         }
+    }
+
+    /// Jayway `contains` semantics: substring match for strings, membership
+    /// for arrays, and key membership for objects.
+    private func filterContains(_ container: Any, _ needle: Any) -> Bool {
+        if let text = container as? String {
+            return text.contains(primitiveContent(needle))
+        }
+        if let array = arrayValues(container) {
+            return array.contains { rjEquals($0, needle) }
+        }
+        if let dictionary = container as? [String: Any] {
+            return dictionary.keys.contains(primitiveContent(needle))
+        }
+        return false
+    }
+
+    /// Jayway `size` operand: UTF-16 length for strings (matching Kotlin's
+    /// String.length), element count for arrays, and key count for objects.
+    private func filterSize(_ value: Any) -> Int? {
+        if let text = value as? String { return text.utf16.count }
+        if let array = arrayValues(value) { return array.count }
+        if let dictionary = value as? [String: Any] { return dictionary.count }
+        return nil
     }
 
     /// rjpath `parseFilterExpression` fallback: property truthiness, `@`,

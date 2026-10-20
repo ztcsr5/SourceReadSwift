@@ -491,4 +491,52 @@ final class JSONRuleExtractorTests: XCTestCase {
             "A"
         )
     }
+
+    func testJaywayFilterWordOperators() throws {
+        let extractor = JSONRuleExtractor()
+        let object: [String: Any] = [
+            "list": [
+                ["name": "Alpha", "type": "a", "tags": ["x", "y"]],
+                ["name": "Beta", "type": "b", "tags": ["y"]],
+                ["name": "Gamma", "type": "c", "tags": []]
+            ]
+        ]
+
+        XCTAssertEqual(
+            extractor.value(from: object, path: "$.list[?(@.type in ['a','b'])].name") as? [String],
+            ["Alpha", "Beta"]
+        )
+        XCTAssertEqual(
+            extractor.value(from: object, path: "$.list[?(@.type nin ['a'])].name") as? [String],
+            ["Beta", "Gamma"]
+        )
+        XCTAssertEqual(
+            extractor.value(from: object, path: "$.list[?(@.tags subsetof ['x','y'])].name") as? [String],
+            ["Alpha", "Beta", "Gamma"]
+        )
+        XCTAssertEqual(
+            extractor.value(from: object, path: "$.list[?(@.tags anyof ['x'])].name") as? [String],
+            ["Alpha"]
+        )
+        XCTAssertEqual(
+            extractor.value(from: object, path: "$.list[?(@.tags noneof ['x'])].name") as? [String],
+            ["Beta", "Gamma"]
+        )
+        XCTAssertEqual(
+            extractor.value(from: object, path: "$.list[?(@.name contains 'a')].name") as? [String],
+            ["Alpha", "Beta", "Gamma"]
+        )
+        XCTAssertEqual(
+            extractor.value(from: object, path: "$.list[?(@.tags size 2)].name") as? [String],
+            ["Alpha"]
+        )
+        XCTAssertEqual(
+            extractor.value(from: object, path: "$.list[?(@.tags empty true)].name") as? [String],
+            ["Gamma"]
+        )
+        XCTAssertEqual(
+            extractor.value(from: object, path: "$.list[?(@.type exists true)].name") as? [String],
+            ["Alpha", "Beta", "Gamma"]
+        )
+    }
 }
