@@ -117,6 +117,7 @@ struct ReaderView: View {
     @AppStorage("reader.footerHeight") private var footerHeight: Double = ReaderTypographyDefaults.footerHeight
     @AppStorage("reader.ttsRate") private var ttsRate: Double = 0.52
     @AppStorage("reader.ttsEngine") private var ttsEngineRawValue: String = TTSEngineKind.local.rawValue
+    @AppStorage("reader.httpTTSVoiceID") private var httpTTSVoiceID: Int = HttpTTSVoice.defaultVoiceID
     @AppStorage("reader.autoScrollDelay") private var autoScrollDelay: Double = 2.0
     @AppStorage("reader.sleepTimerMinutes") private var sleepTimerMinutes: Int = 0
     @AppStorage("reader.background") private var backgroundRawValue: String = ReaderBackground.paper.rawValue
@@ -2658,7 +2659,8 @@ struct ReaderView: View {
             startParagraphIndex: startParagraph,
             includeTitle: false,
             rate: Float(ttsRate),
-            engine: TTSEngineKind(rawValue: ttsEngineRawValue) ?? .local
+            engine: TTSEngineKind(rawValue: ttsEngineRawValue) ?? .local,
+            httpVoiceID: httpTTSVoiceID
         )
     }
 
@@ -3053,10 +3055,16 @@ final class ReaderSpeechController: NSObject, ObservableObject, AVSpeechSynthesi
     private let cloudCredentialsStore = CloudTTSCredentialsStore()
     private let cloudClient = CloudTTSClient()
     private let cloudPlayer = CloudTTSPlayer()
+    private let httpClient = HttpTTSClient()
+    private var httpVoice: HttpTTSVoice = HttpTTSVoice.defaultVoices.first
+        ?? HttpTTSVoice(id: HttpTTSVoice.defaultVoiceID, name: "默认语音", url: "")
     private var cloudTask: Task<Void, Never>?
     private var cloudGeneration = 0
     private var engineKind: TTSEngineKind = .local
     private var activeSegment: (index: Int, text: String)?
+    private var usesRemoteAudioPlayback: Bool {
+        engineKind == .cloud || engineKind == .http
+    }
     @Published var lastErrorMessage: String?
     var onFinished: (() -> Void)?
 
@@ -3087,9 +3095,14 @@ final class ReaderSpeechController: NSObject, ObservableObject, AVSpeechSynthesi
         startParagraphIndex: Int = 0,
         includeTitle: Bool = true,
         rate: Float,
-        engine: TTSEngineKind = .local
+        engine: TTSEngineKind = .local,
+        httpVoiceID: Int? = nil
     ) {
         stop(clearCompletion: false)
+        if let httpVoiceID,
+           let selected = HttpTTSVoice.defaultVoices.first(where: { $0.id == httpVoiceID }) {
+            httpVoice = selected
+        }
         var resolvedEngine = engine
         if resolvedEngine == .cloud && !cloudCredentialsStore.isConfigured {
             lastErrorMessage = "未配置讯飞云端语音凭据，已回退系统语音"
@@ -3115,7 +3128,7 @@ final class ReaderSpeechController: NSObject, ObservableObject, AVSpeechSynthesi
 
     func pause() {
         guard isSpeaking else { return }
-        if engineKind == .cloud {
+        if usesRemoteAudioPlayback {
             cloudPlayer.pause()
             isPaused = true
             updateNowPlayingInfo()
@@ -3128,7 +3141,7 @@ final class ReaderSpeechController: NSObject, ObservableObject, AVSpeechSynthesi
 
     func resume() {
         guard isSpeaking else { return }
-        if engineKind == .cloud {
+        if usesRemoteAudioPlayback {
             cloudPlayer.resume()
             isPaused = false
             updateNowPlayingInfo()
@@ -3147,7 +3160,7 @@ final class ReaderSpeechController: NSObject, ObservableObject, AVSpeechSynthesi
 
     func skipNext() {
         guard isSpeaking else { return }
-        if engineKind == .cloud {
+        if usesRemoteAudioPlayback {
             cancelCloudPlayback()
             activeSegment = nil
             speakNext()
@@ -3160,7 +3173,7 @@ final class ReaderSpeechController: NSObject, ObservableObject, AVSpeechSynthesi
 
     func skipPrevious() {
         guard isSpeaking else { return }
-        if engineKind == .cloud {
+        if usesRemoteAudioPlayback {
             cancelCloudPlayback()
             activeSegment = nil
             guard let segment = queue.stepBack() else {
@@ -3225,6 +3238,10 @@ final class ReaderSpeechController: NSObject, ObservableObject, AVSpeechSynthesi
             playCloudSegment(segment)
             return
         }
+        if engineKind == .http {
+            playHTTPVoiceSegment(segment)
+            return
+        }
         let utterance = AVSpeechUtterance(string: segment.text)
         utterance.voice = AVSpeechSynthesisVoice(language: "zh-CN")
         utterance.rate = rate
@@ -3275,8 +3292,43 @@ final class ReaderSpeechController: NSObject, ObservableObject, AVSpeechSynthesi
         }
     }
 
+    private func playHTTPVoiceSegment(_ segment: (index: Int, text: String)) {
+        cancelCloudPlayback()
+        let generation = cloudGeneration
+        updateNowPlayingInfo()
+        let voice = httpVoice
+        let speed = min(max(Int((rate * 10).rounded()), 0), 10)
+        cloudTask = Task { [weak self] in
+            guard let self else { return }
+            do {
+                let audio = try await self.httpClient.synthesize(
+                    voice: voice,
+                    text: segment.text,
+                    speed: speed
+                )
+                guard !Task.isCancelled else { return }
+                await MainActor.run {
+                    guard self.cloudGeneration == generation, self.isSpeaking else { return }
+                    do {
+                        try self.cloudPlayer.play(data: audio)
+                        if self.isPaused {
+                            self.cloudPlayer.pause()
+                        }
+                    } catch {
+                        self.handleCloudFailure(error, generation: generation)
+                    }
+                }
+            } catch {
+                guard !Task.isCancelled else { return }
+                await MainActor.run {
+                    self.handleCloudFailure(error, generation: generation)
+                }
+            }
+        }
+    }
+
     private func handleCloudSegmentFinished() {
-        guard isSpeaking, engineKind == .cloud else { return }
+        guard isSpeaking, usesRemoteAudioPlayback else { return }
         if let index = activeSegment?.index, index >= 0 {
             lastFinishedParagraphIndex = index
         }
@@ -3285,7 +3337,7 @@ final class ReaderSpeechController: NSObject, ObservableObject, AVSpeechSynthesi
     }
 
     private func handleCloudPlaybackError(_ error: Error) {
-        guard isSpeaking, engineKind == .cloud else { return }
+        guard isSpeaking, usesRemoteAudioPlayback else { return }
         handleCloudFailure(error, generation: cloudGeneration)
     }
 

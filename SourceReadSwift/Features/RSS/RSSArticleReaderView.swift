@@ -35,6 +35,7 @@ struct RSSArticleReaderView: View {
     @AppStorage("reader.titleSpacing") private var titleSpacing: Double = 12
     @AppStorage("reader.ttsRate") private var ttsRate: Double = 0.52
     @AppStorage("reader.ttsEngine") private var ttsEngineRawValue: String = TTSEngineKind.local.rawValue
+    @AppStorage("reader.httpTTSVoiceID") private var httpTTSVoiceID: Int = HttpTTSVoice.defaultVoiceID
     @AppStorage("reader.autoScrollDelay") private var autoScrollDelay: Double = 2.0
     @AppStorage("reader.background") private var backgroundRawValue = "paper"
 
@@ -365,7 +366,7 @@ struct RSSArticleReaderView: View {
                     speechPausedForScene = false
                 }
             }
-            speechController.speak(title: currentArticle.title, paragraphs: paragraphs, startParagraphIndex: visibleParagraphIndex, includeTitle: false, rate: Float(ttsRate), engine: TTSEngineKind(rawValue: ttsEngineRawValue) ?? .local)
+            speechController.speak(title: currentArticle.title, paragraphs: paragraphs, startParagraphIndex: visibleParagraphIndex, includeTitle: false, rate: Float(ttsRate), engine: TTSEngineKind(rawValue: ttsEngineRawValue) ?? .local, httpVoiceID: httpTTSVoiceID)
         }
     }
 

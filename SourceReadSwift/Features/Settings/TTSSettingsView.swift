@@ -4,6 +4,7 @@ import SwiftUI
 /// `CloudTTSCredentialsStore`; only the selected engine lives in UserDefaults.
 struct TTSSettingsView: View {
     @AppStorage("reader.ttsEngine") private var engineRawValue: String = TTSEngineKind.local.rawValue
+    @AppStorage("reader.httpTTSVoiceID") private var httpVoiceID: Int = HttpTTSVoice.defaultVoiceID
 
     @State private var appId = ""
     @State private var apiKey = ""
@@ -15,10 +16,12 @@ struct TTSSettingsView: View {
 
     @State private var statusMessage: String?
     @State private var isTesting = false
+    @State private var isTestingHTTP = false
     @State private var previewPlayer: CloudTTSPlayer?
 
     private let credentialStore = CloudTTSCredentialsStore()
     private let client = CloudTTSClient()
+    private let httpClient = HttpTTSClient()
 
     private var engine: TTSEngineKind {
         TTSEngineKind(rawValue: engineRawValue) ?? .local
@@ -40,6 +43,32 @@ struct TTSSettingsView: View {
                     .foregroundStyle(.secondary)
             } header: {
                 Text("引擎")
+            }
+
+            if engine == .http {
+                Section {
+                    Picker("发音人", selection: $httpVoiceID) {
+                        ForEach(HttpTTSVoice.defaultVoices) { voice in
+                            Text(voice.name).tag(voice.id)
+                        }
+                    }
+                    Button {
+                        self.testHTTPVoiceSynthesis()
+                    } label: {
+                        HStack {
+                            Label("测试 HTTP 语音", systemImage: "waveform")
+                            Spacer()
+                            if isTestingHTTP {
+                                ProgressView()
+                            }
+                        }
+                    }
+                    .disabled(isTestingHTTP)
+                } header: {
+                    Text("在线 HTTP 语音")
+                } footer: {
+                    Text("使用 Legado httpTTS 兼容模板；预设来自 SourceRead httpTTS.json，公共百度接口可能限流。")
+                }
             }
 
             Section {
@@ -104,7 +133,13 @@ struct TTSSettingsView: View {
         }
         .navigationTitle("语音朗读")
         .navigationBarTitleDisplayMode(.inline)
-        .onAppear(perform: loadCredentials)
+        .onAppear {
+            loadCredentials()
+            if !HttpTTSVoice.defaultVoices.contains(where: { $0.id == httpVoiceID }),
+               let first = HttpTTSVoice.defaultVoices.first {
+                httpVoiceID = first.id
+            }
+        }
     }
 
     private var draftCredentials: CloudTTSCredentials {
@@ -200,6 +235,55 @@ struct TTSSettingsView: View {
                 await MainActor.run {
                     self.statusMessage = "合成失败：\(error.localizedDescription)"
                     self.isTesting = false
+                }
+            }
+        }
+    }
+
+    private var selectedHTTPVoice: HttpTTSVoice? {
+        HttpTTSVoice.defaultVoices.first(where: { $0.id == httpVoiceID })
+            ?? HttpTTSVoice.defaultVoices.first
+    }
+
+    private func testHTTPVoiceSynthesis() {
+        guard let voice = selectedHTTPVoice else {
+            statusMessage = "没有可用的 HTTP 语音预设"
+            return
+        }
+        isTestingHTTP = true
+        statusMessage = "正在请求 HTTP 语音…"
+        Task {
+            do {
+                let audio = try await self.httpClient.synthesize(
+                    voice: voice,
+                    text: "纸间阅读，在线语音测试。",
+                    speed: 5
+                )
+                await MainActor.run {
+                    let player = CloudTTSPlayer()
+                    player.onFinish = {
+                        Task { @MainActor in
+                            self.statusMessage = "HTTP 语音成功：\(audio.count) 字节，播放完成"
+                        }
+                    }
+                    player.onError = { error in
+                        Task { @MainActor in
+                            self.statusMessage = "HTTP 语音播放失败：\(error.localizedDescription)"
+                        }
+                    }
+                    self.previewPlayer = player
+                    do {
+                        try player.play(data: audio)
+                        self.statusMessage = "HTTP 语音成功：\(audio.count) 字节，正在播放"
+                    } catch {
+                        self.statusMessage = "HTTP 语音播放失败：\(error.localizedDescription)"
+                    }
+                    self.isTestingHTTP = false
+                }
+            } catch {
+                await MainActor.run {
+                    self.statusMessage = "HTTP 语音失败：\(error.localizedDescription)"
+                    self.isTestingHTTP = false
                 }
             }
         }

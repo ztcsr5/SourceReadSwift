@@ -148,6 +148,7 @@ final class Stage33ReaderExperienceTests: XCTestCase {
         guard let request else { return }
 
         XCTAssertEqual(request.url.absoluteString, "http://tts.baidu.com/text2audio")
+        XCTAssertEqual(request.method, "POST")
         XCTAssertEqual(request.headers["Content-Type"], "application/x-www-form-urlencoded")
 
         guard let body = request.body else {

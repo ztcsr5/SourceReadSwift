@@ -258,6 +258,10 @@ struct HttpTTSVoice: Identifiable, Equatable, Hashable, Sendable {
     let name: String
     let url: String
 
+    /// Stable default used by `@AppStorage("reader.httpTTSVoiceID")` before
+    /// the user picks a preset.
+    static let defaultVoiceID = -1
+
     var isPost: Bool {
         url.contains("\"method\": \"POST\"") || url.contains("\"method\":\"POST\"")
     }
@@ -291,7 +295,7 @@ struct HttpTTSVoice: Identifiable, Equatable, Hashable, Sendable {
         speakText: String,
         speakSpeed: Int = 5,
         runtime: JSCoreRuntime = JSCoreRuntime()
-    ) -> (url: URL, body: String?, headers: [String: String])? {
+    ) -> (url: URL, method: String, body: String?, headers: [String: String])? {
         var evaluated = url
         let pattern = #"\{\{([^\}]+)\}\}"#
         guard let regex = try? NSRegularExpression(pattern: pattern) else { return nil }
@@ -305,11 +309,11 @@ struct HttpTTSVoice: Identifiable, Equatable, Hashable, Sendable {
             let escapedText = speakText
                 .replacingOccurrences(of: "\\", with: "\\\\")
                 .replacingOccurrences(of: "'", with: "\\'")
+                .replacingOccurrences(of: "\r", with: " ")
                 .replacingOccurrences(of: "\n", with: " ")
             let jsScript = "var speakText = '\(escapedText)'; var speakSpeed = \(speakSpeed); \(expr);"
-            if case .success(let value) = runtime.evaluate(jsScript) {
-                replacements.append((match.range, value))
-            }
+            guard case .success(let value) = runtime.evaluate(jsScript) else { return nil }
+            replacements.append((match.range, value))
         }
         for rep in replacements.reversed() {
             evaluated = (evaluated as NSString).replacingCharacters(in: rep.range, with: rep.replacement)
@@ -319,16 +323,27 @@ struct HttpTTSVoice: Identifiable, Equatable, Hashable, Sendable {
         guard let base = parts.first?.trimmingCharacters(in: .whitespacesAndNewlines),
               let targetURL = URL(string: base) else { return nil }
 
+        var method = "GET"
         var body: String? = nil
         var headers: [String: String] = ["User-Agent": "Mozilla/5.0 SourceReadSwift iOS"]
 
         if parts.count > 1, let jsonData = ("{" + parts[1]).data(using: .utf8),
            let dict = try? JSONSerialization.jsonObject(with: jsonData) as? [String: Any] {
+            if let rawMethod = dict["method"] as? String, rawMethod.uppercased() == "POST" {
+                method = "POST"
+            }
             if let postBody = dict["body"] as? String {
                 body = postBody
                 headers["Content-Type"] = "application/x-www-form-urlencoded"
             }
+            if let rawHeaders = dict["headers"] as? [String: Any] {
+                for (key, value) in rawHeaders {
+                    if let stringValue = value as? String {
+                        headers[key] = stringValue
+                    }
+                }
+            }
         }
-        return (targetURL, body, headers)
+        return (targetURL, method, body, headers)
     }
 }
