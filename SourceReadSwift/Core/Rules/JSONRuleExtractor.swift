@@ -659,14 +659,14 @@ struct JSONRuleExtractor {
     ) -> DirectiveResult {
         for put in extractPutDirectives(from: path) {
             let valueRule = put.valueRule.trimmingCharacters(in: .whitespacesAndNewlines)
-            let value: Any
+            let storedValue: Any
             if valueRule.isEmpty {
-                value = object
+                storedValue = object
             } else {
-                value = value(from: object, path: valueRule, variables: variables) ?? NSNull()
+                storedValue = self.value(from: object, path: valueRule, variables: variables) ?? NSNull()
             }
-            directiveStore.put(put.key, value: value)
-            _ = executionContext.put(value, for: put.key)
+            directiveStore.put(put.key, value: storedValue)
+            _ = executionContext.put(storedValue, for: put.key)
         }
         var cleaned = removePutDirectives(from: path)
         cleaned = replaceGetDirectives(in: cleaned)
@@ -1180,6 +1180,197 @@ struct JSONRuleExtractor {
             }
         }
         return text
+    }
+
+    private func interpolateTemplate(_ template: String, item: [String: Any], variables: [String: Any]) -> String {
+        guard let regex = try? NSRegularExpression(pattern: #"\{\{\s*([^{}]+)\s*\}\}"#) else { return template }
+        let mText = NSMutableString(string: template)
+        let matches = regex.matches(in: template, range: NSRange(location: 0, length: mText.length))
+        for match in matches.reversed() {
+            guard match.numberOfRanges > 1 else { continue }
+            let keyRange = match.range(at: 1)
+            let fullRange = match.range(at: 0)
+            let key = mText.substring(with: keyRange).trimmingCharacters(in: .whitespacesAndNewlines)
+            let val: String
+            if key.hasPrefix("$.") || key.hasPrefix("@json:") {
+                val = (value(from: item, path: key, variables: variables)).map { stringify($0) } ?? ""
+            } else if let direct = item[key] {
+                val = stringify(direct)
+            } else if let fromPath = value(from: item, path: key, variables: variables) {
+                val = stringify(fromPath)
+            } else if let varVal = variables[key] {
+                val = stringify(varVal)
+            } else if key.contains("java.") || key.contains("+") || key.contains("?") {
+                val = evaluateRawJS(script: key, object: item, extraVariables: variables).map { stringify($0) } ?? ""
+            } else {
+                val = ""
+            }
+            mText.replaceCharacters(in: fullRange, with: val)
+        }
+        return mText as String
+    }
+
+    private func unquote(_ value: String) -> String {
+        var output = value
+        if output.count >= 2,
+           let first = output.first,
+           let last = output.last,
+           (first == "\"" && last == "\"") || (first == "'" && last == "'") {
+            output.removeFirst()
+            output.removeLast()
+        }
+        return output
+    }
+
+    private func evaluateJS(
+        rule: String,
+        object: Any,
+        extraVariables: [String: Any]
+    ) -> Any? {
+        var script = rule.trimmingCharacters(in: .whitespacesAndNewlines)
+        if script.hasPrefix("@js:") {
+            script = String(script.dropFirst(4)).trimmingCharacters(in: .whitespacesAndNewlines)
+        } else if script.hasPrefix("<js>") && script.contains("</js>") {
+            let start = script.index(script.startIndex, offsetBy: 4)
+            let end = script.range(of: "</js>")?.lowerBound ?? script.endIndex
+            let rest = String(script[script.range(of: "</js>")!.upperBound...])
+            script = String(script[start..<end]) + rest
+        }
+
+        var trailingRegex: [(pattern: String, replacement: String)] = []
+        if script.hasPrefix("##") {
+            let parts = script.components(separatedBy: "##").dropFirst()
+            var index = parts.startIndex
+            while index < parts.endIndex {
+                let pattern = parts[index]
+                let replacement = parts.index(after: index) < parts.endIndex ? parts[parts.index(after: index)] : ""
+                if !pattern.isEmpty { trailingRegex.append((pattern, replacement)) }
+                index = parts.index(index, offsetBy: 2, limitedBy: parts.endIndex) ?? parts.endIndex
+            }
+            var text = stringify(object)
+            for t in trailingRegex {
+                text = text.replacingOccurrences(of: t.pattern, with: t.replacement, options: .regularExpression)
+            }
+            return text
+        }
+
+        if script.contains("##") {
+            if let lineBreak = script.range(of: "\n##", options: .backwards) {
+                let hashStart = script.index(after: lineBreak.lowerBound)
+                let regexText = String(script[hashStart...]).trimmingCharacters(in: .whitespacesAndNewlines)
+                script = String(script[..<lineBreak.lowerBound]).trimmingCharacters(in: .whitespacesAndNewlines)
+                let parts = regexText.components(separatedBy: "##").dropFirst()
+                var index = parts.startIndex
+                while index < parts.endIndex {
+                    let pattern = parts[index]
+                    let replacement = parts.index(after: index) < parts.endIndex ? parts[parts.index(after: index)] : ""
+                    if !pattern.isEmpty { trailingRegex.append((pattern, replacement)) }
+                    index = parts.index(index, offsetBy: 2, limitedBy: parts.endIndex) ?? parts.endIndex
+                }
+            } else if let hashRange = script.range(of: "##") {
+                let regexText = String(script[hashRange.lowerBound...]).trimmingCharacters(in: .whitespacesAndNewlines)
+                let parts = regexText.components(separatedBy: "##").dropFirst()
+                if parts.count >= 2 {
+                    script = String(script[..<hashRange.lowerBound]).trimmingCharacters(in: .whitespacesAndNewlines)
+                    var index = parts.startIndex
+                    while index < parts.endIndex {
+                        let pattern = parts[index]
+                        let replacement = parts.index(after: index) < parts.endIndex ? parts[parts.index(after: index)] : ""
+                        if !pattern.isEmpty { trailingRegex.append((pattern, replacement)) }
+                        index = parts.index(index, offsetBy: 2, limitedBy: parts.endIndex) ?? parts.endIndex
+                    }
+                }
+            }
+        }
+
+        let jsResult = evaluateRawJS(script: script, object: object, extraVariables: extraVariables)
+        guard !trailingRegex.isEmpty, let jsResult else { return jsResult }
+        var text = stringify(jsResult)
+        for t in trailingRegex {
+            text = text.replacingOccurrences(of: t.pattern, with: t.replacement, options: .regularExpression)
+        }
+        return text
+    }
+
+    func evaluateRawJS(
+        script: String,
+        object: Any,
+        extraVariables: [String: Any]
+    ) -> Any? {
+        let source = extraVariables["source"] as? BookSource
+        let runtime = executionContext.jsRuntime(ajaxHandler: { urlText in
+            if let source {
+                return SynchronousSourceLoader().load(urlText: urlText, source: source)
+            }
+            return ""
+        })
+
+        var convertedObject = object
+        let baseStr = (extraVariables["baseUrl"] as? String) ?? ""
+        if let elements = object as? [Element] {
+            convertedObject = LegadoElementsBridge(elements: elements, baseURL: baseStr)
+        } else if let el = object as? Element {
+            convertedObject = LegadoElementBridge(element: el, baseURL: baseStr)
+        }
+
+        var variables: [String: Any] = [
+            "result": convertedObject
+        ]
+
+        // Apply extraVariables first so root document and caller context take precedence
+        for (k, v) in extraVariables {
+            if k != "result" {
+                variables[k] = v
+            }
+        }
+
+        // If extraVariables did not provide html/src, populate from object
+        if variables["html"] == nil {
+            if let dict = object as? [String: Any] {
+                if let data = try? JSONSerialization.data(withJSONObject: dict, options: []),
+                   let jsonStr = String(data: data, encoding: .utf8) {
+                    variables["html"] = jsonStr
+                    variables["src"] = jsonStr
+                }
+            } else if JSONSerialization.isValidJSONObject(object) {
+                if let data = try? JSONSerialization.data(withJSONObject: object, options: []),
+                   let jsonStr = String(data: data, encoding: .utf8) {
+                    variables["html"] = jsonStr
+                    variables["src"] = jsonStr
+                }
+            } else {
+                let str = stringify(object)
+                variables["html"] = str
+                variables["src"] = str
+            }
+        }
+
+        if let dict = object as? [String: Any] {
+            // Also expose item keys directly in JS scope if non-colliding
+            for (k, v) in dict {
+                if variables[k] == nil {
+                    variables[k] = v
+                }
+            }
+        }
+
+        let evaluated = runtime.evaluate(script, variables: variables)
+        if let jsValue = runtime.context.objectForKeyedSubscript("result") {
+            if let bridge = jsValue.toObject() as? LegadoElementsBridge {
+                return bridge
+            } else if let bridge = jsValue.toObject() as? LegadoElementBridge {
+                return bridge
+            }
+        }
+        if case .failure(.javascript) = evaluated, script.contains("return") {
+            if case .success(let val) = runtime.evaluate("(function(){\(script)})()", variables: variables) {
+                return val
+            }
+        }
+        if case .success(let val) = evaluated {
+            return val
+        }
+        return nil
     }
 
     func stringify(_ value: Any) -> String {
