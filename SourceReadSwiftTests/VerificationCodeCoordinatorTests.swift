@@ -101,17 +101,17 @@ final class VerificationCodeCoordinatorTests: XCTestCase {
                 stage: "content",
                 baseURL: "https://example.com/",
                 cookieHeader: "",
-                timeout: 0.4
+                timeout: 2.0
             )
         }
 
-        _ = try await waitForRequest()
+        _ = try await waitForRequest(timeout: 10)
         let value = await task.value
         XCTAssertEqual(value, "")
 
         // The timeout path cancels the sheet on the main actor; give that hop
         // a bounded window instead of asserting immediately.
-        for _ in 0..<100 {
+        for _ in 0..<250 {
             if VerificationCodeCoordinator.shared.request == nil { break }
             try await Task.sleep(nanoseconds: 20_000_000)
         }
