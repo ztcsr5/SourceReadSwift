@@ -173,9 +173,6 @@ struct ContentParser {
         response: SourceResponse,
         globalPurifyRules: [String]
     ) -> Result<ChapterContent, SourceEngineError> {
-        guard let object = ResponseFormatDetector.jsonObject(from: response.body) else {
-            return .failure(.rule("JSON 解析失败"))
-        }
         let rule = source.ruleContent
         let contentRule = htmlExtractor.firstRule(rule, keys: ["content", "bookContent"])
         let chapterMap: [String: Any] = [
@@ -193,12 +190,26 @@ struct ContentParser {
             "baseUrl": response.url.absoluteString,
             "result": response.body
         ]
+        let object = ResponseFormatDetector.jsonObject(from: response.body)
+        let initRule = htmlExtractor.firstRule(rule, keys: ["init"])
+        let initIsJS = initRule.map {
+            LegadoRuleResolver().isJavaScriptRule($0) || $0.contains("<js>") || $0.contains("@js:")
+        } ?? false
         let rootObject: Any
-        if let initRule = htmlExtractor.firstRule(rule, keys: ["init"]),
-           let initialized = jsonExtractor.value(from: object, path: initRule, variables: variables) {
-            rootObject = initialized
+        if let object {
+            if let initRule,
+               let initialized = jsonExtractor.value(from: object, path: initRule, variables: variables) {
+                rootObject = ResponseFormatDetector.jsonContainer(from: initialized)
+            } else {
+                rootObject = object
+            }
+        } else if let initRule, initIsJS,
+                  let initialized = jsonExtractor.value(from: response.body, path: initRule, variables: variables) {
+            // A JavaScript init can decrypt or wrap a non-JSON response into
+            // the container the content rule expects.
+            rootObject = ResponseFormatDetector.jsonContainer(from: initialized)
         } else {
-            rootObject = object
+            return .failure(.rule("JSON 解析失败"))
         }
         var content: String?
         if let rule = contentRule, !rule.isEmpty {

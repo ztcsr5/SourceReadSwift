@@ -140,6 +140,16 @@ enum ResponseFormatDetector {
         return nil
     }
 
+    /// Legado `init` rules are frequently JavaScript and therefore hand back a
+    /// JSON container as a string (`JSON.stringify(...)`).  Re-parse that
+    /// string so downstream field rules keep operating on objects/arrays
+    /// instead of a `String`.
+    static func jsonContainer(from value: Any) -> Any {
+        guard let text = value as? String else { return value }
+        let normalized = normalizedBody(text)
+        guard normalized.hasPrefix("{") || normalized.hasPrefix("[") else { return value }
+        return jsonObject(from: text) ?? value
+    }
     private static func parseJSON(_ value: String) -> Any? {
         let candidate = normalizedBody(value)
         if let data = candidate.data(using: .utf8),

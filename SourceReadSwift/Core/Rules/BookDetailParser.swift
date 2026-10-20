@@ -183,12 +183,7 @@ struct BookDetailParser {
             // JavaScript rules return strings.  When an `init` script builds a
             // JSON container (`JSON.stringify(...)`), parse it so the field
             // rules keep operating on an object instead of a string.
-            if let text = initialized as? String,
-               let parsed = ResponseFormatDetector.jsonObject(from: text) {
-                rootObject = parsed
-            } else {
-                rootObject = initialized
-            }
+            rootObject = ResponseFormatDetector.jsonContainer(from: initialized)
         } else {
             rootObject = object
         }

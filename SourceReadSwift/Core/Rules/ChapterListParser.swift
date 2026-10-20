@@ -252,14 +252,23 @@ struct ChapterListParser {
         let listRule = htmlExtractor.firstRule(source.ruleToc, keys: ["chapterList", "tocList", "list"])
         let isJSRule = listRule.map { LegadoRuleResolver().isJavaScriptRule($0) || $0.contains("<js>") || $0.contains("@js:") } ?? false
 
+        let initRule = htmlExtractor.firstRule(source.ruleToc, keys: ["init"])
+        let initIsJS = initRule.map {
+            LegadoRuleResolver().isJavaScriptRule($0) || $0.contains("<js>") || $0.contains("@js:")
+        } ?? false
         let rootObject: Any
         if let object = ResponseFormatDetector.jsonObject(from: response.body) {
-            if let initRule = htmlExtractor.firstRule(source.ruleToc, keys: ["init"]),
+            if let initRule,
                let initialized = jsonExtractor.value(from: object, path: initRule, variables: variables) {
-                rootObject = initialized
+                rootObject = ResponseFormatDetector.jsonContainer(from: initialized)
             } else {
                 rootObject = object
             }
+        } else if let initRule, initIsJS,
+                  let initialized = jsonExtractor.value(from: response.body, path: initRule, variables: variables) {
+            // See SearchResultParser: Legado runs `init` before field rules,
+            // and a JS init can build JSON from a non-JSON payload.
+            rootObject = ResponseFormatDetector.jsonContainer(from: initialized)
         } else if isJSRule {
             rootObject = response.body
         } else {
