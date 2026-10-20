@@ -82,6 +82,8 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
     private let purifyRules: () async -> [String]
     private let stateLock = NSLock()
     private var states: [String: RulePersistentState] = [:]
+    private var stateAccessOrder: [String] = []
+    static let maximumPersistentStates = 100
     private let evidenceLock = NSLock()
     private var evidence: [String: [SourceDiagnosticStage: SourceDiagnosticEvidence]] = [:]
     private let requestBuilder = SourceRequestBuilder()
@@ -1306,16 +1308,69 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
             )
         }
     }
-    private func persistentState(for source: BookSource) -> RulePersistentState {
-        let key = source.bookSourceUrl.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+    /// Identity used to scope per-source persistent state (`loginInfo`, cookies,
+    /// cached tokens). URL-less sources are legal while editing drafts, so fall
+    /// back to a stable fingerprint of the raw rule instead of collapsing every
+    /// draft into the same empty-string bucket.
+    static func persistentStateKey(for source: BookSource) -> String {
+        let url = source.bookSourceUrl.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        if !url.isEmpty {
+            return "url:" + url
+        }
+        var hash: UInt64 = 0xcbf29ce484222325
+        func combine(_ value: String) {
+            for byte in value.utf8 {
+                hash ^= UInt64(byte)
+                hash = hash &* 0x100000001b3
+            }
+            hash ^= 0x1f
+            hash = hash &* 0x100000001b3
+        }
+        combine(source.bookSourceName.trimmingCharacters(in: .whitespacesAndNewlines).lowercased())
+        combine(source.searchUrl ?? "")
+        combine(source.exploreUrl ?? "")
+        for key in source.raw.keys.sorted() {
+            combine(key)
+            combine(source.raw[key] ?? "")
+        }
+        return "draft:\(source.bookSourceName.lowercased())#\(String(format: "%016llx", hash))"
+    }
+
+    func persistentState(for source: BookSource) -> RulePersistentState {
+        let key = Self.persistentStateKey(for: source)
         stateLock.lock()
         defer { stateLock.unlock() }
-        if let state = states[key] { return state }
-        if states.count > 100 {
-            states.removeAll()
+        if let state = states[key] {
+            touchStateKeyLocked(key)
+            return state
+        }
+        if states.count >= Self.maximumPersistentStates {
+            evictLeastRecentlyUsedStateLocked()
         }
         let state = RulePersistentState()
         states[key] = state
+        touchStateKeyLocked(key)
         return state
+    }
+
+    private func touchStateKeyLocked(_ key: String) {
+        if let index = stateAccessOrder.firstIndex(of: key) {
+            stateAccessOrder.remove(at: index)
+        }
+        stateAccessOrder.append(key)
+    }
+
+    /// Bounded LRU instead of `removeAll()`: clearing every source state threw
+    /// away login cookies and cached tokens for all sources at once whenever
+    /// the 101st source was opened.
+    private func evictLeastRecentlyUsedStateLocked() {
+        while states.count >= Self.maximumPersistentStates, let oldest = stateAccessOrder.first {
+            stateAccessOrder.removeFirst()
+            states.removeValue(forKey: oldest)
+        }
+        if states.count >= Self.maximumPersistentStates {
+            states.removeAll()
+            stateAccessOrder.removeAll()
+        }
     }
 }
