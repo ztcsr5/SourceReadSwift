@@ -5,6 +5,7 @@ struct RootTabView: View {
     @ObservedObject private var audioCoordinator = AudioBookPlaybackCoordinator.shared
     @State private var selectedTab = 0
     @State private var showFullAudioPlayer = false
+    @ObservedObject private var verificationCoordinator = VerificationCodeCoordinator.shared
 
     var body: some View {
         ZStack(alignment: .bottom) {
@@ -56,6 +57,13 @@ struct RootTabView: View {
         }
         .sheet(isPresented: $showFullAudioPlayer) {
             AudioBookPlayerView()
+        }
+        .sheet(item: $verificationCoordinator.request) { request in
+            VerificationCodeSheet(
+                request: request,
+                onSubmit: { verificationCoordinator.submit(id: request.id, code: $0) },
+                onCancel: { verificationCoordinator.cancel(id: request.id) }
+            )
         }
     }
 

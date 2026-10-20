@@ -547,8 +547,24 @@ final class LegadoHostServices {
     // a user-entered value through java.put("captcha:<url>", value); absent
     // that value we return an empty string and leave an actionable diagnostic.
     func verificationCode(imageURL: String) -> String {
-        let cached = executionContext?.get("captcha:\(imageURL)") ?? ""
+        // Normalize once: a source may pass the captcha path relative to its
+        // base URL on one call and absolute on the next.  Both must map to the
+        // same cache entry or the user is prompted twice for one challenge.
+        let baseURL = executionContext?.source?.bookSourceUrl ?? ""
+        let resolvedURL = VerificationCodeURLResolver.resolve(imageURL: imageURL, baseURL: baseURL)
+        let effectiveURL = resolvedURL.isEmpty ? imageURL : resolvedURL
+        let cacheKey = "captcha:\(effectiveURL)"
+        let cached = executionContext?.get(cacheKey) ?? ""
         if !cached.isEmpty { return cached }
+
+        if let provider = executionContext?.verificationCodeProvider {
+            let value = provider(effectiveURL).trimmingCharacters(in: .whitespacesAndNewlines)
+            if !value.isEmpty {
+                executionContext?.put(value, for: cacheKey)
+                return value
+            }
+        }
+
         executionContext?.recordBridgeFailure("java.getVerificationCode", message: "verification-required")
         return ""
     }

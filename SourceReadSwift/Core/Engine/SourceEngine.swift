@@ -121,6 +121,7 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
         })
         defer { executionContext.cleanUp() }
         executionContext.setExecutionStage("search")
+        attachVerificationCodeProvider(executionContext, source: source)
         executionContext.networkHandler = { [network] encoded in
             self.syncLoad(
                 encoded: encoded,
@@ -192,6 +193,7 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
         })
         defer { executionContext.cleanUp() }
         executionContext.setExecutionStage("explore")
+        attachVerificationCodeProvider(executionContext, source: source)
         executionContext.networkHandler = { [network] encoded in
             self.syncLoad(
                 encoded: encoded,
@@ -264,6 +266,7 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
         })
         defer { executionContext.cleanUp() }
         executionContext.setExecutionStage("detail")
+        attachVerificationCodeProvider(executionContext, source: source)
         executionContext.networkHandler = { [network] encoded in
             self.syncLoad(
                 encoded: encoded,
@@ -322,6 +325,7 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
         })
         defer { executionContext.cleanUp() }
         executionContext.setExecutionStage("toc")
+        attachVerificationCodeProvider(executionContext, source: source)
         executionContext.networkHandler = { [network] encoded in
             self.syncLoad(
                 encoded: encoded,
@@ -411,6 +415,7 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
         })
         defer { executionContext.cleanUp() }
         executionContext.setExecutionStage("content")
+        attachVerificationCodeProvider(executionContext, source: source)
         executionContext.networkHandler = { [network] encoded in
             self.syncLoad(
                 encoded: encoded,
@@ -1286,6 +1291,21 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
         ))
     }
 
+    /// Wires the synchronous Legado captcha bridge to the SwiftUI coordinator.
+    /// Contexts created by unit tests have no source and never reach this path,
+    /// so `java.getVerificationCode` stays deterministic in fixtures.
+    private func attachVerificationCodeProvider(_ context: RuleExecutionContext, source: BookSource) {
+        context.verificationCodeProvider = { [weak context] imageURL in
+            guard let context else { return "" }
+            return VerificationCodeCoordinator.requestSynchronously(
+                imageURL: imageURL,
+                sourceName: source.bookSourceName,
+                stage: context.currentExecutionStage ?? "",
+                baseURL: source.bookSourceUrl,
+                cookieHeader: context.string(for: "cookieHeader")
+            )
+        }
+    }
     private func persistentState(for source: BookSource) -> RulePersistentState {
         let key = source.bookSourceUrl.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
         stateLock.lock()

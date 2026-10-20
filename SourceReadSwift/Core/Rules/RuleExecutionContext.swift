@@ -22,6 +22,9 @@ final class RuleExecutionContext: @unchecked Sendable {
     var responseHandler: ResponseHandler?
     var logHandler: LogHandler?
     var source: BookSource?
+    /// Optional synchronous captcha provider. Production wiring points this
+    /// at VerificationCodeCoordinator; tests leave it nil for deterministic runs.
+    var verificationCodeProvider: ((String) -> String)?
 
     func jsRuntime(ajaxHandler: @escaping (String) -> String) -> JSCoreRuntime {
         lock.lock()
