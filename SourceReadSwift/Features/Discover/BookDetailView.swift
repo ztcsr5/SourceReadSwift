@@ -264,6 +264,19 @@ struct BookDetailView: View {
                     .foregroundStyle(.secondary)
                     .lineSpacing(5)
             }
+            let metadata = detailMetadata(detail)
+            if !metadata.isEmpty {
+                HStack(spacing: 8) {
+                    ForEach(metadata.indices, id: \.self) { index in
+                        Text(metadata[index])
+                            .font(.caption.weight(.semibold))
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 4)
+                            .background(AppTheme.accent.opacity(0.12), in: Capsule())
+                            .foregroundStyle(AppTheme.accent)
+                    }
+                }
+            }
             if let latest = detail.latestChapter {
                 Text("最新：\(latest)")
                     .font(.subheadline.weight(.semibold))
@@ -272,6 +285,23 @@ struct BookDetailView: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .podcastCard()
+    }
+
+    private func detailMetadata(_ detail: BookDetail) -> [String] {
+        var items: [String] = []
+        if let kind = detail.kind?.nilIfEmpty {
+            items.append(kind)
+        }
+        if let status = detail.status?.nilIfEmpty {
+            items.append(status)
+        }
+        if let wordCount = detail.wordCount?.nilIfEmpty {
+            items.append("字数 \(wordCount)")
+        }
+        if let updateTime = detail.updateTime?.nilIfEmpty {
+            items.append("更新 \(updateTime)")
+        }
+        return items
     }
 
     private var audioBookActionCard: some View {
@@ -402,7 +432,17 @@ struct BookDetailView: View {
             }
 
             VStack(spacing: 0) {
-                ForEach(Array(displayedChapters.enumerated()), id: \.element.id) { index, chapter in
+                ForEach(displayedChapters.indices, id: \.self) { index in
+                    let chapter = displayedChapters[index]
+                    if let volume = ChapterListPresenter.volumeHeader(at: index, in: displayedChapters) {
+                        Text(volume)
+                            .font(.caption.weight(.bold))
+                            .foregroundStyle(.secondary)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(.horizontal, 14)
+                            .padding(.top, 12)
+                            .padding(.bottom, 4)
+                    }
                     switch sourceKind {
                     case .audio:
                         Button {
@@ -422,10 +462,7 @@ struct BookDetailView: View {
                                 Image(systemName: "headphones")
                                     .font(.caption)
                                     .foregroundStyle(AppTheme.accent)
-                                Text(chapter.title)
-                                    .font(.body)
-                                    .foregroundStyle(.primary)
-                                    .lineLimit(1)
+                                chapterTitleLabel(chapter)
                                 Spacer()
                                 Image(systemName: "play.circle")
                                     .font(.body)
@@ -447,10 +484,7 @@ struct BookDetailView: View {
                                 Image(systemName: "photo.on.rectangle.angled")
                                     .font(.caption)
                                     .foregroundStyle(.orange)
-                                Text(chapter.title)
-                                    .font(.body)
-                                    .foregroundStyle(.primary)
-                                    .lineLimit(1)
+                                chapterTitleLabel(chapter)
                                 Spacer()
                                 Image(systemName: "chevron.right")
                                     .font(.caption.weight(.bold))
@@ -472,10 +506,7 @@ struct BookDetailView: View {
                                 Image(systemName: "play.tv")
                                     .font(.caption)
                                     .foregroundStyle(.red)
-                                Text(chapter.title)
-                                    .font(.body)
-                                    .foregroundStyle(.primary)
-                                    .lineLimit(1)
+                                chapterTitleLabel(chapter)
                                 Spacer()
                                 Image(systemName: "play.fill")
                                     .font(.caption)
@@ -498,10 +529,7 @@ struct BookDetailView: View {
                             )
                         } label: {
                             HStack {
-                                Text(chapter.title)
-                                    .font(.body)
-                                    .foregroundStyle(.primary)
-                                    .lineLimit(1)
+                                chapterTitleLabel(chapter)
                                 Spacer()
                                 Image(systemName: "chevron.right")
                                     .font(.caption.weight(.bold))
@@ -534,6 +562,31 @@ struct BookDetailView: View {
                         .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.bordered)
+            }
+        }
+    }
+
+    private func chapterTitleLabel(_ chapter: BookChapter) -> some View {
+        HStack(spacing: 6) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(chapter.title)
+                    .font(.body)
+                    .foregroundStyle(.primary)
+                    .lineLimit(1)
+                if let update = ChapterListPresenter.updateLabel(chapter) {
+                    Text(update)
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                }
+            }
+            if chapter.isVip {
+                Text("VIP")
+                    .font(.caption2.weight(.bold))
+                    .padding(.horizontal, 5)
+                    .padding(.vertical, 2)
+                    .background(Color.orange.opacity(0.15), in: Capsule())
+                    .foregroundStyle(.orange)
             }
         }
     }
@@ -1197,7 +1250,13 @@ private struct BookDetailAllChaptersView: View {
                             .frame(maxWidth: .infinity, alignment: .center)
                             .listRowBackground(Color.clear)
                     } else {
-                        ForEach(filteredChapters) { chapter in
+                        ForEach(filteredChapters.indices, id: \.self) { index in
+                            let chapter = filteredChapters[index]
+                            if let volume = ChapterListPresenter.volumeHeader(at: index, in: filteredChapters) {
+                                Text(volume)
+                                    .font(.caption.weight(.bold))
+                                    .foregroundStyle(.secondary)
+                            }
                             NavigationLink {
                                 ChapterLoadingView(
                                     bookID: bookID,
@@ -1212,9 +1271,25 @@ private struct BookDetailAllChaptersView: View {
                                         .font(.caption.weight(.semibold).monospacedDigit())
                                         .foregroundStyle(.secondary)
                                         .frame(width: 48, alignment: .leading)
-                                    Text(chapter.title)
-                                        .font(.system(size: 15))
-                                        .lineLimit(1)
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        Text(chapter.title)
+                                            .font(.system(size: 15))
+                                            .lineLimit(1)
+                                        if let update = ChapterListPresenter.updateLabel(chapter) {
+                                            Text(update)
+                                                .font(.caption2)
+                                                .foregroundStyle(.secondary)
+                                                .lineLimit(1)
+                                        }
+                                    }
+                                    if chapter.isVip {
+                                        Text("VIP")
+                                            .font(.caption2.weight(.bold))
+                                            .padding(.horizontal, 5)
+                                            .padding(.vertical, 2)
+                                            .background(Color.orange.opacity(0.15), in: Capsule())
+                                            .foregroundStyle(.orange)
+                                    }
                                 }
                             }
                         }

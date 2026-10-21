@@ -122,6 +122,34 @@ struct BookDetailParser {
                 baseUrl: response.url,
                 variables: variables
             ).nilIfEmpty
+            let wordCount = try htmlExtractor.value(
+                from: root,
+                rule: htmlExtractor.firstRule(rule, keys: ["wordCount", "words"]),
+                fallback: nil,
+                baseUrl: response.url,
+                variables: variables
+            ).nilIfEmpty
+            let status = try htmlExtractor.value(
+                from: root,
+                rule: htmlExtractor.firstRule(rule, keys: ["status", "bookStatus"]),
+                fallback: nil,
+                baseUrl: response.url,
+                variables: variables
+            ).nilIfEmpty
+            let updateTime = try htmlExtractor.value(
+                from: root,
+                rule: htmlExtractor.firstRule(rule, keys: ["updateTime", "lastUpdateTime", "update_time"]),
+                fallback: nil,
+                baseUrl: response.url,
+                variables: variables
+            ).nilIfEmpty
+            let kind = try htmlExtractor.value(
+                from: root,
+                rule: htmlExtractor.firstRule(rule, keys: ["kind", "category", "bookKind"]),
+                fallback: nil,
+                baseUrl: response.url,
+                variables: variables
+            ).nilIfEmpty ?? book.kind
             let rawTocRule = htmlExtractor.firstRule(rule, keys: ["tocUrl", "chapterUrl", "catalogUrl", "chapterListUrl"])
             let tocUrl: String?
             if let rawTocRule, isURLTemplate(rawTocRule) {
@@ -152,7 +180,11 @@ struct BookDetailParser {
                 sourceName: source.bookSourceName,
                 sourceUrl: source.bookSourceUrl,
                 intro: intro,
-                latestChapter: latest
+                latestChapter: latest,
+                wordCount: wordCount,
+                status: status,
+                updateTime: updateTime,
+                kind: kind
             ))
         } catch {
             return .failure(.rule(error.localizedDescription))
@@ -245,6 +277,30 @@ struct BookDetailParser {
             fallbackKeys: ["latestChapter", "lastChapter", "last"],
             variables: variables
         )?.nilIfEmpty
+        let wordCount = jsonExtractor.string(
+            from: dict,
+            rule: htmlExtractor.firstRule(rule, keys: ["wordCount", "words"]),
+            fallbackKeys: ["wordCount", "words", "word_count"],
+            variables: variables
+        )?.nilIfEmpty
+        let status = jsonExtractor.string(
+            from: dict,
+            rule: htmlExtractor.firstRule(rule, keys: ["status", "bookStatus"]),
+            fallbackKeys: ["status", "bookStatus", "serialize"],
+            variables: variables
+        )?.nilIfEmpty
+        let updateTime = jsonExtractor.string(
+            from: dict,
+            rule: htmlExtractor.firstRule(rule, keys: ["updateTime", "lastUpdateTime", "update_time"]),
+            fallbackKeys: ["updateTime", "lastUpdateTime", "update_time", "lastUpdate"],
+            variables: variables
+        )?.nilIfEmpty
+        let kind = jsonExtractor.string(
+            from: dict,
+            rule: htmlExtractor.firstRule(rule, keys: ["kind", "category", "bookKind"]),
+            fallbackKeys: ["kind", "category", "bookKind", "tags"],
+            variables: variables
+        )?.nilIfEmpty ?? book.kind
         var jsonVariables = variables
         jsonVariables["result"] = dict
         jsonVariables["data"] = dict
@@ -282,7 +338,11 @@ struct BookDetailParser {
             sourceName: source.bookSourceName,
             sourceUrl: source.bookSourceUrl,
             intro: intro,
-            latestChapter: latest
+            latestChapter: latest,
+            wordCount: wordCount,
+            status: status,
+            updateTime: updateTime,
+            kind: kind
         ))
     }
 

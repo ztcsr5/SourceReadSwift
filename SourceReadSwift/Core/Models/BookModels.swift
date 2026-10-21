@@ -92,6 +92,14 @@ struct BookDetail: Identifiable, Codable, Hashable, Sendable {
     let sourceUrl: String
     let intro: String?
     let latestChapter: String?
+    /// Legado `ruleBookInfo.wordCount` – the source-formatted word-count text.
+    let wordCount: String?
+    /// Legado `ruleBookInfo.status` – serialization state (连载中 / 已完结 ...).
+    let status: String?
+    /// Legado `ruleBookInfo.updateTime` – last update time as rendered by the source.
+    let updateTime: String?
+    /// Legado `ruleBookInfo.kind` – category / tag text from the detail page.
+    let kind: String?
 
     init(
         name: String,
@@ -102,7 +110,11 @@ struct BookDetail: Identifiable, Codable, Hashable, Sendable {
         sourceName: String,
         sourceUrl: String,
         intro: String?,
-        latestChapter: String?
+        latestChapter: String?,
+        wordCount: String? = nil,
+        status: String? = nil,
+        updateTime: String? = nil,
+        kind: String? = nil
     ) {
         self.name = name
         self.author = author
@@ -113,6 +125,10 @@ struct BookDetail: Identifiable, Codable, Hashable, Sendable {
         self.sourceUrl = sourceUrl
         self.intro = intro
         self.latestChapter = latestChapter
+        self.wordCount = wordCount
+        self.status = status
+        self.updateTime = updateTime
+        self.kind = kind
     }
 }
 

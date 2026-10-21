@@ -198,6 +198,138 @@ final class SourceMetadataChainTests: XCTestCase {
         XCTAssertFalse(page.chapters[1].isVip)
     }
 
+    // MARK: - Book detail: HTML
+
+    func testHTMLBookDetailExtractsWordCountStatusUpdateTimeAndKind() throws {
+        let source = BookSource(
+            bookSourceName: "Detail HTML",
+            bookSourceUrl: "https://example.com",
+            ruleBookInfo: SourceRule(fields: [
+                "name": ".title@text",
+                "author": ".author@text",
+                "wordCount": ".words@text",
+                "status": ".status@text",
+                "updateTime": ".updated@text",
+                "kind": ".kind@text",
+                "intro": ".intro@text",
+                "latestChapter": ".latest@text"
+            ])
+        )
+        let book = makeSearchBook()
+        let response = SourceResponse(
+            url: URL(string: "https://example.com/book/1")!,
+            statusCode: 200,
+            headers: ["Content-Type": "text/html"],
+            body: """
+            <html><body>
+              <h1 class="title">剑来</h1>
+              <span class="author">烽火戏诸侯</span>
+              <span class="words">120万字</span>
+              <span class="status">连载中</span>
+              <span class="updated">2026-10-20</span>
+              <span class="kind">仙侠</span>
+              <p class="intro">简介</p>
+              <span class="latest">第一千章</span>
+            </body></html>
+            """,
+            data: Data()
+        )
+
+        let result = BookDetailParser().parse(source: source, book: book, response: response)
+        guard case .success(let detail) = result else {
+            return XCTFail("expected success, got \(result)")
+        }
+        XCTAssertEqual(detail.name, "剑来")
+        XCTAssertEqual(detail.wordCount, "120万字")
+        XCTAssertEqual(detail.status, "连载中")
+        XCTAssertEqual(detail.updateTime, "2026-10-20")
+        XCTAssertEqual(detail.kind, "仙侠")
+        XCTAssertEqual(detail.latestChapter, "第一千章")
+    }
+
+    // MARK: - Book detail: JSON
+
+    func testJSONBookDetailExtractsWordCountStatusUpdateTimeAndKind() throws {
+        let source = BookSource(
+            bookSourceName: "Detail JSON",
+            bookSourceUrl: "https://api.example.com",
+            ruleBookInfo: SourceRule(fields: [
+                "name": "$.data.name",
+                "author": "$.data.author",
+                "wordCount": "$.data.words",
+                "status": "$.data.status",
+                "updateTime": "$.data.updated",
+                "kind": "$.data.kind",
+                "intro": "$.data.intro",
+                "latestChapter": "$.data.latest"
+            ])
+        )
+        let book = makeSearchBook()
+        let response = SourceResponse(
+            url: URL(string: "https://api.example.com/book/1")!,
+            statusCode: 200,
+            headers: ["Content-Type": "application/json"],
+            body: """
+            {"data":{
+              "name":"剑来",
+              "author":"烽火戏诸侯",
+              "words":"120万字",
+              "status":"连载中",
+              "updated":"2026-10-20",
+              "kind":"仙侠",
+              "intro":"简介",
+              "latest":"第一千章"
+            }}
+            """,
+            data: Data()
+        )
+
+        let result = BookDetailParser().parse(source: source, book: book, response: response)
+        guard case .success(let detail) = result else {
+            return XCTFail("expected success, got \(result)")
+        }
+        XCTAssertEqual(detail.name, "剑来")
+        XCTAssertEqual(detail.wordCount, "120万字")
+        XCTAssertEqual(detail.status, "连载中")
+        XCTAssertEqual(detail.updateTime, "2026-10-20")
+        XCTAssertEqual(detail.kind, "仙侠")
+        XCTAssertEqual(detail.latestChapter, "第一千章")
+    }
+
+    // MARK: - Chapter list presentation
+
+    func testChapterListPresenterEmitsVolumeHeaderOnlyOnChange() {
+        let chapters = [
+            BookChapter(title: "一", url: "/1", bookUrl: "/b", index: 0, updateTime: " 2026-10-01 ", volumeName: "第一卷"),
+            BookChapter(title: "二", url: "/2", bookUrl: "/b", index: 1, updateTime: "", volumeName: "第一卷"),
+            BookChapter(title: "三", url: "/3", bookUrl: "/b", index: 2, updateTime: nil, volumeName: "第二卷")
+        ]
+
+        XCTAssertEqual(ChapterListPresenter.volumeHeader(at: 0, in: chapters), "第一卷")
+        XCTAssertNil(ChapterListPresenter.volumeHeader(at: 1, in: chapters))
+        XCTAssertEqual(ChapterListPresenter.volumeHeader(at: 2, in: chapters), "第二卷")
+        XCTAssertNil(ChapterListPresenter.volumeHeader(at: 9, in: chapters))
+    }
+
+    func testChapterListPresenterUpdateLabelTrimsAndDropsEmpty() {
+        let trimmed = BookChapter(title: "一", url: "/1", bookUrl: "/b", index: 0, updateTime: " 2026-10-01 ", volumeName: nil)
+        let empty = BookChapter(title: "二", url: "/2", bookUrl: "/b", index: 1, updateTime: "   ", volumeName: nil)
+        let missing = BookChapter(title: "三", url: "/3", bookUrl: "/b", index: 2, updateTime: nil, volumeName: nil)
+
+        XCTAssertEqual(ChapterListPresenter.updateLabel(trimmed), "2026-10-01")
+        XCTAssertNil(ChapterListPresenter.updateLabel(empty))
+        XCTAssertNil(ChapterListPresenter.updateLabel(missing))
+    }
+
+    func testChapterListPresenterSkipsBlankVolumeNames() {
+        let chapters = [
+            BookChapter(title: "一", url: "/1", bookUrl: "/b", index: 0, volumeName: "  "),
+            BookChapter(title: "二", url: "/2", bookUrl: "/b", index: 1, volumeName: nil)
+        ]
+
+        XCTAssertNil(ChapterListPresenter.volumeHeader(at: 0, in: chapters))
+        XCTAssertNil(ChapterListPresenter.volumeHeader(at: 1, in: chapters))
+    }
     // MARK: - Backward compatibility
 
     func testSearchBookDecodesLegacyPayloadWithoutMetadataFields() throws {
@@ -209,6 +341,17 @@ final class SourceMetadataChainTests: XCTestCase {
         XCTAssertNil(book.checkKeyWord)
     }
 
+    func testBookDetailDecodesLegacyPayloadWithoutDetailMetadata() throws {
+        let legacy = """
+        {"name":"旧书","author":"作者","coverUrl":null,"bookUrl":"https://example.com/b/1","tocUrl":null,"sourceName":"S","sourceUrl":"https://example.com","intro":null,"latestChapter":null}
+        """
+        let detail = try JSONDecoder().decode(BookDetail.self, from: Data(legacy.utf8))
+        XCTAssertNil(detail.wordCount)
+        XCTAssertNil(detail.status)
+        XCTAssertNil(detail.updateTime)
+        XCTAssertNil(detail.kind)
+    }
+
     func testBookChapterDecodesLegacyPayloadWithoutMetadataFields() throws {
         let legacy = """
         {"title":"第一章","url":"https://example.com/c/1","bookUrl":"https://example.com/b/1","index":0,"isVip":false}
@@ -216,6 +359,17 @@ final class SourceMetadataChainTests: XCTestCase {
         let chapter = try JSONDecoder().decode(BookChapter.self, from: Data(legacy.utf8))
         XCTAssertNil(chapter.updateTime)
         XCTAssertNil(chapter.volumeName)
+    }
+
+    private func makeSearchBook() -> SearchBook {
+        SearchBook(
+            name: "剑来",
+            author: "烽火戏诸侯",
+            coverUrl: nil,
+            bookUrl: "https://example.com/book/1",
+            sourceName: "Detail",
+            sourceUrl: "https://example.com"
+        )
     }
 
     private func makeBook() -> BookDetail {
