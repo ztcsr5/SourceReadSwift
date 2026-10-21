@@ -177,7 +177,7 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
                 await emitFailure(error, stage: "search.empty", source: source, details: ["url": transformedResponse.url.absoluteString])
                 return .failure(error)
             }
-            let parsed = SearchResultParser(executionContext: executionContext).parse(source: source, response: transformedResponse)
+            let parsed = SearchResultParser(executionContext: executionContext).parse(source: source, response: transformedResponse, keyword: keyword)
             if case .failure(let error) = parsed {
                 await emitFailure(error, stage: "search.parse", source: source, details: ["url": transformedResponse.url.absoluteString])
             }

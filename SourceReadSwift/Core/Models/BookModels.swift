@@ -47,6 +47,12 @@ struct SearchBook: Identifiable, Codable, Hashable, Sendable {
     let intro: String?
     let kind: String?
     let lastChapter: String?
+    /// Legado `ruleSearch.wordCount` – the source-formatted word-count text
+    /// (e.g. "12.3万字"). Kept as a string because sources mix units and text.
+    let wordCount: String?
+    /// Legado `ruleSearch.checkKeyWord` – extracted from each result and used
+    /// to discard rows that do not actually contain the searched keyword.
+    let checkKeyWord: String?
 
     init(
         name: String,
@@ -57,7 +63,9 @@ struct SearchBook: Identifiable, Codable, Hashable, Sendable {
         sourceUrl: String,
         intro: String? = nil,
         kind: String? = nil,
-        lastChapter: String? = nil
+        lastChapter: String? = nil,
+        wordCount: String? = nil,
+        checkKeyWord: String? = nil
     ) {
         self.name = name
         self.author = author
@@ -68,6 +76,8 @@ struct SearchBook: Identifiable, Codable, Hashable, Sendable {
         self.intro = intro
         self.kind = kind
         self.lastChapter = lastChapter
+        self.wordCount = wordCount
+        self.checkKeyWord = checkKeyWord
     }
 }
 
@@ -113,6 +123,28 @@ struct BookChapter: Identifiable, Codable, Hashable, Sendable {
     let bookUrl: String
     let index: Int
     let isVip: Bool
+    /// Legado `ruleToc.updateTime` – source-formatted update timestamp.
+    let updateTime: String?
+    /// Legado `ruleToc.volumeName` – volume/group heading the chapter belongs to.
+    let volumeName: String?
+
+    init(
+        title: String,
+        url: String,
+        bookUrl: String,
+        index: Int,
+        isVip: Bool = false,
+        updateTime: String? = nil,
+        volumeName: String? = nil
+    ) {
+        self.title = title
+        self.url = url
+        self.bookUrl = bookUrl
+        self.index = index
+        self.isVip = isVip
+        self.updateTime = updateTime
+        self.volumeName = volumeName
+    }
 }
 
 struct ChapterContent: Codable, Hashable, Sendable {

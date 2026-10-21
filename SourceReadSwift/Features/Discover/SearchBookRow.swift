@@ -60,6 +60,20 @@ struct SearchBookRow: View {
                         .foregroundStyle(.tertiary)
                         .lineLimit(1)
                 }
+
+                if let wordCount = book.wordCount, !wordCount.isEmpty {
+                    Text(wordCount)
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                }
+
+                if let lastChapter = book.lastChapter, !lastChapter.isEmpty {
+                    Text("最新：\(lastChapter)")
+                        .font(.caption2)
+                        .foregroundStyle(.tertiary)
+                        .lineLimit(1)
+                }
             }
 
             Spacer(minLength: 0)

@@ -155,7 +155,8 @@ struct ChapterListParser {
                 let rawUrl = try htmlExtractor.value(from: element, rule: urlRule, fallback: "a@href", baseUrl: response.url, variables: variables)
                 let absUrl = htmlExtractor.absolutize(rawUrl, base: response.url)
                 guard isValidChapter(title: title, url: absUrl, pageURL: response.url, bookURL: book.bookUrl) else { return nil }
-                return BookChapter(title: title, url: absUrl, bookUrl: book.bookUrl, index: index, isVip: false)
+                let metadata = chapterMetadata(from: element, rule: source.ruleToc, variables: variables, baseURL: response.url)
+                return BookChapter(title: title, url: absUrl, bookUrl: book.bookUrl, index: index, isVip: metadata.isVip, updateTime: metadata.updateTime, volumeName: metadata.volumeName)
             }
             if chapters.isEmpty && !elements.isEmpty {
                 chapters = elements.enumerated().compactMap { index, element in
@@ -163,7 +164,8 @@ struct ChapterListParser {
                     let rawHref = (try? element.attr("href"))?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
                     let absUrl = htmlExtractor.absolutize(rawHref, base: response.url)
                     guard isValidChapter(title: title, url: absUrl, pageURL: response.url, bookURL: book.bookUrl) else { return nil }
-                    return BookChapter(title: title, url: absUrl, bookUrl: book.bookUrl, index: index, isVip: false)
+                    let metadata = chapterMetadata(from: element, rule: source.ruleToc, variables: variables, baseURL: response.url)
+                    return BookChapter(title: title, url: absUrl, bookUrl: book.bookUrl, index: index, isVip: metadata.isVip, updateTime: metadata.updateTime, volumeName: metadata.volumeName)
                 }
             }
             if chapters.isEmpty {
@@ -210,7 +212,8 @@ struct ChapterListParser {
                         let rawUrl = ((try? htmlExtractor.value(from: element, rule: urlRule, fallback: "a@href", baseUrl: response.url, variables: variables)) ?? (try? element.attr("href")) ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
                         let absUrl = htmlExtractor.absolutize(rawUrl, base: response.url)
                         guard isValidChapter(title: title, url: absUrl, pageURL: response.url, bookURL: book.bookUrl) else { return nil }
-                        return BookChapter(title: title, url: absUrl, bookUrl: book.bookUrl, index: index, isVip: false)
+                        let metadata = chapterMetadata(from: element, rule: source.ruleToc, variables: variables, baseURL: response.url)
+                        return BookChapter(title: title, url: absUrl, bookUrl: book.bookUrl, index: index, isVip: metadata.isVip, updateTime: metadata.updateTime, volumeName: metadata.volumeName)
                     }
                     if !altChapters.isEmpty {
                         chapters = altChapters
@@ -295,12 +298,31 @@ struct ChapterListParser {
             guard let title, let rawUrl, !title.isEmpty, !rawUrl.isEmpty else { return nil }
             let absUrl = htmlExtractor.absolutize(rawUrl, base: response.url)
             guard isValidChapter(title: title, url: absUrl, pageURL: response.url, bookURL: book.bookUrl) else { return nil }
+            let vipRaw = jsonExtractor.string(
+                from: item,
+                rule: htmlExtractor.firstRule(source.ruleToc, keys: ["isVip", "vip", "isPay"]),
+                fallbackKeys: ["isVip", "vip", "isPay", "vipFlag"],
+                variables: variables
+            )?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+            let isVip = vipRaw.map { !["", "false", "0", "no", "free"].contains($0) } ?? false
             return BookChapter(
                 title: title,
                 url: absUrl,
                 bookUrl: book.bookUrl,
                 index: index,
-                isVip: false
+                isVip: isVip,
+                updateTime: jsonExtractor.string(
+                    from: item,
+                    rule: htmlExtractor.firstRule(source.ruleToc, keys: ["updateTime", "update", "time"]),
+                    fallbackKeys: ["updateTime", "update_time", "time", "lastUpdate"],
+                    variables: variables
+                ),
+                volumeName: jsonExtractor.string(
+                    from: item,
+                    rule: htmlExtractor.firstRule(source.ruleToc, keys: ["volumeName", "volume"]),
+                    fallbackKeys: ["volumeName", "volume", "group"],
+                    variables: variables
+                )
             )
         }
 
@@ -363,4 +385,31 @@ struct ChapterListParser {
 struct ChapterListPage: Equatable, Sendable {
     let chapters: [BookChapter]
     let nextTocUrl: String?
+
+}
+
+private extension ChapterListParser {
+    func chapterMetadata(
+        from element: Element,
+        rule: SourceRule?,
+        variables: [String: Any],
+        baseURL: URL
+    ) -> (isVip: Bool, updateTime: String?, volumeName: String?) {
+        func extract(_ keys: [String]) -> String? {
+            guard let rule, let ruleValue = htmlExtractor.firstRule(rule, keys: keys) else { return nil }
+            if let value = try? htmlExtractor.value(from: element, rule: ruleValue, fallback: nil, baseUrl: baseURL, variables: variables),
+               let trimmed = value.nilIfEmpty {
+                return trimmed
+            }
+            if let parent = element.parent(),
+               let value = try? htmlExtractor.value(from: parent, rule: ruleValue, fallback: nil, baseUrl: baseURL, variables: variables),
+               let trimmed = value.nilIfEmpty {
+                return trimmed
+            }
+            return nil
+        }
+        let vipRaw = extract(["isVip", "vip", "isPay"])?.lowercased()
+        let isVip = vipRaw.map { !["false", "0", "no", "free", "免费"].contains($0) } ?? false
+        return (isVip, extract(["updateTime", "update", "time"]), extract(["volumeName", "volume"]))
+    }
 }

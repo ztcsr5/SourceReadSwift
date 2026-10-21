@@ -10,7 +10,7 @@ struct SearchResultParser {
         self.jsonExtractor = JSONRuleExtractor(executionContext: executionContext)
     }
 
-    func parse(source: BookSource, response: SourceResponse, ruleOverride: SourceRule? = nil) -> Result<[SearchBook], SourceEngineError> {
+    func parse(source: BookSource, response: SourceResponse, ruleOverride: SourceRule? = nil, keyword: String? = nil) -> Result<[SearchBook], SourceEngineError> {
         let normalized = ResponseFormatDetector.normalizedBody(response.body)
         let normalizedResponse = SourceResponse(
             url: response.url,
@@ -26,24 +26,24 @@ struct SearchResultParser {
         let listRule = firstRule(effectiveRule, fallback: source.ruleSearch, keys: ["bookList", "list", "books"])
         let isJSRule = listRule.map { LegadoRuleResolver().isJavaScriptRule($0) || $0.contains("<js>") || $0.contains("@js:") } ?? false
         if isJSRule || ResponseFormatDetector.prefersJSON(body: normalized, headers: response.headers, rule: listRule) {
-            let jsonResult = parseJSON(source: source, response: normalizedResponse, ruleOverride: ruleOverride)
+            let jsonResult = parseJSON(source: source, response: normalizedResponse, ruleOverride: ruleOverride, keyword: keyword)
             switch jsonResult {
             case .success:
                 return jsonResult
             case .failure:
-                let htmlResult = parseHTML(source: source, response: normalizedResponse, ruleOverride: ruleOverride)
+                let htmlResult = parseHTML(source: source, response: normalizedResponse, ruleOverride: ruleOverride, keyword: keyword)
                 if case .success = htmlResult {
                     return htmlResult
                 }
                 return jsonResult
             }
         } else {
-            let htmlResult = parseHTML(source: source, response: normalizedResponse, ruleOverride: ruleOverride)
+            let htmlResult = parseHTML(source: source, response: normalizedResponse, ruleOverride: ruleOverride, keyword: keyword)
             switch htmlResult {
             case .success:
                 return htmlResult
             case .failure:
-                let jsonResult = parseJSON(source: source, response: normalizedResponse, ruleOverride: ruleOverride)
+                let jsonResult = parseJSON(source: source, response: normalizedResponse, ruleOverride: ruleOverride, keyword: keyword)
                 if case .success = jsonResult {
                     return jsonResult
                 }
@@ -52,7 +52,7 @@ struct SearchResultParser {
         }
     }
 
-    private func parseHTML(source: BookSource, response: SourceResponse, ruleOverride: SourceRule? = nil) -> Result<[SearchBook], SourceEngineError> {
+    private func parseHTML(source: BookSource, response: SourceResponse, ruleOverride: SourceRule? = nil, keyword: String? = nil) -> Result<[SearchBook], SourceEngineError> {
         let rule = ruleOverride ?? source.ruleSearch
         guard let rule else {
             return .failure(.rule("搜索与发现规则均为空"))
@@ -155,6 +155,9 @@ struct SearchResultParser {
                 let intro = try? htmlExtractor.value(from: element, rule: firstRule(rule, fallback: source.ruleSearch, keys: ["intro"]), fallback: nil, baseUrl: response.url, variables: variables).nilIfEmpty
                 let kind = try? htmlExtractor.value(from: element, rule: firstRule(rule, fallback: source.ruleSearch, keys: ["kind"]), fallback: nil, baseUrl: response.url, variables: variables).nilIfEmpty
                 let lastChapter = try? htmlExtractor.value(from: element, rule: firstRule(rule, fallback: source.ruleSearch, keys: ["lastChapter"]), fallback: nil, baseUrl: response.url, variables: variables).nilIfEmpty
+                let wordCount = try? htmlExtractor.value(from: element, rule: firstRule(rule, fallback: source.ruleSearch, keys: ["wordCount", "wordNum", "words"]), fallback: nil, baseUrl: response.url, variables: variables).nilIfEmpty
+                let checkKeyWord = try? htmlExtractor.value(from: element, rule: firstRule(rule, fallback: source.ruleSearch, keys: ["checkKeyWord"]), fallback: nil, baseUrl: response.url, variables: variables).nilIfEmpty
+                guard passesCheckKeyWord(checkKeyWord, keyword: keyword) else { continue }
                 books.append(SearchBook(
                     name: name,
                     author: author,
@@ -164,7 +167,9 @@ struct SearchResultParser {
                     sourceUrl: source.bookSourceUrl,
                     intro: intro,
                     kind: kind,
-                    lastChapter: lastChapter
+                    lastChapter: lastChapter,
+                    wordCount: wordCount,
+                    checkKeyWord: checkKeyWord
                 ))
             }
             if elements.isEmpty {
@@ -197,7 +202,7 @@ struct SearchResultParser {
         }
     }
 
-    private func parseJSON(source: BookSource, response: SourceResponse, ruleOverride: SourceRule? = nil) -> Result<[SearchBook], SourceEngineError> {
+    private func parseJSON(source: BookSource, response: SourceResponse, ruleOverride: SourceRule? = nil, keyword: String? = nil) -> Result<[SearchBook], SourceEngineError> {
         let variables: [String: Any] = [
             "source": source,
             "baseUrl": response.url.absoluteString,
@@ -303,10 +308,23 @@ struct SearchResultParser {
                     rule: firstRule(rule, fallback: source.ruleSearch, keys: ["lastChapter"]),
                     fallbackKeys: ["lastChapter", "latestChapter", "last_chapter_title"],
                     variables: variables
+                ),
+                wordCount: extractor.string(
+                    from: item,
+                    rule: firstRule(rule, fallback: source.ruleSearch, keys: ["wordCount", "wordNum", "words"]),
+                    fallbackKeys: ["wordCount", "wordNum", "words", "word_count", "size"],
+                    variables: variables
+                ),
+                checkKeyWord: extractor.string(
+                    from: item,
+                    rule: firstRule(rule, fallback: source.ruleSearch, keys: ["checkKeyWord"]),
+                    fallbackKeys: [],
+                    variables: variables
                 )
             )
         }
-        return books.isEmpty ? .failure(.empty("JSON 搜索解析结果为空")) : .success(Array(books))
+        let filtered = books.filter { passesCheckKeyWord($0.checkKeyWord, keyword: keyword) }
+        return filtered.isEmpty ? .failure(.empty("JSON 搜索解析结果为空")) : .success(Array(filtered))
     }
 
     private func firstRule(_ rule: SourceRule?, fallback: SourceRule? = nil, keys: [String]) -> String? {
@@ -333,4 +351,15 @@ struct SearchResultParser {
         return nil
     }
 
+
+    /// Legado semantics: when `ruleSearch.checkKeyWord` is configured and a
+    /// keyword is available, the extracted value must contain that keyword.
+    /// Rows failing the check are dropped; an empty/missing rule is permissive.
+    private func passesCheckKeyWord(_ value: String?, keyword: String?) -> Bool {
+        guard let keyword = keyword?.trimmingCharacters(in: .whitespacesAndNewlines), !keyword.isEmpty,
+              let value = value?.trimmingCharacters(in: .whitespacesAndNewlines), !value.isEmpty else {
+            return true
+        }
+        return value.range(of: keyword, options: [.caseInsensitive, .diacriticInsensitive]) != nil
+    }
 }
