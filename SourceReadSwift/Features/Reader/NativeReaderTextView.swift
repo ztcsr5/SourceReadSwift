@@ -938,6 +938,12 @@ enum ReaderNativeTextLayout {
             return 320
         }()
 
+        // Derive the height ceiling from the measured column instead of a
+        // hard-coded 320pt so split view and landscape keep the same ratio.
+        let maximumHeight: CGFloat? = configuration.imageStyle.stretchesToColumnWidth
+            ? nil
+            : max(containerWidth * 0.72, 220)
+
         let cached = RemoteImageLoader.shared.cachedImage(for: url)
         let targetSize: CGSize
         let image: UIImage
@@ -947,11 +953,15 @@ enum ReaderNativeTextLayout {
                 for: cached.size,
                 style: configuration.imageStyle,
                 containerWidth: containerWidth,
-                maximumHeight: configuration.imageStyle.stretchesToColumnWidth ? nil : 320
+                maximumHeight: maximumHeight
             )
         } else {
-            let placeholderWidth = configuration.imageStyle.stretchesToColumnWidth ? containerWidth : min(containerWidth, 260)
-            let placeholderHeight: CGFloat = configuration.imageStyle.stretchesToColumnWidth ? min(containerWidth * 0.6, 220) : 160
+            let placeholderWidth = configuration.imageStyle.stretchesToColumnWidth
+                ? containerWidth
+                : min(containerWidth, 260)
+            let placeholderHeight = configuration.imageStyle.stretchesToColumnWidth
+                ? min(containerWidth * 0.6, 220)
+                : min(max(placeholderWidth * 0.62, 120), 200)
             targetSize = CGSize(width: max(placeholderWidth, 1), height: max(placeholderHeight, 1))
             image = placeholderImage(size: targetSize, textColor: configuration.textColor)
         }

@@ -33,8 +33,16 @@ final class RemoteImageLoader: @unchecked Sendable {
         cache.setObject(image, forKey: url as NSURL, cost: max(cost, 1))
     }
 
-    /// Test hook to clear cached images.
+    /// Test hook to clear cached images. In-flight downloads are cancelled so
+    /// a cleared cache cannot be repopulated by a request that started earlier.
     func clearCache() {
+        lock.lock()
+        let pending = Array(inFlight.values)
+        inFlight.removeAll()
+        lock.unlock()
+        for task in pending {
+            task.cancel()
+        }
         cache.removeAllObjects()
     }
 

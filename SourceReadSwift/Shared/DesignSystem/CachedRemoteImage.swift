@@ -47,7 +47,11 @@ struct CachedRemoteImage<Placeholder: View>: View {
         if headers.isEmpty {
             return url.absoluteString
         }
-        return url.absoluteString + "#" + headers.keys.sorted().joined(separator: ",")
+        let headerKey = headers
+            .sorted { $0.key < $1.key }
+            .map { "\($0.key)=\($0.value)" }
+            .joined(separator: "&")
+        return url.absoluteString + "#" + headerKey
     }
 
     private func loadImage() async {

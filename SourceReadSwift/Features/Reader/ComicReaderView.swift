@@ -26,6 +26,11 @@ struct ComicReaderView: View {
     let chapters: [BookChapter]
     let engine: SourceEngine
 
+    /// Comic CDNs are usually hotlink-protected; every page request reuses the
+    /// source's own Referer / User-Agent / Cookie headers. Built once in init
+    /// so a long page list does not re-decode the header JSON per row.
+    private let imageHeaders: [String: String]
+
     @State private var currentChapterIndex: Int
     @State private var pages: [ComicPage] = []
     @State private var isLoading = false
@@ -66,6 +71,7 @@ struct ComicReaderView: View {
         self.initialChapterIndex = initialChapterIndex
         self.chapters = chapters
         self.engine = engine
+        self.imageHeaders = SourceRequestBuilder().imageRequestHeaders(for: source)
         self._currentChapterIndex = State(initialValue: initialChapterIndex)
     }
 
@@ -165,8 +171,13 @@ struct ComicReaderView: View {
             ScrollView {
                 LazyVStack(spacing: 0) {
                     ForEach(pages) { page in
-                        ComicPageImageView(url: page.url, pageNumber: page.id + 1, totalPages: pages.count)
-                            .id(page.id)
+                        ComicPageImageView(
+                            url: page.url,
+                            pageNumber: page.id + 1,
+                            totalPages: pages.count,
+                            headers: imageHeaders
+                        )
+                        .id(page.id)
                             .onAppear {
                                 currentPageIndex = page.id
                             }
@@ -208,8 +219,13 @@ struct ComicReaderView: View {
         TabView(selection: $currentPageIndex) {
             let displayedPages = rtl ? Array(pages.reversed()) : pages
             ForEach(displayedPages) { page in
-                ComicPageImageView(url: page.url, pageNumber: page.id + 1, totalPages: pages.count)
-                    .tag(page.id)
+                ComicPageImageView(
+                    url: page.url,
+                    pageNumber: page.id + 1,
+                    totalPages: pages.count,
+                    headers: imageHeaders
+                )
+                .tag(page.id)
             }
         }
         .tabViewStyle(.page(indexDisplayMode: .never))
@@ -505,6 +521,7 @@ private struct ComicPageImageView: View {
     let url: String
     let pageNumber: Int
     let totalPages: Int
+    let headers: [String: String]
 
     @State private var scale: CGFloat = 1.0
     @State private var lastScale: CGFloat = 1.0
@@ -512,7 +529,7 @@ private struct ComicPageImageView: View {
     var body: some View {
         ZStack {
             if let imageURL = URL(string: url) {
-                CachedRemoteImage(url: imageURL, contentMode: .fit) {
+                CachedRemoteImage(url: imageURL, contentMode: .fit, headers: headers) {
                     ZStack {
                         Color.white.opacity(0.04)
                         VStack(spacing: 8) {

@@ -151,6 +151,81 @@ final class ReaderImageStyleTests: XCTestCase {
         XCTAssertEqual(attachment.bounds.height, 160, accuracy: 0.01)
     }
 
+    func testEstimatedPageCostFollowsImageStyle() {
+        let budget = 1_000
+        XCTAssertEqual(
+            ReaderImageSizingPolicy.estimatedPageCost(for: .single, pageBudget: budget),
+            budget
+        )
+        XCTAssertGreaterThan(
+            ReaderImageSizingPolicy.estimatedPageCost(for: .full, pageBudget: budget),
+            ReaderImageSizingPolicy.estimatedPageCost(for: .standard, pageBudget: budget)
+        )
+        XCTAssertEqual(
+            ReaderImageSizingPolicy.estimatedPageCost(for: .standard, pageBudget: budget),
+            ReaderImageSizingPolicy.estimatedPageCost(for: .text, pageBudget: budget)
+        )
+        XCTAssertEqual(ReaderImageSizingPolicy.estimatedPageCost(for: .standard, pageBudget: 0), 0)
+    }
+
+    func testMaximumIllustrationHeightFollowsStyle() {
+        let single = ReaderImageSizingPolicy.maximumHeight(for: .single, viewportHeight: 800)
+        let standard = ReaderImageSizingPolicy.maximumHeight(for: .standard, viewportHeight: 800)
+        XCTAssertGreaterThan(single, standard)
+        XCTAssertEqual(single, 624, accuracy: 0.01)
+        XCTAssertEqual(standard, 496, accuracy: 0.01)
+        XCTAssertEqual(
+            ReaderImageSizingPolicy.maximumHeight(for: .standard, viewportHeight: 10),
+            160,
+            accuracy: 0.01
+        )
+    }
+
+    func testNativeTextAttachmentUsesColumnDerivedMaximumHeight() {
+        let imageURL = URL(string: "https://example.com/portrait_illustration.jpg")!
+        let renderer = UIGraphicsImageRenderer(size: CGSize(width: 400, height: 800))
+        let testImage = renderer.image { _ in }
+        RemoteImageLoader.shared.insert(testImage, for: imageURL)
+
+        let config = NativeReaderTextView.Configuration(
+            title: "插图高度测试",
+            subtitle: nil,
+            paragraphs: ["[img]\(imageURL.absoluteString)[/img]"],
+            contentFingerprint: "illus-height-test",
+            fontSize: 18,
+            lineSpacing: 8,
+            pagePadding: 20,
+            letterSpacing: 0,
+            paragraphSpacing: 14,
+            paragraphIndent: 0,
+            titleSpacing: 10,
+            footerHeight: 60,
+            textColor: .label,
+            highlightColor: .systemBlue,
+            animatedScrollDuration: 0.35,
+            imageStyle: .standard,
+            imageColumnWidth: 360
+        )
+
+        let result = ReaderNativeTextLayout.makeAttributedText(configuration: config)
+        let attachmentRange = result.paragraphRanges[0]
+        guard let attachment = result.text.attribute(.attachment, at: attachmentRange.location, effectiveRange: nil) as? NSTextAttachment else {
+            return XCTFail("expected attachment")
+        }
+        XCTAssertEqual(attachment.bounds.height, 259.2, accuracy: 0.01)
+        XCTAssertEqual(attachment.bounds.width, 129.6, accuracy: 0.01)
+    }
+
+    func testClearCacheIsIdempotentAndDropsImages() {
+        let url = URL(string: "https://example.com/clear-cache.jpg")!
+        let renderer = UIGraphicsImageRenderer(size: CGSize(width: 20, height: 20))
+        RemoteImageLoader.shared.insert(renderer.image { _ in }, for: url)
+        XCTAssertNotNil(RemoteImageLoader.shared.cachedImage(for: url))
+        RemoteImageLoader.shared.clearCache()
+        RemoteImageLoader.shared.clearCache()
+        XCTAssertNil(RemoteImageLoader.shared.cachedImage(for: url))
+    }
+
     func testSourceRequestBuilderProvidesImageHeaders() {
         let source = BookSource(
             bookSourceName: "ImageHeaderSource",

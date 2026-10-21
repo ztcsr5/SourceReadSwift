@@ -71,6 +71,7 @@ struct ReaderView: View {
     @State private var tocQuery = ""
     @State private var debouncedTocQuery = ""
     @State private var selectedIllustrationURL: URL? = nil
+    @State private var imageHeaderCache: [String: String] = [:]
     @State private var tocReversed = false
     @State private var autoScrollEnabled = false
     @State private var autoScrollAnchorTarget = 0
@@ -266,6 +267,13 @@ struct ReaderView: View {
         return viewportSize
     }
 
+    /// Text column used by illustrations in both the SwiftUI paged surface and
+    /// the TextKit scroll surface. Derived from the measured container instead
+    /// of UIScreen so split view / Stage Manager keep the same geometry.
+    private var illustrationColumnWidth: CGFloat {
+        max(effectiveViewportSize.width - CGFloat(pagePadding * 2), 200)
+    }
+
     private var readerPageCacheKey: String {
         // Pagination depends on the viewport. Include the actual container
         // bounds so rotation, split-view and Stage Manager resize invalidate
@@ -446,7 +454,7 @@ struct ReaderView: View {
             get: { selectedIllustrationURL.map { IdentifiableReaderURL(url: $0) } },
             set: { selectedIllustrationURL = $0?.url }
         )) { item in
-            IllustrationZoomViewer(url: item.url)
+            IllustrationZoomViewer(url: item.url, headers: imageRequestHeaders)
         }
         .sheet(isPresented: $showBookDetailSheet) {
             NavigationStack {
@@ -499,6 +507,9 @@ struct ReaderView: View {
                     startAutoScroll()
                 }
             }
+        }
+        .task(id: imageHeaderCacheKey) {
+            refreshImageRequestHeaders()
         }
         .onDisappear {
             positionPersistTask?.cancel()
@@ -735,9 +746,23 @@ struct ReaderView: View {
         return appState.sourceStore.source(for: sourceURL)
     }
 
+    /// Header JSON is decoded once per source revision instead of on every
+    /// SwiftUI body pass (a page with several illustrations used to re-parse
+    /// it once per image).
     private var imageRequestHeaders: [String: String] {
-        guard let currentBookSource else { return [:] }
-        return SourceRequestBuilder().imageRequestHeaders(for: currentBookSource)
+        imageHeaderCache
+    }
+
+    private var imageHeaderCacheKey: String {
+        "\(bookID)|\(currentBookSource?.bookSourceUrl ?? "")"
+    }
+
+    private func refreshImageRequestHeaders() {
+        guard let source = currentBookSource else {
+            imageHeaderCache = [:]
+            return
+        }
+        imageHeaderCache = SourceRequestBuilder().imageRequestHeaders(for: source)
     }
 
     private var currentImageStyle: ReaderImageStyle {
@@ -769,7 +794,7 @@ struct ReaderView: View {
             showChapterEndBadge: false,
             imageStyle: currentImageStyle,
             imageHeaders: imageRequestHeaders,
-            imageColumnWidth: max(UIScreen.main.bounds.width - CGFloat(pagePadding * 2), 200),
+            imageColumnWidth: illustrationColumnWidth,
             onVisibleParagraph: { index in
                 if paragraphJumpRequest != nil {
                     paragraphJumpRequest = nil
@@ -1120,7 +1145,12 @@ struct ReaderView: View {
                 url: url,
                 style: currentImageStyle,
                 headers: imageRequestHeaders,
-                textColor: readerThemeTextColor
+                textColor: readerThemeTextColor,
+                columnWidth: illustrationColumnWidth,
+                maximumHeight: ReaderImageSizingPolicy.maximumHeight(
+                    for: currentImageStyle,
+                    viewportHeight: effectiveViewportSize.height
+                )
             )
         }
         .buttonStyle(.plain)
@@ -2943,6 +2973,35 @@ struct ReaderView: View {
 
         for (index, paragraph) in content.paragraphs.enumerated() {
             let trimmed = paragraph.trimmingCharacters(in: .whitespacesAndNewlines)
+            // Illustrations are laid out as attachments whose height is only
+            // known after download. Reserve a deterministic share of the page
+            // so an image never lands half-way across a page boundary.
+            if ReaderImageSizingPolicy.imageURL(in: trimmed) != nil {
+                let imageCost = ReaderImageSizingPolicy.estimatedPageCost(
+                    for: currentImageStyle,
+                    pageBudget: pageBudget
+                )
+                if currentImageStyle.reservesWholePage {
+                    // SINGLE: one illustration owns the page. Legado starts a
+                    // new page whenever the cursor is not already at the top.
+                    if currentIncludesTitle || !currentEntries.isEmpty {
+                        flush()
+                    }
+                    currentEntries.append(ReaderPageEntry(index: index, text: paragraph))
+                    currentCost = imageCost
+                    flush()
+                } else {
+                    if !currentEntries.isEmpty && currentCost + imageCost > pageBudget {
+                        flush()
+                    }
+                    currentEntries.append(ReaderPageEntry(index: index, text: paragraph))
+                    currentCost += imageCost
+                    if currentCost >= pageBudget {
+                        flush()
+                    }
+                }
+                continue
+            }
             // UTF-16 units are the same metric used by TextKit ranges and are
             // substantially cheaper than grapheme-cluster counting for long
             // CJK chapters.
@@ -3484,6 +3543,7 @@ private struct IdentifiableReaderURL: Identifiable {
 private struct IllustrationZoomViewer: View {
     @Environment(\.dismiss) private var dismiss
     let url: URL
+    let headers: [String: String]
     @State private var scale: CGFloat = 1.0
     @State private var lastScale: CGFloat = 1.0
     @State private var offset: CGSize = .zero
@@ -3494,7 +3554,7 @@ private struct IllustrationZoomViewer: View {
             ZStack {
                 Color.black.ignoresSafeArea()
 
-                CachedRemoteImage(url: url) {
+                CachedRemoteImage(url: url, headers: headers) {
                     ProgressView()
                         .tint(.white)
                 }
@@ -3569,16 +3629,49 @@ struct ReaderIllustrationView: View {
     let style: ReaderImageStyle
     let headers: [String: String]
     let textColor: Color
+    var columnWidth: CGFloat = 320
+    var maximumHeight: CGFloat = 520
+
+    /// Natural pixel size reported by the decoded bitmap. Until it arrives the
+    /// placeholder defines the footprint; afterwards the shared sizing policy
+    /// keeps paged SwiftUI geometry identical to the TextKit scroll surface.
+    @State private var naturalSize: CGSize = .zero
+
+    private var displaySize: CGSize {
+        guard naturalSize.width > 0, naturalSize.height > 0 else { return .zero }
+        return ReaderImageSizingPolicy.size(
+            for: naturalSize,
+            style: style,
+            containerWidth: columnWidth,
+            maximumHeight: maximumHeight
+        )
+    }
+
+    private var placeholderSize: CGSize {
+        let width = style.stretchesToColumnWidth ? columnWidth : min(columnWidth, 260)
+        let height = style.stretchesToColumnWidth
+            ? min(width * 0.6, maximumHeight)
+            : min(max(width * 0.62, 120), 200)
+        return CGSize(width: max(width, 1), height: max(height, 1))
+    }
 
     var body: some View {
         VStack(spacing: 8) {
             CachedRemoteImage(
                 url: url,
-                headers: headers
+                contentMode: .fit,
+                headers: headers,
+                onSizeChange: { size in
+                    guard size.width > 0, size.height > 0 else { return }
+                    if abs(size.width - naturalSize.width) > 0.5
+                        || abs(size.height - naturalSize.height) > 0.5 {
+                        naturalSize = size
+                    }
+                }
             ) {
                 RoundedRectangle(cornerRadius: 12, style: .continuous)
                     .fill(textColor.opacity(0.06))
-                    .frame(height: 180)
+                    .frame(width: placeholderSize.width, height: placeholderSize.height)
                     .overlay {
                         VStack(spacing: 8) {
                             Image(systemName: "photo")
@@ -3590,10 +3683,9 @@ struct ReaderIllustrationView: View {
                         }
                     }
             }
-            .scaledToFit()
             .frame(
-                maxWidth: .infinity,
-                maxHeight: style.stretchesToColumnWidth ? .infinity : 260
+                width: displaySize.width > 0 ? displaySize.width : nil,
+                height: displaySize.height > 0 ? displaySize.height : nil
             )
             .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
             .overlay {
@@ -3613,5 +3705,3 @@ struct ReaderIllustrationView: View {
         .padding(.vertical, 8)
     }
 }
-
-

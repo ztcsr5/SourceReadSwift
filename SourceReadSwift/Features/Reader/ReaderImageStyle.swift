@@ -63,6 +63,28 @@ enum ReaderImageSizingPolicy {
         return CGSize(width: max(width, 1), height: max(height, 1))
     }
 
+    /// Estimated vertical cost of an illustration in the text pagination
+    /// model. Pagination runs before the bitmap is downloaded, so it reserves
+    /// a deterministic fraction of the page instead of measuring pixels.
+    static func estimatedPageCost(for style: ReaderImageStyle, pageBudget: Int) -> Int {
+        let budget = max(pageBudget, 1)
+        switch style {
+        case .single:
+            return budget
+        case .full:
+            return Int(Double(budget) * 0.72)
+        case .standard, .text:
+            return Int(Double(budget) * 0.46)
+        }
+    }
+
+    /// Legado clamps illustrations to the visible page height. SINGLE keeps a
+    /// larger share because it owns the page; DEFAULT/TEXT leave room for text.
+    static func maximumHeight(for style: ReaderImageStyle, viewportHeight: CGFloat) -> CGFloat {
+        let ratio: CGFloat = style.reservesWholePage ? 0.78 : 0.62
+        return max(viewportHeight * ratio, 160)
+    }
+
     /// The [img]url[/img] paragraph body, or nil when the paragraph is text.
     static func imageURL(in paragraph: String) -> URL? {
         guard paragraph.hasPrefix("[img]"), paragraph.hasSuffix("[/img]") else { return nil }
