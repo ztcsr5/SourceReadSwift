@@ -144,10 +144,11 @@ final class ReaderImageStyleTests: XCTestCase {
         XCTAssertEqual(result.paragraphRanges[1].length, 1)
 
         let attachmentRange = result.paragraphRanges[1]
-        let attachment = result.text.attribute(.attachment, at: attachmentRange.location, effectiveRange: nil) as? NSTextAttachment
-        XCTAssertNotNil(attachment)
-        XCTAssertEqual(attachment?.bounds.width, 320, accuracy: 0.01)
-        XCTAssertEqual(attachment?.bounds.height, 160, accuracy: 0.01)
+        guard let attachment = result.text.attribute(.attachment, at: attachmentRange.location, effectiveRange: nil) as? NSTextAttachment else {
+            return XCTFail("expected attachment")
+        }
+        XCTAssertEqual(attachment.bounds.width, 320, accuracy: 0.01)
+        XCTAssertEqual(attachment.bounds.height, 160, accuracy: 0.01)
     }
 
     func testSourceRequestBuilderProvidesImageHeaders() {
