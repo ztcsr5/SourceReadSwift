@@ -58,6 +58,9 @@ final class LegadoSearchBookBridge: NSObject, LegadoSearchBookExport {
 final class LegadoBookChapterBridge: NSObject, LegadoBookChapterExport {
     var url = ""; var title = ""; var bookUrl = ""; var index = 0; var resourceUrl = ""; var tag = ""; var variable = ""
     private var variables: [String: String] = [:]
+    /// Legado exposes `BookChapter.isVip` as a field.  Keep the real value so
+    /// JS rules can branch on it instead of guessing from the chapter title.
+    private var vipFlag = false
     func putVariable(_ key: String, _ value: String) { variables[key] = value; variable = value }
     func getVariable(_ key: String) -> String { variables[key] ?? "" }
     func putCustomVariable(_ value: String) { variables["custom"] = value }
@@ -68,8 +71,8 @@ final class LegadoBookChapterBridge: NSObject, LegadoBookChapterExport {
     func getChapterUrl() -> String { url }
     func getIndex() -> Int { index }
     func getChapterIndex() -> Int { index }
-    func isVip() -> Bool { let text = title.lowercased(); return text.contains("vip") || text.contains("订阅") || text.contains("付费") }
-    init(chapter: BookChapter) { url = chapter.url; title = chapter.title; bookUrl = chapter.bookUrl; index = chapter.index; super.init() }
+    func isVip() -> Bool { vipFlag }
+    init(chapter: BookChapter) { url = chapter.url; title = chapter.title; bookUrl = chapter.bookUrl; index = chapter.index; vipFlag = chapter.isVip; super.init() }
 }
 
 @objc protocol LegadoResponseExport: JSExport {

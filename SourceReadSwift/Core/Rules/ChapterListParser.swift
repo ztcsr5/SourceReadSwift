@@ -19,7 +19,12 @@ struct ChapterListParser {
         }
     }
 
-    func parsePage(source: BookSource, book: BookDetail, response: SourceResponse) -> Result<ChapterListPage, SourceEngineError> {
+    func parsePage(
+        source: BookSource,
+        book: BookDetail,
+        response: SourceResponse,
+        inheritedVolume: String? = nil
+    ) -> Result<ChapterListPage, SourceEngineError> {
         let normalized = ResponseFormatDetector.normalizedBody(response.body)
         let normalizedResponse = SourceResponse(
             url: response.url,
@@ -35,24 +40,24 @@ struct ChapterListParser {
         let isJSRule = listRule.map { LegadoRuleResolver().isJavaScriptRule($0) || $0.contains("<js>") || $0.contains("@js:") } ?? false
         let prefersJSON = isJSRule || ResponseFormatDetector.prefersJSON(body: normalized, headers: response.headers, rule: listRule)
         if prefersJSON {
-            let jsonResult = parseJSON(source: source, book: book, response: normalizedResponse)
+            let jsonResult = parseJSON(source: source, book: book, response: normalizedResponse, inheritedVolume: inheritedVolume)
             switch jsonResult {
             case .success:
                 return jsonResult
             case .failure:
-                let htmlResult = parseHTML(source: source, book: book, response: normalizedResponse)
+                let htmlResult = parseHTML(source: source, book: book, response: normalizedResponse, inheritedVolume: inheritedVolume)
                 if case .success = htmlResult {
                     return htmlResult
                 }
                 return jsonResult
             }
         } else {
-            let htmlResult = parseHTML(source: source, book: book, response: normalizedResponse)
+            let htmlResult = parseHTML(source: source, book: book, response: normalizedResponse, inheritedVolume: inheritedVolume)
             switch htmlResult {
             case .success:
                 return htmlResult
             case .failure:
-                let jsonResult = parseJSON(source: source, book: book, response: normalizedResponse)
+                let jsonResult = parseJSON(source: source, book: book, response: normalizedResponse, inheritedVolume: inheritedVolume)
                 if case .success = jsonResult {
                     return jsonResult
                 }
@@ -61,7 +66,12 @@ struct ChapterListParser {
         }
     }
 
-    private func parseHTML(source: BookSource, book: BookDetail, response: SourceResponse) -> Result<ChapterListPage, SourceEngineError> {
+    private func parseHTML(
+        source: BookSource,
+        book: BookDetail,
+        response: SourceResponse,
+        inheritedVolume: String?
+    ) -> Result<ChapterListPage, SourceEngineError> {
         let bookMap: [String: Any] = [
             "name": book.name,
             "author": book.author ?? "",
@@ -151,46 +161,39 @@ struct ChapterListParser {
             let nextRule = htmlExtractor.firstRule(source.ruleToc, keys: ["nextTocUrl", "nextChapterUrl", "nextUrl"])
 
             let isVolumeRule = source.ruleToc?.fields["isVolume"]
-            var currentVolume: String?
+            var currentVolume: String? = inheritedVolume
             var chapters: [BookChapter] = []
             for element in elements {
-                let title = try htmlExtractor.value(from: element, rule: nameRule, fallback: "a@text", baseUrl: response.url, variables: variables)
-                let volumeRaw = isVolumeRule.flatMap { rule in
-                    try? htmlExtractor.value(from: element, rule: rule, fallback: nil, baseUrl: response.url, variables: variables)
-                }
-                if isVolumeValue(volumeRaw) {
-                    // Legado keeps the volume row in its model; this app renders
-                    // volume headings from `volumeName`, so consume the row and
-                    // apply its title to the chapters that follow it.
-                    let trimmed = title.trimmingCharacters(in: .whitespacesAndNewlines)
-                    let volumeTitle = trimmed.isEmpty
-                        ? ((try? element.text()) ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
-                        : trimmed
-                    if !volumeTitle.isEmpty { currentVolume = volumeTitle }
-                    continue
-                }
-                let rawUrl = try htmlExtractor.value(from: element, rule: urlRule, fallback: "a@href", baseUrl: response.url, variables: variables)
-                let absUrl = htmlExtractor.absolutize(rawUrl, base: response.url)
-                guard isValidChapter(title: title, url: absUrl, pageURL: response.url, bookURL: book.bookUrl) else { continue }
-                let metadata = chapterMetadata(from: element, rule: source.ruleToc, variables: variables, baseURL: response.url)
-                chapters.append(BookChapter(
-                    title: title,
-                    url: absUrl,
-                    bookUrl: book.bookUrl,
+                if let chapter = makeChapter(
+                    from: element,
                     index: chapters.count,
-                    isVip: metadata.isVip,
-                    updateTime: metadata.updateTime,
-                    volumeName: metadata.volumeName ?? currentVolume
-                ))
+                    book: book,
+                    response: response,
+                    variables: variables,
+                    nameRule: nameRule,
+                    urlRule: urlRule,
+                    tocRule: source.ruleToc,
+                    isVolumeRule: isVolumeRule,
+                    currentVolume: &currentVolume
+                ) {
+                    chapters.append(chapter)
+                }
             }
             if chapters.isEmpty && !elements.isEmpty {
                 chapters = elements.enumerated().compactMap { index, element in
-                    let title = (try? element.text())?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-                    let rawHref = (try? element.attr("href"))?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-                    let absUrl = htmlExtractor.absolutize(rawHref, base: response.url)
-                    guard isValidChapter(title: title, url: absUrl, pageURL: response.url, bookURL: book.bookUrl) else { return nil }
-                    let metadata = chapterMetadata(from: element, rule: source.ruleToc, variables: variables, baseURL: response.url)
-                    return BookChapter(title: title, url: absUrl, bookUrl: book.bookUrl, index: index, isVip: metadata.isVip, updateTime: metadata.updateTime, volumeName: metadata.volumeName)
+                    makeChapter(
+                        from: element,
+                        index: index,
+                        book: book,
+                        response: response,
+                        variables: variables,
+                        nameRule: nameRule,
+                        urlRule: urlRule,
+                        tocRule: source.ruleToc,
+                        isVolumeRule: isVolumeRule,
+                        currentVolume: &currentVolume,
+                        fallbackToAnchor: true
+                    )
                 }
             }
             if chapters.isEmpty {
@@ -233,17 +236,38 @@ struct ChapterListParser {
                         try htmlExtractor.select(from: root, rule: sel, baseUrl: response.url)
                     }), !altElements.isEmpty else { continue }
                     let altChapters = altElements.enumerated().compactMap { index, element -> BookChapter? in
-                        let title = ((try? htmlExtractor.value(from: element, rule: nameRule, fallback: "a@text", baseUrl: response.url, variables: variables)) ?? (try? element.text()) ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
-                        let rawUrl = ((try? htmlExtractor.value(from: element, rule: urlRule, fallback: "a@href", baseUrl: response.url, variables: variables)) ?? (try? element.attr("href")) ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
-                        let absUrl = htmlExtractor.absolutize(rawUrl, base: response.url)
-                        guard isValidChapter(title: title, url: absUrl, pageURL: response.url, bookURL: book.bookUrl) else { return nil }
-                        let metadata = chapterMetadata(from: element, rule: source.ruleToc, variables: variables, baseURL: response.url)
-                        return BookChapter(title: title, url: absUrl, bookUrl: book.bookUrl, index: index, isVip: metadata.isVip, updateTime: metadata.updateTime, volumeName: metadata.volumeName)
+                        makeChapter(
+                            from: element,
+                            index: index,
+                            book: book,
+                            response: response,
+                            variables: variables,
+                            nameRule: nameRule,
+                            urlRule: urlRule,
+                            tocRule: source.ruleToc,
+                            isVolumeRule: isVolumeRule,
+                            currentVolume: &currentVolume
+                        )
                     }
                     if !altChapters.isEmpty {
                         chapters = altChapters
                         break
                     }
+                }
+            }
+            // Volume rows are consumed rather than emitted, so renumber the
+            // surviving rows to keep `index` contiguous on every HTML path.
+            if !chapters.isEmpty {
+                chapters = chapters.enumerated().map { offset, chapter in
+                    BookChapter(
+                        title: chapter.title,
+                        url: chapter.url,
+                        bookUrl: chapter.bookUrl,
+                        index: offset,
+                        isVip: chapter.isVip,
+                        updateTime: chapter.updateTime,
+                        volumeName: chapter.volumeName
+                    )
                 }
             }
             var next: String?
@@ -254,13 +278,18 @@ struct ChapterListParser {
 
             return chapters.isEmpty
                 ? .failure(.empty("Chapter list is empty"))
-                : .success(ChapterListPage(chapters: chapters, nextTocUrl: next))
+                : .success(ChapterListPage(chapters: chapters, nextTocUrl: next, trailingVolume: currentVolume))
         } catch {
             return .failure(.rule(error.localizedDescription))
         }
     }
 
-    private func parseJSON(source: BookSource, book: BookDetail, response: SourceResponse) -> Result<ChapterListPage, SourceEngineError> {
+    private func parseJSON(
+        source: BookSource,
+        book: BookDetail,
+        response: SourceResponse,
+        inheritedVolume: String?
+    ) -> Result<ChapterListPage, SourceEngineError> {
         let bookMap: [String: Any] = [
             "name": book.name,
             "author": book.author ?? "",
@@ -308,7 +337,7 @@ struct ChapterListParser {
         let nextRule = htmlExtractor.firstRule(source.ruleToc, keys: ["nextTocUrl", "nextChapterUrl", "nextUrl"])
 
         let isVolumeRule = source.ruleToc?.fields["isVolume"]
-        var currentVolume: String?
+        var currentVolume: String? = inheritedVolume
         var chapters: [BookChapter] = []
         for item in items {
             let title = jsonExtractor.string(
@@ -380,7 +409,74 @@ struct ChapterListParser {
 
         return chapters.isEmpty
             ? .failure(.empty("JSON chapter list is empty"))
-            : .success(ChapterListPage(chapters: chapters, nextTocUrl: next))
+            : .success(ChapterListPage(chapters: chapters, nextTocUrl: next, trailingVolume: currentVolume))
+    }
+
+    /// Builds one chapter row from a TOC element.  Volume rows are consumed
+    /// here: Legado keeps them as `BookChapter(isVolume=true)`, while this app
+    /// renders volume headings from `volumeName`, so a volume row only updates
+    /// the volume inherited by the chapters that follow it.
+    private func makeChapter(
+        from element: Element,
+        index: Int,
+        book: BookDetail,
+        response: SourceResponse,
+        variables: [String: Any],
+        nameRule: String?,
+        urlRule: String?,
+        tocRule: SourceRule?,
+        isVolumeRule: String?,
+        currentVolume: inout String?,
+        fallbackToAnchor: Bool = false
+    ) -> BookChapter? {
+        let title: String
+        let rawURL: String
+        if fallbackToAnchor {
+            title = ((try? element.text()) ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+            rawURL = ((try? element.attr("href")) ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        } else {
+            // A configured rule can select a node whose attribute/text is empty.
+            // Treat that exactly like a missing rule and fall back to the
+            // element itself, otherwise a TOC with slightly different markup
+            // silently drops every chapter.
+            var extractedTitle = ((try? htmlExtractor.value(from: element, rule: nameRule, fallback: "a@text", baseUrl: response.url, variables: variables)) ?? "")
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+            if extractedTitle.isEmpty {
+                extractedTitle = ((try? element.text()) ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+            }
+            title = extractedTitle
+
+            var extractedURL = ((try? htmlExtractor.value(from: element, rule: urlRule, fallback: "a@href", baseUrl: response.url, variables: variables)) ?? "")
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+            if extractedURL.isEmpty {
+                extractedURL = ((try? element.attr("href")) ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+            }
+            rawURL = extractedURL
+        }
+
+        let volumeRaw = isVolumeRule.flatMap { rule in
+            try? htmlExtractor.value(from: element, rule: rule, fallback: nil, baseUrl: response.url, variables: variables)
+        }
+        if isVolumeValue(volumeRaw) {
+            let volumeTitle = title.isEmpty
+                ? ((try? element.text()) ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+                : title
+            if !volumeTitle.isEmpty { currentVolume = volumeTitle }
+            return nil
+        }
+
+        let absURL = htmlExtractor.absolutize(rawURL, base: response.url)
+        guard isValidChapter(title: title, url: absURL, pageURL: response.url, bookURL: book.bookUrl) else { return nil }
+        let metadata = chapterMetadata(from: element, rule: tocRule, variables: variables, baseURL: response.url)
+        return BookChapter(
+            title: title,
+            url: absURL,
+            bookUrl: book.bookUrl,
+            index: index,
+            isVip: metadata.isVip,
+            updateTime: metadata.updateTime,
+            volumeName: metadata.volumeName ?? currentVolume
+        )
     }
 
     private func isValidChapter(title: String, url: String, pageURL: URL, bookURL: String) -> Bool {
@@ -425,6 +521,10 @@ struct ChapterListParser {
 struct ChapterListPage: Equatable, Sendable {
     let chapters: [BookChapter]
     let nextTocUrl: String?
+    /// Volume in effect at the end of this page.  Paginated TOCs feed this into
+    /// the next page as `inheritedVolume`, so a volume that starts on one page
+    /// keeps applying to the chapters on the following pages.
+    var trailingVolume: String? = nil
 
 }
 

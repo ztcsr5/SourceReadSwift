@@ -181,6 +181,80 @@ final class ChapterListMetadataTests: XCTestCase {
         XCTAssertEqual(network.requestedURLs, [bootstrapURL, tocURL])
     }
 
+    func testPaginationInheritsVolumeFromPreviousPage() async throws {
+        let tocURL = "https://fixture.example/book/paged-volume/toc"
+        let page2URL = "https://fixture.example/book/paged-volume/toc?page=2"
+        let source = BookSource(
+            bookSourceName: "Paged volume fixture",
+            bookSourceUrl: "https://fixture.example",
+            ruleToc: SourceRule(fields: [
+                "chapterList": "div.catalog h3, div.catalog a",
+                "chapterName": "h3.volume@text||a@text",
+                "chapterUrl": "a@href",
+                "isVolume": "h3.volume@text",
+                "nextTocUrl": "a.next@href"
+            ])
+        )
+        let network = ChapterFixtureNetworkClient(responses: [
+            tocURL: """
+                <html><body>
+                  <div class="catalog">
+                    <h3 class="volume">第一卷</h3>
+                    <a href="/chapter/1">第一章</a>
+                    <h3 class="volume">第二卷</h3>
+                  </div>
+                  <a class="next" href="\(page2URL)">下一页</a>
+                </body></html>
+                """,
+            page2URL: """
+                <html><body>
+                  <div class="catalog">
+                    <a href="/chapter/2">第二章</a>
+                  </div>
+                </body></html>
+                """
+        ])
+        let engine = LegadoSourceEngine(network: network)
+
+        let chapters = try await unwrap(engine.getChapterList(source: source, book: makeBook(tocURL: tocURL)))
+
+        XCTAssertEqual(chapters.map(\.title), ["第一章", "第二章"])
+        XCTAssertEqual(chapters.map(\.volumeName), ["第一卷", "第二卷"])
+        XCTAssertEqual(chapters.map(\.index), [0, 1])
+        XCTAssertEqual(network.requestedURLs, [tocURL, page2URL])
+    }
+
+    func testHTMLFallbackRulesConsumeVolumeRowsAndInheritVolume() async throws {
+        let tocURL = "https://fixture.example/book/html-fallback-volume/toc"
+        let source = BookSource(
+            bookSourceName: "HTML fallback volume fixture",
+            bookSourceUrl: "https://fixture.example",
+            ruleToc: SourceRule(fields: [
+                "chapterList": "div.catalog h3, div.catalog a",
+                "chapterName": "span@text",
+                "chapterUrl": "span@data-href",
+                "isVolume": "h3.volume@text"
+            ])
+        )
+        let network = ChapterFixtureNetworkClient(responses: [
+            tocURL: """
+                <html><body>
+                  <div class="catalog">
+                    <h3 class="volume">第一卷</h3>
+                    <a href="/chapter/1">第一章</a>
+                  </div>
+                </body></html>
+                """
+        ])
+        let engine = LegadoSourceEngine(network: network)
+
+        let chapters = try await unwrap(engine.getChapterList(source: source, book: makeBook(tocURL: tocURL)))
+
+        XCTAssertEqual(chapters.map(\.title), ["第一章"])
+        XCTAssertEqual(chapters.map(\.volumeName), ["第一卷"])
+        XCTAssertEqual(chapters.map(\.index), [0])
+    }
+
     private func makeBook(tocURL: String) -> BookDetail {
         BookDetail(
             name: "Fixture Book",

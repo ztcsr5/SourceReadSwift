@@ -302,6 +302,32 @@ final class LegadoNativeBridgeTests: XCTestCase {
         XCTAssertEqual(value, "VIP 1|true")
     }
 
+    func testChapterBridgeUsesRealVipFlagInsteadOfTitleHeuristic() throws {
+        let runtime = JSCoreRuntime()
+        let normalTitleButVip = BookChapter(
+            title: "普通章节",
+            url: "https://example.com/1",
+            bookUrl: "https://example.com",
+            index: 0,
+            isVip: true
+        )
+        let vipTitleButFree = BookChapter(
+            title: "VIP 章节",
+            url: "https://example.com/2",
+            bookUrl: "https://example.com",
+            index: 1,
+            isVip: false
+        )
+
+        let first = runtime.evaluate("chapter.isVip()", variables: ["chapter": normalTitleButVip])
+        guard case .success(let firstValue) = first else { return XCTFail("expected success") }
+        XCTAssertEqual(firstValue, "true")
+
+        let second = runtime.evaluate("chapter.isVip()", variables: ["chapter": vipTitleButFree])
+        guard case .success(let secondValue) = second else { return XCTFail("expected success") }
+        XCTAssertEqual(secondValue, "false")
+    }
+
     func testFilesystemObjectAndBinaryWriteFacadeStayInSandbox() throws {
         let runtime = JSCoreRuntime()
         let result = runtime.evaluate("""

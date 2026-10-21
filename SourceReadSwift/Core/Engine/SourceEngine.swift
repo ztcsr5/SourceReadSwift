@@ -938,9 +938,15 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
         source: BookSource,
         book: BookDetail,
         response: SourceResponse,
+        inheritedVolume: String? = nil,
         executionContext: RuleExecutionContext = RuleExecutionContext()
     ) -> Result<ChapterListPage, SourceEngineError> {
-        return ChapterListParser(executionContext: executionContext).parsePage(source: source, book: book, response: response)
+        return ChapterListParser(executionContext: executionContext).parsePage(
+            source: source,
+            book: book,
+            response: response,
+            inheritedVolume: inheritedVolume
+        )
     }
 
     /// Runs the Legado `ruleToc.preUpdateJs` hook once, immediately before the
@@ -1078,6 +1084,7 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
         // duplicate chapter rows, even when the duplicate URLs differ only by
         // case, fragments or percent-encoding.
         var chapters = deduplicatedChapters(firstPage.chapters, identity: urlIdentity)
+        var inheritedVolume = firstPage.trailingVolume
         guard maxPages > 1 else {
             return chapters.isEmpty ? .failure(.empty("Chapter list is empty")) : .success(chapters)
         }
@@ -1125,8 +1132,9 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
                 seenURLs.insert(responseCanonicalURL)
                 let state = persistentState(for: source)
                 let transformedResponse = transformBodyIfNeeded(response, source: source, rules: [source.ruleToc], network: network, stateOverride: state, executionContext: executionContext)
-                switch parseChapterListPage(source: source, book: book, response: transformedResponse, executionContext: executionContext) {
+                switch parseChapterListPage(source: source, book: book, response: transformedResponse, inheritedVolume: inheritedVolume, executionContext: executionContext) {
                 case .success(let page):
+                    inheritedVolume = page.trailingVolume ?? inheritedVolume
                     let uniquePageChapters = page.chapters.filter { chapter in
                         let key = chapterURLIdentity(chapter.url, identity: urlIdentity)
                         return !chapters.contains { chapterURLIdentity($0.url, identity: urlIdentity) == key }
