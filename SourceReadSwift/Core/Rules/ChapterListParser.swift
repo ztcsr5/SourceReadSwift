@@ -389,7 +389,7 @@ struct ChapterListParser {
                     rule: htmlExtractor.firstRule(source.ruleToc, keys: ["wordCount", "wordNum", "words"]),
                     fallbackKeys: ["wordCount", "wordNum", "words", "word_count"],
                     variables: variables
-                )
+                )?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty
             ))
         }
 
@@ -554,7 +554,12 @@ private extension ChapterListParser {
             }
             if let parent = element.parent(),
                let value = try? htmlExtractor.value(from: parent, rule: ruleValue, fallback: nil, baseUrl: baseURL, variables: variables),
-               let trimmed = value.nilIfEmpty {
+               let trimmed = value.nilIfEmpty,
+               !trimmed.contains("\n") {
+                // A parent-level fallback matches every sibling anchor, which
+                // concatenates values from several chapters ("3200字\n4100字").
+                // A single chapter's metadata is never a multi-line value, so
+                // reject the aggregate instead of assigning it to one row.
                 return trimmed
             }
             return nil
