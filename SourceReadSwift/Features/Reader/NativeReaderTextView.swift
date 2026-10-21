@@ -580,7 +580,7 @@ struct NativeReaderTextView: UIViewRepresentable {
                 fractionOfDistanceBetweenInsertionPoints: &fraction
             )
             let characterIndex = min(max(rawIndex, 0), length - 1)
-            let glyphIndex = textView.layoutManager.glyphIndex(for: characterIndex, in: textView.textContainer)
+            let glyphIndex = textView.layoutManager.glyphIndexForCharacter(at: characterIndex)
             guard glyphIndex < textView.layoutManager.numberOfGlyphs else { return nil }
             let lineRect = textView.layoutManager.lineFragmentRect(forGlyphAt: glyphIndex, effectiveRange: nil)
             let progress = lineRect.height > 0
@@ -599,7 +599,7 @@ struct NativeReaderTextView: UIViewRepresentable {
                   textView.textStorage.length > 0 else { return }
             textView.layoutManager.ensureLayout(for: textView.textContainer)
             let safeIndex = min(max(characterIndex, 0), textView.textStorage.length - 1)
-            let glyphIndex = textView.layoutManager.glyphIndex(for: safeIndex, in: textView.textContainer)
+            let glyphIndex = textView.layoutManager.glyphIndexForCharacter(at: safeIndex)
             guard glyphIndex < textView.layoutManager.numberOfGlyphs else { return }
             let lineRect = textView.layoutManager.lineFragmentRect(forGlyphAt: glyphIndex, effectiveRange: nil)
             let textY = lineRect.minY + lineRect.height * anchor.lineProgress
@@ -1156,3 +1156,4 @@ enum ReaderNativeTextLayout {
         }
     }
 }
+
