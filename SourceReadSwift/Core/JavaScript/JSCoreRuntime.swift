@@ -412,11 +412,24 @@ final class JSCoreRuntime {
                         return java.put('book.variable', book.variable);
                     };
                     book.putVariable = book.setVariable;
-                    book.setReverseToc = function(reverse) {
-                        book.reverseToc = Boolean(reverse);
-                        return book.reverseToc;
-                    };
-                    book.getReverseToc = function() { return Boolean(book.reverseToc); };
+                    // `book` can be a native bridge object, which does not
+                    // export `setReverseToc`.  Install the shim only when
+                    // JavaScript really lacks it, and hand the flag to the
+                    // engine through `java.put`: the native object is rebuilt
+                    // for every evaluate call, so a plain JS property would be
+                    // lost between the paginated TOC pages.
+                    if (typeof book.setReverseToc !== 'function') {
+                        book.setReverseToc = function(reverse) {
+                            book.reverseToc = Boolean(reverse);
+                            if (typeof java !== 'undefined' && java && java.put) {
+                                java.put('book.reverseToc', book.reverseToc ? 'true' : 'false');
+                            }
+                            return book.reverseToc;
+                        };
+                    }
+                    if (typeof book.getReverseToc !== 'function') {
+                        book.getReverseToc = function() { return Boolean(book.reverseToc); };
+                    }
                 }
                 """
                 context.evaluateScript(injectScript)
@@ -2774,11 +2787,18 @@ final class JSCoreRuntime {
             if (arguments.length === 0 || key == null) return book.getVariable('custom');
             return book.getVariable(key);
           };
-          book.setReverseToc = function(reverse) {
-            book.reverseToc = Boolean(reverse);
-            return book.reverseToc;
-          };
-          book.getReverseToc = function() { return Boolean(book.reverseToc); };
+          if (typeof book.setReverseToc !== 'function') {
+            book.setReverseToc = function(reverse) {
+              book.reverseToc = Boolean(reverse);
+              if (typeof java !== 'undefined' && java && java.put) {
+                java.put('book.reverseToc', book.reverseToc ? 'true' : 'false');
+              }
+              return book.reverseToc;
+            };
+          }
+          if (typeof book.getReverseToc !== 'function') {
+            book.getReverseToc = function() { return Boolean(book.reverseToc); };
+          }
           book.variableMap = book.variableMap || {
             get: function(k) { return book.getVariable(k); },
             put: function(k,v) { return book.setVariable(k,v); },

@@ -255,6 +255,63 @@ final class ChapterListMetadataTests: XCTestCase {
         XCTAssertEqual(chapters.map(\.index), [0])
     }
 
+    func testReverseTocFlagReversesCollectedChapterList() async throws {
+        let tocURL = "https://fixture.example/book/reversed/toc"
+        let source = BookSource(
+            bookSourceName: "reverseToc fixture",
+            bookSourceUrl: "https://fixture.example",
+            ruleToc: SourceRule(fields: [
+                "preUpdateJs": "book.setReverseToc(true)",
+                "chapterList": "div.catalog a",
+                "chapterName": "a@text",
+                "chapterUrl": "a@href"
+            ])
+        )
+        let network = ChapterFixtureNetworkClient(responses: [
+            tocURL: """
+                <html><body><div class="catalog">
+                  <a href="/chapter/3">第三章</a>
+                  <a href="/chapter/2">第二章</a>
+                  <a href="/chapter/1">第一章</a>
+                </div></body></html>
+                """
+        ])
+        let engine = LegadoSourceEngine(network: network)
+
+        let chapters = try await unwrap(engine.getChapterList(source: source, book: makeBook(tocURL: tocURL)))
+
+        XCTAssertEqual(chapters.map(\.title), ["第一章", "第二章", "第三章"])
+        XCTAssertEqual(chapters.map(\.index), [0, 1, 2])
+    }
+
+    func testReverseTocFlagStaysOffWhenSourceDoesNotRequestIt() async throws {
+        let tocURL = "https://fixture.example/book/not-reversed/toc"
+        let source = BookSource(
+            bookSourceName: "no reverseToc fixture",
+            bookSourceUrl: "https://fixture.example",
+            ruleToc: SourceRule(fields: [
+                "preUpdateJs": "book.setReverseToc(false)",
+                "chapterList": "div.catalog a",
+                "chapterName": "a@text",
+                "chapterUrl": "a@href"
+            ])
+        )
+        let network = ChapterFixtureNetworkClient(responses: [
+            tocURL: """
+                <html><body><div class="catalog">
+                  <a href="/chapter/1">第一章</a>
+                  <a href="/chapter/2">第二章</a>
+                </div></body></html>
+                """
+        ])
+        let engine = LegadoSourceEngine(network: network)
+
+        let chapters = try await unwrap(engine.getChapterList(source: source, book: makeBook(tocURL: tocURL)))
+
+        XCTAssertEqual(chapters.map(\.title), ["第一章", "第二章"])
+        XCTAssertEqual(chapters.map(\.index), [0, 1])
+    }
+
     private func makeBook(tocURL: String) -> BookDetail {
         BookDetail(
             name: "Fixture Book",

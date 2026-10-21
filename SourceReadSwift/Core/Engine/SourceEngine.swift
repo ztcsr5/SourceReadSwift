@@ -352,6 +352,10 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
         // script is a side-effect hook (`java.put`, `java.ajax`, cookie
         // refresh), so its return value is intentionally ignored; a failure
         // must not block the TOC, it only leaves a diagnostic.
+        // `book.setReverseToc` is a per-run signal; the persistent store is
+        // per-source, so clear the in-memory flag to make sure only this TOC's
+        // preUpdateJs can flip the chapter order.
+        executionContext.setValue(nil, for: "book.reverseToc")
         runTocPreUpdateJs(
             source: source,
             book: book,
@@ -402,8 +406,12 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
             )
             switch result {
             case .success(let chapters):
+                // `book.setReverseToc(true)` (recorded by the JS bridge during
+                // preUpdateJs) restores reading order before titles are
+                // formatted, so `formatJs` sees the final 1-based index.
+                let ordered = applyReverseTocIfNeeded(chapters, executionContext: executionContext)
                 let formatted = applyTocFormatJs(
-                    chapters,
+                    ordered,
                     source: source,
                     executionContext: executionContext
                 )
@@ -990,6 +998,49 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
         if case .failure(let error) = outcome {
             executionContext.log("toc.preUpdateJs failed: \(error)")
         }
+    }
+
+    /// Legado lets a TOC rule flip the whole chapter list with
+    /// `book.setReverseToc(true)` (sources that list newest chapters first use
+    /// it to restore reading order).  The JavaScript bridge records the flag as
+    /// `book.reverseToc`; the engine applies it once the complete paginated TOC
+    /// has been collected and before `formatJs` runs, so formatted titles use
+    /// the final reading order and indices stay contiguous.  The flag is read
+    /// from the current execution context only: it is a per-run signal, not a
+    /// per-book setting,
+    /// so one book cannot silently reverse another book of the same source.
+    private func applyReverseTocIfNeeded(
+        _ chapters: [BookChapter],
+        executionContext: RuleExecutionContext
+    ) -> [BookChapter] {
+        guard chapters.count > 1 else { return chapters }
+        let raw = executionContext.value(for: "book.reverseToc")
+        guard Self.isTruthyFlag(raw) else { return chapters }
+        return chapters.reversed().enumerated().map { offset, chapter in
+            BookChapter(
+                title: chapter.title,
+                url: chapter.url,
+                bookUrl: chapter.bookUrl,
+                index: offset,
+                isVip: chapter.isVip,
+                updateTime: chapter.updateTime,
+                volumeName: chapter.volumeName
+            )
+        }
+    }
+
+    /// Accepts the shapes `book.setReverseToc` receives: a JS boolean, the
+    /// stringified form the bridge persists, or NSNumber coming back through
+    /// JavaScriptCore.
+    private static func isTruthyFlag(_ value: Any?) -> Bool {
+        guard let value, !(value is NSNull) else { return false }
+        if let bool = value as? Bool { return bool }
+        if let number = value as? NSNumber { return number.boolValue }
+        if let text = value as? String {
+            let normalized = text.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+            return !["", "false", "0", "no", "null", "undefined"].contains(normalized)
+        }
+        return false
     }
 
     /// Legado runs `ruleToc.formatJs` once the complete TOC (including every

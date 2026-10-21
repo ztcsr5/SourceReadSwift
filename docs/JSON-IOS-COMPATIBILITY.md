@@ -120,7 +120,7 @@ Legado 目录规则里两个直接影响目录展示的字段已经进入主链�
 }
 ```
 
-卷行（`isVolume` 为 `true` / `"true"` / `"yes"` / `1` 等非空真值）不生成章节，而是写入后续章节的 `volumeName`；`false` / `"false"` / `"no"` / `"0"` / `null` / 空串按普通章节处理。HTML 与 JSON 两条解析路径行为一致，卷行跳过后章节 `index` 保持连续。当前边界：分页目录的卷标题不跨页继承，每页重新开始。
+卷行（`isVolume` 为 `true` / `"true"` / `"yes"` / `1` 等非空真值）不生成章节，而是写入后续章节的 `volumeName`；`false` / `"false"` / `"no"` / `"0"` / `null` / 空串按普通章节处理。HTML 与 JSON 两条解析路径行为一致，卷行跳过后章节 `index` 保持连续；HTML 主选择器、HTML fallback 与备选选择器三条路径都经过同一个 `makeChapter`，卷行在其中统一消费。分页目录的卷标题跨页继承：`ChapterListPage.trailingVolume` 记录本页结束时的卷名，`appendNextChapterListPages` 把它作为 `inheritedVolume` 传给下一页，因此“第二卷”出现在第 1 页末尾时，第 2 页的章节仍然挂在“第二卷”下。回归用例：`ChapterListMetadataTests.testPaginationInheritsVolumeFromPreviousPage`、`testHTMLFallbackRulesConsumeVolumeRowsAndInheritVolume`、`testHTMLVolumeRowsBecomeVolumeNamesAndAreNotChapters`。
 
 **`formatJs`（章节名格式化）**
 
@@ -137,7 +137,13 @@ Legado 目录规则里两个直接影响目录展示的字段已经进入主链�
 
 `formatJs` 在全量目录（含 `nextTocUrl` 分页）收集完成、章节索引定稿后执行；变量为 `title`、1-based `index`、`chapter`（LegadoBookChapterBridge）与 `gInt`（与 Legado `BookChapterList.kt` 的 `bindings["index"] = index + 1` 对齐）。返回空值 / `undefined` / `null` 或单章抛错时回退原标题，不影响其他章节；支持 `@js:` 与 `<js>...</js>` 两种包装，脚本顶层 `return` 会自动以函数包装重试一次。回归用例：`ChapterListMetadataTests.testFormatJsRunsAfterPaginationWithOneBasedIndex`。
 
-这两项不改变“能力矩阵 + 降级边界”的口径：`preUpdateJs` 仍未执行，目录 `wordCount` 仍未在 UI 展示。
+**`reverseToc`（目录倒序）**
+
+书源在 `ruleToc.preUpdateJs` 里调用 `book.setReverseToc(true)` 时，JS 桥会把标记写入 `java.put('book.reverseToc', ...)`；引擎在“全部目录分页收集完成 + `formatJs` 执行完成”之后读取该标记，倒序整份章节表并把 `index` 重新编号为连续值。标记只在本次目录执行上下文内有效，不是按书持久化设置，因此同一书源的另一本书不会被串改。回归用例：`ChapterListMetadataTests.testReverseTocFlagReversesCollectedChapterList`、`testReverseTocFlagStaysOffWhenSourceDoesNotRequestIt`。
+
+`BookChapter.isVip` 现在以真实字段为准：原生 `LegadoBookChapterBridge.isVip()` 返回解析出的 `isVip`，JS 注入只在目标是普通字典（没有原生方法）时才安装“按标题猜 VIP”的 fallback，避免覆盖原生实现。回归用例：`LegadoNativeBridgeTests.testChapterBridgeUsesRealVipFlagInsteadOfTitleHeuristic`。
+
+这三项不改变“能力矩阵 + 降级边界”的口径：目录 `wordCount` 仍未在 UI 展示。
 
 ## 4. 为什么“完美兼容”很难
 
@@ -181,11 +187,12 @@ Legado 目录规则里两个直接影响目录展示的字段已经进入主链�
 
 | 优先级 | 工作 | 验收 |
 |---|---|---|
-| P0（已完成） | `isVolume` / `formatJs` 目录链路 | `ChapterListMetadataTests` 5 个用例通过 |
+| P0（已完成） | `isVolume` / `formatJs` 目录链路 + 跨页卷继承 | `ChapterListMetadataTests` 通过 |
 | P0 | 为 `startBrowserAwait` / 验证码建立 UI 状态机 | 不再返回假成功，UI 有明确状态 |
 | P1 | 把 JSONPath 方言差异写成可执行用例 | 每个差异至少一个 XCTest |
 | P1 | 为 `java.*` stub 建立运行时诊断 | 调用时记录 API 名、源、章节、失败原因 |
-| P2 | 图片正文 `imageDecode` / `imageStyle` | 明确原生渲染或 WebView 渲染边界 |
+| P1（部分完成） | 图片正文 `imageDecode` | `ruleContent.imageDecode` 已接入（`@js:` / `<js>` / `java.` / `##pattern##replacement##`，空结果保留原 URL，相对结果按 baseUrl 绝对化）；`imageStyle` 仍是展示层参数 |
+| P2 | 图片正文 `imageStyle` 渲染策略 | 明确原生渲染或 WebView 渲染边界 |
 | P2 | 7z/RAR 替代方案 | 导入时提示 ZIP/预解压，不在运行时静默空值 |
 
 ## 7. 复现与验证
