@@ -272,7 +272,9 @@ struct NativeReaderTextView: UIViewRepresentable {
         private var hasAppliedInitialScrollTarget = false
         private var didFireNearBottom = false
         private var isProgrammaticScrolling = false
-        private var inFlightIllustrationLoads: Set<URL> = []
+        private var illustrationLoadTask: Task<Void, Never>?
+        private var illustrationGeneration = 0
+        private static let illustrationLoadConcurrency = 4
 
         init(
             onVisibleParagraph: @escaping (Int) -> Void,
@@ -403,7 +405,7 @@ struct NativeReaderTextView: UIViewRepresentable {
             }
         }
 
-        private func rebuild(textView: UITextView, configuration: Configuration) {
+        private func rebuild(textView: UITextView, configuration: Configuration, restartIllustrationLoads: Bool = true) {
             let result = ReaderNativeTextLayout.makeAttributedText(configuration: configuration)
             paragraphRanges = result.paragraphRanges
             lastHighlightedParagraph = -1
@@ -419,7 +421,9 @@ struct NativeReaderTextView: UIViewRepresentable {
             textView.layoutManager.ensureLayout(for: textView.textContainer)
             textView.setNeedsLayout()
             textView.layoutIfNeeded()
-            loadIllustrations(for: configuration, in: textView)
+            if restartIllustrationLoads {
+                loadIllustrations(for: configuration, in: textView)
+            }
         }
 
         private func updateInsets(in textView: UITextView, configuration: Configuration) {
@@ -496,33 +500,117 @@ struct NativeReaderTextView: UIViewRepresentable {
 
         private func loadIllustrations(for config: Configuration, in textView: UITextView) {
             let imageURLs = config.paragraphs.compactMap { ReaderImageSizingPolicy.imageURL(in: $0) }
-            guard !imageURLs.isEmpty else { return }
-
-            let missingURLs = imageURLs.filter { url in
-                RemoteImageLoader.shared.cachedImage(for: url) == nil && !inFlightIllustrationLoads.contains(url)
-            }
-            guard !missingURLs.isEmpty else { return }
-
-            for url in missingURLs {
-                inFlightIllustrationLoads.insert(url)
+            guard !imageURLs.isEmpty else {
+                illustrationLoadTask?.cancel()
+                illustrationLoadTask = nil
+                illustrationGeneration += 1
+                return
             }
 
-            Task { @MainActor [weak self, weak textView] in
+            let missingURLs = imageURLs.filter { RemoteImageLoader.shared.cachedImage(for: $0) == nil }
+            guard !missingURLs.isEmpty else {
+                illustrationLoadTask?.cancel()
+                illustrationLoadTask = nil
+                illustrationGeneration += 1
+                return
+            }
+
+            // A typography change or a new chapter invalidates the previous
+            // batch. Keep exactly one loader driving rebuilds for this surface.
+            illustrationLoadTask?.cancel()
+            illustrationGeneration += 1
+            let generation = illustrationGeneration
+            let chunks = stride(from: 0, to: missingURLs.count, by: Self.illustrationLoadConcurrency).map {
+                Array(missingURLs[$0..<min($0 + Self.illustrationLoadConcurrency, missingURLs.count)])
+            }
+            let headers = config.imageHeaders
+
+            illustrationLoadTask = Task { @MainActor [weak self, weak textView] in
                 guard let self, let textView else { return }
-                var anyLoaded = false
-                for url in missingURLs {
-                    let loaded = await RemoteImageLoader.shared.image(for: url, headers: config.imageHeaders)
-                    self.inFlightIllustrationLoads.remove(url)
-                    if loaded != nil {
-                        anyLoaded = true
+                defer {
+                    if self.illustrationGeneration == generation {
+                        self.illustrationLoadTask = nil
                     }
                 }
 
-                guard anyLoaded, self.configuration?.contentFingerprint == config.contentFingerprint else { return }
-                let currentOffset = textView.contentOffset
-                self.rebuild(textView: textView, configuration: config)
-                self.setContentOffsetIfNeeded(currentOffset, in: textView)
+                for chunk in chunks {
+                    guard !Task.isCancelled, self.illustrationGeneration == generation else { return }
+                    var loadedInChunk = false
+                    await withTaskGroup(of: (URL, Bool).self) { group in
+                        for url in chunk {
+                            group.addTask {
+                                let image = await RemoteImageLoader.shared.image(for: url, headers: headers)
+                                return (url, image != nil)
+                            }
+                        }
+                        for await (_, loaded) in group where loaded {
+                            loadedInChunk = true
+                        }
+                    }
+
+                    guard !Task.isCancelled,
+                          self.illustrationGeneration == generation,
+                          self.configuration?.contentFingerprint == config.contentFingerprint else { return }
+                    guard loadedInChunk else { continue }
+
+                    // Images above the viewport get taller when their real
+                    // bitmap replaces the placeholder. Reusing an absolute
+                    // contentOffset makes the current paragraph jump; anchor
+                    // the top visible character instead and restore it after
+                    // the rebuilt layout pass.
+                    let anchor = self.captureScrollAnchor(in: textView)
+                    self.rebuild(textView: textView, configuration: config, restartIllustrationLoads: false)
+                    self.restoreScrollAnchor(anchor, in: textView)
+                }
             }
+        }
+
+        private func captureScrollAnchor(in textView: UITextView) -> ReaderScrollAnchorPolicy.Anchor? {
+            guard !paragraphRanges.isEmpty, textView.bounds.height > 0 else { return nil }
+            let length = textView.textStorage.length
+            guard length > 0 else { return nil }
+            textView.layoutManager.ensureLayout(for: textView.textContainer)
+
+            let contentTop = textView.contentOffset.y + textView.textContainerInset.top
+            let probe = CGPoint(x: 0, y: max(0, contentTop))
+            var fraction: CGFloat = 0
+            let rawIndex = textView.layoutManager.characterIndex(
+                for: probe,
+                in: textView.textContainer,
+                fractionOfDistanceBetweenInsertionPoints: &fraction
+            )
+            let characterIndex = min(max(rawIndex, 0), length - 1)
+            let glyphIndex = textView.layoutManager.glyphIndex(for: characterIndex, in: textView.textContainer)
+            guard glyphIndex < textView.layoutManager.numberOfGlyphs else { return nil }
+            let lineRect = textView.layoutManager.lineFragmentRect(forGlyphAt: glyphIndex, effectiveRange: nil)
+            let progress = lineRect.height > 0
+                ? min(max((contentTop - lineRect.minY) / lineRect.height, 0), 1)
+                : 0
+            return ReaderScrollAnchorPolicy.anchor(
+                paragraphRanges: paragraphRanges,
+                characterIndex: characterIndex,
+                lineProgress: progress
+            )
+        }
+
+        private func restoreScrollAnchor(_ anchor: ReaderScrollAnchorPolicy.Anchor?, in textView: UITextView) {
+            guard let anchor,
+                  let characterIndex = ReaderScrollAnchorPolicy.characterIndex(for: anchor, in: paragraphRanges),
+                  textView.textStorage.length > 0 else { return }
+            textView.layoutManager.ensureLayout(for: textView.textContainer)
+            let safeIndex = min(max(characterIndex, 0), textView.textStorage.length - 1)
+            let glyphIndex = textView.layoutManager.glyphIndex(for: safeIndex, in: textView.textContainer)
+            guard glyphIndex < textView.layoutManager.numberOfGlyphs else { return }
+            let lineRect = textView.layoutManager.lineFragmentRect(forGlyphAt: glyphIndex, effectiveRange: nil)
+            let textY = lineRect.minY + lineRect.height * anchor.lineProgress
+            let targetY = ReaderScrollPositionPolicy.targetContentOffsetY(
+                textRectMinY: textY,
+                textContainerInsetTop: textView.textContainerInset.top,
+                boundsHeight: textView.bounds.height,
+                contentSizeHeight: textView.contentSize.height,
+                adjustedContentInset: textView.adjustedContentInset
+            )
+            setContentOffsetIfNeeded(CGPoint(x: textView.contentOffset.x, y: targetY), in: textView)
         }
 
         private func setContentOffsetIfNeeded(_ offset: CGPoint, in textView: UITextView) {
@@ -694,6 +782,56 @@ enum ReaderScrollPositionPolicy {
         )
         let desiredY = textRectMinY
         return min(max(desiredY, minimumY), maximumY)
+    }
+}
+
+/// Remembers the character at the top of the viewport across a TextKit
+/// rebuild. Paragraph ranges move when an inline attachment changes height,
+/// so an absolute contentOffset cannot be reused; the paragraph index plus
+/// the offset inside that paragraph survives the rebuild.
+enum ReaderScrollAnchorPolicy {
+    struct Anchor: Equatable {
+        let paragraphIndex: Int
+        let characterOffset: Int
+        let lineProgress: CGFloat
+    }
+
+    static func anchor(
+        paragraphRanges: [NSRange],
+        characterIndex: Int,
+        lineProgress: CGFloat
+    ) -> Anchor? {
+        guard !paragraphRanges.isEmpty else { return nil }
+        var lower = 0
+        var upper = paragraphRanges.count
+        while lower < upper {
+            let middle = lower + (upper - lower) / 2
+            if NSMaxRange(paragraphRanges[middle]) <= characterIndex {
+                lower = middle + 1
+            } else {
+                upper = middle
+            }
+        }
+        var index = min(lower, paragraphRanges.count - 1)
+        // A character index can land on the newline that separates two
+        // paragraphs; attribute it to the preceding paragraph in that case.
+        if paragraphRanges[index].location > characterIndex, index > 0 {
+            index -= 1
+        }
+        let range = paragraphRanges[index]
+        let offset = min(max(characterIndex - range.location, 0), max(range.length - 1, 0))
+        return Anchor(
+            paragraphIndex: index,
+            characterOffset: offset,
+            lineProgress: min(max(lineProgress, 0), 1)
+        )
+    }
+
+    static func characterIndex(for anchor: Anchor, in paragraphRanges: [NSRange]) -> Int? {
+        guard paragraphRanges.indices.contains(anchor.paragraphIndex) else { return nil }
+        let range = paragraphRanges[anchor.paragraphIndex]
+        guard range.length > 0 else { return nil }
+        return range.location + min(max(anchor.characterOffset, 0), range.length - 1)
     }
 }
 
