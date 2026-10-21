@@ -10,6 +10,7 @@ struct ChapterContentCacheEntry: Identifiable, Codable, Hashable, Sendable {
     let title: String
     let paragraphs: [String]
     let nextContentUrl: String?
+    let imageStyle: String?
     let purifySignature: String
     let cachedAt: Date
 
@@ -28,6 +29,7 @@ struct ChapterContentCacheEntry: Identifiable, Codable, Hashable, Sendable {
         title: String,
         paragraphs: [String],
         nextContentUrl: String?,
+        imageStyle: String? = nil,
         purifySignature: String,
         cachedAt: Date
     ) {
@@ -39,6 +41,7 @@ struct ChapterContentCacheEntry: Identifiable, Codable, Hashable, Sendable {
         self.title = title
         self.paragraphs = paragraphs
         self.nextContentUrl = nextContentUrl
+        self.imageStyle = imageStyle
         self.purifySignature = purifySignature
         self.cachedAt = cachedAt
     }
@@ -86,7 +89,8 @@ final class ChapterContentCacheStore: ObservableObject {
             chapter: chapter,
             title: entry.title,
             paragraphs: entry.paragraphs,
-            nextContentUrl: entry.nextContentUrl
+            nextContentUrl: entry.nextContentUrl,
+            imageStyle: entry.imageStyle
         )
     }
 
@@ -99,7 +103,8 @@ final class ChapterContentCacheStore: ObservableObject {
             chapter: chapter,
             title: entry.title,
             paragraphs: entry.paragraphs,
-            nextContentUrl: entry.nextContentUrl
+            nextContentUrl: entry.nextContentUrl,
+            imageStyle: entry.imageStyle
         )
     }
 
@@ -117,6 +122,7 @@ final class ChapterContentCacheStore: ObservableObject {
             title: content.title,
             paragraphs: content.paragraphs,
             nextContentUrl: content.nextContentUrl,
+            imageStyle: content.imageStyle,
             purifySignature: purifySignature(purifyRules),
             cachedAt: Date()
         )

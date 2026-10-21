@@ -12,6 +12,20 @@ struct SourceRequestBuilder {
         buildRequest(source: source, resolvedText: urlText, baseURL: baseURL, persistentValues: persistentValues)
     }
 
+    /// Headers a source sends for its own assets; used by the reader to fetch
+    /// illustrations that require the same Referer / User-Agent as the chapter page.
+    func imageRequestHeaders(for source: BookSource) -> [String: String] {
+        var headers = sourceHeaders(source)
+        if !containsHeader(headers, "User-Agent") {
+            headers["User-Agent"] = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+        }
+        if !containsHeader(headers, "Accept") {
+            headers["Accept"] = "image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8"
+        }
+        applyDefaultNavigationHeaders(to: &headers, sourceBase: source.bookSourceUrl, isPostOrPut: false)
+        return headers
+    }
+
     func buildSearchRequest(
         source: BookSource,
         searchUrl: String,

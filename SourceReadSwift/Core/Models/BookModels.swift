@@ -168,6 +168,25 @@ struct ChapterContent: Codable, Hashable, Sendable {
     let title: String
     let paragraphs: [String]
     let nextContentUrl: String?
+    let imageStyle: String?
+
+    init(
+        chapter: BookChapter,
+        title: String,
+        paragraphs: [String],
+        nextContentUrl: String? = nil,
+        imageStyle: String? = nil
+    ) {
+        self.chapter = chapter
+        self.title = title
+        self.paragraphs = paragraphs
+        self.nextContentUrl = nextContentUrl
+        self.imageStyle = imageStyle
+    }
+
+    var readerImageStyle: ReaderImageStyle {
+        ReaderImageStyle(rule: imageStyle)
+    }
 
     var text: String {
         paragraphs.joined(separator: "\n")

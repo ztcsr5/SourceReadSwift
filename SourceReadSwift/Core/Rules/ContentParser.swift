@@ -163,13 +163,14 @@ struct ContentParser {
                 variables: variables
             ).nilIfEmpty
 
+            let style = imageStyleRule(source.ruleContent)
             return paragraphs.isEmpty
                 ? .failure(.empty("正文解析结果为空"))
-                : .success(ChapterContent(chapter: chapter, title: chapter.title, paragraphs: paragraphs, nextContentUrl: next))
+                : .success(ChapterContent(chapter: chapter, title: chapter.title, paragraphs: paragraphs, nextContentUrl: next, imageStyle: style))
         } catch {
             let fallback = extractFallbackParagraphs(from: response.body, baseUrl: response.url, title: chapter.title)
             if !fallback.isEmpty {
-                return .success(ChapterContent(chapter: chapter, title: chapter.title, paragraphs: fallback, nextContentUrl: nil))
+                return .success(ChapterContent(chapter: chapter, title: chapter.title, paragraphs: fallback, nextContentUrl: nil, imageStyle: imageStyleRule(source.ruleContent)))
             }
             return .failure(.rule(error.localizedDescription))
         }
@@ -258,7 +259,13 @@ struct ContentParser {
         }
         return paragraphs.isEmpty
             ? .failure(.empty("JSON \u{6b63}\u{6587}\u{89e3}\u{6790}\u{7ed3}\u{679c}\u{4e3a}\u{7a7a}"))
-            : .success(ChapterContent(chapter: chapter, title: chapter.title, paragraphs: paragraphs, nextContentUrl: next))
+            : .success(ChapterContent(chapter: chapter, title: chapter.title, paragraphs: paragraphs, nextContentUrl: next, imageStyle: imageStyleRule(rule)))
+    }
+
+    /// Legado `ruleContent.imageStyle` – carried with the parsed chapter so the
+    /// reader (not the parser) decides how illustrations are laid out.
+    private func imageStyleRule(_ rule: SourceRule?) -> String? {
+        rule?.fields["imageStyle"]?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty
     }
 
     /// Legado `ruleContent.imageDecode`: rewrite each `[img]url[/img]` URL with

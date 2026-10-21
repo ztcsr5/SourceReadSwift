@@ -31,6 +31,9 @@ struct NativeReaderTextView: UIViewRepresentable {
     let animatedScrollDuration: Double
     let textSelectionEnabled: Bool
     var showChapterEndBadge: Bool = false
+    var imageStyle: ReaderImageStyle = .standard
+    var imageHeaders: [String: String] = [:]
+    var imageColumnWidth: CGFloat = 0
     let onVisibleParagraph: (Int) -> Void
     var onNearBottom: (() -> Void)? = nil
     var onReachTop: (() -> Void)? = nil
@@ -109,7 +112,10 @@ struct NativeReaderTextView: UIViewRepresentable {
             textColor: textColor,
             highlightColor: highlightColor,
             animatedScrollDuration: animatedScrollDuration,
-            showChapterEndBadge: showChapterEndBadge
+            showChapterEndBadge: showChapterEndBadge,
+            imageStyle: imageStyle,
+            imageHeaders: imageHeaders,
+            imageColumnWidth: imageColumnWidth
         )
     }
 
@@ -132,6 +138,9 @@ struct NativeReaderTextView: UIViewRepresentable {
         let highlightColor: UIColor
         let animatedScrollDuration: Double
         let showChapterEndBadge: Bool
+        let imageStyle: ReaderImageStyle
+        let imageHeaders: [String: String]
+        let imageColumnWidth: CGFloat
 
         init(
             title: String,
@@ -151,7 +160,10 @@ struct NativeReaderTextView: UIViewRepresentable {
             textColor: UIColor,
             highlightColor: UIColor,
             animatedScrollDuration: Double,
-            showChapterEndBadge: Bool = false
+            showChapterEndBadge: Bool = false,
+            imageStyle: ReaderImageStyle = .standard,
+            imageHeaders: [String: String] = [:],
+            imageColumnWidth: CGFloat = 0
         ) {
             self.title = title
             self.subtitle = subtitle
@@ -171,6 +183,9 @@ struct NativeReaderTextView: UIViewRepresentable {
             self.highlightColor = highlightColor
             self.animatedScrollDuration = animatedScrollDuration
             self.showChapterEndBadge = showChapterEndBadge
+            self.imageStyle = imageStyle
+            self.imageHeaders = imageHeaders
+            self.imageColumnWidth = imageColumnWidth
         }
 
         struct TextLayoutSignature: Equatable {
@@ -185,6 +200,8 @@ struct NativeReaderTextView: UIViewRepresentable {
             let paragraphIndent: Double
             let titleSpacing: Double
             let showChapterEndBadge: Bool
+            let imageStyle: ReaderImageStyle
+            let imageColumnWidth: CGFloat
         }
 
         struct InsetsSignature: Equatable {
@@ -204,7 +221,9 @@ struct NativeReaderTextView: UIViewRepresentable {
                 paragraphSpacing: paragraphSpacing,
                 paragraphIndent: paragraphIndent,
                 titleSpacing: titleSpacing,
-                showChapterEndBadge: showChapterEndBadge
+                showChapterEndBadge: showChapterEndBadge,
+                imageStyle: imageStyle,
+                imageColumnWidth: imageColumnWidth
             )
         }
 
@@ -228,6 +247,9 @@ struct NativeReaderTextView: UIViewRepresentable {
                 && lhs.animatedScrollDuration == rhs.animatedScrollDuration
                 && lhs.showChapterEndBadge == rhs.showChapterEndBadge
                 && lhs.isAppendedUpdate == rhs.isAppendedUpdate
+                && lhs.imageStyle == rhs.imageStyle
+                && lhs.imageHeaders == rhs.imageHeaders
+                && abs(lhs.imageColumnWidth - rhs.imageColumnWidth) < 0.5
         }
     }
 
@@ -250,6 +272,7 @@ struct NativeReaderTextView: UIViewRepresentable {
         private var hasAppliedInitialScrollTarget = false
         private var didFireNearBottom = false
         private var isProgrammaticScrolling = false
+        private var inFlightIllustrationLoads: Set<URL> = []
 
         init(
             onVisibleParagraph: @escaping (Int) -> Void,
@@ -396,6 +419,7 @@ struct NativeReaderTextView: UIViewRepresentable {
             textView.layoutManager.ensureLayout(for: textView.textContainer)
             textView.setNeedsLayout()
             textView.layoutIfNeeded()
+            loadIllustrations(for: configuration, in: textView)
         }
 
         private func updateInsets(in textView: UITextView, configuration: Configuration) {
@@ -467,6 +491,38 @@ struct NativeReaderTextView: UIViewRepresentable {
             didFireNearBottom = false
             lastVisibleParagraph = -1
             lastVisibleUpdateAt = 0
+            loadIllustrations(for: newConfig, in: textView)
+        }
+
+        private func loadIllustrations(for config: Configuration, in textView: UITextView) {
+            let imageURLs = config.paragraphs.compactMap { ReaderImageSizingPolicy.imageURL(in: $0) }
+            guard !imageURLs.isEmpty else { return }
+
+            let missingURLs = imageURLs.filter { url in
+                RemoteImageLoader.shared.cachedImage(for: url) == nil && !inFlightIllustrationLoads.contains(url)
+            }
+            guard !missingURLs.isEmpty else { return }
+
+            for url in missingURLs {
+                inFlightIllustrationLoads.insert(url)
+            }
+
+            Task { @MainActor [weak self, weak textView] in
+                guard let self, let textView else { return }
+                var anyLoaded = false
+                for url in missingURLs {
+                    let loaded = await RemoteImageLoader.shared.image(for: url, headers: config.imageHeaders)
+                    self.inFlightIllustrationLoads.remove(url)
+                    if loaded != nil {
+                        anyLoaded = true
+                    }
+                }
+
+                guard anyLoaded, self.configuration?.contentFingerprint == config.contentFingerprint else { return }
+                let currentOffset = textView.contentOffset
+                self.rebuild(textView: textView, configuration: config)
+                self.setContentOffsetIfNeeded(currentOffset, in: textView)
+            }
         }
 
         private func setContentOffsetIfNeeded(_ offset: CGPoint, in textView: UITextView) {
@@ -752,20 +808,16 @@ enum ReaderNativeTextLayout {
                         .paragraphStyle: dividerStyle
                     ]
                     output.addAttributes(dividerAttrs, range: range)
-                } else if paragraph.hasPrefix("[img]") && paragraph.hasSuffix("[/img]") {
-                    let range = ranges[idx]
-                    let imgStyle = NSMutableParagraphStyle()
-                    imgStyle.alignment = .center
-                    imgStyle.paragraphSpacingBefore = CGFloat(configuration.paragraphSpacing + 8)
-                    imgStyle.paragraphSpacing = CGFloat(configuration.paragraphSpacing + 8)
-                    let imgAttrs: [NSAttributedString.Key: Any] = [
-                        .font: configuration.fontFamily.uiFont(ofSize: max(CGFloat(configuration.fontSize - 2), 12), weight: .medium),
-                        .foregroundColor: configuration.textColor.withAlphaComponent(0.65),
-                        .paragraphStyle: imgStyle
-                    ]
-                    output.addAttributes(imgAttrs, range: range)
                 }
             }
+
+            replacingImageParagraphs(
+                output: output,
+                ranges: &ranges,
+                paragraphs: configuration.paragraphs,
+                baseOffset: 0,
+                configuration: configuration
+            )
         }
 
         if configuration.showChapterEndBadge, !configuration.paragraphs.isEmpty {
@@ -778,7 +830,7 @@ enum ReaderNativeTextLayout {
                 .foregroundColor: configuration.textColor.withAlphaComponent(0.42),
                 .paragraphStyle: endMarkerStyle
             ]
-            output.append(NSAttributedString(string: "——— 本章完 · 继续上拉进入下一章 ———\n", attributes: endAttributes))
+            output.append(NSAttributedString(string: "— — — 本章完 — — —\n", attributes: endAttributes))
         }
 
         PerformanceSignpost.event("reader.textLayout.summary", "paragraphs=\(ranges.count), utf16=\(bodyLength)")
@@ -839,8 +891,120 @@ enum ReaderNativeTextLayout {
                     output.addAttributes(dividerAttrs, range: range)
                 }
             }
+
+            replacingImageParagraphs(
+                output: output,
+                ranges: &ranges,
+                paragraphs: paragraphs,
+                baseOffset: startingLocation,
+                configuration: configuration
+            )
         }
 
         return Result(text: output, paragraphRanges: ranges)
+    }
+
+    private static func replacingImageParagraphs(
+        output: NSMutableAttributedString,
+        ranges: inout [NSRange],
+        paragraphs: [String],
+        baseOffset: Int,
+        configuration: NativeReaderTextView.Configuration
+    ) {
+        for idx in (0..<paragraphs.count).reversed() {
+            let paragraph = paragraphs[idx]
+            guard let url = ReaderImageSizingPolicy.imageURL(in: paragraph) else { continue }
+            let oldRange = ranges[idx]
+            let attachmentAttrString = makeAttachment(for: url, configuration: configuration)
+            let rangeInOutput = NSRange(location: oldRange.location - baseOffset, length: oldRange.length)
+            output.replaceCharacters(in: rangeInOutput, with: attachmentAttrString)
+            let newLength = attachmentAttrString.length
+            let delta = newLength - oldRange.length
+            ranges[idx] = NSRange(location: oldRange.location, length: newLength)
+            for j in (idx + 1)..<ranges.count {
+                ranges[j].location += delta
+            }
+        }
+    }
+
+    static func makeAttachment(
+        for url: URL,
+        configuration: NativeReaderTextView.Configuration
+    ) -> NSAttributedString {
+        let containerWidth: CGFloat = {
+            if configuration.imageColumnWidth > 0 {
+                return configuration.imageColumnWidth
+            }
+            return 320
+        }()
+
+        let cached = RemoteImageLoader.shared.cachedImage(for: url)
+        let targetSize: CGSize
+        let image: UIImage
+        if let cached {
+            image = cached
+            targetSize = ReaderImageSizingPolicy.size(
+                for: cached.size,
+                style: configuration.imageStyle,
+                containerWidth: containerWidth,
+                maximumHeight: configuration.imageStyle.stretchesToColumnWidth ? nil : 320
+            )
+        } else {
+            let placeholderWidth = configuration.imageStyle.stretchesToColumnWidth ? containerWidth : min(containerWidth, 260)
+            let placeholderHeight: CGFloat = configuration.imageStyle.stretchesToColumnWidth ? min(containerWidth * 0.6, 220) : 160
+            targetSize = CGSize(width: max(placeholderWidth, 1), height: max(placeholderHeight, 1))
+            image = placeholderImage(size: targetSize, textColor: configuration.textColor)
+        }
+
+        let attachment = NSTextAttachment()
+        attachment.image = image
+        attachment.bounds = CGRect(origin: .zero, size: targetSize)
+
+        let imgStyle = NSMutableParagraphStyle()
+        imgStyle.alignment = .center
+        imgStyle.paragraphSpacingBefore = CGFloat(configuration.paragraphSpacing + 8)
+        imgStyle.paragraphSpacing = CGFloat(configuration.paragraphSpacing + 8)
+
+        let attrString = NSMutableAttributedString(attachment: attachment)
+        attrString.addAttributes([.paragraphStyle: imgStyle], range: NSRange(location: 0, length: attrString.length))
+        return attrString
+    }
+
+    static func placeholderImage(size: CGSize, textColor: UIColor) -> UIImage {
+        let renderer = UIGraphicsImageRenderer(size: size)
+        return renderer.image { _ in
+            let rect = CGRect(origin: .zero, size: size)
+            let path = UIBezierPath(roundedRect: rect, cornerRadius: 10)
+            textColor.withAlphaComponent(0.06).setFill()
+            path.fill()
+
+            let strokeColor = textColor.withAlphaComponent(0.12)
+            strokeColor.setStroke()
+            path.lineWidth = 1
+            path.stroke()
+
+            let config = UIImage.SymbolConfiguration(pointSize: 22, weight: .regular)
+            if let photoIcon = UIImage(systemName: "photo", withConfiguration: config)?.withTintColor(textColor.withAlphaComponent(0.35), renderingMode: .alwaysOriginal) {
+                let iconSize = photoIcon.size
+                let iconOrigin = CGPoint(
+                    x: (size.width - iconSize.width) / 2,
+                    y: (size.height - iconSize.height) / 2 - 8
+                )
+                photoIcon.draw(at: iconOrigin)
+            }
+
+            let text = "加载插图中..." as NSString
+            let textFont = UIFont.systemFont(ofSize: 11, weight: .regular)
+            let textAttrs: [NSAttributedString.Key: Any] = [
+                .font: textFont,
+                .foregroundColor: textColor.withAlphaComponent(0.4)
+            ]
+            let textSize = text.size(withAttributes: textAttrs)
+            let textOrigin = CGPoint(
+                x: (size.width - textSize.width) / 2,
+                y: (size.height - textSize.height) / 2 + 16
+            )
+            text.draw(at: textOrigin, withAttributes: textAttrs)
+        }
     }
 }

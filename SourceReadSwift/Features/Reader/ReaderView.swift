@@ -728,6 +728,22 @@ struct ReaderView: View {
         return nil
     }
 
+    private var currentBookSource: BookSource? {
+        let sourceURL = appState.bookshelfStore.book(id: bookID)?.sourceURL
+            ?? (bookID.contains("|") ? String(bookID.split(separator: "|")[0]) : nil)
+        guard let sourceURL else { return nil }
+        return appState.sourceStore.source(for: sourceURL)
+    }
+
+    private var imageRequestHeaders: [String: String] {
+        guard let currentBookSource else { return [:] }
+        return SourceRequestBuilder().imageRequestHeaders(for: currentBookSource)
+    }
+
+    private var currentImageStyle: ReaderImageStyle {
+        content.readerImageStyle
+    }
+
     private var scrollReaderContent: some View {
         NativeReaderTextView(
             title: content.title,
@@ -751,6 +767,9 @@ struct ReaderView: View {
             animatedScrollDuration: autoScrollEnabled ? max(ReaderAutomationPolicy.clampedDelay(autoScrollDelay) * 0.9, 0.25) : (speechController.isSpeaking ? 0.35 : 0),
             textSelectionEnabled: textSelectionEnabled,
             showChapterEndBadge: false,
+            imageStyle: currentImageStyle,
+            imageHeaders: imageRequestHeaders,
+            imageColumnWidth: max(UIScreen.main.bounds.width - CGFloat(pagePadding * 2), 200),
             onVisibleParagraph: { index in
                 if paragraphJumpRequest != nil {
                     paragraphJumpRequest = nil
@@ -1067,13 +1086,8 @@ struct ReaderView: View {
 
     @ViewBuilder
     private func paragraphText(_ paragraph: String, index: Int) -> some View {
-        if paragraph.hasPrefix("[img]") && paragraph.hasSuffix("[/img]") {
-            let rawURL = String(paragraph.dropFirst(5).dropLast(6)).trimmingCharacters(in: .whitespacesAndNewlines)
-            if let url = URL(string: rawURL) {
-                illustrationCard(url: url)
-            } else {
-                standardParagraphText(paragraph, index: index)
-            }
+        if let url = ReaderImageSizingPolicy.imageURL(in: paragraph) {
+            illustrationCard(url: url)
         } else {
             standardParagraphText(paragraph, index: index)
         }
@@ -1102,40 +1116,12 @@ struct ReaderView: View {
             selectedIllustrationURL = url
             HapticFeedback.light()
         } label: {
-            VStack(spacing: 8) {
-                CachedRemoteImage(url: url) {
-                    RoundedRectangle(cornerRadius: 12, style: .continuous)
-                        .fill(readerThemeTextColor.opacity(0.06))
-                        .frame(height: 180)
-                        .overlay {
-                            VStack(spacing: 8) {
-                                Image(systemName: "photo")
-                                    .font(.title2)
-                                    .foregroundStyle(readerThemeTextColor.opacity(0.4))
-                                Text("加载插图中...")
-                                    .font(.caption)
-                                    .foregroundStyle(readerThemeTextColor.opacity(0.4))
-                            }
-                        }
-                }
-                .scaledToFit()
-                .frame(maxHeight: 260)
-                .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-                .overlay {
-                    RoundedRectangle(cornerRadius: 12, style: .continuous)
-                        .stroke(readerThemeTextColor.opacity(0.12), lineWidth: 0.8)
-                }
-
-                HStack(spacing: 4) {
-                    Image(systemName: "arrow.up.left.and.arrow.down.right")
-                        .font(.system(size: 10))
-                    Text("点击查看插图大图")
-                        .font(.system(size: 11))
-                }
-                .foregroundStyle(readerThemeTextColor.opacity(0.45))
-            }
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 8)
+            ReaderIllustrationView(
+                url: url,
+                style: currentImageStyle,
+                headers: imageRequestHeaders,
+                textColor: readerThemeTextColor
+            )
         }
         .buttonStyle(.plain)
     }
@@ -3577,4 +3563,55 @@ private struct IllustrationZoomViewer: View {
         }
     }
 }
+
+struct ReaderIllustrationView: View {
+    let url: URL
+    let style: ReaderImageStyle
+    let headers: [String: String]
+    let textColor: Color
+
+    var body: some View {
+        VStack(spacing: 8) {
+            CachedRemoteImage(
+                url: url,
+                headers: headers
+            ) {
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .fill(textColor.opacity(0.06))
+                    .frame(height: 180)
+                    .overlay {
+                        VStack(spacing: 8) {
+                            Image(systemName: "photo")
+                                .font(.title2)
+                                .foregroundStyle(textColor.opacity(0.4))
+                            Text("加载插图中...")
+                                .font(.caption)
+                                .foregroundStyle(textColor.opacity(0.4))
+                        }
+                    }
+            }
+            .scaledToFit()
+            .frame(
+                maxWidth: .infinity,
+                maxHeight: style.stretchesToColumnWidth ? .infinity : 260
+            )
+            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .stroke(textColor.opacity(0.12), lineWidth: 0.8)
+            }
+
+            HStack(spacing: 4) {
+                Image(systemName: "arrow.up.left.and.arrow.down.right")
+                    .font(.system(size: 10))
+                Text("点击查看插图大图")
+                    .font(.system(size: 11))
+            }
+            .foregroundStyle(textColor.opacity(0.45))
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 8)
+    }
+}
+
 

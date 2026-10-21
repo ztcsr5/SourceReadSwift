@@ -88,8 +88,8 @@
 `content`, `imageDecode`, `imageStyle`, `nextContentUrl`, `payAction`, `replaceRegex`, `sourceRegex`, `title`, `webJs`
 
 - `content` / `nextContentUrl` / `replaceRegex` / `webJs` 已有主链处理。
-- `imageStyle` 在正文模型中有承载，但渲染层能力取决于阅读器（原生 TextKit 或 WebView）。
-- `imageDecode`：**当前没有图片解码/拼图执行点**。
+- `imageStyle`：已在数据模型（`ChapterContent` / `ChapterContentCacheEntry`）、排版策略（`ReaderImageStyle` / `ReaderImageSizingPolicy`）与双端渲染层（滚动模式原生 TextKit `NSTextAttachment` 内嵌、翻页模式 `ReaderIllustrationView` 全宽/居中铺满）完整落地，并支持书源自定义请求头（防盗链 Referer/UA）透明转发。
+- `imageDecode`：当前已支持 URL 重写模式（通过 JS 转换或 CDN 换源）。Legado 原生在部分反爬拼图/二进制切片场景下支持返回 `byte[]`/Bitmap；SourceReadSwift2 当前版本覆盖了 URL-rewrite 级别解码，二进制级别 byte 拼图需作为后续高级解密扩展。
 - `payAction`：**当前没有付费动作执行点**。
 - `sourceRegex` / `title`：需要按具体源确认是否进入正文元数据链；没有运行时证据时标记为“待验证”，不能写成已完整兼容。
 
@@ -108,8 +108,9 @@
 |---|---|---|---|
 | 已完成（P0） | `isVolume` 目录链路 | 分卷目录平铺、卷标题丢失 | 已实现 HTML/JSON 卷行消费与 `volumeHeader` 边界渲染；回归 `ChapterListMetadataTests.testHTMLVolumeRowsBecomeVolumeNamesAndAreNotChapters`、`testJSONVolumeRowsSupportBooleanAndStringFlags` |
 | 已完成（P0） | `formatJs` 目录链路 | 依赖 JS 生成章节名的源出现空名/原名 | 已在全量目录后执行，1-based index、单章失败回退；回归 `ChapterListMetadataTests.testFormatJsRunsAfterPaginationWithOneBasedIndex` |
-| P1 | `preUpdateJs` 未执行 | 目录刷新前无法清理/更新状态 | 在 TOC 请求前执行，限制副作用并记录失败 |
-| P1 | `imageDecode` 未执行 | 图文/拼图源正文图片不可用 | 先定义图片分段模型，再实现解码器；不要伪造成文本 |
+| 已完成（P1） | `preUpdateJs` 目录刷新 | 目录刷新前无法清理/更新状态 | 已在 TOC 请求前执行并支持 `book.setReverseToc`；回归 `ChapterListMetadataTests.testReverseTocFlagReversesCollectedChapterList` |
+| 已完成（P1） | `imageStyle` 渲染排版 | 漫画与插图小说排版不当、全宽铺满失效 | 已完成 ReaderImageStyle、双模式适配与防盗链 Header 转发；回归 `ReaderImageStyleTests` |
+| P1（部分完成） | `imageDecode` 图片解码 | 图文/拼图源正文图片不可用 | 当前已支持 URL-rewrite 重写模式；二进制切片拼图（byte/Bitmap）需后续专属图像解码管线 |
 | P1 | `payAction` 未执行 | VIP/付费源只能展示不可读 | 明确产品边界：展示 VIP 标记，不伪造购买/解锁 |
 | P2 | `downloadUrls` 未消费 | 详情页下载入口不可用 | 要么实现下载队列，要么在 UI 隐藏 |
 | P2 | 目录逐章 `wordCount` 未展示 | 信息缺失，不影响阅读 | 有值时在章节副标题展示 |

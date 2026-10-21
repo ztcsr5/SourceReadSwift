@@ -188,11 +188,12 @@ Legado 目录规则里两个直接影响目录展示的字段已经进入主链�
 | 优先级 | 工作 | 验收 |
 |---|---|---|
 | P0（已完成） | `isVolume` / `formatJs` 目录链路 + 跨页卷继承 | `ChapterListMetadataTests` 通过 |
+| P1（已完成） | `preUpdateJs` 目录刷新与 `book.setReverseToc` | `ChapterListMetadataTests` 通过 |
+| P1（已完成） | 图片正文 `imageStyle` 排版策略与双端渲染 | 原生 TextKit（NSTextAttachment）与翻页模式（ReaderIllustrationView）落地，支持 FULL 全宽铺满与防盗链 Header 转发；用例 `ReaderImageStyleTests` 通过 |
+| P1（部分完成） | 图片正文 `imageDecode` | 当前已支持 URL 级别的重写与规则链处理（JS/换源/绝对化）；Legado 原生的字节流拼图/Bitmap 解码需后续底层图像解码管道支持 |
 | P0 | 为 `startBrowserAwait` / 验证码建立 UI 状态机 | 不再返回假成功，UI 有明确状态 |
 | P1 | 把 JSONPath 方言差异写成可执行用例 | 每个差异至少一个 XCTest |
 | P1 | 为 `java.*` stub 建立运行时诊断 | 调用时记录 API 名、源、章节、失败原因 |
-| P1（部分完成） | 图片正文 `imageDecode` | `ruleContent.imageDecode` 已接入（`@js:` / `<js>` / `java.` / `##pattern##replacement##`，空结果保留原 URL，相对结果按 baseUrl 绝对化）；`imageStyle` 仍是展示层参数 |
-| P2 | 图片正文 `imageStyle` 渲染策略 | 明确原生渲染或 WebView 渲染边界 |
 | P2 | 7z/RAR 替代方案 | 导入时提示 ZIP/预解压，不在运行时静默空值 |
 
 ## 7. 复现与验证

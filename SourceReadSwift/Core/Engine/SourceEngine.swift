@@ -1339,7 +1339,8 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
             chapter: firstPage.chapter,
             title: firstPage.title,
             paragraphs: paragraphs,
-            nextContentUrl: finalNextURL
+            nextContentUrl: finalNextURL,
+            imageStyle: firstPage.imageStyle
         ))
     }
 

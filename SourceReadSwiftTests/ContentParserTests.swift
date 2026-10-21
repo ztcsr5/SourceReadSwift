@@ -412,4 +412,68 @@ final class ContentParserTests: XCTestCase {
             "[img]https://img.example.com/big/2.jpg[/img]"
         ])
     }
+
+    func testHTMLContentPropagatesImageStyle() throws {
+        let source = BookSource(
+            bookSourceName: "TestImageStyleHTML",
+            bookSourceUrl: "https://example.com",
+            ruleContent: SourceRule(fields: [
+                "content": "#content@textNodes",
+                "imageStyle": "FULL"
+            ])
+        )
+        let chapter = BookChapter(
+            title: "Chapter 1",
+            url: "https://example.com/c/1",
+            bookUrl: "https://example.com/book/1",
+            index: 0,
+            isVip: false
+        )
+        let response = SourceResponse(
+            url: URL(string: chapter.url)!,
+            statusCode: 200,
+            headers: [:],
+            body: "<div id=\"content\"><p>第一段</p><p>第二段</p></div>",
+            data: Data()
+        )
+
+        let result = ContentParser().parse(source: source, chapter: chapter, response: response)
+        guard case .success(let content) = result else {
+            return XCTFail("expected parsed content")
+        }
+        XCTAssertEqual(content.imageStyle, "FULL")
+        XCTAssertEqual(content.readerImageStyle, .full)
+    }
+
+    func testJSONContentPropagatesImageStyle() throws {
+        let source = BookSource(
+            bookSourceName: "TestImageStyleJSON",
+            bookSourceUrl: "https://api.example.com",
+            ruleContent: SourceRule(fields: [
+                "content": "data.content",
+                "imageStyle": "single"
+            ])
+        )
+        let chapter = BookChapter(
+            title: "Chapter 1",
+            url: "https://api.example.com/c/1",
+            bookUrl: "https://api.example.com/book/1",
+            index: 0,
+            isVip: false
+        )
+        let response = SourceResponse(
+            url: URL(string: chapter.url)!,
+            statusCode: 200,
+            headers: [:],
+            body: #"{"data":{"content":"<p>正文内容</p>"}}"#,
+            data: Data()
+        )
+
+        let result = ContentParser().parse(source: source, chapter: chapter, response: response)
+        guard case .success(let content) = result else {
+            return XCTFail("expected parsed content")
+        }
+        XCTAssertEqual(content.imageStyle, "single")
+        XCTAssertEqual(content.readerImageStyle, .single)
+    }
 }

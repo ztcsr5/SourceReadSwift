@@ -1,14 +1,14 @@
 import SwiftUI
 import UIKit
 
-/// Lightweight in-memory image loader for scrolling lists. `AsyncImage` is
-/// convenient but does not provide an app-wide memory cache, so revisiting a
-/// bookshelf/search row can decode the same cover repeatedly. This loader
-/// keeps decoded images in an NSCache and leaves disk/network caching to
-/// URLSession.
+/// Lightweight in-memory image loader for scrolling lists and illustrations.
+/// Uses `RemoteImageLoader.shared` to share decoded bitmaps across views,
+/// text layout attachments, and custom source header requests.
 struct CachedRemoteImage<Placeholder: View>: View {
     let url: URL?
     let contentMode: ContentMode
+    let headers: [String: String]
+    let onSizeChange: ((CGSize) -> Void)?
     let placeholder: () -> Placeholder
 
     @State private var image: UIImage?
@@ -16,10 +16,14 @@ struct CachedRemoteImage<Placeholder: View>: View {
     init(
         url: URL?,
         contentMode: ContentMode = .fill,
+        headers: [String: String] = [:],
+        onSizeChange: ((CGSize) -> Void)? = nil,
         @ViewBuilder placeholder: @escaping () -> Placeholder
     ) {
         self.url = url
         self.contentMode = contentMode
+        self.headers = headers
+        self.onSizeChange = onSizeChange
         self.placeholder = placeholder
     }
 
@@ -33,68 +37,41 @@ struct CachedRemoteImage<Placeholder: View>: View {
                 placeholder()
             }
         }
-        .task(id: url?.absoluteString ?? "") {
+        .task(id: taskIdentifier) {
             await loadImage()
         }
     }
 
+    private var taskIdentifier: String {
+        guard let url else { return "" }
+        if headers.isEmpty {
+            return url.absoluteString
+        }
+        return url.absoluteString + "#" + headers.keys.sorted().joined(separator: ",")
+    }
+
     private func loadImage() async {
         guard let url else {
-            await MainActor.run { image = nil }
-            return
-        }
-        if let cached = ImageMemoryCache.shared.image(for: url) {
-            await MainActor.run { image = cached }
-            return
-        }
-
-        do {
-            var request = URLRequest(url: url)
-            request.cachePolicy = .returnCacheDataElseLoad
-            let (data, response) = try await URLSession.shared.data(for: request)
-            guard !Task.isCancelled,
-                  let http = response as? HTTPURLResponse,
-                  (200..<300).contains(http.statusCode) else { return }
-            // SwiftUI `.task` inherits the main actor from the view. Decode
-            // and decompress covers on a utility queue so a burst of rows
-            // cannot steal the reader/list's display frames.
-            guard let decoded = await Self.decodeImageOffMainThread(data),
-                  !Task.isCancelled else { return }
-            ImageMemoryCache.shared.insert(decoded, for: url)
-            await MainActor.run { image = decoded }
-        } catch {
-            // Keep the placeholder; a failed cover must never block list
-            // scrolling or trigger a state-update loop.
-        }
-    }
-
-    private static func decodeImageOffMainThread(_ data: Data) async -> UIImage? {
-        await withCheckedContinuation { continuation in
-            DispatchQueue.global(qos: .utility).async {
-                autoreleasepool {
-                    continuation.resume(returning: UIImage(data: data)?.preparingForDisplay())
-                }
+            await MainActor.run {
+                image = nil
+                onSizeChange?(.zero)
             }
+            return
         }
-    }
-}
 
-private final class ImageMemoryCache {
-    static let shared = ImageMemoryCache()
+        if let cached = RemoteImageLoader.shared.cachedImage(for: url) {
+            await MainActor.run {
+                image = cached
+                onSizeChange?(cached.size)
+            }
+            return
+        }
 
-    private let cache = NSCache<NSURL, UIImage>()
-
-    private init() {
-        cache.countLimit = 120
-        cache.totalCostLimit = 48 * 1024 * 1024
-    }
-
-    func image(for url: URL) -> UIImage? {
-        cache.object(forKey: url as NSURL)
-    }
-
-    func insert(_ image: UIImage, for url: URL) {
-        let cost = Int(image.size.width * image.size.height * image.scale * image.scale * 4)
-        cache.setObject(image, forKey: url as NSURL, cost: max(cost, 1))
+        let loaded = await RemoteImageLoader.shared.image(for: url, headers: headers)
+        guard let loaded, !Task.isCancelled else { return }
+        await MainActor.run {
+            image = loaded
+            onSizeChange?(loaded.size)
+        }
     }
 }
