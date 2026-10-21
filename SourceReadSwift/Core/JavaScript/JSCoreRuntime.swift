@@ -191,16 +191,23 @@ final class JSCoreRuntime {
                     chapter.url = chapter.url || chapter.chapterUrl || '';
                     chapter.chapterIndex = chapter.chapterIndex == null ? (chapter.index || 0) : chapter.chapterIndex;
                     chapter.index = chapter.index == null ? chapter.chapterIndex : chapter.index;
-                    chapter.getName = function() { return chapter.name || chapter.title || ''; };
-                    chapter.getTitle = chapter.getName;
-                    chapter.getUrl = function() { return chapter.url || chapter.chapterUrl || ''; };
-                    chapter.getChapterUrl = chapter.getUrl;
-                    chapter.getIndex = function() { return chapter.index || chapter.chapterIndex || 0; };
-                    chapter.getChapterIndex = chapter.getIndex;
-                    chapter.isVip = function() {
-                        var title = String(chapter.title || chapter.name || '').toLowerCase();
-                        return title.indexOf('vip') >= 0 || title.indexOf('订阅') >= 0 || title.indexOf('付费') >= 0;
-                    };
+                    // A native `BookChapter` bridge already exports these methods.
+                    // Only install the plain-object fallbacks when JavaScript is
+                    // looking at a dictionary, otherwise the heuristic below
+                    // shadows the bridge's real `isVip` flag and every JS rule
+                    // that branches on it silently gets the wrong answer.
+                    if (typeof chapter.getName !== 'function') { chapter.getName = function() { return chapter.name || chapter.title || ''; }; }
+                    if (typeof chapter.getTitle !== 'function') { chapter.getTitle = chapter.getName; }
+                    if (typeof chapter.getUrl !== 'function') { chapter.getUrl = function() { return chapter.url || chapter.chapterUrl || ''; }; }
+                    if (typeof chapter.getChapterUrl !== 'function') { chapter.getChapterUrl = chapter.getUrl; }
+                    if (typeof chapter.getIndex !== 'function') { chapter.getIndex = function() { return chapter.index || chapter.chapterIndex || 0; }; }
+                    if (typeof chapter.getChapterIndex !== 'function') { chapter.getChapterIndex = chapter.getIndex; }
+                    if (typeof chapter.isVip !== 'function') {
+                        chapter.isVip = function() {
+                            var title = String(chapter.title || chapter.name || '').toLowerCase();
+                            return title.indexOf('vip') >= 0 || title.indexOf('订阅') >= 0 || title.indexOf('付费') >= 0;
+                        };
+                    }
                     chapter.getVariable = function(key) {
                         if (arguments.length > 0 && key != null && String(key) !== '') return java.getVar('chapter.variable.' + String(key));
                         return chapter.variable || java.getVar('chapter.variable') || '';
@@ -2785,12 +2792,14 @@ final class JSCoreRuntime {
           chapter.url = chapter.url || chapter.chapterUrl || '';
           chapter.chapterIndex = chapter.chapterIndex == null ? (chapter.index || 0) : chapter.chapterIndex;
           chapter.index = chapter.index == null ? chapter.chapterIndex : chapter.index;
-          chapter.getName = function() { return chapter.name || chapter.title || ''; };
-          chapter.getTitle = chapter.getName;
-          chapter.getUrl = function() { return chapter.url || chapter.chapterUrl || ''; };
-          chapter.getChapterUrl = chapter.getUrl;
-          chapter.getIndex = function() { return chapter.index || chapter.chapterIndex || 0; };
-          chapter.getChapterIndex = chapter.getIndex;
+          // See the per-variable injection above: native bridges own these
+          // methods, dictionaries need the fallbacks.
+          if (typeof chapter.getName !== 'function') { chapter.getName = function() { return chapter.name || chapter.title || ''; }; }
+          if (typeof chapter.getTitle !== 'function') { chapter.getTitle = chapter.getName; }
+          if (typeof chapter.getUrl !== 'function') { chapter.getUrl = function() { return chapter.url || chapter.chapterUrl || ''; }; }
+          if (typeof chapter.getChapterUrl !== 'function') { chapter.getChapterUrl = chapter.getUrl; }
+          if (typeof chapter.getIndex !== 'function') { chapter.getIndex = function() { return chapter.index || chapter.chapterIndex || 0; }; }
+          if (typeof chapter.getChapterIndex !== 'function') { chapter.getChapterIndex = chapter.getIndex; }
           chapter.getVariable = function(key) {
             if (arguments.length > 0 && key != null && String(key) !== '') return java.getVar('chapter.variable.' + String(key));
             return chapter.variable || java.getVar('chapter.variable') || '';
@@ -2815,10 +2824,12 @@ final class JSCoreRuntime {
             remove: function(k) { return java.removeVar('chapter.variable.' + String(k || '')); },
             containsKey: function(k) { return chapter.getVariable(k) !== ''; }
           };
-          chapter.isVip = function() {
-            var title = String(chapter.title || chapter.name || '').toLowerCase();
-            return title.indexOf('vip') >= 0 || title.indexOf('订阅') >= 0 || title.indexOf('付费') >= 0;
-          };
+          if (typeof chapter.isVip !== 'function') {
+            chapter.isVip = function() {
+              var title = String(chapter.title || chapter.name || '').toLowerCase();
+              return title.indexOf('vip') >= 0 || title.indexOf('订阅') >= 0 || title.indexOf('付费') >= 0;
+            };
+          }
         }
         __installSourceAndBook();
         function base64Encode(value) { return java.base64Encode(value); }
