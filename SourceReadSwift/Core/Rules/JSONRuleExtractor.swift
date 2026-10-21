@@ -909,7 +909,7 @@ struct JSONRuleExtractor {
                 transformed,
                 parts: parts,
                 index: index + 1,
-                mapMemberOverArrays: mapMemberOverArrays
+                mapMemberOverArrays: true
             )
         }
 
@@ -943,9 +943,12 @@ struct JSONRuleExtractor {
             // maps a bare member step over array elements so sources like
             // `$.data.groups.books.title` work; applying that shorthand while
             // scanning descendants would emit every nested match twice
-            // (`$..name` -> A,B,A,B).  The deep-scan remainder therefore runs
-            // with the shorthand disabled and lets the descendant visit
-            // produce the match, which is exactly Jayway's behavior.
+            // (`$..name` -> A,B,A,B).  Only the first remainder step runs with
+            // the shorthand disabled; once that step has been consumed
+            // (key/filter/slice/index), later steps must map over arrays again,
+            // otherwise `$..list[?(@.x)].name` loses the property lookup.
+            // The descendant visit then produces each nested match exactly
+            // once, matching Jayway.
             if let direct = walk(
                 node,
                 parts: parts,
@@ -975,7 +978,7 @@ struct JSONRuleExtractor {
                     filtered,
                     parts: parts,
                     index: index + 1,
-                    mapMemberOverArrays: mapMemberOverArrays
+                    mapMemberOverArrays: true
                 )
             }
             if let dictionary = node as? [String: Any] {
@@ -993,7 +996,7 @@ struct JSONRuleExtractor {
                     filtered,
                     parts: parts,
                     index: index + 1,
-                    mapMemberOverArrays: mapMemberOverArrays
+                    mapMemberOverArrays: true
                 )
             }
             return nil
@@ -1041,7 +1044,7 @@ struct JSONRuleExtractor {
                         sliced,
                         parts: parts,
                         index: index + 1,
-                        mapMemberOverArrays: mapMemberOverArrays
+                        mapMemberOverArrays: true
                     )
                 }
             }
@@ -1061,7 +1064,7 @@ struct JSONRuleExtractor {
                     flattened,
                     parts: parts,
                     index: index + 1,
-                    mapMemberOverArrays: mapMemberOverArrays
+                    mapMemberOverArrays: true
                 )
             }
             guard let value = lookup(dictionary, key: unquoteKey(part)) else { return nil }
@@ -1069,7 +1072,7 @@ struct JSONRuleExtractor {
                 value,
                 parts: parts,
                 index: index + 1,
-                mapMemberOverArrays: mapMemberOverArrays
+                mapMemberOverArrays: true
             )
         }
 
@@ -1080,7 +1083,7 @@ struct JSONRuleExtractor {
                         $0,
                         parts: parts,
                         index: index + 1,
-                        mapMemberOverArrays: mapMemberOverArrays
+                        mapMemberOverArrays: true
                     )
                 }
                 if mapped.isEmpty { return nil }
@@ -1095,7 +1098,7 @@ struct JSONRuleExtractor {
                     array[resolved],
                     parts: parts,
                     index: index + 1,
-                    mapMemberOverArrays: mapMemberOverArrays
+                    mapMemberOverArrays: true
                 )
             }
             guard mapMemberOverArrays else { return nil }
