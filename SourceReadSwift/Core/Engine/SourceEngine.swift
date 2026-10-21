@@ -348,6 +348,16 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
                 persistentState: executionState
             )
         }
+        // Legado executes `ruleToc.preUpdateJs` before the TOC request.  The
+        // script is a side-effect hook (`java.put`, `java.ajax`, cookie
+        // refresh), so its return value is intentionally ignored; a failure
+        // must not block the TOC, it only leaves a diagnostic.
+        runTocPreUpdateJs(
+            source: source,
+            book: book,
+            baseUrl: book.bookUrl.nilIfEmpty ?? book.tocUrl?.nilIfEmpty ?? source.cleanSourceURL,
+            executionContext: executionContext
+        )
         let tocURL = book.tocUrl?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty ?? book.bookUrl
         let resolvedTocURL = DynamicURLResolver.resolve(
             tocURL,
@@ -931,6 +941,49 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
         executionContext: RuleExecutionContext = RuleExecutionContext()
     ) -> Result<ChapterListPage, SourceEngineError> {
         return ChapterListParser(executionContext: executionContext).parsePage(source: source, book: book, response: response)
+    }
+
+    /// Runs the Legado `ruleToc.preUpdateJs` hook once, immediately before the
+    /// TOC page request.  Sources use it to refresh tokens/cookies through
+    /// `java.put` + `java.ajax`; the script's return value has no defined
+    /// meaning in Legado and is discarded here as well.  Errors are recorded
+    /// as diagnostics and never abort the TOC flow.
+    private func runTocPreUpdateJs(
+        source: BookSource,
+        book: BookDetail,
+        baseUrl: String,
+        executionContext: RuleExecutionContext
+    ) {
+        guard let raw = source.ruleToc?.fields["preUpdateJs"]?
+            .trimmingCharacters(in: .whitespacesAndNewlines),
+              !raw.isEmpty else { return }
+
+        var script = raw
+        if script.hasPrefix("@js:") {
+            script = String(script.dropFirst(4)).trimmingCharacters(in: .whitespacesAndNewlines)
+        } else if script.hasPrefix("<js>"), script.hasSuffix("</js>") {
+            script = String(script.dropFirst(4).dropLast(5)).trimmingCharacters(in: .whitespacesAndNewlines)
+        }
+        guard !script.isEmpty else { return }
+
+        let runtime = executionContext.jsRuntime(ajaxHandler: { urlText in
+            executionContext.networkHandler?(urlText)
+                ?? SynchronousSourceLoader().load(urlText: urlText, source: source)
+        })
+        let variables: [String: Any] = [
+            "book": book,
+            "baseUrl": baseUrl,
+            "source": source
+        ]
+        var outcome = runtime.evaluate(script, variables: variables)
+        // Same compatibility retry as `formatJs`: Legado sources often use a
+        // top-level `return`, which a bare script rejects.
+        if case .failure = outcome, script.contains("return") {
+            outcome = runtime.evaluate("(function(){\n\(script)\n})()", variables: variables)
+        }
+        if case .failure(let error) = outcome {
+            executionContext.log("toc.preUpdateJs failed: \(error)")
+        }
     }
 
     /// Legado runs `ruleToc.formatJs` once the complete TOC (including every

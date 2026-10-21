@@ -156,6 +156,31 @@ final class ChapterListMetadataTests: XCTestCase {
         XCTAssertNil(ChapterListPresenter.volumeHeader(at: 3, in: chapters))
     }
 
+    func testPreUpdateJsRunsBeforeTocRequestAndSharesState() async throws {
+        let tocURL = "https://fixture.example/book/pre-update/toc"
+        let bootstrapURL = "https://fixture.example/api/toc-token"
+        let source = BookSource(
+            bookSourceName: "preUpdateJs fixture",
+            bookSourceUrl: "https://fixture.example",
+            ruleToc: SourceRule(fields: [
+                "preUpdateJs": "var payload = JSON.parse(java.ajax('" + bootstrapURL + "')); java.put('tocPath', payload.path)",
+                "chapterList": "$.@get:tocPath[*]",
+                "chapterName": "$.title",
+                "chapterUrl": "$.url"
+            ])
+        )
+        let network = ChapterFixtureNetworkClient(responses: [
+            bootstrapURL: #"{"path":"chapters"}"#,
+            tocURL: #"{"chapters":[{"title":"第一章","url":"/chapter/1"}]}"#
+        ])
+        let engine = LegadoSourceEngine(network: network)
+
+        let chapters = try await unwrap(engine.getChapterList(source: source, book: makeBook(tocURL: tocURL)))
+
+        XCTAssertEqual(chapters.map(\.title), ["第一章"])
+        XCTAssertEqual(network.requestedURLs, [bootstrapURL, tocURL])
+    }
+
     private func makeBook(tocURL: String) -> BookDetail {
         BookDetail(
             name: "Fixture Book",
