@@ -629,4 +629,59 @@ final class HtmlRuleExtractorTests: XCTestCase {
         XCTAssertEqual(try elements.first?.tagName(), "div")
         XCTAssertEqual(try elements.first?.hasClass("wrap"), true)
     }
+    func testSelectJavaScriptRuleResolvesGetDirectiveTemplate() throws {
+        let document = try SwiftSoup.parse("""
+        <html><body>
+          <div class="item">A</div>
+          <div class="item">B</div>
+          <span class="cls">item</span>
+        </body></html>
+        """)
+        let extractor = HtmlRuleExtractor()
+        _ = try extractor.value(from: document, rule: "@put:{cls:.cls@text}.cls@text", baseUrl: nil)
+
+        let elements = try extractor.select(
+            from: document,
+            rule: "@js:result = result.select('.' + '@get:{cls}')",
+            baseUrl: nil
+        )
+
+        XCTAssertEqual(elements.count, 2)
+    }
+
+    func testSelectJavaScriptRuleSeesStoredPutValueAsBareVariable() throws {
+        let document = try SwiftSoup.parse("""
+        <html><body>
+          <div class="item">A</div>
+          <div class="item">B</div>
+          <span class="cls">item</span>
+        </body></html>
+        """)
+        let extractor = HtmlRuleExtractor()
+        _ = try extractor.value(from: document, rule: "@put:{cls:.cls@text}.cls@text", baseUrl: nil)
+
+        let elements = try extractor.select(
+            from: document,
+            rule: "@js:result = result.select('.' + cls)",
+            baseUrl: nil
+        )
+
+        XCTAssertEqual(elements.count, 2)
+    }
+
+    func testJavaScriptValueRuleSeesStoredPutValueAsBareVariable() throws {
+        let document = try SwiftSoup.parse("""
+        <html><body><span class="token">abc123</span></body></html>
+        """)
+        let extractor = HtmlRuleExtractor()
+        _ = try extractor.value(from: document, rule: "@put:{token:.token@text}.token@text", baseUrl: nil)
+
+        let value = try extractor.value(
+            from: document,
+            rule: "@js:return token.toUpperCase()",
+            baseUrl: nil
+        )
+
+        XCTAssertEqual(value, "ABC123")
+    }
 }

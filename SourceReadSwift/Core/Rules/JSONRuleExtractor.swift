@@ -250,8 +250,15 @@ struct JSONRuleExtractor {
         object: Any,
         variables: [String: Any]
     ) -> Any? {
-        let rule = rawRule.trimmingCharacters(in: .whitespacesAndNewlines)
+        var rule = rawRule.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !rule.isEmpty else { return object }
+
+        // `@get:{key}` inside a JS rule is a template placeholder.  Resolve it
+        // before JSCore parses the script; otherwise the directive text is a
+        // syntax error and the whole rule silently returns nil.
+        if rule.contains("@get:"), rule.contains("@js:") || rule.hasPrefix("<js>") {
+            rule = replaceGetDirectives(in: rule)
+        }
 
         if rule.hasPrefix("@js:") || rule.hasPrefix("<js>") {
             return evaluateJS(rule: rule, object: object, extraVariables: variables)
@@ -2270,6 +2277,10 @@ struct JSONRuleExtractor {
             if k != "result" {
                 variables[k] = v
             }
+        }
+        // Source-scoped `@put` values stay visible to later JS rules.
+        for (key, value) in executionContext.persistentSnapshot() where variables[key] == nil {
+            variables[key] = value
         }
 
         // If extraVariables did not provide html/src, populate from object

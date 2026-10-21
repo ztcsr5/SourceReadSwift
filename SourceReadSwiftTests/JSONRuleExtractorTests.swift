@@ -845,4 +845,36 @@ final class JSONRuleExtractorTests: XCTestCase {
             "A"
         )
     }
+    func testJavaScriptRuleResolvesGetDirectiveTemplate() throws {
+        let extractor = JSONRuleExtractor()
+        let object: [String: Any] = ["data": ["token": "abc123"]]
+        _ = extractor.value(from: object, path: "@put:{token:$.data.token}$.data.token")
+
+        let value = extractor.value(
+            from: object,
+            path: "@js:return '@get:{token}'.toUpperCase()"
+        ) as? String
+
+        XCTAssertEqual(value, "ABC123")
+    }
+
+    func testJavaScriptRuleReadsStoredPutValue() throws {
+        let extractor = JSONRuleExtractor()
+        let object: [String: Any] = ["data": ["token": "abc123"]]
+        _ = extractor.value(from: object, path: "@put:{token:$.data.token}$.data.token")
+
+        let value = extractor.value(from: object, path: "@js:return java.get('token')") as? String
+
+        XCTAssertEqual(value, "abc123")
+    }
+
+    func testJavaScriptRuleSeesStoredPutValueAsBareVariable() throws {
+        let extractor = JSONRuleExtractor()
+        let object: [String: Any] = ["data": ["token": "abc123"]]
+        _ = extractor.value(from: object, path: "@put:{token:$.data.token}$.data.token")
+
+        let value = extractor.value(from: object, path: "@js:return token") as? String
+
+        XCTAssertEqual(value, "abc123")
+    }
 }

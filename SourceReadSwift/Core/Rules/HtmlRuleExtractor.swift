@@ -68,7 +68,22 @@ struct HtmlRuleExtractor {
         let selectedRule = rule ?? fallback
         guard let selectedRule, !selectedRule.isEmpty else { return [] }
 
-        let trimmed = selectedRule.trimmingCharacters(in: .whitespacesAndNewlines)
+        let rawTrimmed = selectedRule.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        // `@put` / `@get` are directives, not selectors or JavaScript.  A rule
+        // such as `@put:{token:.token@text}@js:return '@get:{token}'` must
+        // materialize the directive before JSCore sees the script text.
+        let directiveMaterialized = try applyDirectives(
+            root: root,
+            rule: rawTrimmed,
+            baseUrl: baseUrl,
+            variables: variables
+        )
+        if directiveMaterialized.isDirectValue {
+            return directiveMaterialized.text.isEmpty ? [] : [directiveMaterialized.text]
+        }
+        let trimmed = directiveMaterialized.text
+        guard !trimmed.isEmpty else { return [] }
 
         // Stage 1: Template Interpolation {{...}}
         if trimmed.contains("{{") && trimmed.contains("}}") {
@@ -551,6 +566,13 @@ struct HtmlRuleExtractor {
         // `keyword`, `page`, `book`, `source` and earlier `@put` values must
         // stay visible when a source mixes `@js:` selectors with JS values.
         for (key, value) in variables {
+            jsVariables[key] = value
+        }
+        // `@put` values written by earlier rules live in the source-scoped
+        // context, not in the caller's `variables` dictionary.  Legado JS
+        // reads them through `java.get`; expose the snapshot as bare variables
+        // too, without overriding real inputs.
+        for (key, value) in executionContext.persistentSnapshot() where jsVariables[key] == nil {
             jsVariables[key] = value
         }
         if let elements {
@@ -1052,6 +1074,9 @@ struct HtmlRuleExtractor {
         }
         for (k, v) in extraVariables {
             variables[k] = v
+        }
+        for (key, value) in executionContext.persistentSnapshot() where variables[key] == nil {
+            variables[key] = value
         }
 
         let evaluated = runtime.evaluate(script, variables: variables)
