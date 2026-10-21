@@ -147,6 +147,14 @@ struct ContentParser {
                 paragraphs = extractFallbackParagraphs(from: response.body, baseUrl: response.url, title: chapter.title)
             }
 
+            paragraphs = applyingImageDecode(
+                to: paragraphs,
+                rule: source.ruleContent,
+                chapter: chapter,
+                response: response,
+                variables: variables
+            )
+
             let next = try? htmlExtractor.value(
                 from: root,
                 rule: htmlExtractor.firstRule(source.ruleContent, keys: ["nextContentUrl"]),
@@ -230,7 +238,13 @@ struct ContentParser {
             if !text.isEmpty { content = text }
         }
         let cleaned = applyContentTransforms(content ?? "", rule: rule, globalPurifyRules: globalPurifyRules, variables: variables)
-        let paragraphs = splitParagraphs(cleaned)
+        let paragraphs = applyingImageDecode(
+            to: splitParagraphs(cleaned),
+            rule: rule,
+            chapter: chapter,
+            response: response,
+            variables: variables
+        )
         let next: String?
         if let dict = rootObject as? [String: Any] {
             next = jsonExtractor.string(
@@ -245,6 +259,123 @@ struct ContentParser {
         return paragraphs.isEmpty
             ? .failure(.empty("JSON \u{6b63}\u{6587}\u{89e3}\u{6790}\u{7ed3}\u{679c}\u{4e3a}\u{7a7a}"))
             : .success(ChapterContent(chapter: chapter, title: chapter.title, paragraphs: paragraphs, nextContentUrl: next))
+    }
+
+    /// Legado `ruleContent.imageDecode`: rewrite each `[img]url[/img]` URL with
+    /// the source's image decode rule.  The rule receives the image URL as
+    /// `result` (Legado's `AnalyzeRule.getString` contract), so JS snippets such
+    /// as `@js:result.replace('/thumb/','/large/')` work without any
+    /// source-specific handling.  Bare selectors are not valid decode rules;
+    /// only JS, `java.` expressions and `##pattern##replacement##` are applied.
+    private func applyingImageDecode(
+        to paragraphs: [String],
+        rule: SourceRule?,
+        chapter: BookChapter,
+        response: SourceResponse,
+        variables: [String: Any]
+    ) -> [String] {
+        guard let rawRule = rule?.fields["imageDecode"]?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !rawRule.isEmpty else { return paragraphs }
+
+        // Legado treats `java.xxx` as a JavaScript expression.  Normalizing it
+        // here keeps the evaluator path identical to `@js:`.
+        let decodeRule = rawRule.hasPrefix("java.") ? "@js:\(rawRule)" : rawRule
+        let isJS = LegadoRuleResolver().isJavaScriptRule(decodeRule)
+        guard isJS || decodeRule.contains("##") else {
+            executionContext.log("imageDecode skipped: unsupported rule form")
+            return paragraphs
+        }
+        guard let regex = try? NSRegularExpression(
+            pattern: #"\[img\](.*?)\[/img\]"#,
+            options: [.caseInsensitive]
+        ) else {
+            return paragraphs
+        }
+
+        guard paragraphs.contains(where: { $0.contains("[img]") }) else { return paragraphs }
+
+        let chapterMap: [String: Any] = [
+            "title": chapter.title,
+            "url": chapter.url,
+            "bookUrl": chapter.bookUrl,
+            "index": chapter.index
+        ]
+
+        // Reuse the source-scoped JS runtime: a comic chapter can carry
+        // hundreds of image URLs and creating one JavaScriptCore context per
+        // image would dominate the chapter load time.
+        var script: String?
+        if isJS {
+            var body = decodeRule
+            if body.hasPrefix("@js:") {
+                body = String(body.dropFirst(4))
+            } else if body.hasPrefix("<js>") && body.hasSuffix("</js>") {
+                body = String(body.dropFirst(4).dropLast(5))
+            }
+            script = body
+        }
+        let source = variables["source"] as? BookSource
+        let runtime = script.map { _ in
+            executionContext.jsRuntime(ajaxHandler: { urlText in
+                if let source {
+                    return SynchronousSourceLoader().load(urlText: urlText, source: source)
+                }
+                return ""
+            })
+        }
+
+        return paragraphs.map { paragraph in
+            let nsParagraph = paragraph as NSString
+            let matches = regex.matches(in: paragraph, range: NSRange(location: 0, length: nsParagraph.length))
+            guard !matches.isEmpty else { return paragraph }
+            var output = paragraph
+            // Replace from the end so earlier UTF-16 ranges stay valid.
+            for match in matches.reversed() {
+                guard match.numberOfRanges > 1 else { continue }
+                let url = nsParagraph.substring(with: match.range(at: 1))
+                    .trimmingCharacters(in: .whitespacesAndNewlines)
+                guard !url.isEmpty else { continue }
+                var imageVariables = variables
+                imageVariables["chapter"] = chapterMap
+                imageVariables["imageUrl"] = url
+                imageVariables["result"] = url
+                let decoded: String
+                if let script, let runtime {
+                    switch runtime.evaluate(script, variables: imageVariables) {
+                    case .success(let value):
+                        decoded = value
+                    case .failure:
+                        if script.contains("return"),
+                           case .success(let value) = runtime.evaluate("(function(){\(script)})()", variables: imageVariables) {
+                            decoded = value
+                        } else {
+                            executionContext.log("imageDecode JavaScript failed; keeping original image URL")
+                            continue
+                        }
+                    }
+                } else {
+                    decoded = PurifyRuleEvaluator.apply(
+                        rule: decodeRule,
+                        to: url,
+                        variables: imageVariables,
+                        executionContext: executionContext
+                    )
+                }
+                let trimmed = decoded.trimmingCharacters(in: .whitespacesAndNewlines)
+                // An empty decode result is treated as "no rewrite": dropping
+                // the illustration is worse than keeping the original URL.
+                guard !trimmed.isEmpty else {
+                    executionContext.log("imageDecode produced empty result; keeping original image URL")
+                    continue
+                }
+                let finalURL = htmlExtractor.absolutize(trimmed, base: response.url)
+                guard !finalURL.isEmpty else { continue }
+                if let range = Range(match.range(at: 0), in: output) {
+                    output.replaceSubrange(range, with: "[img]\(finalURL)[/img]")
+                }
+            }
+            return output
+        }
     }
 
     private func splitParagraphs(_ text: String) -> [String] {

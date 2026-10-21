@@ -227,4 +227,189 @@ final class ContentParserTests: XCTestCase {
             "后文段落"
         ])
     }
+
+    func testImageDecodeRewritesImageURLWithJavaScript() throws {
+        let source = BookSource(
+            bookSourceName: "TestImageDecodeJS",
+            bookSourceUrl: "https://example.com",
+            ruleContent: SourceRule(fields: [
+                "content": ".content@html",
+                "imageDecode": "<js>result = result.replace('/thumb/', '/large/'); result;</js>"
+            ])
+        )
+        let chapter = BookChapter(
+            title: "Chapter 1",
+            url: "https://example.com/book/1/1.html",
+            bookUrl: "https://example.com/book/1",
+            index: 0,
+            isVip: false
+        )
+        let response = SourceResponse(
+            url: URL(string: chapter.url)!,
+            statusCode: 200,
+            headers: [:],
+            body: """
+            <html><body>
+              <div class="content">
+                <p>前文段落</p>
+                <p><img src="https://img.example.com/thumb/1.jpg" /></p>
+              </div>
+            </body></html>
+            """,
+            data: Data()
+        )
+
+        let result = ContentParser().parse(source: source, chapter: chapter, response: response)
+
+        guard case .success(let content) = result else {
+            return XCTFail("expected parsed content")
+        }
+        XCTAssertEqual(content.paragraphs, [
+            "前文段落",
+            "[img]https://img.example.com/large/1.jpg[/img]"
+        ])
+    }
+
+    func testImageDecodeSupportsRegexReplacement() throws {
+        let source = BookSource(
+            bookSourceName: "TestImageDecodeRegex",
+            bookSourceUrl: "https://example.com",
+            ruleContent: SourceRule(fields: [
+                "content": ".content@html",
+                "imageDecode": "##/thumb/##/large/##"
+            ])
+        )
+        let chapter = BookChapter(
+            title: "Chapter 1",
+            url: "https://example.com/book/1/1.html",
+            bookUrl: "https://example.com/book/1",
+            index: 0,
+            isVip: false
+        )
+        let response = SourceResponse(
+            url: URL(string: chapter.url)!,
+            statusCode: 200,
+            headers: [:],
+            body: """
+            <html><body>
+              <div class="content"><p><img src="https://img.example.com/thumb/2.jpg" /></p></div>
+            </body></html>
+            """,
+            data: Data()
+        )
+
+        let result = ContentParser().parse(source: source, chapter: chapter, response: response)
+
+        guard case .success(let content) = result else {
+            return XCTFail("expected parsed content")
+        }
+        XCTAssertEqual(content.paragraphs, ["[img]https://img.example.com/large/2.jpg[/img]"])
+    }
+
+    func testImageDecodeAbsolutizesRelativeResult() throws {
+        let source = BookSource(
+            bookSourceName: "TestImageDecodeRelative",
+            bookSourceUrl: "https://example.com",
+            ruleContent: SourceRule(fields: [
+                "content": ".content@html",
+                "imageDecode": "<js>result = '/images/cover.jpg';</js>"
+            ])
+        )
+        let chapter = BookChapter(
+            title: "Chapter 1",
+            url: "https://example.com/book/1/1.html",
+            bookUrl: "https://example.com/book/1",
+            index: 0,
+            isVip: false
+        )
+        let response = SourceResponse(
+            url: URL(string: chapter.url)!,
+            statusCode: 200,
+            headers: [:],
+            body: """
+            <html><body>
+              <div class="content"><p><img src="https://img.example.com/thumb/3.jpg" /></p></div>
+            </body></html>
+            """,
+            data: Data()
+        )
+
+        let result = ContentParser().parse(source: source, chapter: chapter, response: response)
+
+        guard case .success(let content) = result else {
+            return XCTFail("expected parsed content")
+        }
+        XCTAssertEqual(content.paragraphs, ["[img]https://example.com/images/cover.jpg[/img]"])
+    }
+
+    func testImageDecodeKeepsOriginalURLWhenDecodeReturnsEmpty() throws {
+        let source = BookSource(
+            bookSourceName: "TestImageDecodeEmpty",
+            bookSourceUrl: "https://example.com",
+            ruleContent: SourceRule(fields: [
+                "content": ".content@html",
+                "imageDecode": "<js>result = '';</js>"
+            ])
+        )
+        let chapter = BookChapter(
+            title: "Chapter 1",
+            url: "https://example.com/book/1/1.html",
+            bookUrl: "https://example.com/book/1",
+            index: 0,
+            isVip: false
+        )
+        let response = SourceResponse(
+            url: URL(string: chapter.url)!,
+            statusCode: 200,
+            headers: [:],
+            body: """
+            <html><body>
+              <div class="content"><p><img src="https://img.example.com/original.jpg" /></p></div>
+            </body></html>
+            """,
+            data: Data()
+        )
+
+        let result = ContentParser().parse(source: source, chapter: chapter, response: response)
+
+        guard case .success(let content) = result else {
+            return XCTFail("expected parsed content")
+        }
+        XCTAssertEqual(content.paragraphs, ["[img]https://img.example.com/original.jpg[/img]"])
+    }
+
+    func testJSONContentAppliesImageDecode() throws {
+        let source = BookSource(
+            bookSourceName: "TestImageDecodeJSON",
+            bookSourceUrl: "https://api.example.com",
+            ruleContent: SourceRule(fields: [
+                "content": "data.content",
+                "imageDecode": "<js>result = result.replace('small', 'big'); result;</js>"
+            ])
+        )
+        let chapter = BookChapter(
+            title: "Chapter 1",
+            url: "https://api.example.com/c/1",
+            bookUrl: "https://api.example.com/book/1",
+            index: 0,
+            isVip: false
+        )
+        let response = SourceResponse(
+            url: URL(string: chapter.url)!,
+            statusCode: 200,
+            headers: [:],
+            body: #"{"data":{"content":"<p>前文</p><p><img src=\"https://img.example.com/small/2.jpg\"/></p>"}}"#,
+            data: Data()
+        )
+
+        let result = ContentParser().parse(source: source, chapter: chapter, response: response)
+
+        guard case .success(let content) = result else {
+            return XCTFail("expected parsed content")
+        }
+        XCTAssertEqual(content.paragraphs, [
+            "前文",
+            "[img]https://img.example.com/big/2.jpg[/img]"
+        ])
+    }
 }
