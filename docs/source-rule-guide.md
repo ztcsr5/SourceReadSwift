@@ -1,7 +1,11 @@
 # 纸间 (InPage) · 源流 (SourceFlow) 书源规则完全开发指南
 
 > 本文档适用于 **「纸间 (InPage)」** 及其核心驱动 **「源流 (SourceFlow)」** 引擎。
-> 本引擎 **100% 完整兼容开源 阅读 3.0 (Legado)** 的 JSON 书源格式标准，同时在 iOS 原生环境（Swift + JavaScriptCore）下提供了毫秒级并发解析与全链路容错。
+> **兼容目标**：对齐开源阅读 3.0（Legado）JSON 书源的 Search → Detail → TOC → Content 主链与常用规则语义。
+>
+> **已实现范围**：主链解析、CSS/XPath/JSONPath 子集、JavaScriptCore 桥、GBK/GB18030、常见加密、ZIP、字体映射、分页与元数据链路；具体能力以 [SOURCE-CAPABILITY-MATRIX.md](SOURCE-CAPABILITY-MATRIX.md) 为准。
+>
+> **未验证边界**：JSONPath 不是 Jayway 全量实现，`java.*` 存在同步 facade 与 stub，7z/RAR、自动 OCR、真实付费解锁等能力不在当前范围；详见 [JSON-IOS-COMPATIBILITY.md](JSON-IOS-COMPATIBILITY.md)。
 
 ---
 
