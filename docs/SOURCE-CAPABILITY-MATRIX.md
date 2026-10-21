@@ -76,9 +76,9 @@
 `chapterList`, `chapterName`, `chapterUrl`, `formatJs`, `isPay`, `isVip`, `isVolume`, `nextTocUrl`, `preUpdateJs`, `updateTime`, `wordCount`
 
 - `chapterList` / `chapterName` / `chapterUrl` / `nextTocUrl` / `updateTime` / `isVip` 已进入目录模型和阅读 UI。
-- `isVolume`：**当前没有引擎消费点**。`LocalTxtSmartDivider` 里的同名字段只是本地 TXT 分卷变量，不是 Legado `ruleToc.isVolume` 实现。
+- `isVolume`：已进入 HTML 与 JSON 两条目录解析链。规则命中为真的行按卷标题处理：不生成章节、写入后续章节的 `volumeName`，由 `ChapterListPresenter.volumeHeader` 在卷边界渲染标题。与 Legado“保留卷行”的模型差异是：本项目的章节模型不承载伪章节，因此卷行被消费而不是原样保留；跨页目录的 `currentVolume` 目前按页重置，跨页续卷仍是开放点。
 - `preUpdateJs`：**当前没有执行点**，规则中的值会被保留/展示，但不会参与目录刷新。
-- `formatJs`：**当前仅在书源编辑器作为文本保存**，没有进入目录格式化执行链。
+- `formatJs`：已在全量目录（含分页）收集完成、章节索引定稿后执行。脚本变量为 `title`、1-based `index`（与 Legado `index + 1` 对齐）、`chapter`、`gInt`；返回值替换章节标题，空值/`undefined`/`null`/单章异常回退原标题，不影响其余章节。支持 `@js:` 与 `<js>...</js>` 包装，顶层 `return` 会以函数包装重试一次。
 - `wordCount`：目录字段可被解析，但目录 UI 目前不展示逐章字数。
 
 ### 3.4 `ruleContent`
@@ -106,8 +106,8 @@
 
 | 优先级 | 缺口 | 影响 | 处理建议 |
 |---|---|---|---|
-| P0 | `isVolume` 未消费 | 分卷目录全部平铺，卷标题丢失 | 在目录解析模型中加入 volume，按卷分组渲染 |
-| P0 | `formatJs` 未执行 | 依赖 JS 生成章节名的源会出现空名/原名 | 在章节名解析后、模型落盘前执行，带超时与失败回退 |
+| 已完成（P0） | `isVolume` 目录链路 | 分卷目录平铺、卷标题丢失 | 已实现 HTML/JSON 卷行消费与 `volumeHeader` 边界渲染；回归 `ChapterListMetadataTests.testHTMLVolumeRowsBecomeVolumeNamesAndAreNotChapters`、`testJSONVolumeRowsSupportBooleanAndStringFlags` |
+| 已完成（P0） | `formatJs` 目录链路 | 依赖 JS 生成章节名的源出现空名/原名 | 已在全量目录后执行，1-based index、单章失败回退；回归 `ChapterListMetadataTests.testFormatJsRunsAfterPaginationWithOneBasedIndex` |
 | P1 | `preUpdateJs` 未执行 | 目录刷新前无法清理/更新状态 | 在 TOC 请求前执行，限制副作用并记录失败 |
 | P1 | `imageDecode` 未执行 | 图文/拼图源正文图片不可用 | 先定义图片分段模型，再实现解码器；不要伪造成文本 |
 | P1 | `payAction` 未执行 | VIP/付费源只能展示不可读 | 明确产品边界：展示 VIP 标记，不伪造购买/解锁 |

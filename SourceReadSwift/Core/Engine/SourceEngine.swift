@@ -382,7 +382,7 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
             guard case .success(let firstPage) = parsed else {
                 return parsed.map { $0.chapters }
             }
-            return await appendNextChapterListPages(
+            let result = await appendNextChapterListPages(
                 firstPage,
                 source: source,
                 book: book,
@@ -390,6 +390,18 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
                 maxPages: maxPages,
                 executionContext: executionContext
             )
+            switch result {
+            case .success(let chapters):
+                let formatted = applyTocFormatJs(
+                    chapters,
+                    source: source,
+                    executionContext: executionContext
+                )
+                recordJavaScriptEvidence(source: source, stage: "toc.format", context: executionContext)
+                return .success(formatted)
+            case .failure:
+                return result
+            }
         case .failure(let error):
             await emitFailure(error, stage: "toc.load", source: source, details: ["url": request.url.absoluteString])
             await emitPaginationStop(
@@ -921,6 +933,63 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
         return ChapterListParser(executionContext: executionContext).parsePage(source: source, book: book, response: response)
     }
 
+    /// Legado runs `ruleToc.formatJs` once the complete TOC (including every
+    /// pagination page) has been collected and chapter indices are final.
+    /// The script receives 1-based `index`, `title`, `chapter`, and `gInt`;
+    /// its return value replaces the chapter title.  A failure on one chapter
+    /// must not discard the rest of the TOC, so each chapter falls back to its
+    /// parsed title.
+    private func applyTocFormatJs(
+        _ chapters: [BookChapter],
+        source: BookSource,
+        executionContext: RuleExecutionContext
+    ) -> [BookChapter] {
+        guard let raw = source.ruleToc?.fields["formatJs"]?
+            .trimmingCharacters(in: .whitespacesAndNewlines),
+              !raw.isEmpty else { return chapters }
+
+        var script = raw
+        if script.hasPrefix("@js:") {
+            script = String(script.dropFirst(4)).trimmingCharacters(in: .whitespacesAndNewlines)
+        } else if script.hasPrefix("<js>"), script.hasSuffix("</js>") {
+            script = String(script.dropFirst(4).dropLast(5)).trimmingCharacters(in: .whitespacesAndNewlines)
+        }
+        guard !script.isEmpty else { return chapters }
+
+        let runtime = executionContext.jsRuntime(ajaxHandler: { urlText in
+            executionContext.networkHandler?(urlText)
+                ?? SynchronousSourceLoader().load(urlText: urlText, source: source)
+        })
+
+        return chapters.enumerated().map { offset, chapter in
+            let variables: [String: Any] = [
+                "gInt": 0,
+                "index": offset + 1,
+                "chapter": LegadoBookChapterBridge(chapter: chapter),
+                "title": chapter.title
+            ]
+            var outcome = runtime.evaluate(script, variables: variables)
+            // Legado sources occasionally use a top-level `return`.  A bare
+            // script rejects it ("Illegal return statement"); retry once in a
+            // function wrapper so those sources keep working.
+            if case .failure = outcome, script.contains("return") {
+                outcome = runtime.evaluate("(function(){\n\(script)\n})()", variables: variables)
+            }
+            guard case .success(let value) = outcome else { return chapter }
+            let title = value.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !title.isEmpty, title != "undefined", title != "null" else { return chapter }
+            return BookChapter(
+                title: title,
+                url: chapter.url,
+                bookUrl: chapter.bookUrl,
+                index: chapter.index,
+                isVip: chapter.isVip,
+                updateTime: chapter.updateTime,
+                volumeName: chapter.volumeName
+            )
+        }
+    }
+
     private func syncLoad(
         encoded: String,
         source: BookSource,
@@ -1021,7 +1090,9 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
                             url: chapter.url,
                             bookUrl: chapter.bookUrl,
                             index: offset + localIndex,
-                            isVip: chapter.isVip
+                            isVip: chapter.isVip,
+                            updateTime: chapter.updateTime,
+                            volumeName: chapter.volumeName
                         )
                     })
                     nextURLText = page.nextTocUrl?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty

@@ -30,8 +30,10 @@
 | **搜索阶段** | `searchUrl` | 搜索请求 URL（支持 `{{key}}`、`{{page}}` 插值及 `@js:` 计算） |
 | | `ruleSearch` | 搜索列表解析规则组（包含 `bookList`、`name`、`author`、`bookUrl`、`coverUrl` 等） |
 | **详情阶段** | `ruleBookInfo` | 书籍详情与元数据（最核心字段为真正目录入口 `tocUrl`） |
-| **目录阶段** | `ruleToc` | 目录列表解析规则（包含 `chapterList`、`chapterName`、`chapterUrl`、`nextTocUrl`） |
+| **目录阶段** | `ruleToc` | 目录列表解析规则（包含 `chapterList`、`chapterName`、`chapterUrl`、`nextTocUrl`、`isVolume`、`formatJs`、`updateTime`） |
 | **正文阶段** | `ruleContent` | 正文抓取与清洗（包含 `content` 提取规则、`replaceRegex` 净化正则） |
+
+> 目录补充：`isVolume` 命中行作为卷标题消费（不生成章节），后续章节写入 `volumeName`；`formatJs` 在全量目录收集后执行，变量为 `title` / 1-based `index` / `chapter` / `gInt`，返回新标题。
 
 ---
 

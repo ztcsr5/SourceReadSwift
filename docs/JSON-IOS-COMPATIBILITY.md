@@ -21,6 +21,7 @@
 | JS/桥测试 | `LegadoJavaScriptCompatibilityTests.swift`、`LegadoNativeBridgeTests.swift`、`LegadoJavaCompatibilityTests.swift` |
 | 端到端 fixture | `SourceEngineLegadoCorpusTests.swift`、`SourceEngineCLevelFixtureTests.swift`、`LegadoStage25CompatibilityTests.swift` |
 | 能力样本库 | `SourceReadSwiftTests/Fixtures/legado-capability-bank-20260908.json` |
+| 目录元数据测试 | `SourceReadSwiftTests/ChapterListMetadataTests.swift` |
 
 ## 2. JSONPath 方言：支持什么，不支持什么
 
@@ -101,6 +102,43 @@
 2. 对必须人工交互的流程，显式建模为 UI 状态机；
 3. 对无法在单次规则执行内完成的流程，返回可诊断的 `verification-required` / `unsupported`，不返回假成功。
 
+### 3.4 目录链路：`isVolume` / `formatJs`（已实现）
+
+Legado 目录规则里两个直接影响目录展示的字段已经进入主链，并有 fixture 回归。
+
+**`isVolume`（卷行）**
+
+```json
+{
+  "ruleToc": {
+    "chapterList": "$.data.chapters",
+    "chapterName": "title",
+    "chapterUrl": "url",
+    "isVolume": "isVolume",
+    "updateTime": "updateTime"
+  }
+}
+```
+
+卷行（`isVolume` 为 `true` / `"true"` / `"yes"` / `1` 等非空真值）不生成章节，而是写入后续章节的 `volumeName`；`false` / `"false"` / `"no"` / `"0"` / `null` / 空串按普通章节处理。HTML 与 JSON 两条解析路径行为一致，卷行跳过后章节 `index` 保持连续。当前边界：分页目录的卷标题不跨页继承，每页重新开始。
+
+**`formatJs`（章节名格式化）**
+
+```json
+{
+  "ruleToc": {
+    "chapterList": "$.data.chapters",
+    "chapterName": "title",
+    "chapterUrl": "url",
+    "formatJs": "@js: title + '（' + index + '）'"
+  }
+}
+```
+
+`formatJs` 在全量目录（含 `nextTocUrl` 分页）收集完成、章节索引定稿后执行；变量为 `title`、1-based `index`、`chapter`（LegadoBookChapterBridge）与 `gInt`（与 Legado `BookChapterList.kt` 的 `bindings["index"] = index + 1` 对齐）。返回空值 / `undefined` / `null` 或单章抛错时回退原标题，不影响其他章节；支持 `@js:` 与 `<js>...</js>` 两种包装，脚本顶层 `return` 会自动以函数包装重试一次。回归用例：`ChapterListMetadataTests.testFormatJsRunsAfterPaginationWithOneBasedIndex`。
+
+这两项不改变“能力矩阵 + 降级边界”的口径：`preUpdateJs` 仍未执行，目录 `wordCount` 仍未在 UI 展示。
+
 ## 4. 为什么“完美兼容”很难
 
 ### 4.1 平台能力差异
@@ -143,7 +181,7 @@
 
 | 优先级 | 工作 | 验收 |
 |---|---|---|
-| P0 | 补 `isVolume` / `formatJs` 的目录链路 | 分卷标题、章节名在 fixture 中可验证 |
+| P0（已完成） | `isVolume` / `formatJs` 目录链路 | `ChapterListMetadataTests` 5 个用例通过 |
 | P0 | 为 `startBrowserAwait` / 验证码建立 UI 状态机 | 不再返回假成功，UI 有明确状态 |
 | P1 | 把 JSONPath 方言差异写成可执行用例 | 每个差异至少一个 XCTest |
 | P1 | 为 `java.*` stub 建立运行时诊断 | 调用时记录 API 名、源、章节、失败原因 |

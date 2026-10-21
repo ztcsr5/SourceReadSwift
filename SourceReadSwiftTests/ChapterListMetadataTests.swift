@@ -1,0 +1,215 @@
+import Foundation
+import XCTest
+@testable import SourceReadSwift
+
+/// Covers Legado TOC metadata that previously stopped at the parser boundary:
+/// volume rows (`ruleToc.isVolume`), post-processing (`ruleToc.formatJs`), and
+/// metadata retention across paginated TOC pages.
+final class ChapterListMetadataTests: XCTestCase {
+    func testHTMLVolumeRowsBecomeVolumeNamesAndAreNotChapters() async throws {
+        let tocURL = "https://fixture.example/book/html-volume/toc"
+        let source = BookSource(
+            bookSourceName: "HTML volume fixture",
+            bookSourceUrl: "https://fixture.example",
+            ruleToc: SourceRule(fields: [
+                "chapterList": "div.catalog h3, div.catalog a",
+                "chapterName": "h3.volume@text||a@text",
+                "chapterUrl": "a@href",
+                "isVolume": "h3.volume@text"
+            ])
+        )
+        let network = ChapterFixtureNetworkClient(responses: [
+            tocURL: """
+                <html><body>
+                  <div class="catalog">
+                    <h3 class="volume">第一卷</h3>
+                    <a href="/chapter/1">第一章</a>
+                    <a href="/chapter/2">第二章</a>
+                    <h3 class="volume">第二卷</h3>
+                    <a href="/chapter/3">第三章</a>
+                  </div>
+                </body></html>
+                """
+        ])
+        let engine = LegadoSourceEngine(network: network)
+
+        let chapters = try await unwrap(engine.getChapterList(source: source, book: makeBook(tocURL: tocURL)))
+
+        XCTAssertEqual(chapters.map(\.title), ["第一章", "第二章", "第三章"])
+        XCTAssertEqual(chapters.map(\.volumeName), ["第一卷", "第一卷", "第二卷"])
+        XCTAssertEqual(chapters.map(\.index), [0, 1, 2])
+    }
+
+    func testJSONVolumeRowsSupportBooleanAndStringFlags() async throws {
+        let tocURL = "https://fixture.example/book/json-volume/toc"
+        let source = BookSource(
+            bookSourceName: "JSON volume fixture",
+            bookSourceUrl: "https://fixture.example",
+            ruleToc: SourceRule(fields: [
+                "chapterList": "$.chapters[*]",
+                "chapterName": "$.title",
+                "chapterUrl": "$.url",
+                "isVolume": "$.isVolume"
+            ])
+        )
+        let network = ChapterFixtureNetworkClient(responses: [
+            tocURL: #"""
+                {"chapters":[
+                  {"title":"第一卷","isVolume":true},
+                  {"title":"第一章","url":"/chapter/1"},
+                  {"title":"第二卷","isVolume":"true"},
+                  {"title":"第二章","url":"/chapter/2"}
+                ]}
+                """#
+        ])
+        let engine = LegadoSourceEngine(network: network)
+
+        let chapters = try await unwrap(engine.getChapterList(source: source, book: makeBook(tocURL: tocURL)))
+
+        XCTAssertEqual(chapters.map(\.title), ["第一章", "第二章"])
+        XCTAssertEqual(chapters.map(\.volumeName), ["第一卷", "第二卷"])
+        XCTAssertEqual(chapters.map(\.index), [0, 1])
+    }
+
+    func testFormatJsRunsAfterPaginationWithOneBasedIndex() async throws {
+        let tocURL = "https://fixture.example/book/format-js/toc"
+        let source = BookSource(
+            bookSourceName: "formatJs fixture",
+            bookSourceUrl: "https://fixture.example",
+            ruleToc: SourceRule(fields: [
+                "chapterList": "div.catalog a",
+                "chapterName": "a@text",
+                "chapterUrl": "a@href",
+                "formatJs": "title + '（' + index + '）'"
+            ])
+        )
+        let network = ChapterFixtureNetworkClient(responses: [
+            tocURL: """
+                <html><body><div class="catalog">
+                  <a href="/chapter/1">第一章</a>
+                  <a href="/chapter/2">第二章</a>
+                </div></body></html>
+                """
+        ])
+        let engine = LegadoSourceEngine(network: network)
+
+        let chapters = try await unwrap(engine.getChapterList(source: source, book: makeBook(tocURL: tocURL)))
+
+        XCTAssertEqual(chapters.map(\.title), ["第一章（1）", "第二章（2）"])
+        XCTAssertEqual(chapters.map(\.index), [0, 1])
+    }
+
+    func testPaginationPreservesUpdateTimeAndVolumeName() async throws {
+        let tocURL = "https://fixture.example/book/paged/toc"
+        let page2URL = "https://fixture.example/book/paged/toc?page=2"
+        let source = BookSource(
+            bookSourceName: "Paged metadata fixture",
+            bookSourceUrl: "https://fixture.example",
+            ruleToc: SourceRule(fields: [
+                "chapterList": "div.catalog a.chapter",
+                "chapterName": "a@text",
+                "chapterUrl": "a@href",
+                "updateTime": "a@data-update",
+                "volumeName": "a@data-volume",
+                "nextTocUrl": "a.next@href"
+            ])
+        )
+        let network = ChapterFixtureNetworkClient(responses: [
+            tocURL: """
+                <html><body>
+                  <div class="catalog">
+                    <a class="chapter" href="/chapter/1" data-update="2026-01-01" data-volume="第一卷">第一章</a>
+                  </div>
+                  <a class="next" href="\(page2URL)">下一页</a>
+                </body></html>
+                """,
+            page2URL: """
+                <html><body>
+                  <div class="catalog">
+                    <a class="chapter" href="/chapter/2" data-update="2026-01-02" data-volume="第二卷">第二章</a>
+                  </div>
+                </body></html>
+                """
+        ])
+        let engine = LegadoSourceEngine(network: network)
+
+        let chapters = try await unwrap(engine.getChapterList(source: source, book: makeBook(tocURL: tocURL)))
+
+        XCTAssertEqual(chapters.map(\.title), ["第一章", "第二章"])
+        XCTAssertEqual(chapters.map(\.updateTime), ["2026-01-01", "2026-01-02"])
+        XCTAssertEqual(chapters.map(\.volumeName), ["第一卷", "第二卷"])
+        XCTAssertEqual(chapters.map(\.index), [0, 1])
+        XCTAssertEqual(network.requestedURLs, [tocURL, page2URL])
+    }
+
+    func testVolumeHeaderOnlyChangesAtBoundaries() {
+        let chapters = [
+            BookChapter(title: "一", url: "u1", bookUrl: "b", index: 0, volumeName: "A"),
+            BookChapter(title: "二", url: "u2", bookUrl: "b", index: 1, volumeName: "A"),
+            BookChapter(title: "三", url: "u3", bookUrl: "b", index: 2, volumeName: "B"),
+            BookChapter(title: "四", url: "u4", bookUrl: "b", index: 3, volumeName: nil)
+        ]
+
+        XCTAssertEqual(ChapterListPresenter.volumeHeader(at: 0, in: chapters), "A")
+        XCTAssertNil(ChapterListPresenter.volumeHeader(at: 1, in: chapters))
+        XCTAssertEqual(ChapterListPresenter.volumeHeader(at: 2, in: chapters), "B")
+        XCTAssertNil(ChapterListPresenter.volumeHeader(at: 3, in: chapters))
+    }
+
+    private func makeBook(tocURL: String) -> BookDetail {
+        BookDetail(
+            name: "Fixture Book",
+            author: "Fixture Author",
+            coverUrl: nil,
+            bookUrl: "https://fixture.example/book/fixture",
+            tocUrl: tocURL,
+            sourceName: "Fixture",
+            sourceUrl: "https://fixture.example",
+            intro: nil,
+            latestChapter: nil
+        )
+    }
+
+    private func unwrap<T>(_ result: Result<T, SourceEngineError>, file: StaticString = #filePath, line: UInt = #line) throws -> T {
+        switch result {
+        case .success(let value): return value
+        case .failure(let error):
+            XCTFail("source pipeline failed: \(error)", file: file, line: line)
+            throw error
+        }
+    }
+}
+
+private final class ChapterFixtureNetworkClient: SourceNetworkClient, @unchecked Sendable {
+    private let responses: [String: String]
+    private let lock = NSLock()
+    private var recordedURLs: [String] = []
+
+    init(responses: [String: String]) {
+        self.responses = responses
+    }
+
+    var requestedURLs: [String] {
+        lock.lock()
+        defer { lock.unlock() }
+        return recordedURLs
+    }
+
+    func load(_ request: SourceRequest) async -> Result<SourceResponse, SourceEngineError> {
+        lock.lock()
+        recordedURLs.append(request.url.absoluteString)
+        lock.unlock()
+        guard let body = responses[request.url.absoluteString] else {
+            return .failure(.network("fixture response missing for \(request.url.absoluteString)"))
+        }
+        let trimmed = body.trimmingCharacters(in: .whitespacesAndNewlines)
+        let contentType = trimmed.first == "{" || trimmed.first == "[" ? "application/json" : "text/html"
+        return .success(SourceResponse(
+            url: request.url,
+            statusCode: 200,
+            headers: ["Content-Type": contentType],
+            body: body,
+            data: Data(body.utf8)
+        ))
+    }
+}
