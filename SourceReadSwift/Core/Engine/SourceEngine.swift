@@ -1251,7 +1251,9 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
                 url: chapter.url,
                 bookUrl: chapter.bookUrl,
                 index: output.count,
-                isVip: chapter.isVip
+                isVip: chapter.isVip,
+                updateTime: chapter.updateTime,
+                volumeName: chapter.volumeName
             ))
         }
         return output

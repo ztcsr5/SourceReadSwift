@@ -858,6 +858,19 @@ final class JSONRuleExtractorTests: XCTestCase {
         XCTAssertEqual(value, "ABC123")
     }
 
+    func testInlineJavaScriptSegmentResolvesGetDirectiveTemplate() throws {
+        let extractor = JSONRuleExtractor()
+        let object: [String: Any] = ["data": ["token": "abc123"]]
+        _ = extractor.value(from: object, path: "@put:{token:$.data.token}$.data.token")
+
+        let value = extractor.value(
+            from: object,
+            path: "<js>return '@get:{token}'.toUpperCase()</js>"
+        ) as? String
+
+        XCTAssertEqual(value, "ABC123")
+    }
+
     func testJavaScriptRuleReadsStoredPutValue() throws {
         let extractor = JSONRuleExtractor()
         let object: [String: Any] = ["data": ["token": "abc123"]]

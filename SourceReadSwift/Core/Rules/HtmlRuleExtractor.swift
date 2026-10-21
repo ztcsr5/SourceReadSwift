@@ -15,7 +15,15 @@ final class RuleDirectiveStore {
     }
 
     func value(for key: String) -> String? {
-        values[key.trimmingCharacters(in: .whitespacesAndNewlines)]
+        let clean = key.trimmingCharacters(in: .whitespacesAndNewlines)
+        if let value = values[clean] { return value }
+        // Same casing tolerance as the JSON directive store: `@put` and
+        // `@get` are often written by hand in different cases.
+        let lowered = clean.lowercased()
+        for (storedKey, value) in values where storedKey.lowercased() == lowered {
+            return value
+        }
+        return nil
     }
 }
 

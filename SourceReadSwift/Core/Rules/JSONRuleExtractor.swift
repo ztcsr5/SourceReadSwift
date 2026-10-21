@@ -11,7 +11,16 @@ final class JSONRuleDirectiveStore {
     }
 
     func get(_ key: String) -> Any? {
-        values[key.trimmingCharacters(in: .whitespacesAndNewlines)]
+        let clean = key.trimmingCharacters(in: .whitespacesAndNewlines)
+        if let value = values[clean] { return value }
+        // Legado sources occasionally drift in directive key casing between
+        // `@put:{Token:...}` and `@get:{token}`.  Keys are opaque labels, so
+        // fall back to a case-insensitive match instead of returning nil.
+        let lowered = clean.lowercased()
+        for (storedKey, value) in values where storedKey.lowercased() == lowered {
+            return value
+        }
+        return nil
     }
 }
 
@@ -203,7 +212,11 @@ struct JSONRuleExtractor {
                 }
                 current = next
             case .js(let code):
-                guard let next = evaluateRawJS(script: code, object: current, extraVariables: variables) else {
+                // `@get:{key}` inside a JS rule is a template placeholder,
+                // not JavaScript.  Resolve it when the segment runs, after
+                // any earlier normal segment has stored its `@put` values.
+                let resolved = replaceGetDirectives(in: code)
+                guard let next = evaluateRawJS(script: resolved, object: current, extraVariables: variables) else {
                     return nil
                 }
                 current = next
@@ -2126,7 +2139,11 @@ struct JSONRuleExtractor {
                     current = applyTransforms(split.transforms, to: split.path)
                 }
             case .js(let code):
-                guard let next = evaluateRawJS(script: code, object: current, extraVariables: variables) else {
+                // `@get:{key}` inside a JS rule is a template placeholder,
+                // not JavaScript.  Resolve it when the segment runs, after
+                // any earlier normal segment has stored its `@put` values.
+                let resolved = replaceGetDirectives(in: code)
+                guard let next = evaluateRawJS(script: resolved, object: current, extraVariables: variables) else {
                     return nil
                 }
                 current = next
