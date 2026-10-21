@@ -1017,15 +1017,7 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
         let raw = executionContext.value(for: "book.reverseToc")
         guard Self.isTruthyFlag(raw) else { return chapters }
         return chapters.reversed().enumerated().map { offset, chapter in
-            BookChapter(
-                title: chapter.title,
-                url: chapter.url,
-                bookUrl: chapter.bookUrl,
-                index: offset,
-                isVip: chapter.isVip,
-                updateTime: chapter.updateTime,
-                volumeName: chapter.volumeName
-            )
+            chapter.withIndex(offset)
         }
     }
 
@@ -1088,15 +1080,7 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
             guard case .success(let value) = outcome else { return chapter }
             let title = value.trimmingCharacters(in: .whitespacesAndNewlines)
             guard !title.isEmpty, title != "undefined", title != "null" else { return chapter }
-            return BookChapter(
-                title: title,
-                url: chapter.url,
-                bookUrl: chapter.bookUrl,
-                index: chapter.index,
-                isVip: chapter.isVip,
-                updateTime: chapter.updateTime,
-                volumeName: chapter.volumeName
-            )
+            return chapter.withTitle(title)
         }
     }
 
@@ -1197,15 +1181,7 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
                     // page 2); filtering it out must not leave a gap before
                     // the next unique chapter.
                     chapters.append(contentsOf: uniquePageChapters.enumerated().map { localIndex, chapter in
-                        BookChapter(
-                            title: chapter.title,
-                            url: chapter.url,
-                            bookUrl: chapter.bookUrl,
-                            index: offset + localIndex,
-                            isVip: chapter.isVip,
-                            updateTime: chapter.updateTime,
-                            volumeName: chapter.volumeName
-                        )
+                        chapter.withIndex(offset + localIndex)
                     })
                     nextURLText = page.nextTocUrl?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty
                     pagesLoaded += 1
@@ -1359,15 +1335,7 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
         for chapter in values {
             let key = chapterURLIdentity(chapter.url, identity: identity)
             guard seen.insert(key).inserted else { continue }
-            output.append(BookChapter(
-                title: chapter.title,
-                url: chapter.url,
-                bookUrl: chapter.bookUrl,
-                index: output.count,
-                isVip: chapter.isVip,
-                updateTime: chapter.updateTime,
-                volumeName: chapter.volumeName
-            ))
+            output.append(chapter.withIndex(output.count))
         }
         return output
     }

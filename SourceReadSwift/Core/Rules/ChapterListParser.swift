@@ -259,16 +259,7 @@ struct ChapterListParser {
             // surviving rows to keep `index` contiguous on every HTML path.
             if !chapters.isEmpty {
                 chapters = chapters.enumerated().map { offset, chapter in
-                    BookChapter(
-                        title: chapter.title,
-                        url: chapter.url,
-                        bookUrl: chapter.bookUrl,
-                        index: offset,
-                        isVip: chapter.isVip,
-                        updateTime: chapter.updateTime,
-                        volumeName: chapter.volumeName,
-                        wordCount: chapter.wordCount
-                    )
+                    chapter.withIndex(offset)
                 }
             }
             var next: String?

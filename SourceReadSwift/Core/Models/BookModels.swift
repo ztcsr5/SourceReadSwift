@@ -168,6 +168,40 @@ struct BookChapter: Identifiable, Codable, Hashable, Sendable {
     }
 }
 
+extension BookChapter {
+    /// Returns a copy with a new zero-based index while preserving every
+    /// metadata field.  Rebuilding chapters field-by-field previously dropped
+    /// `wordCount` (and would silently drop future fields) during pagination
+    /// deduplication and reverse-TOC handling.
+    func withIndex(_ newIndex: Int) -> BookChapter {
+        BookChapter(
+            title: title,
+            url: url,
+            bookUrl: bookUrl,
+            index: newIndex,
+            isVip: isVip,
+            updateTime: updateTime,
+            volumeName: volumeName,
+            wordCount: wordCount
+        )
+    }
+
+    /// Returns a copy with a rewritten title (used by `formatJs`), preserving
+    /// all other metadata.
+    func withTitle(_ newTitle: String) -> BookChapter {
+        BookChapter(
+            title: newTitle,
+            url: url,
+            bookUrl: bookUrl,
+            index: index,
+            isVip: isVip,
+            updateTime: updateTime,
+            volumeName: volumeName,
+            wordCount: wordCount
+        )
+    }
+}
+
 struct ChapterContent: Codable, Hashable, Sendable {
     let chapter: BookChapter
     let title: String
