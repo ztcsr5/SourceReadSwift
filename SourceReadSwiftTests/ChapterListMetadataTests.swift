@@ -312,6 +312,73 @@ final class ChapterListMetadataTests: XCTestCase {
         XCTAssertEqual(chapters.map(\.index), [0, 1])
     }
 
+    func testHTMLChapterWordCountIsParsedAndPreserved() async throws {
+        let tocURL = "https://fixture.example/book/html-word-count/toc"
+        let source = BookSource(
+            bookSourceName: "HTML wordCount fixture",
+            bookSourceUrl: "https://fixture.example",
+            ruleToc: SourceRule(fields: [
+                "chapterList": "div.catalog a",
+                "chapterName": "a@text",
+                "chapterUrl": "a@href",
+                "wordCount": "a@data-words"
+            ])
+        )
+        let network = ChapterFixtureNetworkClient(responses: [
+            tocURL: """
+                <html><body><div class="catalog">
+                  <a href="/chapter/1" data-words="3200字">第一章</a>
+                  <a href="/chapter/2" data-words=" 4100字 ">第二章</a>
+                  <a href="/chapter/3">第三章</a>
+                </div></body></html>
+                """
+        ])
+        let engine = LegadoSourceEngine(network: network)
+
+        let chapters = try await unwrap(engine.getChapterList(source: source, book: makeBook(tocURL: tocURL)))
+
+        XCTAssertEqual(chapters.map(\.wordCount), ["3200字", "4100字", nil])
+        XCTAssertEqual(ChapterListPresenter.wordCountLabel(chapters[0]), "3200字")
+        XCTAssertEqual(ChapterListPresenter.metadataLabel(chapters[0]), "3200字")
+    }
+
+    func testJSONChapterWordCountSupportsNumberStringAndFallbackKeys() async throws {
+        let tocURL = "https://fixture.example/book/json-word-count/toc"
+        let source = BookSource(
+            bookSourceName: "JSON wordCount fixture",
+            bookSourceUrl: "https://fixture.example",
+            ruleToc: SourceRule(fields: [
+                "chapterList": "$.chapters[*]",
+                "chapterName": "$.title",
+                "chapterUrl": "$.url"
+            ])
+        )
+        let network = ChapterFixtureNetworkClient(responses: [
+            tocURL: #"""
+                {"chapters":[
+                  {"title":"第一章","url":"/chapter/1","wordCount":3200},
+                  {"title":"第二章","url":"/chapter/2","wordNum":"1.2万字"},
+                  {"title":"第三章","url":"/chapter/3","words":"  800字  "}
+                ]}
+                """#
+        ])
+        let engine = LegadoSourceEngine(network: network)
+
+        let chapters = try await unwrap(engine.getChapterList(source: source, book: makeBook(tocURL: tocURL)))
+
+        XCTAssertEqual(chapters.map(\.wordCount), ["3200", "1.2万字", "800字"])
+    }
+
+    func testBookChapterDecodesLegacyCacheWithoutWordCount() throws {
+        let legacy = #"""
+            {"title":"第一章","url":"https://fixture.example/1","bookUrl":"https://fixture.example/book","index":0,"isVip":false}
+            """#
+        let chapter = try JSONDecoder().decode(BookChapter.self, from: Data(legacy.utf8))
+        XCTAssertNil(chapter.wordCount)
+        XCTAssertNil(chapter.updateTime)
+        XCTAssertNil(chapter.volumeName)
+    }
+
     private func makeBook(tocURL: String) -> BookDetail {
         BookDetail(
             name: "Fixture Book",

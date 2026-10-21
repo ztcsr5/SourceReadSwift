@@ -573,8 +573,8 @@ struct BookDetailView: View {
                     .font(.body)
                     .foregroundStyle(.primary)
                     .lineLimit(1)
-                if let update = ChapterListPresenter.updateLabel(chapter) {
-                    Text(update)
+                if let metadata = ChapterListPresenter.metadataLabel(chapter) {
+                    Text(metadata)
                         .font(.caption2)
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
@@ -1275,8 +1275,8 @@ private struct BookDetailAllChaptersView: View {
                                         Text(chapter.title)
                                             .font(.system(size: 15))
                                             .lineLimit(1)
-                                        if let update = ChapterListPresenter.updateLabel(chapter) {
-                                            Text(update)
+                                        if let metadata = ChapterListPresenter.metadataLabel(chapter) {
+                                            Text(metadata)
                                                 .font(.caption2)
                                                 .foregroundStyle(.secondary)
                                                 .lineLimit(1)

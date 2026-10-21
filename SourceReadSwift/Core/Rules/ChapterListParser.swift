@@ -266,7 +266,8 @@ struct ChapterListParser {
                         index: offset,
                         isVip: chapter.isVip,
                         updateTime: chapter.updateTime,
-                        volumeName: chapter.volumeName
+                        volumeName: chapter.volumeName,
+                        wordCount: chapter.wordCount
                     )
                 }
             }
@@ -391,7 +392,13 @@ struct ChapterListParser {
                     rule: htmlExtractor.firstRule(source.ruleToc, keys: ["volumeName", "volume"]),
                     fallbackKeys: ["volumeName", "volume", "group"],
                     variables: variables
-                ) ?? currentVolume
+                ) ?? currentVolume,
+                wordCount: jsonExtractor.string(
+                    from: item,
+                    rule: htmlExtractor.firstRule(source.ruleToc, keys: ["wordCount", "wordNum", "words"]),
+                    fallbackKeys: ["wordCount", "wordNum", "words", "word_count"],
+                    variables: variables
+                )
             ))
         }
 
@@ -475,7 +482,8 @@ struct ChapterListParser {
             index: index,
             isVip: metadata.isVip,
             updateTime: metadata.updateTime,
-            volumeName: metadata.volumeName ?? currentVolume
+            volumeName: metadata.volumeName ?? currentVolume,
+            wordCount: metadata.wordCount
         )
     }
 
@@ -546,7 +554,7 @@ private extension ChapterListParser {
         rule: SourceRule?,
         variables: [String: Any],
         baseURL: URL
-    ) -> (isVip: Bool, updateTime: String?, volumeName: String?) {
+    ) -> (isVip: Bool, updateTime: String?, volumeName: String?, wordCount: String?) {
         func extract(_ keys: [String]) -> String? {
             guard let rule, let ruleValue = htmlExtractor.firstRule(rule, keys: keys) else { return nil }
             if let value = try? htmlExtractor.value(from: element, rule: ruleValue, fallback: nil, baseUrl: baseURL, variables: variables),
@@ -562,6 +570,11 @@ private extension ChapterListParser {
         }
         let vipRaw = extract(["isVip", "vip", "isPay"])?.lowercased()
         let isVip = vipRaw.map { !["false", "0", "no", "free", "免费"].contains($0) } ?? false
-        return (isVip, extract(["updateTime", "update", "time"]), extract(["volumeName", "volume"]))
+        return (
+            isVip,
+            extract(["updateTime", "update", "time"]),
+            extract(["volumeName", "volume"]),
+            extract(["wordCount", "wordNum", "words", "word_count"])
+        )
     }
 }

@@ -143,6 +143,9 @@ struct BookChapter: Identifiable, Codable, Hashable, Sendable {
     let updateTime: String?
     /// Legado `ruleToc.volumeName` – volume/group heading the chapter belongs to.
     let volumeName: String?
+    /// Legado `ruleToc.wordCount` – source-formatted chapter length
+    /// (e.g. "3200字"). Optional so caches written before v1.0.23 decode.
+    let wordCount: String?
 
     init(
         title: String,
@@ -151,7 +154,8 @@ struct BookChapter: Identifiable, Codable, Hashable, Sendable {
         index: Int,
         isVip: Bool = false,
         updateTime: String? = nil,
-        volumeName: String? = nil
+        volumeName: String? = nil,
+        wordCount: String? = nil
     ) {
         self.title = title
         self.url = url
@@ -160,6 +164,7 @@ struct BookChapter: Identifiable, Codable, Hashable, Sendable {
         self.isVip = isVip
         self.updateTime = updateTime
         self.volumeName = volumeName
+        self.wordCount = wordCount
     }
 }
 

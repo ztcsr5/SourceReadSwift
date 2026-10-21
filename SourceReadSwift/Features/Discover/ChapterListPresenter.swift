@@ -19,6 +19,21 @@ enum ChapterListPresenter {
         return value
     }
 
+    /// Source-formatted chapter length, trimmed and dropped when empty.
+    static func wordCountLabel(_ chapter: BookChapter) -> String? {
+        guard let value = chapter.wordCount?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !value.isEmpty else { return nil }
+        return value
+    }
+
+    /// Secondary line for the TOC: "更新 2026-10-20 · 3200字", with either
+    /// side omitted when the source does not provide it.
+    static func metadataLabel(_ chapter: BookChapter) -> String? {
+        let parts = [updateLabel(chapter).map { "更新 \($0)" }, wordCountLabel(chapter)]
+            .compactMap { $0 }
+        return parts.isEmpty ? nil : parts.joined(separator: " · ")
+    }
+
     private static func normalizedVolume(_ value: String?) -> String? {
         guard let value = value?.trimmingCharacters(in: .whitespacesAndNewlines),
               !value.isEmpty else { return nil }

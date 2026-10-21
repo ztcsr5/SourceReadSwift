@@ -321,6 +321,30 @@ final class SourceMetadataChainTests: XCTestCase {
         XCTAssertNil(ChapterListPresenter.updateLabel(missing))
     }
 
+    func testChapterListPresenterBuildsMetadataLabelFromUpdateAndWordCount() {
+        let both = BookChapter(
+            title: "一", url: "/1", bookUrl: "/b", index: 0,
+            updateTime: " 2026-10-01 ", volumeName: nil, wordCount: " 3200字 "
+        )
+        let wordOnly = BookChapter(
+            title: "二", url: "/2", bookUrl: "/b", index: 1,
+            updateTime: "", volumeName: nil, wordCount: "1.2万字"
+        )
+        let updateOnly = BookChapter(
+            title: "三", url: "/3", bookUrl: "/b", index: 2,
+            updateTime: "2026-10-02", volumeName: nil, wordCount: "   "
+        )
+        let neither = BookChapter(
+            title: "四", url: "/4", bookUrl: "/b", index: 3,
+            updateTime: nil, volumeName: nil, wordCount: nil
+        )
+
+        XCTAssertEqual(ChapterListPresenter.metadataLabel(both), "更新 2026-10-01 · 3200字")
+        XCTAssertEqual(ChapterListPresenter.metadataLabel(wordOnly), "1.2万字")
+        XCTAssertEqual(ChapterListPresenter.metadataLabel(updateOnly), "更新 2026-10-02")
+        XCTAssertNil(ChapterListPresenter.metadataLabel(neither))
+    }
+
     func testChapterListPresenterSkipsBlankVolumeNames() {
         let chapters = [
             BookChapter(title: "一", url: "/1", bookUrl: "/b", index: 0, volumeName: "  "),
