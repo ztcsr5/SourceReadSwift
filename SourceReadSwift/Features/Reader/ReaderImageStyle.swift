@@ -68,7 +68,7 @@ enum ReaderImageSizingPolicy {
         guard paragraph.hasPrefix("[img]"), paragraph.hasSuffix("[/img]") else { return nil }
         let raw = String(paragraph.dropFirst(5).dropLast(6))
             .trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !raw.isEmpty, let url = URL(string: raw) else { return nil }
+        guard !raw.isEmpty, let url = URL(string: raw), let scheme = url.scheme, !scheme.isEmpty else { return nil }
         return url
     }
 }
