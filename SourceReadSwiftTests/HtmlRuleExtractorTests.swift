@@ -458,4 +458,175 @@ final class HtmlRuleExtractorTests: XCTestCase {
 
         XCTAssertEqual(value, "https://example.com/book/1")
     }
+
+    // MARK: - Legado operator precedence and cross-dialect state
+
+    func testStringListConcatenatesAmpersandBranches() throws {
+        let document = try SwiftSoup.parse("""
+        <html><body>
+          <div class="a">A</div>
+          <div class="b">B</div>
+        </body></html>
+        """)
+
+        let values = try HtmlRuleExtractor().stringList(
+            from: document,
+            rule: ".a@text&&.b@text",
+            baseUrl: nil
+        )
+
+        XCTAssertEqual(values, ["A", "B"])
+    }
+
+    func testSelectConcatenatesAmpersandBranches() throws {
+        let document = try SwiftSoup.parse("""
+        <html><body>
+          <div class="a">A</div>
+          <div class="b">B</div>
+        </body></html>
+        """)
+
+        let elements = try HtmlRuleExtractor().select(
+            from: document,
+            rule: ".a&&.b",
+            baseUrl: nil
+        )
+
+        XCTAssertEqual(try elements.map { try $0.text() }, ["A", "B"])
+    }
+
+    func testAmpersandAndAlternativeOperatorsUseSourceOrder() throws {
+        let document = try SwiftSoup.parse("""
+        <html><body>
+          <div class="a">A</div>
+          <div class="b">B</div>
+        </body></html>
+        """)
+
+        // `&&` appears first, so the rule is `(.missing && (.a || .b))`.
+        // Splitting on `||` first would incorrectly return only `B`.
+        let values = try HtmlRuleExtractor().stringList(
+            from: document,
+            rule: ".missing@text&&.a@text||.b@text",
+            baseUrl: nil
+        )
+
+        XCTAssertEqual(values, ["A"])
+    }
+
+    func testPutDirectiveValueRuleSeesVariables() throws {
+        let document = try SwiftSoup.parse("""
+        <html><body><span class="x">X</span></body></html>
+        """)
+        let extractor = HtmlRuleExtractor()
+
+        _ = try extractor.value(
+            from: document,
+            rule: "@put:{token:@js:keyword}.x@text",
+            baseUrl: nil,
+            variables: ["keyword": "abc123"]
+        )
+        let value = try extractor.value(
+            from: document,
+            rule: "@get:{token}",
+            baseUrl: nil
+        )
+
+        XCTAssertEqual(value, "abc123")
+    }
+
+    func testHtmlPutIsVisibleToNestedJsonGet() throws {
+        let document = try SwiftSoup.parse("""
+        <html><body><span class="host">https://example.com</span></body></html>
+        """)
+        let context = RuleExecutionContext()
+        let html = HtmlRuleExtractor(executionContext: context)
+
+        _ = try html.value(
+            from: document,
+            rule: "@put:{host:.host@text}.host@text",
+            baseUrl: nil
+        )
+
+        let json = JSONRuleExtractor(executionContext: context)
+        let value = json.value(from: ["ok": true], path: "@get:{host}")
+
+        XCTAssertEqual(value as? String, "https://example.com")
+    }
+
+    func testJsonPutIsVisibleToHtmlGet() throws {
+        let context = RuleExecutionContext()
+        let json = JSONRuleExtractor(executionContext: context)
+
+        _ = json.value(
+            from: ["host": "https://example.com"],
+            path: "@put:{host:$.host}$.host"
+        )
+
+        let document = try SwiftSoup.parse("<html><body></body></html>")
+        let html = HtmlRuleExtractor(executionContext: context)
+        let value = try html.value(
+            from: document,
+            rule: "@get:{host}",
+            baseUrl: nil
+        )
+
+        XCTAssertEqual(value, "https://example.com")
+    }
+
+    func testSelectJavaScriptRuleSeesExternalVariables() throws {
+        let document = try SwiftSoup.parse("""
+        <html><body>
+          <div class="item">A</div>
+          <div class="item">B</div>
+        </body></html>
+        """)
+        let extractor = HtmlRuleExtractor()
+
+        let elements = try extractor.select(
+            from: document,
+            rule: "@js:result = result.select('.' + keyword)",
+            baseUrl: nil,
+            variables: ["keyword": "item"]
+        )
+
+        XCTAssertEqual(elements.count, 2)
+    }
+
+    func testAngleJavaScriptSelectRuleSeesExternalVariables() throws {
+        let document = try SwiftSoup.parse("""
+        <html><body>
+          <div class="item">A</div>
+          <div class="item">B</div>
+        </body></html>
+        """)
+        let extractor = HtmlRuleExtractor()
+
+        let elements = try extractor.select(
+            from: document,
+            rule: "<js>result = result.select('.' + keyword).eq(page - 1)</js>",
+            baseUrl: nil,
+            variables: ["keyword": "item", "page": 2]
+        )
+
+        XCTAssertEqual(elements.count, 1)
+        XCTAssertEqual(try elements.first?.text(), "B")
+    }
+
+    func testElementJavaScriptSelectKeepsLiveParentChain() throws {
+        let document = try SwiftSoup.parse("""
+        <html><body><div class="wrap"><span class="item">A</span></div></body></html>
+        """)
+        let extractor = HtmlRuleExtractor()
+
+        let elements = try extractor.select(
+            from: document,
+            rule: "@js:result = result.select('.item').first().parent()",
+            baseUrl: nil
+        )
+
+        XCTAssertEqual(elements.count, 1)
+        XCTAssertEqual(try elements.first?.tagName(), "div")
+        XCTAssertEqual(try elements.first?.hasClass("wrap"), true)
+    }
 }

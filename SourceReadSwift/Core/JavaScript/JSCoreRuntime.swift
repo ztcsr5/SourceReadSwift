@@ -475,6 +475,35 @@ final class JSCoreRuntime {
     }
 }
 
+    /// Runs an element rule and returns the live JS `result` value.
+    ///
+    /// `evaluate` converts the script value to `String` and clears the
+    /// `result` global on exit.  Select rules need the actual jsoup bridge:
+    /// serializing to HTML and re-parsing loses element identity, parent
+    /// links and non-element nodes, so a later `result.parent()` would walk
+    /// a different tree.
+    func evaluateElementResult(
+        _ script: String,
+        variables: [String: Any] = [:]
+    ) -> Result<JSValue?, SourceEngineError> {
+        evaluateLock.lock()
+        context.setObject(NSNull(), forKeyedSubscript: "__elementResult" as NSString)
+        evaluateLock.unlock()
+
+        let captureScript = script + "\n;__elementResult = (typeof result !== 'undefined' ? result : null);"
+        if case .failure(let error) = evaluate(captureScript, variables: variables) {
+            return .failure(error)
+        }
+
+        evaluateLock.lock()
+        defer { evaluateLock.unlock() }
+        guard let value = context.objectForKeyedSubscript("__elementResult" as NSString),
+              !value.isUndefined, !value.isNull else {
+            return .success(nil)
+        }
+        return .success(value)
+    }
+
     func collectGarbage() {
         evaluateLock.lock()
         defer { evaluateLock.unlock() }

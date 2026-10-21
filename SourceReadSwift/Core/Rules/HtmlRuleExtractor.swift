@@ -97,30 +97,67 @@ struct HtmlRuleExtractor {
             return value.isEmpty ? [] : [value]
         }
 
-        if let alternatives = RuleOperatorSplitter.split(trimmed, separator: "||") {
-            for alternative in alternatives {
-                let trimmedAlt = alternative.trimmingCharacters(in: .whitespacesAndNewlines)
-                if trimmedAlt.hasPrefix("$.") || trimmedAlt.hasPrefix("@json:") {
-                    continue
-                }
-                do {
-                    let values = try stringList(from: root, rule: trimmedAlt, fallback: nil, baseUrl: baseUrl, variables: variables)
-                    if !values.isEmpty { return values }
-                } catch {
-                    continue
-                }
-            }
-            return []
-        }
-
-        if let mergeParts = RuleOperatorSplitter.split(trimmed, separator: "%%") {
-            let lists = try mergeParts
-                .map { try stringList(from: root, rule: $0, fallback: nil, baseUrl: baseUrl, variables: variables) }
+        // Legado splits a rule on the first top-level `&&`, `||` or `%%`
+        // in source order.  Checking `||` before `&&` would give
+        // `a&&b||c` the wrong precedence and drop the `&&` branch.
+        if let operation = RuleOperatorSplitter.firstOperator(in: trimmed) {
+            let parts = operation.parts
+                .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
                 .filter { !$0.isEmpty }
-            return interleave(lists)
+            switch operation.op {
+            case "&&":
+                // `&&` concatenates every branch list in source order.
+                var merged: [String] = []
+                for part in parts {
+                    let trimmedPart = part.trimmingCharacters(in: .whitespacesAndNewlines)
+                    if trimmedPart.hasPrefix("$.") || trimmedPart.hasPrefix("@json:") {
+                        continue
+                    }
+                    merged.append(contentsOf: try stringList(
+                        from: root,
+                        rule: trimmedPart,
+                        fallback: nil,
+                        baseUrl: baseUrl,
+                        variables: variables
+                    ))
+                }
+                return merged
+            case "||":
+                for alternative in parts {
+                    let trimmedAlt = alternative.trimmingCharacters(in: .whitespacesAndNewlines)
+                    if trimmedAlt.hasPrefix("$.") || trimmedAlt.hasPrefix("@json:") {
+                        continue
+                    }
+                    do {
+                        let values = try stringList(
+                            from: root,
+                            rule: trimmedAlt,
+                            fallback: nil,
+                            baseUrl: baseUrl,
+                            variables: variables
+                        )
+                        if !values.isEmpty { return values }
+                    } catch {
+                        continue
+                    }
+                }
+                return []
+            case "%%":
+                let lists = try parts
+                    .map { try stringList(from: root, rule: $0, fallback: nil, baseUrl: baseUrl, variables: variables) }
+                    .filter { !$0.isEmpty }
+                return interleave(lists)
+            default:
+                break
+            }
         }
 
-        return try valuesForSingleRule(from: root, rule: trimmed, baseUrl: baseUrl)
+        return try valuesForSingleRule(
+            from: root,
+            rule: trimmed,
+            baseUrl: baseUrl,
+            variables: variables
+        )
     }
 
     private func evaluateChainedJavaScript(
@@ -132,7 +169,12 @@ struct HtmlRuleExtractor {
     ) throws -> String {
         let prefix = String(trimmed[..<jsRange.lowerBound]).trimmingCharacters(in: .whitespacesAndNewlines)
         let script = String(trimmed[jsRange.lowerBound...]).trimmingCharacters(in: .whitespacesAndNewlines)
-        let elements = (try? self.select(from: root, rule: prefix, baseUrl: baseUrl)) ?? []
+        let elements = (try? self.select(
+            from: root,
+            rule: prefix,
+            baseUrl: baseUrl,
+            variables: variables
+        )) ?? []
         if let first = elements.first {
             var chainedVariables = variables
             let baseStr = baseUrl?.absoluteString ?? ""
@@ -150,8 +192,18 @@ struct HtmlRuleExtractor {
             return try evaluateJSWithTrailingRegex(rule: script, rootHtml: extracted, rootElement: nil, baseUrl: baseUrl, extraVariables: chainedVariables)
         }
     }
-    private func valuesForSingleRule(from root: Element, rule: String, baseUrl: URL?) throws -> [String] {
-        let materialized = try applyDirectives(root: root, rule: rule, baseUrl: baseUrl)
+    private func valuesForSingleRule(
+        from root: Element,
+        rule: String,
+        baseUrl: URL?,
+        variables: [String: Any] = [:]
+    ) throws -> [String] {
+        let materialized = try applyDirectives(
+            root: root,
+            rule: rule,
+            baseUrl: baseUrl,
+            variables: variables
+        )
         let materializedRule = materialized.text
         if materializedRule.isEmpty {
             return []
@@ -169,16 +221,25 @@ struct HtmlRuleExtractor {
             let right = String(materializedRule[jsonRange.upperBound...]).trimmingCharacters(in: .whitespacesAndNewlines)
             let rawText: String
             if !left.isEmpty {
-                rawText = (try? valuesForSingleRule(from: root, rule: left, baseUrl: baseUrl))?.joined(separator: "\n") ?? ""
+                rawText = (try? valuesForSingleRule(
+                    from: root,
+                    rule: left,
+                    baseUrl: baseUrl,
+                    variables: variables
+                ))?.joined(separator: "\n") ?? ""
             } else {
                 rawText = (try? root.outerHtml()) ?? ""
             }
             if let obj = ResponseFormatDetector.jsonObject(from: rawText) {
-                if let val = JSONRuleExtractor().value(from: obj, path: right) {
+                // The HTML extractor and the nested JSON extractor must share
+                // one context: `@put` values written while parsing HTML are
+                // visible to JSON `@get` (and the reverse) in the same stage.
+                let jsonExtractor = JSONRuleExtractor(executionContext: executionContext)
+                if let val = jsonExtractor.value(from: obj, path: right, variables: variables) {
                     if let arr = val as? [Any] {
-                        return arr.map { JSONRuleExtractor().stringify($0) }.filter { !$0.isEmpty }
+                        return arr.map { jsonExtractor.stringify($0) }.filter { !$0.isEmpty }
                     }
-                    let str = JSONRuleExtractor().stringify(val)
+                    let str = jsonExtractor.stringify(val)
                     return str.isEmpty ? [] : [str]
                 }
             }
@@ -187,7 +248,12 @@ struct HtmlRuleExtractor {
 
         // Try XPath translator first
         if let xpathSplit = XPathRuleTranslator.valueRule(materializedRule) {
-            let targets = try select(from: root, rule: xpathSplit.selector, baseUrl: baseUrl)
+            let targets = try select(
+                from: root,
+                rule: xpathSplit.selector,
+                baseUrl: baseUrl,
+                variables: variables
+            )
             let attrParts = xpathSplit.attribute.components(separatedBy: "##")
             let attr = attrParts.first ?? "text"
             if attr == "all" {
@@ -232,7 +298,12 @@ struct HtmlRuleExtractor {
         }
 
         let split = splitSelectorAndAttribute(materializedRule)
-        let targets = try select(from: root, rule: split.selector, baseUrl: baseUrl)
+        let targets = try select(
+            from: root,
+            rule: split.selector,
+            baseUrl: baseUrl,
+            variables: variables
+        )
         let attrParts = split.attribute.components(separatedBy: "##")
         let attr = attrParts.first ?? "text"
         if attr == "all" {
@@ -288,8 +359,18 @@ struct HtmlRuleExtractor {
         }
     }
 
-    func select(from root: Element, rule: String, baseUrl: URL? = nil) throws -> [Element] {
-        let materializedRule = try applyDirectives(root: root, rule: rule, baseUrl: baseUrl).text
+    func select(
+        from root: Element,
+        rule: String,
+        baseUrl: URL? = nil,
+        variables: [String: Any] = [:]
+    ) throws -> [Element] {
+        let materializedRule = try applyDirectives(
+            root: root,
+            rule: rule,
+            baseUrl: baseUrl,
+            variables: variables
+        ).text
         if materializedRule.isEmpty {
             return [root]
         }
@@ -310,7 +391,7 @@ struct HtmlRuleExtractor {
         // Handle JS rules inside select
         if workingRule.hasPrefix("@js:") {
             let script = String(workingRule.dropFirst(4)).trimmingCharacters(in: .whitespacesAndNewlines)
-            if let jsElements = executeJSElements(script: script, root: root, baseUrl: baseUrl) {
+            if let jsElements = executeJSElements(script: script, root: root, baseUrl: baseUrl, variables: variables) {
                 return finish(jsElements)
             }
         } else if workingRule.hasPrefix("<js>"), let endRange = workingRule.range(of: "</js>") {
@@ -318,45 +399,82 @@ struct HtmlRuleExtractor {
             let script = String(workingRule[start..<endRange.lowerBound]).trimmingCharacters(in: .whitespacesAndNewlines)
             let remaining = String(workingRule[endRange.upperBound...]).trimmingCharacters(in: .whitespacesAndNewlines)
             if remaining.isEmpty {
-                if let jsElements = executeJSElements(script: script, root: root, baseUrl: baseUrl) {
+                if let jsElements = executeJSElements(script: script, root: root, baseUrl: baseUrl, variables: variables) {
                     return finish(jsElements)
                 }
             } else {
-                let htmlOutput = (try? evaluateJS(rule: script, rootHtml: try root.outerHtml(), baseUrl: baseUrl, extraVariables: [:])) ?? ""
+                let htmlOutput = (try? evaluateJS(rule: script, rootHtml: try root.outerHtml(), baseUrl: baseUrl, extraVariables: variables)) ?? ""
                 if !htmlOutput.isEmpty, let doc = try? SwiftSoup.parse(htmlOutput, baseUrl?.absoluteString ?? "") {
-                    let subElements = try select(from: doc, rule: remaining, baseUrl: baseUrl)
+                    let subElements = try select(
+                        from: doc,
+                        rule: remaining,
+                        baseUrl: baseUrl,
+                        variables: variables
+                    )
                     return finish(subElements)
                 }
             }
         } else if let jsStartRange = workingRule.range(of: "<js>"), let jsEndRange = workingRule.range(of: "</js>") {
             let prefix = String(workingRule[..<jsStartRange.lowerBound]).trimmingCharacters(in: .whitespacesAndNewlines)
             let script = String(workingRule[jsStartRange.upperBound..<jsEndRange.lowerBound]).trimmingCharacters(in: .whitespacesAndNewlines)
-            let initialElements = try select(from: root, rule: prefix, baseUrl: baseUrl)
-            if let jsElements = executeJSElements(script: script, elements: initialElements, root: root, baseUrl: baseUrl) {
+            let initialElements = try select(
+                from: root,
+                rule: prefix,
+                baseUrl: baseUrl,
+                variables: variables
+            )
+            if let jsElements = executeJSElements(script: script, elements: initialElements, root: root, baseUrl: baseUrl, variables: variables) {
                 return finish(jsElements)
             }
         }
 
-        if let fallbackParts = RuleOperatorSplitter.split(workingRule, separator: "||") {
-            for part in fallbackParts {
-                let trimmedPart = part.trimmingCharacters(in: .whitespacesAndNewlines)
-                if trimmedPart.hasPrefix("$.") || trimmedPart.hasPrefix("@json:") {
-                    continue
-                }
-                do {
-                    let elements = try select(from: root, rule: trimmedPart, baseUrl: baseUrl)
-                    if !elements.isEmpty { return finish(elements) }
-                } catch {
-                    continue
-                }
-            }
-            return []
-        }
-        if let mergeParts = RuleOperatorSplitter.split(workingRule, separator: "%%") {
-            let lists = try mergeParts
-                .map { try select(from: root, rule: $0, baseUrl: baseUrl) }
+        if let operation = RuleOperatorSplitter.firstOperator(in: workingRule) {
+            let parts = operation.parts
+                .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
                 .filter { !$0.isEmpty }
-            return finish(interleave(lists))
+            switch operation.op {
+            case "&&":
+                var merged: [Element] = []
+                for part in parts {
+                    let trimmedPart = part.trimmingCharacters(in: .whitespacesAndNewlines)
+                    if trimmedPart.hasPrefix("$.") || trimmedPart.hasPrefix("@json:") {
+                        continue
+                    }
+                    merged.append(contentsOf: try select(
+                        from: root,
+                        rule: trimmedPart,
+                        baseUrl: baseUrl,
+                        variables: variables
+                    ))
+                }
+                return finish(merged)
+            case "||":
+                for part in parts {
+                    let trimmedPart = part.trimmingCharacters(in: .whitespacesAndNewlines)
+                    if trimmedPart.hasPrefix("$.") || trimmedPart.hasPrefix("@json:") {
+                        continue
+                    }
+                    do {
+                        let elements = try select(
+                            from: root,
+                            rule: trimmedPart,
+                            baseUrl: baseUrl,
+                            variables: variables
+                        )
+                        if !elements.isEmpty { return finish(elements) }
+                    } catch {
+                        continue
+                    }
+                }
+                return []
+            case "%%":
+                let lists = try parts
+                    .map { try select(from: root, rule: $0, baseUrl: baseUrl, variables: variables) }
+                    .filter { !$0.isEmpty }
+                return finish(interleave(lists))
+            default:
+                break
+            }
         }
 
         if let xpathSelector = XPathRuleTranslator.selectorRule(workingRule) {
@@ -414,26 +532,44 @@ struct HtmlRuleExtractor {
         script: String,
         elements: [Element]? = nil,
         root: Element,
-        baseUrl: URL?
+        baseUrl: URL?,
+        variables: [String: Any] = [:]
     ) -> [Element]? {
-        let runtime = executionContext.jsRuntime(ajaxHandler: { _ in "" })
-        var variables: [String: Any] = [
+        let source = variables["source"] as? BookSource
+        let runtime = executionContext.jsRuntime(ajaxHandler: { urlText in
+            if let source {
+                return SynchronousSourceLoader().load(urlText: urlText, source: source)
+            }
+            return ""
+        })
+        var jsVariables: [String: Any] = [
             "baseUrl": baseUrl?.absoluteString ?? "",
             "src": (try? root.outerHtml()) ?? "",
             "html": (try? root.outerHtml()) ?? ""
         ]
-        if let elements {
-            variables["result"] = LegadoElementsBridge(elements: elements, baseURL: baseUrl?.absoluteString ?? "")
-        } else {
-            variables["result"] = LegadoElementsBridge(elements: [root], baseURL: baseUrl?.absoluteString ?? "")
+        // Element rules run in the same variable scope as value rules:
+        // `keyword`, `page`, `book`, `source` and earlier `@put` values must
+        // stay visible when a source mixes `@js:` selectors with JS values.
+        for (key, value) in variables {
+            jsVariables[key] = value
         }
-        let evaluated = runtime.evaluate(script, variables: variables)
-        if let jsValue = runtime.context.objectForKeyedSubscript("result") {
+        if let elements {
+            jsVariables["result"] = LegadoElementsBridge(elements: elements, baseURL: baseUrl?.absoluteString ?? "")
+        } else {
+            jsVariables["result"] = LegadoElementsBridge(elements: [root], baseURL: baseUrl?.absoluteString ?? "")
+        }
+        switch runtime.evaluateElementResult(script, variables: jsVariables) {
+        case .failure:
+            return nil
+        case .success(let captured):
+            guard let jsValue = captured else { return nil }
             if let bridge = jsValue.toObject() as? LegadoElementsBridge {
                 return bridge.elements
-            } else if let bridge = jsValue.toObject() as? LegadoElementBridge {
+            }
+            if let bridge = jsValue.toObject() as? LegadoElementBridge {
                 return [bridge.element]
-            } else if let array = jsValue.toArray() {
+            }
+            if let array = jsValue.toArray() {
                 var foundElements: [Element] = []
                 for item in array {
                     if let bridge = item as? LegadoElementBridge {
@@ -446,12 +582,14 @@ struct HtmlRuleExtractor {
                 }
                 if !foundElements.isEmpty { return foundElements }
             }
+            // A rule may replace `result` with an HTML string; keep the
+            // legacy parse path for that shape only.
+            if jsValue.isString, let html = jsValue.toString(), !html.isEmpty,
+               let doc = try? SwiftSoup.parse(html, baseUrl?.absoluteString ?? "") {
+                return doc.body()?.children().array()
+            }
+            return nil
         }
-        if case .success(let val) = evaluated, !val.isEmpty,
-           let doc = try? SwiftSoup.parse(val, baseUrl?.absoluteString ?? "") {
-            return doc.body()?.children().array()
-        }
-        return nil
     }
 
     private func splitSelectorAndAttribute(_ rule: String) -> (selector: String, attribute: String) {
@@ -503,11 +641,22 @@ struct HtmlRuleExtractor {
         let isDirectValue: Bool
     }
 
-    private func applyDirectives(root: Element, rule: String, baseUrl: URL?) throws -> MaterializedDirectiveRule {
+    private func applyDirectives(
+        root: Element,
+        rule: String,
+        baseUrl: URL?,
+        variables: [String: Any] = [:]
+    ) throws -> MaterializedDirectiveRule {
         var output = rule
         let putDirectives = extractPutDirectives(from: output)
         for directive in putDirectives {
-            let value = try value(from: root, rule: directive.valueRule, fallback: nil, baseUrl: baseUrl)
+            let value = try value(
+                from: root,
+                rule: directive.valueRule,
+                fallback: nil,
+                baseUrl: baseUrl,
+                variables: variables
+            )
             directiveStore.put(directive.key, value: value)
             executionContext.put(value, for: directive.key)
         }
@@ -759,10 +908,10 @@ struct HtmlRuleExtractor {
                 val = (try? self.value(from: root, rule: expr, fallback: nil, baseUrl: baseUrl, variables: variables)) ?? ""
             } else if expr.hasPrefix("$.") || expr.hasPrefix("@json:") {
                 let jsonPath = expr.hasPrefix("@json:") ? String(expr.dropFirst(6)) : expr
-                if let data = try? root.outerHtml().data(using: .utf8),
-                   let obj = try? JSONSerialization.jsonObject(with: data, options: [.fragmentsAllowed]),
-                   let extracted = JSONRuleExtractor().value(from: obj, path: jsonPath) {
-                    val = JSONRuleExtractor().stringify(extracted)
+                let jsonExtractor = JSONRuleExtractor(executionContext: executionContext)
+                if let obj = ResponseFormatDetector.jsonObject(from: (try? root.outerHtml()) ?? ""),
+                   let extracted = jsonExtractor.value(from: obj, path: jsonPath, variables: variables) {
+                    val = jsonExtractor.stringify(extracted)
                 }
             } else if expr == "key" || expr == "keyword" {
                 val = (variables["key"] as? String) ?? (variables["keyword"] as? String) ?? ""
