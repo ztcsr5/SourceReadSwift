@@ -2,7 +2,7 @@
 
 > **文档性质**：项目全量说明 + 版本工作记录 + 书源兼容性深度分析 + 验证与复现手册  
 > **代码基线**：`v1.0.30`（Build 31）  
-> **验证 Commit**：`5173230`（文档 HEAD） / `91c9161`（v1.0.30 代码提交）  
+> **验证 Commit**：`91c9161`（v1.0.30 代码提交） / `75aeb44`（本文件提交）  
 > **整理日期**：2026-10-25  
 > **仓库**：`https://github.com/ztcsr5/SourceReadSwift`  
 > **工作分支**：`codex/swift-v2-lifetime-reader`  
@@ -66,7 +66,8 @@
 | 测试规模 | 124 个 Swift 测试文件 / 18,995 行 / CI 987 个 XCTest |
 | 书源能力样本 | 13 个真实源快照（`legado-capability-bank-20260908.json`，87,605 字节） |
 | 最新 CI（代码） | iOS run `40112864505` / job `120928037334`，987 tests / 0 failures |
-| 最新 CI（文档 HEAD） | iOS run `40114220909` / job `120932360168`，987 tests / 0 failures |
+| 最新 CI（本文件） | iOS run `40121317778` / job `120953254683`，987 tests / 0 failures |
+| 最新 IPA CI（本文件） | run `40121317766`，success |
 | 最新 IPA | `C:\Users\Edc21\Desktop\SourceReadSwift-1.0.30-unsigned.ipa`，11,507,953 字节 |
 | IPA SHA256 | `05F3EC27C1FD065D91289045229D0B25A2DCF4E5E5A1FCFCE86313624AA10261` |
 | 回滚演练 | 独立副本 10/10 文件 SHA256 与基线一致 |
@@ -101,8 +102,8 @@
 ```text
 代码提交 91c9161  ──► iOS CI 40112864505（987 tests）──► IPA CI 40112864571 ──► 1.0.30 unsigned IPA
       │
-      └──► 文档提交 594ed57 ──► 文档修正 5173230 ──► iOS CI 40114220909（987 tests）
-                                                   └─► IPA CI 40114220955
+      └──► 文档提交 594ed57 ──► 文档修正 5173230 ──► 本文件 75aeb44 ──► iOS CI 40121317778（987 tests）
+                                                                  └──► IPA CI 40121317766
 ```
 
 `594ed57` 触发的旧 run `40114078830` / `40114078838` 因推送 `5173230` 被并发组自动取消，属于正常行为，不是失败。
@@ -1362,12 +1363,19 @@ delay(afterAttempt:) // 0→2s, 1→5s, 2→10s, 其余 nil
 | iOS | `40112864505` | `120928037334` | build + test success，987 tests |
 | Unsigned IPA | `40112864571` | `120928037986` | success |
 
-#### 文档 HEAD `5173230`
+#### 上一版文档 HEAD `5173230`
 
 | 工作流 | Run | Job | 结果 |
 |---|---|---|---|
 | iOS | `40114220909` | `120932360168` | build + test success，987 tests |
 | Unsigned IPA | `40114220955` | `120932337268` | success |
+
+#### 本文件提交 `75aeb44`
+
+| 工作流 | Run | Job | 结果 |
+|---|---|---|---|
+| iOS | `40121317778` | `120953254683` | build + test success，987 tests / 0 failures |
+| Unsigned IPA | `40121317766` | `120953254569` | success |
 
 说明：
 
@@ -1392,7 +1400,7 @@ delay(afterAttempt:) // 0→2s, 1→5s, 2→10s, 其余 nil
 | 文档 | 状态 |
 |---|---|
 | `PROJECT_HANDOVER.md` | 已更新到 v1.0.30 / Build 31，含第 14 节增量与 CI 证据 |
-| `PROJECT_FULL.md` | 本文件，项目全量说明 + 本轮工作记录 |
+| `PROJECT_FULL.md` | 本文件，项目全量说明 + 本轮工作记录（提交 `75aeb44`） |
 | `docs/IOS-JSON-ECOSYSTEM-DEEP-DIVE.md` | 生态与 12 断层分析 |
 | `docs/SOURCE-CAPABILITY-MATRIX.md` | 13 源能力矩阵 |
 | `docs/JSON-IOS-COMPATIBILITY.md` | iOS 兼容性报告 |
@@ -1699,12 +1707,15 @@ IPA 未签名，需要下列方式之一：
 |---|---|---|
 | 代码 | `91c9161` | v1.0.30 实现 |
 | 文档 | `594ed57` | v1.0.30 交接文档 |
-| 文档 | `5173230` | 预取所有权说明修正（HEAD） |
+| 文档 | `5173230` | 预取所有权说明修正 |
+| 文档 | `75aeb44` | 全量文档 PROJECT_FULL.md（本文） |
 | 代码 | `7773e2b` | v1.0.29 |
 | 代码 | `285950e` | v1.0.28 收尾 |
 | iOS run | `40112864505` | 91c9161，987 tests |
 | IPA run | `40112864571` | 91c9161，IPA |
 | iOS run | `40114220909` | 5173230，987 tests |
+| iOS run | `40121317778` | 75aeb44，987 tests |
+| IPA run | `40121317766` | 75aeb44，IPA workflow success |
 | IPA run | `40114220955` | 5173230，IPA workflow success |
 | iOS run | `40109182540` | 7773e2b，984 tests |
 | iOS run | `40107402912` | 285950e，983 tests |
