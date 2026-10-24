@@ -68,6 +68,15 @@ jobs:
         run: |
           set -euo pipefail
           VERSION="$(grep 'MARKETING_VERSION:' project.yml | awk '{print $2}' | tr -d '\"')"
+          BUILD="$(grep 'CURRENT_PROJECT_VERSION:' project.yml | awk '{print $2}' | tr -d '\"')"
+          PLIST="unsigned-ipa/Payload/SourceReadSwift.app/Info.plist"
+          PLIST_VERSION="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$PLIST")"
+          PLIST_BUILD="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$PLIST")"
+          echo "Plist version: ${PLIST_VERSION} (${PLIST_BUILD})"
+          if [ "$PLIST_VERSION" != "$VERSION" ] || [ "$PLIST_BUILD" != "$BUILD" ]; then
+            echo "::error::Version drift: Info.plist=${PLIST_VERSION} (${PLIST_BUILD}) project.yml=${VERSION} (${BUILD})"
+            exit 1
+          fi
           IPA_NAME="SourceReadSwift-${VERSION}-unsigned.ipa"
           SIZE_BYTES="$(stat -f%z "$IPA_NAME")"
           SHA256="$(shasum -a 256 "$IPA_NAME" | awk '{print $1}')"

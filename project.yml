@@ -42,8 +42,8 @@ targets:
       path: SourceReadSwift/App/Info.plist
       properties:
         CFBundleDisplayName: 纸间
-        CFBundleShortVersionString: "1.0.23"
-        CFBundleVersion: "24"
+        CFBundleShortVersionString: "$(MARKETING_VERSION)"
+        CFBundleVersion: "$(CURRENT_PROJECT_VERSION)"
         CADisableMinimumFrameDurationOnPhone: true
         UILaunchScreen: {}
         UIApplicationSceneManifest:
