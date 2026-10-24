@@ -1539,8 +1539,11 @@ struct ReaderView: View {
 
     private var settingsPanel: some View {
         GeometryReader { proxy in
-            let maxHeight = min(max(proxy.size.height * 0.84, 560), 760)
             let bottomPadding = max(proxy.safeAreaInsets.bottom, 14)
+            let maxHeight = ReaderSettingsLayoutPolicy.maxPanelHeight(
+                viewportHeight: proxy.size.height,
+                bottomInset: proxy.safeAreaInsets.bottom
+            )
 
             VStack {
                 Spacer(minLength: 0)

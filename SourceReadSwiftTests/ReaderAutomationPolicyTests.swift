@@ -44,6 +44,26 @@ final class ReaderAutomationPolicyTests: XCTestCase {
         XCTAssertEqual(chrome.mode, .hidden)
     }
 
+    func testSettingsPanelNeverExceedsVisibleViewport() {
+        // Landscape iPhone: the sheet must fit between the safe areas.
+        XCTAssertEqual(
+            ReaderSettingsLayoutPolicy.maxPanelHeight(viewportHeight: 390, bottomInset: 21),
+            345
+        )
+        // Portrait iPhone keeps the familiar tall sheet.
+        XCTAssertEqual(
+            ReaderSettingsLayoutPolicy.maxPanelHeight(viewportHeight: 844, bottomInset: 34),
+            709,
+            accuracy: 0.5
+        )
+        // Small portrait phone: 84% is smaller than the available height.
+        XCTAssertEqual(
+            ReaderSettingsLayoutPolicy.maxPanelHeight(viewportHeight: 667, bottomInset: 0),
+            560,
+            accuracy: 0.5
+        )
+    }
+
     func testScrollTargetAccountsForContainerInsetAndClampsToContentBounds() {
         let target = ReaderScrollPositionPolicy.targetContentOffsetY(
             textRectMinY: 260,

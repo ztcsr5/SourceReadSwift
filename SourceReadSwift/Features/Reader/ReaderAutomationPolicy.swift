@@ -52,6 +52,16 @@ enum ReaderAdvanceDecision: Equatable {
     case stop
 }
 
+/// Keeps the reader settings sheet inside the visible viewport. The old
+/// `max(height * 0.84, 560)` clause exceeded a landscape iPhone (about 390pt
+/// tall) and clipped the tabs and the close button off-screen.
+enum ReaderSettingsLayoutPolicy {
+    static func maxPanelHeight(viewportHeight: CGFloat, bottomInset: CGFloat) -> CGFloat {
+        let available = max(viewportHeight - max(bottomInset, 14) - 24, 320)
+        return min(max(viewportHeight * 0.84, 420), min(760, available))
+    }
+}
+
 struct ReaderAutomationPolicy {
     public static let minDelay: Double = 0.25
     public static let maxDelay: Double = 30.0
