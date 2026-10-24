@@ -1363,25 +1363,6 @@ final class JSCoreRuntime {
           });
         } catch (_) {}
         window.document = document;
-        // Legado sources occasionally call `java.*` helpers that this build has
-        // not implemented yet.  Without a guard the call throws
-        // "undefined is not a function" and aborts the whole rule, so a single
-        // missing helper loses the entire chapter.  Route unknown members to the
-        // native dispatcher: it records `bridge.error java.<name>` for source
-        // diagnostics and returns an empty string, which mirrors Android's
-        // null-ish fallback and lets the rest of the rule continue.
-        try {
-          java = new Proxy(java, {
-            get: function(target, property) {
-              if (property in target) return target[property];
-              if (typeof property !== 'string') return target[property];
-              return function() {
-                var args = Array.prototype.slice.call(arguments);
-                return __nativeLegado.invoke({ method: property, args: args });
-              };
-            }
-          });
-        } catch (_) {}
         window.java = java;
         if (!String.prototype.contains) {
           String.prototype.contains = function(value) { return this.indexOf(String(value)) >= 0; };
@@ -4266,6 +4247,26 @@ final class JSCoreRuntime {
           if (name && typeof globalThis !== 'undefined') globalThis[name] = value;
           return value;
         }
+        // Legado sources occasionally call `java.*` helpers that this build has
+        // not implemented yet.  Without a guard the call throws
+        // "undefined is not a function" and aborts the whole rule, so a single
+        // missing helper loses the entire chapter.  Route unknown members to the
+        // native dispatcher: it records `bridge.error java.<name>` for source
+        // diagnostics and returns an empty string, which mirrors Android's
+        // null-ish fallback and lets the rest of the rule continue.
+        try {
+          java = new Proxy(java, {
+            get: function(target, property) {
+              if (property in target) return target[property];
+              if (typeof property !== 'string') return target[property];
+              return function() {
+                var args = Array.prototype.slice.call(arguments);
+                return __nativeLegado.invoke({ method: property, args: args });
+              };
+            }
+          });
+        } catch (_) {}
+        window.java = java;
         """
         context.exception = nil
         context.evaluateScript(prelude)
