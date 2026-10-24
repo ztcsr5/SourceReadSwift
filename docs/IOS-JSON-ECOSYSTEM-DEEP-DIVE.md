@@ -115,15 +115,15 @@
 - 购买成功：先 `ChapterContentCacheStore.invalidate`，再刷新目录（对应 Legado `BookContent.delContent` + `loadChapterList`）；
 - 诊断：`payAction` 归入 `content` 诊断 stage，不再被静默丢弃；
 - `isVip`：布尔字段不再被标题启发式函数覆盖；
-- 菜单可见性：按 Legado `hasLogin && isVip && !isPay` 的最近似实现（`BookChapter` 暂无 `isPay`，先做 `hasLogin && isVip`）。
+- 菜单可见性：v1.0.24 已按 Legado `hasLogin && isVip && !isPay` 实现（`BookChapter.isPay: Bool?`，`nil` 视为未知并保留按钮）。
 
 ### 3.3 仍存在的明确缺口
 
 | 优先级 | 缺口 | 影响 | 处理 |
 |---|---|---|---|
 | P1 | `imageDecode` 字节级拼图 | 少数漫画/反爬源图片不可用 | 建 Data → CGImage 管线，支持切片/拼图/解密 |
-| P1 | `ruleContent.title` | 正文页标题与目录不一致 | 在正文响应上执行 title 规则，回填 `ChapterContent.title` |
-| P1 | `isPay` 字段 | 买后仍显示“购买本章” | 目录模型增加可选 `isPay`，购买成功后更新 |
+| 已完成（P1） | `ruleContent.title` | 正文页标题与目录不一致 | v1.0.24 已在 HTML/JSON 正文响应上执行 title 规则，空/失败回退目录标题；`ContentParserTests` 4 个用例 |
+| 已完成（P1） | `isPay` 字段 | 买后仍显示“购买本章” | v1.0.24 目录模型增加 `Bool?`，HTML/JSON 独立解析，按钮条件 `isPay != true`；`ChapterListMetadataTests` / `JSCoreRuntimeTests` |
 | P2 | `downloadUrls` | 详情页下载入口不可用 | 要么实现下载队列，要么 UI 隐藏，禁止半成品 |
 | P2 | 目录 `wordCount` UI | 信息缺失 | 有值时在章节副标题展示 |
 | P2 | `nextContentUrl` 多 URL | 少量源分页失败 | 支持数组/多值并逐页合并 |
@@ -146,8 +146,8 @@
 ### 4.2 近期（P0/P1）
 
 1. **CI 双绿**：iOS build + XCTest、Unsigned IPA 同一 SHA 通过；失败日志落到 `VERIFICATION.txt`。
-2. **`ruleContent.title`**：正文解析后执行 title 规则，回填 `ChapterContent.title`；补 HTML/JSON 两条测试。
-3. **`isPay`**：`BookChapter` 增加可选字段，目录/缓存/购买成功后更新；菜单可见性改为 `hasLogin && isVip && !isPay`。
+2. **`ruleContent.title`（已完成，v1.0.24）**：正文解析后执行 title 规则，回填 `ChapterContent.title`；HTML/JSON 共 4 条测试。
+3. **`isPay`（已完成，v1.0.24）**：`BookChapter` 增加可选字段，目录/缓存/JS bridge 透传；菜单可见性改为 `hasLogin && isVip && !isPay`。
 4. **`downloadUrls` 决策**：没有下载队列就隐藏入口；不要显示“可下载”却点了没反应。
 5. **Java stub 诊断**：未实现的 `java.*` 调用记录 API 名 + 源 + 章节 + 规则，不再静默返回空串。
 

@@ -13,7 +13,7 @@
 | 编码 | Base64、字节数组、Hex、MD5/SHA/RIPEMD160/HMAC、AES、charset-aware String bytes、RSA facade | `LegadoNativeBridgeTests`、`LegadoStage10CompatibilityTests` |
 | Java facade | `StringBuilder`、`HashMap`、`ArrayList`、`Pattern/Matcher`、`URL/URI` | `LegadoNativeBridgeTests`、`LegadoStage10CompatibilityTests` |
 | Android facade | `Build`、`TextUtils`、`Base64` | JS prelude + runtime surface test |
-| 模型 | source/book/chapter getter、variable map、VIP（布尔 `isVip` 不被标题启发式覆盖） | model bridge tests、`JSCoreRuntimeTests.testChapterBooleanIsVipSurvivesFallbackInjection` |
+| 模型 | source/book/chapter getter、variable map、VIP（布尔 `isVip` 不被标题启发式覆盖）、`chapter.isPay` 布尔 | model bridge tests、`JSCoreRuntimeTests.testChapterBooleanIsVipSurvivesFallbackInjection`、`testChapterBridgeExposesIsPayAsBoolean` |
 | 付费动作 | `payAction` 的 `isTrue` 语义、`@js:` / `<js>`、纯 URL 短路 | `PayActionTests` |
 
 ## 设计约束

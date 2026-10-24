@@ -1,10 +1,10 @@
 # SourceReadSwift (纸间) 项目交接全量备忘录
 
 > **交接目标**：交接给下一位 AI 协作者 / 研发工程师  
-> **文档基线**：v1.0.23 (Build 24)  
+> **文档基线**：v1.0.24 (Build 25)  
 > **交接时间**：2026-10-24  
-> **验证 Commit**：`53353a2`（GitHub Actions iOS 915 tests / 0 failures；unsigned IPA 打包通过）  
-> **最新产物**：`C:\Users\Edc21\Desktop\SourceReadSwift-1.0.23-unsigned.ipa`（11,315,094 字节，SHA256 `E46857A97967AE122B026585C1E15E17CBC7355CBB3873352E763F0E7F77C9A6`）
+> **验证 Commit**：`435497a`（GitHub Actions iOS 923 tests / 0 failures；unsigned IPA 打包通过）  
+> **最新产物**：`C:\Users\Edc21\Desktop\SourceReadSwift-1.0.24-unsigned.ipa`（11,320,222 字节，SHA256 `5BA1F2BD180AF3A58EEF78909854ABDF1737314F6A154E5F4C70EA1E10EC9E78`）
 
 ---
 
@@ -18,9 +18,9 @@
 - **远端仓库**：`https://github.com/ztcsr5/SourceReadSwift.git`
   - *注：Git remote 已嵌入认证 Token，直接执行 `git push origin codex/swift-v2-lifetime-reader` 即可推送。*
 - **当前交付产物**：
-  - 路径：`C:\Users\Edc21\Desktop\SourceReadSwift-1.0.23-unsigned.ipa`
-  - 大小：`11,315,094 字节 (~10.8 MB)`
-  - 验证状态：基于 Commit `53353a2`，通过 GitHub Actions CI 真实打包下载（run `40082267564`）。
+  - 路径：`C:\Users\Edc21\Desktop\SourceReadSwift-1.0.24-unsigned.ipa`
+  - 大小：`11,320,222 字节 (~10.8 MB)`
+  - 验证状态：基于 Commit `435497a`，通过 GitHub Actions CI 真实打包下载（run `40084421249`）；IPA 内 `CFBundleShortVersionString=1.0.24`、`CFBundleVersion=25`。
 
 ### 2. 技术栈架构
 - **语言**：Swift 5.9+（全面采用 Swift Concurrency: `async/await`, `actor`, `Sendable`）
@@ -36,9 +36,9 @@
 
 ---
 
-## 二、 v1.0.23 核心功能链实现 (What Changed)
+## 二、 v1.0.24 核心功能链实现 (What Changed)
 
-`v1.0.22` 完成了书籍插图与漫画排版的完整生命周期闭环；`v1.0.23` 在此基础上补齐 `ruleContent.payAction` 付费动作链路（第 7 节），并保持既有排版链路不变。
+`v1.0.22` 完成了书籍插图与漫画排版的完整生命周期闭环；`v1.0.23` 补齐 `ruleContent.payAction` 付费动作链路（第 7 节）；`v1.0.24` 继续补齐 `ruleContent.title` 正文标题回填与 `BookChapter.isPay` 建模，并修复版本元数据漂移（第 8 节）。
 
 ### v1.0.22 基线：插图与漫画排版
 
@@ -104,8 +104,17 @@ SourceRequestBuilder.imageRequestHeaders(for: currentBookSource)
 - **结果分类**：绝对 URL → `UIApplication.open`；Legado `isTrue` 真值（`ok` / `success` / 中文等）→ `.purchased`；`false/no/not/0/空/null` → `.failed` 并提示，不伪造成功。
 - **购后**：先 `ChapterContentCacheStore.invalidate(sourceURL:chapter:)`，再 `onRefreshChapter?()`；对应 Legado `delContent` + `loadChapterList`。
 - **模型**：`chapter` JS 变量补齐 `title` / `name` / `url` / `chapterUrl` / `bookUrl` / `index` / `chapterIndex` / `isVip` / `updateTime` / `volumeName` / `wordCount`；布尔 `isVip` 不再被标题启发式覆盖。
-- **已知边界**：`BookChapter.isPay` 尚未建模，按钮条件缺 `isPay != true`，已购买但 `isVip` 仍为真的章节可能继续显示按钮；这是下一批 P1。
-- **回归**：`PayActionTests` 18 个用例 + `JSCoreRuntimeTests.testChapterBooleanIsVipSurvivesFallbackInjection`；CI 915 tests / 0 failures。
+- **`isPay`**：v1.0.24 已建模（第 8 节），按钮条件为 `hasLogin && isVip && isPay != true`。
+- **回归**：`PayActionTests` 18 个用例 + `JSCoreRuntimeTests.testChapterBooleanIsVipSurvivesFallbackInjection`；v1.0.23 基线 CI 915 tests / 0 failures。
+
+### 8. v1.0.24 增量：正文标题回填、`isPay` 建模与版本元数据单一来源
+
+- **`ruleContent.title`**：`ContentParser` 在正文 HTML / JSON 响应上执行 title 规则。HTML 在 document root 上求值（兼容 `<h1>` 位于正文容器之外），JSON 走 `title/chapterName/name` 回退键；空值或规则失败回退目录标题。`ChapterContent.title` 承载正文标题，`chapter.title` 保持目录标题不变。
+- **`BookChapter.isPay`**：新增 `Bool?`（旧缓存缺失解码为 `nil` = 未知）；目录 HTML / JSON 独立解析 `isPay/paid/purchased`，不再把 `isPay` 误当 `isVip`；`withIndex` / `withTitle` / 缓存 / JS bridge 全链透传。
+- **购买按钮**：`canShowPayAction` 改为 `hasLogin && isVip && isPay != true`，已购章节不再重复显示「购买本章」。
+- **JS 变量**：`payAction` 的 `chapter.isPay` 暴露为布尔值（`nil` 投影为 `false`），Legado 源规则可直接分支。
+- **版本元数据**：`project.yml` 的 `info.properties` 改为 `$(MARKETING_VERSION)` / `$(CURRENT_PROJECT_VERSION)`；Unsigned IPA workflow 增加 `PlistBuddy` 断言，IPA 内部版本与 `project.yml` 不一致时 CI 直接失败。该断言发现并修复了首次 1.0.24 打包内部仍是 1.0.23/24 的漂移。
+- **回归**：`ChapterListMetadataTests` 3 个（HTML `isPay` 独立解析、JSON 布尔/字符串/缺省、旧缓存 Codable）、`ContentParserTests` 4 个（HTML/JSON title、CSS miss 回退、`@js:` title）、`JSCoreRuntimeTests` 1 个（`chapter.isPay` 布尔）；CI 923 tests / 0 failures。
 
 ---
 
@@ -126,30 +135,34 @@ SourceRequestBuilder.imageRequestHeaders(for: currentBookSource)
 | **付费动作策略** | `SourceReadSwift/Core/Engine/PayActionPolicy.swift` | 纯 URL / 模板 / JS 求值与 `isTrue` 分类 |
 | **付费动作测试** | `SourceReadSwiftTests/PayActionTests.swift` | 18 个 `payAction` 用例：求值、分类、缓存、Codable |
 | **文档基线** | `docs/JSON-IOS-COMPATIBILITY.md` & `docs/SOURCE-CAPABILITY-MATRIX.md` | 能力矩阵与 iOS 兼容边界同步更新 |
-| **工程配置** | `project.yml` & `SourceReadSwift/App/Info.plist` | 版本升级声明（1.0.23 / Build 24） |
+| **正文标题** | `SourceReadSwift/Core/Rules/ContentParser.swift` | `ruleContent.title` HTML/JSON 求值与回退 |
+| **章节付费标记** | `SourceReadSwift/Core/Models/BookModels.swift` | `BookChapter.isPay` 可选字段与全链透传 |
+| **工程配置** | `project.yml` & `SourceReadSwift/App/Info.plist` | 版本声明（1.0.24 / Build 25）；bundle 版本由 `MARKETING_VERSION` / `CURRENT_PROJECT_VERSION` 单一来源派生 |
 
 ---
 
 ## 四、 验证结果与 CI 证据 (How to verify)
 
 ### 1. 自动化测试结果
-- **GitHub Actions Run ID**：`40082267528`
-- **验证 Commit**：`53353a2`
+- **GitHub Actions Run ID**：`40084421205`
+- **Job ID**：`120844303932`
+- **验证 Commit**：`435497a`
 - **运行结论**：`Success`
-- **用例总数**：**915 个 XCTest 单元测试全部通过（0 failures, 0 unexpected）**
+- **用例总数**：**923 个 XCTest 单元测试全部通过（0 failures, 0 unexpected）**
 - **本轮新增/关键覆盖**：
-  - `PayActionTests` 18 个用例：纯 URL 不进入 JS、malformed URL 返回 `.failed`、`@js:` / `<js>` 真值、完整真/假值集合、模板分段、缓存只失效当前章、旧缓存兼容、`payAction` Codable round-trip
-  - `JSCoreRuntimeTests.testChapterBooleanIsVipSurvivesFallbackInjection`
-  - `ReaderImageStyleTests` / `ContentParserTests` 既有回归继续通过
-  - `SearchURLResolverTests.testAppVersionSemantics` 锁定 1.0.23 / Build 24
+  - `ChapterListMetadataTests`：`testHTMLChapterIsPayIsParsedSeparatelyFromIsVip`、`testJSONChapterIsPaySupportsBooleanStringAndMissingValue`、`testBookChapterDecodesLegacyCacheWithoutIsPay`
+  - `ContentParserTests`：`testHTMLContentTitleRuleOverridesTOCTitle`、`testHTMLContentTitleRuleFallsBackWhenSelectorMisses`、`testHTMLContentTitleRuleSupportsJavaScript`、`testJSONContentTitleRuleOverridesTOCTitle`
+  - `JSCoreRuntimeTests.testChapterBridgeExposesIsPayAsBoolean`
+  - `PayActionTests` 18 个用例与 `JSCoreRuntimeTests.testChapterBooleanIsVipSurvivesFallbackInjection` 继续通过
+  - `SearchURLResolverTests.testAppVersionSemantics` 锁定 1.0.24 / Build 25
 
 ### 2. IPA 打包产物
-- **GitHub Actions Run ID**：`40082267564`
+- **GitHub Actions Run ID**：`40084421249`
 - **产物名**：`SourceReadSwift-unsigned-ipa`
-- **本地落盘路径**：`C:\Users\Edc21\Desktop\SourceReadSwift-1.0.23-unsigned.ipa`
-- **产物大小**：`11,315,094 字节`
-- **SHA256**：`E46857A97967AE122B026585C1E15E17CBC7355CBB3873352E763F0E7F77C9A6`
-- **Info.plist 核验**：`CFBundleShortVersionString=1.0.23`、`CFBundleVersion=24`、`MinimumOSVersion=16.0`
+- **本地落盘路径**：`C:\Users\Edc21\Desktop\SourceReadSwift-1.0.24-unsigned.ipa`
+- **产物大小**：`11,320,222 字节`
+- **SHA256**：`5BA1F2BD180AF3A58EEF78909854ABDF1737314F6A154E5F4C70EA1E10EC9E78`
+- **Info.plist 核验**：`CFBundleShortVersionString=1.0.24`、`CFBundleVersion=25`、`MinimumOSVersion=16.0`（workflow 内 `PlistBuddy` 断言强制校验）
 
 ---
 
@@ -157,18 +170,12 @@ SourceRequestBuilder.imageRequestHeaders(for: currentBookSource)
 
 下一位接手的工程师或 AI 可在此坚实基准上推进以下事项：
 
-1. **`ruleContent.title` 正文标题回填（P1）**：
-   - 部分站点目录页没有标题，只能在正文响应中取；当前 `ContentParser` 始终使用 `chapter.title`。
-   - 在 HTML / JSON 正文响应上执行 `ruleContent.title`，空值或失败回退 `chapter.title`，回填 `ChapterContent.title` 与阅读器标题。
-2. **`BookChapter.isPay` 建模（P1）**：
-   - 当前购买按钮条件缺 Legado 新版 `isPay != true`，已购买但 `isVip` 仍为真的章节可能重复显示。
-   - 增加向后兼容可选字段，目录 HTML/JSON、`withIndex` / `withTitle`、缓存与 JS bridge 全链透传。
-3. **`imageDecode` 字节级拼图解码（P1/P2）**：
+1. **`imageDecode` 字节级拼图解码（P1/P2）**：
    - 当前已完整支持 URL-rewrite 级别的 `imageDecode`。
    - 对极少数将图片进行反爬切片拼接（JS 返回 `byte[]` 或 Base64 拼图矩阵）的特殊漫画源，可构建底层 CoreGraphics Canvas 拼图管线。
-4. **`downloadUrls`（P2）**：
+2. **`downloadUrls`（P2）**：
    - 当前没有下载队列；要么实现完整队列与进度，要么在 UI 隐藏入口，禁止“可点但无反应”。
-5. **`java.*` stub 运行时诊断（P1）**：
+3. **`java.*` stub 运行时诊断（P1）**：
    - 未实现 API 调用时记录 API 名、源、章节、规则与原因，不静默返回空串。
-6. **目录逐章字数展示（P2）**：
+4. **目录逐章字数展示（P2）**：
    - `ChapterListParser` 已解析 `wordCount`，可在目录抽屉视图的章节副标题中渲染展示。

@@ -171,7 +171,7 @@ isTrue 语义（空/null/false/no/not/0 为假，其余非空为真）
 - JS 执行复用书源同一套 `RuleExecutionContext`：Cookie、持久变量、同步网络桥与诊断 stage `payAction` 一致。
 - `chapter` 变量补齐 `title` / `name` / `url` / `chapterUrl` / `bookUrl` / `index` / `chapterIndex` / `isVip` / `updateTime` / `volumeName` / `wordCount`。
 - 购买成功后先执行 `ChapterContentCacheStore.invalidate(sourceURL:chapter:)`，再触发章节刷新，对应 Legado 的 `delContent` + `loadChapterList`，避免旧 VIP 占位内容继续命中缓存。
-- 当前可见性条件仍缺 `isPay`：Legado 新版为 `hasLogin && isVip && isPay != true`；本项目 `BookChapter` 尚无 `isPay` 字段，因此已购买但 `isVip` 仍为真的章节可能继续显示按钮。该字段是下一批 P1，不能在能力矩阵里写成已完整对齐。
+- 可见性条件已对齐 Legado：`hasLogin && isVip && isPay != true`。`BookChapter.isPay` 为 `Bool?`（旧缓存 `nil` = 未知），目录 HTML/JSON 独立解析 `isPay/paid/purchased`，`nil` 不会误判为已购买；购买成功后的缓存失效与刷新保持不变。
 - 回归：`PayActionTests`（纯 URL 不执行 JS、malformed URL 失败、`@js:` / `<js>` 真值、完整真/假值集合、缓存只失效当前章、旧缓存兼容、`payAction` Codable round-trip）、`JSCoreRuntimeTests.testChapterBooleanIsVipSurvivesFallbackInjection`。
 
 ## 4. 为什么“完美兼容”很难
@@ -220,6 +220,8 @@ isTrue 语义（空/null/false/no/not/0 为假，其余非空为真）
 | P1（已完成） | `preUpdateJs` 目录刷新与 `book.setReverseToc` | `ChapterListMetadataTests` 通过 |
 | P1（已完成） | 图片正文 `imageStyle` 排版策略与双端渲染 | 原生 TextKit（NSTextAttachment）与翻页模式（ReaderIllustrationView）落地，支持 FULL 全宽铺满与防盗链 Header 转发；用例 `ReaderImageStyleTests` 通过 |
 | P1（已完成） | 正文 `payAction` 付费动作 | 纯 URL 短路、模板/JS 求值、`isTrue` 语义、购后缓存失效与刷新；`PayActionTests` 通过 |
+| P1（已完成） | 正文 `ruleContent.title` | HTML/JSON 正文响应执行 title 规则，空值/失败回退目录标题；`ContentParserTests` 4 个用例通过 |
+| P1（已完成） | `BookChapter.isPay` 字段 | 可选字段全链透传，按钮条件为 `hasLogin && isVip && isPay != true`；`ChapterListMetadataTests` / `JSCoreRuntimeTests` 通过 |
 | P1（部分完成） | 图片正文 `imageDecode` | 当前已支持 URL 级别的重写与规则链处理（JS/换源/绝对化）；Legado 原生的字节流拼图/Bitmap 解码需后续底层图像解码管道支持 |
 | P0 | 为 `startBrowserAwait` / 验证码建立 UI 状态机 | 不再返回假成功，UI 有明确状态 |
 | P1 | 把 JSONPath 方言差异写成可执行用例 | 每个差异至少一个 XCTest |
