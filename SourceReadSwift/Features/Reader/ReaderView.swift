@@ -686,7 +686,10 @@ struct ReaderView: View {
             // content and rebuild pages synchronously so the reader never
             // flashes an empty page surface during an in-place refresh.
             resetWindow()
-            rebuildPagedBlocksCache()
+            // The old page model belongs to the previous chapter. Rebuild it
+            // from the freshly reset reading position instead of restoring a
+            // stale page ordinal from the replaced content.
+            rebuildPagedBlocksCache(useCachedPageAnchor: false)
         }
         .onChange(of: preloadChapterCount) { _ in
             // Apply a preload change to the live window immediately: grow
@@ -702,7 +705,7 @@ struct ReaderView: View {
             // use the debounced path below.
             pageLayoutTask?.cancel()
             pageLayoutTask = nil
-            rebuildPagedBlocksCache()
+            rebuildPagedBlocksCache(useCachedPageAnchor: false)
             let paragraph = positionMapping.clampParagraph(visibleParagraphIndex)
             stopAutoScroll()
             stopSpeechPlayback()
@@ -3755,8 +3758,8 @@ struct ReaderView: View {
         positionMapping.page(containingParagraph: paragraphIndex)
     }
 
-    private func rebuildPagedBlocksCache() {
-        let anchor = currentPageAnchor()
+    private func rebuildPagedBlocksCache(useCachedPageAnchor: Bool = true) {
+        let anchor = currentPageAnchor(useCachedPageAnchor: useCachedPageAnchor)
         let cacheKey = readerPageCacheKey
         let blocks = buildReaderPageBlocks()
         pagedBlocksCache = blocks
@@ -3778,8 +3781,8 @@ struct ReaderView: View {
         syncWindowCursorToVisiblePage()
     }
 
-    private func currentPageAnchor() -> ReaderChapterPosition? {
-        if pagedBlocksCache.indices.contains(pagedPageIndex) {
+    private func currentPageAnchor(useCachedPageAnchor: Bool = true) -> ReaderChapterPosition? {
+        if useCachedPageAnchor, pagedBlocksCache.indices.contains(pagedPageIndex) {
             let block = pagedBlocksCache[pagedPageIndex]
             if block.chapterIndex >= 0 {
                 return ReaderChapterPosition(
