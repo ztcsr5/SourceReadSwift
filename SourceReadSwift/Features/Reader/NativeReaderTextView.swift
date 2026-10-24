@@ -619,7 +619,10 @@ struct NativeReaderTextView: UIViewRepresentable {
 
         /// 补做滑动期间被推迟的整窗重建：先抓字符锚点，重建后按锚点复位，
         /// 所以「章界插入/替换」不会把读者眼睛下面那一行挪走。
+        /// 只在手彻底停下时执行 —— 手势结束回调本身也在滚动帧里，
+        /// 所以调用方会把它再推到下一个 runloop，避免“松手那一下”顿一下。
         private func applyDeferredConfiguration(in textView: UITextView) {
+            guard !textView.isTracking, !textView.isDragging, !textView.isDecelerating else { return }
             guard let pending = deferredConfiguration else { return }
             deferredConfiguration = nil
             let anchor = captureScrollAnchor(in: textView)
@@ -1046,9 +1049,13 @@ struct NativeReaderTextView: UIViewRepresentable {
         func scrollViewDidEndDragging(_ scrollView: UIScrollView, willDecelerate decelerate: Bool) {
             if let textView = scrollView as? UITextView {
                 updateVisibleParagraph(in: textView)
-                // 不会继续惯性滑：立刻把滑动期间推迟的重建补上。
+                // 不会继续惯性滑：把推迟的重建推到下一个 runloop，
+                // 松手那一帧只做收尾，不在这里排整窗文本。
                 if !decelerate {
-                    applyDeferredConfiguration(in: textView)
+                    DispatchQueue.main.async { [weak self, weak textView] in
+                        guard let self, let textView else { return }
+                        self.applyDeferredConfiguration(in: textView)
+                    }
                 }
             }
             let offsetY = scrollView.contentOffset.y
@@ -1063,7 +1070,11 @@ struct NativeReaderTextView: UIViewRepresentable {
         func scrollViewDidEndDecelerating(_ scrollView: UIScrollView) {
             if let textView = scrollView as? UITextView {
                 updateVisibleParagraph(in: textView)
-                applyDeferredConfiguration(in: textView)
+                // 惯性刚停，这一帧同样不该承担整窗重建。
+                DispatchQueue.main.async { [weak self, weak textView] in
+                    guard let self, let textView else { return }
+                    self.applyDeferredConfiguration(in: textView)
+                }
             }
         }
     }
