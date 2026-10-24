@@ -4,7 +4,8 @@
 > **文档基线**：v1.0.30 (Build 31)  
 > **交接时间**：2026-10-25  
 > **验证 Commit**：`91c9161`（GitHub Actions iOS 987 tests / 0 failures；unsigned IPA 打包通过）  
-> **最新产物**：`C:\Users\Edc21\Desktop\SourceReadSwift-1.0.30-unsigned.ipa`（11,507,953 字节，SHA256 `05F3EC27C1FD065D91289045229D0B25A2DCF4E5E5A1FCFCE86313624AA10261`）
+> **最新产物**：`C:\Users\Edc21\Desktop\SourceReadSwift-1.0.30-unsigned.ipa`（11,507,953 字节，SHA256 `05F3EC27C1FD065D91289045229D0B25A2DCF4E5E5A1FCFCE86313624AA10261`）  
+> **全量文档**：项目全貌、功能矩阵、生态分析与 v1.0.30 工作记录见 `PROJECT_FULL.md`。
 
 ---
 
