@@ -38,13 +38,20 @@ struct NativeReaderTextView: UIViewRepresentable {
     var onNearBottom: (() -> Void)? = nil
     var onReachTop: (() -> Void)? = nil
     var onReachBottom: (() -> Void)? = nil
+    /// One tap-zone page step in continuous scroll mode. `generation` is
+    /// monotonic so the same direction can be requested twice in a row
+    /// without SwiftUI diffing the two requests as equal.
+    var pageStepDirection: Int = 0
+    var pageStepGeneration: Int = 0
+    var onPageStepBoundary: ((Int) -> Void)? = nil
 
     func makeCoordinator() -> Coordinator {
         Coordinator(
             onVisibleParagraph: onVisibleParagraph,
             onReachTop: onReachTop,
             onReachBottom: onReachBottom,
-            onNearBottom: onNearBottom
+            onNearBottom: onNearBottom,
+            onPageStepBoundary: onPageStepBoundary
         )
     }
 
@@ -76,7 +83,14 @@ struct NativeReaderTextView: UIViewRepresentable {
         textView.setContentCompressionResistancePriority(.defaultLow, for: .vertical)
 
         context.coordinator.attach(textView)
-        context.coordinator.update(textView: textView, configuration: configuration, scrollTarget: scrollTarget, scrollRequestKey: scrollRequestKey)
+        context.coordinator.update(
+            textView: textView,
+            configuration: configuration,
+            scrollTarget: scrollTarget,
+            scrollRequestKey: scrollRequestKey,
+            pageStepDirection: pageStepDirection,
+            pageStepGeneration: pageStepGeneration
+        )
         return textView
     }
 
@@ -85,9 +99,17 @@ struct NativeReaderTextView: UIViewRepresentable {
             visibleParagraph: onVisibleParagraph,
             reachTop: onReachTop,
             reachBottom: onReachBottom,
-            nearBottom: onNearBottom
+            nearBottom: onNearBottom,
+            pageStepBoundary: onPageStepBoundary
         )
-        context.coordinator.update(textView: textView, configuration: configuration, scrollTarget: scrollTarget, scrollRequestKey: scrollRequestKey)
+        context.coordinator.update(
+            textView: textView,
+            configuration: configuration,
+            scrollTarget: scrollTarget,
+            scrollRequestKey: scrollRequestKey,
+            pageStepDirection: pageStepDirection,
+            pageStepGeneration: pageStepGeneration
+        )
         context.coordinator.updateHighlight(currentParagraphIndex, in: textView, color: highlightColor)
         context.coordinator.updateSelection(textSelectionEnabled, in: textView)
     }
@@ -259,6 +281,8 @@ struct NativeReaderTextView: UIViewRepresentable {
         private var reachTopCallback: (() -> Void)?
         private var reachBottomCallback: (() -> Void)?
         private var nearBottomCallback: (() -> Void)?
+        private var pageStepBoundaryCallback: ((Int) -> Void)?
+        private var lastPageStepGeneration = 0
         private var configuration: Configuration?
         private var paragraphRanges: [NSRange] = []
         private var lastHighlightedParagraph = -1
@@ -280,12 +304,14 @@ struct NativeReaderTextView: UIViewRepresentable {
             onVisibleParagraph: @escaping (Int) -> Void,
             onReachTop: (() -> Void)? = nil,
             onReachBottom: (() -> Void)? = nil,
-            onNearBottom: (() -> Void)? = nil
+            onNearBottom: (() -> Void)? = nil,
+            onPageStepBoundary: ((Int) -> Void)? = nil
         ) {
             visibleParagraphCallback = onVisibleParagraph
             reachTopCallback = onReachTop
             reachBottomCallback = onReachBottom
             nearBottomCallback = onNearBottom
+            pageStepBoundaryCallback = onPageStepBoundary
         }
 
         func attach(_ textView: UITextView) {
@@ -300,12 +326,14 @@ struct NativeReaderTextView: UIViewRepresentable {
             visibleParagraph: @escaping (Int) -> Void,
             reachTop: (() -> Void)?,
             reachBottom: (() -> Void)?,
-            nearBottom: (() -> Void)?
+            nearBottom: (() -> Void)?,
+            pageStepBoundary: ((Int) -> Void)?
         ) {
             visibleParagraphCallback = visibleParagraph
             reachTopCallback = reachTop
             reachBottomCallback = reachBottom
             nearBottomCallback = nearBottom
+            pageStepBoundaryCallback = pageStepBoundary
         }
 
         func updateSelection(_ enabled: Bool, in textView: UITextView) {
@@ -314,7 +342,14 @@ struct NativeReaderTextView: UIViewRepresentable {
             textView.isSelectable = enabled
         }
 
-        func update(textView: UITextView, configuration newConfiguration: Configuration, scrollTarget: Int?, scrollRequestKey: String?) {
+        func update(
+            textView: UITextView,
+            configuration newConfiguration: Configuration,
+            scrollTarget: Int?,
+            scrollRequestKey: String?,
+            pageStepDirection: Int,
+            pageStepGeneration: Int
+        ) {
             attach(textView)
             let previousConfiguration = configuration
             let contentChanged = previousConfiguration?.contentFingerprint != newConfiguration.contentFingerprint
@@ -373,6 +408,12 @@ struct NativeReaderTextView: UIViewRepresentable {
                 }
                 if textColorChanged {
                     updateBaseTextColor(in: textView, color: newConfiguration.textColor)
+                }
+            }
+            if pageStepGeneration != lastPageStepGeneration {
+                lastPageStepGeneration = pageStepGeneration
+                if pageStepDirection != 0 {
+                    applyPageStep(direction: pageStepDirection, in: textView)
                 }
             }
             guard !isAppend else { return }
@@ -603,6 +644,39 @@ struct NativeReaderTextView: UIViewRepresentable {
                 adjustedContentInset: textView.adjustedContentInset
             )
             setContentOffsetIfNeeded(CGPoint(x: textView.contentOffset.x, y: targetY), in: textView)
+        }
+
+        /// Continuous-scroll tap-zone page turn.  A boundary tap reports back
+        /// instead of silently swallowing the gesture, so the reader can move
+        /// to the neighbouring chapter.
+        private func applyPageStep(direction: Int, in textView: UITextView) {
+            guard textView.bounds.height > 0 else { return }
+            let currentY = textView.contentOffset.y
+            let targetY = ReaderPageStepPolicy.targetOffsetY(
+                currentOffsetY: currentY,
+                boundsHeight: textView.bounds.height,
+                contentSizeHeight: textView.contentSize.height,
+                adjustedTop: textView.adjustedContentInset.top,
+                adjustedBottom: textView.adjustedContentInset.bottom,
+                direction: direction
+            )
+            guard !ReaderPageStepPolicy.reachedBoundary(currentOffsetY: currentY, targetOffsetY: targetY) else {
+                pageStepBoundaryCallback?(direction)
+                return
+            }
+            isProgrammaticScrolling = true
+            UIView.animate(
+                withDuration: 0.28,
+                delay: 0,
+                options: [.curveEaseOut, .beginFromCurrentState, .allowUserInteraction, .allowAnimatedContent]
+            ) {
+                textView.setContentOffset(CGPoint(x: 0, y: targetY), animated: false)
+            } completion: { [weak self, weak textView] _ in
+                self?.isProgrammaticScrolling = false
+                if let textView {
+                    self?.updateVisibleParagraph(in: textView)
+                }
+            }
         }
 
         private func setContentOffsetIfNeeded(_ offset: CGPoint, in textView: UITextView) {

@@ -279,4 +279,68 @@ final class ReaderPagedNavigationPolicyTests: XCTestCase {
         XCTAssertLessThanOrEqual(height, 628)
         XCTAssertLessThan(height, 844 * 0.7)
     }
+
+    // MARK: - Continuous scroll page step
+
+    func testPageStepMovesOneViewportWithOverlap() {
+        let target = ReaderPageStepPolicy.targetOffsetY(
+            currentOffsetY: 0,
+            boundsHeight: 800,
+            contentSizeHeight: 4000,
+            direction: 1
+        )
+        XCTAssertEqual(target, 704, accuracy: 0.5)
+        XCTAssertLessThan(target, 800, "a page step must leave an overlap so no line is skipped")
+    }
+
+    func testPageStepClampsToContentBounds() {
+        let bottom = ReaderPageStepPolicy.targetOffsetY(
+            currentOffsetY: 3100,
+            boundsHeight: 800,
+            contentSizeHeight: 4000,
+            direction: 1
+        )
+        XCTAssertEqual(bottom, 3200, accuracy: 0.5)
+        let top = ReaderPageStepPolicy.targetOffsetY(
+            currentOffsetY: 100,
+            boundsHeight: 800,
+            contentSizeHeight: 4000,
+            direction: -1
+        )
+        XCTAssertEqual(top, 0, accuracy: 0.5)
+    }
+
+    func testPageStepHonoursAdjustedInsets() {
+        let top = ReaderPageStepPolicy.targetOffsetY(
+            currentOffsetY: -30,
+            boundsHeight: 800,
+            contentSizeHeight: 4000,
+            adjustedTop: 30,
+            direction: -1
+        )
+        XCTAssertEqual(top, -30, accuracy: 0.5, "the inset top is the first legal offset")
+    }
+
+    func testPageStepBoundaryDetection() {
+        XCTAssertTrue(
+            ReaderPageStepPolicy.reachedBoundary(currentOffsetY: 3200, targetOffsetY: 3200)
+        )
+        XCTAssertTrue(
+            ReaderPageStepPolicy.reachedBoundary(currentOffsetY: 0, targetOffsetY: 0.2)
+        )
+        XCTAssertFalse(
+            ReaderPageStepPolicy.reachedBoundary(currentOffsetY: 0, targetOffsetY: 704)
+        )
+    }
+
+    func testPageStepOnShortContentStaysPut() {
+        let target = ReaderPageStepPolicy.targetOffsetY(
+            currentOffsetY: 0,
+            boundsHeight: 800,
+            contentSizeHeight: 300,
+            direction: 1
+        )
+        XCTAssertEqual(target, 0, accuracy: 0.5)
+        XCTAssertTrue(ReaderPageStepPolicy.reachedBoundary(currentOffsetY: 0, targetOffsetY: target))
+    }
 }

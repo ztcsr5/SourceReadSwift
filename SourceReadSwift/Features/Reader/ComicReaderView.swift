@@ -42,6 +42,9 @@ struct ComicReaderView: View {
     @State private var scrollTargetIndex: Int?
     @AppStorage("comic_dimming_level") private var dimmingLevel: Double = 0.0
     @State private var chapterSearchText = ""
+    /// Guards against a slow chapter response overwriting the pages of a
+    /// chapter the user opened afterwards.
+    @State private var loadGeneration = 0
     @State private var isChapterListReversed = false
 
     private var filteredChapterIndices: [Int] {
@@ -206,11 +209,13 @@ struct ComicReaderView: View {
                 }
             }
             .onChange(of: scrollTargetIndex) { target in
-                if let target = target {
-                    withAnimation(.easeInOut(duration: 0.25)) {
-                        proxy.scrollTo(target, anchor: .top)
-                    }
+                guard let target else { return }
+                withAnimation(.easeInOut(duration: 0.25)) {
+                    proxy.scrollTo(target, anchor: .top)
                 }
+                // Clear the request so tapping 首页/末页 again re-fires the
+                // same value instead of being diffed away as "no change".
+                scrollTargetIndex = nil
             }
         }
     }
@@ -485,6 +490,10 @@ struct ComicReaderView: View {
         isLoading = true
         errorMessage = nil
         currentPageIndex = 0
+        scrollTargetIndex = nil
+        pages.removeAll()
+        loadGeneration &+= 1
+        let generation = loadGeneration
 
         if !bookID.isEmpty {
             appState.bookshelfStore.updateReadingProgress(
@@ -498,6 +507,9 @@ struct ComicReaderView: View {
         Task {
             let result = await engine.getContent(source: source, chapter: chapter)
             await MainActor.run {
+                // A stale response from a previously selected chapter must not
+                // replace the chapter the user is reading now.
+                guard generation == self.loadGeneration else { return }
                 self.isLoading = false
                 switch result {
                 case .success(let content):
@@ -506,6 +518,7 @@ struct ComicReaderView: View {
                         self.errorMessage = "未在当前章节解析到漫画图片"
                     } else {
                         self.pages = parsedPages
+                        self.currentPageIndex = 0
                     }
                 case .failure(let error):
                     self.errorMessage = error.displayMessage
@@ -560,6 +573,12 @@ private struct ComicPageImageView: View {
                     }
                 }
         )
+        .onChange(of: url) { _ in
+            // TabView reuses the page view across chapter switches; without
+            // this reset the next chapter inherited the previous zoom level.
+            scale = 1.0
+            lastScale = 1.0
+        }
         .onTapGesture(count: 2) {
             withAnimation(.spring()) {
                 if scale > 1.2 {

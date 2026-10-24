@@ -177,3 +177,37 @@ enum ReaderPagedNavigationPolicy {
         return max(lower - 1, 0)
     }
 }
+
+/// Continuous-scroll page stepping used by the reader tap zones.
+///
+/// The scroll surface used to ignore every tap zone except "menu", even
+/// though the default left/right zones are page turns, so the whole screen
+/// looked dead in the default reading mode.  One tap now moves by one
+/// viewport minus a small overlap (a line is never skipped) and reports when
+/// the reader already sits on the first/last line so the caller can hand over
+/// to the neighbouring chapter.
+enum ReaderPageStepPolicy {
+    static let overlapRatio: CGFloat = 0.12
+
+    static func targetOffsetY(
+        currentOffsetY: CGFloat,
+        boundsHeight: CGFloat,
+        contentSizeHeight: CGFloat,
+        adjustedTop: CGFloat = 0,
+        adjustedBottom: CGFloat = 0,
+        direction: Int
+    ) -> CGFloat {
+        let minimumY = -adjustedTop
+        let maximumY = max(minimumY, contentSizeHeight - boundsHeight + adjustedBottom)
+        guard boundsHeight > 0, direction != 0 else {
+            return min(max(currentOffsetY, minimumY), maximumY)
+        }
+        let step = max(boundsHeight * (1 - overlapRatio), 1)
+        let desired = currentOffsetY + (direction > 0 ? step : -step)
+        return min(max(desired, minimumY), maximumY)
+    }
+
+    static func reachedBoundary(currentOffsetY: CGFloat, targetOffsetY: CGFloat) -> Bool {
+        abs(targetOffsetY - currentOffsetY) < 0.5
+    }
+}

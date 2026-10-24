@@ -112,6 +112,8 @@ struct ReaderView: View {
     @State private var coverIsAnimating = false
     @State private var scrollJumpGeneration = 0
     @State private var chapterSliderTarget: Double? = nil
+    @State private var pageStepDirection: Int = 0
+    @State private var pageStepGeneration: Int = 0
     @State private var brightnessBeforeReader: CGFloat? = nil
     @StateObject private var playbackCoordinator = ReaderPlaybackCoordinator()
     @StateObject private var speechController = ReaderSpeechController()
@@ -364,6 +366,12 @@ struct ReaderView: View {
                     .allowsHitTesting(false)
                 }
 
+            if !showOverlay && !speechController.isSpeaking && !autoScrollEnabled {
+                readerFooter
+                    .transition(.opacity)
+                    .zIndex(1)
+            }
+
             if showOverlay {
                 readerOverlay
                     .transition(
@@ -521,6 +529,7 @@ struct ReaderView: View {
             let initial = initialAutoScrollTarget()
             scrollParagraphTarget = initial.paragraph
             pagedPageIndex = initial.page
+            UIDevice.current.isBatteryMonitoringEnabled = true
             previousIdleTimerDisabled = UIApplication.shared.isIdleTimerDisabled
             brightnessBeforeReader = UIScreen.main.brightness
             applyReaderBrightness()
@@ -554,6 +563,7 @@ struct ReaderView: View {
             stopSpeechPlayback()
             pageLayoutTask = nil
             restoreIdleTimerPreference()
+            UIDevice.current.isBatteryMonitoringEnabled = false
             if let brightnessBeforeReader {
                 UIScreen.main.brightness = brightnessBeforeReader
             }
@@ -905,6 +915,19 @@ struct ReaderView: View {
             onReachTop: nil,
             onReachBottom: {
                 appendNextChapterIfPossible()
+            },
+            pageStepDirection: pageStepDirection,
+            pageStepGeneration: pageStepGeneration,
+            onPageStepBoundary: { direction in
+                // The text surface already sits on its first/last line, so a
+                // further page tap hands over to the neighbouring chapter.
+                if direction < 0 {
+                    guard canSelectRelativeChapter(offset: -1) else { return }
+                    selectRelativeChapter(offset: -1, startAtEnd: true)
+                } else {
+                    guard canSelectRelativeChapter(offset: 1) else { return }
+                    selectRelativeChapter(offset: 1)
+                }
             }
         )
         .ignoresSafeArea(.container, edges: .bottom)
@@ -1001,6 +1024,7 @@ struct ReaderView: View {
 
         // 3. Not in cache: fetch in background Task
         isAppendingNextChapter = true
+        let originChapterIndex = chapterIndex
         Task {
             let engine = appState.engine
             let result = await AsyncTimeout.run(seconds: 12) {
@@ -1008,7 +1032,13 @@ struct ReaderView: View {
             }
             await MainActor.run {
                 self.isAppendingNextChapter = false
-                guard self.readerMode == .scroll else { return }
+                // The chapter can change while a slow source is still
+                // answering.  Appending that stale chapter into the new one
+                // showed the wrong text after the handoff.
+                guard self.readerMode == .scroll,
+                      self.chapterIndex == originChapterIndex,
+                      self.appendedSections.count < 50,
+                      self.appendedSections.last?.chapterIndex != nextIndex else { return }
                 if case .success(let loaded) = result {
                     self.appState.chapterContentCacheStore.save(loaded, sourceURL: source.bookSourceUrl, purifyRules: purifyRules)
                     self.appendedSections.append(ContinuousAppendedSection(
@@ -1290,6 +1320,65 @@ struct ReaderView: View {
             )
         }
         .buttonStyle(.plain)
+    }
+
+    /// The reader already reserves `footerHeight` below the last line in every
+    /// mode, but the band stayed empty, so a full-screen page showed no clock,
+    /// battery or progress once the chrome auto-hid.  This fills that reserved
+    /// band and never intercepts taps.
+    private var readerFooter: some View {
+        TimelineView(.everyMinute) { context in
+            VStack {
+                Spacer(minLength: 0)
+                HStack(spacing: 12) {
+                    Text(context.date, format: .dateTime.hour().minute())
+                        .frame(width: 54, alignment: .leading)
+
+                    Spacer(minLength: 4)
+
+                    Text(progressTitle)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.72)
+                        .frame(maxWidth: .infinity)
+
+                    Spacer(minLength: 4)
+
+                    HStack(spacing: 3) {
+                        Image(systemName: batterySymbolName)
+                        Text(batteryPercentageText)
+                    }
+                    .frame(width: 58, alignment: .trailing)
+                }
+                .font(.system(size: 10, weight: .medium).monospacedDigit())
+                .foregroundStyle(readerThemeTextColor.opacity(0.45))
+                .padding(.horizontal, max(CGFloat(pagePadding), 18))
+                .padding(.bottom, 6)
+                .frame(height: max(CGFloat(footerHeight), 24), alignment: .bottom)
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+        }
+        .allowsHitTesting(false)
+        .accessibilityHidden(true)
+    }
+
+    private var batteryPercentageText: String {
+        let level = UIDevice.current.batteryLevel
+        guard level >= 0 else { return "--" }
+        return "\(Int((level * 100).rounded()))%"
+    }
+
+    private var batterySymbolName: String {
+        let device = UIDevice.current
+        if device.batteryState == .charging || device.batteryState == .full {
+            return "battery.100.bolt"
+        }
+        let level = device.batteryLevel
+        guard level >= 0 else { return "battery.100" }
+        if level < 0.15 { return "battery.0" }
+        if level < 0.4 { return "battery.25" }
+        if level < 0.65 { return "battery.50" }
+        if level < 0.9 { return "battery.75" }
+        return "battery.100"
     }
 
     private var readerOverlay: some View {
@@ -2266,11 +2355,15 @@ struct ReaderView: View {
                                 Button {
                                     showChapterList = false
                                     presentOverlay()
-                                    onSelectChapter?(chapter)
+                                    if let onSelectChapterWithPosition {
+                                        onSelectChapterWithPosition(chapter, 0)
+                                    } else {
+                                        onSelectChapter?(chapter)
+                                    }
                                 } label: {
                                     chapterRow(chapter)
                                 }
-                                .disabled(onSelectChapter == nil || chapter.index == chapterIndex)
+                                .disabled(!canJumpToChapter || chapter.index == chapterIndex)
                                 .listRowBackground(Color.clear)
                                 .listRowSeparatorTint(readerThemeTextColor.opacity(0.15))
                             }
@@ -2456,7 +2549,7 @@ struct ReaderView: View {
                                 }
                             }
                         }
-                        .disabled(bookmark.chapterIndex != chapterIndex && onSelectChapter == nil)
+                        .disabled(bookmark.chapterIndex != chapterIndex && !canJumpToChapter)
                         .listRowBackground(Color.clear)
                         .listRowSeparatorTint(readerThemeTextColor.opacity(0.15))
                         .swipeActions(edge: .leading) {
@@ -2514,7 +2607,8 @@ struct ReaderView: View {
             jumpToParagraph(bookmark.paragraphIndex)
         } else {
             guard let target = chapters.first(where: { $0.index == bookmark.chapterIndex }) else { return }
-            if let paragraphIndex = bookmark.paragraphIndex {
+            let paragraphIndex = bookmark.paragraphIndex
+            if let paragraphIndex {
                 appState.bookshelfStore.updateReadingProgress(
                     bookID: bookID,
                     chapterIndex: bookmark.chapterIndex,
@@ -2523,7 +2617,14 @@ struct ReaderView: View {
                     paragraphIndex: paragraphIndex
                 )
             }
-            onSelectChapter?(target)
+            // Owners that expose the position-aware entry point can land on
+            // the bookmarked paragraph directly; the plain callback always
+            // started the chapter at its first paragraph.
+            if let onSelectChapterWithPosition {
+                onSelectChapterWithPosition(target, paragraphIndex ?? 0)
+            } else {
+                onSelectChapter?(target)
+            }
         }
     }
 
@@ -2541,6 +2642,10 @@ struct ReaderView: View {
             pagedPageIndex = pageIndex(containingParagraph: safeIndex)
         }
         persistReadingPosition(paragraphIndexOverride: safeIndex)
+    }
+
+    private var canJumpToChapter: Bool {
+        onSelectChapter != nil || onSelectChapterWithPosition != nil
     }
 
     private func canSelectRelativeChapter(offset: Int) -> Bool {
@@ -2588,8 +2693,23 @@ struct ReaderView: View {
 
     private func runTapAction(_ action: ReaderTapAction) {
         if readerMode == .scroll {
-            if action == .menu {
+            // Continuous mode used to drop every zone except "menu", so the
+            // default left/right page zones did nothing at all.  A page turn
+            // is now a viewport step on the TextKit surface; chapter zones and
+            // menu keep the same meaning as the paged modes.
+            switch action {
+            case .previousPage:
+                requestPageStep(direction: -1)
+            case .nextPage:
+                requestPageStep(direction: 1)
+            case .previousChapter:
+                selectRelativeChapter(offset: -1, startAtEnd: true)
+            case .nextChapter:
+                selectRelativeChapter(offset: 1)
+            case .menu:
                 toggleOverlay()
+            case .disabled:
+                break
             }
             return
         }
@@ -2607,6 +2727,11 @@ struct ReaderView: View {
         case .disabled:
             break
         }
+    }
+
+    private func requestPageStep(direction: Int) {
+        pageStepDirection = direction
+        pageStepGeneration &+= 1
     }
 
     private func moveReaderTarget(to rawTarget: Int) {
