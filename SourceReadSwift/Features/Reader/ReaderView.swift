@@ -144,6 +144,12 @@ struct ReaderView: View {
     @State private var coverIsAnimating = false
     @State private var scrollJumpGeneration = 0
     @State private var chapterSliderTarget: Double? = nil
+    /// 拖动章节进度条时的实时跳章任务。手指还在滑就不停重排，
+    /// 停住 0.12s 才真正跳，避免一次拖动里塞进十几个章节加载。
+    @State private var chapterSeekTask: Task<Void, Never>? = nil
+    /// 首帧是否已经落到「上次读到的那一段」。为 false 时文字层先透明，
+    /// 避免用户先看到第 1 章章首、随后被切成恢复位置的那一下闪跳。
+    @State private var didLandInitialPosition = false
     @State private var pageStepDirection: Int = 0
     @State private var pageStepGeneration: Int = 0
     @State private var brightnessBeforeReader: CGFloat? = nil
@@ -153,6 +159,10 @@ struct ReaderView: View {
     @AppStorage("reader.fontSize") private var fontSize: Double = ReaderTypographyDefaults.fontSize
     @AppStorage("reader.lineSpacing") private var lineSpacing: Double = ReaderTypographyDefaults.lineSpacing
     @AppStorage("reader.pagePadding") private var pagePadding: Double = ReaderTypographyDefaults.pagePadding
+    // 页脚三件套各自可关（对照香色闺阁 tr_showTime / tr_showBatView / tr_showBatLabel）。
+    @AppStorage("reader.footerShowTime") private var footerShowTime = true
+    @AppStorage("reader.footerShowBatteryIcon") private var footerShowBatteryIcon = true
+    @AppStorage("reader.footerShowBatteryPercent") private var footerShowBatteryPercent = true
     @AppStorage("reader.letterSpacing") private var letterSpacing: Double = ReaderTypographyDefaults.letterSpacing
     @AppStorage("reader.paragraphSpacing") private var paragraphSpacing: Double = ReaderTypographyDefaults.paragraphSpacing
     @AppStorage("reader.paragraphIndent") private var paragraphIndent: Double = ReaderTypographyDefaults.paragraphIndent
@@ -967,15 +977,20 @@ struct ReaderView: View {
     }
 
     private var scrollModeParagraphs: [String] {
-        guard !windowSections.isEmpty else { return content.paragraphs }
-        var result: [String] = []
-        for (offset, section) in windowSections.enumerated() {
-            if offset > 0 {
-                result.append("——— \(section.title) ———")
+        // 每次 body 求值都重建这个数组（几百到上千段）是滚动期最稳定的一笔浪费：
+        // 指纹没变就复用上次的结果，只有章节窗口或正文真的变了才重建。
+        let key = "\(bookID)|\(scrollContentFingerprint)"
+        return ReaderScrollParagraphCache.shared.paragraphs(for: key) {
+            guard !windowSections.isEmpty else { return content.paragraphs }
+            var result: [String] = []
+            for (offset, section) in windowSections.enumerated() {
+                if offset > 0 {
+                    result.append("——— \(section.title) ———")
+                }
+                result.append(contentsOf: section.paragraphs)
             }
-            result.append(contentsOf: section.paragraphs)
+            return result
         }
-        return result
     }
 
     private var scrollContentFingerprint: String {
@@ -1106,6 +1121,13 @@ struct ReaderView: View {
         content.readerImageStyle
     }
 
+    /// 需要恢复到「中间某一段」时，定位落地之前先把文字层藏起来。
+    /// 首帧就开始读的书（目标为 0）不走这个门闸，不会出现空白。
+    private var initialSurfaceOpacity: Double {
+        guard scrollParagraphTarget > 0, !didLandInitialPosition else { return 1 }
+        return 0
+    }
+
     private var scrollReaderContent: some View {
         NativeReaderTextView(
             title: windowSections.first?.title ?? content.title,
@@ -1124,7 +1146,13 @@ struct ReaderView: View {
             paragraphIndent: paragraphIndent,
             titleSpacing: titleSpacing,
             footerHeight: footerHeight,
+            // 工具栏收起后正文要贴上安全区，不能被 56pt 的预留白白顶下去；
+            // NativeReaderTextView 会同时补偿 contentOffset，所以切换时文字不动。
+            topInset: showOverlay
+                ? Double(ReaderPageLayoutEngine.minimumTopInset(pagePadding: CGFloat(pagePadding)))
+                : max(Double(pagePadding) + 10, 24),
             textColor: background.uiTextColor(isNight: colorScheme == .dark),
+            surfaceColor: background.uiColor(isNight: colorScheme == .dark),
             highlightColor: AppTheme.accentUIColor.withAlphaComponent(background == .dark ? 0.22 : 0.12),
             currentParagraphIndex: speechFlatParagraphIndex ?? -1,
             scrollTarget: activeScrollTarget,
@@ -1165,14 +1193,25 @@ struct ReaderView: View {
                     guard canSelectRelativeChapter(offset: 1) else { return }
                     selectRelativeChapter(offset: 1)
                 }
+            },
+            onScrollTargetApplied: {
+                didLandInitialPosition = true
             }
         )
         .ignoresSafeArea(.container, edges: .bottom)
+        .opacity(initialSurfaceOpacity)
         .onAppear {
             if scrollParagraphTarget > 0 {
+                didLandInitialPosition = false
                 scrollJumpGeneration &+= 1
                 DispatchQueue.main.async {
                     paragraphJumpRequest = ParagraphJumpRequest(index: scrollParagraphTarget)
+                }
+                // 兜底：万一定位回调没来（首帧尺寸为 0、章节还在占位），
+                // 0.5s 后无条件显示，宁可闪一下也不能一直白屏。
+                Task { @MainActor in
+                    try? await Task.sleep(nanoseconds: 500_000_000)
+                    didLandInitialPosition = true
                 }
             }
         }
@@ -1965,13 +2004,9 @@ struct ReaderView: View {
             .padding(.bottom, CGFloat(pagePadding) + CGFloat(footerHeight))
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
             .background {
-                if readerMode == .cover {
-                    Rectangle()
-                        .fill(readerThemeBackground)
-                        .shadow(color: .black.opacity(background == .dark ? 0.45 : 0.22), radius: 14, x: -6, y: 0)
-                } else {
-                    readerThemeBackground
-                }
+                // 覆盖模式的方向阴影由 coverPagedReaderContent 每页各画一层；
+                // 这里再叠一层同方向的 shadow，两圈叠在一起就是那道「奇怪的边框」。
+                readerThemeBackground
             }
     }
 
@@ -2035,29 +2070,39 @@ struct ReaderView: View {
             VStack {
                 Spacer(minLength: 0)
                 HStack(spacing: 12) {
-                    Text(context.date, format: .dateTime.hour().minute())
-                        .frame(width: 54, alignment: .leading)
+                    if footerShowTime {
+                        Text(context.date, format: .dateTime.hour().minute())
+                            .frame(width: 54, alignment: .leading)
 
-                    Spacer(minLength: 4)
+                        Spacer(minLength: 4)
+                    }
 
                     Text(progressTitle)
                         .lineLimit(1)
                         .minimumScaleFactor(0.72)
                         .frame(maxWidth: .infinity)
 
-                    Spacer(minLength: 4)
+                    if footerShowBatteryIcon || footerShowBatteryPercent {
+                        Spacer(minLength: 4)
 
-                    HStack(spacing: 3) {
-                        Image(systemName: batterySymbolName)
-                        Text(batteryPercentageText)
+                        HStack(spacing: 3) {
+                            if footerShowBatteryIcon {
+                                Image(systemName: batterySymbolName)
+                            }
+                            if footerShowBatteryPercent {
+                                Text(batteryPercentageText)
+                            }
+                        }
+                        .frame(width: footerShowBatteryIcon && footerShowBatteryPercent ? 58 : nil, alignment: .trailing)
                     }
-                    .frame(width: 58, alignment: .trailing)
                 }
                 .font(.system(size: 10, weight: .medium).monospacedDigit())
                 .foregroundStyle(readerThemeTextColor.opacity(0.45))
                 .padding(.horizontal, max(CGFloat(pagePadding), 18))
-                .padding(.bottom, 6)
-                .frame(height: max(CGFloat(footerHeight), 24), alignment: .bottom)
+                .frame(height: 20, alignment: .center)
+                // 阅读页忽略了安全区，页脚要自己让开 home indicator，
+                // 否则时间 / 章节 / 电量会贴在屏幕最底边上（全屏阅读时最扎眼）。
+                .padding(.bottom, 6 + readerFooterSafeInset)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
@@ -2104,6 +2149,15 @@ struct ReaderView: View {
         }
         .allowsHitTesting(status.isFailure)
         .animation(.easeInOut(duration: 0.2), value: status)
+    }
+
+    /// 全屏阅读时阅读页忽略了安全区，页脚必须自己让开 home indicator。
+    private var readerFooterSafeInset: CGFloat {
+        let scene = UIApplication.shared.connectedScenes
+            .compactMap { $0 as? UIWindowScene }
+            .first { $0.activationState == .foregroundActive }
+        let inset = scene?.windows.first(where: { $0.isKeyWindow })?.safeAreaInsets.bottom ?? 0
+        return max(inset, 0)
     }
 
     private var batteryPercentageText: String {
@@ -2209,7 +2263,7 @@ struct ReaderView: View {
             }
             .padding(.horizontal, 10)
             .padding(.vertical, 8)
-            .background(.regularMaterial)
+            .background(.ultraThinMaterial)
             .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
             .padding(.horizontal, 16)
             .padding(.top, 4)
@@ -2217,6 +2271,13 @@ struct ReaderView: View {
             Spacer()
 
             VStack(spacing: 12) {
+                // 拖动时实时显示落点章节，松手前就知道要跳到哪一章。
+                Text(chapterSliderLabel)
+                    .font(.caption2.weight(.semibold).monospacedDigit())
+                    .foregroundStyle(readerThemeTextColor.opacity(chapterSliderTarget == nil ? 0 : 0.5))
+                    .frame(height: 13)
+                    .animation(.easeOut(duration: 0.12), value: chapterSliderTarget == nil)
+
                 HStack(spacing: 10) {
                     navChapterButton(icon: "chevron.left", title: "上一章") {
                         selectRelativeChapter(offset: -1)
@@ -2226,12 +2287,18 @@ struct ReaderView: View {
                     Slider(
                         value: Binding(
                             get: { chapterSliderTarget ?? Double(chapterIndex) },
-                            set: { chapterSliderTarget = $0 }
+                            set: { newValue in
+                                chapterSliderTarget = newValue
+                                scheduleLiveChapterSeek(to: newValue)
+                            }
                         ),
                         in: 0...Double(max((totalChapters ?? chapters.count) - 1, 0)),
                         step: 1,
                         onEditingChanged: { editing in
-                            guard !editing, let target = chapterSliderTarget else { return }
+                            guard !editing else { return }
+                            chapterSeekTask?.cancel()
+                            chapterSeekTask = nil
+                            guard let target = chapterSliderTarget else { return }
                             chapterSliderTarget = nil
                             let index = Int(target.rounded())
                             guard index != chapterIndex else { return }
@@ -2449,7 +2516,7 @@ struct ReaderView: View {
                 }
                 .frame(maxWidth: .infinity)
                 .frame(height: maxHeight)
-                .glassPanel(cornerRadius: 28, material: .regularMaterial, strokeOpacity: colorScheme == .dark ? 0.08 : 0.12, shadowOpacity: colorScheme == .dark ? 0.35 : 0.18)
+                .glassPanel(cornerRadius: 28, material: .ultraThinMaterial, strokeOpacity: colorScheme == .dark ? 0.08 : 0.12, shadowOpacity: colorScheme == .dark ? 0.35 : 0.18)
                 .contentShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
                 .padding(.horizontal, 12)
                 .padding(.bottom, bottomPadding)
@@ -2512,7 +2579,7 @@ struct ReaderView: View {
                 .foregroundStyle(.secondary)
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 14) {
-                    ForEach(ReaderBackground.allCases) { item in
+                    ForEach(ReaderBackground.pickerCases) { item in
                         Button {
                             UIImpactFeedbackGenerator(style: .light).impactOccurred()
                             backgroundRawValue = item.rawValue
@@ -2534,6 +2601,40 @@ struct ReaderView: View {
                     }
                 }
                 .padding(.horizontal, 2)
+            }
+
+            // 自定义壁纸入口直接贴在色卡下面：以前它排在「阅读亮度」之后，
+            // 选中「自定义」只能看到一片纯黑，找不到下一步该点哪里。
+            if background == .custom {
+                VStack(alignment: .leading, spacing: 8) {
+                    PhotosPicker(selection: $selectedPhotoItem, matching: .images) {
+                        HStack(spacing: 8) {
+                            Image(systemName: "photo.badge.plus")
+                            Text(ReaderCustomWallpaperStore.hasCustomWallpaper ? "更换自定义壁纸" : "从相册选择壁纸")
+                                .font(.subheadline.weight(.semibold))
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 11)
+                        .background(AppTheme.accent.opacity(0.12), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                        .foregroundStyle(AppTheme.accent)
+                    }
+                    .onChange(of: selectedPhotoItem) { item in
+                        guard let item else { return }
+                        Task {
+                            if let data = try? await item.loadTransferable(type: Data.self),
+                               let image = UIImage(data: data) {
+                                ReaderCustomWallpaperStore.saveWallpaper(image)
+                                backgroundWallpaperRevision = UUID()
+                            }
+                        }
+                    }
+
+                    Text(ReaderCustomWallpaperStore.hasCustomWallpaper
+                         ? "壁纸会随阅读页一起滚动，正文自动加一层暗化保证可读性。"
+                         : "还没选壁纸，所以现在是纯黑底。先点上面的按钮从相册挑一张。")
+                        .font(.caption2)
+                        .foregroundStyle(.tertiary)
+                }
             }
 
             VStack(alignment: .leading, spacing: 8) {
@@ -2565,29 +2666,6 @@ struct ReaderView: View {
                     .foregroundStyle(.tertiary)
             }
 
-            if background == .custom {
-                PhotosPicker(selection: $selectedPhotoItem, matching: .images) {
-                    HStack(spacing: 8) {
-                        Image(systemName: "photo.badge.plus")
-                        Text(ReaderCustomWallpaperStore.hasCustomWallpaper ? "更换自定义壁纸" : "从相册选择壁纸")
-                            .font(.subheadline.weight(.semibold))
-                    }
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 10)
-                    .background(AppTheme.accent.opacity(0.12), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-                    .foregroundStyle(AppTheme.accent)
-                }
-                .onChange(of: selectedPhotoItem) { item in
-                    guard let item else { return }
-                    Task {
-                        if let data = try? await item.loadTransferable(type: Data.self),
-                           let image = UIImage(data: data) {
-                            ReaderCustomWallpaperStore.saveWallpaper(image)
-                            backgroundWallpaperRevision = UUID()
-                        }
-                    }
-                }
-            }
         }
     }
 
@@ -2760,6 +2838,19 @@ struct ReaderView: View {
 
             // 8. 底部安全留白
             readerValueSlider("底部安全留白", value: $footerHeight, range: 40...180, step: 8, unit: "pt", help: "屏幕最底部向上预留的安全空隙，防止手势遮挡最后一行正文（推荐 80~100pt）")
+
+            // 9. 页脚内容开关。对照同类阅读器（香色闺阁的 tr_showTime / tr_showBatView /
+            // tr_showBatLabel 就是三个独立开关），把「时间 / 电量图标 / 电量百分比」拆开，
+            // 全屏时不想看就不显示，也就不存在「位置奇怪」这件事。
+            VStack(alignment: .leading, spacing: 8) {
+                Text("页脚显示")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(.secondary)
+                Toggle("显示时间", isOn: $footerShowTime)
+                Toggle("显示电量图标", isOn: $footerShowBatteryIcon)
+                Toggle("显示电量百分比", isOn: $footerShowBatteryPercent)
+            }
+            .font(.subheadline)
         }
     }
 
@@ -3459,19 +3550,41 @@ struct ReaderView: View {
         }
     }
 
-    private func selectChapter(index: Int) {
+    private func selectChapter(index: Int, keepChrome: Bool = false) {
         if windowSections.contains(where: { $0.chapterIndex == index && $0.isReady }) {
             activateWindowChapter(index)
             return
         }
         guard let target = chapters.first(where: { $0.index == index }) ?? (chapters.indices.contains(index) ? chapters[index] : nil) else { return }
-        closeReaderChrome()
+        // 拖动进度条时不能顺手把控制面板关掉，否则滑到一半面板就消失了。
+        if !keepChrome { closeReaderChrome() }
         stopAutoScroll()
         stopSpeechPlayback()
         if let onSelectChapterWithPosition {
             onSelectChapterWithPosition(target, 0)
         } else {
             onSelectChapter?(target)
+        }
+    }
+
+    /// 拖动进度条时的落点文案；不拖动时返回当前章（配合 opacity 隐藏）。
+    private var chapterSliderLabel: String {
+        let total = max(totalChapters ?? chapters.count, 1)
+        let raw = Int((chapterSliderTarget ?? Double(chapterIndex)).rounded())
+        let clamped = min(max(raw, 0), total - 1)
+        return "第 \(clamped + 1) / \(total) 章"
+    }
+
+    /// 拖动进度条时的「边拖边跳」：停 0.12s 就落一章。
+    /// 以前只有手指抬起（onEditingChanged == false）才跳，拖到哪都看不到内容变化。
+    private func scheduleLiveChapterSeek(to rawValue: Double) {
+        chapterSeekTask?.cancel()
+        let index = Int(rawValue.rounded())
+        guard index != chapterIndex, (0..<max(totalChapters ?? chapters.count, 1)).contains(index) else { return }
+        chapterSeekTask = Task { @MainActor in
+            try? await Task.sleep(nanoseconds: 120_000_000)
+            guard !Task.isCancelled else { return }
+            selectChapter(index: index, keepChrome: true)
         }
     }
 
@@ -4695,7 +4808,7 @@ final class ReaderSpeechController: NSObject, ObservableObject, AVSpeechSynthesi
     private var engineKind: TTSEngineKind = .local
     private var activeSegment: (index: Int, text: String)?
     private var usesRemoteAudioPlayback: Bool {
-        engineKind == .cloud || engineKind == .http
+        engineKind == .cloud || engineKind == .http || engineKind == .file
     }
     @Published var lastErrorMessage: String?
     var onFinished: (() -> Void)?
@@ -4738,6 +4851,10 @@ final class ReaderSpeechController: NSObject, ObservableObject, AVSpeechSynthesi
         var resolvedEngine = engine
         if resolvedEngine == .cloud && !cloudCredentialsStore.isConfigured {
             lastErrorMessage = "未配置讯飞云端语音凭据，已回退系统语音"
+            resolvedEngine = .local
+        }
+        if resolvedEngine == .file && LocalVoiceLibrary.isEmpty {
+            lastErrorMessage = "还没导入本地声音，已回退系统语音（设置 → 语音朗读 → 本地声音）"
             resolvedEngine = .local
         }
         engineKind = resolvedEngine
@@ -4874,6 +4991,10 @@ final class ReaderSpeechController: NSObject, ObservableObject, AVSpeechSynthesi
             playHTTPVoiceSegment(segment)
             return
         }
+        if engineKind == .file {
+            playLocalVoiceSegment(segment)
+            return
+        }
         let utterance = AVSpeechUtterance(string: segment.text)
         utterance.voice = AVSpeechSynthesisVoice(language: "zh-CN")
         utterance.rate = rate
@@ -4887,6 +5008,28 @@ final class ReaderSpeechController: NSObject, ObservableObject, AVSpeechSynthesi
         cloudTask?.cancel()
         cloudTask = nil
         cloudPlayer.stop()
+    }
+
+    /// 本地音频通道：第 N 段直接播 `N.mp3`（也接受 `pN.mp3` / `N - 标题.mp3`）。
+    /// 缺哪个段落就跳过那一段（和图片段落同样处理），不合成、不联网；
+    /// 播放失败时把引擎退回系统语音并重念这一段，不让整章哑掉。
+    private func playLocalVoiceSegment(_ segment: (index: Int, text: String)) {
+        guard let url = LocalVoiceLibrary.fileURL(forParagraph: segment.index) else {
+            speakNext()
+            return
+        }
+        cancelCloudPlayback()
+        updateNowPlayingInfo()
+        do {
+            try cloudPlayer.play(fileURL: url)
+            if isPaused {
+                cloudPlayer.pause()
+            }
+        } catch {
+            lastErrorMessage = "本地音频播放失败：\(error.localizedDescription)，已回退系统语音"
+            engineKind = .local
+            playSegment(segment)
+        }
     }
 
     private func playCloudSegment(_ segment: (index: Int, text: String)) {
@@ -4977,7 +5120,9 @@ final class ReaderSpeechController: NSObject, ObservableObject, AVSpeechSynthesi
         guard generation == cloudGeneration, isSpeaking else { return }
         cloudPlayer.stop()
         let message = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
-        lastErrorMessage = "云端语音不可用，已回退系统语音：\(message)"
+        // 同一套回退逻辑也服务 `.file` 通道，文案不能一律写「云端」。
+        let label = engineKind == .file ? "本地音频不可用" : "云端语音不可用"
+        lastErrorMessage = "\(label)，已回退系统语音：\(message)"
         engineKind = .local
         if let segment = activeSegment {
             playSegment(segment)
@@ -5119,6 +5264,26 @@ final class ReaderSpeechController: NSObject, ObservableObject, AVSpeechSynthesi
             self.onFinished = nil
             MPNowPlayingInfoCenter.default().nowPlayingInfo = nil
         }
+    }
+}
+
+/// 滚动模式段落数组的指纹缓存。
+/// `ReaderView.body` 在滚动期间会被反复求值（可见段落回调、进度落地、页脚刷新），
+/// 每次都把窗口内全部段落拼成新数组是稳定的浪费；这里按「书 + 内容指纹」只留一份。
+/// 单例只在主线程访问（SwiftUI body 与 Coordinator 回调都在主线程）。
+private final class ReaderScrollParagraphCache {
+    static let shared = ReaderScrollParagraphCache()
+    private var key = ""
+    private var value: [String] = []
+
+    func paragraphs(for newKey: String, build: () -> [String]) -> [String] {
+        if newKey == key, !value.isEmpty {
+            return value
+        }
+        let built = build()
+        key = newKey
+        value = built
+        return built
     }
 }
 

@@ -31,7 +31,13 @@ struct NativeReaderTextView: UIViewRepresentable {
     let paragraphIndent: Double
     let titleSpacing: Double
     let footerHeight: Double
+    /// 顶部留白。阅读器传当前 chrome 状态对应的值：浮层可见时给 56pt 让开工具栏，
+    /// 自动隐藏后收到 26pt，正文与章标题才会贴到安全区下面，而不是永远悬在半空。
+    var topInset: Double? = nil
     let textColor: UIColor
+    /// 文字表面自己铺一层主题底色。以前是 `.clear` 交给 SwiftUI 背景，
+    /// 一出现布局空档（换章占位、橡皮筋回弹）就露出窗口白底，看着像渲染错误。
+    var surfaceColor: UIColor = .clear
     let highlightColor: UIColor
     let currentParagraphIndex: Int
     let scrollTarget: Int?
@@ -53,6 +59,10 @@ struct NativeReaderTextView: UIViewRepresentable {
     var pageStepDirection: Int = 0
     var pageStepGeneration: Int = 0
     var onPageStepBoundary: ((Int) -> Void)? = nil
+    /// 首次「跳到目标段落」真正落到屏幕上之后回调。
+    /// 阅读器用它控制首帧透明度：内容没定位到之前先不显示，
+    /// 否则用户会先看到第 1 章顶部，再被切成上次读到的位置。
+    var onScrollTargetApplied: (() -> Void)? = nil
 
     func makeCoordinator() -> Coordinator {
         Coordinator(
@@ -61,7 +71,8 @@ struct NativeReaderTextView: UIViewRepresentable {
             onNearTop: onNearTop,
             onReachBottom: onReachBottom,
             onNearBottom: onNearBottom,
-            onPageStepBoundary: onPageStepBoundary
+            onPageStepBoundary: onPageStepBoundary,
+            onScrollTargetApplied: onScrollTargetApplied
         )
     }
 
@@ -111,7 +122,8 @@ struct NativeReaderTextView: UIViewRepresentable {
             nearTop: onNearTop,
             reachBottom: onReachBottom,
             nearBottom: onNearBottom,
-            pageStepBoundary: onPageStepBoundary
+            pageStepBoundary: onPageStepBoundary,
+            scrollTargetApplied: onScrollTargetApplied
         )
         context.coordinator.update(
             textView: textView,
@@ -145,7 +157,9 @@ struct NativeReaderTextView: UIViewRepresentable {
             paragraphIndent: paragraphIndent,
             titleSpacing: titleSpacing,
             footerHeight: footerHeight,
+            topInset: topInset,
             textColor: textColor,
+            surfaceColor: surfaceColor,
             highlightColor: highlightColor,
             animatedScrollDuration: animatedScrollDuration,
             showChapterEndBadge: showChapterEndBadge,
@@ -173,7 +187,9 @@ struct NativeReaderTextView: UIViewRepresentable {
         let paragraphIndent: Double
         let titleSpacing: Double
         let footerHeight: Double
+        let topInset: Double?
         let textColor: UIColor
+        let surfaceColor: UIColor
         let highlightColor: UIColor
         let animatedScrollDuration: Double
         let showChapterEndBadge: Bool
@@ -199,7 +215,9 @@ struct NativeReaderTextView: UIViewRepresentable {
             paragraphIndent: Double,
             titleSpacing: Double,
             footerHeight: Double,
+            topInset: Double? = nil,
             textColor: UIColor,
+            surfaceColor: UIColor = .clear,
             highlightColor: UIColor,
             animatedScrollDuration: Double,
             showChapterEndBadge: Bool = false,
@@ -224,7 +242,9 @@ struct NativeReaderTextView: UIViewRepresentable {
             self.paragraphIndent = paragraphIndent
             self.titleSpacing = titleSpacing
             self.footerHeight = footerHeight
+            self.topInset = topInset
             self.textColor = textColor
+            self.surfaceColor = surfaceColor
             self.highlightColor = highlightColor
             self.animatedScrollDuration = animatedScrollDuration
             self.showChapterEndBadge = showChapterEndBadge
@@ -252,6 +272,7 @@ struct NativeReaderTextView: UIViewRepresentable {
         struct InsetsSignature: Equatable {
             let pagePadding: Double
             let footerHeight: Double
+            let topInset: Double?
         }
 
         var textLayoutSignature: TextLayoutSignature {
@@ -273,7 +294,7 @@ struct NativeReaderTextView: UIViewRepresentable {
         }
 
         var insetsSignature: InsetsSignature {
-            InsetsSignature(pagePadding: pagePadding, footerHeight: footerHeight)
+            InsetsSignature(pagePadding: pagePadding, footerHeight: footerHeight, topInset: topInset)
         }
 
         static func == (lhs: Configuration, rhs: Configuration) -> Bool {
@@ -287,7 +308,9 @@ struct NativeReaderTextView: UIViewRepresentable {
                 && lhs.paragraphIndent == rhs.paragraphIndent
                 && lhs.titleSpacing == rhs.titleSpacing
                 && lhs.footerHeight == rhs.footerHeight
+                && lhs.topInset == rhs.topInset
                 && lhs.textColor.isEqual(rhs.textColor)
+                && lhs.surfaceColor.isEqual(rhs.surfaceColor)
                 && lhs.highlightColor.isEqual(rhs.highlightColor)
                 && lhs.animatedScrollDuration == rhs.animatedScrollDuration
                 && lhs.showChapterEndBadge == rhs.showChapterEndBadge
@@ -309,6 +332,7 @@ struct NativeReaderTextView: UIViewRepresentable {
         private var reachBottomCallback: (() -> Void)?
         private var nearBottomCallback: (() -> Void)?
         private var pageStepBoundaryCallback: ((Int) -> Void)?
+        private var scrollTargetAppliedCallback: (() -> Void)?
         private var lastPageStepGeneration = 0
         private var configuration: Configuration?
         private var paragraphRanges: [NSRange] = []
@@ -325,6 +349,9 @@ struct NativeReaderTextView: UIViewRepresentable {
         private var didFireNearBottom = false
         private var didFireNearTop = false
         private var isProgrammaticScrolling = false
+        /// 连点翻页时排队。动画进行中再来一下只记方向，不重新算目标。
+        private var isPageStepping = false
+        private var pendingPageStepDirection = 0
         private var illustrationLoadTask: Task<Void, Never>?
         private var illustrationGeneration = 0
         private static let illustrationLoadConcurrency = 4
@@ -335,7 +362,8 @@ struct NativeReaderTextView: UIViewRepresentable {
             onNearTop: (() -> Void)? = nil,
             onReachBottom: (() -> Void)? = nil,
             onNearBottom: (() -> Void)? = nil,
-            onPageStepBoundary: ((Int) -> Void)? = nil
+            onPageStepBoundary: ((Int) -> Void)? = nil,
+            onScrollTargetApplied: (() -> Void)? = nil
         ) {
             visibleParagraphCallback = onVisibleParagraph
             reachTopCallback = onReachTop
@@ -343,6 +371,7 @@ struct NativeReaderTextView: UIViewRepresentable {
             reachBottomCallback = onReachBottom
             nearBottomCallback = onNearBottom
             pageStepBoundaryCallback = onPageStepBoundary
+            scrollTargetAppliedCallback = onScrollTargetApplied
         }
 
         func attach(_ textView: UITextView) {
@@ -359,7 +388,8 @@ struct NativeReaderTextView: UIViewRepresentable {
             nearTop: (() -> Void)?,
             reachBottom: (() -> Void)?,
             nearBottom: (() -> Void)?,
-            pageStepBoundary: ((Int) -> Void)?
+            pageStepBoundary: ((Int) -> Void)?,
+            scrollTargetApplied: (() -> Void)? = nil
         ) {
             visibleParagraphCallback = visibleParagraph
             reachTopCallback = reachTop
@@ -367,6 +397,9 @@ struct NativeReaderTextView: UIViewRepresentable {
             reachBottomCallback = reachBottom
             nearBottomCallback = nearBottom
             pageStepBoundaryCallback = pageStepBoundary
+            if let scrollTargetApplied {
+                scrollTargetAppliedCallback = scrollTargetApplied
+            }
         }
 
         func updateSelection(_ enabled: Bool, in textView: UITextView) {
@@ -568,11 +601,18 @@ struct NativeReaderTextView: UIViewRepresentable {
         }
 
         private func updateInsets(in textView: UITextView, configuration: Configuration) {
+            // 文字视图自己铺主题底色。以前这里是 `.clear`，靠 SwiftUI 背景兜底，
+            // 一旦出现布局空档（换章占位、回弹、footer 带）就露出窗口白底。
+            if textView.backgroundColor?.isEqual(configuration.surfaceColor) != true {
+                textView.backgroundColor = configuration.surfaceColor
+            }
             // The representable already lives inside the top safe area. Adding
             // `safeTop` again produced a double inset (a large blank strip above
             // the first line) and disagreed with the paged surface, which starts
             // from the same safe-area origin.
-            let topInset = ReaderPageLayoutEngine.minimumTopInset(pagePadding: CGFloat(configuration.pagePadding))
+            // 顶留白由调用方按 chrome 显隐给出；没给才退回统一的 56pt 预留。
+            let topInset = configuration.topInset.map { CGFloat($0) }
+                ?? ReaderPageLayoutEngine.minimumTopInset(pagePadding: CGFloat(configuration.pagePadding))
             let safeBottom = textView.window?.safeAreaInsets.bottom ?? textView.safeAreaInsets.bottom
             let insets = UIEdgeInsets(
                 top: topInset,
@@ -584,7 +624,20 @@ struct NativeReaderTextView: UIViewRepresentable {
                     || textView.textContainerInset.left != insets.left
                     || textView.textContainerInset.bottom != insets.bottom
                     || textView.textContainerInset.right != insets.right else { return }
+            // 顶留白跟着工具栏显隐变化时补偿 contentOffset，
+            // 让眼睛所在的那一行原地不动，而不是整段文字上下蹦。
+            let topDelta = insets.top - textView.textContainerInset.top
+            let previousOffset = textView.contentOffset
             textView.textContainerInset = insets
+            if abs(topDelta) > 0.5, !textView.isTracking, !textView.isDragging, !textView.isDecelerating {
+                let minimumY = -textView.adjustedContentInset.top
+                let maximumY = max(
+                    minimumY,
+                    textView.contentSize.height - textView.bounds.height + textView.adjustedContentInset.bottom
+                )
+                let targetY = min(max(previousOffset.y + topDelta, minimumY), maximumY)
+                textView.setContentOffset(CGPoint(x: previousOffset.x, y: targetY), animated: false)
+            }
         }
 
         private func updateBaseTextColor(in textView: UITextView, color: UIColor) {
@@ -760,6 +813,13 @@ struct NativeReaderTextView: UIViewRepresentable {
         /// to the neighbouring chapter.
         private func applyPageStep(direction: Int, in textView: UITextView) {
             guard textView.bounds.height > 0 else { return }
+            // 连点排队：上一段翻页动画还在跑时，只记下这一下的方向。
+            // 以前每次都拿「飞行中的 contentOffset」重算目标，于是第二下几乎不动、
+            // 第三下又跳一大截，看起来就是上下乱跳甚至卡住。
+            guard !isPageStepping else {
+                pendingPageStepDirection = direction
+                return
+            }
             let currentY = textView.contentOffset.y
             let targetY = ReaderPageStepPolicy.targetOffsetY(
                 currentOffsetY: currentY,
@@ -773,6 +833,7 @@ struct NativeReaderTextView: UIViewRepresentable {
                 pageStepBoundaryCallback?(direction)
                 return
             }
+            isPageStepping = true
             isProgrammaticScrolling = true
             UIView.animate(
                 withDuration: 0.28,
@@ -781,9 +842,16 @@ struct NativeReaderTextView: UIViewRepresentable {
             ) {
                 textView.setContentOffset(CGPoint(x: 0, y: targetY), animated: false)
             } completion: { [weak self, weak textView] _ in
-                self?.isProgrammaticScrolling = false
+                guard let self else { return }
+                self.isProgrammaticScrolling = false
+                self.isPageStepping = false
                 if let textView {
-                    self?.updateVisibleParagraph(in: textView)
+                    self.updateVisibleParagraph(in: textView)
+                }
+                let queued = self.pendingPageStepDirection
+                self.pendingPageStepDirection = 0
+                if queued != 0, let textView {
+                    self.applyPageStep(direction: queued, in: textView)
                 }
             }
         }
@@ -849,7 +917,10 @@ struct NativeReaderTextView: UIViewRepresentable {
             let offset = CGPoint(x: 0, y: targetY)
             let currentOffset = textView.contentOffset
             hasAppliedInitialScrollTarget = true
-            guard abs(currentOffset.y - offset.y) > 0.5 else { return true }
+            guard abs(currentOffset.y - offset.y) > 0.5 else {
+                scrollTargetAppliedCallback?()
+                return true
+            }
             if animated {
                 isProgrammaticScrolling = true
                 UIView.animate(
@@ -864,10 +935,17 @@ struct NativeReaderTextView: UIViewRepresentable {
             } else {
                 textView.setContentOffset(offset, animated: false)
             }
+            scrollTargetAppliedCallback?()
             return true
         }
 
         func scrollViewDidScroll(_ scrollView: UIScrollView) {
+            #if DEBUG
+            // 只在调试包里量：滚动回调自身的耗时（不含 SwiftUI 重建）。
+            // 卡顿到底出在回调还是出在 body 求值，这一行数字能直接分开。
+            let probeStarted = CACurrentMediaTime()
+            defer { ReaderScrollPerfProbe.record(cost: CACurrentMediaTime() - probeStarted) }
+            #endif
             guard let textView = scrollView as? UITextView,
                   let configuration,
                   !paragraphRanges.isEmpty else { return }
@@ -885,7 +963,11 @@ struct NativeReaderTextView: UIViewRepresentable {
             if contentHeight > 0 && visibleBottom >= contentHeight - 650 {
                 if !didFireNearBottom {
                     didFireNearBottom = true
-                    nearBottomCallback?()
+                    // 不要在 scroll 回调里同步触发章节加载：那一帧里 SwiftUI 会改
+                    // 窗口、重建文本，正好撞上正在滑动的这一帧，表现就是卡壳/回弹。
+                    DispatchQueue.main.async { [weak self] in
+                        self?.nearBottomCallback?()
+                    }
                 }
             } else if visibleBottom < contentHeight - 900 {
                 didFireNearBottom = false
@@ -894,7 +976,9 @@ struct NativeReaderTextView: UIViewRepresentable {
             if contentHeight > 0, offsetY <= 650 {
                 if !didFireNearTop {
                     didFireNearTop = true
-                    nearTopCallback?()
+                    DispatchQueue.main.async { [weak self] in
+                        self?.nearTopCallback?()
+                    }
                 }
             } else if offsetY > 900 {
                 didFireNearTop = false
@@ -945,6 +1029,31 @@ struct NativeReaderTextView: UIViewRepresentable {
             }
         }
     }
+}
+
+/// 调试期滚动采样。每 300 帧打一行「回调自身」的平均/最差耗时，
+/// 用来把「TextKit 回调慢」和「SwiftUI body 重建慢」分开定位。
+/// Release 编译里不产生任何代码路径。
+enum ReaderScrollPerfProbe {
+    #if DEBUG
+    private static var frames = 0
+    private static var total: Double = 0
+    private static var worst: Double = 0
+
+    static func record(cost: Double) {
+        frames += 1
+        total += cost
+        worst = max(worst, cost)
+        guard frames % 300 == 0 else { return }
+        let average = total / Double(frames)
+        print(String(format: "[ReaderPerf] scroll×%d avg=%.3fms worst=%.3fms", frames, average * 1000, worst * 1000))
+        frames = 0
+        total = 0
+        worst = 0
+    }
+    #else
+    static func record(cost: Double) {}
+    #endif
 }
 
 /// Pure scroll-offset math used by the TextKit surface.  Text layout rects are

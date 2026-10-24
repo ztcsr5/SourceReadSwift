@@ -23,7 +23,7 @@ struct RSSReaderSettingsView: View {
                         .font(.headline)
                     ScrollView(.horizontal, showsIndicators: false) {
                         HStack(spacing: 14) {
-                            ForEach(ReaderBackground.allCases) { item in
+                            ForEach(ReaderBackground.pickerCases) { item in
                                 Button {
                                     backgroundRawValue = item.rawValue
                                 } label: {

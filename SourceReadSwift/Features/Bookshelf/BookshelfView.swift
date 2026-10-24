@@ -125,12 +125,14 @@ struct BookshelfView: View {
     var body: some View {
         NavigationStack {
             ScrollView {
-                LazyVStack(alignment: .leading, spacing: 30) {
+                LazyVStack(alignment: .leading, spacing: 26) {
                     readingSection
                     shelfSection
                 }
                 .padding(.horizontal, AppTheme.pagePadding)
-                .padding(.bottom, 22)
+                // 底部额外留白：RootTabView 用 safeAreaInset 预留了 86pt 的浮动 tab bar，
+                // 这里再补 8pt，避免最后一行书卡贴着毛玻璃底边。
+                .padding(.bottom, 30)
             }
             .refreshable {
                 await refreshBookshelf()
@@ -142,16 +144,8 @@ struct BookshelfView: View {
             .navigationTitle("主页")
             .navigationBarTitleDisplayMode(.large)
             .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) {
-                    if !allBooks.isEmpty {
-                        NavigationLink {
-                            BookshelfCollectionView(title: "书架管理", books: allBooks, startsManaging: true)
-                        } label: {
-                            Label("管理", systemImage: "checklist")
-                                .font(.system(size: 15, weight: .semibold))
-                        }
-                    }
-                }
+                // 左上角「管理」入口已移除：书架管理与分组都在书架区标题里点进去，
+                // 工具栏只保留右侧的统计与导入，避免大标题左肩挂一个孤零零的图标。
                 ToolbarItemGroup(placement: .navigationBarTrailing) {
                     NavigationLink {
                         ReadingStatsView()
@@ -708,7 +702,7 @@ struct BookshelfView: View {
         } label: {
             VStack(spacing: 0) {
                 HStack(spacing: 16) {
-                    AsyncBookCover(urlString: book.coverURL, width: 78, height: 108)
+                    AsyncBookCover(urlString: book.coverURL, width: 66, height: 92, style: .onDark)
                         .overlay(alignment: .topTrailing) {
                             if book.hasUpdates {
                                 Circle()
@@ -741,24 +735,21 @@ struct BookshelfView: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
                 }
 
-                Spacer(minLength: 14)
+                Spacer(minLength: 10)
 
                 HStack {
                     Label("继续阅读", systemImage: "book.fill")
-                        .font(.subheadline.weight(.bold))
+                        .font(.footnote.weight(.bold))
                         .padding(.horizontal, 12)
-                        .padding(.vertical, 8)
+                        .padding(.vertical, 7)
                         .background(Color.white)
                         .foregroundStyle(.black)
                         .clipShape(Capsule())
                     Spacer()
-                    Image(systemName: "ellipsis")
-                        .font(.headline)
-                        .foregroundStyle(.white.opacity(0.65))
                 }
             }
-            .padding(20)
-            .frame(width: 312, height: 246, alignment: .topLeading)
+            .padding(16)
+            .frame(width: 300, height: 190, alignment: .topLeading)
             .background(
                 heroGradient(for: book)
             )
@@ -768,7 +759,7 @@ struct BookshelfView: View {
                     .stroke(Color.white.opacity(0.10), lineWidth: 0.8)
             }
             .shadow(color: .black.opacity(colorScheme == .dark ? 0.32 : 0.13), radius: 22, x: 0, y: 14)
-            .padding(.vertical, 6)
+            .padding(.vertical, 8)
         }
         .buttonStyle(PressableScaleButtonStyle())
         .simultaneousGesture(TapGesture().onEnded {
@@ -1453,9 +1444,16 @@ private struct PressableScaleButtonStyle: ButtonStyle {
 }
 
 struct AsyncBookCover: View {
+    /// 占位块要跟着承载它的底色走：白卡片上用浅灰，深色主视觉上用半透明白。
+    enum Style {
+        case card
+        case onDark
+    }
+
     let urlString: String?
     var width: CGFloat? = nil
     let height: CGFloat
+    var style: Style = .card
 
     var body: some View {
         Group {
@@ -1472,10 +1470,11 @@ struct AsyncBookCover: View {
 
     private var placeholder: some View {
         RoundedRectangle(cornerRadius: 10, style: .continuous)
-            .fill(Color.white.opacity(0.12))
+            .fill(style == .onDark ? Color.white.opacity(0.12) : Color.primary.opacity(0.06))
             .overlay {
                 Image(systemName: "book.closed")
-                    .foregroundStyle(.white.opacity(0.9))
+                    .font(.system(size: max(13, height * 0.2), weight: .light))
+                    .foregroundStyle(style == .onDark ? Color.white.opacity(0.9) : Color.secondary.opacity(0.5))
             }
     }
 }

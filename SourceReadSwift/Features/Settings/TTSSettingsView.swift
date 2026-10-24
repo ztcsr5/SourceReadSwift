@@ -1,4 +1,5 @@
 import SwiftUI
+import UniformTypeIdentifiers
 
 /// Cloud TTS configuration. Credentials are stored in the Keychain through
 /// `CloudTTSCredentialsStore`; only the selected engine lives in UserDefaults.
@@ -18,6 +19,9 @@ struct TTSSettingsView: View {
     @State private var isTesting = false
     @State private var isTestingHTTP = false
     @State private var previewPlayer: CloudTTSPlayer?
+    @State private var showVoiceImporter = false
+    @State private var importedVoiceNames: [String] = []
+    @State private var voiceStatusMessage: String?
 
     private let credentialStore = CloudTTSCredentialsStore()
     private let client = CloudTTSClient()
@@ -68,6 +72,54 @@ struct TTSSettingsView: View {
                     Text("在线 HTTP 语音")
                 } footer: {
                     Text("使用 Legado httpTTS 兼容模板；预设来自 SourceRead httpTTS.json，公共百度接口可能限流。")
+                }
+            }
+
+            if engine == .file {
+                Section {
+                    Button {
+                        showVoiceImporter = true
+                    } label: {
+                        Label("导入本地音频", systemImage: "square.and.arrow.down")
+                    }
+
+                    if importedVoiceNames.isEmpty {
+                        Text("还没有导入音频。文件名用段落序号：0.mp3、1.mp3…（也认 p0.mp3）")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    } else {
+                        ForEach(importedVoiceNames.prefix(12), id: \.self) { name in
+                            HStack {
+                                Text(name)
+                                    .font(.footnote)
+                                    .lineLimit(1)
+                                Spacer()
+                                if let index = LocalVoiceLibrary.paragraphIndex(ofFileName: name) {
+                                    Text("第 \(index) 段")
+                                        .font(.caption2)
+                                        .foregroundStyle(.secondary)
+                                }
+                            }
+                        }
+                        if importedVoiceNames.count > 12 {
+                            Text("另有 \(importedVoiceNames.count - 12) 个文件")
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+
+                    Button(role: .destructive) {
+                        LocalVoiceLibrary.clear()
+                        refreshImportedVoices()
+                        voiceStatusMessage = "已清空本地音频"
+                    } label: {
+                        Label("清空本地音频", systemImage: "trash")
+                    }
+                    .disabled(importedVoiceNames.isEmpty)
+                } header: {
+                    Text("本地声音")
+                } footer: {
+                    Text("按段落序号一一对应：朗读到第 N 段就播 N.*，缺文件的段落直接跳过，不会联网合成。音频存在 App 沙盒内，不参与 iCloud 备份。")
                 }
             }
 
@@ -128,18 +180,50 @@ struct TTSSettingsView: View {
                     Text(statusMessage)
                         .font(.footnote)
                         .foregroundStyle(.secondary)
+                    if let voiceStatusMessage {
+                        Text(voiceStatusMessage)
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            } else if let voiceStatusMessage {
+                Section("状态") {
+                    Text(voiceStatusMessage)
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
                 }
             }
         }
         .navigationTitle("语音朗读")
         .navigationBarTitleDisplayMode(.inline)
+        .fileImporter(
+            isPresented: $showVoiceImporter,
+            allowedContentTypes: [.audio],
+            allowsMultipleSelection: true
+        ) { result in
+            switch result {
+            case .success(let urls):
+                let imported = LocalVoiceLibrary.importFiles(urls)
+                refreshImportedVoices()
+                voiceStatusMessage = imported > 0
+                    ? "已导入 \(imported) 个音频，共 \(importedVoiceNames.count) 个"
+                    : "没有可导入的音频文件（支持 mp3 / m4a / wav / caf / flac）"
+            case .failure(let error):
+                voiceStatusMessage = "导入失败：\(error.localizedDescription)"
+            }
+        }
         .onAppear {
             loadCredentials()
+            refreshImportedVoices()
             if !HttpTTSVoice.defaultVoices.contains(where: { $0.id == httpVoiceID }),
                let first = HttpTTSVoice.defaultVoices.first {
                 httpVoiceID = first.id
             }
         }
+    }
+
+    private func refreshImportedVoices() {
+        importedVoiceNames = LocalVoiceLibrary.importedFileNames()
     }
 
     private var draftCredentials: CloudTTSCredentials {

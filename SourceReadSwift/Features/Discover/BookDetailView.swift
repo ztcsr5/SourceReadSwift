@@ -619,6 +619,38 @@ struct BookDetailView: View {
             return
         }
 
+        // 本地书（TXT / EPUB 导入）没有书源。以前这里继续往下走，
+        // `sourceStore.source(for: "local://text")` 必然返回 nil，于是直接落进
+        // 「找不到书源：Local」的空状态，章节数显示 0，缓存/标记已读全部空转。
+        // 现在本地书走独立分支：章节直接从书架里的 localChapters 来，全程不碰 SourceEngine。
+        if book.sourceUrl.hasPrefix("local://") {
+            isLoading = true
+            defer { isLoading = false }
+            let localBook = appState.bookshelfStore.book(id: book.id)
+            let localChapters = localBook?.localChapters ?? []
+            detail = BookDetail(
+                name: book.name,
+                author: book.author,
+                coverUrl: book.coverUrl,
+                bookUrl: book.bookUrl,
+                tocUrl: nil,
+                sourceName: book.sourceName,
+                sourceUrl: book.sourceUrl,
+                intro: book.intro,
+                latestChapter: localChapters.last?.title ?? "本地导入"
+            )
+            chapters = localChapters.map { chapter in
+                BookChapter(
+                    title: chapter.title,
+                    url: "\(book.bookUrl)#\(chapter.index)",
+                    bookUrl: book.bookUrl,
+                    index: chapter.index,
+                    isVip: false
+                )
+            }
+            return
+        }
+
         guard let source = appState.sourceStore.source(for: book.sourceUrl) else {
             errorMessage = "找不到书源：\(book.sourceName)"
             return

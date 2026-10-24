@@ -24,6 +24,26 @@ enum ReaderBackground: String, CaseIterable, Identifiable, Codable, Sendable {
 
     var id: String { rawValue }
 
+    /// 外观面板里真正展示的主题。
+    /// `allCases` 保留全部历史取值用于解码旧设置，但视觉上几乎一样的主题不再出现在选择器里：
+    /// 素白 / 水墨屏 / 大地 / 墨白 的底色都是 #FFFFFF，浅灰 / 樱白 只差 7 个色阶，
+    /// 极黑 / 深渊 也几乎分不出来 —— 这些只在 picker 里收敛，不影响旧数据。
+    static var pickerCases: [ReaderBackground] {
+        [
+            .paper,      // #EBD9BB
+            .kraft,      // #DDC090
+            .green,      // #C2D8AA
+            .lavender,   // #DBB8E2
+            .azure,      // #ABCEE0
+            .white,      // #FFFFFF
+            .gray,       // #F2F2F7
+            .sakuraDark, // #222222
+            .sakuraSolarized, // #002B36
+            .dark,       // #000000
+            .custom      // 自定义壁纸
+        ]
+    }
+
     var title: String {
         switch self {
         case .paper: return "羊皮纸"
