@@ -60,6 +60,10 @@ struct ReaderView: View {
     @State private var showChapterList = false
     @State private var showBookmarks = false
     @State private var showBookDetailSheet = false
+    @State private var showPayActionConfirmation = false
+    @State private var payActionResultMessage = ""
+    @State private var showPayActionResult = false
+    @State private var isPerformingPayAction = false
     @State private var quoteCardBookmark: ReaderBookmark? = nil
     @State private var selectedPhotoItem: PhotosPickerItem? = nil
     @State private var backgroundWallpaperRevision = UUID()
@@ -435,6 +439,19 @@ struct ReaderView: View {
         .statusBarHidden(!showOverlay)
         .preferredColorScheme(background == .dark ? .dark : .light)
         .highRefreshRateSurface()
+        .confirmationDialog("购买本章", isPresented: $showPayActionConfirmation, titleVisibility: .visible) {
+            Button("继续购买") {
+                Task { await performPayAction() }
+            }
+            Button("取消", role: .cancel) {}
+        } message: {
+            Text(content.title)
+        }
+        .alert("购买提示", isPresented: $showPayActionResult) {
+            Button("好", role: .cancel) {}
+        } message: {
+            Text(payActionResultMessage)
+        }
         .sheet(isPresented: $showChapterList) {
             chapterListSheet
         }
@@ -744,6 +761,61 @@ struct ReaderView: View {
             ?? (bookID.contains("|") ? String(bookID.split(separator: "|")[0]) : nil)
         guard let sourceURL else { return nil }
         return appState.sourceStore.source(for: sourceURL)
+    }
+
+    /// Legado's pay button is visible only for `hasLogin && isVip && !isPay`.
+    /// `BookChapter` has no `isPay` field yet, so the closest faithful
+    /// approximation is `hasLogin && isVip`; the rule itself still decides
+    /// whether the purchase succeeds.
+    private var canShowPayAction: Bool {
+        guard let payAction = content.payAction, !payAction.isEmpty else { return false }
+        guard content.chapter.isVip, let source = currentBookSource else { return false }
+        return source.loginUrl?.nilIfEmpty != nil || source.loginCheckJs?.nilIfEmpty != nil
+    }
+
+    /// Legado `ReadBookActivity.payAction()`：确认后执行书源的购买规则。
+    /// 引擎负责 JS、cookie 与持久状态；视图只处理三种结果。
+    private func performPayAction() async {
+        guard let payAction = content.payAction?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !payAction.isEmpty else { return }
+        guard let source = currentBookSource else {
+            payActionResultMessage = "找不到书源，无法执行购买操作"
+            showPayActionResult = true
+            return
+        }
+        guard !isPerformingPayAction else { return }
+        isPerformingPayAction = true
+        let result = await appState.engine.performPayAction(
+            source: source,
+            chapter: content.chapter,
+            payAction: payAction
+        )
+        isPerformingPayAction = false
+        switch result {
+        case .success(.openURL(let url)):
+            let opened = await UIApplication.shared.open(url)
+            if !opened {
+                payActionResultMessage = "无法打开购买页面"
+                showPayActionResult = true
+            }
+        case .success(.purchased):
+            // Legado: BookHelp.delContent(book, chapter) before loadChapterList.
+            // Invalidate first so a failed refresh cannot serve the old VIP
+            // placeholder from cache.
+            appState.chapterContentCacheStore.invalidate(
+                sourceURL: source.bookSourceUrl,
+                chapter: content.chapter
+            )
+            payActionResultMessage = "购买成功，正在刷新本章"
+            showPayActionResult = true
+            onRefreshChapter?()
+        case .success(.failed(let message)):
+            payActionResultMessage = message
+            showPayActionResult = true
+        case .failure(let error):
+            payActionResultMessage = error.displayMessage
+            showPayActionResult = true
+        }
     }
 
     /// Header JSON is decoded once per source revision instead of on every
@@ -1197,6 +1269,16 @@ struct ReaderView: View {
                 }
 
                 Menu {
+                    if canShowPayAction {
+                        Button {
+                            closeReaderChrome()
+                            showPayActionConfirmation = true
+                        } label: {
+                            Label("购买本章", systemImage: "cart")
+                        }
+                        .disabled(isPerformingPayAction)
+                    }
+
                     Button {
                         closeReaderChrome()
                         showBookDetailSheet = true

@@ -394,6 +394,25 @@ final class JSCoreRuntimeTests: XCTestCase {
         XCTAssertEqual(value, "true")
     }
 
+    func testChapterBooleanIsVipSurvivesFallbackInjection() throws {
+        // A plain-object chapter may carry a boolean `isVip` (Legado's field
+        // shape). The title heuristic must not overwrite it with a function.
+        let runtime = JSCoreRuntime()
+        let paid = runtime.evaluate(
+            "typeof chapter.isVip + '|' + chapter.isVip",
+            variables: ["chapter": ["title": "普通章节", "isVip": true]]
+        )
+        guard case .success(let paidValue) = paid else { return XCTFail("expected success") }
+        XCTAssertEqual(paidValue, "boolean|true")
+
+        let free = runtime.evaluate(
+            "typeof chapter.isVip + '|' + chapter.isVip",
+            variables: ["chapter": ["title": "VIP 章节", "isVip": false]]
+        )
+        guard case .success(let freeValue) = free else { return XCTFail("expected success") }
+        XCTAssertEqual(freeValue, "boolean|false")
+    }
+
     func testJsoupSelectionCascadingDOMAPIs() throws {
         let html = """
         <html><body>

@@ -202,7 +202,7 @@ final class JSCoreRuntime {
                     if (typeof chapter.getChapterUrl !== 'function') { chapter.getChapterUrl = chapter.getUrl; }
                     if (typeof chapter.getIndex !== 'function') { chapter.getIndex = function() { return chapter.index || chapter.chapterIndex || 0; }; }
                     if (typeof chapter.getChapterIndex !== 'function') { chapter.getChapterIndex = chapter.getIndex; }
-                    if (typeof chapter.isVip !== 'function') {
+                    if (typeof chapter.isVip !== 'function' && typeof chapter.isVip !== 'boolean') {
                         chapter.isVip = function() {
                             var title = String(chapter.title || chapter.name || '').toLowerCase();
                             return title.indexOf('vip') >= 0 || title.indexOf('订阅') >= 0 || title.indexOf('付费') >= 0;
@@ -2844,7 +2844,7 @@ final class JSCoreRuntime {
             remove: function(k) { return java.removeVar('chapter.variable.' + String(k || '')); },
             containsKey: function(k) { return chapter.getVariable(k) !== ''; }
           };
-          if (typeof chapter.isVip !== 'function') {
+          if (typeof chapter.isVip !== 'function' && typeof chapter.isVip !== 'boolean') {
             chapter.isVip = function() {
               var title = String(chapter.title || chapter.name || '').toLowerCase();
               return title.indexOf('vip') >= 0 || title.indexOf('订阅') >= 0 || title.indexOf('付费') >= 0;

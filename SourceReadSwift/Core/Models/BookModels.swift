@@ -208,19 +208,25 @@ struct ChapterContent: Codable, Hashable, Sendable {
     let paragraphs: [String]
     let nextContentUrl: String?
     let imageStyle: String?
+    /// Legado `ruleContent.payAction`：购买操作（JS 片段，或含 `{{js}}`
+    /// 段落的 URL 模板）。解析层只负责透传规则，执行由
+    /// `SourceEngine.performPayAction` 在同一 JS 上下文内完成。
+    let payAction: String?
 
     init(
         chapter: BookChapter,
         title: String,
         paragraphs: [String],
         nextContentUrl: String? = nil,
-        imageStyle: String? = nil
+        imageStyle: String? = nil,
+        payAction: String? = nil
     ) {
         self.chapter = chapter
         self.title = title
         self.paragraphs = paragraphs
         self.nextContentUrl = nextContentUrl
         self.imageStyle = imageStyle
+        self.payAction = payAction
     }
 
     var readerImageStyle: ReaderImageStyle {

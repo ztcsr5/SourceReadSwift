@@ -11,6 +11,9 @@ struct ChapterContentCacheEntry: Identifiable, Codable, Hashable, Sendable {
     let paragraphs: [String]
     let nextContentUrl: String?
     let imageStyle: String?
+    /// Legado `payAction` is stored with the chapter so a cached chapter can
+    /// still offer “购买本章” after an offline relaunch.
+    let payAction: String?
     let purifySignature: String
     let cachedAt: Date
 
@@ -30,6 +33,7 @@ struct ChapterContentCacheEntry: Identifiable, Codable, Hashable, Sendable {
         paragraphs: [String],
         nextContentUrl: String?,
         imageStyle: String? = nil,
+        payAction: String? = nil,
         purifySignature: String,
         cachedAt: Date
     ) {
@@ -42,6 +46,7 @@ struct ChapterContentCacheEntry: Identifiable, Codable, Hashable, Sendable {
         self.paragraphs = paragraphs
         self.nextContentUrl = nextContentUrl
         self.imageStyle = imageStyle
+        self.payAction = payAction
         self.purifySignature = purifySignature
         self.cachedAt = cachedAt
     }
@@ -90,7 +95,8 @@ final class ChapterContentCacheStore: ObservableObject {
             title: entry.title,
             paragraphs: entry.paragraphs,
             nextContentUrl: entry.nextContentUrl,
-            imageStyle: entry.imageStyle
+            imageStyle: entry.imageStyle,
+            payAction: entry.payAction
         )
     }
 
@@ -104,7 +110,8 @@ final class ChapterContentCacheStore: ObservableObject {
             title: entry.title,
             paragraphs: entry.paragraphs,
             nextContentUrl: entry.nextContentUrl,
-            imageStyle: entry.imageStyle
+            imageStyle: entry.imageStyle,
+            payAction: entry.payAction
         )
     }
 
@@ -123,6 +130,7 @@ final class ChapterContentCacheStore: ObservableObject {
             paragraphs: content.paragraphs,
             nextContentUrl: content.nextContentUrl,
             imageStyle: content.imageStyle,
+            payAction: content.payAction,
             purifySignature: purifySignature(purifyRules),
             cachedAt: Date()
         )
@@ -149,6 +157,13 @@ final class ChapterContentCacheStore: ObservableObject {
         guard entries.contains(where: { $0.key == key }) else { return }
         entries.removeAll { $0.key == key }
         persist()
+    }
+
+    /// Drops one chapter after a successful purchase. Legado calls
+    /// `BookHelp.delContent(book, chapter)` before reloading the TOC so the
+    /// next read cannot fall back to the pre-purchase VIP placeholder.
+    func invalidate(sourceURL: String, chapter: BookChapter) {
+        remove(key: cacheKey(sourceURL: sourceURL, chapterURL: chapter.url))
     }
 
     func entries(forBookURL bookURL: String) -> [ChapterContentCacheEntry] {

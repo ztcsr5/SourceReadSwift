@@ -8,6 +8,9 @@ protocol SourceEngine: Sendable {
     func getChapterList(source: BookSource, book: BookDetail, maxPages: Int) async -> Result<[BookChapter], SourceEngineError>
     func getContent(source: BookSource, chapter: BookChapter) async -> Result<ChapterContent, SourceEngineError>
     func getContent(source: BookSource, chapter: BookChapter, maxPages: Int) async -> Result<ChapterContent, SourceEngineError>
+    /// Executes a Legado `ruleContent.payAction` (purchase operation) with the
+    /// same persistent state, cookies and JS runtime as the chapter request.
+    func performPayAction(source: BookSource, chapter: BookChapter, payAction: String) async -> Result<PayActionOutcome, SourceEngineError>
     func verifyLogin(source: BookSource) async -> Result<SourceLoginVerification, SourceEngineError>
 }
 
@@ -22,6 +25,10 @@ extension SourceEngine {
 
     func getContent(source: BookSource, chapter: BookChapter, maxPages: Int) async -> Result<ChapterContent, SourceEngineError> {
         await getContent(source: source, chapter: chapter)
+    }
+
+    func performPayAction(source: BookSource, chapter: BookChapter, payAction: String) async -> Result<PayActionOutcome, SourceEngineError> {
+        .failure(.rule("Pay action is not supported by this engine"))
     }
 }
 
@@ -685,7 +692,7 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
             normalizedStage = .detail
         } else if stage.lowercased().hasPrefix("toc") {
             normalizedStage = .toc
-        } else if stage.lowercased().hasPrefix("content") {
+        } else if stage.lowercased().hasPrefix("content") || stage.lowercased().hasPrefix("payaction") {
             normalizedStage = .content
         } else {
             normalizedStage = nil
@@ -731,7 +738,7 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
             normalizedStage = .detail
         } else if stage.lowercased().hasPrefix("toc") {
             normalizedStage = .toc
-        } else if stage.lowercased().hasPrefix("content") {
+        } else if stage.lowercased().hasPrefix("content") || stage.lowercased().hasPrefix("payaction") {
             normalizedStage = .content
         } else {
             normalizedStage = nil
@@ -773,7 +780,7 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
         if stage.lowercased().hasPrefix("search") { normalizedStage = .search }
         else if stage.lowercased().hasPrefix("detail") { normalizedStage = .detail }
         else if stage.lowercased().hasPrefix("toc") { normalizedStage = .toc }
-        else if stage.lowercased().hasPrefix("content") { normalizedStage = .content }
+        else if stage.lowercased().hasPrefix("content") || stage.lowercased().hasPrefix("payaction") { normalizedStage = .content }
         else { normalizedStage = nil }
         guard let normalizedStage else { return }
         let scripts = context.javascriptEvidenceSnapshot()
@@ -1214,6 +1221,101 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
         return chapters.isEmpty ? .failure(.empty("Chapter list is empty")) : .success(chapters)
     }
 
+    /// Legado `ReadBookActivity.payAction()`: run the source's purchase rule
+    /// inside the same JS context that chapter parsing uses (cookieHeader,
+    /// persistent variables, `jsLib` prelude and the synchronous HTTP bridge),
+    /// then classify the string result.
+    func performPayAction(
+        source: BookSource,
+        chapter: BookChapter,
+        payAction: String
+    ) async -> Result<PayActionOutcome, SourceEngineError> {
+        let rule = payAction.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !rule.isEmpty else { return .failure(.rule("购买操作规则为空")) }
+
+        let executionState = persistentState(for: source)
+        let executionContext = RuleExecutionContext(
+            persistentState: executionState,
+            source: source,
+            logHandler: { [diagnostics] message in
+                Task {
+                    await diagnostics.emit(.init(
+                        level: .info,
+                        stage: "payAction.js",
+                        sourceName: source.bookSourceName,
+                        message: message
+                    ))
+                }
+            }
+        )
+        defer { executionContext.cleanUp() }
+        executionContext.setExecutionStage("payAction")
+        attachVerificationCodeProvider(executionContext, source: source)
+        executionContext.networkHandler = { [network] encoded in
+            self.syncLoad(
+                encoded: encoded,
+                source: source,
+                network: network,
+                cookieHeader: executionContext.string(for: "cookieHeader"),
+                persistentValues: executionState.snapshot(),
+                persistentState: executionState
+            )
+        }
+        executionContext.responseHandler = { [network] encoded in
+            SynchronousSourceNetworkBridge.loadResponse(
+                urlText: encoded,
+                source: source,
+                network: network,
+                cookieHeader: executionContext.string(for: "cookieHeader"),
+                persistentValues: executionState.snapshot(),
+                persistentState: executionState
+            )
+        }
+
+        let chapterMap: [String: Any] = [
+            "title": chapter.title,
+            "name": chapter.title,
+            "url": chapter.url,
+            "chapterUrl": chapter.url,
+            "bookUrl": chapter.bookUrl,
+            "index": chapter.index,
+            "chapterIndex": chapter.index,
+            "isVip": chapter.isVip,
+            "updateTime": chapter.updateTime ?? "",
+            "volumeName": chapter.volumeName ?? "",
+            "wordCount": chapter.wordCount ?? ""
+        ]
+        let variables: [String: Any] = [
+            "source": source,
+            "chapter": chapterMap,
+            "title": chapter.title,
+            "baseUrl": chapter.url,
+            "result": ""
+        ]
+        let runtime = executionContext.jsRuntime { [network] encoded in
+            self.syncLoad(
+                encoded: encoded,
+                source: source,
+                network: network,
+                cookieHeader: executionContext.string(for: "cookieHeader"),
+                persistentValues: executionState.snapshot(),
+                persistentState: executionState
+            )
+        }
+
+        let outcome = PayActionPolicy.evaluate(rule: rule) { script in
+            runtime.evaluate(script, variables: variables)
+        }
+        recordJavaScriptEvidence(source: source, stage: "payAction", context: executionContext)
+        switch outcome {
+        case .success(let value):
+            return .success(value)
+        case .failure(let error):
+            await emitFailure(error, stage: "payAction", source: source, details: ["chapter": chapter.title])
+            return .failure(error)
+        }
+    }
+
     private func appendNextContentPages(
         _ firstPage: ChapterContent,
         source: BookSource,
@@ -1316,7 +1418,8 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
             title: firstPage.title,
             paragraphs: paragraphs,
             nextContentUrl: finalNextURL,
-            imageStyle: firstPage.imageStyle
+            imageStyle: firstPage.imageStyle,
+            payAction: firstPage.payAction
         ))
     }
 
