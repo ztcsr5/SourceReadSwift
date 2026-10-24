@@ -523,4 +523,33 @@ final class JSCoreRuntimeTests: XCTestCase {
         }
         XCTAssertEqual(unknownValue, "true")
     }
+    /// Unknown `java.*` helpers must not abort the rule with a TypeError.
+    /// The JS proxy routes them to the native dispatcher, which records a
+    /// `bridge.error java.<name>` line and returns an empty string.
+    func testUnknownJavaMethodDegradesAndRecordsBridgeDiagnostic() throws {
+        let context = RuleExecutionContext()
+        let runtime = JSCoreRuntime(executionContext: context)
+        let result = runtime.evaluate("""
+        var probe = java.thisHelperDoesNotExist('x');
+        typeof java.thisHelperDoesNotExist + '|' + probe + '|' + java.md5('abc')
+        """)
+        guard case .success(let value) = result else {
+            return XCTFail("expected success: \(result)")
+        }
+        XCTAssertTrue(value.hasPrefix("function||"), "unexpected shape: \(value)")
+        XCTAssertTrue(context.logs().contains { $0.contains("bridge.error java.thisHelperDoesNotExist") }, "\(context.logs())")
+    }
+
+    /// The proxy must not shadow helpers implemented by the prelude.
+    func testUnknownJavaMethodProxyKeepsKnownBridgesWorking() throws {
+        let runtime = JSCoreRuntime()
+        let result = runtime.evaluate("java.base64Decode(java.base64Encode('abc')) + '|' + java.urlEncode('中')")
+        guard case .success(let value) = result else {
+            return XCTFail("expected success: \(result)")
+        }
+        let parts = value.components(separatedBy: "|")
+        XCTAssertEqual(parts.first, "abc")
+        XCTAssertTrue(parts.last?.contains("%") == true)
+    }
+
 }
