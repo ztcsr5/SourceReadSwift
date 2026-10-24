@@ -742,6 +742,9 @@ struct ReaderView: View {
                 if let bg = ov.background { backgroundRawValue = bg.rawValue }
             }
             appState.acquireTabChromeHidden(owner: tabChromeOwner)
+            // 阅读器存活期间采样真实出帧情况，退出时落盘；
+            // 用户在设置里能直接读到平均帧率与掉帧率，不必连 Xcode。
+            ReaderFrameRateSampler.shared.begin()
             chromeState.setInitialOverlayVisible(initialOverlayVisible)
             sessionStartedAt = Date()
             seedWindow()
@@ -791,6 +794,7 @@ struct ReaderView: View {
                 UIScreen.main.brightness = brightnessBeforeReader
             }
             appState.releaseTabChromeHidden(owner: tabChromeOwner)
+            ReaderFrameRateSampler.shared.end()
             appState.bookshelfStore.recordReadingSession(
                 bookID: bookID,
                 duration: Date().timeIntervalSince(sessionStartedAt)
