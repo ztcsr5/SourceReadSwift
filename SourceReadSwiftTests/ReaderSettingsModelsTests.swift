@@ -28,7 +28,7 @@ final class ReaderSettingsModelsTests: XCTestCase {
     }
 
     func testPreloadPolicyTitle() {
-        XCTAssertEqual(ReaderPreloadPolicy.title(for: 0), "关闭")
+        XCTAssertEqual(ReaderPreloadPolicy.title(for: 0), "仅相邻 1 章")
         XCTAssertEqual(ReaderPreloadPolicy.title(for: 3), "前后各 3 章")
         XCTAssertEqual(ReaderPreloadPolicy.title(for: 99), "前后各 5 章")
     }

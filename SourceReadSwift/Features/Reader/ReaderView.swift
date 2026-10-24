@@ -82,6 +82,12 @@ struct ReaderView: View {
     @State private var sleepTimerTask: Task<Void, Never>?
     @State private var positionPersistTask: Task<Void, Never>?
     @State private var pageLayoutTask: Task<Void, Never>?
+    /// Chapters wait in this queue instead of all hitting the source at once.
+    /// Nearest-first, one at a time: a distant prefetch can never finish ahead
+    /// of the chapter the reader is about to cross into.
+    @State private var prefetchQueue: [Int] = []
+    @State private var prefetchTask: Task<Void, Never>?
+    @State private var prefetchGeneration = 0
     @State private var paragraphJumpRequest: ParagraphJumpRequest?
     @State private var pagedBlocksCache: [ReaderPageBlock] = []
     @State private var pagedBlocksCacheKey = ""
@@ -612,6 +618,7 @@ struct ReaderView: View {
         .onDisappear {
             positionPersistTask?.cancel()
             pageLayoutTask?.cancel()
+            cancelPrefetch()
             persistReadingPosition(paragraphIndexOverride: currentParagraphIndexForPersistence())
             stopAutoScroll()
             sleepTimerTask?.cancel()
@@ -1047,6 +1054,7 @@ struct ReaderView: View {
         isWindowSeeded = true
         layoutAnchorOldParagraph = visibleParagraphIndex
         windowGeneration &+= 1
+        cancelPrefetch()
         windowSections = [
             ReaderChapterSection(
                 chapterIndex: chapterIndex,
@@ -1064,6 +1072,7 @@ struct ReaderView: View {
 
     private func resetWindow() {
         windowGeneration &+= 1
+        cancelPrefetch()
         layoutAnchorOldParagraph = visibleParagraphIndex
         windowLoadingIndices.removeAll()
         windowSections = [
@@ -1094,9 +1103,45 @@ struct ReaderView: View {
             upperBound: windowChapterUpperBound,
             loaded: loaded
         )
-        for index in order {
-            loadWindowChapter(index)
+        queuePrefetch(order)
+    }
+
+    /// Loads prefetched chapters one at a time in nearest-first order.
+    /// Launching the whole radius concurrently let chapter N+2 finish before
+    /// N+1, which left a hole in the page stream and showed a loading page
+    /// exactly when the reader crossed the boundary. A serial queue also
+    /// keeps a large preload setting from bursting the source with requests.
+    private func queuePrefetch(_ indices: [Int]) {
+        prefetchQueue = indices.filter { index in
+            !windowSections.contains { $0.chapterIndex == index && $0.isReady }
+                && !windowLoadingIndices.contains(index)
         }
+        guard !prefetchQueue.isEmpty else { return }
+        guard prefetchTask == nil else { return }
+        let generation = windowGeneration
+        prefetchGeneration &+= 1
+        let token = prefetchGeneration
+        prefetchTask = Task { @MainActor in
+            while !prefetchQueue.isEmpty,
+                  !Task.isCancelled,
+                  prefetchGeneration == token,
+                  windowGeneration == generation {
+                let index = prefetchQueue.removeFirst()
+                if windowSections.contains(where: { $0.chapterIndex == index && $0.isReady }) { continue }
+                if windowLoadingIndices.contains(index) { continue }
+                await loadWindowChapterNow(index, generation: generation)
+            }
+            if prefetchGeneration == token {
+                prefetchTask = nil
+            }
+        }
+    }
+
+    private func cancelPrefetch() {
+        prefetchGeneration &+= 1
+        prefetchTask?.cancel()
+        prefetchTask = nil
+        prefetchQueue.removeAll()
     }
 
     /// Boundary handoff shared by the three reading surfaces. A chapter is
@@ -1130,13 +1175,29 @@ struct ReaderView: View {
         windowLoadingIndices.insert(index)
 
         Task { @MainActor in
-            let loaded = await fetchWindowChapter(index)
-            guard self.windowGeneration == generation else { return }
-            self.windowLoadingIndices.remove(index)
-            guard let loaded else { return }
-            guard self.acceptsWindowChapter(index) else { return }
-            self.upsertWindowSection(loaded)
+            await self.performWindowLoad(index, generation: generation)
         }
+    }
+
+    /// Queue-owned load. The caller already checked the window state; the
+    /// loading mark prevents a direct request and the queue from racing.
+    private func loadWindowChapterNow(_ index: Int, generation: Int) async {
+        guard index >= 0, index < windowChapterUpperBound else { return }
+        if windowSections.contains(where: { $0.chapterIndex == index && $0.isReady }) { return }
+        guard !windowLoadingIndices.contains(index) else { return }
+        windowLoadingIndices.insert(index)
+        await performWindowLoad(index, generation: generation)
+    }
+
+    @discardableResult
+    private func performWindowLoad(_ index: Int, generation: Int) async -> Bool {
+        let loaded = await fetchWindowChapter(index)
+        guard windowGeneration == generation else { return false }
+        windowLoadingIndices.remove(index)
+        guard let loaded else { return false }
+        guard acceptsWindowChapter(index) else { return false }
+        upsertWindowSection(loaded)
+        return true
     }
 
     @MainActor
@@ -3787,7 +3848,13 @@ struct ReaderView: View {
             if block.chapterIndex >= 0 {
                 return ReaderChapterPosition(
                     chapterIndex: block.chapterIndex,
-                    paragraphIndex: block.firstParagraphIndex ?? 0,
+                    paragraphIndex: block.isPlaceholder
+                        ? ReaderChapterWindowPolicy.restoreParagraphIndex(
+                            chapterIndex: block.chapterIndex,
+                            currentChapterIndex: windowCurrentChapterIndex,
+                            placeholderDirection: block.placeholderDirection
+                        )
+                        : (block.firstParagraphIndex ?? 0),
                     pageOrdinal: block.isPlaceholder ? nil : block.pageOrdinal
                 )
             }

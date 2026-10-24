@@ -266,4 +266,18 @@ enum ReaderChapterWindowPolicy {
         let matches = pages.indices.filter { pages[$0].chapterIndex == chapterIndex && !pages[$0].isPlaceholder }
         return matches.last
     }
+
+    /// Paragraph sentinel used when a placeholder is replaced by the real
+    /// chapter. Forward travel lands on the first page; backward travel lands
+    /// on the last page. `Int.max` is the established chapter-end sentinel
+    /// consumed by the page resolver.
+    static func restoreParagraphIndex(
+        chapterIndex: Int,
+        currentChapterIndex: Int,
+        placeholderDirection: Int
+    ) -> Int {
+        if placeholderDirection < 0 { return Int.max }
+        if placeholderDirection > 0 { return 0 }
+        return chapterIndex < currentChapterIndex ? Int.max : 0
+    }
 }

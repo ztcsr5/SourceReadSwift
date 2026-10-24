@@ -216,6 +216,33 @@ final class ReaderChapterWindowPolicyTests: XCTestCase {
         )
     }
 
+    func testPlaceholderRestoreUsesTravelDirection() {
+        XCTAssertEqual(
+            ReaderChapterWindowPolicy.restoreParagraphIndex(
+                chapterIndex: 4, currentChapterIndex: 5, placeholderDirection: -1
+            ),
+            Int.max
+        )
+        XCTAssertEqual(
+            ReaderChapterWindowPolicy.restoreParagraphIndex(
+                chapterIndex: 6, currentChapterIndex: 5, placeholderDirection: 1
+            ),
+            0
+        )
+        XCTAssertEqual(
+            ReaderChapterWindowPolicy.restoreParagraphIndex(
+                chapterIndex: 4, currentChapterIndex: 5, placeholderDirection: 0
+            ),
+            Int.max
+        )
+        XCTAssertEqual(
+            ReaderChapterWindowPolicy.restoreParagraphIndex(
+                chapterIndex: 6, currentChapterIndex: 5, placeholderDirection: 0
+            ),
+            0
+        )
+    }
+
     func testFirstAndLastPageResolutionSkipsPlaceholders() {
         let pages: [(chapterIndex: Int, isPlaceholder: Bool)] = [
             (3, true),
