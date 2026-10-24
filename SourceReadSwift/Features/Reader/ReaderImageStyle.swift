@@ -43,6 +43,11 @@ enum ReaderImageStyle: String, CaseIterable, Sendable {
 /// Mirrors TextChapterLayout.setImage sizing so the native TextKit surface and
 /// the SwiftUI page surface agree on illustration geometry.
 enum ReaderImageSizingPolicy {
+    /// Caption row ("点击查看插图大图"), its VStack gap and the vertical
+    /// padding drawn by `ReaderIllustrationView`. Pagination budgets the whole
+    /// card, not just the bitmap.
+    static let pagedCaptionHeight: CGFloat = 44
+
     static func size(
         for imageSize: CGSize,
         style: ReaderImageStyle,
@@ -83,6 +88,21 @@ enum ReaderImageSizingPolicy {
     static func maximumHeight(for style: ReaderImageStyle, viewportHeight: CGFloat) -> CGFloat {
         let ratio: CGFloat = style.reservesWholePage ? 0.78 : 0.62
         return max(viewportHeight * ratio, 160)
+    }
+
+    /// Paged surfaces reserve the reader's top breathing room and the bottom
+    /// chrome inside their own layout.  Deriving the image ceiling from the
+    /// same budget keeps a SINGLE illustration from overflowing the page now
+    /// that paged pages can no longer scroll.
+    static func maximumHeight(
+        for style: ReaderImageStyle,
+        viewportHeight: CGFloat,
+        pagePadding: Double,
+        footerHeight: Double
+    ) -> CGFloat {
+        let available = max(viewportHeight - CGFloat(pagePadding * 2 + footerHeight) - 96, 160)
+        if style.reservesWholePage { return available }
+        return min(available, max(viewportHeight * 0.62, 160))
     }
 
     /// The [img]url[/img] paragraph body, or nil when the paragraph is text.

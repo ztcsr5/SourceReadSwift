@@ -32,17 +32,21 @@ struct ReaderPositionMapping: Equatable, Sendable {
     func page(containingParagraph rawParagraph: Int?) -> Int {
         guard !pageFirstParagraphs.isEmpty else { return 0 }
         let paragraph = clampParagraph(rawParagraph)
-        // Page starts are monotonic. A binary search keeps speech/highlight
-        // callbacks O(log n) even for chapters with thousands of pages.
+        // Page starts are monotonic but may repeat when a long paragraph is
+        // split across several pages.  Lower-bound search returns the FIRST
+        // page of that paragraph instead of its last continuation page.
         var lower = 0
         var upper = pageFirstParagraphs.count
         while lower < upper {
             let middle = lower + (upper - lower) / 2
-            if pageFirstParagraphs[middle] <= paragraph {
+            if pageFirstParagraphs[middle] < paragraph {
                 lower = middle + 1
             } else {
                 upper = middle
             }
+        }
+        if lower < pageFirstParagraphs.count, pageFirstParagraphs[lower] == paragraph {
+            return lower
         }
         return max(lower - 1, 0)
     }

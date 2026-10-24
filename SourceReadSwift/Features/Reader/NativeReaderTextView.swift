@@ -427,24 +427,16 @@ struct NativeReaderTextView: UIViewRepresentable {
         }
 
         private func updateInsets(in textView: UITextView, configuration: Configuration) {
-            let safeTop: CGFloat = {
-                if let window = textView.window {
-                    return window.safeAreaInsets.top
-                }
-                if textView.safeAreaInsets.top > 0 {
-                    return textView.safeAreaInsets.top
-                }
-                if let scene = UIApplication.shared.connectedScenes.first(where: { $0.activationState == .foregroundActive }) as? UIWindowScene,
-                   let keyWindow = scene.windows.first(where: { $0.isKeyWindow }) {
-                    return keyWindow.safeAreaInsets.top
-                }
-                return 47
-            }()
-            let topInset = max(safeTop + max(CGFloat(configuration.pagePadding), 20), 76)
+            // The representable already lives inside the top safe area. Adding
+            // `safeTop` again produced a double inset (a large blank strip above
+            // the first line) and disagreed with the paged surface, which starts
+            // from the same safe-area origin.
+            let topInset = ReaderPageLayoutEngine.minimumTopInset(pagePadding: CGFloat(configuration.pagePadding))
+            let safeBottom = textView.window?.safeAreaInsets.bottom ?? textView.safeAreaInsets.bottom
             let insets = UIEdgeInsets(
                 top: topInset,
                 left: CGFloat(configuration.pagePadding),
-                bottom: CGFloat(configuration.pagePadding + configuration.footerHeight),
+                bottom: CGFloat(configuration.pagePadding + configuration.footerHeight) + safeBottom,
                 right: CGFloat(configuration.pagePadding)
             )
             guard textView.textContainerInset.top != insets.top
@@ -622,7 +614,10 @@ struct NativeReaderTextView: UIViewRepresentable {
         @discardableResult
         private func scrollToParagraph(_ index: Int, in textView: UITextView, animated: Bool, duration: Double) -> Bool {
             guard paragraphRanges.indices.contains(index) else { return false }
-            guard !textView.isTracking && !textView.isDragging else { return false }
+            // Never fight the user's finger or an in-flight deceleration.
+            // A passive visibility callback must not pull the page back to a
+            // paragraph boundary while the scroll view is still gliding.
+            guard !textView.isTracking && !textView.isDragging && !textView.isDecelerating else { return false }
             if textView.bounds.height <= 0 {
                 DispatchQueue.main.async { [weak self, weak textView] in
                     guard let self, let textView else { return }

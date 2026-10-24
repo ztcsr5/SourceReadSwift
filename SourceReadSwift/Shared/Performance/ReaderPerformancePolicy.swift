@@ -54,7 +54,11 @@ enum ReaderPerformancePolicy {
         letterSpacing: Double
     ) -> PageMetrics {
         let availableWidth = max(Double(viewportSize.width) - pagePadding * 2, 260)
-        let availableHeight = max(Double(viewportSize.height) - pagePadding * 2 - footerHeight - 70, 360)
+        // 96pt matches the reader surface contract: top breathing room,
+        // bottom safe area and the footer chrome are all outside the text
+        // column.  The previous 70pt over-estimated the page and allowed a
+        // long paragraph to overflow a non-scrollable paged surface.
+        let availableHeight = max(Double(viewportSize.height) - pagePadding * 2 - footerHeight - 96, 360)
         let charWidth = max(fontSize * 0.56 + letterSpacing, 7)
         let lineHeight = max(fontSize + lineSpacing, 18)
         let charsPerLine = max(Int(availableWidth / charWidth), 10)

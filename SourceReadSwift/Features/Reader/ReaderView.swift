@@ -108,7 +108,11 @@ struct ReaderView: View {
     @State private var isAppendingNextChapter = false
     @State private var speechPausedForScene = false
     @State private var autoScrollPausedForScene = false
-    @GestureState private var coverSwipeState = ReaderCoverSwipeState()
+    @State private var coverDragTranslation: CGFloat = 0
+    @State private var coverIsAnimating = false
+    @State private var scrollJumpGeneration = 0
+    @State private var chapterSliderTarget: Double? = nil
+    @State private var brightnessBeforeReader: CGFloat? = nil
     @StateObject private var playbackCoordinator = ReaderPlaybackCoordinator()
     @StateObject private var speechController = ReaderSpeechController()
     @AppStorage("reader.fontFamily") private var fontFamilyRawValue: String = ReaderFontFamily.system.rawValue
@@ -130,6 +134,8 @@ struct ReaderView: View {
     @AppStorage("reader.mode") private var readerModeRawValue: String = ReaderMode.scroll.rawValue
     @AppStorage("reader.tapZones") private var tapZonesRawValue: String = ReaderTapAction.defaultRawValue
     @AppStorage("reader.keepScreenAwake") private var keepScreenAwake = true
+    /// -1 follows the system; 0.05...1 overrides while the reader is open.
+    @AppStorage("reader.brightness") private var readerBrightness: Double = -1
     @AppStorage("reader.preloadChapterCount") private var preloadChapterCount = ReaderPreloadPolicy.defaultCount
     @AppStorage("reader.textSelectionEnabled") private var textSelectionEnabled = false
     @AppStorage("reading.dailyGoalMinutes") private var dailyGoalMinutes: Int = 30
@@ -215,6 +221,12 @@ struct ReaderView: View {
             parts.append("页 \(page)/\(pageCount)")
         }
         return parts.joined(separator: " · ")
+    }
+
+    private var sleepTimerBadgeText: String? {
+        if sleepTimerMinutes == -1 { return "播完当章" }
+        if sleepTimerMinutes > 0 { return "\(sleepTimerMinutes)分" }
+        return nil
     }
 
     private var maximumReaderTarget: Int {
@@ -508,6 +520,8 @@ struct ReaderView: View {
             scrollParagraphTarget = initial.paragraph
             pagedPageIndex = initial.page
             previousIdleTimerDisabled = UIApplication.shared.isIdleTimerDisabled
+            brightnessBeforeReader = UIScreen.main.brightness
+            applyReaderBrightness()
             applyIdleTimerPreference()
             scheduleSleepTimer()
             appState.bookshelfStore.markReaderOpened(bookID: bookID)
@@ -538,6 +552,9 @@ struct ReaderView: View {
             stopSpeechPlayback()
             pageLayoutTask = nil
             restoreIdleTimerPreference()
+            if let brightnessBeforeReader {
+                UIScreen.main.brightness = brightnessBeforeReader
+            }
             appState.releaseTabChromeHidden(owner: tabChromeOwner)
             appState.bookshelfStore.recordReadingSession(
                 bookID: bookID,
@@ -616,7 +633,12 @@ struct ReaderView: View {
             stopAutoScroll()
             stopSpeechPlayback()
             scrollParagraphTarget = paragraph
-            pagedPageIndex = positionMapping.page(containingParagraph: paragraph)
+            scrollJumpGeneration &+= 1
+            paragraphJumpRequest = nil
+            pagedPageIndex = ReaderPagedNavigationPolicy.clampedPageIndex(
+                positionMapping.page(containingParagraph: paragraph),
+                pageCount: pagedBlocksCache.count
+            )
             persistReadingPosition(paragraphIndexOverride: paragraph)
             if isPerBookOverride {
                 let ov = BookReaderOverride(
@@ -636,6 +658,9 @@ struct ReaderView: View {
         }
         .onChange(of: readerPageCacheKey) { _ in
             schedulePagedBlocksCacheRebuild()
+        }
+        .onChange(of: readerBrightness) { _ in
+            applyReaderBrightness()
         }
         // Overlay/settings transitions are driven at their mutation sites.
         // Keeping animation scoped there prevents a toolbar toggle from
@@ -883,6 +908,7 @@ struct ReaderView: View {
         .ignoresSafeArea(.container, edges: .bottom)
         .onAppear {
             if scrollParagraphTarget > 0 {
+                scrollJumpGeneration &+= 1
                 DispatchQueue.main.async {
                     paragraphJumpRequest = ParagraphJumpRequest(index: scrollParagraphTarget)
                 }
@@ -909,6 +935,11 @@ struct ReaderView: View {
         let nextIndex = (appendedSections.last?.chapterIndex ?? chapterIndex) + 1
         let maxCount = totalChapters ?? chapters.count
         guard nextIndex < maxCount else { return }
+        // `onNearBottom` and `onReachBottom` can both fire in one runloop, and
+        // the cached branch appends synchronously. Without an identity check
+        // the same chapter was appended several times and the reader showed
+        // duplicated text.
+        guard appendedSections.last?.chapterIndex != nextIndex else { return }
 
         onCacheNextChapters?()
 
@@ -939,11 +970,13 @@ struct ReaderView: View {
             chapter: nextChapter,
             purifyRules: purifyRules
         ) {
+            isAppendingNextChapter = true
             appendedSections.append(ContinuousAppendedSection(
                 chapterIndex: nextIndex,
                 title: nextChapter.title,
                 paragraphs: cached.paragraphs
             ))
+            isAppendingNextChapter = false
             // Pre-load the chapter after this one in background so it's ready ahead of time!
             let followingIndex = nextIndex + 1
             if followingIndex < maxCount,
@@ -989,7 +1022,6 @@ struct ReaderView: View {
     private func updateVisibleParagraphInScroll(_ index: Int) {
         guard visibleParagraphIndex != index else { return }
         visibleParagraphIndex = index
-        scrollParagraphTarget = index
         let resolved = resolvedReadingPosition(forFlatIndex: index)
         scheduleReadingPositionPersistence(paragraphIndex: resolved.paragraphIndex)
     }
@@ -997,7 +1029,7 @@ struct ReaderView: View {
     private var nativeScrollRequestKey: String {
         [
             String(chapterIndex),
-            String(scrollParagraphTarget),
+            String(scrollJumpGeneration),
             String(pagedPageIndex),
             paragraphJumpRequest?.id.uuidString ?? "none",
             String(speechController.currentParagraphIndex)
@@ -1019,6 +1051,7 @@ struct ReaderView: View {
     private var pageCurlReaderContent: some View {
         PageCurlReaderView(
             pages: pagedBlocks,
+            contentRevision: pagedBlocksCacheKey,
             currentPageIndex: $pagedPageIndex,
             onPageChanged: { target in
                 updatePagedVisibleParagraph(pageIndex: target)
@@ -1054,100 +1087,129 @@ struct ReaderView: View {
         GeometryReader { proxy in
             let width = max(proxy.size.width, 1)
             let safeIndex = min(max(pagedPageIndex, 0), max(pagedBlocks.count - 1, 0))
-            let drag = coverSwipeState.isHorizontal ? coverSwipeState.translation : 0
+            let drag = coverDragTranslation
 
             ZStack {
-                if drag <= 0, pagedBlocks.indices.contains(safeIndex) {
+                if pagedBlocks.indices.contains(safeIndex) {
                     readerPage(for: pagedBlocks[safeIndex])
-                        .id(pagedBlocks[safeIndex].id)
-                        .offset(x: drag * 0.15)
+                        .id("cover-page-\(pagedBlocks[safeIndex].id)")
+                        .offset(x: drag * 0.22)
+                        .zIndex(1)
                 }
 
                 if drag < 0, pagedBlocks.indices.contains(safeIndex + 1) {
                     readerPage(for: pagedBlocks[safeIndex + 1])
-                        .id(pagedBlocks[safeIndex + 1].id)
+                        .id("cover-page-\(pagedBlocks[safeIndex + 1].id)")
                         .offset(x: width + drag)
                         .shadow(color: .black.opacity(0.25), radius: 10, x: -6, y: 0)
                         .allowsHitTesting(false)
+                        .zIndex(2)
                 }
 
                 if drag > 0, safeIndex > 0 {
                     readerPage(for: pagedBlocks[safeIndex - 1])
-                        .id(pagedBlocks[safeIndex - 1].id)
+                        .id("cover-page-\(pagedBlocks[safeIndex - 1].id)")
                         .offset(x: -width + drag)
                         .shadow(color: .black.opacity(0.25), radius: 10, x: 6, y: 0)
                         .allowsHitTesting(false)
-                }
-
-                if drag > 0, pagedBlocks.indices.contains(safeIndex) {
-                    readerPage(for: pagedBlocks[safeIndex])
-                        .id(pagedBlocks[safeIndex].id)
-                        .offset(x: drag * 0.15)
-                }
-
-                if drag == 0, pagedBlocks.indices.contains(safeIndex) {
-                    readerPage(for: pagedBlocks[safeIndex])
-                        .id(pagedBlocks[safeIndex].id)
+                        .zIndex(2)
                 }
             }
             .clipped()
             .contentShape(Rectangle())
-            .simultaneousGesture(
-                DragGesture(minimumDistance: 12, coordinateSpace: .local)
-                    .updating($coverSwipeState) { value, state, _ in
+            .gesture(
+                DragGesture(minimumDistance: 8, coordinateSpace: .local)
+                    .onChanged { value in
+                        guard !coverIsAnimating else { return }
                         let horizontal = value.translation.width
                         let vertical = value.translation.height
-                        let isHorizontal = abs(horizontal) > abs(vertical) * 1.15
-                        state = ReaderCoverSwipeState(
-                            translation: isHorizontal ? horizontal : 0,
-                            isHorizontal: isHorizontal
-                        )
-                    }
-                    .onEnded { value in
-                        guard let decision = ReaderPagedSwipePolicy.decision(
-                            horizontal: value.translation.width,
-                            vertical: value.translation.height
-                        ) else { return }
-                        switch decision {
-                        case .next:
-                            moveReaderTarget(to: pagedPageIndex + 1)
-                        case .previous:
-                            moveReaderTarget(to: pagedPageIndex - 1)
+                        if abs(horizontal) > abs(vertical) * 1.15 {
+                            coverDragTranslation = horizontal
+                        } else {
+                            coverDragTranslation = 0
                         }
                     }
+                    .onEnded { value in
+                        let decision = ReaderCoverSwipePolicy.decision(
+                            translation: value.translation,
+                            predictedEndTranslation: value.predictedEndTranslation,
+                            containerWidth: width,
+                            pageIndex: safeIndex,
+                            pageCount: pagedBlocks.count
+                        )
+                        finishCoverGesture(decision, width: width)
+                    }
             )
-            .animation(.interactiveSpring(response: 0.24, dampingFraction: 0.9, blendDuration: 0.08), value: pagedPageIndex)
             .onChange(of: pagedPageIndex) { target in
                 updatePagedVisibleParagraph(pageIndex: target)
             }
             .onChange(of: speechController.currentParagraphIndex) { target in
-                guard target >= 0 else { return }
+                guard target >= 0, !coverIsAnimating, coverDragTranslation == 0 else { return }
                 pagedPageIndex = pageIndex(containingParagraph: target)
             }
         }
     }
 
+    private func finishCoverGesture(_ decision: ReaderCoverSwipeDecision, width: CGFloat) {
+        guard !coverIsAnimating else { return }
+        let target: Int?
+        switch decision {
+        case .next:
+            target = min(pagedPageIndex + 1, max(pagedBlocks.count - 1, 0))
+        case .previous:
+            target = max(pagedPageIndex - 1, 0)
+        case .cancel:
+            target = nil
+        }
+        guard let target, target != pagedPageIndex else {
+            withAnimation(.interactiveSpring(response: 0.28, dampingFraction: 0.86)) {
+                coverDragTranslation = 0
+            }
+            return
+        }
+
+        coverIsAnimating = true
+        let exitOffset = target > pagedPageIndex ? -width : width
+        withAnimation(.interactiveSpring(response: 0.30, dampingFraction: 0.86)) {
+            coverDragTranslation = exitOffset
+        }
+        Task { @MainActor in
+            try? await Task.sleep(nanoseconds: 340_000_000)
+            guard coverIsAnimating else { return }
+            var transaction = Transaction()
+            transaction.disablesAnimations = true
+            withTransaction(transaction) {
+                pagedPageIndex = target
+                coverDragTranslation = 0
+                coverIsAnimating = false
+            }
+            updatePagedVisibleParagraph(pageIndex: target)
+        }
+    }
+
     private func readerPage(for page: ReaderPageBlock) -> some View {
         pageSurface {
-            ScrollView {
-                VStack(alignment: .leading, spacing: CGFloat(paragraphSpacing)) {
-                    if page.includesTitle {
-                        Text(content.title)
-                            .font(fontFamily.swiftUIFont(size: CGFloat(fontSize + 8), weight: .bold))
-                            .foregroundStyle(readerThemeTextColor)
-                            .padding(.bottom, CGFloat(titleSpacing))
-                            .readerSelectableText(textSelectionEnabled)
-                    }
-
-                    ForEach(page.paragraphs, id: \.index) { entry in
-                        paragraphText(entry.text, index: entry.index)
-                    }
-                    // The bottom chrome floats above the page. Keep the final
-                    // lines scrollable instead of letting controls cover them.
-                    Color.clear.frame(height: CGFloat(footerHeight))
+            VStack(alignment: .leading, spacing: 0) {
+                if page.includesTitle {
+                    Text(content.title)
+                        .font(fontFamily.swiftUIFont(size: CGFloat(fontSize + 8), weight: .bold))
+                        .foregroundStyle(readerThemeTextColor)
+                        .padding(.bottom, CGFloat(titleSpacing))
+                        .readerSelectableText(textSelectionEnabled)
                 }
-                .frame(maxWidth: .infinity, alignment: .leading)
+
+                ForEach(page.paragraphs) { entry in
+                    paragraphText(entry)
+                        .padding(
+                            .top,
+                            (page.paragraphs.first.map { $0.id == entry.id } ?? true)
+                                ? 0
+                                : (entry.isContinuation ? 0 : CGFloat(paragraphSpacing))
+                        )
+                }
             }
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+            .clipped()
         }
     }
 
@@ -1166,8 +1228,8 @@ struct ReaderView: View {
     private func pageSurface<Content: View>(@ViewBuilder content: () -> Content) -> some View {
         content()
             .padding(.horizontal, CGFloat(pagePadding))
-            .padding(.top, max(CGFloat(pagePadding) + 36, 76))
-            .padding(.bottom, CGFloat(pagePadding))
+            .padding(.top, ReaderPageLayoutEngine.minimumTopInset(pagePadding: CGFloat(pagePadding)))
+            .padding(.bottom, CGFloat(pagePadding) + CGFloat(footerHeight))
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
             .background {
                 if readerMode == .cover {
@@ -1181,11 +1243,11 @@ struct ReaderView: View {
     }
 
     @ViewBuilder
-    private func paragraphText(_ paragraph: String, index: Int) -> some View {
-        if let url = ReaderImageSizingPolicy.imageURL(in: paragraph) {
+    private func paragraphText(_ entry: ReaderPageEntry) -> some View {
+        if let url = ReaderImageSizingPolicy.imageURL(in: entry.text) {
             illustrationCard(url: url)
         } else {
-            standardParagraphText(paragraph, index: index)
+            standardParagraphText(entry.text, index: entry.index)
         }
     }
 
@@ -1196,7 +1258,6 @@ struct ReaderView: View {
             .kerning(letterSpacing)
             .lineSpacing(lineSpacing)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.leading, CGFloat(paragraphIndent))
             .padding(.vertical, speechController.currentParagraphIndex == index ? 6 : 0)
             .background {
                 if speechController.currentParagraphIndex == index {
@@ -1220,7 +1281,9 @@ struct ReaderView: View {
                 columnWidth: illustrationColumnWidth,
                 maximumHeight: ReaderImageSizingPolicy.maximumHeight(
                     for: currentImageStyle,
-                    viewportHeight: effectiveViewportSize.height
+                    viewportHeight: effectiveViewportSize.height,
+                    pagePadding: pagePadding,
+                    footerHeight: footerHeight
                 )
             )
         }
@@ -1239,6 +1302,8 @@ struct ReaderView: View {
                         .font(.system(size: 16, weight: .semibold))
                         .foregroundStyle(chromeForeground)
                         .lineLimit(1)
+                        .minimumScaleFactor(0.78)
+                        .layoutPriority(1)
                     Text(progressTitle)
                         .font(.system(size: 11, weight: .medium))
                         .foregroundStyle(chromeSecondaryForeground)
@@ -1249,25 +1314,20 @@ struct ReaderView: View {
 
                 extraToolbarActions()
 
-                if let onRefreshChapter {
-                    chromeIconButton(systemName: "arrow.clockwise") {
-                        onRefreshChapter()
-                    }
-                }
-
-                if let onRequestSourceSwitch {
-                    chromeIconButton(systemName: "arrow.triangle.2.circlepath") {
-                        closeReaderChrome()
-                        onRequestSourceSwitch()
-                    }
-                    .accessibilityLabel("换源")
-                }
-
                 chromeIconButton(systemName: isCurrentChapterBookmarked ? "bookmark.fill" : "bookmark") {
                     toggleCurrentBookmark(openList: false)
                 }
 
                 Menu {
+                    if let onRefreshChapter {
+                        Button {
+                            closeReaderChrome()
+                            onRefreshChapter()
+                        } label: {
+                            Label("刷新本章", systemImage: "arrow.clockwise")
+                        }
+                    }
+
                     if canShowPayAction {
                         Button {
                             closeReaderChrome()
@@ -1276,6 +1336,15 @@ struct ReaderView: View {
                             Label("购买本章", systemImage: "cart")
                         }
                         .disabled(isPerformingPayAction)
+                    }
+
+                    if let onCacheNextChapters {
+                        Button {
+                            closeReaderChrome()
+                            onCacheNextChapters()
+                        } label: {
+                            Label("缓存后续章节", systemImage: "square.and.arrow.down")
+                        }
                     }
 
                     Button {
@@ -1318,14 +1387,26 @@ struct ReaderView: View {
                     }
                     .disabled(!canSelectRelativeChapter(offset: -1))
 
-                    Slider(value: Binding(
-                        get: { Double(chapterIndex) },
-                        set: { selectChapter(index: Int($0)) }
-                    ), in: 0...Double(max((totalChapters ?? chapters.count) - 1, 0)), step: 1)
+                    Slider(
+                        value: Binding(
+                            get: { chapterSliderTarget ?? Double(chapterIndex) },
+                            set: { chapterSliderTarget = $0 }
+                        ),
+                        in: 0...Double(max((totalChapters ?? chapters.count) - 1, 0)),
+                        step: 1,
+                        onEditingChanged: { editing in
+                            guard !editing, let target = chapterSliderTarget else { return }
+                            chapterSliderTarget = nil
+                            let index = Int(target.rounded())
+                            guard index != chapterIndex else { return }
+                            selectChapter(index: index)
+                        }
+                    )
                         .tint(AppTheme.accent)
                         .padding(.horizontal, 10)
                         .frame(maxWidth: .infinity)
                         .background(.thinMaterial, in: Capsule())
+                        .accessibilityLabel("章节进度")
 
                     navChapterButton(icon: "chevron.right", title: "下一章") {
                         selectRelativeChapter(offset: 1)
@@ -1344,39 +1425,32 @@ struct ReaderView: View {
                         toggleSpeech()
                         closeSettingsPanel()
                     }
-                    if speechController.isSpeaking {
-                        toolButton(icon: "stop.fill", title: "停止") {
-                            stopSpeechPlayback()
-                            closeSettingsPanel()
-                        }
-                        if sleepTimerMinutes == -1 {
-                            Text("播完当章")
-                                .font(.caption2.weight(.semibold))
-                                .foregroundStyle(AppTheme.accent)
-                                .padding(.horizontal, 6)
-                                .padding(.vertical, 3)
-                                .background(AppTheme.accent.opacity(0.12), in: Capsule())
-                        } else if sleepTimerMinutes > 0 {
-                            Text("\(sleepTimerMinutes)分")
-                                .font(.caption2.weight(.semibold))
-                                .foregroundStyle(AppTheme.accent)
-                                .padding(.horizontal, 6)
-                                .padding(.vertical, 3)
-                                .background(AppTheme.accent.opacity(0.12), in: Capsule())
-                        }
+                    // Keep the stop slot even while idle. Inserting and
+                    // removing it shifted every button after it on each TTS
+                    // toggle.
+                    toolButton(icon: "stop.fill", title: "停止") {
+                        stopSpeechPlayback()
+                        closeSettingsPanel()
                     }
+                    .opacity(speechController.isSpeaking ? 1 : 0.35)
+                    .disabled(!speechController.isSpeaking)
                     toolButton(icon: autoScrollEnabled ? "pause.fill" : "play.fill", title: autoScrollEnabled ? "暂停" : "自动") {
                         toggleAutoScroll()
                         closeSettingsPanel()
                     }
-                    if let onCacheNextChapters {
-                        toolButton(icon: "square.and.arrow.down", title: "缓存") {
-                            onCacheNextChapters()
-                            closeSettingsPanel()
-                        }
-                    }
                     toolButton(icon: "gearshape", title: "设置") {
                         toggleSettingsPanel()
+                    }
+                    .overlay(alignment: .topTrailing) {
+                        if let badge = sleepTimerBadgeText {
+                            Text(badge)
+                                .font(.caption2.weight(.semibold))
+                                .foregroundStyle(AppTheme.accent)
+                                .padding(.horizontal, 5)
+                                .padding(.vertical, 2)
+                                .background(AppTheme.accent.opacity(0.14), in: Capsule())
+                                .offset(x: 2, y: -2)
+                        }
                     }
                 }
             }
@@ -1440,6 +1514,27 @@ struct ReaderView: View {
         .buttonStyle(.plain)
     }
 
+    private var settingsHint: String {
+        switch settingsTab {
+        case 0: return readerModeHint
+        case 1: return "右侧可直接输入数值，精调字号、间距和边距。"
+        default: return "这里保留不重复的阅读辅助：自动滚动间隔、朗读速度、睡眠定时与点击区域。"
+        }
+    }
+
+    private var readerModeHint: String {
+        switch readerMode {
+        case .scroll:
+            return "上下连续滑动，章节末尾自动衔接下一章；页内没有横向翻页手势。"
+        case .pageTurn:
+            return "左右平移翻页，每页固定不滚动，适合习惯整页阅读。"
+        case .cover:
+            return "拖动时下一页从右侧覆盖当前页，松手按位移和速度决定是否翻页。"
+        case .pageCurl:
+            return "系统原生纸张卷曲动画，可拖到一半再松手回弹或完成。"
+        }
+    }
+
     private var settingsPanel: some View {
         GeometryReader { proxy in
             let maxHeight = min(max(proxy.size.height * 0.84, 560), 760)
@@ -1492,7 +1587,7 @@ struct ReaderView: View {
                     .pickerStyle(.segmented)
                     .padding(.horizontal)
 
-                    Text(settingsTab == 0 ? "连续滑动、平移翻页和覆盖翻页决定阅读的跟手感。" : (settingsTab == 1 ? "右侧可直接输入数值，精调字号、间距和边距。" : "这里保留不重复的阅读辅助功能。"))
+                    Text(settingsHint)
                         .font(.caption2)
                         .foregroundStyle(.secondary)
                         .frame(maxWidth: .infinity, alignment: .leading)
@@ -1540,7 +1635,7 @@ struct ReaderView: View {
                 Text("翻页模式")
                     .font(.subheadline.weight(.semibold))
                     .foregroundStyle(.secondary)
-                Text("连续滑动是纵向阅读，平移翻页是左右翻页，覆盖翻页更像单页过场。")
+                Text(readerModeHint)
                     .font(.caption2)
                     .foregroundStyle(.secondary)
             }
@@ -1602,6 +1697,35 @@ struct ReaderView: View {
                 .padding(.horizontal, 2)
             }
 
+            VStack(alignment: .leading, spacing: 8) {
+                HStack {
+                    Text("阅读亮度")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                    Spacer()
+                    Text(readerBrightness < 0 ? "跟随系统" : "\(Int(readerBrightness * 100))%")
+                        .font(.caption.weight(.bold))
+                        .foregroundStyle(AppTheme.accent)
+                    Button("跟随系统") {
+                        readerBrightness = -1
+                    }
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(readerBrightness < 0 ? .secondary : AppTheme.accent)
+                    .disabled(readerBrightness < 0)
+                }
+                Slider(
+                    value: Binding(
+                        get: { readerBrightness < 0 ? Double(UIScreen.main.brightness) : readerBrightness },
+                        set: { readerBrightness = $0 }
+                    ),
+                    in: 0.05...1.0
+                )
+                .tint(AppTheme.accent)
+                Text("只影响阅读页，退出阅读器会恢复系统亮度。")
+                    .font(.caption2)
+                    .foregroundStyle(.tertiary)
+            }
+
             if background == .custom {
                 PhotosPicker(selection: $selectedPhotoItem, matching: .images) {
                     HStack(spacing: 8) {
@@ -1641,7 +1765,7 @@ struct ReaderView: View {
             }
 
             Text("　　夜色沉下来以后，文字应该安静、清楚、耐看。调整外观与排版时，这里会立刻跟随字体、字号、行距、段首缩进和背景变化。")
-                .font(.system(size: min(fontSize, 24), weight: .regular, design: .default))
+                .font(fontFamily.swiftUIFont(size: min(CGFloat(fontSize), 24), weight: .regular))
                 .foregroundStyle(readerThemeTextColor)
                 .lineSpacing(lineSpacing)
                 .lineLimit(4)
@@ -1805,6 +1929,15 @@ struct ReaderView: View {
             Text("高级里只放阅读辅助，不再重复前面的翻页和字号入口。朗读速度只管语速，自动滚动在主阅读菜单。")
                 .font(.caption)
                 .foregroundStyle(.secondary)
+
+            readerValueSlider(
+                "自动滚动间隔",
+                value: $autoScrollDelay,
+                range: ReaderAutomationPolicy.minDelay...12,
+                step: 0.5,
+                unit: "秒",
+                help: "自动滚动每前进一段之间的等待时间。数值越小滚动越快；朗读与自动滚动互斥。"
+            )
 
             readerValueSlider("朗读速度", value: $ttsRate, range: 0.35...0.65, step: 0.01, unit: "倍速", help: "调整语音朗读语速（0.35x ~ 0.65x），从当前可见段落开始朗读，不会跳回章节开头")
 
@@ -2397,6 +2530,7 @@ struct ReaderView: View {
         switch readerMode {
         case .scroll:
             scrollParagraphTarget = safeIndex
+            scrollJumpGeneration &+= 1
             paragraphJumpRequest = ParagraphJumpRequest(index: safeIndex)
         case .pageTurn, .cover, .pageCurl:
             pagedPageIndex = pageIndex(containingParagraph: safeIndex)
@@ -2474,6 +2608,7 @@ struct ReaderView: View {
         let target = min(max(rawTarget, 0), maximumReaderTarget)
         if readerMode == .scroll {
             scrollParagraphTarget = target
+            scrollJumpGeneration &+= 1
             paragraphJumpRequest = ParagraphJumpRequest(index: target)
         } else {
             pagedPageIndex = target
@@ -2862,6 +2997,19 @@ struct ReaderView: View {
         }
     }
 
+    private func applyReaderBrightness() {
+        guard readerBrightness >= 0 else {
+            // "Follow system" must actually release the override. The old
+            // early return left the screen stuck at the last manual value
+            // until the reader was dismissed.
+            if let brightnessBeforeReader {
+                UIScreen.main.brightness = brightnessBeforeReader
+            }
+            return
+        }
+        UIScreen.main.brightness = CGFloat(min(max(readerBrightness, 0.05), 1.0))
+    }
+
     private func applyIdleTimerPreference() {
         UIApplication.shared.isIdleTimerDisabled = keepScreenAwake
     }
@@ -2998,6 +3146,9 @@ struct ReaderView: View {
             paragraphCount: content.paragraphs.count,
             pageFirstParagraphs: blocks.compactMap(\.firstParagraphIndex)
         )
+        pagedPageIndex = min(max(pagedPageIndex, 0), positionMappingCache.maximumPageIndex)
+        scrollParagraphTarget = positionMappingCache.clampParagraph(scrollParagraphTarget)
+        visibleParagraphIndex = positionMappingCache.clampParagraph(visibleParagraphIndex)
     }
 
     private func schedulePagedBlocksCacheRebuild() {
@@ -3021,22 +3172,30 @@ struct ReaderView: View {
             return [ReaderPageBlock(id: 0, includesTitle: true, paragraphs: [])]
         }
 
-        let metrics = ReaderPerformancePolicy.pageMetrics(
-            viewportSize: effectiveViewportSize,
-            pagePadding: pagePadding,
-            footerHeight: footerHeight,
-            fontSize: fontSize,
-            lineSpacing: lineSpacing,
-            letterSpacing: letterSpacing
+        let topPadding = ReaderPageLayoutEngine.minimumTopInset(pagePadding: CGFloat(pagePadding))
+        let bottomPadding = CGFloat(pagePadding) + CGFloat(footerHeight)
+        let typography = ReaderPageTypography(
+            font: fontFamily.uiFont(ofSize: CGFloat(fontSize)),
+            titleFont: fontFamily.uiFont(ofSize: CGFloat(fontSize + 8), weight: .bold),
+            lineSpacing: CGFloat(lineSpacing),
+            letterSpacing: CGFloat(letterSpacing),
+            paragraphSpacing: CGFloat(paragraphSpacing),
+            firstLineIndent: CGFloat(paragraphIndent),
+            titleSpacing: CGFloat(titleSpacing),
+            contentWidth: max(effectiveViewportSize.width - CGFloat(pagePadding * 2), 200),
+            contentHeight: max(effectiveViewportSize.height - topPadding - bottomPadding, 240)
         )
-        let charsPerLine = metrics.charsPerLine
-        let pageBudget = metrics.pageBudget
-        let paragraphBreakCost = metrics.paragraphBreakCost
-        let titleCost = metrics.titleCost
+        var titleTypography = typography
+        titleTypography.lineSpacing = 0
+        titleTypography.letterSpacing = 0
 
         var pages: [ReaderPageBlock] = []
         var currentEntries: [ReaderPageEntry] = []
-        var currentCost = titleCost
+        var currentHeight = ReaderPageLayoutEngine.measureHeight(
+            content.title,
+            typography: titleTypography,
+            font: typography.titleFont
+        ) + typography.titleSpacing
         var currentIncludesTitle = true
 
         func flush() {
@@ -3048,54 +3207,107 @@ struct ReaderView: View {
                 )
             )
             currentEntries = []
-            currentCost = 0
+            currentHeight = 0
             currentIncludesTitle = false
         }
 
         for (index, paragraph) in content.paragraphs.enumerated() {
             let trimmed = paragraph.trimmingCharacters(in: .whitespacesAndNewlines)
-            // Illustrations are laid out as attachments whose height is only
-            // known after download. Reserve a deterministic share of the page
-            // so an image never lands half-way across a page boundary.
             if ReaderImageSizingPolicy.imageURL(in: trimmed) != nil {
-                let imageCost = ReaderImageSizingPolicy.estimatedPageCost(
-                    for: currentImageStyle,
-                    pageBudget: pageBudget
+                // `ReaderIllustrationView` also draws the caption row and its
+                // vertical padding. Reserving only the bitmap height let a
+                // text-plus-image page overflow and clip the last line.
+                let captionBudget = ReaderImageSizingPolicy.pagedCaptionHeight
+                let imageHeight = min(
+                    ReaderImageSizingPolicy.maximumHeight(
+                        for: currentImageStyle,
+                        viewportHeight: effectiveViewportSize.height,
+                        pagePadding: pagePadding,
+                        footerHeight: footerHeight
+                    ),
+                    max(typography.contentHeight - captionBudget, 160)
                 )
+                let cardHeight = imageHeight + captionBudget
                 if currentImageStyle.reservesWholePage {
-                    // SINGLE: one illustration owns the page. Legado starts a
-                    // new page whenever the cursor is not already at the top.
                     if currentIncludesTitle || !currentEntries.isEmpty {
                         flush()
                     }
                     currentEntries.append(ReaderPageEntry(index: index, text: paragraph))
-                    currentCost = imageCost
+                    currentHeight = cardHeight
                     flush()
                 } else {
-                    if !currentEntries.isEmpty && currentCost + imageCost > pageBudget {
+                    let spacing = currentEntries.isEmpty ? 0 : typography.paragraphSpacing
+                    if !currentEntries.isEmpty && currentHeight + spacing + cardHeight > typography.contentHeight {
                         flush()
                     }
+                    let spacingAfterFlush = currentEntries.isEmpty ? 0 : typography.paragraphSpacing
                     currentEntries.append(ReaderPageEntry(index: index, text: paragraph))
-                    currentCost += imageCost
-                    if currentCost >= pageBudget {
+                    currentHeight += spacingAfterFlush + cardHeight
+                    if currentHeight >= typography.contentHeight {
                         flush()
                     }
                 }
                 continue
             }
-            // UTF-16 units are the same metric used by TextKit ranges and are
-            // substantially cheaper than grapheme-cluster counting for long
-            // CJK chapters.
-            let charCount = max(trimmed.utf16.count, 1)
-            let lineCount = max(Int(ceil(Double(charCount) / Double(charsPerLine))), 1)
-            let cost = lineCount * charsPerLine + paragraphBreakCost
-            if !currentEntries.isEmpty && currentCost + cost > pageBudget {
+
+            // The stored page text includes the first-line indent so the paged
+            // surface and TextKit measure exactly the same string.  Continuation
+            // chunks start at a line boundary and therefore carry no indent.
+            let display = ReaderPageLayoutEngine.displayText(
+                paragraph,
+                fontSize: CGFloat(fontSize),
+                indent: typography.firstLineIndent
+            )
+            let wholeHeight = ReaderPageLayoutEngine.measureHeight(display, typography: typography)
+            let spacing = currentEntries.isEmpty ? 0 : typography.paragraphSpacing
+
+            if currentHeight + spacing + wholeHeight <= typography.contentHeight + 0.5 {
+                currentEntries.append(ReaderPageEntry(index: index, text: display))
+                currentHeight += spacing + wholeHeight
+                continue
+            }
+
+            let remaining = typography.contentHeight - currentHeight - spacing
+            if !currentEntries.isEmpty, remaining < typography.contentHeight * 0.28 {
+                flush()
+            } else if currentEntries.isEmpty, currentIncludesTitle,
+                      remaining < typography.contentHeight * 0.28 {
                 flush()
             }
-            currentEntries.append(ReaderPageEntry(index: index, text: paragraph))
-            currentCost += cost
-            if cost >= pageBudget, !currentEntries.isEmpty {
-                flush()
+
+            let available: CGFloat
+            if currentEntries.isEmpty {
+                available = max(typography.contentHeight - currentHeight, typography.contentHeight * 0.28)
+            } else {
+                available = max(
+                    typography.contentHeight - currentHeight - typography.paragraphSpacing,
+                    typography.contentHeight * 0.28
+                )
+            }
+            let chunks = ReaderPageLayoutEngine.split(
+                display,
+                firstPageHeight: available,
+                fullPageHeight: typography.contentHeight,
+                typography: typography
+            )
+            for (chunkIndex, chunk) in chunks.enumerated() {
+                let spacingBefore = currentEntries.isEmpty
+                    ? 0
+                    : (chunkIndex == 0 ? typography.paragraphSpacing : 0)
+                if !currentEntries.isEmpty,
+                   currentHeight + spacingBefore + chunk.height > typography.contentHeight + 0.5 {
+                    flush()
+                }
+                let spacingAfterFlush = currentEntries.isEmpty
+                    ? 0
+                    : (chunkIndex == 0 ? typography.paragraphSpacing : 0)
+                currentEntries.append(
+                    ReaderPageEntry(index: index, text: chunk.text, chunkIndex: chunkIndex)
+                )
+                currentHeight += spacingAfterFlush + chunk.height
+                if chunkIndex < chunks.count - 1 {
+                    flush()
+                }
             }
         }
 
@@ -3134,9 +3346,13 @@ private struct ParagraphJumpRequest: Equatable {
     let index: Int
 }
 
-struct ReaderPageEntry: Equatable {
+struct ReaderPageEntry: Equatable, Identifiable {
     let index: Int
     let text: String
+    /// Non-zero when a long paragraph was split across page boundaries.
+    var chunkIndex: Int = 0
+    var isContinuation: Bool { chunkIndex > 0 }
+    var id: String { "\(index)-\(chunkIndex)" }
 }
 
 struct ReaderPageBlock: Identifiable, Equatable {
