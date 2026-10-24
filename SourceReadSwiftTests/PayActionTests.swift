@@ -92,8 +92,8 @@ final class PayActionPolicyTests: XCTestCase {
             return .success("true")
         }
         XCTAssertFalse(executed)
-        guard case .failure(.rule(let message)) = result else {
-            return XCTFail("expected a rule failure, got \(result)")
+        guard case .success(.failed(let message)) = result else {
+            return XCTFail("expected a failed pay outcome, got \(result)")
         }
         XCTAssertTrue(message.contains("URL 无效"))
     }
