@@ -2,6 +2,33 @@ import XCTest
 @testable import SourceReadSwift
 
 final class ReaderScrollAnchorPolicyTests: XCTestCase {
+    func testParagraphShiftHandlesPrependAppendAndTrim() {
+        XCTAssertEqual(
+            ReaderScrollAnchorPolicy.paragraphShift(old: ["five"], new: ["four", "five", "six"]),
+            1
+        )
+        XCTAssertEqual(
+            ReaderScrollAnchorPolicy.paragraphShift(
+                old: ["two", "three", "four", "five", "six"],
+                new: ["three", "four", "five", "six", "seven"]
+            ),
+            -1
+        )
+        XCTAssertEqual(
+            ReaderScrollAnchorPolicy.paragraphShift(
+                old: ["zero", "one", "two", "three", "four"],
+                new: ["one", "two", "three"]
+            ),
+            -1
+        )
+        XCTAssertEqual(
+            ReaderScrollAnchorPolicy.paragraphShift(old: ["a", "b"], new: ["a", "b", "c"]),
+            0
+        )
+        XCTAssertNil(ReaderScrollAnchorPolicy.paragraphShift(old: [], new: ["a"]))
+        XCTAssertNil(ReaderScrollAnchorPolicy.paragraphShift(old: ["a", "b"], new: ["x", "y"]))
+    }
+
     func testAnchorResolvesParagraphAndCharacterOffset() {
         let ranges = [NSRange(location: 0, length: 10), NSRange(location: 11, length: 20)]
         let anchor = ReaderScrollAnchorPolicy.anchor(

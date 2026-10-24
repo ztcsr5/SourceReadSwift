@@ -13,7 +13,7 @@ struct ReaderChapterSection: Identifiable, Equatable {
     let chapterIndex: Int
     var title: String
     var paragraphs: [String]
-    var state: LoadState
+    var state: LoadState = .ready
 
     var id: Int { chapterIndex }
     var isReady: Bool { state == .ready }
@@ -30,6 +30,15 @@ struct ReaderChapterSlice: Equatable {
 struct ReaderChapterPosition: Equatable {
     let chapterIndex: Int
     let paragraphIndex: Int
+    /// Paged modes use a chapter-local page ordinal to keep the exact
+    /// continuation page when another chapter is prefetched above it.
+    let pageOrdinal: Int?
+
+    init(chapterIndex: Int, paragraphIndex: Int, pageOrdinal: Int? = nil) {
+        self.chapterIndex = chapterIndex
+        self.paragraphIndex = paragraphIndex
+        self.pageOrdinal = pageOrdinal
+    }
 }
 
 /// Pure window math for continuous cross-chapter reading.
@@ -74,7 +83,7 @@ enum ReaderChapterWindowPolicy {
         loaded: Set<Int>
     ) -> [Int] {
         indices(around: current, radius: radius, lowerBound: lowerBound, upperBound: upperBound)
-            .filter { !loaded.contains($0) }
+            .filter { $0 != current && !loaded.contains($0) }
             .sorted { lhs, rhs in
                 let leftDistance = abs(lhs - current)
                 let rightDistance = abs(rhs - current)
@@ -82,6 +91,30 @@ enum ReaderChapterWindowPolicy {
                 if (lhs >= current) != (rhs >= current) { return lhs >= current }
                 return lhs < rhs
             }
+    }
+
+    /// Chapters the live window must keep in memory. Loading chapters are
+    /// retained so a boundary request cannot be evicted before its content
+    /// arrives; the cursor chapter is always kept even when a caller passes a
+    /// radius of zero.
+    static func retainedIndices(
+        around current: Int,
+        radius: Int,
+        lowerBound: Int,
+        upperBound: Int,
+        loading: Set<Int>
+    ) -> Set<Int> {
+        var result = Set(indices(
+            around: current,
+            radius: radius,
+            lowerBound: lowerBound,
+            upperBound: upperBound
+        ))
+        result.formUnion(loading)
+        if current >= lowerBound, current < upperBound {
+            result.insert(current)
+        }
+        return result
     }
 
     /// First chapter outside the window in `direction` that still needs a

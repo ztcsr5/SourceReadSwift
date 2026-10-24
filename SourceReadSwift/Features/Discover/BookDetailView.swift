@@ -902,7 +902,7 @@ struct ChapterLoadingView: View {
         }
         .overlay(alignment: .top) {
             if isCachingNext {
-                Text("Caching next chapters...")
+                Text("Caching adjacent chapters...")
                     .font(.caption.weight(.semibold))
                     .padding(.horizontal, 12)
                     .padding(.vertical, 8)
@@ -944,7 +944,7 @@ struct ChapterLoadingView: View {
         ) {
             content = cached
             isUsingStaleCache = false
-            preloadNextChapters(after: targetChapter, source: source, purifyRules: purifyRules)
+            preloadAdjacentChapters(around: targetChapter, source: source, purifyRules: purifyRules)
             return
         }
         let engine = appState.engine
@@ -956,7 +956,7 @@ struct ChapterLoadingView: View {
             appState.chapterContentCacheStore.save(loaded, sourceURL: source.bookSourceUrl, purifyRules: purifyRules)
             content = loaded
             isUsingStaleCache = false
-            preloadNextChapters(after: targetChapter, source: source, purifyRules: purifyRules)
+            preloadAdjacentChapters(around: targetChapter, source: source, purifyRules: purifyRules)
         case .failure(let error):
             if let cached = appState.chapterContentCacheStore.staleContent(
                 sourceURL: source.bookSourceUrl,
@@ -970,25 +970,19 @@ struct ChapterLoadingView: View {
         }
     }
 
-    private func preloadNextChapters(after chapter: BookChapter, source: BookSource, purifyRules: [String]) {
+    /// Warms both sides of the current chapter. Reading backward must be as
+    /// instant as reading forward: a chapter the reader already visited stays
+    /// in the disk cache, and the chapters just before the current one are
+    /// prefetched before they are needed.
+    private func preloadAdjacentChapters(around chapter: BookChapter, source: BookSource, purifyRules: [String]) {
         let count = ReaderPreloadPolicy.clamp(preloadChapterCount)
         guard count > 0 else { return }
         guard preloadTask == nil else { return }
-        let nextChapters = chapters
-            .filter { $0.index > chapter.index }
-            .sorted { $0.index < $1.index }
-            .prefix(count)
-            .filter {
-                !appState.chapterContentCacheStore.isCached(
-                    sourceURL: source.bookSourceUrl,
-                    chapter: $0,
-                    purifyRules: purifyRules
-                )
-            }
-        guard !nextChapters.isEmpty else { return }
+        let pending = chaptersToCache(around: chapter, source: source, purifyRules: purifyRules, count: count)
+        guard !pending.isEmpty else { return }
         let engine = appState.engine
         preloadTask = Task {
-            for next in nextChapters {
+            for next in pending {
                 guard !Task.isCancelled else { return }
                 let result = await AsyncTimeout.run(seconds: 10) {
                     await engine.getContent(source: source, chapter: next)
@@ -1007,6 +1001,33 @@ struct ChapterLoadingView: View {
             await MainActor.run {
                 preloadTask = nil
             }
+        }
+    }
+
+    /// Forward chapters first (the reading direction), then the same number
+    /// behind the cursor. Already-cached chapters are skipped so the queue
+    /// never duplicates a request.
+    private func chaptersToCache(
+        around chapter: BookChapter,
+        source: BookSource,
+        purifyRules: [String],
+        count: Int
+    ) -> [BookChapter] {
+        guard count > 0 else { return [] }
+        let forward = chapters
+            .filter { $0.index > chapter.index }
+            .sorted { $0.index < $1.index }
+            .prefix(count)
+        let backward = chapters
+            .filter { $0.index < chapter.index }
+            .sorted { $0.index > $1.index }
+            .prefix(count)
+        return (Array(forward) + Array(backward)).filter { candidate in
+            !appState.chapterContentCacheStore.isCached(
+                sourceURL: source.bookSourceUrl,
+                chapter: candidate,
+                purifyRules: purifyRules
+            )
         }
     }
 
@@ -1041,8 +1062,8 @@ struct ChapterLoadingView: View {
             onRefreshChapter: {
                 Task { await load(force: true, ignoreCache: true) }
             },
-            onCacheNextChapters: {
-                Task { await cacheNextChaptersFromReader() }
+            onCacheNextChapters: { cursorChapterIndex in
+                Task { await cacheAdjacentChaptersFromReader(around: cursorChapterIndex) }
             },
             onSpeechFinished: {
                 guard let next = chapters.first(where: { $0.index == effectiveChapter.index + 1 }) else { return }
@@ -1064,22 +1085,12 @@ struct ChapterLoadingView: View {
         .id("reader-\(effectiveChapter.url)")
     }
 
-    private func cacheNextChapters(after chapter: BookChapter, source: BookSource, purifyRules: [String]) async {
+    private func cacheAdjacentChapters(around chapter: BookChapter, source: BookSource, purifyRules: [String]) async {
         let count = ReaderPreloadPolicy.clamp(preloadChapterCount)
         guard count > 0 else { return }
-        let nextChapters = chapters
-            .filter { $0.index > chapter.index }
-            .sorted { $0.index < $1.index }
-            .prefix(count)
-            .filter {
-                !appState.chapterContentCacheStore.isCached(
-                    sourceURL: source.bookSourceUrl,
-                    chapter: $0,
-                    purifyRules: purifyRules
-                )
-        }
+        let pending = chaptersToCache(around: chapter, source: source, purifyRules: purifyRules, count: count)
         let engine = appState.engine
-        for next in nextChapters {
+        for next in pending {
             let result = await AsyncTimeout.run(seconds: 10) {
                 await engine.getContent(source: source, chapter: next)
             } ?? .failure(.network("Cache timed out"))
@@ -1112,12 +1123,13 @@ struct ChapterLoadingView: View {
         .pageBackground()
     }
 
-    private func cacheNextChaptersFromReader() async {
+    private func cacheAdjacentChaptersFromReader(around cursorChapterIndex: Int) async {
         guard !isCachingNext else { return }
         guard let source = appState.sourceStore.source(for: sourceUrl) else { return }
+        let target = chapters.first(where: { $0.index == cursorChapterIndex }) ?? effectiveChapter
         isCachingNext = true
         defer { isCachingNext = false }
-        await cacheNextChapters(after: effectiveChapter, source: source, purifyRules: appState.purifyRuleStore.enabledPatterns)
+        await cacheAdjacentChapters(around: target, source: source, purifyRules: appState.purifyRuleStore.enabledPatterns)
     }
 
     private func chapterLoadErrorView(_ message: String) -> some View {

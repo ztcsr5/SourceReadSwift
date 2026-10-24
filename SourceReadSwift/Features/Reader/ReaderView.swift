@@ -4,13 +4,6 @@ import PhotosUI
 import SwiftUI
 import UIKit
 
-struct ContinuousAppendedSection: Equatable, Identifiable {
-    var id: Int { chapterIndex }
-    let chapterIndex: Int
-    let title: String
-    let paragraphs: [String]
-}
-
 struct ReaderView: View {
     @EnvironmentObject private var appState: AppState
     @Environment(\.colorScheme) private var colorScheme
@@ -36,7 +29,7 @@ struct ReaderView: View {
     var onSelectChapterWithPosition: ((BookChapter, Int?) -> Void)? = nil
     var onSelectNavigationEntry: ((LocalTextNavigationEntry) -> Void)?
     var onRefreshChapter: (() -> Void)?
-    var onCacheNextChapters: (() -> Void)?
+    var onCacheNextChapters: ((Int) -> Void)?
     /// Called after speech reaches the end of the current chapter. The owning
     /// screen can swap in the next chapter without coupling the speech engine
     /// to navigation or networking.
@@ -104,8 +97,28 @@ struct ReaderView: View {
     @State private var previousIdleTimerDisabled = false
     @State private var visibleParagraphIndex = 0
     @State private var readerContentFingerprint = ""
-    @State private var appendedSections: [ContinuousAppendedSection] = []
-    @State private var isAppendingNextChapter = false
+    @State private var windowSections: [ReaderChapterSection] = []
+    @State private var windowCurrentChapterIndex = 0
+    @State private var windowLoadingIndices: Set<Int> = []
+    @State private var windowGeneration = 0
+    @State private var isWindowSeeded = false
+    /// Increments whenever a window mutation moves the visible paragraph in
+    /// the flat index space (a chapter was inserted or trimmed above the
+    /// viewport). The native surface consumes the absolute anchor once per
+    /// revision, which is immune to SwiftUI coalescing several mutations into
+    /// one update.
+    @State private var layoutAnchorRevision = 0
+    @State private var layoutAnchorOldParagraph = 0
+    @State private var lastWindowChangeWasAppend = false
+    /// A playback handoff that is waiting for the next chapter to finish
+    /// downloading. The window resumes the same reader surface when the
+    /// section arrives instead of asking the owner to rebuild the chapter.
+    @State private var pendingSpeechChapterIndex: Int?
+    @State private var pendingAutoScrollChapterIndex: Int?
+    /// Chapter the speech queue was started from. The controller reports a
+    /// chapter-local paragraph index; keeping the chapter here lets every
+    /// highlight/page/target map it back into the window's flat space.
+    @State private var speechChapterIndex = 0
     @State private var speechPausedForScene = false
     @State private var autoScrollPausedForScene = false
     @State private var coverDragTranslation: CGFloat = 0
@@ -178,13 +191,13 @@ struct ReaderView: View {
     }
 
     private var currentChapterBookmarkCount: Int {
-        bookmarks.filter { $0.chapterIndex == chapterIndex }.count
+        bookmarks.filter { $0.chapterIndex == currentDisplayChapterIndex }.count
     }
 
     private var isCurrentChapterBookmarked: Bool {
         appState.bookshelfStore.isBookmarked(
             bookID: bookID,
-            chapterIndex: chapterIndex,
+            chapterIndex: currentDisplayChapterIndex,
             paragraphIndex: currentBookmarkParagraphIndex
         )
     }
@@ -194,17 +207,26 @@ struct ReaderView: View {
     }
 
     private var currentDisplayChapterIndex: Int {
-        if readerMode == .scroll && !appendedSections.isEmpty {
-            return resolvedReadingPosition(forFlatIndex: visibleParagraphIndex).chapterIndex
+        if readerMode != .scroll,
+           pagedBlocksCache.indices.contains(pagedPageIndex) {
+            let block = pagedBlocksCache[pagedPageIndex]
+            if !block.isPlaceholder, block.chapterIndex >= 0 {
+                return block.chapterIndex
+            }
         }
-        return chapterIndex
+        guard !windowSections.isEmpty else { return chapterIndex }
+        return resolvedReadingPosition(forFlatIndex: visibleParagraphIndex).chapterIndex
     }
 
     private var currentDisplayChapterTitle: String {
-        if readerMode == .scroll && !appendedSections.isEmpty {
-            return resolvedReadingPosition(forFlatIndex: visibleParagraphIndex).chapterTitle
+        let index = currentDisplayChapterIndex
+        if let section = windowSections.first(where: { $0.chapterIndex == index }) {
+            return section.title
         }
-        return content.title
+        if index == chapterIndex {
+            return content.title
+        }
+        return chapterTitle(for: index)
     }
 
     private var progressTitle: String {
@@ -238,6 +260,44 @@ struct ReaderView: View {
         case .pageTurn, .cover, .pageCurl:
             return positionMapping.maximumPageIndex
         }
+    }
+
+    private var windowChapterUpperBound: Int {
+        if let totalChapters, totalChapters > 0 {
+            return totalChapters
+        }
+        if let highest = chapters.map(\.index).max() {
+            return max(highest + 1, chapterIndex + 1)
+        }
+        if let localChapters = appState.bookshelfStore.book(id: bookID)?.localChapters,
+           !localChapters.isEmpty {
+            return localChapters.count
+        }
+        return chapterIndex + 1
+    }
+
+    private var windowRadius: Int {
+        ReaderChapterWindowPolicy.radius(forPreloadCount: preloadChapterCount)
+    }
+
+    private var windowSlices: [ReaderChapterSlice] {
+        windowSections.map {
+            ReaderChapterSlice(chapterIndex: $0.chapterIndex, paragraphCount: $0.paragraphs.count)
+        }
+    }
+
+    private var windowLayout: ReaderChapterWindowPolicy.Layout {
+        ReaderChapterWindowPolicy.layout(windowSlices)
+    }
+
+    private func chapterTitle(for index: Int) -> String {
+        if let section = windowSections.first(where: { $0.chapterIndex == index }) {
+            return section.title
+        }
+        if let chapter = chapters.first(where: { $0.index == index }) {
+            return chapter.title
+        }
+        return "第 \(index + 1) 章"
     }
 
     private var filteredChapters: [BookChapter] {
@@ -297,13 +357,16 @@ struct ReaderView: View {
         // bounds so rotation, split-view and Stage Manager resize invalidate
         // the model instead of showing pages calculated for the old width.
         let viewport = effectiveViewportSize
+        let windowSignature = windowSections.isEmpty
+            ? "base:\(content.title):\(content.paragraphs.count)"
+            : windowSections.map { section in
+                "\(section.chapterIndex):\(section.title.hashValue):\(section.paragraphs.count):\(section.paragraphs.first?.hashValue ?? 0):\(section.paragraphs.last?.hashValue ?? 0):\(section.isReady ? 1 : 0)"
+            }.joined(separator: ",")
         return [
             readerLayoutKey,
             ReaderPerformancePolicy.viewportCacheKey(viewport),
-            content.title,
-            String(content.paragraphs.count),
-            String(content.paragraphs.first?.hashValue ?? 0),
-            String(content.paragraphs.last?.hashValue ?? 0)
+            readerContentFingerprint,
+            windowSignature
         ].joined(separator: "|")
     }
 
@@ -323,20 +386,7 @@ struct ReaderView: View {
     }
 
     private var positionMapping: ReaderPositionMapping {
-        if positionMappingCache.paragraphCount == content.paragraphs.count {
-            // A typography gesture may temporarily make the cache key stale;
-            // the old mapping is still valid until the debounced page rebuild
-            // commits and avoids compactMap work on every slider frame.
-            return positionMappingCache
-        }
-        // A first render may not have a page model yet. Keep a safe fallback
-        // for synchronous mode switches during that one transition.
-        return ReaderPositionMapping(
-            paragraphCount: content.paragraphs.count,
-            pageFirstParagraphs: ReaderPositionMapping.pageStarts(
-                from: pagedBlocks.map(\.firstParagraphIndex)
-            )
-        )
+        positionMappingCache
     }
 
     var body: some View {
@@ -352,7 +402,12 @@ struct ReaderView: View {
             // typography gesture discards SwiftUI's page views at 120 Hz and
             // defeats the debounce above; the cache key changes once after
             // the gesture settles.
-            .id(readerMode == .scroll ? "native-scroll-reader" : (pagedBlocksCacheKey.isEmpty ? "reader-page-placeholder" : pagedBlocksCacheKey))
+            // The paged tree must survive page-model revisions: re-keying it
+            // on every prefetched chapter destroys TabView/UIPageViewController
+            // state mid-gesture. Each surface consumes its own content
+            // revision instead (PageCurlReaderView.contentRevision, cover
+            // data and TabView tags).
+            .id(readerMode == .scroll ? "native-scroll-reader" : "reader-paged-surface")
             .contentShape(Rectangle())
             .simultaneousGesture(
                 SpatialTapGesture()
@@ -524,6 +579,7 @@ struct ReaderView: View {
             appState.acquireTabChromeHidden(owner: tabChromeOwner)
             chromeState.setInitialOverlayVisible(initialOverlayVisible)
             sessionStartedAt = Date()
+            seedWindow()
             rebuildPagedBlocksCache()
             readerContentFingerprint = makeContentFingerprint(content)
             let initial = initialAutoScrollTarget()
@@ -618,9 +674,6 @@ struct ReaderView: View {
             stopSpeechPlayback()
             pageLayoutTask?.cancel()
             pageLayoutTask = nil
-            pagedBlocksCache.removeAll()
-            pagedBlocksCacheKey = ""
-            positionMappingCache = ReaderPositionMapping(paragraphCount: updatedContent.paragraphs.count)
             scrollParagraphTarget = 0
             pagedPageIndex = 0
             visibleParagraphIndex = 0
@@ -629,9 +682,18 @@ struct ReaderView: View {
             showChapterList = false
             showBookmarks = false
             chromeState.setInitialOverlayVisible(initialOverlayVisible)
-            DispatchQueue.main.async {
-                rebuildPagedBlocksCache()
-            }
+            // The window owns the chapter list now. Rebuild it from the new
+            // content and rebuild pages synchronously so the reader never
+            // flashes an empty page surface during an in-place refresh.
+            resetWindow()
+            rebuildPagedBlocksCache()
+        }
+        .onChange(of: preloadChapterCount) { _ in
+            // Apply a preload change to the live window immediately: grow
+            // both sides, then evict chapters that fell outside the new
+            // radius. Disk-cached chapters remain available for back-reads.
+            prefetchWindow(around: windowCurrentChapterIndex)
+            trimWindowIfNeeded()
         }
         .onChange(of: readerModeRawValue) { _ in
             UIImpactFeedbackGenerator(style: .light).impactOccurred()
@@ -665,7 +727,8 @@ struct ReaderView: View {
         }
         .onChange(of: initialParagraphIndex) { target in
             guard let target, content.paragraphs.indices.contains(target) else { return }
-            guard target != visibleParagraphIndex else { return }
+            guard let flat = windowLayout.flatIndex(chapterIndex: chapterIndex, paragraphIndex: target) else { return }
+            guard flat != visibleParagraphIndex else { return }
             jumpToParagraph(target)
         }
         .onChange(of: readerPageCacheKey) { _ in
@@ -744,48 +807,54 @@ struct ReaderView: View {
     }
 
     private var scrollModeParagraphs: [String] {
-        guard !appendedSections.isEmpty else { return content.paragraphs }
-        var result = content.paragraphs
-        for section in appendedSections {
-            result.append("——— \(section.title) ———")
+        guard !windowSections.isEmpty else { return content.paragraphs }
+        var result: [String] = []
+        for (offset, section) in windowSections.enumerated() {
+            if offset > 0 {
+                result.append("——— \(section.title) ———")
+            }
             result.append(contentsOf: section.paragraphs)
         }
         return result
     }
 
     private var scrollContentFingerprint: String {
-        let baseCount = content.paragraphs.count
-        let appendedCount = appendedSections.count
-        let lastChapter = appendedSections.last?.chapterIndex ?? chapterIndex
-        let lastParagraphsCount = appendedSections.last?.paragraphs.count ?? baseCount
-        return "\(chapterIndex)|\(baseCount)|\(appendedCount)|\(lastChapter)|\(lastParagraphsCount)"
+        let window = windowSections.map { section in
+            "\(section.chapterIndex):\(section.title.hashValue):\(section.paragraphs.count):\(section.isReady ? "r" : "l")"
+        }.joined(separator: ",")
+        // The window signature catches chapters arriving/leaving; the base
+        // fingerprint catches an in-place refresh of the current chapter with
+        // the same paragraph count.
+        return "\(readerContentFingerprint)|\(window)"
     }
 
     private func resolvedReadingPosition(forFlatIndex index: Int) -> (chapterIndex: Int, chapterTitle: String, paragraphIndex: Int) {
-        if index < content.paragraphs.count {
-            return (chapterIndex, content.title, max(index, 0))
+        guard let position = ReaderChapterWindowPolicy.resolvedPosition(
+            flatIndex: index,
+            layout: windowLayout
+        ) else {
+            let fallback = max(min(index, max(content.paragraphs.count - 1, 0)), 0)
+            return (chapterIndex, content.title, fallback)
         }
-        var offset = content.paragraphs.count
-        for section in appendedSections {
-            if index == offset {
-                return (section.chapterIndex, section.title, 0)
-            }
-            offset += 1
-            let count = section.paragraphs.count
-            if index < offset + count {
-                return (section.chapterIndex, section.title, index - offset)
-            }
-            offset += count
-        }
-        if let last = appendedSections.last {
-            return (last.chapterIndex, last.title, max(last.paragraphs.count - 1, 0))
-        }
-        return (chapterIndex, content.title, max(content.paragraphs.count - 1, 0))
+        let title = windowSections.first { $0.chapterIndex == position.chapterIndex }?.title ?? content.title
+        return (position.chapterIndex, title, position.paragraphIndex)
+    }
+
+    /// The speech controller numbers paragraphs inside the chapter it was
+    /// given. The native surface and page mapping use the window-wide flat
+    /// index, so both sides must meet in the same space.
+    private var speechFlatParagraphIndex: Int? {
+        guard speechController.currentParagraphIndex >= 0 else { return nil }
+        if windowSections.isEmpty { return speechController.currentParagraphIndex }
+        return windowLayout.flatIndex(
+            chapterIndex: speechChapterIndex,
+            paragraphIndex: speechController.currentParagraphIndex
+        )
     }
 
     private var activeScrollTarget: Int? {
-        if speechController.isSpeaking, speechController.currentParagraphIndex >= 0 {
-            return speechController.currentParagraphIndex
+        if speechController.isSpeaking, let flat = speechFlatParagraphIndex {
+            return flat
         }
         if let jump = paragraphJumpRequest {
             return jump.index
@@ -879,10 +948,13 @@ struct ReaderView: View {
 
     private var scrollReaderContent: some View {
         NativeReaderTextView(
-            title: content.title,
+            title: windowSections.first?.title ?? content.title,
             paragraphs: scrollModeParagraphs,
             contentFingerprint: scrollContentFingerprint,
-            isAppendedUpdate: !appendedSections.isEmpty,
+            isAppendedUpdate: lastWindowChangeWasAppend,
+            layoutAnchorParagraph: visibleParagraphIndex,
+            layoutAnchorOldParagraph: layoutAnchorOldParagraph,
+            layoutAnchorRevision: layoutAnchorRevision,
             fontFamily: fontFamily,
             fontSize: fontSize,
             lineSpacing: lineSpacing,
@@ -894,7 +966,7 @@ struct ReaderView: View {
             footerHeight: footerHeight,
             textColor: background.uiTextColor(isNight: colorScheme == .dark),
             highlightColor: AppTheme.accentUIColor.withAlphaComponent(background == .dark ? 0.22 : 0.12),
-            currentParagraphIndex: speechController.currentParagraphIndex,
+            currentParagraphIndex: speechFlatParagraphIndex ?? -1,
             scrollTarget: activeScrollTarget,
             scrollRequestKey: nativeScrollRequestKey,
             animatedScrollDuration: autoScrollEnabled ? max(ReaderAutomationPolicy.clampedDelay(autoScrollDelay) * 0.9, 0.25) : (speechController.isSpeaking ? 0.35 : 0),
@@ -910,11 +982,16 @@ struct ReaderView: View {
                 updateVisibleParagraphInScroll(index)
             },
             onNearBottom: {
-                appendNextChapterIfPossible()
+                requestAdjacentChapter(direction: 1)
             },
-            onReachTop: nil,
+            onReachTop: {
+                requestAdjacentChapter(direction: -1)
+            },
+            onNearTop: {
+                requestAdjacentChapter(direction: -1)
+            },
             onReachBottom: {
-                appendNextChapterIfPossible()
+                requestAdjacentChapter(direction: 1)
             },
             pageStepDirection: pageStepDirection,
             pageStepGeneration: pageStepGeneration,
@@ -940,122 +1017,342 @@ struct ReaderView: View {
             }
         }
         .onChange(of: chapterIndex) { _ in
-            appendedSections.removeAll()
-            isAppendingNextChapter = false
-        }
-        .onChange(of: readerModeRawValue) { _ in
-            appendedSections.removeAll()
-            isAppendingNextChapter = false
+            resetWindow()
         }
         .onChange(of: speechController.currentParagraphIndex) { target in
             guard target >= 0 else { return }
-            scheduleReadingPositionPersistence(paragraphIndex: target)
+            let chapter = speechChapterIndex
+            let title = windowSections.first { $0.chapterIndex == chapter }?.title
+                ?? chapterTitle(for: chapter)
+            appState.bookshelfStore.updateReadingProgress(
+                bookID: bookID,
+                chapterIndex: chapter,
+                chapterTitle: title,
+                totalChapters: totalChapters ?? 0,
+                paragraphIndex: target
+            )
         }
     }
 
-    private func appendNextChapterIfPossible() {
-        guard readerMode == .scroll, !isAppendingNextChapter else { return }
-        guard appendedSections.count < 50 else { return }
+    // MARK: - Continuous chapter window
 
-        let nextIndex = (appendedSections.last?.chapterIndex ?? chapterIndex) + 1
-        let maxCount = totalChapters ?? chapters.count
-        guard nextIndex < maxCount else { return }
-        // `onNearBottom` and `onReachBottom` can both fire in one runloop, and
-        // the cached branch appends synchronously. Without an identity check
-        // the same chapter was appended several times and the reader showed
-        // duplicated text.
-        guard appendedSections.last?.chapterIndex != nextIndex else { return }
+    /// Seeds the live window from the chapter the owner opened. The window is
+    /// the single source of truth for scroll, cover and page-curl, so a
+    /// chapter handoff never tears the reader tree down.
+    private func seedWindow() {
+        guard !isWindowSeeded else { return }
+        isWindowSeeded = true
+        layoutAnchorOldParagraph = visibleParagraphIndex
+        windowGeneration &+= 1
+        windowSections = [
+            ReaderChapterSection(
+                chapterIndex: chapterIndex,
+                title: content.title,
+                paragraphs: content.paragraphs
+            )
+        ]
+        windowCurrentChapterIndex = chapterIndex
+        lastWindowChangeWasAppend = false
+        pendingSpeechChapterIndex = nil
+        pendingAutoScrollChapterIndex = nil
+        rebuildWindowPositionMapping()
+        prefetchWindow(around: chapterIndex)
+    }
 
-        onCacheNextChapters?()
+    private func resetWindow() {
+        windowGeneration &+= 1
+        layoutAnchorOldParagraph = visibleParagraphIndex
+        windowLoadingIndices.removeAll()
+        windowSections = [
+            ReaderChapterSection(
+                chapterIndex: chapterIndex,
+                title: content.title,
+                paragraphs: content.paragraphs
+            )
+        ]
+        windowCurrentChapterIndex = chapterIndex
+        lastWindowChangeWasAppend = false
+        pendingSpeechChapterIndex = nil
+        pendingAutoScrollChapterIndex = nil
+        rebuildWindowPositionMapping()
+        prefetchWindow(around: chapterIndex)
+    }
 
-        // 1. Check local text chapters
-        if let book = appState.bookshelfStore.book(id: bookID),
-           let localChapters = book.localChapters,
-           localChapters.indices.contains(nextIndex) {
-            let nextLocal = localChapters[nextIndex]
-            isAppendingNextChapter = true
-            appendedSections.append(ContinuousAppendedSection(
-                chapterIndex: nextIndex,
-                title: nextLocal.title,
-                paragraphs: nextLocal.paragraphs
-            ))
-            isAppendingNextChapter = false
+    /// Warms both sides of the cursor. Forward chapters are requested first
+    /// because reading is overwhelmingly forward, but the previous chapter is
+    /// loaded with the same priority as the next one so a backward swipe never
+    /// waits for a network round trip.
+    private func prefetchWindow(around chapter: Int) {
+        let loaded = Set(windowSections.map(\.chapterIndex)).union(windowLoadingIndices)
+        let order = ReaderChapterWindowPolicy.prefetchOrder(
+            current: chapter,
+            radius: windowRadius,
+            lowerBound: 0,
+            upperBound: windowChapterUpperBound,
+            loaded: loaded
+        )
+        for index in order {
+            loadWindowChapter(index)
+        }
+    }
+
+    /// Boundary handoff shared by the three reading surfaces. A chapter is
+    /// only requested when it is actually missing; already-loaded neighbours
+    /// make the handoff instant and keep the page cursor inside the window.
+    private func requestAdjacentChapter(direction: Int) {
+        guard direction != 0 else { return }
+        requestChapter(windowCurrentChapterIndex + direction)
+    }
+
+    /// Requests one concrete chapter. Page placeholders call this with the
+    /// chapter printed on the placeholder, not with a cursor-relative index,
+    /// so a leading placeholder can never accidentally load the chapter after
+    /// the one the user is waiting for.
+    private func requestChapter(_ index: Int) {
+        guard index >= 0, index < windowChapterUpperBound else { return }
+        if windowSections.contains(where: { $0.chapterIndex == index && $0.isReady }) {
+            prefetchWindow(around: windowCurrentChapterIndex)
             return
         }
+        loadWindowChapter(index)
+        prefetchWindow(around: windowCurrentChapterIndex)
+    }
 
-        // 2. Check online book chapters
-        guard let nextChapter = chapters.first(where: { $0.index == nextIndex }) else { return }
+    private func loadWindowChapter(_ index: Int) {
+        guard index >= 0, index < windowChapterUpperBound else { return }
+        if windowSections.contains(where: { $0.chapterIndex == index && $0.isReady }) { return }
+        guard !windowLoadingIndices.contains(index) else { return }
+
+        let generation = windowGeneration
+        windowLoadingIndices.insert(index)
+
+        Task { @MainActor in
+            let loaded = await fetchWindowChapter(index)
+            guard self.windowGeneration == generation else { return }
+            self.windowLoadingIndices.remove(index)
+            guard let loaded else { return }
+            guard self.acceptsWindowChapter(index) else { return }
+            self.upsertWindowSection(loaded)
+        }
+    }
+
+    @MainActor
+    private func fetchWindowChapter(_ index: Int) async -> ReaderChapterSection? {
+        if let book = appState.bookshelfStore.book(id: bookID),
+           let localChapters = book.localChapters,
+           localChapters.indices.contains(index) {
+            let local = localChapters[index]
+            return ReaderChapterSection(
+                chapterIndex: index,
+                title: local.title,
+                paragraphs: local.paragraphs
+            )
+        }
+
+        guard let chapter = chapters.first(where: { $0.index == index }) else { return nil }
         let sourceURL = appState.bookshelfStore.book(id: bookID)?.sourceURL
             ?? (bookID.contains("|") ? String(bookID.split(separator: "|")[0]) : nil)
-        guard let sourceURL, let source = appState.sourceStore.source(for: sourceURL) else { return }
+        guard let sourceURL, let source = appState.sourceStore.source(for: sourceURL) else { return nil }
         let purifyRules = appState.purifyRuleStore.enabledPatterns
 
         if let cached = appState.chapterContentCacheStore.content(
             sourceURL: source.bookSourceUrl,
-            chapter: nextChapter,
+            chapter: chapter,
             purifyRules: purifyRules
         ) {
-            isAppendingNextChapter = true
-            appendedSections.append(ContinuousAppendedSection(
-                chapterIndex: nextIndex,
-                title: nextChapter.title,
+            return ReaderChapterSection(
+                chapterIndex: index,
+                title: chapter.title,
                 paragraphs: cached.paragraphs
-            ))
-            isAppendingNextChapter = false
-            // Pre-load the chapter after this one in background so it's ready ahead of time!
-            let followingIndex = nextIndex + 1
-            if followingIndex < maxCount,
-               let followingChapter = chapters.first(where: { $0.index == followingIndex }),
-               !appState.chapterContentCacheStore.isCached(sourceURL: source.bookSourceUrl, chapter: followingChapter, purifyRules: purifyRules) {
-                Task {
-                    let engine = appState.engine
-                    let result = await AsyncTimeout.run(seconds: 8) {
-                        await engine.getContent(source: source, chapter: followingChapter)
-                    }
-                    if case .success(let loaded) = result {
-                        await MainActor.run {
-                            appState.chapterContentCacheStore.save(loaded, sourceURL: source.bookSourceUrl, purifyRules: purifyRules)
-                        }
-                    }
-                }
+            )
+        }
+
+        let engine = appState.engine
+        let result = await AsyncTimeout.run(seconds: 12) {
+            await engine.getContent(source: source, chapter: chapter)
+        } ?? .failure(.network("Chapter window load timed out"))
+        guard case .success(let loaded) = result else { return nil }
+        appState.chapterContentCacheStore.save(
+            loaded,
+            sourceURL: source.bookSourceUrl,
+            purifyRules: purifyRules
+        )
+        return ReaderChapterSection(
+            chapterIndex: index,
+            title: loaded.title,
+            paragraphs: loaded.paragraphs
+        )
+    }
+
+    /// The in-flight load may finish after the cursor moved. Accept it when it
+    /// is still inside the radius or directly extends the loaded block; a
+    /// strict radius-only check used to discard the chapter the user had just
+    /// asked for at the boundary.
+    private func acceptsWindowChapter(_ index: Int) -> Bool {
+        if index == windowCurrentChapterIndex { return true }
+        let radiusIndices = ReaderChapterWindowPolicy.indices(
+            around: windowCurrentChapterIndex,
+            radius: windowRadius,
+            lowerBound: 0,
+            upperBound: windowChapterUpperBound
+        )
+        if radiusIndices.contains(index) { return true }
+        let loaded = windowSections.map(\.chapterIndex)
+        guard let first = loaded.min(), let last = loaded.max() else { return true }
+        return index == first - 1 || index == last + 1
+    }
+
+    private func upsertWindowSection(_ section: ReaderChapterSection) {
+        let anchor = scrollAnchorPosition()
+        let oldMax = windowSections.map(\.chapterIndex).max() ?? windowCurrentChapterIndex
+        insertWindowSection(section)
+        let appended = section.chapterIndex > oldMax
+        applyWindowChange(anchor: anchor, appended: appended)
+        rebuildWindowPositionMapping()
+        scheduleWindowRebuild()
+        trimWindowIfNeeded()
+        resumePendingContinuation(for: section.chapterIndex)
+    }
+
+    /// Resumes a speech or auto-scroll handoff that was waiting for this
+    /// chapter. The reader stays on the same window and native surface.
+    private func resumePendingContinuation(for chapter: Int) {
+        guard windowSections.contains(where: { $0.chapterIndex == chapter && $0.isReady }) else { return }
+        if pendingSpeechChapterIndex == chapter {
+            pendingSpeechChapterIndex = nil
+            activateWindowChapter(chapter)
+            DispatchQueue.main.async { beginSpeechPlayback() }
+        }
+        if pendingAutoScrollChapterIndex == chapter {
+            pendingAutoScrollChapterIndex = nil
+            activateWindowChapter(chapter)
+            DispatchQueue.main.async { startAutoScroll() }
+        }
+    }
+
+    private func insertWindowSection(_ section: ReaderChapterSection) {
+        if let existing = windowSections.firstIndex(where: { $0.chapterIndex == section.chapterIndex }) {
+            windowSections[existing] = section
+        } else {
+            windowSections.append(section)
+            windowSections.sort { $0.chapterIndex < $1.chapterIndex }
+        }
+    }
+
+    /// The paragraph currently under the reader's eye, expressed in stable
+    /// chapter-local coordinates. Re-resolving that position in the new window
+    /// is what keeps a prepended chapter from moving the visible line, even
+    /// when SwiftUI coalesces several window mutations into one update.
+    private func scrollAnchorPosition() -> ReaderChapterPosition? {
+        guard !windowSections.isEmpty, windowLayout.totalCount > 0 else { return nil }
+        let flat = min(max(visibleParagraphIndex, 0), windowLayout.totalCount - 1)
+        let position = resolvedReadingPosition(forFlatIndex: flat)
+        return ReaderChapterPosition(
+            chapterIndex: position.chapterIndex,
+            paragraphIndex: position.paragraphIndex
+        )
+    }
+
+    private func applyWindowChange(anchor: ReaderChapterPosition?, appended: Bool) {
+        lastWindowChangeWasAppend = appended
+        guard !appended, let anchor else { return }
+        layoutAnchorOldParagraph = visibleParagraphIndex
+        guard let newFlat = windowLayout.flatIndex(
+            chapterIndex: anchor.chapterIndex,
+            paragraphIndex: anchor.paragraphIndex
+        ) else {
+            let fallback = min(max(visibleParagraphIndex, 0), max(windowLayout.totalCount - 1, 0))
+            if fallback != visibleParagraphIndex {
+                visibleParagraphIndex = fallback
+                scrollParagraphTarget = fallback
+                layoutAnchorRevision &+= 1
             }
             return
         }
+        guard newFlat != visibleParagraphIndex else { return }
+        let delta = newFlat - visibleParagraphIndex
+        visibleParagraphIndex = newFlat
+        scrollParagraphTarget = newFlat
+        if let jump = paragraphJumpRequest {
+            paragraphJumpRequest = ParagraphJumpRequest(index: max(jump.index + delta, 0))
+        }
+        layoutAnchorRevision &+= 1
+    }
 
-        // 3. Not in cache: fetch in background Task
-        isAppendingNextChapter = true
-        let originChapterIndex = chapterIndex
-        Task {
-            let engine = appState.engine
-            let result = await AsyncTimeout.run(seconds: 12) {
-                await engine.getContent(source: source, chapter: nextChapter)
-            }
-            await MainActor.run {
-                self.isAppendingNextChapter = false
-                // The chapter can change while a slow source is still
-                // answering.  Appending that stale chapter into the new one
-                // showed the wrong text after the handoff.
-                guard self.readerMode == .scroll,
-                      self.chapterIndex == originChapterIndex,
-                      self.appendedSections.count < 50,
-                      self.appendedSections.last?.chapterIndex != nextIndex else { return }
-                if case .success(let loaded) = result {
-                    self.appState.chapterContentCacheStore.save(loaded, sourceURL: source.bookSourceUrl, purifyRules: purifyRules)
-                    self.appendedSections.append(ContinuousAppendedSection(
-                        chapterIndex: nextIndex,
-                        title: nextChapter.title,
-                        paragraphs: loaded.paragraphs
-                    ))
+    /// Keeps the live window bounded. Chapters dropped from memory are still on
+    /// disk: opening one again is a synchronous cache hit, not a new request.
+    /// In-flight chapters and the cursor chapter are never evicted.
+    private func trimWindowIfNeeded() {
+        let keep = ReaderChapterWindowPolicy.retainedIndices(
+            around: windowCurrentChapterIndex,
+            radius: windowRadius,
+            lowerBound: 0,
+            upperBound: windowChapterUpperBound,
+            loading: windowLoadingIndices
+        )
+        let removed = windowSections.contains { !keep.contains($0.chapterIndex) }
+        guard removed else { return }
+        let anchor = scrollAnchorPosition()
+        windowSections.removeAll { !keep.contains($0.chapterIndex) }
+        applyWindowChange(anchor: anchor, appended: false)
+        rebuildWindowPositionMapping()
+        scheduleWindowRebuild()
+    }
+
+    private func rebuildWindowPositionMapping() {
+        let layout = windowLayout
+        positionMappingCache = ReaderPositionMapping(
+            paragraphCount: layout.totalCount,
+            pageFirstParagraphs: ReaderPositionMapping.pageStarts(
+                from: pagedBlocksCache.map { block in
+                    guard !block.isPlaceholder,
+                          let start = layout.paragraphStart(chapterIndex: block.chapterIndex) else { return nil }
+                    return start + (block.firstParagraphIndex ?? 0)
                 }
-            }
+            )
+        )
+    }
+
+    private func scheduleWindowRebuild() {
+        guard readerMode != .scroll else { return }
+        pageLayoutTask?.cancel()
+        pageLayoutTask = Task { @MainActor in
+            try? await Task.sleep(nanoseconds: 30_000_000)
+            guard !Task.isCancelled else { return }
+            rebuildPagedBlocksCache()
+            pageLayoutTask = nil
         }
     }
 
     private func updateVisibleParagraphInScroll(_ index: Int) {
-        guard visibleParagraphIndex != index else { return }
-        visibleParagraphIndex = index
-        let resolved = resolvedReadingPosition(forFlatIndex: index)
-        scheduleReadingPositionPersistence(paragraphIndex: resolved.paragraphIndex)
+        let total = windowLayout.totalCount
+        guard total > 0 else { return }
+        let safeIndex = min(max(index, 0), total - 1)
+        guard visibleParagraphIndex != safeIndex else { return }
+        visibleParagraphIndex = safeIndex
+        let resolved = resolvedReadingPosition(forFlatIndex: safeIndex)
+        if resolved.chapterIndex != windowCurrentChapterIndex {
+            windowCurrentChapterIndex = resolved.chapterIndex
+            prefetchWindow(around: resolved.chapterIndex)
+            trimWindowIfNeeded()
+        }
+        let final = resolvedReadingPosition(forFlatIndex: visibleParagraphIndex)
+        scheduleReadingPositionPersistence(paragraphIndex: final.paragraphIndex)
+    }
+
+    /// Adopts the chapter shown by a freshly built page model. Page-curl moves
+    /// programmatically through `setViewControllers`, which does not fire the
+    /// user-transition delegate, so the rebuild path must advance the cursor
+    /// itself for prefetch/trim to follow the reader.
+    private func syncWindowCursorToVisiblePage() {
+        guard readerMode != .scroll,
+              pagedBlocksCache.indices.contains(pagedPageIndex) else { return }
+        let block = pagedBlocksCache[pagedPageIndex]
+        guard !block.isPlaceholder else { return }
+        guard block.chapterIndex >= 0, block.chapterIndex != windowCurrentChapterIndex else { return }
+        windowCurrentChapterIndex = block.chapterIndex
+        prefetchWindow(around: block.chapterIndex)
+        trimWindowIfNeeded()
     }
 
     private var nativeScrollRequestKey: String {
@@ -1064,7 +1361,7 @@ struct ReaderView: View {
             String(scrollJumpGeneration),
             String(pagedPageIndex),
             paragraphJumpRequest?.id.uuidString ?? "none",
-            String(speechController.currentParagraphIndex)
+            String(speechFlatParagraphIndex ?? -1)
         ].joined(separator: "|")
     }
 
@@ -1093,8 +1390,8 @@ struct ReaderView: View {
             }
         )
         .onChange(of: speechController.currentParagraphIndex) { target in
-            guard target >= 0 else { return }
-            pagedPageIndex = pageIndex(containingParagraph: target)
+            guard target >= 0, let flat = speechFlatParagraphIndex else { return }
+            pagedPageIndex = pageIndex(containingParagraph: flat)
         }
     }
 
@@ -1110,8 +1407,8 @@ struct ReaderView: View {
             updatePagedVisibleParagraph(pageIndex: target)
         }
         .onChange(of: speechController.currentParagraphIndex) { target in
-            guard target >= 0 else { return }
-            pagedPageIndex = pageIndex(containingParagraph: target)
+            guard target >= 0, let flat = speechFlatParagraphIndex else { return }
+            pagedPageIndex = pageIndex(containingParagraph: flat)
         }
     }
 
@@ -1176,8 +1473,9 @@ struct ReaderView: View {
                 updatePagedVisibleParagraph(pageIndex: target)
             }
             .onChange(of: speechController.currentParagraphIndex) { target in
-                guard target >= 0, !coverIsAnimating, coverDragTranslation == 0 else { return }
-                pagedPageIndex = pageIndex(containingParagraph: target)
+                guard target >= 0, let flat = speechFlatParagraphIndex,
+                      !coverIsAnimating, coverDragTranslation == 0 else { return }
+                pagedPageIndex = pageIndex(containingParagraph: flat)
             }
         }
     }
@@ -1219,29 +1517,67 @@ struct ReaderView: View {
         }
     }
 
+    @ViewBuilder
     private func readerPage(for page: ReaderPageBlock) -> some View {
-        pageSurface {
-            VStack(alignment: .leading, spacing: 0) {
-                if page.includesTitle {
-                    Text(content.title)
-                        .font(fontFamily.swiftUIFont(size: CGFloat(fontSize + 8), weight: .bold))
-                        .foregroundStyle(readerThemeTextColor)
-                        .padding(.bottom, CGFloat(titleSpacing))
-                        .readerSelectableText(textSelectionEnabled)
-                }
+        if page.isPlaceholder {
+            chapterPlaceholderPage(page)
+        } else {
+            pageSurface {
+                VStack(alignment: .leading, spacing: 0) {
+                    if page.includesTitle {
+                        Text(page.chapterTitle.isEmpty ? content.title : page.chapterTitle)
+                            .font(fontFamily.swiftUIFont(size: CGFloat(fontSize + 8), weight: .bold))
+                            .foregroundStyle(readerThemeTextColor)
+                            .padding(.bottom, CGFloat(titleSpacing))
+                            .readerSelectableText(textSelectionEnabled)
+                    }
 
-                ForEach(page.paragraphs) { entry in
-                    paragraphText(entry)
-                        .padding(
-                            .top,
-                            (page.paragraphs.first.map { $0.id == entry.id } ?? true)
-                                ? 0
-                                : (entry.isContinuation ? 0 : CGFloat(paragraphSpacing))
-                        )
+                    ForEach(page.paragraphs) { entry in
+                        paragraphText(entry)
+                            .padding(
+                                .top,
+                                (page.paragraphs.first.map { $0.id == entry.id } ?? true)
+                                    ? 0
+                                    : (entry.isContinuation ? 0 : CGFloat(paragraphSpacing))
+                            )
+                    }
                 }
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                .clipped()
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-            .clipped()
+        }
+    }
+
+    /// The page shown while the neighbouring chapter is still downloading.
+    /// Without it the page curl/cover surfaces hit an index edge and bounced,
+    /// which forced the reader to leave the reader and pick the next chapter
+    /// from the table of contents.
+    private func chapterPlaceholderPage(_ page: ReaderPageBlock) -> some View {
+        pageSurface {
+            VStack(spacing: 12) {
+                ProgressView()
+                Text(
+                    page.placeholderDirection < 0
+                        ? "正在加载上一章"
+                        : (page.placeholderDirection > 0 ? "正在加载下一章" : "正在加载章节")
+                )
+                .font(.footnote.weight(.semibold))
+                .foregroundStyle(readerThemeTextColor.opacity(0.65))
+                if !page.chapterTitle.isEmpty {
+                    Text(page.chapterTitle)
+                        .font(.subheadline)
+                        .foregroundStyle(readerThemeTextColor.opacity(0.82))
+                        .multilineTextAlignment(.center)
+                        .lineLimit(2)
+                }
+                Button("重新加载") {
+                    loadWindowChapter(page.chapterIndex)
+                }
+                .font(.footnote.weight(.semibold))
+                .buttonStyle(.bordered)
+                .tint(AppTheme.accent)
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
     }
 
@@ -1279,20 +1615,23 @@ struct ReaderView: View {
         if let url = ReaderImageSizingPolicy.imageURL(in: entry.text) {
             illustrationCard(url: url)
         } else {
-            standardParagraphText(entry.text, index: entry.index)
+            standardParagraphText(entry.text, index: entry.index, chapterIndex: entry.chapterIndex)
         }
     }
 
-    private func standardParagraphText(_ paragraph: String, index: Int) -> some View {
-        Text(paragraph)
+    private func standardParagraphText(_ paragraph: String, index: Int, chapterIndex: Int) -> some View {
+        let ownerChapter = chapterIndex >= 0 ? chapterIndex : windowCurrentChapterIndex
+        let highlighted = speechChapterIndex == ownerChapter
+            && speechController.currentParagraphIndex == index
+        return Text(paragraph)
             .font(fontFamily.swiftUIFont(size: CGFloat(fontSize), weight: .regular))
             .foregroundStyle(readerThemeTextColor)
             .kerning(letterSpacing)
             .lineSpacing(lineSpacing)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.vertical, speechController.currentParagraphIndex == index ? 6 : 0)
+            .padding(.vertical, highlighted ? 6 : 0)
             .background {
-                if speechController.currentParagraphIndex == index {
+                if highlighted {
                     RoundedRectangle(cornerRadius: 10, style: .continuous)
                         .fill(AppTheme.accent.opacity(background == .dark ? 0.22 : 0.12))
                 }
@@ -1432,9 +1771,9 @@ struct ReaderView: View {
                     if let onCacheNextChapters {
                         Button {
                             closeReaderChrome()
-                            onCacheNextChapters()
+                            onCacheNextChapters(windowCurrentChapterIndex)
                         } label: {
-                            Label("缓存后续章节", systemImage: "square.and.arrow.down")
+                            Label("缓存前后章节", systemImage: "square.and.arrow.down")
                         }
                     }
 
@@ -2355,15 +2694,11 @@ struct ReaderView: View {
                                 Button {
                                     showChapterList = false
                                     presentOverlay()
-                                    if let onSelectChapterWithPosition {
-                                        onSelectChapterWithPosition(chapter, 0)
-                                    } else {
-                                        onSelectChapter?(chapter)
-                                    }
+                                    selectChapter(index: chapter.index)
                                 } label: {
                                     chapterRow(chapter)
                                 }
-                                .disabled(!canJumpToChapter || chapter.index == chapterIndex)
+                                .disabled(chapter.index == currentDisplayChapterIndex || !canJump(to: chapter.index))
                                 .listRowBackground(Color.clear)
                                 .listRowSeparatorTint(readerThemeTextColor.opacity(0.15))
                             }
@@ -2415,14 +2750,14 @@ struct ReaderView: View {
         HStack(spacing: 12) {
             Text("\(chapter.index + 1)")
                 .font(.caption.weight(.semibold).monospacedDigit())
-                .foregroundStyle(chapter.index == chapterIndex ? AppTheme.accent : readerThemeTextColor.opacity(0.55))
+                .foregroundStyle(chapter.index == currentDisplayChapterIndex ? AppTheme.accent : readerThemeTextColor.opacity(0.55))
                 .frame(width: 48, alignment: .leading)
             Text(chapter.title)
-                .foregroundStyle(chapter.index == chapterIndex ? AppTheme.accent : readerThemeTextColor)
-                .fontWeight(chapter.index == chapterIndex ? .semibold : .regular)
+                .foregroundStyle(chapter.index == currentDisplayChapterIndex ? AppTheme.accent : readerThemeTextColor)
+                .fontWeight(chapter.index == currentDisplayChapterIndex ? .semibold : .regular)
                 .lineLimit(1)
             Spacer()
-            if chapter.index == chapterIndex {
+            if chapter.index == currentDisplayChapterIndex {
                 Image(systemName: "checkmark.circle.fill")
                     .foregroundStyle(AppTheme.accent)
             }
@@ -2539,7 +2874,7 @@ struct ReaderView: View {
                                         .lineLimit(2)
                                 }
                                 Spacer()
-                                if bookmark.chapterIndex == chapterIndex {
+                                if bookmark.chapterIndex == currentDisplayChapterIndex {
                                     Image(systemName: "checkmark.circle.fill")
                                         .foregroundStyle(AppTheme.accent)
                                 } else {
@@ -2549,7 +2884,11 @@ struct ReaderView: View {
                                 }
                             }
                         }
-                        .disabled(bookmark.chapterIndex != chapterIndex && !canJumpToChapter)
+                        .disabled(
+                            bookmark.chapterIndex == currentDisplayChapterIndex
+                                ? false
+                                : !canJump(to: bookmark.chapterIndex)
+                        )
                         .listRowBackground(Color.clear)
                         .listRowSeparatorTint(readerThemeTextColor.opacity(0.15))
                         .swipeActions(edge: .leading) {
@@ -2596,65 +2935,114 @@ struct ReaderView: View {
     }
 
     private func isCurrentBookmark(_ bookmark: ReaderBookmark) -> Bool {
-        bookmark.chapterIndex == chapterIndex
+        bookmark.chapterIndex == currentDisplayChapterIndex
             && bookmark.paragraphIndex == currentBookmarkParagraphIndex
     }
 
     private func jumpToBookmark(_ bookmark: ReaderBookmark) {
         showBookmarks = false
         closeReaderChrome()
-        if bookmark.chapterIndex == chapterIndex {
-            jumpToParagraph(bookmark.paragraphIndex)
+        if windowSections.contains(where: { $0.chapterIndex == bookmark.chapterIndex && $0.isReady }) {
+            jumpToWindowChapter(bookmark.chapterIndex, paragraphIndex: bookmark.paragraphIndex ?? 0)
+            return
+        }
+        guard let target = chapters.first(where: { $0.index == bookmark.chapterIndex }) else { return }
+        let paragraphIndex = bookmark.paragraphIndex
+        if let paragraphIndex {
+            appState.bookshelfStore.updateReadingProgress(
+                bookID: bookID,
+                chapterIndex: bookmark.chapterIndex,
+                chapterTitle: bookmark.chapterTitle,
+                totalChapters: totalChapters ?? 0,
+                paragraphIndex: paragraphIndex
+            )
+        }
+        // Owners that expose the position-aware entry point can land on
+        // the bookmarked paragraph directly; the plain callback always
+        // started the chapter at its first paragraph.
+        if let onSelectChapterWithPosition {
+            onSelectChapterWithPosition(target, paragraphIndex ?? 0)
         } else {
-            guard let target = chapters.first(where: { $0.index == bookmark.chapterIndex }) else { return }
-            let paragraphIndex = bookmark.paragraphIndex
-            if let paragraphIndex {
-                appState.bookshelfStore.updateReadingProgress(
-                    bookID: bookID,
-                    chapterIndex: bookmark.chapterIndex,
-                    chapterTitle: bookmark.chapterTitle,
-                    totalChapters: totalChapters ?? 0,
-                    paragraphIndex: paragraphIndex
-                )
-            }
-            // Owners that expose the position-aware entry point can land on
-            // the bookmarked paragraph directly; the plain callback always
-            // started the chapter at its first paragraph.
-            if let onSelectChapterWithPosition {
-                onSelectChapterWithPosition(target, paragraphIndex ?? 0)
-            } else {
-                onSelectChapter?(target)
-            }
+            onSelectChapter?(target)
         }
     }
 
     private func jumpToParagraph(_ paragraphIndex: Int?) {
         guard let paragraphIndex else { return }
-        let safeIndex = min(max(paragraphIndex, 0), max(content.paragraphs.count - 1, 0))
-        guard safeIndex != visibleParagraphIndex else { return }
-        visibleParagraphIndex = safeIndex
+        guard let flat = windowLayout.flatIndex(
+            chapterIndex: windowCurrentChapterIndex,
+            paragraphIndex: paragraphIndex
+        ) else { return }
+        jumpToWindowFlat(flat, paragraphIndex: paragraphIndex)
+    }
+
+    /// Moves both surfaces to a flat paragraph index in the live window.
+    private func jumpToWindowFlat(_ flatIndex: Int, paragraphIndex: Int) {
+        let safeFlat = min(max(flatIndex, 0), max(windowLayout.totalCount - 1, 0))
+        guard safeFlat != visibleParagraphIndex else { return }
+        visibleParagraphIndex = safeFlat
         switch readerMode {
         case .scroll:
-            scrollParagraphTarget = safeIndex
+            scrollParagraphTarget = safeFlat
             scrollJumpGeneration &+= 1
-            paragraphJumpRequest = ParagraphJumpRequest(index: safeIndex)
+            paragraphJumpRequest = ParagraphJumpRequest(index: safeFlat)
         case .pageTurn, .cover, .pageCurl:
-            pagedPageIndex = pageIndex(containingParagraph: safeIndex)
+            pagedPageIndex = pageIndex(containingParagraph: safeFlat)
         }
-        persistReadingPosition(paragraphIndexOverride: safeIndex)
+        persistReadingPosition(paragraphIndexOverride: paragraphIndex)
+    }
+
+    private func activateWindowChapter(_ index: Int, startAtEnd: Bool = false) {
+        guard let section = windowSections.first(where: { $0.chapterIndex == index && $0.isReady }) else { return }
+        let paragraph = startAtEnd ? max(section.paragraphs.count - 1, 0) : 0
+        jumpToWindowChapter(index, paragraphIndex: paragraph)
+    }
+
+    /// Jumps inside the already-loaded window without asking the owner to
+    /// rebuild the reader. This is what makes TOC and bookmark navigation
+    /// instant while the user has prefetched neighbours in memory.
+    private func jumpToWindowChapter(_ index: Int, paragraphIndex: Int) {
+        guard let section = windowSections.first(where: { $0.chapterIndex == index && $0.isReady }) else { return }
+        closeReaderChrome()
+        stopAutoScroll()
+        stopSpeechPlayback()
+        windowCurrentChapterIndex = index
+        prefetchWindow(around: index)
+        let paragraph = min(max(paragraphIndex, 0), max(section.paragraphs.count - 1, 0))
+        guard let flat = windowLayout.flatIndex(chapterIndex: index, paragraphIndex: paragraph) else { return }
+        jumpToWindowFlat(flat, paragraphIndex: paragraph)
+        trimWindowIfNeeded()
     }
 
     private var canJumpToChapter: Bool {
-        onSelectChapter != nil || onSelectChapterWithPosition != nil
+        onSelectChapter != nil || onSelectChapterWithPosition != nil || !windowSections.isEmpty
+    }
+
+    /// A TOC row is usable when the chapter is already live or when the owner
+    /// can load it. Window-loaded chapters never rebuild the reader.
+    private func canJump(to targetIndex: Int) -> Bool {
+        if windowSections.contains(where: { $0.chapterIndex == targetIndex && $0.isReady }) {
+            return true
+        }
+        return onSelectChapter != nil || onSelectChapterWithPosition != nil
     }
 
     private func canSelectRelativeChapter(offset: Int) -> Bool {
+        let target = windowCurrentChapterIndex + offset
+        if windowSections.contains(where: { $0.chapterIndex == target && $0.isReady }) {
+            return true
+        }
         guard onSelectChapter != nil || onSelectChapterWithPosition != nil else { return false }
-        return chapters.contains { $0.index == chapterIndex + offset }
+        return chapters.contains { $0.index == target }
     }
 
     private func selectRelativeChapter(offset: Int, startAtEnd: Bool = false) {
-        guard let target = chapters.first(where: { $0.index == chapterIndex + offset }) else { return }
+        let targetIndex = windowCurrentChapterIndex + offset
+        if windowSections.contains(where: { $0.chapterIndex == targetIndex && $0.isReady }) {
+            activateWindowChapter(targetIndex, startAtEnd: startAtEnd)
+            return
+        }
+        guard let target = chapters.first(where: { $0.index == targetIndex }) else { return }
         closeReaderChrome()
         stopAutoScroll()
         stopSpeechPlayback()
@@ -2666,6 +3054,10 @@ struct ReaderView: View {
     }
 
     private func selectChapter(index: Int) {
+        if windowSections.contains(where: { $0.chapterIndex == index && $0.isReady }) {
+            activateWindowChapter(index)
+            return
+        }
         guard let target = chapters.first(where: { $0.index == index }) ?? (chapters.indices.contains(index) ? chapters[index] : nil) else { return }
         closeReaderChrome()
         stopAutoScroll()
@@ -2800,14 +3192,18 @@ struct ReaderView: View {
     }
 
     private func toggleCurrentBookmark(openList: Bool = true) {
+        let targetChapter = currentDisplayChapterIndex
+        let targetTitle = currentDisplayChapterTitle
         let paragraphIndex = currentBookmarkParagraphIndex
-        let snippet = content.paragraphs.indices.contains(paragraphIndex)
-            ? content.paragraphs[paragraphIndex]
-            : content.title
+        let paragraphs = windowSections.first(where: { $0.chapterIndex == targetChapter })?.paragraphs
+            ?? (targetChapter == chapterIndex ? content.paragraphs : [])
+        let snippet = paragraphs.indices.contains(paragraphIndex)
+            ? paragraphs[paragraphIndex]
+            : targetTitle
         appState.bookshelfStore.toggleBookmark(
             bookID: bookID,
-            chapterIndex: chapterIndex,
-            chapterTitle: content.title,
+            chapterIndex: targetChapter,
+            chapterTitle: targetTitle,
             paragraphIndex: paragraphIndex,
             snippet: snippet
         )
@@ -2837,8 +3233,9 @@ struct ReaderView: View {
                         .foregroundStyle(.primary)
                 }
 
-                if speechController.currentParagraphIndex >= 0 && speechController.currentParagraphIndex < content.paragraphs.count {
-                    Text(content.paragraphs[speechController.currentParagraphIndex])
+                if let flat = speechFlatParagraphIndex,
+                   scrollModeParagraphs.indices.contains(flat) {
+                    Text(scrollModeParagraphs[flat])
                         .font(.system(size: 10))
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
@@ -2972,12 +3369,34 @@ struct ReaderView: View {
 
     private func beginSpeechPlayback() {
         stopAutoScroll()
+        // Speech follows the chapter currently in the window, not the chapter
+        // the owner originally opened. Using `content` here read the wrong
+        // paragraph array after a cross-chapter swipe.
+        let targetChapterIndex = windowCurrentChapterIndex
+        let targetSection = windowSections.first {
+            $0.chapterIndex == targetChapterIndex && $0.isReady
+        }
+        let targetTitle: String
+        let targetParagraphs: [String]
+        if let targetSection {
+            targetTitle = targetSection.title
+            targetParagraphs = targetSection.paragraphs
+        } else if targetChapterIndex == chapterIndex {
+            targetTitle = content.title
+            targetParagraphs = content.paragraphs
+        } else {
+            requestChapter(targetChapterIndex)
+            return
+        }
+        guard !targetParagraphs.isEmpty else { return }
+
+        speechChapterIndex = targetChapterIndex
         let coordinator = playbackCoordinator
         let controller = speechController
         let progressStore = appState.bookshelfStore
         let currentBookID = bookID
-        let currentChapterIndex = chapterIndex
-        let currentChapterTitle = content.title
+        let currentChapterIndex = targetChapterIndex
+        let currentChapterTitle = targetTitle
         let currentTotalChapters = totalChapters ?? 0
         let token = coordinator.beginSpeech()
         speechController.onFinished = { [onSpeechFinished] in
@@ -3002,10 +3421,25 @@ struct ReaderView: View {
                     appState.record(DiagnosticEvent(level: .info, stage: "reader.sleepTimer", sourceName: currentChapterTitle, message: "睡眠定时已生效：当前章节播放完毕已自动停止"))
                     return
                 }
-                if let onSpeechFinished {
+                let nextIndex = currentChapterIndex + 1
+                guard nextIndex < windowChapterUpperBound else { return }
+                let nextIsLive = windowSections.contains {
+                    $0.chapterIndex == nextIndex && $0.isReady
+                }
+                if nextIsLive {
+                    activateWindowChapter(nextIndex)
+                    DispatchQueue.main.async { beginSpeechPlayback() }
+                } else if currentChapterIndex == chapterIndex, let onSpeechFinished {
+                    // The owner still points at this reader's opening
+                    // chapter, so its handoff target is correct and it can
+                    // recreate the reader at the next chapter.
                     onSpeechFinished()
-                } else if canSelectRelativeChapter(offset: 1) {
-                    selectRelativeChapter(offset: 1)
+                } else {
+                    // The cursor moved inside the window; the owner's
+                    // `effectiveChapter` is stale. Download the next chapter
+                    // and resume on the same surface.
+                    pendingSpeechChapterIndex = nextIndex
+                    requestChapter(nextIndex)
                 }
             }
         }
@@ -3014,10 +3448,13 @@ struct ReaderView: View {
         // is throttled for performance. This is the latest known visible
         // paragraph (or the first paragraph on the current page), so speech
         // never restarts from chapter zero after a user scrolls.
-        let startParagraph = currentParagraphIndexForPersistence()
+        let startParagraph = min(
+            max(resolvedReadingPosition(forFlatIndex: visibleParagraphIndex).paragraphIndex, 0),
+            max(targetParagraphs.count - 1, 0)
+        )
         speechController.speak(
-            title: content.title,
-            paragraphs: content.paragraphs,
+            title: targetTitle,
+            paragraphs: targetParagraphs,
             startParagraphIndex: startParagraph,
             includeTitle: false,
             rate: Float(ttsRate),
@@ -3030,6 +3467,7 @@ struct ReaderView: View {
     /// AVSpeech controller and the generation coordinator in sync prevents a
     /// late completion callback from reviving a newer reader session.
     private func stopSpeechPlayback() {
+        pendingSpeechChapterIndex = nil
         speechController.stop()
         playbackCoordinator.stop()
         speechPausedForScene = false
@@ -3087,9 +3525,37 @@ struct ReaderView: View {
                             visibleParagraphIndex = positionMapping.paragraph(for: target, mode: readerMode)
                         }
                     case .nextChapter:
-                        stopAutoScroll()
-                        onAutoScrollFinished?()
-                        selectRelativeChapter(offset: 1)
+                        let cursorChapter = windowCurrentChapterIndex
+                        let nextIndex = cursorChapter + 1
+                        guard nextIndex < windowChapterUpperBound else {
+                            stopAutoScroll()
+                            return
+                        }
+                        let nextIsLive = windowSections.contains {
+                            $0.chapterIndex == nextIndex && $0.isReady
+                        }
+                        if nextIsLive {
+                            // The window already holds the next chapter: keep
+                            // the same reader/native surface alive and resume
+                            // the timer at the new chapter head.
+                            selectRelativeChapter(offset: 1)
+                            DispatchQueue.main.async {
+                                startAutoScroll()
+                            }
+                        } else if cursorChapter == chapterIndex, onAutoScrollFinished != nil {
+                            // The owner's handoff target (opening chapter + 1)
+                            // is only valid while the cursor still sits on the
+                            // opening chapter.
+                            stopAutoScroll()
+                            onAutoScrollFinished?()
+                            selectRelativeChapter(offset: 1)
+                        } else {
+                            // Cursor moved inside the window; download the next
+                            // chapter and resume on the same surface.
+                            stopAutoScroll()
+                            pendingAutoScrollChapterIndex = nextIndex
+                            requestChapter(nextIndex)
+                        }
                     case .stop:
                         stopAutoScroll()
                     }
@@ -3099,6 +3565,7 @@ struct ReaderView: View {
     }
 
     private func stopAutoScroll(clearScenePause: Bool = true) {
+        pendingAutoScrollChapterIndex = nil
         if clearScenePause {
             autoScrollPausedForScene = false
         }
@@ -3154,10 +3621,10 @@ struct ReaderView: View {
     private func updateVisibleParagraph(_ index: Int) {
         guard readerMode == .scroll,
               !autoScrollEnabled,
-              content.paragraphs.indices.contains(index),
-              index != visibleParagraphIndex else { return }
-        visibleParagraphIndex = index
-        scheduleReadingPositionPersistence(paragraphIndex: index)
+              windowLayout.totalCount > 0 else { return }
+        let flat = min(max(index, 0), windowLayout.totalCount - 1)
+        guard flat != visibleParagraphIndex else { return }
+        updateVisibleParagraphInScroll(flat)
     }
 
     private func initialAutoScrollTarget() -> (paragraph: Int, page: Int) {
@@ -3172,33 +3639,29 @@ struct ReaderView: View {
             }
             paragraphIndex = storedParagraphIndex
         }
-        let safeParagraph = positionMapping.clampParagraph(paragraphIndex)
+        let flat = windowLayout.flatIndex(
+            chapterIndex: chapterIndex,
+            paragraphIndex: paragraphIndex
+        ) ?? positionMapping.clampParagraph(paragraphIndex)
+        let safeParagraph = positionMapping.clampParagraph(flat)
         visibleParagraphIndex = safeParagraph
         return (safeParagraph, positionMapping.page(containingParagraph: safeParagraph))
     }
 
     private func persistReadingPosition(paragraphIndexOverride: Int? = nil) {
-        let saveChapterIndex: Int
-        let saveChapterTitle: String
-        let paragraphIndex: Int
-        if readerMode == .scroll && !appendedSections.isEmpty {
-            let resolved = resolvedReadingPosition(forFlatIndex: visibleParagraphIndex)
-            saveChapterIndex = resolved.chapterIndex
-            saveChapterTitle = resolved.chapterTitle
-            paragraphIndex = paragraphIndexOverride ?? resolved.paragraphIndex
-        } else {
-            saveChapterIndex = chapterIndex
-            saveChapterTitle = content.title
-            if let paragraphIndexOverride {
-                paragraphIndex = min(max(paragraphIndexOverride, 0), max(content.paragraphs.count - 1, 0))
-            } else {
-                paragraphIndex = currentParagraphIndexForPersistence()
-            }
+        let resolved: (chapterIndex: Int, chapterTitle: String, paragraphIndex: Int)
+        switch readerMode {
+        case .scroll:
+            resolved = resolvedReadingPosition(forFlatIndex: visibleParagraphIndex)
+        case .pageTurn, .cover, .pageCurl:
+            resolved = currentPagedReadingPosition()
+                ?? resolvedReadingPosition(forFlatIndex: visibleParagraphIndex)
         }
+        let paragraphIndex = paragraphIndexOverride ?? resolved.paragraphIndex
         appState.bookshelfStore.updateReadingProgress(
             bookID: bookID,
-            chapterIndex: saveChapterIndex,
-            chapterTitle: saveChapterTitle,
+            chapterIndex: resolved.chapterIndex,
+            chapterTitle: resolved.chapterTitle,
             totalChapters: totalChapters ?? 0,
             paragraphIndex: paragraphIndex
         )
@@ -3237,26 +3700,51 @@ struct ReaderView: View {
         }
     }
 
+    /// Resolves the page cursor to a stable reading position. Placeholder
+    /// pages intentionally report the chapter they are loading at paragraph
+    /// zero; letting `positionMapping` resolve them would report the next
+    /// loaded chapter and corrupt the saved progress.
+    private func currentPagedReadingPosition() -> (chapterIndex: Int, chapterTitle: String, paragraphIndex: Int)? {
+        guard !pagedBlocks.isEmpty, pagedBlocks.indices.contains(pagedPageIndex) else { return nil }
+        let block = pagedBlocks[pagedPageIndex]
+        guard block.chapterIndex >= 0 else { return nil }
+        if block.isPlaceholder {
+            return (block.chapterIndex, block.chapterTitle, 0)
+        }
+        let flat = positionMapping.paragraph(forPage: pagedPageIndex)
+        return resolvedReadingPosition(forFlatIndex: flat)
+    }
+
     private func currentParagraphIndexForPersistence() -> Int {
-        guard !content.paragraphs.isEmpty else { return 0 }
+        guard windowLayout.totalCount > 0 else { return 0 }
         switch readerMode {
         case .scroll:
-            if !appendedSections.isEmpty {
-                let resolved = resolvedReadingPosition(forFlatIndex: visibleParagraphIndex)
-                return resolved.paragraphIndex
-            }
-            return min(max(visibleParagraphIndex, 0), content.paragraphs.count - 1)
+            return resolvedReadingPosition(forFlatIndex: visibleParagraphIndex).paragraphIndex
         case .pageTurn, .cover, .pageCurl:
-            return paragraphIndex(forPage: pagedPageIndex)
+            return currentPagedReadingPosition()?.paragraphIndex ?? 0
         }
     }
 
     private func updatePagedVisibleParagraph(pageIndex: Int) {
-        guard readerMode != .scroll, !content.paragraphs.isEmpty else { return }
-        let paragraphIndex = paragraphIndex(forPage: pageIndex)
-        guard paragraphIndex != visibleParagraphIndex else { return }
-        visibleParagraphIndex = paragraphIndex
-        scheduleReadingPositionPersistence(paragraphIndex: paragraphIndex)
+        guard readerMode != .scroll, !pagedBlocks.isEmpty else { return }
+        guard pagedBlocks.indices.contains(pageIndex) else { return }
+        let block = pagedBlocks[pageIndex]
+        if block.isPlaceholder {
+            requestChapter(block.chapterIndex)
+            return
+        }
+        guard block.chapterIndex >= 0 else { return }
+        let chapterChanged = block.chapterIndex != windowCurrentChapterIndex
+        if chapterChanged {
+            windowCurrentChapterIndex = block.chapterIndex
+            prefetchWindow(around: block.chapterIndex)
+            trimWindowIfNeeded()
+        }
+        let flat = positionMapping.paragraph(forPage: pageIndex)
+        guard flat != visibleParagraphIndex || chapterChanged else { return }
+        visibleParagraphIndex = flat
+        let resolved = resolvedReadingPosition(forFlatIndex: flat)
+        scheduleReadingPositionPersistence(paragraphIndex: resolved.paragraphIndex)
     }
 
     private func paragraphIndex(forPage pageIndex: Int) -> Int {
@@ -3268,19 +3756,78 @@ struct ReaderView: View {
     }
 
     private func rebuildPagedBlocksCache() {
+        let anchor = currentPageAnchor()
         let cacheKey = readerPageCacheKey
         let blocks = buildReaderPageBlocks()
         pagedBlocksCache = blocks
         pagedBlocksCacheKey = cacheKey
+        let layout = windowLayout
         positionMappingCache = ReaderPositionMapping(
-            paragraphCount: content.paragraphs.count,
+            paragraphCount: layout.totalCount,
             pageFirstParagraphs: ReaderPositionMapping.pageStarts(
-                from: blocks.map(\.firstParagraphIndex)
+                from: blocks.map { block in
+                    guard !block.isPlaceholder,
+                          let start = layout.paragraphStart(chapterIndex: block.chapterIndex) else { return nil }
+                    return start + (block.firstParagraphIndex ?? 0)
+                }
             )
         )
-        pagedPageIndex = min(max(pagedPageIndex, 0), positionMappingCache.maximumPageIndex)
+        pagedPageIndex = restoredPageIndex(anchor, in: blocks)
         scrollParagraphTarget = positionMappingCache.clampParagraph(scrollParagraphTarget)
         visibleParagraphIndex = positionMappingCache.clampParagraph(visibleParagraphIndex)
+        syncWindowCursorToVisiblePage()
+    }
+
+    private func currentPageAnchor() -> ReaderChapterPosition? {
+        if pagedBlocksCache.indices.contains(pagedPageIndex) {
+            let block = pagedBlocksCache[pagedPageIndex]
+            if block.chapterIndex >= 0 {
+                return ReaderChapterPosition(
+                    chapterIndex: block.chapterIndex,
+                    paragraphIndex: block.firstParagraphIndex ?? 0,
+                    pageOrdinal: block.isPlaceholder ? nil : block.pageOrdinal
+                )
+            }
+        }
+        return resolvedReadingPosition(forFlatIndex: visibleParagraphIndex)
+    }
+
+    private func restoredPageIndex(_ anchor: ReaderChapterPosition?, in blocks: [ReaderPageBlock]) -> Int {
+        guard let anchor else {
+            return min(max(pagedPageIndex, 0), max(blocks.count - 1, 0))
+        }
+        // A long paragraph can span several pages. Preserve the exact
+        // continuation page while the chapter itself is unchanged; the
+        // paragraph check also rejects a stale ordinal after a typography
+        // change has repaginated the chapter.
+        if let ordinal = anchor.pageOrdinal,
+           let exact = blocks.firstIndex(where: {
+               !$0.isPlaceholder
+                   && $0.chapterIndex == anchor.chapterIndex
+                   && $0.pageOrdinal == ordinal
+                   && $0.firstParagraphIndex == anchor.paragraphIndex
+           }) {
+            return exact
+        }
+        if let exact = pageIndex(forChapter: anchor.chapterIndex, paragraph: anchor.paragraphIndex, in: blocks) {
+            return exact
+        }
+        return min(max(pagedPageIndex, 0), max(blocks.count - 1, 0))
+    }
+
+    private func pageIndex(forChapter chapter: Int, paragraph: Int, in blocks: [ReaderPageBlock]) -> Int? {
+        var lastInChapter: Int?
+        for (index, block) in blocks.enumerated() {
+            guard !block.isPlaceholder, block.chapterIndex == chapter else { continue }
+            let first = block.firstParagraphIndex ?? 0
+            if first >= paragraph { return index }
+            lastInChapter = index
+        }
+        if let lastInChapter { return lastInChapter }
+        if let placeholder = blocks.firstIndex(where: { $0.isPlaceholder && $0.chapterIndex == chapter }) {
+            return placeholder
+        }
+        return blocks.firstIndex { !$0.isPlaceholder && $0.chapterIndex >= chapter }
     }
 
     private func schedulePagedBlocksCacheRebuild() {
@@ -3297,12 +3844,29 @@ struct ReaderView: View {
         }
     }
 
+    /// Builds one continuous page model for the whole live window. Every
+    /// chapter starts with its own title page and carries its chapter number,
+    /// so the page cursor can walk from one chapter into the next without an
+    /// index reset. Unloaded neighbours become a real placeholder page, which
+    /// is what lets cover/page-curl swipe through the boundary instead of
+    /// bouncing at `count - 1`.
     private func buildReaderPageBlocks() -> [ReaderPageBlock] {
         let signpost = PerformanceSignpost.begin("reader.layout")
         defer { PerformanceSignpost.end("reader.layout", id: signpost) }
-        guard !content.paragraphs.isEmpty else {
-            return [ReaderPageBlock(id: 0, includesTitle: true, paragraphs: [])]
+
+        let sections: [ReaderChapterSection]
+        if windowSections.isEmpty {
+            sections = [
+                ReaderChapterSection(
+                    chapterIndex: chapterIndex,
+                    title: content.title,
+                    paragraphs: content.paragraphs
+                )
+            ]
+        } else {
+            sections = windowSections
         }
+        guard !sections.isEmpty else { return [] }
 
         let topPadding = ReaderPageLayoutEngine.minimumTopInset(pagePadding: CGFloat(pagePadding))
         let bottomPadding = CGFloat(pagePadding) + CGFloat(footerHeight)
@@ -3325,9 +3889,102 @@ struct ReaderView: View {
         titleTypography.letterSpacing = 0
 
         var pages: [ReaderPageBlock] = []
+
+        func placeholder(chapterIndex: Int, title: String, direction: Int) -> ReaderPageBlock {
+            ReaderPageBlock(
+                id: pages.count,
+                includesTitle: true,
+                paragraphs: [],
+                chapterIndex: chapterIndex,
+                chapterTitle: title,
+                isPlaceholder: true,
+                placeholderDirection: direction
+            )
+        }
+
+        if let first = sections.first, first.chapterIndex > 0 {
+            pages.append(placeholder(
+                chapterIndex: first.chapterIndex - 1,
+                title: chapterTitle(for: first.chapterIndex - 1),
+                direction: -1
+            ))
+        }
+
+        var expectedChapterIndex = sections.first?.chapterIndex ?? chapterIndex
+        for section in sections {
+            // A failed/missing chapter in the middle of the window used to
+            // become a silent jump in the page stream. Keep every chapter
+            // position explicit so the cursor always advances one chapter at
+            // a time and the placeholder can be retried.
+            while expectedChapterIndex < section.chapterIndex {
+                pages.append(placeholder(
+                    chapterIndex: expectedChapterIndex,
+                    title: chapterTitle(for: expectedChapterIndex),
+                    direction: 0
+                ))
+                expectedChapterIndex += 1
+            }
+            guard section.isReady else {
+                pages.append(placeholder(
+                    chapterIndex: section.chapterIndex,
+                    title: section.title,
+                    direction: 0
+                ))
+                expectedChapterIndex = section.chapterIndex + 1
+                continue
+            }
+            pages.append(contentsOf: appendPages(
+                for: section,
+                typography: typography,
+                titleTypography: titleTypography
+            ))
+            expectedChapterIndex = section.chapterIndex + 1
+        }
+
+        if let last = sections.last, last.chapterIndex + 1 < windowChapterUpperBound {
+            pages.append(placeholder(
+                chapterIndex: last.chapterIndex + 1,
+                title: chapterTitle(for: last.chapterIndex + 1),
+                direction: 1
+            ))
+        }
+
+        if pages.isEmpty {
+            pages.append(ReaderPageBlock(
+                id: 0,
+                includesTitle: true,
+                paragraphs: [],
+                chapterIndex: chapterIndex,
+                chapterTitle: content.title
+            ))
+        }
+        // Every chapter paginates into its own array, so the local ids repeat.
+        // Renumber globally: TabView selection and the page-curl controller
+        // both rely on `page.id == page index`.
+        return pages.enumerated().map { offset, page in
+            ReaderPageBlock(
+                id: offset,
+                includesTitle: page.includesTitle,
+                paragraphs: page.paragraphs,
+                chapterIndex: page.chapterIndex,
+                chapterTitle: page.chapterTitle,
+                pageOrdinal: page.pageOrdinal,
+                isPlaceholder: page.isPlaceholder,
+                placeholderDirection: page.placeholderDirection
+            )
+        }
+    }
+
+    private func appendPages(
+        for section: ReaderChapterSection,
+        typography: ReaderPageTypography,
+        titleTypography: ReaderPageTypography
+    ) -> [ReaderPageBlock] {
+        var pages: [ReaderPageBlock] = []
         var currentEntries: [ReaderPageEntry] = []
+        var pageOrdinal = 0
         var currentHeight = ReaderPageLayoutEngine.measureHeight(
-            content.title,
+            section.title,
             typography: titleTypography,
             font: typography.titleFont
         ) + typography.titleSpacing
@@ -3338,15 +3995,19 @@ struct ReaderView: View {
                 ReaderPageBlock(
                     id: pages.count,
                     includesTitle: currentIncludesTitle,
-                    paragraphs: currentEntries
+                    paragraphs: currentEntries,
+                    chapterIndex: section.chapterIndex,
+                    chapterTitle: section.title,
+                    pageOrdinal: pageOrdinal
                 )
             )
+            pageOrdinal += 1
             currentEntries = []
             currentHeight = 0
             currentIncludesTitle = false
         }
 
-        for (index, paragraph) in content.paragraphs.enumerated() {
+        for (index, paragraph) in section.paragraphs.enumerated() {
             let trimmed = paragraph.trimmingCharacters(in: .whitespacesAndNewlines)
             if ReaderImageSizingPolicy.imageURL(in: trimmed) != nil {
                 // `ReaderIllustrationView` also draws the caption row and its
@@ -3367,7 +4028,11 @@ struct ReaderView: View {
                     if currentIncludesTitle || !currentEntries.isEmpty {
                         flush()
                     }
-                    currentEntries.append(ReaderPageEntry(index: index, text: paragraph))
+                    currentEntries.append(ReaderPageEntry(
+                        index: index,
+                        text: paragraph,
+                        chapterIndex: section.chapterIndex
+                    ))
                     currentHeight = cardHeight
                     flush()
                 } else {
@@ -3376,7 +4041,11 @@ struct ReaderView: View {
                         flush()
                     }
                     let spacingAfterFlush = currentEntries.isEmpty ? 0 : typography.paragraphSpacing
-                    currentEntries.append(ReaderPageEntry(index: index, text: paragraph))
+                    currentEntries.append(ReaderPageEntry(
+                        index: index,
+                        text: paragraph,
+                        chapterIndex: section.chapterIndex
+                    ))
                     currentHeight += spacingAfterFlush + cardHeight
                     if currentHeight >= typography.contentHeight {
                         flush()
@@ -3386,7 +4055,7 @@ struct ReaderView: View {
             }
 
             // The stored page text includes the first-line indent so the paged
-            // surface and TextKit measure exactly the same string.  Continuation
+            // surface and TextKit measure exactly the same string. Continuation
             // chunks start at a line boundary and therefore carry no indent.
             let display = ReaderPageLayoutEngine.displayText(
                 paragraph,
@@ -3397,7 +4066,11 @@ struct ReaderView: View {
             let spacing = currentEntries.isEmpty ? 0 : typography.paragraphSpacing
 
             if currentHeight + spacing + wholeHeight <= typography.contentHeight + 0.5 {
-                currentEntries.append(ReaderPageEntry(index: index, text: display))
+                currentEntries.append(ReaderPageEntry(
+                    index: index,
+                    text: display,
+                    chapterIndex: section.chapterIndex
+                ))
                 currentHeight += spacing + wholeHeight
                 continue
             }
@@ -3437,7 +4110,12 @@ struct ReaderView: View {
                     ? 0
                     : (chunkIndex == 0 ? typography.paragraphSpacing : 0)
                 currentEntries.append(
-                    ReaderPageEntry(index: index, text: chunk.text, chunkIndex: chunkIndex)
+                    ReaderPageEntry(
+                        index: index,
+                        text: chunk.text,
+                        chunkIndex: chunkIndex,
+                        chapterIndex: section.chapterIndex
+                    )
                 )
                 currentHeight += spacingAfterFlush + chunk.height
                 if chunkIndex < chunks.count - 1 {
@@ -3486,14 +4164,31 @@ struct ReaderPageEntry: Equatable, Identifiable {
     let text: String
     /// Non-zero when a long paragraph was split across page boundaries.
     var chunkIndex: Int = 0
+    /// Owning chapter. The window merges several chapters into one page model;
+    /// paragraph 3 of chapter 8 must not collide with paragraph 3 of chapter 9
+    /// in SwiftUI's identity diff.
+    var chapterIndex: Int = -1
     var isContinuation: Bool { chunkIndex > 0 }
-    var id: String { "\(index)-\(chunkIndex)" }
+    var id: String { "\(chapterIndex)-\(index)-\(chunkIndex)" }
 }
 
 struct ReaderPageBlock: Identifiable, Equatable {
     let id: Int
     let includesTitle: Bool
     let paragraphs: [ReaderPageEntry]
+    /// Chapter that owns the first paragraph on this page. -1 keeps the
+    /// legacy single-chapter call sites source compatible.
+    var chapterIndex: Int = -1
+    var chapterTitle: String = ""
+    /// Zero-based page number inside its chapter. Used as a stable anchor
+    /// when chapters are inserted above the current page.
+    var pageOrdinal: Int = 0
+    /// A synthetic page shown while a neighbouring chapter downloads. Its
+    /// chapterIndex points at the chapter being loaded so the reader can jump
+    /// to that chapter's first real page as soon as it arrives.
+    var isPlaceholder: Bool = false
+    /// -1 = previous chapter, +1 = next chapter, 0 = current chapter loading.
+    var placeholderDirection: Int = 0
 
     var firstParagraphIndex: Int? {
         paragraphs.first?.index

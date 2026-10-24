@@ -466,7 +466,7 @@ enum ReaderPreloadPolicy {
 
     static func title(for count: Int) -> String {
         let value = clamp(count)
-        return value == 0 ? "关闭" : "\(value) 章"
+        return value == 0 ? "关闭" : "前后各 \(value) 章"
     }
 }
 

@@ -47,6 +47,25 @@ final class ReaderChapterWindowPolicyTests: XCTestCase {
         )
     }
 
+    func testPrefetchOrderAlwaysSkipsTheCursorChapter() {
+        let order = ReaderChapterWindowPolicy.prefetchOrder(
+            current: 5,
+            radius: 2,
+            lowerBound: 0,
+            upperBound: 10,
+            loaded: []
+        )
+        XCTAssertFalse(order.contains(5))
+        XCTAssertEqual(order, [6, 4, 7, 3])
+    }
+
+    func testChapterPositionKeepsPageOrdinal() {
+        let position = ReaderChapterPosition(chapterIndex: 8, paragraphIndex: 12, pageOrdinal: 3)
+        XCTAssertEqual(position.pageOrdinal, 3)
+        XCTAssertEqual(position, ReaderChapterPosition(chapterIndex: 8, paragraphIndex: 12, pageOrdinal: 3))
+        XCTAssertNotEqual(position, ReaderChapterPosition(chapterIndex: 8, paragraphIndex: 12, pageOrdinal: 2))
+    }
+
     func testNextMissingIndexWalksBothDirections() {
         let loaded: Set<Int> = [4, 5, 6]
         XCTAssertEqual(
@@ -65,6 +84,34 @@ final class ReaderChapterWindowPolicyTests: XCTestCase {
             ReaderChapterWindowPolicy.nextMissingIndex(
                 direction: 1, current: 9, lowerBound: 0, upperBound: 10, loaded: loaded
             )
+        )
+    }
+
+    func testRetainedIndicesKeepLoadingChaptersAndTheCursor() {
+        let keep = ReaderChapterWindowPolicy.retainedIndices(
+            around: 5,
+            radius: 1,
+            lowerBound: 0,
+            upperBound: 10,
+            loading: [7]
+        )
+        XCTAssertEqual(keep, [4, 5, 6, 7])
+        let cursorOutsideRadius = ReaderChapterWindowPolicy.retainedIndices(
+            around: 5,
+            radius: 0,
+            lowerBound: 0,
+            upperBound: 10,
+            loading: []
+        )
+        XCTAssertEqual(cursorOutsideRadius, [5])
+        XCTAssertTrue(
+            ReaderChapterWindowPolicy.retainedIndices(
+                around: 0,
+                radius: 1,
+                lowerBound: 0,
+                upperBound: 0,
+                loading: [3]
+            ).isEmpty
         )
     }
 

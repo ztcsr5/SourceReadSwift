@@ -14,6 +14,14 @@ struct NativeReaderTextView: UIViewRepresentable {
     /// during every SwiftUI body evaluation. It is optional for existing call sites.
     var contentFingerprint: String? = nil
     var isAppendedUpdate: Bool = false
+    /// Absolute flat paragraph that must stay under the viewport after a
+    /// window rebuild. `layoutAnchorRevision` is monotonic: the native surface
+    /// consumes the anchor exactly once per revision, so SwiftUI coalescing
+    /// several chapter loads into one update can neither apply a delta twice
+    /// nor lose an intermediate prepend.
+    var layoutAnchorParagraph: Int? = nil
+    var layoutAnchorOldParagraph: Int? = nil
+    var layoutAnchorRevision: Int = 0
     var fontFamily: ReaderFontFamily = .system
     let fontSize: Double
     let lineSpacing: Double
@@ -37,6 +45,7 @@ struct NativeReaderTextView: UIViewRepresentable {
     let onVisibleParagraph: (Int) -> Void
     var onNearBottom: (() -> Void)? = nil
     var onReachTop: (() -> Void)? = nil
+    var onNearTop: (() -> Void)? = nil
     var onReachBottom: (() -> Void)? = nil
     /// One tap-zone page step in continuous scroll mode. `generation` is
     /// monotonic so the same direction can be requested twice in a row
@@ -49,6 +58,7 @@ struct NativeReaderTextView: UIViewRepresentable {
         Coordinator(
             onVisibleParagraph: onVisibleParagraph,
             onReachTop: onReachTop,
+            onNearTop: onNearTop,
             onReachBottom: onReachBottom,
             onNearBottom: onNearBottom,
             onPageStepBoundary: onPageStepBoundary
@@ -98,6 +108,7 @@ struct NativeReaderTextView: UIViewRepresentable {
         context.coordinator.updateCallbacks(
             visibleParagraph: onVisibleParagraph,
             reachTop: onReachTop,
+            nearTop: onNearTop,
             reachBottom: onReachBottom,
             nearBottom: onNearBottom,
             pageStepBoundary: onPageStepBoundary
@@ -122,6 +133,9 @@ struct NativeReaderTextView: UIViewRepresentable {
             contentFingerprint: contentFingerprint?.nilIfEmpty
                 ?? [title, subtitle ?? "", String(paragraphs.count), String(paragraphs.first?.hashValue ?? 0), String(paragraphs.last?.hashValue ?? 0)].joined(separator: "|"),
             isAppendedUpdate: isAppendedUpdate,
+            layoutAnchorParagraph: layoutAnchorParagraph,
+            layoutAnchorOldParagraph: layoutAnchorOldParagraph,
+            layoutAnchorRevision: layoutAnchorRevision,
             fontFamily: fontFamily,
             fontSize: fontSize,
             lineSpacing: lineSpacing,
@@ -147,6 +161,9 @@ struct NativeReaderTextView: UIViewRepresentable {
         let paragraphs: [String]
         let contentFingerprint: String
         let isAppendedUpdate: Bool
+        let layoutAnchorParagraph: Int?
+        let layoutAnchorOldParagraph: Int?
+        let layoutAnchorRevision: Int
         let fontFamily: ReaderFontFamily
         let fontSize: Double
         let lineSpacing: Double
@@ -170,6 +187,9 @@ struct NativeReaderTextView: UIViewRepresentable {
             paragraphs: [String],
             contentFingerprint: String,
             isAppendedUpdate: Bool = false,
+            layoutAnchorParagraph: Int? = nil,
+            layoutAnchorOldParagraph: Int? = nil,
+            layoutAnchorRevision: Int = 0,
             fontFamily: ReaderFontFamily = .system,
             fontSize: Double,
             lineSpacing: Double,
@@ -192,6 +212,9 @@ struct NativeReaderTextView: UIViewRepresentable {
             self.paragraphs = paragraphs
             self.contentFingerprint = contentFingerprint
             self.isAppendedUpdate = isAppendedUpdate
+            self.layoutAnchorParagraph = layoutAnchorParagraph
+            self.layoutAnchorOldParagraph = layoutAnchorOldParagraph
+            self.layoutAnchorRevision = layoutAnchorRevision
             self.fontFamily = fontFamily
             self.fontSize = fontSize
             self.lineSpacing = lineSpacing
@@ -269,6 +292,9 @@ struct NativeReaderTextView: UIViewRepresentable {
                 && lhs.animatedScrollDuration == rhs.animatedScrollDuration
                 && lhs.showChapterEndBadge == rhs.showChapterEndBadge
                 && lhs.isAppendedUpdate == rhs.isAppendedUpdate
+                && lhs.layoutAnchorParagraph == rhs.layoutAnchorParagraph
+                && lhs.layoutAnchorOldParagraph == rhs.layoutAnchorOldParagraph
+                && lhs.layoutAnchorRevision == rhs.layoutAnchorRevision
                 && lhs.imageStyle == rhs.imageStyle
                 && lhs.imageHeaders == rhs.imageHeaders
                 && abs(lhs.imageColumnWidth - rhs.imageColumnWidth) < 0.5
@@ -279,6 +305,7 @@ struct NativeReaderTextView: UIViewRepresentable {
         private weak var textView: UITextView?
         private var visibleParagraphCallback: (Int) -> Void
         private var reachTopCallback: (() -> Void)?
+        private var nearTopCallback: (() -> Void)?
         private var reachBottomCallback: (() -> Void)?
         private var nearBottomCallback: (() -> Void)?
         private var pageStepBoundaryCallback: ((Int) -> Void)?
@@ -290,11 +317,13 @@ struct NativeReaderTextView: UIViewRepresentable {
         private var lastScrollRequestKey: String?
         private var lastVisibleParagraph = -1
         private var lastVisibleUpdateAt: CFTimeInterval = 0
+        private var lastLayoutAnchorRevision = 0
         private var didConfigureTextView = false
         private var lastSelectionEnabled: Bool?
         private var lastLayoutWidth: CGFloat?
         private var hasAppliedInitialScrollTarget = false
         private var didFireNearBottom = false
+        private var didFireNearTop = false
         private var isProgrammaticScrolling = false
         private var illustrationLoadTask: Task<Void, Never>?
         private var illustrationGeneration = 0
@@ -303,12 +332,14 @@ struct NativeReaderTextView: UIViewRepresentable {
         init(
             onVisibleParagraph: @escaping (Int) -> Void,
             onReachTop: (() -> Void)? = nil,
+            onNearTop: (() -> Void)? = nil,
             onReachBottom: (() -> Void)? = nil,
             onNearBottom: (() -> Void)? = nil,
             onPageStepBoundary: ((Int) -> Void)? = nil
         ) {
             visibleParagraphCallback = onVisibleParagraph
             reachTopCallback = onReachTop
+            nearTopCallback = onNearTop
             reachBottomCallback = onReachBottom
             nearBottomCallback = onNearBottom
             pageStepBoundaryCallback = onPageStepBoundary
@@ -325,12 +356,14 @@ struct NativeReaderTextView: UIViewRepresentable {
         func updateCallbacks(
             visibleParagraph: @escaping (Int) -> Void,
             reachTop: (() -> Void)?,
+            nearTop: (() -> Void)?,
             reachBottom: (() -> Void)?,
             nearBottom: (() -> Void)?,
             pageStepBoundary: ((Int) -> Void)?
         ) {
             visibleParagraphCallback = visibleParagraph
             reachTopCallback = reachTop
+            nearTopCallback = nearTop
             reachBottomCallback = reachBottom
             nearBottomCallback = nearBottom
             pageStepBoundaryCallback = pageStepBoundary
@@ -356,7 +389,19 @@ struct NativeReaderTextView: UIViewRepresentable {
             let textLayoutChanged = previousConfiguration?.textLayoutSignature != newConfiguration.textLayoutSignature
             let insetsChanged = previousConfiguration?.insetsSignature != newConfiguration.insetsSignature
             let textColorChanged = previousConfiguration?.textColor.isEqual(newConfiguration.textColor) != true
-            let isAppend = newConfiguration.isAppendedUpdate
+            // A chapter is appendable only when this update really added
+            // text at the tail of the previous content.  Coalesced
+            // prepend+append updates (previous/next prefetch finishing in one
+            // run loop) must take the full-rebuild path, otherwise the
+            // prepended chapter is silently lost from the text storage.
+            let isAppend: Bool = {
+                guard newConfiguration.isAppendedUpdate, contentChanged else { return false }
+                let previousParagraphs = previousConfiguration?.paragraphs ?? []
+                guard newConfiguration.paragraphs.count > previousParagraphs.count else { return false }
+                return newConfiguration.paragraphs.prefix(previousParagraphs.count).elementsEqual(previousParagraphs)
+            }()
+            let anchorRevisionChanged = contentChanged
+                && newConfiguration.layoutAnchorRevision != lastLayoutAnchorRevision
             let widthChanged: Bool = {
                 guard textView.bounds.width > 1 else { return false }
                 guard let lastLayoutWidth else { return true }
@@ -367,6 +412,7 @@ struct NativeReaderTextView: UIViewRepresentable {
             if textLayoutChanged || widthChanged {
                 let previousOffset = textView.contentOffset
                 let canFastAppend = isAppend
+                    && !anchorRevisionChanged
                     && !widthChanged
                     && previousConfiguration != nil
                     && newConfiguration.fontFamily == previousConfiguration!.fontFamily
@@ -382,17 +428,64 @@ struct NativeReaderTextView: UIViewRepresentable {
                 if canFastAppend, let prevConfig = previousConfiguration {
                     appendNewParagraphs(from: prevConfig.paragraphs.count, to: newConfiguration, in: textView)
                 } else {
+                    // Capture the visible character before the layout ranges
+                    // change so a non-window content revision (refresh, image
+                    // resize) can still keep the exact line under the eye.
+                    // Capture before changing the text storage.  A window
+                    // mutation shifts paragraphs by a known delta; applying
+                    // that delta to this character anchor preserves the exact
+                    // line under the eye instead of snapping to the top of the
+                    // first visible paragraph.
+                    let characterAnchor = !isAppend ? captureScrollAnchor(in: textView) : nil
                     rebuild(textView: textView, configuration: newConfiguration)
                     if textView.bounds.width > 1 {
                         lastLayoutWidth = textView.bounds.width
                     }
-                    if textView.bounds.height > 0 && (!contentChanged || isAppend) {
+                    if anchorRevisionChanged, let anchorParagraph = newConfiguration.layoutAnchorParagraph {
+                        // A window mutation changed the flat index space. The
+                        // caller resolved the same chapter-local position in
+                        // the new layout and supplied the old flat index too.
+                        // Shift the captured character anchor by the same flat
+                        // delta so a prepended chapter never moves the line
+                        // under the eye.
+                        lastLayoutAnchorRevision = newConfiguration.layoutAnchorRevision
+                        // SwiftUI can coalesce several chapter-window
+                        // mutations into one native update. The last
+                        // flat index alone then no longer describes the
+                        // text the viewport still shows. Recover the
+                        // displacement by aligning the old and new
+                        // paragraph arrays; fall back to the caller's
+                        // flat anchor only when no overlap is provable.
+                        let windowShift = previousConfiguration.flatMap { previous in
+                            ReaderScrollAnchorPolicy.paragraphShift(
+                                old: previous.paragraphs,
+                                new: newConfiguration.paragraphs
+                            )
+                        }
+                        if let characterAnchor, let windowShift {
+                            restoreScrollAnchor(
+                                characterAnchor,
+                                paragraphOffset: windowShift,
+                                in: textView
+                            )
+                        } else if let characterAnchor, let oldParagraph = newConfiguration.layoutAnchorOldParagraph {
+                            restoreScrollAnchor(
+                                characterAnchor,
+                                paragraphOffset: anchorParagraph - oldParagraph,
+                                in: textView
+                            )
+                        } else {
+                            _ = scrollToParagraph(anchorParagraph, in: textView, animated: false, duration: 0)
+                        }
+                    } else if let characterAnchor {
+                        restoreScrollAnchor(characterAnchor, in: textView)
+                    } else if textView.bounds.height > 0 && (!contentChanged || isAppend) {
                         setContentOffsetIfNeeded(previousOffset, in: textView)
                     }
                     // A new chapter needs its initial target; settings/theme
                     // changes or appends preserve the existing offset and request key.
                     let isDifferentChapter = previousConfiguration?.title != newConfiguration.title
-                    if isDifferentChapter && !isAppend {
+                    if isDifferentChapter && !isAppend && !anchorRevisionChanged {
                         lastScrollRequestKey = nil
                         hasAppliedInitialScrollTarget = (scrollTarget == nil || scrollTarget == 0)
                     }
@@ -401,6 +494,13 @@ struct NativeReaderTextView: UIViewRepresentable {
                     }
                     lastVisibleParagraph = -1
                     lastVisibleUpdateAt = 0
+                }
+                // Record the revision even when this particular update did
+                // not need an anchor (fast append or a content revision with
+                // no anchor). Otherwise a later update could mistake an old
+                // revision for a fresh one and jump to a stale paragraph.
+                if contentChanged {
+                    lastLayoutAnchorRevision = newConfiguration.layoutAnchorRevision
                 }
             } else {
                 if insetsChanged {
@@ -626,9 +726,18 @@ struct NativeReaderTextView: UIViewRepresentable {
             )
         }
 
-        private func restoreScrollAnchor(_ anchor: ReaderScrollAnchorPolicy.Anchor?, in textView: UITextView) {
-            guard let anchor,
-                  let characterIndex = ReaderScrollAnchorPolicy.characterIndex(for: anchor, in: paragraphRanges),
+        private func restoreScrollAnchor(
+            _ anchor: ReaderScrollAnchorPolicy.Anchor?,
+            paragraphOffset: Int = 0,
+            in textView: UITextView
+        ) {
+            guard let anchor else { return }
+            let shifted = ReaderScrollAnchorPolicy.Anchor(
+                paragraphIndex: max(anchor.paragraphIndex + paragraphOffset, 0),
+                characterOffset: anchor.characterOffset,
+                lineProgress: anchor.lineProgress
+            )
+            guard let characterIndex = ReaderScrollAnchorPolicy.characterIndex(for: shifted, in: paragraphRanges),
                   textView.textStorage.length > 0 else { return }
             textView.layoutManager.ensureLayout(for: textView.textContainer)
             let safeIndex = min(max(characterIndex, 0), textView.textStorage.length - 1)
@@ -782,6 +891,15 @@ struct NativeReaderTextView: UIViewRepresentable {
                 didFireNearBottom = false
             }
 
+            if contentHeight > 0, offsetY <= 650 {
+                if !didFireNearTop {
+                    didFireNearTop = true
+                    nearTopCallback?()
+                }
+            } else if offsetY > 900 {
+                didFireNearTop = false
+            }
+
             let now = CACurrentMediaTime()
             guard now - lastVisibleUpdateAt >= 0.25 else { return }
             lastVisibleUpdateAt = now
@@ -894,6 +1012,61 @@ enum ReaderScrollAnchorPolicy {
             characterOffset: offset,
             lineProgress: min(max(lineProgress, 0), 1)
         )
+    }
+
+    /// Flat-paragraph displacement between two window layouts.
+    ///
+    /// The chapter window only inserts or removes whole chapter chunks at
+    /// its edges. Finding the largest contiguous overlap is therefore
+    /// enough to recover the exact shift of the line under the viewport,
+    /// even when SwiftUI coalesces a prepend, an append and a trim into a
+    /// single native update. Returns nil when the two layouts share no
+    /// provable paragraph run (for example an in-place content refresh).
+    static func paragraphShift(old: [String], new: [String]) -> Int? {
+        guard !old.isEmpty, !new.isEmpty else { return nil }
+
+        func contains(_ haystack: [String], _ needle: [String]) -> Int? {
+            guard needle.count <= haystack.count else { return nil }
+            guard let first = needle.first else { return nil }
+            for start in 0...(haystack.count - needle.count) where haystack[start] == first {
+                if haystack[start..<(start + needle.count)].elementsEqual(needle) {
+                    return start
+                }
+            }
+            return nil
+        }
+
+        if let start = contains(new, old) { return start }
+        if let start = contains(old, new) { return -start }
+
+        let maximumOverlap = min(old.count, new.count)
+        var bestOverlap = 0
+        var bestShift = 0
+
+        // Old suffix -> new prefix (a chapter was removed above or added
+        // below the viewport).
+        for length in stride(from: maximumOverlap, through: 1, by: -1) {
+            if old.suffix(length).elementsEqual(new.prefix(length)) {
+                bestOverlap = length
+                bestShift = length - old.count
+                break
+            }
+        }
+
+        // Old prefix -> new suffix (a chapter was added above or removed
+        // below the viewport).
+        for length in stride(from: maximumOverlap, through: 1, by: -1) {
+            if old.prefix(length).elementsEqual(new.suffix(length)) {
+                let shift = new.count - length
+                if length > bestOverlap || (length == bestOverlap && abs(shift) < abs(bestShift)) {
+                    bestOverlap = length
+                    bestShift = shift
+                }
+                break
+            }
+        }
+
+        return bestOverlap > 0 ? bestShift : nil
     }
 
     static func characterIndex(for anchor: Anchor, in paragraphRanges: [NSRange]) -> Int? {
