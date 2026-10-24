@@ -1200,6 +1200,9 @@ struct ReaderView: View {
         )
         .ignoresSafeArea(.container, edges: .bottom)
         .opacity(initialSurfaceOpacity)
+        // 透明期间不该吃点击：0.5s 兜底窗口里用户可能已经在点下一页，
+        // 让点击落到下面的容器上，比落在看不见的文字层上更安全。
+        .allowsHitTesting(initialSurfaceOpacity > 0)
         .onAppear {
             if scrollParagraphTarget > 0 {
                 didLandInitialPosition = false
