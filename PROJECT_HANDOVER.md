@@ -36,7 +36,7 @@
 
 ---
 
-## 二、 v1.0.26 核心功能链实现 (What Changed)
+## 二、 核心功能链实现（v1.0.22 → v1.0.27） (What Changed)
 
 `v1.0.22` 完成了书籍插图与漫画排版的完整生命周期闭环；`v1.0.23` 补齐 `ruleContent.payAction` 付费动作链路（第 7 节）；`v1.0.24` 继续补齐 `ruleContent.title` 正文标题回填与 `BookChapter.isPay` 建模，并修复版本元数据漂移（第 8 节）；`v1.0.25` 把未知 `java.*` 调用从 TypeError 降级为可诊断的空值（第 9 节）；`v1.0.26` 把 `ruleContent.imageDecode` 返回的字节负载接入阅读器内联图像管线（第 10 节）。
 
@@ -134,6 +134,55 @@ SourceRequestBuilder.imageRequestHeaders(for: currentBookSource)
 - **回归**：`InlineImagePipelineTests` 7 个用例——四种解码形态、拒绝非图像与普通 URL、data URI 入库且段落紧凑、`java.ajaxBytes` → `RemoteImageLoader` 真实解码 3×2 像素、非法 base64 保留原 URL、越界字节数组保留原 URL、store 去重与路径穿越；CI 932 tests / 0 failures。
 - **边界**：本次覆盖“单次规则输出即完整图片”。若某个源把拼图切片分多次返回、需要按坐标拼成一张位图，仍属于后续 Canvas 拼图能力，不在本版范围。
 
+### 11. v1.0.27 增量：阅读器三模式与阅读界面整改
+
+本轮起点是 `51b57fe`（页模型与分页切页的修正版本，CI 963 tests 绿），交付 `bb46349`。范围只覆盖阅读链路：分页页模型、连续滑动、覆盖翻页、系统卷曲翻页、阅读界面顶/底栏与设置面板、目录/书签跳转、漫画阅读器。所有条目均为读码定位的真实缺陷，没有凭猜测改行为。
+
+#### A. 分页页模型（三种翻页共用）
+
+1. **页数与视觉不符、长段溢出**：`buildReaderPageBlocks` 原来按估算行高切页。改为 TextKit `NSLayoutManager` 取真实行片段测量；长段按真实行续切；标题先测高。`ReaderPageLayoutEngine.split` 对每个 chunk 重新 `measureHeight` 并预留 4pt 余量，消除 167 vs 159、587 vs 579 这类累计误差（首版 CI 的 4 个失败即此）。
+2. **纯标题页丢失导致末页不可达**：`ReaderPositionMapping` 用 `compactMap` 过滤无正文页后，页索引整体偏移。新增 `pageStarts(from: [Int?])` 保留占位页，`ReaderView` 两处映射改用该入口。
+3. **模式切换/字体变化越界**：`rebuildPagedBlocksCache` 统一用 `ReaderPagedNavigationPolicy.clampedTargets` 同时收敛页索引与段索引；`progressTitle` 与章节 Slider 目标值一并 clamp。
+4. **插图页预算不足**：只预留位图高度，说明文字与卡片内边距会溢出到页脚。新增 `pagedCaptionHeight = 44`，按整卡 `cardHeight` 参与预算；`ReaderImageSizingPolicy.imageURL` 先 `trimmingCharacters`，段落前后有空白也能识别插图。
+5. **页内滚动与翻页手势打架**：分页页去掉 `ScrollView`，改为固定 `VStack` + `.clipped()`，一页只响应翻页手势。
+
+#### B. 连续滑动模式（默认模式）
+
+6. **点击区域只有中间"菜单"有效**：`runTapAction` 在 `readerMode == .scroll` 时只处理 `.menu` 并直接 `return`，而默认九宫格的左右/上下区域全是"上一页/下一页"——用户侧表现就是"滑动模式坏了、点哪都没反应"。新增 `ReaderPageStepPolicy`：一屏步进 `1 - 12%` 重叠（不漏行）、`adjustedContentInset` 感知的上下边界收敛、边界判定；`NativeReaderTextView.applyPageStep` 以 280ms ease-out 执行并刷新可见段；到顶/到底再点翻页通过 `onPageStepBoundary` 交给上一/下一章。
+7. **追加章节错章**：网络追加任务在用户切章后仍会把旧"下一章"写进新章。任务记录 `originChapterIndex`，回包校验章号、列表上限与重复后才 append；缓存分支同样受 `isAppendingNextChapter` 与 `last.chapterIndex` 防护。
+8. **滑动自激抖动**：可见段回调反向写 `scrollParagraphTarget` 会触发滚动请求循环。回调只更新 `visibleParagraphIndex`；跳转统一走 `scrollJumpGeneration`，`scrollToParagraph` 增加 `!isDecelerating` 保护。
+
+#### C. 覆盖翻页
+
+9. **过半不翻、回弹错误、连划丢页**：新增 `ReaderCoverSwipePolicy`，用 `predictedEndTranslation` + 18% 宽度阈值 + 轴向/边界裁剪判定；松手 340ms 动画结束后以 `Transaction(disablesAnimations)` 提交页索引，动画期间忽略新手势。
+
+#### D. 系统卷曲（仿真）翻页
+
+10. **目录/TTS/跳转与卷曲动画竞争、字号变化显示旧页**：`PageCurlReaderView` 增加 `contentRevision` 与 `ReaderPageCurlSyncPolicy`——用户交互中不抢动画，revision 变化才 reload；首次进入白屏由索引 clamp + 空页处理修复。
+
+#### E. 阅读界面（顶栏/底栏/设置）
+
+11. **顶栏图标挤压标题**：刷新/缓存/购买/详情/换源收进 `Menu`；标题 `minimumScaleFactor(0.78)` + `layoutPriority(1)`。
+12. **章节 Slider 拖动中每格换章**：改为 draft 值，`onEditingChanged` 结束时才 `selectChapter`。
+13. **睡眠定时徽标挤乱工具栏**：改为挂在"设置"按钮上的 overlay 徽标。
+14. **横屏设置面板被裁**：`max(h*0.84, 560)` 在 390pt 高的横屏超出可视区，关闭按钮不可见。新增 `ReaderSettingsLayoutPolicy.maxPanelHeight(viewportHeight:bottomInset:)`（390/21 → 345，844/34 → 709，667/0 → 560）。
+15. **设置缺项**：高级页补自动滚动间隔滑块；外观页补亮度卡片与"跟随系统"；`applyReaderBrightness` 在 `readerBrightness < 0` 时恢复进入阅读器前的亮度。
+16. **底部预留带一直空白**：`footerHeight`（默认 72pt）在所有模式都给正文让了位，但全屏阅读没有时间、电量、进度。新增 `readerFooter`：`TimelineView(.everyMinute)` 时间 + `progressTitle` + `UIDevice` 电量/充电图标；仅在 chrome 隐藏且无朗读/自动滚动时显示，`allowsHitTesting(false)`；进入阅读器开启电量监测、退出关闭。
+17. **跨章书签只跳到章首**：目录与书签统一 `canJumpToChapter`，优先调用 `onSelectChapterWithPosition`，跨章书签直接落到记录段；只有位置无关回调时才退回 `onSelectChapter`。
+
+#### F. 漫画阅读器
+
+18. **切章竞态**：慢源回包会覆盖后打开章节的页面。新增 `loadGeneration` 令牌；切章同时清空 `pages`，加载态与错误态都能正常出现。
+19. **首页/末页第二次点击无效**：`scrollTargetIndex` 残留旧值，SwiftUI diff 认为无变化。滚动执行后清空请求，切章也清空。
+20. **下一章继承上一章缩放**：TabView 复用页面视图，`scale/lastScale` 未重置。`url` 变化时复位缩放。
+
+#### G. 验证
+
+- 新增 `ReaderPageStepPolicy` 5 个用例（一屏步进、上下边界、inset、boundary、短内容不动）+ 设置面板高度 1 个用例；`ReaderPageLayoutEngineTests` 14 个用例、`ReaderPagedNavigationPolicyTests` 其余用例继续通过。
+- CI：iOS run `40096362239` / job `120879785198`，**969 tests / 0 failures / TEST SUCCEEDED**（基线 `51b57fe` run `40095125227` 为 963 tests）。
+- IPA：run `40096362252` / job `120879342208`，`SourceReadSwift-1.0.27-unsigned.ipa`，11,390,330 字节，SHA256 `3A7BE269E3F6CBDFEC0EED159BE7194A02CC3D7F7FD7F348F8CAF7F86A866371`，Info.plist 1.0.27 / Build 28 / iOS 16.0。
+- 四件套与三段验证（基线 / 修改 / 反向补丁回滚）落在 `E:\codex-temp\sourceread\artifacts\reader-modes-v27\`；回滚后 7 个文件与基线逐字节一致。
+
 ---
 
 ## 三、 代码路径与核心文件索引 (Where it lives)
@@ -159,39 +208,48 @@ SourceRequestBuilder.imageRequestHeaders(for: currentBookSource)
 | **正文标题** | `SourceReadSwift/Core/Rules/ContentParser.swift` | `ruleContent.title` HTML/JSON 求值与回退 |
 | **章节付费标记** | `SourceReadSwift/Core/Models/BookModels.swift` | `BookChapter.isPay` 可选字段与全链透传 |
 | **JS 兼容降级** | `SourceReadSwift/Core/JavaScript/JSCoreRuntime.swift` | 未知 `java.*` 调用经 Proxy 降级并写入 `bridge.error` 诊断 |
-| **工程配置** | `project.yml` & `SourceReadSwift/App/Info.plist` | 版本声明（1.0.26 / Build 27）；bundle 版本由 `MARKETING_VERSION` / `CURRENT_PROJECT_VERSION` 单一来源派生 |
+| **工程配置** | `project.yml` & `SourceReadSwift/App/Info.plist` | 版本声明（1.0.27 / Build 28）；bundle 版本由 `MARKETING_VERSION` / `CURRENT_PROJECT_VERSION` 单一来源派生 |
 
 ---
 
 ## 四、 验证结果与 CI 证据 (How to verify)
 
-### 1. 自动化测试结果
-- **GitHub Actions Run ID**：`40090360201`
-- **Job ID**：`120861597916`
-- **验证 Commit**：`99db867`
-- **运行结论**：`Success`
-- **用例总数**：**932 个 XCTest 单元测试全部通过（0 failures, 0 unexpected）**
+### 1. 自动化测试结果（v1.0.27）
+- **GitHub Actions Run ID**：`40096362239`
+- **Job ID**：`120879785198`
+- **验证 Commit**：`bb46349`
+- **运行结论**：`Success`（`** TEST SUCCEEDED **`）
+- **用例总数**：**969 个 XCTest 单元测试全部通过（0 failures, 0 unexpected）**
+- **基线对照**：`51b57fe`（本轮起点）run `40095125227` / job `120875644734`，963 tests / 0 failures；本轮净增 6 个用例
 - **本轮新增/关键覆盖**：
-  - 新增 `InlineImagePipelineTests` 7 个用例：`testInlineImageDecoderRecognizesDataURIByteArrayAndRawBase64`、`testInlineImageDecoderRejectsNonImageAndOrdinaryURLs`、`testImageDecodeStoresInlineDataURIAndKeepsParagraphCompact`、`testImageDecodeReadsAjaxBytesAndLoadsThroughRemoteImageLoader`、`testImageDecodeRejectsMalformedInlinePayloadAndKeepsOriginalURL`、`testImageDecodeRejectsOutOfRangeByteArrayAndKeepsOriginalURL`、`testInlineImageStoreDeduplicatesAndRejectsTraversal`
-  - v1.0.25 的 `JSCoreRuntimeTests.testUnknownJavaMethodDegradesAndRecordsBridgeDiagnostic`、`testUnknownJavaMethodProxyKeepsKnownBridgesWorking` 继续通过
-  - v1.0.24 的 `ChapterListMetadataTests` / `ContentParserTests` / `JSCoreRuntimeTests.testChapterBridgeExposesIsPayAsBoolean` 继续通过
-  - `PayActionTests` 18 个用例继续通过
-  - `SearchURLResolverTests.testAppVersionSemantics` 锁定 1.0.26 / Build 27
-- **历史失败记录（v1.0.25）**：`99c707c` 首版代理在 prelude 中部安装，破坏 `java.jsoup = java.jsoup || {...}`，run `40085678639` 出现 1 failure；`0b46689` 将代理移到 prelude 末尾后全绿。
+  - `ReaderPageStepPolicy`：800pt 视口一屏步进 704pt（保留 12% 重叠）、上下边界收敛、`adjustedContentInset.top` 首行偏移、边界判定、短内容不动
+  - `ReaderSettingsLayoutPolicy.maxPanelHeight`：横屏 390/21 → 345、竖屏 844/34 → 709、小屏 667/0 → 560
+  - `ReaderPageLayoutEngineTests` 14 个用例（真实行切页、页预算、空段、内边距）与 `ReaderPagedNavigationPolicyTests` 其余用例继续通过
+  - `SearchURLResolverTests.testAppVersionSemantics` 锁定 1.0.27 / Build 28
+- **历史**：v1.0.26 为 run `40090360201`，932 tests / 0 failures；v1.0.27 页模型检查点为 `51b57fe`，963 tests / 0 failures
 
-### 2. IPA 打包产物
-- **GitHub Actions Run ID**：`40090360203`
+### 2. IPA 打包产物（v1.0.27）
+- **GitHub Actions Run ID**：`40096362252`
+- **Job ID**：`120879342208`
+- **验证 Commit**：`bb46349`
 - **产物名**：`SourceReadSwift-unsigned-ipa`
-- **本地落盘路径**：`C:\Users\Edc21\Desktop\SourceReadSwift-1.0.26-unsigned.ipa`
-- **产物大小**：`11,343,350 字节`
-- **SHA256**：`84D1D26C8634F0CD4B264B9414D0DBE8B325E6DA68BF113F4281ACB31BE9A0C3`
-- **Info.plist 核验**：`CFBundleShortVersionString=1.0.26`、`CFBundleVersion=27`、`MinimumOSVersion=16.0`（workflow 内 `PlistBuddy` 断言强制校验）
+- **本地落盘路径**：`C:\Users\Edc21\Desktop\SourceReadSwift-1.0.27-unsigned.ipa`
+- **产物大小**：`11,390,330 字节`
+- **SHA256**：`3A7BE269E3F6CBDFEC0EED159BE7194A02CC3D7F7FD7F348F8CAF7F86A866371`
+- **Info.plist 核验**：`CFBundleShortVersionString=1.0.27`、`CFBundleVersion=28`、`MinimumOSVersion=16.0`、`CFBundleIdentifier=com.edc21.SourceReadSwift`（workflow 内 `PlistBuddy` 断言 + 本地 `plistlib` 复验）
+- **历史（v1.0.26）**：`SourceReadSwift-1.0.26-unsigned.ipa`，11,343,350 字节，SHA256 `84D1D26C8634F0CD4B264B9414D0DBE8B325E6DA68BF113F4281ACB31BE9A0C3`，run `40090360203`
 
 ---
 
 ## 五、 后续演进建议与未尽事项 (Next Steps for AI)
 
 下一位接手的工程师或 AI 可在此坚实基准上推进以下事项：
+
+0. **阅读器（P1，v1.0.27 遗留）**：
+   - 分页三模式在**本章最后一页**没有自动衔接下一章：cover 越界拖动、TabView 与系统卷曲的越界滑动都只会回弹，用户必须打开菜单或点底栏"下一章"。方案已明确（末页页脚"本章完 / 下一章"按钮，或越界手势触发 `selectRelativeChapter(offset: 1)`），但手势与 `UIPageViewController` 动画的竞争必须在真机验证后再合并。
+   - 漫画放大后只能看中心：`ComicPageImageView` 有 1×–3.5× 缩放但没有平移；TabView 内 pan 与翻页手势冲突，需要真机调 `DragGesture` 启用阈值。
+   - 滚动模式"追加章节"的段落→章节映射只有单元测试（`ReaderPositionMapping`），没有真机长文连续滚动回归；追加到第 50 章停止是刻意上限。
+   - 本机没有 Xcode/Swift 工具链，本轮所有 UI 结论来自读码 + 单测 + CI 构建；深色主题对比度、横屏安全区、页脚与悬浮胶囊的重叠仍需真机截图回归。
 
 1. **`imageDecode` 后续（P2，非阻塞）**：
    - v1.0.26 已覆盖“一次返回完整图片”的四类负载（data URI、裸 base64、`byte[]` JSON 数组、数字键对象），并完成落盘、去重、渲染与坏负载回退。
