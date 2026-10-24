@@ -90,7 +90,7 @@
 - `content` / `nextContentUrl` / `replaceRegex` / `webJs` 已有主链处理。
 - `imageStyle`：已在数据模型（`ChapterContent` / `ChapterContentCacheEntry`）、排版策略（`ReaderImageStyle` / `ReaderImageSizingPolicy`）与双端渲染层（滚动模式原生 TextKit `NSTextAttachment` 内嵌、翻页模式 `ReaderIllustrationView` 全宽/居中铺满）完整落地，并支持书源自定义请求头（防盗链 Referer/UA）透明转发。
 - `imageDecode`：当前已支持 URL 重写模式（通过 JS 转换或 CDN 换源）。Legado 原生在部分反爬拼图/二进制切片场景下支持返回 `byte[]`/Bitmap；SourceReadSwift2 当前版本覆盖了 URL-rewrite 级别解码，二进制级别 byte 拼图需作为后续高级解密扩展。
-- `payAction`：**当前没有付费动作执行点**。
+- `payAction`：已进入阅读器主链。纯 `http(s)://` 直接打开购买页、不进入 JS；`{{…}}` 模板逐段求值；`@js:` / `<js>` 走 JavaScriptCore；结果按 Legado `isTrue` 语义分类。购买成功后失效本章缓存并刷新。当前缺口是 `BookChapter.isPay` 尚未建模，按钮条件为 `hasLogin && isVip && payAction 非空` 的近似实现。
 - `sourceRegex` / `title`：需要按具体源确认是否进入正文元数据链；没有运行时证据时标记为“待验证”，不能写成已完整兼容。
 
 ### 3.5 顶层字段
@@ -111,7 +111,9 @@
 | 已完成（P1） | `preUpdateJs` 目录刷新 | 目录刷新前无法清理/更新状态 | 已在 TOC 请求前执行并支持 `book.setReverseToc`；回归 `ChapterListMetadataTests.testReverseTocFlagReversesCollectedChapterList` |
 | 已完成（P1） | `imageStyle` 渲染排版 | 漫画与插图小说排版不当、全宽铺满失效 | 已完成 ReaderImageStyle、双模式适配与防盗链 Header 转发；回归 `ReaderImageStyleTests` |
 | P1（部分完成） | `imageDecode` 图片解码 | 图文/拼图源正文图片不可用 | 当前已支持 URL-rewrite 重写模式；二进制切片拼图（byte/Bitmap）需后续专属图像解码管线 |
-| P1 | `payAction` 未执行 | VIP/付费源只能展示不可读 | 明确产品边界：展示 VIP 标记，不伪造购买/解锁 |
+| 已完成（P1） | `payAction` 付费动作 | VIP/付费源无法从阅读器触发购买 | 已实现 URL/模板/JS 求值、`isTrue` 分类、购后缓存失效与刷新；回归 `PayActionTests`；剩余 `isPay` 字段见下一行 |
+| P1 | `isPay` 未建模 | 已购买章节可能仍显示「购买本章」 | `BookChapter` 增加向后兼容可选字段，目录 HTML/JSON、缓存、withIndex/withTitle 全链透传；按钮改为 `hasLogin && isVip && isPay != true` |
+| P1 | `ruleContent.title` 未执行 | 标题只在正文中给出的源显示目录标题 | 在正文响应上执行 title 规则，空/失败回退 `chapter.title`，回填 `ChapterContent.title` |
 | P2 | `downloadUrls` 未消费 | 详情页下载入口不可用 | 要么实现下载队列，要么在 UI 隐藏 |
 | P2 | 目录逐章 `wordCount` 未展示 | 信息缺失，不影响阅读 | 有值时在章节副标题展示 |
 

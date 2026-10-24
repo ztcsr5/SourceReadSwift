@@ -22,6 +22,7 @@
 | 端到端 fixture | `SourceEngineLegadoCorpusTests.swift`、`SourceEngineCLevelFixtureTests.swift`、`LegadoStage25CompatibilityTests.swift` |
 | 能力样本库 | `SourceReadSwiftTests/Fixtures/legado-capability-bank-20260908.json` |
 | 目录元数据测试 | `SourceReadSwiftTests/ChapterListMetadataTests.swift` |
+| 付费动作 | `SourceReadSwift/Core/Engine/PayActionPolicy.swift`、`SourceReadSwiftTests/PayActionTests.swift` |
 
 ## 2. JSONPath 方言：支持什么，不支持什么
 
@@ -141,9 +142,37 @@ Legado 目录规则里两个直接影响目录展示的字段已经进入主链�
 
 书源在 `ruleToc.preUpdateJs` 里调用 `book.setReverseToc(true)` 时，JS 桥会把标记写入 `java.put('book.reverseToc', ...)`；引擎在“全部目录分页收集完成 + `formatJs` 执行完成”之后读取该标记，倒序整份章节表并把 `index` 重新编号为连续值。标记只在本次目录执行上下文内有效，不是按书持久化设置，因此同一书源的另一本书不会被串改。回归用例：`ChapterListMetadataTests.testReverseTocFlagReversesCollectedChapterList`、`testReverseTocFlagStaysOffWhenSourceDoesNotRequestIt`。
 
-`BookChapter.isVip` 现在以真实字段为准：原生 `LegadoBookChapterBridge.isVip()` 返回解析出的 `isVip`，JS 注入只在目标是普通字典（没有原生方法）时才安装“按标题猜 VIP”的 fallback，避免覆盖原生实现。回归用例：`LegadoNativeBridgeTests.testChapterBridgeUsesRealVipFlagInsteadOfTitleHeuristic`。
+`BookChapter.isVip` 现在以真实字段为准：原生 `LegadoBookChapterBridge.isVip()` 返回解析出的 `isVip`；JS 注入只在目标是普通字典且没有原生方法 / 布尔值时才安装“按标题猜 VIP”的 fallback，布尔字段不会被标题启发式覆盖。回归用例：`LegadoNativeBridgeTests.testChapterBridgeUsesRealVipFlagInsteadOfTitleHeuristic`、`JSCoreRuntimeTests.testChapterBooleanIsVipSurvivesFallbackInjection`。
 
 这三项不改变“能力矩阵 + 降级边界”的口径：目录 `wordCount` 仍未在 UI 展示。
+
+### 3.5 正文付费动作：`payAction`（已实现）
+
+`ruleContent.payAction` 已从“只解析不执行”升级为可运行链路，行为对齐 Legado `ReadBookActivity.payAction()`：
+
+```text
+目录/正文解析出 payAction
+      │
+      ▼
+阅读器菜单显示「购买本章」  ← hasLogin && isVip && payAction 非空
+      │  确认框 message = 章节标题
+      ▼
+PayActionPolicy.evaluate
+      ├─ http(s):// 纯 URL → 直接打开，不进入 JS
+      ├─ 含 {{…}} 模板 → 逐段求值后拼接
+      └─ 其它 → 交给 JS（@js: / <js> 归一化）
+      ▼
+isTrue 语义（空/null/false/no/not/0 为假，其余非空为真）
+      ├─ 绝对 URL → 打开购买页
+      ├─ 真值 → 失效本章缓存 → 刷新章节
+      └─ 假值/异常 → 明确提示，不伪造成功
+```
+
+- JS 执行复用书源同一套 `RuleExecutionContext`：Cookie、持久变量、同步网络桥与诊断 stage `payAction` 一致。
+- `chapter` 变量补齐 `title` / `name` / `url` / `chapterUrl` / `bookUrl` / `index` / `chapterIndex` / `isVip` / `updateTime` / `volumeName` / `wordCount`。
+- 购买成功后先执行 `ChapterContentCacheStore.invalidate(sourceURL:chapter:)`，再触发章节刷新，对应 Legado 的 `delContent` + `loadChapterList`，避免旧 VIP 占位内容继续命中缓存。
+- 当前可见性条件仍缺 `isPay`：Legado 新版为 `hasLogin && isVip && isPay != true`；本项目 `BookChapter` 尚无 `isPay` 字段，因此已购买但 `isVip` 仍为真的章节可能继续显示按钮。该字段是下一批 P1，不能在能力矩阵里写成已完整对齐。
+- 回归：`PayActionTests`（纯 URL 不执行 JS、malformed URL 失败、`@js:` / `<js>` 真值、完整真/假值集合、缓存只失效当前章、旧缓存兼容、`payAction` Codable round-trip）、`JSCoreRuntimeTests.testChapterBooleanIsVipSurvivesFallbackInjection`。
 
 ## 4. 为什么“完美兼容”很难
 
@@ -171,7 +200,7 @@ Legado 目录规则里两个直接影响目录展示的字段已经进入主链�
 
 - 支持：搜索、详情、目录、正文、分页、GBK、常见加密、ZIP、字体映射、基础 JS；
 - 条件支持：Cookie、POST、动态 token、图片正文、人工验证码；
-- 不支持/不伪造：真实 Android ID 绑定、7z/RAR、自动 OCR、真实付费解锁、无交互 Cloudflare 绕过。
+- 不支持/不伪造：真实 Android ID 绑定、7z/RAR、自动 OCR、绕过付费墙、无交互 Cloudflare 绕过；`payAction` 只执行书源声明的购买动作（打开购买页或运行源内 JS），不伪造购买成功。
 
 ## 5. 与市场产品的差异
 
@@ -190,6 +219,7 @@ Legado 目录规则里两个直接影响目录展示的字段已经进入主链�
 | P0（已完成） | `isVolume` / `formatJs` 目录链路 + 跨页卷继承 | `ChapterListMetadataTests` 通过 |
 | P1（已完成） | `preUpdateJs` 目录刷新与 `book.setReverseToc` | `ChapterListMetadataTests` 通过 |
 | P1（已完成） | 图片正文 `imageStyle` 排版策略与双端渲染 | 原生 TextKit（NSTextAttachment）与翻页模式（ReaderIllustrationView）落地，支持 FULL 全宽铺满与防盗链 Header 转发；用例 `ReaderImageStyleTests` 通过 |
+| P1（已完成） | 正文 `payAction` 付费动作 | 纯 URL 短路、模板/JS 求值、`isTrue` 语义、购后缓存失效与刷新；`PayActionTests` 通过 |
 | P1（部分完成） | 图片正文 `imageDecode` | 当前已支持 URL 级别的重写与规则链处理（JS/换源/绝对化）；Legado 原生的字节流拼图/Bitmap 解码需后续底层图像解码管道支持 |
 | P0 | 为 `startBrowserAwait` / 验证码建立 UI 状态机 | 不再返回假成功，UI 有明确状态 |
 | P1 | 把 JSONPath 方言差异写成可执行用例 | 每个差异至少一个 XCTest |
