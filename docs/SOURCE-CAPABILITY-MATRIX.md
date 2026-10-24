@@ -79,7 +79,7 @@
 - `isVolume`：已进入 HTML 与 JSON 两条目录解析链。规则命中为真的行按卷标题处理：不生成章节、写入后续章节的 `volumeName`，由 `ChapterListPresenter.volumeHeader` 在卷边界渲染标题。与 Legado“保留卷行”的模型差异是：本项目的章节模型不承载伪章节，因此卷行被消费而不是原样保留；跨页目录的 `currentVolume` 目前按页重置，跨页续卷仍是开放点。
 - `preUpdateJs`：**当前没有执行点**，规则中的值会被保留/展示，但不会参与目录刷新。
 - `formatJs`：已在全量目录（含分页）收集完成、章节索引定稿后执行。脚本变量为 `title`、1-based `index`（与 Legado `index + 1` 对齐）、`chapter`、`gInt`；返回值替换章节标题，空值/`undefined`/`null`/单章异常回退原标题，不影响其余章节。支持 `@js:` 与 `<js>...</js>` 包装，顶层 `return` 会以函数包装重试一次。
-- `wordCount`：目录字段可被解析，但目录 UI 目前不展示逐章字数。
+- `wordCount`：目录字段可被解析，并已在目录/章节列表副标题展示：`ChapterListPresenter.metadataLabel` 输出 `更新 <时间> · <字数>`；回归 `ChapterListMetadataTests.testChapterListPresenterBuildsMetadataLabelFromUpdateAndWordCount`、`SourceMetadataChainTests.testChapterListPresenterBuildsMetadataLabelFromUpdateAndWordCount`。
 
 ### 3.4 `ruleContent`
 
@@ -89,7 +89,7 @@
 
 - `content` / `nextContentUrl` / `replaceRegex` / `webJs` 已有主链处理。
 - `imageStyle`：已在数据模型（`ChapterContent` / `ChapterContentCacheEntry`）、排版策略（`ReaderImageStyle` / `ReaderImageSizingPolicy`）与双端渲染层（滚动模式原生 TextKit `NSTextAttachment` 内嵌、翻页模式 `ReaderIllustrationView` 全宽/居中铺满）完整落地，并支持书源自定义请求头（防盗链 Referer/UA）透明转发。
-- `imageDecode`：当前已支持 URL 重写模式（通过 JS 转换或 CDN 换源）。Legado 原生在部分反爬拼图/二进制切片场景下支持返回 `byte[]`/Bitmap；SourceReadSwift2 当前版本覆盖了 URL-rewrite 级别解码，二进制级别 byte 拼图需作为后续高级解密扩展。
+- `imageDecode`：v1.0.26 已从 URL 重写扩展到字节负载：识别 `data:image/...;base64,...`、裸 base64、`java.ajaxBytes` 的 `byte[]` JSON 数组、数字键对象四类形态，按魔数接受 png/jpg/gif/webp/bmp/tiff/heic/avif，单图上限 32 MB；解码结果经 `srdata://` 注册表进入阅读器，普通 URL 与非法负载保持原路径。仍不覆盖“源分多次返回切片、客户端按坐标拼图”的 Canvas 场景。
 - `payAction`：已进入阅读器主链。纯 `http(s)://` 直接打开购买页、不进入 JS；`{{…}}` 模板逐段求值；`@js:` / `<js>` 走 JavaScriptCore；结果按 Legado `isTrue` 语义分类。购买成功后失效本章缓存并刷新。v1.0.24 已补 `BookChapter.isPay`，按钮条件为 `hasLogin && isVip && isPay != true`。
 - `title`：v1.0.24 已实现。正文 HTML / JSON 响应上执行 `ruleContent.title`，HTML 在 document root 求值（兼容 `<h1>` 在正文容器外），空值或失败回退目录标题；回归 `ContentParserTests` 4 个用例。
 - `sourceRegex`：仍需按具体源确认是否进入正文元数据链；没有运行时证据时标记为“待验证”，不能写成已完整兼容。
@@ -111,13 +111,15 @@
 | 已完成（P0） | `formatJs` 目录链路 | 依赖 JS 生成章节名的源出现空名/原名 | 已在全量目录后执行，1-based index、单章失败回退；回归 `ChapterListMetadataTests.testFormatJsRunsAfterPaginationWithOneBasedIndex` |
 | 已完成（P1） | `preUpdateJs` 目录刷新 | 目录刷新前无法清理/更新状态 | 已在 TOC 请求前执行并支持 `book.setReverseToc`；回归 `ChapterListMetadataTests.testReverseTocFlagReversesCollectedChapterList` |
 | 已完成（P1） | `imageStyle` 渲染排版 | 漫画与插图小说排版不当、全宽铺满失效 | 已完成 ReaderImageStyle、双模式适配与防盗链 Header 转发；回归 `ReaderImageStyleTests` |
-| P1（部分完成） | `imageDecode` 图片解码 | 图文/拼图源正文图片不可用 | 当前已支持 URL-rewrite 重写模式；二进制切片拼图（byte/Bitmap）需后续专属图像解码管线 |
+| 已完成（P1） | `imageDecode` 字节负载 | 图文/反爬源正文插图缺失 | v1.0.26 四类负载解码 + `srdata://` 注册表 + 阅读器渲染；`InlineImagePipelineTests` 7 个用例。仅“多切片 Canvas 拼图”仍需真实样本 |
 | 已完成（P1） | `payAction` 付费动作 | VIP/付费源无法从阅读器触发购买 | 已实现 URL/模板/JS 求值、`isTrue` 分类、购后缓存失效与刷新；回归 `PayActionTests`；`isPay` 见下一行 |
 | 已完成（P1） | `isPay` 字段 | 已购买章节可能仍显示「购买本章」 | `BookChapter.isPay: Bool?`（旧缓存为 nil）；HTML/JSON 独立解析 `isPay/paid/purchased`；缓存与 `withIndex`/`withTitle` 透传；按钮改为 `hasLogin && isVip && isPay != true`；回归 `ChapterListMetadataTests.testHTMLChapterIsPayIsParsedSeparatelyFromIsVip`、`testJSONChapterIsPaySupportsBooleanStringAndMissingValue`、`JSCoreRuntimeTests.testChapterBridgeExposesIsPayAsBoolean` |
 | 已完成（P1） | `ruleContent.title` 正文标题 | 标题只在正文中给出的源显示目录标题 | 已在正文 HTML/JSON 响应上执行 title 规则，空/失败回退 `chapter.title`，回填 `ChapterContent.title`；回归 `ContentParserTests.testHTMLContentTitleRuleOverridesTOCTitle`、`testJSONContentTitleRuleOverridesTOCTitle` |
 | 已完成（P1） | `java.*` 未实现 API | 调用即 TypeError，整条规则失败 | v1.0.25 在 prelude 末尾用 Proxy 降级到原生 dispatcher，记录 `bridge.error java.<name>` 并返回空串；回归 `JSCoreRuntimeTests.testUnknownJavaMethodDegradesAndRecordsBridgeDiagnostic` |
-| P2 | `downloadUrls` 未消费 | 详情页下载入口不可用 | 要么实现下载队列，要么在 UI 隐藏 |
-| P2 | 目录逐章 `wordCount` 未展示 | 信息缺失，不影响阅读 | 有值时在章节副标题展示 |
+| P2（已决策） | `downloadUrls` 未消费 | 详情页下载入口不可用 | 当前不解析也不渲染入口，不存在死按钮；实现前提是完整下载队列/进度/重试，不做半成品 |
+| 已完成（P1） | 目录逐章 `wordCount` | 信息缺失，不影响阅读 | 已在紧凑目录与完整目录副标题渲染 `更新 <时间> · <字数>`；`ChapterListPresenter.metadataLabel` 有测试覆盖 |
+| P2（语义待固定） | `nextContentUrl` 多值 | 极少数源只读第一页 | 上游源码已不可访问；先用离线 fixture 固化“数组/换行多值”的真实行为，再实现合并 |
+| P2（语义待固定） | `replaceRegex` 合并顺序 | 跨页替换范围可能不一致 | 同上：先固化“合并后替换”的可复现样本，再调整执行位置，单 URL 源必须零回归 |
 
 ## 5. 回归入口
 

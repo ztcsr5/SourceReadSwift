@@ -103,7 +103,7 @@
 | JS 运行时 | `SourceReadSwift/Core/JavaScript/JSCoreRuntime.swift` | ~276 KB，JSCore + 兼容 prelude |
 | Java 原生桥 | `LegadoNativeBridges.swift`、`LegadoHostServices.swift` | ~122 KB，网络/加密/存储/解析 facade |
 | 能力样本库 | `SourceReadSwiftTests/Fixtures/legado-capability-bank-20260908.json` | 13 个真实源快照 |
-| 回归 | `SourceReadSwiftTests` | 925 XCTest（v1.0.25 CI 实际结果） |
+| 回归 | `SourceReadSwiftTests` | 932 XCTest（v1.0.26 CI 实际结果） |
 
 ### 3.2 刚完成的 payAction 链路（v1.0.23）
 
@@ -121,14 +121,24 @@
 
 | 优先级 | 缺口 | 影响 | 处理 |
 |---|---|---|---|
-| P1 | `imageDecode` 字节级拼图 | 少数漫画/反爬源图片不可用 | 建 Data → CGImage 管线，支持切片/拼图/解密 |
+| 已完成（P1，v1.0.26） | `imageDecode` 字节负载 | 少数漫画/反爬源图片不可用 | 四类负载 → `Data` → 魔数校验 → `srdata://` 注册表 → `UIImage`；`InlineImagePipelineTests` 7 个用例。多切片拼图矩阵仍需真实样本 |
 | 已完成（P1） | `ruleContent.title` | 正文页标题与目录不一致 | v1.0.24 已在 HTML/JSON 正文响应上执行 title 规则，空/失败回退目录标题；`ContentParserTests` 4 个用例 |
 | 已完成（P1） | `isPay` 字段 | 买后仍显示“购买本章” | v1.0.24 目录模型增加 `Bool?`，HTML/JSON 独立解析，按钮条件 `isPay != true`；`ChapterListMetadataTests` / `JSCoreRuntimeTests` |
-| P2 | `downloadUrls` | 详情页下载入口不可用 | 要么实现下载队列，要么 UI 隐藏，禁止半成品 |
-| P2 | 目录 `wordCount` UI | 信息缺失 | 有值时在章节副标题展示 |
-| P2 | `nextContentUrl` 多 URL | 少量源分页失败 | 支持数组/多值并逐页合并 |
-| P2 | `replaceRegex` 执行顺序 | 多页合并后替换范围不一致 | 对齐 Legado 的“合并后替换”语义 |
+| P2（已决策） | `downloadUrls` | 详情页下载入口不可用 | 当前不解析、不渲染入口，不存在死按钮；实现前提是完整下载队列与进度 |
+| 已完成（P1） | 目录 `wordCount` UI | 信息缺失 | 已由 `ChapterListPresenter.metadataLabel` 在章节副标题展示，含 `3200字` / `1.2万字` 回归 |
+| P2（语义待固定） | `nextContentUrl` 多 URL | 少量源分页失败 | 上游源码已消失；先用离线 fixture 固化真实行为，再实现数组/多值合并 |
+| P2（语义待固定） | `replaceRegex` 执行顺序 | 多页合并后替换范围不一致 | 先采集真实跨页样本并固化期望输出，再决定是否改为合并后替换 |
 | P2 | Java API 未实现诊断 | 失败只剩空值 | 所有 stub 记录 API 名、源、章节、原因 |
+
+### 3.4 上游参考实现已消失（2026-10-24 实测）
+
+2026-10-24 通过 GitHub API 读取 `gedoor/legado`：默认分支只返回 `README.md` 与一张公告图，README 是作者删除项目内容的公告。这不是网络故障，而是上游基线消失。
+
+工程含义：
+
+- 不能再把“对照最新 Kotlin 源码”作为兼容性计划的一部分；规则语义会随时间失真。
+- 仓库内的 13 源快照与各阶段 fixture 就是唯一可执行规范；新增能力必须先补 fixture，再写实现。
+- 文档里所有“Legado 原生如何如何”的表述都应附带样本或代码证据；无法取证时标为 `Assumed`，不写成承诺。
 
 ## 4. 可执行路线：把“兼容”变成工程指标
 
@@ -153,7 +163,7 @@
 
 ### 4.3 中期（P1/P2）
 
-1. **imageDecode 字节管线**：JS 返回 `byte[]`/Base64 → `Data` → 切片/拼图 → `UIImage`；用固定 fixture 做像素级对比。
+1. **imageDecode 字节管线（已完成，v1.0.26）**：JS 返回 `byte[]`/Base64 → `Data` → 魔数校验 → `srdata://` 注册表 → `UIImage`；`InlineImagePipelineTests` 用 3×2 PNG 做真实解码对比。多切片拼图仍未覆盖，需真实样本再立项。
 2. **正则兼容层**：把 Java 常用语法（`\Q...\E`、命名组、Unicode 属性、替换引用）转成 NSRegularExpression 可执行形式；不能转的显式报错。
 3. **fixture 对拍**：同一书源在 Android Legado 与 iOS 引擎上跑同一输入，记录 JSON/HTML 输出差异；CI 只跑离线 fixture，公网验证单独记录。
 4. **源健康度**：连续失败自动降级/禁用，并在书源详情展示失败 stage 与最后错误。

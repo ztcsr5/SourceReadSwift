@@ -59,3 +59,19 @@ Swift 原生桥：
 - 验证码识别已接入阅读器 UI 人工闭环（Stage 35）：图片 URL 统一解析为绝对地址后作为缓存键，超时或取消返回空值并记录 `verification-required`；OCR 自动识别仍不在范围内。
 - Windows 无法运行 Xcode/UIKit/XCTest；Stage 25 的 iOS 编译、XCTest 与 unsigned IPA
   以 GitHub Actions 为准，真机 120 Hz 仍需 ProMotion 设备验收。
+
+## Stage 36：`imageDecode` 内联图像负载（v1.0.26）
+
+`ruleContent.imageDecode` 的返回值不再只按 URL 处理。`InlineImageDecoder` 覆盖：
+
+| 负载形态 | 示例 | 处理 |
+|---|---|---|
+| data URI | `data:image/png;base64,...` | 解码、魔数校验、入库 |
+| 裸 base64 | `iVBORw0...` | 同上 |
+| JS 字节数组 | `[137,80,78,71,...]` | JSON 解析为 `Data` 后同上 |
+| 数字键对象 | `{"0":137,"1":80,...}` | 同上 |
+
+- 只接受魔数可识别的 png/jpg/gif/webp/bmp/tiff/heic/avif；单图上限 32 MB。
+- 段落写 `srdata://inline/<sha256>.<ext>`，由 `InlineImageStore` 去重落盘、`RemoteImageLoader` 解码渲染。
+- 普通 URL 仍走原有绝对化路径；非法负载保留原 URL 并记日志。
+- 回归：`InlineImagePipelineTests` 7 个用例（含 `java.ajaxBytes` 经 `RemoteImageLoader` 的真实解码）。
