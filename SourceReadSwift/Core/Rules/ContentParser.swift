@@ -5,11 +5,16 @@ struct ContentParser {
     private let htmlExtractor: HtmlRuleExtractor
     private let jsonExtractor: JSONRuleExtractor
     private let executionContext: RuleExecutionContext
+    private let inlineImages: InlineImageStore
 
-    init(executionContext: RuleExecutionContext = RuleExecutionContext()) {
+    init(
+        executionContext: RuleExecutionContext = RuleExecutionContext(),
+        inlineImages: InlineImageStore = .shared
+    ) {
         self.executionContext = executionContext
         self.htmlExtractor = HtmlRuleExtractor(executionContext: executionContext)
         self.jsonExtractor = JSONRuleExtractor(executionContext: executionContext)
+        self.inlineImages = inlineImages
     }
 
     func parse(
@@ -441,7 +446,21 @@ struct ContentParser {
                     executionContext.log("imageDecode produced empty result; keeping original image URL")
                     continue
                 }
-                let finalURL = htmlExtractor.absolutize(trimmed, base: response.url)
+                let finalURL: String
+                switch InlineImageDecoder.decode(trimmed) {
+                case .decoded(let payload):
+                    guard let tokenURL = inlineImages.store(payload) else {
+                        executionContext.log("imageDecode inline image could not be stored; keeping original image URL")
+                        continue
+                    }
+                    executionContext.log("imageDecode produced inline image (\(payload.data.count) bytes, \(payload.fileExtension))")
+                    finalURL = tokenURL.absoluteString
+                case .invalid(let reason):
+                    executionContext.log("imageDecode inline payload rejected (\(reason)); keeping original image URL")
+                    continue
+                case .notInline:
+                    finalURL = htmlExtractor.absolutize(trimmed, base: response.url)
+                }
                 guard !finalURL.isEmpty else { continue }
                 if let range = Range(match.range(at: 0), in: output) {
                     output.replaceSubrange(range, with: "[img]\(finalURL)[/img]")

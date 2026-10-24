@@ -14,8 +14,10 @@ final class RemoteImageLoader: @unchecked Sendable {
     private let cache = NSCache<NSURL, UIImage>()
     private let lock = NSLock()
     private var inFlight: [String: Task<UIImage?, Never>] = [:]
+    private let inlineImages: InlineImageStore
 
-    private init() {
+    init(inlineImages: InlineImageStore = .shared) {
+        self.inlineImages = inlineImages
         cache.countLimit = 160
         cache.totalCostLimit = 64 * 1024 * 1024
     }
@@ -77,6 +79,14 @@ final class RemoteImageLoader: @unchecked Sendable {
     }
 
     private func download(_ url: URL, headers: [String: String]) async -> UIImage? {
+        if InlineImageStore.isInlineURL(url) {
+            guard let data = inlineImages.data(for: url),
+                  let decoded = await Self.decodeImageOffMainThread(data),
+                  !Task.isCancelled else { return nil }
+            insert(decoded, for: url)
+            return decoded
+        }
+
         var request = URLRequest(url: url)
         request.cachePolicy = .returnCacheDataElseLoad
         for (key, value) in headers where !key.isEmpty {
