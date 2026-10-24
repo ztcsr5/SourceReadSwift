@@ -154,4 +154,24 @@ final class ChapterContentCacheStoreTests: XCTestCase {
         XCTAssertEqual(reloaded.entries.count, 1)
         try? FileManager.default.removeItem(at: root)
     }
+
+    func testMarkReadMovesEntryToFrontAndPersists() throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        let persistence = ChapterContentCachePersistence(fileManager: .default, rootURL: root)
+        let store = ChapterContentCacheStore(persistence: persistence)
+        let first = BookChapter(title: "One", url: "https://example.com/1", bookUrl: "book", index: 0, isVip: false)
+        let second = BookChapter(title: "Two", url: "https://example.com/2", bookUrl: "book", index: 1, isVip: false)
+        store.save(ChapterContent(chapter: first, title: "One", paragraphs: ["A"], nextContentUrl: nil), sourceURL: "source", purifyRules: ["rule"])
+        store.save(ChapterContent(chapter: second, title: "Two", paragraphs: ["B"], nextContentUrl: nil), sourceURL: "source", purifyRules: ["rule"])
+        XCTAssertEqual(store.entries.map(\.title), ["Two", "One"])
+
+        let readAt = Date().addingTimeInterval(60)
+        store.markRead(sourceURL: "source", chapter: first, purifyRules: ["rule"], at: readAt)
+
+        XCTAssertEqual(store.entries.map(\.title), ["One", "Two"])
+        XCTAssertEqual(store.entries.first?.cachedAt.timeIntervalSince1970 ?? 0, readAt.timeIntervalSince1970, accuracy: 1)
+        let reloaded = ChapterContentCacheStore(persistence: persistence)
+        XCTAssertEqual(reloaded.entries.map(\.title), ["One", "Two"])
+        try? FileManager.default.removeItem(at: root)
+    }
 }

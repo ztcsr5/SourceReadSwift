@@ -106,8 +106,21 @@ struct ReaderView: View {
     @State private var windowSections: [ReaderChapterSection] = []
     @State private var windowCurrentChapterIndex = 0
     @State private var windowLoadingIndices: Set<Int> = []
+    /// Last failure per chapter. Placeholders and the scroll boundary banner
+    /// read this map, so a source timeout is visible instead of looking like
+    /// the book simply ended.
+    @State private var windowFailures: [Int: String] = [:]
+    @State private var windowRetryAttempts: [Int: Int] = [:]
+    @State private var windowRetryTasks: [Int: Task<Void, Never>] = [:]
     @State private var windowGeneration = 0
     @State private var isWindowSeeded = false
+    /// Pagination is immutable per chapter and typography. Rebuilding the whole
+    /// five-chapter window every time a neighbour arrives used to re-measure
+    /// every paragraph and made a prefetch look like a frozen reader. Keep
+    /// chapter-local blocks and renumber them when assembling the window.
+    @State private var chapterPageCache: [Int: ReaderChapterPageCacheEntry] = [:]
+    @State private var chapterPageCacheSignature = ""
+    @State private var chapterPageCounts: [Int: Int] = [:]
     /// Increments whenever a window mutation moves the visible paragraph in
     /// the flat index space (a chapter was inserted or trimmed above the
     /// viewport). The native surface consumes the absolute anchor once per
@@ -238,19 +251,112 @@ struct ReaderView: View {
     private var progressTitle: String {
         var parts: [String] = []
         let displayIndex = currentDisplayChapterIndex
-        if let totalChapters, totalChapters > 0 {
-            let percentage = Int((Double(displayIndex + 1) / Double(totalChapters) * 100).rounded())
-            parts.append("第 \(displayIndex + 1) / \(totalChapters) 章")
+        if let displayTotal = displayTotalChapters, displayTotal > 0 {
+            let percentage = Int((Double(displayIndex + 1) / Double(displayTotal) * 100).rounded())
+            parts.append("第 \(displayIndex + 1) / \(displayTotal) 章")
             parts.append("\(percentage)%")
         } else {
             parts.append("第 \(displayIndex + 1) 章")
         }
         if readerMode != .scroll {
-            let pageCount = max(pagedBlocks.count, 1)
-            let page = min(max(pagedPageIndex + 1, 1), pageCount)
-            parts.append("页 \(page)/\(pageCount)")
+            if let chapterPages = currentChapterPageStatus {
+                parts.append(chapterPages)
+            } else {
+                let pageCount = max(pagedBlocks.count, 1)
+                let page = min(max(pagedPageIndex + 1, 1), pageCount)
+                parts.append("页 \(page)/\(pageCount)")
+            }
         }
         return parts.joined(separator: " · ")
+    }
+
+    /// Live chapter total for the footer. The bookshelf's `totalChapters`
+    /// can be stale after a source reshuffle, so the live TOC wins here too.
+    private var displayTotalChapters: Int? {
+        if let highest = chapters.map(\.index).max(), highest >= 0 {
+            return highest + 1
+        }
+        if let totalChapters, totalChapters > 0 {
+            return totalChapters
+        }
+        return nil
+    }
+
+    /// Page position inside the current chapter, which is what a reader
+    /// expects ("page 2 of 5") instead of a window-wide count that grows
+    /// whenever a prefetched neighbour lands.
+    private var currentChapterPageStatus: String? {
+        guard readerMode != .scroll,
+              pagedBlocks.indices.contains(pagedPageIndex) else { return nil }
+        let block = pagedBlocks[pagedPageIndex]
+        guard !block.isPlaceholder, block.chapterIndex >= 0 else { return nil }
+        let ordinal = block.pageOrdinal + 1
+        let count = max(chapterPageCounts[block.chapterIndex] ?? ordinal, ordinal)
+        return "页 \(ordinal)/\(count)"
+    }
+
+    /// Scroll-mode boundary feedback. The native surface has no placeholder
+    /// page, so without this a slow or failing source looks like the book
+    /// simply ended. It only appears near the boundary where the reader would
+    /// actually cross; a failure keeps a retry button because it needs a
+    /// decision, an in-flight prefetch is just informational.
+    private var scrollChapterStatus: ScrollChapterStatus? {
+        guard readerMode == .scroll else { return nil }
+        if isNearCurrentChapterEnd {
+            let next = windowCurrentChapterIndex + 1
+            if next < windowChapterUpperBound {
+                if let failure = windowFailures[next] {
+                    return ScrollChapterStatus(
+                        chapterIndex: next,
+                        message: "第 \(next + 1) 章加载失败：\(failure)",
+                        isFailure: true
+                    )
+                }
+                if windowLoadingIndices.contains(next) {
+                    return ScrollChapterStatus(
+                        chapterIndex: next,
+                        message: "正在加载第 \(next + 1) 章…",
+                        isFailure: false
+                    )
+                }
+            }
+        }
+        if isNearCurrentChapterStart {
+            let previous = windowCurrentChapterIndex - 1
+            if previous >= 0 {
+                if let failure = windowFailures[previous] {
+                    return ScrollChapterStatus(
+                        chapterIndex: previous,
+                        message: "第 \(previous + 1) 章加载失败：\(failure)",
+                        isFailure: true
+                    )
+                }
+                if windowLoadingIndices.contains(previous) {
+                    return ScrollChapterStatus(
+                        chapterIndex: previous,
+                        message: "正在加载第 \(previous + 1) 章…",
+                        isFailure: false
+                    )
+                }
+            }
+        }
+        return nil
+    }
+
+    private var isNearCurrentChapterEnd: Bool {
+        guard let section = windowSections.first(where: { $0.chapterIndex == windowCurrentChapterIndex }),
+              !section.paragraphs.isEmpty else { return false }
+        let resolved = resolvedReadingPosition(forFlatIndex: visibleParagraphIndex)
+        guard resolved.chapterIndex == windowCurrentChapterIndex else { return false }
+        return section.paragraphs.count - resolved.paragraphIndex <= 6
+    }
+
+    private var isNearCurrentChapterStart: Bool {
+        guard let section = windowSections.first(where: { $0.chapterIndex == windowCurrentChapterIndex }),
+              !section.paragraphs.isEmpty else { return false }
+        let resolved = resolvedReadingPosition(forFlatIndex: visibleParagraphIndex)
+        guard resolved.chapterIndex == windowCurrentChapterIndex else { return false }
+        return resolved.paragraphIndex <= 3
     }
 
     private var sleepTimerBadgeText: String? {
@@ -269,17 +375,17 @@ struct ReaderView: View {
     }
 
     private var windowChapterUpperBound: Int {
-        if let totalChapters, totalChapters > 0 {
-            return totalChapters
-        }
-        if let highest = chapters.map(\.index).max() {
-            return max(highest + 1, chapterIndex + 1)
-        }
-        if let localChapters = appState.bookshelfStore.book(id: bookID)?.localChapters,
-           !localChapters.isEmpty {
-            return localChapters.count
-        }
-        return chapterIndex + 1
+        // The live table of contents is the authority. `totalChapters` is the
+        // count from the last bookshelf refresh and can exceed the chapters
+        // this reader actually holds; trusting it made every boundary request
+        // target a chapter that no longer exists, which looked like the book
+        // had simply ended.
+        let localCount = appState.bookshelfStore.book(id: bookID)?.localChapters?.count ?? 0
+        return ReaderChapterWindowPolicy.upperBound(
+            totalChapters: totalChapters,
+            chapterIndices: chapters.map(\.index),
+            fallback: max(max(chapterIndex, windowCurrentChapterIndex) + 1, localCount)
+        )
     }
 
     private var windowRadius: Int {
@@ -391,6 +497,43 @@ struct ReaderView: View {
         ].joined(separator: "|")
     }
 
+    /// Signature for chapter-local pagination. Unlike `readerLayoutKey` it
+    /// ignores the reading mode: page-turn, cover and page-curl share one page
+    /// model, so switching between them must not re-measure every chapter.
+    private var chapterPageLayoutSignature: String {
+        let viewport = effectiveViewportSize
+        return [
+            fontFamilyRawValue,
+            String(format: "%.1f", fontSize),
+            String(format: "%.1f", lineSpacing),
+            String(format: "%.1f", pagePadding),
+            String(format: "%.1f", letterSpacing),
+            String(format: "%.1f", paragraphSpacing),
+            String(format: "%.1f", paragraphIndent),
+            String(format: "%.1f", titleSpacing),
+            String(format: "%.1f", footerHeight),
+            currentImageStyle.rawValue,
+            String(format: "%.1fx%.1f", viewport.width, viewport.height)
+        ].joined(separator: "|")
+    }
+
+    private func chapterPageContentSignature(_ section: ReaderChapterSection) -> String {
+        "\(section.chapterIndex)|\(section.title)|\(section.paragraphs.count)|\(section.paragraphs.first?.hashValue ?? 0)|\(section.paragraphs.last?.hashValue ?? 0)"
+    }
+
+    /// Keeps the chapter pagination cache bounded. Entries outside the live
+    /// window stay valid for quick back-reads until the cap forces the farthest
+    /// chapters out.
+    private func pruneChapterPageCache(keeping window: Set<Int>) {
+        let limit = max(window.count + 6, 12)
+        guard chapterPageCache.count > limit else { return }
+        let nearest = chapterPageCache.keys.sorted {
+            abs($0 - windowCurrentChapterIndex) < abs($1 - windowCurrentChapterIndex)
+        }.prefix(limit)
+        let keep = window.union(nearest)
+        chapterPageCache = chapterPageCache.filter { keep.contains($0.key) }
+    }
+
     private var positionMapping: ReaderPositionMapping {
         positionMappingCache
     }
@@ -431,6 +574,12 @@ struct ReaderView: View {
                 readerFooter
                     .transition(.opacity)
                     .zIndex(1)
+            }
+
+            if !showOverlay, readerMode == .scroll, let status = scrollChapterStatus {
+                scrollChapterStatusBanner(status)
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+                    .zIndex(2)
             }
 
             if showOverlay {
@@ -619,6 +768,7 @@ struct ReaderView: View {
             positionPersistTask?.cancel()
             pageLayoutTask?.cancel()
             cancelPrefetch()
+            cancelWindowRetries()
             persistReadingPosition(paragraphIndexOverride: currentParagraphIndexForPersistence())
             stopAutoScroll()
             sleepTimerTask?.cancel()
@@ -1055,6 +1205,9 @@ struct ReaderView: View {
         layoutAnchorOldParagraph = visibleParagraphIndex
         windowGeneration &+= 1
         cancelPrefetch()
+        cancelWindowRetries()
+        windowFailures.removeAll()
+        windowRetryAttempts.removeAll()
         windowSections = [
             ReaderChapterSection(
                 chapterIndex: chapterIndex,
@@ -1068,11 +1221,15 @@ struct ReaderView: View {
         pendingAutoScrollChapterIndex = nil
         rebuildWindowPositionMapping()
         prefetchWindow(around: chapterIndex)
+        touchChapterCache(chapterIndex)
     }
 
     private func resetWindow() {
         windowGeneration &+= 1
         cancelPrefetch()
+        cancelWindowRetries()
+        windowFailures.removeAll()
+        windowRetryAttempts.removeAll()
         layoutAnchorOldParagraph = visibleParagraphIndex
         windowLoadingIndices.removeAll()
         windowSections = [
@@ -1088,6 +1245,7 @@ struct ReaderView: View {
         pendingAutoScrollChapterIndex = nil
         rebuildWindowPositionMapping()
         prefetchWindow(around: chapterIndex)
+        touchChapterCache(chapterIndex)
     }
 
     /// Warms both sides of the cursor. Forward chapters are requested first
@@ -1166,8 +1324,29 @@ struct ReaderView: View {
         prefetchWindow(around: windowCurrentChapterIndex)
     }
 
-    private func loadWindowChapter(_ index: Int) {
-        guard index >= 0, index < windowChapterUpperBound else { return }
+    /// A chapter may be requested only while it has automatic attempts left,
+    /// is not already loading, and is not waiting for its backoff timer. Once
+    /// the attempts are exhausted the placeholder keeps a manual retry button;
+    /// without this gate every scroll tick or prefetch pass would restart the
+    /// same failing request and the reader would never settle.
+    private func shouldAttemptLoad(_ index: Int) -> Bool {
+        guard index >= 0, index < windowChapterUpperBound else { return false }
+        if windowSections.contains(where: { $0.chapterIndex == index && $0.isReady }) { return false }
+        guard !windowLoadingIndices.contains(index) else { return false }
+        if windowRetryTasks[index] != nil { return false }
+        if windowFailures[index] != nil,
+           windowRetryAttempts[index, default: 0] >= ReaderChapterRetryPolicy.maximumAutomaticAttempts {
+            return false
+        }
+        return true
+    }
+
+    private func loadWindowChapter(_ index: Int, force: Bool = false) {
+        if force {
+            guard index >= 0, index < windowChapterUpperBound else { return }
+        } else {
+            guard shouldAttemptLoad(index) else { return }
+        }
         if windowSections.contains(where: { $0.chapterIndex == index && $0.isReady }) { return }
         guard !windowLoadingIndices.contains(index) else { return }
 
@@ -1182,41 +1361,56 @@ struct ReaderView: View {
     /// Queue-owned load. The caller already checked the window state; the
     /// loading mark prevents a direct request and the queue from racing.
     private func loadWindowChapterNow(_ index: Int, generation: Int) async {
-        guard index >= 0, index < windowChapterUpperBound else { return }
-        if windowSections.contains(where: { $0.chapterIndex == index && $0.isReady }) { return }
-        guard !windowLoadingIndices.contains(index) else { return }
+        guard shouldAttemptLoad(index) else { return }
         windowLoadingIndices.insert(index)
         await performWindowLoad(index, generation: generation)
     }
 
     @discardableResult
     private func performWindowLoad(_ index: Int, generation: Int) async -> Bool {
-        let loaded = await fetchWindowChapter(index)
+        let outcome = await fetchWindowChapter(index)
         guard windowGeneration == generation else { return false }
         windowLoadingIndices.remove(index)
-        guard let loaded else { return false }
-        guard acceptsWindowChapter(index) else { return false }
-        upsertWindowSection(loaded)
-        return true
+        switch outcome {
+        case .success(let loaded):
+            guard acceptsWindowChapter(index) else { return false }
+            cancelWindowRetry(for: index)
+            windowFailures.removeValue(forKey: index)
+            windowRetryAttempts.removeValue(forKey: index)
+            upsertWindowSection(loaded)
+            return true
+        case .failure(let message):
+            // A chapter the cursor has already left is not worth a retry
+            // timer; recording it would surface a stale error later.
+            guard acceptsWindowChapter(index) else { return false }
+            windowFailures[index] = message
+            scheduleWindowRetry(for: index)
+            return false
+        }
     }
 
     @MainActor
-    private func fetchWindowChapter(_ index: Int) async -> ReaderChapterSection? {
+    private func fetchWindowChapter(_ index: Int) async -> ReaderWindowChapterOutcome {
         if let book = appState.bookshelfStore.book(id: bookID),
            let localChapters = book.localChapters,
            localChapters.indices.contains(index) {
             let local = localChapters[index]
-            return ReaderChapterSection(
-                chapterIndex: index,
-                title: local.title,
-                paragraphs: local.paragraphs
+            return .success(
+                ReaderChapterSection(
+                    chapterIndex: index,
+                    title: local.title,
+                    paragraphs: local.paragraphs
+                )
             )
         }
 
-        guard let chapter = chapters.first(where: { $0.index == index }) else { return nil }
-        let sourceURL = appState.bookshelfStore.book(id: bookID)?.sourceURL
-            ?? (bookID.contains("|") ? String(bookID.split(separator: "|")[0]) : nil)
-        guard let sourceURL, let source = appState.sourceStore.source(for: sourceURL) else { return nil }
+        guard let chapter = chapters.first(where: { $0.index == index }) else {
+            return .failure("目录中没有第 \(index + 1) 章，可能已被书源移除")
+        }
+        guard let sourceURL = windowSourceURL,
+              let source = appState.sourceStore.source(for: sourceURL) else {
+            return .failure("书源不存在或已被删除")
+        }
         let purifyRules = appState.purifyRuleStore.enabledPatterns
 
         if let cached = appState.chapterContentCacheStore.content(
@@ -1224,10 +1418,12 @@ struct ReaderView: View {
             chapter: chapter,
             purifyRules: purifyRules
         ) {
-            return ReaderChapterSection(
-                chapterIndex: index,
-                title: chapter.title,
-                paragraphs: cached.paragraphs
+            return .success(
+                ReaderChapterSection(
+                    chapterIndex: index,
+                    title: chapter.title,
+                    paragraphs: cached.paragraphs
+                )
             )
         }
 
@@ -1235,17 +1431,85 @@ struct ReaderView: View {
         let result = await AsyncTimeout.run(seconds: 12) {
             await engine.getContent(source: source, chapter: chapter)
         } ?? .failure(.network("Chapter window load timed out"))
-        guard case .success(let loaded) = result else { return nil }
-        appState.chapterContentCacheStore.save(
-            loaded,
+        switch result {
+        case .success(let loaded):
+            appState.chapterContentCacheStore.save(
+                loaded,
+                sourceURL: source.bookSourceUrl,
+                purifyRules: purifyRules
+            )
+            return .success(
+                ReaderChapterSection(
+                    chapterIndex: index,
+                    title: loaded.title,
+                    paragraphs: loaded.paragraphs
+                )
+            )
+        case .failure(let error):
+            return .failure(error.displayMessage)
+        }
+    }
+
+    /// Source of truth for the book's source URL; the bookshelf copy is
+    /// authoritative and the encoded book id is the fallback.
+    private var windowSourceURL: String? {
+        appState.bookshelfStore.book(id: bookID)?.sourceURL
+            ?? (bookID.contains("|") ? String(bookID.split(separator: "|")[0]) : nil)
+    }
+
+    /// Refresh the disk cache's LRU position when a chapter is actually read.
+    /// One array move plus one write per chapter transition is cheap, and it
+    /// is what makes "already read" mean "still cached" after heavy prefetch.
+    private func touchChapterCache(_ index: Int) {
+        guard let chapter = chapters.first(where: { $0.index == index }),
+              let sourceURL = windowSourceURL,
+              let source = appState.sourceStore.source(for: sourceURL) else { return }
+        appState.chapterContentCacheStore.markRead(
             sourceURL: source.bookSourceUrl,
-            purifyRules: purifyRules
+            chapter: chapter,
+            purifyRules: appState.purifyRuleStore.enabledPatterns
         )
-        return ReaderChapterSection(
-            chapterIndex: index,
-            title: loaded.title,
-            paragraphs: loaded.paragraphs
-        )
+    }
+
+    // MARK: - Chapter load retry
+
+    /// Schedules the next automatic attempt with backoff. The failure is
+    /// already recorded, so the placeholder shows the reason while the timer
+    /// runs; the task map also blocks prefetch from hammering the same chapter
+    /// during the wait.
+    private func scheduleWindowRetry(for index: Int) {
+        let attempt = windowRetryAttempts[index, default: 0]
+        guard let delay = ReaderChapterRetryPolicy.delay(afterAttempt: attempt) else { return }
+        windowRetryTasks[index]?.cancel()
+        let generation = windowGeneration
+        windowRetryTasks[index] = Task { @MainActor in
+            try? await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
+            guard !Task.isCancelled, windowGeneration == generation else { return }
+            windowRetryTasks[index] = nil
+            guard windowFailures[index] != nil else { return }
+            windowRetryAttempts[index] = attempt + 1
+            loadWindowChapter(index, force: true)
+        }
+    }
+
+    private func cancelWindowRetry(for index: Int) {
+        windowRetryTasks[index]?.cancel()
+        windowRetryTasks[index] = nil
+    }
+
+    private func cancelWindowRetries() {
+        for task in windowRetryTasks.values {
+            task.cancel()
+        }
+        windowRetryTasks.removeAll()
+    }
+
+    /// User-initiated retry: a fresh automatic cycle, then an immediate load.
+    private func retryChapterManually(_ index: Int) {
+        cancelWindowRetry(for: index)
+        windowRetryAttempts[index] = 0
+        windowFailures.removeValue(forKey: index)
+        loadWindowChapter(index, force: true)
     }
 
     /// The in-flight load may finish after the cursor moved. Accept it when it
@@ -1354,6 +1618,15 @@ struct ReaderView: View {
             upperBound: windowChapterUpperBound,
             loading: windowLoadingIndices
         )
+        // Drop failure state and pending retries for chapters the window has
+        // left behind; otherwise a long session accumulates timers for
+        // chapters the reader will never see again.
+        let staleFailures = windowFailures.keys.filter { !keep.contains($0) }
+        for index in staleFailures {
+            windowFailures.removeValue(forKey: index)
+            windowRetryAttempts.removeValue(forKey: index)
+            cancelWindowRetry(for: index)
+        }
         let removed = windowSections.contains { !keep.contains($0.chapterIndex) }
         guard removed else { return }
         let anchor = scrollAnchorPosition()
@@ -1399,6 +1672,7 @@ struct ReaderView: View {
             windowCurrentChapterIndex = resolved.chapterIndex
             prefetchWindow(around: resolved.chapterIndex)
             trimWindowIfNeeded()
+            touchChapterCache(resolved.chapterIndex)
         }
         let final = resolvedReadingPosition(forFlatIndex: visibleParagraphIndex)
         scheduleReadingPositionPersistence(paragraphIndex: final.paragraphIndex)
@@ -1417,6 +1691,7 @@ struct ReaderView: View {
         windowCurrentChapterIndex = block.chapterIndex
         prefetchWindow(around: block.chapterIndex)
         trimWindowIfNeeded()
+        touchChapterCache(block.chapterIndex)
     }
 
     private var nativeScrollRequestKey: String {
@@ -1612,34 +1887,60 @@ struct ReaderView: View {
         }
     }
 
-    /// The page shown while the neighbouring chapter is still downloading.
-    /// Without it the page curl/cover surfaces hit an index edge and bounced,
-    /// which forced the reader to leave the reader and pick the next chapter
-    /// from the table of contents.
+    /// The page shown while the neighbouring chapter is still downloading, or
+    /// after the source rejected it. Without a real failure state a timeout
+    /// looked like the end of the book and forced the reader back to the TOC.
     private func chapterPlaceholderPage(_ page: ReaderPageBlock) -> some View {
         pageSurface {
             VStack(spacing: 12) {
-                ProgressView()
-                Text(
-                    page.placeholderDirection < 0
-                        ? "正在加载上一章"
-                        : (page.placeholderDirection > 0 ? "正在加载下一章" : "正在加载章节")
-                )
-                .font(.footnote.weight(.semibold))
-                .foregroundStyle(readerThemeTextColor.opacity(0.65))
-                if !page.chapterTitle.isEmpty {
-                    Text(page.chapterTitle)
-                        .font(.subheadline)
-                        .foregroundStyle(readerThemeTextColor.opacity(0.82))
+                if let failure = windowFailures[page.chapterIndex] {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .font(.system(size: 26))
+                        .foregroundStyle(.orange)
+                    Text(page.placeholderDirection < 0 ? "上一章加载失败" : "章节加载失败")
+                        .font(.footnote.weight(.semibold))
+                    if !page.chapterTitle.isEmpty {
+                        Text(page.chapterTitle)
+                            .font(.subheadline)
+                            .foregroundStyle(readerThemeTextColor.opacity(0.82))
+                            .multilineTextAlignment(.center)
+                            .lineLimit(2)
+                    }
+                    Text(failure)
+                        .font(.caption2)
+                        .foregroundStyle(readerThemeTextColor.opacity(0.6))
                         .multilineTextAlignment(.center)
-                        .lineLimit(2)
+                        .lineLimit(4)
+                        .padding(.horizontal, 24)
+                    Button("重试") {
+                        retryChapterManually(page.chapterIndex)
+                    }
+                    .font(.footnote.weight(.semibold))
+                    .buttonStyle(.borderedProminent)
+                    .tint(AppTheme.accent)
+                } else {
+                    ProgressView()
+                    Text(
+                        page.placeholderDirection < 0
+                            ? "正在加载上一章"
+                            : (page.placeholderDirection > 0 ? "正在加载下一章" : "正在加载章节")
+                    )
+                    .font(.footnote.weight(.semibold))
+                    .foregroundStyle(readerThemeTextColor.opacity(0.65))
+                    if !page.chapterTitle.isEmpty {
+                        Text(page.chapterTitle)
+                            .font(.subheadline)
+                            .foregroundStyle(readerThemeTextColor.opacity(0.82))
+                            .multilineTextAlignment(.center)
+                            .lineLimit(2)
+                    }
+                    Button("重新加载") {
+                        retryChapterManually(page.chapterIndex)
+                    }
+                    .font(.footnote.weight(.semibold))
+                    .buttonStyle(.bordered)
+                    .tint(AppTheme.accent)
                 }
-                Button("重新加载") {
-                    loadWindowChapter(page.chapterIndex)
-                }
-                .font(.footnote.weight(.semibold))
-                .buttonStyle(.bordered)
-                .tint(AppTheme.accent)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
@@ -1762,6 +2063,47 @@ struct ReaderView: View {
         }
         .allowsHitTesting(false)
         .accessibilityHidden(true)
+    }
+
+    /// Slim status pill above the footer for scroll mode. It is the only
+    /// boundary feedback the TextKit surface has: a chapter that is still
+    /// downloading, or one the source refused.
+    private func scrollChapterStatusBanner(_ status: ScrollChapterStatus) -> some View {
+        VStack {
+            Spacer(minLength: 0)
+            HStack(spacing: 10) {
+                if status.isFailure {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .foregroundStyle(.orange)
+                    Text(status.message)
+                        .lineLimit(2)
+                        .multilineTextAlignment(.leading)
+                    Spacer(minLength: 8)
+                    Button("重试") {
+                        retryChapterManually(status.chapterIndex)
+                    }
+                    .font(.caption.weight(.semibold))
+                    .buttonStyle(.borderedProminent)
+                    .controlSize(.mini)
+                } else {
+                    ProgressView()
+                        .controlSize(.mini)
+                    Text(status.message)
+                        .lineLimit(1)
+                    Spacer(minLength: 0)
+                }
+            }
+            .font(.caption)
+            .foregroundStyle(readerThemeTextColor.opacity(0.85))
+            .padding(.horizontal, 14)
+            .padding(.vertical, 9)
+            .background(.ultraThinMaterial, in: Capsule())
+            .overlay(Capsule().stroke(readerThemeTextColor.opacity(0.12), lineWidth: 0.5))
+            .padding(.horizontal, 24)
+            .padding(.bottom, max(CGFloat(footerHeight), 24) + 8)
+        }
+        .allowsHitTesting(status.isFailure)
+        .animation(.easeInOut(duration: 0.2), value: status)
     }
 
     private var batteryPercentageText: String {
@@ -3803,6 +4145,7 @@ struct ReaderView: View {
             windowCurrentChapterIndex = block.chapterIndex
             prefetchWindow(around: block.chapterIndex)
             trimWindowIfNeeded()
+            touchChapterCache(block.chapterIndex)
         }
         let flat = positionMapping.paragraph(forPage: pageIndex)
         guard flat != visibleParagraphIndex || chapterChanged else { return }
@@ -3942,6 +4285,14 @@ struct ReaderView: View {
         }
         guard !sections.isEmpty else { return [] }
 
+        // Chapter-local pagination cache. A signature change (typography,
+        // viewport, image style) invalidates every chapter at once.
+        let layoutSignature = chapterPageLayoutSignature
+        if chapterPageCacheSignature != layoutSignature {
+            chapterPageCache.removeAll()
+            chapterPageCacheSignature = layoutSignature
+        }
+
         let topPadding = ReaderPageLayoutEngine.minimumTopInset(pagePadding: CGFloat(pagePadding))
         let bottomPadding = CGFloat(pagePadding) + CGFloat(footerHeight)
         let typography = ReaderPageTypography(
@@ -4004,14 +4355,31 @@ struct ReaderView: View {
                     title: section.title,
                     direction: 0
                 ))
+                chapterPageCounts.removeValue(forKey: section.chapterIndex)
                 expectedChapterIndex = section.chapterIndex + 1
                 continue
             }
-            pages.append(contentsOf: appendPages(
-                for: section,
-                typography: typography,
-                titleTypography: titleTypography
-            ))
+            let contentSignature = chapterPageContentSignature(section)
+            let cached = chapterPageCache[section.chapterIndex]
+            let chapterPages: [ReaderPageBlock]
+            if let cached,
+               cached.layoutSignature == layoutSignature,
+               cached.contentSignature == contentSignature {
+                chapterPages = cached.blocks
+            } else {
+                chapterPages = appendPages(
+                    for: section,
+                    typography: typography,
+                    titleTypography: titleTypography
+                )
+                chapterPageCache[section.chapterIndex] = ReaderChapterPageCacheEntry(
+                    layoutSignature: layoutSignature,
+                    contentSignature: contentSignature,
+                    blocks: chapterPages
+                )
+            }
+            chapterPageCounts[section.chapterIndex] = chapterPages.count
+            pages.append(contentsOf: chapterPages)
             expectedChapterIndex = section.chapterIndex + 1
         }
 
@@ -4032,6 +4400,10 @@ struct ReaderView: View {
                 chapterTitle: content.title
             ))
         }
+        let windowIndices = Set(sections.map(\.chapterIndex))
+        chapterPageCounts = chapterPageCounts.filter { windowIndices.contains($0.key) }
+        pruneChapterPageCache(keeping: windowIndices)
+
         // Every chapter paginates into its own array, so the local ids repeat.
         // Renumber globally: TabView selection and the page-curl controller
         // both rely on `page.id == page index`.
@@ -4226,6 +4598,20 @@ private extension View {
             self
         }
     }
+}
+
+/// Result of one window chapter fetch. The message travels to the placeholder
+/// and the scroll banner so a source timeout is visible instead of looking
+/// like an empty chapter.
+private enum ReaderWindowChapterOutcome {
+    case success(ReaderChapterSection)
+    case failure(String)
+}
+
+private struct ScrollChapterStatus: Equatable {
+    let chapterIndex: Int
+    let message: String
+    let isFailure: Bool
 }
 
 private struct ParagraphJumpRequest: Equatable {

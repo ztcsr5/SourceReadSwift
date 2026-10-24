@@ -119,6 +119,44 @@ final class ChapterContentCacheStore: ObservableObject {
         content(sourceURL: sourceURL, chapter: chapter, purifyRules: purifyRules) != nil
     }
 
+    /// Refresh the LRU position when a chapter is actually read.
+    ///
+    /// `save` only marks a chapter as cached when it first arrives. Without a
+    /// touch, a chapter read for an hour could still be evicted by 500 newer
+    /// prefetches, and walking back would show a loading page even though the
+    /// user had just read it. One write per chapter transition is cheap.
+    func markRead(
+        sourceURL: String,
+        chapter: BookChapter,
+        purifyRules: [String],
+        at date: Date = Date()
+    ) {
+        let key = cacheKey(sourceURL: sourceURL, chapterURL: chapter.url)
+        let signature = purifySignature(purifyRules)
+        guard let index = entries.firstIndex(where: { $0.key == key && $0.purifySignature == signature }) else {
+            return
+        }
+        let entry = entries.remove(at: index)
+        entries.insert(
+            ChapterContentCacheEntry(
+                key: entry.key,
+                sourceURL: entry.sourceURL,
+                chapterURL: entry.chapterURL,
+                bookURL: entry.bookURL,
+                chapterIndex: entry.chapterIndex,
+                title: entry.title,
+                paragraphs: entry.paragraphs,
+                nextContentUrl: entry.nextContentUrl,
+                imageStyle: entry.imageStyle,
+                payAction: entry.payAction,
+                purifySignature: entry.purifySignature,
+                cachedAt: date
+            ),
+            at: 0
+        )
+        persist()
+    }
+
     func save(_ content: ChapterContent, sourceURL: String, purifyRules: [String]) {
         let entry = ChapterContentCacheEntry(
             key: cacheKey(sourceURL: sourceURL, chapterURL: content.chapter.url),

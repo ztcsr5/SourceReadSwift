@@ -27,6 +27,18 @@ struct ReaderChapterSlice: Equatable {
     let paragraphCount: Int
 }
 
+/// Chapter-local pagination cached under one layout signature.
+///
+/// The window used to re-measure every paragraph of every loaded chapter each
+/// time a prefetched neighbour arrived. Chapter pagination is immutable while
+/// typography, viewport and image style stay the same, so the reader keeps each
+/// chapter's page array here and only renumbers ids when assembling the window.
+struct ReaderChapterPageCacheEntry: Equatable {
+    let layoutSignature: String
+    let contentSignature: String
+    let blocks: [ReaderPageBlock]
+}
+
 struct ReaderChapterPosition: Equatable {
     let chapterIndex: Int
     let paragraphIndex: Int
@@ -55,6 +67,30 @@ enum ReaderChapterWindowPolicy {
 
     static func radius(forPreloadCount count: Int) -> Int {
         max(ReaderPreloadPolicy.clamp(count), minimumRadius)
+    }
+
+    /// Last readable chapter index plus one.
+    ///
+    /// The live table of contents wins over `totalChapters`. The bookshelf
+    /// stores a chapter count from the last successful refresh; when the
+    /// source removes or reorders chapters that number can be larger than the
+    /// live TOC, and a window that trusts it keeps requesting chapters that do
+    /// not exist. That looked like a reader that refused to continue: every
+    /// boundary request failed silently. When the TOC is unavailable, fall
+    /// back to the persisted count.
+    static func upperBound(
+        totalChapters: Int?,
+        chapterIndices: [Int],
+        fallback: Int
+    ) -> Int {
+        let fallbackValue = max(fallback, 1)
+        if let highest = chapterIndices.max() {
+            return max(highest + 1, fallbackValue)
+        }
+        if let totalChapters, totalChapters > 0 {
+            return max(totalChapters, fallbackValue)
+        }
+        return fallbackValue
     }
 
     /// Inclusive chapter indices around `current`, clamped to the book.
@@ -279,5 +315,22 @@ enum ReaderChapterWindowPolicy {
         if placeholderDirection < 0 { return Int.max }
         if placeholderDirection > 0 { return 0 }
         return chapterIndex < currentChapterIndex ? Int.max : 0
+    }
+}
+
+/// Automatic retry backoff for a chapter that failed while the reader sits on
+/// its boundary. Three automatic retries cover a transient source timeout
+/// without hammering it; after that the placeholder keeps a manual retry
+/// button and the automatic one waits for it.
+enum ReaderChapterRetryPolicy {
+    static let maximumAutomaticAttempts = 3
+
+    static func delay(afterAttempt attempt: Int) -> TimeInterval? {
+        guard attempt >= 0, attempt < maximumAutomaticAttempts else { return nil }
+        switch attempt {
+        case 0: return 2
+        case 1: return 5
+        default: return 10
+        }
     }
 }

@@ -243,6 +243,50 @@ final class ReaderChapterWindowPolicyTests: XCTestCase {
         )
     }
 
+    func testUpperBoundPrefersTheLiveTOC() {
+        XCTAssertEqual(
+            ReaderChapterWindowPolicy.upperBound(
+                totalChapters: 5000,
+                chapterIndices: Array(0..<100),
+                fallback: 1
+            ),
+            100
+        )
+        XCTAssertEqual(
+            ReaderChapterWindowPolicy.upperBound(
+                totalChapters: nil,
+                chapterIndices: [4, 5, 6],
+                fallback: 1
+            ),
+            7
+        )
+        XCTAssertEqual(
+            ReaderChapterWindowPolicy.upperBound(
+                totalChapters: 12,
+                chapterIndices: [],
+                fallback: 1
+            ),
+            12
+        )
+        XCTAssertEqual(
+            ReaderChapterWindowPolicy.upperBound(
+                totalChapters: nil,
+                chapterIndices: [],
+                fallback: 3
+            ),
+            3
+        )
+    }
+
+    func testRetryPolicyStopsAfterThreeAttempts() {
+        XCTAssertEqual(ReaderChapterRetryPolicy.delay(afterAttempt: 0), 2)
+        XCTAssertEqual(ReaderChapterRetryPolicy.delay(afterAttempt: 1), 5)
+        XCTAssertEqual(ReaderChapterRetryPolicy.delay(afterAttempt: 2), 10)
+        XCTAssertNil(ReaderChapterRetryPolicy.delay(afterAttempt: 3))
+        XCTAssertNil(ReaderChapterRetryPolicy.delay(afterAttempt: -1))
+        XCTAssertEqual(ReaderChapterRetryPolicy.maximumAutomaticAttempts, 3)
+    }
+
     func testFirstAndLastPageResolutionSkipsPlaceholders() {
         let pages: [(chapterIndex: Int, isPlaceholder: Bool)] = [
             (3, true),

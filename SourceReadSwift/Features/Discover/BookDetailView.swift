@@ -883,7 +883,6 @@ struct ChapterLoadingView: View {
     @State private var autoplaySpeechAfterHandoff = false
     @State private var autoplayAutoScrollAfterHandoff = false
     @State private var showReaderChromeAfterChapterSelection = false
-    @State private var preloadTask: Task<Void, Never>?
     @AppStorage("reader.preloadChapterCount") private var preloadChapterCount = ReaderPreloadPolicy.defaultCount
 
     private var effectiveChapter: BookChapter {
@@ -918,10 +917,6 @@ struct ChapterLoadingView: View {
                 await load(force: true)
             }
         }
-        .onDisappear {
-            preloadTask?.cancel()
-            preloadTask = nil
-        }
     }
 
     private func load(force: Bool = false, ignoreCache: Bool = false) async {
@@ -944,7 +939,6 @@ struct ChapterLoadingView: View {
         ) {
             content = cached
             isUsingStaleCache = false
-            preloadAdjacentChapters(around: targetChapter, source: source, purifyRules: purifyRules)
             return
         }
         let engine = appState.engine
@@ -956,7 +950,6 @@ struct ChapterLoadingView: View {
             appState.chapterContentCacheStore.save(loaded, sourceURL: source.bookSourceUrl, purifyRules: purifyRules)
             content = loaded
             isUsingStaleCache = false
-            preloadAdjacentChapters(around: targetChapter, source: source, purifyRules: purifyRules)
         case .failure(let error):
             if let cached = appState.chapterContentCacheStore.staleContent(
                 sourceURL: source.bookSourceUrl,
@@ -966,40 +959,6 @@ struct ChapterLoadingView: View {
                 isUsingStaleCache = true
             } else {
                 errorMessage = error.displayMessage
-            }
-        }
-    }
-
-    /// Warms both sides of the current chapter. Reading backward must be as
-    /// instant as reading forward: a chapter the reader already visited stays
-    /// in the disk cache, and the chapters just before the current one are
-    /// prefetched before they are needed.
-    private func preloadAdjacentChapters(around chapter: BookChapter, source: BookSource, purifyRules: [String]) {
-        let count = ReaderPreloadPolicy.clamp(preloadChapterCount)
-        guard count > 0 else { return }
-        guard preloadTask == nil else { return }
-        let pending = chaptersToCache(around: chapter, source: source, purifyRules: purifyRules, count: count)
-        guard !pending.isEmpty else { return }
-        let engine = appState.engine
-        preloadTask = Task {
-            for next in pending {
-                guard !Task.isCancelled else { return }
-                let result = await AsyncTimeout.run(seconds: 10) {
-                    await engine.getContent(source: source, chapter: next)
-                } ?? .failure(.network("Preload timed out"))
-                guard !Task.isCancelled else { return }
-                if case .success(let loaded) = result {
-                    await MainActor.run {
-                        appState.chapterContentCacheStore.save(
-                            loaded,
-                            sourceURL: source.bookSourceUrl,
-                            purifyRules: purifyRules
-                        )
-                    }
-                }
-            }
-            await MainActor.run {
-                preloadTask = nil
             }
         }
     }
