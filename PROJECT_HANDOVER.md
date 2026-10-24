@@ -1,10 +1,10 @@
 # SourceReadSwift (纸间) 项目交接全量备忘录
 
 > **交接目标**：交接给下一位 AI 协作者 / 研发工程师  
-> **文档基线**：v1.0.29 (Build 30)  
+> **文档基线**：v1.0.30 (Build 31)  
 > **交接时间**：2026-10-25  
-> **验证 Commit**：`7773e2b`（GitHub Actions iOS 984 tests / 0 failures；unsigned IPA 打包通过）  
-> **最新产物**：`C:\Users\Edc21\Desktop\SourceReadSwift-1.0.29-unsigned.ipa`（11,466,987 字节，SHA256 `C2CC7A38778A76338E6BDA61BC14D0E75BF908A88C7F72485D06368CF6AD8D2A`）
+> **验证 Commit**：`91c9161`（GitHub Actions iOS 987 tests / 0 failures；unsigned IPA 打包通过）  
+> **最新产物**：`C:\Users\Edc21\Desktop\SourceReadSwift-1.0.30-unsigned.ipa`（11,507,953 字节，SHA256 `05F3EC27C1FD065D91289045229D0B25A2DCF4E5E5A1FCFCE86313624AA10261`）
 
 ---
 
@@ -18,9 +18,9 @@
 - **远端仓库**：`https://github.com/ztcsr5/SourceReadSwift.git`
   - *注：Git remote 已嵌入认证 Token，直接执行 `git push origin codex/swift-v2-lifetime-reader` 即可推送。*
 - **当前交付产物**：
-  - 路径：`C:\Users\Edc21\Desktop\SourceReadSwift-1.0.29-unsigned.ipa`
-  - 大小：`11,466,987 字节 (~10.9 MB)`
-  - 验证状态：基于 Commit `7773e2b`，通过 GitHub Actions CI 真实打包下载（run `40109182535`）；IPA 内 `CFBundleShortVersionString=1.0.29`、`CFBundleVersion=30`、`MinimumOSVersion=16.0`。
+  - 路径：`C:\Users\Edc21\Desktop\SourceReadSwift-1.0.30-unsigned.ipa`
+  - 大小：`11,507,953 字节 (~11.0 MB)`
+  - 验证状态：基于 Commit `91c9161`，通过 GitHub Actions CI 真实打包下载（run `40112864571`）；IPA 内 `CFBundleShortVersionString=1.0.30`、`CFBundleVersion=31`、`MinimumOSVersion=16.0`。
 
 ### 2. 技术栈架构
 - **语言**：Swift 5.9+（全面采用 Swift Concurrency: `async/await`, `actor`, `Sendable`）
@@ -36,9 +36,9 @@
 
 ---
 
-## 二、 核心功能链实现（v1.0.22 → v1.0.29） (What Changed)
+## 二、 核心功能链实现（v1.0.22 → v1.0.30） (What Changed)
 
-`v1.0.22` 完成了书籍插图与漫画排版的完整生命周期闭环；`v1.0.23` 补齐 `ruleContent.payAction` 付费动作链路（第 7 节）；`v1.0.24` 继续补齐 `ruleContent.title` 正文标题回填与 `BookChapter.isPay` 建模，并修复版本元数据漂移（第 8 节）；`v1.0.25` 把未知 `java.*` 调用从 TypeError 降级为可诊断的空值（第 9 节）；`v1.0.26` 把 `ruleContent.imageDecode` 返回的字节负载接入阅读器内联图像管线（第 10 节）；`v1.0.27` 修复阅读器三模式与阅读界面；`v1.0.28` 把四模式阅读器改成双向跨章窗口（第 12 节）；`v1.0.29` 把预取改成近邻优先的串行队列，并修正向后翻页落到上一章章尾（第 13 节）。
+`v1.0.22` 完成了书籍插图与漫画排版的完整生命周期闭环；`v1.0.23` 补齐 `ruleContent.payAction` 付费动作链路（第 7 节）；`v1.0.24` 继续补齐 `ruleContent.title` 正文标题回填与 `BookChapter.isPay` 建模，并修复版本元数据漂移（第 8 节）；`v1.0.25` 把未知 `java.*` 调用从 TypeError 降级为可诊断的空值（第 9 节）；`v1.0.26` 把 `ruleContent.imageDecode` 返回的字节负载接入阅读器内联图像管线（第 10 节）；`v1.0.27` 修复阅读器三模式与阅读界面；`v1.0.28` 把四模式阅读器改成双向跨章窗口（第 12 节）；`v1.0.29` 把预取改成近邻优先的串行队列，并修正向后翻页落到上一章章尾（第 13 节）；`v1.0.30` 把章级分页缓存、读取态 LRU 与失败重试接入同一个连续窗口（第 14 节）。
 
 ### v1.0.22 基线：插图与漫画排版
 
@@ -272,6 +272,48 @@ v1.0.28 的 `prefetchWindow` 对窗口内所有缺失章节同时发起请求。
 **仍待真机验证**：串行预取在弱网下的队列推进速度、向后拖动占位页加载完成后的视觉落点、覆盖/仿真动画与队列回包同时发生时的连续性。本机没有 Xcode/真机，以上只能标记为待验收，不能写成已通过。
 
 
+### 14. v1.0.30 增量：章级分页缓存、读取态 LRU 与失败重试
+
+本轮起点是 v1.0.29（`7773e2b`）。目标是把“读完一章再手动点下一章”彻底从四个阅读表面移除：滑动、覆盖、平移、仿真共用同一个“当前章 + 前后 N 章”的连续窗口，已读章节留在磁盘缓存，跨章失败不再伪装成“全书结束”。
+
+#### A. 章节上界改用实时目录
+
+`windowChapterUpperBound` 原先信任书架保存的 `totalChapters`。书源重排/删章后这个数字会大于真实目录，边界请求一直指向不存在的章节，表现就是“滑到章尾停住”。新增 `ReaderChapterWindowPolicy.upperBound(totalChapters:chapterIndices:fallback:)`：实时目录的最高章号优先，目录不可用时才回退到持久化计数与本地章节数。
+
+#### B. 章级分页缓存与全局页号重编
+
+- `buildReaderPageBlocks` 以 `chapterPageLayoutSignature`（字体、字号、行距、边距、字距、段距、缩进、标题间距、页脚、图片样式、视口）和 `chapterPageContentSignature`（章号、标题、段落数与首尾段落）作为缓存键，逐章缓存 `ReaderPageBlock` 数组。
+- 预取邻章回包时只分页新章，不再重排整个窗口；组装窗口时统一重编全局 `id`，保证 TabView selection、覆盖拖动和 `UIPageViewController` 的 `page.id == index` 契约。
+- `pruneChapterPageCache` 以当前章为圆心保留窗口与最近章节，避免长时间阅读后分页缓存无限增长。
+
+#### C. 跨章失败态、自动重试与手动重试
+
+- `fetchWindowChapter` 现在返回 `ReaderWindowChapterOutcome`：成功携带章节，失败携带可显示的错误文本，不再用空章节冒充成功。
+- `ReaderChapterRetryPolicy` 提供 3 次自动重试（2 / 5 / 10 秒）。`scheduleWindowRetry` / `cancelWindowRetry` 用 `windowGeneration` 丢弃过期回包；重试期间 `shouldAttemptLoad` 阻止滚动 tick 或预取队列重复打同一个失败章节。
+- 分页占位页显示“正在加载上一章/下一章”、真实错误和“重试”按钮；滚动模式在章尾/章首显示 `scrollChapterStatusBanner`。失败不会再被误判为全书结束。
+
+#### D. 读取即刷新磁盘缓存 LRU
+
+`ChapterContentCacheStore.markRead(sourceURL:chapter:purifyRules:at:)` 在章节真正进入阅读位置时把命中条目移到队首并刷新 `cachedAt`。缓存上限仍为 500 章，但“刚读过的章”不会因为后台预取 500 个新章而被淘汰；退出重进或向前回翻时直接命中磁盘，不再发网络请求。
+
+#### E. 预取所有权收敛到阅读窗口
+
+删除 `BookDetailView` 的 `preloadTask`、`onDisappear` 取消块与两处 `preloadAdjacentChapters(...)` 调用。详情页预取和阅读器窗口预取同时存在时会重复请求同一章、互相淘汰缓存；现在窗口是唯一预取所有者，详情页只负责打开阅读器。
+
+#### F. 页脚章内页码与滚动边界提示
+
+- 分页模式页脚改为“第 X / Y 章 · Z% · 页 a/b”，其中 `b` 是当前章总页数（`chapterPageCounts`），不再是会随预取增长的窗口总页数。
+- 滚动模式在距章尾 6 段/章首 3 段时显示加载或失败胶囊，并提供手动重试。
+
+#### G. 验证
+
+- 新增 `ChapterContentCacheStoreTests.testMarkReadMovesEntryToFrontAndPersists`、`ReaderChapterWindowPolicyTests.testUpperBoundPrefersTheLiveTOC`、`ReaderChapterRetryPolicy` 三次上限用例；`SearchURLResolverTests` 版本断言更新到 1.0.30 / Build 31。
+- CI：iOS run `40112864505` / job `120928037334`，commit `91c9161`，**987 tests / 0 failures / TEST SUCCEEDED**（基线 984，净增 3）。
+- IPA：run `40112864571` / job `120928037986`，`C:\Users\Edc21\Desktop\SourceReadSwift-1.0.30-unsigned.ipa`，11,507,953 字节，SHA256 `05F3EC27C1FD065D91289045229D0B25A2DCF4E5E5A1FCFCE86313624AA10261`，Info.plist 1.0.30 / Build 31 / iOS 16.0 / `com.edc21.SourceReadSwift`。
+- 四件套：`E:\codex-temp\sourceread\artifacts\reader-continuous-v30\`（`BASELINE/`、`MODIFIED/`、`DIFF.patch`、`ROLLBACK.sh`、`VERIFICATION.txt`、`DRILL/`）；独立副本回滚演练 10/10 文件 SHA256 与基线一致。
+
+**仍待真机验证**：三种分页手势在章界占位页上的连续滑动节奏、覆盖/仿真动画与预取回包同时发生时的视觉落点、弱网下 2/5/10 秒重试的用户感知。本机没有 Xcode/真机，以上只能标记为待验收，不能写成已通过。
+
 ---
 
 ## 三、 代码路径与核心文件索引 (Where it lives)
@@ -298,36 +340,36 @@ v1.0.28 的 `prefetchWindow` 对窗口内所有缺失章节同时发起请求。
 | **正文标题** | `SourceReadSwift/Core/Rules/ContentParser.swift` | `ruleContent.title` HTML/JSON 求值与回退 |
 | **章节付费标记** | `SourceReadSwift/Core/Models/BookModels.swift` | `BookChapter.isPay` 可选字段与全链透传 |
 | **JS 兼容降级** | `SourceReadSwift/Core/JavaScript/JSCoreRuntime.swift` | 未知 `java.*` 调用经 Proxy 降级并写入 `bridge.error` 诊断 |
-| **工程配置** | `project.yml` & `SourceReadSwift/App/Info.plist` | 版本声明（1.0.29 / Build 30）；bundle 版本由 `MARKETING_VERSION` / `CURRENT_PROJECT_VERSION` 单一来源派生 |
+| **工程配置** | `project.yml` & `SourceReadSwift/App/Info.plist` | 版本声明（1.0.30 / Build 31）；bundle 版本由 `MARKETING_VERSION` / `CURRENT_PROJECT_VERSION` 单一来源派生 |
 
 ---
 
 ## 四、 验证结果与 CI 证据 (How to verify)
 
-### 1. 自动化测试结果（v1.0.29）
-- **GitHub Actions Run ID**：`40109182540`
-- **Job ID**：`120917402615`
-- **验证 Commit**：`7773e2b`
+### 1. 自动化测试结果（v1.0.30）
+- **GitHub Actions Run ID**：`40112864505`
+- **Job ID**：`120928037334`
+- **验证 Commit**：`91c9161`
 - **运行结论**：`Success`（`** TEST SUCCEEDED **`）
-- **用例总数**：**984 个 XCTest 单元测试全部通过（0 failures, 0 unexpected）**
-- **基线对照**：v1.0.28 的 `285950e` 为 983 tests / 0 failures；本轮净增 1 个占位页方向恢复用例
+- **用例总数**：**987 个 XCTest 单元测试全部通过（0 failures, 0 unexpected）**
+- **基线对照**：v1.0.29 的 `7773e2b` 为 984 tests / 0 failures；本轮净增 3 个用例
 - **本轮新增/关键覆盖**：
-  - `ReaderChapterWindowPolicy.restoreParagraphIndex`：向后/向前/中间空洞占位页的端点恢复
-  - `ReaderChapterWindowPolicy.prefetchOrder`：最近优先、同距离向后优先，供串行队列直接消费
-  - `ReaderChapterPosition.pageOrdinal`：窗口重建后的章内精确页恢复
-  - `SearchURLResolverTests.testAppVersionSemantics` 锁定 1.0.29 / Build 30
-- **历史**：v1.0.28 为 run `40107402912` / job `120911836046`，983 tests / 0 failures；v1.0.27 为 run `40096362239` / job `120879785198`，969 tests / 0 failures
+  - `ChapterContentCacheStore.markRead`：命中后移到队首并刷新 `cachedAt`，重启后仍保留
+  - `ReaderChapterWindowPolicy.upperBound`：实时目录优先于可能过期的 `totalChapters`
+  - `ReaderChapterRetryPolicy`：2 / 5 / 10 秒三次自动重试后停止，等待手动重试
+  - `SearchURLResolverTests.testAppVersionSemantics` 锁定 1.0.30 / Build 31
+- **历史**：v1.0.29 为 run `40109182540` / job `120917402615`，984 tests / 0 failures；v1.0.28 为 run `40107402912` / job `120911836046`，983 tests / 0 failures
 
-### 2. IPA 打包产物（v1.0.29）
-- **GitHub Actions Run ID**：`40109182535`
-- **Job ID**：`120917402989`
-- **验证 Commit**：`7773e2b`
+### 2. IPA 打包产物（v1.0.30）
+- **GitHub Actions Run ID**：`40112864571`
+- **Job ID**：`120928037986`
+- **验证 Commit**：`91c9161`
 - **产物名**：`SourceReadSwift-unsigned-ipa`
-- **本地落盘路径**：`C:\Users\Edc21\Desktop\SourceReadSwift-1.0.29-unsigned.ipa`
-- **产物大小**：`11,466,987 字节`
-- **SHA256**：`C2CC7A38778A76338E6BDA61BC14D0E75BF908A88C7F72485D06368CF6AD8D2A`
-- **Info.plist 核验**：`CFBundleShortVersionString=1.0.29`、`CFBundleVersion=30`、`MinimumOSVersion=16.0`、`CFBundleIdentifier=com.edc21.SourceReadSwift`（workflow 内 `PlistBuddy` 断言 + 本地 `plistlib` 复验）
-- **历史（v1.0.28）**：`SourceReadSwift-1.0.28-unsigned.ipa`，11,462,716 字节，SHA256 `AA382E773C727F9FD95EDA3FF51AFA6554B85E939780DF6779CE4EDB8BA96402`，run `40107402785`；v1.0.27 为 11,390,330 字节，run `40096362252`
+- **本地落盘路径**：`C:\Users\Edc21\Desktop\SourceReadSwift-1.0.30-unsigned.ipa`
+- **产物大小**：`11,507,953 字节`
+- **SHA256**：`05F3EC27C1FD065D91289045229D0B25A2DCF4E5E5A1FCFCE86313624AA10261`
+- **Info.plist 核验**：`CFBundleShortVersionString=1.0.30`、`CFBundleVersion=31`、`MinimumOSVersion=16.0`、`CFBundleIdentifier=com.edc21.SourceReadSwift`（workflow 内 `PlistBuddy` 断言 + 本地 `plistlib` 复验）
+- **历史（v1.0.29）**：`SourceReadSwift-1.0.29-unsigned.ipa`，11,466,987 字节，SHA256 `C2CC7A38778A76338E6BDA61BC14D0E75BF908A88C7F72485D06368CF6AD8D2A`，run `40109182535`；v1.0.28 为 11,462,716 字节，run `40107402785`
 
 ---
 
@@ -335,10 +377,12 @@ v1.0.28 的 `prefetchWindow` 对窗口内所有缺失章节同时发起请求。
 
 下一位接手的工程师或 AI 可在此坚实基准上推进以下事项：
 
-0. **阅读器（v1.0.29 已实现双向串行预取，剩余真机验收）**：
-   - 四种模式已经共用“当前章 + 前后 N 章”的双向窗口；分页模式用占位页跨边界，滑动模式用扁平段落空间续接。预取已改为近邻优先的串行队列，向后翻页会落到上一章章尾。剩余工作是真机逐项验收手势节奏、覆盖/仿真动画与预取回包同时发生时的视觉连续性。
+0. **阅读器（v1.0.30 已实现无限跨章与失败重试，剩余真机验收）**：
+   - 四种模式共用“当前章 + 前后 N 章”窗口：滚动模式用扁平段落空间续接，覆盖/平移/仿真用真实占位页跨边界；预取串行、近邻优先，读完一章会自动接上下一章，不再需要手动点“下一章”。
+   - 章级分页缓存避免邻章回包时重排整窗；`markRead` 让读过的章节留在 500 章磁盘缓存队首，回翻直接命中。
+   - 剩余验收项：真机逐项检查滑动/覆盖/翻页的跨章手势节奏、覆盖与仿真动画在占位页替换时的视觉连续性、弱网下三次自动重试后的手动重试入口。
    - 漫画放大后只能看中心：`ComicPageImageView` 有 1×–3.5× 缩放但没有平移；TabView 内 pan 与翻页手势冲突，需要真机调 `DragGesture` 启用阈值。
-   - 跨章窗口目前有边界、预取、锚点和页占位单元测试，但没有真机长文连续滚动/连续翻页回归；长章节回翻和弱网下的占位页仍应作为验收项。
+   - 跨章窗口目前有边界、预取、锚点、页占位与重试的单元测试，但没有真机长文连续滚动/连续翻页回归；长章节回翻和弱网下的占位页仍应作为验收项。
    - 本机没有 Xcode/Swift 工具链，本轮所有 UI 结论来自读码 + 单测 + CI 构建；深色主题对比度、横屏安全区、页脚与悬浮胶囊的重叠仍需真机截图回归。
 
 1. **`imageDecode` 后续（P2，非阻塞）**：
