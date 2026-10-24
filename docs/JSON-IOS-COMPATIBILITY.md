@@ -225,7 +225,7 @@ isTrue 语义（空/null/false/no/not/0 为假，其余非空为真）
 | P1（部分完成） | 图片正文 `imageDecode` | 当前已支持 URL 级别的重写与规则链处理（JS/换源/绝对化）；Legado 原生的字节流拼图/Bitmap 解码需后续底层图像解码管道支持 |
 | P0 | 为 `startBrowserAwait` / 验证码建立 UI 状态机 | 不再返回假成功，UI 有明确状态 |
 | P1 | 把 JSONPath 方言差异写成可执行用例 | 每个差异至少一个 XCTest |
-| P1 | 为 `java.*` stub 建立运行时诊断 | 调用时记录 API 名、源、章节、失败原因 |
+| P1（已完成） | 为 `java.*` stub 建立运行时诊断 | v1.0.25 未知 API 经 Proxy 降级到原生 dispatcher，记录 `bridge.error java.<name>` 并返回空串；`JSCoreRuntimeTests` 2 个用例通过，CI 925 tests |
 | P2 | 7z/RAR 替代方案 | 导入时提示 ZIP/预解压，不在运行时静默空值 |
 
 ## 7. 复现与验证

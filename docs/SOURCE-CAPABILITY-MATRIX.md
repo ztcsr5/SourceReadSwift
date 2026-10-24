@@ -115,6 +115,7 @@
 | 已完成（P1） | `payAction` 付费动作 | VIP/付费源无法从阅读器触发购买 | 已实现 URL/模板/JS 求值、`isTrue` 分类、购后缓存失效与刷新；回归 `PayActionTests`；`isPay` 见下一行 |
 | 已完成（P1） | `isPay` 字段 | 已购买章节可能仍显示「购买本章」 | `BookChapter.isPay: Bool?`（旧缓存为 nil）；HTML/JSON 独立解析 `isPay/paid/purchased`；缓存与 `withIndex`/`withTitle` 透传；按钮改为 `hasLogin && isVip && isPay != true`；回归 `ChapterListMetadataTests.testHTMLChapterIsPayIsParsedSeparatelyFromIsVip`、`testJSONChapterIsPaySupportsBooleanStringAndMissingValue`、`JSCoreRuntimeTests.testChapterBridgeExposesIsPayAsBoolean` |
 | 已完成（P1） | `ruleContent.title` 正文标题 | 标题只在正文中给出的源显示目录标题 | 已在正文 HTML/JSON 响应上执行 title 规则，空/失败回退 `chapter.title`，回填 `ChapterContent.title`；回归 `ContentParserTests.testHTMLContentTitleRuleOverridesTOCTitle`、`testJSONContentTitleRuleOverridesTOCTitle` |
+| 已完成（P1） | `java.*` 未实现 API | 调用即 TypeError，整条规则失败 | v1.0.25 在 prelude 末尾用 Proxy 降级到原生 dispatcher，记录 `bridge.error java.<name>` 并返回空串；回归 `JSCoreRuntimeTests.testUnknownJavaMethodDegradesAndRecordsBridgeDiagnostic` |
 | P2 | `downloadUrls` 未消费 | 详情页下载入口不可用 | 要么实现下载队列，要么在 UI 隐藏 |
 | P2 | 目录逐章 `wordCount` 未展示 | 信息缺失，不影响阅读 | 有值时在章节副标题展示 |
 

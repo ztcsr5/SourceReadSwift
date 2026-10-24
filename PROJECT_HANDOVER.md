@@ -1,10 +1,10 @@
 # SourceReadSwift (纸间) 项目交接全量备忘录
 
 > **交接目标**：交接给下一位 AI 协作者 / 研发工程师  
-> **文档基线**：v1.0.24 (Build 25)  
+> **文档基线**：v1.0.25 (Build 26)  
 > **交接时间**：2026-10-24  
-> **验证 Commit**：`435497a`（GitHub Actions iOS 923 tests / 0 failures；unsigned IPA 打包通过）  
-> **最新产物**：`C:\Users\Edc21\Desktop\SourceReadSwift-1.0.24-unsigned.ipa`（11,320,222 字节，SHA256 `5BA1F2BD180AF3A58EEF78909854ABDF1737314F6A154E5F4C70EA1E10EC9E78`）
+> **验证 Commit**：`0b46689`（GitHub Actions iOS 925 tests / 0 failures；unsigned IPA 打包通过）  
+> **最新产物**：`C:\Users\Edc21\Desktop\SourceReadSwift-1.0.25-unsigned.ipa`（11,320,554 字节，SHA256 `BD718572BD497B724C4A8802412E3859853E0A352F1E5D406B949C1B2E1222C8`）
 
 ---
 
@@ -18,9 +18,9 @@
 - **远端仓库**：`https://github.com/ztcsr5/SourceReadSwift.git`
   - *注：Git remote 已嵌入认证 Token，直接执行 `git push origin codex/swift-v2-lifetime-reader` 即可推送。*
 - **当前交付产物**：
-  - 路径：`C:\Users\Edc21\Desktop\SourceReadSwift-1.0.24-unsigned.ipa`
-  - 大小：`11,320,222 字节 (~10.8 MB)`
-  - 验证状态：基于 Commit `435497a`，通过 GitHub Actions CI 真实打包下载（run `40084421249`）；IPA 内 `CFBundleShortVersionString=1.0.24`、`CFBundleVersion=25`。
+  - 路径：`C:\Users\Edc21\Desktop\SourceReadSwift-1.0.25-unsigned.ipa`
+  - 大小：`11,320,554 字节 (~10.8 MB)`
+  - 验证状态：基于 Commit `0b46689`，通过 GitHub Actions CI 真实打包下载（run `40086744058`）；IPA 内 `CFBundleShortVersionString=1.0.25`、`CFBundleVersion=26`。
 
 ### 2. 技术栈架构
 - **语言**：Swift 5.9+（全面采用 Swift Concurrency: `async/await`, `actor`, `Sendable`）
@@ -36,9 +36,9 @@
 
 ---
 
-## 二、 v1.0.24 核心功能链实现 (What Changed)
+## 二、 v1.0.25 核心功能链实现 (What Changed)
 
-`v1.0.22` 完成了书籍插图与漫画排版的完整生命周期闭环；`v1.0.23` 补齐 `ruleContent.payAction` 付费动作链路（第 7 节）；`v1.0.24` 继续补齐 `ruleContent.title` 正文标题回填与 `BookChapter.isPay` 建模，并修复版本元数据漂移（第 8 节）。
+`v1.0.22` 完成了书籍插图与漫画排版的完整生命周期闭环；`v1.0.23` 补齐 `ruleContent.payAction` 付费动作链路（第 7 节）；`v1.0.24` 继续补齐 `ruleContent.title` 正文标题回填与 `BookChapter.isPay` 建模，并修复版本元数据漂移（第 8 节）；`v1.0.25` 把未知 `java.*` 调用从 TypeError 降级为可诊断的空值（第 9 节）。
 
 ### v1.0.22 基线：插图与漫画排版
 
@@ -116,6 +116,14 @@ SourceRequestBuilder.imageRequestHeaders(for: currentBookSource)
 - **版本元数据**：`project.yml` 的 `info.properties` 改为 `$(MARKETING_VERSION)` / `$(CURRENT_PROJECT_VERSION)`；Unsigned IPA workflow 增加 `PlistBuddy` 断言，IPA 内部版本与 `project.yml` 不一致时 CI 直接失败。该断言发现并修复了首次 1.0.24 打包内部仍是 1.0.23/24 的漂移。
 - **回归**：`ChapterListMetadataTests` 3 个（HTML `isPay` 独立解析、JSON 布尔/字符串/缺省、旧缓存 Codable）、`ContentParserTests` 4 个（HTML/JSON title、CSS miss 回退、`@js:` title）、`JSCoreRuntimeTests` 1 个（`chapter.isPay` 布尔）；CI 923 tests / 0 failures。
 
+### 9. v1.0.25 增量：未知 `java.*` 调用的可控降级与诊断
+
+- **问题**：书源脚本调用本 build 尚未实现的 `java.*` 方法时，JS 侧拿到 `undefined`，调用即抛 TypeError，整条目录/正文规则直接失败，用户只看到空章节。
+- **实现**：prelude 末尾安装 `java = new Proxy(java, ...)`。未知成员返回函数，转交 `__nativeLegado.invoke`；原生 dispatcher 记录 `bridge.error java.<name>: unsupported host method` 并返回空串，规则其余部分继续执行。
+- **顺序约束**：代理必须在 prelude 末尾安装。prelude 内部存在 `java.jsoup = java.jsoup || {...}` 这类惰性命名空间初始化；过早代理会让 `java.jsoup` 变成 truthy 函数，跳过初始化，导致 `select` / `getAttr` 崩溃（`99c707c` 因此 1 个用例失败）。
+- **诊断**：`bridge.error` 行进入 `RuleExecutionContext.logs()`，随 `SourceDiagnosticEvidence.executionLogs` 导出，源诊断面板可见。
+- **回归**：`JSCoreRuntimeTests.testUnknownJavaMethodDegradesAndRecordsBridgeDiagnostic`（未知 API 返回空串且写入 bridge.error）、`testUnknownJavaMethodProxyKeepsKnownBridgesWorking`（已实现方法不被代理覆盖）；CI 925 tests / 0 failures。
+
 ---
 
 ## 三、 代码路径与核心文件索引 (Where it lives)
@@ -137,32 +145,33 @@ SourceRequestBuilder.imageRequestHeaders(for: currentBookSource)
 | **文档基线** | `docs/JSON-IOS-COMPATIBILITY.md` & `docs/SOURCE-CAPABILITY-MATRIX.md` | 能力矩阵与 iOS 兼容边界同步更新 |
 | **正文标题** | `SourceReadSwift/Core/Rules/ContentParser.swift` | `ruleContent.title` HTML/JSON 求值与回退 |
 | **章节付费标记** | `SourceReadSwift/Core/Models/BookModels.swift` | `BookChapter.isPay` 可选字段与全链透传 |
-| **工程配置** | `project.yml` & `SourceReadSwift/App/Info.plist` | 版本声明（1.0.24 / Build 25）；bundle 版本由 `MARKETING_VERSION` / `CURRENT_PROJECT_VERSION` 单一来源派生 |
+| **JS 兼容降级** | `SourceReadSwift/Core/JavaScript/JSCoreRuntime.swift` | 未知 `java.*` 调用经 Proxy 降级并写入 `bridge.error` 诊断 |
+| **工程配置** | `project.yml` & `SourceReadSwift/App/Info.plist` | 版本声明（1.0.25 / Build 26）；bundle 版本由 `MARKETING_VERSION` / `CURRENT_PROJECT_VERSION` 单一来源派生 |
 
 ---
 
 ## 四、 验证结果与 CI 证据 (How to verify)
 
 ### 1. 自动化测试结果
-- **GitHub Actions Run ID**：`40084421205`
-- **Job ID**：`120844303932`
-- **验证 Commit**：`435497a`
+- **GitHub Actions Run ID**：`40086744071`
+- **Job ID**：`120851132686`
+- **验证 Commit**：`0b46689`
 - **运行结论**：`Success`
-- **用例总数**：**923 个 XCTest 单元测试全部通过（0 failures, 0 unexpected）**
+- **用例总数**：**925 个 XCTest 单元测试全部通过（0 failures, 0 unexpected）**
 - **本轮新增/关键覆盖**：
-  - `ChapterListMetadataTests`：`testHTMLChapterIsPayIsParsedSeparatelyFromIsVip`、`testJSONChapterIsPaySupportsBooleanStringAndMissingValue`、`testBookChapterDecodesLegacyCacheWithoutIsPay`
-  - `ContentParserTests`：`testHTMLContentTitleRuleOverridesTOCTitle`、`testHTMLContentTitleRuleFallsBackWhenSelectorMisses`、`testHTMLContentTitleRuleSupportsJavaScript`、`testJSONContentTitleRuleOverridesTOCTitle`
-  - `JSCoreRuntimeTests.testChapterBridgeExposesIsPayAsBoolean`
+  - `JSCoreRuntimeTests.testUnknownJavaMethodDegradesAndRecordsBridgeDiagnostic`、`testUnknownJavaMethodProxyKeepsKnownBridgesWorking`
+  - `ChapterListMetadataTests` / `ContentParserTests` / `JSCoreRuntimeTests.testChapterBridgeExposesIsPayAsBoolean`（v1.0.24 的 8 个用例）继续通过
   - `PayActionTests` 18 个用例与 `JSCoreRuntimeTests.testChapterBooleanIsVipSurvivesFallbackInjection` 继续通过
-  - `SearchURLResolverTests.testAppVersionSemantics` 锁定 1.0.24 / Build 25
+  - `SearchURLResolverTests.testAppVersionSemantics` 锁定 1.0.25 / Build 26
+- **中间失败记录**：`99c707c` 首版代理在 prelude 中部安装，破坏 `java.jsoup = java.jsoup || {...}`，run `40085678639` 出现 1 failure；`0b46689` 将代理移到 prelude 末尾后全绿。
 
 ### 2. IPA 打包产物
-- **GitHub Actions Run ID**：`40084421249`
+- **GitHub Actions Run ID**：`40086744058`
 - **产物名**：`SourceReadSwift-unsigned-ipa`
-- **本地落盘路径**：`C:\Users\Edc21\Desktop\SourceReadSwift-1.0.24-unsigned.ipa`
-- **产物大小**：`11,320,222 字节`
-- **SHA256**：`5BA1F2BD180AF3A58EEF78909854ABDF1737314F6A154E5F4C70EA1E10EC9E78`
-- **Info.plist 核验**：`CFBundleShortVersionString=1.0.24`、`CFBundleVersion=25`、`MinimumOSVersion=16.0`（workflow 内 `PlistBuddy` 断言强制校验）
+- **本地落盘路径**：`C:\Users\Edc21\Desktop\SourceReadSwift-1.0.25-unsigned.ipa`
+- **产物大小**：`11,320,554 字节`
+- **SHA256**：`BD718572BD497B724C4A8802412E3859853E0A352F1E5D406B949C1B2E1222C8`
+- **Info.plist 核验**：`CFBundleShortVersionString=1.0.25`、`CFBundleVersion=26`、`MinimumOSVersion=16.0`（workflow 内 `PlistBuddy` 断言强制校验）
 
 ---
 
@@ -175,7 +184,5 @@ SourceRequestBuilder.imageRequestHeaders(for: currentBookSource)
    - 对极少数将图片进行反爬切片拼接（JS 返回 `byte[]` 或 Base64 拼图矩阵）的特殊漫画源，可构建底层 CoreGraphics Canvas 拼图管线。
 2. **`downloadUrls`（P2）**：
    - 当前没有下载队列；要么实现完整队列与进度，要么在 UI 隐藏入口，禁止“可点但无反应”。
-3. **`java.*` stub 运行时诊断（P1）**：
-   - 未实现 API 调用时记录 API 名、源、章节、规则与原因，不静默返回空串。
-4. **目录逐章字数展示（P2）**：
+3. **目录逐章字数展示（P2）**：
    - `ChapterListParser` 已解析 `wordCount`，可在目录抽屉视图的章节副标题中渲染展示。

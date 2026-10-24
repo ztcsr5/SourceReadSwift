@@ -103,7 +103,7 @@
 | JS 运行时 | `SourceReadSwift/Core/JavaScript/JSCoreRuntime.swift` | ~276 KB，JSCore + 兼容 prelude |
 | Java 原生桥 | `LegadoNativeBridges.swift`、`LegadoHostServices.swift` | ~122 KB，网络/加密/存储/解析 facade |
 | 能力样本库 | `SourceReadSwiftTests/Fixtures/legado-capability-bank-20260908.json` | 13 个真实源快照 |
-| 回归 | `SourceReadSwiftTests` | 640+ XCTest（以 CI 实际结果为准） |
+| 回归 | `SourceReadSwiftTests` | 925 XCTest（v1.0.25 CI 实际结果） |
 
 ### 3.2 刚完成的 payAction 链路（v1.0.23）
 
@@ -149,7 +149,7 @@
 2. **`ruleContent.title`（已完成，v1.0.24）**：正文解析后执行 title 规则，回填 `ChapterContent.title`；HTML/JSON 共 4 条测试。
 3. **`isPay`（已完成，v1.0.24）**：`BookChapter` 增加可选字段，目录/缓存/JS bridge 透传；菜单可见性改为 `hasLogin && isVip && !isPay`。
 4. **`downloadUrls` 决策**：没有下载队列就隐藏入口；不要显示“可下载”却点了没反应。
-5. **Java stub 诊断**：未实现的 `java.*` 调用记录 API 名 + 源 + 章节 + 规则，不再静默返回空串。
+5. **Java stub 诊断（已完成，v1.0.25）**：prelude 末尾 Proxy 把未实现的 `java.*` 调用降级到原生 dispatcher，记录 `bridge.error java.<name>` 并返回空串，不再抛 TypeError；`JSCoreRuntimeTests` 2 个用例。
 
 ### 4.3 中期（P1/P2）
 
