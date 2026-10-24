@@ -352,6 +352,8 @@ struct NativeReaderTextView: UIViewRepresentable {
         /// 连点翻页时排队。动画进行中再来一下只记方向，不重新算目标。
         private var isPageStepping = false
         private var pendingPageStepDirection = 0
+        /// 滑动期间被推迟的整窗重建配置；惯性结束后补做。
+        private var deferredConfiguration: Configuration?
         private var illustrationLoadTask: Task<Void, Never>?
         private var illustrationGeneration = 0
         private static let illustrationLoadConcurrency = 4
@@ -440,6 +442,16 @@ struct NativeReaderTextView: UIViewRepresentable {
                 guard let lastLayoutWidth else { return true }
                 return abs(lastLayoutWidth - textView.bounds.width) > 0.5
             }()
+            // 用户正在滑（拖拽 / 惯性）时不立刻整窗重建：一次重建要做
+            // ensureLayout + 整窗重排，落在滑动帧里就是那一下卡壳（章界把占位页
+            // 换成真实章节时最明显）。先记账，等惯性结束再重建；这期间正文没变，
+            // 视觉上不会缺字，也不会跳位置。
+            let userIsScrolling = textView.isTracking || textView.isDragging || textView.isDecelerating
+            if textLayoutChanged, !isAppend, previousConfiguration != nil, userIsScrolling {
+                deferredConfiguration = newConfiguration
+                return
+            }
+            deferredConfiguration = nil
             configuration = newConfiguration
 
             if textLayoutChanged || widthChanged {
@@ -598,6 +610,24 @@ struct NativeReaderTextView: UIViewRepresentable {
             if restartIllustrationLoads {
                 loadIllustrations(for: configuration, in: textView)
             }
+        }
+
+        /// 补做滑动期间被推迟的整窗重建：先抓字符锚点，重建后按锚点复位，
+        /// 所以「章界插入/替换」不会把读者眼睛下面那一行挪走。
+        private func applyDeferredConfiguration(in textView: UITextView) {
+            guard let pending = deferredConfiguration else { return }
+            deferredConfiguration = nil
+            let anchor = captureScrollAnchor(in: textView)
+            configuration = pending
+            rebuild(textView: textView, configuration: pending)
+            if textView.bounds.width > 1 {
+                lastLayoutWidth = textView.bounds.width
+            }
+            restoreScrollAnchor(anchor, in: textView)
+            lastLayoutAnchorRevision = pending.layoutAnchorRevision
+            lastVisibleParagraph = -1
+            lastVisibleUpdateAt = 0
+            didFireNearBottom = false
         }
 
         private func updateInsets(in textView: UITextView, configuration: Configuration) {
@@ -1013,6 +1043,10 @@ struct NativeReaderTextView: UIViewRepresentable {
         func scrollViewDidEndDragging(_ scrollView: UIScrollView, willDecelerate decelerate: Bool) {
             if let textView = scrollView as? UITextView {
                 updateVisibleParagraph(in: textView)
+                // 不会继续惯性滑：立刻把滑动期间推迟的重建补上。
+                if !decelerate {
+                    applyDeferredConfiguration(in: textView)
+                }
             }
             let offsetY = scrollView.contentOffset.y
             let contentHeight = scrollView.contentSize.height
@@ -1026,6 +1060,7 @@ struct NativeReaderTextView: UIViewRepresentable {
         func scrollViewDidEndDecelerating(_ scrollView: UIScrollView) {
             if let textView = scrollView as? UITextView {
                 updateVisibleParagraph(in: textView)
+                applyDeferredConfiguration(in: textView)
             }
         }
     }
