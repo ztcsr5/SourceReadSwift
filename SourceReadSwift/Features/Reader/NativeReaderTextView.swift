@@ -447,7 +447,12 @@ struct NativeReaderTextView: UIViewRepresentable {
             // 换成真实章节时最明显）。先记账，等惯性结束再重建；这期间正文没变，
             // 视觉上不会缺字，也不会跳位置。
             let userIsScrolling = textView.isTracking || textView.isDragging || textView.isDecelerating
-            if textLayoutChanged, !isAppend, previousConfiguration != nil, userIsScrolling {
+            if ReaderRebuildDeferralPolicy.shouldDefer(
+                textLayoutChanged: textLayoutChanged,
+                isAppend: isAppend,
+                hasPreviousConfiguration: previousConfiguration != nil,
+                userIsScrolling: userIsScrolling
+            ) {
                 deferredConfiguration = newConfiguration
                 return
             }
@@ -1218,6 +1223,23 @@ enum ReaderScrollAnchorPolicy {
         let range = paragraphRanges[anchor.paragraphIndex]
         guard range.length > 0 else { return nil }
         return range.location + min(max(anchor.characterOffset, 0), range.length - 1)
+    }
+}
+
+/// 是否把「整窗文本重建」推迟到滑动结束。
+///
+/// 重建要 `ensureLayout` + 整窗重排，压在拖拽/惯性帧上就是那一下卡壳
+/// （章界把占位页换成真实章节时最明显）。这条判断被抽成纯函数，
+/// 才能在 CI 上锁住行为（Coordinator 依赖 UIKit 滚动状态，没法单测）。
+enum ReaderRebuildDeferralPolicy {
+    static func shouldDefer(
+        textLayoutChanged: Bool,
+        isAppend: Bool,
+        hasPreviousConfiguration: Bool,
+        userIsScrolling: Bool
+    ) -> Bool {
+        // 追加型更新很便宜，照旧即时应用；首次装载没有旧配置可锚定，也不能推迟。
+        textLayoutChanged && !isAppend && hasPreviousConfiguration && userIsScrolling
     }
 }
 
