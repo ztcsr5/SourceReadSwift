@@ -11,6 +11,8 @@ struct SettingsView: View {
     @State private var showBackupExporter = false
     @State private var showBackupImporter = false
     @State private var backupMessage: String?
+    /// 清零采样后强制刷新诊断区。
+    @State private var perfRefreshToken = UUID()
 
     private var themeMode: ThemeMode {
         get { ThemeMode(rawValue: themeModeRawValue) ?? .system }
@@ -169,6 +171,40 @@ struct SettingsView: View {
                         Label("恢复完整数据", systemImage: "arrow.clockwise.icloud")
                     }
                 }
+
+                Section {
+                    let perf = ReaderScrollPerfMeter.snapshot
+                    HStack {
+                        Text("滚动回调平均耗时")
+                        Spacer()
+                        Text(String(format: "%.2f ms", perf.averageMilliseconds))
+                            .monospacedDigit()
+                            .foregroundStyle(.secondary)
+                    }
+                    HStack {
+                        Text("最差一次")
+                        Spacer()
+                        Text(String(format: "%.2f ms", perf.worstMilliseconds))
+                            .monospacedDigit()
+                            .foregroundStyle(.secondary)
+                    }
+                    HStack {
+                        Text("样本帧数")
+                        Spacer()
+                        Text("\(perf.frames)")
+                            .monospacedDigit()
+                            .foregroundStyle(.secondary)
+                    }
+                    Button("清零重新采样") {
+                        ReaderScrollPerfMeter.reset()
+                        perfRefreshToken = UUID()
+                    }
+                } header: {
+                    Text("阅读器性能（诊断）")
+                } footer: {
+                    Text("统计的是滑动回调本身的耗时：小于 2ms 说明瓶颈在界面重建，大于 6ms 说明在文字排版。滚动几章后回来看数字。")
+                }
+                .id(perfRefreshToken)
 
                 Section("最近诊断") {
                     if appState.diagnostics.isEmpty {

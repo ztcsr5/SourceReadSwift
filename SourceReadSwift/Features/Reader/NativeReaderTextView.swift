@@ -975,12 +975,10 @@ struct NativeReaderTextView: UIViewRepresentable {
         }
 
         func scrollViewDidScroll(_ scrollView: UIScrollView) {
-            #if DEBUG
-            // 只在调试包里量：滚动回调自身的耗时（不含 SwiftUI 重建）。
-            // 卡顿到底出在回调还是出在 body 求值，这一行数字能直接分开。
+            // 采样始终打开（开销是几个加法 + 每 240 帧一次 UserDefaults），
+            // 这样用户在 设置 → 诊断 里就能读到数字，不必连 Xcode。
             let probeStarted = CACurrentMediaTime()
             defer { ReaderScrollPerfProbe.record(cost: CACurrentMediaTime() - probeStarted) }
-            #endif
             guard let textView = scrollView as? UITextView,
                   let configuration,
                   !paragraphRanges.isEmpty else { return }
@@ -1071,16 +1069,18 @@ struct NativeReaderTextView: UIViewRepresentable {
     }
 }
 
-/// 调试期滚动采样。每 300 帧打一行「回调自身」的平均/最差耗时，
-/// 用来把「TextKit 回调慢」和「SwiftUI body 重建慢」分开定位。
-/// Release 编译里不产生任何代码路径。
+/// 滚动采样入口：累加进 `ReaderScrollPerfMeter`（设置页可见），
+/// DEBUG 下额外每 300 帧打一行 Console，方便连着 Xcode 时直接看。
 enum ReaderScrollPerfProbe {
     #if DEBUG
     private static var frames = 0
     private static var total: Double = 0
     private static var worst: Double = 0
+    #endif
 
     static func record(cost: Double) {
+        ReaderScrollPerfMeter.record(cost: cost)
+        #if DEBUG
         frames += 1
         total += cost
         worst = max(worst, cost)
@@ -1090,10 +1090,8 @@ enum ReaderScrollPerfProbe {
         frames = 0
         total = 0
         worst = 0
+        #endif
     }
-    #else
-    static func record(cost: Double) {}
-    #endif
 }
 
 /// Pure scroll-offset math used by the TextKit surface.  Text layout rects are
