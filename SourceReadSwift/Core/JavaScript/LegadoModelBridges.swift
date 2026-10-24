@@ -53,6 +53,9 @@ final class LegadoSearchBookBridge: NSObject, LegadoSearchBookExport {
     func getIndex() -> Int
     func getChapterIndex() -> Int
     func isVip() -> Bool
+    /// Legado exposes `BookChapter.isPay` as a boolean property. `nil`
+    /// (unknown, e.g. a legacy cache) is projected to `false`.
+    var isPay: Bool { get }
 }
 
 final class LegadoBookChapterBridge: NSObject, LegadoBookChapterExport {
@@ -61,6 +64,7 @@ final class LegadoBookChapterBridge: NSObject, LegadoBookChapterExport {
     /// Legado exposes `BookChapter.isVip` as a field.  Keep the real value so
     /// JS rules can branch on it instead of guessing from the chapter title.
     private var vipFlag = false
+    private(set) var isPay = false
     func putVariable(_ key: String, _ value: String) { variables[key] = value; variable = value }
     func getVariable(_ key: String) -> String { variables[key] ?? "" }
     func putCustomVariable(_ value: String) { variables["custom"] = value }
@@ -72,7 +76,15 @@ final class LegadoBookChapterBridge: NSObject, LegadoBookChapterExport {
     func getIndex() -> Int { index }
     func getChapterIndex() -> Int { index }
     func isVip() -> Bool { vipFlag }
-    init(chapter: BookChapter) { url = chapter.url; title = chapter.title; bookUrl = chapter.bookUrl; index = chapter.index; vipFlag = chapter.isVip; super.init() }
+    init(chapter: BookChapter) {
+        url = chapter.url
+        title = chapter.title
+        bookUrl = chapter.bookUrl
+        index = chapter.index
+        vipFlag = chapter.isVip
+        isPay = chapter.isPay ?? false
+        super.init()
+    }
 }
 
 @objc protocol LegadoResponseExport: JSExport {

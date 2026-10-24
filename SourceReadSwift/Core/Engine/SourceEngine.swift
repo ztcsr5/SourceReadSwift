@@ -1281,6 +1281,7 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
             "index": chapter.index,
             "chapterIndex": chapter.index,
             "isVip": chapter.isVip,
+            "isPay": chapter.isPay ?? false,
             "updateTime": chapter.updateTime ?? "",
             "volumeName": chapter.volumeName ?? "",
             "wordCount": chapter.wordCount ?? ""

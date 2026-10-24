@@ -487,4 +487,40 @@ final class JSCoreRuntimeTests: XCTestCase {
         }
         XCTAssertEqual(value, "true||false|密钥|KEY-1|KEY-1|true|true|T-2|D-3|device,token,密钥||true|")
     }
+
+    func testChapterBridgeExposesIsPayAsBoolean() throws {
+        let paid = BookChapter(
+            title: "已购买章节",
+            url: "https://fixture.example/2",
+            bookUrl: "https://fixture.example/book",
+            index: 1,
+            isVip: true,
+            isPay: true
+        )
+        let runtime = JSCoreRuntime()
+        let result = runtime.evaluate(
+            "typeof chapter.isPay + '|' + chapter.isPay",
+            variables: ["chapter": paid]
+        )
+        guard case .success(let value) = result else {
+            return XCTFail("expected success: \(result)")
+        }
+        XCTAssertEqual(value, "boolean|true")
+
+        let unknown = BookChapter(
+            title: "旧缓存章节",
+            url: "https://fixture.example/3",
+            bookUrl: "https://fixture.example/book",
+            index: 2,
+            isVip: true
+        )
+        let unknownResult = runtime.evaluate(
+            "chapter.isPay === false",
+            variables: ["chapter": unknown]
+        )
+        guard case .success(let unknownValue) = unknownResult else {
+            return XCTFail("expected success: \(unknownResult)")
+        }
+        XCTAssertEqual(unknownValue, "true")
+    }
 }

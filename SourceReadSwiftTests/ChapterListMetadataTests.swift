@@ -379,6 +379,88 @@ final class ChapterListMetadataTests: XCTestCase {
         XCTAssertNil(chapter.volumeName)
     }
 
+    func testHTMLChapterIsPayIsParsedSeparatelyFromIsVip() async throws {
+        let tocURL = "https://fixture.example/book/html-pay/toc"
+        let source = BookSource(
+            bookSourceName: "HTML isPay fixture",
+            bookSourceUrl: "https://fixture.example",
+            ruleToc: SourceRule(fields: [
+                "chapterList": "div.catalog a",
+                "chapterName": "a@text",
+                "chapterUrl": "a@href",
+                "isVip": "a@data-vip",
+                "isPay": "a@data-pay"
+            ])
+        )
+        let network = ChapterFixtureNetworkClient(responses: [
+            tocURL: """
+                <html><body><div class="catalog">
+                  <a href="/chapter/1" data-vip="true" data-pay="false">第一章</a>
+                  <a href="/chapter/2" data-vip="true" data-pay="true">第二章</a>
+                  <a href="/chapter/3" data-vip="false">第三章</a>
+                </div></body></html>
+                """
+        ])
+        let engine = LegadoSourceEngine(network: network)
+
+        let chapters = try await unwrap(engine.getChapterList(source: source, book: makeBook(tocURL: tocURL)))
+
+        XCTAssertEqual(chapters.map(\.isVip), [true, true, false])
+        XCTAssertEqual(chapters.map(\.isPay), [false, true, nil])
+    }
+
+    func testJSONChapterIsPaySupportsBooleanStringAndMissingValue() async throws {
+        let tocURL = "https://fixture.example/book/json-pay/toc"
+        let source = BookSource(
+            bookSourceName: "JSON isPay fixture",
+            bookSourceUrl: "https://fixture.example",
+            ruleToc: SourceRule(fields: [
+                "chapterList": "$.chapters[*]",
+                "chapterName": "$.title",
+                "chapterUrl": "$.url",
+                "isVip": "$.isVip",
+                "isPay": "$.isPay"
+            ])
+        )
+        let network = ChapterFixtureNetworkClient(responses: [
+            tocURL: #"""
+                {"chapters":[
+                  {"title":"第一章","url":"/chapter/1","isVip":true,"isPay":false},
+                  {"title":"第二章","url":"/chapter/2","isVip":true,"isPay":"true"},
+                  {"title":"第三章","url":"/chapter/3","isVip":false}
+                ]}
+                """#
+        ])
+        let engine = LegadoSourceEngine(network: network)
+
+        let chapters = try await unwrap(engine.getChapterList(source: source, book: makeBook(tocURL: tocURL)))
+
+        XCTAssertEqual(chapters.map(\.isVip), [true, true, false])
+        XCTAssertEqual(chapters.map(\.isPay), [false, true, nil])
+    }
+
+    func testBookChapterDecodesLegacyCacheWithoutIsPay() throws {
+        let legacy = #"""
+            {"title":"第一章","url":"https://fixture.example/1","bookUrl":"https://fixture.example/book","index":0,"isVip":true}
+            """#
+        let chapter = try JSONDecoder().decode(BookChapter.self, from: Data(legacy.utf8))
+        XCTAssertTrue(chapter.isVip)
+        XCTAssertNil(chapter.isPay)
+
+        let paid = BookChapter(
+            title: "第二章",
+            url: "https://fixture.example/2",
+            bookUrl: "https://fixture.example/book",
+            index: 1,
+            isVip: true,
+            isPay: true
+        )
+        let roundTrip = try JSONDecoder().decode(BookChapter.self, from: JSONEncoder().encode(paid))
+        XCTAssertEqual(roundTrip.isPay, true)
+        XCTAssertEqual(roundTrip.withIndex(5).isPay, true)
+        XCTAssertEqual(roundTrip.withTitle("新标题").isPay, true)
+    }
+
     private func makeBook(tocURL: String) -> BookDetail {
         BookDetail(
             name: "Fixture Book",

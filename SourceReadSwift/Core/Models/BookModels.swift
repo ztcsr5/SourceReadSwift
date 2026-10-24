@@ -139,6 +139,9 @@ struct BookChapter: Identifiable, Codable, Hashable, Sendable {
     let bookUrl: String
     let index: Int
     let isVip: Bool
+    /// Legado `BookChapter.isPay` – whether this chapter is already paid.
+    /// Optional so caches written before v1.0.24 decode as `nil` (unknown).
+    let isPay: Bool?
     /// Legado `ruleToc.updateTime` – source-formatted update timestamp.
     let updateTime: String?
     /// Legado `ruleToc.volumeName` – volume/group heading the chapter belongs to.
@@ -153,6 +156,7 @@ struct BookChapter: Identifiable, Codable, Hashable, Sendable {
         bookUrl: String,
         index: Int,
         isVip: Bool = false,
+        isPay: Bool? = nil,
         updateTime: String? = nil,
         volumeName: String? = nil,
         wordCount: String? = nil
@@ -162,6 +166,7 @@ struct BookChapter: Identifiable, Codable, Hashable, Sendable {
         self.bookUrl = bookUrl
         self.index = index
         self.isVip = isVip
+        self.isPay = isPay
         self.updateTime = updateTime
         self.volumeName = volumeName
         self.wordCount = wordCount
@@ -180,6 +185,7 @@ extension BookChapter {
             bookUrl: bookUrl,
             index: newIndex,
             isVip: isVip,
+            isPay: isPay,
             updateTime: updateTime,
             volumeName: volumeName,
             wordCount: wordCount
@@ -195,6 +201,7 @@ extension BookChapter {
             bookUrl: bookUrl,
             index: index,
             isVip: isVip,
+            isPay: isPay,
             updateTime: updateTime,
             volumeName: volumeName,
             wordCount: wordCount

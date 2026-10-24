@@ -476,4 +476,142 @@ final class ContentParserTests: XCTestCase {
         XCTAssertEqual(content.imageStyle, "single")
         XCTAssertEqual(content.readerImageStyle, .single)
     }
+
+    func testHTMLContentTitleRuleOverridesTOCTitle() throws {
+        let source = BookSource(
+            bookSourceName: "Title fixture",
+            bookSourceUrl: "https://example.com",
+            ruleContent: SourceRule(fields: [
+                "content": ".content@html",
+                "title": "h1.chapter-title@text"
+            ])
+        )
+        let chapter = BookChapter(
+            title: "目录标题",
+            url: "https://example.com/book/1/1.html",
+            bookUrl: "https://example.com/book/1",
+            index: 0,
+            isVip: false
+        )
+        let response = SourceResponse(
+            url: URL(string: chapter.url)!,
+            statusCode: 200,
+            headers: [:],
+            body: """
+            <html><body>
+              <h1 class="chapter-title">正文里的真实标题</h1>
+              <div class="content"><p>第一段</p><p>第二段</p></div>
+            </body></html>
+            """,
+            data: Data()
+        )
+
+        let result = ContentParser().parse(source: source, chapter: chapter, response: response)
+
+        guard case .success(let content) = result else {
+            return XCTFail("expected parsed content")
+        }
+        XCTAssertEqual(content.title, "正文里的真实标题")
+        XCTAssertEqual(content.chapter.title, "目录标题")
+    }
+
+    func testHTMLContentTitleRuleFallsBackWhenSelectorMisses() throws {
+        let source = BookSource(
+            bookSourceName: "Title fallback fixture",
+            bookSourceUrl: "https://example.com",
+            ruleContent: SourceRule(fields: [
+                "content": ".content@html",
+                "title": ".missing-title@text"
+            ])
+        )
+        let chapter = BookChapter(
+            title: "目录标题",
+            url: "https://example.com/book/1/1.html",
+            bookUrl: "https://example.com/book/1",
+            index: 0,
+            isVip: false
+        )
+        let response = SourceResponse(
+            url: URL(string: chapter.url)!,
+            statusCode: 200,
+            headers: [:],
+            body: """
+            <html><body><div class="content"><p>第一段</p></div></body></html>
+            """,
+            data: Data()
+        )
+
+        let result = ContentParser().parse(source: source, chapter: chapter, response: response)
+
+        guard case .success(let content) = result else {
+            return XCTFail("expected parsed content")
+        }
+        XCTAssertEqual(content.title, "目录标题")
+    }
+
+    func testHTMLContentTitleRuleSupportsJavaScript() throws {
+        let source = BookSource(
+            bookSourceName: "Title JS fixture",
+            bookSourceUrl: "https://example.com",
+            ruleContent: SourceRule(fields: [
+                "content": ".content@html",
+                "title": "@js:'正文·' + chapter.title"
+            ])
+        )
+        let chapter = BookChapter(
+            title: "第一章",
+            url: "https://example.com/book/1/1.html",
+            bookUrl: "https://example.com/book/1",
+            index: 0,
+            isVip: false
+        )
+        let response = SourceResponse(
+            url: URL(string: chapter.url)!,
+            statusCode: 200,
+            headers: [:],
+            body: """
+            <html><body><div class="content"><p>第一段</p></div></body></html>
+            """,
+            data: Data()
+        )
+
+        let result = ContentParser().parse(source: source, chapter: chapter, response: response)
+
+        guard case .success(let content) = result else {
+            return XCTFail("expected parsed content")
+        }
+        XCTAssertEqual(content.title, "正文·第一章")
+    }
+
+    func testJSONContentTitleRuleOverridesTOCTitle() throws {
+        let source = BookSource(
+            bookSourceName: "JSON title fixture",
+            bookSourceUrl: "https://example.com",
+            ruleContent: SourceRule(fields: [
+                "content": "$.data.content",
+                "title": "$.data.chapterTitle"
+            ])
+        )
+        let chapter = BookChapter(
+            title: "目录标题",
+            url: "https://api.example.com/book/1",
+            bookUrl: "https://api.example.com/book/1",
+            index: 0,
+            isVip: false
+        )
+        let response = SourceResponse(
+            url: URL(string: chapter.url)!,
+            statusCode: 200,
+            headers: ["Content-Type": "application/json"],
+            body: #"{"data":{"chapterTitle":"接口返回的标题","content":"<p>第一段</p><p>第二段</p>"}}"#,
+            data: Data()
+        )
+
+        let result = ContentParser().parse(source: source, chapter: chapter, response: response)
+
+        guard case .success(let content) = result else {
+            return XCTFail("expected parsed content")
+        }
+        XCTAssertEqual(content.title, "接口返回的标题")
+    }
 }

@@ -764,12 +764,11 @@ struct ReaderView: View {
     }
 
     /// Legado's pay button is visible only for `hasLogin && isVip && !isPay`.
-    /// `BookChapter` has no `isPay` field yet, so the closest faithful
-    /// approximation is `hasLogin && isVip`; the rule itself still decides
-    /// whether the purchase succeeds.
+    /// `isPay` is optional because older caches do not carry it; `nil` means
+    /// unknown and keeps the button visible, while an explicit `true` hides it.
     private var canShowPayAction: Bool {
         guard let payAction = content.payAction, !payAction.isEmpty else { return false }
-        guard content.chapter.isVip, let source = currentBookSource else { return false }
+        guard content.chapter.isVip, content.chapter.isPay != true, let source = currentBookSource else { return false }
         return source.loginUrl?.nilIfEmpty != nil || source.loginCheckJs?.nilIfEmpty != nil
     }
 

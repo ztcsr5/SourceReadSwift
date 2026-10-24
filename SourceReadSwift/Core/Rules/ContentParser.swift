@@ -118,6 +118,10 @@ struct ContentParser {
                 root = try htmlExtractor.select(response.body, baseUrl: response.url, listRule: "html").first
             }
             guard let root else { return .failure(.empty("正文 HTML 为空")) }
+            // `ruleContent.title` may live outside the content container
+            // (e.g. an `<h1>` in the page header), so evaluate it against the
+            // document root and only fall back to the content root.
+            let titleRoot = (try? htmlExtractor.select(response.body, baseUrl: response.url, listRule: "html").first) ?? root
             let chapterMap: [String: Any] = [
                 "title": chapter.title,
                 "url": chapter.url,
@@ -127,6 +131,7 @@ struct ContentParser {
             let variables: [String: Any] = [
                 "source": source,
                 "chapter": chapterMap,
+                "title": chapter.title,
                 "src": response.body,
                 "html": response.body,
                 "body": response.body,
@@ -164,9 +169,16 @@ struct ContentParser {
             ).nilIfEmpty
 
             let style = imageStyleRule(source.ruleContent)
+            let resolvedTitle = htmlContentTitle(
+                rule: source.ruleContent,
+                from: titleRoot,
+                response: response,
+                variables: variables,
+                fallback: chapter.title
+            )
             return paragraphs.isEmpty
                 ? .failure(.empty("正文解析结果为空"))
-                : .success(ChapterContent(chapter: chapter, title: chapter.title, paragraphs: paragraphs, nextContentUrl: next, imageStyle: style, payAction: payActionRule(source.ruleContent)))
+                : .success(ChapterContent(chapter: chapter, title: resolvedTitle, paragraphs: paragraphs, nextContentUrl: next, imageStyle: style, payAction: payActionRule(source.ruleContent)))
         } catch {
             let fallback = extractFallbackParagraphs(from: response.body, baseUrl: response.url, title: chapter.title)
             if !fallback.isEmpty {
@@ -193,6 +205,7 @@ struct ContentParser {
         let variables: [String: Any] = [
             "source": source,
             "chapter": chapterMap,
+            "title": chapter.title,
             "src": response.body,
             "html": response.body,
             "body": response.body,
@@ -257,9 +270,56 @@ struct ContentParser {
         } else {
             next = nil
         }
+        let resolvedTitle = jsonContentTitle(
+            rule: rule,
+            from: rootObject,
+            variables: variables,
+            fallback: chapter.title
+        )
         return paragraphs.isEmpty
             ? .failure(.empty("JSON \u{6b63}\u{6587}\u{89e3}\u{6790}\u{7ed3}\u{679c}\u{4e3a}\u{7a7a}"))
-            : .success(ChapterContent(chapter: chapter, title: chapter.title, paragraphs: paragraphs, nextContentUrl: next, imageStyle: imageStyleRule(rule), payAction: payActionRule(rule)))
+            : .success(ChapterContent(chapter: chapter, title: resolvedTitle, paragraphs: paragraphs, nextContentUrl: next, imageStyle: imageStyleRule(rule), payAction: payActionRule(rule)))
+    }
+
+    /// Legado `ruleContent.title`: some sites only expose the real chapter
+    /// title inside the content response. Empty/failed extraction must fall
+    /// back to the TOC title instead of producing a blank reader header.
+    private func htmlContentTitle(
+        rule: SourceRule?,
+        from root: Element,
+        response: SourceResponse,
+        variables: [String: Any],
+        fallback: String
+    ) -> String {
+        guard let titleRule = rule?.fields["title"]?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !titleRule.isEmpty else { return fallback }
+        let value = (try? htmlExtractor.value(
+            from: root,
+            rule: titleRule,
+            fallback: nil,
+            baseUrl: response.url,
+            variables: variables
+        )) ?? ""
+        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? fallback : trimmed
+    }
+
+    private func jsonContentTitle(
+        rule: SourceRule?,
+        from root: Any,
+        variables: [String: Any],
+        fallback: String
+    ) -> String {
+        guard let titleRule = rule?.fields["title"]?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !titleRule.isEmpty else { return fallback }
+        let value = jsonExtractor.string(
+            from: root,
+            rule: titleRule,
+            fallbackKeys: ["title", "chapterName", "name"],
+            variables: variables
+        ) ?? ""
+        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? fallback : trimmed
     }
 
     /// Legado `ruleContent.imageStyle` – carried with the parsed chapter so the

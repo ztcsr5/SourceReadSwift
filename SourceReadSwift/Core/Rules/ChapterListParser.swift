@@ -361,17 +361,24 @@ struct ChapterListParser {
             guard isValidChapter(title: title, url: absUrl, pageURL: response.url, bookURL: book.bookUrl) else { continue }
             let vipRaw = jsonExtractor.string(
                 from: item,
-                rule: htmlExtractor.firstRule(source.ruleToc, keys: ["isVip", "vip", "isPay"]),
-                fallbackKeys: ["isVip", "vip", "isPay", "vipFlag"],
+                rule: htmlExtractor.firstRule(source.ruleToc, keys: ["isVip", "vip"]),
+                fallbackKeys: ["isVip", "vip", "vipFlag"],
                 variables: variables
             )?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
             let isVip = vipRaw.map { !["", "false", "0", "no", "free"].contains($0) } ?? false
+            let payRaw = jsonExtractor.string(
+                from: item,
+                rule: htmlExtractor.firstRule(source.ruleToc, keys: ["isPay", "paid", "purchased"]),
+                fallbackKeys: ["isPay", "paid", "purchased"],
+                variables: variables
+            )
             chapters.append(BookChapter(
                 title: title,
                 url: absUrl,
                 bookUrl: book.bookUrl,
                 index: chapters.count,
                 isVip: isVip,
+                isPay: optionalBooleanFlag(payRaw),
                 updateTime: jsonExtractor.string(
                     from: item,
                     rule: htmlExtractor.firstRule(source.ruleToc, keys: ["updateTime", "update", "time"]),
@@ -472,6 +479,7 @@ struct ChapterListParser {
             bookUrl: book.bookUrl,
             index: index,
             isVip: metadata.isVip,
+            isPay: metadata.isPay,
             updateTime: metadata.updateTime,
             volumeName: metadata.volumeName ?? currentVolume,
             wordCount: metadata.wordCount
@@ -540,12 +548,22 @@ private extension ChapterListParser {
         return !["false", "no", "not", "0", "0.0"].contains(lowered)
     }
 
+    /// Legado boolean fields are frequently exposed as `true` / `"true"` /
+    /// `"1"` / `"yes"` or their negations. `nil` means the source did not
+    /// provide the field at all, which is different from an explicit `false`
+    /// (e.g. `isPay` unknown vs. not purchased).
+    func optionalBooleanFlag(_ raw: String?) -> Bool? {
+        guard let value = raw?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased(),
+              !value.isEmpty else { return nil }
+        return !["false", "0", "no", "not", "free", "免费"].contains(value)
+    }
+
     func chapterMetadata(
         from element: Element,
         rule: SourceRule?,
         variables: [String: Any],
         baseURL: URL
-    ) -> (isVip: Bool, updateTime: String?, volumeName: String?, wordCount: String?) {
+    ) -> (isVip: Bool, isPay: Bool?, updateTime: String?, volumeName: String?, wordCount: String?) {
         func extract(_ keys: [String]) -> String? {
             guard let rule, let ruleValue = htmlExtractor.firstRule(rule, keys: keys) else { return nil }
             if let value = try? htmlExtractor.value(from: element, rule: ruleValue, fallback: nil, baseUrl: baseURL, variables: variables),
@@ -564,10 +582,12 @@ private extension ChapterListParser {
             }
             return nil
         }
-        let vipRaw = extract(["isVip", "vip", "isPay"])?.lowercased()
+        let vipRaw = extract(["isVip", "vip", "vipFlag"])?.lowercased()
         let isVip = vipRaw.map { !["false", "0", "no", "free", "免费"].contains($0) } ?? false
+        let isPay = optionalBooleanFlag(extract(["isPay", "paid", "purchased"]))
         return (
             isVip,
+            isPay,
             extract(["updateTime", "update", "time"]),
             extract(["volumeName", "volume"]),
             extract(["wordCount", "wordNum", "words", "word_count"])
