@@ -331,7 +331,9 @@ struct ReaderView: View {
         // for synchronous mode switches during that one transition.
         return ReaderPositionMapping(
             paragraphCount: content.paragraphs.count,
-            pageFirstParagraphs: pagedBlocks.compactMap(\.firstParagraphIndex)
+            pageFirstParagraphs: ReaderPositionMapping.pageStarts(
+                from: pagedBlocks.map(\.firstParagraphIndex)
+            )
         )
     }
 
@@ -3144,7 +3146,9 @@ struct ReaderView: View {
         pagedBlocksCacheKey = cacheKey
         positionMappingCache = ReaderPositionMapping(
             paragraphCount: content.paragraphs.count,
-            pageFirstParagraphs: blocks.compactMap(\.firstParagraphIndex)
+            pageFirstParagraphs: ReaderPositionMapping.pageStarts(
+                from: blocks.map(\.firstParagraphIndex)
+            )
         )
         pagedPageIndex = min(max(pagedPageIndex, 0), positionMappingCache.maximumPageIndex)
         scrollParagraphTarget = positionMappingCache.clampParagraph(scrollParagraphTarget)
@@ -3183,7 +3187,10 @@ struct ReaderView: View {
             firstLineIndent: CGFloat(paragraphIndent),
             titleSpacing: CGFloat(titleSpacing),
             contentWidth: max(effectiveViewportSize.width - CGFloat(pagePadding * 2), 200),
-            contentHeight: max(effectiveViewportSize.height - topPadding - bottomPadding, 240)
+            // A 4pt cushion covers the tiny leading difference between
+            // TextKit's line fragments and SwiftUI's Text renderer. Without it
+            // the last descender of a page can be clipped by `.clipped()`.
+            contentHeight: max(effectiveViewportSize.height - topPadding - bottomPadding - 4, 240)
         )
         var titleTypography = typography
         titleTypography.lineSpacing = 0
@@ -3225,7 +3232,7 @@ struct ReaderView: View {
                         pagePadding: pagePadding,
                         footerHeight: footerHeight
                     ),
-                    max(typography.contentHeight - captionBudget, 160)
+                    max(typography.contentHeight - captionBudget, 1)
                 )
                 let cardHeight = imageHeight + captionBudget
                 if currentImageStyle.reservesWholePage {

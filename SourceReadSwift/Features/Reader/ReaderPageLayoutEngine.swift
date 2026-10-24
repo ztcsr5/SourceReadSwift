@@ -38,7 +38,7 @@ enum ReaderPageLayoutEngine {
     /// `firstLineHeadIndent`, which resolves to the same visual width for the
     /// default 38pt / 19pt pairing (two full-width spaces).
     static func displayText(_ text: String, fontSize: CGFloat, indent: CGFloat) -> String {
-        guard indent > 0, fontSize > 0 else { return text }
+        guard !text.isEmpty, indent > 0, fontSize > 0 else { return text }
         let spaces = Int((indent / fontSize).rounded())
         guard spaces > 0 else { return text }
         return String(repeating: "\u{3000}", count: spaces) + text
@@ -78,15 +78,13 @@ enum ReaderPageLayoutEngine {
             if currentHeight > 0, currentHeight + metric.height > limit + 0.5 {
                 let length = metric.range.location - chunkStart
                 if length > 0 {
-                    // The last line of a chunk is never followed by another
-                    // line, and SwiftUI does not apply `lineSpacing` after the
-                    // final line. Reporting the raw accumulator would overstate
-                    // the drawn height by one line gap and waste page budget.
-                    let drawnHeight = max(currentHeight - typography.lineSpacing, 0)
-                    result.append((
-                        string.substring(with: NSRange(location: chunkStart, length: length)),
-                        drawnHeight
-                    ))
+                    // Re-measure the exact substring instead of adjusting the
+                    // accumulator. A chunk's final line does not receive
+                    // `lineSpacing`, and re-measuring keeps the reserved height
+                    // identical to what the renderer will draw (the whole-text
+                    // line metrics only decide where to cut).
+                    let chunk = string.substring(with: NSRange(location: chunkStart, length: length))
+                    result.append((chunk, measureHeight(chunk, typography: typography)))
                 }
                 chunkStart = metric.range.location
                 currentHeight = 0
@@ -96,7 +94,8 @@ enum ReaderPageLayoutEngine {
         }
 
         if chunkStart < string.length {
-            result.append((string.substring(from: chunkStart), currentHeight))
+            let tail = string.substring(from: chunkStart)
+            result.append((tail, measureHeight(tail, typography: typography)))
         }
         return result
     }

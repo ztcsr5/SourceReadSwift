@@ -18,6 +18,24 @@ struct ReaderPositionMapping: Equatable, Sendable {
     var maximumParagraphIndex: Int { max(paragraphCount - 1, 0) }
     var maximumPageIndex: Int { max(pageFirstParagraphs.count - 1, 0) }
 
+    /// A chapter-cover page draws only the title and owns no paragraph. If
+    /// that page is dropped from the mapping, every later page index shifts by
+    /// one and the final page becomes unreachable. Fill such pages with the
+    /// start of the next page that does own a paragraph (or 0 for an empty
+    /// chapter) so the mapping stays one-to-one with the rendered pages.
+    static func pageStarts(from firstParagraphIndexes: [Int?]) -> [Int] {
+        var starts = firstParagraphIndexes.map { $0 ?? 0 }
+        var nextKnown = 0
+        for index in starts.indices.reversed() {
+            if firstParagraphIndexes[index] != nil {
+                nextKnown = starts[index]
+            } else {
+                starts[index] = nextKnown
+            }
+        }
+        return starts
+    }
+
     func clampParagraph(_ raw: Int?) -> Int {
         guard paragraphCount > 0 else { return 0 }
         return min(max(raw ?? 0, 0), maximumParagraphIndex)

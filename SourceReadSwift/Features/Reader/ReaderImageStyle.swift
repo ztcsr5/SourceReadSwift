@@ -107,8 +107,12 @@ enum ReaderImageSizingPolicy {
 
     /// The [img]url[/img] paragraph body, or nil when the paragraph is text.
     static func imageURL(in paragraph: String) -> URL? {
-        guard paragraph.hasPrefix("[img]"), paragraph.hasSuffix("[/img]") else { return nil }
-        let raw = String(paragraph.dropFirst(5).dropLast(6))
+        // Source rules frequently leave blank lines around an illustration
+        // marker. Trim once here so pagination, the SwiftUI page and the
+        // TextKit scroll surface all make the same decision.
+        let trimmed = paragraph.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard trimmed.hasPrefix("[img]"), trimmed.hasSuffix("[/img]") else { return nil }
+        let raw = String(trimmed.dropFirst(5).dropLast(6))
             .trimmingCharacters(in: .whitespacesAndNewlines)
         guard !raw.isEmpty, let url = URL(string: raw), let scheme = url.scheme, !scheme.isEmpty else { return nil }
         return url

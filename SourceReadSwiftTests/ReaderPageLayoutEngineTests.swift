@@ -32,6 +32,7 @@ final class ReaderPageLayoutEngineTests: XCTestCase {
     func testDisplayTextLeavesTextUntouchedWithoutIndent() {
         XCTAssertEqual(ReaderPageLayoutEngine.displayText("正文", fontSize: 19, indent: 0), "正文")
         XCTAssertEqual(ReaderPageLayoutEngine.displayText("正文", fontSize: 0, indent: 38), "正文")
+        XCTAssertEqual(ReaderPageLayoutEngine.displayText("", fontSize: 19, indent: 38), "")
     }
 
     func testTopInsetIsSharedAcrossReaderSurfaces() {

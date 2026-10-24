@@ -39,6 +39,30 @@ final class ReaderPositionMappingTests: XCTestCase {
         XCTAssertEqual(mapping.target(for: .scroll, paragraph: paragraph), paragraph)
     }
 
+    func testPageStartsKeepTitleOnlyPagesAddressable() {
+        // A leading chapter-cover page owns no paragraph. Dropping it would
+        // shift every page index; it must inherit the first text page instead.
+        XCTAssertEqual(
+            ReaderPositionMapping.pageStarts(from: [nil, 0, 3]),
+            [0, 0, 3]
+        )
+        // A cover page in the middle maps to the next page's paragraph.
+        XCTAssertEqual(
+            ReaderPositionMapping.pageStarts(from: [0, nil, 3]),
+            [0, 3, 3]
+        )
+        // Empty chapter: the single page still resolves to paragraph 0.
+        XCTAssertEqual(ReaderPositionMapping.pageStarts(from: [nil]), [0])
+    }
+
+    func testTitleOnlyPageDoesNotShrinkReachablePageRange() {
+        let starts = ReaderPositionMapping.pageStarts(from: [nil, 0, 4, 7])
+        let mapping = ReaderPositionMapping(paragraphCount: 10, pageFirstParagraphs: starts)
+        XCTAssertEqual(mapping.maximumPageIndex, 3)
+        XCTAssertEqual(mapping.paragraph(forPage: 3), 7)
+        XCTAssertEqual(mapping.page(containingParagraph: 7), 3)
+    }
+
     func testAutomationSessionRejectsOldGenerationAfterRestart() {
         var session = ReaderAutomationSession()
         let first = session.startAutoScroll()

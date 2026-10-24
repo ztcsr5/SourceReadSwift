@@ -44,6 +44,10 @@ final class ReaderImageStyleTests: XCTestCase {
         XCTAssertNil(ReaderImageSizingPolicy.imageURL(in: "[img][/img]"))
         XCTAssertNil(ReaderImageSizingPolicy.imageURL(in: "[img]   [/img]"))
         XCTAssertNil(ReaderImageSizingPolicy.imageURL(in: "[img]invalid url without scheme[/img]"))
+        XCTAssertEqual(
+            ReaderImageSizingPolicy.imageURL(in: "  [img]\(validURL)[/img]\n")?.absoluteString,
+            validURL
+        )
     }
 
     func testSizingPolicyFullStyleExpandsToColumnWidth() {
