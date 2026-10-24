@@ -296,9 +296,9 @@ v1.0.28 的 `prefetchWindow` 对窗口内所有缺失章节同时发起请求。
 
 `ChapterContentCacheStore.markRead(sourceURL:chapter:purifyRules:at:)` 在章节真正进入阅读位置时把命中条目移到队首并刷新 `cachedAt`。缓存上限仍为 500 章，但“刚读过的章”不会因为后台预取 500 个新章而被淘汰；退出重进或向前回翻时直接命中磁盘，不再发网络请求。
 
-#### E. 预取所有权收敛到阅读窗口
+#### E. 自动预取所有权收敛到阅读窗口
 
-删除 `BookDetailView` 的 `preloadTask`、`onDisappear` 取消块与两处 `preloadAdjacentChapters(...)` 调用。详情页预取和阅读器窗口预取同时存在时会重复请求同一章、互相淘汰缓存；现在窗口是唯一预取所有者，详情页只负责打开阅读器。
+删除 `BookDetailView` 的 `preloadTask`、`onDisappear` 取消块与两处自动 `preloadAdjacentChapters(...)` 调用。详情页自动预取和阅读器窗口预取同时存在时会重复请求同一章、互相淘汰缓存；现在自动预取只由窗口负责。手动“缓存前后章节”入口保留：阅读器通过 `onCacheNextChapters` 调 `cacheAdjacentChaptersFromReader`，仍按当前阅读章用 `chaptersToCache` 跳过已缓存章节，并用 `isCachingNext` 防重入。
 
 #### F. 页脚章内页码与滚动边界提示
 
