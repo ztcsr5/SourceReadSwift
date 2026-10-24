@@ -110,7 +110,7 @@ enum ReaderChapterWindowPolicy {
             lowerBound: lowerBound,
             upperBound: upperBound
         ))
-        result.formUnion(loading)
+        result.formUnion(loading.filter { $0 >= lowerBound && $0 < upperBound })
         if current >= lowerBound, current < upperBound {
             result.insert(current)
         }
