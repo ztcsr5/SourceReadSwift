@@ -3789,7 +3789,11 @@ struct ReaderView: View {
                 )
             }
         }
-        return resolvedReadingPosition(forFlatIndex: visibleParagraphIndex)
+        let fallback = resolvedReadingPosition(forFlatIndex: visibleParagraphIndex)
+        return ReaderChapterPosition(
+            chapterIndex: fallback.chapterIndex,
+            paragraphIndex: fallback.paragraphIndex
+        )
     }
 
     private func restoredPageIndex(_ anchor: ReaderChapterPosition?, in blocks: [ReaderPageBlock]) -> Int {
