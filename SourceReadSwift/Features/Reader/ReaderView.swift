@@ -581,7 +581,7 @@ struct ReaderView: View {
                         defer { tapGestureStartedAt = nil }
                         let moved = abs(value.translation.width) + abs(value.translation.height)
                         let held = tapGestureStartedAt.map { Date().timeIntervalSince($0) } ?? 0
-                        guard moved < 8, held < 0.4 else { return }
+                        guard moved < 6, held < 0.3 else { return }
                         handleReaderTap(at: value.location)
                     }
             )
@@ -1002,7 +1002,8 @@ struct ReaderView: View {
             var result: [String] = []
             for (offset, section) in windowSections.enumerated() {
                 if offset > 0 {
-                    result.append("——— \(section.title) ———")
+                    // 章节标题不再加破折号：阅读器里标题应当左对齐、干净一行。
+        result.append(section.title)
                 }
                 result.append(contentsOf: section.paragraphs)
             }
