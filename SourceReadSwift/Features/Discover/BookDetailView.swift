@@ -974,7 +974,7 @@ struct ChapterLoadingView: View {
             return
         }
         let engine = appState.engine
-        let contentResult = await AsyncTimeout.run(seconds: 14) {
+        let contentResult = await AsyncTimeout.run(seconds: 20) {
             await engine.getContent(source: source, chapter: targetChapter)
         } ?? .failure(.network("Content load timed out"))
         switch contentResult {
