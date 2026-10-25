@@ -404,14 +404,10 @@ struct ReaderView: View {
     }
 
     private var windowRadius: Int {
-        let configured = ReaderChapterWindowPolicy.radius(forPreloadCount: preloadChapterCount)
-        // 连续阅读需要「读到章尾之前下一章已经在文档里」。本地书的章节本来就在
-        // 内存里，多留几章不花网络；书源书也至少前后各 2 章，避免每次都滑到
-        // 文档尽头再等一次加载 —— 用户看到的就是「一章看完卡一下」。
-        if isLocalChapterBook {
-            return max(configured, 4)
-        }
-        return max(configured, 2)
+        // 连续阅读要「章尾之前下一章已经在文档里」，但窗口不能无限大：
+        // 4 章 × 每章几千段会让 WebKit 在大幅快速滚动时排版爆炸（实测卡死）。
+        // 统一 2 章，加上提前 1.6 屏的触发点，衔接仍然连续。
+        return 2
     }
 
     /// 本地导入的书（localChapters 在书架模型里），章节读取不经过书源。
@@ -2098,7 +2094,7 @@ struct ReaderView: View {
             .padding(.top, pageTopInset)
             // 底部只给页脚条让出实际高度：footerHeight 是「安全留白」设置（40…180），
             // 直接当内边距用会在三种分页模式里留下半屏空白。页脚本体只有 20pt。
-            .padding(.bottom, CGFloat(pagePadding) + readerFooterReservedHeight)
+            .padding(.bottom, pagedBottomPadding)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
             .background {
                 // 覆盖模式的方向阴影由 coverPagedReaderContent 每页各画一层；
@@ -2109,9 +2105,15 @@ struct ReaderView: View {
 
     /// 分页表面的顶部留白：与滚动模式同一套规则（工具栏可见 56pt，收起后贴安全区）。
     private var pageTopInset: CGFloat {
-        showOverlay
-            ? ReaderPageLayoutEngine.minimumTopInset(pagePadding: CGFloat(pagePadding))
-            : max(CGFloat(pagePadding) + 6, 20)
+        // 工具栏是浮层，正文不跟着让位：以前用 showOverlay 切两套内边距，
+        // 弹出菜单时整页文本会往下掉一格，关掉又跳回来。
+        ReaderPageLayoutEngine.minimumTopInset(pagePadding: CGFloat(pagePadding))
+    }
+
+    /// 分页模式底部预留：页脚本体 20pt + 半个边距，和分页排版用同一个数，
+    /// 否则排版按 37pt 算、渲染按 64pt 留，页面底部就空出一截。
+    private var pagedBottomPadding: CGFloat {
+        CGFloat(pagePadding) * 0.5 + readerFooterReservedHeight
     }
 
     /// 页脚实际占用高度（20pt 条 + 6pt 间距），滑动模式不需要预留。
@@ -3200,6 +3202,7 @@ struct ReaderView: View {
             // List 自带 systemBackground，叠在主题背景上就是「章节 (N)」下面那条白带。
             // 把滚动内容背景设为透明，让 readerBackdrop 透上来；行背景已经是 clear。
             .scrollContentBackground(.hidden)
+            .background(readerThemeBackground.ignoresSafeArea())
             .navigationTitle(tocTab == 0 ? "目录" : "书签")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -4534,9 +4537,7 @@ struct ReaderView: View {
         }
 
         let topPadding = ReaderPageLayoutEngine.minimumTopInset(pagePadding: CGFloat(pagePadding))
-        // 正文按可用高度排满：底部只留页脚那条 20pt 状态条 + 半个边距，
-        // 不再把「底部安全留白」整段（默认 80pt）留给空白。
-        let bottomPadding = CGFloat(pagePadding) * 0.5 + readerFooterReservedHeight
+        let bottomPadding = pagedBottomPadding
         let typography = ReaderPageTypography(
             font: fontFamily.uiFont(ofSize: CGFloat(fontSize)),
             titleFont: fontFamily.uiFont(ofSize: CGFloat(fontSize + 8), weight: .bold),

@@ -408,7 +408,7 @@ enum WebReaderHTML {
       -webkit-tap-highlight-color: transparent;
     }
     #content { display: block; }
-    .chapter { display: block; }
+    .chapter { display: block; contain: layout style paint; }
     .chapter-title {
       margin: calc(var(--title-gap) * 1.9) calc(var(--side) * -0.32) var(--title-gap);
       padding-left: 0.62em;
@@ -711,7 +711,13 @@ enum WebReaderHTML {
         var metric = metricAt(y + topInset() + 4);
         if (metric && metric.flat !== state.visible) {
           state.visible = metric.flat;
-          post({ type: "visible", flat: metric.flat });
+          // 快速滚动时段落每几毫秒就换一次，逐条回传会让 SwiftUI 整棵阅读器
+          // 树每帧重算。120ms 一条足够记进度，也不会把主线程塞满。
+          var now = performance.now();
+          if (now - (state.lastVisiblePostAt || 0) > 120) {
+            state.lastVisiblePostAt = now;
+            post({ type: "visible", flat: metric.flat });
+          }
         }
         var bottom = y + viewport;
         // 预取要早于「看不见下一章」的那一刻：离末尾还剩约 1.6 屏就开始要下一章，
