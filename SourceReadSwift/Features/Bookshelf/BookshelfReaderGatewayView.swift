@@ -369,13 +369,13 @@ struct BookshelfReaderGatewayView: View {
         )
 
         let engine = appState.engine
-        let detailResult = await AsyncTimeout.run(seconds: 12) {
+        let detailResult = await AsyncTimeout.run(seconds: 20) {
             await engine.getBookDetail(source: source, book: searchBook)
         } ?? .failure(.network("Detail load timed out"))
         switch detailResult {
         case .success(let loadedDetail):
             detail = loadedDetail
-            let chapterResult = await AsyncTimeout.run(seconds: 12) {
+            let chapterResult = await AsyncTimeout.run(seconds: 20) {
                 await engine.getChapterList(source: source, book: loadedDetail)
             } ?? .failure(.network("Chapter list timed out"))
             switch chapterResult {
@@ -593,12 +593,12 @@ struct BookshelfReaderGatewayView: View {
     private func applySwitch(_ candidate: SourceSwitchCandidate) async {
         sourceSwitchState.isLoading = true
         let engine = appState.engine
-        let detailResult = await AsyncTimeout.run(seconds: 12) {
+        let detailResult = await AsyncTimeout.run(seconds: 20) {
             await engine.getBookDetail(source: candidate.source, book: candidate.book)
         } ?? .failure(.network("Detail load timed out"))
         switch detailResult {
         case .success(let detail):
-            let chapterResult = await AsyncTimeout.run(seconds: 12) {
+            let chapterResult = await AsyncTimeout.run(seconds: 20) {
                 await engine.getChapterList(source: candidate.source, book: detail)
             } ?? .failure(.network("Chapter list timed out"))
             switch chapterResult {

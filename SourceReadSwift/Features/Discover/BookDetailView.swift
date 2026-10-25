@@ -661,13 +661,13 @@ struct BookDetailView: View {
 
         let engine = appState.engine
         let selectedBook = book
-        let detailResult = await AsyncTimeout.run(seconds: 12) {
+        let detailResult = await AsyncTimeout.run(seconds: 20) {
             await engine.getBookDetail(source: source, book: selectedBook)
         } ?? .failure(.network("Detail load timed out"))
         switch detailResult {
         case .success(let loadedDetail):
             detail = loadedDetail
-            let chapterResult = await AsyncTimeout.run(seconds: 12) {
+            let chapterResult = await AsyncTimeout.run(seconds: 20) {
                 await engine.getChapterList(source: source, book: loadedDetail)
             } ?? .failure(.network("Chapter list timed out"))
             switch chapterResult {
