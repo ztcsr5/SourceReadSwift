@@ -36,7 +36,7 @@ struct SearchURLResolver {
                 baseUrl: source.cleanSourceURL,
                 charset: isGBK ? "gbk" : nil
             )
-            return normalizePathDoubleSlashes(interpolated)
+            return urlSafeString(normalizePathDoubleSlashes(interpolated))
         }
 
         if trimmedCleaned.hasPrefix("@js:") {
@@ -77,7 +77,29 @@ struct SearchURLResolver {
             ).map(postProcess)
         }
 
-        return .success(normalizePathDoubleSlashes(trimmed))
+        return .success(urlSafeString(normalizePathDoubleSlashes(trimmed)))
+    }
+
+    /// 把插值后仍可能带空格 / 中文 / 裸花括号的 URL 修成 `URL(string:)` 能吃的形态。
+    ///
+    /// 诊断数据里 991 个源有 31 条倒在 `URL 格式非法或解析异常 (-1000)`：
+    /// 多数是 `searchUrl` 里 `{{key}}` 拼进中文关键词、或模板里留了空格/花括号，
+    /// 解析器直接拿到一个非法字符串。这里只在**确实解析不了**时逐个字符转义，
+    /// 已经合法的 URL 原样返回，不会把 `%XX` 二次编码。
+    private func urlSafeString(_ raw: String) -> String {
+        if URL(string: raw) != nil { return raw }
+        var output = ""
+        output.reserveCapacity(raw.count + 16)
+        for scalar in raw.unicodeScalars {
+            let text = String(scalar)
+            if scalar.isASCII, !" \"<>\\^`{|}\n\r\t".unicodeScalars.contains(scalar) {
+                output += text
+            } else {
+                // 空允许集：除 A-Za-z0-9-._~ 外全部百分号编码。
+                output += text.addingPercentEncoding(withAllowedCharacters: CharacterSet(charactersIn: "")) ?? text
+            }
+        }
+        return output
     }
 
     private func normalizePathDoubleSlashes(_ urlString: String) -> String {
