@@ -39,10 +39,18 @@ struct ChapterListParser {
         let listRule = htmlExtractor.firstRule(source.ruleToc, keys: ["chapterList", "tocList", "list"])
         let isJSRule = listRule.map { LegadoRuleResolver().isJavaScriptRule($0) || $0.contains("<js>") || $0.contains("@js:") } ?? false
         let prefersJSON = isJSRule || ResponseFormatDetector.prefersJSON(body: normalized, headers: response.headers, rule: listRule)
+        // 空页也算一次机会：目录为空时换另一套提取器再试一次，
+        // 避免 92 条「Chapter list is empty」其实是另一套规则能解析的。
         if prefersJSON {
             let jsonResult = parseJSON(source: source, book: book, response: normalizedResponse, inheritedVolume: inheritedVolume)
             switch jsonResult {
+            case .success(let page) where !page.chapters.isEmpty:
+                return jsonResult
             case .success:
+                let htmlResult = parseHTML(source: source, book: book, response: normalizedResponse, inheritedVolume: inheritedVolume)
+                if case .success(let htmlPage) = htmlResult, !htmlPage.chapters.isEmpty {
+                    return htmlResult
+                }
                 return jsonResult
             case .failure:
                 let htmlResult = parseHTML(source: source, book: book, response: normalizedResponse, inheritedVolume: inheritedVolume)
@@ -54,7 +62,13 @@ struct ChapterListParser {
         } else {
             let htmlResult = parseHTML(source: source, book: book, response: normalizedResponse, inheritedVolume: inheritedVolume)
             switch htmlResult {
+            case .success(let page) where !page.chapters.isEmpty:
+                return htmlResult
             case .success:
+                let jsonResult = parseJSON(source: source, book: book, response: normalizedResponse, inheritedVolume: inheritedVolume)
+                if case .success(let jsonPage) = jsonResult, !jsonPage.chapters.isEmpty {
+                    return jsonResult
+                }
                 return htmlResult
             case .failure:
                 let jsonResult = parseJSON(source: source, book: book, response: normalizedResponse, inheritedVolume: inheritedVolume)
