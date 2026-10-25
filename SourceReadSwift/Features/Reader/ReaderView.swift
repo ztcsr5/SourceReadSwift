@@ -580,7 +580,9 @@ struct ReaderView: View {
                     .allowsHitTesting(false)
                 }
 
-            if !showOverlay && !speechController.isSpeaking && !autoScrollEnabled {
+            // 滑动模式不再画底部页脚：正文是连续流，页脚会压在中段文字上，
+            // 而且页码/章节对滚动阅读没有意义。分页三种模式保留。
+            if !showOverlay, readerMode != .scroll, !speechController.isSpeaking, !autoScrollEnabled {
                 readerFooter
                     .transition(.opacity)
                     .zIndex(1)
@@ -2007,14 +2009,28 @@ struct ReaderView: View {
     private func pageSurface<Content: View>(@ViewBuilder content: () -> Content) -> some View {
         content()
             .padding(.horizontal, CGFloat(pagePadding))
-            .padding(.top, ReaderPageLayoutEngine.minimumTopInset(pagePadding: CGFloat(pagePadding)))
-            .padding(.bottom, CGFloat(pagePadding) + CGFloat(footerHeight))
+            .padding(.top, pageTopInset)
+            // 底部只给页脚条让出实际高度：footerHeight 是「安全留白」设置（40…180），
+            // 直接当内边距用会在三种分页模式里留下半屏空白。页脚本体只有 20pt。
+            .padding(.bottom, CGFloat(pagePadding) + readerFooterReservedHeight)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
             .background {
                 // 覆盖模式的方向阴影由 coverPagedReaderContent 每页各画一层；
                 // 这里再叠一层同方向的 shadow，两圈叠在一起就是那道「奇怪的边框」。
                 readerThemeBackground
             }
+    }
+
+    /// 分页表面的顶部留白：与滚动模式同一套规则（工具栏可见 56pt，收起后贴安全区）。
+    private var pageTopInset: CGFloat {
+        showOverlay
+            ? ReaderPageLayoutEngine.minimumTopInset(pagePadding: CGFloat(pagePadding))
+            : max(CGFloat(pagePadding) + 6, 20)
+    }
+
+    /// 页脚实际占用高度（20pt 条 + 6pt 间距），滑动模式不需要预留。
+    private var readerFooterReservedHeight: CGFloat {
+        readerMode == .scroll ? 0 : 26
     }
 
     @ViewBuilder
@@ -2523,6 +2539,12 @@ struct ReaderView: View {
                 }
                 .frame(maxWidth: .infinity)
                 .frame(height: maxHeight)
+                // 先铺一层不透明主题底色，再叠玻璃：只靠 ultraThinMaterial 会透出下面正文，
+                // 视觉上就是「东西穿过这个框」。底色跟着阅读主题走，不破坏整体风格。
+                .background(
+                    readerThemeBackground.opacity(0.97),
+                    in: RoundedRectangle(cornerRadius: 28, style: .continuous)
+                )
                 .glassPanel(cornerRadius: 28, material: .ultraThinMaterial, strokeOpacity: colorScheme == .dark ? 0.08 : 0.12, shadowOpacity: colorScheme == .dark ? 0.35 : 0.18)
                 .contentShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
                 .padding(.horizontal, 12)

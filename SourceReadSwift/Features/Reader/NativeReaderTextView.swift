@@ -684,22 +684,14 @@ struct NativeReaderTextView: UIViewRepresentable {
                 return
             }
             UIView.performWithoutAnimation {
-                let fullRange = NSRange(location: 0, length: textView.textStorage.length)
-                var updates: [(NSRange, UIColor)] = []
-                textView.textStorage.enumerateAttribute(.foregroundColor, in: fullRange) { value, range, _ in
-                    let alpha: CGFloat
-                    if let existing = value as? UIColor {
-                        alpha = existing.resolvedColor(with: textView.traitCollection).cgColor.alpha
-                    } else {
-                        alpha = 1
-                    }
-                    updates.append((range, color.withAlphaComponent(alpha)))
-                }
-                textView.textStorage.beginEditing()
-                for (range, updatedColor) in updates {
-                    textView.textStorage.addAttribute(.foregroundColor, value: updatedColor, range: range)
-                }
-                textView.textStorage.endEditing()
+                // 一次整段覆盖，替代原来的逐段枚举 + 逐段 addAttribute。
+                // 长章节（几千段）切主题时，原实现要遍历整篇属性并逐段写入，
+                // 在真机上表现为“点一下主题，等好几秒才变”。
+                textView.textStorage.addAttribute(
+                    .foregroundColor,
+                    value: color,
+                    range: NSRange(location: 0, length: textView.textStorage.length)
+                )
                 textView.textColor = color
             }
         }
