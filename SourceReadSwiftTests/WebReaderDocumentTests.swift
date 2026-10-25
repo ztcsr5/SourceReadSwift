@@ -1,3 +1,4 @@
+import JavaScriptCore
 import UIKit
 import XCTest
 @testable import SourceReadSwift
@@ -199,5 +200,115 @@ final class WebReaderDocumentTests: XCTestCase {
         XCTAssertTrue(shell.contains("held > 320"))
         XCTAssertTrue(shell.contains("state.lastScrollAt"))
         XCTAssertTrue(shell.contains("isCollapsed"))
+    }
+
+    func testWebReaderDocumentJavaScriptCompilesAndInitializesBridge() throws {
+        let shell = WebReaderHTML.shell
+        let scriptStart = try XCTUnwrap(shell.range(of: "<script>")).upperBound
+        let scriptEnd = try XCTUnwrap(shell.range(of: "</script>", range: scriptStart..<shell.endIndex)).lowerBound
+        let script = String(shell[scriptStart..<scriptEnd])
+
+        let context = try XCTUnwrap(JSContext())
+        var jsExceptionMessage: String?
+        context.exceptionHandler = { _, exception in
+            jsExceptionMessage = exception?.toString()
+        }
+
+        let domBootstrap = """
+        var __listeners = {};
+        var document = {
+          documentElement: {
+            style: { setProperty: function() {} },
+            scrollHeight: 2000
+          },
+          body: { className: '' },
+          getElementById: function(id) {
+            return {
+              id: id,
+              textContent: '',
+              replaceChildren: function() {},
+              querySelectorAll: function() { return []; },
+              querySelector: function() { return null; }
+            };
+          },
+          createDocumentFragment: function() {
+            return { appendChild: function() {} };
+          },
+          createElement: function(tag) {
+            return {
+              tagName: tag,
+              className: '',
+              textContent: '',
+              dataset: {},
+              appendChild: function() {},
+              setAttribute: function() {},
+              classList: { add: function() {}, remove: function() {} }
+            };
+          },
+          createTextNode: function(t) { return { textContent: t }; },
+          addEventListener: function(type, fn) { __listeners[type] = fn; }
+        };
+        var window = {
+          innerHeight: 844,
+          innerWidth: 390,
+          scrollY: 0,
+          pageYOffset: 0,
+          webkit: { messageHandlers: { reader: { postMessage: function() {} } } },
+          addEventListener: function() {},
+          scrollTo: function() {},
+          scrollBy: function() {},
+          getSelection: function() { return { isCollapsed: true }; },
+          requestAnimationFrame: function(cb) { cb(); }
+        };
+        var performance = { now: function() { return 0; } };
+        var CSS = { escape: function(s) { return String(s); } };
+        """
+        context.evaluateScript(domBootstrap)
+        XCTAssertNil(jsExceptionMessage, "DOM bootstrap failed: \(jsExceptionMessage ?? "")")
+
+        context.evaluateScript(script)
+        XCTAssertNil(jsExceptionMessage, "WebReaderHTML.shell script failed to compile/execute: \(jsExceptionMessage ?? "")")
+
+        let readerBridge = context.objectForKeyedSubscript("window")?.objectForKeyedSubscript("__reader")
+        XCTAssertNotNil(readerBridge)
+        XCTAssertEqual(readerBridge?.objectForKeyedSubscript("setContent")?.isObject, true)
+        XCTAssertEqual(readerBridge?.objectForKeyedSubscript("setStyle")?.isObject, true)
+        XCTAssertEqual(readerBridge?.objectForKeyedSubscript("scrollToFlat")?.isObject, true)
+        XCTAssertEqual(readerBridge?.objectForKeyedSubscript("pageStep")?.isObject, true)
+    }
+
+    func testReaderTextTransformTraditionalChineseAndBionicReading() {
+        let simplified = "阅读器支持繁体中文与仿生阅读"
+        let traditional = ReaderTextTransform.toTraditionalChinese(simplified)
+        XCTAssertNotEqual(traditional, simplified)
+        XCTAssertEqual(
+            ReaderTextTransform.displayText(simplified, traditionalChinese: false),
+            simplified
+        )
+        XCTAssertEqual(
+            ReaderTextTransform.displayText(simplified, traditionalChinese: true),
+            traditional
+        )
+
+        let baseFont = UIFont.systemFont(ofSize: 18, weight: .regular)
+        let attr = ReaderTextTransform.bionicAttributedString(
+            "Hello world 阅读体验",
+            baseFont: baseFont,
+            textColor: .black,
+            lineSpacing: 6,
+            letterSpacing: 0
+        )
+        XCTAssertEqual(attr.string, "Hello world 阅读体验")
+    }
+
+    func testReaderBackgroundIsDarkIncludesAllDarkThemes() {
+        XCTAssertTrue(ReaderBackground.dark.isDark)
+        XCTAssertTrue(ReaderBackground.sakuraDark.isDark)
+        XCTAssertTrue(ReaderBackground.sakuraSolarized.isDark)
+        XCTAssertTrue(ReaderBackground.sakuraVader.isDark)
+        XCTAssertTrue(ReaderBackground.custom.isDark)
+        XCTAssertFalse(ReaderBackground.paper.isDark)
+        XCTAssertFalse(ReaderBackground.sepia.isDark)
+        XCTAssertFalse(ReaderBackground.green.isDark)
     }
 }

@@ -125,7 +125,12 @@ final class RemoteImageLoader: @unchecked Sendable {
         await withCheckedContinuation { continuation in
             DispatchQueue.global(qos: .utility).async {
                 autoreleasepool {
-                    continuation.resume(returning: UIImage(data: data)?.preparingForDisplay())
+                    guard let rawImage = UIImage(data: data) else {
+                        continuation.resume(returning: nil)
+                        return
+                    }
+                    let image = rawImage.preparingForDisplay() ?? rawImage
+                    continuation.resume(returning: image)
                 }
             }
         }

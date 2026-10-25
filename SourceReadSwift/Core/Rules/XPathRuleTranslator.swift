@@ -66,14 +66,60 @@ struct XPathRuleTranslator {
         var selector = tag
         var indexSuffix = ""
 
-        for predicate in predicates(String(predicateText)) {
-            if let fragment = cssPredicate(predicate) {
-                selector += fragment
-            } else if let index = indexPredicate(predicate) {
-                indexSuffix = "@\(index)"
+        for rawPredicate in predicates(String(predicateText)) {
+            for predicate in splitCompoundPredicates(rawPredicate) {
+                if let fragment = cssPredicate(predicate) {
+                    selector += fragment
+                } else if let index = indexPredicate(predicate) {
+                    indexSuffix = "@\(index)"
+                }
             }
         }
         return selector + indexSuffix
+    }
+
+    private static func splitCompoundPredicates(_ predicate: String) -> [String] {
+        var result: [String] = []
+        var buffer = ""
+        var quote: Character?
+        let chars = Array(predicate)
+        var i = 0
+        while i < chars.count {
+            let ch = chars[i]
+            if let currentQuote = quote {
+                buffer.append(ch)
+                if ch == currentQuote {
+                    quote = nil
+                }
+                i += 1
+                continue
+            }
+            if ch == "'" || ch == "\"" {
+                quote = ch
+                buffer.append(ch)
+                i += 1
+                continue
+            }
+            if i + 5 <= chars.count {
+                let slice = String(chars[i..<(i + 5)])
+                if slice.lowercased() == " and " {
+                    let trimmed = buffer.trimmingCharacters(in: .whitespacesAndNewlines)
+                    if !trimmed.isEmpty {
+                        result.append(trimmed)
+                    }
+                    buffer = ""
+                    i += 5
+                    continue
+                }
+            }
+            buffer.append(ch)
+            i += 1
+        }
+        let trailing = buffer.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !trailing.isEmpty {
+            result.append(trailing)
+        }
+        return result
     }
 
     private static func predicates(_ text: String) -> [String] {
@@ -96,23 +142,49 @@ struct XPathRuleTranslator {
     }
 
     private static func cssPredicate(_ predicate: String) -> String? {
-        if let value = capture(predicate, pattern: #"^@id\s*=\s*['"]([^'"]+)['"]$"#) {
+        let trimmed = predicate.trimmingCharacters(in: .whitespacesAndNewlines)
+        if let value = capture(trimmed, pattern: #"^@id\s*=\s*['"]([^'"]+)['"]$"#) {
             return "#\(escapeIdentifier(value))"
         }
-        if let value = capture(predicate, pattern: #"^@class\s*=\s*['"]([^'"]+)['"]$"#) {
+        if let value = capture(trimmed, pattern: #"^@class\s*=\s*['"]([^'"]+)['"]$"#) {
             return value
                 .split(whereSeparator: { $0.isWhitespace })
                 .map { ".\(escapeIdentifier(String($0)))" }
                 .joined()
         }
-        if let value = capture(predicate, pattern: #"^contains\(\s*@class\s*,\s*['"]([^'"]+)['"]\s*\)$"#) {
+        if let value = capture(trimmed, pattern: #"^contains\(\s*@class\s*,\s*['"]([^'"]+)['"]\s*\)$"#) {
             return ".\(escapeIdentifier(value))"
         }
-        if let match = capturePair(predicate, pattern: #"^@([A-Za-z_][A-Za-z0-9_:\-]*)\s*=\s*['"]([^'"]+)['"]$"#) {
+        if let match = capturePair(trimmed, pattern: #"^@([A-Za-z_][A-Za-z0-9_:\-]*)\s*=\s*['"]([^'"]+)['"]$"#) {
             return "[\(match.0)=\"\(match.1)\"]"
         }
-        if let attr = capture(predicate, pattern: #"^@([A-Za-z_][A-Za-z0-9_:\-]*)$"#) {
+        if let attr = capture(trimmed, pattern: #"^@([A-Za-z_][A-Za-z0-9_:\-]*)$"#) {
             return "[\(attr)]"
+        }
+        if let numStr = capture(trimmed, pattern: #"^position\(\)\s*>\s*(\d+)$"#),
+           let n = Int(numStr), n >= 1 {
+            return ":gt(\(n - 1))"
+        }
+        if let numStr = capture(trimmed, pattern: #"^position\(\)\s*>=\s*(\d+)$"#),
+           let n = Int(numStr) {
+            return n >= 2 ? ":gt(\(n - 2))" : ""
+        }
+        if capture(trimmed, pattern: #"^(position\(\)\s*<\s*last\(\))$"#) != nil {
+            return ":not(:last-child)"
+        }
+        if capture(trimmed, pattern: #"^(position\(\)\s*<=\s*last\(\)\s*-\s*1)$"#) != nil {
+            return ":not(:last-child)"
+        }
+        if capture(trimmed, pattern: #"^(position\(\)\s*==?\s*last\(\)|last\(\))$"#) != nil {
+            return ":last-child"
+        }
+        if let numStr = capture(trimmed, pattern: #"^position\(\)\s*<\s*(\d+)$"#),
+           let n = Int(numStr), n >= 2 {
+            return ":lt(\(n - 1))"
+        }
+        if let numStr = capture(trimmed, pattern: #"^position\(\)\s*<=\s*(\d+)$"#),
+           let n = Int(numStr), n >= 1 {
+            return ":lt(\(n))"
         }
         return nil
     }

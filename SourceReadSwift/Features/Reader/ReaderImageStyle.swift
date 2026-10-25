@@ -13,6 +13,8 @@ enum ReaderImageStyle: String, CaseIterable, Sendable {
     case text = "TEXT"
     case single = "SINGLE"
 
+    static let `default`: ReaderImageStyle = .standard
+
     /// Unknown or missing rule values fall back to DEFAULT, matching Legado.
     init(rule: String?) {
         let normalized = (rule ?? "")

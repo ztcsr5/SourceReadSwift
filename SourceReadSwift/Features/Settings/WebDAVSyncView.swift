@@ -78,7 +78,7 @@ struct WebDAVSyncView: View {
                     }
                 }
                 .onChange(of: selectedPreset) { newPreset in
-                    if newPreset != .custom && serverURL.isEmpty || serverURL == "https://" || serverURL.contains("jianguoyun") || serverURL.contains("cloud.example.com") {
+                    if newPreset != .custom && (serverURL.isEmpty || serverURL == "https://" || serverURL.contains("jianguoyun") || serverURL.contains("cloud.example.com")) {
                         serverURL = newPreset.defaultURL
                     }
                 }

@@ -10,6 +10,7 @@ struct DiscoverView: View {
     @State private var showSmartWebReader = false
     @State private var selectedAggregatedBookForSources: AggregatedSearchBook? = nil
     @State private var detectedClipboardSourceURL: String? = nil
+    @State private var lastCheckedPasteboardChangeCount: Int = -1
     @State private var isImportingClipboardSource = false
     @State private var clipboardImportToast: String? = nil
     @AppStorage("discover_search_history") private var searchHistoryJSON: String = "[]"
@@ -793,7 +794,12 @@ struct DiscoverView: View {
     }
 
     private func checkClipboard() {
-        guard let text = UIPasteboard.general.string?.trimmingCharacters(in: .whitespacesAndNewlines), !text.isEmpty else { return }
+        let pasteboard = UIPasteboard.general
+        let currentChangeCount = pasteboard.changeCount
+        guard currentChangeCount != lastCheckedPasteboardChangeCount else { return }
+        lastCheckedPasteboardChangeCount = currentChangeCount
+        guard pasteboard.hasURLs || pasteboard.hasStrings else { return }
+        guard let text = pasteboard.string?.trimmingCharacters(in: .whitespacesAndNewlines), !text.isEmpty else { return }
         if text == detectedClipboardSourceURL { return }
         if (text.hasPrefix("http://") || text.hasPrefix("https://")) && (text.contains(".json") || text.contains("source") || text.contains("yuedu") || text.contains("legado") || text.contains("book")) {
             detectedClipboardSourceURL = text

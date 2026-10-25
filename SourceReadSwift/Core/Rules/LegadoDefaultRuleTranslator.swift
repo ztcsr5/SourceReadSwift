@@ -317,17 +317,42 @@ enum LegadoDefaultRuleTranslator {
         return LegadoRuleStep(selector: cssSelector, indices: indices, excludeIndices: excludeIndices)
     }
 
+    private static let compoundHTMLTagNames: Set<String> = [
+        "ul", "ol", "li", "dl", "dt", "dd", "div", "span", "p", "a",
+        "h1", "h2", "h3", "h4", "h5", "h6", "table", "tr", "td", "th",
+        "tbody", "thead", "img", "section", "article", "header", "footer",
+        "nav", "main", "em", "strong", "i", "b"
+    ]
+
     private static func convertLegadoComponentToCSS(_ component: String) -> String {
         let trimmed = component.trimmingCharacters(in: .whitespacesAndNewlines)
         let lower = trimmed.lowercased()
 
         if lower.hasPrefix("class.") {
             let className = String(trimmed.dropFirst(6)).trimmingCharacters(in: .whitespacesAndNewlines)
-            return className.isEmpty ? "" : ".\(className.replacingOccurrences(of: " ", with: "."))"
+            guard !className.isEmpty else { return "" }
+            let normalizedClass = className.replacingOccurrences(of: " ", with: ".")
+            if normalizedClass.contains(".") {
+                let parts = normalizedClass.split(separator: ".").map(String.init)
+                if parts.count >= 2, let lastTag = parts.last?.lowercased(), compoundHTMLTagNames.contains(lastTag) {
+                    let classPrefix = parts.dropLast().joined(separator: ".")
+                    return ".\(classPrefix) \(lastTag), .\(normalizedClass)"
+                }
+            }
+            return ".\(normalizedClass)"
         }
         if lower.hasPrefix("id.") {
             let idName = String(trimmed.dropFirst(3)).trimmingCharacters(in: .whitespacesAndNewlines)
-            return idName.isEmpty ? "" : "#\(idName)"
+            guard !idName.isEmpty else { return "" }
+            if idName.contains(".") {
+                let parts = idName.split(separator: ".").map(String.init)
+                if parts.count >= 2, let lastTag = parts.last?.lowercased(), compoundHTMLTagNames.contains(lastTag) {
+                    let idPrefix = parts.dropLast().joined(separator: ".")
+                    let escapedFull = idName.replacingOccurrences(of: ".", with: "\\.")
+                    return "#\(idPrefix) \(lastTag), #\(escapedFull)"
+                }
+            }
+            return "#\(idName)"
         }
         if lower.hasPrefix("tag.") {
             let tagName = String(trimmed.dropFirst(4)).trimmingCharacters(in: .whitespacesAndNewlines)

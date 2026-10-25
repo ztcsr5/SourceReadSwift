@@ -130,7 +130,7 @@ struct BookDetailView: View {
                     Button { toggleDownload() } label: {
                         Label(downloadLabel, systemImage: isDownloading ? "stop.circle" : "arrow.down.circle")
                     }
-                    .disabled(chapters.isEmpty)
+                    .disabled(chapters.isEmpty || book.sourceUrl.hasPrefix("local://"))
                 } label: {
                     Image(systemName: "ellipsis.circle")
                 }
@@ -917,12 +917,14 @@ struct BookDetailView: View {
     private func downloadChapters(limit: Int?) {
         guard !chapters.isEmpty,
               let source = appState.sourceStore.source(for: book.sourceUrl) else { return }
+        let currentReadingIndex = appState.bookshelfStore.book(id: readerBookID)?.currentChapterIndex ?? 0
         let targets: [BookChapter]
         if let limit {
-            targets = Array(chapters.prefix(limit))
+            targets = Array(chapters.dropFirst(max(currentReadingIndex, 0)).prefix(limit))
         } else {
             targets = chapters
         }
+        guard !targets.isEmpty else { return }
         appState.chapterDownloadCoordinator.start(
             bookID: book.id,
             source: source,
@@ -947,6 +949,7 @@ struct ChapterLoadingView: View {
     var initialParagraphIndex: Int? = nil
     var extraToolbarActions: () -> AnyView = { AnyView(EmptyView()) }
     var onRequestSourceSwitch: (() -> Void)?
+    var onRequestBookDetail: (() -> Void)? = nil
     @State private var content: ChapterContent?
     @State private var currentChapter: BookChapter?
     @State private var currentParagraphIndex: Int? = nil
@@ -956,6 +959,7 @@ struct ChapterLoadingView: View {
     @State private var autoplaySpeechAfterHandoff = false
     @State private var autoplayAutoScrollAfterHandoff = false
     @State private var showReaderChromeAfterChapterSelection = false
+    @State private var showBookDetailSheet = false
     @AppStorage("reader.preloadChapterCount") private var preloadChapterCount = ReaderPreloadPolicy.defaultCount
 
     private var effectiveChapter: BookChapter {
@@ -990,6 +994,26 @@ struct ChapterLoadingView: View {
                 await load(force: true)
             }
         }
+        .sheet(isPresented: $showBookDetailSheet) {
+            NavigationStack {
+                BookDetailView(book: detailSheetSearchBook)
+            }
+        }
+    }
+
+    private var detailSheetSearchBook: SearchBook {
+        if let bookID, let shelfBook = appState.bookshelfStore.book(id: bookID) {
+            return shelfBook.asSearchBook
+        }
+        let sourceName = appState.sourceStore.source(for: sourceUrl)?.bookSourceName ?? sourceUrl
+        return SearchBook(
+            name: effectiveChapter.title,
+            author: nil,
+            coverUrl: nil,
+            bookUrl: effectiveChapter.bookUrl,
+            sourceName: sourceName,
+            sourceUrl: sourceUrl
+        )
     }
 
     private func load(force: Bool = false, ignoreCache: Bool = false) async {
@@ -1074,7 +1098,7 @@ struct ChapterLoadingView: View {
             statusMessage: isUsingStaleCache ? "网络加载失败，正在显示本地缓存副本" : nil,
             extraToolbarActions: extraToolbarActions,
             onRequestSourceSwitch: onRequestSourceSwitch,
-            onRequestBookDetail: { dismiss() },
+            onRequestBookDetail: onRequestBookDetail ?? { showBookDetailSheet = true },
             onSelectChapter: { selected in
                 showReaderChromeAfterChapterSelection = true
                 currentChapter = selected
@@ -1110,7 +1134,21 @@ struct ChapterLoadingView: View {
             autoplayAutoScrollOnAppear: autoplayAutoScrollAfterHandoff,
             onAutoScrollAutoplayConsumed: { autoplayAutoScrollAfterHandoff = false },
             onAutoScrollFinished: {
+                guard let next = chapters.first(where: { $0.index == effectiveChapter.index + 1 }) else { return }
                 autoplayAutoScrollAfterHandoff = true
+                currentChapter = next
+                currentParagraphIndex = nil
+                content = nil
+                errorMessage = nil
+                isUsingStaleCache = false
+                if let bookID {
+                    appState.bookshelfStore.updateReadingProgress(
+                        bookID: bookID,
+                        chapterIndex: next.index,
+                        chapterTitle: next.title,
+                        totalChapters: totalChapters ?? chapters.count
+                    )
+                }
             },
             initialOverlayVisible: showReaderChromeAfterChapterSelection
         )
@@ -1224,7 +1262,8 @@ struct ChapterLoadingView: View {
         chapters: [BookChapter] = [],
         initialParagraphIndex: Int? = nil,
         extraToolbarActions: @escaping () -> AnyView = { AnyView(EmptyView()) },
-        onRequestSourceSwitch: (() -> Void)? = nil
+        onRequestSourceSwitch: (() -> Void)? = nil,
+        onRequestBookDetail: (() -> Void)? = nil
     ) {
         self.bookID = bookID
         self.sourceUrl = sourceUrl
@@ -1234,6 +1273,7 @@ struct ChapterLoadingView: View {
         self.initialParagraphIndex = initialParagraphIndex
         self.extraToolbarActions = extraToolbarActions
         self.onRequestSourceSwitch = onRequestSourceSwitch
+        self.onRequestBookDetail = onRequestBookDetail
     }
 }
 

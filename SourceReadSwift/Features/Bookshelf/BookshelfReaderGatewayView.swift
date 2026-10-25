@@ -23,6 +23,7 @@ struct BookshelfReaderGatewayView: View {
     @State private var requestedChapterIndex: Int?
     @State private var sourceSwitchSearchTrigger = 0
     @State private var localNavigationRevision = 0
+    @State private var showBookDetailSheet = false
 
     private var currentBook: BookshelfBook {
         appState.bookshelfStore.book(id: book.id) ?? book
@@ -39,6 +40,11 @@ struct BookshelfReaderGatewayView: View {
         }
         .sheet(isPresented: $showSourceSwitcher) {
             sourceSwitcherSheet
+        }
+        .sheet(isPresented: $showBookDetailSheet) {
+            NavigationStack {
+                BookDetailView(book: currentBook.asSearchBook)
+            }
         }
     }
 
@@ -137,6 +143,9 @@ struct BookshelfReaderGatewayView: View {
                     onRequestSourceSwitch: {
                         UIImpactFeedbackGenerator(style: .light).impactOccurred()
                         showSourceSwitcher = true
+                    },
+                    onRequestBookDetail: {
+                        showBookDetailSheet = true
                     }
                 )
             )
@@ -241,7 +250,7 @@ struct BookshelfReaderGatewayView: View {
             navigationEntries: localNavigationEntries,
             initialParagraphIndex: initialParagraphIndex,
             onRequestBookDetail: {
-                dismiss()
+                showBookDetailSheet = true
             },
             onSelectChapter: { chapter in
                 showReaderChromeAfterChapterSelection = true
@@ -300,8 +309,17 @@ struct BookshelfReaderGatewayView: View {
                 autoplayAutoScrollAfterHandoff = false
             },
             onAutoScrollFinished: {
-                guard chapters.indices.contains(safeIndex + 1) else { return }
+                let nextIndex = safeIndex + 1
+                guard chapters.indices.contains(nextIndex) else { return }
                 autoplayAutoScrollAfterHandoff = true
+                selectedLocalChapterIndex = nextIndex
+                selectedLocalParagraphIndex = nil
+                appState.bookshelfStore.updateReadingProgress(
+                    bookID: book.id,
+                    chapterIndex: nextIndex,
+                    chapterTitle: chapters[nextIndex].title,
+                    totalChapters: chapters.count
+                )
             },
             initialOverlayVisible: showReaderChromeAfterChapterSelection
         )
@@ -372,8 +390,10 @@ struct BookshelfReaderGatewayView: View {
                         intro: activeBook.intro
                     )
                     if let detailResult = try? await appState.engine.getBookDetail(source: source, book: searchBook).get() {
-                        if let loadedChapters = try? await appState.engine.getChapterList(source: source, book: detailResult).get() {
+                        if let loadedChapters = try? await appState.engine.getChapterList(source: source, book: detailResult).get(),
+                           !loadedChapters.isEmpty {
                             await MainActor.run {
+                                self.chapters = loadedChapters
                                 appState.bookshelfStore.updateDetails(
                                     bookID: activeBook.id,
                                     latestChapterTitle: detailResult.latestChapter,
@@ -634,6 +654,17 @@ struct BookshelfReaderGatewayView: View {
             } ?? .failure(.network("Chapter list timed out"))
             switch chapterResult {
             case .success(let loadedChapters):
+                let previousTitle = (selectedChapter?.title ?? currentBook.currentChapterTitle ?? "")
+                    .trimmingCharacters(in: .whitespacesAndNewlines)
+                    .lowercased()
+                let previousIndex = selectedChapter?.index ?? currentBook.currentChapterIndex
+                let matchedByTitle = previousTitle.isEmpty ? nil : loadedChapters.first(where: {
+                    $0.title.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() == previousTitle
+                })
+                let clampedIndex = min(max(previousIndex, 0), max(loadedChapters.count - 1, 0))
+                let targetChapter = matchedByTitle
+                    ?? loadedChapters.first(where: { $0.index == clampedIndex })
+                    ?? (loadedChapters.indices.contains(clampedIndex) ? loadedChapters[clampedIndex] : loadedChapters.first)
                 appState.bookshelfStore.switchSource(
                     bookID: book.id,
                     to: candidate.book,
@@ -641,8 +672,16 @@ struct BookshelfReaderGatewayView: View {
                     intro: detail.intro,
                     totalChapters: loadedChapters.count
                 )
+                if let targetChapter {
+                    appState.bookshelfStore.updateReadingProgress(
+                        bookID: book.id,
+                        chapterIndex: targetChapter.index,
+                        chapterTitle: targetChapter.title,
+                        totalChapters: loadedChapters.count
+                    )
+                }
                 chapters = loadedChapters
-                selectedChapter = loadedChapters.first
+                selectedChapter = targetChapter
                 errorMessage = nil
                 showSourceSwitcher = false
                 sourceSwitchState = SourceSwitchState()

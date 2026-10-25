@@ -165,13 +165,14 @@ struct ContentParser {
                 variables: variables
             )
 
-            let next = try? htmlExtractor.value(
+            let rawNext = try? htmlExtractor.value(
                 from: root,
                 rule: htmlExtractor.firstRule(source.ruleContent, keys: ["nextContentUrl"]),
                 fallback: nil,
                 baseUrl: response.url,
                 variables: variables
             ).nilIfEmpty
+            let next = sanitizeNextContentURL(rawNext, currentURL: response.url)
 
             let style = imageStyleRule(source.ruleContent)
             let resolvedTitle = htmlContentTitle(
@@ -266,12 +267,13 @@ struct ContentParser {
         )
         let next: String?
         if let dict = rootObject as? [String: Any] {
-            next = jsonExtractor.string(
+            let rawNext = jsonExtractor.string(
                 from: dict,
                 rule: htmlExtractor.firstRule(rule, keys: ["nextContentUrl"]),
                 fallbackKeys: ["nextContentUrl", "nextUrl", "next"],
                 variables: variables
-            ).map { htmlExtractor.absolutize($0, base: response.url) }
+            )
+            next = sanitizeNextContentURL(rawNext, currentURL: response.url).map { htmlExtractor.absolutize($0, base: response.url) }
         } else {
             next = nil
         }
@@ -520,6 +522,30 @@ struct ContentParser {
         }
         output = PurifyRuleEvaluator.apply(rules: globalPurifyRules, to: output, variables: variables, executionContext: executionContext)
         return output
+    }
+
+    private func sanitizeNextContentURL(_ raw: String?, currentURL: URL) -> String? {
+        guard let raw else { return nil }
+        let (urlPart, suffixPart) = SearchURLResolver.splitURLAndDirectiveSuffix(raw)
+        let candidates = urlPart
+            .components(separatedBy: .newlines)
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { line in
+                !line.isEmpty
+                    && line != "#"
+                    && line != "!"
+                    && !line.lowercased().hasPrefix("javascript:")
+            }
+        guard !candidates.isEmpty else { return nil }
+        if candidates.count == 1 {
+            return candidates[0] + suffixPart
+        }
+        let currentAbs = currentURL.absoluteString
+        let chosen = candidates.first { candidate in
+            let abs = htmlExtractor.absolutize(candidate, base: currentURL)
+            return abs != currentAbs && abs != currentAbs + "/"
+        } ?? candidates[0]
+        return chosen + suffixPart
     }
 }
 

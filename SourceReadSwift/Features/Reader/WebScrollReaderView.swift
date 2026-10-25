@@ -48,6 +48,8 @@ struct WebScrollReaderView: UIViewRepresentable {
     let animatedScrollDuration: Double
     let textSelectionEnabled: Bool
     var showChapterEndBadge: Bool = false
+    var traditionalChineseEnabled: Bool = false
+    var bionicReadingEnabled: Bool = false
     var imageStyle: ReaderImageStyle = .standard
     var imageHeaders: [String: String] = [:]
     var imageColumnWidth: CGFloat = 0
@@ -126,8 +128,8 @@ struct WebScrollReaderView: UIViewRepresentable {
             webView.navigationDelegate = self
             webView.uiDelegate = self
             webView.isOpaque = false
-            webView.backgroundColor = .clear
-            webView.scrollView.backgroundColor = .clear
+            webView.backgroundColor = view.surfaceColor
+            webView.scrollView.backgroundColor = view.surfaceColor
             webView.scrollView.contentInsetAdjustmentBehavior = .never
             webView.scrollView.showsVerticalScrollIndicator = false
             webView.scrollView.showsHorizontalScrollIndicator = false
@@ -168,8 +170,9 @@ struct WebScrollReaderView: UIViewRepresentable {
 
             pushStyleIfNeeded(webView: webView)
 
-            if lastContentFingerprint != newView.contentFingerprint {
-                lastContentFingerprint = newView.contentFingerprint
+            let fingerprint = effectiveContentFingerprint(for: newView)
+            if lastContentFingerprint != fingerprint {
+                lastContentFingerprint = fingerprint
                 pushContent(webView: webView)
             }
 
@@ -180,6 +183,10 @@ struct WebScrollReaderView: UIViewRepresentable {
         }
 
         // MARK: JavaScript bridge
+
+        private func effectiveContentFingerprint(for currentView: WebScrollReaderView) -> String {
+            "\(currentView.contentFingerprint)|tc=\(currentView.traditionalChineseEnabled ? 1 : 0)|end=\(currentView.showChapterEndBadge ? 1 : 0)"
+        }
 
         private func pushStyleIfNeeded(webView: WKWebView) {
             let payload = WebReaderStylePayload.make(
@@ -197,7 +204,8 @@ struct WebScrollReaderView: UIViewRepresentable {
                 surfaceColor: view.surfaceColor,
                 highlightColor: view.highlightColor,
                 accentColor: AppTheme.accentUIColor,
-                selectable: view.textSelectionEnabled
+                selectable: view.textSelectionEnabled,
+                bionicReadingEnabled: view.bionicReadingEnabled
             )
             let signature = Self.signature(for: payload.jsonObject)
             guard signature != lastStyleSignature else { return }
@@ -208,7 +216,8 @@ struct WebScrollReaderView: UIViewRepresentable {
         private func pushContent(webView: WKWebView) {
             let payload = WebReaderContentPayloadBuilder.payload(
                 sections: view.sections,
-                showChapterEndBadge: view.showChapterEndBadge
+                showChapterEndBadge: view.showChapterEndBadge,
+                traditionalChineseEnabled: view.traditionalChineseEnabled
             )
             call(function: "setContent", jsonObject: payload, webView: webView)
         }
@@ -284,7 +293,7 @@ struct WebScrollReaderView: UIViewRepresentable {
                 isDocumentReady = true
                 if let webView {
                     pushStyleIfNeeded(webView: webView)
-                    lastContentFingerprint = view.contentFingerprint
+                    lastContentFingerprint = effectiveContentFingerprint(for: view)
                     pushContent(webView: webView)
                     pushResetIfNeeded(webView: webView)
                     pushScrollTargetIfNeeded(webView: webView)
@@ -296,15 +305,25 @@ struct WebScrollReaderView: UIViewRepresentable {
                     evaluateScrollTarget(webView: webView)
                 }
             case "visible":
+                let start = CACurrentMediaTime()
+                defer { ReaderScrollPerfMeter.record(cost: CACurrentMediaTime() - start) }
                 guard let flat = body["flat"] as? Int else { return }
                 if flat >= 0 { view.onVisibleParagraph(flat) }
             case "near-bottom":
+                let start = CACurrentMediaTime()
+                defer { ReaderScrollPerfMeter.record(cost: CACurrentMediaTime() - start) }
                 view.onNearBottom?()
             case "near-top":
+                let start = CACurrentMediaTime()
+                defer { ReaderScrollPerfMeter.record(cost: CACurrentMediaTime() - start) }
                 view.onNearTop?()
             case "reach-bottom":
+                let start = CACurrentMediaTime()
+                defer { ReaderScrollPerfMeter.record(cost: CACurrentMediaTime() - start) }
                 view.onReachBottom?()
             case "reach-top":
+                let start = CACurrentMediaTime()
+                defer { ReaderScrollPerfMeter.record(cost: CACurrentMediaTime() - start) }
                 view.onReachTop?()
             case "page-boundary":
                 guard let direction = body["direction"] as? Int else { return }
@@ -357,7 +376,7 @@ struct WebScrollReaderView: UIViewRepresentable {
             if !isDocumentReady {
                 isDocumentReady = true
                 pushStyleIfNeeded(webView: webView)
-                lastContentFingerprint = view.contentFingerprint
+                lastContentFingerprint = effectiveContentFingerprint(for: view)
                 pushContent(webView: webView)
                 pushResetIfNeeded(webView: webView)
                 pushScrollTargetIfNeeded(webView: webView)
@@ -391,10 +410,16 @@ final class ReaderImageSchemeHandler: NSObject, WKURLSchemeHandler {
         let identifier = ObjectIdentifier(urlSchemeTask as AnyObject)
         let task = Task { [weak self] in
             let image = await RemoteImageLoader.shared.image(for: original, headers: headers)
-            let data = image?.jpegData(compressionQuality: 0.86)
+            let encoded = Self.encode(image: image)
             // WebKit expects the scheme task callbacks on the main thread.
             await MainActor.run {
-                self?.finish(identifier: identifier, task: urlSchemeTask, data: data, requestURL: requestURL)
+                self?.finish(
+                    identifier: identifier,
+                    task: urlSchemeTask,
+                    data: encoded?.data,
+                    mimeType: encoded?.mimeType ?? "image/jpeg",
+                    requestURL: requestURL
+                )
             }
         }
         lock.lock()
@@ -418,7 +443,33 @@ final class ReaderImageSchemeHandler: NSObject, WKURLSchemeHandler {
         for task in tasks { task.cancel() }
     }
 
-    private func finish(identifier: ObjectIdentifier, task: WKURLSchemeTask, data: Data?, requestURL: URL) {
+    private static func encode(image: UIImage?) -> (data: Data, mimeType: String)? {
+        guard let image else { return nil }
+        if hasAlphaChannel(image), let pngData = image.pngData() {
+            return (pngData, "image/png")
+        }
+        if let jpegData = image.jpegData(compressionQuality: 0.90) {
+            return (jpegData, "image/jpeg")
+        }
+        if let pngData = image.pngData() {
+            return (pngData, "image/png")
+        }
+        return nil
+    }
+
+    private static func hasAlphaChannel(_ image: UIImage) -> Bool {
+        guard let alpha = image.cgImage?.alphaInfo else { return false }
+        switch alpha {
+        case .first, .last, .premultipliedFirst, .premultipliedLast, .alphaOnly:
+            return true
+        case .none, .noneSkipFirst, .noneSkipLast:
+            return false
+        @unknown default:
+            return false
+        }
+    }
+
+    private func finish(identifier: ObjectIdentifier, task: WKURLSchemeTask, data: Data?, mimeType: String, requestURL: URL) {
         lock.lock()
         let stillRunning = running.removeValue(forKey: identifier) != nil
         lock.unlock()
@@ -430,7 +481,7 @@ final class ReaderImageSchemeHandler: NSObject, WKURLSchemeHandler {
         }
         let response = URLResponse(
             url: requestURL,
-            mimeType: "image/jpeg",
+            mimeType: mimeType,
             expectedContentLength: data.count,
             textEncodingName: nil
         )

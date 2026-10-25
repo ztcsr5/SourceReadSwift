@@ -5,9 +5,9 @@
 	<key>CFBundleDisplayName</key>
 	<string>纸间</string>
 	<key>CFBundleShortVersionString</key>
-	<string>1.0.30</string>
+	<string>1.0.53</string>
 	<key>CFBundleVersion</key>
-	<string>31</string>
+	<string>54</string>
 	<key>CADisableMinimumFrameDurationOnPhone</key>
 	<true/>
 	<key>CADisableMinimumFrameDuration</key>
@@ -19,6 +19,10 @@
 	</dict>
 	<key>NSLocalNetworkUsageDescription</key>
 	<string>Used to import, export and manage book sources on the local network.</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>需要相册权限以保存生成的金句分享卡片到系统相册。</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>需要访问相册以选择阅读页自定义背景壁纸与保存金句分享卡片。</string>
 	<key>NSBonjourServices</key>
 	<array>
 		<string>_http._tcp</string>

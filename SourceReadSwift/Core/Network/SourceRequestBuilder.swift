@@ -34,27 +34,47 @@ struct SourceRequestBuilder {
         persistentValues: [String: String] = [:]
     ) -> SourceRequest {
         let isGBK = SearchURLResolver.isGBKEncoding(searchUrl: searchUrl, source: source)
-        let encodedKey = LegadoRuleResolver.percentEncode(keyword, charset: isGBK ? "gbk" : nil)
+        let ruleResolver = LegadoRuleResolver()
+        let expanded = LegadoRuleResolver.replacePageAngles(in: searchUrl, page: page)
+        let (urlPart, suffixPart) = SearchURLResolver.splitURLAndDirectiveSuffix(expanded)
+        let resolvedURLPart = ruleResolver.interpolate(
+            urlPart,
+            keyword: keyword,
+            page: page,
+            baseUrl: source.bookSourceUrl,
+            charset: isGBK ? "gbk" : nil
+        )
         let resolvedText: String
-        if let jsonStartRange = searchUrl.range(of: #",\s*\{"#, options: .regularExpression) {
-            let basePart = String(searchUrl[..<jsonStartRange.lowerBound]).trimmingCharacters(in: .whitespacesAndNewlines)
-            let optionPart = String(searchUrl[jsonStartRange.lowerBound...].dropFirst()).trimmingCharacters(in: .whitespacesAndNewlines)
-            let resolvedBase = basePart
-                .replacingOccurrences(of: "{{key}}", with: encodedKey)
-                .replacingOccurrences(of: "{{keyword}}", with: encodedKey)
-                .replacingOccurrences(of: "{{page}}", with: String(page))
-            let isJSON = optionPart.localizedCaseInsensitiveContains("application/json") || optionPart.contains("\"keyword\"") || optionPart.contains("\"key\"")
-            let keyForOptions = isJSON ? keyword : encodedKey
-            let resolvedOptions = optionPart
-                .replacingOccurrences(of: "{{key}}", with: keyForOptions)
-                .replacingOccurrences(of: "{{keyword}}", with: keyForOptions)
-                .replacingOccurrences(of: "{{page}}", with: String(page))
-            resolvedText = "\(resolvedBase),\(resolvedOptions)"
+        if !suffixPart.isEmpty {
+            let isJSON = SearchURLResolver.isJSONBodyOption(suffixPart)
+            let resolvedSuffix: String
+            if isJSON {
+                let pageAndBase = ruleResolver.interpolate(
+                    suffixPart,
+                    keyword: nil,
+                    page: page,
+                    baseUrl: source.bookSourceUrl,
+                    charset: isGBK ? "gbk" : nil
+                )
+                resolvedSuffix = pageAndBase
+                    .replacingOccurrences(of: "{{key}}", with: keyword)
+                    .replacingOccurrences(of: "{{keyword}}", with: keyword)
+                    .replacingOccurrences(of: "{{searchKey}}", with: keyword)
+                    .replacingOccurrences(of: "{key}", with: keyword)
+                    .replacingOccurrences(of: "{keyword}", with: keyword)
+                    .replacingOccurrences(of: "{searchKey}", with: keyword)
+            } else {
+                resolvedSuffix = ruleResolver.interpolate(
+                    suffixPart,
+                    keyword: keyword,
+                    page: page,
+                    baseUrl: source.bookSourceUrl,
+                    charset: isGBK ? "gbk" : nil
+                )
+            }
+            resolvedText = resolvedURLPart + resolvedSuffix
         } else {
-            resolvedText = searchUrl
-                .replacingOccurrences(of: "{{key}}", with: encodedKey)
-                .replacingOccurrences(of: "{{keyword}}", with: encodedKey)
-                .replacingOccurrences(of: "{{page}}", with: String(page))
+            resolvedText = resolvedURLPart
         }
 
         return buildRequest(
@@ -73,15 +93,12 @@ struct SourceRequestBuilder {
         page: Int,
         persistentValues: [String: String] = [:]
     ) -> SourceRequest {
-        let pageStr = String(page)
-        let pageMinus1Str = String(max(1, page - 1))
-        let resolved = exploreUrl
-            .replacingOccurrences(of: "{{page}}", with: pageStr)
-            .replacingOccurrences(of: "{{page-1}}", with: pageMinus1Str)
-            .replacingOccurrences(of: "{{page - 1}}", with: pageMinus1Str)
-            .replacingOccurrences(of: "{{page+1}}", with: String(page + 1))
-            .replacingOccurrences(of: "{{page + 1}}", with: String(page + 1))
-            .replacingOccurrences(of: "{{baseUrl}}", with: source.cleanSourceURL)
+        let resolved = LegadoRuleResolver().interpolate(
+            exploreUrl,
+            keyword: nil,
+            page: page,
+            baseUrl: source.bookSourceUrl
+        )
 
         return buildRequest(
             source: source,
@@ -217,7 +234,11 @@ struct SourceRequestBuilder {
         }
     }
 
-    private func resolveURL(_ text: String, base: String) -> URL {
+    func resolveURL(_ rawURL: String, relativeTo baseURL: String) -> URL {
+        resolveURL(rawURL, base: baseURL)
+    }
+
+    func resolveURL(_ text: String, base: String = "") -> URL {
         var cleanBase = base.trimmingCharacters(in: .whitespacesAndNewlines)
         if let hashIdx = cleanBase.firstIndex(of: "#") {
             cleanBase = String(cleanBase[..<hashIdx]).trimmingCharacters(in: .whitespacesAndNewlines)
@@ -266,24 +287,70 @@ struct SourceRequestBuilder {
             let normalized = normalizePathDoubleSlashes(absolute.absoluteString)
             return URL(string: normalized) ?? absolute
         }
-        if let encoded = trimmed.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed.union(.urlPathAllowed)),
-           let absolute = URL(string: encoded), absolute.scheme != nil {
+        let encodedTrimmed = Self.percentEncodePreservingExistingEscapes(trimmed)
+        if let absolute = URL(string: encodedTrimmed), absolute.scheme != nil {
             let normalized = normalizePathDoubleSlashes(absolute.absoluteString)
             return URL(string: normalized) ?? absolute
         }
-        let effectiveBaseURL = URL(string: cleanBase) ?? cleanBase.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed.union(.urlPathAllowed)).flatMap { URL(string: $0) }
+        let effectiveBaseURL = URL(string: cleanBase) ?? URL(string: Self.percentEncodePreservingExistingEscapes(cleanBase))
         if let baseURL = effectiveBaseURL {
             if let relative = URL(string: trimmed, relativeTo: baseURL)?.absoluteURL {
                 let normalized = normalizePathDoubleSlashes(relative.absoluteString)
                 return URL(string: normalized) ?? relative
             }
-            if let encoded = trimmed.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed.union(.urlPathAllowed)),
-               let relative = URL(string: encoded, relativeTo: baseURL)?.absoluteURL {
+            if let relative = URL(string: encodedTrimmed, relativeTo: baseURL)?.absoluteURL {
                 let normalized = normalizePathDoubleSlashes(relative.absoluteString)
                 return URL(string: normalized) ?? relative
             }
         }
         return effectiveBaseURL ?? URL(string: "https://invalid.local")!
+    }
+
+    static func percentEncodePreservingExistingEscapes(_ raw: String) -> String {
+        let bytes = Array(raw.utf8)
+        let hex = Array("0123456789ABCDEF".utf8)
+        var output = ""
+        output.reserveCapacity(bytes.count + 16)
+        var index = 0
+        while index < bytes.count {
+            let byte = bytes[index]
+            if byte == 0x25, index + 2 < bytes.count,
+               isHexByte(bytes[index + 1]), isHexByte(bytes[index + 2]) {
+                output.append(Character(UnicodeScalar(byte)))
+                output.append(Character(UnicodeScalar(bytes[index + 1])))
+                output.append(Character(UnicodeScalar(bytes[index + 2])))
+                index += 3
+                continue
+            }
+            if isAllowedURLByte(byte) {
+                output.append(Character(UnicodeScalar(byte)))
+            } else {
+                output.append("%")
+                output.append(Character(UnicodeScalar(hex[Int(byte >> 4)])))
+                output.append(Character(UnicodeScalar(hex[Int(byte & 0x0F)])))
+            }
+            index += 1
+        }
+        return output
+    }
+
+    private static func isHexByte(_ byte: UInt8) -> Bool {
+        (byte >= 48 && byte <= 57) || (byte >= 65 && byte <= 70) || (byte >= 97 && byte <= 102)
+    }
+
+    private static func isAllowedURLByte(_ byte: UInt8) -> Bool {
+        if (byte >= 48 && byte <= 57) || (byte >= 65 && byte <= 90) || (byte >= 97 && byte <= 122) {
+            return true
+        }
+        switch byte {
+        case 0x2D, 0x2E, 0x5F, 0x7E, // - . _ ~
+             0x3A, 0x2F, 0x3F, 0x23, 0x40, // : / ? # @
+             0x21, 0x24, 0x26, 0x27, 0x28, 0x29, // ! $ & ' ( )
+             0x2A, 0x2B, 0x2C, 0x3B, 0x3D: // * + , ; =
+            return true
+        default:
+            return false
+        }
     }
 
     private func normalizePathDoubleSlashes(_ urlString: String) -> String {

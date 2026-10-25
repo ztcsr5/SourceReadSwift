@@ -1,6 +1,133 @@
 import CoreGraphics
+import CoreText
 import Foundation
+import SwiftUI
 import UIKit
+
+enum ReaderTextTransform {
+    static func toTraditionalChinese(_ text: String) -> String {
+        guard !text.isEmpty else { return text }
+        let mutable = NSMutableString(string: text)
+        CFStringTransform(mutable, nil, "Hans-Hant" as CFString, false)
+        return mutable as String
+    }
+
+    static func displayText(_ text: String, traditionalChineseEnabled: Bool) -> String {
+        guard traditionalChineseEnabled else { return text }
+        return toTraditionalChinese(text)
+    }
+
+    static func bionicAttributedString(_ text: String, regularFont: Font, boldFont: Font) -> AttributedString {
+        guard !text.isEmpty else { return AttributedString() }
+        var result = AttributedString()
+        var index = text.startIndex
+        var cjkRunCount = 0
+
+        while index < text.endIndex {
+            let ch = text[index]
+            if ch.isASCII && (ch.isLetter || ch.isNumber) {
+                cjkRunCount = 0
+                var wordEnd = text.index(after: index)
+                while wordEnd < text.endIndex, text[wordEnd].isASCII && (text[wordEnd].isLetter || text[wordEnd].isNumber) {
+                    wordEnd = text.index(after: wordEnd)
+                }
+                let word = String(text[index..<wordEnd])
+                let count = word.count
+                let boldCount = max(1, Int(ceil(Double(count) * 0.45)))
+                let splitIdx = word.index(word.startIndex, offsetBy: min(boldCount, count))
+                var head = AttributedString(String(word[..<splitIdx]))
+                head.font = boldFont
+                result.append(head)
+                if splitIdx < word.endIndex {
+                    var tail = AttributedString(String(word[splitIdx...]))
+                    tail.font = regularFont
+                    result.append(tail)
+                }
+                index = wordEnd
+                continue
+            }
+
+            let nextIndex = text.index(after: index)
+            var part = AttributedString(String(ch))
+            if isCJKIdeograph(ch) {
+                let isBold = (cjkRunCount % 4) < 2
+                part.font = isBold ? boldFont : regularFont
+                cjkRunCount += 1
+            } else {
+                cjkRunCount = 0
+                part.font = regularFont
+            }
+            result.append(part)
+            index = nextIndex
+        }
+        return result
+    }
+
+    private static func isCJKIdeograph(_ character: Character) -> Bool {
+        guard let scalar = character.unicodeScalars.first else { return false }
+        let v = scalar.value
+        return (0x4E00...0x9FFF).contains(v)
+            || (0x3400...0x4DBF).contains(v)
+            || (0xF900...0xFAFF).contains(v)
+    }
+}
+
+enum WebReaderCustomFontCache {
+    private static let lock = NSLock()
+    private static var cachedPostScriptName: String = ""
+    private static var cachedCSS: String = ""
+
+    static func fontFaceCSSForActiveCustomFont() -> String {
+        let postScript = (UserDefaults.standard.string(forKey: "reader.customFontPostScriptName") ?? "")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !postScript.isEmpty else { return "" }
+
+        lock.lock()
+        if cachedPostScriptName == postScript, !cachedCSS.isEmpty {
+            let hit = cachedCSS
+            lock.unlock()
+            return hit
+        }
+        lock.unlock()
+
+        let fm = FileManager.default
+        guard let appSupport = fm.urls(for: .applicationSupportDirectory, in: .userDomainMask).first else {
+            return ""
+        }
+        let fontsDir = appSupport
+            .appendingPathComponent("SourceReadSwift", isDirectory: true)
+            .appendingPathComponent("Fonts", isDirectory: true)
+        guard let files = try? fm.contentsOfDirectory(at: fontsDir, includingPropertiesForKeys: nil) else {
+            return ""
+        }
+
+        for fileURL in files {
+            guard let provider = CGDataProvider(url: fileURL as CFURL),
+                  let cgFont = CGFont(provider) else { continue }
+            let psName = (cgFont.postScriptName as String?) ?? fileURL.deletingPathExtension().lastPathComponent
+            guard psName == postScript else { continue }
+            guard let data = try? Data(contentsOf: fileURL), !data.isEmpty else { continue }
+            let ext = fileURL.pathExtension.lowercased()
+            let (mime, format): (String, String) = {
+                switch ext {
+                case "otf": return ("font/otf", "opentype")
+                case "woff": return ("font/woff", "woff")
+                case "ttc": return ("font/collection", "truetype")
+                default: return ("font/ttf", "truetype")
+                }
+            }()
+            let base64 = data.base64EncodedString()
+            let escapedName = postScript.replacingOccurrences(of: "\"", with: "\\\"")
+            let css = "@font-face { font-family: \"\(escapedName)\"; src: url(\"data:\(mime);base64,\(base64)\") format(\"\(format)\"); font-weight: 100 900; font-style: normal; font-display: swap; }"
+            lock.lock()
+            cachedPostScriptName = postScript
+            cachedCSS = css
+            lock.unlock()
+            return css
+        }
+        return ""
+    }
+}
 
 /// One chapter as the WebView scroll surface consumes it.
 ///
@@ -73,6 +200,9 @@ struct WebReaderStylePayload: Equatable {
     var highlightColor: String
     var accentColor: String
     var selectable: Bool
+    var customFontFaceCSS: String = ""
+    var traditionalChineseEnabled: Bool = false
+    var bionicReadingEnabled: Bool = false
 
     /// `lineSpacing` in the TextKit surface is *extra* leading between lines, so
     /// the CSS line box has to grow by that amount instead of replacing it.
@@ -105,7 +235,10 @@ struct WebReaderStylePayload: Equatable {
             "surfaceColor": surfaceColor,
             "highlightColor": highlightColor,
             "accentColor": accentColor,
-            "selectable": selectable
+            "selectable": selectable,
+            "customFontFaceCSS": customFontFaceCSS,
+            "traditionalChinese": traditionalChineseEnabled,
+            "bionicReading": bionicReadingEnabled
         ]
     }
 
@@ -124,9 +257,14 @@ struct WebReaderStylePayload: Equatable {
         surfaceColor: UIColor,
         highlightColor: UIColor,
         accentColor: UIColor,
-        selectable: Bool
+        selectable: Bool,
+        traditionalChineseEnabled: Bool = false,
+        bionicReadingEnabled: Bool = false
     ) -> WebReaderStylePayload {
         let resolvedTop = topInset ?? max(pagePadding + 10, 24)
+        let isTransparentSurface = surfaceColor.cgColor.alpha <= 0.001
+        let resolvedSurface = isTransparentSurface ? "transparent" : WebReaderColor.hex(surfaceColor)
+        let fontFaceCSS = fontFamily == .custom ? WebReaderCustomFontCache.fontFaceCSSForActiveCustomFont() : ""
         return WebReaderStylePayload(
             fontFamilyCSS: fontFamily.webCSSFamily,
             fontFamilyWeight: fontFamily.webCSSWeight,
@@ -141,17 +279,24 @@ struct WebReaderStylePayload: Equatable {
             titleSize: titleSize(fontSize: fontSize),
             titleSpacing: max(titleSpacing, 0),
             textColor: WebReaderColor.hex(textColor),
-            surfaceColor: WebReaderColor.hex(surfaceColor),
+            surfaceColor: resolvedSurface,
             highlightColor: WebReaderColor.hex(highlightColor),
             accentColor: WebReaderColor.hex(accentColor),
-            selectable: selectable
+            selectable: selectable,
+            customFontFaceCSS: fontFaceCSS,
+            traditionalChineseEnabled: traditionalChineseEnabled,
+            bionicReadingEnabled: bionicReadingEnabled
         )
     }
 }
 
 /// Builds the JSON body posted into `window.__reader.setContent`.
 enum WebReaderContentPayloadBuilder {
-    static func payload(sections: [WebReaderSection], showChapterEndBadge: Bool) -> [String: Any] {
+    static func payload(
+        sections: [WebReaderSection],
+        showChapterEndBadge: Bool,
+        traditionalChineseEnabled: Bool = false
+    ) -> [String: Any] {
         let starts = WebReaderFlatIndexPolicy.starts(forParagraphCounts: sections.map { $0.paragraphs.count })
         var encoded: [[String: Any]] = []
         encoded.reserveCapacity(sections.count)
@@ -177,18 +322,21 @@ enum WebReaderContentPayloadBuilder {
                 // Divider paragraphs written by older window builds carry the
                 // "——— title ———" decoration. The WebView draws a real title
                 // element instead, so the decoration must not be printed twice.
-                let text = Self.strippingLegacyDividerDecoration(trimmed)
+                let stripped = Self.strippingLegacyDividerDecoration(trimmed)
+                let text = ReaderTextTransform.displayText(stripped, traditionalChineseEnabled: traditionalChineseEnabled)
                 paragraphs.append(["flat": flat, "local": index, "text": text])
             }
 
+            let displayTitle = ReaderTextTransform.displayText(section.title, traditionalChineseEnabled: traditionalChineseEnabled)
+            let sigSuffix = traditionalChineseEnabled ? "|tc1" : ""
             var entry: [String: Any] = [
                 "key": section.key,
                 "chapter": section.chapterIndex,
-                "title": section.title,
+                "title": displayTitle,
                 "start": start,
                 "titleFlat": titleFlat,
                 "first": isFirst,
-                "sig": section.contentSignature,
+                "sig": section.contentSignature + sigSuffix,
                 "paragraphs": paragraphs
             ]
             if !section.isReady, section.paragraphs.isEmpty {
@@ -425,6 +573,9 @@ enum WebReaderHTML {
       text-indent: var(--indent);
       white-space: pre-wrap;
     }
+    .para b.br {
+      font-weight: 700;
+    }
     .para.hl {
       background: var(--hl);
       border-radius: 6px;
@@ -461,7 +612,7 @@ enum WebReaderHTML {
         style: null,
         sections: Object.create(null),
         order: [],
-        metrics: [],
+        nodes: [],
         visible: -1,
         highlightEl: null,
         lastScrollAt: 0,
@@ -469,7 +620,9 @@ enum WebReaderHTML {
         nearTop: false,
         nearBottom: false,
         reachBottom: false,
-        selection: false
+        selection: false,
+        customFontCSS: "",
+        bionicReading: false
       };
 
       function post(message) {
@@ -489,9 +642,78 @@ enum WebReaderHTML {
         post({ type: "fatal", message: String((event && event.message) || "script-error") });
       });
 
+      function applyCustomFontCSS(css) {
+        var nextCSS = css || "";
+        if (state.customFontCSS === nextCSS) { return; }
+        state.customFontCSS = nextCSS;
+        var existing = document.getElementById("reader-custom-font");
+        if (!nextCSS) {
+          if (existing && existing.parentNode) { existing.parentNode.removeChild(existing); }
+          return;
+        }
+        if (!existing) {
+          existing = document.createElement("style");
+          existing.id = "reader-custom-font";
+          if (document.head) { document.head.appendChild(existing); }
+        }
+        existing.textContent = nextCSS;
+      }
+
+      function renderParagraphText(element, rawText, bionic) {
+        element.setAttribute("data-raw-text", rawText);
+        if (!bionic || !rawText) {
+          element.textContent = rawText;
+          return;
+        }
+        var fragment = document.createDocumentFragment();
+        var tokenRegex = /([A-Za-z0-9\u00C0-\u024F]{2,}|[\u4E00-\u9FFF]{2,})/g;
+        var lastIndex = 0;
+        var match;
+        while ((match = tokenRegex.exec(rawText)) !== null) {
+          if (match.index > lastIndex) {
+            fragment.appendChild(document.createTextNode(rawText.slice(lastIndex, match.index)));
+          }
+          var token = match[0];
+          var firstCode = token.charCodeAt(0);
+          var isCJK = firstCode >= 0x4E00 && firstCode <= 0x9FFF;
+          if (isCJK) {
+            var pos = 0;
+            while (pos < token.length) {
+              var chunk = token.slice(pos, pos + 4);
+              var boldLen = Math.min(2, Math.max(1, Math.floor(chunk.length / 2)));
+              var bNode = document.createElement("b");
+              bNode.className = "br";
+              bNode.textContent = chunk.slice(0, boldLen);
+              fragment.appendChild(bNode);
+              if (chunk.length > boldLen) {
+                fragment.appendChild(document.createTextNode(chunk.slice(boldLen)));
+              }
+              pos += 4;
+            }
+          } else {
+            var lead = Math.max(1, Math.ceil(token.length * 0.45));
+            var bWord = document.createElement("b");
+            bWord.className = "br";
+            bWord.textContent = token.slice(0, lead);
+            fragment.appendChild(bWord);
+            if (token.length > lead) {
+              fragment.appendChild(document.createTextNode(token.slice(lead)));
+            }
+          }
+          lastIndex = tokenRegex.lastIndex;
+        }
+        if (lastIndex < rawText.length) {
+          fragment.appendChild(document.createTextNode(rawText.slice(lastIndex)));
+        }
+        element.replaceChildren(fragment);
+      }
+
       function setStyle(style) {
         var anchor = captureAnchor();
+        var prevBionic = state.bionicReading;
         state.style = style;
+        state.bionicReading = !!style.bionicReading;
+        applyCustomFontCSS(style.customFontFaceCSS || "");
         root.style.setProperty("--font-family", style.fontFamily);
         root.style.setProperty("--font-weight", String(style.fontWeight));
         root.style.setProperty("--font-size", px(style.fontSize));
@@ -509,6 +731,13 @@ enum WebReaderHTML {
         root.style.setProperty("--hl", style.highlightColor);
         root.style.setProperty("--accent", style.accentColor);
         root.style.setProperty("--select", style.selectable ? "text" : "none");
+        if (prevBionic !== state.bionicReading) {
+          var paras = content.querySelectorAll(".para:not(.image)");
+          for (var i = 0; i < paras.length; i += 1) {
+            var raw = paras[i].getAttribute("data-raw-text") || paras[i].textContent || "";
+            renderParagraphText(paras[i], raw, state.bionicReading);
+          }
+        }
         refreshMetrics();
         restoreAnchor(anchor);
       }
@@ -547,12 +776,17 @@ enum WebReaderHTML {
           element.className = "para";
           element.setAttribute("data-flat", String(paragraph.flat));
           element.setAttribute("data-local", String(paragraph.local));
-          element.textContent = paragraph.text;
+          renderParagraphText(element, paragraph.text, state.bionicReading);
           fragment.appendChild(element);
         }
         node.appendChild(fragment);
 
-        if (section.end) {
+        if (section.loading) {
+          var loading = document.createElement("p");
+          loading.className = "chapter-loading";
+          loading.textContent = "正在加载章节内容…";
+          node.appendChild(loading);
+        } else if (section.end) {
           var end = document.createElement("p");
           end.className = "chapter-end";
           end.textContent = "— — — 本章完 — — —";
@@ -632,42 +866,39 @@ enum WebReaderHTML {
       }
 
       function refreshMetrics() {
-        var nodes = content.querySelectorAll("[data-flat]");
-        var list = [];
-        list.length = nodes.length;
-        for (var index = 0; index < nodes.length; index += 1) {
-          var element = nodes[index];
-          var rect = element.getBoundingClientRect();
-          var section = element.closest("[data-key]");
-          list[index] = {
-            flat: parseInt(element.getAttribute("data-flat"), 10) || 0,
-            local: parseInt(element.getAttribute("data-local"), 10) || 0,
-            key: section ? section.getAttribute("data-key") : "",
-            top: rect.top + window.scrollY,
-            height: Math.max(rect.height, 1)
-          };
-        }
-        list.sort(function (left, right) { return left.top - right.top; });
-        state.metrics = list;
+        state.nodes = Array.prototype.slice.call(content.querySelectorAll("[data-flat]"));
+      }
+
+      function nodeMetric(element) {
+        var rect = element.getBoundingClientRect();
+        var section = element.closest ? element.closest("[data-key]") : null;
+        return {
+          flat: parseInt(element.getAttribute("data-flat"), 10) || 0,
+          local: parseInt(element.getAttribute("data-local"), 10) || 0,
+          key: section ? section.getAttribute("data-key") : "",
+          top: rect.top + window.scrollY,
+          height: Math.max(rect.height, 1)
+        };
       }
 
       function metricAt(y) {
-        var list = state.metrics;
+        var list = state.nodes;
         if (!list.length) { return null; }
         var low = 0;
         var high = list.length - 1;
         var found = -1;
         while (low <= high) {
           var middle = (low + high) >> 1;
-          if (list[middle].top <= y) { found = middle; low = middle + 1; }
+          var top = list[middle].getBoundingClientRect().top + window.scrollY;
+          if (top <= y) { found = middle; low = middle + 1; }
           else { high = middle - 1; }
         }
-        if (found < 0) { return list[0]; }
-        return list[found];
+        var picked = found < 0 ? list[0] : list[found];
+        return nodeMetric(picked);
       }
 
       function captureAnchor() {
-        if (!state.metrics.length) { return null; }
+        if (!state.nodes.length) { return null; }
         var metric = metricAt(window.scrollY + topInset() + 1);
         if (!metric) { return null; }
         var offset = window.scrollY + topInset() + 1 - metric.top;
@@ -700,18 +931,19 @@ enum WebReaderHTML {
       function elementForFlat(flat) {
         var exact = content.querySelector('[data-flat="' + flat + '"]');
         if (exact) { return exact; }
-        var list = state.metrics;
+        var list = state.nodes;
         var best = null;
         var bestFlat = -1;
         for (var index = 0; index < list.length; index += 1) {
-          if (list[index].flat <= flat && list[index].flat > bestFlat) {
-            bestFlat = list[index].flat;
+          var nodeFlat = parseInt(list[index].getAttribute("data-flat"), 10);
+          if (isNaN(nodeFlat)) { continue; }
+          if (nodeFlat <= flat && nodeFlat > bestFlat) {
+            bestFlat = nodeFlat;
             best = list[index];
           }
-          if (list[index].flat > flat) { break; }
+          if (nodeFlat > flat) { break; }
         }
-        if (!best) { return null; }
-        return content.querySelector('[data-flat="' + best.flat + '"]');
+        return best;
       }
 
       function onScroll() {
@@ -839,14 +1071,12 @@ enum WebReaderHTML {
         }
         var rect = element.getBoundingClientRect();
         var target = Math.max(rect.top + window.scrollY - topInset(), 0);
-        var comfortable = rect.top >= topInset() - 2 && rect.top <= window.innerHeight * 0.72;
-        if (!comfortable) {
+        if (Math.abs(target - window.scrollY) >= 4) {
           animateTo(target, animated ? 320 : 0);
         }
         state.visible = -1;
         window.requestAnimationFrame(onScroll);
         post({ type: "scroll-applied", flat: flat });
-      }
       }
 
       /// 回到文档顶端。换书/首次进书时调用：WKWebView 可能被复用，

@@ -154,7 +154,7 @@ struct BookDetailParser {
             let tocUrl: String?
             if let rawTocRule, isURLTemplate(rawTocRule) {
                 let resolved = resolveTocTemplate(rawTocRule, base: response.url, source: source, variables: variables)
-                tocUrl = resolved.nilIfEmpty
+                tocUrl = sanitizeSingleURL(resolved)
             } else {
                 let extracted = try htmlExtractor.value(
                     from: root,
@@ -163,11 +163,12 @@ struct BookDetailParser {
                     baseUrl: response.url,
                     variables: variables
                 ).nilIfEmpty
-                if let extracted, isURLTemplate(extracted) {
-                    let resolved = resolveTocTemplate(extracted, base: response.url, source: source, variables: variables)
-                    tocUrl = resolved.nilIfEmpty
+                let singleExtracted = sanitizeSingleURL(extracted)
+                if let singleExtracted, isURLTemplate(singleExtracted) {
+                    let resolved = resolveTocTemplate(singleExtracted, base: response.url, source: source, variables: variables)
+                    tocUrl = sanitizeSingleURL(resolved)
                 } else {
-                    tocUrl = extracted.flatMap { resolveURL($0, base: response.url) }
+                    tocUrl = singleExtracted.flatMap { resolveURL($0, base: response.url) }
                 }
             }
 
@@ -309,7 +310,7 @@ struct BookDetailParser {
         let tocUrl: String?
         if let rawTocRule, isURLTemplate(rawTocRule) {
             let resolved = resolveTocTemplate(rawTocRule, base: response.url, source: source, variables: jsonVariables)
-            tocUrl = resolved.nilIfEmpty
+            tocUrl = sanitizeSingleURL(resolved)
         } else {
             let rawTocUrl = jsonExtractor.string(
                 from: dict,
@@ -317,12 +318,12 @@ struct BookDetailParser {
                 fallbackKeys: ["tocUrl", "chapterUrl", "catalogUrl", "chapterListUrl", "toc_url", "chapter_url"],
                 variables: variables
             )?.nilIfEmpty
-            if let rawTocUrl {
-                if isURLTemplate(rawTocUrl) {
-                    let resolved = resolveTocTemplate(rawTocUrl, base: response.url, source: source, variables: jsonVariables)
-                    tocUrl = resolved.nilIfEmpty
+            if let singleTocUrl = sanitizeSingleURL(rawTocUrl) {
+                if isURLTemplate(singleTocUrl) {
+                    let resolved = resolveTocTemplate(singleTocUrl, base: response.url, source: source, variables: jsonVariables)
+                    tocUrl = sanitizeSingleURL(resolved)
                 } else {
-                    tocUrl = resolveURL(rawTocUrl, base: response.url)
+                    tocUrl = resolveURL(singleTocUrl, base: response.url)
                 }
             } else {
                 tocUrl = nil
@@ -394,8 +395,20 @@ struct BookDetailParser {
         return resolveURL(dynamicResolved, base: base) ?? dynamicResolved
     }
 
+    private func sanitizeSingleURL(_ raw: String?) -> String? {
+        guard let raw else { return nil }
+        let (urlPart, suffixPart) = SearchURLResolver.splitURLAndDirectiveSuffix(raw)
+        let firstLine = urlPart
+            .components(separatedBy: .newlines)
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .first { !$0.isEmpty }
+        guard let firstLine, !firstLine.isEmpty else { return nil }
+        return firstLine + suffixPart
+    }
+
     private func resolveURL(_ text: String, base: URL) -> String? {
-        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let sanitized = sanitizeSingleURL(text) else { return nil }
+        let trimmed = sanitized.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return nil }
         if trimmed.hasPrefix("@js:") || trimmed.hasPrefix("<js>") {
             return nil

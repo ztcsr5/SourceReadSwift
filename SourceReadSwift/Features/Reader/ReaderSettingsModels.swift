@@ -178,6 +178,15 @@ enum ReaderBackground: String, CaseIterable, Identifiable, Codable, Sendable {
         }
     }
 
+    var isDark: Bool {
+        switch self {
+        case .dark, .sakuraDark, .sakuraSolarized, .sakuraVader, .custom:
+            return true
+        default:
+            return false
+        }
+    }
+
     func darkStatusIcon(isNight: Bool) -> Bool {
         if isNight { return false }
         switch self {

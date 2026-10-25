@@ -29,14 +29,45 @@ struct SearchURLResolver {
         let trimmedCleaned = cleaned.trimmingCharacters(in: .whitespacesAndNewlines)
 
         func postProcess(_ result: String) -> String {
-            let interpolated = ruleResolver.interpolate(
-                result,
+            let expanded = LegadoRuleResolver.replacePageAngles(in: result, page: page)
+            let (urlPart, suffixPart) = Self.splitURLAndDirectiveSuffix(expanded)
+            let interpolatedURL = ruleResolver.interpolate(
+                urlPart,
                 keyword: keyword,
                 page: page,
-                baseUrl: source.cleanSourceURL,
+                baseUrl: source.bookSourceUrl,
                 charset: isGBK ? "gbk" : nil
             )
-            return urlSafeString(normalizePathDoubleSlashes(interpolated))
+            let safeURL = urlSafeString(normalizePathDoubleSlashes(interpolatedURL))
+            guard !suffixPart.isEmpty else {
+                return safeURL
+            }
+            let interpolatedSuffix: String
+            if Self.isJSONBodyOption(suffixPart) {
+                let pageAndBaseInterpolated = ruleResolver.interpolate(
+                    suffixPart,
+                    keyword: nil,
+                    page: page,
+                    baseUrl: source.bookSourceUrl,
+                    charset: isGBK ? "gbk" : nil
+                )
+                interpolatedSuffix = pageAndBaseInterpolated
+                    .replacingOccurrences(of: "{{key}}", with: keyword)
+                    .replacingOccurrences(of: "{{keyword}}", with: keyword)
+                    .replacingOccurrences(of: "{{searchKey}}", with: keyword)
+                    .replacingOccurrences(of: "{key}", with: keyword)
+                    .replacingOccurrences(of: "{keyword}", with: keyword)
+                    .replacingOccurrences(of: "{searchKey}", with: keyword)
+            } else {
+                interpolatedSuffix = ruleResolver.interpolate(
+                    suffixPart,
+                    keyword: keyword,
+                    page: page,
+                    baseUrl: source.bookSourceUrl,
+                    charset: isGBK ? "gbk" : nil
+                )
+            }
+            return safeURL + interpolatedSuffix
         }
 
         if trimmedCleaned.hasPrefix("@js:") {
@@ -51,7 +82,7 @@ struct SearchURLResolver {
             return evalResult.map(postProcess)
         }
 
-        var resolvedCleaned = cleaned
+        var resolvedCleaned = LegadoRuleResolver.replacePageAngles(in: cleaned, page: page)
         if resolvedCleaned.contains("{{") && resolvedCleaned.contains("}}") {
             resolvedCleaned = resolveEmbeddedBracesScripts(
                 resolvedCleaned,
@@ -77,29 +108,70 @@ struct SearchURLResolver {
             ).map(postProcess)
         }
 
-        return .success(urlSafeString(normalizePathDoubleSlashes(trimmed)))
+        return .success(trimmed)
     }
 
-    /// 把插值后仍可能带空格 / 中文 / 裸花括号的 URL 修成 `URL(string:)` 能吃的形态。
-    ///
-    /// 诊断数据里 991 个源有 31 条倒在 `URL 格式非法或解析异常 (-1000)`：
-    /// 多数是 `searchUrl` 里 `{{key}}` 拼进中文关键词、或模板里留了空格/花括号，
-    /// 解析器直接拿到一个非法字符串。这里只在**确实解析不了**时逐个字符转义，
-    /// 已经合法的 URL 原样返回，不会把 `%XX` 二次编码。
-    private func urlSafeString(_ raw: String) -> String {
-        if URL(string: raw) != nil { return raw }
-        var output = ""
-        output.reserveCapacity(raw.count + 16)
-        for scalar in raw.unicodeScalars {
-            let text = String(scalar)
-            if scalar.isASCII, !" \"<>\\^`{|}\n\r\t".unicodeScalars.contains(scalar) {
-                output += text
-            } else {
-                // 空允许集：除 A-Za-z0-9-._~ 外全部百分号编码。
-                output += text.addingPercentEncoding(withAllowedCharacters: CharacterSet(charactersIn: "")) ?? text
+    static func splitURLAndDirectiveSuffix(_ text: String) -> (urlPart: String, suffixPart: String) {
+        var earliestBound: String.Index?
+
+        if let jsonOptionRange = text.range(of: #",\s*\{[\s\S]*$"#, options: .regularExpression) {
+            earliestBound = jsonOptionRange.lowerBound
+        }
+
+        let directiveMarkers = [
+            "@Header:", "@Headers:", "@Body:", "@Post:",
+            "@RequestBody:", "@Charset:", "@Encoding:"
+        ]
+        for marker in directiveMarkers {
+            if let range = text.range(of: marker, options: .caseInsensitive) {
+                if let current = earliestBound {
+                    if range.lowerBound < current {
+                        earliestBound = range.lowerBound
+                    }
+                } else {
+                    earliestBound = range.lowerBound
+                }
             }
         }
-        return output
+
+        guard let bound = earliestBound else {
+            return (text, "")
+        }
+        return (String(text[..<bound]), String(text[bound...]))
+    }
+
+    static func isJSONBodyOption(_ optionText: String) -> Bool {
+        if optionText.localizedCaseInsensitiveContains("application/json") {
+            return true
+        }
+        if optionText.contains("\\\"") {
+            return true
+        }
+        if optionText.contains("\"keyword\"") || optionText.contains("\"key\"") {
+            return true
+        }
+        if optionText.range(
+            of: #"(?:["']?(?:body|requestBody|postBody|data)["']?\s*:\s*(?:\{|\[|["']\s*[\{\[]))"#,
+            options: [.regularExpression, .caseInsensitive]
+        ) != nil {
+            return true
+        }
+        if optionText.range(
+            of: #"@(?:Body|Post|RequestBody):\s*[\{\[]"#,
+            options: [.regularExpression, .caseInsensitive]
+        ) != nil {
+            return true
+        }
+        return false
+    }
+
+    /// 把插值后仍可能带空格 / 中文 / 裸花括号的纯 URL 部分修成 `URL(string:)` 能吃的形态。
+    ///
+    /// 仅对纯 URL 部分调用（绝不触碰 `,{"method":...}` 或 `@Header:{...}` 指令后缀），
+    /// 并保留已有的 `%[0-9A-Fa-f]{2}` 转义序列，杜绝二次编码为 `%25`。
+    private func urlSafeString(_ raw: String) -> String {
+        if URL(string: raw) != nil { return raw }
+        return SourceRequestBuilder.percentEncodePreservingExistingEscapes(raw)
     }
 
     private func normalizePathDoubleSlashes(_ urlString: String) -> String {
@@ -159,7 +231,7 @@ struct SearchURLResolver {
                   let innerRange = Range(match.range(at: 1), in: output) else { break }
             let expr = String(output[innerRange]).trimmingCharacters(in: .whitespacesAndNewlines)
             let lower = expr.lowercased()
-            if lower == "key" || lower == "keyword" || lower == "page" || lower == "baseurl"
+            if lower == "key" || lower == "keyword" || lower == "searchkey" || lower == "page" || lower == "baseurl" || lower == "booksourceurl"
                 || lower.hasPrefix("page+") || lower.hasPrefix("page-") || lower.hasPrefix("page*") || lower.hasPrefix("page/") {
                 let nextStart = fullRange.upperBound
                 if nextStart < output.endIndex {
@@ -285,8 +357,11 @@ struct SearchURLResolver {
     }
 
     private func interpolateSourcePlaceholders(_ text: String, source: BookSource) -> String {
-        sourceVariableMap(source: source).reduce(text) { output, item in
-            output
+        let baseReplaced = LegadoRuleResolver.replaceBaseUrlPlaceholders(in: text, baseUrl: source.bookSourceUrl)
+        let baseKeys: Set<String> = ["bookSourceUrl", "sourceUrl", "cleanSourceUrl", "baseUrl"]
+        return sourceVariableMap(source: source).reduce(baseReplaced) { output, item in
+            guard !baseKeys.contains(item.key) else { return output }
+            return output
                 .replacingOccurrences(of: "{{source.\(item.key)}}", with: item.value)
                 .replacingOccurrences(of: "{source.\(item.key)}", with: item.value)
                 .replacingOccurrences(of: "{{\(item.key)}}", with: item.value)

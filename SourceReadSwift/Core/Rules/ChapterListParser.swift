@@ -278,7 +278,8 @@ struct ChapterListParser {
             }
             var next: String?
             for root in roots {
-                next = try htmlExtractor.value(from: root, rule: nextRule, fallback: nil, baseUrl: response.url, variables: variables).nilIfEmpty
+                let rawNext = try htmlExtractor.value(from: root, rule: nextRule, fallback: nil, baseUrl: response.url, variables: variables).nilIfEmpty
+                next = sanitizeNextTocURL(rawNext, currentURL: response.url)
                 if next != nil { break }
             }
 
@@ -369,7 +370,7 @@ struct ChapterListParser {
                 rule: urlRule,
                 fallbackKeys: ["chapterUrl", "url", "link", "id", "cid", "u", "href"],
                 variables: variables
-            )
+            ).flatMap(sanitizeSingleChapterURL)
             guard !title.isEmpty, let rawUrl, !rawUrl.isEmpty else { continue }
             let absUrl = htmlExtractor.absolutize(rawUrl, base: response.url)
             guard isValidChapter(title: title, url: absUrl, pageURL: response.url, bookURL: book.bookUrl) else { continue }
@@ -416,12 +417,13 @@ struct ChapterListParser {
 
         let next: String?
         if let dict = rootObject as? [String: Any] {
-            next = jsonExtractor.string(
+            let rawNext = jsonExtractor.string(
                 from: dict,
                 rule: nextRule,
                 fallbackKeys: ["nextTocUrl", "nextChapterUrl", "nextUrl", "next"],
                 variables: variables
-            ).map { htmlExtractor.absolutize($0, base: response.url) }
+            )
+            next = sanitizeNextTocURL(rawNext, currentURL: response.url).map { htmlExtractor.absolutize($0, base: response.url) }
         } else {
             next = nil
         }
@@ -470,7 +472,7 @@ struct ChapterListParser {
             if extractedURL.isEmpty {
                 extractedURL = ((try? element.attr("href")) ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
             }
-            rawURL = extractedURL
+            rawURL = sanitizeSingleChapterURL(extractedURL) ?? ""
         }
 
         let volumeRaw = isVolumeRule.flatMap { rule in
@@ -536,6 +538,41 @@ struct ChapterListParser {
             }
         }
         return true
+    }
+
+    private func sanitizeSingleChapterURL(_ raw: String?) -> String? {
+        guard let raw else { return nil }
+        let (urlPart, suffixPart) = SearchURLResolver.splitURLAndDirectiveSuffix(raw)
+        let firstLine = urlPart
+            .components(separatedBy: .newlines)
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .first { !$0.isEmpty }
+        guard let firstLine, !firstLine.isEmpty else { return nil }
+        return firstLine + suffixPart
+    }
+
+    private func sanitizeNextTocURL(_ raw: String?, currentURL: URL) -> String? {
+        guard let raw else { return nil }
+        let (urlPart, suffixPart) = SearchURLResolver.splitURLAndDirectiveSuffix(raw)
+        let candidates = urlPart
+            .components(separatedBy: .newlines)
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { line in
+                !line.isEmpty
+                    && line != "#"
+                    && line != "!"
+                    && !line.lowercased().hasPrefix("javascript:")
+            }
+        guard !candidates.isEmpty else { return nil }
+        if candidates.count == 1 {
+            return candidates[0] + suffixPart
+        }
+        let currentAbs = currentURL.absoluteString
+        let chosen = candidates.first { candidate in
+            let abs = htmlExtractor.absolutize(candidate, base: currentURL)
+            return abs != currentAbs && abs != currentAbs + "/"
+        } ?? candidates[0]
+        return chosen + suffixPart
     }
 }
 

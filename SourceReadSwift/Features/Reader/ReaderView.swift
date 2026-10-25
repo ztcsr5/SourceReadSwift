@@ -187,6 +187,9 @@ struct ReaderView: View {
     @AppStorage("reader.brightness") private var readerBrightness: Double = -1
     @AppStorage("reader.preloadChapterCount") private var preloadChapterCount = ReaderPreloadPolicy.defaultCount
     @AppStorage("reader.textSelectionEnabled") private var textSelectionEnabled = false
+    @AppStorage("reader.imageStyle") private var globalImageStyleRaw: String = ReaderImageStyle.default.rawValue
+    @AppStorage("reader.traditionalChineseEnabled") private var traditionalChineseEnabled = false
+    @AppStorage("reader.bionicReadingEnabled") private var bionicReadingEnabled = false
     @AppStorage("reading.dailyGoalMinutes") private var dailyGoalMinutes: Int = 30
     @AppStorage("reading.lastGoalCelebratedDate") private var lastGoalCelebratedDate: String = ""
     @State private var showGoalCelebrationToast = false
@@ -521,7 +524,10 @@ struct ReaderView: View {
             String(format: "%.1f", paragraphSpacing),
             String(format: "%.1f", paragraphIndent),
             String(format: "%.1f", titleSpacing),
-            String(format: "%.1f", footerHeight)
+            String(format: "%.1f", footerHeight),
+            currentImageStyle.rawValue,
+            traditionalChineseEnabled ? "tc" : "sc",
+            bionicReadingEnabled ? "br" : "plain"
         ].joined(separator: "|")
     }
 
@@ -541,6 +547,8 @@ struct ReaderView: View {
             String(format: "%.1f", titleSpacing),
             String(format: "%.1f", footerHeight),
             currentImageStyle.rawValue,
+            traditionalChineseEnabled ? "tc" : "sc",
+            bionicReadingEnabled ? "br" : "plain",
             String(format: "%.1fx%.1f", viewport.width, viewport.height)
         ].joined(separator: "|")
     }
@@ -610,9 +618,7 @@ struct ReaderView: View {
                     .allowsHitTesting(false)
                 }
 
-            // 滑动模式不再画底部页脚：正文是连续流，页脚会压在中段文字上，
-            // 而且页码/章节对滚动阅读没有意义。分页三种模式保留。
-            if !showOverlay, readerMode != .scroll, !speechController.isSpeaking, !autoScrollEnabled {
+            if !showOverlay, !speechController.isSpeaking, !autoScrollEnabled {
                 readerFooter
                     .ignoresSafeArea(.container, edges: .bottom)
                     .transition(.opacity)
@@ -712,7 +718,7 @@ struct ReaderView: View {
         .navigationBarBackButtonHidden(true)
         .toolbar(.hidden, for: .navigationBar)
         .statusBarHidden(!showOverlay)
-        .preferredColorScheme(background == .dark ? .dark : .light)
+        .preferredColorScheme(background.isDark ? .dark : .light)
         .highRefreshRateSurface()
         .confirmationDialog("购买本章", isPresented: $showPayActionConfirmation, titleVisibility: .visible) {
             Button("继续购买") {
@@ -786,6 +792,13 @@ struct ReaderView: View {
             let initial = initialAutoScrollTarget()
             scrollParagraphTarget = initial.paragraph
             pagedPageIndex = initial.page
+            if initial.paragraph > 0 {
+                didLandInitialPosition = false
+                scrollJumpGeneration &+= 1
+                paragraphJumpRequest = ParagraphJumpRequest(index: initial.paragraph)
+            } else {
+                didLandInitialPosition = true
+            }
             UIDevice.current.isBatteryMonitoringEnabled = true
             previousIdleTimerDisabled = UIApplication.shared.isIdleTimerDisabled
             brightnessBeforeReader = UIScreen.main.brightness
@@ -921,16 +934,19 @@ struct ReaderView: View {
                 pageCount: pagedBlocksCache.count
             )
             persistReadingPosition(paragraphIndexOverride: paragraph)
-            if isPerBookOverride {
-                let ov = BookReaderOverride(
-                    readerMode: ReaderMode(rawValue: readerModeRawValue),
-                    fontFamily: ReaderFontFamily(rawValue: fontFamilyRawValue),
-                    fontSize: fontSize,
-                    lineSpacing: lineSpacing,
-                    background: ReaderBackground(rawValue: backgroundRawValue)
-                )
-                ReaderOverrideStore.shared.setOverride(ov, for: bookID)
-            }
+            syncPerBookOverrideIfNeeded()
+        }
+        .onChange(of: fontFamilyRawValue) { _ in
+            syncPerBookOverrideIfNeeded()
+        }
+        .onChange(of: fontSize) { _ in
+            syncPerBookOverrideIfNeeded()
+        }
+        .onChange(of: lineSpacing) { _ in
+            syncPerBookOverrideIfNeeded()
+        }
+        .onChange(of: backgroundRawValue) { _ in
+            syncPerBookOverrideIfNeeded()
         }
         .onChange(of: initialParagraphIndex) { target in
             guard let target, content.paragraphs.indices.contains(target) else { return }
@@ -953,6 +969,18 @@ struct ReaderView: View {
         }
     }
 
+    private func syncPerBookOverrideIfNeeded() {
+        guard isPerBookOverride else { return }
+        let ov = BookReaderOverride(
+            readerMode: ReaderMode(rawValue: readerModeRawValue),
+            fontFamily: ReaderFontFamily(rawValue: fontFamilyRawValue),
+            fontSize: fontSize,
+            lineSpacing: lineSpacing,
+            background: ReaderBackground(rawValue: backgroundRawValue)
+        )
+        ReaderOverrideStore.shared.setOverride(ov, for: bookID)
+    }
+
     private var readerBackdrop: some View {
         ZStack {
             if background == .custom, let image = ReaderCustomWallpaperStore.loadWallpaper() {
@@ -965,34 +993,34 @@ struct ReaderView: View {
                 background.color(isNight: colorScheme == .dark)
                 LinearGradient(
                     colors: [
-                        Color.white.opacity(background == .dark ? 0.02 : 0.16),
+                        Color.white.opacity(background.isDark ? 0.02 : 0.16),
                         Color.clear,
-                        Color.black.opacity(background == .dark ? 0.28 : 0.05)
+                        Color.black.opacity(background.isDark ? 0.28 : 0.05)
                     ],
                     startPoint: .topLeading,
                     endPoint: .bottomTrailing
                 )
                 RadialGradient(
                     colors: [
-                        AppTheme.accent.opacity(background == .dark ? 0.16 : 0.08),
+                        AppTheme.accent.opacity(background.isDark ? 0.16 : 0.08),
                         Color.clear
                     ],
                     center: .topTrailing,
                     startRadius: 20,
                     endRadius: 360
                 )
-                .blendMode(background == .dark ? .screen : .multiply)
+                .blendMode(background.isDark ? .screen : .multiply)
             }
         }
         .ignoresSafeArea()
     }
 
     private var chromeForeground: Color {
-        background == .dark ? .white.opacity(0.94) : .primary
+        background.isDark ? .white.opacity(0.94) : .primary
     }
 
     private var chromeSecondaryForeground: Color {
-        background == .dark ? .white.opacity(0.62) : .secondary
+        background.isDark ? .white.opacity(0.62) : .secondary
     }
 
     private var readerThemeTextColor: Color {
@@ -1180,7 +1208,10 @@ struct ReaderView: View {
     }
 
     private var currentImageStyle: ReaderImageStyle {
-        content.readerImageStyle
+        if content.imageStyle != nil {
+            return content.readerImageStyle
+        }
+        return ReaderImageStyle(rawValue: globalImageStyleRaw) ?? .default
     }
 
     /// 首章加载中的占位：主题色底 + 进度指示，避免「点进书先白一会儿」。
@@ -1197,11 +1228,8 @@ struct ReaderView: View {
         .allowsHitTesting(false)
     }
 
-    /// 需要恢复到「中间某一段」时，定位落地之前先把文字层藏起来。
-    /// 首帧就开始读的书（目标为 0）不走这个门闸，不会出现空白。
     private var initialSurfaceOpacity: Double {
-        guard scrollParagraphTarget > 0, !didLandInitialPosition else { return 1 }
-        return 0
+        1
     }
 
     private var scrollReaderContent: some View {
@@ -1225,14 +1253,16 @@ struct ReaderView: View {
             // 否则每次呼出菜单整页文字都会往下掉一格（关掉再弹回来）。
             topInset: Double(ReaderPageLayoutEngine.minimumTopInset(pagePadding: CGFloat(pagePadding))),
             textColor: background.uiTextColor(isNight: colorScheme == .dark),
-            surfaceColor: background.uiColor(isNight: colorScheme == .dark),
-            highlightColor: AppTheme.accentUIColor.withAlphaComponent(background == .dark ? 0.22 : 0.12),
+            surfaceColor: background == .custom ? .clear : background.uiColor(isNight: colorScheme == .dark),
+            highlightColor: AppTheme.accentUIColor.withAlphaComponent(background.isDark ? 0.22 : 0.12),
             currentParagraphIndex: speechFlatParagraphIndex ?? -1,
             scrollTarget: activeScrollTarget,
             scrollRequestKey: nativeScrollRequestKey,
             animatedScrollDuration: autoScrollEnabled ? max(ReaderAutomationPolicy.clampedDelay(autoScrollDelay) * 0.9, 0.25) : (speechController.isSpeaking ? 0.35 : 0),
             textSelectionEnabled: textSelectionEnabled,
             showChapterEndBadge: false,
+            traditionalChineseEnabled: traditionalChineseEnabled,
+            bionicReadingEnabled: bionicReadingEnabled,
             imageStyle: currentImageStyle,
             imageHeaders: imageRequestHeaders,
             imageColumnWidth: illustrationColumnWidth,
@@ -1277,10 +1307,6 @@ struct ReaderView: View {
             }
         )
         .ignoresSafeArea(.container, edges: .bottom)
-        .opacity(initialSurfaceOpacity)
-        // 透明期间不该吃点击：0.5s 兜底窗口里用户可能已经在点下一页，
-        // 让点击落到下面的容器上，比落在看不见的文字层上更安全。
-        .allowsHitTesting(initialSurfaceOpacity > 0)
         .overlay {
             // 只有「这一段窗口里确实没有任何段落」才盖占位层。
             // 之前只判 scrollModeParagraphs 是否为空：滑动跨章时它会被重算成空数组，
@@ -1296,12 +1322,6 @@ struct ReaderView: View {
                 DispatchQueue.main.async {
                     paragraphJumpRequest = ParagraphJumpRequest(index: scrollParagraphTarget)
                 }
-            }
-            // 无条件兜底：定位回调可能因为文档重建、目标段落缺失而不来，
-            // 那种情况下表面会一直停在 opacity 0 —— 用户看到的就是「点进去空白」。
-            Task { @MainActor in
-                try? await Task.sleep(nanoseconds: 800_000_000)
-                didLandInitialPosition = true
             }
         }
         .onChange(of: chapterIndex) { _ in
@@ -1992,7 +2012,7 @@ struct ReaderView: View {
             pageSurface {
                 VStack(alignment: .leading, spacing: 0) {
                     if page.includesTitle {
-                        Text(page.chapterTitle.isEmpty ? content.title : page.chapterTitle)
+                        Text(ReaderTextTransform.displayText(page.chapterTitle.isEmpty ? content.title : page.chapterTitle, traditionalChinese: traditionalChineseEnabled))
                             .font(fontFamily.swiftUIFont(size: CGFloat(fontSize + 8), weight: .bold))
                             .foregroundStyle(readerThemeTextColor)
                             .padding(.bottom, CGFloat(titleSpacing))
@@ -2097,7 +2117,11 @@ struct ReaderView: View {
             .background {
                 // 覆盖模式的方向阴影由 coverPagedReaderContent 每页各画一层；
                 // 这里再叠一层同方向的 shadow，两圈叠在一起就是那道「奇怪的边框」。
-                readerThemeBackground
+                if background == .custom {
+                    Color.clear
+                } else {
+                    readerThemeBackground
+                }
             }
     }
 
@@ -2132,7 +2156,10 @@ struct ReaderView: View {
         let ownerChapter = chapterIndex >= 0 ? chapterIndex : windowCurrentChapterIndex
         let highlighted = speechChapterIndex == ownerChapter
             && speechController.currentParagraphIndex == index
-        return Text(paragraph)
+        let textView: Text = bionicReadingEnabled
+            ? Text(ReaderTextTransform.bionicAttributedString(for: paragraph))
+            : Text(paragraph)
+        return textView
             .font(fontFamily.swiftUIFont(size: CGFloat(fontSize), weight: .regular))
             .foregroundStyle(readerThemeTextColor)
             .kerning(letterSpacing)
@@ -2142,7 +2169,7 @@ struct ReaderView: View {
             .background {
                 if highlighted {
                     RoundedRectangle(cornerRadius: 10, style: .continuous)
-                        .fill(AppTheme.accent.opacity(background == .dark ? 0.22 : 0.12))
+                        .fill(AppTheme.accent.opacity(background.isDark ? 0.22 : 0.12))
                 }
             }
             .readerSelectableText(textSelectionEnabled)
@@ -2401,13 +2428,12 @@ struct ReaderView: View {
 
                     Slider(
                         value: Binding(
-                            get: { chapterSliderTarget ?? Double(chapterIndex) },
+                            get: { chapterSliderTarget ?? Double(currentDisplayChapterIndex) },
                             set: { newValue in
                                 chapterSliderTarget = newValue
-                                scheduleLiveChapterSeek(to: newValue)
                             }
                         ),
-                        in: 0...Double(max((totalChapters ?? chapters.count) - 1, 0)),
+                        in: 0...Double(max((displayTotalChapters ?? chapters.count) - 1, 0)),
                         step: 1,
                         onEditingChanged: { editing in
                             guard !editing else { return }
@@ -2416,14 +2442,16 @@ struct ReaderView: View {
                             guard let target = chapterSliderTarget else { return }
                             chapterSliderTarget = nil
                             let index = Int(target.rounded())
-                            guard index != chapterIndex else { return }
+                            guard index != currentDisplayChapterIndex else { return }
                             selectChapter(index: index)
                         }
                     )
                         .tint(AppTheme.accent)
-                        .padding(.horizontal, 10)
+                        .padding(.horizontal, 16)
                         .frame(maxWidth: .infinity)
+                        .frame(height: 36)
                         .background(.thinMaterial, in: Capsule())
+                        .clipShape(Capsule())
                         .accessibilityLabel("章节进度")
 
                     navChapterButton(icon: "chevron.right", title: "下一章") {
@@ -2475,7 +2503,7 @@ struct ReaderView: View {
             .padding(.horizontal, 14)
             .padding(.top, 14)
             .padding(.bottom, 18)
-            .glassPanel(cornerRadius: 26, material: .ultraThinMaterial, strokeOpacity: background == .dark ? 0.09 : 0.12, shadowOpacity: background == .dark ? 0.42 : 0.14)
+            .glassPanel(cornerRadius: 26, material: .ultraThinMaterial, strokeOpacity: background.isDark ? 0.09 : 0.12, shadowOpacity: background.isDark ? 0.42 : 0.14)
             .padding(.horizontal, 14)
             .padding(.bottom, 10)
         }
@@ -2813,7 +2841,7 @@ struct ReaderView: View {
         .background(readerThemeBackground, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
         .overlay {
             RoundedRectangle(cornerRadius: 18, style: .continuous)
-                .stroke(Color.primary.opacity(background == .dark ? 0.12 : 0.06), lineWidth: 0.8)
+                .stroke(Color.primary.opacity(background.isDark ? 0.12 : 0.06), lineWidth: 0.8)
         }
     }
 
@@ -2832,7 +2860,7 @@ struct ReaderView: View {
             .background(.regularMaterial, in: Capsule())
             .overlay {
                 Capsule()
-                    .stroke(Color.white.opacity(background == .dark ? 0.08 : 0.35), lineWidth: 0.8)
+                    .stroke(Color.white.opacity(background.isDark ? 0.08 : 0.35), lineWidth: 0.8)
             }
             .padding(.horizontal, 18)
             .padding(.top, 12)
@@ -3009,6 +3037,24 @@ struct ReaderView: View {
 
             Toggle("允许正文文字选择", isOn: $textSelectionEnabled)
                 .font(.subheadline.weight(.semibold))
+
+            Toggle("繁体中文显示（简转繁）", isOn: $traditionalChineseEnabled)
+                .font(.subheadline.weight(.semibold))
+
+            Toggle("仿生阅读（Bionic Reading 词首加粗）", isOn: $bionicReadingEnabled)
+                .font(.subheadline.weight(.semibold))
+
+            VStack(alignment: .leading, spacing: 6) {
+                Text("插图排版样式")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(.secondary)
+                Picker("插图排版样式", selection: $globalImageStyleRaw) {
+                    ForEach(ReaderImageStyle.allCases) { style in
+                        Text(style.title).tag(style.rawValue)
+                    }
+                }
+                .pickerStyle(.segmented)
+            }
 
             settingStepper(title: "预加载章节", value: ReaderPreloadPolicy.title(for: preloadChapterCount)) {
                 preloadChapterCount = ReaderPreloadPolicy.clamp(preloadChapterCount - 1)
@@ -3220,12 +3266,12 @@ struct ReaderView: View {
                 }
             }
             .toolbarBackground(readerThemeBackground, for: .navigationBar)
-            .toolbarColorScheme(background == .dark ? .dark : .light, for: .navigationBar)
+            .toolbarColorScheme(background.isDark ? .dark : .light, for: .navigationBar)
         }
         .readerSheetPresentation(color: readerThemeBackground)
         .presentationDetents([.medium, .large])
         .tint(AppTheme.accent)
-        .preferredColorScheme(background == .dark ? .dark : .light)
+        .preferredColorScheme(background.isDark ? .dark : .light)
     }
 
     private var customTocSegmentedPicker: some View {
@@ -3234,7 +3280,7 @@ struct ReaderView: View {
             tocTabButton(title: "书签", tag: 1)
         }
         .padding(3)
-        .background(readerThemeTextColor.opacity(background == .dark ? 0.16 : 0.08), in: Capsule())
+        .background(readerThemeTextColor.opacity(background.isDark ? 0.16 : 0.08), in: Capsule())
         .overlay {
             Capsule()
                 .stroke(readerThemeTextColor.opacity(0.12), lineWidth: 0.8)
@@ -3426,12 +3472,12 @@ struct ReaderView: View {
                     }
             }
             .toolbarBackground(readerThemeBackground, for: .navigationBar)
-            .toolbarColorScheme(background == .dark ? .dark : .light, for: .navigationBar)
+            .toolbarColorScheme(background.isDark ? .dark : .light, for: .navigationBar)
         }
         .readerSheetPresentation(color: readerThemeBackground)
         .presentationDetents([.medium, .large])
         .tint(AppTheme.accent)
-        .preferredColorScheme(background == .dark ? .dark : .light)
+        .preferredColorScheme(background.isDark ? .dark : .light)
     }
 
     private func bookmarkList(includeAddButton: Bool) -> some View {
@@ -3601,7 +3647,6 @@ struct ReaderView: View {
     /// Moves both surfaces to a flat paragraph index in the live window.
     private func jumpToWindowFlat(_ flatIndex: Int, paragraphIndex: Int) {
         let safeFlat = min(max(flatIndex, 0), max(windowLayout.totalCount - 1, 0))
-        guard safeFlat != visibleParagraphIndex else { return }
         visibleParagraphIndex = safeFlat
         switch readerMode {
         case .scroll:
@@ -3630,10 +3675,10 @@ struct ReaderView: View {
         stopSpeechPlayback()
         windowCurrentChapterIndex = index
         prefetchWindow(around: index)
+        trimWindowIfNeeded()
         let paragraph = min(max(paragraphIndex, 0), max(section.paragraphs.count - 1, 0))
         guard let flat = windowLayout.flatIndex(chapterIndex: index, paragraphIndex: paragraph) else { return }
         jumpToWindowFlat(flat, paragraphIndex: paragraph)
-        trimWindowIfNeeded()
     }
 
     private var canJumpToChapter: Bool {
@@ -3694,8 +3739,8 @@ struct ReaderView: View {
 
     /// 拖动进度条时的落点文案；不拖动时返回当前章（配合 opacity 隐藏）。
     private var chapterSliderLabel: String {
-        let total = max(totalChapters ?? chapters.count, 1)
-        let raw = Int((chapterSliderTarget ?? Double(chapterIndex)).rounded())
+        let total = max(displayTotalChapters ?? chapters.count, 1)
+        let raw = Int((chapterSliderTarget ?? Double(currentDisplayChapterIndex)).rounded())
         let clamped = min(max(raw, 0), total - 1)
         return "第 \(clamped + 1) / \(total) 章"
     }
@@ -3705,7 +3750,7 @@ struct ReaderView: View {
     private func scheduleLiveChapterSeek(to rawValue: Double) {
         chapterSeekTask?.cancel()
         let index = Int(rawValue.rounded())
-        guard index != chapterIndex, (0..<max(totalChapters ?? chapters.count, 1)).contains(index) else { return }
+        guard index != currentDisplayChapterIndex, (0..<max(displayTotalChapters ?? chapters.count, 1)).contains(index) else { return }
         chapterSeekTask = Task { @MainActor in
             try? await Task.sleep(nanoseconds: 120_000_000)
             guard !Task.isCancelled else { return }
@@ -4195,7 +4240,6 @@ struct ReaderView: View {
                             // opening chapter.
                             stopAutoScroll()
                             onAutoScrollFinished?()
-                            selectRelativeChapter(offset: 1)
                         } else {
                             // Cursor moved inside the window; download the next
                             // chapter and resume on the same surface.
@@ -4670,8 +4714,9 @@ struct ReaderView: View {
         var pages: [ReaderPageBlock] = []
         var currentEntries: [ReaderPageEntry] = []
         var pageOrdinal = 0
+        let transformedTitle = ReaderTextTransform.displayText(section.title, traditionalChinese: traditionalChineseEnabled)
         var currentHeight = ReaderPageLayoutEngine.measureHeight(
-            section.title,
+            transformedTitle,
             typography: titleTypography,
             font: typography.titleFont
         ) + typography.titleSpacing
@@ -4684,7 +4729,7 @@ struct ReaderView: View {
                     includesTitle: currentIncludesTitle,
                     paragraphs: currentEntries,
                     chapterIndex: section.chapterIndex,
-                    chapterTitle: section.title,
+                    chapterTitle: transformedTitle,
                     pageOrdinal: pageOrdinal
                 )
             )
@@ -4744,8 +4789,9 @@ struct ReaderView: View {
             // The stored page text includes the first-line indent so the paged
             // surface and TextKit measure exactly the same string. Continuation
             // chunks start at a line boundary and therefore carry no indent.
+            let transformedParagraph = ReaderTextTransform.displayText(paragraph, traditionalChinese: traditionalChineseEnabled)
             let display = ReaderPageLayoutEngine.displayText(
-                paragraph,
+                transformedParagraph,
                 fontSize: CGFloat(fontSize),
                 indent: typography.firstLineIndent
             )
@@ -4925,6 +4971,7 @@ final class ReaderSpeechController: NSObject, ObservableObject, AVSpeechSynthesi
     private var activeUtterance: AVSpeechUtterance?
     private var currentTitle: String = ""
     private var remoteCommandsConfigured = false
+    private var remoteCommandTargets: [(MPRemoteCommand, Any)] = []
     private let cloudCredentialsStore = CloudTTSCredentialsStore()
     private let cloudClient = CloudTTSClient()
     private let cloudPlayer = CloudTTSPlayer()
@@ -5280,7 +5327,7 @@ final class ReaderSpeechController: NSObject, ObservableObject, AVSpeechSynthesi
         let commandCenter = MPRemoteCommandCenter.shared()
 
         commandCenter.playCommand.isEnabled = true
-        commandCenter.playCommand.addTarget { [weak self] _ in
+        let playTarget = commandCenter.playCommand.addTarget { [weak self] _ in
             Task { @MainActor [weak self] in
                 self?.resume()
             }
@@ -5288,7 +5335,7 @@ final class ReaderSpeechController: NSObject, ObservableObject, AVSpeechSynthesi
         }
 
         commandCenter.pauseCommand.isEnabled = true
-        commandCenter.pauseCommand.addTarget { [weak self] _ in
+        let pauseTarget = commandCenter.pauseCommand.addTarget { [weak self] _ in
             Task { @MainActor [weak self] in
                 self?.pause()
             }
@@ -5296,7 +5343,7 @@ final class ReaderSpeechController: NSObject, ObservableObject, AVSpeechSynthesi
         }
 
         commandCenter.togglePlayPauseCommand.isEnabled = true
-        commandCenter.togglePlayPauseCommand.addTarget { [weak self] _ in
+        let toggleTarget = commandCenter.togglePlayPauseCommand.addTarget { [weak self] _ in
             Task { @MainActor [weak self] in
                 guard let self else { return }
                 if self.isPaused {
@@ -5309,7 +5356,7 @@ final class ReaderSpeechController: NSObject, ObservableObject, AVSpeechSynthesi
         }
 
         commandCenter.nextTrackCommand.isEnabled = true
-        commandCenter.nextTrackCommand.addTarget { [weak self] _ in
+        let nextTarget = commandCenter.nextTrackCommand.addTarget { [weak self] _ in
             Task { @MainActor [weak self] in
                 self?.skipNext()
             }
@@ -5317,22 +5364,28 @@ final class ReaderSpeechController: NSObject, ObservableObject, AVSpeechSynthesi
         }
 
         commandCenter.previousTrackCommand.isEnabled = true
-        commandCenter.previousTrackCommand.addTarget { [weak self] _ in
+        let prevTarget = commandCenter.previousTrackCommand.addTarget { [weak self] _ in
             Task { @MainActor [weak self] in
                 self?.skipPrevious()
             }
             return .success
         }
+
+        remoteCommandTargets = [
+            (commandCenter.playCommand, playTarget),
+            (commandCenter.pauseCommand, pauseTarget),
+            (commandCenter.togglePlayPauseCommand, toggleTarget),
+            (commandCenter.nextTrackCommand, nextTarget),
+            (commandCenter.previousTrackCommand, prevTarget)
+        ]
     }
 
     private func teardownRemoteCommands() {
         guard remoteCommandsConfigured else { return }
-        let commandCenter = MPRemoteCommandCenter.shared()
-        commandCenter.playCommand.removeTarget(nil)
-        commandCenter.pauseCommand.removeTarget(nil)
-        commandCenter.togglePlayPauseCommand.removeTarget(nil)
-        commandCenter.nextTrackCommand.removeTarget(nil)
-        commandCenter.previousTrackCommand.removeTarget(nil)
+        for (command, target) in remoteCommandTargets {
+            command.removeTarget(target)
+        }
+        remoteCommandTargets.removeAll()
         remoteCommandsConfigured = false
     }
 

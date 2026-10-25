@@ -28,7 +28,7 @@ struct ReaderFrameRateAccumulator: Equatable {
     ///   - delta: 相邻两帧的时间间隔（秒）。
     ///   - expectedFrameDuration: 该设备的期望帧间隔（1 / 刷新率）。
     mutating func recordFrame(delta: Double, expectedFrameDuration: Double) {
-        guard delta.isFinite, delta > 0, expectedFrameDuration > 0 else { return }
+        guard delta.isFinite, delta > 0, delta <= 0.5, expectedFrameDuration > 0 else { return }
         frames += 1
         totalSeconds += delta
         if delta > expectedFrameDuration * Self.dropThreshold {
@@ -136,7 +136,9 @@ final class ReaderFrameRateSampler {
     @objc private func handleFrame(_ link: CADisplayLink) {
         defer { lastTimestamp = link.timestamp }
         guard lastTimestamp > 0 else { return }
-        pending.recordFrame(delta: link.timestamp - lastTimestamp, expectedFrameDuration: expectedFrameDuration)
+        let delta = link.timestamp - lastTimestamp
+        guard delta > 0, delta <= 0.5 else { return }
+        pending.recordFrame(delta: delta, expectedFrameDuration: expectedFrameDuration)
         if pending.frames >= Self.flushInterval {
             flush()
         }

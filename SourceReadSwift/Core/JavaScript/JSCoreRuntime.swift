@@ -1006,19 +1006,20 @@ final class JSCoreRuntime {
           };
         })();
         (function() {
-          var _origJSONParse = JSON.parse;
+          const __nativeJSONParse = JSON.parse.bind(JSON);
           JSON.parse = function(text, reviver) {
             if (text !== null && typeof text === 'object') {
               if (text instanceof String) {
                 text = String(text);
+              } else if (typeof text.body === 'function') {
+                text = String(text.body());
+              } else if (typeof text.__raw === 'string') {
+                text = text.__raw;
               } else {
                 return text;
               }
             }
-            if (typeof text !== 'string') {
-              text = String(text);
-            }
-            return _origJSONParse.call(JSON, text, reviver);
+            return __nativeJSONParse(String(text ?? ''), reviver);
           };
         })();
         var __cache_store = (typeof __cache_store !== 'undefined' && __cache_store) || {};
@@ -1142,7 +1143,17 @@ final class JSCoreRuntime {
           return value == null ? '' : String(value);
         };
         java.getJson = function(value, fallback) {
-          if (value !== null && typeof value === 'object') return value;
+          if (value !== null && typeof value === 'object') {
+            if (value instanceof String) {
+              value = String(value);
+            } else if (typeof value.body === 'function') {
+              value = String(value.body());
+            } else if (typeof value.__raw === 'string') {
+              value = value.__raw;
+            } else {
+              return value;
+            }
+          }
           try { return JSON.parse(String(value == null ? '' : value)); }
           catch (_) {
             if (arguments.length > 1 && fallback !== undefined) {

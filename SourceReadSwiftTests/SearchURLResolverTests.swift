@@ -1,4 +1,5 @@
 import XCTest
+import SwiftSoup
 @testable import SourceReadSwift
 
 final class SearchURLResolverTests: XCTestCase {
@@ -212,13 +213,144 @@ final class SearchURLResolverTests: XCTestCase {
         XCTAssertFalse(request.url.absoluteString.contains("#"))
     }
 
+    func testPreservesJSONOptionsAndHeaderDirectivesWithoutPercentEncodingBraces() throws {
+        let postSource = BookSource(
+            bookSourceName: "POST源",
+            bookSourceUrl: "https://example.com",
+            searchUrl: #"https://example.com/search,{"method":"POST","body":"key={{key}}&page={{page}}"}"#
+        )
+        let postResolved = try SearchURLResolver().resolve(source: postSource, keyword: "剑来", page: 1).get()
+        XCTAssertFalse(postResolved.contains("%7B"))
+        XCTAssertFalse(postResolved.contains("%22"))
+        let postRequest = SourceRequestBuilder().buildSearchRequest(
+            source: postSource,
+            searchUrl: postResolved,
+            keyword: "剑来",
+            page: 1
+        )
+        XCTAssertEqual(postRequest.url.absoluteString, "https://example.com/search")
+        XCTAssertEqual(postRequest.method, .post)
+        XCTAssertEqual(postRequest.body.flatMap { String(data: $0, encoding: .utf8) }, "key=%E5%89%91%E6%9D%A5&page=1")
+
+        let headerSource = BookSource(
+            bookSourceName: "Header源",
+            bookSourceUrl: "https://example.com",
+            searchUrl: #"https://example.com/search?q={{key}}@Header:{"User-Agent":"CustomReader/1.0"}"#
+        )
+        let headerResolved = try SearchURLResolver().resolve(source: headerSource, keyword: "剑来", page: 1).get()
+        XCTAssertFalse(headerResolved.contains("%7B"))
+        XCTAssertFalse(headerResolved.contains("%22"))
+        let headerRequest = SourceRequestBuilder().buildSearchRequest(
+            source: headerSource,
+            searchUrl: headerResolved,
+            keyword: "剑来",
+            page: 1
+        )
+        XCTAssertEqual(headerRequest.url.absoluteString, "https://example.com/search?q=%E5%89%91%E6%9D%A5")
+        XCTAssertEqual(headerRequest.headers["User-Agent"], "CustomReader/1.0")
+    }
+
+    func testJSONPostSearchBodyReceivesRawUTF8Keyword() throws {
+        let source = BookSource(
+            bookSourceName: "JSON搜索源",
+            bookSourceUrl: "https://example.com",
+            searchUrl: #"https://example.com/api/search,{"method":"POST","body":"{\"searchTerms\":\"{{key}}\"}"}"#
+        )
+        let resolved = try SearchURLResolver().resolve(source: source, keyword: "剑来", page: 1).get()
+        let request = SourceRequestBuilder().buildSearchRequest(
+            source: source,
+            searchUrl: resolved,
+            keyword: "剑来",
+            page: 1
+        )
+        XCTAssertEqual(request.url.absoluteString, "https://example.com/api/search")
+        XCTAssertEqual(request.method, .post)
+        let bodyString = try XCTUnwrap(request.body.flatMap { String(data: $0, encoding: .utf8) })
+        XCTAssertEqual(bodyString, #"{"searchTerms":"剑来"}"#)
+        XCTAssertFalse(bodyString.contains("%E5%89%91%E6%9D%A5"))
+    }
+
+    func testAngleBracketPaginationInSearchUrl() throws {
+        let source = BookSource(
+            bookSourceName: "书法小说（优+）",
+            bookSourceUrl: "https://www.shufaxiaoshuo.com",
+            searchUrl: "https://www.shufaxiaoshuo.com/search/{{key}}<,&p={{page}}>"
+        )
+
+        let page1 = try SearchURLResolver().resolve(source: source, keyword: "剑来", page: 1).get()
+        XCTAssertEqual(page1, "https://www.shufaxiaoshuo.com/search/%E5%89%91%E6%9D%A5")
+
+        let page2 = try SearchURLResolver().resolve(source: source, keyword: "剑来", page: 2).get()
+        XCTAssertEqual(page2, "https://www.shufaxiaoshuo.com/search/%E5%89%91%E6%9D%A5&p=2")
+    }
+
+    func testResolveURLPreservesExistingPercentEncodingWithoutDoubleEncoding() {
+        let builder = SourceRequestBuilder()
+        let raw = #"https://boxnovel.baidu.com/search?data={"word":"%E5%89%91%E6%9D%A5"}"#
+        let url = builder.resolveURL(raw, relativeTo: "https://boxnovel.baidu.com")
+        XCTAssertTrue(url.absoluteString.contains("%E5%89%91%E6%9D%A5"))
+        XCTAssertFalse(url.absoluteString.contains("%25E5"))
+        XCTAssertTrue(url.absoluteString.contains("%7B%22word%22:%22%E5%89%91%E6%9D%A5%22%7D"))
+    }
+
+    func testBaseUrlWithFragmentCommentAndRelativePathInsertsSlash() throws {
+        let source = BookSource(
+            bookSourceName: "八一中文",
+            bookSourceUrl: "https://www.blxs.la#comment",
+            searchUrl: "{{baseUrl}}modules/article/search.php"
+        )
+        let resolved = try SearchURLResolver().resolve(source: source, keyword: "剑来", page: 1).get()
+        XCTAssertEqual(resolved, "https://www.blxs.la/modules/article/search.php")
+    }
+
+    func testJSCoreRuntimeJSONParseUnwrapsBridgeResponseFromJavaAjax() throws {
+        let runtime = JSCoreRuntime(ajaxHandler: { _ in
+            #"{"status":200,"bookName":"剑来"}"#
+        })
+        let parsedName = try runtime.evaluate(#"JSON.parse(java.ajax("https://example.com/api")).bookName"#).get()
+        XCTAssertEqual(parsedName, "剑来")
+
+        let getJsonName = try runtime.evaluate(#"java.getJson(java.ajax("https://example.com/api")).bookName"#).get()
+        XCTAssertEqual(getJsonName, "剑来")
+    }
+
+    func testCompoundClassTagSelectorAndXPathPositionRangePredicates() throws {
+        let steps = LegadoDefaultRuleTranslator.translateSelectorSteps("class.chapter.ul.1@li")
+        XCTAssertEqual(steps.count, 2)
+        XCTAssertEqual(steps[0].selector, ".chapter ul, .chapter.ul")
+        XCTAssertEqual(steps[0].indices, [1])
+        XCTAssertEqual(steps[1].selector, "li")
+
+        let html = """
+        <div class="chapter">
+          <ul><li>最新章节1</li></ul>
+          <ul><li>第一章</li><li>第二章</li></ul>
+        </div>
+        <div id="chapterlist">
+          <p><a href="/header">Header</a></p>
+          <p><a href="/1">Ch 1</a></p>
+          <p><a href="/2">Ch 2</a></p>
+          <p><a href="/footer">Footer</a></p>
+        </div>
+        """
+        let doc = try SwiftSoup.parse(html)
+        let liElements = LegadoDefaultRuleTranslator.executeSteps(steps, on: doc)
+        XCTAssertEqual(try liElements.map { try $0.text() }, ["第一章", "第二章"])
+
+        let xpathRule = "//div[@id='chapterlist']/p[position() >= 2 and position() < last()]/a"
+        let cssSelector = XPathRuleTranslator.selectorRule(xpathRule)
+        XCTAssertEqual(cssSelector, "div#chapterlist p:gt(0):not(:last-child) a")
+        let anchors = try HtmlRuleExtractor().select(html, baseUrl: URL(string: "https://example.com")!, listRule: xpathRule)
+        XCTAssertEqual(try anchors.map { try $0.text() }, ["Ch 1", "Ch 2"])
+    }
+
     func testAppVersionSemantics() {
         XCTAssertEqual(AppVersion.versionString, "\(AppVersion.epic).\(AppVersion.major).\(AppVersion.minor)")
         XCTAssertEqual(AppVersion.epic, 1)
         XCTAssertEqual(AppVersion.major, 0)
-        XCTAssertEqual(AppVersion.minor, 52)
-        XCTAssertEqual(AppVersion.build, 53)
+        XCTAssertEqual(AppVersion.minor, 53)
+        XCTAssertEqual(AppVersion.build, 54)
         XCTAssertTrue(AppVersion.displayString.contains(AppVersion.versionString))
-        XCTAssertTrue(AppVersion.fullDisplayString.contains("Build 53"))
+        XCTAssertTrue(AppVersion.fullDisplayString.contains("Build 54"))
     }
 }
