@@ -152,6 +152,9 @@ struct ReaderView: View {
     @State private var didLandInitialPosition = false
     /// 点击手势的按下时刻，用来过滤「长按/拖动」。
     @State private var tapGestureStartedAt: Date?
+    /// 一次点击只处理一次。paged 模式里快照页容器与 SwiftUI 手势可能在同一帧
+    /// 各报一次，用户看到的就是「点一下跳了两页」。
+    @State private var tapCooldownUntil: Date = .distantPast
     @State private var pageStepDirection: Int = 0
     @State private var pageStepGeneration: Int = 0
     @State private var brightnessBeforeReader: CGFloat? = nil
@@ -502,7 +505,12 @@ struct ReaderView: View {
             readerLayoutKey,
             ReaderPerformancePolicy.viewportCacheKey(viewport),
             readerContentFingerprint,
-            windowSignature
+            windowSignature,
+            // 主题/外观也是页面渲染的一部分：page-curl 的页面是创建时快照的
+            // hosting controller，不换 key 就不会重画 —— 这正是「换主题要翻页
+            // 才生效」的成因。
+            backgroundRawValue,
+            colorScheme == .dark ? "dark" : "light"
         ].joined(separator: "|")
     }
 
@@ -610,6 +618,7 @@ struct ReaderView: View {
             // 而且页码/章节对滚动阅读没有意义。分页三种模式保留。
             if !showOverlay, readerMode != .scroll, !speechController.isSpeaking, !autoScrollEnabled {
                 readerFooter
+                    .ignoresSafeArea(.container, edges: .bottom)
                     .transition(.opacity)
                     .zIndex(1)
             }
@@ -2202,7 +2211,8 @@ struct ReaderView: View {
                 .frame(height: 20, alignment: .center)
                 // 阅读页忽略了安全区，页脚要自己让开 home indicator，
                 // 否则时间 / 章节 / 电量会贴在屏幕最底边上（全屏阅读时最扎眼）。
-                .padding(.bottom, 6 + readerFooterSafeInset)
+                // 页脚贴到屏幕最下缘（益达那种位置），只让 home indicator 一点点。
+                .padding(.bottom, max(readerFooterSafeInset * 0.25, 2))
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
@@ -3703,6 +3713,9 @@ struct ReaderView: View {
     }
 
     private func handleReaderTap(at location: CGPoint) {
+        let now = Date()
+        guard now >= tapCooldownUntil else { return }
+        tapCooldownUntil = now.addingTimeInterval(0.28)
         guard !showSettings else { return }
         let size = effectiveViewportSize
         let column = min(max(Int(location.x / max(size.width / 3, 1)), 0), 2)
@@ -4521,7 +4534,9 @@ struct ReaderView: View {
         }
 
         let topPadding = ReaderPageLayoutEngine.minimumTopInset(pagePadding: CGFloat(pagePadding))
-        let bottomPadding = CGFloat(pagePadding) + CGFloat(footerHeight)
+        // 正文按可用高度排满：底部只留页脚那条 20pt 状态条 + 半个边距，
+        // 不再把「底部安全留白」整段（默认 80pt）留给空白。
+        let bottomPadding = CGFloat(pagePadding) * 0.5 + readerFooterReservedHeight
         let typography = ReaderPageTypography(
             font: fontFamily.uiFont(ofSize: CGFloat(fontSize)),
             titleFont: fontFamily.uiFont(ofSize: CGFloat(fontSize + 8), weight: .bold),

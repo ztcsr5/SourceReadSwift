@@ -91,6 +91,17 @@ final class ReaderFrameRateSampler {
         expectedFrameDuration = 1.0 / Double(max(ceiling, 60))
         lastTimestamp = 0
         let link = CADisplayLink(target: self, selector: #selector(handleFrame(_:)))
+        // Ask for the display's full refresh rate instead of letting the system
+        // pin this link to 60Hz: on ProMotion devices that is what makes the
+        // reader's own frame budget honest.
+        if #available(iOS 15.0, *) {
+            let target = Float(max(ceiling, 60))
+            link.preferredFrameRateRange = CAFrameRateRange(
+                minimum: min(target, 80),
+                maximum: target,
+                preferred: target
+            )
+        }
         link.add(to: .main, forMode: .common)
         self.link = link
     }

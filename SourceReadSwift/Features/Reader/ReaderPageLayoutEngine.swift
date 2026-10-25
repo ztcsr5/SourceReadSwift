@@ -26,7 +26,7 @@ enum ReaderPageLayoutEngine {
     /// (native scroll, SwiftUI paged, page-curl) must reserve the same top
     /// inset so the first line is neither hidden by the toolbar nor placed at
     /// a different height when the user switches modes.
-    static let defaultTopInset: CGFloat = 56
+    static let defaultTopInset: CGFloat = 44
 
     static func minimumTopInset(pagePadding: CGFloat) -> CGFloat {
         max(pagePadding + 8, defaultTopInset)
