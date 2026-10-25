@@ -1221,11 +1221,9 @@ struct ReaderView: View {
             paragraphIndent: paragraphIndent,
             titleSpacing: titleSpacing,
             footerHeight: footerHeight,
-            // 工具栏收起后正文要贴上安全区，不能被 56pt 的预留白白顶下去；
-            // WebView 用 CSS 顶内边距实现，主题/字号切换时正文不会整体位移。
-            topInset: showOverlay
-                ? Double(ReaderPageLayoutEngine.minimumTopInset(pagePadding: CGFloat(pagePadding)))
-                : max(Double(pagePadding) + 10, 24),
+            // 工具栏是浮层：正文的顶部内边距必须与菜单开合无关，
+            // 否则每次呼出菜单整页文字都会往下掉一格（关掉再弹回来）。
+            topInset: Double(ReaderPageLayoutEngine.minimumTopInset(pagePadding: CGFloat(pagePadding))),
             textColor: background.uiTextColor(isNight: colorScheme == .dark),
             surfaceColor: background.uiColor(isNight: colorScheme == .dark),
             highlightColor: AppTheme.accentUIColor.withAlphaComponent(background == .dark ? 0.22 : 0.12),
@@ -1298,12 +1296,12 @@ struct ReaderView: View {
                 DispatchQueue.main.async {
                     paragraphJumpRequest = ParagraphJumpRequest(index: scrollParagraphTarget)
                 }
-                // 兜底：万一定位回调没来（首帧尺寸为 0、章节还在占位），
-                // 0.5s 后无条件显示，宁可闪一下也不能一直白屏。
-                Task { @MainActor in
-                    try? await Task.sleep(nanoseconds: 500_000_000)
-                    didLandInitialPosition = true
-                }
+            }
+            // 无条件兜底：定位回调可能因为文档重建、目标段落缺失而不来，
+            // 那种情况下表面会一直停在 opacity 0 —— 用户看到的就是「点进去空白」。
+            Task { @MainActor in
+                try? await Task.sleep(nanoseconds: 800_000_000)
+                didLandInitialPosition = true
             }
         }
         .onChange(of: chapterIndex) { _ in

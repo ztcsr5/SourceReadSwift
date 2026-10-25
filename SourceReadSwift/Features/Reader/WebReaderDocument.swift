@@ -483,6 +483,12 @@ enum WebReaderHTML {
 
       function topInset() { return state.style ? state.style.topInset : 0; }
 
+      // 页面脚本一旦抛错，WebKit 会停在半渲染状态（白屏且不响应滚动）。
+      // 把第一个错误回传给原生侧，由它重建一次文档，用户不用退 App。
+      window.addEventListener("error", function (event) {
+        post({ type: "fatal", message: String((event && event.message) || "script-error") });
+      });
+
       function setStyle(style) {
         var anchor = captureAnchor();
         state.style = style;
@@ -672,6 +678,12 @@ enum WebReaderHTML {
         };
       }
 
+      function safeScrollTo(y) {
+        if (!isFinite(y)) { return false; }
+        window.scrollTo(0, Math.max(y, 0));
+        return true;
+      }
+
       function restoreAnchor(anchor) {
         if (!anchor || !anchor.key) { return; }
         var selector = '[data-key="' + anchor.key + '"] [data-local="' + anchor.local + '"]';
@@ -681,8 +693,8 @@ enum WebReaderHTML {
         var top = rect.top + window.scrollY;
         var height = Math.max(rect.height, 1);
         var target = Math.max(top - topInset() + height * anchor.fraction, 0);
-        if (Math.abs(target - window.scrollY) < 1) { return; }
-        window.scrollTo(0, target);
+        if (!isFinite(target) || Math.abs(target - window.scrollY) < 1) { return; }
+        safeScrollTo(target);
       }
 
       function elementForFlat(flat) {
@@ -834,6 +846,7 @@ enum WebReaderHTML {
         state.visible = -1;
         window.requestAnimationFrame(onScroll);
         post({ type: "scroll-applied", flat: flat });
+      }
       }
 
       /// 回到文档顶端。换书/首次进书时调用：WKWebView 可能被复用，

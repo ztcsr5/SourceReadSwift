@@ -100,6 +100,9 @@ struct WebScrollReaderView: UIViewRepresentable {
         private var pendingScrollKey: String?
         private var pendingScrollTarget: Int?
         private var lastSurfaceColor: UIColor?
+        /// 文档级脚本错误的自愈次数上限：连坏两次说明是内容或样式的问题，
+        /// 再重建只会循环，交给上层占位/错误态。
+        private var recoveredDocumentFailures = 0
 
         init(view: WebScrollReaderView) {
             self.view = view
@@ -318,6 +321,19 @@ struct WebScrollReaderView: UIViewRepresentable {
                 // The requested paragraph is not in the document yet; the next
                 // content update retries through `content-ready`.
                 break
+            case "fatal":
+                // 文档脚本抛错后 WebKit 会停在空白半渲染状态，滚动手势也没反应。
+                // 重建一次文档（保留当前内容与目标段落），比让用户退 App 强。
+                if let webView, recoveredDocumentFailures < 2 {
+                    recoveredDocumentFailures += 1
+                    isDocumentReady = false
+                    lastContentFingerprint = nil
+                    lastStyleSignature = nil
+                    lastSentScrollKey = nil
+                    pendingScrollKey = nil
+                    pendingScrollTarget = nil
+                    webView.loadHTMLString(WebReaderHTML.shell, baseURL: nil)
+                }
             default:
                 break
             }
