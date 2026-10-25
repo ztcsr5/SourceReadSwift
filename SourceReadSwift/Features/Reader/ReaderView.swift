@@ -1235,8 +1235,10 @@ struct ReaderView: View {
         // 让点击落到下面的容器上，比落在看不见的文字层上更安全。
         .allowsHitTesting(initialSurfaceOpacity > 0)
         .overlay {
-            // 首章还没回来时不再是一片空白：给主题色底 + 明确的加载状态。
-            if scrollModeParagraphs.isEmpty {
+            // 只有「这一章确实还没有任何段落」才盖占位层。
+            // 之前只判 scrollModeParagraphs 是否为空：滑动跨章时它会被重算成空数组，
+            // 于是整屏被不透明占位盖住 —— 就是你看到的「往上滑一点突然全白」。
+            if scrollModeParagraphs.isEmpty, content.paragraphs.isEmpty {
                 readerLoadingPlaceholder
             }
         }
