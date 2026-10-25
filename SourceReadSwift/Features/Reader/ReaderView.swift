@@ -568,17 +568,20 @@ struct ReaderView: View {
             // state mid-gesture. Each surface consumes its own content
             // revision instead (PageCurlReaderView.contentRevision, cover
             // data and TabView tags).
-            .id(readerMode == .scroll ? "native-scroll-reader" : "reader-paged-surface")
+            .id(readerMode == .scroll ? "web-scroll-reader" : "reader-paged-surface")
             .contentShape(Rectangle())
             .simultaneousGesture(
                 // 轻触即触发太敏感：以前用 SpatialTapGesture，手指一开始滚动就会被判成点击。
                 // 改成带位移/时长阈值的拖拽手势——位移超过 8pt 或按住超过 0.4s 都不算点击。
+                // 滚动模式已由文档内部的指针判定给出点击（含惯性与选区过滤），
+                // 这里必须让路，否则一次点击会翻两页。
                 DragGesture(minimumDistance: 0)
                     .onChanged { _ in
                         if tapGestureStartedAt == nil { tapGestureStartedAt = Date() }
                     }
                     .onEnded { value in
                         defer { tapGestureStartedAt = nil }
+                        guard readerMode != .scroll else { return }
                         let moved = abs(value.translation.width) + abs(value.translation.height)
                         let held = tapGestureStartedAt.map { Date().timeIntervalSince($0) } ?? 0
                         guard moved < 6, held < 0.3 else { return }
@@ -1021,6 +1024,30 @@ struct ReaderView: View {
         return "\(readerContentFingerprint)|\(window)"
     }
 
+    /// 结构化章节窗口，滚动面用它生成章节标题与段落元素。
+    ///
+    /// 旧实现把窗口压成一维 `[String]`：分隔用的章节标题和正文段落长得一模一样，
+    /// 于是标题只能继承正文字号与颜色。现在标题有独立元素，样式表里改一处就够。
+    private var scrollSections: [WebReaderSection] {
+        if windowSections.isEmpty {
+            return [
+                WebReaderSection(
+                    chapterIndex: chapterIndex,
+                    title: content.title,
+                    paragraphs: content.paragraphs
+                )
+            ]
+        }
+        return windowSections.map { section in
+            WebReaderSection(
+                chapterIndex: section.chapterIndex,
+                title: section.title,
+                paragraphs: section.paragraphs,
+                isReady: section.isReady
+            )
+        }
+    }
+
     private func resolvedReadingPosition(forFlatIndex index: Int) -> (chapterIndex: Int, chapterTitle: String, paragraphIndex: Int) {
         guard let position = ReaderChapterWindowPolicy.resolvedPosition(
             flatIndex: index,
@@ -1161,14 +1188,12 @@ struct ReaderView: View {
     }
 
     private var scrollReaderContent: some View {
-        NativeReaderTextView(
-            title: windowSections.first?.title ?? content.title,
-            paragraphs: scrollModeParagraphs,
+        // 滚动模式改由 WKWebView 渲染。章节窗口的增删在文档内做 DOM 补丁，
+        // 不再整串重建 attributed string —— 跳章/跨章滑动不再有「先清空再排版」
+        // 的那一帧，也就不会整屏空白；标题成为独立的 h1/h2，可以和正文分开造型。
+        WebScrollReaderView(
+            sections: scrollSections,
             contentFingerprint: scrollContentFingerprint,
-            isAppendedUpdate: lastWindowChangeWasAppend,
-            layoutAnchorParagraph: visibleParagraphIndex,
-            layoutAnchorOldParagraph: layoutAnchorOldParagraph,
-            layoutAnchorRevision: layoutAnchorRevision,
             fontFamily: fontFamily,
             fontSize: fontSize,
             lineSpacing: lineSpacing,
@@ -1179,7 +1204,7 @@ struct ReaderView: View {
             titleSpacing: titleSpacing,
             footerHeight: footerHeight,
             // 工具栏收起后正文要贴上安全区，不能被 56pt 的预留白白顶下去；
-            // NativeReaderTextView 会同时补偿 contentOffset，所以切换时文字不动。
+            // WebView 用 CSS 顶内边距实现，主题/字号切换时正文不会整体位移。
             topInset: showOverlay
                 ? Double(ReaderPageLayoutEngine.minimumTopInset(pagePadding: CGFloat(pagePadding)))
                 : max(Double(pagePadding) + 10, 24),
@@ -1228,6 +1253,11 @@ struct ReaderView: View {
             },
             onScrollTargetApplied: {
                 didLandInitialPosition = true
+            },
+            onTap: { point in
+                // 文档内部已经做过位移 / 时长 / 惯性三重判定，这里只把坐标
+                // 换成 3x3 点击区，配置与三种翻页模式共用同一套。
+                handleReaderTap(at: point)
             }
         )
         .ignoresSafeArea(.container, edges: .bottom)
@@ -1236,10 +1266,10 @@ struct ReaderView: View {
         // 让点击落到下面的容器上，比落在看不见的文字层上更安全。
         .allowsHitTesting(initialSurfaceOpacity > 0)
         .overlay {
-            // 只有「这一章确实还没有任何段落」才盖占位层。
+            // 只有「这一段窗口里确实没有任何段落」才盖占位层。
             // 之前只判 scrollModeParagraphs 是否为空：滑动跨章时它会被重算成空数组，
-            // 于是整屏被不透明占位盖住 —— 就是你看到的「往上滑一点突然全白」。
-            if scrollModeParagraphs.isEmpty, content.paragraphs.isEmpty {
+            // 于是整屏被不透明占位盖住 —— 就是「往上滑一点突然全白」。
+            if scrollSections.allSatisfy({ $0.paragraphs.isEmpty }) {
                 readerLoadingPlaceholder
             }
         }

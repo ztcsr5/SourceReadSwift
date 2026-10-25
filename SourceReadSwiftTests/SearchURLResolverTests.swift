@@ -216,9 +216,9 @@ final class SearchURLResolverTests: XCTestCase {
         XCTAssertEqual(AppVersion.versionString, "\(AppVersion.epic).\(AppVersion.major).\(AppVersion.minor)")
         XCTAssertEqual(AppVersion.epic, 1)
         XCTAssertEqual(AppVersion.major, 0)
-        XCTAssertEqual(AppVersion.minor, 47)
-        XCTAssertEqual(AppVersion.build, 48)
+        XCTAssertEqual(AppVersion.minor, 48)
+        XCTAssertEqual(AppVersion.build, 49)
         XCTAssertTrue(AppVersion.displayString.contains(AppVersion.versionString))
-        XCTAssertTrue(AppVersion.fullDisplayString.contains("Build 48"))
+        XCTAssertTrue(AppVersion.fullDisplayString.contains("Build 49"))
     }
 }
