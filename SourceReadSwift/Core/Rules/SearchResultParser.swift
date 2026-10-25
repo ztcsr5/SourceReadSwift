@@ -25,10 +25,18 @@ struct SearchResultParser {
         let effectiveRule = ruleOverride ?? source.ruleSearch
         let listRule = firstRule(effectiveRule, fallback: source.ruleSearch, keys: ["bookList", "list", "books"])
         let isJSRule = listRule.map { LegadoRuleResolver().isJavaScriptRule($0) || $0.contains("<js>") || $0.contains("@js:") } ?? false
+        // 空结果不触发兜底是旧行为：诊断里 168 条「搜索解析结果为空」都是
+        // success(0 条) 直接返回，永远试不到另一套提取器。这里把「空」当成一次机会。
         if isJSRule || ResponseFormatDetector.prefersJSON(body: normalized, headers: response.headers, rule: listRule) {
             let jsonResult = parseJSON(source: source, response: normalizedResponse, ruleOverride: ruleOverride, keyword: keyword)
             switch jsonResult {
+            case .success(let books) where !books.isEmpty:
+                return jsonResult
             case .success:
+                let htmlResult = parseHTML(source: source, response: normalizedResponse, ruleOverride: ruleOverride, keyword: keyword)
+                if case .success(let htmlBooks) = htmlResult, !htmlBooks.isEmpty {
+                    return htmlResult
+                }
                 return jsonResult
             case .failure:
                 let htmlResult = parseHTML(source: source, response: normalizedResponse, ruleOverride: ruleOverride, keyword: keyword)
@@ -40,7 +48,13 @@ struct SearchResultParser {
         } else {
             let htmlResult = parseHTML(source: source, response: normalizedResponse, ruleOverride: ruleOverride, keyword: keyword)
             switch htmlResult {
+            case .success(let books) where !books.isEmpty:
+                return htmlResult
             case .success:
+                let jsonResult = parseJSON(source: source, response: normalizedResponse, ruleOverride: ruleOverride, keyword: keyword)
+                if case .success(let jsonBooks) = jsonResult, !jsonBooks.isEmpty {
+                    return jsonResult
+                }
                 return htmlResult
             case .failure:
                 let jsonResult = parseJSON(source: source, response: normalizedResponse, ruleOverride: ruleOverride, keyword: keyword)
