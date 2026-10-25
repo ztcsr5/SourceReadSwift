@@ -27,6 +27,22 @@ struct BookDetailView: View {
         return .text
     }
 
+    /// The bookshelf record behind a local import. `SearchBook.id` is derived as
+    /// `sourceURL|bookURL`, so it never equals the stored `local|<UUID>` id; the
+    /// detail screen therefore has to resolve the record through `bookUrl`.
+    private var localShelfBook: BookshelfBook? {
+        guard book.sourceUrl.hasPrefix("local://") else { return nil }
+        return appState.bookshelfStore.localBook(matching: book.bookUrl)
+    }
+
+    /// Reader handoff id. Local books must pass the stored `local|<UUID>` id,
+    /// otherwise `bookshelfStore.book(id:)` inside the reader finds nothing and
+    /// every chapter opens empty.
+    private var readerBookID: String {
+        if let shelfBook = localShelfBook { return shelfBook.id }
+        return appState.bookshelfStore.contains(book) ? book.id : "\(book.sourceUrl)|\(book.bookUrl)"
+    }
+
     private var downloadRecord: ChapterDownloadRecord? {
         appState.chapterDownloadStore.record(bookID: book.id)
     }
@@ -83,7 +99,10 @@ struct BookDetailView: View {
                         case .video:
                             videoActionCard
                         case .text:
-                            if !chapters.isEmpty {
+                            // Local imports have no book source, so the batch cache
+                            // card could only ever render dead buttons; keep it for
+                            // source-backed books.
+                            if !chapters.isEmpty, !book.sourceUrl.hasPrefix("local://") {
                                 downloadSection
                             }
                         }
@@ -125,7 +144,8 @@ struct BookDetailView: View {
             BookDetailAllChaptersView(
                 chapters: chapters,
                 book: book,
-                bookID: appState.bookshelfStore.contains(book) ? book.id : "\(book.sourceUrl)|\(book.bookUrl)"
+                bookID: readerBookID,
+                localBook: localShelfBook
             )
         }
         .sheet(isPresented: $showAudioPlayer) {
@@ -519,31 +539,14 @@ struct BookDetailView: View {
                         .buttonStyle(.plain)
 
                     case .text:
-                        NavigationLink {
-                            ChapterLoadingView(
-                                bookID: appState.bookshelfStore.contains(book) ? book.id : "\(book.sourceUrl)|\(book.bookUrl)",
-                                sourceUrl: book.sourceUrl,
-                                chapter: chapter,
-                                totalChapters: chapters.count,
-                                chapters: chapters
-                            )
-                        } label: {
-                            HStack {
-                                chapterTitleLabel(chapter)
-                                Spacer()
-                                Image(systemName: "chevron.right")
-                                    .font(.caption.weight(.bold))
-                                    .foregroundStyle(.tertiary)
-                            }
-                            .padding(.vertical, 12)
-                            .padding(.horizontal, 14)
-                            .contentShape(Rectangle())
-                        }
-                        .buttonStyle(.plain)
-                        .simultaneousGesture(TapGesture().onEnded {
-                            UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                            didOpenReader = true
-                        })
+                        // Local imports have no book source, and ChapterLoadingView
+                        // bails out with 「找不到书源」 for them. They open through the
+                        // same local reader route the shelf uses instead.
+                        textChapterLink(chapter)
+                            .simultaneousGesture(TapGesture().onEnded {
+                                UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                                didOpenReader = true
+                            })
                     }
 
                     if index < displayedChapters.count - 1 {
@@ -564,6 +567,44 @@ struct BookDetailView: View {
                 .buttonStyle(.bordered)
             }
         }
+    }
+
+    @ViewBuilder
+    private func textChapterLink(_ chapter: BookChapter) -> some View {
+        if let shelfBook = localShelfBook {
+            NavigationLink {
+                BookshelfReaderGatewayView(book: shelfBook, initialChapterIndex: chapter.index)
+            } label: {
+                textChapterRowLabel(chapter)
+            }
+            .buttonStyle(.plain)
+        } else {
+            NavigationLink {
+                ChapterLoadingView(
+                    bookID: readerBookID,
+                    sourceUrl: book.sourceUrl,
+                    chapter: chapter,
+                    totalChapters: chapters.count,
+                    chapters: chapters
+                )
+            } label: {
+                textChapterRowLabel(chapter)
+            }
+            .buttonStyle(.plain)
+        }
+    }
+
+    private func textChapterRowLabel(_ chapter: BookChapter) -> some View {
+        HStack {
+            chapterTitleLabel(chapter)
+            Spacer()
+            Image(systemName: "chevron.right")
+                .font(.caption.weight(.bold))
+                .foregroundStyle(.tertiary)
+        }
+        .padding(.vertical, 12)
+        .padding(.horizontal, 14)
+        .contentShape(Rectangle())
     }
 
     private func chapterTitleLabel(_ chapter: BookChapter) -> some View {
@@ -626,7 +667,7 @@ struct BookDetailView: View {
         if book.sourceUrl.hasPrefix("local://") {
             isLoading = true
             defer { isLoading = false }
-            let localBook = appState.bookshelfStore.book(id: book.id)
+            let localBook = appState.bookshelfStore.book(id: book.id) ?? localShelfBook
             let localChapters = localBook?.localChapters ?? []
             detail = BookDetail(
                 name: book.name,
@@ -702,7 +743,7 @@ struct BookDetailView: View {
             appState.bookshelfStore.addOrUpdate(book)
         }
         appState.bookshelfStore.updateReadingProgress(
-            bookID: book.id,
+            bookID: readerBookID,
             chapterIndex: max(chapters.count - 1, 0),
             chapterTitle: chapters.last?.title,
             totalChapters: chapters.count
@@ -1201,6 +1242,9 @@ private struct BookDetailAllChaptersView: View {
     let chapters: [BookChapter]
     let book: SearchBook
     let bookID: String
+    /// Local imports resolve through the bookshelf record because they have no
+    /// book source to read chapters from.
+    let localBook: BookshelfBook?
     @State private var query = ""
     @State private var debouncedQuery = ""
     @State private var isAscending = true
@@ -1261,13 +1305,17 @@ private struct BookDetailAllChaptersView: View {
                                     .foregroundStyle(.secondary)
                             }
                             NavigationLink {
-                                ChapterLoadingView(
-                                    bookID: bookID,
-                                    sourceUrl: book.sourceUrl,
-                                    chapter: chapter,
-                                    totalChapters: chapters.count,
-                                    chapters: chapters
-                                )
+                                if let shelfBook = localBook {
+                                    BookshelfReaderGatewayView(book: shelfBook, initialChapterIndex: chapter.index)
+                                } else {
+                                    ChapterLoadingView(
+                                        bookID: bookID,
+                                        sourceUrl: book.sourceUrl,
+                                        chapter: chapter,
+                                        totalChapters: chapters.count,
+                                        chapters: chapters
+                                    )
+                                }
                             } label: {
                                 HStack(spacing: 12) {
                                     Text("\(chapter.index + 1)")

@@ -87,6 +87,18 @@ final class RemoteImageLoader: @unchecked Sendable {
             return decoded
         }
 
+        // Locally imported EPUB covers are written into Application Support and
+        // referenced with a file:// URL. URLSession answers a file request with a
+        // plain URLResponse, so the HTTP-only guard below rejected every local
+        // cover and the shelf/detail showed the placeholder forever.
+        if url.isFileURL {
+            guard let data = try? Data(contentsOf: url),
+                  let decoded = await Self.decodeImageOffMainThread(data),
+                  !Task.isCancelled else { return nil }
+            insert(decoded, for: url)
+            return decoded
+        }
+
         var request = URLRequest(url: url)
         request.cachePolicy = .returnCacheDataElseLoad
         for (key, value) in headers where !key.isEmpty {

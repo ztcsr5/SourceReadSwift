@@ -25,6 +25,8 @@ import WebKit
 struct WebScrollReaderView: UIViewRepresentable {
     let sections: [WebReaderSection]
     var contentFingerprint: String
+    /// 换书 / 重进阅读器时的身份串。变了就把文档滚回顶部。
+    var resetToken: String = ""
     var fontFamily: ReaderFontFamily = .system
     let fontSize: Double
     let lineSpacing: Double
@@ -92,6 +94,7 @@ struct WebScrollReaderView: UIViewRepresentable {
         private var lastContentFingerprint: String?
         private var lastHighlight = Int.min
         private var lastPageStepGeneration: Int
+        private var lastResetToken: String?
         private var lastSentScrollKey: String?
         private var appliedScrollKey: String?
         private var pendingScrollKey: String?
@@ -167,6 +170,7 @@ struct WebScrollReaderView: UIViewRepresentable {
                 pushContent(webView: webView)
             }
 
+            pushResetIfNeeded(webView: webView)
             pushScrollTargetIfNeeded(webView: webView)
             pushPageStepIfNeeded(webView: webView)
             pushHighlightIfNeeded(webView: webView)
@@ -204,6 +208,16 @@ struct WebScrollReaderView: UIViewRepresentable {
                 showChapterEndBadge: view.showChapterEndBadge
             )
             call(function: "setContent", jsonObject: payload, webView: webView)
+        }
+
+        private func pushResetIfNeeded(webView: WKWebView) {
+            let token = view.resetToken
+            guard lastResetToken != token else { return }
+            lastResetToken = token
+            // 有明确跳转目标时由目标决定落点；没有目标才回顶部，
+            // 否则「换书复用同一个 WKWebView」会把上一本的滚动位置带过来。
+            guard view.scrollTarget == nil else { return }
+            webView.evaluateJavaScript("window.__reader.resetScroll();", completionHandler: nil)
         }
 
         private func pushScrollTargetIfNeeded(webView: WKWebView) {
@@ -269,6 +283,7 @@ struct WebScrollReaderView: UIViewRepresentable {
                     pushStyleIfNeeded(webView: webView)
                     lastContentFingerprint = view.contentFingerprint
                     pushContent(webView: webView)
+                    pushResetIfNeeded(webView: webView)
                     pushScrollTargetIfNeeded(webView: webView)
                     pushPageStepIfNeeded(webView: webView)
                     pushHighlightIfNeeded(webView: webView)
@@ -328,6 +343,7 @@ struct WebScrollReaderView: UIViewRepresentable {
                 pushStyleIfNeeded(webView: webView)
                 lastContentFingerprint = view.contentFingerprint
                 pushContent(webView: webView)
+                pushResetIfNeeded(webView: webView)
                 pushScrollTargetIfNeeded(webView: webView)
             }
         }

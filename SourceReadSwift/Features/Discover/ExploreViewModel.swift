@@ -17,6 +17,9 @@ final class ExploreViewModel: ObservableObject {
 
     private weak var appState: AppState?
     private var activeTask: Task<Void, Never>?
+    /// Guards against a cancelled request clearing the flags of the request that
+    /// replaced it, and against a cancelled request leaving `isLoading` stuck.
+    private var loadGeneration = 0
 
     func bind(appState: AppState) {
         self.appState = appState
@@ -89,14 +92,44 @@ final class ExploreViewModel: ObservableObject {
 
     func selectGroup(_ group: String?) {
         selectedGroup = group
-        if let first = filteredCategories.first {
-            selectCategory(first)
+        guard let first = filteredCategories.first else {
+            books = []
+            selectedCategory = nil
+            isLoading = false
+            isLoadingMore = false
+            errorMessage = categories.isEmpty ? "该书源暂无可解析的分类" : "该分组下没有可用分类，请换一个分组"
+            return
         }
+        selectCategory(first)
     }
 
     func loadBooks(page: Int) {
-        guard let source = selectedSource, let category = selectedCategory, let appState else { return }
+        // The in-flight request is retired first, so a leftover task can never
+        // blank the flags or the list of the request that replaces it.
         activeTask?.cancel()
+        loadGeneration &+= 1
+        let generation = loadGeneration
+
+        // Every early exit reports why: a tap used to do nothing at all when one
+        // of these was nil.
+        guard let source = selectedSource else {
+            isLoading = false
+            isLoadingMore = false
+            errorMessage = "尚未选择书源，请在上方选择一个书源后重试。"
+            return
+        }
+        guard let category = selectedCategory else {
+            isLoading = false
+            isLoadingMore = false
+            errorMessage = categories.isEmpty ? "该书源暂无可解析的分类" : "尚未选择分类，请点一个分类后重试。"
+            return
+        }
+        guard let appState else {
+            isLoading = false
+            isLoadingMore = false
+            errorMessage = "应用尚未就绪，请退出「发现」后重试。"
+            return
+        }
 
         if page == 1 {
             isLoading = true
@@ -108,13 +141,16 @@ final class ExploreViewModel: ObservableObject {
         let engine = appState.engine
         activeTask = Task { @MainActor [weak self] in
             guard let self else { return }
-            let result = await AsyncTimeout.run(seconds: 15) {
+            let result = await AsyncTimeout.run(seconds: 12) {
                 await engine.exploreBooks(source: source, url: category.url, page: page)
-            } ?? .failure(.network("请求超时，请检查网络或稍后重试"))
+            } ?? .failure(.network("请求超时，已停止加载，请点重试或换个分类"))
 
-            guard !Task.isCancelled else { return }
+            // A superseded request must not touch the state of the newer one,
+            // and it must never leave the spinner running.
+            guard self.loadGeneration == generation else { return }
             self.isLoading = false
             self.isLoadingMore = false
+            guard !Task.isCancelled else { return }
 
             switch result {
             case .success(let newBooks):
@@ -137,7 +173,10 @@ final class ExploreViewModel: ObservableObject {
                 if page == 1 {
                     self.errorMessage = error.displayMessage
                 } else {
+                    // Paging failures stay silent in the footer, but the retry
+                    // banner above the list needs a reason.
                     self.canLoadMore = false
+                    self.errorMessage = "加载更多失败：\(error.displayMessage)"
                 }
             }
         }
@@ -152,7 +191,20 @@ final class ExploreViewModel: ObservableObject {
     }
 
     func refresh() async {
-        guard let category = selectedCategory else { return }
+        // Pull-to-refresh used to do nothing when the category list had failed to
+        // parse, so the sheet looked dead. Re-parse, then retry, then explain.
+        if let source = selectedSource, categories.isEmpty {
+            selectSource(source)
+            return
+        }
+        guard let category = selectedCategory ?? filteredCategories.first else {
+            isLoading = false
+            isLoadingMore = false
+            errorMessage = selectedSource == nil
+                ? "尚未选择书源，请在上方选择一个书源后重试。"
+                : "该书源暂无可解析的分类"
+            return
+        }
         selectCategory(category)
     }
 }

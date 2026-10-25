@@ -13,9 +13,13 @@ struct DiscoverView: View {
     @State private var isImportingClipboardSource = false
     @State private var clipboardImportToast: String? = nil
     @AppStorage("discover_search_history") private var searchHistoryJSON: String = "[]"
+    /// Cached decode of `searchHistoryJSON`. Decoding inside `body` ran a full
+    /// JSON decode (and two array copies) on every layout pass of the search tab,
+    /// including every streaming update during a search.
+    @State private var cachedSearchHistory: [String] = []
 
-    private var searchHistory: [String] {
-        guard let data = searchHistoryJSON.data(using: .utf8),
+    private static func decodeSearchHistory(_ json: String) -> [String] {
+        guard let data = json.data(using: .utf8),
               let list = try? JSONDecoder().decode([String].self, from: data) else {
             return []
         }
@@ -25,25 +29,33 @@ struct DiscoverView: View {
     private var hotKeywords: [String] {
         switch currentSourceKind {
         case .some(.comic):
-            return ["海贼王", "咒术回战", "一拳超人", "火影忍者", "间谍过家家", "进击的巨人", "电锯人", "死神"]
+            return Self.comicHotKeywords
         case .some(.audio):
-            return ["凡人修仙传", "鬼吹灯", "雪中悍刀行", "盗墓笔记", "大奉打更人", "吞噬星空", "三体", "剑来"]
+            return Self.audioHotKeywords
         case .some(.video):
-            return ["三体", "庆余年", "狂飙", "繁花", "星际穿越", "流浪地球", "奥本海默", "沙丘"]
+            return Self.videoHotKeywords
         default:
-            return ["诡秘之主", "凡人修仙传", "三体", "剑来", "斗罗大陆", "遮天", "红楼梦", "西游记", "三国演义", "水浒传"]
+            return Self.textHotKeywords
         }
     }
+
+    // Shared constants: `body` reads these once per pass, so they must not
+    // allocate a fresh array each time.
+    private static let comicHotKeywords = ["海贼王", "咒术回战", "一拳超人", "火影忍者", "间谍过家家", "进击的巨人", "电锯人", "死神"]
+    private static let audioHotKeywords = ["凡人修仙传", "鬼吹灯", "雪中悍刀行", "盗墓笔记", "大奉打更人", "吞噬星空", "三体", "剑来"]
+    private static let videoHotKeywords = ["三体", "庆余年", "狂飙", "繁花", "星际穿越", "流浪地球", "奥本海默", "沙丘"]
+    private static let textHotKeywords = ["诡秘之主", "凡人修仙传", "三体", "剑来", "斗罗大陆", "遮天", "红楼梦", "西游记", "三国演义", "水浒传"]
 
     private func saveSearchKeyword(_ keyword: String) {
         let trimmed = keyword.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return }
-        var current = searchHistory
+        var current = cachedSearchHistory
         current.removeAll(where: { $0 == trimmed })
         current.insert(trimmed, at: 0)
         if current.count > 10 {
             current = Array(current.prefix(10))
         }
+        cachedSearchHistory = current
         if let data = try? JSONEncoder().encode(current),
            let str = String(data: data, encoding: .utf8) {
             searchHistoryJSON = str
@@ -52,6 +64,7 @@ struct DiscoverView: View {
 
     private func clearSearchHistory() {
         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+        cachedSearchHistory = []
         searchHistoryJSON = "[]"
     }
 
@@ -124,7 +137,16 @@ struct DiscoverView: View {
             .task {
                 viewModel.bind(appState: appState)
                 exploreViewModel.bind(appState: appState)
+                if cachedSearchHistory.isEmpty {
+                    cachedSearchHistory = Self.decodeSearchHistory(searchHistoryJSON)
+                }
                 checkClipboard()
+            }
+            .onChange(of: searchHistoryJSON) { value in
+                let decoded = Self.decodeSearchHistory(value)
+                if decoded != cachedSearchHistory {
+                    cachedSearchHistory = decoded
+                }
             }
             .onAppear {
                 checkClipboard()
@@ -347,7 +369,7 @@ struct DiscoverView: View {
                     .padding(.horizontal, 12)
                     .frame(height: 42)
                     .background(Color(.systemGray6), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
-                    .onChange(of: viewModel.resultFilter) { _ in viewModel.applyResultFilter() }
+                    .onChange(of: viewModel.resultFilter) { _ in viewModel.applyResultFilterDebounced() }
                     .onChange(of: viewModel.resultFilterScope) { _ in viewModel.applyResultFilter() }
             }
         }
@@ -388,7 +410,7 @@ struct DiscoverView: View {
     private var searchInitialStateView: some View {
         VStack(alignment: .leading, spacing: 22) {
             // Search History Section
-            if !searchHistory.isEmpty {
+            if !cachedSearchHistory.isEmpty {
                 VStack(alignment: .leading, spacing: 12) {
                     HStack {
                         Label("搜索历史", systemImage: "clock")
@@ -409,7 +431,7 @@ struct DiscoverView: View {
                     }
 
                     FlowLayout(spacing: 8) {
-                        ForEach(searchHistory, id: \.self) { item in
+                        ForEach(cachedSearchHistory, id: \.self) { item in
                             Button {
                                 UIImpactFeedbackGenerator(style: .light).impactOccurred()
                                 viewModel.keyword = item
@@ -473,8 +495,36 @@ struct DiscoverView: View {
         .padding(.vertical, 12)
     }
 
+    /// One shelf-membership snapshot per list pass. The rows used to call
+    /// `bookshelfStore.contains(_:)` (a linear scan over the shelf) up to three
+    /// times each, on every layout pass, which is what made long result lists
+    /// stutter. The predicate deliberately mirrors `BookshelfStore.resolvedIndex`
+    /// (exact `id`, else `local://` rows matched by `bookURL`).
+    private var bookshelfMembership: BookshelfMembership {
+        BookshelfMembership(store: appState.bookshelfStore)
+    }
+
+    @MainActor
+    private struct BookshelfMembership {
+        private let ids: Set<String>
+        private let localBookURLs: Set<String>
+
+        init(store: BookshelfStore) {
+            let books = store.books
+            ids = Set(books.map(\.id))
+            localBookURLs = Set(books.map(\.bookURL))
+        }
+
+        func contains(_ book: SearchBook) -> Bool {
+            if ids.contains(book.id) { return true }
+            guard book.sourceUrl.hasPrefix("local://") else { return false }
+            return localBookURLs.contains(book.bookUrl)
+        }
+    }
+
     private var resultsList: some View {
-        LazyVStack(spacing: 14) {
+        let shelf = bookshelfMembership
+        return LazyVStack(spacing: 14) {
             VStack(spacing: 8) {
                 HStack {
                     Text("已检测 \(viewModel.checkedSourceCount)/\(viewModel.enabledSourceCount) 个源 · 命中 \(viewModel.hitSourceCount) 个源 · 结果 \(viewModel.totalResultCount) 条\(viewModel.filterSummary)")
@@ -530,7 +580,7 @@ struct DiscoverView: View {
 
             if viewModel.displayMode == .aggregated {
                 ForEach(viewModel.aggregatedResults) { item in
-                    aggregatedBookCard(item)
+                    aggregatedBookCard(item, inShelf: shelf.contains(item.primaryBook))
                 }
             } else {
                 ForEach(viewModel.groupedResults) { group in
@@ -545,7 +595,7 @@ struct DiscoverView: View {
                         }
                         .foregroundStyle(AppTheme.accent)
                         ForEach(group.books) { book in
-                            searchResultCard(book)
+                            searchResultCard(book, inShelf: shelf.contains(book))
                         }
                     }
                 }
@@ -553,7 +603,7 @@ struct DiscoverView: View {
         }
     }
 
-    private func aggregatedBookCard(_ item: AggregatedSearchBook) -> some View {
+    private func aggregatedBookCard(_ item: AggregatedSearchBook, inShelf: Bool) -> some View {
         HStack(alignment: .top, spacing: 12) {
             NavigationLink {
                 BookDetailView(book: item.primaryBook, availableSources: item.sources)
@@ -613,17 +663,17 @@ struct DiscoverView: View {
             VStack(spacing: 12) {
                 Button {
                     UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                    if !appState.bookshelfStore.contains(item.primaryBook) {
+                    if !inShelf {
                         pendingShelfAddBook = item.primaryBook
                     }
                 } label: {
-                    Image(systemName: appState.bookshelfStore.contains(item.primaryBook) ? "checkmark.circle.fill" : "plus.circle")
+                    Image(systemName: inShelf ? "checkmark.circle.fill" : "plus.circle")
                         .font(.title2)
-                        .foregroundStyle(appState.bookshelfStore.contains(item.primaryBook) ? Color.green : AppTheme.accent)
+                        .foregroundStyle(inShelf ? Color.green : AppTheme.accent)
                         .frame(width: 36, height: 36)
                 }
                 .buttonStyle(.plain)
-                .accessibilityLabel(appState.bookshelfStore.contains(item.primaryBook) ? "已在书架" : "加入书架")
+                .accessibilityLabel(inShelf ? "已在书架" : "加入书架")
 
                 if item.sourceCount > 1 {
                     Button {
@@ -667,7 +717,7 @@ struct DiscoverView: View {
             }
     }
 
-    private func searchResultCard(_ book: SearchBook) -> some View {
+    private func searchResultCard(_ book: SearchBook, inShelf: Bool) -> some View {
         HStack(alignment: .top, spacing: 12) {
             NavigationLink {
                 BookDetailView(book: book)
@@ -681,17 +731,17 @@ struct DiscoverView: View {
 
             Button {
                 UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                if !appState.bookshelfStore.contains(book) {
+                if !inShelf {
                     pendingShelfAddBook = book
                 }
             } label: {
-                Image(systemName: appState.bookshelfStore.contains(book) ? "checkmark.circle.fill" : "plus.circle")
+                Image(systemName: inShelf ? "checkmark.circle.fill" : "plus.circle")
                     .font(.title2)
-                    .foregroundStyle(appState.bookshelfStore.contains(book) ? Color.green : AppTheme.accent)
+                    .foregroundStyle(inShelf ? Color.green : AppTheme.accent)
                     .frame(width: 38, height: 38)
             }
             .buttonStyle(.plain)
-            .accessibilityLabel(appState.bookshelfStore.contains(book) ? "已在书架" : "加入书架")
+            .accessibilityLabel(inShelf ? "已在书架" : "加入书架")
         }
         .podcastCard()
     }
@@ -788,7 +838,8 @@ struct DiscoverView: View {
                 EmptyStateCard(
                     systemImage: "compass.drawing",
                     title: "暂无可探索的书源",
-                    message: "当前启用的书源中未配置分类发现规则(exploreUrl)。您可以在书源管理中导入更多精品书源。"
+                    message: exploreViewModel.errorMessage
+                        ?? "当前启用的书源中未配置分类发现规则(exploreUrl)。您可以在书源管理中导入更多精品书源。"
                 )
             } else {
                 sourceSelectorSection
@@ -883,7 +934,8 @@ struct DiscoverView: View {
     }
 
     private var exploreBooksSection: some View {
-        VStack(spacing: 12) {
+        let shelf = bookshelfMembership
+        return VStack(spacing: 12) {
             if exploreViewModel.isLoading && exploreViewModel.books.isEmpty {
                 VStack(spacing: 16) {
                     ProgressView()
@@ -912,11 +964,39 @@ struct DiscoverView: View {
                     message: "当前分类下未找到相关小说"
                 )
             } else {
-                ForEach(exploreViewModel.books) { book in
-                    searchResultCard(book)
-                        .onAppear {
-                            exploreViewModel.loadNextPageIfNeeded(currentItem: book)
+                // A failed refresh must not be silent just because a previous
+                // page already populated the list.
+                if let error = exploreViewModel.errorMessage {
+                    HStack(alignment: .top, spacing: 8) {
+                        Image(systemName: "exclamationmark.triangle.fill")
+                            .font(.caption)
+                            .foregroundStyle(.orange)
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text(error)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                                .fixedSize(horizontal: false, vertical: true)
+                            Button("重试") {
+                                exploreViewModel.loadBooks(page: 1)
+                            }
+                            .font(.caption.weight(.semibold))
+                            .buttonStyle(.bordered)
+                            .controlSize(.mini)
                         }
+                        Spacer(minLength: 0)
+                    }
+                    .padding(10)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(Color.orange.opacity(0.10), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+                }
+
+                LazyVStack(spacing: 14) {
+                    ForEach(exploreViewModel.books) { book in
+                        searchResultCard(book, inShelf: shelf.contains(book))
+                            .onAppear {
+                                exploreViewModel.loadNextPageIfNeeded(currentItem: book)
+                            }
+                    }
                 }
 
                 if exploreViewModel.isLoadingMore {
@@ -969,7 +1049,14 @@ final class DiscoverViewModel: ObservableObject {
     @Published var resultFilterScope: SearchResultFilterScope = .all
     @Published var resultFilter = ""
     @Published var selectedSourceKind: BookSourceKind? = nil
-    @Published var results: [SearchBook] = []
+    /// Visible, filtered result rows. `didSet` refreshes the derived groupings
+    /// once per change; the groupings used to be recomputed on every `body`
+    /// read, which is what dropped frames while results streamed in.
+    @Published var results: [SearchBook] = [] {
+        didSet { rebuildDerivedResults() }
+    }
+    @Published private(set) var groupedResults: [ResultGroup] = []
+    @Published private(set) var aggregatedResults: [AggregatedSearchBook] = []
     private var unfilteredResults: [SearchBook] = []
     var hasUnfilteredResults: Bool { !unfilteredResults.isEmpty }
     var hasRawResults: Bool { !rawResults.isEmpty }
@@ -993,7 +1080,13 @@ final class DiscoverViewModel: ObservableObject {
         var id: String { sourceURL.isEmpty ? source : sourceURL }
     }
 
-    var groupedResults: [ResultGroup] {
+    /// Recomputed only when `results` changes, never per layout pass.
+    private func rebuildDerivedResults() {
+        groupedResults = Self.makeGroupedResults(from: results)
+        aggregatedResults = Self.makeAggregatedResults(from: results)
+    }
+
+    private static func makeGroupedResults(from results: [SearchBook]) -> [ResultGroup] {
         Dictionary(grouping: results, by: { $0.sourceUrl.isEmpty ? $0.sourceName : $0.sourceUrl })
             .map { _, books in
                 ResultGroup(source: books.first?.sourceName ?? "未知书源", sourceURL: books.first?.sourceUrl ?? "", books: books)
@@ -1004,7 +1097,7 @@ final class DiscoverViewModel: ObservableObject {
             }
     }
 
-    var aggregatedResults: [AggregatedSearchBook] {
+    private static func makeAggregatedResults(from results: [SearchBook]) -> [AggregatedSearchBook] {
         var groups: [String: [SearchBook]] = [:]
         var orderedKeys: [String] = []
 
@@ -1050,9 +1143,31 @@ final class DiscoverViewModel: ObservableObject {
     private var activeKeyword = ""
     private var lastSubmittedKeyword = ""
     private var rawResults: [SearchBook] = []
+    /// Identity of every row already merged into `rawResults`. Appending with a
+    /// set keeps each streamed batch O(batch), instead of re-running the whole
+    /// de-duplication pass over the growing list (O(n²) over a search).
+    private var mergedBookIDs: Set<String> = []
+    private var sourceKindCache: [String: BookSourceKind] = [:]
+    private var sourceKindCacheToken = ""
+    private var filterDebounceTask: Task<Void, Never>?
 
     func bind(appState: AppState) {
         self.appState = appState
+        sourceKindCacheToken = ""
+    }
+
+    /// Appends only unseen rows; returns whether anything was added.
+    @discardableResult
+    private func mergeBooks(_ books: [SearchBook]) -> Bool {
+        var appended = false
+        for book in books {
+            guard let key = SearchBookMatcher.identityKey(for: book) else { continue }
+            if mergedBookIDs.insert(key).inserted {
+                rawResults.append(book)
+                appended = true
+            }
+        }
+        return appended
     }
 
     var hasSearchState: Bool {
@@ -1061,12 +1176,15 @@ final class DiscoverViewModel: ObservableObject {
 
     func clearSearch() {
         cancelSearch()
+        filterDebounceTask?.cancel()
+        filterDebounceTask = nil
         activeKeyword = ""
         hasFinishedSearch = false
         wasCancelled = false
         results = []
         unfilteredResults = []
         rawResults = []
+        mergedBookIDs = []
         totalResultCount = 0
         hitSourceCount = 0
         checkedSourceCount = 0
@@ -1121,11 +1239,32 @@ final class DiscoverViewModel: ObservableObject {
         results = SearchResultFilter.apply(base, query: resultFilter, scope: resultFilterScope)
     }
 
-    func sourceKind(for book: SearchBook) -> BookSourceKind {
-        if let source = appState?.sourceStore.source(for: book.sourceUrl) {
-            return source.sourceKind
+    /// Typing in the filter field re-folds every field of every row, so the text
+    /// field is debounced instead of filtering on each keystroke.
+    func applyResultFilterDebounced() {
+        filterDebounceTask?.cancel()
+        filterDebounceTask = Task { @MainActor [weak self] in
+            try? await Task.sleep(nanoseconds: 180_000_000)
+            guard !Task.isCancelled, let self else { return }
+            self.applyResultFilter()
         }
-        return .text
+    }
+
+    /// O(1) medium lookup. `SourceStore.source(for:)` is a linear scan over all
+    /// sources and the row views called it on every layout pass.
+    func sourceKind(for book: SearchBook) -> BookSourceKind {
+        let sources = appState?.sourceStore.sources ?? []
+        let token = "\(sources.count)|\(sources.first?.bookSourceUrl ?? "")|\(sources.last?.bookSourceUrl ?? "")"
+        if token != sourceKindCacheToken {
+            var map: [String: BookSourceKind] = [:]
+            map.reserveCapacity(sources.count)
+            for source in sources {
+                map[source.bookSourceUrl] = source.sourceKind
+            }
+            sourceKindCache = map
+            sourceKindCacheToken = token
+        }
+        return sourceKindCache[book.sourceUrl] ?? .text
     }
 
     func selectSourceKind(_ kind: BookSourceKind?) {
@@ -1156,6 +1295,7 @@ final class DiscoverViewModel: ObservableObject {
             results = []
             unfilteredResults = []
             rawResults = []
+            mergedBookIDs = []
             totalResultCount = 0
             hitSourceCount = 0
             checkedSourceCount = 0
@@ -1175,6 +1315,7 @@ final class DiscoverViewModel: ObservableObject {
         results = []
         unfilteredResults = []
         rawResults = []
+        mergedBookIDs = []
         resultFilter = ""
         resultFilterScope = .all
         totalResultCount = 0
@@ -1201,11 +1342,42 @@ final class DiscoverViewModel: ObservableObject {
         }
 
         let engine = appState.engine
-        var allBooks: [SearchBook] = []
         var hitSources = Set<String>()
         var failures: [String] = []
+        // A fixed batch of 12 made every batch wait for its slowest source, so
+        // 17 batches could serialise up to 17 × 10s. A sliding window keeps the
+        // same 12 requests in flight and publishes each answer immediately.
+        let maxConcurrent = 12
+        // Per-source timeouts still bound each request; this bounds the whole run.
+        let overallDeadline = Date().addingTimeInterval(20)
+        var lastPublishAt = Date.distantPast
 
-        // 并发执行 Z-Library 全球图书源检索（纯文本小说）
+        func record(_ books: [SearchBook], from source: BookSource) {
+            if mergeBooks(books) {
+                hitSources.insert(source.bookSourceUrl)
+            }
+        }
+
+        func publishIfNeeded(force: Bool) async {
+            let now = Date()
+            if !force, now.timeIntervalSince(lastPublishAt) < 0.2 { return }
+            lastPublishAt = now
+            hitSourceCount = hitSources.count
+            totalResultCount = rawResults.count
+            // Filtering and ranking used to run on the main actor for every
+            // streamed batch; the row list now renders while it runs elsewhere.
+            let snapshot = rawResults
+            let exactMatch = matchMode == .exact
+            let rankedBooks = await Task.detached(priority: .userInitiated) {
+                SearchBookMatcher.filteredAndRanked(snapshot, keyword: keyword, exact: exactMatch)
+            }.value
+            unfilteredResults = rankedBooks
+            applyResultFilter()
+        }
+
+        // Z-Library is merged when it answers; the source phase never waits for
+        // it. Its URLSession resource timeout is 60s, which is why a search with
+        // only one or two sources felt slower than a search with many.
         let shouldSearchZlib = selectedSourceKind == nil || selectedSourceKind == .text
         let zlibSearchTask = Task { () -> [SearchBook] in
             guard shouldSearchZlib else { return [] }
@@ -1214,70 +1386,80 @@ final class DiscoverViewModel: ObservableObject {
             return []
         }
 
-        for batch in sources.chunked(into: 12) {
-            guard activeSearchID == searchID, searchGeneration == generation, !Task.isCancelled else { return }
-            await withTaskGroup(of: (BookSource, Result<[SearchBook], SourceEngineError>).self) { group in
-                for source in batch {
+        await withTaskGroup(of: (BookSource, Result<[SearchBook], SourceEngineError>).self) { group in
+            var iterator = sources.makeIterator()
+            var inFlight = 0
+            while inFlight < maxConcurrent, let source = iterator.next() {
+                group.addTask {
+                    let result = await AsyncTimeout.run(seconds: 10) {
+                        await engine.searchBooks(source: source, keyword: keyword, page: 1)
+                    } ?? .failure(.network("Search timed out"))
+                    return (source, result)
+                }
+                inFlight += 1
+            }
+
+            while let outcome = await group.next() {
+                let source = outcome.0
+                let result = outcome.1
+                inFlight -= 1
+                guard activeSearchID == searchID, searchGeneration == generation, !Task.isCancelled else {
+                    group.cancelAll()
+                    return
+                }
+                checkedSourceCount += 1
+                switch result {
+                case .success(let books):
+                    record(books, from: source)
+                case .failure(let error):
+                    failures.append("\(source.bookSourceName): \(error.displayMessage)")
+                    sourceFailures = Array(failures.suffix(40))
+                }
+                await publishIfNeeded(force: false)
+
+                if Date() < overallDeadline, let next = iterator.next() {
                     group.addTask {
                         let result = await AsyncTimeout.run(seconds: 10) {
-                            await engine.searchBooks(source: source, keyword: keyword, page: 1)
+                            await engine.searchBooks(source: next, keyword: keyword, page: 1)
                         } ?? .failure(.network("Search timed out"))
-                        return (source, result)
+                        return (next, result)
                     }
-                }
-
-                for await (source, result) in group {
-                    guard activeSearchID == searchID, searchGeneration == generation, !Task.isCancelled else {
-                        group.cancelAll()
-                        return
-                    }
-                    checkedSourceCount += 1
-                    switch result {
-                    case .success(let books):
-                        if !books.isEmpty {
-                            hitSources.insert(source.bookSourceUrl)
-                            allBooks.append(contentsOf: books)
-                            rawResults = allBooks
-                            totalResultCount = allBooks.count
-                            hitSourceCount = hitSources.count
-                        }
-                    case .failure(let error):
-                        let message = "\(source.bookSourceName): \(error.displayMessage)"
-                        failures.append(message)
-                        sourceFailures = Array(failures.suffix(40))
-                    }
-                    if checkedSourceCount % 6 == 0 || !allBooks.isEmpty && checkedSourceCount % 3 == 0 {
-                        unfilteredResults = filtered(allBooks, keyword: keyword)
-                        applyResultFilter()
-                        totalResultCount = allBooks.count
-                    }
+                    inFlight += 1
                 }
             }
-            guard activeSearchID == searchID, searchGeneration == generation, !Task.isCancelled else { return }
-            unfilteredResults = filtered(allBooks, keyword: keyword)
-            applyResultFilter()
-            totalResultCount = allBooks.count
-            hitSourceCount = hitSources.count
-        }
-
-        // 汇总 Z-Library 检索结果
-        let zlibBooks = await zlibSearchTask.value
-        if !zlibBooks.isEmpty {
-            hitSources.insert("Z-Library")
-            allBooks.append(contentsOf: zlibBooks)
-            rawResults = allBooks
         }
 
         guard activeSearchID == searchID, searchGeneration == generation else { return }
-        totalResultCount = allBooks.count
-        unfilteredResults = filtered(allBooks, keyword: keyword)
-        applyResultFilter()
-        hitSourceCount = hitSources.count
+        await publishIfNeeded(force: true)
         hasFinishedSearch = true
         // No exact match and a user filter are not engine failures. Only an
         // entirely failed source run takes the error state.
-        if rawResults.isEmpty, failures.count == sources.count {
+        if rawResults.isEmpty, !failures.isEmpty, failures.count == checkedSourceCount {
             errorMessage = failures.prefix(8).joined(separator: "\n")
+        }
+
+        // Merge Z-Library off the critical path: results that arrive after the
+        // source phase append to the visible list instead of restarting it.
+        let pendingZlib = zlibSearchTask
+        Task { @MainActor [weak self] in
+            let zlibBooks = await AsyncTimeout.run(seconds: 8) { await pendingZlib.value }
+            if zlibBooks == nil {
+                pendingZlib.cancel()
+            }
+            guard let self,
+                  let zlibBooks,
+                  !zlibBooks.isEmpty,
+                  self.activeSearchID == searchID,
+                  self.searchGeneration == generation,
+                  self.mergeBooks(zlibBooks) else { return }
+            self.hitSourceCount += 1
+            self.totalResultCount = self.rawResults.count
+            self.unfilteredResults = self.filtered(self.rawResults, keyword: keyword)
+            self.applyResultFilter()
+            self.hasFinishedSearch = true
+            if !self.results.isEmpty {
+                self.errorMessage = nil
+            }
         }
     }
 

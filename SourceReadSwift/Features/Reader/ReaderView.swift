@@ -401,7 +401,19 @@ struct ReaderView: View {
     }
 
     private var windowRadius: Int {
-        ReaderChapterWindowPolicy.radius(forPreloadCount: preloadChapterCount)
+        let configured = ReaderChapterWindowPolicy.radius(forPreloadCount: preloadChapterCount)
+        // 连续阅读需要「读到章尾之前下一章已经在文档里」。本地书的章节本来就在
+        // 内存里，多留几章不花网络；书源书也至少前后各 2 章，避免每次都滑到
+        // 文档尽头再等一次加载 —— 用户看到的就是「一章看完卡一下」。
+        if isLocalChapterBook {
+            return max(configured, 4)
+        }
+        return max(configured, 2)
+    }
+
+    /// 本地导入的书（localChapters 在书架模型里），章节读取不经过书源。
+    private var isLocalChapterBook: Bool {
+        appState.bookshelfStore.book(id: bookID)?.localChapters?.isEmpty == false
     }
 
     private var windowSlices: [ReaderChapterSlice] {
@@ -1194,6 +1206,7 @@ struct ReaderView: View {
         WebScrollReaderView(
             sections: scrollSections,
             contentFingerprint: scrollContentFingerprint,
+            resetToken: bookID,
             fontFamily: fontFamily,
             fontSize: fontSize,
             lineSpacing: lineSpacing,

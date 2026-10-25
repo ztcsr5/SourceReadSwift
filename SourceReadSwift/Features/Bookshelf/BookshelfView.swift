@@ -52,7 +52,11 @@ struct BookshelfView: View {
 
     private func formatTag(for book: BookshelfBook) -> (title: String, color: Color, icon: String)? {
         if book.sourceURL == "local://text" || book.sourceURL.hasPrefix("local://") {
-            if book.id.contains(".epub") || book.title.hasSuffix(".epub") {
+            // `book.id` is always `local|<UUID>` and an imported EPUB title comes
+            // from OPF `dc:title`, so the old `id/title contains ".epub"` probe was
+            // dead code and every EPUB was labelled TXT. Use the persisted EPUB
+            // shape instead (chapters carry a package path / navigation entries).
+            if book.isLocalEPUB {
                 return ("EPUB", .indigo, "doc.richtext")
             }
             return ("TXT", .blue, "doc.text")
@@ -584,7 +588,9 @@ struct BookshelfView: View {
                 }
                 let localURL = try PickedDocumentAccess.copiedURL(from: url)
                 let parsed: LocalTextBook = try await Task.detached(priority: .userInitiated) {
-                    if localURL.pathExtension.localizedCaseInsensitiveCompare("epub") == .orderedSame {
+                    // Same container sniff as the share-sheet entry: never decide
+                    // "this is TXT" from the copied file name alone.
+                    if LocalEPUBBookParser.looksLikeEPUB(localURL) {
                         return try LocalEPUBBookParser().parse(fileURL: localURL)
                     } else {
                         let data = try Data(contentsOf: localURL)

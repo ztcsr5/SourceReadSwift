@@ -546,12 +546,6 @@ enum WebReaderHTML {
         }
         node.appendChild(fragment);
 
-        if (section.loading) {
-          var loading = document.createElement("p");
-          loading.className = "chapter-loading";
-          loading.textContent = "正在加载本章…";
-          node.appendChild(loading);
-        }
         if (section.end) {
           var end = document.createElement("p");
           end.className = "chapter-end";
@@ -720,14 +714,18 @@ enum WebReaderHTML {
           post({ type: "visible", flat: metric.flat });
         }
         var bottom = y + viewport;
-        if (height > 0 && bottom >= height - 650) {
+        // 预取要早于「看不见下一章」的那一刻：离末尾还剩约 1.6 屏就开始要下一章，
+        // 这样追加发生在用户滑到尽头之前，滚动不会被文档底部卡住。
+        var nearMargin = Math.max(1200, viewport * 1.6);
+        var resetMargin = nearMargin + 900;
+        if (height > 0 && bottom >= height - nearMargin) {
           if (!state.nearBottom) { state.nearBottom = true; post({ type: "near-bottom" }); }
-        } else if (bottom < height - 900) {
+        } else if (bottom < height - resetMargin) {
           state.nearBottom = false;
         }
-        if (y <= 650) {
+        if (y <= nearMargin) {
           if (!state.nearTop) { state.nearTop = true; post({ type: "near-top" }); }
-        } else if (y > 900) {
+        } else if (y > resetMargin) {
           state.nearTop = false;
         }
         if (height > 0 && bottom >= height + 40) {
@@ -755,7 +753,7 @@ enum WebReaderHTML {
           y: event.clientY,
           at: performance.now(),
           scrollY: window.scrollY,
-          blocked: (performance.now() - state.lastScrollAt) < 170
+          blocked: (performance.now() - state.lastScrollAt) < 260
         };
       }, true);
 
@@ -767,7 +765,7 @@ enum WebReaderHTML {
         var dx = Math.abs(event.clientX - start.x);
         var dy = Math.abs(event.clientY - start.y);
         var held = performance.now() - start.at;
-        if (dx > 8 || dy > 8 || held > 260) { return; }
+        if (dx > 10 || dy > 10 || held > 320) { return; }
         if (Math.abs(window.scrollY - start.scrollY) > 1) { return; }
         if (state.selection) { return; }
         var selection = window.getSelection();
@@ -832,6 +830,14 @@ enum WebReaderHTML {
         post({ type: "scroll-applied", flat: flat });
       }
 
+      /// 回到文档顶端。换书/首次进书时调用：WKWebView 可能被复用，
+      /// 上一本书的滚动位置会带进来，表现就是「第一次打开却看不见章标题」。
+      function resetScroll() {
+        state.visible = -1;
+        window.scrollTo(0, 0);
+        window.requestAnimationFrame(onScroll);
+      }
+
       function highlight(flat) {
         if (state.highlightEl) {
           state.highlightEl.classList.remove("hl");
@@ -851,6 +857,7 @@ enum WebReaderHTML {
         pageStep: pageStep,
         highlight: highlight,
         refreshMetrics: refreshMetrics,
+        resetScroll: resetScroll,
         state: state
       };
 

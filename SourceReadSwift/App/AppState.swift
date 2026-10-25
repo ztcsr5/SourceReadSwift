@@ -110,7 +110,10 @@ final class AppState: ObservableObject {
         do {
             let localURL = try PickedDocumentAccess.copiedURL(from: url)
             let ext = localURL.pathExtension.lowercased()
-            if ext == "epub" {
+            // Sniff the container instead of trusting the copied file name: a
+            // share-sheet Inbox copy can drop the ".epub" extension, and the
+            // TXT branch below would then render a ZIP as one 全文 chapter.
+            if LocalEPUBBookParser.looksLikeEPUB(localURL) {
                 let parsed = try LocalEPUBBookParser().parse(fileURL: localURL)
                 bookshelfStore.addLocalTextBook(parsed)
                 record(DiagnosticEvent(level: .info, stage: "import", sourceName: parsed.title, message: "已导入 EPUB"))

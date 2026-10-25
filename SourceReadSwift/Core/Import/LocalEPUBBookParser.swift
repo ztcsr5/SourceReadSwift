@@ -3,6 +3,33 @@ import SwiftSoup
 import ZIPFoundation
 
 struct LocalEPUBBookParser {
+    /// Import dispatch used to rely on `pathExtension == "epub"` alone. Files
+    /// vended by AirDrop / "用其他应用打开" / some share providers arrive as a
+    /// security-scoped copy whose temporary name can be extension-less, and the
+    /// TXT branch then byte-split a ZIP container into one 「全文」chapter. The
+    /// ZIP signature plus the mandatory `META-INF/container.xml` entry identify
+    /// an EPUB regardless of the file name, so those imports reach this parser.
+    static func looksLikeEPUB(_ url: URL) -> Bool {
+        if url.pathExtension.localizedCaseInsensitiveCompare("epub") == .orderedSame {
+            return true
+        }
+        let header: Data
+        do {
+            guard let handle = try? FileHandle(forReadingFrom: url) else { return false }
+            defer { try? handle.close() }
+            guard let head = try handle.read(upToCount: 4) else { return false }
+            header = head
+        } catch {
+            return false
+        }
+        let bytes = [UInt8](header)
+        guard bytes.count == 4, bytes[0] == 0x50, bytes[1] == 0x4B, bytes[2] == 0x03, bytes[3] == 0x04 else {
+            return false
+        }
+        guard let archive = Archive(url: url, accessMode: .read) else { return false }
+        return archive["META-INF/container.xml"] != nil
+    }
+
     func parse(fileURL: URL) throws -> LocalTextBook {
         let signpost = PerformanceSignpost.begin("epub.parse")
         defer { PerformanceSignpost.end("epub.parse", id: signpost) }

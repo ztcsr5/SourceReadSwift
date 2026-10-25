@@ -76,6 +76,16 @@ struct BookshelfBook: Identifiable, Codable, Hashable, Sendable {
         totalChapters > max(seenTotalChapters ?? totalChapters, 0)
     }
 
+    /// Local imports (TXT and EPUB) share the `local://text` identity, so the
+    /// format cannot be read from `sourceURL`. The EPUB parser is the only path
+    /// that persists a package-relative chapter path or navigation entries, and
+    /// both are optional fields that older shelves simply decode as nil.
+    var isLocalEPUB: Bool {
+        guard sourceURL.hasPrefix("local://") else { return false }
+        if localNavigationEntries?.isEmpty == false { return true }
+        return (localChapters ?? []).contains { $0.sourcePath?.isEmpty == false }
+    }
+
     var asSearchBook: SearchBook {
         SearchBook(
             name: title,

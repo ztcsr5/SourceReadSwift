@@ -185,11 +185,18 @@ final class WebReaderDocumentTests: XCTestCase {
         XCTAssertTrue(shell.contains("replaceChildren"))
     }
 
+    func testShellCanResetToDocumentTop() {
+        // 换书复用 WKWebView 时必须能回到顶部，否则上一本的滚动位置会带进来。
+        let shell = WebReaderHTML.shell
+        XCTAssertTrue(shell.contains("resetScroll"))
+        XCTAssertTrue(shell.contains("window.scrollTo(0, 0)"))
+    }
+
     func testShellFiltersAccidentalTaps() {
         let shell = WebReaderHTML.shell
         // 位移 / 时长 / 惯性三道阈值，缺一条就会把滑动判成点击。
-        XCTAssertTrue(shell.contains("dx > 8"))
-        XCTAssertTrue(shell.contains("held > 260"))
+        XCTAssertTrue(shell.contains("dx > 10"))
+        XCTAssertTrue(shell.contains("held > 320"))
         XCTAssertTrue(shell.contains("state.lastScrollAt"))
         XCTAssertTrue(shell.contains("isCollapsed"))
     }

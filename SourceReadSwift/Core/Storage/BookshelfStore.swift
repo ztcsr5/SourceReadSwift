@@ -25,12 +25,31 @@ final class BookshelfStore: ObservableObject {
     }
 
     func contains(_ searchBook: SearchBook) -> Bool {
-        books.contains { $0.id == searchBook.id }
+        resolvedIndex(of: searchBook) != nil
+    }
+
+    /// Local imports persist a stable `local|<UUID>` id while `SearchBook.id` is
+    /// derived as `sourceURL|bookURL`, so the two identifiers never match. The
+    /// detail screen is handed the derived `SearchBook`, which used to make
+    /// `contains` false and sent every local chapter row through the
+    /// `sourceURL|bookURL` fallback id that `book(id:)` cannot resolve.
+    private func resolvedIndex(of searchBook: SearchBook) -> Int? {
+        if let exact = books.firstIndex(where: { $0.id == searchBook.id }) {
+            return exact
+        }
+        guard searchBook.sourceUrl.hasPrefix("local://") else { return nil }
+        return books.firstIndex { $0.bookURL == searchBook.bookUrl }
+    }
+
+    /// Resolves the bookshelf record behind a local `SearchBook` (whose `id` is
+    /// derived) through the stable `bookURL` every local import stores as its id.
+    func localBook(matching bookURL: String) -> BookshelfBook? {
+        books.first { $0.bookURL == bookURL || $0.id == bookURL }
     }
 
     func addOrUpdate(_ searchBook: SearchBook) {
-        if let index = books.firstIndex(where: { $0.id == searchBook.id }) {
-            var item = books[index]
+        if let shelfIndex = resolvedIndex(of: searchBook) {
+            var item = books[shelfIndex]
             item.title = searchBook.name
             item.author = searchBook.author ?? item.author
             item.coverURL = searchBook.coverUrl
@@ -38,7 +57,7 @@ final class BookshelfStore: ObservableObject {
             item.sourceURL = searchBook.sourceUrl
             item.bookURL = searchBook.bookUrl
             item.intro = searchBook.intro
-            books[index] = item
+            books[shelfIndex] = item
         } else {
             books.insert(BookshelfBook(searchBook: searchBook), at: 0)
         }
