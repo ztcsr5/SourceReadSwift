@@ -26,7 +26,7 @@ final class ReaderFrameRateSamplerTests: XCTestCase {
     func testFrameBeyondThresholdCountsAsDropped() {
         var accumulator = ReaderFrameRateAccumulator()
         accumulator.recordFrame(delta: fps60, expectedFrameDuration: fps60)
-        accumulator.recordFrame(delta: fps60 * 2.0, expectedFrameDuration: fps60)
+        accumulator.recordFrame(delta: fps60 * 2.5, expectedFrameDuration: fps60)
         XCTAssertEqual(accumulator.droppedFrames, 1)
         XCTAssertEqual(accumulator.droppedRatio, 0.5, accuracy: 0.0001)
     }

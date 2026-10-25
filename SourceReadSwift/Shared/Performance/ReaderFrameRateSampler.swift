@@ -12,8 +12,11 @@ struct ReaderFrameRateAccumulator: Equatable {
     private(set) var droppedFrames: Int
     private(set) var totalSeconds: Double
 
-    /// 超过期望帧间隔 1.5 倍就算掉一帧（120Hz 下约 12.5ms，60Hz 下约 25ms）。
-    static let dropThreshold: Double = 1.5
+    /// 超过期望帧间隔 2 倍才算掉一帧（60Hz 下约 33ms，即真正丢了 2 帧）。
+    ///
+    /// 原来用 1.5 倍：60Hz 下 25ms 就判掉帧，而 27fps 场景每帧约 37ms，
+    /// 于是掉帧率虚高到 99%（诊断页实测 2508/2524），指标失去意义。
+    static let dropThreshold: Double = 2.0
 
     init(frames: Int = 0, droppedFrames: Int = 0, totalSeconds: Double = 0) {
         self.frames = frames
