@@ -308,6 +308,34 @@ struct BookshelfReaderGatewayView: View {
         .id("reader-\(book.id)-\(safeIndex)-\(localNavigationRevision)")
     }
 
+    /// 首章正文预热。
+    ///
+    /// 打开书籍时 TOC 有缓存并不代表正文有缓存（`cachedChapters` 只缓存章节列表）。
+    /// 这里在点开书的一刻就把目标章正文取回来写进缓存，阅读器随后按
+    /// `content(sourceURL:chapter:purifyRules:)` 查询即可命中，省掉首次打开的白等。
+    /// 已有缓存直接返回；失败静默——预热失败不该在书架上弹任何东西。
+    private func prefetchChapterContent(source: BookSource, chapter: BookChapter) {
+        let rules = appState.purifyRuleStore.enabledPatterns
+        guard !appState.chapterContentCacheStore.isCached(
+            sourceURL: source.bookSourceUrl,
+            chapter: chapter,
+            purifyRules: rules
+        ) else { return }
+        Task.detached(priority: .userInitiated) { [appState, source, chapter] in
+            guard let content = try? await appState.engine
+                .getContent(source: source, chapter: chapter)
+                .get()
+            else { return }
+            await MainActor.run {
+                appState.chapterContentCacheStore.save(
+                    content,
+                    sourceURL: source.bookSourceUrl,
+                    purifyRules: rules
+                )
+            }
+        }
+    }
+
     private func resumeReading() async {
         let activeBook = currentBook
         guard activeBook.localChapters == nil, activeBook.localContent == nil else { return }
@@ -328,6 +356,9 @@ struct BookshelfReaderGatewayView: View {
             if let target {
                 self.chapters = cached
                 self.selectedChapter = target
+                // TOC 命中缓存 ≠ 正文命中缓存：首章正文在这里就发出去，
+                // 阅读器打开时 content(...) 直接命中，不再白等一次网络。
+                prefetchChapterContent(source: source, chapter: target)
 
                 // Background silent refresh for new chapters and latest title
                 Task.detached(priority: .utility) { [appState, source, activeBook] in
