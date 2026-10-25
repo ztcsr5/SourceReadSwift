@@ -150,6 +150,8 @@ struct ReaderView: View {
     /// 首帧是否已经落到「上次读到的那一段」。为 false 时文字层先透明，
     /// 避免用户先看到第 1 章章首、随后被切成恢复位置的那一下闪跳。
     @State private var didLandInitialPosition = false
+    /// 点击手势的按下时刻，用来过滤「长按/拖动」。
+    @State private var tapGestureStartedAt: Date?
     @State private var pageStepDirection: Int = 0
     @State private var pageStepGeneration: Int = 0
     @State private var brightnessBeforeReader: CGFloat? = nil
@@ -569,8 +571,17 @@ struct ReaderView: View {
             .id(readerMode == .scroll ? "native-scroll-reader" : "reader-paged-surface")
             .contentShape(Rectangle())
             .simultaneousGesture(
-                SpatialTapGesture()
+                // 轻触即触发太敏感：以前用 SpatialTapGesture，手指一开始滚动就会被判成点击。
+                // 改成带位移/时长阈值的拖拽手势——位移超过 8pt 或按住超过 0.4s 都不算点击。
+                DragGesture(minimumDistance: 0)
+                    .onChanged { _ in
+                        if tapGestureStartedAt == nil { tapGestureStartedAt = Date() }
+                    }
                     .onEnded { value in
+                        defer { tapGestureStartedAt = nil }
+                        let moved = abs(value.translation.width) + abs(value.translation.height)
+                        let held = tapGestureStartedAt.map { Date().timeIntervalSince($0) } ?? 0
+                        guard moved < 8, held < 0.4 else { return }
                         handleReaderTap(at: value.location)
                     }
             )
@@ -1127,6 +1138,20 @@ struct ReaderView: View {
         content.readerImageStyle
     }
 
+    /// 首章加载中的占位：主题色底 + 进度指示，避免「点进书先白一会儿」。
+    private var readerLoadingPlaceholder: some View {
+        VStack(spacing: 12) {
+            ProgressView()
+                .tint(readerThemeTextColor.opacity(0.55))
+            Text("正在加载章节…")
+                .font(.footnote)
+                .foregroundStyle(readerThemeTextColor.opacity(0.6))
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(readerThemeBackground)
+        .allowsHitTesting(false)
+    }
+
     /// 需要恢复到「中间某一段」时，定位落地之前先把文字层藏起来。
     /// 首帧就开始读的书（目标为 0）不走这个门闸，不会出现空白。
     private var initialSurfaceOpacity: Double {
@@ -1209,6 +1234,12 @@ struct ReaderView: View {
         // 透明期间不该吃点击：0.5s 兜底窗口里用户可能已经在点下一页，
         // 让点击落到下面的容器上，比落在看不见的文字层上更安全。
         .allowsHitTesting(initialSurfaceOpacity > 0)
+        .overlay {
+            // 首章还没回来时不再是一片空白：给主题色底 + 明确的加载状态。
+            if scrollModeParagraphs.isEmpty {
+                readerLoadingPlaceholder
+            }
+        }
         .onAppear {
             if scrollParagraphTarget > 0 {
                 didLandInitialPosition = false
@@ -2262,8 +2293,13 @@ struct ReaderView: View {
 
                     Button {
                         closeReaderChrome()
-                        showBookDetailSheet = true
-                        onRequestBookDetail?()
+                        // 二选一，不能两个都做：以前同时置位 sheet 和回调，
+                        // 本地书那条回调是 dismiss()，于是「详情」弹在正在销毁的阅读器上，直接崩。
+                        if let onRequestBookDetail {
+                            onRequestBookDetail()
+                        } else {
+                            showBookDetailSheet = true
+                        }
                     } label: {
                         Label("书籍详情", systemImage: "info.circle")
                     }
