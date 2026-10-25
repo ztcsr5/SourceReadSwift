@@ -3105,6 +3105,9 @@ struct ReaderView: View {
                     }
                 }
             }
+            // List 自带 systemBackground，叠在主题背景上就是「章节 (N)」下面那条白带。
+            // 把滚动内容背景设为透明，让 readerBackdrop 透上来；行背景已经是 clear。
+            .scrollContentBackground(.hidden)
             .navigationTitle(tocTab == 0 ? "目录" : "书签")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
