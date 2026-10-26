@@ -23,7 +23,6 @@ struct NativeReaderTextView: UIViewRepresentable {
     var layoutAnchorOldParagraph: Int? = nil
     var layoutAnchorRevision: Int = 0
     var fontFamily: ReaderFontFamily = .system
-    var customFontPostScriptName: String = ""
     let fontSize: Double
     let lineSpacing: Double
     let pagePadding: Double
@@ -208,7 +207,6 @@ struct NativeReaderTextView: UIViewRepresentable {
             layoutAnchorOldParagraph: Int? = nil,
             layoutAnchorRevision: Int = 0,
             fontFamily: ReaderFontFamily = .system,
-            customFontPostScriptName: String = "",
             fontSize: Double,
             lineSpacing: Double,
             pagePadding: Double,
@@ -236,7 +234,6 @@ struct NativeReaderTextView: UIViewRepresentable {
             self.layoutAnchorOldParagraph = layoutAnchorOldParagraph
             self.layoutAnchorRevision = layoutAnchorRevision
             self.fontFamily = fontFamily
-            self.customFontPostScriptName = customFontPostScriptName
             self.fontSize = fontSize
             self.lineSpacing = lineSpacing
             self.pagePadding = pagePadding
@@ -261,7 +258,6 @@ struct NativeReaderTextView: UIViewRepresentable {
             let subtitle: String?
             let contentFingerprint: String
             let fontFamily: ReaderFontFamily
-            let customFontPostScriptName: String
             let fontSize: Double
             let lineSpacing: Double
             let letterSpacing: Double
@@ -285,7 +281,6 @@ struct NativeReaderTextView: UIViewRepresentable {
                 subtitle: subtitle,
                 contentFingerprint: contentFingerprint,
                 fontFamily: fontFamily,
-                customFontPostScriptName: customFontPostScriptName,
                 fontSize: fontSize,
                 lineSpacing: lineSpacing,
                 letterSpacing: letterSpacing,
@@ -305,7 +300,6 @@ struct NativeReaderTextView: UIViewRepresentable {
         static func == (lhs: Configuration, rhs: Configuration) -> Bool {
             lhs.contentFingerprint == rhs.contentFingerprint
                 && lhs.fontFamily == rhs.fontFamily
-                && lhs.customFontPostScriptName == rhs.customFontPostScriptName
                 && lhs.fontSize == rhs.fontSize
                 && lhs.lineSpacing == rhs.lineSpacing
                 && lhs.pagePadding == rhs.pagePadding
@@ -1292,7 +1286,7 @@ enum ReaderNativeTextLayout {
             titleStyle.paragraphSpacing = CGFloat(configuration.paragraphSpacing + configuration.titleSpacing)
             titleStyle.alignment = .natural
             let titleAttributes: [NSAttributedString.Key: Any] = [
-                .font: configuration.fontFamily.uiFont(ofSize: CGFloat(configuration.fontSize + 8), weight: .bold, customPostScriptName: configuration.customFontPostScriptName),
+                .font: configuration.fontFamily.uiFont(ofSize: CGFloat(configuration.fontSize + 8), weight: .bold),
                 .foregroundColor: configuration.textColor,
                 .paragraphStyle: titleStyle
             ]
@@ -1304,7 +1298,7 @@ enum ReaderNativeTextLayout {
             subtitleStyle.paragraphSpacing = CGFloat(configuration.titleSpacing)
             subtitleStyle.alignment = .natural
             let subtitleAttributes: [NSAttributedString.Key: Any] = [
-                .font: configuration.fontFamily.uiFont(ofSize: max(CGFloat(configuration.fontSize - 5), 12), weight: .regular, customPostScriptName: configuration.customFontPostScriptName),
+                .font: configuration.fontFamily.uiFont(ofSize: max(CGFloat(configuration.fontSize - 5), 12), weight: .regular),
                 .foregroundColor: configuration.textColor.withAlphaComponent(0.62),
                 .paragraphStyle: subtitleStyle
             ]
@@ -1320,7 +1314,7 @@ enum ReaderNativeTextLayout {
         paragraphStyle.firstLineHeadIndent = CGFloat(configuration.paragraphIndent)
         paragraphStyle.alignment = .natural
         let paragraphAttributes: [NSAttributedString.Key: Any] = [
-            .font: configuration.fontFamily.uiFont(ofSize: CGFloat(configuration.fontSize), weight: .regular, customPostScriptName: configuration.customFontPostScriptName),
+            .font: configuration.fontFamily.uiFont(ofSize: CGFloat(configuration.fontSize), weight: .regular),
             .foregroundColor: configuration.textColor,
             .kern: configuration.letterSpacing,
             .paragraphStyle: paragraphStyle
@@ -1356,7 +1350,7 @@ enum ReaderNativeTextLayout {
                     dividerStyle.paragraphSpacingBefore = CGFloat(configuration.paragraphSpacing + 36)
                     dividerStyle.paragraphSpacing = CGFloat(configuration.paragraphSpacing + 18)
                     let dividerAttrs: [NSAttributedString.Key: Any] = [
-                        .font: configuration.fontFamily.uiFont(ofSize: CGFloat(configuration.fontSize + 4), weight: .bold, customPostScriptName: configuration.customFontPostScriptName),
+                        .font: configuration.fontFamily.uiFont(ofSize: CGFloat(configuration.fontSize + 4), weight: .bold),
                         .foregroundColor: configuration.textColor,
                         .paragraphStyle: dividerStyle
                     ]
@@ -1405,7 +1399,7 @@ enum ReaderNativeTextLayout {
         paragraphStyle.firstLineHeadIndent = CGFloat(configuration.paragraphIndent)
         paragraphStyle.alignment = .natural
         let paragraphAttributes: [NSAttributedString.Key: Any] = [
-            .font: configuration.fontFamily.uiFont(ofSize: CGFloat(configuration.fontSize), weight: .regular, customPostScriptName: configuration.customFontPostScriptName),
+            .font: configuration.fontFamily.uiFont(ofSize: CGFloat(configuration.fontSize), weight: .regular),
             .foregroundColor: configuration.textColor,
             .kern: configuration.letterSpacing,
             .paragraphStyle: paragraphStyle
@@ -1437,7 +1431,7 @@ enum ReaderNativeTextLayout {
                     dividerStyle.paragraphSpacingBefore = CGFloat(configuration.paragraphSpacing + 36)
                     dividerStyle.paragraphSpacing = CGFloat(configuration.paragraphSpacing + 18)
                     let dividerAttrs: [NSAttributedString.Key: Any] = [
-                        .font: configuration.fontFamily.uiFont(ofSize: CGFloat(configuration.fontSize + 4), weight: .bold, customPostScriptName: configuration.customFontPostScriptName),
+                        .font: configuration.fontFamily.uiFont(ofSize: CGFloat(configuration.fontSize + 4), weight: .bold),
                         .foregroundColor: configuration.textColor,
                         .paragraphStyle: dividerStyle
                     ]
