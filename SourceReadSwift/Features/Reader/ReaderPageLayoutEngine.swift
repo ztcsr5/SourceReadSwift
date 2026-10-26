@@ -32,14 +32,14 @@ enum ReaderPageLayoutEngine {
         return scene?.windows.first(where: { $0.isKeyWindow })?.safeAreaInsets.top ?? 0
     }
 
-    static func minimumTopInset(pagePadding: CGFloat) -> CGFloat {
-        let safeTop = safeAreaTopInset
-        if safeTop >= 44 {
+    static func minimumTopInset(pagePadding: CGFloat, safeTop: CGFloat? = nil) -> CGFloat {
+        let safe = safeTop ?? safeAreaTopInset
+        if safe >= 44 {
             // 刘海屏 / 灵动岛机型 (iPhone X ~ 16)：让出顶部物理挖孔避让区，避免文字被切或顶格遮挡
-            return safeTop + max(pagePadding * 0.25, 4)
-        } else if safeTop > 0 {
+            return safe + max(pagePadding * 0.25, 4)
+        } else if safe > 0 {
             // 普通状态栏机型 (iPhone SE、iPad)
-            return max(safeTop + 6, pagePadding)
+            return max(safe + 6, pagePadding)
         } else {
             // 单元测试 / 零安全区环境：保持基准值
             return pagePadding
