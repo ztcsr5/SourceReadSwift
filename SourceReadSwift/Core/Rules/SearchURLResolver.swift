@@ -170,8 +170,7 @@ struct SearchURLResolver {
     /// 仅对纯 URL 部分调用（绝不触碰 `,{"method":...}` 或 `@Header:{...}` 指令后缀），
     /// 并保留已有的 `%[0-9A-Fa-f]{2}` 转义序列，杜绝二次编码为 `%25`。
     private func urlSafeString(_ raw: String) -> String {
-        if URL(string: raw) != nil { return raw }
-        return SourceRequestBuilder.percentEncodePreservingExistingEscapes(raw)
+        SourceRequestBuilder.percentEncodePreservingExistingEscapes(raw)
     }
 
     private func normalizePathDoubleSlashes(_ urlString: String) -> String {

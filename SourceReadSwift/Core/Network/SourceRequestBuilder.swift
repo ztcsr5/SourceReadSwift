@@ -283,22 +283,18 @@ struct SourceRequestBuilder {
             }
         }
         trimmed = normalizePathDoubleSlashes(trimmed)
-        if let absolute = URL(string: trimmed), absolute.scheme != nil {
-            let normalized = normalizePathDoubleSlashes(absolute.absoluteString)
-            return URL(string: normalized) ?? absolute
-        }
         let encodedTrimmed = Self.percentEncodePreservingExistingEscapes(trimmed)
         if let absolute = URL(string: encodedTrimmed), absolute.scheme != nil {
             let normalized = normalizePathDoubleSlashes(absolute.absoluteString)
             return URL(string: normalized) ?? absolute
         }
-        let effectiveBaseURL = URL(string: cleanBase) ?? URL(string: Self.percentEncodePreservingExistingEscapes(cleanBase))
+        let effectiveBaseURL = URL(string: Self.percentEncodePreservingExistingEscapes(cleanBase)) ?? URL(string: cleanBase)
         if let baseURL = effectiveBaseURL {
-            if let relative = URL(string: trimmed, relativeTo: baseURL)?.absoluteURL {
+            if let relative = URL(string: encodedTrimmed, relativeTo: baseURL)?.absoluteURL {
                 let normalized = normalizePathDoubleSlashes(relative.absoluteString)
                 return URL(string: normalized) ?? relative
             }
-            if let relative = URL(string: encodedTrimmed, relativeTo: baseURL)?.absoluteURL {
+            if let relative = URL(string: trimmed, relativeTo: baseURL)?.absoluteURL {
                 let normalized = normalizePathDoubleSlashes(relative.absoluteString)
                 return URL(string: normalized) ?? relative
             }
