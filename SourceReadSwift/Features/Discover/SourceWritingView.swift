@@ -667,9 +667,7 @@ final class LightweightHTTPServer: ObservableObject {
                 self.sendResponse(connection: connection, statusCode: 400, statusText: "Bad Request", contentType: "application/json", body: #"{"ok":false,"error":"Invalid JSON"}"#, keepAlive: keepAlive)
                 return
             }
-            Task { @MainActor in
-                store.remove(sourceURLs: [req.url])
-            }
+            store.remove(sourceURLs: [req.url])
             self.sendResponse(connection: connection, statusCode: 200, statusText: "OK", contentType: "application/json", body: #"{"ok":true}"#, keepAlive: keepAlive)
         }
     }
@@ -682,9 +680,7 @@ final class LightweightHTTPServer: ObservableObject {
                 self.sendResponse(connection: connection, statusCode: 400, statusText: "Bad Request", contentType: "application/json", body: #"{"ok":false,"error":"Invalid JSON"}"#, keepAlive: keepAlive)
                 return
             }
-            Task { @MainActor in
-                store.setEnabled(req.enabled, for: [req.url])
-            }
+            store.setEnabled(req.enabled, for: [req.url])
             self.sendResponse(connection: connection, statusCode: 200, statusText: "OK", contentType: "application/json", body: #"{"ok":true}"#, keepAlive: keepAlive)
         }
     }
@@ -782,7 +778,7 @@ final class LightweightHTTPServer: ObservableObject {
 
             // 3. TOC step
             if (step == "toc" || (step == "all" && detailResult != nil)) && errorMessage == nil {
-                let bookForToc: BookDetail = detailResult ?? BookDetail(name: "测试书籍", author: nil, coverUrl: nil, bookUrl: payload.bookUrl ?? source.bookSourceUrl, tocUrl: payload.bookUrl ?? source.bookSourceUrl, intro: nil, latestChapter: nil, updateTime: nil, status: nil, wordCount: nil, sourceUrl: source.bookSourceUrl)
+                let bookForToc: BookDetail = detailResult ?? BookDetail(name: "测试书籍", author: nil, coverUrl: nil, bookUrl: payload.bookUrl ?? source.bookSourceUrl, tocUrl: payload.bookUrl ?? source.bookSourceUrl, sourceName: source.bookSourceName, sourceUrl: source.bookSourceUrl, intro: nil, latestChapter: nil, wordCount: nil, status: nil, updateTime: nil, kind: nil)
                 logStep("📑 正在解析目录列表: '\(bookForToc.tocUrl ?? bookForToc.bookUrl)'...")
                 let tStart = CFAbsoluteTimeGetCurrent()
                 let tRes = await engine.getChapterList(source: source, book: bookForToc, maxPages: 2)
@@ -874,13 +870,9 @@ final class LightweightHTTPServer: ObservableObject {
         }
     }
 
-    private func respondWithSourceStore(connection: NWConnection, keepAlive: Bool = true, action: @escaping (SourceStore?) -> Void) {
-        if Thread.isMainThread {
+    private func respondWithSourceStore(connection: NWConnection, keepAlive: Bool = true, action: @escaping @MainActor (SourceStore?) -> Void) {
+        Task { @MainActor in
             action(self.sourceStore)
-        } else {
-            DispatchQueue.main.sync {
-                action(self.sourceStore)
-            }
         }
     }
 
