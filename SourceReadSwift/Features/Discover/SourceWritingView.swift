@@ -621,7 +621,7 @@ final class LightweightHTTPServer: ObservableObject {
             let dtos = sources.map { s in
                 let rec = healthRecords[s.bookSourceUrl]
                 return SourceHealthDTO(
-                    id: s.id.uuidString,
+                    id: s.id,
                     name: s.bookSourceName,
                     url: s.bookSourceUrl,
                     group: s.bookSourceGroup,
@@ -667,7 +667,9 @@ final class LightweightHTTPServer: ObservableObject {
                 self.sendResponse(connection: connection, statusCode: 400, statusText: "Bad Request", contentType: "application/json", body: #"{"ok":false,"error":"Invalid JSON"}"#, keepAlive: keepAlive)
                 return
             }
-            store.remove(sourceURLs: [req.url])
+            Task { @MainActor in
+                store.remove(sourceURLs: [req.url])
+            }
             self.sendResponse(connection: connection, statusCode: 200, statusText: "OK", contentType: "application/json", body: #"{"ok":true}"#, keepAlive: keepAlive)
         }
     }
@@ -680,9 +682,8 @@ final class LightweightHTTPServer: ObservableObject {
                 self.sendResponse(connection: connection, statusCode: 400, statusText: "Bad Request", contentType: "application/json", body: #"{"ok":false,"error":"Invalid JSON"}"#, keepAlive: keepAlive)
                 return
             }
-            if let idx = store.sources.firstIndex(where: { $0.bookSourceUrl == req.url }) {
-                store.sources[idx].enabled = req.enabled
-                store.save()
+            Task { @MainActor in
+                store.setEnabled(req.enabled, for: [req.url])
             }
             self.sendResponse(connection: connection, statusCode: 200, statusText: "OK", contentType: "application/json", body: #"{"ok":true}"#, keepAlive: keepAlive)
         }
@@ -758,9 +759,9 @@ final class LightweightHTTPServer: ObservableObject {
                 if let first = searchResult?.first {
                     targetBook = first
                 } else if let bUrl = payload.bookUrl, !bUrl.isEmpty {
-                    targetBook = SearchBook(name: "测试书籍", author: "测试作者", coverUrl: nil, bookUrl: bUrl, sourceUrl: source.bookSourceUrl, latestChapter: nil, intro: nil, wordCount: nil)
+                    targetBook = SearchBook(name: "测试书籍", author: "测试作者", coverUrl: nil, bookUrl: bUrl, sourceName: source.bookSourceName, sourceUrl: source.bookSourceUrl, intro: nil, kind: nil, lastChapter: nil, wordCount: nil, checkKeyWord: nil)
                 } else {
-                    targetBook = SearchBook(name: "测试书籍", author: nil, coverUrl: nil, bookUrl: source.bookSourceUrl, sourceUrl: source.bookSourceUrl, latestChapter: nil, intro: nil, wordCount: nil)
+                    targetBook = SearchBook(name: "测试书籍", author: nil, coverUrl: nil, bookUrl: source.bookSourceUrl, sourceName: source.bookSourceName, sourceUrl: source.bookSourceUrl, intro: nil, kind: nil, lastChapter: nil, wordCount: nil, checkKeyWord: nil)
                 }
 
                 logStep("📖 正在解析详情页: '\(targetBook.name)' (\(targetBook.bookUrl))...")
@@ -950,7 +951,8 @@ final class LightweightHTTPServer: ObservableObject {
     }
 
     private func getWebPageHtml() -> String {
-        return #"""<!DOCTYPE html>
+        return #"""
+<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
   <meta charset="UTF-8">
@@ -1783,6 +1785,7 @@ final class LightweightHTTPServer: ObservableObject {
   </script>
 </body>
 </html>
+
 """#
     }
 }
