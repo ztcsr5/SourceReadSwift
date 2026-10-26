@@ -2409,6 +2409,15 @@ struct ReaderView: View {
     }
 
     /// 全屏阅读时阅读页忽略了安全区，页脚必须自己让开 home indicator。
+    /// 全屏阅读时阅读页忽略了安全区，页眉必须自己让开刘海/灵动岛。
+    private var readerTopSafeInset: CGFloat {
+        let scene = UIApplication.shared.connectedScenes
+            .compactMap { $0 as? UIWindowScene }
+            .first { $0.activationState == .foregroundActive }
+        let inset = scene?.windows.first(where: { $0.isKeyWindow })?.safeAreaInsets.top ?? 0
+        return max(inset, 0)
+    }
+
     private var readerFooterSafeInset: CGFloat {
         let scene = UIApplication.shared.connectedScenes
             .compactMap { $0 as? UIWindowScene }

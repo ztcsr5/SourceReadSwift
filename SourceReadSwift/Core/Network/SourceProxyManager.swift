@@ -52,16 +52,17 @@ final class SourceProxyManager: ObservableObject {
 
         var proxyDict: [AnyHashable: Any] = [:]
         if type == "socks5" {
-            proxyDict[kCFStreamPropertySOCKSProxy as String] = 1
-            proxyDict[kCFStreamPropertySOCKSProxyHost as String] = host
-            proxyDict[kCFStreamPropertySOCKSProxyPort as String] = effectivePort
+            proxyDict["SOCKSEnable"] = 1
+            proxyDict["SOCKSProxy"] = host
+            proxyDict["SOCKSPort"] = effectivePort
+            proxyDict["SOCKSVersion"] = "5"
         } else {
-            proxyDict[kCFNetworkProxiesHTTPEnable as String] = 1
-            proxyDict[kCFNetworkProxiesHTTPProxy as String] = host
-            proxyDict[kCFNetworkProxiesHTTPPort as String] = effectivePort
-            proxyDict[kCFNetworkProxiesHTTPSEnable as String] = 1
-            proxyDict[kCFNetworkProxiesHTTPSProxy as String] = host
-            proxyDict[kCFNetworkProxiesHTTPSPort as String] = effectivePort
+            proxyDict["HTTPEnable"] = 1
+            proxyDict["HTTPProxy"] = host
+            proxyDict["HTTPPort"] = effectivePort
+            proxyDict["HTTPSEnable"] = 1
+            proxyDict["HTTPSProxy"] = host
+            proxyDict["HTTPSPort"] = effectivePort
         }
         configuration.connectionProxyDictionary = proxyDict
     }
