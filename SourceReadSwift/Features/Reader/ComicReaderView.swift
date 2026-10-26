@@ -41,6 +41,8 @@ struct ComicReaderView: View {
     @State private var currentPageIndex: Int = 0
     @State private var scrollTargetIndex: Int?
     @AppStorage("comic_dimming_level") private var dimmingLevel: Double = 0.0
+    @AppStorage("reader.showSystemStatusBar") private var showSystemStatusBar = false
+    @AppStorage("reader.statusPosition") private var statusPosition = "bottom"
     @State private var chapterSearchText = ""
     /// Guards against a slow chapter response overwriting the pages of a
     /// chapter the user opened afterwards.
@@ -128,20 +130,26 @@ struct ComicReaderView: View {
                 chromeOverlay
             } else if !pages.isEmpty {
                 VStack {
+                    if statusPosition == "top" || statusPosition == "both" {
+                        comicHeader
+                    }
                     Spacer()
-                    HStack {
-                        Spacer()
-                        Text("\(currentPageIndex + 1) / \(pages.count) P")
-                            .font(.system(size: 11, weight: .semibold).monospacedDigit())
-                            .foregroundStyle(.white.opacity(0.85))
-                            .padding(.horizontal, 10)
-                            .padding(.vertical, 5)
-                            .background(.ultraThinMaterial.opacity(0.85), in: Capsule())
-                            .overlay(Capsule().stroke(Color.white.opacity(0.12), lineWidth: 0.8))
-                            .padding(.trailing, 16)
-                            .padding(.bottom, 20)
+                    if statusPosition == "bottom" || statusPosition == "both" {
+                        HStack {
+                            Spacer()
+                            Text("\(currentPageIndex + 1) / \(pages.count) P")
+                                .font(.system(size: 11, weight: .semibold).monospacedDigit())
+                                .foregroundStyle(.white.opacity(0.85))
+                                .padding(.horizontal, 10)
+                                .padding(.vertical, 5)
+                                .background(.ultraThinMaterial.opacity(0.85), in: Capsule())
+                                .overlay(Capsule().stroke(Color.white.opacity(0.12), lineWidth: 0.8))
+                                .padding(.trailing, 16)
+                                .padding(.bottom, 20)
+                        }
                     }
                 }
+                .allowsHitTesting(false)
                 .transition(.opacity)
                 .zIndex(2)
             }
@@ -152,7 +160,7 @@ struct ComicReaderView: View {
         .sheet(isPresented: $showChapterDrawer) {
             chapterDrawerSheet
         }
-        .statusBarHidden(!showChrome)
+        .statusBarHidden(!showChrome && !showSystemStatusBar)
     }
 
     // MARK: - Main Content Views
@@ -265,15 +273,67 @@ struct ComicReaderView: View {
 
                 Spacer()
 
-                // Reading Mode Picker Menu
+                // Reading Mode & Display Settings Menu
                 Menu {
-                    ForEach(ComicReadingMode.allCases) { mode in
+                    Section("阅读模式") {
+                        ForEach(ComicReadingMode.allCases) { mode in
+                            Button {
+                                readingMode = mode
+                            } label: {
+                                HStack {
+                                    Label(mode.rawValue, systemImage: mode.systemImage)
+                                    if readingMode == mode {
+                                        Image(systemName: "checkmark")
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    Section("状态栏与页眉") {
                         Button {
-                            readingMode = mode
+                            showSystemStatusBar.toggle()
                         } label: {
                             HStack {
-                                Label(mode.rawValue, systemImage: mode.systemImage)
-                                if readingMode == mode {
+                                Text("显示系统原生状态栏")
+                                Spacer()
+                                if showSystemStatusBar {
+                                    Image(systemName: "checkmark")
+                                }
+                            }
+                        }
+
+                        Button {
+                            statusPosition = "bottom"
+                        } label: {
+                            HStack {
+                                Text("仅页脚")
+                                Spacer()
+                                if statusPosition == "bottom" {
+                                    Image(systemName: "checkmark")
+                                }
+                            }
+                        }
+
+                        Button {
+                            statusPosition = "top"
+                        } label: {
+                            HStack {
+                                Text("仅页眉")
+                                Spacer()
+                                if statusPosition == "top" {
+                                    Image(systemName: "checkmark")
+                                }
+                            }
+                        }
+
+                        Button {
+                            statusPosition = "both"
+                        } label: {
+                            HStack {
+                                Text("页眉+页脚")
+                                Spacer()
+                                if statusPosition == "both" {
                                     Image(systemName: "checkmark")
                                 }
                             }
@@ -524,6 +584,28 @@ struct ComicReaderView: View {
                     self.errorMessage = error.displayMessage
                 }
             }
+        }
+    }
+
+    private var comicHeader: some View {
+        TimelineView(.everyMinute) { context in
+            HStack(spacing: 12) {
+                Text(currentChapter?.title ?? bookTitle)
+                    .lineLimit(1)
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundStyle(.white.opacity(0.85))
+
+                Spacer(minLength: 8)
+
+                Text(context.date, format: .dateTime.hour().minute())
+                    .font(.system(size: 11, weight: .medium).monospacedDigit())
+                    .foregroundStyle(.white.opacity(0.85))
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 6)
+            .background(.ultraThinMaterial.opacity(0.85), in: Capsule())
+            .overlay(Capsule().stroke(Color.white.opacity(0.12), lineWidth: 0.8))
+            .padding(.top, 12)
         }
     }
 }

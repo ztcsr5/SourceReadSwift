@@ -79,4 +79,18 @@ final class ComicContentParserTests: XCTestCase {
         XCTAssertEqual(pages[0].url, "https://img.example.com/page1.jpg")
         XCTAssertEqual(pages[1].url, "https://img.example.com/page2.jpg")
     }
+
+    func testParseMarkdownImages() {
+        let chapter = BookChapter(title: "第6话", url: "https://example.com/c6", bookUrl: "https://example.com/b1", index: 5, isVip: false)
+        let paragraphs = [
+            "![page1](https://img.example.com/md1.jpg)",
+            "![page2](https://img.example.com/md2.png)"
+        ]
+        let content = ChapterContent(chapter: chapter, title: "第6话", paragraphs: paragraphs, nextContentUrl: nil)
+        let pages = ComicContentParser.parsePages(from: content)
+
+        XCTAssertEqual(pages.count, 2)
+        XCTAssertEqual(pages[0].url, "https://img.example.com/md1.jpg")
+        XCTAssertEqual(pages[1].url, "https://img.example.com/md2.png")
+    }
 }

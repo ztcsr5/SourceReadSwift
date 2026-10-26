@@ -172,6 +172,9 @@ struct ReaderView: View {
     @AppStorage("reader.footerShowTime") private var footerShowTime = true
     @AppStorage("reader.footerShowBatteryIcon") private var footerShowBatteryIcon = true
     @AppStorage("reader.footerShowBatteryPercent") private var footerShowBatteryPercent = true
+    @AppStorage("reader.showSystemStatusBar") private var showSystemStatusBar = false
+    @AppStorage("reader.statusPosition") private var statusPosition = "bottom"
+    @State private var showFontManagementSheet = false
     @AppStorage("reader.letterSpacing") private var letterSpacing: Double = ReaderTypographyDefaults.letterSpacing
     @AppStorage("reader.paragraphSpacing") private var paragraphSpacing: Double = ReaderTypographyDefaults.paragraphSpacing
     @AppStorage("reader.paragraphIndent") private var paragraphIndent: Double = ReaderTypographyDefaults.paragraphIndent
@@ -602,19 +605,11 @@ struct ReaderView: View {
             .id(readerMode == .scroll ? "web-scroll-reader" : "reader-paged-surface")
             .contentShape(Rectangle())
             .simultaneousGesture(
-                // 轻触即触发太敏感：使用带位移/时长阈值的拖拽判定。
-                // 使用非响应式 tracker 记录触控起点，避免 touch down 时频繁触发全树重绘导致翻页卡顿中断。
-                DragGesture(minimumDistance: 0)
-                    .onChanged { _ in
-                        if tapGestureTracker.startedAt == nil { tapGestureTracker.startedAt = Date() }
-                    }
+                // 仅针对非滚动分页模式使用轻触手势，绝不在距离为0时拦截拖拽，
+                // 彻底释放 iOS 16 及全机型在 WKWebView 与 UIPageViewController 的原生滑动与翻页响应。
+                SpatialTapGesture()
                     .onEnded { value in
-                        let start = tapGestureTracker.startedAt
-                        tapGestureTracker.startedAt = nil
                         guard readerMode != .scroll else { return }
-                        let moved = abs(value.translation.width) + abs(value.translation.height)
-                        let held = start.map { Date().timeIntervalSince($0) } ?? 0
-                        guard moved < 18, held < 0.45 else { return }
                         handleReaderTap(at: value.location)
                     }
             )
@@ -625,10 +620,17 @@ struct ReaderView: View {
                 }
 
             if !showOverlay, !speechController.isSpeaking, !autoScrollEnabled {
-                readerFooter
-                    .ignoresSafeArea(.container, edges: .bottom)
-                    .transition(.opacity)
-                    .zIndex(1)
+                if statusPosition == "top" || statusPosition == "both" {
+                    readerHeader
+                        .transition(.opacity)
+                        .zIndex(1)
+                }
+                if statusPosition == "bottom" || statusPosition == "both" {
+                    readerFooter
+                        .ignoresSafeArea(.container, edges: .bottom)
+                        .transition(.opacity)
+                        .zIndex(1)
+                }
             }
 
             if !showOverlay, readerMode == .scroll, let status = scrollChapterStatus {
@@ -724,7 +726,7 @@ struct ReaderView: View {
         .background(ReaderNavigationPopLock())
         .navigationBarBackButtonHidden(true)
         .toolbar(.hidden, for: .navigationBar)
-        .statusBarHidden(!showOverlay)
+        .statusBarHidden(!showOverlay && !showSystemStatusBar)
         .preferredColorScheme(background.isDark ? .dark : .light)
         .highRefreshRateSurface()
         .confirmationDialog("购买本章", isPresented: $showPayActionConfirmation, titleVisibility: .visible) {
@@ -745,6 +747,19 @@ struct ReaderView: View {
         }
         .sheet(isPresented: $showBookmarks) {
             bookmarkSheet
+        }
+        .sheet(isPresented: $showFontManagementSheet) {
+            NavigationStack {
+                CustomFontManagementView()
+                    .toolbar {
+                        ToolbarItem(placement: .cancellationAction) {
+                            Button("完成") {
+                                showFontManagementSheet = false
+                                rebuildPagedBlocksCache()
+                            }
+                        }
+                    }
+            }
         }
         .sheet(item: $quoteCardBookmark) { bookmark in
             let shelfBook = appState.bookshelfStore.book(id: bookID)
@@ -2264,6 +2279,48 @@ struct ReaderView: View {
     /// mode, but the band stayed empty, so a full-screen page showed no clock,
     /// battery or progress once the chrome auto-hid.  This fills that reserved
     /// band and never intercepts taps.
+    private var readerHeader: some View {
+        TimelineView(.everyMinute) { context in
+            VStack {
+                HStack(spacing: 12) {
+                    Text(currentDisplayChapterTitle)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.75)
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundStyle(readerThemeTextColor.opacity(0.55))
+
+                    Spacer(minLength: 8)
+
+                    if footerShowTime {
+                        Text(context.date, format: .dateTime.hour().minute())
+                            .font(.system(size: 11, weight: .medium).monospacedDigit())
+                            .foregroundStyle(readerThemeTextColor.opacity(0.55))
+                    }
+
+                    if footerShowBatteryIcon || footerShowBatteryPercent {
+                        HStack(spacing: 3) {
+                            if footerShowBatteryIcon {
+                                Image(systemName: batterySymbolName)
+                            }
+                            if footerShowBatteryPercent {
+                                Text(batteryPercentageText)
+                            }
+                        }
+                        .font(.system(size: 10, weight: .medium).monospacedDigit())
+                        .foregroundStyle(readerThemeTextColor.opacity(0.55))
+                    }
+                }
+                .padding(.horizontal, max(CGFloat(pagePadding), 18))
+                .padding(.top, max(readerTopSafeInset * 0.45, 6))
+                .frame(height: 22)
+                Spacer(minLength: 0)
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+        }
+        .allowsHitTesting(false)
+        .accessibilityHidden(true)
+    }
+
     private var readerFooter: some View {
         TimelineView(.everyMinute) { context in
             VStack {
@@ -3051,8 +3108,8 @@ struct ReaderView: View {
                         .font(.subheadline.weight(.semibold))
                         .foregroundStyle(.secondary)
                     Spacer()
-                    NavigationLink {
-                        CustomFontManagementView()
+                    Button {
+                        showFontManagementSheet = true
                     } label: {
                         HStack(spacing: 4) {
                             Text("字体管理 / 导入")
@@ -3124,10 +3181,24 @@ struct ReaderView: View {
             // 9. 页脚内容开关。对照同类阅读器（香色闺阁的 tr_showTime / tr_showBatView /
             // tr_showBatLabel 就是三个独立开关），把「时间 / 电量图标 / 电量百分比」拆开，
             // 全屏时不想看就不显示，也就不存在「位置奇怪」这件事。
-            VStack(alignment: .leading, spacing: 8) {
-                Text("页脚显示")
+            VStack(alignment: .leading, spacing: 10) {
+                Text("页眉与页脚状态栏")
                     .font(.subheadline.weight(.semibold))
                     .foregroundStyle(.secondary)
+
+                HStack {
+                    Text("状态栏位置")
+                    Spacer()
+                    Picker("位置", selection: $statusPosition) {
+                        Text("仅页脚").tag("bottom")
+                        Text("仅页眉").tag("top")
+                        Text("页眉+页脚").tag("both")
+                    }
+                    .pickerStyle(.segmented)
+                    .frame(width: 200)
+                }
+
+                Toggle("始终保留系统原生状态栏", isOn: $showSystemStatusBar)
                 Toggle("显示时间", isOn: $footerShowTime)
                 Toggle("显示电量图标", isOn: $footerShowBatteryIcon)
                 Toggle("显示电量百分比", isOn: $footerShowBatteryPercent)

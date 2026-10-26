@@ -106,18 +106,36 @@ final class InsecureTrustSessionDelegate: NSObject, URLSessionDelegate, URLSessi
 
 final class URLSessionSourceNetworkClient: SourceNetworkClient, @unchecked Sendable {
     private static let sessionDelegate = InsecureTrustSessionDelegate()
-    private static let defaultSession: URLSession = {
+    private static let lock = NSLock()
+    private static var _currentSession: URLSession?
+
+    static func resetSession() {
+        lock.lock()
+        _currentSession = nil
+        lock.unlock()
+    }
+
+    private static var activeSession: URLSession {
+        lock.lock()
+        defer { lock.unlock() }
+        if let s = _currentSession { return s }
         let configuration = URLSessionConfiguration.ephemeral
         configuration.urlCache = nil
         configuration.requestCachePolicy = .reloadIgnoringLocalCacheData
-        return URLSession(configuration: configuration, delegate: sessionDelegate, delegateQueue: nil)
-    }()
+        SourceProxyManager.shared.applyProxy(to: configuration)
+        let newSession = URLSession(configuration: configuration, delegate: sessionDelegate, delegateQueue: nil)
+        _currentSession = newSession
+        return newSession
+    }
 
-    private let session: URLSession
+    private let customSession: URLSession?
+    private var session: URLSession {
+        customSession ?? Self.activeSession
+    }
     private let cookieStore: SourceCookieStore
 
     init(session: URLSession? = nil, cookieStore: SourceCookieStore = SourceCookieStore()) {
-        self.session = session ?? Self.defaultSession
+        self.customSession = session
         self.cookieStore = cookieStore
     }
 

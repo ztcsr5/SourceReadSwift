@@ -644,7 +644,19 @@ final class SourceStore: ObservableObject {
     }
 
     func source(for sourceUrl: String) -> BookSource? {
-        sources.first { $0.bookSourceUrl == sourceUrl }
+        if let exact = sources.first(where: { $0.bookSourceUrl == sourceUrl }) {
+            return exact
+        }
+        let trimmed = sourceUrl.trimmingCharacters(in: CharacterSet(charactersIn: "/ "))
+        if let match = sources.first(where: { $0.bookSourceUrl.trimmingCharacters(in: CharacterSet(charactersIn: "/ ")) == trimmed }) {
+            return match
+        }
+        if let host = URL(string: sourceUrl)?.host?.lowercased(), !host.isEmpty {
+            if let match = sources.first(where: { URL(string: $0.bookSourceUrl)?.host?.lowercased() == host }) {
+                return match
+            }
+        }
+        return nil
     }
 
     /// Portable export used by the all-data backup. Credentials and cookies

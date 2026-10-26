@@ -8,6 +8,7 @@ struct DiscoverView: View {
     @State private var selectedTab: DiscoverTab = .search
     @State private var pendingShelfAddBook: SearchBook?
     @State private var showSmartWebReader = false
+    @State private var showExploreSourcePickerSheet = false
     @State private var selectedAggregatedBookForSources: AggregatedSearchBook? = nil
     @State private var detectedClipboardSourceURL: String? = nil
     @State private var lastCheckedPasteboardChangeCount: Int = -1
@@ -94,12 +95,35 @@ struct DiscoverView: View {
                         clipboardSourceBanner
                     }
 
-                    Picker("发现模式", selection: $selectedTab) {
+                    HStack(spacing: 0) {
                         ForEach(DiscoverTab.allCases) { tab in
-                            Text(tab.rawValue).tag(tab)
+                            let isSelected = selectedTab == tab
+                            Button {
+                                UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                                selectedTab = tab
+                            } label: {
+                                HStack(spacing: 6) {
+                                    Image(systemName: tab.icon)
+                                        .font(.system(size: 13, weight: .semibold))
+                                    Text(tab.rawValue)
+                                        .font(.system(size: 14, weight: isSelected ? .semibold : .medium))
+                                }
+                                .foregroundStyle(isSelected ? Color.white : Color.primary)
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 8)
+                                .background {
+                                    if isSelected {
+                                        RoundedRectangle(cornerRadius: 10, style: .continuous)
+                                            .fill(AppTheme.accent)
+                                            .shadow(color: AppTheme.accent.opacity(0.24), radius: 3, y: 1)
+                                    }
+                                }
+                            }
+                            .buttonStyle(.plain)
                         }
                     }
-                    .pickerStyle(.segmented)
+                    .padding(3)
+                    .background(Color(UIColor.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 13, style: .continuous))
 
                     mediumFilterPillBar
 
@@ -340,25 +364,60 @@ struct DiscoverView: View {
     private var matchModePicker: some View {
         HStack {
             Spacer()
-            Picker("搜索模式", selection: $viewModel.matchMode) {
+            HStack(spacing: 0) {
                 ForEach(SearchMatchMode.allCases) { mode in
-                    Text(mode.title).tag(mode)
+                    let isSelected = viewModel.matchMode == mode
+                    Button {
+                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                        viewModel.matchMode = mode
+                    } label: {
+                        Text(mode.title)
+                            .font(.system(size: 13, weight: isSelected ? .semibold : .medium))
+                            .foregroundStyle(isSelected ? Color.white : Color.primary)
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 6)
+                            .background {
+                                if isSelected {
+                                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                                        .fill(AppTheme.accent)
+                                }
+                            }
+                    }
+                    .buttonStyle(.plain)
                 }
             }
-            .pickerStyle(.segmented)
-            .frame(width: 170)
+            .padding(2)
+            .background(Color(UIColor.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
         }
     }
 
     private var resultFilterPicker: some View {
         VStack(alignment: .leading, spacing: 8) {
             if viewModel.hasUnfilteredResults {
-                Picker("筛选范围", selection: $viewModel.resultFilterScope) {
+                HStack(spacing: 0) {
                     ForEach(SearchResultFilterScope.allCases) { scope in
-                        Text(scope.title).tag(scope)
+                        let isSelected = viewModel.resultFilterScope == scope
+                        Button {
+                            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                            viewModel.resultFilterScope = scope
+                        } label: {
+                            Text(scope.title)
+                                .font(.system(size: 12, weight: isSelected ? .semibold : .medium))
+                                .foregroundStyle(isSelected ? Color.white : Color.primary)
+                                .padding(.horizontal, 10)
+                                .padding(.vertical, 5)
+                                .background {
+                                    if isSelected {
+                                        RoundedRectangle(cornerRadius: 7, style: .continuous)
+                                            .fill(AppTheme.accent)
+                                    }
+                                }
+                        }
+                        .buttonStyle(.plain)
                     }
                 }
-                .pickerStyle(.segmented)
+                .padding(2)
+                .background(Color(UIColor.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 9, style: .continuous))
 
                 TextField(viewModel.resultFilterScope.placeholder, text: $viewModel.resultFilter)
                     .textInputAutocapitalization(.never)
@@ -549,13 +608,30 @@ struct DiscoverView: View {
                         .font(.caption.weight(.semibold))
                         .foregroundStyle(.secondary)
                     Spacer()
-                    Picker("展示方式", selection: $viewModel.displayMode) {
+                    HStack(spacing: 0) {
                         ForEach(SearchDisplayMode.allCases) { mode in
-                            Text(mode.title).tag(mode)
+                            let isSelected = viewModel.displayMode == mode
+                            Button {
+                                UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                                viewModel.displayMode = mode
+                            } label: {
+                                Text(mode.title)
+                                    .font(.system(size: 12, weight: isSelected ? .semibold : .medium))
+                                    .foregroundStyle(isSelected ? Color.white : Color.primary)
+                                    .padding(.horizontal, 12)
+                                    .padding(.vertical, 5)
+                                    .background {
+                                        if isSelected {
+                                            RoundedRectangle(cornerRadius: 7, style: .continuous)
+                                                .fill(AppTheme.accent)
+                                        }
+                                    }
+                            }
+                            .buttonStyle(.plain)
                         }
                     }
-                    .pickerStyle(.segmented)
-                    .frame(width: 170)
+                    .padding(2)
+                    .background(Color(UIColor.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 9, style: .continuous))
                 }
             }
 
@@ -854,34 +930,60 @@ struct DiscoverView: View {
     }
 
     private var sourceSelectorSection: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 8) {
-                ForEach(exploreViewModel.availableSources) { source in
-                    let isSelected = exploreViewModel.selectedSource?.id == source.id
-                    Button {
-                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                        exploreViewModel.selectSource(source)
-                    } label: {
-                        HStack(spacing: 4) {
-                            if source.bookSourceType == 1 {
-                                Image(systemName: "headphones")
-                                    .font(.caption2)
+        HStack(spacing: 8) {
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 8) {
+                    ForEach(exploreViewModel.availableSources) { source in
+                        let isSelected = exploreViewModel.selectedSource?.id == source.id
+                        Button {
+                            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                            exploreViewModel.selectSource(source)
+                        } label: {
+                            HStack(spacing: 4) {
+                                if source.bookSourceType == 1 {
+                                    Image(systemName: "headphones")
+                                        .font(.caption2)
+                                }
+                                Text(source.bookSourceName)
+                                    .font(.subheadline.weight(isSelected ? .semibold : .regular))
                             }
-                            Text(source.bookSourceName)
-                                .font(.subheadline.weight(isSelected ? .semibold : .regular))
+                            .padding(.horizontal, 14)
+                            .padding(.vertical, 7)
+                            .background(
+                                isSelected ? AppTheme.accent : Color(UIColor.secondarySystemGroupedBackground),
+                                in: Capsule()
+                            )
+                            .foregroundStyle(isSelected ? .white : .primary)
                         }
-                        .padding(.horizontal, 14)
-                        .padding(.vertical, 7)
-                        .background(
-                            isSelected ? AppTheme.accent : Color(UIColor.secondarySystemGroupedBackground),
-                            in: Capsule()
-                        )
-                        .foregroundStyle(isSelected ? .white : .primary)
+                        .buttonStyle(.plain)
                     }
-                    .buttonStyle(.plain)
+                }
+                .padding(.vertical, 2)
+            }
+
+            // 「全部源」折叠换源入口
+            Button {
+                showExploreSourcePickerSheet = true
+            } label: {
+                HStack(spacing: 3) {
+                    Image(systemName: "list.bullet")
+                        .font(.caption.weight(.bold))
+                    Text("全部源")
+                        .font(.caption.weight(.semibold))
+                }
+                .padding(.horizontal, 10)
+                .padding(.vertical, 7)
+                .background(Color(UIColor.secondarySystemGroupedBackground), in: Capsule())
+                .foregroundStyle(AppTheme.accent)
+                .overlay {
+                    Capsule().stroke(AppTheme.accent.opacity(0.3), lineWidth: 1)
                 }
             }
-            .padding(.vertical, 2)
+            .buttonStyle(.plain)
+            .accessibilityLabel("展开全部发现书源列表")
+        }
+        .sheet(isPresented: $showExploreSourcePickerSheet) {
+            ExploreSourceSelectionSheet(viewModel: exploreViewModel)
         }
     }
 
@@ -1493,6 +1595,68 @@ private extension Array {
         guard size > 0 else { return [self] }
         return stride(from: 0, to: count, by: size).map {
             Array(self[$0..<Swift.min($0 + size, count)])
+        }
+    }
+}
+
+
+struct ExploreSourceSelectionSheet: View {
+    @ObservedObject var viewModel: ExploreViewModel
+    @Environment(\.dismiss) private var dismiss
+    @State private var searchKeyword = ""
+
+    private var filteredSources: [BookSource] {
+        guard !searchKeyword.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            return viewModel.availableSources
+        }
+        let q = searchKeyword.lowercased()
+        return viewModel.availableSources.filter {
+            $0.bookSourceName.lowercased().contains(q) || ($0.bookSourceGroup?.lowercased().contains(q) == true)
+        }
+    }
+
+    var body: some View {
+        NavigationStack {
+            List {
+                ForEach(filteredSources) { source in
+                    let isSelected = viewModel.selectedSource?.id == source.id
+                    Button {
+                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                        viewModel.selectSource(source)
+                        dismiss()
+                    } label: {
+                        HStack {
+                            if source.bookSourceType == 1 {
+                                Image(systemName: "headphones")
+                                    .foregroundStyle(AppTheme.accent)
+                            }
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(source.bookSourceName)
+                                    .font(.headline)
+                                    .foregroundStyle(isSelected ? AppTheme.accent : .primary)
+                                if let grp = source.bookSourceGroup, !grp.isEmpty {
+                                    Text(grp)
+                                        .font(.caption2)
+                                        .foregroundStyle(.secondary)
+                                }
+                            }
+                            Spacer()
+                            if isSelected {
+                                Image(systemName: "checkmark.circle.fill")
+                                    .foregroundStyle(AppTheme.accent)
+                            }
+                        }
+                    }
+                }
+            }
+            .searchable(text: $searchKeyword, placement: .navigationBarDrawer(displayMode: .always), prompt: "搜索书源名称或分组")
+            .navigationTitle("全部发现书源 (\(viewModel.availableSources.count))")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("关闭") { dismiss() }
+                }
+            }
         }
     }
 }

@@ -5,6 +5,7 @@ import UniformTypeIdentifiers
 struct SettingsView: View {
     @EnvironmentObject private var appState: AppState
     @AppStorage("settings.themeMode") private var themeModeRawValue = ThemeMode.system.rawValue
+    @ObservedObject private var proxyManager = SourceProxyManager.shared
     @State private var cacheSize = "无缓存"
     @State private var rssCacheSize = "无缓存"
     @State private var backupDocument: AppDataBackupDocument?
@@ -84,6 +85,18 @@ struct SettingsView: View {
                         PurifyRulesView()
                     } label: {
                         Label("净化规则", systemImage: "wand.and.stars")
+                    }
+
+                    NavigationLink {
+                        SourceProxySettingsView()
+                    } label: {
+                        HStack {
+                            Label("书源网络代理", systemImage: "network")
+                            Spacer()
+                            Text(proxyManager.isEnabled ? "\(proxyManager.host):\(proxyManager.port)" : "未开启")
+                                .font(.subheadline)
+                                .foregroundStyle(.secondary)
+                        }
                     }
                 }
 

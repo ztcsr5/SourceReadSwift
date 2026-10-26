@@ -30,8 +30,8 @@ targets:
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.edc21.SourceReadSwift
-        MARKETING_VERSION: "1.0.57"
-        CURRENT_PROJECT_VERSION: "58"
+        MARKETING_VERSION: "1.0.58"
+        CURRENT_PROJECT_VERSION: "59"
         INFOPLIST_FILE: SourceReadSwift/App/Info.plist
         CODE_SIGN_ENTITLEMENTS: SourceReadSwift/SourceReadSwift.entitlements
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon

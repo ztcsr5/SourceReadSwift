@@ -1044,7 +1044,51 @@ struct ChapterLoadingView: View {
 
     var body: some View {
         Group {
-            if let loadedContent = content {
+            if let source = appState.sourceStore.source(for: sourceUrl), source.sourceKind != .text {
+                switch source.sourceKind {
+                case .audio:
+                    AudioBookPlayerView()
+                        .onAppear {
+                            let searchBook = SearchBook(
+                                name: effectiveChapter.title,
+                                author: nil,
+                                coverUrl: nil,
+                                bookUrl: effectiveChapter.bookUrl,
+                                sourceName: source.bookSourceName,
+                                sourceUrl: source.bookSourceUrl
+                            )
+                            AudioBookPlaybackCoordinator.shared.startBook(
+                                bookID: bookID,
+                                book: searchBook,
+                                source: source,
+                                chapters: chapters.isEmpty ? [effectiveChapter] : chapters,
+                                initialChapterIndex: effectiveChapter.index,
+                                engine: appState.engine,
+                                bookshelfStore: appState.bookshelfStore
+                            )
+                        }
+                case .comic:
+                    ComicReaderView(
+                        bookID: bookID ?? "",
+                        bookTitle: effectiveChapter.title,
+                        source: source,
+                        initialChapterIndex: effectiveChapter.index,
+                        chapters: chapters.isEmpty ? [effectiveChapter] : chapters,
+                        engine: appState.engine
+                    )
+                case .video:
+                    VideoPlayerView(
+                        bookID: bookID ?? "",
+                        bookTitle: effectiveChapter.title,
+                        source: source,
+                        initialChapterIndex: effectiveChapter.index,
+                        chapters: chapters.isEmpty ? [effectiveChapter] : chapters,
+                        engine: appState.engine
+                    )
+                case .text:
+                    EmptyView()
+                }
+            } else if let loadedContent = content {
                 readerView(loadedContent)
             } else if let errorMessage {
                 chapterLoadErrorView(errorMessage)
@@ -1107,6 +1151,9 @@ struct ChapterLoadingView: View {
         guard content == nil, errorMessage == nil else { return }
         guard let source = appState.sourceStore.source(for: sourceUrl) else {
             errorMessage = "找不到书源"
+            return
+        }
+        if source.sourceKind != .text {
             return
         }
         let purifyRules = appState.purifyRuleStore.enabledPatterns
