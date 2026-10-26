@@ -836,8 +836,7 @@ final class LightweightHTTPServer: ObservableObject {
                         status: errorMessage == nil ? .passed : .failed,
                         message: errorMessage ?? "在线调试通过 (耗时 \(totalDuration)ms)",
                         keyword: keyword,
-                        resultCount: searchResult?.count ?? 0,
-                        latencyMs: totalDuration
+                        resultCount: searchResult?.count ?? 0
                     )
                 }
             }
