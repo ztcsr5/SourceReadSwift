@@ -17,7 +17,11 @@ enum ReaderTextTransform {
         return toTraditionalChinese(text)
     }
 
-    static func bionicAttributedString(_ text: String, regularFont: Font, boldFont: Font) -> AttributedString {
+    static func displayText(_ text: String, traditionalChinese: Bool) -> String {
+        displayText(text, traditionalChineseEnabled: traditionalChinese)
+    }
+
+    static func bionicAttributedString(for text: String, regularFont: Font? = nil, boldFont: Font? = nil) -> AttributedString {
         guard !text.isEmpty else { return AttributedString() }
         var result = AttributedString()
         var index = text.startIndex
@@ -36,11 +40,17 @@ enum ReaderTextTransform {
                 let boldCount = max(1, Int(ceil(Double(count) * 0.45)))
                 let splitIdx = word.index(word.startIndex, offsetBy: min(boldCount, count))
                 var head = AttributedString(String(word[..<splitIdx]))
-                head.font = boldFont
+                if let boldFont {
+                    head.font = boldFont
+                } else {
+                    head.inlinePresentationIntent = .stronglyEmphasized
+                }
                 result.append(head)
                 if splitIdx < word.endIndex {
                     var tail = AttributedString(String(word[splitIdx...]))
-                    tail.font = regularFont
+                    if let regularFont {
+                        tail.font = regularFont
+                    }
                     result.append(tail)
                 }
                 index = wordEnd
@@ -51,13 +61,82 @@ enum ReaderTextTransform {
             var part = AttributedString(String(ch))
             if isCJKIdeograph(ch) {
                 let isBold = (cjkRunCount % 4) < 2
-                part.font = isBold ? boldFont : regularFont
+                if isBold {
+                    if let boldFont {
+                        part.font = boldFont
+                    } else {
+                        part.inlinePresentationIntent = .stronglyEmphasized
+                    }
+                } else if let regularFont {
+                    part.font = regularFont
+                }
                 cjkRunCount += 1
             } else {
                 cjkRunCount = 0
-                part.font = regularFont
+                if let regularFont {
+                    part.font = regularFont
+                }
             }
             result.append(part)
+            index = nextIndex
+        }
+        return result
+    }
+
+    static func bionicAttributedString(_ text: String, regularFont: Font, boldFont: Font) -> AttributedString {
+        bionicAttributedString(for: text, regularFont: regularFont, boldFont: boldFont)
+    }
+
+    static func bionicAttributedString(
+        _ text: String,
+        baseFont: UIFont,
+        textColor: UIColor,
+        lineSpacing: CGFloat,
+        letterSpacing: CGFloat
+    ) -> NSAttributedString {
+        let paragraphStyle = NSMutableParagraphStyle()
+        paragraphStyle.lineSpacing = lineSpacing
+        let baseAttributes: [NSAttributedString.Key: Any] = [
+            .font: baseFont,
+            .foregroundColor: textColor,
+            .paragraphStyle: paragraphStyle,
+            .kern: letterSpacing
+        ]
+        let boldFont: UIFont = {
+            if let descriptor = baseFont.fontDescriptor.withSymbolicTraits(.traitBold) {
+                return UIFont(descriptor: descriptor, size: baseFont.pointSize)
+            }
+            return UIFont.boldSystemFont(ofSize: baseFont.pointSize)
+        }()
+        let result = NSMutableAttributedString(string: text, attributes: baseAttributes)
+        var index = text.startIndex
+        var cjkRunCount = 0
+        while index < text.endIndex {
+            let ch = text[index]
+            if ch.isASCII && (ch.isLetter || ch.isNumber) {
+                cjkRunCount = 0
+                var wordEnd = text.index(after: index)
+                while wordEnd < text.endIndex, text[wordEnd].isASCII && (text[wordEnd].isLetter || text[wordEnd].isNumber) {
+                    wordEnd = text.index(after: wordEnd)
+                }
+                let word = String(text[index..<wordEnd])
+                let boldCount = max(1, Int(ceil(Double(word.count) * 0.45)))
+                let splitIdx = text.index(index, offsetBy: min(boldCount, word.count))
+                let nsRange = NSRange(index..<splitIdx, in: text)
+                result.addAttribute(.font, value: boldFont, range: nsRange)
+                index = wordEnd
+                continue
+            }
+            let nextIndex = text.index(after: index)
+            if isCJKIdeograph(ch) {
+                if (cjkRunCount % 4) < 2 {
+                    let nsRange = NSRange(index..<nextIndex, in: text)
+                    result.addAttribute(.font, value: boldFont, range: nsRange)
+                }
+                cjkRunCount += 1
+            } else {
+                cjkRunCount = 0
+            }
             index = nextIndex
         }
         return result

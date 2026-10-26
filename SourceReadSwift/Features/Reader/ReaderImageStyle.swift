@@ -7,13 +7,16 @@ import Foundation
 /// accepted values in ReadBook is DEFAULT / FULL / TEXT / SINGLE.
 /// SINGLE is a pagination concept (one illustration per page), which maps to
 /// full width, vertically centred, never taller than the viewport on iOS.
-enum ReaderImageStyle: String, CaseIterable, Sendable {
+enum ReaderImageStyle: String, CaseIterable, Identifiable, Sendable {
     case standard = "DEFAULT"
     case full = "FULL"
     case text = "TEXT"
     case single = "SINGLE"
 
     static let `default`: ReaderImageStyle = .standard
+
+    var id: String { rawValue }
+    var title: String { displayName }
 
     /// Unknown or missing rule values fall back to DEFAULT, matching Legado.
     init(rule: String?) {

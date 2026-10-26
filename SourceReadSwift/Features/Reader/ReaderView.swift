@@ -2157,7 +2157,13 @@ struct ReaderView: View {
         let highlighted = speechChapterIndex == ownerChapter
             && speechController.currentParagraphIndex == index
         let textView: Text = bionicReadingEnabled
-            ? Text(ReaderTextTransform.bionicAttributedString(for: paragraph))
+            ? Text(
+                ReaderTextTransform.bionicAttributedString(
+                    for: paragraph,
+                    regularFont: fontFamily.swiftUIFont(size: CGFloat(fontSize), weight: .regular),
+                    boldFont: fontFamily.swiftUIFont(size: CGFloat(fontSize), weight: .bold)
+                )
+            )
             : Text(paragraph)
         return textView
             .font(fontFamily.swiftUIFont(size: CGFloat(fontSize), weight: .regular))
