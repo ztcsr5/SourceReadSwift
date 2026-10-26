@@ -245,6 +245,10 @@ enum ReaderCustomWallpaperStore {
     static var hasCustomWallpaper: Bool {
         FileManager.default.fileExists(atPath: wallpaperURL.path)
     }
+
+    static func clearWallpaper() {
+        try? FileManager.default.removeItem(at: wallpaperURL)
+    }
 }
 
 fileprivate extension Color {
