@@ -306,9 +306,14 @@ final class WebReaderDocumentTests: XCTestCase {
         XCTAssertTrue(ReaderBackground.sakuraDark.isDark)
         XCTAssertTrue(ReaderBackground.sakuraSolarized.isDark)
         XCTAssertTrue(ReaderBackground.sakuraVader.isDark)
-        XCTAssertTrue(ReaderBackground.custom.isDark)
         XCTAssertFalse(ReaderBackground.paper.isDark)
         XCTAssertFalse(ReaderBackground.kraft.isDark)
         XCTAssertFalse(ReaderBackground.green.isDark)
+
+        // Custom background adapts based on user preference (reader.customBackgroundIsDark)
+        UserDefaults.standard.set(true, forKey: "reader.customBackgroundIsDark")
+        XCTAssertTrue(ReaderBackground.custom.isDark)
+        UserDefaults.standard.set(false, forKey: "reader.customBackgroundIsDark")
+        XCTAssertFalse(ReaderBackground.custom.isDark)
     }
 }
