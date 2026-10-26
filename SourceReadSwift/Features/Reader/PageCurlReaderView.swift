@@ -14,6 +14,7 @@ struct PageCurlReaderView<Item: Identifiable, Content: View>: UIViewControllerRe
     /// controller so a font change can never leave stale page content on
     /// screen — index equality alone is not enough.
     let contentRevision: String
+    let transitionStyle: UIPageViewController.TransitionStyle
     @Binding var currentPageIndex: Int
     let onPageChanged: ((Int) -> Void)?
     let pageBuilder: (Item) -> Content
@@ -21,12 +22,14 @@ struct PageCurlReaderView<Item: Identifiable, Content: View>: UIViewControllerRe
     init(
         pages: [Item],
         contentRevision: String,
+        transitionStyle: UIPageViewController.TransitionStyle = .pageCurl,
         currentPageIndex: Binding<Int>,
         onPageChanged: ((Int) -> Void)? = nil,
         @ViewBuilder pageBuilder: @escaping (Item) -> Content
     ) {
         self.pages = pages
         self.contentRevision = contentRevision
+        self.transitionStyle = transitionStyle
         self._currentPageIndex = currentPageIndex
         self.onPageChanged = onPageChanged
         self.pageBuilder = pageBuilder
@@ -37,12 +40,20 @@ struct PageCurlReaderView<Item: Identifiable, Content: View>: UIViewControllerRe
     }
 
     func makeUIViewController(context: Context) -> UIPageViewController {
-        let pvc = UIPageViewController(
-            transitionStyle: .pageCurl,
-            navigationOrientation: .horizontal,
-            options: [
+        let options: [UIPageViewController.OptionsKey: Any]
+        if transitionStyle == .pageCurl {
+            options = [
                 UIPageViewController.OptionsKey.spineLocation: UIPageViewController.SpineLocation.min.rawValue
             ]
+        } else {
+            options = [
+                UIPageViewController.OptionsKey.interPageSpacing: 0
+            ]
+        }
+        let pvc = UIPageViewController(
+            transitionStyle: transitionStyle,
+            navigationOrientation: .horizontal,
+            options: options
         )
         pvc.dataSource = context.coordinator
         pvc.delegate = context.coordinator

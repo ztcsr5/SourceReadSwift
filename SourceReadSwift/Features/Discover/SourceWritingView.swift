@@ -1227,6 +1227,20 @@ final class LightweightHTTPServer: ObservableObject {
 
     <!-- TAB 2: Live Debugger -->
     <div id="tab-debugger" class="tab-pane">
+      <!-- 当前调试目标书源高亮看板 -->
+      <div id="debug-current-source-banner" class="card" style="background: rgba(59, 130, 246, 0.08); border-color: rgba(59, 130, 246, 0.25); padding: 14px 18px; margin-bottom: 16px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+          <div>
+            <div style="font-size: 11px; text-transform: uppercase; color: #60a5fa; font-weight: 700; letter-spacing: 0.5px; display: flex; align-items: center; gap: 6px;">
+              <span style="display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: #60a5fa;"></span> 当前调试目标书源
+            </div>
+            <div style="font-size: 16px; font-weight: 700; color: #fff; margin-top: 4px;" id="current-source-title">待指定（请在“书源编辑”或“源库管理”中选择）</div>
+            <div style="font-size: 12px; color: var(--text-muted); margin-top: 3px;" id="current-source-meta">URL: 未加载 | 分组: - | 权重: -</div>
+          </div>
+          <button class="btn btn-outline" style="font-size: 12px;" onclick="switchTab('editor')">✏️ 查看/编辑该书源码</button>
+        </div>
+      </div>
+
       <div class="card">
         <div class="card-title">
           <span>书源测试与运行参数</span>
@@ -1326,6 +1340,25 @@ final class LightweightHTTPServer: ObservableObject {
             </tbody>
           </table>
         </div>
+
+        <!-- 分页控制器 -->
+        <div id="library-pagination" style="display: flex; justify-content: space-between; align-items: center; margin-top: 16px; flex-wrap: wrap; gap: 10px; font-size: 13px;">
+          <div style="color: var(--text-muted);">
+            显示第 <span id="page-start">0</span> - <span id="page-end">0</span> 条 / 共 <span id="page-total">0</span> 条书源
+          </div>
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <select id="page-size-select" class="input" style="padding: 4px 8px; font-size: 12px;" onchange="changePageSize(this.value)">
+              <option value="20" selected>每页 20 条</option>
+              <option value="50">每页 50 条</option>
+              <option value="100">每页 100 条</option>
+            </select>
+            <button class="btn btn-outline" style="padding: 4px 10px; font-size: 12px;" onclick="goToPage(1)" id="btn-page-first">« 首页</button>
+            <button class="btn btn-outline" style="padding: 4px 10px; font-size: 12px;" onclick="goToPage(currentPage - 1)" id="btn-page-prev">‹ 上一页</button>
+            <span style="font-weight: 600; padding: 0 4px;" id="page-indicator">第 1 / 1 页</span>
+            <button class="btn btn-outline" style="padding: 4px 10px; font-size: 12px;" onclick="goToPage(currentPage + 1)" id="btn-page-next">下一页 ›</button>
+            <button class="btn btn-outline" style="padding: 4px 10px; font-size: 12px;" onclick="goToPage(totalPageCount())" id="btn-page-last">末页 »</button>
+          </div>
+        </div>
       </div>
     </div>
   </div>
@@ -1335,6 +1368,32 @@ final class LightweightHTTPServer: ObservableObject {
   <script>
     let allSources = [];
     let currentHealthFilter = 'all';
+    let currentPage = 1;
+    let pageSize = 20;
+    let currentFilteredSources = [];
+
+    function updateDebugBannerFromEditor() {
+      const code = document.getElementById('source-code').value.trim();
+      const titleElem = document.getElementById('current-source-title');
+      const metaElem = document.getElementById('current-source-meta');
+      if (!code) {
+        titleElem.innerText = '未指定（请在“书源编辑”中输入或“源库”载入）';
+        titleElem.style.color = 'var(--text-muted)';
+        metaElem.innerText = 'URL: 未加载 | 分组: - | 权重: -';
+        return;
+      }
+      try {
+        const parsed = JSON.parse(code);
+        const s = Array.isArray(parsed) ? parsed[0] : parsed;
+        titleElem.innerText = (s.bookSourceName || '未命名书源') + ' (' + (s.bookSourceUrl || '无 URL') + ')';
+        titleElem.style.color = '#fff';
+        metaElem.innerText = `根地址: ${s.bookSourceUrl || '-'} | 分组: ${s.bookSourceGroup || '未分组'} | 权重: ${s.weight ?? 0} | 类型: ${s.bookSourceType === 1 ? '音频' : (s.bookSourceType === 2 ? '图片' : '文本')}`;
+      } catch (e) {
+        titleElem.innerText = 'JSON 格式解析中或格式未完成';
+        titleElem.style.color = 'var(--warning)';
+        metaElem.innerText = e.message;
+      }
+    }
 
     function showToast(msg, isError = false) {
       const toast = document.getElementById('toast');
@@ -1353,6 +1412,7 @@ final class LightweightHTTPServer: ObservableObject {
       } else if (tab === 'debugger') {
         document.querySelector('.tab-btn:nth-child(2)').classList.add('active');
         document.getElementById('tab-debugger').classList.add('active');
+        updateDebugBannerFromEditor();
       } else if (tab === 'library') {
         document.querySelector('.tab-btn:nth-child(3)').classList.add('active');
         document.getElementById('tab-library').classList.add('active');
@@ -1500,11 +1560,17 @@ final class LightweightHTTPServer: ObservableObject {
           chapterUrl: overrideUrl
         };
 
+        updateDebugBannerFromEditor();
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 25000);
+
         const res = await fetch('/api/source/debug', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload)
+          body: JSON.stringify(payload),
+          signal: controller.signal
         });
+        clearTimeout(timeoutId);
 
         const data = await res.json();
         durationLabel.innerText = '耗时: ' + (data.durationMs || 0) + 'ms';
@@ -1532,10 +1598,17 @@ final class LightweightHTTPServer: ObservableObject {
         renderDebugResults(data);
 
       } catch (e) {
-        terminal.innerHTML += `<span class="log-line log-error">❌ 请求异常: ${escapeHtml(e.message)}</span>`;
-        pill.className = 'pill pill-red';
-        pill.innerText = '请求失败';
-        showToast('调试连接出错: ' + e.message, true);
+        if (e.name === 'AbortError') {
+          terminal.innerHTML += `<span class="log-line log-error">⏱️ 调试请求超时 (25秒)：目标书源网站无响应或网络受阻，请检查书源 URL 或单独测试搜索环节。</span>`;
+          pill.className = 'pill pill-red';
+          pill.innerText = '超时异常';
+          showToast('调试请求超时 (25s)', true);
+        } else {
+          terminal.innerHTML += `<span class="log-line log-error">❌ 请求异常: ${escapeHtml(e.message)}</span>`;
+          pill.className = 'pill pill-red';
+          pill.innerText = '请求失败';
+          showToast('调试连接出错: ' + e.message, true);
+        }
       } finally {
         runBtn.disabled = false;
         runBtn.innerText = '▶️ 开始调试';
@@ -1644,9 +1717,25 @@ final class LightweightHTTPServer: ObservableObject {
       applyFilter();
     }
 
+    function totalPageCount() {
+      return Math.max(1, Math.ceil(currentFilteredSources.length / pageSize));
+    }
+
+    function changePageSize(val) {
+      pageSize = parseInt(val, 10) || 20;
+      currentPage = 1;
+      renderCurrentPage();
+    }
+
+    function goToPage(p) {
+      const maxPages = totalPageCount();
+      currentPage = Math.min(Math.max(1, p), maxPages);
+      renderCurrentPage();
+    }
+
     function applyFilter() {
       const query = (document.getElementById('filter-search').value || '').trim().toLowerCase();
-      const filtered = allSources.filter(s => {
+      currentFilteredSources = allSources.filter(s => {
         const matchesQuery = !query ||
           s.name.toLowerCase().includes(query) ||
           (s.group && s.group.toLowerCase().includes(query)) ||
@@ -1661,17 +1750,42 @@ final class LightweightHTTPServer: ObservableObject {
         return true;
       });
 
-      renderSourcesTable(filtered);
+      currentPage = 1;
+      renderCurrentPage();
     }
 
-    function renderSourcesTable(sources) {
+    function renderCurrentPage() {
+      const total = currentFilteredSources.length;
+      const maxPages = totalPageCount();
+      if (currentPage > maxPages) currentPage = maxPages;
+
+      const startIndex = total === 0 ? 0 : (currentPage - 1) * pageSize;
+      const endIndex = Math.min(startIndex + pageSize, total);
+      const pageData = currentFilteredSources.slice(startIndex, endIndex);
+
+      // 更新分页指示器
+      document.getElementById('page-start').innerText = total === 0 ? 0 : startIndex + 1;
+      document.getElementById('page-end').innerText = endIndex;
+      document.getElementById('page-total').innerText = total;
+      document.getElementById('page-indicator').innerText = `第 ${currentPage} / ${maxPages} 页`;
+
+      const btnFirst = document.getElementById('btn-page-first');
+      const btnPrev = document.getElementById('btn-page-prev');
+      const btnNext = document.getElementById('btn-page-next');
+      const btnLast = document.getElementById('btn-page-last');
+
+      if (btnFirst) btnFirst.disabled = currentPage <= 1;
+      if (btnPrev) btnPrev.disabled = currentPage <= 1;
+      if (btnNext) btnNext.disabled = currentPage >= maxPages;
+      if (btnLast) btnLast.disabled = currentPage >= maxPages;
+
       const tbody = document.getElementById('sources-table-body');
-      if (sources.length === 0) {
+      if (pageData.length === 0) {
         tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; color: var(--text-muted); padding: 24px;">没有符合条件的书源</td></tr>';
         return;
       }
 
-      tbody.innerHTML = sources.map(s => {
+      tbody.innerHTML = pageData.map(s => {
         let statusBadge = '<span class="pill pill-gray">未测试</span>';
         if (s.healthStatus === 'passed') {
           statusBadge = '<span class="pill pill-green" title="' + escapeHtml(s.healthMessage) + '">🟢 正常</span>';

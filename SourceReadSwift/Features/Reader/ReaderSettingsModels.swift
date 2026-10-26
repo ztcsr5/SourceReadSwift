@@ -111,7 +111,7 @@ enum ReaderBackground: String, CaseIterable, Identifiable, Codable, Sendable {
         case .white, .eink: return 0xFFFFFF
         case .gray: return 0xF2F2F7
         case .dark: return 0x000000
-        case .custom: return 0x1C1C1E
+        case .custom: return UserDefaults.standard.bool(forKey: "reader.customBackgroundIsDark") ? 0x1C1C1E : 0xF7F7F8
         case .sakuraClassic: return 0xF9F9F9
         case .sakuraDark: return 0x222222
         case .sakuraSolarized: return 0x002B36
@@ -132,7 +132,7 @@ enum ReaderBackground: String, CaseIterable, Identifiable, Codable, Sendable {
         case .gray: return 0x242426
         case .eink: return 0x000000
         case .dark: return 0xFFFFFF
-        case .custom: return 0xFFFFFF
+        case .custom: return UserDefaults.standard.bool(forKey: "reader.customBackgroundIsDark") ? 0xFFFFFF : 0x18181A
         case .sakuraClassic: return 0x4A4A4A
         case .sakuraDark: return 0xC9C9C9
         case .sakuraSolarized: return 0x839496
@@ -180,8 +180,10 @@ enum ReaderBackground: String, CaseIterable, Identifiable, Codable, Sendable {
 
     var isDark: Bool {
         switch self {
-        case .dark, .sakuraDark, .sakuraSolarized, .sakuraVader, .custom:
+        case .dark, .sakuraDark, .sakuraSolarized, .sakuraVader:
             return true
+        case .custom:
+            return UserDefaults.standard.bool(forKey: "reader.customBackgroundIsDark")
         default:
             return false
         }
@@ -192,7 +194,9 @@ enum ReaderBackground: String, CaseIterable, Identifiable, Codable, Sendable {
         switch self {
         case .paper, .kraft, .white, .gray, .eink,
              .sakuraClassic, .sakuraEarthly, .sakuraInk: return true
-        case .green, .lavender, .azure, .dark, .custom,
+        case .custom:
+            return !UserDefaults.standard.bool(forKey: "reader.customBackgroundIsDark")
+        case .green, .lavender, .azure, .dark,
              .sakuraDark, .sakuraSolarized, .sakuraVader: return false
         }
     }

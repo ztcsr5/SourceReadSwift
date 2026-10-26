@@ -150,11 +150,14 @@ struct ReaderView: View {
     /// 首帧是否已经落到「上次读到的那一段」。为 false 时文字层先透明，
     /// 避免用户先看到第 1 章章首、随后被切成恢复位置的那一下闪跳。
     @State private var didLandInitialPosition = false
-    /// 点击手势的按下时刻，用来过滤「长按/拖动」。
-    @State private var tapGestureStartedAt: Date?
+    private final class ReaderTapGestureTracker {
+        var startedAt: Date?
+    }
+    @State private var tapGestureTracker = ReaderTapGestureTracker()
     /// 一次点击只处理一次。paged 模式里快照页容器与 SwiftUI 手势可能在同一帧
     /// 各报一次，用户看到的就是「点一下跳了两页」。
     @State private var tapCooldownUntil: Date = .distantPast
+    @AppStorage("reader.customBackgroundIsDark") private var customBackgroundIsDark: Bool = false
     @State private var pageStepDirection: Int = 0
     @State private var pageStepGeneration: Int = 0
     @State private var brightnessBeforeReader: CGFloat? = nil
@@ -599,19 +602,18 @@ struct ReaderView: View {
             .id(readerMode == .scroll ? "web-scroll-reader" : "reader-paged-surface")
             .contentShape(Rectangle())
             .simultaneousGesture(
-                // 轻触即触发太敏感：以前用 SpatialTapGesture，手指一开始滚动就会被判成点击。
-                // 改成带位移/时长阈值的拖拽手势——位移超过 8pt 或按住超过 0.4s 都不算点击。
-                // 滚动模式已由文档内部的指针判定给出点击（含惯性与选区过滤），
-                // 这里必须让路，否则一次点击会翻两页。
+                // 轻触即触发太敏感：使用带位移/时长阈值的拖拽判定。
+                // 使用非响应式 tracker 记录触控起点，避免 touch down 时频繁触发全树重绘导致翻页卡顿中断。
                 DragGesture(minimumDistance: 0)
                     .onChanged { _ in
-                        if tapGestureStartedAt == nil { tapGestureStartedAt = Date() }
+                        if tapGestureTracker.startedAt == nil { tapGestureTracker.startedAt = Date() }
                     }
                     .onEnded { value in
-                        defer { tapGestureStartedAt = nil }
+                        let start = tapGestureTracker.startedAt
+                        tapGestureTracker.startedAt = nil
                         guard readerMode != .scroll else { return }
                         let moved = abs(value.translation.width) + abs(value.translation.height)
-                        let held = tapGestureStartedAt.map { Date().timeIntervalSince($0) } ?? 0
+                        let held = start.map { Date().timeIntervalSince($0) } ?? 0
                         guard moved < 18, held < 0.45 else { return }
                         handleReaderTap(at: value.location)
                     }
@@ -993,7 +995,11 @@ struct ReaderView: View {
                     .resizable()
                     .scaledToFill()
                     .id(backgroundWallpaperRevision)
-                Color.black.opacity(colorScheme == .dark ? 0.60 : 0.28)
+                if customBackgroundIsDark {
+                    Color.black.opacity(colorScheme == .dark ? 0.60 : 0.35)
+                } else {
+                    Color.white.opacity(colorScheme == .dark ? 0.15 : 0.20)
+                }
             } else {
                 readerThemeBackground
             }
@@ -1910,20 +1916,20 @@ struct ReaderView: View {
     }
 
     private var horizontalPagedReaderContent: some View {
-        TabView(selection: $pagedPageIndex) {
-            ForEach(pagedBlocks) { page in
+        PageCurlReaderView(
+            pages: pagedBlocks,
+            contentRevision: pagedBlocksCacheKey,
+            transitionStyle: .scroll,
+            currentPageIndex: $pagedPageIndex,
+            onPageChanged: { target in
+                updatePagedVisibleParagraph(pageIndex: target)
+            },
+            pageBuilder: { page in
                 readerPage(for: page)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .clipped()
-                    .tag(page.id)
             }
-        }
-        .tabViewStyle(.page(indexDisplayMode: .never))
+        )
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .clipped()
-        .onChange(of: pagedPageIndex) { target in
-            updatePagedVisibleParagraph(pageIndex: target)
-        }
         .onChange(of: speechController.currentParagraphIndex) { target in
             guard target >= 0, let flat = speechFlatParagraphIndex else { return }
             pagedPageIndex = pageIndex(containingParagraph: flat)
@@ -1974,7 +1980,10 @@ struct ReaderView: View {
             .gesture(
                 DragGesture(minimumDistance: 8, coordinateSpace: .local)
                     .onChanged { value in
-                        guard !coverIsAnimating else { return }
+                        if coverIsAnimating {
+                            coverIsAnimating = false
+                            coverDragTranslation = 0
+                        }
                         let horizontal = value.translation.width
                         let vertical = value.translation.height
                         if abs(horizontal) > abs(vertical) * 1.15 {
@@ -2006,7 +2015,6 @@ struct ReaderView: View {
     }
 
     private func finishCoverGesture(_ decision: ReaderCoverSwipeDecision, width: CGFloat) {
-        guard !coverIsAnimating else { return }
         let target: Int?
         switch decision {
         case .next:
@@ -2019,6 +2027,7 @@ struct ReaderView: View {
         guard let target, target != pagedPageIndex else {
             withAnimation(.interactiveSpring(response: 0.28, dampingFraction: 0.86)) {
                 coverDragTranslation = 0
+                coverIsAnimating = false
             }
             return
         }
@@ -2029,8 +2038,7 @@ struct ReaderView: View {
             coverDragTranslation = exitOffset
         }
         Task { @MainActor in
-            try? await Task.sleep(nanoseconds: 340_000_000)
-            guard coverIsAnimating else { return }
+            try? await Task.sleep(nanoseconds: 320_000_000)
             var transaction = Transaction()
             transaction.disablesAnimations = true
             withTransaction(transaction) {
@@ -2153,10 +2161,18 @@ struct ReaderView: View {
             .padding(.bottom, pagedBottomPadding)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
             .background {
-                // 覆盖模式的方向阴影由 coverPagedReaderContent 每页各画一层；
-                // 这里再叠一层同方向的 shadow，两圈叠在一起就是那道「奇怪的边框」。
-                if background == .custom {
-                    Color.clear
+                if background == .custom, let image = ReaderCustomWallpaperStore.loadWallpaper() {
+                    ZStack {
+                        Image(uiImage: image)
+                            .resizable()
+                            .scaledToFill()
+                        if customBackgroundIsDark {
+                            Color.black.opacity(colorScheme == .dark ? 0.60 : 0.35)
+                        } else {
+                            Color.white.opacity(colorScheme == .dark ? 0.15 : 0.20)
+                        }
+                    }
+                    .clipped()
                 } else {
                     readerThemeBackground
                 }
@@ -2831,9 +2847,37 @@ struct ReaderView: View {
                         }
                     }
 
+                    Picker("壁纸基底与文字风格", selection: $customBackgroundIsDark) {
+                        Text("浅色壁纸 (深色字)").tag(false)
+                        Text("深色壁纸 (浅色字)").tag(true)
+                    }
+                    .pickerStyle(.segmented)
+                    .padding(.top, 2)
+                    .onChange(of: customBackgroundIsDark) { _ in
+                        rebuildPagedBlocksCache()
+                    }
+
+                    if ReaderCustomWallpaperStore.hasCustomWallpaper {
+                        Button(role: .destructive) {
+                            ReaderCustomWallpaperStore.clearWallpaper()
+                            backgroundRawValue = ReaderBackground.paper.rawValue
+                            backgroundWallpaperRevision = UUID()
+                            rebuildPagedBlocksCache()
+                            HapticFeedback.light()
+                        } label: {
+                            HStack(spacing: 4) {
+                                Image(systemName: "trash")
+                                Text("清除自定义壁纸，恢复预设羊皮纸主题")
+                            }
+                            .font(.caption)
+                            .foregroundStyle(.red)
+                        }
+                        .padding(.top, 2)
+                    }
+
                     Text(ReaderCustomWallpaperStore.hasCustomWallpaper
-                         ? "壁纸会随阅读页一起滚动，正文自动加一层暗化保证可读性。"
-                         : "还没选壁纸，所以现在是纯黑底。先点上面的按钮从相册挑一张。")
+                         ? "壁纸已生效，支持自主切换浅色/深色文字样式以保证最佳对比度。"
+                         : "可从相册选择壁纸，支持自由搭配浅色或深色文字。")
                         .font(.caption2)
                         .foregroundStyle(.tertiary)
                 }
