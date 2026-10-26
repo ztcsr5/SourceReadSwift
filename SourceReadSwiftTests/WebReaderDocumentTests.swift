@@ -308,7 +308,7 @@ final class WebReaderDocumentTests: XCTestCase {
         XCTAssertTrue(ReaderBackground.sakuraVader.isDark)
         XCTAssertTrue(ReaderBackground.custom.isDark)
         XCTAssertFalse(ReaderBackground.paper.isDark)
-        XCTAssertFalse(ReaderBackground.sepia.isDark)
+        XCTAssertFalse(ReaderBackground.kraft.isDark)
         XCTAssertFalse(ReaderBackground.green.isDark)
     }
 }
