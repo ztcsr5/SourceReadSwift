@@ -42,7 +42,7 @@ final class AppState: ObservableObject {
 
     @Published var diagnostics: [DiagnosticEvent] = []
     @Published var isTabChromeHidden = false
-    private var tabChromeOwner: UUID?
+    private var activeTabChromeOwners: Set<UUID> = []
 
     init(
         sourceStore: SourceStore? = nil,
@@ -96,14 +96,17 @@ final class AppState: ObservableObject {
     }
 
     func acquireTabChromeHidden(owner: UUID) {
-        tabChromeOwner = owner
+        activeTabChromeOwners.insert(owner)
         isTabChromeHidden = true
     }
 
     func releaseTabChromeHidden(owner: UUID? = nil) {
-        if let owner, tabChromeOwner != owner { return }
-        tabChromeOwner = nil
-        isTabChromeHidden = false
+        if let owner {
+            activeTabChromeOwners.remove(owner)
+        } else {
+            activeTabChromeOwners.removeAll()
+        }
+        isTabChromeHidden = !activeTabChromeOwners.isEmpty
     }
 
     func importSharedDocument(_ url: URL) {

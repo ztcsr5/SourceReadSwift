@@ -960,6 +960,7 @@ struct ChapterLoadingView: View {
     @State private var autoplayAutoScrollAfterHandoff = false
     @State private var showReaderChromeAfterChapterSelection = false
     @State private var showBookDetailSheet = false
+    @State private var chapterLoadingTabChromeOwner = UUID()
     @AppStorage("reader.preloadChapterCount") private var preloadChapterCount = ReaderPreloadPolicy.defaultCount
 
     private var effectiveChapter: BookChapter {
@@ -975,6 +976,12 @@ struct ChapterLoadingView: View {
             } else {
                 chapterLoadingView
             }
+        }
+        .onAppear {
+            appState.acquireTabChromeHidden(owner: chapterLoadingTabChromeOwner)
+        }
+        .onDisappear {
+            appState.releaseTabChromeHidden(owner: chapterLoadingTabChromeOwner)
         }
         .overlay(alignment: .top) {
             if isCachingNext {

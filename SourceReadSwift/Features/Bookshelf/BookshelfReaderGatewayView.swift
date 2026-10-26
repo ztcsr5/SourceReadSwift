@@ -24,6 +24,9 @@ struct BookshelfReaderGatewayView: View {
     @State private var sourceSwitchSearchTrigger = 0
     @State private var localNavigationRevision = 0
     @State private var showBookDetailSheet = false
+    @State private var gatewayTabChromeOwner = UUID()
+    @State private var initialLocalChapterSeed: Int?
+    @State private var initialLocalParagraphSeed: Int?
 
     private var currentBook: BookshelfBook {
         appState.bookshelfStore.book(id: book.id) ?? book
@@ -31,6 +34,16 @@ struct BookshelfReaderGatewayView: View {
 
     var body: some View {
         gatewayContent
+        .onAppear {
+            appState.acquireTabChromeHidden(owner: gatewayTabChromeOwner)
+            if initialLocalChapterSeed == nil {
+                initialLocalChapterSeed = currentBook.currentChapterIndex
+                initialLocalParagraphSeed = currentBook.currentParagraphIndex
+            }
+        }
+        .onDisappear {
+            appState.releaseTabChromeHidden(owner: gatewayTabChromeOwner)
+        }
         .task {
             appState.bookshelfStore.markReaderOpened(bookID: book.id)
             appState.bookshelfStore.markUpdatesSeen(bookID: book.id)
@@ -222,7 +235,7 @@ struct BookshelfReaderGatewayView: View {
 
     private var localReader: some View {
         let chapters = localBookChapters
-        let requestedIndex = selectedLocalChapterIndex ?? requestedChapterIndex ?? currentBook.currentChapterIndex
+        let requestedIndex = selectedLocalChapterIndex ?? requestedChapterIndex ?? initialLocalChapterSeed ?? currentBook.currentChapterIndex
         let safeIndex = min(max(requestedIndex, 0), max(chapters.count - 1, 0))
         let localChapter = chapters[safeIndex]
         let fallbackChapters = chapters.map {
@@ -234,7 +247,9 @@ struct BookshelfReaderGatewayView: View {
                 isVip: false
             )
         }
-        let storedParagraph = currentBook.currentChapterIndex == safeIndex ? currentBook.currentParagraphIndex : nil
+        let storedParagraph = (initialLocalChapterSeed ?? currentBook.currentChapterIndex) == safeIndex
+            ? (initialLocalParagraphSeed ?? currentBook.currentParagraphIndex)
+            : nil
         let initialParagraphIndex = selectedLocalParagraphIndex ?? storedParagraph
         return ReaderView(
             bookID: book.id,
@@ -256,6 +271,7 @@ struct BookshelfReaderGatewayView: View {
                 showReaderChromeAfterChapterSelection = true
                 selectedLocalChapterIndex = chapter.index
                 selectedLocalParagraphIndex = nil
+                localNavigationRevision &+= 1
                 appState.bookshelfStore.updateReadingProgress(
                     bookID: book.id,
                     chapterIndex: chapter.index,
@@ -267,6 +283,7 @@ struct BookshelfReaderGatewayView: View {
                 showReaderChromeAfterChapterSelection = true
                 selectedLocalChapterIndex = chapter.index
                 selectedLocalParagraphIndex = targetParagraph
+                localNavigationRevision &+= 1
                 appState.bookshelfStore.updateReadingProgress(
                     bookID: book.id,
                     chapterIndex: chapter.index,
@@ -293,6 +310,7 @@ struct BookshelfReaderGatewayView: View {
                 guard chapters.indices.contains(nextIndex) else { return }
                 autoplaySpeechAfterHandoff = true
                 selectedLocalChapterIndex = nextIndex
+                localNavigationRevision &+= 1
                 appState.bookshelfStore.updateReadingProgress(
                     bookID: book.id,
                     chapterIndex: nextIndex,
@@ -314,6 +332,7 @@ struct BookshelfReaderGatewayView: View {
                 autoplayAutoScrollAfterHandoff = true
                 selectedLocalChapterIndex = nextIndex
                 selectedLocalParagraphIndex = nil
+                localNavigationRevision &+= 1
                 appState.bookshelfStore.updateReadingProgress(
                     bookID: book.id,
                     chapterIndex: nextIndex,
@@ -323,7 +342,7 @@ struct BookshelfReaderGatewayView: View {
             },
             initialOverlayVisible: showReaderChromeAfterChapterSelection
         )
-        .id("reader-\(book.id)-\(safeIndex)-\(localNavigationRevision)")
+        .id("reader-\(book.id)-\(localNavigationRevision)")
     }
 
     /// 首章正文预热。

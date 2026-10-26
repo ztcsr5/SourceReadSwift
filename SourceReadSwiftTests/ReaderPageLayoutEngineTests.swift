@@ -71,6 +71,12 @@ final class ReaderPageLayoutEngineTests: XCTestCase {
         XCTAssertGreaterThan(multi, single)
     }
 
+    func testMeasureHeightAddsLineSpacingOncePerInterLineGap() {
+        let single = ReaderPageLayoutEngine.measureHeight("一行字。", typography: typography())
+        let twoLines = ReaderPageLayoutEngine.measureHeight("第一行\n第二行", typography: typography())
+        XCTAssertEqual(twoLines, single * 2 + 8, accuracy: 1.5)
+    }
+
     // MARK: - Splitting
 
     func testShortParagraphIsNotSplit() {

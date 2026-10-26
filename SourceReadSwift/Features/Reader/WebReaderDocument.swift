@@ -904,7 +904,8 @@ enum WebReaderHTML {
         var anchor = captureAnchor();
         var nextSections = Object.create(null);
         var nextOrder = [];
-        var rebuilt = false;
+        var prefixRebuilt = false;
+        var previousLength = state.order.length;
 
         for (var index = 0; index < payload.sections.length; index += 1) {
           var section = payload.sections[index];
@@ -914,17 +915,19 @@ enum WebReaderHTML {
             nextSections[section.key] = existing;
           } else {
             nextSections[section.key] = buildSection(section);
-            rebuilt = true;
+            if (index < previousLength) {
+              prefixRebuilt = true;
+            }
           }
           nextOrder.push(section.key);
         }
 
         var sameShape = isPrefixPreserved(payload)
-          && nextOrder.length >= state.order.length
-          && !rebuilt;
+          && nextOrder.length >= previousLength
+          && !prefixRebuilt;
 
         if (sameShape) {
-          for (var tail = state.order.length; tail < nextOrder.length; tail += 1) {
+          for (var tail = previousLength; tail < nextOrder.length; tail += 1) {
             content.appendChild(nextSections[nextOrder[tail]]);
           }
         } else {
@@ -939,7 +942,9 @@ enum WebReaderHTML {
         state.order = nextOrder;
         state.visible = -1;
         refreshMetrics();
-        restoreAnchor(anchor);
+        if (!sameShape) {
+          restoreAnchor(anchor);
+        }
         post({ type: "content-ready", total: payload.total });
         window.requestAnimationFrame(onScroll);
       }
@@ -1043,9 +1048,9 @@ enum WebReaderHTML {
           }
         }
         var bottom = y + viewport;
-        // 预取要早于「看不见下一章」的那一刻：离末尾还剩约 1.6 屏就开始要下一章，
+        // 预取要早于「看不见下一章」的那一刻：离末尾还剩约 3.5 屏就开始要下一章，
         // 这样追加发生在用户滑到尽头之前，滚动不会被文档底部卡住。
-        var nearMargin = Math.max(1200, viewport * 1.6);
+        var nearMargin = Math.max(2800, viewport * 3.5);
         var resetMargin = nearMargin + 900;
         if (height > 0 && bottom >= height - nearMargin) {
           if (!state.nearBottom) { state.nearBottom = true; post({ type: "near-bottom" }); }

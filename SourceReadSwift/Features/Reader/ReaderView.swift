@@ -408,9 +408,8 @@ struct ReaderView: View {
 
     private var windowRadius: Int {
         // 连续阅读要「章尾之前下一章已经在文档里」，但窗口不能无限大：
-        // 4 章 × 每章几千段会让 WebKit 在大幅快速滚动时排版爆炸（实测卡死）。
-        // 统一 2 章，加上提前 1.6 屏的触发点，衔接仍然连续。
-        return 2
+        // 至少预取 3 章，结合提前 3.5 屏的触发点与纯尾部 DOM 追加，实现无感跨章连读。
+        return max(ReaderChapterWindowPolicy.radius(forPreloadCount: preloadChapterCount), 3)
     }
 
     /// 本地导入的书（localChapters 在书架模型里），章节读取不经过书源。
@@ -715,6 +714,7 @@ struct ReaderView: View {
                     .preference(key: ReaderViewportSizePreferenceKey.self, value: proxy.size)
             }
         }
+        .background(ReaderNavigationPopLock())
         .navigationBarBackButtonHidden(true)
         .toolbar(.hidden, for: .navigationBar)
         .statusBarHidden(!showOverlay)
@@ -1273,16 +1273,14 @@ struct ReaderView: View {
                 updateVisibleParagraphInScroll(index)
             },
             onNearBottom: {
-                requestAdjacentChapter(direction: 1)
+                requestScrollForwardChapter()
             },
             onReachTop: {
-                requestAdjacentChapter(direction: -1)
+                requestScrollBackwardChapter()
             },
-            onNearTop: {
-                requestAdjacentChapter(direction: -1)
-            },
+            onNearTop: nil,
             onReachBottom: {
-                requestAdjacentChapter(direction: 1)
+                requestScrollForwardChapter()
             },
             pageStepDirection: pageStepDirection,
             pageStepGeneration: pageStepGeneration,
@@ -1409,7 +1407,31 @@ struct ReaderView: View {
             upperBound: windowChapterUpperBound,
             loaded: loaded
         )
-        queuePrefetch(order)
+        if readerMode == .scroll {
+            // In scroll mode, background prefetch must only append forward
+            // chapters at the bottom of the DOM. Prepending previous chapters
+            // above the viewport while the user scrolls down shifts scrollY
+            // and causes a visible jump/flash.
+            queuePrefetch(order.filter { $0 > chapter })
+        } else {
+            queuePrefetch(order)
+        }
+    }
+
+    private func requestScrollForwardChapter() {
+        let maxLoaded = windowSections.map(\.chapterIndex).max() ?? windowCurrentChapterIndex
+        let nextTarget = max(windowCurrentChapterIndex + 1, maxLoaded + 1)
+        if nextTarget < windowChapterUpperBound {
+            loadWindowChapter(nextTarget)
+        }
+        prefetchWindow(around: windowCurrentChapterIndex)
+    }
+
+    private func requestScrollBackwardChapter() {
+        let minLoaded = windowSections.map(\.chapterIndex).min() ?? windowCurrentChapterIndex
+        let prevTarget = minLoaded - 1
+        guard prevTarget >= 0 else { return }
+        loadWindowChapter(prevTarget)
     }
 
     /// Loads prefetched chapters one at a time in nearest-first order.
@@ -1759,13 +1781,27 @@ struct ReaderView: View {
     /// disk: opening one again is a synchronous cache hit, not a new request.
     /// In-flight chapters and the cursor chapter are never evicted.
     private func trimWindowIfNeeded() {
-        let keep = ReaderChapterWindowPolicy.retainedIndices(
+        var keep = ReaderChapterWindowPolicy.retainedIndices(
             around: windowCurrentChapterIndex,
             radius: windowRadius,
             lowerBound: 0,
             upperBound: windowChapterUpperBound,
             loading: windowLoadingIndices
         )
+        if readerMode == .scroll {
+            // In continuous vertical scroll mode, evicting chapters above the
+            // viewport right as the user crosses a chapter boundary shifts the
+            // entire document upward by thousands of pixels and causes a flash.
+            // Retain up to 20 already-loaded trailing chapters above the cursor.
+            let minRetained = max(0, windowCurrentChapterIndex - 20)
+            let maxRetained = min(
+                max(windowChapterUpperBound - 1, 0),
+                max(windowCurrentChapterIndex + windowRadius + 2, windowSections.map(\.chapterIndex).max() ?? windowCurrentChapterIndex)
+            )
+            if minRetained <= maxRetained {
+                keep.formUnion(minRetained...maxRetained)
+            }
+        }
         // Drop failure state and pending retries for chapters the window has
         // left behind; otherwise a long session accumulates timers for
         // chapters the reader will never see again.
@@ -1846,7 +1882,6 @@ struct ReaderView: View {
         [
             String(chapterIndex),
             String(scrollJumpGeneration),
-            String(pagedPageIndex),
             paragraphJumpRequest?.id.uuidString ?? "none",
             String(speechFlatParagraphIndex ?? -1)
         ].joined(separator: "|")
@@ -2135,12 +2170,12 @@ struct ReaderView: View {
     /// 分页模式底部预留：页脚本体 20pt + 半个边距，和分页排版用同一个数，
     /// 否则排版按 37pt 算、渲染按 64pt 留，页面底部就空出一截。
     private var pagedBottomPadding: CGFloat {
-        CGFloat(pagePadding) * 0.5 + readerFooterReservedHeight
+        CGFloat(pagePadding) * 0.5 + 26
     }
 
-    /// 页脚实际占用高度（20pt 条 + 6pt 间距），滑动模式不需要预留。
+    /// 页脚实际占用高度（20pt 条 + 6pt 间距），分页模式固定预留 26pt。
     private var readerFooterReservedHeight: CGFloat {
-        readerMode == .scroll ? 0 : 26
+        26
     }
 
     @ViewBuilder
@@ -4814,21 +4849,22 @@ struct ReaderView: View {
                 continue
             }
 
+            let minLineHeight = ceil(typography.font.lineHeight) + 2
             let remaining = typography.contentHeight - currentHeight - spacing
-            if !currentEntries.isEmpty, remaining < typography.contentHeight * 0.28 {
+            if !currentEntries.isEmpty, remaining < minLineHeight {
                 flush()
             } else if currentEntries.isEmpty, currentIncludesTitle,
-                      remaining < typography.contentHeight * 0.28 {
+                      remaining < minLineHeight {
                 flush()
             }
 
             let available: CGFloat
             if currentEntries.isEmpty {
-                available = max(typography.contentHeight - currentHeight, typography.contentHeight * 0.28)
+                available = max(typography.contentHeight - currentHeight, minLineHeight)
             } else {
                 available = max(
                     typography.contentHeight - currentHeight - typography.paragraphSpacing,
-                    typography.contentHeight * 0.28
+                    minLineHeight
                 )
             }
             let chunks = ReaderPageLayoutEngine.split(
@@ -5642,5 +5678,67 @@ struct ReaderIllustrationView: View {
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 8)
+    }
+}
+
+/// Locks `UINavigationController`'s interactive pop gestures while the reader
+/// is on screen so horizontal page swipes in `.pageTurn`, `.cover`, and
+/// `.pageCurl` never pop the reader back to the root TabView ("书架/发现/设置").
+private struct ReaderNavigationPopLock: UIViewControllerRepresentable {
+    func makeUIViewController(context: Context) -> LockViewController {
+        LockViewController()
+    }
+
+    func updateUIViewController(_ uiViewController: LockViewController, context: Context) {
+        uiViewController.applyPopLock()
+    }
+
+    static func dismantleUIViewController(_ uiViewController: LockViewController, coordinator: ()) {
+        uiViewController.restorePopLock()
+    }
+
+    final class LockViewController: UIViewController {
+        private weak var lockedNavigationController: UINavigationController?
+
+        override func viewWillAppear(_ animated: Bool) {
+            super.viewWillAppear(animated)
+            applyPopLock()
+        }
+
+        override func didMove(toParent parent: UIViewController?) {
+            super.didMove(toParent: parent)
+            if parent != nil {
+                applyPopLock()
+            } else {
+                restorePopLock()
+            }
+        }
+
+        override func viewWillDisappear(_ animated: Bool) {
+            super.viewWillDisappear(animated)
+            restorePopLock()
+        }
+
+        func applyPopLock() {
+            guard let nav = navigationController else { return }
+            lockedNavigationController = nav
+            nav.interactivePopGestureRecognizer?.isEnabled = false
+            let selector = Selector(("interactiveContentPopGestureRecognizer"))
+            if nav.responds(to: selector),
+               let contentPop = nav.value(forKey: "interactiveContentPopGestureRecognizer") as? UIGestureRecognizer {
+                contentPop.isEnabled = false
+            }
+        }
+
+        func restorePopLock() {
+            guard let nav = lockedNavigationController ?? navigationController else { return }
+            nav.interactivePopGestureRecognizer?.isEnabled = true
+            let selector = Selector(("interactiveContentPopGestureRecognizer"))
+            if nav.responds(to: selector),
+               let contentPop = nav.value(forKey: "interactiveContentPopGestureRecognizer") as? UIGestureRecognizer {
+                contentPop.isEnabled = true
+            }
+            lockedNavigationController = nil
+        }
     }
 }

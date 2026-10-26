@@ -111,7 +111,11 @@ enum ReaderPageLayoutEngine {
         font: UIFont
     ) -> [LineMetric] {
         let style = NSMutableParagraphStyle()
-        style.lineSpacing = typography.lineSpacing
+        // Keep paragraphStyle.lineSpacing at 0 so lineFragmentRect reports the
+        // pure single-line glyph box height; we add `typography.lineSpacing`
+        // once per inter-line gap below to match SwiftUI `.lineSpacing(...)`
+        // without double-counting line spacing on every line.
+        style.lineSpacing = 0
         style.lineBreakMode = .byWordWrapping
         style.alignment = .natural
         let storage = NSTextStorage(
