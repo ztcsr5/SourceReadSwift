@@ -1227,7 +1227,6 @@ struct ReaderView: View {
             contentFingerprint: scrollContentFingerprint,
             resetToken: bookID,
             fontFamily: fontFamily,
-            customFontPostScriptName: customFontPostScriptName,
             fontSize: fontSize,
             lineSpacing: lineSpacing,
             pagePadding: pagePadding,
