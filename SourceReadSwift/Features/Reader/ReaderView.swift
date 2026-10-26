@@ -161,6 +161,7 @@ struct ReaderView: View {
     @StateObject private var playbackCoordinator = ReaderPlaybackCoordinator()
     @StateObject private var speechController = ReaderSpeechController()
     @AppStorage("reader.fontFamily") private var fontFamilyRawValue: String = ReaderFontFamily.system.rawValue
+    @AppStorage("reader.customFontPostScriptName") private var customFontPostScriptName: String = ""
     @AppStorage("reader.fontSize") private var fontSize: Double = ReaderTypographyDefaults.fontSize
     @AppStorage("reader.lineSpacing") private var lineSpacing: Double = ReaderTypographyDefaults.lineSpacing
     @AppStorage("reader.pagePadding") private var pagePadding: Double = ReaderTypographyDefaults.pagePadding
@@ -508,6 +509,8 @@ struct ReaderView: View {
             // hosting controller，不换 key 就不会重画 —— 这正是「换主题要翻页
             // 才生效」的成因。
             backgroundRawValue,
+            backgroundWallpaperRevision.uuidString,
+            customFontPostScriptName,
             colorScheme == .dark ? "dark" : "light"
         ].joined(separator: "|")
     }
@@ -516,6 +519,7 @@ struct ReaderView: View {
         [
             readerModeRawValue,
             fontFamilyRawValue,
+            customFontPostScriptName,
             String(format: "%.1f", fontSize),
             String(format: "%.1f", lineSpacing),
             String(format: "%.1f", pagePadding),
@@ -537,6 +541,7 @@ struct ReaderView: View {
         let viewport = effectiveViewportSize
         return [
             fontFamilyRawValue,
+            customFontPostScriptName,
             String(format: "%.1f", fontSize),
             String(format: "%.1f", lineSpacing),
             String(format: "%.1f", pagePadding),
@@ -607,7 +612,7 @@ struct ReaderView: View {
                         guard readerMode != .scroll else { return }
                         let moved = abs(value.translation.width) + abs(value.translation.height)
                         let held = tapGestureStartedAt.map { Date().timeIntervalSince($0) } ?? 0
-                        guard moved < 6, held < 0.3 else { return }
+                        guard moved < 18, held < 0.45 else { return }
                         handleReaderTap(at: value.location)
                     }
             )
@@ -990,26 +995,7 @@ struct ReaderView: View {
                     .id(backgroundWallpaperRevision)
                 Color.black.opacity(colorScheme == .dark ? 0.60 : 0.28)
             } else {
-                background.color(isNight: colorScheme == .dark)
-                LinearGradient(
-                    colors: [
-                        Color.white.opacity(background.isDark ? 0.02 : 0.16),
-                        Color.clear,
-                        Color.black.opacity(background.isDark ? 0.28 : 0.05)
-                    ],
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
-                )
-                RadialGradient(
-                    colors: [
-                        AppTheme.accent.opacity(background.isDark ? 0.16 : 0.08),
-                        Color.clear
-                    ],
-                    center: .topTrailing,
-                    startRadius: 20,
-                    endRadius: 360
-                )
-                .blendMode(background.isDark ? .screen : .multiply)
+                readerThemeBackground
             }
         }
         .ignoresSafeArea()
@@ -1241,6 +1227,7 @@ struct ReaderView: View {
             contentFingerprint: scrollContentFingerprint,
             resetToken: bookID,
             fontFamily: fontFamily,
+            customFontPostScriptName: customFontPostScriptName,
             fontSize: fontSize,
             lineSpacing: lineSpacing,
             pagePadding: pagePadding,
@@ -1889,14 +1876,18 @@ struct ReaderView: View {
 
     @ViewBuilder
     private var pagedReaderContent: some View {
-        switch readerMode {
-        case .cover:
-            coverPagedReaderContent
-        case .pageCurl:
-            pageCurlReaderContent
-        default:
-            horizontalPagedReaderContent
+        Group {
+            switch readerMode {
+            case .cover:
+                coverPagedReaderContent
+            case .pageCurl:
+                pageCurlReaderContent
+            default:
+                horizontalPagedReaderContent
+            }
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .clipped()
     }
 
     private var pageCurlReaderContent: some View {
@@ -1911,6 +1902,8 @@ struct ReaderView: View {
                 readerPage(for: page)
             }
         )
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .clipped()
         .onChange(of: speechController.currentParagraphIndex) { target in
             guard target >= 0, let flat = speechFlatParagraphIndex else { return }
             pagedPageIndex = pageIndex(containingParagraph: flat)
@@ -1921,10 +1914,14 @@ struct ReaderView: View {
         TabView(selection: $pagedPageIndex) {
             ForEach(pagedBlocks) { page in
                 readerPage(for: page)
-                .tag(page.id)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .clipped()
+                    .tag(page.id)
             }
         }
         .tabViewStyle(.page(indexDisplayMode: .never))
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .clipped()
         .onChange(of: pagedPageIndex) { target in
             updatePagedVisibleParagraph(pageIndex: target)
         }
@@ -1944,6 +1941,8 @@ struct ReaderView: View {
                 if pagedBlocks.indices.contains(safeIndex) {
                     readerPage(for: pagedBlocks[safeIndex])
                         .id("cover-page-\(pagedBlocks[safeIndex].id)")
+                        .frame(width: width, height: proxy.size.height)
+                        .clipped()
                         .offset(x: drag * 0.22)
                         .zIndex(1)
                 }
@@ -1951,6 +1950,8 @@ struct ReaderView: View {
                 if drag < 0, pagedBlocks.indices.contains(safeIndex + 1) {
                     readerPage(for: pagedBlocks[safeIndex + 1])
                         .id("cover-page-\(pagedBlocks[safeIndex + 1].id)")
+                        .frame(width: width, height: proxy.size.height)
+                        .clipped()
                         .offset(x: width + drag)
                         .shadow(color: .black.opacity(0.25), radius: 10, x: -6, y: 0)
                         .allowsHitTesting(false)
@@ -1960,12 +1961,15 @@ struct ReaderView: View {
                 if drag > 0, safeIndex > 0 {
                     readerPage(for: pagedBlocks[safeIndex - 1])
                         .id("cover-page-\(pagedBlocks[safeIndex - 1].id)")
+                        .frame(width: width, height: proxy.size.height)
+                        .clipped()
                         .offset(x: -width + drag)
                         .shadow(color: .black.opacity(0.25), radius: 10, x: 6, y: 0)
                         .allowsHitTesting(false)
                         .zIndex(2)
                 }
             }
+            .frame(width: width, height: proxy.size.height)
             .clipped()
             .contentShape(Rectangle())
             .gesture(
@@ -2048,7 +2052,7 @@ struct ReaderView: View {
                 VStack(alignment: .leading, spacing: 0) {
                     if page.includesTitle {
                         Text(ReaderTextTransform.displayText(page.chapterTitle.isEmpty ? content.title : page.chapterTitle, traditionalChinese: traditionalChineseEnabled))
-                            .font(fontFamily.swiftUIFont(size: CGFloat(fontSize + 8), weight: .bold))
+                            .font(fontFamily.swiftUIFont(size: CGFloat(fontSize + 8), weight: .bold, customPostScriptName: customFontPostScriptName))
                             .foregroundStyle(readerThemeTextColor)
                             .padding(.bottom, CGFloat(titleSpacing))
                             .readerSelectableText(textSelectionEnabled)
@@ -2195,13 +2199,13 @@ struct ReaderView: View {
             ? Text(
                 ReaderTextTransform.bionicAttributedString(
                     for: paragraph,
-                    regularFont: fontFamily.swiftUIFont(size: CGFloat(fontSize), weight: .regular),
-                    boldFont: fontFamily.swiftUIFont(size: CGFloat(fontSize), weight: .bold)
+                    regularFont: fontFamily.swiftUIFont(size: CGFloat(fontSize), weight: .regular, customPostScriptName: customFontPostScriptName),
+                    boldFont: fontFamily.swiftUIFont(size: CGFloat(fontSize), weight: .bold, customPostScriptName: customFontPostScriptName)
                 )
             )
             : Text(paragraph)
         return textView
-            .font(fontFamily.swiftUIFont(size: CGFloat(fontSize), weight: .regular))
+            .font(fontFamily.swiftUIFont(size: CGFloat(fontSize), weight: .regular, customPostScriptName: customFontPostScriptName))
             .foregroundStyle(readerThemeTextColor)
             .kerning(letterSpacing)
             .lineSpacing(lineSpacing)
@@ -2697,6 +2701,8 @@ struct ReaderView: View {
                         .padding(.horizontal)
                         .padding(.bottom, 22)
                     }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .clipped()
                 }
                 .frame(maxWidth: .infinity)
                 .frame(height: maxHeight)
@@ -2708,6 +2714,7 @@ struct ReaderView: View {
                 )
                 .glassPanel(cornerRadius: 28, material: .ultraThinMaterial, strokeOpacity: colorScheme == .dark ? 0.08 : 0.12, shadowOpacity: colorScheme == .dark ? 0.35 : 0.18)
                 .contentShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
+                .clipShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
                 .padding(.horizontal, 12)
                 .padding(.bottom, bottomPadding)
                 .zIndex(3)
@@ -2813,8 +2820,14 @@ struct ReaderView: View {
                         Task {
                             if let data = try? await item.loadTransferable(type: Data.self),
                                let image = UIImage(data: data) {
-                                ReaderCustomWallpaperStore.saveWallpaper(image)
-                                backgroundWallpaperRevision = UUID()
+                                await MainActor.run {
+                                    ReaderCustomWallpaperStore.saveWallpaper(image)
+                                    backgroundRawValue = ReaderBackground.custom.rawValue
+                                    backgroundWallpaperRevision = UUID()
+                                    rebuildPagedBlocksCache()
+                                    syncPerBookOverrideIfNeeded()
+                                    HapticFeedback.success()
+                                }
                             }
                         }
                     }
@@ -4622,8 +4635,8 @@ struct ReaderView: View {
         let topPadding = ReaderPageLayoutEngine.minimumTopInset(pagePadding: CGFloat(pagePadding))
         let bottomPadding = pagedBottomPadding
         let typography = ReaderPageTypography(
-            font: fontFamily.uiFont(ofSize: CGFloat(fontSize)),
-            titleFont: fontFamily.uiFont(ofSize: CGFloat(fontSize + 8), weight: .bold),
+            font: fontFamily.uiFont(ofSize: CGFloat(fontSize), customPostScriptName: customFontPostScriptName),
+            titleFont: fontFamily.uiFont(ofSize: CGFloat(fontSize + 8), weight: .bold, customPostScriptName: customFontPostScriptName),
             lineSpacing: CGFloat(lineSpacing),
             letterSpacing: CGFloat(letterSpacing),
             paragraphSpacing: CGFloat(paragraphSpacing),

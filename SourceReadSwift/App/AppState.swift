@@ -85,6 +85,7 @@ final class AppState: ObservableObject {
         }
         resolvedDiscoverViewModel.bind(appState: self)
         bindChildStores()
+        self.sourceWritingServer.bind(engine: self.engine, healthStore: self.sourceHealthStore)
         resolvedBookshelfStore.seedOnboardingBookIfNeeded()
     }
 

@@ -48,6 +48,7 @@ struct PageCurlReaderView<Item: Identifiable, Content: View>: UIViewControllerRe
         pvc.delegate = context.coordinator
         pvc.isDoubleSided = false
         pvc.view.backgroundColor = .clear
+        pvc.view.clipsToBounds = true
 
         let initialIndex = ReaderPagedNavigationPolicy.clampedPageIndex(
             currentPageIndex,
@@ -184,6 +185,17 @@ private final class PageHostingController<Content: View>: UIHostingController<Co
     init(rootView: Content, pageIndex: Int) {
         self.pageIndex = pageIndex
         super.init(rootView: rootView)
+    }
+
+    override func viewDidLoad() {
+        super.viewDidLoad()
+        view.backgroundColor = .clear
+        view.clipsToBounds = true
+    }
+
+    override func viewDidLayoutSubviews() {
+        super.viewDidLayoutSubviews()
+        view.clipsToBounds = true
     }
 
     @MainActor required dynamic init?(coder aDecoder: NSCoder) {

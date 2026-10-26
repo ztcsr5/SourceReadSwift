@@ -51,6 +51,18 @@ struct BookDetailView: View {
         appState.chapterDownloadCoordinator.isRunning(bookID: book.id)
     }
 
+    private var isBookInBookshelf: Bool {
+        appState.bookshelfStore.contains(book)
+    }
+
+    private var targetReadingChapter: BookChapter? {
+        if let currentIdx = appState.bookshelfStore.book(id: readerBookID)?.currentChapterIndex,
+           chapters.indices.contains(currentIdx) {
+            return chapters[currentIdx]
+        }
+        return chapters.first
+    }
+
     private var displayedChapters: [BookChapter] {
         Array((isAscending ? chapters : Array(chapters.reversed())).prefix(20))
     }
@@ -66,6 +78,52 @@ struct BookDetailView: View {
                     isInBookshelf: appState.bookshelfStore.contains(book)
                 )
                     .podcastCard()
+
+                if !chapters.isEmpty {
+                    HStack(spacing: 12) {
+                        if let target = targetReadingChapter {
+                            NavigationLink {
+                                if let shelfBook = localShelfBook {
+                                    BookshelfReaderGatewayView(book: shelfBook, initialChapterIndex: target.index)
+                                } else {
+                                    ChapterLoadingView(
+                                        bookID: readerBookID,
+                                        sourceUrl: book.sourceUrl,
+                                        chapter: target,
+                                        totalChapters: chapters.count,
+                                        chapters: chapters
+                                    )
+                                }
+                            } label: {
+                                HStack(spacing: 8) {
+                                    Image(systemName: "book.fill")
+                                    Text(isBookInBookshelf ? "继续阅读" : "开始阅读")
+                                }
+                                .font(.headline)
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 14)
+                                .background(AppTheme.accent, in: RoundedRectangle(cornerRadius: AppTheme.cardRadius, style: .continuous))
+                                .foregroundStyle(.white)
+                            }
+                            .buttonStyle(.plain)
+                        }
+
+                        Button {
+                            addCurrentBookToShelf()
+                        } label: {
+                            HStack(spacing: 6) {
+                                Image(systemName: isBookInBookshelf ? "checkmark" : "plus")
+                                Text(isBookInBookshelf ? "已在书架" : "加入书架")
+                            }
+                            .font(.headline)
+                            .padding(.horizontal, 18)
+                            .padding(.vertical, 14)
+                            .background(Color(UIColor.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: AppTheme.cardRadius, style: .continuous))
+                            .foregroundStyle(isBookInBookshelf ? .secondary : AppTheme.accent)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
 
                 if availableSources.count > 1 {
                     sourceSwitchBar
@@ -111,6 +169,7 @@ struct BookDetailView: View {
                 }
             }
             .padding(AppTheme.pagePadding)
+            .padding(.bottom, 96)
         }
         .pageBackground()
         .navigationTitle(book.name)
@@ -446,6 +505,22 @@ struct BookDetailView: View {
                 Text("目录")
                     .font(.title2.bold())
                 Spacer()
+                Button {
+                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                    isAscending.toggle()
+                } label: {
+                    HStack(spacing: 4) {
+                        Image(systemName: "arrow.up.arrow.down")
+                        Text(isAscending ? "正序" : "倒序")
+                    }
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(AppTheme.accent)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 5)
+                    .background(AppTheme.accent.opacity(0.1), in: Capsule())
+                }
+                .buttonStyle(.plain)
+
                 Text("\(chapters.count) 章")
                     .font(.subheadline.weight(.semibold))
                     .foregroundStyle(.secondary)

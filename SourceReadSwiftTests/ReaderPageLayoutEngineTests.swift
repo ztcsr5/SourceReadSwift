@@ -36,9 +36,9 @@ final class ReaderPageLayoutEngineTests: XCTestCase {
     }
 
     func testTopInsetIsSharedAcrossReaderSurfaces() {
-        XCTAssertEqual(ReaderPageLayoutEngine.minimumTopInset(pagePadding: 20), 44)
-        XCTAssertEqual(ReaderPageLayoutEngine.minimumTopInset(pagePadding: 48), 56)
-        XCTAssertEqual(ReaderPageLayoutEngine.minimumTopInset(pagePadding: 60), 68)
+        XCTAssertEqual(ReaderPageLayoutEngine.minimumTopInset(pagePadding: 20), 20)
+        XCTAssertEqual(ReaderPageLayoutEngine.minimumTopInset(pagePadding: 48), 48)
+        XCTAssertEqual(ReaderPageLayoutEngine.minimumTopInset(pagePadding: 60), 60)
     }
 
     // MARK: - Measurement

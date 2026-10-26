@@ -22,14 +22,13 @@ struct ReaderPageTypography {
 }
 
 enum ReaderPageLayoutEngine {
-    /// The floating reader toolbar is drawn over the page. Every surface
-    /// (native scroll, SwiftUI paged, page-curl) must reserve the same top
-    /// inset so the first line is neither hidden by the toolbar nor placed at
-    /// a different height when the user switches modes.
-    static let defaultTopInset: CGFloat = 44
+    /// The top inset for reader surfaces. Setting this to 0 eliminates artificial
+    /// blank gaps at the top of the reading page while keeping content aligned
+    /// with the configured page padding.
+    static let defaultTopInset: CGFloat = 0
 
     static func minimumTopInset(pagePadding: CGFloat) -> CGFloat {
-        max(pagePadding + 8, defaultTopInset)
+        pagePadding
     }
 
     /// SwiftUI Text has no first-line-only indent.  Prefixing ideographic
