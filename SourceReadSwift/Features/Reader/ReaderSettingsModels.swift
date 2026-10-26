@@ -111,7 +111,7 @@ enum ReaderBackground: String, CaseIterable, Identifiable, Codable, Sendable {
         case .white, .eink: return 0xFFFFFF
         case .gray: return 0xF2F2F7
         case .dark: return 0x000000
-        case .custom: return UserDefaults.standard.bool(forKey: "reader.customBackgroundIsDark") ? 0x1C1C1E : 0xF7F7F8
+        case .custom: return isDark ? 0x1C1C1E : 0xF7F7F8
         case .sakuraClassic: return 0xF9F9F9
         case .sakuraDark: return 0x222222
         case .sakuraSolarized: return 0x002B36
@@ -132,7 +132,7 @@ enum ReaderBackground: String, CaseIterable, Identifiable, Codable, Sendable {
         case .gray: return 0x242426
         case .eink: return 0x000000
         case .dark: return 0xFFFFFF
-        case .custom: return UserDefaults.standard.bool(forKey: "reader.customBackgroundIsDark") ? 0xFFFFFF : 0x18181A
+        case .custom: return isDark ? 0xFFFFFF : 0x18181A
         case .sakuraClassic: return 0x4A4A4A
         case .sakuraDark: return 0xC9C9C9
         case .sakuraSolarized: return 0x839496
@@ -183,7 +183,7 @@ enum ReaderBackground: String, CaseIterable, Identifiable, Codable, Sendable {
         case .dark, .sakuraDark, .sakuraSolarized, .sakuraVader:
             return true
         case .custom:
-            return UserDefaults.standard.bool(forKey: "reader.customBackgroundIsDark")
+            return ReaderCustomWallpaperStore.isWallpaperDark
         default:
             return false
         }
@@ -195,7 +195,7 @@ enum ReaderBackground: String, CaseIterable, Identifiable, Codable, Sendable {
         case .paper, .kraft, .white, .gray, .eink,
              .sakuraClassic, .sakuraEarthly, .sakuraInk: return true
         case .custom:
-            return !UserDefaults.standard.bool(forKey: "reader.customBackgroundIsDark")
+            return !isDark
         case .green, .lavender, .azure, .dark,
              .sakuraDark, .sakuraSolarized, .sakuraVader: return false
         }
@@ -226,7 +226,59 @@ enum ReaderBackground: String, CaseIterable, Identifiable, Codable, Sendable {
     }
 }
 
+extension UIImage {
+    /// 分析壁纸相对感知亮度（Rec. 709标准），用于自适应决定深浅文字风格与对比度。
+    var isDarkPerception: Bool {
+        if let cgImage = self.cgImage {
+            return Self.analyzeLuminance(cgImage: cgImage)
+        }
+        let format = UIGraphicsImageRendererFormat()
+        format.scale = 1
+        let renderer = UIGraphicsImageRenderer(size: CGSize(width: 8, height: 8), format: format)
+        let smallImage = renderer.image { _ in
+            self.draw(in: CGRect(x: 0, y: 0, width: 8, height: 8))
+        }
+        if let cgImage = smallImage.cgImage {
+            return Self.analyzeLuminance(cgImage: cgImage)
+        }
+        return false
+    }
+
+    private static func analyzeLuminance(cgImage: CGImage) -> Bool {
+        let width = 8
+        let height = 8
+        let colorSpace = CGColorSpaceCreateDeviceRGB()
+        var rawData = [UInt8](repeating: 0, count: width * height * 4)
+        guard let context = CGContext(
+            data: &rawData,
+            width: width,
+            height: height,
+            bitsPerComponent: 8,
+            bytesPerRow: width * 4,
+            space: colorSpace,
+            bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue | CGBitmapInfo.byteOrder32Big.rawValue
+        ) else { return false }
+
+        context.draw(cgImage, in: CGRect(x: 0, y: 0, width: width, height: height))
+
+        var totalLuminance: Double = 0
+        let totalPixels = width * height
+        for i in 0..<totalPixels {
+            let r = Double(rawData[i * 4]) / 255.0
+            let g = Double(rawData[i * 4 + 1]) / 255.0
+            let b = Double(rawData[i * 4 + 2]) / 255.0
+            let luma = 0.2126 * r + 0.7152 * g + 0.0722 * b
+            totalLuminance += luma
+        }
+        let avg = totalLuminance / Double(totalPixels)
+        return avg < 0.52
+    }
+}
+
 enum ReaderCustomWallpaperStore {
+    private static var _cachedWallpaper: UIImage?
+    private static var _cachedIsDark: Bool?
+
     static var wallpaperURL: URL {
         let docs = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
         return docs.appendingPathComponent("custom_reader_wallpaper.jpg")
@@ -235,19 +287,53 @@ enum ReaderCustomWallpaperStore {
     static func saveWallpaper(_ image: UIImage) {
         guard let data = image.jpegData(compressionQuality: 0.85) else { return }
         try? data.write(to: wallpaperURL, options: .atomic)
+        _cachedWallpaper = image
+        let dark = image.isDarkPerception
+        _cachedIsDark = dark
+        // 重新选图时重置手动覆盖标记，自动适应新壁纸的亮度
+        UserDefaults.standard.removeObject(forKey: "reader.customBackgroundIsDarkManual")
+        UserDefaults.standard.set(dark, forKey: "reader.customBackgroundIsDark")
     }
 
     static func loadWallpaper() -> UIImage? {
-        guard let data = try? Data(contentsOf: wallpaperURL) else { return nil }
-        return UIImage(data: data)
+        if let cached = _cachedWallpaper {
+            return cached
+        }
+        guard let data = try? Data(contentsOf: wallpaperURL),
+              let image = UIImage(data: data) else {
+            return nil
+        }
+        _cachedWallpaper = image
+        return image
+    }
+
+    static var isWallpaperDark: Bool {
+        if UserDefaults.standard.bool(forKey: "reader.customBackgroundIsDarkManual") {
+            return UserDefaults.standard.bool(forKey: "reader.customBackgroundIsDark")
+        }
+        if let cached = _cachedIsDark {
+            return cached
+        }
+        if let image = loadWallpaper() {
+            let dark = image.isDarkPerception
+            _cachedIsDark = dark
+            UserDefaults.standard.set(dark, forKey: "reader.customBackgroundIsDark")
+            return dark
+        }
+        return UserDefaults.standard.bool(forKey: "reader.customBackgroundIsDark")
     }
 
     static var hasCustomWallpaper: Bool {
-        FileManager.default.fileExists(atPath: wallpaperURL.path)
+        if _cachedWallpaper != nil { return true }
+        return FileManager.default.fileExists(atPath: wallpaperURL.path)
     }
 
     static func clearWallpaper() {
+        _cachedWallpaper = nil
+        _cachedIsDark = nil
         try? FileManager.default.removeItem(at: wallpaperURL)
+        UserDefaults.standard.removeObject(forKey: "reader.customBackgroundIsDark")
+        UserDefaults.standard.removeObject(forKey: "reader.customBackgroundIsDarkManual")
     }
 }
 

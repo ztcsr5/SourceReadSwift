@@ -27,8 +27,23 @@ enum ReaderPageLayoutEngine {
     /// with the configured page padding.
     static let defaultTopInset: CGFloat = 0
 
+    static var safeAreaTopInset: CGFloat {
+        let scene = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.first
+        return scene?.windows.first(where: { $0.isKeyWindow })?.safeAreaInsets.top ?? 0
+    }
+
     static func minimumTopInset(pagePadding: CGFloat) -> CGFloat {
-        pagePadding
+        let safeTop = safeAreaTopInset
+        if safeTop >= 44 {
+            // 刘海屏 / 灵动岛机型 (iPhone X ~ 16)：让出顶部物理挖孔避让区，避免文字被切或顶格遮挡
+            return safeTop + max(pagePadding * 0.25, 4)
+        } else if safeTop > 0 {
+            // 普通状态栏机型 (iPhone SE、iPad)
+            return max(safeTop + 6, pagePadding)
+        } else {
+            // 单元测试 / 零安全区环境：保持基准值
+            return pagePadding
+        }
     }
 
     /// SwiftUI Text has no first-line-only indent.  Prefixing ideographic

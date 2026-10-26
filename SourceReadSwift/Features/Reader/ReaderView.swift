@@ -787,6 +787,9 @@ struct ReaderView: View {
                 if let spacing = ov.lineSpacing { lineSpacing = spacing }
                 if let bg = ov.background { backgroundRawValue = bg.rawValue }
             }
+            if background == .custom {
+                customBackgroundIsDark = ReaderCustomWallpaperStore.isWallpaperDark
+            }
             appState.acquireTabChromeHidden(owner: tabChromeOwner)
             // 阅读器存活期间采样真实出帧情况，退出时落盘；
             // 用户在设置里能直接读到平均帧率与掉帧率，不必连 Xcode。
@@ -2401,6 +2404,18 @@ struct ReaderView: View {
 
                 extraToolbarActions()
 
+                if background == .custom {
+                    chromeIconButton(systemName: customBackgroundIsDark ? "sun.max" : "moon.stars") {
+                        customBackgroundIsDark.toggle()
+                        UserDefaults.standard.set(true, forKey: "reader.customBackgroundIsDarkManual")
+                        UserDefaults.standard.set(customBackgroundIsDark, forKey: "reader.customBackgroundIsDark")
+                        backgroundWallpaperRevision = UUID()
+                        rebuildPagedBlocksCache()
+                        HapticFeedback.light()
+                    }
+                    .accessibilityLabel("切换壁纸文字黑白色")
+                }
+
                 chromeIconButton(systemName: isCurrentChapterBookmarked ? "bookmark.fill" : "bookmark") {
                     toggleCurrentBookmark(openList: false)
                 }
@@ -2810,6 +2825,9 @@ struct ReaderView: View {
                         Button {
                             UIImpactFeedbackGenerator(style: .light).impactOccurred()
                             backgroundRawValue = item.rawValue
+                            if item == .custom {
+                                customBackgroundIsDark = ReaderCustomWallpaperStore.isWallpaperDark
+                            }
                         } label: {
                             VStack(spacing: 4) {
                                 Circle()
@@ -2852,6 +2870,7 @@ struct ReaderView: View {
                        let image = UIImage(data: data) {
                         await MainActor.run {
                             ReaderCustomWallpaperStore.saveWallpaper(image)
+                            customBackgroundIsDark = ReaderCustomWallpaperStore.isWallpaperDark
                             backgroundRawValue = ReaderBackground.custom.rawValue
                             backgroundWallpaperRevision = UUID()
                             rebuildPagedBlocksCache()
@@ -2868,7 +2887,10 @@ struct ReaderView: View {
             }
             .pickerStyle(.segmented)
             .padding(.top, 2)
-            .onChange(of: customBackgroundIsDark) { _ in
+            .onChange(of: customBackgroundIsDark) { newValue in
+                UserDefaults.standard.set(true, forKey: "reader.customBackgroundIsDarkManual")
+                UserDefaults.standard.set(newValue, forKey: "reader.customBackgroundIsDark")
+                backgroundWallpaperRevision = UUID()
                 rebuildPagedBlocksCache()
             }
 
