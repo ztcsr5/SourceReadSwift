@@ -15,206 +15,10 @@ struct SourceWritingView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 24) {
-                // Header card
-                VStack(alignment: .leading, spacing: 14) {
-                    HStack {
-                        Image(systemName: "globe")
-                            .font(.system(size: 32, weight: .bold))
-                            .foregroundStyle(server.isRunning ? .green : .secondary)
-
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text("Web 写源服务")
-                                .font(.title2.bold())
-                            if server.isRunning {
-                                HStack(spacing: 6) {
-                                    Circle()
-                                        .fill(Color.green)
-                                        .frame(width: 8, height: 8)
-                                    Text("局域网服务运行中 · 屏幕常亮保护中")
-                                        .font(.caption)
-                                        .foregroundStyle(.green)
-                                }
-                            }
-                        }
-
-                        Spacer()
-
-                        Toggle("", isOn: Binding(
-                            get: { server.isRunning || server.isStarting },
-                            set: { newValue in
-                                if newValue {
-                                    server.start()
-                                } else {
-                                    server.stop()
-                                }
-                            }
-                        ))
-                        .toggleStyle(SwitchToggleStyle(tint: AppTheme.accent))
-                        .labelsHidden()
-                    }
-
-                    Text(server.isRunning
-                         ? "服务已启动！请保持手机在此页面（已自动常亮防休眠），在同一 Wi-Fi 下的电脑浏览器输入下方地址："
-                         : "服务已停止。开启服务后，可在局域网内的电脑浏览器上直接编写、调试、格式化并一键推送到手机。")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-
-                    if server.isRunning {
-                        VStack(alignment: .leading, spacing: 8) {
-                            ForEach(server.localURLs, id: \.self) { url in
-                                HStack {
-                                    Text(url)
-                                        .font(.system(.callout, design: .monospaced))
-                                        .fontWeight(.semibold)
-                                        .foregroundStyle(AppTheme.accent)
-                                        .textSelection(.enabled)
-                                    Spacer()
-                                    Button {
-                                        UIPasteboard.general.string = url
-                                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                                    } label: {
-                                        Image(systemName: "doc.on.doc")
-                                            .font(.caption)
-                                            .foregroundStyle(.secondary)
-                                    }
-                                }
-                                .padding(.vertical, 4)
-                            }
-                        }
-                        .padding(.vertical, 4)
-
-                        HStack(spacing: 12) {
-                            Button {
-                                UIPasteboard.general.string = server.localURLs.joined(separator: "\n")
-                                UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                            } label: {
-                                Label("复制访问地址", systemImage: "doc.on.doc")
-                                    .frame(maxWidth: .infinity)
-                            }
-                            .buttonStyle(.bordered)
-
-                            Button {
-                                server.refreshAddresses()
-                                UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                            } label: {
-                                Label("刷新地址", systemImage: "arrow.clockwise")
-                                    .frame(maxWidth: .infinity)
-                            }
-                            .buttonStyle(.bordered)
-                        }
-
-                        Button {
-                            UIPasteboard.general.string = server.healthURLs.joined(separator: "\n")
-                            UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                        } label: {
-                            Label("复制健康检查地址 (/health)", systemImage: "stethoscope")
-                                .frame(maxWidth: .infinity)
-                        }
-                        .buttonStyle(.bordered)
-
-                        Text(server.localURLs.allSatisfy { $0.contains("127.0.0.1") }
-                             ? "⚠️ 当前只发现本机回环地址，电脑无法通过 Wi‑Fi 访问。请让手机连接 Wi‑Fi，并在系统设置中允许本应用使用‘本地网络’。"
-                             : "💡 PC 无法打开时，先访问任一 /health 地址；返回 SOURCE_READ_SWIFT_WEB_OK 即表示局域网连通。请确认手机已允许‘本地网络’权限，且路由器未开启 AP 隔离。")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-
-                    if let lastError = server.lastError {
-                        Text(lastError)
-                            .font(.footnote.weight(.semibold))
-                            .foregroundStyle(.red)
-                    }
-                }
-                .padding(20)
-                .background(Color(.secondarySystemBackground))
-                .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
-
-                // Status notifications
-                if let importStatus {
-                    HStack {
-                        Image(systemName: "checkmark.circle.fill")
-                            .foregroundStyle(.green)
-                        Text(importStatus)
-                            .font(.subheadline)
-                    }
-                    .padding(14)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(Color.green.opacity(0.1))
-                    .clipShape(RoundedRectangle(cornerRadius: 12))
-                }
-
-                if let importError {
-                    HStack {
-                        Image(systemName: "exclamationmark.triangle.fill")
-                            .foregroundStyle(.red)
-                        Text(importError)
-                            .font(.subheadline)
-                    }
-                    .padding(14)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(Color.red.opacity(0.1))
-                    .clipShape(RoundedRectangle(cornerRadius: 12))
-                }
-
-                // Log Messages
-                VStack(alignment: .leading, spacing: 14) {
-                    HStack {
-                        Text("运行日志")
-                            .font(.headline)
-                        Spacer()
-                        if !server.logMessages.isEmpty {
-                            Button("清空") {
-                                server.clearLogs()
-                            }
-                            .font(.caption)
-                        }
-                    }
-
-                    if server.logMessages.isEmpty {
-                        Text("暂无日志，等待电脑连接...")
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
-                            .frame(maxWidth: .infinity, minHeight: 100, alignment: .center)
-                            .background(Color(.secondarySystemBackground).opacity(0.5))
-                            .clipShape(RoundedRectangle(cornerRadius: 12))
-                    } else {
-                        VStack(alignment: .leading, spacing: 8) {
-                            ForEach(server.logMessages.prefix(15), id: \.self) { log in
-                                Text(log)
-                                    .font(.system(size: 12, design: .monospaced))
-                                    .foregroundStyle(.secondary)
-                                    .lineLimit(2)
-                            }
-                        }
-                        .padding(14)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .background(Color(.secondarySystemBackground).opacity(0.5))
-                        .clipShape(RoundedRectangle(cornerRadius: 12))
-
-                        Button {
-                            UIPasteboard.general.string = server.logMessages.joined(separator: "\n")
-                        } label: {
-                            Label("复制全部日志", systemImage: "doc.on.doc")
-                                .frame(maxWidth: .infinity)
-                        }
-                        .buttonStyle(.bordered)
-                    }
-                }
-
-                // Instructions
-                VStack(alignment: .leading, spacing: 14) {
-                    Text("使用指引")
-                        .font(.headline)
-
-                    VStack(alignment: .leading, spacing: 12) {
-                        Label("确保 iPhone 和电脑连接在同一个 Wi-Fi 或连接手机个人热点。", systemImage: "wifi")
-                        Label("打开电脑浏览器（Chrome/Edge/Safari），输入上方显示的地址。", systemImage: "macbook.and.iphone")
-                        Label("在网页中可直接填入标准模板、格式化校验 JSON、导出手机已有书源或推送新源。", systemImage: "square.and.arrow.down")
-                        Label("当前页面已开启常亮保护，请勿手动锁屏以保证服务持续响应。", systemImage: "sun.max")
-                    }
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-                }
+                serverControlCard
+                statusMessagesSection
+                logMessagesSection
+                instructionsSection
             }
             .padding(AppTheme.pagePadding)
         }
@@ -222,7 +26,6 @@ struct SourceWritingView: View {
         .navigationTitle("Web 写源与传输")
         .navigationBarTitleDisplayMode(.inline)
         .onAppear {
-            // Prevent screen sleep while user is editing on PC
             UIApplication.shared.isIdleTimerDisabled = true
 
             server.onJSONReceived = { jsonText in
@@ -253,9 +56,216 @@ struct SourceWritingView: View {
             server.start()
         }
         .onDisappear {
-            // Restore normal screen sleep when leaving view, but preserve server state
-            // so user can switch to WeChat/Notes to copy and share the link freely.
             UIApplication.shared.isIdleTimerDisabled = false
+        }
+    }
+
+    @ViewBuilder
+    private var serverControlCard: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack {
+                Image(systemName: "globe")
+                    .font(.system(size: 32, weight: .bold))
+                    .foregroundStyle(server.isRunning ? .green : .secondary)
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Web 写源服务")
+                        .font(.title2.bold())
+                    if server.isRunning {
+                        HStack(spacing: 6) {
+                            Circle()
+                                .fill(Color.green)
+                                .frame(width: 8, height: 8)
+                            Text("局域网服务运行中 · 屏幕常亮保护中")
+                                .font(.caption)
+                                .foregroundStyle(.green)
+                        }
+                    }
+                }
+
+                Spacer()
+
+                Toggle("", isOn: Binding(
+                    get: { server.isRunning || server.isStarting },
+                    set: { newValue in
+                        if newValue {
+                            server.start()
+                        } else {
+                            server.stop()
+                        }
+                    }
+                ))
+                .toggleStyle(SwitchToggleStyle(tint: AppTheme.accent))
+                .labelsHidden()
+            }
+
+            Text(server.isRunning
+                 ? "服务已启动！请保持手机在此页面（已自动常亮防休眠），在同一 Wi-Fi 下的电脑浏览器输入下方地址："
+                 : "服务已停止。开启服务后，可在局域网内的电脑浏览器上直接编写、调试、格式化并一键推送到手机。")
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+
+            if server.isRunning {
+                VStack(alignment: .leading, spacing: 8) {
+                    ForEach(server.localURLs, id: \.self) { url in
+                        HStack {
+                            Text(url)
+                                .font(.system(.callout, design: .monospaced))
+                                .fontWeight(.semibold)
+                                .foregroundStyle(AppTheme.accent)
+                                .textSelection(.enabled)
+                            Spacer()
+                            Button {
+                                UIPasteboard.general.string = url
+                                UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                            } label: {
+                                Image(systemName: "doc.on.doc")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                        .padding(.vertical, 4)
+                    }
+                }
+                .padding(.vertical, 4)
+
+                HStack(spacing: 12) {
+                    Button {
+                        UIPasteboard.general.string = server.localURLs.joined(separator: "\n")
+                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                    } label: {
+                        Label("复制访问地址", systemImage: "doc.on.doc")
+                            .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.bordered)
+
+                    Button {
+                        server.refreshAddresses()
+                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                    } label: {
+                        Label("刷新地址", systemImage: "arrow.clockwise")
+                            .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.bordered)
+                }
+
+                Button {
+                    UIPasteboard.general.string = server.healthURLs.joined(separator: "\n")
+                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                } label: {
+                    Label("复制健康检查地址 (/health)", systemImage: "stethoscope")
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.bordered)
+
+                Text(server.localURLs.allSatisfy { $0.contains("127.0.0.1") }
+                     ? "⚠️ 当前只发现本机回环地址，电脑无法通过 Wi‑Fi 访问。请让手机连接 Wi‑Fi，并在系统设置中允许本应用使用‘本地网络’。"
+                     : "💡 PC 无法打开时，先访问任一 /health 地址；返回 SOURCE_READ_SWIFT_WEB_OK 即表示局域网连通。请确认手机已允许‘本地网络’权限，且路由器未开启 AP 隔离。")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            if let lastError = server.lastError {
+                Text(lastError)
+                    .font(.footnote.weight(.semibold))
+                    .foregroundStyle(.red)
+            }
+        }
+        .padding(20)
+        .background(Color(.secondarySystemBackground))
+        .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+    }
+
+    @ViewBuilder
+    private var statusMessagesSection: some View {
+        if let importStatus {
+            HStack {
+                Image(systemName: "checkmark.circle.fill")
+                    .foregroundStyle(.green)
+                Text(importStatus)
+                    .font(.subheadline)
+            }
+            .padding(14)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(Color.green.opacity(0.1))
+            .clipShape(RoundedRectangle(cornerRadius: 12))
+        }
+
+        if let importError {
+            HStack {
+                Image(systemName: "exclamationmark.triangle.fill")
+                    .foregroundStyle(.red)
+                Text(importError)
+                    .font(.subheadline)
+            }
+            .padding(14)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(Color.red.opacity(0.1))
+            .clipShape(RoundedRectangle(cornerRadius: 12))
+        }
+    }
+
+    @ViewBuilder
+    private var logMessagesSection: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack {
+                Text("运行日志")
+                    .font(.headline)
+                Spacer()
+                if !server.logMessages.isEmpty {
+                    Button("清空") {
+                        server.clearLogs()
+                    }
+                    .font(.caption)
+                }
+            }
+
+            if server.logMessages.isEmpty {
+                Text("暂无日志，等待电脑连接...")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, minHeight: 100, alignment: .center)
+                    .background(Color(.secondarySystemBackground).opacity(0.5))
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
+            } else {
+                VStack(alignment: .leading, spacing: 8) {
+                    ForEach(server.logMessages.prefix(15), id: \.self) { log in
+                        Text(log)
+                            .font(.system(size: 12, design: .monospaced))
+                            .foregroundStyle(.secondary)
+                            .lineLimit(2)
+                    }
+                }
+                .padding(14)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(Color(.secondarySystemBackground).opacity(0.5))
+                .clipShape(RoundedRectangle(cornerRadius: 12))
+
+                Button {
+                    UIPasteboard.general.string = server.logMessages.joined(separator: "\n")
+                } label: {
+                    Label("复制全部日志", systemImage: "doc.on.doc")
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.bordered)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var instructionsSection: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            Text("使用指引")
+                .font(.headline)
+
+            VStack(alignment: .leading, spacing: 12) {
+                Label("确保 iPhone 和电脑连接在同一个 Wi-Fi 或连接手机个人热点。", systemImage: "wifi")
+                Label("打开电脑浏览器（Chrome/Edge/Safari），输入上方显示的地址。", systemImage: "macbook.and.iphone")
+                Label("在网页中可直接填入标准模板、格式化校验 JSON、导出手机已有书源或推送新源。", systemImage: "square.and.arrow.down")
+                Label("当前页面已开启常亮保护，请勿手动锁屏以保证服务持续响应。", systemImage: "sun.max")
+            }
+            .font(.subheadline)
+            .foregroundStyle(.secondary)
         }
     }
 }
@@ -338,6 +348,12 @@ final class LightweightHTTPServer: ObservableObject {
         guard backgroundTaskID != .invalid else { return }
         UIApplication.shared.endBackgroundTask(backgroundTaskID)
         backgroundTaskID = .invalid
+    }
+
+    func clearLogs() {
+        DispatchQueue.main.async {
+            self.logMessages.removeAll()
+        }
     }
 
     func refreshAddresses() {
