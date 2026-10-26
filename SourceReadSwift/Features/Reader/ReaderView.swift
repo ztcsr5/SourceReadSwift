@@ -2748,15 +2748,24 @@ struct ReaderView: View {
     private var appearanceSettings: some View {
         Group {
             appearancePreview
-
-            VStack(alignment: .leading, spacing: 6) {
-                Text("翻页模式")
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(.secondary)
-                Text(readerModeHint)
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
+            readerModeSection
+            perBookOverrideToggle
+            backgroundPickerSection
+            if background == .custom {
+                customWallpaperSection
             }
+            readerBrightnessSection
+        }
+    }
+
+    private var readerModeSection: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text("翻页模式")
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(.secondary)
+            Text(readerModeHint)
+                .font(.caption2)
+                .foregroundStyle(.secondary)
             Picker("翻页模式", selection: $readerModeRawValue) {
                 ForEach(ReaderMode.allCases) { mode in
                     Text(mode.title).tag(mode.rawValue)
@@ -2764,28 +2773,34 @@ struct ReaderView: View {
             }
             .pickerStyle(.segmented)
             .padding(.bottom, 8)
+        }
+    }
 
-            Toggle("仅对本书生效独立配置", isOn: Binding(
-                get: { isPerBookOverride },
-                set: { enabled in
-                    isPerBookOverride = enabled
-                    if enabled {
-                        let ov = BookReaderOverride(
-                            readerMode: ReaderMode(rawValue: readerModeRawValue),
-                            fontFamily: ReaderFontFamily(rawValue: fontFamilyRawValue),
-                            fontSize: fontSize,
-                            lineSpacing: lineSpacing,
-                            background: ReaderBackground(rawValue: backgroundRawValue)
-                        )
-                        ReaderOverrideStore.shared.setOverride(ov, for: bookID)
-                    } else {
-                        ReaderOverrideStore.shared.clearOverride(for: bookID)
-                    }
+    private var perBookOverrideToggle: some View {
+        Toggle("仅对本书生效独立配置", isOn: Binding(
+            get: { isPerBookOverride },
+            set: { enabled in
+                isPerBookOverride = enabled
+                if enabled {
+                    let ov = BookReaderOverride(
+                        readerMode: ReaderMode(rawValue: readerModeRawValue),
+                        fontFamily: ReaderFontFamily(rawValue: fontFamilyRawValue),
+                        fontSize: fontSize,
+                        lineSpacing: lineSpacing,
+                        background: ReaderBackground(rawValue: backgroundRawValue)
+                    )
+                    ReaderOverrideStore.shared.setOverride(ov, for: bookID)
+                } else {
+                    ReaderOverrideStore.shared.clearOverride(for: bookID)
                 }
-            ))
-            .font(.subheadline.weight(.semibold))
-            .padding(.vertical, 4)
+            }
+        ))
+        .font(.subheadline.weight(.semibold))
+        .padding(.vertical, 4)
+    }
 
+    private var backgroundPickerSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
             Text("背景颜色")
                 .font(.subheadline.weight(.semibold))
                 .foregroundStyle(.secondary)
@@ -2814,104 +2829,103 @@ struct ReaderView: View {
                 }
                 .padding(.horizontal, 2)
             }
+        }
+    }
 
-            // 自定义壁纸入口直接贴在色卡下面：以前它排在「阅读亮度」之后，
-            // 选中「自定义」只能看到一片纯黑，找不到下一步该点哪里。
-            if background == .custom {
-                VStack(alignment: .leading, spacing: 8) {
-                    PhotosPicker(selection: $selectedPhotoItem, matching: .images) {
-                        HStack(spacing: 8) {
-                            Image(systemName: "photo.badge.plus")
-                            Text(ReaderCustomWallpaperStore.hasCustomWallpaper ? "更换自定义壁纸" : "从相册选择壁纸")
-                                .font(.subheadline.weight(.semibold))
-                        }
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 11)
-                        .background(AppTheme.accent.opacity(0.12), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-                        .foregroundStyle(AppTheme.accent)
-                    }
-                    .onChange(of: selectedPhotoItem) { item in
-                        guard let item else { return }
-                        Task {
-                            if let data = try? await item.loadTransferable(type: Data.self),
-                               let image = UIImage(data: data) {
-                                await MainActor.run {
-                                    ReaderCustomWallpaperStore.saveWallpaper(image)
-                                    backgroundRawValue = ReaderBackground.custom.rawValue
-                                    backgroundWallpaperRevision = UUID()
-                                    rebuildPagedBlocksCache()
-                                    syncPerBookOverrideIfNeeded()
-                                    HapticFeedback.success()
-                                }
-                            }
-                        }
-                    }
-
-                    Picker("壁纸基底与文字风格", selection: $customBackgroundIsDark) {
-                        Text("浅色壁纸 (深色字)").tag(false)
-                        Text("深色壁纸 (浅色字)").tag(true)
-                    }
-                    .pickerStyle(.segmented)
-                    .padding(.top, 2)
-                    .onChange(of: customBackgroundIsDark) { _ in
-                        rebuildPagedBlocksCache()
-                    }
-
-                    if ReaderCustomWallpaperStore.hasCustomWallpaper {
-                        Button(role: .destructive) {
-                            ReaderCustomWallpaperStore.clearWallpaper()
-                            backgroundRawValue = ReaderBackground.paper.rawValue
+    private var customWallpaperSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            PhotosPicker(selection: $selectedPhotoItem, matching: .images) {
+                HStack(spacing: 8) {
+                    Image(systemName: "photo.badge.plus")
+                    Text(ReaderCustomWallpaperStore.hasCustomWallpaper ? "更换自定义壁纸" : "从相册选择壁纸")
+                        .font(.subheadline.weight(.semibold))
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 11)
+                .background(AppTheme.accent.opacity(0.12), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                .foregroundStyle(AppTheme.accent)
+            }
+            .onChange(of: selectedPhotoItem) { item in
+                guard let item else { return }
+                Task {
+                    if let data = try? await item.loadTransferable(type: Data.self),
+                       let image = UIImage(data: data) {
+                        await MainActor.run {
+                            ReaderCustomWallpaperStore.saveWallpaper(image)
+                            backgroundRawValue = ReaderBackground.custom.rawValue
                             backgroundWallpaperRevision = UUID()
                             rebuildPagedBlocksCache()
-                            HapticFeedback.light()
-                        } label: {
-                            HStack(spacing: 4) {
-                                Image(systemName: "trash")
-                                Text("清除自定义壁纸，恢复预设羊皮纸主题")
-                            }
-                            .font(.caption)
-                            .foregroundStyle(.red)
+                            syncPerBookOverrideIfNeeded()
+                            HapticFeedback.success()
                         }
-                        .padding(.top, 2)
                     }
-
-                    Text(ReaderCustomWallpaperStore.hasCustomWallpaper
-                         ? "壁纸已生效，支持自主切换浅色/深色文字样式以保证最佳对比度。"
-                         : "可从相册选择壁纸，支持自由搭配浅色或深色文字。")
-                        .font(.caption2)
-                        .foregroundStyle(.tertiary)
                 }
             }
 
-            VStack(alignment: .leading, spacing: 8) {
-                HStack {
-                    Text("阅读亮度")
-                        .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(.secondary)
-                    Spacer()
-                    Text(readerBrightness < 0 ? "跟随系统" : "\(Int(readerBrightness * 100))%")
-                        .font(.caption.weight(.bold))
-                        .foregroundStyle(AppTheme.accent)
-                    Button("跟随系统") {
-                        readerBrightness = -1
-                    }
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(readerBrightness < 0 ? .secondary : AppTheme.accent)
-                    .disabled(readerBrightness < 0)
-                }
-                Slider(
-                    value: Binding(
-                        get: { readerBrightness < 0 ? Double(UIScreen.main.brightness) : readerBrightness },
-                        set: { readerBrightness = $0 }
-                    ),
-                    in: 0.05...1.0
-                )
-                .tint(AppTheme.accent)
-                Text("只影响阅读页，退出阅读器会恢复系统亮度。")
-                    .font(.caption2)
-                    .foregroundStyle(.tertiary)
+            Picker("壁纸基底与文字风格", selection: $customBackgroundIsDark) {
+                Text("浅色壁纸 (深色字)").tag(false)
+                Text("深色壁纸 (浅色字)").tag(true)
+            }
+            .pickerStyle(.segmented)
+            .padding(.top, 2)
+            .onChange(of: customBackgroundIsDark) { _ in
+                rebuildPagedBlocksCache()
             }
 
+            if ReaderCustomWallpaperStore.hasCustomWallpaper {
+                Button(role: .destructive) {
+                    ReaderCustomWallpaperStore.clearWallpaper()
+                    backgroundRawValue = ReaderBackground.paper.rawValue
+                    backgroundWallpaperRevision = UUID()
+                    rebuildPagedBlocksCache()
+                    HapticFeedback.light()
+                } label: {
+                    HStack(spacing: 4) {
+                        Image(systemName: "trash")
+                        Text("清除自定义壁纸，恢复预设羊皮纸主题")
+                    }
+                    .font(.caption)
+                    .foregroundStyle(.red)
+                }
+                .padding(.top, 2)
+            }
+
+            Text(ReaderCustomWallpaperStore.hasCustomWallpaper
+                 ? "壁纸已生效，支持自主切换浅色/深色文字样式以保证最佳对比度。"
+                 : "可从相册选择壁纸，支持自由搭配浅色或深色文字。")
+                .font(.caption2)
+                .foregroundStyle(.tertiary)
+        }
+    }
+
+    private var readerBrightnessSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Text("阅读亮度")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(.secondary)
+                Spacer()
+                Text(readerBrightness < 0 ? "跟随系统" : "\(Int(readerBrightness * 100))%")
+                    .font(.caption.weight(.bold))
+                    .foregroundStyle(AppTheme.accent)
+                Button("跟随系统") {
+                    readerBrightness = -1
+                }
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(readerBrightness < 0 ? .secondary : AppTheme.accent)
+                .disabled(readerBrightness < 0)
+            }
+            Slider(
+                value: Binding(
+                    get: { readerBrightness < 0 ? Double(UIScreen.main.brightness) : readerBrightness },
+                    set: { readerBrightness = $0 }
+                ),
+                in: 0.05...1.0
+            )
+            .tint(AppTheme.accent)
+            Text("只影响阅读页，退出阅读器会恢复系统亮度。")
+                .font(.caption2)
+                .foregroundStyle(.tertiary)
         }
     }
 
