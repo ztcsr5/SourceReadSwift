@@ -2111,6 +2111,22 @@ SwiftUI `Image` 在 `ZStack` 提案阶段仍可能按比例填充后的理想尺
 
 ---
 
+## 二十一、v1.0.68 段距比例与标题去重收尾（2026-10-28）
+
+**背景**：1.0.65 已把 `paragraphSpacing` 从 0 提到 10、给标题加了 1.3x 字号与首段去重，但两处都只做到「从无到有」：段距 10 仍小于行距 12；去重只认完全相同的 key，`第八章` vs `第8章`、`（本章完）` 后缀都会漏。
+
+**段距**：`ReaderTypographyDefaults.lineSpacing 12 -> 8`、`paragraphSpacing 10 -> 16`，与 RSS 正文的 8/16 一致。分页测量（`appendPages` 的 `spacing + wholeHeight`）与渲染（`ReaderPageTextBuilder`）同源。迁移键 `reader.typographyMigrated.v66` 只改写 1.0.65 的旧默认，手动调过的值保留。
+
+**标题去重**：新增 `ChapterTextSanitizer.headingCoreKey`，剥离 `第X章` 标记（中/阿拉伯数字）、括号注释、站点后缀后再比较；核心词相同或前缀差 ≤ 12 字即剥。标题仅含标记（`第8章`）时回退到原 `comparisonKey`，避免漏剥。`looksLikeChapterTitle` 增加 `1. 风起`、`卷一 风起` 两种形状。
+
+**测试**：`ChapterTextSanitizerTests` 新增 5 条，`ReaderSettingsModelsTests` 断言 8/16 且段距 > 行距。
+
+**证据**：提交 `eae2e94`；iOS run `40581829580`（job `122462948434`）1120 tests / 0 failures、`TEST SUCCEEDED`；IPA run `40581829363`；产物 `C:\Users\Edc21\Desktop\SourceReadSwift-1.0.68-unsigned.ipa`（12,182,597 B，SHA256 `493373C174C128B9F8DF87914EFF246B37CD64844CE6654D5CC3FBAFD234FC64`，`1.0.68 / 69`，MinimumOSVersion 16.0）。
+
+**未做**：真机确认 8/16 的视觉密度与具体书源的标题行为；iOS 16 真机矩阵。
+
+---
+
 ## 附录 A：完整文件清单
 
 > 以下为 2026-10-25 工作区实测清单。`build/`、`ci-log/`、`AppIcons_Candidates/` 为本地产物/素材，不计入源码。
