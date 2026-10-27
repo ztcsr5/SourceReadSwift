@@ -1312,7 +1312,7 @@ enum ReaderNativeTextLayout {
         // indents every wrapped line and makes long paragraphs look clipped.
         paragraphStyle.headIndent = 0
         paragraphStyle.firstLineHeadIndent = CGFloat(configuration.paragraphIndent)
-        paragraphStyle.alignment = .natural
+        paragraphStyle.alignment = .justified
         let paragraphAttributes: [NSAttributedString.Key: Any] = [
             .font: configuration.fontFamily.uiFont(ofSize: CGFloat(configuration.fontSize), weight: .regular),
             .foregroundColor: configuration.textColor,
@@ -1397,7 +1397,7 @@ enum ReaderNativeTextLayout {
         paragraphStyle.paragraphSpacing = CGFloat(configuration.paragraphSpacing)
         paragraphStyle.headIndent = 0
         paragraphStyle.firstLineHeadIndent = CGFloat(configuration.paragraphIndent)
-        paragraphStyle.alignment = .natural
+        paragraphStyle.alignment = .justified
         let paragraphAttributes: [NSAttributedString.Key: Any] = [
             .font: configuration.fontFamily.uiFont(ofSize: CGFloat(configuration.fontSize), weight: .regular),
             .foregroundColor: configuration.textColor,

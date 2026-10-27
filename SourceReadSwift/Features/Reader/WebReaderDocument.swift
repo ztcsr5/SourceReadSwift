@@ -657,6 +657,7 @@ enum WebReaderHTML {
          left *and* right edge. WebKit needs the ideograph keyword; without
          it Safari falls back to ragged-right and the page looks untidy. */
       text-align: justify;
+      text-align-last: left;
       text-justify: inter-ideograph;
     }
     .para b.br {

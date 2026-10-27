@@ -316,4 +316,22 @@ final class WebReaderDocumentTests: XCTestCase {
         UserDefaults.standard.set(false, forKey: "reader.customBackgroundIsDark")
         XCTAssertFalse(ReaderBackground.custom.isDark)
     }
+
+    func testBodyCSSKeepsIndentAndJustifiesOnlyFullLines() {
+        let css = WebReaderHTML.shell
+        XCTAssertTrue(css.contains("text-indent: var(--indent);"))
+        XCTAssertTrue(css.contains("text-align: justify;"))
+        XCTAssertTrue(css.contains("text-align-last: left;"))
+    }
+
+    func testChapterTitleCSSDoesNotInheritBodyIndent() {
+        let css = WebReaderHTML.shell
+        guard let start = css.range(of: ".chapter-title {"),
+              let end = css.range(of: "}", range: start.upperBound..<css.endIndex) else {
+            return XCTFail("chapter title rule missing")
+        }
+        let rule = String(css[start.lowerBound..<end.upperBound])
+        XCTAssertTrue(rule.contains("text-align: left;"))
+        XCTAssertTrue(rule.contains("text-indent: 0;"))
+    }
 }

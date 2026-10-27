@@ -244,4 +244,36 @@ final class ReaderImageStyleTests: XCTestCase {
         XCTAssertEqual(headers["Referer"], "https://book.cdn-images.org/")
         XCTAssertTrue(headers["Accept"]?.contains("image/") == true)
     }
+
+    func testBodyParagraphKeepsFirstLineIndentAndJustifies() {
+        let config = NativeReaderTextView.Configuration(
+            title: "对齐测试",
+            subtitle: nil,
+            paragraphs: [
+                "第一段正文内容，用来确认首行缩进和两端对齐同时生效。",
+                "第二段正文内容。"
+            ],
+            contentFingerprint: "body-justify-test",
+            fontSize: 18,
+            lineSpacing: 8,
+            pagePadding: 20,
+            letterSpacing: 0,
+            paragraphSpacing: 10,
+            paragraphIndent: 40,
+            titleSpacing: 12,
+            footerHeight: 60,
+            textColor: .label,
+            highlightColor: .systemBlue,
+            animatedScrollDuration: 0.35,
+            imageStyle: .standard,
+            imageColumnWidth: 360
+        )
+
+        let result = ReaderNativeTextLayout.makeAttributedText(configuration: config)
+        let location = result.paragraphRanges[0].location
+        let style = result.text.attribute(.paragraphStyle, at: location, effectiveRange: nil) as? NSParagraphStyle
+        XCTAssertEqual(style?.alignment, .justified)
+        XCTAssertEqual(style?.firstLineHeadIndent ?? -1, 40, accuracy: 0.01)
+        XCTAssertEqual(style?.headIndent ?? -1, 0, accuracy: 0.01)
+    }
 }
