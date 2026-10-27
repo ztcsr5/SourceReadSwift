@@ -192,6 +192,35 @@ struct HtmlRuleExtractor {
     ) throws -> String {
         let prefix = String(trimmed[..<jsRange.lowerBound]).trimmingCharacters(in: .whitespacesAndNewlines)
         let script = String(trimmed[jsRange.lowerBound...]).trimmingCharacters(in: .whitespacesAndNewlines)
+        // `@onclick@js:` / `@href@js:` / `@text@js:` chain from an attribute on
+        // the current node.  Legado's getString path binds that attribute text
+        // to `result`; binding an Element bridge here makes `result.match(...)`
+        // return nothing and drops the whole row.
+        let lowerPrefix = prefix.lowercased()
+        let isAttributePrefix = prefix.hasPrefix("@")
+            && !lowerPrefix.hasPrefix("@css:")
+            && !lowerPrefix.hasPrefix("@json:")
+            && !lowerPrefix.hasPrefix("@xpath:")
+        if isAttributePrefix {
+            let extracted = try self.value(
+                from: root,
+                rule: prefix,
+                fallback: nil,
+                baseUrl: baseUrl,
+                variables: variables
+            )
+            var chainedVariables = variables
+            chainedVariables["result"] = extracted
+            chainedVariables["src"] = extracted
+            chainedVariables["html"] = extracted
+            return try evaluateJSWithTrailingRegex(
+                rule: script,
+                rootHtml: extracted,
+                rootElement: nil,
+                baseUrl: baseUrl,
+                extraVariables: chainedVariables
+            )
+        }
         let elements = (try? self.select(
             from: root,
             rule: prefix,
@@ -957,7 +986,38 @@ struct HtmlRuleExtractor {
         return mText as String
     }
 
+    /// A JavaScriptCore prelude failure (or an aborted evaluation) poisons the
+    /// cached runtime for the rest of the stage: every later `@js:` rule then
+    /// returns an error and whole sources collapse to "empty".  Rebuild the
+    /// runtime once and retry before giving up on the row.
     private func evaluateJSWithTrailingRegex(
+        rule: String,
+        rootHtml: String,
+        rootElement: Element? = nil,
+        baseUrl: URL?,
+        extraVariables: [String: Any]
+    ) throws -> String {
+        do {
+            return try evaluateJSWithTrailingRegexOnce(
+                rule: rule,
+                rootHtml: rootHtml,
+                rootElement: rootElement,
+                baseUrl: baseUrl,
+                extraVariables: extraVariables
+            )
+        } catch {
+            executionContext.resetRuntime()
+            return try evaluateJSWithTrailingRegexOnce(
+                rule: rule,
+                rootHtml: rootHtml,
+                rootElement: rootElement,
+                baseUrl: baseUrl,
+                extraVariables: extraVariables
+            )
+        }
+    }
+
+    private func evaluateJSWithTrailingRegexOnce(
         rule: String,
         rootHtml: String,
         rootElement: Element? = nil,
@@ -1031,7 +1091,7 @@ struct HtmlRuleExtractor {
                 chainedVariables["result"] = currentResult
                 chainedVariables["src"] = currentResult
                 chainedVariables["html"] = currentResult
-                return try evaluateJSWithTrailingRegex(rule: chained, rootHtml: currentResult, rootElement: nil, baseUrl: baseUrl, extraVariables: chainedVariables)
+                return try evaluateJSWithTrailingRegexOnce(rule: chained, rootHtml: currentResult, rootElement: nil, baseUrl: baseUrl, extraVariables: chainedVariables)
             } else if let doc = try? SwiftSoup.parse(currentResult, baseUrl?.absoluteString ?? "") {
                 var chainedVariables = extraVariables
                 chainedVariables["result"] = currentResult

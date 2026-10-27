@@ -1,0 +1,285 @@
+[
+ {
+  "name": "⚡📂错层小说",
+  "bookSourceUrl": "https://m.cuoceng.com/",
+  "bookUrl": "https://m.cuoceng.com/book/6406e265-c117-475e-8860-a5c9ea8db4e5.html",
+  "tocUrl": "https://m.cuoceng.com/book/6406e265-c117-475e-8860-a5c9ea8db4e5.html",
+  "contentType": "text/html;charset=UTF-8",
+  "charset": "utf-8",
+  "bytes": 12433,
+  "bodyFile": "toc-2662cfb9.body",
+  "emulated": 4,
+  "expectedMinimum": 2,
+  "source": {
+   "bookSourceName": "⚡📂错层小说",
+   "bookSourceUrl": "https://m.cuoceng.com/",
+   "bookSourceType": 0,
+   "searchUrl": "https://m.cuoceng.com/book/so/{{key}}/{{page}}.html",
+   "header": "{\"User-Agent\": \"Mozilla/5.0 (Linux; Android 10; PACM00 Build/QP1A.190711.020) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/108.0.5359.79 Mobile Safari/537.36\"}",
+   "ruleSearch": {
+    "author": ".author:contains(作者)@text",
+    "bookList": ".bookbox",
+    "bookUrl": ".bookname a@href",
+    "intro": ".update@text",
+    "lastChapter": ".cat a@text",
+    "name": ".bookname a@text",
+    "wordCount": ".author:contains(字数)@text"
+   },
+   "ruleBookInfo": {
+    "author": "[href*=\"/book/so/\"]@text",
+    "coverUrl": ".thumbnail@src",
+    "intro": "&nbsp;\n🕰  {{@@.booktime@text}}\n·\n📜  简介：{{@@.bookintro@html}}\n",
+    "kind": ".breadcrumb li:eq(1) a@text",
+    "lastChapter": ".bookchapter@text",
+    "name": ".booktitle@text",
+    "tocUrl": "*[href*=book/chapter]@href",
+    "wordCount": ".booktag span:contains(\"字\")@text"
+   },
+   "ruleToc": {
+    "chapterList": "#allchapter dd",
+    "chapterName": "a@text",
+    "chapterUrl": "a@href",
+    "nextTocUrl": "text.下一@href"
+   },
+   "ruleContent": {
+    "content": "#content@html",
+    "nextContentUrl": "#linkNext@href",
+    "webJs": "{\"webView\":true}"
+   },
+   "loginUrl": null
+  }
+ },
+ {
+  "name": "错层小说网",
+  "bookSourceUrl": "https://m.cuoceng.org/",
+  "bookUrl": "https://m.cuoceng.org/book/6406e265-c117-475e-8860-a5c9ea8db4e5.html",
+  "tocUrl": "https://m.cuoceng.org/book/6406e265-c117-475e-8860-a5c9ea8db4e5.html",
+  "contentType": "text/html;charset=UTF-8",
+  "charset": "utf-8",
+  "bytes": 12469,
+  "bodyFile": "toc-508b600b.body",
+  "emulated": 4,
+  "expectedMinimum": 2,
+  "source": {
+   "bookSourceName": "错层小说网",
+   "bookSourceUrl": "https://m.cuoceng.org/",
+   "bookSourceType": 0,
+   "searchUrl": "/book/so/{{key}}/{{page}}.html",
+   "header": "{\"User-Agent\": \"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36\"}",
+   "ruleSearch": {
+    "bookList": ".bookbox",
+    "name": ".bookname@text",
+    "author": ".author.0@text",
+    "intro": ".update@text",
+    "kind": "",
+    "lastChapter": ".cat@tag.a@text",
+    "bookUrl": ".bookname@tag.a@href",
+    "wordCount": ".author.1@text"
+   },
+   "ruleBookInfo": {
+    "name": "",
+    "author": "",
+    "intro": "",
+    "kind": ".content@.book.0@.bookinfo@tag.a.1@text",
+    "lastChapter": "",
+    "tocUrl": "id.allchapter@tag.a.3@href",
+    "coverUrl": ".content@.book.0@.bookcover@tag.img@src",
+    "wordCount": ""
+   },
+   "ruleToc": {
+    "chapterList": "id.allchapter@tag.dl@tag.dd@tag.a",
+    "chapterName": "text",
+    "chapterUrl": "href",
+    "nextTocUrl": "text.下一页@href"
+   },
+   "ruleContent": {
+    "content": "id.content@html",
+    "replaceRegex": ""
+   },
+   "loginUrl": null
+  }
+ },
+ {
+  "name": "精华书阁手机版",
+  "bookSourceUrl": "https://m.jhssd.com/",
+  "bookUrl": "https://m.jhssd.com/2241/",
+  "tocUrl": "https://m.jhssd.com/2241/",
+  "contentType": "text/html;charset=UTF-8",
+  "charset": "utf-8",
+  "bytes": 29151,
+  "bodyFile": "toc-9f103a3c.body",
+  "emulated": 20,
+  "expectedMinimum": 10,
+  "source": {
+   "bookSourceName": "精华书阁手机版",
+   "bookSourceUrl": "https://m.jhssd.com/",
+   "bookSourceType": 0,
+   "searchUrl": "https://m.jhssd.com/search.html?ie=utf-8&word={{key}}",
+   "header": null,
+   "ruleSearch": {
+    "bookList": "class.searchbook",
+    "name": "h4@text",
+    "author": "class.author@text",
+    "bookUrl": "class.bookimg@tag.a@href",
+    "coverUrl": "class.bookimg@tag.img@src",
+    "checkKeyWord": "7号基地"
+   },
+   "ruleBookInfo": {
+    "name": "class.block_txt2@a.1@text",
+    "author": "p.2@text",
+    "intro": "class.intro_info@textNodes",
+    "lastChapter": "@li.0@text",
+    "coverUrl": "class.block_img2@tag.img@src"
+   },
+   "ruleToc": {
+    "chapterList": "li!0:1:2:3:4@a",
+    "chapterName": "text",
+    "chapterUrl": "href",
+    "nextTocUrl": "option!0@value"
+   },
+   "ruleContent": {
+    "content": "#nr1@textNodes",
+    "nextContentUrl": "text.下一页@href",
+    "replaceRegex": "##精华书阁.*|.*免费阅读.*https.*com.*|为您提供.*请务必保存好书签.|最新章节！|（本章未完，请点击下一页继续阅读）|@"
+   },
+   "loginUrl": null
+  }
+ },
+ {
+  "name": "笔趣阁[biquge7]",
+  "bookSourceUrl": "https://www.biquge7.top/",
+  "bookUrl": "https://www.biquge7.top/50045",
+  "tocUrl": "https://www.biquge7.top/50045",
+  "contentType": "text/html;charset=UTF-8",
+  "charset": "utf-8",
+  "bytes": 240415,
+  "bodyFile": "toc-4aa54d01.body",
+  "emulated": 1838,
+  "expectedMinimum": 919,
+  "source": {
+   "bookSourceName": "笔趣阁[biquge7]",
+   "bookSourceUrl": "https://www.biquge7.top/",
+   "bookSourceType": 0,
+   "searchUrl": "https://www.biquge7.top/search?keyword={{key}}",
+   "header": null,
+   "ruleSearch": {
+    "bookList": "class.tui_1_item",
+    "name": "class.tui_1_item@a@text",
+    "author": "",
+    "bookUrl": "class.tui_1_item@a@href",
+    "coverUrl": "class.tui_1_item@img@src"
+   },
+   "ruleBookInfo": {
+    "init": "",
+    "name": "",
+    "author": "class.up@span.0@text",
+    "intro": "p.0@text",
+    "lastChapter": "class.upd@a@text",
+    "wordCount": ""
+   },
+   "ruleToc": {
+    "chapterList": "class.list@li@tag.a",
+    "chapterName": "text",
+    "chapterUrl": "href"
+   },
+   "ruleContent": {
+    "content": "class.text@textNodes",
+    "nextContentUrl": ""
+   },
+   "loginUrl": null
+  }
+ },
+ {
+  "name": "看书网",
+  "bookSourceUrl": "https://www.kanshuw.com",
+  "bookUrl": "https://www.kanshuw.com/67/67129/",
+  "tocUrl": "https://www.kanshuw.com/67/67129/",
+  "contentType": "text/html;charset=UTF-8",
+  "charset": "utf-8",
+  "bytes": 31871,
+  "bodyFile": "toc-37c56ea6.body",
+  "emulated": 100,
+  "expectedMinimum": 50,
+  "source": {
+   "bookSourceName": "看书网",
+   "bookSourceUrl": "https://www.kanshuw.com",
+   "bookSourceType": 0,
+   "searchUrl": "/search.php?q={{key}}",
+   "header": null,
+   "ruleSearch": {
+    "bookList": ".row@dl",
+    "name": "h3@text##\\[|.*\\]|免费阅读.*",
+    "author": "span@text",
+    "kind": "h3@text##\\[|\\].*",
+    "lastChapter": "a[-1]@text",
+    "bookUrl": "a[0]@href",
+    "coverUrl": "tag.dt@tag.a@img@src",
+    "checkKeyWord": "我的"
+   },
+   "ruleBookInfo": {
+    "init": "",
+    "name": "class.row book_info@h1@text##免费阅读.*",
+    "author": "class.row book_info@a[0]@text",
+    "intro": "class.row book_info@id.intro_pc@oweText",
+    "kind": "class.title@a[1]@text",
+    "lastChapter": "class.row book_info@a[2]@text",
+    "tocUrl": "",
+    "coverUrl": "class.row book_info@img@src"
+   },
+   "ruleToc": {
+    "chapterList": ".row[-1]@a",
+    "chapterName": "text",
+    "chapterUrl": "href",
+    "nextTocUrl": "class.pages@tag.ul@tag.li.!0:1:-1@tag.a@href"
+   },
+   "ruleContent": {
+    "content": ".font_max@html##第\\(\\d+/\\d+\\)页",
+    "nextContentUrl": "text.下一章@href",
+    "replaceRegex": "##[a-zA-Z0-9-]+[a-zA-Z0-9-].*\\.[a-zA-Z0-9-].*"
+   },
+   "loginUrl": null
+  }
+ },
+ {
+  "name": "开心文学网",
+  "bookSourceUrl": "https://www.kxwx.org",
+  "bookUrl": "https://www.kxwx.org/book/10535/",
+  "tocUrl": "https://www.kxwx.org/book/10535/",
+  "contentType": "text/html;charset=UTF-8",
+  "charset": "utf-8",
+  "bytes": 24991,
+  "bodyFile": "toc-b199deb1.body",
+  "emulated": 30,
+  "expectedMinimum": 15,
+  "source": {
+   "bookSourceName": "开心文学网",
+   "bookSourceUrl": "https://www.kxwx.org",
+   "bookSourceType": 0,
+   "searchUrl": "/search/{{key}}.html",
+   "header": null,
+   "ruleSearch": {
+    "bookList": ".grid@tr!0",
+    "name": "a.0@text",
+    "author": "a.2@text",
+    "kind": "td.-1:-2@text",
+    "lastChapter": "a.1@text",
+    "bookUrl": "a.0@href",
+    "wordCount": "td.-3@text"
+   },
+   "ruleBookInfo": {
+    "intro": "[property=\"og:description\"]@content",
+    "kind": "[property=\"og:novel:category\"]@content",
+    "coverUrl": "[property=\"og:image\"]@content"
+   },
+   "ruleToc": {
+    "chapterList": ".chapterNum@li@a",
+    "chapterName": "text",
+    "chapterUrl": "href"
+   },
+   "ruleContent": {
+    "content": ".mainContenr@p@text"
+   },
+   "loginUrl": null
+  }
+ }
+]

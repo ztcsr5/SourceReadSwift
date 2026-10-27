@@ -1,0 +1,295 @@
+<!DOCTYPE HTML>
+<!--[if lt IE 7 ]><html class="ie ie6"><![endif]-->
+<!--[if IE 7 ]><html class="ie ie7"><![endif]-->
+<!--[if IE 8 ]><html class="ie ie8"><![endif]-->
+<!--[if IE 9 ]><html class="ie ie9"><![endif]-->
+<!--[if (gt IE 9)|!(IE)]><html><![endif]-->
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<meta http-equiv="Cache-Control" content="no-siteapp" />
+<meta http-equiv="Cache-Control" content="no-transform" />
+<script type="text/javascript">
+UA = navigator.userAgent.toLowerCase();
+url = window.location;
+url = url.toString();
+if(UA.indexOf('iphone') != -1 || UA.indexOf('mobile') != -1 || UA.indexOf('android') != -1 || UA.indexOf('ipad') != -1 || UA.indexOf('windows ce') != -1 || UA.indexOf('ipod') != -1 ) {
+ uri = url.match(/^https:\/\/www\.(.+)/); Go('https://m.'+uri[1]);
+}
+function Go(url) { window.location = url;}
+var enableQQLogin = true;
+var adEffective = true;
+var contextPath = "";
+</script>
+<script type="text/javascript" src="/themes/default/pc/js/lib/jquery-1.11.1.min.js"></script>
+<script type="text/javascript" src="/themes/default/pc/js/common.min.js"></script>
+<!--[if lt IE 9]>
+<script src="/themes/default/pc/js/lib/html5.js"></script>
+<![endif]-->
+<!--[if IE 6]>
+<script src="/themes/default/pc/js/DD_belatedPNG_0.0.8a-min.js"></script>
+<script>
+  DD_belatedPNG.fix('.png_bg');
+</script>
+<![endif]-->
+
+<title>网游三部曲之斗破苍穹 - 网游三部曲之斗破苍穹最新章节 - 网游三部曲之斗破苍穹TXT下载 - 网游三部曲之斗破苍穹免费阅读 - 网游三部曲之斗破苍穹全文阅读</title>
+<meta name="keywords" content="网游三部曲之斗破苍穹,网游三部曲之斗破苍穹最新章节,网游三部曲之斗破苍穹TXT下载,网游三部曲之斗破苍穹全文阅读,网游三部曲之斗破苍穹免费阅读,网游三部曲之斗破苍穹无广告,开心文学网" />
+<meta name="description" content="《网游三部曲之斗破苍穹》情节跌宕起伏、扣人心弦，是一本情节与文笔俱佳的网游动漫小说，开心文学网免费提供网游三部曲之斗破苍穹最新的清爽干净的文字章节在线阅读!" />
+  <!--360结构化-->
+   <meta property="og:type" content="novel"/>
+   <meta property="og:title" content="网游三部曲之斗破苍穹"/>
+   <meta property="og:description" content="    现实是高手，游戏是菜鸟。
+    本来只想玩耍人生，奈何人生变化多端。
+    为了美女，砍尽一切现实阻碍，踏平一切虚幻屏障。
+    多年以后，拥着美女，站在现实武道与虚幻实力的顶。
+    网游三部曲：
+    第一部:网游之斗破苍穹
+    第二部:网游之风云再起
+    第三部:网游之终极神话
+"/>
+   <meta property="og:image" content="https://www.kaixinwx.net/cover/10/10535/10535s.jpg"/>
+   <meta property="og:novel:category" content="网游动漫"/>
+   <meta property="og:novel:author" content="暗红"/>
+   <meta property="og:novel:book_name" content="网游三部曲之斗破苍穹"/>
+   <meta property="og:novel:read_url" content="https://www.kaixinwx.net/book/10535/"/>
+
+   <!--选填-->
+   <meta property="og:novel:status" content="连载中"/>
+   <meta property="og:novel:update_time" content="2010-12-07 01:00"/>
+   <meta property="og:novel:click_cnt" content="1723"/>
+   <meta property="og:novel:latest_chapter_name" content="第十八章 勇战僵尸"/>
+   <meta property="og:novel:latest_chapter_url" content="https://www.kaixinwx.net/reader/10535/2787212.html"/>
+
+<link rel="stylesheet" type="text/css" href="/themes/default/pc/css/common.css">
+
+</head>
+<body>
+<div id="wrapper">
+  <div class="shadow" ></div>
+  <header id="global-head" >
+    <div>
+      <nav class="site-navigation cf" style="width: 320px;">
+      <a class="home" href="/">首页</a>
+      <a href="/sitemap/index.html">网站地图</a>
+      <a href="/wanben/index.html">完本小说</a>
+      <a href="/saveShortcut" rel="nofollow">创建桌面快捷</a>
+      </nav>
+      <div class="hd-follow" style="width:630px;text-align:right;" >
+        <div class="myhide"><a href="#" class="hides" rel="nofollow">浏览记录</a>
+          <div class="hideInfo">
+            <ul id="readhistory">
+            </ul>
+            <p>*提示：浏览记录仅放置最近浏览的10本书籍</p>
+            <span>浏览记录是空的</span>
+          </div>
+        </div>
+          <span id="checklogin">
+            <a href="/gotoQQLogin" rel="nofollow"><img src="/themes/default/pc/images/qq_login.gif" class="vm" alt="QQ登录"></a>
+            <a href="/login" style="color:#F0F0F0" rel="nofollow">访客登录</a>&nbsp;&nbsp;
+            <a href="/register" style="color:#F0F0F0" rel="nofollow">免费注册</a>&nbsp;&nbsp;
+	    <script type="text/javascript">initUserMenu();</script>
+          </span>
+        </div>
+    </div>
+    <!--TODO haserror check-->
+    <p class="site-logo">
+        <a href="/" title="开心文学网-无弹出广告小说网">
+        <img src="/themes/default/pc/images/logo-medium.png" alt="开心文学网-无弹出广告小说网 - logo"></a>
+    </p>
+    <div class="site-search">
+<form id="searchForm" action="/search" method="get" onSubmit="onSearchButtomClick();return false;">
+       <input name="key" type="text" id="key" onFocus="this.classname='over';if (value =='这是一个神奇的搜索，请输入小说名或作者名'){value =''}" onBlur="this.classname='input'"  value="这是一个神奇的搜索，请输入小说名或作者名" />
+       <input type="button" id="searchbuttom" value="" style="background:url('/themes/default/pc/images/search.jpg');border:0px solid;cursor:pointer;" onClick="onSearchButtomClick()"/>
+</form>
+    </div>
+  </header>
+  <div id="channel-header" class="clearfix">
+    <div class="channel-header-wrapper">
+      <nav class="channel-nav">
+        <ul class="channel-nav-list">
+            <li  ><a href="/" title="开心文学网">开心文学网</a></li>
+            <li ><a href="/list/1.html">玄幻魔法</a></li><li ><a href="/list/2.html">武侠修真</a></li><li ><a href="/list/3.html">都市言情</a></li><li ><a href="/list/4.html">历史军事</a></li><li ><a href="/list/5.html">侦探推理</a></li><li ><a href="/list/6.html">网游动漫</a></li><li ><a href="/list/7.html">科幻小说</a></li><li ><a href="/list/8.html">恐怖灵异</a></li><li ><a href="/list/9.html">散文诗词</a></li><li ><a href="/list/10.html">其他类型</a></li>
+            <li ><a href="/top/lastupdate.html">排行榜</a></li>
+        </ul>
+      </nav>
+    </div>
+  </div>
+    <div id="container">
+    <div id="info_ad_01"></div>
+    <div class="mainnav"><div class="main-index"> 位置：  &nbsp; > &nbsp; 
+        <a href="/list/6.html" class="c009900">
+        网游动漫</a> &nbsp; > &nbsp; 
+        网游三部曲之斗破苍穹
+    </div>
+    <section class="main b-detail">
+        <div class="detail">
+            <img src="/themes/default/pc/images/only2.png" class="leftso png_bg"  alt="连载中图标">
+            <a href="/book/10535/"  class="l mr11">
+                 <img src="/cover/10/10535/10535s.jpg" style="width: 120px; height: 150px" alt="网游三部曲之斗破苍穹" onerror="this.src='/cover/nocover.jpg'"/></a>
+        <div class="b-info">
+          <h1>网游三部曲之斗破苍穹</h1>
+          <div class="infoDetail">
+                <div id="waa" style="height:72px;width:700px;overflow:hidden;">介绍:&nbsp;&nbsp;&nbsp;&nbsp;现实是高手，游戏是菜鸟。<br/>&nbsp;&nbsp;&nbsp;&nbsp;本来只想玩耍人生，奈何人生变化多端。<br/>&nbsp;&nbsp;&nbsp;&nbsp;为了美女，砍尽一切现实阻碍，踏平一切虚幻屏障。<br/>&nbsp;&nbsp;&nbsp;&nbsp;多年以后，拥着美女，站在现实武道与虚幻实力的顶。<br/>&nbsp;&nbsp;&nbsp;&nbsp;网游三部曲：<br/>&nbsp;&nbsp;&nbsp;&nbsp;第一部:网游之斗破苍穹<br/>&nbsp;&nbsp;&nbsp;&nbsp;第二部:网游之风云再起<br/>&nbsp;&nbsp;&nbsp;&nbsp;第三部:网游之终极神话<br/></div>
+                <a href="javascript:void(0)" id="show"  onclick="document.getElementById('waa').style.height='';document.getElementById('hidden').style.display='';document.getElementById('show').style.display='none';" style="float:right;">+ 展开全部</a>
+                <a href="javascript:void(0)" id="hidden" style="display:none;float:right;" onclick="document.getElementById('waa').style.height='72px';document.getElementById('hidden').style.display='none';document.getElementById('show').style.display='';">- 收回介绍</a> 
+          </div>
+          <div class="b-oper">
+              <a href="#chapters" class="reader" title="网游三部曲之斗破苍穹免费阅读">开始阅读</a>
+              <a href="javascript:return false;" articleno="10535"  id="addBookcaseButton" class="mehide" rel="nofollow" >加入书架</a>
+              <a href="javascript:return false;" articleno="10535"  id="addSubscribeButton" class="subscribe" rel="nofollow" >订阅本书</a>
+              <a href="javascript:return false;" articleno="10535"  id="voteButton"  class="toupiao" rel="nofollow">推荐本书</a>
+              <a href="/user/messageEdit?title=网游三部曲之斗破苍穹-章节错误&content=举报原因如下：  "  class="error" target="_blank" rel="nofollow">内容报错</a>
+          </div>
+        </div>
+        <div class="clear"></div>
+        <div class="author">
+            <div class="bookDetail">
+                <dl><dt>类别：</dt><dd><a href="/list/6/1.html"
+                    target="_blank" title="网游动漫">网游动漫</a></dd></dl>
+                <dl><dt>状态：</dt><dd>连载中</dd></dl>
+                <dl class="bookso"><dt>作      者：</dt><dd> <a href="/author/暗红.html">
+                    暗红</a></dd></dl>
+                  <dl><dt>TXT下载：</dt><dd id="downloadUrl"><font id="info_download"></font></dd></dl>
+                <script type="text/javascript">initUserMenu();</script>
+                <dl class="bookNew"><dt>最新章节：</dt>
+                    <dd>
+                    <a href="/reader/10535/2787212.html" target="_blank">第十八章 勇战僵尸</a>
+                    <em>更新于:[12-07 01:00]</em><br />
+                    </dd>
+                </dl>
+            </div>
+            <div class="adv"><div id="info_ad_02"></div></div>
+            <div class="clear"></div>
+        </div>
+    </section>
+    </div>
+    <div id="info_ad_03"></div>
+    <div class="clear"></div>
+    <div class="clear"></div>
+    <div class="chapterNum">
+        <a name="chapters"></a>
+          <ul>
+            <h1>《网游三部曲之斗破苍穹》最新章节</b>（提示：由于开启缓存最新章节可能会延时显示，请通过书架查看。）</h1>
+                <li><a href="/reader/10535/2787212.html">第十八章 勇战僵尸</a></li><li><a href="/reader/10535/2781358.html">第十七章 破开封印</a></li><li><a href="/reader/10535/2718649.html">第十七章 压缩与组合</a></li><li><a href="/reader/10535/2718648.html">第十六章 炼药师</a></li><li><a href="/reader/10535/2718647.html">第十五章 技能</a></li><li><a href="/reader/10535/2718646.html">第十四章 进入迷洞</a></li><li><a href="/reader/10535/2718645.html">第十三章 不是爱的爱</a></li><li><a href="/reader/10535/2718644.html">第十二章 迷洞</a></li><li><a href="/reader/10535/2718643.html">第十一章 坠崖</a></li>
+
+            <h1>《网游三部曲之斗破苍穹》全部章节</h1>
+            <li><a href="/reader/10535/2718631.html" title="心得">心得</a></li><li><a href="/reader/10535/2718632.html" title="话语">话语</a></li><li><a href="/reader/10535/2718633.html" title="第一章 新的开始">第一章 新的开始</a></li><li><a href="/reader/10535/2718634.html" title="第二章 苍穹">第二章 苍穹</a></li><li><a href="/reader/10535/2718635.html" title="第三章 和美女同租">第三章 和美女同租</a></li><li><a href="/reader/10535/2718636.html" title="第四章 进入游戏">第四章 进入游戏</a></li><li><a href="/reader/10535/2718637.html" title="第五章 如此杀怪">第五章 如此杀怪</a></li><li><a href="/reader/10535/2718638.html" title="第六章 炖了BO">第六章 炖了BO</a></li><li><a href="/reader/10535/2718639.html" title="第七章 力战狼王">第七章 力战狼王</a></li><li><a href="/reader/10535/2718640.html" title="第八章 系统更新">第八章 系统更新</a></li><li><a href="/reader/10535/2718641.html" title="第九章 转职与鉴定">第九章 转职与鉴定</a></li><li><a href="/reader/10535/2718642.html" title="第十章 追逐战">第十章 追逐战</a></li><li><a href="/reader/10535/2718643.html" title="第十一章 坠崖">第十一章 坠崖</a></li><li><a href="/reader/10535/2718644.html" title="第十二章 迷洞">第十二章 迷洞</a></li><li><a href="/reader/10535/2718645.html" title="第十三章 不是爱的爱">第十三章 不是爱的爱</a></li><li><a href="/reader/10535/2718646.html" title="第十四章 进入迷洞">第十四章 进入迷洞</a></li><li><a href="/reader/10535/2718647.html" title="第十五章 技能">第十五章 技能</a></li><li><a href="/reader/10535/2718648.html" title="第十六章 炼药师">第十六章 炼药师</a></li><li><a href="/reader/10535/2718649.html" title="第十七章 压缩与组合">第十七章 压缩与组合</a></li><li><a href="/reader/10535/2781358.html" title="第十七章 破开封印">第十七章 破开封印</a></li><li><a href="/reader/10535/2787212.html" title="第十八章 勇战僵尸">第十八章 勇战僵尸</a></li>
+          </ul>
+    </div>
+    <div id="info_ad_05"></div>
+        <div class="navTab">
+        <ul>
+            <li onmouseover="replaces(1,2)" id="for1" class="select"><a href="#">站长推荐</a></li>
+            <li onmouseover="replaces(2,2)" id="for2" class ><a href="#">猜你喜欢</a></li>
+        </ul>
+    </div>
+
+    <div class="tabMain">
+        <ul id="content1">
+            <li><a href="/book/10544/" title="神仙也来玩网游"><img src="/cover/10/10544/10544s.jpg" width="111px;" height="146px;" alt="神仙也来玩网游" onerror="this.src='/cover/nocover.jpg'"></a>
+                <img src="/themes/default/pc/images/only2.png" class="topss png_bg"  alt="连载中图标">
+            <a href="/book/10544/">神仙也来玩网游</a></li>
+            <li><a href="/book/10555/" title="新网游锻造"><img src="/cover/10/10555/10555s.jpg" width="111px;" height="146px;" alt="新网游锻造" onerror="this.src='/cover/nocover.jpg'"></a>
+                <img src="/themes/default/pc/images/only.png" class="topss png_bg" alt="完本图标">
+            <a href="/book/10555/">新网游锻造</a></li>
+            <li><a href="/book/10585/" title="热血传奇之铸造传奇"><img src="/cover/10/10585/10585s.jpg" width="111px;" height="146px;" alt="热血传奇之铸造传奇" onerror="this.src='/cover/nocover.jpg'"></a>
+                <img src="/themes/default/pc/images/only2.png" class="topss png_bg"  alt="连载中图标">
+            <a href="/book/10585/">热血传奇之铸造传奇</a></li>
+            <li><a href="/book/10606/" title="重生之再回魔兽"><img src="/cover/10/10606/10606s.jpg" width="111px;" height="146px;" alt="重生之再回魔兽" onerror="this.src='/cover/nocover.jpg'"></a>
+                <img src="/themes/default/pc/images/only2.png" class="topss png_bg"  alt="连载中图标">
+            <a href="/book/10606/">重生之再回魔兽</a></li>
+            <li><a href="/book/10608/" title="网游之极限猎杀"><img src="/cover/10/10608/10608s.jpg" width="111px;" height="146px;" alt="网游之极限猎杀" onerror="this.src='/cover/nocover.jpg'"></a>
+                <img src="/themes/default/pc/images/only.png" class="topss png_bg" alt="完本图标">
+            <a href="/book/10608/">网游之极限猎杀</a></li>
+            <li><a href="/book/10609/" title="魔兽之暗黑领主"><img src="/cover/10/10609/10609s.jpg" width="111px;" height="146px;" alt="魔兽之暗黑领主" onerror="this.src='/cover/nocover.jpg'"></a>
+                <img src="/themes/default/pc/images/only2.png" class="topss png_bg"  alt="连载中图标">
+            <a href="/book/10609/">魔兽之暗黑领主</a></li>
+            <li><a href="/book/10620/" title="网游之以武求道"><img src="/cover/10/10620/10620s.jpg" width="111px;" height="146px;" alt="网游之以武求道" onerror="this.src='/cover/nocover.jpg'"></a>
+                <img src="/themes/default/pc/images/only2.png" class="topss png_bg"  alt="连载中图标">
+            <a href="/book/10620/">网游之以武求道</a></li>
+            <li><a href="/book/10642/" title="无限征服"><img src="/cover/10/10642/10642s.jpg" width="111px;" height="146px;" alt="无限征服" onerror="this.src='/cover/nocover.jpg'"></a>
+                <img src="/themes/default/pc/images/only2.png" class="topss png_bg"  alt="连载中图标">
+            <a href="/book/10642/">无限征服</a></li>
+            <li><a href="/book/10654/" title="网游之梦寻三国"><img src="/cover/10/10654/10654s.jpg" width="111px;" height="146px;" alt="网游之梦寻三国" onerror="this.src='/cover/nocover.jpg'"></a>
+                <img src="/themes/default/pc/images/only2.png" class="topss png_bg"  alt="连载中图标">
+            <a href="/book/10654/">网游之梦寻三国</a></li>
+            <li><a href="/book/10692/" title="网游之九州传奇"><img src="/cover/10/10692/10692s.jpg" width="111px;" height="146px;" alt="网游之九州传奇" onerror="this.src='/cover/nocover.jpg'"></a>
+                <img src="/themes/default/pc/images/only2.png" class="topss png_bg"  alt="连载中图标">
+            <a href="/book/10692/">网游之九州传奇</a></li>
+            <li><a href="/book/10751/" title="网游之霸王箭"><img src="/cover/10/10751/10751s.jpg" width="111px;" height="146px;" alt="网游之霸王箭" onerror="this.src='/cover/nocover.jpg'"></a>
+                <img src="/themes/default/pc/images/only2.png" class="topss png_bg"  alt="连载中图标">
+            <a href="/book/10751/">网游之霸王箭</a></li>
+            <li><a href="/book/10752/" title="制霸空权"><img src="/cover/10/10752/10752s.jpg" width="111px;" height="146px;" alt="制霸空权" onerror="this.src='/cover/nocover.jpg'"></a>
+                <img src="/themes/default/pc/images/only2.png" class="topss png_bg"  alt="连载中图标">
+            <a href="/book/10752/">制霸空权</a></li>
+        </ul>
+        <ul id="content2" style="display:none;">
+           <li><a href="/book/136067/" title="那个爱脸红的男孩"><img src="/cover/136/136067/136067s.jpg" width="111px;" height="146px;" alt="那个爱脸红的男孩" onerror="this.src='/cover/nocover.jpg'"></a>
+                <img src="/themes/default/pc/images/only2.png" class="topss png_bg"  alt="连载中图标">
+            <a href="/book/136067/">那个爱脸红的男孩</a></li>
+           <li><a href="/book/37069/" title="咒术师传说"><img src="/cover/37/37069/37069s.jpg" width="111px;" height="146px;" alt="咒术师传说" onerror="this.src='/cover/nocover.jpg'"></a>
+                <img src="/themes/default/pc/images/only2.png" class="topss png_bg"  alt="连载中图标">
+            <a href="/book/37069/">咒术师传说</a></li>
+           <li><a href="/book/162775/" title="妖尾之诸星闪耀"><img src="/cover/162/162775/162775s.jpg" width="111px;" height="146px;" alt="妖尾之诸星闪耀" onerror="this.src='/cover/nocover.jpg'"></a>
+                <img src="/themes/default/pc/images/only2.png" class="topss png_bg"  alt="连载中图标">
+            <a href="/book/162775/">妖尾之诸星闪耀</a></li>
+           <li><a href="/book/86417/" title="怪谈电台"><img src="/cover/86/86417/86417s.jpg" width="111px;" height="146px;" alt="怪谈电台" onerror="this.src='/cover/nocover.jpg'"></a>
+                <img src="/themes/default/pc/images/only2.png" class="topss png_bg"  alt="连载中图标">
+            <a href="/book/86417/">怪谈电台</a></li>
+           <li><a href="/book/150628/" title="一傀开天"><img src="/cover/150/150628/150628s.jpg" width="111px;" height="146px;" alt="一傀开天" onerror="this.src='/cover/nocover.jpg'"></a>
+                <img src="/themes/default/pc/images/only2.png" class="topss png_bg"  alt="连载中图标">
+            <a href="/book/150628/">一傀开天</a></li>
+           <li><a href="/book/204978/" title="修弑凡途"><img src="/cover/204/204978/204978s.jpg" width="111px;" height="146px;" alt="修弑凡途" onerror="this.src='/cover/nocover.jpg'"></a>
+                <img src="/themes/default/pc/images/only2.png" class="topss png_bg"  alt="连载中图标">
+            <a href="/book/204978/">修弑凡途</a></li>
+           <li><a href="/book/243687/" title="粉红的肉缝"><img src="/cover/243/243687/243687s.jpg" width="111px;" height="146px;" alt="粉红的肉缝" onerror="this.src='/cover/nocover.jpg'"></a>
+                <img src="/themes/default/pc/images/only2.png" class="topss png_bg"  alt="连载中图标">
+            <a href="/book/243687/">粉红的肉缝</a></li>
+           <li><a href="/book/124703/" title="北地直播间"><img src="/cover/124/124703/124703s.jpg" width="111px;" height="146px;" alt="北地直播间" onerror="this.src='/cover/nocover.jpg'"></a>
+                <img src="/themes/default/pc/images/only2.png" class="topss png_bg"  alt="连载中图标">
+            <a href="/book/124703/">北地直播间</a></li>
+           <li><a href="/book/94246/" title="重生反派女配攻略女主"><img src="/cover/94/94246/94246s.jpg" width="111px;" height="146px;" alt="重生反派女配攻略女主" onerror="this.src='/cover/nocover.jpg'"></a>
+                <img src="/themes/default/pc/images/only2.png" class="topss png_bg"  alt="连载中图标">
+            <a href="/book/94246/">重生反派女配攻略女主</a></li>
+           <li><a href="/book/105600/" title="清风残月刀"><img src="/cover/105/105600/105600s.jpg" width="111px;" height="146px;" alt="清风残月刀" onerror="this.src='/cover/nocover.jpg'"></a>
+                <img src="/themes/default/pc/images/only2.png" class="topss png_bg"  alt="连载中图标">
+            <a href="/book/105600/">清风残月刀</a></li>
+           <li><a href="/book/110747/" title="真武仙尊"><img src="/cover/110/110747/110747s.jpg" width="111px;" height="146px;" alt="真武仙尊" onerror="this.src='/cover/nocover.jpg'"></a>
+                <img src="/themes/default/pc/images/only2.png" class="topss png_bg"  alt="连载中图标">
+            <a href="/book/110747/">真武仙尊</a></li>
+           <li><a href="/book/166449/" title="泡沫之夏3"><img src="/cover/166/166449/166449s.jpg" width="111px;" height="146px;" alt="泡沫之夏3" onerror="this.src='/cover/nocover.jpg'"></a>
+                <img src="/themes/default/pc/images/only2.png" class="topss png_bg"  alt="连载中图标">
+            <a href="/book/166449/">泡沫之夏3</a></li>
+        </ul>
+    </div>
+<div class="clear"></div>
+<footer id="global-foot">
+    <p>
+    本小说站所有小说、评论均为网友更新！仅代表发布者个人行为，与本小说站(https://www.kaixinwx.net)立场无关！<br/>
+    本站所有小说的版权为原作者所有！如无意中侵犯到您的权益，或是含有非法内容，请及时与我们联系，我们将在第一时间做出回应！谢谢！<br/>
+        Copyright &copy; 2019 Kaixinwx.NET All Rights Reserved. | 蜀ICP备16031986号-9 
+    </p>
+</footer>
+    <div id="full2" style="width:37px; height:22px; position:fixed; left:50%; top:425px; margin-left:493px;  z-index:100; text-align:center; cursor:pointer;">
+    <a class="get_top" alt="返回顶部"></a>
+    </div>
+    <div id="full" style="width:37px; height:22px; position:fixed; left:50%; top:562px; margin-left:493px;  z-index:100; text-align:center; cursor:pointer;">
+    <a class="get_bottom" alt="跳至页尾"></a>
+    </div>
+    </div>
+ </div>
+<script type="text/javascript" src="/themes/default/pc/js/lib/layer.min.js"></script>
+<!--[if lt IE 8]>
+<script type="text/javascript" src="/themes/default/pc/js/lib/json.js"></script>
+<![endif]-->
+<script type="text/javascript">
+var downloadUrl = "/download/10535.txt";
+var downloadTitle = "网游三部曲之斗破苍穹";
+</script>
+<script type="text/javascript" src="/themes/default/pc/js/news_top.js"></script>
+
+<script defer src="https://zz.bdstatic.com/linksubmit/push.js"></script>
+<script defer src="https://tj.shinpa.me/script.js" data-website-id="203f0355-9220-4ccb-a7fa-ea94baa45e5e"></script>
+<script> var _mtj = _mtj || []; (function () { var mtj = document.createElement("script"); mtj.src = "https://node95.aizhantj.com:21233/tjjs/?k=7om2gnqgcg6"; var s = document.getElementsByTagName("script")[0]; s.parentNode.insertBefore(mtj, s); })(); </script>
+</body>  
+</html>
