@@ -1872,6 +1872,42 @@ bottom = bottom < 1 && top >= 44 ? 34 : bottom
 - 横屏不额外留顶部 47pt；
 - 页眉/页脚/页码与 1.0.60 几何一致。
 
+## 十五、v1.0.62 滑动模式页脚状态带（2026-10-27）
+
+### 15.1 现象
+
+滑动模式下底部状态栏（时间 / 页码 / 电量）以半透明文字叠在正文最后一行上，正文被遮挡；分页 / 仿真翻页不受影响。
+
+### 15.2 根因
+
+`readerFooter` 是透明 overlay，滑动模式的 `WKWebView` 铺满全屏；文档内 `bottomInset` 只增加内容尾部留白，不能裁剪视口，正文仍会滚到页脚下方。
+
+### 15.3 修复
+
+`ReaderPageChrome` 新增：
+
+```swift
+static let scrollFooterBandHeight: CGFloat = 40
+static func scrollFooterReservedHeight(statusPosition: String) -> CGFloat {
+    (statusPosition == "bottom" || statusPosition == "both") ? scrollFooterBandHeight : 0
+}
+```
+
+`ReaderView.scrollReaderContent` 在 `.ignoresSafeArea(.container, edges: .bottom)` 之后加 `.padding(.bottom, scrollFooterReservedHeight)`，WebView 视口在状态带上方截止；`top` / `none` 不占位。
+
+### 15.4 验证
+
+- 新增 `ReaderPageGeometryTests.testScrollFooterBandOnlyReservesWhenFooterAtBottom`（bottom/both=40，top/none=0）；
+- CI run `40496375952`：Build 成功，`1068 tests / 0 failures`，`** TEST SUCCEEDED **`（2026-10-27T11:35:20Z）；
+- IPA run `40496375949`：`C:\Users\Edc21\Desktop\SourceReadSwift-1.0.62-unsigned.ipa`，`12,026,902` 字节，SHA256 `7A33A9243D728B4D0440960FBC8467F5A8FC3A9EA32836E9A577E6BD8CCAC173`，包内 1.0.62 / Build 63。
+
+### 15.5 待真机验收
+
+- 章末最后一行不被页脚遮挡；
+- 页脚背景与阅读背景连续；
+- `statusPosition=top` 或横屏不额外留底部空白；
+- 底部点击翻页不被页脚拦截。
+
 ## 附录 A：完整文件清单
 
 > 以下为 2026-10-25 工作区实测清单。`build/`、`ci-log/`、`AppIcons_Candidates/` 为本地产物/素材，不计入源码。
