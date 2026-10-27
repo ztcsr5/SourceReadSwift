@@ -1818,6 +1818,60 @@ contentWidth  = max(width - margin*2, 80)
 - 滚动模式：页眉 22pt 行 + 正文 30pt 内边距不重叠；
 - 深色 / 自定义壁纸：页眉页脚颜色与背景对比度。
 
+## 十四、v1.0.61 安全区与 chrome 修复（2026-10-27）
+
+### 14.1 现象
+
+真机截图（390×844pt）显示：顶部工具条压在系统状态栏下面，章节标题与 18:30 / 电池重叠；正文第一章标题顶到状态栏；底部控制坞贴到屏幕物理底边；设置面板底部越过 home indicator。
+
+### 14.2 根因
+
+阅读器根视图 `.ignoresSafeArea()` 后，安全区由代码自行计算。原实现只取 `foregroundActive` 场景的 `keyWindow.safeAreaInsets`；在 LiveContainer / 侧载容器里 key window 可能是容器窗口，安全区上报为 0，导致：
+
+- `readerTopSafeInset = 0` → 顶部工具条 `.padding(.top, 4)`；
+- `scrollContentTopInset = 30` → 正文标题顶到状态栏；
+- `readerFooterSafeInset = 0` → 底部控制坞只留 10pt；
+- `settingsPanel` 读取已归零的 `proxy.safeAreaInsets`。
+
+### 14.3 修复
+
+新增 `SourceReadSwift/Features/Reader/ReaderSafeAreaResolver.swift`：
+
+```text
+top    = max(所有 UIWindow 的 safeAreaInsets.top, 状态栏高度, 0)
+top    = top < 1 ? 按屏幕尺寸兜底 : top
+bottom = max(所有 UIWindow 的 safeAreaInsets.bottom, 0)
+bottom = bottom < 1 && top >= 44 ? 34 : bottom
+```
+
+兜底表：932→59、926→47、896→44、852→59、844→47、812（宽≤375）→50、其余→20；横屏不启用顶部兜底。
+
+`ReaderView` 的 chrome 同步修正：
+
+| 位置 | 修正 |
+|---|---|
+| 顶部工具条 | `top = readerTopSafeInset + 4` |
+| 底部控制坞 | `bottom = max(readerFooterSafeInset, 10) + 10` |
+| 设置面板 | 高度与底部间距改用 `readerFooterSafeInset` |
+| 顶部提示条 / 语音错误条 / 目标 toast | 全部叠加 `readerTopSafeInset` |
+
+`ReaderPageGeometry` 本身不变；安全区恢复后页眉/正文自动回到 `safeTop + 2` 与 `safeTop + 34`。
+
+### 14.4 验证
+
+- 新增 `ReaderSafeAreaResolverTests` 10 个用例（灵动岛、390×844、428×926、430×932、414×896、mini、SE、窗口优先、状态栏兜底、横屏）。
+- 版本三处同步：1.0.61 / Build 62。
+- CI：GitHub Actions run `40489685517`（commit `e3560bc5`）：Build 成功；Test `1067` 个用例、`0` 失败、`** TEST SUCCEEDED **`（2026-10-27T10:44:18Z）。
+- IPA：GitHub Actions run `40489685657` 成功；产物 `C:\Users\Edc21\Desktop\SourceReadSwift-1.0.61-unsigned.ipa`，`12,024,962` 字节，SHA256 `29C079B42733D20FD48C7B4823A547518ACF0379899413EF3679581A65727BF0`；包内 `CFBundleShortVersionString=1.0.61`、`CFBundleVersion=62`、`MinimumOSVersion=16.0`、`CFBundleIdentifier=com.edc21.SourceReadSwift`。
+
+### 14.5 待真机验收
+
+- 390×844：顶部工具条在状态栏下方，正文标题不与时间/电池重叠；
+- 393×852 灵动岛：工具条不压灵动岛；
+- 底部控制坞与设置面板完全位于 home indicator 上方；
+- 横屏不额外留顶部 47pt；
+- 页眉/页脚/页码与 1.0.60 几何一致。
+
 ## 附录 A：完整文件清单
 
 > 以下为 2026-10-25 工作区实测清单。`build/`、`ci-log/`、`AppIcons_Candidates/` 为本地产物/素材，不计入源码。
