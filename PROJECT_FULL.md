@@ -2094,7 +2094,7 @@ SwiftUI `Image` 在 `ZStack` 提案阶段仍可能按比例填充后的理想尺
 ### 19.5 证据
 
 - `SourceReadSwiftTests/ReaderPageSelectionTests.swift`：9 条（插章后仍第 5 章、重分页、锚点章缺失只向前、占位页、空模型、clamp、身份 key 稳定性）。
-- CI 与 IPA 运行号：见 `docs/CODEX_HANDOVER_1_0_66.md` §四。
+- CI：iOS run `40569757995`（job `122420520824`，sha `64b9831`），Build success，**1112 tests / 0 failures**；IPA run `40569757787`（job `122420520603`），`SourceReadSwift-1.0.66-unsigned.ipa`，12,182,355 字节，SHA256 `EF427BD48E3EF53DFA403DB28C55FF55FA60C81ADA83C40A37F9C87D3EC94786`。
 - 真机：本轮无 iOS 16 设备，全部 UI/帧率结论标 `待真机验收`。
 
 ## 附录 A：完整文件清单

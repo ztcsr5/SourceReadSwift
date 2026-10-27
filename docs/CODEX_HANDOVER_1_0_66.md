@@ -1,7 +1,7 @@
 # CODEX 交接 — v1.0.66 (Build 67)
 
 > **分支**：`codex/reader-feedback-fixes`
-> **提交**：`01ec90bb7debc6e18a3576d2910fd63fde80f986`（`fix(reader): anchor page cursor to page identity and reuse page hosts`）
+> **提交**：`01ec90b`（`fix(reader): anchor page cursor to page identity and reuse page hosts`）+ `64b9831`（`test: cover page identity restoration and bump version assertions to 1.0.66`）
 > **日期**：2026-10-28
 > **上一版**：v1.0.65 (Build 66) / `ffb9da4`
 > **本轮输入**：两段真机录像（`c81f0199….mp4` 滑动卡顿、`5338b22f….mp4` 翻页跳回前面章节）+ 三条文字反馈
@@ -136,11 +136,22 @@ enum ReaderPageRestoration {
 
 ### 4.1 CI 结果
 
-（本轮完成后回填：Build 步骤结论、Test 步骤 tests / failures 计数）
+| 项 | 值 |
+|---|---|
+| iOS run | `40569757995` / job `122420520824`（sha `64b9831`） |
+| Build | success |
+| Test | success —— **1112 tests / 0 failures**（`Executed 1112 tests, with 0 failures (0 unexpected) in 49.779`） |
+| 说明 | 首次运行 run `40568266811` 为 1112 / 3 failures，全部是 `SearchURLResolverTests.testAppVersionSemantics` 里硬编码的 65/66，已同步为 66/67 |
 
 ### 4.2 IPA
 
-（回填文件名、字节数、SHA256）
+| 项 | 值 |
+|---|---|
+| 运行 | Unsigned IPA run `40569757787` / job `122420520603`（sha `64b9831`） |
+| 文件 | `C:\Users\Edc21\Desktop\SourceReadSwift-1.0.66-unsigned.ipa` |
+| 大小 | `12,182,355` 字节 |
+| SHA256 | `EF427BD48E3EF53DFA403DB28C55FF55FA60C81ADA83C40A37F9C87D3EC94786` |
+| 版本 | `CFBundleShortVersionString = 1.0.66`，`CFBundleVersion = 67`，`MinimumOSVersion = 16.0` |
 
 ---
 
