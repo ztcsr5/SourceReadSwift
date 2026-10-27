@@ -45,14 +45,14 @@ enum HapticFeedback {
 extension UIImpactFeedbackGenerator {
     private static let swizzleImpactOccurredOnce: Void = {
         let originalSelector = #selector(UIImpactFeedbackGenerator.impactOccurred as (UIImpactFeedbackGenerator) -> () -> Void)
-        let swizzledSelector = #selector(UIImpactFeedbackGenerator.sr_impactOccurred)
+        let swizzledSelector = #selector(UIImpactFeedbackGenerator.sr_impactOccurredNoArgs)
         if let originalMethod = class_getInstanceMethod(UIImpactFeedbackGenerator.self, originalSelector),
            let swizzledMethod = class_getInstanceMethod(UIImpactFeedbackGenerator.self, swizzledSelector) {
             method_exchangeImplementations(originalMethod, swizzledMethod)
         }
 
         let originalIntensitySelector = #selector(UIImpactFeedbackGenerator.impactOccurred(intensity:))
-        let swizzledIntensitySelector = #selector(UIImpactFeedbackGenerator.sr_impactOccurred(intensity:))
+        let swizzledIntensitySelector = #selector(UIImpactFeedbackGenerator.sr_impactOccurredWithIntensity(_:))
         if let origM = class_getInstanceMethod(UIImpactFeedbackGenerator.self, originalIntensitySelector),
            let swizM = class_getInstanceMethod(UIImpactFeedbackGenerator.self, swizzledIntensitySelector) {
             method_exchangeImplementations(origM, swizM)
@@ -63,14 +63,14 @@ extension UIImpactFeedbackGenerator {
         _ = swizzleImpactOccurredOnce
     }
 
-    @objc private func sr_impactOccurred() {
+    @objc private func sr_impactOccurredNoArgs() {
         guard HapticFeedback.isEnabled else { return }
-        sr_impactOccurred()
+        sr_impactOccurredNoArgs()
     }
 
-    @objc private func sr_impactOccurred(intensity: CGFloat) {
+    @objc private func sr_impactOccurredWithIntensity(_ intensity: CGFloat) {
         guard HapticFeedback.isEnabled else { return }
-        sr_impactOccurred(intensity: intensity)
+        sr_impactOccurredWithIntensity(intensity)
     }
 }
 
