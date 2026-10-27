@@ -189,6 +189,10 @@ struct ReaderView: View {
     /// One-shot migration for the 1.0.64 defaults (`paragraphSpacing = 0`,
     /// `titleSpacing = 8`). A value the reader already customised is kept.
     @AppStorage("reader.typographyMigrated.v65") private var typographyMigratedV65 = false
+    /// Second pass for the spacing ratio: 1.0.65 shipped 12 / 10, which still
+    /// left paragraphs closer than the line gap. Only the exact old defaults
+    /// are rewritten; a manually tuned value is kept.
+    @AppStorage("reader.typographyMigrated.v66") private var typographyMigratedV66 = false
     @AppStorage("reader.footerHeight") private var footerHeight: Double = ReaderTypographyDefaults.footerHeight
     /// 章节标题呈现方式。默认「页眉小标题」：每页顶部 12pt 章节名，正文从页眉下开始，
     /// 与栖阅 / 开元阅读的阅读页一致。
@@ -3793,20 +3797,31 @@ struct ReaderView: View {
     /// the previous one. Raise only the untouched legacy defaults so a reader
     /// who deliberately picked a tighter value keeps it.
     private func migrateTypographyDefaultsIfNeeded() {
-        guard !typographyMigratedV65 else { return }
-        if paragraphSpacing == 0 {
-            paragraphSpacing = ReaderTypographyDefaults.paragraphSpacing
+        if !typographyMigratedV65 {
+            if paragraphSpacing == 0 {
+                paragraphSpacing = ReaderTypographyDefaults.paragraphSpacing
+            }
+            if titleSpacing == 8 {
+                titleSpacing = ReaderTypographyDefaults.titleSpacing
+            }
+            typographyMigratedV65 = true
         }
-        if titleSpacing == 8 {
-            titleSpacing = ReaderTypographyDefaults.titleSpacing
+        if !typographyMigratedV66 {
+            // 1.0.65 defaults: lineSpacing 12 / paragraphSpacing 10.
+            if lineSpacing == 12 {
+                lineSpacing = ReaderTypographyDefaults.lineSpacing
+            }
+            if paragraphSpacing == 10 {
+                paragraphSpacing = ReaderTypographyDefaults.paragraphSpacing
+            }
+            typographyMigratedV66 = true
         }
-        typographyMigratedV65 = true
     }
 
     /// 一档对标栖阅 / 开元阅读截图的排版参数。用户随时可以再微调。
     private func applyCompetitiveReaderPreset() {
         fontSize = 20
-        lineSpacing = 12
+        lineSpacing = ReaderTypographyDefaults.lineSpacing
         pagePadding = 21
         paragraphIndent = 40
         paragraphSpacing = ReaderTypographyDefaults.paragraphSpacing

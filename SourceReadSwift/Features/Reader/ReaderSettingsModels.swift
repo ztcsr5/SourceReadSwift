@@ -509,12 +509,12 @@ enum ReaderFontFamily: String, CaseIterable, Identifiable, Codable, Sendable {
 
 enum ReaderTypographyDefaults {
     // 对标 390×844pt 竞品截图：正文 20pt、左右边距 21pt、首行缩进 2 字。
-    // 段距必须大于行距，否则整屏文字会连成一片；10pt 是 20pt 正文在
-    // 常见中文阅读器里的舒适值（行距 12pt 是行内额外 leading，不是段距）。
+    // 段距必须大于行距，否则整屏文字会连成一片：行内额外 leading 8pt，
+    // 段后 16pt（2 倍）。RSS 正文一直用的就是 8 / 16。
     static let fontSize: Double = 20
-    static let lineSpacing: Double = 12
+    static let lineSpacing: Double = 8
     static let letterSpacing: Double = 0
-    static let paragraphSpacing: Double = 10
+    static let paragraphSpacing: Double = 16
     static let paragraphIndent: Double = 40 // 2 characters * 20pt
     static let titleSpacing: Double = 12
     static let pagePadding: Double = 21

@@ -44,9 +44,14 @@ enum ChapterTextSanitizer {
         }
 
         if !isPlaceholder(resolved) {
-            let key = comparisonKey(resolved)
+            // A heading that is only its marker ("第8章") has no core word;
+            // comparing the stripped body against the bare marker would never
+            // match, so fall back to the plain key for both sides.
+            let coreTitle = headingCoreKey(resolved)
+            let usesCore = !coreTitle.isEmpty
+            let key = usesCore ? coreTitle : comparisonKey(resolved)
             while let first = body.first {
-                let firstKey = comparisonKey(first)
+                let firstKey = usesCore ? headingCoreKey(first) : comparisonKey(first)
                 if firstKey == key {
                     body.removeFirst()
                     removed += 1
@@ -54,7 +59,7 @@ enum ChapterTextSanitizer {
                 }
                 if firstKey.hasPrefix(key) {
                     let remainder = firstKey.dropFirst(key.count)
-                    if remainder.count <= 6 {
+                    if remainder.count <= 12 {
                         body.removeFirst()
                         removed += 1
                         continue
@@ -130,6 +135,34 @@ enum ChapterTextSanitizer {
         placeholderKeys.contains(comparisonKey(text).lowercased())
     }
 
+    /// Key used to decide whether a body paragraph repeats the heading.
+    ///
+    /// `comparisonKey` alone missed the common shape where the TOC uses
+    /// Chinese numerals and the body uses Arabic ones ("第八章 入城" vs
+    /// "第8章 入城"), or where the body appends a site suffix. Strip the
+    /// chapter marker, bracketed notes and known suffixes before comparing.
+    /// A heading made only of its marker ("第8章") falls back to the plain
+    /// key so the shorter-body case still deduplicates.
+    private static func headingCoreKey(_ text: String) -> String {
+        var value = text
+        value = value.replacingOccurrences(
+            of: #"^第\s*[0-9零一二三四五六七八九十百千万两]+\s*[章节回卷部篇集]\s*"#,
+            with: "",
+            options: .regularExpression
+        )
+        value = value.replacingOccurrences(
+            of: #"[（(【\[][^）)】\]]{0,20}[）)】\]]"#,
+            with: "",
+            options: .regularExpression
+        )
+        value = value.replacingOccurrences(
+            of: #"(最新章节|求月票|求推荐|求收藏|本章完|正文)$"#,
+            with: "",
+            options: .regularExpression
+        )
+        return comparisonKey(value)
+    }
+
     private static func comparisonKey(_ text: String) -> String {
         let folded = text.folding(
             options: [.widthInsensitive, .caseInsensitive],
@@ -153,6 +186,20 @@ enum ChapterTextSanitizer {
         if trimmed.range(
             of: #"^(序章|序言|楔子|引子|前言|后记|尾声|终章|番外|Chapter\s*\d+)"#,
             options: [.regularExpression, .caseInsensitive]
+        ) != nil {
+            return true
+        }
+        // "1. 风起" / "12、入城" shapes: numbered headings without 第/章.
+        if trimmed.range(
+            of: #"^[0-9]{1,5}\s*[.、．]\s*\S"#,
+            options: .regularExpression
+        ) != nil {
+            return true
+        }
+        // "卷一 风起" without 第.
+        if trimmed.range(
+            of: #"^卷\s*[0-9零一二三四五六七八九十百千万两]"#,
+            options: .regularExpression
         ) != nil {
             return true
         }

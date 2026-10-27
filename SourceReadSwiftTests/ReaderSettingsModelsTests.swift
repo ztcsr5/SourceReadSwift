@@ -74,8 +74,13 @@ final class ReaderSettingsModelsTests: XCTestCase {
         XCTAssertEqual(ReaderTypographyDefaults.fontSize, 20)
         XCTAssertEqual(ReaderTypographyDefaults.paragraphIndent, 40)
         XCTAssertEqual(ReaderTypographyDefaults.pagePadding, 21)
-        XCTAssertEqual(ReaderTypographyDefaults.lineSpacing, 12)
-        XCTAssertEqual(ReaderTypographyDefaults.paragraphSpacing, 10)
+        XCTAssertEqual(ReaderTypographyDefaults.lineSpacing, 8)
+        XCTAssertEqual(ReaderTypographyDefaults.paragraphSpacing, 16)
+        XCTAssertGreaterThan(
+            ReaderTypographyDefaults.paragraphSpacing,
+            ReaderTypographyDefaults.lineSpacing,
+            "paragraph gap must exceed the in-line leading"
+        )
         XCTAssertEqual(ReaderTypographyDefaults.titleSpacing, 12)
         XCTAssertEqual(ReaderTypographyDefaults.titleFontSize(for: 20), 26)
 
