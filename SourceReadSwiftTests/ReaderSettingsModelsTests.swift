@@ -75,7 +75,9 @@ final class ReaderSettingsModelsTests: XCTestCase {
         XCTAssertEqual(ReaderTypographyDefaults.paragraphIndent, 40)
         XCTAssertEqual(ReaderTypographyDefaults.pagePadding, 21)
         XCTAssertEqual(ReaderTypographyDefaults.lineSpacing, 12)
-        XCTAssertEqual(ReaderTypographyDefaults.paragraphSpacing, 0)
+        XCTAssertEqual(ReaderTypographyDefaults.paragraphSpacing, 10)
+        XCTAssertEqual(ReaderTypographyDefaults.titleSpacing, 12)
+        XCTAssertEqual(ReaderTypographyDefaults.titleFontSize(for: 20), 26)
 
         XCTAssertEqual(ReaderPageChromeLayout.allCases.count, 3)
         XCTAssertEqual(ReaderPageChromeLayout.header.title, "页眉小标题")

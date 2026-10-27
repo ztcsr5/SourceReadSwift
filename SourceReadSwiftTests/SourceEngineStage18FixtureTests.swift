@@ -135,7 +135,7 @@ final class SourceEngineStage18FixtureTests: XCTestCase {
         XCTAssertEqual(stop.details["pagesLoaded"], "2")
     }
 
-    func testContentPaginationStopsAtEightPages() async throws {
+    func testContentPaginationFollowsNinePages() async throws {
         let source = paginationSource()
         var responses: [String: Stage18FixtureNetwork.Payload] = [:]
         for page in 1...9 {
@@ -143,9 +143,6 @@ final class SourceEngineStage18FixtureTests: XCTestCase {
             let next = page < 9 ? "<a class='next' href='/content/\(page + 1)'>next</a>" : ""
             responses[url] = html("<div id='content'>页\(page)</div>\(next)")
         }
-        // Page eight points to page nine so the engine has a pending next URL
-        // when its safety cap is reached.
-        responses["https://fixture.local/content/8"] = html("<div id='content'>页8</div><a class='next' href='/content/9'>next</a>")
         let network = Stage18FixtureNetwork(responses: responses)
         let diagnostics = Stage18Diagnostics()
         let engine = LegadoSourceEngine(network: network, diagnostics: DiagnosticSink { event in diagnostics.append(event) })
@@ -153,13 +150,12 @@ final class SourceEngineStage18FixtureTests: XCTestCase {
 
         let result = await engine.getContent(source: source, chapter: chapter)
         guard case .success(let content) = result else { return XCTFail("expected content: \(result)") }
-        XCTAssertEqual(content.paragraphs, (1...8).map { "页\($0)" })
+        // Long serialised chapters used to stop after eight pages mid-sentence.
+        // The safety cap is now 24, so this nine-page chapter must finish.
+        XCTAssertEqual(content.paragraphs, (1...9).map { "页\($0)" })
         XCTAssertNil(content.nextContentUrl)
-        XCTAssertEqual(network.requests.count, 8)
-        XCTAssertFalse(network.requestedURLs.contains("https://fixture.local/content/9"))
-        let stop = try XCTUnwrap(diagnostics.events.first { $0.stage == "content.pagination.stop" })
-        XCTAssertEqual(stop.details["reason"], "max-pages")
-        XCTAssertEqual(stop.details["pagesLoaded"], "8")
+        XCTAssertEqual(network.requests.count, 9)
+        XCTAssertTrue(network.requestedURLs.contains("https://fixture.local/content/9"))
     }
 
     private func paginationSource() -> BookSource {
