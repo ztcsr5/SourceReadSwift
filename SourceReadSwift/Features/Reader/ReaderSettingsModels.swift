@@ -285,10 +285,14 @@ enum ReaderCustomWallpaperStore {
     }
 
     static func saveWallpaper(_ image: UIImage) {
-        guard let data = image.jpegData(compressionQuality: 0.85) else { return }
+        // 相册原图常见 12MP；先按最长边 2800px 降采样再存盘，控制内存，
+        // 同时避免超大 UIImage 的固有尺寸影响任何布局路径。
+        let prepared = ReaderWallpaperLayoutPolicy.downsampledImage(image)
+        guard let data = prepared.jpegData(compressionQuality: 0.85) else { return }
         try? data.write(to: wallpaperURL, options: .atomic)
-        _cachedWallpaper = image
-        let dark = image.isDarkPerception
+        _cachedWallpaper = prepared
+        // 用降采样后的位图算亮度，避免 12MP 原图在主线程遍历像素。
+        let dark = prepared.isDarkPerception
         _cachedIsDark = dark
         // 重新选图时重置手动覆盖标记，自动适应新壁纸的亮度
         UserDefaults.standard.removeObject(forKey: "reader.customBackgroundIsDarkManual")

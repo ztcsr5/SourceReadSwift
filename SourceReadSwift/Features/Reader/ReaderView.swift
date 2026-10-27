@@ -194,6 +194,8 @@ struct ReaderView: View {
     @AppStorage("reader.autoScrollDelay") private var autoScrollDelay: Double = 2.0
     @AppStorage("reader.sleepTimerMinutes") private var sleepTimerMinutes: Int = 0
     @AppStorage("reader.background") private var backgroundRawValue: String = ReaderBackground.paper.rawValue
+    /// 壁纸填充方式：填充 / 适应 / 拉伸。对齐开元 BoxFit 与栖阅 UIImageView contentMode。
+    @AppStorage("reader.customWallpaperFillMode") private var customWallpaperFillModeRaw = ReaderWallpaperFillMode.fill.rawValue
     @State private var isPerBookOverride: Bool = false
     @AppStorage("reader.mode") private var readerModeRawValue: String = ReaderMode.scroll.rawValue
     @AppStorage("reader.tapZones") private var tapZonesRawValue: String = ReaderTapAction.defaultRawValue
@@ -1114,12 +1116,12 @@ struct ReaderView: View {
     private var readerBackdrop: some View {
         ZStack {
             if background == .custom, let image = ReaderCustomWallpaperStore.loadWallpaper() {
-                Image(uiImage: image)
-                    .resizable()
-                    .scaledToFill()
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .clipped()
-                    .id(backgroundWallpaperRevision)
+                ReaderWallpaperView(
+                    image: image,
+                    fillMode: ReaderWallpaperFillMode(rawValue: customWallpaperFillModeRaw) ?? .fill
+                )
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .id(backgroundWallpaperRevision)
                 if customBackgroundIsDark {
                     Color.black.opacity(colorScheme == .dark ? 0.60 : 0.35)
                 } else {
@@ -2351,10 +2353,11 @@ struct ReaderView: View {
     private var pageBackground: some View {
         if background == .custom, let image = ReaderCustomWallpaperStore.loadWallpaper() {
             ZStack {
-                Image(uiImage: image)
-                    .resizable()
-                    .scaledToFill()
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                ReaderWallpaperView(
+                    image: image,
+                    fillMode: ReaderWallpaperFillMode(rawValue: customWallpaperFillModeRaw) ?? .fill
+                )
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
                 if customBackgroundIsDark {
                     Color.black.opacity(colorScheme == .dark ? 0.60 : 0.35)
                 } else {
@@ -3249,6 +3252,14 @@ struct ReaderView: View {
                 backgroundWallpaperRevision = UUID()
                 rebuildPagedBlocksCache()
             }
+
+            Picker("壁纸填充方式", selection: $customWallpaperFillModeRaw) {
+                ForEach(ReaderWallpaperFillMode.allCases) { mode in
+                    Text(mode.title).tag(mode.rawValue)
+                }
+            }
+            .pickerStyle(.segmented)
+            .padding(.top, 2)
 
             if ReaderCustomWallpaperStore.hasCustomWallpaper {
                 Button(role: .destructive) {
