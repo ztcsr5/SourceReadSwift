@@ -816,6 +816,7 @@ struct ReaderView: View {
                 .zIndex(5)
             }
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background {
             GeometryReader { proxy in
                 Color.clear
@@ -1116,6 +1117,8 @@ struct ReaderView: View {
                 Image(uiImage: image)
                     .resizable()
                     .scaledToFill()
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .clipped()
                     .id(backgroundWallpaperRevision)
                 if customBackgroundIsDark {
                     Color.black.opacity(colorScheme == .dark ? 0.60 : 0.35)
@@ -2351,6 +2354,7 @@ struct ReaderView: View {
                 Image(uiImage: image)
                     .resizable()
                     .scaledToFill()
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
                 if customBackgroundIsDark {
                     Color.black.opacity(colorScheme == .dark ? 0.60 : 0.35)
                 } else {
