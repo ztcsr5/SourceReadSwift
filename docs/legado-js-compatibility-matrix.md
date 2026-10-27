@@ -75,3 +75,23 @@ Swift 原生桥：
 - 段落写 `srdata://inline/<sha256>.<ext>`，由 `InlineImageStore` 去重落盘、`RemoteImageLoader` 解码渲染。
 - 普通 URL 仍走原有绝对化路径；非法负载保留原 URL 并记日志。
 - 回归：`InlineImagePipelineTests` 7 个用例（含 `java.ajaxBytes` 经 `RemoteImageLoader` 的真实解码）。
+
+
+## 待补：与栖阅 `packages_stub.js` 的类覆盖差异（v1.0.60 评估）
+
+栖阅在 `packages_stub.js` 中额外提供、当前本项目尚未显式暴露的 Java 类：
+
+| 类 | 典型用途 | 优先级 |
+|---|---|---|
+| `java.math.BigInteger` | RSA、大数运算 | P1 |
+| `java.nio.ByteBuffer` | 字节拼接、AES 入参 | P1 |
+| `android.text.TextUtils` | `isEmpty` / `join` | P1 |
+| `java.util.concurrent.TimeUnit` | `sleep` / 超时 | P1 |
+| `javax.crypto.SecretKeyFactory` + `DESKeySpec` | DES/3DES 源 | P1 |
+| `java.io.BufferedInputStream` / `InputStreamReader` | 流式解密 | P2 |
+| `java.lang.StringBuffer` | 老源字符串拼接 | P2 |
+| `android.graphics.BitmapFactory` | 图片尺寸/解码 | P2（本项目走原生图像管线） |
+
+未实现调用当前会被 Proxy 降级为空串并写 `bridge.error`，症状是“规则返回空”而非显式报错。补齐时每个类至少补一个 `LegadoJavaCompatibilityTests` 用例，并用 `legado-capability-bank-20260908.json` 回归。
+
+详见 `docs/书源解析能力评估-1.0.60.md` §3、§4 P1-1。

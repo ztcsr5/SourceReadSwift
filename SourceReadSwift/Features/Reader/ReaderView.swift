@@ -2624,10 +2624,10 @@ struct ReaderView: View {
                 .foregroundStyle(readerThemeTextColor.opacity(0.45))
                 .padding(.horizontal, max(CGFloat(pagePadding), 18))
                 .frame(height: 20, alignment: .center)
-                // 阅读页忽略了安全区，页脚要自己让开 home indicator，
-                // 否则时间 / 章节 / 电量会贴在屏幕最底边上（全屏阅读时最扎眼）。
-                // 页脚贴到屏幕最下缘（益达那种位置），只让 home indicator 一点点。
-                .padding(.bottom, max(readerFooterSafeInset * 0.25, 2))
+                // 阅读页忽略了安全区，页脚要自己让开 home indicator。
+                // 0.35×底部安全区（34pt → 12pt）与竞品页码离底 12.3pt 对齐：
+                // 文字落在手势条上方，但不会像旧版 0.25× 那样压到指示条上。
+                .padding(.bottom, max(readerFooterSafeInset * 0.35, ReaderPageChrome.footerBottomInset))
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         }

@@ -145,3 +145,12 @@ Get-ChildItem SourceReadSwift -Recurse -File -Include *.swift |
 3. UI 展示或明确不展示；
 4. fixture/XCTest；
 5. 能力矩阵状态更新。
+
+---
+
+## 6. 更正与补充（2026-10-27，v1.0.60）
+
+- §4 中 `sourceRegex` 的“接入正文元数据链”判断已更正：Legado 的 `sourceRegex` 是 WebView 资源嗅探正则，落点在 `WebViewFallback`，不在 `HtmlRuleExtractor` / `JSONRuleExtractor` / `ContentParser`。证据：Legado `BackstageWebView.kt` 的 `SniffingWebClient.onLoadResource`。
+- 新增确认的 P0 缺口：`webJs` 未注入 WebView（当前只作为启用信号，`SourceEngine.swift:801`）、`overrideUrlRegex` 未实现。
+- 新增确认的 P1 缺口：Java 兼容类缺少 `BigInteger`、`ByteBuffer`、`TextUtils`、`TimeUnit`、`SecretKeyFactory`/`DESKeySpec`、`BufferedInputStream`/`InputStreamReader`、`StringBuffer`（对照栖阅 `packages_stub.js`）。
+- 完整评估与修复路线：`docs/书源解析能力评估-1.0.60.md`。
