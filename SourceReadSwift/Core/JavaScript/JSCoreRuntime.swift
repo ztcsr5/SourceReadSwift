@@ -3912,6 +3912,171 @@ final class JSCoreRuntime {
         Packages.android.os = Packages.android.os || { Build: { MODEL: 'iPhone', MANUFACTURER: 'Apple', BRAND: 'Apple' } };
         Packages.android.text = Packages.android.text || { TextUtils: { isEmpty: function(value) { return value == null || String(value).length === 0; } } };
         Packages.android.util = Packages.android.util || { Base64: Packages.java.util.Base64 };
+        // ---- Android / Java compatibility shims used by Legado sources ----
+        // BigInteger: sources use it for RSA-style decoding (`modPow`) and for
+        // hex payloads. Backed by JS BigInt; the host never sees the value.
+        if (typeof BigInt === 'function' && !Packages.java.math) {
+          Packages.java.math = {};
+          function __bigIntValue(value, radix) {
+            if (typeof value === 'bigint') { return value; }
+            if (value && value.__bigint !== undefined) { return value.__bigint; }
+            if (typeof value === 'number') { return BigInt(Math.trunc(value)); }
+            var text = String(value == null ? '0' : value).trim();
+            if (!text) { text = '0'; }
+            var negative = false;
+            if (text.charAt(0) === '-') { negative = true; text = text.substring(1); }
+            var base = radix == null ? 10 : Number(radix);
+            var parsed;
+            if (base === 16) { parsed = BigInt('0x' + text.replace(/^0x/i, '')); }
+            else if (base === 10) { parsed = BigInt(text); }
+            else { parsed = BigInt(parseInt(text, base)); }
+            return negative ? -parsed : parsed;
+          }
+          function __bigIntWrap(value) {
+            var result = Object.create(Packages.java.math.BigInteger.prototype);
+            result.__bigint = value;
+            return result;
+          }
+          Packages.java.math.BigInteger = function (value, radix) {
+            this.__bigint = __bigIntValue(value, radix);
+          };
+          Packages.java.math.BigInteger.prototype = {
+            add: function (other) { return __bigIntWrap(this.__bigint + __bigIntValue(other)); },
+            subtract: function (other) { return __bigIntWrap(this.__bigint - __bigIntValue(other)); },
+            multiply: function (other) { return __bigIntWrap(this.__bigint * __bigIntValue(other)); },
+            divide: function (other) { return __bigIntWrap(this.__bigint / __bigIntValue(other)); },
+            remainder: function (other) { return __bigIntWrap(this.__bigint % __bigIntValue(other)); },
+            mod: function (other) {
+              var m = __bigIntValue(other);
+              var r = this.__bigint % m;
+              return __bigIntWrap(r < BigInt(0) ? r + m : r);
+            },
+            pow: function (exponent) {
+              var e = Number(__bigIntValue(exponent));
+              return __bigIntWrap(this.__bigint ** BigInt(e));
+            },
+            modPow: function (exponent, modulus) {
+              var e = __bigIntValue(exponent);
+              var m = __bigIntValue(modulus);
+              if (m === BigInt(0)) { throw new Error('BigInteger: modulus is zero'); }
+              var result = BigInt(1) % m;
+              var base = this.__bigint % m;
+              if (base < BigInt(0)) { base += m; }
+              while (e > BigInt(0)) {
+                if (e % BigInt(2) === BigInt(1)) { result = (result * base) % m; }
+                base = (base * base) % m;
+                e = e / BigInt(2);
+              }
+              return __bigIntWrap(result);
+            },
+            gcd: function (other) {
+              var a = this.__bigint < BigInt(0) ? -this.__bigint : this.__bigint;
+              var b = __bigIntValue(other);
+              if (b < BigInt(0)) { b = -b; }
+              while (b !== BigInt(0)) { var t = a % b; a = b; b = t; }
+              return __bigIntWrap(a);
+            },
+            negate: function () { return __bigIntWrap(-this.__bigint); },
+            abs: function () { return __bigIntWrap(this.__bigint < BigInt(0) ? -this.__bigint : this.__bigint); },
+            shiftLeft: function (n) { return __bigIntWrap(this.__bigint << BigInt(Number(n))); },
+            shiftRight: function (n) { return __bigIntWrap(this.__bigint >> BigInt(Number(n))); },
+            compareTo: function (other) {
+              var o = __bigIntValue(other);
+              return this.__bigint < o ? -1 : (this.__bigint > o ? 1 : 0);
+            },
+            equals: function (other) {
+              try { return this.__bigint === __bigIntValue(other); } catch (e) { return false; }
+            },
+            signum: function () { return this.__bigint < BigInt(0) ? -1 : (this.__bigint > BigInt(0) ? 1 : 0); },
+            bitLength: function () {
+              var v = this.__bigint < BigInt(0) ? -this.__bigint : this.__bigint;
+              return v === BigInt(0) ? 0 : v.toString(2).length;
+            },
+            testBit: function (index) {
+              var v = this.__bigint < BigInt(0) ? -this.__bigint : this.__bigint;
+              return ((v >> BigInt(Number(index))) & BigInt(1)) === BigInt(1);
+            },
+            intValue: function () { return Number(BigInt.asIntN(32, this.__bigint)); },
+            longValue: function () { return Number(BigInt.asIntN(64, this.__bigint)); },
+            toString: function (radix) { return this.__bigint.toString(radix == null ? 10 : Number(radix)); }
+          };
+          Packages.java.math.BigInteger.valueOf = function (value) {
+            return new Packages.java.math.BigInteger(value);
+          };
+          Packages.java.math.BigInteger.ZERO = new Packages.java.math.BigInteger(0);
+          Packages.java.math.BigInteger.ONE = new Packages.java.math.BigInteger(1);
+        }
+        // StringBuffer: the mutable builder Android sources use in loops.
+        if (!Packages.java.lang.StringBuffer) {
+          Packages.java.lang.StringBuffer = function (value) {
+            this.__parts = value == null ? [] : [String(value)];
+          };
+          Packages.java.lang.StringBuffer.prototype = {
+            append: function (value) { this.__parts.push(String(value == null ? 'null' : value)); return this; },
+            insert: function (index, value) {
+              var text = this.toString();
+              var at = Number(index);
+              this.__parts = [text.substring(0, at) + String(value) + text.substring(at)];
+              return this;
+            },
+            deleteCharAt: function (index) {
+              var text = this.toString();
+              var at = Number(index);
+              this.__parts = [text.substring(0, at) + text.substring(at + 1)];
+              return this;
+            },
+            reverse: function () { this.__parts = [this.toString().split('').reverse().join('')]; return this; },
+            length: function () { return this.toString().length; },
+            charAt: function (index) { return this.toString().charAt(Number(index)); },
+            substring: function (start, end) {
+              var text = this.toString();
+              return end == null ? text.substring(Number(start)) : text.substring(Number(start), Number(end));
+            },
+            setLength: function (length) {
+              var text = this.toString();
+              var n = Number(length);
+              this.__parts = [text.length >= n ? text.substring(0, n) : text + new Array(n - text.length + 1).join(String.fromCharCode(0))];
+            },
+            toString: function () { return this.__parts.join(''); }
+          };
+        }
+        // TimeUnit: commonly used for cache TTLs in source scripts.
+        if (!Packages.java.util.concurrent) {
+          Packages.java.util.concurrent = {};
+          function __timeUnit(millisPerUnit) {
+            return {
+              toMillis: function (value) { return Math.floor(Number(value) * millisPerUnit); },
+              toSeconds: function (value) { return Math.floor(Number(value) * millisPerUnit / 1000); },
+              toNanos: function (value) { return Math.floor(Number(value) * millisPerUnit * 1000000); },
+              convert: function (value, target) { return target.fromMillis(this.toMillis(value)); },
+              fromMillis: function (value) { return Math.floor(Number(value) / millisPerUnit); }
+            };
+          }
+          Packages.java.util.concurrent.TimeUnit = {
+            NANOSECONDS: __timeUnit(0.000001),
+            MICROSECONDS: __timeUnit(0.001),
+            MILLISECONDS: __timeUnit(1),
+            SECONDS: __timeUnit(1000),
+            MINUTES: __timeUnit(60000),
+            HOURS: __timeUnit(3600000),
+            DAYS: __timeUnit(86400000)
+          };
+        }
+        // TextUtils.join, keeping the existing isEmpty helper.
+        var __textUtils = Packages.android.text.TextUtils;
+        if (!__textUtils.join) {
+          __textUtils.join = function (delimiter, iterable) {
+            if (iterable == null) { return ''; }
+            var values = [];
+            if (typeof iterable.length === 'number') {
+              for (var i = 0; i < iterable.length; i++) { values.push(String(iterable[i])); }
+            } else if (typeof iterable.toArray === 'function') {
+              return __textUtils.join(delimiter, iterable.toArray());
+            }
+            return values.join(String(delimiter == null ? '' : delimiter));
+          };
+        }
+        Packages.java.math = Packages.java.math || {};
         var android = Packages.android;
         Packages.util = Packages.java.util;
         java.lang = Packages.java.lang;
@@ -3919,6 +4084,8 @@ final class JSCoreRuntime {
         java.net = Packages.java.net;
         java.io = Packages.java.io;
         java.security = Packages.java.security;
+        java.math = Packages.java.math;
+        java.util.concurrent = Packages.java.util.concurrent;
         java.util.zip = Packages.java.util.zip;
         var javax = Packages.javax;
         Packages.org.jsoup.Jsoup.__javaSimpleName = 'Jsoup';

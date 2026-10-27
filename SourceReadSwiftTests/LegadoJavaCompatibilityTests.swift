@@ -358,4 +358,100 @@ final class LegadoJavaCompatibilityTests: XCTestCase {
         XCTAssertEqual(object["statusCode"] as? Int, 200)
         XCTAssertEqual(object["ajaxCode"] as? Int, 200)
     }
+    func testBigIntegerModPowHexAndCompare() throws {
+        let runtime = JSCoreRuntime()
+        let result = runtime.evaluate("""
+            var BI = java.math.BigInteger;
+            var value = new BI('02', 16).modPow(new BI('0d', 16), new BI('0f', 16));
+            var big = new BI('255');
+            JSON.stringify({
+              hex: value.toString(16),
+              dec: value.toString(),
+              equals: value.equals(new BI('2')),
+              compare: value.compareTo(new BI('3')),
+              bigHex: big.toString(16),
+              bits: big.bitLength(),
+              intValue: big.intValue()
+            })
+            """)
+        guard case .success(let value) = result,
+              let data = value.data(using: .utf8),
+              let object = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+            return XCTFail("expected BigInteger result")
+        }
+        XCTAssertEqual(object["hex"] as? String, "2")
+        XCTAssertEqual(object["dec"] as? String, "2")
+        XCTAssertEqual(object["equals"] as? Bool, true)
+        XCTAssertEqual(object["compare"] as? Int, -1)
+        XCTAssertEqual(object["bigHex"] as? String, "ff")
+        XCTAssertEqual(object["bits"] as? Int, 8)
+        XCTAssertEqual(object["intValue"] as? Int, 255)
+    }
+
+    func testStringBufferAppendInsertDeleteAndReverse() throws {
+        let runtime = JSCoreRuntime()
+        let result = runtime.evaluate("""
+            var sb = new java.lang.StringBuffer();
+            sb.append('ab').append(12);
+            var appended = sb.toString();
+            sb.deleteCharAt(1);
+            sb.insert(1, 'X');
+            var reversed = new java.lang.StringBuffer('abc').reverse().toString();
+            JSON.stringify({
+              appended: appended,
+              edited: sb.toString(),
+              length: sb.length(),
+              reversed: reversed
+            })
+            """)
+        guard case .success(let value) = result,
+              let data = value.data(using: .utf8),
+              let object = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+            return XCTFail("expected StringBuffer result")
+        }
+        XCTAssertEqual(object["appended"] as? String, "ab12")
+        XCTAssertEqual(object["edited"] as? String, "aX12")
+        XCTAssertEqual(object["length"] as? Int, 4)
+        XCTAssertEqual(object["reversed"] as? String, "cba")
+    }
+
+    func testTimeUnitConversionsMatchJavaTruncation() throws {
+        let runtime = JSCoreRuntime()
+        let result = runtime.evaluate("""
+            var TU = java.util.concurrent.TimeUnit;
+            JSON.stringify({
+              millis: TU.SECONDS.toMillis(2),
+              seconds: TU.MILLISECONDS.toSeconds(2500),
+              minutes: TU.MINUTES.toMillis(1)
+            })
+            """)
+        guard case .success(let value) = result,
+              let data = value.data(using: .utf8),
+              let object = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+            return XCTFail("expected TimeUnit result")
+        }
+        XCTAssertEqual(object["millis"] as? Int, 2000)
+        XCTAssertEqual(object["seconds"] as? Int, 2)
+        XCTAssertEqual(object["minutes"] as? Int, 60000)
+    }
+
+    func testTextUtilsJoinKeepsIsEmptyHelper() throws {
+        let runtime = JSCoreRuntime()
+        let result = runtime.evaluate("""
+            var text = Packages.android.text.TextUtils;
+            JSON.stringify({
+              joined: text.join(',', ['a', 'b', 'c']),
+              empty: text.isEmpty(''),
+              notEmpty: text.isEmpty('x')
+            })
+            """)
+        guard case .success(let value) = result,
+              let data = value.data(using: .utf8),
+              let object = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+            return XCTFail("expected TextUtils result")
+        }
+        XCTAssertEqual(object["joined"] as? String, "a,b,c")
+        XCTAssertEqual(object["empty"] as? Bool, true)
+        XCTAssertEqual(object["notEmpty"] as? Bool, false)
+    }
 }

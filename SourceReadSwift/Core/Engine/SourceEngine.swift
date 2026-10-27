@@ -619,7 +619,7 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
             // decide how to recover. The top-level pipeline still reports
             // ordinary 4xx/5xx loads as failures when no WebView fallback is
             // configured.
-            let needsWebViewFallback = shouldUseWebViewFallback(source: source, response: response)
+            let needsWebViewFallback = shouldUseWebViewFallback(source: source, response: response, stage: stage)
             if (400...599).contains(response.statusCode), !needsWebViewFallback {
                 return .failure(.network("HTTP \(response.statusCode)"))
             }
@@ -630,7 +630,7 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
         let shouldFallback: Bool
         if case .success(let raw) = primary {
             let response = ResponseBodyDecoder().normalize(raw, preferredCharset: request.expectedCharset)
-            shouldFallback = shouldUseWebViewFallback(source: source, response: response)
+            shouldFallback = shouldUseWebViewFallback(source: source, response: response, stage: stage)
         } else {
             shouldFallback = shouldUseWebView(source: source)
         }
@@ -650,7 +650,14 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
         ))
 
         let delay = webViewDelay(source: source)
-        let htmlResult = await WebViewFallback(cookieStore: cookieStore).load(url: request.url, delay: delay)
+        let assets = ruleWebViewAssets(source: source)
+        let htmlResult = await WebViewFallback(cookieStore: cookieStore).load(
+            url: request.url,
+            delay: delay,
+            javaScript: assets.javaScript,
+            sourceRegex: assets.sourceRegex,
+            overrideUrlRegex: assets.overrideUrlRegex
+        )
         switch htmlResult {
         case .success(let html):
             let response = SourceResponse(
@@ -806,9 +813,19 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
         return false
     }
 
-    private func shouldUseWebViewFallback(source: BookSource, response: SourceResponse) -> Bool {
+    private func shouldUseWebViewFallback(source: BookSource, response: SourceResponse, stage: String = "") -> Bool {
         guard !SandboxEnvironment.isLiveContainer && allowWebViewFallback else { return false }
         if shouldUseWebView(source: source) { return true }
+        // A source that declares sourceRegex/webJs fetches its real payload
+        // from XHR/fetch inside the page. The plain HTTP response is only the
+        // shell, so the content/toc stage must go through WebKit even when the
+        // shell returns HTTP 200.
+        if stage.lowercased().hasPrefix("content") || stage.lowercased().hasPrefix("toc") {
+            let assets = ruleWebViewAssets(source: source)
+            if assets.sourceRegex != nil || assets.javaScript != nil {
+                return true
+            }
+        }
         let text = response.body.lowercased()
         if (400...599).contains(response.statusCode) && (text.isEmpty || response.statusCode == 403 || response.statusCode == 503) {
             return true
@@ -824,6 +841,19 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
             || text.contains("安全验证")
             || text.contains("百度安全验证")
             || text.contains("人机验证")
+    }
+
+    /// `webJs` / `sourceRegex` / `overrideUrlRegex` live in `ruleContent` in
+    /// the Legado schema; a few hand-written sources keep them at the root.
+    func ruleWebViewAssets(source: BookSource) -> (javaScript: String?, sourceRegex: String?, overrideUrlRegex: String?) {
+        let fields = source.ruleContent?.fields ?? [:]
+        func value(_ key: String) -> String? {
+            let raw = fields[key] ?? source.raw[key]
+            let trimmed = raw?.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard let trimmed, !trimmed.isEmpty else { return nil }
+            return trimmed
+        }
+        return (value("webJs"), value("sourceRegex"), value("overrideUrlRegex"))
     }
 
     private func webViewDelay(source: BookSource) -> TimeInterval {
