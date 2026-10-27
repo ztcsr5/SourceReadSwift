@@ -1,0 +1,48 @@
+{
+ "name": "笔趣阁[biquge7]",
+ "bookSourceUrl": "https://www.biquge7.top/",
+ "searchUrl": "https://www.biquge7.top/search?keyword={{key}}",
+ "keyword": "斗破苍穹",
+ "page": 1,
+ "request": {
+  "method": "GET",
+  "url": "https://www.biquge7.top/search?keyword=斗破苍穹",
+  "body": ""
+ },
+ "status": 200,
+ "contentType": "text/html; charset=utf-8",
+ "bytes": 28156,
+ "bodyFile": "biquge7-1c4aab5a.body",
+ "source": {
+  "bookSourceName": "笔趣阁[biquge7]",
+  "bookSourceUrl": "https://www.biquge7.top/",
+  "bookSourceType": 0,
+  "searchUrl": "https://www.biquge7.top/search?keyword={{key}}",
+  "header": null,
+  "ruleSearch": {
+   "bookList": "class.tui_1_item",
+   "name": "class.tui_1_item@a@text",
+   "author": "",
+   "bookUrl": "class.tui_1_item@a@href",
+   "coverUrl": "class.tui_1_item@img@src"
+  },
+  "ruleBookInfo": {
+   "init": "",
+   "name": "",
+   "author": "class.up@span.0@text",
+   "intro": "p.0@text",
+   "lastChapter": "class.upd@a@text",
+   "wordCount": ""
+  },
+  "ruleToc": {
+   "chapterList": "class.list@li@tag.a",
+   "chapterName": "text",
+   "chapterUrl": "href"
+  },
+  "ruleContent": {
+   "content": "class.text@textNodes",
+   "nextContentUrl": ""
+  },
+  "loginUrl": null
+ }
+}

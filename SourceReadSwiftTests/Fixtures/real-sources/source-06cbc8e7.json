@@ -1,0 +1,46 @@
+{
+ "name": "开心文学网",
+ "bookSourceUrl": "https://www.kxwx.org",
+ "searchUrl": "/search/{{key}}.html",
+ "keyword": "斗破苍穹",
+ "page": 1,
+ "request": {
+  "method": "GET",
+  "url": "https://www.kxwx.org/search/斗破苍穹.html",
+  "body": ""
+ },
+ "status": 200,
+ "contentType": "text/html;charset=UTF-8",
+ "bytes": 14768,
+ "bodyFile": "source-06cbc8e7.body",
+ "source": {
+  "bookSourceName": "开心文学网",
+  "bookSourceUrl": "https://www.kxwx.org",
+  "bookSourceType": 0,
+  "searchUrl": "/search/{{key}}.html",
+  "header": null,
+  "ruleSearch": {
+   "bookList": ".grid@tr!0",
+   "name": "a.0@text",
+   "author": "a.2@text",
+   "kind": "td.-1:-2@text",
+   "lastChapter": "a.1@text",
+   "bookUrl": "a.0@href",
+   "wordCount": "td.-3@text"
+  },
+  "ruleBookInfo": {
+   "intro": "[property=\"og:description\"]@content",
+   "kind": "[property=\"og:novel:category\"]@content",
+   "coverUrl": "[property=\"og:image\"]@content"
+  },
+  "ruleToc": {
+   "chapterList": ".chapterNum@li@a",
+   "chapterName": "text",
+   "chapterUrl": "href"
+  },
+  "ruleContent": {
+   "content": ".mainContenr@p@text"
+  },
+  "loginUrl": null
+ }
+}

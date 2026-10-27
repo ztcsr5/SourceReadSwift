@@ -9,7 +9,7 @@ final class SourceMetadataChainTests: XCTestCase {
 
     // MARK: - Search: HTML
 
-    func testHTMLSearchExtractsWordCountAndFiltersByCheckKeyWord() throws {
+    func testHTMLSearchKeepsEveryRowWhenCheckKeyWordIsConfigured() throws {
         let source = BookSource(
             bookSourceName: "Metadata HTML",
             bookSourceUrl: "https://example.com",
@@ -47,8 +47,8 @@ final class SourceMetadataChainTests: XCTestCase {
         guard case .success(let books) = result else {
             return XCTFail("expected success, got \(result)")
         }
-        XCTAssertEqual(books.count, 1)
-        XCTAssertEqual(books.first?.name, "剑来")
+        XCTAssertEqual(books.count, 2, "checkKeyWord is a debug hint in Legado, not a result filter")
+        XCTAssertEqual(books.map(\.name), ["剑来", "无关之书"])
         XCTAssertEqual(books.first?.wordCount, "120万字")
         XCTAssertEqual(books.first?.checkKeyWord, "剑来")
     }
@@ -83,7 +83,7 @@ final class SourceMetadataChainTests: XCTestCase {
 
     // MARK: - Search: JSON
 
-    func testJSONSearchExtractsWordCountAndFiltersByCheckKeyWord() throws {
+    func testJSONSearchKeepsEveryRowWhenCheckKeyWordIsConfigured() throws {
         let source = BookSource(
             bookSourceName: "Metadata JSON",
             bookSourceUrl: "https://api.example.com",
@@ -113,7 +113,8 @@ final class SourceMetadataChainTests: XCTestCase {
         guard case .success(let books) = result else {
             return XCTFail("expected success, got \(result)")
         }
-        XCTAssertEqual(books.count, 1)
+        XCTAssertEqual(books.count, 2, "checkKeyWord must not drop rows whose name differs from the query")
+        XCTAssertEqual(books.map(\.name), ["剑来", "别的书"])
         XCTAssertEqual(books.first?.wordCount, "120万字")
         XCTAssertEqual(books.first?.checkKeyWord, "剑来")
     }

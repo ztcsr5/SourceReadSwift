@@ -1,0 +1,50 @@
+{
+ "name": "精华书阁手机版",
+ "bookSourceUrl": "https://m.jhssd.com/",
+ "searchUrl": "https://m.jhssd.com/search.html?ie=utf-8&word={{key}}",
+ "keyword": "斗破苍穹",
+ "page": 1,
+ "request": {
+  "method": "GET",
+  "url": "https://m.jhssd.com/search.html?ie=utf-8&word=斗破苍穹",
+  "body": ""
+ },
+ "status": 200,
+ "contentType": "text/html; charset=utf-8",
+ "bytes": 12273,
+ "bodyFile": "source-3aca1898.body",
+ "source": {
+  "bookSourceName": "精华书阁手机版",
+  "bookSourceUrl": "https://m.jhssd.com/",
+  "bookSourceType": 0,
+  "searchUrl": "https://m.jhssd.com/search.html?ie=utf-8&word={{key}}",
+  "header": null,
+  "ruleSearch": {
+   "bookList": "class.searchbook",
+   "name": "h4@text",
+   "author": "class.author@text",
+   "bookUrl": "class.bookimg@tag.a@href",
+   "coverUrl": "class.bookimg@tag.img@src",
+   "checkKeyWord": "7号基地"
+  },
+  "ruleBookInfo": {
+   "name": "class.block_txt2@a.1@text",
+   "author": "p.2@text",
+   "intro": "class.intro_info@textNodes",
+   "lastChapter": "@li.0@text",
+   "coverUrl": "class.block_img2@tag.img@src"
+  },
+  "ruleToc": {
+   "chapterList": "li!0:1:2:3:4@a",
+   "chapterName": "text",
+   "chapterUrl": "href",
+   "nextTocUrl": "option!0@value"
+  },
+  "ruleContent": {
+   "content": "#nr1@textNodes",
+   "nextContentUrl": "text.下一页@href",
+   "replaceRegex": "##精华书阁.*|.*免费阅读.*https.*com.*|为您提供.*请务必保存好书签.|最新章节！|（本章未完，请点击下一页继续阅读）|@"
+  },
+  "loginUrl": null
+ }
+}

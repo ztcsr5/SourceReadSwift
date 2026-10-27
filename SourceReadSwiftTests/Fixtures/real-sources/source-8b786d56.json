@@ -1,0 +1,60 @@
+{
+ "name": "中文万维（优）",
+ "bookSourceUrl": "http://cread.com",
+ "searchUrl": "https://cxb-pro.cread.com/cx/searchbooks,{\n\"method\": \"POST\",\n\"body\": \"keyword={{key}}&pageNo={{page}}\"\n}",
+ "keyword": "斗破苍穹",
+ "page": 1,
+ "request": {
+  "method": "POST",
+  "url": "https://cxb-pro.cread.com/cx/searchbooks",
+  "body": "keyword=斗破苍穹&pageNo=1"
+ },
+ "status": 200,
+ "contentType": "application/json; charset=utf-8",
+ "bytes": 8548,
+ "bodyFile": "source-8b786d56.body",
+ "source": {
+  "bookSourceName": "中文万维（优）",
+  "bookSourceUrl": "http://cread.com",
+  "bookSourceType": 0,
+  "searchUrl": "https://cxb-pro.cread.com/cx/searchbooks,{\n\"method\": \"POST\",\n\"body\": \"keyword={{key}}&pageNo={{page}}\"\n}",
+  "header": "{\r\n\"uid\":\"110496550\",\r\n\"cnid\":\"10005\",\r\n\"version\":\"7.6.0\",\r\n\"packname\":\"com.mianfeizs.book\",\r\n\"oscode\":\"30\",\r\n\"vcode\":\"134\",\r\n\"channelId\":\"10005\",\r\n\"platform\":\"android\",\r\n\"appname\":\"mfzs\"\n}",
+  "ruleSearch": {
+   "author": "$.author",
+   "bookList": "$.list",
+   "bookUrl": "https://readbook-service-freebook.cread.com/cx/bookDetailYS?bookid={{$.id}}",
+   "checkKeyWord": "++https://readbook-service-freebook.cread.com/cx/itf/getvolume?bookId=803500510",
+   "coverUrl": "$.cover",
+   "intro": "$.summary",
+   "kind": "{$.grade}分&&$.categoryName&&连载中{$.bookStatue}已完结\n##连载中03|01已完结",
+   "lastChapter": "",
+   "name": "$.name",
+   "wordCount": "$.words"
+  },
+  "ruleBookInfo": {
+   "author": "$.authorName",
+   "canReName": "",
+   "coverUrl": "$.bookImg",
+   "init": "$.data.bookVo",
+   "intro": "{{'\\n&lrm;\\n'}}{{$.introduction}}",
+   "kind": "{$.grade}分&&$.categoryName&&连载中{$.bookStatue}已完结\n##连载中03|01已完结",
+   "lastChapter": "{{$.lastUpdateChapterName}} • {{$.lastUpdateChapterDate## .*}}",
+   "name": "$.bookName",
+   "tocUrl": "https://readbook-service-freebook.cread.com/cx/itf/getvolume?bookId={{$.bookId}}",
+   "wordCount": "$.wordCount"
+  },
+  "ruleToc": {
+   "chapterList": "@js:\nlet v = [],\n\t\tlist = [];\nJSON.parse(result).list.map($=>{\n\n//分卷判定\n\t\tV = $.name;\n\t\tif(v[v.length-1]!=V&&!/^\\s*$/.test(V)){\n\t\t\t\tv.push(V)\n\t\t\t\tlist.push({\n\t\t\t\t\t\tname: '📖['+V+']📖',\n\t\t\t\t\t\tvolume: true\n\t\t\t\t\t})\n\t\t\t}\n\n$.bookChapters.map($=>{\n\t\treturn list.push({\n\t\t\t\tname: $.name,\n\t\t\t\turl: `https://readbook-service-freebook.cread.com/cx/itf/chapterRead?bookId=${$.bookid}&chapterId=${$.id}`,\n\t\t\t\tinfo: `章节字数：${$.wordCount}　更新时间：${$.updateDate}`\n\t\t\t});\n\t});\n});\nv.length<2?list.filter($=>!$.volume):list",
+   "chapterName": "name",
+   "chapterUrl": "url",
+   "isVip": "",
+   "isVolume": "volume",
+   "nextTocUrl": "",
+   "updateTime": "info"
+  },
+  "ruleContent": {
+   "content": "$..content"
+  },
+  "loginUrl": null
+ }
+}

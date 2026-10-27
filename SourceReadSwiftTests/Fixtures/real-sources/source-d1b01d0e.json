@@ -1,0 +1,54 @@
+{
+ "name": "穿越小说（优）",
+ "bookSourceUrl": "http://www.kk169.org",
+ "searchUrl": "modules/article/search.php?q={{key}}",
+ "keyword": "斗破苍穹",
+ "page": 1,
+ "request": {
+  "method": "GET",
+  "url": "http://www.kk169.org/modules/article/search.php?q=斗破苍穹",
+  "body": ""
+ },
+ "status": 200,
+ "contentType": "text/html; charset=UTF-8",
+ "bytes": 137443,
+ "bodyFile": "source-d1b01d0e.body",
+ "source": {
+  "bookSourceName": "穿越小说（优）",
+  "bookSourceUrl": "http://www.kk169.org",
+  "bookSourceType": 0,
+  "searchUrl": "modules/article/search.php?q={{key}}",
+  "header": null,
+  "ruleSearch": {
+   "author": ".c_value.0@text",
+   "bookList": "class.c_row",
+   "bookUrl": "a.0@href",
+   "checkKeyWord": "我的模拟长生路",
+   "coverUrl": "img@src",
+   "kind": ".c_value.1@text&&.c_value.3@text&&.c_value.5@text",
+   "lastChapter": "{{@@.c_value.4@text}}•{{@@.c_value.5@text}}\n@js:result\n.replace(\"••\",\"\")\n.replace(/^(\\d+).第/,'第')\n.replace(/^(正文|VIP章节|最新章节)?(\\s+|_)|[\\(\\{（｛【].*[求含理更谢乐发推票盟补加字Kk\\/].*/g,'')\n.replace(/^(\\d+)[、．]第.+章/,'第$1章')\n.replace(/^(\\d+)、\\d+、/,'第$1章 ')\n.replace(/^(\\d+)、\\d+/,'第$1章')\n.replace(/^(第.+章)\\s?\\d+/,'$1')\n.replace(/^(\\d+)、/,'第$1章 ')\n.replace(/^(第.+章)\\s?第.+章/,'$1')\n.replace(/第\\s(.+)\\s章/,'第$1章')\n.replace(/.*(chapter|Chapter)\\s?(\\d+)\\s?/,'$1 $2 ')\n.replace(/\\(.+\\)/,'')\n.replace(/\\[|。/,'')\n.replace(/��([零一二两三四五六七八九十百千]+)章/g,java.toNumChapter(result))\n##(章)([^\\s]+)(\\s·)##$1 $2$3",
+   "name": "a.1@text"
+  },
+  "ruleBookInfo": {
+   "author": "[property$=author]@content",
+   "coverUrl": "[property$=image]@content",
+   "intro": "🕰  更新时间：\n{{@@.tabvalue@table@tbody@td.2@text##.*：|\\s.*}}\n📜  内容简介：\n{{@@.tabvalue@div@textNodes##本书尚无公告.|\\\\n}}##(^|[。！？……；]+[”」）】]?)##$1<br>",
+   "kind": "[property~=category|status|update_time]@content&&.tabvalue@table@tbody@td.2@text##.*：|\\s.*",
+   "lastChapter": "{{@@h3@text}}･{{@@.tabvalue@table@tbody@td.2@text##.*：|\\s.*}}\n@js:result\n.replace(\"••\",\"\")\n.replace(/^(\\d+).第/,'第')\n.replace(/^(正文|VIP章节|最新章节)?(\\s+|_)|[\\(\\{（｛【].*[求含理更谢乐发推票盟补加字Kk\\/].*/g,'')\n.replace(/^(\\d+)[、．]第.+章/,'第$1章')\n.replace(/^(\\d+)、\\d+、/,'第$1章 ')\n.replace(/^(\\d+)、\\d+/,'第$1章')\n.replace(/^(第.+章)\\s?\\d+/,'$1')\n.replace(/^(\\d+)、/,'第$1章 ')\n.replace(/^(第.+章)\\s?第.+章/,'$1')\n.replace(/第\\s(.+)\\s章/,'第$1章')\n.replace(/.*(chapter|Chapter)\\s?(\\d+)\\s?/,'$1 $2 ')\n.replace(/\\(.+\\)/,'')\n.replace(/\\[|。/,'')\n.replace(/第([零一二两三四五六七八九十百千]+)章/g,java.toNumChapter(result))\n##(章)([^\\s]+)(\\s·)##$1 $2$3",
+   "name": "[property$=book_name]@content",
+   "tocUrl": "text.点击阅读@href"
+  },
+  "ruleToc": {
+   "chapterList": "li.chapter@a\n<js>\nvar r=result;\nvar v=book.getVariable(\"custom\")\nvar b=[];\nif(v!=\"\"){\n        for(i=0;i<r.length-v;i++){\n                b.push(r[i]);\n                }\n                result=b;\n        }\n        result\n</js>",
+   "chapterName": "text",
+   "chapterUrl": "href",
+   "updateTime": "更新时间：{{@@title##更新，共##·章节字数：}}"
+  },
+  "ruleContent": {
+   "content": "#acontent@textNodes",
+   "nextContentUrl": "",
+   "replaceRegex": "##\\(穿越小说.*www.*\\)|穿越小说.*www.*|正在手打.*|.本章完."
+  },
+  "loginUrl": null
+ }
+}

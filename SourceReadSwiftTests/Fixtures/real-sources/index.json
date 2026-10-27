@@ -1,0 +1,668 @@
+[
+ {
+  "name": "⚡📂错层小说",
+  "bookSourceUrl": "https://m.cuoceng.com/",
+  "searchUrl": "https://m.cuoceng.com/book/so/{{key}}/{{page}}.html",
+  "keyword": "斗破苍穹",
+  "page": 1,
+  "request": {
+   "method": "GET",
+   "url": "https://m.cuoceng.com/book/so/斗破苍穹/1.html",
+   "body": ""
+  },
+  "status": 200,
+  "contentType": "text/html;charset=UTF-8",
+  "bytes": 6209,
+  "bodyFile": "source-c6c59eee.body",
+  "source": {
+   "bookSourceName": "⚡📂错层小说",
+   "bookSourceUrl": "https://m.cuoceng.com/",
+   "bookSourceType": 0,
+   "searchUrl": "https://m.cuoceng.com/book/so/{{key}}/{{page}}.html",
+   "header": "{\"User-Agent\": \"Mozilla/5.0 (Linux; Android 10; PACM00 Build/QP1A.190711.020) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/108.0.5359.79 Mobile Safari/537.36\"}",
+   "ruleSearch": {
+    "author": ".author:contains(作者)@text",
+    "bookList": ".bookbox",
+    "bookUrl": ".bookname a@href",
+    "intro": ".update@text",
+    "lastChapter": ".cat a@text",
+    "name": ".bookname a@text",
+    "wordCount": ".author:contains(字数)@text"
+   },
+   "ruleBookInfo": {
+    "author": "[href*=\"/book/so/\"]@text",
+    "coverUrl": ".thumbnail@src",
+    "intro": "&nbsp;\n🕰  {{@@.booktime@text}}\n·\n📜  简介：{{@@.bookintro@html}}\n",
+    "kind": ".breadcrumb li:eq(1) a@text",
+    "lastChapter": ".bookchapter@text",
+    "name": ".booktitle@text",
+    "tocUrl": "*[href*=book/chapter]@href",
+    "wordCount": ".booktag span:contains(\"字\")@text"
+   },
+   "ruleToc": {
+    "chapterList": "#allchapter dd",
+    "chapterName": "a@text",
+    "chapterUrl": "a@href",
+    "nextTocUrl": "text.下一@href"
+   },
+   "ruleContent": {
+    "content": "#content@html",
+    "nextContentUrl": "#linkNext@href",
+    "webJs": "{\"webView\":true}"
+   },
+   "loginUrl": null
+  },
+  "expectedMinimum": 1,
+  "charset": "utf-8"
+ },
+ {
+  "name": "松鹤阅读",
+  "bookSourceUrl": "https://bookshelf.html5.qq.com/",
+  "searchUrl": "https://so.html5.qq.com/ajax/real/search_result?noTab=1&tabId=360&sogou_huichuan_hippy=1&q={{key}}&jump_from=1_01_22_01",
+  "keyword": "斗破苍穹",
+  "page": 1,
+  "request": {
+   "method": "GET",
+   "url": "https://so.html5.qq.com/ajax/real/search_result?noTab=1&tabId=360&sogou_huichuan_hippy=1&q=斗破苍穹&jump_from=1_01_22_01",
+   "body": ""
+  },
+  "status": 200,
+  "contentType": "application/json; charset=utf-8",
+  "bytes": 31745,
+  "bodyFile": "source-b71bb5a9.body",
+  "source": {
+   "bookSourceName": "松鹤阅读",
+   "bookSourceUrl": "https://bookshelf.html5.qq.com/",
+   "bookSourceType": 0,
+   "searchUrl": "https://so.html5.qq.com/ajax/real/search_result?noTab=1&tabId=360&sogou_huichuan_hippy=1&q={{key}}&jump_from=1_01_22_01",
+   "header": "{\"user-agent\":\"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/96.0.4664.104 Safari/537.36\"}",
+   "ruleSearch": {
+    "author": "$.author",
+    "bookList": "$.data.state[?(@.dataName == 'novel_search_list')].items[*]",
+    "bookUrl": "https://bookshelf.html5.qq.com/qbread/api/novel/intro-info?bookid={{$.docId##.*_}}&channel=0510&noSame=1&withHistory,{\"headers\":{\"Referer\":\"https://bookshelf.html5.qq.com/kdread/adread/catalog?resourceid={{$.docId##.*_}}&sort=desc&traceid=0024001\"}}",
+    "coverUrl": "$.cover_url",
+    "intro": "$.abstract",
+    "kind": "{{$.label_text}}\n{{$.tag_views}}\n{{java.getString(\"is_finished\") == 1 ? '已完结': '连载中'}}\n##\\s+##,",
+    "name": "$.title"
+   },
+   "ruleBookInfo": {
+    "author": "$..author",
+    "coverUrl": "$..picurl",
+    "init": "",
+    "intro": "$..summary",
+    "kind": "{{java.timeFormat(java.getString(\"$..lastSerialUpdateTime\")*1000)}}\n{{$..tag}}##\\|##,",
+    "lastChapter": "$..lastSerialname",
+    "name": "$..resourceName",
+    "tocUrl": "https://bookshelf.html5.qq.com/qbread/api/book/all-chapter?bookId={{$..resourceID}}@put:{bid:$..resourceID},{\"headers\":{\"Referer\":\"https://bookshelf.html5.qq.com/qbread\"}}",
+    "wordCount": "$..contentsize"
+   },
+   "ruleToc": {
+    "chapterList": "$.rows",
+    "chapterName": "$.serialName",
+    "chapterUrl": "https://novel.html5.qq.com/be-api/content/ads-read,{\n\t\"method\": \"POST\",\n\t\"body\": {\n\t\t\"Scene\": \"chapter\",\n\t\t\"ContentAnchorBatch\": [{\n\t\t\t\t\"BookID\": \"{{baseUrl.match(/bookId=(\\d+)/)[1]}}\",\n\t\t\t\t\"ChapterSeqNo\": [{{$.serialID}}]\n\t\t\t}]\n\t},\n\t\"headers\": {\n\t\t\"Q-GUID\": \"47822b7d93d45ed7d703338913b788cb\"\n\t}\n}",
+    "isVip": "",
+    "nextTocUrl": "",
+    "updateTime": ""
+   },
+   "ruleContent": {
+    "content": "<p>{{$.data.Content[0].Content}}</p>"
+   },
+   "loginUrl": ""
+  },
+  "expectedMinimum": 1,
+  "charset": "utf-8"
+ },
+ {
+  "name": "错层小说网",
+  "bookSourceUrl": "https://m.cuoceng.org/",
+  "searchUrl": "/book/so/{{key}}/{{page}}.html",
+  "keyword": "斗破苍穹",
+  "page": 1,
+  "request": {
+   "method": "GET",
+   "url": "https://m.cuoceng.org/book/so/斗破苍穹/1.html",
+   "body": ""
+  },
+  "status": 200,
+  "contentType": "text/html;charset=UTF-8",
+  "bytes": 6209,
+  "bodyFile": "source-5496839e.body",
+  "source": {
+   "bookSourceName": "错层小说网",
+   "bookSourceUrl": "https://m.cuoceng.org/",
+   "bookSourceType": 0,
+   "searchUrl": "/book/so/{{key}}/{{page}}.html",
+   "header": "{\"User-Agent\": \"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36\"}",
+   "ruleSearch": {
+    "bookList": ".bookbox",
+    "name": ".bookname@text",
+    "author": ".author.0@text",
+    "intro": ".update@text",
+    "kind": "",
+    "lastChapter": ".cat@tag.a@text",
+    "bookUrl": ".bookname@tag.a@href",
+    "wordCount": ".author.1@text"
+   },
+   "ruleBookInfo": {
+    "name": "",
+    "author": "",
+    "intro": "",
+    "kind": ".content@.book.0@.bookinfo@tag.a.1@text",
+    "lastChapter": "",
+    "tocUrl": "id.allchapter@tag.a.3@href",
+    "coverUrl": ".content@.book.0@.bookcover@tag.img@src",
+    "wordCount": ""
+   },
+   "ruleToc": {
+    "chapterList": "id.allchapter@tag.dl@tag.dd@tag.a",
+    "chapterName": "text",
+    "chapterUrl": "href",
+    "nextTocUrl": "text.下一页@href"
+   },
+   "ruleContent": {
+    "content": "id.content@html",
+    "replaceRegex": ""
+   },
+   "loginUrl": null
+  },
+  "expectedMinimum": 1,
+  "charset": "utf-8"
+ },
+ {
+  "name": "精华书阁手机版",
+  "bookSourceUrl": "https://m.jhssd.com/",
+  "searchUrl": "https://m.jhssd.com/search.html?ie=utf-8&word={{key}}",
+  "keyword": "斗破苍穹",
+  "page": 1,
+  "request": {
+   "method": "GET",
+   "url": "https://m.jhssd.com/search.html?ie=utf-8&word=斗破苍穹",
+   "body": ""
+  },
+  "status": 200,
+  "contentType": "text/html; charset=utf-8",
+  "bytes": 12273,
+  "bodyFile": "source-3aca1898.body",
+  "source": {
+   "bookSourceName": "精华书阁手机版",
+   "bookSourceUrl": "https://m.jhssd.com/",
+   "bookSourceType": 0,
+   "searchUrl": "https://m.jhssd.com/search.html?ie=utf-8&word={{key}}",
+   "header": null,
+   "ruleSearch": {
+    "bookList": "class.searchbook",
+    "name": "h4@text",
+    "author": "class.author@text",
+    "bookUrl": "class.bookimg@tag.a@href",
+    "coverUrl": "class.bookimg@tag.img@src",
+    "checkKeyWord": "7号基地"
+   },
+   "ruleBookInfo": {
+    "name": "class.block_txt2@a.1@text",
+    "author": "p.2@text",
+    "intro": "class.intro_info@textNodes",
+    "lastChapter": "@li.0@text",
+    "coverUrl": "class.block_img2@tag.img@src"
+   },
+   "ruleToc": {
+    "chapterList": "li!0:1:2:3:4@a",
+    "chapterName": "text",
+    "chapterUrl": "href",
+    "nextTocUrl": "option!0@value"
+   },
+   "ruleContent": {
+    "content": "#nr1@textNodes",
+    "nextContentUrl": "text.下一页@href",
+    "replaceRegex": "##精华书阁.*|.*免费阅读.*https.*com.*|为您提供.*请务必保存好书签.|最新章节！|（本章未完，请点击下一页继续阅读）|@"
+   },
+   "loginUrl": null
+  },
+  "expectedMinimum": 20,
+  "charset": "utf-8"
+ },
+ {
+  "name": "笔趣阁[biquge7]",
+  "bookSourceUrl": "https://www.biquge7.top/",
+  "searchUrl": "https://www.biquge7.top/search?keyword={{key}}",
+  "keyword": "斗破苍穹",
+  "page": 1,
+  "request": {
+   "method": "GET",
+   "url": "https://www.biquge7.top/search?keyword=斗破苍穹",
+   "body": ""
+  },
+  "status": 200,
+  "contentType": "text/html; charset=utf-8",
+  "bytes": 28156,
+  "bodyFile": "biquge7-1c4aab5a.body",
+  "source": {
+   "bookSourceName": "笔趣阁[biquge7]",
+   "bookSourceUrl": "https://www.biquge7.top/",
+   "bookSourceType": 0,
+   "searchUrl": "https://www.biquge7.top/search?keyword={{key}}",
+   "header": null,
+   "ruleSearch": {
+    "bookList": "class.tui_1_item",
+    "name": "class.tui_1_item@a@text",
+    "author": "",
+    "bookUrl": "class.tui_1_item@a@href",
+    "coverUrl": "class.tui_1_item@img@src"
+   },
+   "ruleBookInfo": {
+    "init": "",
+    "name": "",
+    "author": "class.up@span.0@text",
+    "intro": "p.0@text",
+    "lastChapter": "class.upd@a@text",
+    "wordCount": ""
+   },
+   "ruleToc": {
+    "chapterList": "class.list@li@tag.a",
+    "chapterName": "text",
+    "chapterUrl": "href"
+   },
+   "ruleContent": {
+    "content": "class.text@textNodes",
+    "nextContentUrl": ""
+   },
+   "loginUrl": null
+  },
+  "expectedMinimum": 18,
+  "charset": "utf-8"
+ },
+ {
+  "name": "看书网",
+  "bookSourceUrl": "https://www.kanshuw.com",
+  "searchUrl": "/search.php?q={{key}}",
+  "keyword": "斗破苍穹",
+  "page": 1,
+  "request": {
+   "method": "GET",
+   "url": "https://www.kanshuw.com/search.php?q=斗破苍穹",
+   "body": ""
+  },
+  "status": 200,
+  "contentType": "text/html; charset=utf-8",
+  "bytes": 15887,
+  "bodyFile": "source-6448467b.body",
+  "source": {
+   "bookSourceName": "看书网",
+   "bookSourceUrl": "https://www.kanshuw.com",
+   "bookSourceType": 0,
+   "searchUrl": "/search.php?q={{key}}",
+   "header": null,
+   "ruleSearch": {
+    "bookList": ".row@dl",
+    "name": "h3@text##\\[|.*\\]|免费阅读.*",
+    "author": "span@text",
+    "kind": "h3@text##\\[|\\].*",
+    "lastChapter": "a[-1]@text",
+    "bookUrl": "a[0]@href",
+    "coverUrl": "tag.dt@tag.a@img@src",
+    "checkKeyWord": "我的"
+   },
+   "ruleBookInfo": {
+    "init": "",
+    "name": "class.row book_info@h1@text##免费阅读.*",
+    "author": "class.row book_info@a[0]@text",
+    "intro": "class.row book_info@id.intro_pc@oweText",
+    "kind": "class.title@a[1]@text",
+    "lastChapter": "class.row book_info@a[2]@text",
+    "tocUrl": "",
+    "coverUrl": "class.row book_info@img@src"
+   },
+   "ruleToc": {
+    "chapterList": ".row[-1]@a",
+    "chapterName": "text",
+    "chapterUrl": "href",
+    "nextTocUrl": "class.pages@tag.ul@tag.li.!0:1:-1@tag.a@href"
+   },
+   "ruleContent": {
+    "content": ".font_max@html##第\\(\\d+/\\d+\\)页",
+    "nextContentUrl": "text.下一章@href",
+    "replaceRegex": "##[a-zA-Z0-9-]+[a-zA-Z0-9-].*\\.[a-zA-Z0-9-].*"
+   },
+   "loginUrl": null
+  },
+  "expectedMinimum": 17,
+  "charset": "utf-8"
+ },
+ {
+  "name": "开心文学网",
+  "bookSourceUrl": "https://www.kxwx.org",
+  "searchUrl": "/search/{{key}}.html",
+  "keyword": "斗破苍穹",
+  "page": 1,
+  "request": {
+   "method": "GET",
+   "url": "https://www.kxwx.org/search/斗破苍穹.html",
+   "body": ""
+  },
+  "status": 200,
+  "contentType": "text/html;charset=UTF-8",
+  "bytes": 14768,
+  "bodyFile": "source-06cbc8e7.body",
+  "source": {
+   "bookSourceName": "开心文学网",
+   "bookSourceUrl": "https://www.kxwx.org",
+   "bookSourceType": 0,
+   "searchUrl": "/search/{{key}}.html",
+   "header": null,
+   "ruleSearch": {
+    "bookList": ".grid@tr!0",
+    "name": "a.0@text",
+    "author": "a.2@text",
+    "kind": "td.-1:-2@text",
+    "lastChapter": "a.1@text",
+    "bookUrl": "a.0@href",
+    "wordCount": "td.-3@text"
+   },
+   "ruleBookInfo": {
+    "intro": "[property=\"og:description\"]@content",
+    "kind": "[property=\"og:novel:category\"]@content",
+    "coverUrl": "[property=\"og:image\"]@content"
+   },
+   "ruleToc": {
+    "chapterList": ".chapterNum@li@a",
+    "chapterName": "text",
+    "chapterUrl": "href"
+   },
+   "ruleContent": {
+    "content": ".mainContenr@p@text"
+   },
+   "loginUrl": null
+  },
+  "expectedMinimum": 16,
+  "charset": "utf-8"
+ },
+ {
+  "name": "阅友小说（优）",
+  "bookSourceUrl": "http://m.suixkan.com/",
+  "searchUrl": "/s/1.html?keyword={{key}}&page={{page}}",
+  "keyword": "斗破苍穹",
+  "page": 1,
+  "request": {
+   "method": "GET",
+   "url": "http://m.suixkan.com/s/1.html?keyword=斗破苍穹&page=1",
+   "body": ""
+  },
+  "status": 200,
+  "contentType": "text/html; charset=utf-8",
+  "bytes": 12492,
+  "bodyFile": "source-b078ad34.body",
+  "source": {
+   "bookSourceName": "阅友小说（优）",
+   "bookSourceUrl": "http://m.suixkan.com/",
+   "bookSourceType": 0,
+   "searchUrl": "/s/1.html?keyword={{key}}&page={{page}}",
+   "header": null,
+   "ruleSearch": {
+    "author": ".v-author@text##\\s",
+    "bookList": ".v-list-item",
+    "bookUrl": "@onclick@js:result.match(/\\('(.*?)', '', ''\\)/)[1]",
+    "coverUrl": "img@src",
+    "intro": ".v-intro@text",
+    "kind": ".base-label@text",
+    "name": ".v-title@text",
+    "wordCount": ".v-words@text"
+   },
+   "ruleBookInfo": {
+    "author": ".face-info span.0@text##.*：",
+    "coverUrl": ".face-cover img@src",
+    "intro": "#intro@html",
+    "kind": ".face-info span.1:3@text&&#idNewIds@#chapter-ps-id@text##.*：",
+    "lastChapter": "#idNewIds@.chapter-entrance@text",
+    "name": ".face-info-title@text",
+    "tocUrl": ".sumchapter a@href",
+    "wordCount": ".face-info span.2@text##.*："
+   },
+   "ruleToc": {
+    "chapterList": ".catalog_ls li a",
+    "chapterName": "text",
+    "chapterUrl": "href"
+   },
+   "ruleContent": {
+    "content": ".con@html",
+    "replaceRegex": "##[\\(（]本章未完.*[）\\)]|[\\(（]本章完[）\\)]"
+   },
+   "loginUrl": null
+  },
+  "expectedMinimum": 5,
+  "charset": "utf-8"
+ },
+ {
+  "name": "中文万维（优）",
+  "bookSourceUrl": "http://cread.com",
+  "searchUrl": "https://cxb-pro.cread.com/cx/searchbooks,{\n\"method\": \"POST\",\n\"body\": \"keyword={{key}}&pageNo={{page}}\"\n}",
+  "keyword": "斗破苍穹",
+  "page": 1,
+  "request": {
+   "method": "POST",
+   "url": "https://cxb-pro.cread.com/cx/searchbooks",
+   "body": "keyword=斗破苍穹&pageNo=1"
+  },
+  "status": 200,
+  "contentType": "application/json; charset=utf-8",
+  "bytes": 8548,
+  "bodyFile": "source-8b786d56.body",
+  "source": {
+   "bookSourceName": "中文万维（优）",
+   "bookSourceUrl": "http://cread.com",
+   "bookSourceType": 0,
+   "searchUrl": "https://cxb-pro.cread.com/cx/searchbooks,{\n\"method\": \"POST\",\n\"body\": \"keyword={{key}}&pageNo={{page}}\"\n}",
+   "header": "{\r\n\"uid\":\"110496550\",\r\n\"cnid\":\"10005\",\r\n\"version\":\"7.6.0\",\r\n\"packname\":\"com.mianfeizs.book\",\r\n\"oscode\":\"30\",\r\n\"vcode\":\"134\",\r\n\"channelId\":\"10005\",\r\n\"platform\":\"android\",\r\n\"appname\":\"mfzs\"\n}",
+   "ruleSearch": {
+    "author": "$.author",
+    "bookList": "$.list",
+    "bookUrl": "https://readbook-service-freebook.cread.com/cx/bookDetailYS?bookid={{$.id}}",
+    "checkKeyWord": "++https://readbook-service-freebook.cread.com/cx/itf/getvolume?bookId=803500510",
+    "coverUrl": "$.cover",
+    "intro": "$.summary",
+    "kind": "{$.grade}分&&$.categoryName&&连载中{$.bookStatue}已完结\n##连载中03|01已完结",
+    "lastChapter": "",
+    "name": "$.name",
+    "wordCount": "$.words"
+   },
+   "ruleBookInfo": {
+    "author": "$.authorName",
+    "canReName": "",
+    "coverUrl": "$.bookImg",
+    "init": "$.data.bookVo",
+    "intro": "{{'\\n&lrm;\\n'}}{{$.introduction}}",
+    "kind": "{$.grade}分&&$.categoryName&&连载中{$.bookStatue}已完结\n##连载中03|01已完结",
+    "lastChapter": "{{$.lastUpdateChapterName}} • {{$.lastUpdateChapterDate## .*}}",
+    "name": "$.bookName",
+    "tocUrl": "https://readbook-service-freebook.cread.com/cx/itf/getvolume?bookId={{$.bookId}}",
+    "wordCount": "$.wordCount"
+   },
+   "ruleToc": {
+    "chapterList": "@js:\nlet v = [],\n\t\tlist = [];\nJSON.parse(result).list.map($=>{\n\n//分卷判定\n\t\tV = $.name;\n\t\tif(v[v.length-1]!=V&&!/^\\s*$/.test(V)){\n\t\t\t\tv.push(V)\n\t\t\t\tlist.push({\n\t\t\t\t\t\tname: '📖['+V+']📖',\n\t\t\t\t\t\tvolume: true\n\t\t\t\t\t})\n\t\t\t}\n\n$.bookChapters.map($=>{\n\t\treturn list.push({\n\t\t\t\tname: $.name,\n\t\t\t\turl: `https://readbook-service-freebook.cread.com/cx/itf/chapterRead?bookId=${$.bookid}&chapterId=${$.id}`,\n\t\t\t\tinfo: `章节字数：${$.wordCount}　更新时间：${$.updateDate}`\n\t\t\t});\n\t});\n});\nv.length<2?list.filter($=>!$.volume):list",
+    "chapterName": "name",
+    "chapterUrl": "url",
+    "isVip": "",
+    "isVolume": "volume",
+    "nextTocUrl": "",
+    "updateTime": "info"
+   },
+   "ruleContent": {
+    "content": "$..content"
+   },
+   "loginUrl": null
+  },
+  "expectedMinimum": 20,
+  "charset": "utf-8"
+ },
+ {
+  "name": "穿越小说（优）",
+  "bookSourceUrl": "http://www.kk169.org",
+  "searchUrl": "modules/article/search.php?q={{key}}",
+  "keyword": "斗破苍穹",
+  "page": 1,
+  "request": {
+   "method": "GET",
+   "url": "http://www.kk169.org/modules/article/search.php?q=斗破苍穹",
+   "body": ""
+  },
+  "status": 200,
+  "contentType": "text/html; charset=UTF-8",
+  "bytes": 137443,
+  "bodyFile": "source-d1b01d0e.body",
+  "source": {
+   "bookSourceName": "穿越小说（优）",
+   "bookSourceUrl": "http://www.kk169.org",
+   "bookSourceType": 0,
+   "searchUrl": "modules/article/search.php?q={{key}}",
+   "header": null,
+   "ruleSearch": {
+    "author": ".c_value.0@text",
+    "bookList": "class.c_row",
+    "bookUrl": "a.0@href",
+    "checkKeyWord": "我的模拟长生路",
+    "coverUrl": "img@src",
+    "kind": ".c_value.1@text&&.c_value.3@text&&.c_value.5@text",
+    "lastChapter": "{{@@.c_value.4@text}}•{{@@.c_value.5@text}}\n@js:result\n.replace(\"••\",\"\")\n.replace(/^(\\d+).第/,'第')\n.replace(/^(正文|VIP章节|最新章节)?(\\s+|_)|[\\(\\{（｛【].*[求含理更谢乐发推票盟补加字Kk\\/].*/g,'')\n.replace(/^(\\d+)[、．]第.+章/,'第$1章')\n.replace(/^(\\d+)、\\d+、/,'第$1章 ')\n.replace(/^(\\d+)、\\d+/,'第$1章')\n.replace(/^(第.+章)\\s?\\d+/,'$1')\n.replace(/^(\\d+)、/,'第$1章 ')\n.replace(/^(第.+章)\\s?第.+章/,'$1')\n.replace(/第\\s(.+)\\s章/,'第$1章')\n.replace(/.*(chapter|Chapter)\\s?(\\d+)\\s?/,'$1 $2 ')\n.replace(/\\(.+\\)/,'')\n.replace(/\\[|。/,'')\n.replace(/��([零一二两三四五六七八九十百千]+)章/g,java.toNumChapter(result))\n##(章)([^\\s]+)(\\s·)##$1 $2$3",
+    "name": "a.1@text"
+   },
+   "ruleBookInfo": {
+    "author": "[property$=author]@content",
+    "coverUrl": "[property$=image]@content",
+    "intro": "🕰  更新时间：\n{{@@.tabvalue@table@tbody@td.2@text##.*：|\\s.*}}\n📜  内容简介：\n{{@@.tabvalue@div@textNodes##本书尚无公告.|\\\\n}}##(^|[。！？……；]+[”」）】]?)##$1<br>",
+    "kind": "[property~=category|status|update_time]@content&&.tabvalue@table@tbody@td.2@text##.*：|\\s.*",
+    "lastChapter": "{{@@h3@text}}･{{@@.tabvalue@table@tbody@td.2@text##.*：|\\s.*}}\n@js:result\n.replace(\"••\",\"\")\n.replace(/^(\\d+).第/,'第')\n.replace(/^(正文|VIP章节|最新章节)?(\\s+|_)|[\\(\\{（｛【].*[求含理更谢乐发推票盟补加字Kk\\/].*/g,'')\n.replace(/^(\\d+)[、．]第.+章/,'第$1章')\n.replace(/^(\\d+)、\\d+、/,'第$1章 ')\n.replace(/^(\\d+)、\\d+/,'第$1章')\n.replace(/^(第.+章)\\s?\\d+/,'$1')\n.replace(/^(\\d+)、/,'第$1章 ')\n.replace(/^(第.+章)\\s?第.+章/,'$1')\n.replace(/第\\s(.+)\\s章/,'第$1章')\n.replace(/.*(chapter|Chapter)\\s?(\\d+)\\s?/,'$1 $2 ')\n.replace(/\\(.+\\)/,'')\n.replace(/\\[|。/,'')\n.replace(/第([零一二两三四五六七八九十百千]+)章/g,java.toNumChapter(result))\n##(章)([^\\s]+)(\\s·)##$1 $2$3",
+    "name": "[property$=book_name]@content",
+    "tocUrl": "text.点击阅读@href"
+   },
+   "ruleToc": {
+    "chapterList": "li.chapter@a\n<js>\nvar r=result;\nvar v=book.getVariable(\"custom\")\nvar b=[];\nif(v!=\"\"){\n        for(i=0;i<r.length-v;i++){\n                b.push(r[i]);\n                }\n                result=b;\n        }\n        result\n</js>",
+    "chapterName": "text",
+    "chapterUrl": "href",
+    "updateTime": "更新时间：{{@@title##更新，共##·章节字数：}}"
+   },
+   "ruleContent": {
+    "content": "#acontent@textNodes",
+    "nextContentUrl": "",
+    "replaceRegex": "##\\(穿越小说.*www.*\\)|穿越小说.*www.*|正在手打.*|.本章完."
+   },
+   "loginUrl": null
+  },
+  "expectedMinimum": 100,
+  "charset": "utf-8"
+ },
+ {
+  "name": "茶马小说（优++）",
+  "bookSourceUrl": "https://www.chamabooks.net",
+  "searchUrl": "/search?s={{key}}",
+  "keyword": "斗破苍穹",
+  "page": 1,
+  "request": {
+   "method": "GET",
+   "url": "https://www.chamabooks.net/search?s=斗破苍穹",
+   "body": ""
+  },
+  "status": 200,
+  "contentType": "text/html; charset=utf-8",
+  "bytes": 50576,
+  "bodyFile": "source-cf0715c4.body",
+  "source": {
+   "bookSourceName": "茶马小说（优++）",
+   "bookSourceUrl": "https://www.chamabooks.net",
+   "bookSourceType": 0,
+   "searchUrl": "/search?s={{key}}",
+   "header": "{\n\t \"User-Agent\":\"Mozilla/5.0 (iPhone; CPU iPhone OS 17_3 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.3 Mobile/15E148 Safari/604.1\",\n\t \"Referer\": \"https://www.chamabooks.net/\"\n}",
+   "ruleSearch": {
+    "author": ".misc-value a@text",
+    "bookList": ".novel-item",
+    "bookUrl": "h4 a@href",
+    "intro": "p.novel-desc@text",
+    "kind": ".category,.upload-date@text",
+    "name": "h4 a@text",
+    "wordCount": ".word-count@text"
+   },
+   "ruleBookInfo": {
+    "author": "h1 a@text##作者:",
+    "coverUrl": "[property=\"og:image\"]@content",
+    "intro": ".novel-summary-content@html",
+    "kind": "@js:\nconst get = (sel) => String(java.getString(sel))\nlet cat = book.kind || get(\".category@text\")\nlet count = get(\"@@.misc-value.2@text\");\ncount = count ? \",章节数：\"+count : \"\";\ncat.concat(count)",
+    "lastChapter": "option.-1@value",
+    "name": "h1@ownText##《|》",
+    "wordCount": ".misc-value.1@text##$##字"
+   },
+   "ruleToc": {
+    "chapterList": "option",
+    "chapterName": "text",
+    "chapterUrl": "value"
+   },
+   "ruleContent": {
+    "content": "#novel-content@html##{{title}}"
+   },
+   "loginUrl": "/"
+  },
+  "expectedMinimum": 1,
+  "charset": "utf-8"
+ },
+ {
+  "name": "起步新榜（优）",
+  "bookSourceUrl": "DragonQuestQBqqnb",
+  "searchUrl": "https://newopensearch.reader.qq.com/wechat?keyword={{key}}&start={{page-1}}&end=19",
+  "keyword": "斗破苍穹",
+  "page": 1,
+  "request": {
+   "method": "GET",
+   "url": "https://newopensearch.reader.qq.com/wechat?keyword=斗破苍穹&start={{page-1}}&end=19",
+   "body": ""
+  },
+  "status": 200,
+  "contentType": "text/plain; charset=UTF-8",
+  "bytes": 18617,
+  "bodyFile": "source-159f0db9.body",
+  "source": {
+   "bookSourceName": "起步新榜（优）",
+   "bookSourceUrl": "DragonQuestQBqqnb",
+   "bookSourceType": 0,
+   "searchUrl": "https://newopensearch.reader.qq.com/wechat?keyword={{key}}&start={{page-1}}&end=19",
+   "header": "{\n\t\"user-agent\":\"Mozilla/5.0 (Linux; Android 10; MI 8 Build/QKQ1.190828.002; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/83.0.4103.101 Mobile Safari/537.36\",\n\t\"Referer\":\"https://bookshelf.html5.qq.com/qbread\"\n\t}",
+   "ruleSearch": {
+    "author": "$.author",
+    "bookList": "$.booklist[*]",
+    "bookUrl": "$.bid\n<js>1100000000+parseInt(result)</js>\nhttps://bookshelf.html5.qq.com/qbread/api/novel/intro-info?bookid={{result}}",
+    "checkKeyWord": "深空彼岸",
+    "coverUrl": "$.bid\n@js:\nvar s = result\nfunction gt(s){\n\tlet a = s.slice(-3)\n\tif(a<10){\n\t\t\tn = s.slice(-1)\n\t\t}\n\telse if(a<100){\n\t\t\tn = s.slice(-2)\n\t\t}\n\telse{\n\t\t\tn = a\n\t\t}\n\treturn n\n}\n\"http://wfqqreader-1252317822.image.myqcloud.com/cover/\"+gt(s)+\"/\"+s+\"/b_\"+s+\".jpg\"",
+    "intro": "$.intro",
+    "kind": "{{$.categoryInfoV4\n##\\d.*?\\:(.*?)\\:.*?(,|$)##$1$2}}\n{{$.updateInfo##已更新至.*##连载中}}\n##小说,",
+    "lastChapter": "$.updateInfo##已更新至##第",
+    "name": "$.title",
+    "wordCount": "$.totalWords"
+   },
+   "ruleBookInfo": {
+    "author": "$.author",
+    "canReName": "",
+    "coverUrl": "$.picurl",
+    "init": "$.data.bookInfo",
+    "intro": "<p>{{(t=String(java.getString('$.tag'))).length?'🏷️ '+t.replace(/\\|/g,', '):''}}</p>{{'\\n&lrm;'}}\n<p>{{$.summary}}</p>",
+    "kind": "{{$.userscore}}分\n{{$.subject}}\n{{java.getString('$.isfinish')=='true'?'已完结':'连载中'}}\n{{java.put('time',String(java.timeFormat(java.getString('$.lastUpdatetime')*1000)).replace(/\\//g,'-').replace(/\\s.*/,''))}}",
+    "lastChapter": "{{$.lastSerialname}} • {{java.get('time')}}",
+    "name": "$.resourceName",
+    "tocUrl": "https://bookshelf.html5.qq.com/qbread/api/book/all-chapter?bookId={{$.resourceID}}",
+    "wordCount": "$.contentsize"
+   },
+   "ruleToc": {
+    "chapterList": "$.rows",
+    "chapterName": "$.serialName",
+    "chapterUrl": "https://novel.html5.qq.com/be-api/content/ads-read,{\n\t\"method\": \"POST\",\n\t\"body\": {\n\t\t\"Scene\": \"chapter\",\n\t\t\"ContentAnchorBatch\": [{\n\t\t\t\t\"BookID\": \"{{baseUrl.match(/bookId=(\\d+)/)[1]}}\",\n\t\t\t\t\"ChapterSeqNo\": [{{$.serialID}}]\n\t\t\t}]\n\t},\n\t\"headers\": {\n\t\t\"Q-GUID\": \"4aa27c7cf2d9aca3359656ea186488cb\"\n\t}\n}",
+    "isPay": "$.isFree",
+    "isVip": "//删掉这行字，vip章节会显示🔓\n$.isFree",
+    "isVolume": "",
+    "nextTocUrl": "",
+    "preUpdateJs": "",
+    "updateTime": ""
+   },
+   "ruleContent": {
+    "content": "<p>{{$.data.Content[0].Content}}</p>",
+    "nextContentUrl": ""
+   },
+   "loginUrl": ""
+  },
+  "expectedMinimum": 20,
+  "charset": "utf-8"
+ }
+]

@@ -1,0 +1,261 @@
+<!DOCTYPE HTML>
+<!--[if lt IE 7 ]><html class="ie ie6"><![endif]-->
+<!--[if IE 7 ]><html class="ie ie7"><![endif]-->
+<!--[if IE 8 ]><html class="ie ie8"><![endif]-->
+<!--[if IE 9 ]><html class="ie ie9"><![endif]-->
+<!--[if (gt IE 9)|!(IE)]><html><![endif]-->
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<meta http-equiv="Cache-Control" content="no-siteapp" />
+<meta http-equiv="Cache-Control" content="no-transform" />
+<script type="text/javascript">
+UA = navigator.userAgent.toLowerCase();
+url = window.location;
+url = url.toString();
+if(UA.indexOf('iphone') != -1 || UA.indexOf('mobile') != -1 || UA.indexOf('android') != -1 || UA.indexOf('ipad') != -1 || UA.indexOf('windows ce') != -1 || UA.indexOf('ipod') != -1 ) {
+ uri = url.match(/^https:\/\/www\.(.+)/); Go('https://m.'+uri[1]);
+}
+function Go(url) { window.location = url;}
+var enableQQLogin = true;
+var adEffective = true;
+var contextPath = "";
+</script>
+<script type="text/javascript" src="/themes/default/pc/js/lib/jquery-1.11.1.min.js"></script>
+<script type="text/javascript" src="/themes/default/pc/js/common.min.js"></script>
+<!--[if lt IE 9]>
+<script src="/themes/default/pc/js/lib/html5.js"></script>
+<![endif]-->
+<!--[if IE 6]>
+<script src="/themes/default/pc/js/DD_belatedPNG_0.0.8a-min.js"></script>
+<script>
+  DD_belatedPNG.fix('.png_bg');
+</script>
+<![endif]-->
+
+<title>斗破苍穹的搜索结果|开心文学网-无弹出广告小说网</title>
+<meta name="keywords" content="开心文学网,全本小说,TXT小说,免费小说,无弹出广告小说,不弹出广告小说,没广告小说网"/>
+<meta name="description" content="开心文学网是国内最大的小说网站之一。提供玄幻小说,言情小说,网游小说,修真小说,都市小说,武侠小说,网络小说等在线阅读,我们是更新最快,免费最多,页面简洁且无弹出广告的小说网站!" />
+<link rel="stylesheet" type="text/css" href="/themes/default/pc/css/common.css">
+
+</head>
+<body>
+<div id="wrapper">
+  <div class="shadow" ></div>
+  <header id="global-head" >
+    <div>
+      <nav class="site-navigation cf" style="width: 320px;">
+      <a class="home" href="/">首页</a>
+      <a href="/sitemap/index.html">网站地图</a>
+      <a href="/wanben/index.html">完本小说</a>
+      <a href="/saveShortcut" rel="nofollow">创建桌面快捷</a>
+      </nav>
+      <div class="hd-follow" style="width:630px;text-align:right;" >
+        <div class="myhide"><a href="#" class="hides" rel="nofollow">浏览记录</a>
+          <div class="hideInfo">
+            <ul id="readhistory">
+            </ul>
+            <p>*提示：浏览记录仅放置最近浏览的10本书籍</p>
+            <span>浏览记录是空的</span>
+          </div>
+        </div>
+          <span id="checklogin">
+            <a href="/gotoQQLogin" rel="nofollow"><img src="/themes/default/pc/images/qq_login.gif" class="vm" alt="QQ登录"></a>
+            <a href="/login" style="color:#F0F0F0" rel="nofollow">访客登录</a>&nbsp;&nbsp;
+            <a href="/register" style="color:#F0F0F0" rel="nofollow">免费注册</a>&nbsp;&nbsp;
+	    <script type="text/javascript">initUserMenu();</script>
+          </span>
+        </div>
+    </div>
+    <!--TODO haserror check-->
+    <p class="site-logo">
+        <a href="/" title="开心文学网-无弹出广告小说网">
+        <img src="/themes/default/pc/images/logo-medium.png" alt="开心文学网-无弹出广告小说网 - logo"></a>
+    </p>
+    <div class="site-search">
+<form id="searchForm" action="/search" method="get" onSubmit="onSearchButtomClick();return false;">
+       <input name="key" type="text" id="key" onFocus="this.classname='over';if (value =='这是一个神奇的搜索，请输入小说名或作者名'){value =''}" onBlur="this.classname='input'"  value="斗破苍穹" />
+       <input type="button" id="searchbuttom" value="" style="background:url('/themes/default/pc/images/search.jpg');border:0px solid;cursor:pointer;" onClick="onSearchButtomClick()"/>
+</form>
+    </div>
+  </header>
+  <div id="channel-header" class="clearfix">
+    <div class="channel-header-wrapper">
+      <nav class="channel-nav">
+        <ul class="channel-nav-list">
+            <li  ><a href="/" title="开心文学网">开心文学网</a></li>
+            <li ><a href="/list/1.html">玄幻魔法</a></li><li ><a href="/list/2.html">武侠修真</a></li><li ><a href="/list/3.html">都市言情</a></li><li ><a href="/list/4.html">历史军事</a></li><li ><a href="/list/5.html">侦探推理</a></li><li ><a href="/list/6.html">网游动漫</a></li><li ><a href="/list/7.html">科幻小说</a></li><li ><a href="/list/8.html">恐怖灵异</a></li><li ><a href="/list/9.html">散文诗词</a></li><li ><a href="/list/10.html">其他类型</a></li>
+            <li ><a href="/top/lastupdate.html">排行榜</a></li>
+        </ul>
+      </nav>
+    </div>
+  </div>
+    <div id="container">
+    <div id="search_ad_01"></div>
+<div class="mainnav" id="navList">
+    <table class="grid" width="100%" align="center">
+    <caption>搜索结果(<font color="red">搜索结果中的最新章节和更新时间都有缓存，请点击小说名查看最新章节！</font>)</caption>
+      <tr align="center">
+        <th width="20%">文章名称</th>
+        <th width="40%">最新章节</th>
+        <th width="15%">作者</th>
+        <th width="9%">字数</th>
+        <th width="10%">更新</th>
+        <th width="6%">状态</th>
+      </tr>
+      <tr>
+        <td class="even"><a href="/book/10535/" target="_blank">网游三部曲之斗破苍穹</a></td>
+        <td class="even"><a href="/reader/10535/2787212.html" target="_blank"> 第十八章 勇战僵尸</a></td>
+        <td class="odd"><a href="/author/暗红.html" target="_blank">暗红</a></td>
+        <td class="odd">82,321</td>
+        <td class="odd" align="center">12-07 01:00</td>
+        <td class="even" align="center">连载中</td>
+      </tr>
+      <tr>
+        <td class="even"><a href="/book/11219/" target="_blank">战斗天才在斗破苍穹</a></td>
+        <td class="even"><a href="/reader/11219/4550531.html" target="_blank"> 第一百二十七章 冰儿讯息！</a></td>
+        <td class="odd"><a href="/author/骠骑的凋零.html" target="_blank">骠骑的凋零</a></td>
+        <td class="odd">682,398</td>
+        <td class="odd" align="center">07-30 19:30</td>
+        <td class="even" align="center">连载中</td>
+      </tr>
+      <tr>
+        <td class="even"><a href="/book/99/" target="_blank">斗破苍穹</a></td>
+        <td class="even"><a href="/reader/99/7028573.html" target="_blank"> 第十五章 精神力量</a></td>
+        <td class="odd"><a href="/author/天蚕土豆.html" target="_blank">天蚕土豆</a></td>
+        <td class="odd">7,700,119</td>
+        <td class="odd" align="center">10-24 21:55</td>
+        <td class="even" align="center">连载中</td>
+      </tr>
+      <tr>
+        <td class="even"><a href="/book/31321/" target="_blank">斗破苍穹之续</a></td>
+        <td class="even"><a href="/reader/31321/7089063.html" target="_blank"> 第十三章：特殊奖励【精彩纷呈】</a></td>
+        <td class="odd"><a href="/author/草草日子.html" target="_blank">草草日子</a></td>
+        <td class="odd">141,520</td>
+        <td class="odd" align="center">11-02 11:55</td>
+        <td class="even" align="center">连载中</td>
+      </tr>
+      <tr>
+        <td class="even"><a href="/book/34541/" target="_blank">斗破苍穹之萧玄</a></td>
+        <td class="even"><a href="/reader/34541/8024344.html" target="_blank"> 第四十八章 败逃</a></td>
+        <td class="odd"><a href="/author/起笔挥墨.html" target="_blank">起笔挥墨</a></td>
+        <td class="odd">320,786</td>
+        <td class="odd" align="center">03-25 02:20</td>
+        <td class="even" align="center">连载中</td>
+      </tr>
+      <tr>
+        <td class="even"><a href="/book/36858/" target="_blank">斗破苍穹之逍遥斗帝</a></td>
+        <td class="even"><a href="/reader/36858/8424583.html" target="_blank"> 第三章 战斗打响 势均力敌</a></td>
+        <td class="odd"><a href="/author/酔卧寒.html" target="_blank">酔卧寒</a></td>
+        <td class="odd">356,402</td>
+        <td class="odd" align="center">04-21 10:09</td>
+        <td class="even" align="center">连载中</td>
+      </tr>
+      <tr>
+        <td class="even"><a href="/book/37279/" target="_blank">升级在斗破苍穹</a></td>
+        <td class="even"><a href="/reader/37279/8589194.html" target="_blank"> 008、疗伤，有点疼</a></td>
+        <td class="odd"><a href="/author/SJ君.html" target="_blank">SJ君</a></td>
+        <td class="odd">241,238</td>
+        <td class="odd" align="center">05-15 08:36</td>
+        <td class="even" align="center">连载中</td>
+      </tr>
+      <tr>
+        <td class="even"><a href="/book/38360/" target="_blank">斗破苍穹之古昊</a></td>
+        <td class="even"><a href="/reader/38360/8830207.html" target="_blank"> 第六十四章 暴猿裂空拳</a></td>
+        <td class="odd"><a href="/author/夜风无意.html" target="_blank">夜风无意</a></td>
+        <td class="odd">391,706</td>
+        <td class="odd" align="center">06-15 08:35</td>
+        <td class="even" align="center">连载中</td>
+      </tr>
+      <tr>
+        <td class="even"><a href="/book/26531/" target="_blank">穿越斗破苍穹之龙帝</a></td>
+        <td class="even"><a href="/reader/26531/9458781.html" target="_blank"> 第412章 最后一轮大赛</a></td>
+        <td class="odd"><a href="/author/潇雨云逸.html" target="_blank">潇雨云逸</a></td>
+        <td class="odd">3,149,589</td>
+        <td class="odd" align="center">11-08 00:02</td>
+        <td class="even" align="center">连载中</td>
+      </tr>
+      <tr>
+        <td class="even"><a href="/book/42894/" target="_blank">斗破苍穹续集：纵横天下</a></td>
+        <td class="even"><a href="/reader/42894/9932261.html" target="_blank"> 第８５章 斗气丸</a></td>
+        <td class="odd"><a href="/author/家奴.html" target="_blank">家奴</a></td>
+        <td class="odd">436,560</td>
+        <td class="odd" align="center">01-07 16:17</td>
+        <td class="even" align="center">连载中</td>
+      </tr>
+      <tr>
+        <td class="even"><a href="/book/43821/" target="_blank">斗破苍穹之魂墨儿</a></td>
+        <td class="even"><a href="/reader/43821/10050828.html" target="_blank"> Chapter.1 穿越·魂墨儿</a></td>
+        <td class="odd"><a href="/author/丶最北边的极光.html" target="_blank">丶最北边的极光</a></td>
+        <td class="odd">727,386</td>
+        <td class="odd" align="center">01-19 06:10</td>
+        <td class="even" align="center">连载中</td>
+      </tr>
+      <tr>
+        <td class="even"><a href="/book/51985/" target="_blank">斗破苍穹之邪尘傲世</a></td>
+        <td class="even"><a href="/reader/51985/14401879.html" target="_blank"> 第189章 血脉传承斗技！</a></td>
+        <td class="odd"><a href="/author/剑流千世.html" target="_blank">剑流千世</a></td>
+        <td class="odd">1,557,318</td>
+        <td class="odd" align="center">08-13 12:03</td>
+        <td class="even" align="center">连载中</td>
+      </tr>
+      <tr>
+        <td class="even"><a href="/book/65617/" target="_blank">斗破苍穹之穿越轮回</a></td>
+        <td class="even"><a href="/reader/65617/19179714.html" target="_blank"> 855.与裂游等人相见！（第四更）</a></td>
+        <td class="odd"><a href="/author/光影.html" target="_blank">光影</a></td>
+        <td class="odd">2,066,003</td>
+        <td class="odd" align="center">08-09 11:39</td>
+        <td class="even" align="center">连载中</td>
+      </tr>
+      <tr>
+        <td class="even"><a href="/book/86178/" target="_blank">斗破苍穹之最穿越系统</a></td>
+        <td class="even"><a href="/reader/86178/30553370.html" target="_blank"> 第二百二章 超级大的变故!</a></td>
+        <td class="odd"><a href="/author/优言.html" target="_blank">优言</a></td>
+        <td class="odd">367,827</td>
+        <td class="odd" align="center">05-03 23:49</td>
+        <td class="even" align="center">连载中</td>
+      </tr>
+      <tr>
+        <td class="even"><a href="/book/86203/" target="_blank">从斗破苍穹开始的穿越</a></td>
+        <td class="even"><a href="/reader/86203/30558139.html" target="_blank"> 第三十一章 算计</a></td>
+        <td class="odd"><a href="/author/流殇安.html" target="_blank">流殇安</a></td>
+        <td class="odd">64,786</td>
+        <td class="odd" align="center">05-04 01:45</td>
+        <td class="even" align="center">连载中</td>
+      </tr>
+    </table>
+    <div class="pages">
+        <div class="pagelink" id="pagelink">
+            <em id="pagestats">1/5</em>
+            <a href="/search/斗破苍穹/1.html" class="first">首页</a>
+                    <strong>1</strong>
+                    <a href="/search/斗破苍穹/2.html"> 2 </a>
+                    <a href="/search/斗破苍穹/3.html"> 3 </a>
+                    <a href="/search/斗破苍穹/4.html"> 4 </a>
+                    <a href="/search/斗破苍穹/5.html"> 5 </a>
+            <a href="/search/斗破苍穹/5.html">尾页</a>
+            <kbd>
+                <input name="page" type="text" size="4" maxlength="6" onkeydown="if(event.keyCode==13){window.location='/search/斗破苍穹/'+this.value+'.html'; return false;}" /></kbd>
+        </div>
+    </div>
+</div>
+    <div id="search_ad_02"></div>
+<div class="clear"></div>
+<footer id="global-foot">
+    <p>
+    本小说站所有小说、评论均为网友更新！仅代表发布者个人行为，与本小说站(https://www.kaixinwx.net)立场无关！<br/>
+    本站所有小说的版权为原作者所有！如无意中侵犯到您的权益，或是含有非法内容，请及时与我们联系，我们将在第一时间做出回应！谢谢！<br/>
+        Copyright &copy; 2019 Kaixinwx.NET All Rights Reserved. | 蜀ICP备16031986号-9 
+    </p>
+</footer>
+    </div>
+ </div>
+<script type="text/javascript" src="/themes/default/pc/js/lib/layer.min.js"></script>
+<!--[if lt IE 8]>
+<script type="text/javascript" src="/themes/default/pc/js/lib/json.js"></script>
+<![endif]-->
+
+<script defer src="https://zz.bdstatic.com/linksubmit/push.js"></script>
+<script defer src="https://tj.shinpa.me/script.js" data-website-id="203f0355-9220-4ccb-a7fa-ea94baa45e5e"></script>
+<script> var _mtj = _mtj || []; (function () { var mtj = document.createElement("script"); mtj.src = "https://node95.aizhantj.com:21233/tjjs/?k=7om2gnqgcg6"; var s = document.getElementsByTagName("script")[0]; s.parentNode.insertBefore(mtj, s); })(); </script>
+</body>  
+</html>

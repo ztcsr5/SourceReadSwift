@@ -1,0 +1,55 @@
+{
+ "name": "看书网",
+ "bookSourceUrl": "https://www.kanshuw.com",
+ "searchUrl": "/search.php?q={{key}}",
+ "keyword": "斗破苍穹",
+ "page": 1,
+ "request": {
+  "method": "GET",
+  "url": "https://www.kanshuw.com/search.php?q=斗破苍穹",
+  "body": ""
+ },
+ "status": 200,
+ "contentType": "text/html; charset=utf-8",
+ "bytes": 15887,
+ "bodyFile": "source-6448467b.body",
+ "source": {
+  "bookSourceName": "看书网",
+  "bookSourceUrl": "https://www.kanshuw.com",
+  "bookSourceType": 0,
+  "searchUrl": "/search.php?q={{key}}",
+  "header": null,
+  "ruleSearch": {
+   "bookList": ".row@dl",
+   "name": "h3@text##\\[|.*\\]|免费阅读.*",
+   "author": "span@text",
+   "kind": "h3@text##\\[|\\].*",
+   "lastChapter": "a[-1]@text",
+   "bookUrl": "a[0]@href",
+   "coverUrl": "tag.dt@tag.a@img@src",
+   "checkKeyWord": "我的"
+  },
+  "ruleBookInfo": {
+   "init": "",
+   "name": "class.row book_info@h1@text##免费阅读.*",
+   "author": "class.row book_info@a[0]@text",
+   "intro": "class.row book_info@id.intro_pc@oweText",
+   "kind": "class.title@a[1]@text",
+   "lastChapter": "class.row book_info@a[2]@text",
+   "tocUrl": "",
+   "coverUrl": "class.row book_info@img@src"
+  },
+  "ruleToc": {
+   "chapterList": ".row[-1]@a",
+   "chapterName": "text",
+   "chapterUrl": "href",
+   "nextTocUrl": "class.pages@tag.ul@tag.li.!0:1:-1@tag.a@href"
+  },
+  "ruleContent": {
+   "content": ".font_max@html##第\\(\\d+/\\d+\\)页",
+   "nextContentUrl": "text.下一章@href",
+   "replaceRegex": "##[a-zA-Z0-9-]+[a-zA-Z0-9-].*\\.[a-zA-Z0-9-].*"
+  },
+  "loginUrl": null
+ }
+}

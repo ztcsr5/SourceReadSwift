@@ -1,0 +1,50 @@
+{
+ "name": "茶马小说（优++）",
+ "bookSourceUrl": "https://www.chamabooks.net",
+ "searchUrl": "/search?s={{key}}",
+ "keyword": "斗破苍穹",
+ "page": 1,
+ "request": {
+  "method": "GET",
+  "url": "https://www.chamabooks.net/search?s=斗破苍穹",
+  "body": ""
+ },
+ "status": 200,
+ "contentType": "text/html; charset=utf-8",
+ "bytes": 50576,
+ "bodyFile": "source-cf0715c4.body",
+ "source": {
+  "bookSourceName": "茶马小说（优++）",
+  "bookSourceUrl": "https://www.chamabooks.net",
+  "bookSourceType": 0,
+  "searchUrl": "/search?s={{key}}",
+  "header": "{\n\t \"User-Agent\":\"Mozilla/5.0 (iPhone; CPU iPhone OS 17_3 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.3 Mobile/15E148 Safari/604.1\",\n\t \"Referer\": \"https://www.chamabooks.net/\"\n}",
+  "ruleSearch": {
+   "author": ".misc-value a@text",
+   "bookList": ".novel-item",
+   "bookUrl": "h4 a@href",
+   "intro": "p.novel-desc@text",
+   "kind": ".category,.upload-date@text",
+   "name": "h4 a@text",
+   "wordCount": ".word-count@text"
+  },
+  "ruleBookInfo": {
+   "author": "h1 a@text##作者:",
+   "coverUrl": "[property=\"og:image\"]@content",
+   "intro": ".novel-summary-content@html",
+   "kind": "@js:\nconst get = (sel) => String(java.getString(sel))\nlet cat = book.kind || get(\".category@text\")\nlet count = get(\"@@.misc-value.2@text\");\ncount = count ? \",章节数：\"+count : \"\";\ncat.concat(count)",
+   "lastChapter": "option.-1@value",
+   "name": "h1@ownText##《|》",
+   "wordCount": ".misc-value.1@text##$##字"
+  },
+  "ruleToc": {
+   "chapterList": "option",
+   "chapterName": "text",
+   "chapterUrl": "value"
+  },
+  "ruleContent": {
+   "content": "#novel-content@html##{{title}}"
+  },
+  "loginUrl": "/"
+ }
+}

@@ -1,0 +1,55 @@
+{
+ "name": "松鹤阅读",
+ "bookSourceUrl": "https://bookshelf.html5.qq.com/",
+ "searchUrl": "https://so.html5.qq.com/ajax/real/search_result?noTab=1&tabId=360&sogou_huichuan_hippy=1&q={{key}}&jump_from=1_01_22_01",
+ "keyword": "斗破苍穹",
+ "page": 1,
+ "request": {
+  "method": "GET",
+  "url": "https://so.html5.qq.com/ajax/real/search_result?noTab=1&tabId=360&sogou_huichuan_hippy=1&q=斗破苍穹&jump_from=1_01_22_01",
+  "body": ""
+ },
+ "status": 200,
+ "contentType": "application/json; charset=utf-8",
+ "bytes": 31745,
+ "bodyFile": "source-b71bb5a9.body",
+ "source": {
+  "bookSourceName": "松鹤阅读",
+  "bookSourceUrl": "https://bookshelf.html5.qq.com/",
+  "bookSourceType": 0,
+  "searchUrl": "https://so.html5.qq.com/ajax/real/search_result?noTab=1&tabId=360&sogou_huichuan_hippy=1&q={{key}}&jump_from=1_01_22_01",
+  "header": "{\"user-agent\":\"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/96.0.4664.104 Safari/537.36\"}",
+  "ruleSearch": {
+   "author": "$.author",
+   "bookList": "$.data.state[?(@.dataName == 'novel_search_list')].items[*]",
+   "bookUrl": "https://bookshelf.html5.qq.com/qbread/api/novel/intro-info?bookid={{$.docId##.*_}}&channel=0510&noSame=1&withHistory,{\"headers\":{\"Referer\":\"https://bookshelf.html5.qq.com/kdread/adread/catalog?resourceid={{$.docId##.*_}}&sort=desc&traceid=0024001\"}}",
+   "coverUrl": "$.cover_url",
+   "intro": "$.abstract",
+   "kind": "{{$.label_text}}\n{{$.tag_views}}\n{{java.getString(\"is_finished\") == 1 ? '已完结': '连载中'}}\n##\\s+##,",
+   "name": "$.title"
+  },
+  "ruleBookInfo": {
+   "author": "$..author",
+   "coverUrl": "$..picurl",
+   "init": "",
+   "intro": "$..summary",
+   "kind": "{{java.timeFormat(java.getString(\"$..lastSerialUpdateTime\")*1000)}}\n{{$..tag}}##\\|##,",
+   "lastChapter": "$..lastSerialname",
+   "name": "$..resourceName",
+   "tocUrl": "https://bookshelf.html5.qq.com/qbread/api/book/all-chapter?bookId={{$..resourceID}}@put:{bid:$..resourceID},{\"headers\":{\"Referer\":\"https://bookshelf.html5.qq.com/qbread\"}}",
+   "wordCount": "$..contentsize"
+  },
+  "ruleToc": {
+   "chapterList": "$.rows",
+   "chapterName": "$.serialName",
+   "chapterUrl": "https://novel.html5.qq.com/be-api/content/ads-read,{\n\t\"method\": \"POST\",\n\t\"body\": {\n\t\t\"Scene\": \"chapter\",\n\t\t\"ContentAnchorBatch\": [{\n\t\t\t\t\"BookID\": \"{{baseUrl.match(/bookId=(\\d+)/)[1]}}\",\n\t\t\t\t\"ChapterSeqNo\": [{{$.serialID}}]\n\t\t\t}]\n\t},\n\t\"headers\": {\n\t\t\"Q-GUID\": \"47822b7d93d45ed7d703338913b788cb\"\n\t}\n}",
+   "isVip": "",
+   "nextTocUrl": "",
+   "updateTime": ""
+  },
+  "ruleContent": {
+   "content": "<p>{{$.data.Content[0].Content}}</p>"
+  },
+  "loginUrl": ""
+ }
+}

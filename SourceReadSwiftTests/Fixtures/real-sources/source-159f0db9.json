@@ -1,0 +1,63 @@
+{
+ "name": "起步新榜（优）",
+ "bookSourceUrl": "DragonQuestQBqqnb",
+ "searchUrl": "https://newopensearch.reader.qq.com/wechat?keyword={{key}}&start={{page-1}}&end=19",
+ "keyword": "斗破苍穹",
+ "page": 1,
+ "request": {
+  "method": "GET",
+  "url": "https://newopensearch.reader.qq.com/wechat?keyword=斗破苍穹&start={{page-1}}&end=19",
+  "body": ""
+ },
+ "status": 200,
+ "contentType": "text/plain; charset=UTF-8",
+ "bytes": 18617,
+ "bodyFile": "source-159f0db9.body",
+ "source": {
+  "bookSourceName": "起步新榜（优）",
+  "bookSourceUrl": "DragonQuestQBqqnb",
+  "bookSourceType": 0,
+  "searchUrl": "https://newopensearch.reader.qq.com/wechat?keyword={{key}}&start={{page-1}}&end=19",
+  "header": "{\n\t\"user-agent\":\"Mozilla/5.0 (Linux; Android 10; MI 8 Build/QKQ1.190828.002; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/83.0.4103.101 Mobile Safari/537.36\",\n\t\"Referer\":\"https://bookshelf.html5.qq.com/qbread\"\n\t}",
+  "ruleSearch": {
+   "author": "$.author",
+   "bookList": "$.booklist[*]",
+   "bookUrl": "$.bid\n<js>1100000000+parseInt(result)</js>\nhttps://bookshelf.html5.qq.com/qbread/api/novel/intro-info?bookid={{result}}",
+   "checkKeyWord": "深空彼岸",
+   "coverUrl": "$.bid\n@js:\nvar s = result\nfunction gt(s){\n\tlet a = s.slice(-3)\n\tif(a<10){\n\t\t\tn = s.slice(-1)\n\t\t}\n\telse if(a<100){\n\t\t\tn = s.slice(-2)\n\t\t}\n\telse{\n\t\t\tn = a\n\t\t}\n\treturn n\n}\n\"http://wfqqreader-1252317822.image.myqcloud.com/cover/\"+gt(s)+\"/\"+s+\"/b_\"+s+\".jpg\"",
+   "intro": "$.intro",
+   "kind": "{{$.categoryInfoV4\n##\\d.*?\\:(.*?)\\:.*?(,|$)##$1$2}}\n{{$.updateInfo##已更新至.*##连载中}}\n##小说,",
+   "lastChapter": "$.updateInfo##已更新至##第",
+   "name": "$.title",
+   "wordCount": "$.totalWords"
+  },
+  "ruleBookInfo": {
+   "author": "$.author",
+   "canReName": "",
+   "coverUrl": "$.picurl",
+   "init": "$.data.bookInfo",
+   "intro": "<p>{{(t=String(java.getString('$.tag'))).length?'🏷️ '+t.replace(/\\|/g,', '):''}}</p>{{'\\n&lrm;'}}\n<p>{{$.summary}}</p>",
+   "kind": "{{$.userscore}}分\n{{$.subject}}\n{{java.getString('$.isfinish')=='true'?'已完结':'连载中'}}\n{{java.put('time',String(java.timeFormat(java.getString('$.lastUpdatetime')*1000)).replace(/\\//g,'-').replace(/\\s.*/,''))}}",
+   "lastChapter": "{{$.lastSerialname}} • {{java.get('time')}}",
+   "name": "$.resourceName",
+   "tocUrl": "https://bookshelf.html5.qq.com/qbread/api/book/all-chapter?bookId={{$.resourceID}}",
+   "wordCount": "$.contentsize"
+  },
+  "ruleToc": {
+   "chapterList": "$.rows",
+   "chapterName": "$.serialName",
+   "chapterUrl": "https://novel.html5.qq.com/be-api/content/ads-read,{\n\t\"method\": \"POST\",\n\t\"body\": {\n\t\t\"Scene\": \"chapter\",\n\t\t\"ContentAnchorBatch\": [{\n\t\t\t\t\"BookID\": \"{{baseUrl.match(/bookId=(\\d+)/)[1]}}\",\n\t\t\t\t\"ChapterSeqNo\": [{{$.serialID}}]\n\t\t\t}]\n\t},\n\t\"headers\": {\n\t\t\"Q-GUID\": \"4aa27c7cf2d9aca3359656ea186488cb\"\n\t}\n}",
+   "isPay": "$.isFree",
+   "isVip": "//删掉这行字，vip章节会显示🔓\n$.isFree",
+   "isVolume": "",
+   "nextTocUrl": "",
+   "preUpdateJs": "",
+   "updateTime": ""
+  },
+  "ruleContent": {
+   "content": "<p>{{$.data.Content[0].Content}}</p>",
+   "nextContentUrl": ""
+  },
+  "loginUrl": ""
+ }
+}

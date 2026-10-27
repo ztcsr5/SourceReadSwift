@@ -171,7 +171,6 @@ struct SearchResultParser {
                 let lastChapter = try? htmlExtractor.value(from: element, rule: firstRule(rule, fallback: source.ruleSearch, keys: ["lastChapter"]), fallback: nil, baseUrl: response.url, variables: variables).nilIfEmpty
                 let wordCount = try? htmlExtractor.value(from: element, rule: firstRule(rule, fallback: source.ruleSearch, keys: ["wordCount", "wordNum", "words"]), fallback: nil, baseUrl: response.url, variables: variables).nilIfEmpty
                 let checkKeyWord = try? htmlExtractor.value(from: element, rule: firstRule(rule, fallback: source.ruleSearch, keys: ["checkKeyWord"]), fallback: nil, baseUrl: response.url, variables: variables).nilIfEmpty
-                guard passesCheckKeyWord(checkKeyWord, keyword: keyword) else { continue }
                 books.append(SearchBook(
                     name: name,
                     author: author,
@@ -343,7 +342,7 @@ struct SearchResultParser {
                 )
             )
         }
-        let filtered = books.filter { passesCheckKeyWord($0.checkKeyWord, keyword: keyword) }
+        let filtered = books
         if filtered.isEmpty {
             let message = candidates.isEmpty
                 ? "JSON 列表规则未命中（0 项，响应 \(response.body.count) 字符）"
@@ -378,14 +377,4 @@ struct SearchResultParser {
     }
 
 
-    /// Legado semantics: when `ruleSearch.checkKeyWord` is configured and a
-    /// keyword is available, the extracted value must contain that keyword.
-    /// Rows failing the check are dropped; an empty/missing rule is permissive.
-    private func passesCheckKeyWord(_ value: String?, keyword: String?) -> Bool {
-        guard let keyword = keyword?.trimmingCharacters(in: .whitespacesAndNewlines), !keyword.isEmpty,
-              let value = value?.trimmingCharacters(in: .whitespacesAndNewlines), !value.isEmpty else {
-            return true
-        }
-        return value.range(of: keyword, options: [.caseInsensitive, .diacriticInsensitive]) != nil
-    }
 }

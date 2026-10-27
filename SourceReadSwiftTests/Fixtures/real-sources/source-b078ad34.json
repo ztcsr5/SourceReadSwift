@@ -1,0 +1,53 @@
+{
+ "name": "阅友小说（优）",
+ "bookSourceUrl": "http://m.suixkan.com/",
+ "searchUrl": "/s/1.html?keyword={{key}}&page={{page}}",
+ "keyword": "斗破苍穹",
+ "page": 1,
+ "request": {
+  "method": "GET",
+  "url": "http://m.suixkan.com/s/1.html?keyword=斗破苍穹&page=1",
+  "body": ""
+ },
+ "status": 200,
+ "contentType": "text/html; charset=utf-8",
+ "bytes": 12492,
+ "bodyFile": "source-b078ad34.body",
+ "source": {
+  "bookSourceName": "阅友小说（优）",
+  "bookSourceUrl": "http://m.suixkan.com/",
+  "bookSourceType": 0,
+  "searchUrl": "/s/1.html?keyword={{key}}&page={{page}}",
+  "header": null,
+  "ruleSearch": {
+   "author": ".v-author@text##\\s",
+   "bookList": ".v-list-item",
+   "bookUrl": "@onclick@js:result.match(/\\('(.*?)', '', ''\\)/)[1]",
+   "coverUrl": "img@src",
+   "intro": ".v-intro@text",
+   "kind": ".base-label@text",
+   "name": ".v-title@text",
+   "wordCount": ".v-words@text"
+  },
+  "ruleBookInfo": {
+   "author": ".face-info span.0@text##.*：",
+   "coverUrl": ".face-cover img@src",
+   "intro": "#intro@html",
+   "kind": ".face-info span.1:3@text&&#idNewIds@#chapter-ps-id@text##.*：",
+   "lastChapter": "#idNewIds@.chapter-entrance@text",
+   "name": ".face-info-title@text",
+   "tocUrl": ".sumchapter a@href",
+   "wordCount": ".face-info span.2@text##.*："
+  },
+  "ruleToc": {
+   "chapterList": ".catalog_ls li a",
+   "chapterName": "text",
+   "chapterUrl": "href"
+  },
+  "ruleContent": {
+   "content": ".con@html",
+   "replaceRegex": "##[\\(（]本章未完.*[）\\)]|[\\(（]本章完[）\\)]"
+  },
+  "loginUrl": null
+ }
+}

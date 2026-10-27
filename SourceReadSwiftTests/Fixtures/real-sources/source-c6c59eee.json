@@ -1,0 +1,54 @@
+{
+ "name": "⚡📂错层小说",
+ "bookSourceUrl": "https://m.cuoceng.com/",
+ "searchUrl": "https://m.cuoceng.com/book/so/{{key}}/{{page}}.html",
+ "keyword": "斗破苍穹",
+ "page": 1,
+ "request": {
+  "method": "GET",
+  "url": "https://m.cuoceng.com/book/so/斗破苍穹/1.html",
+  "body": ""
+ },
+ "status": 200,
+ "contentType": "text/html;charset=UTF-8",
+ "bytes": 6209,
+ "bodyFile": "source-c6c59eee.body",
+ "source": {
+  "bookSourceName": "⚡📂错层小说",
+  "bookSourceUrl": "https://m.cuoceng.com/",
+  "bookSourceType": 0,
+  "searchUrl": "https://m.cuoceng.com/book/so/{{key}}/{{page}}.html",
+  "header": "{\"User-Agent\": \"Mozilla/5.0 (Linux; Android 10; PACM00 Build/QP1A.190711.020) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/108.0.5359.79 Mobile Safari/537.36\"}",
+  "ruleSearch": {
+   "author": ".author:contains(作者)@text",
+   "bookList": ".bookbox",
+   "bookUrl": ".bookname a@href",
+   "intro": ".update@text",
+   "lastChapter": ".cat a@text",
+   "name": ".bookname a@text",
+   "wordCount": ".author:contains(字数)@text"
+  },
+  "ruleBookInfo": {
+   "author": "[href*=\"/book/so/\"]@text",
+   "coverUrl": ".thumbnail@src",
+   "intro": "&nbsp;\n🕰  {{@@.booktime@text}}\n·\n📜  简介：{{@@.bookintro@html}}\n",
+   "kind": ".breadcrumb li:eq(1) a@text",
+   "lastChapter": ".bookchapter@text",
+   "name": ".booktitle@text",
+   "tocUrl": "*[href*=book/chapter]@href",
+   "wordCount": ".booktag span:contains(\"字\")@text"
+  },
+  "ruleToc": {
+   "chapterList": "#allchapter dd",
+   "chapterName": "a@text",
+   "chapterUrl": "a@href",
+   "nextTocUrl": "text.下一@href"
+  },
+  "ruleContent": {
+   "content": "#content@html",
+   "nextContentUrl": "#linkNext@href",
+   "webJs": "{\"webView\":true}"
+  },
+  "loginUrl": null
+ }
+}
