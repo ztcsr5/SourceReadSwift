@@ -275,6 +275,22 @@ final class BookSourceTests: XCTestCase {
         XCTAssertEqual(request.timeout, 2, accuracy: 0.001)
     }
 
+    func testRequestBuilderDefaultsToThePipelineStageBudget() {
+        let source = BookSource(
+            bookSourceName: "Default Timeout",
+            bookSourceUrl: "https://example.com",
+            searchUrl: "https://example.com/search"
+        )
+        let request = SourceRequestBuilder().buildSearchRequest(
+            source: source,
+            searchUrl: source.searchUrl!,
+            keyword: "test",
+            page: 1
+        )
+        XCTAssertEqual(SourceRequestBuilder.defaultTimeout, 20, accuracy: 0.001)
+        XCTAssertEqual(request.timeout, SourceRequestBuilder.defaultTimeout, accuracy: 0.001)
+    }
+
     func testRequestBuilderReadsLegadoTypeDataAndUserAgentAliases() {
         let source = BookSource(
             bookSourceName: "Legado Alias Source",

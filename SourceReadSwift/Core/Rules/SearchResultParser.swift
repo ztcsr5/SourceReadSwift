@@ -210,7 +210,13 @@ struct SearchResultParser {
                     )])
                 }
             }
-            return books.isEmpty ? .failure(.empty("搜索解析结果为空")) : .success(books)
+            if books.isEmpty {
+                let message = elements.isEmpty
+                    ? "搜索列表规则未命中（0 个节点，响应 \(response.body.count) 字符）"
+                    : "搜索列表命中 \(elements.count) 个节点但书名或链接为空"
+                return .failure(.empty(message))
+            }
+            return .success(books)
         } catch {
             return .failure(.rule(error.localizedDescription))
         }
@@ -338,7 +344,13 @@ struct SearchResultParser {
             )
         }
         let filtered = books.filter { passesCheckKeyWord($0.checkKeyWord, keyword: keyword) }
-        return filtered.isEmpty ? .failure(.empty("JSON 搜索解析结果为空")) : .success(Array(filtered))
+        if filtered.isEmpty {
+            let message = candidates.isEmpty
+                ? "JSON 列表规则未命中（0 项，响应 \(response.body.count) 字符）"
+                : "JSON 列表命中 \(candidates.count) 项但书名或链接为空"
+            return .failure(.empty(message))
+        }
+        return .success(Array(filtered))
     }
 
     private func firstRule(_ rule: SourceRule?, fallback: SourceRule? = nil, keys: [String]) -> String? {

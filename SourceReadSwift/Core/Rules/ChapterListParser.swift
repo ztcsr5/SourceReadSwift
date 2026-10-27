@@ -283,9 +283,13 @@ struct ChapterListParser {
                 if next != nil { break }
             }
 
-            return chapters.isEmpty
-                ? .failure(.empty("Chapter list is empty"))
-                : .success(ChapterListPage(chapters: chapters, nextTocUrl: next, trailingVolume: currentVolume))
+            if chapters.isEmpty {
+                let message = elements.isEmpty
+                    ? "目录规则未命中（0 个节点，响应 \(response.body.count) 字符）"
+                    : "目录规则命中 \(elements.count) 个节点但章节名为空"
+                return .failure(.empty(message))
+            }
+            return .success(ChapterListPage(chapters: chapters, nextTocUrl: next, trailingVolume: currentVolume))
         } catch {
             return .failure(.rule(error.localizedDescription))
         }
@@ -428,9 +432,13 @@ struct ChapterListParser {
             next = nil
         }
 
-        return chapters.isEmpty
-            ? .failure(.empty("JSON chapter list is empty"))
-            : .success(ChapterListPage(chapters: chapters, nextTocUrl: next, trailingVolume: currentVolume))
+        if chapters.isEmpty {
+            let message = items.isEmpty
+                ? "JSON 目录规则未命中（0 项，响应 \(response.body.count) 字符）"
+                : "JSON 目录命中 \(items.count) 项但章节名为空"
+            return .failure(.empty(message))
+        }
+        return .success(ChapterListPage(chapters: chapters, nextTocUrl: next, trailingVolume: currentVolume))
     }
 
     /// Builds one chapter row from a TOC element.  Volume rows are consumed

@@ -3,6 +3,11 @@ import Foundation
 struct SourceRequestBuilder {
     private let directiveParser = SourceURLDirectiveParser()
 
+    /// Per-request budget.  `SourcePipeline` gives every stage 20s, so a
+    /// source that answers between 12s and 20s must be allowed to finish;
+    /// cutting the request at 12s spent the retry window on a dead socket.
+    static let defaultTimeout: TimeInterval = 20
+
     func buildPageRequest(
         source: BookSource,
         urlText: String,
@@ -507,7 +512,7 @@ struct SourceRequestBuilder {
             ?? options
             ?? timeoutValue(source.customConfig)
             ?? timeoutValue(source.raw)
-            ?? 12
+            ?? Self.defaultTimeout
         return min(max(raw, 1), 120)
     }
 
