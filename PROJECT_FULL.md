@@ -34,6 +34,12 @@
 - [十一、已知边界、缺陷与后续路线](#十一已知边界缺陷与后续路线)
 - [十二、文档索引与证据索引](#十二文档索引与证据索引)
 - [十三、v1.0.60 阅读界面重构](#十三v1060-阅读界面重构2026-10-27)
+- [十四、v1.0.61 安全区与 chrome 修复](#十四v1061-安全区与-chrome-修复2026-10-27)
+- [十五、v1.0.62 滑动模式页脚状态带](#十五v1062-滑动模式页脚状态带2026-10-27)
+- [十六、v1.0.63 自定义壁纸布局溢出修复](#十六v1063-自定义壁纸布局溢出修复2026-10-27)
+- [十七、v1.0.64 壁纸 UIKit 图层与导入降采样](#十七v1064-壁纸-uikit-图层与导入降采样2026-10-27)
+- [十八、v1.0.65 排版统一与交互整改](#十八v1065-排版统一与交互整改2026-10-28)
+- [十九、v1.0.66 页面身份锚定与翻页帧率](#十九v1066-页面身份锚定与翻页帧率2026-10-28)
 - [附录 A：完整文件清单](#附录-a完整文件清单)
 - [附录 B：术语与事实标记约定](#附录-b术语与事实标记约定)
 
@@ -2050,6 +2056,46 @@ SwiftUI `Image` 在 `ZStack` 提案阶段仍可能按比例填充后的理想尺
 - 相对/空 `loginUrl` 书源的登录落地；
 - 分页 24 后长章节完整性、「网页打开本章」兜底；
 - 换源缓存命中与后台刷新不阻塞。
+
+## 十九、v1.0.66 页面身份锚定与翻页帧率（2026-10-28）
+
+### 19.1 范围
+
+提交 `01ec90b`（`fix(reader): anchor page cursor to page identity and reuse page hosts`），分支 `codex/reader-feedback-fixes`。输入为两段真机录像与三条文字反馈。
+
+| # | 反馈 | 根因 | 落点 | 状态 |
+|---|---|---|---|---|
+| 1 | 左右滑动卡顿一下 | 起手帧同时新建 SwiftUI 页、重建整窗模型、重建整段富文本；`@State` 手势标志在起手第一帧让整个 body 失效 | `ReaderInteractionGate`、`PageCurlReaderView` 页面 LRU、`prewarm`、`ReaderPageTextCache`、`ReaderPageTextView.isEqual` | 已实现，真机待验收 |
+| 2 | 第 5 章翻页跳回第 2 章 | 页游标按「窗口数组下标」恢复，预取插章后整体位移；覆盖模式 320 ms 动画后用旧下标落笔 | `ReaderPageIdentity` / `ReaderPageRestoration`、`finishCoverGesture` 锚点反解 | 已实现，单测覆盖 |
+| 3 | 其他翻页模式丢帧、主页假 120 Hz | 全书封面按原图解码上屏；跨章边界对同一页调用 `setViewControllers` 重设 | `RemoteImageLoader` ImageIO 降采样、`sync` 同页短路、按页 revision 复用 hosting | 已实现，真机待验收 |
+| 4 | 「关于纸间」文案 | 12 条核心特色标签 | `SettingsView` 改为一段自述 | 已实现 |
+| 5 | iOS 16 显示异常 | 未在本轮真机验证 | — | 待真机验收 |
+
+### 19.2 跳页根因
+
+阅读器的 `pagedBlocks` 是「五章窗口合并后的一条页面数组」，`ReaderPageBlock.id` 是数组下标，任何前插/裁剪都会重排。
+
+旧恢复逻辑用 `first >= paragraph` 选页（重分页时越过锚点），找不到时再 `chapter >= anchor` 跨章漂移，最后直接以 `pagedPageIndex` 兜底下标——窗口前插两章后，第 5 章的下标就指向第 2 章。
+
+新逻辑 `ReaderPageRestoration` 的硬规则：**锚点章节在窗口内时，绝不返回更早章节的页**；同章内取「首个段落 ≤ 锚点」的最后一页；章节不在窗口时只向前找。
+
+### 19.3 覆盖模式
+
+`.cover` 不经过 `UIPageViewController`，手势结束后 `Task.sleep(320ms)` 才写 `pagedPageIndex = target`。这 320 ms 内的预取回包会重排数组，落笔时 `target` 已指向别的页。现在改为先记录 `pageAnchor(for: pagedBlocks[target])`，动画结束后用 `ReaderPageRestoration.index` 反解。
+
+### 19.4 帧率
+
+- `PageCurlReaderView` 新增 `pageRevision`，hosting controller 按「页面身份 + 排版/主题」复用（LRU 8 条），`prewarm` 预建 `+1 / -1 / +2`；窗口新增章节不再清空全部页面。
+- `sync` 的 `contentRevisionChanged` 改为可见页自身的 revision；目标控制器与当前相同则跳过 `setViewControllers`。
+- `ReaderInteractionGate` 以引用盒替代 `@State Bool`，手势起手不再触发整树失效。
+- 页面富文本按「页面身份 + 朗读高亮 + 排版签名」缓存 16 条。
+- 书架/发现/搜索封面走 `ImageIO` 按显示尺寸降采样（260 / 420 / 260 px），解码在 utility 队列。
+
+### 19.5 证据
+
+- `SourceReadSwiftTests/ReaderPageSelectionTests.swift`：9 条（插章后仍第 5 章、重分页、锚点章缺失只向前、占位页、空模型、clamp、身份 key 稳定性）。
+- CI 与 IPA 运行号：见 `docs/CODEX_HANDOVER_1_0_66.md` §四。
+- 真机：本轮无 iOS 16 设备，全部 UI/帧率结论标 `待真机验收`。
 
 ## 附录 A：完整文件清单
 

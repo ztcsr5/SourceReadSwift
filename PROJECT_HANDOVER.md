@@ -1,9 +1,9 @@
 # SourceReadSwift (纸间) 项目交接全量备忘录
 
 > **交接目标**：交接给下一位 AI 协作者 / 研发工程师  
-> **文档基线**：v1.0.65 (Build 66)；下文主体保留 v1.0.30 (Build 31) 历史记录  
+> **文档基线**：v1.0.66 (Build 67)；下文主体保留 v1.0.30 (Build 31) 历史记录  
 > **交接时间**：2026-10-28  
-> **验证 Commit**：`ffb9da4`（GitHub Actions iOS build 成功；1102 tests / 0 failures；unsigned IPA 打包通过）  
+> **验证 Commit**：`01ec90b`（v1.0.66 翻页锚定与帧率修复；CI 结果见 `docs/CODEX_HANDOVER_1_0_66.md` §四）  
 > **最新产物**：`C:\Users\Edc21\Desktop\SourceReadSwift-1.0.65-unsigned.ipa`（12,136,856 字节，SHA256 `2B1F251C303F47797BBDD5FB6E9FBF2675B625AC0246BFBE17BED64E29821230`）  
 > **对齐补丁产物**：`C:\Users\Edc21\Desktop\SourceReadSwift-1.0.65-align-unsigned.ipa`（12,136,991 字节，SHA256 `95416C4060B3795C80F4C52EA41CECB12E2AC0A0028B99DFE75936679A1CF85A`，含正文缩进保留与两端对齐修正）  
 > **分页 TextKit 产物**：`C:\Users\Edc21\Desktop\SourceReadSwift-1.0.65-textkit-unsigned.ipa`（12,154,717 字节，SHA256 `4C3A82686DB04FEBA725F31304CBB4AD2A373072F83A5FF044FE4849A84ECF0E`，三种分页模式改用 TextKit justify）  
@@ -11,6 +11,7 @@
 > **全量文档**：项目全貌、功能矩阵、生态分析与 v1.0.65 工作记录见 `PROJECT_FULL.md`（阅读界面重构 §十三、安全区修复 §十四、页脚状态带 §十五、壁纸布局 §十六、壁纸 UIKit 图层 §十七、1.0.65 排版与交互 §十八）。  
 > **iOS16 审计**：`docs/IOS16-COMPAT-AUDIT-1.0.65.md`（编译级 API 可用、静态扫描 0 命中 iOS17-only、运行时待真机矩阵）。
 
+> **最新修复（v1.0.66，2026-10-28，分支 `codex/reader-feedback-fixes`，提交 `01ec90b`）**：本轮针对两段真机录像解决三类问题——①「第 5 章翻页跳回第 2 章」：页游标不再用窗口数组下标恢复，改用 `ReaderPageIdentity`（章号 + 章内页序 + 首段号）+ `ReaderPageRestoration`（同章精确匹配 → 段落包含 → 只向前），覆盖模式 320 ms 动画结束后用锚点反解下标；②「滑动起手卡顿」：`ReaderInteractionGate` 引用盒替代 `@State` 手势标志、`PageCurlReaderView` 页面 hosting LRU(8) + `prewarm(+1/-1/+2)`、页面富文本 16 条缓存、`ReaderPageTextView` 富文本等值短路、手势期间挂起页面模型重建（120 ms debounce）；③「主页/发现页假 120Hz」：封面统一走 `ImageIO` 按显示尺寸降采样（260/420 px）+ `thumbnailCache`，解码在 utility 队列。另：关于页删除「核心特色」12 条标签，改为一段自述。iOS 16 本轮无真机，全部结论标「待真机验收」。交接见 `docs/CODEX_HANDOVER_1_0_66.md`；全量记录见 `PROJECT_FULL.md` §十九。  
 > **最新修复（v1.0.65，2026-10-28，分支 `codex/reader-feedback-fixes`）**：本轮针对 11 条读者反馈完成整改——标题字号/缺失/重复统一（`ChapterTextSanitizer` + 三渲染面 1.3x）、正文两端对齐、iOS16 封面链路（`CoverURLResolver` + 全调用点上下文）、登录地址解析与主页回退（`SourceLoginURLResolver`）、底栏精简为目录/设置/章节/进度、详情页去重加号、分页上限 8→24 与「网页打开本章」兜底、默认段间距 0→10、设置页渐变头卡、发现页紧凑+网格、换源缓存秒切（`SourceSwitchCacheStore`）。CI run `40539628249`：1095 tests / 0 failures；IPA run `40539628430`。交接见 `docs/CODEX_HANDOVER_1_0_65.md`。  
 > **上一轮（v1.0.64，2026-10-27，分支 `codex/reader-feedback-fixes`）**：自定义壁纸改为 UIKit `UIImageView` 图层（`intrinsicContentSize = noIntrinsicMetric`），导入时按最长边 2800px 降采样，新增填充/适应/拉伸三档；彻底切断壁纸撑大根布局的路径。交接见 `docs/CODEX_HANDOVER_1_0_64.md`。  
 > **上一轮（v1.0.63，2026-10-27，分支 `codex/reader-feedback-fixes`）**：修复自定义壁纸 `scaledToFill` 撑大根布局导致设置面板与工具条左右被裁。壁纸现在锁定在视口内并裁剪溢出；分页三种模式同步。交接见 `docs/CODEX_HANDOVER_1_0_63.md`。  
