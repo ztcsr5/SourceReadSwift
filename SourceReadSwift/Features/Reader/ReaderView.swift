@@ -2238,30 +2238,85 @@ struct ReaderView: View {
     private func readerPage(for page: ReaderPageBlock) -> some View {
         if page.isPlaceholder {
             chapterPlaceholderPage(page)
+        } else if page.paragraphs.contains(where: { ReaderImageSizingPolicy.imageURL(in: $0.text) != nil }) {
+            // Illustration pages keep the SwiftUI stack: the image card owns
+            // its own tap target and cannot live inside a text view.
+            pageSurface(for: page) {
+                legacyTextStack(for: page)
+            }
         } else {
             pageSurface(for: page) {
-                VStack(alignment: .leading, spacing: 0) {
-                    if page.includesTitle {
-                        Text(ReaderTextTransform.displayText(page.chapterTitle.isEmpty ? chapterTitle(for: page.chapterIndex) : page.chapterTitle, traditionalChinese: traditionalChineseEnabled))
-                            .font(fontFamily.swiftUIFont(size: CGFloat(ReaderTypographyDefaults.titleFontSize(for: fontSize)), weight: .bold, customPostScriptName: customFontPostScriptName))
-                            .foregroundStyle(readerThemeTextColor)
-                            .padding(.bottom, CGFloat(titleSpacing))
-                            .readerSelectableText(textSelectionEnabled)
-                    }
-
-                    ForEach(page.paragraphs) { entry in
-                        paragraphText(entry)
-                            .padding(
-                                .top,
-                                (page.paragraphs.first.map { $0.id == entry.id } ?? true)
-                                    ? 0
-                                    : (entry.isContinuation ? 0 : CGFloat(paragraphSpacing))
-                            )
-                    }
-                }
+                ReaderPageTextView(
+                    attributedText: pageAttributedText(for: page),
+                    isSelectable: textSelectionEnabled
+                )
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
             }
         }
+    }
+
+    private func legacyTextStack(for page: ReaderPageBlock) -> some View {
+        VStack(alignment: .leading, spacing: 0) {
+            if page.includesTitle {
+                Text(ReaderTextTransform.displayText(page.chapterTitle.isEmpty ? chapterTitle(for: page.chapterIndex) : page.chapterTitle, traditionalChinese: traditionalChineseEnabled))
+                    .font(fontFamily.swiftUIFont(size: CGFloat(ReaderTypographyDefaults.titleFontSize(for: fontSize)), weight: .bold, customPostScriptName: customFontPostScriptName))
+                    .foregroundStyle(readerThemeTextColor)
+                    .padding(.bottom, CGFloat(titleSpacing))
+                    .readerSelectableText(textSelectionEnabled)
+            }
+
+            ForEach(page.paragraphs) { entry in
+                paragraphText(entry)
+                    .padding(
+                        .top,
+                        (page.paragraphs.first.map { $0.id == entry.id } ?? true)
+                            ? 0
+                            : (entry.isContinuation ? 0 : CGFloat(paragraphSpacing))
+                    )
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+    }
+
+    private func pageAttributedText(for page: ReaderPageBlock) -> NSAttributedString {
+        let bodyFont = fontFamily.uiFont(
+            ofSize: CGFloat(fontSize),
+            weight: .regular,
+            customPostScriptName: customFontPostScriptName
+        )
+        let titleFont = fontFamily.uiFont(
+            ofSize: CGFloat(ReaderTypographyDefaults.titleFontSize(for: fontSize)),
+            weight: .bold,
+            customPostScriptName: customFontPostScriptName
+        )
+        let rawTitle = page.chapterTitle.isEmpty ? chapterTitle(for: page.chapterIndex) : page.chapterTitle
+        let title = page.includesTitle
+            ? ReaderTextTransform.displayText(rawTitle, traditionalChinese: traditionalChineseEnabled)
+            : nil
+        let paragraphs = page.paragraphs.map { entry -> ReaderPageTextBuilder.Paragraph in
+            let ownerChapter = entry.chapterIndex >= 0 ? entry.chapterIndex : windowCurrentChapterIndex
+            let highlighted = speechChapterIndex == ownerChapter
+                && speechController.currentParagraphIndex == entry.index
+            return ReaderPageTextBuilder.Paragraph(
+                text: entry.text,
+                isContinuation: entry.isContinuation,
+                isHighlighted: highlighted
+            )
+        }
+        return ReaderPageTextBuilder.make(
+            title: title,
+            paragraphs: paragraphs,
+            style: ReaderPageTextBuilder.Style(
+                bodyFont: bodyFont,
+                titleFont: titleFont,
+                textColor: background.uiTextColor(isNight: colorScheme == .dark),
+                highlightColor: AppTheme.accentUIColor.withAlphaComponent(background.isDark ? 0.22 : 0.12),
+                lineSpacing: CGFloat(lineSpacing),
+                letterSpacing: CGFloat(letterSpacing),
+                paragraphSpacing: CGFloat(paragraphSpacing),
+                titleSpacing: CGFloat(titleSpacing)
+            )
+        )
     }
 
     /// The page shown while the neighbouring chapter is still downloading, or
