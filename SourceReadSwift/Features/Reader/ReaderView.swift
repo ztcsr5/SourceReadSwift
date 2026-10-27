@@ -91,6 +91,9 @@ struct ReaderView: View {
     @State private var paragraphJumpRequest: ParagraphJumpRequest?
     @State private var pagedBlocksCache: [ReaderPageBlock] = []
     @State private var pagedBlocksCacheKey = ""
+    /// 页面容器的真实几何（UIPageViewController 子控制器可能比根视图小一圈）。
+    /// 分页引擎使用这一份，而不是盲目相信根视图的 viewport。
+    @State private var pagedPageContainerMetrics: ReaderPageContainerMetrics?
     /// Page-to-paragraph mapping is immutable between layout-cache revisions.
     /// Keep it in state instead of rebuilding an array with `compactMap` every
     /// time SwiftUI reevaluates the reader body or a speech callback arrives.
@@ -180,6 +183,11 @@ struct ReaderView: View {
     @AppStorage("reader.paragraphIndent") private var paragraphIndent: Double = ReaderTypographyDefaults.paragraphIndent
     @AppStorage("reader.titleSpacing") private var titleSpacing: Double = ReaderTypographyDefaults.titleSpacing
     @AppStorage("reader.footerHeight") private var footerHeight: Double = ReaderTypographyDefaults.footerHeight
+    /// 章节标题呈现方式。默认「页眉小标题」：每页顶部 12pt 章节名，正文从页眉下开始，
+    /// 与栖阅 / 开元阅读的阅读页一致。
+    @AppStorage("reader.chapterHeadingStyle") private var chapterHeadingStyleRaw = ReaderPageChromeLayout.header.rawValue
+    /// 栖阅的「内容延伸至页眉页脚区域」：开启后正文跨过页眉页脚带，页眉页脚浮在正文上。
+    @AppStorage("reader.contentExtendsIntoChrome") private var contentExtendsIntoChrome = false
     @AppStorage("reader.ttsRate") private var ttsRate: Double = 0.52
     @AppStorage("reader.ttsEngine") private var ttsEngineRawValue: String = TTSEngineKind.local.rawValue
     @AppStorage("reader.httpTTSVoiceID") private var httpTTSVoiceID: Int = HttpTTSVoice.defaultVoiceID
@@ -212,6 +220,10 @@ struct ReaderView: View {
 
     private var readerMode: ReaderMode {
         ReaderMode(rawValue: readerModeRawValue) ?? .scroll
+    }
+
+    private var chapterHeadingStyle: ReaderPageChromeLayout {
+        ReaderPageChromeLayout(rawValue: chapterHeadingStyleRaw) ?? .header
     }
 
     private var tapZoneActions: [ReaderTapAction] {
@@ -489,18 +501,83 @@ struct ReaderView: View {
         return viewportSize
     }
 
+    /// 分页真实可用的视口。首次渲染前回退到根视口，页面首次布局后立即换成实测值。
+    /// 这解决了「分页按 852pt 排、UIPageViewController 只给 793pt」导致的页尾截断。
+    private var pagedLayoutViewportSize: CGSize {
+        if let metrics = pagedPageContainerMetrics, metrics.isValid {
+            return metrics.size
+        }
+        return effectiveViewportSize
+    }
+
+    /// 分页与渲染共用的唯一几何来源。
+    private var pagedPageGeometry: ReaderPageGeometry {
+        let margin = CGFloat(pagePadding)
+        if let metrics = pagedPageContainerMetrics, metrics.isValid {
+            return metrics.geometry(
+                horizontalMargin: margin,
+                chromeLayout: chapterHeadingStyle,
+                contentExtendsIntoChrome: contentExtendsIntoChrome
+            )
+        }
+        return ReaderPageGeometry(
+            viewportSize: effectiveViewportSize,
+            safeTop: readerTopSafeInset,
+            safeBottom: readerFooterSafeInset,
+            horizontalMargin: margin,
+            chromeLayout: chapterHeadingStyle,
+            contentExtendsIntoChrome: contentExtendsIntoChrome
+        )
+    }
+
+    /// cover 模式的页面在同一棵 SwiftUI 树里，用 PreferenceKey 回传；page-curl /
+    /// 滑动模式的页面在独立 UIHostingController 里，preference 出不来，改由
+    /// PageCurlReaderView 的布局回调把真实 bounds 传回来。两条路都汇到这里。
+    private func adoptPageContainerMetrics(_ metrics: ReaderPageContainerMetrics) {
+        guard metrics.isValid else { return }
+        // 0.5pt 吸附，避免像素级抖动触发无休止的重新分页。
+        let snapped = ReaderPageContainerMetrics(
+            size: CGSize(
+                width: (metrics.size.width * 2).rounded() / 2,
+                height: (metrics.size.height * 2).rounded() / 2
+            ),
+            globalMinY: (metrics.globalMinY * 2).rounded() / 2,
+            rootViewportHeight: metrics.rootViewportHeight,
+            rootSafeTop: metrics.rootSafeTop,
+            rootSafeBottom: metrics.rootSafeBottom
+        )
+        guard pagedPageContainerMetrics != snapped else { return }
+        pagedPageContainerMetrics = snapped
+        schedulePagedBlocksCacheRebuild()
+    }
+
+    private var pageContainerLayoutHandler: (CGSize, CGFloat) -> Void {
+        { size, globalMinY in
+            adoptPageContainerMetrics(
+                ReaderPageContainerMetrics(
+                    size: size,
+                    globalMinY: globalMinY,
+                    rootViewportHeight: effectiveViewportSize.height,
+                    rootSafeTop: readerTopSafeInset,
+                    rootSafeBottom: readerFooterSafeInset
+                )
+            )
+        }
+    }
+
     /// Text column used by illustrations in both the SwiftUI paged surface and
     /// the TextKit scroll surface. Derived from the measured container instead
     /// of UIScreen so split view / Stage Manager keep the same geometry.
     private var illustrationColumnWidth: CGFloat {
-        max(effectiveViewportSize.width - CGFloat(pagePadding * 2), 200)
+        let viewport = readerMode == .scroll ? effectiveViewportSize : pagedLayoutViewportSize
+        return max(viewport.width - CGFloat(pagePadding * 2), 200)
     }
 
     private var readerPageCacheKey: String {
         // Pagination depends on the viewport. Include the actual container
         // bounds so rotation, split-view and Stage Manager resize invalidate
         // the model instead of showing pages calculated for the old width.
-        let viewport = effectiveViewportSize
+        let viewport = pagedLayoutViewportSize
         let windowSignature = windowSections.isEmpty
             ? "base:\(content.title):\(content.paragraphs.count)"
             : windowSections.map { section in
@@ -534,6 +611,10 @@ struct ReaderView: View {
             String(format: "%.1f", paragraphIndent),
             String(format: "%.1f", titleSpacing),
             String(format: "%.1f", footerHeight),
+            chapterHeadingStyleRaw,
+            contentExtendsIntoChrome ? "extend" : "inset",
+            statusPosition,
+            showSystemStatusBar ? "sysbar" : "immersive",
             currentImageStyle.rawValue,
             traditionalChineseEnabled ? "tc" : "sc",
             bionicReadingEnabled ? "br" : "plain"
@@ -544,7 +625,8 @@ struct ReaderView: View {
     /// ignores the reading mode: page-turn, cover and page-curl share one page
     /// model, so switching between them must not re-measure every chapter.
     private var chapterPageLayoutSignature: String {
-        let viewport = effectiveViewportSize
+        let viewport = pagedLayoutViewportSize
+        let geometry = pagedPageGeometry
         return [
             fontFamilyRawValue,
             customFontPostScriptName,
@@ -556,10 +638,18 @@ struct ReaderView: View {
             String(format: "%.1f", paragraphIndent),
             String(format: "%.1f", titleSpacing),
             String(format: "%.1f", footerHeight),
+            chapterHeadingStyleRaw,
+            contentExtendsIntoChrome ? "extend" : "inset",
+            statusPosition,
+            showSystemStatusBar ? "sysbar" : "immersive",
             currentImageStyle.rawValue,
             traditionalChineseEnabled ? "tc" : "sc",
             bionicReadingEnabled ? "br" : "plain",
-            String(format: "%.1fx%.1f", viewport.width, viewport.height)
+            String(format: "%.1fx%.1f", viewport.width, viewport.height),
+            String(format: "%.1f", geometry.safeTop),
+            String(format: "%.1f", geometry.safeBottom),
+            String(format: "%.1f", geometry.bodyTop),
+            String(format: "%.1f", geometry.bodyBottom)
         ].joined(separator: "|")
     }
 
@@ -603,6 +693,11 @@ struct ReaderView: View {
             // revision instead (PageCurlReaderView.contentRevision, cover
             // data and TabView tags).
             .id(readerMode == .scroll ? "web-scroll-reader" : "reader-paged-surface")
+            .onPreferenceChange(ReaderPageContainerMetricsKey.self) { metrics in
+                if let metrics {
+                    adoptPageContainerMetrics(metrics)
+                }
+            }
             .contentShape(Rectangle())
             .simultaneousGesture(
                 // 仅针对非滚动分页模式使用轻触手势，绝不在距离为0时拦截拖拽，
@@ -619,7 +714,11 @@ struct ReaderView: View {
                     .allowsHitTesting(false)
                 }
 
-            if !showOverlay, !speechController.isSpeaking, !autoScrollEnabled {
+            // 分页模式的页眉页脚画在每一页内部（见 pageSurface），
+            // 这样 page-curl 的每一张纸都自带页码和章节名，也不会出现
+            // 「全局页眉压在页面上、位置又跟安全区打架」的问题。
+            if readerMode == .scroll,
+               !showOverlay, !speechController.isSpeaking, !autoScrollEnabled {
                 if statusPosition == "top" || statusPosition == "both" {
                     readerHeader
                         .transition(.opacity)
@@ -728,6 +827,8 @@ struct ReaderView: View {
         .navigationBarBackButtonHidden(true)
         .toolbar(.hidden, for: .navigationBar)
         .statusBarHidden(!showOverlay && !showSystemStatusBar)
+        // 全屏阅读时连 home indicator 一起淡出；打开菜单或强制系统状态栏时恢复。
+        .persistentSystemOverlays(showOverlay || showSystemStatusBar ? .automatic : .hidden)
         .preferredColorScheme(background.isDark ? .dark : .light)
         .highRefreshRateSurface()
         .ignoresSafeArea()
@@ -904,6 +1005,7 @@ struct ReaderView: View {
             scheduleReadingPositionPersistence(paragraphIndex: currentParagraphIndexForPersistence())
         }
         .onChange(of: pagedPageIndex) { _ in
+            ensurePagedContinuationBuffer(pageIndex: pagedPageIndex)
             scheduleReadingPositionPersistence(paragraphIndex: currentParagraphIndexForPersistence())
         }
         .onChange(of: content) { updatedContent in
@@ -1244,6 +1346,24 @@ struct ReaderView: View {
         1
     }
 
+    /// 滚动模式的正文顶部内边距：显示页眉时让出页眉带，否则只避让刘海。
+    private var scrollContentTopInset: Double {
+        if statusPosition == "top" || statusPosition == "both" {
+            return Double(
+                readerTopSafeInset
+                    + ReaderPageChrome.headerTopGap
+                    + ReaderPageChrome.headerHeight
+                    + 8
+            )
+        }
+        return Double(
+            ReaderPageLayoutEngine.minimumTopInset(
+                pagePadding: CGFloat(pagePadding),
+                safeTop: readerTopSafeInset
+            )
+        )
+    }
+
     private var scrollReaderContent: some View {
         // 滚动模式改由 WKWebView 渲染。章节窗口的增删在文档内做 DOM 补丁，
         // 不再整串重建 attributed string —— 跳章/跨章滑动不再有「先清空再排版」
@@ -1263,7 +1383,7 @@ struct ReaderView: View {
             footerHeight: footerHeight,
             // 工具栏是浮层：正文的顶部内边距必须与菜单开合无关，
             // 否则每次呼出菜单整页文字都会往下掉一格（关掉再弹回来）。
-            topInset: Double(ReaderPageLayoutEngine.minimumTopInset(pagePadding: CGFloat(pagePadding))),
+            topInset: scrollContentTopInset,
             textColor: background.uiTextColor(isNight: colorScheme == .dark),
             surfaceColor: background == .custom ? .clear : background.uiColor(isNight: colorScheme == .dark),
             highlightColor: AppTheme.accentUIColor.withAlphaComponent(background.isDark ? 0.22 : 0.12),
@@ -1923,6 +2043,7 @@ struct ReaderView: View {
             onPageChanged: { target in
                 updatePagedVisibleParagraph(pageIndex: target)
             },
+            onPageContainerLayout: pageContainerLayoutHandler,
             pageBuilder: { page in
                 readerPage(for: page)
             }
@@ -1944,6 +2065,7 @@ struct ReaderView: View {
             onPageChanged: { target in
                 updatePagedVisibleParagraph(pageIndex: target)
             },
+            onPageContainerLayout: pageContainerLayoutHandler,
             pageBuilder: { page in
                 readerPage(for: page)
             }
@@ -2075,7 +2197,7 @@ struct ReaderView: View {
         if page.isPlaceholder {
             chapterPlaceholderPage(page)
         } else {
-            pageSurface {
+            pageSurface(for: page) {
                 VStack(alignment: .leading, spacing: 0) {
                     if page.includesTitle {
                         Text(ReaderTextTransform.displayText(page.chapterTitle.isEmpty ? content.title : page.chapterTitle, traditionalChinese: traditionalChineseEnabled))
@@ -2096,7 +2218,6 @@ struct ReaderView: View {
                     }
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-                .clipped()
             }
         }
     }
@@ -2105,7 +2226,7 @@ struct ReaderView: View {
     /// after the source rejected it. Without a real failure state a timeout
     /// looked like the end of the book and forced the reader back to the TOC.
     private func chapterPlaceholderPage(_ page: ReaderPageBlock) -> some View {
-        pageSurface {
+        pageSurface(for: page) {
             VStack(spacing: 12) {
                 if let failure = windowFailures[page.chapterIndex] {
                     Image(systemName: "exclamationmark.triangle.fill")
@@ -2172,40 +2293,184 @@ struct ReaderView: View {
         return String(hasher.finalize())
     }
 
-    private func pageSurface<Content: View>(@ViewBuilder content: () -> Content) -> some View {
-        content()
-            .padding(.horizontal, CGFloat(pagePadding))
-            .padding(.top, pageTopInset)
-            .padding(.bottom, pagedBottomPadding)
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-            .background {
-                if background == .custom, let image = ReaderCustomWallpaperStore.loadWallpaper() {
-                    ZStack {
-                        Image(uiImage: image)
-                            .resizable()
-                            .scaledToFill()
-                        if customBackgroundIsDark {
-                            Color.black.opacity(colorScheme == .dark ? 0.60 : 0.35)
-                        } else {
-                            Color.white.opacity(colorScheme == .dark ? 0.15 : 0.20)
-                        }
-                    }
+    /// 阅读页唯一画布。
+    ///
+    /// 几何来源只有 `ReaderPageGeometry`：页眉带、正文矩形、页脚带各自有确定坐标，
+    /// 不再通过三层 padding / frame / safeArea 叠加去「猜」。页面容器尺寸会回传给
+    /// 分页引擎（ReaderPageContainerMetricsKey），所以分页高度与实际可画高度永远一致。
+    private func pageSurface<Content: View>(for page: ReaderPageBlock, @ViewBuilder content: () -> Content) -> some View {
+        GeometryReader { proxy in
+            let globalFrame = proxy.frame(in: .global)
+            let metrics = ReaderPageContainerMetrics(
+                size: proxy.size,
+                globalMinY: globalFrame.minY,
+                rootViewportHeight: effectiveViewportSize.height,
+                rootSafeTop: readerTopSafeInset,
+                rootSafeBottom: readerFooterSafeInset
+            )
+            let geometry = metrics.geometry(
+                horizontalMargin: CGFloat(pagePadding),
+                chromeLayout: chapterHeadingStyle,
+                contentExtendsIntoChrome: contentExtendsIntoChrome
+            )
+
+            ZStack(alignment: .topLeading) {
+                content()
+                    .frame(
+                        width: geometry.contentWidth,
+                        height: geometry.contentHeight,
+                        alignment: .topLeading
+                    )
                     .clipped()
+                    .offset(x: geometry.horizontalMargin, y: geometry.bodyTop)
+
+                if geometry.showsHeader {
+                    pagedPageHeader(page: page, geometry: geometry)
+                }
+                pagedPageFooter(page: page, geometry: geometry)
+            }
+            .frame(width: proxy.size.width, height: proxy.size.height, alignment: .topLeading)
+            .preference(key: ReaderPageContainerMetricsKey.self, value: metrics)
+        }
+        .background(pageBackground.ignoresSafeArea())
+        .ignoresSafeArea()
+    }
+
+    @ViewBuilder
+    private var pageBackground: some View {
+        if background == .custom, let image = ReaderCustomWallpaperStore.loadWallpaper() {
+            ZStack {
+                Image(uiImage: image)
+                    .resizable()
+                    .scaledToFill()
+                if customBackgroundIsDark {
+                    Color.black.opacity(colorScheme == .dark ? 0.60 : 0.35)
                 } else {
-                    readerThemeBackground
+                    Color.white.opacity(colorScheme == .dark ? 0.15 : 0.20)
                 }
             }
-            .ignoresSafeArea()
+            .clipped()
+        } else {
+            readerThemeBackground
+        }
     }
 
-    /// 翻页阅读顶部紧凑规约（贴合灵动岛/刘海边缘，杜绝大片黑空）
-    private var pageTopInset: CGFloat {
-        ReaderPageLayoutEngine.minimumTopInset(pagePadding: CGFloat(pagePadding), safeTop: readerTopSafeInset)
+    /// 页眉：12pt 章节名 +（可选）时间 / 电量。位置由 geometry 决定，永远在安全区内。
+    private func pagedPageHeader(page: ReaderPageBlock, geometry: ReaderPageGeometry) -> some View {
+        TimelineView(.everyMinute) { context in
+            HStack(spacing: 10) {
+                Text(page.chapterTitle.isEmpty ? currentDisplayChapterTitle : page.chapterTitle)
+                    .font(.system(size: ReaderPageChrome.headerFontSize, weight: .regular))
+                    .foregroundStyle(readerThemeTextColor.opacity(0.55))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.75)
+
+                Spacer(minLength: 8)
+
+                if statusPosition == "top" || statusPosition == "both" {
+                    if footerShowTime {
+                        Text(context.date, format: .dateTime.hour().minute())
+                            .font(.system(size: ReaderPageChrome.headerFontSize, weight: .medium).monospacedDigit())
+                            .foregroundStyle(readerThemeTextColor.opacity(0.50))
+                    }
+                    if footerShowBatteryIcon || footerShowBatteryPercent {
+                        HStack(spacing: 3) {
+                            if footerShowBatteryIcon {
+                                Image(systemName: batterySymbolName)
+                            }
+                            if footerShowBatteryPercent {
+                                Text(batteryPercentageText)
+                            }
+                        }
+                        .font(.system(size: ReaderPageChrome.headerFontSize - 1, weight: .medium).monospacedDigit())
+                        .foregroundStyle(readerThemeTextColor.opacity(0.50))
+                    }
+                }
+            }
+            .padding(.horizontal, geometry.contentExtendsIntoChrome ? 6 : 0)
+            .frame(
+                width: geometry.contentExtendsIntoChrome
+                    ? geometry.contentWidth + 12
+                    : geometry.contentWidth,
+                height: ReaderPageChrome.headerHeight,
+                alignment: .leading
+            )
+            .background(
+                geometry.contentExtendsIntoChrome
+                    ? readerThemeBackground.opacity(0.86)
+                    : Color.clear
+            )
+            .offset(
+                x: geometry.contentExtendsIntoChrome
+                    ? geometry.horizontalMargin - 6
+                    : geometry.horizontalMargin,
+                y: geometry.headerTop
+            )
+        }
+        .allowsHitTesting(false)
+        .accessibilityHidden(true)
     }
 
-    /// 翻页模式底部预留：避让 home indicator 并留出适量呼吸感
-    private var pagedBottomPadding: CGFloat {
-        max(readerFooterSafeInset, 16) + 8
+    /// 页脚：右下角 `当前页/本章总页`（竞品格式 3/35），时间与电量按开关排列。
+    private func pagedPageFooter(page: ReaderPageBlock, geometry: ReaderPageGeometry) -> some View {
+        TimelineView(.everyMinute) { context in
+            HStack(spacing: 10) {
+                if statusPosition == "bottom" || statusPosition == "both" {
+                    if footerShowTime {
+                        Text(context.date, format: .dateTime.hour().minute())
+                            .frame(width: 42, alignment: .leading)
+                    }
+                }
+
+                Spacer(minLength: 4)
+
+                if statusPosition == "bottom" || statusPosition == "both",
+                   footerShowBatteryIcon || footerShowBatteryPercent {
+                    HStack(spacing: 3) {
+                        if footerShowBatteryIcon {
+                            Image(systemName: batterySymbolName)
+                        }
+                        if footerShowBatteryPercent {
+                            Text(batteryPercentageText)
+                        }
+                    }
+                }
+
+                Text(pageNumberText(for: page))
+                    .frame(minWidth: 34, alignment: .trailing)
+            }
+            .font(.system(size: ReaderPageChrome.footerFontSize, weight: .medium).monospacedDigit())
+            .foregroundStyle(readerThemeTextColor.opacity(0.45))
+            .padding(.horizontal, geometry.contentExtendsIntoChrome ? 6 : 0)
+            .frame(
+                width: geometry.contentExtendsIntoChrome
+                    ? geometry.contentWidth + 12
+                    : geometry.contentWidth,
+                height: ReaderPageChrome.footerHeight,
+                alignment: .center
+            )
+            .background(
+                geometry.contentExtendsIntoChrome
+                    ? readerThemeBackground.opacity(0.86)
+                    : Color.clear
+            )
+            .offset(
+                x: geometry.contentExtendsIntoChrome
+                    ? geometry.horizontalMargin - 6
+                    : geometry.horizontalMargin,
+                y: geometry.footerTop
+            )
+        }
+        .allowsHitTesting(false)
+        .accessibilityHidden(true)
+    }
+
+    private func pageNumberText(for page: ReaderPageBlock) -> String {
+        guard !page.isPlaceholder,
+              page.chapterIndex >= 0,
+              let total = chapterPageCounts[page.chapterIndex],
+              total > 0 else { return "" }
+        return "\(min(page.pageOrdinal + 1, total))/\(total)"
     }
 
     /// 页脚实际占用高度（20pt 条 + 6pt 间距），分页模式固定预留 26pt。
@@ -2264,7 +2529,7 @@ struct ReaderView: View {
                 columnWidth: illustrationColumnWidth,
                 maximumHeight: ReaderImageSizingPolicy.maximumHeight(
                     for: currentImageStyle,
-                    viewportHeight: effectiveViewportSize.height,
+                    viewportHeight: pagedLayoutViewportSize.height,
                     pagePadding: pagePadding,
                     footerHeight: footerHeight
                 )
@@ -2309,7 +2574,9 @@ struct ReaderView: View {
                     }
                 }
                 .padding(.horizontal, max(CGFloat(pagePadding), 18))
-                .padding(.top, max(readerTopSafeInset * 0.45, 6))
+                // 页眉必须整体落在安全区内：旧版 0.45×safeTop 会把时间/电量
+                // 塞进刘海或系统状态栏里，视觉上就是「状态栏位置不对」。
+                .padding(.top, readerTopSafeInset + ReaderPageChrome.headerTopGap)
                 .frame(height: 22)
                 Spacer(minLength: 0)
             }
@@ -3179,8 +3446,45 @@ struct ReaderView: View {
             // 6. 屏幕边距（左右留白）
             readerValueSlider("屏幕边距（左右留白）", value: $pagePadding, range: 10...40, step: 1, unit: "pt", help: "正文文字距离手机屏幕左右两侧边缘的距离，防止文字贴边（推荐 18~22pt）")
 
-            // 7. 章节标题间距
-            readerValueSlider("章节标题间距", value: $titleSpacing, range: 0...36, step: 2, unit: "pt", help: "大章节标题（如“第一章”）与正文第一行之间的垂直留白高度（推荐 18~24pt）")
+            // 7. 章节标题
+            VStack(alignment: .leading, spacing: 8) {
+                Text("章节标题位置")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(.secondary)
+                Picker("章节标题位置", selection: $chapterHeadingStyleRaw) {
+                    ForEach(ReaderPageChromeLayout.allCases) { layout in
+                        Text(layout.title).tag(layout.rawValue)
+                    }
+                }
+                .pickerStyle(.segmented)
+                Text(chapterHeadingStyle.help)
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            readerValueSlider("章节标题间距", value: $titleSpacing, range: 0...36, step: 2, unit: "pt", help: "仅「正文大标题」模式生效：大章节标题与正文第一行之间的垂直留白（推荐 8~16pt）。页眉模式不占用正文高度。")
+
+            Toggle("内容延伸至页眉页脚区域", isOn: $contentExtendsIntoChrome)
+                .font(.subheadline.weight(.semibold))
+
+            Button {
+                applyCompetitiveReaderPreset()
+            } label: {
+                HStack(spacing: 8) {
+                    Image(systemName: "wand.and.stars")
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("一键对齐成熟阅读器排版").font(.subheadline.weight(.semibold))
+                        Text("字号 20 / 行距 12 / 边距 21 / 首行缩进 2 字 / 页眉小标题 / 页码右下角")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                    }
+                    Spacer()
+                }
+                .padding(12)
+                .background(AppTheme.accent.opacity(0.10), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+            }
+            .buttonStyle(.plain)
 
             // 8. 底部安全留白
             readerValueSlider("底部安全留白", value: $footerHeight, range: 40...180, step: 8, unit: "pt", help: "屏幕最底部向上预留的安全空隙，防止手势遮挡最后一行正文（推荐 80~100pt）")
@@ -3212,6 +3516,24 @@ struct ReaderView: View {
             }
             .font(.subheadline)
         }
+    }
+
+    /// 一档对标栖阅 / 开元阅读截图的排版参数。用户随时可以再微调。
+    private func applyCompetitiveReaderPreset() {
+        fontSize = 20
+        lineSpacing = 12
+        pagePadding = 21
+        paragraphIndent = 40
+        paragraphSpacing = 0
+        titleSpacing = 8
+        chapterHeadingStyleRaw = ReaderPageChromeLayout.header.rawValue
+        contentExtendsIntoChrome = false
+        statusPosition = "bottom"
+        footerShowTime = true
+        footerShowBatteryIcon = true
+        footerShowBatteryPercent = true
+        HapticFeedback.medium()
+        schedulePagedBlocksCacheRebuild()
     }
 
     private var advancedSettings: some View {
@@ -4643,11 +4965,35 @@ struct ReaderView: View {
             trimWindowIfNeeded()
             touchChapterCache(block.chapterIndex)
         }
+        ensurePagedContinuationBuffer(pageIndex: pageIndex)
         let flat = positionMapping.paragraph(forPage: pageIndex)
         guard flat != visibleParagraphIndex || chapterChanged else { return }
         visibleParagraphIndex = flat
         let resolved = resolvedReadingPosition(forFlatIndex: flat)
         scheduleReadingPositionPersistence(paragraphIndex: resolved.paragraphIndex)
+    }
+
+    /// 读到本章倒数第 3 页时就把下一章拉进来；窗口尾部再向外多预取一章。
+    /// 这是「翻页能无感续上下一章」的关键：不能等用户滑到最后一页才发请求。
+    private func ensurePagedContinuationBuffer(pageIndex: Int) {
+        guard readerMode != .scroll, pagedBlocks.indices.contains(pageIndex) else { return }
+        let block = pagedBlocks[pageIndex]
+        guard !block.isPlaceholder, block.chapterIndex >= 0 else { return }
+        let chapter = block.chapterIndex
+        let next = chapter + 1
+        let total = chapterPageCounts[chapter] ?? Int.max
+        let nearChapterEnd = block.pageOrdinal >= max(total - 3, 0)
+
+        if nearChapterEnd,
+           next < windowChapterUpperBound,
+           !windowSections.contains(where: { $0.chapterIndex == next && $0.isReady }) {
+            loadWindowChapter(next)
+        }
+
+        if let maxLoaded = windowSections.map(\.chapterIndex).max(),
+           chapter >= maxLoaded - 1 {
+            prefetchWindow(around: chapter)
+        }
     }
 
     private func paragraphIndex(forPage pageIndex: Int) -> Int {
@@ -4789,8 +5135,9 @@ struct ReaderView: View {
             chapterPageCacheSignature = layoutSignature
         }
 
-        let topPadding = ReaderPageLayoutEngine.minimumTopInset(pagePadding: CGFloat(pagePadding), safeTop: readerTopSafeInset)
-        let bottomPadding = pagedBottomPadding
+        // 分页与页面渲染共用同一份几何：ReaderPageGeometry 已经把安全区、页眉带、
+        // 正文带和页脚带算成确定坐标，这里不再重复扣 safeArea / padding。
+        let geometry = pagedPageGeometry
         let typography = ReaderPageTypography(
             font: fontFamily.uiFont(ofSize: CGFloat(fontSize), customPostScriptName: customFontPostScriptName),
             titleFont: fontFamily.uiFont(ofSize: CGFloat(fontSize + 8), weight: .bold, customPostScriptName: customFontPostScriptName),
@@ -4799,11 +5146,10 @@ struct ReaderView: View {
             paragraphSpacing: CGFloat(paragraphSpacing),
             firstLineIndent: CGFloat(paragraphIndent),
             titleSpacing: CGFloat(titleSpacing),
-            contentWidth: max(effectiveViewportSize.width - CGFloat(pagePadding * 2), 200),
-            // A 4pt cushion covers the tiny leading difference between
-            // TextKit's line fragments and SwiftUI's Text renderer. Without it
-            // the last descender of a page can be clipped by `.clipped()`.
-            contentHeight: max(effectiveViewportSize.height - topPadding - bottomPadding - 4, 240)
+            contentWidth: geometry.contentWidth,
+            // 2pt 缓冲只吸收 TextKit 行框与 SwiftUI Text 渲染之间的亚像素差，
+            // 不再承担「安全区 / 页眉 / 页脚」的二次扣减。
+            contentHeight: max(geometry.contentHeight - 4, 240)
         )
         var titleTypography = typography
         titleTypography.lineSpacing = 0
@@ -4926,12 +5272,18 @@ struct ReaderView: View {
         var currentEntries: [ReaderPageEntry] = []
         var pageOrdinal = 0
         let transformedTitle = ReaderTextTransform.displayText(section.title, traditionalChinese: traditionalChineseEnabled)
-        var currentHeight = ReaderPageLayoutEngine.measureHeight(
-            transformedTitle,
-            typography: titleTypography,
-            font: typography.titleFont
-        ) + typography.titleSpacing
-        var currentIncludesTitle = true
+        // 页眉模式：章节名画在页眉带，正文第一页从与后续页完全相同的位置开始，
+        // 不再给标题预留 40~50pt 的正文高度。只有「正文大标题」模式保留旧行为。
+        var currentHeight: CGFloat = 0
+        var currentIncludesTitle = false
+        if chapterHeadingStyle == .inline {
+            currentHeight = ReaderPageLayoutEngine.measureHeight(
+                transformedTitle,
+                typography: titleTypography,
+                font: typography.titleFont
+            ) + typography.titleSpacing
+            currentIncludesTitle = true
+        }
 
         func flush() {
             pages.append(
@@ -4960,7 +5312,7 @@ struct ReaderView: View {
                 let imageHeight = min(
                     ReaderImageSizingPolicy.maximumHeight(
                         for: currentImageStyle,
-                        viewportHeight: effectiveViewportSize.height,
+                        viewportHeight: pagedLayoutViewportSize.height,
                         pagePadding: pagePadding,
                         footerHeight: footerHeight
                     ),

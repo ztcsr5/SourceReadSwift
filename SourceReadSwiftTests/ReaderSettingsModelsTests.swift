@@ -71,10 +71,15 @@ final class ReaderSettingsModelsTests: XCTestCase {
         XCTAssertEqual(ReaderFontFamily.rounded.title, "圆体")
         XCTAssertEqual(ReaderFontFamily.custom.title, "自定义")
 
-        XCTAssertEqual(ReaderTypographyDefaults.fontSize, 19)
-        XCTAssertEqual(ReaderTypographyDefaults.paragraphIndent, 38)
-        XCTAssertEqual(ReaderTypographyDefaults.pagePadding, 20)
-        XCTAssertEqual(ReaderTypographyDefaults.lineSpacing, 8)
-        XCTAssertEqual(ReaderTypographyDefaults.paragraphSpacing, 6)
+        XCTAssertEqual(ReaderTypographyDefaults.fontSize, 20)
+        XCTAssertEqual(ReaderTypographyDefaults.paragraphIndent, 40)
+        XCTAssertEqual(ReaderTypographyDefaults.pagePadding, 21)
+        XCTAssertEqual(ReaderTypographyDefaults.lineSpacing, 12)
+        XCTAssertEqual(ReaderTypographyDefaults.paragraphSpacing, 0)
+
+        XCTAssertEqual(ReaderPageChromeLayout.allCases.count, 3)
+        XCTAssertEqual(ReaderPageChromeLayout.header.title, "页眉小标题")
+        XCTAssertEqual(ReaderPageChromeLayout.inline.title, "正文大标题")
+        XCTAssertEqual(ReaderPageChromeLayout.hidden.title, "隐藏标题")
     }
 }

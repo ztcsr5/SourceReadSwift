@@ -504,13 +504,15 @@ enum ReaderFontFamily: String, CaseIterable, Identifiable, Codable, Sendable {
 }
 
 enum ReaderTypographyDefaults {
-    static let fontSize: Double = 19
-    static let lineSpacing: Double = 8
+    // 对标 390×844pt 竞品截图：正文 20.7pt、左右边距 21pt、首行缩进 2 字、段距 0。
+    // 取整到 20pt 以保持 SF / 宋体 / 楷体的行高稳定；行距 12pt 约等于 1.8 倍行高。
+    static let fontSize: Double = 20
+    static let lineSpacing: Double = 12
     static let letterSpacing: Double = 0
-    static let paragraphSpacing: Double = 6
-    static let paragraphIndent: Double = 38 // 2 characters * 19pt
-    static let titleSpacing: Double = 20
-    static let pagePadding: Double = 20
+    static let paragraphSpacing: Double = 0
+    static let paragraphIndent: Double = 40 // 2 characters * 20pt
+    static let titleSpacing: Double = 8
+    static let pagePadding: Double = 21
     static let footerHeight: Double = 72
 }
 
