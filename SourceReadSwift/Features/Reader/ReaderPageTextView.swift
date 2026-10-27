@@ -90,9 +90,16 @@ struct ReaderPageTextView: UIViewRepresentable {
         view.isEditable = false
         view.isScrollEnabled = false
         view.backgroundColor = .clear
+        view.contentInset = .zero
+        // iOS 16 still applies the safe-area/content inset to a text view
+        // inside a UIPageViewController child; leaving it on shifts the first
+        // line down and makes a full page look clipped.
+        view.contentInsetAdjustmentBehavior = .never
         view.textContainerInset = .zero
         view.textContainer.lineFragmentPadding = 0
         view.textContainer.widthTracksTextView = true
+        view.textContainer.maximumNumberOfLines = 0
+        view.textContainer.lineBreakMode = .byWordWrapping
         view.adjustsFontForContentSizeCategory = false
         view.setContentHuggingPriority(.defaultLow, for: .horizontal)
         view.setContentHuggingPriority(.defaultLow, for: .vertical)
@@ -108,5 +115,14 @@ struct ReaderPageTextView: UIViewRepresentable {
         // With selection on the long-press selection UI is the explicit user
         // choice, so interaction stays enabled.
         view.isUserInteractionEnabled = isSelectable
+    }
+
+    /// The page owns a fixed frame from `pageSurface`. Returning that proposal
+    /// keeps UITextView's content-sized intrinsic height out of SwiftUI's
+    /// layout pass, which is the iOS 16 path that used to widen or lengthen a
+    /// page before the first layout.
+    func sizeThatFits(_ proposal: ProposedViewSize, uiView: UITextView, context: Context) -> CGSize? {
+        guard let width = proposal.width, let height = proposal.height else { return nil }
+        return CGSize(width: width, height: height)
     }
 }
