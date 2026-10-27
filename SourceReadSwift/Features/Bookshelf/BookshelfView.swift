@@ -1456,6 +1456,8 @@ private struct PressableScaleButtonStyle: ButtonStyle {
 }
 
 struct AsyncBookCover: View {
+    @Environment(\.displayScale) private var displayScale
+
     /// 占位块要跟着承载它的底色走：白卡片上用浅灰，深色主视觉上用半透明白。
     enum Style {
         case card
@@ -1476,7 +1478,7 @@ struct AsyncBookCover: View {
     var body: some View {
         Group {
             if let url = CoverURLResolver.url(from: urlString, base: baseURLString, fallbackBase: sourceURLString) {
-                CachedRemoteImage(url: url) { placeholder }
+                CachedRemoteImage(url: url, maxPixelSize: coverMaxPixelSize) { placeholder }
             } else {
                 placeholder
             }
@@ -1484,6 +1486,14 @@ struct AsyncBookCover: View {
         .frame(width: width, height: height)
         .frame(maxWidth: width == nil ? .infinity : nil)
         .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+    }
+
+    /// Decode at the size this cover is actually drawn. The shelf grid shows
+    /// ~110 pt covers; downloading a 1000 px JPEG and keeping the full texture
+    /// alive for every row was the main scroll hitch on the home page.
+    private var coverMaxPixelSize: CGFloat {
+        let points = max(width ?? 220, height)
+        return points * max(displayScale, 1)
     }
 
     private var placeholder: some View {

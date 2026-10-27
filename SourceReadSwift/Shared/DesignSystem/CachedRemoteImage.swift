@@ -8,6 +8,10 @@ struct CachedRemoteImage<Placeholder: View>: View {
     let url: URL?
     let contentMode: ContentMode
     let headers: [String: String]
+    /// Optional decode ceiling in pixels. Cover thumbnails pass their display
+    /// size × screen scale so a 2000 px source never becomes a 2000 px texture
+    /// in a 70 pt shelf cell.
+    let maxPixelSize: CGFloat?
     let onSizeChange: ((CGSize) -> Void)?
     let placeholder: () -> Placeholder
 
@@ -17,12 +21,14 @@ struct CachedRemoteImage<Placeholder: View>: View {
         url: URL?,
         contentMode: ContentMode = .fill,
         headers: [String: String] = [:],
+        maxPixelSize: CGFloat? = nil,
         onSizeChange: ((CGSize) -> Void)? = nil,
         @ViewBuilder placeholder: @escaping () -> Placeholder
     ) {
         self.url = url
         self.contentMode = contentMode
         self.headers = headers
+        self.maxPixelSize = maxPixelSize
         self.onSizeChange = onSizeChange
         self.placeholder = placeholder
     }
@@ -44,14 +50,15 @@ struct CachedRemoteImage<Placeholder: View>: View {
 
     private var taskIdentifier: String {
         guard let url else { return "" }
+        let sizeKey = maxPixelSize.map { "px\(Int($0.rounded()))" } ?? "full"
         if headers.isEmpty {
-            return url.absoluteString
+            return url.absoluteString + "#" + sizeKey
         }
         let headerKey = headers
             .sorted { $0.key < $1.key }
             .map { "\($0.key)=\($0.value)" }
             .joined(separator: "&")
-        return url.absoluteString + "#" + headerKey
+        return url.absoluteString + "#" + headerKey + "#" + sizeKey
     }
 
     private func loadImage() async {
@@ -63,7 +70,7 @@ struct CachedRemoteImage<Placeholder: View>: View {
             return
         }
 
-        if let cached = RemoteImageLoader.shared.cachedImage(for: url) {
+        if let cached = RemoteImageLoader.shared.cachedImage(for: url, maxPixelSize: maxPixelSize) {
             await MainActor.run {
                 image = cached
                 onSizeChange?(cached.size)
@@ -71,7 +78,11 @@ struct CachedRemoteImage<Placeholder: View>: View {
             return
         }
 
-        let loaded = await RemoteImageLoader.shared.image(for: url, headers: headers)
+        let loaded = await RemoteImageLoader.shared.image(
+            for: url,
+            headers: headers,
+            maxPixelSize: maxPixelSize
+        )
         guard let loaded, !Task.isCancelled else { return }
         await MainActor.run {
             image = loaded

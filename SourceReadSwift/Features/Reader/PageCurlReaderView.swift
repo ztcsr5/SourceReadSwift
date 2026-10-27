@@ -20,6 +20,21 @@ struct PageCurlReaderView<Item: Identifiable, Content: View>: UIViewControllerRe
     /// 页面容器的真实尺寸与窗口坐标原点。分页引擎用它校准正文高度；
     /// 默认 nil 时为旧行为（只靠根视口）。
     let onPageContainerLayout: ((CGSize, CGFloat) -> Void)?
+    /// Reports the stable identity of the page the user can actually see.
+    /// `ReaderView` uses it as the anchor when the page model is rebuilt, so
+    /// an array-index shift can never move the reader into another chapter.
+    let onVisiblePageIdentity: ((String) -> Void)?
+    /// Page-turn gestures are owned by UIPageViewController. The reader uses
+    /// this signal to postpone any page-model rebuild until the gesture ends.
+    let onInteractionChanged: ((Bool) -> Void)?
+    /// Stable key for one item; defaults to its `Identifiable` id.
+    let pageKey: (Item) -> String
+    /// Per-page content signature (typography, theme, text). A chapter that is
+    /// prefetched above the reader changes the window revision but not the
+    /// pages already on screen, so the hosting cache is keyed by this value
+    /// instead of the window-wide revision. `nil` falls back to
+    /// `contentRevision`.
+    let pageRevision: ((Item) -> String)?
     let pageBuilder: (Item) -> Content
 
     init(
@@ -29,6 +44,10 @@ struct PageCurlReaderView<Item: Identifiable, Content: View>: UIViewControllerRe
         currentPageIndex: Binding<Int>,
         onPageChanged: ((Int) -> Void)? = nil,
         onPageContainerLayout: ((CGSize, CGFloat) -> Void)? = nil,
+        onVisiblePageIdentity: ((String) -> Void)? = nil,
+        onInteractionChanged: ((Bool) -> Void)? = nil,
+        pageKey: @escaping (Item) -> String = { item in String(describing: item.id) },
+        pageRevision: ((Item) -> String)? = nil,
         @ViewBuilder pageBuilder: @escaping (Item) -> Content
     ) {
         self.pages = pages
@@ -37,6 +56,10 @@ struct PageCurlReaderView<Item: Identifiable, Content: View>: UIViewControllerRe
         self._currentPageIndex = currentPageIndex
         self.onPageChanged = onPageChanged
         self.onPageContainerLayout = onPageContainerLayout
+        self.onVisiblePageIdentity = onVisiblePageIdentity
+        self.onInteractionChanged = onInteractionChanged
+        self.pageKey = pageKey
+        self.pageRevision = pageRevision
         self.pageBuilder = pageBuilder
     }
 
@@ -82,6 +105,9 @@ struct PageCurlReaderView<Item: Identifiable, Content: View>: UIViewControllerRe
         let initialVC = context.coordinator.viewController(at: initialIndex)
         pvc.setViewControllers([initialVC], direction: .forward, animated: false, completion: nil)
         context.coordinator.lastContentRevision = contentRevision
+        context.coordinator.noteContentRevision(contentRevision)
+        context.coordinator.reportVisibleIdentity(initialVC)
+        context.coordinator.prewarm(around: initialIndex)
         context.coordinator.suppressInternalTapGestures(on: pvc)
         context.coordinator.normalizeInternalScrollViews(in: pvc.view)
         DispatchQueue.main.async {
@@ -102,6 +128,9 @@ struct PageCurlReaderView<Item: Identifiable, Content: View>: UIViewControllerRe
         var parent: PageCurlReaderView
         var lastContentRevision = ""
         private var isUserInteracting = false
+        private var cachedRevision = ""
+        private var hostingControllers: [String: PageHostingController<Content>] = [:]
+        private var hostingOrder: [String] = []
 
         init(_ parent: PageCurlReaderView) {
             self.parent = parent
@@ -133,50 +162,132 @@ struct PageCurlReaderView<Item: Identifiable, Content: View>: UIViewControllerRe
             }
         }
 
+        /// Reuse the hosting controllers that surround the visible page. The
+        /// old code built a fresh SwiftUI tree (including a full attributed
+        /// page) inside `viewControllerBefore/After` while the finger was
+        /// already moving, which showed up as a hitch at the start of every
+        /// swipe. Eight entries cover the visible page plus two neighbours on
+        /// both sides in the three paged modes.
         func viewController(at index: Int) -> UIViewController {
             guard parent.pages.indices.contains(index) else {
                 return UIViewController()
             }
             let item = parent.pages[index]
-            let view = parent.pageBuilder(item)
+            let key = parent.pageKey(item)
+            let revision = parent.pageRevision?(item) ?? parent.contentRevision
+            if let cached = hostingControllers[key], cached.contentRevision == revision {
+                return cached
+            }
+
             let controller = PageHostingController(
-                rootView: view,
+                rootView: parent.pageBuilder(item),
                 pageIndex: index,
+                pageKey: key,
+                contentRevision: revision,
                 onLayout: parent.onPageContainerLayout
             )
             controller.view.backgroundColor = .clear
+            // A rebuilt page (typography or theme change) replaces the cached
+            // entry in place; the key stays the same so the LRU order holds.
+            if hostingControllers.updateValue(controller, forKey: key) == nil {
+                hostingOrder.append(key)
+            }
+            while hostingOrder.count > 8 {
+                let evicted = hostingOrder.removeFirst()
+                hostingControllers.removeValue(forKey: evicted)
+            }
             return controller
+        }
+
+        /// Track the window-wide revision without discarding cached pages.
+        /// Per-page content invalidation is handled by `pageRevision` above;
+        /// clearing here used to rebuild every visible page whenever a
+        /// neighbouring chapter finished prefetching.
+        func noteContentRevision(_ revision: String) {
+            cachedRevision = revision
+        }
+
+        /// Build the next/previous pages after the current frame has been
+        /// committed. Prebuilding them inside the gesture is what caused the
+        /// visible half-second stall on the first swipe after a chapter load.
+        func prewarm(around index: Int) {
+            let candidates = [index + 1, index - 1, index + 2]
+            DispatchQueue.main.async { [weak self] in
+                guard let self, self.cachedRevision == self.parent.contentRevision else { return }
+                for candidate in candidates where self.parent.pages.indices.contains(candidate) {
+                    _ = self.viewController(at: candidate)
+                }
+            }
+        }
+
+        func reportVisibleIdentity(_ controller: UIViewController?) {
+            guard let host = controller as? PageHostingController<Content> else { return }
+            parent.onVisiblePageIdentity?(host.pageKey)
         }
 
         func sync(_ pageViewController: UIPageViewController, contentRevision: String) {
             guard !parent.pages.isEmpty else { return }
-            let displayedIndex = (pageViewController.viewControllers?.first as? PageHostingController<Content>)?.pageIndex
+            noteContentRevision(contentRevision)
+            let displayedController = pageViewController.viewControllers?.first
+            let displayedHost = displayedController as? PageHostingController<Content>
+            // `host.pageIndex` belongs to the revision the controller was
+            // built with. Resolve through the stable page key so a chapter
+            // inserted above the reader cannot make the cursor drift into an
+            // earlier chapter.
+            let displayedIndex = displayedHost.flatMap { currentIndex(for: $0) }
             let desiredIndex = ReaderPagedNavigationPolicy.clampedPageIndex(
                 parent.currentPageIndex,
                 pageCount: parent.pages.count
             )
+            let visiblePageChanged: Bool = {
+                guard let host = displayedHost,
+                      let index = displayedIndex,
+                      parent.pages.indices.contains(index) else {
+                    return contentRevision != lastContentRevision
+                }
+                let revision = parent.pageRevision?(parent.pages[index]) ?? contentRevision
+                return revision != host.contentRevision
+            }()
             let decision = ReaderPageCurlSyncPolicy.decision(
                 displayedIndex: displayedIndex,
                 desiredIndex: desiredIndex,
                 pageCount: parent.pages.count,
-                contentRevisionChanged: contentRevision != lastContentRevision,
+                contentRevisionChanged: visiblePageChanged,
                 isUserInteracting: isUserInteracting
             )
 
             switch decision {
             case .none:
-                break
+                reportVisibleIdentity(displayedController)
             case .reloadCurrentPage:
-                let controller = viewController(at: desiredIndex)
+                let target = displayedIndex ?? desiredIndex
+                let controller = viewController(at: target)
+                lastContentRevision = contentRevision
+                guard controller !== displayedController else {
+                    // Same page object; nothing to reload.
+                    reportVisibleIdentity(controller)
+                    return
+                }
                 pageViewController.setViewControllers(
                     [controller],
                     direction: .forward,
                     animated: false,
                     completion: nil
                 )
-                lastContentRevision = contentRevision
+                reportVisibleIdentity(controller)
+                prewarm(around: target)
             case .move(let target):
                 let controller = viewController(at: target)
+                lastContentRevision = contentRevision
+                guard controller !== displayedController else {
+                    // The index moved because the window gained or lost a
+                    // chapter, but the page itself is unchanged. Animating a
+                    // `setViewControllers` here produced the stutter and the
+                    // half-rendered double page at every chapter boundary.
+                    reportVisibleIdentity(controller)
+                    prewarm(around: target)
+                    return
+                }
                 let direction: UIPageViewController.NavigationDirection = {
                     guard let displayedIndex else { return .forward }
                     return target >= displayedIndex ? .forward : .reverse
@@ -187,16 +298,31 @@ struct PageCurlReaderView<Item: Identifiable, Content: View>: UIViewControllerRe
                     animated: displayedIndex != nil,
                     completion: nil
                 )
-                lastContentRevision = contentRevision
+                reportVisibleIdentity(controller)
+                prewarm(around: target)
             }
+        }
+
+        /// Resolve the index of a hosting controller against the current page
+        /// array. The stored index belongs to the revision the controller was
+        /// built with; after a window insert it is stale even though the page
+        /// content itself is unchanged. The stable page key survives that
+        /// rebuild, so it is the only safe index source here.
+        private func currentIndex(for host: PageHostingController<Content>) -> Int? {
+            if parent.pages.indices.contains(host.pageIndex),
+               parent.pageKey(parent.pages[host.pageIndex]) == host.pageKey {
+                return host.pageIndex
+            }
+            return parent.pages.firstIndex { parent.pageKey($0) == host.pageKey }
         }
 
         func pageViewController(
             _ pageViewController: UIPageViewController,
             viewControllerBefore viewController: UIViewController
         ) -> UIViewController? {
-            guard let host = viewController as? PageHostingController<Content> else { return nil }
-            let previous = host.pageIndex - 1
+            guard let host = viewController as? PageHostingController<Content>,
+                  let current = currentIndex(for: host) else { return nil }
+            let previous = current - 1
             guard previous >= 0 else { return nil }
             return self.viewController(at: previous)
         }
@@ -205,8 +331,9 @@ struct PageCurlReaderView<Item: Identifiable, Content: View>: UIViewControllerRe
             _ pageViewController: UIPageViewController,
             viewControllerAfter viewController: UIViewController
         ) -> UIViewController? {
-            guard let host = viewController as? PageHostingController<Content> else { return nil }
-            let next = host.pageIndex + 1
+            guard let host = viewController as? PageHostingController<Content>,
+                  let current = currentIndex(for: host) else { return nil }
+            let next = current + 1
             guard next < parent.pages.count else { return nil }
             return self.viewController(at: next)
         }
@@ -216,6 +343,7 @@ struct PageCurlReaderView<Item: Identifiable, Content: View>: UIViewControllerRe
             willTransitionTo pendingViewControllers: [UIViewController]
         ) {
             isUserInteracting = true
+            parent.onInteractionChanged?(true)
         }
 
         func pageViewController(
@@ -227,10 +355,20 @@ struct PageCurlReaderView<Item: Identifiable, Content: View>: UIViewControllerRe
             isUserInteracting = false
             if completed,
                let currentVC = pageViewController.viewControllers?.first as? PageHostingController<Content> {
-                let newIndex = currentVC.pageIndex
+                // The visible page may have been built before a chapter was
+                // inserted above it. Translate its stable key into the new
+                // array instead of trusting the old index, which used to land
+                // on chapter 2 after reading chapter 5.
+                let newIndex = currentIndex(for: currentVC)
+                    ?? ReaderPagedNavigationPolicy.clampedPageIndex(
+                        parent.currentPageIndex,
+                        pageCount: parent.pages.count
+                    )
                 parent.currentPageIndex = newIndex
                 parent.onPageChanged?(newIndex)
+                reportVisibleIdentity(currentVC)
             }
+            parent.onInteractionChanged?(false)
             // Apply a page-model revision that arrived while the finger owned
             // the transition.  SwiftUI may not call updateUIViewController a
             // second time after the gesture ends.
@@ -245,12 +383,22 @@ struct PageCurlReaderView<Item: Identifiable, Content: View>: UIViewControllerRe
 
 private final class PageHostingController<Content: View>: UIHostingController<Content> {
     let pageIndex: Int
+    let pageKey: String
+    let contentRevision: String
     private let onLayout: ((CGSize, CGFloat) -> Void)?
     private var lastReportedSize: CGSize = .zero
     private var lastReportedMinY: CGFloat = .greatestFiniteMagnitude
 
-    init(rootView: Content, pageIndex: Int, onLayout: ((CGSize, CGFloat) -> Void)?) {
+    init(
+        rootView: Content,
+        pageIndex: Int,
+        pageKey: String,
+        contentRevision: String,
+        onLayout: ((CGSize, CGFloat) -> Void)?
+    ) {
         self.pageIndex = pageIndex
+        self.pageKey = pageKey
+        self.contentRevision = contentRevision
         self.onLayout = onLayout
         super.init(rootView: rootView)
     }

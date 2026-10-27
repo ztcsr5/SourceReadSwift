@@ -92,6 +92,9 @@ struct ReaderView: View {
     @State private var paragraphJumpRequest: ParagraphJumpRequest?
     @State private var pagedBlocksCache: [ReaderPageBlock] = []
     @State private var pagedBlocksCacheKey = ""
+    @State private var interactionGate = ReaderInteractionGate()
+    @State private var pageTextCache = ReaderPageTextCache()
+    @State private var pageIdentityTracker = ReaderVisiblePageTracker()
     /// 页面容器的真实几何（UIPageViewController 子控制器可能比根视图小一圈）。
     /// 分页引擎使用这一份，而不是盲目相信根视图的 viewport。
     @State private var pagedPageContainerMetrics: ReaderPageContainerMetrics?
@@ -599,6 +602,21 @@ struct ReaderView: View {
             // 主题/外观也是页面渲染的一部分：page-curl 的页面是创建时快照的
             // hosting controller，不换 key 就不会重画 —— 这正是「换主题要翻页
             // 才生效」的成因。
+            backgroundRawValue,
+            backgroundWallpaperRevision.uuidString,
+            customFontPostScriptName,
+            colorScheme == .dark ? "dark" : "light"
+        ].joined(separator: "|")
+    }
+
+    /// Per-page content signature. Deliberately excludes `windowSections`:
+    /// the text of a page depends on typography and theme, not on which
+    /// neighbouring chapters happen to be loaded. `PageCurlReaderView` uses
+    /// this to keep the hosting controllers it already built when a prefetch
+    /// renumbers the array.
+    private var readerPageRevisionKey: String {
+        [
+            readerLayoutKey,
             backgroundRawValue,
             backgroundWallpaperRevision.uuidString,
             customFontPostScriptName,
@@ -2008,12 +2026,37 @@ struct ReaderView: View {
         )
     }
 
+    /// A UIPageViewController gesture owns the screen until its curl or
+    /// scroll settles. Rebuilding the page model in that window replaces the
+    /// hosting controllers under the finger and is the main cause of the
+    /// dropped frame plus the “page jumps back” symptom. Defer the rebuild
+    /// until `didFinishAnimating` has committed the new page cursor.
+    private func handlePageInteraction(_ active: Bool) {
+        // `interactionGate` is a reference box on purpose: assigning a @State
+        // here would invalidate the whole reader body at the exact moment the
+        // page-turn gesture starts, which is the visible hitch at the
+        // beginning of every swipe.
+        interactionGate.isPageInteractionActive = active
+        guard !active, interactionGate.rebuildDeferred else { return }
+        interactionGate.rebuildDeferred = false
+        schedulePagedBlocksCacheRebuild()
+    }
+
     private func scheduleWindowRebuild() {
         guard readerMode != .scroll else { return }
         pageLayoutTask?.cancel()
+        if interactionGate.isPageInteractionActive {
+            interactionGate.rebuildDeferred = true
+            return
+        }
         pageLayoutTask = Task { @MainActor in
-            try? await Task.sleep(nanoseconds: 30_000_000)
+            try? await Task.sleep(nanoseconds: ReaderPerformancePolicy.pageLayoutDebounceNanoseconds)
             guard !Task.isCancelled else { return }
+            if interactionGate.isPageInteractionActive {
+                interactionGate.rebuildDeferred = true
+                pageLayoutTask = nil
+                return
+            }
             rebuildPagedBlocksCache()
             pageLayoutTask = nil
         }
@@ -2086,6 +2129,18 @@ struct ReaderView: View {
                 updatePagedVisibleParagraph(pageIndex: target)
             },
             onPageContainerLayout: pageContainerLayoutHandler,
+            onVisiblePageIdentity: { key in
+                pageIdentityTracker.key = key
+            },
+            onInteractionChanged: { active in
+                handlePageInteraction(active)
+            },
+            pageKey: { page in
+                ReaderPageIdentity(page: page).key
+            },
+            pageRevision: { _ in
+                readerPageRevisionKey
+            },
             pageBuilder: { page in
                 readerPage(for: page)
             }
@@ -2108,6 +2163,18 @@ struct ReaderView: View {
                 updatePagedVisibleParagraph(pageIndex: target)
             },
             onPageContainerLayout: pageContainerLayoutHandler,
+            onVisiblePageIdentity: { key in
+                pageIdentityTracker.key = key
+            },
+            onInteractionChanged: { active in
+                handlePageInteraction(active)
+            },
+            pageKey: { page in
+                ReaderPageIdentity(page: page).key
+            },
+            pageRevision: { _ in
+                readerPageRevisionKey
+            },
             pageBuilder: { page in
                 readerPage(for: page)
             }
@@ -2129,7 +2196,7 @@ struct ReaderView: View {
             ZStack {
                 if pagedBlocks.indices.contains(safeIndex) {
                     readerPage(for: pagedBlocks[safeIndex])
-                        .id("cover-page-\(pagedBlocks[safeIndex].id)")
+                        .id("cover-page-\(ReaderPageIdentity(page: pagedBlocks[safeIndex]).key)")
                         .frame(width: width, height: proxy.size.height)
                         .clipped()
                         .offset(x: drag * 0.22)
@@ -2138,7 +2205,7 @@ struct ReaderView: View {
 
                 if drag < 0, pagedBlocks.indices.contains(safeIndex + 1) {
                     readerPage(for: pagedBlocks[safeIndex + 1])
-                        .id("cover-page-\(pagedBlocks[safeIndex + 1].id)")
+                        .id("cover-page-\(ReaderPageIdentity(page: pagedBlocks[safeIndex + 1]).key)")
                         .frame(width: width, height: proxy.size.height)
                         .clipped()
                         .offset(x: width + drag)
@@ -2149,7 +2216,7 @@ struct ReaderView: View {
 
                 if drag > 0, safeIndex > 0 {
                     readerPage(for: pagedBlocks[safeIndex - 1])
-                        .id("cover-page-\(pagedBlocks[safeIndex - 1].id)")
+                        .id("cover-page-\(ReaderPageIdentity(page: pagedBlocks[safeIndex - 1]).key)")
                         .frame(width: width, height: proxy.size.height)
                         .clipped()
                         .offset(x: -width + drag)
@@ -2189,11 +2256,15 @@ struct ReaderView: View {
             )
             .onChange(of: pagedPageIndex) { target in
                 updatePagedVisibleParagraph(pageIndex: target)
+                reportCoverVisibleIdentity(target)
             }
             .onChange(of: speechController.currentParagraphIndex) { target in
                 guard target >= 0, let flat = speechFlatParagraphIndex,
                       !coverIsAnimating, coverDragTranslation == 0 else { return }
                 pagedPageIndex = pageIndex(containingParagraph: flat)
+            }
+            .onAppear {
+                reportCoverVisibleIdentity(pagedPageIndex)
             }
         }
     }
@@ -2216,6 +2287,15 @@ struct ReaderView: View {
             return
         }
 
+        // Remember where the target page lives in the window, not its array
+        // index. Prefetching the next chapter renumbers every page after the
+        // insertion while the settle animation runs; committing the stale
+        // index is what made a chapter-5 page resolve to chapter 2.
+        let targetAnchor = pagedBlocks.indices.contains(target)
+            ? pageAnchor(for: pagedBlocks[target])
+            : nil
+        interactionGate.isPageInteractionActive = true
+
         coverIsAnimating = true
         let exitOffset = target > pagedPageIndex ? -width : width
         withAnimation(.interactiveSpring(response: 0.30, dampingFraction: 0.86)) {
@@ -2223,15 +2303,30 @@ struct ReaderView: View {
         }
         Task { @MainActor in
             try? await Task.sleep(nanoseconds: 320_000_000)
+            let resolved = ReaderPageRestoration.index(
+                anchor: targetAnchor,
+                in: pagedBlocksCache,
+                fallbackIndex: target
+            )
             var transaction = Transaction()
             transaction.disablesAnimations = true
             withTransaction(transaction) {
-                pagedPageIndex = target
+                pagedPageIndex = resolved
                 coverDragTranslation = 0
                 coverIsAnimating = false
             }
-            updatePagedVisibleParagraph(pageIndex: target)
+            reportCoverVisibleIdentity(resolved)
+            updatePagedVisibleParagraph(pageIndex: resolved)
+            handlePageInteraction(false)
         }
+    }
+
+    /// Cover mode draws its pages with SwiftUI instead of
+    /// `UIPageViewController`, so it must publish the same stable page
+    /// identity. Without it the page model fell back to a raw array index.
+    private func reportCoverVisibleIdentity(_ index: Int) {
+        guard pagedBlocksCache.indices.contains(index) else { return }
+        pageIdentityTracker.key = ReaderPageIdentity(page: pagedBlocksCache[index]).key
     }
 
     @ViewBuilder
@@ -2279,6 +2374,17 @@ struct ReaderView: View {
     }
 
     private func pageAttributedText(for page: ReaderPageBlock) -> NSAttributedString {
+        // A page body is immutable between page-model revisions. Rebuilding
+        // the attributed string on every SwiftUI pass was a measurable hitch
+        // during page curls; keep one cached copy per page and speech cursor.
+        let highlightKey = "\(speechChapterIndex)-\(speechController.currentParagraphIndex)"
+        let key = "\(ReaderPageIdentity(page: page).key)|\(highlightKey)"
+        return pageTextCache.text(key: key, signature: readerPageRevisionKey) {
+            buildPageAttributedText(for: page)
+        }
+    }
+
+    private func buildPageAttributedText(for page: ReaderPageBlock) -> NSAttributedString {
         let bodyFont = fontFamily.uiFont(
             ofSize: CGFloat(fontSize),
             weight: .regular,
@@ -5206,75 +5312,82 @@ struct ReaderView: View {
         syncWindowCursorToVisiblePage()
     }
 
+    /// The page cursor is rebuilt from what the reader can actually see, not
+    /// from an array index. `pageIdentityTracker` is fed by
+    /// `PageCurlReaderView` on every committed page change, so a chapter that
+    /// is prefetched above the reader cannot silently shift the anchor.
     private func currentPageAnchor(useCachedPageAnchor: Bool = true) -> ReaderChapterPosition? {
-        if useCachedPageAnchor, pagedBlocksCache.indices.contains(pagedPageIndex) {
-            let block = pagedBlocksCache[pagedPageIndex]
-            if block.chapterIndex >= 0 {
-                return ReaderChapterPosition(
-                    chapterIndex: block.chapterIndex,
-                    paragraphIndex: block.isPlaceholder
-                        ? ReaderChapterWindowPolicy.restoreParagraphIndex(
-                            chapterIndex: block.chapterIndex,
-                            currentChapterIndex: windowCurrentChapterIndex,
-                            placeholderDirection: block.placeholderDirection
-                        )
-                        : (block.firstParagraphIndex ?? 0),
-                    pageOrdinal: block.isPlaceholder ? nil : block.pageOrdinal
-                )
+        if useCachedPageAnchor {
+            if let key = pageIdentityTracker.key,
+               let index = ReaderPageIdentity.firstIndex(of: key, in: pagedBlocksCache) {
+                let block = pagedBlocksCache[index]
+                if block.chapterIndex >= 0, blockIsInLiveWindow(block) {
+                    return pageAnchor(for: block)
+                }
+            }
+            if pagedBlocksCache.indices.contains(pagedPageIndex) {
+                let block = pagedBlocksCache[pagedPageIndex]
+                if block.chapterIndex >= 0, blockIsInLiveWindow(block) {
+                    return pageAnchor(for: block)
+                }
             }
         }
-        let fallback = resolvedReadingPosition(forFlatIndex: visibleParagraphIndex)
-        return ReaderChapterPosition(
-            chapterIndex: fallback.chapterIndex,
-            paragraphIndex: fallback.paragraphIndex
+        let fallbackChapter: Int
+        if windowSections.contains(where: { $0.chapterIndex == windowCurrentChapterIndex }) {
+            fallbackChapter = windowCurrentChapterIndex
+        } else {
+            fallbackChapter = windowSections.first?.chapterIndex ?? chapterIndex
+        }
+        return ReaderChapterPosition(chapterIndex: fallbackChapter, paragraphIndex: 0)
+    }
+
+    private func pageAnchor(for block: ReaderPageBlock) -> ReaderChapterPosition {
+        ReaderChapterPosition(
+            chapterIndex: block.chapterIndex,
+            paragraphIndex: block.isPlaceholder
+                ? ReaderChapterWindowPolicy.restoreParagraphIndex(
+                    chapterIndex: block.chapterIndex,
+                    currentChapterIndex: windowCurrentChapterIndex,
+                    placeholderDirection: block.placeholderDirection
+                )
+                : (block.firstParagraphIndex ?? 0),
+            pageOrdinal: block.isPlaceholder ? nil : block.pageOrdinal
         )
     }
 
-    private func restoredPageIndex(_ anchor: ReaderChapterPosition?, in blocks: [ReaderPageBlock]) -> Int {
-        guard let anchor else {
-            return min(max(pagedPageIndex, 0), max(blocks.count - 1, 0))
-        }
-        // A long paragraph can span several pages. Preserve the exact
-        // continuation page while the chapter itself is unchanged; the
-        // paragraph check also rejects a stale ordinal after a typography
-        // change has repaginated the chapter.
-        if let ordinal = anchor.pageOrdinal,
-           let exact = blocks.firstIndex(where: {
-               !$0.isPlaceholder
-                   && $0.chapterIndex == anchor.chapterIndex
-                   && $0.pageOrdinal == ordinal
-                   && $0.firstParagraphIndex == anchor.paragraphIndex
-           }) {
-            return exact
-        }
-        if let exact = pageIndex(forChapter: anchor.chapterIndex, paragraph: anchor.paragraphIndex, in: blocks) {
-            return exact
-        }
-        return min(max(pagedPageIndex, 0), max(blocks.count - 1, 0))
+    private func blockIsInLiveWindow(_ block: ReaderPageBlock) -> Bool {
+        windowSections.isEmpty
+            || windowSections.contains { $0.chapterIndex == block.chapterIndex }
     }
 
-    private func pageIndex(forChapter chapter: Int, paragraph: Int, in blocks: [ReaderPageBlock]) -> Int? {
-        var lastInChapter: Int?
-        for (index, block) in blocks.enumerated() {
-            guard !block.isPlaceholder, block.chapterIndex == chapter else { continue }
-            let first = block.firstParagraphIndex ?? 0
-            if first >= paragraph { return index }
-            lastInChapter = index
-        }
-        if let lastInChapter { return lastInChapter }
-        if let placeholder = blocks.firstIndex(where: { $0.isPlaceholder && $0.chapterIndex == chapter }) {
-            return placeholder
-        }
-        return blocks.firstIndex { !$0.isPlaceholder && $0.chapterIndex >= chapter }
+    private func restoredPageIndex(_ anchor: ReaderChapterPosition?, in blocks: [ReaderPageBlock]) -> Int {
+        ReaderPageRestoration.index(
+            anchor: anchor,
+            in: blocks,
+            fallbackIndex: pagedPageIndex
+        )
     }
 
     private func schedulePagedBlocksCacheRebuild() {
         guard readerMode != .scroll else { return }
         pageLayoutTask?.cancel()
+        // Never rebuild the page model while the finger owns a page turn:
+        // swapping the hosting controllers mid-gesture drops a frame and can
+        // commit a stale index (the “chapter 5 jumps back to chapter 2”
+        // report). The rebuild is re-issued by `handlePageInteraction(false)`.
+        if interactionGate.isPageInteractionActive {
+            interactionGate.rebuildDeferred = true
+            return
+        }
         let expectedKey = readerPageCacheKey
         pageLayoutTask = Task { @MainActor in
             try? await Task.sleep(nanoseconds: ReaderPerformancePolicy.pageLayoutDebounceNanoseconds)
             guard !Task.isCancelled, readerPageCacheKey == expectedKey else { return }
+            if interactionGate.isPageInteractionActive {
+                interactionGate.rebuildDeferred = true
+                pageLayoutTask = nil
+                return
+            }
             rebuildPagedBlocksCache()
             pagedPageIndex = min(max(pagedPageIndex, 0), positionMapping.maximumPageIndex)
             scheduleReadingPositionPersistence(paragraphIndex: currentParagraphIndexForPersistence())
@@ -5686,6 +5799,42 @@ struct ReaderPageBlock: Identifiable, Equatable {
 
     var lastParagraphIndex: Int? {
         paragraphs.last?.index
+    }
+}
+
+/// The page-curl controller reports the page that is actually on screen. The
+/// tracker is a reference box, not `@State`, so updating it from a UIKit
+/// callback never invalidates the SwiftUI reader tree mid-gesture.
+final class ReaderVisiblePageTracker {
+    var key: String?
+}
+
+/// Mutable gesture state that must not invalidate the SwiftUI reader tree.
+/// `PageCurlReaderView` reports the start and end of a page turn from a UIKit
+/// delegate callback; storing that in `@State` re-evaluates the entire reader
+/// body on the first frame of every swipe.
+final class ReaderInteractionGate {
+    var isPageInteractionActive = false
+    var rebuildDeferred = false
+}
+
+/// Bounded attributed-string cache keyed by stable page identity. Mutated
+/// from `body` through a reference type, which keeps SwiftUI from treating a
+/// cache fill as a state change.
+final class ReaderPageTextCache {
+    private var storage: [String: NSAttributedString] = [:]
+    private var signature = ""
+
+    func text(key: String, signature: String, build: () -> NSAttributedString) -> NSAttributedString {
+        if signature != self.signature {
+            storage.removeAll(keepingCapacity: true)
+            self.signature = signature
+        }
+        if let cached = storage[key] { return cached }
+        let value = build()
+        if storage.count >= 16 { storage.removeAll(keepingCapacity: true) }
+        storage[key] = value
+        return value
     }
 }
 

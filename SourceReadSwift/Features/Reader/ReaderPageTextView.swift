@@ -109,12 +109,19 @@ struct ReaderPageTextView: UIViewRepresentable {
     }
 
     func updateUIView(_ view: UITextView, context: Context) {
-        view.attributedText = attributedText
-        view.isSelectable = isSelectable
-        // With selection off the text view must not swallow page-turn taps.
-        // With selection on the long-press selection UI is the explicit user
-        // choice, so interaction stays enabled.
-        view.isUserInteractionEnabled = isSelectable
+        // SwiftUI can call this for a layout-only change. Reassigning
+        // `attributedText` tears down and rebuilds the TextKit layout, which
+        // was a hidden per-frame cost during page curls. Compare first.
+        if !view.attributedText.isEqual(to: attributedText) {
+            view.attributedText = attributedText
+        }
+        if view.isSelectable != isSelectable {
+            view.isSelectable = isSelectable
+            // With selection off the text view must not swallow page-turn taps.
+            // With selection on the long-press selection UI is the explicit user
+            // choice, so interaction stays enabled.
+            view.isUserInteractionEnabled = isSelectable
+        }
     }
 
     /// The page owns a fixed frame from `pageSurface`. Returning that proposal

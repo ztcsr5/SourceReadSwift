@@ -1417,33 +1417,11 @@ private struct AboutReadView: View {
                         }
                     }
 
-                    Text("「纸间」是一款专为 iOS 精心打造的纯粹阅读器。遵循 Apple 原生设计哲学，由「源流 (SourceFlow)」深度书源引擎强力驱动，提供 120Hz 满帧丝滑翻页、全网 JSON 书源深度解析、自适应出版级排版与多格式支持，让阅读回归最初的纯粹与宁静。")
+                    Text("纸间，取自「字里行间」。\n\n我们想做的，只是一只安静的书匣：没有推送，没有催促，也不替你决定下一本读什么。打开一本书，剩下的交给文字。\n\n它支持 Legado 格式的 JSON 书源，也能读本地 TXT 与 EPUB。字号、行距、翻页方式、底色都可以慢慢调成你习惯的样子；读到哪里，合上再打开，还是那一页。\n\n纸间还在打磨。如果你遇到问题，或者想要某个功能，欢迎告诉我们。")
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
-
-                    HStack(spacing: 8) {
-                        aboutTag("120Hz 极速")
-                        aboutTag("全媒体生态")
-                        aboutTag("开源书源")
-                        aboutTag("纯净无扰")
-                    }
                 }
                 .padding(.vertical, 6)
-            }
-
-            Section("核心特色") {
-                Label("小说 · 有声书 · 漫画 · 影视 四维全媒介生态", systemImage: "play.rectangle.on.rectangle")
-                Label("120Hz ProMotion 满帧丝滑无限滚动与翻页", systemImage: "speedometer")
-                Label("兼容 Legado 开源书源生态，一键精准全网换源", systemImage: "bolt.horizontal.fill")
-                Label("漫画高性能图片流、快速翻页器与夜间柔和调光", systemImage: "photo.stack")
-                Label("影视全屏播放、手势快进快退与防误触锁屏模式", systemImage: "tv")
-                Label("后台有声书播放、全局悬浮迷你胶囊与睡眠定时", systemImage: "headphones")
-                Label("出版级中文排版引擎，支持水墨屏与自定义壁纸字形", systemImage: "textformat.size")
-                Label("WebDAV 云端多端自动同步与安全冷备份", systemImage: "icloud.and.arrow.up")
-                Label("内置广告净化与规则体检，自动过滤正文杂质", systemImage: "wand.and.stars")
-                Label("TXT 智能目录识别、EPUB 图文精排与 RSS 资讯订阅", systemImage: "doc.text.fill")
-                Label("无线 Web 电脑直连写源，轻松调试与管理书源", systemImage: "globe")
-                Label("全离线书籍与章节缓存，随时随地畅快阅读", systemImage: "arrow.down.circle")
             }
 
             Section("合规与条款") {
@@ -1477,13 +1455,4 @@ private struct AboutReadView: View {
         }
         .navigationTitle("关于纸间")
     }
-}
-
-private func aboutTag(_ title: String) -> some View {
-    Text(title)
-        .font(.caption.weight(.semibold))
-        .padding(.horizontal, 10)
-        .padding(.vertical, 6)
-        .background(AppTheme.accent.opacity(0.12), in: Capsule())
-        .foregroundStyle(AppTheme.accent)
 }

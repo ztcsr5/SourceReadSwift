@@ -859,7 +859,7 @@ struct DiscoverView: View {
     @ViewBuilder
     private func aggregatedCover(_ coverUrl: String?, base: String?, source: String?) -> some View {
         if let url = CoverURLResolver.url(from: coverUrl, base: base, fallbackBase: source) {
-            CachedRemoteImage(url: url) {
+            CachedRemoteImage(url: url, maxPixelSize: 260) {
                 aggregatedCoverPlaceholder
             }
             .frame(width: 64, height: 86)
@@ -874,7 +874,7 @@ struct DiscoverView: View {
     private func aggregatedGridCover(_ coverUrl: String?, base: String?, source: String?) -> some View {
         Group {
             if let url = CoverURLResolver.url(from: coverUrl, base: base, fallbackBase: source) {
-                CachedRemoteImage(url: url) { aggregatedCoverPlaceholder }
+                CachedRemoteImage(url: url, maxPixelSize: 420) { aggregatedCoverPlaceholder }
             } else {
                 aggregatedCoverPlaceholder
             }
