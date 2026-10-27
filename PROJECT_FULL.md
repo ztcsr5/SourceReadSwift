@@ -2097,6 +2097,20 @@ SwiftUI `Image` 在 `ZStack` 提案阶段仍可能按比例填充后的理想尺
 - CI：iOS run `40569757995`（job `122420520824`，sha `64b9831`），Build success，**1112 tests / 0 failures**；IPA run `40569757787`（job `122420520603`），`SourceReadSwift-1.0.66-unsigned.ipa`，12,182,355 字节，SHA256 `EF427BD48E3EF53DFA403DB28C55FF55FA60C81ADA83C40A37F9C87D3EC94786`。
 - 真机：本轮无 iOS 16 设备，全部 UI/帧率结论标 `待真机验收`。
 
+## 二十、v1.0.67 中文标点断行（2026-10-28）
+
+**问题**：正文行首出现 `。，、）」`，段落参差。根因是 `NSParagraphStyle.lineBreakStrategy` 保持默认 `.standard`——TextKit 1 的默认策略只保证西文单词边界，不处理 CJK 行首禁则。
+
+**修复**：`ReaderPageLayoutEngine.lineBreakStrategy = .pushOut`，三处共用：分页测量 `lineMetrics`、页面渲染的标题样式、页面渲染的正文样式。`.pushOut` 让行尾禁则标点悬挂在上一行，不另起一行；策略只改变断行点，不改变字号、行距、段距，因此 1.0.65/1.0.66 的排版基线不变。
+
+**测试**：新增 3 条——标题与正文均为 `.pushOut`、`minimumLineHeight`/`maximumLineHeight` 保持 0、引擎常量固定。测量与渲染同策略由测试锁定，只改一侧会先失败。
+
+**证据**：提交 `1fe7d6d`；iOS run `40574160264`（job `122435994785`）1115 tests / 0 failures、`** TEST SUCCEEDED **`；IPA run `40574160301`；产物 `C:\Users\Edc21\Desktop\SourceReadSwift-1.0.67-unsigned.ipa`（12,182,094 B，SHA256 `C671EC2CE5853DD6F4BF955ACB39F4E2558CA54FC79D753FB168CA5838FACA52`，`1.0.67 / 68`，MinimumOSVersion 16.0）。
+
+**未做**：段距仍小于行距（`lineSpacing 12` / `paragraphSpacing 10`）、章标题页眉与正文可能重复、真机视觉验收（标点悬挂造成的 1–2pt 行尾溢出）。详见 `docs/CODEX_HANDOVER_1_0_67.md` §四。
+
+---
+
 ## 附录 A：完整文件清单
 
 > 以下为 2026-10-25 工作区实测清单。`build/`、`ci-log/`、`AppIcons_Candidates/` 为本地产物/素材，不计入源码。
