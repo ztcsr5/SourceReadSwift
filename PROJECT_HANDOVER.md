@@ -3,8 +3,9 @@
 > **交接目标**：交接给下一位 AI 协作者 / 研发工程师  
 > **文档基线**：v1.0.65 (Build 66)；下文主体保留 v1.0.30 (Build 31) 历史记录  
 > **交接时间**：2026-10-28  
-> **验证 Commit**：`36b1e23`（GitHub Actions iOS build 成功；1095 tests / 0 failures；unsigned IPA 打包通过）  
+> **验证 Commit**：`e586e47`（GitHub Actions iOS build 成功；1098 tests / 0 failures；unsigned IPA 打包通过）  
 > **最新产物**：`C:\Users\Edc21\Desktop\SourceReadSwift-1.0.65-unsigned.ipa`（12,136,856 字节，SHA256 `2B1F251C303F47797BBDD5FB6E9FBF2675B625AC0246BFBE17BED64E29821230`）  
+> **对齐补丁产物**：`C:\Users\Edc21\Desktop\SourceReadSwift-1.0.65-align-unsigned.ipa`（12,136,991 字节，SHA256 `95416C4060B3795C80F4C52EA41CECB12E2AC0A0028B99DFE75936679A1CF85A`，含正文缩进保留与两端对齐修正）  
 > **全量文档**：项目全貌、功能矩阵、生态分析与 v1.0.65 工作记录见 `PROJECT_FULL.md`（阅读界面重构 §十三、安全区修复 §十四、页脚状态带 §十五、壁纸布局 §十六、壁纸 UIKit 图层 §十七、1.0.65 排版与交互 §十八）。
 
 > **最新修复（v1.0.65，2026-10-28，分支 `codex/reader-feedback-fixes`）**：本轮针对 11 条读者反馈完成整改——标题字号/缺失/重复统一（`ChapterTextSanitizer` + 三渲染面 1.3x）、正文两端对齐、iOS16 封面链路（`CoverURLResolver` + 全调用点上下文）、登录地址解析与主页回退（`SourceLoginURLResolver`）、底栏精简为目录/设置/章节/进度、详情页去重加号、分页上限 8→24 与「网页打开本章」兜底、默认段间距 0→10、设置页渐变头卡、发现页紧凑+网格、换源缓存秒切（`SourceSwitchCacheStore`）。CI run `40539628249`：1095 tests / 0 failures；IPA run `40539628430`。交接见 `docs/CODEX_HANDOVER_1_0_65.md`。  

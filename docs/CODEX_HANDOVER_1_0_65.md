@@ -218,3 +218,14 @@ git revert 36b1e23 a21223a 68e4253
 ## 八、结论
 
 11 条反馈全部有代码落点与自动化测试覆盖；CI 1095 例全绿并产出 1.0.65 未签名 IPA。iOS 16 与真实书源的体验结论必须以第五节真机验收为准。
+
+## 九、1.0.65 对齐补丁（2026-10-28，`e586e47`）
+
+用户澄清「正文没对齐、很乱」不是要取消首行缩进。复核后确认并修正：
+
+- 正文缩进一直保留：WebView `.para { text-indent: var(--indent); }`（默认 40pt），TextKit `firstLineHeadIndent = paragraphIndent`、`headIndent = 0`；只有 `.chapter-title` 的 `text-indent: 0`，标题不继承正文缩进。
+- WebView 新增 `text-align-last: left`：`text-align: justify` 只拉伸整行，段落最后一行不再被拉散。
+- TextKit 正文两处 `alignment` 由 `.natural` 改为 `.justified`，滑动模式真正两端对齐。
+- 新增 3 个测试：TextKit 正文同时保留 40pt 首行缩进并 justify、WebView 正文保留 `text-indent` 且含 `text-align-last`、章节标题不继承缩进。
+- 验证：CI iOS run `40544883395`，`1098 tests / 0 failures`；IPA run `40544883327`，`C:/Users/Edc21/Desktop/SourceReadSwift-1.0.65-align-unsigned.ipa`，`12,136,991` 字节，SHA256 `95416C4060B3795C80F4C52EA41CECB12E2AC0A0028B99DFE75936679A1CF85A`。
+- 边界：平移/覆盖/仿真分页使用 SwiftUI `Text`，没有 justified 能力，分页模式仍是左对齐；统一两端对齐需要把分页页视图改为 TextKit 渲染，列为下一项。
