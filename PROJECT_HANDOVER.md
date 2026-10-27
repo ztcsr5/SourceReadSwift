@@ -1,18 +1,19 @@
 # SourceReadSwift (纸间) 项目交接全量备忘录
 
 > **交接目标**：交接给下一位 AI 协作者 / 研发工程师  
-> **文档基线**：v1.0.64 (Build 65)；下文主体保留 v1.0.30 (Build 31) 历史记录  
-> **交接时间**：2026-10-27  
-> **验证 Commit**：`9d2b35a`（GitHub Actions iOS build 成功；1072 tests / 0 failures；unsigned IPA 打包通过）  
-> **最新产物**：`C:\Users\Edc21\Desktop\SourceReadSwift-1.0.64-unsigned.ipa`（12,038,495 字节，SHA256 `036F5DF8C970BCABE401DA713A1B6DE7684F8351C5764DF7D584C2DAB964E72C`）  
-> **全量文档**：项目全貌、功能矩阵、生态分析与 v1.0.64 工作记录见 `PROJECT_FULL.md`（阅读界面重构 §十三、安全区修复 §十四、页脚状态带 §十五、壁纸布局 §十六、壁纸 UIKit 图层 §十七）。
+> **文档基线**：v1.0.65 (Build 66)；下文主体保留 v1.0.30 (Build 31) 历史记录  
+> **交接时间**：2026-10-28  
+> **验证 Commit**：`36b1e23`（GitHub Actions iOS build 成功；1095 tests / 0 failures；unsigned IPA 打包通过）  
+> **最新产物**：`C:\Users\Edc21\Desktop\SourceReadSwift-1.0.65-unsigned.ipa`（12,136,856 字节，SHA256 `2B1F251C303F47797BBDD5FB6E9FBF2675B625AC0246BFBE17BED64E29821230`）  
+> **全量文档**：项目全貌、功能矩阵、生态分析与 v1.0.65 工作记录见 `PROJECT_FULL.md`（阅读界面重构 §十三、安全区修复 §十四、页脚状态带 §十五、壁纸布局 §十六、壁纸 UIKit 图层 §十七、1.0.65 排版与交互 §十八）。
 
-> **最新修复（v1.0.64，2026-10-27，分支 `codex/reader-feedback-fixes`）**：自定义壁纸改为 UIKit `UIImageView` 图层（`intrinsicContentSize = noIntrinsicMetric`），导入时按最长边 2800px 降采样，新增填充/适应/拉伸三档；彻底切断壁纸撑大根布局的路径。交接见 `docs/CODEX_HANDOVER_1_0_64.md`。  
+> **最新修复（v1.0.65，2026-10-28，分支 `codex/reader-feedback-fixes`）**：本轮针对 11 条读者反馈完成整改——标题字号/缺失/重复统一（`ChapterTextSanitizer` + 三渲染面 1.3x）、正文两端对齐、iOS16 封面链路（`CoverURLResolver` + 全调用点上下文）、登录地址解析与主页回退（`SourceLoginURLResolver`）、底栏精简为目录/设置/章节/进度、详情页去重加号、分页上限 8→24 与「网页打开本章」兜底、默认段间距 0→10、设置页渐变头卡、发现页紧凑+网格、换源缓存秒切（`SourceSwitchCacheStore`）。CI run `40539628249`：1095 tests / 0 failures；IPA run `40539628430`。交接见 `docs/CODEX_HANDOVER_1_0_65.md`。  
+> **上一轮（v1.0.64，2026-10-27，分支 `codex/reader-feedback-fixes`）**：自定义壁纸改为 UIKit `UIImageView` 图层（`intrinsicContentSize = noIntrinsicMetric`），导入时按最长边 2800px 降采样，新增填充/适应/拉伸三档；彻底切断壁纸撑大根布局的路径。交接见 `docs/CODEX_HANDOVER_1_0_64.md`。  
 > **上一轮（v1.0.63，2026-10-27，分支 `codex/reader-feedback-fixes`）**：修复自定义壁纸 `scaledToFill` 撑大根布局导致设置面板与工具条左右被裁。壁纸现在锁定在视口内并裁剪溢出；分页三种模式同步。交接见 `docs/CODEX_HANDOVER_1_0_63.md`。  
 > **上一轮（v1.0.62，2026-10-27，分支 `codex/reader-feedback-fixes`）**：滑动模式下底部状态栏不再叠在正文上。`ReaderPageChrome.scrollFooterBandHeight = 40`，WebView 视口在状态带上方截止；`statusPosition` 为 top / none 时不占位。交接见 `docs/CODEX_HANDOVER_1_0_62.md`。  
 > **上一轮（v1.0.61，2026-10-27，分支 `codex/reader-feedback-fixes`）**：修复阅读器安全区数据源失效导致顶部工具条压状态栏、正文顶到刘海、底部控制坞贴底、设置面板越过 home indicator。安全区改为「所有窗口取最大 + 状态栏高度 + 机型兜底」，chrome 全部叠加安全区；交接见 `docs/CODEX_HANDOVER_1_0_61.md`。  
 > **上一轮（v1.0.60，2026-10-27）**：阅读界面已按开元 / 栖阅截图像素量测重构——单一几何来源 `ReaderPageGeometry`、每页内置页眉页脚、页码 `当前页/本章总页`、仿真翻页 tap 去重、滑动容器 inset 归零、跨章续读提前缓冲。本轮完整交接见 `docs/CODEX_HANDOVER_1_0_60.md`；书源解析能力评估见 `docs/书源解析能力评估-1.0.60.md`。  
-> **说明**：下文主体仍以 v1.0.30 为基线，保留 v1.0.22→v1.0.30 的完整工程记录；v1.0.31→v1.0.64 的增量以新交接文档与 `PROJECT_FULL.md` §十三/§十四/§十五/§十六/§十七 为准。
+> **说明**：下文主体仍以 v1.0.30 为基线，保留 v1.0.22→v1.0.30 的完整工程记录；v1.0.31→v1.0.65 的增量以新交接文档与 `PROJECT_FULL.md` §十三/§十四/§十五/§十六/§十七/§十八 为准。
 
 ---
 

@@ -1970,6 +1970,87 @@ SwiftUI `Image` 在 `ZStack` 提案阶段仍可能按比例填充后的理想尺
 - 大图导入无卡顿；
 - 预设背景无回归。
 
+## 十八、v1.0.65 排版统一与交互整改（2026-10-28）
+
+### 18.1 范围
+
+本轮对应用户 11 条反馈，代码提交链 `68e4253`（主体）→ `a21223a`（测试对齐）→ `36b1e23`（分页上限），分支 `codex/reader-feedback-fixes`。
+
+| # | 反馈 | 落点 | 状态 |
+|---|---|---|---|
+| 1 | 章节标题与正文字号相同、标题缺失/重复 | `ReaderTypographyDefaults.titleFontSize`、`ChapterTextSanitizer`、`ReaderChapterSection` | 已实现，待真机验收 |
+| 2 | 正文未对齐 | `WebReaderDocument` CSS、TextKit 段落样式 | 已实现，待真机验收 |
+| 3 | iOS16 搜索框压导航栏、封面不显示、机型尺寸 | `CoverURLResolver`、`AsyncBookCover`、`BookDetailView`、发现页导航 | 部分实现，iOS16 待验收 |
+| 4 | 登录地址无效 / 无登录入口 | `SourceLoginURLResolver`、`SourceManagerView`、`SourceLoginView` | 已实现，特殊源待验收 |
+| 5 | 底栏按钮过多 | 右上 `ellipsis` 菜单 | 已实现，待真机验收 |
+| 6 | 详情页重复加号 | `SearchBookRow(onAdd: nil)` | 已实现 |
+| 7 | 正文末尾省略号/显示不全 | 分页上限 8→24、末段去重、`nextContentUrl`、「网页打开本章」 | 已实现，源相关待验收 |
+| 8 | 默认段间距太小 | 默认 0→10、标题间距 8→12、一次性迁移 | 已实现 |
+| 9 | 设置页单调 | `settingsHeroSection` 渐变统计卡 | 已实现，待真机验收 |
+| 10 | 发现页顶部空、卡片大、要网格 | 间距压缩、列表/网格切换、`LazyVGrid` | 已实现，待真机验收 |
+| 11 | 换源需重新搜索 | `SourceSwitchCacheStore` 先缓存后刷新 | 已实现，命中率待验收 |
+
+### 18.2 标题与正文
+
+- 标题字号统一为 `max(bodySize * 1.3, bodySize + 6)`，内联分页、TextKit、WebView 三处一致。
+- `ChapterTextSanitizer` 清洗 BOM/NBSP/全角空格/零宽字符；占位标题从正文首段回填；正文前 4 段与标题去重；`ReaderChapterSection` 自定义 `init` 使旧磁盘缓存也重新清洗。
+- 内联模式首页不再重复页眉标题。
+- WebView `.para` 使用 `text-align: justify; text-justify: inter-ideograph`，`.chapter-title` 强制左对齐、无缩进。
+
+### 18.3 iOS16 与封面
+
+- `CoverURLResolver` 依次处理绝对 URL、协议相对 `//`、站内绝对路径、相对路径；`bookURL` 为相对时回退书源主页。
+- `AsyncBookCover` 增加 `baseURLString` / `sourceURLString`，书架、搜索行、发现聚合卡、详情页全部传上下文。
+- `BookDetailView` 在本书源无封面时借用兄弟源封面并写回书架；书架刷新路径回传 `coverURL`。
+- 发现页与合集导航标题 `.large → .inline`，消除 iOS16 大标题与搜索框重叠。
+
+### 18.4 登录
+
+- `SourceLoginURLResolver` 支持绝对/协议相对/站内绝对/相对/无 scheme/模板 `{{bookSourceUrl}}`。
+- `loginUrl` 为空或不可解析时回退书源主页并提示；入口判断改为 resolver 是否可产出目标。
+- 死链、纯 JS 登录页、专用 UA 源仍需逐个适配。
+
+### 18.5 底栏与详情页
+
+- 朗读/停止/自动翻页移入右上 `ellipsis` 菜单（Divider 分组）；底栏保留目录、设置、上一章、下一章、进度条。
+- 详情页顶部书籍行不再显示加号，只保留底部「加入书架」。
+
+### 18.6 分页与截断
+
+- `SourceEngine` 正文上限 8→24，便捷入口同步 24。
+- 末段与倒数 3 段去重；达到上限保留 `nextContentUrl`。
+- 新增「网页打开本章」使用 `SmartWebReaderView(initialURL:)` 作为源站内容不全时的兜底。
+
+### 18.7 段间距
+
+- `paragraphSpacing` 默认 0→10，`titleSpacing` 8→12。
+- 迁移键 `reader.typographyMigrated.v65`，仅旧值为 0/8 时提升，用户自定义值不覆盖；一键预设同步。
+
+### 18.8 设置页与发现页
+
+- 设置页新增渐变头卡，展示书源/书架/分组统计。
+- 发现页主间距 20→14、搜索 Tab 24→16；`DiscoverResultLayout` 列表/网格切换（持久化 `discover.resultLayout`）；`LazyVGrid` adaptive 100–140；列表封面 64×86，简介 1 行。
+
+### 18.9 换源缓存
+
+- `SourceSwitchCacheStore`：`@MainActor`、JSON 落盘、TTL 7 天、最多 10 条。
+- key 归一化：去空白/标点、全半角折叠、大小写折叠。
+- 换源面板先展示缓存，再后台刷新合并去重；有缓存时加载中不禁用点击。
+
+### 18.10 验证
+
+- 新增测试 23 例：`ChapterTextSanitizerTests` 7、`SourceLoginURLResolverTests` 7、`SourceSwitchCacheStoreTests` 4、`CoverURLResolverTests` 5。
+- CI iOS run `40539628249` / job `122314182195`：`1095 tests / 0 failures`，`** TEST SUCCEEDED **`。
+- Unsigned IPA run `40539628430`：`C:/Users/Edc21/Desktop/SourceReadSwift-1.0.65-unsigned.ipa`，`12,136,856` 字节，SHA256 `2B1F251C303F47797BBDD5FB6E9FBF2675B625AC0246BFBE17BED64E29821230`；包内 1.0.65 / Build 66 / MinimumOSVersion 16.0。
+
+### 18.11 待真机验收
+
+- iOS16 机型矩阵（SE/mini/标准/Pro/Pro Max）书架、搜索、发现页布局与封面；
+- 三种翻页模式与上下滑动下的标题层级、重复、正文对齐；
+- 相对/空 `loginUrl` 书源的登录落地；
+- 分页 24 后长章节完整性、「网页打开本章」兜底；
+- 换源缓存命中与后台刷新不阻塞。
+
 ## 附录 A：完整文件清单
 
 > 以下为 2026-10-25 工作区实测清单。`build/`、`ci-log/`、`AppIcons_Candidates/` 为本地产物/素材，不计入源码。
