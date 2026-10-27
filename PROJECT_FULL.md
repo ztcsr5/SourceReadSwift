@@ -1908,6 +1908,33 @@ static func scrollFooterReservedHeight(statusPosition: String) -> CGFloat {
 - `statusPosition=top` 或横屏不额外留底部空白；
 - 底部点击翻页不被页脚拦截。
 
+## 十六、v1.0.63 自定义壁纸布局溢出修复（2026-10-27）
+
+### 16.1 现象
+
+选择自定义壁纸后，设置面板、顶部工具条与正文整体左右被裁；预设背景正常。
+
+### 16.2 根因
+
+`readerBackdrop` 的壁纸使用 `.resizable().scaledToFill()`，但没有 `.frame` 与 `.clipped()`。`UIImage(data:)` 的 `scale = 1`，1080×2160 壁纸在 390×844 视口按高度填充后需要 422×844，溢出的布局尺寸把根 `ZStack` 撑宽，居中后左右各裁约 16pt。
+
+### 16.3 修复
+
+- `readerBackdrop` 壁纸：`.frame(maxWidth: .infinity, maxHeight: .infinity)` + `.clipped()`；
+- `pageBackground` 壁纸：同样加 `.frame`，分页三种模式一致；
+- 根 `ZStack`：`.frame(maxWidth: .infinity, maxHeight: .infinity)` 锁定视口布局。
+
+### 16.4 验证
+
+- CI run `40504290855`：Build 成功，`1068 tests / 0 failures`，`** TEST SUCCEEDED **`（2026-10-27T12:38:52Z）；
+- IPA run `40504290853`：`C:/Users/Edc21/Desktop/SourceReadSwift-1.0.63-unsigned.ipa`，`12,031,282` 字节，SHA256 `9AEF2509AA423BF0F44CBAA81257D5561734A43A78612F0AC92FCE8095DD8C29`，包内 1.0.63 / Build 64。
+
+### 16.5 待真机验收
+
+- 自定义壁纸下设置面板与工具条不裁切；
+- 壁纸铺满、比例正确；
+- 三种分页模式与滚动模式均正常。
+
 ## 附录 A：完整文件清单
 
 > 以下为 2026-10-25 工作区实测清单。`build/`、`ci-log/`、`AppIcons_Candidates/` 为本地产物/素材，不计入源码。
