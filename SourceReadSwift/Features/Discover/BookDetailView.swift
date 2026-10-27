@@ -1510,17 +1510,22 @@ private struct BookDetailAllChaptersView: View {
                 }
                 .listStyle(.plain)
                 .scrollDismissesKeyboard(.interactively)
-                .navigationDestination(item: $selectedChapterForReading) { chapter in
-                    if let shelfBook = localBook {
-                        BookshelfReaderGatewayView(book: shelfBook, initialChapterIndex: chapter.index)
-                    } else {
-                        ChapterLoadingView(
-                            bookID: bookID,
-                            sourceUrl: book.sourceUrl,
-                            chapter: chapter,
-                            totalChapters: chapters.count,
-                            chapters: chapters
-                        )
+                .navigationDestination(isPresented: Binding(
+                    get: { selectedChapterForReading != nil },
+                    set: { if !$0 { selectedChapterForReading = nil } }
+                )) {
+                    if let chapter = selectedChapterForReading {
+                        if let shelfBook = localBook {
+                            BookshelfReaderGatewayView(book: shelfBook, initialChapterIndex: chapter.index)
+                        } else {
+                            ChapterLoadingView(
+                                bookID: bookID,
+                                sourceUrl: book.sourceUrl,
+                                chapter: chapter,
+                                totalChapters: chapters.count,
+                                chapters: chapters
+                            )
+                        }
                     }
                 }
             }
