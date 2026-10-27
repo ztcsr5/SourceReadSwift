@@ -263,6 +263,7 @@ struct SourceManagerView: View {
                         sourceTest = nil
                     }
                 )
+                .environmentObject(appState)
             }
             .sheet(isPresented: $showBatchCheckSheet, onDismiss: presentPendingBatchRuleEditor) {
                 batchCheckSheet
@@ -1201,6 +1202,7 @@ struct SourceManagerView: View {
     }
 
     private struct SourceTestSheetView: View {
+        @EnvironmentObject private var appState: AppState
         let source: BookSource
         let initialKeyword: String
         let onOpenLogin: () -> Void
@@ -1277,25 +1279,25 @@ struct SourceManagerView: View {
         }
 
         private func runTest() async {
-            isRunning = true
             let trimmedKeyword = keyword.trimmingCharacters(in: .whitespacesAndNewlines)
-            output = "==== 开始测试书源: \(source.bookSourceName) ====\nURL: \(source.bookSourceUrl)\n关键词: \(trimmedKeyword)\n----------------------------------------\n"
+            guard !trimmedKeyword.isEmpty else { return }
+            isRunning = true
+            output = "==== 书源测试: \(source.bookSourceName) ====\nURL: \(source.bookSourceUrl)\n关键词: \(trimmedKeyword)\n----------------------------------------\n"
 
-            let engine = SourceEngine()
-            let execution = await SourceBatchDiagnosticRunner.executeDetailedDiagnostic(
-                source: source,
-                keyword: trimmedKeyword,
-                engine: engine
-            )
-
-            for step in execution.result.report.steps {
-                output += "[\(step.status == .success ? "PASS" : "FAIL")] \(step.stage.title): \(step.detail)\n"
+            let execution = await appState.engine.runPipelineReport(source: source, keyword: trimmedKeyword, page: 1, timeout: 10)
+            for step in execution.result.steps {
+                let status = step.status == .passed ? "PASS" : (step.status == .warning ? "WARN" : "FAIL")
+                let summary = step.responseSummary?.nilIfEmpty ?? step.failureClassification?.nilIfEmpty ?? "无摘要"
+                let elapsed = step.elapsedMilliseconds.map { "（耗时 \($0) ms）" } ?? ""
+                output += "[\(status)] \(step.stage.title)：\(summary)\(elapsed)\n"
             }
-
-            if let error = execution.result.error {
-                output += "\n[FAIL] 诊断失败: \(error.displayMessage)\n"
-            } else {
-                output += "\n[SUCCESS] 书源全链路测试通过！\n"
+            if execution.isSuccess {
+                output += "\n[PASS] 完整链路测试通过：搜索 → 详情 → 目录 → 正文\n"
+                if let first = execution.result.content?.paragraphs.first {
+                    output += "正文预览：\(first.prefix(120))\n"
+                }
+            } else if let error = execution.error {
+                output += "\n[FAIL] 诊断失败：\(error.displayMessage)\n"
             }
             isRunning = false
         }
