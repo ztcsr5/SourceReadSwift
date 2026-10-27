@@ -148,7 +148,13 @@ final class URLSessionSourceNetworkClient: SourceNetworkClient, @unchecked Senda
         let maxRedirects = 10
 
         while redirectCount <= maxRedirects {
-            if currentURL.scheme?.lowercased() == "data" {
+            guard let scheme = currentURL.scheme?.lowercased(),
+                  scheme == "http" || scheme == "https" || scheme == "data" else {
+                let raw = currentURL.absoluteString
+                let clipped = raw.count > 160 ? String(raw.prefix(160)) + "..." : raw
+                return .failure(.network("不支持的 URL 协议 \(currentURL.scheme ?? "无")：\(clipped)"))
+            }
+            if scheme == "data" {
                 return handleDataURL(currentURL)
             }
             var urlRequest = URLRequest(url: currentURL, timeoutInterval: request.timeout)
@@ -189,7 +195,9 @@ final class URLSessionSourceNetworkClient: SourceNetworkClient, @unchecked Senda
                 }
 
                 if urlError.code == .badURL {
-                    return .failure(.network("URL 格式非法或解析异常 (-1000)"))
+                    let raw = currentURL.absoluteString
+                    let clipped = raw.count > 160 ? String(raw.prefix(160)) + "..." : raw
+                    return .failure(.network("URL 格式非法或解析异常 (-1000)：\(clipped)"))
                 } else if urlError.code == .timedOut {
                     return .failure(.network("连接超时"))
                 } else if urlError.code == .cannotFindHost || urlError.code == .cannotConnectToHost {

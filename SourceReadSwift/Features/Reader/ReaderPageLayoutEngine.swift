@@ -71,10 +71,16 @@ enum ReaderPageLayoutEngine {
     static func measureHeight(
         _ text: String,
         typography: ReaderPageTypography,
-        font: UIFont? = nil
+        font: UIFont? = nil,
+        alignment: NSTextAlignment = .justified
     ) -> CGFloat {
         guard !text.isEmpty else { return 0 }
-        let metrics = lineMetrics(text: text, typography: typography, font: font ?? typography.font)
+        let metrics = lineMetrics(
+            text: text,
+            typography: typography,
+            font: font ?? typography.font,
+            alignment: alignment
+        )
         return metrics.reduce(CGFloat.zero) { $0 + $1.height }
     }
 
@@ -124,6 +130,25 @@ enum ReaderPageLayoutEngine {
         return result
     }
 
+    /// The paragraph style used by both measurement and drawing.
+    ///
+    /// `ReaderPageTextView` draws body paragraphs with `.justified` and titles
+    /// with `.natural`; the paginator must pass the same value or it measures
+    /// one alignment and the page renders another. Exposed for tests so the
+    /// two surfaces cannot drift apart again.
+    static func paragraphStyle(alignment: NSTextAlignment = .justified) -> NSParagraphStyle {
+        let style = NSMutableParagraphStyle()
+        // Keep paragraphStyle.lineSpacing at 0 so lineFragmentRect reports the
+        // pure single-line glyph box height; `lineMetrics` adds
+        // `typography.lineSpacing` once per inter-line gap to match SwiftUI
+        // `.lineSpacing(...)` without double-counting it on every line.
+        style.lineSpacing = 0
+        style.lineBreakMode = .byWordWrapping
+        style.lineBreakStrategy = lineBreakStrategy
+        style.alignment = alignment
+        return style
+    }
+
     private struct LineMetric {
         let range: NSRange
         let height: CGFloat
@@ -132,17 +157,10 @@ enum ReaderPageLayoutEngine {
     private static func lineMetrics(
         text: String,
         typography: ReaderPageTypography,
-        font: UIFont
+        font: UIFont,
+        alignment: NSTextAlignment = .justified
     ) -> [LineMetric] {
-        let style = NSMutableParagraphStyle()
-        // Keep paragraphStyle.lineSpacing at 0 so lineFragmentRect reports the
-        // pure single-line glyph box height; we add `typography.lineSpacing`
-        // once per inter-line gap below to match SwiftUI `.lineSpacing(...)`
-        // without double-counting line spacing on every line.
-        style.lineSpacing = 0
-        style.lineBreakMode = .byWordWrapping
-        style.lineBreakStrategy = lineBreakStrategy
-        style.alignment = .natural
+        let style = paragraphStyle(alignment: alignment)
         let storage = NSTextStorage(
             string: text,
             attributes: [

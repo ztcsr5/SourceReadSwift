@@ -146,6 +146,49 @@ final class ReaderPageLayoutEngineTests: XCTestCase {
             ).isEmpty
         )
     }
+
+    // MARK: - Alignment parity with the renderer
+
+    func testParagraphStyleDefaultsToJustifiedForBodyText() {
+        // ReaderPageTextView draws body paragraphs with `.justified`. If the
+        // paginator's default drifts back to `.natural`, a page measures one
+        // way and draws another - the exact class of bug that produced the
+        // "text does not line up" reports.
+        XCTAssertEqual(ReaderPageLayoutEngine.paragraphStyle().alignment, .justified)
+    }
+
+    func testParagraphStyleHonoursExplicitAlignmentForTitles() {
+        // Titles keep natural alignment; the shot title measurement passes
+        // `.natural` down from ReaderView.
+        XCTAssertEqual(ReaderPageLayoutEngine.paragraphStyle(alignment: .natural).alignment, .natural)
+    }
+
+    func testParagraphStyleKeepsSharedLineBreakStrategy() {
+        XCTAssertEqual(ReaderPageLayoutEngine.paragraphStyle().lineBreakStrategy, .pushOut)
+    }
+
+    func testMeasureHeightDefaultsToTheSameAlignmentAsTheRenderer() {
+        let text = String(repeating: "分页测量和绘制必须使用同一个对齐方式。", count: 8)
+        let byDefault = ReaderPageLayoutEngine.measureHeight(text, typography: typography())
+        let justified = ReaderPageLayoutEngine.measureHeight(
+            text,
+            typography: typography(),
+            alignment: .justified
+        )
+        XCTAssertEqual(byDefault, justified, accuracy: 0.001)
+    }
+
+    func testTitleMeasurementAcceptsNaturalAlignment() {
+        let title = "第一章 风起"
+        let natural = ReaderPageLayoutEngine.measureHeight(
+            title,
+            typography: typography(),
+            font: typography().titleFont,
+            alignment: .natural
+        )
+        XCTAssertGreaterThan(natural, 0)
+    }
+
     func testLineBreakStrategyIsPushOut() {
         // `.pushOut` keeps 。，）」 on the line that owns them. The paginator
         // and the rendering surface must read the same constant; if one side

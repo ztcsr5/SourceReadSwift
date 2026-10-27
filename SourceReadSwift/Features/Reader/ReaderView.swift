@@ -5587,7 +5587,8 @@ struct ReaderView: View {
             currentHeight = ReaderPageLayoutEngine.measureHeight(
                 transformedTitle,
                 typography: titleTypography,
-                font: typography.titleFont
+                font: typography.titleFont,
+                alignment: .natural
             ) + typography.titleSpacing
             currentIncludesTitle = true
         }

@@ -283,8 +283,21 @@ struct SourceRequestBuilder {
             }
         }
         trimmed = normalizePathDoubleSlashes(trimmed)
+        // A rule may return `javascript:void(0)` or `about:blank`. Handing that
+        // straight to URLSession fails with CFNetwork -1000, which surfaced as
+        // the generic "URL 格式非法或解析异常" bucket in diagnostics. Drop the
+        // pseudo-scheme and resolve the remainder against the source host.
+        if let colon = trimmed.firstIndex(of: ":"),
+           !trimmed[..<colon].contains("/"),
+           !trimmed[..<colon].contains("?"),
+           !Self.isNetworkScheme(String(trimmed[..<colon])) {
+            trimmed = String(trimmed[trimmed.index(after: colon)...])
+                .trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+        }
         let encodedTrimmed = Self.percentEncodePreservingExistingEscapes(trimmed)
-        if let absolute = URL(string: encodedTrimmed), absolute.scheme != nil {
+        if let absolute = URL(string: encodedTrimmed),
+           let scheme = absolute.scheme,
+           Self.isNetworkScheme(scheme) {
             let normalized = normalizePathDoubleSlashes(absolute.absoluteString)
             return URL(string: normalized) ?? absolute
         }
@@ -300,6 +313,14 @@ struct SourceRequestBuilder {
             }
         }
         return effectiveBaseURL ?? URL(string: "https://invalid.local")!
+    }
+
+    /// Schemes a source request may actually use. Everything else
+    /// (`javascript:`, `about:`, `file:`, custom app schemes) is not a network
+    /// target and makes URLSession fail with `NSURLErrorBadURL` (-1000).
+    static func isNetworkScheme(_ scheme: String) -> Bool {
+        let value = scheme.lowercased()
+        return value == "http" || value == "https" || value == "data"
     }
 
     static func percentEncodePreservingExistingEscapes(_ raw: String) -> String {

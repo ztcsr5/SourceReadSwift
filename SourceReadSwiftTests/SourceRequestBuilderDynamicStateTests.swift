@@ -27,6 +27,29 @@ final class SourceRequestBuilderDynamicStateTests: XCTestCase {
         XCTAssertEqual(request.headers["Cookie"], "sid=s-7")
     }
 
+    func testPseudoSchemeResolvesAgainstSourceHost() throws {
+        let source = BookSource(
+            bookSourceName: "Pseudo scheme fixture",
+            bookSourceUrl: "https://fixture.example/"
+        )
+
+        let request = SourceRequestBuilder().buildPageRequest(
+            source: source,
+            urlText: "javascript:void(0)"
+        )
+
+        XCTAssertEqual(request.url.scheme, "https")
+        XCTAssertEqual(request.url.host, "fixture.example")
+    }
+
+    func testNetworkSchemeWhitelist() {
+        XCTAssertTrue(SourceRequestBuilder.isNetworkScheme("HTTPS"))
+        XCTAssertTrue(SourceRequestBuilder.isNetworkScheme("data"))
+        XCTAssertFalse(SourceRequestBuilder.isNetworkScheme("javascript"))
+        XCTAssertFalse(SourceRequestBuilder.isNetworkScheme("file"))
+        XCTAssertFalse(SourceRequestBuilder.isNetworkScheme("about"))
+    }
+
     func testPersistentValuesApplyToJSONSourceOptionsWithoutChangingTypes() throws {
         let source = BookSource(
             bookSourceName: "JSON dynamic fixture",

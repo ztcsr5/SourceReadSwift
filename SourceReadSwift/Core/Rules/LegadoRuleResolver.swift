@@ -2,26 +2,38 @@ import Foundation
 import CoreFoundation
 
 struct LegadoRuleResolver {
+    /// Percent-encodes a search keyword exactly the way Legado feeds `{{key}}`.
+    ///
+    /// `.urlQueryAllowed` keeps `& = + ? / :` literal, so a keyword such as
+    /// `剑来&x` silently truncated the query string and the source answered
+    /// with an empty page -- one of the "搜索解析结果为空" shapes in the
+    /// 991-source diagnostic. Java's `URLEncoder.encode` percent-encodes every
+    /// byte outside `A-Z a-z 0-9 . - _ *` and maps the space byte to `+`;
+    /// Legado uses that string verbatim, so mirror it here.
     static func percentEncode(_ text: String, charset: String? = nil) -> String {
         let normalized = charset?.lowercased().replacingOccurrences(of: "-", with: "") ?? "utf8"
+        let data: Data?
         if normalized == "gbk" || normalized == "gb2312" || normalized == "gb18030" {
             let cfEncoding = CFStringEncoding(CFStringEncodings.GB_18030_2000.rawValue)
             let nsEncoding = CFStringConvertEncodingToNSStringEncoding(cfEncoding)
-            let stringEncoding = String.Encoding(rawValue: nsEncoding)
-            if let data = text.data(using: stringEncoding) {
-                return data.map { byte in
-                    if (byte >= 0x41 && byte <= 0x5A) || // A-Z
-                       (byte >= 0x61 && byte <= 0x7A) || // a-z
-                       (byte >= 0x30 && byte <= 0x39) || // 0-9
-                       byte == 0x2D || byte == 0x5F || byte == 0x2E || byte == 0x7E {
-                        return String(UnicodeScalar(byte))
-                    } else {
-                        return String(format: "%%%02X", byte)
-                    }
-                }.joined()
+            data = text.data(using: String.Encoding(rawValue: nsEncoding))
+        } else {
+            data = text.data(using: .utf8)
+        }
+        guard let bytes = data else { return text }
+        var output = ""
+        output.reserveCapacity(bytes.count * 3)
+        for byte in bytes {
+            switch byte {
+            case 0x41...0x5A, 0x61...0x7A, 0x30...0x39, 0x2D, 0x5F, 0x2E, 0x2A:
+                output.append(Character(UnicodeScalar(byte)))
+            case 0x20:
+                output.append("+")
+            default:
+                output.append(String(format: "%%%02X", byte))
             }
         }
-        return text.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? text
+        return output
     }
 
     func interpolate(_ text: String, keyword: String? = nil, page: Int? = nil, baseUrl: String? = nil, charset: String? = nil) -> String {

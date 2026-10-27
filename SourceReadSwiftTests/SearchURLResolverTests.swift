@@ -29,7 +29,37 @@ final class SearchURLResolverTests: XCTestCase {
         guard case .success(let url) = result else {
             return XCTFail("expected success")
         }
-        XCTAssertEqual(url, "https://example.com/search?q=abc%20def&offset=20")
+        XCTAssertEqual(url, "https://example.com/search?q=abc+def&offset=20")
+    }
+
+    func testKeywordPercentEncodesQueryDelimiters() throws {
+        let source = BookSource(
+            bookSourceName: "编码测试",
+            bookSourceUrl: "https://example.com",
+            searchUrl: "https://example.com/search?q={{key}}&page={{page}}"
+        )
+
+        let result = SearchURLResolver().resolve(source: source, keyword: "剑来&x=1", page: 1)
+        guard case .success(let url) = result else {
+            return XCTFail("expected success")
+        }
+        XCTAssertTrue(url.contains("q=%E5%89%91%E6%9D%A5%26x%3D1"), url)
+        XCTAssertFalse(url.contains("剑来"), url)
+        XCTAssertFalse(url.contains("&x=1"), url)
+    }
+
+    func testKeywordUsesGBKWhenSourceDeclaresIt() throws {
+        let source = BookSource(
+            bookSourceName: "GBK 源",
+            bookSourceUrl: "https://example.com",
+            searchUrl: "https://example.com/search?q={{key}}&charset=gbk"
+        )
+
+        let result = SearchURLResolver().resolve(source: source, keyword: "中文", page: 1)
+        guard case .success(let url) = result else {
+            return XCTFail("expected success")
+        }
+        XCTAssertTrue(url.contains("q=%D6%D0%CE%C4"), url)
     }
 
     func testResolveJavaScriptSearchUrl() throws {
@@ -348,9 +378,9 @@ final class SearchURLResolverTests: XCTestCase {
         XCTAssertEqual(AppVersion.versionString, "\(AppVersion.epic).\(AppVersion.major).\(AppVersion.minor)")
         XCTAssertEqual(AppVersion.epic, 1)
         XCTAssertEqual(AppVersion.major, 0)
-        XCTAssertEqual(AppVersion.minor, 68)
-        XCTAssertEqual(AppVersion.build, 69)
+        XCTAssertEqual(AppVersion.minor, 69)
+        XCTAssertEqual(AppVersion.build, 70)
         XCTAssertTrue(AppVersion.displayString.contains(AppVersion.versionString))
-        XCTAssertTrue(AppVersion.fullDisplayString.contains("Build 69"))
+        XCTAssertTrue(AppVersion.fullDisplayString.contains("Build 70"))
     }
 }
