@@ -791,7 +791,7 @@ struct ReaderView: View {
                     .background(Color.black.opacity(0.85))
                     .clipShape(Capsule())
                     .shadow(color: .black.opacity(0.2), radius: 8, y: 4)
-                    .padding(.top, 50)
+                    .padding(.top, readerTopSafeInset + 12)
                     .transition(.move(edge: .top).combined(with: .opacity))
                     Spacer()
                 }
@@ -2676,23 +2676,34 @@ struct ReaderView: View {
         .animation(.easeInOut(duration: 0.2), value: status)
     }
 
-    /// 全屏阅读时阅读页忽略了安全区，页脚必须自己让开 home indicator。
-    /// 全屏阅读时阅读页忽略了安全区，页眉必须自己让开刘海/灵动岛。
-    private var readerTopSafeInset: CGFloat {
-        let scene = UIApplication.shared.connectedScenes
-            .compactMap { $0 as? UIWindowScene }
-            .first { $0.activationState == .foregroundActive }
-        let inset = scene?.windows.first(where: { $0.isKeyWindow })?.safeAreaInsets.top ?? 0
-        return max(inset, 0)
+    /// 全屏阅读忽略了安全区，页眉页脚必须自己让开刘海与 home indicator。
+    /// 所有窗口取最大安全区：key window 可能是容器窗口（安全区为 0），
+    /// 只取 key window 会让页眉直接压到状态栏下面。
+    private var readerResolvedSafeInsets: ReaderSafeAreaResolver.Insets {
+        let scenes = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }
+        var windowTop: CGFloat = 0
+        var windowBottom: CGFloat = 0
+        var statusBarHeight: CGFloat = 0
+        for scene in scenes {
+            for window in scene.windows {
+                windowTop = max(windowTop, window.safeAreaInsets.top)
+                windowBottom = max(windowBottom, window.safeAreaInsets.bottom)
+            }
+            if let frame = scene.statusBarManager?.statusBarFrame {
+                statusBarHeight = max(statusBarHeight, frame.height)
+            }
+        }
+        return ReaderSafeAreaResolver.resolve(
+            windowTop: windowTop,
+            windowBottom: windowBottom,
+            statusBarHeight: statusBarHeight,
+            screenSize: UIScreen.main.bounds.size
+        )
     }
 
-    private var readerFooterSafeInset: CGFloat {
-        let scene = UIApplication.shared.connectedScenes
-            .compactMap { $0 as? UIWindowScene }
-            .first { $0.activationState == .foregroundActive }
-        let inset = scene?.windows.first(where: { $0.isKeyWindow })?.safeAreaInsets.bottom ?? 0
-        return max(inset, 0)
-    }
+    private var readerTopSafeInset: CGFloat { readerResolvedSafeInsets.top }
+
+    private var readerFooterSafeInset: CGFloat { readerResolvedSafeInsets.bottom }
 
     private var batteryPercentageText: String {
         let level = UIDevice.current.batteryLevel
@@ -2817,7 +2828,7 @@ struct ReaderView: View {
             .background(.ultraThinMaterial)
             .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
             .padding(.horizontal, 16)
-            .padding(.top, 4)
+            .padding(.top, readerTopSafeInset + 4)
 
             Spacer()
 
@@ -2914,7 +2925,7 @@ struct ReaderView: View {
             .padding(.bottom, 18)
             .glassPanel(cornerRadius: 26, material: .ultraThinMaterial, strokeOpacity: background.isDark ? 0.09 : 0.12, shadowOpacity: background.isDark ? 0.42 : 0.14)
             .padding(.horizontal, 14)
-            .padding(.bottom, 10)
+            .padding(.bottom, max(readerFooterSafeInset, 10) + 10)
         }
         .foregroundStyle(chromeForeground)
     }
@@ -2992,10 +3003,10 @@ struct ReaderView: View {
 
     private var settingsPanel: some View {
         GeometryReader { proxy in
-            let bottomPadding = max(proxy.safeAreaInsets.bottom, 14)
+            let bottomPadding = max(readerFooterSafeInset, 14)
             let maxHeight = ReaderSettingsLayoutPolicy.maxPanelHeight(
                 viewportHeight: proxy.size.height,
-                bottomInset: proxy.safeAreaInsets.bottom
+                bottomInset: readerFooterSafeInset
             )
 
             VStack {
@@ -3330,7 +3341,7 @@ struct ReaderView: View {
                     .stroke(Color.white.opacity(background.isDark ? 0.08 : 0.35), lineWidth: 0.8)
             }
             .padding(.horizontal, 18)
-            .padding(.top, 12)
+            .padding(.top, readerTopSafeInset + 12)
 
             Spacer()
         }
@@ -3367,7 +3378,7 @@ struct ReaderView: View {
                     .stroke(Color.orange.opacity(0.45), lineWidth: 0.8)
             }
             .padding(.horizontal, 18)
-            .padding(.top, statusMessage == nil ? 12 : 58)
+            .padding(.top, readerTopSafeInset + (statusMessage == nil ? 12 : 58))
 
             Spacer()
         }
