@@ -444,7 +444,10 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
     }
 
     func getContent(source: BookSource, chapter: BookChapter) async -> Result<ChapterContent, SourceEngineError> {
-        await getContent(source: source, chapter: chapter, maxPages: 8)
+        // Match `appendNextContentPages`'s safety cap. Leaving the convenience
+        // entry point at 8 silently truncated every paginated chapter after
+        // eight pages, even though the paginator itself allowed 24.
+        await getContent(source: source, chapter: chapter, maxPages: 24)
     }
 
     func getContent(source: BookSource, chapter: BookChapter, maxPages: Int) async -> Result<ChapterContent, SourceEngineError> {
@@ -533,7 +536,7 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
                 canonicalURL: SourcePaginationURLIdentity().canonical(request.url),
                 pagesLoaded: 0,
                 retainedItemCount: 0,
-                maxPages: 8
+                maxPages: maxPages
             )
             return .failure(error)
         }
