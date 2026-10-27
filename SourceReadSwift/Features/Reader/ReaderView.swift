@@ -722,6 +722,7 @@ struct ReaderView: View {
                 Color.clear
                     .preference(key: ReaderViewportSizePreferenceKey.self, value: proxy.size)
             }
+            .ignoresSafeArea()
         }
         .background(ReaderNavigationPopLock())
         .navigationBarBackButtonHidden(true)
@@ -729,6 +730,7 @@ struct ReaderView: View {
         .statusBarHidden(!showOverlay && !showSystemStatusBar)
         .preferredColorScheme(background.isDark ? .dark : .light)
         .highRefreshRateSurface()
+        .ignoresSafeArea()
         .confirmationDialog("购买本章", isPresented: $showPayActionConfirmation, titleVisibility: .visible) {
             Button("继续购买") {
                 Task { await performPayAction() }
@@ -2174,8 +2176,6 @@ struct ReaderView: View {
         content()
             .padding(.horizontal, CGFloat(pagePadding))
             .padding(.top, pageTopInset)
-            // 底部只给页脚条让出实际高度：footerHeight 是「安全留白」设置（40…180），
-            // 直接当内边距用会在三种分页模式里留下半屏空白。页脚本体只有 20pt。
             .padding(.bottom, pagedBottomPadding)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
             .background {
@@ -2195,19 +2195,17 @@ struct ReaderView: View {
                     readerThemeBackground
                 }
             }
+            .ignoresSafeArea()
     }
 
-    /// 分页表面的顶部留白：与滚动模式同一套规则（工具栏可见 56pt，收起后贴安全区）。
+    /// 翻页阅读顶部紧凑规约（贴合灵动岛/刘海边缘，杜绝大片黑空）
     private var pageTopInset: CGFloat {
-        // 工具栏是浮层，正文不跟着让位：以前用 showOverlay 切两套内边距，
-        // 弹出菜单时整页文本会往下掉一格，关掉又跳回来。
-        ReaderPageLayoutEngine.minimumTopInset(pagePadding: CGFloat(pagePadding))
+        ReaderPageLayoutEngine.minimumTopInset(pagePadding: CGFloat(pagePadding), safeTop: readerTopSafeInset)
     }
 
-    /// 分页模式底部预留：页脚本体 20pt + 半个边距，和分页排版用同一个数，
-    /// 否则排版按 37pt 算、渲染按 64pt 留，页面底部就空出一截。
+    /// 翻页模式底部预留：避让 home indicator 并留出适量呼吸感
     private var pagedBottomPadding: CGFloat {
-        CGFloat(pagePadding) * 0.5 + 26
+        max(readerFooterSafeInset, 16) + 8
     }
 
     /// 页脚实际占用高度（20pt 条 + 6pt 间距），分页模式固定预留 26pt。
@@ -4791,7 +4789,7 @@ struct ReaderView: View {
             chapterPageCacheSignature = layoutSignature
         }
 
-        let topPadding = ReaderPageLayoutEngine.minimumTopInset(pagePadding: CGFloat(pagePadding))
+        let topPadding = ReaderPageLayoutEngine.minimumTopInset(pagePadding: CGFloat(pagePadding), safeTop: readerTopSafeInset)
         let bottomPadding = pagedBottomPadding
         let typography = ReaderPageTypography(
             font: fontFamily.uiFont(ofSize: CGFloat(fontSize), customPostScriptName: customFontPostScriptName),

@@ -34,6 +34,10 @@ enum SandboxEnvironment {
 
     /// Safe batch concurrency to avoid exhausting memory or Mach ports.
     static var recommendedBatchConcurrency: Int {
-        isLiveContainer ? 2 : 3
+        let saved = UserDefaults.standard.integer(forKey: "batch_check_concurrent_threads")
+        if saved >= 1 && saved <= 16 {
+            return saved
+        }
+        return isLiveContainer ? 2 : 4
     }
 }

@@ -30,6 +30,7 @@ struct SourceManagerView: View {
     @State private var batchCheckScope: BatchCheckScope = .enabled
     @State private var batchCheckKeyword = "斗破苍穹"
     @State private var batchCheckDeepCheck = true
+    @AppStorage("batch_check_concurrent_threads") private var batchCheckConcurrency: Int = 4
     @State private var batchCheckExportNotice: String?
     @State private var sourceLogin: BookSource?
     @State private var sourceHistory: BookSource?
@@ -252,7 +253,16 @@ struct SourceManagerView: View {
                 jsonPreviewSheet(preview)
             }
             .sheet(item: $sourceTest) { state in
-                sourceTestSheet(state)
+                SourceTestSheetView(
+                    source: state.source,
+                    initialKeyword: state.keyword,
+                    onOpenLogin: {
+                        sourceLogin = state.source
+                    },
+                    onDismiss: {
+                        sourceTest = nil
+                    }
+                )
             }
             .sheet(isPresented: $showBatchCheckSheet, onDismiss: presentPendingBatchRuleEditor) {
                 batchCheckSheet
@@ -1190,64 +1200,105 @@ struct SourceManagerView: View {
         .presentationDetents([.large])
     }
 
-    private func sourceTestSheet(_ state: SourceTestState) -> some View {
-        NavigationStack {
-            VStack(alignment: .leading, spacing: 14) {
-                Text(state.source.bookSourceUrl)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .textSelection(.enabled)
+    private struct SourceTestSheetView: View {
+        let source: BookSource
+        let initialKeyword: String
+        let onOpenLogin: () -> Void
+        let onDismiss: () -> Void
 
-                TextField("测试关键词", text: Binding(
-                    get: { sourceTest?.keyword ?? state.keyword },
-                    set: { sourceTest?.keyword = $0 }
-                ))
-                .textFieldStyle(.roundedBorder)
-                .textInputAutocapitalization(.never)
+        @State private var keyword: String
+        @State private var isRunning = false
+        @State private var output: String = ""
 
-                if state.source.loginUrl?.nilIfEmpty != nil {
+        init(source: BookSource, initialKeyword: String, onOpenLogin: @escaping () -> Void, onDismiss: @escaping () -> Void) {
+            self.source = source
+            self.initialKeyword = initialKeyword
+            self.onOpenLogin = onOpenLogin
+            self.onDismiss = onDismiss
+            self._keyword = State(initialValue: initialKeyword)
+        }
+
+        var body: some View {
+            NavigationStack {
+                VStack(alignment: .leading, spacing: 14) {
+                    Text(source.bookSourceUrl)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .textSelection(.enabled)
+
+                    TextField("测试关键词", text: $keyword)
+                        .textFieldStyle(.roundedBorder)
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled(true)
+
+                    if source.loginUrl?.nilIfEmpty != nil {
+                        Button {
+                            onOpenLogin()
+                        } label: {
+                            Label("先打开登录/验证页", systemImage: "lock.open")
+                                .frame(maxWidth: .infinity)
+                        }
+                        .buttonStyle(.bordered)
+                    }
+
                     Button {
-                        sourceLogin = state.source
+                        Task { await runTest() }
                     } label: {
-                        Label("先打开登录/验证页", systemImage: "lock.open")
+                        Label(isRunning ? "测试中..." : "开始测试", systemImage: "play.circle")
                             .frame(maxWidth: .infinity)
                     }
-                    .buttonStyle(.bordered)
-                }
+                    .buttonStyle(.borderedProminent)
+                    .disabled(isRunning || keyword.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
 
-                Button {
-                    Task { await runSourceTest() }
-                } label: {
-                    Label(sourceTest?.isRunning == true ? "测试中..." : "开始测试", systemImage: "play.circle")
-                        .frame(maxWidth: .infinity)
-                }
-                .buttonStyle(.borderedProminent)
-                .disabled(sourceTest?.isRunning == true)
-
-                ScrollView {
-                    Text(sourceTest?.output ?? "将执行搜索 URL、网络请求、解码和搜索规则解析。")
-                        .font(.system(.footnote, design: .monospaced))
-                        .textSelection(.enabled)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                }
-                .frame(maxHeight: .infinity)
-            }
-            .padding()
-            .navigationTitle(state.source.bookSourceName)
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Copy") {
-                        UIPasteboard.general.string = sourceTest?.output ?? state.output ?? ""
+                    ScrollView {
+                        Text(output.isEmpty ? "输入关键词后点击开始测试，将按阶段执行 URL、解析规则与数据抓取。" : output)
+                            .font(.system(.footnote, design: .monospaced))
+                            .textSelection(.enabled)
+                            .frame(maxWidth: .infinity, alignment: .leading)
                     }
-                    .disabled((sourceTest?.output ?? state.output ?? "").isEmpty)
+                    .frame(maxHeight: .infinity)
                 }
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("关闭") { sourceTest = nil }
+                .padding()
+                .navigationTitle(source.bookSourceName)
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .confirmationAction) {
+                        Button("Copy") {
+                            UIPasteboard.general.string = output
+                        }
+                        .disabled(output.isEmpty)
+                    }
+                    ToolbarItem(placement: .cancellationAction) {
+                        Button("关闭", action: onDismiss)
+                    }
                 }
             }
+            .presentationDetents([.medium, .large])
         }
-        .presentationDetents([.medium, .large])
+
+        private func runTest() async {
+            isRunning = true
+            let trimmedKeyword = keyword.trimmingCharacters(in: .whitespacesAndNewlines)
+            output = "==== 开始测试书源: \(source.bookSourceName) ====\nURL: \(source.bookSourceUrl)\n关键词: \(trimmedKeyword)\n----------------------------------------\n"
+
+            let engine = SourceEngine()
+            let execution = await SourceBatchDiagnosticRunner.executeDetailedDiagnostic(
+                source: source,
+                keyword: trimmedKeyword,
+                engine: engine
+            )
+
+            for step in execution.result.report.steps {
+                output += "[\(step.status == .success ? "PASS" : "FAIL")] \(step.stage.title): \(step.detail)\n"
+            }
+
+            if let error = execution.result.error {
+                output += "\n[FAIL] 诊断失败: \(error.displayMessage)\n"
+            } else {
+                output += "\n[SUCCESS] 书源全链路测试通过！\n"
+            }
+            isRunning = false
+        }
     }
 
 private struct BatchCheckCoordinatorObserver<Content: View>: View {
@@ -1421,6 +1472,9 @@ private struct BatchCheckCoordinatorObserver<Content: View>: View {
                     }
 
                     VStack(alignment: .leading, spacing: 4) {
+                        Stepper("并发线程数: \(batchCheckConcurrency) 线程", value: $batchCheckConcurrency, in: 1...16)
+                            .font(.subheadline)
+
                         Toggle("搜索通过后深测首条结果", isOn: $batchCheckDeepCheck)
                             .font(.subheadline.weight(.semibold))
 

@@ -39,7 +39,7 @@ final class ReaderPageLayoutEngineTests: XCTestCase {
         XCTAssertEqual(ReaderPageLayoutEngine.minimumTopInset(pagePadding: 20, safeTop: 0), 20)
         XCTAssertEqual(ReaderPageLayoutEngine.minimumTopInset(pagePadding: 48, safeTop: 0), 48)
         XCTAssertEqual(ReaderPageLayoutEngine.minimumTopInset(pagePadding: 60, safeTop: 0), 60)
-        XCTAssertEqual(ReaderPageLayoutEngine.minimumTopInset(pagePadding: 20, safeTop: 59), 59 + 5)
+        XCTAssertEqual(ReaderPageLayoutEngine.minimumTopInset(pagePadding: 20, safeTop: 59), 59 + 4)
     }
 
     // MARK: - Measurement

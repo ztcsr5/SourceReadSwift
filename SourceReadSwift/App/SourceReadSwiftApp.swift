@@ -6,6 +6,11 @@ struct SourceReadSwiftApp: App {
     @AppStorage("settings.themeMode") private var themeModeRawValue = ThemeMode.system.rawValue
     @Environment(\.scenePhase) private var scenePhase
 
+    init() {
+        UIImpactFeedbackGenerator.initializeHapticsControl()
+        UINotificationFeedbackGenerator.initializeNotificationHapticsControl()
+    }
+
     var body: some Scene {
         WindowGroup {
             RootTabView()

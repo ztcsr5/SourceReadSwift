@@ -1448,10 +1448,9 @@ final class DiscoverViewModel: ObservableObject {
         let engine = appState.engine
         var hitSources = Set<String>()
         var failures: [String] = []
-        // A fixed batch of 12 made every batch wait for its slowest source, so
-        // 17 batches could serialise up to 17 × 10s. A sliding window keeps the
-        // same 12 requests in flight and publishes each answer immediately.
-        let maxConcurrent = 12
+        // Sliding window concurrency respects user configuration (default 12, range 2..32).
+        let savedConcurrency = UserDefaults.standard.integer(forKey: "search_concurrent_threads")
+        let maxConcurrent = (savedConcurrency >= 2 && savedConcurrency <= 32) ? savedConcurrency : 12
         // Per-source timeouts still bound each request; this bounds the whole run.
         let overallDeadline = Date().addingTimeInterval(20)
         var lastPublishAt = Date.distantPast
@@ -1464,7 +1463,7 @@ final class DiscoverViewModel: ObservableObject {
 
         func publishIfNeeded(force: Bool) async {
             let now = Date()
-            if !force, now.timeIntervalSince(lastPublishAt) < 0.2 { return }
+            if !force, now.timeIntervalSince(lastPublishAt) < 0.4 { return }
             lastPublishAt = now
             hitSourceCount = hitSources.count
             totalResultCount = rawResults.count

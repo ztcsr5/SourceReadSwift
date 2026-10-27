@@ -60,6 +60,8 @@ struct PageCurlReaderView<Item: Identifiable, Content: View>: UIViewControllerRe
         pvc.isDoubleSided = false
         pvc.view.backgroundColor = .clear
         pvc.view.clipsToBounds = true
+        pvc.view.insetsLayoutMarginsFromSafeArea = false
+        pvc.additionalSafeAreaInsets = .zero
 
         let initialIndex = ReaderPagedNavigationPolicy.clampedPageIndex(
             currentPageIndex,
@@ -202,6 +204,8 @@ private final class PageHostingController<Content: View>: UIHostingController<Co
         super.viewDidLoad()
         view.backgroundColor = .clear
         view.clipsToBounds = true
+        view.insetsLayoutMarginsFromSafeArea = false
+        additionalSafeAreaInsets = .zero
     }
 
     override func viewDidLayoutSubviews() {

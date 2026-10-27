@@ -6,6 +6,9 @@ struct SettingsView: View {
     @EnvironmentObject private var appState: AppState
     @AppStorage("settings.themeMode") private var themeModeRawValue = ThemeMode.system.rawValue
     @ObservedObject private var proxyManager = SourceProxyManager.shared
+    @AppStorage("app.hapticsEnabled") private var hapticsEnabled = true
+    @AppStorage("search_concurrent_threads") private var searchThreads = 12
+    @AppStorage("batch_check_concurrent_threads") private var batchCheckThreads = 4
     @State private var cacheSize = "无缓存"
     @State private var rssCacheSize = "无缓存"
     @State private var backupDocument: AppDataBackupDocument?
@@ -98,6 +101,18 @@ struct SettingsView: View {
                                 .foregroundStyle(.secondary)
                         }
                     }
+                }
+
+                Section("交互与反馈") {
+                    Toggle("触控震动反馈", isOn: $hapticsEnabled)
+                        .onChange(of: hapticsEnabled) { enabled in
+                            UserDefaults.standard.set(enabled, forKey: "app.hapticsEnabled")
+                        }
+                }
+
+                Section("并发与性能") {
+                    Stepper("搜书并发线程数: \(searchThreads) 线程", value: $searchThreads, in: 2...32)
+                    Stepper("书源校验并发线程数: \(batchCheckThreads) 线程", value: $batchCheckThreads, in: 1...16)
                 }
 
                 Section("通用") {

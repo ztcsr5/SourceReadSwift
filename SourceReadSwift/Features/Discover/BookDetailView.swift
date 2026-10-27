@@ -1409,6 +1409,7 @@ struct ChapterLoadingView: View {
 private struct BookDetailAllChaptersView: View {
     @Environment(\.dismiss) private var dismiss
     let chapters: [BookChapter]
+    @State private var selectedChapterForReading: BookChapter? = nil
     let book: SearchBook
     let bookID: String
     /// Local imports resolve through the bookshelf record because they have no
@@ -1473,18 +1474,8 @@ private struct BookDetailAllChaptersView: View {
                                     .font(.caption.weight(.bold))
                                     .foregroundStyle(.secondary)
                             }
-                            NavigationLink {
-                                if let shelfBook = localBook {
-                                    BookshelfReaderGatewayView(book: shelfBook, initialChapterIndex: chapter.index)
-                                } else {
-                                    ChapterLoadingView(
-                                        bookID: bookID,
-                                        sourceUrl: book.sourceUrl,
-                                        chapter: chapter,
-                                        totalChapters: chapters.count,
-                                        chapters: chapters
-                                    )
-                                }
+                            Button {
+                                selectedChapterForReading = chapter
                             } label: {
                                 HStack(spacing: 12) {
                                     Text("\(chapter.index + 1)")
@@ -1511,12 +1502,27 @@ private struct BookDetailAllChaptersView: View {
                                             .foregroundStyle(.orange)
                                     }
                                 }
+                                .contentShape(Rectangle())
                             }
+                            .buttonStyle(.plain)
                         }
                     }
                 }
                 .listStyle(.plain)
                 .scrollDismissesKeyboard(.interactively)
+                .navigationDestination(item: $selectedChapterForReading) { chapter in
+                    if let shelfBook = localBook {
+                        BookshelfReaderGatewayView(book: shelfBook, initialChapterIndex: chapter.index)
+                    } else {
+                        ChapterLoadingView(
+                            bookID: bookID,
+                            sourceUrl: book.sourceUrl,
+                            chapter: chapter,
+                            totalChapters: chapters.count,
+                            chapters: chapters
+                        )
+                    }
+                }
             }
             .task(id: query) {
                 if query.isEmpty {

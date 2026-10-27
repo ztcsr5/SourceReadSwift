@@ -35,14 +35,14 @@ enum ReaderPageLayoutEngine {
     static func minimumTopInset(pagePadding: CGFloat, safeTop: CGFloat? = nil) -> CGFloat {
         let safe = safeTop ?? safeAreaTopInset
         if safe >= 44 {
-            // 刘海屏 / 灵动岛机型 (iPhone X ~ 16)：让出顶部物理挖孔避让区，避免文字被切或顶格遮挡
-            return safe + max(pagePadding * 0.25, 4)
+            // 刘海屏 / 灵动岛机型 (iPhone X ~ 16)：紧凑避让顶部挖孔，正文紧随页眉展开，拒绝大面积空白
+            return safe + 4
         } else if safe > 0 {
             // 普通状态栏机型 (iPhone SE、iPad)
-            return max(safe + 6, pagePadding)
+            return safe + 8
         } else {
             // 单元测试 / 零安全区环境：保持基准值
-            return pagePadding
+            return max(pagePadding, 16)
         }
     }
 
