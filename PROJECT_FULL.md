@@ -2159,6 +2159,46 @@ SwiftUI `Image` 在 `ZStack` 提案阶段仍可能按比例填充后的理想尺
 
 ---
 
+## 二十三、v1.0.71 请求预算与空解析诊断（2026-10-28）
+
+> 提交 `b876d89`；iOS run `40595399470`（1143 tests / 0 failures）；IPA run `40595399610`。
+
+### 23.1 问题定位
+
+「搜索/目录超时」这条诊断曾经被理解成阶段预算 12 秒，但实际是两层预算不一致：
+
+- `SourcePipeline` 阶段预算 `timeout: TimeInterval = 20`，超时后还有一次 `isTransientNetworkFailure` 重试；
+- `SourceRequestBuilder.resolvedTimeout` 的单请求兜底是 `12`。
+
+结果是 12-20 秒才返回的源在请求层就被切断，重试窗口只剩 8 秒，阶段预算永远吃不满。本轮把单请求兜底改为 `SourceRequestBuilder.defaultTimeout = 20`，与阶段预算对齐：死源最坏耗时不变（20 秒），慢源获得完整窗口。
+
+### 23.2 空解析诊断分级
+
+`SearchResultParser` / `ChapterListParser` 的空结果不再统一报「结果为空」，而是区分：
+
+- 列表规则 0 命中：`... 规则未命中（0 个节点/项，响应 N 字符）`；
+- 列表命中但字段为空：`... 命中 N 个节点/项但书名/章节名为空`。
+
+分类仍由 `SourceEngineError.empty` 决定，`SourceDiagnosticClassifier` 与健康度统计不受文案影响。
+
+### 23.3 已存在、本轮未重做的能力
+
+- 搜索/目录的 JSON↔HTML 互查兜底：`295fe30`（v1.0.6）、`23e0834`（v1.0.43）；字段全空的条目被 `compactMap` 丢弃后同样落入空分支。
+- 阶段级 20 秒与超时重试：`SourcePipeline` L91 / L157-165。
+
+### 23.4 证据
+
+| 项 | 值 |
+|---|---|
+| 代码提交 | `b876d89` |
+| iOS CI | run `40595399470` / job `122511649649`，1143 tests / 0 failures |
+| IPA CI | run `40595399610` |
+| IPA | `SourceReadSwift-1.0.71-unsigned.ipa`，12,197,026 B |
+| SHA256 | `077D13628530E3A1252E7C19A0559B73E1C84D8AB51FD2F539713C84A06FD0DC` |
+| 版本 | `1.0.71 / 72`，MinimumOSVersion 16.0 |
+
+---
+
 ## 附录 A：完整文件清单
 
 > 以下为 2026-10-25 工作区实测清单。`build/`、`ci-log/`、`AppIcons_Candidates/` 为本地产物/素材，不计入源码。
