@@ -17,6 +17,34 @@ struct SourceRequest: Sendable {
     let body: Data?
     let expectedCharset: String?
     let timeout: TimeInterval
+    /// URL-option `webView`: skip the plain HTTP probe and render in WebKit.
+    let webView: Bool
+    /// URL-option `webJs`: overrides `ruleContent.webJs` for this request.
+    let webJs: String?
+    /// URL-option `retry`: extra transport attempts after a failure.
+    let retry: Int
+
+    init(
+        url: URL,
+        method: SourceHTTPMethod,
+        headers: [String: String],
+        body: Data?,
+        expectedCharset: String?,
+        timeout: TimeInterval,
+        webView: Bool = false,
+        webJs: String? = nil,
+        retry: Int = 0
+    ) {
+        self.url = url
+        self.method = method
+        self.headers = headers
+        self.body = body
+        self.expectedCharset = expectedCharset
+        self.timeout = timeout
+        self.webView = webView
+        self.webJs = webJs
+        self.retry = retry
+    }
 }
 
 struct SourceResponse: Sendable {

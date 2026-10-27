@@ -24,7 +24,7 @@ struct SearchURLResolver {
                 options: .regularExpression
             ).trimmingCharacters(in: .whitespacesAndNewlines)
         }
-        let isGBK = Self.isGBKEncoding(searchUrl: searchUrl, source: source)
+        let searchCharset = Self.charset(searchUrl: searchUrl, source: source)
         let scriptVariables = scriptVariables(source: source, keyword: keyword, page: page)
         let trimmedCleaned = cleaned.trimmingCharacters(in: .whitespacesAndNewlines)
 
@@ -36,7 +36,7 @@ struct SearchURLResolver {
                 keyword: keyword,
                 page: page,
                 baseUrl: source.bookSourceUrl,
-                charset: isGBK ? "gbk" : nil
+                charset: searchCharset
             )
             let safeURL = urlSafeString(normalizePathDoubleSlashes(interpolatedURL))
             guard !suffixPart.isEmpty else {
@@ -49,7 +49,7 @@ struct SearchURLResolver {
                     keyword: nil,
                     page: page,
                     baseUrl: source.bookSourceUrl,
-                    charset: isGBK ? "gbk" : nil
+                    charset: searchCharset
                 )
                 interpolatedSuffix = pageAndBaseInterpolated
                     .replacingOccurrences(of: "{{key}}", with: keyword)
@@ -64,7 +64,7 @@ struct SearchURLResolver {
                     keyword: keyword,
                     page: page,
                     baseUrl: source.bookSourceUrl,
-                    charset: isGBK ? "gbk" : nil
+                    charset: searchCharset
                 )
             }
             return safeURL + interpolatedSuffix
@@ -408,6 +408,28 @@ struct SearchURLResolver {
         values["header"] = source.header ?? ""
         values["customConfig"] = source.customConfig ?? ""
         return values
+    }
+
+    /// Effective charset for the search keyword.
+    ///
+    /// Android Legado reads `charset` from the URL option JSON (AnalyzeUrl.kt
+    /// L186) and passes it to `analyzeFields`, where `"escape"` switches to
+    /// `EncoderUtils.escape`.  Falling back to the GBK heuristic keeps every
+    /// source that never declared a charset working as before.
+    static func charset(searchUrl: String, source: BookSource) -> String? {
+        let (_, suffixPart) = splitURLAndDirectiveSuffix(searchUrl)
+        if !suffixPart.isEmpty,
+           let brace = suffixPart.range(of: "{"),
+           let data = String(suffixPart[brace.lowerBound...]).data(using: .utf8),
+           let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+            for key in ["charset", "encoding", "encode"] {
+                if let value = object[key] as? String {
+                    let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+                    if !trimmed.isEmpty { return trimmed }
+                }
+            }
+        }
+        return isGBKEncoding(searchUrl: searchUrl, source: source) ? "gbk" : nil
     }
 
     static func isGBKEncoding(searchUrl: String, source: BookSource) -> Bool {

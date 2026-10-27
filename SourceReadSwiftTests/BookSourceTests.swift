@@ -206,6 +206,92 @@ final class BookSourceTests: XCTestCase {
         )
     }
 
+    // MARK: - Legado URL-option parity (v1.0.73)
+
+    func testLegadoEscapeEncoderMatchesAndroidEncoderUtils() {
+        // EncoderUtils.escape keeps only ASCII letters/digits and emits
+        // lowercase hex; `- _ . @ * /` are all escaped, unlike JS `escape()`.
+        XCTAssertEqual(LegadoRuleResolver.escapeEncode("剑来"), "%u5251%u6765")
+        XCTAssertEqual(LegadoRuleResolver.escapeEncode("a b"), "a%20b")
+        XCTAssertEqual(LegadoRuleResolver.escapeEncode("A1-_.@*/"), "A1%2d%5f%2e%40%2a%2f")
+        XCTAssertEqual(LegadoRuleResolver.escapeEncode(""), "")
+    }
+
+    func testInterpolateHonoursLegadoEscapeCharset() {
+        let resolved = LegadoRuleResolver().interpolate(
+            "https://example.com/s?q={{keyword}}",
+            keyword: "剑来",
+            page: 1,
+            charset: "escape"
+        )
+        XCTAssertEqual(resolved, "https://example.com/s?q=%u5251%u6765")
+    }
+
+    func testURLDirectiveParsesLegadoWebViewOption() {
+        let directive = SourceURLDirectiveParser().parse(
+            #"https://example.com/api, {"webView":true,"webJs":"document.body.innerText","retry":2,"type":"json"}"#
+        )
+        XCTAssertEqual(directive.urlText, "https://example.com/api")
+        XCTAssertEqual(directive.webView, true)
+        XCTAssertEqual(directive.webJs, "document.body.innerText")
+        XCTAssertEqual(directive.retry, 2)
+        XCTAssertEqual(directive.responseType, "json")
+        XCTAssertEqual(directive.method, .get)
+    }
+
+    func testURLDirectiveTreatsPresentWebViewKeyAsEnabled() {
+        // Legado only checks `option.webView?.toString()?.isNotBlank()`, so a
+        // literal `false` still turns the WebView path on.
+        let directive = SourceURLDirectiveParser().parse(#"https://example.com/api, {"webView":false}"#)
+        XCTAssertEqual(directive.webView, true)
+    }
+
+    func testURLDirectiveKeepsHTTPVerbTypeAsMethod() {
+        let directive = SourceURLDirectiveParser().parse(#"https://example.com/api, {"type":"POST"}"#)
+        XCTAssertEqual(directive.method, .post)
+        XCTAssertNil(directive.responseType)
+    }
+
+    func testSearchRequestCarriesWebViewAndRetryOptions() {
+        let source = BookSource(
+            bookSourceName: "WebView Option",
+            bookSourceUrl: "https://example.com",
+            searchUrl: #"https://example.com/api, {"webView":true,"retry":3}"#
+        )
+
+        let request = SourceRequestBuilder().buildSearchRequest(
+            source: source,
+            searchUrl: source.searchUrl!,
+            keyword: "剑来",
+            page: 1
+        )
+
+        XCTAssertTrue(request.webView)
+        XCTAssertEqual(request.retry, 3)
+        XCTAssertNil(request.webJs)
+    }
+
+    func testSearchRequestPicksUpEscapeCharsetFromURLJSON() {
+        let source = BookSource(
+            bookSourceName: "Escape Charset",
+            bookSourceUrl: "https://example.com",
+            searchUrl: #"https://example.com/search?q={{keyword}}, {"charset":"escape"}"#
+        )
+
+        let request = SourceRequestBuilder().buildSearchRequest(
+            source: source,
+            searchUrl: source.searchUrl!,
+            keyword: "剑来",
+            page: 1
+        )
+
+        XCTAssertEqual(request.expectedCharset, "escape")
+        XCTAssertTrue(
+            request.url.absoluteString.contains("q=%25u5251%25u6765"),
+            "escape output must survive URL canonicalisation as a literal %: \(request.url.absoluteString)"
+        )
+    }
+
     func testRequestBuilderEscapesKeywordInsideJSONTextBody() {
         let source = BookSource(
             bookSourceName: "JSON Text Body",

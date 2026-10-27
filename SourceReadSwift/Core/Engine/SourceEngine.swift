@@ -603,12 +603,33 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
         ))
     }
 
+    /// Repeats the transport when the URL option asked for `retry`
+    /// (Legado `UrlOption.retry`).  A successful response short-circuits.
+    private func loadWithRetry(_ request: SourceRequest, attempts: Int) async -> Result<SourceResponse, SourceEngineError> {
+        var result = await network.load(request)
+        var remaining = min(max(attempts, 0), 5)
+        while remaining > 0 {
+            if case .success = result { break }
+            remaining -= 1
+            result = await network.load(request)
+        }
+        return result
+    }
+
     private func loadWithOptionalWebViewFallback(
         _ request: SourceRequest,
         source: BookSource,
         stage: String
     ) async -> Result<SourceResponse, SourceEngineError> {
-        let primary = await network.load(request)
+        // Legado `webView` on the URL option skips the plain socket entirely
+        // (AnalyzeUrl.kt L188); `retry` adds transport attempts (L187).
+        let forcedWebView = request.webView && allowWebViewFallback && !SandboxEnvironment.isLiveContainer
+        let primary: Result<SourceResponse, SourceEngineError>
+        if forcedWebView {
+            primary = .failure(.network("URL option requested WebView"))
+        } else {
+            primary = await loadWithRetry(request, attempts: request.retry)
+        }
         if case .success(let rawResponse) = primary {
             let response = ResponseBodyDecoder().normalize(rawResponse, preferredCharset: request.expectedCharset)
             persistentState(for: source).ingestResponse(response)
@@ -628,7 +649,9 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
             }
         }
         let shouldFallback: Bool
-        if case .success(let raw) = primary {
+        if forcedWebView {
+            shouldFallback = true
+        } else if case .success(let raw) = primary {
             let response = ResponseBodyDecoder().normalize(raw, preferredCharset: request.expectedCharset)
             shouldFallback = shouldUseWebViewFallback(source: source, response: response, stage: stage)
         } else {
@@ -654,7 +677,7 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
         let htmlResult = await WebViewFallback(cookieStore: cookieStore).load(
             url: request.url,
             delay: delay,
-            javaScript: assets.javaScript,
+            javaScript: request.webJs ?? assets.javaScript,
             sourceRegex: assets.sourceRegex,
             overrideUrlRegex: assets.overrideUrlRegex
         )

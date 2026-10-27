@@ -36,6 +36,40 @@ struct LegadoRuleResolver {
         return output
     }
 
+    /// `charset: "escape"` selects Legado's `EncoderUtils.escape` instead of
+    /// `java.net.URLEncoder` (AnalyzeUrl.kt L226-236).
+    static func encodeKeyword(_ keyword: String, charset: String? = nil) -> String {
+        if charset?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() == "escape" {
+            return escapeEncode(keyword)
+        }
+        return percentEncode(keyword, charset: charset)
+    }
+
+    /// Android Legado `EncoderUtils.escape` (see app/src/main/java/io/legado/app/utils/EncoderUtils.kt L12-29).
+    ///
+    /// Only ASCII letters and digits survive; everything else becomes `%XX`
+    /// (or `%uXXXX` above U+00FF).  This is deliberately stricter than the
+    /// browser `escape()` builtin, which also keeps `- _ . * @ + /`.
+    static func escapeEncode(_ value: String) -> String {
+        var output = ""
+        output.reserveCapacity(value.count * 3)
+        for unit in value.utf16 {
+            switch unit {
+            case 0x30...0x39, 0x41...0x5A, 0x61...0x7A:
+                if let scalar = Unicode.Scalar(unit) {
+                    output.unicodeScalars.append(scalar)
+                }
+            case 0x0000...0x000F:
+                output += "%0" + String(unit, radix: 16)
+            case 0x0010...0x00FF:
+                output += "%" + String(unit, radix: 16)
+            default:
+                output += "%u" + String(unit, radix: 16)
+            }
+        }
+        return output
+    }
+
     func interpolate(_ text: String, keyword: String? = nil, page: Int? = nil, baseUrl: String? = nil, charset: String? = nil) -> String {
         var output = text
         if let page {
@@ -45,7 +79,7 @@ struct LegadoRuleResolver {
             output = output.replacingOccurrences(of: "{page}", with: String(page))
         }
         if let keyword {
-            let encoded = Self.percentEncode(keyword, charset: charset)
+            let encoded = Self.encodeKeyword(keyword, charset: charset)
             output = output.replacingOccurrences(of: "{{key}}", with: encoded)
             output = output.replacingOccurrences(of: "{{keyword}}", with: encoded)
             output = output.replacingOccurrences(of: "{{searchKey}}", with: encoded)

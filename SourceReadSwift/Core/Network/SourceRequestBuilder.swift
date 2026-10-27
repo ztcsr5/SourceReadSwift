@@ -45,7 +45,7 @@ struct SourceRequestBuilder {
         page: Int,
         persistentValues: [String: String] = [:]
     ) -> SourceRequest {
-        let isGBK = SearchURLResolver.isGBKEncoding(searchUrl: searchUrl, source: source)
+        let searchCharset = SearchURLResolver.charset(searchUrl: searchUrl, source: source)
         let ruleResolver = LegadoRuleResolver()
         let expanded = LegadoRuleResolver.replacePageAngles(in: searchUrl, page: page)
         let (urlPart, suffixPart) = SearchURLResolver.splitURLAndDirectiveSuffix(expanded)
@@ -54,7 +54,7 @@ struct SourceRequestBuilder {
             keyword: keyword,
             page: page,
             baseUrl: source.bookSourceUrl,
-            charset: isGBK ? "gbk" : nil
+            charset: searchCharset
         )
         let resolvedText: String
         if !suffixPart.isEmpty {
@@ -66,7 +66,7 @@ struct SourceRequestBuilder {
                     keyword: nil,
                     page: page,
                     baseUrl: source.bookSourceUrl,
-                    charset: isGBK ? "gbk" : nil
+                    charset: searchCharset
                 )
                 resolvedSuffix = pageAndBase
                     .replacingOccurrences(of: "{{key}}", with: keyword)
@@ -81,7 +81,7 @@ struct SourceRequestBuilder {
                     keyword: keyword,
                     page: page,
                     baseUrl: source.bookSourceUrl,
-                    charset: isGBK ? "gbk" : nil
+                    charset: searchCharset
                 )
             }
             resolvedText = resolvedURLPart + resolvedSuffix
@@ -189,7 +189,10 @@ struct SourceRequestBuilder {
             headers: headers,
             body: body,
             expectedCharset: charset,
-            timeout: timeout
+            timeout: timeout,
+            webView: directive.webView ?? false,
+            webJs: directive.webJs,
+            retry: directive.retry ?? 0
         )
     }
 

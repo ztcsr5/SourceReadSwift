@@ -7,6 +7,18 @@ struct SourceURLDirective: Equatable {
     var body: Data?
     var expectedCharset: String?
     var timeout: TimeInterval?
+    /// Legado `UrlOption.webView` (AnalyzeUrl.kt L188).  Android only checks
+    /// that the key is present, so `{"webView": false}` also forces WebKit;
+    /// we keep the same rule for compatibility.
+    var webView: Bool?
+    /// Legado `UrlOption.webJs` (L189): JS run inside the rendered page.
+    var webJs: String?
+    /// Legado `UrlOption.js` (L190-194): JS run against the final URL string.
+    var urlJavaScript: String?
+    /// Legado `UrlOption.retry` (L187): extra transport attempts.
+    var retry: Int?
+    /// Legado `UrlOption.type` (L185): response kind (`json` / `html`).
+    var responseType: String?
 
     init(
         urlText: String,
@@ -14,7 +26,12 @@ struct SourceURLDirective: Equatable {
         headers: [String: String] = [:],
         body: Data? = nil,
         expectedCharset: String? = nil,
-        timeout: TimeInterval? = nil
+        timeout: TimeInterval? = nil,
+        webView: Bool? = nil,
+        webJs: String? = nil,
+        urlJavaScript: String? = nil,
+        retry: Int? = nil,
+        responseType: String? = nil
     ) {
         self.urlText = urlText
         self.method = method
@@ -22,6 +39,11 @@ struct SourceURLDirective: Equatable {
         self.body = body
         self.expectedCharset = expectedCharset
         self.timeout = timeout
+        self.webView = webView
+        self.webJs = webJs
+        self.urlJavaScript = urlJavaScript
+        self.retry = retry
+        self.responseType = responseType
     }
 }
 
@@ -40,6 +62,11 @@ struct SourceURLDirectiveParser {
         var body: Data?
         var expectedCharset: String?
         var timeout: TimeInterval?
+        var webView: Bool?
+        var webJs: String?
+        var urlJavaScript: String?
+        var retry: Int?
+        var responseType: String?
 
         let directives = splitURLAndTrailingDirectives(working)
         working = directives.url
@@ -78,9 +105,46 @@ struct SourceURLDirectiveParser {
                let parsed = timeoutSeconds(rawTimeout) {
                 timeout = parsed
             }
+            // Legado treats any present `webView` key as "use WebKit"
+            // (`option.webView?.toString()?.isNotBlank() == true`).
+            if options.keys.contains(where: { $0.caseInsensitiveCompare("webView") == .orderedSame }) {
+                webView = true
+            }
+            webJs = firstString(in: options, keys: ["webJs", "webJS"])?
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+                .nilIfEmpty
+            urlJavaScript = firstString(in: options, keys: ["js"])?
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+                .nilIfEmpty
+            if let rawRetry = firstValue(in: options, keys: ["retry"]),
+               let parsedRetry = integerValue(rawRetry),
+               parsedRetry > 0 {
+                retry = parsedRetry
+            }
+            // `type` is also accepted as a method alias above; only keep it as
+            // a response kind when it is not a valid HTTP verb.
+            if let typeText = firstString(in: options, keys: ["type"]) {
+                let trimmedType = typeText.trimmingCharacters(in: .whitespacesAndNewlines)
+                if !trimmedType.isEmpty,
+                   SourceHTTPMethod(rawValue: trimmedType.uppercased()) == nil {
+                    responseType = trimmedType
+                }
+            }
         }
 
-        return SourceURLDirective(urlText: working, method: method, headers: headers, body: body, expectedCharset: expectedCharset, timeout: timeout)
+        return SourceURLDirective(
+            urlText: working,
+            method: method,
+            headers: headers,
+            body: body,
+            expectedCharset: expectedCharset,
+            timeout: timeout,
+            webView: webView,
+            webJs: webJs,
+            urlJavaScript: urlJavaScript,
+            retry: retry,
+            responseType: responseType
+        )
     }
 
     private func splitURLAndTrailingDirectives(_ text: String) -> (url: String, header: String?, body: String?, charset: String?) {
@@ -295,6 +359,12 @@ struct SourceURLDirectiveParser {
             return text
         }
         return String(describing: value)
+    }
+
+    private func integerValue(_ value: Any) -> Int? {
+        if let number = value as? NSNumber { return number.intValue }
+        if let text = value as? String { return Int(text.trimmingCharacters(in: .whitespacesAndNewlines)) }
+        return nil
     }
 
     private func timeoutSeconds(_ value: Any) -> TimeInterval? {
