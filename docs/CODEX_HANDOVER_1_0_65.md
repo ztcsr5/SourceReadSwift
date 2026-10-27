@@ -270,3 +270,13 @@ git revert 36b1e23 a21223a 68e4253
 - 含插图页仍使用 SwiftUI `Text`，该页正文不是两端对齐；
 - `UITextView` 在 page curl 快照动画中的表现需真机确认；
 - 分页测量仍按无缩进字符串计算行数，`justified` 不改变断行位置，理论上不影响分页；真机若出现末行裁切，优先核对 `contentHeight` 与 UITextView 的 line fragment 高度。
+
+## 十一、iOS 16 兼容性审计（2026-10-28，`ffb9da4`）
+
+完整审计见 `docs/IOS16-COMPAT-AUDIT-1.0.65.md`。结论：
+
+- 部署目标 iOS 16.0，CI Build 通过 → 所有出现的系统 API 在 iOS 16 都有实现；未加 `#available` 的 iOS 17 API 会在编译期失败。
+- 静态扫描：`ContentUnavailableView`、双参数 `onChange`、`scrollTargetBehavior`、`containerRelativeFrame`、`@Observable`、`SwiftData` 等 0 命中；唯一 16.4 API `presentationBackground` 已有 `#available(16.4)` 分支。
+- TextKit 页新增 iOS16 防御：`contentInsetAdjustmentBehavior = .never`、`contentInset = .zero`、`maximumNumberOfLines = 0`、`sizeThatFits` 返回固定提案，避免 `UIPageViewController` 子控制器的安全区 inset 和内容高度撑开页面。
+- 仍需真机确认：pageCurl 对 `UITextView` 的快照、首帧 bounds 为 0 的 layout、苹方在 iOS16 的 lineHeight 差异。
+- 验证：CI `40559137785`，`1102 tests / 0 failures`；IPA `40559137604`，`C:/Users/Edc21/Desktop/SourceReadSwift-1.0.65-ios16-unsigned.ipa`，`12,155,355` 字节，SHA256 `761616A840F65F6E44CE149EA65EA9592C68A8D661B68C4CB09677F4ED173AB9`。
