@@ -71,6 +71,43 @@ final class ReaderPageTextBuilderTests: XCTestCase {
         XCTAssertGreaterThan(titleFont?.pointSize ?? 0, bodyFont?.pointSize ?? 0)
     }
 
+    func testBodyAndTitleUsePushOutLineBreakStrategy() {
+        let title = "第一章 标题"
+        let result = ReaderPageTextBuilder.make(
+            title: title,
+            paragraphs: [
+                .init(text: "　　正文内容，标点不应落到行首。", isContinuation: false, isHighlighted: false)
+            ],
+            style: makeStyle()
+        )
+
+        XCTAssertEqual(
+            paragraphStyle(result, at: 0)?.lineBreakStrategy,
+            .pushOut,
+            "title must hang CJK punctuation instead of pushing it to the next line"
+        )
+        XCTAssertEqual(
+            paragraphStyle(result, at: title.utf16.count + 1)?.lineBreakStrategy,
+            .pushOut,
+            "body must measure and render with the paginator's strategy"
+        )
+    }
+
+    func testMinimumAndMaximumLineHeightStayUnset() {
+        let result = ReaderPageTextBuilder.make(
+            title: nil,
+            paragraphs: [
+                .init(text: "　　正文。", isContinuation: false, isHighlighted: false)
+            ],
+            style: makeStyle()
+        )
+
+        // Setting either would override the font's natural leading and make
+        // rendered height diverge from `ReaderPageLayoutEngine.measureHeight`.
+        XCTAssertEqual(paragraphStyle(result, at: 0)?.minimumLineHeight ?? 0, 0, accuracy: 0.01)
+        XCTAssertEqual(paragraphStyle(result, at: 0)?.maximumLineHeight ?? 0, 0, accuracy: 0.01)
+    }
+
     func testHighlightAddsBackground() {
         let result = ReaderPageTextBuilder.make(
             title: nil,

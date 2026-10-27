@@ -146,4 +146,10 @@ final class ReaderPageLayoutEngineTests: XCTestCase {
             ).isEmpty
         )
     }
+    func testLineBreakStrategyIsPushOut() {
+        // `.pushOut` keeps 。，）」 on the line that owns them. The paginator
+        // and the rendering surface must read the same constant; if one side
+        // changes, a page measures one line and draws another.
+        XCTAssertEqual(ReaderPageLayoutEngine.lineBreakStrategy, .pushOut)
+    }
 }

@@ -22,6 +22,16 @@ struct ReaderPageTypography {
 }
 
 enum ReaderPageLayoutEngine {
+    /// CJK line-breaking policy shared by the paginator and the renderer.
+    ///
+    /// With the default `.standard` strategy TextKit is happy to start a line
+    /// with `。`, `，`, `）` or `」`; in Chinese typesetting that is the most
+    /// visible "typeset by an engineer" tell. `.pushOut` lets the preceding
+    /// glyph hang slightly past the margin instead of pushing the punctuation
+    /// to the next line. The paginator and the page renderer must use the same
+    /// strategy, otherwise a page measures one line and draws another.
+    static let lineBreakStrategy: NSParagraphStyle.LineBreakStrategy = .pushOut
+
     /// The top inset for reader surfaces. Setting this to 0 eliminates artificial
     /// blank gaps at the top of the reading page while keeping content aligned
     /// with the configured page padding.
@@ -131,6 +141,7 @@ enum ReaderPageLayoutEngine {
         // without double-counting line spacing on every line.
         style.lineSpacing = 0
         style.lineBreakMode = .byWordWrapping
+        style.lineBreakStrategy = lineBreakStrategy
         style.alignment = .natural
         let storage = NSTextStorage(
             string: text,

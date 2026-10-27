@@ -33,6 +33,7 @@ enum ReaderPageTextBuilder {
             let titleStyle = NSMutableParagraphStyle()
             titleStyle.lineSpacing = 0
             titleStyle.paragraphSpacing = style.titleSpacing
+            titleStyle.lineBreakStrategy = ReaderPageLayoutEngine.lineBreakStrategy
             titleStyle.alignment = .natural
             output.append(NSAttributedString(
                 string: title + "\n",
@@ -50,6 +51,7 @@ enum ReaderPageTextBuilder {
             paragraphStyle.paragraphSpacing = index == paragraphs.count - 1
                 ? 0
                 : (paragraph.isContinuation ? 0 : style.paragraphSpacing)
+            paragraphStyle.lineBreakStrategy = ReaderPageLayoutEngine.lineBreakStrategy
             paragraphStyle.alignment = .justified
             // The indent is already part of `paragraph.text`; adding it here
             // would double the first line and break pagination measurement.
