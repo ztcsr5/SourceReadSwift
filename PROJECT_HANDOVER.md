@@ -1,11 +1,11 @@
 # SourceReadSwift (纸间) 项目交接全量备忘录
 
 > **交接目标**：交接给下一位 AI 协作者 / 研发工程师  
-> **文档基线**：v1.0.30 (Build 31)  
-> **交接时间**：2026-10-25  
-> **验证 Commit**：`91c9161`（GitHub Actions iOS 987 tests / 0 failures；unsigned IPA 打包通过）  
-> **最新产物**：`C:\Users\Edc21\Desktop\SourceReadSwift-1.0.30-unsigned.ipa`（11,507,953 字节，SHA256 `05F3EC27C1FD065D91289045229D0B25A2DCF4E5E5A1FCFCE86313624AA10261`）  
-> **全量文档**：项目全貌、功能矩阵、生态分析与 v1.0.30 工作记录见 `PROJECT_FULL.md`。
+> **文档基线**：v1.0.60 (Build 61)；下文主体保留 v1.0.30 (Build 31) 历史记录  
+> **交接时间**：2026-10-27  
+> **验证 Commit**：`ceb647a`（GitHub Actions iOS build 成功；1057 tests / 0 failures；unsigned IPA 打包通过）  
+> **最新产物**：`C:\Users\Edc21\Desktop\SourceReadSwift-1.0.60-unsigned.ipa`（12,024,153 字节，SHA256 `F4960385D9A3386DAD1151CBC8FB895BFBE5861CCCA232352C3791883B073289`）  
+> **全量文档**：项目全貌、功能矩阵、生态分析与 v1.0.60 工作记录见 `PROJECT_FULL.md`（阅读界面重构见 §十三）。
 
 > **最新交接（v1.0.60，2026-10-27，分支 `codex/reader-feedback-fixes`）**：阅读界面已按开元 / 栖阅截图像素量测重构——单一几何来源 `ReaderPageGeometry`、每页内置页眉页脚、页码 `当前页/本章总页`、仿真翻页 tap 去重、滑动容器 inset 归零、跨章续读提前缓冲。本轮完整交接见 `docs/CODEX_HANDOVER_1_0_60.md`；书源解析能力评估见 `docs/书源解析能力评估-1.0.60.md`。  
 > **说明**：下文主体仍以 v1.0.30 为基线，保留 v1.0.22→v1.0.30 的完整工程记录；v1.0.31→v1.0.60 的增量以新交接文档与 `PROJECT_FULL.md` §十三 为准。
