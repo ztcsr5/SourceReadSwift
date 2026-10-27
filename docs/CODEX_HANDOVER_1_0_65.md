@@ -229,3 +229,44 @@ git revert 36b1e23 a21223a 68e4253
 - 新增 3 个测试：TextKit 正文同时保留 40pt 首行缩进并 justify、WebView 正文保留 `text-indent` 且含 `text-align-last`、章节标题不继承缩进。
 - 验证：CI iOS run `40544883395`，`1098 tests / 0 failures`；IPA run `40544883327`，`C:/Users/Edc21/Desktop/SourceReadSwift-1.0.65-align-unsigned.ipa`，`12,136,991` 字节，SHA256 `95416C4060B3795C80F4C52EA41CECB12E2AC0A0028B99DFE75936679A1CF85A`。
 - 边界：平移/覆盖/仿真分页使用 SwiftUI `Text`，没有 justified 能力，分页模式仍是左对齐；统一两端对齐需要把分页页视图改为 TextKit 渲染，列为下一项。
+
+## 十、分页 TextKit 两端对齐（2026-10-28，`c711e9e`）
+
+### 10.1 问题
+
+平移 / 覆盖 / 仿真三种分页模式由 SwiftUI `Text` 逐段渲染。`Text` 没有 justified 对齐能力，正文始终左对齐、右侧参差；WebView 与滑动模式的 justify 改动无法覆盖这三种模式。
+
+### 10.2 实现
+
+- 新增 `ReaderPageTextView`：`UIViewRepresentable` 包装非滚动 `UITextView(usingTextLayoutManager: false)`，`textContainerInset = .zero`、`lineFragmentPadding = 0`、`textContainer.widthTracksTextView = true`，并用低 hugging / compression 优先级避免固有尺寸撑开页面。
+- 新增 `ReaderPageTextBuilder`：把一页的标题与所有正文段落合成一个 `NSAttributedString`。
+  - 正文 `paragraphStyle.alignment = .justified`；
+  - `firstLineHeadIndent = 0`、`headIndent = 0`：首行缩进已经由分页文本里的全角空格承担，避免双重缩进，也保证与 `ReaderPageLayoutEngine` 的测量字符串一致；
+  - 段落间距、行距、字距、标题字号与标题间距分别映射 `paragraphSpacing` / `lineSpacing` / `kern` / `titleFont` / `titleSpacing`；
+  - 朗读中的段落用 `backgroundColor` 高亮，不再用 SwiftUI padding 改变页面高度。
+- `readerPage(for:)` 分支：
+  - 纯文本页 → `ReaderPageTextView`；
+  - 含插图页 → 保留原 SwiftUI `VStack`（图片卡片需要独立点击区域，不能塞进 text view）；
+  - 占位页不变。
+- 文本选择关闭（默认）时 `isUserInteractionEnabled = false`，不吞翻页 tap；开启选择时保留 `UITextView` 的选择交互。
+
+### 10.3 验证
+
+- 新增 `ReaderPageTextBuilderTests` 4 例：正文 justified 且不叠加 head indent、续页/末段无段后距、标题字号更大且标题间距正确、高亮背景存在。
+- CI iOS run `40556533771`：`1102 tests / 0 failures`，`** TEST SUCCEEDED **`。
+- IPA run `40556533405`：`C:/Users/Edc21/Desktop/SourceReadSwift-1.0.65-textkit-unsigned.ipa`，`12,154,717` 字节，SHA256 `4C3A82686DB04FEBA725F31304CBB4AD2A373072F83A5FF044FE4849A84ECF0E`；包内 1.0.65 / Build 66 / MinimumOSVersion 16.0。
+
+### 10.4 真机验收（待验收）
+
+1. 三种分页模式 + 上下滑动：正文整行两端对齐，最后一行不被拉伸；
+2. 首行缩进仍为 2 字符，续页 chunk 不缩进；
+3. 长段落跨页：最后一行不被裁切，页数与此前一致或更少；
+4. 朗读高亮跟随段落，页面不因高亮跳动；
+5. 含插图页仍可点开图片，文本回退路径无崩溃；
+6. 开启「文本选择」后长按可选，关闭时点击翻页正常。
+
+### 10.5 已知边界
+
+- 含插图页仍使用 SwiftUI `Text`，该页正文不是两端对齐；
+- `UITextView` 在 page curl 快照动画中的表现需真机确认；
+- 分页测量仍按无缩进字符串计算行数，`justified` 不改变断行位置，理论上不影响分页；真机若出现末行裁切，优先核对 `contentHeight` 与 UITextView 的 line fragment 高度。
