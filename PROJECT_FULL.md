@@ -2199,6 +2199,52 @@ SwiftUI `Image` 在 `ZStack` 提案阶段仍可能按比例填充后的理想尺
 
 ---
 
+## 二十四、v1.0.72 / v1.0.73 书源 URL 选项与 escape 编码（2026-10-28）
+
+> 提交 `39310c2`（1.0.72）+ `a4c066b`（1.0.73）；iOS run `40598707154` / job `122521108228` = 1153 tests / 0 failures；IPA run `40598707151`。
+
+### 24.1 v1.0.72：POST 表单体与 `@js:` 绑定
+
+- `SourceRequestBuilder` 的 `KeywordEncoding` 分三档：`.percent`（`java.net.URLEncoder` 语义，GBK 走 charset）、`.jsonLiteral`（只转义 `" \ \n \r \t` 与控制字符）、`.raw`（JSON 对象交给 `JSONSerialization`）。旧实现用 `addingPercentEncoding(.urlQueryAllowed)`，保留 `& = + ? / :`，POST 表单体里的关键词会把请求截成多个字段，站点返回空页 —— 这就是「搜索解析结果为空」的一类。
+- `SearchURLResolver`：整条 `searchUrl` 以 `@js:` / `<js>…</js>` 开头时，变量字典补 `result = cleaned`。Legado `AnalyzeUrl.analyzeJs()` L100-121 正是这样绑定；源里 `result.replace(...)` 之前会抛 ReferenceError，搜索在发请求前就失败。
+
+### 24.2 v1.0.73：`charset: "escape"`
+
+Legado `EncoderUtils.escape`（`EncoderUtils.kt` L12-29）只保留 ASCII 字母数字，其余按 `%0X` / `%XX` / `%uXXXX`（小写十六进制）输出。`LegadoRuleResolver.escapeEncode` 逐行复刻，`encodeKeyword` 按 charset 分派。
+
+取 charset 的位置也修了：`SearchURLResolver.charset(searchUrl:source:)` 先从 URL 选项 JSON 读 `charset` / `encoding` / `encode`，读不到才回落到原有的 GBK 启发式。此前 `charset: "escape"` 会被判成非 GBK，传 `nil` 后退回 UTF-8 百分号编码。
+
+### 24.3 v1.0.73：URL 选项 `webView` / `webJs` / `retry` / `type`
+
+| 选项 | Legado 依据 | 行为 |
+|---|---|---|
+| `webView` | `AnalyzeUrl.kt` L188 | 键存在即为 true（含 `false`）；跳过普通 HTTP，直接 WebKit |
+| `webJs` | L189 | 覆盖本次请求的 `ruleContent.webJs` |
+| `retry` | L187 | 失败后最多再试 5 次，成功即短路 |
+| `type` | L185 | 值是合法 HTTP 动词时仍当 method，否则记为 `responseType` |
+
+链路：`SourceURLDirective` → `SourceRequest` → `SourceRequestBuilder.buildRequest` → `SourceEngine.loadWithOptionalWebViewFallback`。`SourceRequest` 新增字段全部带默认值，旧调用点无需改动。
+
+### 24.4 第三方交叉验证
+
+栖阅 `01_交付包/js/packages_stub.js` L963-983 的 `URLEncoder.encode` 与 `LegadoRuleResolver.percentEncode` 完全一致（空格 `+`，保留 `* - . _`，`%XX` 大写），v1.0.72 的方向得到商业产品验证。
+
+栖阅 `reports/legado_source_keys.txt` 给出真实书源字段频次：`loginUrl` 9 / `loginCheckJs` 7 / `loginUi` **14**。本项目 `loginUi` 目前 0 处引用，是「登录地址无效 / 没有登录选项」的来源：这类源的 `loginUrl` 是 POST 接口，用 WebView 打开必然是空页。JS 侧 `source.getLoginInfoMap` / `putLoginInfo` / `setLoginInfo` / `removeLoginInfo` 已经就绪，缺的是模型字段、表单 UI 和「存 loginInfo → 执行 loginJs」的编排。
+
+### 24.5 证据
+
+| 项 | 值 |
+|---|---|
+| 代码提交 | `39310c2`（1.0.72）、`a4c066b`（1.0.73） |
+| iOS CI | run `40598707154` / job `122521108228`，1153 tests / 0 failures |
+| IPA CI | run `40598707151` |
+| IPA | `SourceReadSwift-1.0.73-unsigned.ipa`，12,206,072 B |
+| SHA256 | `AAD4E89D7515E477070B45F51F3645FBE516C022D63C5B2CE275AC652AA86951` |
+| 版本 | `1.0.73 / 74`，MinimumOSVersion 16.0 |
+| 交接 | `docs/CODEX_HANDOVER_1_0_73.md` |
+
+---
+
 ## 附录 A：完整文件清单
 
 > 以下为 2026-10-25 工作区实测清单。`build/`、`ci-log/`、`AppIcons_Candidates/` 为本地产物/素材，不计入源码。
