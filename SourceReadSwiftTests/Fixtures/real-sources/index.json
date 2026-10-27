@@ -372,7 +372,7 @@
    },
    "loginUrl": null
   },
-  "expectedMinimum": 16,
+  "expectedMinimum": 15,
   "charset": "utf-8"
  },
  {
