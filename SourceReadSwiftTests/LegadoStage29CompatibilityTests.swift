@@ -36,7 +36,7 @@ final class LegadoStage29CompatibilityTests: XCTestCase {
 
         let requests = network.requests
         XCTAssertEqual(requests.map { $0.url.absoluteString }, [
-            "https://fixture.example/stage29/search?q=Matrix%20Reader&page=1",
+            "https://fixture.example/stage29/search?q=Matrix+Reader&page=1",
             "https://fixture.example/stage29/book/1",
             "https://fixture.example/stage29/toc?page=1",
             "https://fixture.example/stage29/toc?page=2",
