@@ -31,7 +31,7 @@ final class WebViewResourceSniffingTests: XCTestCase {
             WebViewCapturedResource(url: "https://api.example/book/991/chapter", body: "{\"text\":\"重复\"}")
         ]
         XCTAssertEqual(
-            WebViewFallback.firstBody(in: resources, matching: "api/book/\\d+/chapter"),
+            WebViewFallback.firstBody(in: resources, matching: "book/[0-9]+/chapter"),
             "{\"text\":\"正文\"}"
         )
     }
