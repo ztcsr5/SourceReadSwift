@@ -8,6 +8,13 @@ struct SourceRequestBuilder {
     /// cutting the request at 12s spent the retry window on a dead socket.
     static let defaultTimeout: TimeInterval = 20
 
+    /// How a search keyword is written into a request body.
+    private enum KeywordEncoding {
+        case percent      // form bodies: java.net.URLEncoder semantics
+        case jsonLiteral  // JSON text bodies: escape quotes/backslashes
+        case raw          // JSON objects: JSONSerialization escapes later
+    }
+
     func buildPageRequest(
         source: BookSource,
         urlText: String,
@@ -131,13 +138,14 @@ struct SourceRequestBuilder {
         let resolvedURLText = interpolateURLValues(directive.urlText, values: persistentValues)
         let effectiveBase = (baseURL?.nilIfEmpty) ?? source.cleanSourceURL
         let url = resolveURL(resolvedURLText, base: effectiveBase)
+        let charset = directive.expectedCharset ?? sourceCharset(source)
         let sourceOptions = requestOptions(
             source,
             keyword: keyword,
             page: page,
+            charset: charset,
             persistentValues: persistentValues
         )
-        let charset = directive.expectedCharset ?? sourceCharset(source)
 
         var headers = sourceHeaders(source, persistentValues: persistentValues)
         mergeHeaders(sourceOptions.headers, into: &headers)
@@ -441,6 +449,7 @@ struct SourceRequestBuilder {
         _ source: BookSource,
         keyword: String?,
         page: Int?,
+        charset: String? = nil,
         persistentValues: [String: String] = [:]
     ) -> (method: SourceHTTPMethod?, body: Data?, headers: [String: String], timeout: TimeInterval?) {
         var method: SourceHTTPMethod?
@@ -479,6 +488,7 @@ struct SourceRequestBuilder {
                    headers: headers,
                    keyword: keyword,
                    page: page,
+                   charset: charset,
                    persistentValues: persistentValues
                ) {
                 body = encoded
@@ -601,16 +611,50 @@ struct SourceRequestBuilder {
         return nil
     }
 
-    private func interpolate(_ text: String, keyword: String?, page: Int?, urlEncodeKeyword: Bool = true) -> String {
+    private func interpolate(
+        _ text: String,
+        keyword: String?,
+        page: Int?,
+        keywordEncoding: KeywordEncoding = .percent,
+        charset: String? = nil
+    ) -> String {
         var output = text
         if let keyword {
-            let keyToUse = urlEncodeKeyword ? (keyword.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? keyword) : keyword
+            let keyToUse: String
+            switch keywordEncoding {
+            case .percent:
+                // `.urlQueryAllowed` leaves `& = + ? / :` literal, so a POST
+                // form body split into extra fields and the source answered
+                // with an empty page.  Java URLEncoder is the Legado shape.
+                keyToUse = LegadoRuleResolver.percentEncode(keyword, charset: charset)
+            case .jsonLiteral:
+                keyToUse = Self.jsonEscaped(keyword)
+            case .raw:
+                keyToUse = keyword
+            }
             output = output
                 .replacingOccurrences(of: "{{key}}", with: keyToUse)
                 .replacingOccurrences(of: "{{keyword}}", with: keyToUse)
         }
         if let page {
             output = output.replacingOccurrences(of: "{{page}}", with: String(page))
+        }
+        return output
+    }
+
+    private static func jsonEscaped(_ value: String) -> String {
+        var output = ""
+        output.reserveCapacity(value.count)
+        for scalar in value.unicodeScalars {
+            switch scalar.value {
+            case 0x22: output += "\\\""
+            case 0x5C: output += "\\\\"
+            case 0x0A: output += "\\n"
+            case 0x0D: output += "\\r"
+            case 0x09: output += "\\t"
+            case 0x00...0x1F: output += String(format: "\\u%04X", scalar.value)
+            default: output.unicodeScalars.append(scalar)
+            }
         }
         return output
     }
@@ -629,6 +673,7 @@ struct SourceRequestBuilder {
         headers: [String: String],
         keyword: String?,
         page: Int?,
+        charset: String? = nil,
         persistentValues: [String: String] = [:]
     ) -> Data? {
         if let text = value as? String {
@@ -637,7 +682,13 @@ struct SourceRequestBuilder {
             let contentType = headers.first { $0.key.caseInsensitiveCompare("Content-Type") == .orderedSame }?.value ?? ""
             let trimmedText = text.trimmingCharacters(in: .whitespacesAndNewlines)
             let isJSON = contentType.localizedCaseInsensitiveContains("application/json") || trimmedText.hasPrefix("{") || trimmedText.hasPrefix("[")
-            let interpolated = interpolate(text, keyword: keyword, page: page, urlEncodeKeyword: !isJSON)
+            let interpolated = interpolate(
+                text,
+                keyword: keyword,
+                page: page,
+                keywordEncoding: isJSON ? .jsonLiteral : .percent,
+                charset: charset
+            )
             return Data(interpolateBodyText(interpolated, values: persistentValues, headers: headers).utf8)
         }
         if let object = value as? [String: Any] {
@@ -646,7 +697,7 @@ struct SourceRequestBuilder {
                 let jsonObject = object.reduce(into: [String: Any]()) { result, item in
                     if let stringValue = item.value as? String {
                         result[item.key] = interpolatePersistentValues(
-                            interpolate(stringValue, keyword: keyword, page: page, urlEncodeKeyword: false),
+                            interpolate(stringValue, keyword: keyword, page: page, keywordEncoding: .raw),
                             values: persistentValues
                         )
                     } else {
@@ -659,7 +710,13 @@ struct SourceRequestBuilder {
             }
             let interpolated = object.reduce(into: [String: String]()) { result, item in
                 result[item.key] = interpolatePersistentValues(
-                    interpolate(stringify(item.value), keyword: keyword, page: page),
+                    interpolate(
+                        stringify(item.value),
+                        keyword: keyword,
+                        page: page,
+                        keywordEncoding: .percent,
+                        charset: charset
+                    ),
                     values: persistentValues
                 )
             }

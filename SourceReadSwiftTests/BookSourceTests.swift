@@ -185,6 +185,47 @@ final class BookSourceTests: XCTestCase {
         XCTAssertEqual(request.headers["Content-Type"], "application/json")
     }
 
+    func testRequestBuilderUsesJavaUrlEncoderForFormBodyKeywords() {
+        let source = BookSource(
+            bookSourceName: "Form Body Encoding",
+            bookSourceUrl: "https://example.com",
+            searchUrl: "https://example.com/api",
+            customConfig: #"{"headers":{"Content-Type":"application/x-www-form-urlencoded"},"body":"q={{keyword}}&page={{page}}"}"#
+        )
+
+        let request = SourceRequestBuilder().buildSearchRequest(
+            source: source,
+            searchUrl: source.searchUrl!,
+            keyword: "剑来&x=1",
+            page: 2
+        )
+
+        XCTAssertEqual(
+            String(data: request.body ?? Data(), encoding: .utf8),
+            "q=%E5%89%91%E6%9D%A5%26x%3D1&page=2"
+        )
+    }
+
+    func testRequestBuilderEscapesKeywordInsideJSONTextBody() {
+        let source = BookSource(
+            bookSourceName: "JSON Text Body",
+            bookSourceUrl: "https://example.com",
+            searchUrl: "https://example.com/api",
+            customConfig: #"{"headers":{"Content-Type":"application/json"},"body":"{\"q\":\"{{keyword}}\"}"}"#
+        )
+
+        let request = SourceRequestBuilder().buildSearchRequest(
+            source: source,
+            searchUrl: source.searchUrl!,
+            keyword: "he said \"hi\"",
+            page: 1
+        )
+
+        let data = request.body ?? Data()
+        let object = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any]
+        XCTAssertEqual(object?["q"] as? String, "he said \"hi\"")
+    }
+
     func testDirectiveBodyOverridesRawBody() {
         let source = BookSource(
             bookSourceName: "Post Source",

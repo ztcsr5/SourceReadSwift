@@ -72,13 +72,21 @@ struct SearchURLResolver {
 
         if trimmedCleaned.hasPrefix("@js:") {
             let script = String(trimmedCleaned.dropFirst(4))
-            let evalResult = evaluateScript(script, source: source, variables: scriptVariables, persistentState: persistentState, network: network, executionContext: executionContext)
+            // Legado binds the rule text being analysed to `result` before
+            // it evaluates `@js:`.  Sources rewrite the URL with
+            // `result.replace(...)`; without the binding the script throws a
+            // ReferenceError and the search dies before any request is sent.
+            var variables = scriptVariables
+            variables["result"] = cleaned
+            let evalResult = evaluateScript(script, source: source, variables: variables, persistentState: persistentState, network: network, executionContext: executionContext)
             return evalResult.map(postProcess)
         }
 
         if trimmedCleaned.hasPrefix("<js>"), trimmedCleaned.hasSuffix("</js>") {
             let script = String(trimmedCleaned.dropFirst(4).dropLast(5))
-            let evalResult = evaluateScript(script, source: source, variables: scriptVariables, persistentState: persistentState, network: network, executionContext: executionContext)
+            var variables = scriptVariables
+            variables["result"] = cleaned
+            let evalResult = evaluateScript(script, source: source, variables: variables, persistentState: persistentState, network: network, executionContext: executionContext)
             return evalResult.map(postProcess)
         }
 

@@ -374,13 +374,27 @@ final class SearchURLResolverTests: XCTestCase {
         XCTAssertEqual(try anchors.map { try $0.text() }, ["Ch 1", "Ch 2"])
     }
 
+    func testSearchURLJavaScriptReceivesResultText() {
+        let source = BookSource(
+            bookSourceName: "JS URL",
+            bookSourceUrl: "https://example.com",
+            searchUrl: #"@js:result.length > 0 ? "https://example.com/search?q=" + key : "https://example.com/fail""#
+        )
+
+        let result = SearchURLResolver().resolve(source: source, keyword: "abc def", page: 1)
+        guard case .success(let url) = result else {
+            return XCTFail("expected success")
+        }
+        XCTAssertEqual(url, "https://example.com/search?q=abc%20def")
+    }
+
     func testAppVersionSemantics() {
         XCTAssertEqual(AppVersion.versionString, "\(AppVersion.epic).\(AppVersion.major).\(AppVersion.minor)")
         XCTAssertEqual(AppVersion.epic, 1)
         XCTAssertEqual(AppVersion.major, 0)
-        XCTAssertEqual(AppVersion.minor, 71)
-        XCTAssertEqual(AppVersion.build, 72)
+        XCTAssertEqual(AppVersion.minor, 72)
+        XCTAssertEqual(AppVersion.build, 73)
         XCTAssertTrue(AppVersion.displayString.contains(AppVersion.versionString))
-        XCTAssertTrue(AppVersion.fullDisplayString.contains("Build 72"))
+        XCTAssertTrue(AppVersion.fullDisplayString.contains("Build 73"))
     }
 }
