@@ -1085,7 +1085,7 @@ private struct AnySourceImportItem: Decodable {
             "rulechapterlist", "rulechaptername", "rulecontenturl", "rulechapterurlnext",
             "rulefindlist", "rulefindname", "rulefindauthor", "rulefindintroduce",
             "rulefindkind", "rulefindnoteurl", "rulefindcoverurl", "rulefindlastchapter",
-            "loginurl", "logincheckjs", "booksourceheader"
+            "loginurl", "logincheckjs", "loginui", "booksourceheader"
         ]
         let hasBookMarker = !loweredKeys.intersection(bookMarkers).isEmpty
 

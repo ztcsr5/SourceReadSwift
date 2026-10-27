@@ -3,45 +3,36 @@ import Foundation
 import WebKit
 
 /// Native login/verification surface for sources that cannot be exercised by URLSession alone.
-/// Cookies are copied into the same actor used by the Legado engine when navigation finishes.
+///
+/// Two modes, mirroring Legado:
+/// - `loginUi` non-empty → a configured form (`RowUi` rows).  Submitting stores
+///   the values where `source.getLoginInfoMap()` reads them and runs `loginUrl`
+///   as JS (`BaseSource.login()`, BaseSource.kt L47-51).
+/// - otherwise → an in-app browser; cookies are copied into the same actor used
+///   by the Legado engine when navigation finishes.
 struct SourceLoginView: View {
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.openURL) private var openURL
     let source: BookSource
     let cookieStore: SourceCookieStore
+    var engine: SourceEngine?
+
     @State private var status = "正在打开登录页…"
+    @State private var input: [String: String] = [:]
+    @State private var busy = false
+
+    private var fields: [SourceLoginField] {
+        SourceLoginFieldParser.parse(source.loginUi)
+    }
 
     var body: some View {
         NavigationStack {
             VStack(spacing: 0) {
-                HStack(spacing: 8) {
-                    Image(systemName: "lock.open")
-                    Text(status)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
-                    Spacer()
-                }
-                .padding(.horizontal, 12)
-                .padding(.vertical, 8)
-                .background(Color.secondary.opacity(0.08))
-
-                if let target = loginTarget {
-                    SourceLoginWebView(url: target.url, cookieStore: cookieStore) { message in
-                        status = message
-                    }
+                statusBar
+                if fields.isEmpty {
+                    pageContent
                 } else {
-                    VStack(spacing: 10) {
-                        Image(systemName: "exclamationmark.triangle")
-                            .font(.title)
-                            .foregroundStyle(.orange)
-                        Text("该书源没有可打开的页面")
-                            .font(.headline)
-                        Text("书源 JSON 既没有 loginUrl，也没有合法的 bookSourceUrl。")
-                            .font(.footnote)
-                            .foregroundStyle(.secondary)
-                            .multilineTextAlignment(.center)
-                    }
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    formContent
                 }
             }
             .navigationTitle(source.bookSourceName)
@@ -51,14 +42,149 @@ struct SourceLoginView: View {
                     Button("关闭") { dismiss() }
                 }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("完成") { dismiss() }
+                    if fields.isEmpty {
+                        Button("完成") { dismiss() }
+                    } else {
+                        Button("登录") { submit() }
+                            .disabled(busy)
+                    }
                 }
             }
         }
         .presentationDetents([.large])
         .onAppear {
-            if loginTarget?.usedBookSourceFallback == true {
+            if fields.isEmpty, loginTarget?.usedBookSourceFallback == true {
                 status = "该书源未配置 loginUrl，已打开书源主页，请登录后点完成"
+            } else if !fields.isEmpty {
+                status = "请输入 \(source.bookSourceName) 的登录信息"
+            }
+        }
+    }
+
+    private var statusBar: some View {
+        HStack(spacing: 8) {
+            if busy {
+                ProgressView().controlSize(.mini)
+            } else {
+                Image(systemName: fields.isEmpty ? "lock.open" : "person.badge.key")
+            }
+            Text(status)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .lineLimit(2)
+            Spacer()
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+        .background(Color.secondary.opacity(0.08))
+    }
+
+    @ViewBuilder
+    private var pageContent: some View {
+        if let target = loginTarget {
+            SourceLoginWebView(url: target.url, cookieStore: cookieStore) { message in
+                status = message
+            }
+        } else {
+            VStack(spacing: 10) {
+                Image(systemName: "exclamationmark.triangle")
+                    .font(.title)
+                    .foregroundStyle(.orange)
+                Text("该书源没有可打开的页面")
+                    .font(.headline)
+                Text("书源 JSON 既没有 loginUrl，也没有合法的 bookSourceUrl。")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+        }
+    }
+
+    private var formContent: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 16) {
+                ForEach(fields) { field in
+                    fieldRow(field)
+                }
+                if !busy {
+                    Button {
+                        submit()
+                    } label: {
+                        Text("登录")
+                            .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .padding(.top, 4)
+                }
+            }
+            .padding(16)
+        }
+    }
+
+    @ViewBuilder
+    private func fieldRow(_ field: SourceLoginField) -> some View {
+        switch field.type {
+        case .text:
+            VStack(alignment: .leading, spacing: 6) {
+                Text(field.name)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                TextField(field.name, text: binding(for: field.name))
+                    .textFieldStyle(.roundedBorder)
+                    .textInputAutocapitalization(.never)
+                    .autocorrectionDisabled()
+                    .disabled(busy)
+            }
+        case .password:
+            VStack(alignment: .leading, spacing: 6) {
+                Text(field.name)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                SecureField(field.name, text: binding(for: field.name))
+                    .textFieldStyle(.roundedBorder)
+                    .disabled(busy)
+            }
+        case .button:
+            Button {
+                if let action = field.action, let url = URL(string: action) {
+                    openURL(url)
+                }
+            } label: {
+                Text(field.name).frame(maxWidth: .infinity)
+            }
+            .buttonStyle(.bordered)
+        }
+    }
+
+    private func binding(for name: String) -> Binding<String> {
+        Binding(
+            get: { input[name] ?? "" },
+            set: { input[name] = $0 }
+        )
+    }
+
+    private func submit() {
+        guard let engine else {
+            status = "阅读引擎尚未就绪，无法提交登录"
+            return
+        }
+        busy = true
+        status = "正在登录…"
+        let credentials = input
+        Task {
+            let result = await engine.login(source: source, credentials: credentials)
+            await MainActor.run {
+                busy = false
+                switch result {
+                case .success(let verification):
+                    status = verification.message
+                    if verification.status == .passed || verification.status == .notConfigured {
+                        dismiss()
+                    }
+                case .failure(let error):
+                    status = "登录失败：\(error.displayMessage)"
+                }
             }
         }
     }

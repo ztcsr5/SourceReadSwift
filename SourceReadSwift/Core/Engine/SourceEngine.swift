@@ -12,6 +12,10 @@ protocol SourceEngine: Sendable {
     /// same persistent state, cookies and JS runtime as the chapter request.
     func performPayAction(source: BookSource, chapter: BookChapter, payAction: String) async -> Result<PayActionOutcome, SourceEngineError>
     func verifyLogin(source: BookSource) async -> Result<SourceLoginVerification, SourceEngineError>
+    /// Stores the `loginUi` form values where `source.getLoginInfoMap()` reads
+    /// them, evaluates `loginUrl` as JS, then reports the `loginCheckJs`
+    /// verdict.  Legado `BaseSource.login()` (BaseSource.kt L47-51).
+    func login(source: BookSource, credentials: [String: String]) async -> Result<SourceLoginVerification, SourceEngineError>
 }
 
 extension SourceEngine {
@@ -29,6 +33,10 @@ extension SourceEngine {
 
     func performPayAction(source: BookSource, chapter: BookChapter, payAction: String) async -> Result<PayActionOutcome, SourceEngineError> {
         .failure(.rule("Pay action is not supported by this engine"))
+    }
+
+    func login(source: BookSource, credentials: [String: String]) async -> Result<SourceLoginVerification, SourceEngineError> {
+        .failure(.unsupported("Login is not supported by this engine"))
     }
 }
 
@@ -540,6 +548,67 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
             )
             return .failure(error)
         }
+    }
+
+    func login(source: BookSource, credentials: [String: String]) async -> Result<SourceLoginVerification, SourceEngineError> {
+        let cleaned = credentials.reduce(into: [String: String]()) { result, item in
+            let key = item.key.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !key.isEmpty else { return }
+            result[key] = item.value
+        }
+        guard !cleaned.isEmpty else {
+            return .failure(.invalidSource("登录信息为空"))
+        }
+        let state = persistentState(for: source)
+        // Re-login replaces the previous account instead of merging into it.
+        state.removePrefix(SourceLoginScript.loginInfoPrefix)
+        for (name, value) in cleaned {
+            state.put(value, for: SourceLoginScript.loginInfoKey(name))
+        }
+
+        guard let script = SourceLoginScript.script(from: source.loginUrl),
+              !SourceLoginScript.isPageURL(source.loginUrl) else {
+            // No JS login step: the credentials are already visible to
+            // `source.getLoginInfoMap()` inside `@js:` rules.
+            return await verifyLogin(source: source)
+        }
+
+        guard let baseURL = URL(string: source.bookSourceUrl),
+              ["http", "https"].contains(baseURL.scheme?.lowercased() ?? "") else {
+            return .failure(.invalidSource("书源 URL 无法用于登录"))
+        }
+        let cookieHeader = await cookieStore.cookieHeader(for: baseURL)
+        let context = RuleExecutionContext(
+            initialValues: [
+                "source": source,
+                "baseUrl": baseURL.absoluteString,
+                "cookieHeader": cookieHeader ?? ""
+            ],
+            persistentState: state,
+            networkHandler: { encoded in
+                SynchronousSourceLoader().loadResponse(urlText: encoded, source: source, cookieHeader: cookieHeader)?.body ?? ""
+            },
+            responseHandler: { encoded in
+                SynchronousSourceLoader().loadResponse(urlText: encoded, source: source, cookieHeader: cookieHeader)
+            },
+            logHandler: { [diagnostics] message in
+                Task { await diagnostics.emit(.init(level: .info, stage: "login.js", sourceName: source.bookSourceName, message: message)) }
+            }
+        )
+        context.setExecutionStage("login")
+        defer { context.cleanUp() }
+        let runtime = JSCoreRuntime(executionContext: context)
+        switch runtime.evaluate(script, variables: [
+            "source": source,
+            "baseUrl": baseURL.absoluteString,
+            "cookieHeader": cookieHeader ?? ""
+        ]) {
+        case .success:
+            break
+        case .failure(let error):
+            return .failure(error)
+        }
+        return await verifyLogin(source: source)
     }
 
     func verifyLogin(source: BookSource) async -> Result<SourceLoginVerification, SourceEngineError> {

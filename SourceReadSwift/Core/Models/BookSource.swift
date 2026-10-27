@@ -59,6 +59,9 @@ struct BookSource: Identifiable, Codable, Hashable, Sendable {
     let header: String?
     let loginUrl: String?
     let loginCheckJs: String?
+    /// Legado `loginUi`: the JSON array of `RowUi` rows that drives the
+    /// configured login form.  Empty means the source logs in through a page.
+    let loginUi: String?
     let customConfig: String?
     let raw: [String: String]
 
@@ -104,6 +107,7 @@ struct BookSource: Identifiable, Codable, Hashable, Sendable {
         case header
         case loginUrl
         case loginCheckJs
+        case loginUi
         case customConfig
         case raw
     }
@@ -125,6 +129,7 @@ struct BookSource: Identifiable, Codable, Hashable, Sendable {
         header: String? = nil,
         loginUrl: String? = nil,
         loginCheckJs: String? = nil,
+        loginUi: String? = nil,
         customConfig: String? = nil,
         raw: [String: String] = [:]
     ) {
@@ -144,6 +149,7 @@ struct BookSource: Identifiable, Codable, Hashable, Sendable {
         self.header = header
         self.loginUrl = loginUrl
         self.loginCheckJs = loginCheckJs
+        self.loginUi = loginUi
         self.customConfig = customConfig
         self.raw = raw
     }
@@ -283,6 +289,7 @@ struct BookSource: Identifiable, Codable, Hashable, Sendable {
             header: string("header") ?? string("headers") ?? string("bookSourceHeader"),
             loginUrl: string("loginUrl"),
             loginCheckJs: string("loginCheckJs"),
+            loginUi: string("loginUi"),
             customConfig: string("customConfig"),
             raw: raw
         )
@@ -306,6 +313,7 @@ struct BookSource: Identifiable, Codable, Hashable, Sendable {
         try container.encodeIfPresent(header, forKey: .header)
         try container.encodeIfPresent(loginUrl, forKey: .loginUrl)
         try container.encodeIfPresent(loginCheckJs, forKey: .loginCheckJs)
+        try container.encodeIfPresent(loginUi, forKey: .loginUi)
         try container.encodeIfPresent(customConfig, forKey: .customConfig)
         if !raw.isEmpty {
             try container.encode(raw, forKey: .raw)
@@ -330,6 +338,7 @@ struct BookSource: Identifiable, Codable, Hashable, Sendable {
             header: header,
             loginUrl: loginUrl,
             loginCheckJs: loginCheckJs,
+            loginUi: loginUi,
             customConfig: customConfig,
             raw: raw
         )
@@ -362,6 +371,7 @@ struct BookSource: Identifiable, Codable, Hashable, Sendable {
             header: header,
             loginUrl: loginUrl,
             loginCheckJs: loginCheckJs,
+            loginUi: loginUi,
             customConfig: customConfig,
             raw: raw
         )

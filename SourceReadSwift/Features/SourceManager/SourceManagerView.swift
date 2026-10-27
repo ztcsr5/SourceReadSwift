@@ -269,7 +269,7 @@ struct SourceManagerView: View {
                 batchCheckSheet
             }
             .sheet(item: $sourceLogin) { source in
-                SourceLoginView(source: source, cookieStore: appState.sourceCookieStore)
+                SourceLoginView(source: source, cookieStore: appState.sourceCookieStore, engine: appState.engine)
             }
             .sheet(item: $sourceHistory) { source in
                 SourceDiagnosticHistoryView(source: source)
