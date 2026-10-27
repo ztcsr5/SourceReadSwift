@@ -25,8 +25,8 @@ struct SourceLoginView: View {
                 .padding(.vertical, 8)
                 .background(Color.secondary.opacity(0.08))
 
-                if let url = loginURL {
-                    SourceLoginWebView(url: url, cookieStore: cookieStore) { message in
+                if let target = loginTarget {
+                    SourceLoginWebView(url: target.url, cookieStore: cookieStore) { message in
                         status = message
                     }
                 } else {
@@ -34,11 +34,12 @@ struct SourceLoginView: View {
                         Image(systemName: "exclamationmark.triangle")
                             .font(.title)
                             .foregroundStyle(.orange)
-                        Text("登录地址无效")
+                        Text("该书源没有可打开的页面")
                             .font(.headline)
-                        Text("请在书源 JSON 中检查 loginUrl。")
+                        Text("书源 JSON 既没有 loginUrl，也没有合法的 bookSourceUrl。")
                             .font(.footnote)
                             .foregroundStyle(.secondary)
+                            .multilineTextAlignment(.center)
                     }
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
@@ -55,13 +56,18 @@ struct SourceLoginView: View {
             }
         }
         .presentationDetents([.large])
+        .onAppear {
+            if loginTarget?.usedBookSourceFallback == true {
+                status = "该书源未配置 loginUrl，已打开书源主页，请登录后点完成"
+            }
+        }
     }
 
-    private var loginURL: URL? {
-        guard let text = source.loginUrl?.trimmingCharacters(in: .whitespacesAndNewlines),
-              let url = URL(string: text),
-              ["http", "https"].contains(url.scheme?.lowercased() ?? "") else { return nil }
-        return url
+    private var loginTarget: SourceLoginURLResolver.Target? {
+        SourceLoginURLResolver.resolve(
+            loginUrl: source.loginUrl,
+            bookSourceUrl: source.bookSourceUrl
+        )
     }
 }
 

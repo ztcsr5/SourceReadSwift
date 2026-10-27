@@ -1322,7 +1322,10 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
         source: BookSource,
         chapter: BookChapter,
         firstURL: URL,
-        maxPages: Int = 8,
+        // Eight pages cut long serialised chapters off mid-sentence on
+        // sources that paginate every 1-2k characters. Keep a safety bound,
+        // but high enough that a normal chapter always finishes.
+        maxPages: Int = 24,
         globalPurifyRules: [String],
         executionContext: RuleExecutionContext
     ) async -> Result<ChapterContent, SourceEngineError> {
@@ -1342,7 +1345,9 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
             attemptedCanonicalURL = urlIdentity.canonical(currentNext)
             if pagesLoaded >= maxPages {
                 stopReason = "max-pages"
-                finalNextURL = nil
+                // Keep the pending URL so the reader can continue from here
+                // instead of treating the truncation as end-of-chapter.
+                finalNextURL = currentNext
                 break
             }
             let request = requestBuilder.buildPageRequest(
@@ -1382,7 +1387,7 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
                     executionContext: executionContext
                 ) {
                 case .success(let nextPage):
-                    paragraphs.append(contentsOf: nextPage.paragraphs)
+                    appendUniqueParagraphs(nextPage.paragraphs, to: &paragraphs)
                     nextURLText = nextPage.nextContentUrl?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty
                     finalNextURL = nextURLText
                     pagesLoaded += 1
@@ -1422,6 +1427,25 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
             imageStyle: firstPage.imageStyle,
             payAction: firstPage.payAction
         ))
+    }
+
+    /// Paginated sources often repeat the last paragraph of page N at the top
+    /// of page N+1 to make the split look seamless. Blind concatenation showed
+    /// that paragraph twice in the reader.
+    private func appendUniqueParagraphs(_ incoming: [String], to existing: inout [String]) {
+        for paragraph in incoming {
+            let trimmed = paragraph.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !trimmed.isEmpty else { continue }
+            if existing.last?.trimmingCharacters(in: .whitespacesAndNewlines) == trimmed {
+                continue
+            }
+            if existing.suffix(3).contains(where: {
+                $0.trimmingCharacters(in: .whitespacesAndNewlines) == trimmed
+            }) {
+                continue
+            }
+            existing.append(paragraph)
+        }
     }
 
     private func chapterURLIdentity(_ value: String, identity: SourcePaginationURLIdentity) -> String {

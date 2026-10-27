@@ -91,7 +91,8 @@ final class BookshelfStore: ObservableObject {
         bookID: String,
         latestChapterTitle: String?,
         intro: String?,
-        totalChapters: Int
+        totalChapters: Int,
+        coverURL: String? = nil
     ) {
         guard let index = books.firstIndex(where: { $0.id == bookID }) else { return }
         let previousTotalChapters = books[index].totalChapters
@@ -102,6 +103,9 @@ final class BookshelfStore: ObservableObject {
         }
         books[index].latestChapterTitle = latestChapterTitle
         books[index].intro = intro ?? books[index].intro
+        if let coverURL = coverURL?.trimmingCharacters(in: .whitespacesAndNewlines), !coverURL.isEmpty {
+            books[index].coverURL = coverURL
+        }
         books[index].totalChapters = max(totalChapters, books[index].totalChapters)
         persist()
     }

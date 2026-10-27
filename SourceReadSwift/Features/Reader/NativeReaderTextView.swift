@@ -1286,7 +1286,7 @@ enum ReaderNativeTextLayout {
             titleStyle.paragraphSpacing = CGFloat(configuration.paragraphSpacing + configuration.titleSpacing)
             titleStyle.alignment = .natural
             let titleAttributes: [NSAttributedString.Key: Any] = [
-                .font: configuration.fontFamily.uiFont(ofSize: CGFloat(configuration.fontSize + 8), weight: .bold),
+                .font: configuration.fontFamily.uiFont(ofSize: CGFloat(ReaderTypographyDefaults.titleFontSize(for: configuration.fontSize)), weight: .bold),
                 .foregroundColor: configuration.textColor,
                 .paragraphStyle: titleStyle
             ]

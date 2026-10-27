@@ -26,6 +26,8 @@ struct SettingsView: View {
     var body: some View {
         NavigationStack {
             List {
+                settingsHeroSection
+
                 Section("外观") {
                     ForEach(ThemeMode.allCases) { mode in
                         Button {
@@ -332,6 +334,79 @@ struct SettingsView: View {
                 Text(backupMessage ?? "")
             }
         }
+    }
+
+    /// The settings screen used to be a plain grey list. A single branded
+    /// gradient header gives the page an anchor without disturbing any of the
+    /// existing controls or their grouping.
+    private var settingsHeroSection: some View {
+        Section {
+            ZStack(alignment: .bottomLeading) {
+                LinearGradient(
+                    colors: [
+                        AppTheme.accent,
+                        AppTheme.accent.opacity(0.78),
+                        Color(red: 0.95, green: 0.46, blue: 0.34).opacity(0.90)
+                    ],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+
+                Circle()
+                    .fill(Color.white.opacity(0.13))
+                    .frame(width: 160, height: 160)
+                    .offset(x: 215, y: -42)
+                Circle()
+                    .fill(Color.white.opacity(0.08))
+                    .frame(width: 96, height: 96)
+                    .offset(x: 275, y: 62)
+
+                VStack(alignment: .leading, spacing: 13) {
+                    HStack(spacing: 12) {
+                        Image(systemName: "books.vertical.fill")
+                            .font(.system(size: 22, weight: .semibold))
+                            .foregroundStyle(.white)
+                            .frame(width: 46, height: 46)
+                            .background(Color.white.opacity(0.18), in: RoundedRectangle(cornerRadius: 13, style: .continuous))
+
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text("纸间 · SourceRead")
+                                .font(.system(size: 18, weight: .bold))
+                                .foregroundStyle(.white)
+                            Text(AppVersion.fullDisplayString)
+                                .font(.system(size: 11, weight: .medium))
+                                .foregroundStyle(.white.opacity(0.78))
+                        }
+                    }
+
+                    HStack(spacing: 8) {
+                        settingsHeroMetric("书源", value: "\(appState.sourceStore.sources.count)")
+                        settingsHeroMetric("书架", value: "\(appState.bookshelfStore.books.count)")
+                        settingsHeroMetric("分组", value: "\(appState.bookshelfStore.groups.count)")
+                    }
+                }
+                .padding(18)
+            }
+            .frame(height: 152)
+            .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+            .listRowInsets(EdgeInsets(top: 4, leading: AppTheme.pagePadding, bottom: 14, trailing: AppTheme.pagePadding))
+            .listRowBackground(Color.clear)
+            .listRowSeparator(.hidden)
+        }
+    }
+
+    private func settingsHeroMetric(_ title: String, value: String) -> some View {
+        VStack(alignment: .leading, spacing: 1) {
+            Text(value)
+                .font(.system(size: 16, weight: .bold))
+                .foregroundStyle(.white)
+            Text(title)
+                .font(.system(size: 10, weight: .medium))
+                .foregroundStyle(.white.opacity(0.72))
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 7)
+        .background(Color.white.opacity(0.14), in: RoundedRectangle(cornerRadius: 9, style: .continuous))
     }
 
     private func importBackup(_ result: Result<[URL], Error>) {

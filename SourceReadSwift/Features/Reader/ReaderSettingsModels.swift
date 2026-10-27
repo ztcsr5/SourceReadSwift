@@ -508,16 +508,22 @@ enum ReaderFontFamily: String, CaseIterable, Identifiable, Codable, Sendable {
 }
 
 enum ReaderTypographyDefaults {
-    // 对标 390×844pt 竞品截图：正文 20.7pt、左右边距 21pt、首行缩进 2 字、段距 0。
-    // 取整到 20pt 以保持 SF / 宋体 / 楷体的行高稳定；行距 12pt 约等于 1.8 倍行高。
+    // 对标 390×844pt 竞品截图：正文 20pt、左右边距 21pt、首行缩进 2 字。
+    // 段距必须大于行距，否则整屏文字会连成一片；10pt 是 20pt 正文在
+    // 常见中文阅读器里的舒适值（行距 12pt 是行内额外 leading，不是段距）。
     static let fontSize: Double = 20
     static let lineSpacing: Double = 12
     static let letterSpacing: Double = 0
-    static let paragraphSpacing: Double = 0
+    static let paragraphSpacing: Double = 10
     static let paragraphIndent: Double = 40 // 2 characters * 20pt
-    static let titleSpacing: Double = 8
+    static let titleSpacing: Double = 12
     static let pagePadding: Double = 21
     static let footerHeight: Double = 72
+
+    /// Title text must stay clearly larger than body text at every font size.
+    static func titleFontSize(for bodySize: Double) -> Double {
+        max(bodySize * 1.30, bodySize + 6)
+    }
 }
 
 enum ReaderTapAction: String, CaseIterable, Identifiable, Sendable {

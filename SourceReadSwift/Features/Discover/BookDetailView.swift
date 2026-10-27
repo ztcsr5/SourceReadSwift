@@ -55,6 +55,29 @@ struct BookDetailView: View {
         appState.bookshelfStore.contains(book)
     }
 
+    /// The detail header is the first place all source results meet. When the
+    /// primary result has no cover but a sibling source does, show the sibling
+    /// cover instead of a blank placeholder.
+    private var displayBook: SearchBook {
+        guard book.coverUrl?.nilIfEmpty == nil,
+              let fallback = availableSources.compactMap({ $0.coverUrl?.nilIfEmpty }).first else {
+            return book
+        }
+        return SearchBook(
+            name: book.name,
+            author: book.author,
+            coverUrl: fallback,
+            bookUrl: book.bookUrl,
+            sourceName: book.sourceName,
+            sourceUrl: book.sourceUrl,
+            intro: book.intro,
+            kind: book.kind,
+            lastChapter: book.lastChapter,
+            wordCount: book.wordCount,
+            checkKeyWord: book.checkKeyWord
+        )
+    }
+
     private var targetReadingChapter: BookChapter? {
         if let currentIdx = appState.bookshelfStore.book(id: readerBookID)?.currentChapterIndex,
            chapters.indices.contains(currentIdx) {
@@ -70,11 +93,12 @@ struct BookDetailView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 18) {
+                // The row's top-right "+" duplicated the dedicated 加入书架
+                // button below it; the detail page keeps the single explicit
+                // action and the row stays a pure display surface.
                 SearchBookRow(
-                    book: book,
-                    onAdd: {
-                        addCurrentBookToShelf()
-                    },
+                    book: displayBook,
+                    onAdd: nil,
                     isInBookshelf: appState.bookshelfStore.contains(book)
                 )
                     .podcastCard()
@@ -783,6 +807,25 @@ struct BookDetailView: View {
         switch detailResult {
         case .success(let loadedDetail):
             detail = loadedDetail
+            // The search result may carry no cover while the detail rule does.
+            // Persist it into the local book state so the header and the
+            // bookshelf row stop showing a placeholder.
+            if let loadedCover = loadedDetail.coverUrl?.nilIfEmpty,
+               book.coverUrl?.nilIfEmpty == nil {
+                book = SearchBook(
+                    name: book.name,
+                    author: book.author ?? loadedDetail.author,
+                    coverUrl: loadedCover,
+                    bookUrl: book.bookUrl,
+                    sourceName: book.sourceName,
+                    sourceUrl: book.sourceUrl,
+                    intro: book.intro ?? loadedDetail.intro,
+                    kind: book.kind,
+                    lastChapter: book.lastChapter,
+                    wordCount: book.wordCount,
+                    checkKeyWord: book.checkKeyWord
+                )
+            }
             let chapterResult = await AsyncTimeout.run(seconds: 20) {
                 await engine.getChapterList(source: source, book: loadedDetail)
             } ?? .failure(.network("Chapter list timed out"))
@@ -794,7 +837,8 @@ struct BookDetailView: View {
                         bookID: book.id,
                         latestChapterTitle: loadedDetail.latestChapter,
                         intro: loadedDetail.intro,
-                        totalChapters: loadedChapters.count
+                        totalChapters: loadedChapters.count,
+                        coverURL: loadedDetail.coverUrl
                     )
                 }
             case .failure(let error):
@@ -861,7 +905,8 @@ struct BookDetailView: View {
                 bookID: book.id,
                 latestChapterTitle: detail.latestChapter,
                 intro: detail.intro,
-                totalChapters: chapters.count
+                totalChapters: chapters.count,
+                coverURL: detail.coverUrl
             )
         }
     }

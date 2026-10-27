@@ -638,6 +638,8 @@ enum WebReaderHTML {
     .chapter { display: block; contain: layout style paint; }
     .chapter-title {
       margin: calc(var(--title-gap) * 1.9) calc(var(--side) * -0.32) var(--title-gap);
+      text-align: left;
+      text-indent: 0;
       padding-left: 0.62em;
       border-left: 3px solid var(--accent);
       font-size: var(--title-size);
@@ -651,6 +653,11 @@ enum WebReaderHTML {
       margin: 0 0 var(--para-gap) 0;
       text-indent: var(--indent);
       white-space: pre-wrap;
+      /* Chinese prose reads as a block when every line shares the same
+         left *and* right edge. WebKit needs the ideograph keyword; without
+         it Safari falls back to ragged-right and the page looks untidy. */
+      text-align: justify;
+      text-justify: inter-ideograph;
     }
     .para b.br {
       font-weight: 700;

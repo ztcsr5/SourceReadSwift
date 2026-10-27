@@ -417,7 +417,8 @@ struct BookshelfReaderGatewayView: View {
                                     bookID: activeBook.id,
                                     latestChapterTitle: detailResult.latestChapter,
                                     intro: detailResult.intro,
-                                    totalChapters: loadedChapters.count
+                                    totalChapters: loadedChapters.count,
+                                    coverURL: detailResult.coverUrl
                                 )
                             }
                         }
@@ -459,7 +460,8 @@ struct BookshelfReaderGatewayView: View {
                         bookID: activeBook.id,
                         latestChapterTitle: loadedDetail.latestChapter,
                         intro: loadedDetail.intro,
-                        totalChapters: loadedChapters.count
+                        totalChapters: loadedChapters.count,
+                        coverURL: loadedDetail.coverUrl
                     )
                     selectedChapter = target
                 } else {
@@ -538,7 +540,7 @@ struct BookshelfReaderGatewayView: View {
                                     .lineLimit(1)
                                 }
                             }
-                            .disabled(sourceSwitchState.isLoading)
+                            .disabled(sourceSwitchState.isLoading && sourceSwitchState.candidates.isEmpty)
                         }
                     }
                 }
@@ -583,8 +585,27 @@ struct BookshelfReaderGatewayView: View {
         let enabledSources = Array(appState.sourceStore
             .sourceSwitchCandidates(for: activeBook.bookURL, excluding: activeBook.sourceURL)
             .prefix(40))
-        sourceSwitchState = SourceSwitchState(isLoading: true, totalCount: enabledSources.count)
-        var candidates: [SourceSwitchCandidate] = []
+
+        // Show the previous result set immediately. The network refresh below
+        // still runs, but the user can tap an already-known source without
+        // waiting for 40 search requests again.
+        var cachedCandidates: [SourceSwitchCandidate] = []
+        if let cached = SourceSwitchCacheStore.shared.candidates(
+            title: activeBook.title,
+            author: activeBook.author
+        ) {
+            cachedCandidates = cached.compactMap { entry in
+                guard let source = appState.sourceStore.source(for: entry.sourceURL) else { return nil }
+                return SourceSwitchCandidate(source: source, book: entry.book)
+            }
+        }
+
+        sourceSwitchState = SourceSwitchState(
+            isLoading: true,
+            candidates: cachedCandidates,
+            totalCount: enabledSources.count
+        )
+        var candidates: [SourceSwitchCandidate] = cachedCandidates
         let engine = appState.engine
         // Keep source switching responsive without creating a burst of 40
         // simultaneous network requests. Six requests per batch is enough to
@@ -644,7 +665,9 @@ struct BookshelfReaderGatewayView: View {
                 }
                 return results
             }
-            candidates.append(contentsOf: batchCandidates)
+            for candidate in batchCandidates where !candidates.contains(where: { $0.id == candidate.id }) {
+                candidates.append(candidate)
+            }
             candidates.sort { $0.source.bookSourceName < $1.source.bookSourceName }
             sourceSwitchState = SourceSwitchState(
                 isLoading: true,
@@ -655,6 +678,19 @@ struct BookshelfReaderGatewayView: View {
         }
         guard !Task.isCancelled else { return }
         candidates.sort { $0.source.bookSourceName < $1.source.bookSourceName }
+        if !candidates.isEmpty {
+            SourceSwitchCacheStore.shared.save(
+                title: activeBook.title,
+                author: activeBook.author,
+                candidates: candidates.map {
+                    SourceSwitchCacheStore.Candidate(
+                        sourceURL: $0.source.bookSourceUrl,
+                        sourceName: $0.source.bookSourceName,
+                        book: $0.book
+                    )
+                }
+            )
+        }
         sourceSwitchState = candidates.isEmpty
             ? SourceSwitchState(message: "没有搜索到可用换源结果。")
             : SourceSwitchState(candidates: candidates)

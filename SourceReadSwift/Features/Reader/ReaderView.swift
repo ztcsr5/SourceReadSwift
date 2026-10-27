@@ -53,6 +53,7 @@ struct ReaderView: View {
     @State private var showChapterList = false
     @State private var showBookmarks = false
     @State private var showBookDetailSheet = false
+    @State private var showChapterWebPage = false
     @State private var showPayActionConfirmation = false
     @State private var payActionResultMessage = ""
     @State private var showPayActionResult = false
@@ -182,6 +183,9 @@ struct ReaderView: View {
     @AppStorage("reader.paragraphSpacing") private var paragraphSpacing: Double = ReaderTypographyDefaults.paragraphSpacing
     @AppStorage("reader.paragraphIndent") private var paragraphIndent: Double = ReaderTypographyDefaults.paragraphIndent
     @AppStorage("reader.titleSpacing") private var titleSpacing: Double = ReaderTypographyDefaults.titleSpacing
+    /// One-shot migration for the 1.0.64 defaults (`paragraphSpacing = 0`,
+    /// `titleSpacing = 8`). A value the reader already customised is kept.
+    @AppStorage("reader.typographyMigrated.v65") private var typographyMigratedV65 = false
     @AppStorage("reader.footerHeight") private var footerHeight: Double = ReaderTypographyDefaults.footerHeight
     /// 章节标题呈现方式。默认「页眉小标题」：每页顶部 12pt 章节名，正文从页眉下开始，
     /// 与栖阅 / 开元阅读的阅读页一致。
@@ -278,11 +282,13 @@ struct ReaderView: View {
 
     private var currentDisplayChapterTitle: String {
         let index = currentDisplayChapterIndex
-        if let section = windowSections.first(where: { $0.chapterIndex == index }) {
+        if let section = windowSections.first(where: { $0.chapterIndex == index }),
+           !section.title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             return section.title
         }
         if index == chapterIndex {
-            return content.title
+            let title = content.title.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !title.isEmpty { return title }
         }
         return chapterTitle(for: index)
     }
@@ -899,7 +905,11 @@ struct ReaderView: View {
                 }
             }
         }
+        .sheet(isPresented: $showChapterWebPage) {
+            SmartWebReaderView(initialURL: currentChapterWebURL)
+        }
         .onAppear {
+            migrateTypographyDefaultsIfNeeded()
             if let ov = ReaderOverrideStore.shared.override(for: bookID) {
                 isPerBookOverride = true
                 if let mode = ov.readerMode { readerModeRawValue = mode.rawValue }
@@ -1244,6 +1254,25 @@ struct ReaderView: View {
             return jump.index
         }
         return nil
+    }
+
+    /// Chapter page for the "open in web view" escape hatch. Some API-style
+    /// sources only return a preview through `ruleContent`; the site page is
+    /// the only place the rest of the text exists, so keep that route one tap
+    /// away instead of pretending the truncated paragraph is the chapter end.
+    private var currentChapterWebURL: URL? {
+        let raw = content.chapter.url.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !raw.isEmpty else { return nil }
+        if let url = URL(string: raw), url.scheme?.isEmpty == false {
+            return url
+        }
+        guard let baseText = currentBookSource?.bookSourceUrl.nilIfEmpty,
+              let base = URL(string: baseText) ?? URL(string: "https://" + baseText),
+              let url = URL(string: raw, relativeTo: base)?.absoluteURL,
+              url.scheme?.isEmpty == false else {
+            return nil
+        }
+        return url
     }
 
     private var currentBookSource: BookSource? {
@@ -2213,8 +2242,8 @@ struct ReaderView: View {
             pageSurface(for: page) {
                 VStack(alignment: .leading, spacing: 0) {
                     if page.includesTitle {
-                        Text(ReaderTextTransform.displayText(page.chapterTitle.isEmpty ? content.title : page.chapterTitle, traditionalChinese: traditionalChineseEnabled))
-                            .font(fontFamily.swiftUIFont(size: CGFloat(fontSize + 8), weight: .bold, customPostScriptName: customFontPostScriptName))
+                        Text(ReaderTextTransform.displayText(page.chapterTitle.isEmpty ? chapterTitle(for: page.chapterIndex) : page.chapterTitle, traditionalChinese: traditionalChineseEnabled))
+                            .font(fontFamily.swiftUIFont(size: CGFloat(ReaderTypographyDefaults.titleFontSize(for: fontSize)), weight: .bold, customPostScriptName: customFontPostScriptName))
                             .foregroundStyle(readerThemeTextColor)
                             .padding(.bottom, CGFloat(titleSpacing))
                             .readerSelectableText(textSelectionEnabled)
@@ -2374,11 +2403,16 @@ struct ReaderView: View {
     private func pagedPageHeader(page: ReaderPageBlock, geometry: ReaderPageGeometry) -> some View {
         TimelineView(.everyMinute) { context in
             HStack(spacing: 10) {
-                Text(page.chapterTitle.isEmpty ? currentDisplayChapterTitle : page.chapterTitle)
-                    .font(.system(size: ReaderPageChrome.headerFontSize, weight: .regular))
-                    .foregroundStyle(readerThemeTextColor.opacity(0.55))
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.75)
+                // In inline mode the first page already carries the large
+                // chapter title in the body; repeating it in the 12pt page
+                // header is what users reported as a duplicated heading.
+                if !(page.includesTitle && chapterHeadingStyle == .inline) {
+                    Text(page.chapterTitle.isEmpty ? chapterTitle(for: page.chapterIndex) : page.chapterTitle)
+                        .font(.system(size: ReaderPageChrome.headerFontSize, weight: .regular))
+                        .foregroundStyle(readerThemeTextColor.opacity(0.55))
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.75)
+                }
 
                 Spacer(minLength: 8)
 
@@ -2808,6 +2842,50 @@ struct ReaderView: View {
                         }
                     }
 
+                    if currentChapterWebURL != nil {
+                        Button {
+                            closeReaderChrome()
+                            showChapterWebPage = true
+                        } label: {
+                            Label("网页打开本章", systemImage: "safari")
+                        }
+                    }
+
+                    Divider()
+
+                    Button {
+                        closeReaderChrome()
+                        toggleSpeech()
+                    } label: {
+                        Label(
+                            speechController.isPaused
+                                ? "继续朗读"
+                                : (speechController.isSpeaking ? "暂停朗读" : "开始朗读"),
+                            systemImage: speechController.isSpeaking ? "pause.fill" : "speaker.wave.2"
+                        )
+                    }
+
+                    if speechController.isSpeaking {
+                        Button(role: .destructive) {
+                            closeReaderChrome()
+                            stopSpeechPlayback()
+                        } label: {
+                            Label("停止朗读", systemImage: "stop.fill")
+                        }
+                    }
+
+                    Button {
+                        closeReaderChrome()
+                        toggleAutoScroll()
+                    } label: {
+                        Label(
+                            autoScrollEnabled ? "暂停自动翻页" : "开始自动翻页",
+                            systemImage: autoScrollEnabled ? "pause.fill" : "play.fill"
+                        )
+                    }
+
+                    Divider()
+
                     Button {
                         closeReaderChrome()
                         // 二选一，不能两个都做：以前同时置位 sheet 和回调，
@@ -2839,7 +2917,10 @@ struct ReaderView: View {
             }
             .padding(.horizontal, 10)
             .padding(.vertical, 8)
-            .background(.ultraThinMaterial)
+            // A material-only bar let the body text show through the title
+            // and progress line (especially on iOS 16). The reader chrome
+            // needs an opaque base; the theme colour keeps it consistent.
+            .background(readerThemeBackground.opacity(0.97))
             .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
             .padding(.horizontal, 16)
             .padding(.top, readerTopSafeInset + 4)
@@ -2894,6 +2975,10 @@ struct ReaderView: View {
                     .disabled(!canSelectRelativeChapter(offset: 1))
                 }
 
+                // TTS and auto-scroll moved into the top-right overflow menu.
+                // Keeping five equal-width buttons made the bottom panel the
+                // busiest part of the reader; the two primary actions stay
+                // here and every secondary action is one tap away.
                 HStack(spacing: 8) {
                     toolButton(icon: "list.bullet", title: "目录") {
                         tocTab = 0
@@ -2901,23 +2986,6 @@ struct ReaderView: View {
                         closeSettingsPanel()
                     }
 
-                    toolButton(icon: speechController.isPaused ? "play.fill" : (speechController.isSpeaking ? "pause.fill" : "speaker.wave.2"), title: speechController.isPaused ? "继续" : (speechController.isSpeaking ? "暂停" : "朗读")) {
-                        toggleSpeech()
-                        closeSettingsPanel()
-                    }
-                    // Keep the stop slot even while idle. Inserting and
-                    // removing it shifted every button after it on each TTS
-                    // toggle.
-                    toolButton(icon: "stop.fill", title: "停止") {
-                        stopSpeechPlayback()
-                        closeSettingsPanel()
-                    }
-                    .opacity(speechController.isSpeaking ? 1 : 0.35)
-                    .disabled(!speechController.isSpeaking)
-                    toolButton(icon: autoScrollEnabled ? "pause.fill" : "play.fill", title: autoScrollEnabled ? "暂停" : "自动") {
-                        toggleAutoScroll()
-                        closeSettingsPanel()
-                    }
                     toolButton(icon: "gearshape", title: "设置") {
                         toggleSettingsPanel()
                     }
@@ -2937,6 +3005,12 @@ struct ReaderView: View {
             .padding(.horizontal, 14)
             .padding(.top, 14)
             .padding(.bottom, 18)
+            // Same reason as the top bar: five buttons over a translucent
+            // panel made the text underneath legible through the controls.
+            .background(
+                readerThemeBackground.opacity(0.96),
+                in: RoundedRectangle(cornerRadius: 26, style: .continuous)
+            )
             .glassPanel(cornerRadius: 26, material: .ultraThinMaterial, strokeOpacity: background.isDark ? 0.09 : 0.12, shadowOpacity: background.isDark ? 0.42 : 0.14)
             .padding(.horizontal, 14)
             .padding(.bottom, max(readerFooterSafeInset, 10) + 10)
@@ -3465,7 +3539,7 @@ struct ReaderView: View {
                 .background(Color(UIColor.tertiarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
 
             // 1. 段落差（段间距）- 放在最前面之一，用户反馈最高频查找项
-            readerValueSlider("段落差（段间距）", value: $paragraphSpacing, range: 0...28, step: 1, unit: "pt", help: "调整上下两段文字之间的垂直留白。调到 0pt 为最紧凑贴近（推荐 4~8pt）")
+            readerValueSlider("段落差（段间距）", value: $paragraphSpacing, range: 0...28, step: 1, unit: "pt", help: "调整上下两段文字之间的垂直留白。段间距应大于行距，正文才不会糊成一片（推荐 10~14pt）")
 
             // 2. 正文字号
             readerValueSlider("正文字号", value: $fontSize, range: 12...34, step: 1, unit: "pt", help: "整体放大或缩小小说正文文字大小（主流阅读推荐 18~20pt）")
@@ -3511,7 +3585,7 @@ struct ReaderView: View {
                     Image(systemName: "wand.and.stars")
                     VStack(alignment: .leading, spacing: 2) {
                         Text("一键对齐成熟阅读器排版").font(.subheadline.weight(.semibold))
-                        Text("字号 20 / 行距 12 / 边距 21 / 首行缩进 2 字 / 页眉小标题 / 页码右下角")
+                        Text("字号 20 / 行距 12 / 段距 10 / 边距 21 / 首行缩进 2 字 / 页眉小标题 / 页码右下角")
                             .font(.caption2)
                             .foregroundStyle(.secondary)
                     }
@@ -3554,14 +3628,28 @@ struct ReaderView: View {
         }
     }
 
+    /// 1.0.64 shipped `paragraphSpacing = 0`, which made every paragraph touch
+    /// the previous one. Raise only the untouched legacy defaults so a reader
+    /// who deliberately picked a tighter value keeps it.
+    private func migrateTypographyDefaultsIfNeeded() {
+        guard !typographyMigratedV65 else { return }
+        if paragraphSpacing == 0 {
+            paragraphSpacing = ReaderTypographyDefaults.paragraphSpacing
+        }
+        if titleSpacing == 8 {
+            titleSpacing = ReaderTypographyDefaults.titleSpacing
+        }
+        typographyMigratedV65 = true
+    }
+
     /// 一档对标栖阅 / 开元阅读截图的排版参数。用户随时可以再微调。
     private func applyCompetitiveReaderPreset() {
         fontSize = 20
         lineSpacing = 12
         pagePadding = 21
         paragraphIndent = 40
-        paragraphSpacing = 0
-        titleSpacing = 8
+        paragraphSpacing = ReaderTypographyDefaults.paragraphSpacing
+        titleSpacing = ReaderTypographyDefaults.titleSpacing
         chapterHeadingStyleRaw = ReaderPageChromeLayout.header.rawValue
         contentExtendsIntoChrome = false
         statusPosition = "bottom"
@@ -5176,7 +5264,7 @@ struct ReaderView: View {
         let geometry = pagedPageGeometry
         let typography = ReaderPageTypography(
             font: fontFamily.uiFont(ofSize: CGFloat(fontSize), customPostScriptName: customFontPostScriptName),
-            titleFont: fontFamily.uiFont(ofSize: CGFloat(fontSize + 8), weight: .bold, customPostScriptName: customFontPostScriptName),
+            titleFont: fontFamily.uiFont(ofSize: CGFloat(ReaderTypographyDefaults.titleFontSize(for: fontSize)), weight: .bold, customPostScriptName: customFontPostScriptName),
             lineSpacing: CGFloat(lineSpacing),
             letterSpacing: CGFloat(letterSpacing),
             paragraphSpacing: CGFloat(paragraphSpacing),

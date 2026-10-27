@@ -15,6 +15,21 @@ struct ReaderChapterSection: Identifiable, Equatable {
     var paragraphs: [String]
     var state: LoadState = .ready
 
+    /// Every construction site (fresh network load, disk cache, local import,
+    /// window seed) goes through the sanitizer. Old on-disk chapter caches
+    /// therefore get the duplicate-heading fix without a cache migration.
+    init(chapterIndex: Int, title: String, paragraphs: [String], state: LoadState = .ready) {
+        let normalized = ChapterTextSanitizer.normalize(
+            title: title,
+            paragraphs: paragraphs,
+            fallbackTitle: "第 \(chapterIndex + 1) 章"
+        )
+        self.chapterIndex = chapterIndex
+        self.title = normalized.title
+        self.paragraphs = normalized.paragraphs
+        self.state = state
+    }
+
     var id: Int { chapterIndex }
     var isReady: Bool { state == .ready }
     var isLoading: Bool { state == .loading }

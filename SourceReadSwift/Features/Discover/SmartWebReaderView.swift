@@ -3,11 +3,19 @@ import WebKit
 
 struct SmartWebReaderView: View {
     @Environment(\.dismiss) private var dismiss
-    @State private var address = "https://"
+    @State private var address: String
     @State private var loadedURL: URL?
     @State private var article: SmartWebArticle?
     @State private var isExtracting = false
     @State private var errorMessage: String?
+
+    /// Opening a chapter from the reader uses the chapter URL directly so a
+    /// source that only exposes a preview in its API can still be read in the
+    /// site's own page. The manual address field stays available when nil.
+    init(initialURL: URL? = nil) {
+        _address = State(initialValue: initialURL?.absoluteString ?? "https://")
+        _loadedURL = State(initialValue: initialURL)
+    }
 
     var body: some View {
         NavigationStack {

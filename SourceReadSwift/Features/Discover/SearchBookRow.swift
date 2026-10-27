@@ -96,7 +96,7 @@ struct SearchBookRow: View {
 
     @ViewBuilder
     private var cover: some View {
-        if let coverUrl = book.coverUrl, let url = URL(string: coverUrl) {
+        if let url = CoverURLResolver.url(from: book.coverUrl, base: book.bookUrl, fallbackBase: book.sourceUrl) {
             CachedRemoteImage(url: url) { placeholder }
             .frame(width: 74, height: 98)
             .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))

@@ -658,8 +658,14 @@ struct SourceManagerView: View {
                 Button("规则编辑") {
                     sourceRuleEditor = SourceRuleEditorLaunch(source: source)
                 }
-                if source.loginUrl?.nilIfEmpty != nil {
-                    Button("打开登录页") {
+                // Many sources authenticate on the home page and leave
+                // `loginUrl` empty; keep the entry available for every source
+                // that has a reachable site.
+                if SourceLoginURLResolver.resolve(
+                    loginUrl: source.loginUrl,
+                    bookSourceUrl: source.bookSourceUrl
+                ) != nil {
+                    Button("打开站点 / 登录") {
                         sourceLogin = source
                     }
                 }
@@ -1233,7 +1239,10 @@ struct SourceManagerView: View {
                         .textInputAutocapitalization(.never)
                         .autocorrectionDisabled(true)
 
-                    if source.loginUrl?.nilIfEmpty != nil {
+                    if SourceLoginURLResolver.resolve(
+                        loginUrl: source.loginUrl,
+                        bookSourceUrl: source.bookSourceUrl
+                    ) != nil {
                         Button {
                             onOpenLogin()
                         } label: {

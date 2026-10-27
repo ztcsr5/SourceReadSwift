@@ -664,7 +664,8 @@ struct BookshelfView: View {
                                     bookID: candidate.bookID,
                                     latestChapterTitle: detail.latestChapter ?? chapters.last?.title,
                                     intro: detail.intro,
-                                    totalChapters: chapters.count
+                                    totalChapters: chapters.count,
+                                    coverURL: detail.coverUrl
                                 )
                             case .failure(let error):
                                 return .failure(bookID: candidate.bookID, message: error.displayMessage)
@@ -681,12 +682,13 @@ struct BookshelfView: View {
                         break
                     }
                     switch result {
-                    case .success(let bookID, let latestChapterTitle, let intro, let totalChapters):
+                    case .success(let bookID, let latestChapterTitle, let intro, let totalChapters, let coverURL):
                         appState.bookshelfStore.updateDetails(
                             bookID: bookID,
                             latestChapterTitle: latestChapterTitle,
                             intro: intro,
-                            totalChapters: totalChapters
+                            totalChapters: totalChapters,
+                            coverURL: coverURL
                         )
                         refreshed += 1
                     case .failure(let bookID, let message):
@@ -708,7 +710,7 @@ struct BookshelfView: View {
         } label: {
             VStack(spacing: 0) {
                 HStack(spacing: 16) {
-                    AsyncBookCover(urlString: book.coverURL, width: 66, height: 92, style: .onDark)
+                    AsyncBookCover(urlString: book.coverURL, width: 66, height: 92, style: .onDark, baseURLString: book.bookURL, sourceURLString: book.sourceURL)
                         .overlay(alignment: .topTrailing) {
                             if book.hasUpdates {
                                 Circle()
@@ -804,7 +806,7 @@ struct BookshelfView: View {
             BookshelfReaderGatewayView(book: book)
         } label: {
             HStack(spacing: 14) {
-                AsyncBookCover(urlString: book.coverURL, width: 70, height: 100)
+                AsyncBookCover(urlString: book.coverURL, width: 70, height: 100, baseURLString: book.bookURL, sourceURLString: book.sourceURL)
 
                 VStack(alignment: .leading, spacing: 6) {
                     Text(book.title)
@@ -838,7 +840,7 @@ struct BookshelfView: View {
             BookshelfReaderGatewayView(book: book)
         } label: {
             HStack(spacing: 14) {
-                AsyncBookCover(urlString: book.coverURL, width: 52, height: 72)
+                AsyncBookCover(urlString: book.coverURL, width: 52, height: 72, baseURLString: book.bookURL, sourceURLString: book.sourceURL)
                     .overlay(alignment: .topLeading) {
                         if book.isPinned {
                             Image(systemName: "pin.fill")
@@ -961,7 +963,7 @@ struct BookshelfView: View {
         } label: {
             VStack(alignment: .leading, spacing: 8) {
                 ZStack(alignment: .topTrailing) {
-                    AsyncBookCover(urlString: book.coverURL, width: nil, height: 145)
+                    AsyncBookCover(urlString: book.coverURL, width: nil, height: 145, baseURLString: book.bookURL, sourceURLString: book.sourceURL)
                         .frame(maxWidth: .infinity)
                         .frame(height: 145)
                         .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
@@ -1091,7 +1093,7 @@ private struct BookshelfRefreshCandidate: Sendable {
 }
 
 private enum BookshelfRefreshResult: Sendable {
-    case success(bookID: String, latestChapterTitle: String?, intro: String?, totalChapters: Int)
+    case success(bookID: String, latestChapterTitle: String?, intro: String?, totalChapters: Int, coverURL: String?)
     case failure(bookID: String, message: String)
 }
 
@@ -1237,7 +1239,11 @@ private struct BookshelfCollectionView: View {
         .scrollDismissesKeyboard(.interactively)
         .pageBackground()
         .navigationTitle(title)
-        .navigationBarTitleDisplayMode(.large)
+        // iOS 16 paints the large title directly above the first row; the
+        // custom search field then reads as if it overlaps the navigation bar.
+        // The collection is a utility screen, so a compact title is both safer
+        // and more space-efficient.
+        .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .navigationBarLeading) {
                 if !books.isEmpty {
@@ -1386,7 +1392,7 @@ private struct BookshelfCollectionView: View {
 
     private func collectionBookLabel(_ book: BookshelfBook) -> some View {
         HStack(spacing: 14) {
-            AsyncBookCover(urlString: book.coverURL, width: 58, height: 82)
+            AsyncBookCover(urlString: book.coverURL, width: 58, height: 82, baseURLString: book.bookURL, sourceURLString: book.sourceURL)
                 .overlay(alignment: .topTrailing) {
                     if book.hasUpdates {
                         Circle()
@@ -1460,10 +1466,16 @@ struct AsyncBookCover: View {
     var width: CGFloat? = nil
     let height: CGFloat
     var style: Style = .card
+    /// Detail-page URL used to resolve protocol-relative or root-relative
+    /// covers returned by imported sources.
+    var baseURLString: String? = nil
+    /// Book-source home page, used when `bookURL` was persisted in relative
+    /// form by an older build.
+    var sourceURLString: String? = nil
 
     var body: some View {
         Group {
-            if let urlString, let url = URL(string: urlString) {
+            if let url = CoverURLResolver.url(from: urlString, base: baseURLString, fallbackBase: sourceURLString) {
                 CachedRemoteImage(url: url) { placeholder }
             } else {
                 placeholder

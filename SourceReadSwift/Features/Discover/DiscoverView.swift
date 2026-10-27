@@ -15,6 +15,9 @@ struct DiscoverView: View {
     @State private var isImportingClipboardSource = false
     @State private var clipboardImportToast: String? = nil
     @AppStorage("discover_search_history") private var searchHistoryJSON: String = "[]"
+    /// Result presentation for the aggregated list. A three-column cover grid
+    /// is much denser than the old full-width row on a phone.
+    @AppStorage("discover.resultLayout") private var discoverResultLayoutRaw = DiscoverResultLayout.list.rawValue
     /// Cached decode of `searchHistoryJSON`. Decoding inside `body` ran a full
     /// JSON decode (and two array copies) on every layout pass of the search tab,
     /// including every streaming update during a search.
@@ -70,6 +73,22 @@ struct DiscoverView: View {
         searchHistoryJSON = "[]"
     }
 
+    enum DiscoverResultLayout: String, CaseIterable, Identifiable {
+        case list
+        case grid
+        var id: String { rawValue }
+        var icon: String {
+            switch self {
+            case .list: return "list.bullet"
+            case .grid: return "square.grid.2x2"
+            }
+        }
+    }
+
+    private var resultLayout: DiscoverResultLayout {
+        DiscoverResultLayout(rawValue: discoverResultLayoutRaw) ?? .list
+    }
+
     enum DiscoverTab: String, CaseIterable, Identifiable {
         case search = "全网搜索"
         case explore = "分类发现"
@@ -90,7 +109,7 @@ struct DiscoverView: View {
     var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(alignment: .leading, spacing: 20) {
+                VStack(alignment: .leading, spacing: 14) {
                     if detectedClipboardSourceURL != nil {
                         clipboardSourceBanner
                     }
@@ -144,7 +163,10 @@ struct DiscoverView: View {
             }
             .pageBackground()
             .navigationTitle("发现")
-            .navigationBarTitleDisplayMode(.large)
+            // iOS 16 allocates a tall large-title area above the custom tab
+            // switcher; the pinned compact title gives that space back to the
+            // search field and result list.
+            .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button {
@@ -302,7 +324,7 @@ struct DiscoverView: View {
     }
 
     private var bookSearchTab: some View {
-        VStack(alignment: .leading, spacing: 24) {
+        VStack(alignment: .leading, spacing: 16) {
             VStack(spacing: 14) {
                 searchField
                 matchModePicker
@@ -632,6 +654,21 @@ struct DiscoverView: View {
                     }
                     .padding(2)
                     .background(Color(UIColor.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 9, style: .continuous))
+
+                    if viewModel.displayMode == .aggregated {
+                        Button {
+                            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                            discoverResultLayoutRaw = resultLayout == .list
+                                ? DiscoverResultLayout.grid.rawValue
+                                : DiscoverResultLayout.list.rawValue
+                        } label: {
+                            Image(systemName: resultLayout == .list ? "square.grid.2x2" : "list.bullet")
+                                .font(.system(size: 13, weight: .semibold))
+                                .frame(width: 30, height: 26)
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel(resultLayout == .list ? "切换为网格" : "切换为列表")
+                    }
                 }
             }
 
@@ -652,8 +689,19 @@ struct DiscoverView: View {
             }
 
             if viewModel.displayMode == .aggregated {
-                ForEach(viewModel.aggregatedResults) { item in
-                    aggregatedBookCard(item, inShelf: shelf.contains(item.primaryBook))
+                if resultLayout == .grid {
+                    LazyVGrid(
+                        columns: [GridItem(.adaptive(minimum: 100, maximum: 140), spacing: 14)],
+                        spacing: 18
+                    ) {
+                        ForEach(viewModel.aggregatedResults) { item in
+                            aggregatedBookGridCard(item, inShelf: shelf.contains(item.primaryBook))
+                        }
+                    }
+                } else {
+                    ForEach(viewModel.aggregatedResults) { item in
+                        aggregatedBookCard(item, inShelf: shelf.contains(item.primaryBook))
+                    }
                 }
             } else {
                 ForEach(viewModel.groupedResults) { group in
@@ -676,13 +724,55 @@ struct DiscoverView: View {
         }
     }
 
+    private func aggregatedBookGridCard(_ item: AggregatedSearchBook, inShelf: Bool) -> some View {
+        NavigationLink {
+            BookDetailView(book: item.primaryBook, availableSources: item.sources)
+        } label: {
+            VStack(alignment: .leading, spacing: 6) {
+                aggregatedGridCover(item.coverUrl, base: item.primaryBook.bookUrl, source: item.primaryBook.sourceUrl)
+                    .overlay(alignment: .topTrailing) {
+                        if inShelf {
+                            Image(systemName: "checkmark.circle.fill")
+                                .font(.system(size: 16, weight: .semibold))
+                                .foregroundStyle(.white, Color.green)
+                                .padding(5)
+                        }
+                    }
+
+                Text(item.name)
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(.primary)
+                    .lineLimit(2)
+                    .multilineTextAlignment(.leading)
+
+                HStack(spacing: 4) {
+                    Text(item.author ?? "作者未知")
+                        .font(.system(size: 11))
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                    Spacer(minLength: 0)
+                    if item.sourceCount > 1 {
+                        Text("\(item.sourceCount)源")
+                            .font(.system(size: 10, weight: .semibold))
+                            .foregroundStyle(AppTheme.accent)
+                            .lineLimit(1)
+                    }
+                }
+            }
+        }
+        .buttonStyle(.plain)
+        .simultaneousGesture(TapGesture().onEnded {
+            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+        })
+    }
+
     private func aggregatedBookCard(_ item: AggregatedSearchBook, inShelf: Bool) -> some View {
         HStack(alignment: .top, spacing: 12) {
             NavigationLink {
                 BookDetailView(book: item.primaryBook, availableSources: item.sources)
             } label: {
                 HStack(alignment: .top, spacing: 12) {
-                    aggregatedCover(item.coverUrl)
+                    aggregatedCover(item.coverUrl, base: item.primaryBook.bookUrl, source: item.primaryBook.sourceUrl)
 
                     VStack(alignment: .leading, spacing: 6) {
                         Text(item.name)
@@ -721,7 +811,7 @@ struct DiscoverView: View {
                             Text(intro)
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
-                                .lineLimit(2)
+                                .lineLimit(1)
                         }
                     }
                 }
@@ -767,17 +857,32 @@ struct DiscoverView: View {
     }
 
     @ViewBuilder
-    private func aggregatedCover(_ coverUrl: String?) -> some View {
-        if let coverUrl, let url = URL(string: coverUrl) {
+    private func aggregatedCover(_ coverUrl: String?, base: String?, source: String?) -> some View {
+        if let url = CoverURLResolver.url(from: coverUrl, base: base, fallbackBase: source) {
             CachedRemoteImage(url: url) {
                 aggregatedCoverPlaceholder
             }
-            .frame(width: 74, height: 98)
-            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+            .frame(width: 64, height: 86)
+            .clipShape(RoundedRectangle(cornerRadius: 11, style: .continuous))
         } else {
             aggregatedCoverPlaceholder
-                .frame(width: 74, height: 98)
+                .frame(width: 64, height: 86)
         }
+    }
+
+    @ViewBuilder
+    private func aggregatedGridCover(_ coverUrl: String?, base: String?, source: String?) -> some View {
+        Group {
+            if let url = CoverURLResolver.url(from: coverUrl, base: base, fallbackBase: source) {
+                CachedRemoteImage(url: url) { aggregatedCoverPlaceholder }
+            } else {
+                aggregatedCoverPlaceholder
+            }
+        }
+        .frame(maxWidth: .infinity)
+        .aspectRatio(3.0 / 4.0, contentMode: .fit)
+        .clipped()
+        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
     }
 
     private var aggregatedCoverPlaceholder: some View {

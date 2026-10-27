@@ -182,13 +182,23 @@ struct ContentParser {
                 variables: variables,
                 fallback: chapter.title
             )
-            return paragraphs.isEmpty
+            let sanitized = ChapterTextSanitizer.normalize(
+                title: resolvedTitle,
+                paragraphs: paragraphs,
+                fallbackTitle: chapter.title
+            )
+            return sanitized.paragraphs.isEmpty
                 ? .failure(.empty("正文解析结果为空"))
-                : .success(ChapterContent(chapter: chapter, title: resolvedTitle, paragraphs: paragraphs, nextContentUrl: next, imageStyle: style, payAction: payActionRule(source.ruleContent)))
+                : .success(ChapterContent(chapter: chapter, title: sanitized.title.isEmpty ? chapter.title : sanitized.title, paragraphs: sanitized.paragraphs, nextContentUrl: next, imageStyle: style, payAction: payActionRule(source.ruleContent)))
         } catch {
             let fallback = extractFallbackParagraphs(from: response.body, baseUrl: response.url, title: chapter.title)
             if !fallback.isEmpty {
-                return .success(ChapterContent(chapter: chapter, title: chapter.title, paragraphs: fallback, nextContentUrl: nil, imageStyle: imageStyleRule(source.ruleContent), payAction: payActionRule(source.ruleContent)))
+                let sanitized = ChapterTextSanitizer.normalize(
+                    title: chapter.title,
+                    paragraphs: fallback,
+                    fallbackTitle: chapter.title
+                )
+                return .success(ChapterContent(chapter: chapter, title: sanitized.title, paragraphs: sanitized.paragraphs, nextContentUrl: nil, imageStyle: imageStyleRule(source.ruleContent), payAction: payActionRule(source.ruleContent)))
             }
             return .failure(.rule(error.localizedDescription))
         }
@@ -283,9 +293,14 @@ struct ContentParser {
             variables: variables,
             fallback: chapter.title
         )
-        return paragraphs.isEmpty
+        let sanitized = ChapterTextSanitizer.normalize(
+            title: resolvedTitle,
+            paragraphs: paragraphs,
+            fallbackTitle: chapter.title
+        )
+        return sanitized.paragraphs.isEmpty
             ? .failure(.empty("JSON \u{6b63}\u{6587}\u{89e3}\u{6790}\u{7ed3}\u{679c}\u{4e3a}\u{7a7a}"))
-            : .success(ChapterContent(chapter: chapter, title: resolvedTitle, paragraphs: paragraphs, nextContentUrl: next, imageStyle: imageStyleRule(rule), payAction: payActionRule(rule)))
+            : .success(ChapterContent(chapter: chapter, title: sanitized.title.isEmpty ? chapter.title : sanitized.title, paragraphs: sanitized.paragraphs, nextContentUrl: next, imageStyle: imageStyleRule(rule), payAction: payActionRule(rule)))
     }
 
     /// Legado `ruleContent.title`: some sites only expose the real chapter
