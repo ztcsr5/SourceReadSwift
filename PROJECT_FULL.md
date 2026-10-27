@@ -1,11 +1,11 @@
 # 纸间 SourceReadSwift · 项目全量文档
 
 > **文档性质**：项目全量说明 + 版本工作记录 + 书源兼容性深度分析 + 验证与复现手册  
-> **代码基线**：`v1.0.30`（Build 31）  
-> **验证 Commit**：`91c9161`（v1.0.30 代码提交） / `75aeb44`（本文件提交）  
-> **整理日期**：2026-10-25  
+> **代码基线**：`v1.0.60`（Build 61）  
+> **验证 Commit**：`66e83ea`（v1.0.60 代码 + 文档提交）；v1.0.30 的历史证据保留在 §八 / §九  
+> **整理日期**：2026-10-27（主体整理于 2026-10-25）  
 > **仓库**：`https://github.com/ztcsr5/SourceReadSwift`  
-> **工作分支**：`codex/swift-v2-lifetime-reader`  
+> **工作分支**：`codex/reader-feedback-fixes`（v1.0.59+）  
 > **本地工作区**：`D:\Gemini反重力\SourceReadSwift2`
 
 本文档回答四个问题：
@@ -13,7 +13,7 @@
 1. 这个项目到底是什么、由哪些模块组成、每个功能落在哪个文件；
 2. 书源解析能力现在做到哪一步，哪些是已实现、哪些是条件支持、哪些是明确边界；
 3. 为什么 iOS 端的 Legado JSON 书源生态稀少，以及“完美兼容”为什么不是一个可交付的终点；
-4. 从 v1.0.22 到 v1.0.30 做了什么，本轮（v1.0.30）的代码、测试、CI、IPA 与回滚证据分别是什么。
+4. 从 v1.0.22 到 v1.0.60 做了什么；v1.0.30 的完整证据与 v1.0.60 的阅读界面重构分别是什么。
 
 事实口径：**只把仓库内代码、XCTest、GitHub Actions 日志和本地产物写成“已完成”；未在真机或公网验证的内容明确标为“待验收”或 `NOT RUN`。** 不把“函数存在”当作“行为已验证”，不把“CI 编译通过”当作“真机体验通过”。
 
@@ -33,6 +33,7 @@
 - [十、构建、发布与复现](#十构建发布与复现)
 - [十一、已知边界、缺陷与后续路线](#十一已知边界缺陷与后续路线)
 - [十二、文档索引与证据索引](#十二文档索引与证据索引)
+- [十三、v1.0.60 阅读界面重构](#十三v1060-阅读界面重构2026-10-27)
 - [附录 A：完整文件清单](#附录-a完整文件清单)
 - [附录 B：术语与事实标记约定](#附录-b术语与事实标记约定)
 
@@ -914,13 +915,13 @@ iOS 没有 Android Runtime，也没有 Rhino；JavaScriptCore 只提供 JS 语�
 
 ## 七、阅读器架构：四模式、跨章窗口与缓存
 
-> 本章描述 v1.0.30 的实际实现。阅读器是本项目最复杂的部分（`ReaderView.swift` 约 222 KB），也是用户感知最强的部分。
+> 本章描述 v1.0.30 的窗口与缓存模型，并标注 v1.0.60 的渲染层变化。阅读器是本项目最复杂的部分（`ReaderView.swift` 约 274 KB），也是用户感知最强的部分。
 
 ### 7.1 四种阅读模式
 
 | 模式 | 枚举 | 实现 | 翻页方式 |
 |---|---|---|---|
-| 滑动 | `.scroll` | `NativeReaderTextView`（TextKit 1） | 垂直连续滚动 |
+| 滑动 | `.scroll` | `WebScrollReaderView`（WKWebView，v1.0.48+；`NativeReaderTextView` 为旧实现） | 垂直连续滚动 |
 | 平移 | `.pageTurn` | SwiftUI `TabView` | 水平整页平移 |
 | 覆盖 | `.cover` | `ReaderCoverSwipePolicy` + 拖拽 | 新页从边缘覆盖旧页 |
 | 仿真 | `.pageCurl` | `PageCurlReaderView`（`UIPageViewController`） | 书页卷曲动画 |
@@ -1732,6 +1733,90 @@ IPA 未签名，需要下列方式之一：
 8. 推送用 `push_commit.py`，不要打印 remote token。
 
 ---
+
+## 十三、v1.0.60 阅读界面重构（2026-10-27）
+
+> 本轮只改阅读界面与阅读模式，不动书源主链。目标是把“顶部空白太多、翻页有 BUG、状态栏位置不佳”收敛到竞品截图量测的同一套几何。
+
+### 13.1 竞品基准（390×844pt @3x 截图像素量测）
+
+| 元素 | 开元 / 栖阅基准 | v1.0.60 实现 |
+|---|---|---|
+| 页眉章节名 | 12pt，墨迹 y 50–61 | `headerFontSize=12`，`safeTop+2` 起，15pt 行高 |
+| 正文首行顶 | 84.3pt（safeTop 50 + 34.3） | `safeTop + 2 + 15 + 17 = safeTop + 34` |
+| 左右边距 | 20.7 / 21.0 | 默认 `pagePadding=21` |
+| 首行缩进 | 40.3（约 2 字） | 默认 `paragraphIndent=40` |
+| 正文字号 / 行距 | 20.7pt / 42.7pt | 默认 20pt / `lineSpacing=12` |
+| 段距 | 0 | 默认 `paragraphSpacing=0` |
+| 正文底 | 819.0 | `footerTop - 4` |
+| 页码 | 右下 `3/35`，11pt，离底 12.3 | 11pt，右下，`footerBottomInset=12` |
+
+### 13.2 单一几何来源：`ReaderPageGeometry`
+
+旧实现有三处各自扣安全区：`pageSurface` 的 padding、分页引擎的 `viewport - topPadding - bottomPadding`、`UIHostingController` 的 safe area。三处各扣一次，就是“顶部大片空白 + 页尾截断”。
+
+v1.0.60 新增 `SourceReadSwift/Features/Reader/ReaderPageGeometry.swift`：
+
+```text
+bodyTop   = safeTop + 2 + 15 + 17   // 页眉模式；inline/hidden 另算
+footerTop = height - max(safeBottom*0.5, 12) - 14
+bodyBottom= footerTop - 4
+contentHeight = max(bodyBottom - bodyTop, 120)
+contentWidth  = max(width - margin*2, 80)
+```
+
+分页引擎、SwiftUI 页面、页眉、页脚、页码全部只读这一份；`ReaderPageContainerMetrics` 把 `UIHostingController` 的真实 bounds 与全局原点回传，解决“按 852pt 排、容器只有 793pt”的错位。
+
+### 13.3 每页内置页眉页脚
+
+- 分页模式不再用全局浮动页眉/页脚覆盖页面；每一页自己画 `pagedPageHeader` / `pagedPageFooter`。
+- 页码格式 `当前页/本章总页`，只在页脚右下。
+- 时间/电量跟随 `statusPosition`（仅页脚 / 仅页眉 / 页眉+页脚）。
+- 滚动模式的全局页眉改为 `safeTop + 2`，并修正 `padding` 与 `frame` 的顺序（先固定 22pt 行高，再加安全区偏移），避免文字被压扁。
+
+### 13.4 翻页/覆盖/滑动修复
+
+| 问题 | 根因 | 修复 |
+|---|---|---|
+| 仿真翻页点一下连翻两页 | `UIPageViewController` 自带 tap + SwiftUI 九宫格 tap 各翻一次 | `suppressInternalTapGestures` 只关 tap，保留拖动卷页 |
+| 滑动模式内容下移/裁切 | 内部 `UIScrollView.contentInsetAdjustmentBehavior` 自动加安全区 | `normalizeInternalScrollViews` 统一 `.never`、inset 归零 |
+| 分页高度与实际容器不一致 | `UIHostingController` 二次安全区内缩 | `edgesForExtendedLayout=.all`、`layoutMargins=.zero`、`additionalSafeAreaInsets=.zero` + 容器 metrics 回传 |
+| 章节标题占正文高度 | 页眉模式仍给大标题预留 40–50pt | `appendPages` 在 header/hidden 模式不再把标题算进正文高度 |
+
+### 13.5 跨章续读
+
+- `ensurePagedContinuationBuffer(pageIndex:)`：读到本章倒数第 3 页就 `loadWindowChapter(next)`；接近已加载尾部时 `prefetchWindow`。
+- 挂在 `onChange(pagedPageIndex)` 与 `updatePagedVisibleParagraph`，翻页/拖动/程序跳页都会触发。
+- 跨章仍沿用 v1.0.28–v1.0.30 的双向窗口、真实占位页、失败重试与 LRU 缓存。
+
+### 13.6 新设置与默认值
+
+新增：
+
+- `reader.chapterHeadingStyle`：页眉小标题（默认）/ 正文大标题 / 隐藏标题；
+- `reader.contentExtendsIntoChrome`：内容延伸至页眉页脚区域（默认关）；
+- 「一键对齐成熟阅读器排版」按钮：字号 20 / 行距 12 / 边距 21 / 缩进 40 / 段距 0 / 页眉模式 / 页脚状态栏。
+
+默认值变更（`ReaderTypographyDefaults`）：19→20、行距 8→12、段距 6→0、缩进 38→40、标题间距 20→8、边距 20→21。
+
+### 13.7 版本与验证
+
+- `project.yml` / `Info.plist` / `AppVersion.swift` 三处同步：1.0.60 / Build 61。
+- 新增 `ReaderPageGeometryTests` 8 个用例（竞品基准、灵动岛、inline/hidden、延伸模式、窄屏钳制、内缩容器、全屏容器、非法 metrics 回退）。
+- 更新 `ReaderSettingsModelsTests` 默认值与标题文案断言；`SearchURLResolverTests` 版本断言同步 60/61。
+- CI 结果：GitHub Actions run `40486194273`（commit `66e83ea4`）：Build 成功；Test `1057` 个用例、`0` 失败、`** TEST SUCCEEDED **`（2026-10-27T10:19:55Z）。
+- IPA：GitHub Actions run `40486194260` 成功；产物 `C:\Users\Edc21\Desktop\SourceReadSwift-1.0.60-unsigned.ipa`，`12,024,153` 字节，SHA256 `F4960385D9A3386DAD1151CBC8FB895BFBE5861CCCA232352C3791883B073289`；包内 `CFBundleShortVersionString=1.0.60`、`CFBundleVersion=61`、`MinimumOSVersion=16.0`、`CFBundleIdentifier=com.edc21.SourceReadSwift`。
+
+### 13.8 待真机验收
+
+以下项目本机无 Xcode/真机，标为“待验收”，不写成已通过：
+
+- iPhone 14 Pro Max / 15 Pro（灵动岛）：页眉不压刘海、页码在 home indicator 上方；
+- iPhone SE（无刘海）：`safeTop=20` 时正文顶 = 54；
+- 四种模式：上下章边界无限续读、点按不连翻、拖动卷页、覆盖跟手；
+- 横屏 / 分屏：容器 metrics 变化后重新分页；
+- 滚动模式：页眉 22pt 行 + 正文 30pt 内边距不重叠；
+- 深色 / 自定义壁纸：页眉页脚颜色与背景对比度。
 
 ## 附录 A：完整文件清单
 
