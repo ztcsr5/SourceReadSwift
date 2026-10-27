@@ -1,19 +1,23 @@
 # SourceReadSwift (纸间) 项目交接全量备忘录
 
 > **交接目标**：交接给下一位 AI 协作者 / 研发工程师  
-> **文档基线**：v1.0.68 (Build 69)；下文主体保留 v1.0.30 (Build 31) 历史记录  
+> **文档基线**：v1.0.70 (Build 71)；下文主体保留 v1.0.30 (Build 31) 历史记录  
 > **交接时间**：2026-10-28  
-> **验证 Commit**：`eae2e94`（v1.0.68；iOS run `40581829580` = 1120 tests / 0 failures；IPA run `40581829363`）  
-> **最新产物（v1.0.68）**：`C:\Users\Edc21\Desktop\SourceReadSwift-1.0.68-unsigned.ipa`（12,182,597 字节，SHA256 `493373C174C128B9F8DF87914EFF246B37CD64844CE6654D5CC3FBAFD234FC64`，`1.0.68 / 69`，MinimumOSVersion 16.0）  
+> **验证 Commit**：`1472b09`（v1.0.70；iOS run `40592742506` = 1142 tests / 0 failures；IPA run `40592742458`）  
+> **最新产物（v1.0.70）**：`C:\Users\Edc21\Desktop\SourceReadSwift-1.0.70-unsigned.ipa`（12,196,165 字节，SHA256 `AFB31739073490EE430EFCFB00B6C5FAD533E6AB36703B297973FCE9EA8E7E28`，`1.0.70 / 71`，MinimumOSVersion 16.0）  
+> **上一版产物（v1.0.69）**：`C:\Users\Edc21\Desktop\SourceReadSwift-1.0.69-unsigned.ipa`（12,185,173 字节，SHA256 `8CED82011AFFE1218BC2C87914A3B05A1DEE2A813471829DCAA9CC0B30A386D0`，`1.0.69 / 70`）  
+> **更早产物（v1.0.68）**：`C:\Users\Edc21\Desktop\SourceReadSwift-1.0.68-unsigned.ipa`（12,182,597 字节，SHA256 `493373C174C128B9F8DF87914EFF246B37CD64844CE6654D5CC3FBAFD234FC64`，`1.0.68 / 69`）  
 > **上一版产物（v1.0.67）**：`C:\Users\Edc21\Desktop\SourceReadSwift-1.0.67-unsigned.ipa`（12,182,094 字节，SHA256 `C671EC2CE5853DD6F4BF955ACB39F4E2558CA54FC79D753FB168CA5838FACA52`）  
 > **更早产物（v1.0.66）**：`C:\Users\Edc21\Desktop\SourceReadSwift-1.0.66-unsigned.ipa`（12,182,355 字节，SHA256 `EF427BD48E3EF53DFA403DB28C55FF55FA60C81ADA83C40A37F9C87D3EC94786`）  
 > **更早产物（v1.0.65）**：`C:\Users\Edc21\Desktop\SourceReadSwift-1.0.65-unsigned.ipa`（12,136,856 字节，SHA256 `2B1F251C303F47797BBDD5FB6E9FBF2675B625AC0246BFBE17BED64E29821230`）  
 > **对齐补丁产物**：`C:\Users\Edc21\Desktop\SourceReadSwift-1.0.65-align-unsigned.ipa`（12,136,991 字节，SHA256 `95416C4060B3795C80F4C52EA41CECB12E2AC0A0028B99DFE75936679A1CF85A`，含正文缩进保留与两端对齐修正）  
 > **分页 TextKit 产物**：`C:\Users\Edc21\Desktop\SourceReadSwift-1.0.65-textkit-unsigned.ipa`（12,154,717 字节，SHA256 `4C3A82686DB04FEBA725F31304CBB4AD2A373072F83A5FF044FE4849A84ECF0E`，三种分页模式改用 TextKit justify）  
 > **iOS16 加固产物**：`C:\Users\Edc21\Desktop\SourceReadSwift-1.0.65-ios16-unsigned.ipa`（12,155,355 字节，SHA256 `761616A840F65F6E44CE149EA65EA9592C68A8D661B68C4CB09677F4ED173AB9`，TextKit 页加 `contentInsetAdjustmentBehavior = .never` 与固定提案尺寸）  
-> **全量文档**：项目全貌、功能矩阵、生态分析与 v1.0.66 工作记录见 `PROJECT_FULL.md`（阅读界面重构 §十三、安全区修复 §十四、页脚状态带 §十五、壁纸布局 §十六、壁纸 UIKit 图层 §十七、1.0.65 排版与交互 §十八、1.0.66 页面身份锚定与翻页帧率 §十九、1.0.67 中文标点断行 §二十、1.0.68 段距比例与标题去重 §二十一）。  
+> **全量文档**：项目全貌、功能矩阵、生态分析与 v1.0.66 工作记录见 `PROJECT_FULL.md`（阅读界面重构 §十三、安全区修复 §十四、页脚状态带 §十五、壁纸布局 §十六、壁纸 UIKit 图层 §十七、1.0.65 排版与交互 §十八、1.0.66 页面身份锚定与翻页帧率 §十九、1.0.67 中文标点断行 §二十、1.0.68 段距比例与标题去重 §二十一、1.0.69/1.0.70 书源 URL 与 WebView 语义 §二十二）。  
 > **iOS16 审计**：`docs/IOS16-COMPAT-AUDIT-1.0.65.md`（编译级 API 可用、静态扫描 0 命中 iOS17-only、运行时待真机矩阵）。
 
+> **最新修复（v1.0.70，2026-10-28，分支 `codex/reader-feedback-fixes`，提交 `325e6a5`/`1472b09`）**：WebView 三个 Legado 语义落地——`sourceRegex` 在 document start 挂钩 XHR/fetch 并返回命中 URL 的响应体，`webJs` 页面稳定后执行且字符串结果作为正文，`overrideUrlRegex` 取消命中导航；`content`/`toc` 阶段存在 `sourceRegex` 或 `webJs` 时强制走 WebKit。同步补 `java.math.BigInteger`（BigInt 后端，`modPow`/`toString(radix)`）、`java.lang.StringBuffer`、`TimeUnit`、`TextUtils.join`。CI run `40592742506`：1142 tests / 0 failures；IPA run `40592742458`；产物见上方最新产物行。交接见 `docs/CODEX_HANDOVER_1_0_70.md`；全量记录见 `PROJECT_FULL.md` §二十二。  
+> **上一轮（v1.0.69，2026-10-28，提交 `2319dcd`/`ea1e258`）**：`{{key}}` 改用 Java `URLEncoder` 语义（空格 `+`，`& = + ? / :` 全部百分号编码），修复关键字截断导致的搜索空解析；`javascript:`/`about:`/`file:` 伪协议在进 URLSession 前剥离；分页测量与渲染共用 `paragraphStyle(alignment:)`。CI run `40586973620`：1129 tests / 0 failures；IPA run `40586973507`。交接见 `docs/CODEX_HANDOVER_1_0_70.md`。  
 > **最新修复（v1.0.68，2026-10-28，分支 `codex/reader-feedback-fixes`，提交 `eae2e94`）**：段距与标题去重收尾。默认 `lineSpacing 12→8`、`paragraphSpacing 10→16`（段距 > 行距），迁移键 `reader.typographyMigrated.v66` 只改写 1.0.65 旧默认；`ChapterTextSanitizer.headingCoreKey` 剥离 `第X章` 标记（中文/阿拉伯数字）、括号注释与站点后缀后再比较，`第八章` vs `第8章`、`（本章完）` 不再留下重复首段；标题形状识别新增 `1. 风起`、`卷一 风起`。CI run `40581829580`：1120 tests / 0 failures；IPA run `40581829363`；产物见上方最新产物行。交接见 `docs/CODEX_HANDOVER_1_0_68.md`；全量记录见 `PROJECT_FULL.md` §二十一。  
 > **最新修复（v1.0.67，2026-10-28，分支 `codex/reader-feedback-fixes`，提交 `1fe7d6d`）**：中文标点断行统一。`ReaderPageLayoutEngine.lineBreakStrategy = .pushOut`，分页测量与页面渲染（标题/正文）三处共用，`。，、）」` 不再落到行首；新增 3 条测试锁定「测量与渲染同策略」及行高不被覆盖。CI run `40574160264`：1115 tests / 0 failures；IPA run `40574160301`；产物见上方最新产物行。交接见 `docs/CODEX_HANDOVER_1_0_67.md`；全量记录见 `PROJECT_FULL.md` §二十。  
 > **最新修复（v1.0.66，2026-10-28，分支 `codex/reader-feedback-fixes`，提交 `01ec90b`）**：本轮针对两段真机录像解决三类问题——①「第 5 章翻页跳回第 2 章」：页游标不再用窗口数组下标恢复，改用 `ReaderPageIdentity`（章号 + 章内页序 + 首段号）+ `ReaderPageRestoration`（同章精确匹配 → 段落包含 → 只向前），覆盖模式 320 ms 动画结束后用锚点反解下标；②「滑动起手卡顿」：`ReaderInteractionGate` 引用盒替代 `@State` 手势标志、`PageCurlReaderView` 页面 hosting LRU(8) + `prewarm(+1/-1/+2)`、页面富文本 16 条缓存、`ReaderPageTextView` 富文本等值短路、手势期间挂起页面模型重建（120 ms debounce）；③「主页/发现页假 120Hz」：封面统一走 `ImageIO` 按显示尺寸降采样（260/420 px）+ `thumbnailCache`，解码在 utility 队列。另：关于页删除「核心特色」12 条标签，改为一段自述。iOS 16 本轮无真机，全部结论标「待真机验收」。交接见 `docs/CODEX_HANDOVER_1_0_66.md`；全量记录见 `PROJECT_FULL.md` §十九。  

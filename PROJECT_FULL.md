@@ -2127,6 +2127,38 @@ SwiftUI `Image` 在 `ZStack` 提案阶段仍可能按比例填充后的理想尺
 
 ---
 
+## 二十二、v1.0.69 / v1.0.70 书源解析与 WebView 语义（2026-10-28）
+
+**背景**：991 源诊断里 `URL 格式非法或解析异常 (-1000)` 31 次、搜索空解析 140（HTML）+ 28（JSON）、目录空 92；`docs/书源解析能力评估-1.0.60.md` 同时把 `sourceRegex` / `webJs` / `overrideUrlRegex` 列为 P0 缺口。本轮先修 URL 主链，再把三个 WebView 语义接上。
+
+### 22.1 v1.0.69 — URL 主链与分页对齐
+
+- `LegadoRuleResolver.percentEncode` 改为 Java `URLEncoder` 逐字节语义：保留 `A-Za-z0-9-_.*`，空格 `+`，其余 `%XX`；UTF-8 与 GBK 双路径。旧 `.urlQueryAllowed` 不转义 `& = + ? / :`，关键字含 `&` 时 query 被截断，是「搜索解析结果为空」的一类真实根因。
+- `SourceRequestBuilder.resolveURL` 剥掉 `javascript:` / `about:` / `file:` 等伪协议并相对 source host 解析；`URLSessionSourceNetworkClient` 只允许 `http/https/data`，`-1000` 错误带上 URL 片段。
+- `ReaderPageLayoutEngine.measureHeight / lineMetrics` 增加 `alignment`（默认 `.justified`），`ReaderView` 标题测量显式 `.natural`；新增 `paragraphStyle(alignment:)` 作为唯一来源。
+
+**证据**：提交 `2319dcd` + `ea1e258`；iOS run `40586973620`（job `122480919833`）1129 tests / 0 failures；IPA run `40586973507`；产物 `C:\Users\Edc21\Desktop\SourceReadSwift-1.0.69-unsigned.ipa`（12,185,173 B，SHA256 `8CED82011AFFE1218BC2C87914A3B05A1DEE2A813471829DCAA9CC0B30A386D0`）。
+
+### 22.2 v1.0.70 — WebView 三个 Legado 语义
+
+| 字段 | 实现 |
+|---|---|
+| `sourceRegex` | document start 注入 `XMLHttpRequest.open/send` 与 `fetch` 钩子，响应写入 `window.__sourcereadResources`；页面稳定后取回 JSON，`firstBody(in:matching:)` 选第一条 URL 命中 |
+| `webJs` | 页面稳定后 `evaluateJavaScript`，字符串结果直接作为正文，对象/数组序列化后返回 |
+| `overrideUrlRegex` | `decidePolicyFor navigationAction` 命中即 `.cancel` |
+
+`LegadoSourceEngine.ruleWebViewAssets` 从 `ruleContent.fields` 读取（兼容根级 `raw`）；`content` / `toc` 阶段存在 `sourceRegex` 或 `webJs` 时强制走 WebKit，因为普通 HTTP 响应只是空壳。
+
+同步补 Java 兼容类：`java.math.BigInteger`（BigInt 后端，支持 `modPow` / `toString(radix)` / `compareTo` / `bitLength`）、`java.lang.StringBuffer`、`java.util.concurrent.TimeUnit`、`TextUtils.join`。
+
+**测试**：`WebViewResourceSniffingTests` 9 条（捕获解码、首条命中、无命中、非法正则、大小写、字段读取/回退/空白）；`LegadoJavaCompatibilityTests` +4 条（BigInteger / StringBuffer / TimeUnit / TextUtils）。JS shim 另用 Node 24 单独跑过，输出与断言一致。
+
+**证据**：提交 `325e6a5` + `fc7f997` + `1472b09`；iOS run `40592742506`（job `122500858798`）1142 tests / 0 failures；IPA run `40592742458`；产物 `C:\Users\Edc21\Desktop\SourceReadSwift-1.0.70-unsigned.ipa`（12,196,165 B，SHA256 `AFB31739073490EE430EFCFB00B6C5FAD533E6AB36703B297973FCE9EA8E7E28`，`1.0.70 / 71`，MinimumOSVersion 16.0）。
+
+**未做**：`BufferedInputStream` / `ByteBuffer` / `SecretKeyFactory` + `DESKeySpec`；WKWebView 端到端 fixture（CI 无本地 HTTP 服务）；`overrideUrlRegex` 只拦主框架导航；XPath 方言边界。
+
+---
+
 ## 附录 A：完整文件清单
 
 > 以下为 2026-10-25 工作区实测清单。`build/`、`ci-log/`、`AppIcons_Candidates/` 为本地产物/素材，不计入源码。
