@@ -125,4 +125,11 @@ final class ReaderPageGeometryTests: XCTestCase {
         XCTAssertEqual(metrics.resolvedSafeTop, 59, accuracy: 0.01)
         XCTAssertEqual(metrics.resolvedSafeBottom, 34, accuracy: 0.01)
     }
+
+    func testScrollFooterBandOnlyReservesWhenFooterAtBottom() {
+        XCTAssertEqual(ReaderPageChrome.scrollFooterReservedHeight(statusPosition: "bottom"), 40, accuracy: 0.01)
+        XCTAssertEqual(ReaderPageChrome.scrollFooterReservedHeight(statusPosition: "both"), 40, accuracy: 0.01)
+        XCTAssertEqual(ReaderPageChrome.scrollFooterReservedHeight(statusPosition: "top"), 0, accuracy: 0.01)
+        XCTAssertEqual(ReaderPageChrome.scrollFooterReservedHeight(statusPosition: "none"), 0, accuracy: 0.01)
+    }
 }

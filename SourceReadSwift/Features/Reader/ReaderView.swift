@@ -1365,6 +1365,11 @@ struct ReaderView: View {
         )
     }
 
+    /// 滚动模式底部状态带：给页脚独立高度，正文视口在页脚上方截止。
+    private var scrollFooterReservedHeight: CGFloat {
+        ReaderPageChrome.scrollFooterReservedHeight(statusPosition: statusPosition)
+    }
+
     private var scrollReaderContent: some View {
         // 滚动模式改由 WKWebView 渲染。章节窗口的增删在文档内做 DOM 补丁，
         // 不再整串重建 attributed string —— 跳章/跨章滑动不再有「先清空再排版」
@@ -1438,6 +1443,8 @@ struct ReaderView: View {
             }
         )
         .ignoresSafeArea(.container, edges: .bottom)
+        // 先铺满物理屏，再从底部让出状态带：页脚不再和正文重叠。
+        .padding(.bottom, scrollFooterReservedHeight)
         .overlay {
             // 只有「这一段窗口里确实没有任何段落」才盖占位层。
             // 之前只判 scrollModeParagraphs 是否为空：滑动跨章时它会被重算成空数组，

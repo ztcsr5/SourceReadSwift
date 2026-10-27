@@ -48,6 +48,14 @@ enum ReaderPageChrome {
     /// 滚动模式页眉行高（章节名 + 时间/电量一行）。分页页眉用 headerHeight，
     /// 滚动模式的页眉是浮层，行高固定 22pt，正文内边距与它共用同一常量。
     static let scrollHeaderBandHeight: CGFloat = 22
+    /// 滚动模式底部状态带：20pt 文字 + 12pt 底部留白 + 8pt 与正文的间隙。
+    /// 正文视口在页脚上方截止，不再从页脚下面穿过。
+    static let scrollFooterBandHeight: CGFloat = 40
+
+    /// 底部状态带是否启用：只有页脚位于底部时才需要占位。
+    static func scrollFooterReservedHeight(statusPosition: String) -> CGFloat {
+        (statusPosition == "bottom" || statusPosition == "both") ? scrollFooterBandHeight : 0
+    }
     /// 页码离屏幕物理底 12pt（竞品 12.3pt）。
     static let footerBottomInset: CGFloat = 12
     static let minimumBodyHeight: CGFloat = 120
