@@ -1349,11 +1349,12 @@ struct ReaderView: View {
     /// 滚动模式的正文顶部内边距：显示页眉时让出页眉带，否则只避让刘海。
     private var scrollContentTopInset: Double {
         if statusPosition == "top" || statusPosition == "both" {
+            // 22pt 页眉行 + 6pt 呼吸间距；与 readerHeader 使用同一个常量。
             return Double(
                 readerTopSafeInset
                     + ReaderPageChrome.headerTopGap
-                    + ReaderPageChrome.headerHeight
-                    + 8
+                    + ReaderPageChrome.scrollHeaderBandHeight
+                    + 6
             )
         }
         return Double(
@@ -2298,7 +2299,7 @@ struct ReaderView: View {
     /// 几何来源只有 `ReaderPageGeometry`：页眉带、正文矩形、页脚带各自有确定坐标，
     /// 不再通过三层 padding / frame / safeArea 叠加去「猜」。页面容器尺寸会回传给
     /// 分页引擎（ReaderPageContainerMetricsKey），所以分页高度与实际可画高度永远一致。
-    private func pageSurface<Content: View>(for page: ReaderPageBlock, @ViewBuilder content: () -> Content) -> some View {
+    private func pageSurface<Content: View>(for page: ReaderPageBlock, @ViewBuilder content: @escaping () -> Content) -> some View {
         GeometryReader { proxy in
             let globalFrame = proxy.frame(in: .global)
             let metrics = ReaderPageContainerMetrics(
@@ -2574,10 +2575,12 @@ struct ReaderView: View {
                     }
                 }
                 .padding(.horizontal, max(CGFloat(pagePadding), 18))
+                .frame(height: ReaderPageChrome.scrollHeaderBandHeight)
                 // 页眉必须整体落在安全区内：旧版 0.45×safeTop 会把时间/电量
                 // 塞进刘海或系统状态栏里，视觉上就是「状态栏位置不对」。
+                // 顺序必须是 frame → padding：先固定行高再加安全区偏移，
+                // 否则 padding 会先吃掉整个行高，文字被压扁或裁切。
                 .padding(.top, readerTopSafeInset + ReaderPageChrome.headerTopGap)
-                .frame(height: 22)
                 Spacer(minLength: 0)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)

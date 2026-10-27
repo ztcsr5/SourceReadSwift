@@ -45,6 +45,9 @@ enum ReaderPageChrome {
     static let headerTopGap: CGFloat = 2
     /// 页眉底到正文顶 17pt，合计正文顶 = safeTop + 34（竞品为 safeTop + 34.3）。
     static let headerToBodyGap: CGFloat = 17
+    /// 滚动模式页眉行高（章节名 + 时间/电量一行）。分页页眉用 headerHeight，
+    /// 滚动模式的页眉是浮层，行高固定 22pt，正文内边距与它共用同一常量。
+    static let scrollHeaderBandHeight: CGFloat = 22
     /// 页码离屏幕物理底 12pt（竞品 12.3pt）。
     static let footerBottomInset: CGFloat = 12
     static let minimumBodyHeight: CGFloat = 120
