@@ -1935,6 +1935,41 @@ static func scrollFooterReservedHeight(statusPosition: String) -> CGFloat {
 - 壁纸铺满、比例正确；
 - 三种分页模式与滚动模式均正常。
 
+## 十七、v1.0.64 壁纸 UIKit 图层与导入降采样（2026-10-27）
+
+### 17.1 现象
+
+v1.0.63 给 SwiftUI `Image` 加 frame/clipped 后，自定义壁纸下设置面板与工具条仍左右被裁。
+
+### 17.2 参考
+
+- 栖阅：`staticBackgroundImageView`（UIImageView）、`backgroundImageOpacity`、`dimmingOverlay`、浅/深两套壁纸、文件/Data/Base64 存储；
+- 开元：Flutter `BoxFit`、「背景图片强度」、背景固定正文滚动。
+
+### 17.3 根因
+
+SwiftUI `Image` 在 `ZStack` 提案阶段仍可能按比例填充后的理想尺寸参与测量；`.frame` 限制绘制框但不能阻止父级被撑宽。
+
+### 17.4 修复
+
+- 新增 `ReaderWallpaperView`（UIViewRepresentable + UIImageView，`intrinsicContentSize = noIntrinsicMetric`）；
+- `readerBackdrop` / `pageBackground` 改用 UIKit 图层；
+- 导入按最长边 2800px 降采样；
+- 设置面板新增「壁纸填充方式」：填充 / 适应 / 拉伸。
+
+### 17.5 验证
+
+- 新增 `ReaderWallpaperLayoutTests` 4 用例；
+- CI run `40507109670`：Build 成功，`1072 tests / 0 failures`，`** TEST SUCCEEDED **`（2026-10-27T13:02:57Z）；
+- IPA run `40507109655`：`C:/Users/Edc21/Desktop/SourceReadSwift-1.0.64-unsigned.ipa`，`12,038,495` 字节，SHA256 `036F5DF8C970BCABE401DA713A1B6DE7684F8351C5764DF7D584C2DAB964E72C`，包内 1.0.64 / Build 65。
+
+### 17.6 待真机验收
+
+- 设置面板与工具条不裁切；
+- 三种填充方式正确；
+- 大图导入无卡顿；
+- 预设背景无回归。
+
 ## 附录 A：完整文件清单
 
 > 以下为 2026-10-25 工作区实测清单。`build/`、`ci-log/`、`AppIcons_Candidates/` 为本地产物/素材，不计入源码。

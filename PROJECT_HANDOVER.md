@@ -1,17 +1,18 @@
 # SourceReadSwift (纸间) 项目交接全量备忘录
 
 > **交接目标**：交接给下一位 AI 协作者 / 研发工程师  
-> **文档基线**：v1.0.63 (Build 64)；下文主体保留 v1.0.30 (Build 31) 历史记录  
+> **文档基线**：v1.0.64 (Build 65)；下文主体保留 v1.0.30 (Build 31) 历史记录  
 > **交接时间**：2026-10-27  
-> **验证 Commit**：`1e55d32`（GitHub Actions iOS build 成功；1068 tests / 0 failures；unsigned IPA 打包通过）  
-> **最新产物**：`C:\Users\Edc21\Desktop\SourceReadSwift-1.0.63-unsigned.ipa`（12,031,282 字节，SHA256 `9AEF2509AA423BF0F44CBAA81257D5561734A43A78612F0AC92FCE8095DD8C29`）  
-> **全量文档**：项目全貌、功能矩阵、生态分析与 v1.0.63 工作记录见 `PROJECT_FULL.md`（阅读界面重构 §十三、安全区修复 §十四、页脚状态带 §十五、壁纸布局 §十六）。
+> **验证 Commit**：`9d2b35a`（GitHub Actions iOS build 成功；1072 tests / 0 failures；unsigned IPA 打包通过）  
+> **最新产物**：`C:\Users\Edc21\Desktop\SourceReadSwift-1.0.64-unsigned.ipa`（12,038,495 字节，SHA256 `036F5DF8C970BCABE401DA713A1B6DE7684F8351C5764DF7D584C2DAB964E72C`）  
+> **全量文档**：项目全貌、功能矩阵、生态分析与 v1.0.64 工作记录见 `PROJECT_FULL.md`（阅读界面重构 §十三、安全区修复 §十四、页脚状态带 §十五、壁纸布局 §十六、壁纸 UIKit 图层 §十七）。
 
-> **最新修复（v1.0.63，2026-10-27，分支 `codex/reader-feedback-fixes`）**：修复自定义壁纸 `scaledToFill` 撑大根布局导致设置面板与工具条左右被裁。壁纸现在锁定在视口内并裁剪溢出；分页三种模式同步。交接见 `docs/CODEX_HANDOVER_1_0_63.md`。  
+> **最新修复（v1.0.64，2026-10-27，分支 `codex/reader-feedback-fixes`）**：自定义壁纸改为 UIKit `UIImageView` 图层（`intrinsicContentSize = noIntrinsicMetric`），导入时按最长边 2800px 降采样，新增填充/适应/拉伸三档；彻底切断壁纸撑大根布局的路径。交接见 `docs/CODEX_HANDOVER_1_0_64.md`。  
+> **上一轮（v1.0.63，2026-10-27，分支 `codex/reader-feedback-fixes`）**：修复自定义壁纸 `scaledToFill` 撑大根布局导致设置面板与工具条左右被裁。壁纸现在锁定在视口内并裁剪溢出；分页三种模式同步。交接见 `docs/CODEX_HANDOVER_1_0_63.md`。  
 > **上一轮（v1.0.62，2026-10-27，分支 `codex/reader-feedback-fixes`）**：滑动模式下底部状态栏不再叠在正文上。`ReaderPageChrome.scrollFooterBandHeight = 40`，WebView 视口在状态带上方截止；`statusPosition` 为 top / none 时不占位。交接见 `docs/CODEX_HANDOVER_1_0_62.md`。  
 > **上一轮（v1.0.61，2026-10-27，分支 `codex/reader-feedback-fixes`）**：修复阅读器安全区数据源失效导致顶部工具条压状态栏、正文顶到刘海、底部控制坞贴底、设置面板越过 home indicator。安全区改为「所有窗口取最大 + 状态栏高度 + 机型兜底」，chrome 全部叠加安全区；交接见 `docs/CODEX_HANDOVER_1_0_61.md`。  
 > **上一轮（v1.0.60，2026-10-27）**：阅读界面已按开元 / 栖阅截图像素量测重构——单一几何来源 `ReaderPageGeometry`、每页内置页眉页脚、页码 `当前页/本章总页`、仿真翻页 tap 去重、滑动容器 inset 归零、跨章续读提前缓冲。本轮完整交接见 `docs/CODEX_HANDOVER_1_0_60.md`；书源解析能力评估见 `docs/书源解析能力评估-1.0.60.md`。  
-> **说明**：下文主体仍以 v1.0.30 为基线，保留 v1.0.22→v1.0.30 的完整工程记录；v1.0.31→v1.0.63 的增量以新交接文档与 `PROJECT_FULL.md` §十三/§十四/§十五/§十六 为准。
+> **说明**：下文主体仍以 v1.0.30 为基线，保留 v1.0.22→v1.0.30 的完整工程记录；v1.0.31→v1.0.64 的增量以新交接文档与 `PROJECT_FULL.md` §十三/§十四/§十五/§十六/§十七 为准。
 
 ---
 
