@@ -75,6 +75,37 @@ struct SearchResultParser {
             return .failure(.rule("bookList 规则为空"))
         }
 
+        // Legado list-level AllInOne: `bookList` may be `:regex` over the raw
+        // body. Group 1 is the detail URL, group 2 the title; other fields
+        // address their own capture groups through `$1`/`$2`.
+        if let allInOne = LegadoAllInOneRegex.rule(from: listRule) {
+            var books: [SearchBook] = []
+            for row in LegadoAllInOneRegex.rows(allInOne, body: response.body) {
+                let name = LegadoAllInOneRegex.field(firstRule(rule, fallback: source.ruleSearch, keys: ["name", "bookName"]), row: row, defaultGroup: 2)
+                let rawURL = LegadoAllInOneRegex.field(firstRule(rule, fallback: source.ruleSearch, keys: ["bookUrl", "url"]), row: row, defaultGroup: 1)
+                guard !name.isEmpty, !rawURL.isEmpty else { continue }
+                let absBookUrl = htmlExtractor.absolutize(rawURL, base: response.url)
+                guard !absBookUrl.isEmpty, !absBookUrl.lowercased().hasPrefix("javascript:") else { continue }
+                func optionalField(_ keys: [String]) -> String? {
+                    guard let ruleText = firstRule(rule, fallback: source.ruleSearch, keys: keys) else { return nil }
+                    return LegadoAllInOneRegex.field(ruleText, row: row, defaultGroup: 0).nilIfEmpty
+                }
+                books.append(SearchBook(
+                    name: name,
+                    author: optionalField(["author"]),
+                    coverUrl: optionalField(["coverUrl", "cover"]),
+                    bookUrl: absBookUrl,
+                    sourceName: source.bookSourceName,
+                    sourceUrl: source.bookSourceUrl,
+                    intro: optionalField(["intro"]),
+                    kind: optionalField(["kind"]),
+                    lastChapter: optionalField(["lastChapter"]),
+                    wordCount: optionalField(["wordCount", "wordNum", "words"]),
+                    checkKeyWord: optionalField(["checkKeyWord"])
+                ))
+            }
+            return .success(books)
+        }
         do {
             let roots: [Element]
             if let initRule = firstRule(rule, keys: ["init"]) {

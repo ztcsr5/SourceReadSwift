@@ -106,6 +106,32 @@ struct ChapterListParser {
             return .failure(.rule("ruleToc.chapterList is empty"))
         }
 
+        // Legado list-level AllInOne: `chapterList` may be `:regex` over the raw
+        // body instead of a CSS selector. Every match is one chapter row and the
+        // field rules address the capture groups (`$1` URL, `$2` name). The
+        // 997-source corpus has no such source, but hand-written sources and the
+        // official syntax guide both use it.
+        if let allInOne = LegadoAllInOneRegex.rule(from: listRule) {
+            let nameRule = htmlExtractor.firstRule(source.ruleToc, keys: ["chapterName", "name", "title"])
+            let urlRule = htmlExtractor.firstRule(source.ruleToc, keys: ["chapterUrl", "url"])
+            var chapters: [BookChapter] = []
+            for row in LegadoAllInOneRegex.rows(allInOne, body: response.body) {
+                let title = LegadoAllInOneRegex.field(nameRule, row: row, defaultGroup: 2)
+                let rawURL = LegadoAllInOneRegex.field(urlRule, row: row, defaultGroup: 1)
+                guard let cleaned = sanitizeSingleChapterURL(rawURL) else { continue }
+                let absURL = htmlExtractor.absolutize(cleaned, base: response.url)
+                guard isValidChapter(title: title, url: absURL, pageURL: response.url, bookURL: book.bookUrl) else { continue }
+                chapters.append(BookChapter(
+                    title: title,
+                    url: absURL,
+                    bookUrl: book.bookUrl,
+                    index: chapters.count,
+                    volumeName: inheritedVolume
+                ))
+            }
+            return .success(ChapterListPage(chapters: chapters, nextTocUrl: nil, trailingVolume: inheritedVolume))
+        }
+
         do {
             let roots: [Element]
             if let initRule = htmlExtractor.firstRule(source.ruleToc, keys: ["init"]) {
