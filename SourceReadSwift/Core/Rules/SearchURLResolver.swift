@@ -306,7 +306,12 @@ struct SearchURLResolver {
             switch evalResult {
             case .success(let val):
                 let trimmedVal = val.trimmingCharacters(in: .whitespacesAndNewlines)
-                if trimmedVal == "undefined" || trimmedVal == "null" || trimmedVal == "true" || trimmedVal == "false" || expr.contains(";") || expr.contains("=") {
+                // A multi-line `{{ ... }}` block (抖音小说) returns its last
+                // expression, exactly like Legado's `eval`.  Treating any
+                // block that contains `;` as side-effect-only dropped the
+                // computed URL and left `/search/` behind.
+                if trimmedVal == "undefined" || trimmedVal == "null" || trimmedVal.isEmpty
+                    || trimmedVal == "true" || trimmedVal == "false" {
                     replacement = ""
                 } else {
                     replacement = val

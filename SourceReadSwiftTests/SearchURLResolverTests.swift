@@ -437,6 +437,22 @@ final class SearchURLResolverTests: XCTestCase {
         XCTAssertFalse(url.contains("%7B"), url)
     }
 
+    func testMultiLineBraceBlockKeepsItsLastExpression() {
+        // 抖音小说 style: a `{{ ... }}` block that declares locals and ends
+        // with the value to splice into the URL.
+        let source = BookSource(
+            bookSourceName: "多行花括号",
+            bookSourceUrl: "https://example.com",
+            searchUrl: "{{var base='https://m.example.com'; base}}/search"
+        )
+
+        let result = SearchURLResolver().resolve(source: source, keyword: "剑来", page: 1)
+        guard case .success(let url) = result else {
+            return XCTFail("expected success")
+        }
+        XCTAssertEqual(url, "https://m.example.com/search")
+    }
+
     func testAppVersionSemantics() {
         // Assert the shape, not a frozen release number: bumping the version
         // should not require editing this test every time.
