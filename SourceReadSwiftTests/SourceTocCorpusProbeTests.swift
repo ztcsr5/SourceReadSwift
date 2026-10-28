@@ -49,25 +49,33 @@ final class SourceTocCorpusProbeTests: XCTestCase {
             var links: [String] = []
             var emptyNames = 0
             var emptyURLs = 0
-            // A Legado source that omits chapterName/chapterUrl still renders
-            // rows: the engine falls back to the row's text and href, exactly
-            // like makeChapter does. Mirror that here, otherwise every source
-            // with default rules looks like a field-extraction failure.
+            // Mirror ChapterListParser.makeChapter: configured rule first,
+            // then the row text/href, then <option value> for select TOCs.
             let rawNameRule = (entry.chapterNameRule ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
             let rawURLRule = (entry.chapterUrlRule ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
             for chapter in chapters.prefix(5) {
-                let title = (try? extractor.value(
+                var title = (try? extractor.value(
                     from: chapter,
                     rule: rawNameRule.isEmpty ? nil : rawNameRule,
                     fallback: "a@text",
                     baseUrl: base
                 )) ?? ""
-                let link = (try? extractor.value(
+                if title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                    title = (try? chapter.text()) ?? ""
+                }
+                var link = (try? extractor.value(
                     from: chapter,
                     rule: rawURLRule.isEmpty ? nil : rawURLRule,
                     fallback: "a@href",
                     baseUrl: base
                 )) ?? ""
+                if link.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                    link = (try? chapter.attr("href")) ?? ""
+                }
+                if link.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+                   (try? chapter.tagName())?.lowercased() == "option" {
+                    link = (try? chapter.attr("value")) ?? ""
+                }
                 if title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { emptyNames += 1 }
                 if link.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { emptyURLs += 1 }
                 if names.count < 3 { names.append(String(title.prefix(30))) }
