@@ -91,12 +91,9 @@ targets:
     type: bundle.unit-test
     platform: iOS
     sources:
-      - path: SourceReadSwiftTests
-        excludes:
-          - Fixtures
+      - SourceReadSwiftTests
     resources:
-      - path: SourceReadSwiftTests/Fixtures
-        type: folder
+      - SourceReadSwiftTests/Fixtures
     dependencies:
       - target: SourceReadSwift
       - package: SwiftSoup
