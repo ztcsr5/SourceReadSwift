@@ -24,8 +24,14 @@ enum LegadoJavaScriptCompatibility {
         let lexicalFeatures = detectFeatures(in: unwrapped)
         features.formUnion(lexicalFeatures)
 
-        let normalized = stripExecutionKeywords(from: unwrapped, features: &features)
-        if normalized != unwrapped { features.insert("sync-normalization") }
+        let keywordStripped = stripExecutionKeywords(from: unwrapped, features: &features)
+        if keywordStripped != unwrapped { features.insert("sync-normalization") }
+        // Android Rhino hands rule code `java.lang.String` objects, so sources
+        // call `s.length()`.  JavaScriptCore exposes `length` as a property and
+        // the call form throws "rev.length is not a function" (连尚读书 dies at
+        // the search step because of it).
+        let normalized = rewriteJavaStringLengthCalls(in: keywordStripped, features: &features)
+        if normalized != keywordStripped { features.insert("java-string-length") }
         return LegadoJavaScriptNormalization(
             originalScript: unwrapped,
             normalizedScript: normalized,
@@ -182,6 +188,88 @@ enum LegadoJavaScriptCompatibility {
             index += 1
         }
         return String(output)
+    }
+
+    /// Rewrites the Java-style empty-argument call `value.length()` into the
+    /// JavaScript property read `value.length`.
+    ///
+    /// Legado runs Rhino, where `java.ajax()` and `java.getString()` return
+    /// `java.lang.String` instances whose length is the method `length()`.
+    /// Rule authors therefore write `rev.length()`, which throws
+    /// "rev.length is not a function" on JavaScriptCore.  Only executable
+    /// regions are touched: string literals, template literals, comments and
+    /// regular-expression literals stay byte-for-byte identical.
+    private static func rewriteJavaStringLengthCalls(
+        in source: String,
+        features: inout Set<String>
+    ) -> String {
+        let chars = Array(source)
+        guard chars.count > 8 else { return source }
+        var output = chars
+        var index = 0
+        var state = 0 // same lexical states as lexicalVisibleText
+        var escaped = false
+        var inClass = false
+        var previousSignificant: Character?
+        while index < chars.count {
+            let c = chars[index]
+            let next = index + 1 < chars.count ? chars[index + 1] : nil
+            switch state {
+            case 0:
+                if c == "'" { state = 1 }
+                else if c == "\"" { state = 2 }
+                else if c == "`" { state = 3 }
+                else if c == "/", next == "/" { state = 4; index += 1 }
+                else if c == "/", next == "*" { state = 5; index += 1 }
+                else if c == "/", isRegexStart(previousSignificant) { state = 6 }
+                else if c == ".", let close = javaLengthCallClose(in: chars, dot: index) {
+                    for position in index...close { output[position] = " " }
+                    output[index] = "."
+                    let letters = Array("length")
+                    for offset in 0..<letters.count { output[index + 1 + offset] = letters[offset] }
+                    features.insert("java-string-length")
+                    previousSignificant = "h"
+                    index = close
+                } else if !c.isWhitespace {
+                    previousSignificant = c
+                }
+            case 1, 2, 3:
+                if escaped { escaped = false }
+                else if c == "\\" { escaped = true }
+                else if (state == 1 && c == "'") || (state == 2 && c == "\"") || (state == 3 && c == "`") { state = 0 }
+            case 4:
+                if c.isNewline { state = 0; previousSignificant = c }
+            case 5:
+                if c == "*", next == "/" { index += 1; state = 0 }
+            case 6:
+                if escaped { escaped = false }
+                else if c == "\\" { escaped = true }
+                else if c == "[" { inClass = true }
+                else if c == "]" { inClass = false }
+                else if c == "/", !inClass { state = 0; previousSignificant = c }
+            default: break
+            }
+            index += 1
+        }
+        return String(output)
+    }
+
+    /// Returns the index of `)` when `chars[dot...]` starts the empty-argument
+    /// call `.length()`, ignoring whitespace.  Any argument list is rejected.
+    private static func javaLengthCallClose(in chars: [Character], dot: Int) -> Int? {
+        var cursor = dot + 1
+        while cursor < chars.count, chars[cursor].isWhitespace { cursor += 1 }
+        let name = Array("length")
+        guard cursor + name.count <= chars.count else { return nil }
+        guard Array(chars[cursor..<(cursor + name.count)]) == name else { return nil }
+        cursor += name.count
+        guard cursor >= chars.count || !isIdentifierPart(chars[cursor]) else { return nil }
+        while cursor < chars.count, chars[cursor].isWhitespace { cursor += 1 }
+        guard cursor < chars.count, chars[cursor] == "(" else { return nil }
+        cursor += 1
+        while cursor < chars.count, chars[cursor].isWhitespace { cursor += 1 }
+        guard cursor < chars.count, chars[cursor] == ")" else { return nil }
+        return cursor
     }
 
     private static func shouldStripAsync(in chars: [Character], end: Int) -> Bool {

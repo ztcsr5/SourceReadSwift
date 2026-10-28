@@ -354,4 +354,40 @@ private final class AsyncBodyFixtureNetwork: SourceNetworkClient, @unchecked Sen
             data: Data(body.utf8)
         ))
     }
+
+    // MARK: - Java String `.length()` bridge
+
+    func testJavaStringLengthCallIsRewrittenToPropertyRead() {
+        let normalized = LegadoJavaScriptCompatibility.normalize(
+            "var rev = 'abc'; var n = rev.length();"
+        )
+        XCTAssertTrue(normalized.changed, "the rewrite must mark the script as normalized")
+        XCTAssertTrue(normalized.normalizedScript.contains("rev.length"), normalized.normalizedScript)
+        XCTAssertFalse(normalized.normalizedScript.contains("rev.length("), normalized.normalizedScript)
+        XCTAssertTrue(normalized.features.contains("java-string-length"))
+    }
+
+    func testJavaStringLengthRewriteSkipsLiteralsCommentsAndRegexes() {
+        let source = #"""
+        var a = "s.length()";
+        var b = 'x.length()';
+        var c = /a\.length\(\)/;
+        // s.length()
+        /* s.length() */
+        var d = s.length ();
+        """#
+        let script = LegadoJavaScriptCompatibility.normalize(source).normalizedScript
+        XCTAssertTrue(script.contains("\"s.length()\""), script)
+        XCTAssertTrue(script.contains("'x.length()'"), script)
+        XCTAssertTrue(script.contains("/a\\.length\\(\\)/"), script)
+        XCTAssertTrue(script.contains("// s.length()"), script)
+        XCTAssertTrue(script.contains("/* s.length() */"), script)
+        XCTAssertTrue(script.contains("var d = s.length"), script)
+        XCTAssertFalse(script.contains("var d = s.length("), script)
+    }
+
+    func testJavaStringLengthRewriteIgnoresArgumentLists() {
+        let script = LegadoJavaScriptCompatibility.normalize("var n = list.length(3);").normalizedScript
+        XCTAssertEqual(script, "var n = list.length(3);")
+    }
 }

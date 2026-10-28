@@ -483,10 +483,13 @@ final class JSCoreRuntime {
                     return nil
                 }()
                 if let rawLib, !rawLib.isEmpty {
-                    let sanitized = rawLib
-                        .replacingOccurrences(of: #"(?m)^\s*let\s+"#, with: "var ", options: .regularExpression)
-                        .replacingOccurrences(of: #"(?m)^\s*const\s+"#, with: "var ", options: .regularExpression)
-                    context.evaluateScript(sanitized)
+                    // jsLib bundles are written for Rhino: they use Java-String
+                    // methods (`s.length()`), `let`/`const` and async sugar.
+                    // Run them through the shared normalizer so a jsLib can
+                    // never break the prelude with a Java-only call form.
+                    context.evaluateScript(
+                        LegadoJavaScriptCompatibility.normalize(rawLib).normalizedScript
+                    )
                 }
             } else if key == "book" {
                 let injectScript = """
