@@ -3208,17 +3208,31 @@ struct ReaderView: View {
                     }
                 }
             }
-            .padding(.horizontal, 14)
-            .padding(.top, 14)
-            .padding(.bottom, 18)
-            // Same reason as the top bar: five buttons over a translucent
-            // panel made the text underneath legible through the controls.
+            .padding(.horizontal, 10)
+            .padding(.top, 8)
+            .padding(.bottom, 8)
+            // Match the top bar exactly: one opaque theme layer and a hairline
+            // stroke. The previous version stacked .ultraThinMaterial on top of
+            // the theme colour, so the panel stayed translucent and read wider
+            // than the top bar (14pt inner + 14pt outer padding = 28pt gutters).
             .background(
-                readerThemeBackground.opacity(0.96),
-                in: RoundedRectangle(cornerRadius: 26, style: .continuous)
+                readerThemeBackground.opacity(0.97),
+                in: RoundedRectangle(cornerRadius: 18, style: .continuous)
             )
-            .glassPanel(cornerRadius: 26, material: .ultraThinMaterial, strokeOpacity: background.isDark ? 0.09 : 0.12, shadowOpacity: background.isDark ? 0.42 : 0.14)
-            .padding(.horizontal, 14)
+            .overlay {
+                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                    .stroke(
+                        Color.primary.opacity(background.isDark ? 0.09 : 0.12),
+                        lineWidth: 0.6
+                    )
+            }
+            .shadow(
+                color: Color.black.opacity(background.isDark ? 0.30 : 0.10),
+                radius: 18,
+                x: 0,
+                y: 8
+            )
+            .padding(.horizontal, 16)
             .padding(.bottom, max(readerFooterSafeInset, 10) + 10)
         }
         .foregroundStyle(chromeForeground)

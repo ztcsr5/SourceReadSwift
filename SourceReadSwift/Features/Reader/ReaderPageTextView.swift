@@ -67,7 +67,19 @@ enum ReaderPageTextBuilder {
             if paragraph.isHighlighted {
                 attributes[.backgroundColor] = style.highlightColor
             }
-            output.append(NSAttributedString(string: paragraph.text, attributes: attributes))
+            let piece = NSMutableAttributedString(
+                string: paragraph.text,
+                attributes: attributes
+            )
+            // Keep the renderer's glyph advances identical to the paginator's
+            // (see `ReaderPageLayoutEngine.lineMetrics`): iOS 16 does not trim
+            // the trailing blank of full-width punctuation on its own.
+            ReaderCJKPunctuationCompression.apply(
+                to: piece,
+                font: style.bodyFont,
+                baseKern: style.letterSpacing
+            )
+            output.append(piece)
             if index != paragraphs.count - 1 {
                 output.append(NSAttributedString(string: "\n", attributes: attributes))
             }

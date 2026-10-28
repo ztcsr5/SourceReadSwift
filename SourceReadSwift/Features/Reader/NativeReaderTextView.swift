@@ -1335,11 +1335,16 @@ enum ReaderNativeTextLayout {
             bodyLength += paragraph.utf16.count + 1
         }
         if !body.isEmpty {
-            output.append(NSAttributedString(string: body))
-            output.addAttributes(
-                paragraphAttributes,
-                range: NSRange(location: bodyStart, length: bodyLength)
+            let bodyString = NSMutableAttributedString(
+                string: body,
+                attributes: paragraphAttributes
             )
+            ReaderCJKPunctuationCompression.apply(
+                to: bodyString,
+                font: configuration.fontFamily.uiFont(ofSize: CGFloat(configuration.fontSize), weight: .regular),
+                baseKern: configuration.letterSpacing
+            )
+            output.append(bodyString)
 
             // Special styling for continuous chapter dividers
             for (idx, paragraph) in configuration.paragraphs.enumerated() {
@@ -1416,11 +1421,16 @@ enum ReaderNativeTextLayout {
         }
 
         if !body.isEmpty {
-            output.append(NSAttributedString(string: body))
-            output.addAttributes(
-                paragraphAttributes,
-                range: NSRange(location: 0, length: bodyLength)
+            let bodyString = NSMutableAttributedString(
+                string: body,
+                attributes: paragraphAttributes
             )
+            ReaderCJKPunctuationCompression.apply(
+                to: bodyString,
+                font: configuration.fontFamily.uiFont(ofSize: CGFloat(configuration.fontSize), weight: .regular),
+                baseKern: configuration.letterSpacing
+            )
+            output.append(bodyString)
 
             // Divider styling for continuous chapter titles
             for (idx, paragraph) in paragraphs.enumerated() {

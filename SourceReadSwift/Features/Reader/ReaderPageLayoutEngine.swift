@@ -215,7 +215,7 @@ enum ReaderPageLayoutEngine {
         alignment: NSTextAlignment = .justified
     ) -> [LineMetric] {
         let style = paragraphStyle(alignment: alignment)
-        let storage = NSTextStorage(
+        let attributed = NSMutableAttributedString(
             string: text,
             attributes: [
                 .font: font,
@@ -223,6 +223,16 @@ enum ReaderPageLayoutEngine {
                 .paragraphStyle: style
             ]
         )
+        if alignment == .justified {
+            // Body paragraphs are drawn through `ReaderPageTextBuilder`, which
+            // applies the same trim. Titles stay uncompressed in both places.
+            ReaderCJKPunctuationCompression.apply(
+                to: attributed,
+                font: font,
+                baseKern: typography.letterSpacing
+            )
+        }
+        let storage = NSTextStorage(attributedString: attributed)
         let layout = NSLayoutManager()
         let container = NSTextContainer(
             size: CGSize(width: max(typography.contentWidth, 1), height: .greatestFiniteMagnitude)

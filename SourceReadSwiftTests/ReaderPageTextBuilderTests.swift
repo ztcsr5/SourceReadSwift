@@ -108,6 +108,42 @@ final class ReaderPageTextBuilderTests: XCTestCase {
         XCTAssertEqual(paragraphStyle(result, at: 0)?.maximumLineHeight ?? 0, 0, accuracy: 0.01)
     }
 
+    func testCJKPunctuationIsCompressedLikeIOS17() {
+        // iOS 16 keeps the full em advance for `，`/`。` even though the glyph
+        // paints half of it. The builder trims the trailing blank so a line
+        // that ends with a comma reaches the right margin on both OS versions.
+        let style = makeStyle()
+        let text = "　　他说，好。"
+        let result = ReaderPageTextBuilder.make(
+            title: nil,
+            paragraphs: [.init(text: text, isContinuation: false, isHighlighted: false)],
+            style: style
+        )
+        let ns = text as NSString
+        let em = style.bodyFont.pointSize
+
+        func kern(at location: Int) -> CGFloat {
+            (result.attribute(.kern, at: location, effectiveRange: nil) as? CGFloat) ?? 0
+        }
+
+        XCTAssertEqual(kern(at: ns.range(of: "，").location), style.letterSpacing - 0.5 * em, accuracy: 0.01)
+        XCTAssertEqual(kern(at: ns.range(of: "。").location), style.letterSpacing - 0.5 * em, accuracy: 0.01)
+        XCTAssertEqual(kern(at: ns.range(of: "说").location), style.letterSpacing, accuracy: 0.01)
+    }
+
+    func testTitleIsNotPunctuationCompressed() {
+        let style = makeStyle()
+        let title = "第一章，标题。"
+        let result = ReaderPageTextBuilder.make(
+            title: title,
+            paragraphs: [.init(text: "　　正文。", isContinuation: false, isHighlighted: false)],
+            style: style
+        )
+        let comma = (title as NSString).range(of: "，").location
+        let kern = (result.attribute(.kern, at: comma, effectiveRange: nil) as? CGFloat) ?? .nan
+        XCTAssertTrue(kern.isNaN || abs(kern) < 0.01, "titles keep their natural advance")
+    }
+
     func testHighlightAddsBackground() {
         let result = ReaderPageTextBuilder.make(
             title: nil,

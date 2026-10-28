@@ -155,13 +155,31 @@ struct PodcastChevronSectionHeader: View {
     }
 }
 
+/// End editing anywhere in the app.
+func dismissKeyboardNow() {
+    UIApplication.shared.sendAction(
+        #selector(UIResponder.resignFirstResponder),
+        to: nil,
+        from: nil,
+        for: nil
+    )
+}
+
 extension View {
     func dismissKeyboard() {
-        UIApplication.shared.sendAction(
-            #selector(UIResponder.resignFirstResponder),
-            to: nil,
-            from: nil,
-            for: nil
+        dismissKeyboardNow()
+    }
+
+    /// Ends editing when the user taps blank space, not only when they drag.
+    ///
+    /// `scrollDismissesKeyboard` reacts to a scroll gesture alone, so the search
+    /// screens kept the keyboard up until Return. The gesture is simultaneous so
+    /// result rows, chips and buttons keep receiving their own taps.
+    func dismissKeyboardOnTap() -> some View {
+        simultaneousGesture(
+            TapGesture().onEnded {
+                dismissKeyboardNow()
+            }
         )
     }
 }

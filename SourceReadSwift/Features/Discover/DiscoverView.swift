@@ -156,6 +156,12 @@ struct DiscoverView: View {
                 .padding(.bottom, 22)
             }
             .scrollDismissesKeyboard(.interactively)
+            .dismissKeyboardOnTap()
+            // Keep the header (tab switcher + search field) where the user put
+            // it. Without this the whole scroll view is inset for the keyboard
+            // and SwiftUI scrolls the focused field into view, which drags the
+            // top bar up with it.
+            .ignoresSafeArea(.keyboard, edges: .bottom)
             .refreshable {
                 if selectedTab == .explore {
                     await exploreViewModel.refresh()
@@ -356,6 +362,7 @@ struct DiscoverView: View {
                 .onSubmit {
                     saveSearchKeyword(viewModel.keyword)
                     viewModel.startSearch()
+                    dismissKeyboardNow()
                 }
 
             if !viewModel.keyword.isEmpty {
