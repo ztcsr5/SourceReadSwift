@@ -13,6 +13,11 @@ struct LegadoRuleStep: Equatable {
     var selector: String
     var indexItems: [LegadoIndexItem]?
     var excludeIndexItems: [LegadoIndexItem]?
+    /// Legado `class.<name>` with whitespace inside the name.
+    /// jsoup getElementsByClass compares the class attribute against one
+    /// contiguous token run, so `class.col-12 col-md-6` matches
+    /// `class="col-12 col-md-6"` but not `class="col-12 col-sm-9 col-md-6"`.
+    var classToken: String?
 
     /// Flattened view kept for older call sites and tests.  It returns nil when
     /// the step carries a range, because a range cannot be represented as a
@@ -50,9 +55,11 @@ struct LegadoRuleStep: Equatable {
         indices: [Int]? = nil,
         excludeIndices: [Int]? = nil,
         indexItems: [LegadoIndexItem]? = nil,
-        excludeIndexItems: [LegadoIndexItem]? = nil
+        excludeIndexItems: [LegadoIndexItem]? = nil,
+        classToken: String? = nil
     ) {
         self.selector = selector
+        self.classToken = classToken
         if let indexItems {
             self.indexItems = indexItems
         } else if let indices {
@@ -347,7 +354,10 @@ enum LegadoDefaultRuleTranslator {
             var nextElements: [Element] = []
             for elem in currentElements {
                 do {
-                    if step.selector.isEmpty {
+                    if let classToken = step.classToken {
+                        let all = try elem.getAllElements().array()
+                        nextElements.append(contentsOf: all.filter { matchesClassToken($0, token: classToken) })
+                    } else if step.selector.isEmpty {
                         nextElements.append(elem)
                     } else {
                         let selected = try elem.select(step.selector).array()
@@ -437,6 +447,17 @@ enum LegadoDefaultRuleTranslator {
         return ordered
     }
 
+    static func matchesClassToken(_ element: Element, token: String) -> Bool {
+        guard let raw = try? element.attr("class"), !raw.isEmpty else { return false }
+        let haystack = raw.split(whereSeparator: { $0.isWhitespace }).map(String.init)
+        let needle = token.split(whereSeparator: { $0.isWhitespace }).map(String.init)
+        guard !needle.isEmpty, needle.count <= haystack.count else { return false }
+        for start in 0...(haystack.count - needle.count) {
+            if Array(haystack[start..<(start + needle.count)]) == needle { return true }
+        }
+        return false
+    }
+
     private static func isSelectorToken(_ token: String) -> Bool {
         let lower = token.lowercased()
         if lower.hasPrefix("class.") || lower.hasPrefix("id.") || lower.hasPrefix("tag.") { return true }
@@ -494,6 +515,30 @@ enum LegadoDefaultRuleTranslator {
                 }
                 step = String(step[..<dotIndexRange.lowerBound]).trimmingCharacters(in: .whitespacesAndNewlines)
             }
+        }
+
+        let trimmedStep = step.trimmingCharacters(in: .whitespacesAndNewlines)
+        let lowerStep = trimmedStep.lowercased()
+
+        // `class.a b` is getElementsByClass("a b") in Legado, not the CSS
+        // `.a.b`; the CSS form also matches elements that carry another class
+        // between the two and adds rows the reference never returns.
+        if lowerStep.hasPrefix("class.") {
+            let name = String(trimmedStep.dropFirst(6)).trimmingCharacters(in: .whitespacesAndNewlines)
+            if name.contains(where: { $0.isWhitespace }) {
+                return LegadoRuleStep(
+                    selector: "",
+                    indexItems: indexItems,
+                    excludeIndexItems: excludeIndexItems,
+                    classToken: name
+                )
+            }
+        }
+
+        // `id.x` is getElementById("x"): one node even when the page repeats
+        // the id. `#x` returns every duplicate (顶点小说: 50 rows for id.nr).
+        if lowerStep.hasPrefix("id."), indexItems == nil, excludeIndexItems == nil {
+            indexItems = [.single(0)]
         }
 
         let cssSelector = convertLegadoComponentToCSS(step)

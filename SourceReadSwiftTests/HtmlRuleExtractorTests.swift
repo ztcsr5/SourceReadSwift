@@ -684,4 +684,36 @@ final class HtmlRuleExtractorTests: XCTestCase {
 
         XCTAssertEqual(value, "ABC123")
     }
+    // MARK: - jsoup parity: getElementById / getElementsByClass
+
+    func testIdPrefixTakesTheFirstMatchLikeGetElementById() throws {
+        let html = "<html><body><div id='nr'>one</div><div id='nr'>two</div><div id='nr'>three</div></body></html>"
+        let document = try SwiftSoup.parse(html)
+        let elements = try HtmlRuleExtractor().select(
+            from: document,
+            rule: "id.nr",
+            baseUrl: URL(string: "https://example.com/")!
+        )
+        XCTAssertEqual(elements.count, 1)
+        XCTAssertEqual(try elements.first?.text(), "one")
+    }
+
+    func testClassRuleWithSpacesMatchesOneContiguousTokenRun() throws {
+        // jsoup-1.17.2 getElementsByClass("col-12 col-md-6") compares the
+        // class attribute as one token run: the div carrying col-sm-9 in
+        // between is NOT a match, so the reference returns 2 rows.
+        let html = "<html><body>"
+            + "<div class='col-12 col-md-6'>a</div>"
+            + "<div class='col-12 col-md-6'>b</div>"
+            + "<div class='col-12 col-sm-9 col-md-6 search'>c</div>"
+            + "</body></html>"
+        let document = try SwiftSoup.parse(html)
+        let elements = try HtmlRuleExtractor().select(
+            from: document,
+            rule: "class.col-12 col-md-6",
+            baseUrl: URL(string: "https://example.com/")!
+        )
+        XCTAssertEqual(elements.count, 2)
+    }
+
 }
