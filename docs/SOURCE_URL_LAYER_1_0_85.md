@@ -1,6 +1,6 @@
 # 书源 URL 层对齐（1.0.85）
 
-探针：`SourceReadSwiftTests/SourceSearchURLProbeTests`，994 条 searchUrl，真实 `SearchURLResolver` 解析 page 1 / page 2。
+探针：`SourceReadSwiftTests/SourceSearchURLProbeTests`，997 条 searchUrl，真实 `SearchURLResolver` 解析 page 1 / page 2。
 
 ## 结果
 
