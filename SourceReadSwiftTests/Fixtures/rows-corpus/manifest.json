@@ -5,7 +5,11 @@
     "rule": ".bookbox",
     "expected": 1,
     "bodyFile": "rows-7.body",
-    "baseUrl": "https://m.cuoceng.com/"
+    "baseUrl": "https://m.cuoceng.com/",
+    "nameRule": ".bookname a@text",
+    "authorRule": ".author:contains(作者)@text",
+    "coverRule": "",
+    "bookUrlRule": ".bookname a@href"
   },
   {
     "id": 24,
@@ -13,7 +17,11 @@
     "rule": ".bookbox",
     "expected": 1,
     "bodyFile": "rows-24.body",
-    "baseUrl": "https://m.cuoceng.org/"
+    "baseUrl": "https://m.cuoceng.org/",
+    "nameRule": ".bookname@text",
+    "authorRule": ".author.0@text",
+    "coverRule": "",
+    "bookUrlRule": ".bookname@tag.a@href"
   },
   {
     "id": 30,
@@ -21,7 +29,11 @@
     "rule": "class.tui_1_item",
     "expected": 18,
     "bodyFile": "rows-30.body",
-    "baseUrl": "https://www.biquge7.top/"
+    "baseUrl": "https://www.biquge7.top/",
+    "nameRule": "class.tui_1_item@a@text",
+    "authorRule": "",
+    "coverRule": "class.tui_1_item@img@src",
+    "bookUrlRule": "class.tui_1_item@a@href"
   },
   {
     "id": 31,
@@ -29,7 +41,11 @@
     "rule": "class.hot_4@tag.li",
     "expected": 18,
     "bodyFile": "rows-31.body",
-    "baseUrl": "https://www.biquges123.com"
+    "baseUrl": "https://www.biquges123.com",
+    "nameRule": ".hot_name@text",
+    "authorRule": ".author@text",
+    "coverRule": "class.cover@tag.img@src",
+    "bookUrlRule": "class.hot_4_item@tag.a@href"
   },
   {
     "id": 32,
@@ -37,7 +53,11 @@
     "rule": "class.novelslist2@li!0",
     "expected": 50,
     "bodyFile": "rows-32.body",
-    "baseUrl": "https://www.biqusa.com/"
+    "baseUrl": "https://www.biqusa.com/",
+    "nameRule": "class.s2 wid@text",
+    "authorRule": "class.s4 wid@text",
+    "coverRule": "",
+    "bookUrlRule": "class.s2 wid@a@href"
   },
   {
     "id": 33,
@@ -45,7 +65,11 @@
     "rule": ".row@dl",
     "expected": 17,
     "bodyFile": "rows-33.body",
-    "baseUrl": "https://www.kanshuw.com"
+    "baseUrl": "https://www.kanshuw.com",
+    "nameRule": "h3@text##\\[|.*\\]|免费阅读.*",
+    "authorRule": "span@text",
+    "coverRule": "tag.dt@tag.a@img@src",
+    "bookUrlRule": "a[0]@href"
   },
   {
     "id": 34,
@@ -53,7 +77,11 @@
     "rule": ".grid@tr!0",
     "expected": 15,
     "bodyFile": "rows-34.body",
-    "baseUrl": "https://www.kxwx.org"
+    "baseUrl": "https://www.kxwx.org",
+    "nameRule": "a.0@text",
+    "authorRule": "a.2@text",
+    "coverRule": "",
+    "bookUrlRule": "a.0@href"
   },
   {
     "id": 36,
@@ -61,7 +89,11 @@
     "rule": ".novelslist2@li!0",
     "expected": 50,
     "bodyFile": "rows-36.body",
-    "baseUrl": "https://www.yingsx.com"
+    "baseUrl": "https://www.yingsx.com",
+    "nameRule": "a@text",
+    "authorRule": ".s4@text",
+    "coverRule": "",
+    "bookUrlRule": "a@href"
   },
   {
     "id": 44,
@@ -69,7 +101,11 @@
     "rule": ".v-list-item",
     "expected": 5,
     "bodyFile": "rows-44.body",
-    "baseUrl": "http://m.suixkan.com/"
+    "baseUrl": "http://m.suixkan.com/",
+    "nameRule": ".v-title@text",
+    "authorRule": ".v-author@text##\\s",
+    "coverRule": "img@src",
+    "bookUrlRule": "@onclick@js:result.match(/\\('(.*?)', '', ''\\)/)[1]"
   },
   {
     "id": 49,
@@ -77,7 +113,11 @@
     "rule": "class.c_row",
     "expected": 100,
     "bodyFile": "rows-49.body",
-    "baseUrl": "http://www.kk169.org"
+    "baseUrl": "http://www.kk169.org",
+    "nameRule": "a.1@text",
+    "authorRule": ".c_value.0@text",
+    "coverRule": "img@src",
+    "bookUrlRule": "a.0@href"
   },
   {
     "id": 57,
@@ -85,7 +125,11 @@
     "rule": ".novel-item",
     "expected": 1,
     "bodyFile": "rows-57.body",
-    "baseUrl": "https://www.chamabooks.net"
+    "baseUrl": "https://www.chamabooks.net",
+    "nameRule": "h4 a@text",
+    "authorRule": ".misc-value a@text",
+    "coverRule": "",
+    "bookUrlRule": "h4 a@href"
   },
   {
     "id": 62,
@@ -93,7 +137,11 @@
     "rule": "div.col-lg-3.col-md-4.col-sm-3.col-xs-6",
     "expected": 1,
     "bodyFile": "rows-62.body",
-    "baseUrl": "https://www.esjzone.cc"
+    "baseUrl": "https://www.esjzone.cc",
+    "nameRule": "@css: .card-title a, .product-title@text\n@js:\njava.t2s(result)",
+    "authorRule": "class.card-author@tag.a@text\n@js:\njava.t2s(result)",
+    "coverRule": "class.main-img@class.lazyload@data-src\n@js:\nresult.match(\"empty\") ? \"\" : result",
+    "bookUrlRule": "@css:div> div > div > h5 > a, .product-title > a@href"
   },
   {
     "id": 75,
@@ -101,7 +149,11 @@
     "rule": "div.col-lg-3",
     "expected": 1,
     "bodyFile": "rows-75.body",
-    "baseUrl": "https://www.esjzone.one"
+    "baseUrl": "https://www.esjzone.one",
+    "nameRule": ".card-title@a@text",
+    "authorRule": ".card-author@a@text",
+    "coverRule": "div.lazyload@html##.*\"(.*)\".*##$1",
+    "bookUrlRule": ".card-title@a@href"
   },
   {
     "id": 104,
@@ -109,7 +161,11 @@
     "rule": "class.ng-star-inserted mio-multi-up mio-multi-up--dynamic mio-multi-up--max mio-multi-up--slim@mio-tile",
     "expected": 1,
     "bodyFile": "rows-104.body",
-    "baseUrl": "https://zxcs.zip/"
+    "baseUrl": "https://zxcs.zip/",
+    "nameRule": "h3@text##《|》|（.*",
+    "authorRule": "h3@text##.*作者(：|:)",
+    "coverRule": "{{@@a.0@href##book##images/cover}}##html##jpg",
+    "bookUrlRule": "a.0@href"
   },
   {
     "id": 106,
@@ -117,7 +173,11 @@
     "rule": ".row:nth-child(2) > .col-12:nth-child(n+1)",
     "expected": 17,
     "bodyFile": "rows-106.body",
-    "baseUrl": "https://www.dtxsw.com"
+    "baseUrl": "https://www.dtxsw.com",
+    "nameRule": "h3 > a@text##\\[.*\\]",
+    "authorRule": ".book_other:nth-child(3)@text",
+    "coverRule": "img@src",
+    "bookUrlRule": "h3 > a@href"
   },
   {
     "id": 112,
@@ -125,7 +185,11 @@
     "rule": ".uk-card",
     "expected": 5,
     "bodyFile": "rows-112.body",
-    "baseUrl": "https://www.antbyw.com"
+    "baseUrl": "https://www.antbyw.com",
+    "nameRule": "a.1@text",
+    "authorRule": "",
+    "coverRule": "a.0@img@src",
+    "bookUrlRule": "a.1@href"
   },
   {
     "id": 117,
@@ -133,7 +197,11 @@
     "rule": ".pb-2",
     "expected": 30,
     "bodyFile": "rows-117.body",
-    "baseUrl": "https://manhuafree.com/"
+    "baseUrl": "https://manhuafree.com/",
+    "nameRule": "h3@text",
+    "authorRule": "",
+    "coverRule": "img@src",
+    "bookUrlRule": "a.0@href"
   },
   {
     "id": 119,
@@ -141,7 +209,11 @@
     "rule": "class.comics-card",
     "expected": 6,
     "bodyFile": "rows-119.body",
-    "baseUrl": "https://cn.bzmanga.com"
+    "baseUrl": "https://cn.bzmanga.com",
+    "nameRule": "class.comics-card__title@text",
+    "authorRule": "class.tags@text",
+    "coverRule": "tag.amp-img.0@src##.w=.*##",
+    "bookUrlRule": "tag.a@href"
   },
   {
     "id": 134,
@@ -149,7 +221,11 @@
     "rule": "class.bookbox",
     "expected": 50,
     "bodyFile": "rows-134.body",
-    "baseUrl": "http://www.yetianlian.com"
+    "baseUrl": "http://www.yetianlian.com",
+    "nameRule": "tag.h4@text",
+    "authorRule": "class.author@text##作者：",
+    "coverRule": "tag.img@src",
+    "bookUrlRule": "tag.a.1@href"
   },
   {
     "id": 136,
@@ -157,7 +233,11 @@
     "rule": "class.result-list@ul@li",
     "expected": 17,
     "bodyFile": "rows-136.body",
-    "baseUrl": "https://www.xxsy.net/"
+    "baseUrl": "https://www.xxsy.net/",
+    "nameRule": "class.info@h4@a.0@text",
+    "authorRule": "class.subtitle@a.0@text##[\\ ]*",
+    "coverRule": "img@src",
+    "bookUrlRule": "li@a@href"
   },
   {
     "id": 141,
@@ -165,7 +245,11 @@
     "rule": "class.col-12 col-md-6",
     "expected": 17,
     "bodyFile": "rows-141.body",
-    "baseUrl": "http://www.16kbook.net"
+    "baseUrl": "http://www.16kbook.net",
+    "nameRule": "h3@a@text##\\]|\\[",
+    "authorRule": "dd.1@span@text",
+    "coverRule": "dt@a@img@src",
+    "bookUrlRule": "h3@a@href"
   },
   {
     "id": 151,
@@ -173,7 +257,11 @@
     "rule": ".u-list@tag.li",
     "expected": 20,
     "bodyFile": "rows-151.body",
-    "baseUrl": "https://ixdzs8.com"
+    "baseUrl": "https://ixdzs8.com",
+    "nameRule": "a@title",
+    "authorRule": ".bauthor@tag.a@text",
+    "coverRule": "img@src\n@js:\nif (result == \"https://img22.ixdzs.com/nopic2.jpg\"){\n\tnull;\n\t}else{result}",
+    "bookUrlRule": "a@href"
   },
   {
     "id": 152,
@@ -181,7 +269,11 @@
     "rule": "#page@div[itemscope]",
     "expected": 2,
     "bodyFile": "rows-152.body",
-    "baseUrl": "https://book.vik.im/ "
+    "baseUrl": "https://book.vik.im/ ",
+    "nameRule": "a.0@text",
+    "authorRule": "",
+    "coverRule": "a.0@href##(\\d+)##https://book.vik.im/contents/$1/cover.jpeg###",
+    "bookUrlRule": "a.0@href"
   },
   {
     "id": 159,
@@ -189,7 +281,11 @@
     "rule": "class.result f s0!0",
     "expected": 9,
     "bodyFile": "rows-159.body",
-    "baseUrl": "https://www.52pojie.cn"
+    "baseUrl": "https://www.52pojie.cn",
+    "nameRule": "tag.h3@text##\\_.*",
+    "authorRule": "",
+    "coverRule": "",
+    "bookUrlRule": "tag.a.0@href"
   },
   {
     "id": 175,
@@ -197,7 +293,11 @@
     "rule": "id.jieqi_page_contents@class.c_row",
     "expected": 50,
     "bodyFile": "rows-175.body",
-    "baseUrl": "http://www.qudushu.com"
+    "baseUrl": "http://www.qudushu.com",
+    "nameRule": "class.c_subject@a@text",
+    "authorRule": "class.c_tag.0@tag.span.1@text",
+    "coverRule": "img@src",
+    "bookUrlRule": "class.c_subject@a@href"
   },
   {
     "id": 184,
@@ -205,7 +305,11 @@
     "rule": "class.bookbox",
     "expected": 50,
     "bodyFile": "rows-184.body",
-    "baseUrl": "http://www.yetianlian.com/"
+    "baseUrl": "http://www.yetianlian.com/",
+    "nameRule": "tag.h4@text",
+    "authorRule": "class.author@text##作者：",
+    "coverRule": "tag.img@src",
+    "bookUrlRule": "tag.a.1@href"
   },
   {
     "id": 188,
@@ -213,7 +317,11 @@
     "rule": "class.novelslist2@ul@li!0",
     "expected": 100,
     "bodyFile": "rows-188.body",
-    "baseUrl": "http://www.swsk.org#"
+    "baseUrl": "http://www.swsk.org#",
+    "nameRule": ".s2@text",
+    "authorRule": ".s4@text",
+    "coverRule": ".s2@a@href##/(\\d+)/(\\d+)/##http://www.swsk.org/files/article/image/$1/$2/$2s.jpg",
+    "bookUrlRule": ".s2@a@href"
   },
   {
     "id": 200,
@@ -221,7 +329,11 @@
     "rule": "tbody tr",
     "expected": 2,
     "bodyFile": "rows-200.body",
-    "baseUrl": "https://www.wxscs.com"
+    "baseUrl": "https://www.wxscs.com",
+    "nameRule": "a.0@text",
+    "authorRule": "td.1@text",
+    "coverRule": "a.0@href\n##(\\d+)##/uploads/cover/pic$1.jpg###",
+    "bookUrlRule": "a.0@href"
   },
   {
     "id": 202,
@@ -229,7 +341,11 @@
     "rule": "tag.form@tag.table.-2@tag.ul",
     "expected": 25,
     "bodyFile": "rows-202.body",
-    "baseUrl": "http://s.sfacg.com"
+    "baseUrl": "http://s.sfacg.com",
+    "nameRule": "tag.a@text",
+    "authorRule": "tag.li.1@text##.+综合信息：\\s*([^\\/]+).*##$1",
+    "coverRule": "tag.img@src",
+    "bookUrlRule": "tag.a@href"
   },
   {
     "id": 220,
@@ -237,7 +353,11 @@
     "rule": "//div[contains(@class, \"slide-item\")]/div",
     "expected": 50,
     "bodyFile": "rows-220.body",
-    "baseUrl": "https://m.biqusa.com"
+    "baseUrl": "https://m.biqusa.com",
+    "nameRule": ".title@text",
+    "authorRule": "/p[1]/a[2]/text()",
+    "coverRule": "",
+    "bookUrlRule": "/a/@href"
   },
   {
     "id": 246,
@@ -245,7 +365,11 @@
     "rule": "class.stui-vodlist[0]@tag.li",
     "expected": 12,
     "bodyFile": "rows-246.body",
-    "baseUrl": "https://www.cupfox7.com/"
+    "baseUrl": "https://www.cupfox7.com/",
+    "nameRule": "tag.a@title",
+    "authorRule": "",
+    "coverRule": "tag.a@data-original",
+    "bookUrlRule": "tag.a@href"
   },
   {
     "id": 259,
@@ -253,7 +377,11 @@
     "rule": "li.lastLine",
     "expected": 30,
     "bodyFile": "rows-259.body",
-    "baseUrl": "https://www.tadu.com/"
+    "baseUrl": "https://www.tadu.com/",
+    "nameRule": "a.bookNm@text",
+    "authorRule": "a.authorNm@text",
+    "coverRule": "img@data-src",
+    "bookUrlRule": "a.bookNm@href"
   },
   {
     "id": 269,
@@ -261,7 +389,11 @@
     "rule": ".sone",
     "expected": 100,
     "bodyFile": "rows-269.body",
-    "baseUrl": "http://m.kk169.net/"
+    "baseUrl": "http://m.kk169.net/",
+    "nameRule": "a.0@text",
+    "authorRule": ".author@text",
+    "coverRule": "a.0@href@js:##.+\\D((\\d+)\\d{3})\\D##http://www.kk169.com/files/article/image/$2/$1/$1s.jpg###",
+    "bookUrlRule": "a.0@href"
   },
   {
     "id": 283,
@@ -269,7 +401,11 @@
     "rule": "div.baseinfo&&class.pt-card pt-card-2@li&&class.ptm-content pt-infopage",
     "expected": 101,
     "bodyFile": "rows-283.body",
-    "baseUrl": "http://m.xbotaodz.com"
+    "baseUrl": "http://m.xbotaodz.com",
+    "nameRule": "a.0@text||a.1@text",
+    "authorRule": ".pt-info@text##作者:||\n.pt-info@text\n@js:\nresult.split(/ +/)[0]",
+    "coverRule": "img@src",
+    "bookUrlRule": "a.0@href||a.1@href"
   },
   {
     "id": 298,
@@ -277,7 +413,11 @@
     "rule": "class.librarylist@tag.li",
     "expected": 100,
     "bodyFile": "rows-298.body",
-    "baseUrl": "http://www.xbotaodz.com"
+    "baseUrl": "http://www.xbotaodz.com",
+    "nameRule": "class.info@tag.span.0@tag.a@text",
+    "authorRule": "class.info@tag.span.1@text",
+    "coverRule": "class.pt-ll-l@tag.a@tag.img@src",
+    "bookUrlRule": "class.info@tag.span.0@tag.a@href"
   },
   {
     "id": 316,
@@ -285,7 +425,11 @@
     "rule": "class.block",
     "expected": 50,
     "bodyFile": "rows-316.body",
-    "baseUrl": "http://m.rulianshi.la/"
+    "baseUrl": "http://m.rulianshi.la/",
+    "nameRule": "h2@text",
+    "authorRule": "p.3@text##作者：",
+    "coverRule": "img@src",
+    "bookUrlRule": "a.0@href"
   },
   {
     "id": 326,
@@ -293,7 +437,11 @@
     "rule": "class.block",
     "expected": 1,
     "bodyFile": "rows-326.body",
-    "baseUrl": "http://m.9191net.com#"
+    "baseUrl": "http://m.9191net.com#",
+    "nameRule": "tag.h2@text",
+    "authorRule": "author",
+    "coverRule": "tag.a@img@src",
+    "bookUrlRule": "tag.a@href"
   },
   {
     "id": 336,
@@ -301,7 +449,11 @@
     "rule": "class.block",
     "expected": 1,
     "bodyFile": "rows-336.body",
-    "baseUrl": "http://m.9191net.com/"
+    "baseUrl": "http://m.9191net.com/",
+    "nameRule": "tag.h2@text",
+    "authorRule": "author",
+    "coverRule": "tag.a@img@src",
+    "bookUrlRule": "tag.a@href"
   },
   {
     "id": 351,
@@ -309,7 +461,11 @@
     "rule": "class.librarylist@tag.li",
     "expected": 100,
     "bodyFile": "rows-351.body",
-    "baseUrl": "http://www.booksky.cc"
+    "baseUrl": "http://www.booksky.cc",
+    "nameRule": "class.info@tag.span.0@tag.a@text",
+    "authorRule": "class.info@tag.span.1@text",
+    "coverRule": "class.pt-ll-l@tag.a@tag.img@src",
+    "bookUrlRule": "class.info@tag.span.0@tag.a@href"
   },
   {
     "id": 358,
@@ -317,7 +473,11 @@
     "rule": "class.librarylist@tag.li",
     "expected": 100,
     "bodyFile": "rows-358.body",
-    "baseUrl": "http://www.xbotaodz.com/"
+    "baseUrl": "http://www.xbotaodz.com/",
+    "nameRule": "class.info@tag.span.0@tag.a@text",
+    "authorRule": "class.info@tag.span.1@text",
+    "coverRule": "class.pt-ll-l@tag.a@tag.img@src",
+    "bookUrlRule": "class.info@tag.span.0@tag.a@href"
   },
   {
     "id": 359,
@@ -325,7 +485,11 @@
     "rule": ".v-list-item",
     "expected": 5,
     "bodyFile": "rows-359.body",
-    "baseUrl": "http://m.suixkan.com"
+    "baseUrl": "http://m.suixkan.com",
+    "nameRule": ".v-title@text",
+    "authorRule": ".v-author@text##\\s",
+    "coverRule": "img@src",
+    "bookUrlRule": "@onclick@js:result.match(/\\('(.*?)', '', ''\\)/)[1]"
   },
   {
     "id": 365,
@@ -333,7 +497,11 @@
     "rule": "class.searchList@li",
     "expected": 10,
     "bodyFile": "rows-365.body",
-    "baseUrl": "http://www.wtzw.com"
+    "baseUrl": "http://www.wtzw.com",
+    "nameRule": "class.sTit@text",
+    "authorRule": "tag.a.2@text",
+    "coverRule": "tag.img@src",
+    "bookUrlRule": "class.sTit@tag.a@href"
   },
   {
     "id": 401,
@@ -341,7 +509,11 @@
     "rule": "div.c_row",
     "expected": 100,
     "bodyFile": "rows-401.body",
-    "baseUrl": "http://www.kk169.net/"
+    "baseUrl": "http://www.kk169.net/",
+    "nameRule": ".c_subject a@text",
+    "authorRule": "div.c_tag:nth-of-type(2) span:nth-of-type(2)@text",
+    "coverRule": "img@src",
+    "bookUrlRule": ".c_subject a@href"
   },
   {
     "id": 403,
@@ -349,7 +521,11 @@
     "rule": "class.block",
     "expected": 50,
     "bodyFile": "rows-403.body",
-    "baseUrl": "http://m.rulianshi.la"
+    "baseUrl": "http://m.rulianshi.la",
+    "nameRule": "h2@text",
+    "authorRule": "p.3@text##作者：",
+    "coverRule": "img@src",
+    "bookUrlRule": "a.0@href"
   },
   {
     "id": 412,
@@ -357,7 +533,11 @@
     "rule": "class.novelslist2@ul@li",
     "expected": 51,
     "bodyFile": "rows-412.body",
-    "baseUrl": "https://www.biqusa.com/#pb1101"
+    "baseUrl": "https://www.biqusa.com/#pb1101",
+    "nameRule": "class.s2@a@text##\\（.*|\\(.*|免费阅读|全文.*阅读|最新章节",
+    "authorRule": "class.s4@a@text",
+    "coverRule": "class.s2@tag.a@href<js>\nvar id = result.match(/(\\d+)\\/?$/)[1];\nvar iid = parseInt(id/1000);\n'https://www.biqusa.com/files/article/image/'+iid+'/'+id+'/'+id+'s.jpg';\n</js>",
+    "bookUrlRule": "class.s2@a@href"
   },
   {
     "id": 413,
@@ -365,7 +545,11 @@
     "rule": "class.novelslist2@li!0",
     "expected": 50,
     "bodyFile": "rows-413.body",
-    "baseUrl": "http://www.biqusa.com"
+    "baseUrl": "http://www.biqusa.com",
+    "nameRule": "class.s2@text",
+    "authorRule": "class.s4@text",
+    "coverRule": "",
+    "bookUrlRule": "tag.a.0@href"
   },
   {
     "id": 425,
@@ -373,7 +557,11 @@
     "rule": "div.c_row",
     "expected": 100,
     "bodyFile": "rows-425.body",
-    "baseUrl": "http://www.kk169.net"
+    "baseUrl": "http://www.kk169.net",
+    "nameRule": ".c_subject a@text",
+    "authorRule": "div.c_tag:nth-of-type(2) span:nth-of-type(2)@text",
+    "coverRule": "img@src",
+    "bookUrlRule": ".c_subject a@href"
   },
   {
     "id": 430,
@@ -381,7 +569,11 @@
     "rule": "class.novelslist2@li!0",
     "expected": 50,
     "bodyFile": "rows-430.body",
-    "baseUrl": "https://www.biqusa.com#"
+    "baseUrl": "https://www.biqusa.com#",
+    "nameRule": "class.s2 wid@text",
+    "authorRule": "class.s4 wid@text",
+    "coverRule": "",
+    "bookUrlRule": "class.s2 wid@a@href"
   },
   {
     "id": 446,
@@ -389,7 +581,11 @@
     "rule": "class.c_row",
     "expected": 100,
     "bodyFile": "rows-446.body",
-    "baseUrl": "http://www.kk169.org/"
+    "baseUrl": "http://www.kk169.org/",
+    "nameRule": "a.1@text",
+    "authorRule": ".c_value.0@text",
+    "coverRule": "img@src",
+    "bookUrlRule": "a.0@href"
   },
   {
     "id": 448,
@@ -397,7 +593,11 @@
     "rule": ".sone",
     "expected": 100,
     "bodyFile": "rows-448.body",
-    "baseUrl": "http://m.kk169.net"
+    "baseUrl": "http://m.kk169.net",
+    "nameRule": "a.0@text",
+    "authorRule": ".author@text",
+    "coverRule": "a.0@href@js:##.+\\D((\\d+)\\d{3})\\D##http://www.kk169.com/files/article/image/$2/$1/$1s.jpg###",
+    "bookUrlRule": "a.0@href"
   },
   {
     "id": 451,
@@ -406,7 +606,11 @@
     "expected": 3,
     "bodyFile": "rows-451.body",
     "baseUrl": "http://www.biqusa.com#",
-    "expectedNote": "Legado [1:3] is an inclusive range; the first harness treated it as two single indices."
+    "expectedNote": "Legado [1:3] is an inclusive range; the first harness treated it as two single indices.",
+    "nameRule": "class.s2@a@text##\\（.*|\\(.*|免费阅读|全文.*阅读|最新章节",
+    "authorRule": "class.s4@a@text",
+    "coverRule": "class.s2@tag.a@href<js>\nvar id = result.match(/(\\d+)\\/?$/)[1];\nvar iid = parseInt(id/1000);\n'http://www.biqusa.com/files/article/image/'+iid+'/'+id+'/'+id+'s.jpg';\n</js>",
+    "bookUrlRule": "class.s2@a@href"
   },
   {
     "id": 476,
@@ -414,7 +618,11 @@
     "rule": "class.librarylist@tag.li",
     "expected": 100,
     "bodyFile": "rows-476.body",
-    "baseUrl": "http://www.booksky.cc#"
+    "baseUrl": "http://www.booksky.cc#",
+    "nameRule": "class.info@tag.span.0@tag.a@text",
+    "authorRule": "class.info@tag.span.1@text",
+    "coverRule": "class.pt-ll-l@tag.a@tag.img@src",
+    "bookUrlRule": "class.info@tag.span.0@tag.a@href"
   },
   {
     "id": 478,
@@ -422,7 +630,11 @@
     "rule": "//div[@class=\"novelslist2\"]/ul/li[position() > 1]",
     "expected": 100,
     "bodyFile": "rows-478.body",
-    "baseUrl": "https://wap.biquluo.info"
+    "baseUrl": "https://wap.biquluo.info",
+    "nameRule": "/span[2]/a/text()",
+    "authorRule": "/span[3]/a/text()",
+    "coverRule": "",
+    "bookUrlRule": "/span[2]/a/@href"
   },
   {
     "id": 484,
@@ -430,7 +642,11 @@
     "rule": "class.bookbox",
     "expected": 50,
     "bodyFile": "rows-484.body",
-    "baseUrl": "http://www.4xiaoshuo.info"
+    "baseUrl": "http://www.4xiaoshuo.info",
+    "nameRule": "h4@a@text",
+    "authorRule": "class.author@text##作者：",
+    "coverRule": "img@src",
+    "bookUrlRule": "h4@a@href"
   },
   {
     "id": 498,
@@ -438,7 +654,11 @@
     "rule": "id.nr",
     "expected": 1,
     "bodyFile": "rows-498.body",
-    "baseUrl": "https://www.x23us.us/"
+    "baseUrl": "https://www.x23us.us/",
+    "nameRule": "class.odd.tag.a.0@text",
+    "authorRule": "class.odd.tag.a.1@text",
+    "coverRule": "",
+    "bookUrlRule": "tag.a.0@href##$##,{'webView': true}"
   },
   {
     "id": 518,
@@ -446,7 +666,11 @@
     "rule": "class.v-list-item",
     "expected": 5,
     "bodyFile": "rows-518.body",
-    "baseUrl": "https://m.suixkan.com"
+    "baseUrl": "https://m.suixkan.com",
+    "nameRule": ".v-title@text",
+    "authorRule": ".v-author@text",
+    "coverRule": "img@src",
+    "bookUrlRule": "##=\"newWebView\\('([^']+)'##$1###"
   },
   {
     "id": 525,
@@ -454,7 +678,11 @@
     "rule": "class.col-12 col-md-6",
     "expected": 17,
     "bodyFile": "rows-525.body",
-    "baseUrl": "http://www.xxtxt.com"
+    "baseUrl": "http://www.xxtxt.com",
+    "nameRule": "h3@a@text##.*\\]",
+    "authorRule": ".book_other.0@span.0@text",
+    "coverRule": "img@src",
+    "bookUrlRule": "a.0@href"
   },
   {
     "id": 572,
@@ -462,7 +690,11 @@
     "rule": "div@.excerpt",
     "expected": 14,
     "bodyFile": "rows-572.body",
-    "baseUrl": "https://www.po5.net/"
+    "baseUrl": "https://www.po5.net/",
+    "nameRule": "header@h2@h4@text##\\d+\\.\\s|_.*",
+    "authorRule": "header@h2@h4@text##\\d+\\.\\s.*_(.*)【.*##$1",
+    "coverRule": "",
+    "bookUrlRule": "header@h2@a@href"
   },
   {
     "id": 573,
@@ -470,7 +702,11 @@
     "rule": "class.book-list@tag.li",
     "expected": 2,
     "bodyFile": "rows-573.body",
-    "baseUrl": "http://m.shubl.com"
+    "baseUrl": "http://m.shubl.com",
+    "nameRule": "class.title@text",
+    "authorRule": "class.author@text",
+    "coverRule": "class.lazyload@data-original",
+    "bookUrlRule": "tag.a@href"
   },
   {
     "id": 603,
@@ -478,7 +714,11 @@
     "rule": "class.librarylist@tag.li",
     "expected": 100,
     "bodyFile": "rows-603.body",
-    "baseUrl": "http://www.booksky.cc#🎃"
+    "baseUrl": "http://www.booksky.cc#🎃",
+    "nameRule": "class.info@tag.span.0@tag.a@text",
+    "authorRule": "class.info@tag.span.1@text",
+    "coverRule": "class.pt-ll-l@tag.a@tag.img@src",
+    "bookUrlRule": "class.info@tag.span.0@tag.a@href"
   },
   {
     "id": 617,
@@ -486,7 +726,11 @@
     "rule": "class.grid@tag.tbody@tag.tr!0",
     "expected": 50,
     "bodyFile": "rows-617.body",
-    "baseUrl": "https://www.aixiawx.com/#pb1101"
+    "baseUrl": "https://www.aixiawx.com/#pb1101",
+    "nameRule": "class.even.0@tag.a@text",
+    "authorRule": "class.even.1@text",
+    "coverRule": "class.even.0@tag.a@href<js>\nvar id = result.match(/(\\d+)\\/?$/)[1];\nvar iid = parseInt(id/1000);\n'/files/article/image/'+iid+'/'+id+'/'+id+'s.jpg';\n</js>",
+    "bookUrlRule": "class.even.0@tag.a@href"
   },
   {
     "id": 629,
@@ -494,7 +738,11 @@
     "rule": "class.bookbox",
     "expected": 50,
     "bodyFile": "rows-629.body",
-    "baseUrl": "http://www.yetianlian.info#"
+    "baseUrl": "http://www.yetianlian.info#",
+    "nameRule": "class.bookname@text",
+    "authorRule": "class.author@text",
+    "coverRule": "img@src",
+    "bookUrlRule": "a@href"
   },
   {
     "id": 641,
@@ -502,7 +750,11 @@
     "rule": "class.block",
     "expected": 1,
     "bodyFile": "rows-641.body",
-    "baseUrl": "http://m.9191net.com"
+    "baseUrl": "http://m.9191net.com",
+    "nameRule": "tag.h2@text",
+    "authorRule": "author",
+    "coverRule": "tag.a@img@src",
+    "bookUrlRule": "tag.a@href"
   },
   {
     "id": 661,
@@ -510,7 +762,11 @@
     "rule": ".v-list-item",
     "expected": 16,
     "bodyFile": "rows-661.body",
-    "baseUrl": "http://m.suixkan.com#"
+    "baseUrl": "http://m.suixkan.com#",
+    "nameRule": ".v-title@text",
+    "authorRule": ".v-author@text##\\s",
+    "coverRule": "img@src",
+    "bookUrlRule": "@onclick@js:result.match(/\\('(.*?)', '', ''\\)/)[1]"
   },
   {
     "id": 665,
@@ -518,7 +774,11 @@
     "rule": ".v-list-item",
     "expected": 16,
     "bodyFile": "rows-665.body",
-    "baseUrl": "http://m.suixkan.com#♤yc"
+    "baseUrl": "http://m.suixkan.com#♤yc",
+    "nameRule": ".v-title@text",
+    "authorRule": ".v-author@text##\\s",
+    "coverRule": "img@src",
+    "bookUrlRule": "@onclick@js:result.match(/\\('(.*?)', '', ''\\)/)[1]"
   },
   {
     "id": 668,
@@ -526,7 +786,11 @@
     "rule": "div@.excerpt",
     "expected": 14,
     "bodyFile": "rows-668.body",
-    "baseUrl": "https://www.po5.net"
+    "baseUrl": "https://www.po5.net",
+    "nameRule": "header@h2@h4@text##\\d+\\.\\s|_.*",
+    "authorRule": "header@h2@h4@text##\\d+\\.\\s.*_(.*)【.*##$1",
+    "coverRule": "",
+    "bookUrlRule": "header@h2@a@href"
   },
   {
     "id": 679,
@@ -534,7 +798,11 @@
     "rule": ".block",
     "expected": 50,
     "bodyFile": "rows-679.body",
-    "baseUrl": "http://m.yetianlian.la#"
+    "baseUrl": "http://m.yetianlian.la#",
+    "nameRule": "h2@text",
+    "authorRule": "##作者.([^<]+)<##$1###",
+    "coverRule": "",
+    "bookUrlRule": "a.0@href"
   },
   {
     "id": 682,
@@ -542,7 +810,11 @@
     "rule": "class.novelslist2@ul@li",
     "expected": 51,
     "bodyFile": "rows-682.body",
-    "baseUrl": "https://www.biqusa.com/#"
+    "baseUrl": "https://www.biqusa.com/#",
+    "nameRule": "class.s2@a@text##\\（.*|\\(.*|免费阅读|全文.*阅读|最新章节",
+    "authorRule": "class.s4@a@text",
+    "coverRule": "class.s2@tag.a@href<js>\nvar id = result.match(/(\\d+)\\/?$/)[1];\nvar iid = parseInt(id/1000);\n'https://www.biqusa.com/files/article/image/'+iid+'/'+id+'/'+id+'s.jpg';\n</js>",
+    "bookUrlRule": "class.s2@a@href"
   },
   {
     "id": 693,
@@ -550,7 +822,11 @@
     "rule": ".v-list-item",
     "expected": 5,
     "bodyFile": "rows-693.body",
-    "baseUrl": "https://sma.yueyouxs.com"
+    "baseUrl": "https://sma.yueyouxs.com",
+    "nameRule": ".v-title@text",
+    "authorRule": ".v-author@text##\\s",
+    "coverRule": "img@src",
+    "bookUrlRule": "@onclick@js:result.match(/\\('(.*?)', '', ''\\)/)[1]"
   },
   {
     "id": 723,
@@ -558,7 +834,11 @@
     "rule": "ul.book-list@tag.li",
     "expected": 22,
     "bodyFile": "rows-723.body",
-    "baseUrl": "https://m.dm5.com"
+    "baseUrl": "https://m.dm5.com",
+    "nameRule": "p.book-list-info-title@text",
+    "authorRule": "tag.p.0@text",
+    "coverRule": "tag.img@src",
+    "bookUrlRule": "tag.a.0@href"
   },
   {
     "id": 725,
@@ -566,7 +846,11 @@
     "rule": "ul.book-list@tag.li",
     "expected": 22,
     "bodyFile": "rows-725.body",
-    "baseUrl": "https://m.dm5.com/"
+    "baseUrl": "https://m.dm5.com/",
+    "nameRule": "p.book-list-info-title@text",
+    "authorRule": "tag.p.0@text",
+    "coverRule": "tag.img@src",
+    "bookUrlRule": "tag.a.0@href"
   },
   {
     "id": 739,
@@ -574,7 +858,11 @@
     "rule": "class.book-result@tag.li||id.contList@tag.li",
     "expected": 8,
     "bodyFile": "rows-739.body",
-    "baseUrl": "http://www.guoman8.cc#Haxc1107"
+    "baseUrl": "http://www.guoman8.cc#Haxc1107",
+    "nameRule": "tag.a.0@title||class.bcover@title",
+    "authorRule": "class.tags.2@a@text",
+    "coverRule": "img@src||tag.img@data-src",
+    "bookUrlRule": "tag.a.0@href||class.ell@href"
   },
   {
     "id": 745,
@@ -582,7 +870,11 @@
     "rule": "class.myui-vodlist__media@li",
     "expected": 37,
     "bodyFile": "rows-745.body",
-    "baseUrl": "https://66yy.net"
+    "baseUrl": "https://66yy.net",
+    "nameRule": "class.title@text",
+    "authorRule": "class.detail@p.1@ownText",
+    "coverRule": "a@data-original@src",
+    "bookUrlRule": "a.0@href"
   },
   {
     "id": 746,
@@ -590,7 +882,11 @@
     "rule": "@css:.xing_vb>ul",
     "expected": 24,
     "bodyFile": "rows-746.body",
-    "baseUrl": "https://hongniuziyuan.com"
+    "baseUrl": "https://hongniuziyuan.com",
+    "nameRule": "@css:.xing_vb4>a@textNodes",
+    "authorRule": "",
+    "coverRule": "",
+    "bookUrlRule": "@css:.xing_vb4>a@href"
   },
   {
     "id": 773,
@@ -598,7 +894,11 @@
     "rule": "class.posts clear@li",
     "expected": 1,
     "bodyFile": "rows-773.body",
-    "baseUrl": "https://www.ypppt.com/"
+    "baseUrl": "https://www.ypppt.com/",
+    "nameRule": "a.1@text",
+    "authorRule": "",
+    "coverRule": "a.0@img@src",
+    "bookUrlRule": "a.1@href"
   },
   {
     "id": 783,
@@ -606,7 +906,11 @@
     "rule": "class.posts clear@li",
     "expected": 1,
     "bodyFile": "rows-783.body",
-    "baseUrl": "https://www.ypppt.com"
+    "baseUrl": "https://www.ypppt.com",
+    "nameRule": "a.1@text",
+    "authorRule": "",
+    "coverRule": "a.0@img@src",
+    "bookUrlRule": "a.1@href"
   },
   {
     "id": 806,
@@ -614,7 +918,11 @@
     "rule": "class.bookbox",
     "expected": 50,
     "bodyFile": "rows-806.body",
-    "baseUrl": "http://www.yetianlian.cc"
+    "baseUrl": "http://www.yetianlian.cc",
+    "nameRule": "tag.h4@text",
+    "authorRule": "class.author@text##作者：",
+    "coverRule": "tag.img@src",
+    "bookUrlRule": "tag.a.1@href"
   },
   {
     "id": 819,
@@ -622,7 +930,11 @@
     "rule": "//div[@class=\"novelslist2\"]/ul/li[position() > 1]",
     "expected": 100,
     "bodyFile": "rows-819.body",
-    "baseUrl": "https://wap.biquluo.info/"
+    "baseUrl": "https://wap.biquluo.info/",
+    "nameRule": "/span[2]/a/text()",
+    "authorRule": "/span[3]/a/text()",
+    "coverRule": "",
+    "bookUrlRule": "/span[2]/a/@href"
   },
   {
     "id": 821,
@@ -630,7 +942,11 @@
     "rule": "id.jieqi_page_contents@class.c_row",
     "expected": 50,
     "bodyFile": "rows-821.body",
-    "baseUrl": "http://www.qudushu.com/#pb1101"
+    "baseUrl": "http://www.qudushu.com/#pb1101",
+    "nameRule": "class.c_subject@a@text",
+    "authorRule": "class.c_tag.0@tag.span.1@text",
+    "coverRule": "img@src",
+    "bookUrlRule": "class.c_subject@a@href"
   },
   {
     "id": 827,
@@ -638,7 +954,11 @@
     "rule": "class.bookbox",
     "expected": 50,
     "bodyFile": "rows-827.body",
-    "baseUrl": "http://www.yetianlian.la"
+    "baseUrl": "http://www.yetianlian.la",
+    "nameRule": "tag.h4@text",
+    "authorRule": "class.author@text##作者：",
+    "coverRule": "tag.img@src",
+    "bookUrlRule": "tag.a.1@href"
   },
   {
     "id": 834,
@@ -646,7 +966,11 @@
     "rule": "id.jieqi_page_contents@class.c_row",
     "expected": 50,
     "bodyFile": "rows-834.body",
-    "baseUrl": "http://www.qudushu.com/"
+    "baseUrl": "http://www.qudushu.com/",
+    "nameRule": "class.c_subject@a@text",
+    "authorRule": "class.c_tag.0@tag.span.1@text",
+    "coverRule": "img@src",
+    "bookUrlRule": "class.c_subject@a@href"
   },
   {
     "id": 842,
@@ -654,7 +978,11 @@
     "rule": "id.jieqi_page_contents@class.c_row",
     "expected": 50,
     "bodyFile": "rows-842.body",
-    "baseUrl": "http://www.qudushu.org/"
+    "baseUrl": "http://www.qudushu.org/",
+    "nameRule": "class.c_subject@a@text",
+    "authorRule": "class.c_tag.0@tag.span.1@text",
+    "coverRule": "img@src",
+    "bookUrlRule": "class.c_subject@a@href"
   },
   {
     "id": 845,
@@ -662,7 +990,11 @@
     "rule": "class.comic_cover.1@tag.tbody@tag.tr@tag.td@tag.ul",
     "expected": 25,
     "bodyFile": "rows-845.body",
-    "baseUrl": "http://book.sfacg.com#🎃"
+    "baseUrl": "http://book.sfacg.com#🎃",
+    "nameRule": "tag.li.1@tag.strong@tag.a@text",
+    "authorRule": "tag.li.1@textNodes##\\/.*\\s.*|综合信息",
+    "coverRule": "tag.li.0@tag.img@src",
+    "bookUrlRule": "tag.li.1@tag.strong@tag.a@href"
   },
   {
     "id": 849,
@@ -670,7 +1002,11 @@
     "rule": "tag.form@tag.table.-2@tag.ul",
     "expected": 25,
     "bodyFile": "rows-849.body",
-    "baseUrl": "http://s.sfacg.com#🎃"
+    "baseUrl": "http://s.sfacg.com#🎃",
+    "nameRule": "tag.a@text",
+    "authorRule": "tag.li.1@text##.+综合信息：\\s*([^\\/]+).*##$1",
+    "coverRule": "tag.img@src",
+    "bookUrlRule": "tag.a@href"
   },
   {
     "id": 850,
@@ -678,7 +1014,11 @@
     "rule": "class.block",
     "expected": 1,
     "bodyFile": "rows-850.body",
-    "baseUrl": "http://m.9191net.com#🎃"
+    "baseUrl": "http://m.9191net.com#🎃",
+    "nameRule": "tag.h2@text",
+    "authorRule": "author",
+    "coverRule": "tag.a@img@src",
+    "bookUrlRule": "tag.a@href"
   },
   {
     "id": 851,
@@ -686,7 +1026,11 @@
     "rule": "class.comic_cover.1@tag.tbody@tag.tr@tag.td@tag.ul",
     "expected": 25,
     "bodyFile": "rows-851.body",
-    "baseUrl": "http://book.sfacg.com已校验"
+    "baseUrl": "http://book.sfacg.com已校验",
+    "nameRule": "tag.li.1@tag.strong@tag.a@text",
+    "authorRule": "tag.li.1@textNodes##\\/.*\\s.*|综合信息",
+    "coverRule": "tag.li.0@tag.img@src",
+    "bookUrlRule": "tag.li.1@tag.strong@tag.a@href"
   },
   {
     "id": 853,
@@ -694,7 +1038,11 @@
     "rule": "tag.ul",
     "expected": 26,
     "bodyFile": "rows-853.body",
-    "baseUrl": "http://www.sfacg.com已校验"
+    "baseUrl": "http://www.sfacg.com已校验",
+    "nameRule": "tag.a.0@text",
+    "authorRule": "tag.br@text##.综合信息：|\\/.*",
+    "coverRule": "tag.img@src",
+    "bookUrlRule": "tag.a@href"
   },
   {
     "id": 854,
@@ -702,7 +1050,11 @@
     "rule": "class.bookbox",
     "expected": 50,
     "bodyFile": "rows-854.body",
-    "baseUrl": "http://www.yetianlian.la/"
+    "baseUrl": "http://www.yetianlian.la/",
+    "nameRule": "tag.h4@text",
+    "authorRule": "class.author@text##作者：",
+    "coverRule": "tag.img@src",
+    "bookUrlRule": "tag.a.1@href"
   },
   {
     "id": 855,
@@ -710,7 +1062,11 @@
     "rule": "id.jieqi_page_contents@class.c_row",
     "expected": 50,
     "bodyFile": "rows-855.body",
-    "baseUrl": "http://www.qudushu.com/#♤pb"
+    "baseUrl": "http://www.qudushu.com/#♤pb",
+    "nameRule": "class.c_subject@a@text",
+    "authorRule": "class.c_tag.0@tag.span.1@text",
+    "coverRule": "img@src",
+    "bookUrlRule": "class.c_subject@a@href"
   },
   {
     "id": 864,
@@ -718,7 +1074,11 @@
     "rule": "tag.form@tag.table.-2@tag.ul",
     "expected": 25,
     "bodyFile": "rows-864.body",
-    "baseUrl": "book.sfacg.com已整理"
+    "baseUrl": "book.sfacg.com已整理",
+    "nameRule": "tag.a@text",
+    "authorRule": "tag.li.1@text##.+综合信息：\\s*([^\\/]+).*##$1",
+    "coverRule": "tag.img@src",
+    "bookUrlRule": "tag.a@href"
   },
   {
     "id": 865,
@@ -726,7 +1086,11 @@
     "rule": "tag.ul",
     "expected": 26,
     "bodyFile": "rows-865.body",
-    "baseUrl": "[图片]http://www.sfacg.com已校验"
+    "baseUrl": "[图片]http://www.sfacg.com已校验",
+    "nameRule": "tag.a.0@text",
+    "authorRule": "tag.br@text##.综合信息：|\\/.*",
+    "coverRule": "tag.img@src",
+    "bookUrlRule": "tag.a@href"
   },
   {
     "id": 871,
@@ -734,7 +1098,11 @@
     "rule": ".w_picTxt_lr li",
     "expected": 10,
     "bodyFile": "rows-871.body",
-    "baseUrl": "https://www.wtzw.com/"
+    "baseUrl": "https://www.wtzw.com/",
+    "nameRule": "a.1@text",
+    "authorRule": "span.1@textNodes",
+    "coverRule": "img@src",
+    "bookUrlRule": "a.1@href"
   },
   {
     "id": 872,
@@ -742,7 +1110,11 @@
     "rule": "class.searchList@li",
     "expected": 10,
     "bodyFile": "rows-872.body",
-    "baseUrl": "http://www.wtzw.com#🎃"
+    "baseUrl": "http://www.wtzw.com#🎃",
+    "nameRule": "class.sTit@text",
+    "authorRule": "tag.a.2@text",
+    "coverRule": "tag.img@src",
+    "bookUrlRule": "class.sTit@tag.a@href"
   },
   {
     "id": 873,
@@ -750,7 +1122,11 @@
     "rule": ".book-base",
     "expected": 10,
     "bodyFile": "rows-873.body",
-    "baseUrl": "https://www.douhuawenxue.com"
+    "baseUrl": "https://www.douhuawenxue.com",
+    "nameRule": "h3@a@text",
+    "authorRule": ".book_author@text##_ 著",
+    "coverRule": "img@src",
+    "bookUrlRule": "a.0@href"
   },
   {
     "id": 878,
@@ -758,7 +1134,11 @@
     "rule": "ul[style='width:100%']",
     "expected": 25,
     "bodyFile": "rows-878.body",
-    "baseUrl": "https://book.sfacg.com"
+    "baseUrl": "https://book.sfacg.com",
+    "nameRule": "a.orange_link2@text",
+    "authorRule": "li.1@ownText##综合信息：\\s|/\\d.*",
+    "coverRule": "li.Conjunction@img@src",
+    "bookUrlRule": "a.orange_link2@href"
   },
   {
     "id": 883,
@@ -766,7 +1146,11 @@
     "rule": "class.common-list common-list-one@a",
     "expected": 17,
     "bodyFile": "rows-883.body",
-    "baseUrl": "https://m.xxsy.net#🎃"
+    "baseUrl": "https://m.xxsy.net#🎃",
+    "nameRule": "class.book-title@text",
+    "authorRule": "class.book-module@text##[·].*",
+    "coverRule": "img@src",
+    "bookUrlRule": "a@href"
   },
   {
     "id": 891,
@@ -774,7 +1158,11 @@
     "rule": ".result-list li",
     "expected": 17,
     "bodyFile": "rows-891.body",
-    "baseUrl": "https://www.xxsy.net#"
+    "baseUrl": "https://www.xxsy.net#",
+    "nameRule": "h4 a.0@text",
+    "authorRule": "h4 a.1@textNodes",
+    "coverRule": "a img@src",
+    "bookUrlRule": "a.1@href"
   },
   {
     "id": 892,
@@ -782,7 +1170,11 @@
     "rule": "class.searchList@li",
     "expected": 10,
     "bodyFile": "rows-892.body",
-    "baseUrl": "http://www.wtzw.com/"
+    "baseUrl": "http://www.wtzw.com/",
+    "nameRule": "class.sTit@text",
+    "authorRule": "tag.a.2@text",
+    "coverRule": "tag.img@src",
+    "bookUrlRule": "class.sTit@tag.a@href"
   },
   {
     "id": 902,
@@ -790,7 +1182,11 @@
     "rule": ".book-base",
     "expected": 10,
     "bodyFile": "rows-902.body",
-    "baseUrl": "https://www.douhuawenxue.com/"
+    "baseUrl": "https://www.douhuawenxue.com/",
+    "nameRule": "h3@a@text",
+    "authorRule": ".book_author@text##_ 著",
+    "coverRule": "img@src",
+    "bookUrlRule": "a.0@href"
   },
   {
     "id": 904,
@@ -798,7 +1194,11 @@
     "rule": "tag.form@tag.table.-2@tag.ul",
     "expected": 25,
     "bodyFile": "rows-904.body",
-    "baseUrl": "http://s.sfacg.com/"
+    "baseUrl": "http://s.sfacg.com/",
+    "nameRule": "tag.a@text",
+    "authorRule": "tag.li.1@text##.+综合信息：\\s*([^\\/]+).*##$1",
+    "coverRule": "tag.img@src",
+    "bookUrlRule": "tag.a@href"
   },
   {
     "id": 906,
@@ -806,7 +1206,11 @@
     "rule": "ul[style='width:100%']",
     "expected": 25,
     "bodyFile": "rows-906.body",
-    "baseUrl": "https://book.sfacg.com/"
+    "baseUrl": "https://book.sfacg.com/",
+    "nameRule": "a.orange_link2@text",
+    "authorRule": "li.1@ownText##综合信息：\\s|/\\d.*",
+    "coverRule": "li.Conjunction@img@src",
+    "bookUrlRule": "a.orange_link2@href"
   },
   {
     "id": 908,
@@ -814,7 +1218,11 @@
     "rule": ".waps_one",
     "expected": 15,
     "bodyFile": "rows-908.body",
-    "baseUrl": "https://m.92dxs.org"
+    "baseUrl": "https://m.92dxs.org",
+    "nameRule": ".waps_name@text",
+    "authorRule": ".author@text##作者：",
+    "coverRule": "",
+    "bookUrlRule": "a.0@href"
   },
   {
     "id": 915,
@@ -822,7 +1230,11 @@
     "rule": "tag.ul",
     "expected": 26,
     "bodyFile": "rows-915.body",
-    "baseUrl": "http://www.sfacg.com"
+    "baseUrl": "http://www.sfacg.com",
+    "nameRule": "tag.a.0@text",
+    "authorRule": "tag.br@text##.综合信息：|\\/.*",
+    "coverRule": "tag.img@src",
+    "bookUrlRule": "tag.a@href"
   },
   {
     "id": 923,
@@ -830,7 +1242,11 @@
     "rule": "class.comic_cover.1@tag.tbody@tag.tr@tag.td@tag.ul",
     "expected": 25,
     "bodyFile": "rows-923.body",
-    "baseUrl": "http://book.sfacg.com"
+    "baseUrl": "http://book.sfacg.com",
+    "nameRule": "tag.li.1@tag.strong@tag.a@text",
+    "authorRule": "tag.li.1@textNodes##\\/.*\\s.*|综合信息",
+    "coverRule": "tag.li.0@tag.img@src",
+    "bookUrlRule": "tag.li.1@tag.strong@tag.a@href"
   },
   {
     "id": 924,
@@ -838,7 +1254,11 @@
     "rule": "#j li",
     "expected": 1,
     "bodyFile": "rows-924.body",
-    "baseUrl": "https://www.bsxiaoshuo.com"
+    "baseUrl": "https://www.bsxiaoshuo.com",
+    "nameRule": "b@text",
+    "authorRule": "p.1@textNodes",
+    "coverRule": "img@src",
+    "bookUrlRule": "a@href"
   },
   {
     "id": 936,
@@ -846,7 +1266,11 @@
     "rule": "class.bookbox",
     "expected": 50,
     "bodyFile": "rows-936.body",
-    "baseUrl": "http://www.yetianlian.info"
+    "baseUrl": "http://www.yetianlian.info",
+    "nameRule": "class.bookname@text",
+    "authorRule": "class.author@text",
+    "coverRule": "img@src",
+    "bookUrlRule": "a@href"
   },
   {
     "id": 943,
@@ -854,7 +1278,11 @@
     "rule": "#j li",
     "expected": 1,
     "bodyFile": "rows-943.body",
-    "baseUrl": "https://www.bsxiaoshuo.com/"
+    "baseUrl": "https://www.bsxiaoshuo.com/",
+    "nameRule": "b@text",
+    "authorRule": "p.1@textNodes",
+    "coverRule": "a@href##/(\\d+)##https://imgz.bsxiaoshuo.com/$1.jpg",
+    "bookUrlRule": "a@href"
   },
   {
     "id": 955,
@@ -862,7 +1290,11 @@
     "rule": ".waps_one",
     "expected": 15,
     "bodyFile": "rows-955.body",
-    "baseUrl": "https://m.92dxs.org#🎃"
+    "baseUrl": "https://m.92dxs.org#🎃",
+    "nameRule": ".waps_name@text",
+    "authorRule": ".author@text##作者：",
+    "coverRule": "",
+    "bookUrlRule": "a.0@href"
   },
   {
     "id": 960,
@@ -870,7 +1302,11 @@
     "rule": ".waps_one",
     "expected": 15,
     "bodyFile": "rows-960.body",
-    "baseUrl": "https://m.92dxs.org#"
+    "baseUrl": "https://m.92dxs.org#",
+    "nameRule": ".waps_name@text",
+    "authorRule": ".author@text##作者：",
+    "coverRule": "",
+    "bookUrlRule": "a.0@href"
   },
   {
     "id": 975,
@@ -879,7 +1315,11 @@
     "expected": 100,
     "bodyFile": "rows-975.body",
     "baseUrl": "http://www.weilaitianwang.info",
-    "expectedNote": "Legado [1:-1] is an inclusive range over 101 li; the first harness treated it as two single indices."
+    "expectedNote": "Legado [1:-1] is an inclusive range over 101 li; the first harness treated it as two single indices.",
+    "nameRule": ".s2@a@text",
+    "authorRule": ".s4@a@text",
+    "coverRule": "##<img\\s*src=\"([^\"]+)\"##$1###",
+    "bookUrlRule": "##<a\\s*href=\"([^\"]+)\"##$1###"
   },
   {
     "id": 976,
@@ -887,7 +1327,11 @@
     "rule": "tag.ul",
     "expected": 26,
     "bodyFile": "rows-976.body",
-    "baseUrl": "[图片]http://www.m.sfacg.com"
+    "baseUrl": "[图片]http://www.m.sfacg.com",
+    "nameRule": "tag.a.0@text",
+    "authorRule": "tag.br@text##.综合信息：|\\/.*",
+    "coverRule": "tag.img@src",
+    "bookUrlRule": "tag.a@href"
   },
   {
     "id": 978,
@@ -895,7 +1339,11 @@
     "rule": "class.comic_cover.1@tag.tbody@tag.tr@tag.td@tag.ul",
     "expected": 25,
     "bodyFile": "rows-978.body",
-    "baseUrl": "http://book.sfacg.com#"
+    "baseUrl": "http://book.sfacg.com#",
+    "nameRule": "tag.li.1@tag.strong@tag.a@text",
+    "authorRule": "tag.li.1@textNodes##\\/.*\\s.*|综合信息",
+    "coverRule": "tag.li.0@tag.img@src",
+    "bookUrlRule": "tag.li.1@tag.strong@tag.a@href"
   },
   {
     "id": 979,
@@ -903,7 +1351,11 @@
     "rule": "ul[style='width:100%']",
     "expected": 25,
     "bodyFile": "rows-979.body",
-    "baseUrl": "https://book.sfacg.com#"
+    "baseUrl": "https://book.sfacg.com#",
+    "nameRule": "a.orange_link2@text",
+    "authorRule": "li.1@ownText##综合信息：\\s|/\\d.*",
+    "coverRule": "li.Conjunction@img@src",
+    "bookUrlRule": "a.orange_link2@href"
   },
   {
     "id": 983,
@@ -911,6 +1363,10 @@
     "rule": ".book-img-text li||.right-book-list li",
     "expected": 10,
     "bodyFile": "rows-983.body",
-    "baseUrl": "https://www.hongxiu.com"
+    "baseUrl": "https://www.hongxiu.com",
+    "nameRule": "a.1@text",
+    "authorRule": "a.2@text",
+    "coverRule": "img.0@src",
+    "bookUrlRule": "a.1@href"
   }
 ]

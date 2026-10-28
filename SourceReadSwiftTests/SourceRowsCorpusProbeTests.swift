@@ -16,6 +16,10 @@ final class SourceRowsCorpusProbeTests: XCTestCase {
         let expected: Int
         let bodyFile: String
         let baseUrl: String
+        let nameRule: String?
+        let authorRule: String?
+        let coverRule: String?
+        let bookUrlRule: String?
     }
 
     func testRowsParityCorpus() throws {
@@ -31,18 +35,53 @@ final class SourceRowsCorpusProbeTests: XCTestCase {
             let bodyURL = directory.appendingPathComponent(entry.bodyFile)
             let html = try String(contentsOf: bodyURL, encoding: .utf8)
             let base = URL(string: entry.baseUrl) ?? URL(string: "https://example.com/")!
+            let rows: [Element]
             let actual: Int
             do {
-                actual = try extractor.select(html, baseUrl: base, listRule: entry.rule).count
+                rows = try extractor.select(html, baseUrl: base, listRule: entry.rule)
+                actual = rows.count
             } catch {
+                rows = []
                 actual = -1
             }
+
+            // Field-level pass: rows alone say nothing about whether the row
+            // turns into a usable book. A rule that selects 50 elements but
+            // yields 50 empty names is the "search returns nothing" report.
+            var emptyNames = 0
+            var emptyAuthors = 0
+            var emptyCovers = 0
+            var emptyBookURLs = 0
+            var nameSamples: [String] = []
+            var authorSamples: [String] = []
+            var bookURLSamples: [String] = []
+            for row in rows.prefix(5) {
+                let name = (try? extractor.value(from: row, rule: entry.nameRule, fallback: nil, baseUrl: base)) ?? ""
+                let author = (try? extractor.value(from: row, rule: entry.authorRule, fallback: nil, baseUrl: base)) ?? ""
+                let cover = (try? extractor.value(from: row, rule: entry.coverRule, fallback: nil, baseUrl: base)) ?? ""
+                let link = (try? extractor.value(from: row, rule: entry.bookUrlRule, fallback: nil, baseUrl: base)) ?? ""
+                if name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { emptyNames += 1 }
+                if author.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, !(entry.authorRule ?? "").isEmpty { emptyAuthors += 1 }
+                if cover.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, !(entry.coverRule ?? "").isEmpty { emptyCovers += 1 }
+                if link.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, !(entry.bookUrlRule ?? "").isEmpty { emptyBookURLs += 1 }
+                if nameSamples.count < 3 { nameSamples.append(String(name.prefix(40))) }
+                if authorSamples.count < 3 { authorSamples.append(String(author.prefix(20))) }
+                if bookURLSamples.count < 3 { bookURLSamples.append(String(link.prefix(60))) }
+            }
+
             report.append([
                 "id": entry.id,
                 "name": entry.name,
                 "rule": entry.rule,
                 "expected": entry.expected,
-                "actual": actual
+                "actual": actual,
+                "emptyNames": emptyNames,
+                "emptyAuthors": emptyAuthors,
+                "emptyCovers": emptyCovers,
+                "emptyBookURLs": emptyBookURLs,
+                "nameSamples": nameSamples,
+                "authorSamples": authorSamples,
+                "bookURLSamples": bookURLSamples
             ])
             if actual != entry.expected {
                 mismatches.append("\(entry.id) exp=\(entry.expected) act=\(actual) rule=\(entry.rule)")
@@ -57,6 +96,15 @@ final class SourceRowsCorpusProbeTests: XCTestCase {
         for line in mismatches.prefix(200) {
             print("ROWS_MISMATCH \(line)")
         }
+        var emptyNameTotal = 0
+        var emptyAuthorTotal = 0
+        var emptyBookURLTotal = 0
+        for item in report {
+            emptyNameTotal += (item["emptyNames"] as? Int) ?? 0
+            emptyAuthorTotal += (item["emptyAuthors"] as? Int) ?? 0
+            emptyBookURLTotal += (item["emptyBookURLs"] as? Int) ?? 0
+        }
+        print("ROWS_FIELDS emptyNames=\(emptyNameTotal) emptyAuthors=\(emptyAuthorTotal) emptyBookURLs=\(emptyBookURLTotal)")
         XCTAssertEqual(report.count, entries.count)
     }
 
