@@ -3440,6 +3440,67 @@ final class JSCoreRuntime {
         Packages.java.net.URLDecoder = Packages.java.net.URLDecoder || {
           decode: function(value, charset) { return java.decodeURI(String(value == null ? '' : value).replace(/\\+/g, '%20'), charset); }
         };
+        Packages.okhttp3 = Packages.okhttp3 || {};
+        Packages.okhttp3.Request = Packages.okhttp3.Request || function(value) {
+          if (!(this instanceof Packages.okhttp3.Request)) return new Packages.okhttp3.Request(value);
+          this.__urlString = String(value == null ? '' : value);
+          this.url = function() { return this.__urlString; };
+          this.toString = function() { return this.__urlString; };
+        };
+        Packages.okhttp3.Request.Builder = function() {
+          var target = '';
+          var method = 'GET';
+          var bodyText = '';
+          var headerMap = {};
+          var builder = {
+            url: function(value) { target = String(value == null ? '' : value); return builder; },
+            addHeader: function(key, value) { headerMap[String(key)] = String(value == null ? '' : value); return builder; },
+            header: function(key, value) { headerMap[String(key)] = String(value == null ? '' : value); return builder; },
+            removeHeader: function(key) { delete headerMap[String(key)]; return builder; },
+            get: function() { method = 'GET'; return builder; },
+            head: function() { method = 'HEAD'; return builder; },
+            post: function(value) { method = 'POST'; bodyText = String(value == null ? '' : value); return builder; },
+            put: function(value) { method = 'PUT'; bodyText = String(value == null ? '' : value); return builder; },
+            delete: function(value) { method = 'DELETE'; bodyText = String(value == null ? '' : value); return builder; },
+            method: function(value, body) { method = String(value || 'GET').toUpperCase(); bodyText = String(body == null ? '' : body); return builder; },
+            build: function() {
+              var request = new Packages.okhttp3.Request(target);
+              request.__method = method;
+              request.__body = bodyText;
+              request.__headerMap = headerMap;
+              return request;
+            }
+          };
+          return builder;
+        };
+        Packages.okhttp3.OkHttpClient = Packages.okhttp3.OkHttpClient || function() {
+          if (!(this instanceof Packages.okhttp3.OkHttpClient)) return new Packages.okhttp3.OkHttpClient();
+          this.newCall = function(request) {
+            var spec = request && request.__urlString ? request.__urlString : String(request == null ? '' : request);
+            var method = request && request.__method ? request.__method : 'GET';
+            var bodyText = request && request.__body ? request.__body : '';
+            var headerMap = request && request.__headerMap ? request.__headerMap : {};
+            return {
+              execute: function() {
+                var connect = __makeConnect(spec);
+                for (var key in headerMap) {
+                  if (Object.prototype.hasOwnProperty.call(headerMap, key)) connect.setRequestProperty(key, headerMap[key]);
+                }
+                if (method !== 'GET') connect.setRequestMethod(method);
+                if (bodyText) connect.post(bodyText);
+                return connect.execute();
+              },
+              cancel: function() {},
+              isCanceled: function() { return false; }
+            };
+          };
+        };
+        Packages.okhttp3.RequestBody = Packages.okhttp3.RequestBody || {
+          create: function(value) { return String(value == null ? '' : value); }
+        };
+        Packages.okhttp3.MediaType = Packages.okhttp3.MediaType || {
+          parse: function(value) { return String(value == null ? '' : value); }
+        };
         if (typeof URL === 'undefined') URL = Packages.java.net.URL;
         if (typeof URI === 'undefined') URI = Packages.java.net.URI;
         java.toURL = function(value, baseValue) {
