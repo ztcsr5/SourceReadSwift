@@ -227,3 +227,33 @@ enum ReaderPageStepPolicy {
         abs(targetOffsetY - currentOffsetY) < 0.5
     }
 }
+
+/// Landing decision for the cover-mode paging scroll view.
+///
+/// Cover mode used to decide this inline inside `DragGesture.onEnded`, which
+/// made the boundary rules untestable. The scroll view owns the pan now; this
+/// is the only place that decides whether a lifted finger turns a page or the
+/// rubber band wins.
+enum ReaderCoverSettlePolicy {
+    enum Outcome: Equatable {
+        case previous
+        case next
+        case springBack
+    }
+
+    static func outcome(
+        contentOffsetX: CGFloat,
+        pageWidth: CGFloat,
+        hasPrevious: Bool,
+        hasNext: Bool
+    ) -> Outcome {
+        let width = max(pageWidth, 1)
+        if contentOffsetX < width * 0.5 {
+            return hasPrevious ? .previous : .springBack
+        }
+        if contentOffsetX > width * 1.5, hasNext {
+            return .next
+        }
+        return .springBack
+    }
+}

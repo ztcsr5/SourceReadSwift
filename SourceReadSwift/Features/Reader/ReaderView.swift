@@ -147,8 +147,6 @@ struct ReaderView: View {
     @State private var speechChapterIndex = 0
     @State private var speechPausedForScene = false
     @State private var autoScrollPausedForScene = false
-    @State private var coverDragTranslation: CGFloat = 0
-    @State private var coverIsAnimating = false
     @State private var scrollJumpGeneration = 0
     @State private var chapterSliderTarget: Double? = nil
     /// 拖动章节进度条时的实时跳章任务。手指还在滑就不停重排，
@@ -2192,152 +2190,79 @@ struct ReaderView: View {
     }
 
     private var coverPagedReaderContent: some View {
-        GeometryReader { proxy in
-            let width = max(proxy.size.width, 1)
-            let safeIndex = min(max(pagedPageIndex, 0), max(pagedBlocks.count - 1, 0))
-            let drag = coverDragTranslation
-
-            ZStack {
-                if pagedBlocks.indices.contains(safeIndex) {
-                    readerPage(for: pagedBlocks[safeIndex])
-                        .id("cover-page-\(ReaderPageIdentity(page: pagedBlocks[safeIndex]).key)")
-                        .frame(width: width, height: proxy.size.height)
-                        .clipped()
-                        .offset(x: drag * 0.22)
-                        .zIndex(1)
-                }
-
-                if drag < 0, pagedBlocks.indices.contains(safeIndex + 1) {
-                    readerPage(for: pagedBlocks[safeIndex + 1])
-                        .id("cover-page-\(ReaderPageIdentity(page: pagedBlocks[safeIndex + 1]).key)")
-                        .frame(width: width, height: proxy.size.height)
-                        .clipped()
-                        .offset(x: width + drag)
-                        // A live `.shadow` on a full-screen page forces an
-                        // offscreen blur every drag frame (the single most
-                        // expensive effect in cover mode). A baked gradient
-                        // strip gives the same edge depth at fill cost.
-                        .overlay(alignment: .leading) {
-                            LinearGradient(
-                                colors: [.black.opacity(0.28), .clear],
-                                startPoint: .leading,
-                                endPoint: .trailing
-                            )
-                            .frame(width: 24)
-                            .allowsHitTesting(false)
-                        }
-                        .allowsHitTesting(false)
-                        .zIndex(2)
-                }
-
-                if drag > 0, safeIndex > 0 {
-                    readerPage(for: pagedBlocks[safeIndex - 1])
-                        .id("cover-page-\(ReaderPageIdentity(page: pagedBlocks[safeIndex - 1]).key)")
-                        .frame(width: width, height: proxy.size.height)
-                        .clipped()
-                        .offset(x: -width + drag)
-                        .overlay(alignment: .trailing) {
-                            LinearGradient(
-                                colors: [.clear, .black.opacity(0.28)],
-                                startPoint: .leading,
-                                endPoint: .trailing
-                            )
-                            .frame(width: 24)
-                            .allowsHitTesting(false)
-                        }
-                        .allowsHitTesting(false)
-                        .zIndex(2)
-                }
+        // Cover mode is a paging `UIScrollView` now. The old SwiftUI version
+        // moved three pages with a `@State` translation, so every drag frame
+        // re-evaluated this body and re-diffed a full-screen ZStack; on
+        // ProMotion hardware that capped the pan well below 120 Hz. See
+        // `CoverPageReaderView` for the identity contract.
+        let safeIndex = min(max(pagedPageIndex, 0), max(pagedBlocks.count - 1, 0))
+        let previousBlock = pagedBlocks.indices.contains(safeIndex - 1) ? pagedBlocks[safeIndex - 1] : nil
+        let currentBlock = pagedBlocks.indices.contains(safeIndex) ? pagedBlocks[safeIndex] : nil
+        let nextBlock = pagedBlocks.indices.contains(safeIndex + 1) ? pagedBlocks[safeIndex + 1] : nil
+        let currentView: AnyView
+        if let currentBlock {
+            currentView = AnyView(readerPage(for: currentBlock))
+        } else {
+            currentView = AnyView(Color.clear)
+        }
+        return CoverPageReaderView(
+            pageIdentity: currentBlock.map { ReaderPageIdentity(page: $0).key } ?? "",
+            contentRevision: readerPageRevisionKey,
+            hasPrevious: previousBlock != nil,
+            hasNext: nextBlock != nil,
+            previous: previousBlock.map { block -> AnyView in AnyView(readerPage(for: block)) },
+            current: currentView,
+            next: nextBlock.map { block -> AnyView in AnyView(readerPage(for: block)) },
+            onCommit: { direction in
+                commitCoverTurn(direction)
+            },
+            onInteractionChange: { active in
+                handlePageInteraction(active)
             }
-            .frame(width: width, height: proxy.size.height)
-            .clipped()
-            .contentShape(Rectangle())
-            .gesture(
-                DragGesture(minimumDistance: 8, coordinateSpace: .local)
-                    .onChanged { value in
-                        if coverIsAnimating {
-                            coverIsAnimating = false
-                            coverDragTranslation = 0
-                        }
-                        let horizontal = value.translation.width
-                        let vertical = value.translation.height
-                        if abs(horizontal) > abs(vertical) * 1.15 {
-                            coverDragTranslation = horizontal
-                        } else {
-                            coverDragTranslation = 0
-                        }
-                    }
-                    .onEnded { value in
-                        let decision = ReaderCoverSwipePolicy.decision(
-                            translation: value.translation,
-                            predictedEndTranslation: value.predictedEndTranslation,
-                            containerWidth: width,
-                            pageIndex: safeIndex,
-                            pageCount: pagedBlocks.count
-                        )
-                        finishCoverGesture(decision, width: width)
-                    }
-            )
-            .onChange(of: pagedPageIndex) { target in
-                updatePagedVisibleParagraph(pageIndex: target)
-                reportCoverVisibleIdentity(target)
-            }
-            .onChange(of: speechController.currentParagraphIndex) { target in
-                guard target >= 0, let flat = speechFlatParagraphIndex,
-                      !coverIsAnimating, coverDragTranslation == 0 else { return }
-                pagedPageIndex = pageIndex(containingParagraph: flat)
-            }
-            .onAppear {
-                reportCoverVisibleIdentity(pagedPageIndex)
-            }
+        )
+        .onChange(of: pagedPageIndex) { target in
+            updatePagedVisibleParagraph(pageIndex: target)
+            reportCoverVisibleIdentity(target)
+        }
+        .onChange(of: speechController.currentParagraphIndex) { target in
+            guard target >= 0, let flat = speechFlatParagraphIndex,
+                  !interactionGate.isPageInteractionActive else { return }
+            pagedPageIndex = pageIndex(containingParagraph: flat)
+        }
+        .onAppear {
+            reportCoverVisibleIdentity(pagedPageIndex)
         }
     }
 
-    private func finishCoverGesture(_ decision: ReaderCoverSwipeDecision, width: CGFloat) {
-        let target: Int?
-        switch decision {
-        case .next:
-            target = min(pagedPageIndex + 1, max(pagedBlocks.count - 1, 0))
-        case .previous:
-            target = max(pagedPageIndex - 1, 0)
-        case .cancel:
-            target = nil
-        }
-        guard let target, target != pagedPageIndex else {
-            withAnimation(.interactiveSpring(response: 0.28, dampingFraction: 0.86)) {
-                coverDragTranslation = 0
-                coverIsAnimating = false
-            }
-            return
-        }
-
-        // Remember where the target page lives in the window, not its array
-        // index. Prefetching the next chapter renumbers every page after the
-        // insertion while the settle animation runs; committing the stale
-        // index is what made a chapter-5 page resolve to chapter 2.
-        let targetAnchor = pagedBlocks.indices.contains(target)
-            ? pageAnchor(for: pagedBlocks[target])
-            : nil
+    /// Commit one cover-mode turn.
+    ///
+    /// The scroll view has already moved the page under the finger; this only
+    /// advances the cursor. The anchor is resolved again after the window has
+    /// settled, because prefetching the next chapter renumbers every page
+    /// after the insertion point (the 1.0.81 "chapter 5 jumps to chapter 2"
+    /// defect).
+    private func commitCoverTurn(_ direction: Int) {
+        guard !pagedBlocks.isEmpty else { return }
+        let target = min(max(pagedPageIndex + direction, 0), pagedBlocks.count - 1)
+        guard target != pagedPageIndex else { return }
+        let targetAnchor = pageAnchor(for: pagedBlocks[target])
         interactionGate.isPageInteractionActive = true
-
-        coverIsAnimating = true
-        let exitOffset = target > pagedPageIndex ? -width : width
-        withAnimation(.interactiveSpring(response: 0.30, dampingFraction: 0.86)) {
-            coverDragTranslation = exitOffset
-        }
+        pagedPageIndex = target
+        reportCoverVisibleIdentity(target)
+        updatePagedVisibleParagraph(pageIndex: target)
         Task { @MainActor in
-            try? await Task.sleep(nanoseconds: 320_000_000)
+            try? await Task.sleep(nanoseconds: 160_000_000)
             let resolved = ReaderPageRestoration.index(
                 anchor: targetAnchor,
                 in: pagedBlocksCache,
                 fallbackIndex: target
             )
-            var transaction = Transaction()
-            transaction.disablesAnimations = true
-            withTransaction(transaction) {
-                pagedPageIndex = resolved
-                coverDragTranslation = 0
-                coverIsAnimating = false
+            if resolved != pagedPageIndex {
+                var transaction = Transaction()
+                transaction.disablesAnimations = true
+                withTransaction(transaction) {
+                    pagedPageIndex = resolved
+                }
             }
             reportCoverVisibleIdentity(resolved)
             updatePagedVisibleParagraph(pageIndex: resolved)
