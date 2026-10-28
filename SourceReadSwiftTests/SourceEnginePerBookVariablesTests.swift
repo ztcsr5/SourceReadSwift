@@ -17,7 +17,7 @@ final class SourceEnginePerBookVariablesTests: XCTestCase {
         JSON.stringify(params)
         """
 
-        let value = JSONRuleExtractor().string(from: item, rule: rule, fallbackKeys: [])
+        let value = try XCTUnwrap(JSONRuleExtractor().string(from: item, rule: rule, fallbackKeys: []))
         XCTAssertFalse(value.contains("{{"), "placeholder must be expanded before JS runs: \(value)")
 
         let data = try XCTUnwrap(value.data(using: .utf8))
