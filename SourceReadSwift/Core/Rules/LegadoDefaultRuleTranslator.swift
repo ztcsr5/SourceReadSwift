@@ -1,47 +1,87 @@
 import Foundation
 import SwiftSoup
 
+/// One entry of a Legado `[...]` index list.  Legado accepts a plain index
+/// (`2`), a range with optional bounds (`8:`, `1:-1`) and a range with a step
+/// (`3:-2:-10`); every form accepts negative numbers.
+enum LegadoIndexItem: Equatable {
+    case single(Int)
+    case range(start: Int?, end: Int?, step: Int)
+}
+
 struct LegadoRuleStep: Equatable {
     var selector: String
-    var index: Int? {
-        get { indices?.first }
-        set {
-            if let newValue {
-                indices = [newValue]
-            } else {
-                indices = nil
-            }
-        }
-    }
-    var excludeIndex: Int? {
-        get { excludeIndices?.first }
-        set {
-            if let newValue {
-                excludeIndices = [newValue]
-            } else {
-                excludeIndices = nil
-            }
-        }
-    }
-    var indices: [Int]?
-    var excludeIndices: [Int]?
+    var indexItems: [LegadoIndexItem]?
+    var excludeIndexItems: [LegadoIndexItem]?
 
-    init(selector: String, index: Int? = nil, excludeIndex: Int? = nil, indices: [Int]? = nil, excludeIndices: [Int]? = nil) {
+    /// Flattened view kept for older call sites and tests.  It returns nil when
+    /// the step carries a range, because a range cannot be represented as a
+    /// list of single indices without knowing how many elements were selected.
+    var indices: [Int]? {
+        get { LegadoRuleStep.plainIndices(indexItems) }
+        set { indexItems = newValue.map { $0.map(LegadoIndexItem.single) } }
+    }
+
+    var excludeIndices: [Int]? {
+        get { LegadoRuleStep.plainIndices(excludeIndexItems) }
+        set { excludeIndexItems = newValue.map { $0.map(LegadoIndexItem.single) } }
+    }
+
+    var index: Int? {
+        get {
+            guard let first = indexItems?.first, case .single(let value) = first else { return nil }
+            return value
+        }
+        set { indexItems = newValue.map { [.single($0)] } }
+    }
+
+    var excludeIndex: Int? {
+        get {
+            guard let first = excludeIndexItems?.first, case .single(let value) = first else { return nil }
+            return value
+        }
+        set { excludeIndexItems = newValue.map { [.single($0)] } }
+    }
+
+    init(
+        selector: String,
+        index: Int? = nil,
+        excludeIndex: Int? = nil,
+        indices: [Int]? = nil,
+        excludeIndices: [Int]? = nil,
+        indexItems: [LegadoIndexItem]? = nil,
+        excludeIndexItems: [LegadoIndexItem]? = nil
+    ) {
         self.selector = selector
-        if let indices {
-            self.indices = indices
+        if let indexItems {
+            self.indexItems = indexItems
+        } else if let indices {
+            self.indexItems = indices.map(LegadoIndexItem.single)
         } else if let index {
-            self.indices = [index]
+            self.indexItems = [.single(index)]
         } else {
-            self.indices = nil
+            self.indexItems = nil
         }
-        if let excludeIndices {
-            self.excludeIndices = excludeIndices
+        if let excludeIndexItems {
+            self.excludeIndexItems = excludeIndexItems
+        } else if let excludeIndices {
+            self.excludeIndexItems = excludeIndices.map(LegadoIndexItem.single)
         } else if let excludeIndex {
-            self.excludeIndices = [excludeIndex]
+            self.excludeIndexItems = [.single(excludeIndex)]
         } else {
-            self.excludeIndices = nil
+            self.excludeIndexItems = nil
         }
+    }
+
+    private static func plainIndices(_ items: [LegadoIndexItem]?) -> [Int]? {
+        guard let items else { return nil }
+        var result: [Int] = []
+        result.reserveCapacity(items.count)
+        for item in items {
+            guard case .single(let value) = item else { return nil }
+            result.append(value)
+        }
+        return result
     }
 }
 
@@ -68,7 +108,21 @@ enum LegadoDefaultRuleTranslator {
         return false
     }
 
-    static func parseIndexList(_ text: String) -> (isExclude: Bool, indices: [Int])? {
+    /// Parses one Legado index list: the text between `[...]` without the
+    /// brackets, or the tail of the legacy `.1:3` / `!0:3` form.
+    ///
+    /// Grammar mirrors `AnalyzeByJSoup.ElementsSingle.findIndexSet`:
+    ///   list  := item ("," item)*
+    ///   item  := "!"? (index | start? ":" end? (":" step)?)
+    ///   index := "-"? digits
+    /// - Parameter allowRanges: `true` for the `[...]` bracket form, where
+    ///   `1:3` is an inclusive range.  Legacy rules such as `.1:3` / `@1:3`
+    ///   use the same separators for a *list of single indices*, so they pass
+    ///   `false` and get `1` and `3` instead of `1,2,3`.
+    static func parseIndexItems(
+        _ text: String,
+        allowRanges: Bool = true
+    ) -> (isExclude: Bool, items: [LegadoIndexItem])? {
         var str = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !str.isEmpty else { return nil }
         var isExclude = false
@@ -76,20 +130,69 @@ enum LegadoDefaultRuleTranslator {
             isExclude = true
             str = String(str.dropFirst())
         }
-        let parts = str.components(separatedBy: ":")
-        var result: [Int] = []
-        for part in parts {
-            let p = part.trimmingCharacters(in: .whitespacesAndNewlines)
-            guard let intVal = Int(p) else { return nil }
-            result.append(intVal)
+        var items: [LegadoIndexItem] = []
+        for rawPart in str.split(separator: ",", omittingEmptySubsequences: false) {
+            let part = String(rawPart).trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !part.isEmpty else { return nil }
+            let pieces = part.split(separator: ":", omittingEmptySubsequences: false).map(String.init)
+            if pieces.count == 1 {
+                guard let value = Int(pieces[0]) else { return nil }
+                items.append(.single(value))
+            } else if pieces.count == 2 || pieces.count == 3 {
+                if !allowRanges {
+                    var legacyValues: [Int] = []
+                    for piece in pieces {
+                        let trimmedPiece = piece.trimmingCharacters(in: .whitespaces)
+                        guard let value = Int(trimmedPiece) else { return nil }
+                        legacyValues.append(value)
+                    }
+                    items.append(contentsOf: legacyValues.map(LegadoIndexItem.single))
+                    continue
+                }
+                let startText = pieces[0].trimmingCharacters(in: .whitespaces)
+                let endText = pieces[1].trimmingCharacters(in: .whitespaces)
+                var rangeStart: Int?
+                if !startText.isEmpty {
+                    guard let value = Int(startText) else { return nil }
+                    rangeStart = value
+                }
+                var rangeEnd: Int?
+                if !endText.isEmpty {
+                    guard let value = Int(endText) else { return nil }
+                    rangeEnd = value
+                }
+                var step = 1
+                if pieces.count == 3 {
+                    let stepText = pieces[2].trimmingCharacters(in: .whitespaces)
+                    if !stepText.isEmpty {
+                        guard let value = Int(stepText) else { return nil }
+                        step = value
+                    }
+                }
+                items.append(.range(start: rangeStart, end: rangeEnd, step: step))
+            } else {
+                return nil
+            }
         }
-        guard !result.isEmpty else { return nil }
-        return (isExclude, result)
+        guard !items.isEmpty else { return nil }
+        return (isExclude, items)
+    }
+
+    /// Legacy helper: succeeds only for plain single indices.  Range syntax
+    /// returns nil here; callers that must accept ranges use `parseIndexItems`.
+    static func parseIndexList(_ text: String) -> (isExclude: Bool, indices: [Int])? {
+        guard let parsed = parseIndexItems(text, allowRanges: false) else { return nil }
+        var values: [Int] = []
+        for item in parsed.items {
+            guard case .single(let value) = item else { return nil }
+            values.append(value)
+        }
+        return (parsed.isExclude, values)
     }
 
     static func isIndexToken(_ token: String) -> Bool {
         let trimmed = token.trimmingCharacters(in: .whitespacesAndNewlines)
-        return parseIndexList(trimmed) != nil
+        return parseIndexItems(trimmed) != nil
     }
 
     static func normalizeAttributeName(_ attr: String) -> String {
@@ -212,18 +315,18 @@ enum LegadoDefaultRuleTranslator {
             let trimmed = segment.trimmingCharacters(in: .whitespacesAndNewlines)
             guard !trimmed.isEmpty else { continue }
 
-            if let parsedIndex = parseIndexList(trimmed) {
+            if let parsedIndex = parseIndexItems(trimmed, allowRanges: false) {
                 if !steps.isEmpty {
                     if parsedIndex.isExclude {
-                        steps[steps.count - 1].excludeIndices = parsedIndex.indices
+                        steps[steps.count - 1].excludeIndexItems = parsedIndex.items
                     } else {
-                        steps[steps.count - 1].indices = parsedIndex.indices
+                        steps[steps.count - 1].indexItems = parsedIndex.items
                     }
                 } else {
                     if parsedIndex.isExclude {
-                        steps.append(LegadoRuleStep(selector: "", excludeIndices: parsedIndex.indices))
+                        steps.append(LegadoRuleStep(selector: "", excludeIndexItems: parsedIndex.items))
                     } else {
-                        steps.append(LegadoRuleStep(selector: "", indices: parsedIndex.indices))
+                        steps.append(LegadoRuleStep(selector: "", indexItems: parsedIndex.items))
                     }
                 }
                 continue
@@ -252,19 +355,13 @@ enum LegadoDefaultRuleTranslator {
                     continue
                 }
             }
-            if let targetIndices = step.indices, !targetIndices.isEmpty {
+            if let targetItems = step.indexItems, !targetItems.isEmpty {
+                let selected = resolveIndexSet(targetItems, count: nextElements.count)
+                currentElements = selected.map { nextElements[$0] }
+            } else if let exclItems = step.excludeIndexItems, !exclItems.isEmpty {
+                let excluded = Set(resolveIndexSet(exclItems, count: nextElements.count))
                 var filtered: [Element] = []
-                for idx in targetIndices {
-                    let normalized = idx >= 0 ? idx : nextElements.count + idx
-                    if nextElements.indices.contains(normalized) {
-                        filtered.append(nextElements[normalized])
-                    }
-                }
-                currentElements = filtered
-            } else if let exclIndices = step.excludeIndices, !exclIndices.isEmpty {
-                let normalizedExcls = Set(exclIndices.map { $0 >= 0 ? $0 : nextElements.count + $0 })
-                var filtered: [Element] = []
-                for (idx, item) in nextElements.enumerated() where !normalizedExcls.contains(idx) {
+                for (idx, item) in nextElements.enumerated() where !excluded.contains(idx) {
                     filtered.append(item)
                 }
                 currentElements = filtered
@@ -273,6 +370,69 @@ enum LegadoDefaultRuleTranslator {
             }
         }
         return currentElements
+    }
+
+    /// Expands a Legado index list against a concrete element count and returns
+    /// the ordered, de-duplicated index set.  Mirrors
+    /// `AnalyzeByJSoup.ElementsSingle.getElementsSingle`:
+    ///  - negative indices count from the end, out-of-range entries are dropped;
+    ///  - omitted range bounds mean first/last element;
+    ///  - `start == end`, or a step at least as large as the list, keeps only
+    ///    the start index;
+    ///  - `end < start` walks backwards, which is how `[-1:0]` reverses a list.
+    private static func resolveIndexSet(_ items: [LegadoIndexItem], count: Int) -> [Int] {
+        guard count > 0 else { return [] }
+        var seen = Set<Int>()
+        var ordered: [Int] = []
+
+        func append(_ index: Int) {
+            guard index >= 0, index < count, !seen.contains(index) else { return }
+            seen.insert(index)
+            ordered.append(index)
+        }
+
+        for item in items {
+            switch item {
+            case .single(let raw):
+                append(raw >= 0 ? raw : raw + count)
+            case .range(let rawStart, let rawEnd, let rawStep):
+                var rangeStart = rawStart ?? 0
+                if rangeStart < 0 { rangeStart += count }
+                var rangeEnd = rawEnd ?? (count - 1)
+                if rangeEnd < 0 { rangeEnd += count }
+                if (rangeStart < 0 && rangeEnd < 0) || (rangeStart >= count && rangeEnd >= count) {
+                    continue
+                }
+                rangeStart = min(max(rangeStart, 0), count - 1)
+                rangeEnd = min(max(rangeEnd, 0), count - 1)
+                if rangeStart == rangeEnd || rawStep >= count {
+                    append(rangeStart)
+                    continue
+                }
+                let step: Int
+                if rawStep > 0 {
+                    step = rawStep
+                } else if -rawStep < count {
+                    step = max(rawStep + count, 1)
+                } else {
+                    step = 1
+                }
+                if rangeEnd > rangeStart {
+                    var index = rangeStart
+                    while index <= rangeEnd {
+                        append(index)
+                        index += step
+                    }
+                } else {
+                    var index = rangeStart
+                    while index >= rangeEnd {
+                        append(index)
+                        index -= step
+                    }
+                }
+            }
+        }
+        return ordered
     }
 
     private static func isSelectorToken(_ token: String) -> Bool {
@@ -295,47 +455,47 @@ enum LegadoDefaultRuleTranslator {
         var step = rawStep.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !step.isEmpty else { return nil }
 
-        var indices: [Int]? = nil
-        var excludeIndices: [Int]? = nil
+        var indexItems: [LegadoIndexItem]? = nil
+        var excludeIndexItems: [LegadoIndexItem]? = nil
 
-        // Check for bracket index: `class.nav-tabs[0]` or `.row[-1]` or `tag.a[1:3]` or `tr[!0]`
-        if let bracketRange = step.range(of: #"\[(!?-?\d+(?::[^\s@]+)*)\]$"#, options: .regularExpression) {
+        // `[...]` list: `.row[-1]`, `tag.a[1:3]`, `tr[!0]`, `.list[8:]`, `li[1:-1]`
+        if let bracketRange = step.range(of: #"\[(!?[\d:,-]+)\]$"#, options: .regularExpression) {
             let inner = String(step[bracketRange].dropFirst().dropLast())
-            if let parsed = parseIndexList(inner) {
+            if let parsed = parseIndexItems(inner) {
                 if parsed.isExclude {
-                    excludeIndices = parsed.indices
+                    excludeIndexItems = parsed.items
                 } else {
-                    indices = parsed.indices
+                    indexItems = parsed.items
                 }
                 step = String(step[..<bracketRange.lowerBound]).trimmingCharacters(in: .whitespacesAndNewlines)
             }
-        } else if let exclRange = step.range(of: #"!(?:-?\d+(?::[^\s@]+)*)$"#, options: .regularExpression) {
+        } else if let exclRange = step.range(of: #"!([\d:,-]+)$"#, options: .regularExpression) {
             let exclStr = String(step[exclRange].dropFirst())
-            if let parsed = parseIndexList(exclStr) {
-                excludeIndices = parsed.indices
+            if let parsed = parseIndexItems(exclStr, allowRanges: false) {
+                excludeIndexItems = parsed.items
                 step = String(step[..<exclRange.lowerBound]).trimmingCharacters(in: .whitespacesAndNewlines)
                 if step.hasSuffix(".") { step = String(step.dropLast()).trimmingCharacters(in: .whitespacesAndNewlines) }
             }
         } else if let eqRange = step.range(of: #":eq\((-?\d+)\)$"#, options: .regularExpression) {
             let numStr = String(step[eqRange]).dropFirst(4).dropLast()
             if let num = Int(numStr) {
-                indices = [num]
+                indexItems = [.single(num)]
             }
             step = String(step[..<eqRange.lowerBound]).trimmingCharacters(in: .whitespacesAndNewlines)
-        } else if let dotIndexRange = step.range(of: #"\.(!?-?\d+(?::[^\s@]+)*)$"#, options: .regularExpression) {
+        } else if let dotIndexRange = step.range(of: #"\.(!?[\d:,-]+)$"#, options: .regularExpression) {
             let indexContent = String(step[dotIndexRange].dropFirst())
-            if let parsed = parseIndexList(indexContent) {
+            if let parsed = parseIndexItems(indexContent, allowRanges: false) {
                 if parsed.isExclude {
-                    excludeIndices = parsed.indices
+                    excludeIndexItems = parsed.items
                 } else {
-                    indices = parsed.indices
+                    indexItems = parsed.items
                 }
                 step = String(step[..<dotIndexRange.lowerBound]).trimmingCharacters(in: .whitespacesAndNewlines)
             }
         }
 
         let cssSelector = convertLegadoComponentToCSS(step)
-        return LegadoRuleStep(selector: cssSelector, indices: indices, excludeIndices: excludeIndices)
+        return LegadoRuleStep(selector: cssSelector, indexItems: indexItems, excludeIndexItems: excludeIndexItems)
     }
 
     private static let compoundHTMLTagNames: Set<String> = [
