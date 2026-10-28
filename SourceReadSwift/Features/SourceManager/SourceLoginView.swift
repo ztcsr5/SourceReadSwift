@@ -43,7 +43,8 @@ struct SourceLoginView: View {
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     if fields.isEmpty {
-                        Button("完成") { dismiss() }
+                        Button("完成") { finishWebLogin() }
+                            .disabled(busy)
                     } else {
                         Button("登录") { submit() }
                             .disabled(busy)
@@ -189,6 +190,39 @@ struct SourceLoginView: View {
         }
     }
 
+    /// The in-app browser is the only sign-in path for sources without
+    /// `loginUi`.  Cookies set by XHR after the final navigation never reach
+    /// `SourceCookieStore` by themselves, so read the WKWebView cookie jar when
+    /// the reader taps 完成 and persist everything before dismissing.
+    private func finishWebLogin() {
+        guard !busy else { return }
+        busy = true
+        status = "正在保存登录状态…"
+        Task {
+            let cookies = await collectWebViewCookies()
+            await cookieStore.storeWebViewCookies(cookies)
+            await MainActor.run {
+                busy = false
+                if cookies.isEmpty {
+                    status = "没有读到 Cookie：请确认网页里已登录成功，再点完成"
+                } else {
+                    status = "已保存 \(cookies.count) 个 Cookie"
+                    dismiss()
+                }
+            }
+        }
+    }
+
+    /// Reads the shared WKWebView jar.  `SourceLoginWebView` always uses
+    /// `WKWebsiteDataStore.default()`, so this is the same store it writes to.
+    private func collectWebViewCookies() async -> [HTTPCookie] {
+        await withCheckedContinuation { continuation in
+            WKWebsiteDataStore.default().httpCookieStore.getAllCookies { cookies in
+                continuation.resume(returning: cookies)
+            }
+        }
+    }
+
     private var loginTarget: SourceLoginURLResolver.Target? {
         SourceLoginURLResolver.resolve(
             loginUrl: source.loginUrl,
@@ -232,7 +266,6 @@ private struct SourceLoginWebView: UIViewRepresentable {
         }
 
         func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
-            onStatus("页面已加载，Cookie 已同步")
             Task { @MainActor in
                 let cookies: [HTTPCookie] = await withCheckedContinuation { continuation in
                     webView.configuration.websiteDataStore.httpCookieStore.getAllCookies { cookies in
@@ -240,6 +273,9 @@ private struct SourceLoginWebView: UIViewRepresentable {
                     }
                 }
                 await cookieStore.storeWebViewCookies(cookies)
+                onStatus(cookies.isEmpty
+                    ? "页面已加载，尚未获取到 Cookie"
+                    : "页面已加载，已同步 \(cookies.count) 个 Cookie")
             }
         }
 

@@ -167,7 +167,7 @@ final class JSCoreRuntime {
         // interpolate that into URLs (STV builds `&h=BookSource(...)` and the
         // toc request 404s).  Bridge objects stay JS globals only.
         executionContext.bind(effectiveVariables.filter { Self.isRuleStoreValue($0.value) })
-        let normalization = LegadoJavaScriptCompatibility.normalize(script)
+        let normalization = LegadoJavaScriptCompatibility.normalizeRuleScript(script)
         let executableScript = normalization.normalizedScript
         context.exception = nil
         let baseStr = (effectiveVariables["baseUrl"] as? String) ?? ""

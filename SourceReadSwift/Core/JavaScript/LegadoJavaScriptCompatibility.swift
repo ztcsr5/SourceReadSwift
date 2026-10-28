@@ -47,6 +47,24 @@ enum LegadoJavaScriptCompatibility {
         return rewriteJavaStringLengthCalls(in: normalized, features: &features)
     }
 
+    /// Normalizes a book-source rule script (`@js:` / `<js>` / search-URL JS).
+    ///
+    /// Android sources are written against Rhino, where a String returned by
+    /// `java.ajax` answers `length()` as a method, so rules contain calls such
+    /// as `rev.length()`.  JavaScriptCore throws "rev.length is not a
+    /// function".  Rewrite the empty-argument call form only; property reads
+    /// (`s.length`), argument lists (`list.length(3)`) and the host File
+    /// facade (`file.length()`, which is a real Java method) stay untouched.
+    static func normalizeRuleScript(_ script: String) -> String {
+        var features = Set<String>()
+        let normalized = normalize(script).normalizedScript
+        return rewriteJavaStringLengthCalls(
+            in: normalized,
+            features: &features,
+            skipHostFileReceivers: true
+        )
+    }
+
     private static func unwrap(_ script: String) -> String {
         var value = script.trimmingCharacters(in: .whitespacesAndNewlines)
         if value.hasPrefix("@js:") {
@@ -209,7 +227,8 @@ enum LegadoJavaScriptCompatibility {
     /// regular-expression literals stay byte-for-byte identical.
     private static func rewriteJavaStringLengthCalls(
         in source: String,
-        features: inout Set<String>
+        features: inout Set<String>,
+        skipHostFileReceivers: Bool = false
     ) -> String {
         let chars = Array(source)
         guard chars.count > 8 else { return source }
@@ -230,7 +249,9 @@ enum LegadoJavaScriptCompatibility {
                 else if c == "/", next == "/" { state = 4; index += 1 }
                 else if c == "/", next == "*" { state = 5; index += 1 }
                 else if c == "/", isRegexStart(previousSignificant) { state = 6 }
-                else if c == ".", let close = javaLengthCallClose(in: chars, dot: index) {
+                else if c == ".",
+                        let close = javaLengthCallClose(in: chars, dot: index),
+                        !(skipHostFileReceivers && hasHostFileReceiver(chars, dot: index)) {
                     for position in index...close { output[position] = " " }
                     output[index] = "."
                     let letters = Array("length")
@@ -260,6 +281,27 @@ enum LegadoJavaScriptCompatibility {
             index += 1
         }
         return String(output)
+    }
+
+    /// True when the member access ending at `dot` is a host File facade
+    /// (`file.length()`, `java.getFile(path).length()`) whose `length` is a
+    /// real method and must not be rewritten into a property read.
+    private static func hasHostFileReceiver(_ chars: [Character], dot: Int) -> Bool {
+        var start = dot
+        var steps = 0
+        while start > 0, steps < 64 {
+            start -= 1
+            steps += 1
+            let ch = chars[start]
+            if ch == ";" || ch == "{" || ch == "}" || ch.isNewline { break }
+        }
+        let window = String(chars[start..<dot])
+        if window.contains("getFile") { return true }
+        // `file.length()`: the receiver is the bare identifier `file`
+        // (or `this.file`).  Match the last identifier token before the dot.
+        let trimmed = window.trimmingCharacters(in: .whitespaces)
+        let tail = trimmed.reversed().prefix { $0.isLetter || $0.isNumber || $0 == "_" }
+        return String(tail.reversed()) == "file"
     }
 
     /// Returns the index of `)` when `chars[dot...]` starts the empty-argument

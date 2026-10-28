@@ -1145,7 +1145,12 @@ private struct RuleHealthView: View {
 
     private func problemText(for source: BookSource) -> String {
         var problems: [String] = []
-        if source.searchUrl?.isEmpty ?? true {
+        let hasSearch = !(source.searchUrl ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        let hasExplore = !(source.exploreUrl ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        // Explore-only sources (365小说, 台湾小说 …) are legitimate in Legado:
+        // they are browsed from 发现 instead of search.  Reporting them as
+        // "缺搜索地址" made the one-tap cleanup disable ~20 working sources.
+        if !hasSearch && !hasExplore {
             problems.append("缺搜索地址")
         }
         if source.ruleToc == nil {
@@ -1385,11 +1390,20 @@ private struct RuleHealthStats {
     init(sources: [BookSource]) {
         total = sources.count
         enabled = sources.filter(\.enabled).count
-        searchable = sources.filter { !($0.searchUrl?.isEmpty ?? true) }.count
+        searchable = sources.filter { Self.canSearch($0) || Self.canDiscover($0) }.count
         readable = sources.filter { $0.ruleContent != nil }.count
         problemSources = sources.filter {
-            ($0.searchUrl?.isEmpty ?? true) || $0.ruleToc == nil || $0.ruleContent == nil
+            (!Self.canSearch($0) && !Self.canDiscover($0)) || $0.ruleToc == nil || $0.ruleContent == nil
         }
+    }
+
+    /// 发现页专用源在 Legado 里完全合法：`searchUrl` 为空但 `exploreUrl` 有分类。
+    static func canSearch(_ source: BookSource) -> Bool {
+        !(source.searchUrl ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    static func canDiscover(_ source: BookSource) -> Bool {
+        !(source.exploreUrl ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 }
 

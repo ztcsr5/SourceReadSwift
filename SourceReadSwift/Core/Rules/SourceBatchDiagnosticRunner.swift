@@ -27,6 +27,14 @@ struct SourceBatchDiagnosticRunner: Sendable {
         let startedAt = Date()
         let cleanKeyword = keyword.trimmingCharacters(in: .whitespacesAndNewlines)
         (engine as? SourceDiagnosticEvidenceProvider)?.resetDiagnosticEvidence(sourceURL: source.bookSourceUrl)
+
+        // Legado allows 发现页专用 sources: `searchUrl` is empty and books are
+        // browsed from 发现.  The old check failed them with "searchUrl 为空"
+        // and the one-tap cleanup then disabled working sources.
+        if Self.isExploreOnly(source) {
+            return await runExploreProbe(source: source, startedAt: startedAt, timeout: timeout)
+        }
+
         guard !cleanKeyword.isEmpty else {
             return SourceDiagnosticReport(
                 sourceName: source.bookSourceName,
@@ -237,6 +245,79 @@ struct SourceBatchDiagnosticRunner: Sendable {
             keyword: keyword,
             reports: reports
         )
+    }
+
+    /// True when the source has no search endpoint but does expose 发现分类.
+    private static func isExploreOnly(_ source: BookSource) -> Bool {
+        let search = (source.searchUrl ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        let explore = (source.exploreUrl ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        return search.isEmpty && !explore.isEmpty
+    }
+
+    /// Exercises the first 发现 category so explore-only sources get a real
+    /// verdict instead of a "缺搜索地址" failure.
+    private func runExploreProbe(
+        source: BookSource,
+        startedAt: Date,
+        timeout: TimeInterval
+    ) async -> SourceDiagnosticReport {
+        let categories = ExploreCategoryParser.parse(exploreUrl: source.exploreUrl)
+        guard let category = categories.first else {
+            return SourceDiagnosticReport(
+                sourceName: source.bookSourceName,
+                sourceURL: source.bookSourceUrl,
+                keyword: "",
+                startedAt: startedAt,
+                steps: [SourceDiagnosticStep(
+                    stage: .search,
+                    status: .warning,
+                    requestSummary: "explore",
+                    responseSummary: "书源没有 searchUrl，exploreUrl 也解析不出分类",
+                    failureClassification: "explore-empty",
+                    failureCode: .invalidSource
+                )]
+            )
+        }
+        let probeStarted = Date()
+        let result = await AsyncTimeout.run(seconds: max(timeout, 0.1), operation: {
+            await self.engine.exploreBooks(source: source, url: category.url, page: 1)
+        }) ?? .failure(.network("发现页超时（超过 " + String(Int(timeout)) + " 秒）"))
+        let elapsed = max(0, Int(Date().timeIntervalSince(probeStarted) * 1_000))
+        switch result {
+        case .success(let books):
+            return SourceDiagnosticReport(
+                sourceName: source.bookSourceName,
+                sourceURL: source.bookSourceUrl,
+                keyword: "",
+                startedAt: startedAt,
+                steps: [SourceDiagnosticStep(
+                    stage: .search,
+                    status: books.isEmpty ? .warning : .passed,
+                    requestSummary: "explore=" + category.title,
+                    responseSummary: "发现页「" + category.title + "」返回 " + String(books.count) + " 条",
+                    matchCount: books.count,
+                    elapsedMilliseconds: elapsed,
+                    failureClassification: books.isEmpty ? "explore-empty-result" : nil,
+                    failureCode: books.isEmpty ? .emptyResult : nil
+                )]
+            )
+        case .failure(let error):
+            return SourceDiagnosticReport(
+                sourceName: source.bookSourceName,
+                sourceURL: source.bookSourceUrl,
+                keyword: "",
+                startedAt: startedAt,
+                steps: [SourceDiagnosticStep(
+                    stage: .search,
+                    status: SourceDiagnosticClassifier.status(message: error.displayMessage, stage: "search"),
+                    requestSummary: "explore=" + category.title,
+                    responseSummary: error.displayMessage,
+                    elapsedMilliseconds: elapsed,
+                    failureClassification: "explore",
+                    failureCode: .network
+                )]
+            )
+        }
     }
 
     private func timeoutReport(

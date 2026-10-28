@@ -393,4 +393,21 @@ private final class AsyncBodyFixtureNetwork: SourceNetworkClient, @unchecked Sen
         let ruleScript = LegadoJavaScriptCompatibility.normalize("var n = file.length();").normalizedScript
         XCTAssertEqual(ruleScript, "var n = file.length();")
     }
+
+    func testRuleScriptRewritesJavaStringLengthCall() {
+        let script = LegadoJavaScriptCompatibility.normalizeRuleScript(
+            "var rev = java.ajax(url); var n = rev.length();"
+        )
+        XCTAssertTrue(script.contains("rev.length;"), script)
+        XCTAssertFalse(script.contains("rev.length("), script)
+    }
+
+    func testRuleScriptKeepsHostFileLengthMethod() {
+        let direct = LegadoJavaScriptCompatibility.normalizeRuleScript("var n = file.length();")
+        XCTAssertEqual(direct, "var n = file.length();")
+        let viaJava = LegadoJavaScriptCompatibility.normalizeRuleScript(
+            "var n = java.getFile(path).length();"
+        )
+        XCTAssertEqual(viaJava, "var n = java.getFile(path).length();")
+    }
 }
