@@ -384,94 +384,94 @@ final class JSCoreRuntime {
                     source.putLoginHeader = function(k, v) { return java.put('source.loginHeader.' + String(k || ''), v == null ? '' : String(v)); };
                     source.getLoginHeader = function(k) { return java.getVar('source.loginHeader.' + String(k || '')); };
                     source.putVariable = source.setVariable;
-          source.putLoginInfo = function(map) {
-            if (!map) return false;
-            var data = map;
-            if (typeof data === 'string') {
-              try { data = JSON.parse(data); } catch (_) { return false; }
-            }
-            if (!data || typeof data !== 'object') return false;
-            var keys = Object.keys(data);
-            for (var i = 0; i < keys.length; i++) {
-              var key = keys[i];
-              if (typeof data[key] === 'function') continue;
-              java.put('source.login.' + String(key), data[key] == null ? '' : String(data[key]));
-            }
-            return true;
-          };
-          source.putLoginHeader = function(k, v) {
-            if (arguments.length <= 1) {
-              var rawHeader = k == null ? '' : (typeof k === 'string' ? k : JSON.stringify(k));
-              java.put('source.loginHeader', rawHeader);
-              return rawHeader;
-            }
-            return java.put('source.loginHeader.' + String(k || ''), v == null ? '' : String(v));
-          };
-          source.getLoginHeader = function(k) {
-            if (arguments.length > 0 && k != null && String(k) !== '') return java.getVar('source.loginHeader.' + String(k));
-            var rawHeader = java.getVar('source.loginHeader');
-            if (rawHeader != null && String(rawHeader) !== '') return String(rawHeader);
-            var headerPrefix = 'source.loginHeader.';
-            var headerKeys = java.keysWithPrefix(headerPrefix);
-            var headerMap = {};
-            var headerCount = Number(headerKeys && (headerKeys.length != null ? headerKeys.length : headerKeys.count) || 0);
-            for (var hi = 0; hi < headerCount; hi++) {
-              var fullHeaderKey = String(headerKeys[hi]);
-              if (fullHeaderKey.indexOf(headerPrefix) === 0) headerMap[fullHeaderKey.substring(headerPrefix.length)] = java.getVar(fullHeaderKey);
-            }
-            return Object.keys(headerMap).length ? JSON.stringify(headerMap) : '';
-          };
-          source.getLoginHeaderMap = function() {
-            var map = null;
-            var rawHeaderText = source.getLoginHeader();
-            if (rawHeaderText) {
-              try {
-                var parsedHeader = JSON.parse(String(rawHeaderText));
-                if (parsedHeader && typeof parsedHeader === 'object') map = parsedHeader;
-              } catch (_) {}
-            }
-            var mapPrefix = 'source.loginHeader.';
-            var mapKeys = java.keysWithPrefix(mapPrefix);
-            var mapCount = Number(mapKeys && (mapKeys.length != null ? mapKeys.length : mapKeys.count) || 0);
-            for (var mi = 0; mi < mapCount; mi++) {
-              var fullMapKey = String(mapKeys[mi]);
-              if (fullMapKey.indexOf(mapPrefix) !== 0) continue;
-              if (!map) map = {};
-              map[fullMapKey.substring(mapPrefix.length)] = java.getVar(fullMapKey);
-            }
-            return map;
-          };
-          source.removeLoginHeader = function() {
-            java.removeVar('source.loginHeader');
-            java.removeVar('source.loginHeader.');
-            java.removePrefix('source.loginHeader.');
-            return true;
-          };
-          source.getLoginInfo = function() {
-            var infoPrefix = 'source.login.';
-            var infoKeys = java.keysWithPrefix(infoPrefix);
-            var info = {};
-            var infoCount = Number(infoKeys && (infoKeys.length != null ? infoKeys.length : infoKeys.count) || 0);
-            for (var ii = 0; ii < infoCount; ii++) {
-              var fullInfoKey = String(infoKeys[ii]);
-              if (fullInfoKey.indexOf(infoPrefix) === 0) info[fullInfoKey.substring(infoPrefix.length)] = java.getVar(fullInfoKey);
-            }
-            return JSON.stringify(info);
-          };
-          source.getLoginUi = function() { return source.loginUi || ''; };
-          source.getTag = function() { return source.bookSourceName || source.sourceName || ''; };
-          source.getHeader = function() { return source.header || ''; };
-          source.includes = function(value) {
-            var needle = String(value == null ? '' : value);
-            if (!needle) return false;
-            var fields = [source.bookSourceName, source.sourceName, source.bookSourceGroup, source.bookSourceComment, source.bookSourceUrl, source.header];
-            for (var fi = 0; fi < fields.length; fi++) if (String(fields[fi] || '').indexOf(needle) >= 0) return true;
-            return false;
-          };
-          source.refreshExplore = function() {
-            try { if (typeof java !== 'undefined' && java && typeof java.refreshExplore === 'function') java.refreshExplore(); } catch (_) {}
-            return '';
-          };
+                    source.putLoginInfo = function(map) {
+                      if (!map) return false;
+                      var data = map;
+                      if (typeof data === 'string') {
+                        try { data = JSON.parse(data); } catch (_) { return false; }
+                      }
+                      if (!data || typeof data !== 'object') return false;
+                      var keys = Object.keys(data);
+                      for (var i = 0; i < keys.length; i++) {
+                        var key = keys[i];
+                        if (typeof data[key] === 'function') continue;
+                        java.put('source.login.' + String(key), data[key] == null ? '' : String(data[key]));
+                      }
+                      return true;
+                    };
+                    source.putLoginHeader = function(k, v) {
+                      if (arguments.length <= 1) {
+                        var rawHeader = k == null ? '' : (typeof k === 'string' ? k : JSON.stringify(k));
+                        java.put('source.loginHeader', rawHeader);
+                        return rawHeader;
+                      }
+                      return java.put('source.loginHeader.' + String(k || ''), v == null ? '' : String(v));
+                    };
+                    source.getLoginHeader = function(k) {
+                      if (arguments.length > 0 && k != null && String(k) !== '') return java.getVar('source.loginHeader.' + String(k));
+                      var rawHeader = java.getVar('source.loginHeader');
+                      if (rawHeader != null && String(rawHeader) !== '') return String(rawHeader);
+                      var headerPrefix = 'source.loginHeader.';
+                      var headerKeys = java.keysWithPrefix(headerPrefix);
+                      var headerMap = {};
+                      var headerCount = Number(headerKeys && (headerKeys.length != null ? headerKeys.length : headerKeys.count) || 0);
+                      for (var hi = 0; hi < headerCount; hi++) {
+                        var fullHeaderKey = String(headerKeys[hi]);
+                        if (fullHeaderKey.indexOf(headerPrefix) === 0) headerMap[fullHeaderKey.substring(headerPrefix.length)] = java.getVar(fullHeaderKey);
+                      }
+                      return Object.keys(headerMap).length ? JSON.stringify(headerMap) : '';
+                    };
+                    source.getLoginHeaderMap = function() {
+                      var map = null;
+                      var rawHeaderText = source.getLoginHeader();
+                      if (rawHeaderText) {
+                        try {
+                          var parsedHeader = JSON.parse(String(rawHeaderText));
+                          if (parsedHeader && typeof parsedHeader === 'object') map = parsedHeader;
+                        } catch (_) {}
+                      }
+                      var mapPrefix = 'source.loginHeader.';
+                      var mapKeys = java.keysWithPrefix(mapPrefix);
+                      var mapCount = Number(mapKeys && (mapKeys.length != null ? mapKeys.length : mapKeys.count) || 0);
+                      for (var mi = 0; mi < mapCount; mi++) {
+                        var fullMapKey = String(mapKeys[mi]);
+                        if (fullMapKey.indexOf(mapPrefix) !== 0) continue;
+                        if (!map) map = {};
+                        map[fullMapKey.substring(mapPrefix.length)] = java.getVar(fullMapKey);
+                      }
+                      return map;
+                    };
+                    source.removeLoginHeader = function() {
+                      java.removeVar('source.loginHeader');
+                      java.removeVar('source.loginHeader.');
+                      java.removePrefix('source.loginHeader.');
+                      return true;
+                    };
+                    source.getLoginInfo = function() {
+                      var infoPrefix = 'source.login.';
+                      var infoKeys = java.keysWithPrefix(infoPrefix);
+                      var info = {};
+                      var infoCount = Number(infoKeys && (infoKeys.length != null ? infoKeys.length : infoKeys.count) || 0);
+                      for (var ii = 0; ii < infoCount; ii++) {
+                        var fullInfoKey = String(infoKeys[ii]);
+                        if (fullInfoKey.indexOf(infoPrefix) === 0) info[fullInfoKey.substring(infoPrefix.length)] = java.getVar(fullInfoKey);
+                      }
+                      return JSON.stringify(info);
+                    };
+                    source.getLoginUi = function() { return source.loginUi || ''; };
+                    source.getTag = function() { return source.bookSourceName || source.sourceName || ''; };
+                    source.getHeader = function() { return source.header || ''; };
+                    source.includes = function(value) {
+                      var needle = String(value == null ? '' : value);
+                      if (!needle) return false;
+                      var fields = [source.bookSourceName, source.sourceName, source.bookSourceGroup, source.bookSourceComment, source.bookSourceUrl, source.header];
+                      for (var fi = 0; fi < fields.length; fi++) if (String(fields[fi] || '').indexOf(needle) >= 0) return true;
+                      return false;
+                    };
+                    source.refreshExplore = function() {
+                      try { if (typeof java !== 'undefined' && java && typeof java.refreshExplore === 'function') java.refreshExplore(); } catch (_) {}
+                      return '';
+                    };
                 }
                 """
                 context.evaluateScript(injectScript)
@@ -496,10 +496,8 @@ final class JSCoreRuntime {
                         return book.variable || java.getVar('book.variable') || '';
                     };
                     book.name = book.name || book.title || '';
-book.durChapterIndex = book.durChapterIndex == null ? 0 : book.durChapterIndex;
-book.durChapterTitle = book.durChapterTitle || '';
-book.durChapterIndex = book.durChapterIndex == null ? 0 : book.durChapterIndex;
-book.durChapterTitle = book.durChapterTitle || '';
+                    book.durChapterIndex = book.durChapterIndex == null ? 0 : book.durChapterIndex;
+                    book.durChapterTitle = book.durChapterTitle || '';
                     book.title = book.title || book.name || '';
                     book.bookUrl = book.bookUrl || book.url || '';
                     book.url = book.url || book.bookUrl || '';
@@ -2994,10 +2992,8 @@ book.durChapterTitle = book.durChapterTitle || '';
           };
           if (typeof book === 'undefined' || book === null) book = {};
           book.name = book.name || book.title || '';
-book.durChapterIndex = book.durChapterIndex == null ? 0 : book.durChapterIndex;
-book.durChapterTitle = book.durChapterTitle || '';
-book.durChapterIndex = book.durChapterIndex == null ? 0 : book.durChapterIndex;
-book.durChapterTitle = book.durChapterTitle || '';
+          book.durChapterIndex = book.durChapterIndex == null ? 0 : book.durChapterIndex;
+          book.durChapterTitle = book.durChapterTitle || '';
           book.title = book.title || book.name || '';
           book.bookUrl = book.bookUrl || book.url || '';
           book.url = book.url || book.bookUrl || '';
