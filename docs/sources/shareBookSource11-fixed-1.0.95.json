@@ -2276,7 +2276,7 @@
   "bookUrlPattern": "https://www\\.shudugu\\.org/\\d+/",
   "customButton": false,
   "customOrder": 38,
-  "enabled": true,
+  "enabled": false,
   "enabledCookieJar": false,
   "enabledExplore": true,
   "eventListener": false,
@@ -2326,7 +2326,7 @@
   },
   "searchUrl": "/i/sor.aspx?key={{key}}",
   "weight": 0,
-  "bookSourceComment": "2026-10-29 复测 HTTP 500（对方后端宕机）。"
+  "bookSourceComment": "2026-10-29 去重：同域第三条，站点 HTTP 500，保留一条用于观察恢复。"
  },
  {
   "bookSourceComment": "版本: 20261026\n作者: 知秋\n反馈群：766236637\ntg群：https://t.me/+dcNnFFZv5KtmYjIx\n1. 除发现使用官方接口外，其余优先使用源作者服务器中转\n2. 共享服务器连接超时，请自行切换服务器\n3. 请选择一个域名接口连接，否则无法使用\n4. 临时token口令为 天一团队是倒狗(qq为1070240776和845646066和1484608559)请勿相信任何需要付费的说法欢迎来官方反馈群举报\n5. 获取token请点击登录界面，获取token按钮，点击测试/修改token可查询日下载量，切记获取token后请保存，token为3日有效期，到期请重新获取，token为明文请自行保存，请勿外传，异地登录多次会封禁token(token改为明文存源变量中防止丢失)\n6. 如爱丽丝域名无法直连，请打开梯子使用\n7. 共享数据库如有，则优先使用数据库，章节开头的图标为🍐\n8. 下载请把预下载改成0-3之间，请求有超限拉黑，请勿大规模批量下载\n9. 修复图片问题，新增正确封面\n10. 反馈q群：755947375，token问题群里找我，或者社区找也行(社区不经常在线，上线看到会回)\n11. 接口请求速率存在限制，故设置并发率，批量下载耐心等待",
@@ -2476,14 +2476,14 @@
   "weight": 0
  },
  {
-  "bookSourceComment": "2026-10-29 复测 HTTP 500（对方后端宕机）。",
+  "bookSourceComment": "2026-10-29 去重：同域第三条，站点 HTTP 500，保留一条用于观察恢复。",
   "bookSourceGroup": "",
   "bookSourceName": "速读谷",
   "bookSourceType": 0,
   "bookSourceUrl": "https://www.sudugu.org#🐳",
   "customButton": false,
   "customOrder": 41,
-  "enabled": true,
+  "enabled": false,
   "enabledCookieJar": false,
   "enabledExplore": true,
   "eventListener": false,
@@ -2738,13 +2738,14 @@
   "bookSourceUrl": "https://m.shuyinfm.com/",
   "customButton": false,
   "customOrder": 46,
-  "enabled": true,
+  "enabled": false,
   "enabledCookieJar": true,
   "enabledExplore": true,
   "eventListener": false,
   "lastUpdateTime": 0,
   "respondTime": 180000,
-  "weight": 0
+  "weight": 0,
+  "bookSourceComment": "2026-10-29 去重：同域重复空壳，保留有规则的「书音FM」条目。"
  },
  {
   "bookSourceGroup": "",
@@ -2971,13 +2972,14 @@
   "bookSourceUrl": "https://api-bc.wtzw.com",
   "customButton": false,
   "customOrder": 53,
-  "enabled": true,
+  "enabled": false,
   "enabledCookieJar": true,
   "enabledExplore": true,
   "eventListener": false,
   "lastUpdateTime": 0,
   "respondTime": 180000,
-  "weight": 0
+  "weight": 0,
+  "bookSourceComment": "2026-10-29 去重：同域重复空壳（api-bc.wtzw.com 已有 3 条规则条目），保留可用条目。"
  },
  {
   "bookSourceGroup": "听书",
@@ -3322,13 +3324,14 @@
   "bookSourceUrl": "https://bcshuku.com",
   "customButton": false,
   "customOrder": 68,
-  "enabled": true,
+  "enabled": false,
   "enabledCookieJar": true,
   "enabledExplore": true,
   "eventListener": false,
   "lastUpdateTime": 0,
   "respondTime": 180000,
-  "weight": 0
+  "weight": 0,
+  "bookSourceComment": "2026-10-29 去重：同域重复空壳，保留有规则的「八叉书库(二合一)」。"
  },
  {
   "bookSourceGroup": "",
