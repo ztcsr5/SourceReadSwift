@@ -4982,6 +4982,41 @@ final class JSCoreRuntime {
           if (name && typeof globalThis !== 'undefined') globalThis[name] = value;
           return value;
         }
+        // Rhino (and therefore Legado) exposes imported `java.lang` / `java.util`
+        // classes as bare globals.  Sources call `Integer.toHexString(...)`,
+        // `new StringBuilder()`, `MessageDigest.getInstance(...)` with no
+        // qualifier, so JSCore's `Packages.*`-only surface produced
+        // "Integer.toHexString is not a function" (连尚读书) even though the
+        // static itself existed.  Bind the simple names once; the ECMAScript
+        // built-ins (String / Boolean / Math / Number / Array / Object) are
+        // deliberately left untouched.
+        try {
+          if (typeof Integer === 'undefined') Integer = Packages.java.lang.Integer;
+          if (typeof Long === 'undefined') Long = Packages.java.lang.Long;
+          if (typeof Short === 'undefined' && Packages.java.lang.Short) Short = Packages.java.lang.Short;
+          if (typeof Byte === 'undefined' && Packages.java.lang.Byte) Byte = Packages.java.lang.Byte;
+          if (typeof Double === 'undefined' && Packages.java.lang.Double) Double = Packages.java.lang.Double;
+          if (typeof Float === 'undefined' && Packages.java.lang.Float) Float = Packages.java.lang.Float;
+          if (typeof Character === 'undefined' && Packages.java.lang.Character) Character = Packages.java.lang.Character;
+          if (typeof StringBuilder === 'undefined') StringBuilder = Packages.java.lang.StringBuilder;
+          if (typeof MessageDigest === 'undefined') MessageDigest = Packages.java.security.MessageDigest;
+          if (typeof Arrays === 'undefined') Arrays = Packages.java.util.Arrays;
+          if (typeof ArrayList === 'undefined') ArrayList = Packages.java.util.ArrayList;
+          if (typeof HashMap === 'undefined') HashMap = Packages.java.util.HashMap;
+          if (typeof URLEncoder === 'undefined') URLEncoder = Packages.java.net.URLEncoder;
+          if (typeof URLDecoder === 'undefined') URLDecoder = Packages.java.net.URLDecoder;
+          if (typeof URI === 'undefined') URI = Packages.java.net.URI;
+          if (typeof Mac === 'undefined') Mac = Packages.javax.crypto.Mac;
+          if (typeof Cipher === 'undefined') Cipher = Packages.javax.crypto.Cipher;
+          if (typeof SecretKeySpec === 'undefined') SecretKeySpec = Packages.javax.crypto.spec.SecretKeySpec;
+          if (typeof IvParameterSpec === 'undefined') IvParameterSpec = Packages.javax.crypto.spec.IvParameterSpec;
+          if (typeof Base64 === 'undefined') Base64 = Packages.java.util.Base64;
+          if (typeof UUID === 'undefined') UUID = Packages.java.util.UUID;
+          if (typeof Jsoup === 'undefined') Jsoup = Packages.org.jsoup.Jsoup;
+          if (typeof ByteArrayOutputStream === 'undefined') ByteArrayOutputStream = Packages.java.io.ByteArrayOutputStream;
+          if (typeof GZIPInputStream === 'undefined') GZIPInputStream = Packages.java.util.zip.GZIPInputStream;
+          if (typeof InflaterInputStream === 'undefined') InflaterInputStream = Packages.java.util.zip.InflaterInputStream;
+        } catch (e) {}
         // Legado sources occasionally call `java.*` helpers that this build has
         // not implemented yet.  Without a guard the call throws
         // "undefined is not a function" and aborts the whole rule, so a single

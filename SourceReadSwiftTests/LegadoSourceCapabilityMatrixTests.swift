@@ -159,6 +159,42 @@ final class LegadoSourceCapabilityMatrixTests: XCTestCase {
         }
     }
 
+    // MARK: - Bare java.* class names (Rhino default imports)
+
+    /// 连尚读书 signs `Integer.toHexString(0xFF & bytes[i])`.  Rhino exposes
+    /// `java.lang.Integer` as a bare global, so the class must be reachable
+    /// without the `Packages.` prefix.
+    func testBareIntegerHexStringIsAvailable() throws {
+        switch JSCoreRuntime().evaluate("Integer.toHexString(255);") {
+        case .success(let value):
+            XCTAssertEqual(value, "ff")
+        case .failure(let error):
+            XCTFail("bare Integer failed: \(error)")
+        }
+    }
+
+    func testBareStringBuilderAndMessageDigestAreAvailable() throws {
+        let script = "new StringBuilder().append('a').append('b').toString() + '|' + MessageDigest.getInstance('MD5').getAlgorithm();"
+        switch JSCoreRuntime().evaluate(script) {
+        case .success(let value):
+            XCTAssertTrue(value.hasPrefix("ab|"), "unexpected: \(value)")
+        case .failure(let error):
+            XCTFail("bare StringBuilder/MessageDigest failed: \(error)")
+        }
+    }
+
+    /// The compatibility shim must not shadow ECMAScript built-ins: sources
+    /// still rely on `Boolean(x)`, `String(x)` and `Array.isArray`.
+    func testBareJavaNamesDoNotShadowECMAScriptBuiltins() throws {
+        let script = "String(Boolean(0)) + '|' + String(Boolean(1)) + '|' + String(Array.isArray([]));"
+        switch JSCoreRuntime().evaluate(script) {
+        case .success(let value):
+            XCTAssertEqual(value, "false|true|true")
+        case .failure(let error):
+            XCTFail("builtins broken by java shim: \(error)")
+        }
+    }
+
     // MARK: - Helpers
 
     private func loadFixture() throws -> [[String: Any]] {
