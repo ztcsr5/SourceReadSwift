@@ -5666,7 +5666,12 @@ struct ReaderView: View {
                 fontSize: CGFloat(fontSize),
                 indent: typography.firstLineIndent
             )
-            let wholeHeight = ReaderPageLayoutEngine.measureHeight(display, typography: typography)
+            // One TextKit pass per paragraph: measure once, then cut with the
+            // metrics we already paid for. Re-measuring the paragraph inside
+            // `split` and every chunk after it was the bulk of the chapter
+            // boundary hitch (5 layouts for a paragraph spanning 3 pages).
+            let paragraphMetrics = ReaderPageLayoutEngine.metrics(for: display, typography: typography)
+            let wholeHeight = ReaderPageLayoutEngine.totalHeight(of: paragraphMetrics)
             let spacing = currentEntries.isEmpty ? 0 : typography.paragraphSpacing
 
             if currentHeight + spacing + wholeHeight <= typography.contentHeight + 0.5 {
@@ -5699,6 +5704,7 @@ struct ReaderView: View {
             }
             let chunks = ReaderPageLayoutEngine.split(
                 display,
+                metrics: paragraphMetrics,
                 firstPageHeight: available,
                 fullPageHeight: typography.contentHeight,
                 typography: typography

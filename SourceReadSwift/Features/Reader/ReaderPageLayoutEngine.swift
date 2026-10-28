@@ -68,20 +68,45 @@ enum ReaderPageLayoutEngine {
         return String(repeating: "\u{3000}", count: spaces) + text
     }
 
+    /// Per-line metrics for one paragraph, exposed so a caller can lay a
+    /// paragraph out once and then cut it into pages without re-running
+    /// TextKit. `appendPages` used to pay one layout for the whole paragraph,
+    /// another inside `split`, and one more for every chunk it produced: a
+    /// paragraph landing on three pages cost five `NSLayoutManager` passes.
+    /// A freshly prefetched chapter therefore stalled the frame where it first
+    /// appeared, which is the hitch readers report when a swipe crosses a
+    /// chapter boundary.
+    struct LineMetric {
+        let range: NSRange
+        let height: CGFloat
+    }
+
+    static func metrics(
+        for text: String,
+        typography: ReaderPageTypography,
+        font: UIFont? = nil,
+        alignment: NSTextAlignment = .justified
+    ) -> [LineMetric] {
+        guard !text.isEmpty else { return [] }
+        return lineMetrics(
+            text: text,
+            typography: typography,
+            font: font ?? typography.font,
+            alignment: alignment
+        )
+    }
+
+    static func totalHeight(of metrics: [LineMetric]) -> CGFloat {
+        metrics.reduce(CGFloat.zero) { $0 + $1.height }
+    }
+
     static func measureHeight(
         _ text: String,
         typography: ReaderPageTypography,
         font: UIFont? = nil,
         alignment: NSTextAlignment = .justified
     ) -> CGFloat {
-        guard !text.isEmpty else { return 0 }
-        let metrics = lineMetrics(
-            text: text,
-            typography: typography,
-            font: font ?? typography.font,
-            alignment: alignment
-        )
-        return metrics.reduce(CGFloat.zero) { $0 + $1.height }
+        totalHeight(of: metrics(for: text, typography: typography, font: font, alignment: alignment))
     }
 
     /// Split a paragraph at real line boundaries so every returned chunk can
@@ -94,38 +119,72 @@ enum ReaderPageLayoutEngine {
         fullPageHeight: CGFloat,
         typography: ReaderPageTypography
     ) -> [(text: String, height: CGFloat)] {
+        split(
+            text,
+            metrics: metrics(for: text, typography: typography),
+            firstPageHeight: firstPageHeight,
+            fullPageHeight: fullPageHeight,
+            typography: typography
+        )
+    }
+
+    /// Cut a paragraph with metrics the caller already owns.
+    ///
+    /// Chunk heights are derived from the line metrics instead of re-measuring
+    /// every substring. The only difference between the paragraph's line sum
+    /// and a chunk drawn on its own is the trailing `lineSpacing`: a chunk that
+    /// ends before the paragraph does must not carry the gap after its last
+    /// line, because `lineMetrics` already drops the gap after the paragraph's
+    /// final line.
+    static func split(
+        _ text: String,
+        metrics: [LineMetric],
+        firstPageHeight: CGFloat,
+        fullPageHeight: CGFloat,
+        typography: ReaderPageTypography
+    ) -> [(text: String, height: CGFloat)] {
         guard !text.isEmpty else { return [] }
-        let metrics = lineMetrics(text: text, typography: typography, font: typography.font)
         guard !metrics.isEmpty else { return [(text, 0)] }
+
+        func height(ofLines lines: Range<Int>) -> CGFloat {
+            var total: CGFloat = 0
+            for index in lines { total += metrics[index].height }
+            if lines.upperBound < metrics.count { total -= typography.lineSpacing }
+            return total
+        }
 
         let string = text as NSString
         var result: [(String, CGFloat)] = []
-        var chunkStart = 0
+        var startLine = 0
         var currentHeight: CGFloat = 0
         var limit = max(firstPageHeight, metrics[0].height)
 
-        for metric in metrics {
+        for (index, metric) in metrics.enumerated() {
             if currentHeight > 0, currentHeight + metric.height > limit + 0.5 {
-                let length = metric.range.location - chunkStart
+                let start = metrics[startLine].range.location
+                let length = metric.range.location - start
                 if length > 0 {
-                    // Re-measure the exact substring instead of adjusting the
-                    // accumulator. A chunk's final line does not receive
-                    // `lineSpacing`, and re-measuring keeps the reserved height
-                    // identical to what the renderer will draw (the whole-text
-                    // line metrics only decide where to cut).
-                    let chunk = string.substring(with: NSRange(location: chunkStart, length: length))
-                    result.append((chunk, measureHeight(chunk, typography: typography)))
+                    result.append((
+                        string.substring(with: NSRange(location: start, length: length)),
+                        height(ofLines: startLine..<index)
+                    ))
                 }
-                chunkStart = metric.range.location
+                startLine = index
                 currentHeight = 0
                 limit = max(fullPageHeight, metric.height)
             }
             currentHeight += metric.height
         }
 
-        if chunkStart < string.length {
-            let tail = string.substring(from: chunkStart)
-            result.append((tail, measureHeight(tail, typography: typography)))
+        if startLine < metrics.count {
+            let start = metrics[startLine].range.location
+            let end = NSMaxRange(metrics[metrics.count - 1].range)
+            if end > start {
+                result.append((
+                    string.substring(with: NSRange(location: start, length: end - start)),
+                    height(ofLines: startLine..<metrics.count)
+                ))
+            }
         }
         return result
     }
@@ -147,11 +206,6 @@ enum ReaderPageLayoutEngine {
         style.lineBreakStrategy = lineBreakStrategy
         style.alignment = alignment
         return style
-    }
-
-    private struct LineMetric {
-        let range: NSRange
-        let height: CGFloat
     }
 
     private static func lineMetrics(

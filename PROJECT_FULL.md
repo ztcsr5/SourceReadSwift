@@ -2360,6 +2360,13 @@ Legado `EncoderUtils.escape`（`EncoderUtils.kt` L12-29）只保留 ASCII 字母
 
 ---
 
+## 二十九、v1.0.78 分页单次排版（2026-10-28）
+
+- `ReaderPageLayoutEngine.metrics(for:)` 暴露行度量；`split(_:metrics:...)` 用度量算术推导切片高度，不再逐片重排。
+- `ReaderView.appendPages` 每段 TextKit 排版次数 2~5 → 1，压掉章节边界的掉帧主因（`reader.layout` 仍在主线程，见 `docs/READER_PERF_1_0_78.md` 第 3 节）。
+- 新增 2 条单测：度量总高一致、切片高度与单独测量一致且拼回原文。
+- 版本 1.0.78（Build 79）。
+
 ## 附录 A：完整文件清单
 
 > 以下为 2026-10-25 工作区实测清单。`build/`、`ci-log/`、`AppIcons_Candidates/` 为本地产物/素材，不计入源码。

@@ -136,6 +136,43 @@ final class ReaderPageLayoutEngineTests: XCTestCase {
         }
     }
 
+    func testMetricsTotalMatchesMeasureHeight() {
+        let text = String(repeating: "行高统计必须和整段测量一致。", count: 60)
+        let typography = typography()
+        let metrics = ReaderPageLayoutEngine.metrics(for: text, typography: typography)
+        XCTAssertGreaterThan(metrics.count, 1)
+        XCTAssertEqual(
+            ReaderPageLayoutEngine.totalHeight(of: metrics),
+            ReaderPageLayoutEngine.measureHeight(text, typography: typography),
+            accuracy: 0.001
+        )
+    }
+
+    func testSplitWithPrecomputedMetricsMatchesMeasuredHeights() {
+        let original = String(repeating: "预分页只跑一次 TextKit 布局，块高必须和单独测量一致。", count: 45)
+        let typography = typography()
+        let metrics = ReaderPageLayoutEngine.metrics(for: original, typography: typography)
+        let chunks = ReaderPageLayoutEngine.split(
+            original,
+            metrics: metrics,
+            firstPageHeight: 240,
+            fullPageHeight: 600,
+            typography: typography
+        )
+        XCTAssertGreaterThan(chunks.count, 2)
+        XCTAssertEqual(chunks.map { $0.text }.joined(), original)
+        XCTAssertEqual(chunks.map { $0.text }, ReaderPageLayoutEngine.split(
+            original,
+            firstPageHeight: 240,
+            fullPageHeight: 600,
+            typography: typography
+        ).map { $0.text })
+        for chunk in chunks {
+            let measured = ReaderPageLayoutEngine.measureHeight(chunk.text, typography: typography)
+            XCTAssertEqual(chunk.height, measured, accuracy: 0.5)
+        }
+    }
+
     func testEmptyParagraphProducesNoChunks() {
         XCTAssertTrue(
             ReaderPageLayoutEngine.split(
