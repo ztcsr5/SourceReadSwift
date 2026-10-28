@@ -139,30 +139,15 @@ struct JSONRuleExtractor {
             //   `$.score&&$.subTitle`  -> concatenation
             // Only the list extractor did this, so 书旗 and the 番茄 aggregators
             // returned an empty name even though `$.title` was right there.
-            if let operation = RuleOperatorSplitter.firstOperator(in: trimmed) {
-                switch operation.op {
-                case "||", "%%":
-                    for part in operation.parts {
-                        let candidate = part.trimmingCharacters(in: .whitespacesAndNewlines)
-                        guard !candidate.isEmpty else { continue }
-                        if let text = string(from: item, rule: candidate, fallbackKeys: [], variables: variables) {
-                            return text
-                        }
-                    }
-                    return nil
-                case "&&":
-                    var joined = ""
-                    for part in operation.parts {
-                        let candidate = part.trimmingCharacters(in: .whitespacesAndNewlines)
-                        guard !candidate.isEmpty else { continue }
-                        if let text = string(from: item, rule: candidate, fallbackKeys: [], variables: variables) {
-                            joined += text
-                        }
-                    }
-                    return joined.isEmpty ? nil : joined
-                default:
-                    break
-                }
+            if RuleOperatorSplitter.firstOperator(in: trimmed) != nil {
+                // Delegate to the list extractor so all three operators keep
+                // Legado semantics: `||` first non-empty, `&&` concatenation,
+                // `%%` element-wise interleave.  The old shortcut returned the
+                // first branch for `%%` (dropping the VIP titles) and glued
+                // `&&` values without the newline separator.
+                let merged = stringList(from: item, rule: trimmed, variables: variables)
+                let joined = merged.joined(separator: "\n")
+                return joined.isEmpty ? nil : joined
             }
             if let value = value(from: item, path: rule, variables: variables) {
                 let text = stringifyJSResult(value)
