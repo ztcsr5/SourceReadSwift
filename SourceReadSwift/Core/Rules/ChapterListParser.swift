@@ -466,7 +466,7 @@ struct ChapterListParser {
             let jsError = executionContext.currentJavaScriptError
             let message = items.isEmpty
                 ? (jsError.map { "目录规则 JS 异常：\($0)" }
-                    ?? "JSON 目录规则未命中（0 项，响应 \(response.body.count) 字符）")
+                    ?? "JSON 目录规则未命中（0 项，响应 \(response.body.count) 字符；结构 \(Self.jsonShapeHint(response.body))）")
                 : "JSON 目录命中 \(items.count) 项但章节名为空"
             return .failure(.empty(message))
         }
@@ -477,6 +477,30 @@ struct ChapterListParser {
     /// here: Legado keeps them as `BookChapter(isVolume=true)`, while this app
     /// renders volume headings from `volumeName`, so a volume row only updates
     /// the volume inherited by the chapters that follow it.
+    /// Same diagnostic as SearchResultParser: when a JSON chapter list rule
+    /// matches nothing, print the response's top-level shape so the rule can be
+    /// corrected without a manual re-request.
+    static func jsonShapeHint(_ body: String) -> String {
+        let trimmed = body.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard trimmed.hasPrefix("{") || trimmed.hasPrefix("["),
+              let data = trimmed.data(using: .utf8),
+              let object = try? JSONSerialization.jsonObject(with: data) else {
+            let head = trimmed.prefix(60).replacingOccurrences(of: "\n", with: " ")
+            return "非 JSON：\(head)"
+        }
+        if let dict = object as? [String: Any] {
+            let keys = dict.keys.sorted().prefix(8).joined(separator: ",")
+            return "{ \(keys) }"
+        }
+        if let array = object as? [Any] {
+            if let first = array.first as? [String: Any] {
+                return "[\(array.count)] item{ \(first.keys.sorted().prefix(8).joined(separator: ",")) }"
+            }
+            return "[\(array.count)]"
+        }
+        return "标量"
+    }
+
     private func makeChapter(
         from element: Element,
         index: Int,

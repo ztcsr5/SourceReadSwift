@@ -133,6 +133,37 @@ struct JSONRuleExtractor {
                     }
                 }
             }
+            // Legado `AnalyzeRule.getString` splits a single-field rule on the
+            // first top-level `&&` / `||` / `%%` before evaluating it:
+            //   `$.bookName||$.title`  -> first non-empty
+            //   `$.score&&$.subTitle`  -> concatenation
+            // Only the list extractor did this, so 书旗 and the 番茄 aggregators
+            // returned an empty name even though `$.title` was right there.
+            if let operation = RuleOperatorSplitter.firstOperator(in: trimmed) {
+                switch operation.op {
+                case "||", "%%":
+                    for part in operation.parts {
+                        let candidate = part.trimmingCharacters(in: .whitespacesAndNewlines)
+                        guard !candidate.isEmpty else { continue }
+                        if let text = string(from: item, rule: candidate, fallbackKeys: [], variables: variables) {
+                            return text
+                        }
+                    }
+                    return nil
+                case "&&":
+                    var joined = ""
+                    for part in operation.parts {
+                        let candidate = part.trimmingCharacters(in: .whitespacesAndNewlines)
+                        guard !candidate.isEmpty else { continue }
+                        if let text = string(from: item, rule: candidate, fallbackKeys: [], variables: variables) {
+                            joined += text
+                        }
+                    }
+                    return joined.isEmpty ? nil : joined
+                default:
+                    break
+                }
+            }
             if let value = value(from: item, path: rule, variables: variables) {
                 let text = stringifyJSResult(value)
                 if !text.isEmpty { return text }
@@ -2295,7 +2326,10 @@ struct JSONRuleExtractor {
             let key = mText.substring(with: keyRange).trimmingCharacters(in: .whitespacesAndNewlines)
             let val: String
             if key.hasPrefix("$.") || key.hasPrefix("@json:") {
-                val = (value(from: item, path: key, variables: variables)).map { stringifyJSResult($0) } ?? ""
+                // Route through `string(from:rule:)` so a template such as
+                // 书旗's `{{$.bookId||$.bid}}` keeps the `||` fallback instead
+                // of being handed to the JSONPath evaluator verbatim.
+                val = string(from: item, rule: key, fallbackKeys: [], variables: variables) ?? ""
             } else if let direct = item[key] {
                 val = stringifyJSResult(direct)
             } else if let fromPath = value(from: item, path: key, variables: variables) {

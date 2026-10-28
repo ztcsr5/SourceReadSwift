@@ -399,13 +399,38 @@ struct SearchResultParser {
             let jsError = executionContext.currentJavaScriptError
             let message = candidates.isEmpty
                 ? (jsError.map { "搜索规则 JS 异常：\($0)" }
-                    ?? "JSON 列表规则未命中（0 项，响应 \(response.body.count) 字符）")
+                    ?? "JSON 列表规则未命中（0 项，响应 \(response.body.count) 字符；结构 \(Self.jsonShapeHint(response.body))）")
                 : "JSON 列表命中 \(candidates.count) 项但书名或链接为空"
             return .failure(.empty(message))
         }
         return .success(Array(filtered))
     }
 
+
+    /// When a JSON list rule matches nothing, the raw body is still the only
+    /// clue the operator has.  Listing the top-level keys turns "0 items" into
+    /// an actionable hint (`{"data":{"list":...}}` vs `{"books":...}`) without
+    /// having to re-run the request by hand.
+    static func jsonShapeHint(_ body: String) -> String {
+        let trimmed = body.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard trimmed.hasPrefix("{") || trimmed.hasPrefix("["),
+              let data = trimmed.data(using: .utf8),
+              let object = try? JSONSerialization.jsonObject(with: data) else {
+            let head = trimmed.prefix(60).replacingOccurrences(of: "\n", with: " ")
+            return "非 JSON：\(head)"
+        }
+        if let dict = object as? [String: Any] {
+            let keys = dict.keys.sorted().prefix(8).joined(separator: ",")
+            return "{ \(keys) }"
+        }
+        if let array = object as? [Any] {
+            if let first = array.first as? [String: Any] {
+                return "[\(array.count)] item{ \(first.keys.sorted().prefix(8).joined(separator: ",")) }"
+            }
+            return "[\(array.count)]"
+        }
+        return "标量"
+    }
     private func firstRule(_ rule: SourceRule?, fallback: SourceRule? = nil, keys: [String]) -> String? {
         if let rule {
             for key in keys {

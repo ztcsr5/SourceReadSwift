@@ -932,4 +932,39 @@ final class JSONRuleExtractorTests: XCTestCase {
         XCTAssertEqual(JSONRuleExtractor.expandedEmbeddedJSON("[1,2,3]")?.count, 3)
         XCTAssertEqual(JSONRuleExtractor.expandedEmbeddedJSON("{\"name\":\"第一章\"}")?.count, 1)
     }
+
+    // MARK: - Single-field `||` / `&&` operators
+
+    /// 书旗's `ruleSearch.name` is `$.bookName||$.title`: the payload only has
+    /// `title`.  Legado's AnalyzeRule.getString splits on the first top-level
+    /// `||` and keeps the first non-empty value.
+    func testStringRuleFallsBackOnDoublePipe() throws {
+        let item: [String: Any] = ["title": "斗破苍穹", "bid": 9389510]
+        let extractor = JSONRuleExtractor()
+        XCTAssertEqual(extractor.string(from: item, rule: "$.bookName||$.title"), "斗破苍穹")
+        XCTAssertEqual(extractor.string(from: item, rule: "bookName||title"), "斗破苍穹")
+    }
+
+    func testStringRulePrefersFirstNonEmptyBranch() throws {
+        let item: [String: Any] = ["bookName": "首选", "title": "备选"]
+        let extractor = JSONRuleExtractor()
+        XCTAssertEqual(extractor.string(from: item, rule: "$.bookName||$.title"), "首选")
+    }
+
+    /// `&&` concatenates every branch (七猫's `$.score&&$.sub_title`).
+    func testStringRuleConcatenatesOnDoubleAmpersand() throws {
+        let item: [String: Any] = ["score": "9.6", "sub_title": "玄幻"]
+        let extractor = JSONRuleExtractor()
+        XCTAssertEqual(extractor.string(from: item, rule: "$.score&&$.sub_title"), "9.6玄幻")
+    }
+
+    /// An operator inside a JSONPath filter must not be treated as a rule
+    /// separator.
+    func testOperatorInsideFilterIsNotSplit() throws {
+        let item: [String: Any] = ["title": "斗破苍穹", "bid": 9389510]
+        let extractor = JSONRuleExtractor()
+        let value = extractor.string(from: item, rule: "$.title")
+        XCTAssertEqual(value, "斗破苍穹")
+    }
+
 }
