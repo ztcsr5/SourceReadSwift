@@ -230,4 +230,21 @@ final class SourceURLDirectiveTests: XCTestCase {
         XCTAssertEqual(directive.method, .post)
         XCTAssertEqual(String(data: directive.body ?? Data(), encoding: .utf8), "a=1")
     }
+
+    // `URL(string:)` percent-encodes the braces of an inline option object, so a
+    // resolved `tocUrl` template arrives as `...,%7B%22body%22...`.  Dropping the
+    // options turned the POST into a GET on `/catalog,%7B...` (爱下电子, 30s
+    // WebView timeout in the 1.0.93 LAN run).
+    func testParsePercentEncodedJSONOptionsAfterURLNormalization() {
+        let directive = SourceURLDirectiveParser().parse(
+            "https://apiv2hans.aixdzs.com/catalog,%7B%0A%20%20%22body%22:%20%27%7B%22bookId%22:%22383523%22%7D%27,%0A%20%20%22method%22:%20%22POST%22%0A%7D"
+        )
+
+        XCTAssertEqual(directive.urlText, "https://apiv2hans.aixdzs.com/catalog")
+        XCTAssertEqual(directive.method, .post)
+        XCTAssertEqual(
+            String(data: directive.body ?? Data(), encoding: .utf8),
+            "{\"bookId\":\"383523\"}"
+        )
+    }
 }

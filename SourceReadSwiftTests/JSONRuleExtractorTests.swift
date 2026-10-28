@@ -910,4 +910,26 @@ final class JSONRuleExtractorTests: XCTestCase {
         let value = JSONRuleExtractor().value(from: object, path: #"@js:result.name"#) as? String
         XCTAssertEqual(value, "覆盖模式")
     }
+
+    // Aggregator/番茄-style APIs ship the chapter list as an escaped JSON
+    // string inside the payload.  Legado deserialises that second layer; without
+    // it the toc rule reports "0 项" while the body already carries thousands of
+    // chapters (木里番茄 65,166 chars / 魔丸 6,109 chars in the 1.0.93 LAN run).
+    func testListExpandsEmbeddedJSONStringChapters() throws {
+        let chapters = "[{\"name\":\"第一章 陨落的天才\",\"url\":\"/1.html\"},{\"name\":\"第二章 斗气大陆\",\"url\":\"/2.html\"}]"
+        let object: [String: Any] = ["data": [chapters]]
+        let extractor = JSONRuleExtractor()
+        let list = extractor.list(from: object, rule: "$.data[*]")
+
+        XCTAssertEqual(list.count, 2)
+        XCTAssertEqual(extractor.string(from: list[0], rule: "name", fallbackKeys: []), "第一章 陨落的天才")
+        XCTAssertEqual(extractor.string(from: list[1], rule: "url", fallbackKeys: []), "/2.html")
+    }
+
+    func testEmbeddedJSONHelperIgnoresPlainChapterText() throws {
+        XCTAssertNil(JSONRuleExtractor.expandedEmbeddedJSON("第一章 陨落的天才"))
+        XCTAssertNil(JSONRuleExtractor.expandedEmbeddedJSON(""))
+        XCTAssertEqual(JSONRuleExtractor.expandedEmbeddedJSON("[1,2,3]")?.count, 3)
+        XCTAssertEqual(JSONRuleExtractor.expandedEmbeddedJSON("{\"name\":\"第一章\"}")?.count, 1)
+    }
 }

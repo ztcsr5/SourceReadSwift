@@ -224,15 +224,26 @@ struct DynamicURLResolver {
                         // `result` equal to the rule text and silently builds a
                         // broken URL such as `data={"gid":gid}`.
                         var resolvedLeft: Any?
-                        if let target = Self.jsonTarget(from: variables),
-                           let value = JSONRuleExtractor(executionContext: context)
-                            .value(from: target, path: left, variables: variables) {
-                            resolvedLeft = value
-                        } else if let html = (variables["html"] as? String) ?? (variables["body"] as? String),
-                                  let baseURLObj = URL(string: baseUrl),
-                                  let document = try? SwiftSoup.parse(html),
-                                  let value = try? HtmlRuleExtractor(executionContext: context)
-                                    .value(from: document, rule: left, fallback: nil, baseUrl: baseURLObj, variables: variables) {
+                        if let target = Self.jsonTarget(from: variables) {
+                            let extractor = JSONRuleExtractor(executionContext: context)
+                            if let value = extractor.value(from: target, path: left, variables: variables) {
+                                resolvedLeft = value
+                            } else if !left.contains("$"),
+                                      let value = extractor.value(from: target, path: "$." + left, variables: variables) {
+                                // Legado treats a bare left side (`gid@js:...`)
+                                // as a field of the current document.  Our path
+                                // parser needs the `$.` prefix, otherwise the
+                                // literal rule text ends up inside the URL
+                                // (`data={"gid":gid}`) and the API answers 0 bytes.
+                                resolvedLeft = value
+                            }
+                        }
+                        if resolvedLeft == nil,
+                           let html = (variables["html"] as? String) ?? (variables["body"] as? String),
+                           let baseURLObj = URL(string: baseUrl),
+                           let document = try? SwiftSoup.parse(html),
+                           let value = try? HtmlRuleExtractor(executionContext: context)
+                            .value(from: document, rule: left, fallback: nil, baseUrl: baseURLObj, variables: variables) {
                             resolvedLeft = value
                         }
                         chainedResult = resolvedLeft ?? left

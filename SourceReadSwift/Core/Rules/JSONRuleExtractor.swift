@@ -1452,9 +1452,29 @@ struct JSONRuleExtractor {
     private func appendFlattened(_ value: Any, to output: inout [Any]) {
         if let array = value as? [Any] {
             array.forEach { appendFlattened($0, to: &output) }
+        } else if let text = value as? String,
+                  let expanded = Self.expandedEmbeddedJSON(text) {
+            expanded.forEach { appendFlattened($0, to: &output) }
         } else {
             output.append(value)
         }
+    }
+
+    /// Aggregator and 番茄-style APIs return the chapter list as an escaped JSON
+    /// string (`"chapter_list": "[{\"name\":...}]"`).  Legado deserialises that
+    /// second layer; without it the rule reports `0 项` even though the upstream
+    /// body already carries tens of kilobytes of chapters.
+    static func expandedEmbeddedJSON(_ text: String) -> [Any]? {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let first = trimmed.first, first == "[" || first == "{" else { return nil }
+        guard trimmed.utf8.count >= 2, trimmed.utf8.count <= 8 * 1024 * 1024 else { return nil }
+        guard let data = trimmed.data(using: .utf8),
+              let object = try? JSONSerialization.jsonObject(with: data, options: [.fragmentsAllowed]) else {
+            return nil
+        }
+        if let array = object as? [Any] { return array }
+        if let dict = object as? [String: Any] { return [dict] }
+        return nil
     }
 
     // MARK: - Filters

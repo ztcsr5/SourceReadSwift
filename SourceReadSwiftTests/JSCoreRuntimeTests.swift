@@ -684,4 +684,36 @@ final class JSCoreRuntimeTests: XCTestCase {
         XCTAssertEqual(try XCTUnwrap(runtime.evaluate("java.qread()").get()), "0")
         XCTAssertEqual(try XCTUnwrap(runtime.evaluate("java.getSource() === source ? 'ok' : 'bad'").get()), "ok")
     }
+
+    // `java.get(key)` reads the Legado `@put` store, not the JS globals.  When
+    // bridge objects were bound into that store, `java.get('source')` returned
+    // Swift's struct description and STV interpolated it into the toc URL
+    // (`&h=BookSource(bookSourceName: ...)`), so the request never resolved.
+    func testRuleStoreDoesNotCaptureBridgeObjects() throws {
+        let source = BookSource(
+            bookSourceName: "STV - Sáng Tác Việt",
+            bookSourceUrl: "STV聚合"
+        )
+        let result = JSCoreRuntime().evaluate(
+            "String(java.get('source'))",
+            variables: ["source": source]
+        )
+        guard case .success(let value) = result else {
+            return XCTFail("expected success: \(result)")
+        }
+        XCTAssertEqual(value, "")
+        XCTAssertFalse(value.contains("BookSource("))
+    }
+
+    func testRuleStoreKeepsPutValuesAcrossBridgeBinding() throws {
+        let source = BookSource(bookSourceName: "STV", bookSourceUrl: "STV聚合")
+        let result = JSCoreRuntime().evaluate(
+            "java.put('source', 'uukanshu'); String(java.get('source'))",
+            variables: ["source": source]
+        )
+        guard case .success(let value) = result else {
+            return XCTFail("expected success: \(result)")
+        }
+        XCTAssertEqual(value, "uukanshu")
+    }
 }

@@ -212,11 +212,26 @@ struct SourceURLDirectiveParser {
         if lower.hasPrefix("@js:") || lower.hasPrefix("<js>") || lower.hasPrefix("js:") {
             return (original, nil)
         }
-        guard let jsonStartRange = text.range(of: #",\s*\{"#, options: .regularExpression) else {
+        var encodedTail = false
+        var jsonStartRange = text.range(of: #",\s*\{"#, options: .regularExpression)
+        if jsonStartRange == nil,
+           let encoded = text.range(of: #",\s*%7B"#, options: [.regularExpression, .caseInsensitive]) {
+            // `URL(string:)` percent-encodes the braces of an inline option
+            // object, so `path,{"method":"POST"}` reaches us as
+            // `path,%7B%22method%22...`.  Without decoding we split nothing,
+            // the POST options are dropped, and the request goes out as a GET
+            // on a bogus path (`/catalog,%7B%0A%20%20%22body%22...`).
+            jsonStartRange = encoded
+            encodedTail = true
+        }
+        guard let jsonStartRange else {
             return (original, nil)
         }
         let url = String(text[..<jsonStartRange.lowerBound]).trimmingCharacters(in: .whitespacesAndNewlines)
-        let rawOptions = String(text[jsonStartRange.lowerBound...].dropFirst()).trimmingCharacters(in: .whitespacesAndNewlines)
+        var rawOptions = String(text[jsonStartRange.lowerBound...].dropFirst()).trimmingCharacters(in: .whitespacesAndNewlines)
+        if encodedTail, let decoded = rawOptions.removingPercentEncoding {
+            rawOptions = decoded
+        }
 
         // Sources write `{...};`, `{...}` + backtick or `{...}` followed by a
         // whole `@js:` script. Feeding that tail to JSONSerialization failed
@@ -226,6 +241,10 @@ struct SourceURLDirectiveParser {
             return (url, nil)
         }
         if let options = parseOptionsObject(objectText) {
+            return (url, options)
+        }
+        if encodedTail, let decoded = objectText.removingPercentEncoding,
+           let options = parseOptionsObject(decoded) {
             return (url, options)
         }
         return (url, nil)

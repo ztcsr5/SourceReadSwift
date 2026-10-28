@@ -50,6 +50,22 @@ final class JSCoreRuntime {
         installBaseBridge()
     }
 
+    /// Values that may live in the Legado `@put` store.  Legado stores text
+    /// only; anything admitted here must stringify back to what the source
+    /// wrote.  Struct/bridge values are excluded on purpose (see `evaluate`).
+    static func isRuleStoreValue(_ value: Any) -> Bool {
+        switch value {
+        case is String, is NSNumber, is Bool, is Double, is Int, is Float:
+            return true
+        case let dict as [String: Any]:
+            return dict.values.allSatisfy { isRuleStoreValue($0) }
+        case let array as [Any]:
+            return array.allSatisfy { isRuleStoreValue($0) }
+        default:
+            return false
+        }
+    }
+
     private func makeJSCompatibleValue(_ value: Any, baseUrl: String) -> Any {
         if let source = value as? BookSource {
             var map = source.raw
@@ -144,7 +160,13 @@ final class JSCoreRuntime {
                 effectiveVariables["src"] = htmlVal
             }
         }
-        executionContext.bind(effectiveVariables)
+        // Legado's `java.get(key)` reads only the `@put` store.  Binding the
+        // bridge objects (`source`, `book`, `chapter`, DOM nodes) into that
+        // store makes `java.get('source')` return Swift's default struct
+        // description - `BookSource(bookSourceName: ...)` - and sources then
+        // interpolate that into URLs (STV builds `&h=BookSource(...)` and the
+        // toc request 404s).  Bridge objects stay JS globals only.
+        executionContext.bind(effectiveVariables.filter { Self.isRuleStoreValue($0.value) })
         let normalization = LegadoJavaScriptCompatibility.normalize(script)
         let executableScript = normalization.normalizedScript
         context.exception = nil
