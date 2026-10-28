@@ -49,12 +49,27 @@ final class SourceTocCorpusProbeTests: XCTestCase {
             var links: [String] = []
             var emptyNames = 0
             var emptyURLs = 0
+            // A Legado source that omits chapterName/chapterUrl still renders
+            // rows: the engine falls back to the row's text and href, exactly
+            // like makeChapter does. Mirror that here, otherwise every source
+            // with default rules looks like a field-extraction failure.
+            let rawNameRule = (entry.chapterNameRule ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+            let rawURLRule = (entry.chapterUrlRule ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
             for chapter in chapters.prefix(5) {
-                let title = (try? extractor.value(from: chapter, rule: entry.chapterNameRule, fallback: nil, baseUrl: base)) ?? ""
-                let link = (try? extractor.value(from: chapter, rule: entry.chapterUrlRule, fallback: nil, baseUrl: base)) ?? ""
+                let title = (try? extractor.value(
+                    from: chapter,
+                    rule: rawNameRule.isEmpty ? nil : rawNameRule,
+                    fallback: "a@text",
+                    baseUrl: base
+                )) ?? ""
+                let link = (try? extractor.value(
+                    from: chapter,
+                    rule: rawURLRule.isEmpty ? nil : rawURLRule,
+                    fallback: "a@href",
+                    baseUrl: base
+                )) ?? ""
                 if title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { emptyNames += 1 }
-                if link.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
-                   !(entry.chapterUrlRule ?? "").isEmpty { emptyURLs += 1 }
+                if link.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { emptyURLs += 1 }
                 if names.count < 3 { names.append(String(title.prefix(30))) }
                 if links.count < 3 { links.append(String(link.prefix(60))) }
             }
