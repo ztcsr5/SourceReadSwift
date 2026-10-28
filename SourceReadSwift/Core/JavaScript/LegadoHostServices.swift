@@ -594,7 +594,7 @@ final class LegadoHostServices {
                         executionContext?.log("AES/GCM requires an IV of at least 8 bytes")
                         return []
                     }
-                    let aes = try AES(key: keyBytes, blockMode: GCM(iv: ivBytes), padding: .noPadding)
+                    let aes = try AES(key: keyBytes, blockMode: GCM(iv: ivBytes, mode: .combined), padding: .noPadding)
                     output = try isDecrypt ? aes.decrypt(payload) : aes.encrypt(payload)
                 } else {
                     ivBytes = Array((ivBytes + Array(repeating: 0, count: blockSize)).prefix(blockSize))

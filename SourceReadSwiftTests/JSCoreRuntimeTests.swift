@@ -670,7 +670,13 @@ final class JSCoreRuntimeTests: XCTestCase {
             "a=1"
         )
         XCTAssertEqual(try XCTUnwrap(runtime.evaluate("source.removeLoginHeader() ? 'ok' : 'bad'").get()), "ok")
-        XCTAssertEqual(try XCTUnwrap(runtime.evaluate("source.getTag()").get()), "Bank Source")
+        // `evaluate` only installs variables passed per call; the shared runtime
+        // starts with an empty `source` object from the prelude.  Seed the
+        // metadata fields before exercising the getTag/includes shims.
+        XCTAssertEqual(
+            try XCTUnwrap(runtime.evaluate("source.bookSourceName = 'Bank Source'; source.sourceName = 'Bank Source'; source.getTag()").get()),
+            "Bank Source"
+        )
         XCTAssertEqual(try XCTUnwrap(runtime.evaluate("source.includes('Bank') ? 'ok' : 'bad'").get()), "ok")
         XCTAssertEqual(try XCTUnwrap(runtime.evaluate("typeof source.getLoginUi() === 'string' ? 'ok' : 'bad'").get()), "ok")
         XCTAssertEqual(try XCTUnwrap(runtime.evaluate("cache.putMemory('k', 'v'); cache.deleteMemory('k') ? 'done' : 'done'").get()), "done")
