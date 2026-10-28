@@ -4,8 +4,15 @@ import SwiftSoup
 struct SearchResultParser {
     private let htmlExtractor: HtmlRuleExtractor
     private let jsonExtractor: JSONRuleExtractor
+    private let executionContext: RuleExecutionContext
+    /// Called after a result row's `bookUrl` rule runs, carrying the variables
+    /// that rule wrote.  Detail/TOC/content replay the delta so an aggregator
+    /// that evaluates `java.put('id', ...)` for every row does not leave the
+    /// last row's id behind for the row the user actually tapped.
+    var onBookVariables: ((String, [String: String]) -> Void)?
 
     init(executionContext: RuleExecutionContext = RuleExecutionContext()) {
+        self.executionContext = executionContext
         self.htmlExtractor = HtmlRuleExtractor(executionContext: executionContext)
         self.jsonExtractor = JSONRuleExtractor(executionContext: executionContext)
     }
@@ -174,6 +181,7 @@ struct SearchResultParser {
                 }
                 let name = rawName?.components(separatedBy: .newlines).first(where: { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty })?.trimmingCharacters(in: .whitespacesAndNewlines) ?? rawName
 
+                let variablesBeforeBookURL = executionContext.persistentSnapshot()
                 var rawBookUrl = (try? htmlExtractor.value(from: element, rule: firstRule(rule, fallback: source.ruleSearch, keys: ["bookUrl", "url"]), fallback: nil, baseUrl: response.url, variables: variables))?.nilIfEmpty
                 if rawBookUrl == nil {
                     rawBookUrl = (try? htmlExtractor.value(from: element, rule: "a.track@href", fallback: nil, baseUrl: response.url, variables: variables))?.nilIfEmpty
@@ -186,6 +194,11 @@ struct SearchResultParser {
                 guard let name, !name.isEmpty, let bookUrl, !bookUrl.isEmpty, !bookUrl.lowercased().hasPrefix("javascript:"), bookUrl != "#" else { continue }
                 let absBookUrl = htmlExtractor.absolutize(bookUrl, base: response.url)
                 guard !absBookUrl.isEmpty else { continue }
+                let variablesAfterBookURL = executionContext.persistentSnapshot()
+                let bookVariableDelta = variablesAfterBookURL.filter { variablesBeforeBookURL[$0.key] != $0.value }
+                if !bookVariableDelta.isEmpty {
+                    onBookVariables?(absBookUrl, bookVariableDelta)
+                }
 
                 var author = (try? htmlExtractor.value(from: element, rule: firstRule(rule, fallback: source.ruleSearch, keys: ["author"]), fallback: nil, baseUrl: response.url, variables: variables))?.nilIfEmpty
                 if author == nil {
@@ -297,12 +310,15 @@ struct SearchResultParser {
                 fallbackKeys: ["name", "bookName", "title", "book_name"],
                 variables: variables
             )
+            let variablesBeforeBookURL = executionContext.persistentSnapshot()
             let url = extractor.string(
                 from: item,
                 rule: firstRule(rule, fallback: source.ruleSearch, keys: ["bookUrl", "url"]),
                 fallbackKeys: ["bookUrl", "url", "link", "book_url", "id"],
                 variables: variables
             )
+            let variablesAfterBookURL = executionContext.persistentSnapshot()
+            let bookVariableDelta = variablesAfterBookURL.filter { variablesBeforeBookURL[$0.key] != $0.value }
             guard let name, let url, !url.isEmpty, !url.lowercased().hasPrefix("javascript:"), url != "#" else { return nil }
             let absBookUrl: String
             let isBareID = !url.contains("/") && !url.contains(".") && !url.contains("?") && !url.contains("=")
@@ -324,6 +340,9 @@ struct SearchResultParser {
                 absBookUrl = htmlExtractor.absolutize(url, base: response.url)
             }
             guard !absBookUrl.isEmpty else { return nil }
+            if !bookVariableDelta.isEmpty {
+                onBookVariables?(absBookUrl, bookVariableDelta)
+            }
             return SearchBook(
                 name: name,
                 author: extractor.string(

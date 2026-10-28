@@ -106,6 +106,10 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
     private let searchURLResolver = SearchURLResolver()
     private let fallbackLock = NSLock()
     private var _allowWebViewFallback: Bool = true
+    private let bookStateLock = NSLock()
+    private var bookVariableDeltas: [String: [String: String]] = [:]
+    private var bookVariableOrder: [String] = []
+    static let maximumBookVariableEntries = 400
 
     var allowWebViewFallback: Bool {
         get {
@@ -130,6 +134,41 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
         self.network = network ?? URLSessionSourceNetworkClient(cookieStore: cookieStore)
         self.diagnostics = diagnostics
         self.purifyRules = purifyRules
+    }
+
+    // MARK: - Per-book rule variables
+
+    private func bookVariableKey(source: BookSource, bookURL: String) -> String {
+        source.bookSourceUrl + "\u{1F}" + bookURL
+    }
+
+    /// Stores the variables written while one search row's `bookUrl` rule ran.
+    /// Aggregators evaluate that rule for every row and reuse keys such as
+    /// `id`, so without per-row capture the last row wins.
+    private func storeBookVariables(source: BookSource, bookURL: String, delta: [String: String]) {
+        guard !delta.isEmpty, !bookURL.isEmpty else { return }
+        let key = bookVariableKey(source: source, bookURL: bookURL)
+        bookStateLock.lock()
+        bookVariableDeltas[key] = delta
+        bookVariableOrder.removeAll { $0 == key }
+        bookVariableOrder.append(key)
+        while bookVariableOrder.count > Self.maximumBookVariableEntries {
+            let evicted = bookVariableOrder.removeFirst()
+            bookVariableDeltas.removeValue(forKey: evicted)
+        }
+        bookStateLock.unlock()
+    }
+
+    private func restoreBookVariables(source: BookSource, bookURL: String, into state: RulePersistentState) {
+        guard !bookURL.isEmpty else { return }
+        let key = bookVariableKey(source: source, bookURL: bookURL)
+        bookStateLock.lock()
+        let delta = bookVariableDeltas[key]
+        bookStateLock.unlock()
+        guard let delta else { return }
+        for (name, value) in delta {
+            state.put(value, for: name)
+        }
     }
 
     func searchBooks(source: BookSource, keyword: String, page: Int) async -> Result<[SearchBook], SourceEngineError> {
@@ -193,7 +232,11 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
                 await emitFailure(error, stage: "search.empty", source: source, details: ["url": transformedResponse.url.absoluteString])
                 return .failure(error)
             }
-            let parsed = SearchResultParser(executionContext: executionContext).parse(source: source, response: transformedResponse, keyword: keyword)
+            var parser = SearchResultParser(executionContext: executionContext)
+            parser.onBookVariables = { [weak self] bookURL, delta in
+                self?.storeBookVariables(source: source, bookURL: bookURL, delta: delta)
+            }
+            let parsed = parser.parse(source: source, response: transformedResponse, keyword: keyword)
             if case .failure(let error) = parsed {
                 await emitFailure(error, stage: "search.parse", source: source, details: ["url": transformedResponse.url.absoluteString])
             }
@@ -262,7 +305,11 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
                 await emitFailure(error, stage: "explore.empty", source: source, details: ["url": transformedResponse.url.absoluteString])
                 return .failure(error)
             }
-            let parsed = SearchResultParser(executionContext: executionContext).parse(
+            var parser = SearchResultParser(executionContext: executionContext)
+            parser.onBookVariables = { [weak self] bookURL, delta in
+                self?.storeBookVariables(source: source, bookURL: bookURL, delta: delta)
+            }
+            let parsed = parser.parse(
                 source: source,
                 response: transformedResponse,
                 ruleOverride: source.ruleExplore
@@ -279,6 +326,7 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
 
     func getBookDetail(source: BookSource, book: SearchBook) async -> Result<BookDetail, SourceEngineError> {
         let executionState = persistentState(for: source)
+        restoreBookVariables(source: source, bookURL: book.bookUrl, into: executionState)
         let executionContext = RuleExecutionContext(persistentState: executionState, source: source, logHandler: { [diagnostics] message in
             Task { await diagnostics.emit(.init(level: .info, stage: "detail.js", sourceName: source.bookSourceName, message: message)) }
         })
@@ -338,6 +386,7 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
 
     func getChapterList(source: BookSource, book: BookDetail, maxPages: Int) async -> Result<[BookChapter], SourceEngineError> {
         let executionState = persistentState(for: source)
+        restoreBookVariables(source: source, bookURL: book.bookUrl, into: executionState)
         let executionContext = RuleExecutionContext(persistentState: executionState, source: source, logHandler: { [diagnostics] message in
             Task { await diagnostics.emit(.init(level: .info, stage: "toc.js", sourceName: source.bookSourceName, message: message)) }
         })
@@ -461,6 +510,7 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
 
     func getContent(source: BookSource, chapter: BookChapter, maxPages: Int) async -> Result<ChapterContent, SourceEngineError> {
         let executionState = persistentState(for: source)
+        restoreBookVariables(source: source, bookURL: chapter.bookUrl, into: executionState)
         let executionContext = RuleExecutionContext(persistentState: executionState, source: source, logHandler: { [diagnostics] message in
             Task { await diagnostics.emit(.init(level: .info, stage: "content.js", sourceName: source.bookSourceName, message: message)) }
         })

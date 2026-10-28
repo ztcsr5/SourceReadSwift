@@ -217,7 +217,23 @@ struct DynamicURLResolver {
                             chainedResult = ""
                         }
                     } else {
-                        chainedResult = left
+                        // Legado evaluates a bare left-hand rule (for example
+                        // `gid@js:...`) against the current document before
+                        // running the script.  Treating it as a literal leaves
+                        // `result` equal to the rule text and silently builds a
+                        // broken URL such as `data={"gid":gid}`.
+                        var resolvedLeft: Any?
+                        if let target = Self.jsonTarget(from: variables),
+                           let value = JSONRuleExtractor(executionContext: context)
+                            .value(from: target, path: left, variables: variables) {
+                            resolvedLeft = value
+                        } else if let html = variables["html"] as? String ?? variables["body"] as? String,
+                                  let baseURLObj = URL(string: baseUrl),
+                                  let value = try? HtmlRuleExtractor(executionContext: context)
+                                    .value(from: html, rule: left, fallback: nil, baseUrl: baseURLObj, variables: variables) {
+                            resolvedLeft = value
+                        }
+                        chainedResult = resolvedLeft ?? left
                     }
                 }
                 jsVariables["result"] = chainedResult

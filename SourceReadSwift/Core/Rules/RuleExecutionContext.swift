@@ -208,6 +208,15 @@ final class RuleExecutionContext: @unchecked Sendable {
 
     func persistentSnapshot() -> [String: String] { persistentState.snapshot() }
 
+    /// Merges a per-book variable snapshot captured while the search result
+    /// was built.  Values written later (cookies, login tokens) stay intact
+    /// because only the keys present in the snapshot are replaced.
+    func mergePersistent(_ snapshot: [String: String]) {
+        for (key, value) in snapshot {
+            persistentState.put(value, for: key)
+        }
+    }
+
     /// Import response cookies into the same state used by `java.put/get`.
     /// This mirrors Android's source-scoped cookie jar and deliberately keeps
     /// only cookie names/values in diagnostics; response bodies and secrets are

@@ -227,7 +227,12 @@ struct JSONRuleExtractor {
                 // `@get:{key}` inside a JS rule is a template placeholder,
                 // not JavaScript.  Resolve it when the segment runs, after
                 // any earlier normal segment has stored its `@put` values.
-                let resolved = replaceGetDirectives(in: code)
+                // Legado also expands `{{$.id}}` style templates before the
+                // script is parsed; sources such as the Qimao API build their
+                // request objects with `{ id: {{$.id}} }`, which is invalid
+                // JavaScript until the placeholder is substituted.
+                let interpolatedCode = interpolateTemplate(code, object: current, variables: variables)
+                let resolved = replaceGetDirectives(in: interpolatedCode)
                 guard let next = evaluateRawJS(script: resolved, object: current, extraVariables: variables) else {
                     return nil
                 }
@@ -2154,7 +2159,12 @@ struct JSONRuleExtractor {
                 // `@get:{key}` inside a JS rule is a template placeholder,
                 // not JavaScript.  Resolve it when the segment runs, after
                 // any earlier normal segment has stored its `@put` values.
-                let resolved = replaceGetDirectives(in: code)
+                // Legado also expands `{{$.id}}` style templates before the
+                // script is parsed; sources such as the Qimao API build their
+                // request objects with `{ id: {{$.id}} }`, which is invalid
+                // JavaScript until the placeholder is substituted.
+                let interpolatedCode = interpolateTemplate(code, object: current, variables: variables)
+                let resolved = replaceGetDirectives(in: interpolatedCode)
                 guard let next = evaluateRawJS(script: resolved, object: current, extraVariables: variables) else {
                     return nil
                 }
@@ -2185,6 +2195,33 @@ struct JSONRuleExtractor {
         }
         return stringify(value)
     }
+    /// Interpolates `{{...}}` against an arbitrary JSON node.  Dictionary
+    /// nodes reuse the item-aware implementation; other nodes resolve each
+    /// placeholder through the normal rule pipeline.
+    private func interpolateTemplate(_ template: String, object: Any, variables: [String: Any]) -> String {
+        if let item = object as? [String: Any] {
+            return interpolateTemplate(template, item: item, variables: variables)
+        }
+        guard template.contains("{{"), template.contains("}}"),
+              let regex = try? NSRegularExpression(pattern: #"\{\{\s*([^{}]+)\s*\}\}"#) else {
+            return template
+        }
+        let mText = NSMutableString(string: template)
+        let matches = regex.matches(in: template, range: NSRange(location: 0, length: mText.length))
+        for match in matches.reversed() {
+            guard match.numberOfRanges > 1 else { continue }
+            let key = mText.substring(with: match.range(at: 1)).trimmingCharacters(in: .whitespacesAndNewlines)
+            var value = ""
+            if let resolved = value(from: object, path: key, variables: variables) {
+                value = stringifyJSResult(resolved)
+            } else if let variable = variables[key] {
+                value = stringifyJSResult(variable)
+            }
+            mText.replaceCharacters(in: match.range(at: 0), with: value)
+        }
+        return mText as String
+    }
+
     private func interpolateTemplate(_ template: String, item: [String: Any], variables: [String: Any]) -> String {
         guard let regex = try? NSRegularExpression(pattern: #"\{\{\s*([^{}]+)\s*\}\}"#) else { return template }
         let mText = NSMutableString(string: template)
