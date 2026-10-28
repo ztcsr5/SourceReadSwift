@@ -39,7 +39,7 @@ final class HtmlRuleLegacyRegexTests: XCTestCase {
         XCTAssertEqual(rows.count, 1)
         let href = try extractor.value(
             from: rows[0],
-            rule: ##"##<a\s*href="([^"]+)"##$1###"##,
+            rule: "##<a\\s*href=\"([^\"]+)\"##$1###",
             fallback: nil,
             baseUrl: base
         )
