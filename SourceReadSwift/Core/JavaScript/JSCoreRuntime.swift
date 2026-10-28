@@ -270,6 +270,19 @@ final class JSCoreRuntime {
                     source.getName = function() { return source.bookSourceName || source.sourceName || ''; };
                     source.getUrl = function() { return source.bookSourceUrl || source.sourceUrl || source.key || ''; };
                     source.getSourceUrl = source.getUrl;
+          // 知秋/神魔系 jsLib 把 `source` 当 Map 用：`source.get(k)` /
+          // `source.put(k, v)` / `source.remove(k)`。Legado 的 BookSource 暴露
+          // 同名方法；没有别名时这些源在 searchUrl 阶段就抛
+          // "source.get is not a function"，搜索链路直接中断。
+          source.get = function(key) {
+            return arguments.length > 0 ? source.getVariable(key) : source.getVariable();
+          };
+          source.put = function(key, value) {
+            return source.setVariable(key, value == null ? '' : value);
+          };
+          source.remove = function(key) {
+            return source.setVariable(String(key == null ? '' : key), '');
+          };
                     source.getVariableMap = function() {
                         var parsed = {};
                         try { parsed = JSON.parse(source.getVariable() || '{}'); } catch (_) {}
@@ -2684,6 +2697,19 @@ final class JSCoreRuntime {
           source.getName = function() { return source.bookSourceName || source.sourceName || ''; };
           source.getUrl = function() { return source.bookSourceUrl || source.sourceUrl || source.key || ''; };
           source.getSourceUrl = source.getUrl;
+          // 知秋/神魔系 jsLib 把 `source` 当 Map 用：`source.get(k)` /
+          // `source.put(k, v)` / `source.remove(k)`。Legado 的 BookSource 暴露
+          // 同名方法；没有别名时这些源在 searchUrl 阶段就抛
+          // "source.get is not a function"，搜索链路直接中断。
+          source.get = function(key) {
+            return arguments.length > 0 ? source.getVariable(key) : source.getVariable();
+          };
+          source.put = function(key, value) {
+            return source.setVariable(key, value == null ? '' : value);
+          };
+          source.remove = function(key) {
+            return source.setVariable(String(key == null ? '' : key), '');
+          };
           source.getVariableMap = function() {
             var parsed = {};
             try { parsed = JSON.parse(source.getVariable() || '{}'); } catch (_) {}

@@ -566,4 +566,21 @@ final class JSCoreRuntimeTests: XCTestCase {
         XCTAssertEqual(runtime.evaluate("java.sleep(1); 'done'"), "done")
     }
 
+
+    /// 知秋/神魔系 jsLib 把 `source` 当 Map 用。缺 `get/put/remove` 别名时，
+    /// 真实私人源在 searchUrl 阶段抛 "source.get is not a function"。
+    func testSourceMapAliasesForZhiqiuLibraries() throws {
+        let source = BookSource(
+            bookSourceName: "Alias Source",
+            bookSourceUrl: "https://alias.example.com"
+        )
+        let runtime = RuleExecutionContext(source: source).jsRuntime(ajaxHandler: { _ in "" })
+        XCTAssertEqual(
+            runtime.evaluate("source.put('qd_base', 'https://a.example.com'); source.get('qd_base')"),
+            "https://a.example.com"
+        )
+        XCTAssertEqual(runtime.evaluate("source.get('missing') === '' ? 'ok' : 'bad'"), "ok")
+        XCTAssertEqual(runtime.evaluate("source.remove('qd_base'); source.get('qd_base')"), "")
+    }
+
 }
