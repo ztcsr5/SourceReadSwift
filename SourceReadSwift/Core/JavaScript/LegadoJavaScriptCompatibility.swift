@@ -64,11 +64,20 @@ enum LegadoJavaScriptCompatibility {
     static func normalizeRule(_ script: String) -> LegadoJavaScriptNormalization {
         let base = normalize(script)
         var features = Set(base.features)
-        let rewritten = rewriteJavaStringLengthCalls(
-            in: base.normalizedScript,
-            features: &features,
-            skipHostFileReceivers: true
-        )
+        // The `.length()` rewrite exists for Java strings returned by
+        // `java.ajax`.  Scripts that instantiate Java builders or reach into
+        // `Packages.java` call real methods (`sb.length()`), so rewriting
+        // those would turn a method call into a property read and produce
+        // `undefined`.  Keep such scripts untouched.
+        let usesJavaObjects = ["StringBuilder", "StringBuffer", "Packages.java"]
+            .contains { base.normalizedScript.contains($0) }
+        let rewritten = usesJavaObjects
+            ? base.normalizedScript
+            : rewriteJavaStringLengthCalls(
+                in: base.normalizedScript,
+                features: &features,
+                skipHostFileReceivers: true
+            )
         return LegadoJavaScriptNormalization(
             originalScript: base.originalScript,
             normalizedScript: rewritten,
