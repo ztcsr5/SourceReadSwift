@@ -1,6 +1,6 @@
 # 书源 URL 层对齐（1.0.85）
 
-探针：`SourceReadSwiftTests/SourceSearchURLProbeTests`，997 条 searchUrl，真实 `SearchURLResolver` 解析 page 1 / page 2。
+探针：`SourceReadSwiftTests/SourceSearchURLProbeTests`，997 条书源、994 条带 `searchUrl`，真实 `SearchURLResolver` 解析 page 1 / page 2。
 
 ## 结果
 
@@ -8,13 +8,15 @@
 |---|---|---|---|
 | 1.0.84 | `5f89ed8` | 16 | 首轮基线 |
 | 1.0.85 | `7bc6034` | 2 | 修复 14 条 |
+| 1.0.85 | `600ebe8` | 1 | 平衡扫描修复 163，只剩 413 |
 
-剩余 2 条：
+剩余 1 条：
 
 | id | 源 | 现象 | 性质 |
 |---|---|---|---|
-| 163 | 抖音小说 | `{{...}}` 多行块未消掉 | `600ebe8` 改成平衡扫描，待探针确认 |
-| 413 | 笔趣小说 | `<"charset": "utf-8">` 被编码 | 源本身写法异常，Legado 同样得到垃圾 URL |
+| 413 | 笔趣小说 | `<"charset": "utf-8">` 被编码 | 源自身写法异常，Legado 同样得到垃圾 URL |
+
+> 注：1.0.85 探针还把 `,{...}` 选项里的 `}}` 误判为 `braceResidue`；1.0.86 已修正分类器，真实缺陷仍为 413。
 
 ## 修复项
 

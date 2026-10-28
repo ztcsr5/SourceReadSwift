@@ -19,11 +19,20 @@ struct RuleEditorValidator {
         for (field, raw) in drafts {
             let value = raw.trimmingCharacters(in: .whitespacesAndNewlines)
             guard !value.isEmpty else { continue }
-            if field == "searchUrl", !value.hasPrefix("@js:"), !value.contains("{{") {
-                guard let url = URL(string: value),
-                      let scheme = url.scheme?.lowercased(),
-                      ["http", "https"].contains(scheme),
-                      !value.contains(where: { $0.isWhitespace }) else {
+            if field == "searchUrl", !value.hasPrefix("@js:"), !value.hasPrefix("<js>"), !value.contains("{{") {
+                // Legado resolves a scheme-less searchUrl against
+                // `bookSourceUrl`; the optional `,{...}` suffix is request
+                // options, not part of the address. Validate the same way the
+                // request layer does instead of requiring an absolute URL.
+                let split = SearchURLResolver.splitURLAndDirectiveSuffix(value)
+                let address = split.urlPart.trimmingCharacters(in: .whitespacesAndNewlines)
+                let resolved = SourceRequestBuilder().resolveURL(address, relativeTo: source.bookSourceUrl)
+                let scheme = resolved.scheme?.lowercased()
+                let invalid = address.isEmpty
+                    || address.contains(where: { $0.isWhitespace })
+                    || resolved.host == "invalid.local"
+                    || !["http", "https"].contains(scheme ?? "")
+                if invalid {
                     issues.append(.init(field: field, message: "搜索 URL 不是有效地址或模板"))
                     continue
                 }

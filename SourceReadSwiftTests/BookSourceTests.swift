@@ -125,6 +125,25 @@ final class BookSourceTests: XCTestCase {
         XCTAssertEqual(request.url.absoluteString, "https://example.com/search?q=test")
     }
 
+    func testRequestBuilderResolvesRelativeSearchURLWithLegadoOptions() {
+        let source = BookSource(
+            bookSourceName: "Relative Post Source",
+            bookSourceUrl: "https://example.com/base/",
+            searchUrl: #"search.php?q=fixed, {"method":"POST","body":"q=fixed"}"#
+        )
+
+        let request = SourceRequestBuilder().buildSearchRequest(
+            source: source,
+            searchUrl: source.searchUrl!,
+            keyword: "test",
+            page: 1
+        )
+
+        XCTAssertEqual(request.url.absoluteString, "https://example.com/base/search.php?q=fixed")
+        XCTAssertEqual(request.method, .post)
+        XCTAssertEqual(String(data: request.body ?? Data(), encoding: .utf8), "q=fixed")
+    }
+
     func testRequestBuilderReadsPostOptionsFromCustomConfig() {
         let source = BookSource(
             bookSourceName: "Post Source",

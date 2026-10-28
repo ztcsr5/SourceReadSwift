@@ -44,4 +44,23 @@ final class RuleEditorValidatorTests: XCTestCase {
         XCTAssertTrue(issues.contains { $0.field == "searchUrl" })
         XCTAssertTrue(issues.contains { $0.field == "ruleSearch" })
     }
+
+    func testAcceptsRelativeSearchURLAndLegadoOptions() {
+        let source = BookSource(
+            bookSourceName: "Fixture",
+            bookSourceUrl: "https://example.com/base/"
+        )
+
+        let relative = RuleEditorValidator().validate(
+            source: source,
+            drafts: ["searchUrl": "/search?q=fixed"]
+        )
+        XCTAssertTrue(relative.isEmpty, "\(relative)")
+
+        let options = RuleEditorValidator().validate(
+            source: source,
+            drafts: ["searchUrl": "search.php?q=fixed, {\n  \"method\": \"POST\",\n  \"body\": \"q=fixed\"\n}"]
+        )
+        XCTAssertTrue(options.isEmpty, "\(options)")
+    }
 }

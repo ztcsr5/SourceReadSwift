@@ -43,7 +43,7 @@ final class SourceSearchURLProbeTests: XCTestCase {
                 case .success(let url):
                     entry[key] = url
                     resolvedCount += 1
-                    if let issue = Self.classify(url) {
+                    if let issue = Self.classify(url, base: source.bookSourceUrl) {
                         entry[key + "Issue"] = issue
                         issueCounts[issue, default: 0] += 1
                         if issueSamples.count < 40 {
@@ -73,28 +73,47 @@ final class SourceSearchURLProbeTests: XCTestCase {
         XCTAssertEqual(report.count, sources.filter { !($0.searchUrl ?? "").isEmpty }.count)
     }
 
-    /// A resolved URL that cannot be handed to `URLSession` as-is. Anything
-    /// left here is a resolver gap, not a site problem.
-    private static func classify(_ url: String) -> String? {
+    /// A resolved URL that cannot be handed to `URLSession` as-is.
+    ///
+    /// Legado allows a scheme-less `searchUrl` (resolved against
+    /// `bookSourceUrl`), and its optional `,{...}` request options are not part
+    /// of the URL. Both are normal, so classify only the URL part after
+    /// splitting the options and resolving it exactly like the request layer.
+    static func classify(_ url: String, base: String) -> String? {
         let trimmed = url.trimmingCharacters(in: .whitespacesAndNewlines)
         if trimmed.isEmpty { return "empty" }
-        if trimmed.contains("{{") || trimmed.contains("}}") { return "braceResidue" }
-        if trimmed.contains("<js>") || trimmed.contains("</js>") { return "jsResidue" }
-        if trimmed.contains("%3C") || trimmed.contains("%3E") { return "encodedAngle" }
-        if trimmed.contains("<") || trimmed.contains(">") { return "angleResidue" }
-        if let hash = trimmed.firstIndex(of: "#") {
-            let tail = trimmed[hash...].dropFirst()
-            if tail.contains("/") || tail.contains("?") { return "fragmentSwallowsPath" }
-        }
-        guard let parsed = URL(string: trimmed), let scheme = parsed.scheme else {
-            // Legado resolves a scheme-less search URL against
-            // `bookSourceUrl`, so `/search?...` and `search.php?...` are
-            // normal, not resolver defects.
-            return trimmed.contains("://") ? "unparseable" : nil
-        }
-        if scheme == "data" { return nil }
+        if trimmed.lowercased().hasPrefix("data:") { return nil }
+
+        let split = SearchURLResolver.splitURLAndDirectiveSuffix(trimmed)
+        let address = split.urlPart.trimmingCharacters(in: .whitespacesAndNewlines)
+        if address.isEmpty { return "emptyAddress" }
+        if address.lowercased().hasPrefix("data:") { return nil }
+        if address.contains("{{") || address.contains("}}") { return "braceResidue" }
+        if address.contains("<js>") || address.contains("</js>") { return "jsResidue" }
+        if address.contains("%3C") || address.contains("%3E") { return "encodedAngle" }
+        if address.contains("<") || address.contains(">") { return "angleResidue" }
+
+        let resolved = SourceRequestBuilder().resolveURL(address, relativeTo: base)
+        if resolved.host == "invalid.local" { return "invalidBase" }
+        guard let scheme = resolved.scheme?.lowercased() else { return "unparseable" }
         guard scheme == "http" || scheme == "https" else { return "nonNetworkScheme" }
-        if (parsed.host ?? "").isEmpty { return "missingHost" }
+        if (resolved.host ?? "").isEmpty { return "missingHost" }
+        if let fragment = resolved.fragment,
+           fragment.contains("/") || fragment.contains("?") {
+            return "fragmentSwallowsPath"
+        }
         return nil
+    }
+
+    func testClassifierAcceptsRelativeURLAndLegadoOptions() {
+        XCTAssertNil(Self.classify("/api/v5/search/words?wd=x", base: "https://api-bc.wtzw.com"))
+        XCTAssertNil(Self.classify("https://api-bc.wtzw.com/api/search?wd=x,{\"headers\":{\"sign\":\"abc\"}}", base: "https://api-bc.wtzw.com"))
+        XCTAssertNil(Self.classify("http://wap.4pan.org#/s.php,{\"method\":\"POST\"}", base: "http://wap.4pan.org#"))
+        XCTAssertNil(Self.classify("search.php?q=x", base: "https://example.com/"))
+    }
+
+    func testClassifierStillFlagsUnresolvedTemplates() {
+        XCTAssertEqual(Self.classify("/search?q={{key}}", base: "https://example.com"), "braceResidue")
+        XCTAssertEqual(Self.classify("/search?q=<js>result</js>", base: "https://example.com"), "jsResidue")
     }
 }
