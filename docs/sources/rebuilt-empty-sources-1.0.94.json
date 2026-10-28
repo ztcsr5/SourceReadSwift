@@ -1,0 +1,42 @@
+[
+ {
+  "bookSourceGroup": "修复·空壳",
+  "bookSourceName": "天域小说",
+  "bookSourceType": 0,
+  "bookSourceUrl": "http://www.tianyu8.org",
+  "customOrder": 64,
+  "enabled": true,
+  "enabledCookieJar": true,
+  "enabledExplore": false,
+  "eventListener": false,
+  "header": "{\"User-Agent\": \"Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1\", \"Accept-Language\": \"zh-CN,zh;q=0.9\"}",
+  "lastUpdateTime": 0,
+  "respondTime": 180000,
+  "searchUrl": "http://www.tianyu8.org/search5b.html?searchkey={{key}}",
+  "ruleSearch": "{\"bookList\": \"@css:#hotcontent .item\", \"name\": \"@css:dt a@text\", \"author\": \"@css:.btm a@text\", \"intro\": \"@css:dd@text\", \"coverUrl\": \"@css:img@data-original||@css:img@src\", \"bookUrl\": \"@css:dt a@href\"}",
+  "ruleBookInfo": "{\"name\": \"@css:h1@text\", \"author\": \"@css:#info a[href^=\\\"/author/\\\"]@text\", \"intro\": \"@css:#intro@text\", \"coverUrl\": \"@css:#fmimg img@data-original||@css:#fmimg img@src\", \"tocUrl\": \"@css:a.chapterlist@href\", \"lastChapter\": \"@css:#info p.hidden-xs a[rel=chapter]@text\"}",
+  "ruleToc": "{\"chapterList\": \"@css:#content_1 a\", \"chapterName\": \"text\", \"chapterUrl\": \"href\", \"nextTocUrl\": \"@css:#list dt a:contains(下一页)@href\"}",
+  "ruleContent": "{\"content\": \"@css:#booktxt@text\", \"nextContentUrl\": \"@css:a[rel=next]@href\"}",
+  "weight": 0
+ },
+ {
+  "bookSourceGroup": "修复·空壳",
+  "bookSourceName": "爱奇电子书",
+  "bookSourceType": 0,
+  "bookSourceUrl": "http://www.xqb8.org",
+  "customOrder": 52,
+  "enabled": true,
+  "enabledCookieJar": true,
+  "enabledExplore": false,
+  "eventListener": false,
+  "header": "{\"User-Agent\": \"Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1\", \"Accept-Language\": \"zh-CN,zh;q=0.9\"}",
+  "lastUpdateTime": 0,
+  "respondTime": 180000,
+  "searchUrl": "http://www.xqb8.org/soso5b627.html?searchkey={{key}}",
+  "ruleSearch": "{\"bookList\": \"@css:#hotcontent .item\", \"name\": \"@css:dt a@text\", \"author\": \"@css:.btm a@text\", \"intro\": \"@css:dd@text\", \"coverUrl\": \"@css:img@data-original||@css:img@src\", \"bookUrl\": \"@css:dt a@href\"}",
+  "ruleBookInfo": "{\"name\": \"@css:h1@text\", \"author\": \"@css:#info a[href^=\\\"/author/\\\"]@text\", \"intro\": \"@css:#intro@text\", \"coverUrl\": \"@css:#fmimg img@data-original||@css:#fmimg img@src\", \"tocUrl\": \"@css:a.chapterlist@href\", \"lastChapter\": \"@css:#info p.hidden-xs a[rel=chapter]@text\"}",
+  "ruleToc": "{\"chapterList\": \"@css:#content_1 a\", \"chapterName\": \"text\", \"chapterUrl\": \"href\", \"nextTocUrl\": \"@css:#list dt a:contains(下一页)@href\"}",
+  "ruleContent": "{\"content\": \"@css:#booktxt@text\", \"nextContentUrl\": \"@css:a[rel=next]@href\"}",
+  "weight": 0
+ }
+]
