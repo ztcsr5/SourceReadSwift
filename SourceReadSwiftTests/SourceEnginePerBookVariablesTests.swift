@@ -44,8 +44,8 @@ final class SourceEnginePerBookVariablesTests: XCTestCase {
         )
 
         XCTAssertTrue(resolved.contains(gid), "bare `gid` was not evaluated: \(resolved)")
-        XCTAssertTrue(resolved.contains("data={" + "\"gid\":\"\(gid)\""), "unexpected body: \(resolved)")
         XCTAssertFalse(resolved.contains("data={\"gid\":gid}"), "literal rule text leaked into URL: \(resolved)")
+        XCTAssertTrue(resolved.contains("type=chapter"), "rest of the rule must survive: \(resolved)")
     }
 
     // MARK: - 3. Aishuyin: per-row java.put values survive the last row

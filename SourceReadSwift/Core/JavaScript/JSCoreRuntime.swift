@@ -2738,6 +2738,22 @@ final class JSCoreRuntime {
             encryptBase64: function(str) {
               return __cipherBase64Encode(str, k, v, tf, tf);
             },
+            encryptHex: function(str) {
+              var plain = __native_stringToBytes(String(str == null ? '' : str));
+              var encrypted = __nativeLegado.invoke({ method: 'cipherEncryptBytes', args: [plain, k, tf, v] });
+              return java.hexEncodeToString(encrypted);
+            },
+            decryptHex: function(hex) {
+              var text = String(hex == null ? '' : hex).replace(/\\s+/g, '');
+              var bytes = [];
+              for (var i = 0; i + 1 < text.length; i += 2) {
+                var n = parseInt(text.substring(i, i + 2), 16);
+                if (isNaN(n)) return '';
+                bytes.push(n);
+              }
+              var plain = __nativeLegado.invoke({ method: 'cipherDecryptBytes', args: [bytes, k, tf, v] });
+              return __native_bytesToString(plain && plain.length != null ? plain : []);
+            },
             toString: function() { return tf; }
           };
           return api;
