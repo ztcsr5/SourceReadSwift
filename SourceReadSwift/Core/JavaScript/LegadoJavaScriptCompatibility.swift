@@ -56,12 +56,23 @@ enum LegadoJavaScriptCompatibility {
     /// (`s.length`), argument lists (`list.length(3)`) and the host File
     /// facade (`file.length()`, which is a real Java method) stay untouched.
     static func normalizeRuleScript(_ script: String) -> String {
-        var features = Set<String>()
-        let normalized = normalize(script).normalizedScript
-        return rewriteJavaStringLengthCalls(
-            in: normalized,
+        normalizeRule(script).normalizedScript
+    }
+
+    /// Full normalization result for a rule script, so the diagnostic evidence
+    /// keeps the unwrapped original text and the recovered feature list.
+    static func normalizeRule(_ script: String) -> LegadoJavaScriptNormalization {
+        let base = normalize(script)
+        var features = Set(base.features)
+        let rewritten = rewriteJavaStringLengthCalls(
+            in: base.normalizedScript,
             features: &features,
             skipHostFileReceivers: true
+        )
+        return LegadoJavaScriptNormalization(
+            originalScript: base.originalScript,
+            normalizedScript: rewritten,
+            features: features.sorted()
         )
     }
 
