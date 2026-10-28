@@ -2211,13 +2211,13 @@ struct JSONRuleExtractor {
         for match in matches.reversed() {
             guard match.numberOfRanges > 1 else { continue }
             let key = mText.substring(with: match.range(at: 1)).trimmingCharacters(in: .whitespacesAndNewlines)
-            var value = ""
-            if let resolved = value(from: object, path: key, variables: variables) {
-                value = stringifyJSResult(resolved)
+            var resolvedText = ""
+            if let resolved = self.value(from: object, path: key, variables: variables) {
+                resolvedText = stringifyJSResult(resolved)
             } else if let variable = variables[key] {
-                value = stringifyJSResult(variable)
+                resolvedText = stringifyJSResult(variable)
             }
-            mText.replaceCharacters(in: match.range(at: 0), with: value)
+            mText.replaceCharacters(in: match.range(at: 0), with: resolvedText)
         }
         return mText as String
     }
