@@ -227,7 +227,7 @@ struct DynamicURLResolver {
                            let value = JSONRuleExtractor(executionContext: context)
                             .value(from: target, path: left, variables: variables) {
                             resolvedLeft = value
-                        } else if let html = variables["html"] as? String ?? variables["body"] as? String,
+                        } else if let html = (variables["html"] as? String) ?? (variables["body"] as? String),
                                   let baseURLObj = URL(string: baseUrl),
                                   let value = try? HtmlRuleExtractor(executionContext: context)
                                     .value(from: html, rule: left, fallback: nil, baseUrl: baseURLObj, variables: variables) {
