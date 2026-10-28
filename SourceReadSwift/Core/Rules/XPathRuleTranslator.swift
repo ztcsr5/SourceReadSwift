@@ -21,6 +21,13 @@ struct XPathRuleTranslator {
             rule = String(rule.dropFirst(6))
         }
         guard rule.hasPrefix("//") || rule.hasPrefix("/") else { return nil }
+        // Axes that cannot be expressed with jsoup selectors are rejected as a
+        // whole instead of silently dropping a step (a dropped step returns
+        // rows from the wrong level of the page).
+        let unsupportedAxes = ["parent::", "ancestor::", "preceding-sibling::", "preceding::", "following::"]
+        if unsupportedAxes.contains(where: { rule.lowercased().contains($0) }) {
+            return nil
+        }
 
         var attribute = "text"
         if rule.hasSuffix("/text()") {
@@ -53,16 +60,39 @@ struct XPathRuleTranslator {
             .components(separatedBy: "/")
             .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
             .filter { !$0.isEmpty && $0 != "." }
-        return steps.compactMap(cssStep).joined(separator: " ")
+        // XPath positional predicates are 1-based and scoped to the parent's
+        // same-type children, which is exactly `:nth-of-type`. The legacy `@n`
+        // suffix only works on the final step (the extractor strips it), so an
+        // axis rule such as `//dt[2]/following-sibling::dd/a` must keep the
+        // position inside the selector.
+        let usesAxes = steps.contains { $0.contains("::") }
+        return steps.compactMap { cssStep($0, useNthOfType: usesAxes) }.joined(separator: " ")
     }
 
-    private static func cssStep(_ rawStep: String) -> String? {
-        if rawStep == "*" { return "*" }
-        guard let tagRange = rawStep.range(of: #"^(?:[A-Za-z][A-Za-z0-9_\-]*|\*)"#, options: .regularExpression) else {
+    private static func cssStep(_ rawStep: String, useNthOfType: Bool) -> String? {
+        var step = rawStep
+        var combinator = ""
+        if let range = step.range(of: #"^following-sibling\s*::\s*"#, options: .regularExpression) {
+            step = String(step[range.upperBound...])
+            combinator = "~ "
+        } else if let range = step.range(of: #"^child\s*::\s*"#, options: .regularExpression) {
+            step = String(step[range.upperBound...])
+            combinator = "> "
+        } else if let range = step.range(of: #"^descendant\s*::\s*"#, options: .regularExpression) {
+            step = String(step[range.upperBound...])
+        } else if let range = step.range(of: #"^self\s*::\s*"#, options: .regularExpression) {
+            step = String(step[range.upperBound...])
+        } else if step.contains("::") {
             return nil
         }
-        let tag = String(rawStep[tagRange])
-        let predicateText = rawStep[tagRange.upperBound...]
+        step = step.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !step.isEmpty else { return nil }
+        if step == "*" { return combinator + "*" }
+        guard let tagRange = step.range(of: #"^(?:[A-Za-z][A-Za-z0-9_\-]*|\*)"#, options: .regularExpression) else {
+            return nil
+        }
+        let tag = String(step[tagRange])
+        let predicateText = step[tagRange.upperBound...]
         var selector = tag
         var indexSuffix = ""
 
@@ -71,11 +101,23 @@ struct XPathRuleTranslator {
                 if let fragment = cssPredicate(predicate) {
                     selector += fragment
                 } else if let index = indexPredicate(predicate) {
-                    indexSuffix = "@\(index)"
+                    if useNthOfType {
+                        selector += index < 0 ? ":last-of-type" : ":nth-of-type(\(index + 1))"
+                    } else {
+                        indexSuffix = "@\(index)"
+                    }
                 }
             }
         }
-        return selector + indexSuffix
+        // `*#list` / `*.chapter` is legal CSS but some jsoup versions only
+        // resolve the class/id when the universal tag is omitted.
+        if selector.hasPrefix("*"), selector.count > 1 {
+            let rest = selector.dropFirst()
+            if rest.hasPrefix(".") || rest.hasPrefix("#") || rest.hasPrefix("[") {
+                selector = String(rest)
+            }
+        }
+        return combinator + selector + indexSuffix
     }
 
     private static func splitCompoundPredicates(_ predicate: String) -> [String] {

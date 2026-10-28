@@ -2213,7 +2213,19 @@ struct ReaderView: View {
                         .frame(width: width, height: proxy.size.height)
                         .clipped()
                         .offset(x: width + drag)
-                        .shadow(color: .black.opacity(0.25), radius: 10, x: -6, y: 0)
+                        // A live `.shadow` on a full-screen page forces an
+                        // offscreen blur every drag frame (the single most
+                        // expensive effect in cover mode). A baked gradient
+                        // strip gives the same edge depth at fill cost.
+                        .overlay(alignment: .leading) {
+                            LinearGradient(
+                                colors: [.black.opacity(0.28), .clear],
+                                startPoint: .leading,
+                                endPoint: .trailing
+                            )
+                            .frame(width: 24)
+                            .allowsHitTesting(false)
+                        }
                         .allowsHitTesting(false)
                         .zIndex(2)
                 }
@@ -2224,7 +2236,15 @@ struct ReaderView: View {
                         .frame(width: width, height: proxy.size.height)
                         .clipped()
                         .offset(x: -width + drag)
-                        .shadow(color: .black.opacity(0.25), radius: 10, x: 6, y: 0)
+                        .overlay(alignment: .trailing) {
+                            LinearGradient(
+                                colors: [.clear, .black.opacity(0.28)],
+                                startPoint: .leading,
+                                endPoint: .trailing
+                            )
+                            .frame(width: 24)
+                            .allowsHitTesting(false)
+                        }
                         .allowsHitTesting(false)
                         .zIndex(2)
                 }

@@ -120,8 +120,13 @@ struct PageCurlReaderView<Item: Identifiable, Content: View>: UIViewControllerRe
 
     func updateUIViewController(_ uiViewController: UIPageViewController, context: Context) {
         context.coordinator.parent = self
-        context.coordinator.suppressInternalTapGestures(on: uiViewController)
-        context.coordinator.normalizeInternalScrollViews(in: uiViewController.view)
+        // Do not walk the whole UIKit tree here. SwiftUI calls this on every
+        // reader state change (page cursor, chrome, progress), and the tap and
+        // scroll-view normalisation only need to run once per controller: the
+        // internal UIScrollView is created with the page controller and keeps
+        // its inset behaviour. Re-running the recursive walk on every update
+        // stole main-thread time from the page transition, which showed up as
+        // the first-swipe hitch on ProMotion devices.
         context.coordinator.sync(uiViewController, contentRevision: contentRevision)
     }
 
@@ -404,6 +409,10 @@ struct PageCurlReaderView<Item: Identifiable, Content: View>: UIViewControllerRe
             // second time after the gesture ends.
             DispatchQueue.main.async { [weak self, weak pageViewController] in
                 guard let self, let pageViewController else { return }
+                // Re-assert once after the transition: UIPageViewController can
+                // rebuild its gesture set when a page is replaced, but doing
+                // this on every SwiftUI update was pure per-frame overhead.
+                self.suppressInternalTapGestures(on: pageViewController)
                 self.normalizeInternalScrollViews(in: pageViewController.view)
                 self.sync(pageViewController, contentRevision: self.parent.contentRevision)
             }

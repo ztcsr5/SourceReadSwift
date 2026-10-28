@@ -716,4 +716,48 @@ final class HtmlRuleExtractorTests: XCTestCase {
         XCTAssertEqual(elements.count, 2)
     }
 
+    func testXPathFollowingSiblingAxisSelectsChapterRows() throws {
+        // Real shape from biqusa (source 451): the first <dt> owns the
+        // "latest chapters" list, the second starts the full TOC. The rule is
+        // `//*[@id="list"]//dt[2]/following-sibling::dd/a`; without axis
+        // support the translator dropped the step and returned zero rows.
+        let html = """
+        <div id="list"><dl>
+          <dt>最新章节</dt>
+          <dd><a href="/late">Late</a></dd>
+          <dt>正文</dt>
+          <dd><a href="/1">Ch 1</a></dd>
+          <dd><a href="/2">Ch 2</a></dd>
+        </dl></div>
+        """
+        let rows = try HtmlRuleExtractor().select(
+            html,
+            baseUrl: URL(string: "https://example.com")!,
+            listRule: #"//*[@id="list"]//dt[2]/following-sibling::dd/a"#
+        )
+        XCTAssertEqual(try rows.map { try $0.text() }, ["Ch 1", "Ch 2"])
+        XCTAssertEqual(try rows.map { try $0.attr("href") }, ["/1", "/2"])
+    }
+
+    func testXPathUniversalClassSelectorResolves() throws {
+        // `//*[@class="chapter clearfix"]/a` used to translate to
+        // `*.chapter.clearfix a`; dropping the universal tag matches jsoup's
+        // behaviour more reliably.
+        let html = #"<div class="chapter clearfix"><a href="/1">一</a><a href="/2">二</a></div>"#
+        let rows = try HtmlRuleExtractor().select(
+            html,
+            baseUrl: URL(string: "https://example.com")!,
+            listRule: #"//*[@class="chapter clearfix"]/a"#
+        )
+        XCTAssertEqual(try rows.map { try $0.text() }, ["一", "二"])
+    }
+
+    func testXPathUnsupportedAxisIsRejectedInsteadOfDroppingSteps() {
+        // Dropping an unsupported axis would silently select the wrong level
+        // of the page; returning nil keeps the caller on its fallback path.
+        XCTAssertNil(XPathRuleTranslator.selectorRule("//div/parent::section"))
+        XCTAssertNil(XPathRuleTranslator.selectorRule("//div/ancestor::body"))
+        XCTAssertNil(XPathRuleTranslator.selectorRule("//div/preceding-sibling::p"))
+    }
+
 }
