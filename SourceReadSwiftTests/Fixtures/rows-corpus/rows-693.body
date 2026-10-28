@@ -1,0 +1,286 @@
+
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="utf-8">
+    <title>搜索结果</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1, maximum-scale=1">
+
+    <link rel="stylesheet" href=https://cdn.p.yueyouxs.com/static/prod/yygowap/common/css/global.css >
+    <link rel="stylesheet" href=https://cdn.p.yueyouxs.com/static/prod/yygowap/common/css/detail.css>
+    <link rel="stylesheet" href=https://cdn.p.yueyouxs.com/static/prod/yygowap/common/css/channel.css>
+
+    
+    
+    <script type="text/javascript" src="https://s9.cnzz.com/z_stat.php?id=1278155193&amp;web_id=1278155193"></script>
+    <script type="text/javascript" src='https://cdn.p.yueyouxs.com/static/prod/yygowap/common/js/jquery-2.1.4.js'></script>
+    <script type="text/javascript" src='https://cdn.p.yueyouxs.com/static/prod/yygowap/common/js/rem.js'></script>
+    <script type="text/javascript" src='https://cdn.p.yueyouxs.com/static/prod/yygowap/common/js/yueYou.js?ts=20260123'></script>
+    <script type="text/javascript" src='https://cdn.p.yueyouxs.com/static/prod/yygowap/common/js/zepto.min.js'></script>
+    <script type="text/javascript" src='https://cdn.p.yueyouxs.com/static/prod/yygowap/common/js/time.js'></script>
+    <script type="text/javascript" src='https://cdn.p.yueyouxs.com/static/prod/yygowap/common/js/autoLazy.js'></script>
+    <script type="text/javascript" src='https://cdn.p.yueyouxs.com/static/prod/yygowap/common/js/toTop.js'></script>
+    <style>
+        .header .search{padding:8px 0}
+        .header .cover{background:#f3f3f3;border-radius:100px}
+        .header .input{padding:0 22px;width:100%;height:34px;background:transparent;box-sizing:border-box}
+        .header .icon_search{
+            width:44px;
+            height:50px;margin-left:7px;
+            background:url(https://cdn.p.yueyouxs.com/static/prod/yygowap/common/image/icon_search.png) no-repeat center;
+            background-size:22px}
+
+        .z_loading {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            z-index: 100;
+            color: #999;
+            font-size: 12px;
+            text-align: center;
+            padding: 5px 0;
+        }
+        .z_loading1 {
+            color: #999;
+            font-size: 12px;
+            text-align: center;
+            padding: 5px 0;
+        }
+
+        .z_loading em {
+            background: url(https://cdn.p.yueyouxs.com/static/prod/yygowap/common/image/loading.png) no-repeat;
+            -webkit-background-size: 12px 12px;
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            margin-right: 10px;
+            -webkit-animation: rotate 1s linear infinite;
+        }
+
+        @-webkit-keyframes rotate {
+            from {
+                -webkit-transform: rotate(0);
+            }
+            to {
+                -webkit-transform: rotate(360deg);
+            }
+        }
+    </style>
+</head>
+<body>
+
+<div class="header_wrap">
+    <div class="header flex dec_line show">
+        <div class="icon_back"></div>
+        <div class="flex_item">
+            <div style="display: block; text-align: center;padding-top: 15px;font-weight: 400;font-size: 16px;">
+                <h3>搜索结果</h3>
+            </div>
+        </div>
+        <div class="icon_home" onclick="gotoPage('/')"></div>
+    </div>
+</div>
+
+<div class="v-list">
+    
+    <div class="v-list-item flex" onclick="newWebView('/b/229093.html', '', '')">
+        <div class="v-cover">
+            <img class="v-cover-img" src="https://cdn.p.yueyouxs.com/wap/229093/c6b23632fa2e3ea7d740305352f5d9eb.jpg">
+        </div>
+        <div class="v-info flex-item flexcol-justify">
+            <div class="v-content">
+                <div class="v-title">灵破苍穹</div>
+                <div class="v-intro">一个从青叶小镇走出来的少年，偶然机会解除体内封印，从此文能一念惊天地，武能一掌碎山河。
+
+灵武兼修，踏遍诸天万界，踩踏无数天才，无数强者倒在了他的脚下！</div>
+            </div>
+            <div class="v-other flex-v-end">
+                <div class="v-author">心跳的瞬间&nbsp; &nbsp;</div>
+                <div class="v-words flex-item">500.55 万字</div>
+                <div class="v-group flex">
+                    <div class="border-1px base-label">玄幻奇幻</div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="v-list-item flex" onclick="newWebView('/b/236324.html', '', '')">
+        <div class="v-cover">
+            <img class="v-cover-img" src="https://cdn.p.yueyouxs.com/wap/236324/07e7dc57ce7b752727dbfa05aa36c6c4.jpg">
+        </div>
+        <div class="v-info flex-item flexcol-justify">
+            <div class="v-content">
+                <div class="v-title">破天</div>
+                <div class="v-intro">&#34;本已站在世界巅峰的神级人物，却因为一个古朴的戒指，成为异世界一个药师家族的废物公子。隐忍的锋芒，广博的学识，惊天的才学，高绝的曲艺！
+万年的轮回是因为某种阴谋？还是真真正正的一种巧合？
+顺我者强，逆我者亡，红尘滚滚，天地苍茫，看我如何一剑刺破天芒！&#34;</div>
+            </div>
+            <div class="v-other flex-v-end">
+                <div class="v-author">青铜&nbsp; &nbsp;</div>
+                <div class="v-words flex-item">322.52 万字</div>
+                <div class="v-group flex">
+                    <div class="border-1px base-label">玄幻奇幻</div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="v-list-item flex" onclick="newWebView('/b/229057.html', '', '')">
+        <div class="v-cover">
+            <img class="v-cover-img" src="https://cdn.p.yueyouxs.com/wap/229057/26a69552e4363e78707daa950fbe0cc2.jpg">
+        </div>
+        <div class="v-info flex-item flexcol-justify">
+            <div class="v-content">
+                <div class="v-title">星核斗天</div>
+                <div class="v-intro">“什么，你说道德经没用。”
+
+    “我告诉你，用什么东西跟我换我都不换。”秦天如是说，他发现道德经不在只是一篇古文那么简单
+
+    ……
+
+    地球青年秦天来到了星核世界，觉醒原核，他发现人们都是一个原核，而他自己却身负两个原核……
+
+    煅经骨，九星圆，真核动，神冲天。
+
+    这是一个异常残酷的世界，异常凶险的世界，也是一个充满机遇的世界，人类修炼，排山倒海，崩山断水。
+
+    男儿自横行，十步杀一人。
+
+    看秦天如何横行在这个世界，过得多姿多彩。</div>
+            </div>
+            <div class="v-other flex-v-end">
+                <div class="v-author">拎香雪碧&nbsp; &nbsp;</div>
+                <div class="v-words flex-item">361.30 万字</div>
+                <div class="v-group flex">
+                    <div class="border-1px base-label">玄幻奇幻</div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="v-list-item flex" onclick="newWebView('/b/28565.html', '', '')">
+        <div class="v-cover">
+            <img class="v-cover-img" src="https://cdn.p.yueyouxs.com/wap/28565/33434566322632a5be0fd274250f0a0c.jpg">
+        </div>
+        <div class="v-info flex-item flexcol-justify">
+            <div class="v-content">
+                <div class="v-title">神动苍穹</div>
+                <div class="v-intro">戚风，身为六方门的一名普通弟子，饱受他人白眼，被骂废柴。机缘巧合下得到一张山河图，从此他的命运发生了惊天逆转，开启了他波澜壮阔的武道人生。在五派会武中，他大放异彩，奠定了在六方门中的地位，更得到了门主的青睐。
+
+热血武道，有恩报恩，有仇报仇。练武升级，大杀四方。杀怪征途，收服异兽。 
+
+进入秘境，激化神脉。踏入神道，且看他如何成就自己的武道传奇！</div>
+            </div>
+            <div class="v-other flex-v-end">
+                <div class="v-author">芒果爱吹牛&nbsp; &nbsp;</div>
+                <div class="v-words flex-item">229.07 万字</div>
+                <div class="v-group flex">
+                    <div class="border-1px base-label">玄幻奇幻</div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="v-list-item flex" onclick="newWebView('/b/232679.html', '', '')">
+        <div class="v-cover">
+            <img class="v-cover-img" src="https://cdn.p.yueyouxs.com/wap/232679/0ea5945eae49e3d03a1dd2c117e7708d.jpg">
+        </div>
+        <div class="v-info flex-item flexcol-justify">
+            <div class="v-content">
+                <div class="v-title">苍穹战神</div>
+                <div class="v-intro">在强者为尊的修行大陆中，少年石洛一度被认定为修炼废材。机缘巧合之下，石洛有幸获得一枚神秘古坠，从此逆转乾坤，傲视苍穹，万战成神！</div>
+            </div>
+            <div class="v-other flex-v-end">
+                <div class="v-author">光明洛&nbsp; &nbsp;</div>
+                <div class="v-words flex-item">86.58 万字</div>
+                <div class="v-group flex">
+                    <div class="border-1px base-label">玄幻奇幻</div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+</div>
+
+<script>
+
+    $(function () {
+        $(".icon_back").on("click",function(){history.back()});
+    });
+
+    var tur = true;
+    var range = 0,
+        maxpage = parseInt( 88 ) + 1,
+        page = 2,
+        totalHeight = 0;
+
+    function loadData() {
+        $(window).scroll(function() {
+            if(tur) {
+                setTimeout(fnscroll, 100);
+                tur = false;
+            }
+        })
+    }
+    loadData();
+
+    function fnscroll() {
+        if(page == -1)
+            return;
+        var scrollHeight = $(window).scrollTop(); 
+        totalHeight = parseFloat($(window).height()) + parseFloat(scrollHeight); 
+        if(page == maxpage){
+            $('.v-list').append('<div class="z_loading1">已到底</div>');
+            page = -1;
+            return;
+        }
+        if(($(document).height()*2/3) <= totalHeight && page != maxpage) {
+            if($(document).height() <= totalHeight)
+                $('.v-list').append('<div class="z_loading"><em/>正在加载更多数据</div>');
+            $.ajax({
+                async : true,
+                cache : false,
+                type : 'get',
+                url : '/api/book/search?keyword=斗破苍穹' + '&page=' + page,
+                dataType : "json",
+                error : function() {},
+                success : function(result) {
+                    $(".z_loading").remove();
+                    $(".z_loading1").remove();
+                    if(result.code == 0){
+                        if(result.data.length == 0){
+                            $('.v-list').append('<div class="z_loading1">已到底</div>');
+                            page = -1;
+                        }else{
+                            addData(result);
+                            page++;
+                        }
+                    }
+                }
+            });
+
+        }
+        tur = true;
+    }
+
+    function addData(result) {
+        for(var i = 0; i < result.data.list.length; i++) {
+            var book = result.data.list[i];
+            var str = '/b/' + book.wapBookId+'.html';
+            var s='<div class="v-list-item flex" onclick=\"gotoPage(\''+str+'\', \'\',\'\')\">'+
+                '<div class="v-cover"> <img class="v-cover-img" src='+book.bookPic+'> </div>' +
+                '<div class="v-info flex-item flexcol-justify">' +
+                '<div class="v-content">' +
+                '<div class="v-title">'+book.bookName+'</div>' +
+                '<div class="v-intro">'+book.intro+'</div></div>' +
+                '<div class="v-other flex-v-end">' +
+                '<div class="v-author">'+book.authorName+'&nbsp; &nbsp;</div>' +
+                '<div class="v-words flex-item">'+(book.words/10000).toFixed(1)+'万字</div></div></div>';
+            $('.v-list').append(s);
+        }
+    }
+</script>
+</body>
+</html>

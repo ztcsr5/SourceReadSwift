@@ -1,0 +1,568 @@
+<!DOCTYPE html>
+
+<html>
+
+<head>
+
+    <title>斗破苍穹搜索结果 - 茶杯狐</title>
+
+<meta name="keywords" content="斗破苍穹搜索结果" />
+
+<meta name="description" content="斗破苍穹搜索结果" />   
+
+	<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+
+<meta http-equiv="X-UA-Compatible" content="IE=EmulateIE10" />
+
+<meta name="renderer" content="webkit|ie-comp|ie-stand">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=0">
+
+<link rel="shortcut icon" href="/template/jianbai/statics/img/favicon.ico" type="image/x-icon" />
+
+<link rel="stylesheet" href="/template/jianbai/statics/font/iconfont.css" type="text/css" />
+
+<link rel="stylesheet" href="/template/jianbai/statics/css/stui_default.css" type="text/css" />
+
+<script type="text/javascript" src="/template/jianbai/statics/js/jquery.min.js"></script>
+
+<script type="text/javascript" src="/template/jianbai/statics/js/index.js"></script>
+
+<script type="text/javascript" src="/template/jianbai/statics/js/stui_default.js "></script>
+
+<script type="text/javascript" src="/template/jianbai/statics/js/jquery.cookie.min.js "></script>
+
+<script type="text/javascript" src="/template/jianbai/statics/js/jquery.lazyload.min.js "></script>
+
+<script type="text/javascript" src="/template/jianbai/statics/js/home.js"></script>
+
+<script>var maccms={"path":"","mid":"1","url":"cupfox7.com","wapurl":"cupfox7.com","mob_status":"0"};</script>
+
+<!--[if lt IE 9]>
+
+<script src="https://cdn.bootcss.com/html5shiv/3.7.2/html5shiv.min.js"></script>
+
+<script src="https://cdn.bootcss.com/respond.js/1.4.2/respond.min.js"></script>
+
+<![endif]-->
+
+</head>
+
+<body>
+
+    <div class="container">
+
+        <div class="row">
+
+        	<div class="stui-pannel">
+
+        		<div class="stui-pannel__hd">
+
+        			<header class="stui-header clearfix">
+	<div class="container">	
+		<div class="row">
+			<ul class="stui_header__user">
+				<li>
+					<a href="javascript:;"><i class="iconfont icon-search"></i></a>
+					<div class="dropdown search">
+						<div class="item"> 
+					        <form id="search" name="search" method="POST" action="/vodsearch/-------------.html" onsubmit="return notnull()">
+		    					<input type="text" id="wd" name="wd" class="form-control" value="斗破苍穹" placeholder="请输入关键词..."/>
+								<button class="submit" id="searchbutton" type="submit" name="submit"><i class="icon iconfont icon-search"></i></button>							
+							</form>
+					   </div>
+					   <ul>
+					   						            <li><a href="/vodsearch/%E9%BB%91%E5%9C%9F%E6%97%A0%E8%A8%80-------------.html">黑土无言</a></li>
+				            				            <li><a href="/vodsearch/%E7%A5%9E%E9%9A%90-------------.html">神隐</a></li>
+				            				            <li><a href="/vodsearch/%E7%B9%81%E8%8A%B1-------------.html">繁花</a></li>
+				            				            <li><a href="/vodsearch/%E4%B8%89%E5%A4%A7%E9%98%9F-------------.html">三大队</a></li>
+				            				            <li><a href="/vodsearch/%E7%8B%82%E9%A3%99-------------.html">狂飙</a></li>
+				            					   </ul>
+					</div>
+				</li>
+				<li>
+					<a href="javascript:;"><i class="iconfont icon-viewgallery"></i></a>
+					<ul class="dropdown type clearfix">
+						<li ><a href="/">首页</a></li>
+								                <li ><a href="/cupfox/fenlei1.html">电影</a></li>
+		                		                <li ><a href="/cupfox/fenlei2.html">电视剧</a></li>
+		                		                <li ><a href="/cupfox/fenlei3.html">综艺</a></li>
+		                		                <li ><a href="/cupfox/fenlei4.html">动漫</a></li>
+		                		                <!--li ><a href="/topic.html">专题</a></li!-->				
+					</ul>
+				</li>
+				<li>
+					<a href="javascript:;"><i class="iconfont icon-clock"></i></a>
+					<div class="dropdown history">
+						<div class="head">
+							<a class="historyclean pull-right" href="">清空</a>
+							<h5>播放记录</h5>
+						</div>
+						<ul class="clearfix" id="stui_history">
+						</ul>
+					</div>
+				</li>
+								<li>
+					<a href="/gbook.html"><i class="icon iconfont icon-comments"></i></a>
+				</li>
+								<li>
+				<a  href="/user/login.html"><i class="icon iconfont icon-account"></i> </a>
+				</li>
+							</ul>
+			<div class="stui-header__logo">
+				<a class="logo" href="/"></a>										  
+			</div>
+			<ul class="stui-header__menu">
+				<li ><a href="/">首页</a></li>
+				                <li ><a href="/cupfox/fenlei1.html">电影</a></li>
+                                <li ><a href="/cupfox/fenlei2.html">电视剧</a></li>
+                                <li ><a href="/cupfox/fenlei3.html">综艺</a></li>
+                                <li ><a href="/cupfox/fenlei4.html">动漫</a></li>
+                                <li ><a href="/topic.html">专题</a></li>
+			</ul>
+			
+		</div>	  							    
+	</div>
+</header>
+<script type="text/javascript">
+	$(".stui_header__user li a").click(function(){
+		$(this).parent().find(".dropdown").toggle();
+	});
+	function notnull() {
+	if (window.document.search.wd.value=="") {
+	alert("您未输入任何信息！");
+	return false;
+	}else {
+	return true;
+	}
+	}
+</script>
+
+        		</div>
+
+        		<div class="stui-pannel__bd clearfix">
+
+        			<div class="stui-screen">
+
+						<div class="head clearfix">
+
+							<span class="text">
+
+								与“斗破苍穹”相关的影片
+
+							</span>	
+
+						</div>
+
+					</div>
+
+        			<ul class="stui-vodlist clearfix">
+
+												<li class="col-md-6 col-sm-4 col-xs-3">
+
+							<div class="stui-vodlist__box">
+
+	<a class="stui-vodlist__thumb lazyload" href="/vos/227.html" title="斗破苍穹年番" data-original="/upload/vod/20250407-1/bc210beef9017b15c6b59699fb1da193.jpg">						
+
+		<span class="play hidden-xs"></span>	
+
+		<span class="pic-text1 text-right"><b>国产动漫</b></span>
+
+		<span class="pic-text text-right"><b>更新至第216集</b></span>
+
+	</a>									
+
+	<div class="stui-vodlist__detail">
+
+		<h4 class="title text-overflow"><a href="/vos/227.html" title="斗破苍穹年番">斗破苍穹年番</a></h4>
+
+		<p class="text text-overflow text-muted hidden-xs">不一,陈奕雯,黑石稔,郭鸿博,v17-富贵,王宇航,赵洋</p>
+
+	</div>												
+
+</div>												
+
+						</li>
+
+												<li class="col-md-6 col-sm-4 col-xs-3">
+
+							<div class="stui-vodlist__box">
+
+	<a class="stui-vodlist__thumb lazyload" href="/vos/44646.html" title="斗破苍穹第三季" data-original="/upload/vod/20250607-1/d644d8a638a7024f711217164c9d1442.jpg">						
+
+		<span class="play hidden-xs"></span>	
+
+		<span class="pic-text1 text-right"><b>国产动漫</b></span>
+
+		<span class="pic-text text-right"><b>已完结</b></span>
+
+	</a>									
+
+	<div class="stui-vodlist__detail">
+
+		<h4 class="title text-overflow"><a href="/vos/44646.html" title="斗破苍穹第三季">斗破苍穹第三季</a></h4>
+
+		<p class="text text-overflow text-muted hidden-xs">张沛,冯骏骅,杨梦露,黑石稔,袁国庆,高其昌</p>
+
+	</div>												
+
+</div>												
+
+						</li>
+
+												<li class="col-md-6 col-sm-4 col-xs-3">
+
+							<div class="stui-vodlist__box">
+
+	<a class="stui-vodlist__thumb lazyload" href="/vos/43867.html" title="斗破苍穹4：逃亡" data-original="/upload/vod/20250426-1/23ac48f183d015a8f0053b89e9474b2c.jpg">						
+
+		<span class="play hidden-xs"></span>	
+
+		<span class="pic-text1 text-right"><b>动作片</b></span>
+
+		<span class="pic-text text-right"><b>HD国语</b></span>
+
+	</a>									
+
+	<div class="stui-vodlist__detail">
+
+		<h4 class="title text-overflow"><a href="/vos/43867.html" title="斗破苍穹4：逃亡">斗破苍穹4：逃亡</a></h4>
+
+		<p class="text text-overflow text-muted hidden-xs">马伯骞 李九霄 高曙光 姜武 黄雯</p>
+
+	</div>												
+
+</div>												
+
+						</li>
+
+												<li class="col-md-6 col-sm-4 col-xs-3">
+
+							<div class="stui-vodlist__box">
+
+	<a class="stui-vodlist__thumb lazyload" href="/vos/41674.html" title="斗破苍穹特别篇" data-original="/upload/vod/20250408-29/eddf0c22b873d6360b641def76d8c15f.jpg">						
+
+		<span class="play hidden-xs"></span>	
+
+		<span class="pic-text1 text-right"><b>国产动漫</b></span>
+
+		<span class="pic-text text-right"><b>已完结</b></span>
+
+	</a>									
+
+	<div class="stui-vodlist__detail">
+
+		<h4 class="title text-overflow"><a href="/vos/41674.html" title="斗破苍穹特别篇">斗破苍穹特别篇</a></h4>
+
+		<p class="text text-overflow text-muted hidden-xs">刘三木,杨梦露</p>
+
+	</div>												
+
+</div>												
+
+						</li>
+
+												<li class="col-md-6 col-sm-4 col-xs-3">
+
+							<div class="stui-vodlist__box">
+
+	<a class="stui-vodlist__thumb lazyload" href="/vos/41673.html" title="斗破苍穹 缘起" data-original="/upload/vod/20250408-29/f30d96983320c9e7e085d573567eff72.jpg">						
+
+		<span class="play hidden-xs"></span>	
+
+		<span class="pic-text1 text-right"><b>国产动漫</b></span>
+
+		<span class="pic-text text-right"><b>已完结</b></span>
+
+	</a>									
+
+	<div class="stui-vodlist__detail">
+
+		<h4 class="title text-overflow"><a href="/vos/41673.html" title="斗破苍穹 缘起">斗破苍穹 缘起</a></h4>
+
+		<p class="text text-overflow text-muted hidden-xs">张沛,黑石稔,陈奕雯,高其昌,V17-筱筝,鬼月,小巫,许棕哲,杜晴晴,郭鸿博,王宇航,柯暮卿,鹏飞,夏磊,海帆,大龙,赵洋,卞云鹏,曹真</p>
+
+	</div>												
+
+</div>												
+
+						</li>
+
+												<li class="col-md-6 col-sm-4 col-xs-3">
+
+							<div class="stui-vodlist__box">
+
+	<a class="stui-vodlist__thumb lazyload" href="/vos/36372.html" title="斗破苍穹第二季" data-original="/upload/vod/20250408-23/dc99f02e5eb76c9c2efe027d68f4e909.jpg">						
+
+		<span class="play hidden-xs"></span>	
+
+		<span class="pic-text1 text-right"><b>国产动漫</b></span>
+
+		<span class="pic-text text-right"><b>已完结</b></span>
+
+	</a>									
+
+	<div class="stui-vodlist__detail">
+
+		<h4 class="title text-overflow"><a href="/vos/36372.html" title="斗破苍穹第二季">斗破苍穹第二季</a></h4>
+
+		<p class="text text-overflow text-muted hidden-xs">刘三木,黑石稔,醋醋,刘北辰,樊俊航,苏鑫,卞云鹏,海帆,杨梦露,十四,杨鸥,李元韬</p>
+
+	</div>												
+
+</div>												
+
+						</li>
+
+												<li class="col-md-6 col-sm-4 col-xs-3">
+
+							<div class="stui-vodlist__box">
+
+	<a class="stui-vodlist__thumb lazyload" href="/vos/36371.html" title="斗破苍穹第一季" data-original="/upload/vod/20250408-23/b53e7d4e3e8994f7e5c3a0b11be18262.jpg">						
+
+		<span class="play hidden-xs"></span>	
+
+		<span class="pic-text1 text-right"><b>国产动漫</b></span>
+
+		<span class="pic-text text-right"><b>已完结</b></span>
+
+	</a>									
+
+	<div class="stui-vodlist__detail">
+
+		<h4 class="title text-overflow"><a href="/vos/36371.html" title="斗破苍穹第一季">斗破苍穹第一季</a></h4>
+
+		<p class="text text-overflow text-muted hidden-xs">刘三木,陈奕雯,黑石稔,王宇航,鬼月,醋醋,常丹瑞,祝俊,杜晴晴</p>
+
+	</div>												
+
+</div>												
+
+						</li>
+
+												<li class="col-md-6 col-sm-4 col-xs-3">
+
+							<div class="stui-vodlist__box">
+
+	<a class="stui-vodlist__thumb lazyload" href="/vos/36370.html" title="斗破苍穹三年之约" data-original="/upload/vod/20250408-23/0ab54fbdd23bb7961d252c70204608f0.jpg">						
+
+		<span class="play hidden-xs"></span>	
+
+		<span class="pic-text1 text-right"><b>国产动漫</b></span>
+
+		<span class="pic-text text-right"><b>已完结</b></span>
+
+	</a>									
+
+	<div class="stui-vodlist__detail">
+
+		<h4 class="title text-overflow"><a href="/vos/36370.html" title="斗破苍穹三年之约">斗破苍穹三年之约</a></h4>
+
+		<p class="text text-overflow text-muted hidden-xs">张沛,黑石稔,冯骏骅,杨梦露,谢添天,鬼月</p>
+
+	</div>												
+
+</div>												
+
+						</li>
+
+												<li class="col-md-6 col-sm-4 col-xs-3">
+
+							<div class="stui-vodlist__box">
+
+	<a class="stui-vodlist__thumb lazyload" href="/vos/33720.html" title="斗破苍穹 动态漫第二季" data-original="/upload/vod/20250408-21/f19582e8493f686e9044ce4ff68951b4.jpg">						
+
+		<span class="play hidden-xs"></span>	
+
+		<span class="pic-text1 text-right"><b>国产动漫</b></span>
+
+		<span class="pic-text text-right"><b>已完结</b></span>
+
+	</a>									
+
+	<div class="stui-vodlist__detail">
+
+		<h4 class="title text-overflow"><a href="/vos/33720.html" title="斗破苍穹 动态漫第二季">斗破苍穹 动态漫第二季</a></h4>
+
+		<p class="text text-overflow text-muted hidden-xs">内详</p>
+
+	</div>												
+
+</div>												
+
+						</li>
+
+												<li class="col-md-6 col-sm-4 col-xs-3">
+
+							<div class="stui-vodlist__box">
+
+	<a class="stui-vodlist__thumb lazyload" href="/vos/33550.html" title="斗破苍穹之大主宰第三季" data-original="/upload/vod/20250408-21/a48207cedd7f519ca0b5fb4a31d8e09c.jpg">						
+
+		<span class="play hidden-xs"></span>	
+
+		<span class="pic-text1 text-right"><b>国产动漫</b></span>
+
+		<span class="pic-text text-right"><b>已完结</b></span>
+
+	</a>									
+
+	<div class="stui-vodlist__detail">
+
+		<h4 class="title text-overflow"><a href="/vos/33550.html" title="斗破苍穹之大主宰第三季">斗破苍穹之大主宰第三季</a></h4>
+
+		<p class="text text-overflow text-muted hidden-xs">内详</p>
+
+	</div>												
+
+</div>												
+
+						</li>
+
+												<li class="col-md-6 col-sm-4 col-xs-3">
+
+							<div class="stui-vodlist__box">
+
+	<a class="stui-vodlist__thumb lazyload" href="/vos/20021.html" title="斗破苍穹第四季" data-original="/upload/vod/20250408-7/edb893710bc71ae45b0c496b3e143824.jpg">						
+
+		<span class="play hidden-xs"></span>	
+
+		<span class="pic-text1 text-right"><b>国产动漫</b></span>
+
+		<span class="pic-text text-right"><b>已完结</b></span>
+
+	</a>									
+
+	<div class="stui-vodlist__detail">
+
+		<h4 class="title text-overflow"><a href="/vos/20021.html" title="斗破苍穹第四季">斗破苍穹第四季</a></h4>
+
+		<p class="text text-overflow text-muted hidden-xs">张沛,黑石稔,冯骏骅,杨梦露,陈奕雯,鬼月,谢添天</p>
+
+	</div>												
+
+</div>												
+
+						</li>
+
+												<li class="col-md-6 col-sm-4 col-xs-3">
+
+							<div class="stui-vodlist__box">
+
+	<a class="stui-vodlist__thumb lazyload" href="/vos/12003.html" title="斗破苍穹 动态漫第三季" data-original="/upload/vod/20250407-12/783718077699066b7b774043e0fd6205.jpg">						
+
+		<span class="play hidden-xs"></span>	
+
+		<span class="pic-text1 text-right"><b>国产动漫</b></span>
+
+		<span class="pic-text text-right"><b>已完结</b></span>
+
+	</a>									
+
+	<div class="stui-vodlist__detail">
+
+		<h4 class="title text-overflow"><a href="/vos/12003.html" title="斗破苍穹 动态漫第三季">斗破苍穹 动态漫第三季</a></h4>
+
+		<p class="text text-overflow text-muted hidden-xs">内详</p>
+
+	</div>												
+
+</div>												
+
+						</li>
+
+											</ul>   			
+
+        		</div>
+
+        		<div class="stui-pannel__ft">
+
+        			<ul class="stui-page__item text-center clearfix">
+
+	<li><a href="/vodsearch/%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9----------1---.html">首页</a></li>
+
+	<li><a href="/vodsearch/%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9----------1---.html">上一页</a></li>							
+
+		<li class="hidden-xs active"><a href="/vodsearch/%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9----------1---.html">1</a></li>
+
+		<li class="hidden-xs "><a href="/vodsearch/%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9----------2---.html">2</a></li>
+
+		<li class="active num"><a>1/2</a></li>
+
+	<li><a href="/vodsearch/%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9----------2---.html">下一页</a></li>
+
+	<li><a href="/vodsearch/%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9----------2---.html">尾页</a></li>							
+
+</ul>
+
+
+
+        		</div>
+
+        	</div>
+
+        </div>
+
+    </div>
+
+    <div class="stui-page__all">
+
+	<a class="left" href="/vodsearch/%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9----------1---.html"><i class="iconfont icon-back"></i></a>
+
+	<a class="right" href="/vodsearch/%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9----------2---.html"><i class="iconfont icon-more"></i></a>
+
+</div>
+
+
+
+	<div class="container">
+	<div class="row">
+		<div class="stui-foot clearfix">
+		    <p class="text-center hidden-xs">本网站只提供web页面服务，并不提供资源存储，也不参与录制、上传<br>若本站收录的节目无意侵犯了贵司版权，请发邮件至123456@test.cn （我们会在3个工作日内删除侵权内容，谢谢。）</p>		
+			<p class="text-center hidden-xs">
+			cupfox7.com 版权所有 联系邮箱：<a href="mailto:{maccms:email}">123456@test.cn</a></p>	
+			<p class="text-muted text-center visible-xs">Copyright © 2020-2022&nbsp;技术支持:<a href="https://www.padnic.com/" target="_blank">茶杯狐</a>&nbsp;</p>
+          <p class="text-muted text-center hidden-xs">
+			<a class="fed-font-xiv" href="/rss.xml" target="_blank">RSS订阅</a>
+			<span class="fed-font-xiv"> - </span>
+			<a class="fed-font-xiv" href="/rss/baidu.xml" target="_blank">百度蜘蛛</a>
+			<span class="fed-font-xiv"> - </span>
+			<a class="fed-font-xiv" href="/rss/google.xml" target="_blank">谷歌地图</a>
+			<span class="fed-font-xiv"> - </span>
+			<a class="fed-font-xiv" href="/rss/sm.xml" target="_blank">神马爬虫</a>
+			<span class="fed-font-xiv fed-hide-xs"> - </span>
+			<a class="fed-font-xiv fed-hide-xs" href="/rss/sogou.xml" target="_blank">搜狗蜘蛛</a>
+			<span class="fed-font-xiv fed-hide-xs"> - </span>
+			<a class="fed-font-xiv fed-hide-xs" href="/rss/so.xml" target="_blank">奇虎地图</a>
+			<span class="fed-font-xiv fed-hide-xs"> - </span>
+			<a class="fed-font-xiv fed-hide-xs" href="/rss/bing.xml" target="_blank">必应爬虫</a>
+		</p>
+		</div>
+	</div>
+</div>
+
+<div class="fixed_right_bar">
+<div class="ant-back-top dbicon" style="display:none;"><i class="icon iconfont icon-less"></i></div>
+</div>
+
+<div class="hide"></div>
+
+
+<script type="text/javascript">
+$(function(){	
+	$(window).scroll(function() {		
+		if($(window).scrollTop() >= 100){
+			$('.ant-back-top').fadeIn(300); 
+		}else{    
+			$('.ant-back-top').fadeOut(300);    
+		}  
+	});
+	$('.ant-back-top').click(function(){
+	$('html,body').animate({scrollTop: '0px'}, 800);});	
+});
+</script>
+
+
+</body>
+
+</html>
+

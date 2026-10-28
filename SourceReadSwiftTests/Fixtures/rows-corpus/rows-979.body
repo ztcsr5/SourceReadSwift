@@ -1,0 +1,748 @@
+
+
+
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "//www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+
+
+<html xmlns="//www.w3.org/1999/xhtml">
+
+<head><title>
+
+	SF综合搜索
+
+</title><link href="//rs.sfacg.com/css/commonality.css" rel="stylesheet" type="text/css" /><link href="//rs.sfacg.com/css/comic.css" rel="stylesheet" type="text/css" />
+
+    <script type="text/javascript" src="//rs.sfacg.com/JS/jquery-1.7.2.min.js"></script>
+
+    <script type="text/javascript" src="//rs.sfacg.com/JS/jquery.bigautocomplete.js"></script>
+
+    <script type="text/javascript" src="/JS/common.js"></script>
+
+</head>
+
+<body>
+
+<table width="980" border="0" align="center" cellpadding="0" cellspacing="0">
+
+  <tr>
+
+    <td width="300"><img src="//rs.sfacg.com/images/sflogo.gif" width="271" height="89" /></td>
+
+    <td align="right"><table width="660" height="70" border="0" cellpadding="0" cellspacing="0">
+
+      <tr>
+
+        <td align="center"> </td>
+
+      </tr>
+
+    </table></td>
+
+  </tr>
+
+</table>
+
+<table width="980" border="0" align="center" cellpadding="0" cellspacing="0">
+
+  <tr>
+
+    <td height="63" valign="top" class="Menu_bg"><table width="100%" border="0" cellspacing="0" cellpadding="0">
+
+      <tr class="F14PX white_link1">
+
+        <td width="60" height="40" align="center" bgcolor="#FFAB00"><a href="//www.sfacg.com"><b>首 页</b></a></td>
+
+        <td width="60" align="center"><a href="https://manhua.sfacg.com/">漫 画</a></td>
+
+        <td width="80" align="center"><a href="//book.sfacg.com/">轻小说</a></td>
+
+        <td width="80" align="center"><a href="https://passport.sfacg.com/">我的SF</a></td>
+
+      </tr>
+
+    </table></td>
+
+  </tr>
+
+</table>
+
+<table width="980" border="0" align="center" cellpadding="1" cellspacing="1" bgcolor="#dfdfdf" class="space10px">
+
+  <tr>
+
+    <td bgcolor="#FFFFFF"><table width="100%" border="0" cellpadding="0" cellspacing="0" bgcolor="#f6f6f6">
+
+      <tr>
+
+        <td width="68%" height="36" style="padding-left: 8px;"><script src="/JS/SearchBox.js" type="text/javascript"></script><div id="searchlist" style="margin-left: 5px;float: left;"></div>
+
+          　<a href="#" class="Red_link1">帮助</a></td>
+
+        <td width="32%" align="center">
+
+		<table width="300" height="22" border="0" cellpadding="0" cellspacing="0">
+
+          <tr>
+
+            <td width="2" class="affiche_left"></td>
+
+            <td align="left" class="affiche_middle"></td>
+
+            <td width="2" class="affiche_right"></td>
+
+          </tr>
+
+        </table>
+
+		</td>
+
+      </tr>
+
+    </table></td>
+
+  </tr>
+
+</table>
+
+    <form method="post" action="./?Key=%u6597%u7834%u82cd%u7a79&amp;S=1&amp;SS=0" id="form1">
+
+<input type="hidden" name="__VIEWSTATE" id="__VIEWSTATE" value="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" />
+
+
+
+<input type="hidden" name="__VIEWSTATEGENERATOR" id="__VIEWSTATEGENERATOR" value="CA0B0334" />
+
+    
+
+
+
+<table width="980" border="0" align="center" cellpadding="0" cellspacing="0">
+
+  <tr>
+
+    <td height="30" class="font_gray gray_link1">您当前的位置：<a href="http://www.sfacg.com">首页</a> &gt; <a href="/">SF搜索</a> &gt; <span class="font_red">搜索结果</span></td>
+
+  </tr>
+
+</table>
+
+<table width="980"  border="0" align="center" cellpadding="0" cellspacing="0">
+
+  <tr>
+
+    <td width="66%" height="19" class="Tab_bg"><table width="84" height="27" border="0" align="left" cellpadding="0" cellspacing="1" bgcolor="#FFFFFF" class="Tab2_frame Tab_space" id="Tab_0">
+
+      <tr>
+
+        <td align="center" class="Tab_middle3 block_place" id="Menu_0">漫画</td>
+
+      </tr>
+
+    </table>
+
+    <table width="84" height="27" border="0" align="left" cellpadding="0" cellspacing="1" bgcolor="#CCCCCC" class="Tab_space" id="Tab_1">
+
+      <tr>
+
+        <td align="center" bgcolor="#ededed" class="block_place" id="Menu_1"><a href="javascript:redirect('S',1);" class="Tab1">轻小说</a></td>
+
+      </tr>
+
+    </table></td>
+
+  </tr>
+
+</table>
+
+<script>initial();</script>
+
+<table width="980" border="0" align="center" cellpadding="0" cellspacing="0" style="margin-top: 1px;">
+
+  <tr>
+
+    <td height="30" align="center" bgcolor="#ededed"><h1 class="font_red"><b class="F14PX">斗破苍穹</b><span style="font-size: 12px;font-weight: normal;">(共搜索到25个结果)</span></h1></td>
+
+  </tr>
+
+</table>
+
+<table width="980" border="0" align="center" cellpadding="0" cellspacing="0" class="comic_cover Height_px22 font_gray">
+
+<tr>
+
+<td>
+
+<script language="javascript" src="http://comic.sfacg.com/AD/Inner/hysj2.js"></script>
+
+</td>
+
+</tr>
+
+</table>
+
+<table width="980" border="0" align="center" cellpadding="0" cellspacing="0" class="comic_cover Height_px22 font_gray space10px">
+
+  <tr>
+
+    <td>
+
+    
+
+	<ul style="width:100%">
+
+	<li class="Conjunction">
+
+	<img src="//rs.sfacg.com/web/novel/images/NovelCover/big/2019/10/068aa7df-fc2f-45b4-b6db-29738e6e6ace.jpg" id="SearchResultList1___ResultList_Cover_0" border="0" alt="斗破苍穹之魂玉" width="80" height="100" /></li>
+
+	<li><strong class="F14PX"><a href="https://book.sfacg.com/Novel/249775" id="SearchResultList1___ResultList_LinkInfo_0" class="orange_link2">斗破苍穹之魂玉</a></strong><br />
+
+	  综合信息： 赤月之瞳/2026/10/25 22:38:21<br />      
+
+	  筹谋千年一朝败亡，绝世枭雄转生为女。重活一世，又会发生怎样的故事？
+
+这里是一种“如果”。原著中的魂天帝是一个反派符号，是萧炎的最后一块踏脚石。他有野心，却无内心；有结局，却无过程。可如果呢？如果他也有过爱，有过恨，有过不忍和牵挂？
+
+这里是一种“补全”。原著中的萧玄只是过去的荣光，一缕残魂，是萧炎的经验包。他没有自己的故事。原著只说他死了，而我想写他为什么配得上这样的荣光。
+
+同人应该还有别的意...</li>
+
+	</ul>
+
+	<hr size="1" noshade="noshade" />
+
+	
+
+	<ul style="width:100%">
+
+	<li class="Conjunction">
+
+	<img src="//rs.sfacg.com/web/novel/images/NovelCover/big/2019/06/ec48160f-742a-4a05-af94-4b34303869d9.jpg" id="SearchResultList1___ResultList_Cover_1" border="0" alt="斗破苍穹之冰雪绝恋" width="80" height="100" /></li>
+
+	<li><strong class="F14PX"><a href="https://book.sfacg.com/Novel/136931" id="SearchResultList1___ResultList_LinkInfo_1" class="orange_link2">斗破苍穹之冰雪绝恋</a></strong><br />
+
+	  综合信息： 溯源轮回/2019/7/6 21:54:27<br />      
+
+	  更新是不可能更新的，哪怕我崩崩崩补给全保底，副本零掉落也不可能更新的！</li>
+
+	</ul>
+
+	<hr size="1" noshade="noshade" />
+
+	
+
+	<ul style="width:100%">
+
+	<li class="Conjunction">
+
+	<img src="//rs.sfacg.com/web/novel/images/NovelCover/big/2020/11/2297cb03-f1d8-4b7e-90e9-14c0f1bb013c.jpg" id="SearchResultList1___ResultList_Cover_2" border="0" alt="斗破苍穹之魂清" width="80" height="100" /></li>
+
+	<li><strong class="F14PX"><a href="https://book.sfacg.com/Novel/392410" id="SearchResultList1___ResultList_LinkInfo_2" class="orange_link2">斗破苍穹之魂清</a></strong><br />
+
+	  综合信息： 江韶云/2024/7/31 12:55:04<br />      
+
+	  身祭斩帝鬼血刃之人重生为魂族圣公主
+善与恶的分界究竟在哪
+心狠手辣又该不该被万世唾弃
+冰山美人的情感寄托又该何处寻
+</li>
+
+	</ul>
+
+	<hr size="1" noshade="noshade" />
+
+	
+
+	<ul style="width:100%">
+
+	<li class="Conjunction">
+
+	<img src="//rs.sfacg.com/web/novel/images/NovelCover/big/2022/02/5ec255f1-ced0-4ee1-874d-b4f9298c2474.jpg" id="SearchResultList1___ResultList_Cover_3" border="0" alt="re斗破苍穹" width="80" height="100" /></li>
+
+	<li><strong class="F14PX"><a href="https://book.sfacg.com/Novel/142361" id="SearchResultList1___ResultList_LinkInfo_3" class="orange_link2">re斗破苍穹</a></strong><br />
+
+	  综合信息： 玄幻之狂龙/2023/9/18 18:27:15<br />      
+
+	  一个月一更
+不一样的斗破，不一样的萧炎。
+昔日的废材，如今的强者。
+三十年河东，三十年河西。
+斗破苍穹，仅一人足矣！</li>
+
+	</ul>
+
+	<hr size="1" noshade="noshade" />
+
+	
+
+	<ul style="width:100%">
+
+	<li class="Conjunction">
+
+	<img src="//rs.sfacg.com/web/novel/images/NovelCover/big/2020/05/f5e10c17-3df9-4414-997c-31ed4faaca3a.jpg" id="SearchResultList1___ResultList_Cover_4" border="0" alt="斗破苍穹之火凤凰" width="80" height="100" /></li>
+
+	<li><strong class="F14PX"><a href="https://book.sfacg.com/Novel/330749" id="SearchResultList1___ResultList_LinkInfo_4" class="orange_link2">斗破苍穹之火凤凰</a></strong><br />
+
+	  综合信息： 笛i/2020/7/20 21:33:02<br />      
+
+	  不得志之人必将穿越？还穿进了斗破苍穹？
+最最最重要的是，变成了女孩子！
+爱恨情仇，风雨欲来
+看与萧炎、云韵等一系列主角的冒险故事
+佛系更新哟</li>
+
+	</ul>
+
+	<hr size="1" noshade="noshade" />
+
+	
+
+	<ul style="width:100%">
+
+	<li class="Conjunction">
+
+	<img src="//rs.sfacg.com/web/novel/images/NovelCover/big/2021/07/d1612376-bef7-41f0-afa3-7f0b4424205e.jpg" id="SearchResultList1___ResultList_Cover_5" border="0" alt="斗破苍穹之倾心于你" width="80" height="100" /></li>
+
+	<li><strong class="F14PX"><a href="https://book.sfacg.com/Novel/469726" id="SearchResultList1___ResultList_LinkInfo_5" class="orange_link2">斗破苍穹之倾心于你</a></strong><br />
+
+	  综合信息： 乾曙螖螸/2026/8/20 22:55:31<br />      
+
+	  熙雨：薰儿你是我的唯一，我爱你，你愿意陪我去一同见证那绚丽的世界吗？ 
+薰儿：我愿意。
+
+萌新作者，更新时间不定，写的不好请见谅</li>
+
+	</ul>
+
+	<hr size="1" noshade="noshade" />
+
+	
+
+	<ul style="width:100%">
+
+	<li class="Conjunction">
+
+	<img src="//rs.sfacg.com/web/novel/images/NovelCover/big/2021/12/9a8bf1ea-2009-4b88-922d-a73e37f035e2.jpg" id="SearchResultList1___ResultList_Cover_6" border="0" alt="我用方舟角色穿越斗破苍穹" width="80" height="100" /></li>
+
+	<li><strong class="F14PX"><a href="https://book.sfacg.com/Novel/506403" id="SearchResultList1___ResultList_LinkInfo_6" class="orange_link2">我用方舟角色穿越斗破苍穹</a></strong><br />
+
+	  综合信息： 米哈游咩/2022/4/10 0:10:04<br />      
+
+	  (新书意外穿越全职法师)</li>
+
+	</ul>
+
+	<hr size="1" noshade="noshade" />
+
+	
+
+	<ul style="width:100%">
+
+	<li class="Conjunction">
+
+	<img src="//rs.sfacg.com/web/novel/images/NovelCover/big/2018/05/8c431f0e-035b-4262-ba0a-819f0d000acb.jpg" id="SearchResultList1___ResultList_Cover_7" border="0" alt="斗破蒼穹之逆天改命" width="80" height="100" /></li>
+
+	<li><strong class="F14PX"><a href="https://book.sfacg.com/Novel/96856" id="SearchResultList1___ResultList_LinkInfo_7" class="orange_link2">斗破蒼穹之逆天改命</a></strong><br />
+
+	  综合信息： 玄宇天/2018/5/23 15:31:07<br />      
+
+	  本文改編自《斗破蒼穹》，加入第二主角幻星離，擁有與蕭炎幾乎相同的遭遇，他們的命運會怎麼樣呢？
+「我命由我不有天！既然天命註定要我死，那我就逆天改命！天亦亡我，我滅了上天！地亦屠我，我毀了山地！我是萬古上神，荒命轉世，幻星離！」</li>
+
+	</ul>
+
+	<hr size="1" noshade="noshade" />
+
+	
+
+	<ul style="width:100%">
+
+	<li class="Conjunction">
+
+	<img src="//rs.sfacg.com/web/novel/images/NovelCover/big/2021/11/bdbcafda-e7d7-463a-8933-9b560ec18dee.jpg" id="SearchResultList1___ResultList_Cover_8" border="0" alt="琪亚娜在斗破苍穹" width="80" height="100" /></li>
+
+	<li><strong class="F14PX"><a href="https://book.sfacg.com/Novel/504964" id="SearchResultList1___ResultList_LinkInfo_8" class="orange_link2">琪亚娜在斗破苍穹</a></strong><br />
+
+	  综合信息： 食蜂操祈4C/2022/1/28 23:22:39<br />      
+
+	  第二次写书，新坑。
+穿越到斗破苍穹世界变身琪亚娜，外貌琪亚娜，能力终焉，实力超强。
+剧情从三年之约开始。
+不嫁人，可百合。</li>
+
+	</ul>
+
+	<hr size="1" noshade="noshade" />
+
+	
+
+	<ul style="width:100%">
+
+	<li class="Conjunction">
+
+	<img src="//rs.sfacg.com/web/novel/images/NovelCover/big/2024/11/1d665744-39fb-4045-b497-83c0b30dfcb4.jpg" id="SearchResultList1___ResultList_Cover_9" border="0" alt="斗破苍穹：从怒怼网瘾少女开始" width="80" height="100" /></li>
+
+	<li><strong class="F14PX"><a href="https://book.sfacg.com/Novel/725834" id="SearchResultList1___ResultList_LinkInfo_9" class="orange_link2">斗破苍穹：从怒怼网瘾少女开始</a></strong><br />
+
+	  综合信息： 飞好71/2025/4/23 23:00:02<br />      
+
+	  （橘味，剧情，无系统，智商在线，快节奏）
+穿越到斗气大陆，少女不服这天，也不服这地！
+人敢欺我，我干碎这人！
+天敢压我，我干碎这天！
+地敢怼我，我干碎这地！
+什么！有人敢娶我？
+我踢断他“腿”！
+什么！这人太强打不过？
+我偷偷发育，回头再一脚把他踩成屎！
+……
+多年以后，少女生下了一堆儿女！
+少女抬头望天：“我服了！”
+漂亮大姐姐捏住少女下巴：
+“真的服了吗？”</li>
+
+	</ul>
+
+	<hr size="1" noshade="noshade" />
+
+	
+
+	<ul style="width:100%">
+
+	<li class="Conjunction">
+
+	<img src="//rs.sfacg.com/web/novel/images/NovelCover/big/2022/09/2e49db1a-2760-4dd4-a3a8-ce9b0c73db45.jpg" id="SearchResultList1___ResultList_Cover_10" border="0" alt="斗破苍穹之纳兰天凤" width="80" height="100" /></li>
+
+	<li><strong class="F14PX"><a href="https://book.sfacg.com/Novel/591621" id="SearchResultList1___ResultList_LinkInfo_10" class="orange_link2">斗破苍穹之纳兰天凤</a></strong><br />
+
+	  综合信息： 荣耀十绝/2023/6/16 22:05:18<br />      
+
+	  纳兰家收留了一个婴儿，只比嫣然小一岁。她将在此留下故事……</li>
+
+	</ul>
+
+	<hr size="1" noshade="noshade" />
+
+	
+
+	<ul style="width:100%">
+
+	<li class="Conjunction">
+
+	<img src="//rs.sfacg.com/web/novel/images/NovelCover/big/2021/12/b9634ed8-5554-4c68-a843-7eb6129f82e3.jpg" id="SearchResultList1___ResultList_Cover_11" border="0" alt="斗破苍穹之仙帝降临" width="80" height="100" /></li>
+
+	<li><strong class="F14PX"><a href="https://book.sfacg.com/Novel/509390" id="SearchResultList1___ResultList_LinkInfo_11" class="orange_link2">斗破苍穹之仙帝降临</a></strong><br />
+
+	  综合信息： 执掌诸天/2022/1/12 2:48:12<br />      
+
+	  仙帝萧寒，曾执掌诸天万界，镇压一切，为诸天之巅。
+却因修炼走火入魔，被其手下杀害，形神俱灭。
+随后意外重生斗气大陆，这一世定重回诸天万界，斩杀一切背叛之人。</li>
+
+	</ul>
+
+	<hr size="1" noshade="noshade" />
+
+	
+
+	<ul style="width:100%">
+
+	<li class="Conjunction">
+
+	<img src="//rs.sfacg.com/web/novel/images/NovelCover/big/2021/10/9f952c55-173c-4df3-82ee-beafaee117b5.jpg" id="SearchResultList1___ResultList_Cover_12" border="0" alt="斗破苍穹之幻梦双星" width="80" height="100" /></li>
+
+	<li><strong class="F14PX"><a href="https://book.sfacg.com/Novel/494782" id="SearchResultList1___ResultList_LinkInfo_12" class="orange_link2">斗破苍穹之幻梦双星</a></strong><br />
+
+	  综合信息： 海侓迦娜/2024/1/18 23:14:53<br />      
+
+	  前一本斗破的重置，两个穿越者的较量。没有其他穿越者也没有系统，单世界</li>
+
+	</ul>
+
+	<hr size="1" noshade="noshade" />
+
+	
+
+	<ul style="width:100%">
+
+	<li class="Conjunction">
+
+	<img src="//rs.sfacg.com/web/novel/images/NovelCover/big/defaultNew.jpg" id="SearchResultList1___ResultList_Cover_13" border="0" alt="斗破苍穹之魂珏" width="80" height="100" /></li>
+
+	<li><strong class="F14PX"><a href="https://book.sfacg.com/Novel/685910" id="SearchResultList1___ResultList_LinkInfo_13" class="orange_link2">斗破苍穹之魂珏</a></strong><br />
+
+	  综合信息： 心塞紫荆/2024/3/20 9:33:56<br />      
+
+	  变嫁文。变嫁文。</li>
+
+	</ul>
+
+	<hr size="1" noshade="noshade" />
+
+	
+
+	<ul style="width:100%">
+
+	<li class="Conjunction">
+
+	<img src="//rs.sfacg.com/web/novel/images/NovelCover/big/2018/10/7c28170c-8e5b-4bd3-a3ab-494ced5bdb3d.jpg" id="SearchResultList1___ResultList_Cover_14" border="0" alt="斗破苍穹之02创世复苏" width="80" height="100" /></li>
+
+	<li><strong class="F14PX"><a href="https://book.sfacg.com/Novel/166521" id="SearchResultList1___ResultList_LinkInfo_14" class="orange_link2">斗破苍穹之02创世复苏</a></strong><br />
+
+	  综合信息： 吾乃女王陛下/2018/10/22 16:00:24<br />      
+
+	  我拥有了创世神的力量，代价确是失去所有感情变成02和重生在斗破苍穹世界。。</li>
+
+	</ul>
+
+	<hr size="1" noshade="noshade" />
+
+	
+
+	<ul style="width:100%">
+
+	<li class="Conjunction">
+
+	<img src="//rs.sfacg.com/web/novel/images/NovelCover/big/2019/10/cef92c12-61d3-4a74-a584-cf6cc948f0f4.jpg" id="SearchResultList1___ResultList_Cover_15" border="0" alt="斗破苍穹之轮回" width="80" height="100" /></li>
+
+	<li><strong class="F14PX"><a href="https://book.sfacg.com/Novel/246436" id="SearchResultList1___ResultList_LinkInfo_15" class="orange_link2">斗破苍穹之轮回</a></strong><br />
+
+	  综合信息： 帝王伪征/2020/2/12 19:01:34<br />      
+
+	  本书已转移，搜索《斗破苍穹之重归巅峰》即可观看！</li>
+
+	</ul>
+
+	<hr size="1" noshade="noshade" />
+
+	
+
+	<ul style="width:100%">
+
+	<li class="Conjunction">
+
+	<img src="//rs.sfacg.com/web/novel/images/NovelCover/big/2025/04/1488c6ef-2132-4e90-9903-057f3a6c54d7.jpg" id="SearchResultList1___ResultList_Cover_16" border="0" alt="斗破苍穹之魂鸢儿" width="80" height="100" /></li>
+
+	<li><strong class="F14PX"><a href="https://book.sfacg.com/Novel/742186" id="SearchResultList1___ResultList_LinkInfo_16" class="orange_link2">斗破苍穹之魂鸢儿</a></strong><br />
+
+	  综合信息： 无敌的猫猫大人/2025/4/16 21:03:25<br />      
+
+	  当萧炎的过往出现错误。
+本不应该存在于过去的他与没有野心游历大陆的魂天帝相识之后会发生什么。
+经历万世轮回，内心逐渐扭曲少女阴恻恻道:无论如何，无论以什么样的方式，我的爱的人或者爱我的人都必须一直陪着我。</li>
+
+	</ul>
+
+	<hr size="1" noshade="noshade" />
+
+	
+
+	<ul style="width:100%">
+
+	<li class="Conjunction">
+
+	<img src="//rs.sfacg.com/web/novel/images/NovelCover/big/2021/07/3b1f1184-4f62-4590-83e9-8876482818e3.jpg" id="SearchResultList1___ResultList_Cover_17" border="0" alt="斗破苍穹之古薰儿" width="80" height="100" /></li>
+
+	<li><strong class="F14PX"><a href="https://book.sfacg.com/Novel/468871" id="SearchResultList1___ResultList_LinkInfo_17" class="orange_link2">斗破苍穹之古薰儿</a></strong><br />
+
+	  综合信息： 啊泰1997/2021/7/27 19:08:21<br />      
+
+	  一代程序猿重生成为斗破苍穹小说女主角古薰儿的故事。其剧情故事可能于原著剧情有差异（原著党请绕行）</li>
+
+	</ul>
+
+	<hr size="1" noshade="noshade" />
+
+	
+
+	<ul style="width:100%">
+
+	<li class="Conjunction">
+
+	<img src="//rs.sfacg.com/web/novel/images/NovelCover/big/2022/05/774baaef-579a-43d1-9cd4-4341a4d1e042.jpg" id="SearchResultList1___ResultList_Cover_18" border="0" alt="成为特瓦林并在斗破苍穹" width="80" height="100" /></li>
+
+	<li><strong class="F14PX"><a href="https://book.sfacg.com/Novel/555802" id="SearchResultList1___ResultList_LinkInfo_18" class="orange_link2">成为特瓦林并在斗破苍穹</a></strong><br />
+
+	  综合信息： 我的MA呀X4/2022/6/18 0:29:25<br />      
+
+	  诶嘿～☆</li>
+
+	</ul>
+
+	<hr size="1" noshade="noshade" />
+
+	
+
+	<ul style="width:100%">
+
+	<li class="Conjunction">
+
+	<img src="//rs.sfacg.com/web/novel/images/NovelCover/big/2018/11/bdd6cff6-0b8b-4354-abf5-35078fde5adc.jpg" id="SearchResultList1___ResultList_Cover_19" border="0" alt="斗破苍穹之萧族斗帝" width="80" height="100" /></li>
+
+	<li><strong class="F14PX"><a href="https://book.sfacg.com/Novel/172699" id="SearchResultList1___ResultList_LinkInfo_19" class="orange_link2">斗破苍穹之萧族斗帝</a></strong><br />
+
+	  综合信息： 玩火的行家/2019/5/5 12:20:57<br />      
+
+	  讲述萧族初代斗帝的故事，剧情原创，无意冒犯原作者，本人不闲，所以更新随缘，但一定完结</li>
+
+	</ul>
+
+	<hr size="1" noshade="noshade" />
+
+	
+
+	<ul style="width:100%">
+
+	<li class="Conjunction">
+
+	<img src="//rs.sfacg.com/web/novel/images/NovelCover/big/defaultNew.jpg" id="SearchResultList1___ResultList_Cover_20" border="0" alt="斗破苍穹之魂玉Q" width="80" height="100" /></li>
+
+	<li><strong class="F14PX"><a href="https://book.sfacg.com/Novel/682507" id="SearchResultList1___ResultList_LinkInfo_20" class="orange_link2">斗破苍穹之魂玉Q</a></strong><br />
+
+	  综合信息： 心塞紫荆/2025/8/19 11:09:40<br />      
+
+	  杀萧炎，抢焚决</li>
+
+	</ul>
+
+	<hr size="1" noshade="noshade" />
+
+	
+
+	<ul style="width:100%">
+
+	<li class="Conjunction">
+
+	<img src="//rs.sfacg.com/web/novel/images/NovelCover/big/2022/06/1a864887-c14d-4621-b80e-0e98414611c4.jpg" id="SearchResultList1___ResultList_Cover_21" border="0" alt="斗破苍穹之炎天异火榜" width="80" height="100" /></li>
+
+	<li><strong class="F14PX"><a href="https://book.sfacg.com/Novel/544385" id="SearchResultList1___ResultList_LinkInfo_21" class="orange_link2">斗破苍穹之炎天异火榜</a></strong><br />
+
+	  综合信息： 脸叔大大/2024/4/17 10:53:57<br />      
+
+	  炎天异火榜是一部以斗破苍穹为原型的小说作品、其中还穿插了一点关于武动乾坤和大主宰的剧情。缘讲述了在炎帝萧炎破碎虚空进入三千世界后1000年后，在斗气大陆上突然出现了巨大的异变，全新异火榜炎天异火榜上面的异火们突然集体暴走危害人间，面对这种暴动，身在大千世界的萧炎十分担忧，便带领着自己的恩师药尘和众爱妻们来到自己的老家斗气大陆上，就在他们马上要出手平复暴动时，时空守望者狄兰•格兰特出现在了他们面前…</li>
+
+	</ul>
+
+	<hr size="1" noshade="noshade" />
+
+	
+
+	<ul style="width:100%">
+
+	<li class="Conjunction">
+
+	<img src="//rs.sfacg.com/web/novel/images/NovelCover/big/2021/02/15b6ed07-c9a0-4566-acbf-27c5b2d975a9.jpg" id="SearchResultList1___ResultList_Cover_22" border="0" alt="斗破苍穹之万毒噬心决" width="80" height="100" /></li>
+
+	<li><strong class="F14PX"><a href="https://book.sfacg.com/Novel/415178" id="SearchResultList1___ResultList_LinkInfo_22" class="orange_link2">斗破苍穹之万毒噬心决</a></strong><br />
+
+	  综合信息： 苏家沐雪/2021/3/8 21:43:28<br />      
+
+	  阿拉德大陆的毒王路易斯在死亡后意外来到斗气大陆……</li>
+
+	</ul>
+
+	<hr size="1" noshade="noshade" />
+
+	
+
+	<ul style="width:100%">
+
+	<li class="Conjunction">
+
+	<img src="//rs.sfacg.com/web/novel/images/NovelCover/big/2022/04/73f015b2-1f77-4128-afb8-dc072468872c.jpg" id="SearchResultList1___ResultList_Cover_23" border="0" alt="斗破苍穹之开局娶夭月" width="80" height="100" /></li>
+
+	<li><strong class="F14PX"><a href="https://book.sfacg.com/Novel/543847" id="SearchResultList1___ResultList_LinkInfo_23" class="orange_link2">斗破苍穹之开局娶夭月</a></strong><br />
+
+	  综合信息： 暮辞MC/2022/4/27 23:07:31<br />      
+
+	  一个有特殊爱好的女总裁一觉醒来，来到了一片陌生大陆，记忆丢失，看她如何在这片大陆上发展</li>
+
+	</ul>
+
+	<hr size="1" noshade="noshade" />
+
+	
+
+	<ul style="width:100%">
+
+	<li class="Conjunction">
+
+	<img src="//rs.sfacg.com/web/novel/images/NovelCover/big/2022/07/b13481bd-c0ce-4774-8261-9274be2526a6.jpg" id="SearchResultList1___ResultList_Cover_24" border="0" alt="斗破苍穹：至尊转世" width="80" height="100" /></li>
+
+	<li><strong class="F14PX"><a href="https://book.sfacg.com/Novel/567962" id="SearchResultList1___ResultList_LinkInfo_24" class="orange_link2">斗破苍穹：至尊转世</a></strong><br />
+
+	  综合信息： 宾美式/2022/7/22 0:36:15<br />      
+
+	  萧忆转世重修，成为萧家第四少！</li>
+
+	</ul>
+
+	<hr size="1" noshade="noshade" />
+
+	
+
+	</td>
+
+  </tr>
+
+</table>
+
+<table width="980" border="0" align="center" cellpadding="0" cellspacing="0">
+
+  <tr>
+
+    <td height="28" valign="top" bgcolor="#ededed"><ul class="nav pagebar" style="margin-right: 5px;">
+
+      
+
+    </ul></td>
+
+  </tr>
+
+</table>
+
+    </form>
+
+    <table width="980" height="36"  border="0" align="center" cellpadding="8" cellspacing="0" class="space10px">
+
+  <tr class="font_gray gray_link1">
+
+    <td bgcolor="#e3e3e3"></td>
+
+    <td align="right" bgcolor="#e3e3e3" class="font_Gray">[C] 2005－2008 SKY-FIRE.COM All Rights Reserved</td>
+
+  </tr>
+
+</table>
+
+<div id="TJ2" style="position:absolute; width:0; height:0; overflow: hidden;">
+
+<script src="//v.sfacg.com/stats/tj.js?v=20180329"></script>
+
+</div>
+
+	<script type="text/javascript">
+
+		$(function(){
+
+			var t = GetArgsFromHref(location.href,"S");
+
+			if(t=="")t="0";
+
+			$("#SKey").bigAutocomplete({width:604,url:"/ajax/GetRelateWord.ashx?a=1&t="+t,callback:function(data){
+
+			}});
+
+			
+
+		
+
+		})
+
+	</script>
+
+</body>
+
+</html>
+

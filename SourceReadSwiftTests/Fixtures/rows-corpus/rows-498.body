@@ -1,0 +1,483 @@
+<!doctype html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+<title>-搜索-二三中文  </title>
+<meta name="keywords" content="二三中文,全本小说,免费小说,好看的小说" />
+<link rel="stylesheet" type="text/css" href="/images/yuedu.css"/>
+<script type="text/javascript" src="/yuedu/js/jquery-1.8.2.js"></script>
+<script src="/4VCgeLzt/yOGZDvZWHK.js"></script>
+<script type="text/javascript" src="/images/bqg.js"></script>
+</head>
+<body>
+    <div id="wrapper">
+        <script>login();</script><script type="text/javascript" src="/images/yuedu.js"></script>
+
+        <div class="header">
+        
+            <div class="header_logo">
+                <a href="http://www.23uswx.la" >二三中文</a>
+            </div>
+            <script>bqg_panel();</script>
+        
+        </div>
+        <div class="nav">
+            <ul>
+                <li><a href="http://www.23uswx.la/">首页</a></li>
+                <li><a href="/modules/article/bookcase.php">我的书架</a></li>
+                <li><a href="/xuanhuanxiaoshuo/">玄幻小说</a></li>
+                <li><a href="/xiuzhenxiaoshuo/">修真小说</a></li>
+                <li><a href="/dushixiaoshuo/">都市小说</a></li>
+                <li><a href="/chuanyuexiaoshuo/">穿越小说</a></li>
+                <li><a href="/wangyouxiaoshuo/">网游小说</a></li>
+                <li><a href="/kehuanxiaoshuo/">科幻小说</a></li>
+                <li><a href="/paihangbang/">小说排行榜</a></li>
+                <li><a href="/wanben/">完本小说</a></li>
+                <li><script type="text/javascript">yuedu();</script></li>
+            </ul>
+        </div>
+        <div id="banner" style="display:none"></div>
+<script type="text/javascript">top_bar();</script>
+ 
+        <div id="main">
+        <div id="content">
+<style type="text/css">
+ul,li{margin:0;padding:0;}
+#boxcase{margin:10px auto;width:975px;border:1px dashed #88C6E5;position:relative;}
+#boxcase .title{top:-15px;width:100%;height:30px;line-height:30px;position:absolute;font-size:14px;color:#000;text-align:center;}
+#boxcase .title span{background-color:#E9FAFF;}
+#boxcase ul{padding:10px 20px 30px 20px;}
+#boxcase ul li{float:left;width:25%;height:25px;line-height:25px;font-size:14px;color:#000;text-align:left; }
+#boxcase ul li a{line-height:30px;font-size:14px;color:#FF0000; text-decoration:none;}
+#boxcase ul li a:hover{color:#ff6600;}
+</style>
+<form action="" method="post" name="checkform" id="checkform" onsubmit="return check_confirm();">
+<div class="gridtop">
+-搜索
+  </div>
+<table class="grid" width="100%" align="center">
+  <tr align="center">
+    <th width="20%">文章名称</th>
+    <th width="40%">最新章节</th>
+    <th width="15%">作者</th>
+    <th width="9%">字数</th>
+    <th width="10%">更新</th>
+    <th width="6%">状态</th>
+  </tr>
+  <tr id="nr">
+    <td class="odd"><a href="http://www.23uswx.la/0_747/">斗破苍穹</a></td>
+    <td class="even"><a href="http://www.23uswx.la/0_747/27031056.html" target="_blank">新书元尊已在起点上传，欢迎大家阅读。</a></td>
+    <td class="odd">天蚕土豆</td>
+    <td class="even">16167k</td>
+    <td class="odd" align="center">19-04-02</td>
+    <td class="even" align="center">完本</td>
+  </tr>
+  <tr id="nr">
+    <td class="odd"><a href="http://www.23uswx.la/53_53526/">穿越斗破苍穹</a></td>
+    <td class="even"><a href="http://www.23uswx.la/53_53526/22220155.html" target="_blank">三女相遇</a></td>
+    <td class="odd">午时一刻</td>
+    <td class="even">579k</td>
+    <td class="odd" align="center">18-09-25</td>
+    <td class="even" align="center">完本</td>
+  </tr>
+  <tr id="nr">
+    <td class="odd"><a href="http://www.23uswx.la/81_81055/">从斗破苍穹开始打卡</a></td>
+    <td class="even"><a href="http://www.23uswx.la/81_81055/31806130.html" target="_blank">第003章 四段斗之气（求推荐求收藏）</a></td>
+    <td class="odd">爱潜水的龙虾</td>
+    <td class="even">8k</td>
+    <td class="odd" align="center">20-01-03</td>
+    <td class="even" align="center">连载</td>
+  </tr>
+  <tr id="nr">
+    <td class="odd"><a href="http://www.23uswx.la/31_31857/">斗破苍穹之最穿越系统</a></td>
+    <td class="even"><a href="http://www.23uswx.la/31_31857/21382419.html" target="_blank">关于回归</a></td>
+    <td class="odd">优言</td>
+    <td class="even">887k</td>
+    <td class="odd" align="center">18-07-26</td>
+    <td class="even" align="center">连载</td>
+  </tr>
+  <tr id="nr">
+    <td class="odd"><a href="http://www.23uswx.la/32_32530/">斗破苍穹之穿越诸天</a></td>
+    <td class="even"><a href="http://www.23uswx.la/32_32530/21400425.html" target="_blank">高考结束</a></td>
+    <td class="odd">奥莱史</td>
+    <td class="even">108k</td>
+    <td class="odd" align="center">18-09-05</td>
+    <td class="even" align="center">连载</td>
+  </tr>
+  <tr id="nr">
+    <td class="odd"><a href="http://www.23uswx.la/18_18419/">斗破苍穹神之炎帝</a></td>
+    <td class="even"><a href="http://www.23uswx.la/18_18419/54538755.html" target="_blank">开新书了（全职法师之亡灵罹难者）</a></td>
+    <td class="odd">柠檬邱霞</td>
+    <td class="even">9811k</td>
+    <td class="odd" align="center">23-09-11</td>
+    <td class="even" align="center">连载</td>
+  </tr>
+  <tr id="nr">
+    <td class="odd"><a href="http://www.23uswx.la/52_52796/">修炼从斗破苍穹开始</a></td>
+    <td class="even"><a href="http://www.23uswx.la/52_52796/43075389.html" target="_blank">第五百三十五章 救出炎帝武祖</a></td>
+    <td class="odd">江湖有酒</td>
+    <td class="even">1847k</td>
+    <td class="odd" align="center">21-08-21</td>
+    <td class="even" align="center">连载</td>
+  </tr>
+  <tr id="nr">
+    <td class="odd"><a href="http://www.23uswx.la/2_2162/">穿越斗破苍穹之龙帝</a></td>
+    <td class="even"><a href="http://www.23uswx.la/2_2162/1310656.html" target="_blank">第417章 丹会结束</a></td>
+    <td class="odd">潇雨云逸</td>
+    <td class="even">4578k</td>
+    <td class="odd" align="center">90-01-01</td>
+    <td class="even" align="center">连载</td>
+  </tr>
+  <tr id="nr">
+    <td class="odd"><a href="http://www.23uswx.la/67_67434/">斗破苍穹之忍者系统</a></td>
+    <td class="even"><a href="http://www.23uswx.la/67_67434/40359276.html" target="_blank">第三百五十六章 焚血魔丹！</a></td>
+    <td class="odd">望月追风</td>
+    <td class="even">2410k</td>
+    <td class="odd" align="center">20-01-09</td>
+    <td class="even" align="center">连载</td>
+  </tr>
+  <tr id="nr">
+    <td class="odd"><a href="http://www.23uswx.la/53_53473/">从斗破苍穹开始秀</a></td>
+    <td class="even"><a href="http://www.23uswx.la/53_53473/25102746.html" target="_blank">第208章 婆娑天狱穿琵骨！</a></td>
+    <td class="odd">阎罗决</td>
+    <td class="even">679k</td>
+    <td class="odd" align="center">19-01-01</td>
+    <td class="even" align="center">连载</td>
+  </tr>
+  <tr id="nr">
+    <td class="odd"><a href="http://www.23uswx.la/18_18147/">斗破苍穹之再造辉煌</a></td>
+    <td class="even"><a href="http://www.23uswx.la/18_18147/21203316.html" target="_blank">新书发布</a></td>
+    <td class="odd">平白无故</td>
+    <td class="even">6391k</td>
+    <td class="odd" align="center">18-08-14</td>
+    <td class="even" align="center">连载</td>
+  </tr>
+  <tr id="nr">
+    <td class="odd"><a href="http://www.23uswx.la/130_130587/">从斗破苍穹签到开始</a></td>
+    <td class="even"><a href="http://www.23uswx.la/130_130587/62555701.html" target="_blank">第355章 九玄蕴魂丹</a></td>
+    <td class="odd">敖晨</td>
+    <td class="even">1350k</td>
+    <td class="odd" align="center">25-01-15</td>
+    <td class="even" align="center">连载</td>
+  </tr>
+  <tr id="nr">
+    <td class="odd"><a href="http://www.23uswx.la/152_152865/">斗破苍穹：辰星闪耀</a></td>
+    <td class="even"><a href="http://www.23uswx.la/152_152865/57398428.html" target="_blank">第二十七章，琐事</a></td>
+    <td class="odd">寡人不听劝</td>
+    <td class="even">146k</td>
+    <td class="odd" align="center">24-02-21</td>
+    <td class="even" align="center">连载</td>
+  </tr>
+  <tr id="nr">
+    <td class="odd"><a href="http://www.23uswx.la/78_78443/">从斗破苍穹开始无敌吧</a></td>
+    <td class="even"><a href="http://www.23uswx.la/78_78443/31070422.html" target="_blank">第8章 瓜分</a></td>
+    <td class="odd">恐小丫亚</td>
+    <td class="even">21k</td>
+    <td class="odd" align="center">19-11-25</td>
+    <td class="even" align="center">连载</td>
+  </tr>
+  <tr id="nr">
+    <td class="odd"><a href="http://www.23uswx.la/47_47936/">斗破苍穹之域外之君</a></td>
+    <td class="even"><a href="http://www.23uswx.la/47_47936/26439360.html" target="_blank">第367章 远古时期17</a></td>
+    <td class="odd">帝君潇</td>
+    <td class="even">1965k</td>
+    <td class="odd" align="center">19-02-28</td>
+    <td class="even" align="center">连载</td>
+  </tr>
+  <tr id="nr">
+    <td class="odd"><a href="http://www.23uswx.la/12_12821/">斗破苍穹之万界商城</a></td>
+    <td class="even"><a href="http://www.23uswx.la/12_12821/32194600.html" target="_blank">新书《诸天最强玩家》</a></td>
+    <td class="odd">梦回夕照</td>
+    <td class="even">4999k</td>
+    <td class="odd" align="center">19-03-06</td>
+    <td class="even" align="center">连载</td>
+  </tr>
+  <tr id="nr">
+    <td class="odd"><a href="http://www.23uswx.la/139_139618/">斗破苍穹之财动乾坤</a></td>
+    <td class="even"><a href="http://www.23uswx.la/139_139618/62606782.html" target="_blank">新书</a></td>
+    <td class="odd">辛酸盐</td>
+    <td class="even">1024k</td>
+    <td class="odd" align="center">25-01-20</td>
+    <td class="even" align="center">连载</td>
+  </tr>
+  <tr id="nr">
+    <td class="odd"><a href="http://www.23uswx.la/62_62342/">斗破苍穹之召唤鬼帝</a></td>
+    <td class="even"><a href="http://www.23uswx.la/62_62342/26750676.html" target="_blank">第249章 兵发伽玛</a></td>
+    <td class="odd">陌文子</td>
+    <td class="even">2038k</td>
+    <td class="odd" align="center">19-03-17</td>
+    <td class="even" align="center">连载</td>
+  </tr>
+  <tr id="nr">
+    <td class="odd"><a href="http://www.23uswx.la/40_40653/">斗破苍穹之位面穿越</a></td>
+    <td class="even"><a href="http://www.23uswx.la/40_40653/21524069.html" target="_blank">我有事说</a></td>
+    <td class="odd">唐家土豆</td>
+    <td class="even">49k</td>
+    <td class="odd" align="center">18-09-05</td>
+    <td class="even" align="center">连载</td>
+  </tr>
+  <tr id="nr">
+    <td class="odd"><a href="http://www.23uswx.la/42_42533/">斗破苍穹之器炼巅峰</a></td>
+    <td class="even"><a href="http://www.23uswx.la/42_42533/22319853.html" target="_blank">完结</a></td>
+    <td class="odd">书剑疯灵子</td>
+    <td class="even">1410k</td>
+    <td class="odd" align="center">18-09-28</td>
+    <td class="even" align="center">连载</td>
+  </tr>
+  <tr id="nr">
+    <td class="odd"><a href="http://www.23uswx.la/45_45321/">斗破苍穹之万界主宰</a></td>
+    <td class="even"><a href="http://www.23uswx.la/45_45321/25911052.html" target="_blank">第239章 </a></td>
+    <td class="odd">她像只猫</td>
+    <td class="even">926k</td>
+    <td class="odd" align="center">19-01-30</td>
+    <td class="even" align="center">连载</td>
+  </tr>
+  <tr id="nr">
+    <td class="odd"><a href="http://www.23uswx.la/5_5400/">斗破苍穹之倾城绝恋</a></td>
+    <td class="even"><a href="http://www.23uswx.la/5_5400/53908733.html" target="_blank">第1761章 最后选择</a></td>
+    <td class="odd">文武全才彬彬</td>
+    <td class="even">10624k</td>
+    <td class="odd" align="center">23-07-12</td>
+    <td class="even" align="center">连载</td>
+  </tr>
+  <tr id="nr">
+    <td class="odd"><a href="http://www.23uswx.la/81_81259/">斗破苍穹之加列奥</a></td>
+    <td class="even"><a href="http://www.23uswx.la/81_81259/40493592.html" target="_blank">第一百四十九章 分道扬镳</a></td>
+    <td class="odd">绝望的月半</td>
+    <td class="even">486k</td>
+    <td class="odd" align="center">20-06-02</td>
+    <td class="even" align="center">连载</td>
+  </tr>
+  <tr id="nr">
+    <td class="odd"><a href="http://www.23uswx.la/13_13276/">战破苍穹</a></td>
+    <td class="even"><a href="http://www.23uswx.la/13_13276/7603420.html" target="_blank">第七百六十七章 新版本登场(大结局）</a></td>
+    <td class="odd">龙大人</td>
+    <td class="even">7469k</td>
+    <td class="odd" align="center">90-01-01</td>
+    <td class="even" align="center">连载</td>
+  </tr>
+  <tr id="nr">
+    <td class="odd"><a href="http://www.23uswx.la/129_129036/">机破苍穹</a></td>
+    <td class="even"><a href="http://www.23uswx.la/129_129036/51131027.html" target="_blank">第四十九章 终</a></td>
+    <td class="odd">哀殿赛高</td>
+    <td class="even">1233k</td>
+    <td class="odd" align="center">22-11-30</td>
+    <td class="even" align="center">连载</td>
+  </tr>
+  <tr id="nr">
+    <td class="odd"><a href="http://www.23uswx.la/96_96521/">武破苍穹</a></td>
+    <td class="even"><a href="http://www.23uswx.la/96_96521/36519325.html" target="_blank">第一七四章 牢笼的世界，功法为钥</a></td>
+    <td class="odd">木易言</td>
+    <td class="even">619k</td>
+    <td class="odd" align="center">20-09-02</td>
+    <td class="even" align="center">完本</td>
+  </tr>
+  <tr id="nr">
+    <td class="odd"><a href="http://www.23uswx.la/77_77952/">魂灵破苍穹</a></td>
+    <td class="even"><a href="http://www.23uswx.la/77_77952/31514824.html" target="_blank">第八十四章 七星坤地</a></td>
+    <td class="odd">火红轰彼岸花</td>
+    <td class="even">323k</td>
+    <td class="odd" align="center">19-12-19</td>
+    <td class="even" align="center">连载</td>
+  </tr>
+  <tr id="nr">
+    <td class="odd"><a href="http://www.23uswx.la/167_167787/">剑破苍穹</a></td>
+    <td class="even"><a href="http://www.23uswx.la/167_167787/61728559.html" target="_blank">第9章 禁制之秘</a></td>
+    <td class="odd">不认得回家的路</td>
+    <td class="even">15k</td>
+    <td class="odd" align="center">24-11-10</td>
+    <td class="even" align="center">连载</td>
+  </tr>
+  <tr id="nr">
+    <td class="odd"><a href="http://www.23uswx.la/181_181679/">帅破苍穹</a></td>
+    <td class="even"><a href="http://www.23uswx.la/181_181679/67917442.html" target="_blank">338.人神共愤！</a></td>
+    <td class="odd">崴少</td>
+    <td class="even">267k</td>
+    <td class="odd" align="center">26-02-28</td>
+    <td class="even" align="center">连载</td>
+  </tr>
+  <tr id="nr">
+    <td class="odd"><a href="http://www.23uswx.la/68_68049/">武破苍穹</a></td>
+    <td class="even"><a href="http://www.23uswx.la/68_68049/27713009.html" target="_blank">第五百十八章 结束感言</a></td>
+    <td class="odd">贪狼星</td>
+    <td class="even">1986k</td>
+    <td class="odd" align="center">14-09-10</td>
+    <td class="even" align="center">完本</td>
+  </tr>
+  <tr id="nr">
+    <td class="odd"><a href="http://www.23uswx.la/21_21611/">Q破苍穹</a></td>
+    <td class="even"><a href="http://www.23uswx.la/21_21611/10776800.html" target="_blank">第五百八十四章 等待后记的结局</a></td>
+    <td class="odd">蘑菇123</td>
+    <td class="even">2394k</td>
+    <td class="odd" align="center">18-03-09</td>
+    <td class="even" align="center">连载</td>
+  </tr>
+  <tr id="nr">
+    <td class="odd"><a href="http://www.23uswx.la/7_7103/">兽破苍穹</a></td>
+    <td class="even"><a href="http://www.23uswx.la/7_7103/20841680.html" target="_blank">第1457章 推荐一本好看的玄幻书籍！</a></td>
+    <td class="odd">妖夜</td>
+    <td class="even">11605k</td>
+    <td class="odd" align="center">18-09-05</td>
+    <td class="even" align="center">完本</td>
+  </tr>
+  <tr id="nr">
+    <td class="odd"><a href="http://www.23uswx.la/16_16970/">刀破苍穹</a></td>
+    <td class="even"><a href="http://www.23uswx.la/16_16970/8865753.html" target="_blank">第2555章 大团圆（大结局+完结感言）</a></td>
+    <td class="odd">何无恨</td>
+    <td class="even">34724k</td>
+    <td class="odd" align="center">90-01-01</td>
+    <td class="even" align="center">连载</td>
+  </tr>
+  <tr id="nr">
+    <td class="odd"><a href="http://www.23uswx.la/1_1031/">机破苍穹</a></td>
+    <td class="even"><a href="http://www.23uswx.la/1_1031/521088.html" target="_blank">第五四五章 大结局（下）</a></td>
+    <td class="odd">落寞孤情</td>
+    <td class="even">4337k</td>
+    <td class="odd" align="center">90-01-01</td>
+    <td class="even" align="center">连载</td>
+  </tr>
+  <tr id="nr">
+    <td class="odd"><a href="http://www.23uswx.la/112_112262/">轩破苍穹</a></td>
+    <td class="even"><a href="http://www.23uswx.la/112_112262/41939975.html" target="_blank">第二卷 第二卷第五章：最终之战！</a></td>
+    <td class="odd">星河凉城</td>
+    <td class="even">37k</td>
+    <td class="odd" align="center">21-07-01</td>
+    <td class="even" align="center">连载</td>
+  </tr>
+  <tr id="nr">
+    <td class="odd"><a href="http://www.23uswx.la/82_82562/">算破苍穹</a></td>
+    <td class="even"><a href="http://www.23uswx.la/82_82562/32407685.html" target="_blank">第四十八章 提亲二</a></td>
+    <td class="odd">有情大白</td>
+    <td class="even">196k</td>
+    <td class="odd" align="center">20-02-06</td>
+    <td class="even" align="center">连载</td>
+  </tr>
+  <tr id="nr">
+    <td class="odd"><a href="http://www.23uswx.la/141_141240/">舞破苍穹</a></td>
+    <td class="even"><a href="http://www.23uswx.la/141_141240/52200358.html" target="_blank">【大结局】</a></td>
+    <td class="odd">詹杰</td>
+    <td class="even">1004k</td>
+    <td class="odd" align="center">23-03-09</td>
+    <td class="even" align="center">完本</td>
+  </tr>
+  <tr id="nr">
+    <td class="odd"><a href="http://www.23uswx.la/46_46063/">斗破苍穹之炼药师柳席</a></td>
+    <td class="even"><a href="http://www.23uswx.la/46_46063/18755771.html" target="_blank">第三十七章 天火尊者苏醒</a></td>
+    <td class="odd">一梦尽余生</td>
+    <td class="even">250k</td>
+    <td class="odd" align="center">90-01-01</td>
+    <td class="even" align="center">连载</td>
+  </tr>
+  <tr id="nr">
+    <td class="odd"><a href="http://www.23uswx.la/3_3070/">一切从斗破苍穹开始</a></td>
+    <td class="even"><a href="http://www.23uswx.la/3_3070/10131863.html" target="_blank">新书《万界之无限副本》发布，求支持。</a></td>
+    <td class="odd">千影残光</td>
+    <td class="even">10194k</td>
+    <td class="odd" align="center">90-01-01</td>
+    <td class="even" align="center">完本</td>
+  </tr>
+  <tr id="nr">
+    <td class="odd"><a href="http://www.23uswx.la/151_151438/">斗破苍穹之扶弟狂魔</a></td>
+    <td class="even"><a href="http://www.23uswx.la/151_151438/56494732.html" target="_blank">第六十六章 让我猜猜你是什么系统</a></td>
+    <td class="odd">没感情的喵</td>
+    <td class="even">173k</td>
+    <td class="odd" align="center">24-01-07</td>
+    <td class="even" align="center">连载</td>
+  </tr>
+  <tr id="nr">
+    <td class="odd"><a href="http://www.23uswx.la/0_527/">魂斗苍穹</a></td>
+    <td class="even"><a href="http://www.23uswx.la/0_527/20593218.html" target="_blank">七玲珑</a></td>
+    <td class="odd">青衣劫</td>
+    <td class="even">10750k</td>
+    <td class="odd" align="center">18-09-05</td>
+    <td class="even" align="center">完本</td>
+  </tr>
+  <tr id="nr">
+    <td class="odd"><a href="http://www.23uswx.la/138_138063/">斗梦苍穹</a></td>
+    <td class="even"><a href="http://www.23uswx.la/138_138063/50579125.html" target="_blank">第九章 震慑【大款是怎样练成的·抢座白金作品】</a></td>
+    <td class="odd">抢座</td>
+    <td class="even">22k</td>
+    <td class="odd" align="center">22-10-06</td>
+    <td class="even" align="center">连载</td>
+  </tr>
+  <tr id="nr">
+    <td class="odd"><a href="http://www.23uswx.la/57_57588/">神之苍穹破</a></td>
+    <td class="even"><a href="http://www.23uswx.la/57_57588/23855175.html" target="_blank">第四十八章：治疗马里</a></td>
+    <td class="odd">兵刃流浪</td>
+    <td class="even">189k</td>
+    <td class="odd" align="center">18-11-18</td>
+    <td class="even" align="center">连载</td>
+  </tr>
+  <tr id="nr">
+    <td class="odd"><a href="http://www.23uswx.la/4_4262/">网游之战破苍穹</a></td>
+    <td class="even"><a href="http://www.23uswx.la/4_4262/2676616.html" target="_blank">第841章，被封了</a></td>
+    <td class="odd">九月花雪</td>
+    <td class="even">7547k</td>
+    <td class="odd" align="center">90-01-01</td>
+    <td class="even" align="center">连载</td>
+  </tr>
+  <tr id="nr">
+    <td class="odd"><a href="http://www.23uswx.la/188_188993/">寒门亦可破苍穹</a></td>
+    <td class="even"><a href="http://www.23uswx.la/188_188993/68216772.html" target="_blank">第八章：心中的善</a></td>
+    <td class="odd">风筝先生</td>
+    <td class="even">26k</td>
+    <td class="odd" align="center">26-03-20</td>
+    <td class="even" align="center">连载</td>
+  </tr>
+  <tr id="nr">
+    <td class="odd"><a href="http://www.23uswx.la/165_165066/">悟空再破苍穹</a></td>
+    <td class="even"><a href="http://www.23uswx.la/165_165066/60903765.html" target="_blank">第十一章：自由的曙光</a></td>
+    <td class="odd">yize艺泽</td>
+    <td class="even">52k</td>
+    <td class="odd" align="center">24-09-19</td>
+    <td class="even" align="center">连载</td>
+  </tr>
+  <tr id="nr">
+    <td class="odd"><a href="http://www.23uswx.la/82_82920/">弑灵破苍穹</a></td>
+    <td class="even"><a href="http://www.23uswx.la/82_82920/32366301.html" target="_blank">第八章 探查东湖林</a></td>
+    <td class="odd">游承诺</td>
+    <td class="even">26k</td>
+    <td class="odd" align="center">20-02-04</td>
+    <td class="even" align="center">连载</td>
+  </tr>
+  <tr id="nr">
+    <td class="odd"><a href="http://www.23uswx.la/136_136971/">斗破苍穹：我的师姐是云韵</a></td>
+    <td class="even"><a href="http://www.23uswx.la/136_136971/50466606.html" target="_blank">第十六章 寻宝</a></td>
+    <td class="odd">凌烟歌</td>
+    <td class="even">48k</td>
+    <td class="odd" align="center">22-09-28</td>
+    <td class="even" align="center">连载</td>
+  </tr>
+  <tr id="nr">
+    <td class="odd"><a href="http://www.23uswx.la/59_59776/">斗破苍穹之他在月球当酋长</a></td>
+    <td class="even"><a href="http://www.23uswx.la/59_59776/24466039.html" target="_blank">第25章 疯狂的行动</a></td>
+    <td class="odd">花漫月</td>
+    <td class="even">74k</td>
+    <td class="odd" align="center">18-12-10</td>
+    <td class="even" align="center">连载</td>
+  </tr>
+  <tr id="nr">
+    <td class="odd"><a href="http://www.23uswx.la/132_132442/">斗破苍穹：与女王陛下的爱恨情仇</a></td>
+    <td class="even"><a href="http://www.23uswx.la/132_132442/48875457.html" target="_blank">第二十二章 解决麻烦</a></td>
+    <td class="odd">会飞的猫02</td>
+    <td class="even">62k</td>
+    <td class="odd" align="center">22-06-21</td>
+    <td class="even" align="center">连载</td>
+  </tr>
+</table>
+</div>
+        </div>
+
+        </div>
+
+        
+        <div class="dahengfu"><script type="text/javascript">bottom();</script></div>
+<div class="footer">
+            <div class="footer_link"></div>
+            <div class="footer_cont">
+                <script>footer();right();dl();</script>
+            </div>
+        </div>    
+</body>
+<script charset="utf-8" src="//www.baidu.com/js/opensug.js"></script>
+</html>

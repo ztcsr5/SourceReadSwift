@@ -1,0 +1,538 @@
+<!doctype html>
+<html>
+<head>
+<meta http-equiv="Cache-Control" content="no-siteapp" />
+<meta http-equiv="Cache-Control" content="no-transform" />
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+<title>-搜索-爱下书小说网  </title>
+<meta name="keywords" content="<title>标题、关键词、描述</title>" />
+<meta name="description" content="" />
+<link rel="stylesheet" type="text/css" href="/images/yuedu.css"/>
+<script type="text/javascript" src="/images/jquery.min.js"></script>
+<script type="text/javascript" src="/images/bqg.js"></script>
+<script src="/1APl5ysr/DEcyMVZzEk.js"></script>
+</head>
+<body>
+    <div id="wrapper">
+        <script>login();</script> 
+        <div class="header">
+            <div class="header_logo">
+                <a href="http://www.aixiashu.la">爱下书小说网</a>
+            </div>
+            <script>bqg_panel();</script>            
+        </div>
+        <div class="nav">
+            <ul>
+                <li><a href="http://www.aixiashu.la/">首页</a></li>
+                                <li><a href="/modules/article/bookcase.php">我的书架</a></li>
+                <li><a href="/xuanhuanxiaoshuo/">玄幻小说</a></li>
+                <li><a href="/wuxiaxiuzhen/">武侠修真</a></li>
+                <li><a href="/dushiyanqing/">都市言情</a></li>
+                <li><a href="/lishijunshi/">历史军事</a></li>
+                <li><a href="/wangyoujingji/">网游竞技</a></li>
+                <li><a href="/kehuanxiaoshuo/">科幻小说</a></li>
+                                <li><a href="/qitaxiaoshuo/">其他小说</a></li>
+                <li><a href="/paihangbang/">排行榜单</a></li>
+                <li><a href="/wanben/1_1">完本小说</a></li>
+            </ul>
+        </div>
+        <div id="banner" style="display:none"></div>
+        
+        <div id="main">
+        <div id="content">
+<table class="grid" width="100%" align="center">
+<caption>搜索结果</caption>
+  <tr align="center" style="height:30px;">
+    <th width="20%">文章名称</th>
+    <th width="40%">最新章节</th>
+    <th width="15%">作者</th>
+    <th width="9%">字数</th>
+    <th width="10%">更新</th>
+    <th width="6%">状态</th>
+  </tr>
+  <tr>
+    <td class="even" align="center"><a href="http://www.aixiashu.la/15/15448/" target="_blank">斗破苍穹</a></td>
+    <td class="odd" align="center"><a href="/15/15448/9613623.html" target="_blank">关于离开</a>
+    </td>
+    <td class="even" align="center">天蚕土豆</td>
+    <td class="odd" align="center">16870136</td>
+    <td class="even" align="center">07-21</td>
+    <td class="odd" align="center">连载中</td>
+  </tr>
+  <tr>
+    <td class="even" align="center"><a href="http://www.aixiashu.la/53/53405/" target="_blank">穿越斗破苍穹</a></td>
+    <td class="odd" align="center"><a href="/53/53405/22959632.html" target="_blank">三女相遇</a>
+    </td>
+    <td class="even" align="center">午时一刻</td>
+    <td class="odd" align="center">579898</td>
+    <td class="even" align="center">10-14</td>
+    <td class="odd" align="center">已完成</td>
+  </tr>
+  <tr>
+    <td class="even" align="center"><a href="http://www.aixiashu.la/44/44297/" target="_blank">斗破苍穹.2</a></td>
+    <td class="odd" align="center"><a href="/44/44297/19940063.html" target="_blank">正文 废柴逆袭_第325章：红尘影，终成梦（大结局）</a>
+    </td>
+    <td class="even" align="center">柴老五</td>
+    <td class="odd" align="center">1191987</td>
+    <td class="even" align="center">06-26</td>
+    <td class="odd" align="center">连载中</td>
+  </tr>
+  <tr>
+    <td class="even" align="center"><a href="http://www.aixiashu.la/20/20078/" target="_blank">斗破苍穹之水君</a></td>
+    <td class="odd" align="center"><a href="/20/20078/20668481.html" target="_blank">第四百四十七章 恐怖如斯</a>
+    </td>
+    <td class="even" align="center">滚键盘吧</td>
+    <td class="odd" align="center">3151238</td>
+    <td class="even" align="center">07-21</td>
+    <td class="odd" align="center">连载中</td>
+  </tr>
+  <tr>
+    <td class="even" align="center"><a href="http://www.aixiashu.la/31/31039/" target="_blank">修炼从斗破苍穹开始</a></td>
+    <td class="odd" align="center"><a href="/31/31039/36481920.html" target="_blank">第五百三十五章 救出炎帝武祖</a>
+    </td>
+    <td class="even" align="center">江湖有酒</td>
+    <td class="odd" align="center">4051838</td>
+    <td class="even" align="center">08-21</td>
+    <td class="odd" align="center">连载中</td>
+  </tr>
+  <tr>
+    <td class="even" align="center"><a href="http://www.aixiashu.la/59/59758/" target="_blank">从斗破苍穹开始打卡</a></td>
+    <td class="odd" align="center"><a href="/59/59758/25050093.html" target="_blank">第003章 四段斗之气（求推荐求收藏）</a>
+    </td>
+    <td class="even" align="center">爱潜水的龙虾</td>
+    <td class="odd" align="center">8337</td>
+    <td class="even" align="center">01-03</td>
+    <td class="odd" align="center">连载中</td>
+  </tr>
+  <tr>
+    <td class="even" align="center"><a href="http://www.aixiashu.la/106/106392/" target="_blank">从斗破苍穹签到开始</a></td>
+    <td class="odd" align="center"><a href="/106/106392/55732890.html" target="_blank">第355章 九玄蕴魂丹</a>
+    </td>
+    <td class="even" align="center">敖晨</td>
+    <td class="odd" align="center">1407727</td>
+    <td class="even" align="center">01-15</td>
+    <td class="odd" align="center">连载中</td>
+  </tr>
+  <tr>
+    <td class="even" align="center"><a href="http://www.aixiashu.la/131/131271/" target="_blank">斗破苍穹：辰星闪耀</a></td>
+    <td class="odd" align="center"><a href="/131/131271/50669421.html" target="_blank">第二十七章，琐事</a>
+    </td>
+    <td class="even" align="center">寡人不听劝</td>
+    <td class="odd" align="center">160099</td>
+    <td class="even" align="center">02-21</td>
+    <td class="odd" align="center">连载中</td>
+  </tr>
+  <tr>
+    <td class="even" align="center"><a href="http://www.aixiashu.la/3/3510/" target="_blank">斗破苍穹神之炎帝</a></td>
+    <td class="odd" align="center"><a href="/3/3510/47877357.html" target="_blank">开新书了（全职法师之亡灵罹难者）</a>
+    </td>
+    <td class="even" align="center">柠檬邱霞</td>
+    <td class="odd" align="center">14270953</td>
+    <td class="even" align="center">09-11</td>
+    <td class="odd" align="center">连载中</td>
+  </tr>
+  <tr>
+    <td class="even" align="center"><a href="http://www.aixiashu.la/40/40141/" target="_blank">斗破苍穹之忍者系统</a></td>
+    <td class="odd" align="center"><a href="/40/40141/34187989.html" target="_blank">第三百五十六章 焚血魔丹！</a>
+    </td>
+    <td class="even" align="center">望月追风</td>
+    <td class="odd" align="center">7562839</td>
+    <td class="even" align="center">01-09</td>
+    <td class="odd" align="center">连载中</td>
+  </tr>
+  <tr>
+    <td class="even" align="center"><a href="http://www.aixiashu.la/28/28572/" target="_blank">从斗破苍穹开始秀</a></td>
+    <td class="odd" align="center"><a href="/28/28572/14839489.html" target="_blank">第208章 婆娑天狱穿琵骨！</a>
+    </td>
+    <td class="even" align="center">阎罗决</td>
+    <td class="odd" align="center">1701222</td>
+    <td class="even" align="center">01-01</td>
+    <td class="odd" align="center">连载中</td>
+  </tr>
+  <tr>
+    <td class="even" align="center"><a href="http://www.aixiashu.la/13/13092/" target="_blank">斗破苍穹之斗帝新世界</a></td>
+    <td class="odd" align="center"><a href="/13/13092/8755239.html" target="_blank">更新说明！！！新书推荐</a>
+    </td>
+    <td class="even" align="center">并集逆丝</td>
+    <td class="odd" align="center">839808</td>
+    <td class="even" align="center">07-20</td>
+    <td class="odd" align="center">连载中</td>
+  </tr>
+  <tr>
+    <td class="even" align="center"><a href="http://www.aixiashu.la/5/5086/" target="_blank">斗破苍穹之万界商城</a></td>
+    <td class="odd" align="center"><a href="/5/5086/25436838.html" target="_blank">新书《诸天最强玩家》</a>
+    </td>
+    <td class="even" align="center">梦回夕照</td>
+    <td class="odd" align="center">5112390</td>
+    <td class="even" align="center">03-06</td>
+    <td class="odd" align="center">连载中</td>
+  </tr>
+  <tr>
+    <td class="even" align="center"><a href="http://www.aixiashu.la/0/577/" target="_blank">斗破苍穹之无上之境</a></td>
+    <td class="odd" align="center"><a href="/0/577/64962310.html" target="_blank">第五千三百零三章 都是她的心血</a>
+    </td>
+    <td class="even" align="center">夜雨闻铃0</td>
+    <td class="odd" align="center">19374699</td>
+    <td class="even" align="center">10-26</td>
+    <td class="odd" align="center">连载中</td>
+  </tr>
+  <tr>
+    <td class="even" align="center"><a href="http://www.aixiashu.la/57/57257/" target="_blank">从斗破苍穹开始无敌吧</a></td>
+    <td class="odd" align="center"><a href="/57/57257/24275576.html" target="_blank">第8章 瓜分</a>
+    </td>
+    <td class="even" align="center">恐小丫亚</td>
+    <td class="odd" align="center">21467</td>
+    <td class="even" align="center">11-30</td>
+    <td class="odd" align="center">连载中</td>
+  </tr>
+  <tr>
+    <td class="even" align="center"><a href="http://www.aixiashu.la/114/114986/" target="_blank">斗破苍穹之药族族长</a></td>
+    <td class="odd" align="center"><a href="/114/114986/45134332.html" target="_blank">第八十九章 投影</a>
+    </td>
+    <td class="even" align="center">作家OX4wgj</td>
+    <td class="odd" align="center">222073</td>
+    <td class="even" align="center">02-22</td>
+    <td class="odd" align="center">连载中</td>
+  </tr>
+  <tr>
+    <td class="even" align="center"><a href="http://www.aixiashu.la/18/18822/" target="_blank">斗破苍穹之万界主宰</a></td>
+    <td class="odd" align="center"><a href="/18/18822/15538943.html" target="_blank">第239章 </a>
+    </td>
+    <td class="even" align="center">她像只猫</td>
+    <td class="odd" align="center">2122050</td>
+    <td class="even" align="center">01-31</td>
+    <td class="odd" align="center">连载中</td>
+  </tr>
+  <tr>
+    <td class="even" align="center"><a href="http://www.aixiashu.la/9/9182/" target="_blank">斗破苍穹之倾城绝恋</a></td>
+    <td class="odd" align="center"><a href="/9/9182/47199837.html" target="_blank">第1761章 最后选择</a>
+    </td>
+    <td class="even" align="center">文武全才彬彬</td>
+    <td class="odd" align="center">11149520</td>
+    <td class="even" align="center">07-12</td>
+    <td class="odd" align="center">连载中</td>
+  </tr>
+  <tr>
+    <td class="even" align="center"><a href="http://www.aixiashu.la/60/60074/" target="_blank">斗破苍穹之加列奥</a></td>
+    <td class="odd" align="center"><a href="/60/60074/34316887.html" target="_blank">第一百四十九章 分道扬镳</a>
+    </td>
+    <td class="even" align="center">绝望的月半</td>
+    <td class="odd" align="center">486105</td>
+    <td class="even" align="center">06-02</td>
+    <td class="odd" align="center">连载中</td>
+  </tr>
+  <tr>
+    <td class="even" align="center"><a href="http://www.aixiashu.la/118/118392/" target="_blank">斗破苍穹之财动乾坤</a></td>
+    <td class="odd" align="center"><a href="/118/118392/55783708.html" target="_blank">新书</a>
+    </td>
+    <td class="even" align="center">辛酸盐</td>
+    <td class="odd" align="center">1013171</td>
+    <td class="even" align="center">01-20</td>
+    <td class="odd" align="center">连载中</td>
+  </tr>
+  <tr>
+    <td class="even" align="center"><a href="http://www.aixiashu.la/40/40859/" target="_blank">武破苍穹</a></td>
+    <td class="odd" align="center"><a href="/40/40859/18892827.html" target="_blank">第五百十八章 结束感言</a>
+    </td>
+    <td class="even" align="center">贪狼星</td>
+    <td class="odd" align="center">2012374</td>
+    <td class="even" align="center">09-10</td>
+    <td class="odd" align="center">已完成</td>
+  </tr>
+  <tr>
+    <td class="even" align="center"><a href="http://www.aixiashu.la/104/104756/" target="_blank">机破苍穹</a></td>
+    <td class="odd" align="center"><a href="/104/104756/44042210.html" target="_blank">第四十九章 终</a>
+    </td>
+    <td class="even" align="center">哀殿赛高</td>
+    <td class="odd" align="center">1380998</td>
+    <td class="even" align="center">11-30</td>
+    <td class="odd" align="center">连载中</td>
+  </tr>
+  <tr>
+    <td class="even" align="center"><a href="http://www.aixiashu.la/146/146332/" target="_blank">剑破苍穹</a></td>
+    <td class="odd" align="center"><a href="/146/146332/54909769.html" target="_blank">第9章 禁制之秘</a>
+    </td>
+    <td class="even" align="center">不认得回家的路</td>
+    <td class="odd" align="center">15724</td>
+    <td class="even" align="center">11-10</td>
+    <td class="odd" align="center">连载中</td>
+  </tr>
+  <tr>
+    <td class="even" align="center"><a href="http://www.aixiashu.la/53/53030/" target="_blank">兽破苍穹</a></td>
+    <td class="odd" align="center"><a href="/53/53030/22805010.html" target="_blank">第1457章 推荐一本好看的玄幻书籍！</a>
+    </td>
+    <td class="even" align="center">妖夜</td>
+    <td class="odd" align="center">4352014</td>
+    <td class="even" align="center">10-10</td>
+    <td class="odd" align="center">已完成</td>
+  </tr>
+  <tr>
+    <td class="even" align="center"><a href="http://www.aixiashu.la/47/47488/" target="_blank">刀破苍穹</a></td>
+    <td class="odd" align="center"><a href="/47/47488/21059796.html" target="_blank">第2555章 大团圆（大结局+完结感言）</a>
+    </td>
+    <td class="even" align="center">何无恨</td>
+    <td class="odd" align="center">10358033</td>
+    <td class="even" align="center">08-03</td>
+    <td class="odd" align="center">已完成</td>
+  </tr>
+  <tr>
+    <td class="even" align="center"><a href="http://www.aixiashu.la/92/92454/" target="_blank">轩破苍穹</a></td>
+    <td class="odd" align="center"><a href="/92/92454/35867077.html" target="_blank">第二卷 第二卷第五章：最终之战！</a>
+    </td>
+    <td class="even" align="center">星河凉城</td>
+    <td class="odd" align="center">37588</td>
+    <td class="even" align="center">07-01</td>
+    <td class="odd" align="center">连载中</td>
+  </tr>
+  <tr>
+    <td class="even" align="center"><a href="http://www.aixiashu.la/76/76319/" target="_blank">武破苍穹</a></td>
+    <td class="odd" align="center"><a href="/76/76319/30263767.html" target="_blank">第一七四章 牢笼的世界，功法为钥</a>
+    </td>
+    <td class="even" align="center">木易言</td>
+    <td class="odd" align="center">619258</td>
+    <td class="even" align="center">09-01</td>
+    <td class="odd" align="center">已完成</td>
+  </tr>
+  <tr>
+    <td class="even" align="center"><a href="http://www.aixiashu.la/55/55489/" target="_blank">战破苍穹</a></td>
+    <td class="odd" align="center"><a href="/55/55489/23690734.html" target="_blank">第七百六十七章 新版本登场(大结局）</a>
+    </td>
+    <td class="even" align="center">龙大人</td>
+    <td class="odd" align="center">2249031</td>
+    <td class="even" align="center">11-08</td>
+    <td class="odd" align="center">已完成</td>
+  </tr>
+  <tr>
+    <td class="even" align="center"><a href="http://www.aixiashu.la/56/56742/" target="_blank">魂灵破苍穹</a></td>
+    <td class="odd" align="center"><a href="/56/56742/24737318.html" target="_blank">第八十四章 七星坤地</a>
+    </td>
+    <td class="even" align="center">火红轰彼岸花</td>
+    <td class="odd" align="center">323808</td>
+    <td class="even" align="center">12-19</td>
+    <td class="odd" align="center">连载中</td>
+  </tr>
+  <tr>
+    <td class="even" align="center"><a href="http://www.aixiashu.la/61/61163/" target="_blank">算破苍穹</a></td>
+    <td class="odd" align="center"><a href="/61/61163/25658425.html" target="_blank">第四十八章 提亲二</a>
+    </td>
+    <td class="even" align="center">有情大白</td>
+    <td class="odd" align="center">193390</td>
+    <td class="even" align="center">02-06</td>
+    <td class="odd" align="center">连载中</td>
+  </tr>
+  <tr>
+    <td class="even" align="center"><a href="http://www.aixiashu.la/161/161403/" target="_blank">帅破苍穹</a></td>
+    <td class="odd" align="center"><a href="/161/161403/61348961.html" target="_blank">338.人神共愤！</a>
+    </td>
+    <td class="even" align="center">崴少</td>
+    <td class="odd" align="center">353629</td>
+    <td class="even" align="center">02-28</td>
+    <td class="odd" align="center">连载中</td>
+  </tr>
+  <tr>
+    <td class="even" align="center"><a href="http://www.aixiashu.la/120/120001/" target="_blank">舞破苍穹</a></td>
+    <td class="odd" align="center"><a href="/120/120001/45457292.html" target="_blank">【大结局】</a>
+    </td>
+    <td class="even" align="center">詹杰</td>
+    <td class="odd" align="center">1005902</td>
+    <td class="even" align="center">03-09</td>
+    <td class="odd" align="center">已完成</td>
+  </tr>
+  <tr>
+    <td class="even" align="center"><a href="http://www.aixiashu.la/171/171838/" target="_blank">剑破苍穹</a></td>
+    <td class="odd" align="center"><a href="/171/171838/62854652.html" target="_blank">一个未完成的故事</a>
+    </td>
+    <td class="even" align="center">狂飙的蜗牛</td>
+    <td class="odd" align="center">925085</td>
+    <td class="even" align="center">06-09</td>
+    <td class="odd" align="center">连载中</td>
+  </tr>
+  <tr>
+    <td class="even" align="center"><a href="http://www.aixiashu.la/47/47515/" target="_blank">一切从斗破苍穹开始</a></td>
+    <td class="odd" align="center"><a href="/47/47515/21082332.html" target="_blank">新书《万界之无限副本》发布，求支持。</a>
+    </td>
+    <td class="even" align="center">千影残光</td>
+    <td class="odd" align="center">3278416</td>
+    <td class="even" align="center">08-04</td>
+    <td class="odd" align="center">连载中</td>
+  </tr>
+  <tr>
+    <td class="even" align="center"><a href="http://www.aixiashu.la/114/114079/" target="_blank">斗梦苍穹</a></td>
+    <td class="odd" align="center"><a href="/114/114079/43223822.html" target="_blank">第九章 震慑【大款是怎样练成的·抢座白金作品】</a>
+    </td>
+    <td class="even" align="center">抢座</td>
+    <td class="odd" align="center">24970</td>
+    <td class="even" align="center">10-06</td>
+    <td class="odd" align="center">连载中</td>
+  </tr>
+  <tr>
+    <td class="even" align="center"><a href="http://www.aixiashu.la/63/63806/" target="_blank">神之苍穹破</a></td>
+    <td class="odd" align="center"><a href="/63/63806/26489054.html" target="_blank">第四十八章：治疗马里</a>
+    </td>
+    <td class="even" align="center">兵刃流浪</td>
+    <td class="odd" align="center">173730</td>
+    <td class="even" align="center">11-18</td>
+    <td class="odd" align="center">连载中</td>
+  </tr>
+  <tr>
+    <td class="even" align="center"><a href="http://www.aixiashu.la/168/168284/" target="_blank">寒门亦可破苍穹</a></td>
+    <td class="odd" align="center"><a href="/168/168284/61654464.html" target="_blank">第八章：心中的善</a>
+    </td>
+    <td class="even" align="center">风筝先生</td>
+    <td class="odd" align="center">26591</td>
+    <td class="even" align="center">03-20</td>
+    <td class="odd" align="center">连载中</td>
+  </tr>
+  <tr>
+    <td class="even" align="center"><a href="http://www.aixiashu.la/143/143540/" target="_blank">悟空再破苍穹</a></td>
+    <td class="odd" align="center"><a href="/143/143540/54088785.html" target="_blank">第十一章：自由的曙光</a>
+    </td>
+    <td class="even" align="center">yize艺泽</td>
+    <td class="odd" align="center">52382</td>
+    <td class="even" align="center">09-19</td>
+    <td class="odd" align="center">连载中</td>
+  </tr>
+  <tr>
+    <td class="even" align="center"><a href="http://www.aixiashu.la/61/61411/" target="_blank">弑灵破苍穹</a></td>
+    <td class="odd" align="center"><a href="/61/61411/25594567.html" target="_blank">第八章 探查东湖林</a>
+    </td>
+    <td class="even" align="center">游承诺</td>
+    <td class="odd" align="center">26626</td>
+    <td class="even" align="center">02-03</td>
+    <td class="odd" align="center">连载中</td>
+  </tr>
+  <tr>
+    <td class="even" align="center"><a href="http://www.aixiashu.la/113/113109/" target="_blank">斗破苍穹：我的师姐是云韵</a></td>
+    <td class="odd" align="center"><a href="/113/113109/43119913.html" target="_blank">第十六章 寻宝</a>
+    </td>
+    <td class="even" align="center">凌烟歌</td>
+    <td class="odd" align="center">48759</td>
+    <td class="even" align="center">09-28</td>
+    <td class="odd" align="center">连载中</td>
+  </tr>
+  <tr>
+    <td class="even" align="center"><a href="http://www.aixiashu.la/108/108624/" target="_blank">斗破苍穹：与女王陛下的爱恨情仇</a></td>
+    <td class="odd" align="center"><a href="/108/108624/41571603.html" target="_blank">第二十二章 解决麻烦</a>
+    </td>
+    <td class="even" align="center">会飞的猫02</td>
+    <td class="odd" align="center">62837</td>
+    <td class="even" align="center">06-21</td>
+    <td class="odd" align="center">连载中</td>
+  </tr>
+  <tr>
+    <td class="even" align="center"><a href="http://www.aixiashu.la/92/92168/" target="_blank">系统之我能改变剧情斗破苍穹篇</a></td>
+    <td class="odd" align="center"><a href="/92/92168/35796677.html" target="_blank">作者有感</a>
+    </td>
+    <td class="even" align="center">如霜冰雪</td>
+    <td class="odd" align="center">16848</td>
+    <td class="even" align="center">07-02</td>
+    <td class="odd" align="center">连载中</td>
+  </tr>
+  <tr>
+    <td class="even" align="center"><a href="http://www.aixiashu.la/94/94267/" target="_blank">斗破苍穹之我的师父是云韵</a></td>
+    <td class="odd" align="center"><a href="/94/94267/37455882.html" target="_blank">第三十七章 斗气跌落</a>
+    </td>
+    <td class="even" align="center">雁鸣孤城</td>
+    <td class="odd" align="center">103823</td>
+    <td class="even" align="center">10-19</td>
+    <td class="odd" align="center">连载中</td>
+  </tr>
+  <tr>
+    <td class="even" align="center"><a href="http://www.aixiashu.la/117/117761/" target="_blank">斗破苍穹之我是帝二代</a></td>
+    <td class="odd" align="center"><a href="/117/117761/44655215.html" target="_blank">第六章：帝子</a>
+    </td>
+    <td class="even" align="center">馄饨城主</td>
+    <td class="odd" align="center">2419</td>
+    <td class="even" align="center">01-13</td>
+    <td class="odd" align="center">连载中</td>
+  </tr>
+  <tr>
+    <td class="even" align="center"><a href="http://www.aixiashu.la/31/31165/" target="_blank">王者荣耀之剑破苍穹</a></td>
+    <td class="odd" align="center"><a href="/31/31165/14605053.html" target="_blank">写在最后</a>
+    </td>
+    <td class="even" align="center">风凌宇</td>
+    <td class="odd" align="center">246830</td>
+    <td class="even" align="center">12-20</td>
+    <td class="odd" align="center">连载中</td>
+  </tr>
+  <tr>
+    <td class="even" align="center"><a href="http://www.aixiashu.la/13/13079/" target="_blank">网游之射破苍穹</a></td>
+    <td class="odd" align="center"><a href="/13/13079/8754177.html" target="_blank">完本感言</a>
+    </td>
+    <td class="even" align="center">龙大人</td>
+    <td class="odd" align="center">12495666</td>
+    <td class="even" align="center">07-20</td>
+    <td class="odd" align="center">连载中</td>
+  </tr>
+  <tr>
+    <td class="even" align="center"><a href="http://www.aixiashu.la/67/67241/" target="_blank">剑破苍穹十万里</a></td>
+    <td class="odd" align="center"><a href="/67/67241/28899366.html" target="_blank">第九十章  棍来！剑出！</a>
+    </td>
+    <td class="even" align="center">夜醉渔舟</td>
+    <td class="odd" align="center">463184</td>
+    <td class="even" align="center">06-23</td>
+    <td class="odd" align="center">连载中</td>
+  </tr>
+  <tr>
+    <td class="even" align="center"><a href="http://www.aixiashu.la/60/60809/" target="_blank">我能射破苍穹</a></td>
+    <td class="odd" align="center"><a href="/60/60809/25400141.html" target="_blank">第12章 抓狂的周涛</a>
+    </td>
+    <td class="even" align="center">区越</td>
+    <td class="odd" align="center">35549</td>
+    <td class="even" align="center">01-23</td>
+    <td class="odd" align="center">连载中</td>
+  </tr>
+  <tr>
+    <td class="even" align="center"><a href="http://www.aixiashu.la/122/122491/" target="_blank">灭世斗苍穹</a></td>
+    <td class="odd" align="center"><a href="/122/122491/47598739.html" target="_blank">第五十一章太阴莲王</a>
+    </td>
+    <td class="even" align="center">凡尘很烦恼</td>
+    <td class="odd" align="center">398617</td>
+    <td class="even" align="center">08-19</td>
+    <td class="odd" align="center">连载中</td>
+  </tr>
+  <tr>
+    <td class="even" align="center"><a href="http://www.aixiashu.la/53/53323/" target="_blank">斗破天启</a></td>
+    <td class="odd" align="center"><a href="/53/53323/22932392.html" target="_blank">第三十四章 变局</a>
+    </td>
+    <td class="even" align="center">释道生</td>
+    <td class="odd" align="center">233658</td>
+    <td class="even" align="center">09-29</td>
+    <td class="odd" align="center">连载中</td>
+  </tr>
+ 
+  
+</table>
+
+<div class="pages"><div class="pagelink" id="pagelink"><em id="pagestats">1/1</em></div></div>
+
+
+<style>
+.pagelink{ text-align:center;margin-top:10px;}
+.pagelink a{border:1px solid #C3DFEA;padding:3px 7px;margin:2px; background-color:#E1ECED}
+kbd{ display:none}
+em{border:1px solid #C3DFEA;padding:3px 7px;margin:2px;background-color:#E1ECED}
+.first,.last,strong{border:1px solid #C3DFEA;padding:3px 7px;margin:2px;background-color:#E1ECED}
+strong{ background-color:#88C6E5}
+.tips{ text-align:center; display:none; border:1px solid #C3DFEA;padding:10px 0px;margin-top:10px;margin-bottom:20px; background-color:#E1ECED; font-weight:bold}
+</style>
+<script>
+    if(document.getElementById("nr") == null ){ document.getElementById("tips").style.display = "block";}
+</script>
+<div style="clear:both"></div></div>
+        </div>
+
+        </div>
+
+        
+        <div class="dahengfu"><script type="text/javascript">bottom();</script></div>
+<div class="footer">
+            <div class="footer_link"></div>
+            <div class="footer_cont">
+                <script>footer();right();dl();</script>
+            </div>
+        </div>
+        
+    </div>
+</body>
+</html>

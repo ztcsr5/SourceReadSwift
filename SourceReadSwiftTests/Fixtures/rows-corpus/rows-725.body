@@ -1,0 +1,845 @@
+<!DOCTYPE html>
+
+<html lang="en">
+
+<head>
+
+    <title>斗破苍穹漫画_漫画搜索_动漫屋</title>
+
+    <meta content="动漫屋是漫画搜索、在线漫画为一体的平台，同时提供多得多在线阅读、我们将会为您提供最新最全的斗破苍穹漫画。" name="Description" />
+
+    <meta content="斗破苍穹,斗破苍穹漫画,在线漫画" name="keywords" />
+
+    <meta content="动漫屋:好漫画,为看漫画的人而生、dm5.com" name="Author" />
+
+    <meta charset="UTF-8">
+
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=0">
+
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+
+    <meta name="apple-mobile-web-app-status-bar-style" content="black" />
+
+    <meta name="format-detection" content="telephone=no" />
+
+    <link rel="stylesheet" type="text/css" href="https://css99tel.cdndm5.com/v202609180933/dm5/css/mobile/reset.css">
+
+    <link rel="stylesheet" type="text/css" href="https://css99tel.cdndm5.com/v202609180933/dm5/css/mobile/style.css">
+
+    <!--引入脚本文件-->
+
+    <script type="text/javascript" src="https://css99tel.cdndm5.com/v202609180933/dm5/js/mobile/jquery.min.js"></script>
+
+    <script type="text/javascript" src="https://css99tel.cdndm5.com/v202609180933/dm5/js/mobile/jquery.cookie.js"></script>
+
+    <script type="text/javascript" src="https://css99tel.cdndm5.com/v202609180933/dm5/js/mobile/amazeui.min.js"></script>
+
+    <script type="text/javascript" src="https://css99tel.cdndm5.com/v202609180933/dm5/js/mobile/script.js"></script>
+
+</head>
+
+<body class="bg-gray">
+
+    <div class="normal-top">
+
+        <a href="javascript:history.back();"><img class="normal-top-back" src="https://css99tel.cdndm5.com/v202609180933/dm5/images/mobile/normal-top-back.png" alt="后退"></a>
+
+        <span class="normal-top-title">搜索：斗破苍穹</span>
+
+        <div class="normal-top-right">
+
+            <a href="javascript:pushHistory('/search/');"><img class="normal-top-right-search" src="https://css99tel.cdndm5.com/v202609180933/dm5/images/mobile/top-right-search.png"></a>
+
+            <a href="/usercenter/"><img class="normal-top-right-avatar" src="https://css99tel.cdndm5.com/dm5/images/mrtx.gif"></a>
+
+        </div>
+
+    </div>
+
+    <script type="text/javascript">
+
+        var _title = "斗破苍穹";        var _f = '0';    </script>
+
+    <script type="text/javascript" src="https://css99tel.cdndm5.com/v202609180933/dm5/js/mobile/loadSearch.js"></script>
+
+    <ul class="book-list">
+
+        <li>
+
+            <div class="book-list-cover">
+
+                <a href="/manhua-cangqiongyutianshi/" title="苍穹与天使"><img class="book-list-cover-img" src="https://mhfm8yd.cdndm5.com/51/50391/20190524132058_180x240_23.jpg" alt="苍穹与天使"></a>
+
+            </div>
+
+            <div class="book-list-info">
+
+                <a href="/manhua-cangqiongyutianshi/">
+
+                    <p class="book-list-info-title">苍穹与天使</p>
+
+                    <p class="book-list-info-desc">失去了翅膀的天使，想要守护所珍重的事物，与挚友温馨励志的故事！</p>
+
+                </a>
+
+                <p class="book-list-info-bottom">
+
+                    <a href="javascript:pushHistory('/search?title=%e7%a7%91%e5%b9%bb%e9%ad%94%e5%b9%bb&language=1&f=2');" style="color:#666;"><span class="book-list-info-bottom-item">科幻魔幻</span></a>
+
+                    <span class='book-list-info-bottom-right-font active'>已完结</span>
+
+                </p>
+
+            </div>
+
+        </li>
+
+        <li>
+
+            <div class="book-list-cover">
+
+                <a href="/manhua-yangwangcangqiongdeni/" title="仰望苍穹的你"><img class="book-list-cover-img" src="https://mhfm4yd.cdndm5.com/87/86801/20241107151836_180x240_23.jpg" alt="仰望苍穹的你"></a>
+
+            </div>
+
+            <div class="book-list-info">
+
+                <a href="/manhua-yangwangcangqiongdeni/">
+
+                    <p class="book-list-info-title">仰望苍穹的你</p>
+
+                    <p class="book-list-info-desc">往后的时光，我希望我们也能继续仰望苍穹</p>
+
+                </a>
+
+                <p class="book-list-info-bottom">
+
+                    <a href="javascript:pushHistory('/search?title=%e5%b0%91%e5%a5%b3%e7%88%b1%e6%83%85&language=1&f=2');" style="color:#666;"><span class="book-list-info-bottom-item">少女爱情</span></a>
+
+                    <span class='book-list-info-bottom-right-font active'>已完结</span>
+
+                </p>
+
+            </div>
+
+        </li>
+
+        <li>
+
+            <div class="book-list-cover">
+
+                <a href="/manhua-cangqiongbangzhishenglingji/" title="苍穹榜之圣灵纪"><img class="book-list-cover-img" src="https://mhfm2yd.cdndm5.com/42/41462/20180425143209_180x240_20.jpg" alt="苍穹榜之圣灵纪"></a>
+
+            </div>
+
+            <div class="book-list-info">
+
+                <a href="/manhua-cangqiongbangzhishenglingji/">
+
+                    <p class="book-list-info-title">苍穹榜之圣灵纪</p>
+
+                    <p class="book-list-info-desc">【每周三，周五更新】原著：天蚕土豆。编绘：猴赛雷
+
+少年姜易年，前往灵路历练，他结交牧尘、林动、萧炎的后人、也俘获一颗芳心。在历练途中，他发现自己似乎与封印在囚牢位面的“邪灵族”有所关联。
+
+一段新的故事即将从这里开始……</p>
+
+                </a>
+
+                <p class="book-list-info-bottom">
+
+                    <a href="javascript:pushHistory('/search?title=%e5%b0%91%e5%b9%b4%e7%83%ad%e8%a1%80&language=1&f=2');" style="color:#666;"><span class="book-list-info-bottom-item">少年热血</span></a>
+
+                    <span class='book-list-info-bottom-right-font active'>已完结</span>
+
+                </p>
+
+            </div>
+
+        </li>
+
+        <li>
+
+            <div class="book-list-cover">
+
+                <a href="/manhua-yinhehuweidui-cangqiongweishi/" title="银河护卫队：苍穹卫士"><img class="book-list-cover-img" src="https://mhfm7yd.cdndm5.com/98/97885/20260823133905_180x240_27.jpg" alt="银河护卫队：苍穹卫士"></a>
+
+            </div>
+
+            <div class="book-list-info">
+
+                <a href="/manhua-yinhehuweidui-cangqiongweishi/">
+
+                    <p class="book-list-info-title">银河护卫队：苍穹卫士</p>
+
+                    <p class="book-list-info-desc">当星爵与银河护卫队一路追击活体星球伊戈来到地球时，他们很快发现，这颗蓝色星球所面临的危机远不止伊戈的怒火。为了阻止地球走向毁灭，他们临危受命，幸得钢铁侠以及联合国环境研究专家的鼎力相助。众人能否及时携手同心，拯救这颗岌岌可危的星球？</p>
+
+                </a>
+
+                <p class="book-list-info-bottom">
+
+                    <a href="javascript:pushHistory('/search?title=%e5%b0%91%e5%b9%b4%e7%83%ad%e8%a1%80&language=1&f=2');" style="color:#666;"><span class="book-list-info-bottom-item">少年热血</span></a>
+
+                    <span class='book-list-info-bottom-right-font active'>已完结</span>
+
+                </p>
+
+            </div>
+
+        </li>
+
+        <li>
+
+            <div class="book-list-cover">
+
+                <a href="/manhua-zdphxy-dangerous/" title="战斗破坏学园DANGEROUS"><img class="book-list-cover-img" src="https://mhfm4yd.cdndm5.com/12/11767/20150330103854_180x240_33.jpg" alt="战斗破坏学园DANGEROUS"></a>
+
+            </div>
+
+            <div class="book-list-info">
+
+                <a href="/manhua-zdphxy-dangerous/">
+
+                    <p class="book-list-info-title">战斗破坏学园DANGEROUS</p>
+
+                    <p class="book-list-info-desc">战斗破坏学园DANGEROUS漫画 ，对所有男人产生憎恨的瞬间，少女觉醒成为”魔人“—— 遭到大学生轮奸，觉醒成为异能力者”魔人“的友钓香鱼。她得到了只让男性感染的史上最恶的病毒创造能力”災玉“。被称作“少女A”，并因那份异能遭到周围人们忌讳的她，所选择的升学高中是，“魔人”们的巢穴·私立希望崎学园，通称「战斗破坏学园DANGEROUS」。 在未曾有过的异能力大战「DANGEROUS·最终战争」中，她的故事就此开始——</p>
+
+                </a>
+
+                <p class="book-list-info-bottom">
+
+                    <a href="javascript:pushHistory('/search?title=%e5%b0%91%e5%b9%b4%e7%83%ad%e8%a1%80&language=1&f=2');" style="color:#666;"><span class="book-list-info-bottom-item">少年热血</span></a>
+
+                    <a href="javascript:pushHistory('/search?title=%e6%ad%a6%e4%be%a0%e6%a0%bc%e6%96%97&language=1&f=2');" style="color:#666;"><span class="book-list-info-bottom-item">武侠格斗</span></a>
+
+                    <a href="javascript:pushHistory('/search?title=%e7%a7%91%e5%b9%bb%e9%ad%94%e5%b9%bb&language=1&f=2');" style="color:#666;"><span class="book-list-info-bottom-item">科幻魔幻</span></a>
+
+                    <span class='book-list-info-bottom-right-font '>连载中</span>
+
+                </p>
+
+            </div>
+
+        </li>
+
+        <li>
+
+            <div class="book-list-cover">
+
+                <a href="/manhua-yiqiongxiongxing/" title="异穹凶星"><img class="book-list-cover-img" src="https://mhfm8yd.cdndm5.com/78/77474/20220428164954_180x240.jpg" alt="异穹凶星"></a>
+
+            </div>
+
+            <div class="book-list-info">
+
+                <a href="/manhua-yiqiongxiongxing/">
+
+                    <p class="book-list-info-title">异穹凶星</p>
+
+                    <p class="book-list-info-desc">科技较为发达的世界，人类意外开启了通往另一个宇宙的通道，宇宙的另一边是拥有着无数强大的生物，那些生物拥有匪夷所思的力量，人类开始研究这个宇宙初步阶段。
+
+ 云逸在一条神秘信息的提示下意外擒获了一名意图暗杀他叔叔女杀手胡燕，意外下带着女杀手进入了一支新组建的异宇宙冒险队伍。</p>
+
+                </a>
+
+                <p class="book-list-info-bottom">
+
+                    <a href="javascript:pushHistory('/search?title=%e5%b0%91%e5%b9%b4%e7%83%ad%e8%a1%80&language=1&f=2');" style="color:#666;"><span class="book-list-info-bottom-item">少年热血</span></a>
+
+                    <span class='book-list-info-bottom-right-font '>连载中</span>
+
+                </p>
+
+            </div>
+
+        </li>
+
+        <li>
+
+            <div class="book-list-cover">
+
+                <a href="/manhua-vtuber-dianliubaoposhengsijuedou/" title="Vtuber电流爆破生死决斗"><img class="book-list-cover-img" src="https://mhfm3yd.cdndm5.com/57/56962/20200124213808_180x240_24.jpg" alt="Vtuber电流爆破生死决斗"></a>
+
+            </div>
+
+            <div class="book-list-info">
+
+                <a href="/manhua-vtuber-dianliubaoposhengsijuedou/">
+
+                    <p class="book-list-info-title">Vtuber电流爆破生死决斗</p>
+
+                    <p class="book-list-info-desc">Vtuber电流爆破生死决斗漫画 ，电脑少女小白累计再生数一亿回突破纪念，Virual Youtuber电流爆破生死决斗！</p>
+
+                </a>
+
+                <p class="book-list-info-bottom">
+
+                    <span class='book-list-info-bottom-right-font '>连载中</span>
+
+                </p>
+
+            </div>
+
+        </li>
+
+        <li>
+
+            <div class="book-list-cover">
+
+                <a href="/manhua-qiongdingzhishang/" title="穹顶之上"><img class="book-list-cover-img" src="https://mhfm4yd.cdndm5.com/95/94246/20260120155251_180x240_17.jpg" alt="穹顶之上"></a>
+
+            </div>
+
+            <div class="book-list-info">
+
+                <a href="/manhua-qiongdingzhishang/">
+
+                    <p class="book-list-info-title">穹顶之上</p>
+
+                    <p class="book-list-info-desc">韩青禹生在一个铸就史诗的年代，平静地生活了十九年，从未想过，有一天自己会变成史诗里灿若星辰的名字。 然后，意外发生了，少年手里被强塞了一把刀，开始不得不面对他曾一无所知的一切：文明入侵、蔚蓝联军、源能机动装置、唯一目击军团；放逐之刃、溪流锋锐…他是全面征兵时代印在汽车和高楼上的“The青少校”；他将在天顶战争中，劈出那一刀。</p>
+
+                </a>
+
+                <p class="book-list-info-bottom">
+
+                    <a href="javascript:pushHistory('/search?title=%e5%b0%91%e5%b9%b4%e7%83%ad%e8%a1%80&language=1&f=2');" style="color:#666;"><span class="book-list-info-bottom-item">少年热血</span></a>
+
+                    <span class='book-list-info-bottom-right-font active'>已完结</span>
+
+                </p>
+
+            </div>
+
+        </li>
+
+        <li>
+
+            <div class="book-list-cover">
+
+                <a href="/manhua-cangying/" title="苍蝇"><img class="book-list-cover-img" src="https://mhfm9yd.cdndm5.com/6/5518/5518.jpg" alt="苍蝇"></a>
+
+            </div>
+
+            <div class="book-list-info">
+
+                <a href="/manhua-cangying/">
+
+                    <p class="book-list-info-title">苍蝇</p>
+
+                    <p class="book-list-info-desc">关于一只苍蝇的神奇故事~~~是法国著名漫画家Lewis Trondheim的作品~~~ 
+
+结局出人意料~~故事轻松爆笑~~~ 
+
+最棒的是没有字一样把故事讲的精彩异常~~~~~~~</p>
+
+                </a>
+
+                <p class="book-list-info-bottom">
+
+                    <a href="javascript:pushHistory('/search?title=%e5%b9%bd%e9%bb%98%e7%88%86%e7%ac%91&language=1&f=2');" style="color:#666;"><span class="book-list-info-bottom-item">幽默爆笑</span></a>
+
+                    <span class='book-list-info-bottom-right-font active'>已完结</span>
+
+                </p>
+
+            </div>
+
+        </li>
+
+        <li>
+
+            <div class="book-list-cover">
+
+                <a href="/manhua-yongzhedouelong10/" title="勇者斗恶龙10苍天的索乌拉"><img class="book-list-cover-img" src="https://mhfm5yd.cdndm5.com/43/42094/20180514164221_180x240_29.jpg" alt="勇者斗恶龙10苍天的索乌拉"></a>
+
+            </div>
+
+            <div class="book-list-info">
+
+                <a href="/manhua-yongzhedouelong10/">
+
+                    <p class="book-list-info-title">勇者斗恶龙10苍天的索乌拉</p>
+
+                    <p class="book-list-info-desc">勇者斗恶龙10苍天的索乌拉漫画 ，勇者斗恶龙10系列漫画，苍天的索乌拉。</p>
+
+                </a>
+
+                <p class="book-list-info-bottom">
+
+                    <a href="javascript:pushHistory('/search?title=%e5%b0%91%e5%b9%b4%e7%83%ad%e8%a1%80&language=1&f=2');" style="color:#666;"><span class="book-list-info-bottom-item">少年热血</span></a>
+
+                    <span class='book-list-info-bottom-right-font '>连载中</span>
+
+                </p>
+
+            </div>
+
+        </li>
+
+        <li>
+
+            <div class="book-list-cover">
+
+                <a href="/manhua-qiongluxiademonv/" title="穹庐下的魔女"><img class="book-list-cover-img" src="https://mhfm1yd.cdndm5.com/84/83256/20221220152258_180x240_18.jpg" alt="穹庐下的魔女"></a>
+
+            </div>
+
+            <div class="book-list-info">
+
+                <a href="/manhua-qiongluxiademonv/">
+
+                    <p class="book-list-info-title">穹庐下的魔女</p>
+
+                    <p class="book-list-info-desc">1213年的波斯（现今的伊朗）， 奴隶少女希塔拉虽然年纪很小， 但因为聪慧美丽， 奴隶商人为了卖个好价钱， 一直想把她卖到上流社会， 后来希塔菈被一个富裕的学者家庭买走…</p>
+
+                </a>
+
+                <p class="book-list-info-bottom">
+
+                    <span class='book-list-info-bottom-right-font '>连载中</span>
+
+                </p>
+
+            </div>
+
+        </li>
+
+        <li>
+
+            <div class="book-list-cover">
+
+                <a href="/manhua-cangyunyoulong/" title="苍云游龙"><img class="book-list-cover-img" src="https://mhfm5yd.cdndm5.com/61/60348/20200605082805_180x240.jpg" alt="苍云游龙"></a>
+
+            </div>
+
+            <div class="book-list-info">
+
+                <a href="/manhua-cangyunyoulong/">
+
+                    <p class="book-list-info-title">苍云游龙</p>
+
+                    <p class="book-list-info-desc">莫槡自小生长在一座与世隔绝的小岛上，小岛物产丰富，岛上的居民丰衣足食安居乐业。由于几年前，莫槡救了一个流落至此的岛外女孩，听到外面世界的种种信息，出于好奇，莫槡变用尽各种办法想出岛去看看外面的世界，关于莫槡的种种奇逢由此而生。</p>
+
+                </a>
+
+                <p class="book-list-info-bottom">
+
+                    <a href="javascript:pushHistory('/search?title=%e5%b0%91%e5%b9%b4%e7%83%ad%e8%a1%80&language=1&f=2');" style="color:#666;"><span class="book-list-info-bottom-item">少年热血</span></a>
+
+                    <span class='book-list-info-bottom-right-font active'>已完结</span>
+
+                </p>
+
+            </div>
+
+        </li>
+
+        <li>
+
+            <div class="book-list-cover">
+
+                <a href="/manhua-gangtianzhuoye/" title="苍狼大帝"><img class="book-list-cover-img" src="https://mhfm6yd.cdndm5.com/15/14946/14946_b.jpg" alt="苍狼大帝"></a>
+
+            </div>
+
+            <div class="book-list-info">
+
+                <a href="/manhua-gangtianzhuoye/">
+
+                    <p class="book-list-info-title">苍狼大帝</p>
+
+                    <p class="book-list-info-desc">人类历史上的英雄成吉思汗。作为一族的领袖，为了人民免受战火而驰骋于草原之上。展现成吉思汗波澜万丈的一生。鲜明而生动的描述了其从少年时代开始的强势霸道，是一部真正的历史传奇！</p>
+
+                </a>
+
+                <p class="book-list-info-bottom">
+
+                    <span class='book-list-info-bottom-right-font active'>已完结</span>
+
+                </p>
+
+            </div>
+
+        </li>
+
+        <li>
+
+            <div class="book-list-cover">
+
+                <a href="/manhua-cangyanranyue/" title="苍炎燃月"><img class="book-list-cover-img" src="https://mhfm8yd.cdndm5.com/44/43618/20250609154152_180x240_16.jpg" alt="苍炎燃月"></a>
+
+            </div>
+
+            <div class="book-list-info">
+
+                <a href="/manhua-cangyanranyue/">
+
+                    <p class="book-list-info-title">苍炎燃月</p>
+
+                    <p class="book-list-info-desc">瞬间分解飞机，一斧劈开航空母舰的少女竟然叫自己“老公”？那两个不像地球人的怪小孩，我才不是你们的“爸爸”！前方高能！</p>
+
+                </a>
+
+                <p class="book-list-info-bottom">
+
+                    <a href="javascript:pushHistory('/search?title=%e5%b0%91%e5%b9%b4%e7%83%ad%e8%a1%80&language=1&f=2');" style="color:#666;"><span class="book-list-info-bottom-item">少年热血</span></a>
+
+                    <span class='book-list-info-bottom-right-font active'>已完结</span>
+
+                </p>
+
+            </div>
+
+        </li>
+
+        <li>
+
+            <div class="book-list-cover">
+
+                <a href="/manhua-pojian/" title="破茧"><img class="book-list-cover-img" src="https://mhfm5yd.cdndm5.com/87/86593/20241031165143_180x240_19.jpg" alt="破茧"></a>
+
+            </div>
+
+            <div class="book-list-info">
+
+                <a href="/manhua-pojian/">
+
+                    <p class="book-list-info-title">破茧</p>
+
+                    <p class="book-list-info-desc">《拒绝命运》作者的最新作品！ 一场不间断的理发大战 同理心羞耻 交际障碍爆炸 在表参道的舞台上爆发！</p>
+
+                </a>
+
+                <p class="book-list-info-bottom">
+
+                    <span class='book-list-info-bottom-right-font active'>已完结</span>
+
+                </p>
+
+            </div>
+
+        </li>
+
+        <li>
+
+            <div class="book-list-cover">
+
+                <a href="/manhua-pobing/" title="破冰"><img class="book-list-cover-img" src="https://mhfm4yd.cdndm5.com/81/80672/20220901094524_180x240_20.jpg" alt="破冰"></a>
+
+            </div>
+
+            <div class="book-list-info">
+
+                <a href="/manhua-pobing/">
+
+                    <p class="book-list-info-title">破冰</p>
+
+                    <p class="book-list-info-desc">以猎物盛行的世界为舞台，两位少女编织友情的故事。</p>
+
+                </a>
+
+                <p class="book-list-info-bottom">
+
+                    <span class='book-list-info-bottom-right-font active'>已完结</span>
+
+                </p>
+
+            </div>
+
+        </li>
+
+        <li>
+
+            <div class="book-list-cover">
+
+                <a href="/manhua-pogua/" title="破瓜"><img class="book-list-cover-img" src="https://mhfm7yd.cdndm5.com/55/54431/20191029213726_180x240_22.jpg" alt="破瓜"></a>
+
+            </div>
+
+            <div class="book-list-info">
+
+                <a href="/manhua-pogua/">
+
+                    <p class="book-list-info-title">破瓜</p>
+
+                    <p class="book-list-info-desc"></p>
+
+                </a>
+
+                <p class="book-list-info-bottom">
+
+                    <span class='book-list-info-bottom-right-font active'>已完结</span>
+
+                </p>
+
+            </div>
+
+        </li>
+
+        <li>
+
+            <div class="book-list-cover">
+
+                <a href="/manhua-canglongjinshi/" title="苍龙近侍"><img class="book-list-cover-img" src="https://mhfm3yd.cdndm5.com/22/21776/20190909155537_180x240_23.jpg" alt="苍龙近侍"></a>
+
+            </div>
+
+            <div class="book-list-info">
+
+                <a href="/manhua-canglongjinshi/">
+
+                    <p class="book-list-info-title">苍龙近侍</p>
+
+                    <p class="book-list-info-desc">没有能力哪里都没有容身之所的巫女，被派遣到宫裡照顾传闻性格有点粗暴的龙。 但是被好好照顾的龙若不能使国家恢复正常，那就没有必要留它活命了！ </p>
+
+                </a>
+
+                <p class="book-list-info-bottom">
+
+                    <a href="javascript:pushHistory('/search?title=%e5%b0%91%e5%a5%b3%e7%88%b1%e6%83%85&language=1&f=2');" style="color:#666;"><span class="book-list-info-bottom-item">少女爱情</span></a>
+
+                    <span class='book-list-info-bottom-right-font active'>已完结</span>
+
+                </p>
+
+            </div>
+
+        </li>
+
+        <li>
+
+            <div class="book-list-cover">
+
+                <a href="/manhua-cangtianzaishang/" title="苍天在上"><img class="book-list-cover-img" src="https://mhfm3yd.cdndm5.com/72/71770/20211012143703_180x240_32.jpg" alt="苍天在上"></a>
+
+            </div>
+
+            <div class="book-list-info">
+
+                <a href="/manhua-cangtianzaishang/">
+
+                    <p class="book-list-info-title">苍天在上</p>
+
+                    <p class="book-list-info-desc">平凡少年肖凡有着慈爱的父母和可爱的妹妹，然而某一天父亲却突然狂性大发，一夜之间幸福美满的家庭瞬间破灭，天空突现一只巨大的眼睛，一道雷劈向了肖凡……这场离奇的家庭变故究竟是无奈之举，还是上天不容？醒来的肖凡发现身体获得神秘电力，为了解开重重谜团，他踏上了未知的旅途……</p>
+
+                </a>
+
+                <p class="book-list-info-bottom">
+
+                    <a href="javascript:pushHistory('/search?title=%e5%b0%91%e5%b9%b4%e7%83%ad%e8%a1%80&language=1&f=2');" style="color:#666;"><span class="book-list-info-bottom-item">少年热血</span></a>
+
+                    <span class='book-list-info-bottom-right-font '>连载中</span>
+
+                </p>
+
+            </div>
+
+        </li>
+
+        <li>
+
+            <div class="book-list-cover">
+
+                <a href="/manhua-canghaijuezhan7485/" title="苍海决战"><img class="book-list-cover-img" src="https://mhfm2yd.cdndm5.com/8/7485/7485.jpg" alt="苍海决战"></a>
+
+            </div>
+
+            <div class="book-list-info">
+
+                <a href="/manhua-canghaijuezhan7485/">
+
+                    <p class="book-list-info-title">苍海决战</p>
+
+                    <p class="book-list-info-desc">猫耳、海战、青春大河漫画，虽然这个故事是虚构的，不过我还是觉得如果这样的故事，在现实中能存在一两个也挺好的</p>
+
+                </a>
+
+                <p class="book-list-info-bottom">
+
+                    <a href="javascript:pushHistory('/search?title=%e5%b0%91%e5%b9%b4%e7%83%ad%e8%a1%80&language=1&f=2');" style="color:#666;"><span class="book-list-info-bottom-item">少年热血</span></a>
+
+                    <span class='book-list-info-bottom-right-font '>连载中</span>
+
+                </p>
+
+            </div>
+
+        </li>
+
+        <li>
+
+            <div class="book-list-cover">
+
+                <a href="/manhua-canghaijuezhan6684/" title="苍海诀战"><img class="book-list-cover-img" src="https://mhfm5yd.cdndm5.com/7/6684/6684.jpg" alt="苍海诀战"></a>
+
+            </div>
+
+            <div class="book-list-info">
+
+                <a href="/manhua-canghaijuezhan6684/">
+
+                    <p class="book-list-info-title">苍海诀战</p>
+
+                    <p class="book-list-info-desc"></p>
+
+                </a>
+
+                <p class="book-list-info-bottom">
+
+                    <span class='book-list-info-bottom-right-font '>连载中</span>
+
+                </p>
+
+            </div>
+
+        </li>
+
+        <li>
+
+            <div class="book-list-cover">
+
+                <a href="/manhua-cangyuxiaoliang/" title="苍与咲良"><img class="book-list-cover-img" src="https://mhfm4yd.cdndm5.com/85/84750/20231113110157_180x240_25.jpg" alt="苍与咲良"></a>
+
+            </div>
+
+            <div class="book-list-info">
+
+                <a href="/manhua-cangyuxiaoliang/">
+
+                    <p class="book-list-info-title">苍与咲良</p>
+
+                    <p class="book-list-info-desc">欢迎观看苍与咲良漫画</p>
+
+                </a>
+
+                <p class="book-list-info-bottom">
+
+                    <span class='book-list-info-bottom-right-font active'>已完结</span>
+
+                </p>
+
+            </div>
+
+        </li>
+
+    </ul>
+
+    <script type="text/javascript" src="https://css99tel.cdndm5.com/v202609180933/dm5/js/mobile/search.js"></script>
+
+    <div style="display: none">
+
+        <script type="text/javascript">
+
+        (function () {
+
+            var ga = document.createElement('script'); ga.type = 'text/javascript'; ga.async = true;
+
+            ga.src = "//hm.baidu.com/hm.js?fa0ea664baca46780244c3019bbfa951";
+
+            var s = document.getElementsByTagName('script')[0]; s.parentNode.insertBefore(ga, s);
+
+        })();
+
+</script>
+
+<script type="text/javascript">
+
+        (function () {
+
+            var ga = document.createElement('script'); ga.type = 'text/javascript'; ga.async = true;
+
+            ga.src =('https:' == document.location.protocol ? 'https://' : 'http://') + "w.cnzz.com/c.php?id=30089965";
+
+            var s = document.getElementsByTagName('script')[0]; s.parentNode.insertBefore(ga, s);
+
+        })();//1277928702
+
+    </script><!-- Google tag (gtag.js) -->
+
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-MP98J9MJ9J"></script>
+
+<script>
+
+  window.dataLayer = window.dataLayer || [];
+
+  function gtag(){dataLayer.push(arguments);}
+
+  gtag('js', new Date());
+
+
+
+  gtag('config', 'G-MP98J9MJ9J');
+
+</script><script type="text/javascript">
+
+        (function () {
+
+            var ga = document.createElement('script'); ga.type = 'text/javascript'; ga.async = true;
+
+            ga.src = ('https:' == document.location.protocol ? 'https://' : 'http://')+"w.cnzz.com/c.php?id=30090267";
+
+            var s = document.getElementsByTagName('script')[0]; s.parentNode.insertBefore(ga, s);
+
+        })();//1277928762
+
+    </script><script>
+
+(function(){
+
+    var bp = document.createElement('script');
+
+    var curProtocol = window.location.protocol.split(':')[0];
+
+    if (curProtocol === 'https'){
+
+   bp.src = 'https://zz.bdstatic.com/linksubmit/push.js';
+
+  }
+
+  else{
+
+  bp.src = 'http://push.zhanzhang.baidu.com/push.js';
+
+  }
+
+    var s = document.getElementsByTagName("script")[0];
+
+    s.parentNode.insertBefore(bp, s);
+
+})();
+
+</script><script>
+
+var _hmt = _hmt || [];
+
+(function() {
+
+  var hm = document.createElement("script");
+
+  hm.src = "//hm.baidu.com/hm.js?6580fa76366dd7bfcf663327c0bcfbe2";
+
+  var s = document.getElementsByTagName("script")[0]; 
+
+  s.parentNode.insertBefore(hm, s);
+
+})();
+
+</script><script type="text/javascript">
+
+var doubtfuluid=0;
+
+        (function () {
+
+            var ga = document.createElement('script'); ga.type = 'text/javascript'; ga.async = true;
+
+            ga.src ='https://css99tel.cdndm5.com/v202609180933/dm5/js/u-fp.min.js';
+
+            var s = document.getElementsByTagName('script')[0]; s.parentNode.insertBefore(ga, s);
+
+        })();
+
+    </script>    </div>
+
+</body>
+
+</html>

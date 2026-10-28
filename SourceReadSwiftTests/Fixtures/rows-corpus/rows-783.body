@@ -1,0 +1,93 @@
+ 
+
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=1176">
+<title>斗破苍穹 - 优品PPT</title>
+<meta name="keywords" content="斗破苍穹" />
+<meta name="description" content="“斗破苍穹”的搜索结果列表页。"/>
+<link href="/style/css51.css" rel="stylesheet" type="text/css" />
+<style>.jtitle {margin: 9px 25px 8px 0;padding: 0 0 0 17px;height: 24px}.wbutton {background: none;border: none}.posts li a img {width: auto;}.posts li .left a{color: #999999;}
+.attention {border: 1px solid #FFC107;padding: 10px;font-size: 14px;background: #fffcdd;border-radius: 3px;margin:0 15px 20px 0;color: #444;}
+</style>
+<script src="https://static-qn.51miz.com/miz-to-ypppt.v.1.0.1.js"></script>
+</head>
+<body>
+<div class="nav">
+<div class="wrapper clear">
+<a href="/" class="logo"></a>
+<ul class="clear">
+<li><a href="/">首页</a></li>
+<li><a href="/moban/">PPT模板</a></li>
+<li><a href="/beijing/">PPT背景</a></li>
+<li><a href="/tubiao/">PPT图表</a></li>
+<li><a href="/sucai/">PPT素材</a></li>
+<li><a href="/jiaocheng/">PPT教程</a></li>
+<li><a href="/jieri/">节日PPT</a></li>
+<li><a href="/ziti/">字体库</a></li>
+<li><a href="/kejian/yuwen/">PPT课件</a></li>
+</ul>
+<form action="/p/search.php" name="formsearch">
+<input type="hidden" name="kwtype" value="1" />
+<input name="q" type="text" class="search-keyword" id="search-keyword" value="search..." onfocus="if (value =='search...'){value =''}" onblur="if (value ==''){value='search...'}">
+<button type="submit" class="search-submit"></button>
+</form>
+</div>
+</div>
+<div class="wrapper">
+<div class="jtitle clear">
+<h1>搜索结果：斗破苍穹</h1>
+</div>
+<div style="width:1162px;margin-bottom: 20px;text-align: center;background:#fff;padding: 8px 0 6px 0;border: 1px #eee solid;">
+<a href="https://www.tukuppt.com/ppt/?plan=10042-17385-2533907" target="_blank" rel="nofollow">
+<img src="/style/qianku.png">
+</a>
+</div>
+<div class="attention">搜索提示：请输入两三个字的核心关键词，能获得更准确的搜索结果。不要带有模板、PPT、素材、课件等词。</div>
+<ul class="posts clear">
+<li>
+<a href="/article/2020/6463.html"class="img_preview" target="_blank"><img src="/uploads/allimg/200826/1-200R60355580-L.png"></a>
+<a href="/article/2020/6463.html" class="p-title" target="_blank">义启-破<font color='red'>苍穹</font></a>
+<div class="clear"><span class="left"><a href='/ziti/shouxie/'>手写字体</a></span><span class="right">6806</span></div>
+</li>
+</ul>
+<div class="wbutton">
+<div class="page-navi">共1页/1条记录</div>
+</div>
+<div class="lad2" style="border: 1px #eee solid;width:1162px;margin: 20px 0 24px 0;">
+<a href="https://www.tukuppt.com/ppt/?plan=10042-17385-2533311" target="_blank" rel="nofollow"><img src="/style/mao.png" style="display: block"></a>
+</div>
+</div>
+<div class="footer">
+<div class="wrapper">
+<div class="clear">
+<ul class="col1 clear">
+<li><a href="/about/about-us.html" rel="nofollow">关于我们</a></li>
+<li><a href="/about/copyright.html" rel="nofollow">版权声明</a></li>
+<li><a href="/about/feedback.html" rel="nofollow">意见建议</a></li>
+<li><a href="/about/contact.html" rel="nofollow">联系方式</a></li>
+<li><a href="/about/friend.html" rel="nofollow">友链申请</a></li>
+<li><a href="/about/sitemap.html" rel="nofollow">网站地图</a></li>
+</ul>
+<div class="col3">
+<h6>优品PPT</h6>
+<p class="about">优品PPT模板网（www.ypppt.com）是一家专注于分享高质量的免费PPT模板下载网站。包括PPT图表、PPT背景图片、PPT素材、PPT教程等各类PPT资源。致力于打造国内最大最权威的PPT下载一站式服务平台。</p>
+</div>
+<div class="cb-to-top right"><a href="#" id="cb-to-top"><i class="fa fa-angle-up cb-circle"></i></a></div>
+</div>
+<p class="copyright">Copyright &copy; 2015-2026 ypppt.com All Rights Reserved. <a href="https://beian.miit.gov.cn/" target="_blank" rel="nofollow">津ICP备15001961号-1</a></p>
+</div>
+</div>
+<script>
+var _hmt = _hmt || [];
+(function() {
+  var hm = document.createElement("script");
+  hm.src = "https://hm.baidu.com/hm.js?45db753385e6d769706e10062e3d6453";
+  var s = document.getElementsByTagName("script")[0]; 
+  s.parentNode.insertBefore(hm, s);
+})();
+</script>
+</body>
+</html>

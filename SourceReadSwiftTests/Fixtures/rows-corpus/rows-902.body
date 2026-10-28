@@ -1,0 +1,744 @@
+<!doctype html>
+<html lang="zh-hans">
+<head>
+    <meta charset="UTF-8">
+
+            <title>豆花文学 - 女性文学原创基地</title>
+    
+            <meta name="keywords" content="豆花文学官方站,纯爱、言情、百合、无CP、同人、女性文学">
+    
+            <meta name="description" content="豆花阅读APP，女性向小说原创基地">
+        <meta name="baidu-site-verification" content="bYvB1XsdUO" />
+    <meta name="robots" content="all">
+    <meta name="googlebot" content="all">
+    <meta name="baiduspider" content="all">
+
+    <meta name="renderer" content="webkit">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+
+    <meta name="csrf-token" content="3OEGPnMuvXbAWdj9DAetGXjjZzY3yO0VhGtuJBS0">
+
+    <meta name="shenma-site-verification" content="bc5c06355f76bbed8e7ae5f831c0da49_1585017027"> 
+    <meta name="sogou_site_verification" content="ey0tBQVRju"/>
+    <meta name="360-site-verification" content="b7a9e6e92f9dc5d96d4f8c5359e1a8cf" />
+
+    <link rel="icon" href="//imgold2.douhuawenxue.com/doufu/web/logo.png">
+    <link href="//w3static.douhuawenxue.com/assets/css/main.css?_v=1.5.3" rel="stylesheet">
+
+    
+    <script src="//imgdh.douhuawenxue.com/jquery/jquery-3.2.1.min.js"></script>
+    <script src="//imgdh.douhuawenxue.com/layer/layer.js"></script>
+    <script src="//w3static.douhuawenxue.com/assets/js/lib/browser.js?_v=1.5.3" defer></script>
+    <script src="//w3static.douhuawenxue.com/assets/js/lib/axios.min.js?_v=1.5.3" defer></script>
+    <script src="//w3static.douhuawenxue.com/assets/js/page/common.js?_v=1.5.3" defer></script>
+
+    <script async src="//pagead2.googlesyndication.com/pagead/js/adsbygoogle.js"></script>
+    <script>
+        (adsbygoogle = window.adsbygoogle || []).push({
+            google_ad_client: "ca-pub-3798943526958313",
+            enable_page_level_ads: true
+        });
+    </script>
+</head>
+<body>
+
+    <div class="page">
+        
+                    <header class="page_hd">
+                <div class="page_wrap">
+                    <div class="logo-box fl">
+                        
+                        <a href="https://www.douhuawenxue.com">
+                            <img src="/assets/img/logo_dh.png" class="logo" style="width: 139px;" alt="豆花阅读">
+                        </a>
+                    </div>
+                                        <nav class="fl">
+                        <ul class="nav nav-top">
+                            <li class="nav_item "><a href="https://www.douhuawenxue.com" title="首页">首页</a></li>
+                            <li class="nav_item "><a href="https://www.douhuawenxue.com/category"  title="分类">分类</a></li>
+                            <li class="nav_item "><a href="https://www.douhuawenxue.com/finished" title="完本">完本</a></li>
+                            <li class="nav_item "><a href="https://www.douhuawenxue.com/rank" title="榜单">榜单</a></li>
+                            
+                            
+                        </ul>
+                    </nav>
+                    <div class="login-box fr">
+                        <a href="https://webcdn.m.qq.com/webapp/homepage/index.html#/appDetail?apkName=com.douhuayuedu.douhua" target="_blank" class="download">
+                            <i class="icon icon-qrcode"></i> 下载豆花APP</a>
+                        <a href="https://www.douhuawenxue.com/personal/recharge" target="_blank" rel="nofollow" class="recharge">
+                            <i class="icon icon-charge icon-justify"></i> 充值
+                        </a>
+
+                        <div class="user-top">
+            <a href="https://www.douhuawenxue.com/login" rel="nofollow">登录</a>
+                |
+        <a href="https://www.douhuawenxue.com/signup" rel="nofollow">注册</a>
+                <i class="icon icon-login icon-justify"></i>
+    
+</div>
+                    </div>
+
+                    <form action="https://www.douhuawenxue.com/search" method="get" class="search">
+
+    
+
+    <input type="text" name="kd" class="search_input" value="斗破苍穹" placeholder="热门书籍、作者"
+
+           maxlength="32">
+
+    <button class="search_btn">
+
+        <i class="icon icon-search"></i>
+
+    </button>
+
+</form>
+                </div>
+            </header>
+        
+                    <div class="page_bd">
+        <p class="text-xs">搜索结果：共<span class="text-base">"71"</span>个相关作品</p>
+        <div class="category category-search">
+            <div class="category_sd fr ml-base">
+                <div class="panel-clean ">
+                    <div class="panel-clean_hd">猜你喜欢看</div>
+                    <div class="panel-clean_bd">
+                        <ol class="list-order on">
+                                                    </ol>
+                    </div>
+                </div>
+            </div>
+
+
+            <main class="category_mn">
+                <div class="category_hd">
+                                            <a href="https://www.douhuawenxue.com/search?kd=%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9&amp;order=1" class="btn btn-border on">
+                            综合排序 <i class="icon icon-down"></i>
+                        </a>
+                                            <a href="https://www.douhuawenxue.com/search?kd=%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9&amp;order=2" class="btn btn-border ">
+                            收藏量 <i class="icon icon-down"></i>
+                        </a>
+                                            <a href="https://www.douhuawenxue.com/search?kd=%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9&amp;order=3" class="btn btn-border ">
+                            综合分 <i class="icon icon-down"></i>
+                        </a>
+                                            <a href="https://www.douhuawenxue.com/search?kd=%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9&amp;order=4" class="btn btn-border ">
+                            最新更新 <i class="icon icon-down"></i>
+                        </a>
+                                    </div>
+                <div class="category_bd">
+                                                                        <div class="book book-base">
+    <div class="book_sd">
+        <a href="https://www.douhuawenxue.com/novel-273476" target="_blank" title="苍穹之渊:浮生引">
+            <img src="https://img.douhuawenxue.com/novel/cover/yq/v/273476.jpg" alt="苍穹之渊:浮生引" class="book_img">
+        </a>
+        <div class="book_author">
+            洛紫湮 著
+        </div>
+    </div>
+    <div class="book_mn">
+        <h3 class="book_tt">
+            <a href="https://www.douhuawenxue.com/novel-273476" target="_blank" title="苍穹之渊:浮生引">
+                苍穹之渊:浮生引
+            </a>
+                            <span class="text-green book_status">[已完结]</span>
+                    </h3>
+        <div class="book_subtt">
+                                                <span class="book_tag">正剧</span>
+                                    <span class="book_tag">古代</span>
+                                    <span class="book_tag">仙侠</span>
+                                    </div>
+        <div class="book_ct">
+            他一身红衣张扬热烈，眼眸嚣张:“不过逆天而已，只要能保她性命，我便付的起代价。”
+他一身白衣身姿凉薄
+        </div>
+        
+            </div>
+</div>                                                    <div class="book book-base">
+    <div class="book_sd">
+        <a href="https://www.douhuawenxue.com/novel-306088" target="_blank" title="狼公子是我夫君">
+            <img src="https://imgold2.douhuawenxue.com/diaobaoimg/IH/Ic/YcKrJA-WClDq01Q6mXQAFat4esN_FeskFsKpWz5NUkFyQLrFjmK9-kiWdH5g.jpg" alt="狼公子是我夫君" class="book_img">
+        </a>
+        <div class="book_author">
+            大斗 著
+        </div>
+    </div>
+    <div class="book_mn">
+        <h3 class="book_tt">
+            <a href="https://www.douhuawenxue.com/novel-306088" target="_blank" title="狼公子是我夫君">
+                狼公子是我夫君
+            </a>
+                            <span class="text-green book_status">[已完结]</span>
+                    </h3>
+        <div class="book_subtt">
+                                                <span class="book_tag">轻松</span>
+                                    <span class="book_tag">现代</span>
+                                    <span class="book_tag">架空</span>
+                                    <span class="book_tag">玄幻</span>
+                                    <span class="book_tag">嫩豆腐言情新秀赛</span>
+                                    </div>
+        <div class="book_ct">
+            少妇炫夫大会
+
+　　“我老公身家超多零，小数点之前的！”
+
+　　“我老公长得超级帅，世界男模级别的！
+        </div>
+        
+            </div>
+</div>                                                    <div class="book book-base">
+    <div class="book_sd">
+        <a href="https://www.douhuawenxue.com/novel-713161" target="_blank" title="决斗">
+            <img src="https://img.douhuawenxue.com/novel/default/cover/713161.jpg?" alt="决斗" class="book_img">
+        </a>
+        <div class="book_author">
+            巡山小妖不吃肉 著
+        </div>
+    </div>
+    <div class="book_mn">
+        <h3 class="book_tt">
+            <a href="https://www.douhuawenxue.com/novel-713161" target="_blank" title="决斗">
+                决斗
+            </a>
+                            <span class="text-red book_status">[连载中]</span>
+                    </h3>
+        <div class="book_subtt">
+                                                <span class="book_tag">正剧</span>
+                                    <span class="book_tag">古代</span>
+                                    <span class="book_tag">仙侠</span>
+                                    </div>
+        <div class="book_ct">
+            
+        </div>
+        
+            </div>
+</div>                                                    <div class="book book-base">
+    <div class="book_sd">
+        <a href="https://www.douhuawenxue.com/novel-642247" target="_blank" title="爆笑宠妃：皇位助攻手册">
+            <img src="https://imgold2.douhuawenxue.com/3c/63/4f7735a18fc7c2e3e30995db60.jpg" alt="爆笑宠妃：皇位助攻手册" class="book_img">
+        </a>
+        <div class="book_author">
+            苍鸾 著
+        </div>
+    </div>
+    <div class="book_mn">
+        <h3 class="book_tt">
+            <a href="https://www.douhuawenxue.com/novel-642247" target="_blank" title="爆笑宠妃：皇位助攻手册">
+                爆笑宠妃：皇位助攻手册
+            </a>
+                            <span class="text-green book_status">[已完结]</span>
+                    </h3>
+        <div class="book_subtt">
+                                                <span class="book_tag">架空历史</span>
+                                    </div>
+        <div class="book_ct">
+            京城里人人都知道吏部尚书萧穆白的府上有两位才貌双全、国色天香的小姐。二小姐温婉端庄，能歌善舞，虽说是
+        </div>
+        
+            </div>
+</div>                                                    <div class="book book-base">
+    <div class="book_sd">
+        <a href="https://www.douhuawenxue.com/novel-450511" target="_blank" title="斗罗之于你">
+            <img src="https://img.douhuawenxue.com/novel/default/cover/450511.jpg?13" alt="斗罗之于你" class="book_img">
+        </a>
+        <div class="book_author">
+            凌甫 著
+        </div>
+    </div>
+    <div class="book_mn">
+        <h3 class="book_tt">
+            <a href="https://www.douhuawenxue.com/novel-450511" target="_blank" title="斗罗之于你">
+                斗罗之于你
+            </a>
+                            <span class="text-green book_status">[已完结]</span>
+                    </h3>
+        <div class="book_subtt">
+                                                <span class="book_tag">HE</span>
+                                    <span class="book_tag">古代</span>
+                                    <span class="book_tag">架空</span>
+                                    <span class="book_tag">玄幻</span>
+                                    <span class="book_tag">虐恋</span>
+                                    <span class="book_tag">虐心慎点</span>
+                                    </div>
+        <div class="book_ct">
+            （图片来于网络，侵权删 封面是可甜可盐的萌了了小可爱提供√）
+唐三是先天满魂力，是双生武魂，是大师玉
+        </div>
+        
+            </div>
+</div>                                                    <div class="book book-base">
+    <div class="book_sd">
+        <a href="https://www.douhuawenxue.com/novel-405288" target="_blank" title="沐色苍茫您是光">
+            <img src="https://imgold2.douhuawenxue.com/33/03/f9f64c1ea75adb1d2df69df471.png" alt="沐色苍茫您是光" class="book_img">
+        </a>
+        <div class="book_author">
+            今夕是何汐 著
+        </div>
+    </div>
+    <div class="book_mn">
+        <h3 class="book_tt">
+            <a href="https://www.douhuawenxue.com/novel-405288" target="_blank" title="沐色苍茫您是光">
+                沐色苍茫您是光
+            </a>
+                            <span class="text-red book_status">[连载中]</span>
+                    </h3>
+        <div class="book_subtt">
+                                                <span class="book_tag">现代</span>
+                                    <span class="book_tag">虐</span>
+                                    </div>
+        <div class="book_ct">
+            一场车祸，让苏凝的人生发生了重大的转变，无依无靠的她竟有着令人匪夷所思的身世，宠物她倒是养过一些，可
+        </div>
+        
+            </div>
+</div>                                                    <div class="book book-base">
+    <div class="book_sd">
+        <a href="https://www.douhuawenxue.com/novel-415642" target="_blank" title="穿书：我才懒得当反派">
+            <img src="https://imgold2.douhuawenxue.com/diaobaoimg/GH/DS/PEJzlDIeKbTtPJJ3beWZmz7sjm-Wnb86Npf8JUj8rwz_04PmWYW-8RHCEFxB.jpg" alt="穿书：我才懒得当反派" class="book_img">
+        </a>
+        <div class="book_author">
+            斗酒八千 著
+        </div>
+    </div>
+    <div class="book_mn">
+        <h3 class="book_tt">
+            <a href="https://www.douhuawenxue.com/novel-415642" target="_blank" title="穿书：我才懒得当反派">
+                穿书：我才懒得当反派
+            </a>
+                            <span class="text-green book_status">[已完结]</span>
+                    </h3>
+        <div class="book_subtt">
+                                                <span class="book_tag">年下</span>
+                                    <span class="book_tag">系统</span>
+                                    <span class="book_tag">HE</span>
+                                    <span class="book_tag">轻松</span>
+                                    <span class="book_tag">古代</span>
+                                    <span class="book_tag">师徒</span>
+                                    <span class="book_tag">仙侠</span>
+                                    </div>
+        <div class="book_ct">
+            白切黑礼貌微笑徒儿攻×外冷内热小暴躁师尊受。
+已完结，番外不定期更！
+宿敌双向暗恋文☞《我可能遇到个
+        </div>
+        
+            </div>
+</div>                                                    <div class="book book-base">
+    <div class="book_sd">
+        <a href="https://www.douhuawenxue.com/novel-616603" target="_blank" title="破风">
+            <img src="https://imgold2.douhuawenxue.com/88/b3/a2399a492ae3e50c52ebd4fb51.jpg" alt="破风" class="book_img">
+        </a>
+        <div class="book_author">
+            我的狗毛毛 著
+        </div>
+    </div>
+    <div class="book_mn">
+        <h3 class="book_tt">
+            <a href="https://www.douhuawenxue.com/novel-616603" target="_blank" title="破风">
+                破风
+            </a>
+                            <span class="text-red book_status">[连载中]</span>
+                    </h3>
+        <div class="book_subtt">
+                    </div>
+        <div class="book_ct">
+            沈从柏是名副其实的痴情种子，愿意为女朋友摘星星摘月亮掏宇宙星辰。
+
+    厉恺是有名的花心滥情种子
+        </div>
+        
+            </div>
+</div>                                                    <div class="book book-base">
+    <div class="book_sd">
+        <a href="https://www.douhuawenxue.com/novel-573208" target="_blank" title="破笼">
+            <img src="https://imgold2.douhuawenxue.com/diaobaoimg/-H/ij/c1xddZj5hkp40Pufa2SSJbghiY9owkYPWmyVO7VRSbB3Z_11ls2uepXncpye.jpg" alt="破笼" class="book_img">
+        </a>
+        <div class="book_author">
+            酒料峭 著
+        </div>
+    </div>
+    <div class="book_mn">
+        <h3 class="book_tt">
+            <a href="https://www.douhuawenxue.com/novel-573208" target="_blank" title="破笼">
+                破笼
+            </a>
+                            <span class="text-green book_status">[已完结]</span>
+                    </h3>
+        <div class="book_subtt">
+                                                <span class="book_tag">强强</span>
+                                    <span class="book_tag">娱乐圈</span>
+                                    <span class="book_tag">都市</span>
+                                    <span class="book_tag">HE</span>
+                                    <span class="book_tag">现代</span>
+                                    <span class="book_tag">虐恋</span>
+                                    </div>
+        <div class="book_ct">
+            万人迷姜鹤在梁尽山假死后走上了人生的巅峰！不仅有个染着棕毛的小弟天天上门黏着他，还有个心理医生想要和
+        </div>
+        
+            </div>
+</div>                                                    <div class="book book-base">
+    <div class="book_sd">
+        <a href="https://www.douhuawenxue.com/novel-379889" target="_blank" title="破绽">
+            <img src="https://img.douhuawenxue.com/novel/cover/ac/v/379889.jpg" alt="破绽" class="book_img">
+        </a>
+        <div class="book_author">
+            阿斯加德二公主 著
+        </div>
+    </div>
+    <div class="book_mn">
+        <h3 class="book_tt">
+            <a href="https://www.douhuawenxue.com/novel-379889" target="_blank" title="破绽">
+                破绽
+            </a>
+                            <span class="text-green book_status">[已完结]</span>
+                    </h3>
+        <div class="book_subtt">
+                                                <span class="book_tag">都市</span>
+                                    <span class="book_tag">HE</span>
+                                    <span class="book_tag">现代</span>
+                                    <span class="book_tag">虐恋</span>
+                                    <span class="book_tag">占有欲病娇受</span>
+                                    </div>
+        <div class="book_ct">
+            正儿八经求个五星好评和长评！二公主在这里谢过大家了！！
+
+尚笙曾对毒蛇说过，人一旦有了感情就会有破绽
+        </div>
+        
+            </div>
+</div>                                                            </div>
+                <div class="category_ft">
+                    <ul class="pagination pagination-center">
+    <li class="pagination_item on">
+        <a href=https://www.douhuawenxue.com/search?kd=%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9&amp;page=1>1</a>
+    </li>
+
+    
+        <li class="pagination_item ">
+        <a href=https://www.douhuawenxue.com/search?kd=%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9&amp;page=2>2</a>
+    </li>
+    
+            <li class="pagination_static">...</li>
+    
+
+
+    <li class="pagination_item ">
+        <a href=https://www.douhuawenxue.com/search?kd=%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9&amp;page=8>8</a>
+    </li>
+
+        <li class="pagination_item">
+        <a href="https://www.douhuawenxue.com/search?kd=%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9&amp;page=2">
+            <i class="icon icon-next-2"></i>
+        </a>
+    </li>
+    
+    <li class="pagination_input"><input type="text" data-max="8"></li>
+    <li class="pagination_item"><a href="https://www.douhuawenxue.com/search?kd=%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9&amp;page=1" class="J_paginationJump">GO</a></li>
+</ul>
+
+                </div>
+            </main>
+        </div>
+    </div>
+
+        <footer class="page_ft">
+
+    <div class="page_wrap clearfix">
+
+        <dl class="nav-footer">
+
+            <dt>
+
+                友情链接
+
+            </dt>
+
+            <!-- <dd><a href="http://www.manmanapp.com/" target="_blank">漫漫漫画</a></dd>
+
+            <dd><a href="http://www.missevan.com/" target="_blank">M站</a></dd>
+
+            <dd><a href="http://u17.com/" target="_blank">有妖气漫画</a></dd> -->
+
+            <dd><a href="https://www.doufu.me/" target="_blank">豆腐阅读国际版</a></dd>
+
+
+
+            
+
+            
+
+            
+
+            
+
+            
+
+            
+
+            
+
+            
+
+            
+
+            
+
+            
+
+        </dl>
+
+
+
+        <dl class="nav-footer" style="width:auto;">
+
+            <dt>
+
+                豆花官方
+
+            </dt>
+
+
+
+            <dd><a target="_blank" href="https://api.douhuawenxue.com/journal/detail?id=814">关于豆花</a></dd>
+
+            <!-- <dd><a href="https://www.douhuawenxue.com/help/sign" title="签约制度">签约制度</a></dd> -->
+
+            <!-- <dd><a href="https://api.douhuawenxue.com/journal/detail?id=795" title="管理规范">管理规范</a></dd> -->
+
+            <!-- <dd><a href="https://www.douhuawenxue.com/help/contact" title="联系我们">联系我们</a></dd> -->
+
+            <dd><a href="https://api.douhuawenxue.com/journal/detail?id=817" title="联系我们">联系我们</a></dd>
+
+            <dd><a href="https://api.douhuawenxue.com/journal/detail?id=793">隐私政策</a></dd>
+
+            <dd><a href="https://api.douhuawenxue.com/journal/detail?id=794">用戶服务协议</a></dd>
+
+            <!-- <dd><a href="https://www.douhuawenxue.com/help/welfare" title="作者福利">作者福利</a></dd> -->
+
+            <!-- <dd><a href="https://www.douhuawenxue.com/help/sitemap" title="网站地图">网站地图</a></dd> -->
+
+            <!-- <dd><a href="https://www.douhuawenxue.com/key" title="关键词库">关键词库</a></dd> -->
+
+            
+
+            
+
+
+
+        </dl>
+
+        
+
+        <!-- <dl class="nav-footer" style="margin-top: 12px;">
+
+            <div class="nav-footer-qrcode">
+
+                扫码关注微信号，<span class="text-red">领礼包</span>免费阅读 (◕‿◕)
+
+                <div class="nav-footer-qrcode-box">
+
+                    <div class="nav-footer-qrcode-item">
+
+                        <img src="https://img.douhuawenxue.com/weiboerweima.jpg" alt="">
+
+                        <div><i class='icon icon-footer-weibo'></i>官方微博</div>
+
+
+
+                    </div>
+
+                    <div class="nav-footer-qrcode-item">
+
+                        <img src="https://img.douhuawenxue.com/weixin.jpg" alt="">
+
+                        <div> <i class="icon icon-footer-weixin"></i>微信服务号</div>
+
+
+
+                    </div>
+
+                </div>
+
+            </div>
+
+        </dl> -->
+
+    </div>
+
+    <div class="copyright">
+
+        
+
+        
+
+        
+
+
+
+        
+
+        
+
+        
+
+        
+
+        
+
+        
+
+
+
+        
+
+        
+
+        
+
+        
+
+        
+
+        
+
+        
+
+        
+
+        
+
+        <footer class="footer footer-home container-wrapper text-center">
+
+            <section class="footer-content"><p class="links">
+
+                    <!-- <a class="links_item" href="https://www.douhuayuedu.com/webview/1">用戶协议</a> -->
+
+                    <!-- <a class="links_item" href="https://www.douhuayuedu.com/webview/2">隐私政策</a> -->
+
+                    <!-- <a class="links_item" href="https://api.douhuawenxue.com/journal/detail?id=524">用戶协议</a> -->
+
+                    <!-- <a class="links_item" href="https://api.douhuawenxue.com/journal/detail?id=523">隐私政策</a> -->
+
+                    
+
+
+
+                </p>
+
+                
+
+                                
+
+                <p>豆阅科技（深圳）有限公司
+
+                    <a href="https://beian.miit.gov.cn/" target="_blank" rel="noopener noreferrer"
+
+                                   style="margin-left: 5px;">粤ICP备2022021542号</a></p>
+
+                <!-- <p>深圳碉堡互动娱乐有限公司 <a href="https://beian.miit.gov.cn/" target="_blank" rel="noopener noreferrer" style="margin-left: 5px;">粤ICP备2022010464号</a></p> -->
+
+                <!-- <p>Copyright © 2022 Hong Kong Tofu Technology Co. ,Limited All Rights Reserved</p> -->
+
+            </section>
+
+            <section class="footer-content"><p class="prove-list">
+
+                    <a target="_blank"
+
+                       href="https://www.beian.gov.cn/portal/registerSystemInfo?recordcode=44030502008961"><img
+
+                                src="/beian.png" rel="nofollow noopener noreferrer" alt="公安备案号"
+
+                                style="width: auto; height: auto; vertical-align: sub; margin-right: auto;"
+
+                        />粤公网安备 44030502008961号</a>
+
+                    <span class="spacer">|</span>
+
+                    <a class="prove_item" target="_blank"
+
+                       href="/static/prove/ICP.jpg">增值电信业务经营许可证 粤B2-20201947</a>
+
+                    <span class="spacer">|</span>
+
+                    <a class="prove_item" target="_blank"
+
+                       href="/static/prove/businesslicense.jpg">营业执照</a>
+
+                    <span class="spacer">|</span>
+
+                    <a class="prove_item" target="_blank"
+
+                       href="/static/prove/culture2.jpg">网络文化经营许可证：粤网文[2023]3818-267号</a>
+
+                </p></section>
+
+        </footer>
+
+        <br>
+
+        <p>用户投稿、上传、发布的任何内容（包括但不限于作品、评论、话题、图片等）均属用户个人行为，不代表本站的立场和观点；本站仅作为用户内容的上传存储平台，不承担任何责任。 <br>
+
+        请所有用户务必严格遵守国家互联网信息管理办法及相关规定，任何色情、暴力等违法违规内容本站均拒绝，一经发现，立即删除；情况严重的，将按本站管理制度从重处理<br>
+
+        如有内容违法违规或侵害他人合法权益，欢迎反馈投诉，一经核实，立即删除。 <br>
+
+        反馈邮箱：kefu@douhuawenxue.com<br>
+
+            联系方式 座机 0755-23075406<br>
+
+            地址：深圳市宝安区新安街道大浪社区新安三路118号顺恒利大厦204
+
+     </p>
+
+    </div>
+
+</footer>
+
+<div class="hidden">
+
+    <script type="text/javascript" src="//s9.cnzz.com/z_stat.php?id=1280994617&web_id=1280994617"></script>
+
+    <!--    1    -->
+
+    <script>
+
+        var _hmt = _hmt || [];
+
+        (function() {
+
+            var hm = document.createElement("script");
+
+            hm.src = "https://hm.baidu.com/hm.js?6829334ed7a02095e1fe894de0bf6620";
+
+            var s = document.getElementsByTagName("script")[0];
+
+            s.parentNode.insertBefore(hm, s);
+
+        })();
+
+    </script>
+
+</div>
+
+
+                    <div class="tool">
+    <ul>
+        <!-- <li class="tool_item">
+            <i class="icon icon-weibo"></i>
+            <img src="//w3static.douhuawenxue.com/assets/img/weiboerweima.jpg?_v=1.5.3" alt="微博" class="tool_img">
+        </li>
+        <li class="tool_item">
+            <i class="icon icon-weixin"></i>
+
+            <img src="//w3static.douhuawenxue.com/assets/img/weixin.jpg?_v=1.5.3" alt="微信" class="tool_img">
+        </li> -->
+        <li class="tool_item" id="J_backToTop">
+            <i class="icon icon-top"></i>
+        </li>
+    </ul>
+</div>            </div>
+
+<script src="//w3static.douhuawenxue.com/assets/js/page/baidu_push.js?_v=1.5.3" defer></script>
+</body>
+</html>

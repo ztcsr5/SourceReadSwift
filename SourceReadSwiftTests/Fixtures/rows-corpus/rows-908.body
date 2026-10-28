@@ -1,0 +1,134 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<title>斗破苍穹搜索结果</title>
+<meta name="keywords" content="就爱读小说网,就爱读书网,免费小说网,无弹出广告小说网,手打小说网"/>
+<meta name="description" content="就爱读小说网是国内最大的小说网站之一。提供玄幻小说,言情小说,网游小说,修真小说,都市小说,武侠小说,网络小说等在线阅读,我们是更新最快,免费最多,页面简洁且无弹出广告的小说网站!" />
+<meta name="MobileOptimized" content="240"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0,  minimum-scale=1.0, maximum-scale=1.0" />
+<link rel="shortcut icon" href="/favicon.ico" />
+<link rel="stylesheet" type="text/css" href="/themes/jieqi/wap/css/mobilecss.css?202207"/>
+<script type="text/javascript" src="/themes/jieqi/wap/js/lib/jquery-2.0.3.min.js"></script>
+<script type="text/javascript" src="/themes/jieqi/wap/js/wap.js?2021"></script>
+</head>
+<body>
+    <div class="lb_top c_big lb_topshow">
+        <table cellpadding="0" cellspacing="0">
+            <tr>
+                <td class="fh"><a onclick="javascript:history.go(-1)" class="c_button">返回</a></td>
+                <td class="t">斗破苍穹搜索结果</td>
+                <td class="shouye"><a href="/" class="c_button">首页</a></td>
+            </tr>
+        </table>
+    </div>
+      <div class="waps_r">
+      <div class="search">
+                <form method="get" action="/search" onsubmit="onSearchButtomClick();return false;"> 
+                    <table cellpadding="0" cellspacing="0" style="width:100%;">
+                        <tr>
+                            <td style="width:80px;">书名/作者</td>
+                            <td style=" background-color:#fff; border:1px solid #CCC;"><input id="key" name="key" type="text" class="key"></td>
+                            <td style="width:35px; background-color:#0080C0; background-image:url('/themes/jieqi/wap/images/search.png'); background-repeat:no-repeat; background-position:center"><input name="t_btnsearch" type="submit" value="" class="go"></td>
+                        </tr>
+                    </table>
+                    <span id="s_tips"></span>
+                </form>
+      </div>
+          <div class="waps_one">
+              <div class="isfull"><span class="waps_full_0">连载中</span><span class="waps_name"><a href="/info/43/43821.html">斗破苍穹之魂墨儿</a></span><span class="waps_sort">(玄幻魔法)</span></div>
+              <div class="author">作者：丶最北边的极光</div>
+              <div class="genxin">更新至：<a href="/reader/43/43821/10050828.html">Chapter.1 穿越·魂墨儿</a></div>
+          </div>
+          <div class="waps_one">
+              <div class="isfull"><span class="waps_full_0">连载中</span><span class="waps_name"><a href="/info/31/31321.html">斗破苍穹之续</a></span><span class="waps_sort">(武侠修真)</span></div>
+              <div class="author">作者：草草日子</div>
+              <div class="genxin">更新至：<a href="/reader/31/31321/7089063.html">第十三章：特殊奖励【精彩纷呈】</a></div>
+          </div>
+          <div class="waps_one">
+              <div class="isfull"><span class="waps_full_0">连载中</span><span class="waps_name"><a href="/info/11/11219.html">战斗天才在斗破苍穹</a></span><span class="waps_sort">(玄幻魔法)</span></div>
+              <div class="author">作者：骠骑的凋零</div>
+              <div class="genxin">更新至：<a href="/reader/11/11219/4550531.html">第一百二十七章 冰儿讯息！</a></div>
+          </div>
+          <div class="waps_one">
+              <div class="isfull"><span class="waps_full_0">连载中</span><span class="waps_name"><a href="/info/37/37279.html">升级在斗破苍穹</a></span><span class="waps_sort">(网游动漫)</span></div>
+              <div class="author">作者：SJ君</div>
+              <div class="genxin">更新至：<a href="/reader/37/37279/8589194.html">008、疗伤，有点疼</a></div>
+          </div>
+          <div class="waps_one">
+              <div class="isfull"><span class="waps_full_0">连载中</span><span class="waps_name"><a href="/info/42/42894.html">斗破苍穹续集：纵横天下</a></span><span class="waps_sort">(其他类型)</span></div>
+              <div class="author">作者：家奴</div>
+              <div class="genxin">更新至：<a href="/reader/42/42894/9932261.html">第８５章 斗气丸</a></div>
+          </div>
+          <div class="waps_one">
+              <div class="isfull"><span class="waps_full_0">连载中</span><span class="waps_name"><a href="/info/26/26531.html">穿越斗破苍穹之龙帝</a></span><span class="waps_sort">(网游动漫)</span></div>
+              <div class="author">作者：潇雨云逸</div>
+              <div class="genxin">更新至：<a href="/reader/26/26531/9458781.html">第412章 最后一轮大赛</a></div>
+          </div>
+          <div class="waps_one">
+              <div class="isfull"><span class="waps_full_0">连载中</span><span class="waps_name"><a href="/info/65/65617.html">斗破苍穹之穿越轮回</a></span><span class="waps_sort">(都市言情)</span></div>
+              <div class="author">作者：光影</div>
+              <div class="genxin">更新至：<a href="/reader/65/65617/19179714.html">855.与裂游等人相见！（第四更）</a></div>
+          </div>
+          <div class="waps_one">
+              <div class="isfull"><span class="waps_full_0">连载中</span><span class="waps_name"><a href="/info/36/36858.html">斗破苍穹之逍遥斗帝</a></span><span class="waps_sort">(其他类型)</span></div>
+              <div class="author">作者：酔卧寒</div>
+              <div class="genxin">更新至：<a href="/reader/36/36858/8424583.html">第三章 战斗打响 势均力敌</a></div>
+          </div>
+          <div class="waps_one">
+              <div class="isfull"><span class="waps_full_0">连载中</span><span class="waps_name"><a href="/info/51/51985.html">斗破苍穹之邪尘傲世</a></span><span class="waps_sort">(历史军事)</span></div>
+              <div class="author">作者：剑流千世</div>
+              <div class="genxin">更新至：<a href="/reader/51/51985/14401879.html">第189章 血脉传承斗技！</a></div>
+          </div>
+          <div class="waps_one">
+              <div class="isfull"><span class="waps_full_0">连载中</span><span class="waps_name"><a href="/info/10/10535.html">网游三部曲之斗破苍穹</a></span><span class="waps_sort">(网游动漫)</span></div>
+              <div class="author">作者：暗红</div>
+              <div class="genxin">更新至：<a href="/reader/10/10535/2787212.html">第十八章 勇战僵尸</a></div>
+          </div>
+          <div class="waps_one">
+              <div class="isfull"><span class="waps_full_0">连载中</span><span class="waps_name"><a href="/info/0/99.html">斗破苍穹</a></span><span class="waps_sort">(玄幻魔法)</span></div>
+              <div class="author">作者：天蚕土豆</div>
+              <div class="genxin">更新至：<a href="/reader/0/99/7028573.html">第十五章 精神力量</a></div>
+          </div>
+          <div class="waps_one">
+              <div class="isfull"><span class="waps_full_0">连载中</span><span class="waps_name"><a href="/info/38/38360.html">斗破苍穹之古昊</a></span><span class="waps_sort">(其他类型)</span></div>
+              <div class="author">作者：夜风无意</div>
+              <div class="genxin">更新至：<a href="/reader/38/38360/8830207.html">第六十四章 暴猿裂空拳</a></div>
+          </div>
+          <div class="waps_one">
+              <div class="isfull"><span class="waps_full_0">连载中</span><span class="waps_name"><a href="/info/34/34541.html">斗破苍穹之萧玄</a></span><span class="waps_sort">(玄幻魔法)</span></div>
+              <div class="author">作者：起笔挥墨</div>
+              <div class="genxin">更新至：<a href="/reader/34/34541/8024344.html">第四十八章 败逃</a></div>
+          </div>
+          <div class="waps_one">
+              <div class="isfull"><span class="waps_full_0">完结</span><span class="waps_name"><a href="/info/80/80676.html">斗破苍穹.2</a></span><span class="waps_sort">(其他类型)</span></div>
+              <div class="author">作者：柴老五</div>
+              <div class="genxin">更新至：<a href="/reader/80/80676/27974635.html">第77章：陨落心炎</a></div>
+          </div>
+          <div class="waps_one">
+              <div class="isfull"><span class="waps_full_0">连载中</span><span class="waps_name"><a href="/info/84/84221.html">斗破苍穹之玄天帝尊</a></span><span class="waps_sort">(玄幻魔法)</span></div>
+              <div class="author">作者：唯物98</div>
+              <div class="genxin">更新至：<a href="/reader/84/84221/29698946.html">第八十八章 突破四星斗者!</a></div>
+          </div>
+    </div>
+	<div id="foot" class="foot">
+		<a href="/">就爱读小说网</a>&nbsp;&nbsp;<a href="/user/bookcase">我的书架</a>
+	</div>
+
+	<!-- Global site tag (gtag.js) - Google Analytics -->
+	<script async src="https://www.googletagmanager.com/gtag/js?id=G-WYGZGW1Z6N"></script>
+	<script>
+	  window.dataLayer = window.dataLayer || [];
+	  function gtag(){dataLayer.push(arguments);}
+	  gtag('js', new Date());
+
+	  gtag('config', 'G-WYGZGW1Z6N');
+	</script>
+
+	<script type="text/javascript" src="/themes/jieqi/wap/js/test.js?1017"></script>
+	<script defer src="https://zz.bdstatic.com/linksubmit/push.js"></script>
+	<script defer src="https://tj.shinpa.me/script.js" data-website-id="55fde5e1-f842-48ea-af3b-150cd5e7809c"></script>
+	<script> var _mtj = _mtj || []; (function () { var mtj = document.createElement("script"); mtj.src = "https://node91.aizhantj.com:21233/tjjs/?k=jgskw2aql5e"; var s = document.getElementsByTagName("script")[0]; s.parentNode.insertBefore(mtj, s); })(); </script>
+ 
+</body>
+</html>

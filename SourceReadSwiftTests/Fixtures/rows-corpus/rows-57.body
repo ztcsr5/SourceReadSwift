@@ -1,0 +1,1548 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="google" content="notranslate">
+  <meta name="robots" content="noarchive">
+  <link rel="manifest" href="/manifest.json">
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+  <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-1827194214937627" crossorigin="anonymous"></script>
+  
+  <link rel="canonical" href="https://www.chamabooks.net/" />
+  
+  <meta name="apple-mobile-web-app-title" content="茶马小说">
+  <title>
+    茶马小说
+  </title>
+  
+  <meta  name="keywords"  content="茶马小说" >
+  
+  <meta  name="description"  content="最新高收藏高人气,精选网络全本小说,供书友免费阅读" >
+  
+  <script type="text/javascript" src="/js/chama.min.1.0.4.js"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/pure/3.0.0/pure.min.css">
+  <link rel="stylesheet" href="/css/main.min.1.0.4.css">
+  <link rel="stylesheet" href="/css/menu.min.1.0.4.css">
+</head>
+<body>
+
+  <div id="main-header">
+
+  <div id="banner-block">
+    <a id="banner" href="/"><img src="/image/cmlogo2-72.png"></a>
+  </div>
+
+  <div id="category-menu">
+    <ul>
+      
+      <li class="cur-cat"><a href="/main">
+          全部
+        </a></li>
+      
+      <li class=""><a href="/main?c=2">
+          言情
+        </a></li>
+      
+      <li class=""><a href="/main?c=3">
+          耽美
+        </a></li>
+      
+      <li class=""><a href="/main?c=4">
+          百合
+        </a></li>
+      
+      <li class=""><a href="/main?c=5">
+          武侠
+        </a></li>
+      
+      <li class=""><a href="/main?c=6">
+          玄幻
+        </a></li>
+      
+      <li class=""><a href="/main?c=7">
+          科幻
+        </a></li>
+      
+      <li class=""><a href="/main?c=8">
+          恐怖
+        </a></li>
+      
+      <li class=""><a href="/main?c=9">
+          推理
+        </a></li>
+      
+      <li class=""><a href="/main?c=12">
+          短篇
+        </a></li>
+      
+      <li class=""><a href="/main?c=100">
+          书单
+        </a></li>
+      
+    </ul>
+  </div>
+
+  <div id="search-container">
+    <form action="/search" onsubmit="return validateSearch()">
+      <input type="text" placeholder="搜索作者或书名" name="s" value="斗破苍穹" id="searchInput">
+      <button class="btn-search" type="submit"><i class="fa fa-search"></i></button>
+    </form>
+
+    <div id="btn-menu" class="dropdown">
+      <button class="dropdown-btn" onclick="toggleDropdown()"><i class="fa fa-cog"></i></button>
+      <div class="dropdown-content" id="dropdownContent">
+        <div class="font-size-options option-content">
+          <label class="option-label">字号：</label>
+          <div class="option small-font" data="small"><span>小</span></div>
+          <div class="option medium-font selected-option" data="medium"><span>中</span></div>
+          <div class="option large-font" data="large"><span>大</span></div>
+        </div>
+        <hr class="solid">
+        </hr>
+        <div class="char-options option-content">
+          <label class="option-label">字体：</label>
+          <div class="option medium-font char-zhs selected-option" data="zhs"><span>简</span></div>
+          <div class="option medium-font char-zht" data="zht"><span>繁</span></div>
+        </div>
+        <hr class="solid">
+        </hr>
+        <div class="color-options option-content">
+          <label class="option-label">背景：</label>
+          <div class="option light-option selected-option" data="light"></div>
+          <div class="option dark-option" data="dark"></div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+</div>
+
+<script>
+  function validateSearch() {
+    const searchInput = document.getElementById('searchInput');
+    const searchValue = searchInput.value.trim();
+
+    if (!searchValue) {
+      // Prevent form submission if search keyword is empty
+      return false;
+    }
+
+    return true;
+  }
+</script>
+  <div id="layout" class="pure-g">
+    <div id="main-list" class="">
+      <div class="main-list-header">
+        <div>
+          "斗破苍穹" 搜索结果
+        </div>
+      </div>
+      
+      <div class="novel-item pure-g">
+        <div class="">
+
+          <h4 class="novel-subject variable-font">
+            <a href="/novel_cca9dcacb77d_1.html">
+              斗破苍穹
+            </a>
+          </h4>
+
+          <h5 class="novel-misc">
+            <span class="author misc-name">作者:</span>
+            <span class="misc-value">
+              <a href="/main?a=天蚕土豆">
+                天蚕土豆
+              </a>
+            </span>
+            
+            <span class="word-count misc-name">
+              560万字
+            </span>
+            
+
+            
+            
+            <span class="category">
+              玄幻
+            </span>
+            
+            
+
+            
+            <span class="upload-date misc-name">
+              3月13日上传
+            </span>
+            
+          </h5>
+
+          <div class="novel-desc-container">
+            
+            <p class="novel-desc variable-font" onclick="location='/novel_cca9dcacb77d_1.html'">
+              这里是属于斗气的世界，没有花俏艳丽的魔法，有的，仅仅是繁衍到巅峰的斗气新书刚开，请各位兄弟多多支持，用推荐票和收藏，砸烂偶吧新书等级制度：斗者，斗师，大斗师，斗灵，斗王，斗皇，斗宗，斗尊，斗圣，斗帝。 
+            </p>
+          </div>
+        </div>
+      </div>
+      
+      
+
+      
+    </div>
+
+    <div id="hot-list" class="">
+      <div class="hot-list-header">
+        <div class="tablink tab-selected" onclick="showHotList(event,'popular')">最新热点</div>
+        <div class="tablink" onclick="showHotList(event,'reader')">经典推荐</div>
+      </div>
+
+      <div id="reader" class="hot-list" style="display:none">
+        
+        <div class="hot-novel-item variable-font">
+
+          <a href="/novel_90d872dcf021_1.html">
+            <div class="hot-novel-subject pure-g">
+              <span class="hot-novel-category">
+                [言情,科幻]
+              </span>
+              <span class="hot-novel-title">
+                穿进赛博游戏后干掉BOSS成功上位
+              </span>
+              <a class="hot-novel-author" href="/main?a=桉柏">
+                <span class="hot-novel-author-label">作者:</span>
+                桉柏
+              </a>
+            </div>
+          </a>
+        </div>
+        
+        <div class="hot-novel-item variable-font">
+
+          <a href="/novel_9564bdba1c88_1.html">
+            <div class="hot-novel-subject pure-g">
+              <span class="hot-novel-category">
+                [言情]
+              </span>
+              <span class="hot-novel-title">
+                不夜坠玉
+              </span>
+              <a class="hot-novel-author" href="/main?a=藤萝为枝">
+                <span class="hot-novel-author-label">作者:</span>
+                藤萝为枝
+              </a>
+            </div>
+          </a>
+        </div>
+        
+        <div class="hot-novel-item variable-font">
+
+          <a href="/novel_0819a48ed89e_1.html">
+            <div class="hot-novel-subject pure-g">
+              <span class="hot-novel-category">
+                [言情]
+              </span>
+              <span class="hot-novel-title">
+                满级绿茶穿成小可怜
+              </span>
+              <a class="hot-novel-author" href="/main?a=春刀寒">
+                <span class="hot-novel-author-label">作者:</span>
+                春刀寒
+              </a>
+            </div>
+          </a>
+        </div>
+        
+        <div class="hot-novel-item variable-font">
+
+          <a href="/novel_c1ff87bc3ebc_1.html">
+            <div class="hot-novel-subject pure-g">
+              <span class="hot-novel-category">
+                [言情]
+              </span>
+              <span class="hot-novel-title">
+                穿成短命白月光后，和反派HE了
+              </span>
+              <a class="hot-novel-author" href="/main?a=青花燃">
+                <span class="hot-novel-author-label">作者:</span>
+                青花燃
+              </a>
+            </div>
+          </a>
+        </div>
+        
+        <div class="hot-novel-item variable-font">
+
+          <a href="/novel_f2f2f8989459_1.html">
+            <div class="hot-novel-subject pure-g">
+              <span class="hot-novel-category">
+                [耽美]
+              </span>
+              <span class="hot-novel-title">
+                地球上线
+              </span>
+              <a class="hot-novel-author" href="/main?a=莫晨欢">
+                <span class="hot-novel-author-label">作者:</span>
+                莫晨欢
+              </a>
+            </div>
+          </a>
+        </div>
+        
+        <div class="hot-novel-item variable-font">
+
+          <a href="/novel_2ba706798a7a_1.html">
+            <div class="hot-novel-subject pure-g">
+              <span class="hot-novel-category">
+                [言情]
+              </span>
+              <span class="hot-novel-title">
+                我就想蹭你的气运
+              </span>
+              <a class="hot-novel-author" href="/main?a=明桂载酒">
+                <span class="hot-novel-author-label">作者:</span>
+                明桂载酒
+              </a>
+            </div>
+          </a>
+        </div>
+        
+        <div class="hot-novel-item variable-font">
+
+          <a href="/novel_5154a952a165_1.html">
+            <div class="hot-novel-subject pure-g">
+              <span class="hot-novel-category">
+                [言情]
+              </span>
+              <span class="hot-novel-title">
+                嫁纨绔
+              </span>
+              <a class="hot-novel-author" href="/main?a=墨书白">
+                <span class="hot-novel-author-label">作者:</span>
+                墨书白
+              </a>
+            </div>
+          </a>
+        </div>
+        
+        <div class="hot-novel-item variable-font">
+
+          <a href="/novel_6416b478ca2c_1.html">
+            <div class="hot-novel-subject pure-g">
+              <span class="hot-novel-category">
+                [言情]
+              </span>
+              <span class="hot-novel-title">
+                （穿书）黑莲花攻略手册
+              </span>
+              <a class="hot-novel-author" href="/main?a=白羽摘雕弓">
+                <span class="hot-novel-author-label">作者:</span>
+                白羽摘雕弓
+              </a>
+            </div>
+          </a>
+        </div>
+        
+        <div class="hot-novel-item variable-font">
+
+          <a href="/novel_cac41f2208d8_1.html">
+            <div class="hot-novel-subject pure-g">
+              <span class="hot-novel-category">
+                [言情]
+              </span>
+              <span class="hot-novel-title">
+                重生之拯救大佬计划
+              </span>
+              <a class="hot-novel-author" href="/main?a=钟仅">
+                <span class="hot-novel-author-label">作者:</span>
+                钟仅
+              </a>
+            </div>
+          </a>
+        </div>
+        
+        <div class="hot-novel-item variable-font">
+
+          <a href="/novel_467b54161331_1.html">
+            <div class="hot-novel-subject pure-g">
+              <span class="hot-novel-category">
+                [言情]
+              </span>
+              <span class="hot-novel-title">
+                待我有罪时
+              </span>
+              <a class="hot-novel-author" href="/main?a=丁墨">
+                <span class="hot-novel-author-label">作者:</span>
+                丁墨
+              </a>
+            </div>
+          </a>
+        </div>
+        
+        <div class="hot-novel-item variable-font">
+
+          <a href="/novel_35ccf826b5a6_1.html">
+            <div class="hot-novel-subject pure-g">
+              <span class="hot-novel-category">
+                [言情]
+              </span>
+              <span class="hot-novel-title">
+                重生之女将星
+              </span>
+              <a class="hot-novel-author" href="/main?a=千山茶客">
+                <span class="hot-novel-author-label">作者:</span>
+                千山茶客
+              </a>
+            </div>
+          </a>
+        </div>
+        
+        <div class="hot-novel-item variable-font">
+
+          <a href="/novel_65a314bb5b9a_1.html">
+            <div class="hot-novel-subject pure-g">
+              <span class="hot-novel-category">
+                [言情]
+              </span>
+              <span class="hot-novel-title">
+                折腰
+              </span>
+              <a class="hot-novel-author" href="/main?a=蓬莱客">
+                <span class="hot-novel-author-label">作者:</span>
+                蓬莱客
+              </a>
+            </div>
+          </a>
+        </div>
+        
+        <div class="hot-novel-item variable-font">
+
+          <a href="/novel_78db477571f1_1.html">
+            <div class="hot-novel-subject pure-g">
+              <span class="hot-novel-category">
+                [言情]
+              </span>
+              <span class="hot-novel-title">
+                你是我的荣耀
+              </span>
+              <a class="hot-novel-author" href="/main?a=顾漫">
+                <span class="hot-novel-author-label">作者:</span>
+                顾漫
+              </a>
+            </div>
+          </a>
+        </div>
+        
+        <div class="hot-novel-item variable-font">
+
+          <a href="/novel_5c0945d6834e_1.html">
+            <div class="hot-novel-subject pure-g">
+              <span class="hot-novel-category">
+                [耽美]
+              </span>
+              <span class="hot-novel-title">
+                天官赐福
+              </span>
+              <a class="hot-novel-author" href="/main?a=墨香铜臭">
+                <span class="hot-novel-author-label">作者:</span>
+                墨香铜臭
+              </a>
+            </div>
+          </a>
+        </div>
+        
+        <div class="hot-novel-item variable-font">
+
+          <a href="/novel_7cdcf9937fe3_1.html">
+            <div class="hot-novel-subject pure-g">
+              <span class="hot-novel-category">
+                [耽美]
+              </span>
+              <span class="hot-novel-title">
+                镇魂
+              </span>
+              <a class="hot-novel-author" href="/main?a=Priest">
+                <span class="hot-novel-author-label">作者:</span>
+                Priest
+              </a>
+            </div>
+          </a>
+        </div>
+        
+        <div class="hot-novel-item variable-font">
+
+          <a href="/novel_9f7a02125f7a_1.html">
+            <div class="hot-novel-subject pure-g">
+              <span class="hot-novel-category">
+                [耽美]
+              </span>
+              <span class="hot-novel-title">
+                破云
+              </span>
+              <a class="hot-novel-author" href="/main?a=淮上">
+                <span class="hot-novel-author-label">作者:</span>
+                淮上
+              </a>
+            </div>
+          </a>
+        </div>
+        
+        <div class="hot-novel-item variable-font">
+
+          <a href="/novel_5b337e3c280e_1.html">
+            <div class="hot-novel-subject pure-g">
+              <span class="hot-novel-category">
+                [耽美]
+              </span>
+              <span class="hot-novel-title">
+                默读
+              </span>
+              <a class="hot-novel-author" href="/main?a=Priest">
+                <span class="hot-novel-author-label">作者:</span>
+                Priest
+              </a>
+            </div>
+          </a>
+        </div>
+        
+        <div class="hot-novel-item variable-font">
+
+          <a href="/novel_d2ddf9cd9363_1.html">
+            <div class="hot-novel-subject pure-g">
+              <span class="hot-novel-category">
+                [耽美]
+              </span>
+              <span class="hot-novel-title">
+                大哥
+              </span>
+              <a class="hot-novel-author" href="/main?a=priest">
+                <span class="hot-novel-author-label">作者:</span>
+                priest
+              </a>
+            </div>
+          </a>
+        </div>
+        
+        <div class="hot-novel-item variable-font">
+
+          <a href="/novel_9896506fa846_1.html">
+            <div class="hot-novel-subject pure-g">
+              <span class="hot-novel-category">
+                [耽美]
+              </span>
+              <span class="hot-novel-title">
+                二哈和他的白猫师尊
+              </span>
+              <a class="hot-novel-author" href="/main?a=肉包不吃肉">
+                <span class="hot-novel-author-label">作者:</span>
+                肉包不吃肉
+              </a>
+            </div>
+          </a>
+        </div>
+        
+        <div class="hot-novel-item variable-font">
+
+          <a href="/novel_de10b285ddc5_1.html">
+            <div class="hot-novel-subject pure-g">
+              <span class="hot-novel-category">
+                [言情]
+              </span>
+              <span class="hot-novel-title">
+                半妖司藤
+              </span>
+              <a class="hot-novel-author" href="/main?a=尾鱼">
+                <span class="hot-novel-author-label">作者:</span>
+                尾鱼
+              </a>
+            </div>
+          </a>
+        </div>
+        
+        <div class="hot-novel-item variable-font">
+
+          <a href="/novel_93079d78d0e6_1.html">
+            <div class="hot-novel-subject pure-g">
+              <span class="hot-novel-category">
+                [言情]
+              </span>
+              <span class="hot-novel-title">
+                烈火浇愁
+              </span>
+              <a class="hot-novel-author" href="/main?a=priest">
+                <span class="hot-novel-author-label">作者:</span>
+                priest
+              </a>
+            </div>
+          </a>
+        </div>
+        
+        <div class="hot-novel-item variable-font">
+
+          <a href="/novel_0cc94dc30e0f_1.html">
+            <div class="hot-novel-subject pure-g">
+              <span class="hot-novel-category">
+                [耽美]
+              </span>
+              <span class="hot-novel-title">
+                杀破狼
+              </span>
+              <a class="hot-novel-author" href="/main?a=Priest">
+                <span class="hot-novel-author-label">作者:</span>
+                Priest
+              </a>
+            </div>
+          </a>
+        </div>
+        
+        <div class="hot-novel-item variable-font">
+
+          <a href="/novel_f0e13235b8f2_1.html">
+            <div class="hot-novel-subject pure-g">
+              <span class="hot-novel-category">
+                [耽美]
+              </span>
+              <span class="hot-novel-title">
+                不死者
+              </span>
+              <a class="hot-novel-author" href="/main?a=淮上">
+                <span class="hot-novel-author-label">作者:</span>
+                淮上
+              </a>
+            </div>
+          </a>
+        </div>
+        
+        <div class="hot-novel-item variable-font">
+
+          <a href="/novel_ba689f34d677_1.html">
+            <div class="hot-novel-subject pure-g">
+              <span class="hot-novel-category">
+                [言情]
+              </span>
+              <span class="hot-novel-title">
+                砸锅卖铁去上学
+              </span>
+              <a class="hot-novel-author" href="/main?a=红刺北">
+                <span class="hot-novel-author-label">作者:</span>
+                红刺北
+              </a>
+            </div>
+          </a>
+        </div>
+        
+        <div class="hot-novel-item variable-font">
+
+          <a href="/novel_3bfa81982fed_1.html">
+            <div class="hot-novel-subject pure-g">
+              <span class="hot-novel-category">
+                [言情]
+              </span>
+              <span class="hot-novel-title">
+                君九龄
+              </span>
+              <a class="hot-novel-author" href="/main?a=希行">
+                <span class="hot-novel-author-label">作者:</span>
+                希行
+              </a>
+            </div>
+          </a>
+        </div>
+        
+        <div class="hot-novel-item variable-font">
+
+          <a href="/novel_03730a02ba71_1.html">
+            <div class="hot-novel-subject pure-g">
+              <span class="hot-novel-category">
+                [言情]
+              </span>
+              <span class="hot-novel-title">
+                爱谁谁
+              </span>
+              <a class="hot-novel-author" href="/main?a=风流书呆">
+                <span class="hot-novel-author-label">作者:</span>
+                风流书呆
+              </a>
+            </div>
+          </a>
+        </div>
+        
+        <div class="hot-novel-item variable-font">
+
+          <a href="/novel_6c4fea993042_1.html">
+            <div class="hot-novel-subject pure-g">
+              <span class="hot-novel-category">
+                [耽美]
+              </span>
+              <span class="hot-novel-title">
+                爱你怎么说
+              </span>
+              <a class="hot-novel-author" href="/main?a=风流书呆">
+                <span class="hot-novel-author-label">作者:</span>
+                风流书呆
+              </a>
+            </div>
+          </a>
+        </div>
+        
+        <div class="hot-novel-item variable-font">
+
+          <a href="/novel_1c93aa44aa02_1.html">
+            <div class="hot-novel-subject pure-g">
+              <span class="hot-novel-category">
+                [言情]
+              </span>
+              <span class="hot-novel-title">
+                一生一世美人骨
+              </span>
+              <a class="hot-novel-author" href="/main?a=墨宝非宝">
+                <span class="hot-novel-author-label">作者:</span>
+                墨宝非宝
+              </a>
+            </div>
+          </a>
+        </div>
+        
+        <div class="hot-novel-item variable-font">
+
+          <a href="/novel_f23ff3eb63eb_1.html">
+            <div class="hot-novel-subject pure-g">
+              <span class="hot-novel-category">
+                [耽美]
+              </span>
+              <span class="hot-novel-title">
+                红尘有幸识丹青
+              </span>
+              <a class="hot-novel-author" href="/main?a=阿堵">
+                <span class="hot-novel-author-label">作者:</span>
+                阿堵
+              </a>
+            </div>
+          </a>
+        </div>
+        
+        <div class="hot-novel-item variable-font">
+
+          <a href="/novel_da17d9c05b34_1.html">
+            <div class="hot-novel-subject pure-g">
+              <span class="hot-novel-category">
+                [耽美]
+              </span>
+              <span class="hot-novel-title">
+                鬓边不是海棠红
+              </span>
+              <a class="hot-novel-author" href="/main?a=水如天儿">
+                <span class="hot-novel-author-label">作者:</span>
+                水如天儿
+              </a>
+            </div>
+          </a>
+        </div>
+        
+        <div class="hot-novel-item variable-font">
+
+          <a href="/novel_9e49db8bbfef_1.html">
+            <div class="hot-novel-subject pure-g">
+              <span class="hot-novel-category">
+                [言情]
+              </span>
+              <span class="hot-novel-title">
+                恰逢雨连天
+              </span>
+              <a class="hot-novel-author" href="/main?a=沉筱之">
+                <span class="hot-novel-author-label">作者:</span>
+                沉筱之
+              </a>
+            </div>
+          </a>
+        </div>
+        
+        <div class="hot-novel-item variable-font">
+
+          <a href="/novel_1952c674180d_1.html">
+            <div class="hot-novel-subject pure-g">
+              <span class="hot-novel-category">
+                [耽美]
+              </span>
+              <span class="hot-novel-title">
+                镇魂
+              </span>
+              <a class="hot-novel-author" href="/main?a=priest">
+                <span class="hot-novel-author-label">作者:</span>
+                priest
+              </a>
+            </div>
+          </a>
+        </div>
+        
+        <div class="hot-novel-item variable-font">
+
+          <a href="/novel_b6d74a6e4796_1.html">
+            <div class="hot-novel-subject pure-g">
+              <span class="hot-novel-category">
+                [言情]
+              </span>
+              <span class="hot-novel-title">
+                难哄
+              </span>
+              <a class="hot-novel-author" href="/main?a=竹已">
+                <span class="hot-novel-author-label">作者:</span>
+                竹已
+              </a>
+            </div>
+          </a>
+        </div>
+        
+      </div>
+
+      <div id="popular" class="hot-list">
+        
+        <div class="hot-novel-item variable-font">
+
+          <a href="/novel_324efa2b06e1_1.html">
+            <div class="hot-novel-subject pure-g">
+              <span class="hot-novel-category">
+                [言情]
+              </span>
+              <span class="hot-novel-title">
+                十二巫
+              </span>
+              <a class="hot-novel-author" href="/main?a=画七">
+                <span class="hot-novel-author-label">作者:</span>
+                画七
+              </a>
+            </div>
+          </a>
+        </div>
+        
+        <div class="hot-novel-item variable-font">
+
+          <a href="/novel_e58d3798015d_1.html">
+            <div class="hot-novel-subject pure-g">
+              <span class="hot-novel-category">
+                [言情]
+              </span>
+              <span class="hot-novel-title">
+                天阶夜色
+              </span>
+              <a class="hot-novel-author" href="/main?a=姑娘别哭">
+                <span class="hot-novel-author-label">作者:</span>
+                姑娘别哭
+              </a>
+            </div>
+          </a>
+        </div>
+        
+        <div class="hot-novel-item variable-font">
+
+          <a href="/novel_9ac21861bd4a_1.html">
+            <div class="hot-novel-subject pure-g">
+              <span class="hot-novel-category">
+                [言情]
+              </span>
+              <span class="hot-novel-title">
+                新聘
+              </span>
+              <a class="hot-novel-author" href="/main?a=榆莳">
+                <span class="hot-novel-author-label">作者:</span>
+                榆莳
+              </a>
+            </div>
+          </a>
+        </div>
+        
+        <div class="hot-novel-item variable-font">
+
+          <a href="/novel_75fe366736b7_1.html">
+            <div class="hot-novel-subject pure-g">
+              <span class="hot-novel-category">
+                [耽美]
+              </span>
+              <span class="hot-novel-title">
+                我不可能是移动天灾
+              </span>
+              <a class="hot-novel-author" href="/main?a=一纸无稽">
+                <span class="hot-novel-author-label">作者:</span>
+                一纸无稽
+              </a>
+            </div>
+          </a>
+        </div>
+        
+        <div class="hot-novel-item variable-font">
+
+          <a href="/novel_878a4cf11360_1.html">
+            <div class="hot-novel-subject pure-g">
+              <span class="hot-novel-category">
+                [耽美]
+              </span>
+              <span class="hot-novel-title">
+                我还能苟[星际]
+              </span>
+              <a class="hot-novel-author" href="/main?a=有点困">
+                <span class="hot-novel-author-label">作者:</span>
+                有点困
+              </a>
+            </div>
+          </a>
+        </div>
+        
+        <div class="hot-novel-item variable-font">
+
+          <a href="/novel_932ff7a62a31_1.html">
+            <div class="hot-novel-subject pure-g">
+              <span class="hot-novel-category">
+                [耽美]
+              </span>
+              <span class="hot-novel-title">
+                拯救苍生从拆CP走起
+              </span>
+              <a class="hot-novel-author" href="/main?a=南歌玉转">
+                <span class="hot-novel-author-label">作者:</span>
+                南歌玉转
+              </a>
+            </div>
+          </a>
+        </div>
+        
+        <div class="hot-novel-item variable-font">
+
+          <a href="/novel_11ce91a62464_1.html">
+            <div class="hot-novel-subject pure-g">
+              <span class="hot-novel-category">
+                [言情]
+              </span>
+              <span class="hot-novel-title">
+                她的护卫
+              </span>
+              <a class="hot-novel-author" href="/main?a=希行">
+                <span class="hot-novel-author-label">作者:</span>
+                希行
+              </a>
+            </div>
+          </a>
+        </div>
+        
+        <div class="hot-novel-item variable-font">
+
+          <a href="/novel_b622339205dc_1.html">
+            <div class="hot-novel-subject pure-g">
+              <span class="hot-novel-category">
+                [言情]
+              </span>
+              <span class="hot-novel-title">
+                今天萧瑀被贬了吗？
+              </span>
+              <a class="hot-novel-author" href="/main?a=笑佳人">
+                <span class="hot-novel-author-label">作者:</span>
+                笑佳人
+              </a>
+            </div>
+          </a>
+        </div>
+        
+        <div class="hot-novel-item variable-font">
+
+          <a href="/novel_6cff04eaca49_1.html">
+            <div class="hot-novel-subject pure-g">
+              <span class="hot-novel-category">
+                [耽美]
+              </span>
+              <span class="hot-novel-title">
+                这里就我一个普通人吗?!
+              </span>
+              <a class="hot-novel-author" href="/main?a=纸苏">
+                <span class="hot-novel-author-label">作者:</span>
+                纸苏
+              </a>
+            </div>
+          </a>
+        </div>
+        
+        <div class="hot-novel-item variable-font">
+
+          <a href="/novel_846f28ea9348_1.html">
+            <div class="hot-novel-subject pure-g">
+              <span class="hot-novel-category">
+                [言情]
+              </span>
+              <span class="hot-novel-title">
+                国公府春闺小韵事
+              </span>
+              <a class="hot-novel-author" href="/main?a=女王不在家">
+                <span class="hot-novel-author-label">作者:</span>
+                女王不在家
+              </a>
+            </div>
+          </a>
+        </div>
+        
+        <div class="hot-novel-item variable-font">
+
+          <a href="/novel_4e33be0e7ef7_1.html">
+            <div class="hot-novel-subject pure-g">
+              <span class="hot-novel-category">
+                [言情]
+              </span>
+              <span class="hot-novel-title">
+                苍山雪
+              </span>
+              <a class="hot-novel-author" href="/main?a=墨书白">
+                <span class="hot-novel-author-label">作者:</span>
+                墨书白
+              </a>
+            </div>
+          </a>
+        </div>
+        
+        <div class="hot-novel-item variable-font">
+
+          <a href="/novel_bab0fb4ed4e9_1.html">
+            <div class="hot-novel-subject pure-g">
+              <span class="hot-novel-category">
+                [耽美]
+              </span>
+              <span class="hot-novel-title">
+                还有此等好事？
+              </span>
+              <a class="hot-novel-author" href="/main?a=一丛音">
+                <span class="hot-novel-author-label">作者:</span>
+                一丛音
+              </a>
+            </div>
+          </a>
+        </div>
+        
+        <div class="hot-novel-item variable-font">
+
+          <a href="/novel_447ae5d78084_1.html">
+            <div class="hot-novel-subject pure-g">
+              <span class="hot-novel-category">
+                [言情]
+              </span>
+              <span class="hot-novel-title">
+                非富即贵
+              </span>
+              <a class="hot-novel-author" href="/main?a=起跃">
+                <span class="hot-novel-author-label">作者:</span>
+                起跃
+              </a>
+            </div>
+          </a>
+        </div>
+        
+        <div class="hot-novel-item variable-font">
+
+          <a href="/novel_795f7bf6c6c9_1.html">
+            <div class="hot-novel-subject pure-g">
+              <span class="hot-novel-category">
+                [耽美]
+              </span>
+              <span class="hot-novel-title">
+                这很奇怪
+              </span>
+              <a class="hot-novel-author" href="/main?a=月下蝶影">
+                <span class="hot-novel-author-label">作者:</span>
+                月下蝶影
+              </a>
+            </div>
+          </a>
+        </div>
+        
+        <div class="hot-novel-item variable-font">
+
+          <a href="/novel_c866c75c8c0d_1.html">
+            <div class="hot-novel-subject pure-g">
+              <span class="hot-novel-category">
+                [言情]
+              </span>
+              <span class="hot-novel-title">
+                剑出鞘
+              </span>
+              <a class="hot-novel-author" href="/main?a=沉筱之">
+                <span class="hot-novel-author-label">作者:</span>
+                沉筱之
+              </a>
+            </div>
+          </a>
+        </div>
+        
+        <div class="hot-novel-item variable-font">
+
+          <a href="/novel_8cfbd7d51a3f_1.html">
+            <div class="hot-novel-subject pure-g">
+              <span class="hot-novel-category">
+                [言情]
+              </span>
+              <span class="hot-novel-title">
+                探花
+              </span>
+              <a class="hot-novel-author" href="/main?a=卿隐">
+                <span class="hot-novel-author-label">作者:</span>
+                卿隐
+              </a>
+            </div>
+          </a>
+        </div>
+        
+        <div class="hot-novel-item variable-font">
+
+          <a href="/novel_6d0a2ba58eab_1.html">
+            <div class="hot-novel-subject pure-g">
+              <span class="hot-novel-category">
+                [耽美]
+              </span>
+              <span class="hot-novel-title">
+                欢迎进入梦魇直播间
+              </span>
+              <a class="hot-novel-author" href="/main?a=桑沃">
+                <span class="hot-novel-author-label">作者:</span>
+                桑沃
+              </a>
+            </div>
+          </a>
+        </div>
+        
+        <div class="hot-novel-item variable-font">
+
+          <a href="/novel_26e74a912447_1.html">
+            <div class="hot-novel-subject pure-g">
+              <span class="hot-novel-category">
+                [耽美]
+              </span>
+              <span class="hot-novel-title">
+                泛泛
+              </span>
+              <a class="hot-novel-author" href="/main?a=巫哲">
+                <span class="hot-novel-author-label">作者:</span>
+                巫哲
+              </a>
+            </div>
+          </a>
+        </div>
+        
+        <div class="hot-novel-item variable-font">
+
+          <a href="/novel_9441819edf95_1.html">
+            <div class="hot-novel-subject pure-g">
+              <span class="hot-novel-category">
+                [言情]
+              </span>
+              <span class="hot-novel-title">
+                开国皇帝的小公主
+              </span>
+              <a class="hot-novel-author" href="/main?a=笑佳人">
+                <span class="hot-novel-author-label">作者:</span>
+                笑佳人
+              </a>
+            </div>
+          </a>
+        </div>
+        
+        <div class="hot-novel-item variable-font">
+
+          <a href="/novel_0599563c3856_1.html">
+            <div class="hot-novel-subject pure-g">
+              <span class="hot-novel-category">
+                [耽美]
+              </span>
+              <span class="hot-novel-title">
+                猫总会被蝴蝶吸引
+              </span>
+              <a class="hot-novel-author" href="/main?a=引路星">
+                <span class="hot-novel-author-label">作者:</span>
+                引路星
+              </a>
+            </div>
+          </a>
+        </div>
+        
+        <div class="hot-novel-item variable-font">
+
+          <a href="/novel_715cd0ce7646_1.html">
+            <div class="hot-novel-subject pure-g">
+              <span class="hot-novel-category">
+                [耽美]
+              </span>
+              <span class="hot-novel-title">
+                我骑扫帚去修仙
+              </span>
+              <a class="hot-novel-author" href="/main?a=拉棉花糖的兔子">
+                <span class="hot-novel-author-label">作者:</span>
+                拉棉花糖的兔子
+              </a>
+            </div>
+          </a>
+        </div>
+        
+        <div class="hot-novel-item variable-font">
+
+          <a href="/novel_97d241671c67_1.html">
+            <div class="hot-novel-subject pure-g">
+              <span class="hot-novel-category">
+                [言情]
+              </span>
+              <span class="hot-novel-title">
+                我夫君是灭世魔头
+              </span>
+              <a class="hot-novel-author" href="/main?a=扶梦">
+                <span class="hot-novel-author-label">作者:</span>
+                扶梦
+              </a>
+            </div>
+          </a>
+        </div>
+        
+        <div class="hot-novel-item variable-font">
+
+          <a href="/novel_ea243419880f_1.html">
+            <div class="hot-novel-subject pure-g">
+              <span class="hot-novel-category">
+                [言情]
+              </span>
+              <span class="hot-novel-title">
+                大唐辟珠记
+              </span>
+              <a class="hot-novel-author" href="/main?a=饭卡">
+                <span class="hot-novel-author-label">作者:</span>
+                饭卡
+              </a>
+            </div>
+          </a>
+        </div>
+        
+        <div class="hot-novel-item variable-font">
+
+          <a href="/novel_2d238e17c71c_1.html">
+            <div class="hot-novel-subject pure-g">
+              <span class="hot-novel-category">
+                [耽美]
+              </span>
+              <span class="hot-novel-title">
+                魔王在异界搞文娱
+              </span>
+              <a class="hot-novel-author" href="/main?a=春风遥">
+                <span class="hot-novel-author-label">作者:</span>
+                春风遥
+              </a>
+            </div>
+          </a>
+        </div>
+        
+        <div class="hot-novel-item variable-font">
+
+          <a href="/novel_87f39b0d8663_1.html">
+            <div class="hot-novel-subject pure-g">
+              <span class="hot-novel-category">
+                [言情]
+              </span>
+              <span class="hot-novel-title">
+                小鱼薄荷
+              </span>
+              <a class="hot-novel-author" href="/main?a=唧唧的猫">
+                <span class="hot-novel-author-label">作者:</span>
+                唧唧的猫
+              </a>
+            </div>
+          </a>
+        </div>
+        
+        <div class="hot-novel-item variable-font">
+
+          <a href="/novel_ee52f7c49105_1.html">
+            <div class="hot-novel-subject pure-g">
+              <span class="hot-novel-category">
+                [耽美]
+              </span>
+              <span class="hot-novel-title">
+                逆鳞
+              </span>
+              <a class="hot-novel-author" href="/main?a=一十四洲">
+                <span class="hot-novel-author-label">作者:</span>
+                一十四洲
+              </a>
+            </div>
+          </a>
+        </div>
+        
+        <div class="hot-novel-item variable-font">
+
+          <a href="/novel_1d1c50c6d6f3_1.html">
+            <div class="hot-novel-subject pure-g">
+              <span class="hot-novel-category">
+                [耽美]
+              </span>
+              <span class="hot-novel-title">
+                你的雪人能活多久
+              </span>
+              <a class="hot-novel-author" href="/main?a=稚楚">
+                <span class="hot-novel-author-label">作者:</span>
+                稚楚
+              </a>
+            </div>
+          </a>
+        </div>
+        
+        <div class="hot-novel-item variable-font">
+
+          <a href="/novel_632decbbccc7_1.html">
+            <div class="hot-novel-subject pure-g">
+              <span class="hot-novel-category">
+                [言情]
+              </span>
+              <span class="hot-novel-title">
+                重生后和宿敌结婚了
+              </span>
+              <a class="hot-novel-author" href="/main?a=白羽摘雕弓">
+                <span class="hot-novel-author-label">作者:</span>
+                白羽摘雕弓
+              </a>
+            </div>
+          </a>
+        </div>
+        
+        <div class="hot-novel-item variable-font">
+
+          <a href="/novel_2ab2a580bcbb_1.html">
+            <div class="hot-novel-subject pure-g">
+              <span class="hot-novel-category">
+                [言情]
+              </span>
+              <span class="hot-novel-title">
+                残疾王爷站起来了
+              </span>
+              <a class="hot-novel-author" href="/main?a=笑佳人">
+                <span class="hot-novel-author-label">作者:</span>
+                笑佳人
+              </a>
+            </div>
+          </a>
+        </div>
+        
+        <div class="hot-novel-item variable-font">
+
+          <a href="/novel_5e58d95319f3_1.html">
+            <div class="hot-novel-subject pure-g">
+              <span class="hot-novel-category">
+                [言情]
+              </span>
+              <span class="hot-novel-title">
+                病美人和杀猪刀
+              </span>
+              <a class="hot-novel-author" href="/main?a=雾矢翊">
+                <span class="hot-novel-author-label">作者:</span>
+                雾矢翊
+              </a>
+            </div>
+          </a>
+        </div>
+        
+        <div class="hot-novel-item variable-font">
+
+          <a href="/novel_c5fa6820ee22_1.html">
+            <div class="hot-novel-subject pure-g">
+              <span class="hot-novel-category">
+                [言情]
+              </span>
+              <span class="hot-novel-title">
+                探花郎他今天后悔了吗
+              </span>
+              <a class="hot-novel-author" href="/main?a=袖侧">
+                <span class="hot-novel-author-label">作者:</span>
+                袖侧
+              </a>
+            </div>
+          </a>
+        </div>
+        
+        <div class="hot-novel-item variable-font">
+
+          <a href="/novel_7d086fd210b9_1.html">
+            <div class="hot-novel-subject pure-g">
+              <span class="hot-novel-category">
+                [言情]
+              </span>
+              <span class="hot-novel-title">
+                恰与梨花同梦
+              </span>
+              <a class="hot-novel-author" href="/main?a=尤四姐">
+                <span class="hot-novel-author-label">作者:</span>
+                尤四姐
+              </a>
+            </div>
+          </a>
+        </div>
+        
+        <div class="hot-novel-item variable-font">
+
+          <a href="/novel_02faf252c151_1.html">
+            <div class="hot-novel-subject pure-g">
+              <span class="hot-novel-category">
+                [耽美]
+              </span>
+              <span class="hot-novel-title">
+                纯白恶魔
+              </span>
+              <a class="hot-novel-author" href="/main?a=priest">
+                <span class="hot-novel-author-label">作者:</span>
+                priest
+              </a>
+            </div>
+          </a>
+        </div>
+        
+        <div class="hot-novel-item variable-font">
+
+          <a href="/novel_96c39887399d_1.html">
+            <div class="hot-novel-subject pure-g">
+              <span class="hot-novel-category">
+                [言情]
+              </span>
+              <span class="hot-novel-title">
+                白篱梦
+              </span>
+              <a class="hot-novel-author" href="/main?a=希行">
+                <span class="hot-novel-author-label">作者:</span>
+                希行
+              </a>
+            </div>
+          </a>
+        </div>
+        
+        <div class="hot-novel-item variable-font">
+
+          <a href="/novel_bb8cb849be71_1.html">
+            <div class="hot-novel-subject pure-g">
+              <span class="hot-novel-category">
+                [耽美]
+              </span>
+              <span class="hot-novel-title">
+                咸鱼一身反骨
+              </span>
+              <a class="hot-novel-author" href="/main?a=一世华裳">
+                <span class="hot-novel-author-label">作者:</span>
+                一世华裳
+              </a>
+            </div>
+          </a>
+        </div>
+        
+        <div class="hot-novel-item variable-font">
+
+          <a href="/novel_8b55a6d4acc5_1.html">
+            <div class="hot-novel-subject pure-g">
+              <span class="hot-novel-category">
+                [耽美]
+              </span>
+              <span class="hot-novel-title">
+                秋燥
+              </span>
+              <a class="hot-novel-author" href="/main?a=巫哲">
+                <span class="hot-novel-author-label">作者:</span>
+                巫哲
+              </a>
+            </div>
+          </a>
+        </div>
+        
+        <div class="hot-novel-item variable-font">
+
+          <a href="/novel_909c23f98239_1.html">
+            <div class="hot-novel-subject pure-g">
+              <span class="hot-novel-category">
+                [言情]
+              </span>
+              <span class="hot-novel-title">
+                他的暗卫
+              </span>
+              <a class="hot-novel-author" href="/main?a=女王不在家">
+                <span class="hot-novel-author-label">作者:</span>
+                女王不在家
+              </a>
+            </div>
+          </a>
+        </div>
+        
+        <div class="hot-novel-item variable-font">
+
+          <a href="/novel_75368881f4b0_1.html">
+            <div class="hot-novel-subject pure-g">
+              <span class="hot-novel-category">
+                [言情]
+              </span>
+              <span class="hot-novel-title">
+                新搬来的邻居
+              </span>
+              <a class="hot-novel-author" href="/main?a=笑佳人">
+                <span class="hot-novel-author-label">作者:</span>
+                笑佳人
+              </a>
+            </div>
+          </a>
+        </div>
+        
+        <div class="hot-novel-item variable-font">
+
+          <a href="/novel_12481b74f3eb_1.html">
+            <div class="hot-novel-subject pure-g">
+              <span class="hot-novel-category">
+                [言情]
+              </span>
+              <span class="hot-novel-title">
+                [武周]问鼎
+              </span>
+              <a class="hot-novel-author" href="/main?a=千里江风">
+                <span class="hot-novel-author-label">作者:</span>
+                千里江风
+              </a>
+            </div>
+          </a>
+        </div>
+        
+        <div class="hot-novel-item variable-font">
+
+          <a href="/novel_493e8b0aa7ea_1.html">
+            <div class="hot-novel-subject pure-g">
+              <span class="hot-novel-category">
+                [耽美]
+              </span>
+              <span class="hot-novel-title">
+                恒星时刻
+              </span>
+              <a class="hot-novel-author" href="/main?a=稚楚">
+                <span class="hot-novel-author-label">作者:</span>
+                稚楚
+              </a>
+            </div>
+          </a>
+        </div>
+        
+      </div>
+
+    </div>
+  </div>
+
+  <div id="main-footer">
+  <p class='brand'>
+    <a href="/">茶马小说 精选网络全本小说</a>
+  </p>
+  <p class='legal'>
+    本站所有内容为网友挑选高收藏高人气小说自行上载，不得用做其他用途。
+  </p>
+
+  <!-- Google tag (gtag.js) -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-KG7X7CF156"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag() { dataLayer.push(arguments); }
+    gtag('js', new Date());
+
+    gtag('config', 'G-KG7X7CF156');
+  </script>
+
+</div>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a51646a14ffa3201',t:'MTc5MzE1MjA4Mg=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+
+</html>

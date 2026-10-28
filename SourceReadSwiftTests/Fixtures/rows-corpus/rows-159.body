@@ -1,0 +1,811 @@
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+    
+
+<!doctype html>
+
+<html>
+
+    <head>
+
+        <meta charset="utf-8">
+
+        <title>斗破苍穹_站内搜索</title>
+
+        <link href="/static/css/default.css?v=0.9" rel="stylesheet" type="text/css"/>
+
+        <script type="text/javascript" src="/static/js/jquery-1.7.2.min.js"></script>
+
+        <script type="text/javascript" src="/static/js/baidu-ajax.js"></script>
+
+        <script type="text/javascript" src="/static/js/statistic.js"></script>
+
+        <script>
+
+            //搜全网功能
+
+            function baidusearch(id) {
+
+                var url = "http://www.baidu.com/s?ie=utf-8&cus_sid=&tn=SE_pscse_053x7tyx&wd=" + encodeURIComponent(document.getElementById(id).value);
+
+                window.open(url, "_blank");
+
+                var bpos;
+
+                if (id === "kw") {
+
+                    bpos = "top";
+
+                }
+
+                else {
+
+                    bpos = "bottom";
+
+                }
+
+                var pageLog = {};
+
+                            pageLog["q"] = "斗破苍穹";
+
+                            pageLog["p"] = "1";
+
+                            pageLog["nsid"] = "";
+
+                            pageLog["cc"] = "52pojie.cn";
+
+                            log.send("/api/customsearch/click", pageLog, {
+
+                    bpos: bpos,
+
+                    tid: "0",
+
+                    cc: "52pojie.cn",
+
+                    rt: 1
+
+                });
+
+            }
+
+        </script>
+
+    </head>
+
+    <body>
+
+
+
+        <div id="wrap" style="position: relative;">
+
+                <div id="head" style="" class="clearfix">
+
+        <div class="s_nav" style="">
+
+                                                <a href="javascript:void(0)" class="s_logo">
+
+                        <img src="/static/img/default-logo.png" border="0" id="logo">
+
+                    </a>
+
+                                    </div>
+
+        <div class='fl mt45'>
+
+            <form name="f" action="site" class="fm" id="bdcs-search-form" >
+
+                <span class="s_ipt_wr_pre"  id="search_input_container">
+
+                    <input name="q" id="kw" class="s_ipt" value="斗破苍穹" maxlength="100"
+
+                           autocomplete="off" style="">
+
+                    <input name="click" value="1" type="hidden">
+
+                                                                                                        <input name="cc" value="52pojie.cn" type="hidden">
+
+                                                                            </span>
+
+                <span class="s_btn_wr_pre" style="">
+
+                    <input name="s" value="" type="hidden">
+
+                    <input name="nsid" value="" type="hidden">
+
+                                                                                                                        <input type="submit" id="su" value="搜本站"  class="s_btn_pre" onmousedown="this.className = 's_btn_pre s_btn_h'"
+
+                           onmouseout="this.className = 's_btn_pre'"> 
+
+                </span>
+
+                                                    <span class="s_btn_wr_after" >
+
+                        <input type="button" id="baidusu" value="搜全网" class="s_btn_after"  onmousedown="this.className = 's_btn_after s_btn_h'"
+
+                               onmouseout="this.className = 's_btn_after'" onclick="baidusearch('kw');"> 
+
+                    </span>
+
+                                            </form>
+
+
+
+            <ul id="bdcs-search-sug-list" class="bdcs-search-sug-list"></ul>
+
+
+
+        </div>
+
+    </div>
+
+    <script type="text/javascript">
+
+            </script>
+
+                <div id="container" class="clearfix">
+
+                <div id="aside" class="aside">
+
+                    
+
+
+
+
+<div id="left" class="aside-main">
+            <dl class="opt">
+            <dd class="dd-selected">全文搜索</dd>
+            <a class="a-no-selected" href="javascript:cse.util.select('stp','1','type')"><dd class="dd-no-selected">标题搜索</dd></a>
+    </dl>
+    
+    <dl class="opt" id="flt-pubTime">
+                                                                            <dd class="dd-selected">全部时间</dd>
+                                                    <a class="a-no-selected" href="javascript:cse.util.select('sti','60','time')"><dd class="dd-no-selected">1小时内</dd></a>
+                                                    <a class="a-no-selected" href="javascript:cse.util.select('sti','1440','time')"><dd class="dd-no-selected">1天内</dd></a>
+                                                    <a class="a-no-selected" href="javascript:cse.util.select('sti','10080','time')"><dd class="dd-no-selected">1周内</dd></a>
+                                                    <a class="a-no-selected" href="javascript:cse.util.select('sti','43200','time')"><dd class="dd-no-selected">1个月内</dd></a>
+                                </dl>   
+
+
+
+<dl class="opt" id="flt-sort">
+                                                    <dd class="dd-selected">默认排序</dd>
+                                    
+                <a class="a-no-selected" href="javascript:cse.util.select('','lds','sort')"><dd class="dd-no-selected">按时间排序</dd></a>
+                    </dl>
+</div>
+<script type="text/javascript" src="/static/js/forum.js"></script>
+<script type="text/javascript">
+    </script>
+
+                </div>
+
+                <div id="center" class="content">
+
+                    <div id="results" class="content-main">
+
+                                                    <span class="support-text-top">为您找到相关结果47个</span>
+
+                                                            
+
+
+
+
+
+
+
+
+
+<div class="result f s0" >
+    <h3 class="c-title">
+        <a rpos="" cpos="title" href="https://www.52pojie.cn/thread-1563089-1-1.html"  target="_blank">暮玖 <em>斗破苍穹</em>有声小说完整版 - 吾爱破解 - 52pojie.cn </a>
+    </h3>
+    <div>
+                        <div class="c-content">
+                                            <div class="c-abstract" >
+                暮玖版的<em>斗破苍穹</em>百度阿里云 53 有阿里云的要不要@Eapoul 阿里云，已私聊 https://www.52pojie.cn/forum.php ... 7%C6%C6%B2%D4%F1%B7 有阿里云的要不要@Eapoul 有斗破苍穹漫画版的吗 55 阿里云，已私聊 大佬也可以给我发一份吗             </div>
+                                                <div>
+                <span class="c-showurl" >www.52pojie.cn/thread-1563089-1...html 2026-10-3</span>
+            </div>
+                    </div>
+                    </div>
+</div>
+
+                                                            
+
+
+
+
+
+
+
+
+
+<div class="result f s0" >
+    <h3 class="c-title">
+        <a rpos="" cpos="title" href="https://www.52pojie.cn/thread-1206013-1-1.html"  target="_blank">求暮玖ayla的<em>斗破苍穹</em>有声小说 - 吾爱破解 - 52pojie.cn </a>
+    </h3>
+    <div>
+                        <div class="c-content">
+                                            <div class="c-abstract" >
+                求喜马拉雅~暮玖ayla的<em>斗破苍穹</em>有声小说，只要暮玖ayla的，其它作者的不要。 谢谢             </div>
+                                                <div>
+                <span class="c-showurl" >www.52pojie.cn/thread-1206013-1...html 2026-10-4</span>
+            </div>
+                    </div>
+                    </div>
+</div>
+
+                                                            
+
+
+
+
+
+
+
+
+
+<div class="result f s0" >
+    <h3 class="c-title">
+        <a rpos="" cpos="title" href="https://www.52pojie.cn/thread-1977577-1-1.html"  target="_blank"><em>斗破苍穹</em>大灰狼有声小说求全集。 - 吾爱破解 - 52pojie.cn </a>
+    </h3>
+    <div>
+                        <div class="c-content">
+                                            <div class="c-abstract" >
+                大佬们，求<em>斗破苍穹</em>有声小说，大灰狼演讲版本全集。谢谢&amp;#10084;&amp;#65039;&amp;#10084;&amp;#65039;&amp;#10084;&amp;...            </div>
+                                                <div>
+                <span class="c-showurl" >www.52pojie.cn/thread-1977577-1...html 2026-9-18</span>
+            </div>
+                    </div>
+                    </div>
+</div>
+
+                                                            
+
+
+
+
+
+
+
+
+
+<div class="result f s0" >
+    <h3 class="c-title">
+        <a rpos="" cpos="title" href="https://www.52pojie.cn/thread-1917840-1-1.html"  target="_blank">爬取某电影网站动漫集数更新发送到TG - 吾爱破解 - 52pojie.cn </a>
+    </h3>
+    <div>
+                        <div class="c-content">
+                                            <div class="c-abstract" >
+                ?1 {&quot;遮天动画版&quot;: &quot;54&quot;, &quot;吞噬星空&quot;: &quot;116&quot;, &quot;仙逆&quot;: &quot;33&quot;, &quot;<em>斗破苍穹</em> 年番&quot;: &quot;93&quot;, ...            </div>
+                                                <div>
+                <span class="c-showurl" >www.52pojie.cn/thread-1917840-1...html 2026-9-22</span>
+            </div>
+                    </div>
+                    </div>
+</div>
+
+                                                            
+
+
+
+
+
+
+
+
+
+<div class="result f s0" >
+    <h3 class="c-title">
+        <a rpos="" cpos="title" href="https://www.52pojie.cn/thread-1547682-1-1.html"  target="_blank">求!<em>斗破苍穹</em>(领先声创)有声小说全本网盘资源! - 吾爱破解 - 52pojie...</a>
+    </h3>
+    <div>
+                        <div class="c-content">
+                                            <div class="c-abstract" >
+                跪求！鹅C FM <em>斗破苍穹</em>（领先声创）有声小说全本网盘资源！全本全本全本！谢谢！            </div>
+                                                <div>
+                <span class="c-showurl" >www.52pojie.cn/thread-1547682-1...html 2026-10-20</span>
+            </div>
+                    </div>
+                    </div>
+</div>
+
+                                                            
+
+
+
+
+
+
+
+
+
+<div class="result f s0" >
+    <h3 class="c-title">
+        <a rpos="" cpos="title" href="https://www.52pojie.cn/thread-1566240-1-1.html"  target="_blank">求暮玖版<em>斗破苍穹</em>有声小说天翼云盘分享 - 吾爱破解 - 52pojie.cn </a>
+    </h3>
+    <div>
+                        <div class="c-content">
+                                            <div class="c-abstract" >
+                https://pan.baidu.com/s/1_Yz9oVBYcmVuEHCHWqaw5A#list/path=%2F <em>斗破苍穹</em> 500个500个转存 或者...            </div>
+                                                <div>
+                <span class="c-showurl" >www.52pojie.cn/thread-1566240-1...html 2026-10-17</span>
+            </div>
+                    </div>
+                    </div>
+</div>
+
+                                                            
+
+
+
+
+
+
+
+
+
+<div class="result f s0" >
+    <h3 class="c-title">
+        <a rpos="" cpos="title" href="https://www.52pojie.cn/thread-1264256-1-1.html"  target="_blank">求有声小说“<em>斗破苍穹</em>之无上之境”干净版 - 吾爱破解 - 52pojie.cn </a>
+    </h3>
+    <div>
+                        <div class="c-content">
+                                            <div class="c-abstract" >
+                求有声小说“<em>斗破苍穹</em>之无上之境”干净版 和 武动乾坤领先声创版的             </div>
+                                                <div>
+                <span class="c-showurl" >www.52pojie.cn/thread-1264256-1...html 2026-9-26</span>
+            </div>
+                    </div>
+                    </div>
+</div>
+
+                                                            
+
+
+
+
+
+
+
+
+
+<div class="result f s0" >
+    <h3 class="c-title">
+        <a rpos="" cpos="title" href="https://www.52pojie.cn/thread-1126938-1-1.html"  target="_blank">万能的吾爱,求助<em>斗破苍穹</em> 蜡笔小勇版 缺少1-200集 - 吾爱破解 - 52poji...</a>
+    </h3>
+    <div>
+                        <div class="c-content">
+                                            <div class="c-abstract" >
+                <em>斗破苍穹</em>这部动画片还是很不错的。。。            </div>
+                                                <div>
+                <span class="c-showurl" >www.52pojie.cn/thread-1126938-1...html 2026-10-3</span>
+            </div>
+                    </div>
+                    </div>
+</div>
+
+                                                            
+
+
+
+
+
+
+
+
+
+<div class="result f s0" >
+    <h3 class="c-title">
+        <a rpos="" cpos="title" href="https://www.52pojie.cn/thread-1280277-1-1.html"  target="_blank">求<em>斗破苍穹</em>之无上之境700到1600有声小说资源 - 吾爱破解 - 52pojie...</a>
+    </h3>
+    <div>
+                        <div class="c-content">
+                                            <div class="c-abstract" >
+                求<em>斗破苍穹</em>之无上之境小说700到1600有声小说资源             </div>
+                                                <div>
+                <span class="c-showurl" >www.52pojie.cn/thread-1280277-1...html 2026-10-12</span>
+            </div>
+                    </div>
+                    </div>
+</div>
+
+                                                            
+
+
+
+
+
+
+
+
+
+<div class="result f s0" >
+    <h3 class="c-title">
+        <a rpos="" cpos="title" href="https://www.52pojie.cn/archiver/tid-1227928.html"  target="_blank">python爬取<em>斗破</em>小说网 - 吾爱破解 - 52pojie.cn - Powered by...</a>
+    </h3>
+    <div>
+                        <div class="c-content">
+                                            <div class="c-abstract" >
+                最近看动漫,<em>斗破苍穹</em>,有点痴迷,动漫看完了,开始搜小说看,一般得小说网站都有广告啥的,我找了个还不错得网站。(斗破小说才看完,下面已大主宰为例) 脚本可实现:在pycharm里去一章一章读取,在控制台输出(方便你摸鱼,别人以为你在调试代码{:1_905:}) ...            </div>
+                                                <div>
+                <span class="c-showurl" >www.52pojie.cn/archiver/tid-12279... 2026-10-21</span>
+            </div>
+                    </div>
+                    </div>
+</div>
+
+                                                                        </div>
+
+                </div>
+
+                    
+
+                <div class="extra"> 
+
+                    <div id="right">
+
+                        
+
+                                                
+
+                    </div>
+
+                </div>
+
+                    
+
+            </div>
+
+        </div>
+
+        <br clear="all">
+
+        <div id="footer" class="clearfix" style="">
+
+        <div class="pager clearfix" id="pageFooter">
+
+                                        <a href="site?q=%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9&p=0&nsid=&cc=52pojie.cn" class="pager-previous-foot n" >&lt;上一页</a>
+
+                                                                                                                                                                                                                                                                                                                                                                <a href="site?q=%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9&p=0&nsid=&cc=52pojie.cn">
+
+                                                        <span class="fk" >
+
+                                                            <i class="c-icon c-icon-bear-pn"></i>
+
+                            </span>
+
+                            <span class="pager-normal-foot" >1</span>
+
+                        </a>
+
+                                                            <strong>
+
+                <span class="fk fk_cur" >
+
+                    <i class="c-icon c-icon-bear-p"></i>
+
+                </span>
+
+                <span class="pager-current-foot" >2</span>
+
+            </strong>
+
+                                                                        <a href="site?q=%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9&p=2&nsid=&cc=52pojie.cn">
+
+                                                        <span class="fk" >
+
+                                                            <i class="c-icon c-icon-bear-pn"></i>
+
+                            </span>
+
+                            <span class="pager-normal-foot" >3</span>
+
+                        </a>
+
+                                                                                                            <a href="site?q=%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9&p=3&nsid=&cc=52pojie.cn">
+
+                                                        <span class="fk fkd" >
+
+                                                            <i class="c-icon c-icon-bear-pn"></i>
+
+                            </span>
+
+                            <span class="pager-normal-foot" >4</span>
+
+                        </a>
+
+                                                                                                            <a href="site?q=%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9&p=4&nsid=&cc=52pojie.cn">
+
+                                                        <span class="fk" >
+
+                                                            <i class="c-icon c-icon-bear-pn"></i>
+
+                            </span>
+
+                            <span class="pager-normal-foot" >5</span>
+
+                        </a>
+
+                                                                                                                                                                                                                                        <a href="site?q=%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9&p=2&nsid=&cc=52pojie.cn" class="pager-next-foot n" >下一页&gt;</a>
+
+                                </div>
+
+    
+
+    <div id="BottomBox" style="">
+
+        <form name="f2" action="site" class="fm" >
+
+            <span class="s_ipt_wr_pre floatLeft" >  
+
+            <input name="q" id="kw2" class="s_ipt" value="斗破苍穹" maxlength="100" autocomplete="off" style="">
+
+                                                                            <input name="cc" value="52pojie.cn" type="hidden">
+
+                                                                                    </span>
+
+            <span class="s_btn_wr_pre floatLeft" style="">
+
+                <input name="s" value="" type="hidden">							
+
+                <input name="nsid" value="" type="hidden">
+
+                                <input type="submit" id="su" value="搜本站"  class="s_btn_pre" onmousedown="this.className='s_btn_pre s_btn_h'"
+
+                onmouseout="this.className='s_btn_pre'">
+
+            </span>
+
+                                    <span class="s_btn_wr_after floatLeft" >
+
+                <input type="button" id="baidusu" value="搜全网"  class="s_btn_after" onmousedown="this.className='s_btn_after s_btn_h'"
+
+                onmouseout="this.className='s_btn_after'" onclick="baidusearch('kw2');">
+
+            </span>
+
+                                                <span class="support-text leftSpan">搜索技术由</span>
+
+            <a href="http://zn.baidu.com" target="_blank"><span class="support-logo" ></span></a>
+
+            <span class="support-text">提供</span>
+
+                    </form>
+
+        <form id="f3" name="f3" action="site">
+
+            <input type="hidden" name="q" value="斗破苍穹">
+
+                        <input type="hidden" name="s" value="">
+
+                                                                <input name="cc" value="52pojie.cn" type="hidden">
+
+                        
+
+        </form>
+
+    </div>
+
+</div>
+
+<script type="text/javascript">
+
+(function () {
+
+    $("#kw2").focus(function () {
+
+        $(".bottom-box-tips").hide();
+
+    });
+
+    $("#kw2").blur(function () {
+
+        $(".bottom-box-tips").show();
+
+    });
+
+})();
+
+</script>
+
+
+
+        <!-- 百度反馈入口 -->
+
+        <div class="feedback-icon" id="bd-feedback"></div>
+
+        <script type="text/javascript" src="/static/js/feedback.js"></script>
+
+    </body>
+
+
+
+    <script>
+
+        var cse = cse || {};
+
+        cse.param = {
+
+            'filters': null || {},
+
+            'sorts': "" || "",
+
+            'searchType': 0 || "",
+
+            'searchTimeRange': 0 || "",
+
+            'dza': "" || "",
+
+        };
+
+        cse.util = {
+
+            'makeParam': function(arr) {
+
+                var sb = [];
+
+                for (var key in arr) {
+
+                    if (arr[key] && typeof (arr[key]) != "function") {
+
+                        sb.push(key + "=" + encodeURIComponent(arr[key]));
+
+                    }
+
+                }
+
+                return sb.join("&");
+
+            },
+
+            'addParam': function(dom, key, value) {
+
+                if (dom && key && value) {
+
+                    var ipt = document.createElement("input");
+
+                    ipt.type = "hidden";
+
+                    ipt.name = key;
+
+                    ipt.value = value;
+
+                    dom.appendChild(ipt);
+
+                }
+
+            },
+
+            'select': function(k, v, action) {
+
+                if (action == "filter") {
+
+                    cse.param.filters[k] = v;
+
+                } else if (action == "sort") {
+
+                    cse.param.sorts = v;
+
+                } else if (action == "type") {
+
+                    cse.param.searchType = v;
+
+                } else if (action == "time") {
+
+                    cse.param.searchTimeRange = v;
+
+                }
+
+                var filterValue = cse.util.makeParam(cse.param.filters);
+
+                var f3 = document.getElementById("f3");
+
+                cse.util.addParam(f3, "flt", filterValue);
+
+                cse.util.addParam(f3, "srt", cse.param.sorts);
+
+                cse.util.addParam(f3, "stp", cse.param.searchType);
+
+                cse.util.addParam(f3, "sti", cse.param.searchTimeRange);
+
+                cse.util.addParam(f3, "dza", cse.param.dza);
+
+                f3.submit();
+
+            },
+
+            'switchFilter': function(obj) {
+
+                var id = obj.getAttribute("data-for"),
+
+                        exp = (obj.getAttribute("data-exp") == "0"),
+
+                        con = document.getElementById("flt-" + id),
+
+                        flts = con.getElementsByTagName("DD");
+
+                for (var i = 0, len = flts.length; i < len; i++) {
+
+                    var flt = flts[i];
+
+                    if (exp) {
+
+                        flt.style.display = "block";
+
+                    } else {
+
+                        if (flt.getAttribute("data-limit") == "1") {
+
+                            flt.style.display = "none";
+
+                        }
+
+                    }
+
+                }
+
+                obj.setAttribute("data-exp", exp ? "1" : "0");
+
+                obj.className = exp ? "filterLimitExp" : "filterLimit";
+
+            }
+
+        };
+
+        window.onload = function() {
+
+            document.forms[0].reset();
+
+            document.forms[document.forms.length - 1].reset()
+
+        };
+
+        $(".result a").click(function() {
+
+            var pageLog = {};
+
+                    pageLog["q"] = "斗破苍穹";
+
+                    pageLog["p"] = "1";
+
+                    pageLog["nsid"] = "";
+
+                    pageLog["cc"] = "52pojie.cn";
+
+                    log.send("/api/customsearch/click", pageLog, {
+
+                rpos: parseInt($(this).parents(".result").index(".result")) + 1,
+
+                uid: encodeURIComponent($(this).attr("href")),
+
+                tid: "0",
+
+                cpos: $(this).attr("cpos"),
+
+                cc: '52pojie.cn',
+
+                from: 'site'
+
+            });
+
+        });
+
+    </script>
+
+
+
+</html>
+
+
+
+
+

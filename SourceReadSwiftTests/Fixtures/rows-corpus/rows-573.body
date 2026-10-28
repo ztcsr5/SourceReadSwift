@@ -1,0 +1,490 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>耽美小说排行榜 - 书耽</title>
+    <meta name="keywords" content="耽美小说排行榜"/>
+    <meta name="description" content="书耽提供最新最全好看的全本耽美小说，同人小说，bl小说"/>
+
+    <meta name="format-detection" content="telephone=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black">
+    <meta name="viewport" content="width=device-width, initial-scale=0.5, maximum-scale=0.5, minimum-scale=0.5, user-scalable=0">
+    <!--针对UC浏览器的设置-->
+    <meta name="browsermode" content="application">
+    <!--应用模式-->
+    <meta name="full-screen" content="no">
+    <!-- QQ应用模式 -->
+    <meta name="x5-page-mode" content="app">
+
+    <link rel="shortcut icon" href="http://m.shubl.com/resources/images/icon/ShuDan_Icon_32_R.png">
+
+    <link rel="stylesheet" type="text/css" href="http://m.shubl.com/resources/fonts/iconfont.css"/>
+    <link rel="stylesheet" type="text/css" href='http://m.shubl.com/resources/css/style.css'/>
+    <link rel="stylesheet" type="text/css" href='http://m.shubl.com/resources/css/grid.css'/>
+
+    <script type="text/javascript" language="javascript" src='http://m.shubl.com/resources/js/jquery-3.2.1.min.js'></script>
+    <script type="text/javascript" language="javascript" src='http://m.shubl.com/resources/js/flexible.js'></script>
+    <script type="text/javascript" language="javascript" src='http://m.shubl.com/resources/js/third-parties/jquery.uiAlertView-1.0.0.js'></script>
+    <script type="text/javascript">
+        var SD = SD || {};
+        SD.config = {jsPath:'http://m.shubl.com/resources/js', rootPath:'http://m.shubl.com/'};
+        SD.book = {book_id: "", chapter_id: "", up_reader_id: "", is_paid: 0};
+        SD.userinfo = {reader_id: 0, reader_name: '""', avatar_thumb_url: '""', vip_lv: ""};
+        SD.reader_other_info = {"exp_lv_list":{"1":"\u65e0\u540d\u5c0f\u53d7","2":"\u521d\u5165\u8150\u95e8","3":"\u521d\u7aa5\u8150\u5f84","4":"\u767d\u53d7\u8d77\u5bb6","5":"\u4e00\u7247\u803d\u5fc3","6":"\u9e33\u9e33\u76f8\u62b1","7":"\u7eaf\u7231\u60c5\u957f","8":"\u53ef\u653b\u53ef\u53d7","9":"\u6709\u8150\u65e0\u7c7b","10":"\u8150\u5982\u4e1c\u6d77","11":"\u8150\u95e8\u6c38\u5b58","12":"\u65e0\u53cc\u7ec5\u58eb","13":"\u653b\u5fb7\u65e0\u91cf","14":"\u4e07\u53d7\u65e0\u7586","15":"\u51fa\u5165\u5e73\u5b89"},"vip_lv_list":["\u666e\u901a","\u4f1a\u5458","\u521dV","\u9ad8V","\u94bbV"]}    </script>
+    <script type="text/javascript" src="http://m.shubl.com/resources/js/base.js"></script>
+    <script>
+        var _hmt = _hmt || [];
+        (function() {
+            var hm = document.createElement("script");
+            hm.src = "//hm.baidu.com/hm.js?3c839f98d7d8b725181063a036813536";
+            var s = document.getElementsByTagName("script")[0];
+            s.parentNode.insertBefore(hm, s);
+        })();
+    </script>
+</head>
+<body>
+<div id="global_search_body">
+    <form id="search_header" method="get" target="_self" action="http://m.shubl.com/index/search_book">
+        <div class="left" style="width: 80%">
+            <div class="search-wrap center">
+                <input class="input" type="text" name="key" id="search_book_input" value="" placeholder="输入你感兴趣的作者作品">
+                <a class="search"><i class="iconfont icon-sousuo"></i></a>
+            </div>
+        </div>
+        <div class="right" style="top:0.37274999999999997rem;">
+            <a id="search_close_btn">取消</a>
+        </div>
+    </form>
+</div>
+<div id="global_menu_body">
+    <div class="header" style="border-bottom: solid 1px #efefef">
+        <div class="left">
+        </div>
+        <span class="J_PageName">作者主页</span>
+        <div class="right">
+            <a id="list_close_btn"><i class="iconfont icon-close"></i></a>
+        </div>
+    </div>
+    <div class="bg-white">
+        <ul id="index_menu">
+            <li>
+                <a class="menu-icon-home" href="http://m.shubl.com/">
+                    <i class="iconfont icon-shouye"></i>
+                </a>
+                <p>首页</p>
+            </li>
+            <li>
+                <a class="menu-icon-fenlei" href="http://m.shubl.com/index/category">
+                    <i class="iconfont icon-fenlei"></i>
+                </a>
+                <p>分类</p>
+            </li>
+            <li>
+                <a class="menu-icon-paihang" href="http://m.shubl.com/index/rank">
+                    <i class="iconfont icon-paihang"></i>
+                </a>
+                <p>排行</p>
+            </li>
+            <li>
+                <a class="menu-icon-wanben" href="http://m.shubl.com/index/ended">
+                    <i class="iconfont icon-wanben"></i>
+                </a>
+                <p>完本</p>
+            </li>
+            <li>
+                <a class="menu-icon-vip" href="http://m.shubl.com/index/vip">
+                    <i class="iconfont icon-vip-zhuanqu"></i>
+                </a>
+                <p>VIP专区</p>
+            </li>
+            <li>
+                <a class="menu-icon-usercenter" href="http://m.shubl.com/reader/get_my_info">
+                    <i class="iconfont icon-user-center"></i>
+                </a>
+                <p>个人中心</p>
+            </li>
+        </ul>
+        <div class="text-center" style="padding: 0.26625rem 0 0.5325rem 0;">
+            <a class="btn btn-primary btn-large" style="width: 80%" href="http://m.shubl.com/bookshelf/my">我的书架</a>
+        </div>
+    </div>
+</div><!--container start-->
+<style>
+    #filter_body {
+        display: none;
+        position: absolute;
+        top: 2.6625rem;
+        left: 0;
+        width: 100%;
+    }
+    #filter_table {
+        width: 100%;
+        table-layout: fixed;
+        border-collapse: separate;
+        border-spacing: 0;
+        border: solid 1px #e6e6e6;
+        border-radius: 0.18637499999999999rem;
+    }
+    #filter_table tr:not(:last-child) td {
+        border-bottom: solid 1px #e6e6e6;
+    }
+    #filter_table tr:first-child td:first-child {
+        border-radius: 0.18637499999999999rem 0 0 0;
+    }
+    #filter_table .title {
+        width: 20%;
+        text-align: center;
+        vertical-align: middle;
+        font-size: 0.399375rem;
+        color: #666;
+        background: #f4f2f2;
+    }
+    #filter_table .selection {
+        padding: 0.5325rem 0.26625rem 0.26625rem 0.26625rem;
+    }
+    #filter_table .selection label {
+        display: inline-block;
+        height: 0.505875rem;
+        line-height: 0.47925rem;
+        border: solid 2px #7e7e7e;
+        border-radius: 0.2529375rem;;
+        padding: 0 0.3195rem;
+        color: #7e7e7e;
+        font-size: 0.3195rem;
+        margin-right: 0.26625rem;
+        margin-bottom: 0.26625rem;
+    }
+    #filter_table .selection label.active {
+        background: #fa7298;
+        color: #fff;
+        border: none;
+    }
+    #filter_table .selection input[type="radio"] {
+        display: none;
+    }
+    #submit_btn {
+        display: block;
+        width: 100%;
+        height: 1.01175rem;
+        line-height: 1.01175rem;
+        text-align: center;
+    }
+    #J_BookList{
+        min-height: 15rem;
+    }
+</style>
+<div id="header">
+    <div class="left">
+        <a id="prev_btn" href="javascript:history.back();"><i class="iconfont icon-arrow-left"></i></a>
+    </div>
+    <span>斗破苍穹</span>
+    <div class="right">
+        <a href="javascript:;" id="search_btn"><i class="iconfont icon-sousuo"></i></a>
+        <a href="javascript:;" id="list_btn"><i class="iconfont icon-menu"></i></a>
+    </div>
+</div>
+<div id="sub_category_body" class="bg-gray before-banner-footer" style="padding-top:0.3195rem;">
+<!--    <div class="btns-bar">-->
+<!--        <div class="button"></div>-->
+<!--    </div>-->
+    <div class="container" id="J_BookList">
+        <ul class="book-list book-list-vetical">
+                            <li>
+                    <a href="http://m.shubl.com/book/book_detail/100843044">
+                        <span class="thumb">
+                            <img class="lazyload" data-original="https://dede-cdn.shubl.com/uploads/allimg/c240602/7881633541e7ba0389f532bed3e30fe9.png" src="http://m.shubl.com/default.jpg" alt="斗破苍穹之崩坏三">
+                        </span>
+                        <div class="info">
+                            <span class="title">斗破苍穹之崩坏三</span>
+                            <div class="author">萧家三少</div>
+                            <div class="summaries">
+                                萧炎穿越到崩坏三的世界里成为了琪亚娜的弟弟                            </div>
+                        </div>
+                    </a>
+                </li>
+            
+            <template v-for="book in book_list" v-cloak>
+                <li>
+                    <a :href="SD.config.rootPath+'book/book_detail/'+book.book_id">
+                        <span class="thumb">
+                            <img class="lazyload"  :data-original="book.cover" src="http://m.shubl.com/default.jpg" :alt="book.book_name">
+                        </span>
+                        <div class="info">
+                            <span target="_blank" class="title">{{book.book_name}}</span>
+                            <div class="author">{{book.author_name}}</div>
+                            <div class="summaries">
+                                {{book.description}}
+                            </div>
+                        </div>
+                    </a>
+                </li>
+            </template>
+        </ul>
+    </div>
+</div>
+<div id="filter_body" class="bg-gray" style="padding-top:0.3195rem;">
+
+    <div class="container" style="padding: 0.26625rem;">
+        <form id="filter_form" action="http://m.shubl.com/index/search_book" method="post">
+            <table id="filter_table">
+                <input type="hidden" name="page" id="page" value=1>
+                <input type="hidden" name="key" value="斗破苍穹">
+                <input type="hidden" name="tag" value="">
+                <input type="hidden" name="tag_module" value="">
+
+                <input type="hidden" name="category_index" value="">
+                <input type="hidden" name="filter_word" value="">
+                <input type="hidden" name="filter_uptime" value="">
+                <input type="hidden" name="is_paid" value="">
+                <input type="hidden" name="up_status" value="">
+                <input type="hidden" name="order" value="week_click">
+                <tr>
+                    <td class="title">范围</td>
+                    <td class="selection J_Filter" id="category_index">
+                        <label data-filter="0" class="active">
+                            不限
+                        </label>
+                        <label data-filter="1" class="">
+                            耽美
+                        </label>
+                        <label data-filter="2" class="">
+                            同人
+                        </label>
+                    </td>
+                </tr>
+                <tr>
+                    <td class="title">排序</td>
+                    <td class="selection J_Filter" id="order">
+                        <label data-filter="week_click" class="active">
+                            人气
+                        </label>
+                        <label data-filter="uptime" class="">
+                            更新时间
+                        </label>
+                        <label data-filter="total_recommend" class="">
+                            总推荐
+                        </label>
+                        <label data-filter="total_favor" class="">
+                            总收藏
+                        </label>
+                        <label data-filter="total_yp" class="">
+                            总月票
+                        </label>
+                        <label data-filter="total_click" class="">
+                            总点击
+                        </label>
+                        <label data-filter="total_tsukkomi" class="">
+                            总吐槽
+                        </label>
+                    </td>
+                </tr>
+                <tr>
+                    <td class="title">更新</td>
+                    <td class="selection J_Filter" id="filter_uptime">
+                        <label data-filter="0" class="active">
+                            不限
+                        </label>
+                        <label data-filter="1" class="">
+                            三日内
+                        </label>
+                        <label data-filter="2" class="">
+                            七日内
+                        </label>
+                        <label data-filter="3" class="">
+                            半月内
+                        </label>
+                        <label data-filter="4" class="">
+                            一月内
+                        </label>
+                    </td>
+                </tr>
+                <tr>
+                    <td class="title">字数</td>
+                    <td class="selection J_Filter" id="filter_word">
+                        <label data-filter="0" class="active">
+                            不限
+                        </label>
+                        <label data-filter="1" class="">
+                            10万以下
+                        </label>
+                        <label data-filter="2" class="">
+                            10万-30万
+                        </label>
+                        <label data-filter="3" class="">
+                            30万-50万
+                        </label>
+                        <label data-filter="4" class="">
+                            50万-80万
+                        </label>
+                        <label data-filter="5" class="">
+                            80万以上
+                        </label>
+                    </td>
+                </tr>
+                <tr>
+                    <td class="title">进度</td>
+                    <td class="selection J_Filter" id="up_status">
+                        <label data-filter="" class="active">
+                            全部
+                        </label>
+                        <label data-filter="0" class="">
+                            连载
+                        </label>
+                        <label data-filter="1" class="">
+                            完本
+                        </label>
+                    </td>
+                </tr>
+                <tr>
+                    <td class="title">状态</td>
+                    <td class="selection J_Filter" id="is_paid">
+                        <label data-filter="" class="active">
+                            全部
+                        </label>
+                        <label data-filter="0" class="">
+                            只看免费
+                        </label>
+                        <label data-filter="1" class="">
+                            只看VIP
+                        </label>
+                    </td>
+                </tr>
+                <tr>
+                    <td colspan="2">
+                        <a id="submit_btn" class="text-primary J_Submit">完成</a>
+                    </td>
+                </tr>
+            </table>
+        </form>
+    </div>
+
+</div>
+
+<script src="http://m.shubl.com/resources/js/vue.min.js"></script>
+<script src="http://m.shubl.com/resources/js/third-parties/dropload.min.js"></script>
+<script>
+    $(function() {
+        initLazyload();//初始化
+        $(".btns-bar .button").click(function() {
+            $(this).hasClass("active")?$(this).removeClass("active"):$(this).addClass("active");
+            toggleFilterPanel();
+        });
+        $(".J_Filter label").click(function() {
+            if ($(this).hasClass("active")){
+                return false
+            }else {
+                $(this).addClass("active").siblings().removeClass("active");
+            }
+        });
+        $("#filter_table #submit_btn").click(function() {
+//          tag=$("#tag").val();
+//          tag_module=$("#tag_module").val();
+            category_index=$("#category_index .active").attr('data-filter');
+            filter_word=$("#filter_word .active").attr('data-filter');
+            filter_uptime=$("#filter_uptime .active").attr('data-filter');
+            is_paid=$("#is_paid .active").attr('data-filter');
+            up_status=$("#up_status .active").attr('data-filter');
+            order=$("#order .active").attr('data-filter');
+            $("#page").val(0);//页面初始化
+            $("input[name='category_index']").val(category_index);
+            $("input[name='filter_word']").val(filter_word);
+            $("input[name='filter_uptime']").val(filter_uptime);
+            $("input[name='is_paid']").val(is_paid);
+            $("input[name='up_status']").val(up_status);
+            $("input[name='order']").val(order);
+
+            $("#filter_form").submit();
+        });
+
+        var bookList=new Vue({
+            el: '#J_BookList',
+            data:{
+                page:0,
+                book_list:[]
+            }
+        });
+        var dropload = $('#J_BookList').dropload({
+            scrollArea : window,
+            loadDownFn : function(me) {
+//                console.log($('#filter_form').serialize());
+                $.ajax({
+                    url:SD.config.rootPath+'index/get_search_book',
+                    dataType:'json',
+                    data:$('#filter_form').serialize(),
+                    complete:function () {
+                        me.resetload();
+                    },
+                    success:function(res){
+                        if(res.code == 100000){
+                            var book_list=res.data.book_list;
+                            var bookCount=0;
+                            for (var key in book_list){
+                                bookList.book_list.push(book_list[key]);
+                                bookCount++
+                            }
+                            if (bookCount<10){//加载完了
+                                // 锁定下
+                                me.lock('down');
+                                // 无数据
+                                me.noData();
+                            }
+                            $("#page").val(parseInt($("#page").val())+1);
+                            lazyloadHandle();
+                        }else {
+                            SD.util.alert(res.tip,1);
+                        }
+                    }
+                });
+            }
+        })
+
+    })
+
+    function toggleFilterPanel() {
+//        console.log($("#filter_body").is(":hidden"))
+        if($("#filter_body").is(":hidden")) {
+            $("#filter_body").show();
+            //如果需要隐藏2级分类，不要注释掉下面语句
+            //$("#sub_category_body").hide();
+        }
+        else {
+            $("#filter_body").hide();
+            //$("#sub_category_body").show();
+        }
+    }
+
+    function lazyloadHandle() {
+        setTimeout(function () {
+            $("img.lazyload").lazyload({
+                threshold : 300,
+                // effect : "fadeIn",
+                // placeholder: "../images/transparent.png",
+                failure_limit: 200,
+                skip_invisible : false
+            });
+        },100)
+    }
+    
+    function initLazyload() {
+        SD.util.require('jquery.lazyload', function(){
+           //do nothing
+        });
+    }
+
+    
+</script>
+<!--container end--><div id="footer">
+    <div class="actions">
+        <a id="J_RedirectWeb" href="http://m.shubl.com/index/redirect_web" target="_blank">电脑版</a>
+        <a href="https://app.shubl.com" target="_blank">客户端</a>
+        <a id="J_GoTop" href="javascript:;">回到顶部</a>
+    </div>
+    <div class="banner">
+        <div class="logo"></div>
+        <a href="https://app.shubl.com/setting/download" id="download_btn" class="btn btn-outline-primary">下载</a>
+    </div>
+</div>
+</body>
+
+</html>

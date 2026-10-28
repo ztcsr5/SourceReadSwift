@@ -1,0 +1,919 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>搜索小说_</title>
+    <meta name="keywords" content="天下第九,鹅是老五新书,爱曲小说" />
+    <meta name="description" content="爱曲小说提供鹅是老五新书作品《天下第九》最新章节免费全文阅读,天下第九无弹窗本站最快更新。" />
+    <meta name="MobileOptimized" content="240" />
+    <meta name="applicable-device" content="mobile" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no" />
+    <meta name="format-detection" content="telephone=no" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    
+    <script language="javascript" type="text/javascript" src="/js/zepto.min.js"></script>
+    <script language="javascript" type="text/javascript" src="/js/common.js"></script>
+    <script language="javascript" type="text/javascript" src="/js/lazyload.js"></script>
+    <script src="/js/aiquxs.js"></script>
+    
+    <link rel="stylesheet" href="/layui/css/layui.css" />
+    <link rel="stylesheet" href="/css/reset.css" />
+    
+    <link rel="stylesheet" href="/css/rank.css" />
+
+</head>
+<body>
+
+<div class="main transition">
+
+<header class="channelHeader">
+    <a class="iconback" href="/"><img src="images/header-back.gif" alt="返回" /></a>
+    搜索小说
+    <a class="iconhome" href="/"><img src="images/header-backhome.gif" alt="首页" /></a>
+</header>
+
+<form class="searchForm" method="get" action="/SearchBook.php">
+    <input type="text" name="keyword" class="searchForm_input searchForm_input2" placeholder="输入书名或作者">
+    <input type="submit" class="searchForm_btn" value="搜索">
+</form>
+
+<div class="tabArea  list rankingList rankingList_3">
+    <div class="slide-con slide-con2">
+        <div class="slide-item list1">
+                                <div class="hot_sale">
+                    <span class="num num1">
+                        1                   </span>
+                    <a href="/wapbook/76571.html">
+                        <p class="title">
+                            斗破苍穹                        </p>
+                   
+                        <p class="author">
+                            作者：<a href="/author/76571/">天蚕土豆</a>
+                        </p>
+                    </a>
+                    <p class="author">
+                        全本 | 最近更新：
+                        <a style="color: Red;" href="/wapbook/76571_35210062.html" target="_blank" title="新书元尊已在起点上传，欢迎大家阅读。">
+                            新书元尊已在起点上传，欢迎大家阅读。                     </a>
+                        04-02                   </p>
+                </div>
+                                <div class="hot_sale hot_saleEm">
+                    <span class="num num2">
+                        2                   </span>
+                    <a href="/wapbook/31556.html">
+                        <p class="title">
+                            斗破苍穹.2                        </p>
+                   
+                        <p class="author">
+                            作者：<a href="/author/31556/">柴老五</a>
+                        </p>
+                    </a>
+                    <p class="author">
+                        连载 | 最近更新：
+                        <a style="color: Red;" href="/wapbook/31556_14092378.html" target="_blank" title="正文 废柴逆袭_第325章：红尘影，终成梦（大结局）">
+                            正文 废柴逆袭_第325章：红尘影，终成梦（大结局）                     </a>
+                        01-08                   </p>
+                </div>
+                                <div class="hot_sale">
+                    <span class="num num3">
+                        3                   </span>
+                    <a href="/wapbook/88402.html">
+                        <p class="title">
+                            穿越斗破苍穹                        </p>
+                   
+                        <p class="author">
+                            作者：<a href="/author/88402/">午时一刻</a>
+                        </p>
+                    </a>
+                    <p class="author">
+                        全本 | 最近更新：
+                        <a style="color: Red;" href="/wapbook/88402_36432787.html" target="_blank" title="三女相遇">
+                            三女相遇                     </a>
+                        05-16                   </p>
+                </div>
+                                <div class="hot_sale hot_saleEm">
+                    <span class="num num4">
+                        4                   </span>
+                    <a href="/wapbook/50875.html">
+                        <p class="title">
+                            斗破苍穹之水君                        </p>
+                   
+                        <p class="author">
+                            作者：<a href="/author/50875/">滚键盘吧</a>
+                        </p>
+                    </a>
+                    <p class="author">
+                        连载 | 最近更新：
+                        <a style="color: Red;" href="/wapbook/50875_38123917.html" target="_blank" title="第四百四十七章 恐怖如斯">
+                            第四百四十七章 恐怖如斯                     </a>
+                        07-21                   </p>
+                </div>
+                                <div class="hot_sale">
+                    <span class="num num5">
+                        5                   </span>
+                    <a href="/wapbook/67208.html">
+                        <p class="title">
+                            从斗破苍穹开始秀                        </p>
+                   
+                        <p class="author">
+                            作者：<a href="/author/67208/">阎罗决</a>
+                        </p>
+                    </a>
+                    <p class="author">
+                        连载 | 最近更新：
+                        <a style="color: Red;" href="/wapbook/67208_32258818.html" target="_blank" title="第208章 婆娑天狱穿琵骨！">
+                            第208章 婆娑天狱穿琵骨！                     </a>
+                        01-01                   </p>
+                </div>
+                                <div class="hot_sale hot_saleEm">
+                    <span class="num num6">
+                        6                   </span>
+                    <a href="/wapbook/13988.html">
+                        <p class="title">
+                            斗破苍穹之无上巅峰                        </p>
+                   
+                        <p class="author">
+                            作者：<a href="/author/13988/">干将将</a>
+                        </p>
+                    </a>
+                    <p class="author">
+                        连载 | 最近更新：
+                        <a style="color: Red;" href="/wapbook/13988_4002756.html" target="_blank" title="第247章  英无双的身份">
+                            第247章  英无双的身份                     </a>
+                        12-13                   </p>
+                </div>
+                                <div class="hot_sale">
+                    <span class="num num7">
+                        7                   </span>
+                    <a href="/wapbook/88657.html">
+                        <p class="title">
+                            斗破苍穹神之炎帝                        </p>
+                   
+                        <p class="author">
+                            作者：<a href="/author/88657/">柠檬邱霞</a>
+                        </p>
+                    </a>
+                    <p class="author">
+                        连载 | 最近更新：
+                        <a style="color: Red;" href="/wapbook/88657_64780289.html" target="_blank" title="开新书了（全职法师之亡灵罹难者）">
+                            开新书了（全职法师之亡灵罹难者）                     </a>
+                        09-11                   </p>
+                </div>
+                                <div class="hot_sale hot_saleEm">
+                    <span class="num num8">
+                        8                   </span>
+                    <a href="/wapbook/73556.html">
+                        <p class="title">
+                            斗破苍穹之大世界                        </p>
+                   
+                        <p class="author">
+                            作者：<a href="/author/73556/">醉百川</a>
+                        </p>
+                    </a>
+                    <p class="author">
+                        连载 | 最近更新：
+                        <a style="color: Red;" href="/wapbook/73556_38091348.html" target="_blank" title="第八百三十七章 天威（第一卷结束）">
+                            第八百三十七章 天威（第一卷结束）                     </a>
+                        07-19                   </p>
+                </div>
+                                <div class="hot_sale">
+                    <span class="num num9">
+                        9                   </span>
+                    <a href="/wapbook/101835.html">
+                        <p class="title">
+                            从斗破苍穹开始打卡                        </p>
+                   
+                        <p class="author">
+                            作者：<a href="/author/101835/">爱潜水的龙虾</a>
+                        </p>
+                    </a>
+                    <p class="author">
+                        连载 | 最近更新：
+                        <a style="color: Red;" href="/wapbook/101835_40986761.html" target="_blank" title="第003章 四段斗之气（求推荐求收藏）">
+                            第003章 四段斗之气（求推荐求收藏）                     </a>
+                        01-03                   </p>
+                </div>
+                                <div class="hot_sale hot_saleEm">
+                    <span class="num num10">
+                        10                   </span>
+                    <a href="/wapbook/87497.html">
+                        <p class="title">
+                            斗破苍穹之忍者系统                        </p>
+                   
+                        <p class="author">
+                            作者：<a href="/author/87497/">望月追风</a>
+                        </p>
+                    </a>
+                    <p class="author">
+                        连载 | 最近更新：
+                        <a style="color: Red;" href="/wapbook/87497_49490858.html" target="_blank" title="第三百五十六章 焚血魔丹！">
+                            第三百五十六章 焚血魔丹！                     </a>
+                        01-09                   </p>
+                </div>
+                                <div class="hot_sale">
+                    <span class="num num11">
+                        11                   </span>
+                    <a href="/wapbook/77870.html">
+                        <p class="title">
+                            修炼从斗破苍穹开始                        </p>
+                   
+                        <p class="author">
+                            作者：<a href="/author/77870/">江湖有酒</a>
+                        </p>
+                    </a>
+                    <p class="author">
+                        连载 | 最近更新：
+                        <a style="color: Red;" href="/wapbook/77870_52246763.html" target="_blank" title="第五百三十五章 救出炎帝武祖">
+                            第五百三十五章 救出炎帝武祖                     </a>
+                        08-21                   </p>
+                </div>
+                                <div class="hot_sale hot_saleEm">
+                    <span class="num num12">
+                        12                   </span>
+                    <a href="/wapbook/151721.html">
+                        <p class="title">
+                            从斗破苍穹签到开始                        </p>
+                   
+                        <p class="author">
+                            作者：<a href="/author/151721/">敖晨</a>
+                        </p>
+                    </a>
+                    <p class="author">
+                        连载 | 最近更新：
+                        <a style="color: Red;" href="/wapbook/151721_72747015.html" target="_blank" title="第355章 九玄蕴魂丹">
+                            第355章 九玄蕴魂丹                     </a>
+                        01-15                   </p>
+                </div>
+                                <div class="hot_sale">
+                    <span class="num num13">
+                        13                   </span>
+                    <a href="/wapbook/177016.html">
+                        <p class="title">
+                            斗破苍穹：辰星闪耀                        </p>
+                   
+                        <p class="author">
+                            作者：<a href="/author/177016/">寡人不听劝</a>
+                        </p>
+                    </a>
+                    <p class="author">
+                        连载 | 最近更新：
+                        <a style="color: Red;" href="/wapbook/177016_67630608.html" target="_blank" title="第二十七章，琐事">
+                            第二十七章，琐事                     </a>
+                        02-21                   </p>
+                </div>
+                                <div class="hot_sale hot_saleEm">
+                    <span class="num num14">
+                        14                   </span>
+                    <a href="/wapbook/163589.html">
+                        <p class="title">
+                            斗破苍穹之财动乾坤                        </p>
+                   
+                        <p class="author">
+                            作者：<a href="/author/163589/">辛酸盐</a>
+                        </p>
+                    </a>
+                    <p class="author">
+                        连载 | 最近更新：
+                        <a style="color: Red;" href="/wapbook/163589_72798550.html" target="_blank" title="新书">
+                            新书                     </a>
+                        01-20                   </p>
+                </div>
+                                <div class="hot_sale">
+                    <span class="num num15">
+                        15                   </span>
+                    <a href="/wapbook/49952.html">
+                        <p class="title">
+                            斗破苍穹之万界主宰                        </p>
+                   
+                        <p class="author">
+                            作者：<a href="/author/49952/">她像只猫</a>
+                        </p>
+                    </a>
+                    <p class="author">
+                        连载 | 最近更新：
+                        <a style="color: Red;" href="/wapbook/49952_33387944.html" target="_blank" title="第239章 ">
+                            第239章                      </a>
+                        01-30                   </p>
+                </div>
+                                <div class="hot_sale hot_saleEm">
+                    <span class="num num16">
+                        16                   </span>
+                    <a href="/wapbook/2597.html">
+                        <p class="title">
+                            斗破苍穹之倾城绝恋                        </p>
+                   
+                        <p class="author">
+                            作者：<a href="/author/2597/">文武全才彬彬</a>
+                        </p>
+                    </a>
+                    <p class="author">
+                        连载 | 最近更新：
+                        <a style="color: Red;" href="/wapbook/2597_64152706.html" target="_blank" title="第1761章 最后选择">
+                            第1761章 最后选择                     </a>
+                        07-12                   </p>
+                </div>
+                                <div class="hot_sale">
+                    <span class="num num17">
+                        17                   </span>
+                    <a href="/wapbook/3268.html">
+                        <p class="title">
+                            斗破苍穹之无上之境                        </p>
+                   
+                        <p class="author">
+                            作者：<a href="/author/3268/">夜雨闻铃0</a>
+                        </p>
+                    </a>
+                    <p class="author">
+                        连载 | 最近更新：
+                        <a style="color: Red;" href="/wapbook/3268_81953751.html" target="_blank" title="第五千三百零三章 都是她的心血">
+                            第五千三百零三章 都是她的心血                     </a>
+                        10-26                   </p>
+                </div>
+                                <div class="hot_sale hot_saleEm">
+                    <span class="num num18">
+                        18                   </span>
+                    <a href="/wapbook/22258.html">
+                        <p class="title">
+                            斗破苍穹之万界商城                        </p>
+                   
+                        <p class="author">
+                            作者：<a href="/author/22258/">梦回夕照</a>
+                        </p>
+                    </a>
+                    <p class="author">
+                        连载 | 最近更新：
+                        <a style="color: Red;" href="/wapbook/22258_41364354.html" target="_blank" title="新书《诸天最强玩家》">
+                            新书《诸天最强玩家》                     </a>
+                        03-06                   </p>
+                </div>
+                                <div class="hot_sale">
+                    <span class="num num19">
+                        19                   </span>
+                    <a href="/wapbook/99339.html">
+                        <p class="title">
+                            从斗破苍穹开始无敌吧                        </p>
+                   
+                        <p class="author">
+                            作者：<a href="/author/99339/">恐小丫亚</a>
+                        </p>
+                    </a>
+                    <p class="author">
+                        连载 | 最近更新：
+                        <a style="color: Red;" href="/wapbook/99339_40289534.html" target="_blank" title="第8章 瓜分">
+                            第8章 瓜分                     </a>
+                        11-28                   </p>
+                </div>
+                                <div class="hot_sale hot_saleEm">
+                    <span class="num num20">
+                        20                   </span>
+                    <a href="/wapbook/101992.html">
+                        <p class="title">
+                            斗破苍穹之加列奥                        </p>
+                   
+                        <p class="author">
+                            作者：<a href="/author/101992/">绝望的月半</a>
+                        </p>
+                    </a>
+                    <p class="author">
+                        连载 | 最近更新：
+                        <a style="color: Red;" href="/wapbook/101992_49622086.html" target="_blank" title="第一百四十九章 分道扬镳">
+                            第一百四十九章 分道扬镳                     </a>
+                        06-02                   </p>
+                </div>
+                                <div class="hot_sale">
+                    <span class="num num21">
+                        21                   </span>
+                    <a href="/wapbook/78572.html">
+                        <p class="title">
+                            斗破苍穹之召唤鬼帝                        </p>
+                   
+                        <p class="author">
+                            作者：<a href="/author/78572/">陌文子</a>
+                        </p>
+                    </a>
+                    <p class="author">
+                        连载 | 最近更新：
+                        <a style="color: Red;" href="/wapbook/78572_34612919.html" target="_blank" title="第249章 兵发伽玛">
+                            第249章 兵发伽玛                     </a>
+                        03-17                   </p>
+                </div>
+                                <div class="hot_sale hot_saleEm">
+                    <span class="num num22">
+                        22                   </span>
+                    <a href="/wapbook/160066.html">
+                        <p class="title">
+                            斗破苍穹之药族族长                        </p>
+                   
+                        <p class="author">
+                            作者：<a href="/author/160066/">作家OX4wgj</a>
+                        </p>
+                    </a>
+                    <p class="author">
+                        连载 | 最近更新：
+                        <a style="color: Red;" href="/wapbook/160066_62148104.html" target="_blank" title="第八十九章 投影">
+                            第八十九章 投影                     </a>
+                        02-22                   </p>
+                </div>
+                                <div class="hot_sale">
+                    <span class="num num23">
+                        23                   </span>
+                    <a href="/wapbook/63824.html">
+                        <p class="title">
+                            龙破苍穹                        </p>
+                   
+                        <p class="author">
+                            作者：<a href="/author/63824/">血友人生</a>
+                        </p>
+                    </a>
+                    <p class="author">
+                        连载 | 最近更新：
+                        <a style="color: Red;" href="/wapbook/63824_26484219.html" target="_blank" title="第364节 大决战12">
+                            第364节 大决战12                     </a>
+                        10-09                   </p>
+                </div>
+                                <div class="hot_sale hot_saleEm">
+                    <span class="num num24">
+                        24                   </span>
+                    <a href="/wapbook/65589.html">
+                        <p class="title">
+                            画破苍穹                        </p>
+                   
+                        <p class="author">
+                            作者：<a href="/author/65589/">粉葡萄</a>
+                        </p>
+                    </a>
+                    <p class="author">
+                        连载 | 最近更新：
+                        <a style="color: Red;" href="/wapbook/65589_27070660.html" target="_blank" title="第一百零四章 交底">
+                            第一百零四章 交底                     </a>
+                        10-13                   </p>
+                </div>
+                                <div class="hot_sale">
+                    <span class="num num25">
+                        25                   </span>
+                    <a href="/wapbook/65697.html">
+                        <p class="title">
+                            武破苍穹                        </p>
+                   
+                        <p class="author">
+                            作者：<a href="/author/65697/">萧妖</a>
+                        </p>
+                    </a>
+                    <p class="author">
+                        连载 | 最近更新：
+                        <a style="color: Red;" href="/wapbook/65697_27109848.html" target="_blank" title="第630章 大结局（3）孑然孤身镜…">
+                            第630章 大结局（3）孑然孤身镜…                     </a>
+                        10-13                   </p>
+                </div>
+                                <div class="hot_sale hot_saleEm">
+                    <span class="num num26">
+                        26                   </span>
+                    <a href="/wapbook/66555.html">
+                        <p class="title">
+                            兽破苍穹                        </p>
+                   
+                        <p class="author">
+                            作者：<a href="/author/66555/">妖夜</a>
+                        </p>
+                    </a>
+                    <p class="author">
+                        连载 | 最近更新：
+                        <a style="color: Red;" href="/wapbook/66555_27389041.html" target="_blank" title="第1457章 推荐一本好看的玄幻书籍！">
+                            第1457章 推荐一本好看的玄幻书籍！                     </a>
+                        10-13                   </p>
+                </div>
+                                <div class="hot_sale">
+                    <span class="num num27">
+                        27                   </span>
+                    <a href="/wapbook/10833.html">
+                        <p class="title">
+                            刀破苍穹                        </p>
+                   
+                        <p class="author">
+                            作者：<a href="/author/10833/">何无恨</a>
+                        </p>
+                    </a>
+                    <p class="author">
+                        连载 | 最近更新：
+                        <a style="color: Red;" href="/wapbook/10833_30593925.html" target="_blank" title="第2555章 大团圆（大结局+完结感言）">
+                            第2555章 大团圆（大结局+完结感言）                     </a>
+                        12-11                   </p>
+                </div>
+                                <div class="hot_sale hot_saleEm">
+                    <span class="num num28">
+                        28                   </span>
+                    <a href="/wapbook/19579.html">
+                        <p class="title">
+                            灵破苍穹                        </p>
+                   
+                        <p class="author">
+                            作者：<a href="/author/19579/">心跳的瞬间</a>
+                        </p>
+                    </a>
+                    <p class="author">
+                        连载 | 最近更新：
+                        <a style="color: Red;" href="/wapbook/19579_12829178.html" target="_blank" title="完本了，说几句吧！">
+                            完本了，说几句吧！                     </a>
+                        12-10                   </p>
+                </div>
+                                <div class="hot_sale">
+                    <span class="num num29">
+                        29                   </span>
+                    <a href="/wapbook/25575.html">
+                        <p class="title">
+                            Q破苍穹                        </p>
+                   
+                        <p class="author">
+                            作者：<a href="/author/25575/">蘑菇123</a>
+                        </p>
+                    </a>
+                    <p class="author">
+                        连载 | 最近更新：
+                        <a style="color: Red;" href="/wapbook/25575_10910604.html" target="_blank" title="第五百八十五章 真·结局">
+                            第五百八十五章 真·结局                     </a>
+                        10-30                   </p>
+                </div>
+                                <div class="hot_sale hot_saleEm">
+                    <span class="num num30">
+                        30                   </span>
+                    <a href="/wapbook/149800.html">
+                        <p class="title">
+                            机破苍穹                        </p>
+                   
+                        <p class="author">
+                            作者：<a href="/author/149800/">哀殿赛高</a>
+                        </p>
+                    </a>
+                    <p class="author">
+                        连载 | 最近更新：
+                        <a style="color: Red;" href="/wapbook/149800_61037510.html" target="_blank" title="第四十九章 终">
+                            第四十九章 终                     </a>
+                        11-30                   </p>
+                </div>
+                                <div class="hot_sale">
+                    <span class="num num31">
+                        31                   </span>
+                    <a href="/wapbook/66224.html">
+                        <p class="title">
+                            雷破苍穹                        </p>
+                   
+                        <p class="author">
+                            作者：<a href="/author/66224/">七号的饭</a>
+                        </p>
+                    </a>
+                    <p class="author">
+                        连载 | 最近更新：
+                        <a style="color: Red;" href="/wapbook/66224_27255737.html" target="_blank" title="第一百五十五章 剑雨">
+                            第一百五十五章 剑雨                     </a>
+                        10-13                   </p>
+                </div>
+                                <div class="hot_sale hot_saleEm">
+                    <span class="num num32">
+                        32                   </span>
+                    <a href="/wapbook/69099.html">
+                        <p class="title">
+                            剑破苍穹                        </p>
+                   
+                        <p class="author">
+                            作者：<a href="/author/69099/">会飞的胖猪</a>
+                        </p>
+                    </a>
+                    <p class="author">
+                        连载 | 最近更新：
+                        <a style="color: Red;" href="/wapbook/69099_27964912.html" target="_blank" title="二百五十二章大结局">
+                            二百五十二章大结局                     </a>
+                        10-22                   </p>
+                </div>
+                                <div class="hot_sale">
+                    <span class="num num33">
+                        33                   </span>
+                    <a href="/wapbook/31230.html">
+                        <p class="title">
+                            战破苍穹                        </p>
+                   
+                        <p class="author">
+                            作者：<a href="/author/31230/">龙大人</a>
+                        </p>
+                    </a>
+                    <p class="author">
+                        连载 | 最近更新：
+                        <a style="color: Red;" href="/wapbook/31230_13874391.html" target="_blank" title="第七百六十七章 新版本登场(大结局）">
+                            第七百六十七章 新版本登场(大结局）                     </a>
+                        01-02                   </p>
+                </div>
+                                <div class="hot_sale hot_saleEm">
+                    <span class="num num34">
+                        34                   </span>
+                    <a href="/wapbook/133177.html">
+                        <p class="title">
+                            轩破苍穹                        </p>
+                   
+                        <p class="author">
+                            作者：<a href="/author/133177/">星河凉城</a>
+                        </p>
+                    </a>
+                    <p class="author">
+                        连载 | 最近更新：
+                        <a style="color: Red;" href="/wapbook/133177_51048074.html" target="_blank" title="第二卷 第二卷第五章：最终之战！">
+                            第二卷 第二卷第五章：最终之战！                     </a>
+                        07-01                   </p>
+                </div>
+                                <div class="hot_sale">
+                    <span class="num num35">
+                        35                   </span>
+                    <a href="/wapbook/117501.html">
+                        <p class="title">
+                            武破苍穹                        </p>
+                   
+                        <p class="author">
+                            作者：<a href="/author/117501/">木易言</a>
+                        </p>
+                    </a>
+                    <p class="author">
+                        全本 | 最近更新：
+                        <a style="color: Red;" href="/wapbook/117501_45701395.html" target="_blank" title="第一七四章 牢笼的世界，功法为钥">
+                            第一七四章 牢笼的世界，功法为钥                     </a>
+                        09-03                   </p>
+                </div>
+                                <div class="hot_sale hot_saleEm">
+                    <span class="num num36">
+                        36                   </span>
+                    <a href="/wapbook/98868.html">
+                        <p class="title">
+                            魂灵破苍穹                        </p>
+                   
+                        <p class="author">
+                            作者：<a href="/author/98868/">火红轰彼岸花</a>
+                        </p>
+                    </a>
+                    <p class="author">
+                        连载 | 最近更新：
+                        <a style="color: Red;" href="/wapbook/98868_40675196.html" target="_blank" title="第八十四章 七星坤地">
+                            第八十四章 七星坤地                     </a>
+                        12-19                   </p>
+                </div>
+                                <div class="hot_sale">
+                    <span class="num num37">
+                        37                   </span>
+                    <a href="/wapbook/88222.html">
+                        <p class="title">
+                            武破苍穹                        </p>
+                   
+                        <p class="author">
+                            作者：<a href="/author/88222/">贪狼星</a>
+                        </p>
+                    </a>
+                    <p class="author">
+                        全本 | 最近更新：
+                        <a style="color: Red;" href="/wapbook/88222_36355562.html" target="_blank" title="第五百十八章 结束感言">
+                            第五百十八章 结束感言                     </a>
+                        09-10                   </p>
+                </div>
+                                <div class="hot_sale hot_saleEm">
+                    <span class="num num38">
+                        38                   </span>
+                    <a href="/wapbook/103319.html">
+                        <p class="title">
+                            算破苍穹                        </p>
+                   
+                        <p class="author">
+                            作者：<a href="/author/103319/">有情大白</a>
+                        </p>
+                    </a>
+                    <p class="author">
+                        连载 | 最近更新：
+                        <a style="color: Red;" href="/wapbook/103319_41563349.html" target="_blank" title="第四十八章 提亲二">
+                            第四十八章 提亲二                     </a>
+                        02-06                   </p>
+                </div>
+                                <div class="hot_sale">
+                    <span class="num num39">
+                        39                   </span>
+                    <a href="/wapbook/165235.html">
+                        <p class="title">
+                            舞破苍穹                        </p>
+                   
+                        <p class="author">
+                            作者：<a href="/author/165235/">詹杰</a>
+                        </p>
+                    </a>
+                    <p class="author">
+                        全本 | 最近更新：
+                        <a style="color: Red;" href="/wapbook/165235_62437981.html" target="_blank" title="【大结局】">
+                            【大结局】                     </a>
+                        03-09                   </p>
+                </div>
+                                <div class="hot_sale hot_saleEm">
+                    <span class="num num40">
+                        40                   </span>
+                    <a href="/wapbook/191765.html">
+                        <p class="title">
+                            剑破苍穹                        </p>
+                   
+                        <p class="author">
+                            作者：<a href="/author/191765/">不认得回家的路</a>
+                        </p>
+                    </a>
+                    <p class="author">
+                        连载 | 最近更新：
+                        <a style="color: Red;" href="/wapbook/191765_71920380.html" target="_blank" title="第9章 禁制之秘">
+                            第9章 禁制之秘                     </a>
+                        11-10                   </p>
+                </div>
+                                <div class="hot_sale">
+                    <span class="num num41">
+                        41                   </span>
+                    <a href="/wapbook/206736.html">
+                        <p class="title">
+                            帅破苍穹                        </p>
+                   
+                        <p class="author">
+                            作者：<a href="/author/206736/">崴少</a>
+                        </p>
+                    </a>
+                    <p class="author">
+                        连载 | 最近更新：
+                        <a style="color: Red;" href="/wapbook/206736_78348791.html" target="_blank" title="338.人神共愤！">
+                            338.人神共愤！                     </a>
+                        02-28                   </p>
+                </div>
+                                <div class="hot_sale hot_saleEm">
+                    <span class="num num42">
+                        42                   </span>
+                    <a href="/wapbook/217530.html">
+                        <p class="title">
+                            剑破苍穹                        </p>
+                   
+                        <p class="author">
+                            作者：<a href="/author/217530/">狂飙的蜗牛</a>
+                        </p>
+                    </a>
+                    <p class="author">
+                        连载 | 最近更新：
+                        <a style="color: Red;" href="/wapbook/217530_79873918.html" target="_blank" title="一个未完成的故事">
+                            一个未完成的故事                     </a>
+                        06-09                   </p>
+                </div>
+                                <div class="hot_sale">
+                    <span class="num num43">
+                        43                   </span>
+                    <a href="/wapbook/15966.html">
+                        <p class="title">
+                            一切从斗破苍穹开始                        </p>
+                   
+                        <p class="author">
+                            作者：<a href="/author/15966/">千影残光</a>
+                        </p>
+                    </a>
+                    <p class="author">
+                        连载 | 最近更新：
+                        <a style="color: Red;" href="/wapbook/15966_15896545.html" target="_blank" title="新书《万界之无限副本》发布，求支持。">
+                            新书《万界之无限副本》发布，求支持。                     </a>
+                        03-01                   </p>
+                </div>
+                                <div class="hot_sale hot_saleEm">
+                    <span class="num num44">
+                        44                   </span>
+                    <a href="/wapbook/175974.html">
+                        <p class="title">
+                            斗破苍穹之扶弟狂魔                        </p>
+                   
+                        <p class="author">
+                            作者：<a href="/author/175974/">没感情的喵</a>
+                        </p>
+                    </a>
+                    <p class="author">
+                        连载 | 最近更新：
+                        <a style="color: Red;" href="/wapbook/175974_66969713.html" target="_blank" title="第六十六章 让我猜猜你是什么系统">
+                            第六十六章 让我猜猜你是什么系统                     </a>
+                        01-07                   </p>
+                </div>
+                                <div class="hot_sale">
+                    <span class="num num45">
+                        45                   </span>
+                    <a href="/wapbook/159308.html">
+                        <p class="title">
+                            斗梦苍穹                        </p>
+                   
+                        <p class="author">
+                            作者：<a href="/author/159308/">抢座</a>
+                        </p>
+                    </a>
+                    <p class="author">
+                        连载 | 最近更新：
+                        <a style="color: Red;" href="/wapbook/159308_60184742.html" target="_blank" title="第九章 震慑【大款是怎样练成的·抢座白金作品】">
+                            第九章 震慑【大款是怎样练成的·抢座白金作品】                     </a>
+                        10-06                   </p>
+                </div>
+                                <div class="hot_sale hot_saleEm">
+                    <span class="num num46">
+                        46                   </span>
+                    <a href="/wapbook/25970.html">
+                        <p class="title">
+                            斗魄苍穹                        </p>
+                   
+                        <p class="author">
+                            作者：<a href="/author/25970/">渡厄方舟</a>
+                        </p>
+                    </a>
+                    <p class="author">
+                        连载 | 最近更新：
+                        <a style="color: Red;" href="/wapbook/25970_11128344.html" target="_blank" title="第四百五十二章　神并天地">
+                            第四百五十二章　神并天地                     </a>
+                        11-04                   </p>
+                </div>
+                                <div class="hot_sale">
+                    <span class="num num47">
+                        47                   </span>
+                    <a href="/wapbook/95934.html">
+                        <p class="title">
+                            神之苍穹破                        </p>
+                   
+                        <p class="author">
+                            作者：<a href="/author/95934/">兵刃流浪</a>
+                        </p>
+                    </a>
+                    <p class="author">
+                        连载 | 最近更新：
+                        <a style="color: Red;" href="/wapbook/95934_39265808.html" target="_blank" title="第四十八章：治疗马里">
+                            第四十八章：治疗马里                     </a>
+                        11-18                   </p>
+                </div>
+                                <div class="hot_sale hot_saleEm">
+                    <span class="num num48">
+                        48                   </span>
+                    <a href="/wapbook/188959.html">
+                        <p class="title">
+                            悟空再破苍穹                        </p>
+                   
+                        <p class="author">
+                            作者：<a href="/author/188959/">yize艺泽</a>
+                        </p>
+                    </a>
+                    <p class="author">
+                        连载 | 最近更新：
+                        <a style="color: Red;" href="/wapbook/188959_71080485.html" target="_blank" title="第十一章：自由的曙光">
+                            第十一章：自由的曙光                     </a>
+                        09-19                   </p>
+                </div>
+                                <div class="hot_sale">
+                    <span class="num num49">
+                        49                   </span>
+                    <a href="/wapbook/213999.html">
+                        <p class="title">
+                            寒门亦可破苍穹                        </p>
+                   
+                        <p class="author">
+                            作者：<a href="/author/213999/">风筝先生</a>
+                        </p>
+                    </a>
+                    <p class="author">
+                        连载 | 最近更新：
+                        <a style="color: Red;" href="/wapbook/213999_78649265.html" target="_blank" title="第八章：心中的善">
+                            第八章：心中的善                     </a>
+                        03-20                   </p>
+                </div>
+                                <div class="hot_sale hot_saleEm">
+                    <span class="num num50">
+                        50                   </span>
+                    <a href="/wapbook/9521.html">
+                        <p class="title">
+                            网游之战破苍穹                        </p>
+                   
+                        <p class="author">
+                            作者：<a href="/author/9521/">九月花雪</a>
+                        </p>
+                    </a>
+                    <p class="author">
+                        连载 | 最近更新：
+                        <a style="color: Red;" href="/wapbook/9521_30565765.html" target="_blank" title="第841章，被封了">
+                            第841章，被封了                     </a>
+                        12-11                   </p>
+                </div>
+                                
+                
+        </div>
+    </div>
+</div>
+
+</div>
+
+
+<form class="searchForm" method="get" action="/SearchBook.php">
+    <input type="text" name="keyword" class="searchForm_input searchForm_input2" placeholder="输入书名或作者">
+    <input type="submit" class="searchForm_btn" value="搜索">
+</form>
+<footer>
+    <a href="#top"><img src="/images/icon-backtop.gif" title="↑" alt="↑"></a>
+    <p class="version channel">
+        <a href="/">首页</a>
+        <a href="/bookcase.html">我的书架</a>
+        <a href="/gj.html">阅读记录</a>
+        <a href="/api/sitemap.xml">sitemap</a>
+    </p>
+</footer>
+<script>tj();</script>
+
+</body>
+</html>

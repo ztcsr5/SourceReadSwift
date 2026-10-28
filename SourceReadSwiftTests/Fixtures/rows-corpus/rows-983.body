@@ -1,0 +1,1422 @@
+<!DOCTYPE html>
+
+<html>
+
+<head>
+
+    
+
+
+
+    
+
+    
+<script>
+   var g_data = g_data || {};
+   g_data.site = 'hongxiu'
+
+   // 环境变量，会按照环境选择性打log
+   g_data.envType = 'pro';
+
+   //环境域名
+   g_data.rootDomain = 'hongxiu.com';
+   g_data.domain = '';
+   g_data.domainPreFix = '';
+
+   //静态资源域名
+   g_data.staticPath = '//yuxseocdn.yuewen.com/pro/hongxiu_pc/_prelease';
+
+   //获取用户是否登录
+   g_data.isLogin = 'false';
+
+   // 导流相关
+   g_data.appDownloadUrl = 'https://www.yuewen.com/app.html#appxx';
+   g_data.guide2app = 'qd';
+   g_data.guide2appXXLocationSite = '_hxpc';
+   g_data.isQReaderNoFreeBook = false;
+
+   // 是否支持登录
+   g_data.enableLogin = true;
+
+   // 是否支持充值 / 消费 / 打赏 / 投票等
+   g_data.enableChargeAndConsume = true;
+</script>
+
+
+    <script>
+
+      // 用作统计PV
+
+      g_data.pageId = 'hx_P_searchresult';
+
+      g_data.path = '斗破苍穹_0_1';
+
+    </script>
+
+    <script>
+
+  function setCookie(name, value, domain, path, expires){
+    if(expires){
+      expires = new Date(+new Date() + expires);
+    }
+    var tempcookie = name + '=' + escape(value) +
+      ((expires) ? '; expires=' + expires.toGMTString() : '') +
+      ((path) ? '; path=' + path : '') +
+      ((domain) ? '; domain=' + domain : '');
+
+    //Ensure the cookie's size is under the limitation
+    if(tempcookie.length < 4096) {
+      document.cookie = tempcookie;
+    }
+  }
+
+  function setReferrer(referrerCookieName) {
+    try {
+      var reg = new RegExp("(^| )" + name + "=([^;]*)(;|$)");
+      var seoReferer = document.cookie.match(reg);
+      console.log("get cookie referrer: ", seoReferer)
+      if (seoReferer && seoReferer[2]) {
+        Object.defineProperty(document, "referrer", {
+          value: decodeURIComponent(seoReferer[2])
+        });
+        document.cookie = referrerCookieName + '=;domain=.' + g_data.rootDomain + ';path=/;expires=Thu, 01-Jan-1970 00:00:01 GMT';
+      }
+    } catch (error) {
+      console.log(error);
+    }
+  }
+  function isMobile() {
+    return /(Android|iPhone|iPad|iPod|SymbianOS|Windows Phone|BlackBerry|OpenHarmony.*Mobile|Fennec|IEMobile)/i.test(navigator.userAgent);
+  }
+  function isSpider() {
+    return /(bot|spider|crawl|slurp|archiver|facebook|googlebot|bingbot|yandexbot|duckduckgo|twitterbot)/i.test(navigator.userAgent);
+  }
+
+  function jumpIfMobile(mPathName, referrerCookieName) {
+    //判断是移动设备 且 宽度小于1024 且 不是爬虫 后跳转到m站
+    if (
+      window.outerWidth <= 1024
+      && isMobile()
+      && !isSpider()
+      && location.host.indexOf('.qq.com') === -1
+    ) {
+      var url = location.protocol + "//" + location.host.replace("www.", "m.") + (mPathName || location.pathname)
+      var search = location.search.replace("?", "");
+      if (search) {
+        if (/source=m_jump/.test(search)) {
+          search = search.replace("source=m_jump", "source=pc_jump")
+        } else if (/source=pc_jump/.test(search)) {
+          // do nothing
+        } else {
+          search = (search + "&source=pc_jump")
+        }
+      } else {
+        search = "source=pc_jump"
+      }
+      url = url.indexOf("?") !== -1 ? (url + "&" + search) : (url + "?" + search);
+
+      console.log("set cookie referrer: ", document.referrer)
+      setCookie(referrerCookieName, document.referrer, '.' + g_data.rootDomain, '/', 60000);
+      window.location.href = url;
+    }
+  }
+
+  var referrerCookieName = "seo-jump-referrer";
+  setReferrer(referrerCookieName);
+  jumpIfMobile(window.mPath, referrerCookieName);
+</script>
+
+
+
+
+    <meta charset="UTF-8">
+
+    
+
+<title>斗破苍穹_无弹窗完结小说免费阅读 – 红袖读书</title>
+<meta name="keywords" content="斗破苍穹, 斗破苍穹小说, 斗破苍穹TXT下载, 斗破苍穹全集, 斗破苍穹全本, 斗破苍穹完结">
+<meta name="description" content="最新更新 《斗破苍穹：斗帝之路》手游·角色传记（下）：这里是属于斗气的世界，没有花俏艳丽的魔法，有的，仅仅是繁衍到巅峰的斗气！新书等级制度：斗者，斗师，大斗师，斗灵，斗王，斗皇，斗宗，斗尊，斗圣，斗帝。……斗破苍穹年番动画，每周日10:00正在腾讯视频火热播出，VIP抢先看2集；于深渊涅槃，收...">
+
+
+    <meta name="robots" content="all">
+
+    <meta http-equiv="X-UA-Compatible" content="IE=Edge,chrome=1">
+
+
+
+    <meta name="renderer" content="webkit" />
+
+    <meta name="applicable-device" content="pc">
+
+    <link rel="shortcut icon" type="image/x-icon" href="//yuxseocdn.yuewen.com/favicon/hongxiu.ico">
+
+
+
+    
+
+    <!-- start mobile and canonical link related -->
+
+
+<meta http-equiv="mobile-agent" content="format=html5; url=https://m.hongxiu.com/so/斗破苍穹_0_1">
+<link rel="alternate" href="https://m.hongxiu.com/so/斗破苍穹_0_1">
+<link rel="canonical" href="https://www.hongxiu.com/so/斗破苍穹_0_1">
+
+
+
+
+    <script>document.domain = 'hongxiu.com';</script>
+
+
+
+    <!-- start 通用头逻辑 -->
+
+    <meta name="applicable-device" content="pc">
+
+<!-- 移动设备访问PC端跳转的代码被删除 -->
+
+<!-- 跳转逻辑放在 static/component/mobileJump.js 中 -->
+
+<link rel="shortcut icon" type="image/x-icon" href="//yuxseocdn.yuewen.com/favicon/hongxiu.ico">
+
+<link rel="Bookmark" type="image/x-icon" href="//yuxseocdn.yuewen.com/favicon/hongxiu.ico">
+
+
+
+
+
+    <!-- end 通用头逻辑 -->
+
+
+
+    <link rel="stylesheet" href="//yuxseocdn.yuewen.com/pro/hongxiu_pc/_prelease/css/reset.1586d.css">
+
+    <link rel="stylesheet" href="//yuxseocdn.yuewen.com/pro/hongxiu_pc/_prelease/css/font.918d2.css">
+
+    <link rel="stylesheet" href="//yuxseocdn.yuewen.com/pro/hongxiu_pc/_prelease/css/header.b687a.css">
+
+    <link rel="stylesheet" href="//yuxseocdn.yuewen.com/pro/hongxiu_pc/_prelease/css/module.beafa.css">
+
+    <link rel="stylesheet" href="//yuxseocdn.yuewen.com/pro/hongxiu_pc/_prelease/css/list_module.1b344.css">
+
+    <link rel="stylesheet" href="//yuxseocdn.yuewen.com/pro/hongxiu_pc/_prelease/css/so.05180.css">
+
+    <link rel="stylesheet" href="//yuxseocdn.yuewen.com/pro/hongxiu_pc/_prelease/css/layout.c0894.css">
+
+    <link rel="stylesheet" href="//yuxseocdn.yuewen.com/pro/hongxiu_pc/_prelease/css/popup.74b40.css">
+
+    <link rel="stylesheet" href="//yuxseocdn.yuewen.com/pro/hongxiu_pc/_prelease/css/footer.6b6ba.css">
+
+</head>
+
+<body class="g_site_hongxiu">
+
+
+
+<div class="wrap">
+
+
+
+    <!-- 如果有关键词 -->
+
+    
+
+        <!-- start 头部 -->
+
+        <div class="header">
+
+    
+
+    <!-- start 顶部 -->
+
+    <div class="top-head box-center cf">
+
+        <!-- start Logo -->
+
+        <div class="logo" title="红袖读书">
+
+            <a href="/"><em></em></a>
+
+        </div>
+
+        <!-- end Logo -->
+
+
+
+        <!-- start 搜索框 -->
+
+        <div class="search-wrap">
+
+            
+
+            <form class="cf" id="formUrl" action="/so" method="get" target="">
+
+                <input class="search-box" id="s-box" name="kw" type="text" placeholder="傲气如我" autocomplete="off" value="斗破苍穹">
+
+                
+
+                    <input class="submit-input" type="submit" id="searchSubmit" data-eid=""><label id="search-btn" class="search-btn" for="searchSubmit"><em class="iconfont" data-eid="">&#xe604;</em></label>
+
+                
+
+            </form>
+
+        </div>
+
+        <!-- end 搜索框 -->
+
+        
+
+        <!-- start 用户专区 -->
+
+        <div class="user-wrap">
+
+            <div class="avatar" id="j-userWrap"><a class="link" href="javascript:" id="j-avatar"><img src="//yuxseocdn.yuewen.com/pro/hongxiu_pc/_prelease/images/ico/account.1e031.png"></a>
+
+
+
+                <!-- start 用户专区下拉框 -->
+
+                <div class="down-drop" id="j-userDownDrop">
+
+                    <dl>
+
+                        <dd><a href="javascript:" id="sign-out">退出</a></dd>
+
+                    </dl>
+
+                </div>
+
+                <!-- end 用户专区下拉框 -->
+
+            </div>
+
+            <ul>
+
+                <li><a class="head-msg" href="javascript:" title="消息中心"><em class="iconfont">&#xe902;</em></a></li>
+
+                <li><a class="head-shelf" href="javascript:"><em class="iconfont">&#xe62c;</em>我的书架</a></li>
+
+            </ul>
+
+        </div>
+
+        <!-- end 用户专区 -->
+
+        
+
+    </div>
+
+    <!-- end 顶部 -->
+
+    
+
+    
+
+    <!-- start 顶部导航 -->
+
+    <div class="top-nav-wrap">
+
+        <div class="box-center cf">
+
+            <div class="left-nav fl">
+
+                <ul class="cf">
+
+                    <li class="type " id="j-navType"><a href="/category"><em class="iconfont">&#xe612;</em>全部分类</a>
+
+                        
+
+                        <div class="type-list" id="j-typeList">
+
+                            <cite></cite>
+
+                            <dl>
+
+                                <dd><a href="/category/30020_f1_f1_f1_f1_f1_0_1"><em class="iconfont">&#xe630;</em><i>现代言情</i></a></dd>
+
+                                <dd><a href="/category/30013_f1_f1_f1_f1_f1_0_1"><em class="iconfont">&#xe632;</em><i>古代言情</i></a></dd>
+
+                                <dd><a href="/category/30031_f1_f1_f1_f1_f1_0_1"><em class="iconfont">&#xe631;</em><i>浪漫青春</i></a></dd>
+
+                                <dd><a href="/category/30001_f1_f1_f1_f1_f1_0_1"><em class="iconfont">&#xe637;</em><i>玄幻言情</i></a></dd>
+
+                                <dd><a href="/category/30008_f1_f1_f1_f1_f1_0_1"><em class="iconfont">&#xe62e;</em><i>仙侠奇缘</i></a></dd>
+
+                                <dd><a href="/category/30036_f1_f1_f1_f1_f1_0_1"><em class="iconfont">&#xe634;</em><i>悬疑</i></a></dd>
+
+                                <dd><a href="/category/30042_f1_f1_f1_f1_f1_0_1"><em class="iconfont">&#xe62d;</em><i>科幻空间</i></a></dd>
+
+                                <dd><a href="/category/30050_f1_f1_f1_f1_f1_0_1"><em class="iconfont">&#xe638;</em><i>游戏竞技</i></a></dd>
+
+                                <dd><a href="/category/30083_f1_f1_f1_f1_f1_0_1"><em class="iconfont">&#xe63b;</em>短篇小说</a></dd>
+
+                                <dd><a href="/category/30055_f1_f1_f1_f1_f1_0_1"><em class="iconfont">&#xe904;</em><i>轻小说</i></a></dd>
+
+                            </dl>
+
+                        </div>
+
+                    </li>
+
+                    <li class=""><a href="/rank">排行榜</a></li>
+
+                    <li class=""><a href="/free">免费</a></li>
+
+                    <li class=""><a href="/finish">完本</a></li>
+
+                    <li class=""><a href="/baike">百科</a></li>
+
+                    <li><a href="/gdyq">古言</a></li>
+
+                    <li><a href="/xdyq">现言</a></li>
+
+                    <li><a href="/xhxx">玄幻仙侠</a></li>
+
+                    <li><a href="/lykh">悬疑科幻</a></li>
+
+                    <li><a href="/qcyx">青春游戏</a></li>
+
+                    <li><a href="/fsg">风尚阁</a></li>
+
+
+
+                    
+
+
+
+                        <!-- 临时将 版权专区 改为 动漫专区 （审核） -->
+
+                        <li class=""><a href="/z/comic" rel="nofollow">动漫专区</a></li>
+
+                        <!-- 临时将 版权专区 改为 动漫专区 （审核） -->
+
+                    
+
+                </ul>
+
+            </div>
+
+            <div class="right-nav fr">
+
+                <!-- 删除 _blank 修复未登录时跳到空白页面 -->
+
+<!--                <a class="j-goCharge" href="javascript:"><em class="iconfont">&#xe60f;</em>充值</a>-->
+
+                <a href="//write.qq.com?siteid=6" target="_blank"><em class="iconfont">&#xe62a;</em>作家专区</a>
+
+        </div>
+
+    </div>
+
+    </div>
+
+    <!-- end 顶部导航 -->
+
+
+
+    
+
+</div>
+
+
+
+        <!-- end 头部 -->
+
+
+
+        <!-- start 搜索页面内容 -->
+
+        <div class="box-center">
+
+            
+
+            <div class="crumbs-nav">
+    <a href="/" rel="nofollow">首页</a><em class="iconfont">&#xe621;</em>
+    
+         
+            <a href="/search">小说搜索</a><em class="iconfont">&#xe621;</em>
+        
+    
+        
+            <h2 class="last-nav act">斗破苍穹</h2>
+        
+     
+</div>
+
+            <!-- start 搜索筛选排序 -->
+
+            <div class="search-tab-wrap cf">
+
+                <div class="search-tab sort-switcher">
+
+                    
+
+                        <a href="javascript:" data-key="orderBy" data-orderBy="0"  class="act" >综合</a>
+
+                    
+
+                        <a href="javascript:" data-key="orderBy" data-orderBy="9" >字数</a>
+
+                    
+
+                        <a href="javascript:" data-key="orderBy" data-orderBy="17" >点击</a>
+
+                    
+
+                        <a href="javascript:" data-key="orderBy" data-orderBy="3" >时间</a>
+
+                    
+
+                </div>
+
+                <div class="total">
+
+                    <p>共<span class="pink">"500"</span>个相关作品</p>
+
+                </div>
+
+            </div>
+
+            <!-- start 搜索筛选排序 -->
+
+
+
+            <!-- start 搜索结果容器 -->
+
+            <div class="result-wrap cf">
+
+                <div class="main-content-wrap fl">
+
+                    
+
+
+
+                    
+
+                    <!-- start 搜索结果列表 —— 有结果 -->
+
+                    <div id="result-list" class="inner-wrap">
+
+                        <div class="book-img-text">
+
+                            <ul>
+
+
+
+                                
+
+
+
+                                <li>
+
+                                    <div class="book-img-box">
+
+                                        <a href="/book/22344671000280502" target="_blank" rel="nofollow"><img src="//bookcover.yuewen.com/qdbimg/349573/c_22344671000280502/150"></a>
+
+                                    </div>
+
+                                    <div class="book-mid-info">
+
+                                        
+
+                                        <h4><a href="/book/22344671000280502" target="_blank"><cite class="red-kw">斗破苍穹</cite></a></h4>
+
+                                        <p class="author">
+
+                                            <!-- 添加作者主页链接 todo  -->
+
+                                            <img src="//yuxseocdn.yuewen.com/pro/hongxiu_pc/_prelease/images/ico/account.1e031.png"/><a class="name default">天蚕土豆</a><em>|</em><a href="/category/20001_f1_f1_f1_f1_f1_0_1" target="_blank">玄幻</a><em>|</em><span>已完结</span>
+
+                                        </p>
+
+                                        <p class="intro">　　这里是属于斗气的世界，没有花俏艳丽的魔法，有的，仅仅是繁衍到巅峰的斗气！
+
+　　新书等级制度：斗者，斗师，大斗师，斗灵，斗王，斗皇，斗宗，斗尊，斗圣，斗帝。
+
+……
+
+<cite class="r</p>
+
+                                        <p class="update"><a href="/chapter/22344671000280502/31482322938360269" target="_blank">最新更新  《斗破苍穹：斗帝之路》手游·角色传记（下）</a><em>·</em><span>2019-01-16 05:04:30</span></p>
+
+                                    </div>
+
+                                    <div class="book-right-info">
+
+                                        <p class="btn">
+
+                                            <a class="red-btn" href="/book/22344671000280502" target="_blank" rel="nofollow">书籍详情</a>
+
+                                            <a class="add-book border-btn" href="javascript:" data-bookid="22344671000280502">加入书架</a>
+
+                                        </p>
+
+                                    </div>
+
+                                </li>
+
+                                
+
+
+
+                                <li>
+
+                                    <div class="book-img-box">
+
+                                        <a href="/book/22328007000863202" target="_blank" rel="nofollow"><img src="//bookcover.yuewen.com/qdbimg/349573/c_22328007000863202/150"></a>
+
+                                    </div>
+
+                                    <div class="book-mid-info">
+
+                                        
+
+                                        <h4><a href="/book/22328007000863202" target="_blank">斗破之无上之境</a></h4>
+
+                                        <p class="author">
+
+                                            <!-- 添加作者主页链接 todo  -->
+
+                                            <img src="//yuxseocdn.yuewen.com/pro/hongxiu_pc/_prelease/images/ico/account.1e031.png"/><a class="name default">夜雨闻铃0</a><em>|</em><a href="/category/20109_f1_f1_f1_f1_f1_0_1" target="_blank">诸天无限</a><em>|</em><span>连载中</span>
+
+                                        </p>
+
+                                        <p class="intro">　　你常说，复仇才是我的使命，但你却不知道，守护你，才是我一生的宿命
+　　等级制度：斗帝、斗仙、斗神、帝之不朽、神之不朽（初掌、半握、九源、超脱、帝心、踏天、无天、无极、无涯）、无上之境
+
+</p>
+
+                                        <p class="update"><a href="/chapter/22328007000863202/99916408820910702" target="_blank">最新更新  第五千二百九十七章 岂敢对女王不利</a><em>·</em><span>2026-10-21 05:35:56</span></p>
+
+                                    </div>
+
+                                    <div class="book-right-info">
+
+                                        <p class="btn">
+
+                                            <a class="red-btn" href="/book/22328007000863202" target="_blank" rel="nofollow">书籍详情</a>
+
+                                            <a class="add-book border-btn" href="javascript:" data-bookid="22328007000863202">加入书架</a>
+
+                                        </p>
+
+                                    </div>
+
+                                </li>
+
+                                
+
+
+
+                                <li>
+
+                                    <div class="book-img-box">
+
+                                        <a href="/book/24683453201458804" target="_blank" rel="nofollow"><img src="//bookcover.yuewen.com/qdbimg/349573/c_24683453201458804/150"></a>
+
+                                    </div>
+
+                                    <div class="book-mid-info">
+
+                                        
+
+                                        <h4><a href="/book/24683453201458804" target="_blank">斗破之我即正道</a></h4>
+
+                                        <p class="author">
+
+                                            <!-- 添加作者主页链接 todo  -->
+
+                                            <img src="//yuxseocdn.yuewen.com/pro/hongxiu_pc/_prelease/images/ico/account.1e031.png"/><a class="name default">小虎崽子不会飞</a><em>|</em><a href="/category/20059_f1_f1_f1_f1_f1_0_1" target="_blank">轻小说</a><em>|</em><span>已完结</span>
+
+                                        </p>
+
+                                        <p class="intro">“父亲，你找我？”
+
+萧炎站在会客大厅门口看着自己父亲，萧战正欲开口，纳兰嫣然却是猛地从座位上站了起来，惊愕的看着萧炎。
+
+“你......你就是萧炎？！”
+
+“你是？”
+
+萧炎看着这个颇为眼熟的少女</p>
+
+                                        <p class="update"><a href="/chapter/24683453201458804/90521773669400578" target="_blank">最新更新  后记</a><em>·</em><span>2025-09-08 02:53:08</span></p>
+
+                                    </div>
+
+                                    <div class="book-right-info">
+
+                                        <p class="btn">
+
+                                            <a class="red-btn" href="/book/24683453201458804" target="_blank" rel="nofollow">书籍详情</a>
+
+                                            <a class="add-book border-btn" href="javascript:" data-bookid="24683453201458804">加入书架</a>
+
+                                        </p>
+
+                                    </div>
+
+                                </li>
+
+                                
+
+
+
+                                <li>
+
+                                    <div class="book-img-box">
+
+                                        <a href="/book/19610412108853904" target="_blank" rel="nofollow"><img src="//bookcover.yuewen.com/qdbimg/349573/c_19610412108853904/150"></a>
+
+                                    </div>
+
+                                    <div class="book-mid-info">
+
+                                        
+
+                                        <h4><a href="/book/19610412108853904" target="_blank">斗罗之大昏君</a></h4>
+
+                                        <p class="author">
+
+                                            <!-- 添加作者主页链接 todo  -->
+
+                                            <img src="//yuxseocdn.yuewen.com/pro/hongxiu_pc/_prelease/images/ico/account.1e031.png"/><a class="name default">火琪琳</a><em>|</em><a href="/category/20059_f1_f1_f1_f1_f1_0_1" target="_blank">轻小说</a><em>|</em><span>连载中</span>
+
+                                        </p>
+
+                                        <p class="intro">魂穿雪清河，开局签到千仞雪。
+
+继承皇位，坐拥天斗江山。
+
+雪清河大帝：“教皇冕下，来联姻不？江山归你，你归我！”
+
+比比东：“不去。”
+
+
+
+雪清河大帝怒道：“天斗的战士们，为朕而战吧！踏平武魂殿！</p>
+
+                                        <p class="update"><a href="/chapter/19610412108853904/72685602125957693" target="_blank">最新更新  第七百四十七章</a><em>·</em><span>2023-07-31 23:57:23</span></p>
+
+                                    </div>
+
+                                    <div class="book-right-info">
+
+                                        <p class="btn">
+
+                                            <a class="red-btn" href="/book/19610412108853904" target="_blank" rel="nofollow">书籍详情</a>
+
+                                            <a class="add-book border-btn" href="javascript:" data-bookid="19610412108853904">加入书架</a>
+
+                                        </p>
+
+                                    </div>
+
+                                </li>
+
+                                
+
+
+
+                                <li>
+
+                                    <div class="book-img-box">
+
+                                        <a href="/book/24508494501337804" target="_blank" rel="nofollow"><img src="//bookcover.yuewen.com/qdbimg/349573/c_24508494501337804/150"></a>
+
+                                    </div>
+
+                                    <div class="book-mid-info">
+
+                                        
+
+                                        <h4><a href="/book/24508494501337804" target="_blank">带着祖符穿越斗破</a></h4>
+
+                                        <p class="author">
+
+                                            <!-- 添加作者主页链接 todo  -->
+
+                                            <img src="//yuxseocdn.yuewen.com/pro/hongxiu_pc/_prelease/images/ico/account.1e031.png"/><a class="name default">飞天大橘猫</a><em>|</em><a href="/category/20059_f1_f1_f1_f1_f1_0_1" target="_blank">轻小说</a><em>|</em><span>已完结</span>
+
+                                        </p>
+
+                                        <p class="intro">二次穿越的吕鈽来到了斗气大陆，意外发现自己灵魂中带着吞噬祖符。
+桀桀桀……大丈夫生居天地之间，岂能郁郁久居与人下？
+这斗帝，魂天帝当得，萧炎当得，我堂堂大丈夫吕鈽，便当不得？
+桀桀……这一世，我当站在</p>
+
+                                        <p class="update"><a href="/chapter/24508494501337804/76625532040576271" target="_blank">最新更新  番外一：异魔皇入侵斗气大陆</a><em>·</em><span>2024-02-29 21:17:00</span></p>
+
+                                    </div>
+
+                                    <div class="book-right-info">
+
+                                        <p class="btn">
+
+                                            <a class="red-btn" href="/book/24508494501337804" target="_blank" rel="nofollow">书籍详情</a>
+
+                                            <a class="add-book border-btn" href="javascript:" data-bookid="24508494501337804">加入书架</a>
+
+                                        </p>
+
+                                    </div>
+
+                                </li>
+
+                                
+
+
+
+                                <li>
+
+                                    <div class="book-img-box">
+
+                                        <a href="/book/19505176708144304" target="_blank" rel="nofollow"><img src="//bookcover.yuewen.com/qdbimg/349573/c_19505176708144304/150"></a>
+
+                                    </div>
+
+                                    <div class="book-mid-info">
+
+                                        
+
+                                        <h4><a href="/book/19505176708144304" target="_blank">斗破：我魂天帝开局拿到剧本</a></h4>
+
+                                        <p class="author">
+
+                                            <!-- 添加作者主页链接 todo  -->
+
+                                            <img src="//yuxseocdn.yuewen.com/pro/hongxiu_pc/_prelease/images/ico/account.1e031.png"/><a class="name default">聂之心</a><em>|</em><a href="/category/20001_f1_f1_f1_f1_f1_0_1" target="_blank">玄幻</a><em>|</em><span>已完结</span>
+
+                                        </p>
+
+                                        <p class="intro">新书《斗破：被夺混沌血脉后，我无敌了》
+新书《斗罗：我千仞雪开局拿到剧本》
+闭关之中的魂天帝，被一本从天而降的书籍砸到了，捡起一看，书名叫《<cite class="red-kw">斗破苍穹</cit</p>
+
+                                        <p class="update"><a href="/chapter/19505176708144304/57972682985548173" target="_blank">最新更新  新书求收藏</a><em>·</em><span>2021-11-04 14:17:54</span></p>
+
+                                    </div>
+
+                                    <div class="book-right-info">
+
+                                        <p class="btn">
+
+                                            <a class="red-btn" href="/book/19505176708144304" target="_blank" rel="nofollow">书籍详情</a>
+
+                                            <a class="add-book border-btn" href="javascript:" data-bookid="19505176708144304">加入书架</a>
+
+                                        </p>
+
+                                    </div>
+
+                                </li>
+
+                                
+
+
+
+                                <li>
+
+                                    <div class="book-img-box">
+
+                                        <a href="/book/5369044004593703" target="_blank" rel="nofollow"><img src="//bookcover.yuewen.com/qdbimg/349573/c_5369044004593703/150"></a>
+
+                                    </div>
+
+                                    <div class="book-mid-info">
+
+                                        
+
+                                        <h4><a href="/book/5369044004593703" target="_blank">斗破神天</a></h4>
+
+                                        <p class="author">
+
+                                            <!-- 添加作者主页链接 todo  -->
+
+                                            <img src="//yuxseocdn.yuewen.com/pro/hongxiu_pc/_prelease/images/ico/account.1e031.png"/><a class="name default">血代1</a><em>|</em><a href="/category/20001_f1_f1_f1_f1_f1_0_1" target="_blank">玄幻</a><em>|</em><span>已完结</span>
+
+                                        </p>
+
+                                        <p class="intro">  孙天与自己斗，与命运斗，与他人斗，与妖族斗，与万族斗，与一切要攻击自己的力量斗，与一切要阻止自己发展的力量斗……
+懦弱卑微屈从，不是斗者精神。
+勇于斗战反抗，乃霸王强者本色……</p>
+
+                                        <p class="update"><a href="/chapter/5369044004593703/87097830304443580" target="_blank">最新更新  第294章 武帝相战 （大结局）</a><em>·</em><span>2025-04-13 16:46:56</span></p>
+
+                                    </div>
+
+                                    <div class="book-right-info">
+
+                                        <p class="btn">
+
+                                            <a class="red-btn" href="/book/5369044004593703" target="_blank" rel="nofollow">书籍详情</a>
+
+                                            <a class="add-book border-btn" href="javascript:" data-bookid="5369044004593703">加入书架</a>
+
+                                        </p>
+
+                                    </div>
+
+                                </li>
+
+                                
+
+
+
+                                <li>
+
+                                    <div class="book-img-box">
+
+                                        <a href="/book/19396473501215604" target="_blank" rel="nofollow"><img src="//bookcover.yuewen.com/qdbimg/349573/c_19396473501215604/150"></a>
+
+                                    </div>
+
+                                    <div class="book-mid-info">
+
+                                        
+
+                                        <h4><a href="/book/19396473501215604" target="_blank">从<cite class="red-kw">斗破苍穹</cite>签到开始</a></h4>
+
+                                        <p class="author">
+
+                                            <!-- 添加作者主页链接 todo  -->
+
+                                            <img src="//yuxseocdn.yuewen.com/pro/hongxiu_pc/_prelease/images/ico/account.1e031.png"/><a class="name default">敖晨</a><em>|</em><a href="/category/20059_f1_f1_f1_f1_f1_0_1" target="_blank">轻小说</a><em>|</em><span>已完结</span>
+
+                                        </p>
+
+                                        <p class="intro">萧晨穿越斗气大陆，获得签到女神系统。
+签到女神：薰儿，获得奖励：本源帝气！
+签到女神：雅妃，获得奖励：九尾仙狐！
+签到女神：云韵，获得奖励：混沌神体！</p>
+
+                                        <p class="update"><a href="/chapter/19396473501215604/84989391398829239" target="_blank">最新更新  第357章 大千世界（大结局）</a><em>·</em><span>2026-06-07 17:00:07</span></p>
+
+                                    </div>
+
+                                    <div class="book-right-info">
+
+                                        <p class="btn">
+
+                                            <a class="red-btn" href="/book/19396473501215604" target="_blank" rel="nofollow">书籍详情</a>
+
+                                            <a class="add-book border-btn" href="javascript:" data-bookid="19396473501215604">加入书架</a>
+
+                                        </p>
+
+                                    </div>
+
+                                </li>
+
+                                
+
+
+
+                                <li>
+
+                                    <div class="book-img-box">
+
+                                        <a href="/book/8896975503574403" target="_blank" rel="nofollow"><img src="//bookcover.yuewen.com/qdbimg/349573/c_8896975503574403/150"></a>
+
+                                    </div>
+
+                                    <div class="book-mid-info">
+
+                                        
+
+                                        <h4><a href="/book/8896975503574403" target="_blank"><cite class="red-kw">斗破苍穹</cite>神之炎帝</a></h4>
+
+                                        <p class="author">
+
+                                            <!-- 添加作者主页链接 todo  -->
+
+                                            <img src="//yuxseocdn.yuewen.com/pro/hongxiu_pc/_prelease/images/ico/account.1e031.png"/><a class="name default">柠檬邱霞</a><em>|</em><a href="/category/20059_f1_f1_f1_f1_f1_0_1" target="_blank">轻小说</a><em>|</em><span>已完结</span>
+
+                                        </p>
+
+                                        <p class="intro">新书（我的女友养成日常）已发
+
+五帝破空，结束亦是开始，新的起点。
+纵横大千世界，天骄无双，明争暗斗数不胜数。
+更是惹得无数英雄豪杰争相争夺，追寻那无上之道。
+大千之外，域外邪族虎视耽搁，新的风暴越演</p>
+
+                                        <p class="update"><a href="/chapter/8896975503574403/73648131090209301" target="_blank">最新更新  开新书了（全职法师之亡灵罹难者）</a><em>·</em><span>2023-09-11 12:51:34</span></p>
+
+                                    </div>
+
+                                    <div class="book-right-info">
+
+                                        <p class="btn">
+
+                                            <a class="red-btn" href="/book/8896975503574403" target="_blank" rel="nofollow">书籍详情</a>
+
+                                            <a class="add-book border-btn" href="javascript:" data-bookid="8896975503574403">加入书架</a>
+
+                                        </p>
+
+                                    </div>
+
+                                </li>
+
+                                
+
+
+
+                                <li>
+
+                                    <div class="book-img-box">
+
+                                        <a href="/book/23743559709146404" target="_blank" rel="nofollow"><img src="//bookcover.yuewen.com/qdbimg/349573/c_23743559709146404/150"></a>
+
+                                    </div>
+
+                                    <div class="book-mid-info">
+
+                                        
+
+                                        <h4><a href="/book/23743559709146404" target="_blank">从天才开始无敌于斗破</a></h4>
+
+                                        <p class="author">
+
+                                            <!-- 添加作者主页链接 todo  -->
+
+                                            <img src="//yuxseocdn.yuewen.com/pro/hongxiu_pc/_prelease/images/ico/account.1e031.png"/><a class="name default">a小白b</a><em>|</em><a href="/category/20059_f1_f1_f1_f1_f1_0_1" target="_blank">轻小说</a><em>|</em><span>已完结</span>
+
+                                        </p>
+
+                                        <p class="intro">有已完结同人：【斗破】、【全职法师】。【斗罗】连载中
+假如萧炎最初没有失去斗气。
+假如药老在魂戒中因重伤最终身死道消。
+假如萧炎因缘际会加入了魂殿。
+假如蝴蝶煽动了翅膀，命运脱离了原有轨道，齿轮会如何</p>
+
+                                        <p class="update"><a href="/chapter/23743559709146404/97989047279996511" target="_blank">最新更新  第1067章 有限和无限</a><em>·</em><span>2026-08-10 22:44:36</span></p>
+
+                                    </div>
+
+                                    <div class="book-right-info">
+
+                                        <p class="btn">
+
+                                            <a class="red-btn" href="/book/23743559709146404" target="_blank" rel="nofollow">书籍详情</a>
+
+                                            <a class="add-book border-btn" href="javascript:" data-bookid="23743559709146404">加入书架</a>
+
+                                        </p>
+
+                                    </div>
+
+                                </li>
+
+                                
+
+                            </ul>
+
+                        </div>
+
+
+
+                        <!-- start 分页 -->
+
+                        <div class="page-box cf">
+
+                            <div class="pagination" id="page-container" data-page="1" data-pageMax="50"></div>
+
+                        </div>
+
+                        <!-- end 分页 -->
+
+
+
+                    </div>
+
+
+
+                    
+
+
+
+                    
+
+                    <!-- end 搜索结果列表 —— 有结果 -->
+
+
+
+                </div>
+
+
+
+                <div class="right-side-wrap fr">
+
+                    <div class="other-rec-wrap inner-wrap">
+
+                        <h3 class="lang">大家都在搜</h3>
+
+                        <ul>
+
+                            
+
+                            <li>
+
+                                <div class="img-box">
+
+                                    <a href="/book/8263527304935303" target="_blank" data-bid="8263527304935303"><img src="//bookcover.yuewen.com/qdbimg/349573/c_8263527304935303/150"></a>
+
+                                </div>
+
+                                <div class="book-info">
+
+                                    <h4><a href="/book/8263527304935303" target="_blank">恰似寒光遇骄阳</a></h4>
+
+                                    <!-- 添加作者主页链接 todo  -->
+
+                                    <p class="author"><a href="javascript:void(0);" target="_blank">囧囧有妖</a></p>
+
+                                    <p class="intro">一觉醒来，她看着镜子里的自己，爆炸头血腥纹身脸化得像鬼，多看一秒都辣眼睛。重生前，她另有所爱，一心逃离，对他恨之入骨。上一世脑子被门夹了放着绝色老公不要，被渣男贱女所害，被最信任的闺密洗脑，落了个众叛亲离的下场。这一世，任各路牛鬼蛇神处心积虑巴不得她离婚让位，不好意思，本小姐智商上线了！</p>
+
+                                </div>
+
+                            </li>
+
+                            
+
+                            <li>
+
+                                <div class="img-box">
+
+                                    <a href="/book/21855922801825904" target="_blank" data-bid="21855922801825904"><img src="//bookcover.yuewen.com/qdbimg/349573/c_21855922801825904/150"></a>
+
+                                </div>
+
+                                <div class="book-info">
+
+                                    <h4><a href="/book/21855922801825904" target="_blank">摄政王他又在掐我桃花</a></h4>
+
+                                    <!-- 添加作者主页链接 todo  -->
+
+                                    <p class="author"><a href="javascript:void(0);" target="_blank">花匪</a></p>
+
+                                    <p class="intro">丞相府的嫡女沈醉容，自小被爹娘哥哥宠爱，性子跳脱，伶俐非常。哪料常在江湖飘，谁能不挨刀。为了抓风流二哥的把柄，沈醉容听墙角时，竟一不小心从某个房顶上栽了下去。这下便将篓子捅到了当朝人人敬畏的摄政王傅郁之身上。傅郁之目光危险的盯着那个自己摔上门来的小狐狸。沈醉容却语出惊人，脑子一抽后问道:“摄政王您也来逛啊？”几日后，一道婚约下达到丞相府。沈醉容一脸迷惑。就在她以为自己可以凭借家里的宠爱，拒绝这门亲</p>
+
+                                </div>
+
+                            </li>
+
+                            
+
+                            <li>
+
+                                <div class="img-box">
+
+                                    <a href="/book/24125475801715104" target="_blank" data-bid="24125475801715104"><img src="//bookcover.yuewen.com/qdbimg/349573/c_24125475801715104/150"></a>
+
+                                </div>
+
+                                <div class="book-info">
+
+                                    <h4><a href="/book/24125475801715104" target="_blank">穿成权臣的首富娇妻</a></h4>
+
+                                    <!-- 添加作者主页链接 todo  -->
+
+                                    <p class="author"><a href="javascript:void(0);" target="_blank">巧克力派</a></p>
+
+                                    <p class="intro">【甜宠+双强+基建】她穿了，成了爱慕太子殿下的有夫之妻，可是她没有原主记忆！原本这已经是地狱模式开局，谁想便宜夫君出差回来直接下大狱，咸鱼生活破灭不说，还招来抄家杀生之祸，为了小命，她撩起袖子捞夫君。只是为何夫君让她接触的人都有病。京城首富：徐娘子，下个护肤方子想好了吗？太子殿下：徐姑娘有人还在等你，你又何苦追随探花郎。探花郎：娘子救命！看着身陷牢狱却不失风采的男人，她表示看在那张脸上，她决定还是</p>
+
+                                </div>
+
+                            </li>
+
+                            
+
+                            <li>
+
+                                <div class="img-box">
+
+                                    <a href="/book/17536776207350304" target="_blank" data-bid="17536776207350304"><img src="//bookcover.yuewen.com/qdbimg/349573/c_17536776207350304/150"></a>
+
+                                </div>
+
+                                <div class="book-info">
+
+                                    <h4><a href="/book/17536776207350304" target="_blank">夫人她马甲又轰动全城了</a></h4>
+
+                                    <!-- 添加作者主页链接 todo  -->
+
+                                    <p class="author"><a href="javascript:void(0);" target="_blank">灵小哥</a></p>
+
+                                    <p class="intro">乔念在乔家生活了18年，亲生父母找上门来，一时之间，绕城豪门都知道乔家出了个假千金！真千金多才多艺，温柔善良。假千金不学无术，一事无成。所有人都想看她被赶出豪门后，回到山沟沟过得有多惨！乔念也以为自己亲生父母来自漯河县，是个一穷二白的穷老师。谁知道哥哥开的车是辉腾，裸车300万！亲爸教书的地方在清大，老师还有个别称是教授！渣渣们一家跪舔的顶级大佬对着她爷爷点头哈腰…乔念：？enmm…这和说好的不一</p>
+
+                                </div>
+
+                            </li>
+
+                            
+
+                            <li>
+
+                                <div class="img-box">
+
+                                    <a href="/book/25001510901180504" target="_blank" data-bid="25001510901180504"><img src="//bookcover.yuewen.com/qdbimg/349573/c_25001510901180504/150"></a>
+
+                                </div>
+
+                                <div class="book-info">
+
+                                    <h4><a href="/book/25001510901180504" target="_blank">欢迎来到我的地狱</a></h4>
+
+                                    <!-- 添加作者主页链接 todo  -->
+
+                                    <p class="author"><a href="javascript:void(0);" target="_blank">墨泠</a></p>
+
+                                    <p class="intro">【无限流+无CP】【只要胆子大，游戏是我家。】自幼倒霉的银苏被拉进无限生存游戏后，被困在第一个副本，要死要活无限轮回无数次，终于回到正常游戏进程。终于不用面对同一批怪物的银苏泪流满面，决定好好和怪物们交朋友，再也不打他们了。众人看着随手捏爆怪物，渣都不剩的银苏：灰都扬了是吧！后来游戏里多了一条禁忌：远离银苏，她有病！</p>
+
+                                </div>
+
+                            </li>
+
+                            
+
+                            <li>
+
+                                <div class="img-box">
+
+                                    <a href="/book/23668280201484904" target="_blank" data-bid="23668280201484904"><img src="//bookcover.yuewen.com/qdbimg/349573/c_23668280201484904/150"></a>
+
+                                </div>
+
+                                <div class="book-info">
+
+                                    <h4><a href="/book/23668280201484904" target="_blank">宋檀记事</a></h4>
+
+                                    <!-- 添加作者主页链接 todo  -->
+
+                                    <p class="author"><a href="javascript:void(0);" target="_blank">荆棘之歌</a></p>
+
+                                    <p class="intro">一句话简介：从修真界穿越回来后，我回老家种地开直播卖菜了！——修成金丹渡劫失败的宋檀回到现代，发现自己身处连环车祸的现场，靠着恩人救命才死里逃生。那还有什么好考虑的？不做社畜，回老家种田吧！！！靠着自己的修仙经验，宋檀打造山水田园，薅野菜，农家饭，掐黄瓜，开直播，卖山珍……［纯种田，真的种田那种］［有男主，戏份不多］</p>
+
+                                </div>
+
+                            </li>
+
+                            
+
+                        </ul>
+
+                    </div>
+
+                </div>
+
+
+
+            </div>
+
+            <!-- end 搜索结果容器 -->
+
+        </div>
+
+        <!-- end 搜索页面内容 -->
+
+
+
+
+
+    
+
+
+
+    <!-- start 页脚 -->
+
+    <!--
+
+ * @Author: tangtianlai@tal.com
+
+ * @Date: 2021-10-12 15:07:40
+
+ * @LastEditors: tangtianlai
+
+ * @LastEditTime: 2021-11-25 10:24:44
+
+ * @FilePath: /hongxiu_pc_proj/src/views/layout/footer.html
+
+-->
+
+<!-- start 页脚 -->
+
+<div class="footer">
+
+    
+
+    <!--start 友情链接-->
+
+    <div class="box-center cf">
+
+        <!--start 页脚菜单-->
+
+        <div class="footer-menu dib-wrap">
+
+            <a href="//www.yuewen.com" target="_blank" rel="nofollow">关于我们</a>
+
+            <a href="//www.yuewen.com/#&contact" target="_blank" rel="nofollow">联系我们</a>
+
+            
+
+                <a href="/help?id=11159" target="_blank" rel="nofollow">帮助中心</a>
+
+            
+
+            <a href="//www.yuewen.com/service.html" target="_blank" rel="nofollow">客服中心</a>
+
+            <a href="//join.yuewen.com" target="_blank" rel="nofollow">加入我们</a>
+
+            <a href="//write.qq.com/public/login.html?siteid=6" target="_blank" rel="nofollow">作家专区</a>
+
+            <a href="//jubao.yuewen.com" target="_blank" rel="nofollow">举报中心</a>
+
+            <a href="//security.tencent.com/" target="_blank" rel="nofollow">漏洞提交</a>
+
+            
+
+             <a href="/ask" title="在线问答">在线问答</a>
+
+            
+
+            
+
+             <a href="/novelbaike" title="小说百科">小说百科</a>
+
+            
+
+            <!--start 隐式内链-->
+
+            <a href="/bqalist"></a>
+
+            <a href="/kolquerylist"></a>
+
+            <!--end 隐式内链-->
+
+        </div>
+
+        <!--end 页脚菜单-->
+
+        <!--start 版权-->
+
+        
+
+
+
+
+
+
+
+<div class="copy-right">
+    <p><span>Copyright &copy; 1999-2026 www.hongxiu.com All Rights Reserved</span>版权所有 北京红袖添香科技发展有限公司</p>
+    <p><a href="http://www.beian.gov.cn/portal/registerSystemInfo?recordcode=11010502030109" style="display: inline-block;" target="_blank" rel="nofollow"><img src="//yuxseocdn.yuewen.com/pro/hongxiu_pc/_prelease/images/beian.d0289.png" style="float: left;">京公网安备 11010502030109号</a> <a href="https://yuxseocdn.yuewen.com/imges/2a23647f.9y9f9r.jpeg">增值电信业务经营许可证：京ICP证090200号</a><a href="http://beian.miit.gov.cn/publish/query/indexFirst.action" target="_blank" rel="nofollow">互联网ICP备案号：京ICP备09093681号-1</a> 出版物经营许可证：新出发京零字第 朝180153 号
+    </p>
+    <p><a href="https://yuxseocdn.yuewen.com/imges/hongxiu-online-culture-license.jpeg">网络文化经营许可证：京网文〔2024〕1504-075号</a> <a href="https://yuxseocdn.yuewen.com/imges/869ddf6d.gjxt8r.jpeg" target="_blank">网络出版服务许可证：（署）网出证（京）字第140号</a><a target="_blank" href="https://yuxseocdn.yuewen.com/imges/6c3a33ff.6fp0yh.jpeg"><span>营业执照</span></a>
+    </p>
+    <p>请所有作者发布作品时务必遵守国家互联网信息管理办法规定，我们拒绝任何色情小说，一经发现，即作删除！举报电话：010-59357051 举报邮箱：<a href="mailto:ywjubao@yuewen.com">ywjubao@yuewen.com</a></p>
+    <p>本站所收录的作品、社区话题、用户评论、用户上传内容或图片等均属用户个人行为。如前述内容侵害您的权益，欢迎举报投诉，一经核实，立即删除，本站不承担任何责任</p>
+    <p>联系方式 总机 010-83050798-6000 地址：北京市朝阳区东三环北路27号楼23层(20)2302内05单元</p>
+</div>
+
+
+
+
+
+
+
+        <!--end 版权-->
+
+
+
+        <!--start 安全中心-->
+
+        
+
+        <div class="safety-box">
+
+            <div class="safety-img dib-wrap">
+
+                <a class="site4" href="http://cyberpolice.mps.gov.cn/wfjb/" target="_blank" rel="nofollow"></a>
+
+                
+
+                    <a class="site3" href="https://ss.knet.cn/verifyseal.dll?sn=e17103011010869321wsdl000000&a=1&pa=0.8369620393163408" target="_blank" rel="nofollow"></a>
+
+                
+
+                <a class="site1" href="https://www.12377.cn" target="_blank" rel="nofollow"></a>
+
+                <a class="site2" href="http://www.bjjubao.org.cn/index.html" target="_blank" rel="nofollow"></a>
+
+            </div>
+
+        </div>
+
+        
+
+
+
+        
+
+
+
+        
+
+        <!--end 安全中心-->        
+
+    </div>
+
+</div>
+
+<!-- end 页脚 -->
+
+
+
+    <!-- end 页脚 -->
+
+</div>
+
+<!-- start modern-js: 本页已迁移，脱离 LBF -->
+
+
+
+    <!-- 登录 SDK：pre 解析到 oaqidian.gtimg.com，pro 解析到 qidian.gtimg.com -->
+
+    <script src="//qidian.gtimg.com/common/1.0.1/login/yuewen.js"></script>
+
+    <script type="module" src="//yuxseocdn.yuewen.com/pro/hongxiu_pc/_prelease/modern-js/so/index.ed66b.js"></script>
+
+
+
+<!-- end modern-js -->
+
+<!-- 页面置灰 -->
+<!-- <script>
+  var time = +new Date()
+  if (time < 1672502400000) { // - 2023-1-1
+    document.getElementsByTagName('html')[0].style.filter = 'grayscale(100%)'
+    document.getElementsByTagName('html')[0].style['-webkit-filter'] = 'grayscale(100%)'
+  }
+</script> -->
+
+<!--【新增】百度统计配置 -->
+<script>
+    var _hmt = _hmt || [];
+    (function() {
+        var hm = document.createElement("script");
+        hm.src = "https://hm.baidu.com/hm.js?3ba92f5fe7e3e5ecd3c37df261beed8a";
+        var s = document.getElementsByTagName("script")[0]; 
+        s.parentNode.insertBefore(hm, s);
+    })();
+</script>
+
+
+
+
+
+</body>
+
+</html>
+

@@ -1,0 +1,220 @@
+<!doctype html>
+<html lang="zh-Hans">
+    <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>斗破苍穹_搜索下载-爱下电子书</title>
+        <meta name="description" content="爱下电子书提供斗破苍穹免费阅读,txt电子书，免费下载！" />
+        <link rel="shortcut icon" href="/images/favicon.ico">
+        <link href="/images/favicon-32x32.png" rel="icon" sizes="32x32" type="image/png">
+        <link href="/images/favicon-16x16.png" rel="icon" sizes="16x16" type="image/png">
+        <link href="/images/apple-touch-icon.png" rel="apple-touch-icon" sizes="180x180">
+        <link href="/css/v1.2.css?v=1.0" rel="stylesheet" type="text/css" />
+        <script type="text/javascript" src="/js/zepto.min.js"></script>
+        <script type="text/javascript" src="/js/v1.0.js"></script>
+            </head>
+    <body>
+        <header>
+            <div class="logo">
+                <div class="menu"><i class="icon icon-menu"></i></div>
+                <div class="logo-i"><a href="/" title="返回首页"><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="80" zoomAndPan="magnify" viewBox="0 0 60 60" height="80" preserveAspectRatio="xMidYMid meet" version="1.0"><path fill="#ffffff" d="M 30 0 C 13.429688 0 0 13.429688 0 30 C 0 46.570312 13.429688 60 30 60 L 60 60 L 60 30 C 60.003906 13.429688 46.570312 0 30 0 Z M 30 0 " fill-opacity="1" fill-rule="nonzero"></path><g fill="#cc0000" fill-opacity="1" transform="translate(9.453486, 45.411509)"><path d="M 8.75 -29.09375 L 8.75 0 L 2.109375 0 L 2.109375 -29.09375 Z M 8.75 -29.09375 "></path></g><g fill="#cc0000" fill-opacity="1" transform="translate(22.074098, 45.411509)"><path d="M 29.34375 0 L 20.765625 0 L 13.890625 -9.90625 L 7.015625 0 L -1.203125 0 L 9.796875 -15.65625 L 0.640625 -29.09375 L 8.53125 -29.09375 L 13.890625 -21.15625 L 19.25 -29.09375 L 27.5 -29.09375 L 17.984375 -15.65625 Z M 29.34375 0 "></path></g></svg></a></div>
+            </div>
+            <div class="logo-n"><a href="/">爱下电子书</a></div>
+            <div class="page-n">搜索结果</div>
+            <div class="search">
+                <div class="icon icon-close"></div>
+                <form name="sform" id="form" method="get" action="/bsearch">
+                    <span class="s-inp"><input class="s-inptext" type="search" name="q" id="kw" placeholder="输入小说名\作者" autocomplete="off">
+                        <button value="1" class="s-button" aria-label="搜索" tabindex="-1" type="submit"><i class="icon icon-search"></i></button>
+                    </span>
+                </form>
+            </div>
+            <nav id="i-nav">
+                <div class="n-nav">
+                    <span class="n-close"><i class="icon icon-close"></i></span>
+                    <span class="icon icon-home"><a href="/">首页</a></span>
+                    <span class="icon icon-rank"><a href="/hot/">排行</a></span>
+                    <span class="icon icon-category"><a href="/sort/1/">分类</a></span>
+                    <span class="icon icon-end"><a href="/end/">完结</a></span>
+                </div>
+            </nav>
+            <div class="user">
+                <div id="cklogin"><i class="icon icon-my"><span class="wide-text">登入/注册</span></i></div>
+                <span class="i-search icon icon-search"></span>
+            </div>
+        </header>
+        <main>
+            <div class="panel">
+                <div class="breadcrumbs">
+                    <ul>
+                        <li><a href="/">首页</a></li>
+                        <li><a href="/bsearch?q=/%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9/">斗破苍穹搜索结果</a></li>
+
+                    </ul>
+                </div>
+            
+                <ul class="u-list">
+                    <li class="burl" data-url="/read/383523/"><div class="l-img"><a href="/read/383523/"><img src="https://img22.ixdzs.com/de/c8/dec8303d4e5d87a1144ef7b972175e5f.jpg" alt="从斗破苍穹签到开始封面"/></a></div><div class="l-text"><div class="l-info"><h3 class="bname"><a href="/read/383523/"  title="从斗破苍穹签到开始">从斗破苍穹签到开始</a></h3><p class="l-p1"><span class="bauthor"><a href="/author/%E6%95%96%E6%99%A8">敖晨</a></span><span class="size">80.95万字</span><span class="lz">连载中</span></p><p class="l-p2">【系统流，无敌流】萧晨穿越斗气大陆，绑定签到女神系统。签到女神：萧薰儿，获得奖励：本源帝气！签到女神：雅妃，获得奖励：九尾仙狐！签到女神：云韵，获得奖励：混沌神体！签到女神：美杜莎女王，获得奖励：主宰剑！</p><p class="l-last"><span class="l-nt">最新:</span><a href="/read/383523/p123002872830.html"><span class="l-chapter">第253章 欣蓝</span></a><span class="l-time">2026-06-10 14:01</span></p></div></div></li><li class="burl" data-url="/read/494125/"><div class="l-img"><a href="/read/494125/"><img src="https://img22.ixdzs.com/af/2b/af2b8d911f5703a9384d2651d7d1f0fd.jpg" alt="斗破苍穹外传之云韵篇封面"/></a></div><div class="l-text"><div class="l-info"><h3 class="bname"><a href="/read/494125/"  title="斗破苍穹外传之云韵篇">斗破苍穹外传之云韵篇</a></h3><p class="l-p1"><span class="bauthor"><a href="/author/%E6%96%B0%E5%B7%AB%E4%BA%91">新巫云</a></span><span class="size">45.22万字</span><span class="lz">连载中</span></p><p class="l-p2">斗破苍穹同人外传，云韵篇。萧炎去往大千世界前后数十年，云韵在斗气大陆的故事。</p><p class="l-last"><span class="l-nt">最新:</span><a href="/read/494125/p0.html"><span class="l-chapter"></span></a><span class="l-time">2025-11-02 18:12</span></p></div></div></li><li class="burl" data-url="/read/69576/"><div class="l-img"><a href="/read/69576/"><img src="https://img22.ixdzs.com/a7/cf/a7cfc4ce93025d0c43b26a98a6ce97da.jpg" alt="斗破苍穹之无上之境封面"/></a></div><div class="l-text"><div class="l-info"><h3 class="bname"><a href="/read/69576/"  title="斗破苍穹之无上之境">斗破苍穹之无上之境</a></h3><p class="l-p1"><span class="bauthor"><a href="/author/%E5%A4%9C%E9%9B%A8%E9%97%BB%E9%93%830">夜雨闻铃0</a></span><span class="size">967.89万字</span><span class="lz">连载中</span></p><p class="l-p2">结束，也是一种开始……《斗破苍穹之无上之境》，这是一本斗破续，在这本斗破当中，你们依然会见到繁衍到巅峰的斗气，还有着最高级的斗气，我们的主角依旧是我们的炎帝，萧炎。很多人都觉得斗破苍穹惜之过早，这本斗破苍穹之无上之境，我相信，一定能够延续大家的梦想，在让我们的炎帝创造一个不一样的辉煌吧!!等级制度：斗帝、斗仙、斗神、帝之不朽...</p><p class="l-last"><span class="l-nt">最新:</span><a href="/read/69576/p176003587471.html"><span class="l-chapter">第3936章 全部收下</span></a><span class="l-time">2025-09-11 15:06</span></p></div></div></li><li class="burl" data-url="/read/609482/"><div class="l-img"><a href="/read/609482/"><img src="https://img22.ixdzs.com/5d/af/5dafa15e313cc5ecebebef214363c4d0.jpg" alt="从炼器开始在斗破修仙封面"/></a></div><div class="l-text"><div class="l-info"><h3 class="bname"><a href="/read/609482/"  title="从炼器开始在斗破修仙">从炼器开始在斗破修仙</a></h3><p class="l-p1"><span class="bauthor"><a href="/author/%E9%99%88%E7%99%BB%E9%A6%A5">陈登馥</a></span><span class="size">141.37万字</span><span class="lz">连载中</span></p><p class="l-p2">
+
+          【斗破苍穹】【炼器】【机甲】【科技】
+
+
+邻居囤粮我囤枪，邻居就是我粮仓！
+
+
+炼药救（杀穿）不了斗破，你说是吧？小炎子。
+
+
+在这个炼药师为尊的世界，姜麟悄悄以炼器崛起，成王做祖。
+
+
+萧炎：我的玄丹能够诞生灵智，你能吗？
+
+
+姜麟：嗯...（拿出天阶法宝），好了，现在它是我的了。
+
+
+【空间道器·达摩克里斯之剑打击系统已就位】
+
+
+萧炎：别别别！给你给你都给你！
+
+
+.</p><p class="l-last"><span class="l-nt">最新:</span><a href="/read/609482/p0.html"><span class="l-chapter"></span></a><span class="l-time">2025-05-28 00:00</span></p></div></div></li><li class="burl" data-url="/read/563731/"><div class="l-img"><a href="/read/563731/"><img src="https://img22.ixdzs.com/9e/61/9e613323c86066e6957fcdcd558cc63c.jpg" alt="斗破苍穹：遗失的篇章封面"/></a></div><div class="l-text"><div class="l-info"><h3 class="bname"><a href="/read/563731/"  title="斗破苍穹：遗失的篇章">斗破苍穹：遗失的篇章</a></h3><p class="l-p1"><span class="bauthor"><a href="/author/%E5%A4%A9%E5%90%AF%E7%8E%8B">天启王</a></span><span class="size">46.76万字</span><span class="end">已完结</span></p><p class="l-p2">标题：背景设定：故事发生在萧炎成为斗帝后，斗气大陆迎来了一段和平时期。主要角色：萧炎：主角，斗帝，继续探索斗气大陆的未知领域。萧薰儿：萧炎的妻子，拥有强大的斗气天赋。新角色：在新篇章中引入的角色，与萧炎一同冒险。故事梗概：萧炎在一次探险中发现了一本古老的斗技秘籍，这本秘籍记载了一个被遗忘的斗技，据说能够超越斗帝的力量为了探索这个秘密，萧焱和萧薰儿踏上了新的旅</p><p class="l-last"><span class="l-nt">最新:</span><a href="/read/563731/p0.html"><span class="l-chapter"></span></a><span class="l-time">2025-04-10 00:35</span></p></div></div></li><li class="burl" data-url="/read/155854/"><div class="l-img"><a href="/read/155854/"><img src="https://img22.ixdzs.com/00/8e/008eb4a0966e3b0484c6ec8755e200ad.jpg" alt="斗破苍穹之无上巅峰封面"/></a></div><div class="l-text"><div class="l-info"><h3 class="bname"><a href="/read/155854/"  title="斗破苍穹之无上巅峰">斗破苍穹之无上巅峰</a></h3><p class="l-p1"><span class="bauthor"><a href="/author/%E5%B9%B2%E5%B0%86">干将</a></span><span class="size">113.33万字</span><span class="end">已完结</span></p><p class="l-p2">斗气大陆，帝王为尊，传承血脉，无上永存！为了自己的后代，为了拥有更强的实力，还有自己的身世，一代帝王，飞升异世。斗帝变成斗低，真正的强者，无上之巅峰。术，并非武术武技，它是一个特有而让惊叹的字，术者，代表一个超越斗之帝的强者！无上，触不到，摸不着…然而，我们的主角，他却做到了，萧炎再创辉煌……</p><p class="l-last"><span class="l-nt">最新:</span><a href="/read/155854/p54000118581.html"><span class="l-chapter">371.第371章 枭尊者冯书</span></a><span class="l-time">2025-01-22 18:29</span></p></div></div></li><li class="burl" data-url="/read/585924/"><div class="l-img"><a href="/read/585924/"><img src="https://img22.ixdzs.com/bf/71/bf71377b0be545cddb5b43617c98d890.jpg" alt="转世从斗破苍穹世界开始封面"/></a></div><div class="l-text"><div class="l-info"><h3 class="bname"><a href="/read/585924/"  title="转世从斗破苍穹世界开始">转世从斗破苍穹世界开始</a></h3><p class="l-p1"><span class="bauthor"><a href="/author/%E6%B4%9B%E6%B4%9B%E6%B4%9B%E6%B0%B4">洛洛洛水</a></span><span class="size">32.55万字</span><span class="lz">连载中</span></p><p class="l-p2">万古难遇的转生者，被神王寻到后却沦为玩物，四次人生被玩弄于股掌之中，这一世，神王开恩，将他转生到斗破苍穹世界，看主角如何从斗气大陆崛起，一步一步向原始宇宙进击，遇魔斩魔，遇仙诛仙，颠覆神王们的统治。</p><p class="l-last"><span class="l-nt">最新:</span><a href="/read/585924/p0.html"><span class="l-chapter"></span></a><span class="l-time">2025-01-18 17:58</span></p></div></div></li><li class="burl" data-url="/read/574709/"><div class="l-img"><a href="/read/574709/"><img src="https://img22.ixdzs.com/c9/fb/c9fb482d39c32e1113b77d90e58d242e.jpg" alt="斗破苍穹之斗仙封面"/></a></div><div class="l-text"><div class="l-info"><h3 class="bname"><a href="/read/574709/"  title="斗破苍穹之斗仙">斗破苍穹之斗仙</a></h3><p class="l-p1"><span class="bauthor"><a href="/author/%E5%A4%A9%E5%A0%82%E9%A9%AC">天堂马</a></span><span class="size">158.92万字</span><span class="lz">连载中</span></p><p class="l-p2">萧炎突破斗帝后，意外发现斗气大陆多了一个境界，那就是斗仙，遨游天地间，不受任何束缚，可穿越时空隧道，可来返两个世界，更能创造一个世界。</p><p class="l-last"><span class="l-nt">最新:</span><a href="/read/574709/p0.html"><span class="l-chapter"></span></a><span class="l-time">2024-12-16 13:19</span></p></div></div></li><li class="burl" data-url="/read/549901/"><div class="l-img"><a href="/read/549901/"><img src="https://img22.ixdzs.com/7e/39/7e399dd7bec7db341828ab68533dd974.jpg" alt="从斗破苍穹模拟到大主宰封面"/></a></div><div class="l-text"><div class="l-info"><h3 class="bname"><a href="/read/549901/"  title="从斗破苍穹模拟到大主宰">从斗破苍穹模拟到大主宰</a></h3><p class="l-p1"><span class="bauthor"><a href="/author/%E5%8D%83%E5%BD%B1%E6%AE%8B%E5%85%89">千影残光</a></span><span class="size">104.55万字</span><span class="lz">连载中</span></p><p class="l-p2">穿越到斗气大陆，还成了萧炎的双胞胎兄弟怎么办？
+
+
+如果没有外挂，当然是直接躺平了，截胡萧薰儿，等到萧炎突破到斗帝，保底九星斗圣不香吗？
+
+
+叮！功德模拟器系统已激活！
+
+
+什么？有外挂！
+
+
+那还躺个毛啊！
+
+
+系统给我模拟！
+
+
+巨人之力进化斗帝法身！魂骨进化至尊骨！写轮眼超进化——重瞳！！！
+
+
+重瞳本是无敌路，多根骨头多条路！
+
+
+什么？纳兰嫣然来退婚了？
+
+
+三年之约，云岚山顶！
+
+
+纳</p><p class="l-last"><span class="l-nt">最新:</span><a href="/read/549901/p0.html"><span class="l-chapter"></span></a><span class="l-time">2024-10-22 05:22</span></p></div></div></li><li class="burl" data-url="/read/540433/"><div class="l-img"><a href="/read/540433/"><img src="https://img22.ixdzs.com/57/92/5792bf85db151bbde4ff8789b908ebec.jpg" alt="斗破苍穹之圣阳仙尊封面"/></a></div><div class="l-text"><div class="l-info"><h3 class="bname"><a href="/read/540433/"  title="斗破苍穹之圣阳仙尊">斗破苍穹之圣阳仙尊</a></h3><p class="l-p1"><span class="bauthor"><a href="/author/%E9%BE%99%E5%B4%BD%E8%B4%AA%E5%90%83%E9%AC%BC">龙崽贪吃鬼</a></span><span class="size">157.87万字</span><span class="end">已完结</span></p><p class="l-p2">林然穿越斗破世界，被蝎魔三鬼直接收徒，开局成为了云雨宗少宗主！
+
+
+本想着成为少宗主的自己能够开始为所欲为的龙傲天人生，却没想到此刻的云雨宗因为太过于邪恶，已经被中州各大宗门联合抵制，被迫离开了中州。
+
+
+蝎魔三鬼为了能够回到中州，费尽心机，而身为少宗主的林然，也是身负重任的来到了加玛帝国，准备创建分宗。
+
+
+不曾想，一到加玛帝国，林然便是遇到了云韵。
+
+
+还是身中封印术的云韵……
+
+      </p><p class="l-last"><span class="l-nt">最新:</span><a href="/read/540433/p0.html"><span class="l-chapter"></span></a><span class="l-time">2024-10-03 19:26</span></p></div></div></li><li class="burl" data-url="/read/460993/"><div class="l-img"><a href="/read/460993/"><img src="https://img22.ixdzs.com/9d/b0/9db0e1f928ff002c05c3dff8c5f07de2.jpg" alt="斗破苍穹之至高真神封面"/></a></div><div class="l-text"><div class="l-info"><h3 class="bname"><a href="/read/460993/"  title="斗破苍穹之至高真神">斗破苍穹之至高真神</a></h3><p class="l-p1"><span class="bauthor"><a href="/author/%E8%90%BD%E6%97%A5%E7%B2%BE%E7%81%B5">落日精灵</a></span><span class="size">310.36万字</span><span class="lz">连载中</span></p><p class="l-p2">                    大千世界，位面集结，万道争锋，真龙降世，一位突破位面桎梏的炎帝萧炎，降临在这片浩瀚的无尽世界，会演绎怎样的传奇？各方天之至尊层出不穷，追逐那令人向往的主宰之路，探索主宰之上的神之领域。
+
+    等级制度：至尊境、地至尊、天至尊、主宰境、神祇境
+
+</p><p class="l-last"><span class="l-nt">最新:</span><a href="/read/460993/p193004733800.html"><span class="l-chapter">第一百七十三章 圣仙之主</span></a><span class="l-time">2024-09-09 10:15</span></p></div></div></li><li class="burl" data-url="/read/554883/"><div class="l-img"><a href="/read/554883/"><img src="https://img22.ixdzs.com/" alt="人在斗破：我也捡了道灵魂体封面"/></a></div><div class="l-text"><div class="l-info"><h3 class="bname"><a href="/read/554883/"  title="人在斗破：我也捡了道灵魂体">人在斗破：我也捡了道灵魂体</a></h3><p class="l-p1"><span class="bauthor"><a href="/author/%E9%9D%92%E5%B1%B1%E5%B8%B8%E5%9C%A8123">青山常在123</a></span><span class="size">19.37万字</span><span class="lz">连载中</span></p><p class="l-p2">穿越来到斗破，我发现我是个天才，但只是个普通人之中的天才，修炼一辈子也就是斗宗强者。
+
+
+直到那一天，一个藏在纳戒之中的老头，桀桀桀大笑着飘了出来，他说我是绝世天才，修炼大成足以纵横斗气大陆。
+
+
+是不是绝世天才暂且放在一边，在斗气大陆上，哪有好人桀桀桀的大笑，桀桀桀大笑的能是好人。
+
+
+我结合自己前世的经验判断，我遇到的，不是萧炎的药老，而是林琅天的穆师。
+
+       </p><p class="l-last"><span class="l-nt">最新:</span><a href="/read/554883/p0.html"><span class="l-chapter"></span></a><span class="l-time">2024-08-04 12:05</span></p></div></div></li><li class="burl" data-url="/read/530605/"><div class="l-img"><a href="/read/530605/"><img src="https://img22.ixdzs.com/cf/a9/cfa9b659b5e85c8f8e2ec78836e00608.jpg" alt="斗破苍穹之帝子萧炎封面"/></a></div><div class="l-text"><div class="l-info"><h3 class="bname"><a href="/read/530605/"  title="斗破苍穹之帝子萧炎">斗破苍穹之帝子萧炎</a></h3><p class="l-p1"><span class="bauthor"><a href="/author/%E9%A6%84%E9%A5%A8%E5%9F%8E%E4%B8%BB">馄饨城主</a></span><span class="size">260.11万字</span><span class="lz">连载中</span></p><p class="l-p2">
+
+          
+
+假如萧玄冲击斗帝成功了，萧炎会是一个怎样的开局呢？<br />
+<br />
+我叫萧炎！<br />
+<br />
+我来到了一个不一样的斗破苍穹，在这个世界里，我的先祖萧玄冲击斗帝...成功了！<br />
+<br />
+于是乎，我成为了斗气大陆最顶级的二世祖。<br />
+<br />
+斗圣爷爷，斗尊父亲，七品炼药师的老妈，这只是冰山一角！<br />
+<br />
+</p><p class="l-last"><span class="l-nt">最新:</span><a href="/read/530605/p0.html"><span class="l-chapter"></span></a><span class="l-time">2024-07-12 01:30</span></p></div></div></li><li class="burl" data-url="/read/526751/"><div class="l-img"><a href="/read/526751/"><img src="https://img22.ixdzs.com/79/fd/79fdb37abadab05bac67c381b70b1020.jpg" alt="斗破苍穹之魔帝萧炎封面"/></a></div><div class="l-text"><div class="l-info"><h3 class="bname"><a href="/read/526751/"  title="斗破苍穹之魔帝萧炎">斗破苍穹之魔帝萧炎</a></h3><p class="l-p1"><span class="bauthor"><a href="/author/%E6%9C%BD%E6%9C%A8%E7%BD%A2%E4%BA%86">朽木罢了</a></span><span class="size">107.78万字</span><span class="lz">连载中</span></p><p class="l-p2">                    众叛亲离，孤独一人成为盖世强者的魔怒圣者萧炎，在探寻斗帝之秘时，却穿过了时间之门。
+
+    原本处于黑化线的他却重生到了正常线的斗气大陆，经历注定不平凡的人生……
+
+</p><p class="l-last"><span class="l-nt">最新:</span><a href="/read/526751/p0.html"><span class="l-chapter"></span></a><span class="l-time">2024-05-10 04:25</span></p></div></div></li><li class="burl" data-url="/read/528724/"><div class="l-img"><a href="/read/528724/"><img src="https://img22.ixdzs.com/2c/f8/2cf8c342d1e81486c80d96fb5ba6a463.jpg" alt="斗破苍穹从韩枫开始封面"/></a></div><div class="l-text"><div class="l-info"><h3 class="bname"><a href="/read/528724/"  title="斗破苍穹从韩枫开始">斗破苍穹从韩枫开始</a></h3><p class="l-p1"><span class="bauthor"><a href="/author/%E5%B0%8F%E5%B0%8F%E9%BA%BB%E8%BE%A3%E8%BE%A3%E6%A4%92">小小麻辣辣椒</a></span><span class="size">63.91万字</span><span class="lz">连载中</span></p><p class="l-p2">                    韩枫，一位弑师者，为人所不齿。
+
+    可是有一天，同名同姓的韩枫穿越到了斗气大陆，成为了药老的弟子。
+
+    蝴蝶的翅膀已经煽动，命运的齿轮也开始了转动。
+
+    如果韩枫没有背叛药老，那故事的走向会是什么呢？
+
+    如果韩枫修炼了完整版的焚决，实力又能达到何种地步呢？
+
+</p><p class="l-last"><span class="l-nt">最新:</span><a href="/read/528724/p0.html"><span class="l-chapter"></span></a><span class="l-time">2024-03-23 10:20</span></p></div></div></li><li class="burl" data-url="/read/535567/"><div class="l-img"><a href="/read/535567/"><img src="https://img22.ixdzs.com/1b/76/1b762260edd65cf677eaa977cac7af6e.jpg" alt="斗破苍穹：辰星闪耀封面"/></a></div><div class="l-text"><div class="l-info"><h3 class="bname"><a href="/read/535567/"  title="斗破苍穹：辰星闪耀">斗破苍穹：辰星闪耀</a></h3><p class="l-p1"><span class="bauthor"><a href="/author/%E5%AF%A1%E4%BA%BA%E4%B8%8D%E5%90%AC%E5%8A%9D">寡人不听劝</a></span><span class="size">10.94万字</span><span class="lz">连载中</span></p><p class="l-p2">
+
+				    远古帝族的遗留之物，更加强悍的稀有体质，隐于世间的魔兽残族？异火的消息，天鼎的下落，丹方的补足，斗技的创造…那些未曾现世、未曾过多描述的势力，以及中州之外的故事，一个更加精彩纷呈的斗气大陆。
+</p><p class="l-last"><span class="l-nt">最新:</span><a href="/read/535567/p0.html"><span class="l-chapter"></span></a><span class="l-time">2024-02-21 00:44</span></p></div></div></li><li class="burl" data-url="/read/530874/"><div class="l-img"><a href="/read/530874/"><img src="https://img22.ixdzs.com/bd/6a/bd6ac62166945370721837e9db35878b.jpg" alt="斗破苍穹之药帝传奇封面"/></a></div><div class="l-text"><div class="l-info"><h3 class="bname"><a href="/read/530874/"  title="斗破苍穹之药帝传奇">斗破苍穹之药帝传奇</a></h3><p class="l-p1"><span class="bauthor"><a href="/author/%E5%AD%A4%E5%B3%B0%E8%BF%9C%E8%A1%8C">孤峰远行</a></span><span class="size">21.98万字</span><span class="lz">连载中</span></p><p class="l-p2">
+
+					金雷破苍穹，异火动乾坤！?这里依旧是那个精彩绝艳的斗气世界。你们以为人神共愤的?魂族被灭就天下太平了吗？不……，这世间最不缺的就是野心者。命运的齿轮从未停止，世间的百态事又无定常。那么随着以萧炎为首的五位至强者的离去，?这个世界又将会迎来什么样的动乱呐？大乱至，英雄起，数风流人物，还看今朝。?
+
+				
+
+			
+
+			</p><p class="l-last"><span class="l-nt">最新:</span><a href="/read/530874/p0.html"><span class="l-chapter"></span></a><span class="l-time">2024-01-10 00:35</span></p></div></div></li><li class="burl" data-url="/read/522417/"><div class="l-img"><a href="/read/522417/"><img src="https://img22.ixdzs.com/1b/76/1b762260edd65cf677eaa977cac7af6e.jpg" alt="萧炎全文免费阅读完整版封面"/></a></div><div class="l-text"><div class="l-info"><h3 class="bname"><a href="/read/522417/"  title="萧炎全文免费阅读完整版">萧炎全文免费阅读完整版</a></h3><p class="l-p1"><span class="bauthor"><a href="/author/%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9%E4%B9%8B%E6%97%A0%E4%B8%8A%E4%B9%8B%E5%A2%83">斗破苍穹之无上之境</a></span><span class="size">3.36千字</span><span class="lz">连载中</span></p><p class="l-p2">
+
+				    你常说，复仇才是我的使命，但你却不知道，守护你，才是我一生的宿命等级制度：斗帝、斗仙、斗神、帝之不朽、神之不朽、无上之境
+</p><p class="l-last"><span class="l-nt">最新:</span><a href="/read/522417/p0.html"><span class="l-chapter"></span></a><span class="l-time">2023-08-23 18:07</span></p></div></div></li><li class="burl" data-url="/read/516006/"><div class="l-img"><a href="/read/516006/"><img src="https://img22.ixdzs.com/1b/76/1b762260edd65cf677eaa977cac7af6e.jpg" alt="斗破苍穹之无上之境无错版封面"/></a></div><div class="l-text"><div class="l-info"><h3 class="bname"><a href="/read/516006/"  title="斗破苍穹之无上之境无错版">斗破苍穹之无上之境无错版</a></h3><p class="l-p1"><span class="bauthor"><a href="/author/%E5%A4%9C%E9%9B%A8%E9%97%BB%E9%93%830">夜雨闻铃0</a></span><span class="size">48.71万字</span><span class="lz">连载中</span></p><p class="l-p2">
+
+				    你常说，复仇才是我的使命，但你却不知道，守护你，才是我一生的宿命等级制度：斗帝、斗仙、斗神、帝之不朽、神之不朽、无上之境
+</p><p class="l-last"><span class="l-nt">最新:</span><a href="/read/516006/p0.html"><span class="l-chapter"></span></a><span class="l-time">2023-08-08 15:49</span></p></div></div></li><li class="burl" data-url="/read/515991/"><div class="l-img"><a href="/read/515991/"><img src="https://img22.ixdzs.com/1b/76/1b762260edd65cf677eaa977cac7af6e.jpg" alt="萧炎的小说全文免费阅读无弹窗封面"/></a></div><div class="l-text"><div class="l-info"><h3 class="bname"><a href="/read/515991/"  title="萧炎的小说全文免费阅读无弹窗">萧炎的小说全文免费阅读无弹窗</a></h3><p class="l-p1"><span class="bauthor"><a href="/author/%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9%E4%B9%8B%E6%97%A0%E4%B8%8A%E4%B9%8B%E5%A2%83">斗破苍穹之无上之境</a></span><span class="size">48.71万字</span><span class="lz">连载中</span></p><p class="l-p2">
+
+				    你常说，复仇才是我的使命，但你却不知道，守护你，才是我一生的宿命等级制度：斗帝、斗仙、斗神、帝之不朽、神之不朽、无上之境
+</p><p class="l-last"><span class="l-nt">最新:</span><a href="/read/515991/p0.html"><span class="l-chapter"></span></a><span class="l-time">2023-08-08 15:39</span></p></div></div></li>                </ul>
+            </div>
+            
+          <div class="page">
+                <div class="pagei">
+                    <a href="/bsearch?q=%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9&page=1" class="num  current" title="第1页">1</a><a href="/bsearch?q=%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9&page=2" class="num " title="第2页">2</a><a href="/bsearch?q=%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9&page=3" class="num " title="第3页">3</a><a href="/bsearch?q=%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9&page=4" class="num " title="第4页">4</a><a href="/bsearch?q=%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9&page=5" class="num " title="第5页">5</a><a href="/bsearch?q=%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9&page=6" class="num " title="第6页">6</a><a href="/bsearch?q=%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9&page=7" class="num " title="第7页">7</a><a href="/bsearch?q=%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9&page=2" title="下一页">&raquo;</a> <a href="/bsearch?q=%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B9&page=7" title="最后一页">末页</a>                </div>
+            </div>  
+            
+            
+        </main>
+
+        <footer>
+            <div class="f-nav">
+                <a href="/hot/">排行榜</a>
+                <a href="/sort/1/">全部分类</a>
+                <a href="/end/">全本小说</a>
+            </div>
+            <div class="copyright">
+                2026 © ixdzs8.com
+            </div>
+        </footer> 
+        <div id="goBack"></div>
+        <script async src="https://www.googletagmanager.com/gtag/js?id=G-1NX8SQR9LJ"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+  gtag('config', 'G-1NX8SQR9LJ');
+</script>
+    </body>
+</html>

@@ -1,0 +1,1171 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>塔读小说网</title>
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+    <meta name="keywords" content="">
+    <meta name="description" content="">
+    <meta http-equiv="mobile-agent" content="format=wml; url=">
+    <meta http-equiv="mobile-agent" content="format=xhtml; url=">
+    <meta http-equiv="mobile-agent" content="format=html5; url=">
+    <meta name="mobile-agent" content="format=wml; url=">
+    <meta name="mobile-agent" content="format=xhtml; url=">
+    <meta name="mobile-agent" content="format=html5; url=">
+    <link rel="icon" href="https://media3.tadu.com/web_dubbo_static//images/tadu.ico" type="image/x-icon" />
+    <link href="https://media3.tadu.com/web_dubbo_static//prod/css/search300-dc68ae503a.css" rel="stylesheet" type="text/css"/>
+    <link href="https://media3.tadu.com/web_dubbo_static//prod/css/search500-56160a774d.css" rel="stylesheet" type="text/css"/>
+</head>
+<!--
+    data-isLogin用于判断用户是否登录，true则用户已经登录，false则未登录
+    data-bookid是书籍id，用于提交加入书架回传服务端
+-->
+
+<body>
+<div id="content" data-isLogin="true">
+    <!-- 二级页面头部 -->
+    <div class="navSecond">
+        <div class="boxCenter clearfix">
+            <a href="http://www.tadu.com/" target="_blank" class="logo"></a>
+            <div class="navLi clearfix">
+                <a href="/" class="navBar" target="_blank">男频<span></span></a>
+                <a href="/girls" class="navBar" target="_blank">女频<span></span></a>
+                <a href="/store" class="navBar" target="_blank">书库<span></span></a>
+                <a href="/book/rank" class="navBar" target="_blank">排行<span></span></a>
+                <a href="/category/firstContext" class="navBar" target="_blank">衍生版权<span></span></a>
+                <a href="/v3/authorWelfare" class="navBar" target="_blank">作者福利<span></span></a>
+            </div>
+            <div class="logoWrapRt">
+                <form action="/search" method="post" target="_blank">
+                    <input type="text" name="query" placeholder="请输入书名、作者、关键词" class="text">
+                    <input type="submit" class="submit" id="searchSubmit">
+                    <label for="searchSubmit" class="searchBtn"><em></em></label>
+                </form>
+                <hr />
+                <a href="http://author.tadu.com" class="authorZone"  target="_blank"><i></i>作者专区</a>
+                <hr />
+                <div class="dlBox">
+                    <div class="downLoad">APP下载</div>
+                    <div class="dlCon hidden">
+                        <span>扫描下载”塔读免费小说”客户端</span>
+                        <img src="https://media3.tadu.com/web_dubbo_static//assets/images/v500/qrCode.png" alt="扫描下载”塔读免费小说”客户端" />
+                        <em></em>
+                    </div>
+                </div>
+                <hr />
+
+                <!-- 未登录 -->
+                <div class="login">
+                    <a href="/v5/toLogin" class="loginBtn second_nologin">登录</a>
+                    <a href="javascript:window.location.href='/v3/register?referer='+window.location.href" class="registerBtn register second_nologin">注册</a>
+                </div>
+                <!-- 已登录 -->
+                <div class="isLogged"  id="logined_info">
+                    <a href="/tadu/space/reader" class="reader_a"></a>&nbsp;
+                    <a href="/tadu/space/author" class="author_a"></a>&nbsp;
+                    <img src="https://media3.tadu.com/web_dubbo_static//assets/images/v300/cover.png" data-src="https://media7.tadu.com//">
+                </div>
+                <!-- 已登录悬浮框 -->
+                <div class="suspend hidden"  id="logined_select">
+                    <a href="/tadu/space/reader" class="reader_a">个人中心</a>
+                    <a href="/tadu/space/author" class="author_a">个人中心</a>
+                    <a href="/tadu/space/my-message/1">我的消息</a>
+                    <a href="/help/reader" class="feedback reader_a">帮助反馈</a>
+                    <a href="/help/author" class="feedback author_a">帮助反馈</a>
+                    <a href="/logout" class="exit">退出</a>
+                    <i></i>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="boxCenter seach_box clearfix">
+        <div class="search_left">
+            <div class="search_top clearfix">
+                                    <p class="search_tp">共搜索到4227 条与<span>"斗破苍穹"</span>相关的结果</p>
+                                <form class="search_form" action="/search" method="post">
+                    <input type="text" name="query" value="斗破苍穹" placeholder="关键词、书名、作者名" class="text">
+                    <input type="submit" class="submit" id="searchSubmit">
+                    <div for="searchSubmit" class="searchBtn"><em></em></div>
+                </form>
+            </div>
+
+                            <!-- 有搜索结果start -->
+                <ul class="bookList bookBgList ">
+                                            <li class="lastLine">
+                            <a href="/book/986132/" class="bookImg" target="_blank">
+                                <img src="https://media3.tadu.com/web_dubbo_static//assets/images/v300/coverBg.jpg" data-src="https://media3.tadu.com//2022/12/12/20/24/08686cbce2074684b14d90206d3523f4_125_100.jpg" />
+                            </a>
+                            <div class="rtList">
+                                <a href="/book/986132/" target="_blank" class="bookNm">悟空<span class="orange">斗破苍穹</span></a>
+                                <a href="/book/986132/" target="_blank" class="bookIntro">     盘古开天地，女娲炼石补天，一个不一样的世界随着时间的推进而成，这是一个斗气的世界，斗气越高，实力越强，强者为尊。
+       重生于这样的一个斗气世</a>
+                                <div class="bot_list clearfix">
+                                    <div class="condition">
+                                        <a href="javascript:void(0);" class="authorNm"><i></i>蒿水扬呀</a>
+                                        <span>现代都市</span>
+                                        <span>
+                                                                                            3万
+                                                                                        字
+                                        </span>
+                                        <span>连载中</span>
+                                    </div>
+                                    <a href="/book/986132/" target="_blank" class="look_readBtn">点击阅读</a>
+                                    <!-- 已经加入书架添加book_onRack -->
+                                    <a href="javascript:;" class="bookrackBtn" data-bookid='986132'>加入书架</a>
+                                </div>
+                            </div>
+                        </li>
+                                            <li class="lastLine">
+                            <a href="/book/969822/" class="bookImg" target="_blank">
+                                <img src="https://media3.tadu.com/web_dubbo_static//assets/images/v300/coverBg.jpg" data-src="https://media3.tadu.com//2022/08/16/12/48/b7359b72bec543dca4f922aa3f347bdc_125_100.jpg" />
+                            </a>
+                            <div class="rtList">
+                                <a href="/book/969822/" target="_blank" class="bookNm"><span class="orange">斗破苍穹</span>缘起</a>
+                                <a href="/book/969822/" target="_blank" class="bookIntro">双帝之战后，五帝破空，飞升上界，重新打开了源气通道，大陆上的斗圣大能不断修至巅峰，进而飞升。
+随之而来的，并非天下太平，而是各路纷争。
+在魂族余孽的挑唆下，各方</a>
+                                <div class="bot_list clearfix">
+                                    <div class="condition">
+                                        <a href="javascript:void(0);" class="authorNm"><i></i>莽莽的执安</a>
+                                        <span>东方玄幻</span>
+                                        <span>
+                                                                                            2万
+                                                                                        字
+                                        </span>
+                                        <span>连载中</span>
+                                    </div>
+                                    <a href="/book/969822/" target="_blank" class="look_readBtn">点击阅读</a>
+                                    <!-- 已经加入书架添加book_onRack -->
+                                    <a href="javascript:;" class="bookrackBtn" data-bookid='969822'>加入书架</a>
+                                </div>
+                            </div>
+                        </li>
+                                            <li class="lastLine">
+                            <a href="/book/1034765/" class="bookImg" target="_blank">
+                                <img src="https://media3.tadu.com/web_dubbo_static//assets/images/v300/coverBg.jpg" data-src="https://media3.tadu.com//2025/06/12/17/46/774d3e99871c415aa4370b6037352d69_125_100.jpg" />
+                            </a>
+                            <div class="rtList">
+                                <a href="/book/1034765/" target="_blank" class="bookNm"><span class="orange">斗破苍穹</span>：大千</a>
+                                <a href="/book/1034765/" target="_blank" class="bookIntro">五帝破空，炎帝之名响彻下位面。然踏足浩瀚大千，昔日荣光尽敛。
+
+萧炎初临此界，便深陷危机四伏的沉灵渊底。境界受天地压制，神力十不存一，形同凡胎。
+
+为守护结识身</a>
+                                <div class="bot_list clearfix">
+                                    <div class="condition">
+                                        <a href="javascript:void(0);" class="authorNm"><i></i>无非v</a>
+                                        <span>东方玄幻</span>
+                                        <span>
+                                                                                            5万
+                                                                                        字
+                                        </span>
+                                        <span>连载中</span>
+                                    </div>
+                                    <a href="/book/1034765/" target="_blank" class="look_readBtn">点击阅读</a>
+                                    <!-- 已经加入书架添加book_onRack -->
+                                    <a href="javascript:;" class="bookrackBtn" data-bookid='1034765'>加入书架</a>
+                                </div>
+                            </div>
+                        </li>
+                                            <li class="lastLine">
+                            <a href="/book/1018261/" class="bookImg" target="_blank">
+                                <img src="https://media3.tadu.com/web_dubbo_static//assets/images/v300/coverBg.jpg" data-src="https://media3.tadu.com//2024/02/05/08/10/d7635702de9c470e89bd74d83008624a_125_100.jpg" />
+                            </a>
+                            <div class="rtList">
+                                <a href="/book/1018261/" target="_blank" class="bookNm"><span class="orange">斗破苍穹</span>之风尊者</a>
+                                <a href="/book/1018261/" target="_blank" class="bookIntro">风尊者，一个名震斗气大陆的强者，星陨阁的副阁主，偶然间融入了一个地球人的灵魂，两世的记忆让他得知了斗气大陆即将发生的一切。
+
+他灭杀欺师灭祖的逆徒韩枫，也间接的</a>
+                                <div class="bot_list clearfix">
+                                    <div class="condition">
+                                        <a href="javascript:void(0);" class="authorNm"><i></i>无梦枉少年</a>
+                                        <span>东方玄幻</span>
+                                        <span>
+                                                                                            3921
+                                                                                        字
+                                        </span>
+                                        <span>连载中</span>
+                                    </div>
+                                    <a href="/book/1018261/" target="_blank" class="look_readBtn">点击阅读</a>
+                                    <!-- 已经加入书架添加book_onRack -->
+                                    <a href="javascript:;" class="bookrackBtn" data-bookid='1018261'>加入书架</a>
+                                </div>
+                            </div>
+                        </li>
+                                            <li class="lastLine">
+                            <a href="/book/976796/" class="bookImg" target="_blank">
+                                <img src="https://media3.tadu.com/web_dubbo_static//assets/images/v300/coverBg.jpg" data-src="https://media3.tadu.com//2022/09/29/13/17/ccf00f5a53ef458bace504a11a3224f6_125_100.jpg" />
+                            </a>
+                            <div class="rtList">
+                                <a href="/book/976796/" target="_blank" class="bookNm"><span class="orange">斗破苍穹</span>之亵渎</a>
+                                <a href="/book/976796/" target="_blank" class="bookIntro">斗气为尊，谁与争锋，难道斗帝就是不容亵渎的吗？这是个只有斗气没有魔法的世界。</a>
+                                <div class="bot_list clearfix">
+                                    <div class="condition">
+                                        <a href="javascript:void(0);" class="authorNm"><i></i>鬼渊</a>
+                                        <span>东方玄幻</span>
+                                        <span>
+                                                                                            4861
+                                                                                        字
+                                        </span>
+                                        <span>连载中</span>
+                                    </div>
+                                    <a href="/book/976796/" target="_blank" class="look_readBtn">点击阅读</a>
+                                    <!-- 已经加入书架添加book_onRack -->
+                                    <a href="javascript:;" class="bookrackBtn" data-bookid='976796'>加入书架</a>
+                                </div>
+                            </div>
+                        </li>
+                                            <li class="lastLine">
+                            <a href="/book/836093/" class="bookImg" target="_blank">
+                                <img src="https://media3.tadu.com/web_dubbo_static//assets/images/v300/coverBg.jpg" data-src="https://media7.tadu.com//2021/08/17/13/00/c1de9f3f718f47f690f8546ed537ab1e_125_100.jpg" />
+                            </a>
+                            <div class="rtList">
+                                <a href="/book/836093/" target="_blank" class="bookNm"><span class="orange">斗破苍穹</span>之萧焱</a>
+                                <a href="/book/836093/" target="_blank" class="bookIntro">天才如同黑夜中的星光，而哥哥的光芒总是在黑夜中最耀眼的。就算自己任性地窃取了萧炎哥哥的名字，可自己仍不过是一个不能修炼的废物。即便如此，哪怕有一点点的可能性，凭</a>
+                                <div class="bot_list clearfix">
+                                    <div class="condition">
+                                        <a href="javascript:void(0);" class="authorNm"><i></i>无名星火</a>
+                                        <span>东方玄幻</span>
+                                        <span>
+                                                                                            1万
+                                                                                        字
+                                        </span>
+                                        <span>连载中</span>
+                                    </div>
+                                    <a href="/book/836093/" target="_blank" class="look_readBtn">点击阅读</a>
+                                    <!-- 已经加入书架添加book_onRack -->
+                                    <a href="javascript:;" class="bookrackBtn" data-bookid='836093'>加入书架</a>
+                                </div>
+                            </div>
+                        </li>
+                                            <li class="lastLine">
+                            <a href="/book/1020831/" class="bookImg" target="_blank">
+                                <img src="https://media3.tadu.com/web_dubbo_static//assets/images/v300/coverBg.jpg" data-src="https://media7.tadu.com//2024/05/03/08/45/9c2c6eb796d242b894be5c8206fa6b39_125_100.jpg" />
+                            </a>
+                            <div class="rtList">
+                                <a href="/book/1020831/" target="_blank" class="bookNm"><span class="orange">斗破苍穹</span>之至高天火</a>
+                                <a href="/book/1020831/" target="_blank" class="bookIntro">《<span class="orange">斗破苍穹</span>之至高天火》是一部玄幻小说，讲述了主角林炎在修炼道路上历经艰辛，最终掌握至高天火，成为一代仙尊的传奇故事。林炎，原本是一个天赋平平的少年，因家族遭遇变</a>
+                                <div class="bot_list clearfix">
+                                    <div class="condition">
+                                        <a href="javascript:void(0);" class="authorNm"><i></i>陪着我</a>
+                                        <span>东方玄幻</span>
+                                        <span>
+                                                                                            2万
+                                                                                        字
+                                        </span>
+                                        <span>连载中</span>
+                                    </div>
+                                    <a href="/book/1020831/" target="_blank" class="look_readBtn">点击阅读</a>
+                                    <!-- 已经加入书架添加book_onRack -->
+                                    <a href="javascript:;" class="bookrackBtn" data-bookid='1020831'>加入书架</a>
+                                </div>
+                            </div>
+                        </li>
+                                            <li class="lastLine">
+                            <a href="/book/843589/" class="bookImg" target="_blank">
+                                <img src="https://media3.tadu.com/web_dubbo_static//assets/images/v300/coverBg.jpg" data-src="https://media3.tadu.com//2021/09/05/11/58/65aec1230e2b49c097fb73ca09a87eca_125_100.jpg" />
+                            </a>
+                            <div class="rtList">
+                                <a href="/book/843589/" target="_blank" class="bookNm"><span class="orange">斗破苍穹</span>之仙缘修炼</a>
+                                <a href="/book/843589/" target="_blank" class="bookIntro">首创，请多多包涵！谢谢支持！     
+
+       上一世，他是万人景仰的五大仙尊之首——月浑子仙尊，竟遭其他四位仙尊“好友”暗算，仅仅为了得到他的修行而叛</a>
+                                <div class="bot_list clearfix">
+                                    <div class="condition">
+                                        <a href="javascript:void(0);" class="authorNm"><i></i>文元清黛</a>
+                                        <span>武侠仙侠</span>
+                                        <span>
+                                                                                            8485
+                                                                                        字
+                                        </span>
+                                        <span>连载中</span>
+                                    </div>
+                                    <a href="/book/843589/" target="_blank" class="look_readBtn">点击阅读</a>
+                                    <!-- 已经加入书架添加book_onRack -->
+                                    <a href="javascript:;" class="bookrackBtn" data-bookid='843589'>加入书架</a>
+                                </div>
+                            </div>
+                        </li>
+                                            <li class="lastLine">
+                            <a href="/book/804571/" class="bookImg" target="_blank">
+                                <img src="https://media3.tadu.com/web_dubbo_static//assets/images/v300/coverBg.jpg" data-src="https://media3.tadu.com//2021/05/14/22/31/169bdd2cc6a941158e943448d3bccb9f_125_100.jpg" />
+                            </a>
+                            <div class="rtList">
+                                <a href="/book/804571/" target="_blank" class="bookNm"><span class="orange">斗破苍穹</span>之异世崛起</a>
+                                <a href="/book/804571/" target="_blank" class="bookIntro">网吧打游戏的我居然穿越到了斗气大陆。。。原来的我只是一个吃了上顿没下顿，没人看得起的一个死肥宅，这次居然给了我这样一个机会，这次我一定要赢！！！</a>
+                                <div class="bot_list clearfix">
+                                    <div class="condition">
+                                        <a href="javascript:void(0);" class="authorNm"><i></i>卖报的小次郎</a>
+                                        <span>东方玄幻</span>
+                                        <span>
+                                                                                            5757
+                                                                                        字
+                                        </span>
+                                        <span>连载中</span>
+                                    </div>
+                                    <a href="/book/804571/" target="_blank" class="look_readBtn">点击阅读</a>
+                                    <!-- 已经加入书架添加book_onRack -->
+                                    <a href="javascript:;" class="bookrackBtn" data-bookid='804571'>加入书架</a>
+                                </div>
+                            </div>
+                        </li>
+                                            <li class="lastLine">
+                            <a href="/book/989745/" class="bookImg" target="_blank">
+                                <img src="https://media3.tadu.com/web_dubbo_static//assets/images/v300/coverBg.jpg" data-src="https://media3.tadu.com//2023/01/11/23/11/7684a2155b864442a8fad18abfb490f4_125_100.jpg" />
+                            </a>
+                            <div class="rtList">
+                                <a href="/book/989745/" target="_blank" class="bookNm"><span class="orange">斗破苍穹</span>之魂族外传</a>
+                                <a href="/book/989745/" target="_blank" class="bookIntro">我魂天帝，重回斗气大陆！第一件事就是为纳兰嫣然操办婚礼！</a>
+                                <div class="bot_list clearfix">
+                                    <div class="condition">
+                                        <a href="javascript:void(0);" class="authorNm"><i></i>二乃乃乃乃</a>
+                                        <span>东方玄幻</span>
+                                        <span>
+                                                                                            1万
+                                                                                        字
+                                        </span>
+                                        <span>连载中</span>
+                                    </div>
+                                    <a href="/book/989745/" target="_blank" class="look_readBtn">点击阅读</a>
+                                    <!-- 已经加入书架添加book_onRack -->
+                                    <a href="javascript:;" class="bookrackBtn" data-bookid='989745'>加入书架</a>
+                                </div>
+                            </div>
+                        </li>
+                                            <li class="lastLine">
+                            <a href="/book/732369/" class="bookImg" target="_blank">
+                                <img src="https://media3.tadu.com/web_dubbo_static//assets/images/v300/coverBg.jpg" data-src="https://media3.tadu.com//2019/09/27/19/00/cbbdc757fd2040b4a84f2ae3a7647eaf_125_100.jpg" />
+                            </a>
+                            <div class="rtList">
+                                <a href="/book/732369/" target="_blank" class="bookNm">王妃斗苍穹</a>
+                                <a href="/book/732369/" target="_blank" class="bookIntro">狠毒凶残得黑暗帝皇：“我吃了你。”
+
+素手轻拂黑发，女子淡定回眸：”想吃我，我看你有没有那个本事。“
+
+”我爱你。“温柔的帝国之王。
+
+”可我不爱你“
+
+”跟我</a>
+                                <div class="bot_list clearfix">
+                                    <div class="condition">
+                                        <a href="javascript:void(0);" class="authorNm"><i></i>一世风流</a>
+                                        <span>古代言情</span>
+                                        <span>
+                                                                                            34万
+                                                                                        字
+                                        </span>
+                                        <span>完结</span>
+                                    </div>
+                                    <a href="/book/732369/" target="_blank" class="look_readBtn">点击阅读</a>
+                                    <!-- 已经加入书架添加book_onRack -->
+                                    <a href="javascript:;" class="bookrackBtn" data-bookid='732369'>加入书架</a>
+                                </div>
+                            </div>
+                        </li>
+                                            <li class="lastLine">
+                            <a href="/book/851241/" class="bookImg" target="_blank">
+                                <img src="https://media3.tadu.com/web_dubbo_static//assets/images/v300/coverBg.jpg" data-src="https://media7.tadu.com//2021/09/30/10/25/4a60d5d6e06f49fbaf715eb50ea93d15_125_100.jpg" />
+                            </a>
+                            <div class="rtList">
+                                <a href="/book/851241/" target="_blank" class="bookNm">神武破苍穹</a>
+                                <a href="/book/851241/" target="_blank" class="bookIntro">神武大陆，有奇异的各种族，而主角作为一个混血儿，是如何一步步走上巅峰的</a>
+                                <div class="bot_list clearfix">
+                                    <div class="condition">
+                                        <a href="javascript:void(0);" class="authorNm"><i></i>花都新华街</a>
+                                        <span>东方玄幻</span>
+                                        <span>
+                                                                                            1万
+                                                                                        字
+                                        </span>
+                                        <span>连载中</span>
+                                    </div>
+                                    <a href="/book/851241/" target="_blank" class="look_readBtn">点击阅读</a>
+                                    <!-- 已经加入书架添加book_onRack -->
+                                    <a href="javascript:;" class="bookrackBtn" data-bookid='851241'>加入书架</a>
+                                </div>
+                            </div>
+                        </li>
+                                            <li class="lastLine">
+                            <a href="/book/1013531/" class="bookImg" target="_blank">
+                                <img src="https://media3.tadu.com/web_dubbo_static//assets/images/v300/coverBg.jpg" data-src="https://media3.tadu.com//2023/10/18/13/54/d363f93acb164e619e1d07821fd2658b_125_100.jpg" />
+                            </a>
+                            <div class="rtList">
+                                <a href="/book/1013531/" target="_blank" class="bookNm">君破苍穹</a>
+                                <a href="/book/1013531/" target="_blank" class="bookIntro">一个巡捕大队长，被誉为龙国神探，却遭遇陷害枪杀同事，被判入监无期，监狱里，机缘巧合，得到上古传承，边疆御敌，用秘法杀敌百万，遭遇天谴，一身修为全无，这时，家中父</a>
+                                <div class="bot_list clearfix">
+                                    <div class="condition">
+                                        <a href="javascript:void(0);" class="authorNm"><i></i>柳潇吟</a>
+                                        <span>现代都市</span>
+                                        <span>
+                                                                                            8万
+                                                                                        字
+                                        </span>
+                                        <span>连载中</span>
+                                    </div>
+                                    <a href="/book/1013531/" target="_blank" class="look_readBtn">点击阅读</a>
+                                    <!-- 已经加入书架添加book_onRack -->
+                                    <a href="javascript:;" class="bookrackBtn" data-bookid='1013531'>加入书架</a>
+                                </div>
+                            </div>
+                        </li>
+                                            <li class="lastLine">
+                            <a href="/book/886803/" class="bookImg" target="_blank">
+                                <img src="https://media3.tadu.com/web_dubbo_static//assets/images/v300/coverBg.jpg" data-src="https://media3.tadu.com//2022/01/14/13/40/4d0b61b46a80416f9196c4a18f1eed40_125_100.jpg" />
+                            </a>
+                            <div class="rtList">
+                                <a href="/book/886803/" target="_blank" class="bookNm">枪破苍穹</a>
+                                <a href="/book/886803/" target="_blank" class="bookIntro">刚穿越到天元大陆，就被玄天剑宗外门弟子打到濒临死亡？
+楚阳有点懵。
+在他临死之际，意外觉醒无上签到系统，只需完成签到，就可以获得不属于这个世界的武器！
+“叮！玄</a>
+                                <div class="bot_list clearfix">
+                                    <div class="condition">
+                                        <a href="javascript:void(0);" class="authorNm"><i></i>书生无愁</a>
+                                        <span>脑洞创意</span>
+                                        <span>
+                                                                                            25万
+                                                                                        字
+                                        </span>
+                                        <span>连载中</span>
+                                    </div>
+                                    <a href="/book/886803/" target="_blank" class="look_readBtn">点击阅读</a>
+                                    <!-- 已经加入书架添加book_onRack -->
+                                    <a href="javascript:;" class="bookrackBtn" data-bookid='886803'>加入书架</a>
+                                </div>
+                            </div>
+                        </li>
+                                            <li class="lastLine">
+                            <a href="/book/817753/" class="bookImg" target="_blank">
+                                <img src="https://media3.tadu.com/web_dubbo_static//assets/images/v300/coverBg.jpg" data-src="https://media3.tadu.com//2021/06/30/22/28/73b9599d0a0341faada9da4032ecc162_125_100.jpg" />
+                            </a>
+                            <div class="rtList">
+                                <a href="/book/817753/" target="_blank" class="bookNm">轩破苍穹</a>
+                                <a href="/book/817753/" target="_blank" class="bookIntro">这里没有科技，没有魔法，有的只有斗气！
+
+罗智轩三人穿越到了玄神大陆励志成为斗神，三人会发生什么样的经历。</a>
+                                <div class="bot_list clearfix">
+                                    <div class="condition">
+                                        <a href="javascript:void(0);" class="authorNm"><i></i>国服阿giao</a>
+                                        <span>脑洞创意</span>
+                                        <span>
+                                                                                            2万
+                                                                                        字
+                                        </span>
+                                        <span>连载中</span>
+                                    </div>
+                                    <a href="/book/817753/" target="_blank" class="look_readBtn">点击阅读</a>
+                                    <!-- 已经加入书架添加book_onRack -->
+                                    <a href="javascript:;" class="bookrackBtn" data-bookid='817753'>加入书架</a>
+                                </div>
+                            </div>
+                        </li>
+                                            <li class="lastLine">
+                            <a href="/book/911654/" class="bookImg" target="_blank">
+                                <img src="https://media3.tadu.com/web_dubbo_static//assets/images/v300/coverBg.jpg" data-src="https://media3.tadu.com//2022/04/14/23/24/7b1158fde2c04522b795086edc90ecae_125_100.jpg" />
+                            </a>
+                            <div class="rtList">
+                                <a href="/book/911654/" target="_blank" class="bookNm">破界苍穹</a>
+                                <a href="/book/911654/" target="_blank" class="bookIntro">“苍穹”曾是一个绝世强者，一怒灭至强帝境，一泪滴成就小帝境，一指弹可碎大千世界之下任何位面，大千世界之中，谁主争锋？他却陨落了，是什么原因引起一个绝世强者陨世？</a>
+                                <div class="bot_list clearfix">
+                                    <div class="condition">
+                                        <a href="javascript:void(0);" class="authorNm"><i></i>孤星帝</a>
+                                        <span>东方玄幻</span>
+                                        <span>
+                                                                                            2万
+                                                                                        字
+                                        </span>
+                                        <span>连载中</span>
+                                    </div>
+                                    <a href="/book/911654/" target="_blank" class="look_readBtn">点击阅读</a>
+                                    <!-- 已经加入书架添加book_onRack -->
+                                    <a href="javascript:;" class="bookrackBtn" data-bookid='911654'>加入书架</a>
+                                </div>
+                            </div>
+                        </li>
+                                            <li class="lastLine">
+                            <a href="/book/798338/" class="bookImg" target="_blank">
+                                <img src="https://media3.tadu.com/web_dubbo_static//assets/images/v300/coverBg.jpg" data-src="https://media3.tadu.com//2021/05/07/11/37/713d930c36694f23aa1a815b1fcfedcb_125_100.jpg" />
+                            </a>
+                            <div class="rtList">
+                                <a href="/book/798338/" target="_blank" class="bookNm">剑破苍穹</a>
+                                <a href="/book/798338/" target="_blank" class="bookIntro">朱元璋的开局是一个破碗，最后成就了享誉中外的千古大帝......
+
+　　秦天的开局也好不到哪儿去，身为修真界的天才修士的他，意外身亡后，重生到了凡人界，本来以为</a>
+                                <div class="bot_list clearfix">
+                                    <div class="condition">
+                                        <a href="javascript:void(0);" class="authorNm"><i></i>百冽惊涛</a>
+                                        <span>东方玄幻</span>
+                                        <span>
+                                                                                            61万
+                                                                                        字
+                                        </span>
+                                        <span>完结</span>
+                                    </div>
+                                    <a href="/book/798338/" target="_blank" class="look_readBtn">点击阅读</a>
+                                    <!-- 已经加入书架添加book_onRack -->
+                                    <a href="javascript:;" class="bookrackBtn" data-bookid='798338'>加入书架</a>
+                                </div>
+                            </div>
+                        </li>
+                                            <li class="lastLine">
+                            <a href="/book/817303/" class="bookImg" target="_blank">
+                                <img src="https://media3.tadu.com/web_dubbo_static//assets/images/v300/coverBg.jpg" data-src="https://media3.tadu.com//2021/07/02/10/53/a9dd96cd750748c09fe3ddf727866a3f_125_100.jpg" />
+                            </a>
+                            <div class="rtList">
+                                <a href="/book/817303/" target="_blank" class="bookNm">虎破苍穹</a>
+                                <a href="/book/817303/" target="_blank" class="bookIntro">一朝穿越到天元大陆，当年女娲捏的泥娃娃就复活了。白虎成了他乳母，老子李耳成了他启蒙老师。在上古神墓之地，他炼就了无上神功；于通天秘境之处，他终于修成大道正果，苍</a>
+                                <div class="bot_list clearfix">
+                                    <div class="condition">
+                                        <a href="javascript:void(0);" class="authorNm"><i></i>无可</a>
+                                        <span>东方玄幻</span>
+                                        <span>
+                                                                                            4万
+                                                                                        字
+                                        </span>
+                                        <span>连载中</span>
+                                    </div>
+                                    <a href="/book/817303/" target="_blank" class="look_readBtn">点击阅读</a>
+                                    <!-- 已经加入书架添加book_onRack -->
+                                    <a href="javascript:;" class="bookrackBtn" data-bookid='817303'>加入书架</a>
+                                </div>
+                            </div>
+                        </li>
+                                            <li class="lastLine">
+                            <a href="/book/970506/" class="bookImg" target="_blank">
+                                <img src="https://media3.tadu.com/web_dubbo_static//assets/images/v300/coverBg.jpg" data-src="https://media3.tadu.com/null" />
+                            </a>
+                            <div class="rtList">
+                                <a href="/book/970506/" target="_blank" class="bookNm">寰宇苍穹破</a>
+                                <a href="/book/970506/" target="_blank" class="bookIntro">这是一个由万千世界汇集而形成的界面，界面的中心乃是一个名为寰宇的位面。这个位面连接着无数的大大小小的世界。而一切的开始便是这万千世界的边陲之地，被称为银河系的失</a>
+                                <div class="bot_list clearfix">
+                                    <div class="condition">
+                                        <a href="javascript:void(0);" class="authorNm"><i></i>抿笑江湖</a>
+                                        <span>东方玄幻</span>
+                                        <span>
+                                                                                            3万
+                                                                                        字
+                                        </span>
+                                        <span>连载中</span>
+                                    </div>
+                                    <a href="/book/970506/" target="_blank" class="look_readBtn">点击阅读</a>
+                                    <!-- 已经加入书架添加book_onRack -->
+                                    <a href="javascript:;" class="bookrackBtn" data-bookid='970506'>加入书架</a>
+                                </div>
+                            </div>
+                        </li>
+                                            <li class="lastLine">
+                            <a href="/book/1005435/" class="bookImg" target="_blank">
+                                <img src="https://media3.tadu.com/web_dubbo_static//assets/images/v300/coverBg.jpg" data-src="https://media3.tadu.com//2023/07/01/23/33/798dd779572c40988006e1fa6c264e60_125_100.jpg" />
+                            </a>
+                            <div class="rtList">
+                                <a href="/book/1005435/" target="_blank" class="bookNm">杀破苍穹</a>
+                                <a href="/book/1005435/" target="_blank" class="bookIntro">天狼星智能AI机器人余生和塔罗师塔罗因为一件凶
+
+杀案不打不相识，从此在天狼星和地球之间穿梭，
+
+并且和龙族，树人族和地心天使族，有了扯不断理
+
+还乱的故事。而</a>
+                                <div class="bot_list clearfix">
+                                    <div class="condition">
+                                        <a href="javascript:void(0);" class="authorNm"><i></i>月袭白衣</a>
+                                        <span>脑洞创意</span>
+                                        <span>
+                                                                                            3万
+                                                                                        字
+                                        </span>
+                                        <span>连载中</span>
+                                    </div>
+                                    <a href="/book/1005435/" target="_blank" class="look_readBtn">点击阅读</a>
+                                    <!-- 已经加入书架添加book_onRack -->
+                                    <a href="javascript:;" class="bookrackBtn" data-bookid='1005435'>加入书架</a>
+                                </div>
+                            </div>
+                        </li>
+                                            <li class="lastLine">
+                            <a href="/book/1040246/" class="bookImg" target="_blank">
+                                <img src="https://media3.tadu.com/web_dubbo_static//assets/images/v300/coverBg.jpg" data-src="https://media3.tadu.com//2025/10/19/16/18/e8df24d5bda64cc981f5ad927e971b34_125_100.jpg" />
+                            </a>
+                            <div class="rtList">
+                                <a href="/book/1040246/" target="_blank" class="bookNm">拳破苍穹</a>
+                                <a href="/book/1040246/" target="_blank" class="bookIntro">架空武侠世界“天武大陆”，武道昌盛，正邪纷争不断，散落着上古武林遗迹与秘宝，朝廷势力薄弱，武林门派主导天下格局。</a>
+                                <div class="bot_list clearfix">
+                                    <div class="condition">
+                                        <a href="javascript:void(0);" class="authorNm"><i></i>福云社</a>
+                                        <span>武侠仙侠</span>
+                                        <span>
+                                                                                            24万
+                                                                                        字
+                                        </span>
+                                        <span>连载中</span>
+                                    </div>
+                                    <a href="/book/1040246/" target="_blank" class="look_readBtn">点击阅读</a>
+                                    <!-- 已经加入书架添加book_onRack -->
+                                    <a href="javascript:;" class="bookrackBtn" data-bookid='1040246'>加入书架</a>
+                                </div>
+                            </div>
+                        </li>
+                                            <li class="lastLine">
+                            <a href="/book/849397/" class="bookImg" target="_blank">
+                                <img src="https://media3.tadu.com/web_dubbo_static//assets/images/v300/coverBg.jpg" data-src="https://media3.tadu.com//2021/09/24/22/03/e6ebc63233dc4d679b9fc894b0a58501_125_100.jpg" />
+                            </a>
+                            <div class="rtList">
+                                <a href="/book/849397/" target="_blank" class="bookNm"><span class="orange">斗破苍穹</span>之最强把拔刀系统</a>
+                                <a href="/book/849397/" target="_blank" class="bookIntro">萧天穿越到斗气大陆，意外觉醒了最强拔刀系统，看主角如何披荆斩棘，一步一步走上大陆之巅。（本书单女主。）</a>
+                                <div class="bot_list clearfix">
+                                    <div class="condition">
+                                        <a href="javascript:void(0);" class="authorNm"><i></i>神明也得去扛米</a>
+                                        <span>东方玄幻</span>
+                                        <span>
+                                                                                            8446
+                                                                                        字
+                                        </span>
+                                        <span>连载中</span>
+                                    </div>
+                                    <a href="/book/849397/" target="_blank" class="look_readBtn">点击阅读</a>
+                                    <!-- 已经加入书架添加book_onRack -->
+                                    <a href="javascript:;" class="bookrackBtn" data-bookid='849397'>加入书架</a>
+                                </div>
+                            </div>
+                        </li>
+                                            <li class="lastLine">
+                            <a href="/book/885724/" class="bookImg" target="_blank">
+                                <img src="https://media3.tadu.com/web_dubbo_static//assets/images/v300/coverBg.jpg" data-src="https://media7.tadu.com//2022/01/19/21/13/315232eed9e34fdd833851f742a99e2b_125_100.jpg" />
+                            </a>
+                            <div class="rtList">
+                                <a href="/book/885724/" target="_blank" class="bookNm"><span class="orange">斗破苍穹</span>我拥有无限技能</a>
+                                <a href="/book/885724/" target="_blank" class="bookIntro">叶天一觉醒来，来到了星辰大陆在这个世界他什么都不懂，什么都不知道！这个世界是什么规矩？这个世界有什么？，意外的激活英雄联盟随机系统，恭喜主人获得【大荒星陨】【风</a>
+                                <div class="bot_list clearfix">
+                                    <div class="condition">
+                                        <a href="javascript:void(0);" class="authorNm"><i></i>恰饭丶</a>
+                                        <span>东方玄幻</span>
+                                        <span>
+                                                                                            2万
+                                                                                        字
+                                        </span>
+                                        <span>连载中</span>
+                                    </div>
+                                    <a href="/book/885724/" target="_blank" class="look_readBtn">点击阅读</a>
+                                    <!-- 已经加入书架添加book_onRack -->
+                                    <a href="javascript:;" class="bookrackBtn" data-bookid='885724'>加入书架</a>
+                                </div>
+                            </div>
+                        </li>
+                                            <li class="lastLine">
+                            <a href="/book/957641/" class="bookImg" target="_blank">
+                                <img src="https://media3.tadu.com/web_dubbo_static//assets/images/v300/coverBg.jpg" data-src="https://media7.tadu.com//2022/06/19/18/47/0fa582c4825541d4b126999f2bb24a42_125_100.jpg" />
+                            </a>
+                            <div class="rtList">
+                                <a href="/book/957641/" target="_blank" class="bookNm">重生之<span class="orange">斗破苍穹</span>帝释天</a>
+                                <a href="/book/957641/" target="_blank" class="bookIntro">  “我等了这么多年，就是要等一个机会，我要争一口气，不是证明我了不起，我是要告诉所有人，我曾经失去的我一定要拿回来”。</a>
+                                <div class="bot_list clearfix">
+                                    <div class="condition">
+                                        <a href="javascript:void(0);" class="authorNm"><i></i>古粥</a>
+                                        <span>武侠仙侠</span>
+                                        <span>
+                                                                                            2万
+                                                                                        字
+                                        </span>
+                                        <span>连载中</span>
+                                    </div>
+                                    <a href="/book/957641/" target="_blank" class="look_readBtn">点击阅读</a>
+                                    <!-- 已经加入书架添加book_onRack -->
+                                    <a href="javascript:;" class="bookrackBtn" data-bookid='957641'>加入书架</a>
+                                </div>
+                            </div>
+                        </li>
+                                            <li class="lastLine">
+                            <a href="/book/966166/" class="bookImg" target="_blank">
+                                <img src="https://media3.tadu.com/web_dubbo_static//assets/images/v300/coverBg.jpg" data-src="https://media7.tadu.com/null" />
+                            </a>
+                            <div class="rtList">
+                                <a href="/book/966166/" target="_blank" class="bookNm">穿越特种兵之<span class="orange">斗破苍穹</span></a>
+                                <a href="/book/966166/" target="_blank" class="bookIntro">身为2077顶级特种兵的他
+
+被一名身穿黑袍的人带入了一个
+
+名为<span class="orange">斗破苍穹</span>的世界
+
+没有系统没有金手指没有剧情的他
+
+将会如此开启他崭新的人生
+
+将会在<span class="orange">斗破苍穹</span></a>
+                                <div class="bot_list clearfix">
+                                    <div class="condition">
+                                        <a href="javascript:void(0);" class="authorNm"><i></i>白月无穷</a>
+                                        <span>东方玄幻</span>
+                                        <span>
+                                                                                            2万
+                                                                                        字
+                                        </span>
+                                        <span>连载中</span>
+                                    </div>
+                                    <a href="/book/966166/" target="_blank" class="look_readBtn">点击阅读</a>
+                                    <!-- 已经加入书架添加book_onRack -->
+                                    <a href="javascript:;" class="bookrackBtn" data-bookid='966166'>加入书架</a>
+                                </div>
+                            </div>
+                        </li>
+                                            <li class="lastLine">
+                            <a href="/book/836809/" class="bookImg" target="_blank">
+                                <img src="https://media3.tadu.com/web_dubbo_static//assets/images/v300/coverBg.jpg" data-src="https://media3.tadu.com//2021/08/18/18/10/b282d2f6472948eb9f3b70e976c4e3c2_125_100.jpg" />
+                            </a>
+                            <div class="rtList">
+                                <a href="/book/836809/" target="_blank" class="bookNm"><span class="orange">斗破苍穹</span>之混沌仙魔体</a>
+                                <a href="/book/836809/" target="_blank" class="bookIntro">本来千珏想要平平安安过完一生，但是萧家萧龙看上自己母亲，看着自己母亲惨死在自己面前，千珏发誓这一世，谁都不能阻止我复仇！萧炎，你！也不行！</a>
+                                <div class="bot_list clearfix">
+                                    <div class="condition">
+                                        <a href="javascript:void(0);" class="authorNm"><i></i>黑色白杨树</a>
+                                        <span>东方玄幻</span>
+                                        <span>
+                                                                                            1万
+                                                                                        字
+                                        </span>
+                                        <span>连载中</span>
+                                    </div>
+                                    <a href="/book/836809/" target="_blank" class="look_readBtn">点击阅读</a>
+                                    <!-- 已经加入书架添加book_onRack -->
+                                    <a href="javascript:;" class="bookrackBtn" data-bookid='836809'>加入书架</a>
+                                </div>
+                            </div>
+                        </li>
+                                            <li class="lastLine">
+                            <a href="/book/1035568/" class="bookImg" target="_blank">
+                                <img src="https://media3.tadu.com/web_dubbo_static//assets/images/v300/coverBg.jpg" data-src="https://media3.tadu.com//2025/06/27/23/11/7f2695ee9a4c4d2389ac96c8f633efb0_125_100.jpg" />
+                            </a>
+                            <div class="rtList">
+                                <a href="/book/1035568/" target="_blank" class="bookNm">苍穹变，斗战苍穹！</a>
+                                <a href="/book/1035568/" target="_blank" class="bookIntro">在这个看似繁华实则黑暗的世界里，少年萧澈本怀着一颗与世无争的心，只想在平凡的生活中度过一生。他无意与这世界相抗衡，渴望的不过是一方宁静的天地，能让自己和身边的人</a>
+                                <div class="bot_list clearfix">
+                                    <div class="condition">
+                                        <a href="javascript:void(0);" class="authorNm"><i></i>铃丰</a>
+                                        <span>东方玄幻</span>
+                                        <span>
+                                                                                            2719
+                                                                                        字
+                                        </span>
+                                        <span>连载中</span>
+                                    </div>
+                                    <a href="/book/1035568/" target="_blank" class="look_readBtn">点击阅读</a>
+                                    <!-- 已经加入书架添加book_onRack -->
+                                    <a href="javascript:;" class="bookrackBtn" data-bookid='1035568'>加入书架</a>
+                                </div>
+                            </div>
+                        </li>
+                                            <li class="lastLine">
+                            <a href="/book/802500/" class="bookImg" target="_blank">
+                                <img src="https://media3.tadu.com/web_dubbo_static//assets/images/v300/coverBg.jpg" data-src="https://media3.tadu.com//2021/05/08/15/22/3ac24ae883c840f6989790cb602f9a9b_125_100.jpg" />
+                            </a>
+                            <div class="rtList">
+                                <a href="/book/802500/" target="_blank" class="bookNm">医斗苍穹</a>
+                                <a href="/book/802500/" target="_blank" class="bookIntro">一本神奇的医术，一身神秘的血脉，两者相辅相成，无往不利。 
+
+
+
+万事万物皆有利弊，芸芸众生亦不可能一帆风顺。
+
+
+
+五行世界大陆无数，分为起始、原始、成长、大</a>
+                                <div class="bot_list clearfix">
+                                    <div class="condition">
+                                        <a href="javascript:void(0);" class="authorNm"><i></i>相当扯把子</a>
+                                        <span>东方玄幻</span>
+                                        <span>
+                                                                                            15万
+                                                                                        字
+                                        </span>
+                                        <span>连载中</span>
+                                    </div>
+                                    <a href="/book/802500/" target="_blank" class="look_readBtn">点击阅读</a>
+                                    <!-- 已经加入书架添加book_onRack -->
+                                    <a href="javascript:;" class="bookrackBtn" data-bookid='802500'>加入书架</a>
+                                </div>
+                            </div>
+                        </li>
+                                            <li class="lastLine">
+                            <a href="/book/733044/" class="bookImg" target="_blank">
+                                <img src="https://media3.tadu.com/web_dubbo_static//assets/images/v300/coverBg.jpg" data-src="https://media7.tadu.com//2019/10/16/20/20/9808fe34809e49bc8d36c886c1f10733_125_100.jpg" />
+                            </a>
+                            <div class="rtList">
+                                <a href="/book/733044/" target="_blank" class="bookNm">魔斗苍穹</a>
+                                <a href="/book/733044/" target="_blank" class="bookIntro">“大龙呢？别装死，快出来，我把公主带来了！那个谁，别躲了深渊恶魔，我都看到你了，炼金要用你的血，什么？牙龈血？不行不行，鼻血也不行，别废话，不然剁了你！”</a>
+                                <div class="bot_list clearfix">
+                                    <div class="condition">
+                                        <a href="javascript:void(0);" class="authorNm"><i></i>苇索</a>
+                                        <span>西方奇幻</span>
+                                        <span>
+                                                                                            10万
+                                                                                        字
+                                        </span>
+                                        <span>连载中</span>
+                                    </div>
+                                    <a href="/book/733044/" target="_blank" class="look_readBtn">点击阅读</a>
+                                    <!-- 已经加入书架添加book_onRack -->
+                                    <a href="javascript:;" class="bookrackBtn" data-bookid='733044'>加入书架</a>
+                                </div>
+                            </div>
+                        </li>
+                                            <li class="lastLine">
+                            <a href="/book/1016125/" class="bookImg" target="_blank">
+                                <img src="https://media3.tadu.com/web_dubbo_static//assets/images/v300/coverBg.jpg" data-src="https://media7.tadu.com//2023/12/05/20/15/af118bf9876c43ffa6636c8c0ba2db0a_125_100.jpg" />
+                            </a>
+                            <div class="rtList">
+                                <a href="/book/1016125/" target="_blank" class="bookNm">帝斗苍穹</a>
+                                <a href="/book/1016125/" target="_blank" class="bookIntro">远古时期。万族视人族为刍狗。远古先贤为人族改天换命。在星球的一角苟延残喘！数百万年后！人族再一次面临奴隶的命运……</a>
+                                <div class="bot_list clearfix">
+                                    <div class="condition">
+                                        <a href="javascript:void(0);" class="authorNm"><i></i>我乃一根聪</a>
+                                        <span>东方玄幻</span>
+                                        <span>
+                                                                                            3289
+                                                                                        字
+                                        </span>
+                                        <span>连载中</span>
+                                    </div>
+                                    <a href="/book/1016125/" target="_blank" class="look_readBtn">点击阅读</a>
+                                    <!-- 已经加入书架添加book_onRack -->
+                                    <a href="javascript:;" class="bookrackBtn" data-bookid='1016125'>加入书架</a>
+                                </div>
+                            </div>
+                        </li>
+                                    </ul>
+                <!-- 有搜索结果end -->
+                                    <!-- 有结果的分页显示start -->
+                    <form method="post" id="pageForm" action="/search?query=斗破苍穹&pageSize=30&pageNum=~page~" class="M-box ">
+                                                <!-- 如果不是第一页-->
+                        <a href="javascript:void(0);" class="prev prevNo"></a>
+                        
+                                                                                                <a href="/search?query=斗破苍穹&pageSize=30&pageNum=1" data-page="1" class=" active ">1</a>
+                                                                                                <a href="/search?query=斗破苍穹&pageSize=30&pageNum=2" data-page="2" class="">2</a>
+                                                                                                <a href="/search?query=斗破苍穹&pageSize=30&pageNum=3" data-page="3" class="">3</a>
+                                                                                                <a href="/search?query=斗破苍穹&pageSize=30&pageNum=4" data-page="4" class="">4</a>
+                                                                                                <a href="/search?query=斗破苍穹&pageSize=30&pageNum=5" data-page="5" class="">5</a>
+                                                
+                                                <span>...</span>
+                        
+                        
+                        <a href="/search?query=斗破苍穹&pageSize=30&pageNum=141" data-page="141" class="">141</a>
+
+                                                <a href="/search?query=斗破苍穹&pageSize=30&pageNum=2" class="next"></a>
+                        
+                        <!-- 输入框的value要和页码一致 -->
+                        <input type="text" class="jumpIpt" value="" onkeyup="this.value=this.value.replace(/[^0-9]/g,'')" max="141" >
+                        <button type="button" class="jumpBtn" data="141">GO</button>
+                    </form>
+                    <!-- 有结果的分页显示end -->
+                            
+
+            <!-- 没有搜索结果start -->
+                        <!-- 没有搜索结果end -->
+        </div>
+        <div class="search_right clearfix">
+            <div class="search_rCon">
+                <h4>
+                    <i></i>
+                    <span>热门搜索</span>
+                </h4>
+                                    <a href="/book/408691/" class="hot_searchList clearfix">
+                        <div class="bookImg">
+                            <img src="https://media3.tadu.com/web_dubbo_static//assets/images/v300/coverBg.jpg" data-src="https://media3.tadu.com//2014/09/01/d/0/8/6/d08647d2bafc42619edf9e9474ad78ea_a.jpg" />
+                        </div>
+                        <div class="book">
+                            <h3>全职修真高手</h3>
+                            <p>1 低调未必怕事！一块神奇的玉佩让他走上都市修真路。他自诩只想平淡一生，可所到之处却风起云涌；他自认用情颇深，专情独一，却处处风流债，到处桃花劫……爱他的人四处赞扬他，恨他的人到处诋毁</p>
+                            <div class="authorNm"><i></i>洗剑</div>
+                            <div class="classifyLt"><i></i>现代都市</div>
+                        </div>
+                    </a>
+                                    <a href="/book/1051643/" class="hot_searchList clearfix">
+                        <div class="bookImg">
+                            <img src="https://media3.tadu.com/web_dubbo_static//assets/images/v300/coverBg.jpg" data-src="https://media3.tadu.com//2026/08/07/18/51/787ce3d72a144f29800b58490c443cd6_a.jpg" />
+                        </div>
+                        <div class="book">
+                            <h3>虞运</h3>
+                            <p>1 穿越千年、李戴运&林虞
+
+跨越千年烽烟，楚汉时代的故人，意外坠落现代世间。
+
+落魄漂泊的李戴运，与跨越生死而来的林虞再次相逢。
+
+一边是现实谋生的柴米油盐，打工、求职、人世冷暖；
+</p>
+                            <div class="authorNm"><i></i>阿运</div>
+                            <div class="classifyLt"><i></i>历史架空</div>
+                        </div>
+                    </a>
+                                    <a href="/book/831144/" class="hot_searchList clearfix">
+                        <div class="bookImg">
+                            <img src="https://media3.tadu.com/web_dubbo_static//assets/images/v300/coverBg.jpg" data-src="https://media7.tadu.com//2021/08/05/10/56/beada6722e4146b1a1fdc140ffadc300_a.jpg" />
+                        </div>
+                        <div class="book">
+                            <h3>灵气复苏，从天道聊天群开始</h3>
+                            <p>1 量劫将至，三界剧变。
+
+高三学生姜锋姜源被元始天尊拉进天道聊天群，并成为群里唯一的管理员。
+
+从此以后，满天神佛都开始巴结姜锋。
+
+月老：@姜源大神，看上了哪个妹纸只管说，小神立马</p>
+                            <div class="authorNm"><i></i>怪盗平次</div>
+                            <div class="classifyLt"><i></i>武侠仙侠</div>
+                        </div>
+                    </a>
+                                    <a href="/book/1042191/" class="hot_searchList clearfix">
+                        <div class="bookImg">
+                            <img src="https://media3.tadu.com/web_dubbo_static//assets/images/v300/coverBg.jpg" data-src="https://media3.tadu.com//2025/12/16/05/51/8e92a60cf9d644b8a60dd31fe9120938_a.jpg" />
+                        </div>
+                        <div class="book">
+                            <h3>全球团宠：星光入怀</h3>
+                            <p>1 [团宠+校园+爽文+豪门+大小姐+爽文+轻文]
+
+
+
+许星晚生来就是世界的宠儿。
+
+
+
+家庭极尽宠爱，三位哥哥各显神通为她扫平一切障碍，连清冷学神顾辰，都是她早已注定的守护星。
+
+</p>
+                            <div class="authorNm"><i></i>团宠小公主</div>
+                            <div class="classifyLt"><i></i>现代言情</div>
+                        </div>
+                    </a>
+                                    <a href="/book/853864/" class="hot_searchList clearfix">
+                        <div class="bookImg">
+                            <img src="https://media3.tadu.com/web_dubbo_static//assets/images/v300/coverBg.jpg" data-src="https://media3.tadu.com//2021/10/08/21/25/2439e3961ac24833a9ea557697589268_a.jpg" />
+                        </div>
+                        <div class="book">
+                            <h3>吞噬黑暗</h3>
+                            <p>1 无能小辈，逆天改命。
+经历重重险阻，却未能保护家人。
+如若要取我力量，拿去便是……</p>
+                            <div class="authorNm"><i></i>黑暗黎明</div>
+                            <div class="classifyLt"><i></i>东方玄幻</div>
+                        </div>
+                    </a>
+                                    <a href="/book/756204/" class="hot_searchList clearfix">
+                        <div class="bookImg">
+                            <img src="https://media3.tadu.com/web_dubbo_static//assets/images/v300/coverBg.jpg" data-src="https://media7.tadu.com//2020/08/24/10/30/1c2366c2d95141d286e6526d8fcca3f7_a.jpg" />
+                        </div>
+                        <div class="book">
+                            <h3>重生大佬又萌又飒</h3>
+                            <p>1 　当一个懦弱胆小的受气包变成一个精神力强大的异能者会产生怎样的变化呢！
+
+
+
+　　“云曦，赌石怎么样？”
+
+小迷妹之一问。
+
+
+
+　　“小意思，你是要祖母绿还是要玻璃种？”
+
+
+
+</p>
+                            <div class="authorNm"><i></i>飒姐</div>
+                            <div class="classifyLt"><i></i>现代言情</div>
+                        </div>
+                    </a>
+                                    <a href="/book/879869/" class="hot_searchList clearfix">
+                        <div class="bookImg">
+                            <img src="https://media3.tadu.com/web_dubbo_static//assets/images/v300/coverBg.jpg" data-src="https://media3.tadu.com//2022/01/03/19/37/b702893699a24724a8d97ac5048c2b00_a.jpg" />
+                        </div>
+                        <div class="book">
+                            <h3>禁忌踏帝</h3>
+                            <p>1 神秘少年——凌霄，一觉从仙神大陆醒来，大部分记忆已经没有了，只剩下一点残余的记忆碎片，但好在，他认识了这片大陆第一个朋友——叶嫣然。
+随着某一事件的发生，凌霄踏入了修行之路。管你是</p>
+                            <div class="authorNm"><i></i>帝凌霄</div>
+                            <div class="classifyLt"><i></i>东方玄幻</div>
+                        </div>
+                    </a>
+                                    <a href="/book/490591/" class="hot_searchList clearfix">
+                        <div class="bookImg">
+                            <img src="https://media3.tadu.com/web_dubbo_static//assets/images/v300/coverBg.jpg" data-src="https://media3.tadu.com//2023/05/22/15/03/e952cc293dc04e689a63071626ccaa55_a.jpg" />
+                        </div>
+                        <div class="book">
+                            <h3>毒妃心术：强上摄政王</h3>
+                            <p>1 因为一双眼,她被世人排挤,在死亡的边缘苟延残喘着.
+
+未婚夫联合亲姐谋害,被华夏的古武杀手利代取代.
+
+黑暗的毒蛇出没,被一只狐狸给盯上.
+
+面对他的死缠烂打,她却束手无策.
+
+既</p>
+                            <div class="authorNm"><i></i>太妃兔</div>
+                            <div class="classifyLt"><i></i>古代言情</div>
+                        </div>
+                    </a>
+                                    <a href="/book/846532/" class="hot_searchList clearfix">
+                        <div class="bookImg">
+                            <img src="https://media3.tadu.com/web_dubbo_static//assets/images/v300/coverBg.jpg" data-src="https://media7.tadu.com//2021/09/15/17/07/4c7c867f3f934614999f7dc7fd12dac2_a.jpg" />
+                        </div>
+                        <div class="book">
+                            <h3>异种龙神</h3>
+                            <p>1 辰山从自家院子中发现一条能进入异世界的空间通道。
+这个世界叫：龙神大陆！
+龙神大陆人人身怀龙之血脉。
+其他没有龙血的生物被他们称之为——异种！！！
+辰山成为了龙神大陆的人族异种，被</p>
+                            <div class="authorNm"><i></i>落鱼</div>
+                            <div class="classifyLt"><i></i>东方玄幻</div>
+                        </div>
+                    </a>
+                                    <a href="/book/851835/" class="hot_searchList clearfix">
+                        <div class="bookImg">
+                            <img src="https://media3.tadu.com/web_dubbo_static//assets/images/v300/coverBg.jpg" data-src="https://media3.tadu.com//2021/10/14/10/39/13d2e384e9e54bd5bc91d04caca164bb_a.jpg" />
+                        </div>
+                        <div class="book">
+                            <h3>溺爱成瘾：夫人称霸娱乐圈</h3>
+                            <p>1 于初这二十三年来唯一引以为傲的就是自己的这张脸。
+也是因为这张脸，性格安静乖巧的她从小到大总是被孤立。
+影视大学毕业后，于初成了娱乐圈的一名十八线小透明。
+好不容易参演一部潜力爆剧</p>
+                            <div class="authorNm"><i></i>清清不胖</div>
+                            <div class="classifyLt"><i></i>现代言情</div>
+                        </div>
+                    </a>
+                            </div>
+        </div>
+    </div>
+    <!-- 失败 -->
+    <div class="defeated failure hidden">
+        <h1><span>失败</span></h1>
+        <div class="it clearfix">
+            <h2><i></i>后台返回失败原因展示</h2>
+        </div>
+        <a href="javascript:void(0);" class="sure">确认</a>
+    </div>
+</div>
+
+<!-- footer -->
+<div class="footer">
+    <div class="boxCenter foot">
+        <div class="friendLink clearfix">
+            <span>友情链接：</span>
+                         <a href="http://www.170.com" target="_blank" rel="nofollow">天音移动</a>
+                        <a href="http://www.sweetread.net" target="_blank" rel="nofollow">甜悦读文学</a>
+                        <a href="http://www.fbook.net" target="_blank" rel="nofollow">天下书盟</a>
+                        <a href="http://www.baokan.name" target="_blank" rel="nofollow">爆侃网文</a>
+                        <a href="http://b.faloo.com" target="_blank" rel="nofollow">飞卢小说网</a>
+                        <a href="http://www.iciyuan.com/" target="_blank" rel="nofollow">iCiyuan轻小说</a>
+                        <a href="http://www.yokong.com/" target="_blank" rel="nofollow">悠空网</a>
+                        <a href="http://www.luochen.com/" target="_blank" rel="nofollow">落尘文学</a>
+                        <a href="http://www.tenghen.com/" target="_blank" rel="nofollow">藤痕书院</a>
+                        <a href="http://www.alphafun.com/index.htm" target="_blank" rel="nofollow">天翼原创</a>
+                        <a href="http://www.iyoule.com/" target="_blank" rel="nofollow">有乐中文网</a>
+                        <a href="http://www.lkong.net" target="_blank" rel="nofollow">龙的天空</a>
+                        <a href="http://www.datangzww.com/" target="_blank" rel="nofollow">大唐中文网</a>
+                        <a href="http://book.sina.com.cn/" target="_blank" rel="nofollow">新浪读书</a>
+                        <a href="https://mz.chenggua.com/" target="_blank" rel="nofollow">橙瓜码字</a>
+                    </div>
+
+        <div class="aboutBox">
+            <div class="clearfix">
+                <a href="/help/all" target="_blank">关于塔读</a><hr />
+                <a href="/help/cooperate" target="_blank">联系塔读</a><hr />
+                <a href="https://weibo.com/tytd" target="_blank">塔读微博</a>
+            </div>
+            <div class="service">
+                <span>客服电话：400-678-5158（周一至周日 8:30-22:00）</span>
+                <!-- <span>在线客服：<a href="https://support.qq.com/product/49730?d-wx-push=1" target="_blank">开始交谈</a></span> -->
+                <span>意见反馈：<a href="javascript:void(0)" onclick="feedBack()">点此进入</a></span>
+            </div>
+        </div>
+        <div class="aboutTd">
+            <span>京ICP证080655号&nbsp;&nbsp;<a href="https://beian.miit.gov.cn/publish/query/indexFirst.action" rel="noreferrer" target="_blank" style="border: none; line-height:100%;vertical-align: baseline;"> 京ICP备09017823号-5</a><a href="https://www.beian.gov.cn/portal/registerSystemInfo?recordcode=11010202003943" target="_blank" style="border: none;position: relative;">&nbsp;&nbsp;&nbsp;京公网安备 11010202003943号</a></span>
+            <span>Copyright(C) 2008-2021 www.tadu.com All Rights Reserved 版权所有 北京易天新动网络科技有限公司 &nbsp;&nbsp;塔读小说版权所有，未经许可不得转载</span>
+<!--            <span><i></i><a href="https://www.beian.gov.cn/portal/registerSystemInfo?recordcode=11010202003943" target="_blank" style="border: none;position: relative;"><em></em>京公网安备 11010202003943号</a></span>-->
+        </div>
+        <div class="codeBox clearfix">
+            <div class="">
+                <img src="https://media3.tadu.com/web_dubbo_static//assets/images/v500/qrCode.png" alt="扫描下载”塔读小说免费版”客户端" />
+                <span>客户端下载</span>
+            </div>
+            <div class="">
+                <img src="https://media3.tadu.com/web_dubbo_static//assets/images/v500/sinaCode.png" alt="塔读微博" />
+                <span>官方微博</span>
+            </div>
+            <div class="">
+                <img src="https://media3.tadu.com/web_dubbo_static//assets/images/v500/wechatCode.png" alt="塔读官方公众号" />
+                <span>官方公众号</span>
+            </div>
+        </div>
+    </div>
+</div>
+<div class="hidden">
+    <script type="text/javascript" tadu>
+        var mCookieName = 'accessMark';
+        var mUrl = 'https://m.tadu.com';
+
+        // $(function(){
+        var ua = window.navigator.userAgent.toLowerCase();
+        if (ua.indexOf('android') > -1 || (ua.indexOf('iphone') > -1) || (ua.indexOf('ipad') > -1)) {
+            var cookValue = getCookie(mCookieName);
+            // debugger;
+            if(cookValue == null || cookValue == undefined || cookValue != 1 || cookValue != "1"){
+                window.location.href = mUrl;
+            }
+        }
+        // });
+
+        function getCookie(cookie_name) {
+            var allcookies = document.cookie;
+            //索引长度，开始索引的位置
+            var cookie_pos = allcookies.indexOf(cookie_name);
+
+            // 如果找到了索引，就代表cookie存在,否则不存在
+            if (cookie_pos != -1) {
+                // 把cookie_pos放在值的开始，只要给值加1即可
+                //计算取cookie值得开始索引，加的1为“=”
+                cookie_pos = cookie_pos + cookie_name.length + 1;
+                //计算取cookie值得结束索引
+                var cookie_end = allcookies.indexOf(";", cookie_pos);
+
+                if (cookie_end == -1) {
+                    cookie_end = allcookies.length;
+
+                }
+                //得到想要的cookie的值
+                var value = unescape(allcookies.substring(cookie_pos, cookie_end));
+            }
+            return value;
+        }
+    </script>
+
+    <!--百度统计-->
+    <script type="text/javascript" tadu>
+        var _hmt = _hmt || [];
+        (function() {
+          var hm = document.createElement("script");
+          hm.src = "https://hm.baidu.com/hm.js?3b387970cdb803bd81d7f67e34d57668";
+          var s = document.getElementsByTagName("script")[0]; 
+          s.parentNode.insertBefore(hm, s);
+        })();
+    </script>
+
+    <!--360搜索seo-->
+    <script type="text/javascript" tadu>
+        (function(){
+        var src = "https://s.ssl.qhres2.com/ssl/ab77b6ea7f3fbf79.js";
+        document.write('<script src="' + src + '" id="sozz"><\/script>');
+        })();
+    </script>
+    <!--360搜索seo end-->
+</div>
+<script src="https://media3.tadu.com/web_dubbo_static//prod/js/tucao/tucao-2bdbbe6f09.js"></script><script src="https://media3.tadu.com/web_dubbo_static//prod/js/libs/jquery-1-22e85f4f06.12.4.min.js"></script>
+<script src="https://media3.tadu.com/web_dubbo_static//prod/js/v300/common300-ab3a6d865f.js"></script>
+<script src="https://media3.tadu.com/web_dubbo_static//prod/js/v300/search300-bb851130c7.js"></script>
+<script src="https://media3.tadu.com/web_dubbo_static//prod/js/plugin/lazyload300-8ed982d92e.js"></script>
+<script src="https://media3.tadu.com/web_dubbo_static//prod/js/user/second_header_userinfo-5f25756b81.js"></script>
+
+</body>
+
+</html>
