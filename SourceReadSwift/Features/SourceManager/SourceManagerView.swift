@@ -37,6 +37,7 @@ struct SourceManagerView: View {
     /// instead of the login action so a user can see which sources still need
     /// an account without opening each source's menu.
     @State private var loggedInHosts: Set<String> = []
+    @State private var showLoginCenter = false
     @State private var sourceHistory: BookSource?
     @State private var sourceVisualDetail: BookSource?
     @State private var pendingDetailAction: SourceDetailAction?
@@ -230,9 +231,33 @@ struct SourceManagerView: View {
                         }
                     }
                 }
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button {
+                        showLoginCenter = true
+                    } label: {
+                        Image(systemName: "key.fill")
+                    }
+                    .accessibilityLabel("书源登录中心")
+                }
             }
             .sheet(isPresented: $showImportSheet) {
                 importSheet
+            }
+            .sheet(isPresented: $showLoginCenter, onDismiss: {
+                Task { await refreshLoggedInHosts() }
+            }) {
+                NavigationStack {
+                    SourceLoginCenterView(
+                        sources: appState.sourceStore.sources,
+                        cookieStore: appState.sourceCookieStore,
+                        engine: appState.engine
+                    )
+                    .toolbar {
+                        ToolbarItem(placement: .cancellationAction) {
+                            Button("关闭") { showLoginCenter = false }
+                        }
+                    }
+                }
             }
             .onChange(of: showImportSheet) { isPresented in
                 guard !isPresented, openFileImporterAfterSheetDismiss else { return }
@@ -1022,7 +1047,7 @@ struct SourceManagerView: View {
                 Button(action: onLogin) {
                     Label(
                         isLoggedIn ? "已登录" : "登录",
-                        systemImage: isLoggedIn ? "checkmark.seal.fill" : "person.badge.key"
+                        systemImage: isLoggedIn ? "checkmark.seal.fill" : "key.fill"
                     )
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(isLoggedIn ? Color.green : AppTheme.accent)

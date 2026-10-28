@@ -920,7 +920,8 @@
    "tocUrl": "$.dir"
   },
   "ruleContent": {
-   "content": "article > .entry-content > p@html\n##<p style.*|.*<a href.*"
+   "content": "@js:\nvar raw = String(result);\nvar m = raw.match(/html_b=\"([^\"]+)\"/);\nif (m) { try { raw = String(java.base64Decode(m[1])); } catch (e) {} }\nreturn String(java.getString(raw, \"article > .entry-content@html\")).replace(/服务商故障已切换备份,少许页面故障请见谅/, \"\").replace(/^-->\\s*/gm, \"\");\n",
+   "nextContentUrl": ""
   },
   "ruleExplore": {
    "author": "p.author.0@text",
@@ -934,7 +935,7 @@
   },
   "ruleSearch": {
    "author": "p.author.0@text",
-   "bookList": "<js>\nString(result).replace(/<!--|-->/g, \"\");\n</js>\n#book_list li",
+   "bookList": "<js>\nvar raw = String(result);\nvar m = raw.match(/html_b=\"([^\"]+)\"/);\nif (m) { try { return String(java.base64Decode(m[1])); } catch (e) {} }\nreturn raw.replace(/<!--|-->/g, \"\");\n</js>\n#book_list li",
    "bookUrl": "a.1@href",
    "coverUrl": "img@src",
    "intro": "p.-1@html##简介：",
@@ -943,7 +944,7 @@
    "name": "a.1@text##《|》"
   },
   "ruleToc": {
-   "chapterList": "@js:\nvar _ = JSON.parse(result).chapter_list;\nArray.from(_, ($) => ({\n    name: $.name,\n    link: book.bookUrl + $.file_name,\n    info: String(`${$.len}字`)\n}));",
+   "chapterList": "<js>\nvar raw = String(result);\nvar m = raw.match(/html_b=\"([^\"]+)\"/);\nif (m) { try { raw = String(java.base64Decode(m[1])); } catch (e) {} }\nvar bid = (raw.match(/\"book_id\"\\s*:\\s*(\\d+)/) || [])[1];\nif (!bid) { var bm = String(baseUrl).match(/\\/(\\d+)\\/?$/); bid = bm ? bm[1] : \"\"; }\nvar pref = (raw.match(/\"book_yun_path\"\\s*:\\s*\"([^\"\\/]+)\\//) || [])[1];\nif (!bid) return [];\nvar url = \"https://book4.cc/show_jsload_book_info/\" + (pref ? pref + \"/\" : \"\") + bid + \"/book.json\";\nvar js = String(java.ajax(url));\nvar mm = js.match(/dstr=\"([^\"]+)\"/);\nif (!mm) return [];\nvar d = JSON.parse(decodeURIComponent(String(java.base64Decode(mm[1]))));\nvar list = d.chapter_list || [];\nvar base = String(book.bookUrl || \"\");\nvar out = [];\nfor (var i = 0; i < list.length; i++) { var c = list[i]; out.push({ name: c.name, link: base + c.file_name, info: String(c.len) + \"字\" }); }\nreturn out;\n</js>",
    "chapterName": "name",
    "chapterUrl": "link",
    "preUpdateJs": "java.refreshTocUrl()",

@@ -169,6 +169,16 @@ struct SettingsView: View {
                         Label("离线章节", systemImage: "arrow.down.circle")
                     }
                     NavigationLink {
+                        SourceLoginCenterView(
+                            sources: appState.sourceStore.sources,
+                            cookieStore: appState.sourceCookieStore,
+                            engine: appState.engine
+                        )
+                    } label: {
+                        Label("书源登录中心", systemImage: "key.fill")
+                    }
+
+                    NavigationLink {
                         CookieManagerView(cookieStore: appState.sourceCookieStore)
                     } label: {
                         Label("会话与 Cookie 管理", systemImage: "network.badge.shield.half.filled")
