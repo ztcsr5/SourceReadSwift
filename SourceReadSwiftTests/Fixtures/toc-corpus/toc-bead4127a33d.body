@@ -1,0 +1,616 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="utf-8">
+	<title>斗破苍穹之足诀 - 第十八章 厄难毒体||https://www.esjzone.one/forum/1771755194/493331.html - 輕小說 - ESJ Zone</title>
+	<!-- SEO Meta Tags-->
+	<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+		<meta name="robots" content="noindex">
+	<meta name="googlebot" content="noindex">
+			<meta name="referrer" content="no-referrer" />
+	<meta name="robots" content="noindex">
+	<link rel="shortcut icon" href="https://img.kookapp.cn/assets/2023-01/rhv1ugUjQw0dd0ef.png">
+	<link rel="stylesheet" media="screen" href="/assets/css/vendor.min.css?v=1.5">
+	<link id="mainStyles" rel="stylesheet" media="screen" href="/assets/css/styles.min.css?v=1.2">
+	<link rel="stylesheet" media="screen" href="/assets/css/customizer.min.css?v=208">
+	<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-8867758861617561" crossorigin="anonymous"></script>
+
+		<link rel="stylesheet" href="/assets/css/jquery.mloading.css">
+	<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/froala-editor/3.1.0/css/froala_editor.min.css">
+	<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/froala-editor/3.1.0/css/froala_style.min.css">
+	<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/froala-editor/3.1.0/css/plugins/char_counter.min.css">
+	<link rel="stylesheet" href="/assets/css/plugins/emoticons.css">
+	<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/froala-editor/3.1.0/css/plugins/image.min.css">
+	<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/froala-editor/3.1.0/css/plugins/colors.min.css">
+	<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/froala-editor/3.1.0/css/plugins/video.min.css">
+		<link href="https://cdnjs.cloudflare.com/ajax/libs/limonte-sweetalert2/6.10.1/sweetalert2.css" rel="stylesheet">
+	<script src="/assets/js/vendor.min.js"></script>
+	<script src="/assets/js/modernizr.min.js"></script>
+	<!-- Google tag (gtag.js) -->
+	<script async src="https://www.googletagmanager.com/gtag/js?id=G-6N355XR0Y6"></script>
+	<script>
+		window.dataLayer = window.dataLayer || [];
+		function gtag(){dataLayer.push(arguments);}
+		gtag('js', new Date());
+		gtag('config', 'G-6N355XR0Y6');
+	</script>
+	<script>var defaultEncoding=1,cookieDomain="https://www.esjzone.cc/";</script>	<script src="/assets/js/JinJing.js"></script>
+	<script type='text/javascript'>
+function getAuthToken(){ return new JinJing().Callback('getAuthToken', getAuthToken.arguments); }
+</script>
+	<script src="https://www.esjzone.cc/assets/js/jquery.lazy.min.js"></script>
+	<script>var data='books',nickname='',g=0,forum_id=0;</script>
+</head>
+<body>
+	
+	
+	
+	
+	
+	
+	<form class="modal fade forumReport" id="forumReport" tabindex="-1">
+		<div class="modal-dialog">
+			<div class="modal-content">
+				<div class="modal-header">
+					<h4 class="modal-title">檢舉回應</h4>
+					<button class="close" type="button" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+				</div>
+				<div class="modal-body">
+					<div class="form-group">
+						<label for="review-name">檢舉類型</label>
+						<select class="form-control" name="category">
+							<option value="1">劇透</option>
+							<option value="2">辱罵攻擊</option>
+							<option value="3">垃圾廣告</option>
+							<option value="4">其他</option>
+						</select>
+						<input type="hidden" name="rid" value="">
+						<input type="hidden" name="data" value="books">
+					</div>
+					<div class="form-group">
+						<label for="review-message">備註</label>
+						<textarea name="memo" class="form-control" id="memo" rows="5" ></textarea>
+					</div>
+				</div>
+				<div class="modal-footer">
+					<a class="btn btn-default" data-dismiss="modal">取消</a>
+					<a class="btn btn-primary btn-send" data-form="forumReport" data-send="forum_report">送出</a>
+				</div>
+			</div>
+		</div>
+	</form>
+
+		
+	
+	<!-- Off-Canvas Mobile Menu-->
+	<div class="offcanvas-container" id="mobile-menu">
+		<a class="account-link" href="/my/profile.html">
+			<div class="user-ava"><img src="/assets/img/nophoto.png?t=1793156882" alt=""></div>
+			<div class="user-info">
+				<h6 class="user-name"></h6><span class="text-sm text-white opacity-60">0 EXP</span>
+			</div>
+		</a>
+		<nav class="offcanvas-menu">
+			<ul class="menu">
+				<li class="active">
+					<span><a href="/"><span class="glyphicon glyphicon-home"> Home</span></a><span class="sub-menu-toggle"></span></span>
+				</li>
+				<li class="">
+										<span><a href="/my/login">登入 / 註冊</a></span>
+									</li>
+
+				<li class=""><span><a href="/update/">一週更新</a></span></li><li class=""><span><a href="/list-21/">原創小說</a></span></li><li class=""><span><a href="/forum/">論壇</a></span></li><li class=""><span><a href="/guestbook/">留言板</a></span></li><li class=""><span><a href="/faq/">問與答</a></span></li><li><span><a href="/forum/1584622376/1585970655/"><span style="font-size: 20px;">站方公告</span></a></span></li>			</ul>
+		</nav>
+	</div>
+	<!-- Topbar-->
+	<div class="topbar"></div>
+
+	<header class="navbar navbar-sticky" id="">
+		<div class="customizer-backdrop"></div>
+		<div class="customizer">
+			<div class="customizer-toggle"><i class="icon-settings"></i></div>
+			<div class="customizer-body">
+				<div class="customizer-title">選擇背景色</div>
+				<div class="customizer-color-switch">
+					<a id="mycolor-0" class="" href="#"></a>
+					<a id="mycolor-1" class="" href="#"></a>
+					<a id="mycolor-6" class="" href="#"></a>
+					<a id="mycolor-2" class="" href="#"></a>
+					<a id="mycolor-3" class="" href="#"></a>
+					<a id="mycolor-4" class="" href="#"></a>
+					<a id="mycolor-5" class="" href="#"></a>
+				</div>
+				<div class="customizer-title">简繁</div>
+				<div class="customizer-text-switch">
+					<a id="mycolor-0" class="trans " data-encode="1" href="#">简</a>
+					<a id="mycolor-0" class="trans " data-encode="2" href="#">繁</a>
+					<a id="mycolor-0" class="trans active" data-encode="0" href="#">原</a>
+				</div>
+							</div>
+		</div>
+
+		<div class="site-search">
+			<input type="text" name="site_search" placeholder="輸入關鍵字...">
+			<div class="search"><span class="btn-search"><i class="icon-search"></i></span></div>
+			<div class="search-tools"><span class="close-search"><i class="icon-x"></i></span></div>
+		</div>
+		<div class="site-branding">
+			<div class="inner">
+				<a class="offcanvas-toggle menu-toggle" href="#mobile-menu" data-toggle="offcanvas"></a>
+				<a class="site-logo" href="/"><img src="https://img.kookapp.cn/assets/2023-01/7PGfhqgvGV1w30tt.png" alt="ESJ Zone"></a>
+			</div>
+		</div>
+		<nav class="site-menu">
+			<ul>
+				<li class="">
+					<a href="/"><span><i class="icon-home pb-1"></i> Home</span></a>
+				</li>
+				<li><a href="/update/"><span>一週更新</span></a></li><li><a href="/list-21/"><span>原創小說</span></a></li><li><a href="/forum/"><span>論壇</span></a></li><li><a href="/guestbook/"><span>留言板</span></a></li><li><a href="/faq/"><span>問與答</span></a></li>				<li >
+					<a href="/forum/1584622376/1585970655/"><span style="font-size: 20px;">站方公告</span></a>
+				</li>
+			</ul>
+		</nav>
+		<!-- Toolbar-->
+		<div class="toolbar" style="">
+			<div class="inner">
+				<div class="tools">
+										<!--<div class="facebook"><a href="https://www.facebook.com/esjzone/" target="_blank"><img src="https://i.loli.net/2020/06/26/jzlra2oiOKZhT1U.png"></a></div>-->
+					
+					<div class="discord"><a href="https://discord.gg/PhvJq6G6WC" target="_blank"><img src="/assets/img/discord_logo.png"></a></div>
+					<div class="search"><i class="icon-search"></i></div>
+					<div class="hidden-xs hidden-sm account " >
+						<a href="/my/profile.html"></a><i class="icon-user"></i>
+						<ul class="toolbar-dropdown">
+							<li class="sub-menu-user">
+								<div class="user-ava">
+									<img src="/assets/img/nophoto.png?t=1793156882" alt="">
+								</div>
+								<div class="user-info">
+									<h6 class="user-name"></h6>
+									<span class="text-xs text-exp">0 EXP</span>
+									<span class="text-xs text-exp mem-level"></span>
+								</div>
+							</li>
+														<li><a href="/my/login">登入 / 註冊</a></li>
+													</ul>
+					</div>
+									</div>
+			</div>
+		</div>
+	</header>
+	<!-- Off-Canvas Wrapper-->
+	<div class="offcanvas-wrapper" id="">
+		<div class="page-title">
+			<div class="container">
+				<div class="column">
+					<h1>輕小說</h1>
+				</div>
+				<div class="column">
+					<ul class="breadcrumbs">
+						<li><a href="/">Home</a></li>
+						<li class="slash"> / </li>
+						<li>輕小說</li>
+					</ul>
+				</div>
+			</div>
+		</div>
+		<section class="container">
+			<div class="row">
+				<div class="col-xl-9 col-lg-8 p-r-30">
+					<div class="row mb-3">
+						<div class="col-md-3">
+														<div class="product-gallery text-center mb-3">
+								<a href="https://i.imgs.ovh/2026/02/23/ywqfLU.png" target="_blank"><img src="https://i.imgs.ovh/2026/02/23/ywqfLU.png" alt="斗破苍穹之足诀"></a>
+							</div>
+							
+													</div>
+						<div class="col-md-9 book-detail">
+							<span class="text-muted align-middle">
+								<label class="mr-3"><i class="icon-eye"></i> <span id="vtimes">8715</span></label>
+								<label class="mr-3"><i class="icon-heart"></i> <span id="favorite">20</span></label>
+								<label><i class="icon-file-text"></i> <span id="txt">73,614</span></label>
+							</span>
+							<h2 class="p-t-10 text-normal">斗破苍穹之足诀</h2>
+							<ul class="list-unstyled mb-2 book-detail">
+								<li><strong>類型:</strong> 原創</li>
+								<li><strong>作者:</strong> <a href="/tags/苍蓝/">苍蓝</a></li>
+
+								
+								
+								<li><strong>更新日期:</strong> 2026-03-09</li>								<li class="hidden-md-up">
+																	</li>
+							</ul>
+							<div class="row out-link">
+								
+								
+								
+															</div>
+							<hr class="mb-3 mt-3">
+							<div class="d-flex flex-wrap justify-content-between">
+								<div class="sp-buttons mt-2 mb-2">
+																		<button class="btn btn-danger m-b-10 btn-memfirst"><i class="icon-heart"></i> <span>收藏</span></button>
+																		<a href="/forum/1584622325/1771755194/" class="btn btn-info m-b-10 btn-forum ">
+										<i class="icon-link"></i> 前往論壇
+										<!---->
+									</a>
+																	</div>
+							</div>
+						</div>
+					</div>
+
+										<section class="widget widget-tags hidden-lg-up mt-30">
+						<h3 class="widget-title">內容標籤</h3>
+						<a class="tag" href="/tags/R15/">R15</a><a class="tag" href="/tags/足控/">足控</a><a class="tag" href="/tags/萝莉/">萝莉</a><a class="tag" href="/tags/踩踏/">踩踏</a><a class="tag" href="/tags/抖M/">抖M</a>					</section>
+					
+
+										<div class="bg-secondary p-20 margin-top-1x" id="details">
+						<div class="row">
+							<div class="col-md-12">
+								<div class="description"><p>足控向的文，作者只想被各种美少女踩来踩去。</p><p>前几章过渡内容可能多一些，后面足控内容会占比大一些。</p><p>斗破苍穹的世界出现了新的奇怪人物，名为苍蓝，老天给了他阴阳二相体的体质，这种体质会在面对男性敌人时让自己的实力随着仇恨值不断增长，最多可以翻三倍！ 但相反的是，这种体质会在面对女性敌人时让自己的实力随着我对她的喜爱程度不断降低，年龄越小降的越多，最多可以降成斗之气一段！ 功法是足诀，需要被不同的苍蓝喜欢的少女用脚踩脸或者别的方式触碰才能增长实力！</p></div>
+							</div>
+						</div>
+					</div>
+					
+					
+					
+										<div class="m-b-15">
+						<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js"></script>
+						<ins class="adsbygoogle" style="display:block" data-ad-client="ca-pub-8867758861617561" data-ad-slot="1445673685" data-ad-format="auto" data-full-width-responsive="true"></ins>
+						<script>(adsbygoogle = window.adsbygoogle || []).push({});</script>
+					</div>
+					
+					<div class="padding-top-1x">
+						<div class="row">
+						</div>
+					</div>
+
+										<div class="row padding-top-1x mb-3">
+						<div class="col-lg-12">
+							<ul class="nav nav-tabs" role="tablist">
+								<li class="nav-item"><a class="nav-link active" href="#integration" data-toggle="tab" role="tab" aria-selected="true">章節列表</a></li>
+							</ul>
+							<div class="tab-content">
+								<div class="tab-pane fade active show" id="integration" role="tabpanel">
+									<div class="sp-buttons mb-3">
+										<button class="btn btn-secondary btn-sort" data-sort="1"><i class="icon-arrow-down"></i> 正序</button>
+									</div>
+									<div id="chapterList"><a href="https://www.esjzone.cc/forum/1771755194/486584.html" target="_blank" data-title="第一章 陨落的天才与旁观者"><p>第一章 陨落的天才与旁观者</p></a>
+<a href="https://www.esjzone.cc/forum/1771755194/486585.html" target="_blank" data-title="第二章 夜访与隐秘 "><p>第二章 夜访与隐秘 </p></a>
+<a href="https://www.esjzone.cc/forum/1771755194/486587.html" target="_blank" data-title="第三章 旁观者 "><p>第三章 旁观者 </p></a>
+<a href="https://www.esjzone.cc/forum/1771755194/486598.html" target="_blank" data-title="第四章 意外的馈赠 "><p>第四章 意外的馈赠 </p></a>
+<a href="https://www.esjzone.cc/forum/1771755194/486599.html" target="_blank" data-title="第五章 第二次踩脸与意外之喜"><p>第五章 第二次踩脸与意外之喜</p></a>
+<a href="https://www.esjzone.cc/forum/1771755194/486740.html" target="_blank" data-title="第六章 救赎"><p>第六章 救赎</p></a>
+<a href="https://www.esjzone.cc/forum/1771755194/486743.html" target="_blank" data-title="第七章 奴隶"><p>第七章 奴隶</p></a>
+<a href="https://www.esjzone.cc/forum/1771755194/486744.html" target="_blank" data-title="第八章 最后一日"><p>第八章 最后一日</p></a>
+<a href="https://www.esjzone.cc/forum/1771755194/486746.html" target="_blank" data-title="第九章 预测"><p>第九章 预测</p></a>
+<a href="https://www.esjzone.cc/forum/1771755194/486751.html" target="_blank" data-title="第十章 交易"><p>第十章 交易</p></a>
+<a href="https://www.esjzone.cc/forum/1771755194/486764.html" target="_blank" data-title="第十一章 聚气散与永远的契约"><p>第十一章 聚气散与永远的契约</p></a>
+<a href="https://www.esjzone.cc/forum/1771755194/486835.html" target="_blank" data-title="第十二章 夜晚的博弈"><p>第十二章 夜晚的博弈</p></a>
+<a href="https://www.esjzone.cc/forum/1771755194/486867.html" target="_blank" data-title="第十三章 成长与抉择"><p>第十三章 成长与抉择</p></a>
+<a href="https://www.esjzone.cc/forum/1771755194/486900.html" target="_blank" data-title="第十四章 夜别"><p>第十四章 夜别</p></a>
+<a href="https://www.esjzone.cc/forum/1771755194/487069.html" target="_blank" data-title="第十五章 悬崖上的意外"><p>第十五章 悬崖上的意外</p></a>
+<a href="https://www.esjzone.cc/forum/1771755194/487336.html" target="_blank" data-title="第十六章 小医仙的帮助"><p>第十六章 小医仙的帮助</p></a>
+<a href="https://www.esjzone.cc/forum/1771755194/490741.html" target="_blank" data-title="第十七章 足诀的秘密"><p>第十七章 足诀的秘密</p></a>
+<a href="https://www.esjzone.cc/forum/1771755194/493331.html" target="_blank" data-title="第十八章 厄难毒体"><p>第十八章 厄难毒体</p></a>
+</div>
+								</div>
+
+															</div>
+						</div>
+					</div>
+										<!-- Comment Form-->
+					<h4 class="padding-top-2x pb-1" id="reply">你的回應</h4>
+					<form class="row commentEditor" method="post">
+												<div class="col-12">
+							<div class="form-group">
+								<input class="form-control form-control-rounded" type="text" name="nickname" placeholder="你的暱稱" value="" data-text="請輸入你的暱稱" >
+							</div>
+						</div>
+												<div class="col-12">
+							<div class="form-group">
+								<div id="commentEditor"></div>
+								<input type="hidden" name="content" value="" data-text="請輸入你的回應">
+								<input type="hidden" name="data" value="books">
+							</div>
+						</div>
+						<div class="col-12 text-right">
+							<a class="btn btn-pill btn-primary btn-send" data-form="commentEditor" data-send="forum_reply">送出</a>
+						</div>
+					</form>
+					
+					<!-- Comments-->
+					<span id="content_end"></span>
+
+										<div style="text-align: right;">
+						<div id="page-selection-top" style="display:inline-block;margin-left:auto;"></div>
+					</div>
+										<section class="padding-top-1x comments-section comments-page-1" id="comments" style="display:none;">
+												<div class="comment" id="comment-2796494">
+							<div class="comment-author-ava">
+								<a href="/my/profile?uid=286575" target="_blank"><div class="lazyload-author-ava" data-src="https://i.pinimg.com/564x/ec/4b/c0/ec4bc0f9ec00d1454fc61de82b047c09.jpg"></div></a>							</div>
+							<div class="comment-body">
+								<div class="comment-header">
+									<div class="column">
+										<span class="comment-title"><a href="/my/profile?uid=286575" target="_blank">禾一三</a></span>
+									</div>
+									<div class="column text-right">
+										<span class="comment-meta m-r-10 comment-floor">#1</span>
+										<span class="comment-meta">2026-02-22 20:13</span>
+									</div>
+								</div>
+																<p class="comment-text ">冒个泡，还没有其他人</p>
+
+								
+								<div class="comment-footer">
+									<div class="column text-right">
+																				<a class="reply-link m-r-10 forum_report" href="#" data-comment="2796494"><i class="icon-alert-triangle"></i>檢舉</a>										<a class="reply-link forum_reply" href="#" data-comment="2796494-286575"><i class="icon-corner-up-left"></i>回覆</a>									</div>
+								</div>
+							</div>
+						</div>
+												<div class="comment" id="comment-2796789">
+							<div class="comment-author-ava">
+								<a href="/my/profile?uid=37458" target="_blank"><div class="lazyload-author-ava" data-src="https://i.pinimg.com/564x/ec/4b/c0/ec4bc0f9ec00d1454fc61de82b047c09.jpg"></div></a>							</div>
+							<div class="comment-body">
+								<div class="comment-header">
+									<div class="column">
+										<span class="comment-title"><a href="/my/profile?uid=37458" target="_blank">yuilove</a></span>
+									</div>
+									<div class="column text-right">
+										<span class="comment-meta m-r-10 comment-floor">#2</span>
+										<span class="comment-meta">2026-02-22 22:56</span>
+									</div>
+								</div>
+																<p class="comment-text ">神人书名</p>
+
+								
+								<div class="comment-footer">
+									<div class="column text-right">
+																				<a class="reply-link m-r-10 forum_report" href="#" data-comment="2796789"><i class="icon-alert-triangle"></i>檢舉</a>										<a class="reply-link forum_reply" href="#" data-comment="2796789-37458"><i class="icon-corner-up-left"></i>回覆</a>									</div>
+								</div>
+							</div>
+						</div>
+												<div class="comment" id="comment-2796840">
+							<div class="comment-author-ava">
+								<a href="/my/profile?uid=291866" target="_blank"><div class="lazyload-author-ava" data-src="https://i.pinimg.com/564x/ec/4b/c0/ec4bc0f9ec00d1454fc61de82b047c09.jpg"></div></a>							</div>
+							<div class="comment-body">
+								<div class="comment-header">
+									<div class="column">
+										<span class="comment-title"><a href="/my/profile?uid=291866" target="_blank">canglan233</a></span>
+									</div>
+									<div class="column text-right">
+										<span class="comment-meta m-r-10 comment-floor">#3</span>
+										<span class="comment-meta">2026-02-22 23:26</span>
+									</div>
+								</div>
+								<blockquote><p>神人书名</p></blockquote>								<p class="comment-text ">哈哈哈哈其实内容也是</p>
+
+								
+								<div class="comment-footer">
+									<div class="column text-right">
+																				<a class="reply-link m-r-10 forum_report" href="#" data-comment="2796840"><i class="icon-alert-triangle"></i>檢舉</a>										<a class="reply-link forum_reply" href="#" data-comment="2796840-291866"><i class="icon-corner-up-left"></i>回覆</a>									</div>
+								</div>
+							</div>
+						</div>
+												<div class="comment" id="comment-2796919">
+							<div class="comment-author-ava">
+								<a href="/my/profile?uid=290587" target="_blank"><div class="lazyload-author-ava" data-src="https://i.pinimg.com/564x/ec/4b/c0/ec4bc0f9ec00d1454fc61de82b047c09.jpg"></div></a>							</div>
+							<div class="comment-body">
+								<div class="comment-header">
+									<div class="column">
+										<span class="comment-title"><a href="/my/profile?uid=290587" target="_blank">昆汀神州分汀</a></span>
+									</div>
+									<div class="column text-right">
+										<span class="comment-meta m-r-10 comment-floor">#4</span>
+										<span class="comment-meta">2026-02-23 00:11</span>
+									</div>
+								</div>
+																<p class="comment-text ">很好，足控小说越来越多了，令人振奋！就趁着这股势头，把esj占领吧（bushi）<span class="fr-emoticon fr-deletable fr-emoticon-img" style="background: url(/assets/img/teiba/tb05.png);background-repeat: no-repeat;">&nbsp;&nbsp;&nbsp;&nbsp;</span>&nbsp;</p>
+
+								
+								<div class="comment-footer">
+									<div class="column text-right">
+																				<a class="reply-link m-r-10 forum_report" href="#" data-comment="2796919"><i class="icon-alert-triangle"></i>檢舉</a>										<a class="reply-link forum_reply" href="#" data-comment="2796919-290587"><i class="icon-corner-up-left"></i>回覆</a>									</div>
+								</div>
+							</div>
+						</div>
+												<div class="comment" id="comment-2796931">
+							<div class="comment-author-ava">
+								<a href="/my/profile?uid=291866" target="_blank"><div class="lazyload-author-ava" data-src="https://i.pinimg.com/564x/ec/4b/c0/ec4bc0f9ec00d1454fc61de82b047c09.jpg"></div></a>							</div>
+							<div class="comment-body">
+								<div class="comment-header">
+									<div class="column">
+										<span class="comment-title"><a href="/my/profile?uid=291866" target="_blank">canglan233</a></span>
+									</div>
+									<div class="column text-right">
+										<span class="comment-meta m-r-10 comment-floor">#5</span>
+										<span class="comment-meta">2026-02-23 00:19</span>
+									</div>
+								</div>
+								<blockquote><p>很好，足控小说越来越多了，令人振奋！就趁着这股势头，把esj占领吧（bushi）&nbsp;&nbsp;</p></blockquote>								<p class="comment-text ">没办法，别的平台限制太多了呜呜呜呜呜</p>
+
+								
+								<div class="comment-footer">
+									<div class="column text-right">
+																				<a class="reply-link m-r-10 forum_report" href="#" data-comment="2796931"><i class="icon-alert-triangle"></i>檢舉</a>										<a class="reply-link forum_reply" href="#" data-comment="2796931-291866"><i class="icon-corner-up-left"></i>回覆</a>									</div>
+								</div>
+							</div>
+						</div>
+												<div class="comment" id="comment-2798337">
+							<div class="comment-author-ava">
+								<a href="/my/profile?uid=216709" target="_blank"><div class="lazyload-author-ava" data-src="https://i.pinimg.com/564x/ec/4b/c0/ec4bc0f9ec00d1454fc61de82b047c09.jpg"></div></a>							</div>
+							<div class="comment-body">
+								<div class="comment-header">
+									<div class="column">
+										<span class="comment-title"><a href="/my/profile?uid=216709" target="_blank">是后藤时雨啊</a></span>
+									</div>
+									<div class="column text-right">
+										<span class="comment-meta m-r-10 comment-floor">#6</span>
+										<span class="comment-meta">2026-02-23 16:21</span>
+									</div>
+								</div>
+																<p class="comment-text ">粥吧打过来了😨粥批过来我第一个小苹果🏳️</p>
+
+								
+								<div class="comment-footer">
+									<div class="column text-right">
+																				<a class="reply-link m-r-10 forum_report" href="#" data-comment="2798337"><i class="icon-alert-triangle"></i>檢舉</a>										<a class="reply-link forum_reply" href="#" data-comment="2798337-216709"><i class="icon-corner-up-left"></i>回覆</a>									</div>
+								</div>
+							</div>
+						</div>
+												<div class="comment" id="comment-2799985">
+							<div class="comment-author-ava">
+								<a href="/my/profile?uid=71585" target="_blank"><div class="lazyload-author-ava" data-src="https://i.pinimg.com/564x/ec/4b/c0/ec4bc0f9ec00d1454fc61de82b047c09.jpg"></div></a>							</div>
+							<div class="comment-body">
+								<div class="comment-header">
+									<div class="column">
+										<span class="comment-title"><a href="/my/profile?uid=71585" target="_blank">贫乳回避</a></span>
+									</div>
+									<div class="column text-right">
+										<span class="comment-meta m-r-10 comment-floor">#7</span>
+										<span class="comment-meta">2026-02-24 10:03</span>
+									</div>
+								</div>
+																<p class="comment-text ">只要你做好准备，臭脚是不会追上你的</p>
+
+								
+								<div class="comment-footer">
+									<div class="column text-right">
+																				<a class="reply-link m-r-10 forum_report" href="#" data-comment="2799985"><i class="icon-alert-triangle"></i>檢舉</a>										<a class="reply-link forum_reply" href="#" data-comment="2799985-71585"><i class="icon-corner-up-left"></i>回覆</a>									</div>
+								</div>
+							</div>
+						</div>
+						
+					</section>
+										<div style="text-align: right;">
+						<div id="page-selection-bottom" style="display:inline-block;margin-left:auto;"></div>
+					</div>
+									</div>
+				<div class="hidden-xs hidden-sm col-xl-3 col-lg-4">
+										<section class="widget widget-tags m-t-20">
+						<h3 class="widget-title">內容標籤</h3>
+						<a class="tag" href="/tags/R15/">R15</a><a class="tag" href="/tags/足控/">足控</a><a class="tag" href="/tags/萝莉/">萝莉</a><a class="tag" href="/tags/踩踏/">踩踏</a><a class="tag" href="/tags/抖M/">抖M</a>					</section>
+
+					
+					<h3 class="widget-title text-left m-b-20">最新更新</h3>
+					<aside class="sidebar sidebar-offcanvas">
+						<span class="sidebar-close"><i class="material-icons icon_close"></i></span>
+						<section class="widget widget-categories pt-0 pb-2">
+							<ul>
+								<li><a href="/detail/1793027953.html">「为了偿还父母的债务，我要去做风俗业」这么说的她，我给了她57万8千日元。然而这一切都是谎言，她拿着我的钱和同伴们玩乐，还笑着称我为「ATM」。</a></li><li><a href="/detail/1793098793.html">成为了不列颠的儿童之友</a></li><li><a href="/detail/1792419508.html">被解雇的凌叔叔竟然是天才吉他手？</a></li><li><a href="/detail/1784798089.html">赛博剑侠传</a></li><li><a href="/detail/1784967325.html">OVERLORD 倾国狐的异世界日记</a></li><li><a href="/detail/1792987261.html">只有我上过魔法学院所以去爬塔</a></li><li><a href="/detail/1792157549.html">转生者，以嗜乐之心，求索无上之力，化为天衣无缝的修罗</a></li><li><a href="/detail/1759572725.html">成为了黑手党家族的小女儿</a></li><li><a href="/detail/1791596460.html">TS转生为成人向游戏的反派公爵千金，驾驶机甲卷入国家纷争，要和所有女主角成为好朋友（意味深长）！</a></li><li><a href="/detail/1792495483.html">童话里的反派千金忙着赎罪</a></li><li><a href="/detail/1764496071.html">虽然成了飞机杯，但我仍要攻略塔</a></li><li><a href="/detail/1768923703.html">我成了北海冰宫的少宫主</a></li>							</ul>
+						</section>
+					</aside>
+										<h3 class="widget-title text-left m-t-20 m-b-20">最新討論</h3>
+					<aside class="sidebar sidebar-offcanvas">
+						<span class="sidebar-close"><i class="material-icons icon_close"></i></span>
+						<section class="widget widget-categories pt-0 pb-2">
+							<ul>
+								<li><a href="/forum/1789432631/606396.html">389 - 蔚蓝之恋 Forever！</a></li><li><a href="/forum/1716174812/503845.html">628.应试集大成者</a></li><li><a href="/forum/1749797723/606395.html">35 - 某个女人的好感</a></li><li><a href="/forum/1792063832/605137.html">48. 见到了恶女</a></li><li><a href="/forum/1783615896/546610.html">0026_26. 火之後裔所走的路</a></li><li><a href="/forum/1576573703/604640.html">Web 198</a></li><li><a href="/forum/1791969703/606251.html">Chap4.物色（4）</a></li><li><a href="/forum/1781491904/536351.html">第14话 广告碰头会当天</a></li><li><a href="/forum/1793027953/606394.html">第42话　那天，笑着的四人</a></li><li><a href="/forum/1788599464/606393.html">369 - 骑士的休假(2)</a></li>							</ul>
+						</section>
+					</aside>
+									</div>
+			</div>
+		</section>
+
+				<!-- Site Footer-->
+		<footer class="site-footer">
+			<div class="container">
+				<!-- Copyright-->
+				<p class="footer-copyright">© <script>document.write(new Date().getFullYear());</script>. Made with &nbsp;<i class="icon-heart text-danger"></i></p>
+			</div>
+		</footer>
+			</div>
+	<a class="scroll-to-end-btn" href="#"><i class="icon-arrow-down"></i></a>
+	<a class="scroll-to-top-btn" href="#"><i class="icon-arrow-up"></i></a>
+	<!-- Backdrop-->
+	<div class="site-backdrop"></div>
+
+	<style>.pagination{margin-bottom: 0px;}</style>
+		<script src="/assets/js/scripts.min.js"></script>
+	<script src="/assets/js/customizer.min.js?v=311"></script>
+	<script src="https://cdnjs.cloudflare.com/ajax/libs/core-js/2.4.1/core.js"></script>
+	<script src="https://cdnjs.cloudflare.com/ajax/libs/limonte-sweetalert2/6.10.1/sweetalert2.all.min.js"></script>
+	<script src="/assets/js/jquery.ajaxform.js"></script>
+		<script src="/assets/js/modifyDetail.js?v=204"></script>
+	<script src="/assets/js/froala_editor.min.js"></script>
+	<script src="https://cdnjs.cloudflare.com/ajax/libs/froala-editor/3.1.0/js/plugins/char_counter.min.js"></script>
+	<script src="https://cdnjs.cloudflare.com/ajax/libs/froala-editor/3.1.0/js/plugins/link.min.js"></script>
+	<script src="/assets/js/plugins/emoticons.min.js"></script>
+	<script src="https://cdnjs.cloudflare.com/ajax/libs/froala-editor/3.1.0/js/plugins/colors.min.js"></script>
+	<script src="https://cdnjs.cloudflare.com/ajax/libs/froala-editor/3.1.0/js/plugins/font_size.min.js"></script>
+	<script src="https://cdnjs.cloudflare.com/ajax/libs/froala-editor/3.1.0/js/plugins/font_family.min.js"></script>
+	<script src="https://cdnjs.cloudflare.com/ajax/libs/froala-editor/3.1.0/js/plugins/image.min.js"></script>
+	<script src="https://cdnjs.cloudflare.com/ajax/libs/froala-editor/3.1.0/js/plugins/video.min.js"></script>
+	<script src="https://cdnjs.cloudflare.com/ajax/libs/froala-editor/3.1.0/js/plugins/align.min.js"></script>
+	<script src="/assets/js/jquery.mloading.js?>"></script>
+		<script src="/assets/js/chinese_convert.js"></script>
+	<script src="/assets/js/jquery.bootpag.min.js"></script>
+	<script src="/assets/js/plugins/ruby.js"></script>
+	<script src="/assets/js/plugins/details.js?v=1793156882"></script>
+	<script>
+		(function () {
+						editor['commentEditor'] = new FroalaEditor("#commentEditor", {
+				enter: FroalaEditor.ENTER_BR, 
+				toolbarButtons: [['insertImage', 'insertLink']], 
+				placeholderText: '請輸入你的回應', 
+				pasteDeniedAttrs: ['class', 'id', 'style', 'align'], 
+				htmlAllowedTags: ['br','a','img'], 
+				imageUpload: false, 
+				heightMin: 50, 
+				heightMax: 400, 
+				linkEditButtons: ['linkEdit', 'linkRemove'], 
+				zIndex:2501, 
+				events : {
+					'froalaEditor.initialized' : function(e, editor) {
+						editor.edit.off();
+					}
+				}
+			});
+			
+			
+			$('.lazyload-author-ava').lazy();
+		})()
+
+		$(document).ready(function(t){
+			page = 1;
+			if (hash != "") {
+				$.each($('.comment'), function(i,v) {
+					if ($('.comment').eq(i).attr('id') == hash) {
+						page = (Math.floor(i/15))+1;
+						return false;
+					}
+				});
+			}
+
+			$(".comments-page-" + page).show();
+			$('#page-selection-top, #page-selection-bottom').bootpag({
+				total: 1,
+				page: page,
+				maxVisible: 5,
+				leaps: false, 
+				firstLastUse: true, 
+				first: '←',
+				last: '→'
+			}).on("page", function(event, num){
+				$('.comments-section').hide();
+				$('.comments-page-' + num).show();
+				$("html, body").animate({ scrollTop: content_end }, 100);
+			});
+
+			let count = 0;
+			let i = setInterval(function() {
+				if (count > 20) clearInterval(i);
+				if (hash != "") {
+					clearInterval(i);
+
+					setTimeout(function() {
+						$('.comments-page-' + page).scrollTop($(".comments-page-" + page + " #" + hash).offset().top);
+					}, 2000);
+				}
+
+				count++;
+			}, 200);
+
+					});
+	</script>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a516bbc0d96ebc74',t:'MTc5MzE1Njg3OQ=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+</html>

@@ -1,0 +1,738 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>斗破苍穹之崩坏三最新章节(萧家三少),斗破苍穹之崩坏三无弹窗全文阅读-书耽</title>
+    <meta name="keywords" content="斗破苍穹之崩坏三,斗破苍穹之崩坏三全文阅读,,斗破苍穹之崩坏三最新章节"/>
+    <meta name="description" content="斗破苍穹之崩坏三是作者萧家三少倾情打造的一部小说，书耽第一时间提供斗破苍穹之崩坏三小说最新章节以及斗破苍穹之崩坏三全文阅读。页面清爽无广告，访问速度快。"/>
+
+    <meta name="format-detection" content="telephone=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black">
+    <meta name="viewport" content="width=device-width, initial-scale=0.5, maximum-scale=0.5, minimum-scale=0.5, user-scalable=0">
+    <!--针对UC浏览器的设置-->
+    <meta name="browsermode" content="application">
+    <!--应用模式-->
+    <meta name="full-screen" content="no">
+    <!-- QQ应用模式 -->
+    <meta name="x5-page-mode" content="app">
+
+    <link rel="shortcut icon" href="http://m.shubl.com/resources/images/icon/ShuDan_Icon_32_R.png">
+
+    <link rel="stylesheet" type="text/css" href="http://m.shubl.com/resources/fonts/iconfont.css"/>
+    <link rel="stylesheet" type="text/css" href='http://m.shubl.com/resources/css/style.css'/>
+    <link rel="stylesheet" type="text/css" href='http://m.shubl.com/resources/css/grid.css'/>
+
+    <script type="text/javascript" language="javascript" src='http://m.shubl.com/resources/js/jquery-3.2.1.min.js'></script>
+    <script type="text/javascript" language="javascript" src='http://m.shubl.com/resources/js/flexible.js'></script>
+    <script type="text/javascript" language="javascript" src='http://m.shubl.com/resources/js/third-parties/jquery.uiAlertView-1.0.0.js'></script>
+    <script type="text/javascript">
+        var SD = SD || {};
+        SD.config = {jsPath:'http://m.shubl.com/resources/js', rootPath:'http://m.shubl.com/'};
+        SD.book = {book_id: 100843044, chapter_id: "", up_reader_id: 18884529, is_paid: 0};
+        SD.userinfo = {reader_id: 0, reader_name: '""', avatar_thumb_url: '""', vip_lv: ""};
+        SD.reader_other_info = {"exp_lv_list":{"1":"\u65e0\u540d\u5c0f\u53d7","2":"\u521d\u5165\u8150\u95e8","3":"\u521d\u7aa5\u8150\u5f84","4":"\u767d\u53d7\u8d77\u5bb6","5":"\u4e00\u7247\u803d\u5fc3","6":"\u9e33\u9e33\u76f8\u62b1","7":"\u7eaf\u7231\u60c5\u957f","8":"\u53ef\u653b\u53ef\u53d7","9":"\u6709\u8150\u65e0\u7c7b","10":"\u8150\u5982\u4e1c\u6d77","11":"\u8150\u95e8\u6c38\u5b58","12":"\u65e0\u53cc\u7ec5\u58eb","13":"\u653b\u5fb7\u65e0\u91cf","14":"\u4e07\u53d7\u65e0\u7586","15":"\u51fa\u5165\u5e73\u5b89"},"vip_lv_list":["\u666e\u901a","\u4f1a\u5458","\u521dV","\u9ad8V","\u94bbV"]}    </script>
+    <script type="text/javascript" src="http://m.shubl.com/resources/js/base.js"></script>
+    <script>
+        var _hmt = _hmt || [];
+        (function() {
+            var hm = document.createElement("script");
+            hm.src = "//hm.baidu.com/hm.js?3c839f98d7d8b725181063a036813536";
+            var s = document.getElementsByTagName("script")[0];
+            s.parentNode.insertBefore(hm, s);
+        })();
+    </script>
+</head>
+<body>
+<div id="global_search_body">
+    <form id="search_header" method="get" target="_self" action="http://m.shubl.com/index/search_book">
+        <div class="left" style="width: 80%">
+            <div class="search-wrap center">
+                <input class="input" type="text" name="key" id="search_book_input" value="" placeholder="输入你感兴趣的作者作品">
+                <a class="search"><i class="iconfont icon-sousuo"></i></a>
+            </div>
+        </div>
+        <div class="right" style="top:0.37274999999999997rem;">
+            <a id="search_close_btn">取消</a>
+        </div>
+    </form>
+</div>
+<div id="global_menu_body">
+    <div class="header" style="border-bottom: solid 1px #efefef">
+        <div class="left">
+        </div>
+        <span class="J_PageName">作者主页</span>
+        <div class="right">
+            <a id="list_close_btn"><i class="iconfont icon-close"></i></a>
+        </div>
+    </div>
+    <div class="bg-white">
+        <ul id="index_menu">
+            <li>
+                <a class="menu-icon-home" href="http://m.shubl.com/">
+                    <i class="iconfont icon-shouye"></i>
+                </a>
+                <p>首页</p>
+            </li>
+            <li>
+                <a class="menu-icon-fenlei" href="http://m.shubl.com/index/category">
+                    <i class="iconfont icon-fenlei"></i>
+                </a>
+                <p>分类</p>
+            </li>
+            <li>
+                <a class="menu-icon-paihang" href="http://m.shubl.com/index/rank">
+                    <i class="iconfont icon-paihang"></i>
+                </a>
+                <p>排行</p>
+            </li>
+            <li>
+                <a class="menu-icon-wanben" href="http://m.shubl.com/index/ended">
+                    <i class="iconfont icon-wanben"></i>
+                </a>
+                <p>完本</p>
+            </li>
+            <li>
+                <a class="menu-icon-vip" href="http://m.shubl.com/index/vip">
+                    <i class="iconfont icon-vip-zhuanqu"></i>
+                </a>
+                <p>VIP专区</p>
+            </li>
+            <li>
+                <a class="menu-icon-usercenter" href="http://m.shubl.com/reader/get_my_info">
+                    <i class="iconfont icon-user-center"></i>
+                </a>
+                <p>个人中心</p>
+            </li>
+        </ul>
+        <div class="text-center" style="padding: 0.26625rem 0 0.5325rem 0;">
+            <a class="btn btn-primary btn-large" style="width: 80%" href="http://m.shubl.com/bookshelf/my">我的书架</a>
+        </div>
+    </div>
+</div><!--container start-->
+<style>
+    html, body {
+        height: 100%;
+    }
+    .container + .container {
+        margin-top: 0.3195rem;
+    }
+    #book_info {
+        margin-bottom: 0.639rem;
+        position: relative;
+    }
+    #book_info:after {
+        clear: both;
+        content: "";
+        display: table;
+    }
+    #book_info .thumb {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 2.60925rem;
+        height: 3.46125rem;
+        background: #8f8f8f;
+        overflow: hidden;
+    }
+    #book_info .thumb img {
+        width: 100%;
+        height: auto;
+        margin: auto 0;
+    }
+    #book_info .info {
+        margin-left: 2.92875rem; /* 196+24*/
+        min-height: 3.46125rem;
+        font-size: 0.3195rem;
+        line-height: 1.6;
+    }
+    #book_info .info > div + div {
+        margin-top: 0.426rem;
+        white-space: nowrap;
+        overflow: hidden;
+    }
+    #book_info .info .name {
+        font-size: 0.426rem;
+        color: #333;
+    }
+    #book_info .info span + span {
+        margin-left: 0.15975rem;
+        padding-left: 0.15975rem;
+        border-left: solid 1px #333;
+    }
+    #book_info + div {
+        display: flex;
+        justify-content: space-between;
+    }
+    #book_info + div > .btn {
+        border-radius: 0.15975rem;
+        height: 0.7321875rem;
+        line-height: 0.7321875rem;
+        width: 30%;
+    }
+    #book_info [class*='btn-outline-'] {
+        border-width: 1px;
+        border-radius: 0.079875rem;
+        margin-right: 0.26625rem;
+    }
+    .block-title .text-muted {
+        font-size: 0.37275rem;
+    }
+    #comment_list {
+        display: block;
+        margin: 0 -0.26625rem;
+        border-top: solid 0.079875rem #efefef;
+    }
+    #comment_list li {
+        margin: 0.37275rem 0.26625rem 0;
+        padding-bottom: 0.37275rem;
+        border-bottom: solid 1px #efefef;
+        background: #fff;
+        position: relative;
+    }
+    #comment_list li .thumb {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 1.091625rem;
+        height: 1.091625rem;
+        border-radius: 50%;
+        overflow: hidden;
+    }
+    #comment_list li .thumb img {
+        width: 100%;
+        height: auto;
+    }
+    #comment_list li .info {
+        margin-left: 1.357875rem;
+    }
+    li:after {
+        content: "";
+        display: table;
+        clear: both;
+    }
+
+    #dashang_selects {
+        padding: 0.5325rem 0.426rem 0.26625rem 0.426rem;
+        column-count: 4;
+        column-gap: 0.426rem;
+        -webkit-column-count: 4;
+        -webkit-column-gap: 0.426rem;
+        -moz-column-count: 4;
+        -moz-column-gap: 0.426rem;
+    }
+    #dashang_selects .item {
+        display: block;
+        text-align: center;
+        vertical-align: middle;
+        height: 1.411125rem;
+        margin-bottom: 0.399375rem;
+        border-radius: 0.079875rem;
+        font-size: 0.399375rem;
+        line-height: 1.2;
+        padding: 0.213rem;
+        font-family: 'Microsoft YaHei';
+        font-weight: bolder;
+        border: solid 2px #999;
+    }
+    #dashang_selects .item.active {
+        color: #fa7298;
+        border-color: #fa7298
+    }
+
+    .blade_box{
+        width: 76%;
+        border: dashed 2px #fa7298;
+        border-radius: 0.079875rem;
+        height: 2rem;
+        margin: 0.665625rem 12% 0;
+    }
+    .blade_box .blade_price{
+        display: inline-block;
+        width: 35%;
+        vertical-align: middle;
+        text-align: center;
+        height: inherit;
+        line-height: 2rem;
+        overflow: hidden;
+    }
+    .blade_box .blade_detail{
+        display: inline-block;
+        width: 65%;
+        height: 100%;
+        float: left;
+        border-left: dashed 1px #fa7298;
+        vertical-align: middle;
+        text-align: center;
+        line-height: 0.6666rem;
+    }
+
+    .subscribe-box {
+        position: fixed;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        z-index: 200;
+        font-size: 0.40625rem;
+        color: #828282;
+        background: #f7f7f7;
+    }
+
+    .subscribe-box .sub-item {
+        position: relative;
+        padding: 0.328125rem 0.46875rem;
+        border-bottom: 1px solid #e6e6e6;
+        background: #fff;
+    }
+    .subscribe-box .sub-item p {
+        width: 100%;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+    .subscribe-box .sub-item .rest-hlb {
+        line-height: 1.21875rem;
+    }
+    .subscribe-box .btn {
+        padding: 0.078125rem 0.4375rem;
+        font-size: 0.40625rem;
+        line-height: 0.625rem;
+        border-radius: 0.46875rem;
+    }
+    .subscribe-box .btn-default {
+        color: #fff;
+        background-color: #fa7298;
+    }
+    .subscribe-box .sub-item .btn-recharge {
+        position: absolute;
+        top: 0.546875rem;
+        right: 0.46875rem;
+    }
+    .subscribe-box .tips {
+        margin-top: 0.3125rem;
+        padding: 0.328125rem 0.46875rem;
+        background: #fff;
+        border-top: 1px solid #e6e6e6;
+    }
+
+    .hidden{
+        display: none;
+    }
+
+    .promotion-info{
+        background: #f77672;
+        position: relative;
+        left: 1.4rem;
+        border-radius: 0 0 0.1rem 0.1rem;
+        text-align: center;
+        color: #eee;
+        line-height: 0.45rem;
+        width: 1.2rem;
+        height: 0.45rem;
+    }
+</style>
+<div id="header">
+    <div class="left">
+        <a id="prev_btn" href="javascript:history.back();"><i class="iconfont icon-arrow-left"></i></a>
+    </div>
+    <span>斗破苍穹之崩坏三</span>
+    <div class="right">
+        <a href="javascript:;" id="search_btn"><i class="iconfont icon-sousuo"></i></a>
+        <a href="javascript:;" id="list_btn"><i class="iconfont icon-menu"></i></a>
+    </div>
+</div>
+<div class="bg-gray" style="padding-top:0.3195rem;">
+    <div class="container" style="padding:0.426rem 0.26625rem;">
+        <div id="book_info">
+            <div class="thumb">
+                <img class="lazyload cover" data-original="https://dede-cdn.shubl.com/uploads/allimg/c240602/7881633541e7ba0389f532bed3e30fe9.png" src="http://m.shubl.com/default.jpg" alt="斗破苍穹之崩坏三">
+            </div>
+                        <div class="info">
+                <div><a href="" target="_blank" class="name">斗破苍穹之崩坏三</a></div>
+                <div class="author">萧家三少 | 同人无CP/同人无CP</div>
+                <div class="numbers">
+                    <span>1.0万字</span>
+                    <span>2.9万点击</span>
+                    <span>23收藏</span>
+                </div>
+                <div>
+                                            <button class="J_Tag btn btn-mini btn-outline-purple">爽文</button>
+                                            <button class="J_Tag btn btn-mini btn-outline-default">玄幻</button>
+                                            <button class="J_Tag btn btn-mini btn-outline-default">动漫</button>
+                                            <button class="J_Tag btn btn-mini btn-outline-purple">网游</button>
+                                    </div>
+            </div>
+        </div>
+        <div>
+                            <button data-favor="0" data-book-id="100843044" class="J_Favor btn btn-outline-default"> <span class="J_FavorText">放入书架</span> </button>
+                        <button class="btn btn-outline-default J_SubscribeAll">全本订阅</button>
+                            <a onclick="window.open('https://app.shubl.com/setting/download','_blank')" class="btn btn-primary">下载APP,读本书</a>
+                    </div>
+    </div>
+
+    
+    <div class="container">
+        <div class="block-title">简介</div>
+        <div class="text-muted J_DescContent">
+            萧炎穿越到崩坏三的世界里成为了琪亚娜的弟弟        </div>
+        <div>
+            <a class="more pull-right text-muted J_ShowAllBar">更多>></a>
+        </div>
+    </div>
+
+    <div class="container">
+        <a href="http://m.shubl.com/reader/up_book_list/18884529" class="block-title">
+            作者
+            <span class="pull-right text-muted">
+          <i style="display:inline-block;border-radius:50%;width:0.426rem;height:0.426rem;content:'';background:#ffac83; vertical-align:middle;"></i>
+          萧家三少 <i class="iconfont icon-arrow-right"></i>
+        </span>
+        </a>
+    </div>
+
+    <div class="container">
+        <ul id="tools">
+            <li onclick="openDialod('recommend')">
+                <i class="iconfont icon-tuijian"></i>
+                <p>推荐</p>
+                <p class="small text-muted"><span class="J_BookRecommend">0</span>票</p>
+            </li>
+            <li onclick="openDialod('reward')">
+                <i class="iconfont icon-dashang"></i>
+                <p>打赏<p>
+                <p class="small text-muted"><span class="J_BookDaShang">0</span>耽币</p>
+            </li>
+            <li onclick="openDialod('blade')">
+                <i class="iconfont icon-cuigeng"></i>
+                <p>催更</p>
+                <p class="small text-muted"><span class="J_BookBlade">0</span>票</p>
+            </li>
+            <li onclick="openDialod('yp')">
+                <i class="iconfont icon-yuepiao"></i>
+                <p>月票</p>
+                <p class="small text-muted"><span class="J_BookYp">0</span>票</p>
+            </li>
+        </ul>
+    </div>
+
+    <div class="container">
+        <div class="block-title">
+            <span>更多推荐</span>
+<!--            <a href="" class="more">更多 &gt;</a>-->
+        </div>
+        <ul class="book-list book-list-vetical">
+                            <li>
+                    <a href="http://m.shubl.com/book/book_detail/100679610">
+                        <span class="thumb">
+                            <img class="lazyload cover" data-original="https://dede-cdn.shubl.com/uploads/allimg/c220411/8f840ce3cea8125a983a24b5a3bcab19.jpeg" src="http://m.shubl.com/default.jpg" alt="【快穿】满级大佬虐渣攻略">
+                        </span>
+                        <div class="info">
+                            <span class="title">【快穿】满级大佬虐渣攻略</span>
+                            <div class="author">程六六</div>
+                            <div class="summaries">
+                                秋唐，一个长相极品性格虐人的大佬级小受，又渣又茶脑子还特好使，向来在风月场里寻欢作乐惯了，钓系属性拉满，没有他钓不到的男人，但绝口不谈“爱情”二字。没想到一朝穿越，绑定“渣攻系统”，专门替原主教训渣男，在各个位面里虐的渣男们挠心挠肺。ps：?主受，无cp，爽就完事了。?每个位面的炮灰攻都不同，可以当做独立的故事阅读。                            </div>
+                        </div>
+                    </a>
+                </li>
+                            <li>
+                    <a href="http://m.shubl.com/book/book_detail/100359295">
+                        <span class="thumb">
+                            <img class="lazyload cover" data-original="https://dede-cdn.shubl.com/uploads/allimg/c200508/1d68152e17b1c08716535b0dfeb70417.jpg" src="http://m.shubl.com/default.jpg" alt="【快穿】我心怀天下">
+                        </span>
+                        <div class="info">
+                            <span class="title">【快穿】我心怀天下</span>
+                            <div class="author">白鸦芥子</div>
+                            <div class="summaries">
+                                他是毒药，是堕落，是无法触及的镜花水月。殷祸修无情道六百余年，迟迟无法突破渡劫，只好封了记忆进入尘世历练。于是那些渴求他的垂怜的人们欢欣鼓舞，妄图在他身上留下不可磨灭的痕迹。可谁也没想到，他堪破了无情道，却悟了忘情道。他们得到了他的爱，可这爱，如同爱一棵草，爱一缕风。“你之于我，如同草木，如同清风，如同江海，一般无二。”“我叫殷祸，无妄之祸”他是所有人的求不得。Ps:本文又名《我只想飞升》《男主他心怀天下》《人世诸般苦我尝了个遍》《我是所有人的求不得》排雷:①作者终极受控，又渣又强苏爽受。②作者写文不带脑子，请看文的各位把脑子先放旁边搁着。③无cp，不要看到一半问男主没啥没对象，也不要半路让我给男主捡对象，全员单箭头。④文笔小白，裸更，谨慎入坑，不喜勿入。                            </div>
+                        </div>
+                    </a>
+                </li>
+                            <li>
+                    <a href="http://m.shubl.com/book/book_detail/100812977">
+                        <span class="thumb">
+                            <img class="lazyload cover" data-original="https://dede-cdn.shubl.com/uploads/allimg/c230725/64722e8260633e3f7ddda43e2bc58f5b.jpeg" src="http://m.shubl.com/default.jpg" alt="柯南之红与黑之间">
+                        </span>
+                        <div class="info">
+                            <span class="title">柯南之红与黑之间</span>
+                            <div class="author">不是温柔</div>
+                            <div class="summaries">
+                                为了给养父报仇的尤尔暗算黑衣组织后，却不幸被三瓶威士忌捉了回去；被琴酒踩倒在地，尤尔狼狈躺在地上也不忘挑衅:“你最好直接杀了我！”回应他的是琴酒脸上意味深长的笑容。消失了三个月的尤尔重新出现在三瓶威士忌面前面，智多近妖，阵营反转的尤尔成了三名威士忌的重点关注。再一次回来的究竟是敌还是友？终于追查到养父死亡的真相，阵营已经反转灰色的尤尔又该何去何从？再一次来到阴暗的小巷，这一次拿着枪的人是自己，尤尔看着目光决绝的景光缓缓放下了手枪。回到休息屋，回应他的是琴酒黑黝黝的枪口。本来以为一切会到此结束，尤尔在意大利又一个遇见了改变他命运的人。然而药物改造过的身体已经不堪承受工作的压力，无奈之下，尤尔再一次回到了日本，是时候结束这一切了。主角要素：美强惨，伪万人迷，这是一个拯救与被拯救的故事。谁说拯救一定得是爱情？希望我的文笔能让友友们满意，阿门，感谢观看。                            </div>
+                        </div>
+                    </a>
+                </li>
+                            <li>
+                    <a href="http://m.shubl.com/book/book_detail/100822751">
+                        <span class="thumb">
+                            <img class="lazyload cover" data-original="https://dede-cdn.shubl.com/uploads/allimg/c230930/f065a8d688d212136f5946a3a71899b9.jpeg" src="http://m.shubl.com/default.jpg" alt="【火影】我的弟弟不可能那么冷酷">
+                        </span>
+                        <div class="info">
+                            <span class="title">【火影】我的弟弟不可能那么冷酷</span>
+                            <div class="author">漂亮的曼曼</div>
+                            <div class="summaries">
+                                （鼬佐亲情向，不是骨科，不是骨科，不是骨科！！！重要的事情说三遍。）我叫宇智波鼬。我穿越了，我遇到了我的弟弟，在不同的世界里。但是，我的弟弟，宇智波佐助，他变了。见到我，他不是要打要杀，就是沉默不语。我很痛苦。佐助，我不是你最爱的哥哥了吗？最爱你的人是我，你怎么舍得我难过!!!我可爱、甜甜的弟弟哪里去了?!好想哭，我什么时候可以回到我的世界  一句话简介：穿越鼬的穿越故事                            </div>
+                        </div>
+                    </a>
+                </li>
+                            <li>
+                    <a href="http://m.shubl.com/book/book_detail/100826552">
+                        <span class="thumb">
+                            <img class="lazyload cover" data-original="https://dede-cdn.shubl.com/uploads/allimg/c231024/8cf8f91314049fb84ff169d8984e8dca.jpeg" src="http://m.shubl.com/default.jpg" alt="成神后我摆烂了">
+                        </span>
+                        <div class="info">
+                            <span class="title">成神后我摆烂了</span>
+                            <div class="author">发疯的蛋卷头鱼</div>
+                            <div class="summaries">
+                                所有他想要的，皆唾手可得。                            </div>
+                        </div>
+                    </a>
+                </li>
+                            <li>
+                    <a href="http://m.shubl.com/book/book_detail/100766337">
+                        <span class="thumb">
+                            <img class="lazyload cover" data-original="https://dede-cdn.shubl.com/images/default.jpg" src="http://m.shubl.com/default.jpg" alt="深夜睡不着脑洞写文">
+                        </span>
+                        <div class="info">
+                            <span class="title">深夜睡不着脑洞写文</span>
+                            <div class="author">火星撞地球148</div>
+                            <div class="summaries">
+                                2000年一个偏僻的小山村诞下了一个娃从此开启了她的人生之路                            </div>
+                        </div>
+                    </a>
+                </li>
+                    </ul>
+    </div>
+</div>
+
+<!-- overlay -->
+<div id="book_detail_dialog" class="dialog">
+    <div id="book_detail_tabs" class="tabs">
+        <ul>
+            <li id="tab_tuijian" class="active" data-type="recommend">
+                <a href="javascript:;">
+                    <i class="iconfont icon-tuijian"></i>
+                    <span>推荐</span>
+                </a>
+            </li>
+            <li id="tab_dashang" data-type="reward">
+                <a href="javascript:;">
+                    <i class="iconfont icon-dashang"></i>
+                    <span>打赏</span>
+                </a>
+            </li>
+            <li id="tab_cuigeng" data-type="blade">
+                <a href="javascript:;">
+                    <i class="iconfont icon-cuigeng"></i>
+                    <span>催更</span>
+                </a>
+            </li>
+            <li id="tab_yuepiao" data-type="yp">
+                <a href="javascript:;">
+                    <i class="iconfont icon-yuepiao"></i>
+                    <span>月票</span>
+                </a>
+            </li>
+        </ul>
+        <!-- 推荐 -->
+        <div class="tab-content">
+            <div id="panel_recommend" class="J_GiveGift">
+                <div class="shang_amount">
+                    <a class="J_noMinus">-</a>
+                    <input type="text" value="1" class="input input-small J_NumResult" maxlength="10"/>
+                    <a class="J_noPlus">+</a>
+<!--                    <a class="J_noPlus">ALL</a>-->
+                </div>
+                <div class="action-footer">
+                    <span>您的推荐票余额： <b class="J_Recommend">0</b> </span>
+                    <button class="btn btn-primary btn-large btn-rect pull-right J_BoxSubmit" style="width: 40%">投推荐票</button>
+                </div>
+            </div>
+            <!-- 打赏 -->
+            <div id="panel_reward" class="J_GiveGift">
+                <div id="dashang_selects">
+                                            <a data-hlb="100" class="item J_rewardItem">
+                            <strong>100</strong><br>耽币
+                        </a>
+                                            <a data-hlb="233" class="item J_rewardItem">
+                            <strong>233</strong><br>耽币
+                        </a>
+                                            <a data-hlb="666" class="item J_rewardItem">
+                            <strong>666</strong><br>耽币
+                        </a>
+                                            <a data-hlb="999" class="item J_rewardItem">
+                            <strong>999</strong><br>耽币
+                        </a>
+                                            <a data-hlb="2000" class="item J_rewardItem">
+                            <strong>2000</strong><br>耽币
+                        </a>
+                                            <a data-hlb="5000" class="item J_rewardItem">
+                            <strong>5000</strong><br>耽币
+                        </a>
+                                            <a data-hlb="10000" class="item J_rewardItem">
+                            <strong>10000</strong><br>耽币
+                        </a>
+                                            <a data-hlb="100000" class="item J_rewardItem">
+                            <strong>100000</strong><br>耽币
+                        </a>
+                                    </div>
+<!--                <p class="p text-center fn-default">余额不足</p>-->
+<!--                <div class="text-center">-->
+<!--                    <button class="btn btn-primary" style="width: 33%">去充值</button>-->
+<!--                </div>-->
+                <div class="action-footer m-t">
+                    <span>您的耽币余额： <b class="J_HLB">0</b> </span>
+                    <button class="btn btn-primary btn-large btn-rect pull-right J_BoxSubmit" style="width: 40%">打赏</button>
+                    <button class="btn btn-primary btn-large btn-rect pull-right J_ToRecharge hidden" style="width: 40%">余额不足，去充值</button>
+                </div>
+            </div>
+            <!-- 催更 -->
+            <div id="panel_blade" class="J_Prop">
+                <div class="blade_box">
+                    <p class="text-primary pull-left blade_price">
+                        <span class="J_BladePrice">100</span>耽币/催更票</p>
+                    <p class="blade_detail">
+                        已拥有<b class="J_OwnBlade">0</b>张<br>
+                        需购道具：<b class="J_BladeNum">1</b> x 催更票<br>
+                        应付总额：<b class="J_Consume">100</b> 耽币
+                    </p>
+                </div>
+                <div class="shang_amount J_BladeAmount">
+                    <a class="J_noMinus">-</a>
+                    <input type="text" value="1" class="input input-small J_NumResult" maxlength="10"/>
+                    <a class="J_noPlus">+</a>
+<!--                    <a>ALL</a>-->
+                </div>
+                <div class="action-footer">
+                    <span>您的耽币余额： <b class="J_HLB">0</b> </span>
+                    <button class="btn btn-primary btn-large btn-rect pull-right J_BoxSubmit" style="width: 40%">投催更票</button>
+                    <button class="btn btn-primary btn-large btn-rect pull-right J_ToRecharge hidden" style="width: 40%">余额不足，去充值</button>
+                </div>
+            </div>
+            <!-- 月票 -->
+            <div id="panel_yp" class="J_GiveGift">
+                <div class="shang_amount">
+                    <a class="J_noMinus">-</a>
+                    <input type="text" value="1" class="input input-small J_NumResult" maxlength="10"/>
+                    <a class="J_noPlus">+</a>
+<!--                    <a>ALL</a>-->
+                </div>
+<!--                <div class="text-primary text-center">-->
+<!--                    一次性打赏2000自动投一张月票-->
+<!--                    <button class="btn btn-outline-primary">去打赏</button>-->
+<!--                </div>-->
+                <div class="action-footer m-t">
+                    <span>您的月票余额： <b class="J_Stock">0</b> </span>
+                    <button class="btn btn-primary btn-large btn-rect pull-right J_BoxSubmit" style="width: 40%">投月票</button>
+                </div>
+            </div>
+
+        </div>
+
+    </div>
+</div>
+<div class="dialog subscribe-box" id="J_SubscribeBox">
+    <div class="sub-item">
+                <p class="J_ChapterCount">需购章节：0章<br>
+            应付总额：
+                            0耽币
+                    </p>
+                            <a class="btn btn-default btn-recharge J_BuyBook" href="javascript:;">确认订阅</a>
+            </div>
+    <div class="sub-item">
+        <p class="rest-hlb">您的余额： <span class="J_HLB">0</span>耽币</p>
+        <a class="btn btn-default btn-recharge" href="http://m.shubl.com/recharge/index">充值中心</a>
+    </div>
+    <div class="J_ChapterDesc sub-item">
+        <p>您将购买: </p>
+        <p>至: </p>
+    </div>
+    <div class="tips">
+        <h3>温馨提示</h3>
+        <p>1、全本订阅是订阅目前已更新的全部章节，如期间有免费章节和已购买章节，下载时将一并下载。</p>
+        <p>2、免费章节及已购买章节不会重复扣费，请放心购买。</p>
+    </div>
+</div>
+<div class="ui-overlay"></div>
+
+
+<script type="text/javascript" language="javascript" src='http://m.shubl.com/resources/js/dialog-form.js?v=3'></script>
+<script>
+    $(function(){
+        // TO DO
+        $('.ui-overlay').click(function() {
+            $(".dialog").hide();
+            $(".ui-overlay").hide();
+        })
+
+        $("#book_detail_tabs li").click(function() {
+            var it = $(this);
+            var operate_type = it.attr("data-type");
+            console.log(operate_type)
+            it.addClass("active").siblings().removeClass("active");
+            console.log($("#panel_"+operate_type));
+            $("#panel_"+operate_type).show().siblings().hide();
+        })
+
+        $("#dashang_selects .item").click(function() {
+            $(this).addClass("active").siblings().removeClass("active")
+            var hlb = parseInt($("#panel_reward .J_HLB").text());
+            var reward_hlb = parseInt($(this).attr("data-hlb"));
+            if (reward_hlb>hlb){
+                $("#panel_reward .J_ToRecharge").show();
+                $("#panel_reward .J_BoxSubmit").hide();
+            }else {
+                $("#panel_reward .J_ToRecharge").hide();
+                $("#panel_reward .J_BoxSubmit").show();
+            }
+        })
+
+        $(".J_ShowAllBar").click(function () {
+            $(".J_DescContent").css("max-height","100%");
+            $(".J_ShowAllBar").hide();
+        })
+
+        $(document).on('click', ".J_ToRecharge", function () {
+            SD.util.Cookie.set('pre_recharge_page', window.location.href, {
+                domain: document.domain,
+                path: "/"
+            });
+            window.location.href = SD.config.rootPath + "recharge/index";
+        });
+    });
+
+    function openDialod(operate_type) {
+        $(".ui-overlay").show();
+        $("li[data-type='"+operate_type+"']").addClass("active").siblings().removeClass("active");
+        $("#panel_"+operate_type).show().siblings().hide();
+        $("#book_detail_dialog").show();
+    }
+
+    function downloadApp(){
+        $( "#J_DownloadAPP" ).dialog({
+            modal: true,
+            width:300,
+            create: function() {
+                var dialog = $(this);
+                dialog.find('.close-btn').click(function(){
+                    dialog.dialog("close");
+                })
+            }
+        });
+    }
+
+</script>
+<!--    占位块-->
+<div style="height: 3.03525rem;">
+</div><div id="footer">
+    <div class="actions">
+        <a id="J_RedirectWeb" href="http://m.shubl.com/index/redirect_web" target="_blank">电脑版</a>
+        <a href="https://app.shubl.com" target="_blank">客户端</a>
+        <a id="J_GoTop" href="javascript:;">回到顶部</a>
+    </div>
+    <div class="banner">
+        <div class="logo"></div>
+        <a href="https://app.shubl.com/setting/download" id="download_btn" class="btn btn-outline-primary">下载</a>
+    </div>
+</div>
+</body>
+
+</html>

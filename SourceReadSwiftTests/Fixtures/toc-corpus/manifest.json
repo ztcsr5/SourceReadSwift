@@ -1,0 +1,972 @@
+[
+  {
+    "id": 7,
+    "name": "⚡📂错层小说",
+    "rule": "#allchapter dd",
+    "expected": 500,
+    "bodyFile": "toc-fdd9c740108b.body",
+    "baseUrl": "https://m.cuoceng.com/",
+    "chapterNameRule": "",
+    "chapterUrlRule": ""
+  },
+  {
+    "id": 24,
+    "name": "错层小说网",
+    "rule": "id.allchapter@tag.dl@tag.dd@tag.a",
+    "expected": 500,
+    "bodyFile": "toc-2bc469b9631f.body",
+    "baseUrl": "https://m.cuoceng.org/",
+    "chapterNameRule": "",
+    "chapterUrlRule": ""
+  },
+  {
+    "id": 30,
+    "name": "笔趣阁[biquge7]",
+    "rule": "class.list@li@tag.a",
+    "expected": 1838,
+    "bodyFile": "toc-730c465f4744.body",
+    "baseUrl": "https://www.biquge7.top/",
+    "chapterNameRule": "",
+    "chapterUrlRule": ""
+  },
+  {
+    "id": 31,
+    "name": "新笔趣阁",
+    "rule": "class.list@tag.li",
+    "expected": 1838,
+    "bodyFile": "toc-64f49d703b41.body",
+    "baseUrl": "https://www.biquges123.com",
+    "chapterNameRule": "",
+    "chapterUrlRule": ""
+  },
+  {
+    "id": 32,
+    "name": "笔趣阁[biqusa]",
+    "rule": "id.list@tag.dd!0:1:2:3:4:5:6:7:8:9:10:11@a",
+    "expected": 1914,
+    "bodyFile": "toc-e90ddf69aa9c.body",
+    "baseUrl": "https://www.biqusa.com/",
+    "chapterNameRule": "",
+    "chapterUrlRule": ""
+  },
+  {
+    "id": 33,
+    "name": "看书网",
+    "rule": ".row[-1]@a",
+    "expected": 100,
+    "bodyFile": "toc-c001cacd59a7.body",
+    "baseUrl": "https://www.kanshuw.com",
+    "chapterNameRule": "",
+    "chapterUrlRule": ""
+  },
+  {
+    "id": 34,
+    "name": "开心文学网",
+    "rule": ".chapterNum@li@a",
+    "expected": 30,
+    "bodyFile": "toc-30a222b06fd6.body",
+    "baseUrl": "https://www.kxwx.org",
+    "chapterNameRule": "",
+    "chapterUrlRule": ""
+  },
+  {
+    "id": 36,
+    "name": "影书小说[修复]",
+    "rule": "id.list@dd!0:1:2:3:4:5:6:7:8",
+    "expected": 1914,
+    "bodyFile": "toc-c3be6a35418c.body",
+    "baseUrl": "https://www.yingsx.com",
+    "chapterNameRule": "",
+    "chapterUrlRule": ""
+  },
+  {
+    "id": 49,
+    "name": "穿越小说（优）",
+    "rule": "li.chapter@a <js> var r=result; var v=book.getVariable(\"custom\") var b=[]; if(v!=\"\"){ for(i=0;i<r.length-v;i++){ b.push(r[i]); } result=b; } result </js>",
+    "expected": 0,
+    "bodyFile": "toc-42776e26265a.body",
+    "baseUrl": "http://www.kk169.org",
+    "chapterNameRule": "",
+    "chapterUrlRule": ""
+  },
+  {
+    "id": 57,
+    "name": "茶马小说（优++）",
+    "rule": "option",
+    "expected": 1645,
+    "bodyFile": "toc-7826264ba4e6.body",
+    "baseUrl": "https://www.chamabooks.net",
+    "chapterNameRule": "",
+    "chapterUrlRule": ""
+  },
+  {
+    "id": 62,
+    "name": "异轻纵然（优++）",
+    "rule": "#chapterList@a[data-title], p.non, summary",
+    "expected": 18,
+    "bodyFile": "toc-bead4127a33d.body",
+    "baseUrl": "https://www.esjzone.cc",
+    "chapterNameRule": "",
+    "chapterUrlRule": ""
+  },
+  {
+    "id": 75,
+    "name": "恩施轻语（优+）",
+    "rule": "#chapterList@a[data-title], p.non, summary",
+    "expected": 18,
+    "bodyFile": "toc-d2954efea70d.body",
+    "baseUrl": "https://www.esjzone.one",
+    "chapterNameRule": "",
+    "chapterUrlRule": ""
+  },
+  {
+    "id": 106,
+    "name": "大唐小说（优+）",
+    "rule": ".book_list2 .col-md-3:nth-child(n+1) > a",
+    "expected": 37,
+    "bodyFile": "toc-d6a9ff28de9c.body",
+    "baseUrl": "https://www.dtxsw.com",
+    "chapterNameRule": "",
+    "chapterUrlRule": ""
+  },
+  {
+    "id": 112,
+    "name": "漫画搬运（优+）",
+    "rule": ".uk-alert-warning:not(div)&&.uk-alert-warning:not(div) ~ .uk-subnav ~.uk-switcher @js: list=[] voList = Array.from(result).filter(n=>String(n).includes('<h3')) ulList = Array.from(result).filter(n=>String(n).includes('<ul')) ulList.map((n,index)=>{ list.push({ href:\"\", text:java.getString(\"text\",voList[index]), volume:true }) dList = [] Array.from(org.jsoup.Jsoup.parse(n).select(\"li\")).reverse().map(t=>{ mList = Array.from(org.jsoup.Jsoup.parse(t).select(\".muludiv\")).reverse().map(k=>{ dList.push({ href:org.jsoup.Jsoup.parse(k).select(\"a\")[0].attr(\"href\"), text:org.jsoup.Jsoup.parse(k).select(\"a\")[0].text(), volume:false }) }) }) if(java.getString(\"text\",voList[index])!=\"番外篇\"){ dList = dList.sort(function(a, b) { return parseInt((a.text.match(/\\d+/) || [0])[0], 10) - parseInt((b.text.match(/\\d+/) || [0])[0], 10) }) } list = list.concat(dList) }) list",
+    "expected": 0,
+    "bodyFile": "toc-38dbee26b57c.body",
+    "baseUrl": "https://www.antbyw.com",
+    "chapterNameRule": "",
+    "chapterUrlRule": ""
+  },
+  {
+    "id": 117,
+    "name": "吉站漫画（优+）",
+    "rule": "$..chapters[*]@put:{bid:$.data.id}",
+    "expected": 0,
+    "bodyFile": "toc-3bb57edaf861.body",
+    "baseUrl": "https://manhuafree.com/",
+    "chapterNameRule": "",
+    "chapterUrlRule": ""
+  },
+  {
+    "id": 119,
+    "name": "包子漫画（优+）",
+    "rule": "class.pure-g[3,4]@class.comics-chapters__item||class.pure-g.2@class.comics-chapters__item[-1:0]",
+    "expected": 0,
+    "bodyFile": "toc-1df530f09465.body",
+    "baseUrl": "https://cn.bzmanga.com",
+    "chapterNameRule": "",
+    "chapterUrlRule": ""
+  },
+  {
+    "id": 134,
+    "name": "夜天连看（优）",
+    "rule": "class.listmain@tag.dd!0:1:2:3:4:5:6:7:8:9:10:11",
+    "expected": 1914,
+    "bodyFile": "toc-326f969ff680.body",
+    "baseUrl": "http://www.yetianlian.com",
+    "chapterNameRule": "",
+    "chapterUrlRule": ""
+  },
+  {
+    "id": 136,
+    "name": "潇湘书院",
+    "rule": "class.works-main cl@class.profile-main@ul@li",
+    "expected": 9,
+    "bodyFile": "toc-e65dc110d3c3.body",
+    "baseUrl": "https://www.xxsy.net/",
+    "chapterNameRule": "",
+    "chapterUrlRule": ""
+  },
+  {
+    "id": 141,
+    "name": "商店小说（优）",
+    "rule": "class.row@li",
+    "expected": 119,
+    "bodyFile": "toc-18b4aa92d1c1.body",
+    "baseUrl": "http://www.16kbook.net",
+    "chapterNameRule": "",
+    "chapterUrlRule": ""
+  },
+  {
+    "id": 151,
+    "name": "爱下电子（优）",
+    "rule": "@js: var bid = baseUrl.match(/read\\/(\\d+)/)[1]; var resp = java.post(source.getKey()+\"/novel/clist/\",\"bid=\"+bid,{}); var json = JSON.parse(resp.body()).data; var page = 0; var n = \"\"; for(var i=json.length - 1; i >= 0; i--){ if(json[i].ctype === \"1\"){ n = json[i].title; json.splice(i, 1); continue; } page = json[i][\"ordernum\"]; json[i][\"url\"] = source.getKey() + \"/read/\" + bid + \"/p\" + page + \".html\"; json[i][\"n\"] = n; } json;",
+    "expected": 0,
+    "bodyFile": "toc-51a394820b00.body",
+    "baseUrl": "https://ixdzs8.com",
+    "chapterNameRule": "",
+    "chapterUrlRule": ""
+  },
+  {
+    "id": 152,
+    "name": "阅读电子",
+    "rule": "#content@.page",
+    "expected": 0,
+    "bodyFile": "toc-b72dc2d53627.body",
+    "baseUrl": "https://book.vik.im/ ",
+    "chapterNameRule": "",
+    "chapterUrlRule": ""
+  },
+  {
+    "id": 159,
+    "name": "吾爱破解（优+）",
+    "rule": "tag.h1",
+    "expected": 1,
+    "bodyFile": "toc-298b8a55105a.body",
+    "baseUrl": "https://www.52pojie.cn",
+    "chapterNameRule": "",
+    "chapterUrlRule": ""
+  },
+  {
+    "id": 175,
+    "name": "去读书",
+    "rule": "class.index@li",
+    "expected": 0,
+    "bodyFile": "toc-c6094e9fea62.body",
+    "baseUrl": "http://www.qudushu.com",
+    "chapterNameRule": "",
+    "chapterUrlRule": ""
+  },
+  {
+    "id": 184,
+    "name": "夜天连看",
+    "rule": "class.listmain@tag.dd!0:1:2:3:4:5:6:7:8:9:10:11",
+    "expected": 1914,
+    "bodyFile": "toc-326f969ff680.body",
+    "baseUrl": "http://www.yetianlian.com/",
+    "chapterNameRule": "",
+    "chapterUrlRule": ""
+  },
+  {
+    "id": 188,
+    "name": "空白小说",
+    "rule": "#list@dl@dd@a",
+    "expected": 1838,
+    "bodyFile": "toc-be4735cbe40f.body",
+    "baseUrl": "http://www.swsk.org#",
+    "chapterNameRule": "",
+    "chapterUrlRule": ""
+  },
+  {
+    "id": 200,
+    "name": "万象书城",
+    "rule": "#all-chapter a",
+    "expected": 1646,
+    "bodyFile": "toc-485f2a1a4f4f.body",
+    "baseUrl": "https://www.wxscs.com",
+    "chapterNameRule": "",
+    "chapterUrlRule": ""
+  },
+  {
+    "id": 202,
+    "name": "行轻小说",
+    "rule": "class.catalog-list@tag.ul@tag.li@tag.a",
+    "expected": 0,
+    "bodyFile": "toc-75c80fedae0f.body",
+    "baseUrl": "http://s.sfacg.com",
+    "chapterNameRule": "",
+    "chapterUrlRule": ""
+  },
+  {
+    "id": 246,
+    "name": "茶杯狐狸（优+++）",
+    "rule": "id.playlist1@tag.ul@tag.li",
+    "expected": 216,
+    "bodyFile": "toc-2c6a622d6c8c.body",
+    "baseUrl": "https://www.cupfox7.com/",
+    "chapterNameRule": "",
+    "chapterUrlRule": ""
+  },
+  {
+    "id": 259,
+    "name": "塔读小说",
+    "rule": "//*[@class=\"chapter clearfix\"]/a",
+    "expected": 0,
+    "bodyFile": "toc-5e1dbaf61a08.body",
+    "baseUrl": "https://www.tadu.com/",
+    "chapterNameRule": "",
+    "chapterUrlRule": ""
+  },
+  {
+    "id": 269,
+    "name": "穿越小说",
+    "rule": ".list_xm ul li a",
+    "expected": 25,
+    "bodyFile": "toc-18d55a25a1e1.body",
+    "baseUrl": "http://m.kk169.net/",
+    "chapterNameRule": "",
+    "chapterUrlRule": ""
+  },
+  {
+    "id": 283,
+    "name": "快眼看书",
+    "rule": "-class.ptm-list-view chapterlist@class.ptm-list-view-cell@a",
+    "expected": 15,
+    "bodyFile": "toc-c3dad4970647.body",
+    "baseUrl": "http://m.xbotaodz.com",
+    "chapterNameRule": "",
+    "chapterUrlRule": ""
+  },
+  {
+    "id": 298,
+    "name": "快眼看书（优+）",
+    "rule": "class.fulldir@tag.ul@tag.li@tag.a",
+    "expected": 1914,
+    "bodyFile": "toc-55b001305612.body",
+    "baseUrl": "http://www.xbotaodz.com",
+    "chapterNameRule": "",
+    "chapterUrlRule": ""
+  },
+  {
+    "id": 316,
+    "name": "晚怒小说",
+    "rule": "class.cover@tag.ul.1@tag.a",
+    "expected": 20,
+    "bodyFile": "toc-c662227a7156.body",
+    "baseUrl": "http://m.rulianshi.la/",
+    "chapterNameRule": "",
+    "chapterUrlRule": ""
+  },
+  {
+    "id": 326,
+    "name": "久久小说（下载）",
+    "rule": "class.ablum_read",
+    "expected": 1,
+    "bodyFile": "toc-e72608fb24ca.body",
+    "baseUrl": "http://m.9191net.com#",
+    "chapterNameRule": "",
+    "chapterUrlRule": ""
+  },
+  {
+    "id": 336,
+    "name": "久久小说（下载）",
+    "rule": "class.ablum_read",
+    "expected": 1,
+    "bodyFile": "toc-e72608fb24ca.body",
+    "baseUrl": "http://m.9191net.com/",
+    "chapterNameRule": "",
+    "chapterUrlRule": ""
+  },
+  {
+    "id": 351,
+    "name": "快眼看书（优+）",
+    "rule": "class.fulldir@tag.ul@tag.li@tag.a",
+    "expected": 1914,
+    "bodyFile": "toc-55b001305612.body",
+    "baseUrl": "http://www.booksky.cc",
+    "chapterNameRule": "",
+    "chapterUrlRule": ""
+  },
+  {
+    "id": 358,
+    "name": "快眼看书",
+    "rule": "class.fulldir@tag.ul@tag.li@tag.a",
+    "expected": 1914,
+    "bodyFile": "toc-55b001305612.body",
+    "baseUrl": "http://www.xbotaodz.com/",
+    "chapterNameRule": "",
+    "chapterUrlRule": ""
+  },
+  {
+    "id": 365,
+    "name": " 梧桐中文网",
+    "rule": "class.w_ulTxt w_ulTxt_3 clearfix@tag.li",
+    "expected": 123,
+    "bodyFile": "toc-d3d84acb45eb.body",
+    "baseUrl": "http://www.wtzw.com",
+    "chapterNameRule": "",
+    "chapterUrlRule": ""
+  },
+  {
+    "id": 401,
+    "name": "穿越小说",
+    "rule": ".chapter a",
+    "expected": 1664,
+    "bodyFile": "toc-20af3736cf85.body",
+    "baseUrl": "http://www.kk169.net/",
+    "chapterNameRule": "",
+    "chapterUrlRule": ""
+  },
+  {
+    "id": 403,
+    "name": "咋填小说",
+    "rule": "class.cover@tag.ul.1@tag.a",
+    "expected": 20,
+    "bodyFile": "toc-c662227a7156.body",
+    "baseUrl": "http://m.rulianshi.la",
+    "chapterNameRule": "",
+    "chapterUrlRule": ""
+  },
+  {
+    "id": 413,
+    "name": "笔趣小说",
+    "rule": "id.list@tag.dd!0:1:2:3:4:5:6:7:8:9:10:11",
+    "expected": 1914,
+    "bodyFile": "toc-e90ddf69aa9c.body",
+    "baseUrl": "http://www.biqusa.com",
+    "chapterNameRule": "",
+    "chapterUrlRule": ""
+  },
+  {
+    "id": 425,
+    "name": "穿越小说",
+    "rule": ".chapter a",
+    "expected": 1664,
+    "bodyFile": "toc-20af3736cf85.body",
+    "baseUrl": "http://www.kk169.net",
+    "chapterNameRule": "",
+    "chapterUrlRule": ""
+  },
+  {
+    "id": 430,
+    "name": "笔趣阁",
+    "rule": "id.list@tag.dd!0:1:2:3:4:5:6:7:8:9:10:11@a",
+    "expected": 1914,
+    "bodyFile": "toc-e90ddf69aa9c.body",
+    "baseUrl": "https://www.biqusa.com#",
+    "chapterNameRule": "",
+    "chapterUrlRule": ""
+  },
+  {
+    "id": 446,
+    "name": "穿越小说",
+    "rule": "li.chapter@a <js> var r=result; var v=book.getVariable(\"custom\") var b=[]; if(v!=\"\"){ for(i=0;i<r.length-v;i++){ b.push(r[i]); } result=b; } result </js>",
+    "expected": 0,
+    "bodyFile": "toc-42776e26265a.body",
+    "baseUrl": "http://www.kk169.org/",
+    "chapterNameRule": "",
+    "chapterUrlRule": ""
+  },
+  {
+    "id": 448,
+    "name": "穿越小说",
+    "rule": ".list_xm ul li a",
+    "expected": 25,
+    "bodyFile": "toc-18d55a25a1e1.body",
+    "baseUrl": "http://m.kk169.net",
+    "chapterNameRule": "",
+    "chapterUrlRule": ""
+  },
+  {
+    "id": 451,
+    "name": "笔趣小说",
+    "rule": "//*[@id=\"list\"]//dt[2]/following-sibling::dd/a",
+    "expected": 0,
+    "bodyFile": "toc-e90ddf69aa9c.body",
+    "baseUrl": "http://www.biqusa.com#",
+    "chapterNameRule": "",
+    "chapterUrlRule": ""
+  },
+  {
+    "id": 476,
+    "name": "快眼看书",
+    "rule": "class.fulldir@tag.ul@tag.li@tag.a",
+    "expected": 1914,
+    "bodyFile": "toc-55b001305612.body",
+    "baseUrl": "http://www.booksky.cc#",
+    "chapterNameRule": "",
+    "chapterUrlRule": ""
+  },
+  {
+    "id": 484,
+    "name": "年代小说",
+    "rule": "class.listmain@tag.dd!0:1:2:3:4:5:6:7:8:9:10:11",
+    "expected": 1908,
+    "bodyFile": "toc-ed67f99d998f.body",
+    "baseUrl": "http://www.4xiaoshuo.info",
+    "chapterNameRule": "",
+    "chapterUrlRule": ""
+  },
+  {
+    "id": 498,
+    "name": "顶点小说",
+    "rule": "id.list@tag.dd",
+    "expected": 1653,
+    "bodyFile": "toc-dad2a3726500.body",
+    "baseUrl": "https://www.x23us.us/",
+    "chapterNameRule": "",
+    "chapterUrlRule": ""
+  },
+  {
+    "id": 525,
+    "name": "星星小说",
+    "rule": ".book_list2 li a",
+    "expected": 16,
+    "bodyFile": "toc-5ee3ca4ccb12.body",
+    "baseUrl": "http://www.xxtxt.com",
+    "chapterNameRule": "",
+    "chapterUrlRule": ""
+  },
+  {
+    "id": 572,
+    "name": "五二书库",
+    "rule": ".clearfix@.mulu@a",
+    "expected": 126,
+    "bodyFile": "toc-29b193d95407.body",
+    "baseUrl": "https://www.po5.net/",
+    "chapterNameRule": "",
+    "chapterUrlRule": ""
+  },
+  {
+    "id": 573,
+    "name": "书耽中文",
+    "rule": "class.list@tag.li",
+    "expected": 0,
+    "bodyFile": "toc-8b01f53082fe.body",
+    "baseUrl": "http://m.shubl.com",
+    "chapterNameRule": "",
+    "chapterUrlRule": ""
+  },
+  {
+    "id": 603,
+    "name": "快眼看书",
+    "rule": "class.fulldir@tag.ul@tag.li@tag.a",
+    "expected": 1914,
+    "bodyFile": "toc-55b001305612.body",
+    "baseUrl": "http://www.booksky.cc#🎃",
+    "chapterNameRule": "",
+    "chapterUrlRule": ""
+  },
+  {
+    "id": 617,
+    "name": "爱下书吧",
+    "rule": "id.list@tag.dl@tag.dd!0:1:2:3:4:5:6:7:8",
+    "expected": 1661,
+    "bodyFile": "toc-a20ffd625df2.body",
+    "baseUrl": "https://www.aixiawx.com/#pb1101",
+    "chapterNameRule": "",
+    "chapterUrlRule": ""
+  },
+  {
+    "id": 629,
+    "name": "小说",
+    "rule": "dd",
+    "expected": 1926,
+    "bodyFile": "toc-326f969ff680.body",
+    "baseUrl": "http://www.yetianlian.info#",
+    "chapterNameRule": "",
+    "chapterUrlRule": ""
+  },
+  {
+    "id": 641,
+    "name": "久久下载（下载）",
+    "rule": "class.ablum_read",
+    "expected": 1,
+    "bodyFile": "toc-e72608fb24ca.body",
+    "baseUrl": "http://m.9191net.com",
+    "chapterNameRule": "",
+    "chapterUrlRule": ""
+  },
+  {
+    "id": 668,
+    "name": "五二书库",
+    "rule": ".clearfix@.mulu@a",
+    "expected": 126,
+    "bodyFile": "toc-29b193d95407.body",
+    "baseUrl": "https://www.po5.net",
+    "chapterNameRule": "",
+    "chapterUrlRule": ""
+  },
+  {
+    "id": 679,
+    "name": "何以笙箫",
+    "rule": ".chapter.-1@li@a",
+    "expected": 20,
+    "bodyFile": "toc-cac8a2c8226c.body",
+    "baseUrl": "http://m.yetianlian.la#",
+    "chapterNameRule": "",
+    "chapterUrlRule": ""
+  },
+  {
+    "id": 723,
+    "name": "漫画小屋（优）",
+    "rule": "-ul.detail-list-select@li",
+    "expected": 1,
+    "bodyFile": "toc-950e193a60b9.body",
+    "baseUrl": "https://m.dm5.com",
+    "chapterNameRule": "",
+    "chapterUrlRule": ""
+  },
+  {
+    "id": 725,
+    "name": "漫画小屋（优）",
+    "rule": "-ul.detail-list-select@li",
+    "expected": 1,
+    "bodyFile": "toc-950e193a60b9.body",
+    "baseUrl": "https://m.dm5.com/",
+    "chapterNameRule": "",
+    "chapterUrlRule": ""
+  },
+  {
+    "id": 739,
+    "name": "创国漫吧（魔法）",
+    "rule": "-id.chpater-list-1@li@a",
+    "expected": 42,
+    "bodyFile": "toc-692f079ec184.body",
+    "baseUrl": "http://www.guoman8.cc#Haxc1107",
+    "chapterNameRule": "",
+    "chapterUrlRule": ""
+  },
+  {
+    "id": 745,
+    "name": "榴莲影视（优）",
+    "rule": "<js> all=\"\" //线路个数 len=java.getElements('class.nav-tabs[0]@li').length for(i=1;i<=len;i++){ //获取线路名称 from=java.getElements('class.nav-tabs[0]@li')[i-1].text() //获取线路的播放列表 res=java.getElements('class.myui-content__list')[i-1] //把线路名称插入列表里，在更新时间那里显示 res=JSON.stringify(res).replace(/<\\/a>/g,'<p>'+'🎬'+from+'</p></a>') all+=JSON.parse(res) } all </js> class.myui-content__list@li@a",
+    "expected": 0,
+    "bodyFile": "toc-1ee8bb04a6b9.body",
+    "baseUrl": "https://66yy.net",
+    "chapterNameRule": "",
+    "chapterUrlRule": ""
+  },
+  {
+    "id": 773,
+    "name": "优品文档（导+）",
+    "rule": "class.down clear@li",
+    "expected": 2,
+    "bodyFile": "toc-625c5edba654.body",
+    "baseUrl": "https://www.ypppt.com/",
+    "chapterNameRule": "",
+    "chapterUrlRule": ""
+  },
+  {
+    "id": 783,
+    "name": "优品学习（优）",
+    "rule": "class.down clear@li",
+    "expected": 2,
+    "bodyFile": "toc-625c5edba654.body",
+    "baseUrl": "https://www.ypppt.com",
+    "chapterNameRule": "",
+    "chapterUrlRule": ""
+  },
+  {
+    "id": 806,
+    "name": "夜天连看cc",
+    "rule": "class.listmain@tag.dd!0:1:2:3:4:5:6:7:8:9:10:11",
+    "expected": 1914,
+    "bodyFile": "toc-326f969ff680.body",
+    "baseUrl": "http://www.yetianlian.cc",
+    "chapterNameRule": "",
+    "chapterUrlRule": ""
+  },
+  {
+    "id": 821,
+    "name": "去读书⑤",
+    "rule": "class.index@li",
+    "expected": 0,
+    "bodyFile": "toc-c6094e9fea62.body",
+    "baseUrl": "http://www.qudushu.com/#pb1101",
+    "chapterNameRule": "",
+    "chapterUrlRule": ""
+  },
+  {
+    "id": 827,
+    "name": "夜天连看",
+    "rule": "class.listmain@tag.dd!0:1:2:3:4:5:6:7:8:9:10:11",
+    "expected": 1914,
+    "bodyFile": "toc-326f969ff680.body",
+    "baseUrl": "http://www.yetianlian.la",
+    "chapterNameRule": "",
+    "chapterUrlRule": ""
+  },
+  {
+    "id": 834,
+    "name": "去读书",
+    "rule": "class.index@li",
+    "expected": 0,
+    "bodyFile": "toc-c6094e9fea62.body",
+    "baseUrl": "http://www.qudushu.com/",
+    "chapterNameRule": "",
+    "chapterUrlRule": ""
+  },
+  {
+    "id": 842,
+    "name": "去读书",
+    "rule": "class.index@li",
+    "expected": 0,
+    "bodyFile": "toc-c6094e9fea62.body",
+    "baseUrl": "http://www.qudushu.org/",
+    "chapterNameRule": "",
+    "chapterUrlRule": ""
+  },
+  {
+    "id": 845,
+    "name": "SF轻小说#3",
+    "rule": "class.story-catalog@class.catalog-list@tag.ul@tag.li",
+    "expected": 0,
+    "bodyFile": "toc-5bb77eee365c.body",
+    "baseUrl": "http://book.sfacg.com#🎃",
+    "chapterNameRule": "",
+    "chapterUrlRule": ""
+  },
+  {
+    "id": 849,
+    "name": "SF轻小说",
+    "rule": "class.catalog-list@tag.ul@tag.li@tag.a",
+    "expected": 0,
+    "bodyFile": "toc-9fcb4c81d895.body",
+    "baseUrl": "http://s.sfacg.com#🎃",
+    "chapterNameRule": "",
+    "chapterUrlRule": ""
+  },
+  {
+    "id": 850,
+    "name": "久久小说",
+    "rule": "class.ablum_read",
+    "expected": 1,
+    "bodyFile": "toc-e72608fb24ca.body",
+    "baseUrl": "http://m.9191net.com#🎃",
+    "chapterNameRule": "",
+    "chapterUrlRule": ""
+  },
+  {
+    "id": 851,
+    "name": " sf轻小说",
+    "rule": "class.story-catalog@class.catalog-list@tag.ul@tag.li",
+    "expected": 0,
+    "bodyFile": "toc-9f9c13117933.body",
+    "baseUrl": "http://book.sfacg.com已校验",
+    "chapterNameRule": "",
+    "chapterUrlRule": ""
+  },
+  {
+    "id": 853,
+    "name": " SF轻小说",
+    "rule": "class.catalog-list@tag.li",
+    "expected": 0,
+    "bodyFile": "toc-8d5cfd3378da.body",
+    "baseUrl": "http://www.sfacg.com已校验",
+    "chapterNameRule": "",
+    "chapterUrlRule": ""
+  },
+  {
+    "id": 854,
+    "name": "⚡ 夜天连看",
+    "rule": "class.listmain@tag.dd!0:1:2:3:4:5:6:7:8:9:10:11",
+    "expected": 1914,
+    "bodyFile": "toc-326f969ff680.body",
+    "baseUrl": "http://www.yetianlian.la/",
+    "chapterNameRule": "",
+    "chapterUrlRule": ""
+  },
+  {
+    "id": 855,
+    "name": "去读书 #破冰",
+    "rule": "class.index@li",
+    "expected": 0,
+    "bodyFile": "toc-c6094e9fea62.body",
+    "baseUrl": "http://www.qudushu.com/#♤pb",
+    "chapterNameRule": "",
+    "chapterUrlRule": ""
+  },
+  {
+    "id": 864,
+    "name": " SF轻小说",
+    "rule": "class.catalog-list@tag.ul@tag.li@tag.a",
+    "expected": 0,
+    "bodyFile": "toc-ab66c6188a4b.body",
+    "baseUrl": "book.sfacg.com已整理",
+    "chapterNameRule": "",
+    "chapterUrlRule": ""
+  },
+  {
+    "id": 865,
+    "name": " SF轻小说[图片]",
+    "rule": "class.catalog-list@tag.li",
+    "expected": 0,
+    "bodyFile": "toc-35248bf45500.body",
+    "baseUrl": "[图片]http://www.sfacg.com已校验",
+    "chapterNameRule": "",
+    "chapterUrlRule": ""
+  },
+  {
+    "id": 871,
+    "name": "梧桐中文网[网页]",
+    "rule": ".w_ulTxt li a",
+    "expected": 123,
+    "bodyFile": "toc-d3d84acb45eb.body",
+    "baseUrl": "https://www.wtzw.com/",
+    "chapterNameRule": "",
+    "chapterUrlRule": ""
+  },
+  {
+    "id": 872,
+    "name": "梧桐中文",
+    "rule": "class.w_ulTxt w_ulTxt_3 clearfix@tag.li",
+    "expected": 123,
+    "bodyFile": "toc-ea3e2143bb8a.body",
+    "baseUrl": "http://www.wtzw.com#🎃",
+    "chapterNameRule": "",
+    "chapterUrlRule": ""
+  },
+  {
+    "id": 873,
+    "name": "豆花文学",
+    "rule": ".list-inline-3@.list_item@a",
+    "expected": 0,
+    "bodyFile": "toc-deb4833e6f57.body",
+    "baseUrl": "https://www.douhuawenxue.com",
+    "chapterNameRule": "",
+    "chapterUrlRule": ""
+  },
+  {
+    "id": 878,
+    "name": "安轻小说",
+    "rule": "div.wrap.s-list@h3.catalog-title, li",
+    "expected": 0,
+    "bodyFile": "toc-7a966238acf1.body",
+    "baseUrl": "https://book.sfacg.com",
+    "chapterNameRule": "",
+    "chapterUrlRule": ""
+  },
+  {
+    "id": 891,
+    "name": "潇湘书院",
+    "rule": ".profile-main li",
+    "expected": 9,
+    "bodyFile": "toc-39a68a03181f.body",
+    "baseUrl": "https://www.xxsy.net#",
+    "chapterNameRule": "",
+    "chapterUrlRule": ""
+  },
+  {
+    "id": 892,
+    "name": "梧桐中文",
+    "rule": "class.w_ulTxt w_ulTxt_3 clearfix@tag.li",
+    "expected": 123,
+    "bodyFile": "toc-ea3e2143bb8a.body",
+    "baseUrl": "http://www.wtzw.com/",
+    "chapterNameRule": "",
+    "chapterUrlRule": ""
+  },
+  {
+    "id": 902,
+    "name": "豆花文学",
+    "rule": ".list-inline-3@.list_item@a",
+    "expected": 0,
+    "bodyFile": "toc-10a74390d4ec.body",
+    "baseUrl": "https://www.douhuawenxue.com/",
+    "chapterNameRule": "",
+    "chapterUrlRule": ""
+  },
+  {
+    "id": 904,
+    "name": "心轻小说",
+    "rule": "class.catalog-list@tag.ul@tag.li@tag.a",
+    "expected": 0,
+    "bodyFile": "toc-174171f2d9f1.body",
+    "baseUrl": "http://s.sfacg.com/",
+    "chapterNameRule": "",
+    "chapterUrlRule": ""
+  },
+  {
+    "id": 906,
+    "name": "SF轻小说",
+    "rule": "div.wrap.s-list@h3.catalog-title, li",
+    "expected": 0,
+    "bodyFile": "toc-dd0b25304986.body",
+    "baseUrl": "https://book.sfacg.com/",
+    "chapterNameRule": "",
+    "chapterUrlRule": ""
+  },
+  {
+    "id": 908,
+    "name": "就爱读小说网",
+    "rule": "items",
+    "expected": 0,
+    "bodyFile": "toc-ccea560028ca.body",
+    "baseUrl": "https://m.92dxs.org",
+    "chapterNameRule": "",
+    "chapterUrlRule": ""
+  },
+  {
+    "id": 915,
+    "name": "轻小说钱",
+    "rule": "class.catalog-list@tag.li",
+    "expected": 0,
+    "bodyFile": "toc-d509511ad417.body",
+    "baseUrl": "http://www.sfacg.com",
+    "chapterNameRule": "",
+    "chapterUrlRule": ""
+  },
+  {
+    "id": 923,
+    "name": "SF轻小说",
+    "rule": "class.story-catalog@class.catalog-list@tag.ul@tag.li",
+    "expected": 0,
+    "bodyFile": "toc-e2c8b16f1cea.body",
+    "baseUrl": "http://book.sfacg.com",
+    "chapterNameRule": "",
+    "chapterUrlRule": ""
+  },
+  {
+    "id": 936,
+    "name": "何以生肖",
+    "rule": "dd",
+    "expected": 1926,
+    "bodyFile": "toc-326f969ff680.body",
+    "baseUrl": "http://www.yetianlian.info",
+    "chapterNameRule": "",
+    "chapterUrlRule": ""
+  },
+  {
+    "id": 955,
+    "name": "爱读小说",
+    "rule": "items",
+    "expected": 0,
+    "bodyFile": "toc-ccea560028ca.body",
+    "baseUrl": "https://m.92dxs.org#🎃",
+    "chapterNameRule": "",
+    "chapterUrlRule": ""
+  },
+  {
+    "id": 960,
+    "name": "爱读小说",
+    "rule": "items",
+    "expected": 0,
+    "bodyFile": "toc-ccea560028ca.body",
+    "baseUrl": "https://m.92dxs.org#",
+    "chapterNameRule": "",
+    "chapterUrlRule": ""
+  },
+  {
+    "id": 976,
+    "name": "轻小说吧",
+    "rule": "class.catalog-list@tag.li",
+    "expected": 0,
+    "bodyFile": "toc-e544a6e6b5bf.body",
+    "baseUrl": "[图片]http://www.m.sfacg.com",
+    "chapterNameRule": "",
+    "chapterUrlRule": ""
+  },
+  {
+    "id": 978,
+    "name": "SF轻小说",
+    "rule": "class.story-catalog@class.catalog-list@tag.ul@tag.li",
+    "expected": 0,
+    "bodyFile": "toc-64ed87c7f95b.body",
+    "baseUrl": "http://book.sfacg.com#",
+    "chapterNameRule": "",
+    "chapterUrlRule": ""
+  },
+  {
+    "id": 979,
+    "name": "安轻小说",
+    "rule": "div.wrap.s-list@h3.catalog-title, li",
+    "expected": 0,
+    "bodyFile": "toc-64ed87c7f95b.body",
+    "baseUrl": "https://book.sfacg.com#",
+    "chapterNameRule": "",
+    "chapterUrlRule": ""
+  },
+  {
+    "id": 983,
+    "name": "红袖添香",
+    "rule": ".volume-wrap li",
+    "expected": 1681,
+    "bodyFile": "toc-43f467ee00a5.body",
+    "baseUrl": "https://www.hongxiu.com",
+    "chapterNameRule": "",
+    "chapterUrlRule": ""
+  }
+]
