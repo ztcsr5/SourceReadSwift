@@ -11,8 +11,7 @@ final class LegadoFixtureTests: XCTestCase {
         ]
         for name in names {
             let url = try XCTUnwrap(
-                Bundle(for: Self.self).url(forResource: name, withExtension: "json", subdirectory: "Fixtures")
-                    ?? Bundle(for: Self.self).url(forResource: name, withExtension: "json")
+                TestFixtureSupport.url(name: name, extension: "json", subdirectory: "Fixtures")
             )
             let source = try JSONDecoder().decode(BookSource.self, from: Data(contentsOf: url))
             XCTAssertFalse(source.bookSourceName.isEmpty, name)

@@ -24,6 +24,7 @@ final class RealSourceSearchRegressionTests: XCTestCase {
         // XcodeGen may keep the folder reference or flatten every fixture into
         // the bundle root, so probe both shapes and pick whichever holds the index.
         let candidates = [
+            TestFixtureSupport.directory("real-sources"),
             bundle.resourceURL?.appendingPathComponent("Fixtures/real-sources"),
             bundle.resourceURL?.appendingPathComponent("real-sources"),
             bundle.bundleURL.appendingPathComponent("Fixtures/real-sources"),

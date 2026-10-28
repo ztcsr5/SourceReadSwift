@@ -127,10 +127,8 @@ final class SourceEngineLegadoCorpusTests: XCTestCase {
     }
 
     private func loadFixture(named name: String) throws -> BookSource {
-        let bundle = Bundle(for: Self.self)
         let url = try XCTUnwrap(
-            bundle.url(forResource: name, withExtension: "json", subdirectory: "Fixtures")
-                ?? bundle.url(forResource: name, withExtension: "json")
+            TestFixtureSupport.url(name: name, extension: "json", subdirectory: "Fixtures")
         )
         return try JSONDecoder().decode(BookSource.self, from: Data(contentsOf: url))
     }

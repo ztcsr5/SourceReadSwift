@@ -83,10 +83,8 @@ final class LegadoCapabilityBankTests: XCTestCase {
     }
 
     private func loadFixture() throws -> [[String: Any]] {
-        let bundle = Bundle(for: Self.self)
         let url = try XCTUnwrap(
-            bundle.url(forResource: "legado-capability-bank-20260908", withExtension: "json", subdirectory: "Fixtures")
-            ?? bundle.url(forResource: "legado-capability-bank-20260908", withExtension: "json")
+            TestFixtureSupport.url(name: "legado-capability-bank-20260908", extension: "json", subdirectory: "Fixtures")
         )
         let data = try Data(contentsOf: url)
         let raw = try JSONSerialization.jsonObject(with: data)

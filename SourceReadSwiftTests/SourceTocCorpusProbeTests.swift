@@ -94,6 +94,7 @@ final class SourceTocCorpusProbeTests: XCTestCase {
     private func corpusDirectory() throws -> URL {
         let bundle = Bundle(for: type(of: self))
         let candidates = [
+            TestFixtureSupport.directory("toc-corpus"),
             bundle.resourceURL?.appendingPathComponent("Fixtures/toc-corpus"),
             bundle.resourceURL?.appendingPathComponent("toc-corpus"),
             bundle.bundleURL.appendingPathComponent("Fixtures/toc-corpus"),

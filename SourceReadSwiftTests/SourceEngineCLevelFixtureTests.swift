@@ -222,10 +222,8 @@ final class SourceEngineCLevelFixtureTests: XCTestCase {
     // MARK: - Helper
 
     private func loadCapabilityBank() throws -> [[String: Any]] {
-        let bundle = Bundle(for: Self.self)
         let url = try XCTUnwrap(
-            bundle.url(forResource: "legado-capability-bank-20260908", withExtension: "json", subdirectory: "Fixtures")
-                ?? bundle.url(forResource: "legado-capability-bank-20260908", withExtension: "json")
+            TestFixtureSupport.url(name: "legado-capability-bank-20260908", extension: "json", subdirectory: "Fixtures")
         )
         let data = try Data(contentsOf: url)
         return try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [[String: Any]])

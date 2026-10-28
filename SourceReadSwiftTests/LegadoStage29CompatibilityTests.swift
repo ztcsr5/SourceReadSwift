@@ -117,10 +117,8 @@ final class LegadoStage29CompatibilityTests: XCTestCase {
     }
 
     private func loadFixture(named name: String) throws -> BookSource {
-        let bundle = Bundle(for: Self.self)
         let url = try XCTUnwrap(
-            bundle.url(forResource: name, withExtension: "json", subdirectory: "Fixtures")
-                ?? bundle.url(forResource: name, withExtension: "json")
+            TestFixtureSupport.url(name: name, extension: "json", subdirectory: "Fixtures")
         )
         return try JSONDecoder().decode(BookSource.self, from: Data(contentsOf: url))
     }
@@ -241,8 +239,7 @@ private func fixtureBody(_ name: String, extension fileExtension: String) throws
     // Test bundles copy Fixtures as resources; this helper is intentionally
     // independent from XCTest so the network doubles can remain private.
     let candidates = [
-        Bundle(for: LegadoStage29CompatibilityTests.self).url(forResource: name, withExtension: fileExtension, subdirectory: "Fixtures"),
-        Bundle(for: LegadoStage29CompatibilityTests.self).url(forResource: name, withExtension: fileExtension)
+        TestFixtureSupport.url(name: name, extension: fileExtension, subdirectory: "Fixtures")
     ]
     guard let url = candidates.compactMap({ $0 }).first else {
         throw NSError(domain: "Stage29Fixture", code: 1, userInfo: [NSLocalizedDescriptionKey: "missing fixture \(name).\(fileExtension)"])

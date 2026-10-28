@@ -111,6 +111,7 @@ final class SourceRowsCorpusProbeTests: XCTestCase {
     private func corpusDirectory() throws -> URL {
         let bundle = Bundle(for: type(of: self))
         let candidates = [
+            TestFixtureSupport.directory("rows-corpus"),
             bundle.resourceURL?.appendingPathComponent("Fixtures/rows-corpus"),
             bundle.resourceURL?.appendingPathComponent("rows-corpus"),
             bundle.bundleURL.appendingPathComponent("Fixtures/rows-corpus"),
