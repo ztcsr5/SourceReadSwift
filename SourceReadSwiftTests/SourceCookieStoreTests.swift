@@ -73,4 +73,30 @@ final class SourceCookieStoreTests: XCTestCase {
         let count = await store.cookieCount()
         XCTAssertEqual(count, 0)
     }
+
+    func testCookieSetOnParentDomainReachesSubdomain() async throws {
+        let store = SourceCookieStore(storageURL: nil)
+        let loginURL = URL(string: "https://example.com/login")!
+        let cookies = HTTPCookie.cookies(withResponseHeaderFields: [
+            "Set-Cookie": "sid=parent; Path=/; Domain=.example.com"
+        ], for: loginURL)
+
+        await store.storeWebViewCookies(cookies)
+        let header = await store.cookieHeader(for: URL(string: "https://www.example.com/api/search")!)
+
+        XCTAssertEqual(header, "sid=parent")
+    }
+
+    func testCookieStoredOnSubdomainAlsoServesThatSubdomain() async throws {
+        let store = SourceCookieStore(storageURL: nil)
+        let apiURL = URL(string: "https://m.example.com/api")!
+        let cookies = HTTPCookie.cookies(withResponseHeaderFields: [
+            "Set-Cookie": "token=sub; Path=/; Domain=m.example.com"
+        ], for: apiURL)
+
+        await store.store(cookies, for: apiURL)
+        let header = await store.cookieHeader(for: URL(string: "https://m.example.com/read/1")!)
+
+        XCTAssertEqual(header, "token=sub")
+    }
 }

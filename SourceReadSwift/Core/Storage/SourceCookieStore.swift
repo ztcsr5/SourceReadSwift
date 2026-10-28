@@ -55,7 +55,44 @@ actor SourceCookieStore {
     func cookies(for url: URL) -> [HTTPCookie] {
         pruneExpiredCookies()
         guard let host = url.host?.lowercased() else { return [] }
-        return cookiesByHost[host] ?? []
+        // RFC 6265 domain matching: a cookie stored for `example.com` (or
+        // `.example.com`) must also be sent to `www.example.com`, `m.example.com`
+        // and any other subdomain. Login usually happens on one host while
+        // search/toc/content live on another, so an exact-host lookup silently
+        // dropped the session and every authenticated request returned 401.
+        var result: [HTTPCookie] = []
+        var seen = Set<String>()
+        var candidate = host
+        while true {
+            for cookie in cookiesByHost[candidate] ?? [] where cookieMatches(cookie, host: host, path: url.path) {
+                let key = "\(cookie.name)|\(cookie.domain)|\(cookie.path)"
+                if seen.insert(key).inserted {
+                    result.append(cookie)
+                }
+            }
+            guard let dot = candidate.firstIndex(of: ".") else { break }
+            let parent = String(candidate[candidate.index(after: dot)...])
+            if parent.isEmpty || !parent.contains(".") { break }
+            candidate = parent
+        }
+        return result
+    }
+
+    /// True when `cookie` may be sent to `host` + `path`.
+    private func cookieMatches(_ cookie: HTTPCookie, host: String, path: String) -> Bool {
+        let domain = cookie.domain.lowercased()
+        let domainMatches: Bool
+        if domain.hasPrefix(".") {
+            let bare = String(domain.dropFirst())
+            domainMatches = host == bare || host.hasSuffix("." + bare)
+        } else {
+            domainMatches = host == domain
+        }
+        guard domainMatches else { return false }
+        let cookiePath = cookie.path.isEmpty ? "/" : cookie.path
+        if cookiePath == "/" { return true }
+        let requestPath = path.isEmpty ? "/" : path
+        return requestPath == cookiePath || requestPath.hasPrefix(cookiePath.hasSuffix("/") ? cookiePath : cookiePath + "/")
     }
 
     func cookieHeader(for url: URL) -> String? {
