@@ -453,6 +453,24 @@ final class SearchURLResolverTests: XCTestCase {
         XCTAssertEqual(url, "https://m.example.com/search")
     }
 
+    func testMultiLineBraceBlockWithObjectLiteralIsEvaluated() {
+        // The 抖音小说 rule is a `{{ ... }}` block that contains `{}` and
+        // `${...}`. A regex that stops at the first `}` truncates it; the
+        // balanced scanner must consume the whole block.
+        let source = BookSource(
+            bookSourceName: "多行对象字面量",
+            bookSourceUrl: "https://example.com",
+            searchUrl: "{{\nvar base = 'https://m.example.com';\nvar obj = {};\nvar tpl = `${base}`;\nbase\n}}/search/,{\"method\":\"POST\",\"body\":\"k={{key}}\"}"
+        )
+
+        let result = SearchURLResolver().resolve(source: source, keyword: "剑来", page: 1)
+        guard case .success(let url) = result else {
+            return XCTFail("expected success")
+        }
+        XCTAssertTrue(url.hasPrefix("https://m.example.com/search/"), url)
+        XCTAssertFalse(url.contains("%7B%7B"), url)
+    }
+
     func testAppVersionSemantics() {
         // Assert the shape, not a frozen release number: bumping the version
         // should not require editing this test every time.

@@ -274,24 +274,43 @@ struct SearchURLResolver {
         executionContext: RuleExecutionContext?
     ) -> String {
         var output = text
-        let pattern = #"\{\{((?:[^{}]|(?!\}\}))+)\}\}"#
-        guard let regex = try? NSRegularExpression(pattern: pattern) else { return output }
+        var searchStart = output.startIndex
 
-        var searchRange = NSRange(output.startIndex..<output.endIndex, in: output)
-        while let match = regex.firstMatch(in: output, range: searchRange) {
-            guard let fullRange = Range(match.range, in: output),
-                  let innerRange = Range(match.range(at: 1), in: output) else { break }
+        while let open = output.range(of: "{{", range: searchStart..<output.endIndex) {
+            // Legado scans `{{ ... }}` with a balanced scan, not a regex: a
+            // JavaScript block may legally contain object literals (`{}`) and
+            // `${...}` template holes. The old `(?:[^{}]|(?!\}\}))+` pattern
+            // matched a zero-width alternative on `{`, so a multi-line block
+            // (抖音小说) never matched and stayed as `%7B%7B...`.
+            var depth = 0
+            var cursor = open.lowerBound
+            var closeStart: String.Index?
+            while cursor < output.endIndex {
+                let ch = output[cursor]
+                if ch == "{" {
+                    depth += 1
+                } else if ch == "}" {
+                    depth -= 1
+                    if depth == 0 {
+                        closeStart = output.index(cursor, offsetBy: -1)
+                        break
+                    }
+                }
+                cursor = output.index(after: cursor)
+            }
+            guard let close = closeStart else { break }
+
+            let innerRange = open.upperBound..<close
+            let fullRange = open.lowerBound..<output.index(after: cursor)
             let expr = String(output[innerRange]).trimmingCharacters(in: .whitespacesAndNewlines)
             let lower = expr.lowercased()
-            if lower == "key" || lower == "keyword" || lower == "searchkey" || lower == "page" || lower == "baseurl" || lower == "booksourceurl"
-                || lower.hasPrefix("page+") || lower.hasPrefix("page-") || lower.hasPrefix("page*") || lower.hasPrefix("page/") {
-                let nextStart = fullRange.upperBound
-                if nextStart < output.endIndex {
-                    searchRange = NSRange(nextStart..<output.endIndex, in: output)
-                    continue
-                } else {
-                    break
-                }
+            let isPlaceholder = lower == "key" || lower == "keyword" || lower == "searchkey"
+                || lower == "page" || lower == "baseurl" || lower == "booksourceurl"
+                || lower.hasPrefix("page+") || lower.hasPrefix("page-")
+                || lower.hasPrefix("page*") || lower.hasPrefix("page/")
+            if isPlaceholder {
+                searchStart = fullRange.upperBound
+                continue
             }
 
             let evalResult = evaluateScript(
@@ -306,10 +325,9 @@ struct SearchURLResolver {
             switch evalResult {
             case .success(let val):
                 let trimmedVal = val.trimmingCharacters(in: .whitespacesAndNewlines)
-                // A multi-line `{{ ... }}` block (抖音小说) returns its last
-                // expression, exactly like Legado's `eval`.  Treating any
-                // block that contains `;` as side-effect-only dropped the
-                // computed URL and left `/search/` behind.
+                // A multi-line `{{ ... }}` block returns its last expression,
+                // exactly like Legado's `eval`. Treating every block that
+                // contains `;` as side-effect-only dropped the computed URL.
                 if trimmedVal == "undefined" || trimmedVal == "null" || trimmedVal.isEmpty
                     || trimmedVal == "true" || trimmedVal == "false" {
                     replacement = ""
@@ -320,7 +338,7 @@ struct SearchURLResolver {
                 replacement = ""
             }
             output.replaceSubrange(fullRange, with: replacement)
-            searchRange = NSRange(output.startIndex..<output.endIndex, in: output)
+            searchStart = output.startIndex
         }
         return output.trimmingCharacters(in: .whitespacesAndNewlines)
     }
