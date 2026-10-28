@@ -150,7 +150,7 @@ final class SearchURLResolverTests: XCTestCase {
         guard case .success(let url) = result else {
             return XCTFail("expected success")
         }
-        XCTAssertTrue(url.hasPrefix("/search/,"))
+        XCTAssertTrue(url.hasPrefix("https://www.min-yuan.com/search/,"), url)
         XCTAssertFalse(url.contains("cookie.removeCookie"))
 
         let request = SourceRequestBuilder().buildPageRequest(source: source, urlText: url)
@@ -170,7 +170,7 @@ final class SearchURLResolverTests: XCTestCase {
         }
         XCTAssertFalse(url.contains("cookie.removeCookie"))
         XCTAssertFalse(url.contains("source.getKey"))
-        XCTAssertTrue(url.hasPrefix("/modules/article/search.php?searchkey="))
+        XCTAssertTrue(url.hasPrefix("https://www.banwenwu.com/modules/article/search.php?searchkey="), url)
 
         let request = SourceRequestBuilder().buildPageRequest(source: source, urlText: url)
         XCTAssertEqual(request.url.path, "/modules/article/search.php")

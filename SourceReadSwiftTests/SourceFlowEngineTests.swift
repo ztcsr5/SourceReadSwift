@@ -19,7 +19,7 @@ final class SourceFlowEngineTests: XCTestCase {
         XCTAssertEqual(resolved, "https://api.example.com/books/123")
     }
     
-    func testDynamicURLResolverPreservesNormalURL() {
+    func testDynamicURLResolverAbsolutizesRootRelativeURL() {
         let rawUrl = "/api/v1/search?keyword=test"
         let source = BookSource(bookSourceName: "NormalTest", bookSourceUrl: "https://example.com")
         let context = RuleExecutionContext()
@@ -29,7 +29,7 @@ final class SourceFlowEngineTests: XCTestCase {
             source: source,
             context: context
         )
-        XCTAssertEqual(resolved, rawUrl)
+        XCTAssertEqual(resolved, "https://example.com/api/v1/search?keyword=test")
     }
 
     // MARK: - Category 2: 4-Stage Composite Pipeline & Template Interpolation
