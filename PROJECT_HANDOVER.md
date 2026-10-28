@@ -1,10 +1,11 @@
 # SourceReadSwift (纸间) 项目交接全量备忘录
 
 > **交接目标**：交接给下一位 AI 协作者 / 研发工程师  
-> **文档基线**：v1.0.90 (Build 91)；下文主体保留 v1.0.30 (Build 31) 历史记录
+> **文档基线**：v1.0.91 (Build 92)；下文主体保留 v1.0.30 (Build 31) 历史记录
 > **交接时间**：2026-10-28  
-> **验证 Commit**：`6b624b77e`（v1.0.90 76 条整理版书源审计 + GCM/Inflater/hutool/login 头兼容；iOS run `40673826791` **1245 tests / 0 failures**，IPA run `40673826138` success）  
-> **最新产物（v1.0.90）**：`C:/Users/Edc21/Desktop/SourceReadSwift-1.0.90-unsigned.ipa`（12,282,638 字节，SHA256 `6DAEBF20AFFC4FF5387113AB27D82C0229E63411B00781881A248A7ACBF01F55`，`1.0.90 / 91`，MinimumOSVersion 16.0，CFBundleDisplayName 纸间，CFBundleIdentifier com.edc21.SourceReadSwift）  
+> **验证 Commit**：`360926819`（v1.0.91 引擎四项修复：`@js:` 模板插值 / 裸字段前缀求值 / 逐书 `java.put` 回放 / Hutool `encryptHex`；iOS run `40691160747` **1248 tests / 0 failures**，IPA run `40691160718` success）  
+> **最新产物（v1.0.91）**：`C:/Users/Edc21/Desktop/SourceReadSwift-1.0.91-unsigned.ipa`（12,290,943 字节，SHA256 `5D369DECA82EEC4450080C395BED6F37CAA9344FEDBC21695E05BB35D31F7088`，`1.0.91 / 92`，MinimumOSVersion 16.0，CFBundleDisplayName 纸间）  
+> **上一版产物（v1.0.90）**：`C:/Users/Edc21/Desktop/SourceReadSwift-1.0.90-unsigned.ipa`（12,282,638 字节，SHA256 `6DAEBF20AFFC4FF5387113AB27D82C0229E63411B00781881A248A7ACBF01F55`，`1.0.90 / 91`）  
 > **上一版产物（v1.0.89）**：`C:/Users/Edc21/Desktop/SourceReadSwift-1.0.89-unsigned.ipa`（12,279,051 字节，SHA256 `063883C0D29D8793B94E6C62863870CD9A04BBB6B576174F89B074580C1573AA`，`1.0.89 / 90`，MinimumOSVersion 16.0）  
 > **上一版产物（v1.0.88）**：`C:\Users\Edc21\Desktop\SourceReadSwift-1.0.88-unsigned.ipa`（12,278,092 字节，SHA256 `D186EA4CBC5562AE3D9BD3E9DD091BDA4D27E662E72188C9DE00C5372A627D12`，`1.0.88 / 89`，MinimumOSVersion 16.0，CFBundleDisplayName 纸间）  
 > **上一版产物（v1.0.87）**：`C:\Users\Edc21\Desktop\SourceReadSwift-1.0.87-unsigned.ipa`（12,277,812 字节，SHA256 `ADB7B1585DE28E05B70DBEFB07A540A346D0A2D5F7543729471C9928549A64CF`，`1.0.87 / 88`，MinimumOSVersion 16.0，CFBundleDisplayName 纸间）  
