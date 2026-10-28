@@ -1,10 +1,11 @@
 # SourceReadSwift (纸间) 项目交接全量备忘录
 
 > **交接目标**：交接给下一位 AI 协作者 / 研发工程师  
-> **文档基线**：v1.0.83 (Build 84)；下文主体保留 v1.0.30 (Build 31) 历史记录
+> **文档基线**：v1.0.84 (Build 85)；下文主体保留 v1.0.30 (Build 31) 历史记录
 > **交接时间**：2026-10-28  
-> **验证 Commit**：`2e620705d`（v1.0.83 覆盖模式改 UIScrollView；iOS run `40638610223` success，IPA run `40638610178` success）  
-> **最新产物（v1.0.83）**：`C:\Users\Edc21\Desktop\SourceReadSwift-1.0.83-unsigned.ipa`（12,264,325 字节，SHA256 `A3DB31EB605D0C6D97A58923925EEF2AA9DF4ADEE8A157B21C23A4B832FBF22D`，`1.0.83 / 84`，MinimumOSVersion 16.0）  
+> **验证 Commit**：`67c88bee8`（v1.0.84 平移翻页并入 UIKit 分页容器；iOS run `40642380485` Build/Test success）  
+> **最新产物（v1.0.84）**：待本轮 IPA 构建完成后回填（`1.0.84 / 85`，MinimumOSVersion 16.0）  
+> **上一版产物（v1.0.83）**：`C:\Users\Edc21\Desktop\SourceReadSwift-1.0.83-unsigned.ipa`（12,264,325 字节，SHA256 `A3DB31EB605D0C6D97A58923925EEF2AA9DF4ADEE8A157B21C23A4B832FBF22D`，`1.0.83 / 84`，MinimumOSVersion 16.0）  
 > **上一版产物（v1.0.82）**：`C:\Users\Edc21\Desktop\SourceReadSwift-1.0.82-unsigned.ipa`（12,276,846 字节，SHA256 `D796DA9E1D7471FEB87DFD256FB1C153800E680B1F0766830670DE00128F2835`，`1.0.82 / 83`，MinimumOSVersion 16.0）  
 > **上一版产物（v1.0.81）**：`C:\Users\Edc21\Desktop\SourceReadSwift-1.0.81-unsigned.ipa`（12,273,917 字节，SHA256 `7490F2DF30B3B875D403A882DA4AA1FB3CEAFABFD27C37D431BC64E9A6265C63`，`1.0.81 / 82`，MinimumOSVersion 16.0）  
 > **上一版产物（v1.0.79）**：`C:\Users\Edc21\Desktop\SourceReadSwift-1.0.79-unsigned.ipa`（12,270,433 字节，SHA256 `E1641F5B054EEFDDF0850579D4DA224ECD6F72C8F5879F294F5FDDAF0893AC06`，`1.0.79 / 80`，MinimumOSVersion 16.0）  
