@@ -558,14 +558,13 @@ final class JSCoreRuntimeTests: XCTestCase {
     // with `TypeError: ... is not a function` before any network call.
     func testCacheMemoryAliasesAndJavaLoginBridge() throws {
         let runtime = JSCoreRuntime()
-        XCTAssertEqual(runtime.evaluate("cache.putMemory('k', 'v'); cache.getFromMemory('k')"), "v")
-        XCTAssertEqual(runtime.evaluate("cache.put('k2', 'v2'); cache.remove('k2')"), "v2")
-        XCTAssertEqual(runtime.evaluate("typeof java.getLoginInfo().get === 'function' ? 'ok' : 'bad'"), "ok")
-        XCTAssertEqual(runtime.evaluate("typeof java.getLoginInfoMap().get === 'function' ? 'ok' : 'bad'"), "ok")
-        XCTAssertEqual(runtime.evaluate("typeof java.reLoginView() === 'string' ? 'ok' : 'bad'"), "ok")
-        XCTAssertEqual(runtime.evaluate("java.sleep(1); 'done'"), "done")
+        XCTAssertEqual(try XCTUnwrap(runtime.evaluate("cache.putMemory('k', 'v'); cache.getFromMemory('k')").get()), "v")
+        XCTAssertEqual(try XCTUnwrap(runtime.evaluate("cache.put('k2', 'v2'); cache.remove('k2')").get()), "v2")
+        XCTAssertEqual(try XCTUnwrap(runtime.evaluate("typeof java.getLoginInfo().get === 'function' ? 'ok' : 'bad'").get()), "ok")
+        XCTAssertEqual(try XCTUnwrap(runtime.evaluate("typeof java.getLoginInfoMap().get === 'function' ? 'ok' : 'bad'").get()), "ok")
+        XCTAssertEqual(try XCTUnwrap(runtime.evaluate("typeof java.reLoginView() === 'string' ? 'ok' : 'bad'").get()), "ok")
+        XCTAssertEqual(try XCTUnwrap(runtime.evaluate("java.sleep(1); 'done'").get()), "done")
     }
-
 
     /// 知秋/神魔系 jsLib 把 `source` 当 Map 用。缺 `get/put/remove` 别名时，
     /// 真实私人源在 searchUrl 阶段抛 "source.get is not a function"。
@@ -576,11 +575,10 @@ final class JSCoreRuntimeTests: XCTestCase {
         )
         let runtime = RuleExecutionContext(source: source).jsRuntime(ajaxHandler: { _ in "" })
         XCTAssertEqual(
-            runtime.evaluate("source.put('qd_base', 'https://a.example.com'); source.get('qd_base')"),
+            try XCTUnwrap(runtime.evaluate("source.put('qd_base', 'https://a.example.com'); source.get('qd_base')").get()),
             "https://a.example.com"
         )
-        XCTAssertEqual(runtime.evaluate("source.get('missing') === '' ? 'ok' : 'bad'"), "ok")
-        XCTAssertEqual(runtime.evaluate("source.remove('qd_base'); source.get('qd_base')"), "")
+        XCTAssertEqual(try XCTUnwrap(runtime.evaluate("source.get('missing') === '' ? 'ok' : 'bad'").get()), "ok")
+        XCTAssertEqual(try XCTUnwrap(runtime.evaluate("source.remove('qd_base'); source.get('qd_base')").get()), "")
     }
-
 }
