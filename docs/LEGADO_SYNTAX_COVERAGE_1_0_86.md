@@ -1,4 +1,4 @@
-# Legado 规则语法对照表（1.0.86）
+# Legado 规则语法对照表（1.0.86 → 1.0.87）
 
 对照依据：用户提供的 Legado 语法说明（jsoup / CSS / XPath / JSONPath / JS / AllInOne / OnlyOne / `&&` `||` `%%` / `@put` `@get` / URL 选项 / `{{}}` / `<>` 页码）。
 结论：除「列表级 AllInOne `:regex`」外，语法均已落地并有回归测试。
@@ -18,7 +18,7 @@
 | OnlyOne `##正则##替换###` | `RuleTransformParser.transform`（第 4 段即 replaceFirst） | `RuleTransformParserTests` | 支持 |
 | `&&` 合并、`||` 取首个非空、`%%` 交错 | `RuleOperatorSplitter.firstOperator` | `RuleOperatorSplitterTests`、`HtmlRuleExtractorTests`、`JSONRuleExtractorTests` | 支持 |
 | `@put:{k:rule}` / `@get:{k}`（含 JSONPath 不加引号） | `RuleDirectiveParser`、`RuleExecutionContext` | `HtmlRuleExtractorTests`、`JSONRuleExtractorTests`、`SourceEnginePersistentStateTests` | 支持 |
-| **列表级 AllInOne `:正则`** | **未实现** | — | **缺口** |
+| 列表级 AllInOne `:正则` | `LegadoAllInOneRegex` + `ChapterListParser` / `SearchResultParser` | `LegadoAllInOneTests`（4 条） | 1.0.87 支持 |
 
 ## 二、URL 与模板
 
@@ -43,7 +43,7 @@
 | 正文 `content` / `nextContentUrl` / `webJs` / `sourceRegex` | `ContentParser`、`WebViewFallback` | `ContentParserTests`、`WebViewResourceSniffingTests` |
 | `bookSourceType: 1` 音频/视频 | `VideoContentParser`、`ComicContentParser` | `VideoContentParserTests`、`ComicContentParserTests` |
 
-## 四、唯一缺口：列表级 AllInOne `:regex`
+## 四、列表级 AllInOne `:regex`（1.0.87 已实现）
 
 文档【书源二】的目录规则：
 
@@ -51,19 +51,20 @@
 "chapterList": ":href=\"(/read[^\"]*html)\">([^<]*)"
 ```
 
-Legado 的语义是：对整页 HTML 跑正则，每个匹配产出一个条目，`$1` 为章节 URL、`$2` 为章节名；搜索/发现列表同理（`$1` 书籍 URL、`$2` 书名）。本项目当前把 `chapterList` 直接交给 `HtmlRuleExtractor.select`，`:` 开头会被当成 CSS 选择器而得到 0 条。
+1.0.86 及以前，`chapterList` 直接交给 `HtmlRuleExtractor.select`，`:` 开头被当成 CSS 选择器，得到 0 条。
 
-影响面：997 条语料中 `chapterList` / `bookList` 以 `:` 开头的数量为 **0**，所以现有源不受影响；只有手写源（含文档示例）会命中。
+1.0.87 起：
 
-建议实现方式（下一轮）：
+- 新增 `LegadoAllInOneRegex`：解析可选 `-`/`+` 前缀与 `:pattern`，对 body 跑 `NSRegularExpression`，每个匹配产出一行；
+- `ChapterListParser` 命中该规则时直接构造章节：`chapterUrl` 默认 `$1`、`chapterName` 默认 `$2`，`-` 前缀反转；
+- `SearchResultParser` 同样处理 `bookList`，其余字段用 `$n` 取各自捕获组；
+- 新增 `LegadoAllInOneTests` 四条：正向、`-` 反转、搜索列表、规则识别（普通选择器不误判）。
 
-1. 新增 `LegadoAllInOneRegex`：解析可选 `-`/`+` 前缀与 `:pattern`，对 `body` 跑 `NSRegularExpression`，返回 `[[String]]`（每个匹配的捕获组）；
-2. `ChapterListParser` 在 `listRule` 命中 `:pattern` 时走该分支：`url = group[1]`、`name = group[2]`，`-` 前缀反转；
-3. `SearchResultParser` 同样处理 `bookList`，字段规则中的 `$1`/`$2` 直接取捕获组；
-4. 用文档【书源二】的目录规则加 fixture 锁定。
+语料影响面：997 条语料中 `chapterList` / `bookList` 以 `:` 开头的数量为 0，所以现有源行为不变；手写源与文档示例现在可以解析。
 
 ## 五、结论
 
-- 语法覆盖已完成，1.0.86 的探针修复解决的是「诊断误报」，不是引擎缺陷；
+- Legado 语法说明中的选择器、模板、运算符与请求选项已全部落地；唯一缺口「列表级 AllInOne」在 1.0.87 补齐；
+- 1.0.86 的探针修复解决的是「诊断误报」，不是引擎缺陷；
 - 实测 994 条 `searchUrl`，URL 层缺陷 19 → 2，无回归；
-- 剩余缺口只有列表级 AllInOne，语料命中 0，按上面的方案可在下一轮补齐。
+- 1.0.87 iOS run `40655735484` success，IPA run `40655735595` success。
