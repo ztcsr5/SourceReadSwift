@@ -1,5 +1,6 @@
 import Foundation
 import JavaScriptCore
+import SwiftSoup
 
 /// Resolves dynamic `@js:` or `<js>` expressions in URLs (such as `bookUrl`, `tocUrl`, `nextTocUrl`)
 /// before making network requests, preventing unparsed JS code from being appended to base domains.
@@ -229,8 +230,9 @@ struct DynamicURLResolver {
                             resolvedLeft = value
                         } else if let html = (variables["html"] as? String) ?? (variables["body"] as? String),
                                   let baseURLObj = URL(string: baseUrl),
+                                  let document = try? SwiftSoup.parse(html),
                                   let value = try? HtmlRuleExtractor(executionContext: context)
-                                    .value(from: html, rule: left, fallback: nil, baseUrl: baseURLObj, variables: variables) {
+                                    .value(from: document, rule: left, fallback: nil, baseUrl: baseURLObj, variables: variables) {
                             resolvedLeft = value
                         }
                         chainedResult = resolvedLeft ?? left
