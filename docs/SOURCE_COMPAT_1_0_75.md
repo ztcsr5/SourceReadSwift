@@ -8,7 +8,7 @@
 
 1. **"搜索为空 / 目录为空"的主因不是规则引擎，而是源站存活率。** 随机 60 条源按各自 `searchUrl` 真实请求，只有 18 条返回 200 且响应里含关键词；16 条返回 200 但页面无结果，12 条 4xx/5xx，8 条是纯 JS URL，6 条直接连接失败。剩下能用的源里，我们的解析器必须与 Legado 逐字段一致才有意义。
 2. **URL 层语法我们已经对齐得比较完整**：`@js:` / `<js>`、`{{表达式}}`、`<1,2,3>` 分页模板、`,{...}` 选项（含单引号宽松解析）、POST body、GBK 关键字编码、`webView` / `webJs` / `retry` 都有实现（见第二节）。
-3. **仍然缺的三项**：`UrlOption.js`（解析了但未消费）、`concurrentRate`（0 处引用）、`@result` 文本占位。前两项在 997 条里分别只命中 1 条和 5 条，属于长尾，不是"很多源搜不到"的原因。
+3. **剩余长尾已经量化**：`options.js` 全库只有 1 条（大美书网，内容是 `java.toast('正在搜索中，请稍等！')`，Legado 返回 undefined 时 URL 不变，收益≈0，降级 P3）；`concurrentRate` 5 条；`@result` 0 条。它们都不是"很多源搜不到"的原因。真正的单点是 `checkKeyWord` 误过滤（174 条）与 `@attr` 前缀绑定（阅友小说一类），本轮均已修。
 4. **解析层的真实风险集中在 98 条 JSONPath 源和 43 条 `||` 组合源**。这两类一旦选择器翻译偏差，表现就是"搜索为空"，而日志里看不出区别。
 5. **栖阅能在 iOS 跑 Legado 源的关键**不是规则引擎，而是 56 KB 的 `packages_stub.js`：在 JavaScriptCore 里铺了 `Packages.javax.crypto`、`java.security`、`org.jsoup`、`okhttp3`、`cn.hutool`、`android.util.Base64`、`com.jayway.jsonpath` 的等价实现。我们的 `JSCoreRuntime.swift`（287 KB）+ `LegadoHostServices.swift`（59 KB）覆盖面已经不小于它，差距主要在**长尾类名**，不在架构。
 
@@ -94,8 +94,62 @@
 
 | 优先级 | 项 | 说明 |
 |---|---|---|
-| P1 | 真实源回归集接入 CI | 本轮已落地，等 CI 结果 |
-| P1 | `options.js` 消费 | `SourceURLDirective.urlJavaScript` 传到请求层并执行 |
+| P1 | 真实源回归集接入 CI | 已落地：12 组搜索 + 6 组目录，CI 1167/0 |
+| P1 | `||` 回退顺序 | 43 条搜索 / 16 条目录，下一轮优先 |
 | P2 | JSONPath 过滤器覆盖 | `$.data.state[?(@.dataName == 'x')].items[*]` 已在 fixture 中 |
-| P2 | `concurrentRate` | 按源 key 的令牌桶 |
-| P3 | `@result` | 长尾 |
+| P2 | `concurrentRate` | 5 条源；按源 key 的令牌桶 |
+| P3 | `options.js` | 全库仅 1 条 toast，收益≈0，不做 |
+| P3 | `@result` | 997 条里 0 条使用 |
+
+## 七、`@attr` 规则与 `@onclick@js:` 链式绑定（v1.0.75 修复）
+
+失败样本：阅友小说（优）`http://m.suixkan.com/`
+
+```json
+"bookList": ".v-list-item",
+"bookUrl": "@onclick@js:result.match(/\\('(.*?)', '', ''\\)/)[1]"
+```
+
+真实节点：`<div class="v-list-item flex" onclick="newWebView('/b/229093.html', '', '')">`，`.v-title` 文本正常。
+
+两处根因：
+
+1. `translateValueRule("@onclick")` 按 `@` 切分后丢掉标记，把 `onclick` 当成标签选择器，`root.select("onclick")` 永远为空；
+2. `evaluateChainedJavaScript` 先 `select` 前缀，命中元素时把 `LegadoElementBridge` 绑给 `result`，而 Legado `getString` 链路里 `result` 是属性字符串，`result.match(...)` 拿不到 onclick 文本。
+
+修复后语义：
+
+| 规则 | 绑定 |
+|---|---|
+| `@text` / `@href` / `@onclick` / `@data-src` | 当前节点的属性字符串 |
+| `@attr:name` | 同上（去掉 `@attr:`） |
+| `@css:...` / `@json:` / `@js:` / `@xpath:` | 保持原有分支 |
+
+影响面：`@href` / `@src` / `@text` 这种“列表节点上直接取属性”的写法遍布 Legado 生态；本修复同时覆盖链式与非链式。
+
+## 八、目录回归集（6 张真实页面）
+
+`SourceReadSwiftTests/Fixtures/real-sources/toc-index.json` + `RealSourceTOCRegressionTests`。每张 `.body` 是真实书页的字节响应，`expectedMinimum = emulated / 2`（下界），失败输出实际章数与首章名。
+
+| 源 | 实际解析 | Legado 语义 |
+|---|---|---|
+| ⚡📂错层小说 | 4 | 4 |
+| 错层小说网 | 4 | 4 |
+| 精华书阁手机版 | 20 | 20 |
+| 笔趣阁[biquge7] | 1838 | 1838 |
+| 看书网 | 100 | 100 |
+| 开心文学网 | 30 | 30 |
+
+看书网页面字节已按 UTF-8 校验，章节名（`第三百五十六章 焚血魔丹！`）可读，不存在 GBK 乱码；源本身的 `Content-Type` 也声明 UTF-8。
+
+## 九、`&&` 分布
+
+| 字段 | 含 `&&` 的源数 |
+|---|---|
+| `ruleSearch` | 6 |
+| `ruleToc` | 19 |
+| `ruleContent` | 15 |
+| `ruleExplore` | 7 |
+| `ruleBookInfo.name` | 2 |
+
+`RuleOperatorSplitter` 按 Legado “首个顶层操作符”切分，暂不列为缺陷；后续只在真实源回归出现反例时再动。

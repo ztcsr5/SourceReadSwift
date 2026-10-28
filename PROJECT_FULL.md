@@ -2245,6 +2245,57 @@ Legado `EncoderUtils.escape`（`EncoderUtils.kt` L12-29）只保留 ASCII 字母
 
 ---
 
+## 二十五、v1.0.74 Legado 登录（2026-10-28）
+
+> 提交 `1b1bf83`。
+
+- `BookSource` 增加 `loginUi` 模型字段，兼容 Legado 的 JSON 数组与字符串两种形态；
+- `SourceLoginView` 渲染 `loginUi` 表单（`name` / `type` / `action` / `charset` / `method`），提交后写入 `loginInfo`；
+- `loginUrl` 为接口时先执行 `loginJs`，再按 `loginCheckJs` 判定；页面型登录走 WebView，成功后回填 Cookie；
+- `SourceEngine` 在搜索 / 详情 / 目录 / 正文四个阶段前统一注入登录态；
+- 新增 `SourceLoginURLResolverTests` 覆盖“登录地址是 POST 接口时不再直接开 WebView”。
+
+依据：Legado `AnalyzeUrl` / `SourceLogin` 的登录流程；栖阅解包里 `loginUi` 出现 14 次，是本项目此前「登录地址无效 / 没有登录选项」的直接来源。
+
+## 二十六、v1.0.75 checkKeyWord 语义修正、真实源回归集与 `@attr` 绑定（2026-10-28）
+
+> 提交 `10545a5` + `371248b` + `af9a086`；iOS run `40605778349` / job `122544790117` = **1167 tests / 0 failures**；IPA run `40605778396`。
+
+### 26.1 `checkKeyWord` 不再参与过滤
+
+`SearchResultParser` 删除 `passesCheckKeyWord` 及其两处调用。Legado `BookList.kt` 搜索链路从不读该字段，只在 `BookSourceDebugActivity.kt` L85-89 当调试提示。997 条源里 **174 条**配置了它，旧实现会在关键词不一致时把整页行删空——这是「搜索为空」最大的单点。
+
+### 26.2 真实源搜索回归集
+
+`SourceReadSwiftTests/Fixtures/real-sources/`：12 组 `.body` + `.json` + `index.json`（8 HTML + 4 JSON API），`RealSourceSearchRegressionTests` 按每条源真实 `ruleSearch` 解析并断言 `books.count >= expectedMinimum`。
+
+### 26.3 `@attr` 规则修复
+
+`LegadoDefaultRuleTranslator.translateValueRule` 新增前导 `@` 分支：`@onclick` / `@href` / `@text` / `@data-src` / `@attr:name` 直接作用于当前节点；`@css:` / `@json:` / `@js:` / `@xpath:` 保持原分支。`HtmlRuleExtractor.evaluateChainedJavaScript` 对属性前缀直接绑定字符串给 `result`。
+
+修复样本：阅友小说（优）的 `@onclick@js:result.match(...)` 此前 bookUrl 为空、整行被丢弃；CI 12 组搜索全部通过。
+
+### 26.4 JS 运行时失败重置
+
+`evaluateJSWithTrailingRegex` 拆 wrapper + `Once`；首次失败 `resetRuntime()` 后重试一次，避免一次 prelude 失败污染整阶段。
+
+### 26.5 真实目录回归集
+
+6 张真实目录页接入 `RealSourceTOCRegressionTests`，实际解析与 Legado 语义完全一致：错层 4 / 错层新 4 / 精华书阁 20 / 笔趣阁 1838 / 看书网 100 / 开心 30。
+
+### 26.6 证据
+
+| 项 | 值 |
+|---|---|
+| iOS CI | `40605778349` / `122544790117`，1167 tests / 0 failures |
+| IPA | `SourceReadSwift-1.0.75-unsigned.ipa`，12,246,665 B |
+| SHA256 | `532EAFD3E8DCEED2CE0B63B629BA894066D3ACFA87BA094BC55B1F22F7425CF6` |
+| 版本 | `1.0.75 / 76`，MinimumOSVersion 16.0 |
+| 交接 | `docs/CODEX_HANDOVER_1_0_75.md` |
+| 研究 | `docs/SOURCE_COMPAT_1_0_75.md` |
+
+---
+
 ## 附录 A：完整文件清单
 
 > 以下为 2026-10-25 工作区实测清单。`build/`、`ci-log/`、`AppIcons_Candidates/` 为本地产物/素材，不计入源码。
