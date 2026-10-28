@@ -1313,6 +1313,9 @@ enum ReaderNativeTextLayout {
         paragraphStyle.headIndent = 0
         paragraphStyle.firstLineHeadIndent = CGFloat(configuration.paragraphIndent)
         paragraphStyle.alignment = .justified
+        // Same CJK policy as the paged engine: a closing punctuation mark
+        // hangs instead of starting the next line.
+        paragraphStyle.lineBreakStrategy = ReaderPageLayoutEngine.lineBreakStrategy
         let paragraphAttributes: [NSAttributedString.Key: Any] = [
             .font: configuration.fontFamily.uiFont(ofSize: CGFloat(configuration.fontSize), weight: .regular),
             .foregroundColor: configuration.textColor,
@@ -1403,6 +1406,9 @@ enum ReaderNativeTextLayout {
         paragraphStyle.headIndent = 0
         paragraphStyle.firstLineHeadIndent = CGFloat(configuration.paragraphIndent)
         paragraphStyle.alignment = .justified
+        // Same CJK policy as the paged engine: a closing punctuation mark
+        // hangs instead of starting the next line.
+        paragraphStyle.lineBreakStrategy = ReaderPageLayoutEngine.lineBreakStrategy
         let paragraphAttributes: [NSAttributedString.Key: Any] = [
             .font: configuration.fontFamily.uiFont(ofSize: CGFloat(configuration.fontSize), weight: .regular),
             .foregroundColor: configuration.textColor,
