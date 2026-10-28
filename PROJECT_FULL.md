@@ -2337,6 +2337,29 @@ Legado `EncoderUtils.escape`（`EncoderUtils.kt` L12-29）只保留 ASCII 字母
 
 ---
 
+## 二十八、v1.0.77 URL 选项宽松解析与 concurrentRate（2026-10-28）
+
+### 28.1 URL 选项
+
+`SourceURLDirective.swift` 支持单引号对象、引号不配对、`{...};` 后的 `@js:` 尾巴与 `js:` 纯脚本规则；`parseOptionsObject` 走 标准 JSON → 宽松 JSON → JS eval 三级回退。新增 6 条真实源形态测试。
+
+### 28.2 concurrentRate
+
+`SourceRateRule` 解析 Legado 并发率：`500`（串行 + 500 ms 间隔）、`20/60000`（60 s 内 20 次）。`SourceRateLimiter.shared` 按书源 URL 隔离状态，`LegadoSourceEngine.loadWithRetry` 与 `SynchronousSourceNetworkBridge` 共用，因此搜索 / 目录 / 正文 / JS 内 `java.ajax` 在同一窗口内排队。997 条源中 5 条使用该字段。
+
+### 28.3 证据
+
+| 项 | 值 |
+|---|---|
+| 提交 | `1a965b0` → `24ba8b1` → `38ba450` |
+| iOS CI | `40619907231` success |
+| IPA CI | `40619907109` success |
+| 版本 | 1.0.77 / Build 78 |
+| IPA SHA256 | `812DB2CF43CCA94D99239BD6526F3971855E568CEB85DE008A0E5684D6143FFF` |
+| 交接 | `docs/CODEX_HANDOVER_1_0_77.md` |
+
+---
+
 ## 附录 A：完整文件清单
 
 > 以下为 2026-10-25 工作区实测清单。`build/`、`ci-log/`、`AppIcons_Candidates/` 为本地产物/素材，不计入源码。
