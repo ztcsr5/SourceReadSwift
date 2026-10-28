@@ -2180,6 +2180,11 @@ struct JSONRuleExtractor {
     /// render `2.0` for the integer `2`.
     func stringifyJSResult(_ value: Any) -> String {
         if value is NSNull { return "" }
+        // `{{source}}` in a URL template must expand to the source URL, not to
+        // Swift's default struct dump (`BookSource(bookSourceName: ...)`).
+        // STV's tocUrl embedded that dump into `h=` and produced a 0-chapter
+        // catalogue even though the request succeeded.
+        if let source = value as? BookSource { return source.bookSourceUrl }
         if let string = value as? String { return string }
         if let number = value as? NSNumber {
             if CFGetTypeID(number) == CFBooleanGetTypeID() {

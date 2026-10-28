@@ -274,7 +274,8 @@ struct DynamicURLResolver {
                 }
             }
 
-            return trimmed
+            let (plainURL, directiveSuffix) = SearchURLResolver.splitURLAndDirectiveSuffix(trimmed)
+            return Self.absolutize(plainURL, baseUrl: baseUrl) + directiveSuffix
         }
 
         // 3. Handle full JavaScript rule
@@ -342,6 +343,31 @@ struct DynamicURLResolver {
     /// Picks the object that JSONPath segments in a URL rule should run
     /// against.  Parsers usually pass a decoded object as `result`, but some
     /// call sites only provide the raw response body.
+    /// Legado's `NetworkUtils.getAbsoluteURL`: a source may give a bare path
+    /// (`/search.html?q=...`) or a protocol-relative URL.  Resolve it against
+    /// the source URL before the request is built; otherwise URLSession rejects
+    /// the empty scheme and the whole search dies with
+    /// "不支持的 URL 协议 无".
+    static func absolutize(_ raw: String, baseUrl: String) -> String {
+        let value = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !value.isEmpty else { return raw }
+        let lower = value.lowercased()
+        if lower.hasPrefix("http://") || lower.hasPrefix("https://")
+            || lower.hasPrefix("data:") || lower.hasPrefix("file:")
+            || lower.hasPrefix("content:") || lower.hasPrefix("javascript:") {
+            return value
+        }
+        guard let base = URL(string: baseUrl) else { return value }
+        if value.hasPrefix("//") {
+            return (base.scheme ?? "https") + ":" + value
+        }
+        if let resolved = URL(string: value, relativeTo: base)?.absoluteURL.absoluteString,
+           !resolved.isEmpty {
+            return resolved
+        }
+        return value
+    }
+
     private static func jsonTarget(from variables: [String: Any]) -> Any? {
         if let value = variables["result"], JSONSerialization.isValidJSONObject(value) {
             return value

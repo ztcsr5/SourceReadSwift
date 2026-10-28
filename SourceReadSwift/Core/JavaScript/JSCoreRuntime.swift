@@ -1490,6 +1490,12 @@ final class JSCoreRuntime {
         } catch (_) {}
         window.document = document;
         window.java = java;
+        // Aggregator jsLib bundles use `_` as a plain namespace holder and
+        // reference `_.java`.  Legado runs Rhino where `_` is a global object;
+        // JSCore has no Underscore unless the source loads it, so provide the
+        // alias instead of throwing "undefined is not an object".
+        if (typeof _ === 'undefined' || _ === null) { var _ = {}; }
+        _.java = _.java || java;
         if (!String.prototype.contains) {
           String.prototype.contains = function(value) { return this.indexOf(String(value)) >= 0; };
         }

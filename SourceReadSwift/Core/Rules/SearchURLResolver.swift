@@ -55,8 +55,13 @@ struct SearchURLResolver {
                 charset: searchCharset
             )
             let safeURL = urlSafeString(normalizePathDoubleSlashes(interpolatedURL))
+            // Relative `searchUrl` values such as `/search.html?q=...` are
+            // legal in Legado: NetworkUtils.getAbsoluteURL joins them with
+            // bookSourceUrl.  Without this the request is created with an
+            // empty scheme and fails before it is sent.
+            let absoluteURL = DynamicURLResolver.absolutize(safeURL, baseUrl: source.bookSourceUrl)
             guard !suffixPart.isEmpty else {
-                return safeURL
+                return absoluteURL
             }
             let interpolatedSuffix: String
             if Self.isJSONBodyOption(suffixPart) {
@@ -83,7 +88,7 @@ struct SearchURLResolver {
                     charset: searchCharset
                 )
             }
-            return safeURL + interpolatedSuffix
+            return absoluteURL + interpolatedSuffix
         }
 
         if trimmedCleaned.hasPrefix("@js:") {
