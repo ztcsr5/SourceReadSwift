@@ -1837,7 +1837,7 @@
   "weight": 0
  },
  {
-  "bookSourceComment": "//GET搜索；目录为详情页静态完整目录；正文分页只跟随“下一页”",
+  "bookSourceComment": "2026-10-29 复测 HTTP 500（对方后端宕机）。",
   "bookSourceGroup": "",
   "bookSourceName": "速读谷",
   "bookSourceType": 0,
@@ -2057,20 +2057,21 @@
   "bookSourceUrl": "https://www.deqixs.co",
   "customButton": false,
   "customOrder": 33,
-  "enabled": true,
+  "enabled": false,
   "enabledCookieJar": true,
   "enabledExplore": true,
   "eventListener": false,
   "lastUpdateTime": 0,
   "respondTime": 180000,
-  "weight": 0
+  "weight": 0,
+  "bookSourceComment": "重复条目，规则已合并到同名主条目（2026-10-29）。"
  },
  {
-  "bookSourceComment": "得奇小说网 www.deqixs.org（杰奇CMS架构，UTF-8）\n· 搜索：POST精确书名，唯一命中302直达详情页，多命中返回列表页，规则已用||兼容两种结构\n· 目录：详情页内嵌目录（id.list），超长书籍目录分页（如玄鉴仙族1585章分2页），已配置nextTocUrl自动翻页，末页href=#已用##^#$##净化防重复\n· 正文：div.con，已净化末尾电报群广告，已修复站点防采集字符替换（幺→么）\n· 分页：text.下一页自动拼接，末页无下一页不会串章\n· 发现：最新更新（首页实时列表，含最热标记书）、16分类+完结库支持{{page}}翻页、阅读排行（站方固定20本）。注意：站方将所有top分类榜单(allvisit/lastupdate等)统一指向同一静态榜单，故分类榜单未单独设入口，最新更新以首页数据为准\n· 注意：站内搜索不支持模糊搜索，搜索词过短(<4字节)无结果",
+  "bookSourceComment": "2026-10-29 实测重建：searchkey 直出详情页（UTF-8）；目录内联在详情页 #list-chapterAll；正文为 JS 注入，chapterUrl 携带 {\"webView\":true} 由 WebView 渲染后取 #chapter-content。",
   "bookSourceGroup": "",
   "bookSourceName": "得奇小说网",
   "bookSourceType": 0,
-  "bookSourceUrl": "https://www.deqixs.org",
+  "bookSourceUrl": "https://www.deqixss.com",
   "customButton": false,
   "customOrder": 34,
   "enabled": true,
@@ -2081,19 +2082,8 @@
   "header": "{\"User-Agent\": \"Mozilla/5.0 (Linux; Android 12; Pixel 6) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36\"}",
   "lastUpdateTime": 1788680226191,
   "respondTime": 180000,
-  "ruleBookInfo": {
-   "author": "class.itemtxt@tag.p.1@tag.a.0@text##作者：##",
-   "coverUrl": "tag.a.0@tag.img@src",
-   "intro": "class.des@text",
-   "kind": "class.itemtxt@tag.p.0@tag.span.1@text",
-   "lastChapter": "class.itemtxt@tag.ul@tag.li.0@tag.a@text",
-   "name": "class.itemtxt@tag.h1@tag.a.0@text",
-   "wordCount": "class.itemtxt@tag.p.0@tag.span.2@text"
-  },
-  "ruleContent": {
-   "content": "class.con@html##求书、催更、报错[\\s\\S]*##<js>result.replace(/幺/g, '么')</js>",
-   "nextContentUrl": "text.下一页@href"
-  },
+  "ruleBookInfo": "{\"name\":\"@css:h1.booktitle@text\",\"author\":\"@css:p.booktag a.0@text\",\"kind\":\"@css:meta[property=\\\"og:novel:category\\\"]@content\",\"lastChapter\":\"@css:meta[property=\\\"og:novel:latest_chapter_name\\\"]@content\",\"intro\":\"@css:meta[property=\\\"og:description\\\"]@content\",\"coverUrl\":\"@css:meta[property=\\\"og:image\\\"]@content\",\"tocUrl\":\"\"}",
+  "ruleContent": "{\"content\":\"@css:#chapter-content@html\"}",
   "ruleExplore": {
    "author": "class.itemtxt@tag.p.1@tag.a.0@text##作者：##",
    "bookList": "class.item",
@@ -2104,25 +2094,9 @@
    "name": "class.itemtxt@tag.h3@tag.a.0@text||class.itemtxt@tag.h1@tag.a.0@text",
    "wordCount": "class.itemtxt@tag.p.0@tag.span.2@text"
   },
-  "ruleSearch": {
-   "author": "class.itemtxt@tag.p.1@tag.a.0@text||class.itemtxt@tag.ul@tag.li.0@text##作者：##",
-   "bookList": "class.item",
-   "bookUrl": "class.itemtxt@tag.h1@tag.a.0@href||class.itemtxt@tag.h3@tag.a.0@href",
-   "checkKeyWord": "没钱修什么仙",
-   "coverUrl": "tag.a.0@tag.img@src",
-   "intro": "class.des@text||class.itemtxt@tag.p.0@text##简介：\\s*##",
-   "kind": "class.itemtxt@tag.p.0@tag.span.1@text",
-   "lastChapter": "class.itemtxt@tag.ul@tag.li.0@tag.a@text||class.itemtxt@tag.ul@tag.li.2@tag.a@text",
-   "name": "class.itemtxt@tag.h1@tag.a.0@text||class.itemtxt@tag.h3@tag.a.0@text",
-   "wordCount": "class.itemtxt@tag.p.0@tag.span.2@text"
-  },
-  "ruleToc": {
-   "chapterList": "id.list@tag.li@tag.a",
-   "chapterName": "tag.a@text",
-   "chapterUrl": "tag.a@href",
-   "nextTocUrl": "text.下一页@href##^#$##"
-  },
-  "searchUrl": "https://www.deqixs.org/modules/article/search.php,{\"method\": \"POST\", \"body\": \"searchkey={{key}}&action=login&searchtype=articlename\"}",
+  "ruleSearch": "{\"bookList\":\"@css:.bookbox||@css:body\",\"name\":\"@css:h1.booktitle@text||@css:.bookname a@text\",\"author\":\"@css:p.booktag a.0@text||@css:.author.0@text##作者：\",\"bookUrl\":\"@css:meta[property=\\\"og:url\\\"]@content||@css:.bookname a@href\",\"coverUrl\":\"@css:img.thumbnail@src||@css:.bookbox img@src\",\"intro\":\"@css:meta[property=\\\"og:description\\\"]@content||@css:.update@text##简介：\",\"lastChapter\":\"@css:meta[property=\\\"og:novel:latest_chapter_name\\\"]@content||@css:.cat a@text\",\"kind\":\"@css:meta[property=\\\"og:novel:category\\\"]@content\"}",
+  "ruleToc": "{\"chapterList\":\"@css:#list-chapterAll dd a\",\"chapterName\":\"@text\",\"chapterUrl\":\"@href##$##,{\\\"webView\\\":true}\"}",
+  "searchUrl": "/modules/article/search.php?searchkey={{key}}",
   "weight": 0
  },
  {
@@ -2185,7 +2159,7 @@
   "weight": 0
  },
  {
-  "bookSourceComment": "QQ 浏览器小说接口书源 v7；发现页按 QQ 浏览器分类表重排为 22 类，并补齐女频扩展、纯爱与短篇。搜索合并 QQ 浏览器和 QQ 阅读并自动去重。",
+  "bookSourceComment": "2026-10-29 修复：搜索直接解析 data.state[*].items[*]（此前 bodyJs 依赖导致 0 项）；bookUrl 由 docId 尾段拼 bookInfo。",
   "bookSourceGroup": "",
   "bookSourceName": "QQ浏览器-完整分类-v7",
   "bookSourceType": 0,
@@ -2225,17 +2199,7 @@
    "name": "$.resourceName",
    "wordCount": "$.contentsize"
   },
-  "ruleSearch": {
-   "author": "$.author",
-   "bookList": "$.books[*]",
-   "bookUrl": "$.bookUrl",
-   "coverUrl": "$.coverUrl",
-   "intro": "$.intro",
-   "kind": "$.kind",
-   "lastChapter": "$.lastChapter",
-   "name": "$.name",
-   "wordCount": "$.wordCount"
-  },
+  "ruleSearch": "{\"bookList\":\"$.data.state[*].items[*]\",\"name\":\"$.title\",\"author\":\"$.author\",\"coverUrl\":\"$.cover_url\",\"intro\":\"$.abstract\",\"kind\":\"$.tag_views\",\"lastChapter\":\"\",\"wordCount\":\"\",\"bookUrl\":\"https://novel.html5.qq.com/qbread/api/novel/bookInfo?resourceId={{$.docId##^.*_##}}\"}",
   "ruleToc": {
    "chapterList": "$.rows[*]",
    "chapterName": "$.serialName",
@@ -2302,7 +2266,8 @@
    "updateTime": "updateTime"
   },
   "searchUrl": "@js:\nif (key.match(/^\\d+$/) && !Number.isNaN(parseInt(key))) {\n  result = `data:bookId;base64,${java.base64Encode(key)},{\"type\":\"id\"}`\n} else {\n\tresult = getUrl(\"/book/search/result?searchcontent=\"+key+\"&page=\"+page+\"&type=3&readLike=3&searchType=3&searchFrom=1&wordMinNum=0&wordMaxNum=0\")\n\n}\nresult",
-  "weight": 0
+  "weight": 0,
+  "bookSourceComment": "规则本身正确；2026-10-29 复测上游搜索接口返回 code:303（服务端风控），非引擎问题，等官方接口恢复。"
  },
  {
   "bookSourceName": "速读谷",
@@ -2360,7 +2325,8 @@
    "nextTocUrl": "text.下一页@href"
   },
   "searchUrl": "/i/sor.aspx?key={{key}}",
-  "weight": 0
+  "weight": 0,
+  "bookSourceComment": "2026-10-29 复测 HTTP 500（对方后端宕机）。"
  },
  {
   "bookSourceComment": "版本: 20261026\n作者: 知秋\n反馈群：766236637\ntg群：https://t.me/+dcNnFFZv5KtmYjIx\n1. 除发现使用官方接口外，其余优先使用源作者服务器中转\n2. 共享服务器连接超时，请自行切换服务器\n3. 请选择一个域名接口连接，否则无法使用\n4. 临时token口令为 天一团队是倒狗(qq为1070240776和845646066和1484608559)请勿相信任何需要付费的说法欢迎来官方反馈群举报\n5. 获取token请点击登录界面，获取token按钮，点击测试/修改token可查询日下载量，切记获取token后请保存，token为3日有效期，到期请重新获取，token为明文请自行保存，请勿外传，异地登录多次会封禁token(token改为明文存源变量中防止丢失)\n6. 如爱丽丝域名无法直连，请打开梯子使用\n7. 共享数据库如有，则优先使用数据库，章节开头的图标为🍐\n8. 下载请把预下载改成0-3之间，请求有超限拉黑，请勿大规模批量下载\n9. 修复图片问题，新增正确封面\n10. 反馈q群：755947375，token问题群里找我，或者社区找也行(社区不经常在线，上线看到会回)\n11. 接口请求速率存在限制，故设置并发率，批量下载耐心等待",
@@ -2510,7 +2476,7 @@
   "weight": 0
  },
  {
-  "bookSourceComment": "sudugu.org - 速读谷，玄幻/仙侠/都市/言情等小说。目录在详情页，章节有分页（如3044-2.html）。",
+  "bookSourceComment": "2026-10-29 复测 HTTP 500（对方后端宕机）。",
   "bookSourceGroup": "",
   "bookSourceName": "速读谷",
   "bookSourceType": 0,
@@ -2793,7 +2759,8 @@
   "eventListener": false,
   "lastUpdateTime": 0,
   "respondTime": 180000,
-  "weight": 0
+  "weight": 0,
+  "bookSourceComment": "2026-10-29 探测：搜索走 /user/search.html JSON，但接口对非浏览器会话固定返回 \"1\"，规则无法直连。"
  },
  {
   "bookSourceGroup": "",
@@ -2871,7 +2838,8 @@
    "nextTocUrl": "text.下一页@href"
   },
   "searchUrl": "https://mad回家访问25a点jisge点com.jishuge-vip.com/list-{{key}}_{{page}}.html",
-  "weight": 0
+  "weight": 0,
+  "bookSourceComment": "2026-10-29 复测连接超时（服务器不可达）。"
  },
  {
   "bookSourceComment": "连尚读书app官方接口 全部算法均与本地完成 下载无限制 by咪咪喵原创  搬运请注明来源！tg反馈群https://t.me/+Zy7z9Ql2KrVjYjZl 不开放🐧裙",
@@ -2993,7 +2961,8 @@
   "ruleSearch": "{\"bookList\": \"@css:#hotcontent .item\", \"name\": \"@css:dt a@text\", \"author\": \"@css:.btm a@text\", \"intro\": \"@css:dd@text\", \"coverUrl\": \"@css:img@data-original||@css:img@src\", \"bookUrl\": \"@css:dt a@href\"}",
   "ruleToc": "{\"chapterList\": \"@css:#content_1 a\", \"chapterName\": \"text\", \"chapterUrl\": \"href\", \"nextTocUrl\": \"@css:#list dt a:contains(下一页)@href\"}",
   "searchUrl": "http://www.xqb8.org/soso5b627.html?searchkey={{key}}",
-  "weight": 0
+  "weight": 0,
+  "bookSourceComment": "2026-10-29 复测 HTTP 404。"
  },
  {
   "bookSourceGroup": "",
@@ -3236,7 +3205,8 @@
   "eventListener": false,
   "lastUpdateTime": 0,
   "respondTime": 180000,
-  "weight": 0
+  "weight": 0,
+  "bookSourceComment": "2026-10-29 复测 Cloudflare 403（需浏览器挑战，HTTP 直连不可用）。"
  },
  {
   "bookSourceGroup": "",
@@ -3251,7 +3221,8 @@
   "eventListener": false,
   "lastUpdateTime": 0,
   "respondTime": 180000,
-  "weight": 0
+  "weight": 0,
+  "bookSourceComment": "2026-10-29 复测搜索页 Cloudflare 403；首页可开，搜索需浏览器挑战。"
  },
  {
   "bookSourceGroup": "修复·空壳",
@@ -3271,7 +3242,8 @@
   "ruleSearch": "{\"bookList\": \"@css:#hotcontent .item\", \"name\": \"@css:dt a@text\", \"author\": \"@css:.btm a@text\", \"intro\": \"@css:dd@text\", \"coverUrl\": \"@css:img@data-original||@css:img@src\", \"bookUrl\": \"@css:dt a@href\"}",
   "ruleToc": "{\"chapterList\": \"@css:#content_1 a\", \"chapterName\": \"text\", \"chapterUrl\": \"href\", \"nextTocUrl\": \"@css:#list dt a:contains(下一页)@href\"}",
   "searchUrl": "http://www.tianyu8.org/search5b.html?searchkey={{key}}",
-  "weight": 0
+  "weight": 0,
+  "bookSourceComment": "2026-10-29 复测 HTTP 404（域名路由废弃）。"
  },
  {
   "bookSourceGroup": "修复·空壳",
@@ -3340,7 +3312,8 @@
   "eventListener": false,
   "lastUpdateTime": 0,
   "respondTime": 180000,
-  "weight": 0
+  "weight": 0,
+  "bookSourceComment": "2026-10-29 复测 TLS 握手失败（证书/域名异常）。"
  },
  {
   "bookSourceGroup": "",
@@ -3370,7 +3343,8 @@
   "eventListener": false,
   "lastUpdateTime": 0,
   "respondTime": 180000,
-  "weight": 0
+  "weight": 0,
+  "bookSourceComment": "2026-10-29 复测搜索为 JS 挑战页（动态 c2 校验），HTTP 直连不可用。"
  },
  {
   "bookSourceGroup": "听书",
