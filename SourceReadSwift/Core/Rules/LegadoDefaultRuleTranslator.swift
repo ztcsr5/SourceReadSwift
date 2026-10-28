@@ -138,8 +138,11 @@ enum LegadoDefaultRuleTranslator {
             if pieces.count == 1 {
                 guard let value = Int(pieces[0]) else { return nil }
                 items.append(.single(value))
-            } else if pieces.count == 2 || pieces.count == 3 {
+            } else {
                 if !allowRanges {
+                    // Legacy form: every colon-separated piece is its own
+                    // index, and the list may hold any number of them
+                    // (`li!0:1:2:3:4` excludes the first five nodes).
                     var legacyValues: [Int] = []
                     for piece in pieces {
                         let trimmedPiece = piece.trimmingCharacters(in: .whitespaces)
@@ -149,6 +152,7 @@ enum LegadoDefaultRuleTranslator {
                     items.append(contentsOf: legacyValues.map(LegadoIndexItem.single))
                     continue
                 }
+                guard pieces.count == 2 || pieces.count == 3 else { return nil }
                 let startText = pieces[0].trimmingCharacters(in: .whitespaces)
                 let endText = pieces[1].trimmingCharacters(in: .whitespaces)
                 var rangeStart: Int?
@@ -170,8 +174,6 @@ enum LegadoDefaultRuleTranslator {
                     }
                 }
                 items.append(.range(start: rangeStart, end: rangeEnd, step: step))
-            } else {
-                return nil
             }
         }
         guard !items.isEmpty else { return nil }

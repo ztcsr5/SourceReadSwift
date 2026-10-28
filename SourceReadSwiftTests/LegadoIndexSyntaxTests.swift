@@ -90,6 +90,12 @@ final class LegadoIndexSyntaxTests: XCTestCase {
         XCTAssertEqual(try execute("ul li.1:3"), ["i1", "i3"])
     }
 
+    func testLegacyExclusionWithManyColonSeparators() throws {
+        // 精华书阁's chapterList: `li!0:1:2:3:4@a` excludes the first five
+        // items; the legacy form accepts any number of colon-separated parts.
+        XCTAssertEqual(try execute("ul li!0:1:2:3:4"), ["i5", "i6", "i7", "i8", "i9"])
+    }
+
     func testExecuteStepInterval() throws {
         // 0:9:3 -> 0, 3, 6, 9 under Legado's inclusive range semantics.
         XCTAssertEqual(try execute("ul li[0:9:3]"), ["i0", "i3", "i6", "i9"])

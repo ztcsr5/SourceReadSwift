@@ -66,10 +66,22 @@ struct JSONRuleExtractor {
         guard !trimmed.isEmpty else {
             return rootDictionaryList(from: object)
         }
-        guard let selected = value(from: object, path: trimmed, variables: variables) else {
-            return []
+        if let selected = value(from: object, path: trimmed, variables: variables) {
+            let rows = dictionaries(from: selected)
+            if !rows.isEmpty { return rows }
         }
-        return dictionaries(from: selected)
+        // Legado resolves a leading-dot list path such as `.bookList[*]` even
+        // when the array sits under a wrapper (`{"data":{"bookList":…}}`).
+        // A direct lookup misses it, so retry the same path as a descendant
+        // scan before reporting "list rule matched nothing".
+        let path = splitTransforms(trimmed).path.trimmingCharacters(in: .whitespacesAndNewlines)
+        if path.hasPrefix("."), !path.hasPrefix(".."), !path.contains("||"), !path.contains("&&") {
+            let descendant = "$.." + String(path.dropFirst())
+            if let selected = value(from: object, path: descendant, variables: variables) {
+                return dictionaries(from: selected)
+            }
+        }
+        return []
     }
 
     func string(
