@@ -69,6 +69,7 @@ final class RealSourceSearchRegressionTests: XCTestCase {
             )
             switch result {
             case .success(let books):
+                print("SEARCH \(fixture.name): \(books.count) books")
                 if books.count < fixture.expectedMinimum {
                     let first = books.first?.name ?? "<none>"
                     failures.append(
