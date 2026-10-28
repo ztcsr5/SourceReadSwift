@@ -136,17 +136,21 @@ struct JSONRuleExtractor {
             // Legado `AnalyzeRule.getString` splits a single-field rule on the
             // first top-level `&&` / `||` / `%%` before evaluating it:
             //   `$.bookName||$.title`  -> first non-empty
-            //   `$.score&&$.subTitle`  -> concatenation
-            // Only the list extractor did this, so 书旗 and the 番茄 aggregators
-            // returned an empty name even though `$.title` was right there.
-            if RuleOperatorSplitter.firstOperator(in: trimmed) != nil {
-                // Delegate to the list extractor so all three operators keep
-                // Legado semantics: `||` first non-empty, `&&` concatenation,
-                // `%%` element-wise interleave.  The old shortcut returned the
-                // first branch for `%%` (dropping the VIP titles) and glued
-                // `&&` values without the newline separator.
+            //   `$.score&&$.subTitle`  -> literal concatenation ("9.6玄幻")
+            //   `{$..title}&&{$..id}`  -> one value per line ("斗破苍穹\n765")
+            // List-shaped `&&` chains and inner-rule chains keep Legado's "\n"
+            // join; plain one-value-per-branch `&&` chains are glued because
+            // sources such as 七猫 use them as string concatenation for
+            // `kind` / `score` display, where a newline would break the render.
+            if let operation = RuleOperatorSplitter.firstOperator(in: trimmed) {
                 let merged = stringList(from: item, rule: trimmed, variables: variables)
-                let joined = merged.joined(separator: "\n")
+                let branchLists = operation.parts.map {
+                    stringList(from: item, rule: $0, variables: variables)
+                }
+                let isPlainConcatenation = operation.op == "&&"
+                    && !operation.parts.contains { $0.contains("{$") }
+                    && !branchLists.contains { $0.count > 1 }
+                let joined = merged.joined(separator: isPlainConcatenation ? "" : "\n")
                 return joined.isEmpty ? nil : joined
             }
             if let value = value(from: item, path: rule, variables: variables) {
