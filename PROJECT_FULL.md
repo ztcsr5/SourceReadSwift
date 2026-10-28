@@ -2367,6 +2367,12 @@ Legado `EncoderUtils.escape`（`EncoderUtils.kt` L12-29）只保留 ASCII 字母
 - 新增 2 条单测：度量总高一致、切片高度与单独测量一致且拼回原文。
 - 版本 1.0.78（Build 79）。
 
+## 三十、v1.0.79 jsoup 选择器对账（2026-10-28）
+
+- 用 114 条真实搜索响应跑 `rows` 对账：首轮 5 条不一致、0 条空结果；3 条是 Swift 多选（`id.` / 多类名 `class.`），2 条是基线把闭区间当离散索引。
+- 修复 `getElementById`（取首个）与 `getElementsByClass`（连续 token 段）语义；基线 `LegadoCount.java` 改为闭区间后仅 451/975 变化。
+- 详见 `docs/SOURCE_COMPAT_1_0_79.md`；版本 1.0.79（Build 80）。
+
 ## 附录 A：完整文件清单
 
 > 以下为 2026-10-25 工作区实测清单。`build/`、`ci-log/`、`AppIcons_Candidates/` 为本地产物/素材，不计入源码。
