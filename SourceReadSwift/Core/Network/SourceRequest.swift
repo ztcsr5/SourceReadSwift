@@ -24,6 +24,11 @@ struct SourceRequest: Sendable {
     /// URL-option `retry`: extra transport attempts after a failure.
     let retry: Int
 
+    /// Legado `concurrentRate` 原文，由 `SourceRateRule` 解析；nil 表示不限速。
+    let concurrentRate: String?
+    /// 限流分组键：同一书源的搜索 / 目录 / 正文共享一个窗口。
+    let rateLimitKey: String?
+
     init(
         url: URL,
         method: SourceHTTPMethod,
@@ -33,7 +38,9 @@ struct SourceRequest: Sendable {
         timeout: TimeInterval,
         webView: Bool = false,
         webJs: String? = nil,
-        retry: Int = 0
+        retry: Int = 0,
+        concurrentRate: String? = nil,
+        rateLimitKey: String? = nil
     ) {
         self.url = url
         self.method = method
@@ -44,6 +51,8 @@ struct SourceRequest: Sendable {
         self.webView = webView
         self.webJs = webJs
         self.retry = retry
+        self.concurrentRate = concurrentRate
+        self.rateLimitKey = rateLimitKey
     }
 }
 

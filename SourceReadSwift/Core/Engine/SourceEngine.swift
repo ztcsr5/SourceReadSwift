@@ -102,6 +102,7 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
     private let evidenceLock = NSLock()
     private var evidence: [String: [SourceDiagnosticStage: SourceDiagnosticEvidence]] = [:]
     private let requestBuilder = SourceRequestBuilder()
+    private let rateLimiter = SourceRateLimiter.shared
     private let searchURLResolver = SearchURLResolver()
     private let fallbackLock = NSLock()
     private var _allowWebViewFallback: Bool = true
@@ -675,6 +676,19 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
     /// Repeats the transport when the URL option asked for `retry`
     /// (Legado `UrlOption.retry`).  A successful response short-circuits.
     private func loadWithRetry(_ request: SourceRequest, attempts: Int) async -> Result<SourceResponse, SourceEngineError> {
+        // Legado `concurrentRate`：同一书源的搜索 / 目录 / 正文共用一个限流窗口，
+        // 在真正发出请求前取号（ConcurrentRateLimiter.kt）。
+        let rateRule = SourceRateRule(request.concurrentRate)
+        let rateKey = request.rateLimitKey
+        if let rateRule, let rateKey {
+            await rateLimiter.acquire(key: rateKey, rule: rateRule)
+        }
+        defer {
+            if let rateRule, let rateKey {
+                rateLimiter.release(key: rateKey, rule: rateRule)
+            }
+        }
+
         var result = await network.load(request)
         var remaining = min(max(attempts, 0), 5)
         while remaining > 0 {

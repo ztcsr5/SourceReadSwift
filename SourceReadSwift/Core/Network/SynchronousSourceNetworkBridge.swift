@@ -26,7 +26,17 @@ struct SynchronousSourceNetworkBridge {
         let semaphore = DispatchSemaphore(value: 0)
         let box = ResultBox()
         Task.detached(priority: nil) {
-            box.store(await network.load(request))
+            // Legado 的 JS 网络调用同样走并发率限制（getConcurrentRecordBlocking）。
+            let rateRule = SourceRateRule(request.concurrentRate)
+            let rateKey = request.rateLimitKey
+            if let rateRule, let rateKey {
+                await SourceRateLimiter.shared.acquire(key: rateKey, rule: rateRule)
+            }
+            let result = await network.load(request)
+            if let rateRule, let rateKey {
+                SourceRateLimiter.shared.release(key: rateKey, rule: rateRule)
+            }
+            box.store(result)
             semaphore.signal()
         }
         guard semaphore.wait(timeout: .now() + effectiveTimeout) == .success else { return nil }

@@ -192,7 +192,9 @@ struct SourceRequestBuilder {
             timeout: timeout,
             webView: directive.webView ?? false,
             webJs: directive.webJs,
-            retry: directive.retry ?? 0
+            retry: directive.retry ?? 0,
+            concurrentRate: source.concurrentRate,
+            rateLimitKey: source.bookSourceUrl
         )
     }
 

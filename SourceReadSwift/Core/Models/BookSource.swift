@@ -65,6 +65,13 @@ struct BookSource: Identifiable, Codable, Hashable, Sendable {
     let customConfig: String?
     let raw: [String: String]
 
+    /// Legado `concurrentRate`（并发率）。空串 / `0` / 缺省 = 不限速；
+    /// `500` = 同一时刻只允许一个请求且两次请求开始时间至少间隔 500 ms；
+    /// `3/1000` = 1000 ms 窗口内最多 3 次。语义对齐 ConcurrentRateLimiter.kt。
+    var concurrentRate: String? {
+        raw["concurrentRate"]?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty
+    }
+
     /// Format identity survives persistence and updates. Older exports without
     /// an explicit marker fall back to their structural fingerprints.
     var sourceFormat: BookSourceFormat {
