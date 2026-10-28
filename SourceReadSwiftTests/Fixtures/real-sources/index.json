@@ -680,6 +680,7 @@
   "contentType": "application/json",
   "bytes": 7733,
   "bodyFile": "QQ-d709685c.body",
+  "charset": "utf-8",
   "source": {
    "bookSourceName": "QQ阅读",
    "bookSourceUrl": "https://book.qq.com/##闫",
@@ -737,6 +738,7 @@
   "contentType": "text/html; charset=utf-8",
   "bytes": 26385,
   "bodyFile": "source-92c612e8.body",
+  "charset": "utf-8",
   "source": {
    "bookSourceName": "新笔趣阁",
    "bookSourceUrl": "https://www.biquges123.com",
@@ -789,6 +791,7 @@
   "contentType": "text/html; charset=UTF-8",
   "bytes": 32120,
   "bodyFile": "biqusa-798fa7b4.body",
+  "charset": "utf-8",
   "source": {
    "bookSourceName": "笔趣阁[biqusa]",
    "bookSourceUrl": "https://www.biqusa.com/",
@@ -835,6 +838,7 @@
   "contentType": "text/html; charset=UTF-8",
   "bytes": 45505,
   "bodyFile": "source-aad57a4e.body",
+  "charset": "utf-8",
   "source": {
    "bookSourceName": "影书小说[修复]",
    "bookSourceUrl": "https://www.yingsx.com",
@@ -890,6 +894,7 @@
   "contentType": "application/json; charset=utf-8",
   "bytes": 8548,
   "bodyFile": "source-d52dcbfb.body",
+  "charset": "utf-8",
   "source": {
    "bookSourceName": "爱看书网（优）",
    "bookSourceUrl": "https://cxb-pro.cread.com",
