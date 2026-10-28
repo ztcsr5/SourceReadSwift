@@ -388,6 +388,55 @@ final class SearchURLResolverTests: XCTestCase {
         XCTAssertEqual(url, "https://example.com/search?q=abc%20def")
     }
 
+    func testTrailingJavaScriptDirectiveIsEvaluatedBeforeURLSplit() {
+        // 猫耳 / 随心看吧 style: the URL on the first line, then `@js:` on the
+        // next line. Legado evaluates the script with `result` bound to the
+        // URL text; the marker must never survive into the query string.
+        let source = BookSource(
+            bookSourceName: "尾随 JS",
+            bookSourceUrl: "https://example.com",
+            searchUrl: "https://example.com/search?q={{key}}\n@js:java.put('key',key);result"
+        )
+
+        let result = SearchURLResolver().resolve(source: source, keyword: "剑来", page: 1)
+        guard case .success(let url) = result else {
+            return XCTFail("expected success")
+        }
+        XCTAssertFalse(url.contains("@js"), url)
+        XCTAssertTrue(url.contains("q=%E5%89%91%E6%9D%A5"), url)
+    }
+
+    func testTrailingJavaScriptDirectiveCanRewriteTheURL() {
+        let source = BookSource(
+            bookSourceName: "尾随 JS 改写",
+            bookSourceUrl: "https://example.com",
+            searchUrl: "https://example.com/search?q={{key}}\n@js:result.replace('search','find')"
+        )
+
+        let result = SearchURLResolver().resolve(source: source, keyword: "剑来", page: 1)
+        guard case .success(let url) = result else {
+            return XCTFail("expected success")
+        }
+        XCTAssertTrue(url.contains("/find?q=%E5%89%91%E6%9D%A5"), url)
+    }
+
+    func testBracesInsideJavaScriptResultAreStillEvaluated() {
+        // 曼哈漫画 builds its query inside a `@js:` template and leaves
+        // `{{...}}` placeholders in the returned string.
+        let source = BookSource(
+            bookSourceName: "JS 结果里的花括号",
+            bookSourceUrl: "https://example.com",
+            searchUrl: #"@js:`https://example.com/search?q={{key}}&tag={{1+1}}`"#
+        )
+
+        let result = SearchURLResolver().resolve(source: source, keyword: "剑来", page: 1)
+        guard case .success(let url) = result else {
+            return XCTFail("expected success")
+        }
+        XCTAssertTrue(url.contains("tag=2"), url)
+        XCTAssertFalse(url.contains("%7B"), url)
+    }
+
     func testAppVersionSemantics() {
         // Assert the shape, not a frozen release number: bumping the version
         // should not require editing this test every time.

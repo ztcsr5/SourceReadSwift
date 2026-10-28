@@ -31,8 +31,24 @@ struct SearchURLResolver {
         func postProcess(_ result: String) -> String {
             let expanded = LegadoRuleResolver.replacePageAngles(in: result, page: page)
             let (urlPart, suffixPart) = Self.splitURLAndDirectiveSuffix(expanded)
+            // A `@js:` rule (e.g. 曼哈漫画) can build the query with its own
+            // `{{...}}` placeholders *after* the script returns.  Legado runs
+            // `replaceKeyPageJs()` on the evaluated string as well, so the
+            // braces must be expanded here instead of being percent-encoded
+            // into `%7B%7B...%7D%7D`.
+            var evaluatedURLPart = urlPart
+            if evaluatedURLPart.contains("{{"), evaluatedURLPart.contains("}}") {
+                evaluatedURLPart = resolveEmbeddedBracesScripts(
+                    evaluatedURLPart,
+                    source: source,
+                    variables: scriptVariables,
+                    persistentState: persistentState,
+                    network: network,
+                    executionContext: executionContext
+                )
+            }
             let interpolatedURL = ruleResolver.interpolate(
-                urlPart,
+                evaluatedURLPart,
                 keyword: keyword,
                 page: page,
                 baseUrl: source.bookSourceUrl,
@@ -88,6 +104,32 @@ struct SearchURLResolver {
             variables["result"] = cleaned
             let evalResult = evaluateScript(script, source: source, variables: variables, persistentState: persistentState, network: network, executionContext: executionContext)
             return evalResult.map(postProcess)
+        }
+
+        // A trailing `@js:` after the URL (or after a `,{...}` POST option) is
+        // evaluated by Legado before the URL is split from its directives.
+        // `result` is the text before the marker, so a source can rewrite the
+        // body or the query and hand the new string back.  Without this branch
+        // the marker was percent-encoded into the query and every 猫耳 /
+        // 随心看吧 style source searched for the literal JS text.
+        if let jsRange = cleaned.range(of: "@js:", options: .caseInsensitive) {
+            let prefix = String(cleaned[..<jsRange.lowerBound])
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+            let script = String(cleaned[jsRange.upperBound...])
+            if !prefix.isEmpty,
+               !script.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                var variables = scriptVariables
+                variables["result"] = prefix
+                let evalResult = evaluateScript(
+                    script,
+                    source: source,
+                    variables: variables,
+                    persistentState: persistentState,
+                    network: network,
+                    executionContext: executionContext
+                )
+                return evalResult.map(postProcess)
+            }
         }
 
         var resolvedCleaned = LegadoRuleResolver.replacePageAngles(in: cleaned, page: page)
