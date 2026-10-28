@@ -30,22 +30,22 @@ App 端要做的是「快速归因 + 明确提示」，而不是继续在 CSS �
 
 ## 3. 67 条 expected>0 的对账结果
 
-probe run `40629754410`（commit `b5014be`）：
+probe run `40631770450`（commit `ac50c9db7`）：
 
 ```text
 TOC_CORPUS total=97 mismatches=0
-TOC_FIELDS emptyNames=9 emptyURLs=9
+TOC_FIELDS emptyNames=0 emptyURLs=4
 ```
 
 - **选择器 97/97 与 jsoup 完全一致**：30 条 0、67 条正数（min 1、median 500、max 3254）。
-- 字段级：67 条源各抽前 5 章，共 335 行，其中 9 行章节名/URL 为空，集中在 4 条源：
+- 字段级：67 条源各抽前 5 章，共 335 行。**章节名 335/335 全部提取成功**；URL 有 4 行为空，集中在 3 条源：
 
 | id | 源 | 现象 | 归因 |
 |---|---|---|---|
-| 57 | 茶马小说 | 5/5 章名与 URL 空 | `<option value="…">标题</option>` 目录，默认 `a@href` 读不到 → **解析器缺口，已修** |
-| 141 | 商店小说 | 2/5 空，首条是作者名「陌文子」 | `class.row@li` 抓到推荐位 → 规则过时 |
-| 159 | 吾爱破解 | 1/5 空 | `chapterList: tag.h1` 本身不是目录规则 → 规则错误 |
-| 891 | 潇湘书院 | 1/5 空 | `.profile-main li` 混入导航行 → 规则过时 |
+| 57 | 茶马小说 | 修复前 5/5 章名与 URL 空，修复后归零 | `<option value="…">标题</option>` 目录，默认 `a@href` 读不到 → **解析器缺口，已修** |
+| 141 | 商店小说 | 2/5 URL 空，首行是作者名「陌文子」 | `class.row@li` 抓到推荐位 → 规则过时 |
+| 159 | 吾爱破解 | 1/5 URL 空，抓到的是帖子标题 | `chapterList: tag.h1` 本身不是目录规则 → 规则错误 |
+| 891 | 潇湘书院 | 1/5 URL 空，首行是「正文卷」分卷行 | `.profile-main li` 混入导航行 → 规则过时 |
 
 修复：`ChapterListParser.makeChapter` 在 `href` 为空且元素是 `<option>` 时读 `value`；
 单测 `ChapterListParserTests` 之外的 `ChapterListMetadataTests.testSelectOptionTOCUsesValueAttributeForChapterURL` 覆盖该路径。
@@ -59,7 +59,7 @@ probe 早期版本把空字符串当规则传，导致 301 行误报——**那�
 
 ## 5. 下一步
 
-- 重跑 probe，确认 57 号 5 行归零（预期 `emptyNames=4`）；
+- 141/159/891 属于源规则过时，交给源维护/诊断面板提示，不在解析器里特判；
 - `XPathRuleTranslator` 补 `following-sibling::` 语义（451、259 这类源，当前站点已失效但语法缺口真实存在）；
 - 对 `items` 规则的源，tocUrl 返回 JSON 时走 `JSONRuleExtractor`，不要强塞 HTML 通道；
 - 源诊断面板复用这四类归因：`SITE_DEAD` / `RULE_STALE` / `NEED_JS` / `RULE_MISMATCH`。

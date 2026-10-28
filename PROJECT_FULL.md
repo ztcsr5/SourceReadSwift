@@ -2373,6 +2373,15 @@ Legado `EncoderUtils.escape`（`EncoderUtils.kt` L12-29）只保留 ASCII 字母
 - 修复 `getElementById`（取首个）与 `getElementsByClass`（连续 token 段）语义；基线 `LegadoCount.java` 改为闭区间后仅 451/975 变化。
 - 详见 `docs/SOURCE_COMPAT_1_0_79.md`；版本 1.0.79（Build 80）。
 
+## 三十一、v1.0.80 目录（TOC）全链路对账与 select 目录修复（2026-10-28）
+
+- 新建 97 条真实目录页语料（`SourceReadSwiftTests/Fixtures/toc-corpus/`，51 份 HTML，11.0 MB），基线由 jsoup-1.17.2 跑 Legado `chapterList` 生成。
+- 选择器 **97/97 与 jsoup 一致**（30 条 0 命中、67 条正数）。30 条 0 命中逐条归因：15 条站群错误页（`SITE_DEAD`）、5 条规则过时（`RULE_STALE`）、6 条 JS/JSONPath 规则（`NEED_JS`）、3 条 JSON 规则套 HTML（`RULE_MISMATCH`）、1 条详情页无目录（`NEED_JS`/URL）。
+- 字段级：67 条源前 5 章共 335 行，**章节名 335/335 提取成功**；URL 4 行为空，集中在 3 条规则过时源（141 商店小说、159 吾爱破解、891 潇湘书院）。
+- 修复 `<option value="…">标题</option>` 型目录：`ChapterListParser.makeChapter` 在 `href` 为空且元素为 `<option>` 时读 `value`，单测 `ChapterListMetadataTests.testSelectOptionTOCUsesValueAttributeForChapterURL`。
+- CI 测试夹具改为 `#filePath` 从源码树读取（`TestFixtureSupport`）：两套 corpus 的 `manifest.json` 不再在 `.xctest` 根撞车，`project.yml` 不再声明测试资源。
+- 详见 `docs/SOURCE_TOC_1_0_80.md`；版本 1.0.80（Build 81）。
+
 ## 附录 A：完整文件清单
 
 > 以下为 2026-10-25 工作区实测清单。`build/`、`ci-log/`、`AppIcons_Candidates/` 为本地产物/素材，不计入源码。
