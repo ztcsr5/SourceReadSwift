@@ -160,4 +160,74 @@ final class SourceURLDirectiveTests: XCTestCase {
 
         XCTAssertEqual(String(data: directive.body ?? Data(), encoding: .utf8), #"{"enabled":true,"page":2}"#)
     }
+
+    // MARK: - 1.0.77 relaxed option objects (real source shapes)
+
+    /// 爱下小说 / 爱下电子: single-quoted keys plus a single-quoted JSON body.
+    func testParseSingleQuotedOptionsWithNestedJSONBody() {
+        let directive = SourceURLDirectiveParser().parse(
+            #"https://example.com/api,{'method': 'POST','body': '{"searchTerms":"剑来","pageSize": "20"}'}"#
+        )
+
+        XCTAssertEqual(directive.urlText, "https://example.com/api")
+        XCTAssertEqual(directive.method, .post)
+        XCTAssertEqual(
+            String(data: directive.body ?? Data(), encoding: .utf8),
+            #"{"searchTerms":"剑来","pageSize": "20"}"#
+        )
+    }
+
+    /// 零点看书 / 全本小说: `{...};` followed by more JavaScript.
+    func testParseOptionsFollowedByTrailingScript() {
+        let directive = SourceURLDirectiveParser().parse(
+            #"https://example.com/api,{"method":"POST","body":"q=1"}; var x = 1; @js:result"#
+        )
+
+        XCTAssertEqual(directive.urlText, "https://example.com/api")
+        XCTAssertEqual(directive.method, .post)
+        XCTAssertEqual(String(data: directive.body ?? Data(), encoding: .utf8), "q=1")
+    }
+
+    /// 大米小说: the charset value closes with a mismatched double quote.
+    func testParseOptionsWithMismatchedCharsetQuote() {
+        let directive = SourceURLDirectiveParser().parse(
+            #"https://example.com/api,{'charset': 'UTF-8"','method': 'POST','body': 'a=1'}"#
+        )
+
+        XCTAssertEqual(directive.urlText, "https://example.com/api")
+        XCTAssertEqual(directive.expectedCharset, "UTF-8")
+        XCTAssertEqual(directive.method, .post)
+        XCTAssertEqual(String(data: directive.body ?? Data(), encoding: .utf8), "a=1")
+    }
+
+    /// 酷我音乐: a backtick and template value trail the object.
+    func testParseOptionsWithTrailingBacktickAndTemplateValue() {
+        let directive = SourceURLDirectiveParser().parse(
+            #"https://example.com/api,{"type":"${type}"}`"#
+        )
+
+        XCTAssertEqual(directive.urlText, "https://example.com/api")
+        XCTAssertEqual(directive.responseType, "${type}")
+    }
+
+    /// A JS rule may contain `,{}`; it must not be cut into a URL + options.
+    func testJavaScriptRuleWithObjectArgumentIsNotSplit() {
+        let rule = #"@js:java.connect(su,{}).headers('Location')"#
+        let directive = SourceURLDirectiveParser().parse(rule)
+
+        XCTAssertEqual(directive.urlText, rule)
+        XCTAssertNil(directive.body)
+        XCTAssertEqual(directive.method, .get)
+    }
+
+    /// Only the first balanced object is the option block.
+    func testParseOptionsIgnoresFollowingObject() {
+        let directive = SourceURLDirectiveParser().parse(
+            #"https://example.com/api,{"method":"POST","body":"a=1"},{"unrelated":true}"#
+        )
+
+        XCTAssertEqual(directive.urlText, "https://example.com/api")
+        XCTAssertEqual(directive.method, .post)
+        XCTAssertEqual(String(data: directive.body ?? Data(), encoding: .utf8), "a=1")
+    }
 }

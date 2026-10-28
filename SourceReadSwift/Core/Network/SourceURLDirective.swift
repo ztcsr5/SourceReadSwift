@@ -100,6 +100,7 @@ struct SourceURLDirectiveParser {
             }
             expectedCharset = firstString(in: options, keys: ["charset", "encoding", "encode"])?
                 .trimmingCharacters(in: .whitespacesAndNewlines)
+                .trimmingCharacters(in: CharacterSet(charactersIn: "\"'"))
                 .nilIfEmpty
             if let rawTimeout = firstValue(in: options, keys: ["timeout", "timeoutMs", "connectTimeout"]),
                let parsed = timeoutSeconds(rawTimeout) {
@@ -204,39 +205,224 @@ struct SourceURLDirectiveParser {
     }
 
     private func splitURLAndJSONOptions(_ text: String) -> (url: String, options: [String: Any]?) {
+        let original = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        let lower = original.lowercased()
+        // A JavaScript rule can itself contain `,{...}` (java.connect(url,{})).
+        // Splitting there would cut the script in half, so leave it alone.
+        if lower.hasPrefix("@js:") || lower.hasPrefix("<js>") || lower.hasPrefix("js:") {
+            return (original, nil)
+        }
         guard let jsonStartRange = text.range(of: #",\s*\{"#, options: .regularExpression) else {
-            return (text.trimmingCharacters(in: .whitespacesAndNewlines), nil)
+            return (original, nil)
         }
         let url = String(text[..<jsonStartRange.lowerBound]).trimmingCharacters(in: .whitespacesAndNewlines)
-        let optionText = String(text[jsonStartRange.lowerBound...].dropFirst()).trimmingCharacters(in: .whitespacesAndNewlines)
+        let rawOptions = String(text[jsonStartRange.lowerBound...].dropFirst()).trimmingCharacters(in: .whitespacesAndNewlines)
 
-        // 1. Direct standard JSON
-        if let data = optionText.data(using: .utf8),
-           let options = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+        // Sources write `{...};`, `{...}` + backtick or `{...}` followed by a
+        // whole `@js:` script. Feeding that tail to JSONSerialization failed
+        // and the options were dropped, so the search went out as a bodyless
+        // GET. Take the first balanced object and ignore the tail.
+        guard let objectText = Self.firstBalancedObject(in: rawOptions) else {
+            return (url, nil)
+        }
+        if let options = parseOptionsObject(objectText) {
             return (url, options)
         }
-
-        // 2. Relaxed JSON: fix unquoted keys, single quotes, trailing commas
-        let sanitized = sanitizeRelaxedJSON(optionText)
-        if let data = sanitized.data(using: .utf8),
-           let options = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
-            return (url, options)
-        }
-
-        // 3. Fallback: JavaScriptCore evaluation of object literal
-        if let options = evaluateJSObjectLiteral(optionText) {
-            return (url, options)
-        }
-
         return (url, nil)
     }
 
+    private func parseOptionsObject(_ text: String) -> [String: Any]? {
+        if let data = text.data(using: .utf8),
+           let options = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+            return options
+        }
+        let sanitized = sanitizeRelaxedJSON(text)
+        if let data = sanitized.data(using: .utf8),
+           let options = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+            return options
+        }
+        if let options = evaluateJSObjectLiteral(text) {
+            return options
+        }
+        return nil
+    }
+
+    /// First balanced `{...}` block, quote-aware. Returns nil when the block
+    /// never closes (a JS fragment rather than an option object).
+    static func firstBalancedObject(in text: String) -> String? {
+        var depth = 0
+        var quote: Character?
+        var escaped = false
+        var start: String.Index?
+        var index = text.startIndex
+        while index < text.endIndex {
+            let ch = text[index]
+            if let active = quote {
+                if escaped {
+                    escaped = false
+                } else if ch == "\\" {
+                    escaped = true
+                } else if ch == active {
+                    quote = nil
+                }
+            } else {
+                switch ch {
+                case "\"", "'":
+                    quote = ch
+                case "{":
+                    if depth == 0 { start = index }
+                    depth += 1
+                case "}":
+                    if depth > 0 {
+                        depth -= 1
+                        if depth == 0, let begin = start {
+                            return String(text[begin...index])
+                        }
+                    }
+                default:
+                    break
+                }
+            }
+            index = text.index(after: index)
+        }
+        return nil
+    }
+
+    /// String-level repair for the JSON-ish objects Legado sources use:
+    /// single quotes, single-quoted JSON bodies, bare keys, trailing commas
+    /// and the occasional mismatched closing quote. Everything is converted
+    /// to valid JSON so JSONSerialization does the actual parsing.
     private func sanitizeRelaxedJSON(_ raw: String) -> String {
-        var s = raw.trimmingCharacters(in: .whitespacesAndNewlines)
-        s = s.replacingOccurrences(of: #"(?<=[\{,]\s*)([a-zA-Z_][a-zA-Z0-9_]*)\s*:"#, with: "\"$1\":", options: .regularExpression)
-        s = s.replacingOccurrences(of: #":\s*'([^']*)'"#, with: ": \"$1\"", options: .regularExpression)
-        s = s.replacingOccurrences(of: #",\s*\}"#, with: "}", options: .regularExpression)
-        return s
+        var converted = convertSingleQuotedStrings(raw)
+        converted = quoteBareKeys(converted)
+        converted = converted.replacingOccurrences(
+            of: #",\s*([}\]])"#,
+            with: "$1",
+            options: .regularExpression
+        )
+        return converted.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private func convertSingleQuotedStrings(_ text: String) -> String {
+        var output = ""
+        output.reserveCapacity(text.count + 16)
+        var index = text.startIndex
+        var inDouble = false
+        var inSingle = false
+        var escaped = false
+        while index < text.endIndex {
+            let ch = text[index]
+            if inDouble {
+                output.append(ch)
+                if escaped {
+                    escaped = false
+                } else if ch == "\\" {
+                    escaped = true
+                } else if ch == "\"" {
+                    inDouble = false
+                }
+            } else if inSingle {
+                if escaped {
+                    if ch == "'" {
+                        output.append("'")
+                    } else {
+                        output.append("\\")
+                        output.append(ch)
+                    }
+                    escaped = false
+                } else if ch == "\\" {
+                    escaped = true
+                } else if ch == "'" {
+                    output.append("\"")
+                    inSingle = false
+                } else if ch == "\"" {
+                    output.append("\\\"")
+                } else if ch == "\n" || ch == "\r" {
+                    // An unterminated single-quoted value ends at the line.
+                    output.append("\"")
+                    output.append(ch)
+                    inSingle = false
+                } else {
+                    output.append(ch)
+                }
+            } else {
+                if ch == "\"" {
+                    inDouble = true
+                    output.append(ch)
+                } else if ch == "'" {
+                    inSingle = true
+                    output.append("\"")
+                } else {
+                    output.append(ch)
+                }
+            }
+            index = text.index(after: index)
+        }
+        if inSingle { output.append("\"") }
+        return output
+    }
+
+    private func quoteBareKeys(_ text: String) -> String {
+        var output = ""
+        output.reserveCapacity(text.count + 16)
+        var index = text.startIndex
+        var inString = false
+        var escaped = false
+        var lastSignificant: Character = "{"
+        while index < text.endIndex {
+            let ch = text[index]
+            if inString {
+                output.append(ch)
+                if escaped {
+                    escaped = false
+                } else if ch == "\\" {
+                    escaped = true
+                } else if ch == "\"" {
+                    inString = false
+                }
+                index = text.index(after: index)
+                continue
+            }
+            if ch == "\"" {
+                inString = true
+                output.append(ch)
+                lastSignificant = ch
+                index = text.index(after: index)
+                continue
+            }
+            let isKeyPosition = (lastSignificant == "{" || lastSignificant == ",")
+            let isIdentifierStart = ch.isLetter || ch == "_" || ch == "$"
+            if isKeyPosition, isIdentifierStart {
+                var end = index
+                var identifier = ""
+                while end < text.endIndex {
+                    let c = text[end]
+                    if c.isLetter || c.isNumber || c == "_" || c == "-" || c == "$" {
+                        identifier.append(c)
+                        end = text.index(after: end)
+                    } else {
+                        break
+                    }
+                }
+                var lookahead = end
+                while lookahead < text.endIndex, text[lookahead] == " " || text[lookahead] == "\t" {
+                    lookahead = text.index(after: lookahead)
+                }
+                if lookahead < text.endIndex, text[lookahead] == ":" {
+                    output.append("\"" + identifier + "\"")
+                    index = end
+                    continue
+                }
+            }
+            if ch == " " || ch == "\n" || ch == "\r" || ch == "\t" {
+                output.append(ch)
+            } else {
+                output.append(ch)
+                lastSignificant = ch
+            }
+            index = text.index(after: index)
+        }
+        return output
     }
 
     private func evaluateJSObjectLiteral(_ raw: String) -> [String: Any]? {
