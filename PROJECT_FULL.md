@@ -2382,6 +2382,33 @@ Legado `EncoderUtils.escape`（`EncoderUtils.kt` L12-29）只保留 ASCII 字母
 - CI 测试夹具改为 `#filePath` 从源码树读取（`TestFixtureSupport`）：两套 corpus 的 `manifest.json` 不再在 `.xctest` 根撞车，`project.yml` 不再声明测试资源。
 - 详见 `docs/SOURCE_TOC_1_0_80.md`；版本 1.0.80（Build 81）。
 
+## 三十二、v1.0.83 覆盖模式改 UIScrollView（2026-10-28）
+
+读者反馈「滑动还行，其他三种翻页掉帧，明显不是 120Hz」。1.0.82 已去掉覆盖模式每帧的
+全屏 `.shadow`，帧率没有恢复——因为瓶颈不在阴影，而在渲染通道。
+
+旧的 `coverPagedReaderContent` 是 `GeometryReader + ZStack + DragGesture`，位移写进
+`@State coverDragTranslation`。手指每移动一个事件，SwiftUI 就重新求值整个子树：三页
+`readerPage`、三次 `ReaderPageIdentity`、三次 `.clipped()` / `.overlay()` diff。UIKit 的
+pan 是 120Hz 事件，SwiftUI body 求值跟不上，实际出帧被压在 60Hz 附近。
+
+1.0.83 新增 `CoverPageReaderView`（`UIViewControllerRepresentable`）：
+
+- `UIScrollView(isPagingEnabled = true)` + 三个 `UIHostingController` 槽位；
+- 拖拽由 UIKit / Core Animation 驱动，拖拽期间不触发任何 SwiftUI body；
+- 只有 `pageIdentity` / `contentRevision` 变化才替换 rootView；
+- `ReaderCoverSettlePolicy` 判定松手落点：过半提交，否则回弹；
+- 提交后仍走 `ReaderPageRestoration` 锚点复算，保留 1.0.81 的「第五章不跳回第二章」修复；
+- 邻章未就绪时 450ms 兜底回中，不会停在边缘空白页。
+
+验证：iOS run `40638610223` success（含 `ReaderCoverSettlePolicyTests` 5 条），
+IPA run `40638610178` success；产物 12,264,325 字节，`1.0.83 / 84`，MinimumOSVersion 16.0。
+交接见 `docs/READER_COVER_UIKIT_1_0_83.md`。
+
+仍未动的通道：滑动模式仍是 WKWebView；平移模式仍是 `UIPageViewController(.scroll)`，
+卡顿来自手势中按需构建 hosting controller；仿真模式是 Apple CA 卷页，按 60Hz 设计，
+应用层无法提高。三项分开记账，不再合并成一句「帧率修复」。
+
 ## 附录 A：完整文件清单
 
 > 以下为 2026-10-25 工作区实测清单。`build/`、`ci-log/`、`AppIcons_Candidates/` 为本地产物/素材，不计入源码。
