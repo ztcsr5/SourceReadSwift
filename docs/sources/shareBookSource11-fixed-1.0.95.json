@@ -2761,7 +2761,12 @@
   "lastUpdateTime": 0,
   "respondTime": 180000,
   "weight": 0,
-  "bookSourceComment": "2026-10-29 探测：搜索走 /user/search.html JSON，但接口对非浏览器会话固定返回 \"1\"，规则无法直连。"
+  "bookSourceComment": "2026-10-29 重建：搜索 /user/search.html?q={{key}} 返回 JSON（实测“总裁”100 条），详情 h1/.info .small/.intro dd，目录 .listmain a 179 章，正文需 webView 过 getsite 校验。",
+  "searchUrl": "/user/search.html?q={{key}}",
+  "ruleSearch": "{\"bookList\": \"$[*]\", \"name\": \"$.articlename\", \"author\": \"$.author\", \"coverUrl\": \"$.url_img\", \"intro\": \"$.intro\", \"bookUrl\": \"$.url_list\"}",
+  "ruleBookInfo": "{\"name\": \"@css:h1@text\", \"author\": \"@css:.info .small span:eq(0)@text##^作者[:：]\\\\s*\", \"coverUrl\": \"@css:.info .cover img@src\", \"intro\": \"@css:.intro dd@text\", \"kind\": \"\", \"lastChapter\": \"\", \"tocUrl\": \"\"}",
+  "ruleToc": "{\"chapterList\": \"@css:.listmain a\", \"chapterName\": \"text\", \"chapterUrl\": \"href##$##,{\\\"webView\\\":true}\", \"nextTocUrl\": \"\"}",
+  "ruleContent": "{\"content\": \"@css:#content@html\", \"nextContentUrl\": \"\"}"
  },
  {
   "bookSourceGroup": "",
@@ -3224,7 +3229,12 @@
   "lastUpdateTime": 0,
   "respondTime": 180000,
   "weight": 0,
-  "bookSourceComment": "2026-10-29 复测搜索页 Cloudflare 403；首页可开，搜索需浏览器挑战。"
+  "bookSourceComment": "2026-10-29 重建：搜索 /search?s={{key}}&p={{page}}（实测 p1/p2 各 20 条），目录 select.pg-sel option 1645 章，正文 #novel-content。",
+  "searchUrl": "/search?s={{key}}&p={{page}}",
+  "ruleSearch": "{\"bookList\": \"@css:#main-list .novel-item\", \"name\": \"h4.novel-subject a@text\", \"author\": \".misc-value a@text\", \"kind\": \".category@text\", \"wordCount\": \".word-count@text\", \"intro\": \"p.novel-desc@text\", \"bookUrl\": \"h4.novel-subject a@href\"}",
+  "ruleBookInfo": "{\"name\": \"@css:h1@text##\\\\s*作者.*$\", \"author\": \"@css:h1 a@text##^作者[:：]\\\\s*\", \"intro\": \"@css:.novel-summary-content@text\", \"coverUrl\": \"\", \"kind\": \"\", \"lastChapter\": \"\", \"tocUrl\": \"\"}",
+  "ruleToc": "{\"chapterList\": \"@css:select.pg-sel option\", \"chapterName\": \"text\", \"chapterUrl\": \"value\", \"nextTocUrl\": \"\"}",
+  "ruleContent": "{\"content\": \"@css:#novel-content@html\", \"nextContentUrl\": \"\"}"
  },
  {
   "bookSourceGroup": "修复·空壳",
