@@ -1117,6 +1117,12 @@ final class JSCoreRuntime {
         }
         if (typeof window === 'undefined' || window === null) window = globalThis;
         if (typeof document === 'undefined' || document === null) document = {};
+        if (typeof navigator === 'undefined' || navigator === null) navigator = {};
+        navigator.userAgent = navigator.userAgent || 'Mozilla/5.0 (Linux; Android 9; Pixel 4 Build/PQ3A.190801.002; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/81.0.4044.117 Mobile Safari/537.36';
+        navigator.platform = navigator.platform || 'Linux armv8l';
+        navigator.language = navigator.language || 'zh-CN';
+        navigator.appVersion = navigator.appVersion || navigator.userAgent;
+        if (typeof navigator.onLine === 'undefined') navigator.onLine = true;
         (function() {
           var origMatch = String.prototype.match;
           String.prototype.match = function(re) {
@@ -1515,12 +1521,15 @@ final class JSCoreRuntime {
         } catch (_) {}
         window.document = document;
         window.java = java;
+        window.navigator = window.navigator || navigator;
+        try { globalThis.navigator = navigator; } catch (_) {}
         // Aggregator jsLib bundles use `_` as a plain namespace holder and
         // reference `_.java`.  Legado runs Rhino where `_` is a global object;
         // JSCore has no Underscore unless the source loads it, so provide the
         // alias instead of throwing "undefined is not an object".
         if (typeof _ === 'undefined' || _ === null) { var _ = {}; }
         _.java = _.java || java;
+        try { globalThis._ = _; } catch (_) {}
         if (!String.prototype.contains) {
           String.prototype.contains = function(value) { return this.indexOf(String(value)) >= 0; };
         }
@@ -3468,13 +3477,28 @@ final class JSCoreRuntime {
           return String(format || '').replace(/%[sdif]/g, function() { return String(args[index++]); });
         };
         Packages.java.lang.Integer = Packages.java.lang.Integer || {
-          parseInt: function(value, radix) { var n = parseInt(String(value || ''), Number(radix || 10)); return isNaN(n) ? 0 : n; },
+          parseInt: function(value, radix) { var n = parseInt(String(value == null ? '' : value), Number(radix || 10)); return isNaN(n) ? 0 : n; },
           valueOf: function(value) { return Number(value || 0); },
-          toString: function(value, radix) { return Number(value || 0).toString(Number(radix || 10)); }
+          toString: function(value, radix) { return Number(value || 0).toString(Number(radix || 10)); },
+          // 连尚读书 signs requests with `Integer.toHexString(hash)`.  Rhino
+          // exposes the JDK statics; JSCore has no such class, so the call
+          // threw "Integer.toHexString is not a function" and search died.
+          toHexString: function(value) { return (Number(value || 0) >>> 0).toString(16); },
+          toOctalString: function(value) { return (Number(value || 0) >>> 0).toString(8); },
+          toBinaryString: function(value) { return (Number(value || 0) >>> 0).toString(2); },
+          compare: function(a, b) { return Number(a || 0) === Number(b || 0) ? 0 : (Number(a || 0) < Number(b || 0) ? -1 : 1); },
+          max: function(a, b) { return Math.max(Number(a || 0), Number(b || 0)); },
+          min: function(a, b) { return Math.min(Number(a || 0), Number(b || 0)); }
         };
-        Packages.java.lang.Long = Packages.java.lang.Long || Packages.java.lang.Integer;
+        Packages.java.lang.Long = Packages.java.lang.Long || {};
+        (function(target) {
+          for (var key in Packages.java.lang.Integer) {
+            if (!(key in target)) target[key] = Packages.java.lang.Integer[key];
+          }
+        })(Packages.java.lang.Long);
         Packages.java.lang.Long.parseLong = function(value, radix) { var n = parseInt(String(value == null ? '0' : value), Number(radix || 10)); return isNaN(n) ? 0 : n; };
         Packages.java.lang.Long.toString = function(value, radix) { return Number(value || 0).toString(Number(radix || 10)); };
+        Packages.java.lang.Long.toHexString = function(value) { var n = Number(value || 0); return (n < 0 ? n >>> 0 : n).toString(16); };
         Packages.java.lang.Double = Packages.java.lang.Double || {
           parseDouble: function(value) { var n = parseFloat(String(value || '')); return isNaN(n) ? 0 : n; },
           valueOf: function(value) { return Number(value || 0); }

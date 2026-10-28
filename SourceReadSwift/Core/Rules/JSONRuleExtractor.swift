@@ -81,6 +81,17 @@ struct JSONRuleExtractor {
                 return dictionaries(from: selected)
             }
         }
+        // Last resort for the Legado `.[?(@.bookName)]` idiom: scan every array
+        // in the document and keep the elements that satisfy the filter.  This
+        // is the shape of `$..[?(@.field)]` that the Jayway path produces and
+        // what 书旗/聚合 style sources rely on when the wrapper key is unknown.
+        if let start = path.range(of: "[?("), path.hasSuffix(")") {
+            let expression = String(path[start.upperBound..<path.index(before: path.endIndex)])
+            var matches: [Any] = []
+            collectFilterMatches(in: object, expression: expression, into: &matches)
+            let rows = dictionaries(from: matches)
+            if !rows.isEmpty { return rows }
+        }
         return []
     }
 
@@ -1022,12 +1033,24 @@ struct JSONRuleExtractor {
                 // rjpath FilterSelector on a JsonObject keeps only entries
                 // whose value is itself an object. Swift dictionaries have no
                 // stable order, so sort keys to keep output deterministic.
-                let filtered = dictionary.keys.sorted().compactMap { key -> Any? in
-                    guard let value = dictionary[key], value is [String: Any],
-                          matchesFilterExpression(value, expression: expression) else {
-                        return nil
+                //
+                // Aggregator APIs nest the real result inside a sibling array
+                // (`{aladdin:{...}, data:[books]}`).  Some sources still use
+                // the Legado idiom `.[?(@.bookName)]`, which expects the filter
+                // to reach that array.  Filter array values element-wise too so
+                // the rule resolves instead of matching only the wrapper.
+                var filtered: [Any] = []
+                for key in dictionary.keys.sorted() {
+                    guard let value = dictionary[key] else { continue }
+                    if let object = value as? [String: Any] {
+                        if matchesFilterExpression(object, expression: expression) {
+                            filtered.append(object)
+                        }
+                    } else if let array = arrayValues(value) {
+                        for element in array where matchesFilterExpression(element, expression: expression) {
+                            filtered.append(element)
+                        }
                     }
-                    return value
                 }
                 return walk(
                     filtered,
@@ -1437,6 +1460,20 @@ struct JSONRuleExtractor {
         if let dictionary = value as? [String: Any] { return Array(dictionary.values) }
         if let array = arrayValues(value) { return array }
         return []
+    }
+
+    /// Recursively collect every array element that satisfies a JSONPath
+    /// filter expression.  Used only when the direct/descendant path lookup
+    /// produced nothing, so normal rules keep their exact Jayway semantics.
+    private func collectFilterMatches(in value: Any, expression: String, into matches: inout [Any]) {
+        if let array = arrayValues(value) {
+            for element in array where matchesFilterExpression(element, expression: expression) {
+                matches.append(element)
+            }
+        }
+        for child in children(of: value) {
+            collectFilterMatches(in: child, expression: expression, into: &matches)
+        }
     }
 
     private func arrayValues(_ value: Any) -> [Any]? {
@@ -2423,10 +2460,12 @@ struct JSONRuleExtractor {
                 return bridge
             }
         }
-        if case .failure(.javascript) = evaluated, script.contains("return") {
-            if case .success(let val) = runtime.evaluate("(function(){\(script)})()", variables: variables) {
+        if case .failure(.javascript(let message)) = evaluated {
+            if script.contains("return"),
+               case .success(let val) = runtime.evaluate("(function(){\(script)})()", variables: variables) {
                 return val
             }
+            executionContext.recordJavaScriptError(message)
         }
         if case .success(let val) = evaluated {
             return val

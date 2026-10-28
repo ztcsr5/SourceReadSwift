@@ -33,6 +33,10 @@ struct SourceManagerView: View {
     @AppStorage("batch_check_concurrent_threads") private var batchCheckConcurrency: Int = 4
     @State private var batchCheckExportNotice: String?
     @State private var sourceLogin: BookSource?
+    /// Hosts that currently hold cookies.  The source row shows a 已登录 pill
+    /// instead of the login action so a user can see which sources still need
+    /// an account without opening each source's menu.
+    @State private var loggedInHosts: Set<String> = []
     @State private var sourceHistory: BookSource?
     @State private var sourceVisualDetail: BookSource?
     @State private var pendingDetailAction: SourceDetailAction?
@@ -50,6 +54,15 @@ struct SourceManagerView: View {
         case test(BookSource)
         case rules(BookSource, SourceDiagnosticStep?)
         case json(BookSource)
+    }
+
+    /// Cookie presence is the only durable signal that a source has been
+    /// authenticated; keep a main-actor snapshot so rows can render it without
+    /// awaiting the actor on every body evaluation.
+    private func refreshLoggedInHosts() async {
+        let hosts = await appState.sourceCookieStore.hostsWithCookies()
+        let normalized = Set(hosts.map { $0.trimmingCharacters(in: CharacterSet(charactersIn: ". ")).lowercased() })
+        await MainActor.run { loggedInHosts = normalized }
     }
 
     private func routeFromDetail(_ action: SourceDetailAction) {
@@ -206,6 +219,7 @@ struct SourceManagerView: View {
             }
             .scrollDismissesKeyboard(.interactively)
             .pageBackground()
+            .task { await refreshLoggedInHosts() }
             .navigationTitle("源管理")
             .navigationBarTitleDisplayMode(.large)
             .toolbar {
@@ -268,7 +282,9 @@ struct SourceManagerView: View {
             .sheet(isPresented: $showBatchCheckSheet, onDismiss: presentPendingBatchRuleEditor) {
                 batchCheckSheet
             }
-            .sheet(item: $sourceLogin) { source in
+            .sheet(item: $sourceLogin, onDismiss: {
+                Task { await refreshLoggedInHosts() }
+            }) { source in
                 SourceLoginView(source: source, cookieStore: appState.sourceCookieStore, engine: appState.engine)
             }
             .sheet(item: $sourceHistory) { source in
@@ -629,6 +645,12 @@ struct SourceManagerView: View {
     }
 
     private func bookSourceRow(_ source: BookSource) -> some View {
+        let loginTarget = SourceLoginURLResolver.resolve(
+            loginUrl: source.loginUrl,
+            bookSourceUrl: source.bookSourceUrl
+        )
+        let loginHost = loginTarget?.url.host?.lowercased()
+        let loggedIn = loginHost.map { loggedInHosts.contains($0) } ?? false
         return sourceCard(
             title: source.bookSourceName,
             subtitle: source.bookSourceUrl,
@@ -636,6 +658,9 @@ struct SourceManagerView: View {
             enabled: source.enabled,
             badges: source.displayBadges,
             health: appState.sourceHealthStore.record(for: source),
+            loginHost: loginHost,
+            isLoggedIn: loggedIn,
+            onLogin: loginTarget == nil ? nil : { sourceLogin = source },
             primaryAction: {
                 sourceVisualDetail = source
             },
@@ -956,6 +981,9 @@ struct SourceManagerView: View {
         enabled: Bool,
         badges: [String],
         health: SourceHealthRecord? = nil,
+        loginHost: String? = nil,
+        isLoggedIn: Bool = false,
+        onLogin: (() -> Void)? = nil,
         primaryAction: (() -> Void)? = nil,
         @ViewBuilder actions: @escaping () -> MenuContent
     ) -> some View {
@@ -990,6 +1018,21 @@ struct SourceManagerView: View {
                 }
             }
             Spacer()
+            if let onLogin, loginHost != nil {
+                Button(action: onLogin) {
+                    Label(
+                        isLoggedIn ? "已登录" : "登录",
+                        systemImage: isLoggedIn ? "checkmark.seal.fill" : "person.badge.key"
+                    )
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(isLoggedIn ? Color.green : AppTheme.accent)
+                    .padding(.horizontal, 9)
+                    .padding(.vertical, 8)
+                    .background((isLoggedIn ? Color.green : AppTheme.accent).opacity(0.12), in: Capsule())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(isLoggedIn ? "\(title) 已登录，点击可重新登录" : "登录\(title)")
+            }
             if let primaryAction {
                 Button(action: primaryAction) {
                     Label("详情", systemImage: "info.circle")

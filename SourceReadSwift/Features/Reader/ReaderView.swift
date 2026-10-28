@@ -53,6 +53,10 @@ struct ReaderView: View {
     @State private var showChapterList = false
     @State private var showBookmarks = false
     @State private var showBookDetailSheet = false
+    /// Per-source login surface.  Sources that gate chapters behind an account
+    /// previously had no entry point inside the reader, so the only way to
+    /// authenticate was the source manager's long-press menu.
+    @State private var readerLoginSource: BookSource?
     @State private var showChapterWebPage = false
     @State private var showPayActionConfirmation = false
     @State private var payActionResultMessage = ""
@@ -927,6 +931,17 @@ struct ReaderView: View {
         }
         .sheet(isPresented: $showChapterWebPage) {
             SmartWebReaderView(initialURL: currentChapterWebURL)
+        }
+        .sheet(item: $readerLoginSource, onDismiss: {
+            // Cookies land in the shared store while the sheet is up, so the
+            // chapter that failed with 401/403 can be retried immediately.
+            retryChapterManually(currentDisplayChapterIndex)
+        }) { source in
+            SourceLoginView(
+                source: source,
+                cookieStore: appState.sourceCookieStore,
+                engine: appState.engine
+            )
         }
         .onAppear {
             migrateTypographyDefaultsIfNeeded()
@@ -2428,6 +2443,17 @@ struct ReaderView: View {
     /// The page shown while the neighbouring chapter is still downloading, or
     /// after the source rejected it. Without a real failure state a timeout
     /// looked like the end of the book and forced the reader back to the TOC.
+    /// A 401/403 or an explicit VIP/permission message means the source needs
+    /// an account.  Surfacing the login sheet where the chapter failed removes
+    /// the dead end where the reader only offered "retry".
+    private func chapterFailureSuggestsLogin(_ message: String) -> Bool {
+        let text = message.lowercased()
+        return text.contains("401") || text.contains("403")
+            || text.contains("登录") || text.contains("登陆")
+            || text.contains("vip") || text.contains("权限")
+            || text.contains("订阅") || text.contains("购买")
+    }
+
     private func chapterPlaceholderPage(_ page: ReaderPageBlock) -> some View {
         pageSurface(for: page) {
             VStack(spacing: 12) {
@@ -2456,6 +2482,16 @@ struct ReaderView: View {
                     .font(.footnote.weight(.semibold))
                     .buttonStyle(.borderedProminent)
                     .tint(AppTheme.accent)
+                    if let source = currentBookSource,
+                       SourceLoginURLResolver.resolve(loginUrl: source.loginUrl, bookSourceUrl: source.bookSourceUrl) != nil,
+                       chapterFailureSuggestsLogin(failure) {
+                        Button("登录书源") {
+                            readerLoginSource = source
+                        }
+                        .font(.footnote.weight(.semibold))
+                        .buttonStyle(.bordered)
+                        .tint(AppTheme.accent)
+                    }
                 } else {
                     ProgressView()
                     Text(
@@ -3067,6 +3103,15 @@ struct ReaderView: View {
                         Label("换源", systemImage: "arrow.triangle.2.circlepath")
                     }
                     .disabled(onRequestSourceSwitch == nil)
+
+                    if let source = currentBookSource {
+                        Button {
+                            closeReaderChrome()
+                            readerLoginSource = source
+                        } label: {
+                            Label("登录书源", systemImage: "person.badge.key")
+                        }
+                    }
                 } label: {
                     Image(systemName: "ellipsis")
                         .font(.system(size: 17, weight: .semibold))

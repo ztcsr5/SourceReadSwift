@@ -254,8 +254,10 @@ struct SearchResultParser {
                 }
             }
             if books.isEmpty {
+                let jsError = executionContext.currentJavaScriptError
                 let message = elements.isEmpty
-                    ? "搜索列表规则未命中（0 个节点，响应 \(response.body.count) 字符）"
+                    ? (jsError.map { "搜索规则 JS 异常：\($0)" }
+                        ?? "搜索列表规则未命中（0 个节点，响应 \(response.body.count) 字符）")
                     : "搜索列表命中 \(elements.count) 个节点但书名或链接为空"
                 return .failure(.empty(message))
             }
@@ -394,8 +396,10 @@ struct SearchResultParser {
         }
         let filtered = books
         if filtered.isEmpty {
+            let jsError = executionContext.currentJavaScriptError
             let message = candidates.isEmpty
-                ? "JSON 列表规则未命中（0 项，响应 \(response.body.count) 字符）"
+                ? (jsError.map { "搜索规则 JS 异常：\($0)" }
+                    ?? "JSON 列表规则未命中（0 项，响应 \(response.body.count) 字符）")
                 : "JSON 列表命中 \(candidates.count) 项但书名或链接为空"
             return .failure(.empty(message))
         }

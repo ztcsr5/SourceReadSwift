@@ -17,6 +17,7 @@ final class RuleExecutionContext: @unchecked Sendable {
     private var javascriptEvidence: [SourceJavaScriptEvidence] = []
     private var executionStage: String?
     private var cachedRuntime: JSCoreRuntime?
+    private var lastJavaScriptError: String?
 
     var networkHandler: NetworkHandler?
     var responseHandler: ResponseHandler?
@@ -25,6 +26,29 @@ final class RuleExecutionContext: @unchecked Sendable {
     /// Optional synchronous captcha provider. Production wiring points this
     /// at VerificationCodeCoordinator; tests leave it nil for deterministic runs.
     var verificationCodeProvider: ((String) -> String)?
+
+    /// Most recent JavaScript exception raised while evaluating a rule.
+    /// Parsers surface it instead of a bare "0 items" message so a broken
+    /// `jsLib` helper is distinguishable from an empty rule match.
+    func recordJavaScriptError(_ message: String) {
+        let trimmed = message.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+        lock.lock()
+        lastJavaScriptError = trimmed
+        lock.unlock()
+    }
+
+    var currentJavaScriptError: String? {
+        lock.lock()
+        defer { lock.unlock() }
+        return lastJavaScriptError
+    }
+
+    func clearJavaScriptError() {
+        lock.lock()
+        lastJavaScriptError = nil
+        lock.unlock()
+    }
 
     func jsRuntime(ajaxHandler: @escaping (String) -> String) -> JSCoreRuntime {
         lock.lock()

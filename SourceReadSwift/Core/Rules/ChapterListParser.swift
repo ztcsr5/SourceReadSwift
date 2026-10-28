@@ -4,8 +4,10 @@ import SwiftSoup
 struct ChapterListParser {
     private let htmlExtractor: HtmlRuleExtractor
     private let jsonExtractor: JSONRuleExtractor
+    private let executionContext: RuleExecutionContext
 
     init(executionContext: RuleExecutionContext = RuleExecutionContext()) {
+        self.executionContext = executionContext
         self.htmlExtractor = HtmlRuleExtractor(executionContext: executionContext)
         self.jsonExtractor = JSONRuleExtractor(executionContext: executionContext)
     }
@@ -310,8 +312,10 @@ struct ChapterListParser {
             }
 
             if chapters.isEmpty {
+                let jsError = executionContext.currentJavaScriptError
                 let message = elements.isEmpty
-                    ? "目录规则未命中（0 个节点，响应 \(response.body.count) 字符）"
+                    ? (jsError.map { "目录规则 JS 异常：\($0)" }
+                        ?? "目录规则未命中（0 个节点，响应 \(response.body.count) 字符）")
                     : "目录规则命中 \(elements.count) 个节点但章节名为空"
                 return .failure(.empty(message))
             }
@@ -459,8 +463,10 @@ struct ChapterListParser {
         }
 
         if chapters.isEmpty {
+            let jsError = executionContext.currentJavaScriptError
             let message = items.isEmpty
-                ? "JSON 目录规则未命中（0 项，响应 \(response.body.count) 字符）"
+                ? (jsError.map { "目录规则 JS 异常：\($0)" }
+                    ?? "JSON 目录规则未命中（0 项，响应 \(response.body.count) 字符）")
                 : "JSON 目录命中 \(items.count) 项但章节名为空"
             return .failure(.empty(message))
         }
