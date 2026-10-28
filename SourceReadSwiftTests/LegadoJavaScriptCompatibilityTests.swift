@@ -358,13 +358,11 @@ private final class AsyncBodyFixtureNetwork: SourceNetworkClient, @unchecked Sen
     // MARK: - Java String `.length()` bridge
 
     func testJavaStringLengthCallIsRewrittenToPropertyRead() {
-        let normalized = LegadoJavaScriptCompatibility.normalize(
+        let script = LegadoJavaScriptCompatibility.normalizeJavaScriptLibrary(
             "var rev = 'abc'; var n = rev.length();"
         )
-        XCTAssertTrue(normalized.changed, "the rewrite must mark the script as normalized")
-        XCTAssertTrue(normalized.normalizedScript.contains("rev.length"), normalized.normalizedScript)
-        XCTAssertFalse(normalized.normalizedScript.contains("rev.length("), normalized.normalizedScript)
-        XCTAssertTrue(normalized.features.contains("java-string-length"))
+        XCTAssertTrue(script.contains("rev.length"), script)
+        XCTAssertFalse(script.contains("rev.length("), script)
     }
 
     func testJavaStringLengthRewriteSkipsLiteralsCommentsAndRegexes() {
@@ -376,7 +374,7 @@ private final class AsyncBodyFixtureNetwork: SourceNetworkClient, @unchecked Sen
         /* s.length() */
         var d = s.length ();
         """#
-        let script = LegadoJavaScriptCompatibility.normalize(source).normalizedScript
+        let script = LegadoJavaScriptCompatibility.normalizeJavaScriptLibrary(source)
         XCTAssertTrue(script.contains("\"s.length()\""), script)
         XCTAssertTrue(script.contains("'x.length()'"), script)
         XCTAssertTrue(script.contains("/a\\.length\\(\\)/"), script)
@@ -387,7 +385,12 @@ private final class AsyncBodyFixtureNetwork: SourceNetworkClient, @unchecked Sen
     }
 
     func testJavaStringLengthRewriteIgnoresArgumentLists() {
-        let script = LegadoJavaScriptCompatibility.normalize("var n = list.length(3);").normalizedScript
+        let script = LegadoJavaScriptCompatibility.normalizeJavaScriptLibrary("var n = list.length(3);")
         XCTAssertEqual(script, "var n = list.length(3);")
+
+        // Rule scripts and host shims keep Java method calls untouched:
+        // `file.length()` on the File facade must stay a method call.
+        let ruleScript = LegadoJavaScriptCompatibility.normalize("var n = file.length();").normalizedScript
+        XCTAssertEqual(ruleScript, "var n = file.length();")
     }
 }

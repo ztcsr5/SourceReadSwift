@@ -488,7 +488,7 @@ final class JSCoreRuntime {
                     // Run them through the shared normalizer so a jsLib can
                     // never break the prelude with a Java-only call form.
                     context.evaluateScript(
-                        LegadoJavaScriptCompatibility.normalize(rawLib).normalizedScript
+                        LegadoJavaScriptCompatibility.normalizeJavaScriptLibrary(rawLib)
                     )
                 }
             } else if key == "book" {

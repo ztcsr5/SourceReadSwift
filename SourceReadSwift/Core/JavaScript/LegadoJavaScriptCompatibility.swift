@@ -24,19 +24,27 @@ enum LegadoJavaScriptCompatibility {
         let lexicalFeatures = detectFeatures(in: unwrapped)
         features.formUnion(lexicalFeatures)
 
-        let keywordStripped = stripExecutionKeywords(from: unwrapped, features: &features)
-        if keywordStripped != unwrapped { features.insert("sync-normalization") }
-        // Android Rhino hands rule code `java.lang.String` objects, so sources
-        // call `s.length()`.  JavaScriptCore exposes `length` as a property and
-        // the call form throws "rev.length is not a function" (连尚读书 dies at
-        // the search step because of it).
-        let normalized = rewriteJavaStringLengthCalls(in: keywordStripped, features: &features)
-        if normalized != keywordStripped { features.insert("java-string-length") }
+        let normalized = stripExecutionKeywords(from: unwrapped, features: &features)
+        if normalized != unwrapped { features.insert("sync-normalization") }
         return LegadoJavaScriptNormalization(
             originalScript: unwrapped,
             normalizedScript: normalized,
             features: features.sorted()
         )
+    }
+
+    /// Normalizes a source-level `jsLib` bundle.
+    ///
+    /// jsLib code is written against Rhino's Java objects, where a
+    /// `StringBuilder(...).toString()` result answers `length()` as a method.
+    /// Rule scripts, in contrast, are written against Legado's JavaScript
+    /// strings where `length` is a number, and host shims such as
+    /// `java.getFile(...).length()` expose real methods that must not be
+    /// rewritten.  Only jsLib bundles get the `.length()` rewrite.
+    static func normalizeJavaScriptLibrary(_ script: String) -> String {
+        var features = Set<String>()
+        let normalized = normalize(script).normalizedScript
+        return rewriteJavaStringLengthCalls(in: normalized, features: &features)
     }
 
     private static func unwrap(_ script: String) -> String {
