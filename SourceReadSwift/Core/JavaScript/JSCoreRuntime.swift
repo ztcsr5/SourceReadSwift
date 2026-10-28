@@ -384,6 +384,94 @@ final class JSCoreRuntime {
                     source.putLoginHeader = function(k, v) { return java.put('source.loginHeader.' + String(k || ''), v == null ? '' : String(v)); };
                     source.getLoginHeader = function(k) { return java.getVar('source.loginHeader.' + String(k || '')); };
                     source.putVariable = source.setVariable;
+          source.putLoginInfo = function(map) {
+            if (!map) return false;
+            var data = map;
+            if (typeof data === 'string') {
+              try { data = JSON.parse(data); } catch (_) { return false; }
+            }
+            if (!data || typeof data !== 'object') return false;
+            var keys = Object.keys(data);
+            for (var i = 0; i < keys.length; i++) {
+              var key = keys[i];
+              if (typeof data[key] === 'function') continue;
+              java.put('source.login.' + String(key), data[key] == null ? '' : String(data[key]));
+            }
+            return true;
+          };
+          source.putLoginHeader = function(k, v) {
+            if (arguments.length <= 1) {
+              var rawHeader = k == null ? '' : (typeof k === 'string' ? k : JSON.stringify(k));
+              java.put('source.loginHeader', rawHeader);
+              return rawHeader;
+            }
+            return java.put('source.loginHeader.' + String(k || ''), v == null ? '' : String(v));
+          };
+          source.getLoginHeader = function(k) {
+            if (arguments.length > 0 && k != null && String(k) !== '') return java.getVar('source.loginHeader.' + String(k));
+            var rawHeader = java.getVar('source.loginHeader');
+            if (rawHeader != null && String(rawHeader) !== '') return String(rawHeader);
+            var headerPrefix = 'source.loginHeader.';
+            var headerKeys = java.keysWithPrefix(headerPrefix);
+            var headerMap = {};
+            var headerCount = Number(headerKeys && (headerKeys.length != null ? headerKeys.length : headerKeys.count) || 0);
+            for (var hi = 0; hi < headerCount; hi++) {
+              var fullHeaderKey = String(headerKeys[hi]);
+              if (fullHeaderKey.indexOf(headerPrefix) === 0) headerMap[fullHeaderKey.substring(headerPrefix.length)] = java.getVar(fullHeaderKey);
+            }
+            return Object.keys(headerMap).length ? JSON.stringify(headerMap) : '';
+          };
+          source.getLoginHeaderMap = function() {
+            var map = null;
+            var rawHeaderText = source.getLoginHeader();
+            if (rawHeaderText) {
+              try {
+                var parsedHeader = JSON.parse(String(rawHeaderText));
+                if (parsedHeader && typeof parsedHeader === 'object') map = parsedHeader;
+              } catch (_) {}
+            }
+            var mapPrefix = 'source.loginHeader.';
+            var mapKeys = java.keysWithPrefix(mapPrefix);
+            var mapCount = Number(mapKeys && (mapKeys.length != null ? mapKeys.length : mapKeys.count) || 0);
+            for (var mi = 0; mi < mapCount; mi++) {
+              var fullMapKey = String(mapKeys[mi]);
+              if (fullMapKey.indexOf(mapPrefix) !== 0) continue;
+              if (!map) map = {};
+              map[fullMapKey.substring(mapPrefix.length)] = java.getVar(fullMapKey);
+            }
+            return map;
+          };
+          source.removeLoginHeader = function() {
+            java.removeVar('source.loginHeader');
+            java.removeVar('source.loginHeader.');
+            java.removePrefix('source.loginHeader.');
+            return true;
+          };
+          source.getLoginInfo = function() {
+            var infoPrefix = 'source.login.';
+            var infoKeys = java.keysWithPrefix(infoPrefix);
+            var info = {};
+            var infoCount = Number(infoKeys && (infoKeys.length != null ? infoKeys.length : infoKeys.count) || 0);
+            for (var ii = 0; ii < infoCount; ii++) {
+              var fullInfoKey = String(infoKeys[ii]);
+              if (fullInfoKey.indexOf(infoPrefix) === 0) info[fullInfoKey.substring(infoPrefix.length)] = java.getVar(fullInfoKey);
+            }
+            return JSON.stringify(info);
+          };
+          source.getLoginUi = function() { return source.loginUi || ''; };
+          source.getTag = function() { return source.bookSourceName || source.sourceName || ''; };
+          source.getHeader = function() { return source.header || ''; };
+          source.includes = function(value) {
+            var needle = String(value == null ? '' : value);
+            if (!needle) return false;
+            var fields = [source.bookSourceName, source.sourceName, source.bookSourceGroup, source.bookSourceComment, source.bookSourceUrl, source.header];
+            for (var fi = 0; fi < fields.length; fi++) if (String(fields[fi] || '').indexOf(needle) >= 0) return true;
+            return false;
+          };
+          source.refreshExplore = function() {
+            try { if (typeof java !== 'undefined' && java && typeof java.refreshExplore === 'function') java.refreshExplore(); } catch (_) {}
+            return '';
+          };
                 }
                 """
                 context.evaluateScript(injectScript)
@@ -408,6 +496,10 @@ final class JSCoreRuntime {
                         return book.variable || java.getVar('book.variable') || '';
                     };
                     book.name = book.name || book.title || '';
+book.durChapterIndex = book.durChapterIndex == null ? 0 : book.durChapterIndex;
+book.durChapterTitle = book.durChapterTitle || '';
+book.durChapterIndex = book.durChapterIndex == null ? 0 : book.durChapterIndex;
+book.durChapterTitle = book.durChapterTitle || '';
                     book.title = book.title || book.name || '';
                     book.bookUrl = book.bookUrl || book.url || '';
                     book.url = book.url || book.bookUrl || '';
@@ -1044,6 +1136,7 @@ final class JSCoreRuntime {
           putInCache: function(key, value, time) { return this.put(key, value); },
           getFromMemory: function(key) { return this.get(key); },
           putMemory: function(key, value) { return this.put(key, value); },
+          deleteMemory: function(key) { return this.delete(key); },
           delete: function(key) { var old = __cache_store[String(key)]; delete __cache_store[String(key)]; return old == null ? '' : old; },
           remove: function(key) { return this.delete(key); }
         };
@@ -2811,8 +2904,100 @@ final class JSCoreRuntime {
           source.putLoginHeader = function(k, v) { return java.put('source.loginHeader.' + String(k || ''), v == null ? '' : String(v)); };
           source.getLoginHeader = function(k) { return java.getVar('source.loginHeader.' + String(k || '')); };
           source.putVariable = source.setVariable;
+          source.putLoginInfo = function(map) {
+            if (!map) return false;
+            var data = map;
+            if (typeof data === 'string') {
+              try { data = JSON.parse(data); } catch (_) { return false; }
+            }
+            if (!data || typeof data !== 'object') return false;
+            var keys = Object.keys(data);
+            for (var i = 0; i < keys.length; i++) {
+              var key = keys[i];
+              if (typeof data[key] === 'function') continue;
+              java.put('source.login.' + String(key), data[key] == null ? '' : String(data[key]));
+            }
+            return true;
+          };
+          source.putLoginHeader = function(k, v) {
+            if (arguments.length <= 1) {
+              var rawHeader = k == null ? '' : (typeof k === 'string' ? k : JSON.stringify(k));
+              java.put('source.loginHeader', rawHeader);
+              return rawHeader;
+            }
+            return java.put('source.loginHeader.' + String(k || ''), v == null ? '' : String(v));
+          };
+          source.getLoginHeader = function(k) {
+            if (arguments.length > 0 && k != null && String(k) !== '') return java.getVar('source.loginHeader.' + String(k));
+            var rawHeader = java.getVar('source.loginHeader');
+            if (rawHeader != null && String(rawHeader) !== '') return String(rawHeader);
+            var headerPrefix = 'source.loginHeader.';
+            var headerKeys = java.keysWithPrefix(headerPrefix);
+            var headerMap = {};
+            var headerCount = Number(headerKeys && (headerKeys.length != null ? headerKeys.length : headerKeys.count) || 0);
+            for (var hi = 0; hi < headerCount; hi++) {
+              var fullHeaderKey = String(headerKeys[hi]);
+              if (fullHeaderKey.indexOf(headerPrefix) === 0) headerMap[fullHeaderKey.substring(headerPrefix.length)] = java.getVar(fullHeaderKey);
+            }
+            return Object.keys(headerMap).length ? JSON.stringify(headerMap) : '';
+          };
+          source.getLoginHeaderMap = function() {
+            var map = null;
+            var rawHeaderText = source.getLoginHeader();
+            if (rawHeaderText) {
+              try {
+                var parsedHeader = JSON.parse(String(rawHeaderText));
+                if (parsedHeader && typeof parsedHeader === 'object') map = parsedHeader;
+              } catch (_) {}
+            }
+            var mapPrefix = 'source.loginHeader.';
+            var mapKeys = java.keysWithPrefix(mapPrefix);
+            var mapCount = Number(mapKeys && (mapKeys.length != null ? mapKeys.length : mapKeys.count) || 0);
+            for (var mi = 0; mi < mapCount; mi++) {
+              var fullMapKey = String(mapKeys[mi]);
+              if (fullMapKey.indexOf(mapPrefix) !== 0) continue;
+              if (!map) map = {};
+              map[fullMapKey.substring(mapPrefix.length)] = java.getVar(fullMapKey);
+            }
+            return map;
+          };
+          source.removeLoginHeader = function() {
+            java.removeVar('source.loginHeader');
+            java.removeVar('source.loginHeader.');
+            java.removePrefix('source.loginHeader.');
+            return true;
+          };
+          source.getLoginInfo = function() {
+            var infoPrefix = 'source.login.';
+            var infoKeys = java.keysWithPrefix(infoPrefix);
+            var info = {};
+            var infoCount = Number(infoKeys && (infoKeys.length != null ? infoKeys.length : infoKeys.count) || 0);
+            for (var ii = 0; ii < infoCount; ii++) {
+              var fullInfoKey = String(infoKeys[ii]);
+              if (fullInfoKey.indexOf(infoPrefix) === 0) info[fullInfoKey.substring(infoPrefix.length)] = java.getVar(fullInfoKey);
+            }
+            return JSON.stringify(info);
+          };
+          source.getLoginUi = function() { return source.loginUi || ''; };
+          source.getTag = function() { return source.bookSourceName || source.sourceName || ''; };
+          source.getHeader = function() { return source.header || ''; };
+          source.includes = function(value) {
+            var needle = String(value == null ? '' : value);
+            if (!needle) return false;
+            var fields = [source.bookSourceName, source.sourceName, source.bookSourceGroup, source.bookSourceComment, source.bookSourceUrl, source.header];
+            for (var fi = 0; fi < fields.length; fi++) if (String(fields[fi] || '').indexOf(needle) >= 0) return true;
+            return false;
+          };
+          source.refreshExplore = function() {
+            try { if (typeof java !== 'undefined' && java && typeof java.refreshExplore === 'function') java.refreshExplore(); } catch (_) {}
+            return '';
+          };
           if (typeof book === 'undefined' || book === null) book = {};
           book.name = book.name || book.title || '';
+book.durChapterIndex = book.durChapterIndex == null ? 0 : book.durChapterIndex;
+book.durChapterTitle = book.durChapterTitle || '';
+book.durChapterIndex = book.durChapterIndex == null ? 0 : book.durChapterIndex;
+book.durChapterTitle = book.durChapterTitle || '';
           book.title = book.title || book.name || '';
           book.bookUrl = book.bookUrl || book.url || '';
           book.url = book.url || book.bookUrl || '';
@@ -3201,10 +3386,27 @@ final class JSCoreRuntime {
         Packages.org.jsoup.Jsoup = Packages.org.jsoup.Jsoup || {};
         Packages.java = Packages.java || {};
         Packages.java.lang = Packages.java.lang || {};
-        Packages.java.lang.String = Packages.java.lang.String || function(value, charset) {
+        Packages.java.lang.String = Packages.java.lang.String || function(value, offsetOrCharset, length, charset) {
           var str;
           if (value && typeof value !== 'string' && !(value instanceof String) && value.length != null) {
-            var decoded = charset == null ? __native_bytesToString(value) : __native_bytesToStringCharset(value, String(charset));
+            // Java has both String(byte[], charset) and
+            // String(byte[], offset, length, charset).  The 七猫 ZIP reader
+            // uses the four-argument form for every extracted HTML entry.
+            var sourceBytes = Array.prototype.slice.call(value);
+            var start = 0;
+            var count = sourceBytes.length;
+            var encoding = offsetOrCharset;
+            if (arguments.length >= 4) {
+              start = Math.max(0, Number(offsetOrCharset) || 0);
+              count = Math.max(0, Number(length) || 0);
+              encoding = charset;
+            } else if (arguments.length === 3 && typeof offsetOrCharset === 'number') {
+              start = Math.max(0, Number(offsetOrCharset) || 0);
+              count = Math.max(0, Number(length) || 0);
+              encoding = null;
+            }
+            var slice = sourceBytes.slice(start, start + count);
+            var decoded = encoding == null ? __native_bytesToString(slice) : __native_bytesToStringCharset(slice, String(encoding));
             str = String(decoded || '');
           } else {
             str = String(value == null ? '' : value);
@@ -3311,6 +3513,13 @@ final class JSCoreRuntime {
         };
         Packages.java.util = Packages.java.util || {};
         Packages.java.util.Arrays = Packages.java.util.Arrays || {
+          copyOf: function(values, length) {
+            var source = values && values.length != null ? Array.prototype.slice.call(values) : [];
+            var count = Math.max(0, Number(length == null ? source.length : length) || 0);
+            var out = source.slice(0, count);
+            while (out.length < count) out.push(0);
+            return __asJavaList(out);
+          },
           copyOfRange: function(values, start, end) {
             var source = values && values.length != null ? Array.prototype.slice.call(values) : [];
             var from = Math.max(0, Number(start || 0)), to = Math.max(from, Number(end || 0));
@@ -3855,6 +4064,182 @@ final class JSCoreRuntime {
           };
           this.available = function() { return Math.max(0, inflated.length - index); };
           this.close = function() {};
+        };
+        Packages.java.util.zip.Inflater = Packages.java.util.zip.Inflater || function(nowrap) {
+          if (!(this instanceof Packages.java.util.zip.Inflater)) return new Packages.java.util.zip.Inflater(nowrap);
+          var input = [];
+          var decoded = null;
+          var produced = 0;
+          var finished = false;
+          function ensureDecoded() {
+            if (decoded == null) decoded = __javaBytes(java.inflate(input));
+            return decoded;
+          }
+          this.setInput = function(value, offset, length) {
+            var sourceBytes = value && value.length != null ? Array.prototype.slice.call(value) : __javaBytes(value);
+            var start = Math.max(0, Number(offset) || 0);
+            var count = length == null ? sourceBytes.length - start : Math.max(0, Number(length) || 0);
+            input = sourceBytes.slice(start, start + count);
+            decoded = null;
+            produced = 0;
+            finished = false;
+            return this;
+          };
+          // Java callers loop over `inflate(buf, off, len)` until it returns 0.
+          // Re-decoding the stream on every call and copying from byte zero
+          // replays the same prefix forever, so track how much has already
+          // been handed out.
+          this.inflate = function(output, offset, length) {
+            var inflated = ensureDecoded();
+            if (!output || output.length == null) {
+              if (produced >= inflated.length) { finished = true; return -1; }
+              return Number(inflated[produced++]) & 255;
+            }
+            var start = Math.max(0, Number(offset) || 0);
+            var requested = length == null ? output.length - start : Math.max(0, Number(length) || 0);
+            var count = Math.min(requested, Math.max(0, inflated.length - produced));
+            for (var i = 0; i < count; i++) output[start + i] = Number(inflated[produced + i]) & 255;
+            produced += count;
+            finished = produced >= inflated.length;
+            return count;
+          };
+          this.getRemaining = function() {
+            var inflated = ensureDecoded();
+            return Math.max(0, inflated.length - produced);
+          };
+          this.getTotalOut = function() { return ensureDecoded().length; };
+          this.finished = function() { return finished; };
+          this.reset = function() { input = []; decoded = null; produced = 0; finished = false; return this; };
+          this.end = function() { input = []; decoded = null; produced = 0; finished = true; };
+        };
+        Packages.java.security.SecureRandom = Packages.java.security.SecureRandom || function() {
+          if (!(this instanceof Packages.java.security.SecureRandom)) return new Packages.java.security.SecureRandom();
+          this.nextBytes = function(target) {
+            if (!target || target.length == null) return;
+            for (var i = 0; i < target.length; i++) target[i] = Math.floor(Math.random() * 256) & 255;
+          };
+          this.nextInt = function(bound) {
+            var limit = Number(bound);
+            if (isFinite(limit) && limit > 0) return Math.floor(Math.random() * limit);
+            return Math.floor(Math.random() * 2147483647);
+          };
+          this.nextLong = function() { return Math.floor(Math.random() * 9007199254740991); };
+          this.setSeed = function() { return this; };
+          this.generateSeed = function(count) {
+            var out = new Array(Math.max(0, Number(count) || 0));
+            for (var i = 0; i < out.length; i++) out[i] = 0;
+            this.nextBytes(out);
+            return __asJavaList(out);
+          };
+        };
+        Packages.java.lang.reflect = Packages.java.lang.reflect || {};
+        Packages.java.lang.reflect.Array = Packages.java.lang.reflect.Array || {
+          newInstance: function(type, length) {
+            var count = Math.max(0, Number(length) || 0);
+            var out = new Array(count);
+            for (var i = 0; i < count; i++) out[i] = 0;
+            return __asJavaList(out);
+          }
+        };
+        Packages.java.lang.Byte = Packages.java.lang.Byte || {
+          TYPE: 'byte',
+          MIN_VALUE: -128,
+          MAX_VALUE: 127,
+          parseByte: function(value) { var parsed = parseInt(String(value), 10); return isNaN(parsed) ? 0 : parsed; },
+          valueOf: function(value) { return Number(value) || 0; }
+        };
+        Packages.java.nio = Packages.java.nio || {};
+        Packages.java.nio.ByteBuffer = Packages.java.nio.ByteBuffer || function(capacity) {
+          if (!(this instanceof Packages.java.nio.ByteBuffer)) return new Packages.java.nio.ByteBuffer(capacity);
+          var size = Math.max(0, Number(capacity) || 0);
+          var bytes = new Array(size);
+          for (var i = 0; i < size; i++) bytes[i] = 0;
+          var position = 0;
+          var limit = size;
+          this.putInt = function(value) {
+            var number = Number(value) || 0;
+            bytes[position++] = (number >>> 24) & 255;
+            bytes[position++] = (number >>> 16) & 255;
+            bytes[position++] = (number >>> 8) & 255;
+            bytes[position++] = number & 255;
+            return this;
+          };
+          this.putShort = function(value) {
+            var number = Number(value) || 0;
+            bytes[position++] = (number >>> 8) & 255;
+            bytes[position++] = number & 255;
+            return this;
+          };
+          this.put = function(value) {
+            if (value && value.length != null) {
+              for (var i = 0; i < value.length; i++) bytes[position++] = Number(value[i]) & 255;
+            } else {
+              bytes[position++] = Number(value) & 255;
+            }
+            return this;
+          };
+          this.getInt = function() {
+            var number = ((bytes[position] & 255) << 24) | ((bytes[position + 1] & 255) << 16) | ((bytes[position + 2] & 255) << 8) | (bytes[position + 3] & 255);
+            position += 4;
+            return number;
+          };
+          this.array = function() { return __asJavaList(bytes.slice(0, size)); };
+          this.flip = function() { limit = position; position = 0; return this; };
+          this.position = function(value) {
+            if (value !== undefined) { position = Math.max(0, Math.min(size, Number(value) || 0)); return this; }
+            return position;
+          };
+          this.remaining = function() { return Math.max(0, limit - position); };
+          this.hasRemaining = function() { return position < limit; };
+        };
+        // java.nio.ByteBuffer.allocate / wrap are static factories; sources
+        // call them as `Packages.java.nio.ByteBuffer.allocate(4)`.
+        Packages.java.nio.ByteBuffer.allocate = function(capacity) {
+          return new Packages.java.nio.ByteBuffer(capacity);
+        };
+        Packages.java.nio.ByteBuffer.wrap = function(values) {
+          var source = values && values.length != null ? Array.prototype.slice.call(values) : [];
+          var buffer = new Packages.java.nio.ByteBuffer(source.length);
+          for (var wi = 0; wi < source.length; wi++) buffer.put(source[wi]);
+          buffer.flip();
+          return buffer;
+        };
+        Packages.cn = Packages.cn || {};
+        Packages.cn.hutool = Packages.cn.hutool || {};
+        Packages.cn.hutool.crypto = Packages.cn.hutool.crypto || {};
+        Packages.cn.hutool.crypto.digest = Packages.cn.hutool.crypto.digest || {};
+        Packages.cn.hutool.crypto.digest.DigestUtil = Packages.cn.hutool.crypto.digest.DigestUtil || {
+          md5Hex: function(value) { return java.md5(String(value == null ? '' : value)); },
+          sha1Hex: function(value) { return java.sha1(String(value == null ? '' : value)); },
+          sha256Hex: function(value) { return java.sha256(String(value == null ? '' : value)); },
+          sha512Hex: function(value) { return java.digestHex(String(value == null ? '' : value), 'sha512'); }
+        };
+        Packages.cn.hutool.core = Packages.cn.hutool.core || {};
+        Packages.cn.hutool.core.util = Packages.cn.hutool.core.util || {};
+        Packages.cn.hutool.core.util.StrUtil = Packages.cn.hutool.core.util.StrUtil || {
+          reverse: function(value) { return String(value == null ? '' : value).split('').reverse().join(''); },
+          isBlank: function(value) { return value == null || String(value).trim() === ''; },
+          isNotBlank: function(value) { return !Packages.cn.hutool.core.util.StrUtil.isBlank(value); },
+          emptyToDefault: function(value, fallback) { return value == null || String(value) === '' ? String(fallback == null ? '' : fallback) : String(value); }
+        };
+        Packages.cn.hutool.core.codec = Packages.cn.hutool.core.codec || {};
+        Packages.cn.hutool.core.codec.Base64 = Packages.cn.hutool.core.codec.Base64 || {
+          encode: function(value) { return java.base64Encode(String(value == null ? '' : value)); },
+          decode: function(value) { return java.base64Decode(String(value == null ? '' : value)); }
+        };
+        Packages.javax = Packages.javax || {};
+        Packages.javax.crypto = Packages.javax.crypto || {};
+        Packages.javax.crypto.spec = Packages.javax.crypto.spec || {};
+        Packages.javax.crypto.spec.GCMParameterSpec = Packages.javax.crypto.spec.GCMParameterSpec || function(tagLength, iv, offset, length) {
+          if (!(this instanceof Packages.javax.crypto.spec.GCMParameterSpec)) return new Packages.javax.crypto.spec.GCMParameterSpec(tagLength, iv, offset, length);
+          var source = iv && iv.length != null ? Array.prototype.slice.call(iv) : [];
+          var start = arguments.length >= 4 ? Math.max(0, Number(offset) || 0) : 0;
+          var count = arguments.length >= 4 ? Math.max(0, Number(length) || 0) : source.length;
+          this.bytes = source.slice(start, start + count);
+          this.iv = this.bytes;
+          this.tLen = Number(tagLength) || 128;
+          this.getIV = function() { return this.bytes.slice(); };
+          this.getTLen = function() { return this.tLen; };
         };
         Packages.java.util.regex = Packages.java.util.regex || {};
         function __javaRegexFlags(flags) {
@@ -4537,6 +4922,34 @@ final class JSCoreRuntime {
         // native dispatcher: it records `bridge.error java.<name>` for source
         // diagnostics and returns an empty string, which mirrors Android's
         // null-ish fallback and lets the rest of the rule continue.
+        // ---- Private-bank (shareBookSource11, 76 sources) compatibility ----
+        // These members exist in Android Legado's java/BookSource facade.  The
+        // Proxy below turns unknown methods into an empty native call, but the
+        // ones that must return an object, a byte array or a platform answer
+        // are implemented here explicitly.
+        java.qread = function() { return '0'; };
+        java.getSource = function() { try { return typeof source !== 'undefined' ? source : null; } catch (_) { return null; } };
+        java.deviceID = function() { return ''; };
+        java.getActivityRef = function() { return { get: function() { return null; } }; };
+        java.startBrowserDp = function(url) { return String(url == null ? '' : url); };
+        java.showReadingBrowser = function(url) { return String(url == null ? '' : url); };
+        java.openVideoPlayer = function(url) { return String(url == null ? '' : url); };
+        java.getThemeConfig = function() { return ''; };
+        java.open = function() { return ''; };
+        java.searchBook = function() { return ''; };
+        java.hexDecodeToByteArray = function(value) {
+          var text = String(value == null ? '' : value).replace(/[^0-9a-fA-F]/g, '');
+          if (text.length % 2 !== 0) text = text.substring(0, text.length - 1);
+          var bytes = [];
+          for (var i = 0; i < text.length; i += 2) bytes.push(parseInt(text.substring(i, i + 2), 16) || 0);
+          return __asJavaList(bytes);
+        };
+        java.removeCookie = function(url) {
+          try {
+            if (typeof cookie !== 'undefined' && cookie && typeof cookie.removeCookie === 'function') return cookie.removeCookie(url);
+          } catch (_) {}
+          return true;
+        };
         try {
           java = new Proxy(java, {
             get: function(target, property) {

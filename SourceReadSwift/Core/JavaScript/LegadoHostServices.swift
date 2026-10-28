@@ -568,7 +568,14 @@ final class LegadoHostServices {
             operation.localizedCaseInsensitiveContains("decode")
         let kind: String = upper.contains("DESEDE") || upper.contains("TRIPLEDES") ? "3DES" :
             (upper.contains("DES") ? "DES" : "AES")
-        let mode = upper.contains("/ECB") || upper.contains("ECB/") ? "ECB" : "CBC"
+        let mode: String
+        if upper.contains("/GCM") || upper.contains("GCM/") {
+            mode = "GCM"
+        } else if upper.contains("/ECB") || upper.contains("ECB/") {
+            mode = "ECB"
+        } else {
+            mode = "CBC"
+        }
         let padding: String = upper.contains("NOPADDING") ? "NoPadding" :
             (upper.contains("ZEROPADDING") ? "ZeroPadding" : "PKCS7")
         var payload = bytes(from: input)
@@ -579,12 +586,24 @@ final class LegadoHostServices {
             if kind == "AES" {
                 let blockSize = 16
                 keyBytes = normalizedKey(keyBytes)
-                ivBytes = Array((ivBytes + Array(repeating: 0, count: blockSize)).prefix(blockSize))
-                let blockMode: BlockMode = mode == "ECB" ? ECB() : CBC(iv: ivBytes)
-                let paddingMode: Padding = padding == "NoPadding" ? .noPadding :
-                    (padding == "ZeroPadding" ? .zeroPadding : .pkcs7)
-                let aes = try AES(key: keyBytes, blockMode: blockMode, padding: paddingMode)
-                output = try isDecrypt ? aes.decrypt(payload) : aes.encrypt(payload)
+                if mode == "GCM" {
+                    // javax.crypto GCM semantics: encrypt emits ciphertext||tag,
+                    // decrypt consumes the same layout. CryptoSwift's combined
+                    // GCM mode matches that contract byte for byte.
+                    guard ivBytes.count >= 8 else {
+                        executionContext?.log("AES/GCM requires an IV of at least 8 bytes")
+                        return []
+                    }
+                    let aes = try AES(key: keyBytes, blockMode: GCM(iv: ivBytes), padding: .noPadding)
+                    output = try isDecrypt ? aes.decrypt(payload) : aes.encrypt(payload)
+                } else {
+                    ivBytes = Array((ivBytes + Array(repeating: 0, count: blockSize)).prefix(blockSize))
+                    let blockMode: BlockMode = mode == "ECB" ? ECB() : CBC(iv: ivBytes)
+                    let paddingMode: Padding = padding == "NoPadding" ? .noPadding :
+                        (padding == "ZeroPadding" ? .zeroPadding : .pkcs7)
+                    let aes = try AES(key: keyBytes, blockMode: blockMode, padding: paddingMode)
+                    output = try isDecrypt ? aes.decrypt(payload) : aes.encrypt(payload)
+                }
             } else {
                 output = try commonCrypto(
                     payload: payload,
@@ -678,6 +697,13 @@ final class LegadoHostServices {
         let input = bytes(from: value)
         guard !input.isEmpty else { return [] }
         if let output = zlibInflate(input, rawDeflate: false) {
+            return output.map { NSNumber(value: $0) } as NSArray
+        }
+        // java.util.zip.Inflater(nowrap=true) hands raw DEFLATE bytes to
+        // the runtime. Local 七猫/番茄 interfaces ship ZIP entries whose
+        // payloads carry no zlib header, so retry in raw mode before the
+        // wrapper-stripping heuristics below.
+        if let output = zlibInflate(input, rawDeflate: true) {
             return output.map { NSNumber(value: $0) } as NSArray
         }
         // Compression.framework accepts the zlib-wrapped payload used by

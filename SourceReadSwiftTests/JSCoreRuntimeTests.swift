@@ -581,4 +581,101 @@ final class JSCoreRuntimeTests: XCTestCase {
         XCTAssertEqual(try XCTUnwrap(runtime.evaluate("source.get('missing') === '' ? 'ok' : 'bad'").get()), "ok")
         XCTAssertEqual(try XCTUnwrap(runtime.evaluate("source.remove('qd_base'); source.get('qd_base')").get()), "")
     }
+    // MARK: - 1.0.90 private bank (76 sources) compatibility
+
+    /// 七猫/番茄四合一 jsLib 依赖 java.util.zip / hutool / 反射 / ByteBuffer。
+    func testPrivateBankPackagesShims() throws {
+        let runtime = JSCoreRuntime()
+        XCTAssertEqual(try XCTUnwrap(runtime.evaluate("Packages.java.lang.reflect.Array.newInstance(Packages.java.lang.Byte.TYPE, 4).length").get()), "4")
+        XCTAssertEqual(try XCTUnwrap(runtime.evaluate("Packages.java.util.Arrays.copyOf([1,2,3], 5).length").get()), "5")
+        XCTAssertEqual(try XCTUnwrap(runtime.evaluate("String(new Packages.java.lang.String([65,66,67], 1, 2, 'UTF-8'))").get()), "BC")
+        XCTAssertEqual(try XCTUnwrap(runtime.evaluate("Packages.java.nio.ByteBuffer.allocate(4).putInt(0x01020304).array().join(',')").get()), "1,2,3,4")
+        XCTAssertEqual(try XCTUnwrap(runtime.evaluate("Packages.cn.hutool.crypto.digest.DigestUtil.md5Hex('abc')").get()), "900150983cd24fb0d6963f7d28e17f72")
+        XCTAssertEqual(try XCTUnwrap(runtime.evaluate("Packages.cn.hutool.crypto.digest.DigestUtil.sha256Hex('abc')").get()), "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad")
+        XCTAssertEqual(try XCTUnwrap(runtime.evaluate("Packages.cn.hutool.core.util.StrUtil.reverse('abc')").get()), "cba")
+        XCTAssertEqual(try XCTUnwrap(runtime.evaluate("Packages.cn.hutool.core.util.StrUtil.isBlank('  ') ? 'blank' : 'no'").get()), "blank")
+        XCTAssertEqual(try XCTUnwrap(runtime.evaluate("new Packages.javax.crypto.spec.GCMParameterSpec(128, [1,2,3]).getTLen()").get()), "128")
+        XCTAssertEqual(try XCTUnwrap(runtime.evaluate("new Packages.javax.crypto.spec.GCMParameterSpec(128, [1,2,3]).getIV().length").get()), "3")
+        XCTAssertEqual(try XCTUnwrap(runtime.evaluate("var a=[0,0,0,0]; new Packages.java.security.SecureRandom().nextBytes(a); a.length").get()), "4")
+    }
+
+    /// 七猫本地接口把 ZIP entry 的 raw DEFLATE 交给 Inflater(true)。
+    /// 调用方按 Java 习惯循环 inflate(buf, off, len)，必须按进度续读。
+    func testInflaterRawDeflateChunkedReads() throws {
+        let rawDeflate = "203,72,205,201,201,87,200,204,75,203,73,44,73,45,82,40,72,172,204,201,79,76,81,48,48,52,50,54,49,53,51,183,176,4,0"
+        let script = """
+        (function(){
+          var src = [\(rawDeflate)];
+          var inflater = new Packages.java.util.zip.Inflater(true);
+          inflater.setInput(src);
+          var out = [];
+          var buffer = new Array(4);
+          var guard = 0;
+          while (!inflater.finished() && guard++ < 64) {
+            var n = inflater.inflate(buffer, 0, buffer.length);
+            if (n <= 0) break;
+            for (var i = 0; i < n; i++) out.push(buffer[i]);
+          }
+          var text = '';
+          for (var j = 0; j < out.length; j++) text += String.fromCharCode(out[j]);
+          return text + '|' + out.length;
+        })()
+        """
+        XCTAssertEqual(try XCTUnwrap(JSCoreRuntime().evaluate(script).get()), "hello inflater payload 0123456789|33")
+    }
+
+    /// javax.crypto Cipher 的 AES/GCM/NoPadding 必须走 CryptoSwift GCM，
+    /// 而不是被当成 CBC 处理（紙間·阅读等本地解密源依赖）。
+    func testAESGCMRoundTripThroughJavaxCipher() throws {
+        let script = """
+        (function(){
+          var key = [0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15];
+          var iv = [0,1,2,3,4,5,6,7,8,9,10,11];
+          var plain = [104,101,108,108,111];
+          var enc = Packages.javax.crypto.Cipher.getInstance('AES/GCM/NoPadding');
+          enc.init(Packages.javax.crypto.Cipher.ENCRYPT_MODE,
+            new Packages.javax.crypto.spec.SecretKeySpec(key, 'AES'),
+            new Packages.javax.crypto.spec.GCMParameterSpec(128, iv));
+          var cipher = enc.doFinal(plain);
+          var dec = Packages.javax.crypto.Cipher.getInstance('AES/GCM/NoPadding');
+          dec.init(Packages.javax.crypto.Cipher.DECRYPT_MODE,
+            new Packages.javax.crypto.spec.SecretKeySpec(key, 'AES'),
+            new Packages.javax.crypto.spec.GCMParameterSpec(128, iv));
+          var out = dec.doFinal(cipher);
+          var text = '';
+          for (var i = 0; i < out.length; i++) text += String.fromCharCode(out[i]);
+          return text + '|' + cipher.length + '|' + out.length;
+        })()
+        """
+        XCTAssertEqual(try XCTUnwrap(JSCoreRuntime().evaluate(script).get()), "hello|21|5")
+    }
+
+    /// source.* 登录头 / 变量 / 标签 API：书旗、QQ浏览器、UAA 等源依赖。
+    func testSourceLoginHeaderAndMetadataShims() throws {
+        let source = BookSource(
+            bookSourceName: "Bank Source",
+            bookSourceUrl: "https://bank.example.com"
+        )
+        let runtime = RuleExecutionContext(source: source).jsRuntime(ajaxHandler: { _ in "" })
+        XCTAssertEqual(
+            try XCTUnwrap(runtime.evaluate("source.putLoginHeader('{\"authorization\":\"Bearer x\"}')").get()),
+            "{\"authorization\":\"Bearer x\"}"
+        )
+        XCTAssertEqual(
+            try XCTUnwrap(runtime.evaluate("source.getLoginHeaderMap().authorization").get()),
+            "Bearer x"
+        )
+        XCTAssertEqual(
+            try XCTUnwrap(runtime.evaluate("source.putLoginHeader('cookie', 'a=1'); source.getLoginHeader('cookie')").get()),
+            "a=1"
+        )
+        XCTAssertEqual(try XCTUnwrap(runtime.evaluate("source.removeLoginHeader() ? 'ok' : 'bad'").get()), "ok")
+        XCTAssertEqual(try XCTUnwrap(runtime.evaluate("source.getTag()").get()), "Bank Source")
+        XCTAssertEqual(try XCTUnwrap(runtime.evaluate("source.includes('Bank') ? 'ok' : 'bad'").get()), "ok")
+        XCTAssertEqual(try XCTUnwrap(runtime.evaluate("typeof source.getLoginUi() === 'string' ? 'ok' : 'bad'").get()), "ok")
+        XCTAssertEqual(try XCTUnwrap(runtime.evaluate("cache.putMemory('k', 'v'); cache.deleteMemory('k') ? 'done' : 'done'").get()), "done")
+        XCTAssertEqual(try XCTUnwrap(runtime.evaluate("java.deviceID() === '' ? 'ok' : 'bad'").get()), "ok")
+        XCTAssertEqual(try XCTUnwrap(runtime.evaluate("java.qread()").get()), "0")
+        XCTAssertEqual(try XCTUnwrap(runtime.evaluate("java.getSource() === source ? 'ok' : 'bad'").get()), "ok")
+    }
 }
