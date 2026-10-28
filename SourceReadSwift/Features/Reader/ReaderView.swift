@@ -2117,13 +2117,59 @@ struct ReaderView: View {
             case .cover, .pageTurn:
                 coverPagedReaderContent
             case .pageCurl:
-                pageCurlReaderContent
+                flipPagedReaderContent
             default:
                 horizontalPagedReaderContent
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .clipped()
+    }
+
+    /// Simulated page turn ("仿真"). It reuses the same three-slot paging
+    /// scroll view as cover mode and only changes the layer transform, so the
+    /// drag runs at the display refresh rate instead of the 60 Hz Core
+    /// Animation page-curl transition.
+    private var flipPagedReaderContent: some View {
+        let safeIndex = min(max(pagedPageIndex, 0), max(pagedBlocks.count - 1, 0))
+        let previousBlock = pagedBlocks.indices.contains(safeIndex - 1) ? pagedBlocks[safeIndex - 1] : nil
+        let currentBlock = pagedBlocks.indices.contains(safeIndex) ? pagedBlocks[safeIndex] : nil
+        let nextBlock = pagedBlocks.indices.contains(safeIndex + 1) ? pagedBlocks[safeIndex + 1] : nil
+        let currentView: AnyView
+        if let currentBlock {
+            currentView = AnyView(readerPage(for: currentBlock))
+        } else {
+            currentView = AnyView(Color.clear)
+        }
+        return CoverPageReaderView(
+            pageIdentity: currentBlock.map { ReaderPageIdentity(page: $0).key } ?? "",
+            contentRevision: readerPageRevisionKey,
+            hasPrevious: previousBlock != nil,
+            hasNext: nextBlock != nil,
+            previous: previousBlock.map { block -> AnyView in AnyView(readerPage(for: block)) },
+            current: currentView,
+            next: nextBlock.map { block -> AnyView in AnyView(readerPage(for: block)) },
+            onCommit: { direction in
+                commitCoverTurn(direction)
+            },
+            onInteractionChange: { active in
+                handlePageInteraction(active)
+            },
+            onPageContainerLayout: pageContainerLayoutHandler,
+            turnStyle: .flip
+        )
+        .onChange(of: pagedPageIndex) { target in
+            updatePagedVisibleParagraph(pageIndex: target)
+            reportCoverVisibleIdentity(target)
+        }
+        .onChange(of: speechController.currentParagraphIndex) { target in
+            guard target >= 0, let flat = speechFlatParagraphIndex,
+                  !interactionGate.isPageInteractionActive else { return }
+            pagedPageIndex = pageIndex(containingParagraph: flat)
+        }
+        .onAppear {
+            reportCoverVisibleIdentity(pagedPageIndex)
+        }
     }
 
     private var pageCurlReaderContent: some View {

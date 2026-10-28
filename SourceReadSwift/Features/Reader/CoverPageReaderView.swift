@@ -1,6 +1,14 @@
 import SwiftUI
 import UIKit
 
+/// Visual transition used by the shared three-slot paging surface.
+enum CoverPageTurnStyle {
+    /// Pages slide sideways like a card stack ("cover").
+    case cover
+    /// The turning page rotates around its left edge with perspective ("curl").
+    case flip
+}
+
 /// Cover mode ("覆盖") page surface driven by a paging `UIScrollView`.
 ///
 /// The SwiftUI version displaced three page views with a `@State` translation
@@ -31,6 +39,8 @@ struct CoverPageReaderView: UIViewControllerRepresentable {
     /// surface, and its pages live in hosting controllers, so pagination
     /// must measure them instead of the root viewport.
     var onPageContainerLayout: ((CGSize, CGFloat) -> Void)?
+    /// `.cover` slides; `.flip` rotates the outgoing page in 3D.
+    var turnStyle: CoverPageTurnStyle = .cover
 
     func makeUIViewController(context: Context) -> CoverPageHostController {
         let controller = CoverPageHostController()
@@ -44,7 +54,8 @@ struct CoverPageReaderView: UIViewControllerRepresentable {
             next: next,
             onCommit: onCommit,
             onInteractionChange: onInteractionChange,
-            onPageContainerLayout: onPageContainerLayout
+            onPageContainerLayout: onPageContainerLayout,
+            turnStyle: turnStyle
         )
         return controller
     }
@@ -60,7 +71,8 @@ struct CoverPageReaderView: UIViewControllerRepresentable {
             next: next,
             onCommit: onCommit,
             onInteractionChange: onInteractionChange,
-            onPageContainerLayout: onPageContainerLayout
+            onPageContainerLayout: onPageContainerLayout,
+            turnStyle: turnStyle
         )
     }
 }
@@ -81,6 +93,7 @@ final class CoverPageHostController: UIViewController, UIScrollViewDelegate {
     private var hasNext = false
     private var onCommit: ((Int) -> Void)?
     private var onInteractionChange: ((Bool) -> Void)?
+    private var turnStyle: CoverPageTurnStyle = .cover
     private var onPageContainerLayout: ((CGSize, CGFloat) -> Void)?
     private var lastReportedLayoutSize: CGSize = .zero
     private var lastReportedLayoutMinY: CGFloat = .greatestFiniteMagnitude
@@ -159,12 +172,14 @@ final class CoverPageHostController: UIViewController, UIScrollViewDelegate {
         next: AnyView?,
         onCommit: @escaping (Int) -> Void,
         onInteractionChange: @escaping (Bool) -> Void,
-        onPageContainerLayout: ((CGSize, CGFloat) -> Void)?
+        onPageContainerLayout: ((CGSize, CGFloat) -> Void)?,
+        turnStyle: CoverPageTurnStyle = .cover
     ) {
         loadViewIfNeeded()
         self.onCommit = onCommit
         self.onInteractionChange = onInteractionChange
         self.onPageContainerLayout = onPageContainerLayout
+        self.turnStyle = turnStyle
         self.hasPrevious = hasPrevious
         self.hasNext = hasNext
 
@@ -203,8 +218,18 @@ final class CoverPageHostController: UIViewController, UIScrollViewDelegate {
         scrollView.contentSize = CGSize(width: width * 3, height: size.height)
 
         for (slot, host) in hosts.enumerated() {
-            let frame = CGRect(x: CGFloat(slot) * width, y: 0, width: width, height: size.height)
-            if host.view.frame != frame { host.view.frame = frame }
+            let originX = CGFloat(slot) * width
+            // A flip page pivots on its left edge; a cover page pivots on its
+            // centre. Setting bounds/position keeps the anchor point stable
+            // across relayouts.
+            if turnStyle == .flip && slot == 1 {
+                host.view.layer.anchorPoint = CGPoint(x: 0, y: 0.5)
+                host.view.layer.position = CGPoint(x: originX, y: size.height / 2)
+            } else {
+                host.view.layer.anchorPoint = CGPoint(x: 0.5, y: 0.5)
+                host.view.layer.position = CGPoint(x: originX + width / 2, y: size.height / 2)
+            }
+            host.view.bounds = CGRect(x: 0, y: 0, width: width, height: size.height)
         }
 
         guard force || (!scrollView.isDragging && !scrollView.isDecelerating && !isSettling) else { return }
@@ -215,6 +240,17 @@ final class CoverPageHostController: UIViewController, UIScrollViewDelegate {
     }
 
     // MARK: - UIScrollViewDelegate
+
+    func scrollViewDidScroll(_ scrollView: UIScrollView) {
+        guard turnStyle == .flip else { return }
+        let width = max(scrollView.bounds.width, 1)
+        let shift = scrollView.contentOffset.x - width
+        let progress = min(max(shift / width, -1), 1)
+        let angle = ReaderFlipTransitionPolicy.rotationAngle(progress: abs(progress))
+        var transform = ReaderFlipTransitionPolicy.perspectiveTransform()
+        transform = CATransform3DRotate(transform, progress >= 0 ? angle : -angle, 0, 1, 0)
+        hosts[1].view.layer.transform = transform
+    }
 
     func scrollViewWillBeginDragging(_ scrollView: UIScrollView) {
         onInteractionChange?(true)
