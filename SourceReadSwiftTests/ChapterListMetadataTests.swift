@@ -40,6 +40,36 @@ final class ChapterListMetadataTests: XCTestCase {
         XCTAssertEqual(chapters.map(\.index), [0, 1, 2])
     }
 
+    func testSelectOptionTOCUsesValueAttributeForChapterURL() async throws {
+        let tocURL = "https://fixture.example/book/select-option/toc"
+        let source = BookSource(
+            bookSourceName: "select option fixture",
+            bookSourceUrl: "https://fixture.example",
+            ruleToc: SourceRule(fields: [
+                "chapterList": "option"
+            ])
+        )
+        let network = ChapterFixtureNetworkClient(responses: [
+            tocURL: """
+                <html><body>
+                  <select id="catalog">
+                    <option value="/novel_1.html">第一章 陨落的天才</option>
+                    <option value="/novel_2.html">第二章 斗气大陆</option>
+                  </select>
+                </body></html>
+                """
+        ])
+        let engine = LegadoSourceEngine(network: network)
+
+        let chapters = try await unwrap(engine.getChapterList(source: source, book: makeBook(tocURL: tocURL)))
+
+        XCTAssertEqual(chapters.map(\.title), ["第一章 陨落的天才", "第二章 斗气大陆"])
+        XCTAssertEqual(chapters.map(\.url), [
+            "https://fixture.example/novel_1.html",
+            "https://fixture.example/novel_2.html"
+        ])
+    }
+
     func testJSONVolumeRowsSupportBooleanAndStringFlags() async throws {
         let tocURL = "https://fixture.example/book/json-volume/toc"
         let source = BookSource(

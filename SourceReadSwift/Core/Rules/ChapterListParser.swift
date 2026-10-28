@@ -480,6 +480,12 @@ struct ChapterListParser {
             if extractedURL.isEmpty {
                 extractedURL = ((try? element.attr("href")) ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
             }
+            if extractedURL.isEmpty, (try? element.tagName())?.lowercased() == "option" {
+                // Legado also accepts `<select>` catalogues: the row is an
+                // `<option value="chapter-url">chapter title</option>`, so the
+                // default `a@href` fallback has nothing to read.
+                extractedURL = ((try? element.attr("value")) ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+            }
             rawURL = sanitizeSingleChapterURL(extractedURL) ?? ""
         }
 
