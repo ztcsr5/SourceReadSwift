@@ -2339,8 +2339,19 @@ struct JSONRuleExtractor {
             convertedObject = LegadoElementBridge(element: el, baseURL: baseStr)
         }
 
+        // Rhino stringifies a Java JSON object as its JSON text, so
+        // `JSON.parse(result)` / `JSON.parse(String(result))` is a common
+        // Legado idiom in book-info, chapter-list and list-item rules.
+        // JavaScriptCore would stringify a bridged dictionary as
+        // "[object Object]" and the parse would throw.  Hand those rules the
+        // JSON text of the *current* object: the response body for body-level
+        // rules, the item JSON for per-row rules, the init product for details.
+        let jsResultValue: Any = scriptExpectsJSONText(script)
+            ? (jsonText(for: convertedObject) ?? convertedObject)
+            : convertedObject
+
         var variables: [String: Any] = [
-            "result": convertedObject
+            "result": jsResultValue
         ]
 
         // Apply extraVariables first so root document and caller context take precedence
@@ -2401,6 +2412,25 @@ struct JSONRuleExtractor {
             return val
         }
         return nil
+    }
+
+    /// True when a Legado JS rule feeds `result` into `JSON.parse`, meaning the
+    /// author relies on Rhino's `JSONObject.toString()` producing JSON text.
+    private func scriptExpectsJSONText(_ script: String) -> Bool {
+        script.range(
+            of: #"JSON\.parse\s*\(\s*(String\s*\(\s*)?result"#,
+            options: .regularExpression
+        ) != nil
+    }
+
+    /// JSON text for the object a rule is currently evaluating, matching the
+    /// `toString()` Rhino would call on a Java JSON object / JSON array.
+    private func jsonText(for value: Any) -> String? {
+        if let text = value as? String { return text }
+        guard JSONSerialization.isValidJSONObject(value),
+              let data = try? JSONSerialization.data(withJSONObject: value, options: []),
+              let text = String(data: data, encoding: .utf8) else { return nil }
+        return text
     }
 
     func stringify(_ value: Any) -> String {

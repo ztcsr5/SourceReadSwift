@@ -890,4 +890,24 @@ final class JSONRuleExtractorTests: XCTestCase {
 
         XCTAssertEqual(value, "abc123")
     }
+
+    // MARK: - Rhino JSON-object stringification
+
+    func testJSRuleJSONParseResultUsesCurrentObjectJSONText() {
+        let object: [String: Any] = ["name": "斗破苍穹", "id": 42]
+        let value = JSONRuleExtractor().value(from: object, path: #"@js:JSON.parse(result).name"#) as? String
+        XCTAssertEqual(value, "斗破苍穹")
+    }
+
+    func testJSRuleJSONParseStringResultUsesCurrentObjectJSONText() {
+        let object: [String: Any] = ["data": ["title": "含遇見"]]
+        let value = JSONRuleExtractor().value(from: object, path: #"@js:JSON.parse(String(result)).data.title"#) as? String
+        XCTAssertEqual(value, "含遇見")
+    }
+
+    func testJSRuleObjectAccessStillSeesTheObject() {
+        let object: [String: Any] = ["name": "覆盖模式"]
+        let value = JSONRuleExtractor().value(from: object, path: #"@js:result.name"#) as? String
+        XCTAssertEqual(value, "覆盖模式")
+    }
 }
