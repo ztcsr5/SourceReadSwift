@@ -1345,7 +1345,7 @@ enum ReaderNativeTextLayout {
             ReaderCJKPunctuationCompression.apply(
                 to: bodyString,
                 font: configuration.fontFamily.uiFont(ofSize: CGFloat(configuration.fontSize), weight: .regular),
-                baseKern: configuration.letterSpacing
+                baseKern: CGFloat(configuration.letterSpacing)
             )
             output.append(bodyString)
 
@@ -1434,7 +1434,7 @@ enum ReaderNativeTextLayout {
             ReaderCJKPunctuationCompression.apply(
                 to: bodyString,
                 font: configuration.fontFamily.uiFont(ofSize: CGFloat(configuration.fontSize), weight: .regular),
-                baseKern: configuration.letterSpacing
+                baseKern: CGFloat(configuration.letterSpacing)
             )
             output.append(bodyString)
 
