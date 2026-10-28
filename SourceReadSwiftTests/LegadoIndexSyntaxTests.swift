@@ -60,8 +60,10 @@ final class LegadoIndexSyntaxTests: XCTestCase {
         XCTAssertEqual(try execute("ul li[8:]"), ["i8", "i9"])
     }
 
-    func testExecuteInnerRangeExcludesLast() throws {
-        XCTAssertEqual(try execute("ul li[1:-1]"), (1...8).map { "i\($0)" })
+    func testExecuteNegativeEndIncludesLast() throws {
+        // Legado resolves `-1` against the element count first, so `[1:-1]`
+        // means `1...(count-1)` inclusive — not Python's exclusive slice.
+        XCTAssertEqual(try execute("ul li[1:-1]"), (1...9).map { "i\($0)" })
     }
 
     func testExecuteOverflowRangeKeepsLast() throws {
