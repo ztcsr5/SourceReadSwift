@@ -130,3 +130,26 @@ App 内真实缺口集中在 6 类，本轮全部补齐：
 - `紙間·阅读`：源内置 `当前阅读版本不支持本源所需的 Java 环境` 自检，需要完整 Java 运行时；本轮只补齐其 GCM / ByteBuffer 底层，是否放行取决于源自身判断。
 - 速读谷×3、小原文学网、有听网、爱下电子、含遇見（SSL）、少年梦/次元姬（401）：站点侧，`NOT RUN`。
 - AES/GCM 的 CryptoSwift 实现仅在 CI（macOS）验证；本地 Node 只验证参数装配。
+
+## 9. CI 验证结果（2026-10-28）
+
+| Run | 内容 | Commit | 结果 |
+|---|---|---|---|
+| `40673826791` | iOS build + XCTest | `6b624b77e` | success · **1245 tests / 0 failures** · TEST SUCCEEDED |
+| `40673826138` | Unsigned IPA | `6b624b77e` | success · artifact 12,186,099 B |
+
+产物校验（本机 `testzip` + `plistlib`）：
+
+- 路径：`C:/Users/Edc21/Desktop/SourceReadSwift-1.0.90-unsigned.ipa`
+- 大小：12,282,638 字节
+- SHA256：`6DAEBF20AFFC4FF5387113AB27D82C0229E63411B00781881A248A7ACBF01F55`
+- Info.plist：`1.0.90` / `91` / MinimumOSVersion `16.0` / CFBundleDisplayName `纸间` / `com.edc21.SourceReadSwift`
+- `ZipFile.testzip()` → `None`
+
+### 9.1 与上一构建的差异
+
+| 构建 | Commit | 状态 |
+|---|---|---|
+| `40671223112` | `2be3c8c1e` | failure：GCM 用 detached 标签，密文为空；`getTag` 断言未过 |
+| `40670139003` | `8fc49f06f` | failure：多行字符串缩进 92 行导致编译失败 |
+| `40673826791` | `6b624b77e` | success（当前） |
