@@ -20,7 +20,7 @@ final class SourceSearchURLProbeTests: XCTestCase {
         let directory = TestFixtureSupport.directory("search-url-corpus")
         let data = try Data(contentsOf: directory.appendingPathComponent("sources.json"))
         let sources = try JSONDecoder().decode([BookSource].self, from: data)
-        XCTAssertEqual(sources.count, 997, "search-url-corpus is incomplete")
+        XCTAssertEqual(sources.count, 1100, "search-url-corpus is incomplete")
 
         let resolver = SearchURLResolver()
         var report: [[String: Any]] = []
