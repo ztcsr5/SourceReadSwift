@@ -82,3 +82,20 @@
 2. 用户恢复 LAN 服务 → 导入源库 → 全量复测 76 条。
 3. 言情小说网降级方案（103 页分页 → 章节映射）。
 4. 登录链路真机验证（登录 → 搜索 → 目录 → 正文 cookie）。
+
+## 8. 追加（同日第二轮）
+
+| SHA | 内容 |
+|---|---|
+| `1a01ce4` | 设置页把「书源登录中心 / 会话与 Cookie 管理」从“通用”移到“内容设置”，紧跟“书源管理” |
+| `eb09535` | 规则归一化遇到 `StringBuilder` / `StringBuffer` / `Packages.java` 时跳过 `length()` 改写，修复两个 Java builder 单元测试 |
+
+CI：
+
+| run | commit | 工作流 | 结果 |
+|---|---|---|---|
+| 40742683271 | 1a01ce4 | Unsigned IPA | **success** |
+| 40742683362 | 1a01ce4 | iOS | failure（`LegadoStage10CompatibilityTests.testStringBuilderMutations`、`LegadoJavaCompatibilityTests.testStringBufferAppendInsertDeleteAndReverse`） |
+| 40744972232 / 40744972258 | eb09535 | iOS / Unsigned IPA | 运行中（预期转绿） |
+
+失败根因：`sb.length()` 被改写成 `sb.length` 属性读取，Java builder 只有 `length()` 方法，返回 undefined。
