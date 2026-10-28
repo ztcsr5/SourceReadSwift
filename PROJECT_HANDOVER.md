@@ -1,9 +1,10 @@
 # SourceReadSwift (纸间) 项目交接全量备忘录
 
 > **交接目标**：交接给下一位 AI 协作者 / 研发工程师  
-> **文档基线**：v1.0.77 (Build 78)；下文主体保留 v1.0.30 (Build 31) 历史记录
+> **文档基线**：v1.0.79 (Build 80)；下文主体保留 v1.0.30 (Build 31) 历史记录
 > **交接时间**：2026-10-28  
-> **验证 Commit**：`24ba8b1`（v1.0.77 代码；iOS run `40619907231`、IPA run `40619907109`，均 success）+ `38ba450`（版本断言修正）  
+> **验证 Commit**：`50463e9`（v1.0.79 代码；iOS run `40623354223`、IPA run `40623354199`、rows probe run `40623365492`，均 success）  
+> **最新产物（v1.0.79）**：`C:\Users\Edc21\Desktop\SourceReadSwift-1.0.79-unsigned.ipa`（12,270,433 字节，SHA256 `E1641F5B054EEFDDF0850579D4DA224ECD6F72C8F5879F294F5FDDAF0893AC06`，`1.0.79 / 80`，MinimumOSVersion 16.0）  
 > **最新产物（v1.0.77）**：`C:\Users\Edc21\Desktop\SourceReadSwift-1.0.77-unsigned.ipa`（12,266,727 字节，SHA256 `812DB2CF43CCA94D99239BD6526F3971855E568CEB85DE008A0E5684D6143FFF`，`1.0.77 / 78`，MinimumOSVersion 16.0）  
 > **上一版产物（v1.0.76）**：`C:\Users\Edc21\Desktop\SourceReadSwift-1.0.76-unsigned.ipa`（12,250,999 字节，SHA256 `83C858C9B363436BE1166ECED6E16E69CC3B612E4389D429AAC2353F6A2CF8B2`，`1.0.76 / 77`，MinimumOSVersion 16.0）  
 > **上一版产物（v1.0.75）**：`C:\Users\Edc21\Desktop\SourceReadSwift-1.0.75-unsigned.ipa`（12,246,665 字节，SHA256 `532EAFD3E8DCEED2CE0B63B629BA894066D3ACFA87BA094BC55B1F22F7425CF6`，`1.0.75 / 76`，MinimumOSVersion 16.0）  
@@ -19,6 +20,7 @@
 > **分页 TextKit 产物**：`C:\Users\Edc21\Desktop\SourceReadSwift-1.0.65-textkit-unsigned.ipa`（12,154,717 字节，SHA256 `4C3A82686DB04FEBA725F31304CBB4AD2A373072F83A5FF044FE4849A84ECF0E`，三种分页模式改用 TextKit justify）  
 > **iOS16 加固产物**：`C:\Users\Edc21\Desktop\SourceReadSwift-1.0.65-ios16-unsigned.ipa`（12,155,355 字节，SHA256 `761616A840F65F6E44CE149EA65EA9592C68A8D661B68C4CB09677F4ED173AB9`，TextKit 页加 `contentInsetAdjustmentBehavior = .never` 与固定提案尺寸）  
 > **全量文档**：项目全貌、功能矩阵、生态分析与 v1.0.66 工作记录见 `PROJECT_FULL.md`（阅读界面重构 §十三、安全区修复 §十四、页脚状态带 §十五、壁纸布局 §十六、壁纸 UIKit 图层 §十七、1.0.65 排版与交互 §十八、1.0.66 页面身份锚定与翻页帧率 §十九、1.0.67 中文标点断行 §二十、1.0.68 段距比例与标题去重 §二十一、1.0.69/1.0.70 书源 URL 与 WebView 语义 §二十二、1.0.71 请求预算与空解析诊断 §二十三、1.0.72/1.0.73 书源 URL 选项与 escape 编码 §二十四、§二十五（1.0.74 登录）、§二十六（1.0.75 书源解析深挖）、§二十七（1.0.76 索引语法 / @html / okhttp3））。  
+> **最新修复（v1.0.78 / v1.0.79，2026-10-28，分支 `codex/reader-feedback-fixes`，提交 `e87d2a6`→`800d395`→`50463e9`）**：① 分页单次排版：`appendPages` 原来对每段做 2~5 次 TextKit 全排版（整段测量 + split 重排 + 每个切片重排），全部在主线程；改为 `metrics` 一次排版、切片高度算术推导，每段 1 次。阅读侧记录见 `docs/READER_PERF_1_0_78.md`。② 书源 rows 对账：114 条真实搜索响应跑 Swift vs jsoup，首轮 5 条不一致 → 修 `id.`（取首个，等价 getElementById）与多类名 `class.`（连续 token 段）；基线 `LegadoCount.java` 改闭区间后仅 451/975 变化；复跑 **114/114 全对齐、0 空结果**。记录见 `docs/SOURCE_COMPAT_1_0_79.md`、`PROJECT_FULL.md` 二十九/三十。  
 > **最新修复（v1.0.77，2026-10-28，分支 `codex/reader-feedback-fixes`，提交 `1a965b0`→`24ba8b1`→`38ba450`）**：书源链路补最后两个缺口。① URL 选项放宽：`@Header:{'a':'b'}` 单引号、引号不配对、`{...};` 后的 `@js:` 尾巴、`js:` 纯脚本规则不再被切分；`parseOptionsObject` 三级回退（标准 JSON → 宽松 JSON → JS eval）。② `concurrentRate` 落地：`500` 串行 + 500 ms 间隔、`20/60000` 窗口限流，`SourceRateLimiter.shared` 按书源 URL 隔离，HTTP 与 JS `java.ajax` 共用。阅读器排版沿用 1.0.65/1.0.68，未重做。iOS run `40619907231`、IPA run `40619907109` 均 success；交接见 `docs/CODEX_HANDOVER_1_0_77.md`，全量记录见 `PROJECT_FULL.md` 二十八。  
 > **iOS16 审计**：`docs/IOS16-COMPAT-AUDIT-1.0.65.md`（编译级 API 可用、静态扫描 0 命中 iOS17-only、运行时待真机矩阵）。
 
