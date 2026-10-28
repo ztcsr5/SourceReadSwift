@@ -2296,6 +2296,47 @@ Legado `EncoderUtils.escape`（`EncoderUtils.kt` L12-29）只保留 ASCII 字母
 
 ---
 
+## 二十七、v1.0.76 Legado 索引语法、`@html`/`@all` 语义与 okhttp3 兼容（2026-10-28）
+
+> 提交 `8e15eb1` + `f8f9e77` + `c6e49df` + `6eec467` + `5ceda53` + `3086014`，发布提交 `5df9d3a`；iOS run `40613012622` / job `122569378462` = **1186 tests / 0 failures**。
+
+### 27.1 索引语法
+
+`LegadoDefaultRuleTranslator` 引入 `LegadoIndexItem { single | range }`，`parseIndexItems` 区分两种写法：
+
+- `[...]` 内 `1:3` 是闭区间，支持 `8:`、`1:-1`、`3:-2:-10`、`[3,4]`、`[!1,2,-2]`；
+- 旧式 `.1:3` / `!0:1:2:3:4` 的冒号是多个独立索引，段数不限。
+
+`resolveIndexSet` 逐条镜像 `AnalyzeByJSoup.ElementsSingle.getElementsSingle`：负索引、越界裁剪与丢弃、`start == end`、`step >= count`、反向展开、保序去重。`[1:-1]` 含末元素（`6eec467` 修正断言）。
+
+### 27.2 `@html` / `@all`
+
+`html` 删除 `script`/`style` 后返回 outerHtml；`all` 返回 outerHtml 拼接。XPath / Legado / fallback 三路统一。`BookDetailParser.introPlainText` 把 `<br>` / `</p>` / `</div>` 转换行，详情页不再显示标签字面量。
+
+### 27.3 JSON 前导点
+
+`.bookList[*]` 直接 0 行时降级 `$..bookList[*]`；QQ阅读 `data.bookList` 由 0 恢复到 10 行。
+
+### 27.4 okhttp3
+
+`Packages.okhttp3.Request` / `Request.Builder` / `OkHttpClient.newCall().execute()` / `RequestBody` / `MediaType` 映射到 `__makeConnect`；JS 驱动 HTTP 的源不再首行进 catch。
+
+### 27.5 真实源
+
+搜索 17/17 达标（QQ阅读 10）；目录 6/6 与 Legado 模拟一致（精华书阁 20、笔趣阁 1838）。详见 `docs/SOURCE_COMPAT_1_0_76.md`。
+
+### 27.6 证据
+
+| 项 | 值 |
+|---|---|
+| iOS CI | `40613012622` / `122569378462`，1186 tests / 0 failures |
+| 版本 | 1.0.76 / Build 77 |
+| IPA | 见 `PROJECT_HANDOVER.md` 顶部产物行 |
+| 交接 | `docs/CODEX_HANDOVER_1_0_76.md` |
+| 研究 | `docs/SOURCE_COMPAT_1_0_76.md` |
+
+---
+
 ## 附录 A：完整文件清单
 
 > 以下为 2026-10-25 工作区实测清单。`build/`、`ci-log/`、`AppIcons_Candidates/` 为本地产物/素材，不计入源码。
