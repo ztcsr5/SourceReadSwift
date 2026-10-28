@@ -66,7 +66,14 @@ struct XPathRuleTranslator {
         // axis rule such as `//dt[2]/following-sibling::dd/a` must keep the
         // position inside the selector.
         let usesAxes = steps.contains { $0.contains("::") }
-        return steps.compactMap { cssStep($0, useNthOfType: usesAxes) }.joined(separator: " ")
+        // XPath positional predicates are scoped to the parent's same-type
+        // children at every step. The legacy `@n` suffix indexes the final
+        // match list, which is only equivalent for a single-step path: a
+        // relative field rule such as `/span[2]/a/text()` (used by the
+        // novelslist2 sources) would otherwise translate to `span@1 a` and
+        // select nothing.
+        let useNthOfType = usesAxes || steps.count > 1
+        return steps.compactMap { cssStep($0, useNthOfType: useNthOfType) }.joined(separator: " ")
     }
 
     private static func cssStep(_ rawStep: String, useNthOfType: Bool) -> String? {

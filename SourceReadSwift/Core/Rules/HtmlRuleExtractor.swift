@@ -298,6 +298,21 @@ struct HtmlRuleExtractor {
             return []
         }
 
+        // Legado `SourceRule.splitRegex`: a rule whose selector part is empty
+        // (`##pattern##replacement###`) never runs a selector at all. The
+        // current content -- for a book row, the element's outer HTML -- is the
+        // input to the regex. Sources use this to pull a URL out of an
+        // `onclick="newWebView('...')"` handler, where no CSS selector can
+        // reach the attribute text.
+        if materializedRule.hasPrefix("##") {
+            let parts = materializedRule.components(separatedBy: "##")
+            let transform = RuleTransformParser.transform(fromTrailingParts: parts.dropFirst())
+            let html = (try? root.outerHtml()) ?? ""
+            let applied = RuleTransformParser.apply(transform, to: html)
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+            return applied.isEmpty ? [] : [applied]
+        }
+
         // Try XPath translator first
         if let xpathSplit = XPathRuleTranslator.valueRule(materializedRule) {
             let targets = try select(
@@ -326,8 +341,11 @@ struct HtmlRuleExtractor {
             }
         }
 
-        // Try Legado default syntax translator (class., id., tag., @ chaining)
-        if let translated = LegadoDefaultRuleTranslator.translateValueRule(materializedRule) {
+        // Try Legado default syntax translator (class., id., tag., @ chaining).
+        // `@css:` must skip it: the whole remainder is one CSS selector and the
+        // trailing `@attr` belongs to AnalyzeByJSoup, not to the `@` chain.
+        let isExplicitCSS = materializedRule.lowercased().hasPrefix("@css:")
+        if !isExplicitCSS, let translated = LegadoDefaultRuleTranslator.translateValueRule(materializedRule) {
             let currentElements = LegadoDefaultRuleTranslator.executeSteps(translated.steps, on: root)
 
             if translated.attribute == "all" {
