@@ -552,4 +552,18 @@ final class JSCoreRuntimeTests: XCTestCase {
         XCTAssertTrue(parts.last?.contains("%") == true)
     }
 
+    // Private Legado banks call `cache.getFromMemory` / `cache.putMemory`
+    // (7-8 sources in the 103-source bank) and `java.getLoginInfo` /
+    // `java.reLoginView` / `java.sleep`.  Missing shims made those rules die
+    // with `TypeError: ... is not a function` before any network call.
+    func testCacheMemoryAliasesAndJavaLoginBridge() throws {
+        let runtime = JSCoreRuntime()
+        XCTAssertEqual(runtime.evaluate("cache.putMemory('k', 'v'); cache.getFromMemory('k')"), "v")
+        XCTAssertEqual(runtime.evaluate("cache.put('k2', 'v2'); cache.remove('k2')"), "v2")
+        XCTAssertEqual(runtime.evaluate("typeof java.getLoginInfo().get === 'function' ? 'ok' : 'bad'"), "ok")
+        XCTAssertEqual(runtime.evaluate("typeof java.getLoginInfoMap().get === 'function' ? 'ok' : 'bad'"), "ok")
+        XCTAssertEqual(runtime.evaluate("typeof java.reLoginView() === 'string' ? 'ok' : 'bad'"), "ok")
+        XCTAssertEqual(runtime.evaluate("java.sleep(1); 'done'"), "done")
+    }
+
 }

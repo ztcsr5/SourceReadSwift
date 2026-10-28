@@ -1028,7 +1028,11 @@ final class JSCoreRuntime {
           get: function(key) { var value = __cache_store[String(key)]; return value == null ? '' : value; },
           put: function(key, value) { __cache_store[String(key)] = value; return value; },
           getFromCache: function(key) { return this.get(key); },
-          putInCache: function(key, value, time) { return this.put(key, value); }
+          putInCache: function(key, value, time) { return this.put(key, value); },
+          getFromMemory: function(key) { return this.get(key); },
+          putMemory: function(key, value) { return this.put(key, value); },
+          delete: function(key) { var old = __cache_store[String(key)]; delete __cache_store[String(key)]; return old == null ? '' : old; },
+          remove: function(key) { return this.delete(key); }
         };
         // SourceRead's JSON/HTML hybrid helper.  Keep both constructor and
         // factory spellings used by Android Legado sources.
@@ -1331,6 +1335,13 @@ final class JSCoreRuntime {
         };
         java.uuid = java.randomUUID;
         java.androidId = function() { return 'a1b2c3d4e5f60718'; };
+        java.reLoginView = function() { return ''; };
+        java.getLoginInfo = function() {
+          try { if (typeof source !== 'undefined' && source && typeof source.getLoginInfoMap === 'function') return source.getLoginInfoMap(); } catch (e) {}
+          return { get: function() { return ''; }, put: function(k, v) { return v; }, remove: function() { return ''; }, containsKey: function() { return false; }, isEmpty: function() { return true; } };
+        };
+        java.getLoginInfoMap = function() { return java.getLoginInfo(); };
+        java.sleep = function(ms) { var value = Number(ms); if (!isFinite(value) || value <= 0) return ''; return __nativeLegado.invoke({ method: 'sleep', args: [Math.min(value, 2000)] }); };
         java.toast = function(msg) { java.log(String(msg)); return msg; };
         java.longToast = function(msg) { java.log(String(msg)); return msg; };
         java.openUrl = function(url) { return url; };
@@ -2502,6 +2513,13 @@ final class JSCoreRuntime {
         };
         java.fetchCloudTTS = function(_) { return ''; };
         java.androidId = function() { return 'a1b2c3d4e5f60718'; };
+        java.reLoginView = function() { return ''; };
+        java.getLoginInfo = function() {
+          try { if (typeof source !== 'undefined' && source && typeof source.getLoginInfoMap === 'function') return source.getLoginInfoMap(); } catch (e) {}
+          return { get: function() { return ''; }, put: function(k, v) { return v; }, remove: function() { return ''; }, containsKey: function() { return false; }, isEmpty: function() { return true; } };
+        };
+        java.getLoginInfoMap = function() { return java.getLoginInfo(); };
+        java.sleep = function(ms) { var value = Number(ms); if (!isFinite(value) || value <= 0) return ''; return __nativeLegado.invoke({ method: 'sleep', args: [Math.min(value, 2000)] }); };
         java.randomUUID = function() {
           return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
             var r = Math.random() * 16 | 0, v = c === 'x' ? r : (r & 0x3 | 0x8);

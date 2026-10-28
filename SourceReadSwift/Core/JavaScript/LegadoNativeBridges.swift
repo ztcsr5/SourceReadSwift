@@ -207,6 +207,10 @@ final class LegadoJavaHostBridge: NSObject, LegadoJavaHostExport {
                 RuleExecutionContext.bridgeString(arguments.first),
                 charset: arguments.count > 1 ? RuleExecutionContext.bridgeString(arguments[1]) : nil
             )
+        case "sleep":
+            let millis = Double(RuleExecutionContext.bridgeString(arguments.first)) ?? 0
+            if millis > 0 { Thread.sleep(forTimeInterval: min(millis, 2000) / 1000.0) }
+            return ""
         case "t2s":
             let text = RuleExecutionContext.bridgeString(arguments.first)
             let mutable = NSMutableString(string: text)
