@@ -297,7 +297,7 @@ enum LegadoDefaultRuleTranslator {
 
     /// Translates a selector rule (e.g. for `bookList` or `chapterList`) into steps.
     /// e.g. `id.list@tag.dd@tag.a` -> steps: [`#list`, `dd`, `a`]
-    static func translateSelectorSteps(_ rawRule: String) -> [LegadoRuleStep] {
+    static func translateSelectorSteps(_ rawRule: String, cssSemantics: Bool = false) -> [LegadoRuleStep] {
         var working = rawRule.trimmingCharacters(in: .whitespacesAndNewlines)
         if working.hasPrefix("+") || working.hasPrefix("-") {
             working = String(working.dropFirst()).trimmingCharacters(in: .whitespacesAndNewlines)
@@ -315,10 +315,10 @@ enum LegadoDefaultRuleTranslator {
             .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
             .filter { !$0.isEmpty }
 
-        return parseSteps(from: segments)
+        return parseSteps(from: segments, cssSemantics: cssSemantics)
     }
 
-    static func parseSteps(from rawSegments: [String]) -> [LegadoRuleStep] {
+    static func parseSteps(from rawSegments: [String], cssSemantics: Bool = false) -> [LegadoRuleStep] {
         var steps: [LegadoRuleStep] = []
         for segment in rawSegments {
             let trimmed = segment.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -341,7 +341,7 @@ enum LegadoDefaultRuleTranslator {
                 continue
             }
 
-            if let parsed = parseSingleStep(trimmed) {
+            if let parsed = parseSingleStep(trimmed, cssSemantics: cssSemantics) {
                 steps.append(parsed)
             }
         }
@@ -474,7 +474,7 @@ enum LegadoDefaultRuleTranslator {
         return commonTags.contains(base)
     }
 
-    private static func parseSingleStep(_ rawStep: String) -> LegadoRuleStep? {
+    private static func parseSingleStep(_ rawStep: String, cssSemantics: Bool = false) -> LegadoRuleStep? {
         var step = rawStep.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !step.isEmpty else { return nil }
 
@@ -499,7 +499,7 @@ enum LegadoDefaultRuleTranslator {
                 step = String(step[..<exclRange.lowerBound]).trimmingCharacters(in: .whitespacesAndNewlines)
                 if step.hasSuffix(".") { step = String(step.dropLast()).trimmingCharacters(in: .whitespacesAndNewlines) }
             }
-        } else if let eqRange = step.range(of: #":eq\((-?\d+)\)$"#, options: .regularExpression) {
+        } else if !cssSemantics, let eqRange = step.range(of: #":eq\((-?\d+)\)$"#, options: .regularExpression) {
             let numStr = String(step[eqRange]).dropFirst(4).dropLast()
             if let num = Int(numStr) {
                 indexItems = [.single(num)]

@@ -453,7 +453,7 @@
     "id": 451,
     "name": "笔趣小说",
     "rule": "//*[@id=\"list\"]//dt[2]/following-sibling::dd/a",
-    "expected": 0,
+    "expected": 1914,
     "bodyFile": "toc-e90ddf69aa9c.html",
     "baseUrl": "http://www.biqusa.com#",
     "chapterNameRule": "",

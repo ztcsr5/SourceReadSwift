@@ -760,4 +760,42 @@ final class HtmlRuleExtractorTests: XCTestCase {
         XCTAssertNil(XPathRuleTranslator.selectorRule("//div/preceding-sibling::p"))
     }
 
+
+    // Legado `@css:` rules are jsoup selectors: `:eq(n)` must keep its jsoup
+    // meaning (0-based index inside each parent) instead of being rewritten
+    // into one list index over the whole match set.
+    func testExplicitCSSEqKeepsPerParentSemantics() throws {
+        let document = try SwiftSoup.parse("""
+        <html><body>
+          <div class="item"><p><a>a0</a></p><p><a>a1</a></p><p><a>a2</a></p></div>
+          <div class="item"><p><a>b0</a></p><p><a>b1</a></p><p><a>b2</a></p></div>
+        </body></html>
+        """)
+
+        let values = try HtmlRuleExtractor().stringList(
+            from: document,
+            rule: "@css:.item p:eq(1)>a@text",
+            baseUrl: nil
+        )
+
+        XCTAssertEqual(values, ["a1", "b1"])
+    }
+
+    func testExplicitCSSTailEqIsNotTreatedAsListIndex() throws {
+        let document = try SwiftSoup.parse("""
+        <html><body>
+          <div class="item"><p>a0</p><p>a1</p></div>
+          <div class="item"><p>b0</p><p>b1</p></div>
+        </body></html>
+        """)
+
+        let values = try HtmlRuleExtractor().stringList(
+            from: document,
+            rule: "@css:.item p:eq(1)@text",
+            baseUrl: nil
+        )
+
+        XCTAssertEqual(values, ["a1", "b1"])
+    }
+
 }

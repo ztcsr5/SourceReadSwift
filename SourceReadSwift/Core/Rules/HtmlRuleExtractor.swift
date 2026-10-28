@@ -595,7 +595,9 @@ struct HtmlRuleExtractor {
             return finish(filtered)
         }
 
-        let steps = LegadoDefaultRuleTranslator.translateSelectorSteps(workingRule)
+        let usesExplicitCSS = workingRule.lowercased().hasPrefix("@css:")
+            || workingRule.lowercased().hasPrefix("css:")
+        let steps = LegadoDefaultRuleTranslator.translateSelectorSteps(workingRule, cssSemantics: usesExplicitCSS)
         if !steps.isEmpty {
             let executed = LegadoDefaultRuleTranslator.executeSteps(steps, on: root)
             if !executed.isEmpty {
@@ -605,7 +607,7 @@ struct HtmlRuleExtractor {
 
         let selector = cleanCSS(workingRule)
         guard !selector.isEmpty else { return finish([root]) }
-        let indexed = parseIndexedSelector(selector)
+        let indexed = parseIndexedSelector(selector, stripCSSEq: !usesExplicitCSS)
         let elements: [Element]
         do {
             elements = try root.select(indexed.selector).array()
@@ -706,7 +708,7 @@ struct HtmlRuleExtractor {
         return (selector, attribute)
     }
 
-    private func parseIndexedSelector(_ selector: String) -> (selector: String, index: Int?, excludeIndex: Int?) {
+    private func parseIndexedSelector(_ selector: String, stripCSSEq: Bool = true) -> (selector: String, index: Int?, excludeIndex: Int?) {
         let trimmed = selector.trimmingCharacters(in: .whitespacesAndNewlines)
         if let exclMatch = trimmed.range(of: #"(?:\[!(-?\d+)\]|!(-?\d+))$"#, options: .regularExpression) {
             let matchedStr = String(trimmed[exclMatch])
@@ -716,7 +718,10 @@ struct HtmlRuleExtractor {
             let sel = String(trimmed[..<exclMatch.lowerBound]).trimmingCharacters(in: .whitespacesAndNewlines)
             return (sel, nil, Int(digits))
         }
-        if let idxMatch = trimmed.range(of: #"(?:\[(-?\d+)\]|@(-?\d+)|:eq\((-?\d+)\))$"#, options: .regularExpression) {
+        let indexPattern = stripCSSEq
+            ? #"(?:\[(-?\d+)\]|@(-?\d+)|:eq\((-?\d+)\))$"#
+            : #"(?:\[(-?\d+)\]|@(-?\d+))$"#
+        if let idxMatch = trimmed.range(of: indexPattern, options: .regularExpression) {
             let matchedStr = String(trimmed[idxMatch])
             let clean = matchedStr
                 .replacingOccurrences(of: "[", with: "")

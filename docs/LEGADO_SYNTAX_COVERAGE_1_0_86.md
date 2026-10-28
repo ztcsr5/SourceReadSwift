@@ -11,6 +11,7 @@
 | 负索引 `-1`、排除 `!0`、区间 `0:2`、步长 | `LegadoDefaultRuleTranslator.parseIndexItems` | `LegadoIndexSyntaxTests`（含 `li!0:1:2:3:4`） | 支持 |
 | 列表倒序前缀 `-` | `HtmlRuleExtractor.select` / `ChapterListParser` | `LegadoIndexSyntaxTests`、`ChapterListMetadataTests.testReverseTocFlagReversesCollectedChapterList` | 支持 |
 | CSS `@css:` | `HtmlRuleExtractor.cleanCSS` | `HtmlRuleExtractorTests` | 支持 |
+| CSS `:eq(n)`（jsoup 0-based） | `@css:` 走 `LegadoDefaultRuleTranslator`，`:eq` 保留给 SwiftSoup | `HtmlRuleExtractorTests.testExplicitCSSEqKeepsPerParentSemantics` 等 | 1.0.88 修正 |
 | XPath `@XPath:`、`//` | `XPathRuleTranslator` | `HtmlRuleExtractorTests`（XPath 段） | 支持 |
 | JSONPath `$.`、`@json:`、`$..`、`{$...}` 内联 | `JSONRuleExtractor` | `JSONRuleExtractorTests`、`JSONListDescendantTests` | 支持 |
 | `@js:` / `<js></js>` / `+` 前缀 | `JSCoreRuntime`、`HtmlRuleExtractor` | `JSCoreRuntimeTests`、`LegadoJavaScriptCompatibilityTests` | 支持 |
