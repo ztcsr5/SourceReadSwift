@@ -2110,7 +2110,11 @@ struct ReaderView: View {
     private var pagedReaderContent: some View {
         Group {
             switch readerMode {
-            case .cover:
+            // `.pageTurn` and `.cover` share the UIKit paging scroll view.
+            // `UIPageViewController(.scroll)` built a hosting controller
+            // inside each gesture, which dropped frames on ProMotion
+            // hardware; this surface keeps three reused slots instead.
+            case .cover, .pageTurn:
                 coverPagedReaderContent
             case .pageCurl:
                 pageCurlReaderContent
@@ -2218,7 +2222,8 @@ struct ReaderView: View {
             },
             onInteractionChange: { active in
                 handlePageInteraction(active)
-            }
+            },
+            onPageContainerLayout: pageContainerLayoutHandler
         )
         .onChange(of: pagedPageIndex) { target in
             updatePagedVisibleParagraph(pageIndex: target)

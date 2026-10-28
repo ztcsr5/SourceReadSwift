@@ -27,6 +27,10 @@ struct CoverPageReaderView: UIViewControllerRepresentable {
     /// -1 = the user pulled the previous page in, +1 = the next page.
     var onCommit: (Int) -> Void
     var onInteractionChange: (Bool) -> Void
+    /// Reports the real page container geometry. `.pageTurn` shares this
+    /// surface, and its pages live in hosting controllers, so pagination
+    /// must measure them instead of the root viewport.
+    var onPageContainerLayout: ((CGSize, CGFloat) -> Void)?
 
     func makeUIViewController(context: Context) -> CoverPageHostController {
         let controller = CoverPageHostController()
@@ -39,7 +43,8 @@ struct CoverPageReaderView: UIViewControllerRepresentable {
             current: current,
             next: next,
             onCommit: onCommit,
-            onInteractionChange: onInteractionChange
+            onInteractionChange: onInteractionChange,
+            onPageContainerLayout: onPageContainerLayout
         )
         return controller
     }
@@ -54,7 +59,8 @@ struct CoverPageReaderView: UIViewControllerRepresentable {
             current: current,
             next: next,
             onCommit: onCommit,
-            onInteractionChange: onInteractionChange
+            onInteractionChange: onInteractionChange,
+            onPageContainerLayout: onPageContainerLayout
         )
     }
 }
@@ -75,6 +81,9 @@ final class CoverPageHostController: UIViewController, UIScrollViewDelegate {
     private var hasNext = false
     private var onCommit: ((Int) -> Void)?
     private var onInteractionChange: ((Bool) -> Void)?
+    private var onPageContainerLayout: ((CGSize, CGFloat) -> Void)?
+    private var lastReportedLayoutSize: CGSize = .zero
+    private var lastReportedLayoutMinY: CGFloat = .greatestFiniteMagnitude
 
     /// True while a commit or a spring-back animation is in flight. Layout
     /// passes must not recentre the scroll view during that window.
@@ -118,6 +127,26 @@ final class CoverPageHostController: UIViewController, UIScrollViewDelegate {
     override func viewDidLayoutSubviews() {
         super.viewDidLayoutSubviews()
         installFramesIfNeeded(force: false)
+        reportLayoutIfNeeded()
+    }
+
+    /// Publish the measured page viewport once per geometry change. The
+    /// reader repaginates from this size, so a stale root-viewport value
+    /// would clip the last line of every page.
+    private func reportLayoutIfNeeded() {
+        let size = view.bounds.size
+        guard size.width > 1, size.height > 1, let onPageContainerLayout else { return }
+        let minY = view.convert(view.bounds, to: nil).minY
+        guard abs(size.width - lastReportedLayoutSize.width) > 0.5
+                || abs(size.height - lastReportedLayoutSize.height) > 0.5
+                || abs(minY - lastReportedLayoutMinY) > 0.5 else { return }
+        lastReportedLayoutSize = size
+        lastReportedLayoutMinY = minY
+        // Touching SwiftUI state during layoutSubviews raises
+        // "modifying state during view update"; defer one runloop.
+        DispatchQueue.main.async {
+            onPageContainerLayout(size, minY)
+        }
     }
 
     func apply(
@@ -129,11 +158,13 @@ final class CoverPageHostController: UIViewController, UIScrollViewDelegate {
         current: AnyView,
         next: AnyView?,
         onCommit: @escaping (Int) -> Void,
-        onInteractionChange: @escaping (Bool) -> Void
+        onInteractionChange: @escaping (Bool) -> Void,
+        onPageContainerLayout: ((CGSize, CGFloat) -> Void)?
     ) {
         loadViewIfNeeded()
         self.onCommit = onCommit
         self.onInteractionChange = onInteractionChange
+        self.onPageContainerLayout = onPageContainerLayout
         self.hasPrevious = hasPrevious
         self.hasNext = hasNext
 
