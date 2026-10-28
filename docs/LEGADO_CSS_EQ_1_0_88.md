@@ -59,3 +59,13 @@ jsoup 语义：`:eq(n)` 是 **0-based、在每个父元素内部**的同类子�
 - 未修改任何 TOC/搜索解析逻辑来「凑」0；
 - rows-probe 114 条仍为 0 mismatch；
 - TOC 的 29 条 0 命中维持 1.0.80 归因（站点失效 15 / 规则过时 5 / JS 6 / JSON 错配 3），非本轮回归。
+
+## 六、1.0.88 探针复跑（run `40659515096`，success）
+
+| 探针 | 总数 | 0 命中 | mismatch |
+|---|---|---|---|
+| rows | 114 | 0 | **0** |
+| toc | 97 | 29（1.0.80 已归因：站点失效 15 / 规则过时 5 / JS 6 / JSON 错配 3） | **0** |
+| searchUrl | 994 | — | URL 层 2（413 笔趣 `encodedAngle`、655 云中书库 `empty`）；另 5 条为源 JS 依赖 App 私有 API（`default_pm` / `getWbiEnc` / 番茄 / 零点 / 爱书单） |
+
+对比 1.0.86 的 19 → 2，本轮 URL 层无回归；toc 由 1 条 mismatch 归零。
