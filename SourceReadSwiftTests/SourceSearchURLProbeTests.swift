@@ -86,7 +86,12 @@ final class SourceSearchURLProbeTests: XCTestCase {
             let tail = trimmed[hash...].dropFirst()
             if tail.contains("/") || tail.contains("?") { return "fragmentSwallowsPath" }
         }
-        guard let parsed = URL(string: trimmed), let scheme = parsed.scheme else { return "unparseable" }
+        guard let parsed = URL(string: trimmed), let scheme = parsed.scheme else {
+            // Legado resolves a scheme-less search URL against
+            // `bookSourceUrl`, so `/search?...` and `search.php?...` are
+            // normal, not resolver defects.
+            return trimmed.contains("://") ? "unparseable" : nil
+        }
         if scheme == "data" { return nil }
         guard scheme == "http" || scheme == "https" else { return "nonNetworkScheme" }
         if (parsed.host ?? "").isEmpty { return "missingHost" }
