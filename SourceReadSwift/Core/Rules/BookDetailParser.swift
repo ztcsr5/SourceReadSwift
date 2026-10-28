@@ -108,13 +108,13 @@ struct BookDetailParser {
                 baseUrl: response.url,
                 variables: variables
             ).nilIfEmpty ?? book.coverUrl
-            let intro = try htmlExtractor.value(
+            let intro = Self.introPlainText(try htmlExtractor.value(
                 from: root,
                 rule: htmlExtractor.firstRule(rule, keys: ["intro", "introduction"]),
                 fallback: nil,
                 baseUrl: response.url,
                 variables: variables
-            ).nilIfEmpty ?? book.intro
+            )) ?? book.intro
             let latest = try htmlExtractor.value(
                 from: root,
                 rule: htmlExtractor.firstRule(rule, keys: ["latestChapter", "lastChapter"]),
@@ -266,12 +266,12 @@ struct BookDetailParser {
             fallbackKeys: ["cover", "coverUrl", "img", "image"],
             variables: variables
         )?.nilIfEmpty ?? book.coverUrl
-        let intro = jsonExtractor.string(
+        let intro = Self.introPlainText(jsonExtractor.string(
             from: dict,
             rule: htmlExtractor.firstRule(rule, keys: ["intro", "introduction"]),
             fallbackKeys: ["intro", "desc", "description"],
             variables: variables
-        )?.nilIfEmpty ?? book.intro
+        )) ?? book.intro
         let latest = jsonExtractor.string(
             from: dict,
             rule: htmlExtractor.firstRule(rule, keys: ["latestChapter", "lastChapter"]),
@@ -345,6 +345,29 @@ struct BookDetailParser {
             updateTime: updateTime,
             kind: kind
         ))
+    }
+
+    /// Intro rules frequently end in `@html`; Legado shows that markup as
+    /// rich text, while this app renders plain text.  Keep line breaks from
+    /// `<br>` / `</p>` / `</div>` and drop the remaining tags so a book card
+    /// never displays literal `<div class="intro">`.
+    private static func introPlainText(_ raw: String?) -> String? {
+        guard let raw else { return nil }
+        let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return nil }
+        guard trimmed.contains("<") else { return trimmed }
+        var text = trimmed
+        text = text.replacingOccurrences(of: "(?i)<br\\s*/?>", with: "\n", options: .regularExpression)
+        text = text.replacingOccurrences(of: "(?i)</p\\s*>", with: "\n", options: .regularExpression)
+        text = text.replacingOccurrences(of: "(?i)</div\\s*>", with: "\n", options: .regularExpression)
+        text = text.replacingOccurrences(of: "<[^>]+>", with: "", options: .regularExpression)
+        text = text.replacingOccurrences(of: "&nbsp;", with: " ")
+        text = text.replacingOccurrences(of: "&amp;", with: "&")
+        text = text.replacingOccurrences(of: "&lt;", with: "<")
+        text = text.replacingOccurrences(of: "&gt;", with: ">")
+        text = text.replacingOccurrences(of: "&quot;", with: "\"")
+        let cleaned = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        return cleaned.isEmpty ? nil : cleaned
     }
 
     private func isURLTemplate(_ rule: String) -> Bool {

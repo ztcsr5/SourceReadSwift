@@ -121,7 +121,7 @@ final class HtmlRuleExtractorTests: XCTestCase {
             baseUrl: URL(string: "https://example.com")!
         )
 
-        XCTAssertEqual(value, "A\nB")
+        XCTAssertEqual(value, "<p>A</p><p>B</p>")
     }
 
     func testMergeOperatorInterleavesHTMLValues() throws {

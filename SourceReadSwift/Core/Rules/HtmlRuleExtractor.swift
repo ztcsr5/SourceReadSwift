@@ -309,7 +309,7 @@ struct HtmlRuleExtractor {
             let attrParts = xpathSplit.attribute.components(separatedBy: "##")
             let attr = attrParts.first ?? "text"
             if attr == "all" {
-                let joined = try targets.map { try $0.text() }.joined(separator: "\n")
+                let joined = try joinedAllValue(targets)
                 let transformed = applyRegexTransforms(attrParts.dropFirst(), to: joined)
                     .trimmingCharacters(in: .whitespacesAndNewlines)
                 return transformed.isEmpty ? [] : [transformed]
@@ -331,7 +331,7 @@ struct HtmlRuleExtractor {
             let currentElements = LegadoDefaultRuleTranslator.executeSteps(translated.steps, on: root)
 
             if translated.attribute == "all" {
-                let joined = try currentElements.map { try $0.text() }.joined(separator: "\n")
+                let joined = try joinedAllValue(currentElements)
                 let transformed = applyRegexTransforms(translated.regexTransforms[...], to: joined)
                     .trimmingCharacters(in: .whitespacesAndNewlines)
                 return transformed.isEmpty ? [] : [transformed]
@@ -359,7 +359,7 @@ struct HtmlRuleExtractor {
         let attrParts = split.attribute.components(separatedBy: "##")
         let attr = attrParts.first ?? "text"
         if attr == "all" {
-            let joined = try targets.map { try $0.text() }.joined(separator: "\n")
+            let joined = try joinedAllValue(targets)
             let transformed = applyRegexTransforms(attrParts.dropFirst(), to: joined)
                 .trimmingCharacters(in: .whitespacesAndNewlines)
             return transformed.isEmpty ? [] : [transformed]
@@ -374,6 +374,29 @@ struct HtmlRuleExtractor {
             }
             return trimmed.isEmpty ? nil : trimmed
         }
+    }
+
+    /// Legado's `@all` returns `Elements.outerHtml()`: every matched node's
+    /// outer HTML concatenated in document order.
+    private func joinedAllValue(_ elements: [Element]) throws -> String {
+        try elements.map { try $0.outerHtml() }.joined()
+    }
+
+    /// Removes `<script>…</script>` and `<style>…</style>` blocks, matching
+    /// Legado's `html` handling before it hands the markup to the caller.
+    private func stripScriptAndStyle(_ html: String) -> String {
+        var output = html
+        output = output.replacingOccurrences(
+            of: "(?is)<script\\b[^>]*>.*?</script\\s*>",
+            with: "",
+            options: .regularExpression
+        )
+        output = output.replacingOccurrences(
+            of: "(?is)<style\\b[^>]*>.*?</style\\s*>",
+            with: "",
+            options: .regularExpression
+        )
+        return output
     }
 
     private func attributeValue(from target: Element, attr: String) throws -> String {
@@ -402,7 +425,11 @@ struct HtmlRuleExtractor {
             }
             return try target.text()
         } else if normalizedAttr == "html" || normalizedAttr == "html()" {
-            return try target.html()
+            // Legado's `html` returns the element's outerHtml after removing
+            // script/style nodes.  innerHTML leaks inline <script> source into
+            // chapter text once the reader strips tags, so keep the outer form
+            // and drop executable blocks exactly like AnalyzeByJSoup does.
+            return stripScriptAndStyle(try target.outerHtml())
         } else if normalizedAttr.hasPrefix("attr(") && normalizedAttr.hasSuffix(")") {
             let inner = String(attr.dropFirst(5).dropLast()).trimmingCharacters(in: .whitespacesAndNewlines)
             return try target.attr(inner)
