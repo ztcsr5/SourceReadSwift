@@ -4,7 +4,7 @@
     "name": "⚡📂错层小说",
     "rule": "#allchapter dd",
     "expected": 500,
-    "bodyFile": "toc-fdd9c740108b.body",
+    "bodyFile": "toc-add61252fe30.body",
     "baseUrl": "https://m.cuoceng.com/",
     "chapterNameRule": "",
     "chapterUrlRule": ""
@@ -14,7 +14,7 @@
     "name": "错层小说网",
     "rule": "id.allchapter@tag.dl@tag.dd@tag.a",
     "expected": 500,
-    "bodyFile": "toc-2bc469b9631f.body",
+    "bodyFile": "toc-17ad8e9a2c91.body",
     "baseUrl": "https://m.cuoceng.org/",
     "chapterNameRule": "",
     "chapterUrlRule": ""
@@ -84,7 +84,7 @@
     "name": "穿越小说（优）",
     "rule": "li.chapter@a <js> var r=result; var v=book.getVariable(\"custom\") var b=[]; if(v!=\"\"){ for(i=0;i<r.length-v;i++){ b.push(r[i]); } result=b; } result </js>",
     "expected": 0,
-    "bodyFile": "toc-42776e26265a.body",
+    "bodyFile": "toc-20af3736cf85.body",
     "baseUrl": "http://www.kk169.org",
     "chapterNameRule": "",
     "chapterUrlRule": ""
@@ -203,8 +203,8 @@
     "id": 152,
     "name": "阅读电子",
     "rule": "#content@.page",
-    "expected": 0,
-    "bodyFile": "toc-b72dc2d53627.body",
+    "expected": 126,
+    "bodyFile": "toc-1a2d6d6f0be8.body",
     "baseUrl": "https://book.vik.im/ ",
     "chapterNameRule": "",
     "chapterUrlRule": ""
@@ -223,8 +223,8 @@
     "id": 175,
     "name": "去读书",
     "rule": "class.index@li",
-    "expected": 0,
-    "bodyFile": "toc-c6094e9fea62.body",
+    "expected": 1914,
+    "bodyFile": "toc-8ba64c2f0c11.body",
     "baseUrl": "http://www.qudushu.com",
     "chapterNameRule": "",
     "chapterUrlRule": ""
@@ -264,7 +264,7 @@
     "name": "行轻小说",
     "rule": "class.catalog-list@tag.ul@tag.li@tag.a",
     "expected": 0,
-    "bodyFile": "toc-75c80fedae0f.body",
+    "bodyFile": "toc-5ed0eb0fd74d.body",
     "baseUrl": "http://s.sfacg.com",
     "chapterNameRule": "",
     "chapterUrlRule": ""
@@ -434,7 +434,7 @@
     "name": "穿越小说",
     "rule": "li.chapter@a <js> var r=result; var v=book.getVariable(\"custom\") var b=[]; if(v!=\"\"){ for(i=0;i<r.length-v;i++){ b.push(r[i]); } result=b; } result </js>",
     "expected": 0,
-    "bodyFile": "toc-42776e26265a.body",
+    "bodyFile": "toc-20af3736cf85.body",
     "baseUrl": "http://www.kk169.org/",
     "chapterNameRule": "",
     "chapterUrlRule": ""
@@ -653,8 +653,8 @@
     "id": 821,
     "name": "去读书⑤",
     "rule": "class.index@li",
-    "expected": 0,
-    "bodyFile": "toc-c6094e9fea62.body",
+    "expected": 1914,
+    "bodyFile": "toc-8ba64c2f0c11.body",
     "baseUrl": "http://www.qudushu.com/#pb1101",
     "chapterNameRule": "",
     "chapterUrlRule": ""
@@ -673,8 +673,8 @@
     "id": 834,
     "name": "去读书",
     "rule": "class.index@li",
-    "expected": 0,
-    "bodyFile": "toc-c6094e9fea62.body",
+    "expected": 1914,
+    "bodyFile": "toc-8ba64c2f0c11.body",
     "baseUrl": "http://www.qudushu.com/",
     "chapterNameRule": "",
     "chapterUrlRule": ""
@@ -683,8 +683,8 @@
     "id": 842,
     "name": "去读书",
     "rule": "class.index@li",
-    "expected": 0,
-    "bodyFile": "toc-c6094e9fea62.body",
+    "expected": 1914,
+    "bodyFile": "toc-8ba64c2f0c11.body",
     "baseUrl": "http://www.qudushu.org/",
     "chapterNameRule": "",
     "chapterUrlRule": ""
@@ -694,7 +694,7 @@
     "name": "SF轻小说#3",
     "rule": "class.story-catalog@class.catalog-list@tag.ul@tag.li",
     "expected": 0,
-    "bodyFile": "toc-5bb77eee365c.body",
+    "bodyFile": "toc-5ed0eb0fd74d.body",
     "baseUrl": "http://book.sfacg.com#🎃",
     "chapterNameRule": "",
     "chapterUrlRule": ""
@@ -704,7 +704,7 @@
     "name": "SF轻小说",
     "rule": "class.catalog-list@tag.ul@tag.li@tag.a",
     "expected": 0,
-    "bodyFile": "toc-9fcb4c81d895.body",
+    "bodyFile": "toc-5ed0eb0fd74d.body",
     "baseUrl": "http://s.sfacg.com#🎃",
     "chapterNameRule": "",
     "chapterUrlRule": ""
@@ -724,7 +724,7 @@
     "name": " sf轻小说",
     "rule": "class.story-catalog@class.catalog-list@tag.ul@tag.li",
     "expected": 0,
-    "bodyFile": "toc-9f9c13117933.body",
+    "bodyFile": "toc-5ed0eb0fd74d.body",
     "baseUrl": "http://book.sfacg.com已校验",
     "chapterNameRule": "",
     "chapterUrlRule": ""
@@ -734,7 +734,7 @@
     "name": " SF轻小说",
     "rule": "class.catalog-list@tag.li",
     "expected": 0,
-    "bodyFile": "toc-8d5cfd3378da.body",
+    "bodyFile": "toc-5ed0eb0fd74d.body",
     "baseUrl": "http://www.sfacg.com已校验",
     "chapterNameRule": "",
     "chapterUrlRule": ""
@@ -753,8 +753,8 @@
     "id": 855,
     "name": "去读书 #破冰",
     "rule": "class.index@li",
-    "expected": 0,
-    "bodyFile": "toc-c6094e9fea62.body",
+    "expected": 1914,
+    "bodyFile": "toc-8ba64c2f0c11.body",
     "baseUrl": "http://www.qudushu.com/#♤pb",
     "chapterNameRule": "",
     "chapterUrlRule": ""
@@ -764,7 +764,7 @@
     "name": " SF轻小说",
     "rule": "class.catalog-list@tag.ul@tag.li@tag.a",
     "expected": 0,
-    "bodyFile": "toc-ab66c6188a4b.body",
+    "bodyFile": "toc-5ed0eb0fd74d.body",
     "baseUrl": "book.sfacg.com已整理",
     "chapterNameRule": "",
     "chapterUrlRule": ""
@@ -774,7 +774,7 @@
     "name": " SF轻小说[图片]",
     "rule": "class.catalog-list@tag.li",
     "expected": 0,
-    "bodyFile": "toc-35248bf45500.body",
+    "bodyFile": "toc-5ed0eb0fd74d.body",
     "baseUrl": "[图片]http://www.sfacg.com已校验",
     "chapterNameRule": "",
     "chapterUrlRule": ""
@@ -814,7 +814,7 @@
     "name": "安轻小说",
     "rule": "div.wrap.s-list@h3.catalog-title, li",
     "expected": 0,
-    "bodyFile": "toc-7a966238acf1.body",
+    "bodyFile": "toc-5ed0eb0fd74d.body",
     "baseUrl": "https://book.sfacg.com",
     "chapterNameRule": "",
     "chapterUrlRule": ""
@@ -823,8 +823,8 @@
     "id": 891,
     "name": "潇湘书院",
     "rule": ".profile-main li",
-    "expected": 9,
-    "bodyFile": "toc-39a68a03181f.body",
+    "expected": 3254,
+    "bodyFile": "toc-cdf268d2f4f6.body",
     "baseUrl": "https://www.xxsy.net#",
     "chapterNameRule": "",
     "chapterUrlRule": ""
@@ -854,7 +854,7 @@
     "name": "心轻小说",
     "rule": "class.catalog-list@tag.ul@tag.li@tag.a",
     "expected": 0,
-    "bodyFile": "toc-174171f2d9f1.body",
+    "bodyFile": "toc-5ed0eb0fd74d.body",
     "baseUrl": "http://s.sfacg.com/",
     "chapterNameRule": "",
     "chapterUrlRule": ""
@@ -864,7 +864,7 @@
     "name": "SF轻小说",
     "rule": "div.wrap.s-list@h3.catalog-title, li",
     "expected": 0,
-    "bodyFile": "toc-dd0b25304986.body",
+    "bodyFile": "toc-5ed0eb0fd74d.body",
     "baseUrl": "https://book.sfacg.com/",
     "chapterNameRule": "",
     "chapterUrlRule": ""
@@ -884,7 +884,7 @@
     "name": "轻小说钱",
     "rule": "class.catalog-list@tag.li",
     "expected": 0,
-    "bodyFile": "toc-d509511ad417.body",
+    "bodyFile": "toc-5ed0eb0fd74d.body",
     "baseUrl": "http://www.sfacg.com",
     "chapterNameRule": "",
     "chapterUrlRule": ""
@@ -894,7 +894,7 @@
     "name": "SF轻小说",
     "rule": "class.story-catalog@class.catalog-list@tag.ul@tag.li",
     "expected": 0,
-    "bodyFile": "toc-e2c8b16f1cea.body",
+    "bodyFile": "toc-5ed0eb0fd74d.body",
     "baseUrl": "http://book.sfacg.com",
     "chapterNameRule": "",
     "chapterUrlRule": ""
@@ -934,7 +934,7 @@
     "name": "轻小说吧",
     "rule": "class.catalog-list@tag.li",
     "expected": 0,
-    "bodyFile": "toc-e544a6e6b5bf.body",
+    "bodyFile": "toc-5ed0eb0fd74d.body",
     "baseUrl": "[图片]http://www.m.sfacg.com",
     "chapterNameRule": "",
     "chapterUrlRule": ""
@@ -944,7 +944,7 @@
     "name": "SF轻小说",
     "rule": "class.story-catalog@class.catalog-list@tag.ul@tag.li",
     "expected": 0,
-    "bodyFile": "toc-64ed87c7f95b.body",
+    "bodyFile": "toc-5ed0eb0fd74d.body",
     "baseUrl": "http://book.sfacg.com#",
     "chapterNameRule": "",
     "chapterUrlRule": ""
@@ -954,7 +954,7 @@
     "name": "安轻小说",
     "rule": "div.wrap.s-list@h3.catalog-title, li",
     "expected": 0,
-    "bodyFile": "toc-64ed87c7f95b.body",
+    "bodyFile": "toc-5ed0eb0fd74d.body",
     "baseUrl": "https://book.sfacg.com#",
     "chapterNameRule": "",
     "chapterUrlRule": ""
