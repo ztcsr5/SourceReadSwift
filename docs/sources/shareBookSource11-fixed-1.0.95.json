@@ -2082,7 +2082,7 @@
   "header": "{\"User-Agent\": \"Mozilla/5.0 (Linux; Android 12; Pixel 6) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36\"}",
   "lastUpdateTime": 1788680226191,
   "respondTime": 180000,
-  "ruleBookInfo": "{\"name\":\"@css:h1.booktitle@text\",\"author\":\"@css:p.booktag a.0@text\",\"kind\":\"@css:meta[property=\\\"og:novel:category\\\"]@content\",\"lastChapter\":\"@css:meta[property=\\\"og:novel:latest_chapter_name\\\"]@content\",\"intro\":\"@css:meta[property=\\\"og:description\\\"]@content\",\"coverUrl\":\"@css:meta[property=\\\"og:image\\\"]@content\",\"tocUrl\":\"\"}",
+  "ruleBookInfo": "{\"name\":\"@css:h1.booktitle@text\",\"author\":\"@css:meta[property=og:novel:author]@content\",\"kind\":\"@css:meta[property=og:novel:category]@content\",\"lastChapter\":\"@css:meta[property=og:novel:latest_chapter_name]@content\",\"intro\":\"@css:meta[property=og:description]@content\",\"coverUrl\":\"@css:meta[property=og:image]@content\",\"tocUrl\":\"\"}",
   "ruleContent": "{\"content\":\"@css:#chapter-content@html\"}",
   "ruleExplore": {
    "author": "class.itemtxt@tag.p.1@tag.a.0@text##作者：##",
@@ -2094,7 +2094,7 @@
    "name": "class.itemtxt@tag.h3@tag.a.0@text||class.itemtxt@tag.h1@tag.a.0@text",
    "wordCount": "class.itemtxt@tag.p.0@tag.span.2@text"
   },
-  "ruleSearch": "{\"bookList\":\"@css:.bookbox||@css:body\",\"name\":\"@css:h1.booktitle@text||@css:.bookname a@text\",\"author\":\"@css:p.booktag a.0@text||@css:.author.0@text##作者：\",\"bookUrl\":\"@css:meta[property=\\\"og:url\\\"]@content||@css:.bookname a@href\",\"coverUrl\":\"@css:img.thumbnail@src||@css:.bookbox img@src\",\"intro\":\"@css:meta[property=\\\"og:description\\\"]@content||@css:.update@text##简介：\",\"lastChapter\":\"@css:meta[property=\\\"og:novel:latest_chapter_name\\\"]@content||@css:.cat a@text\",\"kind\":\"@css:meta[property=\\\"og:novel:category\\\"]@content\"}",
+  "ruleSearch": "{\"bookList\":\"@css:.bookbox||@css:html\",\"name\":\"@css:h1.booktitle@text||@css:.bookname a@text\",\"author\":\"@css:meta[property=og:novel:author]@content||@css:.author@text##作者：\",\"bookUrl\":\"@css:meta[property=og:url]@content||@css:.bookname a@href\",\"coverUrl\":\"@css:img.thumbnail@src||@css:.bookbox img@src\",\"intro\":\"@css:meta[property=og:description]@content||@css:.update@text##简介：\",\"lastChapter\":\"@css:meta[property=og:novel:latest_chapter_name]@content||@css:.cat a@text\",\"kind\":\"@css:meta[property=og:novel:category]@content\"}",
   "ruleToc": "{\"chapterList\":\"@css:#list-chapterAll dd a\",\"chapterName\":\"@text\",\"chapterUrl\":\"@href##$##,{\\\"webView\\\":true}\"}",
   "searchUrl": "/modules/article/search.php?searchkey={{key}}",
   "weight": 0
