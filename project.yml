@@ -95,7 +95,8 @@ targets:
         excludes:
           - Fixtures
     resources:
-      - SourceReadSwiftTests/Fixtures
+      - path: SourceReadSwiftTests/Fixtures
+        type: folder
     dependencies:
       - target: SourceReadSwift
       - package: SwiftSoup
