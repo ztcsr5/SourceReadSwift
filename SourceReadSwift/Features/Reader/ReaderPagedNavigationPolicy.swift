@@ -58,6 +58,11 @@ enum ReaderPageCurlSyncDecision: Equatable {
     case none
     case reloadCurrentPage
     case move(to: Int)
+    /// The page on screen is still the page the user is reading; only its
+    /// array index moved because a chapter was inserted above it. SwiftUI's
+    /// binding is stale, so the coordinator must adopt the visible index
+    /// instead of sending the reader back to the old slot.
+    case adopt(visible: Int)
 }
 
 enum ReaderPageCurlSyncPolicy {
@@ -69,7 +74,8 @@ enum ReaderPageCurlSyncPolicy {
         desiredIndex: Int,
         pageCount: Int,
         contentRevisionChanged: Bool,
-        isUserInteracting: Bool
+        isUserInteracting: Bool,
+        lastDesiredIndex: Int? = nil
     ) -> ReaderPageCurlSyncDecision {
         guard pageCount > 0 else { return .none }
         let clamped = min(max(desiredIndex, 0), pageCount - 1)
@@ -77,6 +83,16 @@ enum ReaderPageCurlSyncPolicy {
         if contentRevisionChanged { return .reloadCurrentPage }
         guard let displayedIndex else { return .move(to: clamped) }
         guard displayedIndex != clamped else { return .none }
+        // A window insertion renumbers every page after the insertion point
+        // while SwiftUI keeps the old value. When the binding did not change
+        // since the last sync, nobody asked for a page turn: the index moved
+        // under the reader. Adopting the visible page is the only move that
+        // cannot jump into a neighbouring chapter.
+        if let lastDesiredIndex,
+           clamped == lastDesiredIndex,
+           lastDesiredIndex != displayedIndex {
+            return .adopt(visible: displayedIndex)
+        }
         return .move(to: clamped)
     }
 }

@@ -231,6 +231,61 @@ final class ReaderPagedNavigationPolicyTests: XCTestCase {
         )
     }
 
+    func testPageCurlSyncAdoptsVisiblePageWhenWindowShifts() {
+        // A prefetched chapter inserted nine pages above the reader. The page
+        // on screen is still the same object (displayed moved 12 -> 21) but
+        // SwiftUI still holds 12. Adopting the visible index is the only
+        // outcome that cannot jump back into the previous chapter.
+        XCTAssertEqual(
+            ReaderPageCurlSyncPolicy.decision(
+                displayedIndex: 21,
+                desiredIndex: 12,
+                pageCount: 40,
+                contentRevisionChanged: false,
+                isUserInteracting: false,
+                lastDesiredIndex: 12
+            ),
+            .adopt(visible: 21)
+        )
+        // An explicit jump changes the binding after the last sync, so the
+        // stale-binding heuristic must not swallow it.
+        XCTAssertEqual(
+            ReaderPageCurlSyncPolicy.decision(
+                displayedIndex: 21,
+                desiredIndex: 5,
+                pageCount: 40,
+                contentRevisionChanged: false,
+                isUserInteracting: false,
+                lastDesiredIndex: 12
+            ),
+            .move(to: 5)
+        )
+        // First sync after mounting: no recorded intent yet, legacy move.
+        XCTAssertEqual(
+            ReaderPageCurlSyncPolicy.decision(
+                displayedIndex: 21,
+                desiredIndex: 12,
+                pageCount: 40,
+                contentRevisionChanged: false,
+                isUserInteracting: false,
+                lastDesiredIndex: nil
+            ),
+            .move(to: 12)
+        )
+        // Content revision still wins over the stale-binding heuristic.
+        XCTAssertEqual(
+            ReaderPageCurlSyncPolicy.decision(
+                displayedIndex: 21,
+                desiredIndex: 12,
+                pageCount: 40,
+                contentRevisionChanged: true,
+                isUserInteracting: false,
+                lastDesiredIndex: 12
+            ),
+            .reloadCurrentPage
+        )
+    }
+
     // MARK: - Long paragraph splitter
 
     func testTextSplitterKeepsShortText() {

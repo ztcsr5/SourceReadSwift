@@ -105,6 +105,7 @@ struct PageCurlReaderView<Item: Identifiable, Content: View>: UIViewControllerRe
         let initialVC = context.coordinator.viewController(at: initialIndex)
         pvc.setViewControllers([initialVC], direction: .forward, animated: false, completion: nil)
         context.coordinator.lastContentRevision = contentRevision
+        context.coordinator.lastDesiredIndex = initialIndex
         context.coordinator.noteContentRevision(contentRevision)
         context.coordinator.reportVisibleIdentity(initialVC)
         context.coordinator.prewarm(around: initialIndex)
@@ -127,6 +128,10 @@ struct PageCurlReaderView<Item: Identifiable, Content: View>: UIViewControllerRe
     final class Coordinator: NSObject, UIPageViewControllerDataSource, UIPageViewControllerDelegate {
         var parent: PageCurlReaderView
         var lastContentRevision = ""
+        /// Last page index SwiftUI asked for. A mismatch with the live
+        /// binding means an explicit jump (TOC, TTS); a match means the page
+        /// array shifted underneath the reader and the visible index wins.
+        var lastDesiredIndex: Int?
         private var isUserInteracting = false
         private var cachedRevision = ""
         private var hostingControllers: [String: PageHostingController<Content>] = [:]
@@ -253,12 +258,21 @@ struct PageCurlReaderView<Item: Identifiable, Content: View>: UIViewControllerRe
                 desiredIndex: desiredIndex,
                 pageCount: parent.pages.count,
                 contentRevisionChanged: visiblePageChanged,
-                isUserInteracting: isUserInteracting
+                isUserInteracting: isUserInteracting,
+                lastDesiredIndex: lastDesiredIndex
             )
+            lastDesiredIndex = desiredIndex
 
             switch decision {
             case .none:
                 reportVisibleIdentity(displayedController)
+            case .adopt(let visible):
+                // A prefetched chapter was inserted above the reader: the
+                // page on screen is unchanged, only its array index moved.
+                // Sending `setViewControllers` to the stale index here is
+                // what produced the “chapter 5 jumps back to chapter 2”
+                // report.
+                adoptVisibleIndex(visible, staleDesired: desiredIndex, controller: displayedController)
             case .reloadCurrentPage:
                 let target = displayedIndex ?? desiredIndex
                 let controller = viewController(at: target)
@@ -300,6 +314,21 @@ struct PageCurlReaderView<Item: Identifiable, Content: View>: UIViewControllerRe
                 )
                 reportVisibleIdentity(controller)
                 prewarm(around: target)
+            }
+        }
+
+        /// Writes the page that is actually on screen back into
+        /// `pagedPageIndex` after the page array shifted above it. Deferred and
+        /// guarded so an explicit jump issued in the same frame still wins.
+        private func adoptVisibleIndex(_ visible: Int, staleDesired: Int, controller: UIViewController?) {
+            reportVisibleIdentity(controller)
+            prewarm(around: visible)
+            DispatchQueue.main.async { [weak self] in
+                guard let self else { return }
+                guard self.parent.pages.indices.contains(visible) else { return }
+                guard self.parent.currentPageIndex == staleDesired,
+                      self.parent.currentPageIndex != visible else { return }
+                self.parent.currentPageIndex = visible
             }
         }
 
@@ -365,6 +394,7 @@ struct PageCurlReaderView<Item: Identifiable, Content: View>: UIViewControllerRe
                         pageCount: parent.pages.count
                     )
                 parent.currentPageIndex = newIndex
+                lastDesiredIndex = newIndex
                 parent.onPageChanged?(newIndex)
                 reportVisibleIdentity(currentVC)
             }
