@@ -37,6 +37,7 @@ jobs:
           fi
           TEST_RUNNER_ROWS_PROBE_OUTPUT="$RUNNER_TEMP/rows-probe.json" \
           TEST_RUNNER_TOC_PROBE_OUTPUT="$RUNNER_TEMP/toc-probe.json" \
+          TEST_RUNNER_SEARCH_URL_PROBE_OUTPUT="$RUNNER_TEMP/search-url-probe.json" \
           xcodebuild \
             -project SourceReadSwift.xcodeproj \
             -scheme SourceReadSwift \
@@ -45,6 +46,7 @@ jobs:
             -parallel-testing-enabled NO \
             -only-testing:SourceReadSwiftTests/SourceRowsCorpusProbeTests \
             -only-testing:SourceReadSwiftTests/SourceTocCorpusProbeTests \
+            -only-testing:SourceReadSwiftTests/SourceSearchURLProbeTests \
             test-without-building 2>&1 | tee probe-test.log
 
       - name: Upload probe report
@@ -55,4 +57,5 @@ jobs:
           path: |
             ${{ runner.temp }}/rows-probe.json
             ${{ runner.temp }}/toc-probe.json
+            ${{ runner.temp }}/search-url-probe.json
           if-no-files-found: warn
