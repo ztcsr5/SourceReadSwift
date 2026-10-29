@@ -2,7 +2,8 @@
 
 - 版本：1.0.103 / Build 104
 - 分支：`codex/reader-feedback-fixes`（推送分支 `codex/swift-v2-lifetime-reader`）
-- 真机基线：1.0.98/99，LAN `192.168.31.205:8080`（当前 HTTP 挂起，1.0.103 复测未跑）
+- 真机基线：1.0.98/99；LAN `192.168.31.205:8080` 当前未监听（TCP 拒绝），1.0.106 复测未跑
+- 当前安装包：1.0.106（2026-10-29 18:16，SHA256 `35a8a31b…`）；问题编号沿用 1.0.103
 - 状态图例：
   - `OPEN`：未修或仍能复现
   - `PARTIAL`：部分路径已改，边界仍存在
@@ -19,21 +20,21 @@
 | R02 | 翻页跳回前面的章节（第 5 章跳到第 2 章） | FIXED? | 1.0.66 用 `ReaderPageIdentity` 替代数组下标；1.0.81/83 提交后用锚点复算；`ReaderPageSelectionTests` 9 例 | 用用户视频场景回归：预取插章、覆盖 320ms 延迟、章界连续翻 |
 | R03 | 不能无限前后跨章滑，读完一章要手动点下一章；预缓存不足 | PARTIAL | 现为五章窗口 + 预取；用户要求“读过等于缓存前后几章” | 检查窗口边界与预取触发；前后各扩 2 章；章界自动续页；记录缓存命中率 |
 | R04 | 章节标题重复/缺失；标题字号与正文一样；有的源不显示标题 | PARTIAL | 1.0.65 已加 `ChapterTextSanitizer` + `titleFontSize`；1.0.103 UI 队列仍列“标题重复” | 抽 76 源逐源看标题节点；标题只渲染一次；无标题时用章节名；iOS16 单独验 |
-| R05 | iOS16 双引号导致正文不对齐，最后一个字不齐；iOS17+ 正常 | OPEN | 1.0.65 已给 WebView 加 `text-align: justify`；TextKit 路径仍受 iOS16 TextKit1 行尾处理影响 | iOS16 真机对比 UITextView/WKWebView；检查 `lineFragmentPadding`、`textAlignment`、`paragraphStyle`；末字对齐单独回归 |
+| R05 | iOS16 双引号导致正文不对齐，最后一个字不齐；iOS17+ 正常 | FIXED? | `17c9285`：`ReaderCJKPunctuationCompression` + TextKit/WebView 末端标点压缩；`ReaderPageTextBuilderTests.swift:111` 回归用例；该提交在 `cc9b4297` 祖先链内，iOS run `40855813316` 测试通过 | 真机 iOS16 对比长段落末尾引号；若仍不齐，量 `lineFragmentPadding`/`paragraphStyle`；iOS17 回归 |
 | R06 | 顶部空白太多；状态栏位置不佳 | PARTIAL | 1.0.59 已加 `.ignoresSafeArea()` 并收紧 `pageTopInset`；1.0.65 继续修 inset；用户仍反馈 | iOS16 真机量 `safeTop`、`pageTopInset`、`contentInset`；四种模式统一 |
 | R07 | 正文显示不全，末尾是省略号 | PARTIAL | 1.0.65 分页上限 8→24、末段去重、保留 `nextContentUrl`、加“网页打开本章”兜底；仍与源站内容有关 | 复现具体书源；检查 `content` 规则、`nextContentUrl`、分页上限；源站本身缺字则明确标注 |
 | R08 | 默认段间距太小，段距应大于行距 | FIXED? | 1.0.65 默认 `paragraphSpacing 0→10`、`titleSpacing 8→12`，带一次性迁移 | 真机看长段落/对话段；设置页可调；导出一组对照截图 |
 | R09 | 自定义壁纸比例错、裁切、设置面板被裁 | PARTIAL | 1.0.63 加 frame/clipped；1.0.64 改 UIKit `UIImageView` + 降采样 + 三种填充；用户仍反馈“和前面一样” | 复现导入图片比例；固定容器尺寸；`scaleAspectFill/Fit/Fill` 三档；参考栖阅独立图层 |
-| R10 | 阅读菜单太宽、留白多、不透明，与顶部菜单不一致 | OPEN | 用户 P2 截图；底部面板与顶部 material/宽度不统一 | 统一 `ultraThinMaterial`；面板宽度 `min(560, screen-32)`；底部安全区对齐 |
-| R11 | 滑动模式状态栏透明，正文透出挡住 | OPEN | 用户截图；滚动模式顶部没有独立遮罩 | 顶部加渐变/不透明背景层；状态栏区域与正文分离；滚动时保持可读 |
+| R10 | 阅读菜单太宽、留白多、不透明，与顶部菜单不一致 | FIXED? | `3e70e4d03`：`ReaderSettingsLayoutPolicy.maxPanelWidth` 统一 16pt gutter（390→358、844/1024→560、24→0）；面板底色 0.97 主题色 + 18pt 圆角 + 0.6pt 边线 + 阴影；`ReaderAutomationPolicyTests.swift:67` 宽度用例 | 真机竖屏/横屏/iPad 看宽度与留白；CI 编译测试已过 |
+| R11 | 滑动模式状态栏透明，正文透出挡住 | FIXED? | `3e70e4d03`：新增 `ReaderScrollChromePolicy.statusScrimHeight`（safeTop+header+10），滚动模式顶部 0.97 实色遮罩 + 10pt 渐变；`ReaderView.swift:2800`；测试覆盖 69/93/30 | 真机滚动模式看时钟/刘海区；开/关顶部章节栏各一版 |
 | R12 | 底部菜单按钮太多，朗读/自动翻页占位 | FIXED? | 1.0.65 已把朗读/自动翻页移入右上 `ellipsis`；底部只留目录/设置/上一章/下一章/进度 | 真机确认底部五项；右上菜单分组；不再新增底栏按钮 |
 
 ## 二、P1 · 阅读交互与设置
 
 | ID | 问题 | 状态 | 证据/根因 | 下一步 |
 |---|---|---|---|---|
-| I01 | 搜索时键盘不能点空白收起，只能按回车 | OPEN | 用户反馈；搜索页缺少 tap-to-dismiss 手势 | 加 `simultaneousGesture`/背景 `onTapGesture` 收起键盘；保留滚动不误触 |
-| I02 | 键盘弹起时导航栏跟着上移 | OPEN | 用户反馈；键盘 avoidance 作用到了导航容器 | 只让搜索框/结果列表避让键盘；导航栏固定；iOS16 单独验 |
+| I01 | 搜索时键盘不能点空白收起，只能按回车 | FIXED? | `17c9285`：`DiscoverView.swift:159` 加 `.dismissKeyboardOnTap()`；`365` 保留 onSubmit 收起；该提交在 `cc9b4297` 祖先链内，iOS run `40855813316` 测试通过 | 真机搜索页点空白/滚动/点结果三路验证；iOS16 单验 |
+| I02 | 键盘弹起时导航栏跟着上移 | FIXED? | `17c9285`：`DiscoverView.swift:164` 加 `.ignoresSafeArea(.keyboard, edges: .bottom)`，只让列表避让键盘 | 真机键盘弹起/收起看顶部搜索栏是否固定；iOS16 单验 |
 | I03 | 阅读页页脚/home indicator/安全区位置 | PARTIAL | 1.0.59/1.0.65 已调页脚和底部间距；用户仍反馈状态栏/页脚 | 统一 `safeAreaInsets` 基准；四种模式页脚位置一致 |
 | I04 | 竞品有音量键翻页、双栏、左右独立边距、页脚三开关 | OPEN | `竞品翻页与阅读设置对照.md`：栖阅有 `VolumeButtonPageTurnMonitor`、`_doublePageMode`；香色有页脚三开关 | P1 先做音量键；P2 做双栏/左右边距；页脚开关已补，验真机 |
 | I05 | 覆盖与平移视觉差异小，没有真正“上一页压住下一页”叠层 | OPEN | 1.0.84 明确“真正的叠层尚未实现” | 覆盖模式加三页叠层/方向阴影；平移保持滑动；分开验收 |
@@ -95,11 +96,11 @@
 | ID | 问题 | 状态 | 证据/根因 | 下一步 |
 |---|---|---|---|---|
 | T01 | 10 与 8 口径不一致，容易误判退化 | OPEN | 旧 1.0.90 单关键词/单线程/180s；新 1.0.98/99 五词/并发3/150s/无重试 | 统一用 `sweep76_v4.py`：重试、checkKeyWord、quality 分列、固定输入 |
-| T02 | 1.0.103 未真机复测 | BLOCKED | LAN TCP 可连但 HTTP 8–20s 0 字节 | App 前台/重开服务后跑 `verify_named.py` + `sweep76_v4.py` |
+| T02 | 1.0.103 未真机复测 | BLOCKED | ping `192.168.31.205` 通；TCP 8080 主动拒绝（服务未监听）；ARP MAC `0e-f9-10-72-df-90` | iPhone 打开 App 保持前台/重开服务；恢复后跑 `verify_named.py` + `sweep76_v4.py`；重点 #14/#28/#37/#51/#73 |
 | T03 | iOS16 真机矩阵未跑 | BLOCKED | 只有编译级证据；SE/mini/标准/Pro/Pro Max 未覆盖 | 至少 SE2/3、13 mini、14/15 标准、Pro Max 各一台；按 `IOS16-COMPAT-AUDIT` 第七节 8 条验收 |
 | T04 | LAN 服务/代理不稳定 | PARTIAL | `HTTP_PROXY` 会劫持 LAN；`sweep76_v3` 无重试；当前 App 挂起 | v4 已绕代理/重试；App 侧加 keepalive/前台提示；服务不可用时明确 `BLOCKED` |
-| T05 | 桌面 IPA/版本太多，分不清最新 | OPEN | 桌面有 1.0.98/99/100/101/103 等多个包 | 保留最新 3 个；旧包移到 `E:\codex-temp\ipa-archive`；文件名带版本+日期+sha 前 8 位 |
-| T06 | docs 提交未推送 | OPEN | `1f49206` 本地 docs；`SOURCE_BASELINE_1_0_103.md` 未跟踪 | 下次推代码时一起推；或单独推 docs 分支 |
+| T05 | 桌面 IPA/版本太多，分不清最新 | RESOLVED | 1.0.103 已归档到 `E:\codex-temp\ipa-archive\SourceReadSwift-1.0.103-unsigned.ipa`（12,439,805 B，SHA256 `25aedffc…`）；桌面只剩 1.0.106 `SourceReadSwift-1.0.106-20261029-35a8a31b.ipa`（12,477,827 B，SHA256 `35a8a31b…`） | 后续文件名固定 `版本-日期-sha8`；新包只保留最近 3 个 |
+| T06 | docs 提交未推送 | RESOLVED | `cc9b4297` docs 已推送；iOS run `40855813316` + IPA run `40855813405` 均 success；本次 docs 更新随验证单独推送 | 保持 docs 变更单独 push 并附 CI run |
 
 ## 八、P2 · 产品与竞品差距
 
