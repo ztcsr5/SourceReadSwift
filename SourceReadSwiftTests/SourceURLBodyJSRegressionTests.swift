@@ -97,7 +97,7 @@ final class SourceURLBodyJSRegressionTests: XCTestCase {
         let books = try await engine.exploreBooks(source: source, url: encodedURL("https://fixture.test/explore", script: normalizer), page: 1).get()
         let detail = try await engine.getBookDetail(source: source, book: XCTUnwrap(books.first)).get()
         let chapters = try await engine.getChapterList(source: source, book: detail, maxPages: 3).get()
-        XCTAssertEqual(chapters.map(\.name), ["第一章", "第二章"])
+        XCTAssertEqual(chapters.map(\.title), ["第一章", "第二章"])
         let content = try await engine.getContent(source: source, chapter: XCTUnwrap(chapters.first), maxPages: 3).get()
         XCTAssertTrue(content.paragraphs.joined().contains("正文第一页。"))
         XCTAssertTrue(content.paragraphs.joined().contains("正文第二页。"))
