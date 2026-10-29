@@ -321,7 +321,11 @@ struct ReaderView: View {
         let displayIndex = currentDisplayChapterIndex
         if let displayTotal = displayTotalChapters, displayTotal > 0 {
             let percentage = Int((Double(displayIndex + 1) / Double(displayTotal) * 100).rounded())
-            parts.append("第 \(displayIndex + 1) / \(displayTotal) 章")
+            let chapterNumber = min(
+                max(declaredChapterNumber(in: currentDisplayChapterTitle) ?? (displayIndex + 1), 1),
+                displayTotal
+            )
+            parts.append("第 \(chapterNumber) / \(displayTotal) 章")
             parts.append("\(percentage)%")
         } else {
             parts.append("第 \(displayIndex + 1) 章")
@@ -359,8 +363,30 @@ struct ReaderView: View {
         let block = pagedBlocks[pagedPageIndex]
         guard !block.isPlaceholder, block.chapterIndex >= 0 else { return nil }
         let ordinal = block.pageOrdinal + 1
-        let count = max(chapterPageCounts[block.chapterIndex] ?? ordinal, ordinal)
-        return "页 \(ordinal)/\(count)"
+        let count = chapterPageTotal(for: block.chapterIndex, fallback: ordinal)
+        return "页 \(min(ordinal, count))/\(count)"
+    }
+
+    /// Total pages of one chapter, reconciled across every source of truth:
+    /// the live paging window, the per-chapter cache and the current ordinal.
+    /// A stale cache used to leave the footer one page short, which made the
+    /// real last page unreachable ("6/7" that cannot turn).
+    private func chapterPageTotal(for chapterIndex: Int, fallback: Int) -> Int {
+        var windowTotal = 0
+        for block in pagedBlocks where block.chapterIndex == chapterIndex && !block.isPlaceholder {
+            windowTotal = max(windowTotal, block.pageOrdinal + 1)
+        }
+        let cached = chapterPageCounts[chapterIndex] ?? 0
+        return max(windowTotal, cached, fallback, 1)
+    }
+
+    /// The chapter number printed in the TOC title ("第25章 地宫全图"), which
+    /// can differ from the array index when a source ships extra volumes.
+    private func declaredChapterNumber(in title: String) -> Int? {
+        guard let range = title.range(of: #"第\s*[0-9]+\s*章"#, options: .regularExpression) else { return nil }
+        let digits = title[range].filter(\.isNumber)
+        guard let value = Int(digits), value > 0 else { return nil }
+        return value
     }
 
     /// Scroll-mode boundary feedback. The native surface has no placeholder
@@ -3129,10 +3155,8 @@ struct ReaderView: View {
     }
 
     private func pageNumberText(for page: ReaderPageBlock) -> String {
-        guard !page.isPlaceholder,
-              page.chapterIndex >= 0,
-              let total = chapterPageCounts[page.chapterIndex],
-              total > 0 else { return "" }
+        guard !page.isPlaceholder, page.chapterIndex >= 0 else { return "" }
+        let total = chapterPageTotal(for: page.chapterIndex, fallback: page.pageOrdinal + 1)
         return "\(min(page.pageOrdinal + 1, total))/\(total)"
     }
 
@@ -3491,8 +3515,6 @@ struct ReaderView: View {
                         }
                     }
 
-                    Divider()
-
                     Button {
                         closeReaderChromeFromMenu()
                         toggleSpeech()
@@ -3523,8 +3545,6 @@ struct ReaderView: View {
                             systemImage: autoScrollEnabled ? "pause.fill" : "play.fill"
                         )
                     }
-
-                    Divider()
 
                     Button {
                         closeReaderChromeFromMenu()
@@ -3578,10 +3598,15 @@ struct ReaderView: View {
             Spacer()
 
             VStack(spacing: 12) {
-                // 拖动时实时显示落点章节，松手前就知道要跳到哪一章。
-                Text(chapterSliderLabel)
+                // 滚动模式显示落点章节，分页模式显示本章页码；两者语义不同，
+                // 分页时拖章节滑条会让整章重排，正是「翻页卡住」的来源之一。
+                Text(readerMode == .scroll ? chapterSliderLabel : pageSliderLabel)
                     .font(.caption2.weight(.semibold).monospacedDigit())
-                    .foregroundStyle(readerThemeTextColor.opacity(chapterSliderTarget == nil ? 0 : 0.5))
+                    .foregroundStyle(readerThemeTextColor.opacity(
+                        readerMode == .scroll
+                            ? (chapterSliderTarget == nil ? 0 : 0.5)
+                            : 0.55
+                    ))
                     .frame(height: 13)
                     .animation(.easeOut(duration: 0.12), value: chapterSliderTarget == nil)
 
@@ -3591,33 +3616,53 @@ struct ReaderView: View {
                     }
                     .disabled(!canSelectRelativeChapter(offset: -1))
 
-                    Slider(
-                        value: Binding(
-                            get: { chapterSliderTarget ?? Double(currentDisplayChapterIndex) },
-                            set: { newValue in
-                                chapterSliderTarget = newValue
+                    if readerMode == .scroll {
+                        Slider(
+                            value: Binding(
+                                get: { chapterSliderTarget ?? Double(currentDisplayChapterIndex) },
+                                set: { newValue in
+                                    chapterSliderTarget = newValue
+                                    scheduleLiveChapterSeek(to: newValue)
+                                }
+                            ),
+                            in: 0...Double(max((displayTotalChapters ?? chapters.count) - 1, 0)),
+                            step: 1,
+                            onEditingChanged: { editing in
+                                guard !editing else { return }
+                                chapterSeekTask?.cancel()
+                                chapterSeekTask = nil
+                                guard let target = chapterSliderTarget else { return }
+                                chapterSliderTarget = nil
+                                let index = Int(target.rounded())
+                                guard index != currentDisplayChapterIndex else { return }
+                                selectChapter(index: index)
                             }
-                        ),
-                        in: 0...Double(max((displayTotalChapters ?? chapters.count) - 1, 0)),
-                        step: 1,
-                        onEditingChanged: { editing in
-                            guard !editing else { return }
-                            chapterSeekTask?.cancel()
-                            chapterSeekTask = nil
-                            guard let target = chapterSliderTarget else { return }
-                            chapterSliderTarget = nil
-                            let index = Int(target.rounded())
-                            guard index != currentDisplayChapterIndex else { return }
-                            selectChapter(index: index)
-                        }
-                    )
-                        .tint(AppTheme.accent)
-                        .padding(.horizontal, 16)
-                        .frame(maxWidth: .infinity)
-                        .frame(height: 36)
-                        .background(readerThemeBackground.opacity(0.98), in: Capsule())
-                        .clipShape(Capsule())
-                        .accessibilityLabel("章节进度")
+                        )
+                            .tint(AppTheme.accent)
+                            .padding(.horizontal, 16)
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 36)
+                            .background(readerThemeBackground.opacity(0.98), in: Capsule())
+                            .clipShape(Capsule())
+                            .accessibilityLabel("章节进度")
+                    } else {
+                        Slider(
+                            value: Binding(
+                                get: { Double(currentChapterPageOrdinal) },
+                                set: { newValue in seekPagedPage(ordinal: Int(newValue.rounded())) }
+                            ),
+                            in: 0...Double(max(currentChapterPageTotalForSlider - 1, 0)),
+                            step: 1,
+                            onEditingChanged: { _ in }
+                        )
+                            .tint(AppTheme.accent)
+                            .padding(.horizontal, 16)
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 36)
+                            .background(readerThemeBackground.opacity(0.98), in: Capsule())
+                            .clipShape(Capsule())
+                            .accessibilityLabel("本章页码")
+                    }
 
                     navChapterButton(icon: "chevron.right", title: "下一章") {
                         selectRelativeChapter(offset: 1)
@@ -4686,8 +4731,9 @@ struct ReaderView: View {
             .toolbarColorScheme(background.isDark ? .dark : .light, for: .navigationBar)
         }
         .readerSheetPresentation(color: readerThemeBackground)
-        // 目录默认全屏高度：medium 只露几行，定位当前章后仍像「停在顶部」。
-        .presentationDetents([.large, .medium])
+        // 目录固定全屏：带 .medium 时 SwiftUI 默认选最小 detent，每次都要手动上拉。
+        .presentationDetents([.large])
+        .presentationDragIndicator(.hidden)
         .tint(AppTheme.accent)
         .preferredColorScheme(background.isDark ? .dark : .light)
     }
@@ -4877,11 +4923,13 @@ struct ReaderView: View {
         let preferred = windowCurrentChapterIndex
         let fallback = currentDisplayChapterIndex
         guard let target = chapters.first(where: { $0.index == preferred })
-            ?? chapters.first(where: { $0.index == fallback }) else { return }
+            ?? chapters.first(where: { $0.index == fallback })
+            ?? chapters.first(where: { $0.index >= preferred })
+            ?? chapters.first else { return }
         let id = target.id
         // sheet 首次 onAppear 时 List 的行还没完成布局，单次 async 会落空，
         // 于是每次打开都停在第一章。多拍重试，行建好后自然命中。
-        for delay in [0.02, 0.12, 0.32, 0.7] {
+        for delay in [0.05, 0.15, 0.35, 0.7] {
             DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
                 proxy.scrollTo(id, anchor: .center)
             }
@@ -5239,6 +5287,46 @@ struct ReaderView: View {
         case .outOfRange:
             return
         }
+    }
+
+    /// 当前页在本章内的 0-based 序号。
+    private var currentChapterPageOrdinal: Int {
+        guard pagedBlocks.indices.contains(pagedPageIndex) else { return 0 }
+        return pagedBlocks[pagedPageIndex].pageOrdinal
+    }
+
+    /// 当前章总页数，用于分页模式滑条上限。
+    private var currentChapterPageTotalForSlider: Int {
+        guard pagedBlocks.indices.contains(pagedPageIndex) else { return max(pagedBlocks.count, 1) }
+        let block = pagedBlocks[pagedPageIndex]
+        return max(chapterPageTotal(for: block.chapterIndex, fallback: block.pageOrdinal + 1), 1)
+    }
+
+    /// 分页模式底栏文案：本章第几页 / 共几页。
+    private var pageSliderLabel: String {
+        let total = currentChapterPageTotalForSlider
+        return "第 \(min(currentChapterPageOrdinal + 1, total)) / \(total) 页"
+    }
+
+    /// 分页模式跳页：只在当前章节内移动，不触发章节重排。
+    private func seekPagedPage(ordinal: Int) {
+        guard pagedBlocks.indices.contains(pagedPageIndex) else { return }
+        let block = pagedBlocks[pagedPageIndex]
+        let upper = max(currentChapterPageTotalForSlider - 1, 0)
+        let target = min(max(ordinal, 0), upper)
+        guard target != block.pageOrdinal else { return }
+        guard let index = pagedBlocks.firstIndex(where: {
+            $0.chapterIndex == block.chapterIndex
+                && $0.pageOrdinal == target
+                && !$0.isPlaceholder
+        }) else { return }
+        var transaction = Transaction()
+        transaction.disablesAnimations = true
+        withTransaction(transaction) {
+            pagedPageIndex = index
+        }
+        reportCoverVisibleIdentity(index)
+        updatePagedVisibleParagraph(pageIndex: index)
     }
 
     /// 拖动进度条时的落点文案；不拖动时返回当前章（配合 opacity 隐藏）。
@@ -6118,7 +6206,7 @@ struct ReaderView: View {
             contentWidth: geometry.contentWidth,
             // Tiny buffer for sub-pixel differences between TextKit line boxes
             // and the SwiftUI text renderer.
-            contentHeight: max(geometry.contentHeight - 4, 240)
+            contentHeight: max(geometry.contentHeight - 1, 120)
         )
         var titleTypography = typography
         titleTypography.lineSpacing = 0

@@ -143,9 +143,16 @@ struct ReaderPageGeometry: Equatable {
     }
 
     /// 正文结束 y。页脚上方留 4pt，竞品正文底 819 / 页码顶 821 的 2pt 间距。
+    ///
+    /// 「内容延伸至页眉页脚区域」只允许正文吃进页眉留白，不允许吃进页脚：
+    /// 页脚是浮层，正文从它下面穿过去会看到半截字被页码压住。所以无论哪种
+    /// 模式，正文底都不越过 footerTop - bodyToFooterGap。
     var bodyBottom: CGFloat {
-        if contentExtendsIntoChrome { return viewportSize.height - 10 }
-        return max(footerTop - ReaderPageChrome.bodyToFooterGap, bodyTop + 1)
+        let footerGuard = footerTop - ReaderPageChrome.bodyToFooterGap
+        if contentExtendsIntoChrome {
+            return min(max(viewportSize.height - 10, bodyTop + 1), max(footerGuard, bodyTop + 1))
+        }
+        return max(footerGuard, bodyTop + 1)
     }
 
     var contentHeight: CGFloat {
@@ -176,15 +183,22 @@ struct ReaderPageContainerMetrics: Equatable {
         size.width > 1 && size.height > 1 && rootViewportHeight > 1
     }
 
-    /// 页面原点在屏幕顶部：安全区由页面自己补；原点已在安全区下方：页面内部不再补。
+    /// 页面容器被安全区内缩多少，根安全区就相应减少多少。
+    ///
+    /// 旧实现是二值判断（`globalMinY <= 1` 才给整份 rootSafeTop），容器只要
+    /// 下移 1pt 就把安全区整个丢掉，页眉直接顶到状态栏、正文再往上跑一截；
+    /// 反过来容器只是被 inset 了一部分时又补满整份安全区，正文被推下去，
+    /// 页尾就压进页脚。改成连续差值：容器吃掉多少就扣多少。
     var resolvedSafeTop: CGFloat {
         guard isValid else { return rootSafeTop }
-        return globalMinY <= 1 ? rootSafeTop : 0
+        let consumed = max(globalMinY, 0)
+        return max(rootSafeTop - consumed, 0)
     }
 
     var resolvedSafeBottom: CGFloat {
         guard isValid else { return rootSafeBottom }
-        return globalMinY + size.height >= rootViewportHeight - 1 ? rootSafeBottom : 0
+        let consumed = max(rootViewportHeight - (globalMinY + size.height), 0)
+        return max(rootSafeBottom - consumed, 0)
     }
 
     func geometry(
