@@ -70,7 +70,7 @@ final class ExploreViewModel: ObservableObject {
 
     func selectSource(_ source: BookSource) {
         selectedSource = source
-        categories = ExploreCategoryParser.parse(exploreUrl: source.exploreUrl)
+        categories = ExploreCategoryParser.parse(exploreUrl: source.exploreUrl, source: source)
         selectedGroup = groups.first
         if let first = filteredCategories.first ?? categories.first {
             selectCategory(first)

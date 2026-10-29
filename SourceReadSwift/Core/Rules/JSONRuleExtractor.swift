@@ -2499,10 +2499,19 @@ struct JSONRuleExtractor {
     /// True when a Legado JS rule feeds `result` into `JSON.parse`, meaning the
     /// author relies on Rhino's `JSONObject.toString()` producing JSON text.
     private func scriptExpectsJSONText(_ script: String) -> Bool {
-        script.range(
+        // Direct: `JSON.parse(result)` / `JSON.parse(String(result))`.
+        if script.range(
             of: #"JSON\.parse\s*\(\s*(String\s*\(\s*)?result"#,
             options: .regularExpression
-        ) != nil
+        ) != nil {
+            return true
+        }
+        // Indirect: 木里/日落 style `var raw = String(result || ''); … JSON.parse(raw)`.
+        // Rhino hands these rules the response-body string, while JSCore would
+        // otherwise bridge the parsed dictionary and `String(result)` would
+        // yield "[object Object]" -> `JSON Parse error: Unexpected identifier "object"`.
+        let indirect = #"(?:var|let|const)\s+([A-Za-z_$][\w$]*)\s*=\s*String\s*\(\s*result\b[^;]{0,160};[\s\S]{0,6000}?JSON\.parse\s*\(\s*\1\b"#
+        return script.range(of: indirect, options: .regularExpression) != nil
     }
 
     /// JSON text for the object a rule is currently evaluating, matching the

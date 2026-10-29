@@ -78,4 +78,19 @@ final class ExploreCategoryParserTests: XCTestCase {
         XCTAssertTrue(ExploreCategoryParser.parse(exploreUrl: "   ").isEmpty)
         XCTAssertTrue(ExploreCategoryParser.parse(exploreUrl: "// comment only").isEmpty)
     }
+
+    /// 36 of the packaged sources build their 发现 menu with `@js:`.  The
+    /// evaluated array must feed the same parser as a static JSON array,
+    /// otherwise those sources show an empty 发现 tab.
+    func testJavaScriptExploreUrlProducesCategories() throws {
+        let source = BookSource(
+            bookSourceName: "JS源",
+            bookSourceUrl: "https://example.com",
+            exploreUrl: "@js:var s=[]; s.push({title:'玄幻',url:'/sort/1/{{page}}.html'}); s.push({title:'都市',url:'/sort/2/{{page}}.html'}); s;"
+        )
+        let categories = ExploreCategoryParser.parse(exploreUrl: source.exploreUrl, source: source)
+        XCTAssertEqual(categories.map(\.title), ["玄幻", "都市"])
+        XCTAssertEqual(categories.first?.url, "/sort/1/{{page}}.html")
+    }
+
 }

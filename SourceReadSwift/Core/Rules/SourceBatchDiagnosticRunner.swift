@@ -261,7 +261,7 @@ struct SourceBatchDiagnosticRunner: Sendable {
         startedAt: Date,
         timeout: TimeInterval
     ) async -> SourceDiagnosticReport {
-        let categories = ExploreCategoryParser.parse(exploreUrl: source.exploreUrl)
+        let categories = ExploreCategoryParser.parse(exploreUrl: source.exploreUrl, source: source)
         guard let category = categories.first else {
             return SourceDiagnosticReport(
                 sourceName: source.bookSourceName,

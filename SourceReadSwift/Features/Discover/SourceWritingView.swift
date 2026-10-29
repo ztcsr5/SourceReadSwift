@@ -713,6 +713,7 @@ final class LightweightHTTPServer: ObservableObject {
             var step: String?
             var bookUrl: String?
             var chapterUrl: String?
+            var exploreUrl: String?
         }
 
         let decoder = JSONDecoder()
@@ -737,13 +738,47 @@ final class LightweightHTTPServer: ObservableObject {
             let totalStart = CFAbsoluteTimeGetCurrent()
 
             var searchResult: [SearchBook]? = nil
+            var exploreResult: [SearchBook]? = nil
             var detailResult: BookDetail? = nil
             var chapterListResult: [BookChapter]? = nil
             var contentResult: ChapterContent? = nil
             var errorMessage: String? = nil
 
+            // 0. Explore step (发现页): doubles as the only probe for sources
+            // that ship no searchUrl, matching Legado's explore-only sources.
+            let searchURLText = (source.searchUrl ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+            let exploreURLText = (payload.exploreUrl ?? source.exploreUrl ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+            let exploreOnly = searchURLText.isEmpty && !exploreURLText.isEmpty
+            if step == "explore" || (step == "all" && exploreOnly) {
+                let categories = ExploreCategoryParser.parse(exploreUrl: exploreURLText, source: source)
+                if let first = categories.first {
+                    logStep("🧭 发起发现页测试: '\(first.title)' -> \(first.url)...")
+                    let eStart = CFAbsoluteTimeGetCurrent()
+                    let eRes = await engine.exploreBooks(source: source, url: first.url, page: 1)
+                    let eDuration = Int((CFAbsoluteTimeGetCurrent() - eStart) * 1000)
+                    switch eRes {
+                    case .success(let books):
+                        exploreResult = books
+                        logStep("✅ 发现页解析成功 (耗时 \(eDuration)ms)，返回 \(books.count) 条")
+                        if books.isEmpty {
+                            if step == "explore" { errorMessage = "发现页返回 0 条" }
+                        } else if searchResult == nil {
+                            searchResult = books
+                        }
+                    case .failure(let error):
+                        errorMessage = "发现页失败: \(error.localizedDescription)"
+                        logStep("❌ 发现页解析失败 (耗时 \(eDuration)ms): \(error.localizedDescription)")
+                    }
+                } else if step == "explore" {
+                    errorMessage = "发现页分类为空（exploreUrl 无法解析出分类）"
+                    logStep("❌ exploreUrl 无法解析出分类（\(exploreURLText.count) 字符）")
+                } else {
+                    logStep("⚠️ exploreUrl 存在但解析不出分类，跳过发现页")
+                }
+            }
+
             // 1. Search step
-            if step == "search" || step == "all" {
+            if (step == "search" || step == "all") && !(step == "all" && exploreOnly) {
                 logStep("🔍 发起搜索测试: keyword='\(keyword)', URL='\(source.searchUrl ?? "空")'...")
                 let sStart = CFAbsoluteTimeGetCurrent()
                 let sRes = await engine.searchBooks(source: source, keyword: keyword, page: 1)
@@ -863,6 +898,7 @@ final class LightweightHTTPServer: ObservableObject {
                 var durationMs: Int
                 var logs: [String]
                 var search: [SearchBook]?
+                var explore: [SearchBook]?
                 var detail: BookDetail?
                 var toc: [BookChapter]?
                 var content: ChapterContent?
@@ -875,6 +911,7 @@ final class LightweightHTTPServer: ObservableObject {
                 durationMs: totalDuration,
                 logs: logs,
                 search: searchResult,
+                explore: exploreResult,
                 detail: detailResult,
                 toc: chapterListResult.map { Array($0.prefix(30)) },
                 content: contentResult,

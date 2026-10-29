@@ -32,12 +32,64 @@ enum ExploreCategoryParser {
         return parseTextFormat(raw)
     }
 
+    /// Legado lets `exploreUrl` be a JavaScript rule that returns the category
+    /// array (`@js:` / `<js>`).  Evaluate it with the source's own jsLib so
+    /// helpers such as `push()` / `sec()` resolve, then feed the runtime's JSON
+    /// string through the same parser as a static array.
+    static func parse(exploreUrl: String?, source: BookSource?) -> [ExploreCategory] {
+        let direct = parse(exploreUrl: exploreUrl)
+        if !direct.isEmpty { return direct }
+        guard let raw = exploreUrl?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !raw.isEmpty,
+              let source,
+              raw.hasPrefix("@js:") || raw.hasPrefix("<js>") else {
+            return direct
+        }
+        return evaluateJSCategories(raw, source: source)
+    }
+
+    private static func evaluateJSCategories(_ raw: String, source: BookSource) -> [ExploreCategory] {
+        var script = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        if script.hasPrefix("@js:") {
+            script = String(script.dropFirst(4))
+        } else if script.hasPrefix("<js>") {
+            script = String(script.dropFirst(4))
+            if let end = script.range(of: "</js>") {
+                script = String(script[..<end.lowerBound])
+            }
+        }
+        script = script.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !script.isEmpty else { return [] }
+
+        let context = RuleExecutionContext(source: source, stage: "explore.categories")
+        defer { context.cleanUp() }
+        let runtime = context.jsRuntime(ajaxHandler: { urlText in
+            SynchronousSourceLoader().load(urlText: urlText, source: source)
+        })
+        let variables: [String: Any] = [
+            "source": source,
+            "baseUrl": source.bookSourceUrl,
+            "result": "",
+            "key": "",
+            "page": 1
+        ]
+        guard case .success(let text) = runtime.evaluate(script, variables: variables),
+              let data = text.data(using: .utf8),
+              let json = try? JSONSerialization.jsonObject(with: data, options: [.fragmentsAllowed]) else {
+            return []
+        }
+        return categories(fromJSON: json)
+    }
+
     private static func parseJSON(_ jsonString: String) -> [ExploreCategory]? {
         guard let data = jsonString.data(using: .utf8),
-              let json = try? JSONSerialization.jsonObject(with: data) else {
+              let json = try? JSONSerialization.jsonObject(with: data, options: [.fragmentsAllowed]) else {
             return nil
         }
+        return categories(fromJSON: json)
+    }
 
+    private static func categories(fromJSON json: Any) -> [ExploreCategory] {
         var result: [ExploreCategory] = []
         var currentGroup: String? = nil
 

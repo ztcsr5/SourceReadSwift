@@ -983,4 +983,32 @@ final class JSONRuleExtractorTests: XCTestCase {
         let result = extractor.string(from: item, rule: rule, fallbackKeys: [])
         XCTAssertEqual(result, "{\"id\":1784900,\"teeny_mode\":0}")
     }
+
+    /// 木里/日落 evaluate `var raw = String(result || ''); … JSON.parse(raw)`.
+    /// Rhino gives the rule the response-body string; JSCore must do the same
+    /// instead of stringifying a bridged dictionary as "[object Object]".
+    func testIndirectJSONParseOfResultReceivesJSONText() throws {
+        let body: [String: Any] = [
+            "data": [
+                "catalog_data": [
+                    ["name": "第一章 初入", "cid": "1001"],
+                    ["name": "第二章 风起", "cid": "1002"]
+                ]
+            ]
+        ]
+        let rule = """
+        <js>
+        var tocRaw = String(result || '');
+        var root = JSON.parse(tocRaw);
+        var data = root.data || {};
+        var chapters = data.catalog_data || [];
+        chapters;
+        </js>
+        """
+        let extractor = JSONRuleExtractor()
+        let rows = extractor.list(from: body, rule: rule)
+        XCTAssertEqual(rows.count, 2)
+        XCTAssertEqual(rows.first?["name"] as? String, "第一章 初入")
+    }
+
 }
