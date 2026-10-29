@@ -591,7 +591,8 @@ enum ReaderTapAction: String, CaseIterable, Identifiable, Sendable {
 }
 
 enum ReaderPreloadPolicy {
-    static let defaultCount = 2
+    // Five chapters on each side matches the continuous-read contract.
+    static let defaultCount = 5
     static let minimumCount = 0
     static let maximumCount = 5
 

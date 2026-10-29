@@ -8,6 +8,44 @@ final class ReaderChapterWindowPolicyTests: XCTestCase {
         XCTAssertEqual(ReaderChapterWindowPolicy.radius(forPreloadCount: 99), ReaderPreloadPolicy.maximumCount)
     }
 
+    func testPreloadPolicyDefaultsToFiveChaptersOnEachSide() {
+        XCTAssertEqual(ReaderPreloadPolicy.defaultCount, 5)
+        XCTAssertEqual(ReaderPreloadPolicy.maximumCount, 5)
+        XCTAssertEqual(
+            ReaderChapterWindowPolicy.radius(forPreloadCount: ReaderPreloadPolicy.defaultCount),
+            5
+        )
+        XCTAssertEqual(ReaderPreloadPolicy.clamp(9), 5)
+    }
+
+    func testLocalBookWindowSeedsFiveChaptersOnEachSide() {
+        XCTAssertEqual(
+            ReaderChapterWindowPolicy.indices(around: 10, radius: 5, lowerBound: 0, upperBound: 100),
+            Array(5...15)
+        )
+        XCTAssertEqual(
+            ReaderChapterWindowPolicy.indices(around: 0, radius: 5, lowerBound: 0, upperBound: 100),
+            Array(0...5)
+        )
+        XCTAssertEqual(
+            ReaderChapterWindowPolicy.indices(around: 99, radius: 5, lowerBound: 0, upperBound: 100),
+            Array(94...99)
+        )
+    }
+
+    func testPrefetchOrderAtRadiusFiveIsNearestFirst() {
+        XCTAssertEqual(
+            ReaderChapterWindowPolicy.prefetchOrder(
+                current: 5,
+                radius: 5,
+                lowerBound: 0,
+                upperBound: 11,
+                loaded: []
+            ),
+            [6, 4, 7, 3, 8, 2, 9, 1, 10, 0]
+        )
+    }
+
     func testWindowIndicesClampAtBookEdges() {
         XCTAssertEqual(
             ReaderChapterWindowPolicy.indices(around: 0, radius: 2, lowerBound: 0, upperBound: 10),
