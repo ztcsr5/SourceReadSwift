@@ -843,4 +843,18 @@ final class JSCoreRuntimeTests: XCTestCase {
             XCTFail("for-in probe failed: \(error.localizedDescription)")
         }
     }
+
+    /// UAA's jsLib declares `getApiUrl(path, data, _)`; the undefined `_`
+    /// parameter shadows the global alias and `_.java.androidId()` used to
+    /// throw before the search URL was built.
+    func testUnderscoreJavaAliasSurvivesShadowedParameter() throws {
+        let result = JSCoreRuntime().evaluate("(function(_){ return _.java.md5Encode('abc'); })()")
+        switch result {
+        case .success(let value):
+            XCTAssertEqual(value, "900150983cd24fb0d6963f7d28e17f72")
+        case .failure(let error):
+            XCTFail("evaluate failed: \(error)")
+        }
+    }
+
 }

@@ -150,11 +150,24 @@ final class JSCoreRuntime {
         let normalized = LegadoJavaScriptCompatibility.normalizeJavaScriptLibrary(library)
         guard !normalized.isEmpty, !loadedJsLibraries.contains(normalized) else { return }
         loadedJsLibraries.insert(normalized)
-        let result = context.evaluateScript(normalized)
+        let result = context.evaluateScript(Self.bindingUnderscoreJavaToBridge(normalized))
         if result == nil, let exception = context.exception {
             executionContext.recordJavaScriptError("jsLib: " + (exception.toString() ?? "unknown"))
             context.exception = nil
         }
+    }
+
+    /// Rewrites `_.java` to the `java` bridge.  Legado exposes `_` as the
+    /// global context object, but jsLib helpers commonly reuse `_` as a
+    /// parameter name (UAA), which shadows the global for the rest of that
+    /// function and makes `_.java.ajax(...)` throw before the request runs.
+    static func bindingUnderscoreJavaToBridge(_ script: String) -> String {
+        guard script.contains("_.java") else { return script }
+        return script.replacingOccurrences(
+            of: #"(?<![\w$.])_\.java\b"#,
+            with: "java",
+            options: .regularExpression
+        )
     }
 
     func evaluate(_ script: String, variables: [String: Any] = [:]) -> Result<String, SourceEngineError> {
@@ -186,7 +199,12 @@ final class JSCoreRuntime {
         // toc request 404s).  Bridge objects stay JS globals only.
         executionContext.bind(effectiveVariables.filter { Self.isRuleStoreValue($0.value) })
         let normalization = LegadoJavaScriptCompatibility.normalizeRule(script)
-        let executableScript = normalization.normalizedScript
+        // Legado's global `_` exposes the `java` bridge (`_.java.ajax(...)`).
+        // A jsLib helper parameter named `_` shadows that global, so UAA's
+        // `getApiUrl(path, data)` threw "undefined is not an object (evaluating
+        // '_.java')" before any request was built.  Both names refer to the
+        // same bridge in Legado, so bind the access to `java` textually.
+        let executableScript = Self.bindingUnderscoreJavaToBridge(normalization.normalizedScript)
         context.exception = nil
         let baseStr = (effectiveVariables["baseUrl"] as? String) ?? ""
         for (key, value) in effectiveVariables {
