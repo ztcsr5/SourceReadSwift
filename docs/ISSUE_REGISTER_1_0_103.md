@@ -3,7 +3,7 @@
 - 版本：1.0.103 / Build 104
 - 分支：`codex/reader-feedback-fixes`（推送分支 `codex/swift-v2-lifetime-reader`）
 - 真机基线：1.0.98/99；LAN `192.168.31.205:8080` 当前未监听（TCP 拒绝），1.0.106 复测未跑
-- 当前安装包：1.0.106（2026-10-29 18:16，SHA256 `35a8a31b…`）；问题编号沿用 1.0.103
+- 当前安装包：1.0.106 基线（2026-10-29 18:16，SHA256 `35a8a31b…`）；`e41b5164d` 新包待装（iOS `40864237402` / IPA `40864237393`，1344 tests 0 failures）；问题编号沿用 1.0.103
 - 状态图例：
   - `OPEN`：未修或仍能复现
   - `PARTIAL`：部分路径已改，边界仍存在
@@ -16,9 +16,9 @@
 
 | ID | 问题 | 状态 | 证据/根因 | 下一步 |
 |---|---|---|---|---|
-| R01 | 覆盖/平移/仿真三种翻页掉帧，明显不到 120Hz | PARTIAL | 1.0.83 覆盖改 `UIScrollView`；1.0.84 平移并入；仿真仍是系统 `UIPageViewController(.pageCurl)`，按 60Hz 设计；滑动是 WKWebView | 真机 `CADisplayLink` 采样；平移加页面池/预热；仿真接受 60Hz 或改自绘；滑动评估 TextKit |
+| R01 | 覆盖/平移/仿真三种翻页掉帧，明显不到 120Hz | FIXED? | `e41b5164d`：`CoverPageReaderView` 三槽稳定 identity，翻页改为**移动已有** `UIHostingController`（不再重建 rootView），仅排版 revision 全量重建，identity 变化清 `CATransform3D`；此前每次翻页重建 3 个 host 是卡顿主因 | 真机 `CADisplayLink` 采样对比 1.0.106；仿真仍是系统 `.pageCurl`（60Hz 设计），若要 120Hz 需自绘 |
 | R02 | 翻页跳回前面的章节（第 5 章跳到第 2 章） | FIXED? | 1.0.66 用 `ReaderPageIdentity` 替代数组下标；1.0.81/83 提交后用锚点复算；`ReaderPageSelectionTests` 9 例 | 用用户视频场景回归：预取插章、覆盖 320ms 延迟、章界连续翻 |
-| R03 | 不能无限前后跨章滑，读完一章要手动点下一章；预缓存不足 | PARTIAL | 现为五章窗口 + 预取；用户要求“读过等于缓存前后几章” | 检查窗口边界与预取触发；前后各扩 2 章；章界自动续页；记录缓存命中率 |
+| R03 | 不能无限前后跨章滑，读完一章要手动点下一章；预缓存不足 | FIXED? | `e41b5164d`：`BookDetailView.load(force:)` 保留 `content`，4 处回调删 `content = nil`，书级稳定 `.id("reader-\(bookID ?? sourceUrl)")`；`BookshelfReaderGatewayView` 去掉 `localNavigationRevision`；预取循环每章 `Task.yield()`。翻章不再整屏重建/整页 loading | 真机回归“读完一章继续往下翻”；跨章 5 章窗口边界复测；prefetch 命中率仍待采样 |
 | R04 | 章节标题重复/缺失；标题字号与正文一样；有的源不显示标题 | PARTIAL | 1.0.65 已加 `ChapterTextSanitizer` + `titleFontSize`；1.0.103 UI 队列仍列“标题重复” | 抽 76 源逐源看标题节点；标题只渲染一次；无标题时用章节名；iOS16 单独验 |
 | R05 | iOS16 双引号导致正文不对齐，最后一个字不齐；iOS17+ 正常 | FIXED? | `17c9285`：`ReaderCJKPunctuationCompression` + TextKit/WebView 末端标点压缩；`ReaderPageTextBuilderTests.swift:111` 回归用例；该提交在 `cc9b4297` 祖先链内，iOS run `40855813316` 测试通过 | 真机 iOS16 对比长段落末尾引号；若仍不齐，量 `lineFragmentPadding`/`paragraphStyle`；iOS17 回归 |
 | R06 | 顶部空白太多；状态栏位置不佳 | PARTIAL | 1.0.59 已加 `.ignoresSafeArea()` 并收紧 `pageTopInset`；1.0.65 继续修 inset；用户仍反馈 | iOS16 真机量 `safeTop`、`pageTopInset`、`contentInset`；四种模式统一 |
@@ -28,6 +28,7 @@
 | R10 | 阅读菜单太宽、留白多、不透明，与顶部菜单不一致 | FIXED? | `3e70e4d03`：`ReaderSettingsLayoutPolicy.maxPanelWidth` 统一 16pt gutter（390→358、844/1024→560、24→0）；面板底色 0.97 主题色 + 18pt 圆角 + 0.6pt 边线 + 阴影；`ReaderAutomationPolicyTests.swift:67` 宽度用例 | 真机竖屏/横屏/iPad 看宽度与留白；CI 编译测试已过 |
 | R11 | 滑动模式状态栏透明，正文透出挡住 | FIXED? | `3e70e4d03`：新增 `ReaderScrollChromePolicy.statusScrimHeight`（safeTop+header+10），滚动模式顶部 0.97 实色遮罩 + 10pt 渐变；`ReaderView.swift:2800`；测试覆盖 69/93/30 | 真机滚动模式看时钟/刘海区；开/关顶部章节栏各一版 |
 | R12 | 底部菜单按钮太多，朗读/自动翻页占位 | FIXED? | 1.0.65 已把朗读/自动翻页移入右上 `ellipsis`；底部只留目录/设置/上一章/下一章/进度 | 真机确认底部五项；右上菜单分组；不再新增底栏按钮 |
+| R13 | 目录里选一章后继续往下翻，进不了下一章（章节衔接断裂） | FIXED? | `e41b5164d`：新增 `ReaderChapterJumpDisposition`（activate / loadIntoWindow / outOfRange）+ `ReaderPendingChapterJump`；TOC/书签/进度条跳章改走 `beginWindowJump` + `loadIntoWindow`，不再回调 owner 重建；`resumePendingContinuation` 先 resume 再 trim；`ReaderChapterWindowPolicyTests` 4 例（未加载章留在窗口、已加载章 activate、越界拒绝、pending 默认值） | 真机按用户路径复现：目录选章 → 往下翻 → 应自然进入下一章；iOS16 单独验；CI 已过 1344 tests |
 
 ## 二、P1 · 阅读交互与设置
 
