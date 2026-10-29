@@ -857,4 +857,21 @@ final class JSCoreRuntimeTests: XCTestCase {
         }
     }
 
+
+    /// 百度小说 TOC: `java.getElements('$..items.*')` must return JSON nodes
+    /// (so `.cid` is readable), not JSON strings.
+    func testGetElementsReturnsJSONPathNodes() throws {
+        let body = "{\"data\":{\"items\":[{\"cid\":\"a|1\"},{\"cid\":\"b|2\"}]}}"
+        let result = JSCoreRuntime().evaluate(
+            "var els = java.getElements('$..items.*'); els.length + ':' + els[0].cid",
+            variables: ["html": body, "result": body]
+        )
+        switch result {
+        case .success(let value):
+            XCTAssertEqual(value, "2:a|1")
+        case .failure(let error):
+            XCTFail("evaluate failed: \(error)")
+        }
+    }
+
 }

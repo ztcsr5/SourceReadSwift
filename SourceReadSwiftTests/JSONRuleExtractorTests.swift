@@ -1011,4 +1011,15 @@ final class JSONRuleExtractorTests: XCTestCase {
         XCTAssertEqual(rows.first?["name"] as? String, "第一章 初入")
     }
 
+
+    /// 连尚/百度 chain `<js>…</js>$[*]`: the selector after a JS segment must
+    /// parse the JS string as JSON before applying the path.
+    func testJSONPathAfterJSSegmentParsesJSONText() throws {
+        let object: [String: Any] = ["unused": true]
+        let rule = #"<js>JSON.stringify({items:[{name:"第1章"},{name:"第2章"}]})</js>$.items[*]"#
+        let rows = JSONRuleExtractor().list(from: object, rule: rule)
+        XCTAssertEqual(rows.count, 2)
+        XCTAssertEqual(rows.first?["name"] as? String, "第1章")
+    }
+
 }

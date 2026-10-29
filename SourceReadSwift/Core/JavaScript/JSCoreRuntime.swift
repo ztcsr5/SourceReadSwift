@@ -1903,6 +1903,18 @@ final class JSCoreRuntime {
           var pageHtml = useDefaultHtml ? __defaultHtml() : String(input);
           var actualRule = useDefaultHtml ? String(input) : String(rule);
           if (useDefaultHtml) {
+            // Legado's getElements is also the JSON helper (百度小说 calls
+            // java.getElements('$..items.*') and then reads .cid off each
+            // node).  The native bridge is Jsoup-only, so a JSONPath must be
+            // answered with real objects; stringifying them made every
+            // follow-up property read undefined and the TOC came back empty.
+            var jsonRule = actualRule.replace(/^\\s*@json:/i, '');
+            if (/^\\s*(\\$|\\[)/.test(jsonRule)) {
+              try {
+                var jsonValues = __jsonRuleValues(pageHtml, jsonRule);
+                if (jsonValues && jsonValues.length) return __asJavaList(jsonValues);
+              } catch (_jsonError) {}
+            }
             __nativeRule.setContent(pageHtml);
             var nativeElements = __nativeRule.getElements(actualRule);
             return (typeof __wrapJsoupElements === 'function')

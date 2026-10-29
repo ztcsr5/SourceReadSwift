@@ -250,7 +250,16 @@ struct JSONRuleExtractor {
             case .normal(let text):
                 let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
                 guard !trimmed.isEmpty else { continue }
-                guard let next = evaluateNormalSegment(trimmed, object: current, variables: variables) else {
+                // Legado chains a JSONPath after a JS segment (`<js>…</js>$[*]`,
+                // 连尚/百度 TOC rules).  The JS evaluates to a JSON string, so
+                // the selector has to see the parsed document, not the text.
+                var segmentObject = current
+                if trimmed.hasPrefix("$"), let text = current as? String,
+                   let data = text.data(using: .utf8),
+                   let parsed = try? JSONSerialization.jsonObject(with: data, options: [.fragmentsAllowed]) {
+                    segmentObject = parsed
+                }
+                guard let next = evaluateNormalSegment(trimmed, object: segmentObject, variables: variables) else {
                     return nil
                 }
                 current = next
