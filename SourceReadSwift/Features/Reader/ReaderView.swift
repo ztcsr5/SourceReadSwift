@@ -135,6 +135,15 @@ struct ReaderView: View {
     /// chapter-local blocks and renumber them when assembling the window.
     @State private var chapterPageCache: [Int: ReaderChapterPageCacheEntry] = [:]
     @State private var chapterPageCacheSignature = ""
+    /// The measured page container lands one frame after `onAppear`; until it
+    /// stops moving, chapters outside the cursor's neighbours stay cheap
+    /// placeholders instead of being measured twice (fallback viewport first,
+    /// real container second). That double pass was the pause on
+    /// "正在加载下一章" for chapters the local book already had in memory.
+    @State private var chapterGeometrySettled = false
+    @State private var geometrySettleTask: Task<Void, Never>?
+    @State private var paginationWarmupRestartTask: Task<Void, Never>?
+    @State private var paginationWarmupPending = false
     @State private var chapterPageCounts: [Int: Int] = [:]
     /// Increments whenever a window mutation moves the visible paragraph in
     /// the flat index space (a chapter was inserted or trimmed above the
@@ -456,8 +465,12 @@ struct ReaderView: View {
     }
 
     /// 本地导入的书（localChapters 在书架模型里），章节读取不经过书源。
+    /// `localChapters` 是后加的可选字段，旧书架可能解码成 nil；本地导入的
+    /// 身份标记还在，不能让整条本地快路径（宽窗口 + 同步 seed）因此失效。
     private var isLocalChapterBook: Bool {
-        appState.bookshelfStore.book(id: bookID)?.localChapters?.isEmpty == false
+        guard let book = appState.bookshelfStore.book(id: bookID) else { return false }
+        if book.localChapters?.isEmpty == false { return true }
+        return book.sourceURL.hasPrefix("local://") && book.localContent?.isEmpty == false
     }
 
     private var windowSlices: [ReaderChapterSlice] {
@@ -573,6 +586,33 @@ struct ReaderView: View {
         guard pagedPageContainerMetrics != snapped else { return }
         pagedPageContainerMetrics = snapped
         schedulePagedBlocksCacheRebuild()
+        scheduleGeometrySettle()
+    }
+
+    /// Holds the pagination warmup until the page container stops reporting new
+    /// bounds. `pagedPageGeometry` feeds the chapter signature, so measuring a
+    /// chapter against the fallback viewport and then again against the real
+    /// one throws the first result away — the reason a freshly opened local
+    /// book paused on "正在加载下一章" for chapters it already had in memory.
+    private func scheduleGeometrySettle() {
+        guard !chapterGeometrySettled else { return }
+        geometrySettleTask?.cancel()
+        geometrySettleTask = Task { @MainActor in
+            try? await Task.sleep(nanoseconds: 320_000_000)
+            guard !Task.isCancelled else { return }
+            geometrySettleTask = nil
+            chapterGeometrySettled = true
+            // Far chapters were placeholders while the container settled.
+            // Rebuild once so the page model and the position mapping agree,
+            // then fill the rest of the window off the page-turn path.
+            schedulePagedBlocksCacheRebuild()
+            // Clear the pending flag for network books too: they never start a
+            // warmup, and a stuck flag kept their placeholder radius at "the
+            // warmup will fill this" forever.
+            paginationWarmupPending = false
+            guard readerMode != .scroll, isLocalChapterBook else { return }
+            warmPaginationCache(around: windowCurrentChapterIndex)
+        }
     }
 
     private var pageContainerLayoutHandler: (CGSize, CGFloat) -> Void {
@@ -660,13 +700,11 @@ struct ReaderView: View {
         ].joined(separator: "|")
     }
 
-    /// Signature for chapter-local pagination. Unlike `readerLayoutKey` it
-    /// ignores the reading mode: page-turn, cover and page-curl share one page
-    /// model, so switching between them must not re-measure every chapter.
-    private var chapterPageLayoutSignature: String {
-        let viewport = pagedLayoutViewportSize
-        let geometry = pagedPageGeometry
-        return [
+    /// Typography half of the chapter pagination signature. A change here makes
+    /// the measured page *content* of every cached chapter stale, so the page
+    /// cache is dropped and the window is measured again from scratch.
+    private var chapterTypographySignature: String {
+        [
             fontFamilyRawValue,
             customFontPostScriptName,
             String(format: "%.1f", fontSize),
@@ -683,13 +721,34 @@ struct ReaderView: View {
             showSystemStatusBar ? "sysbar" : "immersive",
             currentImageStyle.rawValue,
             traditionalChineseEnabled ? "tc" : "sc",
-            bionicReadingEnabled ? "br" : "plain",
+            bionicReadingEnabled ? "br" : "plain"
+        ].joined(separator: "|")
+    }
+
+    /// Container-geometry half of the signature. The measured page container
+    /// arrives one frame after `onAppear` and can wobble for a moment while the
+    /// reader settles, so geometry is tracked separately: a geometry change
+    /// needs new measurements, but it must not wipe the chapters already
+    /// measured for the previous container or restart the warmup from zero.
+    private var chapterViewportSignature: String {
+        let viewport = pagedLayoutViewportSize
+        let geometry = pagedPageGeometry
+        return [
             String(format: "%.1fx%.1f", viewport.width, viewport.height),
             String(format: "%.1f", geometry.safeTop),
             String(format: "%.1f", geometry.safeBottom),
             String(format: "%.1f", geometry.bodyTop),
             String(format: "%.1f", geometry.bodyBottom)
         ].joined(separator: "|")
+    }
+
+    /// Signature for chapter-local pagination. Unlike `readerLayoutKey` it
+    /// ignores the reading mode: page-turn, cover and page-curl share one page
+    /// model, so switching between them must not re-measure every chapter.
+    /// A cached chapter is only reusable for the exact typography *and*
+    /// geometry it was measured with, so the stored key keeps both halves.
+    private var chapterPageLayoutSignature: String {
+        chapterTypographySignature + "||" + chapterViewportSignature
     }
 
     private func chapterPageContentSignature(_ section: ReaderChapterSection) -> String {
@@ -1158,12 +1217,22 @@ struct ReaderView: View {
         .onChange(of: readerPageCacheKey) { _ in
             schedulePagedBlocksCacheRebuild()
         }
-        .onChange(of: chapterPageLayoutSignature) { _ in
-            // Typography, viewport or image style changed: every cached
-            // chapter is stale. Warm the window one chapter per frame instead
-            // of letting the next rebuild measure all of them in one turn.
+        .onChange(of: chapterTypographySignature) { _ in
+            // Typography or content styling changed: every cached chapter is
+            // stale. Drop the cache now and measure the window again one
+            // chapter per frame.
             guard readerMode != .scroll, isLocalChapterBook else { return }
+            chapterPageCache.removeAll()
+            chapterPageCacheSignature = chapterPageLayoutSignature
             warmPaginationCache(around: windowCurrentChapterIndex)
+        }
+        .onChange(of: chapterViewportSignature) { _ in
+            // Geometry only. Cached chapters stay around — they are simply not
+            // reusable for the new container — and the warmup restarts after
+            // the container stops moving instead of being cancelled mid-flight.
+            guard readerMode != .scroll, isLocalChapterBook else { return }
+            schedulePagedBlocksCacheRebuild()
+            schedulePaginationWarmupRestart()
         }
         .onChange(of: readerBrightness) { _ in
             applyReaderBrightness()
@@ -1772,6 +1841,10 @@ struct ReaderView: View {
         paginationWarmupGeneration &+= 1
         paginationWarmupTask?.cancel()
         paginationWarmupTask = nil
+        // The pending flag drives the placeholder radius. Leaving it set after
+        // a cancel collapsed the synchronous radius to "warmup owns the
+        // window" while no warmup was running, so the pages never came back.
+        paginationWarmupPending = false
     }
 
     /// Paginates prefetched chapters one at a time, yielding a frame between
@@ -1780,6 +1853,15 @@ struct ReaderView: View {
     /// ten chapters in the same main-thread turn as the first page.
     private func warmPaginationCache(around current: Int) {
         guard readerMode != .scroll else { return }
+        // The page container is still moving: every measurement would be
+        // thrown away when the real bounds land. The settle task restarts the
+        // warmup with the final geometry.
+        guard chapterGeometrySettled else {
+            paginationWarmupPending = true
+            scheduleGeometrySettle()
+            return
+        }
+        paginationWarmupPending = false
         cancelPaginationWarmup()
         let token = paginationWarmupGeneration
         let generation = windowGeneration
@@ -1826,15 +1908,45 @@ struct ReaderView: View {
                     contentSignature: contentSignature,
                     blocks: pages
                 )
-                schedulePagedBlocksCacheRebuild()
-                // One chapter is hundreds of TextKit measurements. Without this
-                // yield the warmup itself becomes the long block it removes.
-                await Task.yield()
+                requestWarmupPageRebuild()
+                // One chapter is hundreds of TextKit measurements. Hand the
+                // main run loop a full frame between chapters: `Task.yield()`
+                // can resume inside the same frame, which let the warmup stack
+                // several chapters of work before the screen updated.
+                try? await Task.sleep(nanoseconds: 8_000_000)
             }
             if windowGeneration == generation, token == paginationWarmupGeneration {
                 paginationWarmupTask = nil
                 schedulePagedBlocksCacheRebuild()
             }
+        }
+    }
+
+    /// Warmup writes one chapter at a time. The regular rebuild entry point
+    /// debounces, so calling it after every chapter cancelled the pending
+    /// rebuild each time and the measured pages only replaced their
+    /// placeholders once the whole window finished. Keep the rebuild that is
+    /// already in flight and let the next chapter schedule the following one,
+    /// so the page right after the current chapter becomes readable while the
+    /// rest of the window is still being measured.
+    private func requestWarmupPageRebuild() {
+        guard !interactionGate.isPageInteractionActive else { return }
+        guard pageLayoutTask == nil else { return }
+        schedulePagedBlocksCacheRebuild()
+    }
+
+    /// Geometry changes arrive in bursts (first layout, safe-area adoption,
+    /// rotation). Restart the warmup only after the burst ends: cancelling and
+    /// re-measuring on every intermediate value wasted more work than the
+    /// settle window it was protecting.
+    private func schedulePaginationWarmupRestart(delayNanoseconds: UInt64 = 260_000_000) {
+        guard readerMode != .scroll, isLocalChapterBook, chapterGeometrySettled else { return }
+        paginationWarmupRestartTask?.cancel()
+        paginationWarmupRestartTask = Task { @MainActor in
+            try? await Task.sleep(nanoseconds: delayNanoseconds)
+            guard !Task.isCancelled else { return }
+            paginationWarmupRestartTask = nil
+            warmPaginationCache(around: windowCurrentChapterIndex)
         }
     }
 
@@ -5812,11 +5924,12 @@ struct ReaderView: View {
         }
         guard !sections.isEmpty else { return [] }
 
-        // Chapter-local pagination cache. A signature change (typography,
-        // viewport, image style) invalidates every chapter at once.
+        // Chapter-local pagination cache. Only a typography change invalidates
+        // the measured page *content*; a geometry change fails the per-entry
+        // signature check by itself, so chapters measured with the previous
+        // container are kept until the pruner evicts them.
         let layoutSignature = chapterPageLayoutSignature
         if chapterPageCacheSignature != layoutSignature {
-            chapterPageCache.removeAll()
             chapterPageCacheSignature = layoutSignature
         }
 
@@ -5880,9 +5993,16 @@ struct ReaderView: View {
             // frame after a local import opens. Only cache-missing chapters
             // become placeholders: replacing an already cached chapter would
             // blank pages that the warmup then skips as a cache hit.
-            if let warmup = paginationWarmupTask, !warmup.isCancelled,
-               abs(section.chapterIndex - windowCurrentChapterIndex) > 1,
-               !cacheIsValid {
+            // While the container is still settling the synchronous radius is
+            // the current chapter plus its two neighbours; anything wider
+            // would be measured against a viewport that is about to change.
+            let warmupIsRunning = paginationWarmupPending
+                || (paginationWarmupTask.map { !$0.isCancelled } ?? false)
+            let synchronousRadius = chapterGeometrySettled ? 2 : 1
+            let geometryIsSettling = isLocalChapterBook && !chapterGeometrySettled
+            if !cacheIsValid,
+               abs(section.chapterIndex - windowCurrentChapterIndex) > synchronousRadius,
+               warmupIsRunning || geometryIsSettling {
                 pages.append(placeholder(
                     chapterIndex: section.chapterIndex,
                     title: section.title,
