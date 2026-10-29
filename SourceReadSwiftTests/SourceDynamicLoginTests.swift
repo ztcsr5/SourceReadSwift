@@ -95,6 +95,6 @@ private actor LoginFixtureNetwork: SourceNetworkClient {
         var headers = ["Content-Type": "application/json"]
         if login { headers["Set-Cookie"] = "session=fixture-session; Path=/" }
         return .success(SourceResponse(url: request.url, statusCode: 200, headers: headers,
-                                       body: login ? #"{"token":"fixture-token"}"# : #"{"data":[{"name":"Fixture book","url":"https://fixture.test/book/1"}]}"#))
+                                       body: login ? #"{"token":"fixture-token"}"# : #"{"data":[{"name":"Fixture book","url":"https://fixture.test/book/1"}]}"#, data: nil))
     }
 }
