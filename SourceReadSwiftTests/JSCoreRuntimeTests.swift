@@ -760,4 +760,43 @@ final class JSCoreRuntimeTests: XCTestCase {
         }
         XCTAssertEqual(value, "3")
     }
+
+    /// `JXNode(doc)` must keep working while `doc` is the wrapped Jsoup node:
+    /// the Swift factory unwraps `__nativeNode` instead of flattening the Proxy.
+    func testJXNodeAcceptsWrappedJsoupDocument() throws {
+        let script = """
+        var d = org.jsoup.Jsoup.parse('<div><a>A</a><a>B</a></div>');
+        var n = new JXNode(d);
+        n.selOne('a').text()
+        """
+        let result = JSCoreRuntime().evaluate(script)
+        guard case .success(let value) = result else {
+            return XCTFail("expected success: \(result)")
+        }
+        XCTAssertEqual(value, "A")
+    }
+
+    func testStringPrototypeSelectSupportsNumericIndexing() throws {
+        let script = """
+        var form = '<form action="/s"><input name="q" value="v"></form>'.select('form')[0];
+        form.attr('action')
+        """
+        let result = JSCoreRuntime().evaluate(script)
+        guard case .success(let value) = result else {
+            return XCTFail("expected success: \(result)")
+        }
+        XCTAssertEqual(value, "/s")
+    }
+
+    func testJavaGetElementsExplicitSelectionSupportsNumericIndexing() throws {
+        let script = """
+        var form = java.getElements('<form action="/g"><input name="q" value="v"></form>', 'form')[0];
+        form.attr('action')
+        """
+        let result = JSCoreRuntime().evaluate(script)
+        guard case .success(let value) = result else {
+            return XCTFail("expected success: \(result)")
+        }
+        XCTAssertEqual(value, "/g")
+    }
 }

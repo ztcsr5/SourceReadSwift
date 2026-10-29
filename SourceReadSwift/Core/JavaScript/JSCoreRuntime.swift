@@ -1861,7 +1861,10 @@ final class JSCoreRuntime {
           var actualRule = useDefaultHtml ? String(input) : String(rule);
           if (useDefaultHtml) {
             __nativeRule.setContent(pageHtml);
-            return __nativeRule.getElements(actualRule);
+            var nativeElements = __nativeRule.getElements(actualRule);
+            return (typeof __wrapJsoupElements === 'function')
+              ? __wrapJsoupElements(nativeElements)
+              : nativeElements;
           }
           // The native bridge is document-scoped; return a Jsoup-like selection
           // proxy for the explicit HTML overload so callers can still chain text,
@@ -4735,7 +4738,7 @@ final class JSCoreRuntime {
           return String(selector || '') + '@' + String(Number(index));
         }
         function __makeJsoupSelection(docState, selector, baseUrlValue, selectionIndex) {
-          return {
+          var selection = {
             select: function(nextSelector) {
               var baseSelector = __selectorWithIndex(selector, selectionIndex);
               if (selectionIndex !== undefined && selectionIndex !== null && !isNaN(Number(selectionIndex))) {
@@ -4794,6 +4797,16 @@ final class JSCoreRuntime {
               return this;
             }
           };
+          if (typeof Proxy === 'undefined') { return selection; }
+          return new Proxy(selection, {
+            get: function(target, prop) {
+              if (prop === 'length') { return target.size(); }
+              if (typeof prop === 'string' && /^(0|[1-9][0-9]*)$/.test(prop)) {
+                return target.get(Number(prop));
+              }
+              return target[prop];
+            }
+          });
         }
         // Rhino exposes Jsoup's `Elements` as a java.util.List: sources index it
         // (`select('form')[0]`) and iterate it (`for (var i in elements)`). The
@@ -4826,11 +4839,17 @@ final class JSCoreRuntime {
           };
           return new Proxy(facade, {
             get: function(target, prop) {
+              if (prop === '__nativeNode') { return nativeElements; }
               if (prop === 'length') { return count; }
               if (typeof prop === 'string' && /^(0|[1-9][0-9]*)$/.test(prop)) { return nativeElements.get(Number(prop)); }
               if (Object.prototype.hasOwnProperty.call(target, prop)) { return target[prop]; }
               var value = nativeElements[prop];
-              return (typeof value === 'function') ? value.bind(nativeElements) : value;
+              if (typeof value === 'function') { return value.bind(nativeElements); }
+              if (value && typeof value === 'object'
+                  && typeof value.get === 'function' && typeof value.select === 'function') {
+                return __wrapJsoupElements(value);
+              }
+              return value;
             },
             has: function(target, prop) {
               if (prop === 'length') { return true; }
@@ -4854,6 +4873,10 @@ final class JSCoreRuntime {
           if (!node || typeof Proxy === 'undefined') { return node; }
           return new Proxy(node, {
             get: function(target, prop) {
+              // Swift bridges (JXNode create, rule context) call JSValue.toObject(),
+              // which cannot recover a JSExport object behind a Proxy. Hand them
+              // the original node instead.
+              if (prop === '__nativeNode') { return target; }
               if (prop === 'select') {
                 return function(nextSelector) { return __wrapJsoupElements(target.select(String(nextSelector))); };
               }
@@ -4866,6 +4889,18 @@ final class JSCoreRuntime {
               return value;
             }
           });
+        }
+        // String.prototype.select is installed by the bootstrap script and used
+        // widely by sources (`html.select('form')[0]`). Re-wrap its result so the
+        // list semantics above apply there as well.
+        if (typeof String.prototype.select === 'function') {
+          var __rawStringSelect = String.prototype.select;
+          String.prototype.select = function(selector) {
+            var selected = __rawStringSelect.call(this, selector);
+            return (selected && typeof selected === 'object')
+              ? __wrapJsoupElements(selected)
+              : selected;
+          };
         }
         // The overload-aware java.getElements implementation is installed above.
         Packages.org.jsoup.Jsoup = {

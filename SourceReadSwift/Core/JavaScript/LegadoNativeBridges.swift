@@ -596,7 +596,15 @@ final class LegadoJXNodeFactoryBridge: NSObject, LegadoJXNodeFactoryExport {
     init(executionContext: RuleExecutionContext?) { self.executionContext = executionContext; super.init() }
 
     func create(_ value: JSValue) -> LegadoJXNodeBridge {
-        let object = value.toObject() ?? NSNull()
+        // A wrapped Jsoup node is a JS Proxy; toObject() would flatten it into a
+        // dictionary and lose the native bridge. Prefer the original object.
+        var payload = value
+        if value.isObject,
+           let native = value.objectForKeyedSubscript("__nativeNode"),
+           !native.isUndefined, !native.isNull {
+            payload = native
+        }
+        let object = payload.toObject() ?? NSNull()
         let base = executionContext?.string(for: "baseUrl") ?? ""
         if let node = object as? LegadoJXNodeBridge { return node }
         if let element = object as? LegadoElementBridge { return LegadoJXNodeBridge(value: element, baseURL: base) }
