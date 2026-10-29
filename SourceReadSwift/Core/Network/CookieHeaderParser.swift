@@ -66,6 +66,50 @@ enum CookieHeaderParser {
         return merged.map { "\($0.name)=\($0.value)" }.joined(separator: "; ")
     }
 
+    /// Foundation only parses RFC 1123 expiry dates.  Several novel sites
+    /// emit `expires=Thu, 29-Oct-2026 17:10:52 GMT`, which Foundation silently
+    /// drops; the cookie is then stored as a session cookie and a 30-second
+    /// search cooldown turns into a permanent block.  Parse the attributes
+    /// ourselves so the expiry survives.
+    static func expiryDate(fromSetCookie value: String) -> Date? {
+        var maxAge: TimeInterval?
+        var expires: Date?
+        for attribute in value.split(separator: ";", omittingEmptySubsequences: true).dropFirst() {
+            let parts = attribute.split(separator: "=", maxSplits: 1, omittingEmptySubsequences: false)
+            guard parts.count == 2 else { continue }
+            let name = parts[0].trimmingCharacters(in: .whitespaces).lowercased()
+            let raw = parts[1].trimmingCharacters(in: .whitespaces)
+            switch name {
+            case "max-age":
+                if let seconds = TimeInterval(raw) { maxAge = seconds }
+            case "expires":
+                expires = parseCookieDate(raw)
+            default:
+                break
+            }
+        }
+        if let maxAge { return Date(timeIntervalSinceNow: maxAge) }
+        return expires
+    }
+
+    private static func parseCookieDate(_ raw: String) -> Date? {
+        let formats = [
+            "EEE, dd MMM yyyy HH:mm:ss zzz",
+            "EEE, dd-MMM-yyyy HH:mm:ss zzz",
+            "dd-MMM-yyyy HH:mm:ss zzz",
+            "EEE, dd-MMM-yy HH:mm:ss zzz",
+            "EEE MMM d HH:mm:ss yyyy"
+        ]
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.timeZone = TimeZone(identifier: "GMT")
+        for format in formats {
+            formatter.dateFormat = format
+            if let date = formatter.date(from: raw) { return date }
+        }
+        return nil
+    }
+
     static func setCookieValues(from headers: [String: String]) -> [String] {
         headers.first { key, _ in key.caseInsensitiveCompare("Set-Cookie") == .orderedSame }
             .map { splitSetCookie($0.value) } ?? []

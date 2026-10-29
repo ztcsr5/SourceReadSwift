@@ -186,6 +186,9 @@ final class URLSessionSourceNetworkClient: SourceNetworkClient, @unchecked Senda
         // HTTP→HTTPS for hosts whose port 80 resets but TLS answers. A single
         // guard stops a dead host from ping-ponging between the two.
         var schemeFallbackUsed = false
+        // One cookie reset per request when the server answers with an
+        // anti-flood guard page instead of content.
+        var cooldownRetryUsed = false
         let maxRedirects = 10
 
         while redirectCount <= maxRedirects {
@@ -348,10 +351,41 @@ final class URLSessionSourceNetworkClient: SourceNetworkClient, @unchecked Senda
                 }
             }
 
+            // Anti-flood guard page: a few dozen bytes of HTML that only
+            // runs `alert("搜索间隔: 30 秒"); history.go(-1)`.  The site keys
+            // it on a 30-second cookie, so replaying that cookie pins every
+            // later request to the guard.  Drop the host's cookies and retry
+            // once; the guard clears itself and search works again.
+            if http.statusCode == 200, data.count < 512, !cooldownRetryUsed {
+                let peekHeaders = http.allHeaderFields.reduce(into: [String: String]()) { result, item in
+                    result[String(describing: item.key)] = String(describing: item.value)
+                }
+                let peekText = ResponseTextDecoder().decode(data: data, headers: peekHeaders, preferredCharset: request.expectedCharset)
+                if Self.looksLikeCooldownPage(peekText) {
+                    cooldownRetryUsed = true
+                    if let host = currentURL.host?.lowercased() {
+                        await cookieStore.clearCookies(for: host)
+                    }
+                    continue
+                }
+            }
+
             return await processResponse(data: data, http: http, request: request)
         }
 
         return .failure(.network("重定向超出最大限制"))
+    }
+
+    /// True for the tiny JS "too many searches" interstitial that Chinese
+    /// novel sites return instead of the result page.
+    static func looksLikeCooldownPage(_ text: String) -> Bool {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard trimmed.count < 400, trimmed.contains("alert(") else { return false }
+        return trimmed.contains("间隔")
+            || trimmed.contains("秒")
+            || trimmed.contains("频繁")
+            || trimmed.contains("太快")
+            || trimmed.lowercased().contains("delay")
     }
 
     private func extractHtmlRedirect(from body: String) -> String? {
