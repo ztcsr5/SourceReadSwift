@@ -986,6 +986,10 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
         if (400...599).contains(response.statusCode) && (text.isEmpty || response.statusCode == 403 || response.statusCode == 503) {
             return true
         }
+        // Anti-bot bootstrap shells (七猫/梧桐 `var arg1=`, `getRenderData`,
+        // cookie+reload) return HTTP 200 with no crawlable markup. The plain
+        // socket cannot execute the script, so the stage must go through WebKit.
+        if Self.looksLikeJavaScriptChallenge(response.body) { return true }
         return text.contains("cloudflare")
             || text.contains("cf-challenge")
             || text.contains("cf-browser-verification")
@@ -997,6 +1001,24 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
             || text.contains("安全验证")
             || text.contains("百度安全验证")
             || text.contains("人机验证")
+    }
+
+    /// Body-only heuristic for pages that are pure anti-bot bootstrap.
+    /// Kept separate from `shouldUseWebViewFallback` so the classifier can be
+    /// unit-tested without a network stack or a `BookSource`.
+    static func looksLikeJavaScriptChallenge(_ body: String) -> Bool {
+        let text = body.lowercased()
+        guard !text.isEmpty else { return false }
+        if text.contains("var arg1=") || text.contains("getrenderdata") {
+            return true
+        }
+        if text.contains("document.cookie"),
+           text.contains("location.reload") || text.contains(".reload()"),
+           !text.contains("<article"),
+           !text.contains("<li") {
+            return true
+        }
+        return false
     }
 
     /// `webJs` / `sourceRegex` / `overrideUrlRegex` live in `ruleContent` in

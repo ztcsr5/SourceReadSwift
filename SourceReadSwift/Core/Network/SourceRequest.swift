@@ -182,6 +182,10 @@ final class URLSessionSourceNetworkClient: SourceNetworkClient, @unchecked Senda
         var currentBody = request.body
         var currentHeaders = request.headers
         var redirectCount = 0
+        // One scheme repair per request: HTTPS→HTTP for broken TLS hosts,
+        // HTTP→HTTPS for hosts whose port 80 resets but TLS answers. A single
+        // guard stops a dead host from ping-ponging between the two.
+        var schemeFallbackUsed = false
         let maxRedirects = 10
 
         while redirectCount <= maxRedirects {
@@ -217,7 +221,8 @@ final class URLSessionSourceNetworkClient: SourceNetworkClient, @unchecked Senda
                 }
             } catch let urlError as URLError {
                 // 1. Automatic HTTP Fallback when HTTPS fails with TLS/certificate/connection error
-                if currentURL.scheme?.lowercased() == "https",
+                if !schemeFallbackUsed,
+                   currentURL.scheme?.lowercased() == "https",
                    (urlError.code == .secureConnectionFailed ||
                     urlError.code == .serverCertificateUntrusted ||
                     urlError.code == .serverCertificateHasBadDate ||
@@ -226,15 +231,29 @@ final class URLSessionSourceNetworkClient: SourceNetworkClient, @unchecked Senda
                     urlError.code == .cannotConnectToHost ||
                     urlError.code == .networkConnectionLost) {
                     if let httpURL = URL(string: currentURL.absoluteString.replacingOccurrences(of: "https://", with: "http://", options: .anchored)) {
+                        schemeFallbackUsed = true
                         currentURL = httpURL
                         continue
                     }
                 }
 
+                // 1b. Upgrade HTTP→HTTPS when cleartext is reset. 言情小说网
+                // (m.bgnovel.com) drops port-80 connections from iOS while the
+                // TLS endpoint serves the identical page, so an http-only
+                // bookSourceUrl looked like a dead site.
+                if !schemeFallbackUsed,
+                   currentURL.scheme?.lowercased() == "http",
+                   (urlError.code == .networkConnectionLost || urlError.code == .cannotConnectToHost),
+                   let httpsURL = URL(string: currentURL.absoluteString.replacingOccurrences(of: "http://", with: "https://", options: .anchored)) {
+                    schemeFallbackUsed = true
+                    currentURL = httpsURL
+                    continue
+                }
+
                 if urlError.code == .badURL {
                     let raw = currentURL.absoluteString
                     let clipped = raw.count > 160 ? String(raw.prefix(160)) + "..." : raw
-                    return .failure(.network("URL 格式非法或解析异常 (-1000)：\(clipped)"))
+                    return .failure(.network("上游连接失败或 URL 异常 (-1000)：\(clipped)"))
                 } else if urlError.code == .timedOut {
                     return .failure(.network("连接超时"))
                 } else if urlError.code == .cannotFindHost || urlError.code == .cannotConnectToHost {

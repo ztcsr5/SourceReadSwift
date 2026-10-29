@@ -568,7 +568,10 @@ struct SourceRequestBuilder {
         }
         guard let baseURL = URL(string: cleanBase), let host = baseURL.host else { return }
         let scheme = baseURL.scheme ?? "https"
-        let origin = "\(scheme)://\(host)"
+        // Keep the port: `Origin: http://host:8080` and `Origin: http://host`
+        // are different origins, and CSRF middleware compares them exactly.
+        let hostWithPort = baseURL.port.map { "\(host):\($0)" } ?? host
+        let origin = "\(scheme)://\(hostWithPort)"
         if !containsHeader(headers, "Referer") {
             headers["Referer"] = "\(origin)/"
         }
