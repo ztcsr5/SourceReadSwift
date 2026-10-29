@@ -37,7 +37,7 @@ final class ReaderPageTextBuilderTests: XCTestCase {
         XCTAssertEqual(style?.paragraphSpacing ?? -1, 10, accuracy: 0.01)
     }
 
-    func testContinuationAndLastParagraphDoNotAddSpacing() {
+    func testContinuationChunkSpacingBelongsToTheTerminatingNewline() {
         let result = ReaderPageTextBuilder.make(
             title: nil,
             paragraphs: [
@@ -47,8 +47,11 @@ final class ReaderPageTextBuilderTests: XCTestCase {
             style: makeStyle()
         )
 
+        // 段间距画在本段末尾的换行上：续页 chunk 后面还有新段时必须保留
+        // paragraphSpacing（分页器在 currentEntries 非空时就是这么加间距的），
+        // 只有整页最后一段才归零。
         let first = paragraphStyle(result, at: 0)
-        XCTAssertEqual(first?.paragraphSpacing ?? -1, 0, accuracy: 0.01)
+        XCTAssertEqual(first?.paragraphSpacing ?? -1, 10, accuracy: 0.01)
         let lastLocation = result.string.utf16.count - 2
         XCTAssertEqual(paragraphStyle(result, at: lastLocation)?.paragraphSpacing ?? -1, 0, accuracy: 0.01)
     }
