@@ -81,10 +81,10 @@ final class SourceURLBodyJSRegressionTests: XCTestCase {
         let chapterURL = try encodedURL("https://fixture.test/chapter/1", script: normalizer)
         let nextContentURL = try encodedURL("https://fixture.test/chapter/1/2", script: normalizer)
         let source = BookSource(bookSourceName: "Pagination body", bookSourceUrl: "https://fixture.test",
-            ruleExplore: SourceRule(fields: ["bookList":"$.books[*]", "name":"$.name", "bookUrl":"$.url"]),
             ruleBookInfo: SourceRule(fields: ["name":"$.title", "tocUrl":"$.toc"]),
             ruleToc: SourceRule(fields: ["chapterList":"$.chapters[*]", "chapterName":"$.name", "chapterUrl":"$.url", "nextTocUrl":"$.next"]),
-            ruleContent: SourceRule(fields: ["content":"$.body", "nextContentUrl":"$.next"]))
+            ruleContent: SourceRule(fields: ["content":"$.body", "nextContentUrl":"$.next"]),
+            ruleExplore: SourceRule(fields: ["bookList":"$.books[*]", "name":"$.name", "bookUrl":"$.url"]))
         let network = URLBodyFixtureNetwork(responses: [
             "/explore": try json(["payload":["books":[["name":"Fixture", "url":"/book/1"]]]]),
             "/book/1": try json(["title":"Fixture", "toc":catalogURL]),
