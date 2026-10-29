@@ -52,16 +52,21 @@ struct DynamicURLResolver {
             || trimmed.contains("{{")
             || trimmed.lowercased().contains("@get:")
         if !carriesRuleSyntax, trimmed.contains("\n") || trimmed.contains("\r") {
-            if let firstLine = trimmed.components(separatedBy: .newlines).first(where: { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }) {
-                trimmed = firstLine.trimmingCharacters(in: .whitespacesAndNewlines)
+            // A formatted ,{...} suffix is one request, not a list of URLs.
+            // Truncating the whole string drops POST/body (爱下电子's detail
+            // became GET), so only normalize the actual URL component.
+            let (urlPart, suffixPart) = SearchURLResolver.splitURLAndDirectiveSuffix(trimmed)
+            if let firstLine = urlPart.components(separatedBy: .newlines).first(where: { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }) {
+                trimmed = firstLine.trimmingCharacters(in: .whitespacesAndNewlines) + suffixPart
             }
         }
 
         // Strip accidental double domain concatenation, e.g. `http://domain/http://domain/path` or `http://domainhttp://domain/path`
         if (trimmed.hasPrefix("http://") || trimmed.hasPrefix("https://")) && trimmed.count > 8 {
-            let searchStart = trimmed.index(trimmed.startIndex, offsetBy: 7)
-            if let secondSchemeRange = trimmed.range(of: "https?://", options: .regularExpression, range: searchStart..<trimmed.endIndex) {
-                trimmed = String(trimmed[secondSchemeRange.lowerBound...])
+            let (urlPart, suffixPart) = SearchURLResolver.splitURLAndDirectiveSuffix(trimmed)
+            let searchStart = urlPart.index(urlPart.startIndex, offsetBy: min(7, urlPart.count))
+            if let secondSchemeRange = urlPart.range(of: "https?://", options: .regularExpression, range: searchStart..<urlPart.endIndex) {
+                trimmed = String(urlPart[secondSchemeRange.lowerBound...]) + suffixPart
             }
         }
 

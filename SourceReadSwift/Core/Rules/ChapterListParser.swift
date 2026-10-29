@@ -93,7 +93,10 @@ struct ChapterListParser {
             "author": book.author ?? "",
             "coverUrl": book.coverUrl ?? "",
             "bookUrl": book.bookUrl,
-            "intro": book.intro ?? ""
+            "intro": book.intro ?? "",
+            "tocUrl": book.tocUrl ?? "",
+            "kind": book.kind ?? "",
+            "latestChapterTitle": book.latestChapter ?? ""
         ]
         let variables: [String: Any] = [
             "source": source,
@@ -336,7 +339,10 @@ struct ChapterListParser {
             "author": book.author ?? "",
             "coverUrl": book.coverUrl ?? "",
             "bookUrl": book.bookUrl,
-            "intro": book.intro ?? ""
+            "intro": book.intro ?? "",
+            "tocUrl": book.tocUrl ?? "",
+            "kind": book.kind ?? "",
+            "latestChapterTitle": book.latestChapter ?? ""
         ]
         let variables: [String: Any] = [
             "source": source,
@@ -380,6 +386,9 @@ struct ChapterListParser {
         let isVolumeRule = source.ruleToc?.fields["isVolume"]
         var currentVolume: String? = inheritedVolume
         var chapters: [BookChapter] = []
+        var missingTitleCount = 0
+        var missingURLCount = 0
+        var rejectedURLCount = 0
         for item in items {
             let title = jsonExtractor.string(
                 from: item,
@@ -405,9 +414,14 @@ struct ChapterListParser {
                 fallbackKeys: ["chapterUrl", "url", "link", "id", "cid", "u", "href"],
                 variables: variables
             ).flatMap(sanitizeSingleChapterURL)
+            if title.isEmpty { missingTitleCount += 1 }
+            if rawUrl?.isEmpty != false { missingURLCount += 1 }
             guard !title.isEmpty, let rawUrl, !rawUrl.isEmpty else { continue }
             let absUrl = htmlExtractor.absolutize(rawUrl, base: response.url)
-            guard isValidChapter(title: title, url: absUrl, pageURL: response.url, bookURL: book.bookUrl) else { continue }
+            guard isValidChapter(title: title, url: absUrl, pageURL: response.url, bookURL: book.bookUrl) else {
+                rejectedURLCount += 1
+                continue
+            }
             let vipRaw = jsonExtractor.string(
                 from: item,
                 rule: htmlExtractor.firstRule(source.ruleToc, keys: ["isVip", "vip"]),
@@ -467,7 +481,7 @@ struct ChapterListParser {
             let message = items.isEmpty
                 ? (jsError.map { "目录规则 JS 异常：\($0)" }
                     ?? "JSON 目录规则未命中（0 项，响应 \(response.body.count) 字符；结构 \(Self.jsonShapeHint(response.body))）")
-                : "JSON 目录命中 \(items.count) 项但章节名为空"
+                : "JSON 目录命中 \(items.count) 项但无可用章节（标题为空 \(missingTitleCount)，链接为空 \(missingURLCount)，链接被过滤 \(rejectedURLCount)）"
             return .failure(.empty(message))
         }
         return .success(ChapterListPage(chapters: chapters, nextTocUrl: next, trailingVolume: currentVolume))

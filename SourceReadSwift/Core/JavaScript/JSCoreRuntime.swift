@@ -235,6 +235,22 @@ final class JSCoreRuntime {
             context.setObject(jsCompatibleValue, forKeyedSubscript: key as NSString)
             
             if key == "result" {
+                if value is [String: Any] {
+                    // Rhino's JSON map stringifies as JSON even when the parse
+                    // occurs inside jsLib, outside the caller's visible script.
+                    // Keep property access and normal objects intact; only the
+                    // current JSON input gets a non-enumerable string coercion.
+                    context.evaluateScript("""
+                    (function(obj) {
+                        if (!Object.prototype.hasOwnProperty.call(obj, 'toString')) {
+                            Object.defineProperty(obj, 'toString', {
+                                value: function() { return JSON.stringify(this); },
+                                enumerable: false, configurable: true
+                            });
+                        }
+                    })(result);
+                    """)
+                }
                 context.evaluateScript("""
                 if (typeof result !== 'undefined' && result !== null && typeof result === 'object') {
                     (function(obj) {
