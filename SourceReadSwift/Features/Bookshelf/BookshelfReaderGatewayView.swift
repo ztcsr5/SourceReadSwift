@@ -382,6 +382,24 @@ struct BookshelfReaderGatewayView: View {
             return
         }
 
+        // 0. TOC CACHE：上次成功落盘的完整目录。命中就立刻打开目标章，
+        //    详情与目录在后台刷新——“点进书要等半天”卡的就是这里。
+        if let cached = appState.bookTOCacheStore.entry(
+            sourceURL: source.bookSourceUrl,
+            bookURL: activeBook.bookURL
+        ), !cached.chapters.isEmpty {
+            let targetIndex = requestedChapterIndex ?? activeBook.currentChapterIndex
+            let target = cached.chapters.first(where: { $0.index == targetIndex }) ?? cached.chapters.first
+            if let target {
+                chapters = cached.chapters
+                if detail == nil { detail = cached.detail }
+                selectedChapter = target
+                prefetchChapterContent(source: source, chapter: target)
+                refreshBookDetailAndTOC(source: source, book: activeBook)
+                return
+            }
+        }
+
         // 1. FAST PATH: Instant-Open using cached chapters if available!
         let cached = appState.chapterContentCacheStore.cachedChapters(
             sourceURL: source.bookSourceUrl,
@@ -396,34 +414,8 @@ struct BookshelfReaderGatewayView: View {
                 // TOC 命中缓存 ≠ 正文命中缓存：首章正文在这里就发出去，
                 // 阅读器打开时 content(...) 直接命中，不再白等一次网络。
                 prefetchChapterContent(source: source, chapter: target)
-
-                // Background silent refresh for new chapters and latest title
-                Task.detached(priority: .utility) { [appState, source, activeBook] in
-                    let searchBook = SearchBook(
-                        name: activeBook.title,
-                        author: activeBook.author,
-                        coverUrl: activeBook.coverURL,
-                        bookUrl: activeBook.bookURL,
-                        sourceName: activeBook.sourceName,
-                        sourceUrl: activeBook.sourceURL,
-                        intro: activeBook.intro
-                    )
-                    if let detailResult = try? await appState.engine.getBookDetail(source: source, book: searchBook).get() {
-                        if let loadedChapters = try? await appState.engine.getChapterList(source: source, book: detailResult).get(),
-                           !loadedChapters.isEmpty {
-                            await MainActor.run {
-                                self.chapters = loadedChapters
-                                appState.bookshelfStore.updateDetails(
-                                    bookID: activeBook.id,
-                                    latestChapterTitle: detailResult.latestChapter,
-                                    intro: detailResult.intro,
-                                    totalChapters: loadedChapters.count,
-                                    coverURL: detailResult.coverUrl
-                                )
-                            }
-                        }
-                    }
-                }
+                // Background silent refresh for new chapters and latest title.
+                refreshBookDetailAndTOC(source: source, book: activeBook)
                 return
             }
         }
@@ -446,12 +438,20 @@ struct BookshelfReaderGatewayView: View {
         switch detailResult {
         case .success(let loadedDetail):
             detail = loadedDetail
+            // 首次开书先取目录头部打开阅读器，完整目录交给后台刷新：
+            // 分页目录是串行抓取，30 页会让「进书」停在加载页上。
             let chapterResult = await AsyncTimeout.run(seconds: 20) {
-                await engine.getChapterList(source: source, book: loadedDetail)
+                await engine.getChapterList(source: source, book: loadedDetail, maxPages: 8)
             } ?? .failure(.network("Chapter list timed out"))
             switch chapterResult {
             case .success(let loadedChapters):
                 chapters = loadedChapters
+                appState.bookTOCacheStore.save(
+                    detail: loadedDetail,
+                    chapters: loadedChapters,
+                    sourceURL: source.bookSourceUrl,
+                    bookURL: activeBook.bookURL
+                )
                 let targetIndex = requestedChapterIndex ?? activeBook.currentChapterIndex
                 let target = loadedChapters.first(where: { $0.index == targetIndex })
                     ?? loadedChapters.first
@@ -464,6 +464,8 @@ struct BookshelfReaderGatewayView: View {
                         coverURL: loadedDetail.coverUrl
                     )
                     selectedChapter = target
+                    // 目录只取了前 8 页，阅读器已经打开，剩余章节后台补。
+                    refreshBookDetailAndTOC(source: source, book: activeBook)
                 } else {
                     errorMessage = "目录为空"
                 }
@@ -495,6 +497,48 @@ struct BookshelfReaderGatewayView: View {
                 appState.record(DiagnosticEvent(level: .info, stage: "reader.offline", sourceName: activeBook.sourceName, message: "详情网络失败，已切换到离线缓存", details: ["chapters": String(cached.count)]))
             } else {
                 errorMessage = "详情加载失败：\(error.displayMessage)"
+            }
+        }
+    }
+
+    /// 后台补全详情与目录：命中本地目录缓存时先开书，新章节、最新标题和
+    /// 封面在后台刷新，成功后再写回目录缓存。失败保持静默，不打断阅读。
+    private func refreshBookDetailAndTOC(source: BookSource, book activeBook: BookshelfBook) {
+        Task.detached(priority: .utility) { [appState, source, activeBook] in
+            let searchBook = SearchBook(
+                name: activeBook.title,
+                author: activeBook.author,
+                coverUrl: activeBook.coverURL,
+                bookUrl: activeBook.bookURL,
+                sourceName: activeBook.sourceName,
+                sourceUrl: activeBook.sourceURL,
+                intro: activeBook.intro
+            )
+            guard let detailResult = try? await appState.engine
+                .getBookDetail(source: source, book: searchBook)
+                .get()
+            else { return }
+            guard let loadedChapters = try? await appState.engine
+                .getChapterList(source: source, book: detailResult)
+                .get(),
+                !loadedChapters.isEmpty
+            else { return }
+            await MainActor.run {
+                self.detail = detailResult
+                self.chapters = loadedChapters
+                appState.bookTOCacheStore.save(
+                    detail: detailResult,
+                    chapters: loadedChapters,
+                    sourceURL: source.bookSourceUrl,
+                    bookURL: activeBook.bookURL
+                )
+                appState.bookshelfStore.updateDetails(
+                    bookID: activeBook.id,
+                    latestChapterTitle: detailResult.latestChapter,
+                    intro: detailResult.intro,
+                    totalChapters: loadedChapters.count,
+                    coverURL: detailResult.coverUrl
+                )
             }
         }
     }

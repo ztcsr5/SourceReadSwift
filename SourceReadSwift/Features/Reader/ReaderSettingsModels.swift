@@ -678,14 +678,15 @@ struct ReaderNumberInput: View {
             .keyboardType(.numbersAndPunctuation)
             .multilineTextAlignment(.trailing)
             .textFieldStyle(.roundedBorder)
-            .frame(width: 66)
+            .frame(width: 54)
             .focused($focused)
             .accessibilityLabel("输入\(title)")
 
             Text(unit)
                 .font(.caption2.weight(.semibold))
                 .foregroundStyle(.secondary)
-                .frame(minWidth: 20, alignment: .leading)
+                .lineLimit(1)
+                .frame(minWidth: 13, alignment: .leading)
         }
         .accessibilityElement(children: .combine)
         .onChange(of: value) { updated in
