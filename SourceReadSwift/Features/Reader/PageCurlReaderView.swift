@@ -262,13 +262,17 @@ struct PageCurlReaderView<Item: Identifiable, Content: View>: UIViewControllerRe
                     // is the per-page loading hitch users reported. Load and
                     // lay the page out now, on an idle frame.
                     controller.loadViewIfNeeded()
-                    controller.suppressesLayoutReport = true
+                    // `viewController(at:)` is typed as UIViewController so
+                    // UIPageViewController can consume it directly; the
+                    // layout-report flag only exists on the hosting subclass.
+                    let host = controller as? PageHostingController<Content>
+                    host?.suppressesLayoutReport = true
                     let size = self.parent.prewarmSize
                     if size.width > 1, size.height > 1 {
                         controller.view.frame = CGRect(origin: .zero, size: size)
                         controller.view.layoutIfNeeded()
                     }
-                    controller.suppressesLayoutReport = false
+                    host?.suppressesLayoutReport = false
                 }
             }
         }
