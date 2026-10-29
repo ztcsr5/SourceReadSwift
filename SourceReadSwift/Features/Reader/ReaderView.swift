@@ -92,6 +92,8 @@ struct ReaderView: View {
     /// of the chapter the reader is about to cross into.
     @State private var prefetchQueue: [Int] = []
     @State private var prefetchTask: Task<Void, Never>?
+    @State private var paginationWarmupTask: Task<Void, Never>?
+    @State private var paginationWarmupGeneration = 0
     @State private var prefetchGeneration = 0
     @State private var paragraphJumpRequest: ParagraphJumpRequest?
     @State private var pagedBlocksCache: [ReaderPageBlock] = []
@@ -445,9 +447,12 @@ struct ReaderView: View {
     }
 
     private var windowRadius: Int {
-        // 连续阅读要「章尾之前下一章已经在文档里」，但窗口不能无限大：
-        // 至少预取 3 章，结合提前 3.5 屏的触发点与纯尾部 DOM 追加，实现无感跨章连读。
-        return max(ReaderChapterWindowPolicy.radius(forPreloadCount: preloadChapterCount), 3)
+        // Keep the window bounded, but local imports are cheap to widen: the
+        // paragraphs already live in the bookshelf model, so the only cost is
+        // pagination. Force five chapters on each side so an old AppStorage
+        // value of 2 still gets ten chapters of instant back/forward reading.
+        let base = ReaderChapterWindowPolicy.radius(forPreloadCount: preloadChapterCount)
+        return isLocalChapterBook ? max(base, ReaderPreloadPolicy.maximumCount) : max(base, 3)
     }
 
     /// 本地导入的书（localChapters 在书架模型里），章节读取不经过书源。
@@ -1014,6 +1019,7 @@ struct ReaderView: View {
             positionPersistTask?.cancel()
             pageLayoutTask?.cancel()
             cancelPrefetch()
+            cancelPaginationWarmup()
             cancelWindowRetries()
             persistReadingPosition(paragraphIndexOverride: currentParagraphIndexForPersistence())
             stopAutoScroll()
@@ -1107,9 +1113,16 @@ struct ReaderView: View {
             UIImpactFeedbackGenerator(style: .light).impactOccurred()
             // A mode switch changes the page model itself. Rebuild now so the
             // first paged frame has a valid mapping; slider/rotation changes
-            // use the debounced path below.
+            // use the debounced path below. Start the warmup first: the page
+            // builder turns far chapters into cheap placeholders while it
+            // paginates them one per frame.
             pageLayoutTask?.cancel()
             pageLayoutTask = nil
+            if readerMode != .scroll {
+                warmPaginationCache(around: windowCurrentChapterIndex)
+            } else {
+                cancelPaginationWarmup()
+            }
             rebuildPagedBlocksCache(useCachedPageAnchor: false)
             let paragraph = positionMapping.clampParagraph(visibleParagraphIndex)
             stopAutoScroll()
@@ -1144,6 +1157,13 @@ struct ReaderView: View {
         }
         .onChange(of: readerPageCacheKey) { _ in
             schedulePagedBlocksCacheRebuild()
+        }
+        .onChange(of: chapterPageLayoutSignature) { _ in
+            // Typography, viewport or image style changed: every cached
+            // chapter is stale. Warm the window one chapter per frame instead
+            // of letting the next rebuild measure all of them in one turn.
+            guard readerMode != .scroll, isLocalChapterBook else { return }
+            warmPaginationCache(around: windowCurrentChapterIndex)
         }
         .onChange(of: readerBrightness) { _ in
             applyReaderBrightness()
@@ -1574,9 +1594,15 @@ struct ReaderView: View {
         layoutAnchorOldParagraph = visibleParagraphIndex
         windowGeneration &+= 1
         cancelPrefetch()
+        cancelPaginationWarmup()
         cancelWindowRetries()
         windowFailures.removeAll()
         windowRetryAttempts.removeAll()
+        if seedLocalWindowSynchronously(around: chapterIndex) {
+            warmPaginationCache(around: chapterIndex)
+            touchChapterCache(chapterIndex)
+            return
+        }
         windowSections = [
             ReaderChapterSection(
                 chapterIndex: chapterIndex,
@@ -1597,11 +1623,17 @@ struct ReaderView: View {
     private func resetWindow() {
         windowGeneration &+= 1
         cancelPrefetch()
+        cancelPaginationWarmup()
         cancelWindowRetries()
         windowFailures.removeAll()
         windowRetryAttempts.removeAll()
         layoutAnchorOldParagraph = visibleParagraphIndex
         windowLoadingIndices.removeAll()
+        if seedLocalWindowSynchronously(around: chapterIndex) {
+            warmPaginationCache(around: chapterIndex)
+            touchChapterCache(chapterIndex)
+            return
+        }
         windowSections = [
             ReaderChapterSection(
                 chapterIndex: chapterIndex,
@@ -1617,6 +1649,41 @@ struct ReaderView: View {
         rebuildWindowPositionMapping()
         prefetchWindow(around: chapterIndex)
         touchChapterCache(chapterIndex)
+    }
+
+    /// Local imports keep every chapter in the bookshelf model, so the whole
+    /// window can be seeded in one synchronous pass. The old path upserted one
+    /// chapter at a time; every upsert rebuilt the full page model and restored
+    /// the anchor, which is the stutter seen when a local book opened or a TOC
+    /// entry was tapped and the reader kept paging.
+    @discardableResult
+    private func seedLocalWindowSynchronously(around current: Int) -> Bool {
+        guard let book = appState.bookshelfStore.book(id: bookID),
+              let localChapters = book.localChapters,
+              !localChapters.isEmpty,
+              localChapters.indices.contains(current) else { return false }
+        let indices = ReaderChapterWindowPolicy.indices(
+            around: current,
+            radius: windowRadius,
+            lowerBound: 0,
+            upperBound: min(windowChapterUpperBound, localChapters.count)
+        )
+        guard !indices.isEmpty else { return false }
+        windowSections = indices.map { index in
+            let local = localChapters[index]
+            return ReaderChapterSection(
+                chapterIndex: index,
+                title: local.title,
+                paragraphs: local.paragraphs
+            )
+        }
+        windowCurrentChapterIndex = current
+        lastWindowChangeWasAppend = false
+        pendingSpeechChapterIndex = nil
+        pendingAutoScrollChapterIndex = nil
+        pendingWindowJump = nil
+        rebuildWindowPositionMapping()
+        return true
     }
 
     /// Warms both sides of the cursor. Forward chapters are requested first
@@ -1699,6 +1766,76 @@ struct ReaderView: View {
         prefetchTask?.cancel()
         prefetchTask = nil
         prefetchQueue.removeAll()
+    }
+
+    private func cancelPaginationWarmup() {
+        paginationWarmupGeneration &+= 1
+        paginationWarmupTask?.cancel()
+        paginationWarmupTask = nil
+    }
+
+    /// Paginates prefetched chapters one at a time, yielding a frame between
+    /// chapters. `buildReaderPageBlocks` keeps a placeholder for the chapters
+    /// this task has not reached yet, so opening a local book no longer measures
+    /// ten chapters in the same main-thread turn as the first page.
+    private func warmPaginationCache(around current: Int) {
+        guard readerMode != .scroll else { return }
+        cancelPaginationWarmup()
+        let token = paginationWarmupGeneration
+        let generation = windowGeneration
+        let signature = chapterPageLayoutSignature
+        let (typography, titleTypography) = chapterPaginationTypography()
+        let order = [current] + ReaderChapterWindowPolicy.prefetchOrder(
+            current: current,
+            radius: windowRadius,
+            lowerBound: 0,
+            upperBound: windowChapterUpperBound,
+            loaded: []
+        )
+        paginationWarmupTask = Task { @MainActor in
+            for index in order {
+                guard !Task.isCancelled, windowGeneration == generation,
+                      token == paginationWarmupGeneration else { break }
+                guard readerMode != .scroll, chapterPageLayoutSignature == signature else { break }
+                // A page-turn gesture owns the main thread. Measuring a whole
+                // chapter under the finger is the one remaining hitch, so the
+                // warmup pauses until the gesture settles.
+                while interactionGate.isPageInteractionActive && !Task.isCancelled {
+                    try? await Task.sleep(nanoseconds: 40_000_000)
+                }
+                guard !Task.isCancelled, windowGeneration == generation,
+                      token == paginationWarmupGeneration else { break }
+                guard let section = windowSections.first(where: {
+                    $0.chapterIndex == index && $0.isReady
+                }) else { continue }
+                let contentSignature = chapterPageContentSignature(section)
+                if let cached = chapterPageCache[index],
+                   cached.layoutSignature == signature,
+                   cached.contentSignature == contentSignature {
+                    continue
+                }
+                let pages = appendPages(
+                    for: section,
+                    typography: typography,
+                    titleTypography: titleTypography
+                )
+                guard !Task.isCancelled, windowGeneration == generation,
+                      token == paginationWarmupGeneration else { break }
+                chapterPageCache[index] = ReaderChapterPageCacheEntry(
+                    layoutSignature: signature,
+                    contentSignature: contentSignature,
+                    blocks: pages
+                )
+                schedulePagedBlocksCacheRebuild()
+                // One chapter is hundreds of TextKit measurements. Without this
+                // yield the warmup itself becomes the long block it removes.
+                await Task.yield()
+            }
+            if windowGeneration == generation, token == paginationWarmupGeneration {
+                paginationWarmupTask = nil
+                schedulePagedBlocksCacheRebuild()
+            }
+        }
     }
 
     /// Boundary handoff shared by the three reading surfaces. A chapter is
@@ -4683,6 +4820,25 @@ struct ReaderView: View {
     /// the actual jump from `upsertWindowSection`.
     private func beginWindowJump(to index: Int, paragraphIndex: Int, startAtEnd: Bool = false) {
         guard index >= 0, index < windowChapterUpperBound else { return }
+        // Local imports hold every chapter in memory. Re-seed the whole window
+        // around the TOC target in one pass instead of loading the target and
+        // then prefetching ten neighbours one upsert at a time; each upsert
+        // rebuilt the page model, which is what stalled reading after a jump.
+        if isLocalChapterBook, seedLocalWindowSynchronously(around: index) {
+            cancelPrefetch()
+            windowGeneration &+= 1
+            cancelPaginationWarmup()
+            warmPaginationCache(around: index)
+            touchChapterCache(index)
+            if readerMode != .scroll {
+                // Rebuild the page model from the new window before moving the
+                // cursor: the old blocks belong to chapters that just left it,
+                // and a stale mapping would resolve the jump to the wrong page.
+                rebuildPagedBlocksCache(useCachedPageAnchor: false)
+            }
+            jumpToWindowChapter(index, paragraphIndex: startAtEnd ? Int.max : paragraphIndex)
+            return
+        }
         pendingWindowJump = ReaderPendingChapterJump(
             chapterIndex: index,
             paragraphIndex: paragraphIndex,
@@ -5470,6 +5626,8 @@ struct ReaderView: View {
         let next = chapter + 1
         let total = chapterPageCounts[chapter] ?? Int.max
         let nearChapterEnd = block.pageOrdinal >= max(total - 3, 0)
+            || (total > 0 && total != Int.max
+                && Double(block.pageOrdinal) / Double(total) >= 0.7)
 
         if nearChapterEnd,
            next < windowChapterUpperBound,
@@ -5597,6 +5755,33 @@ struct ReaderView: View {
         }
     }
 
+    /// Shared typography for the synchronous first-page pass and the warmup
+    /// pass. Both must produce identical metrics, otherwise the chapter cache
+    /// signatures stop matching and every rebuild re-measures the chapter.
+    private func chapterPaginationTypography() -> (
+        typography: ReaderPageTypography,
+        titleTypography: ReaderPageTypography
+    ) {
+        let geometry = pagedPageGeometry
+        let typography = ReaderPageTypography(
+            font: fontFamily.uiFont(ofSize: CGFloat(fontSize), customPostScriptName: customFontPostScriptName),
+            titleFont: fontFamily.uiFont(ofSize: CGFloat(ReaderTypographyDefaults.titleFontSize(for: fontSize)), weight: .bold, customPostScriptName: customFontPostScriptName),
+            lineSpacing: CGFloat(lineSpacing),
+            letterSpacing: CGFloat(letterSpacing),
+            paragraphSpacing: CGFloat(paragraphSpacing),
+            firstLineIndent: CGFloat(paragraphIndent),
+            titleSpacing: CGFloat(titleSpacing),
+            contentWidth: geometry.contentWidth,
+            // Tiny buffer for sub-pixel differences between TextKit line boxes
+            // and the SwiftUI text renderer.
+            contentHeight: max(geometry.contentHeight - 4, 240)
+        )
+        var titleTypography = typography
+        titleTypography.lineSpacing = 0
+        titleTypography.letterSpacing = 0
+        return (typography, titleTypography)
+    }
+
     /// Builds one continuous page model for the whole live window. Every
     /// chapter starts with its own title page and carries its chapter number,
     /// so the page cursor can walk from one chapter into the next without an
@@ -5631,23 +5816,7 @@ struct ReaderView: View {
 
         // 分页与页面渲染共用同一份几何：ReaderPageGeometry 已经把安全区、页眉带、
         // 正文带和页脚带算成确定坐标，这里不再重复扣 safeArea / padding。
-        let geometry = pagedPageGeometry
-        let typography = ReaderPageTypography(
-            font: fontFamily.uiFont(ofSize: CGFloat(fontSize), customPostScriptName: customFontPostScriptName),
-            titleFont: fontFamily.uiFont(ofSize: CGFloat(ReaderTypographyDefaults.titleFontSize(for: fontSize)), weight: .bold, customPostScriptName: customFontPostScriptName),
-            lineSpacing: CGFloat(lineSpacing),
-            letterSpacing: CGFloat(letterSpacing),
-            paragraphSpacing: CGFloat(paragraphSpacing),
-            firstLineIndent: CGFloat(paragraphIndent),
-            titleSpacing: CGFloat(titleSpacing),
-            contentWidth: geometry.contentWidth,
-            // 2pt 缓冲只吸收 TextKit 行框与 SwiftUI Text 渲染之间的亚像素差，
-            // 不再承担「安全区 / 页眉 / 页脚」的二次扣减。
-            contentHeight: max(geometry.contentHeight - 4, 240)
-        )
-        var titleTypography = typography
-        titleTypography.lineSpacing = 0
-        titleTypography.letterSpacing = 0
+        let (typography, titleTypography) = chapterPaginationTypography()
 
         var pages: [ReaderPageBlock] = []
 
@@ -5697,10 +5866,28 @@ struct ReaderView: View {
             }
             let contentSignature = chapterPageContentSignature(section)
             let cached = chapterPageCache[section.chapterIndex]
+            let cacheIsValid = cached.map {
+                $0.layoutSignature == layoutSignature && $0.contentSignature == contentSignature
+            } ?? false
+            // Pagination warmup owns every chapter outside the cursor's
+            // immediate neighbours. Measuring them here would block the first
+            // frame after a local import opens. Only cache-missing chapters
+            // become placeholders: replacing an already cached chapter would
+            // blank pages that the warmup then skips as a cache hit.
+            if let warmup = paginationWarmupTask, !warmup.isCancelled,
+               abs(section.chapterIndex - windowCurrentChapterIndex) > 1,
+               !cacheIsValid {
+                pages.append(placeholder(
+                    chapterIndex: section.chapterIndex,
+                    title: section.title,
+                    direction: 0
+                ))
+                chapterPageCounts.removeValue(forKey: section.chapterIndex)
+                expectedChapterIndex = section.chapterIndex + 1
+                continue
+            }
             let chapterPages: [ReaderPageBlock]
-            if let cached,
-               cached.layoutSignature == layoutSignature,
-               cached.contentSignature == contentSignature {
+            if cacheIsValid, let cached {
                 chapterPages = cached.blocks
             } else {
                 chapterPages = appendPages(
