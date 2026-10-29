@@ -2102,6 +2102,12 @@ struct ReaderView: View {
         // and keep scrolling" never advanced to the next one.
         resumePendingContinuation(for: section.chapterIndex)
         trimWindowIfNeeded()
+        if isLocalChapterBook, readerMode != .scroll {
+            // A local chapter that just entered the window needs its page
+            // cache as well. Restart the warmup so the new edge chapter is
+            // measured off the page-turn path instead of in the next rebuild.
+            warmPaginationCache(around: windowCurrentChapterIndex)
+        }
     }
 
     /// Resumes a speech or auto-scroll handoff that was waiting for this
