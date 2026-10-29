@@ -990,17 +990,36 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
         // cookie+reload) return HTTP 200 with no crawlable markup. The plain
         // socket cannot execute the script, so the stage must go through WebKit.
         if Self.looksLikeJavaScriptChallenge(response.body) { return true }
-        return text.contains("cloudflare")
-            || text.contains("cf-challenge")
-            || text.contains("cf-browser-verification")
-            || text.contains("turnstile")
-            || text.contains("just a moment")
-            || text.contains("ddos-guard")
-            || text.contains("attention required")
-            || text.contains("captcha")
-            || text.contains("安全验证")
-            || text.contains("百度安全验证")
-            || text.contains("人机验证")
+        // Hard challenge markers are unambiguous: they only appear on an
+        // interstitial page. Brand strings such as "cloudflare" or "captcha"
+        // also appear in ordinary footers and login widgets, so they count
+        // only when the body carries no crawlable markup at all. Treating a
+        // full result page as a challenge forces WebKit, whose simplified DOM
+        // dropped every rule target: qunxs returned a 17K/15-item page over
+        // HTTP yet parsed 0 nodes once the fallback kicked in.
+        let hardChallengeMarkers = [
+            "cf-challenge", "cf-browser-verification", "__cf_chl",
+            "cf_chl_opt", "turnstile", "just a moment",
+            "attention required", "ddos-guard", "百度安全验证", "人机验证"
+        ]
+        if hardChallengeMarkers.contains(where: { text.contains($0) }) { return true }
+        let softMarkers = ["cloudflare", "captcha", "安全验证"]
+        if softMarkers.contains(where: { text.contains($0) }) {
+            return !Self.hasCrawlableMarkup(response.body)
+        }
+        return false
+    }
+
+    /// A challenge interstitial carries no crawlable list/detail structure.
+    /// A real result page always exposes several links or list/table nodes, so
+    /// the soft anti-bot markers above must not pre-empt it.
+    static func hasCrawlableMarkup(_ body: String) -> Bool {
+        let text = body.lowercased()
+        let anchorCount = text.components(separatedBy: "<a ").count - 1
+        if anchorCount >= 6 { return true }
+        if text.contains("<article") || text.contains("<table") { return true }
+        let listCount = text.components(separatedBy: "<li").count - 1
+        return listCount >= 6
     }
 
     /// Body-only heuristic for pages that are pure anti-bot bootstrap.
