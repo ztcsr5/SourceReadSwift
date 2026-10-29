@@ -6,6 +6,9 @@ import CommonCrypto
 
 final class JSCoreRuntime {
     let context: JSContext
+    /// Calling the original eval indirectly gives each rule its own lexical
+    /// environment while preserving global var/function declarations.
+    private let ruleEvaluator: JSValue
     private let ajaxHandler: ((String) -> String)?
     private let executionContext: RuleExecutionContext
     private let javaHostBridge: LegadoJavaHostBridge
@@ -20,6 +23,7 @@ final class JSCoreRuntime {
     /// that use `let`/`const` (UAA 四合一) and re-executes multi-KB
     /// libraries on every field rule.
     private var loadedJsLibraries: Set<String> = []
+    private var failedJsLibraries: [String: String] = [:]
 
     /// Exposes the per-runtime Legado sandbox to deterministic integration
     /// tests and import tooling without leaking the host bridge object.
@@ -33,7 +37,9 @@ final class JSCoreRuntime {
         ajaxHandler: ((String) -> String)? = nil,
         executionContext: RuleExecutionContext = RuleExecutionContext()
     ) {
-        self.context = JSContext()!
+        let jsContext = JSContext()!
+        self.context = jsContext
+        self.ruleEvaluator = jsContext.objectForKeyedSubscript("eval")!
         self.ajaxHandler = ajaxHandler
         self.executionContext = executionContext
         self.javaHostBridge = LegadoJavaHostBridge(executionContext: executionContext)
@@ -90,6 +96,7 @@ final class JSCoreRuntime {
             map["bookSourceComment"] = source.raw["bookSourceComment"] ?? source.raw["comment"] ?? ""
             map["bookSourceUrlName"] = source.raw["bookSourceUrlName"] ?? source.raw["urlName"] ?? ""
             map["loginUrl"] = source.loginUrl ?? source.raw["loginUrl"] ?? ""
+            map["loginUi"] = source.loginUi ?? source.raw["loginUi"] ?? ""
             map["loginCheckJs"] = source.loginCheckJs ?? source.raw["loginCheckJs"] ?? ""
             return map
         } else if let chapter = value as? BookChapter {
@@ -146,15 +153,28 @@ final class JSCoreRuntime {
     }
 
     /// Evaluates a source `jsLib` bundle at most once per runtime.
-    func preloadJavaScriptLibrary(_ library: String) {
+    @discardableResult
+    func preloadJavaScriptLibrary(_ library: String) -> Result<Void, SourceEngineError> {
+        evaluateLock.lock()
+        defer { evaluateLock.unlock() }
         let normalized = LegadoJavaScriptCompatibility.normalizeJavaScriptLibrary(library)
-        guard !normalized.isEmpty, !loadedJsLibraries.contains(normalized) else { return }
-        loadedJsLibraries.insert(normalized)
-        let result = context.evaluateScript(Self.bindingUnderscoreJavaToBridge(normalized))
-        if result == nil, let exception = context.exception {
-            executionContext.recordJavaScriptError("jsLib: " + (exception.toString() ?? "unknown"))
-            context.exception = nil
+        guard !normalized.isEmpty, !loadedJsLibraries.contains(normalized) else { return .success(()) }
+        if let message = failedJsLibraries[normalized] {
+            return .failure(.javascript(message))
         }
+        context.exception = nil
+        context.evaluateScript(Self.bindingUnderscoreJavaToBridge(normalized))
+        if let exception = context.exception {
+            let message = "jsLib: " + (exception.toString() ?? "unknown")
+            executionContext.recordJavaScriptError(message)
+            // A failed global script may have created lexical bindings or
+            // performed requests. Do not blindly replay those side effects.
+            failedJsLibraries[normalized] = message
+            context.exception = nil
+            return .failure(.javascript(message))
+        }
+        loadedJsLibraries.insert(normalized)
+        return .success(())
     }
 
     /// Rewrites `_.java` to the `java` bridge.  Legado exposes `_` as the
@@ -186,6 +206,9 @@ final class JSCoreRuntime {
             return .failure(.javascript("Legado bridge prelude failed: \(baseBridgeError)"))
         }
         var effectiveVariables = variables
+        if effectiveVariables["source"] == nil, let source = executionContext.source {
+            effectiveVariables["source"] = source
+        }
         if effectiveVariables["src"] == nil {
             if let htmlVal = effectiveVariables["html"] ?? effectiveVariables["result"] {
                 effectiveVariables["src"] = htmlVal
@@ -543,19 +566,6 @@ final class JSCoreRuntime {
                 }
                 """
                 context.evaluateScript(injectScript)
-                let rawLib: String? = {
-                    if let source = value as? BookSource { return source.raw["jsLib"] }
-                    if let dict = value as? [String: Any] { return dict["jsLib"] as? String }
-                    if let dict = value as? [String: String] { return dict["jsLib"] }
-                    if let dict = value as? NSDictionary { return dict["jsLib"] as? String }
-                    return nil
-                }()
-                if let rawLib, !rawLib.isEmpty {
-                    // One injection per runtime: `let`/`const` declarations
-                    // throw on a second evaluation and leave the following
-                    // rule script with a stale exception.
-                    preloadJavaScriptLibrary(rawLib)
-                }
             } else if key == "book" {
                 let injectScript = """
                 if (typeof book !== 'undefined' && book !== null) {
@@ -606,7 +616,23 @@ final class JSCoreRuntime {
                 context.evaluateScript(injectScript)
             }
         }
-        guard let result = context.evaluateScript(executableScript) else {
+        // Dictionary iteration order is unspecified. Bind every global before
+        // running jsLib, not just source; initializers also read key, book and
+        // baseUrl. The shared library remains global and is loaded only once.
+        let rawLib: String? = {
+            if let source = effectiveVariables["source"] as? BookSource { return source.raw["jsLib"] }
+            if let source = effectiveVariables["source"] as? [String: Any] { return source["jsLib"] as? String }
+            return nil
+        }()
+        if let rawLib, case .failure(let error) = preloadJavaScriptLibrary(rawLib) {
+            return .failure(error)
+        }
+        // evaluateScript places top-level let/const in the persistent global
+        // lexical environment. Repeating a field rule for the next search row
+        // then throws a redeclaration error. Indirect eval keeps the script's
+        // completion value, strict mode and shared var/functions without
+        // leaking its let/const bindings into the following rule.
+        guard let result = ruleEvaluator.call(withArguments: [executableScript]) else {
             if let exception = context.exception {
                 let details = javascriptExceptionDetails(exception)
                 executionContext.recordJavaScript(SourceJavaScriptEvidence(

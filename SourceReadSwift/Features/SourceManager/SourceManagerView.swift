@@ -670,10 +670,7 @@ struct SourceManagerView: View {
     }
 
     private func bookSourceRow(_ source: BookSource) -> some View {
-        let loginTarget = SourceLoginURLResolver.resolve(
-            loginUrl: source.loginUrl,
-            bookSourceUrl: source.bookSourceUrl
-        )
+        let loginTarget = SourceLoginURLResolver.resolve(source: source)
         let loginHost = loginTarget?.url.host?.lowercased()
         let loggedIn = loginHost.map { loggedInHosts.contains($0) } ?? false
         return sourceCard(
@@ -711,10 +708,7 @@ struct SourceManagerView: View {
                 // Many sources authenticate on the home page and leave
                 // `loginUrl` empty; keep the entry available for every source
                 // that has a reachable site.
-                if SourceLoginURLResolver.resolve(
-                    loginUrl: source.loginUrl,
-                    bookSourceUrl: source.bookSourceUrl
-                ) != nil {
+                if SourceLoginURLResolver.resolve(source: source) != nil {
                     Button("打开站点 / 登录") {
                         sourceLogin = source
                     }
@@ -1307,10 +1301,7 @@ struct SourceManagerView: View {
                         .textInputAutocapitalization(.never)
                         .autocorrectionDisabled(true)
 
-                    if SourceLoginURLResolver.resolve(
-                        loginUrl: source.loginUrl,
-                        bookSourceUrl: source.bookSourceUrl
-                    ) != nil {
+                    if SourceLoginURLResolver.resolve(source: source) != nil {
                         Button {
                             onOpenLogin()
                         } label: {

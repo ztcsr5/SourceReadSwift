@@ -11,18 +11,23 @@ struct SourceLoginField: Equatable, Sendable, Identifiable {
         case text
         case password
         case button
+        case toggle
     }
 
     let name: String
     let type: Kind
     let action: String?
+    let choices: [String]
+    let defaultValue: String?
 
     var id: String { type.rawValue + ":" + name }
 
-    init(name: String, type: Kind = .text, action: String? = nil) {
+    init(name: String, type: Kind = .text, action: String? = nil, choices: [String] = [], defaultValue: String? = nil) {
         self.name = name
         self.type = type
         self.action = action
+        self.choices = choices
+        self.defaultValue = defaultValue
     }
 }
 
@@ -36,7 +41,7 @@ enum SourceLoginFieldParser {
         }
         guard let objects = jsonObjects(text) ?? relaxedObjects(text) else { return [] }
         return objects.compactMap { object in
-            guard let name = stringValue(object["name"])?
+            guard let name = stringValue(object["name"] ?? object["title"])?
                 .trimmingCharacters(in: .whitespacesAndNewlines),
                 !name.isEmpty else { return nil }
             let kind = SourceLoginField.Kind(
@@ -47,7 +52,9 @@ enum SourceLoginFieldParser {
             let action = stringValue(object["action"])?
                 .trimmingCharacters(in: .whitespacesAndNewlines)
                 .nilIfEmpty
-            return SourceLoginField(name: name, type: kind, action: action)
+            let choices = (object["chars"] as? [Any])?.compactMap(stringValue) ?? []
+            let defaultValue = stringValue(object["default"] ?? object["value"])
+            return SourceLoginField(name: name, type: kind, action: action, choices: choices, defaultValue: defaultValue)
         }
     }
 
@@ -84,6 +91,13 @@ enum SourceLoginScript {
         loginInfoPrefix + name
     }
 
+    /// A dynamic loginUi is a script, not malformed JSON or a login URL.
+    static func dynamicUI(from raw: String?) -> String? {
+        guard let raw = raw?.trimmingCharacters(in: .whitespacesAndNewlines),
+              raw.hasPrefix("@js:") || raw.lowercased().hasPrefix("<js>") else { return nil }
+        return script(from: raw)
+    }
+
     /// Strips the Legado `@js:` / `<js>…</js>` wrapper.  A source that leaves
     /// `loginUrl` empty has no script; its credentials are only stored.
     static func script(from loginUrl: String?) -> String? {
@@ -114,9 +128,18 @@ enum SourceLoginScript {
         }
         let lowered = raw.lowercased()
         if lowered.hasPrefix("@js:") || lowered.hasPrefix("<js>") { return false }
+        // `// ==== config ====\nvar ...` is a JS comment, not a
+        // protocol-relative URL. This previously disabled 木里/日落 login.
+        if raw.contains(where: { $0.isWhitespace }) || raw.contains("{") || raw.contains("}") {
+            return false
+        }
+        if lowered.hasPrefix("//") {
+            guard let url = URL(string: "https:" + raw), let host = url.host,
+                  !host.isEmpty, host != "." else { return false }
+            return true
+        }
         return lowered.hasPrefix("http://")
             || lowered.hasPrefix("https://")
-            || lowered.hasPrefix("//")
             || lowered.hasPrefix("/")
     }
 }

@@ -16,9 +16,19 @@ protocol SourceEngine: Sendable {
     /// them, evaluates `loginUrl` as JS, then reports the `loginCheckJs`
     /// verdict.  Legado `BaseSource.login()` (BaseSource.kt L47-51).
     func login(source: BookSource, credentials: [String: String]) async -> Result<SourceLoginVerification, SourceEngineError>
+    func loginFields(source: BookSource) async -> Result<[SourceLoginField], SourceEngineError>
+    func performLoginAction(source: BookSource, action: String, credentials: [String: String]) async -> Result<[SourceLoginField], SourceEngineError>
 }
 
 extension SourceEngine {
+    func loginFields(source: BookSource) async -> Result<[SourceLoginField], SourceEngineError> {
+        .success(SourceLoginFieldParser.parse(source.loginUi))
+    }
+
+    func performLoginAction(source: BookSource, action: String, credentials: [String: String]) async -> Result<[SourceLoginField], SourceEngineError> {
+        .failure(.unsupported("This engine does not execute login UI actions"))
+    }
+
     func exploreBooks(source: BookSource, url: String, page: Int) async -> Result<[SearchBook], SourceEngineError> {
         .failure(.rule("Explore not supported"))
     }
@@ -624,7 +634,7 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
             return await verifyLogin(source: source)
         }
 
-        guard let baseURL = URL(string: source.bookSourceUrl),
+        guard let baseURL = URL(string: source.networkBaseURL),
               ["http", "https"].contains(baseURL.scheme?.lowercased() ?? "") else {
             return .failure(.invalidSource("书源 URL 无法用于登录"))
         }
@@ -666,7 +676,7 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
         guard let script = source.loginCheckJs?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty else {
             return .success(SourceLoginVerification(status: .notConfigured, message: "未配置 loginCheckJs", cookiePresent: false))
         }
-        guard let baseURL = URL(string: source.bookSourceUrl),
+        guard let baseURL = URL(string: source.networkBaseURL),
               ["http", "https"].contains(baseURL.scheme?.lowercased() ?? "") else {
             return .failure(.invalidSource("书源 URL 无法用于登录检查"))
         }
@@ -721,6 +731,108 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
             message: value.isEmpty ? "loginCheckJs 返回空值" : "loginCheckJs 返回：\(value.prefix(160))",
             cookiePresent: !(cookieHeader?.isEmpty ?? true)
         ))
+    }
+
+    func loginFields(source: BookSource) async -> Result<[SourceLoginField], SourceEngineError> {
+        guard SourceLoginScript.dynamicUI(from: source.loginUi) != nil else {
+            return .success(SourceLoginFieldParser.parse(source.loginUi))
+        }
+        switch await makeLoginUIContext(source: source) {
+        case .failure(let error): return .failure(error)
+        case .success(let context):
+            defer { context.cleanUp() }
+            return evaluateLoginFields(source: source, context: context)
+        }
+    }
+
+    /// Buttons such as login(), setToken() and menu navigation are JS actions,
+    /// not URLs. A fresh context loads loginUrl definitions and jsLib, and the
+    /// source's persistent store keeps configuration between menu refreshes.
+    func performLoginAction(source: BookSource, action: String, credentials: [String: String]) async -> Result<[SourceLoginField], SourceEngineError> {
+        let action = action.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !action.isEmpty else { return .failure(.invalidSource("登录操作为空")) }
+        let state = persistentState(for: source)
+        for (name, value) in credentials where !name.isEmpty {
+            state.put(value, for: SourceLoginScript.loginInfoKey(name))
+        }
+        switch await makeLoginUIContext(source: source) {
+        case .failure(let error): return .failure(error)
+        case .success(let context):
+            defer { context.cleanUp() }
+            let runtime = context.jsRuntime(ajaxHandler: { _ in "" })
+            let values = loginUIVariables(source: source, context: context)
+            if case .failure(let error) = runtime.evaluate(action, variables: values) {
+                return .failure(error)
+            }
+            return evaluateLoginFields(source: source, context: context)
+        }
+    }
+
+    private func makeLoginUIContext(source: BookSource) async -> Result<RuleExecutionContext, SourceEngineError> {
+        guard let base = URL(string: source.networkBaseURL),
+              ["http", "https"].contains(base.scheme?.lowercased() ?? "") else {
+            return .failure(.invalidSource("书源缺少可用于登录的 HTTP 地址"))
+        }
+        let state = persistentState(for: source)
+        let cookieHeader = await cookieStore.cookieHeader(for: base) ?? ""
+        let context = RuleExecutionContext(
+            initialValues: ["source": source, "baseUrl": base.absoluteString, "cookieHeader": cookieHeader],
+            persistentState: state, source: source, stage: "login.ui"
+        )
+        attachVerificationCodeProvider(context, source: source)
+        // Use the same injected network and cookies as search/detail. This is
+        // also what allows fixture tests to prove login -> search continuity.
+        context.responseHandler = { [weak context, network] encoded in
+            SynchronousSourceNetworkBridge.loadResponse(
+                urlText: encoded, source: source, network: network,
+                cookieHeader: context?.string(for: "cookieHeader"),
+                persistentValues: state.snapshot(), persistentState: state
+            )
+        }
+        context.networkHandler = { [weak context] encoded in
+            context?.responseHandler?(encoded)?.body ?? ""
+        }
+        if let definitions = SourceLoginScript.script(from: source.loginUrl),
+           !SourceLoginScript.isPageURL(source.loginUrl) {
+            let runtime = context.jsRuntime(ajaxHandler: { _ in "" })
+            if case .failure(let error) = runtime.evaluate(definitions, variables: loginUIVariables(source: source, context: context)) {
+                context.cleanUp()
+                return .failure(error)
+            }
+        }
+        return .success(context)
+    }
+
+    private func loginUIVariables(source: BookSource, context: RuleExecutionContext) -> [String: Any] {
+        let state = persistentState(for: source)
+        let prefix = SourceLoginScript.loginInfoPrefix
+        var credentials: [String: String] = [:]
+        for key in state.keys(withPrefix: prefix) {
+            credentials[String(key.dropFirst(prefix.count))] = state.get(key)
+        }
+        return ["source": source, "baseUrl": context.string(for: "baseUrl"),
+                "cookieHeader": context.string(for: "cookieHeader"), "result": credentials]
+    }
+
+    private func evaluateLoginFields(source: BookSource, context: RuleExecutionContext) -> Result<[SourceLoginField], SourceEngineError> {
+        var raw = source.loginUi
+        if let script = SourceLoginScript.dynamicUI(from: raw) {
+            let runtime = context.jsRuntime(ajaxHandler: { _ in "" })
+            switch runtime.evaluate(script, variables: loginUIVariables(source: source, context: context)) {
+            case .success(let output): raw = output
+            case .failure(let error): return .failure(error)
+            }
+        }
+        let state = persistentState(for: source)
+        let fields = SourceLoginFieldParser.parse(raw).map { field in
+            SourceLoginField(name: field.name, type: field.type, action: field.action, choices: field.choices,
+                             defaultValue: state.storedString(for: SourceLoginScript.loginInfoKey(field.name)) ?? field.defaultValue)
+        }
+        if fields.isEmpty, !(raw ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+           raw?.trimmingCharacters(in: .whitespacesAndNewlines) != "[]" {
+            return .failure(.rule("loginUi 未返回有效的表单数组"))
+        }
+        return .success(fields)
     }
 
     /// Repeats the transport when the URL option asked for `retry`

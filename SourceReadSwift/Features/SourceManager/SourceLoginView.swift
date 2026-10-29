@@ -20,16 +20,21 @@ struct SourceLoginView: View {
     @State private var status = "正在打开登录页…"
     @State private var input: [String: String] = [:]
     @State private var busy = false
+    @State private var resolvedFields: [SourceLoginField]?
 
     private var fields: [SourceLoginField] {
-        SourceLoginFieldParser.parse(source.loginUi)
+        resolvedFields ?? SourceLoginFieldParser.parse(source.loginUi)
+    }
+
+    private var hasConfiguredForm: Bool {
+        !(source.loginUi ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 
     var body: some View {
         NavigationStack {
             VStack(spacing: 0) {
                 statusBar
-                if fields.isEmpty {
+                if !hasConfiguredForm {
                     pageContent
                 } else {
                     formContent
@@ -42,7 +47,7 @@ struct SourceLoginView: View {
                     Button("关闭") { dismiss() }
                 }
                 ToolbarItem(placement: .confirmationAction) {
-                    if fields.isEmpty {
+                    if !hasConfiguredForm {
                         Button("完成") { finishWebLogin() }
                             .disabled(busy)
                     } else {
@@ -53,11 +58,11 @@ struct SourceLoginView: View {
             }
         }
         .presentationDetents([.large])
-        .onAppear {
-            if fields.isEmpty, loginTarget?.usedBookSourceFallback == true {
+        .task {
+            if !hasConfiguredForm, loginTarget?.usedBookSourceFallback == true {
                 status = "该书源未配置 loginUrl，已打开书源主页，请登录后点完成"
-            } else if !fields.isEmpty {
-                status = "请输入 \(source.bookSourceName) 的登录信息"
+            } else if hasConfiguredForm {
+                await loadFields()
             }
         }
     }
@@ -148,13 +153,93 @@ struct SourceLoginView: View {
             }
         case .button:
             Button {
-                if let action = field.action, let url = URL(string: action) {
-                    openURL(url)
-                }
+                executeAction(field.action)
             } label: {
                 Text(field.name).frame(maxWidth: .infinity)
             }
             .buttonStyle(.bordered)
+            .disabled(busy)
+        case .toggle:
+            if field.choices.isEmpty {
+                Toggle(field.name, isOn: Binding(
+                    get: { ["true", "1", "on"].contains((input[field.name] ?? "").lowercased()) },
+                    set: { input[field.name] = $0 ? "true" : "false" }
+                ))
+                .disabled(busy)
+            } else {
+                Picker(field.name, selection: binding(for: field.name)) {
+                    ForEach(field.choices, id: \.self) { choice in
+                        Text(choice).tag(choice)
+                    }
+                }
+                .disabled(busy)
+            }
+        }
+    }
+
+    @MainActor
+    private func loadFields() async {
+        guard let engine else {
+            if SourceLoginScript.dynamicUI(from: source.loginUi) != nil {
+                status = "阅读引擎尚未就绪，无法加载动态登录表单"
+            }
+            return
+        }
+        busy = true
+        status = "正在加载书源登录与配置表单…"
+        let result = await engine.loginFields(source: source)
+        busy = false
+        switch result {
+        case .success(let loaded):
+            applyFields(loaded)
+            status = "可输入登录信息，或点击书源提供的操作按钮"
+        case .failure(let error):
+            status = "表单加载失败：\(error.displayMessage)"
+        }
+    }
+
+    private func applyFields(_ loaded: [SourceLoginField]) {
+        resolvedFields = loaded
+        for field in loaded {
+            if let value = field.defaultValue {
+                input[field.name] = value
+            } else if input[field.name] == nil, let first = field.choices.first {
+                input[field.name] = first
+            }
+        }
+    }
+
+    private func executeAction(_ action: String?) {
+        guard let action = action?.trimmingCharacters(in: .whitespacesAndNewlines), !action.isEmpty else {
+            status = "该按钮未配置操作"
+            return
+        }
+        // URL(string:) also accepts login() as a relative URL. Only an
+        // explicit external scheme may go to openURL; JS goes to the engine.
+        if let url = URL(string: action), let scheme = url.scheme?.lowercased(),
+           !["javascript", "data", "file"].contains(scheme) {
+            openURL(url)
+            return
+        }
+        guard let engine else {
+            status = "阅读引擎尚未就绪，无法执行书源操作"
+            return
+        }
+        busy = true
+        status = "正在执行书源操作…"
+        let credentials = input
+        Task {
+            let result = await engine.performLoginAction(source: source, action: action, credentials: credentials)
+            await MainActor.run {
+                busy = false
+                switch result {
+                case .success(let loaded):
+                    applyFields(loaded)
+                    status = "操作已执行，表单已刷新；书源可用性仍以搜索与正文验证为准"
+                case .failure(let error):
+                    status = "操作失败：\(error.displayMessage)"
+                }
+            }
         }
     }
 
@@ -166,6 +251,16 @@ struct SourceLoginView: View {
     }
 
     private func submit() {
+        // Extended Legado sources expose the real login entry as a button.
+        // Evaluating loginUrl alone merely declares login(), it does not call
+        // that function or authenticate the user.
+        if let loginButton = fields.first(where: {
+            $0.type == .button && ($0.action?.trimmingCharacters(in: .whitespacesAndNewlines) == "login()"
+                || ["登录", "登入", "登錄", "立即登录"].contains($0.name))
+        }), let action = loginButton.action {
+            executeAction(action)
+            return
+        }
         guard let engine else {
             status = "阅读引擎尚未就绪，无法提交登录"
             return
@@ -226,7 +321,7 @@ struct SourceLoginView: View {
     private var loginTarget: SourceLoginURLResolver.Target? {
         SourceLoginURLResolver.resolve(
             loginUrl: source.loginUrl,
-            bookSourceUrl: source.bookSourceUrl
+            bookSourceUrl: source.networkBaseURL
         )
     }
 }

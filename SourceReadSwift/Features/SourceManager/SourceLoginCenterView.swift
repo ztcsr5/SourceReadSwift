@@ -32,10 +32,7 @@ struct SourceLoginCenterView: View {
 
     private var entries: [Entry] {
         sources.compactMap { source in
-            guard let target = SourceLoginURLResolver.resolve(
-                loginUrl: source.loginUrl,
-                bookSourceUrl: source.bookSourceUrl
-            ), let host = target.url.host?.lowercased(), !host.isEmpty else { return nil }
+            guard let target = SourceLoginURLResolver.resolve(source: source), let host = target.url.host?.lowercased(), !host.isEmpty else { return nil }
             return Entry(source: source, host: host, usedHomePageFallback: target.usedBookSourceFallback)
         }
     }

@@ -57,9 +57,9 @@ final class RuleExecutionContext: @unchecked Sendable {
             return cached
         }
         let runtime = JSCoreRuntime(ajaxHandler: ajaxHandler, executionContext: self)
-        if let jsLib = source?.raw["jsLib"], !jsLib.isEmpty {
-            runtime.preloadJavaScriptLibrary(jsLib)
-        }
+        // The runtime installs jsLib after binding source and the first rule's
+        // globals. Loading it here freezes an empty source/baseUrl in any
+        // library-level initializer, before evaluate can supply real values.
         cachedRuntime = runtime
         return runtime
     }

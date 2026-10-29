@@ -14,6 +14,10 @@ enum SourceLoginURLResolver {
         let usedBookSourceFallback: Bool
     }
 
+    static func resolve(source: BookSource) -> Target? {
+        resolve(loginUrl: source.loginUrl, bookSourceUrl: source.networkBaseURL)
+    }
+
     static func resolve(loginUrl: String?, bookSourceUrl: String?) -> Target? {
         let sourceBase = baseURL(bookSourceUrl)
         let raw = loginUrl?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
@@ -44,7 +48,10 @@ enum SourceLoginURLResolver {
     }
 
     private static func targetURL(from raw: String, sourceBase: URL?) -> URL? {
-        guard !raw.isEmpty, !raw.hasPrefix("@js:") else { return nil }
+        guard !raw.isEmpty, SourceLoginScript.dynamicUI(from: raw) == nil,
+              !raw.contains(where: { $0.isWhitespace }),
+              !raw.contains("{"), !raw.contains("}"),
+              !raw.contains("("), !raw.contains(")"), !raw.contains(";") else { return nil }
         if raw.hasPrefix("//"), let url = URL(string: "https:" + raw), isHTTP(url) {
             return url
         }

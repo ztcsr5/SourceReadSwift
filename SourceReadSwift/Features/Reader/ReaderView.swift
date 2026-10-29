@@ -2483,7 +2483,7 @@ struct ReaderView: View {
                     .buttonStyle(.borderedProminent)
                     .tint(AppTheme.accent)
                     if let source = currentBookSource,
-                       SourceLoginURLResolver.resolve(loginUrl: source.loginUrl, bookSourceUrl: source.bookSourceUrl) != nil,
+                       SourceLoginURLResolver.resolve(source: source) != nil,
                        chapterFailureSuggestsLogin(failure) {
                         Button("登录书源") {
                             readerLoginSource = source
