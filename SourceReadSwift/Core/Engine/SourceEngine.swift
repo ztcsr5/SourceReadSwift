@@ -235,7 +235,13 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
         )
         switch await loadWithOptionalWebViewFallback(request, source: source, stage: "search.load") {
         case .success(let response):
-            let transformedResponse = transformBodyIfNeeded(response, source: source, rules: [source.ruleSearch], network: network, stateOverride: executionState, executionContext: executionContext)
+            let transformedResponse: SourceResponse
+            switch transformBodyIfNeeded(response, source: source, rules: [source.ruleSearch], network: network, stateOverride: executionState, executionContext: executionContext, requestText: searchUrl, variables: ["key": keyword, "keyword": keyword, "page": page]) {
+            case .success(let value): transformedResponse = value
+            case .failure(let error):
+                await emitFailure(error, stage: "search.bodyJs", source: source)
+                return .failure(error)
+            }
             recordJavaScriptEvidence(source: source, stage: "search", context: executionContext)
             guard !transformedResponse.body.isEmpty else {
                 let error = SourceEngineError.empty("\u{641c}\u{7d22}\u{54cd}\u{5e94}\u{4e3a}\u{7a7a}")
@@ -301,14 +307,17 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
         )
         switch await loadWithOptionalWebViewFallback(request, source: source, stage: "explore.load") {
         case .success(let response):
-            let transformedResponse = transformBodyIfNeeded(
-                response,
-                source: source,
-                rules: [source.ruleExplore, source.ruleSearch],
-                network: network,
-                stateOverride: executionState,
-                executionContext: executionContext
-            )
+            let transformedResponse: SourceResponse
+            switch transformBodyIfNeeded(
+                response, source: source, rules: [source.ruleExplore, source.ruleSearch],
+                network: network, stateOverride: executionState, executionContext: executionContext,
+                requestText: url, variables: ["page": page]
+            ) {
+            case .success(let value): transformedResponse = value
+            case .failure(let error):
+                await emitFailure(error, stage: "explore.bodyJs", source: source)
+                return .failure(error)
+            }
             recordJavaScriptEvidence(source: source, stage: "explore", context: executionContext)
             guard !transformedResponse.body.isEmpty else {
                 let error = SourceEngineError.empty("分类发现响应为空")
@@ -377,7 +386,13 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
         )
         switch await loadWithOptionalWebViewFallback(request, source: source, stage: "detail.load") {
         case .success(let response):
-            let transformedResponse = transformBodyIfNeeded(response, source: source, rules: [source.ruleBookInfo], network: network, stateOverride: executionState, executionContext: executionContext)
+            let transformedResponse: SourceResponse
+            switch transformBodyIfNeeded(response, source: source, rules: [source.ruleBookInfo], network: network, stateOverride: executionState, executionContext: executionContext, requestText: resolvedBookUrl, variables: ["book": book]) {
+            case .success(let value): transformedResponse = value
+            case .failure(let error):
+                await emitFailure(error, stage: "detail.bodyJs", source: source)
+                return .failure(error)
+            }
             recordJavaScriptEvidence(source: source, stage: "detail", context: executionContext)
             let parsed = BookDetailParser(executionContext: executionContext).parse(source: source, book: book, response: transformedResponse)
             if case .failure(let error) = parsed {
@@ -452,7 +467,13 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
         )
         switch await loadWithOptionalWebViewFallback(request, source: source, stage: "toc.load") {
         case .success(let response):
-            let transformedResponse = transformBodyIfNeeded(response, source: source, rules: [source.ruleToc], network: network, stateOverride: executionState, executionContext: executionContext)
+            let transformedResponse: SourceResponse
+            switch transformBodyIfNeeded(response, source: source, rules: [source.ruleToc], network: network, stateOverride: executionState, executionContext: executionContext, requestText: resolvedTocURL, variables: ["book": book]) {
+            case .success(let value): transformedResponse = value
+            case .failure(let error):
+                await emitFailure(error, stage: "toc.bodyJs", source: source)
+                return .failure(error)
+            }
             recordJavaScriptEvidence(source: source, stage: "toc", context: executionContext)
             let parsed = parseChapterListPage(source: source, book: book, response: transformedResponse, executionContext: executionContext)
             if case .failure(let error) = parsed {
@@ -563,7 +584,13 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
         let globalPurifyRules = await purifyRules()
         switch await loadWithOptionalWebViewFallback(request, source: source, stage: "content.load") {
         case .success(let response):
-            let transformedResponse = transformBodyIfNeeded(response, source: source, rules: [source.ruleContent], network: network, stateOverride: executionState, executionContext: executionContext)
+            let transformedResponse: SourceResponse
+            switch transformBodyIfNeeded(response, source: source, rules: [source.ruleContent], network: network, stateOverride: executionState, executionContext: executionContext, requestText: resolvedChapterUrl, variables: ["chapter": chapter]) {
+            case .success(let value): transformedResponse = value
+            case .failure(let error):
+                await emitFailure(error, stage: "content.bodyJs", source: source)
+                return .failure(error)
+            }
             recordJavaScriptEvidence(source: source, stage: "content", context: executionContext)
             let parsed = parseContentPage(
                 source: source,
@@ -1192,14 +1219,19 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
         rules: [SourceRule?] = [],
         network: SourceNetworkClient? = nil,
         stateOverride: RulePersistentState? = nil,
-        executionContext sharedExecutionContext: RuleExecutionContext? = nil
-    ) -> SourceResponse {
+        executionContext sharedExecutionContext: RuleExecutionContext? = nil,
+        requestText: String? = nil,
+        variables additionalVariables: [String: Any] = [:]
+    ) -> Result<SourceResponse, SourceEngineError> {
         var scripts: [String] = []
         if let sourceScript = bodyJSScript(source) { scripts.append(sourceScript) }
+        if let requestText, let script = SourceURLDirectiveParser().parse(requestText).bodyJavaScript {
+            scripts.append(script)
+        }
         for rule in rules {
             if let script = bodyJSScript(rule) { scripts.append(script) }
         }
-        guard !scripts.isEmpty else { return response }
+        guard !scripts.isEmpty else { return .success(response) }
         let state = stateOverride ?? persistentState(for: source)
         let context: RuleExecutionContext
         if let sharedExecutionContext {
@@ -1258,27 +1290,47 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
         }
         var output = response.body
         for script in scripts {
-            let variables: [String: Any] = [
+            var variables: [String: Any] = context.persistentSnapshot().mapValues { $0 as Any }
+            for (key, value) in additionalVariables { variables[key] = value }
+            variables.merge([
                 "result": output,
                 "html": output,
                 "body": output,
                 "baseUrl": response.url.absoluteString,
                 "source": source
-            ]
-            let runtime = JSCoreRuntime(executionContext: context)
+            ], uniquingKeysWith: { _, current in current })
+            // URL construction, jsLib and body transforms share declarations
+            // and the injected network/cookies, instead of reloading the library
+            // in a new runtime for each hook.
+            let runtime = context.jsRuntime(ajaxHandler: context.networkHandler ?? { _ in "" })
             let evaluated = runtime.evaluate(script, variables: variables)
             let result: Result<String, SourceEngineError>
-            if case .failure(.javascript) = evaluated, script.contains("return") {
+            // Only a parse-time top-level return can be retried safely.
+            // A nested function may contain return while the script already
+            // performed requests; replaying an arbitrary runtime error would
+            // duplicate those side effects.
+            if case .failure(.javascript(let message)) = evaluated,
+               message.lowercased().contains("syntaxerror"),
+               message.lowercased().contains("return"),
+               (message.lowercased().contains("only valid inside functions")
+                || message.lowercased().contains("illegal return")
+                || message.lowercased().contains("return not in function")) {
                 result = runtime.evaluate("(function(){\(script)})()", variables: variables)
             } else {
                 result = evaluated
             }
-            guard case .success(let value) = result else { continue }
-            let candidate = value.trimmingCharacters(in: .whitespacesAndNewlines)
-            if !candidate.isEmpty { output = value }
+            if case .failure(let error) = result {
+                context.recordJavaScriptError("bodyJs: " + error.displayMessage)
+                recordJavaScriptEvidence(source: source, stage: context.currentExecutionStage ?? "bodyJs", context: context)
+                return .failure(.javascript("bodyJs: " + error.displayMessage))
+            }
+            guard case .success(let value) = result else { return .failure(.javascript("bodyJs 未返回结果")) }
+            // An empty transformed response is still the script's result,
+            // not permission to parse an untransformed response instead.
+            output = value
         }
-        guard output != response.body else { return response }
-        return SourceResponse(
+        guard output != response.body else { return .success(response) }
+        return .success(SourceResponse(
             url: response.url,
             statusCode: response.statusCode,
             headers: response.headers,
@@ -1287,7 +1339,7 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
             encodedByteCount: response.encodedByteCount,
             bodyWasDecoded: response.bodyWasDecoded,
             contentEncodings: response.contentEncodings
-        )
+        ))
     }
 
     private func parseContentPage(
@@ -1529,7 +1581,13 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
                 }
                 seenURLs.insert(responseCanonicalURL)
                 let state = persistentState(for: source)
-                let transformedResponse = transformBodyIfNeeded(response, source: source, rules: [source.ruleToc], network: network, stateOverride: state, executionContext: executionContext)
+                let transformedResponse: SourceResponse
+                switch transformBodyIfNeeded(response, source: source, rules: [source.ruleToc], network: network, stateOverride: state, executionContext: executionContext, requestText: currentNext, variables: ["book": book]) {
+                case .success(let value): transformedResponse = value
+                case .failure(let error):
+                    await emitFailure(error, stage: "toc.next.bodyJs", source: source)
+                    return .failure(error)
+                }
                 switch parseChapterListPage(source: source, book: book, response: transformedResponse, inheritedVolume: inheritedVolume, executionContext: executionContext) {
                 case .success(let page):
                     inheritedVolume = page.trailingVolume ?? inheritedVolume
@@ -1734,7 +1792,13 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
                 }
                 seenURLs.insert(responseCanonicalURL)
                 let state = persistentState(for: source)
-                let transformedResponse = transformBodyIfNeeded(response, source: source, rules: [source.ruleContent], network: network, stateOverride: state, executionContext: executionContext)
+                let transformedResponse: SourceResponse
+                switch transformBodyIfNeeded(response, source: source, rules: [source.ruleContent], network: network, stateOverride: state, executionContext: executionContext, requestText: currentNext, variables: ["chapter": chapter]) {
+                case .success(let value): transformedResponse = value
+                case .failure(let error):
+                    await emitFailure(error, stage: "content.next.bodyJs", source: source)
+                    return .failure(error)
+                }
                 switch parseContentPage(
                     source: source,
                     chapter: chapter,

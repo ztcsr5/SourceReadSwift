@@ -41,14 +41,14 @@ final class LegadoJavaScriptCompatibilityTests: XCTestCase {
         )
     }
 
-    func testNormalizationConvertsLetAndConstToVar() {
+    func testNormalizationPreservesLexicalDeclarations() {
         let source = #"let a = 1; const b = "let and const in string"; let c = 2;"#
         let normalized = LegadoJavaScriptCompatibility.normalize(source)
-        XCTAssertTrue(normalized.normalizedScript.contains("var a = 1;"))
-        XCTAssertTrue(normalized.normalizedScript.contains("var   b = \"let and const in string\";"))
-        XCTAssertTrue(normalized.normalizedScript.contains("var c = 2;"))
-        XCTAssertTrue(normalized.features.contains("let-to-var"))
-        XCTAssertTrue(normalized.features.contains("const-to-var"))
+        // Rewriting these to var defeated the runtime's independent eval
+        // scopes and allowed a row's `let data` to overwrite jsLib's data.
+        XCTAssertEqual(normalized.normalizedScript, source)
+        XCTAssertFalse(normalized.features.contains("let-to-var"))
+        XCTAssertFalse(normalized.features.contains("const-to-var"))
     }
 
     func testAwaitJavaAjaxAndThenableResponse() throws {

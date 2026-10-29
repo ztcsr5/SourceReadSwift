@@ -430,9 +430,9 @@ struct SearchURLResolver {
                 persistentState: persistentState
             )
         })
-        if let jsLib = source.raw["jsLib"], !jsLib.isEmpty {
-            _ = runtime.evaluate(jsLib)
-        }
+        // evaluate() preloads jsLib once, after all rule globals are bound.
+        // Evaluating it here both ran initializers twice and bound key/baseUrl
+        // too late for the first library invocation.
         return runtime
     }
 

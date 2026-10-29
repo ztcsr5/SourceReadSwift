@@ -149,6 +149,16 @@ struct SourceRequestBuilder {
 
         var headers = sourceHeaders(source, persistentValues: persistentValues)
         mergeHeaders(sourceOptions.headers, into: &headers)
+        // Source login actions persist these separately from static headers.
+        // Apply them to every native request (including JS ajax), while an
+        // explicit URL header remains the final per-request override.
+        mergeHeaders(parseHeaders(persistentValues["source.loginHeader"]), into: &headers)
+        let loginHeaderPrefix = "source.loginHeader."
+        for key in persistentValues.keys.sorted() where key.hasPrefix(loginHeaderPrefix) {
+            let name = String(key.dropFirst(loginHeaderPrefix.count))
+            guard !name.isEmpty, let value = persistentValues[key] else { continue }
+            setHeaderCaseInsensitive(name, value: value, in: &headers)
+        }
         // A cookie written by a Legado JS stage is dynamic state, not a source
         // default.  Apply it after source/custom headers but before the URL
         // directive so an explicit @Header: Cookie=... still wins.

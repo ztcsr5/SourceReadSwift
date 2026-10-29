@@ -50,6 +50,21 @@ final class SourceDynamicLoginTests: XCTestCase {
         }
     }
 
+    func testAJAXCookieIsVisibleInTheSameRuleAndSurvivesTheNextRule() throws {
+        let state = RulePersistentState()
+        let context = RuleExecutionContext(persistentState: state)
+        context.responseHandler = { _ in
+            SourceResponse(url: URL(string: "https://fixture.test/login")!, statusCode: 200,
+                           headers: ["Set-Cookie": "session=fresh; Path=/"], body: "ok", data: Data())
+        }
+        let runtime = context.jsRuntime(ajaxHandler: { _ in "" })
+        XCTAssertEqual(try runtime.evaluate("java.ajax('https://fixture.test/login'); cookieHeader").get(), "session=fresh")
+        XCTAssertEqual(state.get("cookieHeader"), "session=fresh")
+        XCTAssertEqual(try runtime.evaluate("cookieHeader").get(), "session=fresh")
+        _ = try runtime.evaluate("cookieHeader = ''").get()
+        XCTAssertEqual(state.get("cookieHeader"), "", "An explicit JS logout must still clear its cookie")
+    }
+
     func testNameOnlySourceCanUseItsLibraryOriginForActions() async throws {
         let source = BookSource(bookSourceName: "Named source", bookSourceUrl: "书源标签",
                                 loginUrl: "function choose() { source.put('chosen', '1'); }",

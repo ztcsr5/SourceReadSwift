@@ -214,6 +214,9 @@ final class JSCoreRuntime {
                 effectiveVariables["src"] = htmlVal
             }
         }
+        if effectiveVariables["cookieHeader"] == nil {
+            effectiveVariables["cookieHeader"] = executionContext.string(for: "cookieHeader")
+        }
         // Legado's `java.get(key)` reads only the `@put` store.  Binding the
         // bridge objects (`source`, `book`, `chapter`, DOM nodes) into that
         // store makes `java.get('source')` return Swift's default struct
@@ -695,7 +698,7 @@ final class JSCoreRuntime {
             stage: executionContext.currentExecutionStage
         ))
         synchronizeExecutionContextFromJavaScript()
-        if result.isArray || result.toString() == "[object Object]" {
+        if result.isArray || (result.isObject && result.toString() == "[object Object]") {
             if let stringifyFunc = context.objectForKeyedSubscript("JSON" as NSString)?.objectForKeyedSubscript("stringify" as NSString),
                let jsonValue = stringifyFunc.call(withArguments: [result]),
                !jsonValue.isUndefined && !jsonValue.isNull,
@@ -775,6 +778,14 @@ final class JSCoreRuntime {
                   !value.isNull else { continue }
             executionContext.setValue(value.toObject(), for: key)
         }
+    }
+
+    private func ingestJavaScriptResponse(_ response: SourceResponse) {
+        executionContext.ingestResponse(response)
+        // The native response changes the store during eval. Without updating
+        // its JS mirror, synchronization at the end overwrites new cookies
+        // with the pre-request value (often an empty login cookie).
+        context.setObject(executionContext.string(for: "cookieHeader"), forKeyedSubscript: "cookieHeader" as NSString)
     }
 
     private func installNativeClosures() {
@@ -1005,7 +1016,7 @@ final class JSCoreRuntime {
             guard let runtime = weakSelf else { return [:] }
             let requestText = runtime.requestText(url: url, body: nil, headers: headers, includeStoredBody: false)
             if let response = runtime.executionContext.responseHandler?(requestText) {
-                runtime.executionContext.ingestResponse(response)
+                runtime.ingestJavaScriptResponse(response)
                 return responseMetadata(response)
             }
             if let handler = runtime.executionContext.networkHandler {
@@ -1024,7 +1035,7 @@ final class JSCoreRuntime {
             guard let runtime = weakSelf else { return [] }
             let requestText = runtime.requestText(url: url, body: nil, headers: headers, includeStoredBody: false)
             if let response = runtime.executionContext.responseHandler?(requestText) {
-                runtime.executionContext.ingestResponse(response)
+                runtime.ingestJavaScriptResponse(response)
                 if !response.data.isEmpty {
                     return response.data.map { NSNumber(value: $0) } as NSArray
                 }
@@ -1044,7 +1055,7 @@ final class JSCoreRuntime {
             guard let runtime = weakSelf else { return "" }
             let requestText = runtime.requestText(url: url, body: nil, headers: headers, includeStoredBody: false)
             if let response = runtime.executionContext.responseHandler?(requestText) {
-                runtime.executionContext.ingestResponse(response)
+                runtime.ingestJavaScriptResponse(response)
                 return response.body
             }
             if let handler = runtime.executionContext.networkHandler { return handler(requestText) }
@@ -1055,7 +1066,7 @@ final class JSCoreRuntime {
         let post: @convention(block) (String, String, String) -> String = { url, body, headers in
             let requestText = weakSelf?.requestText(url: url, body: body, headers: headers, includeStoredBody: true) ?? "\(url)@Body:\(body)"
             if let response = weakSelf?.executionContext.responseHandler?(requestText) {
-                weakSelf?.executionContext.ingestResponse(response)
+                weakSelf?.ingestJavaScriptResponse(response)
                 return response.body
             }
             return weakSelf?.executionContext.networkHandler?(requestText) ?? ajaxHandler?(requestText) ?? ""
@@ -1064,7 +1075,7 @@ final class JSCoreRuntime {
             guard let runtime = weakSelf else { return [:] }
             let requestText = runtime.requestText(url: url, body: body, headers: headers, includeStoredBody: true)
             if let response = runtime.executionContext.responseHandler?(requestText) {
-                runtime.executionContext.ingestResponse(response)
+                runtime.ingestJavaScriptResponse(response)
                 return responseMetadata(response)
             }
             let value: String
@@ -1087,7 +1098,7 @@ final class JSCoreRuntime {
                 forceMethodDirective: forceMethodDirective
             )
             if let response = runtime.executionContext.responseHandler?(requestText) {
-                runtime.executionContext.ingestResponse(response)
+                runtime.ingestJavaScriptResponse(response)
                 return responseMetadata(response)
             }
             let value: String

@@ -19,6 +19,8 @@ struct SourceURLDirective: Equatable {
     var retry: Int?
     /// Legado `UrlOption.type` (L185): response kind (`json` / `html`).
     var responseType: String?
+    /// Response transformation attached to this URL, not a source-wide hook.
+    var bodyJavaScript: String?
 
     init(
         urlText: String,
@@ -31,7 +33,8 @@ struct SourceURLDirective: Equatable {
         webJs: String? = nil,
         urlJavaScript: String? = nil,
         retry: Int? = nil,
-        responseType: String? = nil
+        responseType: String? = nil,
+        bodyJavaScript: String? = nil
     ) {
         self.urlText = urlText
         self.method = method
@@ -44,6 +47,7 @@ struct SourceURLDirective: Equatable {
         self.urlJavaScript = urlJavaScript
         self.retry = retry
         self.responseType = responseType
+        self.bodyJavaScript = bodyJavaScript
     }
 }
 
@@ -67,6 +71,7 @@ struct SourceURLDirectiveParser {
         var urlJavaScript: String?
         var retry: Int?
         var responseType: String?
+        var bodyJavaScript: String?
 
         let directives = splitURLAndTrailingDirectives(working)
         working = directives.url
@@ -117,6 +122,9 @@ struct SourceURLDirectiveParser {
             urlJavaScript = firstString(in: options, keys: ["js"])?
                 .trimmingCharacters(in: .whitespacesAndNewlines)
                 .nilIfEmpty
+            bodyJavaScript = firstString(in: options, keys: ["bodyJs", "bodyjs", "bodyJS"])?
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+                .nilIfEmpty
             if let rawRetry = firstValue(in: options, keys: ["retry"]),
                let parsedRetry = integerValue(rawRetry),
                parsedRetry > 0 {
@@ -144,7 +152,8 @@ struct SourceURLDirectiveParser {
             webJs: webJs,
             urlJavaScript: urlJavaScript,
             retry: retry,
-            responseType: responseType
+            responseType: responseType,
+            bodyJavaScript: bodyJavaScript
         )
     }
 

@@ -2,6 +2,22 @@ import XCTest
 @testable import SourceReadSwift
 
 final class SourceRequestBuilderDynamicStateTests: XCTestCase {
+    func testLoginHeadersOverrideStaticHeadersAndDirectiveOverridesLogin() {
+        let source = BookSource(bookSourceName: "Login headers", bookSourceUrl: "https://fixture.example/",
+                                header: #"{"authorization":"static","X-Mode":"static"}"#)
+        let state = ["source.loginHeader": #"{"Authorization":"Bearer login","X-Mode":"login"}"#,
+                     "source.loginHeader.X-Mode": "field"]
+        let request = SourceRequestBuilder().buildPageRequest(source: source,
+            urlText: "https://fixture.example/search", persistentValues: state)
+        XCTAssertEqual(request.headers["Authorization"], "Bearer login")
+        XCTAssertNil(request.headers["authorization"])
+        XCTAssertEqual(request.headers["X-Mode"], "field")
+        let explicit = SourceRequestBuilder().buildPageRequest(source: source,
+            urlText: #"https://fixture.example/search@Header:{"authorization":"directive"}"#, persistentValues: state)
+        XCTAssertEqual(explicit.headers["authorization"], "directive")
+        XCTAssertNil(explicit.headers["Authorization"])
+    }
+
     func testPersistentTokenInterpolatesURLHeadersAndBody() throws {
         let source = BookSource(
             bookSourceName: "Dynamic fixture",

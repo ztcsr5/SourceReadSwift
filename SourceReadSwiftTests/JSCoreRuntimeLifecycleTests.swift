@@ -60,6 +60,13 @@ final class JSCoreRuntimeLifecycleTests: XCTestCase {
         XCTAssertEqual(try runtime.evaluate("libraryData()").get(), "library")
     }
 
+    func testConstCannotBeReassignedAndBlockLetDoesNotEscape() throws {
+        let runtime = JSCoreRuntime()
+        XCTAssertThrowsError(try runtime.evaluate("const value = 1; value = 2; value").get())
+        XCTAssertEqual(try runtime.evaluate("if (true) { let row = 'inside'; } typeof row").get(), "undefined")
+        XCTAssertEqual(try runtime.evaluate("'after failed const'").get(), "after failed const")
+    }
+
     func testSourceNamedLexicalVariableInSearchRowDoesNotConflictWithSourceBridge() throws {
         // 76-source corpus #13 书山聚合 declares `let source = result.source`
         // in its per-row bookUrl rule. The global source facade is a var;

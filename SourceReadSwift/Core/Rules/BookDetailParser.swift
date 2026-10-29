@@ -433,12 +433,17 @@ struct BookDetailParser {
         guard let sanitized = sanitizeSingleURL(text) else { return nil }
         let trimmed = sanitized.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return nil }
-        if trimmed.hasPrefix("@js:") || trimmed.hasPrefix("<js>") {
+        // Foundation must only see the URL. Feeding the request options to
+        // URL(string:) percent-encodes JSON braces/quotes into the address and
+        // loses POST/bodyJs when the next stage reparses the directive.
+        let (urlPart, suffixPart) = SearchURLResolver.splitURLAndDirectiveSuffix(trimmed)
+        if urlPart.hasPrefix("@js:") || urlPart.hasPrefix("<js>") {
             return nil
         }
-        if let absolute = URL(string: trimmed), absolute.scheme != nil {
-            return absolute.absoluteString
+        if let absolute = URL(string: urlPart), absolute.scheme != nil {
+            return absolute.absoluteString + suffixPart
         }
-        return URL(string: trimmed, relativeTo: base)?.absoluteURL.absoluteString
+        guard let relative = URL(string: urlPart, relativeTo: base) else { return nil }
+        return relative.absoluteURL.absoluteString + suffixPart
     }
 }
