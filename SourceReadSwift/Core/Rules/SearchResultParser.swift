@@ -412,10 +412,14 @@ struct SearchResultParser {
         let filtered = books
         if filtered.isEmpty {
             let jsError = executionContext.currentJavaScriptError
-            let message = candidates.isEmpty
-                ? (jsError.map { "搜索规则 JS 异常：\($0)" }
-                    ?? "JSON 列表规则未命中（0 项，响应 \(response.body.count) 字符；结构 \(Self.jsonShapeHint(response.body))）")
-                : "JSON 列表命中 \(candidates.count) 项但书名或链接为空"
+            let message: String
+            if candidates.isEmpty {
+                message = jsError.map { "搜索规则 JS 异常：\($0)" }
+                    ?? "JSON 列表规则未命中（0 项，响应 \(response.body.count) 字符；结构 \(Self.jsonShapeHint(response.body))）"
+            } else {
+                message = "JSON 列表命中 \(candidates.count) 项但书名或链接为空"
+                    + (jsError.map { "（\($0)）" } ?? "")
+            }
             return .failure(.empty(message))
         }
         return .success(Array(filtered))

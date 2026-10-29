@@ -820,4 +820,27 @@ final class JSCoreRuntimeTests: XCTestCase {
             }
         }
     }
+
+    /// Legado sources build query strings with `for (var k in params)`.
+    /// The String-helper bridge installs methods on the object prototype, and
+    /// an enumerable definition would append `&split=&trim=...` to every
+    /// request (七猫 signs the query, so the extra fields break the request).
+    func testStringHelperBridgeDoesNotPolluteForInEnumeration() throws {
+        let runtime = RuleExecutionContext().jsRuntime(ajaxHandler: { _ in "" })
+        let script = """
+        (function() {
+            var params = { id: 1784900, page: 1 };
+            var keys = [];
+            for (var k in params) { keys.push(k); }
+            return keys.join(',');
+        })()
+        """
+        let result = runtime.evaluate(script, variables: ["result": ["id": 1784900, "page": 1]])
+        switch result {
+        case .success(let value):
+            XCTAssertEqual(value, "id,page")
+        case .failure(let error):
+            XCTFail("for-in probe failed: \(error.localizedDescription)")
+        }
+    }
 }

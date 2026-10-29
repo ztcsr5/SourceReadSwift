@@ -199,7 +199,7 @@ final class JSCoreRuntime {
                     (function(obj) {
                         var proto = Object.getPrototypeOf(obj);
                         if (proto && !proto._hasStringMethods) {
-                            proto._hasStringMethods = true;
+                            Object.defineProperty(proto, '_hasStringMethods', { value: true, enumerable: false, configurable: true });
                             var stringMethods = [
                                 'replace', 'replaceAll', 'match', 'matchAll', 'search',
                                 'split', 'slice', 'substring', 'substr',
@@ -210,10 +210,20 @@ final class JSCoreRuntime {
                             ];
                             stringMethods.forEach(function(name) {
                                 if (!proto[name] && typeof String.prototype[name] === 'function') {
-                                    proto[name] = function() {
-                                        var s = this.toString();
-                                        return String.prototype[name].apply(s, arguments);
-                                    };
+                                    // Legado sources serialize request objects with
+                                    // `for (var k in params)`.  An enumerable helper
+                                    // on Object.prototype would add `&split=` and
+                                    // friends to every such query, so the method
+                                    // must stay invisible to for-in.
+                                    Object.defineProperty(proto, name, {
+                                        value: function() {
+                                            var s = this.toString();
+                                            return String.prototype[name].apply(s, arguments);
+                                        },
+                                        enumerable: false,
+                                        configurable: true,
+                                        writable: true
+                                    });
                                 }
                             });
                         }
