@@ -746,6 +746,15 @@ struct ReaderView: View {
                     .allowsHitTesting(false)
                 }
 
+            // The web view scrolls body text beneath the forced system status
+            // bar. Paint one theme-coloured scrim over that band so the clock
+            // and battery never sit on moving text; the optional in-reader
+            // header is drawn above this layer.
+            if readerMode == .scroll, showSystemStatusBar, !showOverlay {
+                statusBarScrollScrim
+                    .transition(.opacity)
+            }
+
             // 分页模式的页眉页脚画在每一页内部（见 pageSurface），
             // 这样 page-curl 的每一张纸都自带页码和章节名，也不会出现
             // 「全局页眉压在页面上、位置又跟安全区打架」的问题。
@@ -2784,6 +2793,32 @@ struct ReaderView: View {
         .buttonStyle(.plain)
     }
 
+    /// Fixed top scrim for scroll mode when the system status bar is forced
+    /// visible. Height comes from ReaderScrollChromePolicy so the band keeps
+    /// covering the status bar and the in-reader header after safe-area changes.
+    private var statusBarScrollScrim: some View {
+        let scrimHeight = ReaderScrollChromePolicy.statusScrimHeight(
+            safeTop: readerTopSafeInset,
+            headerVisible: statusPosition == "top" || statusPosition == "both"
+        )
+        return VStack(spacing: 0) {
+            // Solid band over the status bar; only the last 10pt fade into
+            // the first line so the header band never goes half-transparent.
+            readerThemeBackground.opacity(0.97)
+                .frame(height: max(scrimHeight - 10, 0))
+            LinearGradient(
+                colors: [readerThemeBackground.opacity(0.97), readerThemeBackground.opacity(0)],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+            .frame(height: 10)
+            Spacer(minLength: 0)
+        }
+        .ignoresSafeArea(edges: .top)
+        .allowsHitTesting(false)
+        .accessibilityHidden(true)
+    }
+
     /// The reader already reserves `footerHeight` below the last line in every
     /// mode, but the band stayed empty, so a full-screen page showed no clock,
     /// battery or progress once the chrome auto-hid.  This fills that reserved
@@ -3311,10 +3346,13 @@ struct ReaderView: View {
 
     private var settingsPanel: some View {
         GeometryReader { proxy in
-            let bottomPadding = max(readerFooterSafeInset, 14)
+            let bottomPadding = max(readerFooterSafeInset, 10) + 10
             let maxHeight = ReaderSettingsLayoutPolicy.maxPanelHeight(
                 viewportHeight: proxy.size.height,
                 bottomInset: readerFooterSafeInset
+            )
+            let panelWidth = ReaderSettingsLayoutPolicy.maxPanelWidth(
+                viewportWidth: proxy.size.width
             )
 
             VStack {
@@ -3387,18 +3425,32 @@ struct ReaderView: View {
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .clipped()
                 }
+                .frame(width: panelWidth)
                 .frame(maxWidth: .infinity)
                 .frame(height: maxHeight)
-                // 先铺一层不透明主题底色，再叠玻璃：只靠 ultraThinMaterial 会透出下面正文，
-                // 视觉上就是「东西穿过这个框」。底色跟着阅读主题走，不破坏整体风格。
+                // Match the top and bottom bars: one opaque theme layer, one
+                // hairline, one 16pt gutter. Stacking .ultraThinMaterial on
+                // top of the theme colour made the sheet read wider than the
+                // chrome and let body text ghost through.
                 .background(
                     readerThemeBackground.opacity(0.97),
-                    in: RoundedRectangle(cornerRadius: 28, style: .continuous)
+                    in: RoundedRectangle(cornerRadius: 18, style: .continuous)
                 )
-                .glassPanel(cornerRadius: 28, material: .ultraThinMaterial, strokeOpacity: colorScheme == .dark ? 0.08 : 0.12, shadowOpacity: colorScheme == .dark ? 0.35 : 0.18)
-                .contentShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
-                .clipShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
-                .padding(.horizontal, 12)
+                .overlay {
+                    RoundedRectangle(cornerRadius: 18, style: .continuous)
+                        .stroke(
+                            Color.primary.opacity(background.isDark ? 0.09 : 0.12),
+                            lineWidth: 0.6
+                        )
+                }
+                .shadow(
+                    color: Color.black.opacity(background.isDark ? 0.30 : 0.10),
+                    radius: 18,
+                    x: 0,
+                    y: 8
+                )
+                .contentShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+                .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
                 .padding(.bottom, bottomPadding)
                 .zIndex(3)
             }

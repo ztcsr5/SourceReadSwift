@@ -64,6 +64,53 @@ final class ReaderAutomationPolicyTests: XCTestCase {
         )
     }
 
+    func testSettingsPanelWidthMatchesChromeGutterAndCapsOnTablets() {
+        // Phone: 16pt gutters on both sides, same as the top/bottom bars.
+        XCTAssertEqual(
+            ReaderSettingsLayoutPolicy.maxPanelWidth(viewportWidth: 390),
+            358,
+            accuracy: 0.001
+        )
+        // Tablet / landscape: cap the reading width instead of stretching.
+        XCTAssertEqual(
+            ReaderSettingsLayoutPolicy.maxPanelWidth(viewportWidth: 844),
+            560,
+            accuracy: 0.001
+        )
+        XCTAssertEqual(
+            ReaderSettingsLayoutPolicy.maxPanelWidth(viewportWidth: 1024),
+            560,
+            accuracy: 0.001
+        )
+        // Degenerate widths never produce a negative frame.
+        XCTAssertEqual(
+            ReaderSettingsLayoutPolicy.maxPanelWidth(viewportWidth: 24),
+            0,
+            accuracy: 0.001
+        )
+    }
+
+    func testScrollStatusScrimCoversStatusBarAndOptionalHeaderBand() {
+        // Dynamic Island portrait: 59pt safe area + 10pt fade.
+        XCTAssertEqual(
+            ReaderScrollChromePolicy.statusScrimHeight(safeTop: 59, headerVisible: false),
+            69,
+            accuracy: 0.001
+        )
+        // With the in-reader header: add headerTopGap (2) + band (22).
+        XCTAssertEqual(
+            ReaderScrollChromePolicy.statusScrimHeight(safeTop: 59, headerVisible: true),
+            93,
+            accuracy: 0.001
+        )
+        // Unknown safe area still leaves a usable status-bar band.
+        XCTAssertEqual(
+            ReaderScrollChromePolicy.statusScrimHeight(safeTop: 0, headerVisible: false),
+            30,
+            accuracy: 0.001
+        )
+    }
+
     func testScrollTargetAccountsForContainerInsetAndClampsToContentBounds() {
         let target = ReaderScrollPositionPolicy.targetContentOffsetY(
             textRectMinY: 260,

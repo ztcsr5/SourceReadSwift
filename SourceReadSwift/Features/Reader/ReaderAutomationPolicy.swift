@@ -60,6 +60,25 @@ enum ReaderSettingsLayoutPolicy {
         let available = max(viewportHeight - max(bottomInset, 14) - 24, 320)
         return min(max(viewportHeight * 0.84, 420), min(760, available))
     }
+
+    /// Menu panels share one gutter with the top/bottom bars: 16pt per side on
+    /// phones, capped at a 560pt reading width on tablets and landscape.
+    static func maxPanelWidth(viewportWidth: CGFloat) -> CGFloat {
+        min(560, max(viewportWidth - 32, 0))
+    }
+}
+
+/// Keeps the fixed status-bar scrim in scroll mode large enough for the system
+/// bar plus (optionally) the in-reader chapter/clock band. Without it the
+/// WKWebView text scrolls visibly underneath the clock and battery.
+enum ReaderScrollChromePolicy {
+    static func statusScrimHeight(safeTop: CGFloat, headerVisible: Bool) -> CGFloat {
+        let statusBar = max(safeTop, 20)
+        let headerBand = headerVisible
+            ? ReaderPageChrome.headerTopGap + ReaderPageChrome.scrollHeaderBandHeight
+            : 0
+        return statusBar + headerBand + 10
+    }
 }
 
 struct ReaderAutomationPolicy {
