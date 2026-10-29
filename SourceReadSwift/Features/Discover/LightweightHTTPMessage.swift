@@ -24,7 +24,7 @@ enum LightweightHTTPParseResult {
 
 enum LightweightHTTPParser {
     static let maximumHeaderBytes = 64 * 1024
-    static let maximumBodyBytes = 2 * 1024 * 1024
+    static let maximumBodyBytes = 16 * 1024 * 1024
     private static let crlfHeaderDelimiter = Data([13, 10, 13, 10])
     private static let lfHeaderDelimiter = Data([10, 10])
 

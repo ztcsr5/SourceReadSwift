@@ -676,9 +676,17 @@ struct ReaderNumberInput: View {
                 if !isEditing { commit() }
             }, onCommit: commit)
             .keyboardType(.numbersAndPunctuation)
-            .multilineTextAlignment(.trailing)
-            .textFieldStyle(.roundedBorder)
-            .frame(width: 54)
+            .multilineTextAlignment(.center)
+            .textFieldStyle(.plain)
+            .foregroundStyle(.primary)
+            // 系统深色模式下 .roundedBorder 会渲染成纯黑方块，和阅读面板脱节；
+            // 改用主题中性的半透明底 + 圆角，深浅背景下都可读。
+            .frame(width: 56, height: 30)
+            .background(Color.primary.opacity(0.08), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .stroke(Color.primary.opacity(0.12), lineWidth: 0.6)
+            }
             .focused($focused)
             .accessibilityLabel("输入\(title)")
 

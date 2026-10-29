@@ -181,7 +181,7 @@ struct PageCurlReaderView<Item: Identifiable, Content: View>: UIViewControllerRe
         /// old code built a fresh SwiftUI tree (including a full attributed
         /// page) inside `viewControllerBefore/After` while the finger was
         /// already moving, which showed up as a hitch at the start of every
-        /// swipe. Sixteen entries cover fast flicks in both directions and
+        /// swipe. Thirty-two entries cover fast flicks in both directions and
         /// keep a page that was just left alive when the reader swipes back.
         func viewController(at index: Int) -> UIViewController {
             guard parent.pages.indices.contains(index) else {
@@ -207,7 +207,7 @@ struct PageCurlReaderView<Item: Identifiable, Content: View>: UIViewControllerRe
             if hostingControllers.updateValue(controller, forKey: key) == nil {
                 hostingOrder.append(key)
             }
-            while hostingOrder.count > 16 {
+            while hostingOrder.count > 32 {
                 let evicted = hostingOrder.removeFirst()
                 hostingControllers.removeValue(forKey: evicted)
             }
@@ -255,9 +255,10 @@ struct PageCurlReaderView<Item: Identifiable, Content: View>: UIViewControllerRe
             // dropped by the bounds check inside the closure.
             let candidates = [
                 index + 1, index - 1, index + 2, index - 2,
-                index + 3, index - 3, index + 4, index - 4
+                index + 3, index - 3, index + 4, index - 4,
+                index + 5, index - 5, index + 6, index - 6
             ]
-            let delays: [Int] = [0, 8, 16, 32, 48, 64, 80, 96]
+            let delays: [Int] = [0, 8, 16, 24, 32, 48, 64, 80, 96, 112, 128, 144]
             for (offset, candidate) in candidates.enumerated() {
                 // Spread the work over consecutive runloop turns. Building
                 // eight hosting trees in one turn just moved the hitch from
@@ -269,24 +270,28 @@ struct PageCurlReaderView<Item: Identifiable, Content: View>: UIViewControllerRe
                           self.cachedRevision == self.parent.contentRevision else { return }
                     guard self.parent.pages.indices.contains(candidate) else { return }
                     let controller = self.viewController(at: candidate)
-                    // Creating the controller is cheap because SwiftUI defers
-                    // the page body until the view loads. UIPageViewController
-                    // then paid for that body - attributed string, TextKit
-                    // surface, header/footer - inside the swipe gesture, which
-                    // is the per-page loading hitch users reported. Load and
-                    // lay the page out now, on an idle frame.
-                    controller.loadViewIfNeeded()
+                    guard let host = controller as? PageHostingController<Content> else { return }
+                    // Stage the work by distance. Laying out every neighbour
+                    // made UIPageViewController wait for six pages while the
+                    // finger was already moving - the stall at the start of
+                    // every swipe.
+                    //   ±1/±2 build + lay out: nothing left for the swipe
+                    //   ±3/±4 build the hosting view only
+                    //   ±5/±6 reserve the controller; the body stays lazy
+                    guard offset <= 7 else { return }
                     // `viewController(at:)` is typed as UIViewController so
                     // UIPageViewController can consume it directly; the
                     // layout-report flag only exists on the hosting subclass.
-                    let host = controller as? PageHostingController<Content>
-                    host?.suppressesLayoutReport = true
-                    let size = self.parent.prewarmSize
-                    if size.width > 1, size.height > 1 {
-                        controller.view.frame = CGRect(origin: .zero, size: size)
-                        controller.view.layoutIfNeeded()
+                    host.suppressesLayoutReport = true
+                    controller.loadViewIfNeeded()
+                    if offset <= 3 {
+                        let size = self.parent.prewarmSize
+                        if size.width > 1, size.height > 1 {
+                            controller.view.frame = CGRect(origin: .zero, size: size)
+                            controller.view.layoutIfNeeded()
+                        }
                     }
-                    host?.suppressesLayoutReport = false
+                    host.suppressesLayoutReport = false
                 }
             }
         }

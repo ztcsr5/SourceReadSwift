@@ -1,189 +1,121 @@
-# 76 条书源逐条总表（1.0.103）
+# 书源 76 条总表（build 113 真机 web 实测）
 
-- 数据：`E:\codex-temp\sourceread\artifacts\sweep76_share11_1029b.json`（1.0.98/99 真机）
-- 输入：`D:\QQ游戏\shareBookSource11.json`（76 条，原始顺序编号 01–76）
-- 判定：PASS4 = 搜索≥1 + 详情 + 目录≥1 + 正文>0；**这是结构通过，不是正文质量通过**
-- 状态：PASS4 8 / 空壳 20 / 有规则但失败 48（搜索 32 + 目录 7 + 详情 4 + 正文 1 + 驱动 1 + 登录 3）
+- 生成时间：2026-10-30 03:46
+- 设备端：`http://192.168.31.205:8080`，`/api/status` sourceCount=76 / enabled=70
+- 数据源：`E:\codex-temp\sourceread\artifacts\sweep76_device_113.jsonl`（每条 `step=all`，关键词「剑来」）
+- 判定：`toc_n>0 && chars>=100 && 无❌正文失败` → PASS；`search_n==0` 记 PASS_EXPLORE；有任一非空但未达标 → PARTIAL；全空 → FAIL
+- 合计：**76 条**，已完成 **76 条**
 
-## 0. 总览
+## 汇总
 
-| 状态 | 数量 | 说明 |
-|---|---:|---|
-| PASS4 | 8 | 搜索/详情/目录/正文全通 |
-| NO_SEARCH_URL | 20 | 只有名称+URL，无任何规则 |
-| FAIL | 32 | 搜索阶段失败 |
-| FAIL_TOC | 7 | 详情成功，目录 0 章 |
-| FAIL_DETAIL | 4 | 搜索成功，详情失败 |
-| FAIL_CONTENT | 1 | 搜索/详情/目录通，正文 0 字 |
-| DRIVER_ERROR | 1 | 请求驱动超时 |
-| LOGIN | 3 | HTTP 401，需要登录 |
+| 分类 | 数量 | 占比 |
+|---|---|---|
+| ✅ 搜索+目录+正文全部通过 | 23 | 30% |
+| ⚠️ 部分可用 | 11 | 14% |
+| ❌ 失败 | 41 | 54% |
+| ⏱ 超时 | 1 | 1% |
+| **合计** | **76** | 100% |
 
-旧 10 → 新 8：两次都 PASS 6 条；仅旧 PASS 4 条（52书库、Icu、八叉二合一、番茄沐凡）；仅新 PASS 2 条（无错、有听网）。原因见 `SOURCE_BASELINE_1_0_103.md`。
+## 明细
 
-## 1. PASS4（8 条）
+### ✅ 搜索+目录+正文全部通过（23）
 
-| # | 书源 | URL | 搜索 | 目录 | 字数 | 关键词 | 备注 |
-|---|---|---|---:|---:|---:|---|---|
-| 01 | 番茄小说TS | https://fq.tangsongxs.com | 9 | 30 | 1112 | 斗破苍穹 | 正文≥500 字 |
-| 06 | 免费追书 | http://cread.com | 20 | 30 | 2467 | 斗破苍穹 | 正文≥500 字 |
-| 10 | 反代番茄 | https://fqapi.tongle.dev | 17 | 30 | 1024 | 斗破苍穹 | 正文≥500 字 |
-| 29 | 小原文学网 | https://www.min-yuan.com/ | 20 | 30 | 1267 | 斗破苍穹 | 正文≥500 字 |
-| 31 | ⭐七猫听书[官方]v0.2✨ | https://api-bc.wtzw.com#七猫听书 | 10 | 1 | 115 | 斗破苍穹 | 低正文（<500 字） |
-| 32 | 无错 | https://www.wcshuba.com | 60 | 30 | 2092 | 斗破苍穹 | 正文≥500 字 |
-| 55 | 有听网 | https://m.ting15.com/ | 3 | 30 | 208 | 斗破苍穹 | 低正文（<500 字） |
-| 76 | ⚡📂小原文学网 | https://www.min-yuan.com | 20 | 30 | 1267 | 斗破苍穹 | 正文≥500 字 |
+| # | 书源 | 域名 | 搜索 | 目录 | 正文 | 耗时s | 备注 |
+|---|---|---|---|---|---|---|---|
+| 1 | 52书库 | www.52shuku.net#🐳 | 7 | 30 | 7282 | 3.3 |  |
+| 2 | QQ浏览器-完整分类-v7 | so.html5.qq.com | 41 | 30 | 2980 | 4.1 |  |
+| 3 | biquge2345 | www.biquge2345.com | 34 | 30 | 2535 | 2.0 |  |
+| 4 | bqg128 | www.bqg128.cc | 24 | 30 | 1084 | 32.7 |  |
+| 5 | ⚡📂小原文学网 | www.min-yuan.com | 17 | 30 | 3003 | 2.6 |  |
+| 6 | ⭐七猫听书[官方]v0.2✨ | api-bc.wtzw.com#七猫听书 | 10 | 1 | 115 | 1.7 |  |
+| 7 | ⭐百度小说[官方]v1.0✨ | novelapi.baidu.com#百度小说官方API | 10 | 30 | 349 | 3.9 |  |
+| 8 | 七猫四合一本地版（同人） | 七猫四合一本地版（同人） | 9 | 30 | 136 | 2.4 |  |
+| 9 | 东滩小说 | www.dongtanxs.com | 50 | 30 | 10200 | 2.0 |  |
+| 10 | 免费追书 | cread.com | 20 | 30 | 3235 | 1.6 |  |
+| 11 | 夜读阁 | www.yeduge.com | 10 | 10 | 5990 | 2.6 |  |
+| 12 | 天域小说 | www.tianyu8.org | 46 | 30 | 2627 | 3.7 |  |
+| 13 | 小原文学网 | www.min-yuan.com | 17 | 30 | 3003 | 2.4 |  |
+| 14 | 无错 | www.wcshuba.com | 60 | 30 | 2236 | 12.1 |  |
+| 15 | 日落小说 | fqv1.sscrl.vip | 10 | 30 | 726964 | 21.0 |  |
+| 16 | 有听网 | m.ting15.com | 1 | 30 | 193 | 16.7 |  |
+| 17 | 爱奇电子书 | www.xqb8.org | 44 | 30 | 2627 | 3.5 |  |
+| 18 | 番茄小说TS | fq.tangsongxs.com | 10 | 30 | 2609 | 15.9 |  |
+| 19 | 话本小说 | www.ihuaben.com | 30 | 30 | 1070 | 1.6 |  |
+| 20 | 连尚读书[官方] | read.zhulang.com | 20 | 30 | 32024 | 13.0 |  |
+| 21 | 🍅木里番茄0922[GO聚合版] | 154.58.233.54:1968 | 10 | 30 | 726933 | 14.5 |  |
+| 22 | 🍅番茄小说(APP) | fanqienovel.com | 10 | 30 | 2026 | 32.6 |  |
+| 23 | 🎉 聚合书库 | book4.cc | 20 | 30 | 1915 | 2.6 |  |
 
-## 2. 空壳（20 条）
+### ⚠️ 部分可用（11）
 
-| # | 书源 | URL | 站点判断/建议 |
-|---|---|---|---|
-| 34 | 得奇小说网 | https://www.deqixs.co | 站点可开；另有带规则的同名源 #35；可补规则 |
-| 47 | 🎧书音FM | https://m.shuyinfm.com/ | 站点可开；与 #46 书音FM 同一 API；可补 |
-| 48 | bqg128 | https://www.bqg128.cc/ | 站点可开；搜索需 Cookie，正文需 webView |
-| 52 | 小说狂人 | https://czbooks.net | 站点可开；普通 HTML，优先补 |
-| 53 | 爱奇电子书 | http://www.xqb8.org/ | rebuilt 文件已补规则；优先导入 |
-| 54 | 七猫 | https://api-bc.wtzw.com | API 可开；已有多个七猫源，可复用规则 |
-| 56 | 🎃 言情小说网 | https://m.bgnovel.com#🎃 | 站点可开；普通 HTML，优先补 |
-| 58 | 🎨 漫蛙 | http://manwaso.cc | 站点异常（404/跳转）；暂缓 |
-| 59 | 365小说 | http://www.shukuge.com | 站点可开；普通 HTML，优先补 |
-| 60 | 肉书屋 | https://m.roushuwu7.com | 站点可开但 GBK/乱码；需编码处理 |
-| 61 | 阅友小说 | https://m.suixkan.com/ | 站点可开；普通 HTML，优先补 |
-| 62 | 东滩小说 | http://www.dongtanxs.com/ | 站点可开；普通 HTML，优先补 |
-| 63 | 台湾小说 | https://twkan.com/ | 403；暂缓/标记失效 |
-| 64 | 🥕茶马小说 | https://www.chamabooks.net | 站点可开；有搜索表单，优先补 |
-| 65 | 天域小说 | http://www.tianyu8.org | rebuilt 文件已补规则；优先导入 |
-| 66 | 夜读阁 | https://www.yeduge.com | 站点可开；普通 HTML，优先补 |
-| 67 | 🌱米读小说 | http://api.midukanshu.com | API 可开但仅 2 字节；需逆向接口 |
-| 68 | 御书屋 | https://m.seyuwen.com/ | SSL EOF；标记失效 |
-| 69 | 八叉书库 | https://bcshuku.com | 站点可开；动态 Cookie；另有带规则的同名源 #72 |
-| 70 | 宝华书院 | https://www.baohuasy.com | 站点可开但 GBK；需编码处理 |
+| # | 书源 | 域名 | 搜索 | 目录 | 正文 | 耗时s | 备注 |
+|---|---|---|---|---|---|---|---|
+| 1 | STV - Sáng Tác Việt | STV聚合 | 20 | 1 | 0 | 14.3 |  |
+| 2 | ❤️爱下电子 | apiv2hans.aixdzs.com | 20 | 0 | 0 | 0.8 |  |
+| 3 | ⭐七猫小说[官方本地接口]API✨ | api-bc.wtzw.com#七猫官方API | 11 | 30 | 43 | 52.8 |  |
+| 4 | 七猫小说 | api-bc.wtzw.com#七猫官方API·来源自网络 | 11 | 30 | 41 | 5.7 |  |
+| 5 | 书旗小说 | ocean.shuqireader.com | 10 | 30 | 57 | 5.4 |  |
+| 6 | 书旗小说本地源（同人） | ocean.shuqireader.com#1 | 10 | 30 | 57 | 2.5 |  |
+| 7 | 含遇見(加发现页) | 210.16.175.40:11451 | 20 | 0 | 0 | 3.6 |  |
+| 8 | 得奇小说网 | www.deqixss.com | 4 | 30 | 0 | 33.7 |  |
+| 9 | 本地番茄红果·mini | 本地番茄红果mini | 10 | 0 | 0 | 32.2 |  |
+| 10 | 爱书音 | 爱书音 | 37 | 30 | 0 | 7.7 |  |
+| 11 | 📚书山聚合 | 书山聚合 | 120 | 0 | 0 | 22.9 |  |
 
-## 3. 登录墙（3 条）
+### ❌ 失败（41）
 
-| # | 书源 | URL | 搜索/目录/字数 | 问题 | 下一步 |
-|---|---|---|---|---|---|
-| 02 | ✿少年梦（知秋）✿ | 少年梦＃知秋 | 0/0/0 | HTTP 401 | 做登录面板/Cookie 持久化，登录后重试 |
-| 11 | 魔丸小说 | https://www.mowan.lol | 0/0/0 | HTTP 401 | 做登录面板/Cookie 持久化，登录后重试 |
-| 21 | ✿番茄四合一（知秋段评）✿ | 番茄四合一#知秋 lyc版阅读 | 0/0/0 | HTTP 401 | 做登录面板/Cookie 持久化，登录后重试 |
+| # | 书源 | 域名 | 搜索 | 目录 | 正文 | 耗时s | 备注 |
+|---|---|---|---|---|---|---|---|
+| 1 | 365小说 | www.shukuge.com | 0 | 0 | 0 | 0.1 | 搜索失败: searchUrl 为空 |
+| 2 | Icu | ztopaq7zrz.hq555.icu:1678 | 0 | 0 | 0 | 0.8 | 搜索失败: The network connection was lost. |
+| 3 | NovelHub聚合 | sunianxin.cmcure.com | 0 | 0 | 0 | 0.4 | 搜索失败: JSON 列表规则未命中（0 项，响应 113 字符；结构 { code,log_id,message }） |
+| 4 | ✿UAA四合一（知秋）✿ | UAA四合一＃知秋 | 0 | 0 | 0 | 1.8 | 搜索失败: HTTP 401 |
+| 5 | ✿少年梦（知秋）✿ | 少年梦＃知秋 | 0 | 0 | 0 | 0.2 | 搜索失败: HTTP 401 |
+| 6 | ✿次元姬（知秋）✿ | cyj.vv9v.cn | 0 | 0 | 0 | 3.4 | 搜索失败: 搜索列表规则未命中（0 个节点，响应 183 字符） |
+| 7 | ✿爱丽丝书屋（知秋）✿ | 爱丽丝书屋＃知秋 | 0 | 0 | 0 | 21.1 | 搜索失败: 连接超时 |
+| 8 | ✿番茄四合一（知秋段评）✿ | 番茄四合一#知秋 lyc版阅读 | 0 | 0 | 0 | 0.2 | 搜索失败: HTTP 401 |
+| 9 | 七猫 | api-bc.wtzw.com | 0 | 0 | 0 | 0.0 | 搜索失败: searchUrl 为空 |
+| 10 | 书音FM | m.shuyinfm.com | 0 | 0 | 0 | 0.3 | 搜索失败: JSON 列表规则未命中（0 项，响应 118 字符；结构 { code,data,message }） |
+| 11 | 八叉书库 | bcshuku.com | 0 | 0 | 0 | 0.0 | 搜索失败: searchUrl 为空 |
+| 12 | 八叉书库(二合一)☆夜明空☆ | 八叉书库-假(小说漫画二合一)☆夜明空☆ | 0 | 0 | 0 | 2.1 | 搜索失败: A TLS error caused the secure connection to fail. |
+| 13 | 千白羽轻小说交流站 | www.xiaoxiaoshuo8.com | 0 | 0 | 0 | 3.5 | 搜索失败: 搜索列表规则未命中（0 个节点，响应 2464 字符） |
+| 14 | 反代番茄 | fqapi.tongle.dev | 0 | 0 | 0 | 15.1 | 搜索失败: JSON 列表规则未命中（0 项，响应 140 字符；结构 { code,data,message,requestId,serverTime }） |
+| 15 | 台湾小说 | twkan.com | 0 | 0 | 0 | 0.0 | 搜索失败: searchUrl 为空 |
+| 16 | 含遇見 | api.whjcgn.online | 0 | 0 | 0 | 32.5 | 搜索失败: WebView fallback timed out |
+| 17 | 塔读小说app v0.12 | reader.tadu.com | 0 | 0 | 0 | 0.4 | 搜索失败: JSON 列表规则未命中（0 项，响应 39 字符；结构 { code,data,message }） |
+| 18 | 宝华书院 | www.baohuasy.com | 0 | 0 | 0 | 0.0 | 搜索失败: searchUrl 为空 |
+| 19 | 小说狂人 | czbooks.net | 0 | 0 | 0 | 10.5 | 搜索失败: 搜索列表规则未命中（0 个节点，响应 4319 字符） |
+| 20 | 得奇小说网 | www.deqixs.co | 0 | 0 | 0 | 0.0 | 搜索失败: searchUrl 为空 |
+| 21 | 御书屋 | m.seyuwen.com | 0 | 0 | 0 | 0.0 | 搜索失败: searchUrl 为空 |
+| 22 | 番茄🍅（沐凡·PyFQ-Go本地） | fqaggregate.de5.net | 0 | 0 | 0 | 104.0 | 搜索失败: 搜索列表规则未命中（0 个节点，响应 6978 字符） |
+| 23 | 紙間·阅读 | www.zjread.cc | 0 | 0 | 0 | 57.2 | 搜索失败: 搜索规则 JS 异常：Error: 站点错误 503：網站維護中 |
+| 24 | 聚合书源 | 154.12.91.167:9947 | 0 | 0 | 0 | 0.1 | 搜索失败: JSON 列表规则未命中（0 项，响应 39 字符；结构 { count,results,success }） |
+| 25 | 聚合书源(zenneko) | zenneko.top | 0 | 0 | 0 | 0.2 | 搜索失败: JSON 列表规则未命中（0 项，响应 160 字符；结构 { error,success }） |
+| 26 | 肉书屋 | m.roushuwu7.com | 0 | 0 | 0 | 0.0 | 搜索失败: searchUrl 为空 |
+| 27 | 速读谷 | www.sudugu.org | 0 | 0 | 0 | 1.2 | 搜索失败: The network connection was lost. |
+| 28 | 速读谷 | www.shudugu.org | 0 | 0 | 0 | 1.5 | 搜索失败: HTTP 500 |
+| 29 | 速读谷 | www.sudugu.org#🐳 | 0 | 0 | 0 | 1.2 | 搜索失败: The network connection was lost. |
+| 30 | 错层小说网 | m.cuoceng.org | 0 | 0 | 0 | 1.5 | 搜索失败: The network connection was lost. |
+| 31 | 阅友小说 | m.suixkan.com | 0 | 0 | 0 | 0.0 | 搜索失败: searchUrl 为空 |
+| 32 | 集书阁 | mad回家访问25a点jisge点com.jishuge-vip.com | 0 | 0 | 0 | 21.0 | 搜索失败: 连接超时 |
+| 33 | 魔丸小说 | www.mowan.lol | 0 | 0 | 0 | 2.9 | 搜索失败: HTTP 401 |
+| 34 | 🌱米读小说 | api.midukanshu.com | 0 | 0 | 0 | 0.0 | 搜索失败: searchUrl 为空 |
+| 35 | 🍅蕃茄小说 | m.dzrjk.com | 0 | 0 | 0 | 2.3 | 搜索失败: JSON 列表规则未命中（0 项，响应 47 字符；结构 { code,data,msg }） |
+| 36 | 🍓玖玖小说 | sunianxin.cmcure.com##玖玖 | 0 | 0 | 0 | 0.4 | 搜索失败: JSON 列表规则未命中（0 项，响应 100 字符；结构 { code,log_id,message }） |
+| 37 | 🎃 言情小说网 | m.bgnovel.com#🎃 | 0 | 0 | 0 | 0.0 | 搜索失败: searchUrl 为空 |
+| 38 | 🎧书音FM | m.shuyinfm.com | 0 | 0 | 0 | 0.0 | 搜索失败: searchUrl 为空 |
+| 39 | 🎨 漫蛙 | manwaso.cc | 0 | 0 | 0 | 0.0 | 搜索失败: searchUrl 为空 |
+| 40 | 📚 圣灵聚合 | apiba.top | 0 | 0 | 0 | 0.5 | 搜索失败: JSON 列表规则未命中（0 项，响应 206 字符；结构 { keyword,mode,results }） |
+| 41 | 🥕茶马小说 | www.chamabooks.net | 0 | 0 | 0 | 2.9 | 搜索失败: 搜索列表规则未命中（0 个节点，响应 49979 字符） |
 
-## 4. 详情失败（4 条）
+### ⏱ 超时（1）
 
-| # | 书源 | URL | 搜索 | 问题 | 下一步 |
-|---|---|---|---:|---|---|
-| 03 | 七猫小说 | https://api-bc.wtzw.com#七猫官方API·来源自网络 | 11 | 详情未解析 | 1.0.103 String 枚举/签名修复；待真机验 |
-| 18 | ⭐七猫小说[官方本地接口]API✨ | https://api-bc.wtzw.com#七猫官方API | 11 | 详情未解析 | 1.0.103 String 枚举/签名修复；待真机验 |
-| 19 | STV - Sáng Tác Việt | STV聚合 | 19 | 详情未解析 | source 对象字符串化；1.0.92/1.0.103 待验 |
-| 20 | 🍅番茄小说(APP) | https://fanqienovel.com | 1 | 详情未解析 | 详情规则/JSON 结构；需抓响应 |
+| # | 书源 | 域名 | 搜索 | 目录 | 正文 | 耗时s | 备注 |
+|---|---|---|---|---|---|---|---|
+| 1 | 📖顶点小说🔥 | api.anwaben.com | 0 | 0 | 0 | 150.0 | timed out |
 
-## 5. 目录 0 章（7 条）
+## 维护备注
 
-| # | 书源 | URL | 搜索 | 问题 | 下一步 |
-|---|---|---|---:|---|---|
-| 14 | 含遇見(加发现页) | http://210.16.175.40:11451 | 24 | 目录 0 章 | tocUrl/JSON 结构不匹配；需真机日志 |
-| 16 | 📚 圣灵聚合 | http://apiba.top | 6 | 目录 0 章 | toc 规则读 `src` 变量；需上下文/真机日志 |
-| 22 | 🍅木里番茄0922[GO聚合版] | http://154.58.233.54:1968 | 10 | 目录 0 章 | 1.0.103 间接 JSON.parse；待真机验 |
-| 24 | 日落小说 | http://fqv1.sscrl.vip | 10 | 目录 0 章 | 1.0.103 间接 JSON.parse；待真机验 |
-| 26 | ⭐百度小说[官方]v1.0✨ | https://novelapi.baidu.com#百度小说官方API | 10 | 目录 0 章 | 1.0.103 java.getElements JSON；待真机验 |
-| 51 | 连尚读书[官方] | https://read.zhulang.com | 20 | 目录 0 章 | 1.0.103 JS+JSONPath 链；待真机验 |
-| 73 | ❤️爱下电子 | https://apiv2hans.aixdzs.com | 20 | 目录 0 章 | init=$.data.book 与 toc 结构不匹配 |
-
-## 6. 正文 0 字 / 驱动超时（2 条）
-
-| # | 书源 | URL | 状态 | 搜索/目录/字数 | 问题 | 下一步 |
-|---|---|---|---|---|---|---|
-| 07 | 📖顶点小说🔥 | http://api.anwaben.com | DRIVER_ERROR | 0/0/0 | TimeoutError；站点侧超时 | 标记失效，不再占并发 |
-| 71 | 爱书音 | 爱书音 | FAIL_CONTENT | 38/30/0 | 正文 0 字；搜索/详情/目录已通 | 查 content 规则/资源类型；必要时 webView 兜底 |
-
-## 7. 搜索失败（32 条）
-
-按根因分组；同一条源只出现一次。
-
-### A. 网络断开（5 条）
-
-| # | 书源 | URL | 关键词 | 错误摘要 | 根因/下一步 |
-|---|---|---|---|---|---|
-| 30 | 速读谷 | https://www.sudugu.org | 斗破苍穹 | 搜索失败: The network connection was lost. | 连接断开/HTTP500；标记失效 |
-| 33 | 错层小说网 | https://m.cuoceng.org/ | 斗破苍穹 | 搜索失败: The network connection was lost. | connection lost；重试；仍失败则失效 |
-| 42 | 速读谷 | https://www.sudugu.org#🐳 | 斗破苍穹 | 搜索失败: The network connection was lost. | 连接断开/HTTP500；标记失效 |
-| 57 | Icu | https://ztopaq7zrz.hq555.icu:1678 | 斗破苍穹 | 搜索失败: The network connection was lost. | connection lost；标记失效 |
-| 72 | 八叉书库(二合一)☆夜明空☆ | 八叉书库-假(小说漫画二合一)☆夜明空☆ | 斗破苍穹 | 搜索失败: The network connection was lost. | connection lost；切备用域/改默认 host |
-
-### B. 超时（3 条）
-
-| # | 书源 | URL | 关键词 | 错误摘要 | 根因/下一步 |
-|---|---|---|---|---|---|
-| 35 | 得奇小说网 | https://www.deqixs.org | 斗破苍穹 | 搜索失败: WebView fallback timed out | WebView 超时；先修规则/超时，避免重复源 |
-| 44 | 52书库 | https://www.52shuku.net#🐳 | 斗破苍穹 | 搜索失败: 连接超时 | 连接超时；重试；不应判死 |
-| 50 | 集书阁 | https://mad回家访问25a点jisge点com.jishuge-vip.com/?jifangge | 斗破苍穹 | 搜索失败: 连接超时 | 连接超时；标记失效 |
-
-### C. HTTP 500（1 条）
-
-| # | 书源 | URL | 关键词 | 错误摘要 | 根因/下一步 |
-|---|---|---|---|---|---|
-| 39 | 速读谷 | https://www.shudugu.org/ | 斗破苍穹 | 搜索失败: HTTP 500 | 连接断开/HTTP500；标记失效 |
-
-### D. HTTP 404（1 条）
-
-| # | 书源 | URL | 关键词 | 错误摘要 | 根因/下一步 |
-|---|---|---|---|---|---|
-| 74 | 含遇見 | https://api.whjcgn.online | 斗破苍穹 | 搜索失败: HTTP 404 | HTTP 404；标记失效/找新接口 |
-
-### E. URL 非法（1 条）
-
-| # | 书源 | URL | 关键词 | 错误摘要 | 根因/下一步 |
-|---|---|---|---|---|---|
-| 49 | biquge2345 | https://www.biquge2345.com | 斗破苍穹 | 搜索失败: URL 格式非法或解析异常 (-1000)：https://www.biquge2345.com/s.php | URL -1000；换域名/检查 URL |
-
-### F. JS/响应解析（3 条）
-
-| # | 书源 | URL | 关键词 | 错误摘要 | 根因/下一步 |
-|---|---|---|---|---|---|
-| 12 | 七猫四合一本地版（同人） | 七猫四合一本地版（同人） | 斗破苍穹 | 搜索失败: 搜索规则 JS 异常：Error: 七猫接口返回非 JSON，请检查网络或压缩响应 | 非 JSON；抓响应；加解压/换接口 |
-| 15 | 🎉 聚合书库 | https://book4.cc | 斗破苍穹 | 搜索失败: JSON 列表规则未命中（0 项，响应 42908 字符；结构 非 JSON：<!DOCTYPE html> <html lan… | 返回 HTML；抓响应；必要时 webView |
-| 75 | 紙間·阅读 | https://www.zjread.cc | 斗破苍穹 | 搜索失败: 搜索规则 JS 异常：Error: 响应解析失败 | 响应解析失败；抓响应比对规则 |
-
-### G. 列表 0 项（14 条）
-
-| # | 书源 | URL | 关键词 | 错误摘要 | 根因/下一步 |
-|---|---|---|---|---|---|
-| 04 | ✿次元姬（知秋）✿ | https://cyj.vv9v.cn | 斗破苍穹 | 搜索失败: 搜索列表规则未命中（0 个节点，响应 183 字符） | 列表 0/规则未命中；抓响应比对；换 checkKeyWord |
-| 05 | 🍓玖玖小说 | https://sunianxin.cmcure.com##玖玖 | 斗破苍穹 | 搜索失败: JSON 列表规则未命中（0 项，响应 100 字符；结构 { code,log_id,message }） | 列表 0/规则未命中；抓响应比对；换 checkKeyWord |
-| 08 | 🍅蕃茄小说 | https://m.dzrjk.com | 斗破苍穹 | 搜索失败: JSON 列表规则未命中（0 项，响应 40 字符；结构 { code,data,msg }） | 列表 0/规则未命中；抓响应比对；换 checkKeyWord |
-| 09 | 聚合书源(zenneko) | https://zenneko.top/api/ | 斗破苍穹 | 搜索失败: JSON 列表规则未命中（0 项，响应 160 字符；结构 { error,success }） | 列表 0/规则未命中；抓响应比对；换 checkKeyWord |
-| 13 | 📚书山聚合 | 书山聚合 | 斗破苍穹 | 搜索失败: JSON 列表规则未命中（0 项，响应 94 字符；结构 { cached_at,data,error,isSuccess }） | 列表 0/规则未命中；抓响应比对；换 checkKeyWord |
-| 17 | NovelHub聚合 | https://sunianxin.cmcure.com | 斗破苍穹 | 搜索失败: JSON 列表规则未命中（0 项，响应 113 字符；结构 { code,log_id,message }） | 列表 0/规则未命中；抓响应比对；换 checkKeyWord |
-| 23 | 番茄🍅（沐凡·PyFQ-Go本地） | https://fqaggregate.de5.net | 斗破苍穹 | 搜索失败: 搜索列表规则未命中（0 个节点，响应 7005 字符） | 列表 0；标记失效/换聚合接口 |
-| 27 | 聚合书源 | http://154.12.91.167:9947 | 斗破苍穹 | 搜索失败: JSON 列表规则未命中（0 项，响应 39 字符；结构 { count,results,success }） | 列表 0/规则未命中；抓响应比对；换 checkKeyWord |
-| 28 | 本地番茄红果·mini | 本地番茄红果mini | 斗破苍穹 | 搜索失败: JSON 列表规则未命中（0 项，响应 84880 字符；结构 { code,log_id,message,search_tab… | 列表 0/规则未命中；抓响应比对；换 checkKeyWord |
-| 37 | QQ浏览器-完整分类-v7 | https://so.html5.qq.com/?legado_source=qqbrowser_categories_v7 | 斗破苍穹 | 搜索失败: JSON 列表规则未命中（0 项，响应 24938 字符；结构 { code,data,msg }） | 列表 0/规则未命中；抓响应比对；换 checkKeyWord |
-| 38 | 塔读小说app v0.12 | https://reader.tadu.com | 斗破苍穹 | 搜索失败: JSON 列表规则未命中（0 项，响应 39 字符；结构 { code,data,message }） | 列表 0；抓响应；DES/接口 |
-| 41 | 话本小说 | https://www.ihuaben.com | 斗破苍穹 | 搜索失败: 搜索列表规则未命中（0 个节点，响应 8897 字符） | 列表 0/规则未命中；抓响应比对；换 checkKeyWord |
-| 43 | 千白羽轻小说交流站 | https://www.xiaoxiaoshuo8.com | 斗破苍穹 | 搜索失败: 搜索列表规则未命中（0 个节点，响应 2378 字符） | 列表 0/规则未命中；抓响应比对；换 checkKeyWord |
-| 46 | 书音FM | https://m.shuyinfm.com | 斗破苍穹 | 搜索失败: JSON 列表规则未命中（0 项，响应 118 字符；结构 { code,data,message }） | 列表 0；抓响应；换接口 |
-
-### H. 字段为空（2 条）
-
-| # | 书源 | URL | 关键词 | 错误摘要 | 根因/下一步 |
-|---|---|---|---|---|---|
-| 25 | 书旗小说 | https://ocean.shuqireader.com | 斗破苍穹 | 搜索失败: JSON 列表命中 11 项但书名或链接为空 | 11 项字段空；真机日志确认 Cookie 落盘 |
-| 36 | 书旗小说本地源（同人） | https://ocean.shuqireader.com#1 | 斗破苍穹 | 搜索失败: JSON 列表命中 11 项但书名或链接为空 | 11 项字段空；同上 |
-
-### I. 相对 URL（1 条）
-
-| # | 书源 | URL | 关键词 | 错误摘要 | 根因/下一步 |
-|---|---|---|---|---|---|
-| 40 | ✿爱丽丝书屋（知秋）✿ | 爱丽丝书屋＃知秋 | 斗破苍穹 | 搜索失败: 不支持的 URL 协议 无：/search.html?q=%E6%96%97%E7%A0%B4%E8%8B%8D%E7%A9%B… | 相对 URL；1.0.103 已修，待真机验 |
-
-### J. JS 桥（1 条）
-
-| # | 书源 | URL | 关键词 | 错误摘要 | 根因/下一步 |
-|---|---|---|---|---|---|
-| 45 | ✿UAA四合一（知秋）✿ | UAA四合一＃知秋 | 斗破苍穹 | 搜索失败: TypeError: undefined is not an object (evaluating '_.java') | _.java 未定义；1.0.103 已修，待真机验 |
-
-## 8. 结论
-
-1. 真正全链路可用的只有 8 条，其中 2 条正文 <500 字（七猫听书 115、有听网 208）。
-2. 20 条空壳不是引擎失败，是导入文件本身没有规则；rebuilt 文件已补 2 条，剩 18 条。
-3. 48 条有规则失败里，1.0.103 已定向覆盖 8 条（七猫×2、爱丽丝、木里、日落、UAA、百度、连尚），未真机复测。
-4. 需要登录的 3 条、书旗 2 条、空壳 20 条，是下一批最明确的工程量。
-5. 站点死/瞬断：52书库可重试；Icu、八叉默认域、番茄沐凡、速读谷、集书阁、顶点应标记失效或切备用域。
+- `PASS_EXPLORE` 不是故障：书源本身没写 `searchUrl`，只能从发现页/详情页进入。
+- `FAIL` 分三类：searchUrl 为空（源设计如此）、规则未命中（选择器/JS 需改写）、站点 401/503（登录态或维护）。
+- 本表由 `scripts/gen_doc_76_113.py` 从 JSONL 直出，数据与设备 web 实测一致。

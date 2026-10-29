@@ -825,64 +825,97 @@ struct BookDetailView: View {
         // 抓取（下一页 URL 由上页 HTML 给出），30 页目录能让详情页白等几秒。
         // 缓存已有目录时后台刷新直接取全量，不再做二次请求。
         let stagedFirstPaint = chapters.isEmpty
-        let detailResult = await AsyncTimeout.run(seconds: 20) {
+        // 大多数书源的目录地址就是书籍页本身（`tocUrl` 为空），所以详情和
+        // 目录可以同时发请求。之前先 await 详情、再 await 目录，两段网络
+        // 时间完全串行，表现为「搜书点进去详情慢、目录又慢」。
+        let placeholderDetail = BookDetail(
+            name: selectedBook.name,
+            author: selectedBook.author,
+            coverUrl: selectedBook.coverUrl,
+            bookUrl: selectedBook.bookUrl,
+            tocUrl: nil,
+            sourceName: selectedBook.sourceName,
+            sourceUrl: selectedBook.sourceUrl,
+            intro: selectedBook.intro,
+            latestChapter: selectedBook.lastChapter,
+            wordCount: selectedBook.wordCount,
+            kind: selectedBook.kind
+        )
+        let firstPageCount = stagedFirstPaint ? 2 : 30
+        async let detailTask: Result<BookDetail, SourceEngineError>? = AsyncTimeout.run(seconds: 20) {
             await engine.getBookDetail(source: source, book: selectedBook)
-        } ?? .failure(.network("Detail load timed out"))
+        }
+        async let tocTask: Result<[BookChapter], SourceEngineError>? = AsyncTimeout.run(seconds: 12) {
+            await engine.getChapterList(source: source, book: placeholderDetail, maxPages: firstPageCount)
+        }
+
+        let detailResult = await detailTask ?? .failure(.network("Detail load timed out"))
+        var loadedDetail: BookDetail?
         switch detailResult {
-        case .success(let loadedDetail):
-            detail = loadedDetail
+        case .success(let fetchedDetail):
+            loadedDetail = fetchedDetail
+            detail = fetchedDetail
             // The search result may carry no cover while the detail rule does.
             // Persist it into the local book state so the header and the
             // bookshelf row stop showing a placeholder.
-            if let loadedCover = loadedDetail.coverUrl?.nilIfEmpty,
+            if let loadedCover = fetchedDetail.coverUrl?.nilIfEmpty,
                book.coverUrl?.nilIfEmpty == nil {
                 book = SearchBook(
                     name: book.name,
-                    author: book.author ?? loadedDetail.author,
+                    author: book.author ?? fetchedDetail.author,
                     coverUrl: loadedCover,
                     bookUrl: book.bookUrl,
                     sourceName: book.sourceName,
                     sourceUrl: book.sourceUrl,
-                    intro: book.intro ?? loadedDetail.intro,
+                    intro: book.intro ?? fetchedDetail.intro,
                     kind: book.kind,
                     lastChapter: book.lastChapter,
                     wordCount: book.wordCount,
                     checkKeyWord: book.checkKeyWord
                 )
             }
-            let chapterResult = await AsyncTimeout.run(seconds: 20) {
-                await engine.getChapterList(source: source, book: loadedDetail, maxPages: stagedFirstPaint ? 6 : 30)
-            } ?? .failure(.network("Chapter list timed out"))
-            switch chapterResult {
-            case .success(let loadedChapters):
-                chapters = loadedChapters
-                appState.bookTOCacheStore.save(
-                    detail: loadedDetail,
-                    chapters: loadedChapters,
-                    sourceURL: source.bookSourceUrl,
-                    bookURL: book.bookUrl
-                )
-                if appState.bookshelfStore.contains(book) {
-                    appState.bookshelfStore.updateDetails(
-                        bookID: book.id,
-                        latestChapterTitle: loadedDetail.latestChapter,
-                        intro: loadedDetail.intro,
-                        totalChapters: loadedChapters.count,
-                        coverURL: loadedDetail.coverUrl
-                    )
-                }
-                if stagedFirstPaint {
-                    // 目录先显示头部，完整目录在后台补齐并落缓存。
-                    extendTOCInBackground(source: source, detail: loadedDetail)
-                }
-            case .failure(let error):
-                if reportErrors || chapters.isEmpty {
-                    errorMessage = "目录加载失败：\(error.displayMessage)"
-                }
-            }
         case .failure(let error):
             if reportErrors || chapters.isEmpty {
                 errorMessage = error.displayMessage
+            }
+        }
+
+        var chapterResult: Result<[BookChapter], SourceEngineError> = await tocTask
+            ?? .failure(.network("Chapter list timed out"))
+        // 占位详情缺少详情规则解析出的变量或 tocUrl，失败时用真实详情重试一次。
+        if case .failure = chapterResult, let loadedDetail = loadedDetail {
+            chapterResult = await AsyncTimeout.run(seconds: 20) {
+                await engine.getChapterList(source: source, book: loadedDetail, maxPages: firstPageCount)
+            } ?? .failure(.network("Chapter list timed out"))
+        }
+
+        switch chapterResult {
+        case .success(let loadedChapters):
+            chapters = loadedChapters
+            let cacheDetail = loadedDetail ?? placeholderDetail
+            appState.bookTOCacheStore.save(
+                detail: cacheDetail,
+                chapters: loadedChapters,
+                sourceURL: source.bookSourceUrl,
+                bookURL: book.bookUrl
+            )
+            if let loadedDetail = loadedDetail, appState.bookshelfStore.contains(book) {
+                appState.bookshelfStore.updateDetails(
+                    bookID: book.id,
+                    latestChapterTitle: loadedDetail.latestChapter,
+                    intro: loadedDetail.intro,
+                    totalChapters: loadedChapters.count,
+                    coverURL: loadedDetail.coverUrl
+                )
+            }
+            if stagedFirstPaint {
+                // 目录先显示头部（2 页），完整目录在后台补齐并落缓存；
+                // 真实详情的 tocUrl 与占位不同也会在这次补全里纠正。
+                extendTOCInBackground(source: source, detail: cacheDetail)
+            }
+        case .failure(let error):
+            if reportErrors || chapters.isEmpty {
+                errorMessage = "目录加载失败：\(error.displayMessage)"
             }
         }
     }

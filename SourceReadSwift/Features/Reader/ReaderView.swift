@@ -2974,10 +2974,20 @@ struct ReaderView: View {
                     .clipped()
                     .offset(x: geometry.horizontalMargin, y: geometry.bodyTop)
 
-                if geometry.showsHeader {
-                    pagedPageHeader(page: page, geometry: geometry)
+                // One clock per page instead of one per chrome element: two
+                // `TimelineView`s per page doubled the per-frame work on the
+                // text surface and showed up as the stutter while flipping.
+                TimelineView(.everyMinute) { context in
+                    ZStack(alignment: .topLeading) {
+                        if geometry.showsHeader {
+                            pagedPageHeader(page: page, geometry: geometry, now: context.date)
+                        }
+                        pagedPageFooter(page: page, geometry: geometry, now: context.date)
+                    }
+                    .frame(width: proxy.size.width, height: proxy.size.height, alignment: .topLeading)
                 }
-                pagedPageFooter(page: page, geometry: geometry)
+                .allowsHitTesting(false)
+                .accessibilityHidden(true)
             }
             .frame(width: proxy.size.width, height: proxy.size.height, alignment: .topLeading)
             .preference(key: ReaderPageContainerMetricsKey.self, value: metrics)
@@ -3008,81 +3018,28 @@ struct ReaderView: View {
     }
 
     /// 页眉：12pt 章节名 +（可选）时间 / 电量。位置由 geometry 决定，永远在安全区内。
-    private func pagedPageHeader(page: ReaderPageBlock, geometry: ReaderPageGeometry) -> some View {
-        TimelineView(.everyMinute) { context in
-            HStack(spacing: 10) {
-                // In inline mode the first page already carries the large
-                // chapter title in the body; repeating it in the 12pt page
-                // header is what users reported as a duplicated heading.
-                if !(page.includesTitle && chapterHeadingStyle == .inline) {
-                    Text(page.chapterTitle.isEmpty ? chapterTitle(for: page.chapterIndex) : page.chapterTitle)
-                        .font(.system(size: ReaderPageChrome.headerFontSize, weight: .regular))
-                        .foregroundStyle(readerThemeTextColor.opacity(0.55))
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.75)
-                }
-
-                Spacer(minLength: 8)
-
-                if statusPosition == "top" || statusPosition == "both" {
-                    if footerShowTime {
-                        Text(context.date, format: .dateTime.hour().minute())
-                            .font(.system(size: ReaderPageChrome.headerFontSize, weight: .medium).monospacedDigit())
-                            .foregroundStyle(readerThemeTextColor.opacity(0.50))
-                    }
-                    if footerShowBatteryIcon || footerShowBatteryPercent {
-                        HStack(spacing: 3) {
-                            if footerShowBatteryIcon {
-                                Image(systemName: batterySymbolName)
-                            }
-                            if footerShowBatteryPercent {
-                                Text(batteryPercentageText)
-                            }
-                        }
-                        .font(.system(size: ReaderPageChrome.headerFontSize - 1, weight: .medium).monospacedDigit())
-                        .foregroundStyle(readerThemeTextColor.opacity(0.50))
-                    }
-                }
+    private func pagedPageHeader(page: ReaderPageBlock, geometry: ReaderPageGeometry, now: Date) -> some View {
+        HStack(spacing: 10) {
+            // In inline mode the first page already carries the large
+            // chapter title in the body; repeating it in the 12pt page
+            // header is what users reported as a duplicated heading.
+            if !(page.includesTitle && chapterHeadingStyle == .inline) {
+                Text(page.chapterTitle.isEmpty ? chapterTitle(for: page.chapterIndex) : page.chapterTitle)
+                    .font(.system(size: ReaderPageChrome.headerFontSize, weight: .regular))
+                    .foregroundStyle(readerThemeTextColor.opacity(0.55))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.75)
             }
-            .padding(.horizontal, geometry.contentExtendsIntoChrome ? 6 : 0)
-            .frame(
-                width: geometry.contentExtendsIntoChrome
-                    ? geometry.contentWidth + 12
-                    : geometry.contentWidth,
-                height: ReaderPageChrome.headerHeight,
-                alignment: .leading
-            )
-            .background(
-                geometry.contentExtendsIntoChrome
-                    ? readerThemeBackground.opacity(0.86)
-                    : Color.clear
-            )
-            .offset(
-                x: geometry.contentExtendsIntoChrome
-                    ? geometry.horizontalMargin - 6
-                    : geometry.horizontalMargin,
-                y: geometry.headerTop
-            )
-        }
-        .allowsHitTesting(false)
-        .accessibilityHidden(true)
-    }
 
-    /// 页脚：右下角 `当前页/本章总页`（竞品格式 3/35），时间与电量按开关排列。
-    private func pagedPageFooter(page: ReaderPageBlock, geometry: ReaderPageGeometry) -> some View {
-        TimelineView(.everyMinute) { context in
-            HStack(spacing: 10) {
-                if statusPosition == "bottom" || statusPosition == "both" {
-                    if footerShowTime {
-                        Text(context.date, format: .dateTime.hour().minute())
-                            .frame(width: 42, alignment: .leading)
-                    }
+            Spacer(minLength: 8)
+
+            if statusPosition == "top" || statusPosition == "both" {
+                if footerShowTime {
+                    Text(now, format: .dateTime.hour().minute())
+                        .font(.system(size: ReaderPageChrome.headerFontSize, weight: .medium).monospacedDigit())
+                        .foregroundStyle(readerThemeTextColor.opacity(0.50))
                 }
-
-                Spacer(minLength: 4)
-
-                if statusPosition == "bottom" || statusPosition == "both",
-                   footerShowBatteryIcon || footerShowBatteryPercent {
+                if footerShowBatteryIcon || footerShowBatteryPercent {
                     HStack(spacing: 3) {
                         if footerShowBatteryIcon {
                             Image(systemName: batterySymbolName)
@@ -3091,33 +3048,82 @@ struct ReaderView: View {
                             Text(batteryPercentageText)
                         }
                     }
+                    .font(.system(size: ReaderPageChrome.headerFontSize - 1, weight: .medium).monospacedDigit())
+                    .foregroundStyle(readerThemeTextColor.opacity(0.50))
                 }
-
-                Text(pageNumberText(for: page))
-                    .frame(minWidth: 34, alignment: .trailing)
             }
-            .font(.system(size: ReaderPageChrome.footerFontSize, weight: .medium).monospacedDigit())
-            .foregroundStyle(readerThemeTextColor.opacity(0.45))
-            .padding(.horizontal, geometry.contentExtendsIntoChrome ? 6 : 0)
-            .frame(
-                width: geometry.contentExtendsIntoChrome
-                    ? geometry.contentWidth + 12
-                    : geometry.contentWidth,
-                height: ReaderPageChrome.footerHeight,
-                alignment: .center
-            )
-            .background(
-                geometry.contentExtendsIntoChrome
-                    ? readerThemeBackground.opacity(0.86)
-                    : Color.clear
-            )
-            .offset(
-                x: geometry.contentExtendsIntoChrome
-                    ? geometry.horizontalMargin - 6
-                    : geometry.horizontalMargin,
-                y: geometry.footerTop
-            )
         }
+        .padding(.horizontal, geometry.contentExtendsIntoChrome ? 6 : 0)
+        .frame(
+            width: geometry.contentExtendsIntoChrome
+                ? geometry.contentWidth + 12
+                : geometry.contentWidth,
+            height: ReaderPageChrome.headerHeight,
+            alignment: .leading
+        )
+        .background(
+            geometry.contentExtendsIntoChrome
+                ? readerThemeBackground.opacity(0.86)
+                : Color.clear
+        )
+        .offset(
+            x: geometry.contentExtendsIntoChrome
+                ? geometry.horizontalMargin - 6
+                : geometry.horizontalMargin,
+            y: geometry.headerTop
+        )
+        .allowsHitTesting(false)
+        .accessibilityHidden(true)
+    }
+
+    /// 页脚：右下角 `当前页/本章总页`（竞品格式 3/35），时间与电量按开关排列。
+    private func pagedPageFooter(page: ReaderPageBlock, geometry: ReaderPageGeometry, now: Date) -> some View {
+        HStack(spacing: 10) {
+            if statusPosition == "bottom" || statusPosition == "both" {
+                if footerShowTime {
+                    Text(now, format: .dateTime.hour().minute())
+                        .frame(width: 42, alignment: .leading)
+                }
+            }
+
+            Spacer(minLength: 4)
+
+            if statusPosition == "bottom" || statusPosition == "both",
+               footerShowBatteryIcon || footerShowBatteryPercent {
+                HStack(spacing: 3) {
+                    if footerShowBatteryIcon {
+                        Image(systemName: batterySymbolName)
+                    }
+                    if footerShowBatteryPercent {
+                        Text(batteryPercentageText)
+                    }
+                }
+            }
+
+            Text(pageNumberText(for: page))
+                .frame(minWidth: 34, alignment: .trailing)
+        }
+        .font(.system(size: ReaderPageChrome.footerFontSize, weight: .medium).monospacedDigit())
+        .foregroundStyle(readerThemeTextColor.opacity(0.45))
+        .padding(.horizontal, geometry.contentExtendsIntoChrome ? 6 : 0)
+        .frame(
+            width: geometry.contentExtendsIntoChrome
+                ? geometry.contentWidth + 12
+                : geometry.contentWidth,
+            height: ReaderPageChrome.footerHeight,
+            alignment: .center
+        )
+        .background(
+            geometry.contentExtendsIntoChrome
+                ? readerThemeBackground.opacity(0.86)
+                : Color.clear
+        )
+        .offset(
+            x: geometry.contentExtendsIntoChrome
+                ? geometry.horizontalMargin - 6
+                : geometry.horizontalMargin,
+            y: geometry.footerTop
+        )
         .allowsHitTesting(false)
         .accessibilityHidden(true)
     }
@@ -3650,6 +3656,16 @@ struct ReaderView: View {
                         toggleCurrentBookmark(openList: true)
                     }
 
+                    // 第五个入口给朗读/暂停：TTS 原来只在右上角溢出菜单里，
+                    // 追更时一边听一边翻页是高频操作，底栏一键可达。
+                    toolButton(
+                        icon: speechController.isSpeaking && !speechController.isPaused ? "pause.fill" : "speaker.wave.2",
+                        title: speechController.isSpeaking && !speechController.isPaused ? "暂停" : "朗读"
+                    ) {
+                        closeSettingsPanel()
+                        toggleSpeech()
+                    }
+
                     toolButton(icon: "gearshape", title: "设置") {
                         toggleSettingsPanel()
                     }
@@ -3817,12 +3833,17 @@ struct ReaderView: View {
                             }
                     )
 
-                    Picker("设置", selection: $settingsTab) {
-                        Text("外观").tag(0)
-                        Text("排版").tag(1)
-                        Text("高级").tag(2)
+                    HStack(spacing: 0) {
+                        settingsTabButton(title: "外观", tag: 0)
+                        settingsTabButton(title: "排版", tag: 1)
+                        settingsTabButton(title: "高级", tag: 2)
                     }
-                    .pickerStyle(.segmented)
+                    .padding(3)
+                    .background(readerThemeTextColor.opacity(background.isDark ? 0.16 : 0.08), in: Capsule())
+                    .overlay {
+                        Capsule()
+                            .stroke(readerThemeTextColor.opacity(0.12), lineWidth: 0.8)
+                    }
                     .padding(.horizontal)
 
                     Text(settingsHint)
@@ -3851,6 +3872,9 @@ struct ReaderView: View {
                 .frame(width: panelWidth)
                 .frame(maxWidth: .infinity)
                 .frame(height: maxHeight)
+                // 面板内所有系统控件（分段控件、开关、输入框）跟随阅读主题，
+                // 而不是跟随系统深色/浅色，否则浅色背景 + 系统深色会整片发黑。
+                .environment(\.colorScheme, background.isDark ? .dark : .light)
                 // Match the top and bottom bars: one opaque theme layer, one
                 // hairline, one 16pt gutter. Stacking .ultraThinMaterial on
                 // top of the theme colour made the sheet read wider than the
@@ -3886,6 +3910,26 @@ struct ReaderView: View {
         withAnimation(.easeOut(duration: 0.18)) {
             chromeState.closeSettings()
         }
+    }
+
+    private func settingsTabButton(title: String, tag: Int) -> some View {
+        Button {
+            withAnimation(.spring(response: 0.25, dampingFraction: 0.8)) {
+                settingsTab = tag
+            }
+        } label: {
+            Text(title)
+                .font(.subheadline.weight(settingsTab == tag ? .semibold : .regular))
+                .foregroundStyle(settingsTab == tag ? .white : readerThemeTextColor.opacity(0.75))
+                .frame(maxWidth: .infinity)
+                .frame(height: 32)
+                .background {
+                    if settingsTab == tag {
+                        Capsule().fill(AppTheme.accent)
+                    }
+                }
+        }
+        .buttonStyle(.plain)
     }
 
     private var appearanceSettings: some View {
@@ -4438,17 +4482,28 @@ struct ReaderView: View {
         help: String
     ) -> some View {
         VStack(alignment: .leading, spacing: 8) {
-            HStack(alignment: .center, spacing: 6) {
+            HStack(alignment: .center, spacing: 8) {
                 Text(title)
                     .font(.subheadline.weight(.bold))
                     .foregroundStyle(readerThemeTextColor)
-                    // 标题 + 数值胶囊 + 数字输入框在窄屏上会互相挤压：
-                    // 「行距（行高间距）」曾被折成两行，卡片第一行高度参差。
-                    // 限定单行并允许 0.7 倍微缩，保证每张卡片顶部对齐。
+                    // 标题独占左侧剩余宽度，右侧固定给精确输入框；
+                    // 「行距（行高间距）」不再被数值胶囊挤成两行。
                     .lineLimit(1)
-                    .minimumScaleFactor(0.7)
+                    .minimumScaleFactor(0.75)
                     .layoutPriority(1)
 
+                Spacer(minLength: 6)
+
+                ReaderNumberInput(
+                    title: title,
+                    value: value,
+                    range: range,
+                    step: step,
+                    unit: unit
+                )
+            }
+
+            HStack(spacing: 8) {
                 Text("\(ReaderValueNormalizer.formatted(value.wrappedValue, step: step)) \(unit)")
                     .font(.caption.weight(.bold))
                     .foregroundStyle(AppTheme.accent)
@@ -4460,13 +4515,10 @@ struct ReaderView: View {
 
                 Spacer(minLength: 0)
 
-                ReaderNumberInput(
-                    title: title,
-                    value: value,
-                    range: range,
-                    step: step,
-                    unit: unit
-                )
+                Text("范围 \(ReaderValueNormalizer.formatted(range.lowerBound, step: step)) ~ \(ReaderValueNormalizer.formatted(range.upperBound, step: step))")
+                    .font(.caption2)
+                    .foregroundStyle(readerThemeTextColor.opacity(0.42))
+                    .lineLimit(1)
             }
 
             // 醒目的功能说明卡片，让用户清楚知道每一项调整的是什么，告别盲测
@@ -4512,12 +4564,6 @@ struct ReaderView: View {
                 .buttonStyle(.plain)
             }
 
-            HStack {
-                Text("范围：\(ReaderValueNormalizer.formatted(range.lowerBound, step: step)) ~ \(ReaderValueNormalizer.formatted(range.upperBound, step: step)) \(unit)")
-                    .font(.caption2)
-                    .foregroundStyle(readerThemeTextColor.opacity(0.42))
-                Spacer()
-            }
         }
         .padding(12)
         .background(readerThemeTextColor.opacity(0.055), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
@@ -4640,7 +4686,8 @@ struct ReaderView: View {
             .toolbarColorScheme(background.isDark ? .dark : .light, for: .navigationBar)
         }
         .readerSheetPresentation(color: readerThemeBackground)
-        .presentationDetents([.medium, .large])
+        // 目录默认全屏高度：medium 只露几行，定位当前章后仍像「停在顶部」。
+        .presentationDetents([.large, .medium])
         .tint(AppTheme.accent)
         .preferredColorScheme(background.isDark ? .dark : .light)
     }
@@ -4739,9 +4786,17 @@ struct ReaderView: View {
                                     presentOverlay()
                                     selectChapter(index: chapter.index)
                                 } label: {
-                                    chapterRow(chapter)
+                                    TocChapterRow(
+                                        index: chapter.index,
+                                        title: chapter.title,
+                                        isCurrent: chapter.index == currentDisplayChapterIndex,
+                                        textColor: readerThemeTextColor
+                                    )
+                                    .equatable()
                                 }
+                                .buttonStyle(.plain)
                                 .disabled(chapter.index == currentDisplayChapterIndex || !canJump(to: chapter.index))
+                                .listRowInsets(EdgeInsets(top: 7, leading: 16, bottom: 7, trailing: 16))
                                 .listRowBackground(Color.clear)
                                 .listRowSeparatorTint(readerThemeTextColor.opacity(0.15))
                             }
@@ -4762,6 +4817,7 @@ struct ReaderView: View {
                                     navigationEntryRow(entry, ordinal: offset)
                                 }
                                 .disabled(onSelectNavigationEntry == nil || entry.chapterIndex == nil)
+                                .listRowInsets(EdgeInsets(top: 7, leading: 16, bottom: 7, trailing: 16))
                                 .listRowBackground(Color.clear)
                                 .listRowSeparatorTint(readerThemeTextColor.opacity(0.15))
                             }
@@ -4818,10 +4874,17 @@ struct ReaderView: View {
 
     /// 打开目录时把当前阅读章滚到可视区中部；搜索过滤把目标章滤掉时静默跳过。
     private func scrollTocToCurrentChapter(_ proxy: ScrollViewProxy) {
-        guard let target = chapters.first(where: { $0.index == currentDisplayChapterIndex }) else { return }
+        let preferred = windowCurrentChapterIndex
+        let fallback = currentDisplayChapterIndex
+        guard let target = chapters.first(where: { $0.index == preferred })
+            ?? chapters.first(where: { $0.index == fallback }) else { return }
         let id = target.id
-        DispatchQueue.main.async {
-            proxy.scrollTo(id, anchor: .center)
+        // sheet 首次 onAppear 时 List 的行还没完成布局，单次 async 会落空，
+        // 于是每次打开都停在第一章。多拍重试，行建好后自然命中。
+        for delay in [0.02, 0.12, 0.32, 0.7] {
+            DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
+                proxy.scrollTo(id, anchor: .center)
+            }
         }
     }
 
@@ -5319,7 +5382,9 @@ struct ReaderView: View {
     /// views, which read as the panel flickering. Let the menu finish first,
     /// then hide the chrome without another transition.
     private func closeReaderChromeFromMenu() {
-        DispatchQueue.main.async {
+        // UIMenu 的收起动画约 0.2s；同一 runloop 关闭 chrome 会与它争夺
+        // 同一批图层，表现为菜单面板一闪一闪。等收起动画结束后再关。
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.24) {
             var transaction = Transaction()
             transaction.disablesAnimations = true
             withTransaction(transaction) {
@@ -6516,6 +6581,33 @@ private extension View {
             textSelection(.enabled)
         } else {
             self
+        }
+    }
+}
+
+/// 目录行独立成 Equatable 视图：滚动时只有真正变化的行会重新求值，
+/// 而不是每个滚动帧重建整排 HStack（章节多时这就是掉帧的来源）。
+private struct TocChapterRow: View, Equatable {
+    let index: Int
+    let title: String
+    let isCurrent: Bool
+    let textColor: Color
+
+    var body: some View {
+        HStack(spacing: 12) {
+            Text("\(index + 1)")
+                .font(.caption.weight(.semibold).monospacedDigit())
+                .foregroundStyle(isCurrent ? AppTheme.accent : textColor.opacity(0.55))
+                .frame(width: 48, alignment: .leading)
+            Text(title)
+                .foregroundStyle(isCurrent ? AppTheme.accent : textColor)
+                .fontWeight(isCurrent ? .semibold : .regular)
+                .lineLimit(1)
+            Spacer(minLength: 0)
+            if isCurrent {
+                Image(systemName: "checkmark.circle.fill")
+                    .foregroundStyle(AppTheme.accent)
+            }
         }
     }
 }
