@@ -68,7 +68,7 @@ diagnostic_attachment_sha256=7f34ee4188cd88ea33eb025a07a220e8ea676eb06e6dc974c71
 | 4 | ✿次元姬（知秋）✿ | FAIL | 登录 | — | — | — | API未授权: Unauthorized |
 | 5 | 🍓玖玖小说 | FAIL | △ | — | — | — | API返回: invalid version header (400) |
 | 6 | 免费追书 | PASS4 | ✓ 20 | ✓ 1 | △ | — | 目录超时（超过 10 秒）；排查超时预算、并发和网络，不判域名死亡 |
-| 7 | 📖顶点小说🔥 | DRIVER_ERROR | — | — | — | — | 新附件没有该条报告；需补测，不判失败 |
+| 7 | 📖顶点小说🔥 | PASS4（离线补测） | ✓ 15 | ✓ 1 | ✓ 1914 | ✓ 3015 | 新附件无报告；2026-10-29 晚用源 JSON 原始 header 离线四步实测全通（见 §8），非附件口径 |
 | 8 | 🍅蕃茄小说 | FAIL | 拦截 | — | — | — | HTTP 403 源站拒绝访问 (WAF/防爬)；只是当次响应 |
 | 9 | 聚合书源(zenneko) | FAIL | × | — | — | — | JSON 列表规则未命中（0 项，响应 160 字符；结构 { error,success }） |
 | 10 | 反代番茄 | PASS4 | △ | — | — | — | 完整链路超时（超过 41 秒）；排查超时预算、并发和网络，不判域名死亡 |
@@ -162,3 +162,31 @@ diagnostic_attachment_sha256=7f34ee4188cd88ea33eb025a07a220e8ea676eb06e6dc974c71
 - PC 响应核验：`E:/codex-temp/sourceread/artifacts/takeover/fresh-response-evidence.json`。
 - 本轮副本、补丁、验证记录、回滚脚本：`E:/codex-temp/sourceread/artifacts/diagnostic75-fixes/`。
 - 原始私人源和附件未覆盖；桌面旧 IPA 未删除。
+
+## 8. 离线补测（2026-10-29 晚，独立于附件口径）
+
+### 8.1 #7 📖顶点小说🔥 → PASS4
+
+| 步骤 | 结果 | 实测 |
+|---|---|---|
+| search | PASS | `GET /search?keyword=斗破苍穹&page=1` HTTP 200，15 本 |
+| detail | PASS | `GET /novel/zbqYrb?isSearch=1` HTTP 200，`斗破苍穹` / 695万字 |
+| toc | PASS | `GET /novel/zbqYrb/chapters` HTTP 200，1914 章 |
+| content | PASS | 目录 `path` → base64 → AES-128-CBC(key `f041c49714d39908`, iv `0123456789abcdef`, PKCS5) → `http://api.anwaben.com/0/152/221121.json` → 3015 字 |
+
+关键结论：
+
+1. **不是死源，是探针缺口**。旧表记 `DRIVER_ERROR`（请求驱动超时），本次实测四步全通。
+2. **header 必须逐字复用源 JSON 的 `header` 字段**。手工重打 JWT 会让 `/novel/*` 全部返回 `{"msg":"验证失败","code":4005}`；用 `json.loads(source["header"])` 原样注入即 200。这条对所有自带 JWT 的源都适用，iOS 侧不能裁剪/重组 header。
+3. 正文是标准 UTF-8（`\xe6\x96\x97` = 斗）；PowerShell 控制台看到的乱码是终端代码页问题，不是响应编码问题。**不要为此加 GBK 回退**。
+4. 复现脚本：`E:/codex-temp/sourceread/scripts/probe_007_full.py` / `probe_007_raw_header.py` / `probe_007_encoding.py`。
+
+### 8.2 对 76 总账的影响
+
+| 口径 | 变化 |
+|---|---|
+| 新附件（75 条，缺 #7） | 不变：14 条四步报告通过 |
+| 离线补测 | +1：**#7 PASS4** |
+| 真机 PASS4（1.0.98/99 基线） | 8 条，本次未重跑，不并入 |
+
+因此「结构可用」的保守计数是 **真机 8 + 离线新增 1 = 9**；#7 仍需要在 App 内用同一 header 路径复测一次，才能并入真机口径。
