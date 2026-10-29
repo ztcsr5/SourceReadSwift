@@ -262,7 +262,37 @@ final class CoverPageHostController: UIViewController, UIScrollViewDelegate {
             settleToken += 1
             // Rotated hosts may carry the old slot-1 flip transform.
             for host in hosts { host.view.layer.transform = CATransform3DIdentity }
+            setFlipRasterization(false)
             installFramesIfNeeded(force: true)
+        }
+        if identityChanged || revisionChanged {
+            prewarmNeighbourSlots()
+        }
+    }
+
+    /// Rasterise only the rotating page while a flip is in flight. The two
+    /// neighbours stay live so a spring-back never shows a stale bitmap.
+    private func setFlipRasterization(_ enabled: Bool) {
+        guard turnStyle == .flip else { return }
+        let scale = view.window?.screen.scale ?? UIScreen.main.scale
+        for (slot, host) in hosts.enumerated() {
+            let active = enabled && slot == 1
+            host.view.layer.shouldRasterize = active
+            if active { host.view.layer.rasterizationScale = scale }
+        }
+    }
+
+    /// Push the two off-screen slots through a layout pass as soon as the
+    /// window changes. SwiftUI would otherwise realise the new neighbour on
+    /// the first frame of the next gesture, which is the visible "still
+    /// loading" beat between pages.
+    private func prewarmNeighbourSlots() {
+        DispatchQueue.main.async { [weak self] in
+            guard let self else { return }
+            for slot in [0, 2] where self.hosts.indices.contains(slot) {
+                self.hosts[slot].view.setNeedsLayout()
+                self.hosts[slot].view.layoutIfNeeded()
+            }
         }
     }
 
@@ -311,6 +341,10 @@ final class CoverPageHostController: UIViewController, UIScrollViewDelegate {
 
     func scrollViewWillBeginDragging(_ scrollView: UIScrollView) {
         onInteractionChange?(true)
+        // The turning page is static for the whole drag: rotate one cached
+        // bitmap instead of re-compositing the TextKit subtree on every
+        // ProMotion frame.
+        setFlipRasterization(true)
     }
 
     func scrollViewDidEndDragging(_ scrollView: UIScrollView, willDecelerate decelerate: Bool) {
@@ -323,6 +357,7 @@ final class CoverPageHostController: UIViewController, UIScrollViewDelegate {
 
     func scrollViewDidEndScrollingAnimation(_ scrollView: UIScrollView) {
         isSettling = false
+        setFlipRasterization(false)
         installFramesIfNeeded(force: true)
     }
 

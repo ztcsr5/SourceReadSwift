@@ -89,6 +89,19 @@ enum ReaderPageTextBuilder {
     }
 }
 
+/// Everything one page's attributed string is built from, captured on the
+/// main thread. Building the string touches only Core Text/UIKit value types,
+/// so the prewarm pass can run it on a background queue.
+struct ReaderPageTextSpec {
+    let title: String?
+    let paragraphs: [ReaderPageTextBuilder.Paragraph]
+    let style: ReaderPageTextBuilder.Style
+
+    var attributedString: NSAttributedString {
+        ReaderPageTextBuilder.make(title: title, paragraphs: paragraphs, style: style)
+    }
+}
+
 /// TextKit 1 surface that finishes glyph layout as soon as it owns a size.
 ///
 /// A plain `UITextView` defers glyph generation until its first draw. In the

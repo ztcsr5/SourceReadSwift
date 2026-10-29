@@ -2497,6 +2497,11 @@ struct ReaderView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .clipped()
+        // Build the 5-page window on both sides ahead of the turn.
+        .onAppear { prewarmPageText(around: pagedPageIndex) }
+        .onChange(of: pagedPageIndex) { target in prewarmPageText(around: target) }
+        .onChange(of: pagedBlocksCacheKey) { _ in prewarmPageText(around: pagedPageIndex) }
+        .onChange(of: readerPageRevisionKey) { _ in prewarmPageText(around: pagedPageIndex) }
     }
 
     /// Simulated page turn ("仿真"). It reuses the same three-slot paging
@@ -2773,6 +2778,13 @@ struct ReaderView: View {
     }
 
     private func buildPageAttributedText(for page: ReaderPageBlock) -> NSAttributedString {
+        pageTextSpec(for: page).attributedString
+    }
+
+    /// Main-thread snapshot of one page's rich text. Fonts, theme colours and
+    /// the speech cursor are read here; the character-level build (paragraph
+    /// styles + CJK punctuation compression) then runs off the main thread.
+    private func pageTextSpec(for page: ReaderPageBlock) -> ReaderPageTextSpec {
         let bodyFont = fontFamily.uiFont(
             ofSize: CGFloat(fontSize),
             weight: .regular,
@@ -2797,7 +2809,7 @@ struct ReaderView: View {
                 isHighlighted: highlighted
             )
         }
-        return ReaderPageTextBuilder.make(
+        return ReaderPageTextSpec(
             title: title,
             paragraphs: paragraphs,
             style: ReaderPageTextBuilder.Style(
@@ -2811,6 +2823,32 @@ struct ReaderView: View {
                 titleSpacing: CGFloat(titleSpacing)
             )
         )
+    }
+
+    /// 预建前后各 radius 页的富文本（前 5 后 5）。
+    /// 翻页首帧只保留 TextKit 排字，逐字符的标点压缩在抬手前就已算完。
+    private func prewarmPageText(around index: Int, radius: Int = 5) {
+        guard readerMode != .scroll, !pagedBlocks.isEmpty else { return }
+        let lower = max(0, index - radius)
+        let upper = min(pagedBlocks.count - 1, index + radius)
+        guard lower <= upper else { return }
+        let signature = readerPageRevisionKey
+        var items: [(key: String, spec: ReaderPageTextSpec)] = []
+        items.reserveCapacity(upper - lower + 1)
+        for pageIndex in lower...upper {
+            let page = pagedBlocks[pageIndex]
+            guard !page.isPlaceholder else { continue }
+            items.append((pageTextCacheKey(for: page), pageTextSpec(for: page)))
+        }
+        guard !items.isEmpty else { return }
+        let cache = pageTextCache
+        DispatchQueue.global(qos: .userInitiated).async {
+            for item in items {
+                cache.storeIfAbsent(key: item.key, signature: signature) {
+                    item.spec.attributedString
+                }
+            }
+        }
     }
 
     /// The page shown while the neighbouring chapter is still downloading, or
@@ -6353,32 +6391,76 @@ final class ReaderPageTextCache {
     private var storage: [String: NSAttributedString] = [:]
     private var order: [String] = []
     private var signature = ""
+    private var inFlight: Set<String> = []
+    /// `text` runs on the main thread, `storeIfAbsent` on a prewarm queue.
+    private let lock = NSLock()
     /// A whole-cache flush every 16 pages forced TextKit to rebuild the
     /// attributed strings of pages the reader was about to swipe back to.
     /// Keep a wide window and evict the oldest entry one at a time instead.
     private let capacity = 96
 
     func text(key: String, signature: String, build: () -> NSAttributedString) -> NSAttributedString {
+        lock.lock()
         if signature != self.signature {
             storage.removeAll(keepingCapacity: true)
             order.removeAll(keepingCapacity: true)
             self.signature = signature
         }
         if let cached = storage[key] {
-            if let position = order.firstIndex(of: key) {
-                order.remove(at: position)
-            }
-            order.append(key)
+            touch(key)
+            lock.unlock()
             return cached
         }
+        lock.unlock()
+
+        // Build outside the lock: one page build is milliseconds long and a
+        // prewarm pass must not block the visible page behind it.
         let value = build()
+
+        lock.lock()
+        if signature == self.signature {
+            insert(key, value)
+        }
+        lock.unlock()
+        return value
+    }
+
+    /// Fills one entry from the background prewarm pass. A value built for an
+    /// older typography revision is dropped instead of shadowing a live page.
+    func storeIfAbsent(key: String, signature: String, build: () -> NSAttributedString) {
+        lock.lock()
+        if self.signature.isEmpty { self.signature = signature }
+        if signature != self.signature || storage[key] != nil || inFlight.contains(key) {
+            lock.unlock()
+            return
+        }
+        inFlight.insert(key)
+        lock.unlock()
+
+        let value = build()
+
+        lock.lock()
+        inFlight.remove(key)
+        if signature == self.signature, storage[key] == nil {
+            insert(key, value)
+        }
+        lock.unlock()
+    }
+
+    private func touch(_ key: String) {
+        if let position = order.firstIndex(of: key) {
+            order.remove(at: position)
+        }
+        order.append(key)
+    }
+
+    private func insert(_ key: String, _ value: NSAttributedString) {
         if storage.count >= capacity, let evicted = order.first {
             order.removeFirst()
             storage.removeValue(forKey: evicted)
         }
         storage[key] = value
         order.append(key)
-        return value
     }
 }
 
