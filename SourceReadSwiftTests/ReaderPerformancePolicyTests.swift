@@ -104,4 +104,25 @@ final class ReaderPerformancePolicyTests: XCTestCase {
         XCTAssertGreaterThanOrEqual(ReaderPerformancePolicy.visibleParagraphUpdateInterval, 0.05)
         XCTAssertLessThan(ReaderPerformancePolicy.visibleParagraphUpdateInterval, 0.2)
     }
+
+    func testPagedWarmupAndSettleConstantsStayCheap() {
+        // One frame at 120 Hz is 8.33 ms; the settle debounce must clear the
+        // geometry noise but stay well under the old 320 ms stall.
+        XCTAssertGreaterThan(ReaderPerformancePolicy.geometrySettleNanoseconds, 16_000_000)
+        XCTAssertLessThan(ReaderPerformancePolicy.geometrySettleNanoseconds, 160_000_000)
+        XCTAssertGreaterThan(ReaderPerformancePolicy.paginationWarmupRestartNanoseconds, 16_000_000)
+        XCTAssertGreaterThan(ReaderPerformancePolicy.paginationWarmupBatchSize, 0)
+        XCTAssertLessThanOrEqual(ReaderPerformancePolicy.paginationWarmupBatchSize, 8)
+        XCTAssertLessThan(ReaderPerformancePolicy.paginationWarmupInterBatchNanoseconds, 16_000_000)
+        XCTAssertGreaterThan(ReaderPerformancePolicy.coverCommitFallbackNanoseconds, 100_000_000)
+        XCTAssertLessThan(ReaderPerformancePolicy.coverCommitFallbackNanoseconds, 1_500_000_000)
+    }
+
+    func testCoverSlotsAlwaysCoverTheDeclaredRadius() {
+        XCTAssertEqual(
+            ReaderPerformancePolicy.coverPageSlotCount,
+            ReaderPerformancePolicy.coverPageSlotRadius * 2 + 1
+        )
+        XCTAssertGreaterThanOrEqual(ReaderPerformancePolicy.coverPageSlotRadius, 1)
+    }
 }

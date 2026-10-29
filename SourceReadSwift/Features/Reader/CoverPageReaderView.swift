@@ -32,11 +32,19 @@ struct CoverPageReaderView: UIViewControllerRepresentable {
     var previousIdentity: String = ""
     var currentIdentity: String = ""
     var nextIdentity: String = ""
+    /// Second cached page on each side. With a single neighbour every turn
+    /// still built a brand new `UIHostingController` + `UITextView` for the
+    /// page that entered the window, which is the per-page hitch users see on
+    /// local books where no network is involved.
+    var previous2Identity: String = ""
+    var next2Identity: String = ""
     var hasPrevious: Bool
     var hasNext: Bool
     var previous: AnyView?
     var current: AnyView
     var next: AnyView?
+    var previous2: AnyView?
+    var next2: AnyView?
     /// -1 = the user pulled the previous page in, +1 = the next page.
     var onCommit: (Int) -> Void
     var onInteractionChange: (Bool) -> Void
@@ -46,6 +54,14 @@ struct CoverPageReaderView: UIViewControllerRepresentable {
     var onPageContainerLayout: ((CGSize, CGFloat) -> Void)?
     /// `.cover` slides; `.flip` rotates the outgoing page in 3D.
     var turnStyle: CoverPageTurnStyle = .cover
+    /// Opaque paper colour. `nil` keeps the hosts transparent so a custom
+    /// wallpaper shows through; otherwise the hosts paint it themselves,
+    /// which is what stops the white flash while a chapter is swapped.
+    var pageBackgroundColor: UIColor?
+    /// Forced appearance for the hosted UIKit tree. `preferredColorScheme`
+    /// does not reach `UIHostingController`s reliably, so the reader theme is
+    /// pushed down explicitly or a system dark device turns every paper black.
+    var userInterfaceStyle: UIUserInterfaceStyle = .unspecified
 
     func makeUIViewController(context: Context) -> CoverPageHostController {
         let controller = CoverPageHostController()
@@ -55,15 +71,21 @@ struct CoverPageReaderView: UIViewControllerRepresentable {
             previousIdentity: previousIdentity,
             currentIdentity: currentIdentity,
             nextIdentity: nextIdentity,
+            previous2Identity: previous2Identity,
+            next2Identity: next2Identity,
             hasPrevious: hasPrevious,
             hasNext: hasNext,
             previous: previous,
             current: current,
             next: next,
+            previous2: previous2,
+            next2: next2,
             onCommit: onCommit,
             onInteractionChange: onInteractionChange,
             onPageContainerLayout: onPageContainerLayout,
-            turnStyle: turnStyle
+            turnStyle: turnStyle,
+            pageBackgroundColor: pageBackgroundColor,
+            userInterfaceStyle: userInterfaceStyle
         )
         return controller
     }
@@ -75,33 +97,51 @@ struct CoverPageReaderView: UIViewControllerRepresentable {
             previousIdentity: previousIdentity,
             currentIdentity: currentIdentity,
             nextIdentity: nextIdentity,
+            previous2Identity: previous2Identity,
+            next2Identity: next2Identity,
             hasPrevious: hasPrevious,
             hasNext: hasNext,
             previous: previous,
             current: current,
             next: next,
+            previous2: previous2,
+            next2: next2,
             onCommit: onCommit,
             onInteractionChange: onInteractionChange,
             onPageContainerLayout: onPageContainerLayout,
-            turnStyle: turnStyle
+            turnStyle: turnStyle,
+            pageBackgroundColor: pageBackgroundColor,
+            userInterfaceStyle: userInterfaceStyle
         )
     }
 }
 
-/// Three-slot paging container: previous / current / next.
+/// Five-slot paging container: two cached pages on each side of the visible
+/// one.
 ///
-/// The middle slot is always at `contentOffset.x == width`. Pulling past half
-/// a page commits a turn; anything less springs back. The reader then swaps in
-/// the new window and this controller recentres without animation, so the page
-/// under the user's finger stays the same page.
+/// The resting slot is always at `contentOffset.x == radius * width`. Pulling
+/// past half a page commits a turn; anything less springs back. The reader
+/// then swaps in the new window and this controller recentres without
+/// animation, so the page under the user's finger stays the same page.
+///
+/// The radius used to be one. With three slots the page that entered the
+/// window was created on the commit, so the first frame of every turn paid for
+/// a `UIHostingController` + `UITextView` + TextKit layout pass. That is the
+/// per-page stutter reported on local books, where nothing is downloaded.
 final class CoverPageHostController: UIViewController, UIScrollViewDelegate {
     private let scrollView = UIScrollView()
     private var hosts: [UIHostingController<AnyView>] = []
+
+    /// Two neighbours on each side; the middle slot is the visible page.
+    private let slotRadius = ReaderPerformancePolicy.coverPageSlotRadius
+    private var slotCount: Int { slotRadius * 2 + 1 }
 
     private var pageIdentity = ""
     private var contentRevision = ""
     private var hasPrevious = false
     private var hasNext = false
+    private var pageBackgroundColor: UIColor?
+    private var userInterfaceStyle: UIUserInterfaceStyle = .unspecified
     private var onCommit: ((Int) -> Void)?
     private var onInteractionChange: ((Bool) -> Void)?
     private var turnStyle: CoverPageTurnStyle = .cover
@@ -115,7 +155,10 @@ final class CoverPageHostController: UIViewController, UIScrollViewDelegate {
     private var settleToken = 0
     private var didInstallContent = false
     /// Page key currently hosted by each physical slot.
-    private var slotIdentities = ["", "", ""]
+    private var slotIdentities: [String] = Array(
+        repeating: "",
+        count: ReaderPerformancePolicy.coverPageSlotCount
+    )
 
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -134,10 +177,10 @@ final class CoverPageHostController: UIViewController, UIScrollViewDelegate {
         scrollView.delegate = self
         view.addSubview(scrollView)
 
-        for _ in 0..<3 {
+        for _ in 0..<slotCount {
             let host = UIHostingController(rootView: AnyView(EmptyView()))
-            host.view.backgroundColor = .clear
-            host.view.isOpaque = false
+            host.view.backgroundColor = pageBackgroundColor ?? .clear
+            host.view.isOpaque = pageBackgroundColor != nil
             addChild(host)
             scrollView.addSubview(host.view)
             host.didMove(toParent: self)
@@ -183,15 +226,21 @@ final class CoverPageHostController: UIViewController, UIScrollViewDelegate {
         previousIdentity: String,
         currentIdentity: String,
         nextIdentity: String,
+        previous2Identity: String = "",
+        next2Identity: String = "",
         hasPrevious: Bool,
         hasNext: Bool,
         previous: AnyView?,
         current: AnyView,
         next: AnyView?,
+        previous2: AnyView? = nil,
+        next2: AnyView? = nil,
         onCommit: @escaping (Int) -> Void,
         onInteractionChange: @escaping (Bool) -> Void,
         onPageContainerLayout: ((CGSize, CGFloat) -> Void)?,
-        turnStyle: CoverPageTurnStyle = .cover
+        turnStyle: CoverPageTurnStyle = .cover,
+        pageBackgroundColor: UIColor? = nil,
+        userInterfaceStyle: UIUserInterfaceStyle = .unspecified
     ) {
         loadViewIfNeeded()
         self.onCommit = onCommit
@@ -201,6 +250,7 @@ final class CoverPageHostController: UIViewController, UIScrollViewDelegate {
         self.turnStyle = turnStyle
         self.hasPrevious = hasPrevious
         self.hasNext = hasNext
+        applyChrome(pageBackgroundColor: pageBackgroundColor, style: userInterfaceStyle)
 
         let identityChanged = self.pageIdentity != pageIdentity
         let revisionChanged = self.contentRevision != contentRevision
@@ -211,11 +261,19 @@ final class CoverPageHostController: UIViewController, UIScrollViewDelegate {
         didInstallContent = true
 
         let roots: [AnyView] = [
+            previous2 ?? AnyView(EmptyView()),
             previous ?? AnyView(EmptyView()),
             current,
-            next ?? AnyView(EmptyView())
+            next ?? AnyView(EmptyView()),
+            next2 ?? AnyView(EmptyView())
         ]
-        let identities = [previousIdentity, currentIdentity, nextIdentity]
+        let identities = [
+            previous2Identity,
+            previousIdentity,
+            currentIdentity,
+            nextIdentity,
+            next2Identity
+        ]
 
         if revisionChanged {
             // Typography / highlight changes invalidate every page.
@@ -228,28 +286,31 @@ final class CoverPageHostController: UIViewController, UIScrollViewDelegate {
             // most of the three pages keep their identity. Move the host
             // that already renders the page instead of rebuilding its
             // SwiftUI root, which was the source of the settle stutter.
-            var desired: [UIHostingController<AnyView>?] = [nil, nil, nil]
-            var claimed = [false, false, false]
-            for slot in 0..<3 where slotIdentities[slot] == identities[slot] {
+            var desired: [UIHostingController<AnyView>?] = Array(
+                repeating: nil,
+                count: slotCount
+            )
+            var claimed = Array(repeating: false, count: slotCount)
+            for slot in 0..<slotCount where slotIdentities[slot] == identities[slot] {
                 desired[slot] = hosts[slot]
                 claimed[slot] = true
             }
-            for slot in 0..<3 where desired[slot] == nil {
-                if let donor = (0..<3).first(where: { !claimed[$0] && slotIdentities[$0] == identities[slot] }) {
+            for slot in 0..<slotCount where desired[slot] == nil {
+                if let donor = (0..<slotCount).first(where: { !claimed[$0] && slotIdentities[$0] == identities[slot] }) {
                     desired[slot] = hosts[donor]
                     claimed[donor] = true
                 }
             }
             var rebuilt = false
-            for slot in 0..<3 where desired[slot] == nil {
-                guard let donor = (0..<3).first(where: { !claimed[$0] }) else { continue }
+            for slot in 0..<slotCount where desired[slot] == nil {
+                guard let donor = (0..<slotCount).first(where: { !claimed[$0] }) else { continue }
                 claimed[donor] = true
                 hosts[donor].rootView = roots[slot]
                 desired[slot] = hosts[donor]
                 rebuilt = true
             }
-            if let first = desired[0], let second = desired[1], let third = desired[2] {
-                hosts = [first, second, third]
+            if desired.allSatisfy({ $0 != nil }) {
+                hosts = desired.compactMap { $0 }
             } else if rebuilt {
                 for (slot, root) in roots.enumerated() where hosts.indices.contains(slot) {
                     hosts[slot].rootView = root
@@ -279,7 +340,7 @@ final class CoverPageHostController: UIViewController, UIScrollViewDelegate {
         let scale = view.window?.screen.scale ?? UIScreen.main.scale
         let flip = turnStyle == .flip
         for (slot, host) in hosts.enumerated() {
-            let active = enabled && (flip ? slot == 1 : true)
+            let active = enabled && (flip ? slot == slotRadius : true)
             host.view.layer.shouldRasterize = active
             if active { host.view.layer.rasterizationScale = scale }
         }
@@ -292,10 +353,42 @@ final class CoverPageHostController: UIViewController, UIScrollViewDelegate {
     private func prewarmNeighbourSlots() {
         DispatchQueue.main.async { [weak self] in
             guard let self else { return }
-            for slot in [0, 2] where self.hosts.indices.contains(slot) {
+            for slot in self.hosts.indices where slot != self.slotRadius {
                 self.hosts[slot].view.setNeedsLayout()
                 self.hosts[slot].view.layoutIfNeeded()
             }
+        }
+    }
+
+    /// Paint the paper colour into the UIKit tree.
+    ///
+    /// Every host used to be `.clear` + `isOpaque = false`, so a chapter swap
+    /// (or the frame between a commit and the reader's rebuild) composited two
+    /// transparent layers and the white system background flashed through.
+    /// A custom wallpaper still needs transparency, so the colour stays
+    /// optional.
+    private func applyChrome(pageBackgroundColor: UIColor?, style: UIUserInterfaceStyle) {
+        if self.pageBackgroundColor != pageBackgroundColor {
+            self.pageBackgroundColor = pageBackgroundColor
+        }
+        if self.userInterfaceStyle != style {
+            self.userInterfaceStyle = style
+            overrideUserInterfaceStyle = style
+        }
+        let paper = self.pageBackgroundColor
+        let opaque = paper != nil
+        if view.backgroundColor != paper {
+            view.backgroundColor = paper ?? .clear
+        }
+        if scrollView.backgroundColor != paper {
+            scrollView.backgroundColor = paper ?? .clear
+        }
+        for host in hosts {
+            if host.view.backgroundColor != paper {
+                host.view.backgroundColor = paper ?? .clear
+            }
+            guard host.view.isOpaque != opaque else { continue }
+            host.view.isOpaque = opaque
         }
     }
 
@@ -305,14 +398,17 @@ final class CoverPageHostController: UIViewController, UIScrollViewDelegate {
 
         let width = size.width
         scrollView.frame = view.bounds
-        scrollView.contentSize = CGSize(width: width * 3, height: size.height)
+        scrollView.contentSize = CGSize(
+            width: width * CGFloat(slotCount),
+            height: size.height
+        )
 
         for (slot, host) in hosts.enumerated() {
             let originX = CGFloat(slot) * width
             // A flip page pivots on its left edge; a cover page pivots on its
             // centre. Setting bounds/position keeps the anchor point stable
             // across relayouts.
-            if turnStyle == .flip && slot == 1 {
+            if turnStyle == .flip && slot == slotRadius {
                 // A single-sided layer never shows its mirrored back face;
                 // without this the previous page bleeds through mid-turn.
                 host.view.layer.isDoubleSided = false
@@ -327,7 +423,7 @@ final class CoverPageHostController: UIViewController, UIScrollViewDelegate {
         }
 
         guard force || (!scrollView.isDragging && !scrollView.isDecelerating && !isSettling) else { return }
-        let centred = CGPoint(x: width, y: 0)
+        let centred = CGPoint(x: width * CGFloat(slotRadius), y: 0)
         if scrollView.contentOffset != centred {
             scrollView.setContentOffset(centred, animated: false)
         }
@@ -338,12 +434,13 @@ final class CoverPageHostController: UIViewController, UIScrollViewDelegate {
     func scrollViewDidScroll(_ scrollView: UIScrollView) {
         guard turnStyle == .flip else { return }
         let width = max(scrollView.bounds.width, 1)
-        let shift = scrollView.contentOffset.x - width
+        let shift = scrollView.contentOffset.x - width * CGFloat(slotRadius)
         let progress = min(max(shift / width, -1), 1)
         let angle = ReaderFlipTransitionPolicy.rotationAngle(progress: abs(progress))
         var transform = ReaderFlipTransitionPolicy.perspectiveTransform()
         transform = CATransform3DRotate(transform, progress >= 0 ? angle : -angle, 0, 1, 0)
-        hosts[1].view.layer.transform = transform
+        guard hosts.indices.contains(slotRadius) else { return }
+        hosts[slotRadius].view.layer.transform = transform
     }
 
     func scrollViewWillBeginDragging(_ scrollView: UIScrollView) {
@@ -372,10 +469,10 @@ final class CoverPageHostController: UIViewController, UIScrollViewDelegate {
         onInteractionChange?(false)
         guard !isSettling else { return }
         let width = max(scrollView.bounds.width, 1)
-        let offset = scrollView.contentOffset.x
+        let shift = scrollView.contentOffset.x - width * CGFloat(slotRadius)
 
         switch ReaderCoverSettlePolicy.outcome(
-            contentOffsetX: offset,
+            shift: shift,
             pageWidth: width,
             hasPrevious: hasPrevious,
             hasNext: hasNext
@@ -397,7 +494,8 @@ final class CoverPageHostController: UIViewController, UIScrollViewDelegate {
         // The reader normally swaps the window synchronously, which recentres
         // through `apply`. If the neighbour is still loading, recover the
         // middle slot instead of leaving the scroll view parked on an edge.
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) { [weak self] in
+        let fallback = Double(ReaderPerformancePolicy.coverCommitFallbackNanoseconds) / 1_000_000_000
+        DispatchQueue.main.asyncAfter(deadline: .now() + fallback) { [weak self] in
             guard let self, self.settleToken == token, self.isSettling else { return }
             self.isSettling = false
             self.springBack(width: self.scrollView.bounds.width > 1 ? self.scrollView.bounds.width : width)
@@ -407,6 +505,9 @@ final class CoverPageHostController: UIViewController, UIScrollViewDelegate {
     private func springBack(width: CGFloat) {
         isSettling = true
         settleToken += 1
-        scrollView.setContentOffset(CGPoint(x: width, y: 0), animated: true)
+        scrollView.setContentOffset(
+            CGPoint(x: width * CGFloat(slotRadius), y: 0),
+            animated: true
+        )
     }
 }
