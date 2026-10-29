@@ -48,9 +48,16 @@ enum ReaderPageTextBuilder {
         for (index, paragraph) in paragraphs.enumerated() {
             let paragraphStyle = NSMutableParagraphStyle()
             paragraphStyle.lineSpacing = style.lineSpacing
+            // Paragraph spacing belongs to the newline that terminates this
+            // paragraph. It must therefore be decided by the NEXT paragraph:
+            // a split continuation is glued to this chunk, and a continuation
+            // followed by a new paragraph starts a new visual block. The
+            // paginator already adds spacing only before chunkIndex == 0;
+            // testing `paragraph.isContinuation` here measured a different
+            // document than the one TextKit rendered.
             paragraphStyle.paragraphSpacing = index == paragraphs.count - 1
                 ? 0
-                : (paragraph.isContinuation ? 0 : style.paragraphSpacing)
+                : (paragraphs[index + 1].isContinuation ? 0 : style.paragraphSpacing)
             paragraphStyle.lineBreakStrategy = ReaderPageLayoutEngine.lineBreakStrategy
             paragraphStyle.alignment = .justified
             // The indent is already part of `paragraph.text`; adding it here

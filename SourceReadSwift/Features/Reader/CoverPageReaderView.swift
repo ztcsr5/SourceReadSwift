@@ -120,6 +120,7 @@ final class CoverPageHostController: UIViewController, UIScrollViewDelegate {
     override func viewDidLoad() {
         super.viewDidLoad()
         view.backgroundColor = .clear
+        view.clipsToBounds = true
 
         scrollView.backgroundColor = .clear
         scrollView.isPagingEnabled = true
@@ -128,6 +129,7 @@ final class CoverPageHostController: UIViewController, UIScrollViewDelegate {
         scrollView.showsHorizontalScrollIndicator = false
         scrollView.showsVerticalScrollIndicator = false
         scrollView.contentInsetAdjustmentBehavior = .never
+        scrollView.clipsToBounds = true
         scrollView.scrollsToTop = false
         scrollView.delegate = self
         view.addSubview(scrollView)
@@ -195,6 +197,7 @@ final class CoverPageHostController: UIViewController, UIScrollViewDelegate {
         self.onCommit = onCommit
         self.onInteractionChange = onInteractionChange
         self.onPageContainerLayout = onPageContainerLayout
+        let styleChanged = self.turnStyle != turnStyle
         self.turnStyle = turnStyle
         self.hasPrevious = hasPrevious
         self.hasNext = hasNext
@@ -204,7 +207,7 @@ final class CoverPageHostController: UIViewController, UIScrollViewDelegate {
         self.pageIdentity = pageIdentity
         self.contentRevision = contentRevision
 
-        guard identityChanged || revisionChanged || !didInstallContent else { return }
+        guard identityChanged || revisionChanged || styleChanged || !didInstallContent else { return }
         didInstallContent = true
 
         let roots: [AnyView] = [
@@ -255,14 +258,14 @@ final class CoverPageHostController: UIViewController, UIScrollViewDelegate {
             slotIdentities = identities
         }
 
-        if identityChanged {
+        if identityChanged || styleChanged {
             // A committed turn (or an external jump) replaced the window.
             // Recentre on the new current page without animating.
             isSettling = false
             settleToken += 1
             // Rotated hosts may carry the old slot-1 flip transform.
             for host in hosts { host.view.layer.transform = CATransform3DIdentity }
-            setFlipRasterization(false)
+            setSlotRasterization(false)
             installFramesIfNeeded(force: true)
         }
         if identityChanged || revisionChanged {
@@ -270,13 +273,13 @@ final class CoverPageHostController: UIViewController, UIScrollViewDelegate {
         }
     }
 
-    /// Rasterise only the rotating page while a flip is in flight. The two
-    /// neighbours stay live so a spring-back never shows a stale bitmap.
-    private func setFlipRasterization(_ enabled: Bool) {
-        guard turnStyle == .flip else { return }
+    /// Rasterise every page that moves during a gesture.
+    /// A flip moves one page; cover reshuffles all three, and recompositing
+    private func setSlotRasterization(_ enabled: Bool) {
         let scale = view.window?.screen.scale ?? UIScreen.main.scale
+        let flip = turnStyle == .flip
         for (slot, host) in hosts.enumerated() {
-            let active = enabled && slot == 1
+            let active = enabled && (flip ? slot == 1 : true)
             host.view.layer.shouldRasterize = active
             if active { host.view.layer.rasterizationScale = scale }
         }
@@ -310,9 +313,13 @@ final class CoverPageHostController: UIViewController, UIScrollViewDelegate {
             // centre. Setting bounds/position keeps the anchor point stable
             // across relayouts.
             if turnStyle == .flip && slot == 1 {
+                // A single-sided layer never shows its mirrored back face;
+                // without this the previous page bleeds through mid-turn.
+                host.view.layer.isDoubleSided = false
                 host.view.layer.anchorPoint = CGPoint(x: 0, y: 0.5)
                 host.view.layer.position = CGPoint(x: originX, y: size.height / 2)
             } else {
+                host.view.layer.isDoubleSided = true
                 host.view.layer.anchorPoint = CGPoint(x: 0.5, y: 0.5)
                 host.view.layer.position = CGPoint(x: originX + width / 2, y: size.height / 2)
             }
@@ -344,7 +351,7 @@ final class CoverPageHostController: UIViewController, UIScrollViewDelegate {
         // The turning page is static for the whole drag: rotate one cached
         // bitmap instead of re-compositing the TextKit subtree on every
         // ProMotion frame.
-        setFlipRasterization(true)
+        setSlotRasterization(true)
     }
 
     func scrollViewDidEndDragging(_ scrollView: UIScrollView, willDecelerate decelerate: Bool) {
@@ -357,7 +364,7 @@ final class CoverPageHostController: UIViewController, UIScrollViewDelegate {
 
     func scrollViewDidEndScrollingAnimation(_ scrollView: UIScrollView) {
         isSettling = false
-        setFlipRasterization(false)
+        setSlotRasterization(false)
         installFramesIfNeeded(force: true)
     }
 
@@ -390,7 +397,7 @@ final class CoverPageHostController: UIViewController, UIScrollViewDelegate {
         // The reader normally swaps the window synchronously, which recentres
         // through `apply`. If the neighbour is still loading, recover the
         // middle slot instead of leaving the scroll view parked on an edge.
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.45) { [weak self] in
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) { [weak self] in
             guard let self, self.settleToken == token, self.isSettling else { return }
             self.isSettling = false
             self.springBack(width: self.scrollView.bounds.width > 1 ? self.scrollView.bounds.width : width)

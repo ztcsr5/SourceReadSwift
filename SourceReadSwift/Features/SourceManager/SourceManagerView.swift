@@ -38,6 +38,7 @@ struct SourceManagerView: View {
     /// an account without opening each source's menu.
     @State private var loggedInHosts: Set<String> = []
     @State private var showLoginCenter = false
+    @Environment(\.dismiss) private var dismiss
     @State private var sourceHistory: BookSource?
     @State private var sourceVisualDetail: BookSource?
     @State private var pendingDetailAction: SourceDetailAction?
@@ -199,10 +200,52 @@ struct SourceManagerView: View {
         }
     }
 
+    /// 自绘顶部栏：系统导航栏隐藏后仍保留返回、管理和登录中心三个入口。
+    private var sourceManagerHeader: some View {
+        HStack(spacing: 12) {
+            Button {
+                dismiss()
+            } label: {
+                Image(systemName: "chevron.left")
+                    .font(.system(size: 17, weight: .semibold))
+                    .frame(width: 40, height: 40)
+                    .background(AppTheme.accent.opacity(0.12), in: Circle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("返回")
+
+            Text("源管理")
+                .font(.title2.weight(.bold))
+
+            Spacer(minLength: 8)
+
+            if currentTabCount > 0 {
+                Button(isManagingCurrentTab ? "完成" : "管理") {
+                    toggleManagementForCurrentTab()
+                }
+                .font(.subheadline.weight(.semibold))
+                .buttonStyle(.plain)
+            }
+
+            Button {
+                showLoginCenter = true
+            } label: {
+                Image(systemName: "key.fill")
+                    .frame(width: 36, height: 36)
+                    .background(AppTheme.accent.opacity(0.12), in: Circle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("书源登录中心")
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.top, 2)
+    }
+
     var body: some View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
+                    sourceManagerHeader
                     batchCheckStatusBanner
                     webServiceCard
                     tabPicker
@@ -221,25 +264,9 @@ struct SourceManagerView: View {
             .scrollDismissesKeyboard(.interactively)
             .pageBackground()
             .task { await refreshLoggedInHosts() }
-            .navigationTitle("源管理")
-            .navigationBarTitleDisplayMode(.large)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) {
-                    if currentTabCount > 0 {
-                        Button(isManagingCurrentTab ? "完成" : "管理") {
-                            toggleManagementForCurrentTab()
-                        }
-                    }
-                }
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button {
-                        showLoginCenter = true
-                    } label: {
-                        Image(systemName: "key.fill")
-                    }
-                    .accessibilityLabel("书源登录中心")
-                }
-            }
+            // 进入书源管理是阅读器外的二级页面，系统导航栏会多出一条空白
+            // 标题区；顶部自绘返回键 + 管理/登录入口，正文直接顶到状态栏下。
+            .toolbar(.hidden, for: .navigationBar)
             .sheet(isPresented: $showImportSheet) {
                 importSheet
             }

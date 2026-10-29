@@ -55,11 +55,30 @@ final class ReaderPageGeometryTests: XCTestCase {
         XCTAssertFalse(hidden.showsHeader)
     }
 
-    func testContentExtensionUsesHeaderFooterAsOverlay() {
+    /// 「延伸到页眉页脚」只放宽页眉：正文仍然不能压到页脚上。
+    /// 旧断言允许 bodyBottom 到 834（屏幕底 - 10），正文最后一行的下半截
+    /// 会被浮层页码盖住，正是 build 114 修掉的截断。
+    func testContentExtensionUsesHeaderAsOverlayButStopsAtFooter() {
         let geo = geometry(extends: true)
         XCTAssertEqual(geo.bodyTop, 58, accuracy: 0.01)
-        XCTAssertEqual(geo.bodyBottom, 834, accuracy: 0.01)
-        XCTAssertEqual(geo.contentHeight, 776, accuracy: 0.01)
+        XCTAssertEqual(geo.footerTop, 813, accuracy: 0.01)
+        XCTAssertEqual(geo.bodyBottom, 809, accuracy: 0.01)
+        XCTAssertEqual(geo.contentHeight, 751, accuracy: 0.01)
+        XCTAssertLessThanOrEqual(geo.bodyBottom, geo.footerTop - 4 + 0.01)
+    }
+
+    /// 页面容器只被安全区内缩一部分时，剩余安全区必须按差值保留，
+    /// 不能像旧实现那样二值清零（那会把正文往上顶，页尾随即被裁）。
+    func testPartiallyInsetContainerKeepsRemainingSafeArea() {
+        let metrics = ReaderPageContainerMetrics(
+            size: CGSize(width: 393, height: 810),
+            globalMinY: 24,
+            rootViewportHeight: 852,
+            rootSafeTop: 59,
+            rootSafeBottom: 34
+        )
+        XCTAssertEqual(metrics.resolvedSafeTop, 35, accuracy: 0.01)
+        XCTAssertEqual(metrics.resolvedSafeBottom, 16, accuracy: 0.01)
     }
 
     func testHorizontalMarginClampsOnNarrowViewports() {

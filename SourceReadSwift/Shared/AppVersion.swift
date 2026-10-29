@@ -1,31 +1,34 @@
 import Foundation
 
-/// 统一版本号管理规范
-/// 格式：[巨大版本].[大版本].[小版本]
-/// - 最前面为巨大版本 (Epic / Generation)
-/// - 中间为大版本 (Feature / Major Architecture)
-/// - 最后面为小版本 (Fix / Patch / Detail Optimization)
+/// 版本号单一来源：Info.plist（由 project.yml 注入）。
+/// UI 不再维护 1.0.96 这类硬编码副本，避免安装包版本与「关于」页漂移。
 public enum AppVersion {
-    /// 巨大版本
-    public static let epic: Int = 1
-    /// 大版本
-    public static let major: Int = 0
-    /// 小版本
-    public static let minor: Int = 96
-    /// 内部构建号
-    public static let build: Int = 97
+    private static var versionComponents: (epic: Int, major: Int, minor: Int) {
+        let raw = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String
+        let parts = (raw ?? "1.0.114").split(separator: ".").compactMap { Int($0) }
+        return (
+            parts.indices.contains(0) ? parts[0] : 1,
+            parts.indices.contains(1) ? parts[1] : 0,
+            parts.indices.contains(2) ? parts[2] : 114
+        )
+    }
 
-    /// 标准语义化版本号：1.0.0
+    public static var epic: Int { versionComponents.epic }
+    public static var major: Int { versionComponents.major }
+    public static var minor: Int { versionComponents.minor }
+    public static var build: Int {
+        let raw = Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String
+        return Int(raw ?? "") ?? 114
+    }
+
     public static var versionString: String {
         "\(epic).\(major).\(minor)"
     }
 
-    /// 用户界面展示文本：版本 1.0.0
     public static var displayString: String {
         "版本 \(versionString)"
     }
 
-    /// 完整诊断与关于展示文本：版本 1.0.0 (Build 1)
     public static var fullDisplayString: String {
         "版本 \(versionString) (Build \(build))"
     }
