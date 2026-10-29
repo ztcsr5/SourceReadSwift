@@ -53,4 +53,41 @@ final class WebViewFallbackHeuristicTests: XCTestCase {
     func testNormalSearchPageIsNotAChallengeShell() {
         XCTAssertFalse(LegadoSourceEngine.looksLikeJavaScriptChallenge(qunxsResultPage()))
     }
+
+    // MARK: - URL option `webView` with a POST body
+
+    private func request(method: SourceHTTPMethod, body: Data?, webView: Bool = true) -> SourceRequest {
+        SourceRequest(
+            url: URL(string: "https://m.douxsw.com/search/")!,
+            method: method,
+            headers: [:],
+            body: body,
+            expectedCharset: nil,
+            timeout: 15,
+            webView: webView
+        )
+    }
+
+    /// 抖音小说 sends `searchkey` as a POST body together with `webView:true`.
+    /// WKWebView can only navigate with GET, so forcing WebKit first dropped the
+    /// body and returned the 2.8KB empty form instead of the 5KB result page.
+    func testPostBodyWithWebViewOptionProbesSocketFirst() {
+        let req = request(method: .post, body: Data("searchkey=剑来".utf8))
+        XCTAssertFalse(LegadoSourceEngine.shouldForceWebView(for: req))
+    }
+
+    func testGetWithWebViewOptionStillRenders() {
+        let req = request(method: .get, body: nil)
+        XCTAssertTrue(LegadoSourceEngine.shouldForceWebView(for: req))
+    }
+
+    func testPostWithoutBodyStillRenders() {
+        let req = request(method: .post, body: nil)
+        XCTAssertTrue(LegadoSourceEngine.shouldForceWebView(for: req))
+    }
+
+    func testWebViewOptionFalseNeverForcesWebKit() {
+        let req = request(method: .get, body: nil, webView: false)
+        XCTAssertFalse(LegadoSourceEngine.shouldForceWebView(for: req))
+    }
 }

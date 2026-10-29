@@ -756,7 +756,8 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
     ) async -> Result<SourceResponse, SourceEngineError> {
         // Legado `webView` on the URL option skips the plain socket entirely
         // (AnalyzeUrl.kt L188); `retry` adds transport attempts (L187).
-        let forcedWebView = request.webView && allowWebViewFallback && !SandboxEnvironment.isLiveContainer
+        let forcedWebView = Self.shouldForceWebView(for: request)
+            && allowWebViewFallback && !SandboxEnvironment.isLiveContainer
         let primary: Result<SourceResponse, SourceEngineError>
         if forcedWebView {
             primary = .failure(.network("URL option requested WebView"))
@@ -788,7 +789,9 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
             let response = ResponseBodyDecoder().normalize(raw, preferredCharset: request.expectedCharset)
             shouldFallback = shouldUseWebViewFallback(source: source, response: response, stage: stage)
         } else {
-            shouldFallback = shouldUseWebView(source: source)
+            // A URL option that asked for WebView still gets the render
+            // path when the plain probe fails outright.
+            shouldFallback = request.webView || shouldUseWebView(source: source)
         }
         guard shouldFallback else {
             if case .failure(let error) = primary {
@@ -958,6 +961,17 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
             evidence[key]?[normalizedStage] = existing.with(javascript: scripts, executionLogs: logs)
         }
         evidenceLock.unlock()
+    }
+
+    /// `webView: true` normally means "render in WebKit instead of the plain
+    /// socket". A POST body cannot survive WKWebView's GET navigation,
+    /// though: m.douxsw.com dropped `searchkey` and rendered its 2.8KB empty
+    /// form while the POST response carried the 5KB result page. Body-bearing
+    /// requests probe the socket first and keep WebKit as a fallback.
+    static func shouldForceWebView(for request: SourceRequest) -> Bool {
+        guard request.webView else { return false }
+        let hasBody = request.body?.isEmpty == false
+        return !(hasBody && request.method != .get)
     }
 
     private func shouldUseWebView(source: BookSource) -> Bool {

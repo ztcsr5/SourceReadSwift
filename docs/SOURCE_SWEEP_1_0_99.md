@@ -169,3 +169,123 @@ IPA `40796775150` = success，产物 `C:\Users\Edc21\Desktop\SourceReadSwift-1.0
 - 规则层可用率：**88 / 99**（除 8 条站点失效 + 1 条搜索 403 + 2 条 key 变更）
 - 装新 IPA 后预期 PASS：**81/99**（车群 + 猫耳）
 - 乡土 ×5 与抖音若错峰重跑可再 +6 → 上限 **87/99**
+
+## 8. 全量 991 条体检（2026-10-29 10:50，旧 IPA 1.0.98）
+
+脚本 `E:\codex-temp\sourceread\scripts\full_sweep_v2.py`（2 并发 + 502 重试 + 每源最多 4 关键词）
+结果 `artifacts/full_sweep_v2.json`
+
+| 指标 | 数值 |
+|---|---|
+| 总数 | 991 |
+| PASS | **750（75.7%）** |
+| FAIL | 238 |
+| 无 searchUrl（仅发现页） | 3 |
+
+### 8.1 FAIL 分类
+
+| 类别 | 条数 | 判定 |
+|---|---|---|
+| BAD_URL（-1000） | 66 | 全部是 **301 换域名** 的站；App 首跳即报 badURL |
+| TIMEOUT | 32 | 慢站 / 网络 |
+| EMPTY_FIELD（命中节点但字段空） | 31 | 帝国 CMS 搜索表为空 / 死站 |
+| NETWORK（连接丢失/域名未解析） | 30 | 站点侧 |
+| ZERO_NODE | 27 | 限流页 / 失效站 / WebView 误判（旧 IPA） |
+| JSON 列表空 | 27 | JSON 源字段差异 |
+| HTTP 404 | 15 | 站点路径变更 |
+| OTHER | 10 | — |
+
+### 8.2 BAD_URL 66 条的真实根因（301 假设已排除）
+
+结论修正：**301 重定向处理正常，不是 -1000 的来源。**
+
+决定性实验（`redirect_server.py` @ 8096，真机 `/api/source/debug`）：
+
+| 用例 | 服务端行为 | 真机结果 |
+|---|---|---|
+| `/redir` | 301 → 相对 `Location: /target` | PASS，3 条 |
+| `/redir-abs` | 301 → 绝对 `Location: http://<host>/target` | PASS，3 条 |
+
+DNS 抽样（本机）：
+
+```
+m.rulianshi.la    -> 0.0.0.0
+www.kk169.net     -> 0.0.0.0
+www.yetianlian.com-> 0.0.0.0
+www.wsskw.com     -> 0.0.0.0
+m.yunxs.cc        -> 0.0.0.0
+www.wurexs.com    -> 178.107.151.115（搜索路径 301 后 502）
+```
+
+iOS 连接 `0.0.0.0` 时抛 `NSURLErrorBadURL (-1000)`，与重定向无关。66 条里的活站已通过改域名恢复（rulianshi / kk169 / yetianlian / quduwx），其余 54 条死站已 `enabled=false`。
+
+### 8.3 本轮修复的源（写回真机库）
+
+| 源 | 条数 | 改动 | 验证 |
+|---|---|---|---|
+| 不知加啥 | 1 | bookSourceUrl `m.rulianshi.la` -> `m.rulianshi.cc` | 真机 50 条 PASS |
+| 去读书家族 | 5->1 | 合并为 `http://www.quduwx.net` + `/modules/article/search.php?q={{key}}` | 真机 50 条 PASS（元尊） |
+| 夜天连看家族 | 9->2 | 桌面 `www.xyetianlian.com`、移动 `m.xyetianlian.com` | 真机各 40 条 PASS |
+| 穿越小说家族（kk169） | 9->1 | `http://www.kk169.la` + `modules/article/search.php?q={{key}}` | 真机 56 条 PASS |
+
+### 8.4 批量禁用死站（54 条）
+
+以下 host 经 PC 侧实测为 DNS 失败或 301 后 502，已 `enabled=false`：
+
+```
+www.wurexs.com  m.yunxs.cc  www.tangsanshu.org  www.biqusk.com  m.wenxuedu.net
+wujixsw.info  www.xbiquzw.com  www.tcmaoxin.org  www.xmayitxt.com  www.00shu.la
+m.00shu.la  www.23uswx.org  www.gdbzkz.org  www.95dushu.net  www.kyxsw.org
+m.wsskw.com  www.wsskw.com  www.xinshuge.net  www.sjwx.la  wap.xuanyge.org
+www.xuanyge.org  wap.dawensk.com  www.dingdianxs.la
+```
+
+### 8.5 真机库最终状态
+
+| 指标 | 值 |
+|---|---|
+| total | 973（原 992，合并重复家族 -19） |
+| enabled | 918 |
+
+### 8.6 未验证 / NOT RUN
+
+- 1.0.99 / 1.0.100 IPA 装机后的全量复测（当前全量结果仍来自 1.0.98）。
+- 301 引擎修复：**不需要**（实验证明现有实现正确）。
+
+## 9. 1.0.100 引擎修复（2026-10-29）
+
+### 9.1 `webView:true` + POST body 丢失修复
+
+`loadWithOptionalWebViewFallback` 原来对 `webView:true` 直接跳过 socket。WKWebView 只能 GET，POST body 丢失：
+
+| 源 | App 的 POST 结果 | 回退后的 GET | 最终解析 |
+|---|---|---|---|
+| 抖音 m.douxsw.com | 5010 B / 3 本 | 2831 B 空表单 | 失败 2789 字符 |
+| 乡土 www.xiangtxsw.com | 28572 B | 1465 B 无关键词页 | 失败 1363 字符 |
+| 车群 www.qunxs.com | 21527 B / 15 本 | 13110 B 首页式页面 | 失败 11787 字符 |
+
+修复：body-bearing 的 POST 先走 socket，WebKit 仅作为失败回退（`LegadoSourceEngine.shouldForceWebView(for:)`）。
+
+### 9.2 1.0.98 的 WebView 误判（已在 1.0.99 修复，待装机）
+
+车群 / 乡土 / 抖音的 28K 结果页都含 `cdn-cgi` 的 `cloudflare` 字样，1.0.98 把它当成人机验证页强制 WebView，简化 DOM 后 0 节点。1.0.99 的 `hasCrawlableMarkup` 已按 `<a>/<table>/<li>` 判定真实结果页。
+
+### 9.3 “引擎差异”逐条复核
+
+| 其他 AI 的判断 | 现行代码 | 真机实测 |
+|---|---|---|
+| `s.length()` 不存在 | 已兼容 | `"abcd".length()` → 4 |
+| `createSymmetricCrypto(...).encryptHex` 缺失 | 已实现 DES/3DES | DES 加密 `4a242ef2e9ce4ca6`，解密回 `test` |
+| `_.java` undefined | 已挂载 | base64 `abc` → `YWJj` |
+| 内嵌 JSON 字符串目录 0 章 | `decodeJSONValue` 递归展开 | 代码路径已存在 |
+| 相对 searchUrl 报“不支持的 URL 协议” | 已按 bookSourceUrl 拼接 | `/redir` 相对 301 PASS |
+
+### 9.4 站点侧确认不可修
+
+| 源 | 证据 |
+|---|---|
+| 猫耳听书 | `dramaapi/search` 返回 412 bilibili 错误页 |
+| 五六中文 | `m.56zw.com` 301 → `m.56yz.com`，搜索恒为空（1603 B） |
+| 蚂蚁文学 | `mayiwsk.com` HTTP 404 |
+| 全本同人 | `/e/search` 返回 cookie+reload JS 跳转页（WebView 可试） |
+| 看点小说 | 搜索响应 138 B（站点侧拦截） |
