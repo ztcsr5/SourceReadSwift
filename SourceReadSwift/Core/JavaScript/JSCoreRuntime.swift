@@ -4819,7 +4819,10 @@ final class JSCoreRuntime {
             eachText: function() { return nativeElements.eachText(); },
             eachAttr: function(name) { return nativeElements.eachAttr(String(name)); },
             children: function() { return __wrapJsoupElements(nativeElements.children()); },
-            parents: function() { return __wrapJsoupElements(nativeElements.parents()); }
+            parents: function() { return __wrapJsoupElements(nativeElements.parents()); },
+            array: function() { return nativeElements.array(); },
+            toArray: function() { return nativeElements.toArray(); },
+            toString: function() { return nativeElements.toString(); }
           };
           return new Proxy(facade, {
             get: function(target, prop) {
