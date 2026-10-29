@@ -651,6 +651,12 @@ final class JSCoreRuntime {
         // then throws a redeclaration error. Indirect eval keeps the script's
         // completion value, strict mode and shared var/functions without
         // leaking its let/const bindings into the following rule.
+        let cookieHeaderBeforeEvaluation = context
+            .objectForKeyedSubscript("cookieHeader" as NSString)
+            .flatMap { value -> String? in
+                guard !value.isUndefined, !value.isNull else { return nil }
+                return value.toString()
+            }
         guard let result = ruleEvaluator.call(withArguments: [executableScript]) else {
             if let exception = context.exception {
                 let details = javascriptExceptionDetails(exception)
@@ -697,7 +703,7 @@ final class JSCoreRuntime {
             succeeded: true,
             stage: executionContext.currentExecutionStage
         ))
-        synchronizeExecutionContextFromJavaScript()
+        synchronizeExecutionContextFromJavaScript(cookieHeaderBeforeEvaluation: cookieHeaderBeforeEvaluation)
         if result.isArray || (result.isObject && result.toString() == "[object Object]") {
             if let stringifyFunc = context.objectForKeyedSubscript("JSON" as NSString)?.objectForKeyedSubscript("stringify" as NSString),
                let jsonValue = stringifyFunc.call(withArguments: [result]),
@@ -771,11 +777,23 @@ final class JSCoreRuntime {
         return JavaScriptExceptionDetails(message: message, type: type, stack: stack)
     }
 
-    private func synchronizeExecutionContextFromJavaScript() {
+    private func synchronizeExecutionContextFromJavaScript(cookieHeaderBeforeEvaluation: String? = nil) {
         for key in ["result", "baseUrl", "nextChapterUrl", "cookieHeader"] {
             guard let value = context.objectForKeyedSubscript(key),
                   !value.isUndefined,
                   !value.isNull else { continue }
+            if key == "cookieHeader" {
+                // `java.put("cookieHeader", ...)` updates the native store but
+                // leaves the JS mirror at the value bound before the script
+                // ran. Copying that stale mirror back erased freshly written
+                // cookies between the search URL and the search request.
+                let current = value.toString() ?? ""
+                let previous = cookieHeaderBeforeEvaluation ?? ""
+                if current == previous,
+                   executionContext.string(for: key) != previous {
+                    continue
+                }
+            }
             executionContext.setValue(value.toObject(), for: key)
         }
     }
