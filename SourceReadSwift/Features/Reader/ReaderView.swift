@@ -116,6 +116,8 @@ struct ReaderView: View {
     @State private var readerContentFingerprint = ""
     @State private var windowSections: [ReaderChapterSection] = []
     @State private var windowCurrentChapterIndex = 0
+    /// A TOC / bookmark / slider jump whose chapter is still downloading.
+    @State private var pendingWindowJump: ReaderPendingChapterJump?
     @State private var windowLoadingIndices: Set<Int> = []
     /// Last failure per chapter. Placeholders and the scroll boundary banner
     /// read this map, so a source timeout is visible instead of looking like
@@ -1540,7 +1542,10 @@ struct ReaderView: View {
                 }
             }
         }
-        .onChange(of: chapterIndex) { _ in
+        .onChange(of: chapterIndex) { newValue in
+            // 父层可能先发布新章号、后拿到正文；此时重置会把上一章的
+            // 段落挂到新章号上。等 content 追上再重置。
+            guard content.chapter.index == newValue else { return }
             resetWindow()
         }
         .onChange(of: speechController.currentParagraphIndex) { target in
@@ -1583,6 +1588,7 @@ struct ReaderView: View {
         lastWindowChangeWasAppend = false
         pendingSpeechChapterIndex = nil
         pendingAutoScrollChapterIndex = nil
+        pendingWindowJump = nil
         rebuildWindowPositionMapping()
         prefetchWindow(around: chapterIndex)
         touchChapterCache(chapterIndex)
@@ -1607,6 +1613,7 @@ struct ReaderView: View {
         lastWindowChangeWasAppend = false
         pendingSpeechChapterIndex = nil
         pendingAutoScrollChapterIndex = nil
+        pendingWindowJump = nil
         rebuildWindowPositionMapping()
         prefetchWindow(around: chapterIndex)
         touchChapterCache(chapterIndex)
@@ -1672,6 +1679,10 @@ struct ReaderView: View {
                   !Task.isCancelled,
                   prefetchGeneration == token,
                   windowGeneration == generation {
+                // One runloop between chapters: DOM patches and page
+                // rebuilds are main-actor work, and a back-to-back burst is
+                // what made neighbour prefetch stutter.
+                await Task.yield()
                 let index = prefetchQueue.removeFirst()
                 if windowSections.contains(where: { $0.chapterIndex == index && $0.isReady }) { continue }
                 if windowLoadingIndices.contains(index) { continue }
@@ -1772,6 +1783,24 @@ struct ReaderView: View {
             // timer; recording it would surface a stale error later.
             guard acceptsWindowChapter(index) else { return false }
             windowFailures[index] = message
+            let resumable = ReaderChapterRetryPolicy.delay(
+                afterAttempt: windowRetryAttempts[index, default: 0]
+            ) != nil
+            if !resumable, let jump = pendingWindowJump, jump.chapterIndex == index {
+                // Every automatic attempt failed. Fall back to the owner
+                // contract once so a dead source still opens something.
+                pendingWindowJump = nil
+                if let target = chapters.first(where: { $0.index == index }) {
+                    if let onSelectChapterWithPosition {
+                        onSelectChapterWithPosition(
+                            target,
+                            jump.startAtEnd ? Int.max : jump.paragraphIndex
+                        )
+                    } else {
+                        onSelectChapter?(target)
+                    }
+                }
+            }
             scheduleWindowRetry(for: index)
             return false
         }
@@ -1905,6 +1934,10 @@ struct ReaderView: View {
     /// strict radius-only check used to discard the chapter the user had just
     /// asked for at the boundary.
     private func acceptsWindowChapter(_ index: Int) -> Bool {
+        // A jump requested from the TOC, a bookmark or the slider may land
+        // far outside the cursor radius. Without this the freshly downloaded
+        // chapter was rejected and the jump silently never happened.
+        if pendingWindowJump?.chapterIndex == index { return true }
         if index == windowCurrentChapterIndex { return true }
         let radiusIndices = ReaderChapterWindowPolicy.indices(
             around: windowCurrentChapterIndex,
@@ -1926,14 +1959,26 @@ struct ReaderView: View {
         applyWindowChange(anchor: anchor, appended: appended)
         rebuildWindowPositionMapping()
         scheduleWindowRebuild()
-        trimWindowIfNeeded()
+        // Resume the jump before trimming: a TOC target can sit outside the
+        // cursor's retention radius, and trimming first deleted the chapter
+        // the reader was waiting for. This is why "pick a chapter in the TOC
+        // and keep scrolling" never advanced to the next one.
         resumePendingContinuation(for: section.chapterIndex)
+        trimWindowIfNeeded()
     }
 
     /// Resumes a speech or auto-scroll handoff that was waiting for this
     /// chapter. The reader stays on the same window and native surface.
     private func resumePendingContinuation(for chapter: Int) {
         guard windowSections.contains(where: { $0.chapterIndex == chapter && $0.isReady }) else { return }
+        if let jump = pendingWindowJump, jump.chapterIndex == chapter {
+            pendingWindowJump = nil
+            activateWindowChapter(
+                chapter,
+                startAtEnd: jump.startAtEnd,
+                paragraphIndex: jump.paragraphIndex
+            )
+        }
         if pendingSpeechChapterIndex == chapter {
             pendingSpeechChapterIndex = nil
             activateWindowChapter(chapter)
@@ -2168,6 +2213,9 @@ struct ReaderView: View {
         return CoverPageReaderView(
             pageIdentity: currentBlock.map { ReaderPageIdentity(page: $0).key } ?? "",
             contentRevision: readerPageRevisionKey,
+            previousIdentity: previousBlock.map { ReaderPageIdentity(page: $0).key } ?? "",
+            currentIdentity: currentBlock.map { ReaderPageIdentity(page: $0).key } ?? "",
+            nextIdentity: nextBlock.map { ReaderPageIdentity(page: $0).key } ?? "",
             hasPrevious: previousBlock != nil,
             hasNext: nextBlock != nil,
             previous: previousBlock.map { block -> AnyView in AnyView(readerPage(for: block)) },
@@ -2282,6 +2330,9 @@ struct ReaderView: View {
         return CoverPageReaderView(
             pageIdentity: currentBlock.map { ReaderPageIdentity(page: $0).key } ?? "",
             contentRevision: readerPageRevisionKey,
+            previousIdentity: previousBlock.map { ReaderPageIdentity(page: $0).key } ?? "",
+            currentIdentity: currentBlock.map { ReaderPageIdentity(page: $0).key } ?? "",
+            nextIdentity: nextBlock.map { ReaderPageIdentity(page: $0).key } ?? "",
             hasPrevious: previousBlock != nil,
             hasNext: nextBlock != nil,
             previous: previousBlock.map { block -> AnyView in AnyView(readerPage(for: block)) },
@@ -4554,7 +4605,7 @@ struct ReaderView: View {
             jumpToWindowChapter(bookmark.chapterIndex, paragraphIndex: bookmark.paragraphIndex ?? 0)
             return
         }
-        guard let target = chapters.first(where: { $0.index == bookmark.chapterIndex }) else { return }
+        guard bookmark.chapterIndex >= 0, bookmark.chapterIndex < windowChapterUpperBound else { return }
         let paragraphIndex = bookmark.paragraphIndex
         if let paragraphIndex {
             appState.bookshelfStore.updateReadingProgress(
@@ -4565,14 +4616,10 @@ struct ReaderView: View {
                 paragraphIndex: paragraphIndex
             )
         }
-        // Owners that expose the position-aware entry point can land on
-        // the bookmarked paragraph directly; the plain callback always
-        // started the chapter at its first paragraph.
-        if let onSelectChapterWithPosition {
-            onSelectChapterWithPosition(target, paragraphIndex ?? 0)
-        } else {
-            onSelectChapter?(target)
-        }
+        // Load the chapter into the live window instead of asking the owner
+        // to rebuild the reader: the owner callback replaced the web view and
+        // threw away the scroll position.
+        beginWindowJump(to: bookmark.chapterIndex, paragraphIndex: paragraphIndex ?? 0)
     }
 
     private func jumpToParagraph(_ paragraphIndex: Int?) {
@@ -4599,10 +4646,14 @@ struct ReaderView: View {
         persistReadingPosition(paragraphIndexOverride: paragraphIndex)
     }
 
-    private func activateWindowChapter(_ index: Int, startAtEnd: Bool = false) {
+    private func activateWindowChapter(
+        _ index: Int,
+        startAtEnd: Bool = false,
+        paragraphIndex: Int? = nil
+    ) {
         guard let section = windowSections.first(where: { $0.chapterIndex == index && $0.isReady }) else { return }
-        let paragraph = startAtEnd ? max(section.paragraphs.count - 1, 0) : 0
-        jumpToWindowChapter(index, paragraphIndex: paragraph)
+        let fallback = startAtEnd ? max(section.paragraphs.count - 1, 0) : 0
+        jumpToWindowChapter(index, paragraphIndex: paragraphIndex ?? fallback)
     }
 
     /// Jumps inside the already-loaded window without asking the owner to
@@ -4621,6 +4672,25 @@ struct ReaderView: View {
         jumpToWindowFlat(flat, paragraphIndex: paragraph)
     }
 
+    /// Chapters already live in the window. TOC / bookmark / slider jumps use
+    /// this so a loaded neighbour is activated without touching the network.
+    private var readyWindowIndices: Set<Int> {
+        Set(windowSections.filter { $0.isReady }.map(\.chapterIndex))
+    }
+
+    /// Defers a jump until the target chapter lands in the window. The reader
+    /// keeps its web view and page cache; `resumePendingContinuation` performs
+    /// the actual jump from `upsertWindowSection`.
+    private func beginWindowJump(to index: Int, paragraphIndex: Int, startAtEnd: Bool = false) {
+        guard index >= 0, index < windowChapterUpperBound else { return }
+        pendingWindowJump = ReaderPendingChapterJump(
+            chapterIndex: index,
+            paragraphIndex: paragraphIndex,
+            startAtEnd: startAtEnd
+        )
+        requestChapter(index)
+    }
+
     private var canJumpToChapter: Bool {
         onSelectChapter != nil || onSelectChapterWithPosition != nil || !windowSections.isEmpty
     }
@@ -4631,6 +4701,9 @@ struct ReaderView: View {
         if windowSections.contains(where: { $0.chapterIndex == targetIndex && $0.isReady }) {
             return true
         }
+        if targetIndex >= 0, targetIndex < windowChapterUpperBound {
+            return true
+        }
         return onSelectChapter != nil || onSelectChapterWithPosition != nil
     }
 
@@ -4639,41 +4712,48 @@ struct ReaderView: View {
         if windowSections.contains(where: { $0.chapterIndex == target && $0.isReady }) {
             return true
         }
+        if target >= 0, target < windowChapterUpperBound {
+            return true
+        }
         guard onSelectChapter != nil || onSelectChapterWithPosition != nil else { return false }
         return chapters.contains { $0.index == target }
     }
 
     private func selectRelativeChapter(offset: Int, startAtEnd: Bool = false) {
         let targetIndex = windowCurrentChapterIndex + offset
-        if windowSections.contains(where: { $0.chapterIndex == targetIndex && $0.isReady }) {
+        switch ReaderChapterWindowPolicy.jumpDisposition(
+            target: targetIndex,
+            loadedIndices: readyWindowIndices,
+            upperBound: windowChapterUpperBound
+        ) {
+        case .activate:
             activateWindowChapter(targetIndex, startAtEnd: startAtEnd)
+        case .loadIntoWindow:
+            closeReaderChrome()
+            stopAutoScroll()
+            stopSpeechPlayback()
+            beginWindowJump(to: targetIndex, paragraphIndex: 0, startAtEnd: startAtEnd)
+        case .outOfRange:
             return
-        }
-        guard let target = chapters.first(where: { $0.index == targetIndex }) else { return }
-        closeReaderChrome()
-        stopAutoScroll()
-        stopSpeechPlayback()
-        if let onSelectChapterWithPosition {
-            onSelectChapterWithPosition(target, startAtEnd ? Int.max : 0)
-        } else {
-            onSelectChapter?(target)
         }
     }
 
     private func selectChapter(index: Int, keepChrome: Bool = false) {
-        if windowSections.contains(where: { $0.chapterIndex == index && $0.isReady }) {
+        switch ReaderChapterWindowPolicy.jumpDisposition(
+            target: index,
+            loadedIndices: readyWindowIndices,
+            upperBound: windowChapterUpperBound
+        ) {
+        case .activate:
             activateWindowChapter(index)
+        case .loadIntoWindow:
+            // 拖动进度条时不能顺手把控制面板关掉，否则滑到一半面板就消失了。
+            if !keepChrome { closeReaderChrome() }
+            stopAutoScroll()
+            stopSpeechPlayback()
+            beginWindowJump(to: index, paragraphIndex: 0)
+        case .outOfRange:
             return
-        }
-        guard let target = chapters.first(where: { $0.index == index }) ?? (chapters.indices.contains(index) ? chapters[index] : nil) else { return }
-        // 拖动进度条时不能顺手把控制面板关掉，否则滑到一半面板就消失了。
-        if !keepChrome { closeReaderChrome() }
-        stopAutoScroll()
-        stopSpeechPlayback()
-        if let onSelectChapterWithPosition {
-            onSelectChapterWithPosition(target, 0)
-        } else {
-            onSelectChapter?(target)
         }
     }
 

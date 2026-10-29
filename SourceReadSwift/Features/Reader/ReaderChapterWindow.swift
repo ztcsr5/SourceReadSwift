@@ -349,3 +349,37 @@ enum ReaderChapterRetryPolicy {
         }
     }
 }
+
+/// Where a table-of-contents, bookmark or chapter-slider jump should land.
+enum ReaderChapterJumpDisposition: Equatable {
+    /// The chapter is already live in the window; jump without any load.
+    case activate
+    /// The chapter belongs to the book but is not loaded yet. Load it into the
+    /// window and keep the reader surface alive instead of recreating it.
+    case loadIntoWindow
+    /// The index is outside the table of contents.
+    case outOfRange
+}
+
+/// A jump the reader is waiting for while its chapter downloads.
+struct ReaderPendingChapterJump: Equatable {
+    let chapterIndex: Int
+    var paragraphIndex: Int
+    var startAtEnd: Bool = false
+}
+
+extension ReaderChapterWindowPolicy {
+    /// A TOC/bookmark jump must never fall back to the owner callback just
+    /// because the chapter is outside the prefetched window: that callback
+    /// rebuilds the whole reader (new `.id`, new web view, full HTML
+    /// injection) and is what made chapter switching feel like a cold open.
+    static func jumpDisposition(
+        target: Int,
+        loadedIndices: Set<Int>,
+        upperBound: Int
+    ) -> ReaderChapterJumpDisposition {
+        if loadedIndices.contains(target) { return .activate }
+        guard target >= 0, target < upperBound else { return .outOfRange }
+        return .loadIntoWindow
+    }
+}

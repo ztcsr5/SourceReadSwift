@@ -342,7 +342,7 @@ struct BookshelfReaderGatewayView: View {
             },
             initialOverlayVisible: showReaderChromeAfterChapterSelection
         )
-        .id("reader-\(book.id)-\(localNavigationRevision)")
+        .id("reader-\(book.id)")
     }
 
     /// 首章正文预热。

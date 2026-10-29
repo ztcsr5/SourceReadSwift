@@ -299,4 +299,52 @@ final class ReaderChapterWindowPolicyTests: XCTestCase {
         XCTAssertNil(ReaderChapterWindowPolicy.lastPageIndex(chapterIndex: 5, in: pages))
         XCTAssertEqual(ReaderChapterWindowPolicy.firstPageIndex(chapterIndex: 6, in: pages), 3)
     }
+
+    func testJumpIntoUnloadedTocChapterStaysInWindow() {
+        XCTAssertEqual(
+            ReaderChapterWindowPolicy.jumpDisposition(
+                target: 50,
+                loadedIndices: [0, 1, 2],
+                upperBound: 76
+            ),
+            .loadIntoWindow
+        )
+    }
+
+    func testJumpToLoadedChapterActivatesWithoutLoading() {
+        XCTAssertEqual(
+            ReaderChapterWindowPolicy.jumpDisposition(
+                target: 2,
+                loadedIndices: [0, 1, 2],
+                upperBound: 76
+            ),
+            .activate
+        )
+    }
+
+    func testJumpOutsideTocIsRejected() {
+        XCTAssertEqual(
+            ReaderChapterWindowPolicy.jumpDisposition(
+                target: 76,
+                loadedIndices: [0, 1, 2],
+                upperBound: 76
+            ),
+            .outOfRange
+        )
+        XCTAssertEqual(
+            ReaderChapterWindowPolicy.jumpDisposition(
+                target: -1,
+                loadedIndices: [0, 1, 2],
+                upperBound: 76
+            ),
+            .outOfRange
+        )
+    }
+
+    func testPendingJumpDefaultsToFirstParagraph() {
+        let jump = ReaderPendingChapterJump(chapterIndex: 7, paragraphIndex: 0)
+        XCTAssertEqual(jump.chapterIndex, 7)
+        XCTAssertEqual(jump.paragraphIndex, 0)
+        XCTAssertFalse(jump.startAtEnd)
+    }
 }

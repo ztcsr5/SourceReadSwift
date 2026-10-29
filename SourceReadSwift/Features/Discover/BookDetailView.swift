@@ -1189,11 +1189,11 @@ struct ChapterLoadingView: View {
 
     private func load(force: Bool = false, ignoreCache: Bool = false) async {
         if force {
-            content = nil
+            // 换章时保留上一章正文，避免整屏 loading 和 ReaderView 重建。
             errorMessage = nil
             isUsingStaleCache = false
         }
-        guard content == nil, errorMessage == nil else { return }
+        guard (content == nil || force), errorMessage == nil else { return }
         guard let source = appState.sourceStore.source(for: sourceUrl) else {
             errorMessage = "找不到书源"
             return
@@ -1277,7 +1277,6 @@ struct ChapterLoadingView: View {
                 showReaderChromeAfterChapterSelection = true
                 currentChapter = selected
                 currentParagraphIndex = nil
-                content = nil
                 errorMessage = nil
                 isUsingStaleCache = false
             },
@@ -1285,7 +1284,6 @@ struct ChapterLoadingView: View {
                 showReaderChromeAfterChapterSelection = true
                 currentChapter = selected
                 currentParagraphIndex = targetParagraph
-                content = nil
                 errorMessage = nil
                 isUsingStaleCache = false
             },
@@ -1299,7 +1297,6 @@ struct ChapterLoadingView: View {
                 guard let next = chapters.first(where: { $0.index == effectiveChapter.index + 1 }) else { return }
                 autoplaySpeechAfterHandoff = true
                 currentChapter = next
-                content = nil
                 errorMessage = nil
                 isUsingStaleCache = false
             },
@@ -1312,7 +1309,6 @@ struct ChapterLoadingView: View {
                 autoplayAutoScrollAfterHandoff = true
                 currentChapter = next
                 currentParagraphIndex = nil
-                content = nil
                 errorMessage = nil
                 isUsingStaleCache = false
                 if let bookID {
@@ -1326,7 +1322,8 @@ struct ChapterLoadingView: View {
             },
             initialOverlayVisible: showReaderChromeAfterChapterSelection
         )
-        .id("reader-\(effectiveChapter.url)")
+        // 书级稳定身份：换章只更新 content，不再销毁 ReaderView + WKWebView。
+        .id("reader-\(bookID ?? sourceUrl)")
     }
 
     private func cacheAdjacentChapters(around chapter: BookChapter, source: BookSource, purifyRules: [String]) async {

@@ -27,6 +27,11 @@ struct CoverPageReaderView: UIViewControllerRepresentable {
     /// Typography / highlight revision; changes replace the page roots without
     /// resetting the scroll position.
     var contentRevision: String
+    /// Stable identity of each slot. A page turn shifts the same page from
+    /// one slot to the next, so the host can be moved instead of rebuilt.
+    var previousIdentity: String = ""
+    var currentIdentity: String = ""
+    var nextIdentity: String = ""
     var hasPrevious: Bool
     var hasNext: Bool
     var previous: AnyView?
@@ -47,6 +52,9 @@ struct CoverPageReaderView: UIViewControllerRepresentable {
         controller.apply(
             pageIdentity: pageIdentity,
             contentRevision: contentRevision,
+            previousIdentity: previousIdentity,
+            currentIdentity: currentIdentity,
+            nextIdentity: nextIdentity,
             hasPrevious: hasPrevious,
             hasNext: hasNext,
             previous: previous,
@@ -64,6 +72,9 @@ struct CoverPageReaderView: UIViewControllerRepresentable {
         controller.apply(
             pageIdentity: pageIdentity,
             contentRevision: contentRevision,
+            previousIdentity: previousIdentity,
+            currentIdentity: currentIdentity,
+            nextIdentity: nextIdentity,
             hasPrevious: hasPrevious,
             hasNext: hasNext,
             previous: previous,
@@ -103,6 +114,8 @@ final class CoverPageHostController: UIViewController, UIScrollViewDelegate {
     private var isSettling = false
     private var settleToken = 0
     private var didInstallContent = false
+    /// Page key currently hosted by each physical slot.
+    private var slotIdentities = ["", "", ""]
 
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -165,6 +178,9 @@ final class CoverPageHostController: UIViewController, UIScrollViewDelegate {
     func apply(
         pageIdentity: String,
         contentRevision: String,
+        previousIdentity: String,
+        currentIdentity: String,
+        nextIdentity: String,
         hasPrevious: Bool,
         hasNext: Bool,
         previous: AnyView?,
@@ -196,8 +212,47 @@ final class CoverPageHostController: UIViewController, UIScrollViewDelegate {
             current,
             next ?? AnyView(EmptyView())
         ]
-        for (slot, root) in roots.enumerated() where hosts.indices.contains(slot) {
-            hosts[slot].rootView = root
+        let identities = [previousIdentity, currentIdentity, nextIdentity]
+
+        if revisionChanged {
+            // Typography / highlight changes invalidate every page.
+            for (slot, root) in roots.enumerated() where hosts.indices.contains(slot) {
+                hosts[slot].rootView = root
+            }
+            slotIdentities = identities
+        } else {
+            // A committed turn shifts previous→current and current→next, so
+            // most of the three pages keep their identity. Move the host
+            // that already renders the page instead of rebuilding its
+            // SwiftUI root, which was the source of the settle stutter.
+            var desired: [UIHostingController<AnyView>?] = [nil, nil, nil]
+            var claimed = [false, false, false]
+            for slot in 0..<3 where slotIdentities[slot] == identities[slot] {
+                desired[slot] = hosts[slot]
+                claimed[slot] = true
+            }
+            for slot in 0..<3 where desired[slot] == nil {
+                if let donor = (0..<3).first(where: { !claimed[$0] && slotIdentities[$0] == identities[slot] }) {
+                    desired[slot] = hosts[donor]
+                    claimed[donor] = true
+                }
+            }
+            var rebuilt = false
+            for slot in 0..<3 where desired[slot] == nil {
+                guard let donor = (0..<3).first(where: { !claimed[$0] }) else { continue }
+                claimed[donor] = true
+                hosts[donor].rootView = roots[slot]
+                desired[slot] = hosts[donor]
+                rebuilt = true
+            }
+            if let first = desired[0], let second = desired[1], let third = desired[2] {
+                hosts = [first, second, third]
+            } else if rebuilt {
+                for (slot, root) in roots.enumerated() where hosts.indices.contains(slot) {
+                    hosts[slot].rootView = root
+                }
+            }
+            slotIdentities = identities
         }
 
         if identityChanged {
@@ -205,6 +260,8 @@ final class CoverPageHostController: UIViewController, UIScrollViewDelegate {
             // Recentre on the new current page without animating.
             isSettling = false
             settleToken += 1
+            // Rotated hosts may carry the old slot-1 flip transform.
+            for host in hosts { host.view.layer.transform = CATransform3DIdentity }
             installFramesIfNeeded(force: true)
         }
     }
