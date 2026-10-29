@@ -42,6 +42,59 @@ struct BookSource: Identifiable, Codable, Hashable, Sendable {
         return baseWithoutHash
     }
 
+    /// Origin used for relative request URLs.  Shared sources sometimes
+    /// replace `bookSourceUrl` with a display name (`爱丽丝书屋＃知秋`), so
+    /// joining a relative `searchUrl` against it leaves an empty scheme.
+    /// Legado only ever sees an absolute `bookSourceUrl`; when an export
+    /// lost it, recover the origin from the bundle's own `hosts` array or
+    /// explore rules instead of failing the request before it is sent.
+    var networkBaseURL: String {
+        let cleaned = cleanSourceURL
+        if let parsed = URL(string: cleaned), parsed.scheme != nil, parsed.host != nil {
+            return cleaned
+        }
+        let candidates = ["jsLib", "exploreUrl", "ruleSearch", "ruleBookInfo", "ruleToc", "ruleContent", "header"]
+        // A `hosts = ["https://…"]` bundle names the reader-facing origin
+        // explicitly; a shared `api = "https://…"` endpoint does not.
+        for key in candidates {
+            guard let text = raw[key], !text.isEmpty else { continue }
+            if let origin = Self.hostsOrigin(in: text) { return origin }
+        }
+        for key in candidates {
+            guard let text = raw[key], !text.isEmpty else { continue }
+            if let origin = Self.firstAbsoluteURL(in: text) { return origin }
+        }
+        return cleaned
+    }
+
+    /// First entry of a `hosts = ["https://…"]` array in a jsLib bundle.
+    static func hostsOrigin(in text: String) -> String? {
+        return firstMatch(
+            in: text,
+            pattern: #"hosts\s*=\s*\[\s*["'](https?://[^"']+)"#
+        )
+    }
+
+    /// First absolute URL in arbitrary rule text.
+    static func firstAbsoluteURL(in text: String) -> String? {
+        return firstMatch(
+            in: text,
+            pattern: #"(https?://[A-Za-z0-9\.\-]+(?::\d+)?)"#
+        )
+    }
+
+    private static func firstMatch(in text: String, pattern: String) -> String? {
+        guard let regex = try? NSRegularExpression(pattern: pattern) else { return nil }
+        let range = NSRange(text.startIndex..<text.endIndex, in: text)
+        guard let match = regex.firstMatch(in: text, range: range),
+              match.numberOfRanges > 1,
+              let capture = Range(match.range(at: 1), in: text) else { return nil }
+        var value = String(text[capture]).trimmingCharacters(in: .whitespacesAndNewlines)
+        while value.hasSuffix("/"), value.count > 8 { value.removeLast() }
+        guard let parsed = URL(string: value), parsed.host != nil else { return nil }
+        return value
+    }
+
     let bookSourceName: String
     let bookSourceUrl: String
     let bookSourceGroup: String?

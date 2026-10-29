@@ -482,4 +482,31 @@ final class SearchURLResolverTests: XCTestCase {
         XCTAssertTrue(AppVersion.displayString.contains(AppVersion.versionString))
         XCTAssertTrue(AppVersion.fullDisplayString.contains("Build \(AppVersion.build)"))
     }
+
+    /// 知秋-style bundles replace `bookSourceUrl` with a display name.  A
+    /// relative `searchUrl` must still be joined against the site origin the
+    /// bundle declares in its `hosts` array instead of dying with an empty
+    /// scheme (`不支持的 URL 协议 无：/search.html?...`).
+    func testRelativeSearchURLUsesBundleHostsWhenSourceURLIsDisplayName() throws {
+        let source = BookSource(
+            bookSourceName: "爱丽丝书屋（知秋）",
+            bookSourceUrl: "爱丽丝书屋＃知秋",
+            searchUrl: "{{source.get('host')}}/search.html?q={{key}}&p={{page}}",
+            raw: ["jsLib": "var api = 'https://als.aadcn.cn/ALSapi'\nvar hosts = [\"https://www.alicesw.com\", \"https://alicesw2.buzz\"]"]
+        )
+        let result = SearchURLResolver().resolve(source: source, keyword: "测试", page: 1)
+        guard case .success(let url) = result else {
+            return XCTFail("expected success")
+        }
+        XCTAssertTrue(url.hasPrefix("https://www.alicesw.com/search.html"), url)
+    }
+
+    func testNetworkBaseURLPrefersHostsArrayOverSharedAPI() throws {
+        let source = BookSource(
+            bookSourceName: "聚合源",
+            bookSourceUrl: "聚合源＃知秋",
+            raw: ["jsLib": "var api = 'https://shared-api.example.com'\nvar hosts = [\"https://www.site.example\"]"]
+        )
+        XCTAssertEqual(source.networkBaseURL, "https://www.site.example")
+    }
 }

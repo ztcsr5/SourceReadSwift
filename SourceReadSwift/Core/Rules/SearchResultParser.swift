@@ -313,12 +313,27 @@ struct SearchResultParser {
                 variables: variables
             )
             let variablesBeforeBookURL = executionContext.persistentSnapshot()
+            let bookUrlRule = firstRule(rule, fallback: source.ruleSearch, keys: ["bookUrl", "url"])
+            var bookURLFallbackKeys = ["bookUrl", "url", "link", "book_url"]
+            // A bare `id` is not a book URL.  Only sources without any
+            // bookUrl rule rely on it (their request builder appends the id).
+            // When the rule exists but its `@js` failed, the old fallback
+            // silently produced `https://api-bc.wtzw.com/1784900` and every
+            // detail request 404'd (七猫).  Keep the failure visible instead.
+            if (bookUrlRule?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ?? true) {
+                bookURLFallbackKeys.append("id")
+            }
             let url = extractor.string(
                 from: item,
-                rule: firstRule(rule, fallback: source.ruleSearch, keys: ["bookUrl", "url"]),
-                fallbackKeys: ["bookUrl", "url", "link", "book_url", "id"],
+                rule: bookUrlRule,
+                fallbackKeys: bookURLFallbackKeys,
                 variables: variables
             )
+            if url == nil, let bookUrlRule, bookUrlRule.contains("@js:") {
+                executionContext.recordJavaScriptError(
+                    "bookUrl 规则未产出 URL（\(source.bookSourceName)）"
+                )
+            }
             let variablesAfterBookURL = executionContext.persistentSnapshot()
             let bookVariableDelta = variablesAfterBookURL.filter { variablesBeforeBookURL[$0.key] != $0.value }
             guard let name, let url, !url.isEmpty, !url.lowercased().hasPrefix("javascript:"), url != "#" else { return nil }

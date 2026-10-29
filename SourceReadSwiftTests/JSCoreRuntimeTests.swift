@@ -799,4 +799,25 @@ final class JSCoreRuntimeTests: XCTestCase {
         }
         XCTAssertEqual(value, "/g")
     }
+
+    /// UAA 四合一's jsLib uses `let api = ...`.  Re-evaluating the bundle on
+    /// every rule call throws `Identifier 'api' has already been declared`
+    /// and leaves the next script with a stale exception.
+    func testJsLibraryIsInjectedOncePerRuntime() throws {
+        let source = BookSource(
+            bookSourceName: "UAA 四合一",
+            bookSourceUrl: "https://example.com",
+            raw: ["jsLib": "let api = 'https://uaa1234.com'\nfunction apiHost() { return api; }"]
+        )
+        let context = RuleExecutionContext(source: source)
+        let runtime = context.jsRuntime(ajaxHandler: { _ in "" })
+        for _ in 0..<3 {
+            switch runtime.evaluate("apiHost()", variables: ["source": source]) {
+            case .success(let value):
+                XCTAssertEqual(value, "https://uaa1234.com")
+            case .failure(let error):
+                XCTFail("jsLib re-injection failed: \(error.localizedDescription)")
+            }
+        }
+    }
 }

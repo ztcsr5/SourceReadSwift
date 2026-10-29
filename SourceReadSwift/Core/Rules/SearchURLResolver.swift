@@ -59,7 +59,7 @@ struct SearchURLResolver {
             // legal in Legado: NetworkUtils.getAbsoluteURL joins them with
             // bookSourceUrl.  Without this the request is created with an
             // empty scheme and fails before it is sent.
-            let absoluteURL = DynamicURLResolver.absolutize(safeURL, baseUrl: source.bookSourceUrl)
+            let absoluteURL = DynamicURLResolver.absolutize(safeURL, baseUrl: source.networkBaseURL)
             guard !suffixPart.isEmpty else {
                 return absoluteURL
             }

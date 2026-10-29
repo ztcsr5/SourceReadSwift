@@ -967,4 +967,20 @@ final class JSONRuleExtractorTests: XCTestCase {
         XCTAssertEqual(value, "斗破苍穹")
     }
 
+
+    /// 七猫 builds `{ id: {{$.id}} }` before the script is parsed.  The
+    /// template must expand against the row even when the rule starts with
+    /// `@js:`; otherwise the object literal is a syntax error and the row is
+    /// dropped (or silently falls back to a bare id).
+    func testJSTemplateExpandsRootFieldBeforeScriptParsing() throws {
+        let item: [String: Any] = ["id": 1784900, "book_name": "斗破苍穹"]
+        let rule = """
+        @js:
+        var params = { id: {{$.id}}, teeny_mode: 0 };
+        JSON.stringify(params);
+        """
+        let extractor = JSONRuleExtractor()
+        let result = extractor.string(from: item, rule: rule, fallbackKeys: [])
+        XCTAssertEqual(result, "{\"id\":1784900,\"teeny_mode\":0}")
+    }
 }

@@ -14,6 +14,12 @@ final class JSCoreRuntime {
     private let jxNodeFactory: LegadoJXNodeFactoryBridge
     private var baseBridgeError: String? = nil
     private let evaluateLock = NSRecursiveLock()
+    /// `jsLib` bundles are evaluated once per runtime, matching Legado's
+    /// one-engine-per-source model.  Re-running the bundle on every rule
+    /// call throws `Identifier 'x' has already been declared` for bundles
+    /// that use `let`/`const` (UAA 四合一) and re-executes multi-KB
+    /// libraries on every field rule.
+    private var loadedJsLibraries: Set<String> = []
 
     /// Exposes the per-runtime Legado sandbox to deterministic integration
     /// tests and import tooling without leaking the host bridge object.
@@ -136,6 +142,18 @@ final class JSCoreRuntime {
             return obj
         } else {
             return String(describing: value)
+        }
+    }
+
+    /// Evaluates a source `jsLib` bundle at most once per runtime.
+    func preloadJavaScriptLibrary(_ library: String) {
+        let normalized = LegadoJavaScriptCompatibility.normalizeJavaScriptLibrary(library)
+        guard !normalized.isEmpty, !loadedJsLibraries.contains(normalized) else { return }
+        loadedJsLibraries.insert(normalized)
+        let result = context.evaluateScript(normalized)
+        if result == nil, let exception = context.exception {
+            executionContext.recordJavaScriptError("jsLib: " + (exception.toString() ?? "unknown"))
+            context.exception = nil
         }
     }
 
@@ -505,13 +523,10 @@ final class JSCoreRuntime {
                     return nil
                 }()
                 if let rawLib, !rawLib.isEmpty {
-                    // jsLib bundles are written for Rhino: they use Java-String
-                    // methods (`s.length()`), `let`/`const` and async sugar.
-                    // Run them through the shared normalizer so a jsLib can
-                    // never break the prelude with a Java-only call form.
-                    context.evaluateScript(
-                        LegadoJavaScriptCompatibility.normalizeJavaScriptLibrary(rawLib)
-                    )
+                    // One injection per runtime: `let`/`const` declarations
+                    // throw on a second evaluation and leave the following
+                    // rule script with a stale exception.
+                    preloadJavaScriptLibrary(rawLib)
                 }
             } else if key == "book" {
                 let injectScript = """
