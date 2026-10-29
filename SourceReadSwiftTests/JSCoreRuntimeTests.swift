@@ -716,4 +716,48 @@ final class JSCoreRuntimeTests: XCTestCase {
         }
         XCTAssertEqual(value, "uukanshu")
     }
+
+    /// Legado runs Rhino, where Jsoup `Elements` behaves like a java.util.List.
+    /// Sources index (`select('form')[0]`) and iterate (`for (var i in es)`);
+    /// the JSExport bridge alone exposes only `.get(i)`, so 爱书单包 threw
+    /// "undefined is not an object (evaluating 'form.attr')".
+    func testJsoupSelectionSupportsNumericIndexing() throws {
+        let script = """
+        var doc = org.jsoup.Jsoup.parse('<form action="/x"><input name="q" value="v"></form>');
+        var form = doc.select('form')[0];
+        form.attr('action')
+        """
+        let result = JSCoreRuntime().evaluate(script)
+        guard case .success(let value) = result else {
+            return XCTFail("expected success: \(result)")
+        }
+        XCTAssertEqual(value, "/x")
+    }
+
+    func testJsoupSelectionSupportsForInIteration() throws {
+        let script = """
+        var doc = org.jsoup.Jsoup.parse('<form><input name="q" value="v"><input name="p" value="w"></form>');
+        var es = doc.select('input[name]');
+        var out = [];
+        for (var it in es) { out.push(String(es[it].attr('name'))); }
+        out.join(',')
+        """
+        let result = JSCoreRuntime().evaluate(script)
+        guard case .success(let value) = result else {
+            return XCTFail("expected success: \(result)")
+        }
+        XCTAssertEqual(value, "q,p")
+    }
+
+    func testJsoupSelectionLengthMatchesNativeCount() throws {
+        let script = """
+        var doc = org.jsoup.Jsoup.parse('<ul><li>a</li><li>b</li><li>c</li></ul>');
+        String(doc.select('li').length)
+        """
+        let result = JSCoreRuntime().evaluate(script)
+        guard case .success(let value) = result else {
+            return XCTFail("expected success: \(result)")
+        }
+        XCTAssertEqual(value, "3")
+    }
 }

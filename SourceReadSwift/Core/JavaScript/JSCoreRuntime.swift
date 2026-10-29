@@ -4795,12 +4795,83 @@ final class JSCoreRuntime {
             }
           };
         }
+        // Rhino exposes Jsoup's `Elements` as a java.util.List: sources index it
+        // (`select('form')[0]`) and iterate it (`for (var i in elements)`). The
+        // JSExport bridge only provides `.get(i)`/`.length`, so those idioms
+        // produced `undefined` (the 爱书单包 source's `form.attr` threw). These
+        // proxies keep the native method surface and add list semantics.
+        function __wrapJsoupElements(nativeElements) {
+          if (!nativeElements || typeof Proxy === 'undefined') { return nativeElements; }
+          var count = 0;
+          try { count = Number(nativeElements.length) || 0; } catch (e) { count = 0; }
+          var facade = {
+            select: function(nextSelector) { return __wrapJsoupElements(nativeElements.select(String(nextSelector))); },
+            first: function() { return nativeElements.first(); },
+            last: function() { return nativeElements.last(); },
+            get: function(index) { return nativeElements.get(Number(index)); },
+            eq: function(index) { return nativeElements.eq(Number(index)); },
+            size: function() { return nativeElements.size(); },
+            isEmpty: function() { return nativeElements.isEmpty(); },
+            text: function() { return nativeElements.text(); },
+            html: function() { return nativeElements.html(); },
+            outerHtml: function() { return nativeElements.outerHtml(); },
+            attr: function() { return nativeElements.attr.apply(nativeElements, arguments); },
+            eachText: function() { return nativeElements.eachText(); },
+            eachAttr: function(name) { return nativeElements.eachAttr(String(name)); },
+            children: function() { return __wrapJsoupElements(nativeElements.children()); },
+            parents: function() { return __wrapJsoupElements(nativeElements.parents()); }
+          };
+          return new Proxy(facade, {
+            get: function(target, prop) {
+              if (prop === 'length') { return count; }
+              if (typeof prop === 'string' && /^(0|[1-9][0-9]*)$/.test(prop)) { return nativeElements.get(Number(prop)); }
+              if (Object.prototype.hasOwnProperty.call(target, prop)) { return target[prop]; }
+              var value = nativeElements[prop];
+              return (typeof value === 'function') ? value.bind(nativeElements) : value;
+            },
+            has: function(target, prop) {
+              if (prop === 'length') { return true; }
+              if (typeof prop === 'string' && /^(0|[1-9][0-9]*)$/.test(prop)) { return Number(prop) < count; }
+              return Object.prototype.hasOwnProperty.call(target, prop) || prop in nativeElements;
+            },
+            ownKeys: function() {
+              var keys = [];
+              for (var i = 0; i < count; i++) { keys.push(String(i)); }
+              keys.push('length');
+              return keys;
+            },
+            getOwnPropertyDescriptor: function(target, prop) {
+              if (prop === 'length') { return { value: count, writable: false, enumerable: false, configurable: true }; }
+              if (typeof prop === 'string' && /^(0|[1-9][0-9]*)$/.test(prop)) { return { value: undefined, writable: false, enumerable: true, configurable: true }; }
+              return undefined;
+            }
+          });
+        }
+        function __wrapJsoupNode(node) {
+          if (!node || typeof Proxy === 'undefined') { return node; }
+          return new Proxy(node, {
+            get: function(target, prop) {
+              if (prop === 'select') {
+                return function(nextSelector) { return __wrapJsoupElements(target.select(String(nextSelector))); };
+              }
+              var value = target[prop];
+              if (typeof value === 'function') { return value.bind(target); }
+              if (value && typeof value === 'object'
+                  && typeof value.get === 'function' && typeof value.select === 'function') {
+                return __wrapJsoupElements(value);
+              }
+              return value;
+            }
+          });
+        }
         // The overload-aware java.getElements implementation is installed above.
         Packages.org.jsoup.Jsoup = {
           parse: function(html, baseUrlValue) {
             var resolvedBase = String(baseUrlValue || (typeof baseUrl === 'undefined' ? '' : baseUrl));
-            if (resolvedBase) return __nativeJsoup.parseWithBase({ html: String(html), baseUrl: resolvedBase });
-            return __nativeJsoup.parse(String(html));
+            var parsed = resolvedBase
+              ? __nativeJsoup.parseWithBase({ html: String(html), baseUrl: resolvedBase })
+              : __nativeJsoup.parse(String(html));
+            return __wrapJsoupNode(parsed);
           },
           connect: __makeConnect
         };
