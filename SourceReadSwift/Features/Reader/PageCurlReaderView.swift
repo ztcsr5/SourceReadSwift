@@ -35,6 +35,9 @@ struct PageCurlReaderView<Item: Identifiable, Content: View>: UIViewControllerRe
     /// instead of the window-wide revision. `nil` falls back to
     /// `contentRevision`.
     let pageRevision: ((Item) -> String)?
+    /// Page viewport used to lay out neighbouring page bodies off-screen.
+    /// `CGSize.zero` keeps the old behaviour (controller only, no layout).
+    let prewarmSize: CGSize
     let pageBuilder: (Item) -> Content
 
     init(
@@ -48,6 +51,7 @@ struct PageCurlReaderView<Item: Identifiable, Content: View>: UIViewControllerRe
         onInteractionChanged: ((Bool) -> Void)? = nil,
         pageKey: @escaping (Item) -> String = { item in String(describing: item.id) },
         pageRevision: ((Item) -> String)? = nil,
+        prewarmSize: CGSize = .zero,
         @ViewBuilder pageBuilder: @escaping (Item) -> Content
     ) {
         self.pages = pages
@@ -60,6 +64,7 @@ struct PageCurlReaderView<Item: Identifiable, Content: View>: UIViewControllerRe
         self.onInteractionChanged = onInteractionChanged
         self.pageKey = pageKey
         self.pageRevision = pageRevision
+        self.prewarmSize = prewarmSize
         self.pageBuilder = pageBuilder
     }
 
@@ -176,8 +181,8 @@ struct PageCurlReaderView<Item: Identifiable, Content: View>: UIViewControllerRe
         /// old code built a fresh SwiftUI tree (including a full attributed
         /// page) inside `viewControllerBefore/After` while the finger was
         /// already moving, which showed up as a hitch at the start of every
-        /// swipe. Eight entries cover the visible page plus two neighbours on
-        /// both sides in the three paged modes.
+        /// swipe. Sixteen entries cover fast flicks in both directions and
+        /// keep a page that was just left alive when the reader swipes back.
         func viewController(at index: Int) -> UIViewController {
             guard parent.pages.indices.contains(index) else {
                 return UIViewController()
@@ -202,7 +207,7 @@ struct PageCurlReaderView<Item: Identifiable, Content: View>: UIViewControllerRe
             if hostingControllers.updateValue(controller, forKey: key) == nil {
                 hostingOrder.append(key)
             }
-            while hostingOrder.count > 8 {
+            while hostingOrder.count > 16 {
                 let evicted = hostingOrder.removeFirst()
                 hostingControllers.removeValue(forKey: evicted)
             }
@@ -220,12 +225,68 @@ struct PageCurlReaderView<Item: Identifiable, Content: View>: UIViewControllerRe
         /// Build the next/previous pages after the current frame has been
         /// committed. Prebuilding them inside the gesture is what caused the
         /// visible half-second stall on the first swipe after a chapter load.
+        private var lastPrewarmSignature = ""
+        private var prewarmGeneration = 0
+
         func prewarm(around index: Int) {
-            let candidates = [index + 1, index - 1, index + 2]
-            DispatchQueue.main.async { [weak self] in
-                guard let self, self.cachedRevision == self.parent.contentRevision else { return }
-                for candidate in candidates where self.parent.pages.indices.contains(candidate) {
-                    _ = self.viewController(at: candidate)
+            // Never build pages while the finger owns the page turn: the work
+            // would land on the same main thread that is animating the curl.
+            // `didFinishAnimating` calls back into `sync`, which prewarms the
+            // new neighbourhood once the transition settled.
+            guard !isUserInteracting else { return }
+            // Include the prewarm viewport: the first `sync` can run before
+            // the reader has measured its container (`prewarmSize == .zero`).
+            // Without the size in the signature that first no-op pass blocked
+            // every later prewarm of the same page, so the neighbours were
+            // never laid out ahead of the swipe - the per-page "loading" hitch.
+            let size = parent.prewarmSize
+            let signature = "\(index)|\(parent.pages.count)|\(parent.contentRevision)|\(Int(size.width.rounded()))x\(Int(size.height.rounded()))"
+            guard signature != lastPrewarmSignature else { return }
+            lastPrewarmSignature = signature
+            // Every pass owns a generation. A fast swipe drives `sync` several
+            // times per second; without the token the pages queued by the
+            // previous passes still ran, so the page under the finger waited
+            // behind stale neighbours and showed an empty frame first.
+            prewarmGeneration &+= 1
+            let generation = prewarmGeneration
+            // Order matters: the finger reaches +1 first, so it must be warm
+            // before the slower neighbours. ±4 covers a two-page flick and a
+            // chapter boundary in either direction; out-of-range indices are
+            // dropped by the bounds check inside the closure.
+            let candidates = [
+                index + 1, index - 1, index + 2, index - 2,
+                index + 3, index - 3, index + 4, index - 4
+            ]
+            let delays: [Int] = [0, 8, 16, 32, 48, 64, 80, 96]
+            for (offset, candidate) in candidates.enumerated() {
+                // Spread the work over consecutive runloop turns. Building
+                // eight hosting trees in one turn just moved the hitch from
+                // the swipe to the frame right after it.
+                let delay = DispatchTimeInterval.milliseconds(delays[min(offset, delays.count - 1)])
+                DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in
+                    guard let self,
+                          self.prewarmGeneration == generation,
+                          self.cachedRevision == self.parent.contentRevision else { return }
+                    guard self.parent.pages.indices.contains(candidate) else { return }
+                    let controller = self.viewController(at: candidate)
+                    // Creating the controller is cheap because SwiftUI defers
+                    // the page body until the view loads. UIPageViewController
+                    // then paid for that body - attributed string, TextKit
+                    // surface, header/footer - inside the swipe gesture, which
+                    // is the per-page loading hitch users reported. Load and
+                    // lay the page out now, on an idle frame.
+                    controller.loadViewIfNeeded()
+                    // `viewController(at:)` is typed as UIViewController so
+                    // UIPageViewController can consume it directly; the
+                    // layout-report flag only exists on the hosting subclass.
+                    let host = controller as? PageHostingController<Content>
+                    host?.suppressesLayoutReport = true
+                    let size = self.parent.prewarmSize
+                    if size.width > 1, size.height > 1 {
+                        controller.view.frame = CGRect(origin: .zero, size: size)
+                        controller.view.layoutIfNeeded()
+                    }
+                    host?.suppressesLayoutReport = false
                 }
             }
         }
@@ -271,6 +332,10 @@ struct PageCurlReaderView<Item: Identifiable, Content: View>: UIViewControllerRe
             switch decision {
             case .none:
                 reportVisibleIdentity(displayedController)
+                // A normal page turn ends here (the binding update only
+                // re-runs `sync`); without this the +2/+3 neighbours were
+                // never warmed and every fast flick rebuilt a cold page.
+                prewarm(around: displayedIndex ?? desiredIndex)
             case .adopt(let visible):
                 // A prefetched chapter was inserted above the reader: the
                 // page on screen is unchanged, only its array index moved.
@@ -427,6 +492,10 @@ private final class PageHostingController<Content: View>: UIHostingController<Co
     private let onLayout: ((CGSize, CGFloat) -> Void)?
     private var lastReportedSize: CGSize = .zero
     private var lastReportedMinY: CGFloat = .greatestFiniteMagnitude
+    /// Off-screen prewarming lays a page out before it enters the page
+    /// controller. That layout must not be reported back as the reader's real
+    /// container geometry.
+    var suppressesLayoutReport = false
 
     init(
         rootView: Content,
@@ -458,6 +527,7 @@ private final class PageHostingController<Content: View>: UIHostingController<Co
         super.viewDidLayoutSubviews()
         view.clipsToBounds = true
 
+        guard !suppressesLayoutReport else { return }
         let size = view.bounds.size
         guard size.width > 1, size.height > 1, let onLayout else { return }
         let minY = view.convert(view.bounds, to: nil).minY

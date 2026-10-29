@@ -731,8 +731,8 @@ struct BookDetailView: View {
         }
     }
 
-    private func load() async {
-        guard detail == nil, !isLoading else { return }
+    private func load(ignoreCache: Bool = false) async {
+        guard !isLoading else { return }
         if book.sourceName == "Z-Library" || book.bookUrl.hasPrefix("zlib://") {
             isLoading = true
             defer { isLoading = false }
@@ -796,11 +796,35 @@ struct BookDetailView: View {
             return
         }
 
+        // 目录缓存命中：先把上次的详情 + 目录画出来，网络请求放到后台，
+        // 详情页不再为了等 `getChapterList` 的几十页分页而白屏。
+        if !ignoreCache,
+           let cached = appState.bookTOCacheStore.entry(sourceURL: book.sourceUrl, bookURL: book.bookUrl),
+           !cached.chapters.isEmpty {
+            if detail == nil { detail = cached.detail }
+            chapters = cached.chapters
+            errorMessage = nil
+            Task { await refreshDetailAndTOC(source: source, reportErrors: false) }
+            return
+        }
+
+        guard detail == nil || ignoreCache else { return }
+
         isLoading = true
         defer { isLoading = false }
+        await refreshDetailAndTOC(source: source, reportErrors: true)
+    }
 
+    /// 拉详情 + 全量目录。首次打开用于填充整页，命中缓存后用于后台刷新；
+    /// `reportErrors == false` 时失败保持静默，避免把已经显示出来的目录
+    /// 换成一屏红字。
+    private func refreshDetailAndTOC(source: BookSource, reportErrors: Bool) async {
         let engine = appState.engine
         let selectedBook = book
+        // 首次打开没有缓存时只抓目录头部：`getChapterList` 对分页目录是串行
+        // 抓取（下一页 URL 由上页 HTML 给出），30 页目录能让详情页白等几秒。
+        // 缓存已有目录时后台刷新直接取全量，不再做二次请求。
+        let stagedFirstPaint = chapters.isEmpty
         let detailResult = await AsyncTimeout.run(seconds: 20) {
             await engine.getBookDetail(source: source, book: selectedBook)
         } ?? .failure(.network("Detail load timed out"))
@@ -827,11 +851,17 @@ struct BookDetailView: View {
                 )
             }
             let chapterResult = await AsyncTimeout.run(seconds: 20) {
-                await engine.getChapterList(source: source, book: loadedDetail)
+                await engine.getChapterList(source: source, book: loadedDetail, maxPages: stagedFirstPaint ? 6 : 30)
             } ?? .failure(.network("Chapter list timed out"))
             switch chapterResult {
             case .success(let loadedChapters):
                 chapters = loadedChapters
+                appState.bookTOCacheStore.save(
+                    detail: loadedDetail,
+                    chapters: loadedChapters,
+                    sourceURL: source.bookSourceUrl,
+                    bookURL: book.bookUrl
+                )
                 if appState.bookshelfStore.contains(book) {
                     appState.bookshelfStore.updateDetails(
                         bookID: book.id,
@@ -841,11 +871,40 @@ struct BookDetailView: View {
                         coverURL: loadedDetail.coverUrl
                     )
                 }
+                if stagedFirstPaint {
+                    // 目录先显示头部，完整目录在后台补齐并落缓存。
+                    extendTOCInBackground(source: source, detail: loadedDetail)
+                }
             case .failure(let error):
-                errorMessage = "目录加载失败：\(error.displayMessage)"
+                if reportErrors || chapters.isEmpty {
+                    errorMessage = "目录加载失败：\(error.displayMessage)"
+                }
             }
         case .failure(let error):
-            errorMessage = error.displayMessage
+            if reportErrors || chapters.isEmpty {
+                errorMessage = error.displayMessage
+            }
+        }
+    }
+
+    /// 补全第一次只取了头部的目录。只增不减，避免把正在阅读的列表换短。
+    private func extendTOCInBackground(source: BookSource, detail loadedDetail: BookDetail) {
+        Task.detached(priority: .utility) { [appState, source, loadedDetail] in
+            guard let full = try? await appState.engine
+                .getChapterList(source: source, book: loadedDetail)
+                .get(),
+                !full.isEmpty
+            else { return }
+            await MainActor.run {
+                guard full.count > self.chapters.count else { return }
+                self.chapters = full
+                appState.bookTOCacheStore.save(
+                    detail: loadedDetail,
+                    chapters: full,
+                    sourceURL: source.bookSourceUrl,
+                    bookURL: self.book.bookUrl
+                )
+            }
         }
     }
 
@@ -853,7 +912,7 @@ struct BookDetailView: View {
         detail = nil
         chapters = []
         errorMessage = nil
-        await load()
+        await load(ignoreCache: true)
     }
 
     private func markAsRead() {

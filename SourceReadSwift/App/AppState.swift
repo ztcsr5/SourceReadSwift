@@ -7,6 +7,7 @@ final class AppState: ObservableObject {
     let bookshelfStore: BookshelfStore
     let purifyRuleStore: PurifyRuleStore
     let chapterContentCacheStore: ChapterContentCacheStore
+    let bookTOCacheStore: BookTOCacheStore
     let chapterDownloadStore: ChapterDownloadStore
     let chapterDownloadCoordinator: ChapterDownloadCoordinator
     let rssArticleStateStore: RSSArticleStateStore
@@ -49,6 +50,7 @@ final class AppState: ObservableObject {
         bookshelfStore: BookshelfStore? = nil,
         purifyRuleStore: PurifyRuleStore? = nil,
         chapterContentCacheStore: ChapterContentCacheStore? = nil,
+        bookTOCacheStore: BookTOCacheStore? = nil,
         chapterDownloadStore: ChapterDownloadStore? = nil,
         rssArticleStateStore: RSSArticleStateStore? = nil,
         rssFeedCacheStore: RSSFeedCacheStore? = nil,
@@ -65,6 +67,7 @@ final class AppState: ObservableObject {
         self.bookshelfStore = resolvedBookshelfStore
         self.purifyRuleStore = purifyRuleStore ?? PurifyRuleStore()
         self.chapterContentCacheStore = chapterContentCacheStore ?? ChapterContentCacheStore()
+        self.bookTOCacheStore = bookTOCacheStore ?? BookTOCacheStore()
         let resolvedChapterDownloadStore = chapterDownloadStore ?? ChapterDownloadStore()
         self.chapterDownloadStore = resolvedChapterDownloadStore
         self.chapterDownloadCoordinator = ChapterDownloadCoordinator(store: resolvedChapterDownloadStore)

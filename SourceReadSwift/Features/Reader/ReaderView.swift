@@ -100,6 +100,7 @@ struct ReaderView: View {
     @State private var pagedBlocksCacheKey = ""
     @State private var interactionGate = ReaderInteractionGate()
     @State private var pageTextCache = ReaderPageTextCache()
+    @State private var tocFilterCache = ReaderTocFilterCache()
     @State private var pageIdentityTracker = ReaderVisiblePageTracker()
     /// 页面容器的真实几何（UIPageViewController 子控制器可能比根视图小一圈）。
     /// 分页引擎使用这一份，而不是盲目相信根视图的 viewport。
@@ -494,27 +495,19 @@ struct ReaderView: View {
     }
 
     private var filteredChapters: [BookChapter] {
-        let query = debouncedTocQuery.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-        var result = chapters.filter { chapter in
-            query.isEmpty
-                || chapter.title.lowercased().contains(query)
-                || "\(chapter.index + 1)".contains(query)
-        }
-        if tocReversed {
-            result.reverse()
-        }
-        return result
+        tocFilterCache.chapters(
+            query: debouncedTocQuery,
+            reversed: tocReversed,
+            chapters: chapters
+        )
     }
 
     private var filteredNavigationEntries: [LocalTextNavigationEntry] {
-        let query = debouncedTocQuery.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-        var result = navigationEntries.filter { entry in
-            query.isEmpty
-                || entry.title.lowercased().contains(query)
-                || entry.chapterIndex.map { String($0 + 1).contains(query) } == true
-        }
-        if tocReversed { result.reverse() }
-        return result
+        tocFilterCache.navigationEntries(
+            query: debouncedTocQuery,
+            reversed: tocReversed,
+            entries: navigationEntries
+        )
     }
 
     private var pagedBlocks: [ReaderPageBlock] {
@@ -658,7 +651,7 @@ struct ReaderView: View {
             backgroundRawValue,
             backgroundWallpaperRevision.uuidString,
             customFontPostScriptName,
-            colorScheme == .dark ? "dark" : "light"
+            readerIsNight ? "dark" : "light"
         ].joined(separator: "|")
     }
 
@@ -673,7 +666,7 @@ struct ReaderView: View {
             backgroundRawValue,
             backgroundWallpaperRevision.uuidString,
             customFontPostScriptName,
-            colorScheme == .dark ? "dark" : "light"
+            readerIsNight ? "dark" : "light"
         ].joined(separator: "|")
     }
 
@@ -1268,9 +1261,9 @@ struct ReaderView: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .id(backgroundWallpaperRevision)
                 if customBackgroundIsDark {
-                    Color.black.opacity(colorScheme == .dark ? 0.60 : 0.35)
+                    Color.black.opacity(readerIsNight ? 0.60 : 0.35)
                 } else {
-                    Color.white.opacity(colorScheme == .dark ? 0.15 : 0.20)
+                    Color.white.opacity(readerIsNight ? 0.15 : 0.20)
                 }
             } else {
                 readerThemeBackground
@@ -1279,20 +1272,27 @@ struct ReaderView: View {
         .ignoresSafeArea()
     }
 
+    // 顶栏文字也属于主题：系统深色 + 浅色主题时 .primary/.secondary
+    // 会解析成白色，压在米色栏上直接看不见。
     private var chromeForeground: Color {
-        background.isDark ? .white.opacity(0.94) : .primary
+        readerThemeTextColor.opacity(0.94)
     }
 
     private var chromeSecondaryForeground: Color {
-        background.isDark ? .white.opacity(0.62) : .secondary
+        readerThemeTextColor.opacity(0.62)
     }
 
+    /// 阅读器明暗完全由所选主题决定，不再跟随系统 colorScheme。
+    /// 之前这里读 readerIsNight，系统深色时每个主题都取夜配色，
+    /// 用户怎么换主题都是黑的。
+    private var readerIsNight: Bool { background.isDark }
+
     private var readerThemeTextColor: Color {
-        background.textColor(isNight: colorScheme == .dark)
+        background.textColor(isNight: readerIsNight)
     }
 
     private var readerThemeBackground: Color {
-        background.color(isNight: colorScheme == .dark)
+        background.color(isNight: readerIsNight)
     }
 
     @ViewBuilder
@@ -1559,8 +1559,8 @@ struct ReaderView: View {
             // 工具栏是浮层：正文的顶部内边距必须与菜单开合无关，
             // 否则每次呼出菜单整页文字都会往下掉一格（关掉再弹回来）。
             topInset: scrollContentTopInset,
-            textColor: background.uiTextColor(isNight: colorScheme == .dark),
-            surfaceColor: background == .custom ? .clear : background.uiColor(isNight: colorScheme == .dark),
+            textColor: background.uiTextColor(isNight: readerIsNight),
+            surfaceColor: background == .custom ? .clear : background.uiColor(isNight: readerIsNight),
             highlightColor: AppTheme.accentUIColor.withAlphaComponent(background.isDark ? 0.22 : 0.12),
             currentParagraphIndex: speechFlatParagraphIndex ?? -1,
             scrollTarget: activeScrollTarget,
@@ -1867,6 +1867,12 @@ struct ReaderView: View {
         let generation = windowGeneration
         let signature = chapterPageLayoutSignature
         let (typography, titleTypography) = chapterPaginationTypography()
+        // One immutable snapshot per pass. The workers below never read
+        // @AppStorage or any other main-actor state.
+        let context = chapterPaginationContext(
+            typography: typography,
+            titleTypography: titleTypography
+        )
         let order = [current] + ReaderChapterWindowPolicy.prefetchOrder(
             current: current,
             radius: windowRadius,
@@ -1875,45 +1881,88 @@ struct ReaderView: View {
             loaded: []
         )
         paginationWarmupTask = Task { @MainActor in
-            for index in order {
+            // Cutting a chapter is a pure function of the snapshot, so it runs
+            // on the cooperative pool. The old version measured one chapter
+            // per runloop turn on the main actor; a swipe faster than that
+            // landed on a chapter that was still being cut and showed its
+            // placeholder for a frame - the per-page loading hitch.
+            let batchSize = 3
+            var attempted = Set<Int>()
+            while true {
                 guard !Task.isCancelled, windowGeneration == generation,
                       token == paginationWarmupGeneration else { break }
                 guard readerMode != .scroll, chapterPageLayoutSignature == signature else { break }
-                // A page-turn gesture owns the main thread. Measuring a whole
-                // chapter under the finger is the one remaining hitch, so the
-                // warmup pauses until the gesture settles.
+                // A page-turn gesture owns the main thread. Wait it out before
+                // handing another batch to the pool.
                 while interactionGate.isPageInteractionActive && !Task.isCancelled {
                     try? await Task.sleep(nanoseconds: 40_000_000)
                 }
                 guard !Task.isCancelled, windowGeneration == generation,
                       token == paginationWarmupGeneration else { break }
-                guard let section = windowSections.first(where: {
-                    $0.chapterIndex == index && $0.isReady
-                }) else { continue }
-                let contentSignature = chapterPageContentSignature(section)
-                if let cached = chapterPageCache[index],
-                   cached.layoutSignature == signature,
-                   cached.contentSignature == contentSignature {
-                    continue
+                guard readerMode != .scroll, chapterPageLayoutSignature == signature else { break }
+                var batch: [(index: Int, title: String, paragraphs: [String], contentSignature: String)] = []
+                for index in order where !attempted.contains(index) {
+                    attempted.insert(index)
+                    guard let section = windowSections.first(where: {
+                        $0.chapterIndex == index && $0.isReady
+                    }) else { continue }
+                    let contentSignature = chapterPageContentSignature(section)
+                    if let cached = chapterPageCache[index],
+                       cached.layoutSignature == signature,
+                       cached.contentSignature == contentSignature {
+                        continue
+                    }
+                    batch.append((index, section.title, section.paragraphs, contentSignature))
+                    if batch.count == batchSize { break }
                 }
-                let pages = appendPages(
-                    for: section,
-                    typography: typography,
-                    titleTypography: titleTypography
-                )
+                if batch.isEmpty { break }
+                let measured: [(Int, String, [ReaderPageBlock])] = await withTaskGroup(
+                    of: (Int, String, [ReaderPageBlock]).self
+                ) { group in
+                    for job in batch {
+                        let jobIndex = job.index
+                        let jobTitle = job.title
+                        let jobParagraphs = job.paragraphs
+                        let jobSignature = job.contentSignature
+                        group.addTask(priority: .userInitiated) {
+                            // Each call builds its own TextKit stack and
+                            // shares no state, so this is safe off the main
+                            // actor.
+                            let pages = ReaderChapterPaginator.paginate(
+                                chapterIndex: jobIndex,
+                                title: jobTitle,
+                                paragraphs: jobParagraphs,
+                                context: context
+                            )
+                            return (jobIndex, jobSignature, pages)
+                        }
+                    }
+                    var collected: [(Int, String, [ReaderPageBlock])] = []
+                    collected.reserveCapacity(batch.count)
+                    for await result in group {
+                        collected.append(result)
+                    }
+                    return collected
+                }
                 guard !Task.isCancelled, windowGeneration == generation,
                       token == paginationWarmupGeneration else { break }
-                chapterPageCache[index] = ReaderChapterPageCacheEntry(
-                    layoutSignature: signature,
-                    contentSignature: contentSignature,
-                    blocks: pages
-                )
-                requestWarmupPageRebuild()
-                // One chapter is hundreds of TextKit measurements. Hand the
-                // main run loop a full frame between chapters: `Task.yield()`
-                // can resume inside the same frame, which let the warmup stack
-                // several chapters of work before the screen updated.
-                try? await Task.sleep(nanoseconds: 8_000_000)
+                guard readerMode != .scroll, chapterPageLayoutSignature == signature else { break }
+                var merged = false
+                for (index, contentSignature, pages) in measured {
+                    chapterPageCache[index] = ReaderChapterPageCacheEntry(
+                        layoutSignature: signature,
+                        contentSignature: contentSignature,
+                        blocks: pages
+                    )
+                    merged = true
+                }
+                if merged {
+                    requestWarmupPageRebuild()
+                }
+                // Hand the main run loop a frame between batches: the merge
+                // above can schedule a rebuild, and that rebuild must not queue
+                // behind the next three chapters.
+                try? await Task.sleep(nanoseconds: 4_000_000)
             }
             if windowGeneration == generation, token == paginationWarmupGeneration {
                 paginationWarmupTask = nil
@@ -2448,6 +2497,11 @@ struct ReaderView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .clipped()
+        // Build the 5-page window on both sides ahead of the turn.
+        .onAppear { prewarmPageText(around: pagedPageIndex) }
+        .onChange(of: pagedPageIndex) { target in prewarmPageText(around: target) }
+        .onChange(of: pagedBlocksCacheKey) { _ in prewarmPageText(around: pagedPageIndex) }
+        .onChange(of: readerPageRevisionKey) { _ in prewarmPageText(around: pagedPageIndex) }
     }
 
     /// Simulated page turn ("仿真"). It reuses the same three-slot paging
@@ -2520,6 +2574,7 @@ struct ReaderView: View {
             pageRevision: { _ in
                 readerPageRevisionKey
             },
+            prewarmSize: pagedLayoutViewportSize,
             pageBuilder: { page in
                 readerPage(for: page)
             }
@@ -2554,6 +2609,7 @@ struct ReaderView: View {
             pageRevision: { _ in
                 readerPageRevisionKey
             },
+            prewarmSize: pagedLayoutViewportSize,
             pageBuilder: { page in
                 readerPage(for: page)
             }
@@ -2672,7 +2728,8 @@ struct ReaderView: View {
         } else {
             pageSurface(for: page) {
                 ReaderPageTextView(
-                    attributedText: pageAttributedText(for: page),
+                    attributedTextProvider: { pageAttributedText(for: page) },
+                    contentKey: pageTextCacheKey(for: page),
                     isSelectable: textSelectionEnabled
                 )
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
@@ -2703,18 +2760,31 @@ struct ReaderView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     }
 
+    /// Cache key for one rendered page: identity + speech highlight, then the
+    /// layout revision. `ReaderPageTextView` compares the same string instead
+    /// of diffing the whole attributed string on every layout pass.
+    private func pageTextCacheKey(for page: ReaderPageBlock) -> String {
+        let highlightKey = "\(speechChapterIndex)-\(speechController.currentParagraphIndex)"
+        return "\(ReaderPageIdentity(page: page).key)|\(highlightKey)|\(readerPageRevisionKey)"
+    }
+
     private func pageAttributedText(for page: ReaderPageBlock) -> NSAttributedString {
         // A page body is immutable between page-model revisions. Rebuilding
         // the attributed string on every SwiftUI pass was a measurable hitch
         // during page curls; keep one cached copy per page and speech cursor.
-        let highlightKey = "\(speechChapterIndex)-\(speechController.currentParagraphIndex)"
-        let key = "\(ReaderPageIdentity(page: page).key)|\(highlightKey)"
-        return pageTextCache.text(key: key, signature: readerPageRevisionKey) {
+        return pageTextCache.text(key: pageTextCacheKey(for: page), signature: readerPageRevisionKey) {
             buildPageAttributedText(for: page)
         }
     }
 
     private func buildPageAttributedText(for page: ReaderPageBlock) -> NSAttributedString {
+        pageTextSpec(for: page).attributedString
+    }
+
+    /// Main-thread snapshot of one page's rich text. Fonts, theme colours and
+    /// the speech cursor are read here; the character-level build (paragraph
+    /// styles + CJK punctuation compression) then runs off the main thread.
+    private func pageTextSpec(for page: ReaderPageBlock) -> ReaderPageTextSpec {
         let bodyFont = fontFamily.uiFont(
             ofSize: CGFloat(fontSize),
             weight: .regular,
@@ -2739,13 +2809,13 @@ struct ReaderView: View {
                 isHighlighted: highlighted
             )
         }
-        return ReaderPageTextBuilder.make(
+        return ReaderPageTextSpec(
             title: title,
             paragraphs: paragraphs,
             style: ReaderPageTextBuilder.Style(
                 bodyFont: bodyFont,
                 titleFont: titleFont,
-                textColor: background.uiTextColor(isNight: colorScheme == .dark),
+                textColor: background.uiTextColor(isNight: readerIsNight),
                 highlightColor: AppTheme.accentUIColor.withAlphaComponent(background.isDark ? 0.22 : 0.12),
                 lineSpacing: CGFloat(lineSpacing),
                 letterSpacing: CGFloat(letterSpacing),
@@ -2753,6 +2823,32 @@ struct ReaderView: View {
                 titleSpacing: CGFloat(titleSpacing)
             )
         )
+    }
+
+    /// 预建前后各 radius 页的富文本（前 5 后 5）。
+    /// 翻页首帧只保留 TextKit 排字，逐字符的标点压缩在抬手前就已算完。
+    private func prewarmPageText(around index: Int, radius: Int = 5) {
+        guard readerMode != .scroll, !pagedBlocks.isEmpty else { return }
+        let lower = max(0, index - radius)
+        let upper = min(pagedBlocks.count - 1, index + radius)
+        guard lower <= upper else { return }
+        let signature = readerPageRevisionKey
+        var items: [(key: String, spec: ReaderPageTextSpec)] = []
+        items.reserveCapacity(upper - lower + 1)
+        for pageIndex in lower...upper {
+            let page = pagedBlocks[pageIndex]
+            guard !page.isPlaceholder else { continue }
+            items.append((pageTextCacheKey(for: page), pageTextSpec(for: page)))
+        }
+        guard !items.isEmpty else { return }
+        let cache = pageTextCache
+        DispatchQueue.global(qos: .userInitiated).async {
+            for item in items {
+                cache.storeIfAbsent(key: item.key, signature: signature) {
+                    item.spec.attributedString
+                }
+            }
+        }
     }
 
     /// The page shown while the neighbouring chapter is still downloading, or
@@ -2900,9 +2996,9 @@ struct ReaderView: View {
                 )
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 if customBackgroundIsDark {
-                    Color.black.opacity(colorScheme == .dark ? 0.60 : 0.35)
+                    Color.black.opacity(readerIsNight ? 0.60 : 0.35)
                 } else {
-                    Color.white.opacity(colorScheme == .dark ? 0.15 : 0.20)
+                    Color.white.opacity(readerIsNight ? 0.15 : 0.20)
                 }
             }
             .clipped()
@@ -3253,7 +3349,7 @@ struct ReaderView: View {
             .foregroundStyle(readerThemeTextColor.opacity(0.85))
             .padding(.horizontal, 14)
             .padding(.vertical, 9)
-            .background(.ultraThinMaterial, in: Capsule())
+            .background(readerThemeBackground.opacity(0.98), in: Capsule())
             .overlay(Capsule().stroke(readerThemeTextColor.opacity(0.12), lineWidth: 0.5))
             .padding(.horizontal, 24)
             .padding(.bottom, max(CGFloat(footerHeight), 24) + 8)
@@ -3354,7 +3450,7 @@ struct ReaderView: View {
                 Menu {
                     if let onRefreshChapter {
                         Button {
-                            closeReaderChrome()
+                            closeReaderChromeFromMenu()
                             onRefreshChapter()
                         } label: {
                             Label("刷新本章", systemImage: "arrow.clockwise")
@@ -3363,7 +3459,7 @@ struct ReaderView: View {
 
                     if canShowPayAction {
                         Button {
-                            closeReaderChrome()
+                            closeReaderChromeFromMenu()
                             showPayActionConfirmation = true
                         } label: {
                             Label("购买本章", systemImage: "cart")
@@ -3373,7 +3469,7 @@ struct ReaderView: View {
 
                     if let onCacheNextChapters {
                         Button {
-                            closeReaderChrome()
+                            closeReaderChromeFromMenu()
                             onCacheNextChapters(windowCurrentChapterIndex)
                         } label: {
                             Label("缓存前后章节", systemImage: "square.and.arrow.down")
@@ -3382,7 +3478,7 @@ struct ReaderView: View {
 
                     if currentChapterWebURL != nil {
                         Button {
-                            closeReaderChrome()
+                            closeReaderChromeFromMenu()
                             showChapterWebPage = true
                         } label: {
                             Label("网页打开本章", systemImage: "safari")
@@ -3392,7 +3488,7 @@ struct ReaderView: View {
                     Divider()
 
                     Button {
-                        closeReaderChrome()
+                        closeReaderChromeFromMenu()
                         toggleSpeech()
                     } label: {
                         Label(
@@ -3405,7 +3501,7 @@ struct ReaderView: View {
 
                     if speechController.isSpeaking {
                         Button(role: .destructive) {
-                            closeReaderChrome()
+                            closeReaderChromeFromMenu()
                             stopSpeechPlayback()
                         } label: {
                             Label("停止朗读", systemImage: "stop.fill")
@@ -3413,7 +3509,7 @@ struct ReaderView: View {
                     }
 
                     Button {
-                        closeReaderChrome()
+                        closeReaderChromeFromMenu()
                         toggleAutoScroll()
                     } label: {
                         Label(
@@ -3425,7 +3521,7 @@ struct ReaderView: View {
                     Divider()
 
                     Button {
-                        closeReaderChrome()
+                        closeReaderChromeFromMenu()
                         // 二选一，不能两个都做：以前同时置位 sheet 和回调，
                         // 本地书那条回调是 dismiss()，于是「详情」弹在正在销毁的阅读器上，直接崩。
                         if let onRequestBookDetail {
@@ -3438,7 +3534,7 @@ struct ReaderView: View {
                     }
 
                     Button {
-                        closeReaderChrome()
+                        closeReaderChromeFromMenu()
                         onRequestSourceSwitch?()
                     } label: {
                         Label("换源", systemImage: "arrow.triangle.2.circlepath")
@@ -3447,7 +3543,7 @@ struct ReaderView: View {
 
                     if let source = currentBookSource {
                         Button {
-                            closeReaderChrome()
+                            closeReaderChromeFromMenu()
                             readerLoginSource = source
                         } label: {
                             Label("登录书源", systemImage: "person.badge.key")
@@ -3457,7 +3553,8 @@ struct ReaderView: View {
                     Image(systemName: "ellipsis")
                         .font(.system(size: 17, weight: .semibold))
                         .frame(width: 44, height: 44)
-                        .background(.thinMaterial, in: Circle())
+                        .background(Circle().fill(readerThemeBackground.opacity(0.97)))
+                        .overlay(Circle().stroke(readerThemeTextColor.opacity(0.12), lineWidth: 0.6))
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel("书籍详情和换源")
@@ -3512,7 +3609,7 @@ struct ReaderView: View {
                         .padding(.horizontal, 16)
                         .frame(maxWidth: .infinity)
                         .frame(height: 36)
-                        .background(.thinMaterial, in: Capsule())
+                        .background(readerThemeBackground.opacity(0.98), in: Capsule())
                         .clipShape(Capsule())
                         .accessibilityLabel("章节进度")
 
@@ -3531,6 +3628,26 @@ struct ReaderView: View {
                         tocTab = 0
                         showChapterList = true
                         closeSettingsPanel()
+                    }
+
+                    // 换源入口从右上角溢出菜单提到常驻底栏：换源是追更时
+                    // 最高频的操作之一，藏在二级菜单里每次要多两次点击。
+                    toolButton(icon: "arrow.triangle.2.circlepath", title: "换源") {
+                        closeSettingsPanel()
+                        onRequestSourceSwitch?()
+                    }
+                    .disabled(onRequestSourceSwitch == nil)
+                    .opacity(onRequestSourceSwitch == nil ? 0.35 : 1)
+
+                    // 第二个常驻按钮选「书签」：阅读器里加/查书签原本只有
+                    // 顶部小图标一个入口，底栏给一个带当前状态的入口，
+                    // 点一下直接落到书签列表，读完一章随手归档最顺手。
+                    toolButton(
+                        icon: isCurrentChapterBookmarked ? "bookmark.fill" : "bookmark",
+                        title: "书签"
+                    ) {
+                        closeSettingsPanel()
+                        toggleCurrentBookmark(openList: true)
                     }
 
                     toolButton(icon: "gearshape", title: "设置") {
@@ -3563,7 +3680,7 @@ struct ReaderView: View {
             .overlay {
                 RoundedRectangle(cornerRadius: 18, style: .continuous)
                     .stroke(
-                        Color.primary.opacity(background.isDark ? 0.09 : 0.12),
+                        readerThemeTextColor.opacity(background.isDark ? 0.16 : 0.20),
                         lineWidth: 0.6
                     )
             }
@@ -3591,7 +3708,7 @@ struct ReaderView: View {
                     .font(.system(size: 10, weight: .medium))
             }
             .frame(width: 54, height: 48)
-            .background(Color.secondary.opacity(0.12), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+            .background(readerThemeTextColor.opacity(0.10), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
             .contentShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
         }
         .buttonStyle(.plain)
@@ -3623,7 +3740,7 @@ struct ReaderView: View {
             Image(systemName: systemName)
                 .font(.system(size: 17, weight: .semibold))
                 .frame(width: 44, height: 44)
-                .background(.thinMaterial, in: Circle())
+                .background(Circle().fill(readerThemeBackground.opacity(0.97)))
                 .contentShape(Circle())
         }
         .buttonStyle(.plain)
@@ -3671,7 +3788,7 @@ struct ReaderView: View {
                                 .font(.headline.weight(.semibold))
                             Text(settingsTab == 0 ? "外观和翻页感" : (settingsTab == 1 ? "字号与排版细节" : "阅读辅助与行为"))
                                 .font(.caption)
-                                .foregroundStyle(.secondary)
+                                .foregroundStyle(readerThemeTextColor.opacity(0.62))
                         }
                         Spacer()
                         Button {
@@ -3681,9 +3798,9 @@ struct ReaderView: View {
                         } label: {
                             Image(systemName: "xmark")
                                 .font(.system(size: 13, weight: .bold))
-                                .foregroundStyle(.secondary)
+                                .foregroundStyle(readerThemeTextColor.opacity(0.62))
                                 .frame(width: 44, height: 44)
-                                .background(Color.secondary.opacity(0.12), in: Circle())
+                                .background(readerThemeTextColor.opacity(0.12), in: Circle())
                         }
                         .buttonStyle(.plain)
                         .accessibilityLabel("关闭阅读设置")
@@ -3710,7 +3827,7 @@ struct ReaderView: View {
 
                     Text(settingsHint)
                         .font(.caption2)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(readerThemeTextColor.opacity(0.62))
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .padding(.horizontal)
 
@@ -3745,7 +3862,7 @@ struct ReaderView: View {
                 .overlay {
                     RoundedRectangle(cornerRadius: 18, style: .continuous)
                         .stroke(
-                            Color.primary.opacity(background.isDark ? 0.09 : 0.12),
+                            readerThemeTextColor.opacity(background.isDark ? 0.09 : 0.12),
                             lineWidth: 0.6
                         )
                 }
@@ -3788,10 +3905,10 @@ struct ReaderView: View {
         VStack(alignment: .leading, spacing: 6) {
             Text("翻页模式")
                 .font(.subheadline.weight(.semibold))
-                .foregroundStyle(.secondary)
+                .foregroundStyle(readerThemeTextColor.opacity(0.62))
             Text(readerModeHint)
                 .font(.caption2)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(readerThemeTextColor.opacity(0.62))
             Picker("翻页模式", selection: $readerModeRawValue) {
                 ForEach(ReaderMode.allCases) { mode in
                     Text(mode.title).tag(mode.rawValue)
@@ -3829,7 +3946,7 @@ struct ReaderView: View {
         VStack(alignment: .leading, spacing: 8) {
             Text("背景颜色")
                 .font(.subheadline.weight(.semibold))
-                .foregroundStyle(.secondary)
+                .foregroundStyle(readerThemeTextColor.opacity(0.62))
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 14) {
                     ForEach(ReaderBackground.pickerCases) { item in
@@ -3842,15 +3959,15 @@ struct ReaderView: View {
                         } label: {
                             VStack(spacing: 4) {
                                 Circle()
-                                    .fill(item.color(isNight: colorScheme == .dark))
+                                    .fill(item.color(isNight: item.isDark))
                                     .frame(width: 40, height: 40)
                                     .overlay {
                                         Circle()
-                                            .stroke(background == item ? AppTheme.accent : Color.secondary.opacity(0.25), lineWidth: background == item ? 3 : 1)
+                                            .stroke(background == item ? AppTheme.accent : readerThemeTextColor.opacity(0.25), lineWidth: background == item ? 3 : 1)
                                     }
                                 Text(item.title)
                                     .font(.caption2)
-                                    .foregroundStyle(background == item ? AppTheme.accent : .secondary)
+                                    .foregroundStyle(background == item ? AppTheme.accent : readerThemeTextColor.opacity(0.62))
                             }
                         }
                         .accessibilityLabel(item.title)
@@ -3935,7 +4052,7 @@ struct ReaderView: View {
                  ? "壁纸已生效，支持自主切换浅色/深色文字样式以保证最佳对比度。"
                  : "可从相册选择壁纸，支持自由搭配浅色或深色文字。")
                 .font(.caption2)
-                .foregroundStyle(.tertiary)
+                .foregroundStyle(readerThemeTextColor.opacity(0.42))
         }
     }
 
@@ -3944,7 +4061,7 @@ struct ReaderView: View {
             HStack {
                 Text("阅读亮度")
                     .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(readerThemeTextColor.opacity(0.62))
                 Spacer()
                 Text(readerBrightness < 0 ? "跟随系统" : "\(Int(readerBrightness * 100))%")
                     .font(.caption.weight(.bold))
@@ -3953,7 +4070,7 @@ struct ReaderView: View {
                     readerBrightness = -1
                 }
                 .font(.caption.weight(.semibold))
-                .foregroundStyle(readerBrightness < 0 ? .secondary : AppTheme.accent)
+                .foregroundStyle(readerBrightness < 0 ? readerThemeTextColor.opacity(0.45) : AppTheme.accent)
                 .disabled(readerBrightness < 0)
             }
             Slider(
@@ -3966,7 +4083,7 @@ struct ReaderView: View {
             .tint(AppTheme.accent)
             Text("只影响阅读页，退出阅读器会恢复系统亮度。")
                 .font(.caption2)
-                .foregroundStyle(.tertiary)
+                .foregroundStyle(readerThemeTextColor.opacity(0.42))
         }
     }
 
@@ -3993,7 +4110,7 @@ struct ReaderView: View {
         .background(readerThemeBackground, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
         .overlay {
             RoundedRectangle(cornerRadius: 18, style: .continuous)
-                .stroke(Color.primary.opacity(background.isDark ? 0.12 : 0.06), lineWidth: 0.8)
+                .stroke(readerThemeTextColor.opacity(background.isDark ? 0.12 : 0.06), lineWidth: 0.8)
         }
     }
 
@@ -4038,7 +4155,7 @@ struct ReaderView: View {
                 } label: {
                     Image(systemName: "xmark.circle.fill")
                         .font(.system(size: 16, weight: .semibold))
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(readerThemeTextColor.opacity(0.62))
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel("关闭语音错误提示")
@@ -4068,7 +4185,7 @@ struct ReaderView: View {
                 HStack {
                     Text("字体")
                         .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(readerThemeTextColor.opacity(0.62))
                     Spacer()
                     Button {
                         showFontManagementSheet = true
@@ -4095,10 +4212,10 @@ struct ReaderView: View {
                                     .background(
                                         fontFamilyRawValue == item.rawValue
                                             ? AppTheme.accent
-                                            : Color(UIColor.tertiarySystemGroupedBackground)
+                                            : readerThemeTextColor.opacity(0.10)
                                     )
                                     .foregroundColor(
-                                        fontFamilyRawValue == item.rawValue ? .white : .primary
+                                        fontFamilyRawValue == item.rawValue ? .white : readerThemeTextColor
                                     )
                                     .clipShape(Capsule())
                             }
@@ -4111,10 +4228,10 @@ struct ReaderView: View {
 
             Text("💡 排版说明：每项均标明具体作用与推荐值。右侧可点数字直接输入，滑块用于快速滑动粗调。已采用主流小说标准排版规范。")
                 .font(.caption)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(readerThemeTextColor.opacity(0.62))
                 .padding(.horizontal, 10)
                 .padding(.vertical, 8)
-                .background(Color(UIColor.tertiarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+                .background(readerThemeTextColor.opacity(0.10), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
 
             // 1. 段落差（段间距）- 放在最前面之一，用户反馈最高频查找项
             readerValueSlider("段落差（段间距）", value: $paragraphSpacing, range: 0...28, step: 1, unit: "pt", help: "调整上下两段文字之间的垂直留白。段间距应大于行距，正文才不会糊成一片（推荐 10~14pt）")
@@ -4123,7 +4240,7 @@ struct ReaderView: View {
             readerValueSlider("正文字号", value: $fontSize, range: 12...34, step: 1, unit: "pt", help: "整体放大或缩小小说正文文字大小（主流阅读推荐 18~20pt）")
 
             // 3. 行距（行高间距）
-            readerValueSlider("行距（行高间距）", value: $lineSpacing, range: 0...18, step: 1, unit: "pt", help: "同一段落内上下每一行文字之间的垂直间隙与呼吸感（推荐 8~10pt）")
+            readerValueSlider("行距", value: $lineSpacing, range: 0...18, step: 1, unit: "pt", help: "行高间距：同一段落内上下每一行文字之间的垂直间隙与呼吸感（推荐 8~10pt）")
 
             // 4. 段首缩进
             readerValueSlider("段首缩进", value: $paragraphIndent, range: 0...50, step: 2, unit: "pt", help: "每个段落第一行开头的缩进空格。38pt 刚好为标准空两个汉字")
@@ -4138,7 +4255,7 @@ struct ReaderView: View {
             VStack(alignment: .leading, spacing: 8) {
                 Text("章节标题位置")
                     .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(readerThemeTextColor.opacity(0.62))
                 Picker("章节标题位置", selection: $chapterHeadingStyleRaw) {
                     ForEach(ReaderPageChromeLayout.allCases) { layout in
                         Text(layout.title).tag(layout.rawValue)
@@ -4147,7 +4264,7 @@ struct ReaderView: View {
                 .pickerStyle(.segmented)
                 Text(chapterHeadingStyle.help)
                     .font(.caption2)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(readerThemeTextColor.opacity(0.62))
                     .fixedSize(horizontal: false, vertical: true)
             }
 
@@ -4165,7 +4282,7 @@ struct ReaderView: View {
                         Text("一键对齐成熟阅读器排版").font(.subheadline.weight(.semibold))
                         Text("字号 20 / 行距 12 / 段距 10 / 边距 21 / 首行缩进 2 字 / 页眉小标题 / 页码右下角")
                             .font(.caption2)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(readerThemeTextColor.opacity(0.62))
                     }
                     Spacer()
                 }
@@ -4183,7 +4300,7 @@ struct ReaderView: View {
             VStack(alignment: .leading, spacing: 10) {
                 Text("页眉与页脚状态栏")
                     .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(readerThemeTextColor.opacity(0.62))
 
                 HStack {
                     Text("状态栏位置")
@@ -4253,7 +4370,7 @@ struct ReaderView: View {
         VStack(alignment: .leading, spacing: 14) {
             Text("高级里只放阅读辅助，不再重复前面的翻页和字号入口。朗读速度只管语速，自动滚动在主阅读菜单。")
                 .font(.caption)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(readerThemeTextColor.opacity(0.62))
 
             readerValueSlider(
                 "自动滚动间隔",
@@ -4268,7 +4385,7 @@ struct ReaderView: View {
 
             Text("睡眠定时")
                 .font(.subheadline.weight(.semibold))
-                .foregroundStyle(.secondary)
+                .foregroundStyle(readerThemeTextColor.opacity(0.62))
             Picker("睡眠定时", selection: $sleepTimerMinutes) {
                 Text("关闭").tag(0)
                 Text("播完当章").tag(-1)
@@ -4293,7 +4410,7 @@ struct ReaderView: View {
             VStack(alignment: .leading, spacing: 6) {
                 Text("插图排版样式")
                     .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(readerThemeTextColor.opacity(0.62))
                 Picker("插图排版样式", selection: $globalImageStyleRaw) {
                     ForEach(ReaderImageStyle.allCases) { style in
                         Text(style.title).tag(style.rawValue)
@@ -4321,19 +4438,27 @@ struct ReaderView: View {
         help: String
     ) -> some View {
         VStack(alignment: .leading, spacing: 8) {
-            HStack(alignment: .center, spacing: 8) {
+            HStack(alignment: .center, spacing: 6) {
                 Text(title)
                     .font(.subheadline.weight(.bold))
-                    .foregroundStyle(.primary)
+                    .foregroundStyle(readerThemeTextColor)
+                    // 标题 + 数值胶囊 + 数字输入框在窄屏上会互相挤压：
+                    // 「行距（行高间距）」曾被折成两行，卡片第一行高度参差。
+                    // 限定单行并允许 0.7 倍微缩，保证每张卡片顶部对齐。
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
+                    .layoutPriority(1)
 
                 Text("\(ReaderValueNormalizer.formatted(value.wrappedValue, step: step)) \(unit)")
                     .font(.caption.weight(.bold))
                     .foregroundStyle(AppTheme.accent)
-                    .padding(.horizontal, 8)
+                    .lineLimit(1)
+                    .fixedSize()
+                    .padding(.horizontal, 7)
                     .padding(.vertical, 3)
                     .background(AppTheme.accent.opacity(0.12), in: Capsule())
 
-                Spacer()
+                Spacer(minLength: 0)
 
                 ReaderNumberInput(
                     title: title,
@@ -4353,13 +4478,13 @@ struct ReaderView: View {
 
                 Text(help)
                     .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(readerThemeTextColor.opacity(0.62))
                     .fixedSize(horizontal: false, vertical: true)
             }
             .padding(.horizontal, 10)
             .padding(.vertical, 6)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(Color.primary.opacity(0.04), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+            .background(readerThemeTextColor.opacity(0.04), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
 
             HStack(spacing: 12) {
                 Button {
@@ -4368,7 +4493,7 @@ struct ReaderView: View {
                 } label: {
                     Image(systemName: "minus.circle.fill")
                         .font(.system(size: 22))
-                        .foregroundStyle(value.wrappedValue <= range.lowerBound ? .secondary.opacity(0.3) : AppTheme.accent)
+                        .foregroundStyle(value.wrappedValue <= range.lowerBound ? readerThemeTextColor.opacity(0.25) : AppTheme.accent)
                 }
                 .disabled(value.wrappedValue <= range.lowerBound)
                 .buttonStyle(.plain)
@@ -4381,7 +4506,7 @@ struct ReaderView: View {
                 } label: {
                     Image(systemName: "plus.circle.fill")
                         .font(.system(size: 22))
-                        .foregroundStyle(value.wrappedValue >= range.upperBound ? .secondary.opacity(0.3) : AppTheme.accent)
+                        .foregroundStyle(value.wrappedValue >= range.upperBound ? readerThemeTextColor.opacity(0.25) : AppTheme.accent)
                 }
                 .disabled(value.wrappedValue >= range.upperBound)
                 .buttonStyle(.plain)
@@ -4390,15 +4515,15 @@ struct ReaderView: View {
             HStack {
                 Text("范围：\(ReaderValueNormalizer.formatted(range.lowerBound, step: step)) ~ \(ReaderValueNormalizer.formatted(range.upperBound, step: step)) \(unit)")
                     .font(.caption2)
-                    .foregroundStyle(.tertiary)
+                    .foregroundStyle(readerThemeTextColor.opacity(0.42))
                 Spacer()
             }
         }
         .padding(12)
-        .background(Color(UIColor.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .background(readerThemeTextColor.opacity(0.055), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
         .overlay {
             RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .stroke(Color.primary.opacity(0.06), lineWidth: 0.8)
+                .stroke(readerThemeTextColor.opacity(0.06), lineWidth: 0.8)
         }
         .padding(.vertical, 2)
     }
@@ -4407,7 +4532,7 @@ struct ReaderView: View {
         VStack(alignment: .leading, spacing: 8) {
             Text("九宫格点击区域")
                 .font(.subheadline.weight(.semibold))
-                .foregroundStyle(.secondary)
+                .foregroundStyle(readerThemeTextColor.opacity(0.62))
             LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 6), count: 3), spacing: 6) {
                 ForEach(0..<9, id: \.self) { index in
                     Menu {
@@ -4460,7 +4585,7 @@ struct ReaderView: View {
         HStack {
             Text(title)
                 .font(.subheadline.weight(.semibold))
-                .foregroundStyle(.secondary)
+                .foregroundStyle(readerThemeTextColor.opacity(0.62))
             Spacer()
             Button(action: decrease) {
                 Image(systemName: "minus.circle.fill")
@@ -4592,6 +4717,10 @@ struct ReaderView: View {
             .padding(.horizontal)
             .padding(.top, 10)
 
+            // 没有 ScrollViewReader 时，每次打开目录都停在第一行：
+            // 读了两百章再点目录，还要自己往下翻。这里用行 identity
+            // 直接定位到当前阅读章。
+            ScrollViewReader { proxy in
             List {
                 if chapters.isEmpty && navigationEntries.isEmpty {
                     Text("当前章节没有可切换目录")
@@ -4624,7 +4753,7 @@ struct ReaderView: View {
                     }
                     if !filteredNavigationEntries.isEmpty {
                         Section {
-                            ForEach(Array(filteredNavigationEntries.enumerated()), id: \.element) { offset, entry in
+                            ForEach(Array(filteredNavigationEntries.enumerated()), id: \.offset) { offset, entry in
                                 Button {
                                     showChapterList = false
                                     presentOverlay()
@@ -4648,6 +4777,15 @@ struct ReaderView: View {
             .scrollContentBackground(.hidden)
             .background(Color.clear)
             .scrollDismissesKeyboard(.interactively)
+            .onAppear {
+                // 首帧的行还没建出来，同一 runloop 里 scrollTo 会落空，
+                // 挪到下一拍再滚动。
+                scrollTocToCurrentChapter(proxy)
+            }
+            .onChange(of: tocReversed) { _ in
+                scrollTocToCurrentChapter(proxy)
+            }
+            }
         }
         .task(id: tocQuery) {
             if tocQuery.isEmpty {
@@ -4675,6 +4813,15 @@ struct ReaderView: View {
                 Image(systemName: "checkmark.circle.fill")
                     .foregroundStyle(AppTheme.accent)
             }
+        }
+    }
+
+    /// 打开目录时把当前阅读章滚到可视区中部；搜索过滤把目标章滤掉时静默跳过。
+    private func scrollTocToCurrentChapter(_ proxy: ScrollViewProxy) {
+        guard let target = chapters.first(where: { $0.index == currentDisplayChapterIndex }) else { return }
+        let id = target.id
+        DispatchQueue.main.async {
+            proxy.scrollTo(id, anchor: .center)
         }
     }
 
@@ -5167,6 +5314,20 @@ struct ReaderView: View {
         }
     }
 
+    /// The overflow `Menu` collapses with UIKit's own animation. Closing the
+    /// chrome in the same frame started a second animation over the same
+    /// views, which read as the panel flickering. Let the menu finish first,
+    /// then hide the chrome without another transition.
+    private func closeReaderChromeFromMenu() {
+        DispatchQueue.main.async {
+            var transaction = Transaction()
+            transaction.disablesAnimations = true
+            withTransaction(transaction) {
+                chromeState.closeAll()
+            }
+        }
+    }
+
     private func setTapZone(index: Int, action: ReaderTapAction) {
         var actions = tapZoneActions
         guard actions.indices.contains(index) else { return }
@@ -5216,14 +5377,14 @@ struct ReaderView: View {
                         .foregroundStyle(AppTheme.accent)
                     Text(speechController.isPaused ? "朗读已暂停" : "AI 语音朗读中")
                         .font(.system(size: 11, weight: .semibold))
-                        .foregroundStyle(.primary)
+                        .foregroundStyle(readerThemeTextColor)
                 }
 
                 if let flat = speechFlatParagraphIndex,
                    scrollModeParagraphs.indices.contains(flat) {
                     Text(scrollModeParagraphs[flat])
                         .font(.system(size: 10))
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(readerThemeTextColor.opacity(0.62))
                         .lineLimit(1)
                         .frame(maxWidth: 160, alignment: .leading)
                 }
@@ -5259,16 +5420,16 @@ struct ReaderView: View {
                 } label: {
                     Image(systemName: "xmark")
                         .font(.system(size: 12, weight: .bold))
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(readerThemeTextColor.opacity(0.62))
                 }
                 .buttonStyle(.plain)
             }
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 8)
-        .background(.ultraThinMaterial, in: Capsule())
-        .overlay(Capsule().stroke(Color.primary.opacity(0.08), lineWidth: 0.8))
-        .shadow(color: .black.opacity(colorScheme == .dark ? 0.35 : 0.12), radius: 10, y: 5)
+        .background(readerThemeBackground.opacity(0.98), in: Capsule())
+        .overlay(Capsule().stroke(readerThemeTextColor.opacity(0.10), lineWidth: 0.8))
+        .shadow(color: .black.opacity(readerIsNight ? 0.35 : 0.12), radius: 10, y: 5)
     }
 
     private var floatingAutoScrollCapsule: some View {
@@ -5289,11 +5450,11 @@ struct ReaderView: View {
                         .foregroundStyle(AppTheme.accent)
                     Text("自动滚屏中")
                         .font(.system(size: 11, weight: .semibold))
-                        .foregroundStyle(.primary)
+                        .foregroundStyle(readerThemeTextColor)
                 }
                 Text(String(format: "%.1f 秒/屏", autoScrollDelay))
                     .font(.system(size: 10))
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(readerThemeTextColor.opacity(0.62))
             }
 
             HStack(spacing: 8) {
@@ -5304,7 +5465,7 @@ struct ReaderView: View {
                     Image(systemName: "minus")
                         .font(.system(size: 12, weight: .bold))
                         .padding(4)
-                        .background(Color.primary.opacity(0.06), in: Circle())
+                        .background(readerThemeTextColor.opacity(0.08), in: Circle())
                 }
                 .buttonStyle(.plain)
 
@@ -5315,7 +5476,7 @@ struct ReaderView: View {
                     Image(systemName: "plus")
                         .font(.system(size: 12, weight: .bold))
                         .padding(4)
-                        .background(Color.primary.opacity(0.06), in: Circle())
+                        .background(readerThemeTextColor.opacity(0.08), in: Circle())
                 }
                 .buttonStyle(.plain)
 
@@ -5328,16 +5489,16 @@ struct ReaderView: View {
                 } label: {
                     Image(systemName: "xmark")
                         .font(.system(size: 12, weight: .bold))
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(readerThemeTextColor.opacity(0.62))
                 }
                 .buttonStyle(.plain)
             }
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 8)
-        .background(.ultraThinMaterial, in: Capsule())
-        .overlay(Capsule().stroke(Color.primary.opacity(0.08), lineWidth: 0.8))
-        .shadow(color: .black.opacity(colorScheme == .dark ? 0.35 : 0.12), radius: 10, y: 5)
+        .background(readerThemeBackground.opacity(0.98), in: Capsule())
+        .overlay(Capsule().stroke(readerThemeTextColor.opacity(0.10), lineWidth: 0.8))
+        .shadow(color: .black.opacity(readerIsNight ? 0.35 : 0.12), radius: 10, y: 5)
     }
 
     private func toggleSpeech() {
@@ -5900,6 +6061,25 @@ struct ReaderView: View {
         return (typography, titleTypography)
     }
 
+    /// Immutable snapshot of every setting the paginator reads. Captured on
+    /// the main actor so the warmup can cut chapters on the cooperative pool
+    /// without touching `@AppStorage` or any other view state.
+    private func chapterPaginationContext(
+        typography: ReaderPageTypography,
+        titleTypography: ReaderPageTypography
+    ) -> ReaderChapterPaginationContext {
+        ReaderChapterPaginationContext(
+            typography: typography,
+            titleTypography: titleTypography,
+            chromeLayout: chapterHeadingStyle,
+            imageStyle: currentImageStyle,
+            viewportHeight: pagedLayoutViewportSize.height,
+            pagePadding: pagePadding,
+            footerHeight: footerHeight,
+            traditionalChinese: traditionalChineseEnabled
+        )
+    }
+
     /// Builds one continuous page model for the whole live window. Every
     /// chapter starts with its own title page and carries its chapter number,
     /// so the page cursor can walk from one chapter into the next without an
@@ -6075,170 +6255,34 @@ struct ReaderView: View {
         typography: ReaderPageTypography,
         titleTypography: ReaderPageTypography
     ) -> [ReaderPageBlock] {
-        var pages: [ReaderPageBlock] = []
-        var currentEntries: [ReaderPageEntry] = []
-        var pageOrdinal = 0
-        let transformedTitle = ReaderTextTransform.displayText(section.title, traditionalChinese: traditionalChineseEnabled)
-        // 页眉模式：章节名画在页眉带，正文第一页从与后续页完全相同的位置开始，
-        // 不再给标题预留 40~50pt 的正文高度。只有「正文大标题」模式保留旧行为。
-        var currentHeight: CGFloat = 0
-        var currentIncludesTitle = false
-        if chapterHeadingStyle == .inline {
-            currentHeight = ReaderPageLayoutEngine.measureHeight(
-                transformedTitle,
-                typography: titleTypography,
-                font: typography.titleFont,
-                alignment: .natural
-            ) + typography.titleSpacing
-            currentIncludesTitle = true
-        }
+        paginateChapter(
+            chapterIndex: section.chapterIndex,
+            title: section.title,
+            paragraphs: section.paragraphs,
+            typography: typography,
+            titleTypography: titleTypography
+        )
+    }
 
-        func flush() {
-            pages.append(
-                ReaderPageBlock(
-                    id: pages.count,
-                    includesTitle: currentIncludesTitle,
-                    paragraphs: currentEntries,
-                    chapterIndex: section.chapterIndex,
-                    chapterTitle: transformedTitle,
-                    pageOrdinal: pageOrdinal
-                )
+    /// Cuts one chapter into pages from a single geometry snapshot. Shared by
+    /// the synchronous first pass and the background warmup so both produce
+    /// identical metrics and the cache signatures keep matching.
+    private func paginateChapter(
+        chapterIndex: Int,
+        title: String,
+        paragraphs: [String],
+        typography: ReaderPageTypography,
+        titleTypography: ReaderPageTypography
+    ) -> [ReaderPageBlock] {
+        ReaderChapterPaginator.paginate(
+            chapterIndex: chapterIndex,
+            title: title,
+            paragraphs: paragraphs,
+            context: chapterPaginationContext(
+                typography: typography,
+                titleTypography: titleTypography
             )
-            pageOrdinal += 1
-            currentEntries = []
-            currentHeight = 0
-            currentIncludesTitle = false
-        }
-
-        for (index, paragraph) in section.paragraphs.enumerated() {
-            let trimmed = paragraph.trimmingCharacters(in: .whitespacesAndNewlines)
-            if ReaderImageSizingPolicy.imageURL(in: trimmed) != nil {
-                // `ReaderIllustrationView` also draws the caption row and its
-                // vertical padding. Reserving only the bitmap height let a
-                // text-plus-image page overflow and clip the last line.
-                let captionBudget = ReaderImageSizingPolicy.pagedCaptionHeight
-                let imageHeight = min(
-                    ReaderImageSizingPolicy.maximumHeight(
-                        for: currentImageStyle,
-                        viewportHeight: pagedLayoutViewportSize.height,
-                        pagePadding: pagePadding,
-                        footerHeight: footerHeight
-                    ),
-                    max(typography.contentHeight - captionBudget, 1)
-                )
-                let cardHeight = imageHeight + captionBudget
-                if currentImageStyle.reservesWholePage {
-                    if currentIncludesTitle || !currentEntries.isEmpty {
-                        flush()
-                    }
-                    currentEntries.append(ReaderPageEntry(
-                        index: index,
-                        text: paragraph,
-                        chapterIndex: section.chapterIndex
-                    ))
-                    currentHeight = cardHeight
-                    flush()
-                } else {
-                    let spacing = currentEntries.isEmpty ? 0 : typography.paragraphSpacing
-                    if !currentEntries.isEmpty && currentHeight + spacing + cardHeight > typography.contentHeight {
-                        flush()
-                    }
-                    let spacingAfterFlush = currentEntries.isEmpty ? 0 : typography.paragraphSpacing
-                    currentEntries.append(ReaderPageEntry(
-                        index: index,
-                        text: paragraph,
-                        chapterIndex: section.chapterIndex
-                    ))
-                    currentHeight += spacingAfterFlush + cardHeight
-                    if currentHeight >= typography.contentHeight {
-                        flush()
-                    }
-                }
-                continue
-            }
-
-            // The stored page text includes the first-line indent so the paged
-            // surface and TextKit measure exactly the same string. Continuation
-            // chunks start at a line boundary and therefore carry no indent.
-            let transformedParagraph = ReaderTextTransform.displayText(paragraph, traditionalChinese: traditionalChineseEnabled)
-            let display = ReaderPageLayoutEngine.displayText(
-                transformedParagraph,
-                fontSize: CGFloat(fontSize),
-                indent: typography.firstLineIndent
-            )
-            // One TextKit pass per paragraph: measure once, then cut with the
-            // metrics we already paid for. Re-measuring the paragraph inside
-            // `split` and every chunk after it was the bulk of the chapter
-            // boundary hitch (5 layouts for a paragraph spanning 3 pages).
-            let paragraphMetrics = ReaderPageLayoutEngine.metrics(for: display, typography: typography)
-            let wholeHeight = ReaderPageLayoutEngine.totalHeight(of: paragraphMetrics)
-            let spacing = currentEntries.isEmpty ? 0 : typography.paragraphSpacing
-
-            if currentHeight + spacing + wholeHeight <= typography.contentHeight + 0.5 {
-                currentEntries.append(ReaderPageEntry(
-                    index: index,
-                    text: display,
-                    chapterIndex: section.chapterIndex
-                ))
-                currentHeight += spacing + wholeHeight
-                continue
-            }
-
-            let minLineHeight = ceil(typography.font.lineHeight) + 2
-            let remaining = typography.contentHeight - currentHeight - spacing
-            if !currentEntries.isEmpty, remaining < minLineHeight {
-                flush()
-            } else if currentEntries.isEmpty, currentIncludesTitle,
-                      remaining < minLineHeight {
-                flush()
-            }
-
-            let available: CGFloat
-            if currentEntries.isEmpty {
-                available = max(typography.contentHeight - currentHeight, minLineHeight)
-            } else {
-                available = max(
-                    typography.contentHeight - currentHeight - typography.paragraphSpacing,
-                    minLineHeight
-                )
-            }
-            let chunks = ReaderPageLayoutEngine.split(
-                display,
-                metrics: paragraphMetrics,
-                firstPageHeight: available,
-                fullPageHeight: typography.contentHeight,
-                typography: typography
-            )
-            for (chunkIndex, chunk) in chunks.enumerated() {
-                let spacingBefore = currentEntries.isEmpty
-                    ? 0
-                    : (chunkIndex == 0 ? typography.paragraphSpacing : 0)
-                if !currentEntries.isEmpty,
-                   currentHeight + spacingBefore + chunk.height > typography.contentHeight + 0.5 {
-                    flush()
-                }
-                let spacingAfterFlush = currentEntries.isEmpty
-                    ? 0
-                    : (chunkIndex == 0 ? typography.paragraphSpacing : 0)
-                currentEntries.append(
-                    ReaderPageEntry(
-                        index: index,
-                        text: chunk.text,
-                        chunkIndex: chunkIndex,
-                        chapterIndex: section.chapterIndex
-                    )
-                )
-                currentHeight += spacingAfterFlush + chunk.height
-                if chunkIndex < chunks.count - 1 {
-                    flush()
-                }
-            }
-        }
-
-        if currentIncludesTitle || !currentEntries.isEmpty {
-            flush()
-        }
-        return pages
+        )
     }
 }
 
@@ -6284,7 +6328,7 @@ private struct ParagraphJumpRequest: Equatable {
     let index: Int
 }
 
-struct ReaderPageEntry: Equatable, Identifiable {
+struct ReaderPageEntry: Equatable, Identifiable, Sendable {
     let index: Int
     let text: String
     /// Non-zero when a long paragraph was split across page boundaries.
@@ -6297,7 +6341,7 @@ struct ReaderPageEntry: Equatable, Identifiable {
     var id: String { "\(chapterIndex)-\(index)-\(chunkIndex)" }
 }
 
-struct ReaderPageBlock: Identifiable, Equatable {
+struct ReaderPageBlock: Identifiable, Equatable, Sendable {
     let id: Int
     let includesTitle: Bool
     let paragraphs: [ReaderPageEntry]
@@ -6345,18 +6389,123 @@ final class ReaderInteractionGate {
 /// cache fill as a state change.
 final class ReaderPageTextCache {
     private var storage: [String: NSAttributedString] = [:]
+    private var order: [String] = []
     private var signature = ""
+    private var inFlight: Set<String> = []
+    /// `text` runs on the main thread, `storeIfAbsent` on a prewarm queue.
+    private let lock = NSLock()
+    /// A whole-cache flush every 16 pages forced TextKit to rebuild the
+    /// attributed strings of pages the reader was about to swipe back to.
+    /// Keep a wide window and evict the oldest entry one at a time instead.
+    private let capacity = 96
 
     func text(key: String, signature: String, build: () -> NSAttributedString) -> NSAttributedString {
+        lock.lock()
         if signature != self.signature {
             storage.removeAll(keepingCapacity: true)
+            order.removeAll(keepingCapacity: true)
             self.signature = signature
         }
-        if let cached = storage[key] { return cached }
+        if let cached = storage[key] {
+            touch(key)
+            lock.unlock()
+            return cached
+        }
+        lock.unlock()
+
+        // Build outside the lock: one page build is milliseconds long and a
+        // prewarm pass must not block the visible page behind it.
         let value = build()
-        if storage.count >= 16 { storage.removeAll(keepingCapacity: true) }
-        storage[key] = value
+
+        lock.lock()
+        if signature == self.signature {
+            insert(key, value)
+        }
+        lock.unlock()
         return value
+    }
+
+    /// Fills one entry from the background prewarm pass. A value built for an
+    /// older typography revision is dropped instead of shadowing a live page.
+    func storeIfAbsent(key: String, signature: String, build: () -> NSAttributedString) {
+        lock.lock()
+        if self.signature.isEmpty { self.signature = signature }
+        if signature != self.signature || storage[key] != nil || inFlight.contains(key) {
+            lock.unlock()
+            return
+        }
+        inFlight.insert(key)
+        lock.unlock()
+
+        let value = build()
+
+        lock.lock()
+        inFlight.remove(key)
+        if signature == self.signature, storage[key] == nil {
+            insert(key, value)
+        }
+        lock.unlock()
+    }
+
+    private func touch(_ key: String) {
+        if let position = order.firstIndex(of: key) {
+            order.remove(at: position)
+        }
+        order.append(key)
+    }
+
+    private func insert(_ key: String, _ value: NSAttributedString) {
+        if storage.count >= capacity, let evicted = order.first {
+            order.removeFirst()
+            storage.removeValue(forKey: evicted)
+        }
+        storage[key] = value
+        order.append(key)
+    }
+}
+
+/// Memoised TOC filtering. `filteredChapters` and
+/// `filteredNavigationEntries` were recomputed from scratch on every body
+/// pass (filter + optional reverse over the full chapter array), which showed
+/// up as dropped frames while scrolling a long table of contents.
+final class ReaderTocFilterCache {
+    private var chapterKey = ""
+    private var chapterResult: [BookChapter] = []
+    private var navigationKey = ""
+    private var navigationResult: [LocalTextNavigationEntry] = []
+
+    func chapters(query: String, reversed: Bool, chapters: [BookChapter]) -> [BookChapter] {
+        let normalized = query.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        let key = "\(normalized)|\(reversed)|\(chapters.count)|\(chapters.first?.id ?? "")|\(chapters.last?.id ?? "")"
+        if key == chapterKey { return chapterResult }
+        var result = chapters.filter { chapter in
+            normalized.isEmpty
+                || chapter.title.lowercased().contains(normalized)
+                || "\(chapter.index + 1)".contains(normalized)
+        }
+        if reversed { result.reverse() }
+        chapterKey = key
+        chapterResult = result
+        return result
+    }
+
+    func navigationEntries(
+        query: String,
+        reversed: Bool,
+        entries: [LocalTextNavigationEntry]
+    ) -> [LocalTextNavigationEntry] {
+        let normalized = query.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        let key = "\(normalized)|\(reversed)|\(entries.count)|\(entries.first?.title ?? "")|\(entries.last?.title ?? "")"
+        if key == navigationKey { return navigationResult }
+        var result = entries.filter { entry in
+            normalized.isEmpty
+                || entry.title.lowercased().contains(normalized)
+                || entry.chapterIndex.map { String($0 + 1).contains(normalized) } == true
+        }
+        if reversed { result.reverse() }
+        navigationKey = key
+        navigationResult = result
+        return result
     }
 }
 

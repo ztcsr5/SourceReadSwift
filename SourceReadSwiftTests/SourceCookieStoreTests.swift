@@ -87,6 +87,37 @@ final class SourceCookieStoreTests: XCTestCase {
         XCTAssertEqual(header, "sid=parent")
     }
 
+    func testNonRFCExpiryDateStillExpires() async throws {
+        let store = SourceCookieStore(storageURL: nil)
+        let url = URL(string: "http://www.tianyu8.org/searchde.html")!
+        await store.storeSetCookieHeaders(
+            ["Set-Cookie": "ss_search_delay=1; expires=Thu, 29-Oct-2026 17:10:52 GMT; Max-Age=30; path=/"],
+            for: url
+        )
+        let cookies = await store.allCookies()
+        XCTAssertEqual(cookies.count, 1)
+        let expiry = try XCTUnwrap(cookies.first?.expiresDate)
+        XCTAssertGreaterThan(expiry, Date())
+        XCTAssertLessThan(expiry, Date().addingTimeInterval(120))
+    }
+
+    func testExpiredMaxAgeCookieIsNotSent() async throws {
+        let store = SourceCookieStore(storageURL: nil)
+        let url = URL(string: "http://www.tianyu8.org/searchde.html")!
+        await store.storeSetCookieHeaders(
+            ["Set-Cookie": "ss_search_delay=1; Max-Age=0; path=/"],
+            for: url
+        )
+        let header = await store.cookieHeader(for: url)
+        XCTAssertNil(header)
+    }
+
+    func testCooldownPageDetection() {
+        let page = "\n\n\n<script>alert(\"搜索间隔: 30 秒\");window.history.go(-1);</script>"
+        XCTAssertTrue(URLSessionSourceNetworkClient.looksLikeCooldownPage(page))
+        XCTAssertFalse(URLSessionSourceNetworkClient.looksLikeCooldownPage("<html>" + String(repeating: "x", count: 800) + "alert(间隔)</html>"))
+    }
+
     func testCookieStoredOnSubdomainAlsoServesThatSubdomain() async throws {
         let store = SourceCookieStore(storageURL: nil)
         let apiURL = URL(string: "https://m.example.com/api")!

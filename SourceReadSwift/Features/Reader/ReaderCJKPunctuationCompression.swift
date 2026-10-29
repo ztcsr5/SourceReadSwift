@@ -25,6 +25,12 @@ enum ReaderCJKPunctuationCompression {
         "】": 0.5, "〕": 0.5, "〉": 0.5
     ]
 
+    /// Every scalar that carries a trim, as a set so the scan can jump
+    /// straight to the next mark instead of walking the whole page.
+    private static let punctuationSet: CharacterSet = CharacterSet(
+        charactersIn: String(trailingTrim.keys)
+    )
+
     static func apply(
         to text: NSMutableAttributedString,
         font: UIFont,
@@ -34,19 +40,25 @@ enum ReaderCJKPunctuationCompression {
         guard length > 0, font.pointSize > 0 else { return }
         let string = text.string as NSString
         let em = font.pointSize
-        for index in 0..<length {
-            let unit = string.character(at: index)
-            // CJK punctuation lives in the BMP; skip surrogate halves so an
-            // emoji never turns into a bogus scalar.
-            guard !(0xD800...0xDFFF).contains(unit),
-                  let scalar = Unicode.Scalar(unit),
-                  let trim = trailingTrim[Character(scalar)]
-            else { continue }
-            text.addAttribute(
-                .kern,
-                value: baseKern - trim * em,
-                range: NSRange(location: index, length: 1)
-            )
+        // `rangeOfCharacter` is a framework-side memchr-style scan, so this
+        // loop only visits punctuation. Walking every CJK glyph and building a
+        // `Character` per index was measurable inside both page rendering and
+        // pagination measurement for every page of the book.
+        var search = NSRange(location: 0, length: length)
+        while search.length > 0 {
+            let hit = string.rangeOfCharacter(from: punctuationSet, options: [], range: search)
+            guard hit.location != NSNotFound else { return }
+            let unit = string.character(at: hit.location)
+            // All keys are BMP scalars; a stray surrogate half cannot match.
+            if let scalar = Unicode.Scalar(unit), let trim = trailingTrim[Character(scalar)] {
+                text.addAttribute(
+                    .kern,
+                    value: baseKern - trim * em,
+                    range: NSRange(location: hit.location, length: 1)
+                )
+            }
+            let next = NSMaxRange(hit)
+            search = NSRange(location: next, length: length - next)
         }
     }
 }

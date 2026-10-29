@@ -122,9 +122,32 @@ actor SourceCookieStore {
         guard !values.isEmpty else { return }
         var parsed: [HTTPCookie] = []
         for value in values {
-            parsed.append(contentsOf: HTTPCookie.cookies(withResponseHeaderFields: ["Set-Cookie": value], for: url))
+            let cookies = HTTPCookie.cookies(withResponseHeaderFields: ["Set-Cookie": value], for: url)
+            guard let cookie = cookies.first else { continue }
+            // Foundation keeps the cookie but throws away expiry dates it
+            // cannot parse, which is how `Max-Age=30` became permanent.
+            if cookie.expiresDate == nil,
+               let expiry = CookieHeaderParser.expiryDate(fromSetCookie: value) {
+                parsed.append(cookieApplying(expiry: expiry, to: cookie))
+            } else {
+                parsed.append(cookie)
+            }
         }
         store(parsed, for: url)
+    }
+
+    /// Rebuild a cookie with an expiry Foundation failed to parse.
+    private func cookieApplying(expiry: Date, to cookie: HTTPCookie) -> HTTPCookie {
+        var properties: [HTTPCookiePropertyKey: Any] = [
+            .name: cookie.name,
+            .value: cookie.value,
+            .domain: cookie.domain,
+            .path: cookie.path,
+            .expires: expiry
+        ]
+        if cookie.isSecure { properties[.secure] = "TRUE" }
+        if cookie.isHTTPOnly { properties[HTTPCookiePropertyKey("HttpOnly")] = "TRUE" }
+        return HTTPCookie(properties: properties) ?? cookie
     }
 
     func clearCookies(for host: String) {
