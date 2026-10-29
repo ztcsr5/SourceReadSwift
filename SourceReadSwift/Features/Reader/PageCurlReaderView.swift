@@ -226,6 +226,7 @@ struct PageCurlReaderView<Item: Identifiable, Content: View>: UIViewControllerRe
         /// committed. Prebuilding them inside the gesture is what caused the
         /// visible half-second stall on the first swipe after a chapter load.
         private var lastPrewarmSignature = ""
+        private var prewarmGeneration = 0
 
         func prewarm(around index: Int) {
             // Never build pages while the finger owns the page turn: the work
@@ -242,23 +243,36 @@ struct PageCurlReaderView<Item: Identifiable, Content: View>: UIViewControllerRe
             let signature = "\(index)|\(parent.pages.count)|\(parent.contentRevision)|\(Int(size.width.rounded()))x\(Int(size.height.rounded()))"
             guard signature != lastPrewarmSignature else { return }
             lastPrewarmSignature = signature
+            // Every pass owns a generation. A fast swipe drives `sync` several
+            // times per second; without the token the pages queued by the
+            // previous passes still ran, so the page under the finger waited
+            // behind stale neighbours and showed an empty frame first.
+            prewarmGeneration &+= 1
+            let generation = prewarmGeneration
             // Order matters: the finger reaches +1 first, so it must be warm
-            // before the slower neighbours.
-            let candidates = [index + 1, index - 1, index + 2, index - 2, index + 3]
-            let delays: [Int] = [0, 45, 110, 180, 260]
+            // before the slower neighbours. ±4 covers a two-page flick and a
+            // chapter boundary in either direction; out-of-range indices are
+            // dropped by the bounds check inside the closure.
+            let candidates = [
+                index + 1, index - 1, index + 2, index - 2,
+                index + 3, index - 3, index + 4, index - 4
+            ]
+            let delays: [Int] = [0, 8, 16, 32, 48, 64, 80, 96]
             for (offset, candidate) in candidates.enumerated() {
                 // Spread the work over consecutive runloop turns. Building
-                // five hosting trees in one turn just moved the hitch from
+                // eight hosting trees in one turn just moved the hitch from
                 // the swipe to the frame right after it.
                 let delay = DispatchTimeInterval.milliseconds(delays[min(offset, delays.count - 1)])
                 DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in
-                    guard let self, self.cachedRevision == self.parent.contentRevision else { return }
+                    guard let self,
+                          self.prewarmGeneration == generation,
+                          self.cachedRevision == self.parent.contentRevision else { return }
                     guard self.parent.pages.indices.contains(candidate) else { return }
                     let controller = self.viewController(at: candidate)
                     // Creating the controller is cheap because SwiftUI defers
                     // the page body until the view loads. UIPageViewController
-                    // then paid for that body — attributed string, TextKit
-                    // surface, header/footer — inside the swipe gesture, which
+                    // then paid for that body - attributed string, TextKit
+                    // surface, header/footer - inside the swipe gesture, which
                     // is the per-page loading hitch users reported. Load and
                     // lay the page out now, on an idle frame.
                     controller.loadViewIfNeeded()

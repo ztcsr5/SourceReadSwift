@@ -1867,6 +1867,12 @@ struct ReaderView: View {
         let generation = windowGeneration
         let signature = chapterPageLayoutSignature
         let (typography, titleTypography) = chapterPaginationTypography()
+        // One immutable snapshot per pass. The workers below never read
+        // @AppStorage or any other main-actor state.
+        let context = chapterPaginationContext(
+            typography: typography,
+            titleTypography: titleTypography
+        )
         let order = [current] + ReaderChapterWindowPolicy.prefetchOrder(
             current: current,
             radius: windowRadius,
@@ -1875,45 +1881,88 @@ struct ReaderView: View {
             loaded: []
         )
         paginationWarmupTask = Task { @MainActor in
-            for index in order {
+            // Cutting a chapter is a pure function of the snapshot, so it runs
+            // on the cooperative pool. The old version measured one chapter
+            // per runloop turn on the main actor; a swipe faster than that
+            // landed on a chapter that was still being cut and showed its
+            // placeholder for a frame - the per-page loading hitch.
+            let batchSize = 3
+            var attempted = Set<Int>()
+            while true {
                 guard !Task.isCancelled, windowGeneration == generation,
                       token == paginationWarmupGeneration else { break }
                 guard readerMode != .scroll, chapterPageLayoutSignature == signature else { break }
-                // A page-turn gesture owns the main thread. Measuring a whole
-                // chapter under the finger is the one remaining hitch, so the
-                // warmup pauses until the gesture settles.
+                // A page-turn gesture owns the main thread. Wait it out before
+                // handing another batch to the pool.
                 while interactionGate.isPageInteractionActive && !Task.isCancelled {
                     try? await Task.sleep(nanoseconds: 40_000_000)
                 }
                 guard !Task.isCancelled, windowGeneration == generation,
                       token == paginationWarmupGeneration else { break }
-                guard let section = windowSections.first(where: {
-                    $0.chapterIndex == index && $0.isReady
-                }) else { continue }
-                let contentSignature = chapterPageContentSignature(section)
-                if let cached = chapterPageCache[index],
-                   cached.layoutSignature == signature,
-                   cached.contentSignature == contentSignature {
-                    continue
+                guard readerMode != .scroll, chapterPageLayoutSignature == signature else { break }
+                var batch: [(index: Int, title: String, paragraphs: [String], contentSignature: String)] = []
+                for index in order where !attempted.contains(index) {
+                    attempted.insert(index)
+                    guard let section = windowSections.first(where: {
+                        $0.chapterIndex == index && $0.isReady
+                    }) else { continue }
+                    let contentSignature = chapterPageContentSignature(section)
+                    if let cached = chapterPageCache[index],
+                       cached.layoutSignature == signature,
+                       cached.contentSignature == contentSignature {
+                        continue
+                    }
+                    batch.append((index, section.title, section.paragraphs, contentSignature))
+                    if batch.count == batchSize { break }
                 }
-                let pages = appendPages(
-                    for: section,
-                    typography: typography,
-                    titleTypography: titleTypography
-                )
+                if batch.isEmpty { break }
+                let measured: [(Int, String, [ReaderPageBlock])] = await withTaskGroup(
+                    of: (Int, String, [ReaderPageBlock]).self
+                ) { group in
+                    for job in batch {
+                        let jobIndex = job.index
+                        let jobTitle = job.title
+                        let jobParagraphs = job.paragraphs
+                        let jobSignature = job.contentSignature
+                        group.addTask(priority: .userInitiated) {
+                            // Each call builds its own TextKit stack and
+                            // shares no state, so this is safe off the main
+                            // actor.
+                            let pages = ReaderChapterPaginator.paginate(
+                                chapterIndex: jobIndex,
+                                title: jobTitle,
+                                paragraphs: jobParagraphs,
+                                context: context
+                            )
+                            return (jobIndex, jobSignature, pages)
+                        }
+                    }
+                    var collected: [(Int, String, [ReaderPageBlock])] = []
+                    collected.reserveCapacity(batch.count)
+                    for await result in group {
+                        collected.append(result)
+                    }
+                    return collected
+                }
                 guard !Task.isCancelled, windowGeneration == generation,
                       token == paginationWarmupGeneration else { break }
-                chapterPageCache[index] = ReaderChapterPageCacheEntry(
-                    layoutSignature: signature,
-                    contentSignature: contentSignature,
-                    blocks: pages
-                )
-                requestWarmupPageRebuild()
-                // One chapter is hundreds of TextKit measurements. Hand the
-                // main run loop a full frame between chapters: `Task.yield()`
-                // can resume inside the same frame, which let the warmup stack
-                // several chapters of work before the screen updated.
-                try? await Task.sleep(nanoseconds: 8_000_000)
+                guard readerMode != .scroll, chapterPageLayoutSignature == signature else { break }
+                var merged = false
+                for (index, contentSignature, pages) in measured {
+                    chapterPageCache[index] = ReaderChapterPageCacheEntry(
+                        layoutSignature: signature,
+                        contentSignature: contentSignature,
+                        blocks: pages
+                    )
+                    merged = true
+                }
+                if merged {
+                    requestWarmupPageRebuild()
+                }
+                // Hand the main run loop a frame between batches: the merge
+                // above can schedule a rebuild, and that rebuild must not queue
+                // behind the next three chapters.
+                try? await Task.sleep(nanoseconds: 4_000_000)
             }
             if windowGeneration == generation, token == paginationWarmupGeneration {
                 paginationWarmupTask = nil
@@ -5974,6 +6023,25 @@ struct ReaderView: View {
         return (typography, titleTypography)
     }
 
+    /// Immutable snapshot of every setting the paginator reads. Captured on
+    /// the main actor so the warmup can cut chapters on the cooperative pool
+    /// without touching `@AppStorage` or any other view state.
+    private func chapterPaginationContext(
+        typography: ReaderPageTypography,
+        titleTypography: ReaderPageTypography
+    ) -> ReaderChapterPaginationContext {
+        ReaderChapterPaginationContext(
+            typography: typography,
+            titleTypography: titleTypography,
+            chromeLayout: chapterHeadingStyle,
+            imageStyle: currentImageStyle,
+            viewportHeight: pagedLayoutViewportSize.height,
+            pagePadding: pagePadding,
+            footerHeight: footerHeight,
+            traditionalChinese: traditionalChineseEnabled
+        )
+    }
+
     /// Builds one continuous page model for the whole live window. Every
     /// chapter starts with its own title page and carries its chapter number,
     /// so the page cursor can walk from one chapter into the next without an
@@ -6149,170 +6217,34 @@ struct ReaderView: View {
         typography: ReaderPageTypography,
         titleTypography: ReaderPageTypography
     ) -> [ReaderPageBlock] {
-        var pages: [ReaderPageBlock] = []
-        var currentEntries: [ReaderPageEntry] = []
-        var pageOrdinal = 0
-        let transformedTitle = ReaderTextTransform.displayText(section.title, traditionalChinese: traditionalChineseEnabled)
-        // 页眉模式：章节名画在页眉带，正文第一页从与后续页完全相同的位置开始，
-        // 不再给标题预留 40~50pt 的正文高度。只有「正文大标题」模式保留旧行为。
-        var currentHeight: CGFloat = 0
-        var currentIncludesTitle = false
-        if chapterHeadingStyle == .inline {
-            currentHeight = ReaderPageLayoutEngine.measureHeight(
-                transformedTitle,
-                typography: titleTypography,
-                font: typography.titleFont,
-                alignment: .natural
-            ) + typography.titleSpacing
-            currentIncludesTitle = true
-        }
+        paginateChapter(
+            chapterIndex: section.chapterIndex,
+            title: section.title,
+            paragraphs: section.paragraphs,
+            typography: typography,
+            titleTypography: titleTypography
+        )
+    }
 
-        func flush() {
-            pages.append(
-                ReaderPageBlock(
-                    id: pages.count,
-                    includesTitle: currentIncludesTitle,
-                    paragraphs: currentEntries,
-                    chapterIndex: section.chapterIndex,
-                    chapterTitle: transformedTitle,
-                    pageOrdinal: pageOrdinal
-                )
+    /// Cuts one chapter into pages from a single geometry snapshot. Shared by
+    /// the synchronous first pass and the background warmup so both produce
+    /// identical metrics and the cache signatures keep matching.
+    private func paginateChapter(
+        chapterIndex: Int,
+        title: String,
+        paragraphs: [String],
+        typography: ReaderPageTypography,
+        titleTypography: ReaderPageTypography
+    ) -> [ReaderPageBlock] {
+        ReaderChapterPaginator.paginate(
+            chapterIndex: chapterIndex,
+            title: title,
+            paragraphs: paragraphs,
+            context: chapterPaginationContext(
+                typography: typography,
+                titleTypography: titleTypography
             )
-            pageOrdinal += 1
-            currentEntries = []
-            currentHeight = 0
-            currentIncludesTitle = false
-        }
-
-        for (index, paragraph) in section.paragraphs.enumerated() {
-            let trimmed = paragraph.trimmingCharacters(in: .whitespacesAndNewlines)
-            if ReaderImageSizingPolicy.imageURL(in: trimmed) != nil {
-                // `ReaderIllustrationView` also draws the caption row and its
-                // vertical padding. Reserving only the bitmap height let a
-                // text-plus-image page overflow and clip the last line.
-                let captionBudget = ReaderImageSizingPolicy.pagedCaptionHeight
-                let imageHeight = min(
-                    ReaderImageSizingPolicy.maximumHeight(
-                        for: currentImageStyle,
-                        viewportHeight: pagedLayoutViewportSize.height,
-                        pagePadding: pagePadding,
-                        footerHeight: footerHeight
-                    ),
-                    max(typography.contentHeight - captionBudget, 1)
-                )
-                let cardHeight = imageHeight + captionBudget
-                if currentImageStyle.reservesWholePage {
-                    if currentIncludesTitle || !currentEntries.isEmpty {
-                        flush()
-                    }
-                    currentEntries.append(ReaderPageEntry(
-                        index: index,
-                        text: paragraph,
-                        chapterIndex: section.chapterIndex
-                    ))
-                    currentHeight = cardHeight
-                    flush()
-                } else {
-                    let spacing = currentEntries.isEmpty ? 0 : typography.paragraphSpacing
-                    if !currentEntries.isEmpty && currentHeight + spacing + cardHeight > typography.contentHeight {
-                        flush()
-                    }
-                    let spacingAfterFlush = currentEntries.isEmpty ? 0 : typography.paragraphSpacing
-                    currentEntries.append(ReaderPageEntry(
-                        index: index,
-                        text: paragraph,
-                        chapterIndex: section.chapterIndex
-                    ))
-                    currentHeight += spacingAfterFlush + cardHeight
-                    if currentHeight >= typography.contentHeight {
-                        flush()
-                    }
-                }
-                continue
-            }
-
-            // The stored page text includes the first-line indent so the paged
-            // surface and TextKit measure exactly the same string. Continuation
-            // chunks start at a line boundary and therefore carry no indent.
-            let transformedParagraph = ReaderTextTransform.displayText(paragraph, traditionalChinese: traditionalChineseEnabled)
-            let display = ReaderPageLayoutEngine.displayText(
-                transformedParagraph,
-                fontSize: CGFloat(fontSize),
-                indent: typography.firstLineIndent
-            )
-            // One TextKit pass per paragraph: measure once, then cut with the
-            // metrics we already paid for. Re-measuring the paragraph inside
-            // `split` and every chunk after it was the bulk of the chapter
-            // boundary hitch (5 layouts for a paragraph spanning 3 pages).
-            let paragraphMetrics = ReaderPageLayoutEngine.metrics(for: display, typography: typography)
-            let wholeHeight = ReaderPageLayoutEngine.totalHeight(of: paragraphMetrics)
-            let spacing = currentEntries.isEmpty ? 0 : typography.paragraphSpacing
-
-            if currentHeight + spacing + wholeHeight <= typography.contentHeight + 0.5 {
-                currentEntries.append(ReaderPageEntry(
-                    index: index,
-                    text: display,
-                    chapterIndex: section.chapterIndex
-                ))
-                currentHeight += spacing + wholeHeight
-                continue
-            }
-
-            let minLineHeight = ceil(typography.font.lineHeight) + 2
-            let remaining = typography.contentHeight - currentHeight - spacing
-            if !currentEntries.isEmpty, remaining < minLineHeight {
-                flush()
-            } else if currentEntries.isEmpty, currentIncludesTitle,
-                      remaining < minLineHeight {
-                flush()
-            }
-
-            let available: CGFloat
-            if currentEntries.isEmpty {
-                available = max(typography.contentHeight - currentHeight, minLineHeight)
-            } else {
-                available = max(
-                    typography.contentHeight - currentHeight - typography.paragraphSpacing,
-                    minLineHeight
-                )
-            }
-            let chunks = ReaderPageLayoutEngine.split(
-                display,
-                metrics: paragraphMetrics,
-                firstPageHeight: available,
-                fullPageHeight: typography.contentHeight,
-                typography: typography
-            )
-            for (chunkIndex, chunk) in chunks.enumerated() {
-                let spacingBefore = currentEntries.isEmpty
-                    ? 0
-                    : (chunkIndex == 0 ? typography.paragraphSpacing : 0)
-                if !currentEntries.isEmpty,
-                   currentHeight + spacingBefore + chunk.height > typography.contentHeight + 0.5 {
-                    flush()
-                }
-                let spacingAfterFlush = currentEntries.isEmpty
-                    ? 0
-                    : (chunkIndex == 0 ? typography.paragraphSpacing : 0)
-                currentEntries.append(
-                    ReaderPageEntry(
-                        index: index,
-                        text: chunk.text,
-                        chunkIndex: chunkIndex,
-                        chapterIndex: section.chapterIndex
-                    )
-                )
-                currentHeight += spacingAfterFlush + chunk.height
-                if chunkIndex < chunks.count - 1 {
-                    flush()
-                }
-            }
-        }
-
-        if currentIncludesTitle || !currentEntries.isEmpty {
-            flush()
-        }
-        return pages
+        )
     }
 }
 
@@ -6358,7 +6290,7 @@ private struct ParagraphJumpRequest: Equatable {
     let index: Int
 }
 
-struct ReaderPageEntry: Equatable, Identifiable {
+struct ReaderPageEntry: Equatable, Identifiable, Sendable {
     let index: Int
     let text: String
     /// Non-zero when a long paragraph was split across page boundaries.
@@ -6371,7 +6303,7 @@ struct ReaderPageEntry: Equatable, Identifiable {
     var id: String { "\(chapterIndex)-\(index)-\(chunkIndex)" }
 }
 
-struct ReaderPageBlock: Identifiable, Equatable {
+struct ReaderPageBlock: Identifiable, Equatable, Sendable {
     let id: Int
     let includesTitle: Bool
     let paragraphs: [ReaderPageEntry]
