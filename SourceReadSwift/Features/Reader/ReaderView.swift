@@ -100,6 +100,10 @@ struct ReaderView: View {
     @State private var pagedBlocksCacheKey = ""
     @State private var interactionGate = ReaderInteractionGate()
     @State private var pageTextCache = ReaderPageTextCache()
+    /// A cache rebuild that arrived while the finger was still on a page.
+    /// Dropping it left the visible slot on its placeholder until the next
+    /// chapter was measured - the one-beat stall between pages.
+    @State private var paginationRebuildPending = false
     @State private var tocFilterCache = ReaderTocFilterCache()
     @State private var pageIdentityTracker = ReaderVisiblePageTracker()
     /// 页面容器的真实几何（UIPageViewController 子控制器可能比根视图小一圈）。
@@ -617,7 +621,7 @@ struct ReaderView: View {
         guard !chapterGeometrySettled else { return }
         geometrySettleTask?.cancel()
         geometrySettleTask = Task { @MainActor in
-            try? await Task.sleep(nanoseconds: 320_000_000)
+            try? await Task.sleep(nanoseconds: ReaderPerformancePolicy.geometrySettleNanoseconds)
             guard !Task.isCancelled else { return }
             geometrySettleTask = nil
             chapterGeometrySettled = true
@@ -957,6 +961,11 @@ struct ReaderView: View {
         // 全屏阅读时连 home indicator 一起淡出；打开菜单或强制系统状态栏时恢复。
         .persistentSystemOverlays(showOverlay || showSystemStatusBar ? .automatic : .hidden)
         .preferredColorScheme(background.isDark ? .dark : .light)
+        // `preferredColorScheme` only drives the window. The paged reader
+        // builds `UIHostingController`s outside the SwiftUI environment, and
+        // system controls inside the chrome read `colorScheme` directly, so
+        // the reader theme is also pushed into the environment here.
+        .environment(\.colorScheme, background.isDark ? .dark : .light)
         .highRefreshRateSurface()
         .ignoresSafeArea()
         .confirmationDialog("购买本章", isPresented: $showPayActionConfirmation, titleVisibility: .visible) {
@@ -1912,16 +1921,19 @@ struct ReaderView: View {
             // per runloop turn on the main actor; a swipe faster than that
             // landed on a chapter that was still being cut and showed its
             // placeholder for a frame - the per-page loading hitch.
-            let batchSize = 3
+            let batchSize = ReaderPerformancePolicy.paginationWarmupBatchSize
             var attempted = Set<Int>()
             while true {
                 guard !Task.isCancelled, windowGeneration == generation,
                       token == paginationWarmupGeneration else { break }
                 guard readerMode != .scroll, chapterPageLayoutSignature == signature else { break }
-                // A page-turn gesture owns the main thread. Wait it out before
-                // handing another batch to the pool.
-                while interactionGate.isPageInteractionActive && !Task.isCancelled {
-                    try? await Task.sleep(nanoseconds: 40_000_000)
+                // A page-turn gesture owns the main thread. Polling here put a
+                // 40 ms timer on the main actor for the whole drag; park the
+                // warmup instead and let `handlePageInteraction(false)` restart
+                // it once the finger is up.
+                if interactionGate.isPageInteractionActive {
+                    paginationWarmupPending = true
+                    break
                 }
                 guard !Task.isCancelled, windowGeneration == generation,
                       token == paginationWarmupGeneration else { break }
@@ -1950,7 +1962,7 @@ struct ReaderView: View {
                         let jobTitle = job.title
                         let jobParagraphs = job.paragraphs
                         let jobSignature = job.contentSignature
-                        group.addTask(priority: .userInitiated) {
+                        group.addTask(priority: .utility) {
                             // Each call builds its own TextKit stack and
                             // shares no state, so this is safe off the main
                             // actor.
@@ -1988,7 +2000,7 @@ struct ReaderView: View {
                 // Hand the main run loop a frame between batches: the merge
                 // above can schedule a rebuild, and that rebuild must not queue
                 // behind the next three chapters.
-                try? await Task.sleep(nanoseconds: 4_000_000)
+                try? await Task.sleep(nanoseconds: ReaderPerformancePolicy.paginationWarmupInterBatchNanoseconds)
             }
             if windowGeneration == generation, token == paginationWarmupGeneration {
                 paginationWarmupTask = nil
@@ -2005,7 +2017,14 @@ struct ReaderView: View {
     /// so the page right after the current chapter becomes readable while the
     /// rest of the window is still being measured.
     private func requestWarmupPageRebuild() {
-        guard !interactionGate.isPageInteractionActive else { return }
+        guard !interactionGate.isPageInteractionActive else {
+            // Mid-gesture rebuilds used to be dropped outright, so the page the
+            // finger had already moved onto kept rendering its placeholder
+            // until the *next* chapter finished. Record it and flush when the
+            // interaction ends.
+            paginationRebuildPending = true
+            return
+        }
         guard pageLayoutTask == nil else { return }
         schedulePagedBlocksCacheRebuild()
     }
@@ -2014,7 +2033,9 @@ struct ReaderView: View {
     /// rotation). Restart the warmup only after the burst ends: cancelling and
     /// re-measuring on every intermediate value wasted more work than the
     /// settle window it was protecting.
-    private func schedulePaginationWarmupRestart(delayNanoseconds: UInt64 = 260_000_000) {
+    private func schedulePaginationWarmupRestart(
+        delayNanoseconds: UInt64 = ReaderPerformancePolicy.paginationWarmupRestartNanoseconds
+    ) {
         guard readerMode != .scroll, isLocalChapterBook, chapterGeometrySettled else { return }
         paginationWarmupRestartTask?.cancel()
         paginationWarmupRestartTask = Task { @MainActor in
@@ -2438,9 +2459,23 @@ struct ReaderView: View {
         // page-turn gesture starts, which is the visible hitch at the
         // beginning of every swipe.
         interactionGate.isPageInteractionActive = active
-        guard !active, interactionGate.rebuildDeferred else { return }
+        guard !active else { return }
+        // Three different pieces of work can be parked for the duration of a
+        // gesture: a debounced window rebuild, a page-cache rebuild that
+        // arrived mid-drag, and a warmup that stopped at a chapter boundary.
+        // Only the first used to be replayed, so a turn that landed next to an
+        // unmeasured chapter kept its placeholder until something else
+        // happened - the "have to pick the chapter again from the TOC" stall.
+        let rebuildDeferred = interactionGate.rebuildDeferred || paginationRebuildPending
+        let warmupDeferred = paginationWarmupPending
         interactionGate.rebuildDeferred = false
+        paginationRebuildPending = false
+        paginationWarmupPending = false
+        guard rebuildDeferred || warmupDeferred else { return }
         schedulePagedBlocksCacheRebuild()
+        if warmupDeferred {
+            warmPaginationCache(around: windowCurrentChapterIndex)
+        }
     }
 
     private func scheduleWindowRebuild() {
@@ -2539,6 +2574,8 @@ struct ReaderView: View {
         let previousBlock = pagedBlocks.indices.contains(safeIndex - 1) ? pagedBlocks[safeIndex - 1] : nil
         let currentBlock = pagedBlocks.indices.contains(safeIndex) ? pagedBlocks[safeIndex] : nil
         let nextBlock = pagedBlocks.indices.contains(safeIndex + 1) ? pagedBlocks[safeIndex + 1] : nil
+        let previous2Block = pagedBlocks.indices.contains(safeIndex - 2) ? pagedBlocks[safeIndex - 2] : nil
+        let next2Block = pagedBlocks.indices.contains(safeIndex + 2) ? pagedBlocks[safeIndex + 2] : nil
         let currentView: AnyView
         if let currentBlock {
             currentView = AnyView(readerPage(for: currentBlock))
@@ -2551,11 +2588,15 @@ struct ReaderView: View {
             previousIdentity: previousBlock.map { ReaderPageIdentity(page: $0).key } ?? "",
             currentIdentity: currentBlock.map { ReaderPageIdentity(page: $0).key } ?? "",
             nextIdentity: nextBlock.map { ReaderPageIdentity(page: $0).key } ?? "",
+            previous2Identity: previous2Block.map { ReaderPageIdentity(page: $0).key } ?? "",
+            next2Identity: next2Block.map { ReaderPageIdentity(page: $0).key } ?? "",
             hasPrevious: previousBlock != nil,
             hasNext: nextBlock != nil,
             previous: previousBlock.map { block -> AnyView in AnyView(readerPage(for: block)) },
             current: currentView,
             next: nextBlock.map { block -> AnyView in AnyView(readerPage(for: block)) },
+            previous2: previous2Block.map { block -> AnyView in AnyView(readerPage(for: block)) },
+            next2: next2Block.map { block -> AnyView in AnyView(readerPage(for: block)) },
             onCommit: { direction in
                 commitCoverTurn(direction)
             },
@@ -2563,7 +2604,9 @@ struct ReaderView: View {
                 handlePageInteraction(active)
             },
             onPageContainerLayout: pageContainerLayoutHandler,
-            turnStyle: .flip
+            turnStyle: .flip,
+            pageBackgroundColor: pagedPageBackgroundColor,
+            userInterfaceStyle: pagedUserInterfaceStyle
         )
         .onChange(of: pagedPageIndex) { target in
             updatePagedVisibleParagraph(pageIndex: target)
@@ -2601,6 +2644,8 @@ struct ReaderView: View {
                 readerPageRevisionKey
             },
             prewarmSize: pagedLayoutViewportSize,
+            pageBackgroundColor: pagedPageBackgroundColor,
+            userInterfaceStyle: pagedUserInterfaceStyle,
             pageBuilder: { page in
                 readerPage(for: page)
             }
@@ -2636,6 +2681,8 @@ struct ReaderView: View {
                 readerPageRevisionKey
             },
             prewarmSize: pagedLayoutViewportSize,
+            pageBackgroundColor: pagedPageBackgroundColor,
+            userInterfaceStyle: pagedUserInterfaceStyle,
             pageBuilder: { page in
                 readerPage(for: page)
             }
@@ -2648,6 +2695,22 @@ struct ReaderView: View {
         }
     }
 
+    /// Opaque paper colour handed to the UIKit paging hosts. `nil` for a
+    /// custom wallpaper, which must stay transparent so the image shows
+    /// through; every other theme paints the paper itself, which is what stops
+    /// the white flash while a chapter is swapped.
+    private var pagedPageBackgroundColor: UIColor? {
+        background == .custom ? nil : background.uiColor(isNight: readerIsNight)
+    }
+
+    /// `preferredColorScheme` on the SwiftUI root does not reach the
+    /// `UIHostingController`s inside the paging surfaces, so the reader theme
+    /// is pushed into them explicitly. Without this a system-dark device made
+    /// every paper black regardless of the selected appearance.
+    private var pagedUserInterfaceStyle: UIUserInterfaceStyle {
+        background.isDark ? .dark : .light
+    }
+
     private var coverPagedReaderContent: some View {
         // Cover mode is a paging `UIScrollView` now. The old SwiftUI version
         // moved three pages with a `@State` translation, so every drag frame
@@ -2658,6 +2721,8 @@ struct ReaderView: View {
         let previousBlock = pagedBlocks.indices.contains(safeIndex - 1) ? pagedBlocks[safeIndex - 1] : nil
         let currentBlock = pagedBlocks.indices.contains(safeIndex) ? pagedBlocks[safeIndex] : nil
         let nextBlock = pagedBlocks.indices.contains(safeIndex + 1) ? pagedBlocks[safeIndex + 1] : nil
+        let previous2Block = pagedBlocks.indices.contains(safeIndex - 2) ? pagedBlocks[safeIndex - 2] : nil
+        let next2Block = pagedBlocks.indices.contains(safeIndex + 2) ? pagedBlocks[safeIndex + 2] : nil
         let currentView: AnyView
         if let currentBlock {
             currentView = AnyView(readerPage(for: currentBlock))
@@ -2670,18 +2735,24 @@ struct ReaderView: View {
             previousIdentity: previousBlock.map { ReaderPageIdentity(page: $0).key } ?? "",
             currentIdentity: currentBlock.map { ReaderPageIdentity(page: $0).key } ?? "",
             nextIdentity: nextBlock.map { ReaderPageIdentity(page: $0).key } ?? "",
+            previous2Identity: previous2Block.map { ReaderPageIdentity(page: $0).key } ?? "",
+            next2Identity: next2Block.map { ReaderPageIdentity(page: $0).key } ?? "",
             hasPrevious: previousBlock != nil,
             hasNext: nextBlock != nil,
             previous: previousBlock.map { block -> AnyView in AnyView(readerPage(for: block)) },
             current: currentView,
             next: nextBlock.map { block -> AnyView in AnyView(readerPage(for: block)) },
+            previous2: previous2Block.map { block -> AnyView in AnyView(readerPage(for: block)) },
+            next2: next2Block.map { block -> AnyView in AnyView(readerPage(for: block)) },
             onCommit: { direction in
                 commitCoverTurn(direction)
             },
             onInteractionChange: { active in
                 handlePageInteraction(active)
             },
-            onPageContainerLayout: pageContainerLayoutHandler
+            onPageContainerLayout: pageContainerLayoutHandler,
+            pageBackgroundColor: pagedPageBackgroundColor,
+            userInterfaceStyle: pagedUserInterfaceStyle
         )
         .onChange(of: pagedPageIndex) { target in
             updatePagedVisibleParagraph(pageIndex: target)
@@ -4828,9 +4899,14 @@ struct ReaderView: View {
                         Section {
                             ForEach(filteredChapters) { chapter in
                                 Button {
-                                    showChapterList = false
+                                    // Apply the jump before dismissing the sheet:
+                                    // `showChapterList = false` tears the window down
+                                    // with the old chapter, and a jump landing in the
+                                    // same runloop was dropped — after which the reader
+                                    // could not continue into the next chapter.
                                     presentOverlay()
                                     selectChapter(index: chapter.index)
+                                    showChapterList = false
                                 } label: {
                                     TocChapterRow(
                                         index: chapter.index,
@@ -4856,9 +4932,9 @@ struct ReaderView: View {
                         Section {
                             ForEach(Array(filteredNavigationEntries.enumerated()), id: \.offset) { offset, entry in
                                 Button {
-                                    showChapterList = false
                                     presentOverlay()
                                     onSelectNavigationEntry?(entry)
+                                    showChapterList = false
                                 } label: {
                                     navigationEntryRow(entry, ordinal: offset)
                                 }
@@ -4885,6 +4961,12 @@ struct ReaderView: View {
                 scrollTocToCurrentChapter(proxy)
             }
             .onChange(of: tocReversed) { _ in
+                scrollTocToCurrentChapter(proxy)
+            }
+            .onChange(of: debouncedTocQuery) { _ in
+                scrollTocToCurrentChapter(proxy)
+            }
+            .onChange(of: chapters.count) { _ in
                 scrollTocToCurrentChapter(proxy)
             }
             }
@@ -4929,7 +5011,11 @@ struct ReaderView: View {
         let id = target.id
         // sheet 首次 onAppear 时 List 的行还没完成布局，单次 async 会落空，
         // 于是每次打开都停在第一章。多拍重试，行建好后自然命中。
-        for delay in [0.05, 0.15, 0.35, 0.7] {
+        // Sheet presentation + List lazy row construction can take longer than
+        // the old 0.7 s cap on a 1000-chapter book, which is why reopening the
+        // TOC still landed on chapter one. Keep retrying while the sheet
+        // settles; later attempts are cheap and idempotent.
+        for delay in [0.05, 0.15, 0.35, 0.7, 1.1, 1.6] {
             DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
                 proxy.scrollTo(id, anchor: .center)
             }

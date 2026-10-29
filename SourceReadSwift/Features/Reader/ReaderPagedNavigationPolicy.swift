@@ -247,11 +247,29 @@ enum ReaderCoverSettlePolicy {
         hasPrevious: Bool,
         hasNext: Bool
     ) -> Outcome {
+        outcome(
+            shift: contentOffsetX - max(pageWidth, 1),
+            pageWidth: pageWidth,
+            hasPrevious: hasPrevious,
+            hasNext: hasNext
+        )
+    }
+
+    /// Slot-relative variant. The cover surface keeps two cached pages on each
+    /// side of the visible one, so the resting offset is `radius * width`
+    /// instead of `width`; the decision is made on the displacement from that
+    /// centre so the radius never leaks into the gesture thresholds.
+    static func outcome(
+        shift: CGFloat,
+        pageWidth: CGFloat,
+        hasPrevious: Bool,
+        hasNext: Bool
+    ) -> Outcome {
         let width = max(pageWidth, 1)
-        if contentOffsetX < width * 0.5 {
+        if shift < -width * 0.5 {
             return hasPrevious ? .previous : .springBack
         }
-        if contentOffsetX > width * 1.5, hasNext {
+        if shift > width * 0.5, hasNext {
             return .next
         }
         return .springBack

@@ -98,4 +98,29 @@ enum ReaderPerformancePolicy {
     /// it does not need to follow every display-link tick. Throttling this
     /// update keeps PreferenceKey propagation off the 120 Hz rendering path.
     static let visibleParagraphUpdateInterval: TimeInterval = 0.08
+
+    /// Geometry settle used to be a fixed 320 ms wait before the paged cache
+    /// rebuild + warmup restarted, which is exactly the "one beat of stutter"
+    /// users see after a rotation, a chapter cut or a font change.
+    static let geometrySettleNanoseconds: UInt64 = 96_000_000
+
+    /// How many chapters a single warmup task renders per batch. The previous
+    /// hard-coded 3 slept 4 ms between batches while polling the interaction
+    /// gate every 40 ms, which kept the main actor busy during a page drag.
+    static let paginationWarmupBatchSize = 3
+    static let paginationWarmupInterBatchNanoseconds: UInt64 = 1_000_000
+
+    /// Deferred restart instead of a 260 ms unconditional timer.
+    static let paginationWarmupRestartNanoseconds: UInt64 = 120_000_000
+
+    /// A cover turn only needs the neighbouring slot to be committed; the old
+    /// 1.2 s springBack fallback kept the scroll view mid-transition long
+    /// enough to leave the transparent hosts blended (ghosting).
+    static let coverCommitFallbackNanoseconds: UInt64 = 600_000_000
+
+    /// Two neighbours ahead and two behind. With three slots every turn built
+    /// a brand new UIHostingController + UITextView on the spot, which is the
+    /// per-page hitch reported on local books (no network involved).
+    static let coverPageSlotCount = 5
+    static let coverPageSlotRadius = 2
 }

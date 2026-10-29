@@ -38,6 +38,12 @@ struct PageCurlReaderView<Item: Identifiable, Content: View>: UIViewControllerRe
     /// Page viewport used to lay out neighbouring page bodies off-screen.
     /// `CGSize.zero` keeps the old behaviour (controller only, no layout).
     let prewarmSize: CGSize
+    /// Opaque paper colour handed to every hosting controller. `nil` keeps
+    /// the transparent behaviour a custom wallpaper needs.
+    let pageBackgroundColor: UIColor?
+    /// Reader theme pushed into UIKit explicitly: `preferredColorScheme` on
+    /// the SwiftUI root does not reach controllers created by this representable.
+    let userInterfaceStyle: UIUserInterfaceStyle
     let pageBuilder: (Item) -> Content
 
     init(
@@ -52,6 +58,8 @@ struct PageCurlReaderView<Item: Identifiable, Content: View>: UIViewControllerRe
         pageKey: @escaping (Item) -> String = { item in String(describing: item.id) },
         pageRevision: ((Item) -> String)? = nil,
         prewarmSize: CGSize = .zero,
+        pageBackgroundColor: UIColor? = nil,
+        userInterfaceStyle: UIUserInterfaceStyle = .unspecified,
         @ViewBuilder pageBuilder: @escaping (Item) -> Content
     ) {
         self.pages = pages
@@ -65,6 +73,8 @@ struct PageCurlReaderView<Item: Identifiable, Content: View>: UIViewControllerRe
         self.pageKey = pageKey
         self.pageRevision = pageRevision
         self.prewarmSize = prewarmSize
+        self.pageBackgroundColor = pageBackgroundColor
+        self.userInterfaceStyle = userInterfaceStyle
         self.pageBuilder = pageBuilder
     }
 
@@ -91,7 +101,13 @@ struct PageCurlReaderView<Item: Identifiable, Content: View>: UIViewControllerRe
         pvc.dataSource = context.coordinator
         pvc.delegate = context.coordinator
         pvc.isDoubleSided = false
-        pvc.view.backgroundColor = .clear
+        // The page controller's own view sits between the reader backdrop and
+        // the page hosts. Leaving it clear let the window show through for a
+        // frame while the curl swapped controllers (the white flash), and on a
+        // system-dark device it also ignored the reader's paper colour.
+        pvc.view.backgroundColor = pageBackgroundColor ?? .clear
+        pvc.view.isOpaque = pageBackgroundColor != nil
+        pvc.overrideUserInterfaceStyle = userInterfaceStyle
         pvc.view.clipsToBounds = true
         // UIPageViewController 默认会把子控制器再内缩一层安全区：分页按全屏算、
         // 页面只拿到 793pt，最后一行就被裁掉。这里把整条 UIKit 链路的
@@ -125,6 +141,9 @@ struct PageCurlReaderView<Item: Identifiable, Content: View>: UIViewControllerRe
 
     func updateUIViewController(_ uiViewController: UIPageViewController, context: Context) {
         context.coordinator.parent = self
+        uiViewController.view.backgroundColor = pageBackgroundColor ?? .clear
+        uiViewController.view.isOpaque = pageBackgroundColor != nil
+        uiViewController.overrideUserInterfaceStyle = userInterfaceStyle
         // Do not walk the whole UIKit tree here. SwiftUI calls this on every
         // reader state change (page cursor, chrome, progress), and the tap and
         // scroll-view normalisation only need to run once per controller: the
@@ -199,9 +218,13 @@ struct PageCurlReaderView<Item: Identifiable, Content: View>: UIViewControllerRe
                 pageIndex: index,
                 pageKey: key,
                 contentRevision: revision,
+                pageBackgroundColor: parent.pageBackgroundColor,
+                userInterfaceStyle: parent.userInterfaceStyle,
                 onLayout: parent.onPageContainerLayout
             )
-            controller.view.backgroundColor = .clear
+            controller.view.backgroundColor = parent.pageBackgroundColor ?? .clear
+            controller.view.isOpaque = parent.pageBackgroundColor != nil
+            controller.overrideUserInterfaceStyle = parent.userInterfaceStyle
             // A rebuilt page (typography or theme change) replaces the cached
             // entry in place; the key stays the same so the LRU order holds.
             if hostingControllers.updateValue(controller, forKey: key) == nil {
@@ -495,6 +518,8 @@ private final class PageHostingController<Content: View>: UIHostingController<Co
     let pageKey: String
     let contentRevision: String
     private let onLayout: ((CGSize, CGFloat) -> Void)?
+    private let pageBackgroundColor: UIColor?
+    private let pageUserInterfaceStyle: UIUserInterfaceStyle
     private var lastReportedSize: CGSize = .zero
     private var lastReportedMinY: CGFloat = .greatestFiniteMagnitude
     /// Off-screen prewarming lays a page out before it enters the page
@@ -507,18 +532,24 @@ private final class PageHostingController<Content: View>: UIHostingController<Co
         pageIndex: Int,
         pageKey: String,
         contentRevision: String,
+        pageBackgroundColor: UIColor?,
+        userInterfaceStyle: UIUserInterfaceStyle,
         onLayout: ((CGSize, CGFloat) -> Void)?
     ) {
         self.pageIndex = pageIndex
         self.pageKey = pageKey
         self.contentRevision = contentRevision
+        self.pageBackgroundColor = pageBackgroundColor
+        self.pageUserInterfaceStyle = userInterfaceStyle
         self.onLayout = onLayout
         super.init(rootView: rootView)
     }
 
     override func viewDidLoad() {
         super.viewDidLoad()
-        view.backgroundColor = .clear
+        view.backgroundColor = pageBackgroundColor ?? .clear
+        view.isOpaque = pageBackgroundColor != nil
+        overrideUserInterfaceStyle = pageUserInterfaceStyle
         view.clipsToBounds = true
         edgesForExtendedLayout = .all
         extendedLayoutIncludesOpaqueBars = true
