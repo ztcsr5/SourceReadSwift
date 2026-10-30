@@ -609,7 +609,7 @@ struct BookshelfReaderGatewayView: View {
                 }
             }
         }
-        .presentationDetents([.medium, .large])
+        .presentationDetents([.large])
         .onDisappear {
             // A dismissed sheet cancels its task. Clear a stale loading flag
             // so opening换源 again always starts a fresh search.

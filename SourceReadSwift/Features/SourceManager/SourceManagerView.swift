@@ -266,6 +266,7 @@ struct SourceManagerView: View {
             // 进入书源管理是阅读器外的二级页面，系统导航栏会多出一条空白
             // 标题区；顶部自绘返回键 + 管理/登录入口，正文直接顶到状态栏下。
             .toolbar(.hidden, for: .navigationBar)
+            .hideRootTabBar()
             .sheet(isPresented: $showImportSheet) {
                 importSheet
             }
@@ -1257,7 +1258,7 @@ struct SourceManagerView: View {
                 }
             }
         }
-        .presentationDetents([.medium, .large])
+        .presentationDetents([.large])
     }
 
     private func sourceJSONEditorSheet(_ editor: SourceJSONEditorState) -> some View {
@@ -1370,7 +1371,7 @@ struct SourceManagerView: View {
                     }
                 }
             }
-            .presentationDetents([.medium, .large])
+            .presentationDetents([.large])
         }
 
         private func runTest() async {
@@ -1839,7 +1840,7 @@ private struct BatchCheckCoordinatorObserver<Content: View>: View {
                 }
             }
         }
-        .presentationDetents([.medium, .large])
+        .presentationDetents([.large])
         }
     }
 
@@ -2385,7 +2386,7 @@ private struct SourceVisualDetailView: View {
                     .environmentObject(appState)
             }
         }
-        .presentationDetents([.medium, .large])
+        .presentationDetents([.large])
     }
 
     @ViewBuilder

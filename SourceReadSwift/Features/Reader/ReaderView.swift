@@ -876,6 +876,7 @@ struct ReaderView: View {
                             removal: .opacity
                         )
                     )
+                    .zIndex(10)
             }
 
             if let statusMessage {
@@ -1931,7 +1932,7 @@ struct ReaderView: View {
                 // 40 ms timer on the main actor for the whole drag; park the
                 // warmup instead and let `handlePageInteraction(false)` restart
                 // it once the finger is up.
-                if interactionGate.isPageInteractionActive {
+                if !isLocalChapterBook && interactionGate.isPageInteractionActive {
                     paginationWarmupPending = true
                     break
                 }
@@ -2924,7 +2925,7 @@ struct ReaderView: View {
 
     /// 预建前后各 radius 页的富文本（前 5 后 5）。
     /// 翻页首帧只保留 TextKit 排字，逐字符的标点压缩在抬手前就已算完。
-    private func prewarmPageText(around index: Int, radius: Int = 5) {
+    private func prewarmPageText(around index: Int, radius: Int = 12) {
         guard readerMode != .scroll, !pagedBlocks.isEmpty else { return }
         let lower = max(0, index - radius)
         let upper = min(pagedBlocks.count - 1, index + radius)
@@ -3652,8 +3653,10 @@ struct ReaderView: View {
                         .frame(width: 44, height: 44)
                         .background(Circle().fill(readerThemeBackground.opacity(0.97)))
                         .overlay(Circle().stroke(readerThemeTextColor.opacity(0.12), lineWidth: 0.6))
+                        .contentShape(Circle())
                 }
                 .buttonStyle(.plain)
+                .contentShape(Rectangle())
                 .accessibilityLabel("书籍详情和换源")
             }
             .padding(.horizontal, 10)
@@ -4012,10 +4015,10 @@ struct ReaderView: View {
                         )
                 }
                 .shadow(
-                    color: Color.black.opacity(background.isDark ? 0.30 : 0.10),
-                    radius: 18,
+                    color: Color.black.opacity(background.isDark ? 0.24 : 0.08),
+                    radius: 8,
                     x: 0,
-                    y: 8
+                    y: 4
                 )
                 .contentShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
                 .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
@@ -5070,7 +5073,7 @@ struct ReaderView: View {
             .toolbarColorScheme(background.isDark ? .dark : .light, for: .navigationBar)
         }
         .readerSheetPresentation(color: readerThemeBackground)
-        .presentationDetents([.medium, .large])
+        .presentationDetents([.large])
         .tint(AppTheme.accent)
         .preferredColorScheme(background.isDark ? .dark : .light)
     }
@@ -5446,6 +5449,16 @@ struct ReaderView: View {
         guard now >= tapCooldownUntil else { return }
         tapCooldownUntil = now.addingTimeInterval(0.28)
         guard !showSettings else { return }
+        if showOverlay {
+            let topBarHeight = readerTopSafeInset + 80
+            let bottomBarHeight = readerFooterSafeInset + 150
+            if location.y <= topBarHeight || location.y >= effectiveViewportSize.height - bottomBarHeight {
+                // Inside toolbar bounds - let toolbar controls and Menu receive the tap
+                return
+            }
+            toggleOverlay()
+            return
+        }
         let size = effectiveViewportSize
         let column = min(max(Int(location.x / max(size.width / 3, 1)), 0), 2)
         let row = min(max(Int(location.y / max(size.height / 3, 1)), 0), 2)
@@ -6297,7 +6310,7 @@ struct ReaderView: View {
             contentWidth: geometry.contentWidth,
             // Tiny buffer for sub-pixel differences between TextKit line boxes
             // and the SwiftUI text renderer.
-            contentHeight: max(geometry.contentHeight - 1, 120)
+            contentHeight: max(geometry.contentHeight - 8, 120)
         )
         var titleTypography = typography
         titleTypography.lineSpacing = 0
@@ -6422,7 +6435,7 @@ struct ReaderView: View {
             // would be measured against a viewport that is about to change.
             let warmupIsRunning = paginationWarmupPending
                 || (paginationWarmupTask.map { !$0.isCancelled } ?? false)
-            let synchronousRadius = chapterGeometrySettled ? 2 : 1
+            let synchronousRadius = isLocalChapterBook ? windowRadius : (chapterGeometrySettled ? 3 : 1)
             let geometryIsSettling = isLocalChapterBook && !chapterGeometrySettled
             if !cacheIsValid,
                abs(section.chapterIndex - windowCurrentChapterIndex) > synchronousRadius,

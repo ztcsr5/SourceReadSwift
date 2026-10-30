@@ -160,7 +160,7 @@ enum ReaderPageLayoutEngine {
         var limit = max(firstPageHeight, metrics[0].height)
 
         for (index, metric) in metrics.enumerated() {
-            if currentHeight > 0, currentHeight + metric.height > limit + 0.5 {
+            if currentHeight > 0, currentHeight + metric.height > limit {
                 let start = metrics[startLine].range.location
                 let length = metric.range.location - start
                 if length > 0 {

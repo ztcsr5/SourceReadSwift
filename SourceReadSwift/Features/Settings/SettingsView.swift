@@ -6,7 +6,7 @@ struct SettingsView: View {
     @EnvironmentObject private var appState: AppState
     @AppStorage("settings.themeMode") private var themeModeRawValue = ThemeMode.system.rawValue
     @ObservedObject private var proxyManager = SourceProxyManager.shared
-    @AppStorage("app.hapticsEnabled") private var hapticsEnabled = true
+    @AppStorage("app.hapticsEnabled") private var hapticsEnabled = false
     @AppStorage("search_concurrent_threads") private var searchThreads = 12
     @AppStorage("batch_check_concurrent_threads") private var batchCheckThreads = 4
     @State private var cacheSize = "无缓存"
@@ -51,7 +51,7 @@ struct SettingsView: View {
 
                 Section("排版与字体") {
                     NavigationLink {
-                        CustomFontManagementView()
+                        CustomFontManagementView().hideRootTabBar()
                     } label: {
                         Label("字体管理与自定义导入", systemImage: "textformat")
                     }
@@ -59,7 +59,7 @@ struct SettingsView: View {
 
                 Section("语音朗读") {
                     NavigationLink {
-                        TTSSettingsView()
+                        TTSSettingsView().hideRootTabBar()
                     } label: {
                         Label("朗读引擎与云端凭据", systemImage: "waveform")
                     }
@@ -69,6 +69,7 @@ struct SettingsView: View {
                     NavigationLink {
                         SourceManagerView()
                             .environmentObject(appState)
+                            .hideRootTabBar()
                     } label: {
                         Label("书源管理", systemImage: "books.vertical")
                     }
@@ -84,7 +85,7 @@ struct SettingsView: View {
                     }
 
                     NavigationLink {
-                        CookieManagerView(cookieStore: appState.sourceCookieStore)
+                        CookieManagerView(cookieStore: appState.sourceCookieStore).hideRootTabBar()
                     } label: {
                         Label("会话与 Cookie 管理", systemImage: "network.badge.shield.half.filled")
                     }
@@ -92,24 +93,25 @@ struct SettingsView: View {
                     NavigationLink {
                         SourceWritingView(server: appState.sourceWritingServer)
                             .environmentObject(appState)
+                            .hideRootTabBar()
                     } label: {
                         Label("Web 写源与传输服务", systemImage: "globe")
                     }
 
                     NavigationLink {
-                        RuleHealthView()
+                        RuleHealthView().hideRootTabBar()
                     } label: {
                         Label("规则体检", systemImage: "shield")
                     }
 
                     NavigationLink {
-                        PurifyRulesView()
+                        PurifyRulesView().hideRootTabBar()
                     } label: {
                         Label("净化规则", systemImage: "wand.and.stars")
                     }
 
                     NavigationLink {
-                        SourceProxySettingsView()
+                        SourceProxySettingsView().hideRootTabBar()
                     } label: {
                         HStack {
                             Label("书源网络代理", systemImage: "network")
@@ -352,72 +354,70 @@ struct SettingsView: View {
     /// existing controls or their grouping.
     private var settingsHeroSection: some View {
         Section {
-            ZStack(alignment: .bottomLeading) {
-                LinearGradient(
-                    colors: [
-                        AppTheme.accent,
-                        AppTheme.accent.opacity(0.78),
-                        Color(red: 0.95, green: 0.46, blue: 0.34).opacity(0.90)
-                    ],
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
-                )
-
-                Circle()
-                    .fill(Color.white.opacity(0.13))
-                    .frame(width: 160, height: 160)
-                    .offset(x: 215, y: -42)
-                Circle()
-                    .fill(Color.white.opacity(0.08))
-                    .frame(width: 96, height: 96)
-                    .offset(x: 275, y: 62)
-
-                VStack(alignment: .leading, spacing: 13) {
-                    HStack(spacing: 12) {
+            VStack(spacing: 14) {
+                HStack(spacing: 14) {
+                    ZStack {
+                        RoundedRectangle(cornerRadius: 15, style: .continuous)
+                            .fill(AppTheme.accent.opacity(0.12))
                         Image(systemName: "books.vertical.fill")
-                            .font(.system(size: 22, weight: .semibold))
-                            .foregroundStyle(.white)
-                            .frame(width: 46, height: 46)
-                            .background(Color.white.opacity(0.18), in: RoundedRectangle(cornerRadius: 13, style: .continuous))
-
-                        VStack(alignment: .leading, spacing: 3) {
-                            Text("纸间 · SourceRead")
-                                .font(.system(size: 18, weight: .bold))
-                                .foregroundStyle(.white)
-                            Text(AppVersion.fullDisplayString)
-                                .font(.system(size: 11, weight: .medium))
-                                .foregroundStyle(.white.opacity(0.78))
-                        }
+                            .font(.system(size: 24, weight: .semibold))
+                            .foregroundStyle(AppTheme.accent)
+                    }
+                    .frame(width: 52, height: 52)
+                    .overlay {
+                        RoundedRectangle(cornerRadius: 15, style: .continuous)
+                            .stroke(AppTheme.accent.opacity(0.20), lineWidth: 0.8)
                     }
 
-                    HStack(spacing: 8) {
-                        settingsHeroMetric("书源", value: "\(appState.sourceStore.sources.count)")
-                        settingsHeroMetric("书架", value: "\(appState.bookshelfStore.books.count)")
-                        settingsHeroMetric("分组", value: "\(appState.bookshelfStore.groups.count)")
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text("纸间")
+                            .font(.system(size: 20, weight: .bold, design: .rounded))
+                            .foregroundStyle(.primary)
+                        Text("纯粹掌上阅读 · \(AppVersion.fullDisplayString)")
+                            .font(.system(size: 12, weight: .medium))
+                            .foregroundStyle(.secondary)
                     }
+
+                    Spacer()
                 }
-                .padding(18)
+
+                HStack(spacing: 8) {
+                    settingsHeroMetric("书源", value: "\(appState.sourceStore.sources.count)")
+                    settingsHeroMetric("书架", value: "\(appState.bookshelfStore.books.count)")
+                    settingsHeroMetric("分组", value: "\(appState.bookshelfStore.groups.count)")
+                }
             }
-            .frame(height: 152)
-            .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
-            .listRowInsets(EdgeInsets(top: 4, leading: AppTheme.pagePadding, bottom: 14, trailing: AppTheme.pagePadding))
+            .padding(16)
+            .background(
+                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                    .fill(Color(uiColor: .secondarySystemGroupedBackground))
+            )
+            .overlay {
+                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                    .stroke(Color.primary.opacity(0.06), lineWidth: 0.8)
+            }
+            .listRowInsets(EdgeInsets(top: 6, leading: AppTheme.pagePadding, bottom: 12, trailing: AppTheme.pagePadding))
             .listRowBackground(Color.clear)
             .listRowSeparator(.hidden)
         }
     }
 
     private func settingsHeroMetric(_ title: String, value: String) -> some View {
-        VStack(alignment: .leading, spacing: 1) {
-            Text(value)
-                .font(.system(size: 16, weight: .bold))
-                .foregroundStyle(.white)
+        HStack(spacing: 6) {
             Text(title)
-                .font(.system(size: 10, weight: .medium))
-                .foregroundStyle(.white.opacity(0.72))
+                .font(.system(size: 11, weight: .medium))
+                .foregroundStyle(.secondary)
+            Text(value)
+                .font(.system(size: 14, weight: .bold, design: .rounded).monospacedDigit())
+                .foregroundStyle(AppTheme.accent)
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 7)
-        .background(Color.white.opacity(0.14), in: RoundedRectangle(cornerRadius: 9, style: .continuous))
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 8)
+        .background(Color.primary.opacity(0.03), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .stroke(Color.primary.opacity(0.05), lineWidth: 0.6)
+        }
     }
 
     private func importBackup(_ result: Result<[URL], Error>) {

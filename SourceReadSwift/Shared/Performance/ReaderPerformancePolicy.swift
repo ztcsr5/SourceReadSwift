@@ -107,7 +107,7 @@ enum ReaderPerformancePolicy {
     /// How many chapters a single warmup task renders per batch. The previous
     /// hard-coded 3 slept 4 ms between batches while polling the interaction
     /// gate every 40 ms, which kept the main actor busy during a page drag.
-    static let paginationWarmupBatchSize = 3
+    static let paginationWarmupBatchSize = 6
     static let paginationWarmupInterBatchNanoseconds: UInt64 = 1_000_000
 
     /// Deferred restart instead of a 260 ms unconditional timer.

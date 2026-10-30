@@ -172,35 +172,40 @@ struct RootTabView: View {
     }
 
     private func tabButton(index: Int, title: String, systemImage: String) -> some View {
-        Button {
+        let isSelected = selectedTab == index
+        return Button {
             switchToTab(index)
         } label: {
-            VStack(spacing: 4) {
-                Image(systemName: selectedTab == index ? "\(systemImage).fill" : systemImage)
-                    .font(.system(size: 22, weight: selectedTab == index ? .bold : .medium))
-                    .foregroundStyle(selectedTab == index ? AppTheme.accent : .secondary)
-                    .frame(width: 46, height: 28)
-                    .background {
-                        if selectedTab == index {
-                            Capsule()
-                                .fill(AppTheme.accent.opacity(0.14))
-                        }
-                    }
+            VStack(spacing: 3) {
+                Image(systemName: isSelected ? "\(systemImage).fill" : systemImage)
+                    .font(.system(size: 21, weight: isSelected ? .semibold : .regular))
+                    .foregroundStyle(isSelected ? AppTheme.accent : .secondary)
+                    .frame(height: 24)
 
                 Text(title)
-                    .font(.system(size: 11, weight: selectedTab == index ? .bold : .medium))
-                    .foregroundStyle(selectedTab == index ? AppTheme.accent : .secondary)
+                    .font(.system(size: 10.5, weight: isSelected ? .semibold : .medium))
+                    .foregroundStyle(isSelected ? AppTheme.accent : .secondary)
             }
-            .frame(width: 64, height: 48)
-            .contentShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+            .frame(width: 68, height: 44)
+            .background {
+                if isSelected {
+                    RoundedRectangle(cornerRadius: 14, style: .continuous)
+                        .fill(AppTheme.accent.opacity(0.12))
+                }
+            }
+            .contentShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
         }
         .buttonStyle(RootTabPressableButtonStyle())
     }
 
     private func switchToTab(_ index: Int) {
         guard selectedTab != index else { return }
-        UIImpactFeedbackGenerator(style: .light).impactOccurred()
-        selectedTab = index
+        if HapticFeedback.isEnabled {
+            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+        }
+        withAnimation(.spring(response: 0.28, dampingFraction: 0.8)) {
+            selectedTab = index
+        }
     }
 
     private func dismissKeyboard() {
@@ -216,8 +221,29 @@ struct RootTabView: View {
 private struct RootTabPressableButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .scaleEffect(configuration.isPressed ? 0.94 : 1)
-            .opacity(configuration.isPressed ? 0.82 : 1)
-            .animation(.easeOut(duration: 0.105), value: configuration.isPressed)
+            .scaleEffect(configuration.isPressed ? 0.92 : 1.0)
+            .opacity(configuration.isPressed ? 0.78 : 1.0)
+            .animation(.interactiveSpring(response: 0.2, dampingFraction: 0.7), value: configuration.isPressed)
+    }
+}
+
+struct HideRootTabBarModifier: ViewModifier {
+    @EnvironmentObject private var appState: AppState
+    @State private var token = UUID()
+
+    func body(content: Content) -> some View {
+        content
+            .onAppear {
+                appState.acquireTabChromeHidden(owner: token)
+            }
+            .onDisappear {
+                appState.releaseTabChromeHidden(owner: token)
+            }
+    }
+}
+
+extension View {
+    func hideRootTabBar() -> some View {
+        modifier(HideRootTabBarModifier())
     }
 }

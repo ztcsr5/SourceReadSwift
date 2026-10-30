@@ -4,7 +4,7 @@ import ObjectiveC
 enum HapticFeedback {
     static var isEnabled: Bool {
         get {
-            UserDefaults.standard.object(forKey: "app.hapticsEnabled") as? Bool ?? true
+            UserDefaults.standard.object(forKey: "app.hapticsEnabled") as? Bool ?? false
         }
         set {
             UserDefaults.standard.set(newValue, forKey: "app.hapticsEnabled")

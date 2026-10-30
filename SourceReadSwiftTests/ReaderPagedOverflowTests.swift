@@ -117,4 +117,40 @@ final class ReaderPagedOverflowTests: XCTestCase {
         XCTAssertEqual(spacing(at: ns.range(of: "第一段").location), 0, accuracy: 0.01)
         XCTAssertEqual(spacing(at: ns.range(of: "续页开头").location), max(0, style.paragraphSpacing - style.lineSpacing), accuracy: 0.01)
     }
+
+    func testOnboardingGuideChapter5DoesNotTruncateLastLine() {
+        let book = OnboardingClassicBook.makeWelcomeBook()
+        guard let ch5 = book.chapters.last else {
+            XCTFail("Missing chapter 5")
+            return
+        }
+        let typo = typography(contentHeight: 717)
+        let pages = ReaderChapterPaginator.paginate(
+            chapterIndex: ch5.index,
+            title: ch5.title,
+            paragraphs: ch5.paragraphs,
+            context: context(typo)
+        )
+        let allText = pages.flatMap { (page: ReaderPageBlock) -> [String] in
+            page.paragraphs.map { $0.text }
+        }.joined()
+        XCTAssertTrue(allText.contains("永驻字里行间"), "Last line must be fully present in paginated pages")
+        let style = builderStyle(typo)
+        for page in pages {
+            let paragraphs: [ReaderPageTextBuilder.Paragraph] = page.paragraphs.map { p in
+                ReaderPageTextBuilder.Paragraph(text: p.text, isContinuation: p.isContinuation, isHighlighted: false)
+            }
+            let built = ReaderPageTextBuilder.make(
+                title: nil,
+                paragraphs: paragraphs,
+                style: style
+            )
+            let height = measuredHeight(built, width: typo.contentWidth)
+            XCTAssertLessThanOrEqual(
+                height,
+                typo.contentHeight + 0.01,
+                "Every page must fit within the typography content height"
+            )
+        }
+    }
 }

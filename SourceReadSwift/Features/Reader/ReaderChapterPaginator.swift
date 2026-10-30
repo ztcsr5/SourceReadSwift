@@ -144,7 +144,7 @@ enum ReaderChapterPaginator {
             let wholeHeight = ReaderPageLayoutEngine.totalHeight(of: paragraphMetrics)
             let spacing = currentEntries.isEmpty ? 0 : typography.paragraphSpacing
 
-            if currentHeight + spacing + wholeHeight <= typography.contentHeight + 0.5 {
+            if currentHeight + spacing + wholeHeight <= typography.contentHeight {
                 currentEntries.append(ReaderPageEntry(
                     index: index,
                     text: display,
@@ -184,7 +184,7 @@ enum ReaderChapterPaginator {
                     ? 0
                     : (chunkIndex == 0 ? typography.paragraphSpacing : 0)
                 if !currentEntries.isEmpty,
-                   currentHeight + spacingBefore + chunk.height > typography.contentHeight + 0.5 {
+                   currentHeight + spacingBefore + chunk.height > typography.contentHeight {
                     flush()
                 }
                 let spacingAfterFlush = currentEntries.isEmpty
