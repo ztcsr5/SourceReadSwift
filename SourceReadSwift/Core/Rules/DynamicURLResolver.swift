@@ -139,9 +139,8 @@ struct DynamicURLResolver {
 
                     if let evaluated = evaluatedValue {
                         let cleanEval = evaluated.trimmingCharacters(in: .whitespacesAndNewlines)
-                        if !cleanEval.isEmpty && cleanEval != "undefined" && cleanEval != "null" {
-                            mText.replaceCharacters(in: match.range(at: 0), with: cleanEval)
-                        }
+                        let replacement = (cleanEval == "undefined" || cleanEval == "null") ? "" : cleanEval
+                        mText.replaceCharacters(in: match.range(at: 0), with: replacement)
                     }
                 }
                 trimmed = mText as String

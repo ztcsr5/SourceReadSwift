@@ -242,8 +242,7 @@ struct SourceManagerView: View {
     }
 
     var body: some View {
-        NavigationStack {
-            ScrollView {
+        ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
                     sourceManagerHeader
                     batchCheckStatusBanner
@@ -429,7 +428,8 @@ struct SourceManagerView: View {
                 )
                 .ignoresSafeArea()
             }
-        }
+            .navigationBarBackButtonHidden(true)
+            .toolbar(.hidden, for: .navigationBar)
     }
 
     private var webServiceCard: some View {

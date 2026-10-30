@@ -55,9 +55,10 @@ enum ReaderPageTextBuilder {
             // paginator already adds spacing only before chunkIndex == 0;
             // testing `paragraph.isContinuation` here measured a different
             // document than the one TextKit rendered.
+            let effectiveSpacing = max(0, style.paragraphSpacing - style.lineSpacing)
             paragraphStyle.paragraphSpacing = index == paragraphs.count - 1
                 ? 0
-                : (paragraphs[index + 1].isContinuation ? 0 : style.paragraphSpacing)
+                : (paragraphs[index + 1].isContinuation ? 0 : effectiveSpacing)
             paragraphStyle.lineBreakStrategy = ReaderPageLayoutEngine.lineBreakStrategy
             paragraphStyle.alignment = .justified
             // The indent is already part of `paragraph.text`; adding it here

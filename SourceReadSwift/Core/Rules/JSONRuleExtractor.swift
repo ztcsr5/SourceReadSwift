@@ -2294,7 +2294,7 @@ struct JSONRuleExtractor {
             return interpolateTemplate(template, item: item, variables: variables)
         }
         guard template.contains("{{"), template.contains("}}"),
-              let regex = try? NSRegularExpression(pattern: #"\{\{\s*([^{}]+)\s*\}\}"#) else {
+              let regex = try? NSRegularExpression(pattern: #"\{\{\s*([\s\S]*?)\s*\}\}"#) else {
             return template
         }
         let mText = NSMutableString(string: template)
@@ -2314,7 +2314,7 @@ struct JSONRuleExtractor {
     }
 
     private func interpolateTemplate(_ template: String, item: [String: Any], variables: [String: Any]) -> String {
-        guard let regex = try? NSRegularExpression(pattern: #"\{\{\s*([^{}]+)\s*\}\}"#) else { return template }
+        guard let regex = try? NSRegularExpression(pattern: #"\{\{\s*([\s\S]*?)\s*\}\}"#) else { return template }
         let mText = NSMutableString(string: template)
         let matches = regex.matches(in: template, range: NSRange(location: 0, length: mText.length))
         for match in matches.reversed() {

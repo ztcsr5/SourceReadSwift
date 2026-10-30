@@ -813,7 +813,7 @@ struct ReaderView: View {
             // state mid-gesture. Each surface consumes its own content
             // revision instead (PageCurlReaderView.contentRevision, cover
             // data and TabView tags).
-            .id(readerMode == .scroll ? "web-scroll-reader" : "reader-paged-surface")
+            .id(readerMode.rawValue)
             .onPreferenceChange(ReaderPageContainerMetricsKey.self) { metrics in
                 if let metrics {
                     adoptPageContainerMetrics(metrics)
@@ -981,7 +981,7 @@ struct ReaderView: View {
         } message: {
             Text(payActionResultMessage)
         }
-        .sheet(isPresented: $showChapterList) {
+        .fullScreenCover(isPresented: $showChapterList) {
             chapterListSheet
         }
         .sheet(isPresented: $showBookmarks) {
@@ -3688,6 +3688,8 @@ struct ReaderView: View {
                     .disabled(!canSelectRelativeChapter(offset: -1))
 
                     if readerMode == .scroll {
+                        let totalChapterCount = displayTotalChapters ?? chapters.count
+                        let maxChapterSlider = max(totalChapterCount - 1, 1)
                         Slider(
                             value: Binding(
                                 get: { chapterSliderTarget ?? Double(currentDisplayChapterIndex) },
@@ -3696,7 +3698,7 @@ struct ReaderView: View {
                                     scheduleLiveChapterSeek(to: newValue)
                                 }
                             ),
-                            in: 0...Double(max((displayTotalChapters ?? chapters.count) - 1, 0)),
+                            in: 0...Double(maxChapterSlider),
                             step: 1,
                             onEditingChanged: { editing in
                                 guard !editing else { return }
@@ -3715,14 +3717,16 @@ struct ReaderView: View {
                             .frame(height: 36)
                             .background(readerThemeBackground.opacity(0.98), in: Capsule())
                             .clipShape(Capsule())
+                            .disabled(totalChapterCount <= 1)
                             .accessibilityLabel("章节进度")
                     } else {
+                        let maxPageSlider = max(currentChapterPageTotalForSlider - 1, 1)
                         Slider(
                             value: Binding(
                                 get: { Double(currentChapterPageOrdinal) },
                                 set: { newValue in seekPagedPage(ordinal: Int(newValue.rounded())) }
                             ),
-                            in: 0...Double(max(currentChapterPageTotalForSlider - 1, 0)),
+                            in: 0...Double(maxPageSlider),
                             step: 1,
                             onEditingChanged: { _ in }
                         )
@@ -3732,6 +3736,7 @@ struct ReaderView: View {
                             .frame(height: 36)
                             .background(readerThemeBackground.opacity(0.98), in: Capsule())
                             .clipShape(Capsule())
+                            .disabled(currentChapterPageTotalForSlider <= 1)
                             .accessibilityLabel("本章页码")
                     }
 

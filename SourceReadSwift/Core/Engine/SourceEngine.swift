@@ -446,13 +446,15 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
         // per-source, so clear the in-memory flag to make sure only this TOC's
         // preUpdateJs can flip the chapter order.
         executionContext.setValue(nil, for: "book.reverseToc")
+        executionContext.setValue(nil, for: "book.tocUrl")
         runTocPreUpdateJs(
             source: source,
             book: book,
             baseUrl: book.bookUrl.nilIfEmpty ?? book.tocUrl?.nilIfEmpty ?? source.cleanSourceURL,
             executionContext: executionContext
         )
-        let tocURL = book.tocUrl?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty ?? book.bookUrl
+        let dynamicTocUrl = executionContext.string(for: "book.tocUrl").trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty
+        let tocURL = dynamicTocUrl ?? book.tocUrl?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty ?? book.bookUrl
         let resolvedTocURL = DynamicURLResolver.resolve(
             tocURL,
             baseUrl: book.bookUrl.nilIfEmpty ?? book.tocUrl?.nilIfEmpty ?? source.cleanSourceURL,
@@ -1412,6 +1414,11 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
         }
         if case .failure(let error) = outcome {
             executionContext.log("toc.preUpdateJs failed: \(error)")
+        }
+        if let jsBook = runtime.context.objectForKeyedSubscript("book"),
+           let updatedToc = jsBook.forProperty("tocUrl")?.toString(),
+           !updatedToc.isEmpty, updatedToc != "undefined", updatedToc != "null" {
+            executionContext.setValue(updatedToc, for: "book.tocUrl")
         }
     }
 

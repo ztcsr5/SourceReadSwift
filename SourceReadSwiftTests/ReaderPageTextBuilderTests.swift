@@ -34,7 +34,8 @@ final class ReaderPageTextBuilderTests: XCTestCase {
         XCTAssertEqual(style?.alignment, .justified)
         XCTAssertEqual(style?.firstLineHeadIndent ?? -1, 0, accuracy: 0.01)
         XCTAssertEqual(style?.headIndent ?? -1, 0, accuracy: 0.01)
-        XCTAssertEqual(style?.paragraphSpacing ?? -1, 10, accuracy: 0.01)
+        // Effective spacing = max(0, paragraphSpacing(10) - lineSpacing(8)) = 2
+        XCTAssertEqual(style?.paragraphSpacing ?? -1, 2, accuracy: 0.01)
     }
 
     func testContinuationChunkSpacingBelongsToTheTerminatingNewline() {
@@ -51,7 +52,9 @@ final class ReaderPageTextBuilderTests: XCTestCase {
         // paragraphSpacing（分页器在 currentEntries 非空时就是这么加间距的），
         // 只有整页最后一段才归零。
         let first = paragraphStyle(result, at: 0)
-        XCTAssertEqual(first?.paragraphSpacing ?? -1, 10, accuracy: 0.01)
+        // With lineSpacing=8 and paragraphSpacing=10, the effective paragraphSpacing applied
+        // to TextKit 1 is max(0, 10 - 8) = 2, so that lineSpacing (8) + paragraphSpacing (2) = 10
+        XCTAssertEqual(first?.paragraphSpacing ?? -1, 2, accuracy: 0.01)
         let lastLocation = result.string.utf16.count - 2
         XCTAssertEqual(paragraphStyle(result, at: lastLocation)?.paragraphSpacing ?? -1, 0, accuracy: 0.01)
     }

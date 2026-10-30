@@ -115,6 +115,6 @@ final class ReaderPagedOverflowTests: XCTestCase {
 
         let ns = result.string as NSString
         XCTAssertEqual(spacing(at: ns.range(of: "第一段").location), 0, accuracy: 0.01)
-        XCTAssertEqual(spacing(at: ns.range(of: "续页开头").location), style.paragraphSpacing, accuracy: 0.01)
+        XCTAssertEqual(spacing(at: ns.range(of: "续页开头").location), max(0, style.paragraphSpacing - style.lineSpacing), accuracy: 0.01)
     }
 }

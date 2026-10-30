@@ -503,11 +503,25 @@ final class CoverPageHostController: UIViewController, UIScrollViewDelegate {
     }
 
     private func springBack(width: CGFloat) {
+        let targetX = width * CGFloat(slotRadius)
+        if abs(scrollView.contentOffset.x - targetX) < 0.5 {
+            isSettling = false
+            setSlotRasterization(false)
+            installFramesIfNeeded(force: true)
+            return
+        }
         isSettling = true
         settleToken += 1
+        let token = settleToken
         scrollView.setContentOffset(
-            CGPoint(x: width * CGFloat(slotRadius), y: 0),
+            CGPoint(x: targetX, y: 0),
             animated: true
         )
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
+            guard let self, self.settleToken == token, self.isSettling else { return }
+            self.isSettling = false
+            self.setSlotRasterization(false)
+            self.installFramesIfNeeded(force: true)
+        }
     }
 }

@@ -952,7 +952,7 @@ struct HtmlRuleExtractor {
         }
         var cleaned = output.replacingOccurrences(of: "&&", with: " ")
         cleaned = RuleDirectiveParser.removingPuts(from: cleaned)
-        cleaned = RuleDirectiveParser.replacingGets(in: cleaned) { _ in "" }
+        cleaned = RuleDirectiveParser.replacingGets(in: cleaned) { storedDirectiveValue(for: $0) }
         return cleaned.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
@@ -1001,7 +1001,7 @@ struct HtmlRuleExtractor {
         baseUrl: URL?,
         variables: [String: Any]
     ) throws -> String {
-        guard let regex = try? NSRegularExpression(pattern: #"\{\{\s*([^{}]+)\s*\}\}"#) else { return template }
+        guard let regex = try? NSRegularExpression(pattern: #"\{\{\s*([\s\S]*?)\s*\}\}"#) else { return template }
         let mText = NSMutableString(string: template)
         let matches = regex.matches(in: template, range: NSRange(location: 0, length: mText.length))
         for match in matches.reversed() {
