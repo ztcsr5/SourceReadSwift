@@ -208,7 +208,7 @@ enum ResponseFormatDetector {
         return value
     }
 
-    private static func decodeHTMLEntities(_ input: String) -> String {
+    static func decodeHTMLEntities(_ input: String) -> String {
         var value = input
             .replacingOccurrences(of: "&quot;", with: "\"")
             .replacingOccurrences(of: "&apos;", with: "'")

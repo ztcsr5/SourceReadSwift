@@ -510,10 +510,10 @@ struct ContentParser {
             options: .regularExpression
         )
         output = output.replacingOccurrences(of: "(?i)<br\\s*/?>", with: "\n", options: .regularExpression)
-        output = output.replacingOccurrences(of: "(?i)</p\\s*>", with: "\n", options: .regularExpression)
-        output = output.replacingOccurrences(of: "(?i)</div\\s*>", with: "\n", options: .regularExpression)
-        output = output.replacingOccurrences(of: "(?i)</li\\s*>", with: "\n", options: .regularExpression)
+        output = output.replacingOccurrences(of: "(?i)<(?:p|div|li)[^>]*>", with: "\n", options: .regularExpression)
+        output = output.replacingOccurrences(of: "(?i)</(?:p|div|li)\\s*>", with: "\n", options: .regularExpression)
         output = output.replacingOccurrences(of: "<[^>]+>", with: "", options: .regularExpression)
+        output = ResponseFormatDetector.decodeHTMLEntities(output)
         output = output.replacingOccurrences(of: "&nbsp;", with: " ")
         output = output.replacingOccurrences(of: "&amp;", with: "&")
         output = output.replacingOccurrences(of: "&lt;", with: "<")

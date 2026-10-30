@@ -5,7 +5,7 @@ import Foundation
 public enum AppVersion {
     private static var versionComponents: (epic: Int, major: Int, minor: Int) {
         let raw = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String
-        let parts = (raw ?? "1.0.115").split(separator: ".").compactMap { Int($0) }
+        let parts = (raw ?? "1.0.116").split(separator: ".").compactMap { Int($0) }
         return (
             parts.indices.contains(0) ? parts[0] : 1,
             parts.indices.contains(1) ? parts[1] : 0,

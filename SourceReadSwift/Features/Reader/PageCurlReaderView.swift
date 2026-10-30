@@ -407,7 +407,7 @@ struct PageCurlReaderView<Item: Identifiable, Content: View>: UIViewControllerRe
                 pageViewController.setViewControllers(
                     [controller],
                     direction: direction,
-                    animated: displayedIndex != nil,
+                    animated: false,
                     completion: nil
                 )
                 reportVisibleIdentity(controller)
