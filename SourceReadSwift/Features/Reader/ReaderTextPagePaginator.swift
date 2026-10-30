@@ -40,13 +40,15 @@ enum ReaderTextPagePaginator {
         let manager = NSLayoutManager()
         manager.allowsNonContiguousLayout = false
         storage.addLayoutManager(manager)
-        let glyphCount = manager.numberOfGlyphs
-        var glyphEnd = 0
+        var characterEnd = 0
         var pages: [ReaderPageBlock] = []
         var paragraphCursor = 0
         var chunks = Array(repeating: 0, count: display.count)
 
-        while glyphEnd < glyphCount {
+        // Shaping can change the glyph count as layout advances (notably RTL
+        // ligatures). Completion belongs to immutable source UTF16 characters,
+        // never to a glyph count captured before layout.
+        while characterEnd < document.length {
             let container = NSTextContainer(size: CGSize(
                 width: max(typography.contentWidth, 1),
                 height: max(typography.contentHeight, typography.font.lineHeight)
@@ -54,14 +56,17 @@ enum ReaderTextPagePaginator {
             container.lineFragmentPadding = 0
             container.lineBreakMode = .byWordWrapping
             manager.addTextContainer(container)
+            if manager.textContainers.count == 1 {
+                manager.ensureGlyphs(forCharacterRange: NSRange(location: 0, length: document.length))
+            }
             manager.ensureLayout(for: container)
             let glyphs = manager.glyphRange(for: container)
-            // The minimum height above admits at least one body line. An
-            // oversized title line still needs forward progress, not a loop.
-            guard NSMaxRange(glyphs) > glyphEnd else { break }
-            glyphEnd = NSMaxRange(glyphs)
             let characters = manager.characterRange(forGlyphRange: glyphs, actualGlyphRange: nil)
             let pageEnd = NSMaxRange(characters)
+            // The UI guarantees enough height for a title/body line. Invalid
+            // smaller external contexts must not spin forever.
+            guard pageEnd > characterEnd else { break }
+            characterEnd = pageEnd
             var entries: [ReaderPageEntry] = []
             while paragraphCursor < sourceRanges.count {
                 let range = sourceRanges[paragraphCursor]

@@ -152,6 +152,54 @@ final class ReaderPanController119Tests: XCTestCase {
         return controller
     }
 
+    func testProductionTextSurfaceMatchesMeasuredPagesAcrossMixedFontMatrix() {
+        let paragraphs = [
+            String(repeating: "纯中文行高，不能因为缺少英文而低估。", count: 16),
+            "iOS Human Interface Guidelines、IDFA、Legado、ZIPFoundation、CryptoSwift。",
+            String(repeating: "中文 Mixed words 👩🏽‍💻🙂、（标点）。", count: 25)
+        ]
+        for size: CGFloat in [16, 20, 30] {
+            for line: CGFloat in [0, 8, 18] {
+                for heading in [ReaderPageChromeLayout.header, .inline] {
+                    let typography = ReaderPageTypography(
+                        font: .systemFont(ofSize: size), titleFont: .boldSystemFont(ofSize: size * 1.3),
+                        lineSpacing: line, letterSpacing: 0, paragraphSpacing: 16, firstLineIndent: size * 2,
+                        titleSpacing: 12, contentWidth: 280, contentHeight: 320)
+                    let context = ReaderChapterPaginationContext(typography: typography, titleTypography: typography,
+                        chromeLayout: heading, imageStyle: .standard, viewportHeight: 568, pagePadding: 21,
+                        footerHeight: 14, traditionalChinese: false)
+                    let pages = ReaderChapterPaginator.paginate(chapterIndex: 0, title: "中英 Mixed 标题", paragraphs: paragraphs, context: context)
+                    XCTAssertFalse(pages.isEmpty)
+                    for (index, original) in paragraphs.enumerated() {
+                        XCTAssertEqual(pages.flatMap(\.paragraphs).filter { $0.index == index }.map(\.text).joined(),
+                                       ReaderPageLayoutEngine.displayText(original, fontSize: size, indent: size * 2))
+                    }
+                    for page in pages {
+                        let text = ReaderPageTextBuilder.make(
+                            title: page.includesTitle ? (page.inlineTitleText ?? page.chapterTitle) : nil,
+                            paragraphs: page.paragraphs.map { .init(text: $0.text, isContinuation: $0.isContinuation, isHighlighted: false) },
+                            style: ReaderPageTextBuilder.layoutStyle(typography))
+                        let view = ReaderPrepaginatedTextView.makePageSurface()
+                        view.frame = CGRect(x: 0, y: 0, width: 280, height: 320)
+                        view.setPage(text)
+                        view.layoutIfNeeded()
+                        let storage = NSTextStorage(attributedString: text)
+                        let manager = NSLayoutManager()
+                        let container = NSTextContainer(size: CGSize(width: 280, height: .greatestFiniteMagnitude))
+                        container.lineFragmentPadding = 0
+                        manager.addTextContainer(container)
+                        storage.addLayoutManager(manager)
+                        manager.ensureLayout(for: container)
+                        let measured = manager.usedRect(for: container).maxY
+                        let actual = view.layoutManager.usedRect(for: view.textContainer).maxY
+                        XCTAssertEqual(actual, measured, accuracy: 0.5, "font metrics \(size)/\(line)/\(heading) page\(page.pageOrdinal)")
+                        XCTAssertLessThanOrEqual(actual, typography.contentHeight + 0.5, "production overflow \(size)/\(line)/\(heading) page\(page.pageOrdinal)")
+                    }
+                }
+            }
+        }
+    }
+
     func testNeighbourArrivalRefreshesWithoutChangingCurrentPage() {
         let controller = makeController()
         apply(controller)

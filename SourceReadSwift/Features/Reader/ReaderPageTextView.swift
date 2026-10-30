@@ -38,6 +38,7 @@ enum ReaderPageTextBuilder {
 
         if let title, !title.isEmpty {
             let titleStyle = NSMutableParagraphStyle()
+            titleStyle.minimumLineHeight = style.titleFont.lineHeight
             titleStyle.lineSpacing = 0
             titleStyle.paragraphSpacing = style.titleSpacing
             titleStyle.lineBreakStrategy = ReaderPageLayoutEngine.lineBreakStrategy
@@ -54,6 +55,11 @@ enum ReaderPageTextBuilder {
 
         for (index, paragraph) in paragraphs.enumerated() {
             let paragraphStyle = NSMutableParagraphStyle()
+            // UITextView keeps the base font's line box even on a CJK-only
+            // line. A standalone NSLayoutManager otherwise uses the smaller
+            // fallback font on those lines, undercounting a full page's height.
+            // A minimum (not maximum) still admits taller emoji/fallback glyphs.
+            paragraphStyle.minimumLineHeight = style.bodyFont.lineHeight
             paragraphStyle.lineSpacing = style.lineSpacing
             // Paragraph spacing belongs to the newline that terminates this
             // paragraph. It must therefore be decided by the NEXT paragraph:
