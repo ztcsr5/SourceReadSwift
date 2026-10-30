@@ -66,6 +66,7 @@ jobs:
             -destination "id=$DEVICE_ID" \
             CODE_SIGNING_ALLOWED=NO \
             -parallel-testing-enabled NO \
+            -resultBundlePath TestResults.xcresult \
             test 2>&1 | tee xcodebuild-test.log
 
       - name: Summarize test failure
@@ -86,3 +87,14 @@ jobs:
           if [ -f xcodebuild-test.log ]; then
             grep -E "Test Suite|Executed [0-9]+ tests" xcodebuild-test.log | tail -n 12 >> "$GITHUB_STEP_SUMMARY" || true
           fi
+
+      - name: Preserve native test evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-test-evidence-${{ github.sha }}
+          path: |
+            xcodebuild-build.log
+            xcodebuild-test.log
+            TestResults.xcresult
+          retention-days: 7

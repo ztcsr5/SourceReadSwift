@@ -53,7 +53,6 @@ struct ReaderView: View {
     @State private var showChapterList = false
     @State private var showBookmarks = false
     @State private var showBookDetailSheet = false
-    @State private var showMoreOptionsMenu = false
     /// Per-source login surface.  Sources that gate chapters behind an account
     /// previously had no entry point inside the reader, so the only way to
     /// authenticate was the source manager's long-press menu.
@@ -669,7 +668,7 @@ struct ReaderView: View {
         let windowSignature = windowSections.isEmpty
             ? "base:\(content.title):\(content.paragraphs.count)"
             : windowSections.map { section in
-                "\(section.chapterIndex):\(section.title.hashValue):\(section.paragraphs.count):\(section.paragraphs.first?.hashValue ?? 0):\(section.paragraphs.last?.hashValue ?? 0):\(section.isReady ? 1 : 0)"
+                "\(section.chapterIndex):\(section.contentRevision):\(section.state)"
             }.joined(separator: ",")
         return [
             readerLayoutKey,
@@ -694,6 +693,8 @@ struct ReaderView: View {
     private var readerPageRevisionKey: String {
         [
             readerLayoutKey,
+            chapterViewportSignature,
+            textSelectionEnabled ? "selectable" : "page-taps",
             backgroundRawValue,
             backgroundWallpaperRevision.uuidString,
             customFontPostScriptName,
@@ -776,7 +777,7 @@ struct ReaderView: View {
     }
 
     private func chapterPageContentSignature(_ section: ReaderChapterSection) -> String {
-        "\(section.chapterIndex)|\(section.title)|\(section.paragraphs.count)|\(section.paragraphs.first?.hashValue ?? 0)|\(section.paragraphs.last?.hashValue ?? 0)"
+        "\(section.chapterIndex)|\(section.contentRevision)"
     }
 
     /// Keeps the chapter pagination cache bounded. Entries outside the live
@@ -878,10 +879,6 @@ struct ReaderView: View {
                         )
                     )
                     .zIndex(10)
-            }
-
-            if showMoreOptionsMenu && showOverlay && !showSettings {
-                moreOptionsMenuOverlay
             }
 
             if let statusMessage {
@@ -1110,6 +1107,13 @@ struct ReaderView: View {
             refreshImageRequestHeaders()
         }
         .onDisappear {
+            windowGeneration &+= 1
+            geometrySettleTask?.cancel()
+            geometrySettleTask = nil
+            paginationWarmupRestartTask?.cancel()
+            paginationWarmupRestartTask = nil
+            chapterSeekTask?.cancel()
+            chapterSeekTask = nil
             positionPersistTask?.cancel()
             pageLayoutTask?.cancel()
             cancelPrefetch()
@@ -2551,14 +2555,11 @@ struct ReaderView: View {
     private var pagedReaderContent: some View {
         Group {
             switch readerMode {
-            // `.pageTurn` and `.cover` share the UIKit paging scroll view.
-            // `UIPageViewController(.scroll)` built a hosting controller
-            // inside each gesture, which dropped frames on ProMotion
-            // hardware; this surface keeps three reused slots instead.
+            // Cover and slide share transaction semantics, not displacement.
             case .cover, .pageTurn:
                 coverPagedReaderContent
             case .pageCurl:
-                flipPagedReaderContent
+                pageCurlReaderContent
             default:
                 horizontalPagedReaderContent
             }
@@ -2572,67 +2573,10 @@ struct ReaderView: View {
         .onChange(of: readerPageRevisionKey) { _ in prewarmPageText(around: pagedPageIndex) }
     }
 
-    /// Simulated page turn ("仿真"). It reuses the same three-slot paging
-    /// scroll view as cover mode and only changes the layer transform, so the
-    /// drag runs at the display refresh rate instead of the 60 Hz Core
-    /// Animation page-curl transition.
-    private var flipPagedReaderContent: some View {
-        let safeIndex = min(max(pagedPageIndex, 0), max(pagedBlocks.count - 1, 0))
-        let previousBlock = pagedBlocks.indices.contains(safeIndex - 1) ? pagedBlocks[safeIndex - 1] : nil
-        let currentBlock = pagedBlocks.indices.contains(safeIndex) ? pagedBlocks[safeIndex] : nil
-        let nextBlock = pagedBlocks.indices.contains(safeIndex + 1) ? pagedBlocks[safeIndex + 1] : nil
-        let previous2Block = pagedBlocks.indices.contains(safeIndex - 2) ? pagedBlocks[safeIndex - 2] : nil
-        let next2Block = pagedBlocks.indices.contains(safeIndex + 2) ? pagedBlocks[safeIndex + 2] : nil
-        let currentView: AnyView
-        if let currentBlock {
-            currentView = AnyView(readerPage(for: currentBlock))
-        } else {
-            currentView = AnyView(Color.clear)
-        }
-        return CoverPageReaderView(
-            pageIdentity: currentBlock.map { ReaderPageIdentity(page: $0).key } ?? "",
-            contentRevision: readerPageRevisionKey,
-            previousIdentity: previousBlock.map { ReaderPageIdentity(page: $0).key } ?? "",
-            currentIdentity: currentBlock.map { ReaderPageIdentity(page: $0).key } ?? "",
-            nextIdentity: nextBlock.map { ReaderPageIdentity(page: $0).key } ?? "",
-            previous2Identity: previous2Block.map { ReaderPageIdentity(page: $0).key } ?? "",
-            next2Identity: next2Block.map { ReaderPageIdentity(page: $0).key } ?? "",
-            hasPrevious: previousBlock != nil,
-            hasNext: nextBlock != nil,
-            previous: previousBlock.map { block -> AnyView in AnyView(readerPage(for: block)) },
-            current: currentView,
-            next: nextBlock.map { block -> AnyView in AnyView(readerPage(for: block)) },
-            previous2: previous2Block.map { block -> AnyView in AnyView(readerPage(for: block)) },
-            next2: next2Block.map { block -> AnyView in AnyView(readerPage(for: block)) },
-            onCommit: { direction in
-                commitCoverTurn(direction)
-            },
-            onInteractionChange: { active in
-                handlePageInteraction(active)
-            },
-            onPageContainerLayout: pageContainerLayoutHandler,
-            turnStyle: .flip,
-            pageBackgroundColor: pagedPageBackgroundColor,
-            userInterfaceStyle: pagedUserInterfaceStyle
-        )
-        .onChange(of: pagedPageIndex) { target in
-            updatePagedVisibleParagraph(pageIndex: target)
-            reportCoverVisibleIdentity(target)
-        }
-        .onChange(of: speechController.currentParagraphIndex) { target in
-            guard target >= 0, let flat = speechFlatParagraphIndex,
-                  !interactionGate.isPageInteractionActive else { return }
-            pagedPageIndex = pageIndex(containingParagraph: flat)
-        }
-        .onAppear {
-            reportCoverVisibleIdentity(pagedPageIndex)
-        }
-    }
-
     private var pageCurlReaderContent: some View {
         PageCurlReaderView(
             pages: pagedBlocks,
-            contentRevision: pagedBlocksCacheKey,
+            contentRevision: pagedBlocksCacheKey + "|" + readerPageRevisionKey,
             currentPageIndex: $pagedPageIndex,
             onPageChanged: { target in
                 updatePagedVisibleParagraph(pageIndex: target)
@@ -2647,8 +2591,8 @@ struct ReaderView: View {
             pageKey: { page in
                 ReaderPageIdentity(page: page).key
             },
-            pageRevision: { _ in
-                readerPageRevisionKey
+            pageRevision: { page in
+                pageTextCacheKey(for: page)
             },
             prewarmSize: pagedLayoutViewportSize,
             pageBackgroundColor: pagedPageBackgroundColor,
@@ -2668,7 +2612,7 @@ struct ReaderView: View {
     private var horizontalPagedReaderContent: some View {
         PageCurlReaderView(
             pages: pagedBlocks,
-            contentRevision: pagedBlocksCacheKey,
+            contentRevision: pagedBlocksCacheKey + "|" + readerPageRevisionKey,
             transitionStyle: .scroll,
             currentPageIndex: $pagedPageIndex,
             onPageChanged: { target in
@@ -2684,8 +2628,8 @@ struct ReaderView: View {
             pageKey: { page in
                 ReaderPageIdentity(page: page).key
             },
-            pageRevision: { _ in
-                readerPageRevisionKey
+            pageRevision: { page in
+                pageTextCacheKey(for: page)
             },
             prewarmSize: pagedLayoutViewportSize,
             pageBackgroundColor: pagedPageBackgroundColor,
@@ -2739,11 +2683,11 @@ struct ReaderView: View {
         return CoverPageReaderView(
             pageIdentity: currentBlock.map { ReaderPageIdentity(page: $0).key } ?? "",
             contentRevision: readerPageRevisionKey,
-            previousIdentity: previousBlock.map { ReaderPageIdentity(page: $0).key } ?? "",
-            currentIdentity: currentBlock.map { ReaderPageIdentity(page: $0).key } ?? "",
-            nextIdentity: nextBlock.map { ReaderPageIdentity(page: $0).key } ?? "",
-            previous2Identity: previous2Block.map { ReaderPageIdentity(page: $0).key } ?? "",
-            next2Identity: next2Block.map { ReaderPageIdentity(page: $0).key } ?? "",
+            previousIdentity: previousBlock.map { pageTextCacheKey(for: $0) } ?? "",
+            currentIdentity: currentBlock.map { pageTextCacheKey(for: $0) } ?? "",
+            nextIdentity: nextBlock.map { pageTextCacheKey(for: $0) } ?? "",
+            previous2Identity: previous2Block.map { pageTextCacheKey(for: $0) } ?? "",
+            next2Identity: next2Block.map { pageTextCacheKey(for: $0) } ?? "",
             hasPrevious: previousBlock != nil,
             hasNext: nextBlock != nil,
             previous: previousBlock.map { block -> AnyView in AnyView(readerPage(for: block)) },
@@ -2758,6 +2702,7 @@ struct ReaderView: View {
                 handlePageInteraction(active)
             },
             onPageContainerLayout: pageContainerLayoutHandler,
+            turnStyle: readerMode == .pageTurn ? .slide : .cover,
             pageBackgroundColor: pagedPageBackgroundColor,
             userInterfaceStyle: pagedUserInterfaceStyle
         )
@@ -2804,7 +2749,6 @@ struct ReaderView: View {
         }
         reportCoverVisibleIdentity(resolved)
         updatePagedVisibleParagraph(pageIndex: resolved)
-        handlePageInteraction(false)
     }
 
     /// Cover mode draws its pages with SwiftUI instead of
@@ -2865,7 +2809,7 @@ struct ReaderView: View {
     /// of diffing the whole attributed string on every layout pass.
     private func pageTextCacheKey(for page: ReaderPageBlock) -> String {
         let highlightKey = "\(speechChapterIndex)-\(speechController.currentParagraphIndex)"
-        return "\(ReaderPageIdentity(page: page).key)|\(highlightKey)|\(readerPageRevisionKey)"
+        return "\(ReaderPageIdentity(page: page).key)|\(ReaderRenderRevision.page(page))|\(highlightKey)|\(readerPageRevisionKey)"
     }
 
     private func pageAttributedText(for page: ReaderPageBlock) -> NSAttributedString {
@@ -2895,7 +2839,7 @@ struct ReaderView: View {
             weight: .bold,
             customPostScriptName: customFontPostScriptName
         )
-        let rawTitle = page.chapterTitle.isEmpty ? chapterTitle(for: page.chapterIndex) : page.chapterTitle
+        let rawTitle = page.inlineTitleText ?? (page.chapterTitle.isEmpty ? chapterTitle(for: page.chapterIndex) : page.chapterTitle)
         let title = page.includesTitle
             ? ReaderTextTransform.displayText(rawTitle, traditionalChinese: traditionalChineseEnabled)
             : nil
@@ -3551,20 +3495,12 @@ struct ReaderView: View {
                     toggleCurrentBookmark(openList: false)
                 }
 
-                Button {
-                    withAnimation(.easeOut(duration: 0.16)) {
-                        showMoreOptionsMenu.toggle()
-                    }
-                } label: {
-                    Image(systemName: "ellipsis")
-                        .font(.system(size: 17, weight: .semibold))
-                        .frame(width: 44, height: 44)
-                        .background(Circle().fill(readerThemeBackground.opacity(0.97)))
-                        .overlay(Circle().stroke(readerThemeTextColor.opacity(0.12), lineWidth: 0.6))
-                        .contentShape(Circle())
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel("更多操作")
+                ReaderNativeMenuButton(
+                    menu: readerNativeMenu,
+                    foregroundColor: background.uiTextColor(isNight: readerIsNight),
+                    backgroundColor: background.uiColor(isNight: readerIsNight)
+                )
+                .frame(width: 44, height: 44)
             }
             .padding(.horizontal, 10)
             .padding(.vertical, 8)
@@ -3936,151 +3872,47 @@ struct ReaderView: View {
         }
     }
 
-    @ViewBuilder
-    private var moreOptionsMenuOverlay: some View {
-        ZStack(alignment: .topTrailing) {
-            Color.black.opacity(0.18)
-                .ignoresSafeArea()
-                .contentShape(Rectangle())
-                .onTapGesture {
-                    withAnimation(.easeOut(duration: 0.15)) {
-                        showMoreOptionsMenu = false
-                    }
-                }
-
-            moreOptionsMenuCard
-                .padding(.top, readerTopSafeInset + 54)
-                .padding(.trailing, 16)
-                .transition(.opacity.combined(with: .scale(scale: 0.94, anchor: .topTrailing)))
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
-        .zIndex(14)
-    }
-
-    private var moreOptionsMenuCard: some View {
-        VStack(spacing: 0) {
-            if let onRefreshChapter {
-                moreOptionRow(title: "刷新本章", systemImage: "arrow.clockwise") {
-                    onRefreshChapter()
-                }
-            }
-
-            if canShowPayAction {
-                moreOptionRow(title: "购买本章", systemImage: "cart", disabled: isPerformingPayAction) {
-                    showPayActionConfirmation = true
-                }
-            }
-
-            if let onCacheNextChapters {
-                moreOptionRow(title: "缓存前后章节", systemImage: "square.and.arrow.down") {
-                    onCacheNextChapters(windowCurrentChapterIndex)
-                }
-            }
-
-            if currentChapterWebURL != nil {
-                moreOptionRow(title: "网页打开本章", systemImage: "safari") {
-                    showChapterWebPage = true
-                }
-            }
-
-            Divider()
-                .background(Color.white.opacity(0.12))
-                .padding(.horizontal, 12)
-
-            moreOptionRow(
-                title: speechController.isPaused
-                    ? "继续朗读"
-                    : (speechController.isSpeaking ? "暂停朗读" : "开始朗读"),
-                systemImage: speechController.isSpeaking ? "pause.fill" : "speaker.wave.2"
-            ) {
-                toggleSpeech()
-            }
-
-            if speechController.isSpeaking {
-                moreOptionRow(title: "停止朗读", systemImage: "stop.fill", isDestructive: true) {
-                    stopSpeechPlayback()
-                }
-            }
-
-            moreOptionRow(
-                title: autoScrollEnabled ? "暂停自动翻页" : "开始自动翻页",
-                systemImage: autoScrollEnabled ? "pause.fill" : "play.fill"
-            ) {
-                toggleAutoScroll()
-            }
-
-            Divider()
-                .background(Color.white.opacity(0.12))
-                .padding(.horizontal, 12)
-
-            moreOptionRow(title: "书籍详情", systemImage: "info.circle") {
-                if let onRequestBookDetail {
-                    onRequestBookDetail()
-                } else {
-                    showBookDetailSheet = true
-                }
-            }
-
-            moreOptionRow(
-                title: "换源",
-                systemImage: "arrow.triangle.2.circlepath",
-                disabled: onRequestSourceSwitch == nil
-            ) {
-                onRequestSourceSwitch?()
-            }
-
-            if let source = currentBookSource {
-                moreOptionRow(title: "登录书源", systemImage: "person.badge.key") {
-                    readerLoginSource = source
-                }
+    private var readerNativeMenu: UIMenu {
+        func action(_ title: String, _ symbol: String, enabled: Bool = true, destructive: Bool = false, run: @escaping () -> Void) -> UIAction {
+            var attributes: UIMenuElement.Attributes = []
+            if !enabled { attributes.insert(.disabled) }
+            if destructive { attributes.insert(.destructive) }
+            return UIAction(title: title, image: UIImage(systemName: symbol), attributes: attributes) { _ in
+                closeReaderChromeFromMenu()
+                run()
             }
         }
-        .padding(.vertical, 6)
-        .frame(width: 200)
-        .background(
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .fill(Color(red: 0.16, green: 0.16, blue: 0.18).opacity(0.96))
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .stroke(Color.white.opacity(0.12), lineWidth: 0.5)
-        )
-        .shadow(color: Color.black.opacity(0.35), radius: 18, x: 0, y: 8)
-    }
-
-    private func moreOptionRow(
-        title: String,
-        systemImage: String,
-        isDestructive: Bool = false,
-        disabled: Bool = false,
-        action: @escaping () -> Void
-    ) -> some View {
-        Button {
-            withAnimation(.easeOut(duration: 0.15)) {
-                showMoreOptionsMenu = false
-            }
-            closeReaderChromeFromMenu()
-            action()
-        } label: {
-            HStack(spacing: 12) {
-                Text(title)
-                    .font(.system(size: 15, weight: .regular))
-                    .foregroundStyle(isDestructive ? Color.red : (disabled ? Color.gray.opacity(0.5) : Color.white))
-                Spacer()
-                Image(systemName: systemImage)
-                    .font(.system(size: 15, weight: .regular))
-                    .foregroundStyle(isDestructive ? Color.red : (disabled ? Color.gray.opacity(0.5) : Color.white.opacity(0.85)))
-            }
-            .padding(.horizontal, 14)
-            .frame(height: 38)
-            .contentShape(Rectangle())
+        var chapterActions: [UIMenuElement] = [
+            action("刷新本章", "arrow.clockwise", enabled: onRefreshChapter != nil) { onRefreshChapter?() },
+            action("缓存前后章节", "square.and.arrow.down", enabled: onCacheNextChapters != nil) { onCacheNextChapters?(windowCurrentChapterIndex) },
+            action("网页打开本章", "safari", enabled: currentChapterWebURL != nil) { showChapterWebPage = true }
+        ]
+        if canShowPayAction {
+            chapterActions.append(action("购买本章", "cart", enabled: !isPerformingPayAction) { showPayActionConfirmation = true })
         }
-        .buttonStyle(.plain)
-        .disabled(disabled)
+        var playback: [UIMenuElement] = [
+            action(speechController.isPaused ? "继续朗读" : (speechController.isSpeaking ? "暂停朗读" : "开始朗读"),
+                   speechController.isSpeaking ? "pause.fill" : "speaker.wave.2") { toggleSpeech() },
+            action(autoScrollEnabled ? "暂停自动翻页" : "开始自动翻页", autoScrollEnabled ? "pause.fill" : "play.fill") { toggleAutoScroll() }
+        ]
+        if speechController.isSpeaking {
+            playback.append(action("停止朗读", "stop.fill", destructive: true) { stopSpeechPlayback() })
+        }
+        let bookActions: [UIMenuElement] = [
+            action("书籍详情", "info.circle") {
+                if let onRequestBookDetail { onRequestBookDetail() } else { showBookDetailSheet = true }
+            },
+            action("换源", "arrow.triangle.2.circlepath", enabled: onRequestSourceSwitch != nil) { onRequestSourceSwitch?() },
+            action("登录书源", "person.badge.key", enabled: currentBookSource != nil) { readerLoginSource = currentBookSource }
+        ]
+        return UIMenu(children: [
+            UIMenu(options: .displayInline, children: chapterActions),
+            UIMenu(options: .displayInline, children: playback),
+            UIMenu(options: .displayInline, children: bookActions)
+        ])
     }
 
     private func closeSettingsPanel() {
-        showMoreOptionsMenu = false
         guard showSettings else { return }
         withAnimation(.easeOut(duration: 0.18)) {
             chromeState.closeSettings()
@@ -5496,12 +5328,6 @@ struct ReaderView: View {
     }
 
     private func handleReaderTap(at location: CGPoint) {
-        if showMoreOptionsMenu {
-            withAnimation(.easeOut(duration: 0.15)) {
-                showMoreOptionsMenu = false
-            }
-            return
-        }
         let now = Date()
         guard now >= tapCooldownUntil else { return }
         tapCooldownUntil = now.addingTimeInterval(0.28)
@@ -5621,7 +5447,6 @@ struct ReaderView: View {
     }
 
     private func closeReaderChrome() {
-        showMoreOptionsMenu = false
         withAnimation(.easeOut(duration: 0.2)) {
             chromeState.closeAll()
         }
@@ -5632,7 +5457,6 @@ struct ReaderView: View {
     /// views, which read as the panel flickering. Let the menu finish first,
     /// then hide the chrome without another transition.
     private func closeReaderChromeFromMenu() {
-        showMoreOptionsMenu = false
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.24) {
             var transaction = Transaction()
             transaction.disablesAnimations = true
@@ -6304,7 +6128,8 @@ struct ReaderView: View {
                     placeholderDirection: block.placeholderDirection
                 )
                 : (block.firstParagraphIndex ?? 0),
-            pageOrdinal: block.isPlaceholder ? nil : block.pageOrdinal
+            pageOrdinal: block.isPlaceholder ? nil : block.pageOrdinal,
+            paragraphUTF16Offset: block.isPlaceholder ? nil : block.paragraphs.first?.sourceUTF16Offset
         )
     }
 
@@ -6365,9 +6190,10 @@ struct ReaderView: View {
             firstLineIndent: CGFloat(paragraphIndent),
             titleSpacing: CGFloat(titleSpacing),
             contentWidth: geometry.contentWidth,
-            // Reserve a safe buffer (16pt) so TextKit line fragments and paragraph breaks
-            // can never push the last line past the clipping boundary of the page.
-            contentHeight: max(geometry.contentHeight - 16, 120)
+            // Text pages use final attributed-document TextKit containers.
+            // The body rect already excludes header/footer; do not hide layout
+            // disagreements behind a fixed subtraction.
+            contentHeight: geometry.contentHeight
         )
         var titleTypography = typography
         titleTypography.lineSpacing = 0
@@ -6490,13 +6316,9 @@ struct ReaderView: View {
             // While the container is still settling the synchronous radius is
             // the current chapter plus its two neighbours; anything wider
             // would be measured against a viewport that is about to change.
-            let warmupIsRunning = paginationWarmupPending
-                || (paginationWarmupTask.map { !$0.isCancelled } ?? false)
-            let synchronousRadius = windowRadius
-            let geometryIsSettling = !chapterGeometrySettled
+            let synchronousRadius = 0
             if !cacheIsValid,
-               abs(section.chapterIndex - windowCurrentChapterIndex) > synchronousRadius,
-               warmupIsRunning || geometryIsSettling {
+               abs(section.chapterIndex - windowCurrentChapterIndex) > synchronousRadius {
                 pages.append(placeholder(
                     chapterIndex: section.chapterIndex,
                     title: section.title,
@@ -6559,7 +6381,8 @@ struct ReaderView: View {
                 chapterTitle: page.chapterTitle,
                 pageOrdinal: page.pageOrdinal,
                 isPlaceholder: page.isPlaceholder,
-                placeholderDirection: page.placeholderDirection
+                placeholderDirection: page.placeholderDirection,
+                inlineTitleText: page.inlineTitleText
             )
         }
     }
@@ -6651,6 +6474,7 @@ struct ReaderPageEntry: Equatable, Identifiable, Sendable {
     /// paragraph 3 of chapter 8 must not collide with paragraph 3 of chapter 9
     /// in SwiftUI's identity diff.
     var chapterIndex: Int = -1
+    var sourceUTF16Offset: Int = 0
     var isContinuation: Bool { chunkIndex > 0 }
     var id: String { "\(chapterIndex)-\(index)-\(chunkIndex)" }
 }
@@ -6672,6 +6496,7 @@ struct ReaderPageBlock: Identifiable, Equatable, Sendable {
     var isPlaceholder: Bool = false
     /// -1 = previous chapter, +1 = next chapter, 0 = current chapter loading.
     var placeholderDirection: Int = 0
+    var inlineTitleText: String? = nil
 
     var firstParagraphIndex: Int? {
         paragraphs.first?.index

@@ -3,7 +3,7 @@ import SwiftUI
 import UIKit
 
 /// iOS 原生 3D 仿真翻页容器（Page Curl）。
-/// 使用 UIPageViewController 实现 120Hz 硬件加速的纸张卷曲与阴影。
+/// 使用 UIPageViewController 实现系统纸张卷曲与阴影；帧时延需设备实测。
 ///
 /// SwiftUI 只提供页模型；手势由 UIKit 自己拥有，避免 SwiftUI 在用户拖动
 /// 过程中再次 setViewControllers 造成动画竞争。
@@ -290,6 +290,7 @@ struct PageCurlReaderView<Item: Identifiable, Content: View>: UIViewControllerRe
                 DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in
                     guard let self,
                           self.prewarmGeneration == generation,
+                          !self.isUserInteracting,
                           self.cachedRevision == self.parent.contentRevision else { return }
                     guard self.parent.pages.indices.contains(candidate) else { return }
                     let controller = self.viewController(at: candidate)
@@ -470,6 +471,8 @@ struct PageCurlReaderView<Item: Identifiable, Content: View>: UIViewControllerRe
             willTransitionTo pendingViewControllers: [UIViewController]
         ) {
             isUserInteracting = true
+            prewarmGeneration &+= 1
+            lastPrewarmSignature = ""
             parent.onInteractionChanged?(true)
         }
 

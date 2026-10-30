@@ -26,6 +26,13 @@ enum ReaderPageTextBuilder {
         let isHighlighted: Bool
     }
 
+    static func layoutStyle(_ typography: ReaderPageTypography, textColor: UIColor = .label, highlightColor: UIColor = .clear) -> Style {
+        Style(bodyFont: typography.font, titleFont: typography.titleFont,
+              textColor: textColor, highlightColor: highlightColor,
+              lineSpacing: typography.lineSpacing, letterSpacing: typography.letterSpacing,
+              paragraphSpacing: typography.paragraphSpacing, titleSpacing: typography.titleSpacing)
+    }
+
     static func make(title: String?, paragraphs: [Paragraph], style: Style) -> NSAttributedString {
         let output = NSMutableAttributedString()
 

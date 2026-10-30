@@ -54,6 +54,19 @@ enum ReaderPageRestoration {
         let fallback = min(max(fallbackIndex, 0), blocks.count - 1)
         guard let anchor else { return fallback }
 
+        // Character location survives repagination; an ordinal does not.
+        // Legacy paragraph-only anchors keep their existing behaviour below.
+        if let offset = anchor.paragraphUTF16Offset,
+           let exact = blocks.firstIndex(where: { block in
+               !block.isPlaceholder && block.chapterIndex == anchor.chapterIndex && block.paragraphs.contains { entry in
+                   entry.index == anchor.paragraphIndex
+                       && offset >= entry.sourceUTF16Offset
+                       && offset < entry.sourceUTF16Offset + max(entry.text.utf16.count, 1)
+               }
+           }) {
+            return exact
+        }
+
         // Exact continuation page: same chapter, same chapter-local ordinal,
         // same first paragraph. This keeps a page inside a long paragraph when
         // an unrelated chapter is inserted above it.

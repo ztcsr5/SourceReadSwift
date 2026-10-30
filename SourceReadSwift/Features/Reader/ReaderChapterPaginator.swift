@@ -37,6 +37,9 @@ enum ReaderChapterPaginator {
         paragraphs: [String],
         context: ReaderChapterPaginationContext
     ) -> [ReaderPageBlock] {
+        if !paragraphs.contains(where: { ReaderImageSizingPolicy.imageURL(in: $0.trimmingCharacters(in: .whitespacesAndNewlines)) != nil }) {
+            return ReaderTextPagePaginator.paginate(chapterIndex: chapterIndex, title: title, paragraphs: paragraphs, context: context)
+        }
         let typography = context.typography
         let titleTypography = context.titleTypography
         var pages: [ReaderPageBlock] = []
@@ -179,6 +182,7 @@ enum ReaderChapterPaginator {
                 fullPageHeight: typography.contentHeight,
                 typography: typography
             )
+            var sourceOffset = 0
             for (chunkIndex, chunk) in chunks.enumerated() {
                 let spacingBefore = currentEntries.isEmpty
                     ? 0
@@ -195,9 +199,11 @@ enum ReaderChapterPaginator {
                         index: index,
                         text: chunk.text,
                         chunkIndex: chunkIndex,
-                        chapterIndex: chapterIndex
+                        chapterIndex: chapterIndex,
+                        sourceUTF16Offset: sourceOffset
                     )
                 )
+                sourceOffset += chunk.text.utf16.count
                 currentHeight += spacingAfterFlush + chunk.height
                 if chunkIndex < chunks.count - 1 {
                     flush()

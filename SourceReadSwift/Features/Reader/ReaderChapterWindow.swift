@@ -11,9 +11,10 @@ struct ReaderChapterSection: Identifiable, Equatable {
     }
 
     let chapterIndex: Int
-    var title: String
-    var paragraphs: [String]
+    var title: String { didSet { refreshContentRevision() } }
+    var paragraphs: [String] { didSet { refreshContentRevision() } }
     var state: LoadState = .ready
+    private(set) var contentRevision: String
 
     /// Every construction site (fresh network load, disk cache, local import,
     /// window seed) goes through the sanitizer. Old on-disk chapter caches
@@ -28,6 +29,11 @@ struct ReaderChapterSection: Identifiable, Equatable {
         self.title = normalized.title
         self.paragraphs = normalized.paragraphs
         self.state = state
+        self.contentRevision = ReaderRenderRevision.chapter(title: normalized.title, paragraphs: normalized.paragraphs)
+    }
+
+    private mutating func refreshContentRevision() {
+        contentRevision = ReaderRenderRevision.chapter(title: title, paragraphs: paragraphs)
     }
 
     var id: Int { chapterIndex }
@@ -60,11 +66,13 @@ struct ReaderChapterPosition: Equatable {
     /// Paged modes use a chapter-local page ordinal to keep the exact
     /// continuation page when another chapter is prefetched above it.
     let pageOrdinal: Int?
+    let paragraphUTF16Offset: Int?
 
-    init(chapterIndex: Int, paragraphIndex: Int, pageOrdinal: Int? = nil) {
+    init(chapterIndex: Int, paragraphIndex: Int, pageOrdinal: Int? = nil, paragraphUTF16Offset: Int? = nil) {
         self.chapterIndex = chapterIndex
         self.paragraphIndex = paragraphIndex
         self.pageOrdinal = pageOrdinal
+        self.paragraphUTF16Offset = paragraphUTF16Offset
     }
 }
 
