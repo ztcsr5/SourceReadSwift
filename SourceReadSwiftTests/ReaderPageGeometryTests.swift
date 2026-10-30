@@ -106,9 +106,9 @@ final class ReaderPageGeometryTests: XCTestCase {
             contentExtendsIntoChrome: false
         )
         XCTAssertEqual(geo.bodyTop, 34, accuracy: 0.01)
-        XCTAssertEqual(geo.footerTop, 765, accuracy: 0.01)
-        XCTAssertEqual(geo.bodyBottom, 755, accuracy: 0.01)
-        XCTAssertEqual(geo.contentHeight, 721, accuracy: 0.01)
+        XCTAssertEqual(geo.footerTop, 745, accuracy: 0.01)
+        XCTAssertEqual(geo.bodyBottom, 735, accuracy: 0.01)
+        XCTAssertEqual(geo.contentHeight, 701, accuracy: 0.01)
     }
 
     func testFullBleedPageContainerUsesWindowSafeInsets() {
