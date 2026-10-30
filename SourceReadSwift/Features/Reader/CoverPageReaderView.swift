@@ -168,7 +168,13 @@ final class CoverPageHostController: UIViewController, UIGestureRecognizerDelega
                 translation = 0
                 layoutPages(translation: 0)
                 awaitingIdentityChangeFrom = nextWindow.identity
-                onCommit?(direction)
+                let generation = animationGeneration
+                DispatchQueue.main.async { [weak self] in
+                    guard let self, self.animationGeneration == generation,
+                          self.awaitingIdentityChangeFrom == nextWindow.identity,
+                          self.window?.identity == nextWindow.identity else { return }
+                    self.onCommit?(direction)
+                }
                 return
             }
         }
@@ -347,7 +353,9 @@ final class CoverPageHostController: UIViewController, UIGestureRecognizerDelega
         switch gesture.state {
         case .began: beginInteraction()
         case .changed: updateInteraction(translation: gesture.translation(in: view).x)
-        case .ended: endInteraction(velocity: gesture.velocity(in: view).x)
+        case .ended:
+            updateInteraction(translation: gesture.translation(in: view).x)
+            endInteraction(velocity: gesture.velocity(in: view).x)
         case .cancelled, .failed: endInteraction(velocity: 0, cancelled: true)
         default: break
         }

@@ -88,6 +88,30 @@ final class ReaderRecovery119Tests: XCTestCase {
         XCTAssertEqual(ReaderPanTurnPolicy.direction(translation: 2, velocity: 0, width: 390, hasPrevious: true, hasNext: true), 0)
     }
 
+    func testLongInlineTitleAndEmbeddedNewlinesConserveSourceRanges() {
+        let title = String(repeating: "长标题 Mixed words 👩🏽‍💻（测试）。", count: 24)
+        let paragraphs = ["", "首行\n次行\n\n末行", String(repeating: "مرحبا بالعالم 中文 Mixed words. ", count: 60), "", "最后一段。"]
+        let typography = ReaderPageTypography(
+            font: .systemFont(ofSize: 20), titleFont: .boldSystemFont(ofSize: 26),
+            lineSpacing: 8, letterSpacing: 0, paragraphSpacing: 16, firstLineIndent: 40,
+            titleSpacing: 12, contentWidth: 280, contentHeight: 320)
+        let context = ReaderChapterPaginationContext(typography: typography, titleTypography: typography,
+            chromeLayout: .inline, imageStyle: .standard, viewportHeight: 568, pagePadding: 21,
+            footerHeight: 14, traditionalChinese: false)
+        let pages = ReaderChapterPaginator.paginate(chapterIndex: 0, title: title, paragraphs: paragraphs, context: context)
+        XCTAssertEqual(pages.compactMap(\.inlineTitleText).joined(), title)
+        for (index, original) in paragraphs.enumerated() {
+            let entries = pages.flatMap(\.paragraphs).filter { $0.index == index }
+            let expected = ReaderPageLayoutEngine.displayText(original, fontSize: 20, indent: 40)
+            XCTAssertEqual(entries.map(\.text).joined(), expected)
+            var offset = 0
+            for entry in entries {
+                XCTAssertEqual(entry.sourceUTF16Offset, offset)
+                offset += entry.text.utf16.count
+            }
+        }
+    }
+
     func testParagraphOnlyChapterJumpDoesNotSkipTheFirstContinuation() {
         let pages = [
             ReaderPageBlock(id: 0, includesTitle: false, paragraphs: [.init(index: 0, text: "first", sourceUTF16Offset: 0)], chapterIndex: 1),
@@ -177,6 +201,7 @@ final class ReaderPanController119Tests: XCTestCase {
         controller.endInteraction(velocity: -500, animated: false)
         XCTAssertEqual(commits, [1])
         apply(controller, page: "p1", next: "p2")
+        await drainMainQueue()
         XCTAssertEqual(commits, [1, 1])
         apply(controller, page: "p2", next: "p3")
         await drainMainQueue()
@@ -244,6 +269,7 @@ final class ReaderPanController119Tests: XCTestCase {
         controller.beginInteraction()
         controller.updateInteraction(translation: 20)
         apply(controller, page: "p1", next: "p2")
+        await drainMainQueue()
         XCTAssertEqual(commits, [1, 1])
         XCTAssertTrue(controller.isDragging)
         apply(controller, page: "p2", next: "p3")
@@ -264,11 +290,29 @@ final class ReaderPanController119Tests: XCTestCase {
             controller.endInteraction(velocity: 0, animated: false)
         }
         XCTAssertEqual(commits, [1])
-        for page in ["p1", "p2", "p1", "p2"] { apply(controller, page: page) }
+        for page in ["p1", "p2", "p1", "p2"] {
+            apply(controller, page: page)
+            await drainMainQueue()
+        }
         await drainMainQueue()
         XCTAssertEqual(commits, [1, 1, -1, 1])
         XCTAssertFalse(controller.isDragging)
         XCTAssertEqual(interactions.last, false)
+    }
+
+    func testDismantleCancelsDeferredQueuedCommit() async {
+        let controller = makeController()
+        apply(controller)
+        for _ in 0..<2 {
+            controller.beginInteraction()
+            controller.updateInteraction(translation: -180)
+            controller.endInteraction(velocity: 0, animated: false)
+        }
+        apply(controller, page: "p1", next: "p2")
+        XCTAssertEqual(commits, [1], "representable updates must not publish synchronously")
+        controller.cancelInteraction()
+        await drainMainQueue()
+        XCTAssertEqual(commits, [1])
     }
 
     func testCoverAndSlideHaveDifferentPhysicalDisplacement() {

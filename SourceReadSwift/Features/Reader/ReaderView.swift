@@ -2664,11 +2664,8 @@ struct ReaderView: View {
     }
 
     private var coverPagedReaderContent: some View {
-        // Cover mode is a paging `UIScrollView` now. The old SwiftUI version
-        // moved three pages with a `@State` translation, so every drag frame
-        // re-evaluated this body and re-diffed a full-screen ZStack; on
-        // ProMotion hardware that capped the pan well below 120 Hz. See
-        // `CoverPageReaderView` for the identity contract.
+        // UIKit owns pan displacement and animation; SwiftUI supplies versioned
+        // snapshots only. Cover and slide share the transaction, not the motion.
         let safeIndex = min(max(pagedPageIndex, 0), max(pagedBlocks.count - 1, 0))
         let previousBlock = pagedBlocks.indices.contains(safeIndex - 1) ? pagedBlocks[safeIndex - 1] : nil
         let currentBlock = pagedBlocks.indices.contains(safeIndex) ? pagedBlocks[safeIndex] : nil
@@ -2723,7 +2720,7 @@ struct ReaderView: View {
 
     /// Commit one cover-mode turn.
     ///
-    /// The scroll view has already moved the page under the finger; this only
+    /// The UIKit animator has already moved the page under the finger; this only
     /// advances the cursor. The anchor is resolved again after the window has
     /// settled, because prefetching the next chapter renumbers every page
     /// after the insertion point (the 1.0.81 "chapter 5 jumps to chapter 2"
@@ -2752,8 +2749,8 @@ struct ReaderView: View {
         updatePagedVisibleParagraph(pageIndex: resolved)
     }
 
-    /// Cover mode draws its pages with SwiftUI instead of
-    /// `UIPageViewController`, so it must publish the same stable page
+    /// Cover mode hosts SwiftUI snapshots without `UIPageViewController`,
+    /// so it must publish the same stable page
     /// identity. Without it the page model fell back to a raw array index.
     private func reportCoverVisibleIdentity(_ index: Int) {
         guard pagedBlocksCache.indices.contains(index) else { return }
