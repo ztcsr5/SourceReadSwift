@@ -56,10 +56,11 @@ enum ReaderPageChrome {
     static func scrollFooterReservedHeight(statusPosition: String) -> CGFloat {
         (statusPosition == "bottom" || statusPosition == "both") ? scrollFooterBandHeight : 0
     }
-    /// 页码离屏幕物理底 12pt（竞品 12.3pt）。
-    static let footerBottomInset: CGFloat = 12
+    /// 页码离屏幕物理底至少 14pt，避开圆角与 Home 指示条。
+    static let footerBottomInset: CGFloat = 14
     static let minimumBodyHeight: CGFloat = 120
-    static let bodyToFooterGap: CGFloat = 4
+    /// 正文底与页脚顶之间保留 10pt 的安全间隙，杜绝正文压住页脚。
+    static let bodyToFooterGap: CGFloat = 10
 }
 
 /// 单一几何来源：分页引擎、SwiftUI 页面、页眉页脚、页码都用这一份计算。
@@ -110,11 +111,11 @@ struct ReaderPageGeometry: Equatable {
         )
     }
 
-    /// 页脚顶端。底部只让开 home indicator 的一半：既不会被手势条压住，
-    /// 也不会像旧版那样把页码顶到屏幕中间。
+    /// 页脚顶端。底部避开 safeBottom（在 iPhone 13 Pro 等带 Home 条机型为 34pt），
+    /// 既不会被手势条压住，也确保正文底端有充足的安全呼吸区。
     var footerTop: CGFloat {
         viewportSize.height
-            - max(safeBottom * 0.5, ReaderPageChrome.footerBottomInset)
+            - max(safeBottom, ReaderPageChrome.footerBottomInset)
             - ReaderPageChrome.footerHeight
     }
 

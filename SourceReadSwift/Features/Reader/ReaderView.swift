@@ -53,6 +53,7 @@ struct ReaderView: View {
     @State private var showChapterList = false
     @State private var showBookmarks = false
     @State private var showBookDetailSheet = false
+    @State private var showMoreOptionsMenu = false
     /// Per-source login surface.  Sources that gate chapters behind an account
     /// previously had no entry point inside the reader, so the only way to
     /// authenticate was the source manager's long-press menu.
@@ -633,7 +634,7 @@ struct ReaderView: View {
             // warmup, and a stuck flag kept their placeholder radius at "the
             // warmup will fill this" forever.
             paginationWarmupPending = false
-            guard readerMode != .scroll, isLocalChapterBook else { return }
+            guard readerMode != .scroll else { return }
             warmPaginationCache(around: windowCurrentChapterIndex)
         }
     }
@@ -868,7 +869,7 @@ struct ReaderView: View {
                     .zIndex(2)
             }
 
-            if showOverlay {
+            if showOverlay && !showSettings {
                 readerOverlay
                     .transition(
                         .asymmetric(
@@ -877,6 +878,10 @@ struct ReaderView: View {
                         )
                     )
                     .zIndex(10)
+            }
+
+            if showMoreOptionsMenu && showOverlay && !showSettings {
+                moreOptionsMenuOverlay
             }
 
             if let statusMessage {
@@ -895,16 +900,17 @@ struct ReaderView: View {
             }
 
             if showSettings {
-                Color.black.opacity(0.18)
+                Color.black.opacity(0.35)
                     .ignoresSafeArea()
                     .contentShape(Rectangle())
                     .onTapGesture {
                         closeSettingsPanel()
                     }
                     .transition(.opacity)
+                    .zIndex(15)
 
                 settingsPanel
-                    .zIndex(2)
+                    .zIndex(20)
                     .transition(.move(edge: .bottom).combined(with: .opacity))
             }
 
@@ -1250,7 +1256,7 @@ struct ReaderView: View {
             // Typography or content styling changed: every cached chapter is
             // stale. Drop the cache now and measure the window again one
             // chapter per frame.
-            guard readerMode != .scroll, isLocalChapterBook else { return }
+            guard readerMode != .scroll else { return }
             chapterPageCache.removeAll()
             chapterPageCacheSignature = chapterPageLayoutSignature
             warmPaginationCache(around: windowCurrentChapterIndex)
@@ -1259,7 +1265,7 @@ struct ReaderView: View {
             // Geometry only. Cached chapters stay around — they are simply not
             // reusable for the new container — and the warmup restarts after
             // the container stops moving instead of being cancelled mid-flight.
-            guard readerMode != .scroll, isLocalChapterBook else { return }
+            guard readerMode != .scroll else { return }
             schedulePagedBlocksCacheRebuild()
             schedulePaginationWarmupRestart()
         }
@@ -2037,7 +2043,7 @@ struct ReaderView: View {
     private func schedulePaginationWarmupRestart(
         delayNanoseconds: UInt64 = ReaderPerformancePolicy.paginationWarmupRestartNanoseconds
     ) {
-        guard readerMode != .scroll, isLocalChapterBook, chapterGeometrySettled else { return }
+        guard readerMode != .scroll, chapterGeometrySettled else { return }
         paginationWarmupRestartTask?.cancel()
         paginationWarmupRestartTask = Task { @MainActor in
             try? await Task.sleep(nanoseconds: delayNanoseconds)
@@ -2311,8 +2317,8 @@ struct ReaderView: View {
         // and keep scrolling" never advanced to the next one.
         resumePendingContinuation(for: section.chapterIndex)
         trimWindowIfNeeded()
-        if isLocalChapterBook, readerMode != .scroll {
-            // A local chapter that just entered the window needs its page
+        if readerMode != .scroll {
+            // A chapter that just entered the window needs its page
             // cache as well. Restart the warmup so the new edge chapter is
             // measured off the page-turn path instead of in the next rebuild.
             warmPaginationCache(around: windowCurrentChapterIndex)
@@ -2781,28 +2787,24 @@ struct ReaderView: View {
         let target = min(max(pagedPageIndex + direction, 0), pagedBlocks.count - 1)
         guard target != pagedPageIndex else { return }
         let targetAnchor = pageAnchor(for: pagedBlocks[target])
-        interactionGate.isPageInteractionActive = true
         pagedPageIndex = target
         reportCoverVisibleIdentity(target)
         updatePagedVisibleParagraph(pageIndex: target)
-        Task { @MainActor in
-            try? await Task.sleep(nanoseconds: 160_000_000)
-            let resolved = ReaderPageRestoration.index(
-                anchor: targetAnchor,
-                in: pagedBlocksCache,
-                fallbackIndex: target
-            )
-            if resolved != pagedPageIndex {
-                var transaction = Transaction()
-                transaction.disablesAnimations = true
-                withTransaction(transaction) {
-                    pagedPageIndex = resolved
-                }
+        let resolved = ReaderPageRestoration.index(
+            anchor: targetAnchor,
+            in: pagedBlocksCache,
+            fallbackIndex: target
+        )
+        if resolved != pagedPageIndex {
+            var transaction = Transaction()
+            transaction.disablesAnimations = true
+            withTransaction(transaction) {
+                pagedPageIndex = resolved
             }
-            reportCoverVisibleIdentity(resolved)
-            updatePagedVisibleParagraph(pageIndex: resolved)
-            handlePageInteraction(false)
         }
+        reportCoverVisibleIdentity(resolved)
+        updatePagedVisibleParagraph(pageIndex: resolved)
+        handlePageInteraction(false)
     }
 
     /// Cover mode draws its pages with SwiftUI instead of
@@ -3549,103 +3551,9 @@ struct ReaderView: View {
                     toggleCurrentBookmark(openList: false)
                 }
 
-                Menu {
-                    if let onRefreshChapter {
-                        Button {
-                            closeReaderChromeFromMenu()
-                            onRefreshChapter()
-                        } label: {
-                            Label("刷新本章", systemImage: "arrow.clockwise")
-                        }
-                    }
-
-                    if canShowPayAction {
-                        Button {
-                            closeReaderChromeFromMenu()
-                            showPayActionConfirmation = true
-                        } label: {
-                            Label("购买本章", systemImage: "cart")
-                        }
-                        .disabled(isPerformingPayAction)
-                    }
-
-                    if let onCacheNextChapters {
-                        Button {
-                            closeReaderChromeFromMenu()
-                            onCacheNextChapters(windowCurrentChapterIndex)
-                        } label: {
-                            Label("缓存前后章节", systemImage: "square.and.arrow.down")
-                        }
-                    }
-
-                    if currentChapterWebURL != nil {
-                        Button {
-                            closeReaderChromeFromMenu()
-                            showChapterWebPage = true
-                        } label: {
-                            Label("网页打开本章", systemImage: "safari")
-                        }
-                    }
-
-                    Button {
-                        closeReaderChromeFromMenu()
-                        toggleSpeech()
-                    } label: {
-                        Label(
-                            speechController.isPaused
-                                ? "继续朗读"
-                                : (speechController.isSpeaking ? "暂停朗读" : "开始朗读"),
-                            systemImage: speechController.isSpeaking ? "pause.fill" : "speaker.wave.2"
-                        )
-                    }
-
-                    if speechController.isSpeaking {
-                        Button(role: .destructive) {
-                            closeReaderChromeFromMenu()
-                            stopSpeechPlayback()
-                        } label: {
-                            Label("停止朗读", systemImage: "stop.fill")
-                        }
-                    }
-
-                    Button {
-                        closeReaderChromeFromMenu()
-                        toggleAutoScroll()
-                    } label: {
-                        Label(
-                            autoScrollEnabled ? "暂停自动翻页" : "开始自动翻页",
-                            systemImage: autoScrollEnabled ? "pause.fill" : "play.fill"
-                        )
-                    }
-
-                    Button {
-                        closeReaderChromeFromMenu()
-                        // 二选一，不能两个都做：以前同时置位 sheet 和回调，
-                        // 本地书那条回调是 dismiss()，于是「详情」弹在正在销毁的阅读器上，直接崩。
-                        if let onRequestBookDetail {
-                            onRequestBookDetail()
-                        } else {
-                            showBookDetailSheet = true
-                        }
-                    } label: {
-                        Label("书籍详情", systemImage: "info.circle")
-                    }
-
-                    Button {
-                        closeReaderChromeFromMenu()
-                        onRequestSourceSwitch?()
-                    } label: {
-                        Label("换源", systemImage: "arrow.triangle.2.circlepath")
-                    }
-                    .disabled(onRequestSourceSwitch == nil)
-
-                    if let source = currentBookSource {
-                        Button {
-                            closeReaderChromeFromMenu()
-                            readerLoginSource = source
-                        } label: {
-                            Label("登录书源", systemImage: "person.badge.key")
-                        }
+                Button {
+                    withAnimation(.easeOut(duration: 0.16)) {
+                        showMoreOptionsMenu.toggle()
                     }
                 } label: {
                     Image(systemName: "ellipsis")
@@ -3656,8 +3564,7 @@ struct ReaderView: View {
                         .contentShape(Circle())
                 }
                 .buttonStyle(.plain)
-                .contentShape(Rectangle())
-                .accessibilityLabel("书籍详情和换源")
+                .accessibilityLabel("更多操作")
             }
             .padding(.horizontal, 10)
             .padding(.vertical, 8)
@@ -4029,7 +3936,151 @@ struct ReaderView: View {
         }
     }
 
+    @ViewBuilder
+    private var moreOptionsMenuOverlay: some View {
+        ZStack(alignment: .topTrailing) {
+            Color.black.opacity(0.18)
+                .ignoresSafeArea()
+                .contentShape(Rectangle())
+                .onTapGesture {
+                    withAnimation(.easeOut(duration: 0.15)) {
+                        showMoreOptionsMenu = false
+                    }
+                }
+
+            moreOptionsMenuCard
+                .padding(.top, readerTopSafeInset + 54)
+                .padding(.trailing, 16)
+                .transition(.opacity.combined(with: .scale(scale: 0.94, anchor: .topTrailing)))
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
+        .zIndex(14)
+    }
+
+    private var moreOptionsMenuCard: some View {
+        VStack(spacing: 0) {
+            if let onRefreshChapter {
+                moreOptionRow(title: "刷新本章", systemImage: "arrow.clockwise") {
+                    onRefreshChapter()
+                }
+            }
+
+            if canShowPayAction {
+                moreOptionRow(title: "购买本章", systemImage: "cart", disabled: isPerformingPayAction) {
+                    showPayActionConfirmation = true
+                }
+            }
+
+            if let onCacheNextChapters {
+                moreOptionRow(title: "缓存前后章节", systemImage: "square.and.arrow.down") {
+                    onCacheNextChapters(windowCurrentChapterIndex)
+                }
+            }
+
+            if currentChapterWebURL != nil {
+                moreOptionRow(title: "网页打开本章", systemImage: "safari") {
+                    showChapterWebPage = true
+                }
+            }
+
+            Divider()
+                .background(Color.white.opacity(0.12))
+                .padding(.horizontal, 12)
+
+            moreOptionRow(
+                title: speechController.isPaused
+                    ? "继续朗读"
+                    : (speechController.isSpeaking ? "暂停朗读" : "开始朗读"),
+                systemImage: speechController.isSpeaking ? "pause.fill" : "speaker.wave.2"
+            ) {
+                toggleSpeech()
+            }
+
+            if speechController.isSpeaking {
+                moreOptionRow(title: "停止朗读", systemImage: "stop.fill", isDestructive: true) {
+                    stopSpeechPlayback()
+                }
+            }
+
+            moreOptionRow(
+                title: autoScrollEnabled ? "暂停自动翻页" : "开始自动翻页",
+                systemImage: autoScrollEnabled ? "pause.fill" : "play.fill"
+            ) {
+                toggleAutoScroll()
+            }
+
+            Divider()
+                .background(Color.white.opacity(0.12))
+                .padding(.horizontal, 12)
+
+            moreOptionRow(title: "书籍详情", systemImage: "info.circle") {
+                if let onRequestBookDetail {
+                    onRequestBookDetail()
+                } else {
+                    showBookDetailSheet = true
+                }
+            }
+
+            moreOptionRow(
+                title: "换源",
+                systemImage: "arrow.triangle.2.circlepath",
+                disabled: onRequestSourceSwitch == nil
+            ) {
+                onRequestSourceSwitch?()
+            }
+
+            if let source = currentBookSource {
+                moreOptionRow(title: "登录书源", systemImage: "person.badge.key") {
+                    readerLoginSource = source
+                }
+            }
+        }
+        .padding(.vertical, 6)
+        .frame(width: 200)
+        .background(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .fill(Color(red: 0.16, green: 0.16, blue: 0.18).opacity(0.96))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .stroke(Color.white.opacity(0.12), lineWidth: 0.5)
+        )
+        .shadow(color: Color.black.opacity(0.35), radius: 18, x: 0, y: 8)
+    }
+
+    private func moreOptionRow(
+        title: String,
+        systemImage: String,
+        isDestructive: Bool = false,
+        disabled: Bool = false,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button {
+            withAnimation(.easeOut(duration: 0.15)) {
+                showMoreOptionsMenu = false
+            }
+            closeReaderChromeFromMenu()
+            action()
+        } label: {
+            HStack(spacing: 12) {
+                Text(title)
+                    .font(.system(size: 15, weight: .regular))
+                    .foregroundStyle(isDestructive ? Color.red : (disabled ? Color.gray.opacity(0.5) : Color.white))
+                Spacer()
+                Image(systemName: systemImage)
+                    .font(.system(size: 15, weight: .regular))
+                    .foregroundStyle(isDestructive ? Color.red : (disabled ? Color.gray.opacity(0.5) : Color.white.opacity(0.85)))
+            }
+            .padding(.horizontal, 14)
+            .frame(height: 38)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .disabled(disabled)
+    }
+
     private func closeSettingsPanel() {
+        showMoreOptionsMenu = false
         guard showSettings else { return }
         withAnimation(.easeOut(duration: 0.18)) {
             chromeState.closeSettings()
@@ -5445,6 +5496,12 @@ struct ReaderView: View {
     }
 
     private func handleReaderTap(at location: CGPoint) {
+        if showMoreOptionsMenu {
+            withAnimation(.easeOut(duration: 0.15)) {
+                showMoreOptionsMenu = false
+            }
+            return
+        }
         let now = Date()
         guard now >= tapCooldownUntil else { return }
         tapCooldownUntil = now.addingTimeInterval(0.28)
@@ -5564,6 +5621,7 @@ struct ReaderView: View {
     }
 
     private func closeReaderChrome() {
+        showMoreOptionsMenu = false
         withAnimation(.easeOut(duration: 0.2)) {
             chromeState.closeAll()
         }
@@ -5574,8 +5632,7 @@ struct ReaderView: View {
     /// views, which read as the panel flickering. Let the menu finish first,
     /// then hide the chrome without another transition.
     private func closeReaderChromeFromMenu() {
-        // UIMenu 的收起动画约 0.2s；同一 runloop 关闭 chrome 会与它争夺
-        // 同一批图层，表现为菜单面板一闪一闪。等收起动画结束后再关。
+        showMoreOptionsMenu = false
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.24) {
             var transaction = Transaction()
             transaction.disablesAnimations = true
@@ -6308,9 +6365,9 @@ struct ReaderView: View {
             firstLineIndent: CGFloat(paragraphIndent),
             titleSpacing: CGFloat(titleSpacing),
             contentWidth: geometry.contentWidth,
-            // Tiny buffer for sub-pixel differences between TextKit line boxes
-            // and the SwiftUI text renderer.
-            contentHeight: max(geometry.contentHeight - 8, 120)
+            // Reserve a safe buffer (16pt) so TextKit line fragments and paragraph breaks
+            // can never push the last line past the clipping boundary of the page.
+            contentHeight: max(geometry.contentHeight - 16, 120)
         )
         var titleTypography = typography
         titleTypography.lineSpacing = 0
@@ -6435,8 +6492,8 @@ struct ReaderView: View {
             // would be measured against a viewport that is about to change.
             let warmupIsRunning = paginationWarmupPending
                 || (paginationWarmupTask.map { !$0.isCancelled } ?? false)
-            let synchronousRadius = isLocalChapterBook ? windowRadius : (chapterGeometrySettled ? 3 : 1)
-            let geometryIsSettling = isLocalChapterBook && !chapterGeometrySettled
+            let synchronousRadius = windowRadius
+            let geometryIsSettling = !chapterGeometrySettled
             if !cacheIsValid,
                abs(section.chapterIndex - windowCurrentChapterIndex) > synchronousRadius,
                warmupIsRunning || geometryIsSettling {

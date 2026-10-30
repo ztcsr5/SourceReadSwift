@@ -28,9 +28,9 @@ final class ReaderPageGeometryTests: XCTestCase {
         let geo = geometry()
         XCTAssertEqual(geo.contentWidth, 348, accuracy: 0.01)
         XCTAssertEqual(geo.bodyTop, 84, accuracy: 0.01)
-        XCTAssertEqual(geo.footerTop, 813, accuracy: 0.01)
-        XCTAssertEqual(geo.bodyBottom, 809, accuracy: 0.01)
-        XCTAssertEqual(geo.contentHeight, 725, accuracy: 0.01)
+        XCTAssertEqual(geo.footerTop, 796, accuracy: 0.01)
+        XCTAssertEqual(geo.bodyBottom, 786, accuracy: 0.01)
+        XCTAssertEqual(geo.contentHeight, 702, accuracy: 0.01)
         XCTAssertEqual(geo.headerRect.minX, 21, accuracy: 0.01)
         XCTAssertEqual(geo.headerRect.minY, 52, accuracy: 0.01)
         XCTAssertTrue(geo.showsHeader)
@@ -39,9 +39,9 @@ final class ReaderPageGeometryTests: XCTestCase {
     func testDynamicIslandViewportKeepsBodyBelowSafeArea() {
         let geo = geometry(width: 393, height: 852, safeTop: 59, safeBottom: 34)
         XCTAssertEqual(geo.bodyTop, 93, accuracy: 0.01)
-        XCTAssertEqual(geo.footerTop, 821, accuracy: 0.01)
-        XCTAssertEqual(geo.bodyBottom, 817, accuracy: 0.01)
-        XCTAssertEqual(geo.contentHeight, 724, accuracy: 0.01)
+        XCTAssertEqual(geo.footerTop, 804, accuracy: 0.01)
+        XCTAssertEqual(geo.bodyBottom, 794, accuracy: 0.01)
+        XCTAssertEqual(geo.contentHeight, 701, accuracy: 0.01)
     }
 
     func testInlineAndHiddenLayoutsDoNotReserveHeaderBand() {
@@ -61,10 +61,10 @@ final class ReaderPageGeometryTests: XCTestCase {
     func testContentExtensionUsesHeaderAsOverlayButStopsAtFooter() {
         let geo = geometry(extends: true)
         XCTAssertEqual(geo.bodyTop, 58, accuracy: 0.01)
-        XCTAssertEqual(geo.footerTop, 813, accuracy: 0.01)
-        XCTAssertEqual(geo.bodyBottom, 809, accuracy: 0.01)
-        XCTAssertEqual(geo.contentHeight, 751, accuracy: 0.01)
-        XCTAssertLessThanOrEqual(geo.bodyBottom, geo.footerTop - 4 + 0.01)
+        XCTAssertEqual(geo.footerTop, 796, accuracy: 0.01)
+        XCTAssertEqual(geo.bodyBottom, 786, accuracy: 0.01)
+        XCTAssertEqual(geo.contentHeight, 728, accuracy: 0.01)
+        XCTAssertLessThanOrEqual(geo.bodyBottom, geo.footerTop - 10 + 0.01)
     }
 
     /// 页面容器只被安全区内缩一部分时，剩余安全区必须按差值保留，
@@ -106,9 +106,9 @@ final class ReaderPageGeometryTests: XCTestCase {
             contentExtendsIntoChrome: false
         )
         XCTAssertEqual(geo.bodyTop, 34, accuracy: 0.01)
-        XCTAssertEqual(geo.footerTop, 762, accuracy: 0.01)
-        XCTAssertEqual(geo.bodyBottom, 758, accuracy: 0.01)
-        XCTAssertEqual(geo.contentHeight, 724, accuracy: 0.01)
+        XCTAssertEqual(geo.footerTop, 765, accuracy: 0.01)
+        XCTAssertEqual(geo.bodyBottom, 755, accuracy: 0.01)
+        XCTAssertEqual(geo.contentHeight, 721, accuracy: 0.01)
     }
 
     func testFullBleedPageContainerUsesWindowSafeInsets() {

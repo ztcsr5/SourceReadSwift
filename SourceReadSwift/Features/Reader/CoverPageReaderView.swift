@@ -444,6 +444,7 @@ final class CoverPageHostController: UIViewController, UIScrollViewDelegate {
     }
 
     func scrollViewWillBeginDragging(_ scrollView: UIScrollView) {
+        isSettling = false
         onInteractionChange?(true)
         // The turning page is static for the whole drag: rotate one cached
         // bitmap instead of re-compositing the TextKit subtree on every
