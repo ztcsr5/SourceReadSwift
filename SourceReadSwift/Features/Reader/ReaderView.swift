@@ -695,6 +695,7 @@ struct ReaderView: View {
             readerLayoutKey,
             chapterViewportSignature,
             textSelectionEnabled ? "selectable" : "page-taps",
+            "\(footerShowTime)-\(footerShowBatteryIcon)-\(footerShowBatteryPercent)",
             backgroundRawValue,
             backgroundWallpaperRevision.uuidString,
             customFontPostScriptName,
@@ -2809,7 +2810,8 @@ struct ReaderView: View {
     /// of diffing the whole attributed string on every layout pass.
     private func pageTextCacheKey(for page: ReaderPageBlock) -> String {
         let highlightKey = "\(speechChapterIndex)-\(speechController.currentParagraphIndex)"
-        return "\(ReaderPageIdentity(page: page).key)|\(ReaderRenderRevision.page(page))|\(highlightKey)|\(readerPageRevisionKey)"
+        let statusKey = page.isPlaceholder ? String((windowFailures[page.chapterIndex] ?? "loading").hashValue) : "ready"
+        return "\(ReaderPageIdentity(page: page).key)|\(ReaderRenderRevision.page(page))|\(highlightKey)|\(statusKey)|\(readerPageRevisionKey)"
     }
 
     private func pageAttributedText(for page: ReaderPageBlock) -> NSAttributedString {
@@ -6129,7 +6131,7 @@ struct ReaderView: View {
                 )
                 : (block.firstParagraphIndex ?? 0),
             pageOrdinal: block.isPlaceholder ? nil : block.pageOrdinal,
-            paragraphUTF16Offset: block.isPlaceholder ? nil : block.paragraphs.first?.sourceUTF16Offset
+            paragraphUTF16Offset: block.isPlaceholder ? 0 : block.paragraphs.first?.sourceUTF16Offset
         )
     }
 

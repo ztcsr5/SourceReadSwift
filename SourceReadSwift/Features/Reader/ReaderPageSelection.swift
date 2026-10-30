@@ -67,6 +67,14 @@ enum ReaderPageRestoration {
             return exact
         }
 
+        if anchor.pageOrdinal == nil, anchor.paragraphUTF16Offset == nil,
+           let paragraphStart = blocks.firstIndex(where: { block in
+               !block.isPlaceholder && block.chapterIndex == anchor.chapterIndex
+                   && block.paragraphs.contains { $0.index == anchor.paragraphIndex && !$0.isContinuation }
+           }) {
+            return paragraphStart
+        }
+
         // Exact continuation page: same chapter, same chapter-local ordinal,
         // same first paragraph. This keeps a page inside a long paragraph when
         // an unrelated chapter is inserted above it.

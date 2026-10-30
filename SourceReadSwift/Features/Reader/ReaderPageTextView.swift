@@ -129,6 +129,26 @@ struct ReaderPageTextSpec {
 final class ReaderPrepaginatedTextView: UITextView {
     private var needsGlyphLayout = false
 
+    static func makePageSurface() -> ReaderPrepaginatedTextView {
+        let view = ReaderPrepaginatedTextView(usingTextLayoutManager: false)
+        view.isEditable = false
+        view.isScrollEnabled = false
+        view.backgroundColor = .clear
+        view.contentInset = .zero
+        view.contentInsetAdjustmentBehavior = .never
+        view.textContainerInset = .zero
+        view.textContainer.lineFragmentPadding = 0
+        view.textContainer.widthTracksTextView = true
+        view.textContainer.maximumNumberOfLines = 0
+        view.textContainer.lineBreakMode = .byWordWrapping
+        view.adjustsFontForContentSizeCategory = false
+        view.setContentHuggingPriority(.defaultLow, for: .horizontal)
+        view.setContentHuggingPriority(.defaultLow, for: .vertical)
+        view.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+        view.setContentCompressionResistancePriority(.defaultLow, for: .vertical)
+        return view
+    }
+
     /// Assigning `attributedText` invalidates TextKit and schedules a layout
     /// pass; the glyph run itself waits for the first draw. Flag the page so
     /// the next `layoutSubviews` can force it.
@@ -180,26 +200,7 @@ struct ReaderPageTextView: UIViewRepresentable {
     }
 
     func makeUIView(context: Context) -> ReaderPrepaginatedTextView {
-        let view = ReaderPrepaginatedTextView(usingTextLayoutManager: false)
-        view.isEditable = false
-        view.isScrollEnabled = false
-        view.backgroundColor = .clear
-        view.contentInset = .zero
-        // iOS 16 still applies the safe-area/content inset to a text view
-        // inside a UIPageViewController child; leaving it on shifts the first
-        // line down and makes a full page look clipped.
-        view.contentInsetAdjustmentBehavior = .never
-        view.textContainerInset = .zero
-        view.textContainer.lineFragmentPadding = 0
-        view.textContainer.widthTracksTextView = true
-        view.textContainer.maximumNumberOfLines = 0
-        view.textContainer.lineBreakMode = .byWordWrapping
-        view.adjustsFontForContentSizeCategory = false
-        view.setContentHuggingPriority(.defaultLow, for: .horizontal)
-        view.setContentHuggingPriority(.defaultLow, for: .vertical)
-        view.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
-        view.setContentCompressionResistancePriority(.defaultLow, for: .vertical)
-        return view
+        ReaderPrepaginatedTextView.makePageSurface()
     }
 
     func updateUIView(_ view: ReaderPrepaginatedTextView, context: Context) {

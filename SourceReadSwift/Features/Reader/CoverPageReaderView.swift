@@ -93,7 +93,12 @@ final class CoverPageHostController: UIViewController, UIGestureRecognizerDelega
     private var lastMinY: CGFloat = .greatestFiniteMagnitude
     private var translation: CGFloat = 0
     private var rawTranslation: CGFloat = 0
-    private var pendingEnd: (velocity: CGFloat, cancelled: Bool, animated: Bool)?
+    private struct CompletedGesture {
+        let translation: CGFloat
+        let velocity: CGFloat
+        let cancelled: Bool
+    }
+    private var completedGestures: [CompletedGesture] = []
     private(set) var isDragging = false
     var visiblePageIdentity: String { window?.identity ?? "" }
     var installedPageKeys: [String] { window?.keys ?? [] }
@@ -151,19 +156,30 @@ final class CoverPageHostController: UIViewController, UIGestureRecognizerDelega
             return
         }
         install(nextWindow)
-        if isDragging || pendingEnd != nil {
-            isDragging = true
-            updateInteraction(translation: rawTranslation)
+        // Completed flicks belong to their own immutable input, not the finger
+        // that may already be dragging again while SwiftUI delivers this model.
+        while !completedGestures.isEmpty {
+            let gesture = completedGestures.removeFirst()
+            let direction = gesture.cancelled ? 0 : ReaderPanTurnPolicy.direction(
+                translation: gesture.translation, velocity: gesture.velocity, width: view.bounds.width,
+                hasPrevious: nextWindow.hasPrevious, hasNext: nextWindow.hasNext
+            )
+            if direction != 0 {
+                translation = 0
+                layoutPages(translation: 0)
+                awaitingIdentityChangeFrom = nextWindow.identity
+                onCommit?(direction)
+                return
+            }
         }
-        if let end = pendingEnd {
-            pendingEnd = nil
-            endInteraction(velocity: end.velocity, cancelled: end.cancelled, animated: end.animated)
+        if isDragging {
+            updateInteraction(translation: rawTranslation)
         } else {
             // updateUIViewController must not synchronously flush SwiftUI
             // @State. Recheck ownership after the representable update ends.
             DispatchQueue.main.async { [weak self] in
                 guard let self, !self.isDragging, self.animator == nil,
-                      self.awaitingIdentityChangeFrom == nil else { return }
+                      self.awaitingIdentityChangeFrom == nil, self.completedGestures.isEmpty else { return }
                 self.onInteractionChange?(false)
             }
         }
@@ -192,6 +208,7 @@ final class CoverPageHostController: UIViewController, UIGestureRecognizerDelega
                     return host
                 }
                 let host = UIHostingController(rootView: root)
+                host.view.accessibilityIdentifier = "reader.page.\(key)"
                 addChild(host)
                 view.addSubview(host.view)
                 host.didMove(toParent: self)
@@ -273,7 +290,7 @@ final class CoverPageHostController: UIViewController, UIGestureRecognizerDelega
         guard isDragging else { return }
         isDragging = false
         if awaitingIdentityChangeFrom != nil {
-            pendingEnd = (velocity, cancelled, animated)
+            completedGestures.append(CompletedGesture(translation: rawTranslation, velocity: velocity, cancelled: cancelled))
             return
         }
         guard let window else { return }
@@ -317,7 +334,7 @@ final class CoverPageHostController: UIViewController, UIGestureRecognizerDelega
         animator?.stopAnimation(true)
         animator = nil
         isDragging = false
-        pendingEnd = nil
+        completedGestures.removeAll()
         rawTranslation = 0
         awaitingIdentityChangeFrom = nil
         translation = 0

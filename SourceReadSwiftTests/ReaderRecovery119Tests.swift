@@ -87,6 +87,14 @@ final class ReaderRecovery119Tests: XCTestCase {
         XCTAssertEqual(ReaderPanTurnPolicy.direction(translation: 300, velocity: 1000, width: 390, hasPrevious: false, hasNext: true), 0)
         XCTAssertEqual(ReaderPanTurnPolicy.direction(translation: 2, velocity: 0, width: 390, hasPrevious: true, hasNext: true), 0)
     }
+
+    func testParagraphOnlyChapterJumpDoesNotSkipTheFirstContinuation() {
+        let pages = [
+            ReaderPageBlock(id: 0, includesTitle: false, paragraphs: [.init(index: 0, text: "first", sourceUTF16Offset: 0)], chapterIndex: 1),
+            ReaderPageBlock(id: 1, includesTitle: false, paragraphs: [.init(index: 0, text: "second", chunkIndex: 1, sourceUTF16Offset: 5)], chapterIndex: 1, pageOrdinal: 1)
+        ]
+        XCTAssertEqual(ReaderPageRestoration.index(anchor: .init(chapterIndex: 1, paragraphIndex: 0), in: pages, fallbackIndex: 1), 0)
+    }
 }
 
 @MainActor
@@ -192,18 +200,101 @@ final class ReaderPanController119Tests: XCTestCase {
         XCTAssertFalse(pages.isEmpty)
         XCTAssertTrue(pages.flatMap(\.paragraphs).map(\.text).joined().contains("永驻字里行间"))
         for page in pages {
-            let view = ReaderPrepaginatedTextView(usingTextLayoutManager: false)
+            let view = ReaderPrepaginatedTextView.makePageSurface()
             view.frame = CGRect(x: 0, y: 0, width: typography.contentWidth, height: typography.contentHeight)
             view.isScrollEnabled = false
             view.contentInsetAdjustmentBehavior = .never
             view.textContainerInset = .zero
             view.textContainer.lineFragmentPadding = 0
-            view.setPage(ReaderPageTextBuilder.make(title: nil,
+            let text = ReaderPageTextBuilder.make(title: nil,
                 paragraphs: page.paragraphs.map { .init(text: $0.text, isContinuation: $0.isContinuation, isHighlighted: false) },
-                style: ReaderPageTextBuilder.layoutStyle(typography)))
+                style: ReaderPageTextBuilder.layoutStyle(typography))
+            view.setPage(text)
             view.layoutIfNeeded()
+            let storage = NSTextStorage(attributedString: text)
+            let manager = NSLayoutManager()
+            let container = NSTextContainer(size: CGSize(width: typography.contentWidth, height: .greatestFiniteMagnitude))
+            container.lineFragmentPadding = 0
+            manager.addTextContainer(container)
+            storage.addLayoutManager(manager)
+            manager.ensureLayout(for: container)
+            if view.layoutManager.usedRect(for: view.textContainer).maxY > view.bounds.height + 0.5 {
+                print("PAGE_DIAGNOSTIC page=\(page.pageOrdinal) standalone=\(manager.usedRect(for: container)) actual=\(view.layoutManager.usedRect(for: view.textContainer)) bounds=\(view.bounds) container=\(view.textContainer.size) padding=\(view.textContainer.lineFragmentPadding) inset=\(view.textContainerInset) fontLeading=\(manager.usesFontLeading)/\(view.layoutManager.usesFontLeading) equal=\(text.isEqual(to: view.attributedText))")
+                for (label, lm) in [("standalone", manager), ("view", view.layoutManager)] {
+                    lm.enumerateLineFragments(forGlyphRange: NSRange(location: 0, length: lm.numberOfGlyphs)) { rect, used, _, range, _ in
+                        print("PAGE_LINE \(label) \(range) rect=\(rect) used=\(used)")
+                    }
+                }
+            }
+            XCTAssertLessThanOrEqual(manager.usedRect(for: container).maxY, typography.contentHeight + 0.5, "standalone onboarding page \(page.pageOrdinal) clips")
             XCTAssertLessThanOrEqual(view.layoutManager.usedRect(for: view.textContainer).maxY,
                                      view.bounds.height + 0.5, "actual UITextView page \(page.pageOrdinal) clips")
         }
+    }
+
+    func testThirdActiveDragIsNotEndedByTheSecondQueuedFlick() async {
+        let controller = makeController()
+        apply(controller)
+        controller.beginInteraction()
+        controller.updateInteraction(translation: -180)
+        controller.endInteraction(velocity: -500, animated: false)
+        controller.beginInteraction()
+        controller.updateInteraction(translation: -180)
+        controller.endInteraction(velocity: -500, animated: false)
+        controller.beginInteraction()
+        controller.updateInteraction(translation: 20)
+        apply(controller, page: "p1", next: "p2")
+        XCTAssertEqual(commits, [1, 1])
+        XCTAssertTrue(controller.isDragging)
+        apply(controller, page: "p2", next: "p3")
+        XCTAssertTrue(controller.isDragging)
+        controller.endInteraction(velocity: 0, cancelled: true, animated: false)
+        await drainMainQueue()
+        XCTAssertEqual(commits, [1, 1])
+        XCTAssertFalse(controller.isDragging)
+        XCTAssertEqual(interactions.last, false)
+    }
+
+    func testCompletedFlickQueueRetainsEveryIndependentTranslation() async {
+        let controller = makeController()
+        apply(controller)
+        for translation: CGFloat in [-180, -180, 180, -180] {
+            controller.beginInteraction()
+            controller.updateInteraction(translation: translation)
+            controller.endInteraction(velocity: 0, animated: false)
+        }
+        XCTAssertEqual(commits, [1])
+        for page in ["p1", "p2", "p1", "p2"] { apply(controller, page: page) }
+        await drainMainQueue()
+        XCTAssertEqual(commits, [1, 1, -1, 1])
+        XCTAssertFalse(controller.isDragging)
+        XCTAssertEqual(interactions.last, false)
+    }
+
+    func testCoverAndSlideHaveDifferentPhysicalDisplacement() {
+        let controller = makeController()
+        apply(controller, style: .cover)
+        controller.beginInteraction()
+        controller.updateInteraction(translation: -100)
+        let next = controller.children.first { $0.view.accessibilityIdentifier == "reader.page.placeholder" }
+        XCTAssertEqual(next?.view.frame.minX ?? -999, 0, accuracy: 0.01)
+        controller.cancelInteraction()
+        apply(controller, style: .slide)
+        controller.beginInteraction()
+        controller.updateInteraction(translation: -100)
+        XCTAssertEqual(next?.view.frame.minX ?? -999, 290, accuracy: 0.01)
+        controller.cancelInteraction()
+    }
+
+    func testNewDragFinishesTheOldAnimationExactlyOnce() {
+        let controller = makeController()
+        apply(controller)
+        controller.beginInteraction()
+        controller.updateInteraction(translation: -180)
+        controller.endInteraction(velocity: -500)
+        controller.beginInteraction()
+        XCTAssertEqual(commits, [1])
+        controller.cancelInteraction()
+        XCTAssertEqual(commits, [1])
     }
 }
