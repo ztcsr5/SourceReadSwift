@@ -10,6 +10,7 @@ enum CoverPageTurnStyle {
 /// a per-frame translation. Only three pages participate in the gesture;
 /// two further snapshots can be warmed while idle, outside the visible stack.
 struct CoverPageReaderView: UIViewControllerRepresentable {
+    var turnRequest: ReaderPageTurnRequest? = nil
     var pageIdentity: String
     var contentRevision: String
     var previousIdentity: String = ""
@@ -48,6 +49,7 @@ struct CoverPageReaderView: UIViewControllerRepresentable {
             onPageContainerLayout: onPageContainerLayout, turnStyle: turnStyle,
             pageBackgroundColor: pageBackgroundColor, userInterfaceStyle: userInterfaceStyle
         )
+        controller.requestTurn(turnRequest)
     }
 
     static func dismantleUIViewController(_ controller: CoverPageHostController, coordinator: ()) {
@@ -267,6 +269,26 @@ final class CoverPageHostController: UIViewController, UIGestureRecognizerDelega
             guard let self, self.warmupGeneration == generation, !self.isDragging,
                   self.animator == nil, self.awaitingIdentityChangeFrom == nil else { return }
             for host in self.active { host?.view.layoutIfNeeded() }
+        }
+    }
+
+    private var consumedTurnRequest: UUID?
+
+    func requestTurn(_ request: ReaderPageTurnRequest?) {
+        guard let request, consumedTurnRequest != request.id else { return }
+        consumedTurnRequest = request.id
+        let identity = window?.identity
+        DispatchQueue.main.async { [weak self] in
+            guard let self, self.window?.identity == identity,
+                  !self.isDragging, self.animator == nil,
+                  self.awaitingIdentityChangeFrom == nil,
+                  let window = self.window,
+                  request.direction > 0 ? window.hasNext : window.hasPrevious else { return }
+            self.beginInteraction()
+            // The pan policy projects velocity into a complete turn. Starting
+            // at zero retains the swipe's cover/slide displacement and shadows.
+            let velocity = -CGFloat(request.direction) * max(self.view.bounds.width, 1) * 10
+            self.endInteraction(velocity: velocity, animated: !UIAccessibility.isReduceMotionEnabled)
         }
     }
 

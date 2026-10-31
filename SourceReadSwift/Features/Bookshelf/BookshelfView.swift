@@ -1239,13 +1239,14 @@ private struct BookshelfCollectionView: View {
         .scrollDismissesKeyboard(.interactively)
         .pageBackground()
         .navigationTitle(title)
+        .hideRootTabBar()
         // iOS 16 paints the large title directly above the first row; the
         // custom search field then reads as if it overlaps the navigation bar.
         // The collection is a utility screen, so a compact title is both safer
         // and more space-efficient.
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
-            ToolbarItem(placement: .navigationBarLeading) {
+            ToolbarItem(placement: .navigationBarTrailing) {
                 if !books.isEmpty {
                     Button(isManaging ? "完成" : "管理") {
                         withAnimation(.easeOut(duration: 0.18)) {
@@ -1300,6 +1301,8 @@ private struct BookshelfCollectionView: View {
                             selectedBookIDs.removeAll()
                         } label: {
                             Label("标记已读", systemImage: "checkmark.circle")
+                                .labelStyle(.iconOnly)
+                                .accessibilityLabel("标记已读")
                                 .frame(maxWidth: .infinity)
                         }
                         .buttonStyle(.bordered)
@@ -1312,6 +1315,8 @@ private struct BookshelfCollectionView: View {
                             UIImpactFeedbackGenerator(style: .medium).impactOccurred()
                         } label: {
                             Label("导出", systemImage: "square.and.arrow.up")
+                                .labelStyle(.iconOnly)
+                                .accessibilityLabel("导出")
                                 .frame(maxWidth: .infinity)
                         }
                         .buttonStyle(.bordered)
@@ -1319,6 +1324,8 @@ private struct BookshelfCollectionView: View {
 
                         Button(role: .destructive) { confirmBatchDelete = true } label: {
                             Label("删除", systemImage: "trash")
+                                .labelStyle(.iconOnly)
+                                .accessibilityLabel("删除")
                                 .frame(maxWidth: .infinity)
                         }
                         .buttonStyle(.bordered)
@@ -1337,6 +1344,8 @@ private struct BookshelfCollectionView: View {
                             }
                         } label: {
                             Label("移动", systemImage: "folder")
+                                .labelStyle(.iconOnly)
+                                .accessibilityLabel("移动")
                                 .frame(maxWidth: .infinity)
                         }
                         .buttonStyle(.borderedProminent)

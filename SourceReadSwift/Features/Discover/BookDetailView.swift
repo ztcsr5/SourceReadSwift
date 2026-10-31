@@ -223,6 +223,7 @@ struct BookDetailView: View {
             }
         }
         .task {
+            SourceSwitchCacheStore.shared.remember(books: availableSources + [book])
             await load()
         }
         .sheet(isPresented: $showAllChapters) {

@@ -62,7 +62,15 @@ struct JSONRuleExtractor {
     }
 
     func list(from object: Any, rule: String?, variables: [String: Any] = [:]) -> [[String: Any]] {
-        let trimmed = rule?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        let raw = rule?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        // Legado list modifiers apply before JS/JSONPath dispatch. Passing the
+        // '+' into the JS pipeline evaluated a nonexistent '+' JSON property;
+        // '-$..comic_chapter[*]' likewise never reached the descendant path.
+        if raw.hasPrefix("+") || raw.hasPrefix("-") {
+            let rows = list(from: object, rule: String(raw.dropFirst()), variables: variables)
+            return raw.hasPrefix("-") ? Array(rows.reversed()) : rows
+        }
+        let trimmed = raw
         guard !trimmed.isEmpty else {
             return rootDictionaryList(from: object)
         }

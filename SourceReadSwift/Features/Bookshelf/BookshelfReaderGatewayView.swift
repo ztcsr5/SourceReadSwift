@@ -22,6 +22,10 @@ struct BookshelfReaderGatewayView: View {
     @State private var didApplyInitialChapter = false
     @State private var requestedChapterIndex: Int?
     @State private var sourceSwitchSearchTrigger = 0
+    @State private var sourceSwitchGeneration = UUID()
+    @State private var sourceSwitchApplyTask: Task<Void, Never>?
+    @State private var isApplyingSource = false
+    @State private var switchRefreshRequested = false
     @State private var localNavigationRevision = 0
     @State private var showBookDetailSheet = false
     @State private var gatewayTabChromeOwner = UUID()
@@ -51,7 +55,7 @@ struct BookshelfReaderGatewayView: View {
             applyInitialChapterIfNeeded()
             await resumeReading()
         }
-        .sheet(isPresented: $showSourceSwitcher) {
+        .fullScreenCover(isPresented: $showSourceSwitcher) {
             sourceSwitcherSheet
         }
         .sheet(isPresented: $showBookDetailSheet) {
@@ -141,18 +145,6 @@ struct BookshelfReaderGatewayView: View {
                     totalChapters: chapters.count,
                     chapters: chapters,
                     initialParagraphIndex: storedParagraph,
-                    extraToolbarActions: {
-                        AnyView(
-                            Button {
-                                UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                                showSourceSwitcher = true
-                            } label: {
-                                Image(systemName: "arrow.triangle.2.circlepath")
-                                    .font(.title3.weight(.semibold))
-                                    .frame(width: 44, height: 44)
-                            }
-                        )
-                    },
                     onRequestSourceSwitch: {
                         UIImpactFeedbackGenerator(style: .light).impactOccurred()
                         showSourceSwitcher = true
@@ -161,6 +153,7 @@ struct BookshelfReaderGatewayView: View {
                         showBookDetailSheet = true
                     }
                 )
+                .id("remote-reader|\(currentBook.sourceURL)|\(currentBook.bookURL)")
             )
         } else if let errorMessage {
             return AnyView(readerRecoveryErrorView(errorMessage))
@@ -524,6 +517,8 @@ struct BookshelfReaderGatewayView: View {
                 !loadedChapters.isEmpty
             else { return }
             await MainActor.run {
+                guard currentBook.sourceURL == activeBook.sourceURL,
+                      currentBook.bookURL == activeBook.bookURL else { return }
                 self.detail = detailResult
                 self.chapters = loadedChapters
                 appState.bookTOCacheStore.save(
@@ -551,10 +546,16 @@ struct BookshelfReaderGatewayView: View {
                     .foregroundStyle(.secondary)
                     .padding(.horizontal)
 
+                if isApplyingSource {
+                    ProgressView("正在对齐阅读章节…").padding(.horizontal)
+                }
+                if let message = sourceSwitchState.message, !sourceSwitchState.candidates.isEmpty {
+                    Text(message).font(.footnote).foregroundStyle(.red).padding(.horizontal)
+                }
                 if sourceSwitchState.isLoading, sourceSwitchState.candidates.isEmpty {
                     ProgressView(sourceSwitchProgressTitle)
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
-                } else if let message = sourceSwitchState.message {
+                } else if let message = sourceSwitchState.message, sourceSwitchState.candidates.isEmpty {
                     EmptyStateCard(systemImage: "magnifyingglass", title: "换源结果", message: message)
                         .padding(.horizontal)
                 } else {
@@ -569,7 +570,12 @@ struct BookshelfReaderGatewayView: View {
                         }
                         ForEach(sourceSwitchState.candidates) { candidate in
                             Button {
-                                Task { await applySwitch(candidate) }
+                                sourceSwitchGeneration = UUID()
+                                sourceSwitchSearchTrigger &+= 1
+                                isApplyingSource = true
+                                sourceSwitchState.isLoading = false
+                                sourceSwitchApplyTask?.cancel()
+                                sourceSwitchApplyTask = Task { await applySwitch(candidate) }
                             } label: {
                                 VStack(alignment: .leading, spacing: 5) {
                                     Text(candidate.book.name)
@@ -578,13 +584,16 @@ struct BookshelfReaderGatewayView: View {
                                     Text("\(candidate.source.bookSourceName) · \(candidate.book.author ?? "作者未知")")
                                         .font(.caption)
                                         .foregroundStyle(.secondary)
+                                    Text(candidate.chapterCount.map { "共 \($0) 章" } ?? "章节数待统计")
+                                        .font(.caption.weight(.medium))
+                                        .foregroundStyle(.secondary)
                                     Text(candidate.book.bookUrl)
                                         .font(.caption2)
                                         .foregroundStyle(.secondary)
                                     .lineLimit(1)
                                 }
                             }
-                            .disabled(sourceSwitchState.isLoading && sourceSwitchState.candidates.isEmpty)
+                            .disabled(isApplyingSource)
                         }
                     }
                 }
@@ -596,26 +605,27 @@ struct BookshelfReaderGatewayView: View {
                     Button("关闭") { showSourceSwitcher = false }
                 }
                 ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("搜索") {
-                        sourceSwitchState = SourceSwitchState()
+                    Button("刷新") {
+                        switchRefreshRequested = true
+                        sourceSwitchGeneration = UUID()
+                        sourceSwitchState.message = nil
                         sourceSwitchSearchTrigger &+= 1
                     }
-                    .disabled(sourceSwitchState.isLoading)
+                    .disabled(isApplyingSource || sourceSwitchState.isLoading)
                 }
             }
             .task(id: sourceSwitchSearchTrigger) {
-                if sourceSwitchState.candidates.isEmpty, sourceSwitchState.message == nil {
-                    await searchSwitchCandidates()
-                }
+                guard !isApplyingSource else { return }
+                await searchSwitchCandidates(force: switchRefreshRequested)
             }
         }
-        .presentationDetents([.large])
+        .interactiveDismissDisabled(isApplyingSource)
         .onDisappear {
-            // A dismissed sheet cancels its task. Clear a stale loading flag
-            // so opening换源 again always starts a fresh search.
-            if sourceSwitchState.isLoading {
-                sourceSwitchState = SourceSwitchState()
-            }
+            sourceSwitchGeneration = UUID()
+            sourceSwitchApplyTask?.cancel()
+            isApplyingSource = false
+            sourceSwitchState.isLoading = false
+            // Keep partial candidates; closing a search is not cache invalidation.
         }
     }
 
@@ -624,173 +634,169 @@ struct BookshelfReaderGatewayView: View {
         return "正在搜索 \(sourceSwitchState.checkedCount)/\(sourceSwitchState.totalCount)"
     }
 
-    private func searchSwitchCandidates() async {
-        let activeBook = currentBook
-        let enabledSources = Array(appState.sourceStore
-            .sourceSwitchCandidates(for: activeBook.bookURL, excluding: activeBook.sourceURL)
-            .prefix(40))
+    private func persistSwitchCandidates() {
+        let active = currentBook
+        var cached = sourceSwitchState.candidates.map {
+            SourceSwitchCacheStore.Candidate(sourceURL: $0.source.bookSourceUrl,
+                sourceName: $0.source.bookSourceName, book: $0.book, chapterCount: $0.chapterCount)
+        }
+        if !cached.contains(where: { $0.sourceURL == active.sourceURL && $0.book.bookUrl == active.bookURL }) {
+            cached.append(SourceSwitchCacheStore.Candidate(sourceURL: active.sourceURL,
+                sourceName: active.sourceName, book: active.asSearchBook,
+                chapterCount: active.totalChapters > 0 ? active.totalChapters : nil))
+        }
+        SourceSwitchCacheStore.shared.save(title: active.title, author: active.author,
+            candidates: cached)
+    }
 
-        // Show the previous result set immediately. The network refresh below
-        // still runs, but the user can tap an already-known source without
-        // waiting for 40 search requests again.
-        var cachedCandidates: [SourceSwitchCandidate] = []
-        if let cached = SourceSwitchCacheStore.shared.candidates(
-            title: activeBook.title,
-            author: activeBook.author
-        ) {
-            cachedCandidates = cached.compactMap { entry in
-                guard let source = appState.sourceStore.source(for: entry.sourceURL) else { return nil }
-                return SourceSwitchCandidate(source: source, book: entry.book)
+    private func searchSwitchCandidates(force: Bool = false) async {
+        let active = currentBook
+        let token = UUID(); sourceSwitchGeneration = token
+        switchRefreshRequested = false
+        sourceSwitchState.message = nil
+        let kind = appState.sourceStore.source(for: active.sourceURL)?.sourceKind
+        let sources = Array(appState.sourceStore.sourceSwitchCandidates(for: active.bookURL, excluding: active.sourceURL)
+            .filter { kind == nil || $0.sourceKind == kind }.prefix(60))
+        if !force, let cached = SourceSwitchCacheStore.shared.candidates(title: active.title, author: active.author) {
+            sourceSwitchState.candidates = cached.compactMap { entry in
+                guard entry.sourceURL != active.sourceURL,
+                      let source = appState.sourceStore.source(for: entry.sourceURL), source.enabled,
+                      kind == nil || source.sourceKind == kind else { return nil }
+                return SourceSwitchCandidate(source: source, book: entry.book, chapterCount: entry.chapterCount)
+            }
+            // A fresh cache opens without triggering another search. Refresh is explicit.
+            if !sourceSwitchState.candidates.isEmpty {
+                let missing = sourceSwitchState.candidates.filter { $0.chapterCount == nil }
+                await hydrateSwitchCounts(missing, token: token)
+                return
             }
         }
-
-        sourceSwitchState = SourceSwitchState(
-            isLoading: true,
-            candidates: cachedCandidates,
-            totalCount: enabledSources.count
-        )
-        var candidates: [SourceSwitchCandidate] = cachedCandidates
+        sourceSwitchState.isLoading = true
+        sourceSwitchState.totalCount = sources.count
+        sourceSwitchState.checkedCount = 0
+        sourceSwitchState.message = nil
         let engine = appState.engine
-        // Keep source switching responsive without creating a burst of 40
-        // simultaneous network requests. Six requests per batch is enough to
-        // hide a slow source while preserving cancellation and device limits.
-        let batchSize = 6
-        for start in stride(from: 0, to: enabledSources.count, by: batchSize) {
-            guard !Task.isCancelled else { return }
-            let end = min(start + batchSize, enabledSources.count)
-            let batch = Array(enabledSources[start..<end])
-            let batchCandidates = await withTaskGroup(of: SourceSwitchCandidate?.self, returning: [SourceSwitchCandidate].self) { group in
-                for source in batch {
-                    group.addTask {
-                        let result = await AsyncTimeout.run(seconds: 10) {
-                            await engine.searchBooks(source: source, keyword: activeBook.title, page: 1)
-                        } ?? .failure(.network("Source switch search timed out"))
-                        guard case .success(let books) = result else { return nil }
-                        let cleanTargetTitle = SearchBookMatcher.cleanTitle(activeBook.title)
-                        let cleanTargetAuthor = SearchBookMatcher.cleanAuthor(activeBook.author)
-
-                        func score(for b: SearchBook) -> Int {
-                            let title = SearchBookMatcher.cleanTitle(b.name)
-                            let author = SearchBookMatcher.cleanAuthor(b.author ?? "")
-                            let isExactTitle = (title == cleanTargetTitle)
-                            let isExactAuthor = (!cleanTargetAuthor.isEmpty && author == cleanTargetAuthor)
-
-                            // Discard spinoff/fanfic noise keywords if original title did not have them
-                            let noiseKeywords = ["同人", "续集", "前传", "后传", "外传", "之"]
-                            let containsNoise = noiseKeywords.contains { k in
-                                b.name.contains(k) && !activeBook.title.contains(k)
-                            }
-                            if containsNoise { return 0 }
-
-                            if isExactTitle && isExactAuthor { return 100 }
-                            if isExactTitle { return 80 }
-                            if isExactAuthor && b.name.hasPrefix(activeBook.title) { return 60 }
-                            if title == activeBook.title.lowercased() { return 70 }
-                            return 0
+        await withTaskGroup(of: Void.self) { group in
+            var iterator = sources.makeIterator()
+            func submit(_ source: BookSource) {
+                group.addTask {
+                    let result = await AsyncTimeout.run(seconds: 8) {
+                        await engine.searchBooks(source: source, keyword: active.title, page: 1)
+                    }
+                    guard !Task.isCancelled, let result, case .success(let books) = result,
+                          let match = books.first(where: {
+                              SearchBookMatcher.cleanTitle($0.name) == SearchBookMatcher.cleanTitle(active.title)
+                                && (SearchBookMatcher.cleanAuthor($0.author ?? "").isEmpty
+                                    || SearchBookMatcher.cleanAuthor(active.author).isEmpty
+                                    || SearchBookMatcher.cleanAuthor($0.author ?? "") == SearchBookMatcher.cleanAuthor(active.author))
+                          }) else { return }
+                    let candidate = SourceSwitchCandidate(source: source, book: match)
+                    let accepted = await MainActor.run { () -> Bool in
+                        guard sourceSwitchGeneration == token, !isApplyingSource else { return false }
+                        if !sourceSwitchState.candidates.contains(where: { $0.id == candidate.id }) {
+                            sourceSwitchState.candidates.append(candidate)
                         }
-
-                        let sortedMatches = books
-                            .map { ($0, score(for: $0)) }
-                            .filter { $0.1 > 0 }
-                            .sorted { $0.1 > $1.1 }
-
-                        guard let match = sortedMatches.first?.0 else { return nil }
-                        return SourceSwitchCandidate(source: source, book: match)
+                        persistSwitchCandidates()
+                        return true
                     }
+                    guard accepted else { return }
+                    await hydrateSwitchCount(candidate, token: token)
                 }
-                var results: [SourceSwitchCandidate] = []
-                results.reserveCapacity(batch.count)
-                for await candidate in group {
-                    guard !Task.isCancelled else {
-                        group.cancelAll()
-                        return results
-                    }
-                    if let candidate { results.append(candidate) }
-                }
-                return results
             }
-            for candidate in batchCandidates where !candidates.contains(where: { $0.id == candidate.id }) {
-                candidates.append(candidate)
+            for _ in 0..<min(6, sources.count) { if let source = iterator.next() { submit(source) } }
+            while await group.next() != nil {
+                guard !Task.isCancelled, sourceSwitchGeneration == token, !isApplyingSource else { group.cancelAll(); break }
+                sourceSwitchState.checkedCount += 1
+                if let source = iterator.next() { submit(source) }
             }
-            candidates.sort { $0.source.bookSourceName < $1.source.bookSourceName }
-            sourceSwitchState = SourceSwitchState(
-                isLoading: true,
-                candidates: candidates,
-                checkedCount: end,
-                totalCount: enabledSources.count
-            )
         }
-        guard !Task.isCancelled else { return }
-        candidates.sort { $0.source.bookSourceName < $1.source.bookSourceName }
-        if !candidates.isEmpty {
-            SourceSwitchCacheStore.shared.save(
-                title: activeBook.title,
-                author: activeBook.author,
-                candidates: candidates.map {
-                    SourceSwitchCacheStore.Candidate(
-                        sourceURL: $0.source.bookSourceUrl,
-                        sourceName: $0.source.bookSourceName,
-                        book: $0.book
-                    )
+        guard !Task.isCancelled, sourceSwitchGeneration == token, !isApplyingSource else { return }
+        sourceSwitchState.isLoading = false
+        if sourceSwitchState.candidates.isEmpty { sourceSwitchState.message = "没有找到同名同作者结果，可刷新重试。" }
+    }
+
+    private func hydrateSwitchCounts(_ candidates: [SourceSwitchCandidate], token: UUID) async {
+        await withTaskGroup(of: Void.self) { group in
+            var iterator = candidates.makeIterator()
+            for _ in 0..<min(3, candidates.count) {
+                if let candidate = iterator.next() {
+                    group.addTask { await hydrateSwitchCount(candidate, token: token) }
                 }
-            )
+            }
+            while await group.next() != nil {
+                guard !Task.isCancelled, sourceSwitchGeneration == token else { group.cancelAll(); break }
+                if let candidate = iterator.next() {
+                    group.addTask { await hydrateSwitchCount(candidate, token: token) }
+                }
+            }
         }
-        sourceSwitchState = candidates.isEmpty
-            ? SourceSwitchState(message: "没有搜索到可用换源结果。")
-            : SourceSwitchState(candidates: candidates)
+    }
+
+    @MainActor private func hydrateSwitchCount(_ candidate: SourceSwitchCandidate, token: UUID) async {
+        guard !Task.isCancelled, sourceSwitchGeneration == token else { return }
+        let source = candidate.source, match = candidate.book
+        let cached = appState.bookTOCacheStore.entry(sourceURL: source.bookSourceUrl, bookURL: match.bookUrl)
+        var count = cached?.chapters.count
+        if count == nil {
+            let engine = appState.engine
+            let metadata = await AsyncTimeout.run(seconds: 12) {
+                guard case .success(let detail) = await engine.getBookDetail(source: source, book: match),
+                      case .success(let chapters) = await engine.getChapterList(source: source, book: detail)
+                else { return (nil as BookDetail?, [BookChapter]()) }
+                return (detail as BookDetail?, chapters)
+            }
+            guard !Task.isCancelled, sourceSwitchGeneration == token, !isApplyingSource else { return }
+            if let metadata, !metadata.1.isEmpty {
+                count = metadata.1.count
+                appState.bookTOCacheStore.save(detail: metadata.0, chapters: metadata.1,
+                    sourceURL: source.bookSourceUrl, bookURL: match.bookUrl)
+            }
+        }
+        guard !Task.isCancelled, sourceSwitchGeneration == token, !isApplyingSource,
+              let i = sourceSwitchState.candidates.firstIndex(where: { $0.id == candidate.id }) else { return }
+        sourceSwitchState.candidates[i].chapterCount = count
+        persistSwitchCandidates()
     }
 
     private func applySwitch(_ candidate: SourceSwitchCandidate) async {
-        sourceSwitchState.isLoading = true
+        let token = sourceSwitchGeneration
+        let progress = currentBook
+        defer { if sourceSwitchGeneration == token { isApplyingSource = false } }
+        persistSwitchCandidates()
+        let cached = appState.bookTOCacheStore.entry(sourceURL: candidate.source.bookSourceUrl, bookURL: candidate.book.bookUrl)
         let engine = appState.engine
-        let detailResult = await AsyncTimeout.run(seconds: 20) {
-            await engine.getBookDetail(source: candidate.source, book: candidate.book)
-        } ?? .failure(.network("Detail load timed out"))
-        switch detailResult {
-        case .success(let detail):
-            let chapterResult = await AsyncTimeout.run(seconds: 20) {
-                await engine.getChapterList(source: candidate.source, book: detail)
-            } ?? .failure(.network("Chapter list timed out"))
-            switch chapterResult {
-            case .success(let loadedChapters):
-                let previousTitle = (selectedChapter?.title ?? currentBook.currentChapterTitle ?? "")
-                    .trimmingCharacters(in: .whitespacesAndNewlines)
-                    .lowercased()
-                let previousIndex = selectedChapter?.index ?? currentBook.currentChapterIndex
-                let matchedByTitle = previousTitle.isEmpty ? nil : loadedChapters.first(where: {
-                    $0.title.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() == previousTitle
-                })
-                let clampedIndex = min(max(previousIndex, 0), max(loadedChapters.count - 1, 0))
-                let targetChapter = matchedByTitle
-                    ?? loadedChapters.first(where: { $0.index == clampedIndex })
-                    ?? (loadedChapters.indices.contains(clampedIndex) ? loadedChapters[clampedIndex] : loadedChapters.first)
-                appState.bookshelfStore.switchSource(
-                    bookID: book.id,
-                    to: candidate.book,
-                    latestChapterTitle: detail.latestChapter ?? loadedChapters.last?.title,
-                    intro: detail.intro,
-                    totalChapters: loadedChapters.count
-                )
-                if let targetChapter {
-                    appState.bookshelfStore.updateReadingProgress(
-                        bookID: book.id,
-                        chapterIndex: targetChapter.index,
-                        chapterTitle: targetChapter.title,
-                        totalChapters: loadedChapters.count
-                    )
-                }
-                chapters = loadedChapters
-                selectedChapter = targetChapter
-                errorMessage = nil
-                showSourceSwitcher = false
-                sourceSwitchState = SourceSwitchState()
-            case .failure(let error):
-                sourceSwitchState = SourceSwitchState(message: "目录加载失败：\(error.displayMessage)")
-            }
-        case .failure(let error):
-            sourceSwitchState = SourceSwitchState(message: "详情加载失败：\(error.displayMessage)")
+        let loaded: (BookDetail, [BookChapter])?
+        if let detail = cached?.detail, let chapters = cached?.chapters, !chapters.isEmpty {
+            loaded = (detail, chapters)
+        } else {
+            loaded = await AsyncTimeout.run(seconds: 24) {
+                guard case .success(let detail) = await engine.getBookDetail(source: candidate.source, book: candidate.book),
+                      case .success(let chapters) = await engine.getChapterList(source: candidate.source, book: detail),
+                      !chapters.isEmpty else { return nil as (BookDetail, [BookChapter])? }
+                return (detail, chapters)
+            } ?? nil
         }
+        guard !Task.isCancelled, sourceSwitchGeneration == token, showSourceSwitcher else { return }
+        guard let (newDetail, newChapters) = loaded,
+              let target = SourceChapterAlignment.match(title: progress.currentChapterTitle,
+                  index: progress.currentChapterIndex, in: newChapters) else {
+            sourceSwitchState.message = "无法读取该源目录，阅读进度未改变；请选择其他源或重试。"
+            return
+        }
+        appState.bookTOCacheStore.save(detail: newDetail, chapters: newChapters,
+            sourceURL: candidate.source.bookSourceUrl, bookURL: candidate.book.bookUrl)
+        appState.bookshelfStore.switchSource(bookID: book.id, to: candidate.book,
+            latestChapterTitle: newDetail.latestChapter ?? newChapters.last?.title,
+            intro: newDetail.intro, totalChapters: newChapters.count)
+        appState.bookshelfStore.updateReadingProgress(bookID: book.id, chapterIndex: target.index,
+            chapterTitle: target.title, totalChapters: newChapters.count, paragraphIndex: 0)
+        detail = newDetail
+        chapters = newChapters
+        selectedChapter = target
+        errorMessage = nil
+        showSourceSwitcher = false
     }
+
 }
 
 private struct SourceSwitchState: Sendable {
@@ -805,4 +811,5 @@ private struct SourceSwitchCandidate: Identifiable, Sendable {
     var id: String { "\(source.bookSourceUrl)|\(book.bookUrl)" }
     let source: BookSource
     let book: SearchBook
+    var chapterCount: Int? = nil
 }

@@ -86,6 +86,7 @@ struct ReaderView: View {
     /// number as a paragraph (or vice versa).
     @State private var scrollParagraphTarget = 0
     @State private var pagedPageIndex = 0
+    @State private var tapPageTurnRequest: ReaderPageTurnRequest?
     @State private var autoScrollTask: Task<Void, Never>?
     @State private var sleepTimerTask: Task<Void, Never>?
     @State private var positionPersistTask: Task<Void, Never>?
@@ -230,7 +231,7 @@ struct ReaderView: View {
     @AppStorage("reader.httpTTSVoiceID") private var httpTTSVoiceID: Int = HttpTTSVoice.defaultVoiceID
     @AppStorage("reader.autoScrollDelay") private var autoScrollDelay: Double = 2.0
     @AppStorage("reader.sleepTimerMinutes") private var sleepTimerMinutes: Int = 0
-    @AppStorage("reader.background") private var backgroundRawValue: String = ReaderBackground.paper.rawValue
+    @AppStorage("reader.background") private var backgroundRawValue: String = ReaderBackground.white.rawValue
     /// 壁纸填充方式：填充 / 适应 / 拉伸。对齐开元 BoxFit 与栖阅 UIImageView contentMode。
     @AppStorage("reader.customWallpaperFillMode") private var customWallpaperFillModeRaw = ReaderWallpaperFillMode.fill.rawValue
     @State private var isPerBookOverride: Bool = false
@@ -1370,6 +1371,8 @@ struct ReaderView: View {
                 } else {
                     Color.white.opacity(readerIsNight ? 0.15 : 0.20)
                 }
+            } else if background.hasTexture {
+                ReaderPaperTextureView(background: background, night: readerIsNight)
             } else {
                 readerThemeBackground
             }
@@ -1666,7 +1669,7 @@ struct ReaderView: View {
             // 否则每次呼出菜单整页文字都会往下掉一格（关掉再弹回来）。
             topInset: scrollContentTopInset,
             textColor: background.uiTextColor(isNight: readerIsNight),
-            surfaceColor: background == .custom ? .clear : background.uiColor(isNight: readerIsNight),
+            surfaceColor: background == .custom || background.hasTexture ? .clear : background.uiColor(isNight: readerIsNight),
             highlightColor: AppTheme.accentUIColor.withAlphaComponent(background.isDark ? 0.22 : 0.12),
             currentParagraphIndex: speechFlatParagraphIndex ?? -1,
             scrollTarget: activeScrollTarget,
@@ -2646,6 +2649,7 @@ struct ReaderView: View {
             pages: pagedBlocks,
             contentRevision: pagedBlocksCacheKey + "|" + readerPageRevisionKey,
             currentPageIndex: $pagedPageIndex,
+            turnRequest: tapPageTurnRequest,
             onPageChanged: { target in
                 updatePagedVisibleParagraph(pageIndex: target)
             },
@@ -2683,6 +2687,7 @@ struct ReaderView: View {
             contentRevision: pagedBlocksCacheKey + "|" + readerPageRevisionKey,
             transitionStyle: .scroll,
             currentPageIndex: $pagedPageIndex,
+            turnRequest: tapPageTurnRequest,
             onPageChanged: { target in
                 updatePagedVisibleParagraph(pageIndex: target)
             },
@@ -2746,6 +2751,7 @@ struct ReaderView: View {
             currentView = AnyView(Color.clear)
         }
         return CoverPageReaderView(
+            turnRequest: tapPageTurnRequest,
             pageIdentity: currentBlock.map { ReaderPageIdentity(page: $0).key } ?? "",
             contentRevision: readerPageRevisionKey,
             previousIdentity: previousBlock.map { pageTextCacheKey(for: $0) } ?? "",
@@ -3123,6 +3129,8 @@ struct ReaderView: View {
                 }
             }
             .clipped()
+        } else if background.hasTexture {
+            ReaderPaperTextureView(background: background, night: readerIsNight)
         } else {
             readerThemeBackground
         }
@@ -4137,7 +4145,7 @@ struct ReaderView: View {
             if ReaderCustomWallpaperStore.hasCustomWallpaper {
                 Button(role: .destructive) {
                     ReaderCustomWallpaperStore.clearWallpaper()
-                    backgroundRawValue = ReaderBackground.paper.rawValue
+                    backgroundRawValue = ReaderBackground.white.rawValue
                     backgroundWallpaperRevision = UUID()
                     rebuildPagedBlocksCache()
                     HapticFeedback.light()
@@ -5509,9 +5517,9 @@ struct ReaderView: View {
         }
         switch action {
         case .previousPage:
-            moveReaderTarget(to: currentReaderTarget - 1)
+            requestAnimatedPageTurn(direction: -1)
         case .nextPage:
-            moveReaderTarget(to: currentReaderTarget + 1)
+            requestAnimatedPageTurn(direction: 1)
         case .previousChapter:
             selectRelativeChapter(offset: -1)
         case .nextChapter:
@@ -5521,6 +5529,12 @@ struct ReaderView: View {
         case .disabled:
             break
         }
+    }
+
+    private func requestAnimatedPageTurn(direction: Int) {
+        guard pendingWindowJump == nil, !interactionGate.isPageInteractionActive,
+              pagedBlocks.indices.contains(pagedPageIndex + direction) else { return }
+        tapPageTurnRequest = ReaderPageTurnRequest(direction: direction)
     }
 
     private func requestPageStep(direction: Int) {

@@ -14,6 +14,7 @@ final class SourceSwitchCacheStore {
         var sourceURL: String
         var sourceName: String
         var book: SearchBook
+        var chapterCount: Int? = nil
     }
 
     private struct Entry: Codable, Equatable, Sendable {
@@ -22,6 +23,7 @@ final class SourceSwitchCacheStore {
         var candidates: [Candidate]
     }
 
+    private static let writer = DispatchQueue(label: "SourceSwitchCache.writer", qos: .utility)
     private let fileURL: URL
     private let ttl: TimeInterval
     private var entries: [String: Entry] = [:]
@@ -75,19 +77,37 @@ final class SourceSwitchCacheStore {
         persist()
     }
 
+    func remember(books: [SearchBook]) {
+        let grouped = Dictionary(grouping: books) { Self.key(title: $0.name, author: $0.author) }
+        for (_, books) in grouped {
+            guard let first = books.first else { continue }
+            var items = candidates(title: first.name, author: first.author) ?? []
+            for book in books where !book.sourceUrl.hasPrefix("local://") {
+                if !items.contains(where: { $0.sourceURL == book.sourceUrl && $0.book.bookUrl == book.bookUrl }) {
+                    items.append(Candidate(sourceURL: book.sourceUrl, sourceName: book.sourceName, book: book))
+                }
+            }
+            save(title: first.name, author: first.author, candidates: items)
+        }
+    }
+
     func clear() {
         entries.removeAll()
         persist()
     }
 
     private func load() {
-        guard let data = try? Data(contentsOf: fileURL) else { return }
+        guard let data = Self.writer.sync(execute: { try? Data(contentsOf: fileURL) }) else { return }
         guard let decoded = try? JSONDecoder().decode([String: Entry].self, from: data) else { return }
         entries = decoded
     }
 
     private func persist() {
-        guard let data = try? JSONEncoder().encode(entries) else { return }
-        try? AppStorageDirectory.safeWrite(data, to: fileURL)
+        let snapshot = entries
+        let url = fileURL
+        Self.writer.async {
+            guard let data = try? JSONEncoder().encode(snapshot) else { return }
+            try? AppStorageDirectory.safeWrite(data, to: url)
+        }
     }
 }

@@ -30,7 +30,7 @@ struct SourceManagerView: View {
     @State private var batchCheckScope: BatchCheckScope = .enabled
     @State private var batchCheckKeyword = "斗破苍穹"
     @State private var batchCheckDeepCheck = true
-    @AppStorage("batch_check_concurrent_threads") private var batchCheckConcurrency: Int = 4
+    @AppStorage("batch_check_concurrent_threads") private var batchCheckConcurrency: Int = 8
     @State private var batchCheckExportNotice: String?
     @State private var sourceLogin: BookSource?
     /// Hosts that currently hold cookies.  The source row shows a 已登录 pill

@@ -15,62 +15,62 @@ struct RootTabView: View {
     var body: some View {
         let _ = accentHex
         let _ = secondaryAccentHex
-        return ZStack(alignment: .bottom) {
-            // Only keep the active root alive.  The previous opacity-based
-            // stack rendered three complete navigation trees every frame,
-            // which was especially visible on long bookshelf lists.
-            Group {
-                switch selectedTab {
-                case 0:
-                    BookshelfView()
-                        .transition(.opacity)
-                case 1:
-                    DiscoverView(viewModel: appState.discoverViewModel)
-                        .transition(.opacity)
-                default:
-                    SettingsView()
-                        .transition(.opacity)
-                }
-            }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            // Reserve space for the floating tab bar and mini player instead of letting the
-            // last row disappear underneath it on every root scroll view.
-            .safeAreaInset(edge: .bottom, spacing: 0) {
-                if !appState.isTabChromeHidden {
-                    Color.clear.frame(height: audioCoordinator.currentBook != nil ? 144 : 86)
-                }
-            }
-
-            if !appState.isTabChromeHidden {
+        return navigationContent
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            if !usesNativeTabs, !appState.isTabChromeHidden {
                 VStack(spacing: 8) {
-                    if audioCoordinator.currentBook != nil {
-                        miniAudioPlayerBar
-                            .transition(.move(edge: .bottom).combined(with: .opacity))
-                    }
+                    if audioCoordinator.currentBook != nil { miniAudioPlayerBar }
                     customTabBar
                 }
-                .transition(.move(edge: .bottom).combined(with: .opacity))
-                .zIndex(10)
             }
         }
-        // Let SwiftUI lift the tab bar with the keyboard. The previous
-        // keyboard-ignore modifier left the bar underneath the input accessory
-        // and made the bottom controls feel blocked on small screens.
         .animation(.interactiveSpring(response: 0.28, dampingFraction: 0.86), value: appState.isTabChromeHidden)
-        .animation(.interactiveSpring(response: 0.28, dampingFraction: 0.86), value: audioCoordinator.currentBook != nil)
         .tint(AppTheme.accent)
-        .onChange(of: selectedTab) { _ in
-            dismissKeyboard()
-        }
-        .sheet(isPresented: $showFullAudioPlayer) {
-            AudioBookPlayerView()
-        }
+        .onChange(of: selectedTab) { _ in dismissKeyboard() }
+        .sheet(isPresented: $showFullAudioPlayer) { AudioBookPlayerView() }
         .sheet(item: verificationRequestBinding) { request in
-            VerificationCodeSheet(
-                request: request,
+            VerificationCodeSheet(request: request,
                 onSubmit: { verificationCoordinator.submit(id: request.id, code: $0) },
-                onCancel: { verificationCoordinator.cancel(id: request.id) }
-            )
+                onCancel: { verificationCoordinator.cancel(id: request.id) })
+        }
+    }
+
+    private var usesNativeTabs: Bool {
+        #if compiler(>=6.2)
+        if #available(iOS 26.0, *) { return true }
+        #endif
+        return false
+    }
+
+    @ViewBuilder private var navigationContent: some View {
+        #if compiler(>=6.2)
+        if #available(iOS 26.0, *) {
+            TabView(selection: $selectedTab) {
+                BookshelfView().tabItem { Label("主页", systemImage: "house") }.tag(0)
+                DiscoverView(viewModel: appState.discoverViewModel).tabItem { Label("发现", systemImage: "square.grid.2x2") }.tag(1)
+                SettingsView().tabItem { Label("设置", systemImage: "gearshape") }.tag(2)
+            }
+            .toolbar(appState.isTabChromeHidden ? .hidden : .visible, for: .tabBar)
+            .tabBarMinimizeBehavior(.onScrollDown)
+            .tabViewBottomAccessory {
+                if audioCoordinator.currentBook != nil, !appState.isTabChromeHidden { miniAudioPlayerBar }
+            }
+        } else {
+            legacyNavigationContent
+        }
+        #else
+        legacyNavigationContent
+        #endif
+    }
+
+    private var legacyNavigationContent: some View {
+        Group {
+            switch selectedTab {
+            case 0: BookshelfView()
+            case 1: DiscoverView(viewModel: appState.discoverViewModel)
+            default: SettingsView()
+            }
         }
     }
 

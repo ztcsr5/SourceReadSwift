@@ -4,6 +4,9 @@ import UIKit
 
 enum ReaderBackground: String, CaseIterable, Identifiable, Codable, Sendable {
     case paper      // 羊皮纸暖黄 (#EBD9BB)
+    case kraftTexture
+    case parchmentTexture
+    case linen
     case kraft      // 复古牛皮 (#DDC090)
     case green      // 豆沙青绿 (#C2D8AA)
     case lavender   // 淡雅黛紫 (#DBB8E2)
@@ -30,6 +33,7 @@ enum ReaderBackground: String, CaseIterable, Identifiable, Codable, Sendable {
     /// 极黑 / 深渊 也几乎分不出来 —— 这些只在 picker 里收敛，不影响旧数据。
     static var pickerCases: [ReaderBackground] {
         [
+            .kraftTexture, .parchmentTexture, .linen,
             .paper,      // #EBD9BB
             .kraft,      // #DDC090
             .green,      // #C2D8AA
@@ -47,7 +51,10 @@ enum ReaderBackground: String, CaseIterable, Identifiable, Codable, Sendable {
     var title: String {
         switch self {
         case .paper: return "羊皮纸"
-        case .kraft: return "牛皮纸"
+        case .kraft: return "牛皮色"
+        case .kraftTexture: return "牛皮纸纹"
+        case .parchmentTexture: return "羊皮纸纹"
+        case .linen: return "亚麻纸纹"
         case .green: return "豆沙绿"
         case .lavender: return "黛紫"
         case .azure: return "青空"
@@ -64,6 +71,8 @@ enum ReaderBackground: String, CaseIterable, Identifiable, Codable, Sendable {
         case .sakuraVader: return "深渊"
         }
     }
+
+    var hasTexture: Bool { self == .kraftTexture || self == .parchmentTexture || self == .linen }
 
     var color: Color {
         color(isNight: false)
@@ -103,8 +112,9 @@ enum ReaderBackground: String, CaseIterable, Identifiable, Codable, Sendable {
 
     var dayBackgroundHex: UInt32 {
         switch self {
-        case .paper: return 0xEBD9BB
-        case .kraft: return 0xDDC090
+        case .paper, .parchmentTexture: return 0xEBD9BB
+        case .kraft, .kraftTexture: return 0xDDC090
+        case .linen: return 0xF1EBDD
         case .green: return 0xC2D8AA
         case .lavender: return 0xDBB8E2
         case .azure: return 0xABCEE0
@@ -123,8 +133,9 @@ enum ReaderBackground: String, CaseIterable, Identifiable, Codable, Sendable {
 
     var dayTextHex: UInt32 {
         switch self {
-        case .paper: return 0x63543C
-        case .kraft: return 0x3E3422
+        case .paper, .parchmentTexture: return 0x63543C
+        case .kraft, .kraftTexture: return 0x3E3422
+        case .linen: return 0x38342F
         case .green: return 0x596C44
         case .lavender: return 0x5A4761
         case .azure: return 0x345367
@@ -144,8 +155,8 @@ enum ReaderBackground: String, CaseIterable, Identifiable, Codable, Sendable {
 
     var nightBackgroundHex: UInt32 {
         switch self {
-        case .paper: return 0x1E2021
-        case .kraft, .green, .lavender, .azure: return 0x3C3F43
+        case .paper, .parchmentTexture: return 0x1E2021
+        case .kraft, .kraftTexture, .linen, .green, .lavender, .azure: return 0x3C3F43
         case .white: return 0x18181A
         case .gray: return 0x2C2C2E
         case .dark, .eink: return 0x000000
@@ -161,7 +172,7 @@ enum ReaderBackground: String, CaseIterable, Identifiable, Codable, Sendable {
 
     var nightTextHex: UInt32 {
         switch self {
-        case .paper, .kraft: return 0xDCDFE1
+        case .paper, .kraft, .parchmentTexture, .kraftTexture, .linen: return 0xDCDFE1
         case .green: return 0x88C16F
         case .lavender: return 0xF6AEAE
         case .azure: return 0x90BFF5
@@ -192,7 +203,7 @@ enum ReaderBackground: String, CaseIterable, Identifiable, Codable, Sendable {
     func darkStatusIcon(isNight: Bool) -> Bool {
         if isNight { return false }
         switch self {
-        case .paper, .kraft, .white, .gray, .eink,
+        case .paper, .kraft, .parchmentTexture, .kraftTexture, .linen, .white, .gray, .eink,
              .sakuraClassic, .sakuraEarthly, .sakuraInk: return true
         case .custom:
             return !isDark

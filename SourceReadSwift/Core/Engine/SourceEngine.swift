@@ -125,7 +125,7 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
         get {
             fallbackLock.lock()
             defer { fallbackLock.unlock() }
-            return _allowWebViewFallback
+            return _allowWebViewFallback && !SourceRequestContext.isDiagnostic
         }
         set {
             fallbackLock.lock()

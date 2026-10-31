@@ -23,7 +23,13 @@ struct SourceBatchDiagnosticRunner: Sendable {
         page: Int = 1,
         timeout: TimeInterval = 10
     ) async -> SourceDiagnosticReport {
-        (engine as? SourceWebViewFallbackControllable)?.allowWebViewFallback = false
+        await SourceRequestContext.$isDiagnostic.withValue(true) {
+            await runIsolated(source: source, keyword: keyword, deepCheck: deepCheck, page: page, timeout: timeout)
+        }
+    }
+
+    private func runIsolated(source: BookSource, keyword: String, deepCheck: Bool,
+                             page: Int, timeout: TimeInterval) async -> SourceDiagnosticReport {
         let startedAt = Date()
         let cleanKeyword = keyword.trimmingCharacters(in: .whitespacesAndNewlines)
         (engine as? SourceDiagnosticEvidenceProvider)?.resetDiagnosticEvidence(sourceURL: source.bookSourceUrl)
@@ -213,30 +219,27 @@ struct SourceBatchDiagnosticRunner: Sendable {
         reports.reserveCapacity(sources.count)
         var completed = 0
 
-        var start = 0
-        while start < sources.count {
-            if Task.isCancelled { break }
-            let end = Swift.min(start + size, sources.count)
-            let batch = Array(sources[start..<end])
-            await withTaskGroup(of: SourceDiagnosticReport.self) { group in
-                for source in batch {
-                    group.addTask {
-                        await self.run(
-                            source: source,
-                            keyword: keyword,
-                            deepCheck: deepCheck,
-                            page: page,
-                            timeout: timeout
-                        )
-                    }
-                }
-                for await report in group {
-                    reports.append(report)
-                    completed += 1
-                    await progress?(completed, report)
+        // Refill a slot as soon as it finishes. Fixed batches made every fast
+        // source wait for the slowest timeout before any new probe could start.
+        await withTaskGroup(of: SourceDiagnosticReport.self) { group in
+            var iterator = sources.makeIterator()
+            func submit(_ source: BookSource) {
+                group.addTask {
+                    await self.run(source: source, keyword: keyword, deepCheck: deepCheck,
+                                   page: page, timeout: timeout)
                 }
             }
-            start = end
+            for _ in 0..<min(size, sources.count) {
+                if Task.isCancelled { break }
+                if let source = iterator.next() { submit(source) }
+            }
+            while let report = await group.next() {
+                if Task.isCancelled { group.cancelAll(); break }
+                reports.append(report)
+                completed += 1
+                await progress?(completed, report)
+                if let source = iterator.next() { submit(source) }
+            }
         }
 
         return SourceDiagnosticBatchReport(

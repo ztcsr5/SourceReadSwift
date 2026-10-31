@@ -695,23 +695,24 @@ struct DiscoverView: View {
                 .foregroundStyle(.secondary)
             }
 
+            resultPageControls
             if viewModel.displayMode == .aggregated {
                 if resultLayout == .grid {
                     LazyVGrid(
                         columns: [GridItem(.adaptive(minimum: 100, maximum: 140), spacing: 14)],
                         spacing: 18
                     ) {
-                        ForEach(viewModel.aggregatedResults) { item in
+                        ForEach(viewModel.pagedAggregatedResults) { item in
                             aggregatedBookGridCard(item, inShelf: shelf.contains(item.primaryBook))
                         }
                     }
                 } else {
-                    ForEach(viewModel.aggregatedResults) { item in
+                    ForEach(viewModel.pagedAggregatedResults) { item in
                         aggregatedBookCard(item, inShelf: shelf.contains(item.primaryBook))
                     }
                 }
             } else {
-                ForEach(viewModel.groupedResults) { group in
+                ForEach(viewModel.pagedGroupedResults) { group in
                     Section {
                         ForEach(group.books) { book in
                             searchResultCard(book, inShelf: shelf.contains(book))
@@ -730,6 +731,20 @@ struct DiscoverView: View {
                 }
             }
         }
+    }
+
+    private var resultPageControls: some View {
+        HStack {
+            Button("上一页") { viewModel.resultPage = max(0, viewModel.resultPage - 1) }
+                .disabled(viewModel.resultPage == 0)
+            Spacer()
+            Text("第 \(viewModel.resultPage + 1) / \(viewModel.resultPageCount) 页 · 每页 20 条")
+                .font(.caption.monospacedDigit()).foregroundStyle(.secondary)
+            Spacer()
+            Button("下一页") { viewModel.resultPage = min(viewModel.resultPageCount - 1, viewModel.resultPage + 1) }
+                .disabled(viewModel.resultPage + 1 >= viewModel.resultPageCount)
+        }
+        .buttonStyle(.bordered)
     }
 
     private func aggregatedBookGridCard(_ item: AggregatedSearchBook, inShelf: Bool) -> some View {
@@ -1261,7 +1276,13 @@ struct AggregatedSearchBook: Identifiable {
 @MainActor
 final class DiscoverViewModel: ObservableObject {
     @Published var keyword = ""
-    @Published var displayMode: SearchDisplayMode = .aggregated
+    @Published var displayMode: SearchDisplayMode = .aggregated { didSet { resultPage = 0 } }
+    @Published var resultPage = 0
+    static let resultPageSize = 20
+    var resultPageCount: Int { max(1, (displayCount + Self.resultPageSize - 1) / Self.resultPageSize) }
+    private var displayCount: Int { displayMode == .aggregated ? aggregatedResults.count : results.count }
+    var pagedAggregatedResults: [AggregatedSearchBook] { ResultPage.slice(aggregatedResults, page: resultPage) }
+    var pagedGroupedResults: [ResultGroup] { Self.makeGroupedResults(from: ResultPage.slice(results, page: resultPage)) }
     @Published var matchMode: SearchMatchMode = .exact
     @Published var resultFilterScope: SearchResultFilterScope = .all
     @Published var resultFilter = ""
@@ -1301,6 +1322,7 @@ final class DiscoverViewModel: ObservableObject {
     private func rebuildDerivedResults() {
         groupedResults = Self.makeGroupedResults(from: results)
         aggregatedResults = Self.makeAggregatedResults(from: results)
+        resultPage = min(resultPage, resultPageCount - 1)
     }
 
     private static func makeGroupedResults(from results: [SearchBook]) -> [ResultGroup] {

@@ -33,6 +33,7 @@ final class BookTOCacheStore {
         let updatedAt: Date
     }
 
+    private static let writer = DispatchQueue(label: "BookTOCache.writer", qos: .utility)
     private let fileManager: FileManager
     private let rootURL: URL?
     private var memory: [String: BookTOCacheEntry] = [:]
@@ -91,7 +92,8 @@ final class BookTOCacheStore {
         memory.removeValue(forKey: key)
         memoryOrder.removeAll { $0 == key }
         guard let url = try? storageURL(key: key) else { return }
-        try? fileManager.removeItem(at: url)
+        let manager = fileManager
+        Self.writer.async { try? manager.removeItem(at: url) }
     }
 
     // MARK: - Key / memory
@@ -130,8 +132,7 @@ final class BookTOCacheStore {
 
     private func loadFromDisk(key: String) -> (entry: BookTOCacheEntry, url: URL)? {
         guard let url = try? storageURL(key: key),
-              fileManager.fileExists(atPath: url.path),
-              let data = try? Data(contentsOf: url) else { return nil }
+              let data = Self.writer.sync(execute: { try? Data(contentsOf: url) }) else { return nil }
         let decoder = JSONDecoder()
         decoder.dateDecodingStrategy = .iso8601
         guard let persisted = try? decoder.decode(Persisted.self, from: data) else { return nil }
@@ -156,12 +157,12 @@ final class BookTOCacheStore {
             chapters: entry.chapters,
             updatedAt: entry.updatedAt
         )
-        let encoder = JSONEncoder()
-        encoder.dateEncodingStrategy = .iso8601
-        encoder.outputFormatting = [.sortedKeys]
-        guard let data = try? encoder.encode(persisted) else { return }
         let fileManager = self.fileManager
-        DispatchQueue.global(qos: .utility).async {
+        Self.writer.async {
+            let encoder = JSONEncoder()
+            encoder.dateEncodingStrategy = .iso8601
+            encoder.outputFormatting = [.sortedKeys]
+            guard let data = try? encoder.encode(persisted) else { return }
             try? AppStorageDirectory.safeWrite(data, to: url, fileManager: fileManager)
         }
     }

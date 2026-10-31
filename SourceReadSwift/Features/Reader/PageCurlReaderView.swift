@@ -16,6 +16,7 @@ struct PageCurlReaderView<Item: Identifiable, Content: View>: UIViewControllerRe
     let contentRevision: String
     let transitionStyle: UIPageViewController.TransitionStyle
     @Binding var currentPageIndex: Int
+    let turnRequest: ReaderPageTurnRequest?
     let onPageChanged: ((Int) -> Void)?
     /// 页面容器的真实尺寸与窗口坐标原点。分页引擎用它校准正文高度；
     /// 默认 nil 时为旧行为（只靠根视口）。
@@ -51,6 +52,7 @@ struct PageCurlReaderView<Item: Identifiable, Content: View>: UIViewControllerRe
         contentRevision: String,
         transitionStyle: UIPageViewController.TransitionStyle = .pageCurl,
         currentPageIndex: Binding<Int>,
+        turnRequest: ReaderPageTurnRequest? = nil,
         onPageChanged: ((Int) -> Void)? = nil,
         onPageContainerLayout: ((CGSize, CGFloat) -> Void)? = nil,
         onVisiblePageIdentity: ((String) -> Void)? = nil,
@@ -66,6 +68,7 @@ struct PageCurlReaderView<Item: Identifiable, Content: View>: UIViewControllerRe
         self.contentRevision = contentRevision
         self.transitionStyle = transitionStyle
         self._currentPageIndex = currentPageIndex
+        self.turnRequest = turnRequest
         self.onPageChanged = onPageChanged
         self.onPageContainerLayout = onPageContainerLayout
         self.onVisiblePageIdentity = onVisiblePageIdentity
@@ -152,6 +155,7 @@ struct PageCurlReaderView<Item: Identifiable, Content: View>: UIViewControllerRe
         // stole main-thread time from the page transition, which showed up as
         // the first-swipe hitch on ProMotion devices.
         context.coordinator.sync(uiViewController, contentRevision: contentRevision)
+        context.coordinator.requestTurn(turnRequest, on: uiViewController)
     }
 
     final class Coordinator: NSObject, UIPageViewControllerDataSource, UIPageViewControllerDelegate {
@@ -316,6 +320,38 @@ struct PageCurlReaderView<Item: Identifiable, Content: View>: UIViewControllerRe
                         }
                     }
                     host.suppressesLayoutReport = false
+                }
+            }
+        }
+
+        private var consumedTurnRequest: UUID?
+
+        func requestTurn(_ request: ReaderPageTurnRequest?, on pvc: UIPageViewController) {
+            guard let request, consumedTurnRequest != request.id else { return }
+            consumedTurnRequest = request.id
+            DispatchQueue.main.async { [weak self, weak pvc] in
+                guard let self, let pvc, !self.isUserInteracting,
+                      let host = pvc.viewControllers?.first as? PageHostingController<Content>,
+                      let current = self.currentIndex(for: host) else { return }
+                let target = current + request.direction
+                guard self.parent.pages.indices.contains(target) else { return }
+                let revision = self.parent.contentRevision
+                let controller = self.viewController(at: target)
+                self.isUserInteracting = true
+                self.parent.onInteractionChanged?(true)
+                pvc.setViewControllers([controller], direction: request.direction > 0 ? .forward : .reverse,
+                    animated: !UIAccessibility.isReduceMotionEnabled) { [weak self, weak pvc] completed in
+                    guard let self, let pvc else { return }
+                    self.isUserInteracting = false
+                    if completed, self.parent.contentRevision == revision,
+                       pvc.viewControllers?.first === controller {
+                        self.parent.currentPageIndex = target
+                        self.lastDesiredIndex = target
+                        self.parent.onPageChanged?(target)
+                        self.reportVisibleIdentity(controller)
+                    }
+                    self.parent.onInteractionChanged?(false)
+                    self.sync(pvc, contentRevision: self.parent.contentRevision)
                 }
             }
         }
