@@ -24,11 +24,8 @@ struct PurifyRulePreset: Identifiable, Hashable, Sendable {
             title: "广告与推广",
             detail: "删除常见章节内广告、推广、备用网址提示。",
             patterns: [
-                ".*最新地址.*",
-                ".*备用网址.*",
-                ".*APP内阅读.*",
-                ".*下载.*app.*",
-                ".*关注.*公众号.*"
+                "(?im)^\\s*(?:最新网址|备用网址|请记住本站域名)[：:][^\\r\\n]*(?:\\r?\\n|$)##",
+                "(?im)^\\s*(?:请下载本站APP|请在APP内阅读|关注本站公众号)[^\\r\\n]*(?:\\r?\\n|$)##"
             ]
         ),
         PurifyRulePreset(
@@ -36,10 +33,9 @@ struct PurifyRulePreset: Identifiable, Hashable, Sendable {
             title: "站点尾巴",
             detail: "删除站点在正文首尾追加的收藏、推荐、版权尾巴。",
             patterns: [
-                "请收藏本站.*##",
-                "喜欢.*请大家收藏.*##",
-                "本章未完.*请点击下一页继续阅读.*##",
-                "章节错误.*请点击报错.*##"
+                "(?m)^\\s*请收藏本站[^\\r\\n]*(?:\\r?\\n|$)##",
+                "(?m)^\\s*本章未完[，,。 ]*请点击下一页继续阅读[^\\r\\n]*(?:\\r?\\n|$)##",
+                "(?m)^\\s*章节错误[，,。 ]*请点击报错[^\\r\\n]*(?:\\r?\\n|$)##"
             ]
         ),
         PurifyRulePreset(
@@ -47,10 +43,8 @@ struct PurifyRulePreset: Identifiable, Hashable, Sendable {
             title: "乱码与占位",
             detail: "删除常见空白占位、重复分隔符和正文噪声。",
             patterns: [
-                "\\u3000{4,}##\\n",
-                "[-—=]{6,}##",
-                "\\[.*?最新网址.*?\\]##",
-                "『.*?』##"
+                "[\\u200B\\uFEFF]##",
+                "(?m)^[ \\t]*[-=]{8,}[ \\t]*$##"
             ]
         )
     ]

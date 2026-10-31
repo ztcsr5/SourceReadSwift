@@ -1,6 +1,11 @@
 import Foundation
 
 struct PurifyRuleEvaluator {
+    private static let regexCache: NSCache<NSString, NSRegularExpression> = {
+        let cache = NSCache<NSString, NSRegularExpression>()
+        cache.countLimit = 128
+        return cache
+    }()
     static func apply(
         rule: String,
         to text: String,
@@ -82,9 +87,14 @@ struct PurifyRuleEvaluator {
     }
 
     private static func replaceRegex(pattern: String, replacement: String, in text: String) -> String {
-        guard !pattern.isEmpty,
-              let regex = try? NSRegularExpression(pattern: pattern) else {
-            return text
+        guard !pattern.isEmpty else { return text }
+        let key = pattern as NSString
+        let regex: NSRegularExpression
+        if let cached = regexCache.object(forKey: key) { regex = cached }
+        else {
+            guard let compiled = try? NSRegularExpression(pattern: pattern) else { return text }
+            regexCache.setObject(compiled, forKey: key)
+            regex = compiled
         }
         let range = NSRange(text.startIndex..<text.endIndex, in: text)
         return regex.stringByReplacingMatches(in: text, range: range, withTemplate: replacement)

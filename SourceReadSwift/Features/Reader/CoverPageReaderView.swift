@@ -370,6 +370,7 @@ final class CoverPageHostController: UIViewController, UIGestureRecognizerDelega
         var candidate = touch.view
         while let view = candidate {
             if view is UIControl { return false }
+            if let text = view as? UITextView, text.isSelectable { return false }
             candidate = view.superview
         }
         return true

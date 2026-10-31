@@ -4,12 +4,18 @@ import SwiftUI
 struct RootTabView: View {
     @EnvironmentObject private var appState: AppState
     @ObservedObject private var audioCoordinator = AudioBookPlaybackCoordinator.shared
+    @AppStorage("settings.accentHex") private var accentHex = "594FDB"
+    @AppStorage("settings.secondaryAccentHex") private var secondaryAccentHex = "419BDC"
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Namespace private var tabSelection
     @State private var selectedTab = 0
     @State private var showFullAudioPlayer = false
     @ObservedObject private var verificationCoordinator = VerificationCodeCoordinator.shared
 
     var body: some View {
-        ZStack(alignment: .bottom) {
+        let _ = accentHex
+        let _ = secondaryAccentHex
+        return ZStack(alignment: .bottom) {
             // Only keep the active root alive.  The previous opacity-based
             // stack rendered three complete navigation trees every frame,
             // which was especially visible on long bookshelf lists.
@@ -52,7 +58,7 @@ struct RootTabView: View {
         // and made the bottom controls feel blocked on small screens.
         .animation(.interactiveSpring(response: 0.28, dampingFraction: 0.86), value: appState.isTabChromeHidden)
         .animation(.interactiveSpring(response: 0.28, dampingFraction: 0.86), value: audioCoordinator.currentBook != nil)
-        .animation(.easeOut(duration: 0.16), value: selectedTab)
+        .tint(AppTheme.accent)
         .onChange(of: selectedTab) { _ in
             dismissKeyboard()
         }
@@ -191,6 +197,7 @@ struct RootTabView: View {
                 if isSelected {
                     RoundedRectangle(cornerRadius: 14, style: .continuous)
                         .fill(AppTheme.accent.opacity(0.12))
+                        .matchedGeometryEffect(id: "selected-tab", in: tabSelection)
                 }
             }
             .contentShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
@@ -203,7 +210,7 @@ struct RootTabView: View {
         if HapticFeedback.isEnabled {
             UIImpactFeedbackGenerator(style: .light).impactOccurred()
         }
-        withAnimation(.spring(response: 0.28, dampingFraction: 0.8)) {
+        withAnimation(reduceMotion ? nil : .spring(response: 0.36, dampingFraction: 0.84)) {
             selectedTab = index
         }
     }

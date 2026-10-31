@@ -16,18 +16,14 @@ enum SmartWebArticleExtractor {
         guard let document = try? SwiftSoup.parse(html) else {
             return SmartWebArticle(title: fallbackTitle, paragraphs: plainText(html))
         }
-        for selector in ["script", "style", "noscript", "nav", "header", "footer", "form", "aside"] {
+        for selector in ["script", "style", "noscript", "nav", "header", "footer", "form", "aside", "[hidden]", "[aria-hidden=true]", "ins.adsbygoogle"] {
             try? document.select(selector).remove()
         }
         let title = (try? document.title())?.trimmingCharacters(in: .whitespacesAndNewlines)
             .nilIfEmpty ?? fallbackTitle
-        let candidates: [SwiftSoup.Element] = (try? Array(document.select("article, main, [class*=content], [class*=article], body"))) ?? []
-        let root: SwiftSoup.Element? = candidates.first ?? ((try? document.body()) ?? nil)
-        let blocks: [SwiftSoup.Element] = root.map { (try? Array($0.select("p, h1, h2, h3, li"))) ?? [] } ?? []
-        let structured = blocks.compactMap { try? $0.text().trimmingCharacters(in: .whitespacesAndNewlines) }
-            .filter { $0.count >= 2 }
-        let rawText = root.flatMap { try? $0.text() } ?? ""
-        let paragraphs = structured.isEmpty ? plainText(rawText) : deduplicated(structured)
+        let candidates: [SwiftSoup.Element] = (try? Array(document.select("article, main, #content, #chaptercontent, .read-content, [class*=content], [class*=article], body"))) ?? []
+        let root = candidates.max { score($0) < score($1) } ?? ((try? document.body()) ?? nil)
+        let paragraphs = root.map { plainText(blockText($0)) } ?? []
         return SmartWebArticle(title: title, paragraphs: paragraphs)
     }
 
@@ -37,14 +33,22 @@ enum SmartWebArticleExtractor {
             .components(separatedBy: .newlines)
             .flatMap { $0.components(separatedBy: "  ") }
             .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
-            .filter { $0.count >= 2 }
-            .reduce(into: [String]()) { result, paragraph in
-                if result.last != paragraph { result.append(paragraph) }
-            }
+            .filter { !$0.isEmpty }
     }
 
-    private static func deduplicated(_ paragraphs: [String]) -> [String] {
-        var seen = Set<String>()
-        return paragraphs.filter { seen.insert($0).inserted }
+    private static func score(_ element: SwiftSoup.Element) -> Double {
+        let text = (try? element.text()) ?? ""
+        let links = (try? element.select("a").text()) ?? ""
+        let weight: Double = ["article", "main"].contains(element.tagName()) ? 1.5 : (element.tagName() == "body" ? 0.65 : 1)
+        return Double(max(text.count - links.count * 3, 0)) * weight
+    }
+
+    private static func blockText(_ node: SwiftSoup.Node) -> String {
+        if let text = node as? SwiftSoup.TextNode { return text.getWholeText() }
+        let tag = (node as? SwiftSoup.Element)?.tagName() ?? ""
+        if tag == "br" { return "\n" }
+        let block = ["p", "div", "section", "article", "main", "h1", "h2", "h3", "li", "blockquote"].contains(tag)
+        let children = node.getChildNodes().map(blockText).joined()
+        return block ? "\n" + children + "\n" : children
     }
 }

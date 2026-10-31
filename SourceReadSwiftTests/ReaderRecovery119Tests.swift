@@ -50,7 +50,7 @@ final class ReaderRecovery119Tests: XCTestCase {
                         XCTAssertGreaterThan(pages.count, 1)
                         for (index, original) in paragraphs.enumerated() {
                             let entries = pages.flatMap(\.paragraphs).filter { $0.index == index }
-                            let expected = ReaderPageLayoutEngine.displayText(original, fontSize: size, indent: size * 2)
+                            let expected = original
                             XCTAssertEqual(entries.map(\.text).joined(), expected, "missing/repeated characters at \(size)/\(line)/\(gap)")
                             var offset = 0
                             for entry in entries {
@@ -102,7 +102,7 @@ final class ReaderRecovery119Tests: XCTestCase {
         XCTAssertEqual(pages.compactMap(\.inlineTitleText).joined(), title)
         for (index, original) in paragraphs.enumerated() {
             let entries = pages.flatMap(\.paragraphs).filter { $0.index == index }
-            let expected = ReaderPageLayoutEngine.displayText(original, fontSize: 20, indent: 40)
+            let expected = original
             XCTAssertEqual(entries.map(\.text).joined(), expected)
             var offset = 0
             for entry in entries {
@@ -172,7 +172,7 @@ final class ReaderPanController119Tests: XCTestCase {
                     XCTAssertFalse(pages.isEmpty)
                     for (index, original) in paragraphs.enumerated() {
                         XCTAssertEqual(pages.flatMap(\.paragraphs).filter { $0.index == index }.map(\.text).joined(),
-                                       ReaderPageLayoutEngine.displayText(original, fontSize: size, indent: size * 2))
+                                       original)
                     }
                     for page in pages {
                         let text = ReaderPageTextBuilder.make(

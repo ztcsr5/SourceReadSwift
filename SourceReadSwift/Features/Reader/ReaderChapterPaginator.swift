@@ -49,11 +49,11 @@ enum ReaderChapterPaginator {
             title,
             traditionalChinese: context.traditionalChinese
         )
-        // 页眉模式：章节名画在页眉带，正文第一页从与后续页完全相同的位置开始，
-        // 不再给标题预留 40~50pt 的正文高度。只有「正文大标题」模式保留旧行为。
+        // Both visible title modes include the chapter-opening heading. Only
+        // hidden explicitly removes it; header also retains the small page header.
         var currentHeight: CGFloat = 0
         var currentIncludesTitle = false
-        if context.chromeLayout == .inline {
+        if context.chromeLayout != .hidden && !transformedTitle.isEmpty {
             currentHeight = ReaderPageLayoutEngine.measureHeight(
                 transformedTitle,
                 typography: titleTypography,

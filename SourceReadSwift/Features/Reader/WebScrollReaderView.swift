@@ -94,6 +94,7 @@ struct WebScrollReaderView: UIViewRepresentable {
         private var isDocumentReady = false
         private var lastStyleSignature: String?
         private var lastContentFingerprint: String?
+        private var expectedContentRevision = ""
         private var lastHighlight = Int.min
         private var lastPageStepGeneration: Int
         private var lastResetToken: String?
@@ -214,11 +215,13 @@ struct WebScrollReaderView: UIViewRepresentable {
         }
 
         private func pushContent(webView: WKWebView) {
-            let payload = WebReaderContentPayloadBuilder.payload(
+            var payload = WebReaderContentPayloadBuilder.payload(
                 sections: view.sections,
                 showChapterEndBadge: view.showChapterEndBadge,
                 traditionalChineseEnabled: view.traditionalChineseEnabled
             )
+            expectedContentRevision = UUID().uuidString
+            payload["revision"] = expectedContentRevision
             call(function: "setContent", jsonObject: payload, webView: webView)
         }
 
@@ -242,9 +245,9 @@ struct WebScrollReaderView: UIViewRepresentable {
         }
 
         private func evaluateScrollTarget(webView: WKWebView) {
-            guard let target = pendingScrollTarget else { return }
+            guard let target = pendingScrollTarget, let key = pendingScrollKey else { return }
             let animated = view.animatedScrollDuration > 0.05
-            let script = "window.__reader.scrollToFlat(\(target), \(animated ? "true" : "false"));"
+            let script = "window.__reader.scrollToFlat(\(target), \(animated ? "true" : "false"), \(WebReaderJavaScriptLiteral.string(key)), \(WebReaderJavaScriptLiteral.string(expectedContentRevision)));"
             webView.evaluateJavaScript(script, completionHandler: nil)
         }
 
@@ -288,6 +291,12 @@ struct WebScrollReaderView: UIViewRepresentable {
                   let body = message.body as? [String: Any],
                   let type = body["type"] as? String else { return }
 
+            // A flat index only has meaning in the DOM version that produced
+            // it. Old WebKit messages must never be mapped through a new window.
+            if type != "ready" && type != "fatal" {
+                guard ReaderWebMessagePolicy.matchesRevision(body["revision"] as? String, expected: expectedContentRevision) else { return }
+            }
+
             switch type {
             case "ready":
                 isDocumentReady = true
@@ -307,21 +316,27 @@ struct WebScrollReaderView: UIViewRepresentable {
             case "visible":
                 let start = CACurrentMediaTime()
                 defer { ReaderScrollPerfMeter.record(cost: CACurrentMediaTime() - start) }
-                guard let flat = body["flat"] as? Int else { return }
+                guard pendingScrollKey == nil,
+                      view.scrollTarget == nil || view.scrollRequestKey == appliedScrollKey,
+                      let flat = body["flat"] as? Int else { return }
                 if flat >= 0 { view.onVisibleParagraph(flat) }
             case "near-bottom":
+                guard pendingScrollKey == nil else { return }
                 let start = CACurrentMediaTime()
                 defer { ReaderScrollPerfMeter.record(cost: CACurrentMediaTime() - start) }
                 view.onNearBottom?()
             case "near-top":
+                guard pendingScrollKey == nil else { return }
                 let start = CACurrentMediaTime()
                 defer { ReaderScrollPerfMeter.record(cost: CACurrentMediaTime() - start) }
                 view.onNearTop?()
             case "reach-bottom":
+                guard pendingScrollKey == nil else { return }
                 let start = CACurrentMediaTime()
                 defer { ReaderScrollPerfMeter.record(cost: CACurrentMediaTime() - start) }
                 view.onReachBottom?()
             case "reach-top":
+                guard pendingScrollKey == nil else { return }
                 let start = CACurrentMediaTime()
                 defer { ReaderScrollPerfMeter.record(cost: CACurrentMediaTime() - start) }
                 view.onReachTop?()
@@ -329,9 +344,11 @@ struct WebScrollReaderView: UIViewRepresentable {
                 guard let direction = body["direction"] as? Int else { return }
                 view.onPageStepBoundary?(direction > 0 ? 1 : -1)
             case "tap":
+                guard !view.textSelectionEnabled else { return }
                 guard let x = body["x"] as? Double, let y = body["y"] as? Double else { return }
                 view.onTap?(CGPoint(x: x, y: y))
             case "scroll-applied":
+                guard ReaderWebMessagePolicy.matchesRequest(body["requestKey"] as? String, pending: pendingScrollKey) else { return }
                 appliedScrollKey = pendingScrollKey
                 pendingScrollKey = nil
                 pendingScrollTarget = nil

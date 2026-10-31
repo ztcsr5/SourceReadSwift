@@ -10,9 +10,24 @@ enum AppTheme {
     static let card = Color(.systemBackground)
     static let elevatedCard = Color(.secondarySystemGroupedBackground)
     static let cardBackground = Color(.secondarySystemBackground)
-    static let accent = Color(red: 0.35, green: 0.31, blue: 0.86)
-    static let accentUIColor = UIColor(red: 0.35, green: 0.31, blue: 0.86, alpha: 1)
-    static let softBlue = Color(red: 0.86, green: 0.92, blue: 1.0)
+    static var accentUIColor: UIColor { color(for: "settings.accentHex", fallback: 0x594FDB) }
+    static var accent: Color { Color(uiColor: accentUIColor) }
+    static var secondaryAccent: Color { Color(uiColor: color(for: "settings.secondaryAccentHex", fallback: 0x419BDC)) }
+    static var softBlue: Color { secondaryAccent.opacity(0.16) }
+
+    static func color(for key: String, fallback: UInt32) -> UIColor {
+        let raw = UserDefaults.standard.string(forKey: key) ?? ""
+        let rgb = raw.count == 6 ? UInt32(raw, radix: 16) ?? fallback : fallback
+        return UIColor(red: CGFloat((rgb >> 16) & 255) / 255,
+                       green: CGFloat((rgb >> 8) & 255) / 255,
+                       blue: CGFloat(rgb & 255) / 255, alpha: 1)
+    }
+
+    static func hex(_ color: Color) -> String? {
+        var r: CGFloat = 0, g: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0
+        guard UIColor(color).getRed(&r, green: &g, blue: &b, alpha: &a) else { return nil }
+        return String(format: "%02X%02X%02X", Int((r * 255).rounded()), Int((g * 255).rounded()), Int((b * 255).rounded()))
+    }
     static let secondaryText = Color.secondary
 
     static let cardRadius: CGFloat = 24

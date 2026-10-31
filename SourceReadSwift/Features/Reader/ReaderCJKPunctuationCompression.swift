@@ -21,7 +21,10 @@ enum ReaderCJKPunctuationCompression {
     private static let trailingTrim: [Character: CGFloat] = [
         "，": 0.5, "。": 0.5, "、": 0.5, "；": 0.5, "：": 0.5,
         "！": 0.25, "？": 0.25,
-        "”": 0.5, "’": 0.5, "）": 0.5, "》": 0.5, "」": 0.5, "』": 0.5,
+        // Curly quotes are proportional in several system/custom fonts. An
+        // em/2 negative kern can consume their whole advance and overlap the
+        // next character; leave those marks at the font's natural advance.
+        "）": 0.5, "》": 0.5, "」": 0.5, "』": 0.5,
         "】": 0.5, "〕": 0.5, "〉": 0.5
     ]
 

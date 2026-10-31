@@ -9,6 +9,8 @@ struct SettingsView: View {
     @AppStorage("app.hapticsEnabled") private var hapticsEnabled = false
     @AppStorage("search_concurrent_threads") private var searchThreads = 12
     @AppStorage("batch_check_concurrent_threads") private var batchCheckThreads = 4
+    @AppStorage("settings.accentHex") private var accentHex = "594FDB"
+    @AppStorage("settings.secondaryAccentHex") private var secondaryAccentHex = "419BDC"
     @State private var cacheSize = "无缓存"
     @State private var rssCacheSize = "无缓存"
     @State private var backupDocument: AppDataBackupDocument?
@@ -47,6 +49,22 @@ struct SettingsView: View {
                             }
                         }
                     }
+                }
+
+                Section("自定义外观") {
+                    ColorPicker("主题主色", selection: Binding(get: { AppTheme.accent }, set: { if let hex = AppTheme.hex($0) { accentHex = hex } }), supportsOpacity: false)
+                    ColorPicker("主题辅色", selection: Binding(get: { AppTheme.secondaryAccent }, set: { if let hex = AppTheme.hex($0) { secondaryAccentHex = hex } }), supportsOpacity: false)
+                    HStack(spacing: 8) {
+                        ForEach(["594FDB", "267A62", "B75473", "B76A2C", "3476B8"], id: \.self) { hex in
+                            Button { accentHex = hex } label: {
+                                Circle().fill(Color(uiColor: colorFromHex(hex))).frame(width: 30, height: 30)
+                                    .overlay(Circle().strokeBorder(.primary.opacity(accentHex == hex ? 0.8 : 0), lineWidth: 2))
+                                    .frame(maxWidth: .infinity, minHeight: 44)
+                            }.buttonStyle(.plain).accessibilityLabel("主题色 \(hex)")
+                        }
+                    }
+                    Button("恢复纸间默认配色") { accentHex = "594FDB"; secondaryAccentHex = "419BDC" }
+                    Text("只调整应用界面配色，不覆盖书籍的阅读背景和字体颜色。").font(.caption).foregroundStyle(.secondary)
                 }
 
                 Section("排版与字体") {
@@ -274,34 +292,11 @@ struct SettingsView: View {
                 }
                 .id(perfRefreshToken)
 
-                Section("最近诊断") {
-                    if appState.diagnostics.isEmpty {
-                        Text("暂无诊断")
-                            .foregroundStyle(.secondary)
-                    } else {
-                        Button {
-                            UIPasteboard.general.string = diagnosticExportText(events: appState.diagnostics)
-                        } label: {
-                            Label("Copy all diagnostics", systemImage: "doc.on.doc")
-                        }
-
-                        ForEach(Array(appState.diagnostics.prefix(12))) { event in
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text("[\(event.stage)] \(event.message)")
-                                    .font(.subheadline.weight(.semibold))
-                                if let sourceName = event.sourceName {
-                                    Text(sourceName)
-                                        .font(.caption)
-                                        .foregroundStyle(.secondary)
-                                }
-                                ForEach(event.details.sorted(by: { $0.key < $1.key }), id: \.key) { item in
-                                    Text("\(item.key): \(item.value)")
-                                        .font(.caption2)
-                                        .lineLimit(2)
-                                        .foregroundStyle(.secondary)
-                                }
-                            }
-                        }
+                Section("诊断") {
+                    NavigationLink {
+                        RecentDiagnosticsView(events: appState.diagnostics).hideRootTabBar()
+                    } label: {
+                        Label("最近诊断 · 查看与复制", systemImage: "doc.text.magnifyingglass")
                     }
                 }
             }
@@ -349,54 +344,26 @@ struct SettingsView: View {
         }
     }
 
-    /// The settings screen used to be a plain grey list. A single branded
-    /// gradient header gives the page an anchor without disturbing any of the
-    /// existing controls or their grouping.
+    private func colorFromHex(_ hex: String) -> UIColor {
+        let n = UInt32(hex, radix: 16) ?? 0x594FDB
+        return UIColor(red: CGFloat((n >> 16) & 255) / 255, green: CGFloat((n >> 8) & 255) / 255, blue: CGFloat(n & 255) / 255, alpha: 1)
+    }
+
     private var settingsHeroSection: some View {
         Section {
-            VStack(spacing: 14) {
-                HStack(spacing: 14) {
-                    ZStack {
-                        RoundedRectangle(cornerRadius: 15, style: .continuous)
-                            .fill(AppTheme.accent.opacity(0.12))
-                        Image(systemName: "books.vertical.fill")
-                            .font(.system(size: 24, weight: .semibold))
-                            .foregroundStyle(AppTheme.accent)
-                    }
-                    .frame(width: 52, height: 52)
-                    .overlay {
-                        RoundedRectangle(cornerRadius: 15, style: .continuous)
-                            .stroke(AppTheme.accent.opacity(0.20), lineWidth: 0.8)
-                    }
-
-                    VStack(alignment: .leading, spacing: 3) {
-                        Text("纸间")
-                            .font(.system(size: 20, weight: .bold, design: .rounded))
-                            .foregroundStyle(.primary)
-                        Text("纯粹掌上阅读 · \(AppVersion.fullDisplayString)")
-                            .font(.system(size: 12, weight: .medium))
-                            .foregroundStyle(.secondary)
-                    }
-
-                    Spacer()
+            HStack(spacing: 16) {
+                Image(systemName: "book.closed.fill")
+                    .font(.system(size: 30, weight: .light))
+                    .foregroundStyle(LinearGradient(colors: [AppTheme.accent, AppTheme.secondaryAccent], startPoint: .topLeading, endPoint: .bottomTrailing))
+                    .frame(width: 48, height: 56)
+                VStack(alignment: .leading, spacing: 5) {
+                    Text("纸间").font(.system(size: 25, weight: .semibold, design: .serif))
+                    Text("把时间留给阅读").font(.subheadline).foregroundStyle(.secondary)
+                    Text(AppVersion.fullDisplayString).font(.caption.monospacedDigit()).foregroundStyle(.tertiary)
                 }
-
-                HStack(spacing: 8) {
-                    settingsHeroMetric("书源", value: "\(appState.sourceStore.sources.count)")
-                    settingsHeroMetric("书架", value: "\(appState.bookshelfStore.books.count)")
-                    settingsHeroMetric("分组", value: "\(appState.bookshelfStore.groups.count)")
-                }
+                Spacer(minLength: 0)
             }
-            .padding(16)
-            .background(
-                RoundedRectangle(cornerRadius: 18, style: .continuous)
-                    .fill(Color(uiColor: .secondarySystemGroupedBackground))
-            )
-            .overlay {
-                RoundedRectangle(cornerRadius: 18, style: .continuous)
-                    .stroke(Color.primary.opacity(0.06), lineWidth: 0.8)
-            }
-            .listRowInsets(EdgeInsets(top: 6, leading: AppTheme.pagePadding, bottom: 12, trailing: AppTheme.pagePadding))
+            .padding(.vertical, 10)
             .listRowBackground(Color.clear)
             .listRowSeparator(.hidden)
         }
@@ -1164,7 +1131,7 @@ private struct RuleHealthView: View {
     }
 }
 
-private struct PurifyRulesView: View {
+struct PurifyRulesView: View {
     @EnvironmentObject private var appState: AppState
     @State private var newRule = ""
     @State private var importText = ""

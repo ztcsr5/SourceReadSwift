@@ -32,7 +32,10 @@ struct SourceSmartImportResult: Sendable {
 
 @MainActor
 final class SourceStore: ObservableObject {
-    @Published private(set) var sources: [BookSource] = []
+    private(set) var sourcesRevision: UInt64 = 0
+    @Published private(set) var sources: [BookSource] = [] {
+        didSet { sourcesRevision &+= 1 }
+    }
     @Published private(set) var rssSources: [RSSSource] = []
     @Published private(set) var catalogs: [SourceCatalog] = []
     @Published private(set) var lastError: String?

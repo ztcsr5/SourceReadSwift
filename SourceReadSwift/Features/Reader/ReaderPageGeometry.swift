@@ -16,7 +16,7 @@ enum ReaderPageChromeLayout: String, CaseIterable, Identifiable, Codable, Sendab
 
     var title: String {
         switch self {
-        case .header: return "页眉小标题"
+        case .header: return "页眉与章首标题"
         case .inline: return "正文大标题"
         case .hidden: return "隐藏标题"
         }
@@ -25,7 +25,7 @@ enum ReaderPageChromeLayout: String, CaseIterable, Identifiable, Codable, Sendab
     var help: String {
         switch self {
         case .header:
-            return "每页顶部一行 12pt 章节名，正文从页眉下方开始；与栖阅 / 开元阅读截图一致，页面利用率最高。"
+            return "每页顶部显示小章节名，章节第一页同时显示正文大标题。"
         case .inline:
             return "章节第一页用大字号标题，标题占用正文高度；旧版排版。"
         case .hidden:

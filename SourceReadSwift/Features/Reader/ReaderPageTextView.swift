@@ -3,11 +3,8 @@ import UIKit
 
 /// Builds the attributed string for one paginated reader page.
 ///
-/// Pagination stores the first-line indent as ideographic spaces inside the
-/// paragraph (see `ReaderPageLayoutEngine.displayText`), so the paragraph
-/// style must not add `firstLineHeadIndent` again. The builder only applies
-/// justification: full lines reach both edges, the last line stays flush left
-/// because text is not stretched after its final glyph.
+/// Use a geometric indent, not expandable ideographic spaces. Justification
+/// then aligns the body edges without stretching the first-line indent.
 enum ReaderPageTextBuilder {
     struct Style {
         let bodyFont: UIFont
@@ -18,6 +15,7 @@ enum ReaderPageTextBuilder {
         let letterSpacing: CGFloat
         let paragraphSpacing: CGFloat
         let titleSpacing: CGFloat
+        var firstLineIndent: CGFloat = 0
     }
 
     struct Paragraph {
@@ -30,7 +28,8 @@ enum ReaderPageTextBuilder {
         Style(bodyFont: typography.font, titleFont: typography.titleFont,
               textColor: textColor, highlightColor: highlightColor,
               lineSpacing: typography.lineSpacing, letterSpacing: typography.letterSpacing,
-              paragraphSpacing: typography.paragraphSpacing, titleSpacing: typography.titleSpacing)
+              paragraphSpacing: typography.paragraphSpacing, titleSpacing: typography.titleSpacing,
+              firstLineIndent: typography.firstLineIndent)
     }
 
     static func make(title: String?, paragraphs: [Paragraph], style: Style) -> NSAttributedString {
@@ -74,9 +73,10 @@ enum ReaderPageTextBuilder {
                 : (paragraphs[index + 1].isContinuation ? 0 : effectiveSpacing)
             paragraphStyle.lineBreakStrategy = ReaderPageLayoutEngine.lineBreakStrategy
             paragraphStyle.alignment = .justified
-            // The indent is already part of `paragraph.text`; adding it here
-            // would double the first line and break pagination measurement.
-            paragraphStyle.firstLineHeadIndent = 0
+            // Legacy mixed-image pages still store explicit U+3000 prefixes.
+            // Continuations never repeat the paragraph's first-line indent.
+            paragraphStyle.firstLineHeadIndent = paragraph.isContinuation || paragraph.text.hasPrefix("　")
+                ? 0 : max(0, style.firstLineIndent)
             paragraphStyle.headIndent = 0
 
             var attributes: [NSAttributedString.Key: Any] = [

@@ -53,6 +53,8 @@ struct ReaderView: View {
     @State private var showChapterList = false
     @State private var showBookmarks = false
     @State private var showBookDetailSheet = false
+    @State private var showContentFilter = false
+    @State private var tocScrollTask: Task<Void, Never>?
     /// Per-source login surface.  Sources that gate chapters behind an account
     /// previously had no entry point inside the reader, so the only way to
     /// authenticate was the source manager's long-press menu.
@@ -828,9 +830,10 @@ struct ReaderView: View {
                 // 彻底释放 iOS 16 及全机型在 WKWebView 与 UIPageViewController 的原生滑动与翻页响应。
                 SpatialTapGesture()
                     .onEnded { value in
-                        guard readerMode != .scroll else { return }
+                        guard readerMode != .scroll, !textSelectionEnabled else { return }
                         handleReaderTap(at: value.location)
                     }
+                , including: textSelectionEnabled ? .none : .all
             )
 
             if showSettings && settingsTab == 2 {
@@ -880,6 +883,21 @@ struct ReaderView: View {
                         )
                     )
                     .zIndex(10)
+            }
+
+            if textSelectionEnabled && !showSettings {
+                VStack {
+                    HStack {
+                        Spacer()
+                        Button("完成选择") {
+                            textSelectionEnabled = false
+                            presentOverlay()
+                        }
+                        .font(.caption.weight(.semibold)).buttonStyle(.borderedProminent)
+                    }
+                    Spacer()
+                }
+                .padding(.top, readerTopSafeInset + 8).padding(.trailing, 16).zIndex(11)
             }
 
             if let statusMessage {
@@ -1020,9 +1038,17 @@ struct ReaderView: View {
         )) { item in
             IllustrationZoomViewer(url: item.url, headers: imageRequestHeaders)
         }
+        .sheet(isPresented: $showContentFilter) {
+            NavigationStack {
+                PurifyRulesView()
+                    .toolbar { ToolbarItem(placement: .cancellationAction) { Button("完成") { showContentFilter = false } } }
+            }
+        }
         .sheet(isPresented: $showBookDetailSheet) {
             NavigationStack {
-                if let shelfBook = appState.bookshelfStore.book(id: bookID) {
+                if let shelfBook = appState.bookshelfStore.book(id: bookID), shelfBook.sourceURL.hasPrefix("local://") {
+                    LocalBookMetadataView(book: shelfBook)
+                } else if let shelfBook = appState.bookshelfStore.book(id: bookID) {
                     BookDetailView(book: shelfBook.asSearchBook)
                 } else {
                     BookDetailView(book: SearchBook(
@@ -1115,6 +1141,8 @@ struct ReaderView: View {
             paginationWarmupRestartTask = nil
             chapterSeekTask?.cancel()
             chapterSeekTask = nil
+            tocScrollTask?.cancel()
+            tocScrollTask = nil
             positionPersistTask?.cancel()
             pageLayoutTask?.cancel()
             cancelPrefetch()
@@ -1858,6 +1886,9 @@ struct ReaderView: View {
         prefetchGeneration &+= 1
         let token = prefetchGeneration
         prefetchTask = Task { @MainActor in
+            // Let the first document/page commit before neighbouring chapters
+            // start patching it. Cancellation still takes effect immediately.
+            try? await Task.sleep(nanoseconds: 180_000_000)
             while !prefetchQueue.isEmpty,
                   !Task.isCancelled,
                   prefetchGeneration == token,
@@ -1943,7 +1974,7 @@ struct ReaderView: View {
                 // 40 ms timer on the main actor for the whole drag; park the
                 // warmup instead and let `handlePageInteraction(false)` restart
                 // it once the finger is up.
-                if !isLocalChapterBook && interactionGate.isPageInteractionActive {
+                if interactionGate.isPageInteractionActive {
                     paginationWarmupPending = true
                     break
                 }
@@ -2863,14 +2894,15 @@ struct ReaderView: View {
                 lineSpacing: CGFloat(lineSpacing),
                 letterSpacing: CGFloat(letterSpacing),
                 paragraphSpacing: CGFloat(paragraphSpacing),
-                titleSpacing: CGFloat(titleSpacing)
+                titleSpacing: CGFloat(titleSpacing),
+                firstLineIndent: CGFloat(paragraphIndent)
             )
         )
     }
 
     /// 预建前后各 radius 页的富文本（前 5 后 5）。
     /// 翻页首帧只保留 TextKit 排字，逐字符的标点压缩在抬手前就已算完。
-    private func prewarmPageText(around index: Int, radius: Int = 12) {
+    private func prewarmPageText(around index: Int, radius: Int = 4) {
         guard readerMode != .scroll, !pagedBlocks.isEmpty else { return }
         let lower = max(0, index - radius)
         let upper = min(pagedBlocks.count - 1, index + radius)
@@ -3611,17 +3643,6 @@ struct ReaderView: View {
                     .disabled(onRequestSourceSwitch == nil)
                     .opacity(onRequestSourceSwitch == nil ? 0.35 : 1)
 
-                    // 第二个常驻按钮选「书签」：阅读器里加/查书签原本只有
-                    // 顶部小图标一个入口，底栏给一个带当前状态的入口，
-                    // 点一下直接落到书签列表，读完一章随手归档最顺手。
-                    toolButton(
-                        icon: isCurrentChapterBookmarked ? "bookmark.fill" : "bookmark",
-                        title: "书签"
-                    ) {
-                        closeSettingsPanel()
-                        toggleCurrentBookmark(openList: true)
-                    }
-
                     // 第五个入口给朗读/暂停：TTS 原来只在右上角溢出菜单里，
                     // 追更时一边听一边翻页是高频操作，底栏一键可达。
                     toolButton(
@@ -3889,19 +3910,16 @@ struct ReaderView: View {
         if canShowPayAction {
             chapterActions.append(action("购买本章", "cart", enabled: !isPerformingPayAction) { showPayActionConfirmation = true })
         }
-        var playback: [UIMenuElement] = [
-            action(speechController.isPaused ? "继续朗读" : (speechController.isSpeaking ? "暂停朗读" : "开始朗读"),
-                   speechController.isSpeaking ? "pause.fill" : "speaker.wave.2") { toggleSpeech() },
+        let playback: [UIMenuElement] = [
             action(autoScrollEnabled ? "暂停自动翻页" : "开始自动翻页", autoScrollEnabled ? "pause.fill" : "play.fill") { toggleAutoScroll() }
         ]
-        if speechController.isSpeaking {
-            playback.append(action("停止朗读", "stop.fill", destructive: true) { stopSpeechPlayback() })
-        }
         let bookActions: [UIMenuElement] = [
             action("书籍详情", "info.circle") {
-                if let onRequestBookDetail { onRequestBookDetail() } else { showBookDetailSheet = true }
+                if appState.bookshelfStore.book(id: bookID)?.sourceURL.hasPrefix("local://") == true {
+                    showBookDetailSheet = true
+                } else if let onRequestBookDetail { onRequestBookDetail() } else { showBookDetailSheet = true }
             },
-            action("换源", "arrow.triangle.2.circlepath", enabled: onRequestSourceSwitch != nil) { onRequestSourceSwitch?() },
+            action("内容过滤", "line.3.horizontal.decrease.circle") { showContentFilter = true },
             action("登录书源", "person.badge.key", enabled: currentBookSource != nil) { readerLoginSource = currentBookSource }
         ]
         return UIMenu(children: [
@@ -4113,7 +4131,7 @@ struct ReaderView: View {
                     .font(.subheadline.weight(.semibold))
                     .foregroundStyle(readerThemeTextColor.opacity(0.62))
                 Spacer()
-                Text(readerBrightness < 0 ? "跟随系统" : "\(Int(readerBrightness * 100))%")
+                Text(readerBrightness < 0 ? "自动亮度" : "\(Int(readerBrightness * 100))%")
                     .font(.caption.weight(.bold))
                     .foregroundStyle(AppTheme.accent)
                 Button("跟随系统") {
@@ -4845,6 +4863,10 @@ struct ReaderView: View {
             .scrollContentBackground(.hidden)
             .background(Color.clear)
             .scrollDismissesKeyboard(.interactively)
+            .simultaneousGesture(DragGesture(minimumDistance: 3).onChanged { _ in
+                tocScrollTask?.cancel()
+                tocScrollTask = nil
+            })
             .onAppear {
                 // 首帧的行还没建出来，同一 runloop 里 scrollTo 会落空，
                 // 挪到下一拍再滚动。
@@ -4899,16 +4921,14 @@ struct ReaderView: View {
             ?? chapters.first(where: { $0.index >= preferred })
             ?? chapters.first else { return }
         let id = target.id
-        // sheet 首次 onAppear 时 List 的行还没完成布局，单次 async 会落空，
-        // 于是每次打开都停在第一章。多拍重试，行建好后自然命中。
-        // Sheet presentation + List lazy row construction can take longer than
-        // the old 0.7 s cap on a 1000-chapter book, which is why reopening the
-        // TOC still landed on chapter one. Keep retrying while the sheet
-        // settles; later attempts are cheap and idempotent.
-        for delay in [0.05, 0.15, 0.35, 0.7, 1.1, 1.6] {
-            DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
-                proxy.scrollTo(id, anchor: .center)
-            }
+        tocScrollTask?.cancel()
+        tocScrollTask = Task { @MainActor in
+            await Task.yield()
+            try? await Task.sleep(nanoseconds: 80_000_000)
+            guard !Task.isCancelled, showChapterList else { return }
+            var transaction = Transaction()
+            transaction.disablesAnimations = true
+            withTransaction(transaction) { proxy.scrollTo(id, anchor: .center) }
         }
     }
 
@@ -5327,6 +5347,7 @@ struct ReaderView: View {
     }
 
     private func handleReaderTap(at location: CGPoint) {
+        guard !textSelectionEnabled else { return }
         let now = Date()
         guard now >= tapCooldownUntil else { return }
         tapCooldownUntil = now.addingTimeInterval(0.28)

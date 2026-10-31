@@ -712,7 +712,11 @@ struct DiscoverView: View {
                 }
             } else {
                 ForEach(viewModel.groupedResults) { group in
-                    VStack(alignment: .leading, spacing: 10) {
+                    Section {
+                        ForEach(group.books) { book in
+                            searchResultCard(book, inShelf: shelf.contains(book))
+                        }
+                    } header: {
                         HStack(spacing: 6) {
                             Image(systemName: "books.vertical")
                             Text(group.source)
@@ -722,9 +726,6 @@ struct DiscoverView: View {
                                 .foregroundStyle(.secondary)
                         }
                         .foregroundStyle(AppTheme.accent)
-                        ForEach(group.books) { book in
-                            searchResultCard(book, inShelf: shelf.contains(book))
-                        }
                     }
                 }
             }
@@ -1470,7 +1471,7 @@ final class DiscoverViewModel: ObservableObject {
     /// sources and the row views called it on every layout pass.
     func sourceKind(for book: SearchBook) -> BookSourceKind {
         let sources = appState?.sourceStore.sources ?? []
-        let token = "\(sources.count)|\(sources.first?.bookSourceUrl ?? "")|\(sources.last?.bookSourceUrl ?? "")"
+        let token = String(appState?.sourceStore.sourcesRevision ?? 0)
         if token != sourceKindCacheToken {
             var map: [String: BookSourceKind] = [:]
             map.reserveCapacity(sources.count)
@@ -1586,6 +1587,7 @@ final class DiscoverViewModel: ObservableObject {
             let rankedBooks = await Task.detached(priority: .userInitiated) {
                 SearchBookMatcher.filteredAndRanked(snapshot, keyword: keyword, exact: exactMatch)
             }.value
+            guard !Task.isCancelled, generation == searchGeneration, activeSearchID == searchID else { return }
             unfilteredResults = rankedBooks
             applyResultFilter()
         }

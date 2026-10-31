@@ -714,6 +714,7 @@ enum WebReaderHTML {
 
       function post(message) {
         try {
+          message.revision = state.revision || "";
           var bridge = window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.reader;
           if (bridge) { bridge.postMessage(message); }
         } catch (error) {}
@@ -909,6 +910,7 @@ enum WebReaderHTML {
       }
 
       function setContent(payload) {
+        state.revision = payload.revision || "";
         var anchor = captureAnchor();
         var nextSections = Object.create(null);
         var nextOrder = [];
@@ -1155,8 +1157,10 @@ enum WebReaderHTML {
         animateTo(target, 280);
       }
 
-      function scrollToFlat(flat, animated) {
-        var element = elementForFlat(flat);
+      function scrollToFlat(flat, animated, requestKey, revision) {
+        if (revision !== state.revision) { return; }
+        // Explicit chapter jumps cannot settle on a nearby old paragraph.
+        var element = content.querySelector('[data-flat="' + flat + '"]');
         if (!element) {
           post({ type: "scroll-miss", flat: flat });
           return;
@@ -1164,11 +1168,13 @@ enum WebReaderHTML {
         var rect = element.getBoundingClientRect();
         var target = Math.max(rect.top + window.scrollY - topInset(), 0);
         if (Math.abs(target - window.scrollY) >= 4) {
-          animateTo(target, animated ? 320 : 0);
+          // Jump atomically: intermediate smooth-scroll positions used to be
+          // reported as reading progress and could reactivate the old chapter.
+          animateTo(target, 0);
         }
         state.visible = -1;
         window.requestAnimationFrame(onScroll);
-        post({ type: "scroll-applied", flat: flat });
+        post({ type: "scroll-applied", flat: flat, requestKey: requestKey });
       }
 
       /// 回到文档顶端。换书/首次进书时调用：WKWebView 可能被复用，

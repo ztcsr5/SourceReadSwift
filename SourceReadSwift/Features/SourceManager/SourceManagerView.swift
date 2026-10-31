@@ -1034,71 +1034,43 @@ struct SourceManagerView: View {
         primaryAction: (() -> Void)? = nil,
         @ViewBuilder actions: @escaping () -> MenuContent
     ) -> some View {
-        HStack(alignment: .top, spacing: 12) {
-            VStack(alignment: .leading, spacing: 6) {
-                Text(title)
-                    .font(.headline)
-                    .foregroundStyle(.primary)
-                    .lineLimit(1)
-                Text([subtitle, group].compactMap { $0 }.filter { !$0.isEmpty }.joined(separator: " · "))
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(2)
-                HStack(spacing: 8) {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(alignment: .top, spacing: 8) {
+                VStack(alignment: .leading, spacing: 5) {
+                    Text(title).font(.headline).foregroundStyle(.primary).lineLimit(2)
+                    Text([subtitle, group].compactMap { $0 }.filter { !$0.isEmpty }.joined(separator: " · "))
+                        .font(.caption).foregroundStyle(.secondary).lineLimit(2)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                Menu { actions() } label: {
+                    Image(systemName: "ellipsis.circle").font(.title3)
+                        .foregroundStyle(.secondary).frame(width: 44, height: 44)
+                }
+            }
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 6) {
                     statusBadge(enabled ? "启用" : "停用", color: enabled ? .green : .gray)
-                    ForEach(badges, id: \.self) { badge in
-                        statusBadge(badge, color: .blue)
+                    ForEach(badges, id: \.self) { badge in statusBadge(badge, color: AppTheme.accent) }
+                }
+            }
+            if let health {
+                Label("\(health.status.title) · \(health.testedAt.formatted(date: .abbreviated, time: .shortened))", systemImage: health.status.systemImage)
+                    .font(.caption2.weight(.semibold)).foregroundStyle(health.status.color).lineLimit(1)
+                Text(health.message).font(.caption2).foregroundStyle(.secondary).lineLimit(2)
+            }
+            if onLogin != nil || primaryAction != nil {
+                HStack(spacing: 12) {
+                    if let onLogin, loginHost != nil {
+                        Button(action: onLogin) {
+                            Label(isLoggedIn ? "已登录" : "登录", systemImage: isLoggedIn ? "checkmark.seal.fill" : "key.fill")
+                        }
+                    }
+                    if let primaryAction {
+                        Button(action: primaryAction) { Label("详情", systemImage: "info.circle") }
                     }
                 }
-                if let health {
-                    HStack(spacing: 6) {
-                        Image(systemName: health.status.systemImage)
-                        Text("\(health.status.title) · \(health.testedAt.formatted(date: .abbreviated, time: .shortened))")
-                            .lineLimit(1)
-                    }
-                    .font(.caption2.weight(.semibold))
-                    .foregroundStyle(health.status.color)
-                    Text(health.message)
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(2)
-                }
-            }
-            Spacer()
-            if let onLogin, loginHost != nil {
-                Button(action: onLogin) {
-                    Label(
-                        isLoggedIn ? "已登录" : "登录",
-                        systemImage: isLoggedIn ? "checkmark.seal.fill" : "key.fill"
-                    )
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(isLoggedIn ? Color.green : AppTheme.accent)
-                    .padding(.horizontal, 9)
-                    .padding(.vertical, 8)
-                    .background((isLoggedIn ? Color.green : AppTheme.accent).opacity(0.12), in: Capsule())
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel(isLoggedIn ? "\(title) 已登录，点击可重新登录" : "登录\(title)")
-            }
-            if let primaryAction {
-                Button(action: primaryAction) {
-                    Label("详情", systemImage: "info.circle")
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(AppTheme.accent)
-                        .padding(.horizontal, 9)
-                        .padding(.vertical, 8)
-                        .background(AppTheme.accent.opacity(0.12), in: Capsule())
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel("打开\(title)详情")
-            }
-            Menu {
-                actions()
-            } label: {
-                Image(systemName: "ellipsis.circle")
-                    .font(.title3)
-                    .foregroundStyle(.secondary)
-                    .frame(width: 44, height: 44)
+                .font(.caption.weight(.semibold)).buttonStyle(.bordered).tint(AppTheme.accent)
+                .labelStyle(.titleAndIcon).lineLimit(1).fixedSize(horizontal: false, vertical: true)
             }
         }
         .padding(14)
@@ -1114,6 +1086,8 @@ struct SourceManagerView: View {
     private func statusPill(_ text: String, color: Color) -> some View {
         Text(text)
             .font(.caption2.weight(.bold))
+            .lineLimit(1)
+            .fixedSize(horizontal: true, vertical: false)
             .padding(.horizontal, 8)
             .padding(.vertical, 4)
             .foregroundStyle(color)

@@ -21,6 +21,7 @@ struct SourceLoginView: View {
     @State private var input: [String: String] = [:]
     @State private var busy = false
     @State private var resolvedFields: [SourceLoginField]?
+    @StateObject private var readingSession = WebReadingSession()
 
     private var fields: [SourceLoginField] {
         resolvedFields ?? SourceLoginFieldParser.parse(source.loginUi)
@@ -36,6 +37,21 @@ struct SourceLoginView: View {
                 statusBar
                 if !hasConfiguredForm {
                     pageContent
+                        .overlay {
+                            if let article = readingSession.article { ExtractedArticleView(article: article) }
+                        }
+                        .safeAreaInset(edge: .bottom) {
+                            VStack(spacing: 6) {
+                                if let error = readingSession.errorMessage { Text(error).font(.caption).foregroundStyle(.red) }
+                                Button {
+                                    if readingSession.article != nil { readingSession.article = nil }
+                                    else { readingSession.extractCurrentPage() }
+                                } label: {
+                                    Label(readingSession.article != nil ? "返回登录网页" : (readingSession.isExtracting ? "提取中…" : "提取当前页正文并阅读"), systemImage: "doc.text.magnifyingglass")
+                                }
+                                .buttonStyle(.bordered).disabled(readingSession.isExtracting)
+                            }.padding(10).background(.regularMaterial)
+                        }
                 } else {
                     formContent
                 }
@@ -58,6 +74,7 @@ struct SourceLoginView: View {
             }
         }
         .presentationDetents([.large])
+        .onDisappear { readingSession.cancelExtraction() }
         .task {
             if !hasConfiguredForm, loginTarget?.usedBookSourceFallback == true {
                 status = "该书源未配置 loginUrl，已打开书源主页，请登录后点完成"
@@ -88,7 +105,7 @@ struct SourceLoginView: View {
     @ViewBuilder
     private var pageContent: some View {
         if let target = loginTarget {
-            SourceLoginWebView(url: target.url, cookieStore: cookieStore) { message in
+            SourceLoginWebView(url: target.url, cookieStore: cookieStore, readingSession: readingSession) { message in
                 status = message
             }
         } else {
@@ -329,6 +346,7 @@ struct SourceLoginView: View {
 private struct SourceLoginWebView: UIViewRepresentable {
     let url: URL
     let cookieStore: SourceCookieStore
+    let readingSession: WebReadingSession
     let onStatus: (String) -> Void
 
     func makeCoordinator() -> Coordinator {
@@ -339,6 +357,7 @@ private struct SourceLoginWebView: UIViewRepresentable {
         let configuration = WKWebViewConfiguration()
         configuration.websiteDataStore = .default()
         let webView = WKWebView(frame: .zero, configuration: configuration)
+        readingSession.webView = webView
         webView.navigationDelegate = context.coordinator
         webView.allowsBackForwardNavigationGestures = true
         webView.load(URLRequest(url: url))

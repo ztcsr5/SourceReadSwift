@@ -8,6 +8,8 @@ struct BookDetailView: View {
     @State private var book: SearchBook
     @State private var detail: BookDetail?
     @State private var chapters: [BookChapter] = []
+    @State private var loadGeneration = UUID()
+    @State private var tocExpansionTask: Task<Void, Never>?
     @State private var isLoading = false
     @State private var errorMessage: String?
     @State private var didOpenReader = false
@@ -818,126 +820,106 @@ struct BookDetailView: View {
     /// 拉详情 + 全量目录。首次打开用于填充整页，命中缓存后用于后台刷新；
     /// `reportErrors == false` 时失败保持静默，避免把已经显示出来的目录
     /// 换成一屏红字。
+    private enum LoadEvent {
+        case detail(Result<BookDetail, SourceEngineError>)
+        case toc(Result<[BookChapter], SourceEngineError>)
+    }
+
     private func refreshDetailAndTOC(source: BookSource, reportErrors: Bool) async {
         let engine = appState.engine
         let selectedBook = book
-        // 首次打开没有缓存时只抓目录头部：`getChapterList` 对分页目录是串行
-        // 抓取（下一页 URL 由上页 HTML 给出），30 页目录能让详情页白等几秒。
-        // 缓存已有目录时后台刷新直接取全量，不再做二次请求。
+        let generation = UUID()
+        loadGeneration = generation
+        tocExpansionTask?.cancel()
         let stagedFirstPaint = chapters.isEmpty
-        // 大多数书源的目录地址就是书籍页本身（`tocUrl` 为空），所以详情和
-        // 目录可以同时发请求。之前先 await 详情、再 await 目录，两段网络
-        // 时间完全串行，表现为「搜书点进去详情慢、目录又慢」。
-        let placeholderDetail = BookDetail(
-            name: selectedBook.name,
-            author: selectedBook.author,
-            coverUrl: selectedBook.coverUrl,
-            bookUrl: selectedBook.bookUrl,
-            tocUrl: nil,
-            sourceName: selectedBook.sourceName,
-            sourceUrl: selectedBook.sourceUrl,
-            intro: selectedBook.intro,
-            latestChapter: selectedBook.lastChapter,
-            wordCount: selectedBook.wordCount,
-            kind: selectedBook.kind
-        )
-        let firstPageCount = stagedFirstPaint ? 2 : 30
-        async let detailTask: Result<BookDetail, SourceEngineError>? = AsyncTimeout.run(seconds: 20) {
-            await engine.getBookDetail(source: source, book: selectedBook)
+        let placeholder = BookDetail(name: selectedBook.name, author: selectedBook.author,
+            coverUrl: selectedBook.coverUrl, bookUrl: selectedBook.bookUrl, tocUrl: nil,
+            sourceName: selectedBook.sourceName, sourceUrl: selectedBook.sourceUrl,
+            intro: selectedBook.intro, latestChapter: selectedBook.lastChapter,
+            wordCount: selectedBook.wordCount, kind: selectedBook.kind)
+        let pages = stagedFirstPaint ? 1 : 30
+        var fetchedDetail: BookDetail?
+        var tocFailed = false
+        func current() -> Bool {
+            !Task.isCancelled && loadGeneration == generation
+                && book.bookUrl == selectedBook.bookUrl && book.sourceUrl == selectedBook.sourceUrl
         }
-        async let tocTask: Result<[BookChapter], SourceEngineError>? = AsyncTimeout.run(seconds: 12) {
-            await engine.getChapterList(source: source, book: placeholderDetail, maxPages: firstPageCount)
-        }
-
-        let detailResult = await detailTask ?? .failure(.network("Detail load timed out"))
-        var loadedDetail: BookDetail?
-        switch detailResult {
-        case .success(let fetchedDetail):
-            loadedDetail = fetchedDetail
-            detail = fetchedDetail
-            // The search result may carry no cover while the detail rule does.
-            // Persist it into the local book state so the header and the
-            // bookshelf row stop showing a placeholder.
-            if let loadedCover = fetchedDetail.coverUrl?.nilIfEmpty,
-               book.coverUrl?.nilIfEmpty == nil {
-                book = SearchBook(
-                    name: book.name,
-                    author: book.author ?? fetchedDetail.author,
-                    coverUrl: loadedCover,
-                    bookUrl: book.bookUrl,
-                    sourceName: book.sourceName,
-                    sourceUrl: book.sourceUrl,
-                    intro: book.intro ?? fetchedDetail.intro,
-                    kind: book.kind,
-                    lastChapter: book.lastChapter,
-                    wordCount: book.wordCount,
-                    checkKeyWord: book.checkKeyWord
-                )
+        // Deliver each phase as it arrives. A fast TOC must not wait behind a
+        // slow metadata request just because detailTask was awaited first.
+        await withTaskGroup(of: LoadEvent.self) { group in
+            group.addTask {
+                .detail(await AsyncTimeout.run(seconds: 20) {
+                    await engine.getBookDetail(source: source, book: selectedBook)
+                } ?? .failure(.network("详情加载超时")))
             }
-        case .failure(let error):
-            if reportErrors || chapters.isEmpty {
-                errorMessage = error.displayMessage
+            group.addTask {
+                .toc(await AsyncTimeout.run(seconds: 12) {
+                    await engine.getChapterList(source: source, book: placeholder, maxPages: pages)
+                } ?? .failure(.network("目录加载超时")))
+            }
+            for await event in group {
+                guard current() else { group.cancelAll(); return }
+                switch event {
+                case .detail(.success(let value)):
+                    fetchedDetail = value
+                    detail = value
+                    isLoading = false
+                    if book.coverUrl?.nilIfEmpty == nil, let cover = value.coverUrl?.nilIfEmpty {
+                        book = SearchBook(name: book.name, author: book.author ?? value.author,
+                            coverUrl: cover, bookUrl: book.bookUrl, sourceName: book.sourceName,
+                            sourceUrl: book.sourceUrl, intro: book.intro ?? value.intro,
+                            kind: book.kind, lastChapter: book.lastChapter,
+                            wordCount: book.wordCount, checkKeyWord: book.checkKeyWord)
+                    }
+                case .detail(.failure(let error)):
+                    if reportErrors && chapters.isEmpty { errorMessage = error.displayMessage }
+                case .toc(.success(let value)):
+                    chapters = value
+                    isLoading = false
+                    errorMessage = nil
+                case .toc(.failure):
+                    tocFailed = true
+                }
             }
         }
-
-        var chapterResult: Result<[BookChapter], SourceEngineError> = await tocTask
-            ?? .failure(.network("Chapter list timed out"))
-        // 占位详情缺少详情规则解析出的变量或 tocUrl，失败时用真实详情重试一次。
-        if case .failure = chapterResult, let loadedDetail = loadedDetail {
-            chapterResult = await AsyncTimeout.run(seconds: 20) {
-                await engine.getChapterList(source: source, book: loadedDetail, maxPages: firstPageCount)
-            } ?? .failure(.network("Chapter list timed out"))
+        guard current() else { return }
+        // Some rules need the real tocUrl/variables obtained from metadata.
+        if tocFailed, let fetchedDetail {
+            let retry = await AsyncTimeout.run(seconds: 20) {
+                await engine.getChapterList(source: source, book: fetchedDetail, maxPages: pages)
+            }
+            guard current() else { return }
+            if case .success(let value)? = retry { chapters = value; errorMessage = nil }
+            else if reportErrors && chapters.isEmpty { errorMessage = "目录加载失败，可刷新重试" }
         }
-
-        switch chapterResult {
-        case .success(let loadedChapters):
-            chapters = loadedChapters
-            let cacheDetail = loadedDetail ?? placeholderDetail
-            appState.bookTOCacheStore.save(
-                detail: cacheDetail,
-                chapters: loadedChapters,
-                sourceURL: source.bookSourceUrl,
-                bookURL: book.bookUrl
-            )
-            if let loadedDetail = loadedDetail, appState.bookshelfStore.contains(book) {
-                appState.bookshelfStore.updateDetails(
-                    bookID: book.id,
-                    latestChapterTitle: loadedDetail.latestChapter,
-                    intro: loadedDetail.intro,
-                    totalChapters: loadedChapters.count,
-                    coverURL: loadedDetail.coverUrl
-                )
-            }
-            if stagedFirstPaint {
-                // 目录先显示头部（2 页），完整目录在后台补齐并落缓存；
-                // 真实详情的 tocUrl 与占位不同也会在这次补全里纠正。
-                extendTOCInBackground(source: source, detail: cacheDetail)
-            }
-        case .failure(let error):
-            if reportErrors || chapters.isEmpty {
-                errorMessage = "目录加载失败：\(error.displayMessage)"
-            }
+        guard current() else { return }
+        if appState.bookshelfStore.contains(selectedBook), let fetchedDetail {
+            appState.bookshelfStore.updateDetails(bookID: selectedBook.id,
+                latestChapterTitle: fetchedDetail.latestChapter, intro: fetchedDetail.intro,
+                totalChapters: chapters.count, coverURL: fetchedDetail.coverUrl)
+        }
+        isLoading = false
+        let cacheDetail = fetchedDetail ?? placeholder
+        if detail == nil { detail = cacheDetail }
+        if !chapters.isEmpty {
+            appState.bookTOCacheStore.save(detail: cacheDetail, chapters: chapters,
+                sourceURL: selectedBook.sourceUrl, bookURL: selectedBook.bookUrl)
+            if stagedFirstPaint { extendTOCInBackground(source: source, detail: cacheDetail, generation: generation) }
         }
     }
 
-    /// 补全第一次只取了头部的目录。只增不减，避免把正在阅读的列表换短。
-    private func extendTOCInBackground(source: BookSource, detail loadedDetail: BookDetail) {
-        Task.detached(priority: .utility) { [appState, source, loadedDetail] in
-            guard let full = try? await appState.engine
-                .getChapterList(source: source, book: loadedDetail)
-                .get(),
-                !full.isEmpty
-            else { return }
-            await MainActor.run {
-                guard full.count > self.chapters.count else { return }
-                self.chapters = full
-                appState.bookTOCacheStore.save(
-                    detail: loadedDetail,
-                    chapters: full,
-                    sourceURL: source.bookSourceUrl,
-                    bookURL: self.book.bookUrl
-                )
-            }
+    private func extendTOCInBackground(source: BookSource, detail loadedDetail: BookDetail, generation: UUID) {
+        let engine = appState.engine
+        let bookURL = book.bookUrl
+        let sourceURL = book.sourceUrl
+        tocExpansionTask = Task { @MainActor in
+            let result = await engine.getChapterList(source: source, book: loadedDetail)
+            guard !Task.isCancelled, loadGeneration == generation,
+                  book.bookUrl == bookURL, book.sourceUrl == sourceURL,
+                  case .success(let full) = result, full.count > chapters.count else { return }
+            chapters = full
+            appState.bookTOCacheStore.save(detail: loadedDetail, chapters: full,
+                sourceURL: sourceURL, bookURL: bookURL)
         }
     }
 
