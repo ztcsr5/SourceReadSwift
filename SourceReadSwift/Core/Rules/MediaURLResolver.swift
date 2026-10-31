@@ -10,6 +10,6 @@ enum MediaURLResolver {
               let url = URL(string: trimmed, relativeTo: URL(string: base))?.absoluteURL,
               let scheme = url.scheme?.lowercased(), ["https", "http"].contains(scheme),
               url.host != nil else { return nil }
-        return url.absoluteString
+        return url.standardized.absoluteString
     }
 }

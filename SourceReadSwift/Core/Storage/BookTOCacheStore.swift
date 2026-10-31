@@ -15,6 +15,7 @@ struct BookTOCacheEntry: Codable, Sendable {
     let detail: BookDetail?
     let chapters: [BookChapter]
     let updatedAt: Date
+    var isComplete: Bool? = nil
 }
 
 /// Per-book JSON files under the app storage folder.
@@ -31,6 +32,7 @@ final class BookTOCacheStore {
         let detail: BookDetail?
         let chapters: [BookChapter]
         let updatedAt: Date
+        var isComplete: Bool? = nil
     }
 
     private static let writer = DispatchQueue(label: "BookTOCache.writer", qos: .utility)
@@ -69,11 +71,14 @@ final class BookTOCacheStore {
         chapters: [BookChapter],
         sourceURL: String,
         bookURL: String,
+        isComplete: Bool = true,
         at date: Date = Date()
     ) {
         guard !chapters.isEmpty else { return }
         let key = cacheKey(sourceURL: sourceURL, bookURL: bookURL)
-        let entry = BookTOCacheEntry(
+        if !isComplete, let existing = self.entry(sourceURL: sourceURL, bookURL: bookURL),
+           existing.isComplete == true { return }
+        var entry = BookTOCacheEntry(
             version: BookTOCacheEntry.schemaVersion,
             sourceURL: sourceURL,
             bookURL: bookURL,
@@ -81,6 +86,7 @@ final class BookTOCacheStore {
             chapters: chapters,
             updatedAt: date
         )
+        entry.isComplete = isComplete
         memory[key] = entry
         touch(key)
         trimMemory()
@@ -136,7 +142,7 @@ final class BookTOCacheStore {
         let decoder = JSONDecoder()
         decoder.dateDecodingStrategy = .iso8601
         guard let persisted = try? decoder.decode(Persisted.self, from: data) else { return nil }
-        let entry = BookTOCacheEntry(
+        var entry = BookTOCacheEntry(
             version: persisted.version,
             sourceURL: persisted.sourceURL,
             bookURL: persisted.bookURL,
@@ -144,12 +150,13 @@ final class BookTOCacheStore {
             chapters: persisted.chapters,
             updatedAt: persisted.updatedAt
         )
+        entry.isComplete = persisted.isComplete
         return (entry, url)
     }
 
     private func writeToDisk(_ entry: BookTOCacheEntry, key: String) {
         guard let url = try? storageURL(key: key) else { return }
-        let persisted = Persisted(
+        var persisted = Persisted(
             version: entry.version,
             sourceURL: entry.sourceURL,
             bookURL: entry.bookURL,
@@ -157,6 +164,7 @@ final class BookTOCacheStore {
             chapters: entry.chapters,
             updatedAt: entry.updatedAt
         )
+        persisted.isComplete = entry.isComplete
         let fileManager = self.fileManager
         Self.writer.async {
             let encoder = JSONEncoder()

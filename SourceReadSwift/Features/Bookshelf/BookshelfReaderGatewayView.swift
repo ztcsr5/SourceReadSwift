@@ -383,7 +383,7 @@ struct BookshelfReaderGatewayView: View {
             bookURL: activeBook.bookURL
         ), !cached.chapters.isEmpty {
             let targetIndex = requestedChapterIndex ?? activeBook.currentChapterIndex
-            let target = cached.chapters.first(where: { $0.index == targetIndex }) ?? cached.chapters.first
+            let target = cached.chapters.first(where: { $0.index == targetIndex })
             if let target {
                 chapters = cached.chapters
                 if detail == nil { detail = cached.detail }
@@ -401,7 +401,7 @@ struct BookshelfReaderGatewayView: View {
         )
         if !cached.isEmpty {
             let targetIndex = requestedChapterIndex ?? activeBook.currentChapterIndex
-            let target = cached.first(where: { $0.index == targetIndex }) ?? cached.first
+            let target = cached.first(where: { $0.index == targetIndex })
             if let target {
                 self.chapters = cached
                 self.selectedChapter = target
@@ -432,10 +432,12 @@ struct BookshelfReaderGatewayView: View {
         switch detailResult {
         case .success(let loadedDetail):
             detail = loadedDetail
-            // 首次开书先取目录头部打开阅读器，完整目录交给后台刷新：
+            // 首次从头开书先取目录头部；恢复非首章必须抓到真实目标，不能回退第一章。
             // 分页目录是串行抓取，30 页会让「进书」停在加载页上。
+            let targetIndex = requestedChapterIndex ?? activeBook.currentChapterIndex
+            let pages = targetIndex > 0 ? 30 : 8
             let chapterResult = await AsyncTimeout.run(seconds: 20) {
-                await engine.getChapterList(source: source, book: loadedDetail, maxPages: 8)
+                await engine.getChapterList(source: source, book: loadedDetail, maxPages: pages)
             } ?? .failure(.network("Chapter list timed out"))
             switch chapterResult {
             case .success(let loadedChapters):
@@ -444,11 +446,10 @@ struct BookshelfReaderGatewayView: View {
                     detail: loadedDetail,
                     chapters: loadedChapters,
                     sourceURL: source.bookSourceUrl,
-                    bookURL: activeBook.bookURL
+                    bookURL: activeBook.bookURL,
+                    isComplete: pages == 30
                 )
-                let targetIndex = requestedChapterIndex ?? activeBook.currentChapterIndex
                 let target = loadedChapters.first(where: { $0.index == targetIndex })
-                    ?? loadedChapters.first
                 if let target {
                     appState.bookshelfStore.updateDetails(
                         bookID: activeBook.id,
@@ -458,10 +459,10 @@ struct BookshelfReaderGatewayView: View {
                         coverURL: loadedDetail.coverUrl
                     )
                     selectedChapter = target
-                    // 目录只取了前 8 页，阅读器已经打开，剩余章节后台补。
+                    // 阅读器已经打开，目录更新交给后台，不阻塞目标正文。
                     refreshBookDetailAndTOC(source: source, book: activeBook)
                 } else {
-                    errorMessage = "目录为空"
+                    errorMessage = loadedChapters.isEmpty ? "目录为空" : "目录尚未包含上次阅读的章节，请刷新目录后重试；原阅读进度已保留"
                 }
             case .failure(let error):
                 let cached = appState.chapterContentCacheStore.cachedChapters(
@@ -469,7 +470,7 @@ struct BookshelfReaderGatewayView: View {
                     bookURL: activeBook.bookURL
                 )
                 let targetIndex = requestedChapterIndex ?? activeBook.currentChapterIndex
-                if let target = cached.first(where: { $0.index == targetIndex }) ?? cached.first {
+                if let target = cached.first(where: { $0.index == targetIndex }) {
                     chapters = cached
                     selectedChapter = target
                     errorMessage = nil
@@ -484,7 +485,7 @@ struct BookshelfReaderGatewayView: View {
                 bookURL: activeBook.bookURL
             )
             let targetIndex = requestedChapterIndex ?? activeBook.currentChapterIndex
-            if let target = cached.first(where: { $0.index == targetIndex }) ?? cached.first {
+            if let target = cached.first(where: { $0.index == targetIndex }) {
                 chapters = cached
                 selectedChapter = target
                 errorMessage = nil
@@ -585,7 +586,7 @@ struct BookshelfReaderGatewayView: View {
                                     Text("\(candidate.source.bookSourceName) · \(candidate.book.author ?? "作者未知")")
                                         .font(.caption)
                                         .foregroundStyle(.secondary)
-                                    Text(candidate.chapterCount.map { "共 \($0) 章" } ?? "章节数待统计")
+                                    Text(candidate.chapterCount.map { "目录 \($0) 章" } ?? "章节数待统计")
                                         .font(.caption.weight(.medium))
                                         .foregroundStyle(.secondary)
                                     Text(candidate.book.bookUrl)
@@ -644,7 +645,8 @@ struct BookshelfReaderGatewayView: View {
         if !cached.contains(where: { $0.sourceURL == active.sourceURL && $0.book.bookUrl == active.bookURL }) {
             cached.append(SourceSwitchCacheStore.Candidate(sourceURL: active.sourceURL,
                 sourceName: active.sourceName, book: active.asSearchBook,
-                chapterCount: active.totalChapters > 0 ? active.totalChapters : nil))
+                chapterCount: appState.bookTOCacheStore.entry(sourceURL: active.sourceURL,
+                    bookURL: active.bookURL).flatMap { $0.isComplete == true ? $0.chapters.count : nil }))
         }
         SourceSwitchCacheStore.shared.save(title: active.title, author: active.author,
             candidates: cached)
@@ -737,7 +739,7 @@ struct BookshelfReaderGatewayView: View {
         guard !Task.isCancelled, sourceSwitchGeneration == token else { return }
         let source = candidate.source, match = candidate.book
         let cached = appState.bookTOCacheStore.entry(sourceURL: source.bookSourceUrl, bookURL: match.bookUrl)
-        var count = cached?.chapters.count
+        var count = cached.flatMap { $0.isComplete == true ? $0.chapters.count : nil }
         if count == nil {
             let engine = appState.engine
             let metadata = await AsyncTimeout.run(seconds: 12) {
@@ -767,7 +769,7 @@ struct BookshelfReaderGatewayView: View {
         let cached = appState.bookTOCacheStore.entry(sourceURL: candidate.source.bookSourceUrl, bookURL: candidate.book.bookUrl)
         let engine = appState.engine
         let loaded: (BookDetail, [BookChapter])?
-        if let detail = cached?.detail, let chapters = cached?.chapters, !chapters.isEmpty {
+        if cached?.isComplete == true, let detail = cached?.detail, let chapters = cached?.chapters, !chapters.isEmpty {
             loaded = (detail, chapters)
         } else {
             loaded = await AsyncTimeout.run(seconds: 24) {

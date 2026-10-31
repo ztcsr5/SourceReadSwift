@@ -15,6 +15,8 @@ rolling production diagnostic coordinator with actual user concurrency, cancella
 ordered report persistence and ISO8601 reload; iOS26 native glass tabs, iOS16 legacy branch.
 Audit caught full-screen source cover lifecycle ownership and stale old-source background TOCs.
 Native first compile found exhaustive font switches; fixed web CSS and font management paths.
+TOC cache now distinguishes staged/complete directories; resume never replaces an uncached
+saved chapter with the first chapter. Default diagnostic concurrency is 8 (LiveContainer 2).
 Next: native XCTest/device build, fix real failures, download verified IPA, patch/rollback drill.
 Unfinished: Aidoku WASM execution/subscription integration (research only); no physical-device
 FPS/latency/iOS16 all-feature verification, no live Azure audio without a Speech resource key,

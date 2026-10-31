@@ -11,13 +11,13 @@ final class ReaderBackgroundPickerTests: XCTestCase {
         let cases = ReaderBackground.pickerCases
         var seen: [String: String] = [:]
         for item in cases {
-            let key = "\(item.dayBackgroundHex)-\(item.dayTextHex)"
+            let key = item.hasTexture ? "texture-\(item.rawValue)" : "\(item.dayBackgroundHex)-\(item.dayTextHex)"
             if let existing = seen[key] {
                 XCTFail("\(item.rawValue) 与 \(existing) 在白天下完全同色（\(key)），不该同时出现在面板里")
             }
             seen[key] = item.rawValue
         }
-        XCTAssertEqual(cases.count, 11, "面板主题数应为 11")
+        XCTAssertEqual(cases.count, 14, "11 种原有外观与 3 种独立纸纹")
     }
 
     func testPickerCasesAreSubsetOfAllCases() {

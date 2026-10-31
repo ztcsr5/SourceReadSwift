@@ -10,7 +10,7 @@ struct SettingsView: View {
     @ObservedObject private var proxyManager = SourceProxyManager.shared
     @AppStorage("app.hapticsEnabled") private var hapticsEnabled = false
     @AppStorage("search_concurrent_threads") private var searchThreads = 12
-    @AppStorage("batch_check_concurrent_threads") private var batchCheckThreads = 8
+    @AppStorage("batch_check_concurrent_threads") private var batchCheckThreads = SandboxEnvironment.recommendedBatchConcurrency
     @State private var cacheSize = "无缓存"
     @State private var rssCacheSize = "无缓存"
     @State private var backupDocument: AppDataBackupDocument?

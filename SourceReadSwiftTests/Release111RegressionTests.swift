@@ -33,6 +33,7 @@ final class Release111RegressionTests: XCTestCase {
         XCTAssertEqual(SourceChapterAlignment.match(title: "第75章　新篇", index: 74, in: chapters)?.index, 2)
         XCTAssertEqual(SourceChapterAlignment.number("第一千零二十四章 起"), 1024)
         XCTAssertEqual(SourceChapterAlignment.number("第１２８章 起"), 128)
+        XCTAssertEqual(SourceChapterAlignment.number("第一〇二章 起"), 102)
         XCTAssertNil(SourceChapterAlignment.match(title: nil, index: 0, in: []))
     }
 
@@ -58,6 +59,19 @@ final class Release111RegressionTests: XCTestCase {
         XCTAssertNotEqual(a.pngData(), ReaderPaperTexture.image(background: .linen, night: false).pngData())
     }
 
+    @MainActor func testPartialTOCCacheCannotReplaceCompleteCacheAndFlagSurvivesReload() {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let store = BookTOCacheStore(rootURL: root)
+        store.save(detail: nil, chapters: [chapter("第一章", 0)], sourceURL: "s", bookURL: "b", isComplete: false)
+        XCTAssertEqual(store.entry(sourceURL: "s", bookURL: "b")?.isComplete, false)
+        store.save(detail: nil, chapters: [chapter("第一章", 0), chapter("第二章", 1)], sourceURL: "s", bookURL: "b")
+        store.save(detail: nil, chapters: [chapter("第一章", 0)], sourceURL: "s", bookURL: "b", isComplete: false)
+        let restored = BookTOCacheStore(rootURL: root).entry(sourceURL: "s", bookURL: "b")
+        XCTAssertEqual(restored?.isComplete, true)
+        XCTAssertEqual(restored?.chapters.count, 2)
+    }
+
     func testMediaSignedQueriesAndRelativeLazyImagesSurviveParsing() {
         let chapter = chapter("媒体", 0)
         let images = ChapterContent(chapter: chapter, title: "媒体", paragraphs: [
@@ -73,6 +87,8 @@ final class Release111RegressionTests: XCTestCase {
         XCTAssertEqual(AudioContentParser.parseURL("<audio src='/a.mp3?token=a&amp;x=2'>", base: chapter.url), "https://fixture.test/a.mp3?token=a&x=2")
         XCTAssertNil(AudioContentParser.parseURL("<html>站点维护</html>", base: chapter.url))
         XCTAssertNil(MediaURLResolver.resolve("javascript:alert(1)", base: chapter.url))
+        XCTAssertEqual(MediaURLResolver.resolve("../p3.jpg?sig=a%2Fb%2Bc", base: chapter.url),
+                       "https://fixture.test/p3.jpg?sig=a%2Fb%2Bc")
     }
 
     func testAzureRequestUsesKeyHeaderAndEscapesSSML() throws {

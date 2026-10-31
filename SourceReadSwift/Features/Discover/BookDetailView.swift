@@ -904,7 +904,7 @@ struct BookDetailView: View {
         if detail == nil { detail = cacheDetail }
         if !chapters.isEmpty {
             appState.bookTOCacheStore.save(detail: cacheDetail, chapters: chapters,
-                sourceURL: selectedBook.sourceUrl, bookURL: selectedBook.bookUrl)
+                sourceURL: selectedBook.sourceUrl, bookURL: selectedBook.bookUrl, isComplete: !stagedFirstPaint)
             if stagedFirstPaint { extendTOCInBackground(source: source, detail: cacheDetail, generation: generation) }
         }
     }
@@ -917,7 +917,7 @@ struct BookDetailView: View {
             let result = await engine.getChapterList(source: source, book: loadedDetail)
             guard !Task.isCancelled, loadGeneration == generation,
                   book.bookUrl == bookURL, book.sourceUrl == sourceURL,
-                  case .success(let full) = result, full.count > chapters.count else { return }
+                  case .success(let full) = result, !full.isEmpty, full.count >= chapters.count else { return }
             chapters = full
             appState.bookTOCacheStore.save(detail: loadedDetail, chapters: full,
                 sourceURL: sourceURL, bookURL: bookURL)

@@ -36,6 +36,9 @@ enum SourceChapterAlignment {
         let digits = String(folded[range]); if let n = Int(digits) { return n }
         let values: [Character:Int] = ["零":0,"〇":0,"一":1,"二":2,"两":2,"三":3,"四":4,"五":5,"六":6,"七":7,"八":8,"九":9]
         let units: [Character:Int] = ["十":10,"百":100,"千":1000,"万":10000]
+        if digits.allSatisfy({ values[$0] != nil }) {
+            return Int(digits.compactMap { values[$0].map(String.init) }.joined())
+        }
         var total = 0, section = 0, digit = 0
         for c in digits {
             if let n = values[c] { digit = n }

@@ -38,6 +38,6 @@ enum SandboxEnvironment {
         if saved >= 1 && saved <= 16 {
             return saved
         }
-        return isLiveContainer ? 2 : 4
+        return isLiveContainer ? 2 : 8
     }
 }
