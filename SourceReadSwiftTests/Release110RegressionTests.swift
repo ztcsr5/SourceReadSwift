@@ -1,9 +1,44 @@
 import XCTest
 import UIKit
 import WebKit
+import JavaScriptCore
 @testable import SourceReadSwift
 
 final class Release110RegressionTests: XCTestCase {
+    func testNewExplicitJumpCancelsOldSmoothMotionAndFallback() throws {
+        let shell = WebReaderHTML.shell
+        let motionStart = try XCTUnwrap(shell.range(of: "      function stopScrollAnimation()")).lowerBound
+        let motionEnd = try XCTUnwrap(shell.range(of: "      function pageStep(", range: motionStart..<shell.endIndex)).lowerBound
+        let jumpStart = try XCTUnwrap(shell.range(of: "      function scrollToFlat(")).lowerBound
+        let jumpEnd = try XCTUnwrap(shell.range(of: "      /// 回到文档顶端", range: jumpStart..<shell.endIndex)).lowerBound
+        let context = try XCTUnwrap(JSContext())
+        var exception: String?
+        context.exceptionHandler = { _, value in exception = value?.toString() }
+        context.evaluateScript("""
+        var scrollAnimationGeneration = 0, timers = [], messages = [], nextTarget = 200;
+        var state = {revision: 'r', visible: 0};
+        var content = {querySelector: function() { return {getBoundingClientRect: function() { return {top: nextTarget - window.scrollY}; }}; }};
+        var window = {scrollY: 0, nativeTarget: null,
+          scrollTo: function(x, y) { if (typeof x === 'object') { this.nativeTarget = x.top; } else { this.nativeTarget = null; this.scrollY = y; } },
+          setTimeout: function(cb) { timers.push(cb); }, requestAnimationFrame: function() {}};
+        function topInset() { return 0; }
+        function onScroll() {}
+        function post(m) { messages.push(m); }
+        """)
+        context.evaluateScript(String(shell[motionStart..<motionEnd]) + String(shell[jumpStart..<jumpEnd]))
+        context.evaluateScript("""
+        scrollToFlat(1, true, 'old-speech', 'r');
+        nextTarget = 0;
+        scrollToFlat(0, false, 'new-toc', 'r');
+        timers.forEach(function(cb) { cb(); });
+        if (window.nativeTarget !== null) { window.scrollY = window.nativeTarget; }
+        """)
+        XCTAssertNil(exception)
+        XCTAssertEqual(context.evaluateScript("window.scrollY")?.toInt32(), 0)
+        XCTAssertEqual(context.evaluateScript("messages.filter(function(m) { return m.type === 'scroll-applied' && m.requestKey === 'old-speech'; }).length")?.toInt32(), 0)
+        XCTAssertEqual(context.evaluateScript("messages.filter(function(m) { return m.type === 'scroll-applied' && m.requestKey === 'new-toc'; }).length")?.toInt32(), 1)
+    }
+
     func testWebSectionRevisionSeesMiddleParagraphChanges() {
         let old = WebReaderSection(chapterIndex: 1, title: "章", paragraphs: ["首", "旧", "尾"])
         let new = WebReaderSection(chapterIndex: 1, title: "章", paragraphs: ["首", "新", "尾"])

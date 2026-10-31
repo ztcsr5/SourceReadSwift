@@ -713,6 +713,7 @@ enum WebReaderHTML {
       "use strict";
       var content = document.getElementById("content");
       var root = document.documentElement;
+      var scrollAnimationGeneration = 0;
       var state = {
         style: null,
         sections: Object.create(null),
@@ -928,6 +929,8 @@ enum WebReaderHTML {
       }
 
       function setContent(payload) {
+        stopScrollAnimation();
+        state.activeScrollKey = null;
         state.revision = payload.revision || "";
         var anchor = captureAnchor();
         var nextSections = Object.create(null);
@@ -1145,7 +1148,16 @@ enum WebReaderHTML {
       document.addEventListener("load", function () { refreshMetrics(); }, true);
       window.addEventListener("resize", function () { refreshMetrics(); });
 
+      function stopScrollAnimation() {
+        scrollAnimationGeneration += 1;
+        // A same-position jump must also cancel WebKit's in-flight smooth
+        // scroll. Otherwise an older speech animation can move a new TOC jump.
+        window.scrollTo(0, window.scrollY);
+      }
+
       function animateTo(target, duration) {
+        stopScrollAnimation();
+        var generation = scrollAnimationGeneration;
         var start = window.scrollY;
         var delta = target - start;
         if (Math.abs(delta) < 0.5) { return; }
@@ -1159,6 +1171,7 @@ enum WebReaderHTML {
         // 平台可能忽略 smooth（Reduce Motion / 无合成器）：等一小段，若位移
         // 完全没发生就直接落位，别让一次翻页点击变成没反应。
         window.setTimeout(function () {
+          if (generation !== scrollAnimationGeneration) { return; }
           if (Math.abs(window.scrollY - start) < 2) { window.scrollTo(0, target); }
         }, Math.min(Math.max(duration * 0.45, 90), 160));
       }
@@ -1186,11 +1199,9 @@ enum WebReaderHTML {
         }
         var rect = element.getBoundingClientRect();
         var target = Math.max(rect.top + window.scrollY - topInset(), 0);
-        if (Math.abs(target - window.scrollY) >= 4) {
-          // TOC/bookmark jumps are atomic (animated == false); speech and
-          // automatic reading keep their smooth progression.
-          animateTo(target, animated ? 300 : 0);
-        }
+        // Always invalidate old motion, including a jump to the current line.
+        // TOC/bookmark jumps stay atomic; speech keeps smooth progression.
+        animateTo(target, animated ? 300 : 0);
         var finish = function () {
           if (revision !== state.revision || requestKey !== state.activeScrollKey) { return; }
           state.visible = -1;
@@ -1203,6 +1214,8 @@ enum WebReaderHTML {
       /// 回到文档顶端。换书/首次进书时调用：WKWebView 可能被复用，
       /// 上一本书的滚动位置会带进来，表现就是「第一次打开却看不见章标题」。
       function resetScroll() {
+        stopScrollAnimation();
+        state.activeScrollKey = null;
         state.visible = -1;
         window.scrollTo(0, 0);
         window.requestAnimationFrame(onScroll);
