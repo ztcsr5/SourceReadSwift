@@ -116,6 +116,28 @@ final class Release111RegressionTests: XCTestCase {
         XCTAssertFalse(SourceRequestContext.isDiagnostic)
     }
 
+    @MainActor func testRealBatchCoordinatorUsesChosenConcurrencyAndRestoresSavedReport() async throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let engine = SchedulingProbeEngine()
+        let coordinator = SourceBatchCheckCoordinator(reportRootURL: root)
+        let sources = (0..<4).map { BookSource(bookSourceName: String($0), bookSourceUrl: "https://fixture\($0).test", searchUrl: "/search") }
+        coordinator.start(sources: sources, keyword: "test", deepCheck: false, engine: engine,
+            healthStore: SourceHealthStore(persistence: SourceHealthPersistence(rootURL: root)),
+            historyStore: SourceDiagnosticHistoryStore(persistence: SourceDiagnosticHistoryPersistence(rootURL: root)), concurrency: 2)
+        for _ in 0..<150 {
+            if !coordinator.isRunning { break }
+            try await Task.sleep(nanoseconds: 10_000_000)
+        }
+        XCTAssertFalse(coordinator.isRunning)
+        XCTAssertEqual(coordinator.checkedCount, 4)
+        let events = await engine.events
+        XCTAssertLessThan(try XCTUnwrap(events.firstIndex(of: "start2")), try XCTUnwrap(events.firstIndex(of: "finish0")))
+        let restored = SourceBatchCheckCoordinator(reportRootURL: root)
+        XCTAssertEqual(restored.lastSavedReport?.totalCount, 4)
+        XCTAssertEqual(restored.checkedCount, 4)
+    }
+
     @MainActor func testCoverTapUsesAnimationBeforeCursorCommit() async {
         let host = CoverPageHostController()
         host.loadViewIfNeeded()

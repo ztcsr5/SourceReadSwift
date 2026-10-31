@@ -34,9 +34,12 @@ final class SourceBatchCheckCoordinator: ObservableObject {
 
     private var activeSessionID = UUID()
     private var activeTask: Task<Void, Never>? = nil
+    private static let reportWriter = DispatchQueue(label: "SourceBatchCheck.reportWriter", qos: .utility)
     private let reportFileName = "last_batch_test_report.json"
+    private let reportRootURL: URL?
 
-    init() {
+    init(reportRootURL: URL? = nil) {
+        self.reportRootURL = reportRootURL
         loadLastSavedReport()
     }
 
@@ -57,7 +60,8 @@ final class SourceBatchCheckCoordinator: ObservableObject {
         deepCheck: Bool,
         engine: SourceEngine,
         healthStore: SourceHealthStore,
-        historyStore: SourceDiagnosticHistoryStore
+        historyStore: SourceDiagnosticHistoryStore,
+        concurrency: Int = 8
     ) {
         stop()
 
@@ -95,12 +99,14 @@ final class SourceBatchCheckCoordinator: ObservableObject {
                 sessionID: sessionID,
                 engine: engine,
                 healthStore: healthStore,
-                historyStore: historyStore
+                historyStore: historyStore,
+                concurrency: min(max(concurrency, 1), 16)
             )
         }
     }
 
     func stop() {
+        activeSessionID = UUID()
         activeTask?.cancel()
         activeTask = nil
         if isRunning {
@@ -120,12 +126,9 @@ final class SourceBatchCheckCoordinator: ObservableObject {
         sessionID: UUID,
         engine: SourceEngine,
         healthStore: SourceHealthStore,
-        historyStore: SourceDiagnosticHistoryStore
+        historyStore: SourceDiagnosticHistoryStore,
+        concurrency: Int
     ) async {
-        (engine as? SourceWebViewFallbackControllable)?.allowWebViewFallback = false
-        defer {
-            (engine as? SourceWebViewFallbackControllable)?.allowWebViewFallback = true
-        }
 
         var pendingHealthRecords: [SourceHealthRecord] = []
         var pendingHistoryRecords: [SourceDiagnosticHistoryRecord] = []
@@ -175,28 +178,26 @@ final class SourceBatchCheckCoordinator: ObservableObject {
             }
         }
 
-        let concurrency = SandboxEnvironment.recommendedBatchConcurrency
-        for batch in sources.chunked(into: concurrency) {
-            guard !Task.isCancelled, activeSessionID == sessionID else { break }
-
-            await withTaskGroup(of: BatchCheckOutcome.self) { group in
-                for source in batch {
-                    group.addTask {
-                        await Self.evaluateSource(
-                            source: source,
-                            keyword: keyword,
-                            engine: engine,
-                            deepCheck: deepCheck
-                        )
+        await withTaskGroup(of: BatchCheckOutcome.self) { group in
+            var iterator = sources.makeIterator()
+            func submit(_ source: BookSource) {
+                group.addTask {
+                    await SourceRequestContext.$isDiagnostic.withValue(true) {
+                        await Self.evaluateSource(source: source, keyword: keyword,
+                                                  engine: engine, deepCheck: deepCheck)
                     }
                 }
-
-                for await outcome in group {
-                    guard !Task.isCancelled, self.activeSessionID == sessionID else {
-                        group.cancelAll()
-                        return
-                    }
-
+            }
+            for _ in 0..<min(concurrency, sources.count) {
+                if let source = iterator.next() { submit(source) }
+            }
+            while let outcome = await group.next() {
+                guard !Task.isCancelled, self.activeSessionID == sessionID else {
+                    group.cancelAll()
+                    return
+                }
+                // Refill before UI/history bookkeeping, without a batch barrier.
+                if let source = iterator.next() { submit(source) }
                     loopCount += 1
                     var result = outcome.result
                     if let report = outcome.diagnosticReport {
@@ -298,14 +299,11 @@ final class SourceBatchCheckCoordinator: ObservableObject {
                         self.saveIncrementalReport()
                         URLCache.shared.removeAllCachedResponses()
                     }
-                }
             }
-
-            // Sync UI and release network cache per chunk
-            syncUI()
-            URLCache.shared.removeAllCachedResponses()
         }
 
+        // A cancelled old run must never flush into its replacement session.
+        guard !Task.isCancelled, activeSessionID == sessionID else { return }
         syncUI()
         flushPending(isFinal: true)
         healthStore.flushToDisk()
@@ -422,13 +420,12 @@ final class SourceBatchCheckCoordinator: ObservableObject {
             reports: currentReports
         )
         self.lastSavedReport = batchReport
-        let fileName = self.reportFileName
-        Task.detached(priority: .utility) {
+        let url = AppStorageDirectory.appStorageURL(fileName: reportFileName, rootURL: reportRootURL)
+        Self.reportWriter.async {
             do {
                 let encoder = JSONEncoder()
                 encoder.dateEncodingStrategy = .iso8601
                 let data = try encoder.encode(batchReport)
-                let url = AppStorageDirectory.appStorageURL(fileName: fileName)
                 try AppStorageDirectory.safeWrite(data, to: url)
             } catch {
                 // Non-critical background save error
@@ -437,10 +434,11 @@ final class SourceBatchCheckCoordinator: ObservableObject {
     }
 
     func loadLastSavedReport() {
-        let url = AppStorageDirectory.appStorageURL(fileName: reportFileName)
-        guard FileManager.default.fileExists(atPath: url.path),
-              let data = try? Data(contentsOf: url),
-              let report = try? JSONDecoder().decode(SourceDiagnosticBatchReport.self, from: data) else {
+        let url = AppStorageDirectory.appStorageURL(fileName: reportFileName, rootURL: reportRootURL)
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        guard let data = Self.reportWriter.sync(execute: { try? Data(contentsOf: url) }),
+              let report = try? decoder.decode(SourceDiagnosticBatchReport.self, from: data) else {
             return
         }
         self.lastSavedReport = report

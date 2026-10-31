@@ -1487,7 +1487,7 @@ private struct BatchCheckCoordinatorObserver<Content: View>: View {
 
             NavigationStack {
             VStack(alignment: .leading, spacing: 14) {
-                Text("当前将测试 \(targetCount) 个书源（并发 \(SandboxEnvironment.recommendedBatchConcurrency) 个）。")
+                Text("当前将测试 \(targetCount) 个书源（并发 \(batchCheckConcurrency) 个）。")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
 
@@ -1583,7 +1583,8 @@ private struct BatchCheckCoordinatorObserver<Content: View>: View {
                                 deepCheck: batchCheckDeepCheck,
                                 engine: appState.engine,
                                 healthStore: appState.sourceHealthStore,
-                                historyStore: appState.sourceDiagnosticHistoryStore
+                                historyStore: appState.sourceDiagnosticHistoryStore,
+                                concurrency: batchCheckConcurrency
                             )
                         } label: {
                             Label("开始批量体检 (\(sourcesToTest.count) 个书源)", systemImage: "play.circle")
