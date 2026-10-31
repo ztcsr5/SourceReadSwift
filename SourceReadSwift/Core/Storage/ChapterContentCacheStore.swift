@@ -66,6 +66,7 @@ final class ChapterContentCacheStore: ObservableObject {
 
     private let persistence: ChapterContentCachePersistence
     private let maxEntryCount: Int
+    private var persistenceRevision = 0
 
     var estimatedByteCount: Int {
         entries.reduce(0) { $0 + $1.estimatedByteCount }
@@ -236,16 +237,30 @@ final class ChapterContentCacheStore: ObservableObject {
     }
 
     private func persist() {
-        do {
-            try persistence.save(entries)
-            lastError = nil
-        } catch {
-            lastError = error.localizedDescription
+        // Both neighbour downloads and an LRU touch used to encode up to 500
+        // chapters on the main actor. A TOC could therefore freeze even when
+        // the selected chapter was already cached. Immutable COW snapshots
+        // are written in order on one disk queue, never on the scroll path.
+        persistenceRevision &+= 1
+        let revision = persistenceRevision
+        persistence.saveInBackground(entries) { [weak self] result in
+            let message: String?
+            switch result {
+            case .success: message = nil
+            case .failure(let error): message = error.localizedDescription
+            }
+            Task { @MainActor [weak self] in
+                guard let self, self.persistenceRevision == revision else { return }
+                if self.lastError != message { self.lastError = message }
+            }
         }
     }
 }
 
-struct ChapterContentCachePersistence {
+struct ChapterContentCachePersistence: Sendable {
+    // Shared across instances: reopening the cache flushes preceding writes,
+    // and an older store cannot finish a write after a newer store cleared it.
+    private static let diskQueue = DispatchQueue(label: "SourceReadSwift.chapter-cache.disk", qos: .utility)
     private let fileManager: FileManager
     private let fileName = "chapter_content_cache.json"
     private let rootURL: URL?
@@ -256,6 +271,10 @@ struct ChapterContentCachePersistence {
     }
 
     func load() throws -> [ChapterContentCacheEntry] {
+        try Self.diskQueue.sync { try readSnapshot() }
+    }
+
+    private func readSnapshot() throws -> [ChapterContentCacheEntry] {
         let url = try storageURL()
         guard fileManager.fileExists(atPath: url.path) else { return [] }
         let data = try Data(contentsOf: url)
@@ -265,6 +284,17 @@ struct ChapterContentCachePersistence {
     }
 
     func save(_ entries: [ChapterContentCacheEntry]) throws {
+        try Self.diskQueue.sync { try writeSnapshot(entries) }
+    }
+
+    /// Completion runs on the writer queue; UI clients must hop to MainActor.
+    func saveInBackground(_ entries: [ChapterContentCacheEntry], completion: @escaping @Sendable (Result<Void, Error>) -> Void) {
+        Self.diskQueue.async {
+            completion(Result { try writeSnapshot(entries) })
+        }
+    }
+
+    private func writeSnapshot(_ entries: [ChapterContentCacheEntry]) throws {
         let url = try storageURL()
         try fileManager.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
         let encoder = JSONEncoder()

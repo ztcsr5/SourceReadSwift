@@ -5309,7 +5309,12 @@ struct ReaderView: View {
             paragraphIndex: paragraphIndex,
             startAtEnd: startAtEnd
         )
-        requestChapter(index)
+        // A deliberate selection outranks speculative work for the old cursor.
+        // Do not enqueue another old-window prefetch through requestChapter.
+        cancelPrefetch()
+        cancelPaginationWarmup()
+        positionPersistTask?.cancel()
+        loadWindowChapter(index)
     }
 
     private var canJumpToChapter: Bool {
