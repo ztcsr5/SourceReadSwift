@@ -56,13 +56,22 @@ final class WebReadingSession: ObservableObject {
 enum WebAdvertisementRules {
     // Deliberately narrow: no blanket script blocking, login/paywall removal,
     // or broad [class*=ad] selectors that can hide legitimate reading content.
-    static let json = #"[{"trigger":{"url-filter":"^https?://([^/]+\\.)?(doubleclick\\.net|googlesyndication\\.com|adservice\\.google\\.com)/"},"action":{"type":"block"}},{"trigger":{"url-filter":".*"},"action":{"type":"css-display-none","selector":"ins.adsbygoogle,[id^=google_ads_],iframe[src*=doubleclick]"}}]"#
+    static let json: String = {
+        // WebKit content blockers accept only a restricted regex dialect.
+        // ICU matching alone is not a compilation test; avoid alternation.
+        var rules: [[String: Any]] = ["doubleclick.net", "googlesyndication.com", "adservice.google.com"].map { domain in
+            let escaped = domain.replacingOccurrences(of: ".", with: "\\.")
+            return ["trigger": ["url-filter": "^https?://([^/]+\\.)?\(escaped)/"], "action": ["type": "block"]]
+        }
+        rules.append(["trigger": ["url-filter": ".*"], "action": ["type": "css-display-none", "selector": "ins.adsbygoogle,[id^=google_ads_],iframe[src*=doubleclick]"]])
+        return String(data: try! JSONSerialization.data(withJSONObject: rules), encoding: .utf8)!
+    }()
 
     @MainActor
     static func compile(enabled: Bool, completion: @escaping (WKContentRuleList?, Error?) -> Void) {
         guard enabled else { completion(nil, nil); return }
         let store = WKContentRuleListStore.default()!
-        let identifier = "inpage-conservative-ads-v1"
+        let identifier = "inpage-conservative-ads-v2"
         store.lookUpContentRuleList(forIdentifier: identifier) { rule, _ in
             if let rule { completion(rule, nil) }
             else { store.compileContentRuleList(forIdentifier: identifier, encodedContentRuleList: json, completionHandler: completion) }

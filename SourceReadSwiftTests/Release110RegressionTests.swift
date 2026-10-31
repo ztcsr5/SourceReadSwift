@@ -124,13 +124,16 @@ final class Release110RegressionTests: XCTestCase {
 
     func testAdvertisementRulesMatchOnlyTargetedDomains() throws {
         let rules = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(WebAdvertisementRules.json.utf8)) as? [[String: Any]])
-        let trigger = try XCTUnwrap(rules[0]["trigger"] as? [String: Any])
-        let regex = try NSRegularExpression(pattern: XCTUnwrap(trigger["url-filter"] as? String))
+        let regexes = try rules.filter { ($0["action"] as? [String: Any])?["type"] as? String == "block" }.map { rule in
+            let trigger = try XCTUnwrap(rule["trigger"] as? [String: Any])
+            return try NSRegularExpression(pattern: XCTUnwrap(trigger["url-filter"] as? String))
+        }
+        XCTAssertEqual(regexes.count, 3)
         for url in ["https://doubleclick.net/ad.js", "https://ads.doubleclick.net/ad.js", "https://googlesyndication.com/pagead.js"] {
-            XCTAssertNotNil(regex.firstMatch(in: url, range: NSRange(location: 0, length: url.utf16.count)))
+            XCTAssertTrue(regexes.contains { $0.firstMatch(in: url, range: NSRange(location: 0, length: url.utf16.count)) != nil })
         }
         for url in ["https://example.com/chapter.html", "https://notdoubleclick.net/chapter.html", "https://doubleclick.net.example.com/chapter.html"] {
-            XCTAssertNil(regex.firstMatch(in: url, range: NSRange(location: 0, length: url.utf16.count)))
+            XCTAssertFalse(regexes.contains { $0.firstMatch(in: url, range: NSRange(location: 0, length: url.utf16.count)) != nil })
         }
     }
 

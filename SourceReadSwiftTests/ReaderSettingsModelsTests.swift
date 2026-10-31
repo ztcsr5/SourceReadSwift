@@ -85,7 +85,7 @@ final class ReaderSettingsModelsTests: XCTestCase {
         XCTAssertEqual(ReaderTypographyDefaults.titleFontSize(for: 20), 26)
 
         XCTAssertEqual(ReaderPageChromeLayout.allCases.count, 3)
-        XCTAssertEqual(ReaderPageChromeLayout.header.title, "页眉小标题")
+        XCTAssertEqual(ReaderPageChromeLayout.header.title, "页眉与章首标题")
         XCTAssertEqual(ReaderPageChromeLayout.inline.title, "正文大标题")
         XCTAssertEqual(ReaderPageChromeLayout.hidden.title, "隐藏标题")
     }
