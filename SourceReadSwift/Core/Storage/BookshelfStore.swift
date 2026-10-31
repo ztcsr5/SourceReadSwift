@@ -191,7 +191,7 @@ final class BookshelfStore: ObservableObject {
         books[index].lastOpenedAt = Date()
         books[index].lastReadAt = Date()
         moveToFront(index: index)
-        persist()
+        persistReadingProgress()
         if let updated = books.first {
             onBookRead?(updated)
         }

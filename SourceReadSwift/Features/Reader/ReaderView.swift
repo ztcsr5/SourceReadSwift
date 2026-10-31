@@ -130,6 +130,7 @@ struct ReaderView: View {
     @State private var pendingWindowJump: ReaderPendingChapterJump?
     @State private var chapterJumpTask: Task<Void, Never>?
     @State private var chapterJumpRequestID = UUID()
+    @State private var readerPresentationLifecycle = ReaderPresentationLifecycle()
     @State private var windowLoadingIndices: Set<Int> = []
     /// Last failure per chapter. Placeholders and the scroll boundary banner
     /// read this map, so a source timeout is visible instead of looking like
@@ -1099,6 +1100,9 @@ struct ReaderView: View {
             )
         }
         .onAppear {
+            // Dismissing the full-screen TOC must not replay initial position,
+            // markReaderOpened or the initial synchronous pagination pass.
+            guard readerPresentationLifecycle.beginAppearance() else { return }
             migrateTypographyDefaultsIfNeeded()
             if let ov = ReaderOverrideStore.shared.override(for: bookID) {
                 isPerBookOverride = true
@@ -1155,6 +1159,9 @@ struct ReaderView: View {
             refreshImageRequestHeaders()
         }
         .onDisappear {
+            // Cover presentation is not a reader exit. Keep the live session
+            // and any selected chapter's download/pagination transaction alive.
+            guard readerPresentationLifecycle.endAppearance(chapterListPresented: showChapterList) else { return }
             windowGeneration &+= 1
             cancelChapterJumpPreparation()
             geometrySettleTask?.cancel()

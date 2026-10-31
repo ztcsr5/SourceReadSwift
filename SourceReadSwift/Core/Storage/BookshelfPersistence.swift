@@ -63,11 +63,13 @@ struct BookshelfPersistence {
         let total: Int
         let seen: Int?
         let lastReadAt: Date?
+        let lastOpenedAt: Date?
 
         init(_ book: BookshelfBook) {
             chapter = book.currentChapterIndex; title = book.currentChapterTitle
             paragraph = book.currentParagraphIndex; total = book.totalChapters
             seen = book.seenTotalChapters; lastReadAt = book.lastReadAt
+            lastOpenedAt = book.lastOpenedAt
         }
 
         func apply(to book: inout BookshelfBook) {
@@ -78,6 +80,7 @@ struct BookshelfPersistence {
             book.currentChapterIndex = chapter; book.currentChapterTitle = title
             book.currentParagraphIndex = paragraph; book.totalChapters = max(book.totalChapters, total)
             book.seenTotalChapters = seen; book.lastReadAt = lastReadAt
+            book.lastOpenedAt = lastOpenedAt
         }
     }
 
