@@ -90,7 +90,7 @@ final class ReaderPageTextBuilderTests: XCTestCase {
         XCTAssertEqual(
             paragraphStyle(result, at: 0)?.lineBreakStrategy,
             .pushOut,
-            "title must hang CJK punctuation instead of pushing it to the next line"
+            "title preserves the shared orphan-word avoidance strategy"
         )
         XCTAssertEqual(
             paragraphStyle(result, at: title.utf16.count + 1)?.lineBreakStrategy,
@@ -99,19 +99,26 @@ final class ReaderPageTextBuilderTests: XCTestCase {
         )
     }
 
-    func testMinimumAndMaximumLineHeightStayUnset() {
+    func testMinimumLineHeightMatchesEachFontWithoutCappingTallerGlyphs() {
+        let style = makeStyle()
+        let title = "第一章 标题"
         let result = ReaderPageTextBuilder.make(
-            title: nil,
+            title: title,
             paragraphs: [
                 .init(text: "　　正文。", isContinuation: false, isHighlighted: false)
             ],
-            style: makeStyle()
+            style: style
         )
 
-        // Setting either would override the font's natural leading and make
-        // rendered height diverge from `ReaderPageLayoutEngine.measureHeight`.
-        XCTAssertEqual(paragraphStyle(result, at: 0)?.minimumLineHeight ?? 0, 0, accuracy: 0.01)
-        XCTAssertEqual(paragraphStyle(result, at: 0)?.maximumLineHeight ?? 0, 0, accuracy: 0.01)
+        // UITextView uses the font's natural line height even for all-CJK lines.
+        // Standalone TextKit pagination must use the same floor, while leaving
+        // the maximum unset so taller fallback/emoji glyphs can still fit.
+        let titleStyle = paragraphStyle(result, at: 0)
+        let bodyStyle = paragraphStyle(result, at: title.utf16.count + 1)
+        XCTAssertEqual(titleStyle?.minimumLineHeight ?? -1, style.titleFont.lineHeight, accuracy: 0.01)
+        XCTAssertEqual(bodyStyle?.minimumLineHeight ?? -1, style.bodyFont.lineHeight, accuracy: 0.01)
+        XCTAssertEqual(titleStyle?.maximumLineHeight ?? -1, 0, accuracy: 0.01)
+        XCTAssertEqual(bodyStyle?.maximumLineHeight ?? -1, 0, accuracy: 0.01)
     }
 
     func testCJKPunctuationIsCompressedLikeIOS17() {
