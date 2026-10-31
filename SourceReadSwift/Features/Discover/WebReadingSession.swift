@@ -8,6 +8,13 @@ final class WebReadingSession: ObservableObject {
     @Published var isExtracting = false
     @Published var errorMessage: String?
     private var extractionID = UUID()
+    private(set) var documentGeneration: UInt64 = 0
+
+    func documentDidStartLoading() {
+        documentGeneration &+= 1
+        cancelExtraction()
+        article = nil
+    }
 
     func cancelExtraction() {
         extractionID = UUID()
@@ -21,8 +28,9 @@ final class WebReadingSession: ObservableObject {
         let id = UUID()
         extractionID = id
         let pageURL = webView.url
+        let document = documentGeneration
         webView.evaluateJavaScript("document.documentElement.outerHTML") { [weak self, weak webView] value, error in
-            guard let self, let webView, self.extractionID == id else { return }
+            guard let self, let webView, self.extractionID == id, self.documentGeneration == document else { return }
             guard error == nil, let html = value as? String else {
                 self.isExtracting = false
                 self.errorMessage = error?.localizedDescription ?? "无法读取当前网页"
@@ -32,7 +40,7 @@ final class WebReadingSession: ObservableObject {
                 let result = await Task.detached(priority: .userInitiated) {
                     SmartWebArticleExtractor.extract(html: html, fallbackTitle: pageURL?.host ?? "网页文章")
                 }.value
-                guard let self, let webView, self.extractionID == id else { return }
+                guard let self, let webView, self.extractionID == id, self.documentGeneration == document else { return }
                 self.isExtracting = false
                 guard self.webView === webView, webView.url == pageURL else {
                     self.errorMessage = "页面已切换，请重新提取当前页"
@@ -75,6 +83,8 @@ struct ReadableWebView: UIViewRepresentable {
         let view = WKWebView(frame: .zero, configuration: config)
         view.allowsBackForwardNavigationGestures = true
         view.uiDelegate = context.coordinator
+        view.navigationDelegate = context.coordinator
+        context.coordinator.session = session
         session.webView = view
         return view
     }
@@ -87,6 +97,7 @@ struct ReadableWebView: UIViewRepresentable {
         context.coordinator.blockAds = blockAds
         context.coordinator.generation += 1
         let generation = context.coordinator.generation
+        let navigationEpoch = context.coordinator.navigationEpoch
         view.configuration.userContentController.removeAllContentRuleLists()
         WebAdvertisementRules.compile(enabled: blockAds) { [weak view, weak session, weak coordinator = context.coordinator] rule, error in
             guard let view, coordinator?.generation == generation else { return }
@@ -94,7 +105,9 @@ struct ReadableWebView: UIViewRepresentable {
             // late compilation cannot re-enable ads blocking after a toggle.
             if let rule { view.configuration.userContentController.add(rule) }
             if let error { session?.errorMessage = "广告规则未加载：\(error.localizedDescription)" }
-            view.load(URLRequest(url: destination))
+            // An internal link/back action may have moved the visible browser
+            // while the disk-backed rule compilation was suspended.
+            if coordinator?.navigationEpoch == navigationEpoch { view.load(URLRequest(url: destination)) }
         }
     }
 
@@ -102,12 +115,19 @@ struct ReadableWebView: UIViewRepresentable {
         coordinator.generation += 1
         view.stopLoading()
         view.uiDelegate = nil
+        view.navigationDelegate = nil
     }
 
-    final class Coordinator: NSObject, WKUIDelegate {
+    final class Coordinator: NSObject, WKUIDelegate, WKNavigationDelegate {
+        weak var session: WebReadingSession?
+        var navigationEpoch: UInt64 = 0
         var requestedURL: URL?
         var blockAds = false
         var generation = 0
+        func webView(_ webView: WKWebView, didStartProvisionalNavigation navigation: WKNavigation!) {
+            navigationEpoch &+= 1
+            session?.documentDidStartLoading()
+        }
         func webView(_ webView: WKWebView, createWebViewWith configuration: WKWebViewConfiguration, for navigationAction: WKNavigationAction, windowFeatures: WKWindowFeatures) -> WKWebView? {
             if navigationAction.navigationType == .linkActivated { webView.load(navigationAction.request) }
             return nil

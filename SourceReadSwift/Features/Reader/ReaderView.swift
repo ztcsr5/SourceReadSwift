@@ -55,6 +55,7 @@ struct ReaderView: View {
     @State private var showBookDetailSheet = false
     @State private var showContentFilter = false
     @State private var tocScrollTask: Task<Void, Never>?
+    @State private var tocUserHasScrolled = false
     /// Per-source login surface.  Sources that gate chapters behind an account
     /// previously had no entry point inside the reader, so the only way to
     /// authenticate was the source manager's long-press menu.
@@ -1400,7 +1401,7 @@ struct ReaderView: View {
 
     private var scrollContentFingerprint: String {
         let window = windowSections.map { section in
-            "\(section.chapterIndex):\(section.title.hashValue):\(section.paragraphs.count):\(section.isReady ? "r" : "l")"
+            "\(section.chapterIndex):\(section.contentRevision):\(section.isReady ? "r" : "l")"
         }.joined(separator: ",")
         // The window signature catches chapters arriving/leaving; the base
         // fingerprint catches an in-place refresh of the current chapter with
@@ -1427,7 +1428,8 @@ struct ReaderView: View {
                 chapterIndex: section.chapterIndex,
                 title: section.title,
                 paragraphs: section.paragraphs,
-                isReady: section.isReady
+                isReady: section.isReady,
+                contentRevision: section.contentRevision
             )
         }
     }
@@ -4864,12 +4866,14 @@ struct ReaderView: View {
             .background(Color.clear)
             .scrollDismissesKeyboard(.interactively)
             .simultaneousGesture(DragGesture(minimumDistance: 3).onChanged { _ in
+                tocUserHasScrolled = true
                 tocScrollTask?.cancel()
                 tocScrollTask = nil
             })
             .onAppear {
                 // 首帧的行还没建出来，同一 runloop 里 scrollTo 会落空，
                 // 挪到下一拍再滚动。
+                tocUserHasScrolled = false
                 scrollTocToCurrentChapter(proxy)
             }
             .onChange(of: tocReversed) { _ in
@@ -4879,7 +4883,7 @@ struct ReaderView: View {
                 scrollTocToCurrentChapter(proxy)
             }
             .onChange(of: chapters.count) { _ in
-                scrollTocToCurrentChapter(proxy)
+                if !tocUserHasScrolled { scrollTocToCurrentChapter(proxy) }
             }
             }
         }

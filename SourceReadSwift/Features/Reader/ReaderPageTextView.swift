@@ -92,6 +92,15 @@ enum ReaderPageTextBuilder {
                 string: paragraph.text,
                 attributes: attributes
             )
+            if paragraph.isContinuation, let newline = paragraph.text.firstIndex(of: "\n") {
+                // Only the first logical paragraph is a continuation. New
+                // paragraphs inside the same source entry keep their indent.
+                let offset = paragraph.text[..<paragraph.text.index(after: newline)].utf16.count
+                if offset < piece.length, let nextStyle = paragraphStyle.mutableCopy() as? NSMutableParagraphStyle {
+                    nextStyle.firstLineHeadIndent = max(0, style.firstLineIndent)
+                    piece.addAttribute(.paragraphStyle, value: nextStyle, range: NSRange(location: offset, length: piece.length - offset))
+                }
+            }
             // Keep the renderer's glyph advances identical to the paginator's
             // (see `ReaderPageLayoutEngine.lineMetrics`): iOS 16 does not trim
             // the trailing blank of full-width punctuation on its own.

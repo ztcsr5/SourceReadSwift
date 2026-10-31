@@ -95,6 +95,8 @@ struct WebScrollReaderView: UIViewRepresentable {
         private var lastStyleSignature: String?
         private var lastContentFingerprint: String?
         private var expectedContentRevision = ""
+        private var contentBuildTask: Task<Void, Never>?
+        private var isBuildingContent = false
         private var lastHighlight = Int.min
         private var lastPageStepGeneration: Int
         private var lastResetToken: String?
@@ -149,6 +151,8 @@ struct WebScrollReaderView: UIViewRepresentable {
         }
 
         func tearDown(webView: WKWebView) {
+            contentBuildTask?.cancel()
+            expectedContentRevision = UUID().uuidString
             webView.stopLoading()
             webView.configuration.userContentController.removeScriptMessageHandler(forName: "reader")
             webView.navigationDelegate = nil
@@ -176,6 +180,8 @@ struct WebScrollReaderView: UIViewRepresentable {
                 lastContentFingerprint = fingerprint
                 pushContent(webView: webView)
             }
+
+            guard !isBuildingContent else { return }
 
             pushResetIfNeeded(webView: webView)
             pushScrollTargetIfNeeded(webView: webView)
@@ -215,17 +221,32 @@ struct WebScrollReaderView: UIViewRepresentable {
         }
 
         private func pushContent(webView: WKWebView) {
-            var payload = WebReaderContentPayloadBuilder.payload(
-                sections: view.sections,
-                showChapterEndBadge: view.showChapterEndBadge,
-                traditionalChineseEnabled: view.traditionalChineseEnabled
-            )
-            expectedContentRevision = UUID().uuidString
-            payload["revision"] = expectedContentRevision
-            call(function: "setContent", jsonObject: payload, webView: webView)
+            contentBuildTask?.cancel()
+            let revision = UUID().uuidString
+            expectedContentRevision = revision
+            isBuildingContent = true
+            let sections = view.sections
+            let badge = view.showChapterEndBadge
+            let traditional = view.traditionalChineseEnabled
+            contentBuildTask = Task { @MainActor [weak self, weak webView] in
+                let literal = await Task.detached(priority: .userInitiated) {
+                    WebReaderContentPayloadBuilder.json(sections: sections, showChapterEndBadge: badge,
+                        traditionalChineseEnabled: traditional, revision: revision).map(WebReaderJavaScriptLiteral.string)
+                }.value
+                guard !Task.isCancelled, let self, let webView,
+                      self.expectedContentRevision == revision, self.isDocumentReady else { return }
+                self.isBuildingContent = false
+                guard let literal else { return }
+                webView.evaluateJavaScript("window.__reader.setContent(JSON.parse(\(literal)));", completionHandler: nil)
+                self.pushResetIfNeeded(webView: webView)
+                self.pushScrollTargetIfNeeded(webView: webView)
+                self.pushPageStepIfNeeded(webView: webView)
+                self.pushHighlightIfNeeded(webView: webView)
+            }
         }
 
         private func pushResetIfNeeded(webView: WKWebView) {
+            guard !isBuildingContent else { return }
             let token = view.resetToken
             guard lastResetToken != token else { return }
             lastResetToken = token
@@ -236,6 +257,7 @@ struct WebScrollReaderView: UIViewRepresentable {
         }
 
         private func pushScrollTargetIfNeeded(webView: WKWebView) {
+            guard !isBuildingContent else { return }
             guard let target = view.scrollTarget, let key = view.scrollRequestKey else { return }
             guard key != lastSentScrollKey else { return }
             lastSentScrollKey = key
@@ -252,6 +274,7 @@ struct WebScrollReaderView: UIViewRepresentable {
         }
 
         private func pushPageStepIfNeeded(webView: WKWebView) {
+            guard !isBuildingContent else { return }
             guard view.pageStepGeneration != lastPageStepGeneration else { return }
             lastPageStepGeneration = view.pageStepGeneration
             guard view.pageStepDirection != 0 else { return }
@@ -261,6 +284,7 @@ struct WebScrollReaderView: UIViewRepresentable {
         }
 
         private func pushHighlightIfNeeded(webView: WKWebView) {
+            guard !isBuildingContent else { return }
             guard view.currentParagraphIndex != lastHighlight else { return }
             lastHighlight = view.currentParagraphIndex
             let script = "window.__reader.highlight(\(view.currentParagraphIndex));"
@@ -363,6 +387,8 @@ struct WebScrollReaderView: UIViewRepresentable {
                 if let webView, recoveredDocumentFailures < 2 {
                     recoveredDocumentFailures += 1
                     isDocumentReady = false
+                    contentBuildTask?.cancel()
+                    expectedContentRevision = UUID().uuidString
                     lastContentFingerprint = nil
                     lastStyleSignature = nil
                     lastSentScrollKey = nil

@@ -216,11 +216,20 @@ enum WebReaderCustomFontCache {
 /// title its own element and CSS rule, so the sections travel explicitly and
 /// the flat index space is derived from them with the same rule the paged model
 /// and `ReaderChapterWindowPolicy` already use.
-struct WebReaderSection: Equatable {
+struct WebReaderSection: Equatable, Sendable {
     let chapterIndex: Int
     let title: String
     let paragraphs: [String]
     var isReady: Bool = true
+    private let textRevision: String
+
+    init(chapterIndex: Int, title: String, paragraphs: [String], isReady: Bool = true, contentRevision: String? = nil) {
+        self.chapterIndex = chapterIndex
+        self.title = title
+        self.paragraphs = paragraphs
+        self.isReady = isReady
+        textRevision = contentRevision ?? ReaderRenderRevision.chapter(title: title, paragraphs: paragraphs)
+    }
 
     /// Stable identity inside the WebView document. Chapter indices are unique
     /// inside one reading window, and a chapter that is re-fetched keeps its
@@ -230,9 +239,7 @@ struct WebReaderSection: Equatable {
     /// Cheap structural signature: the DOM is only rebuilt for sections whose
     /// content really changed.
     var contentSignature: String {
-        let head = paragraphs.first?.hashValue ?? 0
-        let tail = paragraphs.last?.hashValue ?? 0
-        return "\(chapterIndex)|\(title.hashValue)|\(paragraphs.count)|\(head)|\(tail)|\(isReady ? "r" : "l")"
+        "\(chapterIndex)|\(textRevision)|\(isReady ? "r" : "l")"
     }
 }
 
@@ -371,6 +378,17 @@ struct WebReaderStylePayload: Equatable {
 
 /// Builds the JSON body posted into `window.__reader.setContent`.
 enum WebReaderContentPayloadBuilder {
+    /// Value-only work. Return a JSON string so no mutable Foundation/Any graph
+    /// crosses actors and serialization never occupies the swipe's UI frame.
+    static func json(sections: [WebReaderSection], showChapterEndBadge: Bool,
+                     traditionalChineseEnabled: Bool, revision: String) -> String? {
+        var body = payload(sections: sections, showChapterEndBadge: showChapterEndBadge,
+                           traditionalChineseEnabled: traditionalChineseEnabled)
+        body["revision"] = revision
+        guard let data = try? JSONSerialization.data(withJSONObject: body) else { return nil }
+        return String(data: data, encoding: .utf8)
+    }
+
     static func payload(
         sections: [WebReaderSection],
         showChapterEndBadge: Bool,
@@ -1159,6 +1177,7 @@ enum WebReaderHTML {
 
       function scrollToFlat(flat, animated, requestKey, revision) {
         if (revision !== state.revision) { return; }
+        state.activeScrollKey = requestKey;
         // Explicit chapter jumps cannot settle on a nearby old paragraph.
         var element = content.querySelector('[data-flat="' + flat + '"]');
         if (!element) {
@@ -1168,13 +1187,17 @@ enum WebReaderHTML {
         var rect = element.getBoundingClientRect();
         var target = Math.max(rect.top + window.scrollY - topInset(), 0);
         if (Math.abs(target - window.scrollY) >= 4) {
-          // Jump atomically: intermediate smooth-scroll positions used to be
-          // reported as reading progress and could reactivate the old chapter.
-          animateTo(target, 0);
+          // TOC/bookmark jumps are atomic (animated == false); speech and
+          // automatic reading keep their smooth progression.
+          animateTo(target, animated ? 300 : 0);
         }
-        state.visible = -1;
-        window.requestAnimationFrame(onScroll);
-        post({ type: "scroll-applied", flat: flat, requestKey: requestKey });
+        var finish = function () {
+          if (revision !== state.revision || requestKey !== state.activeScrollKey) { return; }
+          state.visible = -1;
+          post({ type: "scroll-applied", flat: flat, requestKey: requestKey });
+          window.requestAnimationFrame(onScroll);
+        };
+        if (animated) { window.setTimeout(finish, 400); } else { finish(); }
       }
 
       /// 回到文档顶端。换书/首次进书时调用：WKWebView 可能被复用，

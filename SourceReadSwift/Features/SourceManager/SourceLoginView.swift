@@ -358,6 +358,7 @@ private struct SourceLoginWebView: UIViewRepresentable {
         configuration.websiteDataStore = .default()
         let webView = WKWebView(frame: .zero, configuration: configuration)
         readingSession.webView = webView
+        context.coordinator.readingSession = readingSession
         webView.navigationDelegate = context.coordinator
         webView.allowsBackForwardNavigationGestures = true
         webView.load(URLRequest(url: url))
@@ -367,6 +368,7 @@ private struct SourceLoginWebView: UIViewRepresentable {
     func updateUIView(_ webView: WKWebView, context: Context) {}
 
     final class Coordinator: NSObject, WKNavigationDelegate {
+        weak var readingSession: WebReadingSession?
         let cookieStore: SourceCookieStore
         let onStatus: (String) -> Void
 
@@ -376,6 +378,7 @@ private struct SourceLoginWebView: UIViewRepresentable {
         }
 
         func webView(_ webView: WKWebView, didStartProvisionalNavigation navigation: WKNavigation!) {
+            readingSession?.documentDidStartLoading()
             onStatus("正在加载…")
         }
 

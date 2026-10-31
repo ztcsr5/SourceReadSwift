@@ -813,7 +813,6 @@ struct BookDetailView: View {
         guard detail == nil || ignoreCache else { return }
 
         isLoading = true
-        defer { isLoading = false }
         await refreshDetailAndTOC(source: source, reportErrors: true)
     }
 
@@ -875,6 +874,7 @@ struct BookDetailView: View {
                     if reportErrors && chapters.isEmpty { errorMessage = error.displayMessage }
                 case .toc(.success(let value)):
                     chapters = value
+                    if detail == nil { detail = placeholder }
                     isLoading = false
                     errorMessage = nil
                 case .toc(.failure):
@@ -924,6 +924,11 @@ struct BookDetailView: View {
     }
 
     private func reload() async {
+        // A source switch supersedes an in-flight load; it must not be dropped
+        // by load()'s duplicate-request guard after the page has been cleared.
+        loadGeneration = UUID()
+        tocExpansionTask?.cancel()
+        isLoading = false
         detail = nil
         chapters = []
         errorMessage = nil

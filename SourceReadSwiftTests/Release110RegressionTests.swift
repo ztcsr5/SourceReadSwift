@@ -4,6 +4,24 @@ import WebKit
 @testable import SourceReadSwift
 
 final class Release110RegressionTests: XCTestCase {
+    func testWebSectionRevisionSeesMiddleParagraphChanges() {
+        let old = WebReaderSection(chapterIndex: 1, title: "章", paragraphs: ["首", "旧", "尾"])
+        let new = WebReaderSection(chapterIndex: 1, title: "章", paragraphs: ["首", "新", "尾"])
+        XCTAssertNotEqual(old.contentSignature, new.contentSignature)
+        XCTAssertEqual(old.key, new.key)
+    }
+
+    func testBackgroundPayloadKeepsRevisionAndEveryParagraph() throws {
+        let section = WebReaderSection(chapterIndex: 29, title: "第二十九章", paragraphs: ["甲", "乙", "丙"])
+        let text = try XCTUnwrap(WebReaderContentPayloadBuilder.json(sections: [section],
+            showChapterEndBadge: false, traditionalChineseEnabled: false, revision: "generation-29"))
+        let body = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(text.utf8)) as? [String: Any])
+        XCTAssertEqual(body["revision"] as? String, "generation-29")
+        XCTAssertEqual(body["total"] as? Int, 3)
+        let encoded = try XCTUnwrap(body["sections"] as? [[String: Any]])
+        XCTAssertEqual((encoded[0]["paragraphs"] as? [[String: Any]])?.compactMap { $0["text"] as? String }, ["甲", "乙", "丙"])
+    }
+
     func testOldDOMCannotReportProgressThroughNewChapterWindow() {
         XCTAssertFalse(ReaderWebMessagePolicy.matchesRevision("old", expected: "new"))
         XCTAssertFalse(ReaderWebMessagePolicy.matchesRevision(nil, expected: "new"))
@@ -56,6 +74,40 @@ final class Release110RegressionTests: XCTestCase {
             XCTAssertEqual(pages.first?.includesTitle, chrome != .hidden)
             XCTAssertEqual(pages.flatMap(\.paragraphs).map(\.text).joined(), text)
         }
+    }
+
+    func testContinuationRestoresIndentAfterEmbeddedNewline() {
+        let rendered = ReaderPageTextBuilder.make(title: nil,
+            paragraphs: [.init(text: "续行\n新段落", isContinuation: true, isHighlighted: false)],
+            style: ReaderPageTextBuilder.layoutStyle(makeTypography()))
+        let first = rendered.attribute(.paragraphStyle, at: 0, effectiveRange: nil) as! NSParagraphStyle
+        let next = rendered.attribute(.paragraphStyle, at: 3, effectiveRange: nil) as! NSParagraphStyle
+        XCTAssertEqual(first.firstLineHeadIndent, 0)
+        XCTAssertEqual(next.firstLineHeadIndent, 40)
+        XCTAssertEqual(rendered.string, "续行\n新段落")
+    }
+
+    func testAdvertisementRulesMatchOnlyTargetedDomains() throws {
+        let rules = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(WebAdvertisementRules.json.utf8)) as? [[String: Any]])
+        let trigger = try XCTUnwrap(rules[0]["trigger"] as? [String: Any])
+        let regex = try NSRegularExpression(pattern: XCTUnwrap(trigger["url-filter"] as? String))
+        for url in ["https://doubleclick.net/ad.js", "https://ads.doubleclick.net/ad.js", "https://googlesyndication.com/pagead.js"] {
+            XCTAssertNotNil(regex.firstMatch(in: url, range: NSRange(location: 0, length: url.utf16.count)))
+        }
+        for url in ["https://example.com/chapter.html", "https://notdoubleclick.net/chapter.html", "https://doubleclick.net.example.com/chapter.html"] {
+            XCTAssertNil(regex.firstMatch(in: url, range: NSRange(location: 0, length: url.utf16.count)))
+        }
+    }
+
+    @MainActor func testSameURLNavigationInvalidatesExtractionEpoch() {
+        let session = WebReadingSession()
+        let before = session.documentGeneration
+        session.article = SmartWebArticle(title: "旧页", paragraphs: ["旧正文"])
+        session.isExtracting = true
+        session.documentDidStartLoading()
+        XCTAssertGreaterThan(session.documentGeneration, before)
+        XCTAssertNil(session.article)
+        XCTAssertFalse(session.isExtracting)
     }
 
     func testExtractionPreservesBRShortLinesAndRepeatedDialogue() {

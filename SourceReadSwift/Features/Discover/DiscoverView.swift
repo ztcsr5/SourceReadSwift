@@ -1587,7 +1587,8 @@ final class DiscoverViewModel: ObservableObject {
             let rankedBooks = await Task.detached(priority: .userInitiated) {
                 SearchBookMatcher.filteredAndRanked(snapshot, keyword: keyword, exact: exactMatch)
             }.value
-            guard !Task.isCancelled, generation == searchGeneration, activeSearchID == searchID else { return }
+            guard !Task.isCancelled, generation == searchGeneration, activeSearchID == searchID,
+                  exactMatch == (matchMode == .exact) else { return }
             unfilteredResults = rankedBooks
             applyResultFilter()
         }
