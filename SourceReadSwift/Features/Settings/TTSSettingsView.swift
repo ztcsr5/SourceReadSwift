@@ -22,6 +22,8 @@ struct TTSSettingsView: View {
     @State private var showVoiceImporter = false
     @State private var importedVoiceNames: [String] = []
     @State private var voiceStatusMessage: String?
+    @State private var azureRegion = "eastasia"
+    @State private var azureKey = ""
 
     private let credentialStore = CloudTTSCredentialsStore()
     private let client = CloudTTSClient()
@@ -71,8 +73,29 @@ struct TTSSettingsView: View {
                 } header: {
                     Text("在线 HTTP 语音")
                 } footer: {
-                    Text("使用 Legado httpTTS 兼容模板；预设来自 SourceRead httpTTS.json，公共百度接口可能限流。")
+                    Text("百度公共预设可能限流；晓萱、晓伊、晓晓、云希使用 Azure 官方服务，需自己的 Speech Key，可能产生服务费用。风格名称仅供选声参考。")
                 }
+                Section {
+                    TextField("资源区域（如 eastasia）", text: $azureRegion)
+                        .textInputAutocapitalization(.never).autocorrectionDisabled()
+                    SecureField("Azure Speech Key", text: $azureKey)
+                        .textInputAutocapitalization(.never).autocorrectionDisabled()
+                    Button("保存 Azure 凭据") {
+                        do {
+                            try AzureTTSCredentialsStore().save(AzureTTSCredentials(
+                                region: azureRegion.trimmingCharacters(in: .whitespacesAndNewlines).lowercased(),
+                                key: azureKey.trimmingCharacters(in: .whitespacesAndNewlines)))
+                            statusMessage = "Azure 凭据已保存到 Keychain"
+                        } catch { statusMessage = error.localizedDescription }
+                    }
+                    Button("清除 Azure 凭据", role: .destructive) {
+                        do {
+                            try AzureTTSCredentialsStore().clear()
+                            azureKey = ""
+                            statusMessage = "Azure 凭据已清除"
+                        } catch { statusMessage = error.localizedDescription }
+                    }
+                } header: { Text("Azure 特色音色") }
             }
 
             if engine == .file {
@@ -213,6 +236,9 @@ struct TTSSettingsView: View {
             }
         }
         .onAppear {
+            if let credentials = AzureTTSCredentialsStore().load() {
+                azureRegion = credentials.region; azureKey = credentials.key
+            }
             loadCredentials()
             refreshImportedVoices()
             if !HttpTTSVoice.defaultVoices.contains(where: { $0.id == httpVoiceID }),

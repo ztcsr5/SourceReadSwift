@@ -7,6 +7,7 @@ import UIKit
 struct ReaderView: View {
     @EnvironmentObject private var appState: AppState
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.readerTemporaryCoverPresented) private var temporaryCoverPresented
     let bookID: String
     let content: ChapterContent
     let chapterIndex: Int
@@ -1162,7 +1163,7 @@ struct ReaderView: View {
         .onDisappear {
             // Cover presentation is not a reader exit. Keep the live session
             // and any selected chapter's download/pagination transaction alive.
-            guard readerPresentationLifecycle.endAppearance(chapterListPresented: showChapterList) else { return }
+            guard readerPresentationLifecycle.endAppearance(chapterListPresented: showChapterList || temporaryCoverPresented) else { return }
             windowGeneration &+= 1
             cancelChapterJumpPreparation()
             geometrySettleTask?.cancel()
@@ -2376,6 +2377,15 @@ struct ReaderView: View {
     }
 
     private func upsertWindowSection(_ section: ReaderChapterSection) {
+        if pendingWindowJump?.chapterIndex == section.chapterIndex {
+            // A distant selection is a foreground transaction, not an append
+            // to the old cursor. Do not lay out/prewarm the abandoned window
+            // before preparing the requested chapter.
+            insertWindowSection(section)
+            rebuildWindowPositionMapping()
+            resumePendingContinuation(for: section.chapterIndex)
+            return
+        }
         let anchor = scrollAnchorPosition()
         let oldMax = windowSections.map(\.chapterIndex).max() ?? windowCurrentChapterIndex
         insertWindowSection(section)

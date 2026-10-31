@@ -58,6 +58,43 @@ final class Release111RegressionTests: XCTestCase {
         XCTAssertNotEqual(a.pngData(), ReaderPaperTexture.image(background: .linen, night: false).pngData())
     }
 
+    func testMediaSignedQueriesAndRelativeLazyImagesSurviveParsing() {
+        let chapter = chapter("媒体", 0)
+        let images = ChapterContent(chapter: chapter, title: "媒体", paragraphs: [
+            "<img data-original='/a/1.webp?token=a&amp;x=2' src='data:image/gif;base64,AA'>",
+            "[img]//cdn.test/a2.webp?sign=x%2By[/img]",
+            "![p](../p3.jpg)"
+        ], nextContentUrl: nil)
+        XCTAssertEqual(ComicContentParser.parsePages(from: images).map(\.url), [
+            "https://fixture.test/a/1.webp?token=a&x=2", "https://cdn.test/a2.webp?sign=x%2By", "https://fixture.test/p3.jpg"
+        ])
+        let video = ChapterContent(chapter: chapter, title: "媒体", paragraphs: ["https://cdn.test/a.m3u8?sign=abc%2Bdef&expires=123"], nextContentUrl: nil)
+        XCTAssertEqual(VideoContentParser.parseVideoURL(from: video), "https://cdn.test/a.m3u8?sign=abc%2Bdef&expires=123")
+        XCTAssertEqual(AudioContentParser.parseURL("<audio src='/a.mp3?token=a&amp;x=2'>", base: chapter.url), "https://fixture.test/a.mp3?token=a&x=2")
+        XCTAssertNil(AudioContentParser.parseURL("<html>站点维护</html>", base: chapter.url))
+        XCTAssertNil(MediaURLResolver.resolve("javascript:alert(1)", base: chapter.url))
+    }
+
+    func testAzureRequestUsesKeyHeaderAndEscapesSSML() throws {
+        let request = try AzureTTSVoice.request(voice: AzureTTSVoice.presets[0], text: "A & B <voice> \"'", speed: 6,
+            credentials: AzureTTSCredentials(region: "eastasia", key: "fixture-secret"), timeout: 9)
+        XCTAssertEqual(request.url?.host, "eastasia.tts.speech.microsoft.com")
+        XCTAssertEqual(request.value(forHTTPHeaderField: "Ocp-Apim-Subscription-Key"), "fixture-secret")
+        let body = String(decoding: try XCTUnwrap(request.httpBody), as: UTF8.self)
+        XCTAssertTrue(body.contains("A &amp; B &lt;voice&gt; &quot;&apos;"))
+        XCTAssertTrue(body.contains("+10%"))
+        XCTAssertFalse(body.contains("fixture-secret"))
+        XCTAssertThrowsError(try AzureTTSVoice.request(voice: AzureTTSVoice.presets[0], text: "x", speed: 5,
+            credentials: AzureTTSCredentials(region: "evil/path", key: "x"), timeout: 9))
+    }
+
+    @MainActor func testBundledFontsHaveRealPostScriptNamesAndRoundTrip() throws {
+        XCTAssertEqual(ReaderFontFamily.maShanZheng.uiFont(ofSize: 20).fontName, "MaShanZheng-Regular")
+        XCTAssertEqual(ReaderFontFamily.zhiMangXing.uiFont(ofSize: 20).fontName, "ZhiMangXing-Regular")
+        let data = try JSONEncoder().encode(ReaderFontFamily.zhiMangXing)
+        XCTAssertEqual(try JSONDecoder().decode(ReaderFontFamily.self, from: data), .zhiMangXing)
+    }
+
     @MainActor func testDiagnosticPolicyDoesNotPermanentlyDisableProductionFallback() async {
         let engine = LegadoSourceEngine()
         XCTAssertTrue(engine.allowWebViewFallback)

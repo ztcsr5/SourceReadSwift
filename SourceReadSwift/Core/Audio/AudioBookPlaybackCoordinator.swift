@@ -201,8 +201,14 @@ final class AudioBookPlaybackCoordinator: ObservableObject {
         playChapter(at: self.currentChapterIndex)
     }
 
+    private var chapterLoadTask: Task<Void, Never>?
+    private var chapterLoadID = UUID()
+
     func playChapter(at index: Int, resumeSeconds: Double? = nil) {
         guard chapters.indices.contains(index) else { return }
+        chapterLoadTask?.cancel()
+        chapterLoadID = UUID()
+        let loadID = chapterLoadID
         currentChapterIndex = index
         if let resumeSeconds, resumeSeconds > 0 {
             pendingResumeSeconds = resumeSeconds
@@ -212,7 +218,7 @@ final class AudioBookPlaybackCoordinator: ObservableObject {
         errorMessage = nil
 
         // If audio url is already known in chapter url or content
-        if let directURL = extractAudioURL(from: chapter.url), isAudioMediaURL(directURL) {
+        if let directURL = AudioContentParser.parseURL(chapter.url, base: chapter.url), AudioContentParser.isMediaURL(directURL) {
             setupPlayer(with: directURL)
             return
         }
@@ -224,15 +230,14 @@ final class AudioBookPlaybackCoordinator: ObservableObject {
             return
         }
 
-        Task { @MainActor [weak self] in
+        chapterLoadTask = Task { @MainActor [weak self] in
             guard let self else { return }
             let contentResult = await engine.getContent(source: source, chapter: chapter)
+            guard !Task.isCancelled, self.chapterLoadID == loadID else { return }
             switch contentResult {
             case .success(let content):
-                if let audioURL = self.extractAudioURL(from: content.text) ?? self.extractAudioURL(from: chapter.url) {
+                if let audioURL = AudioContentParser.parseURL(content.text, base: chapter.url) {
                     self.setupPlayer(with: audioURL)
-                } else if !content.text.isEmpty {
-                    self.setupPlayer(with: content.text.trimmingCharacters(in: .whitespacesAndNewlines))
                 } else {
                     self.isLoading = false
                     self.errorMessage = "未找到音频播放流地址"
@@ -383,6 +388,9 @@ final class AudioBookPlaybackCoordinator: ObservableObject {
     }
 
     func stop() {
+        chapterLoadID = UUID()
+        chapterLoadTask?.cancel()
+        chapterLoadTask = nil
         fadeTimer?.invalidate()
         fadeTimer = nil
         pause()
@@ -521,45 +529,4 @@ final class AudioBookPlaybackCoordinator: ObservableObject {
 
     // MARK: - Helpers
 
-    private func extractAudioURL(from text: String?) -> String? {
-        guard let text, !text.isEmpty else { return nil }
-
-        // Look for audio extensions
-        let audioExtensions = [".mp3", ".m4a", ".aac", ".ogg", ".wav", ".flac"]
-        for ext in audioExtensions {
-            if let range = text.range(of: ext, options: .caseInsensitive) {
-                // Find preceding http:// or https://
-                let prefix = text[..<range.upperBound]
-                if let httpIdx = prefix.range(of: "http", options: [.backwards, .caseInsensitive])?.lowerBound {
-                    let candidate = String(text[httpIdx..<range.upperBound])
-                    if URL(string: candidate) != nil {
-                        return candidate
-                    }
-                }
-            }
-        }
-
-        // Look for HTML <source src="..."> or <audio src="...">
-        if let srcRange = text.range(of: "src=\"", options: .caseInsensitive) {
-            let rest = text[srcRange.upperBound...]
-            if let quoteRange = rest.range(of: "\"") {
-                let candidate = String(rest[..<quoteRange.lowerBound])
-                if candidate.hasPrefix("http") {
-                    return candidate
-                }
-            }
-        }
-
-        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
-        if trimmed.hasPrefix("http://") || trimmed.hasPrefix("https://") {
-            return trimmed
-        }
-
-        return nil
-    }
-
-    private func isAudioMediaURL(_ url: String) -> Bool {
-        let lower = url.lowercased()
-        return lower.hasSuffix(".mp3") || lower.hasSuffix(".m4a") || lower.hasSuffix(".aac") || lower.hasSuffix(".wav") || lower.hasSuffix(".ogg") || lower.hasSuffix(".flac") || lower.contains(".mp3?") || lower.contains(".m4a?")
-    }
 }

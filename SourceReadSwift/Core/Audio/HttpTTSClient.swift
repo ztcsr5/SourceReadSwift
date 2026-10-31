@@ -53,21 +53,25 @@ final class HttpTTSClient {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { throw HttpTTSError.emptyText }
         let clampedSpeed = min(max(speed, 0), 10)
-        guard let resolved = voice.resolveRequest(speakText: trimmed, speakSpeed: clampedSpeed) else {
-            throw HttpTTSError.invalidRequest
-        }
-
-        var request = URLRequest(url: resolved.url)
-        request.httpMethod = resolved.method
-        request.timeoutInterval = timeout
-        for (key, value) in resolved.headers {
-            request.setValue(value, forHTTPHeaderField: key)
-        }
-        if let body = resolved.body {
-            request.httpBody = Data(body.utf8)
-            if request.value(forHTTPHeaderField: "Content-Type") == nil {
-                request.setValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
+        let request: URLRequest
+        if voice.url.hasPrefix("azuretts://") {
+            request = try AzureTTSVoice.request(voice: voice, text: trimmed, speed: clampedSpeed,
+                credentials: AzureTTSCredentialsStore().load() ?? AzureTTSCredentials(), timeout: timeout)
+        } else {
+            guard let resolved = voice.resolveRequest(speakText: trimmed, speakSpeed: clampedSpeed) else {
+                throw HttpTTSError.invalidRequest
             }
+            var templateRequest = URLRequest(url: resolved.url)
+            templateRequest.httpMethod = resolved.method
+            templateRequest.timeoutInterval = timeout
+            for (key, value) in resolved.headers { templateRequest.setValue(value, forHTTPHeaderField: key) }
+            if let body = resolved.body {
+                templateRequest.httpBody = Data(body.utf8)
+                if templateRequest.value(forHTTPHeaderField: "Content-Type") == nil {
+                    templateRequest.setValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
+                }
+            }
+            request = templateRequest
         }
 
         let (data, response) = try await requester.httpTTSData(for: request)

@@ -336,6 +336,7 @@ struct PageCurlReaderView<Item: Identifiable, Content: View>: UIViewControllerRe
                 let target = current + request.direction
                 guard self.parent.pages.indices.contains(target) else { return }
                 let revision = self.parent.contentRevision
+                let requestedIndex = self.parent.currentPageIndex
                 let controller = self.viewController(at: target)
                 self.isUserInteracting = true
                 self.parent.onInteractionChanged?(true)
@@ -344,6 +345,7 @@ struct PageCurlReaderView<Item: Identifiable, Content: View>: UIViewControllerRe
                     guard let self, let pvc else { return }
                     self.isUserInteracting = false
                     if completed, self.parent.contentRevision == revision,
+                       self.parent.currentPageIndex == requestedIndex,
                        pvc.viewControllers?.first === controller {
                         self.parent.currentPageIndex = target
                         self.lastDesiredIndex = target

@@ -38,6 +38,7 @@ struct BookshelfReaderGatewayView: View {
 
     var body: some View {
         gatewayContent
+        .environment(\.readerTemporaryCoverPresented, showSourceSwitcher)
         .onAppear {
             appState.acquireTabChromeHidden(owner: gatewayTabChromeOwner)
             if initialLocalChapterSeed == nil {

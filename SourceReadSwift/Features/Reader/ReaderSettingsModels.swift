@@ -395,6 +395,8 @@ enum ReaderFontFamily: String, CaseIterable, Identifiable, Codable, Sendable {
     case songti
     case kaiti
     case rounded
+    case maShanZheng
+    case zhiMangXing
     case custom
 
     var id: String { rawValue }
@@ -407,6 +409,8 @@ enum ReaderFontFamily: String, CaseIterable, Identifiable, Codable, Sendable {
         case .songti: return "宋体"
         case .kaiti: return "楷体"
         case .rounded: return "圆体"
+        case .maShanZheng: return "马善政楷书"
+        case .zhiMangXing: return "志莽行书"
         case .custom: return "自定义"
         }
     }
@@ -420,6 +424,8 @@ enum ReaderFontFamily: String, CaseIterable, Identifiable, Codable, Sendable {
         case "songti": self = .songti
         case "kaiti": self = .kaiti
         case "rounded": self = .rounded
+        case "maShanZheng": self = .maShanZheng
+        case "zhiMangXing": self = .zhiMangXing
         case "custom": self = .custom
         default: self = .system
         }
@@ -469,6 +475,9 @@ enum ReaderFontFamily: String, CaseIterable, Identifiable, Codable, Sendable {
                 return UIFont(descriptor: desc, size: size)
             }
             return UIFont.systemFont(ofSize: size, weight: weight)
+        case .maShanZheng, .zhiMangXing:
+            let name = self == .maShanZheng ? "MaShanZheng-Regular" : "ZhiMangXing-Regular"
+            return UIFont(name: name, size: size) ?? UIFont.systemFont(ofSize: size, weight: weight)
         case .custom:
             let psName = customPostScriptName ?? UserDefaults.standard.string(forKey: "reader.customFontPostScriptName")
             if let psName, !psName.isEmpty, let font = UIFont(name: psName, size: size) {
@@ -508,6 +517,8 @@ enum ReaderFontFamily: String, CaseIterable, Identifiable, Codable, Sendable {
             return .system(size: size, weight: weight, design: .serif)
         case .rounded:
             return .system(size: size, weight: weight, design: .rounded)
+        case .maShanZheng, .zhiMangXing:
+            return .custom(self == .maShanZheng ? "MaShanZheng-Regular" : "ZhiMangXing-Regular", size: size)
         case .custom:
             let psName = customPostScriptName ?? UserDefaults.standard.string(forKey: "reader.customFontPostScriptName")
             if let psName, !psName.isEmpty, UIFont(name: psName, size: size) != nil {

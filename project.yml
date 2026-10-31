@@ -59,6 +59,9 @@ targets:
           - audio
         LSSupportsOpeningDocumentsInPlace: true
         UIFileSharingEnabled: true
+        UIAppFonts:
+          - MaShanZheng-Regular.ttf
+          - ZhiMangXing-Regular.ttf
         CFBundleDocumentTypes:
           - CFBundleTypeName: Readable text, EPUB and source JSON
             CFBundleTypeRole: Viewer

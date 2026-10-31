@@ -317,7 +317,7 @@ struct HttpTTSVoice: Identifiable, Equatable, Hashable, Sendable {
             name: "百度解说 (影视旁白)",
             url: #"http://tts.baidu.com/text2audio,{"method":"POST","body":"tex={{java.encodeURI(java.encodeURI(speakText))}}&spd={{(speakSpeed + 5) / 10 + 4}}&per=4123&cuid=baidu_speech_demo&idx=1&cod=2&lan=zh&ctp=1&pdt=12&vol=5&aue=6&pit=5&_res_tag_=audio"}"#
         )
-    ]
+    ] + AzureTTSVoice.presets
 
     /// Resolves the Legado HTTP TTS request template by evaluating embedded JS expressions.
     func resolveRequest(
