@@ -180,7 +180,7 @@ final class BookshelfStore: ObservableObject {
         )
         books[index].lastReadAt = Date()
         moveToFront(index: index)
-        persist()
+        persistReadingProgress()
         if let updated = books.first {
             onBookRead?(updated)
         }
@@ -411,6 +411,19 @@ final class BookshelfStore: ObservableObject {
             return
         }
         persistNow()
+    }
+
+    private func persistReadingProgress() {
+        if persistenceBatchDepth > 0 {
+            persistenceBatchDirty = true
+            return
+        }
+        do {
+            try persistence.saveReadingProgress(books)
+            lastError = nil
+        } catch {
+            lastError = error.localizedDescription
+        }
     }
 
     private func persistNow() {

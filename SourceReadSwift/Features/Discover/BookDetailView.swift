@@ -1539,18 +1539,15 @@ private struct BookDetailAllChaptersView: View {
     @State private var query = ""
     @State private var debouncedQuery = ""
     @State private var isAscending = true
+    @State private var tocFilterCache = ReaderTocFilterCache()
 
     private var filteredChapters: [BookChapter] {
-        let q = debouncedQuery.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-        let base = isAscending ? chapters : Array(chapters.reversed())
-        guard !q.isEmpty else { return base }
-        return base.filter {
-            $0.title.lowercased().contains(q) || "\($0.index + 1)".contains(q)
-        }
+        tocFilterCache.chapters(query: debouncedQuery, reversed: !isAscending, chapters: chapters)
     }
 
     var body: some View {
-        NavigationStack {
+        let visibleChapters = filteredChapters
+        return NavigationStack {
             VStack(spacing: 8) {
                 HStack(spacing: 8) {
                     Image(systemName: "magnifyingglass")
@@ -1581,16 +1578,19 @@ private struct BookDetailAllChaptersView: View {
                 .padding(.top, 6)
 
                 List {
-                    if filteredChapters.isEmpty {
+                    if visibleChapters.isEmpty {
                         Text("没有匹配章节")
                             .font(.subheadline)
                             .foregroundStyle(.secondary)
                             .frame(maxWidth: .infinity, alignment: .center)
                             .listRowBackground(Color.clear)
                     } else {
-                        ForEach(filteredChapters.indices, id: \.self) { index in
-                            let chapter = filteredChapters[index]
-                            if let volume = ChapterListPresenter.volumeHeader(at: index, in: filteredChapters) {
+                        ForEach(Array(visibleChapters.enumerated()), id: \.element.id) { index, chapter in
+                            // One stable row per chapter lets List stay lazy even
+                            // when volumes are present. Filtering is done once,
+                            // not twice again for every row it inspects.
+                            VStack(alignment: .leading, spacing: 8) {
+                            if let volume = ChapterListPresenter.volumeHeader(at: index, in: visibleChapters) {
                                 Text(volume)
                                     .font(.caption.weight(.bold))
                                     .foregroundStyle(.secondary)
@@ -1626,6 +1626,7 @@ private struct BookDetailAllChaptersView: View {
                                 .contentShape(Rectangle())
                             }
                             .buttonStyle(.plain)
+                            }
                         }
                     }
                 }
@@ -1664,7 +1665,7 @@ private struct BookDetailAllChaptersView: View {
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
                     Button(isAscending ? "倒序" : "正序") {
-                        withAnimation { isAscending.toggle() }
+                        isAscending.toggle()
                     }
                 }
                 ToolbarItem(placement: .navigationBarTrailing) {

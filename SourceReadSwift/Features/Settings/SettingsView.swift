@@ -4,13 +4,10 @@ import UniformTypeIdentifiers
 
 struct SettingsView: View {
     @EnvironmentObject private var appState: AppState
-    @AppStorage("settings.themeMode") private var themeModeRawValue = ThemeMode.system.rawValue
     @ObservedObject private var proxyManager = SourceProxyManager.shared
     @AppStorage("app.hapticsEnabled") private var hapticsEnabled = false
     @AppStorage("search_concurrent_threads") private var searchThreads = 12
     @AppStorage("batch_check_concurrent_threads") private var batchCheckThreads = 4
-    @AppStorage("settings.accentHex") private var accentHex = "594FDB"
-    @AppStorage("settings.secondaryAccentHex") private var secondaryAccentHex = "419BDC"
     @State private var cacheSize = "无缓存"
     @State private var rssCacheSize = "无缓存"
     @State private var backupDocument: AppDataBackupDocument?
@@ -20,51 +17,17 @@ struct SettingsView: View {
     /// 清零采样后强制刷新诊断区。
     @State private var perfRefreshToken = UUID()
 
-    private var themeMode: ThemeMode {
-        get { ThemeMode(rawValue: themeModeRawValue) ?? .system }
-        set { themeModeRawValue = newValue.rawValue }
-    }
-
     var body: some View {
         NavigationStack {
             List {
                 settingsHeroSection
 
-                Section("外观") {
-                    ForEach(ThemeMode.allCases) { mode in
-                        Button {
-                            UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                            withAnimation(.easeInOut(duration: 0.22)) {
-                                themeModeRawValue = mode.rawValue
-                            }
-                        } label: {
-                            HStack {
-                                Text(mode.title)
-                                    .foregroundStyle(.primary)
-                                Spacer()
-                                if themeMode == mode {
-                                    Image(systemName: "checkmark")
-                                        .foregroundStyle(AppTheme.accent)
-                                }
-                            }
-                        }
+                Section {
+                    NavigationLink {
+                        AppearanceSettingsView().hideRootTabBar()
+                    } label: {
+                        Label("外观", systemImage: "paintpalette")
                     }
-                }
-
-                Section("自定义外观") {
-                    ColorPicker("主题主色", selection: Binding(get: { AppTheme.accent }, set: { if let hex = AppTheme.hex($0) { accentHex = hex } }), supportsOpacity: false)
-                    ColorPicker("主题辅色", selection: Binding(get: { AppTheme.secondaryAccent }, set: { if let hex = AppTheme.hex($0) { secondaryAccentHex = hex } }), supportsOpacity: false)
-                    HStack(spacing: 8) {
-                        ForEach(["594FDB", "267A62", "B75473", "B76A2C", "3476B8"], id: \.self) { hex in
-                            Button { accentHex = hex } label: {
-                                Circle().fill(Color(uiColor: colorFromHex(hex))).frame(width: 30, height: 30)
-                                    .overlay(Circle().strokeBorder(.primary.opacity(accentHex == hex ? 0.8 : 0), lineWidth: 2))
-                                    .frame(maxWidth: .infinity, minHeight: 44)
-                            }.buttonStyle(.plain).accessibilityLabel("主题色 \(hex)")
-                        }
-                    }
-                    Button("恢复纸间默认配色") { accentHex = "594FDB"; secondaryAccentHex = "419BDC" }
-                    Text("只调整应用界面配色，不覆盖书籍的阅读背景和字体颜色。").font(.caption).foregroundStyle(.secondary)
                 }
 
                 Section("排版与字体") {
@@ -342,11 +305,6 @@ struct SettingsView: View {
                 Text(backupMessage ?? "")
             }
         }
-    }
-
-    private func colorFromHex(_ hex: String) -> UIColor {
-        let n = UInt32(hex, radix: 16) ?? 0x594FDB
-        return UIColor(red: CGFloat((n >> 16) & 255) / 255, green: CGFloat((n >> 8) & 255) / 255, blue: CGFloat(n & 255) / 255, alpha: 1)
     }
 
     private var settingsHeroSection: some View {

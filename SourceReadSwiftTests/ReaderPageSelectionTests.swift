@@ -163,6 +163,24 @@ final class ReaderPageRestorationTests: XCTestCase {
         XCTAssertEqual(ReaderPageRestoration.index(anchor: nil, in: [], fallbackIndex: 5), 0)
     }
 
+    func testDistantTocSelectionUsesExplicitTargetNotPreviousVisibleAnchor() {
+        // Video case: chapter 147 stayed visible after choosing chapter 173.
+        // A normal background rebuild restores chapter 147, but a user jump
+        // must install a new model with the explicit target as its anchor.
+        let pages = [
+            makePage(id: 0, chapter: 146, ordinal: 3, paragraph: 15),
+            makePage(id: 1, chapter: 172, ordinal: 0, paragraph: 0),
+            makePage(id: 2, chapter: 172, ordinal: 1, paragraph: 9)
+        ]
+        let previous = ReaderChapterPosition(chapterIndex: 146, paragraphIndex: 15, pageOrdinal: 3)
+        XCTAssertEqual(ReaderPageRestoration.index(anchor: previous, in: pages, fallbackIndex: 0), 0)
+        let target = ReaderChapterPosition(chapterIndex: 172, paragraphIndex: 0)
+        let selected = ReaderPageRestoration.index(anchor: target, in: pages, fallbackIndex: 0)
+        XCTAssertEqual(selected, 1)
+        XCTAssertEqual(pages[selected].chapterIndex, 172)
+        XCTAssertEqual(pages[selected + 1].chapterIndex, 172, "The next swipe must stay inside the selected chapter")
+    }
+
     func testFallbackIsClampedWhenNoAnchorExists() {
         let pages = [makePage(id: 0, chapter: 1, ordinal: 0, paragraph: 0)]
         XCTAssertEqual(ReaderPageRestoration.index(anchor: nil, in: pages, fallbackIndex: 99), 0)

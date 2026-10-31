@@ -128,6 +128,8 @@ struct ReaderView: View {
     @State private var windowCurrentChapterIndex = 0
     /// A TOC / bookmark / slider jump whose chapter is still downloading.
     @State private var pendingWindowJump: ReaderPendingChapterJump?
+    @State private var chapterJumpTask: Task<Void, Never>?
+    @State private var chapterJumpRequestID = UUID()
     @State private var windowLoadingIndices: Set<Int> = []
     /// Last failure per chapter. Placeholders and the scroll boundary banner
     /// read this map, so a source timeout is visible instead of looking like
@@ -906,6 +908,24 @@ struct ReaderView: View {
                     .transition(.move(edge: .top).combined(with: .opacity))
             }
 
+            if let jump = pendingWindowJump, !showChapterList {
+                VStack {
+                    HStack(spacing: 10) {
+                        ProgressView().tint(readerThemeTextColor)
+                        Text("正在打开 · \(chapterTitle(for: jump.chapterIndex))")
+                            .font(.subheadline).lineLimit(1)
+                    }
+                    .padding(12)
+                    .foregroundStyle(readerThemeTextColor)
+                    .background(readerThemeBackground, in: Capsule())
+                    .padding(.top, readerTopSafeInset + 12)
+                    .padding(.horizontal, 16)
+                    Spacer()
+                }
+                .allowsHitTesting(false)
+                .zIndex(12)
+            }
+
             // Cloud TTS failures fall back to the system voice. Keep the
             // reason on screen (instead of a transient toast) so a silent
             // keychain/network failure never looks like the app ignored the
@@ -1136,6 +1156,7 @@ struct ReaderView: View {
         }
         .onDisappear {
             windowGeneration &+= 1
+            cancelChapterJumpPreparation()
             geometrySettleTask?.cancel()
             geometrySettleTask = nil
             paginationWarmupRestartTask?.cancel()
@@ -1198,6 +1219,7 @@ struct ReaderView: View {
             scheduleReadingPositionPersistence(paragraphIndex: currentParagraphIndexForPersistence())
         }
         .onChange(of: pagedPageIndex) { _ in
+            guard pendingWindowJump == nil else { return }
             ensurePagedContinuationBuffer(pageIndex: pagedPageIndex)
             scheduleReadingPositionPersistence(paragraphIndex: currentParagraphIndexForPersistence())
         }
@@ -1768,6 +1790,7 @@ struct ReaderView: View {
 
     private func resetWindow() {
         windowGeneration &+= 1
+        cancelChapterJumpPreparation()
         cancelPrefetch()
         cancelPaginationWarmup()
         cancelWindowRetries()
@@ -1933,6 +1956,7 @@ struct ReaderView: View {
     /// ten chapters in the same main-thread turn as the first page.
     private func warmPaginationCache(around current: Int) {
         guard readerMode != .scroll else { return }
+        guard pendingWindowJump == nil else { return }
         // The page container is still moving: every measurement would be
         // thrown away when the real bounds land. The settle task restarts the
         // warmup with the final geometry.
@@ -2447,6 +2471,9 @@ struct ReaderView: View {
             upperBound: windowChapterUpperBound,
             loading: windowLoadingIndices
         )
+        // Network loading ends before off-thread pagination. Retain a distant
+        // target until the foreground jump commits, not just while downloading.
+        if let jump = pendingWindowJump { keep.insert(jump.chapterIndex) }
         if readerMode == .scroll {
             // In continuous vertical scroll mode, evicting chapters above the
             // viewport right as the user crosses a chapter boundary shifts the
@@ -4756,7 +4783,15 @@ struct ReaderView: View {
     }
 
     private var tocList: some View {
-        VStack(spacing: 8) {
+        // List asks every row for its identity up front. Never let that pass
+        // rescan the complete TOC once per row (canJump -> upperBound -> map).
+        let visibleChapters = filteredChapters
+        let visibleNavigationEntries = filteredNavigationEntries
+        let currentIndex = currentDisplayChapterIndex
+        let upperBound = windowChapterUpperBound
+        let readyIndices = readyWindowIndices
+        let ownerCanLoad = onSelectChapter != nil || onSelectChapterWithPosition != nil
+        return VStack(spacing: 8) {
             HStack(spacing: 8) {
                 Image(systemName: "magnifyingglass")
                     .font(.system(size: 14))
@@ -4800,14 +4835,14 @@ struct ReaderView: View {
                     Text("当前章节没有可切换目录")
                         .foregroundStyle(readerThemeTextColor.opacity(0.6))
                         .listRowBackground(Color.clear)
-                } else if filteredChapters.isEmpty && filteredNavigationEntries.isEmpty {
+                } else if visibleChapters.isEmpty && visibleNavigationEntries.isEmpty {
                     Text("没有匹配章节")
                         .foregroundStyle(readerThemeTextColor.opacity(0.6))
                         .listRowBackground(Color.clear)
                 } else {
-                    if !filteredChapters.isEmpty {
+                    if !visibleChapters.isEmpty {
                         Section {
-                            ForEach(filteredChapters) { chapter in
+                            ForEach(visibleChapters) { chapter in
                                 Button {
                                     // Apply the jump before dismissing the sheet:
                                     // `showChapterList = false` tears the window down
@@ -4821,26 +4856,27 @@ struct ReaderView: View {
                                     TocChapterRow(
                                         index: chapter.index,
                                         title: chapter.title,
-                                        isCurrent: chapter.index == currentDisplayChapterIndex,
+                                        isCurrent: chapter.index == currentIndex,
                                         textColor: readerThemeTextColor
                                     )
                                     .equatable()
                                 }
                                 .buttonStyle(.plain)
-                                .disabled(chapter.index == currentDisplayChapterIndex || !canJump(to: chapter.index))
+                                .disabled(chapter.index == currentIndex || !(readyIndices.contains(chapter.index)
+                                    || (chapter.index >= 0 && chapter.index < upperBound) || ownerCanLoad))
                                 .listRowInsets(EdgeInsets(top: 7, leading: 16, bottom: 7, trailing: 16))
                                 .listRowBackground(Color.clear)
                                 .listRowSeparatorTint(readerThemeTextColor.opacity(0.15))
                             }
                         } header: {
-                            Text("章节 (\(filteredChapters.count))")
+                            Text("章节 (\(visibleChapters.count))")
                                 .font(.footnote.weight(.semibold))
                                 .foregroundStyle(readerThemeTextColor.opacity(0.65))
                         }
                     }
-                    if !filteredNavigationEntries.isEmpty {
+                    if !visibleNavigationEntries.isEmpty {
                         Section {
-                            ForEach(Array(filteredNavigationEntries.enumerated()), id: \.offset) { offset, entry in
+                            ForEach(Array(visibleNavigationEntries.enumerated()), id: \.offset) { offset, entry in
                                 Button {
                                     presentOverlay()
                                     onSelectNavigationEntry?(entry)
@@ -4866,6 +4902,7 @@ struct ReaderView: View {
             .background(Color.clear)
             .scrollDismissesKeyboard(.interactively)
             .simultaneousGesture(DragGesture(minimumDistance: 3).onChanged { _ in
+                guard !tocUserHasScrolled else { return }
                 tocUserHasScrolled = true
                 tocScrollTask?.cancel()
                 tocScrollTask = nil
@@ -5174,6 +5211,57 @@ struct ReaderView: View {
     /// instant while the user has prefetched neighbours in memory.
     private func jumpToWindowChapter(_ index: Int, paragraphIndex: Int) {
         guard let section = windowSections.first(where: { $0.chapterIndex == index && $0.isReady }) else { return }
+        cancelChapterJumpPreparation()
+        let signature = chapterPageLayoutSignature
+        let contentSignature = chapterPageContentSignature(section)
+        let cached = chapterPageCache[index]
+        if readerMode != .scroll,
+           cached?.layoutSignature != signature || cached?.contentSignature != contentSignature {
+            // A TOC selection must not run TextKit in the button/dismiss action.
+            // Keep the last rendered surface while one foreground worker cuts
+            // the target, then install pages + paragraph mapping atomically.
+            cancelPaginationWarmup()
+            pageLayoutTask?.cancel()
+            pageLayoutTask = nil
+            positionPersistTask?.cancel()
+            pendingWindowJump = ReaderPendingChapterJump(chapterIndex: index, paragraphIndex: paragraphIndex, startAtEnd: false)
+            let requestID = chapterJumpRequestID
+            let generation = windowGeneration
+            let (typography, titleTypography) = chapterPaginationTypography()
+            let context = chapterPaginationContext(typography: typography, titleTypography: titleTypography)
+            chapterJumpTask = Task { @MainActor in
+                let pages = await Task.detached(priority: .userInitiated) {
+                    ReaderChapterPaginator.paginate(chapterIndex: index, title: section.title,
+                                                    paragraphs: section.paragraphs, context: context)
+                }.value
+                guard !Task.isCancelled, requestID == chapterJumpRequestID,
+                      generation == windowGeneration else { return }
+                guard chapterPageLayoutSignature == signature, readerMode != .scroll,
+                      windowSections.first(where: { $0.chapterIndex == index })?.contentRevision == section.contentRevision else {
+                    // Rotation/settings may have changed while measuring.
+                    jumpToWindowChapter(index, paragraphIndex: paragraphIndex)
+                    return
+                }
+                chapterPageCache[index] = ReaderChapterPageCacheEntry(
+                    layoutSignature: signature, contentSignature: contentSignature, blocks: pages)
+                chapterJumpTask = nil
+                pendingWindowJump = nil
+                commitWindowChapterJump(index, paragraphIndex: paragraphIndex)
+            }
+            return
+        }
+        pendingWindowJump = nil
+        commitWindowChapterJump(index, paragraphIndex: paragraphIndex)
+    }
+
+    private func cancelChapterJumpPreparation() {
+        chapterJumpRequestID = UUID()
+        chapterJumpTask?.cancel()
+        chapterJumpTask = nil
+    }
+
+    private func commitWindowChapterJump(_ index: Int, paragraphIndex: Int) {
+        guard let section = windowSections.first(where: { $0.chapterIndex == index && $0.isReady }) else { return }
         closeReaderChrome()
         stopAutoScroll()
         stopSpeechPlayback()
@@ -5181,8 +5269,15 @@ struct ReaderView: View {
         prefetchWindow(around: index)
         trimWindowIfNeeded()
         let paragraph = min(max(paragraphIndex, 0), max(section.paragraphs.count - 1, 0))
+        if readerMode != .scroll {
+            // In a distant network/cache jump the old page array still points
+            // at the previous chapter. Resolving flat -> page against it made
+            // the new chapter stay invisible until an unrelated warmup ended.
+            rebuildPagedBlocksCache(anchorOverride: ReaderChapterPosition(chapterIndex: index, paragraphIndex: paragraph))
+        }
         guard let flat = windowLayout.flatIndex(chapterIndex: index, paragraphIndex: paragraph) else { return }
         jumpToWindowFlat(flat, paragraphIndex: paragraph)
+        warmPaginationCache(around: index)
     }
 
     /// Chapters already live in the window. TOC / bookmark / slider jumps use
@@ -5196,6 +5291,7 @@ struct ReaderView: View {
     /// the actual jump from `upsertWindowSection`.
     private func beginWindowJump(to index: Int, paragraphIndex: Int, startAtEnd: Bool = false) {
         guard index >= 0, index < windowChapterUpperBound else { return }
+        cancelChapterJumpPreparation()
         // Local imports hold every chapter in memory. Re-seed the whole window
         // around the TOC target in one pass instead of loading the target and
         // then prefetching ten neighbours one upsert at a time; each upsert
@@ -5204,14 +5300,7 @@ struct ReaderView: View {
             cancelPrefetch()
             windowGeneration &+= 1
             cancelPaginationWarmup()
-            warmPaginationCache(around: index)
             touchChapterCache(index)
-            if readerMode != .scroll {
-                // Rebuild the page model from the new window before moving the
-                // cursor: the old blocks belong to chapters that just left it,
-                // and a stale mapping would resolve the jump to the wrong page.
-                rebuildPagedBlocksCache(useCachedPageAnchor: false)
-            }
             jumpToWindowChapter(index, paragraphIndex: startAtEnd ? Int.max : paragraphIndex)
             return
         }
@@ -5957,6 +6046,7 @@ struct ReaderView: View {
     }
 
     private func persistReadingPosition(paragraphIndexOverride: Int? = nil) {
+        guard pendingWindowJump == nil else { return }
         let resolved: (chapterIndex: Int, chapterTitle: String, paragraphIndex: Int)
         switch readerMode {
         case .scroll:
@@ -6034,6 +6124,7 @@ struct ReaderView: View {
     }
 
     private func updatePagedVisibleParagraph(pageIndex: Int) {
+        guard pendingWindowJump == nil else { return }
         guard readerMode != .scroll, !pagedBlocks.isEmpty else { return }
         guard pagedBlocks.indices.contains(pageIndex) else { return }
         let block = pagedBlocks[pageIndex]
@@ -6090,8 +6181,11 @@ struct ReaderView: View {
         positionMapping.page(containingParagraph: paragraphIndex)
     }
 
-    private func rebuildPagedBlocksCache(useCachedPageAnchor: Bool = true) {
-        let anchor = currentPageAnchor(useCachedPageAnchor: useCachedPageAnchor)
+    private func rebuildPagedBlocksCache(useCachedPageAnchor: Bool = true, anchorOverride: ReaderChapterPosition? = nil) {
+        // The foreground jump owns this transaction until its target is ready.
+        // Background prefetch must not restore an anchor from the old surface.
+        guard pendingWindowJump == nil || anchorOverride != nil else { return }
+        let anchor = anchorOverride ?? currentPageAnchor(useCachedPageAnchor: useCachedPageAnchor)
         let cacheKey = readerPageCacheKey
         let blocks = buildReaderPageBlocks()
         pagedBlocksCache = blocks
@@ -6636,11 +6730,18 @@ final class ReaderTocFilterCache {
     private var chapterResult: [BookChapter] = []
     private var navigationKey = ""
     private var navigationResult: [LocalTextNavigationEntry] = []
+    // Retain the actual COW buffers, not just first/last/count. A TOC refresh
+    // can change a middle chapter while those three values remain identical.
+    private var chapterSource: [BookChapter] = []
+    private var navigationSource: [LocalTextNavigationEntry] = []
+    private(set) var chapterBuildCount = 0
 
     func chapters(query: String, reversed: Bool, chapters: [BookChapter]) -> [BookChapter] {
         let normalized = query.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-        let key = "\(normalized)|\(reversed)|\(chapters.count)|\(chapters.first?.id ?? "")|\(chapters.last?.id ?? "")"
-        if key == chapterKey { return chapterResult }
+        let key = "\(normalized)|\(reversed)"
+        if key == chapterKey, sharesStorage(chapters, chapterSource) { return chapterResult }
+        chapterSource = chapters
+        chapterBuildCount += 1
         var result = chapters.filter { chapter in
             normalized.isEmpty
                 || chapter.title.lowercased().contains(normalized)
@@ -6658,8 +6759,9 @@ final class ReaderTocFilterCache {
         entries: [LocalTextNavigationEntry]
     ) -> [LocalTextNavigationEntry] {
         let normalized = query.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-        let key = "\(normalized)|\(reversed)|\(entries.count)|\(entries.first?.title ?? "")|\(entries.last?.title ?? "")"
-        if key == navigationKey { return navigationResult }
+        let key = "\(normalized)|\(reversed)"
+        if key == navigationKey, sharesStorage(entries, navigationSource) { return navigationResult }
+        navigationSource = entries
         var result = entries.filter { entry in
             normalized.isEmpty
                 || entry.title.lowercased().contains(normalized)
@@ -6669,6 +6771,13 @@ final class ReaderTocFilterCache {
         navigationKey = key
         navigationResult = result
         return result
+    }
+
+    private func sharesStorage<Element>(_ lhs: [Element], _ rhs: [Element]) -> Bool {
+        guard lhs.count == rhs.count else { return false }
+        return lhs.withUnsafeBufferPointer { left in
+            rhs.withUnsafeBufferPointer { right in left.baseAddress == right.baseAddress }
+        }
     }
 }
 
