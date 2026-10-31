@@ -185,7 +185,7 @@ final class ReaderPanController119Tests: XCTestCase {
                         view.layoutIfNeeded()
                         let storage = NSTextStorage(attributedString: text)
                         let manager = NSLayoutManager()
-                        let container = NSTextContainer(size: CGSize(width: 280, height: .greatestFiniteMagnitude))
+                        let container = NSTextContainer(size: CGSize(width: 280, height: CGFloat.greatestFiniteMagnitude))
                         container.lineFragmentPadding = 0
                         manager.addTextContainer(container)
                         storage.addLayoutManager(manager)
