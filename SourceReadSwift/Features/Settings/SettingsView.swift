@@ -4,6 +4,9 @@ import UniformTypeIdentifiers
 
 struct SettingsView: View {
     @EnvironmentObject private var appState: AppState
+    // The root still observes the selected scheme while the editor lives in
+    // AppearanceSettingsView; keeping this binding updates the whole screen.
+    @AppStorage("settings.themeMode") private var themeModeRawValue = ThemeMode.system.rawValue
     @ObservedObject private var proxyManager = SourceProxyManager.shared
     @AppStorage("app.hapticsEnabled") private var hapticsEnabled = false
     @AppStorage("search_concurrent_threads") private var searchThreads = 12
