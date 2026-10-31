@@ -7,10 +7,12 @@ import JavaScriptCore
 final class Release110RegressionTests: XCTestCase {
     func testNewExplicitJumpCancelsOldSmoothMotionAndFallback() throws {
         let shell = WebReaderHTML.shell
-        let motionStart = try XCTUnwrap(shell.range(of: "      function stopScrollAnimation()")).lowerBound
-        let motionEnd = try XCTUnwrap(shell.range(of: "      function pageStep(", range: motionStart..<shell.endIndex)).lowerBound
-        let jumpStart = try XCTUnwrap(shell.range(of: "      function scrollToFlat(")).lowerBound
-        let jumpEnd = try XCTUnwrap(shell.range(of: "      /// 回到文档顶端", range: jumpStart..<shell.endIndex)).lowerBound
+        // Swift multiline literals strip their closing delimiter's indent.
+        // Locate function names, not source-file indentation.
+        let motionStart = try XCTUnwrap(shell.range(of: "function stopScrollAnimation()")).lowerBound
+        let motionEnd = try XCTUnwrap(shell.range(of: "function pageStep(", range: motionStart..<shell.endIndex)).lowerBound
+        let jumpStart = try XCTUnwrap(shell.range(of: "function scrollToFlat(")).lowerBound
+        let jumpEnd = try XCTUnwrap(shell.range(of: "/// 回到文档顶端", range: jumpStart..<shell.endIndex)).lowerBound
         let context = try XCTUnwrap(JSContext())
         var exception: String?
         context.exceptionHandler = { _, value in exception = value?.toString() }
