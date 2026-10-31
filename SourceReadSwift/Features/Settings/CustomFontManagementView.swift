@@ -191,6 +191,8 @@ struct CustomFontManagementView: View {
         case .songti: return "传统宋体衬线字，具有典雅纸质韵味"
         case .kaiti: return "经典楷体笔触，笔意连贯自然"
         case .rounded: return "圆润温和，视觉柔和不刺眼"
+        case .maShanZheng: return "内置开源楷书，笔画有力度，适合古风阅读"
+        case .zhiMangXing: return "内置开源行书，轻快手写感；长篇可优先使用常规或楷体"
         case .custom: return "用户自定义导入"
         }
     }

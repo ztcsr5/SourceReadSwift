@@ -786,6 +786,8 @@ struct BookshelfReaderGatewayView: View {
         }
         appState.bookTOCacheStore.save(detail: newDetail, chapters: newChapters,
             sourceURL: candidate.source.bookSourceUrl, bookURL: candidate.book.bookUrl)
+        // End the covered reader while its old source/progress are still authoritative.
+        NotificationCenter.default.post(name: .readerSourceWillChange, object: book.id)
         appState.bookshelfStore.switchSource(bookID: book.id, to: candidate.book,
             latestChapterTitle: newDetail.latestChapter ?? newChapters.last?.title,
             intro: newDetail.intro, totalChapters: newChapters.count)

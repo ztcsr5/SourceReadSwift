@@ -62,7 +62,7 @@ final class ReaderSettingsModelsTests: XCTestCase {
     }
 
     func testReaderFontFamilyAndTypographyDefaults() {
-        XCTAssertEqual(ReaderFontFamily.allCases.count, 7)
+        XCTAssertEqual(ReaderFontFamily.allCases.count, 9)
         XCTAssertEqual(ReaderFontFamily.system.title, "常规")
         XCTAssertEqual(ReaderFontFamily.light.title, "细体")
         XCTAssertEqual(ReaderFontFamily.bold.title, "粗体")

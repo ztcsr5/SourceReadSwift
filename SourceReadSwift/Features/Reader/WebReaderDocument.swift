@@ -208,6 +208,26 @@ enum WebReaderCustomFontCache {
     }
 }
 
+enum WebReaderBundledFontCache {
+    private static let lock = NSLock()
+    private static var entries: [String: String] = [:]
+    static func css(for family: ReaderFontFamily) -> String {
+        let name: String
+        switch family {
+        case .maShanZheng: name = "MaShanZheng-Regular"
+        case .zhiMangXing: name = "ZhiMangXing-Regular"
+        default: return ""
+        }
+        lock.lock(); defer { lock.unlock() }
+        if let css = entries[name] { return css }
+        guard let url = Bundle.main.url(forResource: name, withExtension: "ttf"),
+              let data = try? Data(contentsOf: url) else { return "" }
+        let css = "@font-face { font-family: \"\(name)\"; src: url(\"data:font/ttf;base64,\(data.base64EncodedString())\") format(\"truetype\"); font-weight: 100 900; font-style: normal; font-display: swap; }"
+        entries[name] = css
+        return css
+    }
+}
+
 /// One chapter as the WebView scroll surface consumes it.
 ///
 /// The TextKit surface took a flat `[String]` and therefore could not tell a
@@ -350,7 +370,9 @@ struct WebReaderStylePayload: Equatable {
         let resolvedTop = topInset ?? max(pagePadding + 10, 24)
         let isTransparentSurface = surfaceColor.cgColor.alpha <= 0.001
         let resolvedSurface = isTransparentSurface ? "transparent" : WebReaderColor.hex(surfaceColor)
-        let fontFaceCSS = fontFamily == .custom ? WebReaderCustomFontCache.fontFaceCSSForActiveCustomFont() : ""
+        let fontFaceCSS = fontFamily == .custom
+            ? WebReaderCustomFontCache.fontFaceCSSForActiveCustomFont()
+            : WebReaderBundledFontCache.css(for: fontFamily)
         return WebReaderStylePayload(
             fontFamilyCSS: fontFamily.webCSSFamily,
             fontFamilyWeight: fontFamily.webCSSWeight,
@@ -576,6 +598,8 @@ extension ReaderFontFamily {
             return "\"Kaiti SC\", \"STKaiti\", \"KaiTi\", serif"
         case .rounded:
             return "ui-rounded, \"SF Pro Rounded\", -apple-system, sans-serif"
+        case .maShanZheng: return "\"MaShanZheng-Regular\", serif"
+        case .zhiMangXing: return "\"ZhiMangXing-Regular\", serif"
         case .custom:
             let postScript = UserDefaults.standard.string(forKey: "reader.customFontPostScriptName") ?? ""
             let trimmed = postScript.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -592,7 +616,7 @@ extension ReaderFontFamily {
         case .bold: return 600
         case .songti, .kaiti: return 400
         case .rounded: return 500
-        case .system, .custom: return 400
+        case .system, .custom, .maShanZheng, .zhiMangXing: return 400
         }
     }
 }

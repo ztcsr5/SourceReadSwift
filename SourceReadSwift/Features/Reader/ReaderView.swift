@@ -51,6 +51,7 @@ struct ReaderView: View {
     @Environment(\.scenePhase) private var scenePhase
     @State private var chromeState = ReaderChromeStateMachine()
     @State private var tabChromeOwner = UUID()
+    @State private var readerSessionEnded = false
     @State private var showChapterList = false
     @State private var showBookmarks = false
     @State private var showBookDetailSheet = false
@@ -625,6 +626,43 @@ struct ReaderView: View {
     /// chapter against the fallback viewport and then again against the real
     /// one throws the first result away — the reason a freshly opened local
     /// book paused on "正在加载下一章" for chapters it already had in memory.
+    private func endReaderSession() {
+        guard !readerSessionEnded else { return }
+        readerSessionEnded = true
+        windowGeneration &+= 1
+        cancelChapterJumpPreparation()
+        geometrySettleTask?.cancel()
+        geometrySettleTask = nil
+        paginationWarmupRestartTask?.cancel()
+        paginationWarmupRestartTask = nil
+        chapterSeekTask?.cancel()
+        chapterSeekTask = nil
+        tocScrollTask?.cancel()
+        tocScrollTask = nil
+        positionPersistTask?.cancel()
+        pageLayoutTask?.cancel()
+        cancelPrefetch()
+        cancelPaginationWarmup()
+        cancelWindowRetries()
+        persistReadingPosition(paragraphIndexOverride: currentParagraphIndexForPersistence())
+        stopAutoScroll()
+        sleepTimerTask?.cancel()
+        sleepTimerTask = nil
+        stopSpeechPlayback()
+        pageLayoutTask = nil
+        restoreIdleTimerPreference()
+        UIDevice.current.isBatteryMonitoringEnabled = false
+        if let brightnessBeforeReader {
+            UIScreen.main.brightness = brightnessBeforeReader
+        }
+        appState.releaseTabChromeHidden(owner: tabChromeOwner)
+        ReaderFrameRateSampler.shared.end()
+        appState.bookshelfStore.recordReadingSession(
+            bookID: bookID,
+            duration: Date().timeIntervalSince(sessionStartedAt)
+        )
+    }
+
     private func scheduleGeometrySettle() {
         guard !chapterGeometrySettled else { return }
         geometrySettleTask?.cancel()
@@ -1102,9 +1140,11 @@ struct ReaderView: View {
             )
         }
         .onAppear {
+            appState.acquireTabChromeHidden(owner: tabChromeOwner)
             // Dismissing the full-screen TOC must not replay initial position,
             // markReaderOpened or the initial synchronous pagination pass.
             guard readerPresentationLifecycle.beginAppearance() else { return }
+            readerSessionEnded = false
             migrateTypographyDefaultsIfNeeded()
             if let ov = ReaderOverrideStore.shared.override(for: bookID) {
                 isPerBookOverride = true
@@ -1161,41 +1201,16 @@ struct ReaderView: View {
             refreshImageRequestHeaders()
         }
         .onDisappear {
+            // Ownership is visibility-scoped even for temporary covers.
+            appState.releaseTabChromeHidden(owner: tabChromeOwner)
             // Cover presentation is not a reader exit. Keep the live session
             // and any selected chapter's download/pagination transaction alive.
             guard readerPresentationLifecycle.endAppearance(chapterListPresented: showChapterList || temporaryCoverPresented) else { return }
-            windowGeneration &+= 1
-            cancelChapterJumpPreparation()
-            geometrySettleTask?.cancel()
-            geometrySettleTask = nil
-            paginationWarmupRestartTask?.cancel()
-            paginationWarmupRestartTask = nil
-            chapterSeekTask?.cancel()
-            chapterSeekTask = nil
-            tocScrollTask?.cancel()
-            tocScrollTask = nil
-            positionPersistTask?.cancel()
-            pageLayoutTask?.cancel()
-            cancelPrefetch()
-            cancelPaginationWarmup()
-            cancelWindowRetries()
-            persistReadingPosition(paragraphIndexOverride: currentParagraphIndexForPersistence())
-            stopAutoScroll()
-            sleepTimerTask?.cancel()
-            sleepTimerTask = nil
-            stopSpeechPlayback()
-            pageLayoutTask = nil
-            restoreIdleTimerPreference()
-            UIDevice.current.isBatteryMonitoringEnabled = false
-            if let brightnessBeforeReader {
-                UIScreen.main.brightness = brightnessBeforeReader
-            }
-            appState.releaseTabChromeHidden(owner: tabChromeOwner)
-            ReaderFrameRateSampler.shared.end()
-            appState.bookshelfStore.recordReadingSession(
-                bookID: bookID,
-                duration: Date().timeIntervalSince(sessionStartedAt)
-            )
+            endReaderSession()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .readerSourceWillChange)) { notice in
+            guard notice.object as? String == bookID else { return }
+            endReaderSession()
         }
         .onChange(of: keepScreenAwake) { _ in
             applyIdleTimerPreference()
@@ -2362,7 +2377,7 @@ struct ReaderView: View {
         // A jump requested from the TOC, a bookmark or the slider may land
         // far outside the cursor radius. Without this the freshly downloaded
         // chapter was rejected and the jump silently never happened.
-        if pendingWindowJump?.chapterIndex == index { return true }
+        if let jump = pendingWindowJump { return jump.chapterIndex == index }
         if index == windowCurrentChapterIndex { return true }
         let radiusIndices = ReaderChapterWindowPolicy.indices(
             around: windowCurrentChapterIndex,
@@ -2571,7 +2586,7 @@ struct ReaderView: View {
     }
 
     private func scheduleWindowRebuild() {
-        guard readerMode != .scroll else { return }
+        guard readerMode != .scroll, pendingWindowJump == nil else { return }
         pageLayoutTask?.cancel()
         if interactionGate.isPageInteractionActive {
             interactionGate.rebuildDeferred = true
@@ -5334,6 +5349,8 @@ struct ReaderView: View {
             paragraphIndex: paragraphIndex,
             startAtEnd: startAtEnd
         )
+        pageLayoutTask?.cancel()
+        pageLayoutTask = nil
         // A deliberate selection outranks speculative work for the old cursor.
         // Do not enqueue another old-window prefetch through requestChapter.
         if windowLoadingIndices.contains(index) {
@@ -6307,7 +6324,7 @@ struct ReaderView: View {
     }
 
     private func schedulePagedBlocksCacheRebuild() {
-        guard readerMode != .scroll else { return }
+        guard readerMode != .scroll, pendingWindowJump == nil else { return }
         pageLayoutTask?.cancel()
         // Never rebuild the page model while the finger owns a page turn:
         // swapping the hosting controllers mid-gesture drops a frame and can

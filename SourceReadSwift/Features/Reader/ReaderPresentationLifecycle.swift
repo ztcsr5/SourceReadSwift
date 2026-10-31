@@ -1,5 +1,9 @@
 import SwiftUI
 
+extension Notification.Name {
+    static let readerSourceWillChange = Notification.Name("SourceReadSwift.readerSourceWillChange")
+}
+
 private struct ReaderTemporaryCoverKey: EnvironmentKey {
     static let defaultValue = false
 }

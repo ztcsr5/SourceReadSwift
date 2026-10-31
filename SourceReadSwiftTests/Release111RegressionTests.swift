@@ -93,6 +93,8 @@ final class Release111RegressionTests: XCTestCase {
         XCTAssertEqual(ReaderFontFamily.zhiMangXing.uiFont(ofSize: 20).fontName, "ZhiMangXing-Regular")
         let data = try JSONEncoder().encode(ReaderFontFamily.zhiMangXing)
         XCTAssertEqual(try JSONDecoder().decode(ReaderFontFamily.self, from: data), .zhiMangXing)
+        XCTAssertTrue(WebReaderBundledFontCache.css(for: .maShanZheng).contains("data:font/ttf;base64,"))
+        XCTAssertTrue(ReaderFontFamily.zhiMangXing.webCSSFamily.contains("ZhiMangXing-Regular"))
     }
 
     @MainActor func testDiagnosticPolicyDoesNotPermanentlyDisableProductionFallback() async {
