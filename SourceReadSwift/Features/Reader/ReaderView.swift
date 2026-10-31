@@ -5311,7 +5311,13 @@ struct ReaderView: View {
         )
         // A deliberate selection outranks speculative work for the old cursor.
         // Do not enqueue another old-window prefetch through requestChapter.
-        cancelPrefetch()
+        if windowLoadingIndices.contains(index) {
+            // If this exact chapter is already being prefetched, promote its
+            // in-flight request instead of cancelling it and waiting for retry.
+            prefetchQueue.removeAll()
+        } else {
+            cancelPrefetch()
+        }
         cancelPaginationWarmup()
         positionPersistTask?.cancel()
         loadWindowChapter(index)
