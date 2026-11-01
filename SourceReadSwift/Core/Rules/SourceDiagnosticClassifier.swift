@@ -124,7 +124,8 @@ enum SourceDiagnosticClassifier {
 
         let lower = snippet.lowercased()
 
-        if lower.contains("browser verification"), lower.contains("challenge-assets/") {
+        if lower.contains("browser verification"), lower.contains("challenge-assets/"),
+           !LegadoSourceEngine.hasCrawlableMarkup(snippet) {
             return SniffedDiagnostic(kind: .verification, status: .verificationRequired,
                 classification: "verification(\"浏览器验证页，不是搜索或正文数据\")",
                 summary: "源站要求浏览器验证；请在登录中心打开站点，不能将验证页当成规则失效")

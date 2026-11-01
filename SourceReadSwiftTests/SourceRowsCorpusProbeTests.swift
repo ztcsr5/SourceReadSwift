@@ -31,6 +31,7 @@ final class SourceRowsCorpusProbeTests: XCTestCase {
         let extractor = HtmlRuleExtractor()
         var report: [[String: Any]] = []
         var mismatches: [String] = []
+        var unusablePositivePages: [String] = []
         for entry in entries {
             let bodyURL = directory.appendingPathComponent(entry.bodyFile)
             let html = try String(contentsOf: bodyURL, encoding: .utf8)
@@ -69,6 +70,23 @@ final class SourceRowsCorpusProbeTests: XCTestCase {
                 if bookURLSamples.count < 3 { bookURLSamples.append(String(link.prefix(60))) }
             }
 
+            // Row-count parity alone can be green while every field is empty.
+            // Exercise the same whole-page parser and fallbacks as the app.
+            var fields = ["bookList": entry.rule]
+            for (key, rule) in [("name", entry.nameRule), ("author", entry.authorRule), ("coverUrl", entry.coverRule), ("bookUrl", entry.bookUrlRule)] {
+                if let rule, !rule.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { fields[key] = rule }
+            }
+            let source = BookSource(bookSourceName: entry.name, bookSourceUrl: base.absoluteString,
+                                    ruleSearch: SourceRule(fields: fields))
+            let response = SourceResponse(url: base, statusCode: 200, headers: ["Content-Type": "text/html"], body: html, data: Data(html.utf8))
+            let parsed = SearchResultParser().parse(source: source, response: response)
+            let usableBooks = (try? parsed.get()) ?? []
+            if entry.expected > 0, usableBooks.isEmpty {
+                let reason: String
+                if case .failure(let error) = parsed { reason = error.displayMessage } else { reason = "zero usable books" }
+                unusablePositivePages.append("\(entry.id) \(entry.name): \(reason)")
+            }
+
             report.append([
                 "id": entry.id,
                 "name": entry.name,
@@ -81,7 +99,8 @@ final class SourceRowsCorpusProbeTests: XCTestCase {
                 "emptyBookURLs": emptyBookURLs,
                 "nameSamples": nameSamples,
                 "authorSamples": authorSamples,
-                "bookURLSamples": bookURLSamples
+                "bookURLSamples": bookURLSamples,
+                "usableBooks": usableBooks.count
             ])
             if actual != entry.expected {
                 mismatches.append("\(entry.id) exp=\(entry.expected) act=\(actual) rule=\(entry.rule)")
@@ -105,11 +124,14 @@ final class SourceRowsCorpusProbeTests: XCTestCase {
             emptyBookURLTotal += (item["emptyBookURLs"] as? Int) ?? 0
         }
         print("ROWS_FIELDS emptyNames=\(emptyNameTotal) emptyAuthors=\(emptyAuthorTotal) emptyBookURLs=\(emptyBookURLTotal)")
+        print("ROWS_PRODUCTION_UNUSABLE count=\(unusablePositivePages.count)")
+        for line in unusablePositivePages { print("ROWS_PRODUCTION_FAILURE \(line)") }
         let attachment = XCTAttachment(data: data, uniformTypeIdentifier: "public.json")
         attachment.name = "parser-search-114-field-evidence"
         attachment.lifetime = .keepAlways
         add(attachment)
         XCTAssertTrue(mismatches.isEmpty, "SwiftSoup/jsoup row parity regressed: " + mismatches.prefix(8).joined(separator: "; "))
+        XCTAssertTrue(unusablePositivePages.isEmpty, "Positive search samples must yield usable books: " + unusablePositivePages.prefix(8).joined(separator: "; "))
         XCTAssertEqual(report.count, entries.count)
     }
 

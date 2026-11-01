@@ -57,6 +57,26 @@ final class Release117ComicCompatibilityTests: XCTestCase {
         XCTAssertEqual(diagnostic.kind, .verification)
         XCTAssertEqual(diagnostic.status, .verificationRequired)
         XCTAssertFalse(LegadoSourceEngine.looksLikeJavaScriptChallenge("<article>教程：browser verification 是什么？</article><footer>challenge-assets/ 文档链接</footer>"))
+        XCTAssertNil(SourceDiagnosticClassifier.sniffSnippet(snippet: "<article>教程：browser verification 是什么？</article><footer>challenge-assets/ 文档链接</footer>", statusCode: 200, stage: "search"))
+    }
+
+    func testOriginalNestedComicRulePreservesAuthorMetadataAndGuard() throws {
+        let fixture = try XCTUnwrap(TestFixtureSupport.url(name: "comic-sources-20261101", extension: "json", subdirectory: "Fixtures"))
+        let sources = try JSONDecoder().decode([BookSource].self, from: Data(contentsOf: fixture))
+        let source = try XCTUnwrap(sources.first { $0.cleanSourceURL.contains("kaixinman.com") })
+        let marker = "//2025.10.6  夜明空\n//源社区：https://ycoo.net"
+        XCTAssertTrue(source.raw["bookSourceComment"]?.contains(marker) == true, "Original source metadata must not be rewritten")
+        let check = try JSCoreRuntime().evaluate(
+            "String(source.bookSourceComment).includes(java.base64Decode('Ly8yMDI1LjEwLjYgIOWknOaYjuepugovL+a6kOekvuWMuu+8mmh0dHBzOi8veWNvby5uZXQ='))",
+            variables: ["source": source]).get()
+        XCTAssertEqual(check, "true", "The compatibility bridge must preserve, not bypass, the original guard")
+        let chapter = BookChapter(title: "001", url: "https://www.kaixinman.com/chapter/1", bookUrl: "https://www.kaixinman.com/book/1", index: 0)
+        let html = #"<html><body><img class="chapter-image" data-original="https://cdn.example/1.jpg"><img class="chapter-image" data-original="https://cdn.example/2.jpg"></body></html>"#
+        let response = SourceResponse(url: URL(string: chapter.url)!, statusCode: 200,
+            headers: ["Content-Type": "text/html"], body: html, data: Data(html.utf8))
+        let parsed = try ContentParser().parse(source: source, chapter: chapter, response: response).get()
+        XCTAssertEqual(ComicContentParser.parsePages(from: parsed).map(\.url), ["https://cdn.example/1.jpg", "https://cdn.example/2.jpg"],
+                       "Nested java.getString must retain source and extract the original image rule")
     }
 
     private func content(_ paragraphs: [String], url: String = "https://comic.example.com/chapters/1") -> ChapterContent {
