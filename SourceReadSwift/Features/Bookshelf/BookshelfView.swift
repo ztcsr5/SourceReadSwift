@@ -257,8 +257,13 @@ struct BookshelfView: View {
     }
 
     private var readingSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: 8) {
             collectionHeader(title: "正在阅读", books: recentBooks)
+            if !recentBooks.isEmpty {
+                Text("把这一刻，留给下一页。")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+            }
             if recentBooks.isEmpty {
                 emptyImportCard
             } else {
@@ -341,7 +346,7 @@ struct BookshelfView: View {
     }
 
     private var shelfSection: some View {
-        VStack(alignment: .leading, spacing: 14) {
+        VStack(alignment: .leading, spacing: 8) {
             shelfHeader
 
             if !allBooks.isEmpty {
@@ -704,34 +709,9 @@ struct BookshelfView: View {
         NavigationLink {
             BookshelfReaderGatewayView(book: book)
         } label: {
-            ContinueReadingCardContent(title: book.title, author: book.author,
-                progressText: book.lastReadAt == nil ? "待开始" : "已读 \(Int(book.readingProgress * 100))%") {
-                    AsyncBookCover(urlString: book.coverURL, width: 54, height: 76, style: .onDark, baseURLString: book.bookURL, sourceURLString: book.sourceURL)
-                        .overlay(alignment: .topTrailing) {
-                            if book.hasUpdates {
-                                Circle()
-                                    .fill(Color.red)
-                                    .frame(width: 12, height: 12)
-                                    .overlay {
-                                        Circle().stroke(Color.white, lineWidth: 1.5)
-                                    }
-                                    .offset(x: 4, y: -4)
-                                    .shadow(color: .red.opacity(0.6), radius: 4)
-                            }
-                        }
-                        .shadow(color: .black.opacity(0.18), radius: 6, x: 0, y: 3)
-            }
-            .frame(width: AppLayout.continueCardWidth, alignment: .topLeading)
-            .background(
-                heroGradient(for: book)
-            )
-            .clipShape(RoundedRectangle(cornerRadius: AppTheme.cardRadius, style: .continuous))
-            .overlay {
-                RoundedRectangle(cornerRadius: AppTheme.cardRadius, style: .continuous)
-                    .stroke(Color.white.opacity(0.10), lineWidth: 0.8)
-            }
-            .shadow(color: .black.opacity(colorScheme == .dark ? 0.24 : 0.10), radius: 6, x: 0, y: 3)
-            .padding(.vertical, 3)
+            ReadingHeroCard(book: book)
+                .frame(width: AppLayout.continueCardWidth, alignment: .topLeading)
+                .padding(.vertical, 3)
         }
         .buttonStyle(PressableScaleButtonStyle())
         .simultaneousGesture(TapGesture().onEnded {
@@ -753,16 +733,6 @@ struct BookshelfView: View {
                 appState.bookshelfStore.remove(bookID: book.id)
             }
         }
-    }
-
-    private func heroGradient(for book: BookshelfBook) -> LinearGradient {
-        let palettes: [[Color]] = [
-            [Color(red: 0.10, green: 0.16, blue: 0.09), Color(red: 0.18, green: 0.24, blue: 0.14)],
-            [Color(red: 0.18, green: 0.14, blue: 0.12), Color(red: 0.30, green: 0.25, blue: 0.21)],
-            [Color(red: 0.16, green: 0.14, blue: 0.28), Color(red: 0.28, green: 0.22, blue: 0.44)]
-        ]
-        let index = Int(book.id.hashValue.magnitude % UInt(palettes.count))
-        return LinearGradient(colors: palettes[index], startPoint: .topLeading, endPoint: .bottomTrailing)
     }
 
     private func updateRow(_ book: BookshelfBook) -> some View {
@@ -1447,11 +1417,12 @@ struct AsyncBookCover: View {
     /// Book-source home page, used when `bookURL` was persisted in relative
     /// form by an older build.
     var sourceURLString: String? = nil
+    var onImageLoad: ((UIImage?) -> Void)? = nil
 
     var body: some View {
         Group {
             if let url = CoverURLResolver.url(from: urlString, base: baseURLString, fallbackBase: sourceURLString) {
-                CachedRemoteImage(url: url, maxPixelSize: coverMaxPixelSize) { placeholder }
+                CachedRemoteImage(url: url, maxPixelSize: coverMaxPixelSize, onImageLoad: onImageLoad) { placeholder }
             } else {
                 placeholder
             }

@@ -13,6 +13,7 @@ struct CachedRemoteImage<Placeholder: View>: View {
     /// in a 70 pt shelf cell.
     let maxPixelSize: CGFloat?
     let onSizeChange: ((CGSize) -> Void)?
+    let onImageLoad: ((UIImage?) -> Void)?
     let placeholder: () -> Placeholder
 
     @State private var image: UIImage?
@@ -23,6 +24,7 @@ struct CachedRemoteImage<Placeholder: View>: View {
         headers: [String: String] = [:],
         maxPixelSize: CGFloat? = nil,
         onSizeChange: ((CGSize) -> Void)? = nil,
+        onImageLoad: ((UIImage?) -> Void)? = nil,
         @ViewBuilder placeholder: @escaping () -> Placeholder
     ) {
         self.url = url
@@ -30,6 +32,7 @@ struct CachedRemoteImage<Placeholder: View>: View {
         self.headers = headers
         self.maxPixelSize = maxPixelSize
         self.onSizeChange = onSizeChange
+        self.onImageLoad = onImageLoad
         self.placeholder = placeholder
     }
 
@@ -62,6 +65,12 @@ struct CachedRemoteImage<Placeholder: View>: View {
     }
 
     private func loadImage() async {
+        await MainActor.run {
+            guard !Task.isCancelled else { return }
+            image = nil
+            onImageLoad?(nil)
+        }
+        guard !Task.isCancelled else { return }
         guard let url else {
             await MainActor.run {
                 image = nil
@@ -72,8 +81,10 @@ struct CachedRemoteImage<Placeholder: View>: View {
 
         if let cached = RemoteImageLoader.shared.cachedImage(for: url, maxPixelSize: maxPixelSize) {
             await MainActor.run {
+                guard !Task.isCancelled else { return }
                 image = cached
                 onSizeChange?(cached.size)
+                onImageLoad?(cached)
             }
             return
         }
@@ -85,8 +96,10 @@ struct CachedRemoteImage<Placeholder: View>: View {
         )
         guard let loaded, !Task.isCancelled else { return }
         await MainActor.run {
+            guard !Task.isCancelled else { return }
             image = loaded
             onSizeChange?(loaded.size)
+            onImageLoad?(loaded)
         }
     }
 }
