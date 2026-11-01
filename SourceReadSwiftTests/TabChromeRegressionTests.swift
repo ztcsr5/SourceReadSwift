@@ -45,12 +45,13 @@ final class TabChromeRegressionTests: XCTestCase {
         let app = AppState(), route = TabChromeTestRoute()
         let window = host(TabChromeNavigationFixture(route: route).environmentObject(app))
         defer { window.isHidden = true }
-        let ready = await eventually { self.tabs(in: window.rootViewController) != nil }
+        let ready = await eventually { route.isRootMounted && self.tabs(in: window.rootViewController) != nil }
         XCTAssertTrue(ready)
         let tabs = try XCTUnwrap(self.tabs(in: window.rootViewController))
         route.path = [1]
-        let hidden = await eventually { tabs.isTabBarHidden && app.isTabChromeHidden }
-        XCTAssertTrue(hidden, "Pushed hideRootTabBar destination must hide the real native tab bar")
+        _ = await eventually { tabs.isTabBarHidden && app.isTabChromeHidden }
+        XCTAssertTrue(app.isTabChromeHidden, "Pushed destination must acquire the visibility owner")
+        XCTAssertTrue(tabs.isTabBarHidden, "Pushed hideRootTabBar destination must hide the real native tab bar")
         route.path = []
         let restored = await eventually { !tabs.isTabBarHidden && !app.isTabChromeHidden }
         XCTAssertTrue(restored, "Popping must restore navigation rather than leave it permanently hidden")
@@ -88,6 +89,7 @@ final class TabChromeRegressionTests: XCTestCase {
 
 private final class TabChromeTestRoute: ObservableObject {
     @Published var path: [Int] = []
+    @Published var isRootMounted = false
 }
 
 private struct TabChromeNavigationFixture: View {
@@ -96,11 +98,14 @@ private struct TabChromeNavigationFixture: View {
         TabView {
             NavigationStack(path: $route.path) {
                 Text("Home")
-                    .toolbar(.visible, for: .tabBar)
+                    .onAppear { route.isRootMounted = true }
                     .navigationDestination(for: Int.self) { _ in
                         Text("Reader").hideRootTabBar()
                     }
             }
+            // Use the same owner-driven policy as RootTabView; a permanently
+            // visible test root does not model the production navigation tree.
+            .modifier(RootTabChromeVisibilityModifier())
             .tabItem { Label("Home", systemImage: "house") }
             Text("Settings").tabItem { Label("Settings", systemImage: "gearshape") }
         }

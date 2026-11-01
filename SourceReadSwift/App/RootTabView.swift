@@ -62,7 +62,7 @@ struct RootTabView: View {
 
     private func nativeTabRoot<Content: View>(_ content: Content) -> some View {
         content
-            .toolbar(appState.isTabChromeHidden ? .hidden : .visible, for: .tabBar)
+            .modifier(RootTabChromeVisibilityModifier())
             .safeAreaInset(edge: .bottom, spacing: 0) {
                 // An empty native accessory still reserves a glass container on
                 // some iOS26 releases. Keep the TabView identity stable instead
@@ -240,6 +240,14 @@ private struct RootTabPressableButtonStyle: ButtonStyle {
             .scaleEffect(configuration.isPressed ? 0.92 : 1.0)
             .opacity(configuration.isPressed ? 0.78 : 1.0)
             .animation(.interactiveSpring(response: 0.2, dampingFraction: 0.7), value: configuration.isPressed)
+    }
+}
+
+struct RootTabChromeVisibilityModifier: ViewModifier {
+    @EnvironmentObject private var appState: AppState
+
+    func body(content: Content) -> some View {
+        content.toolbar(appState.isTabChromeHidden ? .hidden : .visible, for: .tabBar)
     }
 }
 
