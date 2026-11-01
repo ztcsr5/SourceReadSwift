@@ -78,10 +78,19 @@ final class WebsiteSourceFamilyInferenceTests: XCTestCase {
         let json = #"{"data":{"content":"direct-json"},"token":"memory-only"}"#
         let pages = ["<pre>" + json + "</pre>",
                      "<h1>渲染章节</h1><article>可见正文</article><form><input value='PRIVATE-FORM'></form><script>var marker='PRIVATE-SCRIPT';</script>"]
+        let scene = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.first
+        let previousWindow = scene?.windows.first(where: \.isKeyWindow)
+        let window = scene.map { UIWindow(windowScene: $0) } ?? UIWindow(frame: UIScreen.main.bounds)
+        window.frame = UIScreen.main.bounds
+        let container = UIViewController()
+        window.rootViewController = container
+        window.makeKeyAndVisible()
+        let web = WKWebView(frame: CGRect(x: 0, y: 0, width: 320, height: 568))
+        container.view.addSubview(web)
+        defer { web.stopLoading(); web.navigationDelegate = nil; window.isHidden = true; previousWindow?.makeKeyAndVisible() }
         for (index, html) in pages.enumerated() {
             let loaded = expectation(description: "local page \(index)")
             let observer = WebsiteSampleNavigation(loaded: loaded)
-            let web = WKWebView(frame: .zero)
             web.navigationDelegate = observer
             web.loadHTMLString(html, baseURL: nil)
             await fulfillment(of: [loaded], timeout: 8)
