@@ -78,9 +78,10 @@ final class Stage33ReaderExperienceTests: XCTestCase {
     // MARK: - 2. SourceRead Native Palettes (readConfig.json)
 
     func testSourceReadNativePalettesConfiguration() {
-        // Historical palettes remain decodable alongside four illustrated presets.
+        // Historical palettes and illustrated presets remain alongside four new vector papers.
         let allCases = ReaderBackground.allCases
-        XCTAssertEqual(allCases.count, 23)
+        XCTAssertEqual(allCases.count, 27)
+        XCTAssertTrue(Set([ReaderBackground.paperCats, .moonLetters, .cloudIslands, .starPlanes]).isSubset(of: Set(allCases)))
 
         // 1. 羊皮纸
         let paper = ReaderBackground.paper
