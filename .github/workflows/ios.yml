@@ -59,6 +59,7 @@ jobs:
             -only-testing:SourceReadSwiftTests/Release117SearchProjectionTests \
             -only-testing:SourceReadSwiftTests/Release117ChromeTests \
             -only-testing:SourceReadSwiftTests/WebsiteSourceInferenceTests \
+            -only-testing:SourceReadSwiftTests/WebsiteSourceFamilyInferenceTests \
             -only-testing:SourceReadSwiftTests/AIChatTests \
             -only-testing:SourceReadSwiftTests/Release117PurificationTests \
             -only-testing:SourceReadSwiftTests/LANWorkbenchTests \

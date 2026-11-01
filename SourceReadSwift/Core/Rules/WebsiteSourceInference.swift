@@ -15,7 +15,7 @@ struct WebsiteSourceDraft: Sendable {
     let contentSelector: String
 }
 
-/// A local, evidence-based starter for ordinary HTML novel sites, not a claim
+/// A local, evidence-based starter for rendered HTML and direct JSON, not a claim
 /// that one page reveals a site's private search API or every template.
 enum WebsiteSourceInference {
     enum Failure: LocalizedError {
@@ -25,8 +25,8 @@ enum WebsiteSourceInference {
             case .invalidURL: return "仅支持不含账号密码的 HTTP/HTTPS 网页。"
             case .differentSite: return "目录和正文需来自同一站点（协议、域名、端口一致）。"
             case .oversized: return "网页超过 2 MB，请打开具体目录或章节页后重新采样。"
-            case .noCatalog: return "没有识别出章节链接容器；请打开完整目录页，或调整目录 CSS 选择器。"
-            case .noContent: return "没有识别出正文容器；请打开正文页，或调整正文 CSS 选择器。"
+            case .noCatalog: return "没有识别出唯一章节列表；请采集完整目录，或调整目录 CSS / JSONPath 规则。"
+            case .noContent: return "没有识别出唯一正文容器或文本字段；请采集可读取正文，或调整 CSS / JSONPath 规则。"
             case .invalidSample: return "生成规则未通过本地目录与正文解析验证。"
             }
         }
@@ -36,7 +36,7 @@ enum WebsiteSourceInference {
         guard let url = URL(string: text.trimmingCharacters(in: .whitespacesAndNewlines)),
               ["http", "https"].contains(url.scheme?.lowercased() ?? ""),
               url.host != nil, url.user == nil, url.password == nil else { return nil }
-        let sensitive = Set(["token", "access_token", "refresh_token", "password", "passwd", "session", "sessionid", "authorization", "api_key"])
+        let sensitive = Set(["token", "access_token", "refresh_token", "password", "passwd", "session", "sessionid", "authorization", "api_key", "apikey", "secret"])
         if URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems?.contains(where: { sensitive.contains($0.name.lowercased()) }) == true { return nil }
         return url
     }
@@ -53,6 +53,10 @@ enum WebsiteSourceInference {
         guard let base = origin(catalog.url), let chapterBase = origin(chapter.url) else { throw Failure.invalidURL }
         guard base == chapterBase else { throw Failure.differentSite }
         guard catalog.html.utf8.count <= 2_000_000, chapter.html.utf8.count <= 2_000_000 else { throw Failure.oversized }
+        if ResponseFormatDetector.looksLikeJSON(catalog.html) || ResponseFormatDetector.looksLikeJSON(chapter.html) {
+            return try WebsiteJSONSourceInference.infer(catalog: catalog, chapter: chapter, name: name,
+                                                        selectors: (tocCSS, contentCSS))
+        }
         let tocDoc = try SwiftSoup.parse(catalog.html, catalog.url.absoluteString)
         let bodyDoc = try SwiftSoup.parse(chapter.html, chapter.url.absoluteString)
         try bodyDoc.select("script,style,nav,header,footer,form,aside,[hidden],ins.adsbygoogle").remove()
@@ -88,7 +92,7 @@ enum WebsiteSourceInference {
         let contentSelector: String
         if !content.isEmpty { contentSelector = content }
         else {
-            let candidates = try bodyDoc.select("article,main,#content,#chaptercontent,#chapterContent,.read-content,.reading-content,.showtxt,.chapter-content,.entry-content").array()
+            let candidates = try bodyDoc.select("article,main,#content,#chaptercontent,#chapterContent,#ChapterBody,.content,.readcontent,.read-content,.reading-content,.showtxt,.chapter-content,.entry-content").array()
             func score(_ node: Element) -> Int {
                 max(((try? node.text()) ?? "").count - ((try? node.select("a").text()) ?? "").count * 3, 0)
             }
@@ -132,8 +136,8 @@ enum WebsiteSourceInference {
                                   preview: Array(body.paragraphs.prefix(4)), tocSelector: tocSelector, contentSelector: contentSelector)
     }
 
-    private static func response(_ sample: WebsitePageSample) -> SourceResponse {
-        SourceResponse(url: sample.url, statusCode: 200, headers: ["Content-Type": "text/html; charset=utf-8"],
+    static func response(_ sample: WebsitePageSample) -> SourceResponse {
+        SourceResponse(url: sample.url, statusCode: 200, headers: ["Content-Type": ResponseFormatDetector.looksLikeJSON(sample.html) ? "application/json" : "text/html; charset=utf-8"],
                        body: sample.html, data: Data(sample.html.utf8))
     }
 }

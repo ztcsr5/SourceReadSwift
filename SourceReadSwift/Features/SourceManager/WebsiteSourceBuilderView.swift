@@ -33,7 +33,7 @@ struct WebsiteSourceBuilderView: View {
                 VStack(spacing: 10) {
                     Image(systemName: "globe.badge.chevron.backward").font(.largeTitle)
                     Text("网页 → 本地书源").font(.headline)
-                    Text("先采集完整目录，再打开其中一章采集正文。\nHTML 在本机分析，不调用 AI，不上传网页或登录信息。")
+                    Text("先采集完整目录，再打开其中一章采集正文。支持渲染后的 HTML 或直接 JSON 响应；不会猜测隐藏接口。\n样本在本机分析，不调用 AI，不上传网页或登录信息。")
                         .font(.footnote).foregroundStyle(.secondary).multilineTextAlignment(.center)
                 }.frame(maxWidth: .infinity, maxHeight: .infinity)
             }
@@ -63,8 +63,8 @@ struct WebsiteSourceBuilderView: View {
             Form {
                 Section("规则草稿") {
                     TextField("书源名称", text: $name)
-                    TextField("目录容器 CSS", text: $tocCSS).textInputAutocapitalization(.never).autocorrectionDisabled()
-                    TextField("正文容器 CSS", text: $contentCSS).textInputAutocapitalization(.never).autocorrectionDisabled()
+                    TextField("目录容器 CSS / JSONPath", text: $tocCSS).textInputAutocapitalization(.never).autocorrectionDisabled()
+                    TextField("正文容器 CSS / JSONPath", text: $contentCSS).textInputAutocapitalization(.never).autocorrectionDisabled()
                     Button("按当前选择器重新生成") { build() }.disabled(working)
                 }.disabled(working)
                 if let draft {
@@ -73,7 +73,7 @@ struct WebsiteSourceBuilderView: View {
                         ForEach(draft.preview.indices, id: \.self) { Text(draft.preview[$0]).font(.subheadline).lineLimit(4) }
                     }
                     Section("验证后导入") {
-                        Text("当前仅推断普通 HTML 小说的目录、正文和此书的发现入口，不冒充全站搜索。请复核章节顺序与正文；动态 API、分页、漫画仍需专用规则。")
+                        Text("仅验证已采集的目录与正文模板，不代表整站兼容。HTML 提供此书发现入口；直接 JSON 仅生成已提供的接口规则，不猜搜索、发现、签名或加密接口。分页、付费与验证码需另行处理。")
                             .font(.footnote).foregroundStyle(.secondary)
                         Text(status).font(.caption)
                         Button(working ? "验证中…" : "联网验证目录和正文") { validate(draft) }.disabled(working)
@@ -107,12 +107,7 @@ struct WebsiteSourceBuilderView: View {
         worker = Task { @MainActor in
             defer { working = false }
             do {
-                let script = """
-                (()=>{const root=document.documentElement.cloneNode(true);
-                root.querySelectorAll('script,style,noscript,form,input,textarea,[hidden]').forEach(n=>n.remove());
-                const html=root.outerHTML;if(html.length>2000000)throw new Error('网页过大，请打开具体目录或章节');return html;})()
-                """
-                let value = try await web.evaluateJavaScript(script)
+                let value = try await web.evaluateJavaScript(WebsitePageCapture.script)
                 guard !Task.isCancelled, browser.documentGeneration == generation, web.url == url,
                       let html = value as? String else { status = "页面已切换，请重新采集。"; return }
                 let sample = WebsitePageSample(url: url, html: html)
