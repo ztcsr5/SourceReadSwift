@@ -53,7 +53,7 @@ struct CoverPageReaderView: UIViewControllerRepresentable {
     }
 
     static func dismantleUIViewController(_ controller: CoverPageHostController, coordinator: ()) {
-        controller.cancelInteraction()
+        controller.tearDown()
     }
 }
 
@@ -87,6 +87,7 @@ final class CoverPageHostController: UIViewController, UIGestureRecognizerDelega
     private var animator: UIViewPropertyAnimator?
     private var animationGeneration = 0
     private var warmupGeneration = 0
+    private var isTornDown = false
     private var awaitingIdentityChangeFrom: String?
     private var onCommit: ((Int) -> Void)?
     private var onInteractionChange: ((Bool) -> Void)?
@@ -116,6 +117,7 @@ final class CoverPageHostController: UIViewController, UIGestureRecognizerDelega
 
     override func viewDidLayoutSubviews() {
         super.viewDidLayoutSubviews()
+        guard !isTornDown else { return }
         let size = view.bounds.size
         guard size.width > 1, size.height > 1 else { return }
         if lastSize != size {
@@ -126,7 +128,10 @@ final class CoverPageHostController: UIViewController, UIGestureRecognizerDelega
         guard size != lastSize || abs(minY - lastMinY) > 0.5 else { return }
         lastSize = size
         lastMinY = minY
-        DispatchQueue.main.async { [weak self] in self?.onPageContainerLayout?(size, minY) }
+        DispatchQueue.main.async { [weak self] in
+            guard let self, !self.isTornDown else { return }
+            self.onPageContainerLayout?(size, minY)
+        }
     }
 
     func apply(
@@ -139,6 +144,7 @@ final class CoverPageHostController: UIViewController, UIGestureRecognizerDelega
         onPageContainerLayout: ((CGSize, CGFloat) -> Void)?, turnStyle: CoverPageTurnStyle = .cover,
         pageBackgroundColor: UIColor? = nil, userInterfaceStyle: UIUserInterfaceStyle = .unspecified
     ) {
+        guard !isTornDown else { return }
         loadViewIfNeeded()
         self.onCommit = onCommit
         self.onInteractionChange = onInteractionChange
@@ -172,7 +178,7 @@ final class CoverPageHostController: UIViewController, UIGestureRecognizerDelega
                 awaitingIdentityChangeFrom = nextWindow.identity
                 let generation = animationGeneration
                 DispatchQueue.main.async { [weak self] in
-                    guard let self, self.animationGeneration == generation,
+                    guard let self, !self.isTornDown, self.animationGeneration == generation,
                           self.awaitingIdentityChangeFrom == nextWindow.identity,
                           self.window?.identity == nextWindow.identity else { return }
                     self.onCommit?(direction)
@@ -186,7 +192,7 @@ final class CoverPageHostController: UIViewController, UIGestureRecognizerDelega
             // updateUIViewController must not synchronously flush SwiftUI
             // @State. Recheck ownership after the representable update ends.
             DispatchQueue.main.async { [weak self] in
-                guard let self, !self.isDragging, self.animator == nil,
+                guard let self, !self.isTornDown, !self.isDragging, self.animator == nil,
                       self.awaitingIdentityChangeFrom == nil, self.completedGestures.isEmpty else { return }
                 self.onInteractionChange?(false)
             }
@@ -194,6 +200,7 @@ final class CoverPageHostController: UIViewController, UIGestureRecognizerDelega
     }
 
     private func install(_ next: Window) {
+        guard !isTornDown else { return }
         let changed = window?.keys != next.keys || window?.revision != next.revision || window?.style != next.style
         let oldRevision = window?.revision
         window = next
@@ -235,7 +242,7 @@ final class CoverPageHostController: UIViewController, UIGestureRecognizerDelega
     }
 
     private func layoutPages(translation x: CGFloat) {
-        guard active.count == 5, let window else { return }
+        guard !isTornDown, active.count == 5, let window else { return }
         let width = view.bounds.width
         for host in active { host?.view.frame = view.bounds }
         let previous = active[1]?.view
@@ -266,7 +273,7 @@ final class CoverPageHostController: UIViewController, UIGestureRecognizerDelega
     private func scheduleWarmup() {
         let generation = warmupGeneration
         DispatchQueue.main.async { [weak self] in
-            guard let self, self.warmupGeneration == generation, !self.isDragging,
+            guard let self, !self.isTornDown, self.warmupGeneration == generation, !self.isDragging,
                   self.animator == nil, self.awaitingIdentityChangeFrom == nil else { return }
             for host in self.active { host?.view.layoutIfNeeded() }
         }
@@ -275,11 +282,11 @@ final class CoverPageHostController: UIViewController, UIGestureRecognizerDelega
     private var consumedTurnRequest: UUID?
 
     func requestTurn(_ request: ReaderPageTurnRequest?) {
-        guard let request, consumedTurnRequest != request.id else { return }
+        guard !isTornDown, let request, consumedTurnRequest != request.id else { return }
         consumedTurnRequest = request.id
         let identity = window?.identity
         DispatchQueue.main.async { [weak self] in
-            guard let self, self.window?.identity == identity,
+            guard let self, !self.isTornDown, self.window?.identity == identity,
                   !self.isDragging, self.animator == nil,
                   self.awaitingIdentityChangeFrom == nil,
                   let window = self.window,
@@ -293,11 +300,13 @@ final class CoverPageHostController: UIViewController, UIGestureRecognizerDelega
     }
 
     func beginInteraction() {
+        guard !isTornDown else { return }
         isDragging = true
         translation = 0
         rawTranslation = 0
         warmupGeneration += 1
         onInteractionChange?(true)
+        guard !isTornDown else { return }
         if let animator {
             animator.stopAnimation(false)
             animator.finishAnimation(at: .end)
@@ -305,6 +314,7 @@ final class CoverPageHostController: UIViewController, UIGestureRecognizerDelega
     }
 
     func updateInteraction(translation raw: CGFloat) {
+        guard !isTornDown else { return }
         rawTranslation = raw
         guard isDragging, awaitingIdentityChangeFrom == nil, let window else { return }
         let width = max(view.bounds.width, 1)
@@ -315,7 +325,7 @@ final class CoverPageHostController: UIViewController, UIGestureRecognizerDelega
     }
 
     func endInteraction(velocity: CGFloat, cancelled: Bool = false, animated: Bool = true) {
-        guard isDragging else { return }
+        guard !isTornDown, isDragging else { return }
         isDragging = false
         if awaitingIdentityChangeFrom != nil {
             completedGestures.append(CompletedGesture(translation: rawTranslation, velocity: velocity, cancelled: cancelled))
@@ -330,7 +340,7 @@ final class CoverPageHostController: UIViewController, UIGestureRecognizerDelega
         let generation = animationGeneration
         let target = -CGFloat(direction) * view.bounds.width
         let completion: () -> Void = { [weak self] in
-            guard let self, self.animationGeneration == generation else { return }
+            guard let self, !self.isTornDown, self.animationGeneration == generation else { return }
             self.animator = nil
             self.translation = 0
             if direction != 0 {
@@ -357,6 +367,7 @@ final class CoverPageHostController: UIViewController, UIGestureRecognizerDelega
     }
 
     func cancelInteraction() {
+        guard !isTornDown else { return }
         animationGeneration += 1
         warmupGeneration += 1
         animator?.stopAnimation(true)
@@ -368,7 +379,39 @@ final class CoverPageHostController: UIViewController, UIGestureRecognizerDelega
         translation = 0
         if let pending = pendingWindow { install(pending) }
         layoutPages(translation: 0)
-        onInteractionChange?(false)
+        // Resize/layout can also cancel a turn while SwiftUI owns its graph.
+        // Publish only after that transaction, unless a new gesture took over.
+        let generation = animationGeneration
+        DispatchQueue.main.async { [weak self] in
+            guard let self, !self.isTornDown, self.animationGeneration == generation,
+                  !self.isDragging, self.animator == nil,
+                  self.awaitingIdentityChangeFrom == nil else { return }
+            self.onInteractionChange?(false)
+        }
+    }
+
+    /// SwiftUI dismantles this controller while holding exclusive graph access.
+    /// A reusable cancel may publish state or install pending hosted pages; a
+    /// terminal teardown must do neither (iOS 17 aborts in swift_beginAccess).
+    func tearDown() {
+        guard !isTornDown else { return }
+        isTornDown = true
+        onCommit = nil
+        onInteractionChange = nil
+        onPageContainerLayout = nil
+        animationGeneration += 1
+        warmupGeneration += 1
+        animator?.stopAnimation(true)
+        animator = nil
+        isDragging = false
+        completedGestures.removeAll()
+        pendingWindow = nil
+        awaitingIdentityChangeFrom = nil
+        rawTranslation = 0
+        translation = 0
+        if isViewLoaded { pan.isEnabled = false }
+        // Let UIKit dispose of the children. Removing/replacing hosting roots
+        // here would re-enter the very SwiftUI graph being dismantled.
     }
 
     @objc private func handlePan(_ gesture: UIPanGestureRecognizer) {
@@ -384,11 +427,13 @@ final class CoverPageHostController: UIViewController, UIGestureRecognizerDelega
     }
 
     func gestureRecognizerShouldBegin(_ gestureRecognizer: UIGestureRecognizer) -> Bool {
+        guard !isTornDown else { return false }
         let velocity = pan.velocity(in: view)
         return abs(velocity.x) > abs(velocity.y)
     }
 
     func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldReceive touch: UITouch) -> Bool {
+        guard !isTornDown else { return false }
         var candidate = touch.view
         while let view = candidate {
             if view is UIControl { return false }

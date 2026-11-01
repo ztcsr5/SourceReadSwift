@@ -1296,6 +1296,12 @@ struct ReaderView: View {
         }
         .onChange(of: readerModeRawValue) { _ in
             UIImpactFeedbackGenerator(style: .light).impactOccurred()
+            // The departing pager cannot publish from SwiftUI dismantle.
+            // Its owner releases the gate before rebuilding the new mode.
+            interactionGate.isPageInteractionActive = false
+            interactionGate.rebuildDeferred = false
+            paginationRebuildPending = false
+            paginationWarmupPending = false
             // A mode switch changes the page model itself. Rebuild now so the
             // first paged frame has a valid mapping; slider/rotation changes
             // use the debounced path below. Start the warmup first: the page
@@ -2575,6 +2581,7 @@ struct ReaderView: View {
     /// dropped frame plus the “page jumps back” symptom. Defer the rebuild
     /// until `didFinishAnimating` has committed the new page cursor.
     private func handlePageInteraction(_ active: Bool) {
+        guard !readerSessionEnded else { return }
         // `interactionGate` is a reference box on purpose: assigning a @State
         // here would invalidate the whole reader body at the exact moment the
         // page-turn gesture starts, which is the visible hitch at the

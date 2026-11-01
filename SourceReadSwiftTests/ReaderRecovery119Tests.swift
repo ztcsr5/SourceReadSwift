@@ -358,7 +358,8 @@ final class ReaderPanController119Tests: XCTestCase {
         }
         apply(controller, page: "p1", next: "p2")
         XCTAssertEqual(commits, [1], "representable updates must not publish synchronously")
-        controller.cancelInteraction()
+        let coordinator = ()
+        CoverPageReaderView.dismantleUIViewController(controller, coordinator: coordinator)
         await drainMainQueue()
         XCTAssertEqual(commits, [1])
     }
