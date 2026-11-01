@@ -1,10 +1,19 @@
 [
   {
+    "bookSourceComment": "by:xsw8093\n\n发布页\nhttps://antbyw.github.io/\n--https://www.antbyw.com/plugin.php?id=jameson_manhua&a=read&kuid=194612&zjid=1531082",
+    "bookSourceGroup": "漫画源",
     "bookSourceName": "漫画搬运（优+）",
     "bookSourceType": 2,
     "bookSourceUrl": "https://www.antbyw.com",
+    "customButton": false,
+    "customOrder": 78,
+    "enabled": true,
+    "enabledCookieJar": true,
+    "enabledExplore": true,
+    "eventListener": false,
     "exploreUrl": "全部::/plugin.php?id=jameson_manhua&a=ku&category_id=8&region=1\n热血::/plugin.php?id=jameson_manhua&a=ku&category_id=7&region=1\n冒险::/plugin.php?id=jameson_manhua&a=ku&category_id=8&region=1\n魔幻::/plugin.php?id=jameson_manhua&a=ku&category_id=9&region=1\n神鬼::/plugin.php?id=jameson_manhua&a=ku&category_id=10&region=1\n搞笑::/plugin.php?id=jameson_manhua&a=ku&category_id=11&region=1\n萌系::/plugin.php?id=jameson_manhua&a=ku&category_id=12&region=1\n爱情::/plugin.php?id=jameson_manhua&a=ku&category_id=13&region=1\n科幻::/plugin.php?id=jameson_manhua&a=ku&category_id=14&region=1\n魔法::/plugin.php?id=jameson_manhua&a=ku&category_id=15&region=1\n格斗::/plugin.php?id=jameson_manhua&a=ku&category_id=16&region=1\n武侠::/plugin.php?id=jameson_manhua&a=ku&category_id=17&region=1\n机战::/plugin.php?id=jameson_manhua&a=ku&category_id=18&region=1\n战争::/plugin.php?id=jameson_manhua&a=ku&category_id=19&region=1\n竞技::/plugin.php?id=jameson_manhua&a=ku&category_id=20&region=1\n���育::/plugin.php?id=jameson_manhua&a=ku&category_id=21&region=1\n校园::/plugin.php?id=jameson_manhua&a=ku&category_id=22&region=1\n生活::/plugin.php?id=jameson_manhua&a=ku&category_id=23&region=1\n励志::/plugin.php?id=jameson_manhua&a=ku&category_id=24&region=1\n历史::/plugin.php?id=jameson_manhua&a=ku&category_id=25&region=1\n伪娘::/plugin.php?id=jameson_manhua&a=ku&category_id=26&region=1\n宅男::/plugin.php?id=jameson_manhua&a=ku&category_id=27&region=1\n腐女::/plugin.php?id=jameson_manhua&a=ku&category_id=28&region=1\n耽美::/plugin.php?id=jameson_manhua&a=ku&category_id=29&region=1\n百合::/plugin.php?id=jameson_manhua&a=ku&category_id=30&region=1\n后宫::/plugin.php?id=jameson_manhua&a=ku&category_id=31&region=1\n治愈::/plugin.php?id=jameson_manhua&a=ku&category_id=32&region=1\n美食::/plugin.php?id=jameson_manhua&a=ku&category_id=33&region=1\n推理::/plugin.php?id=jameson_manhua&a=ku&category_id=34&region=1\n悬疑::/plugin.php?id=jameson_manhua&a=ku&category_id=35&region=1\n恐怖::/plugin.php?id=jameson_manhua&a=ku&category_id=36&region=1\n四格::/plugin.php?id=jameson_manhua&a=ku&category_id=37&region=1\n职场::/plugin.php?id=jameson_manhua&a=ku&category_id=38&region=1\n侦探::/plugin.php?id=jameson_manhua&a=ku&category_id=39&region=1\n社会::/plugin.php?id=jameson_manhua&a=ku&category_id=40&region=1\n音乐::/plugin.php?id=jameson_manhua&a=ku&category_id=41&region=1\n舞蹈::/plugin.php?id=jameson_manhua&a=ku&category_id=42&region=1\n杂志::/plugin.php?id=jameson_manhua&a=ku&category_id=43&region=1\n黑道::/plugin.php?id=jameson_manhua&a=ku&category_id=44&region=1",
     "header": "{\n    \"User-Agent\": \"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36 Edg/131.0.0.0\",\"Cookie\":\"0\"\n}",
+    "lastUpdateTime": 1759126590288,
     "respondTime": 5016,
     "ruleBookInfo": {
       "author": "text.漫畫作者@text##漫畫作者:##",
@@ -39,15 +48,25 @@
       "chapterUrl": "href",
       "isVolume": "volume"
     },
-    "searchUrl": "/plugin.php?id=jameson_manhua&a=search&c=index&keyword={{key}}"
+    "searchUrl": "/plugin.php?id=jameson_manhua&a=search&c=index&keyword={{key}}",
+    "weight": 0
   },
   {
+    "bookSourceComment": "//2025.4.16 ◎夜泽川◎\n纯英文",
+    "bookSourceGroup": "漫画源",
     "bookSourceName": "曼哈漫画（优+）",
     "bookSourceType": 2,
     "bookSourceUrl": "https://mangadex.org",
+    "customButton": false,
+    "customOrder": 81,
+    "enabled": true,
+    "enabledCookieJar": true,
+    "enabledExplore": true,
+    "eventListener": false,
     "exploreUrl": "@js:\neval(String(source.loginUrl));\nvar result = [];\npush = (title, url, size) => result.push({\n    title: title,\n    url: url,\n    style: {\n        layout_flexGrow: 1,\n        layout_flexBasisPercent: size\n    }\n});\npush(\"全部\", `https://api.mangadex.org/manga?limit=32&offset={{(page-1)*32}}&includes[]=cover_art&includedTagsMode=AND&excludedTagsMode=OR{{buildQueryParams()}}`, 1);\n\nsorts.map(([title, key, order]) => {\n    push(title, `https://api.mangadex.org/manga?limit=32&offset={{(page-1)*32}}&includes[]=cover_art&includedTagsMode=AND&excludedTagsMode=OR{{buildQueryParams(\"分类\")}}&order[${key}]=${order}`, 0.45);\n}\n);\nJSON.stringify(result);",
     "header": "{\"User-Agent\": \"Mozilla/5.0 (Linux; Android 9) Mobile Safari/537.36\"}",
     "jsLib": "function formatDate(dateStr) {\n  const date = new Date(dateStr);\n  const pad = n => String(n).padStart(2, '0');\n  return `${date.getFullYear()}-${pad(date.getMonth()+1)}-${pad(date.getDate())} ` +\n         `${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`;\n}\nvar contentRating = [[\"普通\",\"safe\"],[\"粗略\",\"suggestive\"],[\"限制\",\"erotica\"]];\nvar sorts = [\n    [\"最佳匹配\", \"relevance\", \"desc\"],\n    [\"最新上传\", \"latestUploadedChapter\", \"desc\"],\n    [\"最旧上传\", \"latestUploadedChapter\", \"asc\"],\n    [\"标题升序\", \"title\", \"asc\"],\n    [\"标题降序\", \"title\", \"desc\"],\n    [\"最高评级\", \"rating\", \"desc\"],\n    [\"最低评级\", \"rating\", \"asc\"],\n    [\"最多关注\", \"followedCount\", \"desc\"],\n    [\"最少关注\", \"followedCount\", \"asc\"],\n    [\"最近添加\", \"createdAt\", \"desc\"],\n    [\"最早添加\", \"createdAt\", \"asc\"],\n    [\"年份升序\", \"year\", \"asc\"],\n    [\"年份倒序\", \"year\", \"desc\"]\n];\n\nfunction buildQueryParams(e) {\n\tconst { source } = this\n\tlet selected = JSON.parse(source.getVariable());\n  let query = '';\n  const allRatings = contentRating.map(([Str,tag]) => tag);\n\n  allRatings.forEach((rating, index) => {\n    if (selected.contentRating.includes(rating)) {\n      const encoded = `contentRating[]=${rating}`;\n      \n      query += `&${encoded}`;\n    }\n  });\n  if (selected.Language) {\n    let languages = selected.Language.split(\",\");\n    query += languages.map(item => `&originalLanguage[]=${item}`).join('');\n  }\n  if (selected.sort && e !== \"分类\") {\n  \tlet sort_ = selected.sort.split(\",\");\n    query += `&order[${sort_[0]}]=${sort_[1]}`;\n    }\n  return query;\n}\n\nfunction getLanguage(str) {\n    const languageMap = {\"en\":\"英语\",\"en-us\":\"英语（美国）\",\"en-gb\":\"英语（英国）\",\"en-au\":\"英语（澳大利亚）\",\"en-ca\":\"英语（加拿大）\",\"zh\":\"中文\",\"zh-tw\":\"繁体中文（台湾）\",\"zh-hk\":\"繁体中文（香港）\",\"es\":\"西班牙语\",\"es-mx\":\"西班牙语（墨西哥）\",\"es-ar\":\"西班牙语（阿根廷）\",\"es-es\":\"西班牙语（西班牙）\",\"fr\":\"法语\",\"fr-fr\":\"法语（法国）\",\"fr-ca\":\"法语（加拿大）\",\"de\":\"德语\",\"de-de\":\"德语（德国）\",\"de-at\":\"德语（奥地利）\",\"ja\":\"日语\",\"ja-jp\":\"日语（日本）\",\"ru\":\"俄语\",\"ru-ru\":\"俄语（俄罗斯）\",\"pt\":\"葡萄牙语\",\"pt-br\":\"葡萄牙语（巴西）\",\"pt-pt\":\"葡萄牙语（葡萄牙）\",\"it\":\"意大利语\",\"it-it\":\"意大利语（意大利）\",\"ko\":\"韩语\",\"ko-kr\":\"韩语（韩国）\",\"ar\":\"阿拉伯语\",\"ar-ae\":\"阿拉伯语（阿联酋）\",\"ar-sa\":\"阿拉伯语（沙特）\",\"nl\":\"荷兰语\",\"nl-nl\":\"荷兰语（荷兰）\",\"sv\":\"瑞典语\",\"sv-se\":\"瑞典语（瑞典）\",\"da\":\"丹麦语\",\"da-dk\":\"丹麦语（丹麦）\",\"no\":\"挪威语\",\"no-no\":\"挪威语（挪威）\",\"fi\":\"芬兰语\",\"fi-fi\":\"芬兰语（芬兰）\",\"tr\":\"土耳其语\",\"tr-tr\":\"土耳其语（土耳其）\",\"el\":\"希腊语\",\"el-gr\":\"希腊语（希腊）\",\"he\":\"希伯来语\",\"he-il\":\"希伯来语（以色列）\",\"pl\":\"波兰语\",\"pl-pl\":\"波兰语（波兰）\",\"hu\":\"匈牙利语\",\"hu-hu\":\"匈牙利语（匈牙利）\",\"th\":\"泰语\",\"th-th\":\"泰语（泰国）\",\"vi\":\"越南语\",\"vi-vn\":\"越南语（越南）\",\"id\":\"印尼语\",\"id-id\":\"印尼语（印尼）\",\"ms\":\"马来语\",\"my\":\"马来语（马来西亚）\",\"ro\":\"罗马尼亚语\",\"ro-ro\":\"罗马尼亚语（罗马尼亚）\",\"bg\":\"保加利亚语\",\"bg-bg\":\"保加利亚语（保加利亚）\",\"hr\":\"克罗地亚语\",\"hr-hr\":\"克罗地亚语（克罗地亚）\",\"cs\":\"捷克语\",\"cs-cz\":\"捷克语（捷克）\",\"sk\":\"斯洛伐克语\",\"sk-sk\":\"斯洛伐克语（斯洛伐克）\",\"sl\":\"斯洛文尼亚语\",\"sl-si\":\"斯洛文尼亚语（斯洛文尼亚）\",\"et\":\"爱沙尼亚语\",\"et-ee\":\"爱沙尼亚语（爱沙尼亚）\",\"lv\":\"拉脱维亚语\",\"lv-lv\":\"拉脱维亚语（拉脱维亚）\",\"lt\":\"立陶宛语\",\"lt-lt\":\"立陶宛语（立陶宛）\",\"uk\":\"乌克兰语\",\"uk-ua\":\"乌克兰语（乌克兰）\",\"be\":\"白俄罗斯语\",\"be-by\":\"白俄罗斯语（白俄罗斯）\"};\n    if (languageMap.hasOwnProperty(str)) {\n        return languageMap[str];\n    }\n    const primaryCode = str.split(\"-\")[0];\n    return languageMap[primaryCode] || str;\n}",
+    "lastUpdateTime": 1759572813399,
     "loginUi": "[ \n {\n        \"name\": \"登录\",\n        \"type\": \"button\",\n        \"action\": \"Login('登录')\",\n        \"style\": {\n            \"layout_flexGrow\": 1,\n            \"layout_flexBasisPercent\": 0.45\n       }\n  },\n  {\n        \"name\": \"登出\",\n        \"type\": \"button\",\n        \"action\": \"Login('登出')\",\n        \"style\": {\n            \"layout_flexGrow\": 1,\n            \"layout_flexBasisPercent\": 0.45\n       }\n  },\n {\n        \"name\": \"展示选择\",\n        \"type\": \"button\",\n        \"action\": \"Show()\",\n        \"style\": {\n            \"layout_flexGrow\": 1,\n            \"layout_flexBasisPercent\": 1\n       }\n  },\n {\n        \"name\": \"级别设置\",\n        \"type\": \"button\",\n        \"action\": \"\",\n        \"style\": {\n            \"layout_flexGrow\": 1,\n            \"layout_flexBasisPercent\": 1\n        }\n   },\n  {\n        \"name\": \"普通\",\n        \"type\": \"button\",\n        \"action\": \"Put_contentRating(0)\",\n        \"style\": {\n            \"layout_flexGrow\": 1,\n            \"layout_flexBasisPercent\": 0.2\n        }\n    },\n    {\n        \"name\": \"粗略\",\n        \"type\": \"button\",\n        \"action\": \"Put_contentRating(1)\",\n        \"style\": {\n            \"layout_flexGrow\": 1,\n            \"layout_flexBasisPercent\": 0.2\n        }\n    },\n    {\n        \"name\": \"限制\",\n        \"type\": \"button\",\n        \"action\": \"Put_contentRating(2)\",\n        \"style\": {\n            \"layout_flexGrow\": 1,\n            \"layout_flexBasisPercent\": 0.2\n        }\n    },\n    {\n        \"name\": \"排序切换\",\n        \"type\": \"button\",\n        \"action\": \"\",\n        \"style\": {\n            \"layout_flexGrow\": 1,\n            \"layout_flexBasisPercent\": 1\n        }\n    },\n    {\n        \"name\": \"默认\",\n        \"type\": \"button\",\n        \"action\": \"Put_Sort('默认')\",\n        \"style\": {\n            \"layout_flexGrow\": 1,\n            \"layout_flexBasisPercent\": 0.45\n        }\n    },\n    {\n        \"name\": \"最佳匹配\",\n        \"type\": \"button\",\n        \"action\": \"Put_Sort(0)\",\n        \"style\": {\n            \"layout_flexGrow\": 1,\n            \"layout_flexBasisPercent\": 0.45\n        }\n    },\n    {\n        \"name\": \"最新上传\",\n        \"type\": \"button\",\n        \"action\": \"Put_Sort(1)\",\n        \"style\": {\n            \"layout_flexGrow\": 1,\n            \"layout_flexBasisPercent\": 0.45\n        }\n    },\n    {\n        \"name\": \"最旧上传\",\n        \"type\": \"button\",\n        \"action\": \"Put_Sort(2)\",\n        \"style\": {\n            \"layout_flexGrow\": 1,\n            \"layout_flexBasisPercent\": 0.45\n        }\n    },\n    {\n        \"name\": \"标题升序\",\n        \"type\": \"button\",\n        \"action\": \"Put_Sort(3)\",\n        \"style\": {\n            \"layout_flexGrow\": 1,\n            \"layout_flexBasisPercent\": 0.45\n        }\n    },\n    {\n        \"name\": \"标题倒序\",\n        \"type\": \"button\",\n        \"action\": \"Put_Sort(4)\",\n        \"style\": {\n            \"layout_flexGrow\": 1,\n            \"layout_flexBasisPercent\": 0.45\n        }\n    },\n    {\n        \"name\": \"最高评分\",\n        \"type\": \"button\",\n        \"action\": \"Put_Sort(5)\",\n        \"style\": {\n            \"layout_flexGrow\": 1,\n            \"layout_flexBasisPercent\": 0.45\n        }\n    },\n    {\n        \"name\": \"最低评分\",\n        \"type\": \"button\",\n        \"action\": \"Put_Sort(6)\",\n        \"style\": {\n            \"layout_flexGrow\": 1,\n            \"layout_flexBasisPercent\": 0.45\n        }\n    },\n    {\n        \"name\": \"最多关注\",\n        \"type\": \"button\",\n        \"action\": \"Put_Sort(7)\",\n        \"style\": {\n            \"layout_flexGrow\": 1,\n            \"layout_flexBasisPercent\": 0.45\n        }\n    },\n    {\n        \"name\": \"最少关注\",\n        \"type\": \"button\",\n        \"action\": \"Put_Sort(8)\",\n        \"style\": {\n            \"layout_flexGrow\": 1,\n            \"layout_flexBasisPercent\": 0.45\n        }\n    },\n    {\n        \"name\": \"最近添加\",\n        \"type\": \"button\",\n        \"action\": \"Put_Sort(9)\",\n        \"style\": {\n            \"layout_flexGrow\": 1,\n            \"layout_flexBasisPercent\": 0.45\n        }\n    },\n    {\n        \"name\": \"最早添加\",\n        \"type\": \"button\",\n        \"action\": \"Put_Sort(10)\",\n        \"style\": {\n            \"layout_flexGrow\": 1,\n            \"layout_flexBasisPercent\": 0.45\n        }\n    },\n    {\n        \"name\": \"年份升序\",\n        \"type\": \"button\",\n        \"action\": \"Put_Sort(11)\",\n        \"style\": {\n            \"layout_flexGrow\": 1,\n            \"layout_flexBasisPercent\": 0.45\n        }\n    },\n    {\n        \"name\": \"年份倒序\",\n        \"type\": \"button\",\n        \"action\": \"Put_Sort(12)\",\n        \"style\": {\n            \"layout_flexGrow\": 1,\n            \"layout_flexBasisPercent\": 0.45\n        }\n    },\n    {\n        \"name\": \"语言/缩写（英文逗号分隔多个语言）\",\n        \"type\": \"text\",\n        \"action\": \"\",\n        \"style\": {\n            \"layout_flexGrow\": 1,\n            \"layout_flexBasisPercent\": 1\n        }\n   }\n]",
     "loginUrl": "if (source.getVariable() == \"\") {\n    java.toast('已初始化');\n    let option = {\n        contentRating: ['safe', 'suggestive', 'erotica'],\n        sort: \"\",\n        Language: \"\"\n    }\n    source.setVariable(JSON.stringify(option, null, \"\\t\"));\n}\nfunction Login(l) {\n\tlet url = source.key;\n\tif ( l === \"登出\") {\n\tjava.toast('请浏览器手动登出');\n}\n\tcookie.removeCookie(url);\n\tsource.removeLoginHeader();\n\tjava.startBrowserAwait(url,\"登录\",false);\n}\nvar svb = JSON.parse(source.getVariable());\nfunction Show() {\n    let text = [];\n    const target = svb.contentRating;\n    const [sortField, sortOrder] = svb.sort.split(\",\");\n    const languages = svb.Language.split(\",\").map(x => getLanguage(x)).join(\" | \");\n    text.push(`\\n语言：${languages ? languages : \"所有语言\"}`);\n    const sortKey = sortField || \"\";\n    const sortStr = sorts.find(([_, or, ord]) =>\n        sortKey.includes(or) && ord === sortOrder)?. [0] || \"默认\";\n    text.push(`排序方式：${sortStr}`);\n\n    const contentStr = contentRating\n        .filter(([_, cr]) => target.includes(cr))\n        .map(([str]) => str)\n        .join(\" | \") || \"未设置\";\n    text.push(`内容等级：${contentStr}`);\n\n    text = text.join(\"\\n\");\n    java.toast(text);\n}\n\nfunction Put_contentRating(e) {\n    let tag = contentRating[e][1];\n    let tagStr = contentRating[e][0];\n    if (svb.contentRating.includes(tag)) {\n        java.toast(`\\n已取消展示【${tagStr}级】作品❌`);\n        svb.contentRating = svb.contentRating.filter(item => item !== tag);\n        java.log(JSON.stringify(svb.contentRating))\n    } else {\n        java.toast(`\\n已添加展示【${tagStr}级】作品✔️`);\n        svb.contentRating.push(tag);\n    }\n    source.setVariable(JSON.stringify(svb, null, \"\\t\"));\n}\n\nfunction Put_Sort(e) {\n    if (e !== \"默认\") {\n        sort_ = sorts[e][1] + \",\" + sorts[e][2];\n        point = sorts[e][0];\n    } else {\n        sort_ = \"\";\n        point = e;\n    }\n    svb.sort = sort_;\n    source.setVariable(JSON.stringify(svb, null, \"\\t\"));\n    java.toast(`\\n已切换排序为【${point}】`);\n}\n\nfunction login() {\n    svb.Language = source.getLoginInfoMap()[\"语言/缩写（英文逗号分隔多个语言）\"].toLowerCase();\n    source.setVariable(JSON.stringify(svb, null, \"\\t\"));\n}",
     "respondTime": 3463,
@@ -80,14 +99,24 @@
       "nextTocUrl": "@js: var result = [];\nconst pages = Math.round(JSON.parse(src).total / JSON.parse(src).limit) -1;\n//java.log(pages);\nfor (let i=1;i <= pages;i++) {\nurl = baseUrl.replace(/offset=0/,`offset=${i*96}`)\nresult.push(url);\n}\nresult;",
       "updateTime": "info"
     },
-    "searchUrl": "@js:\neval(String(source.loginUrl));\nresult = `https://api.mangadex.org/manga?limit=32&offset={{(page-1)*32}}&title={{key}}&includes[]=cover_art&includedTagsMode=AND&excludedTagsMode=OR{{buildQueryParams()}}`;\nresult;"
+    "searchUrl": "@js:\neval(String(source.loginUrl));\nresult = `https://api.mangadex.org/manga?limit=32&offset={{(page-1)*32}}&title={{key}}&includes[]=cover_art&includedTagsMode=AND&excludedTagsMode=OR{{buildQueryParams()}}`;\nresult;",
+    "weight": 0
   },
   {
+    "bookSourceComment": "//2025.1.7by.◎辞晨◎",
+    "bookSourceGroup": "漫画源",
     "bookSourceName": "吉站漫画（优+）",
     "bookSourceType": 2,
     "bookSourceUrl": "https://manhuafree.com/",
+    "customButton": false,
+    "customOrder": 83,
+    "enabled": true,
+    "enabledCookieJar": true,
+    "enabledExplore": true,
+    "eventListener": false,
     "exploreUrl": "@js:\nsort=[];\npush=(title,url,type1,type2)=>sort.push({\n\t\ttitle: title,\n\t\turl: url,\n\t\tstyle: {\n\t\t\t\tlayout_flexGrow: type1,\n\t\t\t\tlayout_flexBasisPercent: type2\n\t\t\t}\n\t});\n\tpush(\"全部🌊分类\", null, 1, 1);\n\tarList = [[\"全部🌊类型\",\"/manga\"],[\"人气🌊推荐\",\"/hots\"],[\"热门🌊推荐\",\"/dayup\"],[\"最新🌊上架\",\"/newss\"]];\narList.map(([title, uri]) => {\n  let url = `${uri}<,/page/{{page+1}}>`;\n  push(title, url, 1, 0.35);\n  })\n\t  xrList = [[\"全部\",\"\"],[\"韩漫\",\"-genre/kr\"],[\"热门漫画\",\"-genre/hots\"],[\"国漫\",\"-genre/cn\"],[\"其他\",\"-genre/qita\"],[\"日漫\",\"-genre/jp\"],[\"欧美\",\"-genre/ou-mei\"],[\"复仇\",\"-tag/fuchou\"],[\"古风\",\"-tag/gufeng\"],[\"奇幻\",\"-tag/qihuan\"],[\"逆袭\",\"-tag/nixi\"],[\"异能\",\"-tag/yineng\"],[\"宅向\",\"-tag/zhaixiang\"],[\"穿越\",\"-tag/chuanyue\"],[\"热血\",\"-tag/rexue\"],[\"纯爱\",\"-tag/chunai\"],[\"系统\",\"-tag/xitong\"],[\"重生\",\"-tag/zhongsheng\"],[\"冒险\",\"-tag/maoxian\"],[\"灵异\",\"-tag/lingyi\"],[\"大女主\",\"-tag/danvzhu\"],[\"剧情\",\"-tag/juqing\"],[\"恋爱\",\"-tag/lianai\"],[\"玄幻\",\"-tag/xuanhuan\"],[\"女神\",\"-tag/nvshen\"],[\"科幻\",\"-tag/kehuan\"],[\"魔幻\",\"-tag/mohuan\"],[\"推理\",\"-tag/tuili\"],[\"猎奇\",\"-tag/lieqi\"],[\"治愈\",\"-tag/zhiyu\"],[\"都市\",\"-tag/doushi\"],[\"异形\",\"-tag/yixing\"],[\"末日\",\"-tag/qingchun\"],[\"嫌疑\",\"-tag/xuanyi\"],[\"修仙\",\"-tag/xiuxian\"],[\"战斗\",\"-tag/zhandou\"]];\n  xrList.map(([tag, uro]) => {\n    url = `/manga${uro}<,/page/{{page+1}}>`;\n    push(tag, url, 1, 0.25);\n  });\n//java.log(JSON.stringify(sort))\nJSON.stringify(sort)",
     "header": "{\n  'User-Agent': \"Mozilla/5.0 (Linux; Android 15; V2304A Build/AP3A.240905.015.A2; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/126.0.6478.71 Mobile Safari/537.36\",\n  'sec-ch-ua-platform': \"\\\"Android\\\"\",\n  'origin': \"https://manhuafree.com/\",\n  'x-requested-with': \"cn.mujiankeji.mbrowser\",\n  'referer': \"https://manhuafree.com/\",\n  'accept-language': \"zh-CN,zh;q=0.9,en-US;q=0.8,en;q=0.7\"\n}",
+    "lastUpdateTime": 1759429634880,
     "respondTime": 9644,
     "ruleBookInfo": {
       "author": ".pb-2.0@text##编剧:|作画:",
@@ -116,13 +145,23 @@
       "chapterUrl": "https://api-get-v2.mgsearcher.com/api/chapter/getinfo?m=@get:{bid}&c={{$..id}}",
       "updateTime": "$..updatedAt"
     },
-    "searchUrl": "/s/{{key}}?page={{page}}"
+    "searchUrl": "/s/{{key}}?page={{page}}",
+    "weight": 0
   },
   {
+    "bookSourceComment": "// Error: 发现目录失效\n\n作者🍟",
+    "bookSourceGroup": "漫画源",
     "bookSourceName": "包子漫画（优+）",
     "bookSourceType": 2,
     "bookSourceUrl": "https://cn.bzmanga.com",
+    "customButton": false,
+    "customOrder": 85,
+    "enabled": true,
+    "enabledCookieJar": false,
+    "enabledExplore": true,
+    "eventListener": false,
     "exploreUrl": "最新上架::/list/new\n全部::/classify\n国漫::/classify?region=cn&page={{page}}\n中国::/classify?region=cn&page={{page}}\n日本::/classify?region=jp&page={{page}}\n欧美::/classify?region=en&page={{page}}\n连载中::/classify?state=serial&page={{page}}\n已完结::/classify?state=pub&page={{page}}\n都市::/classify?type=dushi&page={{page}}\n冒险::/classify?type=mouxian&page={{page}}\n热血::/classify?type=rexie&page={{page}}\n爱情::/classify?type=aiqing&page={{page}}\n恋爱::/classify?type=lianai&page={{page}}\n耽美::/classify?type=danmei&page={{page}}\n武侠::/classify?type=wuxia&page={{page}}\n格斗::/classify?type=gedou&page={{page}}\n科幻::/classify?type=kehuan&page={{page}}\n魔幻::/classify?type=mohuan&page={{page}}\n侦探::/classify?type=zhentan&page={{page}}\n推理::/classify?type=tuili&page={{page}}\n玄幻::/classify?type=xuanhuan&page={{page}}\n日常::/classify?type=richang&page={{page}}\n生活::/classify?type=shenghuo&page={{page}}\n搞笑::/classify?type=gaoxiao&page={{page}}\n校园::/classify?type=xiaoyuan&page={{page}}\n奇幻::/classify?type=qihuan&page={{page}}",
+    "lastUpdateTime": 1759430671956,
     "respondTime": 5535,
     "ruleBookInfo": {
       "author": "class.comics-detail__author@text",
@@ -153,14 +192,24 @@
       "chapterUrl": "tag.a@href##.*comic_id=(.*?)&.*chapter_slot=(.*)##https://cn.dzmanga.com/comic/chapter/$1/0_$2.html",
       "preUpdateJs": "book.canUpdate=false"
     },
-    "searchUrl": "/search?q={{key}}"
+    "searchUrl": "/search?q={{key}}",
+    "weight": 0
   },
   {
+    "bookSourceComment": "// Error: Connection reset",
+    "bookSourceGroup": "漫画源",
     "bookSourceName": "包子漫画（优）",
     "bookSourceType": 2,
     "bookSourceUrl": "https://cn.baozimhcn.com",
+    "customButton": false,
+    "customOrder": 89,
+    "enabled": true,
+    "enabledCookieJar": false,
+    "enabledExplore": true,
+    "eventListener": false,
     "exploreUrl": "<js>\nvar sort = [];\nvar push = function(title, url, type1, type2) {\n    sort.push({\n        title: title,\n        url: url,\n        style: {\n            layout_flexGrow: type1,\n            layout_flexBasisPercent: type2\n        }\n    });\n};\n\nvar typeNames = [\"全部\", \"恋爱\", \"纯爱\", \"古风\", \"异能\", \"悬疑\", \"剧情\", \"科幻\", \"奇幻\", \"玄幻\", \"穿越\", \"冒险\", \"推理\", \"武侠\", \"格斗\", \"战争\", \"热血\", \"搞笑\", \"大女主\", \"都市\", \"总裁\", \"后宫\", \"日常\", \"韩漫\", \"少年\", \"其它\"];\nvar types = [\"all\",\"lianai\",\"chunai\",\"gufeng\",\"yineng\",\"xuanyi\",\"juqing\",\"kehuan\",\"qihuan\",\"xuanhuan\",\"chuanyue\",\"mouxian\",\"tuili\",\"wuxia\",\"gedou\",\"zhanzheng\",\"rexie\",\"gaoxiao\",\"danuzhu\",\"dushi\",\"zongcai\",\"hougong\",\"richang\",\"hanman\",\"shaonian\",\"qita\"];\n\ntypeNames.forEach(function(item, index) {\n    var url = \"https://cn.baozimhcn.com/api/bzmhq/amp_comic_list?type=\" + types[index] + \"&region=all&filter=&page={{page}}&limit=36&language=cn&__amp_source_origin=https%3A%2F%2Fcn.baozimhcn.com\";\n    push(item, url, 1, 0.25);\n});\nJSON.stringify(sort)\n</js>",
     "header": "@js:\nJSON.stringify({\n\"Accept-Language\": \"zh-CN,zh;q=0.9,en-US;q=0.8,en;q=0.7\"\n})",
+    "lastUpdateTime": 1759430460163,
     "respondTime": 1443,
     "ruleBookInfo": {
       "author": "class.comics-detail__author@text",
@@ -199,14 +248,24 @@
       "chapterName": "tag.span@text",
       "chapterUrl": "tag.a@href"
     },
-    "searchUrl": "https://cn.baozimhcn.com/search?q={{key}}"
+    "searchUrl": "https://cn.baozimhcn.com/search?q={{key}}",
+    "weight": 0
   },
   {
+    "bookSourceComment": "源社区：@Mengteen  2025.11.22原创\n二传二创或者是其它问题请联系我。\n我邮箱:[xxxmgqxxx@vip.qq.com]\n我QQ:99737563(备注来意)\n1.不需要挂🪜子,不排除个别地方网络加载可能有点慢或者是需要挂🪜子才能访问，别急！\n2.发现是按我个人喜欢,你也可以自行创建你个人喜欢的。",
+    "bookSourceGroup": "漫画源",
     "bookSourceName": "爱轻写真（优+）",
     "bookSourceType": 2,
     "bookSourceUrl": "http://www.635k.com/##@Mengteen",
+    "customButton": false,
+    "customOrder": 171,
+    "enabled": true,
+    "enabledCookieJar": false,
+    "enabledExplore": true,
+    "eventListener": false,
     "exploreUrl": "[\n{\"title\": \"首页\",\"url\": \"http://www.635k.com/\",\n\"style\": {\"layout_flexGrow\": 1,\n\"layout_flexBasisPercent\": 0.25\n}},\n{\"title\": \"绅士摄影\",\"url\": \"/shenshiSHENSHIjinjiqihua_{{page}}.html\",\n\"style\": {\"layout_flexGrow\": 1,\n\"layout_flexBasisPercent\": 0.25\n}},\n{\"title\": \"SSA丝社\",\"url\": \"/ssasishe_{{page}}.html\",\n\"style\": {\"layout_flexGrow\": 1,\n\"layout_flexBasisPercent\": 0.25\n}},\n{\"title\": \"Ligui丽柜\",\"url\": \"/liguiligui_{{page}}.html\",\n\"style\": {\"layout_flexGrow\": 1,\n\"layout_flexBasisPercent\": 0.25\n}},\n{\"title\": \"异思趣向\",\"url\": \"/IESSyisiquxiang_{{page}}.html\",\n\"style\": {\"layout_flexGrow\": 1,\n\"layout_flexBasisPercent\": 0.25\n}},\n{\"title\": \"丝慕SMOU\",\"url\": \"/simusmou_{{page}}.html\",\n\"style\": {\"layout_flexGrow\": 1,\n\"layout_flexBasisPercent\": 0.25\n}},\n{\"title\": \"克拉女神\",\"url\": \"/kelanvshenKelagirls_{{page}}.html\",\n\"style\": {\"layout_flexGrow\": 1,\n\"layout_flexBasisPercent\": 0.25\n}},\n{\"title\": \"丝意SIEE\",\"url\": \"/siyiSIEE_{{page}}.html\",\n\"style\": {\"layout_flexGrow\": 1,\n\"layout_flexBasisPercent\": 0.25\n}},\n{\"title\": \"丝袜套图\",\"url\": \"/siwataotu_{{page}}.html\",\n\"style\": {\"layout_flexGrow\": 1,\n\"layout_flexBasisPercent\": 0.25\n}},\n{\"title\": \"慕丝女郎\",\"url\": \"/musinvlang_{{page}}.html\",\n\"style\": {\"layout_flexGrow\": 1,\n\"layout_flexBasisPercent\": 0.25\n}},\n{\"title\": \"梦丝女神\",\"url\": \"/mengsinvshen_{{page}}.html\",\n\"style\": {\"layout_flexGrow\": 1,\n\"layout_flexBasisPercent\": 0.25\n}}\n]",
     "header": "{\"User-Agent\": \"Mozilla/5.0 (Linux; Android 13; 2211133C Build/TKQ1.220905.001) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Mobile Safari/537.36\"}",
+    "lastUpdateTime": 1766316449562,
     "respondTime": 1840,
     "ruleBookInfo": {
       "kind": "span@text",
@@ -231,14 +290,24 @@
       "chapterName": "text",
       "chapterUrl": "href"
     },
-    "searchUrl": "/search/{{page}}_2.html"
+    "searchUrl": "/search/{{page}}_2.html",
+    "weight": 0
   },
   {
+    "bookSourceComment": "//2025.10.6  夜明空\n//源社区：https://ycoo.net",
+    "bookSourceGroup": "漫画源",
     "bookSourceName": "开心漫画（优+）",
     "bookSourceType": 2,
     "bookSourceUrl": "https://www.kaixinman.com",
+    "customButton": false,
+    "customOrder": 183,
+    "enabled": true,
+    "enabledCookieJar": false,
+    "enabledExplore": true,
+    "eventListener": false,
     "exploreUrl": "[\n{\"title\":\"🔖​地区🔖​\",\"url\":\"\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":1}},\n{\"title\":\"国内漫画\",\"url\":\"/category/area/guonei/page/{{page}}\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.25}},{\"title\":\"日本漫画\",\"url\":\"/category/area/riben/page/{{page}}\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.25}},{\"title\":\"韩国漫画\",\"url\":\"/category/area/hanguo/page/{{page}}\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.25}},{\"title\":\"欧美漫画\",\"url\":\"/category/area/oumei/page/{{page}}\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.25}},{\"title\":\"最近更新\",\"url\":\"/update\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.25}},\n{\"title\":\"🔖​题材🔖​\",\"url\":\"\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":1}},\n{\"title\":\"全部\",\"url\":\"/category/page/{{page}}\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.2}},{\"title\":\"热血\",\"url\":\"/category/theme/rexue/page/{{page}}\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.2}},{\"title\":\"仙侠\",\"url\":\"/category/theme/xianxia/page/{{page}}\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.2}},{\"title\":\"玄幻\",\"url\":\"/category/theme/xuanhuan/page/{{page}}\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.2}},{\"title\":\"都市\",\"url\":\"/category/theme/dushi/page/{{page}}\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.2}},{\"title\":\"冒险\",\"url\":\"/category/theme/maoxian/page/{{page}}\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.2}},{\"title\":\"武侠\",\"url\":\"/category/theme/wuxia/page/{{page}}\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.2}},{\"title\":\"格斗\",\"url\":\"/category/theme/gedou/page/{{page}}\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.2}},{\"title\":\"科幻\",\"url\":\"/category/theme/kehuan/page/{{page}}\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.2}},{\"title\":\"异能\",\"url\":\"/category/theme/yineng/page/{{page}}\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.2}},{\"title\":\"重生\",\"url\":\"/category/theme/chongsheng/page/{{page}}\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.2}},{\"title\":\"推理\",\"url\":\"/category/theme/tuili/page/{{page}}\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.2}},{\"title\":\"悬疑\",\"url\":\"/category/theme/xuanyi/page/{{page}}\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.2}},{\"title\":\"竞技\",\"url\":\"/category/theme/jingji/page/{{page}}\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.2}},{\"title\":\"搞笑\",\"url\":\"/category/theme/gaoxiao/page/{{page}}\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.2}},{\"title\":\"恐怖\",\"url\":\"/category/theme/kongbu/page/{{page}}\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.2}},{\"title\":\"生活\",\"url\":\"/category/theme/shenghuo/page/{{page}}\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.2}},{\"title\":\"校园\",\"url\":\"/category/theme/xiaoyuan/page/{{page}}\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.2}},{\"title\":\"恋爱\",\"url\":\"/category/theme/lianai/page/{{page}}\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.2}},{\"title\":\"百合\",\"url\":\"/category/theme/baihe/page/{{page}}\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.2}},{\"title\":\"耽美\",\"url\":\"/category/theme/danmei/page/{{page}}\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.2}},{\"title\":\"二次元\",\"url\":\"/category/theme/erciyuan/page/{{page}}\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.2}},{\"title\":\"萌系\",\"url\":\"/category/theme/mengxi/page/{{page}}\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.2}},{\"title\":\"伪娘\",\"url\":\"/category/theme/weiniang/page/{{page}}\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.2}},{\"title\":\"历史\",\"url\":\"/category/theme/lishi/page/{{page}}\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.2}},{\"title\":\"战争\",\"url\":\"/category/theme/zhanzheng/page/{{page}}\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.2}},{\"title\":\"剧情\",\"url\":\"/category/theme/juqing/page/{{page}}\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.2}},{\"title\":\"唯美\",\"url\":\"/category/theme/weimei/page/{{page}}\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.2}},{\"title\":\"奇幻\",\"url\":\"/category/theme/qihuan/page/{{page}}\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.2}},{\"title\":\"治愈\",\"url\":\"/category/theme/zhiyu/page/{{page}}\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.2}},{\"title\":\"少女\",\"url\":\"/category/theme/shaonv/page/{{page}}\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.2}},{\"title\":\"古风\",\"url\":\"/category/theme/gufeng/page/{{page}}\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.2}},{\"title\":\"高甜\",\"url\":\"/category/theme/gaotian/page/{{page}}\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.2}},{\"title\":\"动作\",\"url\":\"/category/theme/dongzuo/page/{{page}}\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.2}},{\"title\":\"穿越\",\"url\":\"/category/theme/chuanyue/page/{{page}}\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.2}},{\"title\":\"复仇\",\"url\":\"/category/theme/fuchou/page/{{page}}\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.2}},{\"title\":\"魔幻\",\"url\":\"/category/theme/mohuan/page/{{page}}\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.2}},{\"title\":\"励志\",\"url\":\"/category/theme/lizhi/page/{{page}}\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.2}},{\"title\":\"后宫\",\"url\":\"/category/theme/hougong/page/{{page}}\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.2}},{\"title\":\"爱情\",\"url\":\"/category/theme/aiqing/page/{{page}}\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.2}},{\"title\":\"青春\",\"url\":\"/category/theme/qingchun/page/{{page}}\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.2}},{\"title\":\"机甲\",\"url\":\"/category/theme/jijia/page/{{page}}\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.2}},{\"title\":\"战斗\",\"url\":\"/category/theme/zhandou/page/{{page}}\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.2}},{\"title\":\"灵异\",\"url\":\"/category/theme/lingyi/page/{{page}}\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.2}},{\"title\":\"运动\",\"url\":\"/category/theme/yundong/page/{{page}}\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.2}},{\"title\":\"职场\",\"url\":\"/category/theme/zhichang/page/{{page}}\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.2}},{\"title\":\"总裁\",\"url\":\"/category/theme/zongcai/page/{{page}}\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.2}},{\"title\":\"宫斗\",\"url\":\"/category/theme/gongdou/page/{{page}}\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.2}},{\"title\":\"科技\",\"url\":\"/category/theme/keji/page/{{page}}\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.2}},{\"title\":\"浪漫\",\"url\":\"/category/theme/langman/page/{{page}}\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.2}},{\"title\":\"末日\",\"url\":\"/category/theme/mori/page/{{page}}\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.2}},{\"title\":\"大女主\",\"url\":\"/category/theme/danvzhu/page/{{page}}\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.2}},{\"title\":\"系统\",\"url\":\"/category/theme/xitong/page/{{page}}\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.2}},{\"title\":\"暗黑\",\"url\":\"/category/theme/anhei/page/{{page}}\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.2}},{\"title\":\"正能量\",\"url\":\"/category/theme/zhengnengliang/page/{{page}}\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.2}},{\"title\":\"魔法\",\"url\":\"/category/theme/mofa/page/{{page}}\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.2}},{\"title\":\"脑洞\",\"url\":\"/category/theme/naodong/page/{{page}}\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.2}},{\"title\":\"少年\",\"url\":\"/category/theme/shaonian/page/{{page}}\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.2}},{\"title\":\"幻想\",\"url\":\"/category/theme/huanxiang/page/{{page}}\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.2}},{\"title\":\"宫廷\",\"url\":\"/category/theme/gongting/page/{{page}}\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.2}},{\"title\":\"侦探\",\"url\":\"/category/theme/zhentan/page/{{page}}\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.2}},{\"title\":\"萝莉\",\"url\":\"/category/theme/luoli/page/{{page}}\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.2}},{\"title\":\"霸总\",\"url\":\"/category/theme/bazong/page/{{page}}\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.2}},{\"title\":\"神话\",\"url\":\"/category/theme/shenhua/page/{{page}}\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.2}},{\"title\":\"明星\",\"url\":\"/category/theme/mingxing/page/{{page}}\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.2}},{\"title\":\"游戏\",\"url\":\"/category/theme/youxi/page/{{page}}\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.2}},{\"title\":\"修真\",\"url\":\"/category/theme/xiuzhen/page/{{page}}\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.2}},{\"title\":\"女神\",\"url\":\"/category/theme/nvshen/page/{{page}}\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.2}},{\"title\":\"御姐\",\"url\":\"/category/theme/yujie/page/{{page}}\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.2}},{\"title\":\"电竞\",\"url\":\"/category/theme/dianjing/page/{{page}}\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.2}},{\"title\":\"体育\",\"url\":\"/category/theme/tiyu/page/{{page}}\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.2}},{\"title\":\"男神\",\"url\":\"/category/theme/nanshen/page/{{page}}\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.2}},{\"title\":\"武侠仙侠\",\"url\":\"/category/theme/wuxiaxianxia/page/{{page}}\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.2}},{\"title\":\"治癒\",\"url\":\"/category/theme/279/page/{{page}}\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.2}},{\"title\":\"日常\",\"url\":\"/category/theme/richang/page/{{page}}\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.2}},{\"title\":\"types.治愈\",\"url\":\"/category/theme/typeszhiyu/page/{{page}}\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.2}},{\"title\":\"types.搞笑\",\"url\":\"/category/theme/typesgaoxiao/page/{{page}}\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.2}},{\"title\":\"types.恋爱\",\"url\":\"/category/theme/typeslianai/page/{{page}}\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.2}},{\"title\":\"types.萌系\",\"url\":\"/category/theme/typesmengxi/page/{{page}}\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.2}},{\"title\":\"types.穿越\",\"url\":\"/category/theme/typeschuanyue/page/{{page}}\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.2}},{\"title\":\"types.纯爱\",\"url\":\"/category/theme/typeschunai/page/{{page}}\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.2}},{\"title\":\"types.都市\",\"url\":\"/category/theme/typesdushi/page/{{page}}\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.2}},{\"title\":\"纯爱\",\"url\":\"/category/theme/chunai/page/{{page}}\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.2}},{\"title\":\"校园日常\",\"url\":\"/category/theme/xiaoyuanrichang/page/{{page}}\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.2}},{\"title\":\"types.奇幻\",\"url\":\"/category/theme/typesqihuan/page/{{page}}\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.2}},{\"title\":\"types.校园\",\"url\":\"/category/theme/typesxiaoyuan/page/{{page}}\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.2}},{\"title\":\"types.剧情\",\"url\":\"/category/theme/typesjuqing/page/{{page}}\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.2}},{\"title\":\"types.重生\",\"url\":\"/category/theme/typeszhongsheng/page/{{page}}\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.2}},{\"title\":\"types.热血\",\"url\":\"/category/theme/typesrexue/page/{{page}}\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.2}},{\"title\":\"types.异能\",\"url\":\"/category/theme/typesyineng/page/{{page}}\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.2}},{\"title\":\"types.悬疑\",\"url\":\"/category/theme/typesxuanyi/page/{{page}}\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.2}},{\"title\":\"强剧情\",\"url\":\"/category/theme/qiangjuqing/page/{{page}}\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.2}},{\"title\":\"types.冒险\",\"url\":\"/category/theme/typesmaoxian/page/{{page}}\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.2}},{\"title\":\"types.日常\",\"url\":\"/category/theme/typesrichang/page/{{page}}\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.2}},{\"title\":\"types.唯美\",\"url\":\"/category/theme/typesweimei/page/{{page}}\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.2}},{\"title\":\"types.少年\",\"url\":\"/category/theme/typesshaonian/page/{{page}}\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.2}},{\"title\":\"types.少女\",\"url\":\"/category/theme/typesshaonv/page/{{page}}\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.2}},{\"title\":\"types.灵异\",\"url\":\"/category/theme/typeslingyi/page/{{page}}\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.2}},{\"title\":\"types.脑洞\",\"url\":\"/category/theme/typesnaodong/page/{{page}}\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.2}},{\"title\":\"types.美食\",\"url\":\"/category/theme/typesmeishi/page/{{page}}\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.2}},{\"title\":\"types.推理\",\"url\":\"/category/theme/typestuili/page/{{page}}\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.2}},{\"title\":\"架空\",\"url\":\"/category/theme/jiakong/page/{{page}}\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.2}},{\"title\":\"types.大女主\",\"url\":\"/category/theme/typesdanvzhu/page/{{page}}\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.2}},{\"title\":\"types.百合\",\"url\":\"/category/theme/typesbaihe/page/{{page}}\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.2}},{\"title\":\"types.爆笑\",\"url\":\"/category/theme/typesbaoxiao/page/{{page}}\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.2}},{\"title\":\"惊悚\",\"url\":\"/category/theme/jingsong/page/{{page}}\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.2}},{\"title\":\"综合\",\"url\":\"/category/theme/zonghe/page/{{page}}\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.2}},{\"title\":\"types.古风\",\"url\":\"/category/theme/typesgufeng/page/{{page}}\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.2}},{\"title\":\"types.玄幻\",\"url\":\"/category/theme/typesxuanhuan/page/{{page}}\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.2}},{\"title\":\"神魔\",\"url\":\"/category/theme/shenmo/page/{{page}}\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.2}},\n{\"title\":\"🔖​进度🔖​\",\"url\":\"\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":1}},\n{\"title\":\"全部\",\"url\":\"/category/page/{{page}}\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.25}},{\"title\":\"连载\",\"url\":\"/category/state/lianzai/page/{{page}}\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.25}},{\"title\":\"完结\",\"url\":\"/category/state/wanjie/page/{{page}}\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.25}},\n{\"title\":\"🔖​排序🔖​\",\"url\":\"\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":1}},\n{\"title\":\"热门人气\",\"url\":\"/category/order/views/page/{{page}}\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.25}},{\"title\":\"更新时间\",\"url\":\"/category/order/update/page/{{page}}\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.25}}]",
     "header": "{\"User-Agent\":\"Mozilla/5.0 (Linux; U; Android 13; zh-Hans-CN; PFJM10 Build/TP1A.220905.001) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/135.0.4896.58 Quark/6.13.6.581 Mobile Safari/537.36\",\"Accept-Language\":\"zh-CN,zh;q=0.9,en-US;q=0.8,en;q=0.7\"}",
+    "lastUpdateTime": 1764967786397,
     "loginUrl": "/",
     "respondTime": 7453,
     "ruleBookInfo": {
@@ -271,14 +340,24 @@
       "chapterName": "text",
       "chapterUrl": "href##$##,{\"webView\": true}"
     },
-    "searchUrl": "{{cookie.removeCookie(source.getKey())}}/search?q={{key}}&page={{page}}"
+    "searchUrl": "{{cookie.removeCookie(source.getKey())}}/search?q={{key}}&page={{page}}",
+    "weight": 0
   },
   {
+    "bookSourceComment": "",
+    "bookSourceGroup": "漫画源",
     "bookSourceName": "我的漫神（优+）",
     "bookSourceType": 2,
     "bookSourceUrl": "https://m.mhkami.com",
+    "customButton": false,
+    "customOrder": 691,
+    "enabled": true,
+    "enabledCookieJar": false,
+    "enabledExplore": true,
+    "eventListener": false,
     "exploreUrl": "周一::/update/1.html\n周二::/update/2.html\n周三::/update/3.html\n周四::/update/4.html\n周五::/update/5.html\n周六::/update/6.html\n周日::/update/7.html\n全部::/mangalists/9/全部/3/{{page}}.html\n长条::/mangalists/9/长条/3/{{page}}.html\n大女主::/mangalists/9/大女主/3/{{page}}.html\n百合::/mangalists/9/百合/3/{{page}}.html\n耽美::/mangalists/9/耽美/3/{{page}}.html\n纯爱::/mangalists/9/纯爱/3/{{page}}.html\n後宫::/mangalists/9/後宫/3/{{page}}.html\n韩漫::/mangalists/9/韩漫/3/{{page}}.html\n奇幻::/mangalists/9/奇幻/3/{{page}}.html\n轻小说::/mangalists/9/轻小说/3/{{page}}.html\n生活::/mangalists/9/生活/3/{{page}}.html\n悬疑::/mangalists/9/悬疑/3/{{page}}.html\n格斗::/mangalists/9/格斗/3/{{page}}.html\n搞笑::/mangalists/9/搞笑/3/{{page}}.html\n伪娘::/mangalists/9/伪娘/3/{{page}}.html\n竞技::/mangalists/9/竞技/3/{{page}}.html\n职场::/mangalists/9/职场/3/{{page}}.html\n萌系::/mangalists/9/萌系/3/{{page}}.html\n冒险::/mangalists/9/冒险/3/{{page}}.html\n治愈::/mangalists/9/治愈/3/{{page}}.html\n都市::/mangalists/9/都市/3/{{page}}.html\n霸总::/mangalists/9/霸总/3/{{page}}.html\n神鬼::/mangalists/9/神鬼/3/{{page}}.html\n侦探::/mangalists/9/侦探/3/{{page}}.html\n爱情::/mangalists/9/爱情/3/{{page}}.html\n古风::/mangalists/9/古风/3/{{page}}.html\n欢乐向::/mangalists/9/欢乐向/3/{{page}}.html\n科幻::/mangalists/9/科幻/3/{{page}}.html\n穿越::/mangalists/9/穿越/3/{{page}}.html\n性转换::/mangalists/9/性转换/3/{{page}}.html\n校园::/mangalists/9/校园/3/{{page}}.html\n美食::/mangalists/9/美食/3/{{page}}.html\n悬疑::/mangalists/9/悬疑/3/{{page}}.html\n剧情::/mangalists/9/剧情/3/{{page}}.html\n热血::/mangalists/9/热血/3/{{page}}.html\n节操::/mangalists/9/节操/3/{{page}}.html\n励志::/mangalists/9/励志/3/{{page}}.html\n异世界::/mangalists/9/异世界/3/{{page}}.html\n历史::/mangalists/9/历史/3/{{page}}.html\n战争::/mangalists/9/战争/3/{{page}}.html\n恐怖::/mangalists/9/恐怖/3/{{page}}.html\n霸总::/mangalists/9/霸总/3/{{page}}.html",
     "header": "{\n\t\"User-Agent\":\"Mozilla/5.0 (Linux; Android 11; PCLM10 Build/RKQ1.200928.002; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/100.0.4896.127 Mobile Safari/537.36\"\n}",
+    "lastUpdateTime": 1735066896028,
     "respondTime": 3911,
     "ruleBookInfo": {
       "author": "[property=\"og:novel:author\"]@content",
@@ -314,13 +393,22 @@
       "chapterName": "text",
       "chapterUrl": "href"
     },
-    "searchUrl": "https://m.mhkami.com/api/front/index/search,{\n\t\"method\":\"POST\",\n  \"body\": \"key={{key}}\"\n}"
+    "searchUrl": "https://m.mhkami.com/api/front/index/search,{\n\t\"method\":\"POST\",\n  \"body\": \"key={{key}}\"\n}",
+    "weight": 0
   },
   {
+    "bookSourceGroup": "漫画源",
     "bookSourceName": "全免漫画（优）",
     "bookSourceType": 2,
     "bookSourceUrl": "https://api-cdn.kaimanhua.com/",
+    "customButton": false,
+    "customOrder": 692,
+    "enabled": true,
+    "enabledCookieJar": true,
+    "enabledExplore": true,
+    "eventListener": false,
     "exploreUrl": "<js>\nresult=\"\";\n   f=[\"热血\",\"机战\",\"运动\",\"推理\",\"冒险\",\"耿美\",\"百合\",\"搞笑\",\"战争\",\"神魔\",\"忍者\",\"竞技\",\"悬疑\",\"社会\",\"恋爱\",\"宠物\",\"吸血\",\"萝莉\",\"后宫\",\"御姐\",\"霸总\",\"玄幻\",\"古风\",\"历史\",\"漫改\",\"游戏\",\"穿越\",\"恐怖\",\"真人\",\"科幻\",\"防疫\",\"都市\",\"武侠\",\"修真\",\"生活\",\"动作\"];    \np=[\"rexue\",\"jizhan\",\"yundong\",\"tuili\",\"maoxian\",\"liaomei\",\"baihe\",\"gaoxiao\",\"zhanzhen\",\"shenmo\",\"renzhe\",\"jingji\",\"xuanyi\",\"shehui\",\"lianai\",\"chongwu\",\"xixue\",\"luoli\",\"hougong\",\"yujie\",\"bazong\",\"xuanhuan\",\"gufeng\",\"lishi\",\"mangai\",\"youxi\",\"chuanyue\",\"kongbu\",\"zhenren\",\"kehuan\",\"fangyi\",\"dushi\",\"wuxia\",\"xiuzhen\",\"shenghuo\",\"dongzuo\"];\na=\"::https://api-cdn.kaimanhua.com/comic-api/v1/comic/getsortlist?status_id=0&comic_sort=\";\nb=\"&human_type=0&orderby=date&pagesize=30&page={{page}}&young_mode=0&client-type=android&productname=qmmh&client-channel=xiaomi&platformname=android&client-version=1.4.8\";\n\nfor(i in f){\n\tresult=result+f[i]+a+p[i]+b+\"\\n\";\n\t}\n</js>",
+    "lastUpdateTime": 1765997984586,
     "respondTime": 2033,
     "ruleBookInfo": {
       "author": "$.author_name",
@@ -350,13 +438,22 @@
       "chapterName": "$.chapter_name",
       "chapterUrl": "@js:\ncid='@get:{cid}'\nchapter_id='{{$.chapter_id}}'\nt=\"/comic-api/v2/comic/getchapterdatacomic_id=\"+cid+\"&chapter_id=\"+chapter_id+\"&quality=middle&client-type=android&productname=qmmh&client-channel=xiaomi&platformname=android&client-version=1.4.8erciyuan2020\";\nsign=java.md5Encode(t);\nb={\n\"method\": \"GET\",\n\"headers\": {\n\"User-Agent\": \"okhttp/4.9.1\",\n\"access-token\":\"v1_090fNTIt4Omg86B7LUPcqWRTkvW8JjjLYXTxnm01BiXN8SgniETjucYezOrjZoOopFGr02Fj12RREysE4eHukTCc/LuyeIHzFGMayAgLGaSF8+jMMwrnDdTuYdFk34z7DZf+Zy+VHtjFS0Uy6n6Vyr/5GuJy6FDcbCoVBCjdbFneHjV38UwHjL6AwauUMFfa0f3uSEqGWZG6xn9+OpAn6GGRWHaypicXswr450DO29FcuqP7pHCSldVJtIzOv/Uc\",\n\"m-request-id\": sign\n}\n};\n\"https://api-cdn.kaimanhua.com/comic-api/v2/comic/getchapterdata?comic_id=@get:{cid}&chapter_id={{$.chapter_id}}&quality=middle&client-type=android&productname=qmmh&client-channel=xiaomi&platformname=android&client-version=1.4.8,\"+JSON.stringify(b);"
     },
-    "searchUrl": "https://api-cdn.kaimanhua.com/comic-api/v1/comic/getsortlist?search_key={{key}}&orderby=shoucang&page={{page}}&pagesize=20&young_mode=0&client-type=android&productname=qmmh&client-channel=xiaomi&platformname=android&client-version=1.4.8"
+    "searchUrl": "https://api-cdn.kaimanhua.com/comic-api/v1/comic/getsortlist?search_key={{key}}&orderby=shoucang&page={{page}}&pagesize=20&young_mode=0&client-type=android&productname=qmmh&client-channel=xiaomi&platformname=android&client-version=1.4.8",
+    "weight": 0
   },
   {
+    "bookSourceGroup": "漫画源",
     "bookSourceName": "爱看漫画（优+）",
     "bookSourceType": 2,
     "bookSourceUrl": "https://m.kanman.com#Haxc1107",
+    "customButton": false,
+    "customOrder": 693,
+    "enabled": true,
+    "enabledCookieJar": true,
+    "enabledExplore": true,
+    "eventListener": false,
     "exploreUrl": "人气::https://m.kanman.com/api/getsortlist/?comic_sort=&orderby=click&search_type=&search_key=&page={{page}}&size=48\n更新::https://m.kanman.com/api/getsortlist/?comic_sort=&orderby=date&search_type=&search_key=&page={{page}}&size=48\n评分::https://m.kanman.com/api/getsortlist/?comic_sort=&orderby=score&search_type=&search_key=&page={{page}}&size=48\n收藏::https://m.kanman.com/api/getsortlist/?comic_sort=&orderby=shoucang&search_type=&search_key=&page={{page}}&size=48\n热血::https://m.kanman.com/api/getsortlist/?comic_sort=rexue&orderby=&search_type=&search_key=&page={{page}}&size=48\n机战::https://m.kanman.com/api/getsortlist/?comic_sort=jizhan&orderby=&search_type=&search_key=&page={{page}}&size=48\n运动::https://m.kanman.com/api/getsortlist/?comic_sort=yundong&orderby=&search_type=&search_key=&page={{page}}&size=48\n推理::https://m.kanman.com/api/getsortlist/?comic_sort=tuili&orderby=&search_type=&search_key=&page={{page}}&size=48\n冒险::https://m.kanman.com/api/getsortlist/?comic_sort=maoxian&orderby=&search_type=&search_key=&page={{page}}&size=48\n搞笑::https://m.kanman.com/api/getsortlist/?comic_sort=gaoxiao&orderby=&search_type=&search_key=&page={{page}}&size=48\n战争::https://m.kanman.com/api/getsortlist/?comic_sort=zhanzhen&orderby=&search_type=&search_key=&page={{page}}&size=48\n神魔::https://m.kanman.com/api/getsortlist/?comic_sort=shenmo&orderby=&search_type=&search_key=&page={{page}}&size=48\n忍者::https://m.kanman.com/api/getsortlist/?comic_sort=renzhe&orderby=&search_type=&search_key=&page={{page}}&size=48\n竞技::https://m.kanman.com/api/getsortlist/?comic_sort=jingji&orderby=&search_type=&search_key=&page={{page}}&size=48\n悬疑::https://m.kanman.com/api/getsortlist/?comic_sort=xuanyi&orderby=&search_type=&search_key=&page={{page}}&size=48\n社会::https://m.kanman.com/api/getsortlist/?comic_sort=shehui&orderby=&search_type=&search_key=&page={{page}}&size=48\n恋爱::https://m.kanman.com/api/getsortlist/?comic_sort=lianai&orderby=&search_type=&search_key=&page={{page}}&size=48\n宠物::https://m.kanman.com/api/getsortlist/?comic_sort=chongwu&orderby=&search_type=&search_key=&page={{page}}&size=48\n吸血::https://m.kanman.com/api/getsortlist/?comic_sort=xixue&orderby=&search_type=&search_key=&page={{page}}&size=48\n萝莉::https://m.kanman.com/api/getsortlist/?comic_sort=luoli&orderby=&search_type=&search_key=&page={{page}}&size=48\n后宫::https://m.kanman.com/api/getsortlist/?comic_sort=hougong&orderby=&search_type=&search_key=&page={{page}}&size=48\n御姐::https://m.kanman.com/api/getsortlist/?comic_sort=yujie&orderby=&search_type=&search_key=&page={{page}}&size=48\n霸总::https://m.kanman.com/api/getsortlist/?comic_sort=bazong&orderby=&search_type=&search_key=&page={{page}}&size=48\n玄幻::https://m.kanman.com/api/getsortlist/?comic_sort=xuanhuan&orderby=&search_type=&search_key=&page={{page}}&size=48\n古风::https://m.kanman.com/api/getsortlist/?comic_sort=gufeng&orderby=&search_type=&search_key=&page={{page}}&size=48\n历史::https://m.kanman.com/api/getsortlist/?comic_sort=lishi&orderby=&search_type=&search_key=&page={{page}}&size=48\n漫改::https://m.kanman.com/api/getsortlist/?comic_sort=mangai&orderby=&search_type=&search_key=&page={{page}}&size=48\n游戏::https://m.kanman.com/api/getsortlist/?comic_sort=youxi&orderby=&search_type=&search_key=&page={{page}}&size=48\n穿越::https://m.kanman.com/api/getsortlist/?comic_sort=chuanyue&orderby=&search_type=&search_key=&page={{page}}&size=48\n恐怖::https://m.kanman.com/api/getsortlist/?comic_sort=kongbu&orderby=&search_type=&search_key=&page={{page}}&size=48\n真人::https://m.kanman.com/api/getsortlist/?comic_sort=zhenren&orderby=&search_type=&search_key=&page={{page}}&size=48\n科幻::https://m.kanman.com/api/getsortlist/?comic_sort=kehuan&orderby=&search_type=&search_key=&page={{page}}&size=48\n都市::https://m.kanman.com/api/getsortlist/?comic_sort=dushi&orderby=&search_type=&search_key=&page={{page}}&size=48\n武侠::https://m.kanman.com/api/getsortlist/?comic_sort=wuxia&orderby=&search_type=&search_key=&page={{page}}&size=48\n修真::https://m.kanman.com/api/getsortlist/?comic_sort=xiuzhen&orderby=&search_type=&search_key=&page={{page}}&size=48\n生活::https://m.kanman.com/api/getsortlist/?comic_sort=shenghuo&orderby=&search_type=&search_key=&page={{page}}&size=48\n动作::https://m.kanman.com/api/getsortlist/?comic_sort=dongzuo&orderby=&search_type=&search_key=&page={{page}}&size=48\n防疫::https://m.kanman.com/api/getsortlist/?comic_sort=fangyi&orderby=&search_type=&search_key=&page={{page}}&size=48",
+    "lastUpdateTime": 1766318133353,
     "respondTime": 472,
     "ruleBookInfo": {
       "author": "[property=\"og:novel:author\"]@content",
@@ -385,13 +482,24 @@
       "chapterName": "$.chapter_name",
       "chapterUrl": "https://m.kanman.com/api/getchapterinfov2?product_id=1&productname=kmh&platformname=wap&comic_id=@get:{bid}&chapter_newid={{$.chapter_newid}}&isWebp=1&quality=low"
     },
-    "searchUrl": "https://m.kanman.com/api/serachcomic/?product_id=1&productname=kmh&platformname=wap&serachKey={{key}}&topNumber=10"
+    "searchUrl": "https://m.kanman.com/api/serachcomic/?product_id=1&productname=kmh&platformname=wap&serachKey={{key}}&topNumber=10",
+    "weight": 0
   },
   {
+    "bookSourceComment": "",
+    "bookSourceGroup": "漫画源",
     "bookSourceName": "看漫画吧（优）",
     "bookSourceType": 2,
     "bookSourceUrl": "http://m.kanman.com/",
+    "bookUrlPattern": "",
+    "customButton": false,
+    "customOrder": 694,
+    "enabled": true,
+    "enabledCookieJar": true,
+    "enabledExplore": true,
+    "eventListener": false,
     "header": "{\ruser-agent: \"Mozilla/5.0 (Linux; Android 8.0; Pixel 2 Build/OPD3.170816.012) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/94.0.4606.71 Mobile Safari/537.36\"\r}",
+    "lastUpdateTime": 1733580216406,
     "loginUrl": "",
     "respondTime": 3373,
     "ruleBookInfo": {
@@ -423,12 +531,23 @@
       "chapterName": "tag.a@text",
       "chapterUrl": "tag.a@href"
     },
-    "searchUrl": "http://m.kanman.com/sort/all.html?cache=false&search_key={{key}}"
+    "searchUrl": "http://m.kanman.com/sort/all.html?cache=false&search_key={{key}}",
+    "weight": 0
   },
   {
+    "bookSourceComment": "",
+    "bookSourceGroup": "漫画源",
     "bookSourceName": "漫画小屋（优）",
     "bookSourceType": 2,
     "bookSourceUrl": "https://m.dm5.com",
+    "bookUrlPattern": "",
+    "customButton": false,
+    "customOrder": 695,
+    "enabled": true,
+    "enabledCookieJar": true,
+    "enabledExplore": true,
+    "eventListener": false,
+    "lastUpdateTime": 1734945453513,
     "loginUrl": "",
     "respondTime": 3621,
     "ruleBookInfo": {
@@ -461,13 +580,22 @@
       "chapterName": "tag.a@text",
       "chapterUrl": "tag.a@href"
     },
-    "searchUrl": "https://m.dm5.com/search?title={{key}}&language=1"
+    "searchUrl": "https://m.dm5.com/search?title={{key}}&language=1",
+    "weight": 0
   },
   {
+    "bookSourceGroup": "漫画源",
     "bookSourceName": "名著阅读（优++）",
     "bookSourceType": 2,
     "bookSourceUrl": "https://api.520diandu.com/",
+    "customButton": false,
+    "customOrder": 696,
+    "enabled": true,
+    "enabledCookieJar": true,
+    "enabledExplore": true,
+    "eventListener": false,
     "exploreUrl": "[{\"title\":\"📚全部书籍\",\"url\":\"https://api.520diandu.com/api/read/allReadBooks?uid=&key=&page={{page}}&cv=134&from=web\",\"style\":{\"layout_flexBasisPercent\":1,\"layout_flexGrow\":1}}]",
+    "lastUpdateTime": 1766230205190,
     "respondTime": 1044,
     "ruleBookInfo": {},
     "ruleContent": {
@@ -487,12 +615,23 @@
       "chapterName": "$.page",
       "chapterUrl": "$.pic@put:{img:pic}"
     },
-    "searchUrl": "https://api.520diandu.com/api/read/allReadBooks?uid=&key=&name={{key}}&page={{page}}&cv=134&from=app"
+    "searchUrl": "https://api.520diandu.com/api/read/allReadBooks?uid=&key=&name={{key}}&page={{page}}&cv=134&from=app",
+    "weight": 0
   },
   {
+    "bookSourceComment": "",
+    "bookSourceGroup": "漫画源",
     "bookSourceName": "漫画小屋（优）",
     "bookSourceType": 2,
     "bookSourceUrl": "https://m.dm5.com/",
+    "bookUrlPattern": "",
+    "customButton": false,
+    "customOrder": 697,
+    "enabled": true,
+    "enabledCookieJar": true,
+    "enabledExplore": true,
+    "eventListener": false,
+    "lastUpdateTime": 1732184308404,
     "loginUrl": "",
     "respondTime": 3473,
     "ruleBookInfo": {
@@ -525,13 +664,23 @@
       "chapterName": "tag.a@text",
       "chapterUrl": "tag.a@href"
     },
-    "searchUrl": "https://m.dm5.com/search?title={{key}}&language=1"
+    "searchUrl": "https://m.dm5.com/search?title={{key}}&language=1",
+    "weight": 0
   },
   {
+    "bookSourceComment": "// Error: 搜索失效",
+    "bookSourceGroup": "漫画源",
     "bookSourceName": "网络漫画（优）",
     "bookSourceType": 2,
     "bookSourceUrl": "https://mm.sfacg.com",
+    "customButton": false,
+    "customOrder": 698,
+    "enabled": true,
+    "enabledCookieJar": true,
+    "enabledExplore": true,
+    "eventListener": false,
     "exploreUrl": "更新::https://mm.sfacg.com/ajax/Common.ashx?op=getLatest&pageIndex={{page-1}}&tid=-1\n热血::https://mm.sfacg.com/ajax/Common.ashx?op=getLatest&pageIndex={{page-1}}&tid=1\n校园::https://mm.sfacg.com/ajax/Common.ashx?op=getLatest&pageIndex={{page-1}}&tid=2\n推理::https://mm.sfacg.com/ajax/Common.ashx?op=getLatest&pageIndex={{page-1}}&tid=3\n机战::https://mm.sfacg.com/ajax/Common.ashx?op=getLatest&pageIndex={{page-1}}&tid=4\n冒险::https://mm.sfacg.com/ajax/Common.ashx?op=getLatest&pageIndex={{page-1}}&tid=5\n运动::https://mm.sfacg.com/ajax/Common.ashx?op=getLatest&pageIndex={{page-1}}&tid=6\n耽美::https://mm.sfacg.com/ajax/Common.ashx?op=getLatest&pageIndex={{page-1}}&tid=7\n搞笑::https://mm.sfacg.com/ajax/Common.ashx?op=getLatest&pageIndex={{page-1}}&tid=8\n科幻::https://mm.sfacg.com/ajax/Common.ashx?op=getLatest&pageIndex={{page-1}}&tid=9\n魔幻::https://mm.sfacg.com/ajax/Common.ashx?op=getLatest&pageIndex={{page-1}}&tid=10\n恐怖::https://mm.sfacg.com/ajax/Common.ashx?op=getLatest&pageIndex={{page-1}}&tid=11\n社会::https://mm.sfacg.com/ajax/Common.ashx?op=getLatest&pageIndex={{page-1}}&tid=12\n爱情::https://mm.sfacg.com/ajax/Common.ashx?op=getLatest&pageIndex={{page-1}}&tid=13\n武侠::https://mm.sfacg.com/ajax/Common.ashx?op=getLatest&pageIndex={{page-1}}&tid=14\n温情::https://mm.sfacg.com/ajax/Common.ashx?op=getLatest&pageIndex={{page-1}}&tid=15\nnull",
+    "lastUpdateTime": 1765998802872,
     "loginUrl": "https://mm.sfacg.com/Login/",
     "respondTime": 1739,
     "ruleBookInfo": {
@@ -561,14 +710,23 @@
       "chapterUrl": "href",
       "isVip": "b@text"
     },
-    "searchUrl": "https://mm.sfacg.com/ajax/Common.ashx?op=search,{\n  \"method\": \"POST\",\n  \"body\": \"keyword={{key}}\"\n}"
+    "searchUrl": "https://mm.sfacg.com/ajax/Common.ashx?op=search,{\n  \"method\": \"POST\",\n  \"body\": \"keyword={{key}}\"\n}",
+    "weight": 36
   },
   {
+    "bookSourceGroup": "漫画源",
     "bookSourceName": "新爱漫画（优+）",
     "bookSourceType": 2,
     "bookSourceUrl": "https://xapi.xinmanhua.net#♤Haxc",
+    "customButton": false,
+    "customOrder": 699,
+    "enabled": true,
+    "enabledCookieJar": false,
+    "enabledExplore": true,
+    "eventListener": false,
     "exploreUrl": "全部::https://xapi.xinmanhua.net/search/catalog?keyword=all&ischarge=2&isfinish=2&order=0&page={{page}}\n治愈::https://xapi.xinmanhua.net/search/catalog?keyword=治愈&page={{page}}\n日常::https://xapi.xinmanhua.net/search/catalog?keyword=日常&page={{page}}\n都市::https://xapi.xinmanhua.net/search/catalog?keyword=都市&page={{page}}\n悬疑::https://xapi.xinmanhua.net/search/catalog?keyword=悬疑&page={{page}}\n科幻::https://xapi.xinmanhua.net/search/catalog?keyword=科幻&page={{page}}\n奇幻::https://xapi.xinmanhua.net/search/catalog?keyword=奇幻&page={{page}}\n热血::https://xapi.xinmanhua.net/search/catalog?keyword=热血&page={{page}}\n武侠::https://xapi.xinmanhua.net/search/catalog?keyword=武侠&page={{page}}\n古风::https://xapi.xinmanhua.net/search/catalog?keyword=古风&page={{page}}\n恋爱::https://xapi.xinmanhua.net/search/catalog?keyword=恋爱&page={{page}}\n少年::https://xapi.xinmanhua.net/search/catalog?keyword=少年&page={{page}}\n日漫::https://xapi.xinmanhua.net/search/catalog?keyword=日漫&page={{page}}\n原创::https://xapi.xinmanhua.net/search/catalog?keyword=原创&page={{page}}",
     "header": "{\n  \"User-Agent\": \"okhttp/3.10.0\"\n}",
+    "lastUpdateTime": 1758062550845,
     "respondTime": 1222,
     "ruleBookInfo": {
       "intro": "@JSon:$.data.attributes.intro&&$.data.attributes.description"
@@ -592,14 +750,25 @@
       "chapterName": "$.attributes.title&&$.attributes.intro",
       "chapterUrl": "https://xapi.xinmanhua.net/chapters/{$.id}/qualitywebs"
     },
-    "searchUrl": "https://xapi.xinmanhua.net/search/selfdefine,{\n  \"method\": \"POST\",\n  \"body\": \"keyword={{key}}&page={{page}}\"\n}"
+    "searchUrl": "https://xapi.xinmanhua.net/search/selfdefine,{\n  \"method\": \"POST\",\n  \"body\": \"keyword={{key}}&page={{page}}\"\n}",
+    "weight": 0
   },
   {
+    "bookSourceComment": "",
+    "bookSourceGroup": "漫画源",
     "bookSourceName": "新人漫画",
     "bookSourceType": 2,
     "bookSourceUrl": "https://xapi.xinmanhua.net#",
+    "bookUrlPattern": "",
+    "customButton": false,
+    "customOrder": 700,
+    "enabled": true,
+    "enabledCookieJar": true,
+    "enabledExplore": true,
+    "eventListener": false,
     "exploreUrl": "全部::https://xapi.xinmanhua.net/search/catalog?keyword=all&ischarge=2&isfinish=2&order=0&page={{page}}\n治愈::https://xapi.xinmanhua.net/search/catalog?keyword=治愈&page={{page}}\n日常::https://xapi.xinmanhua.net/search/catalog?keyword=日常&page={{page}}\n都市::https://xapi.xinmanhua.net/search/catalog?keyword=都市&page={{page}}\n悬疑::https://xapi.xinmanhua.net/search/catalog?keyword=悬疑&page={{page}}\n科幻::https://xapi.xinmanhua.net/search/catalog?keyword=科幻&page={{page}}\n奇幻::https://xapi.xinmanhua.net/search/catalog?keyword=奇幻&page={{page}}\n热血::https://xapi.xinmanhua.net/search/catalog?keyword=热血&page={{page}}\n武侠::https://xapi.xinmanhua.net/search/catalog?keyword=武侠&page={{page}}\n古风::https://xapi.xinmanhua.net/search/catalog?keyword=古风&page={{page}}\n恋爱::https://xapi.xinmanhua.net/search/catalog?keyword=恋爱&page={{page}}\n少年::https://xapi.xinmanhua.net/search/catalog?keyword=少年&page={{page}}\n日漫::https://xapi.xinmanhua.net/search/catalog?keyword=日漫&page={{page}}\n原创::https://xapi.xinmanhua.net/search/catalog?keyword=原创&page={{page}}",
     "header": "{\n  \"User-Agent\": \"okhttp/3.10.0\"\n}",
+    "lastUpdateTime": 1734944720585,
     "loginUrl": "",
     "respondTime": 2504,
     "ruleBookInfo": {
@@ -625,13 +794,23 @@
       "chapterName": "$.attributes.title&&$.attributes.intro",
       "chapterUrl": "https://xapi.xinmanhua.net/chapters/{$.id}/qualitywebs"
     },
-    "searchUrl": "https://xapi.xinmanhua.net/search/selfdefine,{\n  \"method\": \"POST\",\n  \"body\": \"keyword={{key}}&page={{page}}\"\n}"
+    "searchUrl": "https://xapi.xinmanhua.net/search/selfdefine,{\n  \"method\": \"POST\",\n  \"body\": \"keyword={{key}}&page={{page}}\"\n}",
+    "weight": 0
   },
   {
+    "bookSourceComment": "API",
+    "bookSourceGroup": "漫画源",
     "bookSourceName": "漫画台吧",
     "bookSourceType": 2,
     "bookSourceUrl": "https://m.manhuatai.com",
+    "customButton": false,
+    "customOrder": 701,
+    "enabled": true,
+    "enabledCookieJar": false,
+    "enabledExplore": true,
+    "eventListener": false,
     "exploreUrl": "[{\"title\":\"排行榜\",\"url\":\"\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":1}},\n{\"title\":\"人气\",\"url\":\"https://m.manhuatai.com/api/getsortlist/?comic_sort=&orderby=click&search_type=&search_key=&page={{page}}&size=48\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.2}},\n{\"title\":\"更新\",\"url\":\"https://m.manhuatai.com/api/getsortlist/?comic_sort=&orderby=date&search_type=&search_key=&page={{page}}&size=48\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.2}},\n{\"title\":\"评分\",\"url\":\"https://m.manhuatai.com/api/getsortlist/?comic_sort=&orderby=score&search_type=&search_key=&page={{page}}&size=48\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.2}},\n{\"title\":\"收藏\",\"url\":\"https://m.manhuatai.com/api/getsortlist/?comic_sort=&orderby=shoucang&search_type=&search_key=&page={{page}}&size=48\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.2}},\n{\"title\":\"标签\",\"url\":\"\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":1}},\n{\"title\":\"热血\",\"url\":\"https://m.manhuatai.com/api/getsortlist/?comic_sort=rexue&orderby=&search_type=&search_key=&page={{page}}&size=48\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.2}},\n{\"title\":\"机战\",\"url\":\"https://m.manhuatai.com/api/getsortlist/?comic_sort=jizhan&orderby=&search_type=&search_key=&page={{page}}&size=48\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.2}},\n{\"title\":\"运动\",\"url\":\"https://m.manhuatai.com/api/getsortlist/?comic_sort=yundong&orderby=&search_type=&search_key=&page={{page}}&size=48\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.2}},\n{\"title\":\"推理\",\"url\":\"https://m.manhuatai.com/api/getsortlist/?comic_sort=tuili&orderby=&search_type=&search_key=&page={{page}}&size=48\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.2}},\n{\"title\":\"冒险\",\"url\":\"https://m.manhuatai.com/api/getsortlist/?comic_sort=maoxian&orderby=&search_type=&search_key=&page={{page}}&size=48\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.2}},\n{\"title\":\"搞笑\",\"url\":\"https://m.manhuatai.com/api/getsortlist/?comic_sort=gaoxiao&orderby=&search_type=&search_key=&page={{page}}&size=48\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.2}},\n{\"title\":\"战争\",\"url\":\"https://m.manhuatai.com/api/getsortlist/?comic_sort=zhanzhen&orderby=&search_type=&search_key=&page={{page}}&size=48\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.2}},\n{\"title\":\"神魔\",\"url\":\"https://m.manhuatai.com/api/getsortlist/?comic_sort=shenmo&orderby=&search_type=&search_key=&page={{page}}&size=48\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.2}},\n{\"title\":\"忍者\",\"url\":\"https://m.manhuatai.com/api/getsortlist/?comic_sort=renzhe&orderby=&search_type=&search_key=&page={{page}}&size=48\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.2}},\n{\"title\":\"竞技\",\"url\":\"https://m.manhuatai.com/api/getsortlist/?comic_sort=jingji&orderby=&search_type=&search_key=&page={{page}}&size=48\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.2}},\n{\"title\":\"悬疑\",\"url\":\"https://m.manhuatai.com/api/getsortlist/?comic_sort=xuanyi&orderby=&search_type=&search_key=&page={{page}}&size=48\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.2}},\n{\"title\":\"社会\",\"url\":\"https://m.manhuatai.com/api/getsortlist/?comic_sort=shehui&orderby=&search_type=&search_key=&page={{page}}&size=48\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.2}},\n{\"title\":\"恋爱\",\"url\":\"https://m.manhuatai.com/api/getsortlist/?comic_sort=lianai&orderby=&search_type=&search_key=&page={{page}}&size=48\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.2}},\n{\"title\":\"宠物\",\"url\":\"https://m.manhuatai.com/api/getsortlist/?comic_sort=chongwu&orderby=&search_type=&search_key=&page={{page}}&size=48\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.2}},\n{\"title\":\"吸血\",\"url\":\"https://m.manhuatai.com/api/getsortlist/?comic_sort=xixue&orderby=&search_type=&search_key=&page={{page}}&size=48\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.2}},\n{\"title\":\"萝莉\",\"url\":\"https://m.manhuatai.com/api/getsortlist/?comic_sort=luoli&orderby=&search_type=&search_key=&page={{page}}&size=48\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.2}},\n{\"title\":\"后宫\",\"url\":\"https://m.manhuatai.com/api/getsortlist/?comic_sort=hougong&orderby=&search_type=&search_key=&page={{page}}&size=48\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.2}},\n{\"title\":\"御姐\",\"url\":\"https://m.manhuatai.com/api/getsortlist/?comic_sort=yujie&orderby=&search_type=&search_key=&page={{page}}&size=48\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.2}},\n{\"title\":\"霸总\",\"url\":\"https://m.manhuatai.com/api/getsortlist/?comic_sort=bazong&orderby=&search_type=&search_key=&page={{page}}&size=48\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.2}},\n{\"title\":\"玄幻\",\"url\":\"https://m.manhuatai.com/api/getsortlist/?comic_sort=xuanhuan&orderby=&search_type=&search_key=&page={{page}}&size=48\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.2}},\n{\"title\":\"古风\",\"url\":\"https://m.manhuatai.com/api/getsortlist/?comic_sort=gufeng&orderby=&search_type=&search_key=&page={{page}}&size=48\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.2}},\n{\"title\":\"历史\",\"url\":\"https://m.manhuatai.com/api/getsortlist/?comic_sort=lishi&orderby=&search_type=&search_key=&page={{page}}&size=48\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.2}},\n{\"title\":\"漫改\",\"url\":\"https://m.manhuatai.com/api/getsortlist/?comic_sort=mangai&orderby=&search_type=&search_key=&page={{page}}&size=48\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.2}},\n{\"title\":\"游戏\",\"url\":\"https://m.manhuatai.com/api/getsortlist/?comic_sort=youxi&orderby=&search_type=&search_key=&page={{page}}&size=48\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.2}},\n{\"title\":\"穿越\",\"url\":\"https://m.manhuatai.com/api/getsortlist/?comic_sort=chuanyue&orderby=&search_type=&search_key=&page={{page}}&size=48\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.2}},\n{\"title\":\"恐怖\",\"url\":\"https://m.manhuatai.com/api/getsortlist/?comic_sort=kongbu&orderby=&search_type=&search_key=&page={{page}}&size=48\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.2}},\n{\"title\":\"真人\",\"url\":\"https://m.manhuatai.com/api/getsortlist/?comic_sort=zhenren&orderby=&search_type=&search_key=&page={{page}}&size=48\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.2}},\n{\"title\":\"科幻\",\"url\":\"https://m.manhuatai.com/api/getsortlist/?comic_sort=kehuan&orderby=&search_type=&search_key=&page={{page}}&size=48\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.2}},\n{\"title\":\"都市\",\"url\":\"https://m.manhuatai.com/api/getsortlist/?comic_sort=dushi&orderby=&search_type=&search_key=&page={{page}}&size=48\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.2}},\n{\"title\":\"武侠\",\"url\":\"https://m.manhuatai.com/api/getsortlist/?comic_sort=wuxia&orderby=&search_type=&search_key=&page={{page}}&size=48\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.2}},\n{\"title\":\"修真\",\"url\":\"https://m.manhuatai.com/api/getsortlist/?comic_sort=xiuzhen&orderby=&search_type=&search_key=&page={{page}}&size=48\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.2}},\n{\"title\":\"生活\",\"url\":\"https://m.manhuatai.com/api/getsortlist/?comic_sort=shenghuo&orderby=&search_type=&search_key=&page={{page}}&size=48\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.2}},\n{\"title\":\"动作\",\"url\":\"https://m.manhuatai.com/api/getsortlist/?comic_sort=dongzuo&orderby=&search_type=&search_key=&page={{page}}&size=48\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.2}},\n{\"title\":\"防疫\",\"url\":\"https://m.manhuatai.com/api/getsortlist/?comic_sort=fangyi&orderby=&search_type=&search_key=&page={{page}}&size=48\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.2}}]",
+    "lastUpdateTime": 1732187804682,
     "respondTime": 2056,
     "ruleBookInfo": {
       "author": "[property=\"og:novel:author\"]@content",
@@ -676,13 +855,23 @@
       "chapterUrl": "tag.a@href\n@js:\nvar num=result.match(/.*\\/(.*).html/)[1];\n'https://m.manhuatai.com/api/getchapterinfov2?product_id=2&productname=mht&platformname=wap&comic_id=@get:{bid}&chapter_newid='+num+'&isWebp=1&quality=low'",
       "isVip": ""
     },
-    "searchUrl": "https://m.manhuatai.com/api/serachcomic/?product_id=2&productname=mht&platformname=wap&serachKey={{key}}&topNumber={{page+10}}"
+    "searchUrl": "https://m.manhuatai.com/api/serachcomic/?product_id=2&productname=mht&platformname=wap&serachKey={{key}}&topNumber={{page+10}}",
+    "weight": 0
   },
   {
+    "bookSourceComment": "",
+    "bookSourceGroup": "漫画源",
     "bookSourceName": "知音漫客",
     "bookSourceType": 2,
     "bookSourceUrl": "https://m.zymk.cn/",
+    "customButton": false,
+    "customOrder": 702,
+    "enabled": true,
+    "enabledCookieJar": false,
+    "enabledExplore": true,
+    "eventListener": false,
     "exploreUrl": "热血::/sort/5_p{{page}}.html&&\n搞笑::/sort/6_p{{page}}.html&&\n玄幻::/sort/7_p{{page}}.html&&\n生活::/sort/8_p{{page}}.html&&\n恋爱::/sort/9_p{{page}}.html&&\n动作::/sort/10_p{{page}}.html&&\n科幻::/sort/11_p{{page}}.html&&\n战争::/sort/12_p{{page}}.html&&\n悬疑::/sort/13_p{{page}}.html&&\n恐怖::/sort/14_p{{page}}.html&&\n校园::/sort/15_p{{page}}.html&&\n历史::/sort/16_p{{page}}.html&&\n穿越::/sort/17_p{{page}}.html&&\n体育::/sort/19_p{{page}}.html&&\n都市::/sort/20_p{{page}}.html&&\n漫改::/sort/22_p{{page}}.html&&\n修真::/sort/53_p{{page}}.html&&\n霸总::/sort/62_p{{page}}.html&&\n古风::/sort/63_p{{page}}.html&&\n游戏::/sort/64_p{{page}}.html&&\n真人::/sort/65_p{{page}}.html&&\n武侠::/sort/66_p{{page}}.html&&",
+    "lastUpdateTime": 1732184856973,
     "respondTime": 2238,
     "ruleBookInfo": {
       "author": "class.author@text",
@@ -709,13 +898,22 @@
       "chapterName": "text",
       "chapterUrl": "href"
     },
-    "searchUrl": "https://m.zymk.cn/sort/all.html?key={{key}}"
+    "searchUrl": "https://m.zymk.cn/sort/all.html?key={{key}}",
+    "weight": 0
   },
   {
+    "bookSourceGroup": "漫画源",
     "bookSourceName": "爱看漫画（优）",
     "bookSourceType": 2,
     "bookSourceUrl": "https://m.kanman.com",
+    "customButton": false,
+    "customOrder": 704,
+    "enabled": true,
+    "enabledCookieJar": true,
+    "enabledExplore": true,
+    "eventListener": false,
     "exploreUrl": "人气::https://m.kanman.com/api/getsortlist/?comic_sort=&orderby=click&search_type=&search_key=&page={{page}}&size=48\n更新::https://m.kanman.com/api/getsortlist/?comic_sort=&orderby=date&search_type=&search_key=&page={{page}}&size=48\n评分::https://m.kanman.com/api/getsortlist/?comic_sort=&orderby=score&search_type=&search_key=&page={{page}}&size=48\n收藏::https://m.kanman.com/api/getsortlist/?comic_sort=&orderby=shoucang&search_type=&search_key=&page={{page}}&size=48\n热血::https://m.kanman.com/api/getsortlist/?comic_sort=rexue&orderby=&search_type=&search_key=&page={{page}}&size=48\n机战::https://m.kanman.com/api/getsortlist/?comic_sort=jizhan&orderby=&search_type=&search_key=&page={{page}}&size=48\n运动::https://m.kanman.com/api/getsortlist/?comic_sort=yundong&orderby=&search_type=&search_key=&page={{page}}&size=48\n推理::https://m.kanman.com/api/getsortlist/?comic_sort=tuili&orderby=&search_type=&search_key=&page={{page}}&size=48\n冒险::https://m.kanman.com/api/getsortlist/?comic_sort=maoxian&orderby=&search_type=&search_key=&page={{page}}&size=48\n搞笑::https://m.kanman.com/api/getsortlist/?comic_sort=gaoxiao&orderby=&search_type=&search_key=&page={{page}}&size=48\n战争::https://m.kanman.com/api/getsortlist/?comic_sort=zhanzhen&orderby=&search_type=&search_key=&page={{page}}&size=48\n神魔::https://m.kanman.com/api/getsortlist/?comic_sort=shenmo&orderby=&search_type=&search_key=&page={{page}}&size=48\n竞技::https://m.kanman.com/api/getsortlist/?comic_sort=jingji&orderby=&search_type=&search_key=&page={{page}}&size=48\n悬疑::https://m.kanman.com/api/getsortlist/?comic_sort=xuanyi&orderby=&search_type=&search_key=&page={{page}}&size=48\n社会::https://m.kanman.com/api/getsortlist/?comic_sort=shehui&orderby=&search_type=&search_key=&page={{page}}&size=48\n恋爱::https://m.kanman.com/api/getsortlist/?comic_sort=lianai&orderby=&search_type=&search_key=&page={{page}}&size=48\n宠物::https://m.kanman.com/api/getsortlist/?comic_sort=chongwu&orderby=&search_type=&search_key=&page={{page}}&size=48\n吸血::https://m.kanman.com/api/getsortlist/?comic_sort=xixue&orderby=&search_type=&search_key=&page={{page}}&size=48\n萝莉::https://m.kanman.com/api/getsortlist/?comic_sort=luoli&orderby=&search_type=&search_key=&page={{page}}&size=48\n后宫::https://m.kanman.com/api/getsortlist/?comic_sort=hougong&orderby=&search_type=&search_key=&page={{page}}&size=48\n御姐::https://m.kanman.com/api/getsortlist/?comic_sort=yujie&orderby=&search_type=&search_key=&page={{page}}&size=48\n霸总::https://m.kanman.com/api/getsortlist/?comic_sort=bazong&orderby=&search_type=&search_key=&page={{page}}&size=48\n玄幻::https://m.kanman.com/api/getsortlist/?comic_sort=xuanhuan&orderby=&search_type=&search_key=&page={{page}}&size=48\n古风::https://m.kanman.com/api/getsortlist/?comic_sort=gufeng&orderby=&search_type=&search_key=&page={{page}}&size=48\n历史::https://m.kanman.com/api/getsortlist/?comic_sort=lishi&orderby=&search_type=&search_key=&page={{page}}&size=48\n漫改::https://m.kanman.com/api/getsortlist/?comic_sort=mangai&orderby=&search_type=&search_key=&page={{page}}&size=48\n游戏::https://m.kanman.com/api/getsortlist/?comic_sort=youxi&orderby=&search_type=&search_key=&page={{page}}&size=48\n穿越::https://m.kanman.com/api/getsortlist/?comic_sort=chuanyue&orderby=&search_type=&search_key=&page={{page}}&size=48\n恐怖::https://m.kanman.com/api/getsortlist/?comic_sort=kongbu&orderby=&search_type=&search_key=&page={{page}}&size=48\n真人::https://m.kanman.com/api/getsortlist/?comic_sort=zhenren&orderby=&search_type=&search_key=&page={{page}}&size=48\n科幻::https://m.kanman.com/api/getsortlist/?comic_sort=kehuan&orderby=&search_type=&search_key=&page={{page}}&size=48\n都市::https://m.kanman.com/api/getsortlist/?comic_sort=dushi&orderby=&search_type=&search_key=&page={{page}}&size=48\n武侠::https://m.kanman.com/api/getsortlist/?comic_sort=wuxia&orderby=&search_type=&search_key=&page={{page}}&size=48\n修真::https://m.kanman.com/api/getsortlist/?comic_sort=xiuzhen&orderby=&search_type=&search_key=&page={{page}}&size=48\n生活::https://m.kanman.com/api/getsortlist/?comic_sort=shenghuo&orderby=&search_type=&search_key=&page={{page}}&size=48\n动作::https://m.kanman.com/api/getsortlist/?comic_sort=dongzuo&orderby=&search_type=&search_key=&page={{page}}&size=48",
+    "lastUpdateTime": 1759582024007,
     "respondTime": 407,
     "ruleBookInfo": {
       "author": "[property=\"og:novel:author\"]@content",
@@ -744,13 +942,22 @@
       "chapterName": "$.chapter_name",
       "chapterUrl": "https://m.kanman.com/api/getchapterinfov2?product_id=1&productname=kmh&platformname=wap&comic_id=@get:{bid}&chapter_newid={{$.chapter_newid}}&isWebp=1&quality=low"
     },
-    "searchUrl": "https://m.kanman.com/api/serachcomic/?product_id=1&productname=kmh&platformname=wap&serachKey={{key}}&topNumber=10"
+    "searchUrl": "https://m.kanman.com/api/serachcomic/?product_id=1&productname=kmh&platformname=wap&serachKey={{key}}&topNumber=10",
+    "weight": 0
   },
   {
+    "bookSourceGroup": "漫画源",
     "bookSourceName": "全免漫画（优）",
     "bookSourceType": 2,
     "bookSourceUrl": "https://api-cdn.kaimanhua.com/##@遇知",
+    "customButton": false,
+    "customOrder": 705,
+    "enabled": true,
+    "enabledCookieJar": true,
+    "enabledExplore": true,
+    "eventListener": false,
     "exploreUrl": "<js>\nresult=\"\";\n   f=[\"热血\",\"机战\",\"运动\",\"推理\",\"冒险\",\"耿美\",\"百合\",\"搞笑\",\"战争\",\"神魔\",\"忍者\",\"竞技\",\"悬疑\",\"社会\",\"恋爱\",\"宠物\",\"吸血\",\"萝莉\",\"后宫\",\"御姐\",\"霸总\",\"玄幻\",\"古风\",\"历史\",\"漫改\",\"游戏\",\"穿越\",\"恐怖\",\"真人\",\"科幻\",\"防疫\",\"都市\",\"武侠\",\"修真\",\"生活\",\"动作\"];    \np=[\"rexue\",\"jizhan\",\"yundong\",\"tuili\",\"maoxian\",\"liaomei\",\"baihe\",\"gaoxiao\",\"zhanzhen\",\"shenmo\",\"renzhe\",\"jingji\",\"xuanyi\",\"shehui\",\"lianai\",\"chongwu\",\"xixue\",\"luoli\",\"hougong\",\"yujie\",\"bazong\",\"xuanhuan\",\"gufeng\",\"lishi\",\"mangai\",\"youxi\",\"chuanyue\",\"kongbu\",\"zhenren\",\"kehuan\",\"fangyi\",\"dushi\",\"wuxia\",\"xiuzhen\",\"shenghuo\",\"dongzuo\"];\na=\"::https://api-cdn.kaimanhua.com/comic-api/v1/comic/getsortlist?status_id=0&comic_sort=\";\nb=\"&human_type=0&orderby=date&pagesize=30&page={{page}}&young_mode=0&client-type=android&productname=qmmh&client-channel=xiaomi&platformname=android&client-version=1.4.8\";\n\nfor(i in f){\n\tresult=result+f[i]+a+p[i]+b+\"\\n\";\n\t}\n</js>",
+    "lastUpdateTime": 1765997965088,
     "respondTime": 2003,
     "ruleBookInfo": {
       "author": "$.author_name",
@@ -780,13 +987,23 @@
       "chapterName": "$.chapter_name",
       "chapterUrl": "@js:\ncid='@get:{cid}'\nchapter_id='{{$.chapter_id}}'\nt=\"/comic-api/v2/comic/getchapterdatacomic_id=\"+cid+\"&chapter_id=\"+chapter_id+\"&quality=middle&client-type=android&productname=qmmh&client-channel=xiaomi&platformname=android&client-version=1.4.8erciyuan2020\";\nsign=java.md5Encode(t);\nb={\n\"method\": \"GET\",\n\"headers\": {\n\"User-Agent\": \"okhttp/4.9.1\",\n\"access-token\":\"v1_090fNTIt4Omg86B7LUPcqWRTkvW8JjjLYXTxnm01BiXN8SgniETjucYezOrjZoOopFGr02Fj12RREysE4eHukTCc/LuyeIHzFGMayAgLGaSF8+jMMwrnDdTuYdFk34z7DZf+Zy+VHtjFS0Uy6n6Vyr/5GuJy6FDcbCoVBCjdbFneHjV38UwHjL6AwauUMFfa0f3uSEqGWZG6xn9+OpAn6GGRWHaypicXswr450DO29FcuqP7pHCSldVJtIzOv/Uc\",\n\"m-request-id\": sign\n}\n};\n\"https://api-cdn.kaimanhua.com/comic-api/v2/comic/getchapterdata?comic_id=@get:{cid}&chapter_id={{$.chapter_id}}&quality=middle&client-type=android&productname=qmmh&client-channel=xiaomi&platformname=android&client-version=1.4.8,\"+JSON.stringify(b);"
     },
-    "searchUrl": "https://api-cdn.kaimanhua.com/comic-api/v1/comic/getsortlist?search_key={{key}}&orderby=shoucang&page={{page}}&pagesize=20&young_mode=0&client-type=android&productname=qmmh&client-channel=xiaomi&platformname=android&client-version=1.4.8"
+    "searchUrl": "https://api-cdn.kaimanhua.com/comic-api/v1/comic/getsortlist?search_key={{key}}&orderby=shoucang&page={{page}}&pagesize=20&young_mode=0&client-type=android&productname=qmmh&client-channel=xiaomi&platformname=android&client-version=1.4.8",
+    "weight": 0
   },
   {
+    "bookSourceComment": "可能需要魔法",
+    "bookSourceGroup": "漫画源",
     "bookSourceName": "爱看漫画（优）",
     "bookSourceType": 2,
     "bookSourceUrl": "https://m.kanman.com已校验",
+    "customButton": false,
+    "customOrder": 706,
+    "enabled": true,
+    "enabledCookieJar": true,
+    "enabledExplore": true,
+    "eventListener": false,
     "exploreUrl": "人气::https://m.kanman.com/api/getsortlist/?comic_sort=&orderby=click&search_type=&search_key=&page={{page}}&size=48\n更新::https://m.kanman.com/api/getsortlist/?comic_sort=&orderby=date&search_type=&search_key=&page={{page}}&size=48\n评分::https://m.kanman.com/api/getsortlist/?comic_sort=&orderby=score&search_type=&search_key=&page={{page}}&size=48\n收藏::https://m.kanman.com/api/getsortlist/?comic_sort=&orderby=shoucang&search_type=&search_key=&page={{page}}&size=48\n热血::https://m.kanman.com/api/getsortlist/?comic_sort=rexue&orderby=&search_type=&search_key=&page={{page}}&size=48\n机战::https://m.kanman.com/api/getsortlist/?comic_sort=jizhan&orderby=&search_type=&search_key=&page={{page}}&size=48\n运动::https://m.kanman.com/api/getsortlist/?comic_sort=yundong&orderby=&search_type=&search_key=&page={{page}}&size=48\n推理::https://m.kanman.com/api/getsortlist/?comic_sort=tuili&orderby=&search_type=&search_key=&page={{page}}&size=48\n冒险::https://m.kanman.com/api/getsortlist/?comic_sort=maoxian&orderby=&search_type=&search_key=&page={{page}}&size=48\n搞笑::https://m.kanman.com/api/getsortlist/?comic_sort=gaoxiao&orderby=&search_type=&search_key=&page={{page}}&size=48\n战争::https://m.kanman.com/api/getsortlist/?comic_sort=zhanzhen&orderby=&search_type=&search_key=&page={{page}}&size=48\n神魔::https://m.kanman.com/api/getsortlist/?comic_sort=shenmo&orderby=&search_type=&search_key=&page={{page}}&size=48\n忍者::https://m.kanman.com/api/getsortlist/?comic_sort=renzhe&orderby=&search_type=&search_key=&page={{page}}&size=48\n竞技::https://m.kanman.com/api/getsortlist/?comic_sort=jingji&orderby=&search_type=&search_key=&page={{page}}&size=48\n悬疑::https://m.kanman.com/api/getsortlist/?comic_sort=xuanyi&orderby=&search_type=&search_key=&page={{page}}&size=48\n社会::https://m.kanman.com/api/getsortlist/?comic_sort=shehui&orderby=&search_type=&search_key=&page={{page}}&size=48\n恋爱::https://m.kanman.com/api/getsortlist/?comic_sort=lianai&orderby=&search_type=&search_key=&page={{page}}&size=48\n宠物::https://m.kanman.com/api/getsortlist/?comic_sort=chongwu&orderby=&search_type=&search_key=&page={{page}}&size=48\n吸血::https://m.kanman.com/api/getsortlist/?comic_sort=xixue&orderby=&search_type=&search_key=&page={{page}}&size=48\n萝莉::https://m.kanman.com/api/getsortlist/?comic_sort=luoli&orderby=&search_type=&search_key=&page={{page}}&size=48\n后宫::https://m.kanman.com/api/getsortlist/?comic_sort=hougong&orderby=&search_type=&search_key=&page={{page}}&size=48\n御姐::https://m.kanman.com/api/getsortlist/?comic_sort=yujie&orderby=&search_type=&search_key=&page={{page}}&size=48\n霸总::https://m.kanman.com/api/getsortlist/?comic_sort=bazong&orderby=&search_type=&search_key=&page={{page}}&size=48\n玄幻::https://m.kanman.com/api/getsortlist/?comic_sort=xuanhuan&orderby=&search_type=&search_key=&page={{page}}&size=48\n古风::https://m.kanman.com/api/getsortlist/?comic_sort=gufeng&orderby=&search_type=&search_key=&page={{page}}&size=48\n历史::https://m.kanman.com/api/getsortlist/?comic_sort=lishi&orderby=&search_type=&search_key=&page={{page}}&size=48\n漫改::https://m.kanman.com/api/getsortlist/?comic_sort=mangai&orderby=&search_type=&search_key=&page={{page}}&size=48\n游戏::https://m.kanman.com/api/getsortlist/?comic_sort=youxi&orderby=&search_type=&search_key=&page={{page}}&size=48\n穿越::https://m.kanman.com/api/getsortlist/?comic_sort=chuanyue&orderby=&search_type=&search_key=&page={{page}}&size=48\n恐怖::https://m.kanman.com/api/getsortlist/?comic_sort=kongbu&orderby=&search_type=&search_key=&page={{page}}&size=48\n真人::https://m.kanman.com/api/getsortlist/?comic_sort=zhenren&orderby=&search_type=&search_key=&page={{page}}&size=48\n科幻::https://m.kanman.com/api/getsortlist/?comic_sort=kehuan&orderby=&search_type=&search_key=&page={{page}}&size=48\n都市::https://m.kanman.com/api/getsortlist/?comic_sort=dushi&orderby=&search_type=&search_key=&page={{page}}&size=48\n武侠::https://m.kanman.com/api/getsortlist/?comic_sort=wuxia&orderby=&search_type=&search_key=&page={{page}}&size=48\n修真::https://m.kanman.com/api/getsortlist/?comic_sort=xiuzhen&orderby=&search_type=&search_key=&page={{page}}&size=48\n生活::https://m.kanman.com/api/getsortlist/?comic_sort=shenghuo&orderby=&search_type=&search_key=&page={{page}}&size=48\n动作::https://m.kanman.com/api/getsortlist/?comic_sort=dongzuo&orderby=&search_type=&search_key=&page={{page}}&size=48\n防疫::https://m.kanman.com/api/getsortlist/?comic_sort=fangyi&orderby=&search_type=&search_key=&page={{page}}&size=48",
+    "lastUpdateTime": 1759430147252,
     "respondTime": 562,
     "ruleBookInfo": {
       "author": "[property=\"og:novel:author\"]@content",
@@ -815,13 +1032,22 @@
       "chapterName": "$.chapter_name",
       "chapterUrl": "https://m.kanman.com/api/getchapterinfov2?product_id=1&productname=kmh&platformname=wap&comic_id=@get:{bid}&chapter_newid={{$.chapter_newid}}&isWebp=1&quality=low"
     },
-    "searchUrl": "https://m.kanman.com/api/serachcomic/?product_id=1&productname=kmh&platformname=wap&serachKey={{key}}&topNumber=10"
+    "searchUrl": "https://m.kanman.com/api/serachcomic/?product_id=1&productname=kmh&platformname=wap&serachKey={{key}}&topNumber=10",
+    "weight": 62
   },
   {
+    "bookSourceGroup": "漫画源",
     "bookSourceName": "武芊漫画（优+）",
     "bookSourceType": 2,
     "bookSourceUrl": "https://comic.mkzcdn.com",
+    "customButton": false,
+    "customOrder": 707,
+    "enabled": true,
+    "enabledCookieJar": false,
+    "enabledExplore": true,
+    "eventListener": false,
     "exploreUrl": "@js:\nlet url = 'https://comic.mkzcdn.com/search/filter/?audience=0&order=sort&page_num={{page}}&page_size=18&theme_id=class'\nlet class_name=\"全部&修真&霸总&恋爱&校园&冒险&搞笑&生活&热血&架空&后宫&玄幻&悬疑&恐怖&灵异&动作&科幻&战争&古风&穿越&竞技&励志&同人&真人\".split(\"&\");\nlet class_url=\"0&2&1&3&4&5&6&7&8&9&10&12&13&14&15&16&17&18&19&20&21&23&24&26\".split(\"&\")\n\nlet sort_name='推荐&最热&最新'.split(\"&\")\nlet sort_url='3&1&2'.split(\"&\")\nlet model = (title,url,num)=>{\n    return {title:title,url:url,style:{layout_flexGroup:1,layout_flexBasisPercent:num}}\n}\n\ntop=[{\"title\":\"热门人气\",\"url\":\"https://comic.mkzcdn.com/search/filter/?order=1&page_num={{page}}&page_size=12\",\"style\":{\"layout_flexBasisPercent\":0.4,\"layout_flexGrow\":1}},\n{\"title\":\"更新时间\",\"url\":\"https://comic.mkzcdn.com/search/filter/?order=2&page_num={{page}}&page_size=12\",\"style\":{\"layout_flexBasisPercent\":0.4,\"layout_flexGrow\":1}}]\n\n\n\nlet list = []\nlist=list.concat(top)\n\nfor (let i = 0; i < sort_name.length; i++) {\n    list.push(model(sort_name[i],\"\",1))\n    for (let j = 0; j < class_name.length; j++) {\n        let t = url.replace(\"sort\",`${sort_url[i]}`).replace(\"class\",`${class_url[j]}`)\n        list.push(model(class_name[j],t,0.15))\n    }\n}\nJSON.stringify(list)",
+    "lastUpdateTime": 1759568531485,
     "respondTime": 3653,
     "ruleBookInfo": {
       "intro": "$..content##^##<br/>",
@@ -848,13 +1074,24 @@
       "chapterUrl": "https://comic.mkzcdn.com/chapter/content/?chapter_id={{$.chapter_id}}&comic_id=@get:{comic_id}",
       "updateTime": "$..start_time\n@js:\"🕗 \"+java.timeFormat(result*1000)+\"    \"+(new Date(result*1000)>new Date()?\"❗️未发布\":\"\")"
     },
-    "searchUrl": "https://comic.mkzcdn.com/search/keyword/?keyword={{key}}&page_num={{page}}&page_size=20"
+    "searchUrl": "https://comic.mkzcdn.com/search/keyword/?keyword={{key}}&page_num={{page}}&page_size=20",
+    "weight": 0
   },
   {
+    "bookSourceComment": "",
+    "bookSourceGroup": "漫画源",
     "bookSourceName": "爱看漫画",
     "bookSourceType": 2,
     "bookSourceUrl": "http://m.kanman.com",
+    "bookUrlPattern": "",
+    "customButton": false,
+    "customOrder": 710,
+    "enabled": true,
+    "enabledCookieJar": true,
+    "enabledExplore": true,
+    "eventListener": false,
     "header": "{\ruser-agent: \"Mozilla/5.0 (Linux; Android 8.0; Pixel 2 Build/OPD3.170816.012) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/94.0.4606.71 Mobile Safari/537.36\"\r}",
+    "lastUpdateTime": 1734944869903,
     "loginUrl": "",
     "respondTime": 1791,
     "ruleBookInfo": {
@@ -886,13 +1123,23 @@
       "chapterName": "tag.a@text",
       "chapterUrl": "tag.a@href"
     },
-    "searchUrl": "http://m.kanman.com/sort/all.html?cache=false&search_key={{key}}"
+    "searchUrl": "http://m.kanman.com/sort/all.html?cache=false&search_key={{key}}",
+    "weight": 0
   },
   {
+    "bookSourceComment": "",
+    "bookSourceGroup": "漫画源",
     "bookSourceName": "知音漫客",
     "bookSourceType": 2,
     "bookSourceUrl": "https://m.zymk.cn",
+    "customButton": false,
+    "customOrder": 712,
+    "enabled": true,
+    "enabledCookieJar": false,
+    "enabledExplore": true,
+    "eventListener": false,
     "exploreUrl": "热血::/sort/5_p{{page}}.html&&\n搞笑::/sort/6_p{{page}}.html&&\n玄幻::/sort/7_p{{page}}.html&&\n生活::/sort/8_p{{page}}.html&&\n恋爱::/sort/9_p{{page}}.html&&\n动作::/sort/10_p{{page}}.html&&\n科幻::/sort/11_p{{page}}.html&&\n战争::/sort/12_p{{page}}.html&&\n悬疑::/sort/13_p{{page}}.html&&\n恐怖::/sort/14_p{{page}}.html&&\n校园::/sort/15_p{{page}}.html&&\n历史::/sort/16_p{{page}}.html&&\n穿越::/sort/17_p{{page}}.html&&\n体育::/sort/19_p{{page}}.html&&\n都市::/sort/20_p{{page}}.html&&\n漫改::/sort/22_p{{page}}.html&&\n修真::/sort/53_p{{page}}.html&&\n霸总::/sort/62_p{{page}}.html&&\n古风::/sort/63_p{{page}}.html&&\n游戏::/sort/64_p{{page}}.html&&\n真人::/sort/65_p{{page}}.html&&\n武侠::/sort/66_p{{page}}.html&&",
+    "lastUpdateTime": 1734944913615,
     "respondTime": 2154,
     "ruleBookInfo": {
       "author": "class.author@text",
@@ -919,14 +1166,24 @@
       "chapterName": "text",
       "chapterUrl": "href"
     },
-    "searchUrl": "https://m.zymk.cn/sort/all.html?key={{key}}"
+    "searchUrl": "https://m.zymk.cn/sort/all.html?key={{key}}",
+    "weight": 0
   },
   {
+    "bookSourceComment": "// Error: 搜索失效",
+    "bookSourceGroup": "漫画源",
     "bookSourceName": "永远漫画（优）",
     "bookSourceType": 2,
     "bookSourceUrl": "https://www.yydsmh.com/",
+    "customButton": false,
+    "customOrder": 713,
+    "enabled": true,
+    "enabledCookieJar": true,
+    "enabledExplore": true,
+    "eventListener": false,
     "exploreUrl": "[\n{\"title\":\"𓆡𓆝𓆟地ོ区ོ​​𓆟𓆜𓆞\",\"url\":\"\",\"style\":\n{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":1}},\n\n\n{\"title\":\"🥣日漫\",\"url\":'https://www.yydsmh.com/api/comic/index/lists,{\"body\":\"area=9&tags=日漫&full=3&page={{page}}\",\"method\":\"POST\"}',\n\"style\":{\"layout_flexGrow\":1,\n\"layout_flexBasisPercent\":0.25}},\n\n{\"title\":\"🥣港台\",\"url\":'https://www.yydsmh.com/api/comic/index/lists,{\"body\":\"area=9&tags=港台&full=3&page={{page}}\",\"method\":\"POST\"}',\n\"style\":{\"layout_flexGrow\":1,\n\"layout_flexBasisPercent\":0.25}},\n\n{\"title\":\"🥣美漫\",\"url\":'https://www.yydsmh.com/api/comic/index/lists,{\"body\":\"area=9&tags=美漫&full=3&page={{page}}\",\"method\":\"POST\"}',\n\"style\":{\"layout_flexGrow\":1,\n\"layout_flexBasisPercent\":0.25}},\n\n{\"title\":\"🥣国漫\",\"url\":'https://www.yydsmh.com/api/comic/index/lists,{\"body\":\"area=9&tags=国漫&full=3&page={{page}}\",\"method\":\"POST\"}',\n\"style\":{\"layout_flexGrow\":1,\n\"layout_flexBasisPercent\":0.25}},\n\n{\"title\":\"🥣韩漫\",\"url\":'https://www.yydsmh.com/api/comic/index/lists,{\"body\":\"area=9&tags=韩漫&full=3&page={{page}}\",\"method\":\"POST\"}',\n\"style\":{\"layout_flexGrow\":1,\n\"layout_flexBasisPercent\":0.25}},\n\n\n{\"title\":\"𓆡𓆝𓆟进ོ度ོ​​𓆟𓆜𓆞\",\"url\":\"\",\"style\":\n{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":1}},\n\n\n{\"title\":\"🥣连载中\",\"url\":'https://www.yydsmh.com/api/comic/index/lists,{\"body\":\"area=9&tags=连载中&full=3&page={{page}}\",\"method\":\"POST\"}',\n\"style\":{\"layout_flexGrow\":1,\n\"layout_flexBasisPercent\":0.4}},\n\n{\"title\":\"🥣已完结\",\"url\":'https://www.yydsmh.com/api/comic/index/lists,{\"body\":\"area=9&tags=已完结&full=3&page={{page}}\",\"method\":\"POST\"}',\n\"style\":{\"layout_flexGrow\":1,\n\"layout_flexBasisPercent\":0.4}},\n\n\n{\"title\":\"𓆡𓆝𓆟喜ོ好ོ​​𓆟𓆜𓆞\",\"url\":\"\",\"style\":\n{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":1}},\n\n\n{\"title\":\"💫全部🥣\",\"url\":'https://www.yydsmh.com/api/comic/index/lists,{\"body\":\"area=9&tags=全部&full=3&page={{page}}\",\"method\":\"POST\"}',\n\"style\":{\"layout_flexGrow\":1,\n\"layout_flexBasisPercent\":1}},\n\n{\"title\":\"🥣大女主\",\"url\":'https://www.yydsmh.com/api/comic/index/lists,{\"body\":\"area=9&tags=大女主&full=3&page={{page}}\",\"method\":\"POST\"}',\n\"style\":{\"layout_flexGrow\":1,\n\"layout_flexBasisPercent\":1}},\n\n{\"title\":\"🥣性转换\",\"url\":'https://www.yydsmh.com/api/comic/index/lists,{\"body\":\"area=9&tags=性转换&full=3&page={{page}}\",\"method\":\"POST\"}',\n\"style\":{\"layout_flexGrow\":1,\n\"layout_flexBasisPercent\":0.4}},\n\n{\"title\":\"🥣异世界\",\"url\":'https://www.yydsmh.com/api/comic/index/lists,{\"body\":\"area=9&tags=异世界&full=3&page={{page}}\",\"method\":\"POST\"}',\n\"style\":{\"layout_flexGrow\":1,\n\"layout_flexBasisPercent\":0.4}},\n\n{\"title\":\"🥣轻小说\",\"url\":'https://www.yydsmh.com/api/comic/index/lists,{\"body\":\"area=9&tags=轻小说&full=3&page={{page}}\",\"method\":\"POST\"}',\n\"style\":{\"layout_flexGrow\":1,\n\"layout_flexBasisPercent\":0.4}},\n\n{\"title\":\"🥣欢乐向\",\"url\":'https://www.yydsmh.com/api/comic/index/lists,{\"body\":\"area=9&tags=欢乐向&full=3&page={{page}}\",\"method\":\"POST\"}',\n\"style\":{\"layout_flexGrow\":1,\n\"layout_flexBasisPercent\":0.4}},\n\n{\"title\":\"💫热血₯\",\"url\":'https://www.yydsmh.com/api/comic/index/lists,{\"body\":\"area=9&tags=热血&full=3&page={{page}}\",\"method\":\"POST\"}',\n\"style\":{\"layout_flexGrow\":1,\n\"layout_flexBasisPercent\":0.25}},\n\n{\"title\":\"💫长条₯\",\"url\":'https://www.yydsmh.com/api/comic/index/lists,{\"body\":\"area=9&tags=长条&full=3&page={{page}}\",\"method\":\"POST\"}',\n\"style\":{\"layout_flexGrow\":1,\n\"layout_flexBasisPercent\":0.25}},\n\n{\"title\":\"💫百合₯\",\"url\":'https://www.yydsmh.com/api/comic/index/lists,{\"body\":\"area=9&tags=百合&full=3&page={{page}}\",\"method\":\"POST\"}',\n\"style\":{\"layout_flexGrow\":1,\n\"layout_flexBasisPercent\":0.25}},\n\n{\"title\":\"💫耽美₯\",\"url\":'https://www.yydsmh.com/api/comic/index/lists,{\"body\":\"area=9&tags=耽美&full=3&page={{page}}\",\"method\":\"POST\"}',\n\"style\":{\"layout_flexGrow\":1,\n\"layout_flexBasisPercent\":0.25}},\n\n{\"title\":\"💫纯爱₯\",\"url\":'https://www.yydsmh.com/api/comic/index/lists,{\"body\":\"area=9&tags=纯爱&full=3&page={{page}}\",\"method\":\"POST\"}',\n\"style\":{\"layout_flexGrow\":1,\n\"layout_flexBasisPercent\":0.25}},\n\n{\"title\":\"💫后宫₯\",\"url\":'https://www.yydsmh.com/api/comic/index/lists,{\"body\":\"area=9&tags=后宫&full=3&page={{page}}\",\"method\":\"POST\"}',\n\"style\":{\"layout_flexGrow\":1,\n\"layout_flexBasisPercent\":0.25}},\n\n{\"title\":\"💫韩漫₯\",\"url\":'https://www.yydsmh.com/api/comic/index/lists,{\"body\":\"area=9&tags=韩漫&full=3&page={{page}}\",\"method\":\"POST\"}',\n\"style\":{\"layout_flexGrow\":1,\n\"layout_flexBasisPercent\":0.25}},\n\n{\"title\":\"💫奇幻₯\",\"url\":'https://www.yydsmh.com/api/comic/index/lists,{\"body\":\"area=9&tags=奇幻&full=3&page={{page}}\",\"method\":\"POST\"}',\n\"style\":{\"layout_flexGrow\":1,\n\"layout_flexBasisPercent\":0.25}},\n\n{\"title\":\"💫生活₯\",\"url\":'https://www.yydsmh.com/api/comic/index/lists,{\"body\":\"area=9&tags=生活&full=3&page={{page}}\",\"method\":\"POST\"}',\n\"style\":{\"layout_flexGrow\":1,\n\"layout_flexBasisPercent\":0.25}},\n\n{\"title\":\"💫悬疑₯\",\"url\":'https://www.yydsmh.com/api/comic/index/lists,{\"body\":\"area=9&tags=悬疑&full=3&page={{page}}\",\"method\":\"POST\"}',\n\"style\":{\"layout_flexGrow\":1,\n\"layout_flexBasisPercent\":0.25}},\n\n{\"title\":\"💫格斗₯\",\"url\":'https://www.yydsmh.com/api/comic/index/lists,{\"body\":\"area=9&tags=搞笑&full=3&page={{page}}\",\"method\":\"POST\"}',\n\"style\":{\"layout_flexGrow\":1,\n\"layout_flexBasisPercent\":0.25}},\n\n{\"title\":\"💫搞笑₯\",\"url\":'https://www.yydsmh.com/api/comic/index/lists,{\"body\":\"area=9&tags=搞笑&full=3&page={{page}}\",\"method\":\"POST\"}',\n\"style\":{\"layout_flexGrow\":1,\n\"layout_flexBasisPercent\":0.25}},\n\n{\"title\":\"💫伪娘₯\",\"url\":'https://www.yydsmh.com/api/comic/index/lists,{\"body\":\"area=9&tags=伪娘&full=3&page={{page}}\",\"method\":\"POST\"}',\n\"style\":{\"layout_flexGrow\":1,\n\"layout_flexBasisPercent\":0.25}},\n\n{\"title\":\"💫竞技⚡︎\",\"url\":'https://www.yydsmh.com/api/comic/index/lists,{\"body\":\"area=9&tags=竞技&full=3&page={{page}}\",\"method\":\"POST\"}',\n\"style\":{\"layout_flexGrow\":1,\n\"layout_flexBasisPercent\":0.25}},\n\n{\"title\":\"💫职场⚡︎\",\"url\":'https://www.yydsmh.com/api/comic/index/lists,{\"body\":\"area=9&tags=职场&full=3&page={{page}}\",\"method\":\"POST\"}',\n\"style\":{\"layout_flexGrow\":1,\n\"layout_flexBasisPercent\":0.25}},\n\n{\"title\":\"💫萌系⚡︎\",\"url\":'https://www.yydsmh.com/api/comic/index/lists,{\"body\":\"area=9&tags=萌系&full=3&page={{page}}\",\"method\":\"POST\"}',\n\"style\":{\"layout_flexGrow\":1,\n\"layout_flexBasisPercent\":0.25}},\n\n{\"title\":\"💫冒险⚡︎\",\"url\":'https://www.yydsmh.com/api/comic/index/lists,{\"body\":\"area=9&tags=冒险&full=3&page={{page}}\",\"method\":\"POST\"}',\n\"style\":{\"layout_flexGrow\":1,\n\"layout_flexBasisPercent\":0.25}},\n\n{\"title\":\"💫治愈⚡︎\",\"url\":'https://www.yydsmh.com/api/comic/index/lists,{\"body\":\"area=9&tags=治愈&full=3&page={{page}}\",\"method\":\"POST\"}',\n\"style\":{\"layout_flexGrow\":1,\n\"layout_flexBasisPercent\":0.25}},\n\n{\"title\":\"💫都市⚡︎\",\"url\":'https://www.yydsmh.com/api/comic/index/lists,{\"body\":\"area=9&tags=都市&full=3&page={{page}}\",\"method\":\"POST\"}',\n\"style\":{\"layout_flexGrow\":1,\n\"layout_flexBasisPercent\":0.25}},\n\n{\"title\":\"💫霸总⚡︎\",\"url\":'https://www.yydsmh.com/api/comic/index/lists,{\"body\":\"area=9&tags=霸总&full=3&page={{page}}\",\"method\":\"POST\"}',\n\"style\":{\"layout_flexGrow\":1,\n\"layout_flexBasisPercent\":0.25}},\n\n{\"title\":\"💫神鬼⚡︎\",\"url\":'https://www.yydsmh.com/api/comic/index/lists,{\"body\":\"area=9&tags=神鬼&full=3&page={{page}}\",\"method\":\"POST\"}',\n\"style\":{\"layout_flexGrow\":1,\n\"layout_flexBasisPercent\":0.25}},\n\n{\"title\":\"💫侦探⚡︎\",\"url\":'https://www.yydsmh.com/api/comic/index/lists,{\"body\":\"area=9&tags=侦探&full=3&page={{page}}\",\"method\":\"POST\"}',\n\"style\":{\"layout_flexGrow\":1,\n\"layout_flexBasisPercent\":0.25}},\n\n{\"title\":\"💫爱情⚡︎\",\"url\":'https://www.yydsmh.com/api/comic/index/lists,{\"body\":\"area=9&tags=爱情&full=3&page={{page}}\",\"method\":\"POST\"}',\n\"style\":{\"layout_flexGrow\":1,\n\"layout_flexBasisPercent\":0.25}},\n\n{\"title\":\"💫古风⚡︎\",\"url\":'https://www.yydsmh.com/api/comic/index/lists,{\"body\":\"area=9&tags=古风&full=3&page={{page}}\",\"method\":\"POST\"}',\n\"style\":{\"layout_flexGrow\":1,\n\"layout_flexBasisPercent\":0.25}},\n\n{\"title\":\"💫科幻⚡︎\",\"url\":'https://www.yydsmh.com/api/comic/index/lists,{\"body\":\"area=9&tags=科幻&full=3&page={{page}}\",\"method\":\"POST\"}',\n\"style\":{\"layout_flexGrow\":1,\n\"layout_flexBasisPercent\":0.25}},\n\n{\"title\":\"💫穿越⚡︎\",\"url\":'https://www.yydsmh.com/api/comic/index/lists,{\"body\":\"area=9&tags=穿越&full=3&page={{page}}\",\"method\":\"POST\"}',\n\"style\":{\"layout_flexGrow\":1,\n\"layout_flexBasisPercent\":0.25}},\n\n{\"title\":\"💫校园⚡︎\",\"url\":'https://www.yydsmh.com/api/comic/index/lists,{\"body\":\"area=9&tags=校园&full=3&page={{page}}\",\"method\":\"POST\"}',\n\"style\":{\"layout_flexGrow\":1,\n\"layout_flexBasisPercent\":0.25}},\n\n{\"title\":\"💫美食⚡︎\",\"url\":'https://www.yydsmh.com/api/comic/index/lists,{\"body\":\"area=9&tags=美食&full=3&page={{page}}\",\"method\":\"POST\"}',\n\"style\":{\"layout_flexGrow\":1,\n\"layout_flexBasisPercent\":0.25}},\n\n{\"title\":\"💫剧情⚡︎\",\"url\":'https://www.yydsmh.com/api/comic/index/lists,{\"body\":\"area=9&tags=剧情&full=3&page={{page}}\",\"method\":\"POST\"}',\n\"style\":{\"layout_flexGrow\":1,\n\"layout_flexBasisPercent\":0.25}},\n\n{\"title\":\"💫节操⚡︎\",\"url\":'https://www.yydsmh.com/api/comic/index/lists,{\"body\":\"area=9&tags=节操&full=3&page={{page}}\",\"method\":\"POST\"}',\n\"style\":{\"layout_flexGrow\":1,\n\"layout_flexBasisPercent\":0.25}},\n\n{\"title\":\"💫励志⚡︎\",\"url\":'https://www.yydsmh.com/api/comic/index/lists,{\"body\":\"area=9&tags=励志&full=3&page={{page}}\",\"method\":\"POST\"}',\n\"style\":{\"layout_flexGrow\":1,\n\"layout_flexBasisPercent\":0.25}},\n\n{\"title\":\"💫历史⚡︎\",\"url\":'https://www.yydsmh.com/api/comic/index/lists,{\"body\":\"area=9&tags=历史&full=3&page={{page}}\",\"method\":\"POST\"}',\n\"style\":{\"layout_flexGrow\":1,\n\"layout_flexBasisPercent\":0.25}},\n\n{\"title\":\"💫战争⚡︎\",\"url\":'https://www.yydsmh.com/api/comic/index/lists,{\"body\":\"area=9&tags=战争&full=3&page={{page}}\",\"method\":\"POST\"}',\n\"style\":{\"layout_flexGrow\":1,\n\"layout_flexBasisPercent\":0.25}},\n\n{\"title\":\"💫恐怖⚡︎\",\"url\":'https://www.yydsmh.com/api/comic/index/lists,{\"body\":\"area=9&tags=恐怖&full=3&page={{page}}\",\"method\":\"POST\"}',\n\"style\":{\"layout_flexGrow\":1,\n\"layout_flexBasisPercent\":0.25}}\n]",
     "header": "{\n\t\"User-Agent\": \"Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/116.0.0.0 Mobile Safari/537.36\"\n}",
+    "lastUpdateTime": 1766136161837,
     "respondTime": 3015,
     "ruleBookInfo": {
       "author": "#detail > div > div.book-name > h1 > span@text",
@@ -960,13 +1217,22 @@
       "chapterName": "a@text\n@js:\na=\"🥣\"+result",
       "chapterUrl": "a@href"
     },
-    "searchUrl": "{{cookie.removeCookie(source.getKey())}}\nhttps://www.yydsmh.com/search?searchkey={{key}}"
+    "searchUrl": "{{cookie.removeCookie(source.getKey())}}\nhttps://www.yydsmh.com/search?searchkey={{key}}",
+    "weight": 0
   },
   {
+    "bookSourceGroup": "漫画源",
     "bookSourceName": "全免漫画（优）",
     "bookSourceType": 2,
     "bookSourceUrl": "https://api-cdn.kaimanhua.com",
+    "customButton": false,
+    "customOrder": 714,
+    "enabled": true,
+    "enabledCookieJar": true,
+    "enabledExplore": true,
+    "eventListener": false,
     "exploreUrl": "<js>\nresult=\"\";\n   f=[\"热血\",\"机战\",\"运动\",\"推理\",\"冒险\",\"耿美\",\"百合\",\"搞笑\",\"战争\",\"神魔\",\"忍者\",\"竞技\",\"悬疑\",\"社会\",\"恋爱\",\"宠物\",\"吸血\",\"萝莉\",\"后宫\",\"御姐\",\"霸总\",\"玄幻\",\"古风\",\"历史\",\"漫改\",\"游戏\",\"穿越\",\"恐怖\",\"真人\",\"科幻\",\"防疫\",\"都市\",\"武侠\",\"修真\",\"生活\",\"动作\"];    \np=[\"rexue\",\"jizhan\",\"yundong\",\"tuili\",\"maoxian\",\"liaomei\",\"baihe\",\"gaoxiao\",\"zhanzhen\",\"shenmo\",\"renzhe\",\"jingji\",\"xuanyi\",\"shehui\",\"lianai\",\"chongwu\",\"xixue\",\"luoli\",\"hougong\",\"yujie\",\"bazong\",\"xuanhuan\",\"gufeng\",\"lishi\",\"mangai\",\"youxi\",\"chuanyue\",\"kongbu\",\"zhenren\",\"kehuan\",\"fangyi\",\"dushi\",\"wuxia\",\"xiuzhen\",\"shenghuo\",\"dongzuo\"];\na=\"::https://api-cdn.kaimanhua.com/comic-api/v1/comic/getsortlist?status_id=0&comic_sort=\";\nb=\"&human_type=0&orderby=date&pagesize=30&page={{page}}&young_mode=0&client-type=android&productname=qmmh&client-channel=xiaomi&platformname=android&client-version=1.4.8\";\n\nfor(i in f){\n\tresult=result+f[i]+a+p[i]+b+\"\\n\";\n\t}\n</js>",
+    "lastUpdateTime": 1759429756100,
     "respondTime": 1878,
     "ruleBookInfo": {
       "author": "$.author_name",
@@ -996,13 +1262,22 @@
       "chapterName": "$.chapter_name",
       "chapterUrl": "@js:\ncid='@get:{cid}'\nchapter_id='{{$.chapter_id}}'\nt=\"/comic-api/v2/comic/getchapterdatacomic_id=\"+cid+\"&chapter_id=\"+chapter_id+\"&quality=middle&client-type=android&productname=qmmh&client-channel=xiaomi&platformname=android&client-version=1.4.8erciyuan2020\";\nsign=java.md5Encode(t);\nb={\n\"method\": \"GET\",\n\"headers\": {\n\"User-Agent\": \"okhttp/4.9.1\",\n\"access-token\":\"v1_090fNTIt4Omg86B7LUPcqWRTkvW8JjjLYXTxnm01BiXN8SgniETjucYezOrjZoOopFGr02Fj12RREysE4eHukTCc/LuyeIHzFGMayAgLGaSF8+jMMwrnDdTuYdFk34z7DZf+Zy+VHtjFS0Uy6n6Vyr/5GuJy6FDcbCoVBCjdbFneHjV38UwHjL6AwauUMFfa0f3uSEqGWZG6xn9+OpAn6GGRWHaypicXswr450DO29FcuqP7pHCSldVJtIzOv/Uc\",\n\"m-request-id\": sign\n}\n};\n\"https://api-cdn.kaimanhua.com/comic-api/v2/comic/getchapterdata?comic_id=@get:{cid}&chapter_id={{$.chapter_id}}&quality=middle&client-type=android&productname=qmmh&client-channel=xiaomi&platformname=android&client-version=1.4.8,\"+JSON.stringify(b);"
     },
-    "searchUrl": "https://api-cdn.kaimanhua.com/comic-api/v1/comic/getsortlist?search_key={{key}}&orderby=shoucang&page={{page}}&pagesize=20&young_mode=0&client-type=android&productname=qmmh&client-channel=xiaomi&platformname=android&client-version=1.4.8"
+    "searchUrl": "https://api-cdn.kaimanhua.com/comic-api/v1/comic/getsortlist?search_key={{key}}&orderby=shoucang&page={{page}}&pagesize=20&young_mode=0&client-type=android&productname=qmmh&client-channel=xiaomi&platformname=android&client-version=1.4.8",
+    "weight": 0
   },
   {
+    "bookSourceGroup": "漫画源",
     "bookSourceName": "爱优漫吧（优+）",
     "bookSourceType": 2,
     "bookSourceUrl": "https://m.iyouman.com",
+    "customButton": false,
+    "customOrder": 715,
+    "enabled": true,
+    "enabledCookieJar": true,
+    "enabledExplore": true,
+    "eventListener": false,
     "exploreUrl": "每日更新::https://m.iyouman.com/api/updatelist/?productname=aym&platformname=wap\n综合榜::https://m.iyouman.com/api/getRankDataForWeb/?product_id=2&isalldata=0&time_type=total&sort_type=all&rank_type=heat&page={{page}}&productname=aym&platformname=wap\n自制榜::https://m.iyouman.com/api/getRankDataForWeb/?product_id=2&isalldata=0&time_type=total&sort_type=self&rank_type=heat&page={{page}}&productname=aym&platformname=wap\n少年榜::https://m.iyouman.com/api/getRankDataForWeb/?product_id=2&isalldata=0&time_type=total&sort_type=boy&rank_type=heat&page={{page}}&productname=aym&platformname=wap\n少女榜::https://m.iyouman.com/api/getRankDataForWeb/?product_id=2&isalldata=0&time_type=total&sort_type=girl&rank_type=heat&page={{page}}&productname=aym&platformname=wap\n新作榜::https://m.iyouman.com/api/getRankDataForWeb/?product_id=2&isalldata=0&time_type=total&sort_type=new&rank_type=heat&page={{page}}&productname=aym&platformname=wap\n黑马榜::https://m.iyouman.com/api/getRankDataForWeb/?product_id=2&isalldata=0&time_type=total&sort_type=dark&rank_type=heat&page={{page}}&productname=aym&platformname=wap\n付费榜::https://m.iyouman.com/api/getRankDataForWeb/?product_id=2&isalldata=0&time_type=total&sort_type=charge&rank_type=heat&page={{page}}&productname=aym&platformname=wap\n免费榜::https://m.iyouman.com/api/getRankDataForWeb/?product_id=2&isalldata=0&time_type=total&sort_type=free&rank_type=heat&page={{page}}&productname=aym&platformname=wap\n完结榜::https://m.iyouman.com/api/getRankDataForWeb/?product_id=2&isalldata=0&time_type=total&sort_type=finish&rank_type=heat&page={{page}}&productname=aym&platformname=wap\n连载榜::https://m.iyouman.com/api/getRankDataForWeb/?product_id=2&isalldata=0&time_type=total&sort_type=serialize&rank_type=heat&page={{page}}&productname=aym&platformname=wap\n人气::https://m.iyouman.com/api/getsortlist/?comic_sort=&orderby=click&search_type=&search_key=&page={{page}}&size=30&productname=aym&platformname=wap\n更新::https://m.iyouman.com/api/getsortlist/?comic_sort=&orderby=date&search_type=&search_key=&page={{page}}&size=30&productname=aym&platformname=wap\n评分::https://m.iyouman.com/api/getsortlist/?comic_sort=&orderby=score&search_type=&search_key=&page={{page}}&size=30&productname=aym&platformname=wap\n收藏::https://m.iyouman.com/api/getsortlist/?comic_sort=&orderby=shoucang&search_type=&search_key=&page={{page}}&size=30&productname=aym&platformname=wap\n连载::https://m.iyouman.com/api/getsortlist/?comic_sort=lianzai&orderby=&search_type=&search_key=&page={{page}}&size=30&productname=aym&platformname=wap\n完结::https://m.iyouman.com/api/getsortlist/?comic_sort=wanjie&orderby=&search_type=&search_key=&page={{page}}&size=30&productname=aym&platformname=wap\n热血::https://m.iyouman.com/api/getsortlist/?comic_sort=rexue&orderby=&search_type=&search_key=&page={{page}}&size=30&productname=aym&platformname=wap\n机战::https://m.iyouman.com/api/getsortlist/?comic_sort=jizhan&orderby=&search_type=&search_key=&page={{page}}&size=30&productname=aym&platformname=wap\n运动::https://m.iyouman.com/api/getsortlist/?comic_sort=yundong&orderby=&search_type=&search_key=&page={{page}}&size=30&productname=aym&platformname=wap\n推理::https://m.iyouman.com/api/getsortlist/?comic_sort=tuili&orderby=&search_type=&search_key=&page={{page}}&size=30&productname=aym&platformname=wap\n冒险::https://m.iyouman.com/api/getsortlist/?comic_sort=maoxian&orderby=&search_type=&search_key=&page={{page}}&size=30&productname=aym&platformname=wap\n耽美::https://m.iyouman.com/api/getsortlist/?comic_sort=liaomei&orderby=&search_type=&search_key=&page={{page}}&size=30&productname=aym&platformname=wap\n百合::https://m.iyouman.com/api/getsortlist/?comic_sort=baihe&orderby=&search_type=&search_key=&page={{page}}&size=30&productname=aym&platformname=wap\n搞笑::https://m.iyouman.com/api/getsortlist/?comic_sort=gaoxiao&orderby=&search_type=&search_key=&page={{page}}&size=30&productname=aym&platformname=wap\n战争::https://m.iyouman.com/api/getsortlist/?comic_sort=zhanzhen&orderby=&search_type=&search_key=&page={{page}}&size=30&productname=aym&platformname=wap\n神魔::https://m.iyouman.com/api/getsortlist/?comic_sort=shenmo&orderby=&search_type=&search_key=&page={{page}}&size=30&productname=aym&platformname=wap\n忍者::https://m.iyouman.com/api/getsortlist/?comic_sort=renzhe&orderby=&search_type=&search_key=&page={{page}}&size=30&productname=aym&platformname=wap\n竞技::https://m.iyouman.com/api/getsortlist/?comic_sort=jingji&orderby=&search_type=&search_key=&page={{page}}&size=30&productname=aym&platformname=wap\n悬疑::https://m.iyouman.com/api/getsortlist/?comic_sort=xuanyi&orderby=&search_type=&search_key=&page={{page}}&size=30&productname=aym&platformname=wap\n社会::https://m.iyouman.com/api/getsortlist/?comic_sort=shehui&orderby=&search_type=&search_key=&page={{page}}&size=30&productname=aym&platformname=wap\n恋爱::https://m.iyouman.com/api/getsortlist/?comic_sort=lianai&orderby=&search_type=&search_key=&page={{page}}&size=30&productname=aym&platformname=wap\n宠物::https://m.iyouman.com/api/getsortlist/?comic_sort=chongwu&orderby=&search_type=&search_key=&page={{page}}&size=30&productname=aym&platformname=wap\n吸血::https://m.iyouman.com/api/getsortlist/?comic_sort=xixue&orderby=&search_type=&search_key=&page={{page}}&size=30&productname=aym&platformname=wap\n萝莉::https://m.iyouman.com/api/getsortlist/?comic_sort=luoli&orderby=&search_type=&search_key=&page={{page}}&size=30&productname=aym&platformname=wap\n后宫::https://m.iyouman.com/api/getsortlist/?comic_sort=hougong&orderby=&search_type=&search_key=&page={{page}}&size=30&productname=aym&platformname=wap\n御姐::https://m.iyouman.com/api/getsortlist/?comic_sort=yujie&orderby=&search_type=&search_key=&page={{page}}&size=30&productname=aym&platformname=wap\n霸总::https://m.iyouman.com/api/getsortlist/?comic_sort=bazong&orderby=&search_type=&search_key=&page={{page}}&size=30&productname=aym&platformname=wap\n玄幻::https://m.iyouman.com/api/getsortlist/?comic_sort=xuanhuan&orderby=&search_type=&search_key=&page={{page}}&size=30&productname=aym&platformname=wap\n古风::https://m.iyouman.com/api/getsortlist/?comic_sort=gufeng&orderby=&search_type=&search_key=&page={{page}}&size=30&productname=aym&platformname=wap\n历史::https://m.iyouman.com/api/getsortlist/?comic_sort=lishi&orderby=&search_type=&search_key=&page={{page}}&size=30&productname=aym&platformname=wap\n漫改::https://m.iyouman.com/api/getsortlist/?comic_sort=mangai&orderby=&search_type=&search_key=&page={{page}}&size=30&productname=aym&platformname=wap\n游戏::https://m.iyouman.com/api/getsortlist/?comic_sort=youxi&orderby=&search_type=&search_key=&page={{page}}&size=30&productname=aym&platformname=wap\n穿越::https://m.iyouman.com/api/getsortlist/?comic_sort=chuanyue&orderby=&search_type=&search_key=&page={{page}}&size=30&productname=aym&platformname=wap\n恐怖::https://m.iyouman.com/api/getsortlist/?comic_sort=kongbu&orderby=&search_type=&search_key=&page={{page}}&size=30&productname=aym&platformname=wap\n真人::https://m.iyouman.com/api/getsortlist/?comic_sort=zhenren&orderby=&search_type=&search_key=&page={{page}}&size=30&productname=aym&platformname=wap\n防疫::https://m.iyouman.com/api/getsortlist/?comic_sort=fangyi&orderby=&search_type=&search_key=&page={{page}}&size=30&productname=aym&platformname=wap\n防疫::https://m.iyouman.com/api/getsortlist/?comic_sort=fangyi&orderby=&search_type=&search_key=&page={{page}}&size=30&productname=aym&platformname=wap\n科幻::https://m.iyouman.com/api/getsortlist/?comic_sort=kehuan&orderby=&search_type=&search_key=&page={{page}}&size=30&productname=aym&platformname=wap\n都市::https://m.iyouman.com/api/getsortlist/?comic_sort=dushi&orderby=&search_type=&search_key=&page={{page}}&size=30&productname=aym&platformname=wap\n武侠::https://m.iyouman.com/api/getsortlist/?comic_sort=wuxia&orderby=&search_type=&search_key=&page={{page}}&size=30&productname=aym&platformname=wap\n修真::https://m.iyouman.com/api/getsortlist/?comic_sort=xiuzhen&orderby=&search_type=&search_key=&page={{page}}&size=30&productname=aym&platformname=wap\n生活::https://m.iyouman.com/api/getsortlist/?comic_sort=shenghuo&orderby=&search_type=&search_key=&page={{page}}&size=30&productname=aym&platformname=wap\n动作::https://m.iyouman.com/api/getsortlist/?comic_sort=dongzuo&orderby=&search_type=&search_key=&page={{page}}&size=30&productname=aym&platformname=wap\n大陆::https://m.iyouman.com/api/getsortlist/?comic_sort=dalu&orderby=&search_type=&search_key=&page={{page}}&size=30&productname=aym&platformname=wap\n日本::https://m.iyouman.com/api/getsortlist/?comic_sort=riben&orderby=&search_type=&search_key=&page={{page}}&size=30&productname=aym&platformname=wap\n港台::https://m.iyouman.com/api/getsortlist/?comic_sort=gangtai&orderby=&search_type=&search_key=&page={{page}}&size=30&productname=aym&platformname=wap\n欧美::https://m.iyouman.com/api/getsortlist/?comic_sort=oumei&orderby=&search_type=&search_key=&page={{page}}&size=30&productname=aym&platformname=wap\n韩国::https://m.iyouman.com/api/getsortlist/?comic_sort=os&orderby=&search_type=&search_key=&page={{page}}&size=30&productname=aym&platformname=wap\n全彩::https://m.iyouman.com/api/getsortlist/?comic_sort=quancai&orderby=&search_type=&search_key=&page={{page}}&size=30&productname=aym&platformname=wap\n黑白::https://m.iyouman.com/api/getsortlist/?comic_sort=heibai&orderby=&search_type=&search_key=&page={{page}}&size=30&productname=aym&platformname=wap\n小说::https://m.iyouman.com/api/getsortlist/?comic_sort=xiaoshuo&orderby=&search_type=&search_key=&page={{page}}&size=30&productname=aym&platformname=wap\n杂志::https://m.iyouman.com/api/getsortlist/?comic_sort=zazhi&orderby=&search_type=&search_key=&page={{page}}&size=30&productname=aym&platformname=wap\n日更::https://m.iyouman.com/api/getsortlist/?comic_sort=rigeng&orderby=&search_type=&search_key=&page={{page}}&size=30&productname=aym&platformname=wap\n新作::https://m.iyouman.com/api/getsortlist/?comic_sort=xinzuo&orderby=&search_type=&search_key=&page={{page}}&size=30&productname=aym&platformname=wap\n精品::https://m.iyouman.com/api/getsortlist/?comic_sort=jingpin&orderby=&search_type=&search_key=&page={{page}}&size=30&productname=aym&platformname=wap",
+    "lastUpdateTime": 1759291916622,
     "respondTime": 1228,
     "ruleBookInfo": {
       "author": "$.data.comic_author",
@@ -1032,13 +1307,22 @@
       "chapterName": "$.chapter_name@put:{chapter_id:$.chapter_id}",
       "chapterUrl": "https://m.iyouman.com/api/getchapterinfov2?product_id=4&productname=aym&platformname=wap&comic_id=@get:{comic_id}&chapter_newid={{$.chapter_newid}}&isWebp=1&quality=low"
     },
-    "searchUrl": "https://m.iyouman.com/api/getsortlist/?search_type=&search_key={{key}}&page={{page}}&size=30&productname=aym&platformname=wap"
+    "searchUrl": "https://m.iyouman.com/api/getsortlist/?search_type=&search_key={{key}}&page={{page}}&size=30&productname=aym&platformname=wap",
+    "weight": 0
   },
   {
+    "bookSourceGroup": "漫画源",
     "bookSourceName": "爱优漫吧（优+）",
     "bookSourceType": 2,
     "bookSourceUrl": "https://m.iyouman.com/",
+    "customButton": false,
+    "customOrder": 716,
+    "enabled": true,
+    "enabledCookieJar": false,
+    "enabledExplore": true,
+    "eventListener": false,
     "exploreUrl": "每日更新::https://m.iyouman.com/api/updatelist/?productname=aym&platformname=wap\n综合榜::https://m.iyouman.com/api/getRankDataForWeb/?product_id=2&isalldata=0&time_type=total&sort_type=all&rank_type=heat&page={{page}}&productname=aym&platformname=wap\n自制榜::https://m.iyouman.com/api/getRankDataForWeb/?product_id=2&isalldata=0&time_type=total&sort_type=self&rank_type=heat&page={{page}}&productname=aym&platformname=wap\n少年榜::https://m.iyouman.com/api/getRankDataForWeb/?product_id=2&isalldata=0&time_type=total&sort_type=boy&rank_type=heat&page={{page}}&productname=aym&platformname=wap\n少女榜::https://m.iyouman.com/api/getRankDataForWeb/?product_id=2&isalldata=0&time_type=total&sort_type=girl&rank_type=heat&page={{page}}&productname=aym&platformname=wap\n新作榜::https://m.iyouman.com/api/getRankDataForWeb/?product_id=2&isalldata=0&time_type=total&sort_type=new&rank_type=heat&page={{page}}&productname=aym&platformname=wap\n黑马榜::https://m.iyouman.com/api/getRankDataForWeb/?product_id=2&isalldata=0&time_type=total&sort_type=dark&rank_type=heat&page={{page}}&productname=aym&platformname=wap\n付费榜::https://m.iyouman.com/api/getRankDataForWeb/?product_id=2&isalldata=0&time_type=total&sort_type=charge&rank_type=heat&page={{page}}&productname=aym&platformname=wap\n免费榜::https://m.iyouman.com/api/getRankDataForWeb/?product_id=2&isalldata=0&time_type=total&sort_type=free&rank_type=heat&page={{page}}&productname=aym&platformname=wap\n完结榜::https://m.iyouman.com/api/getRankDataForWeb/?product_id=2&isalldata=0&time_type=total&sort_type=finish&rank_type=heat&page={{page}}&productname=aym&platformname=wap\n连载榜::https://m.iyouman.com/api/getRankDataForWeb/?product_id=2&isalldata=0&time_type=total&sort_type=serialize&rank_type=heat&page={{page}}&productname=aym&platformname=wap\n人气::https://m.iyouman.com/api/getsortlist/?comic_sort=&orderby=click&search_type=&search_key=&page={{page}}&size=30&productname=aym&platformname=wap\n更新::https://m.iyouman.com/api/getsortlist/?comic_sort=&orderby=date&search_type=&search_key=&page={{page}}&size=30&productname=aym&platformname=wap\n评分::https://m.iyouman.com/api/getsortlist/?comic_sort=&orderby=score&search_type=&search_key=&page={{page}}&size=30&productname=aym&platformname=wap\n收藏::https://m.iyouman.com/api/getsortlist/?comic_sort=&orderby=shoucang&search_type=&search_key=&page={{page}}&size=30&productname=aym&platformname=wap\n连载::https://m.iyouman.com/api/getsortlist/?comic_sort=lianzai&orderby=&search_type=&search_key=&page={{page}}&size=30&productname=aym&platformname=wap\n完结::https://m.iyouman.com/api/getsortlist/?comic_sort=wanjie&orderby=&search_type=&search_key=&page={{page}}&size=30&productname=aym&platformname=wap\n热血::https://m.iyouman.com/api/getsortlist/?comic_sort=rexue&orderby=&search_type=&search_key=&page={{page}}&size=30&productname=aym&platformname=wap\n机战::https://m.iyouman.com/api/getsortlist/?comic_sort=jizhan&orderby=&search_type=&search_key=&page={{page}}&size=30&productname=aym&platformname=wap\n运动::https://m.iyouman.com/api/getsortlist/?comic_sort=yundong&orderby=&search_type=&search_key=&page={{page}}&size=30&productname=aym&platformname=wap\n推理::https://m.iyouman.com/api/getsortlist/?comic_sort=tuili&orderby=&search_type=&search_key=&page={{page}}&size=30&productname=aym&platformname=wap\n冒险::https://m.iyouman.com/api/getsortlist/?comic_sort=maoxian&orderby=&search_type=&search_key=&page={{page}}&size=30&productname=aym&platformname=wap\n耽美::https://m.iyouman.com/api/getsortlist/?comic_sort=liaomei&orderby=&search_type=&search_key=&page={{page}}&size=30&productname=aym&platformname=wap\n百合::https://m.iyouman.com/api/getsortlist/?comic_sort=baihe&orderby=&search_type=&search_key=&page={{page}}&size=30&productname=aym&platformname=wap\n搞笑::https://m.iyouman.com/api/getsortlist/?comic_sort=gaoxiao&orderby=&search_type=&search_key=&page={{page}}&size=30&productname=aym&platformname=wap\n战争::https://m.iyouman.com/api/getsortlist/?comic_sort=zhanzhen&orderby=&search_type=&search_key=&page={{page}}&size=30&productname=aym&platformname=wap\n神魔::https://m.iyouman.com/api/getsortlist/?comic_sort=shenmo&orderby=&search_type=&search_key=&page={{page}}&size=30&productname=aym&platformname=wap\n忍者::https://m.iyouman.com/api/getsortlist/?comic_sort=renzhe&orderby=&search_type=&search_key=&page={{page}}&size=30&productname=aym&platformname=wap\n竞技::https://m.iyouman.com/api/getsortlist/?comic_sort=jingji&orderby=&search_type=&search_key=&page={{page}}&size=30&productname=aym&platformname=wap\n悬疑::https://m.iyouman.com/api/getsortlist/?comic_sort=xuanyi&orderby=&search_type=&search_key=&page={{page}}&size=30&productname=aym&platformname=wap\n社会::https://m.iyouman.com/api/getsortlist/?comic_sort=shehui&orderby=&search_type=&search_key=&page={{page}}&size=30&productname=aym&platformname=wap\n恋爱::https://m.iyouman.com/api/getsortlist/?comic_sort=lianai&orderby=&search_type=&search_key=&page={{page}}&size=30&productname=aym&platformname=wap\n宠物::https://m.iyouman.com/api/getsortlist/?comic_sort=chongwu&orderby=&search_type=&search_key=&page={{page}}&size=30&productname=aym&platformname=wap\n吸血::https://m.iyouman.com/api/getsortlist/?comic_sort=xixue&orderby=&search_type=&search_key=&page={{page}}&size=30&productname=aym&platformname=wap\n萝莉::https://m.iyouman.com/api/getsortlist/?comic_sort=luoli&orderby=&search_type=&search_key=&page={{page}}&size=30&productname=aym&platformname=wap\n后宫::https://m.iyouman.com/api/getsortlist/?comic_sort=hougong&orderby=&search_type=&search_key=&page={{page}}&size=30&productname=aym&platformname=wap\n御姐::https://m.iyouman.com/api/getsortlist/?comic_sort=yujie&orderby=&search_type=&search_key=&page={{page}}&size=30&productname=aym&platformname=wap\n霸总::https://m.iyouman.com/api/getsortlist/?comic_sort=bazong&orderby=&search_type=&search_key=&page={{page}}&size=30&productname=aym&platformname=wap\n玄幻::https://m.iyouman.com/api/getsortlist/?comic_sort=xuanhuan&orderby=&search_type=&search_key=&page={{page}}&size=30&productname=aym&platformname=wap\n古风::https://m.iyouman.com/api/getsortlist/?comic_sort=gufeng&orderby=&search_type=&search_key=&page={{page}}&size=30&productname=aym&platformname=wap\n历史::https://m.iyouman.com/api/getsortlist/?comic_sort=lishi&orderby=&search_type=&search_key=&page={{page}}&size=30&productname=aym&platformname=wap\n漫改::https://m.iyouman.com/api/getsortlist/?comic_sort=mangai&orderby=&search_type=&search_key=&page={{page}}&size=30&productname=aym&platformname=wap\n游戏::https://m.iyouman.com/api/getsortlist/?comic_sort=youxi&orderby=&search_type=&search_key=&page={{page}}&size=30&productname=aym&platformname=wap\n穿越::https://m.iyouman.com/api/getsortlist/?comic_sort=chuanyue&orderby=&search_type=&search_key=&page={{page}}&size=30&productname=aym&platformname=wap\n恐怖::https://m.iyouman.com/api/getsortlist/?comic_sort=kongbu&orderby=&search_type=&search_key=&page={{page}}&size=30&productname=aym&platformname=wap\n真人::https://m.iyouman.com/api/getsortlist/?comic_sort=zhenren&orderby=&search_type=&search_key=&page={{page}}&size=30&productname=aym&platformname=wap\n防疫::https://m.iyouman.com/api/getsortlist/?comic_sort=fangyi&orderby=&search_type=&search_key=&page={{page}}&size=30&productname=aym&platformname=wap\n防疫::https://m.iyouman.com/api/getsortlist/?comic_sort=fangyi&orderby=&search_type=&search_key=&page={{page}}&size=30&productname=aym&platformname=wap\n科幻::https://m.iyouman.com/api/getsortlist/?comic_sort=kehuan&orderby=&search_type=&search_key=&page={{page}}&size=30&productname=aym&platformname=wap\n都市::https://m.iyouman.com/api/getsortlist/?comic_sort=dushi&orderby=&search_type=&search_key=&page={{page}}&size=30&productname=aym&platformname=wap\n武侠::https://m.iyouman.com/api/getsortlist/?comic_sort=wuxia&orderby=&search_type=&search_key=&page={{page}}&size=30&productname=aym&platformname=wap\n修真::https://m.iyouman.com/api/getsortlist/?comic_sort=xiuzhen&orderby=&search_type=&search_key=&page={{page}}&size=30&productname=aym&platformname=wap\n生活::https://m.iyouman.com/api/getsortlist/?comic_sort=shenghuo&orderby=&search_type=&search_key=&page={{page}}&size=30&productname=aym&platformname=wap\n动作::https://m.iyouman.com/api/getsortlist/?comic_sort=dongzuo&orderby=&search_type=&search_key=&page={{page}}&size=30&productname=aym&platformname=wap\n大陆::https://m.iyouman.com/api/getsortlist/?comic_sort=dalu&orderby=&search_type=&search_key=&page={{page}}&size=30&productname=aym&platformname=wap\n日本::https://m.iyouman.com/api/getsortlist/?comic_sort=riben&orderby=&search_type=&search_key=&page={{page}}&size=30&productname=aym&platformname=wap\n港台::https://m.iyouman.com/api/getsortlist/?comic_sort=gangtai&orderby=&search_type=&search_key=&page={{page}}&size=30&productname=aym&platformname=wap\n欧美::https://m.iyouman.com/api/getsortlist/?comic_sort=oumei&orderby=&search_type=&search_key=&page={{page}}&size=30&productname=aym&platformname=wap\n韩国::https://m.iyouman.com/api/getsortlist/?comic_sort=os&orderby=&search_type=&search_key=&page={{page}}&size=30&productname=aym&platformname=wap\n全彩::https://m.iyouman.com/api/getsortlist/?comic_sort=quancai&orderby=&search_type=&search_key=&page={{page}}&size=30&productname=aym&platformname=wap\n黑白::https://m.iyouman.com/api/getsortlist/?comic_sort=heibai&orderby=&search_type=&search_key=&page={{page}}&size=30&productname=aym&platformname=wap\n小说::https://m.iyouman.com/api/getsortlist/?comic_sort=xiaoshuo&orderby=&search_type=&search_key=&page={{page}}&size=30&productname=aym&platformname=wap\n杂志::https://m.iyouman.com/api/getsortlist/?comic_sort=zazhi&orderby=&search_type=&search_key=&page={{page}}&size=30&productname=aym&platformname=wap\n日更::https://m.iyouman.com/api/getsortlist/?comic_sort=rigeng&orderby=&search_type=&search_key=&page={{page}}&size=30&productname=aym&platformname=wap\n新作::https://m.iyouman.com/api/getsortlist/?comic_sort=xinzuo&orderby=&search_type=&search_key=&page={{page}}&size=30&productname=aym&platformname=wap\n精品::https://m.iyouman.com/api/getsortlist/?comic_sort=jingpin&orderby=&search_type=&search_key=&page={{page}}&size=30&productname=aym&platformname=wap",
+    "lastUpdateTime": 1759291952356,
     "respondTime": 1195,
     "ruleBookInfo": {
       "author": "$.data.comic_author",
@@ -1068,13 +1352,23 @@
       "chapterName": "$.chapter_name@put:{chapter_id:$.chapter_id}",
       "chapterUrl": "https://m.iyouman.com/api/getchapterinfov2?product_id=4&productname=aym&platformname=wap&comic_id=@get:{comic_id}&chapter_newid={{$.chapter_newid}}&isWebp=1&quality=low"
     },
-    "searchUrl": "https://m.iyouman.com/api/getsortlist/?search_type=&search_key={{key}}&page={{page}}&size=30&productname=aym&platformname=wap"
+    "searchUrl": "https://m.iyouman.com/api/getsortlist/?search_type=&search_key={{key}}&page={{page}}&size=30&productname=aym&platformname=wap",
+    "weight": 0
   },
   {
+    "bookSourceComment": "wjc是竟成",
+    "bookSourceGroup": "视频源",
     "bookSourceName": "红牛资源",
     "bookSourceType": 2,
     "bookSourceUrl": "https://hongniuziyuan.com",
+    "customButton": false,
+    "customOrder": 718,
+    "enabled": true,
+    "enabledCookieJar": false,
+    "enabledExplore": true,
+    "eventListener": false,
     "exploreUrl": "[\n{\"title\":\"首页\",\"url\":\"\",\"style\":{\"layout_flexGrow\":1}},{\"title\":\"最近更新\",\"url\":\"https://hongniuziyuan.com/index.php/index/index/page/{{page}}.html?ac=detail\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":1}},{\"title\":\"电影\",\"url\":\"\",\"style\":{\"layout_flexGrow\":1}},{\"title\":\"动作片\",\"url\":\"https://hongniuziyuan.com/index.php/vod/type/id/5/page/{{page}}.html?ac=detail\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":1}},{\"title\":\"喜剧片\",\"url\":\"https://hongniuziyuan.com/index.php/vod/type/id/6/page/{{page}}.html?ac=detail\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":1}},{\"title\":\"爱情片\",\"url\":\"https://hongniuziyuan.com/index.php/vod/type/id/7/page/{{page}}.html?ac=detail\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":1}},{\"title\":\"科幻片\",\"url\":\"https://hongniuziyuan.com/index.php/vod/type/id/8/page/{{page}}.html?ac=detail\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":1}},{\"title\":\"恐怖片\",\"url\":\"https://hongniuziyuan.com/index.php/vod/type/id/9/page/{{page}}.html?ac=detail\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":1}},{\"title\":\"剧情片\",\"url\":\"https://hongniuziyuan.com/index.php/vod/type/id/10/page/{{page}}.html?ac=detail\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":1}},{\"title\":\"战争片\",\"url\":\"https://hongniuziyuan.com/index.php/vod/type/id/11/page/{{page}}.html?ac=detail\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":1}},{\"title\":\"动作电影\",\"url\":\"https://hongniuziyuan.com/index.php/vod/type/id/20/page/{{page}}.html?ac=detail\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":1}},{\"title\":\"连续剧\",\"url\":\"\",\"style\":{\"layout_flexGrow\":1}},{\"title\":\"国产剧\",\"url\":\"https://hongniuziyuan.com/index.php/vod/type/id/12/page/{{page}}.html?ac=detail\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":1}},{\"title\":\"港澳剧\",\"url\":\"https://hongniuziyuan.com/index.php/vod/type/id/13/page/{{page}}.html?ac=detail\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":1}},{\"title\":\"日剧\",\"url\":\"https://hongniuziyuan.com/index.php/vod/type/id/14/page/{{page}}.html?ac=detail\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":1}},{\"title\":\"欧美剧\",\"url\":\"https://hongniuziyuan.com/index.php/vod/type/id/15/page/{{page}}.html?ac=detail\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":1}},{\"title\":\"台湾剧\",\"url\":\"https://hongniuziyuan.com/index.php/vod/type/id/16/page/{{page}}.html?ac=detail\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":1}},{\"title\":\"泰剧\",\"url\":\"https://hongniuziyuan.com/index.php/vod/type/id/17/page/{{page}}.html?ac=detail\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":1}},{\"title\":\"韩剧\",\"url\":\"https://hongniuziyuan.com/index.php/vod/type/id/18/page/{{page}}.html?ac=detail\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":1}},{\"title\":\"——\",\"url\":\"\",\"style\":{\"layout_flexGrow\":1}},{\"title\":\"综艺\",\"url\":\"https://hongniuziyuan.com/index.php/vod/type/id/3/page/{{page}}.html?ac=detail\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":1}},{\"title\":\"——\",\"url\":\"\",\"style\":{\"layout_flexGrow\":1}},{\"title\":\"动漫\",\"url\":\"https://hongniuziyuan.com/index.php/vod/type/id/4/page/{{page}}.html?ac=detail\",\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":1}},{\"title\":\"——\",\"url\":\"\",\"style\":{\"layout_flexGrow\":1}},{\"title\":\"纪录片\",\"url\":\"https://hongniuziyuan.com/index.php/vod/type/id/19/page/{{page}}.html?ac=detail\",\"style\":{\"layout_flexGrow\":1, \"layout_flexBasisPercent\":1}},{\"title\":\"——\",\"url\":\"\",\"style\":{\"layout_flexGrow\":1}},{\"title\":\"伦理片\",\"url\":\"https://hongniuziyuan.com/index.php/vod/type/id/21/page/{{page}}.html?ac=detail\",\"style\":{\"layout_flexGrow\":1}}\n]",
+    "lastUpdateTime": 1729288547900,
     "respondTime": 5398,
     "ruleBookInfo": {
       "author": "@css:.vodinfobox>ul>li:eq(1)>strong>span@text",
@@ -1103,13 +1397,23 @@
       "chapterUrl": "@css:a@text##(.+)\\$(.+)##$2",
       "isVip": ""
     },
-    "searchUrl": "https://hongniuziyuan.com/index.php/vod/search.html?wd={{key}}&submit=search"
+    "searchUrl": "https://hongniuziyuan.com/index.php/vod/search.html?wd={{key}}&submit=search",
+    "weight": 59
   },
   {
+    "bookSourceComment": "// Error: Failed to connect to meitulu.me/[::]:443",
+    "bookSourceGroup": "小说源",
     "bookSourceName": "美图网可搜索",
     "bookSourceType": 2,
     "bookSourceUrl": "https://meitulu.me/",
+    "customButton": false,
+    "customOrder": 963,
+    "enabled": true,
+    "enabledCookieJar": true,
+    "enabledExplore": true,
+    "eventListener": false,
     "exploreUrl": "日韩美女::https://meitulu.me/rihan/index_{{page}}.html\n港台美女::https://meitulu.me/gangtai/index_{{page}}.html\n比基尼::https://meitulu.me/t/bijini/index_{{page}}.html\n国产美女::https://meitulu.me/guochan/index_{{page}}.html\n风俗媚娘::https://meitulu.me/t/fengsumeiniang/index_{{page}}.html\n女神::https://meitulu.me/t/nvshen/index_2{{page}}.html\n极品::https://meitulu.me/t/jipin/index_{{page}}.html\n嫩模::https://meitulu.me/t/nenmo/index_{{page}}.html\n尤物::https://meitulu.me/t/youwu/index_{{page}}.html\n爆乳::https://meitulu.me/t/baoru/index_{{page}}.html\n美胸::https://meitulu.me/t/meixiong/index_{{page}}.html\n诱惑::https://meitulu.me/t/youhuo/index_{{page}}.html\n少妇::https://meitulu.me/t/shaofu/index_{{page}}.html\n长腿::https://meitulu.me/t/changtui/index_{{page}}.html",
+    "lastUpdateTime": 1702447499310,
     "respondTime": 10106,
     "ruleBookInfo": {
       "author": "class.container pt-3@tag.a.3@text",
@@ -1146,6 +1450,7 @@
       "chapterUrl": "",
       "nextTocUrl": "text.下一页@href"
     },
-    "searchUrl": "https://meitulu.me/search?q={{key}}"
+    "searchUrl": "https://meitulu.me/search?q={{key}}",
+    "weight": 0
   }
 ]
