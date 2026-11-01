@@ -11,6 +11,12 @@ import UIKit
 /// parameters explicit.
 final class RemoteImageLoader: @unchecked Sendable {
     static let shared = RemoteImageLoader()
+    private static let boundedSession: URLSession = {
+        let configuration = URLSessionConfiguration.default
+        configuration.timeoutIntervalForRequest = 18
+        configuration.timeoutIntervalForResource = 30
+        return URLSession(configuration: configuration)
+    }()
 
     private let cache = NSCache<NSURL, UIImage>()
     /// Covers are displayed at 50–150 pt but the source often serves a
@@ -23,9 +29,9 @@ final class RemoteImageLoader: @unchecked Sendable {
     private let inlineImages: InlineImageStore
     private let session: URLSession
 
-    init(inlineImages: InlineImageStore = .shared, session: URLSession = .shared) {
+    init(inlineImages: InlineImageStore = .shared, session: URLSession? = nil) {
         self.inlineImages = inlineImages
-        self.session = session
+        self.session = session ?? Self.boundedSession
         cache.countLimit = 160
         cache.totalCostLimit = 64 * 1024 * 1024
         thumbnailCache.countLimit = 240
@@ -123,7 +129,7 @@ final class RemoteImageLoader: @unchecked Sendable {
         }
 
         var request = URLRequest(url: url, timeoutInterval: 18)
-        request.cachePolicy = .returnCacheDataElseLoad
+        request.cachePolicy = .useProtocolCachePolicy
         for (key, value) in headers where !key.isEmpty {
             request.setValue(value, forHTTPHeaderField: key)
         }
@@ -132,7 +138,12 @@ final class RemoteImageLoader: @unchecked Sendable {
             let (data, response) = try await session.data(for: request)
             guard !Task.isCancelled,
                   let http = response as? HTTPURLResponse,
-                  (200..<300).contains(http.statusCode) else { return nil }
+                  (200..<300).contains(http.statusCode) else {
+                // A cached 403/expired signed response must not make the
+                // reader's explicit retry replay the same failure forever.
+                session.configuration.urlCache?.removeCachedResponse(for: request)
+                return nil
+            }
             return await decodeAndStore(data, for: url, maxPixelSize: maxPixelSize)
         } catch {
             return nil

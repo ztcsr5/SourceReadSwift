@@ -660,30 +660,41 @@ private struct ComicPageImageView: View {
     @State private var scale: CGFloat = 1.0
     @State private var lastScale: CGFloat = 1.0
 
+    private var loadIdentity: String {
+        let headerIdentity = headers.keys.sorted().map { key in
+            key + "=" + (headers[key] ?? "")
+        }.joined(separator: "|")
+        return url + "#" + headerIdentity + "#" + String(attempt)
+    }
+
+    private var placeholder: some View {
+        VStack(spacing: 12) {
+            if failed {
+                Image(systemName: "photo.badge.exclamationmark").font(.title2)
+                Text("第 \(pageNumber) 页加载失败").font(.subheadline)
+                Text("网络、登录状态或图片防盗链可能导致失败")
+                    .font(.caption).foregroundStyle(.white.opacity(0.6))
+                Button("重新加载这一页") { attempt += 1 }
+                    .buttonStyle(.bordered).frame(minHeight: 44)
+            } else {
+                ProgressView().tint(.white)
+                Text("正在加载第 \(pageNumber) / \(totalPages) 页").font(.caption)
+            }
+        }
+        .foregroundStyle(.white)
+        .frame(maxWidth: .infinity, minHeight: 320)
+        .background(Color.white.opacity(0.04))
+    }
+
     var body: some View {
         ZStack {
             if let image {
                 Image(uiImage: image).resizable().aspectRatio(contentMode: .fit)
             } else {
-                VStack(spacing: 12) {
-                    if failed {
-                        Image(systemName: "photo.badge.exclamationmark").font(.title2)
-                        Text("第 \(pageNumber) 页加载失败").font(.subheadline)
-                        Text("网络、登录状态或图片防盗链可能导致失败")
-                            .font(.caption).foregroundStyle(.white.opacity(0.6))
-                        Button("重新加载这一页") { attempt += 1 }
-                            .buttonStyle(.bordered).frame(minHeight: 44)
-                    } else {
-                        ProgressView().tint(.white)
-                        Text("正在加载第 \(pageNumber) / \(totalPages) 页").font(.caption)
-                    }
-                }
-                .foregroundStyle(.white)
-                .frame(maxWidth: .infinity, minHeight: 320)
-                .background(Color.white.opacity(0.04))
+                placeholder
             }
         }
-        .task(id: url + "#" + headers.keys.sorted().map { $0 + "=" + (headers[$0] ?? "") }.joined(separator: "|") + "#" + String(attempt)) {
+        .task(id: loadIdentity) {
             image = nil
             failed = false
             guard let imageURL = URL(string: url) else { failed = true; return }
