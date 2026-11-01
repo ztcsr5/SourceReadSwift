@@ -58,6 +58,7 @@ struct ReaderView: View {
     @State private var showContentFilter = false
     @State private var tocScrollTask: Task<Void, Never>?
     @State private var tocUserHasScrolled = false
+    @State private var tocScrollIntent = ReaderTocScrollIntent.currentChapter
     /// Per-source login surface.  Sources that gate chapters behind an account
     /// previously had no entry point inside the reader, so the only way to
     /// authenticate was the source manager's long-press menu.
@@ -3676,6 +3677,7 @@ struct ReaderView: View {
                 HStack(spacing: 8) {
                     toolButton(icon: "list.bullet", title: "目录") {
                         tocTab = 0
+                        tocScrollIntent = .currentChapter
                         showChapterList = true
                         closeSettingsPanel()
                     }
@@ -4740,7 +4742,13 @@ struct ReaderView: View {
                 if tocTab == 0 {
                     ToolbarItem(placement: .navigationBarLeading) {
                         Button(tocReversed ? "倒序" : "顺序") {
-                            tocReversed.toggle()
+                            tocScrollTask?.cancel()
+                            tocScrollTask = nil
+                            tocScrollIntent = .firstRow
+                            tocUserHasScrolled = false
+                            var transaction = Transaction()
+                            transaction.disablesAnimations = true
+                            withTransaction(transaction) { tocReversed.toggle() }
                         }
                         .foregroundStyle(readerThemeTextColor)
                     }
@@ -4901,6 +4909,7 @@ struct ReaderView: View {
                                 } label: {
                                     navigationEntryRow(entry, ordinal: offset)
                                 }
+                                .id("toc-nav-\(offset)")
                                 .disabled(onSelectNavigationEntry == nil || entry.chapterIndex == nil)
                                 .listRowInsets(EdgeInsets(top: 7, leading: 16, bottom: 7, trailing: 16))
                                 .listRowBackground(Color.clear)
@@ -4915,6 +4924,9 @@ struct ReaderView: View {
                 }
             }
             .listStyle(.plain)
+            // Reversing thousands of identities in place makes UIKit animate
+            // a full list diff. Recreate only the TOC list, not the reader.
+            .id(tocReversed)
             .scrollContentBackground(.hidden)
             .background(Color.clear)
             .scrollDismissesKeyboard(.interactively)
@@ -4930,10 +4942,8 @@ struct ReaderView: View {
                 tocUserHasScrolled = false
                 scrollTocToCurrentChapter(proxy)
             }
-            .onChange(of: tocReversed) { _ in
-                scrollTocToCurrentChapter(proxy)
-            }
             .onChange(of: debouncedTocQuery) { _ in
+                tocScrollIntent = .firstRow
                 scrollTocToCurrentChapter(proxy)
             }
             .onChange(of: chapters.count) { _ in
@@ -4972,13 +4982,9 @@ struct ReaderView: View {
 
     /// 打开目录时把当前阅读章滚到可视区中部；搜索过滤把目标章滤掉时静默跳过。
     private func scrollTocToCurrentChapter(_ proxy: ScrollViewProxy) {
-        let preferred = windowCurrentChapterIndex
-        let fallback = currentDisplayChapterIndex
-        guard let target = chapters.first(where: { $0.index == preferred })
-            ?? chapters.first(where: { $0.index == fallback })
-            ?? chapters.first(where: { $0.index >= preferred })
-            ?? chapters.first else { return }
-        let id = target.id
+        guard let id = tocScrollIntent.target(in: filteredChapters, preferred: windowCurrentChapterIndex,
+            fallback: currentDisplayChapterIndex)
+            ?? (filteredNavigationEntries.isEmpty ? nil : "toc-nav-0") else { return }
         tocScrollTask?.cancel()
         tocScrollTask = Task { @MainActor in
             await Task.yield()
@@ -4986,7 +4992,7 @@ struct ReaderView: View {
             guard !Task.isCancelled, showChapterList else { return }
             var transaction = Transaction()
             transaction.disablesAnimations = true
-            withTransaction(transaction) { proxy.scrollTo(id, anchor: .center) }
+            withTransaction(transaction) { proxy.scrollTo(id, anchor: tocScrollIntent == .firstRow ? .top : .center) }
         }
     }
 
@@ -6764,8 +6770,10 @@ final class ReaderPageTextCache {
 final class ReaderTocFilterCache {
     private var chapterKey = ""
     private var chapterResult: [BookChapter] = []
+    private var chapterReversedResult: [BookChapter]?
     private var navigationKey = ""
     private var navigationResult: [LocalTextNavigationEntry] = []
+    private var navigationReversedResult: [LocalTextNavigationEntry]?
     // Retain the actual COW buffers, not just first/last/count. A TOC refresh
     // can change a middle chapter while those three values remain identical.
     private var chapterSource: [BookChapter] = []
@@ -6774,19 +6782,18 @@ final class ReaderTocFilterCache {
 
     func chapters(query: String, reversed: Bool, chapters: [BookChapter]) -> [BookChapter] {
         let normalized = query.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-        let key = "\(normalized)|\(reversed)"
-        if key == chapterKey, sharesStorage(chapters, chapterSource) { return chapterResult }
-        chapterSource = chapters
-        chapterBuildCount += 1
-        var result = chapters.filter { chapter in
-            normalized.isEmpty
-                || chapter.title.lowercased().contains(normalized)
-                || "\(chapter.index + 1)".contains(normalized)
+        if normalized != chapterKey || !sharesStorage(chapters, chapterSource) {
+            chapterSource = chapters
+            chapterBuildCount += 1
+            chapterResult = normalized.isEmpty ? chapters : chapters.filter { chapter in
+                chapter.title.lowercased().contains(normalized) || "\(chapter.index + 1)".contains(normalized)
+            }
+            chapterReversedResult = nil
+            chapterKey = normalized
         }
-        if reversed { result.reverse() }
-        chapterKey = key
-        chapterResult = result
-        return result
+        guard reversed else { return chapterResult }
+        if chapterReversedResult == nil { chapterReversedResult = Array(chapterResult.reversed()) }
+        return chapterReversedResult ?? []
     }
 
     func navigationEntries(
@@ -6795,18 +6802,18 @@ final class ReaderTocFilterCache {
         entries: [LocalTextNavigationEntry]
     ) -> [LocalTextNavigationEntry] {
         let normalized = query.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-        let key = "\(normalized)|\(reversed)"
-        if key == navigationKey, sharesStorage(entries, navigationSource) { return navigationResult }
-        navigationSource = entries
-        var result = entries.filter { entry in
-            normalized.isEmpty
-                || entry.title.lowercased().contains(normalized)
-                || entry.chapterIndex.map { String($0 + 1).contains(normalized) } == true
+        if normalized != navigationKey || !sharesStorage(entries, navigationSource) {
+            navigationSource = entries
+            navigationResult = normalized.isEmpty ? entries : entries.filter { entry in
+                entry.title.lowercased().contains(normalized)
+                    || entry.chapterIndex.map { String($0 + 1).contains(normalized) } == true
+            }
+            navigationReversedResult = nil
+            navigationKey = normalized
         }
-        if reversed { result.reverse() }
-        navigationKey = key
-        navigationResult = result
-        return result
+        guard reversed else { return navigationResult }
+        if navigationReversedResult == nil { navigationReversedResult = Array(navigationResult.reversed()) }
+        return navigationReversedResult ?? []
     }
 
     private func sharesStorage<Element>(_ lhs: [Element], _ rhs: [Element]) -> Bool {

@@ -38,6 +38,7 @@ final class SourceStore: ObservableObject {
     }
     @Published private(set) var rssSources: [RSSSource] = []
     @Published private(set) var catalogs: [SourceCatalog] = []
+    @Published private(set) var organization = SourceOrganization()
     @Published private(set) var lastError: String?
     private let persistence: SourcePersistence
 
@@ -392,6 +393,7 @@ final class SourceStore: ObservableObject {
             }.filter { !$0.bookSourceUrl.contains("6yzw.org") }
             rssSources = snapshot.rssSources
             catalogs = snapshot.catalogs
+            organization = snapshot.organization
         } catch {
             lastError = error.localizedDescription
         }
@@ -665,7 +667,7 @@ final class SourceStore: ObservableObject {
     /// Portable export used by the all-data backup. Credentials and cookies
     /// are intentionally not part of the source library snapshot.
     func backupSnapshot() -> SourceLibrarySnapshot {
-        SourceLibrarySnapshot(sources: sources, rssSources: rssSources, catalogs: catalogs)
+        SourceLibrarySnapshot(sources: sources, rssSources: rssSources, catalogs: catalogs, organization: organization)
     }
 
     @discardableResult
@@ -677,12 +679,14 @@ final class SourceStore: ObservableObject {
             let normalized = SourceLibrarySnapshot(
                 sources: normalizedSources,
                 rssSources: normalizedRSSSources,
-                catalogs: normalizedCatalogs
+                catalogs: normalizedCatalogs,
+                organization: snapshot.organization
             )
             try persistence.save(normalized)
             sources = normalizedSources
             rssSources = normalizedRSSSources
             catalogs = normalizedCatalogs
+            organization = snapshot.organization
             lastError = nil
             return true
         } catch {
@@ -781,12 +785,47 @@ final class SourceStore: ObservableObject {
         }
     }
 
+    @discardableResult
+    func updateOrganization(_ change: (inout SourceOrganization) -> Void) -> Bool {
+        var next = organization
+        change(&next)
+        do {
+            try persistence.save(SourceLibrarySnapshot(sources: sources, rssSources: rssSources,
+                catalogs: catalogs, organization: next))
+            organization = next
+            lastError = nil
+            return true
+        } catch {
+            lastError = error.localizedDescription
+            return false
+        }
+    }
+
+    func setPlacement(_ placement: SourcePlacement, for ids: Set<String>) {
+        updateOrganization { preferences in
+            for id in ids { preferences.placements[id] = placement == .normal ? nil : placement }
+        }
+    }
+
+    func setGroup(_ name: String, for ids: Set<String>) {
+        let group = SourceOrganization.splitGroups(name).joined(separator: ",")
+        updateOrganization { preferences in
+            for id in ids { preferences.groupOverrides[id] = group }
+            preferences.namedGroups = Array(Set(preferences.namedGroups + SourceOrganization.splitGroups(group))).sorted()
+        }
+    }
+
+    func reorderSources(_ ids: [String]) {
+        updateOrganization { $0.reorder(ids, in: sources) }
+    }
+
     private func persist() throws {
         try persistence.save(
             SourceLibrarySnapshot(
                 sources: sources,
                 rssSources: rssSources,
-                catalogs: catalogs
+                catalogs: catalogs,
+                organization: organization
             )
         )
     }

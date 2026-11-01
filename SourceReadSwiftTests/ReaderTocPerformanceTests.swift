@@ -43,4 +43,41 @@ final class ReaderTocPerformanceTests: XCTestCase {
         XCTAssertEqual(first.count, 1)
         XCTAssertTrue(cache.chapters(query: "", reversed: false, chapters: []).isEmpty)
     }
+
+    func testRepeatedSortTogglesReuseBothProjections() {
+        let chapters = (0..<10_000).map { chapter($0) }
+        let cache = ReaderTocFilterCache()
+        let start = Date()
+        for index in 0..<1_000 {
+            let reversed = index % 2 == 0
+            let rows = cache.chapters(query: "内容", reversed: reversed, chapters: chapters)
+            XCTAssertEqual(rows.first?.index, reversed ? 9_999 : 0)
+        }
+        XCTAssertEqual(cache.chapterBuildCount, 1, "Toggling sort must not refilter 10,000 chapters every time")
+        print("TOC 10000 chapters / 1000 alternating sorts / builds=\(cache.chapterBuildCount) / seconds=\(Date().timeIntervalSince(start))")
+    }
+
+    func testReverseProjectionInvalidatesWhenMiddleChapterChanges() {
+        var chapters = (0..<5).map { chapter($0) }
+        let cache = ReaderTocFilterCache()
+        _ = cache.chapters(query: "", reversed: true, chapters: chapters)
+        chapters[2] = chapter(2, title: "修订")
+        let reversed = cache.chapters(query: "", reversed: true, chapters: chapters)
+        XCTAssertEqual(reversed[2].title, "修订")
+        XCTAssertEqual(cache.chapters(query: "", reversed: false, chapters: chapters)[2].title, "修订")
+    }
+
+    func testSortIntentGoesToFirstVisibleRowNotCurrentChapter() {
+        let chapters = (0..<1000).map { chapter($0) }
+        let reverse = Array(chapters.reversed())
+        XCTAssertEqual(ReaderTocScrollIntent.firstRow.target(in: reverse, preferred: 0, fallback: 0), chapters[999].id)
+        XCTAssertEqual(ReaderTocScrollIntent.firstRow.target(in: chapters, preferred: 800, fallback: 800), chapters[0].id)
+        XCTAssertEqual(ReaderTocScrollIntent.currentChapter.target(in: reverse, preferred: 0, fallback: 0), chapters[0].id)
+    }
+
+    func testSearchScrollTargetCannotReferToFilteredOutChapter() {
+        let chapters = [chapter(400), chapter(600)]
+        XCTAssertEqual(ReaderTocScrollIntent.firstRow.target(in: chapters, preferred: 0, fallback: 0), chapters[0].id)
+        XCTAssertNil(ReaderTocScrollIntent.firstRow.target(in: [], preferred: 0, fallback: 0))
+    }
 }

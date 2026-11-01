@@ -102,9 +102,19 @@ struct SourceManagerView: View {
     @State private var isManagingRSS = false
     @State private var selectedRSSURLs: Set<String> = []
     @State private var pendingDeleteRSSURLs: Set<String> = []
+    @State private var showSourceOrganization = false
+    @State private var sourceGroupAssignment: SourceGroupAssignmentRequest?
+    @State private var selectedSourceGroup: String?
 
     private var filteredBookSources: [BookSource] {
-        var list = appState.sourceStore.sources
+        let organization = appState.sourceStore.organization
+        var list = organization.ordered(appState.sourceStore.sources)
+        if let group = selectedSourceGroup {
+            list = list.filter { source in
+                let groups = organization.groups(for: source)
+                return group.isEmpty ? groups.isEmpty : groups.contains(group)
+            }
+        }
         switch selectedFilterTag {
         case .all:
             break
@@ -123,7 +133,7 @@ struct SourceManagerView: View {
         let keyword = normalizedSearchText
         guard !keyword.isEmpty else { return list }
         return list.filter {
-            [$0.bookSourceName, $0.bookSourceUrl, $0.bookSourceGroup ?? "", $0.searchUrl ?? ""]
+            [$0.bookSourceName, $0.bookSourceUrl, organization.groups(for: $0).joined(separator: " "), $0.searchUrl ?? ""]
                 .contains { $0.lowercased().contains(keyword) }
         }
     }
@@ -266,6 +276,16 @@ struct SourceManagerView: View {
             .hideRootTabBar()
             .sheet(isPresented: $showImportSheet) {
                 importSheet
+            }
+            .sheet(isPresented: $showSourceOrganization) {
+                SourceOrganizationView(store: appState.sourceStore)
+            }
+            .sheet(item: $sourceGroupAssignment) { request in
+                SourceGroupAssignmentView(store: appState.sourceStore, sourceIDs: request.sourceIDs)
+            }
+            .onChange(of: appState.sourceStore.organization) { organization in
+                if let group = selectedSourceGroup, !group.isEmpty,
+                   !organization.allGroups(in: appState.sourceStore.sources).contains(group) { selectedSourceGroup = nil }
             }
             .sheet(isPresented: $showLoginCenter, onDismiss: {
                 Task { await refreshLoggedInHosts() }
@@ -590,7 +610,22 @@ struct SourceManagerView: View {
 
     private var bookSourceContent: some View {
         VStack(alignment: .leading, spacing: 10) {
-            sectionHeader(title: "书源", count: appState.sourceStore.sources.count)
+            HStack {
+                Menu {
+                    Button("全部分组") { selectedSourceGroup = nil }
+                    Button("未分组") { selectedSourceGroup = "" }
+                    ForEach(appState.sourceStore.organization.allGroups(in: appState.sourceStore.sources), id: \.self) { group in
+                        Button(group) { selectedSourceGroup = group }
+                    }
+                } label: {
+                    Label(selectedSourceGroup.map { $0.isEmpty ? "未分组" : $0 } ?? "全部书源", systemImage: "folder")
+                        .font(.subheadline.weight(.semibold)).lineLimit(1)
+                        .frame(minHeight: AppLayout.minimumTapTarget)
+                }
+                Spacer()
+                Button("排序与分组") { showSourceOrganization = true }
+                    .font(.subheadline).frame(minHeight: AppLayout.minimumTapTarget)
+            }
             if isManagingBookSources {
                 bookSourceBatchToolbar
             } else {
@@ -689,7 +724,7 @@ struct SourceManagerView: View {
         return sourceCard(
             title: source.bookSourceName,
             subtitle: source.bookSourceUrl,
-            group: source.bookSourceGroup,
+            group: sourceOrganizationSummary(source),
             enabled: source.enabled,
             badges: source.displayBadges,
             health: appState.sourceHealthStore.record(for: source),
@@ -700,6 +735,12 @@ struct SourceManagerView: View {
                 sourceVisualDetail = source
             },
             actions: {
+                ForEach(SourcePlacement.allCases) { placement in
+                    Button(placement == .normal ? "取消置顶 / 置底" : placement.title) {
+                        appState.sourceStore.setPlacement(placement, for: [source.id])
+                    }
+                }
+                Button("设置分组") { sourceGroupAssignment = SourceGroupAssignmentRequest(sourceIDs: [source.id]) }
                 Button(source.enabled ? "停用" : "启用") {
                     appState.sourceStore.setEnabled(!source.enabled, for: [source.bookSourceUrl])
                 }
@@ -735,6 +776,16 @@ struct SourceManagerView: View {
 
     private var bookSourceBatchToolbar: some View {
         VStack(alignment: .leading, spacing: 10) {
+            Menu("批量排序 / 分组") {
+                ForEach(SourcePlacement.allCases) { placement in
+                    Button(placement == .normal ? "取消置顶 / 置底" : placement.title) {
+                        appState.sourceStore.setPlacement(placement, for: selectedBookSourceURLs)
+                    }
+                }
+                Button("设置分组") { sourceGroupAssignment = SourceGroupAssignmentRequest(sourceIDs: selectedBookSourceURLs) }
+            }
+            .disabled(selectedBookSourceURLs.isEmpty)
+            .frame(minHeight: AppLayout.minimumTapTarget)
             HStack(spacing: 10) {
                 Button("全选") {
                     selectedBookSourceURLs = Set(filteredBookSources.map(\.bookSourceUrl))
@@ -849,6 +900,12 @@ struct SourceManagerView: View {
         }
     }
 
+    private func sourceOrganizationSummary(_ source: BookSource) -> String {
+        let organization = appState.sourceStore.organization
+        let placement = organization.placement(for: source)
+        return ((placement == .normal ? [] : [placement.title]) + organization.groups(for: source)).joined(separator: " · ")
+    }
+
     private func selectableBookSourceRow(_ source: BookSource) -> some View {
         Button {
             if selectedBookSourceURLs.contains(source.bookSourceUrl) {
@@ -868,7 +925,7 @@ struct SourceManagerView: View {
                         .font(.headline)
                         .foregroundStyle(.primary)
                         .lineLimit(1)
-                    Text([source.bookSourceUrl, source.bookSourceGroup].compactMap { $0 }.filter { !$0.isEmpty }.joined(separator: " · "))
+                    Text([source.bookSourceUrl, sourceOrganizationSummary(source)].filter { !$0.isEmpty }.joined(separator: " · "))
                         .font(.caption)
                         .foregroundStyle(.secondary)
                         .lineLimit(2)

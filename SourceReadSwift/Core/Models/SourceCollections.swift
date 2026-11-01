@@ -227,14 +227,27 @@ struct SourceLibrarySnapshot: Codable, Hashable, Sendable {
     var sources: [BookSource]
     var rssSources: [RSSSource]
     var catalogs: [SourceCatalog]
+    var organization: SourceOrganization
 
     init(
         sources: [BookSource] = [],
         rssSources: [RSSSource] = [],
-        catalogs: [SourceCatalog] = []
+        catalogs: [SourceCatalog] = [],
+        organization: SourceOrganization = SourceOrganization()
     ) {
         self.sources = sources
         self.rssSources = rssSources
         self.catalogs = catalogs
+        self.organization = organization
+    }
+
+    enum CodingKeys: String, CodingKey { case sources, rssSources, catalogs, organization }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        sources = try c.decodeIfPresent([BookSource].self, forKey: .sources) ?? []
+        rssSources = try c.decodeIfPresent([RSSSource].self, forKey: .rssSources) ?? []
+        catalogs = try c.decodeIfPresent([SourceCatalog].self, forKey: .catalogs) ?? []
+        organization = try c.decodeIfPresent(SourceOrganization.self, forKey: .organization) ?? SourceOrganization()
     }
 }
