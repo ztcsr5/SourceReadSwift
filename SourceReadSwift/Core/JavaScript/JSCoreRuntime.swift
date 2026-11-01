@@ -235,7 +235,16 @@ final class JSCoreRuntime {
         let baseStr = (effectiveVariables["baseUrl"] as? String) ?? ""
         for (key, value) in effectiveVariables {
             let jsCompatibleValue = makeJSCompatibleValue(value, baseUrl: baseStr)
-            context.setObject(jsCompatibleValue, forKeyedSubscript: key as NSString)
+            if jsCompatibleValue is LegadoElementsBridge,
+               let wrapped = context.objectForKeyedSubscript("__wrapJsoupElements")?
+                .call(withArguments: [jsCompatibleValue]) {
+                // java.getElements already exposes this same facade. A CSS
+                // pipeline result also needs indexed access for Array.from;
+                // exporting length/get alone yields undefined array entries.
+                context.setObject(wrapped, forKeyedSubscript: key as NSString)
+            } else {
+                context.setObject(jsCompatibleValue, forKeyedSubscript: key as NSString)
+            }
             
             if key == "result" {
                 if value is [String: Any] {
