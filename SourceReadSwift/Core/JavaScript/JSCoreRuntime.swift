@@ -200,6 +200,7 @@ final class JSCoreRuntime {
                 snapshot[key] = context.objectForKeyedSubscript(key)
             } : [:]
             let callerValues = isNested ? executionContext.snapshot() : [:]
+            let callerPersistentValues = isNested ? executionContext.persistentSnapshot() : [:]
             evaluationDepth += 1
             defer {
                 evaluationDepth -= 1
@@ -207,7 +208,10 @@ final class JSCoreRuntime {
                     for (key, value) in callerGlobals {
                         context.setObject(value, forKeyedSubscript: key as NSString)
                     }
-                    for key in scopedKeys where key != "cookieHeader" {
+                    // Only input bindings are scoped. java.put/remove changes
+                    // remain visible after the nested rule returns.
+                    let persistentValues = executionContext.persistentSnapshot()
+                    for key in scopedKeys where key != "cookieHeader" && persistentValues[key] == callerPersistentValues[key] {
                         executionContext.setValue(callerValues[key], for: key)
                     }
                 } else {
