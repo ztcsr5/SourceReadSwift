@@ -17,7 +17,7 @@ final class ReaderBackgroundPickerTests: XCTestCase {
             }
             seen[key] = item.rawValue
         }
-        XCTAssertEqual(cases.count, 18, "11 种原有外观、3 种纸纹与 4 幅原创插画")
+        XCTAssertEqual(cases.count, 22, "11 种原有外观、3 种纸纹、4 幅原创插画与 4 种矢量手绘")
     }
 
     func testPickerCasesAreSubsetOfAllCases() {

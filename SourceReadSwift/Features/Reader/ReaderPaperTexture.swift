@@ -2,7 +2,12 @@ import SwiftUI
 import UIKit
 
 enum ReaderPaperTexture {
-    private static let cache = NSCache<NSString, UIImage>()
+    private static let cache: NSCache<NSString, UIImage> = {
+        let cache = NSCache<NSString, UIImage>()
+        cache.countLimit = 16
+        cache.totalCostLimit = 16 * 256 * 256 * 4
+        return cache
+    }()
 
     static func image(background: ReaderBackground, night: Bool) -> UIImage {
         let key = "\(background.rawValue)|\(night)" as NSString
@@ -40,8 +45,9 @@ enum ReaderPaperTexture {
                 }
                 c.strokePath()
             }
+            background.doodlePattern?.draw(in: c, ink: background.uiTextColor(isNight: night), night: night)
         }
-        cache.setObject(image, forKey: key)
+        cache.setObject(image, forKey: key, cost: 256 * 256 * 4)
         return image
     }
 }

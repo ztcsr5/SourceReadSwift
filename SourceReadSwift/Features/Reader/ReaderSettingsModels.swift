@@ -8,6 +8,7 @@ enum ReaderBackground: String, CaseIterable, Identifiable, Codable, Sendable {
     case parchmentTexture
     case linen
     case bamboo, mountains, ginkgo, tide
+    case paperCats, moonLetters, cloudIslands, starPlanes
     case kraft      // 复古牛皮 (#DDC090)
     case green      // 豆沙青绿 (#C2D8AA)
     case lavender   // 淡雅黛紫 (#DBB8E2)
@@ -35,6 +36,7 @@ enum ReaderBackground: String, CaseIterable, Identifiable, Codable, Sendable {
     static var pickerCases: [ReaderBackground] {
         [
             .bamboo, .mountains, .ginkgo, .tide,
+            .paperCats, .moonLetters, .cloudIslands, .starPlanes,
             .kraftTexture, .parchmentTexture, .linen,
             .paper,      // #EBD9BB
             .kraft,      // #DDC090
@@ -61,6 +63,10 @@ enum ReaderBackground: String, CaseIterable, Identifiable, Codable, Sendable {
         case .mountains: return "远山雾白"
         case .ginkgo: return "银杏花笺"
         case .tide: return "浅海潮汐"
+        case .paperCats: return "猫咪借书处"
+        case .moonLetters: return "月亮邮局"
+        case .cloudIslands: return "云朵小岛"
+        case .starPlanes: return "星屑纸飞机"
         case .green: return "豆沙绿"
         case .lavender: return "黛紫"
         case .azure: return "青空"
@@ -78,7 +84,17 @@ enum ReaderBackground: String, CaseIterable, Identifiable, Codable, Sendable {
         }
     }
 
-    var hasTexture: Bool { self == .kraftTexture || self == .parchmentTexture || self == .linen || wallpaperAssetName != nil }
+    var hasTexture: Bool { self == .kraftTexture || self == .parchmentTexture || self == .linen || wallpaperAssetName != nil || doodlePattern != nil }
+
+    var doodlePattern: ReaderDoodlePattern? {
+        switch self {
+        case .paperCats: return .cats
+        case .moonLetters: return .letters
+        case .cloudIslands: return .clouds
+        case .starPlanes: return .planes
+        default: return nil
+        }
+    }
 
     var wallpaperAssetName: String? {
         switch self {
@@ -135,6 +151,10 @@ enum ReaderBackground: String, CaseIterable, Identifiable, Codable, Sendable {
         case .mountains: return 0xF5F3EB
         case .ginkgo: return 0xF8F1E7
         case .tide: return 0xEFF5F7
+        case .paperCats: return 0xF9F3E9
+        case .moonLetters: return 0xF2F0FA
+        case .cloudIslands: return 0xEEF5F8
+        case .starPlanes: return 0xF3F6EC
         case .green: return 0xC2D8AA
         case .lavender: return 0xDBB8E2
         case .azure: return 0xABCEE0
@@ -156,7 +176,7 @@ enum ReaderBackground: String, CaseIterable, Identifiable, Codable, Sendable {
         case .paper, .parchmentTexture: return 0x63543C
         case .kraft, .kraftTexture: return 0x3E3422
         case .linen: return 0x38342F
-        case .bamboo, .mountains, .ginkgo, .tide: return 0x222A25
+        case .bamboo, .mountains, .ginkgo, .tide, .paperCats, .moonLetters, .cloudIslands, .starPlanes: return 0x222A25
         case .green: return 0x596C44
         case .lavender: return 0x5A4761
         case .azure: return 0x345367
@@ -178,7 +198,7 @@ enum ReaderBackground: String, CaseIterable, Identifiable, Codable, Sendable {
         switch self {
         case .paper, .parchmentTexture: return 0x1E2021
         case .kraft, .kraftTexture, .linen, .green, .lavender, .azure: return 0x3C3F43
-        case .bamboo, .mountains, .ginkgo, .tide: return 0x1D2420
+        case .bamboo, .mountains, .ginkgo, .tide, .paperCats, .moonLetters, .cloudIslands, .starPlanes: return 0x1D2420
         case .white: return 0x18181A
         case .gray: return 0x2C2C2E
         case .dark, .eink: return 0x000000
@@ -195,7 +215,7 @@ enum ReaderBackground: String, CaseIterable, Identifiable, Codable, Sendable {
     var nightTextHex: UInt32 {
         switch self {
         case .paper, .kraft, .parchmentTexture, .kraftTexture, .linen: return 0xDCDFE1
-        case .bamboo, .mountains, .ginkgo, .tide: return 0xDEE4DF
+        case .bamboo, .mountains, .ginkgo, .tide, .paperCats, .moonLetters, .cloudIslands, .starPlanes: return 0xDEE4DF
         case .green: return 0x88C16F
         case .lavender: return 0xF6AEAE
         case .azure: return 0x90BFF5
