@@ -3,7 +3,7 @@ import UIKit
 
 /// 壁纸填充方式。对齐开元（Flutter `BoxFit`）与栖阅（UIImageView contentMode）：
 /// 填充裁切 / 完整显示 / 拉伸铺满。
-enum ReaderWallpaperFillMode: String, CaseIterable, Identifiable {
+enum ReaderWallpaperFillMode: String, CaseIterable, Identifiable, Codable, Hashable, Sendable {
     case fill
     case fit
     case stretch
@@ -39,28 +39,47 @@ enum ReaderWallpaperFillMode: String, CaseIterable, Identifiable {
 struct ReaderWallpaperView: UIViewRepresentable {
     let image: UIImage
     let fillMode: ReaderWallpaperFillMode
+    var adjustment = ReaderWallpaperAdjustment()
 
     func makeUIView(context: Context) -> ReaderWallpaperUIImageView {
-        let view = ReaderWallpaperUIImageView()
+        let view = ReaderWallpaperUIImageView(frame: .zero)
         view.backgroundColor = .clear
         view.isUserInteractionEnabled = false
         view.clipsToBounds = true
         view.image = image
         view.fillMode = fillMode
+        view.adjustment = adjustment
         return view
     }
 
     func updateUIView(_ view: ReaderWallpaperUIImageView, context: Context) {
         view.image = image
         view.fillMode = fillMode
+        view.adjustment = adjustment
     }
 }
 
-final class ReaderWallpaperUIImageView: UIImageView {
+final class ReaderWallpaperUIImageView: UIView {
+    private let picture = UIImageView()
+    private let shade = UIView()
+    var image: UIImage? { didSet { picture.image = image; setNeedsLayout() } }
     var fillMode: ReaderWallpaperFillMode = .fill {
-        didSet {
-            contentMode = fillMode.uiContentMode
-        }
+        didSet { setNeedsLayout() }
+    }
+    var adjustment = ReaderWallpaperAdjustment() { didSet { setNeedsLayout() } }
+
+    override init(frame: CGRect) {
+        super.init(frame: frame)
+        clipsToBounds = true
+        picture.contentMode = .scaleToFill
+        addSubview(picture); addSubview(shade)
+    }
+    required init?(coder: NSCoder) { fatalError("init(coder:) is not supported") }
+    override func layoutSubviews() {
+        super.layoutSubviews()
+        picture.frame = adjustment.imageFrame(imageSize: image?.size ?? .zero, viewport: bounds.size, mode: fillMode)
+        shade.frame = bounds
+        shade.backgroundColor = UIColor.black.withAlphaComponent(adjustment.dimming.isFinite ? min(max(adjustment.dimming, 0), 0.6) : 0)
     }
 
     override var intrinsicContentSize: CGSize {

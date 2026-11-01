@@ -70,6 +70,12 @@ struct ReaderView: View {
     @State private var isPerformingPayAction = false
     @State private var quoteCardBookmark: ReaderBookmark? = nil
     @State private var selectedPhotoItem: PhotosPickerItem? = nil
+    @State private var wallpaperDraft: ReaderWallpaperDraft?
+    @State private var wallpaperImportTask: Task<Void, Never>?
+    @State private var wallpaperImportRevision = UUID()
+    @State private var isPreparingWallpaper = false
+    @State private var wallpaperMessage: String?
+    @State private var confirmClearWallpaper = false
     @State private var backgroundWallpaperRevision = UUID()
     @State private var settingsTab = 0
 
@@ -1050,6 +1056,18 @@ struct ReaderView: View {
         // 全屏阅读时连 home indicator 一起淡出；打开菜单或强制系统状态栏时恢复。
         .persistentSystemOverlays(showOverlay || showSystemStatusBar ? .automatic : .hidden)
         .task(id: backgroundRawValue) {
+            if background == .custom {
+                await ReaderCustomWallpaperStore.warmWallpaper()
+                guard !Task.isCancelled else { return }
+                customBackgroundIsDark = ReaderCustomWallpaperStore.isWallpaperDark
+                if ReaderCustomWallpaperStore.hasEditedWallpaper,
+                   UserDefaults.standard.object(forKey: "reader.customWallpaperFillMode") == nil {
+                    customWallpaperFillModeRaw = ReaderCustomWallpaperStore.adjustment.fillMode.rawValue
+                }
+                backgroundWallpaperRevision = UUID()
+                rebuildPagedBlocksCache()
+                return
+            }
             guard let name = background.wallpaperAssetName else { return }
             let loaded = await ReaderIllustratedBackgroundStore.load(name)
             guard loaded != nil, !Task.isCancelled else { return }
@@ -1085,6 +1103,16 @@ struct ReaderView: View {
         .sheet(isPresented: $showBookmarks) {
             bookmarkSheet
         }
+        .sheet(item: $wallpaperDraft) { draft in
+            ReaderWallpaperEditorView(draft: draft) {
+                backgroundRawValue = ReaderBackground.custom.rawValue
+                customBackgroundIsDark = ReaderCustomWallpaperStore.isWallpaperDark
+                customWallpaperFillModeRaw = ReaderCustomWallpaperStore.adjustment.fillMode.rawValue
+                backgroundWallpaperRevision = UUID()
+                rebuildPagedBlocksCache(); syncPerBookOverrideIfNeeded(); HapticFeedback.success()
+            }
+        }
+        .onDisappear { wallpaperImportTask?.cancel(); wallpaperImportRevision = UUID() }
         .sheet(isPresented: $showFontManagementSheet) {
             NavigationStack {
                 CustomFontManagementView()
@@ -1416,10 +1444,11 @@ struct ReaderView: View {
 
     private var readerBackdrop: some View {
         ZStack {
-            if background == .custom, let image = ReaderCustomWallpaperStore.loadWallpaper() {
+            if background == .custom, let image = ReaderCustomWallpaperStore.cachedWallpaper {
                 ReaderWallpaperView(
                     image: image,
-                    fillMode: ReaderWallpaperFillMode(rawValue: customWallpaperFillModeRaw) ?? .fill
+                    fillMode: ReaderWallpaperFillMode(rawValue: customWallpaperFillModeRaw) ?? .fill,
+                    adjustment: ReaderCustomWallpaperStore.adjustment
                 )
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .id(backgroundWallpaperRevision)
@@ -3198,11 +3227,12 @@ struct ReaderView: View {
 
     @ViewBuilder
     private var pageBackground: some View {
-        if background == .custom, let image = ReaderCustomWallpaperStore.loadWallpaper() {
+        if background == .custom, let image = ReaderCustomWallpaperStore.cachedWallpaper {
             ZStack {
                 ReaderWallpaperView(
                     image: image,
-                    fillMode: ReaderWallpaperFillMode(rawValue: customWallpaperFillModeRaw) ?? .fill
+                    fillMode: ReaderWallpaperFillMode(rawValue: customWallpaperFillModeRaw) ?? .fill,
+                    adjustment: ReaderCustomWallpaperStore.adjustment
                 )
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 if customBackgroundIsDark {
@@ -4128,20 +4158,25 @@ struct ReaderView: View {
             }
             .onChange(of: selectedPhotoItem) { item in
                 guard let item else { return }
-                Task {
-                    if let data = try? await item.loadTransferable(type: Data.self),
-                       let image = UIImage(data: data) {
-                        await MainActor.run {
-                            ReaderCustomWallpaperStore.saveWallpaper(image)
-                            customBackgroundIsDark = ReaderCustomWallpaperStore.isWallpaperDark
-                            backgroundRawValue = ReaderBackground.custom.rawValue
-                            backgroundWallpaperRevision = UUID()
-                            rebuildPagedBlocksCache()
-                            syncPerBookOverrideIfNeeded()
-                            HapticFeedback.success()
+                prepareWallpaper(from: item)
+            }
+            .disabled(isPreparingWallpaper)
+
+            if isPreparingWallpaper { Text("正在准备壁纸预览…").font(.caption) }
+            if let wallpaperMessage { Text(wallpaperMessage).font(.caption).foregroundStyle(.secondary) }
+            if ReaderCustomWallpaperStore.hasCustomWallpaper {
+                Button("编辑已保存壁纸") {
+                    Task { @MainActor in
+                        await ReaderCustomWallpaperStore.warmWallpaper()
+                        guard let image = ReaderCustomWallpaperStore.cachedWallpaper else {
+                            wallpaperMessage = ReaderCustomWallpaperStore.lastError ?? "壁纸无法读取，请重新选择图片。"; return
                         }
+                        var adjustment = ReaderCustomWallpaperStore.adjustment
+                        adjustment.fillMode = ReaderWallpaperFillMode(rawValue: customWallpaperFillModeRaw) ?? .fill
+                        adjustment.usesLightText = customBackgroundIsDark
+                        wallpaperDraft = ReaderWallpaperDraft(image: image, adjustment: adjustment)
                     }
-                }
+                }.buttonStyle(.bordered)
             }
 
             Picker("壁纸基底与文字风格", selection: $customBackgroundIsDark) {
@@ -4167,20 +4202,28 @@ struct ReaderView: View {
 
             if ReaderCustomWallpaperStore.hasCustomWallpaper {
                 Button(role: .destructive) {
-                    ReaderCustomWallpaperStore.clearWallpaper()
-                    backgroundRawValue = ReaderBackground.white.rawValue
-                    backgroundWallpaperRevision = UUID()
-                    rebuildPagedBlocksCache()
-                    HapticFeedback.light()
+                    confirmClearWallpaper = true
                 } label: {
                     HStack(spacing: 4) {
                         Image(systemName: "trash")
-                        Text("清除自定义壁纸，恢复预设羊皮纸主题")
+                        Text("删除自定义壁纸，恢复素白背景")
                     }
                     .font(.caption)
                     .foregroundStyle(.red)
                 }
                 .padding(.top, 2)
+                .confirmationDialog("删除自定义壁纸？裁切与原图将一并移除。", isPresented: $confirmClearWallpaper, titleVisibility: .visible) {
+                    Button("删除自定义壁纸", role: .destructive) {
+                        Task { @MainActor in
+                            do {
+                                try await ReaderCustomWallpaperStore.clearEditedWallpaper()
+                                backgroundRawValue = ReaderBackground.white.rawValue
+                                backgroundWallpaperRevision = UUID(); rebuildPagedBlocksCache()
+                            } catch { wallpaperMessage = "删除未完成，请重试。" + error.localizedDescription }
+                        }
+                    }
+                    Button("保留壁纸", role: .cancel) {}
+                }
             }
 
             Text(ReaderCustomWallpaperStore.hasCustomWallpaper
@@ -4188,6 +4231,28 @@ struct ReaderView: View {
                  : "可从相册选择壁纸，支持自由搭配浅色或深色文字。")
                 .font(.caption2)
                 .foregroundStyle(readerThemeTextColor.opacity(0.42))
+        }
+    }
+
+    private func prepareWallpaper(from item: PhotosPickerItem) {
+        wallpaperImportTask?.cancel()
+        let revision = UUID(); wallpaperImportRevision = revision
+        isPreparingWallpaper = true; wallpaperMessage = nil
+        wallpaperImportTask = Task { @MainActor in
+            defer { if wallpaperImportRevision == revision { isPreparingWallpaper = false } }
+            do {
+                guard let bytes = try await item.loadTransferable(type: Data.self) else { throw ReaderWallpaperFailure.invalidImage }
+                let snapshot = try await Task.detached(priority: .userInitiated) {
+                    let image = try ReaderWallpaperRepository.decodeImage(bytes)
+                    var adjustment = ReaderWallpaperAdjustment(); adjustment.usesLightText = image.isDarkPerception
+                    return ReaderWallpaperSnapshot(image: image, adjustment: adjustment)
+                }.value
+                guard !Task.isCancelled, wallpaperImportRevision == revision else { return }
+                wallpaperDraft = ReaderWallpaperDraft(image: snapshot.image, adjustment: snapshot.adjustment)
+                selectedPhotoItem = nil
+            } catch {
+                if !Task.isCancelled, wallpaperImportRevision == revision { wallpaperMessage = error.localizedDescription }
+            }
         }
     }
 
