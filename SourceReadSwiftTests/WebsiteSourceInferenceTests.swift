@@ -21,6 +21,9 @@ final class WebsiteSourceInferenceTests: XCTestCase {
         XCTAssertEqual(draft.contentSelector, "#content")
         XCTAssertTrue(draft.preview.joined().contains("第0段"))
         XCTAssertNil(draft.source.searchUrl, "One catalog page is not evidence of a search protocol")
+        let categories = ExploreCategoryParser.parse(exploreUrl: draft.source.exploreUrl)
+        XCTAssertEqual(categories.count, 1, "Imported source must have a reachable discovery entry, not a bare URL treated as a group header")
+        XCTAssertEqual(categories.first?.url, catalog.url.absoluteString)
         let response = SourceResponse(url: catalog.url, statusCode: 200, headers: [:], body: catalog.html, data: Data(catalog.html.utf8))
         let books = try SearchResultParser().parse(source: draft.source, response: response, ruleOverride: draft.source.ruleExplore).get()
         XCTAssertEqual(books.first?.name, "示例长篇")
@@ -49,6 +52,8 @@ final class WebsiteSourceInferenceTests: XCTestCase {
         XCTAssertNotNil(WebsiteSourceInference.validURL("https://novel.example/book?id=12"))
         let draft = try WebsiteSourceInference.infer(catalog: catalog, chapter: chapter, name: "x", tocCSS: "#catalog", contentCSS: "#content")
         XCTAssertEqual(draft.chapterCount, 3)
+        XCTAssertThrowsError(try WebsiteSourceInference.infer(catalog: catalog, chapter: chapter, name: "x", tocCSS: "#missing", contentCSS: "#content"))
+        XCTAssertThrowsError(try WebsiteSourceInference.infer(catalog: catalog, chapter: chapter, name: "x", tocCSS: "#catalog", contentCSS: "#missing"))
         let oversized = WebsitePageSample(url: chapter.url, html: String(repeating: "中", count: 700_000))
         XCTAssertThrowsError(try WebsiteSourceInference.infer(catalog: catalog, chapter: oversized, name: "x"))
     }

@@ -43,6 +43,11 @@ struct SettingsView: View {
 
                 Section("内容设置") {
                     NavigationLink {
+                        AIChatView().hideRootTabBar()
+                    } label: {
+                        Label("AI 助手 · 对话与写源", systemImage: "bubble.left.and.bubble.right")
+                    }
+                    NavigationLink {
                         SourceManagerView()
                             .environmentObject(appState)
                             .hideRootTabBar()

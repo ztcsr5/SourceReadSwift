@@ -96,13 +96,18 @@ enum WebsiteSourceInference {
             contentSelector = try root.cssSelector()
         }
         let title = ((try? tocDoc.select("h1").first()?.text()) ?? nil)?.nilIfEmpty ?? "网页书籍"
+        guard try tocDoc.select(tocSelector).count == 1,
+              try tocDoc.select(tocSelector + " a[href]").count >= 2 else { throw Failure.noCatalog }
+        guard try bodyDoc.select(contentSelector).count == 1,
+              try bodyDoc.select(contentSelector).text().count >= 80 else { throw Failure.noContent }
         let sourceName = name.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty ?? (catalog.url.host ?? "网页书源")
         // No cookies, credentials, page HTML, scripts or inferred search API
         // enter the exported source. The browser cookie jar stays local.
         let explore = SourceRule(fields: ["bookList": "@css:body", "name": "@css:h1@text", "bookUrl": "@js:baseUrl"])
+        let exploreCategories = String(decoding: try JSONSerialization.data(withJSONObject: [["title": title, "url": catalog.url.absoluteString]]), as: UTF8.self)
         let source = BookSource(bookSourceName: sourceName,
             bookSourceUrl: base + "#local-inference-" + UUID().uuidString,
-            bookSourceGroup: "网页本地解析", exploreUrl: catalog.url.absoluteString,
+            bookSourceGroup: "网页本地解析", exploreUrl: exploreCategories,
             ruleBookInfo: .init(fields: ["name": "@css:h1@text", "tocUrl": catalog.url.absoluteString]),
             ruleToc: .init(fields: ["chapterList": "@css:\(tocSelector) a[href]", "chapterName": "text", "chapterUrl": "href"]),
             ruleContent: .init(fields: ["content": "@css:\(contentSelector)@html", "title": "@css:h1@text"]),
