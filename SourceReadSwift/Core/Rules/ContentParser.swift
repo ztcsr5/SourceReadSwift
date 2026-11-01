@@ -23,6 +23,13 @@ struct ContentParser {
         response: SourceResponse,
         globalPurifyRules: [String] = []
     ) -> Result<ChapterContent, SourceEngineError> {
+        // Some picture sources point chapter URLs directly at the image bytes.
+        // Applying HTML/JSON rules to that response loses the actual page URL.
+        let mime = response.headers.first { $0.key.lowercased() == "content-type" }?.value.lowercased() ?? ""
+        if source.bookSourceType == 2, mime.hasPrefix("image/") {
+            return .success(ChapterContent(chapter: chapter, title: chapter.title,
+                paragraphs: ["[img]\(response.url.absoluteString)[/img]"], nextContentUrl: nil))
+        }
         let body = ResponseFormatDetector.normalizedBody(response.body)
         let normalizedResponse = SourceResponse(
             url: response.url,

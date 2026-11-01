@@ -286,7 +286,10 @@ final class JSCoreRuntime {
                                     // must stay invisible to for-in.
                                     Object.defineProperty(proto, name, {
                                         value: function() {
-                                            var s = this.toString();
+                                            // Legado image rules split extracted lists on newlines.
+                                            // Keep ordinary Array.toString/comma semantics unchanged.
+                                            var s = name === 'split' && arguments[0] === '\\n' && Array.isArray(this)
+                                                ? this.join('\\n') : this.toString();
                                             return String.prototype[name].apply(s, arguments);
                                         },
                                         enumerable: false,

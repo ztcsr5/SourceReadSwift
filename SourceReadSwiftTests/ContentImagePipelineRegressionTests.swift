@@ -56,6 +56,27 @@ final class ContentImagePipelineRegressionTests: XCTestCase {
         XCTAssertEqual(pages([#"["https://cdn.example/render?id=3","/p2.jpg"]"#]).map(\.url), ["https://cdn.example/render?id=3", "https://comic.example/p2.jpg"])
     }
 
+    func testExtractedImageArraySplitsOnNewlinesWithoutJoiningURLsWithCommas() throws {
+        let rule = #"data.pages@js:result.split("\n").map(x => '<img src=\"' + x + ',{"headers":{"Referer":"https://comic.example/reader"}}\">').join("\n")"#
+        let source = BookSource(bookSourceName: "Array image fixture", bookSourceUrl: "https://comic.example", ruleContent: SourceRule(fields: ["content": rule]))
+        let body = #"{"data":{"pages":["https://cdn.example/a.jpg","https://cdn.example/b.jpg"]}}"#
+        let response = SourceResponse(url: URL(string: chapter.url)!, statusCode: 200, headers: ["Content-Type": "application/json"], body: body, data: Data(body.utf8))
+        let content = try ContentParser().parse(source: source, chapter: chapter, response: response).get()
+        let result = ComicContentParser.parsePages(from: content)
+        XCTAssertEqual(result.map(\.url), ["https://cdn.example/a.jpg", "https://cdn.example/b.jpg"])
+        XCTAssertEqual(result.map { $0.headers["Referer"] }, ["https://comic.example/reader", "https://comic.example/reader"])
+    }
+
+    func testDirectImageChapterUsesResponseURLInsteadOfTextRules() throws {
+        let source = BookSource(bookSourceName: "Image chapter fixture", bookSourceUrl: "https://comic.example", bookSourceType: 2, ruleContent: SourceRule(fields: ["content": "@get:{img}"]))
+        let url = URL(string: "https://cdn.example/direct.png")!
+        let data = Data(base64Encoded: "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aDZkAAAAASUVORK5CYII=")!
+        let response = SourceResponse(url: url, statusCode: 200, headers: ["content-type": "image/png"], body: "", data: data)
+        let content = try ContentParser().parse(source: source, chapter: chapter, response: response).get()
+        XCTAssertEqual(ComicContentParser.parsePages(from: content).map(\.url), [url.absoluteString])
+        XCTAssertEqual(content.title, chapter.title)
+    }
+
     func testRejectsNavigationJavaScriptAndTrackingPlaceholders() {
         XCTAssertTrue(pages(["正文不是图片", "javascript:alert(1)", #"<img src="data:image/gif;base64,AAAA">"#]).isEmpty)
     }
