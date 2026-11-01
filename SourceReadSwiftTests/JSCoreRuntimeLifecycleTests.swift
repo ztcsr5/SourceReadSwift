@@ -3,6 +3,22 @@ import XCTest
 
 /// A source shares its library and @put store, not a rule's let/const scope.
 final class JSCoreRuntimeLifecycleTests: XCTestCase {
+    func testNestedStringRuleSharesSourceLibraryAndStoreWithoutErasingCallerInput() throws {
+        let source = BookSource(bookSourceName: "Nested source", bookSourceUrl: "https://fixture.test",
+            raw: ["bookSourceComment": "Original author", "jsLib": "const libraryMarker = 'loaded'; function readMarker() { return libraryMarker; }"])
+        let context = RuleExecutionContext(source: source)
+        defer { context.cleanUp() }
+        let runtime = context.jsRuntime(ajaxHandler: { _ in "" })
+        let html = "<html><body><b>chapter</b></body></html>"
+        let script = #"""
+        java.put('shared', 'before');
+        var nested = java.getString('<js>java.put("shared", "after"); [source.bookSourceComment, readMarker(), java.getString("b@text")].join("|")</js>');
+        [nested, java.get('shared'), java.getString('b@text'), src, baseUrl].join('~')
+        """#
+        XCTAssertEqual(try runtime.evaluate(script, variables: ["src": html, "html": html, "result": html, "baseUrl": "https://fixture.test/chapter/1"]).get(),
+            "Original author|loaded|chapter~after~chapter~\(html)~https://fixture.test/chapter/1")
+    }
+
     func testRepeatedRulesHaveIndependentLexicalBindings() throws {
         let runtime = JSCoreRuntime()
         for index in 1...3 {

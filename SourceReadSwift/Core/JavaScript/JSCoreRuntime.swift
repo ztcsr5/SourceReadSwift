@@ -17,6 +17,7 @@ final class JSCoreRuntime {
     private let jxNodeFactory: LegadoJXNodeFactoryBridge
     private var baseBridgeError: String? = nil
     private let evaluateLock = NSRecursiveLock()
+    private var evaluationDepth = 0
     /// `jsLib` bundles are evaluated once per runtime, matching Legado's
     /// one-engine-per-source model.  Re-running the bundle on every rule
     /// call throws `Identifier 'x' has already been declared` for bundles
@@ -193,19 +194,39 @@ final class JSCoreRuntime {
     func evaluate(_ script: String, variables: [String: Any] = [:]) -> Result<String, SourceEngineError> {
         return autoreleasepool {
             evaluateLock.lock()
+            let isNested = evaluationDepth > 0
+            let scopedKeys = Set(variables.keys).union(["src", "result", "html", "content", "id", "type", "source", "baseUrl", "cookieHeader"])
+            let callerGlobals = isNested ? scopedKeys.reduce(into: [String: JSValue]()) { snapshot, key in
+                snapshot[key] = context.objectForKeyedSubscript(key)
+            } : [:]
+            let callerValues = isNested ? executionContext.snapshot() : [:]
+            evaluationDepth += 1
             defer {
-                context.setObject("", forKeyedSubscript: "src" as NSString)
-                context.setObject("", forKeyedSubscript: "result" as NSString)
-                context.setObject("", forKeyedSubscript: "html" as NSString)
-                context.setObject("", forKeyedSubscript: "content" as NSString)
-                context.setObject("", forKeyedSubscript: "id" as NSString)
-                context.setObject("", forKeyedSubscript: "type" as NSString)
+                evaluationDepth -= 1
+                if isNested {
+                    for (key, value) in callerGlobals {
+                        context.setObject(value, forKeyedSubscript: key as NSString)
+                    }
+                    for key in scopedKeys where key != "cookieHeader" {
+                        executionContext.setValue(callerValues[key], for: key)
+                    }
+                } else {
+                    context.setObject("", forKeyedSubscript: "src" as NSString)
+                    context.setObject("", forKeyedSubscript: "result" as NSString)
+                    context.setObject("", forKeyedSubscript: "html" as NSString)
+                    context.setObject("", forKeyedSubscript: "content" as NSString)
+                    context.setObject("", forKeyedSubscript: "id" as NSString)
+                    context.setObject("", forKeyedSubscript: "type" as NSString)
+                }
                 evaluateLock.unlock()
             }
         if let baseBridgeError {
             return .failure(.javascript("Legado bridge prelude failed: \(baseBridgeError)"))
         }
         var effectiveVariables = variables
+        if let source = variables["source"] as? BookSource {
+            executionContext.source = source
+        }
         if effectiveVariables["source"] == nil, let source = executionContext.source {
             effectiveVariables["source"] = source
         }
@@ -977,7 +998,8 @@ final class JSCoreRuntime {
                 .replacingOccurrences(of: "ss", with: "ss")
             return formatter.string(from: date)
         }
-        let getString: @convention(block) (String, String, String) -> String = { html, rule, baseUrl in
+        let getString: @convention(block) (String, String, String) -> String = { [weak self] html, rule, baseUrl in
+            guard let self else { return "" }
             do {
                 var cleanRule = rule.trimmingCharacters(in: .whitespacesAndNewlines)
                 if cleanRule.hasPrefix("$.") || cleanRule.hasPrefix("@json:") || ResponseFormatDetector.looksLikeJSON(html) {
@@ -996,8 +1018,9 @@ final class JSCoreRuntime {
                 }
                 let safeBaseUrl = baseUrl.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "http://localhost/" : baseUrl
                 let document = try SwiftSoup.parse(html, safeBaseUrl)
-                return try Self.extractString(from: document, rule: cleanRule, baseUrl: URL(string: safeBaseUrl))
+                return try self.extractString(from: document, rule: cleanRule, baseUrl: URL(string: safeBaseUrl))
             } catch {
+                self.executionContext.recordBridgeFailure("java.getString", message: error.localizedDescription)
                 return ""
             }
         }
@@ -5646,8 +5669,14 @@ final class JSCoreRuntime {
         return Data(bytes).base64EncodedString()
     }
 
-    private static func extractString(from document: Document, rule: String, baseUrl: URL?) throws -> String {
-        try HtmlRuleExtractor().value(from: document, rule: rule, baseUrl: baseUrl)
+    private func extractString(from document: Document, rule: String, baseUrl: URL?) throws -> String {
+        // Nested rules belong to the caller's source/library/@put store, not
+        // a fresh anonymous runtime. evaluate restores the caller's input frame.
+        let html = try document.outerHtml()
+        var variables: [String: Any] = ["html": html, "src": html, "result": html]
+        if let source = executionContext.source { variables["source"] = source }
+        return try HtmlRuleExtractor(executionContext: executionContext)
+            .value(from: document, rule: rule, baseUrl: baseUrl, variables: variables)
     }
 
     private static func extractStringList(from document: Document, rule: String, baseUrl: URL?) throws -> [String] {

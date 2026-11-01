@@ -14,6 +14,7 @@ final class SourceRowsCorpusProbeTests: XCTestCase {
         let name: String
         let rule: String
         let expected: Int
+        let expectedEmptyResultText: String?
         let bodyFile: String
         let baseUrl: String
         let nameRule: String?
@@ -32,6 +33,7 @@ final class SourceRowsCorpusProbeTests: XCTestCase {
         var report: [[String: Any]] = []
         var mismatches: [String] = []
         var unusablePositivePages: [String] = []
+        var emptyResultPages = 0
         for entry in entries {
             let bodyURL = directory.appendingPathComponent(entry.bodyFile)
             let html = try String(contentsOf: bodyURL, encoding: .utf8)
@@ -81,7 +83,18 @@ final class SourceRowsCorpusProbeTests: XCTestCase {
             let response = SourceResponse(url: base, statusCode: 200, headers: ["Content-Type": "text/html"], body: html, data: Data(html.utf8))
             let parsed = SearchResultParser().parse(source: source, response: response)
             let usableBooks = (try? parsed.get()) ?? []
-            if entry.expected > 0, usableBooks.isEmpty {
+            if let emptyText = entry.expectedEmptyResultText {
+                // jsoup counts the site's no-results placeholder as one li,
+                // but producing a book from that row would fabricate a result.
+                emptyResultPages += 1
+                XCTAssertEqual(rows.count, 1, "\(entry.id): empty-result fixture changed")
+                XCTAssertEqual(try rows.first?.text(), emptyText)
+                XCTAssertEqual(try rows.first?.select("a[href], b").count, 0)
+                XCTAssertTrue(usableBooks.isEmpty, "\(entry.id): no-results row became a fabricated book")
+                if case .failure(.empty) = parsed {} else {
+                    XCTFail("\(entry.id): expected an explicit empty-result diagnostic, got \(parsed)")
+                }
+            } else if entry.expected > 0, usableBooks.isEmpty {
                 let reason: String
                 if case .failure(let error) = parsed { reason = error.displayMessage } else { reason = "zero usable books" }
                 unusablePositivePages.append("\(entry.id) \(entry.name): \(reason)")
@@ -133,6 +146,7 @@ final class SourceRowsCorpusProbeTests: XCTestCase {
         XCTAssertTrue(mismatches.isEmpty, "SwiftSoup/jsoup row parity regressed: " + mismatches.prefix(8).joined(separator: "; "))
         XCTAssertTrue(unusablePositivePages.isEmpty, "Positive search samples must yield usable books: " + unusablePositivePages.prefix(8).joined(separator: "; "))
         XCTAssertEqual(report.count, entries.count)
+        XCTAssertEqual(emptyResultPages, 2, "Only the two audited no-results placeholders are negative fixtures")
     }
 
     private func corpusDirectory() throws -> URL {
