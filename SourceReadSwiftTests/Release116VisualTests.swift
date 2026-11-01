@@ -1,5 +1,6 @@
 import SwiftUI
 import UIKit
+import WebKit
 import XCTest
 @testable import SourceReadSwift
 
@@ -113,6 +114,26 @@ final class Release116VisualTests: XCTestCase {
         defer { window.isHidden = true }
         try await Task.sleep(nanoseconds: 500_000_000)
         host.view.layoutIfNeeded()
+        if name.hasPrefix("reader-top-") {
+            func findWebView(_ view: UIView) -> WKWebView? {
+                if let web = view as? WKWebView { return web }
+                return view.subviews.lazy.compactMap { findWebView($0) }.first
+            }
+            let web = try XCTUnwrap(findWebView(host.view))
+            var ready = false
+            for _ in 0..<100 {
+                ready = (try? await web.evaluateJavaScript("document.body.innerText.includes('这是顶部与安全区域')")) as? Bool == true
+                if ready { break }
+                try await Task.sleep(nanoseconds: 100_000_000)
+            }
+            XCTAssertTrue(ready, "Do not accept a blank WebKit reader as visual evidence")
+            try await Task.sleep(nanoseconds: 200_000_000)
+            let webImage = try await web.takeSnapshot(configuration: nil)
+            let webAttachment = XCTAttachment(image: webImage)
+            webAttachment.name = "release116-webbody-\(name)"
+            webAttachment.lifetime = .keepAlways
+            add(webAttachment)
+        }
         XCTAssertEqual(host.view.bounds.width, width, accuracy: 1)
         XCTAssertEqual(host.traitCollection.userInterfaceStyle, style, "Rendered evidence must receive its named appearance")
         let image = UIGraphicsImageRenderer(size: host.view.bounds.size).image { _ in host.view.drawHierarchy(in: host.view.bounds, afterScreenUpdates: true) }
