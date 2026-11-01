@@ -247,7 +247,8 @@ enum ReaderBackground: String, CaseIterable, Identifiable, Codable, Sendable {
         if isNight { return false }
         switch self {
         case .paper, .kraft, .parchmentTexture, .kraftTexture, .linen, .white, .gray, .eink,
-             .sakuraClassic, .sakuraEarthly, .sakuraInk, .bamboo, .mountains, .ginkgo, .tide: return true
+             .sakuraClassic, .sakuraEarthly, .sakuraInk, .bamboo, .mountains, .ginkgo, .tide,
+             .paperCats, .moonLetters, .cloudIslands, .starPlanes: return true
         case .custom:
             return !isDark
         case .green, .lavender, .azure, .dark,

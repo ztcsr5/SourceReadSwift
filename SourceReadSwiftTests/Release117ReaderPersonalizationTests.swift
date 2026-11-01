@@ -11,6 +11,8 @@ final class Release117ReaderPersonalizationTests: XCTestCase {
             XCTAssertTrue(background.hasTexture)
             XCTAssertNil(background.wallpaperAssetName, "Vector backgrounds need no remote or bundled bitmap")
             XCTAssertNotNil(background.doodlePattern)
+            XCTAssertTrue(background.darkStatusIcon(isNight: false))
+            XCTAssertFalse(background.darkStatusIcon(isNight: true))
             for night in [false, true] {
                 let image = ReaderPaperTexture.image(background: background, night: night)
                 XCTAssertTrue(image === ReaderPaperTexture.image(background: background, night: night))
