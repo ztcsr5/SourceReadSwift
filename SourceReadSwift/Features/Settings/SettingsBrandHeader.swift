@@ -7,13 +7,18 @@ struct SettingsBrandHeader: View {
     var body: some View {
         Group {
             if dynamicTypeSize.isAccessibilitySize {
-                // Give large text the full row rather than wrapping it in the
-                // narrow column left beside the fixed-width brand mark.
-                VStack(alignment: .leading, spacing: 10) {
+                // Long "version / Build" wording wrapped into several lines
+                // at accessibility sizes. Present the same numbers compactly;
+                // VoiceOver retains the full version label and fonts still scale.
+                VStack(alignment: .leading, spacing: 8) {
                     HStack(alignment: .top, spacing: 12) {
                         PaperBetweenMark()
-                        identity.frame(maxWidth: .infinity, alignment: .leading)
+                        title.frame(maxWidth: .infinity, alignment: .leading)
                     }
+                    Text("\(AppVersion.versionString) · \(AppVersion.build)")
+                        .font(.caption.monospacedDigit())
+                        .foregroundStyle(.tertiary)
+                        .accessibilityLabel(AppVersion.fullDisplayString)
                     note
                 }
             } else {

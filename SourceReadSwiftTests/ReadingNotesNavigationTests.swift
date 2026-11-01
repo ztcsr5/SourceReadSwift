@@ -57,7 +57,7 @@ final class ReadingNotesNavigationTests: XCTestCase {
                     .dynamicTypeSize(largeText ? .accessibility3 : .large))
                 let size = header.sizeThatFits(in: CGSize(width: width - 32, height: 600))
                 XCTAssertLessThanOrEqual(size.width, width - 31)
-                XCTAssertLessThan(size.height, largeText ? 260 : 120, "Note must remain compact while permitting larger text")
+                XCTAssertLessThan(size.height, largeText ? 260 : 120, "Header width=\(width), accessibility=\(largeText): retain compact layout and full scalable text")
                 let image = UIGraphicsImageRenderer(size: host.view.bounds.size).image { _ in
                     host.view.drawHierarchy(in: host.view.bounds, afterScreenUpdates: true)
                 }
