@@ -23,7 +23,7 @@ final class TabChromeRegressionTests: XCTestCase {
         defer { window.isHidden = true }
         let ready = await eventually { self.tabs(in: window.rootViewController) != nil }
         XCTAssertTrue(ready)
-        let tabs = try XCTUnwrap(tabs(in: window.rootViewController))
+        let tabs = try XCTUnwrap(self.tabs(in: window.rootViewController))
         XCTAssertNil(tabs.bottomAccessory, "No playback must not create a blank glass accessory")
         let owner = UUID()
         app.acquireTabChromeHidden(owner: owner)
@@ -47,7 +47,7 @@ final class TabChromeRegressionTests: XCTestCase {
         defer { window.isHidden = true }
         let ready = await eventually { self.tabs(in: window.rootViewController) != nil }
         XCTAssertTrue(ready)
-        let tabs = try XCTUnwrap(tabs(in: window.rootViewController))
+        let tabs = try XCTUnwrap(self.tabs(in: window.rootViewController))
         route.path = [1]
         let hidden = await eventually { tabs.isTabBarHidden && app.isTabChromeHidden }
         XCTAssertTrue(hidden, "Pushed hideRootTabBar destination must hide the real native tab bar")
@@ -60,7 +60,9 @@ final class TabChromeRegressionTests: XCTestCase {
     }
 
     @MainActor private func host<Content: View>(_ content: Content) -> UIWindow {
-        let window = UIWindow(frame: UIScreen.main.bounds)
+        let scene = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.first
+        let window = scene.map { UIWindow(windowScene: $0) } ?? UIWindow(frame: UIScreen.main.bounds)
+        window.frame = UIScreen.main.bounds
         window.rootViewController = UIHostingController(rootView: content)
         window.makeKeyAndVisible()
         return window
