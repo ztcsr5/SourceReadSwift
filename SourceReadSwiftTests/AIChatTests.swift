@@ -5,6 +5,23 @@ import SwiftUI
 final class AIChatTests: XCTestCase {
     private let config = AIChatConfiguration(endpoint: "https://ai.example/v1/chat/completions", model: "user-selected-model", supportsImages: false)
 
+    func testHTTPGatewayIsLimitedToLiteralLoopbackAndKeepsExactCredentialScope() throws {
+        for endpoint in ["http://127.0.0.1:8788/v1/chat/completions", "http://localhost:3425/v1/chat/completions", "http://[::1]:8788/v1/chat/completions"] {
+            XCTAssertNotNil(AIChatConfiguration(endpoint: endpoint).validatedURL, endpoint)
+            XCTAssertTrue(AIChatConfiguration(endpoint: endpoint).isLocalHTTPGateway, endpoint)
+        }
+        for endpoint in ["http://192.168.1.2/v1/chat/completions", "http://127.0.0.1.evil.example/chat", "http://2130706433/chat", "http://127.1/chat", "http://user:pass@127.0.0.1/chat", "http://127.0.0.1/chat?key=private"] {
+            XCTAssertNil(AIChatConfiguration(endpoint: endpoint).validatedURL, endpoint)
+        }
+        let local = AIChatConfiguration(endpoint: "http://127.0.0.1:8788/v1/chat/completions", model: "workbuddy/deepseek-v4.1-flash")
+        let credentials = AIChatCredentials(store: AIChatMemorySecrets())
+        try credentials.save("LOCAL-TEST-KEY", for: local)
+        XCTAssertEqual(credentials.key(for: local), "LOCAL-TEST-KEY")
+        var changed = local; changed.endpoint = "http://127.0.0.1:3425/v1/chat/completions"
+        XCTAssertNil(credentials.key(for: changed), "A different local gateway must not inherit a saved credential")
+        XCTAssertFalse(config.isLocalHTTPGateway)
+    }
+
     func testEndpointValidationAndCredentialIsolation() throws {
         for endpoint in ["http://ai.example/chat", "https://user:pass@ai.example/chat", "https://ai.example/chat?key=secret", "https://ai.example/chat#secret", "file:///private/key"] {
             XCTAssertNil(AIChatConfiguration(endpoint: endpoint).validatedURL)

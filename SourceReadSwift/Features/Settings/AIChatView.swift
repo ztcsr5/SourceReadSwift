@@ -211,12 +211,16 @@ private struct AIChatConfigurationView: View {
         NavigationStack {
             Form {
                 Section("Chat Completions 兼容接口") {
-                    TextField("完整 HTTPS 地址，以 /chat/completions 等路径结尾", text: $config.endpoint, axis: .vertical)
+                    TextField("完整 HTTPS / 本机环回地址，以 /chat/completions 等路径结尾", text: $config.endpoint, axis: .vertical)
                         .textInputAutocapitalization(.never).autocorrectionDisabled().keyboardType(.URL).focused($focused)
                     TextField("服务商提供的模型 ID", text: $config.model).textInputAutocapitalization(.never).autocorrectionDisabled().focused($focused)
                     Toggle("此模型支持图片", isOn: $config.supportsImages)
                     Text("填写完整接口地址，不会替你拼接路径或更换模型。不支持 Responses、Claude 原生等不同协议的接口。")
                         .font(.caption).foregroundStyle(.secondary)
+                    if config.isLocalHTTPGateway {
+                        Text("HTTP 仅用于本机网关。127.0.0.1 / localhost 指当前运行 App 的设备，不是你的电脑；iPhone 连接电脑需可达的 HTTPS 地址。")
+                            .font(.caption).foregroundStyle(.secondary)
+                    }
                 }
                 Section("API Key · 仅钥匙串") {
                     SecureField(savedKey ? "已有密钥，留空保留；填入可替换" : "粘贴 API Key", text: $key)
@@ -335,6 +339,10 @@ private struct AIChatSendReview: View {
             List {
                 Section("即将发送到") {
                     Text(submission.config.endpoint).font(.footnote).textSelection(.enabled)
+                    if submission.config.isLocalHTTPGateway {
+                        Text("本次发送到当前设备的本机 HTTP 网关；网关仍可能转发给上游服务商。")
+                            .font(.caption).foregroundStyle(.secondary)
+                    }
                     Text("模型：\(submission.config.model)")
                     Text("共 \(submission.history.count) 条消息 · \(submission.history.reduce(0) { $0 + $1.attachments.count }) 个附件 · \(submission.byteCount) 字节")
                         .font(.caption).foregroundStyle(.secondary)

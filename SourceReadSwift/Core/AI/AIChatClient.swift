@@ -7,10 +7,13 @@ struct AIChatConfiguration: Codable, Equatable, Sendable {
 
     var validatedURL: URL? {
         guard let parts = URLComponents(string: endpoint.trimmingCharacters(in: .whitespacesAndNewlines)),
-              parts.scheme?.lowercased() == "https", parts.host?.isEmpty == false,
+              let host = parts.host?.lowercased(), !host.isEmpty,
+              parts.scheme?.lowercased() == "https" || (parts.scheme?.lowercased() == "http" && ["localhost", "127.0.0.1", "::1", "[::1]"].contains(host)),
               parts.user == nil, parts.password == nil, parts.query == nil, parts.fragment == nil else { return nil }
         return parts.url
     }
+
+    var isLocalHTTPGateway: Bool { validatedURL?.scheme?.lowercased() == "http" }
 }
 
 enum AIChatFailure: LocalizedError, Equatable {
@@ -18,7 +21,7 @@ enum AIChatFailure: LocalizedError, Equatable {
     case http(Int), network
     var errorDescription: String? {
         switch self {
-        case .configuration: return "请填写完整 HTTPS Chat Completions 接口地址和模型名称，地址不能含凭据、查询参数或片段。"
+        case .configuration: return "请填写完整 HTTPS Chat Completions 地址和模型名称；HTTP 仅允许本机环回地址。地址不能含凭据、查询参数或片段。"
         case .missingKey: return "请先在配置中保存 API Key。"
         case .tooLarge: return "超出会话或附件大小限制，请清空旧会话或减少附件。"
         case .imageUnsupported: return "当前模型未开启图片支持；请在配置中确认模型支持图片，或移除图片。"
