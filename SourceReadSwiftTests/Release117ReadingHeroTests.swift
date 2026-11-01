@@ -68,17 +68,19 @@ final class Release117ReadingHeroTests: XCTestCase {
                 }.padding(16)
             }.background(AppTheme.background)
                 .environment(\.dynamicTypeSize, isLarge ? .accessibility3 : .large)
-                .environment(\.colorSchemeContrast, isLarge ? .increased : .standard)
                 .preferredColorScheme(isDark ? .dark : .light))
             let scene = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.first
             let window = scene.map { UIWindow(windowScene: $0) } ?? UIWindow(frame: UIScreen.main.bounds)
             window.frame = UIScreen.main.bounds
             let parent = UIViewController(); window.rootViewController = parent; window.makeKeyAndVisible()
-            parent.addChild(host); parent.view.addSubview(host.view)
+            parent.addChild(host)
+            parent.setOverrideTraitCollection(UITraitCollection(accessibilityContrast: isLarge ? .high : .normal), forChild: host)
+            parent.view.addSubview(host.view)
             host.view.frame = CGRect(x: 0, y: 0, width: width, height: 844); host.didMove(toParent: parent)
             try await Task.sleep(nanoseconds: 500_000_000)
             host.view.layoutIfNeeded()
             XCTAssertEqual(host.view.bounds.width, width, accuracy: 1)
+            XCTAssertEqual(host.traitCollection.accessibilityContrast, isLarge ? .high : .normal)
             let image = UIGraphicsImageRenderer(size: host.view.bounds.size).image { _ in host.view.drawHierarchy(in: host.view.bounds, afterScreenUpdates: true) }
             let attachment = XCTAttachment(image: image)
             attachment.name = "release117-hero-\(Int(width))-\(isDark ? "dark" : "light")-\(isLarge ? "large-contrast" : "normal")"
