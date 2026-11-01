@@ -4,6 +4,7 @@ import UIKit
 
 struct SourceManagerView: View {
     @EnvironmentObject private var appState: AppState
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @State private var selectedTab: SourceManagerTab = .bookSources
     @State private var searchText = ""
     @State private var debouncedSearchText = ""
@@ -242,6 +243,7 @@ struct SourceManagerView: View {
                 showLoginCenter = true
             } label: {
                 Image(systemName: "key.fill")
+                    .font(.system(size: 17, weight: .semibold))
                     .frame(width: AppLayout.minimumTapTarget, height: AppLayout.minimumTapTarget)
                     .background(AppTheme.accent.opacity(0.12), in: Circle())
             }
@@ -458,7 +460,11 @@ struct SourceManagerView: View {
             ViewThatFits(in: .horizontal) {
                 HStack(spacing: 8) { sourceQuickActions }
                     .fixedSize(horizontal: true, vertical: false)
-                VStack(spacing: 6) { sourceQuickActions }
+                if dynamicTypeSize.isAccessibilitySize {
+                    VStack(spacing: 6) { sourceQuickActions }
+                } else {
+                    LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 6) { sourceQuickActions }
+                }
             }
             .buttonStyle(.plain)
             DisclosureGroup("格式与检测说明") {

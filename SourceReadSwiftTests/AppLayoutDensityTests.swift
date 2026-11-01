@@ -55,7 +55,7 @@ final class AppLayoutDensityTests: XCTestCase {
 
     @MainActor func testDarkAndLargeTextRenderEvidence() async throws {
         let app = AppState()
-        try await snapshot("settings-dark", width: 390, height: 844,
+        try await snapshot("settings-dark", width: 390, height: 844, style: .dark,
                            content: SettingsView().environmentObject(app).preferredColorScheme(.dark))
         try await snapshot("settings-accessibility", width: 390, height: 844,
                            content: SettingsView().environmentObject(app).environment(\.dynamicTypeSize, .accessibility3))
@@ -87,12 +87,15 @@ final class AppLayoutDensityTests: XCTestCase {
     // Mounted UIKit rendering captures real List/NavigationStack layout and
     // materials. Attachments are exported by both CI SDK/runtime jobs.
     @MainActor private func snapshot<Content: View>(_ name: String, width: CGFloat, height: CGFloat,
+                                                   style: UIUserInterfaceStyle = .light,
                                                    content: Content) async throws {
         let scene = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.first
         let window = scene.map { UIWindow(windowScene: $0) } ?? UIWindow(frame: UIScreen.main.bounds)
         window.frame = UIScreen.main.bounds
+        window.overrideUserInterfaceStyle = style
         let container = UIViewController()
         let host = UIHostingController(rootView: content)
+        host.overrideUserInterfaceStyle = style
         window.rootViewController = container
         window.makeKeyAndVisible()
         container.addChild(host)
@@ -104,6 +107,7 @@ final class AppLayoutDensityTests: XCTestCase {
         host.view.setNeedsLayout()
         host.view.layoutIfNeeded()
         XCTAssertEqual(host.view.bounds.width, width, accuracy: 1)
+        XCTAssertEqual(host.traitCollection.userInterfaceStyle, style, "A hosted child must actually receive the requested appearance")
         let image = UIGraphicsImageRenderer(size: host.view.bounds.size).image { _ in
             host.view.drawHierarchy(in: host.view.bounds, afterScreenUpdates: true)
         }
