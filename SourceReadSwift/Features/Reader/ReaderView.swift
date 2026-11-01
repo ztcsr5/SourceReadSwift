@@ -4942,6 +4942,11 @@ struct ReaderView: View {
                 tocUserHasScrolled = false
                 scrollTocToCurrentChapter(proxy)
             }
+            .onChange(of: tocReversed) { _ in
+                // The outer modifier may survive the inner List identity.
+                // Always schedule the explicit new-order target as well.
+                scrollTocToCurrentChapter(proxy)
+            }
             .onChange(of: debouncedTocQuery) { _ in
                 tocScrollIntent = .firstRow
                 scrollTocToCurrentChapter(proxy)
@@ -4980,7 +4985,7 @@ struct ReaderView: View {
         }
     }
 
-    /// 打开目录时把当前阅读章滚到可视区中部；搜索过滤把目标章滤掉时静默跳过。
+    /// 打开目录定位当前章；手动排序或筛选定位新列表首行。
     private func scrollTocToCurrentChapter(_ proxy: ScrollViewProxy) {
         guard let id = tocScrollIntent.target(in: filteredChapters, preferred: windowCurrentChapterIndex,
             fallback: currentDisplayChapterIndex)

@@ -74,6 +74,22 @@ final class SourceOrganizationTests: XCTestCase {
         XCTAssertEqual(restored.organization, SourceOrganization())
     }
 
+    @MainActor func testDeletingSourceAlsoForgetsOnlyItsOrganization() throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let store = SourceStore(persistence: SourcePersistence(rootURL: root))
+        let sources = [source("a"), source("b")]
+        try store.importSources(sources)
+        store.setPlacement(.top, for: Set(sources.map(\.id)))
+        store.setGroup("收藏", for: Set(sources.map(\.id)))
+        store.remove(sources[0])
+        XCTAssertNil(store.organization.placements[sources[0].id])
+        XCTAssertNil(store.organization.groupOverrides[sources[0].id])
+        XCTAssertEqual(store.organization.placements[sources[1].id], .top)
+        try store.importSources([sources[0]])
+        XCTAssertEqual(store.organization.placement(for: sources[0]), .normal)
+    }
+
     @MainActor func testOrganizationSurvivesRestartReimportAndBackupRestore() throws {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         defer { try? FileManager.default.removeItem(at: root) }

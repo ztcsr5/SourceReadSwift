@@ -722,12 +722,12 @@ final class SourceStore: ObservableObject {
     }
 
     func remove(_ source: BookSource) {
-        sources.removeAll { $0.bookSourceUrl == source.bookSourceUrl }
-        saveAfterMutation()
+        remove(sourceURLs: [source.id])
     }
 
     func remove(sourceURLs: Set<String>) {
         sources.removeAll { sourceURLs.contains($0.bookSourceUrl) }
+        organization.forget(sourceURLs)
         saveAfterMutation()
     }
 

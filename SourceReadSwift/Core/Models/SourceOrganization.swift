@@ -96,4 +96,12 @@ struct SourceOrganization: Codable, Hashable, Sendable {
         }
         namedGroups.removeAll { $0 == name }
     }
+
+    mutating func forget(_ ids: Set<String>) {
+        order.removeAll { ids.contains($0) }
+        for id in ids {
+            placements.removeValue(forKey: id)
+            groupOverrides.removeValue(forKey: id)
+        }
+    }
 }

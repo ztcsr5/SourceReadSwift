@@ -79,6 +79,26 @@ struct SourceOrganizationView: View {
                 } footer: {
                     Text("置顶与置底始终优先；自定义顺序下可拖动同一区域的书源。筛选后排序不会改变其他分组。")
                 }
+                Section {
+                    DisclosureGroup("管理分组") {
+                    Button {
+                        editingGroup = nil; groupName = ""; showGroupEditor = true
+                    } label: { Label("新建分组", systemImage: "folder.badge.plus") }
+                    ForEach(groups, id: \.self) { group in
+                        HStack {
+                            Text(group)
+                            Spacer()
+                            Menu {
+                                Button("重命名") { editingGroup = group; groupName = group; showGroupEditor = true }
+                                Button("删除分组", role: .destructive) { deletingGroup = group }
+                            } label: {
+                                Image(systemName: "ellipsis.circle").frame(minWidth: 44, minHeight: 44)
+                            }
+                            .accessibilityLabel("管理分组 \(group)")
+                        }
+                    }
+                    }
+                }
                 ForEach(SourcePlacement.allCases) { placement in
                     let section = visible.filter { organization.placement(for: $0) == placement }
                     if !section.isEmpty {
@@ -104,24 +124,6 @@ struct SourceOrganizationView: View {
                                 store.reorderSources(ids)
                             }
                             .moveDisabled(organization.sort != .custom)
-                        }
-                    }
-                }
-                Section("管理分组") {
-                    Button {
-                        editingGroup = nil; groupName = ""; showGroupEditor = true
-                    } label: { Label("新建分组", systemImage: "folder.badge.plus") }
-                    ForEach(groups, id: \.self) { group in
-                        HStack {
-                            Text(group)
-                            Spacer()
-                            Menu {
-                                Button("重命名") { editingGroup = group; groupName = group; showGroupEditor = true }
-                                Button("删除分组", role: .destructive) { deletingGroup = group }
-                            } label: {
-                                Image(systemName: "ellipsis.circle").frame(minWidth: 44, minHeight: 44)
-                            }
-                            .accessibilityLabel("管理分组 \(group)")
                         }
                     }
                 }

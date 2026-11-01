@@ -64,6 +64,18 @@ final class AppLayoutDensityTests: XCTestCase {
                             .environment(\.dynamicTypeSize, .accessibility3))
     }
 
+    @MainActor func testSourceOrganizationRenderEvidence() async throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let store = SourceStore(persistence: SourcePersistence(rootURL: root))
+        let sources = (1...6).map { BookSource(bookSourceName: "示例书源 \($0)", bookSourceUrl: "https://source\($0).example", bookSourceGroup: "小说") }
+        try store.importSources(sources)
+        store.setPlacement(.top, for: [sources[0].id])
+        store.setPlacement(.bottom, for: [sources[5].id])
+        store.setGroup("收藏", for: [sources[0].id])
+        try await snapshot("source-organization", width: 390, height: 844, content: SourceOrganizationView(store: store))
+    }
+
     @MainActor private func measureCard(width: CGFloat, type: DynamicTypeSize) -> CGSize {
         let host = UIHostingController(rootView:
             ContinueReadingCardContent(title: "纸间 · 阅读指引与经典选篇", author: "纸间团队", progressText: "已读 35%") {
