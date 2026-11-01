@@ -3,6 +3,7 @@ import Combine
 
 @MainActor
 final class AppState: ObservableObject {
+    let readingNote = ReadingNoteCatalog.launchNote
     let sourceStore: SourceStore
     let bookshelfStore: BookshelfStore
     let purifyRuleStore: PurifyRuleStore

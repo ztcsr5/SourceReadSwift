@@ -93,7 +93,7 @@ struct DiscoverView: View {
 
     enum DiscoverTab: String, CaseIterable, Identifiable {
         case search = "全网搜索"
-        case explore = "分类发现"
+        case explore = "分类寻书"
 
         var id: String { rawValue }
         var icon: String {
@@ -171,7 +171,7 @@ struct DiscoverView: View {
                 }
             }
             .pageBackground()
-            .navigationTitle("发现")
+            .navigationTitle(AppNavigationLabels.findBooks)
             // iOS 16 allocates a tall large-title area above the custom tab
             // switcher; the pinned compact title gives that space back to the
             // search field and result list.
@@ -1057,7 +1057,7 @@ struct DiscoverView: View {
                     systemImage: "compass.drawing",
                     title: "暂无可探索的书源",
                     message: exploreViewModel.errorMessage
-                        ?? "当前启用的书源中未配置分类发现规则(exploreUrl)。您可以在书源管理中导入更多精品书源。"
+                        ?? "当前启用的书源中未配置分类寻书规则(exploreUrl)。您可以在书源管理中导入更多精品书源。"
                 )
             } else {
                 sourceSelectorSection
@@ -1120,7 +1120,7 @@ struct DiscoverView: View {
                 }
             }
             .buttonStyle(.plain)
-            .accessibilityLabel("展开全部发现书源列表")
+            .accessibilityLabel("展开全部寻书书源列表")
         }
         .sheet(isPresented: $showExploreSourcePickerSheet) {
             ExploreSourceSelectionSheet(viewModel: exploreViewModel)
@@ -1855,7 +1855,7 @@ struct ExploreSourceSelectionSheet: View {
                 }
             }
             .searchable(text: $searchKeyword, placement: .navigationBarDrawer(displayMode: .always), prompt: "搜索书源名称或分组")
-            .navigationTitle("全部发现书源 (\(viewModel.availableSources.count))")
+            .navigationTitle("全部寻书书源 (\(viewModel.availableSources.count))")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {

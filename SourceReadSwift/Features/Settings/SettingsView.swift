@@ -253,24 +253,7 @@ struct SettingsView: View {
 
     private var settingsHeroSection: some View {
         Section {
-            HStack(spacing: 12) {
-                PaperBetweenMark()
-                VStack(alignment: .leading, spacing: 5) {
-                    ViewThatFits(in: .horizontal) {
-                        HStack(alignment: .firstTextBaseline, spacing: 8) {
-                            Text("纸间").font(.title3.weight(.semibold))
-                            Text(AppVersion.fullDisplayString).font(.caption.monospacedDigit()).foregroundStyle(.tertiary)
-                        }.fixedSize(horizontal: true, vertical: false)
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text("纸间").font(.title3.weight(.semibold))
-                            Text(AppVersion.fullDisplayString).font(.caption.monospacedDigit()).foregroundStyle(.tertiary)
-                        }
-                    }
-                    Text("把时间留给阅读").font(.caption).foregroundStyle(.secondary)
-                }
-                Spacer(minLength: 0)
-            }
-            .padding(.vertical, 2)
+            SettingsBrandHeader(readingNote: appState.readingNote)
             .listRowBackground(Color.clear)
             .listRowSeparator(.hidden)
         }

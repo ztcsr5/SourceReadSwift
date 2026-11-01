@@ -56,7 +56,7 @@ struct RootTabView: View {
         if #available(iOS 26.0, *) {
             TabView(selection: $selectedTab) {
                 nativeTabRoot(BookshelfView()).tabItem { Label("主页", systemImage: "house") }.tag(0)
-                nativeTabRoot(DiscoverView(viewModel: appState.discoverViewModel)).tabItem { Label("发现", systemImage: "square.grid.2x2") }.tag(1)
+                nativeTabRoot(DiscoverView(viewModel: appState.discoverViewModel)).tabItem { Label(AppNavigationLabels.findBooks, systemImage: AppNavigationLabels.findBooksSymbol) }.tag(1)
                 nativeTabRoot(SettingsView()).tabItem { Label("设置", systemImage: "gearshape") }.tag(2)
             }
             .tabBarMinimizeBehavior(.onScrollDown)

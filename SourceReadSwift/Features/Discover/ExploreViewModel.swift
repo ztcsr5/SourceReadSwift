@@ -52,7 +52,7 @@ final class ExploreViewModel: ObservableObject {
             categories = []
             books = []
             selectedCategory = nil
-            errorMessage = "该类型暂无配置分类发现的书源"
+            errorMessage = "该类型暂无配置分类寻书的书源"
         }
     }
 
@@ -127,7 +127,7 @@ final class ExploreViewModel: ObservableObject {
         guard let appState else {
             isLoading = false
             isLoadingMore = false
-            errorMessage = "应用尚未就绪，请退出「发现」后重试。"
+            errorMessage = "应用尚未就绪，请退出「寻书」后重试。"
             return
         }
 

@@ -24,6 +24,9 @@ final class TabChromeRegressionTests: XCTestCase {
         let ready = await eventually { self.tabs(in: window.rootViewController) != nil }
         XCTAssertTrue(ready)
         let tabs = try XCTUnwrap(self.tabs(in: window.rootViewController))
+        let labelsReady = await eventually { tabs.tabBar.items?.count == 3 }
+        XCTAssertTrue(labelsReady)
+        XCTAssertEqual(tabs.tabBar.items?[1].title, AppNavigationLabels.findBooks)
         XCTAssertNil(tabs.bottomAccessory, "No playback must not create a blank glass accessory")
         let owner = UUID()
         app.acquireTabChromeHidden(owner: owner)
