@@ -68,7 +68,7 @@ struct AppThemePreview: View {
                         .stroke(.primary.opacity(0.18), lineWidth: theme.borderWidth))
                     .frame(width: 35, height: 15)
             }
-            .foregroundStyle(Color(uiColor: AppVisualTheme.uiColor(theme.accentHex)))
+            .foregroundStyle(theme.dynamicColor(light: theme.accentHex, dark: theme.darkAccentHex))
             .frame(width: 56, height: 56)
             .background(theme.dynamicColor(light: theme.backgroundHex, dark: theme.darkBackgroundHex),
                         in: RoundedRectangle(cornerRadius: min(theme.radius, 14)))

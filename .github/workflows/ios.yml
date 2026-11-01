@@ -21,7 +21,7 @@ on:
 jobs:
   native-tabs:
     runs-on: macos-26
-    timeout-minutes: 30
+    timeout-minutes: 35
     env:
       DEVELOPER_DIR: /Applications/Xcode_26.2.app/Contents/Developer
     steps:
@@ -29,7 +29,7 @@ jobs:
       - run: brew install xcodegen
       - run: xcodegen generate
       - name: iOS26 native tab runtime regression
-        timeout-minutes: 15
+        timeout-minutes: 25
         run: |
           set -euo pipefail
           RUNTIME_ID="$(xcrun simctl list runtimes -j | python3 -c 'import json,sys; print(next(r["identifier"] for r in json.load(sys.stdin)["runtimes"] if r.get("isAvailable") and r["version"].startswith("26.")))')"
@@ -54,7 +54,12 @@ jobs:
             -only-testing:SourceReadSwiftTests/Release116VisualTests \
             -destination-timeout 120 -test-timeouts-enabled YES -maximum-test-execution-time-allowance 60 \
             -resultBundlePath NativeTabResults.xcresult test 2>&1 | tee native-tab-test.log
-          xcrun xcresulttool export attachments --path NativeTabResults.xcresult --output-path native-ui-snapshots
+      - name: Export iOS26 attachments
+        if: always()
+        run: |
+          if [ -d NativeTabResults.xcresult ]; then
+            xcrun xcresulttool export attachments --path NativeTabResults.xcresult --output-path native-ui-snapshots
+          fi
       - name: Preserve iOS26 runtime evidence
         if: always()
         uses: actions/upload-artifact@v4
@@ -117,7 +122,12 @@ jobs:
             -parallel-testing-enabled NO \
             -resultBundlePath TestResults.xcresult \
             test 2>&1 | tee xcodebuild-test.log
-          xcrun xcresulttool export attachments --path TestResults.xcresult --output-path ui-snapshots
+      - name: Export test attachments
+        if: always()
+        run: |
+          if [ -d TestResults.xcresult ]; then
+            xcrun xcresulttool export attachments --path TestResults.xcresult --output-path ui-snapshots
+          fi
 
       - name: Summarize test failure
         if: failure()

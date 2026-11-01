@@ -14,6 +14,22 @@ final class Release116VisualTests: XCTestCase {
         XCTAssertEqual(AppVisualTheme.graphite.borderWidth, 1)
     }
 
+    func testNewThemeDefaultAccentContrastInBothAppearances() {
+        func luminance(_ rgb: UInt32) -> Double {
+            let components = [16,8,0].map { shift -> Double in
+                let value = Double((rgb >> shift) & 255) / 255
+                return value <= 0.04045 ? value / 12.92 : pow((value + 0.055) / 1.055, 2.4)
+            }
+            return components[0] * 0.2126 + components[1] * 0.7152 + components[2] * 0.0722
+        }
+        for theme in AppVisualTheme.allCases where theme != .classic {
+            for (foreground, background) in [(theme.accentHex,theme.cardHex), (theme.darkAccentHex,theme.darkCardHex)] {
+                let a = luminance(foreground), b = luminance(background)
+                XCTAssertGreaterThanOrEqual((max(a,b) + 0.05) / (min(a,b) + 0.05), 4.5, theme.title)
+            }
+        }
+    }
+
     @MainActor func testThemePersistenceAndBackup() {
         let defaults = UserDefaults.standard
         let keys = ["settings.visualTheme", AppVisualTheme.coast.preferenceKey("accent")]

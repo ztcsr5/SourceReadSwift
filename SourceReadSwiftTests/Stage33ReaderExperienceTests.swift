@@ -78,9 +78,9 @@ final class Stage33ReaderExperienceTests: XCTestCase {
     // MARK: - 2. SourceRead Native Palettes (readConfig.json)
 
     func testSourceReadNativePalettesConfiguration() {
-        // Verify all 16 background palettes exist (10 native presets + 6 Sakura themes)
+        // Historical palettes remain decodable alongside four illustrated presets.
         let allCases = ReaderBackground.allCases
-        XCTAssertEqual(allCases.count, 19)
+        XCTAssertEqual(allCases.count, 23)
 
         // 1. 羊皮纸
         let paper = ReaderBackground.paper

@@ -34,6 +34,12 @@ enum AppVisualTheme: String, CaseIterable, Identifiable, Codable, Sendable {
     var secondaryHex: UInt32 {
         switch self { case .classic: return 0x419BDC; case .botanical: return 0x8C784F; case .editorial: return 0x7B6260; case .coast: return 0x548C87; case .rose: return 0x8C7291; case .graphite: return 0x63778A }
     }
+    var darkAccentHex: UInt32 {
+        switch self { case .classic: return accentHex; case .botanical: return 0x9ECAB4; case .editorial: return 0xDCC39D; case .coast: return 0x9BCCE5; case .rose: return 0xEAB1C6; case .graphite: return 0xC4CBD6 }
+    }
+    var darkSecondaryHex: UInt32 {
+        switch self { case .classic: return secondaryHex; case .botanical: return 0xD1C39C; case .editorial: return 0xD2B9B5; case .coast: return 0xA4CEC7; case .rose: return 0xCAB9D3; case .graphite: return 0xB5C8DC }
+    }
     var backgroundHex: UInt32 {
         switch self { case .classic: return 0xF2F2F7; case .botanical: return 0xEFF3EA; case .editorial: return 0xF3EFE6; case .coast: return 0xEDF4F8; case .rose: return 0xF8EFF1; case .graphite: return 0xECEDEF }
     }

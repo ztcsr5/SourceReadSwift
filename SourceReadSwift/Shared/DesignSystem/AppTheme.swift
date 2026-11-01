@@ -10,14 +10,19 @@ enum AppTheme {
     static var card: Color { AppVisualTheme.current.dynamicColor(light: AppVisualTheme.current.cardHex, dark: AppVisualTheme.current.darkCardHex) }
     static var elevatedCard: Color { card }
     static var cardBackground: Color { card }
-    static var accentUIColor: UIColor { color(for: AppVisualTheme.current.preferenceKey("accent"), fallback: AppVisualTheme.current.accentHex) }
+    static var accentUIColor: UIColor { color(for: AppVisualTheme.current.preferenceKey("accent"), fallback: AppVisualTheme.current.accentHex, darkFallback: AppVisualTheme.current.darkAccentHex) }
     static var accent: Color { Color(uiColor: accentUIColor) }
-    static var secondaryAccent: Color { Color(uiColor: color(for: AppVisualTheme.current.preferenceKey("secondaryAccent"), fallback: AppVisualTheme.current.secondaryHex)) }
+    static var secondaryAccent: Color { Color(uiColor: color(for: AppVisualTheme.current.preferenceKey("secondaryAccent"), fallback: AppVisualTheme.current.secondaryHex, darkFallback: AppVisualTheme.current.darkSecondaryHex)) }
     static var softBlue: Color { secondaryAccent.opacity(0.16) }
 
-    static func color(for key: String, fallback: UInt32) -> UIColor {
+    static func color(for key: String, fallback: UInt32, darkFallback: UInt32? = nil) -> UIColor {
         let raw = UserDefaults.standard.string(forKey: key) ?? ""
-        let rgb = raw.count == 6 ? UInt32(raw, radix: 16) ?? fallback : fallback
+        if raw.count != 6 || UInt32(raw, radix: 16) == nil {
+            return UIColor { traits in
+                AppVisualTheme.uiColor(traits.userInterfaceStyle == .dark ? darkFallback ?? fallback : fallback)
+            }
+        }
+        let rgb = UInt32(raw, radix: 16) ?? fallback
         return UIColor(red: CGFloat((rgb >> 16) & 255) / 255,
                        green: CGFloat((rgb >> 8) & 255) / 255,
                        blue: CGFloat(rgb & 255) / 255, alpha: 1)

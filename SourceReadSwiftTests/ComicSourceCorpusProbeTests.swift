@@ -21,6 +21,7 @@ final class ComicSourceCorpusProbeTests: XCTestCase {
             while let row = await group.next() {
                 reports.append(row)
                 print("COMIC_AUDIT index=\(row.index) stage=\(row.stage) images=\(row.imageCount) decoded=\(row.decoded)")
+                if let data = try? JSONEncoder().encode(row) { print("COMIC_ROW_B64 " + data.base64EncodedString()) }
                 if let (i,source) = iterator.next() { group.addTask { await self.probe(source, index: i) } }
             }
         }

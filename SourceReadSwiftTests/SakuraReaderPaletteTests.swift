@@ -135,6 +135,10 @@ final class SakuraReaderPaletteTests: XCTestCase {
     func testNonSakuraPalettesHaveNoSakuraMapping() {
         XCTAssertNil(ReaderBackground.paper.sakuraTheme)
         XCTAssertNil(ReaderBackground.custom.sakuraTheme)
-        XCTAssertEqual(ReaderBackground.allCases.count, 19)
+        XCTAssertEqual(ReaderBackground.allCases.count, 23)
+        for background in [ReaderBackground.bamboo, .mountains, .ginkgo, .tide] {
+            XCTAssertNil(background.sakuraTheme)
+            XCTAssertNotNil(background.wallpaperAssetName)
+        }
     }
 }
