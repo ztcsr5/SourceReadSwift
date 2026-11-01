@@ -69,9 +69,12 @@ final class Release117ReadingHeroTests: XCTestCase {
             }.background(AppTheme.background)
                 .environment(\.dynamicTypeSize, isLarge ? .accessibility3 : .large)
                 .preferredColorScheme(isDark ? .dark : .light))
+            let style: UIUserInterfaceStyle = isDark ? .dark : .light
+            host.overrideUserInterfaceStyle = style
             let scene = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.first
             let window = scene.map { UIWindow(windowScene: $0) } ?? UIWindow(frame: UIScreen.main.bounds)
             window.frame = UIScreen.main.bounds
+            window.overrideUserInterfaceStyle = style
             let parent = UIViewController(); window.rootViewController = parent; window.makeKeyAndVisible()
             parent.addChild(host)
             parent.setOverrideTraitCollection(UITraitCollection(accessibilityContrast: isLarge ? .high : .normal), forChild: host)
@@ -81,6 +84,7 @@ final class Release117ReadingHeroTests: XCTestCase {
             host.view.layoutIfNeeded()
             XCTAssertEqual(host.view.bounds.width, width, accuracy: 1)
             XCTAssertEqual(host.traitCollection.accessibilityContrast, isLarge ? .high : .normal)
+            XCTAssertEqual(host.traitCollection.userInterfaceStyle, style, "A dark-labelled screenshot must really use dark traits")
             let image = UIGraphicsImageRenderer(size: host.view.bounds.size).image { _ in host.view.drawHierarchy(in: host.view.bounds, afterScreenUpdates: true) }
             let attachment = XCTAttachment(image: image)
             attachment.name = "release117-hero-\(Int(width))-\(isDark ? "dark" : "light")-\(isLarge ? "large-contrast" : "normal")"
