@@ -17,31 +17,23 @@ struct SettingsView: View {
     @State private var showBackupExporter = false
     @State private var showBackupImporter = false
     @State private var backupMessage: String?
-    /// 清零采样后强制刷新诊断区。
-    @State private var perfRefreshToken = UUID()
 
     var body: some View {
         NavigationStack {
             List {
                 settingsHeroSection
 
-                Section {
+                Section("阅读与外观") {
                     NavigationLink {
                         AppearanceSettingsView().hideRootTabBar()
                     } label: {
                         Label("外观", systemImage: "paintpalette")
                     }
-                }
-
-                Section("排版与字体") {
                     NavigationLink {
                         CustomFontManagementView().hideRootTabBar()
                     } label: {
                         Label("字体管理与自定义导入", systemImage: "textformat")
                     }
-                }
-
-                Section("语音朗读") {
                     NavigationLink {
                         TTSSettingsView().hideRootTabBar()
                     } label: {
@@ -107,14 +99,11 @@ struct SettingsView: View {
                     }
                 }
 
-                Section("交互与反馈") {
+                Section("交互与性能") {
                     Toggle("触控震动反馈", isOn: $hapticsEnabled)
                         .onChange(of: hapticsEnabled) { enabled in
                             UserDefaults.standard.set(enabled, forKey: "app.hapticsEnabled")
                         }
-                }
-
-                Section("并发与性能") {
                     Stepper("搜书并发线程数: \(searchThreads) 线程", value: $searchThreads, in: 2...32)
                     Stepper("书源校验并发线程数: \(batchCheckThreads) 线程", value: $batchCheckThreads, in: 1...16)
                 }
@@ -199,66 +188,13 @@ struct SettingsView: View {
                     }
                 }
 
-                Section {
-                    let perf = ReaderScrollPerfMeter.snapshot
-                    HStack {
-                        Text("滚动回调平均耗时")
-                        Spacer()
-                        Text(String(format: "%.2f ms", perf.averageMilliseconds))
-                            .monospacedDigit()
-                            .foregroundStyle(.secondary)
-                    }
-                    HStack {
-                        Text("最差一次")
-                        Spacer()
-                        Text(String(format: "%.2f ms", perf.worstMilliseconds))
-                            .monospacedDigit()
-                            .foregroundStyle(.secondary)
-                    }
-                    HStack {
-                        Text("样本帧数")
-                        Spacer()
-                        Text("\(perf.frames)")
-                            .monospacedDigit()
-                            .foregroundStyle(.secondary)
-                    }
-
-                    let frameRate = ReaderFrameRateSampler.snapshot
-                    HStack {
-                        Text("平均帧率")
-                        Spacer()
-                        Text(String(format: "%.1f fps", frameRate.averageFPS))
-                            .monospacedDigit()
-                            .foregroundStyle(.secondary)
-                    }
-                    HStack {
-                        Text("掉帧率")
-                        Spacer()
-                        Text(String(format: "%.1f%%（%d 帧）", frameRate.droppedRatio * 100, frameRate.droppedFrames))
-                            .monospacedDigit()
-                            .foregroundStyle(.secondary)
-                    }
-                    HStack {
-                        Text("出帧样本")
-                        Spacer()
-                        Text("\(frameRate.frames)")
-                            .monospacedDigit()
-                            .foregroundStyle(.secondary)
-                    }
-
-                    Button("清零重新采样") {
-                        ReaderScrollPerfMeter.reset()
-                        ReaderFrameRateSampler.reset()
-                        perfRefreshToken = UUID()
-                    }
-                } header: {
-                    Text("阅读器性能（诊断）")
-                } footer: {
-                    Text("滚动回调耗时小于 2ms 说明瓶颈在界面重建，大于 6ms 说明在文字排版；掉帧率超过 5% 就是肉眼可见的卡。滚动几章后回来看数字。")
-                }
-                .id(perfRefreshToken)
 
                 Section("诊断") {
+                    NavigationLink {
+                        ReaderPerformanceDiagnosticsView().hideRootTabBar()
+                    } label: {
+                        Label("阅读器性能", systemImage: "speedometer")
+                    }
                     NavigationLink {
                         RecentDiagnosticsView(events: appState.diagnostics).hideRootTabBar()
                     } label: {
@@ -271,7 +207,7 @@ struct SettingsView: View {
             .pageBackground()
             .listStyle(.insetGrouped)
             .navigationTitle("设置")
-            .navigationBarTitleDisplayMode(.large)
+            .navigationBarTitleDisplayMode(.inline)
             .animation(.easeInOut(duration: 0.22), value: themeModeRawValue)
             .onAppear {
                 updateCacheSummary()
@@ -312,19 +248,27 @@ struct SettingsView: View {
 
     private var settingsHeroSection: some View {
         Section {
-            HStack(spacing: 16) {
+            HStack(spacing: 12) {
                 Image(systemName: "book.closed.fill")
-                    .font(.system(size: 30, weight: .light))
+                    .font(.system(size: 25, weight: .light))
                     .foregroundStyle(LinearGradient(colors: [AppTheme.accent, AppTheme.secondaryAccent], startPoint: .topLeading, endPoint: .bottomTrailing))
-                    .frame(width: 48, height: 56)
+                    .frame(width: 36, height: 40)
                 VStack(alignment: .leading, spacing: 5) {
-                    Text("纸间").font(.system(size: 25, weight: .semibold, design: .serif))
-                    Text("把时间留给阅读").font(.subheadline).foregroundStyle(.secondary)
-                    Text(AppVersion.fullDisplayString).font(.caption.monospacedDigit()).foregroundStyle(.tertiary)
+                    ViewThatFits(in: .horizontal) {
+                        HStack(alignment: .firstTextBaseline, spacing: 8) {
+                            Text("纸间").font(.title3.weight(.semibold))
+                            Text(AppVersion.fullDisplayString).font(.caption.monospacedDigit()).foregroundStyle(.tertiary)
+                        }.fixedSize(horizontal: true, vertical: false)
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("纸间").font(.title3.weight(.semibold))
+                            Text(AppVersion.fullDisplayString).font(.caption.monospacedDigit()).foregroundStyle(.tertiary)
+                        }
+                    }
+                    Text("把时间留给阅读").font(.caption).foregroundStyle(.secondary)
                 }
                 Spacer(minLength: 0)
             }
-            .padding(.vertical, 10)
+            .padding(.vertical, 2)
             .listRowBackground(Color.clear)
             .listRowSeparator(.hidden)
         }

@@ -129,24 +129,20 @@ struct BookshelfView: View {
     var body: some View {
         NavigationStack {
             ScrollView {
-                LazyVStack(alignment: .leading, spacing: 26) {
+                LazyVStack(alignment: .leading, spacing: AppLayout.sectionGap) {
                     readingSection
                     shelfSection
                 }
                 .padding(.horizontal, AppTheme.pagePadding)
-                // 底部额外留白：RootTabView 用 safeAreaInset 预留了 86pt 的浮动 tab bar，
-                // 这里再补 8pt，避免最后一行书卡贴着毛玻璃底边。
-                .padding(.bottom, 30)
+                // RootTabView already owns tab-bar/safe-area clearance.
+                .padding(.bottom, AppLayout.contentTail)
             }
             .refreshable {
                 await refreshBookshelf()
             }
             .background(bookshelfBackdrop)
-            // Native large-title navigation gives the bounded collapse shown
-            // in the reference: large at the top, compact and centered after
-            // scrolling, rather than letting a custom title drift forever.
             .navigationTitle("主页")
-            .navigationBarTitleDisplayMode(.large)
+            .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 // 左上角「管理」入口已移除：书架管理与分组都在书架区标题里点进去，
                 // 工具栏只保留右侧的统计与导入，避免大标题左肩挂一个孤零零的图标。
@@ -405,7 +401,7 @@ struct BookshelfView: View {
                     }
                 }
             } else {
-                LazyVStack(spacing: 14) {
+                LazyVStack(spacing: AppLayout.rowGap) {
                     ForEach(displayedShelfBooks) { book in
                         bookshelfRow(book)
                     }
@@ -708,9 +704,9 @@ struct BookshelfView: View {
         NavigationLink {
             BookshelfReaderGatewayView(book: book)
         } label: {
-            VStack(spacing: 0) {
-                HStack(spacing: 16) {
-                    AsyncBookCover(urlString: book.coverURL, width: 66, height: 92, style: .onDark, baseURLString: book.bookURL, sourceURLString: book.sourceURL)
+            ContinueReadingCardContent(title: book.title, author: book.author,
+                progressText: book.lastReadAt == nil ? "待开始" : "已读 \(Int(book.readingProgress * 100))%") {
+                    AsyncBookCover(urlString: book.coverURL, width: 54, height: 76, style: .onDark, baseURLString: book.bookURL, sourceURLString: book.sourceURL)
                         .overlay(alignment: .topTrailing) {
                             if book.hasUpdates {
                                 Circle()
@@ -723,51 +719,19 @@ struct BookshelfView: View {
                                     .shadow(color: .red.opacity(0.6), radius: 4)
                             }
                         }
-                        .shadow(color: .black.opacity(0.28), radius: 16, x: 0, y: 10)
-
-                    VStack(alignment: .leading, spacing: 7) {
-                        Text(book.lastReadAt == nil ? "待开始" : "已读 \(Int(book.readingProgress * 100))%")
-                            .font(.caption.weight(.semibold))
-                            .foregroundStyle(.white.opacity(0.72))
-
-                        Text(book.title)
-                            .font(.headline)
-                            .foregroundStyle(.white)
-                            .lineLimit(2)
-
-                        Text(book.author)
-                            .font(.subheadline)
-                            .foregroundStyle(.white.opacity(0.72))
-                            .lineLimit(1)
-                    }
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                }
-
-                Spacer(minLength: 10)
-
-                HStack {
-                    Label("继续阅读", systemImage: "book.fill")
-                        .font(.footnote.weight(.bold))
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 7)
-                        .background(Color.white)
-                        .foregroundStyle(.black)
-                        .clipShape(Capsule())
-                    Spacer()
-                }
+                        .shadow(color: .black.opacity(0.18), radius: 6, x: 0, y: 3)
             }
-            .padding(16)
-            .frame(width: 300, height: 190, alignment: .topLeading)
+            .frame(width: AppLayout.continueCardWidth, alignment: .topLeading)
             .background(
                 heroGradient(for: book)
             )
-            .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
+            .clipShape(RoundedRectangle(cornerRadius: AppTheme.cardRadius, style: .continuous))
             .overlay {
-                RoundedRectangle(cornerRadius: 24, style: .continuous)
+                RoundedRectangle(cornerRadius: AppTheme.cardRadius, style: .continuous)
                     .stroke(Color.white.opacity(0.10), lineWidth: 0.8)
             }
-            .shadow(color: .black.opacity(colorScheme == .dark ? 0.32 : 0.13), radius: 22, x: 0, y: 14)
-            .padding(.vertical, 8)
+            .shadow(color: .black.opacity(colorScheme == .dark ? 0.24 : 0.10), radius: 6, x: 0, y: 3)
+            .padding(.vertical, 3)
         }
         .buttonStyle(PressableScaleButtonStyle())
         .simultaneousGesture(TapGesture().onEnded {

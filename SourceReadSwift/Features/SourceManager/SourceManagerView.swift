@@ -208,7 +208,7 @@ struct SourceManagerView: View {
             } label: {
                 Image(systemName: "chevron.left")
                     .font(.system(size: 17, weight: .semibold))
-                    .frame(width: 40, height: 40)
+                    .frame(width: AppLayout.minimumTapTarget, height: AppLayout.minimumTapTarget)
                     .background(AppTheme.accent.opacity(0.12), in: Circle())
             }
             .buttonStyle(.plain)
@@ -224,6 +224,7 @@ struct SourceManagerView: View {
                     toggleManagementForCurrentTab()
                 }
                 .font(.subheadline.weight(.semibold))
+                .frame(minWidth: AppLayout.minimumTapTarget, minHeight: AppLayout.minimumTapTarget)
                 .buttonStyle(.plain)
             }
 
@@ -231,7 +232,7 @@ struct SourceManagerView: View {
                 showLoginCenter = true
             } label: {
                 Image(systemName: "key.fill")
-                    .frame(width: 36, height: 36)
+                    .frame(width: AppLayout.minimumTapTarget, height: AppLayout.minimumTapTarget)
                     .background(AppTheme.accent.opacity(0.12), in: Circle())
             }
             .buttonStyle(.plain)
@@ -243,7 +244,7 @@ struct SourceManagerView: View {
 
     var body: some View {
         ScrollView {
-                VStack(alignment: .leading, spacing: 16) {
+                VStack(alignment: .leading, spacing: AppLayout.sectionGap) {
                     sourceManagerHeader
                     batchCheckStatusBanner
                     webServiceCard
@@ -254,11 +255,7 @@ struct SourceManagerView: View {
                 }
                 .padding(.horizontal, AppTheme.pagePadding)
                 .padding(.top, 10)
-                // Keep the last source row clear of the floating root tab bar.
-                // The root inset handles the global chrome; this small tail
-                // spacing also covers the inline batch toolbar when it is
-                // expanded on compact screens.
-                .padding(.bottom, 18)
+                .padding(.bottom, AppLayout.contentTail)
             }
             .scrollDismissesKeyboard(.interactively)
             .pageBackground()
@@ -434,32 +431,27 @@ struct SourceManagerView: View {
     }
 
     private var webServiceCard: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack {
-                Image(systemName: "globe")
-                    .font(.system(size: 16, weight: .semibold))
-                    .foregroundStyle(AppTheme.accent)
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("源库状态")
-                        .font(.subheadline.weight(.bold))
-                    Text("书源、仓库与 RSS")
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
-                }
-                Spacer()
-                Text("\(sourceCounts.total) 项")
-                    .font(.caption.weight(.bold))
-                    .foregroundStyle(AppTheme.accent)
-                    .padding(.horizontal, 9)
-                    .padding(.vertical, 5)
-                    .background(AppTheme.accent.opacity(0.12), in: Capsule())
+        VStack(alignment: .leading, spacing: 8) {
+            Text("书源 \(sourceCounts.books) · 仓库 \(sourceCounts.catalogs) · RSS \(sourceCounts.rss)")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: 8) { sourceQuickActions }
+                    .fixedSize(horizontal: true, vertical: false)
+                VStack(spacing: 6) { sourceQuickActions }
             }
-            HStack(spacing: 8) {
-                statusPill("书源 \(sourceCounts.books)", color: .blue)
-                statusPill("仓库 \(sourceCounts.catalogs)", color: .purple)
-                statusPill("RSS \(sourceCounts.rss)", color: .orange)
+            .buttonStyle(.plain)
+            DisclosureGroup("格式与检测说明") {
+                Text("支持 JSON、URL、阅读分享链接、仓库、RSS，以及搜索 → 详情 → 目录 → 正文全链路测试。")
+                    .foregroundStyle(.secondary)
             }
-            LazyVGrid(columns: [GridItem(.flexible(), spacing: 8), GridItem(.flexible(), spacing: 8)], spacing: 8) {
+            .font(.caption)
+        }
+        .padding(AppLayout.cardInset)
+        .glassPanel(cornerRadius: AppTheme.cardRadius, material: .thinMaterial, strokeOpacity: 0.08, shadowOpacity: 0.04)
+    }
+
+    @ViewBuilder private var sourceQuickActions: some View {
                 Button {
                     UIImpactFeedbackGenerator(style: .medium).impactOccurred()
                     batchCheckScope = .enabled
@@ -486,13 +478,6 @@ struct SourceManagerView: View {
                     sourceActionTile("Web 写源", systemImage: "network", tint: .blue)
                 }
                 .accessibilityLabel("打开 Web 写源")
-            }
-            Text("支持 JSON、URL、阅读分享链接、仓库、RSS，以及搜索 → 详情 → 目录 → 正文全链路测试。")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-        }
-        .padding(14)
-        .glassPanel(cornerRadius: 18, material: .thinMaterial, strokeOpacity: 0.08, shadowOpacity: 0.06)
     }
 
     private func sourceActionTile(_ title: String, systemImage: String, tint: Color) -> some View {
@@ -508,7 +493,7 @@ struct SourceManagerView: View {
         }
         .padding(.horizontal, 10)
         .padding(.vertical, 9)
-        .frame(maxWidth: .infinity, alignment: .leading)
+        .frame(maxWidth: .infinity, minHeight: AppLayout.minimumTapTarget, alignment: .leading)
         .background(tint.opacity(0.10), in: RoundedRectangle(cornerRadius: 11, style: .continuous))
         .overlay {
             RoundedRectangle(cornerRadius: 11, style: .continuous)

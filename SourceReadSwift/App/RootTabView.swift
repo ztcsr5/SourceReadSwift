@@ -179,7 +179,7 @@ struct RootTabView: View {
                 tabButton(index: 2, title: "设置", systemImage: "gearshape")
             }
             .padding(.horizontal, 28)
-            .padding(.vertical, 9)
+            .padding(.vertical, AppLayout.tabVerticalInset)
             .glassPanel(cornerRadius: 28, material: .ultraThinMaterial, strokeOpacity: 0.08, shadowOpacity: 0.16)
             .padding(.horizontal, 12)
             .padding(.bottom, 6)

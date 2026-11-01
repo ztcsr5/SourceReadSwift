@@ -30,8 +30,8 @@ enum AppTheme {
     }
     static let secondaryText = Color.secondary
 
-    static let cardRadius: CGFloat = 24
-    static let pagePadding: CGFloat = 20
+    static let cardRadius: CGFloat = 18
+    static let pagePadding: CGFloat = AppLayout.pageMargin
     static let capsuleRadius: CGFloat = 16
 }
 
@@ -41,7 +41,7 @@ extension View {
     }
 
     func podcastCard() -> some View {
-        padding(18)
+        padding(AppLayout.cardInset)
             .glassPanel(cornerRadius: AppTheme.cardRadius, material: .thinMaterial)
     }
 

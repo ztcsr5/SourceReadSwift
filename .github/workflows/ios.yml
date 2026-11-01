@@ -45,8 +45,10 @@ jobs:
             -destination "id=$DEVICE_ID" CODE_SIGNING_ALLOWED=NO \
             -parallel-testing-enabled NO -only-testing:SourceReadSwiftTests/TabChromeRegressionTests \
             -only-testing:SourceReadSwiftTests/ReaderCoverTeardownTests \
+            -only-testing:SourceReadSwiftTests/AppLayoutDensityTests \
             -destination-timeout 120 -test-timeouts-enabled YES -maximum-test-execution-time-allowance 60 \
             -resultBundlePath NativeTabResults.xcresult test 2>&1 | tee native-tab-test.log
+          xcrun xcresulttool export attachments --path NativeTabResults.xcresult --output-path native-ui-snapshots
       - name: Preserve iOS26 runtime evidence
         if: always()
         uses: actions/upload-artifact@v4
@@ -56,6 +58,7 @@ jobs:
             native-tab-test.log
             native-boot.log
             NativeTabResults.xcresult
+            native-ui-snapshots
           retention-days: 7
   build:
     runs-on: macos-15
@@ -106,6 +109,7 @@ jobs:
             -parallel-testing-enabled NO \
             -resultBundlePath TestResults.xcresult \
             test 2>&1 | tee xcodebuild-test.log
+          xcrun xcresulttool export attachments --path TestResults.xcresult --output-path ui-snapshots
 
       - name: Summarize test failure
         if: failure()
@@ -135,4 +139,5 @@ jobs:
             xcodebuild-build.log
             xcodebuild-test.log
             TestResults.xcresult
+            ui-snapshots
           retention-days: 7

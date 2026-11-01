@@ -14,7 +14,7 @@ struct SourceWritingView: View {
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 24) {
+            VStack(alignment: .leading, spacing: AppLayout.sectionGap) {
                 serverControlCard
                 statusMessagesSection
                 logMessagesSection
@@ -171,7 +171,7 @@ struct SourceWritingView: View {
                     .foregroundStyle(.red)
             }
         }
-        .padding(20)
+        .padding(AppLayout.cardInset)
         .background(Color(.secondarySystemBackground))
         .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
     }
@@ -224,7 +224,7 @@ struct SourceWritingView: View {
                 Text("暂无日志，等待电脑连接...")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
-                    .frame(maxWidth: .infinity, minHeight: 100, alignment: .center)
+                    .frame(maxWidth: .infinity, minHeight: 64, alignment: .center)
                     .background(Color(.secondarySystemBackground).opacity(0.5))
                     .clipShape(RoundedRectangle(cornerRadius: 12))
             } else {

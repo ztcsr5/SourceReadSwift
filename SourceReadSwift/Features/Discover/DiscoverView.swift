@@ -153,7 +153,7 @@ struct DiscoverView: View {
                     }
                 }
                 .padding(.horizontal, AppTheme.pagePadding)
-                .padding(.bottom, 22)
+                .padding(.bottom, AppLayout.contentTail)
             }
             .scrollDismissesKeyboard(.interactively)
             .dismissKeyboardOnTap()

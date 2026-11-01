@@ -94,7 +94,7 @@ struct BookDetailView: View {
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 18) {
+            VStack(alignment: .leading, spacing: AppLayout.sectionGap) {
                 // The row's top-right "+" duplicated the dedicated 加入书架
                 // button below it; the detail page keeps the single explicit
                 // action and the row stays a pure display surface.
@@ -195,7 +195,6 @@ struct BookDetailView: View {
                 }
             }
             .padding(AppTheme.pagePadding)
-            .padding(.bottom, 96)
         }
         .pageBackground()
         .navigationTitle(book.name)
