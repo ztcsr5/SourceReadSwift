@@ -1732,6 +1732,7 @@ final class DiscoverViewModel: ObservableObject {
 
         guard activeSearchID == searchID, searchGeneration == generation else { return }
         await publishIfNeeded(force: true)
+        guard !Task.isCancelled, activeSearchID == searchID, searchGeneration == generation else { return }
         hasFinishedSearch = true
         // No exact match and a user filter are not engine failures. Only an
         // entirely failed source run takes the error state.
@@ -1763,6 +1764,7 @@ final class DiscoverViewModel: ObservableObject {
             guard self.activeSearchID == searchID, self.searchGeneration == generation,
                   exact == (self.matchMode == .exact) else { return }
             await self.installRankedResults(ranked)
+            guard !Task.isCancelled, self.activeSearchID == searchID, self.searchGeneration == generation else { return }
             self.hasFinishedSearch = true
             if !self.results.isEmpty {
                 self.errorMessage = nil

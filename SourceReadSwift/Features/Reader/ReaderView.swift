@@ -3612,17 +3612,13 @@ struct ReaderView: View {
                 ReaderNativeMenuButton(
                     menu: readerNativeMenu,
                     foregroundColor: background.uiTextColor(isNight: readerIsNight),
-                    backgroundColor: background.uiColor(isNight: readerIsNight)
+                    backgroundColor: readerUsesNativeGlass ? .clear : background.uiColor(isNight: readerIsNight)
                 )
                 .frame(width: 44, height: 44)
             }
-            .padding(.horizontal, 10)
-            .padding(.vertical, 8)
-            // A material-only bar let the body text show through the title
-            // and progress line (especially on iOS 16). The reader chrome
-            // needs an opaque base; the theme colour keeps it consistent.
-            .background(readerThemeBackground.opacity(0.97))
-            .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+            .padding(.horizontal, 12)
+            .padding(.vertical, 10)
+            .modifier(ReaderChromeSurface(paper: readerThemeBackground, ink: readerThemeTextColor))
             .padding(.horizontal, 16)
             .padding(.top, readerTopSafeInset + 4)
             .background(readerThemeBackground.ignoresSafeArea(edges: .top))
@@ -3634,13 +3630,8 @@ struct ReaderView: View {
                 // 分页时拖章节滑条会让整章重排，正是「翻页卡住」的来源之一。
                 Text(readerMode == .scroll ? chapterSliderLabel : pageSliderLabel)
                     .font(.caption2.weight(.semibold).monospacedDigit())
-                    .foregroundStyle(readerThemeTextColor.opacity(
-                        readerMode == .scroll
-                            ? (chapterSliderTarget == nil ? 0 : 0.5)
-                            : 0.55
-                    ))
+                    .foregroundStyle(readerThemeTextColor.opacity(0.55))
                     .frame(height: 13)
-                    .animation(.easeOut(duration: 0.12), value: chapterSliderTarget == nil)
 
                 HStack(spacing: 10) {
                     navChapterButton(icon: "chevron.left", title: "上一章") {
@@ -3754,24 +3745,8 @@ struct ReaderView: View {
                     }
                 }
             }
-            .padding(.horizontal, 10)
-            .padding(.top, 8)
-            .padding(.bottom, 8)
-            // Match the top bar exactly: one opaque theme layer and a hairline
-            // stroke. The previous version stacked .ultraThinMaterial on top of
-            // the theme colour, so the panel stayed translucent and read wider
-            // than the top bar (14pt inner + 14pt outer padding = 28pt gutters).
-            .background(
-                readerThemeBackground.opacity(0.97),
-                in: RoundedRectangle(cornerRadius: 18, style: .continuous)
-            )
-            .overlay {
-                RoundedRectangle(cornerRadius: 18, style: .continuous)
-                    .stroke(
-                        readerThemeTextColor.opacity(background.isDark ? 0.16 : 0.20),
-                        lineWidth: 0.6
-                    )
-            }
+            .padding(12)
+            .modifier(ReaderChromeSurface(paper: readerThemeBackground, ink: readerThemeTextColor))
             .shadow(
                 color: Color.black.opacity(background.isDark ? 0.30 : 0.10),
                 radius: 18,
@@ -3828,10 +3803,14 @@ struct ReaderView: View {
             Image(systemName: systemName)
                 .font(.system(size: 17, weight: .semibold))
                 .frame(width: 44, height: 44)
-                .background(Circle().fill(readerThemeBackground.opacity(0.97)))
+                .background(Circle().fill(readerUsesNativeGlass ? Color.clear : readerThemeBackground))
                 .contentShape(Circle())
         }
         .buttonStyle(.plain)
+    }
+
+    private var readerUsesNativeGlass: Bool {
+        ReaderChromeSurface.usesNativeGlass(reduceTransparency: UIAccessibility.isReduceTransparencyEnabled)
     }
 
     private var settingsHint: String {

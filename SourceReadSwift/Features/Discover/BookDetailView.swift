@@ -61,21 +61,19 @@ struct BookDetailView: View {
     /// primary result has no cover but a sibling source does, show the sibling
     /// cover instead of a blank placeholder.
     private var displayBook: SearchBook {
-        guard book.coverUrl?.nilIfEmpty == nil,
-              let fallback = availableSources.compactMap({ $0.coverUrl?.nilIfEmpty }).first else {
-            return book
-        }
+        let cover = detail?.coverUrl?.nilIfEmpty ?? book.coverUrl?.nilIfEmpty
+            ?? availableSources.compactMap({ $0.coverUrl?.nilIfEmpty }).first
         return SearchBook(
-            name: book.name,
-            author: book.author,
-            coverUrl: fallback,
+            name: detail?.name.nilIfEmpty ?? book.name,
+            author: detail?.author?.nilIfEmpty ?? book.author,
+            coverUrl: cover,
             bookUrl: book.bookUrl,
             sourceName: book.sourceName,
             sourceUrl: book.sourceUrl,
             intro: book.intro,
             kind: book.kind,
             lastChapter: book.lastChapter,
-            wordCount: book.wordCount,
+            wordCount: detail?.wordCount?.nilIfEmpty ?? book.wordCount,
             checkKeyWord: book.checkKeyWord
         )
     }
@@ -89,21 +87,13 @@ struct BookDetailView: View {
     }
 
     private var displayedChapters: [BookChapter] {
-        Array((isAscending ? chapters : Array(chapters.reversed())).prefix(20))
+        isAscending ? Array(chapters.prefix(20)) : Array(chapters.reversed().prefix(20))
     }
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: AppLayout.sectionGap) {
-                // The row's top-right "+" duplicated the dedicated 加入书架
-                // button below it; the detail page keeps the single explicit
-                // action and the row stays a pure display surface.
-                SearchBookRow(
-                    book: displayBook,
-                    onAdd: nil,
-                    isInBookshelf: appState.bookshelfStore.contains(book)
-                )
-                    .podcastCard()
+                BookDetailHeader(book: displayBook)
 
                 if !chapters.isEmpty {
                     HStack(spacing: 12) {
@@ -125,9 +115,9 @@ struct BookDetailView: View {
                                     Image(systemName: "book.fill")
                                     Text(isBookInBookshelf ? "继续阅读" : "开始阅读")
                                 }
-                                .font(.headline)
+                                .font(.subheadline.weight(.semibold))
                                 .frame(maxWidth: .infinity)
-                                .padding(.vertical, 14)
+                                .padding(.vertical, 12)
                                 .background(AppTheme.accent, in: RoundedRectangle(cornerRadius: AppTheme.cardRadius, style: .continuous))
                                 .foregroundStyle(.white)
                             }
@@ -141,10 +131,10 @@ struct BookDetailView: View {
                                 Image(systemName: isBookInBookshelf ? "checkmark" : "plus")
                                 Text(isBookInBookshelf ? "已在书架" : "加入书架")
                             }
-                            .font(.headline)
-                            .padding(.horizontal, 18)
-                            .padding(.vertical, 14)
-                            .background(Color(UIColor.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: AppTheme.cardRadius, style: .continuous))
+                            .font(.subheadline.weight(.semibold))
+                            .padding(.horizontal, 14)
+                            .padding(.vertical, 12)
+                            .background(AppTheme.card, in: RoundedRectangle(cornerRadius: AppTheme.cardRadius, style: .continuous))
                             .foregroundStyle(isBookInBookshelf ? .secondary : AppTheme.accent)
                         }
                         .buttonStyle(.plain)
@@ -162,7 +152,7 @@ struct BookDetailView: View {
                         Text("正在加载详情")
                             .font(.headline)
                     }
-                    .frame(maxWidth: .infinity, minHeight: 220)
+                    .frame(maxWidth: .infinity, minHeight: 100)
                     .podcastCard()
                 } else if let errorMessage {
                     EmptyStateCard(
@@ -357,56 +347,7 @@ struct BookDetailView: View {
     }
 
     private func detailCard(_ detail: BookDetail) -> some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text(detail.name)
-                .font(.title.bold())
-            Text(detail.author ?? "作者未知")
-                .font(.headline)
-                .foregroundStyle(.secondary)
-            if let intro = detail.intro, !intro.isEmpty {
-                Text(intro)
-                    .font(.body)
-                    .foregroundStyle(.secondary)
-                    .lineSpacing(5)
-            }
-            let metadata = detailMetadata(detail)
-            if !metadata.isEmpty {
-                HStack(spacing: 8) {
-                    ForEach(metadata.indices, id: \.self) { index in
-                        Text(metadata[index])
-                            .font(.caption.weight(.semibold))
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 4)
-                            .background(AppTheme.accent.opacity(0.12), in: Capsule())
-                            .foregroundStyle(AppTheme.accent)
-                    }
-                }
-            }
-            if let latest = detail.latestChapter {
-                Text("最新：\(latest)")
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(AppTheme.accent)
-            }
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .podcastCard()
-    }
-
-    private func detailMetadata(_ detail: BookDetail) -> [String] {
-        var items: [String] = []
-        if let kind = detail.kind?.nilIfEmpty {
-            items.append(kind)
-        }
-        if let status = detail.status?.nilIfEmpty {
-            items.append(status)
-        }
-        if let wordCount = detail.wordCount?.nilIfEmpty {
-            items.append("字数 \(wordCount)")
-        }
-        if let updateTime = detail.updateTime?.nilIfEmpty {
-            items.append("更新 \(updateTime)")
-        }
-        return items
+        BookDetailSummary(detail: detail)
     }
 
     private var audioBookActionCard: some View {

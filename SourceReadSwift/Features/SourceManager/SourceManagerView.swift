@@ -39,6 +39,7 @@ struct SourceManagerView: View {
     /// an account without opening each source's menu.
     @State private var loggedInHosts: Set<String> = []
     @State private var showLoginCenter = false
+    @State private var showWebsiteSourceBuilder = false
     @Environment(\.dismiss) private var dismiss
     @State private var sourceHistory: BookSource?
     @State private var sourceVisualDetail: BookSource?
@@ -262,6 +263,13 @@ struct SourceManagerView: View {
                     webServiceCard
                     tabPicker
                     searchField
+                    if selectedTab == .bookSources {
+                        Button { showWebsiteSourceBuilder = true } label: {
+                            Label("网页本地解析书源", systemImage: "globe.badge.chevron.backward")
+                                .font(.subheadline.weight(.medium))
+                                .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+                        }.buttonStyle(.bordered)
+                    }
                     currentTabContent
                     importStatus
                 }
@@ -281,6 +289,9 @@ struct SourceManagerView: View {
             }
             .sheet(isPresented: $showSourceOrganization) {
                 SourceOrganizationView(store: appState.sourceStore)
+            }
+            .sheet(isPresented: $showWebsiteSourceBuilder) {
+                NavigationStack { WebsiteSourceBuilderView().environmentObject(appState) }
             }
             .sheet(item: $sourceGroupAssignment) { request in
                 SourceGroupAssignmentView(store: appState.sourceStore, sourceIDs: request.sourceIDs)

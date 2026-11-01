@@ -57,6 +57,8 @@ jobs:
             -only-testing:SourceReadSwiftTests/Release117ComicCompatibilityTests \
             -only-testing:SourceReadSwiftTests/Release117AppearanceTests \
             -only-testing:SourceReadSwiftTests/Release117SearchProjectionTests \
+            -only-testing:SourceReadSwiftTests/Release117ChromeTests \
+            -only-testing:SourceReadSwiftTests/WebsiteSourceInferenceTests \
             -destination-timeout 120 -test-timeouts-enabled YES -maximum-test-execution-time-allowance 60 \
             -resultBundlePath NativeTabResults.xcresult test 2>&1 | tee native-tab-test.log
       - name: Export iOS26 attachments

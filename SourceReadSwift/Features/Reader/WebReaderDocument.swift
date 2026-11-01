@@ -1244,6 +1244,7 @@ enum WebReaderHTML {
       }
 
       function visibleTextOffset(element) {
+        if (element.getAttribute("data-local") === "-1") { return 0; }
         var length = (element.textContent || "").length;
         if (!length) { return 0; }
         var low = 0, high = length - 1;
