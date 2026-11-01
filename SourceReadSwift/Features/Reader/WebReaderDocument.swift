@@ -1098,9 +1098,18 @@ enum WebReaderHTML {
           // 树每帧重算。120ms 一条足够记进度，也不会把主线程塞满。
           var now = performance.now();
           if (now - (state.lastVisiblePostAt || 0) > 120) {
+            window.clearTimeout(state.visiblePostTimer);
+            state.visiblePostTimer = null;
             state.lastVisiblePostAt = now;
             state.visible = metric.flat;
             post({ type: "visible", flat: metric.flat, utf16Offset: visibleTextOffset(metric.element) });
+          } else if (!state.visiblePostTimer) {
+            // Keep the final line even when scrolling stops within the throttle
+            // interval. Otherwise a quick swipe persists the previous position.
+            state.visiblePostTimer = window.setTimeout(function () {
+              state.visiblePostTimer = null;
+              onScroll();
+            }, 125 - (now - (state.lastVisiblePostAt || 0)));
           }
         }
         var bottom = y + viewport;
@@ -1253,7 +1262,9 @@ enum WebReaderHTML {
         if (revision !== state.revision) { return; }
         state.activeScrollKey = requestKey;
         // Explicit chapter jumps cannot settle on a nearby old paragraph.
-        var element = content.querySelector('[data-flat="' + flat + '"]');
+        // A chapter heading intentionally shares the first paragraph's flat
+        // index. Character anchors must resolve the paragraph, not that title.
+        var element = content.querySelector((utf16Offset > 0 ? '.para' : '') + '[data-flat="' + flat + '"]');
         if (!element) {
           post({ type: "scroll-miss", flat: flat });
           return;
@@ -1267,6 +1278,7 @@ enum WebReaderHTML {
         var finish = function () {
           if (revision !== state.revision || requestKey !== state.activeScrollKey) { return; }
           state.visible = -1;
+          state.lastVisiblePostAt = 0;
           post({ type: "scroll-applied", flat: flat, requestKey: requestKey });
           window.requestAnimationFrame(onScroll);
         };

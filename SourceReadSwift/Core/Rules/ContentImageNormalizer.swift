@@ -42,6 +42,29 @@ struct ComicImageRequest: Equatable, Sendable {
     let url: String
     let headers: [String: String]
 
+    static func resolve(object: [String: Any], base: String) -> ComicImageRequest? {
+        guard let raw = (object["url"] ?? object["src"] ?? object["image"]) as? String,
+              let request = resolve(raw, base: base) else { return nil }
+        let value = object["headers"] ?? object["header"]
+        let explicit: [String: String]
+        if let dictionary = value as? [String: String] {
+            explicit = dictionary
+        } else if let text = value as? String, let data = text.data(using: .utf8),
+                  let dictionary = try? JSONDecoder().decode([String: String].self, from: data) {
+            explicit = dictionary
+        } else { explicit = [:] }
+        // Object options override URL directives, case-insensitively. Keep
+        // source/chapter fallback separate until the actual request is made.
+        var headers = request.headers
+        for (key, value) in explicit {
+            for existing in Array(headers.keys) where existing.caseInsensitiveCompare(key) == .orderedSame {
+                headers.removeValue(forKey: existing)
+            }
+            headers[key] = value
+        }
+        return .init(url: request.url, headers: headers)
+    }
+
     static func resolve(_ raw: String, base: String) -> ComicImageRequest? {
         let decoded = ResponseFormatDetector.decodeHTMLEntities(raw)
         if let url = URL(string: decoded), InlineImageStore.isInlineURL(url) {

@@ -5,6 +5,8 @@ struct SourceProxySettingsView: View {
     @State private var isTesting = false
     @State private var testResult: String?
     @State private var showingTestResult = false
+    private enum Field: Hashable { case host, port }
+    @FocusState private var focusedField: Field?
 
     var body: some View {
         Form {
@@ -30,19 +32,24 @@ struct SourceProxySettingsView: View {
                             .autocorrectionDisabled()
                             .textInputAutocapitalization(.never)
                             .keyboardType(.numbersAndPunctuation)
+                            .focused($focusedField, equals: .host)
+                            .submitLabel(.next)
+                            .onSubmit { focusedField = .port }
                     }
 
                     HStack {
                         Text("代理端口")
                         Spacer()
-                        TextField("7890", value: $proxyManager.port, format: .number)
+                        TextField("7890", value: $proxyManager.port, format: .number.grouping(.never))
                             .keyboardType(.numberPad)
                             .multilineTextAlignment(.trailing)
+                            .focused($focusedField, equals: .port)
                     }
                 }
 
                 Section("代理连通性测试") {
                     Button {
+                        focusedField = nil
                         testProxyConnection()
                     } label: {
                         HStack {
@@ -68,6 +75,16 @@ struct SourceProxySettingsView: View {
                     .foregroundStyle(.secondary)
                 }
             }
+        }
+        .scrollDismissesKeyboard(.interactively)
+        .toolbar {
+            ToolbarItemGroup(placement: .keyboard) {
+                Spacer()
+                Button("完成") { focusedField = nil }
+            }
+        }
+        .onChange(of: proxyManager.isEnabled) { enabled in
+            if !enabled { focusedField = nil }
         }
         .navigationTitle("书源网络代理")
         .navigationBarTitleDisplayMode(.inline)

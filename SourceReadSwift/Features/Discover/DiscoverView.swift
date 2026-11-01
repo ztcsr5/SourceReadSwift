@@ -1272,7 +1272,7 @@ enum SearchDisplayMode: String, CaseIterable, Identifiable {
     }
 }
 
-struct AggregatedSearchBook: Identifiable {
+struct AggregatedSearchBook: Identifiable, Sendable {
     var id: String { "\(name.lowercased())|\(author?.lowercased() ?? "")" }
     let name: String
     let author: String?
@@ -1303,8 +1303,14 @@ final class DiscoverViewModel: ObservableObject {
     /// once per change; the groupings used to be recomputed on every `body`
     /// read, which is what dropped frames while results streamed in.
     @Published var results: [SearchBook] = [] {
-        didSet { rebuildDerivedResults() }
+        didSet {
+            guard !installingProjection else { return }
+            projectionRevision &+= 1
+            rebuildDerivedResults()
+        }
     }
+    private var installingProjection = false
+    private var projectionRevision = 0
     @Published private(set) var groupedResults: [ResultGroup] = []
     @Published private(set) var aggregatedResults: [AggregatedSearchBook] = []
     private var unfilteredResults: [SearchBook] = []
@@ -1323,7 +1329,7 @@ final class DiscoverViewModel: ObservableObject {
     @Published var sourceFailures: [String] = []
     @Published private(set) var enabledSourceCount = 0
 
-    struct ResultGroup: Identifiable {
+    struct ResultGroup: Identifiable, Sendable {
         let source: String
         let sourceURL: String
         let books: [SearchBook]
@@ -1337,7 +1343,7 @@ final class DiscoverViewModel: ObservableObject {
         resultPage = min(resultPage, resultPageCount - 1)
     }
 
-    private static func makeGroupedResults(from results: [SearchBook]) -> [ResultGroup] {
+    nonisolated private static func makeGroupedResults(from results: [SearchBook]) -> [ResultGroup] {
         Dictionary(grouping: results, by: { $0.sourceUrl.isEmpty ? $0.sourceName : $0.sourceUrl })
             .map { _, books in
                 ResultGroup(source: books.first?.sourceName ?? "未知书源", sourceURL: books.first?.sourceUrl ?? "", books: books)
@@ -1348,9 +1354,10 @@ final class DiscoverViewModel: ObservableObject {
             }
     }
 
-    private static func makeAggregatedResults(from results: [SearchBook]) -> [AggregatedSearchBook] {
+    nonisolated private static func makeAggregatedResults(from results: [SearchBook]) -> [AggregatedSearchBook] {
         var groups: [String: [SearchBook]] = [:]
         var orderedKeys: [String] = []
+        var seen: [String: Set<SourceBookIdentity>] = [:]
 
         for book in results {
             let cleanName = book.name.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -1361,7 +1368,7 @@ final class DiscoverViewModel: ObservableObject {
                 groups[key] = []
                 orderedKeys.append(key)
             }
-            if !groups[key]!.contains(where: { $0.sourceUrl == book.sourceUrl && $0.bookUrl == book.bookUrl }) {
+            if seen[key, default: []].insert(.init(source: book.sourceUrl, book: book.bookUrl)).inserted {
                 groups[key]!.append(book)
             }
         }
@@ -1385,6 +1392,46 @@ final class DiscoverViewModel: ObservableObject {
                 sources: list
             )
         }
+    }
+
+    private struct SourceBookIdentity: Hashable { let source: String; let book: String }
+
+    struct ResultProjection: Sendable {
+        let results: [SearchBook]
+        let groups: [ResultGroup]
+        let aggregated: [AggregatedSearchBook]
+    }
+
+    nonisolated static func makeProjection(_ books: [SearchBook], kinds: [String: BookSourceKind],
+                                           kind: BookSourceKind?, query: String,
+                                           scope: SearchResultFilterScope) -> ResultProjection {
+        let base = kind.map { selected in books.filter { (kinds[$0.sourceUrl] ?? .text) == selected } } ?? books
+        let filtered = SearchResultFilter.apply(base, query: query, scope: scope)
+        return .init(results: filtered, groups: makeGroupedResults(from: filtered),
+                     aggregated: makeAggregatedResults(from: filtered))
+    }
+
+    /// A streamed batch does all folding, grouping and source aggregation off
+    /// the main actor. A newer filter/reset invalidates the whole snapshot.
+    func installRankedResults(_ books: [SearchBook]) async {
+        unfilteredResults = books
+        if let first = books.first { _ = sourceKind(for: first) }
+        projectionRevision &+= 1
+        let revision = projectionRevision
+        let kinds = sourceKindCache
+        let kind = selectedSourceKind
+        let query = resultFilter
+        let scope = resultFilterScope
+        let projection = await Task.detached(priority: .userInitiated) {
+            Self.makeProjection(books, kinds: kinds, kind: kind, query: query, scope: scope)
+        }.value
+        guard !Task.isCancelled, projectionRevision == revision else { return }
+        installingProjection = true
+        results = projection.results
+        groupedResults = projection.groups
+        aggregatedResults = projection.aggregated
+        installingProjection = false
+        resultPage = min(resultPage, resultPageCount - 1)
     }
 
     private weak var appState: AppState?
@@ -1451,6 +1498,7 @@ final class DiscoverViewModel: ObservableObject {
     }
 
     func cancelSearch() {
+        projectionRevision &+= 1
         wasCancelled = isSearching
         searchGeneration &+= 1
         searchTask?.cancel()
@@ -1595,6 +1643,7 @@ final class DiscoverViewModel: ObservableObject {
         let engine = appState.engine
         var hitSources = Set<String>()
         var failures: [String] = []
+        var checkedSources = 0
         // Sliding window concurrency respects user configuration (default 12, range 2..32).
         let savedConcurrency = UserDefaults.standard.integer(forKey: "search_concurrent_threads")
         let maxConcurrent = (savedConcurrency >= 2 && savedConcurrency <= 32) ? savedConcurrency : 12
@@ -1614,6 +1663,8 @@ final class DiscoverViewModel: ObservableObject {
             lastPublishAt = now
             hitSourceCount = hitSources.count
             totalResultCount = rawResults.count
+            checkedSourceCount = checkedSources
+            sourceFailures = Array(failures.suffix(40))
             // Filtering and ranking used to run on the main actor for every
             // streamed batch; the row list now renders while it runs elsewhere.
             let snapshot = rawResults
@@ -1623,8 +1674,7 @@ final class DiscoverViewModel: ObservableObject {
             }.value
             guard !Task.isCancelled, generation == searchGeneration, activeSearchID == searchID,
                   exactMatch == (matchMode == .exact) else { return }
-            unfilteredResults = rankedBooks
-            applyResultFilter()
+            await installRankedResults(rankedBooks)
         }
 
         // Z-Library is merged when it answers; the source phase never waits for
@@ -1659,13 +1709,12 @@ final class DiscoverViewModel: ObservableObject {
                     group.cancelAll()
                     return
                 }
-                checkedSourceCount += 1
+                checkedSources += 1
                 switch result {
                 case .success(let books):
                     record(books, from: source)
                 case .failure(let error):
                     failures.append("\(source.bookSourceName): \(error.displayMessage)")
-                    sourceFailures = Array(failures.suffix(40))
                 }
                 await publishIfNeeded(force: false)
 
@@ -1706,8 +1755,14 @@ final class DiscoverViewModel: ObservableObject {
                   self.mergeBooks(zlibBooks) else { return }
             self.hitSourceCount += 1
             self.totalResultCount = self.rawResults.count
-            self.unfilteredResults = self.filtered(self.rawResults, keyword: keyword)
-            self.applyResultFilter()
+            let snapshot = self.rawResults
+            let exact = self.matchMode == .exact
+            let ranked = await Task.detached(priority: .userInitiated) {
+                SearchBookMatcher.filteredAndRanked(snapshot, keyword: keyword, exact: exact)
+            }.value
+            guard self.activeSearchID == searchID, self.searchGeneration == generation,
+                  exact == (self.matchMode == .exact) else { return }
+            await self.installRankedResults(ranked)
             self.hasFinishedSearch = true
             if !self.results.isEmpty {
                 self.errorMessage = nil

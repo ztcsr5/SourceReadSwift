@@ -1122,7 +1122,10 @@ struct ReaderView: View {
         .sheet(isPresented: $showBookDetailSheet) {
             NavigationStack {
                 if let shelfBook = appState.bookshelfStore.book(id: bookID), shelfBook.sourceURL.hasPrefix("local://") {
-                    LocalBookMetadataView(book: shelfBook)
+                    LocalBookMetadataView(book: shelfBook, onSelectChapter: { index in
+                        selectChapter(index: index)
+                        showBookDetailSheet = false
+                    })
                 } else if let shelfBook = appState.bookshelfStore.book(id: bookID) {
                     BookDetailView(book: shelfBook.asSearchBook)
                 } else {
@@ -4904,7 +4907,11 @@ struct ReaderView: View {
                 } else {
                     if !visibleChapters.isEmpty {
                         Section {
-                            ForEach(visibleChapters) { chapter in
+                            // Stable presentation slots avoid moving every
+                            // identity (or recreating the List) on reversal.
+                            // Selection still uses the actual chapter index.
+                            ForEach(visibleChapters.indices, id: \.self) { row in
+                                let chapter = visibleChapters[row]
                                 Button {
                                     // Apply the jump before dismissing the sheet:
                                     // `showChapterList = false` tears the window down
@@ -4961,9 +4968,6 @@ struct ReaderView: View {
                 }
             }
             .listStyle(.plain)
-            // Reversing thousands of identities in place makes UIKit animate
-            // a full list diff. Recreate only the TOC list, not the reader.
-            .id(tocReversed)
             .scrollContentBackground(.hidden)
             .background(Color.clear)
             .scrollDismissesKeyboard(.interactively)
@@ -4980,8 +4984,6 @@ struct ReaderView: View {
                 scrollTocToCurrentChapter(proxy)
             }
             .onChange(of: tocReversed) { _ in
-                // The outer modifier may survive the inner List identity.
-                // Always schedule the explicit new-order target as well.
                 scrollTocToCurrentChapter(proxy)
             }
             .onChange(of: debouncedTocQuery) { _ in
@@ -5024,9 +5026,13 @@ struct ReaderView: View {
 
     /// 打开目录定位当前章；手动排序或筛选定位新列表首行。
     private func scrollTocToCurrentChapter(_ proxy: ScrollViewProxy) {
-        guard let id = tocScrollIntent.target(in: filteredChapters, preferred: windowCurrentChapterIndex,
-            fallback: currentDisplayChapterIndex)
-            ?? (filteredNavigationEntries.isEmpty ? nil : "toc-nav-0") else { return }
+        let id: AnyHashable
+        if let row = tocScrollIntent.row(in: filteredChapters, preferred: windowCurrentChapterIndex,
+                                        fallback: currentDisplayChapterIndex) {
+            id = AnyHashable(row)
+        } else if !filteredNavigationEntries.isEmpty {
+            id = AnyHashable("toc-nav-0")
+        } else { return }
         tocScrollTask?.cancel()
         tocScrollTask = Task { @MainActor in
             await Task.yield()

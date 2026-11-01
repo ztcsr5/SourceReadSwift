@@ -80,4 +80,16 @@ final class ReaderTocPerformanceTests: XCTestCase {
         XCTAssertEqual(ReaderTocScrollIntent.firstRow.target(in: chapters, preferred: 0, fallback: 0), chapters[0].id)
         XCTAssertNil(ReaderTocScrollIntent.firstRow.target(in: [], preferred: 0, fallback: 0))
     }
+
+    func testPresentationSlotsDoNotMoveWhenTenThousandChaptersReverse() {
+        let chapters = (0..<10_000).map { chapter($0) }
+        let reverse = Array(chapters.reversed())
+        XCTAssertEqual(Array(chapters.indices), Array(reverse.indices))
+        XCTAssertEqual(ReaderTocScrollIntent.firstRow.row(in: reverse, preferred: 0, fallback: 0), 0)
+        XCTAssertEqual(ReaderTocScrollIntent.currentChapter.row(in: reverse, preferred: 173, fallback: 0), 9_826)
+        // Reusing the row must not accidentally select the old chapter.
+        XCTAssertEqual(reverse[0].index, 9_999)
+        XCTAssertEqual(chapters[0].index, 0)
+        XCTAssertNil(ReaderTocScrollIntent.currentChapter.row(in: [], preferred: 0, fallback: 0))
+    }
 }

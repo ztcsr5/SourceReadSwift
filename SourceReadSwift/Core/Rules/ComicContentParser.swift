@@ -18,7 +18,13 @@ enum ComicContentParser {
                let json = try? JSONSerialization.jsonObject(with: data) {
                 if let list = json as? [String] { candidates = list }
                 else if let list = json as? [[String: Any]] {
-                    candidates = list.compactMap { ($0["url"] ?? $0["src"] ?? $0["image"]) as? String }
+                    // Retain per-page hotlink headers. Flattening an object
+                    // to its URL made an otherwise valid API return 403 images.
+                    for object in list {
+                        guard let request = ComicImageRequest.resolve(object: object, base: base), requests.last != request else { continue }
+                        requests.append(request)
+                    }
+                    continue
                 }
             }
             let imageText = ContentImageNormalizer.tokens(in: text)
