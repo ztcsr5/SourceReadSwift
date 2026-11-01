@@ -47,21 +47,30 @@ struct RootTabView: View {
         #if compiler(>=6.2)
         if #available(iOS 26.0, *) {
             TabView(selection: $selectedTab) {
-                BookshelfView().tabItem { Label("主页", systemImage: "house") }.tag(0)
-                DiscoverView(viewModel: appState.discoverViewModel).tabItem { Label("发现", systemImage: "square.grid.2x2") }.tag(1)
-                SettingsView().tabItem { Label("设置", systemImage: "gearshape") }.tag(2)
+                nativeTabRoot(BookshelfView()).tabItem { Label("主页", systemImage: "house") }.tag(0)
+                nativeTabRoot(DiscoverView(viewModel: appState.discoverViewModel)).tabItem { Label("发现", systemImage: "square.grid.2x2") }.tag(1)
+                nativeTabRoot(SettingsView()).tabItem { Label("设置", systemImage: "gearshape") }.tag(2)
             }
-            .toolbar(appState.isTabChromeHidden ? .hidden : .visible, for: .tabBar)
             .tabBarMinimizeBehavior(.onScrollDown)
-            .tabViewBottomAccessory {
-                if audioCoordinator.currentBook != nil, !appState.isTabChromeHidden { miniAudioPlayerBar }
-            }
         } else {
             legacyNavigationContent
         }
         #else
         legacyNavigationContent
         #endif
+    }
+
+    private func nativeTabRoot<Content: View>(_ content: Content) -> some View {
+        content
+            .toolbar(appState.isTabChromeHidden ? .hidden : .visible, for: .tabBar)
+            .safeAreaInset(edge: .bottom, spacing: 0) {
+                // An empty native accessory still reserves a glass container on
+                // some iOS26 releases. Keep the TabView identity stable instead
+                // of conditionally attaching/removing its accessory modifier.
+                if audioCoordinator.currentBook != nil, !appState.isTabChromeHidden {
+                    miniAudioPlayerBar
+                }
+            }
     }
 
     private var legacyNavigationContent: some View {
@@ -240,6 +249,7 @@ struct HideRootTabBarModifier: ViewModifier {
 
     func body(content: Content) -> some View {
         content
+            .toolbar(.hidden, for: .tabBar)
             .onAppear {
                 appState.acquireTabChromeHidden(owner: token)
             }

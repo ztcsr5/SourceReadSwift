@@ -1041,7 +1041,7 @@ struct ReaderView: View {
         }
         .background(ReaderNavigationPopLock())
         .navigationBarBackButtonHidden(true)
-        .toolbar(.hidden, for: .navigationBar)
+        .toolbar(.hidden, for: .navigationBar, .tabBar)
         .statusBarHidden(!showOverlay && !showSystemStatusBar)
         // 全屏阅读时连 home indicator 一起淡出；打开菜单或强制系统状态栏时恢复。
         .persistentSystemOverlays(showOverlay || showSystemStatusBar ? .automatic : .hidden)
