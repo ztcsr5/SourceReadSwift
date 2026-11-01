@@ -24,17 +24,22 @@ enum ReaderIllustratedBackgroundStore {
 struct ReaderIllustratedBackgroundView: View {
     let name: String
     let paper: Color
+    let night: Bool
     @State private var image: UIImage?
 
-    init(name: String, paper: Color) {
+    init(name: String, paper: Color, night: Bool = false) {
         self.name = name
         self.paper = paper
+        self.night = night
         _image = State(initialValue: ReaderIllustratedBackgroundStore.cached(name))
     }
     var body: some View {
         ZStack {
             paper
-            if let image { ReaderWallpaperView(image: image, fillMode: .fill) }
+            if let image {
+                ReaderWallpaperView(image: image, fillMode: .fill)
+                    .opacity(night ? 0.08 : 1)
+            }
         }
         .task(id: name) {
             let loaded = await ReaderIllustratedBackgroundStore.load(name)

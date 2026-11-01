@@ -51,7 +51,7 @@ struct ReaderPaperTextureView: View {
     let night: Bool
     var body: some View {
         if let asset = background.wallpaperAssetName {
-            ReaderIllustratedBackgroundView(name: asset, paper: background.color(isNight: night))
+            ReaderIllustratedBackgroundView(name: asset, paper: background.color(isNight: night), night: night)
         } else {
             Image(uiImage: ReaderPaperTexture.image(background: background, night: night))
                 .resizable(resizingMode: .tile)
