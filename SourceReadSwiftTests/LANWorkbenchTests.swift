@@ -45,7 +45,7 @@ final class LANWorkbenchTests: XCTestCase {
         let html = LANWorkbenchDocument.html
         XCTAssertTrue(html.contains("仅保留于当前页面"))
         XCTAssertTrue(html.contains("X-SourceRead-Token"))
-        XCTAssertTrue(html.contains("slice(start,start+20)"))
+        XCTAssertTrue(html.contains("每页 20 条"))
         XCTAssertFalse(html.contains("localStorage"))
         XCTAssertFalse(html.contains("sessionStorage"))
         XCTAssertFalse(html.contains("<script src="))
