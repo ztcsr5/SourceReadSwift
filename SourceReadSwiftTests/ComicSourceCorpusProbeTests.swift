@@ -40,6 +40,8 @@ final class ComicSourceCorpusProbeTests: XCTestCase {
         var searchCount = 0
         var chapterCount = 0
         var chapterTitle: String = ""
+        var contentPreview: String = ""
+        var firstImageURL: String = ""
         var imageCount = 0
         var decoded = false
         var elapsedSeconds = 0.0
@@ -63,9 +65,11 @@ final class ComicSourceCorpusProbeTests: XCTestCase {
                 return row
             }
             guard let content = result.result.content else { row.stage = "content"; row.message = "No chapter content"; return row }
+            row.contentPreview = String(content.paragraphs.prefix(2).joined(separator: "\n").prefix(400))
             let pages = ComicContentParser.parsePages(from: content)
             row.stage = "image-parse"; row.imageCount = pages.count
             guard let first = pages.first, let imageURL = URL(string: first.url) else { row.message = "No image URL extracted"; return row }
+            row.firstImageURL = first.url
             let sourceHeaders = SourceRequestBuilder().imageRequestHeaders(for: source, chapterURL: content.chapter.url)
             let headers = ComicImageRequest(url: first.url, headers: first.headers).mergingHeaders(sourceHeaders, chapterURL: content.chapter.url)
             row.stage = "image-decode"

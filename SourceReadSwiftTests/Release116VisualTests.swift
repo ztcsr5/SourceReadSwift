@@ -98,18 +98,23 @@ final class Release116VisualTests: XCTestCase {
     }
 
     @MainActor private func snapshot<V: View>(_ name: String, width: CGFloat, height: CGFloat, style: UIUserInterfaceStyle = .light, @ViewBuilder content: () -> V) async throws {
-        let window = UIWindow(frame: CGRect(x: 0, y: 0, width: width, height: height))
+        let scene = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.first
+        let window = scene.map { UIWindow(windowScene: $0) } ?? UIWindow(frame: UIScreen.main.bounds)
+        window.frame = UIScreen.main.bounds
+        window.overrideUserInterfaceStyle = style
         let container = UIViewController()
         container.overrideUserInterfaceStyle = style
         let host = UIHostingController(rootView: content().preferredColorScheme(style == .dark ? .dark : .light))
+        host.overrideUserInterfaceStyle = style
         window.rootViewController = container
         window.makeKeyAndVisible()
         container.addChild(host); container.view.addSubview(host.view)
-        host.view.frame = container.view.bounds; host.didMove(toParent: container)
+        host.view.frame = CGRect(x: 0, y: 0, width: width, height: height); host.didMove(toParent: container)
         defer { window.isHidden = true }
         try await Task.sleep(nanoseconds: 500_000_000)
         host.view.layoutIfNeeded()
         XCTAssertEqual(host.view.bounds.width, width, accuracy: 1)
+        XCTAssertEqual(host.traitCollection.userInterfaceStyle, style, "Rendered evidence must receive its named appearance")
         let image = UIGraphicsImageRenderer(size: host.view.bounds.size).image { _ in host.view.drawHierarchy(in: host.view.bounds, afterScreenUpdates: true) }
         let attachment = XCTAttachment(image: image); attachment.name = "release116-\(name)"; attachment.lifetime = .keepAlways; add(attachment)
     }

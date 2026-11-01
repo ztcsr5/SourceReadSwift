@@ -20,6 +20,9 @@ enum ContentImageNormalizer {
     }
 
     static func imageURL(in tag: String) -> String? {
+        // Some source JS emits literal \" delimiters, not just JSON escaping
+        // in the source definition. Restrict unescaping to the image tag.
+        let tag = tag.replacingOccurrences(of: #"\""#, with: "\"")
         for re in attributes {
             // The closing quote must precede the next attribute / tag end.
             // Some Legado rules put unescaped JSON quotes inside src options.

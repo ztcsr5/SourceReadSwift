@@ -22,6 +22,26 @@ final class ContentImagePipelineRegressionTests: XCTestCase {
         XCTAssertEqual(page.headers["X-Image"], "yes")
     }
 
+    func testLiteralBackslashImageDelimitersFromSourceJavaScript() throws {
+        let tag = #"<img src=\"https://cdn.example/a.webp,{"headers":{"Referer":"https://comic.example/reader"}}\">"#
+        let page = try XCTUnwrap(pages([tag]).first)
+        XCTAssertEqual(page.url, "https://cdn.example/a.webp")
+        XCTAssertEqual(page.headers["Referer"], "https://comic.example/reader")
+    }
+
+    func testCSSNodesCanBecomeObjectDirectoryThroughJavaScript() throws {
+        let source = BookSource(bookSourceName: "CSS JS fixture", bookSourceUrl: "https://comic.example", ruleToc: SourceRule(fields: [
+            "chapterList": ".chapter@js:Array.from(result).map(n => ({text:n.text(),href:n.attr('href')}))",
+            "chapterName": "text", "chapterUrl": "href"
+        ]))
+        let book = BookDetail(name: "fixture", author: nil, coverUrl: nil, bookUrl: "https://comic.example/book/1", sourceName: "fixture", sourceUrl: source.bookSourceUrl, intro: nil, latestChapter: nil)
+        let html = #"<a class="chapter" href="/c1">第一话</a><a class="chapter" href="/c2">第二话</a>"#
+        let response = SourceResponse(url: URL(string: book.bookUrl)!, statusCode: 200, headers: [:], body: html, data: Data(html.utf8))
+        let chapters = try ChapterListParser().parse(source: source, book: book, response: response).get()
+        XCTAssertEqual(chapters.map(\.title), ["第一话", "第二话"])
+        XCTAssertEqual(chapters.map(\.url), ["https://comic.example/c1", "https://comic.example/c2"])
+    }
+
     func testProductionContentNormalizationRetainsLazyPagesAndParagraphs() throws {
         let source = BookSource(bookSourceName: "Comic fixture", bookSourceUrl: "https://comic.example", ruleContent: SourceRule(fields: ["content": ".content@html"]))
         let html = #"<div class="content"><p>before</p><img src="/blank.png" data-src="/a.webp"><img data-original="//cdn.example/b.png?sig=a&amp;b=2"></div>"#

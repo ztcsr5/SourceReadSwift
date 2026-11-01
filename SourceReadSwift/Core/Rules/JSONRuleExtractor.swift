@@ -347,6 +347,15 @@ struct JSONRuleExtractor {
             let intermediate: Any?
             if left.isEmpty {
                 intermediate = object
+            } else if let html = object as? String,
+                      html.trimmingCharacters(in: .whitespacesAndNewlines).hasPrefix("<"),
+                      [".", "#", "@css:", "@xpath:", "class.", "id.", "tag.", "text."].contains(where: { left.hasPrefix($0) }),
+                      let base = URL(string: variables["baseUrl"] as? String ?? "https://localhost/") {
+                // A JS TOC may return dictionaries even though its input is
+                // CSS-selected HTML nodes. Preserve those nodes for JS rather
+                // than interpreting the CSS prefix as a JSON property path.
+                intermediate = try? HtmlRuleExtractor(executionContext: executionContext)
+                    .select(html, baseUrl: base, listRule: left)
             } else {
                 intermediate = evaluateNormalSegment(left, object: object, variables: variables)
             }
