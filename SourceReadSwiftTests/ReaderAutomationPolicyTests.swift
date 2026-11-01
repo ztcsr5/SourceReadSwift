@@ -174,7 +174,7 @@ final class ReaderAutomationPolicyTests: XCTestCase {
         XCTAssertEqual(ReaderAutomationPolicy.clampedDelay(.nan), 2.0)
         XCTAssertEqual(ReaderAutomationPolicy.clampedDelay(.infinity), 2.0)
         XCTAssertEqual(ReaderAutomationPolicy.clampedDelay(-10), 0.25)
-        XCTAssertEqual(ReaderAutomationPolicy.clampedDelay(120), 30)
+        XCTAssertEqual(ReaderAutomationPolicy.clampedDelay(120), 60)
     }
 
     func testAutoScrollStartSnapshotsVisibleParagraphInScrollMode() {

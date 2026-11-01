@@ -1034,6 +1034,13 @@ struct ReaderView: View {
             .ignoresSafeArea()
         }
         .background(ReaderNavigationPopLock())
+        .background(ReaderExitSwipeBridge(
+            enabled: ReaderExitSwipePolicy.isEnabled(
+                menuVisible: showOverlay, settingsVisible: showSettings,
+                coverPresented: showChapterList || temporaryCoverPresented
+            ),
+            onExit: { dismiss() }
+        ))
         .navigationBarBackButtonHidden(true)
         .toolbar(.hidden, for: .navigationBar, .tabBar)
         .statusBarHidden(!showOverlay && !showSystemStatusBar)
@@ -1211,6 +1218,16 @@ struct ReaderView: View {
         }
         .onChange(of: sleepTimerMinutes) { _ in
             scheduleSleepTimer()
+        }
+        .onChange(of: autoScrollDelay) { value in
+            let validDelay = ReaderAutomationPolicy.clampedDelay(value)
+            if value != validDelay {
+                autoScrollDelay = validDelay
+                return
+            }
+            // The task captures its delay. Cancel that old wait and start the
+            // new interval now, rather than only changing the displayed number.
+            if autoScrollEnabled { startAutoScroll() }
         }
         .onChange(of: scenePhase) { phase in
             if phase != .active {
@@ -4465,10 +4482,10 @@ struct ReaderView: View {
             readerValueSlider(
                 "自动滚动间隔",
                 value: $autoScrollDelay,
-                range: ReaderAutomationPolicy.minDelay...12,
-                step: 0.5,
+                range: ReaderAutomationPolicy.minDelay...ReaderAutomationPolicy.maxDelay,
+                step: 0.25,
                 unit: "秒",
-                help: "自动滚动每前进一段之间的等待时间。数值越小滚动越快；朗读与自动滚动互斥。"
+                help: "自动滚动间隔最长 60 秒，数值越大滚动越慢；运行中修改立即重新计时。朗读与自动滚动互斥。"
             )
 
             readerValueSlider("朗读速度", value: $ttsRate, range: 0.35...0.65, step: 0.01, unit: "倍速", help: "调整语音朗读语速（0.35x ~ 0.65x），从当前可见段落开始朗读，不会跳回章节开头")

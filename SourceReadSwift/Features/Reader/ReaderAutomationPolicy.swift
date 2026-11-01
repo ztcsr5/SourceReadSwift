@@ -97,7 +97,7 @@ struct ReaderScrollChromeGeometry: Equatable {
 
 struct ReaderAutomationPolicy {
     public static let minDelay: Double = 0.25
-    public static let maxDelay: Double = 30.0
+    public static let maxDelay: Double = 60.0
 
     /// Keep automation responsive without allowing a malformed persisted value
     /// to create a busy loop (or an animation that effectively never moves).
