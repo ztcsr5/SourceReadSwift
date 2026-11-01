@@ -1183,6 +1183,10 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
     static func looksLikeJavaScriptChallenge(_ body: String) -> Bool {
         let text = body.lowercased()
         guard !text.isEmpty else { return false }
+        if text.contains("<title>"), text.contains("browser verification"),
+           text.contains("challenge-assets/challenge.js"), !hasCrawlableMarkup(body) {
+            return true
+        }
         if text.contains("var arg1=") || text.contains("getrenderdata") {
             return true
         }

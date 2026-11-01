@@ -44,6 +44,12 @@ final class ComicSourceCorpusProbeTests: XCTestCase {
         var firstImageURL: String = ""
         var imageCount = 0
         var decoded = false
+        var failureKind = ""
+        var sampledPositions: [Int] = []
+        var sampledDecoded: [Bool] = []
+        var responseStatus: Int?
+        var responseType: String?
+        var responseSnippet: String?
         var elapsedSeconds = 0.0
     }
 
@@ -61,6 +67,19 @@ final class ComicSourceCorpusProbeTests: XCTestCase {
             row.elapsedSeconds = Date().timeIntervalSince(start)
             if let error = result.error {
                 row.stage = result.result.steps.last?.stage.rawValue ?? "search"
+                row.failureKind = SourceDiagnosticClassifier.kind(error: error, stage: row.stage).rawValue
+                if let step = result.result.steps.last,
+                   let evidence = engine.diagnosticEvidence(sourceURL: source.bookSourceUrl, stage: step.stage) {
+                    row.responseStatus = evidence.responseStatusCode
+                    row.responseType = evidence.responseHeaders.first { $0.key.lowercased() == "content-type" }?.value
+                    row.responseSnippet = evidence.responseSnippet.map { String(SourceDiagnosticRedactor.value($0).prefix(400)) }
+                    if let sniffed = SourceDiagnosticClassifier.sniffSnippet(snippet: evidence.responseSnippet,
+                        statusCode: evidence.responseStatusCode, decodedByteCount: evidence.responseDecodedByteCount, stage: row.stage) {
+                        row.failureKind = sniffed.kind.rawValue
+                        row.message = sniffed.summary
+                        return row
+                    }
+                }
                 row.message = String(error.displayMessage.prefix(200))
                 return row
             }
@@ -68,14 +87,29 @@ final class ComicSourceCorpusProbeTests: XCTestCase {
             row.contentPreview = String(content.paragraphs.prefix(2).joined(separator: "\n").prefix(400))
             let pages = ComicContentParser.parsePages(from: content)
             row.stage = "image-parse"; row.imageCount = pages.count
-            guard let first = pages.first, let imageURL = URL(string: first.url) else { row.message = "No image URL extracted"; return row }
+            guard let first = pages.first else {
+                row.failureKind = "not-image-payload"
+                row.message = "No image URL extracted; homepage, source guard, empty list or non-image media must not count as a bitmap failure"
+                return row
+            }
             row.firstImageURL = first.url
             let sourceHeaders = SourceRequestBuilder().imageRequestHeaders(for: source, chapterURL: content.chapter.url)
-            let headers = ComicImageRequest(url: first.url, headers: first.headers).mergingHeaders(sourceHeaders, chapterURL: content.chapter.url)
             row.stage = "image-decode"
-            let image = await AsyncTimeout.run(seconds: 10) { await RemoteImageLoader.shared.image(for: imageURL, headers: headers) }
-            row.decoded = image.flatMap { $0 } != nil
-            row.message = row.decoded ? "First chapter / first image decoded (not all chapters verified)" : "Image request or bitmap decode failed"
+            let positions = Array(Set([0, pages.count / 2, pages.count - 1])).sorted()
+            for position in positions {
+                let page = pages[position]
+                let headers = ComicImageRequest(url: page.url, headers: page.headers).mergingHeaders(sourceHeaders, chapterURL: content.chapter.url)
+                let imageURL = URL(string: page.url)
+                let image = await AsyncTimeout.run(seconds: 10) {
+                    guard let imageURL else { return UIImage?.none }
+                    return await RemoteImageLoader.shared.image(for: imageURL, headers: headers)
+                }
+                row.sampledPositions.append(position)
+                row.sampledDecoded.append(image.flatMap { $0 } != nil)
+            }
+            row.decoded = row.sampledDecoded.first == true
+            row.failureKind = row.sampledDecoded.allSatisfy { $0 } ? "" : "image-transport-or-decode"
+            row.message = "First chapter sampled first/middle/last: \(row.sampledDecoded.filter { $0 }.count)/\(positions.count) decoded; not all chapters/pages verified"
             row.elapsedSeconds = Date().timeIntervalSince(start)
             return row
         }

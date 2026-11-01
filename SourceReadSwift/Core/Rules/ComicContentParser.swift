@@ -21,7 +21,7 @@ enum ComicContentParser {
                     // Retain per-page hotlink headers. Flattening an object
                     // to its URL made an otherwise valid API return 403 images.
                     for object in list {
-                        guard let request = ComicImageRequest.resolve(object: object, base: base), requests.last != request else { continue }
+                        guard let request = ComicImageRequest.resolve(object: object, base: base), isImageCandidate(request.url), requests.last != request else { continue }
                         requests.append(request)
                     }
                     continue
@@ -38,14 +38,26 @@ enum ComicContentParser {
             if candidates.isEmpty, !text.contains(where: { $0.isWhitespace }),
                !text.contains("<"), !text.contains("[") {
                 let ext = URL(string: text)?.pathExtension.lowercased() ?? ""
-                if text.hasPrefix("http://") || text.hasPrefix("https://") || text.hasPrefix("//")
+                let isURL = text.hasPrefix("http://") || text.hasPrefix("https://") || text.hasPrefix("//")
+                if (isURL && isImageCandidate(text))
                     || ["jpg", "jpeg", "png", "webp", "gif", "avif"].contains(ext) { candidates = [text] }
             }
             for candidate in candidates {
-                guard let request = ComicImageRequest.resolve(candidate, base: base), requests.last != request else { continue }
+                guard let request = ComicImageRequest.resolve(candidate, base: base), isImageCandidate(request.url), requests.last != request else { continue }
                 requests.append(request)
             }
         }
         return requests.enumerated().map { ComicPage(id: $0.offset, url: $0.element.url, headers: $0.element.headers) }
+    }
+
+    /// A source can be mistyped as a comic or emit its author's homepage when
+    /// its own guard fails. Neither is a failed bitmap, and neither belongs in
+    /// the reader's image queue. Extensionless image APIs remain supported.
+    static func isImageCandidate(_ address: String) -> Bool {
+        guard let url = URL(string: address) else { return false }
+        if InlineImageStore.isInlineURL(url) { return true }
+        let path = url.path.lowercased()
+        guard !(path.isEmpty || path == "/") || url.query?.isEmpty == false else { return false }
+        return !["m3u8", "mpd", "mp4", "m4v", "webm", "mp3", "m4a", "aac", "ts", "html", "htm"].contains(url.pathExtension.lowercased())
     }
 }

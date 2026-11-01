@@ -124,6 +124,12 @@ enum SourceDiagnosticClassifier {
 
         let lower = snippet.lowercased()
 
+        if lower.contains("browser verification"), lower.contains("challenge-assets/") {
+            return SniffedDiagnostic(kind: .verification, status: .verificationRequired,
+                classification: "verification(\"浏览器验证页，不是搜索或正文数据\")",
+                summary: "源站要求浏览器验证；请在登录中心打开站点，不能将验证页当成规则失效")
+        }
+
         // 1. Regional block / WAF block
         if containsAny(lower, ["<title>地区拦截</title>", "地区拦截", "访问受限", "地域限制", "ip受限", "站点已开启防护", "waf拦截"]) {
             return SniffedDiagnostic(

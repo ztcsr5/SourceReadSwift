@@ -111,6 +111,11 @@ final class SourceTocCorpusProbeTests: XCTestCase {
             print("TOC_MISMATCH \(line)")
         }
         print("TOC_FIELDS emptyNames=\(emptyNameTotal) emptyURLs=\(emptyURLTotal)")
+        let attachment = XCTAttachment(data: data, uniformTypeIdentifier: "public.json")
+        attachment.name = "parser-toc-97-field-evidence"
+        attachment.lifetime = .keepAlways
+        add(attachment)
+        XCTAssertTrue(mismatches.isEmpty, "SwiftSoup/jsoup TOC parity regressed: " + mismatches.prefix(8).joined(separator: "; "))
         XCTAssertEqual(report.count, entries.count)
     }
 

@@ -105,6 +105,11 @@ final class SourceRowsCorpusProbeTests: XCTestCase {
             emptyBookURLTotal += (item["emptyBookURLs"] as? Int) ?? 0
         }
         print("ROWS_FIELDS emptyNames=\(emptyNameTotal) emptyAuthors=\(emptyAuthorTotal) emptyBookURLs=\(emptyBookURLTotal)")
+        let attachment = XCTAttachment(data: data, uniformTypeIdentifier: "public.json")
+        attachment.name = "parser-search-114-field-evidence"
+        attachment.lifetime = .keepAlways
+        add(attachment)
+        XCTAssertTrue(mismatches.isEmpty, "SwiftSoup/jsoup row parity regressed: " + mismatches.prefix(8).joined(separator: "; "))
         XCTAssertEqual(report.count, entries.count)
     }
 

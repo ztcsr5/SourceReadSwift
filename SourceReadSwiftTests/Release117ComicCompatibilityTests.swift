@@ -42,6 +42,23 @@ final class Release117ComicCompatibilityTests: XCTestCase {
         XCTAssertEqual(request.headers, ["referer": "new"])
     }
 
+    func testSourceGuardHomepageAndVideoPlaylistAreNotComicImages() {
+        let values = ["⚠️ 检测到书源被恶意篡改", "https://ycoo.net", "https://hn.example/play/index.m3u8",
+                      "[img]https://hn.example/play/index.m3u8[/img]", #"[{"url":"https://example.com/"}]"#]
+        XCTAssertTrue(ComicContentParser.parsePages(from: content(values)).isEmpty)
+        XCTAssertEqual(ComicContentParser.parsePages(from: content(["https://cdn.example/render?id=1", "[img]https://cdn.example/page/2[/img]"])).count, 2)
+        XCTAssertTrue(ComicContentParser.parsePages(from: content([#"[img],{"headers":{"Referer":"https://example.com/"}}[/img]"#])).isEmpty)
+    }
+
+    func testBrowserVerificationIsClassifiedWithoutMistakingAnOrdinaryFooter() throws {
+        let challenge = #"<!doctype html><title>MangaDex - Browser verification...</title><script src="challenge-assets/challenge.js"></script><noscript>Please enable JavaScript and cookies</noscript>"#
+        XCTAssertTrue(LegadoSourceEngine.looksLikeJavaScriptChallenge(challenge))
+        let diagnostic = try XCTUnwrap(SourceDiagnosticClassifier.sniffSnippet(snippet: challenge, statusCode: 200, stage: "search"))
+        XCTAssertEqual(diagnostic.kind, .verification)
+        XCTAssertEqual(diagnostic.status, .verificationRequired)
+        XCTAssertFalse(LegadoSourceEngine.looksLikeJavaScriptChallenge("<article>教程：browser verification 是什么？</article><footer>challenge-assets/ 文档链接</footer>"))
+    }
+
     private func content(_ paragraphs: [String], url: String = "https://comic.example.com/chapters/1") -> ChapterContent {
         .init(chapter: .init(title: "第1话", url: url, bookUrl: "https://comic.example.com/book", index: 0, isVip: false),
               title: "第1话", paragraphs: paragraphs, nextContentUrl: nil)
