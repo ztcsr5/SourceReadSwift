@@ -42,7 +42,7 @@ enum WebsiteJSONSourceInference {
         let source = BookSource(bookSourceName: sourceName,
             bookSourceUrl: base + "#local-inference-" + UUID().uuidString,
             bookSourceGroup: "网页本地解析",
-            ruleBookInfo: .init(fields: [:]),
+            ruleBookInfo: .init(fields: ["tocUrl": catalog.url.absoluteString]),
             ruleToc: .init(fields: ["chapterList": toc.path, "chapterName": "$." + toc.name, "chapterUrl": "$." + toc.url]),
             ruleContent: .init(fields: ["content": contentPath]), loginUrl: base,
             raw: ["sourceComment": "本地直接 JSON 样本生成，只验证已提供的目录/正文接口。未推断搜索、发现、分页、签名或加密接口。"])
