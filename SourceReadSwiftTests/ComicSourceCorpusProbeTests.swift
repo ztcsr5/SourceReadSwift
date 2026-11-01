@@ -36,6 +36,10 @@ final class ComicSourceCorpusProbeTests: XCTestCase {
         let name: String
         var stage: String = "search"
         var message: String = ""
+        var keyword: String = ""
+        var searchCount = 0
+        var chapterCount = 0
+        var chapterTitle: String = ""
         var imageCount = 0
         var decoded = false
         var elapsedSeconds = 0.0
@@ -46,7 +50,12 @@ final class ComicSourceCorpusProbeTests: XCTestCase {
             let start = Date()
             var row = Row(index: index, name: source.bookSourceName)
             let engine = LegadoSourceEngine()
-            let result = await engine.runPipelineExecution(source: source, keyword: "斗罗", timeout: 8, tocMaxPages: 1, contentMaxPages: 1)
+            let configured = source.ruleSearch?.fields["checkKeyWord"]?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+            row.keyword = configured.isEmpty ? "斗罗" : configured
+            let result = await engine.runPipelineExecution(source: source, keyword: row.keyword, timeout: 8, tocMaxPages: 1, contentMaxPages: 1)
+            row.searchCount = result.result.searchBooks.count
+            row.chapterCount = result.result.chapters.count
+            row.chapterTitle = result.result.chapters.first?.title ?? ""
             row.elapsedSeconds = Date().timeIntervalSince(start)
             if let error = result.error {
                 row.stage = result.result.steps.last?.stage.rawValue ?? "search"
