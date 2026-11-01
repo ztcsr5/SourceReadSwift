@@ -60,6 +60,7 @@ jobs:
             -only-testing:SourceReadSwiftTests/Release117ChromeTests \
             -only-testing:SourceReadSwiftTests/WebsiteSourceInferenceTests \
             -only-testing:SourceReadSwiftTests/AIChatTests \
+            -only-testing:SourceReadSwiftTests/Release117PurificationTests \
             -destination-timeout 120 -test-timeouts-enabled YES -maximum-test-execution-time-allowance 60 \
             -resultBundlePath NativeTabResults.xcresult test 2>&1 | tee native-tab-test.log
       - name: Export iOS26 attachments
@@ -78,6 +79,14 @@ jobs:
             native-boot.log
             NativeTabResults.xcresult
             native-ui-snapshots
+          retention-days: 7
+      - name: Preserve compact iOS26 UI snapshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios26-ui-snapshots-${{ github.sha }}
+          path: native-ui-snapshots
+          if-no-files-found: ignore
           retention-days: 7
   build:
     runs-on: macos-15
@@ -166,4 +175,12 @@ jobs:
             xcodebuild-test.log
             TestResults.xcresult
             ui-snapshots
+          retention-days: 7
+      - name: Preserve compact UI snapshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-ui-snapshots-${{ github.sha }}
+          path: ui-snapshots
+          if-no-files-found: ignore
           retention-days: 7

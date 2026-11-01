@@ -107,7 +107,8 @@ final class AIChatTests: XCTestCase {
         XCTAssertEqual(try AIGeneratedSourceDecoder.decode("建议如下：\n```json\n" + text + "\n``` ").bookSourceName, "示例")
         XCTAssertThrowsError(try AIGeneratedSourceDecoder.decode("{}"))
         XCTAssertThrowsError(try AIGeneratedSourceDecoder.decode("[\(text),\(text)]"))
-        XCTAssertThrowsError(try AIGeneratedSourceDecoder.decode(text.replacingOccurrences(of: "https://novel.example", with: "file:///private/data")))
+        let invalid = BookSource(bookSourceName: "示例", bookSourceUrl: "file:///private/data", ruleToc: source.ruleToc, ruleContent: source.ruleContent)
+        XCTAssertThrowsError(try AIGeneratedSourceDecoder.decode(String(decoding: try JSONEncoder().encode(invalid), as: UTF8.self)))
     }
 
     @MainActor func testFileAttachmentLoaderBoundsTextAndResizesImages() throws {
@@ -140,6 +141,7 @@ final class AIChatTests: XCTestCase {
         for width: CGFloat in [320, 390] {
             let scene = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.first
             let window = scene.map { UIWindow(windowScene: $0) } ?? UIWindow(frame: UIScreen.main.bounds)
+            window.frame = UIScreen.main.bounds
             let container = UIViewController()
             let host = UIHostingController(rootView: NavigationStack { AIChatView().environmentObject(app) })
             window.rootViewController = container; window.makeKeyAndVisible()
@@ -147,6 +149,8 @@ final class AIChatTests: XCTestCase {
             host.view.frame = CGRect(x: 0, y: 0, width: width, height: 844); host.didMove(toParent: container)
             try await Task.sleep(nanoseconds: 300_000_000)
             host.view.layoutIfNeeded()
+            XCTAssertEqual(host.view.bounds.width, width, accuracy: 1)
+            XCTAssertEqual(host.view.bounds.height, 844, accuracy: 1)
             let image = UIGraphicsImageRenderer(size: host.view.bounds.size).image { _ in host.view.drawHierarchy(in: host.view.bounds, afterScreenUpdates: true) }
             let attachment = XCTAttachment(image: image); attachment.name = "release117-ai-entry-\(Int(width))"; attachment.lifetime = .keepAlways; add(attachment)
             window.isHidden = true

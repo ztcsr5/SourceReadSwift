@@ -46,6 +46,40 @@ struct PurifyRulePreset: Identifiable, Hashable, Sendable {
                 "[\\u200B\\uFEFF]##",
                 "(?m)^[ \\t]*[-=]{8,}[ \\t]*$##"
             ]
+        ),
+        PurifyRulePreset(
+            id: "navigation-lines",
+            title: "独立导航行 · 保守",
+            detail: "只删除整行的上一章、下一章、返回目录等按钮文字；不会删除句子或对话里的同名词。按需导入。",
+            patterns: [
+                "(?m)^[ \\t]*(?:上一章|下一章|返回目录|章节目录|加入书签|返回书架)[ \\t]*(?:\\r?\\n|$)##",
+                "(?m)^[ \\t]*(?:上一页|下一页)[ \\t]*(?:\\r?\\n|$)##"
+            ]
+        ),
+        PurifyRulePreset(
+            id: "page-markers",
+            title: "网页分页标记 · 可选",
+            detail: "删除单独一行的“第1/3页”等网页分页标记；如原书有相同独立行，请勿启用。",
+            patterns: [
+                "(?m)^[ \\t]*[（(]?第[ \\t]*[0-9]+[ \\t]*/[ \\t]*[0-9]+[ \\t]*页[）)]?[ \\t]*(?:\\r?\\n|$)##"
+            ]
+        ),
+        PurifyRulePreset(
+            id: "site-link-prompts",
+            title: "带网址的访问提示 · 保守",
+            detail: "仅删除固定提示开头、后接完整 HTTP(S) 网址的独立行，保留正文中的网址与对话。",
+            patterns: [
+                "(?im)^[ \\t]*(?:手机用户请访问|本书最新章节请访问|请访问备用网址)[：: \\t]+https?://[^ \\t\\r\\n]+[ \\t]*(?:\\r?\\n|$)##"
+            ]
+        ),
+        PurifyRulePreset(
+            id: "control-residue",
+            title: "不可见控制符与空白残留",
+            detail: "移除非换行/制表的 ASCII 控制符，以及纯空白 HTML 占位行；不替换引号、繁简字或正常标点。",
+            patterns: [
+                "[\\x00-\\x08\\x0B\\x0C\\x0E-\\x1F\\x7F]##",
+                "(?im)^[ \\t]*(?:&nbsp;|&#160;|&#xA0;|<br[ \\t]*/?>)+[ \\t]*(?:\\r?\\n|$)##"
+            ]
         )
     ]
 }

@@ -17,6 +17,7 @@ struct AIChatView: View {
     @State private var pending: AIChatSubmission?
     @State private var editing: AIChatAttachment?
     @State private var generatedSource: AIChatMessage?
+    @State private var fullText: AIChatMessage?
     @State private var showClear = false
     @FocusState private var composing: Bool
 
@@ -65,6 +66,12 @@ struct AIChatView: View {
         .sheet(item: $generatedSource) { message in
             AIGeneratedSourceReviewView(text: message.text).environmentObject(appState)
         }
+        .sheet(item: $fullText) { message in
+            NavigationStack {
+                AIChatPagedText(text: message.text).navigationTitle("完整回复").navigationBarTitleDisplayMode(.inline)
+                    .toolbar { ToolbarItem(placement: .confirmationAction) { Button("关闭") { fullText = nil } } }
+            }
+        }
         .fileImporter(isPresented: $showFiles, allowedContentTypes: [.json, .plainText, .text, .image], allowsMultipleSelection: true, onCompletion: importFiles)
     }
 
@@ -93,7 +100,12 @@ struct AIChatView: View {
     private func messageRow(_ message: AIChatMessage) -> some View {
         VStack(alignment: .leading, spacing: 10) {
             Text(message.role == .user ? "你" : "AI · \(message.modelName ?? "回复")").font(.caption.weight(.semibold)).foregroundStyle(.secondary)
-            if !message.text.isEmpty { Text(message.text).textSelection(.enabled).frame(maxWidth: .infinity, alignment: .leading) }
+            if !message.text.isEmpty {
+                Text(String(message.text.prefix(8000))).textSelection(.enabled).frame(maxWidth: .infinity, alignment: .leading)
+                if !message.text.dropFirst(8000).isEmpty {
+                    Button("长内容分段查看（复制可获得全文）") { fullText = message }.font(.caption)
+                }
+            }
             ForEach(message.attachments) { attachment in
                 Label(attachment.name, systemImage: attachment.isImage ? "photo" : "doc.text").font(.caption).foregroundStyle(.secondary)
             }
@@ -331,7 +343,10 @@ private struct AIChatSendReview: View {
                 }
                 ForEach(submission.history) { message in
                     Section(message.role == .user ? "你的消息" : "AI 历史回复") {
-                        Text(message.text).textSelection(.enabled)
+                        Text(String(message.text.prefix(8000))).textSelection(.enabled)
+                        if !message.text.dropFirst(8000).isEmpty {
+                            NavigationLink("分段查看完整消息") { AIChatPagedText(text: message.text) }
+                        }
                         ForEach(message.attachments) { attachment in
                             NavigationLink(attachment.name) { AIChatInlineAttachment(attachment: attachment) }
                         }
@@ -349,11 +364,40 @@ private struct AIChatSendReview: View {
 private struct AIChatInlineAttachment: View {
     let attachment: AIChatAttachment
     var body: some View {
-        ScrollView {
+        Group {
             switch attachment.payload {
-            case .text(let text): Text(text).font(.system(.footnote, design: .monospaced)).textSelection(.enabled).padding(16)
-            case .jpeg(let data): if let image = UIImage(data: data) { Image(uiImage: image).resizable().scaledToFit().padding(16) }
+            case .text(let text): AIChatPagedText(text: text)
+            case .jpeg(let data): ScrollView { if let image = UIImage(data: data) { Image(uiImage: image).resizable().scaledToFit().padding(16) } }
             }
         }.navigationTitle(attachment.name).navigationBarTitleDisplayMode(.inline)
+    }
+}
+
+/// Do not ask SwiftUI to lay out an entire multi-megabyte source attachment.
+private struct AIChatPagedText: View {
+    let text: String
+    @State private var start: String.Index?
+    @State private var previous: [String.Index] = []
+    var body: some View {
+        let lower = start ?? text.startIndex
+        let upper = text.index(lower, offsetBy: 6000, limitedBy: text.endIndex) ?? text.endIndex
+        return VStack(spacing: 8) {
+            ScrollView {
+                Text(String(text[lower..<upper])).font(.system(.footnote, design: .monospaced))
+                    .textSelection(.enabled).frame(maxWidth: .infinity, alignment: .leading).padding(16)
+            }.id(previous.count)
+            HStack {
+                Button("上一段") { if let value = previous.popLast() { start = value } }.disabled(previous.isEmpty)
+                Spacer()
+                Text("第 \(previous.count + 1) 段").font(.caption).foregroundStyle(.secondary)
+                Spacer()
+                Button("下一段") {
+                    let current = start ?? text.startIndex
+                    let next = text.index(current, offsetBy: 6000, limitedBy: text.endIndex) ?? text.endIndex
+                    if current < next { previous.append(current); start = next }
+                }.disabled(upper == text.endIndex)
+            }.padding(.horizontal, 16)
+            Button("复制全文") { UIPasteboard.general.string = text }.font(.caption).padding(.bottom, 12)
+        }
     }
 }
