@@ -89,6 +89,14 @@ final class ReaderWallpaperUIImageView: UIView {
 
 /// 壁纸导入与布局的纯计算部分，方便单元测试。
 enum ReaderWallpaperLayoutPolicy {
+    /// Preserve the reader's aspect ratio; a wide editor row would otherwise preview a different crop.
+    static func previewSize(viewport: CGSize, available: CGSize) -> CGSize {
+        guard viewport.width.isFinite, viewport.height.isFinite, available.width.isFinite, available.height.isFinite,
+              viewport.width > 0, viewport.height > 0, available.width > 0, available.height > 0 else { return .zero }
+        let scale = min(available.width / viewport.width, available.height / viewport.height)
+        return CGSize(width: viewport.width * scale, height: viewport.height * scale)
+    }
+
     /// 3x 屏最高约 2796px；2800 足够全屏清晰，又不会让解码后的位图过大。
     static let maxPixelDimension: CGFloat = 2800
 

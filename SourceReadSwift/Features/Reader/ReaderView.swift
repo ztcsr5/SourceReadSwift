@@ -4174,7 +4174,7 @@ struct ReaderView: View {
                         var adjustment = ReaderCustomWallpaperStore.adjustment
                         adjustment.fillMode = ReaderWallpaperFillMode(rawValue: customWallpaperFillModeRaw) ?? .fill
                         adjustment.usesLightText = customBackgroundIsDark
-                        wallpaperDraft = ReaderWallpaperDraft(image: image, adjustment: adjustment)
+                        wallpaperDraft = ReaderWallpaperDraft(image: image, adjustment: adjustment, viewportSize: effectiveViewportSize)
                     }
                 }.buttonStyle(.bordered)
             }
@@ -4248,7 +4248,7 @@ struct ReaderView: View {
                     return ReaderWallpaperSnapshot(image: image, adjustment: adjustment)
                 }.value
                 guard !Task.isCancelled, wallpaperImportRevision == revision else { return }
-                wallpaperDraft = ReaderWallpaperDraft(image: snapshot.image, adjustment: snapshot.adjustment)
+                wallpaperDraft = ReaderWallpaperDraft(image: snapshot.image, adjustment: snapshot.adjustment, viewportSize: effectiveViewportSize)
                 selectedPhotoItem = nil
             } catch {
                 if !Task.isCancelled, wallpaperImportRevision == revision { wallpaperMessage = error.localizedDescription }

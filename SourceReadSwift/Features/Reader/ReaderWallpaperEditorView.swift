@@ -4,6 +4,7 @@ struct ReaderWallpaperDraft: Identifiable {
     let id = UUID()
     let image: UIImage
     var adjustment: ReaderWallpaperAdjustment
+    var viewportSize = ReaderPerformancePolicy.defaultViewportSize
 }
 
 struct ReaderWallpaperEditorView: View {
@@ -26,6 +27,7 @@ struct ReaderWallpaperEditorView: View {
             Form {
                 Section("实时阅读预览 · 拖动调整位置") {
                     GeometryReader { geometry in
+                        let previewSize = ReaderWallpaperLayoutPolicy.previewSize(viewport: draft.viewportSize, available: geometry.size)
                         ZStack(alignment: .topLeading) {
                             AppTheme.background
                             ReaderWallpaperView(image: draft.image, fillMode: adjustment.fillMode, adjustment: adjustment)
@@ -34,15 +36,17 @@ struct ReaderWallpaperEditorView: View {
                             VStack(alignment: .leading, spacing: 12) {
                                 Text("第二章 · 小岛来信").font(.headline)
                                 Text("风吹动纸页，云朵慢慢经过。\n\n文字要清楚，背景才会恰到好处。\n\n这是编辑预览，不会改变阅读进度。")
-                                    .font(.body).lineSpacing(6)
+                                    .font(.caption).lineSpacing(6)
                             }.foregroundStyle(adjustment.usesLightText ? Color.white : Color.black).padding(20)
                         }
+                        .frame(width: previewSize.width, height: previewSize.height)
                         .clipped().clipShape(RoundedRectangle(cornerRadius: 12))
                         .gesture(DragGesture().onChanged { gesture in
                             if dragOrigin == nil { dragOrigin = CGPoint(x: adjustment.horizontalOffset, y: adjustment.verticalOffset) }
-                            adjustment.horizontalOffset = min(max(Double(dragOrigin?.x ?? 0) + Double(gesture.translation.width / max(geometry.size.width, 1)), -1), 1)
-                            adjustment.verticalOffset = min(max(Double(dragOrigin?.y ?? 0) + Double(gesture.translation.height / max(geometry.size.height, 1)), -1), 1)
+                            adjustment.horizontalOffset = min(max(Double(dragOrigin?.x ?? 0) + Double(gesture.translation.width / max(previewSize.width, 1)), -1), 1)
+                            adjustment.verticalOffset = min(max(Double(dragOrigin?.y ?? 0) + Double(gesture.translation.height / max(previewSize.height, 1)), -1), 1)
                         }.onEnded { _ in dragOrigin = nil })
+                        .position(x: geometry.size.width / 2, y: geometry.size.height / 2)
                     }.frame(height: 320)
                     Toggle("夜间遮罩预览", isOn: $isNightPreview)
                 }.listRowBackground(AppThemeRowSurface())
@@ -55,7 +59,7 @@ struct ReaderWallpaperEditorView: View {
                     slider("垂直位置", value: $adjustment.verticalOffset, range: -1...1)
                     slider("压暗图片", value: $adjustment.dimming, range: 0...0.6)
                     Toggle("使用浅色文字", isOn: $adjustment.usesLightText)
-                    Text("位置只移动超出边界的部分。预览使用与阅读页相同的填充、裁切与遮罩；取消不会覆盖原壁纸。")
+                    Text("位置只移动超出边界的部分。缩略预览保持当前阅读页比例，展示裁切与遮罩，不代表正文字号排版；取消不会覆盖原壁纸。")
                         .font(.caption).foregroundStyle(.secondary)
                     Button("重置裁切") {
                         adjustment.zoom = 1; adjustment.horizontalOffset = 0; adjustment.verticalOffset = 0; adjustment.dimming = 0

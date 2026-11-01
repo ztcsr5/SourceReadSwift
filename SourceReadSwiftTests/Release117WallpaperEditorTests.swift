@@ -3,6 +3,22 @@ import XCTest
 @testable import SourceReadSwift
 
 final class Release117WallpaperEditorTests: XCTestCase {
+    func testMiniaturePreviewPreservesTheRealReaderCropAtEveryAspectRatio() {
+        for viewport in [CGSize(width: 320, height: 568), CGSize(width: 390, height: 844), CGSize(width: 844, height: 390)] {
+            let preview = ReaderWallpaperLayoutPolicy.previewSize(viewport: viewport, available: CGSize(width: 280, height: 320))
+            XCTAssertEqual(preview.width / preview.height, viewport.width / viewport.height, accuracy: 0.0001)
+            XCTAssertLessThanOrEqual(preview.width, 280); XCTAssertLessThanOrEqual(preview.height, 320)
+            var adjustment = ReaderWallpaperAdjustment(); adjustment.zoom = 1.7; adjustment.horizontalOffset = 0.5
+            let source = CGSize(width: 1600, height: 400)
+            let full = adjustment.imageFrame(imageSize: source, viewport: viewport, mode: .fill)
+            let small = adjustment.imageFrame(imageSize: source, viewport: preview, mode: .fill)
+            let scale = preview.width / viewport.width
+            XCTAssertEqual(small.minX, full.minX * scale, accuracy: 0.01)
+            XCTAssertEqual(small.minY, full.minY * scale, accuracy: 0.01)
+            XCTAssertEqual(small.width, full.width * scale, accuracy: 0.01)
+        }
+    }
+
     func testNormalizedCropStaysInsideViewportWithoutChangingContainerSize() throws {
         for viewport in [CGSize(width: 320, height: 568), CGSize(width: 390, height: 844), CGSize(width: 844, height: 390)] {
             for imageSize in [CGSize(width: 1600, height: 400), CGSize(width: 400, height: 1600)] {
