@@ -497,18 +497,7 @@ struct ContentParser {
 
     private func normalizeContentText(_ text: String) -> String {
         var output = text
-        // Preserve <img> tags as [img]url[/img] tokens before stripping HTML
-        output = output.replacingOccurrences(
-            of: #"(?i)<img[^>]+(?:src|data-src|data-original)=["']?([^"' >]+)["']?[^>]*>"#,
-            with: "\n[img]$1[/img]\n",
-            options: .regularExpression
-        )
-        // Also support SVG <image href="..."> in ePubs
-        output = output.replacingOccurrences(
-            of: #"(?i)<image[^>]+(?:href|xlink:href)=["']?([^"' >]+)["']?[^>]*>"#,
-            with: "\n[img]$1[/img]\n",
-            options: .regularExpression
-        )
+        output = ContentImageNormalizer.tokens(in: output)
         output = output.replacingOccurrences(of: "(?i)<br\\s*/?>", with: "\n", options: .regularExpression)
         output = output.replacingOccurrences(of: "(?i)<(?:p|div|li)[^>]*>", with: "\n", options: .regularExpression)
         output = output.replacingOccurrences(of: "(?i)</(?:p|div|li)\\s*>", with: "\n", options: .regularExpression)

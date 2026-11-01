@@ -26,8 +26,13 @@ struct SourceRequestBuilder {
 
     /// Headers a source sends for its own assets; used by the reader to fetch
     /// illustrations that require the same Referer / User-Agent as the chapter page.
-    func imageRequestHeaders(for source: BookSource) -> [String: String] {
+    func imageRequestHeaders(for source: BookSource, chapterURL: String? = nil) -> [String: String] {
         var headers = sourceHeaders(source)
+        if !containsHeader(headers, "Referer"), let chapterURL,
+           let url = URL(string: directiveParser.parse(chapterURL).urlText),
+           ["http", "https"].contains(url.scheme?.lowercased() ?? "") {
+            headers["Referer"] = url.absoluteString
+        }
         if !containsHeader(headers, "User-Agent") {
             headers["User-Agent"] = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
         }

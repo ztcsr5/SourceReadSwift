@@ -4,12 +4,13 @@ import SwiftSoup
 struct ComicPage: Identifiable, Hashable, Sendable {
     let id: Int
     let url: String
+    var headers: [String: String] = [:]
 }
 
 enum ComicContentParser {
     static func parsePages(from content: ChapterContent) -> [ComicPage] {
         let base = content.chapter.url
-        var urls: [String] = []
+        var requests: [ComicImageRequest] = []
         for paragraph in content.paragraphs {
             let text = paragraph.trimmingCharacters(in: .whitespacesAndNewlines)
             var candidates: [String] = []
@@ -20,23 +21,12 @@ enum ComicContentParser {
                     candidates = list.compactMap { ($0["url"] ?? $0["src"] ?? $0["image"]) as? String }
                 }
             }
-            if candidates.isEmpty, text.lowercased().contains("<img"),
-               let doc = try? SwiftSoup.parse(text), let images = try? doc.select("img") {
-                for image in images.array() {
-                    // Lazy originals outrank placeholders regardless of attribute order.
-                    for key in ["data-original", "data-src", "data-url", "data-lazy-src", "src"] {
-                        let raw = (try? image.attr(key)) ?? ""
-                        if let resolved = MediaURLResolver.resolve(raw, base: base) {
-                            candidates.append(resolved); break
-                        }
-                    }
-                }
-            }
+            let imageText = ContentImageNormalizer.tokens(in: text)
             if candidates.isEmpty {
                 for pattern in [#"\[img\]([\s\S]*?)\[/img\]"#, #"!\[[^\]]*\]\(([^\s\)]+)\)"#] {
                     guard let regex = try? NSRegularExpression(pattern: pattern, options: .caseInsensitive) else { continue }
-                    let ns = text as NSString
-                    candidates += regex.matches(in: text, range: NSRange(location: 0, length: ns.length)).map { ns.substring(with: $0.range(at: 1)) }
+                    let ns = imageText as NSString
+                    candidates += regex.matches(in: imageText, range: NSRange(location: 0, length: ns.length)).map { ns.substring(with: $0.range(at: 1)) }
                 }
             }
             if candidates.isEmpty, !text.contains(where: { $0.isWhitespace }),
@@ -46,10 +36,10 @@ enum ComicContentParser {
                     || ["jpg", "jpeg", "png", "webp", "gif", "avif"].contains(ext) { candidates = [text] }
             }
             for candidate in candidates {
-                guard let url = MediaURLResolver.resolve(candidate, base: base), urls.last != url else { continue }
-                urls.append(url)
+                guard let request = ComicImageRequest.resolve(candidate, base: base), requests.last != request else { continue }
+                requests.append(request)
             }
         }
-        return urls.enumerated().map { ComicPage(id: $0.offset, url: $0.element) }
+        return requests.enumerated().map { ComicPage(id: $0.offset, url: $0.element.url, headers: $0.element.headers) }
     }
 }

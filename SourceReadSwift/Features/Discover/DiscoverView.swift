@@ -4,6 +4,8 @@ import UIKit
 struct DiscoverView: View {
     @EnvironmentObject private var appState: AppState
     @ObservedObject var viewModel: DiscoverViewModel
+    let searchRequestID: UUID?
+    @FocusState private var searchIsFocused: Bool
     @StateObject private var exploreViewModel = ExploreViewModel()
     @State private var selectedTab: DiscoverTab = .search
     @State private var pendingShelfAddBook: SearchBook?
@@ -102,7 +104,8 @@ struct DiscoverView: View {
         }
     }
 
-    init(viewModel: DiscoverViewModel? = nil) {
+    init(viewModel: DiscoverViewModel? = nil, searchRequestID: UUID? = nil) {
+        self.searchRequestID = searchRequestID
         self._viewModel = ObservedObject(wrappedValue: viewModel ?? DiscoverViewModel())
     }
 
@@ -183,7 +186,15 @@ struct DiscoverView: View {
                     .accessibilityLabel("智能网页阅读")
                 }
             }
+            .onChange(of: searchRequestID) { request in
+                if request != nil { selectedTab = .search; searchIsFocused = true }
+            }
             .task {
+                if searchRequestID != nil {
+                    selectedTab = .search
+                    await Task.yield()
+                    searchIsFocused = true
+                }
                 viewModel.bind(appState: appState)
                 exploreViewModel.bind(appState: appState)
                 if cachedSearchHistory.isEmpty {
@@ -355,6 +366,7 @@ struct DiscoverView: View {
                 .font(.system(size: 18, weight: .regular))
                 .foregroundStyle(.secondary)
             TextField("搜索书名或作者", text: $viewModel.keyword)
+                .focused($searchIsFocused)
                 .font(.system(size: 16, weight: .semibold))
                 .textInputAutocapitalization(.never)
                 .autocorrectionDisabled(true)

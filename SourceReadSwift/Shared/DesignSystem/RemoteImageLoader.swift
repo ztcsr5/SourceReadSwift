@@ -21,9 +21,11 @@ final class RemoteImageLoader: @unchecked Sendable {
     private let lock = NSLock()
     private var inFlight: [String: Task<UIImage?, Never>] = [:]
     private let inlineImages: InlineImageStore
+    private let session: URLSession
 
-    init(inlineImages: InlineImageStore = .shared) {
+    init(inlineImages: InlineImageStore = .shared, session: URLSession = .shared) {
         self.inlineImages = inlineImages
+        self.session = session
         cache.countLimit = 160
         cache.totalCostLimit = 64 * 1024 * 1024
         thumbnailCache.countLimit = 240
@@ -120,14 +122,14 @@ final class RemoteImageLoader: @unchecked Sendable {
             return await decodeAndStore(data, for: url, maxPixelSize: maxPixelSize)
         }
 
-        var request = URLRequest(url: url)
+        var request = URLRequest(url: url, timeoutInterval: 18)
         request.cachePolicy = .returnCacheDataElseLoad
         for (key, value) in headers where !key.isEmpty {
             request.setValue(value, forHTTPHeaderField: key)
         }
 
         do {
-            let (data, response) = try await URLSession.shared.data(for: request)
+            let (data, response) = try await session.data(for: request)
             guard !Task.isCancelled,
                   let http = response as? HTTPURLResponse,
                   (200..<300).contains(http.statusCode) else { return nil }

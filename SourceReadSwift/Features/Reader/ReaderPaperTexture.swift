@@ -50,9 +50,13 @@ struct ReaderPaperTextureView: View {
     let background: ReaderBackground
     let night: Bool
     var body: some View {
-        Image(uiImage: ReaderPaperTexture.image(background: background, night: night))
-            .resizable(resizingMode: .tile)
-            .allowsHitTesting(false)
-            .accessibilityHidden(true)
+        if let asset = background.wallpaperAssetName {
+            ReaderIllustratedBackgroundView(name: asset, paper: background.color(isNight: night))
+        } else {
+            Image(uiImage: ReaderPaperTexture.image(background: background, night: night))
+                .resizable(resizingMode: .tile)
+                .allowsHitTesting(false)
+                .accessibilityHidden(true)
+        }
     }
 }

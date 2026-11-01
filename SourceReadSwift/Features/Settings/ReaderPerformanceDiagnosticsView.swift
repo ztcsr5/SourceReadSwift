@@ -7,6 +7,7 @@ struct ReaderPerformanceDiagnosticsView: View {
 
     var body: some View {
         List {
+                AppFrameProfilerSection()
                 Section {
                     let perf = ReaderScrollPerfMeter.snapshot
                     HStack {
@@ -62,7 +63,7 @@ struct ReaderPerformanceDiagnosticsView: View {
                 } header: {
                     Text("阅读器性能（诊断）")
                 } footer: {
-                    Text("滚动回调耗时小于 2ms 说明瓶颈在界面重建，大于 6ms 说明在文字排版；掉帧率超过 5% 就是肉眼可见的卡。滚动几章后回来看数字。")
+                    Text("阅读器局部采样，仅用于辅助定位。回调耗时不等于整帧耗时，不能单凭这个数字判断是重建、排版还是 GPU 瓶颈。使用上方全局采样和真机 Instruments 交叉验证。")
                 }
                 .id(perfRefreshToken)
 

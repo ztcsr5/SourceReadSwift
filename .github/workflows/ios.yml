@@ -48,6 +48,10 @@ jobs:
             -only-testing:SourceReadSwiftTests/AppLayoutDensityTests \
             -only-testing:SourceReadSwiftTests/SourceOrganizationTests \
             -only-testing:SourceReadSwiftTests/ReaderTocPerformanceTests \
+            -only-testing:SourceReadSwiftTests/ContentImagePipelineRegressionTests \
+            -only-testing:SourceReadSwiftTests/RemoteComicImageTests \
+            -only-testing:SourceReadSwiftTests/AppFrameProfilerTests \
+            -only-testing:SourceReadSwiftTests/Release116VisualTests \
             -destination-timeout 120 -test-timeouts-enabled YES -maximum-test-execution-time-allowance 60 \
             -resultBundlePath NativeTabResults.xcresult test 2>&1 | tee native-tab-test.log
           xcrun xcresulttool export attachments --path NativeTabResults.xcresult --output-path native-ui-snapshots
@@ -95,6 +99,8 @@ jobs:
           fi
 
       - name: Test
+        env:
+          TEST_RUNNER_COMIC_CORPUS_PROBE: "1"
         run: |
           set -euo pipefail
           DEVICE_ID="$(xcrun simctl list devices available | awk -F '[()]' '/iPhone/ {print $2; exit}')"

@@ -1,73 +1,86 @@
 import SwiftUI
 
-/// Keep the existing preference keys so upgrading does not reset a theme.
 struct AppearanceSettingsView: View {
     @AppStorage("settings.themeMode") private var themeModeRawValue = ThemeMode.system.rawValue
-    @AppStorage("settings.accentHex") private var accentHex = "594FDB"
-    @AppStorage("settings.secondaryAccentHex") private var secondaryAccentHex = "419BDC"
+    @AppStorage("settings.visualTheme") private var visualTheme = AppVisualTheme.classic.rawValue
+    @AppStorage("settings.appearanceRevision") private var appearanceRevision = 0
 
     var body: some View {
         Form {
-            Section("显示模式") {
-                ForEach(ThemeMode.allCases) { mode in
-                    Button {
-                        withAnimation(.easeInOut(duration: 0.22)) {
-                            themeModeRawValue = mode.rawValue
-                        }
-                    } label: {
-                        HStack {
-                            Text(mode.title).foregroundStyle(.primary)
-                            Spacer()
-                            if (ThemeMode(rawValue: themeModeRawValue) ?? .system) == mode {
-                                Image(systemName: "checkmark").foregroundStyle(AppTheme.accent)
-                            }
-                        }
-                        .contentShape(Rectangle())
+            Section {
+                ForEach(AppVisualTheme.allCases) { theme in
+                    Button { visualTheme = theme.rawValue } label: {
+                        AppThemePreview(theme: theme, selected: visualTheme == theme.rawValue)
                     }
-                    .accessibilityAddTraits(themeModeRawValue == mode.rawValue ? [.isSelected] : [])
+                    .buttonStyle(.plain)
+                    .accessibilityAddTraits(visualTheme == theme.rawValue ? [.isSelected] : [])
+                    .listRowBackground(AppTheme.card)
+                }
+            } header: { Text("全局主题") } footer: {
+                Text("主题同时调整背景、卡片纸色、圆角、边框、默认字形与装饰；不替换主页布局，不覆盖阅读背景。每套主题的自定义配色独立保存。")
+            }
+            Section("显示模式") {
+                Picker("明暗", selection: $themeModeRawValue) {
+                    ForEach(ThemeMode.allCases) { mode in Text(mode.title).tag(mode.rawValue) }
                 }
             }
             Section {
-                ColorPicker("主题主色", selection: Binding(
-                    get: { AppTheme.accent },
-                    set: { if let hex = AppTheme.hex($0) { accentHex = hex } }
-                ), supportsOpacity: false)
-                ColorPicker("主题辅色", selection: Binding(
-                    get: { AppTheme.secondaryAccent },
-                    set: { if let hex = AppTheme.hex($0) { secondaryAccentHex = hex } }
-                ), supportsOpacity: false)
-                HStack(spacing: 8) {
-                    ForEach(["594FDB", "267A62", "B75473", "B76A2C", "3476B8"], id: \.self) { hex in
-                        Button { accentHex = hex } label: {
-                            Circle()
-                                .fill(presetColor(hex))
-                                .frame(width: 30, height: 30)
-                                .overlay(Circle().strokeBorder(.primary.opacity(accentHex == hex ? 0.8 : 0), lineWidth: 2))
-                                .frame(maxWidth: .infinity, minHeight: 44)
-                        }
-                        .buttonStyle(.plain)
-                        .accessibilityLabel("主题色 \(hex)")
+                ColorPicker("主题主色", selection: colorBinding("accent"), supportsOpacity: false)
+                ColorPicker("主题辅色", selection: colorBinding("secondaryAccent"), supportsOpacity: false)
+                Button("恢复当前主题配色") {
+                    for component in ["accent", "secondaryAccent"] {
+                        UserDefaults.standard.removeObject(forKey: AppVisualTheme.current.preferenceKey(component))
                     }
+                    appearanceRevision += 1
                 }
-                Button("恢复纸间默认配色") {
-                    accentHex = "594FDB"
-                    secondaryAccentHex = "419BDC"
-                }
-            } header: {
-                Text("主题配色")
-            } footer: {
-                Text("只调整应用界面配色，不覆盖书籍的阅读背景和字体颜色。")
-            }
+            } header: { Text("当前主题 · 自定义配色") }
         }
+        .scrollContentBackground(.hidden)
+        .pageBackground()
         .navigationTitle("外观")
         .navigationBarTitleDisplayMode(.inline)
         .tint(AppTheme.accent)
     }
 
-    private func presetColor(_ hex: String) -> Color {
-        let rgb = UInt32(hex, radix: 16) ?? 0x594FDB
-        return Color(red: Double((rgb >> 16) & 255) / 255,
-                     green: Double((rgb >> 8) & 255) / 255,
-                     blue: Double(rgb & 255) / 255)
+    private func colorBinding(_ component: String) -> Binding<Color> {
+        Binding(get: {
+            _ = appearanceRevision
+            return component == "accent" ? AppTheme.accent : AppTheme.secondaryAccent
+        }, set: {
+            if let hex = AppTheme.hex($0) {
+                UserDefaults.standard.set(hex, forKey: AppVisualTheme.current.preferenceKey(component))
+                appearanceRevision += 1
+            }
+        })
+    }
+}
+
+struct AppThemePreview: View {
+    let theme: AppVisualTheme
+    var selected = false
+    var body: some View {
+        HStack(spacing: 12) {
+            VStack(alignment: .leading, spacing: 5) {
+                Image(systemName: theme.ornament).font(.system(size: 15))
+                RoundedRectangle(cornerRadius: theme.radius / 6)
+                    .fill(theme.dynamicColor(light: theme.cardHex, dark: theme.darkCardHex))
+                    .overlay(RoundedRectangle(cornerRadius: theme.radius / 6)
+                        .stroke(.primary.opacity(0.18), lineWidth: theme.borderWidth))
+                    .frame(width: 35, height: 15)
+            }
+            .foregroundStyle(Color(uiColor: AppVisualTheme.uiColor(theme.accentHex)))
+            .frame(width: 56, height: 56)
+            .background(theme.dynamicColor(light: theme.backgroundHex, dark: theme.darkBackgroundHex),
+                        in: RoundedRectangle(cornerRadius: min(theme.radius, 14)))
+            VStack(alignment: .leading, spacing: 4) {
+                Text(theme.title).font(.system(.subheadline, design: theme.fontDesign).weight(.semibold))
+                Text(theme.detail).font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+            }
+            Spacer(minLength: 0)
+            if selected { Image(systemName: "checkmark.circle.fill").foregroundStyle(AppTheme.accent) }
+        }
+        .foregroundStyle(.primary)
+        .frame(maxWidth: .infinity, minHeight: 60, alignment: .leading)
+        .contentShape(Rectangle())
     }
 }

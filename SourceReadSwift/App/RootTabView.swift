@@ -3,16 +3,22 @@ import SwiftUI
 
 struct RootTabView: View {
     @EnvironmentObject private var appState: AppState
-    @ObservedObject private var audioCoordinator = AudioBookPlaybackCoordinator.shared
+    private let audioCoordinator = AudioBookPlaybackCoordinator.shared
+    @State private var hasAudio = false
     @AppStorage("settings.accentHex") private var accentHex = "594FDB"
     @AppStorage("settings.secondaryAccentHex") private var secondaryAccentHex = "419BDC"
+    @AppStorage("settings.visualTheme") private var visualTheme = AppVisualTheme.classic.rawValue
+    @AppStorage("settings.appearanceRevision") private var appearanceRevision = 0
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Namespace private var tabSelection
     @State private var selectedTab = 0
+    @State private var legacySearchRequest: UUID?
     @State private var showFullAudioPlayer = false
     @ObservedObject private var verificationCoordinator = VerificationCodeCoordinator.shared
 
     var body: some View {
+        let _ = visualTheme
+        let _ = appearanceRevision
         let _ = accentHex
         let _ = secondaryAccentHex
         return navigationContent
@@ -20,13 +26,15 @@ struct RootTabView: View {
         .safeAreaInset(edge: .bottom, spacing: 0) {
             if !usesNativeTabs, !appState.isTabChromeHidden {
                 VStack(spacing: 8) {
-                    if audioCoordinator.currentBook != nil { miniAudioPlayerBar }
+                    if hasAudio { miniAudioPlayerBar }
                     customTabBar
                 }
             }
         }
         .animation(.interactiveSpring(response: 0.28, dampingFraction: 0.86), value: appState.isTabChromeHidden)
+        .font(.system(.body, design: AppVisualTheme.current.fontDesign))
         .tint(AppTheme.accent)
+        .onReceive(audioCoordinator.$currentBook.map { $0 != nil }.removeDuplicates()) { hasAudio = $0 }
         .onChange(of: selectedTab) { _ in dismissKeyboard() }
         .sheet(isPresented: $showFullAudioPlayer) { AudioBookPlayerView() }
         .sheet(item: verificationRequestBinding) { request in
@@ -67,7 +75,7 @@ struct RootTabView: View {
                 // An empty native accessory still reserves a glass container on
                 // some iOS26 releases. Keep the TabView identity stable instead
                 // of conditionally attaching/removing its accessory modifier.
-                if audioCoordinator.currentBook != nil, !appState.isTabChromeHidden {
+                if hasAudio, !appState.isTabChromeHidden {
                     miniAudioPlayerBar
                 }
             }
@@ -77,7 +85,7 @@ struct RootTabView: View {
         Group {
             switch selectedTab {
             case 0: BookshelfView()
-            case 1: DiscoverView(viewModel: appState.discoverViewModel)
+            case 1: DiscoverView(viewModel: appState.discoverViewModel, searchRequestID: legacySearchRequest)
             default: SettingsView()
             }
         }
@@ -103,6 +111,69 @@ struct RootTabView: View {
     }
 
     private var miniAudioPlayerBar: some View {
+        RootMiniAudioPlayerBar(showFullAudioPlayer: $showFullAudioPlayer)
+    }
+
+    private var customTabBar: some View {
+        LegacyTabBar(selection: $selectedTab) {
+            legacySearchRequest = UUID()
+            selectedTab = 1
+        }
+    }
+
+    private func dismissKeyboard() {
+        UIApplication.shared.sendAction(
+            #selector(UIResponder.resignFirstResponder),
+            to: nil,
+            from: nil,
+            for: nil
+        )
+    }
+}
+
+private struct RootTabPressableButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .scaleEffect(configuration.isPressed ? 0.92 : 1.0)
+            .opacity(configuration.isPressed ? 0.78 : 1.0)
+            .animation(.interactiveSpring(response: 0.2, dampingFraction: 0.7), value: configuration.isPressed)
+    }
+}
+
+struct RootTabChromeVisibilityModifier: ViewModifier {
+    @EnvironmentObject private var appState: AppState
+
+    func body(content: Content) -> some View {
+        content.toolbar(appState.isTabChromeHidden ? .hidden : .visible, for: .tabBar)
+    }
+}
+
+struct HideRootTabBarModifier: ViewModifier {
+    @EnvironmentObject private var appState: AppState
+    @State private var token = UUID()
+
+    func body(content: Content) -> some View {
+        content
+            .toolbar(.hidden, for: .tabBar)
+            .onAppear {
+                appState.acquireTabChromeHidden(owner: token)
+            }
+            .onDisappear {
+                appState.releaseTabChromeHidden(owner: token)
+            }
+    }
+}
+
+extension View {
+    func hideRootTabBar() -> some View {
+        modifier(HideRootTabBarModifier())
+    }
+}
+
+private struct RootMiniAudioPlayerBar: View {
+    @ObservedObject private var audioCoordinator = AudioBookPlaybackCoordinator.shared
+    @Binding var showFullAudioPlayer: Bool
+    var body: some View {
         Button {
             showFullAudioPlayer = true
         } label: {
@@ -169,106 +240,4 @@ struct RootTabView: View {
         .buttonStyle(.plain)
     }
 
-    private var customTabBar: some View {
-        VStack(spacing: 0) {
-            HStack {
-                tabButton(index: 0, title: "主页", systemImage: "house")
-                Spacer()
-                tabButton(index: 1, title: "发现", systemImage: "square.grid.2x2")
-                Spacer()
-                tabButton(index: 2, title: "设置", systemImage: "gearshape")
-            }
-            .padding(.horizontal, 28)
-            .padding(.vertical, AppLayout.tabVerticalInset)
-            .glassPanel(cornerRadius: 28, material: .ultraThinMaterial, strokeOpacity: 0.08, shadowOpacity: 0.16)
-            .padding(.horizontal, 12)
-            .padding(.bottom, 6)
-        }
-    }
-
-    private func tabButton(index: Int, title: String, systemImage: String) -> some View {
-        let isSelected = selectedTab == index
-        return Button {
-            switchToTab(index)
-        } label: {
-            VStack(spacing: 3) {
-                Image(systemName: isSelected ? "\(systemImage).fill" : systemImage)
-                    .font(.system(size: 21, weight: isSelected ? .semibold : .regular))
-                    .foregroundStyle(isSelected ? AppTheme.accent : .secondary)
-                    .frame(height: 24)
-
-                Text(title)
-                    .font(.system(size: 10.5, weight: isSelected ? .semibold : .medium))
-                    .foregroundStyle(isSelected ? AppTheme.accent : .secondary)
-            }
-            .frame(width: 68, height: 44)
-            .background {
-                if isSelected {
-                    RoundedRectangle(cornerRadius: 14, style: .continuous)
-                        .fill(AppTheme.accent.opacity(0.12))
-                        .matchedGeometryEffect(id: "selected-tab", in: tabSelection)
-                }
-            }
-            .contentShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
-        }
-        .buttonStyle(RootTabPressableButtonStyle())
-    }
-
-    private func switchToTab(_ index: Int) {
-        guard selectedTab != index else { return }
-        if HapticFeedback.isEnabled {
-            UIImpactFeedbackGenerator(style: .light).impactOccurred()
-        }
-        withAnimation(reduceMotion ? nil : .spring(response: 0.36, dampingFraction: 0.84)) {
-            selectedTab = index
-        }
-    }
-
-    private func dismissKeyboard() {
-        UIApplication.shared.sendAction(
-            #selector(UIResponder.resignFirstResponder),
-            to: nil,
-            from: nil,
-            for: nil
-        )
-    }
-}
-
-private struct RootTabPressableButtonStyle: ButtonStyle {
-    func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .scaleEffect(configuration.isPressed ? 0.92 : 1.0)
-            .opacity(configuration.isPressed ? 0.78 : 1.0)
-            .animation(.interactiveSpring(response: 0.2, dampingFraction: 0.7), value: configuration.isPressed)
-    }
-}
-
-struct RootTabChromeVisibilityModifier: ViewModifier {
-    @EnvironmentObject private var appState: AppState
-
-    func body(content: Content) -> some View {
-        content.toolbar(appState.isTabChromeHidden ? .hidden : .visible, for: .tabBar)
-    }
-}
-
-struct HideRootTabBarModifier: ViewModifier {
-    @EnvironmentObject private var appState: AppState
-    @State private var token = UUID()
-
-    func body(content: Content) -> some View {
-        content
-            .toolbar(.hidden, for: .tabBar)
-            .onAppear {
-                appState.acquireTabChromeHidden(owner: token)
-            }
-            .onDisappear {
-                appState.releaseTabChromeHidden(owner: token)
-            }
-    }
-}
-
-extension View {
-    func hideRootTabBar() -> some View {
-        modifier(HideRootTabBarModifier())
-    }
 }

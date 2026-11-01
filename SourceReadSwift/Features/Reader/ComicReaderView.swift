@@ -29,7 +29,7 @@ struct ComicReaderView: View {
     /// Comic CDNs are usually hotlink-protected; every page request reuses the
     /// source's own Referer / User-Agent / Cookie headers. Built once in init
     /// so a long page list does not re-decode the header JSON per row.
-    private let imageHeaders: [String: String]
+    @State private var imageHeaders: [String: String]
 
     @State private var currentChapterIndex: Int
     @State private var pages: [ComicPage] = []
@@ -46,6 +46,8 @@ struct ComicReaderView: View {
     @State private var chapterSearchText = ""
     /// Guards against a slow chapter response overwriting the pages of a
     /// chapter the user opened afterwards.
+    @State private var chapterTask: Task<Void, Never>?
+    @State private var timeoutTask: Task<Void, Never>?
     @State private var loadGeneration = 0
     @State private var isChapterListReversed = false
 
@@ -76,8 +78,8 @@ struct ComicReaderView: View {
         self.initialChapterIndex = initialChapterIndex
         self.chapters = chapters
         self.engine = engine
-        self.imageHeaders = SourceRequestBuilder().imageRequestHeaders(for: source)
-        self._currentChapterIndex = State(initialValue: initialChapterIndex)
+        _imageHeaders = State(initialValue: SourceRequestBuilder().imageRequestHeaders(for: source))
+        self._currentChapterIndex = State(initialValue: min(max(initialChapterIndex, 0), max(chapters.count - 1, 0)))
     }
 
     var currentChapter: BookChapter? {
@@ -161,6 +163,13 @@ struct ComicReaderView: View {
             chapterDrawerSheet
         }
         .statusBarHidden(!showChrome && !showSystemStatusBar)
+        .toolbar(.hidden, for: .navigationBar)
+        .hideRootTabBar()
+        .onDisappear {
+            loadGeneration &+= 1
+            chapterTask?.cancel()
+            timeoutTask?.cancel()
+        }
     }
 
     // MARK: - Main Content Views
@@ -186,7 +195,7 @@ struct ComicReaderView: View {
                             url: page.url,
                             pageNumber: page.id + 1,
                             totalPages: pages.count,
-                            headers: imageHeaders
+                            headers: pageRequestHeaders(page)
                         )
                         .id(page.id)
                             .onAppear {
@@ -236,7 +245,7 @@ struct ComicReaderView: View {
                     url: page.url,
                     pageNumber: page.id + 1,
                     totalPages: pages.count,
-                    headers: imageHeaders
+                    headers: pageRequestHeaders(page)
                 )
                 .tag(page.id)
             }
@@ -544,9 +553,16 @@ struct ComicReaderView: View {
     // MARK: - Logic
 
     private func loadChapter(at index: Int) {
-        guard chapters.indices.contains(index) else { return }
+        guard chapters.indices.contains(index) else {
+            isLoading = false
+            errorMessage = "漫画目录为空，请返回书籍详情刷新目录"
+            return
+        }
+        chapterTask?.cancel()
+        timeoutTask?.cancel()
         currentChapterIndex = index
         let chapter = chapters[index]
+        imageHeaders = SourceRequestBuilder().imageRequestHeaders(for: source, chapterURL: chapter.url)
         isLoading = true
         errorMessage = nil
         currentPageIndex = 0
@@ -564,16 +580,31 @@ struct ComicReaderView: View {
             )
         }
 
-        Task {
+        timeoutTask = Task { @MainActor in
+            do { try await Task.sleep(nanoseconds: 30_000_000_000) } catch { return }
+            guard generation == loadGeneration, isLoading else { return }
+            loadGeneration &+= 1
+            chapterTask?.cancel()
+            isLoading = false
+            errorMessage = "漫画章节请求超过 30 秒，可重试或返回换源"
+        }
+        chapterTask = Task {
             let result = await engine.getContent(source: source, chapter: chapter)
+            let parsedPages: [ComicPage]
+            if case .success(let content) = result {
+                parsedPages = await Task.detached(priority: .userInitiated) {
+                    ComicContentParser.parsePages(from: content)
+                }.value
+            } else { parsedPages = [] }
+            guard !Task.isCancelled else { return }
             await MainActor.run {
                 // A stale response from a previously selected chapter must not
                 // replace the chapter the user is reading now.
                 guard generation == self.loadGeneration else { return }
+                self.timeoutTask?.cancel()
                 self.isLoading = false
                 switch result {
-                case .success(let content):
-                    let parsedPages = ComicContentParser.parsePages(from: content)
+                case .success:
                     if parsedPages.isEmpty {
                         self.errorMessage = "未在当前章节解析到漫画图片"
                     } else {
@@ -585,6 +616,11 @@ struct ComicReaderView: View {
                 }
             }
         }
+    }
+
+    private func pageRequestHeaders(_ page: ComicPage) -> [String: String] {
+        ComicImageRequest(url: page.url, headers: page.headers)
+            .mergingHeaders(imageHeaders, chapterURL: currentChapter?.url ?? source.cleanSourceURL)
     }
 
     private var comicHeader: some View {
@@ -618,26 +654,43 @@ private struct ComicPageImageView: View {
     let totalPages: Int
     let headers: [String: String]
 
+    @State private var image: UIImage?
+    @State private var failed = false
+    @State private var attempt = 0
     @State private var scale: CGFloat = 1.0
     @State private var lastScale: CGFloat = 1.0
 
     var body: some View {
         ZStack {
-            if let imageURL = URL(string: url) {
-                CachedRemoteImage(url: imageURL, contentMode: .fit, headers: headers) {
-                    ZStack {
-                        Color.white.opacity(0.04)
-                        VStack(spacing: 8) {
-                            ProgressView()
-                                .tint(.white.opacity(0.7))
-                            Text("P \(pageNumber)")
-                                .font(.caption2.monospacedDigit())
-                                .foregroundStyle(.white.opacity(0.4))
-                        }
+            if let image {
+                Image(uiImage: image).resizable().aspectRatio(contentMode: .fit)
+            } else {
+                VStack(spacing: 12) {
+                    if failed {
+                        Image(systemName: "photo.badge.exclamationmark").font(.title2)
+                        Text("第 \(pageNumber) 页加载失败").font(.subheadline)
+                        Text("网络、登录状态或图片防盗链可能导致失败")
+                            .font(.caption).foregroundStyle(.white.opacity(0.6))
+                        Button("重新加载这一页") { attempt += 1 }
+                            .buttonStyle(.bordered).frame(minHeight: 44)
+                    } else {
+                        ProgressView().tint(.white)
+                        Text("正在加载第 \(pageNumber) / \(totalPages) 页").font(.caption)
                     }
-                    .frame(maxWidth: .infinity, minHeight: 320)
                 }
+                .foregroundStyle(.white)
+                .frame(maxWidth: .infinity, minHeight: 320)
+                .background(Color.white.opacity(0.04))
             }
+        }
+        .task(id: url + "#" + headers.keys.sorted().map { $0 + "=" + (headers[$0] ?? "") }.joined(separator: "|") + "#" + String(attempt)) {
+            image = nil
+            failed = false
+            guard let imageURL = URL(string: url) else { failed = true; return }
+            let loaded = await RemoteImageLoader.shared.image(for: imageURL, headers: headers)
+            guard !Task.isCancelled else { return }
+            image = loaded
+            failed = loaded == nil
         }
         .scaleEffect(scale)
         .gesture(

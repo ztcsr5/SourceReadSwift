@@ -1047,6 +1047,15 @@ struct ReaderView: View {
         .statusBarHidden(!showOverlay && !showSystemStatusBar)
         // 全屏阅读时连 home indicator 一起淡出；打开菜单或强制系统状态栏时恢复。
         .persistentSystemOverlays(showOverlay || showSystemStatusBar ? .automatic : .hidden)
+        .task(id: backgroundRawValue) {
+            guard let name = background.wallpaperAssetName else { return }
+            let loaded = await ReaderIllustratedBackgroundStore.load(name)
+            guard loaded != nil, !Task.isCancelled else { return }
+            // Warm before versioning UIKit snapshots; otherwise a cached page
+            // could keep its pre-decode blank background forever.
+            backgroundWallpaperRevision = UUID()
+            rebuildPagedBlocksCache()
+        }
         .preferredColorScheme(background.isDark ? .dark : .light)
         // `preferredColorScheme` only drives the window. The paged reader
         // builds `UIHostingController`s outside the SwiftUI environment, and
@@ -3589,6 +3598,7 @@ struct ReaderView: View {
             .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
             .padding(.horizontal, 16)
             .padding(.top, readerTopSafeInset + 4)
+            .background(readerThemeBackground.ignoresSafeArea(edges: .top))
 
             Spacer()
 
@@ -4060,7 +4070,7 @@ struct ReaderView: View {
 
     private var backgroundPickerSection: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("背景颜色")
+            Text("阅读背景 · 纸纹与插画")
                 .font(.subheadline.weight(.semibold))
                 .foregroundStyle(readerThemeTextColor.opacity(0.62))
             ScrollView(.horizontal, showsIndicators: false) {
@@ -4074,9 +4084,12 @@ struct ReaderView: View {
                             }
                         } label: {
                             VStack(spacing: 4) {
-                                Circle()
-                                    .fill(item.color(isNight: item.isDark))
+                                ZStack {
+                                    item.color(isNight: item.isDark)
+                                    if item.hasTexture { ReaderPaperTextureView(background: item, night: item.isDark) }
+                                }
                                     .frame(width: 40, height: 40)
+                                    .clipShape(Circle())
                                     .overlay {
                                         Circle()
                                             .stroke(background == item ? AppTheme.accent : readerThemeTextColor.opacity(0.25), lineWidth: background == item ? 3 : 1)

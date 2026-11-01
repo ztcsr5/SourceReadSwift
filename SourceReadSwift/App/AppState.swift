@@ -41,7 +41,9 @@ final class AppState: ObservableObject {
         )
     }()
 
-    @Published var diagnostics: [DiagnosticEvent] = []
+    // Diagnostics are a bounded snapshot read when opening their detail page.
+    // Publishing every network log invalidated the entire app/reader subtree.
+    var diagnostics: [DiagnosticEvent] = []
     @Published var isTabChromeHidden = false
     private var activeTabChromeOwners: Set<UUID> = []
 
@@ -249,13 +251,8 @@ final class AppState: ObservableObject {
             }
             .store(in: &cancellables)
 
-        discoverViewModel.objectWillChange
-            .sink { [weak self] _ in
-                Task { @MainActor [weak self] in
-                    self?.objectWillChange.send()
-                }
-            }
-            .store(in: &cancellables)
+        // DiscoverView observes this model directly. Forwarding every search
+        // progress / keyword update through AppState redrew every app screen.
 
     }
 
@@ -267,8 +264,8 @@ final class AppState: ObservableObject {
             "reader.paragraphSpacing", "reader.paragraphIndent", "reader.titleSpacing", "reader.footerHeight",
             "reader.ttsRate", "reader.autoScrollDelay", "reader.sleepTimerMinutes", "reader.background",
             "reader.mode", "reader.tapZones", "reader.keepScreenAwake", "reader.preloadChapterCount",
-            "reader.textSelectionEnabled", "settings.themeMode"
-        ]
+            "reader.textSelectionEnabled", "settings.themeMode", "settings.visualTheme"
+        ] + AppVisualTheme.allCases.flatMap { [$0.preferenceKey("accent"), $0.preferenceKey("secondaryAccent")] }
         let defaults = UserDefaults.standard
         let doubleKeys: Set<String> = [
             "reader.fontSize", "reader.lineSpacing", "reader.pagePadding", "reader.letterSpacing",

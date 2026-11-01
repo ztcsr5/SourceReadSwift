@@ -5,14 +5,14 @@ enum AppTheme {
     static var background: Color {
         UserDefaults.standard.string(forKey: "settings.themeMode") == "eyeCare"
             ? Color(red: 0.90, green: 0.95, blue: 0.88)
-            : Color(.systemGroupedBackground)
+            : AppVisualTheme.current.dynamicColor(light: AppVisualTheme.current.backgroundHex, dark: AppVisualTheme.current.darkBackgroundHex)
     }
-    static let card = Color(.systemBackground)
-    static let elevatedCard = Color(.secondarySystemGroupedBackground)
-    static let cardBackground = Color(.secondarySystemBackground)
-    static var accentUIColor: UIColor { color(for: "settings.accentHex", fallback: 0x594FDB) }
+    static var card: Color { AppVisualTheme.current.dynamicColor(light: AppVisualTheme.current.cardHex, dark: AppVisualTheme.current.darkCardHex) }
+    static var elevatedCard: Color { card }
+    static var cardBackground: Color { card }
+    static var accentUIColor: UIColor { color(for: AppVisualTheme.current.preferenceKey("accent"), fallback: AppVisualTheme.current.accentHex) }
     static var accent: Color { Color(uiColor: accentUIColor) }
-    static var secondaryAccent: Color { Color(uiColor: color(for: "settings.secondaryAccentHex", fallback: 0x419BDC)) }
+    static var secondaryAccent: Color { Color(uiColor: color(for: AppVisualTheme.current.preferenceKey("secondaryAccent"), fallback: AppVisualTheme.current.secondaryHex)) }
     static var softBlue: Color { secondaryAccent.opacity(0.16) }
 
     static func color(for key: String, fallback: UInt32) -> UIColor {
@@ -30,7 +30,7 @@ enum AppTheme {
     }
     static let secondaryText = Color.secondary
 
-    static let cardRadius: CGFloat = 18
+    static var cardRadius: CGFloat { AppVisualTheme.current.radius }
     static let pagePadding: CGFloat = AppLayout.pageMargin
     static let capsuleRadius: CGFloat = 16
 }
@@ -51,7 +51,11 @@ extension View {
         strokeOpacity: Double = 0.10,
         shadowOpacity: Double = 0.08
     ) -> some View {
-        background(material, in: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
+        background {
+            let shape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+            if AppVisualTheme.current == .classic { shape.fill(material) }
+            else { shape.fill(AppTheme.card) }
+        }
             .overlay {
                 RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
                     .stroke(
@@ -63,14 +67,14 @@ extension View {
                             startPoint: .topLeading,
                             endPoint: .bottomTrailing
                         ),
-                        lineWidth: 0.8
+                        lineWidth: AppVisualTheme.current.borderWidth
                     )
             }
             .shadow(color: .black.opacity(shadowOpacity), radius: 6, x: 0, y: 3)
     }
 
     func listRowCard(cornerRadius: CGFloat = 16) -> some View {
-        background(Color(uiColor: .secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
+        background(AppTheme.card, in: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
             .overlay {
                 RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
                     .stroke(Color.primary.opacity(0.06), lineWidth: 0.8)
@@ -91,7 +95,12 @@ extension View {
 private struct PageBackgroundModifier: ViewModifier {
     @AppStorage("settings.themeMode") private var themeModeRawValue = ThemeMode.system.rawValue
 
+    @AppStorage("settings.visualTheme") private var visualTheme = AppVisualTheme.classic.rawValue
+    @AppStorage("settings.appearanceRevision") private var appearanceRevision = 0
+
     func body(content: Content) -> some View {
+        _ = visualTheme
+        _ = appearanceRevision
         _ = themeModeRawValue
         return content.background(AppTheme.background.ignoresSafeArea())
     }

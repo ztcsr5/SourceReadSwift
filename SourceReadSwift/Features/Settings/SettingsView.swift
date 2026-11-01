@@ -249,10 +249,7 @@ struct SettingsView: View {
     private var settingsHeroSection: some View {
         Section {
             HStack(spacing: 12) {
-                Image(systemName: "book.closed.fill")
-                    .font(.system(size: 25, weight: .light))
-                    .foregroundStyle(LinearGradient(colors: [AppTheme.accent, AppTheme.secondaryAccent], startPoint: .topLeading, endPoint: .bottomTrailing))
-                    .frame(width: 36, height: 40)
+                PaperBetweenMark()
                 VStack(alignment: .leading, spacing: 5) {
                     ViewThatFits(in: .horizontal) {
                         HStack(alignment: .firstTextBaseline, spacing: 8) {
