@@ -209,7 +209,7 @@ final class ReaderCoverTeardownTests: XCTestCase {
 
     private func findPager(_ controller: UIViewController) -> CoverPageHostController? {
         if let pager = controller as? CoverPageHostController { return pager }
-        return controller.children.lazy.compactMap { findPager($0) }.first
+        return controller.children.lazy.compactMap { self.findPager($0) }.first
     }
 
     func testSwiftUIUnmountUsesSilentTerminalPath() async throws {
