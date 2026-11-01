@@ -41,6 +41,7 @@ struct SourceDiagnosticHistoryView: View {
                                 }
                             }
                         }
+                        .listRowBackground(AppThemeRowSurface())
                         ForEach(appState.sourceDiagnosticHistoryStore.records(for: source)) { entry in
                             VStack(alignment: .leading, spacing: 5) {
                                 HStack {
@@ -69,6 +70,7 @@ struct SourceDiagnosticHistoryView: View {
                     }
                 }
             }
+            .pageBackground()
             .navigationTitle("诊断历史")
             .navigationBarTitleDisplayMode(.inline)
             .safeAreaInset(edge: .bottom) {

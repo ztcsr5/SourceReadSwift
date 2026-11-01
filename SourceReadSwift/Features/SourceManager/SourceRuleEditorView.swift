@@ -66,6 +66,7 @@ struct SourceRuleEditorView: View {
                     }
                     .pickerStyle(.segmented)
                 }
+                .listRowBackground(AppThemeRowSurface())
                 if let diagnosticStep {
                     let advice = SourceDiagnosticRepairAdvisor.advice(for: diagnosticStep)
                     Section("诊断修复入口") {
@@ -85,6 +86,7 @@ struct SourceRuleEditorView: View {
                                 .foregroundStyle(.tertiary)
                         }
                     }
+                    .listRowBackground(AppThemeRowSurface())
                 }
                 Section("当前阶段说明") {
                     Label(stageHelp.title, systemImage: stageHelp.systemImage)
@@ -93,6 +95,7 @@ struct SourceRuleEditorView: View {
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                 }
+                .listRowBackground(AppThemeRowSurface())
                 Section("输入") {
                     if selectedSection == 0 {
                         TextEditor(text: $searchURL)
@@ -110,6 +113,7 @@ struct SourceRuleEditorView: View {
                             .foregroundStyle(.secondary)
                     }
                 }
+                .listRowBackground(AppThemeRowSurface())
                 Section {
                     TextEditor(text: $previewSample)
                         .frame(minHeight: 120)
@@ -220,6 +224,7 @@ struct SourceRuleEditorView: View {
                 } footer: {
                     Text("输入脱敏 HTML/JSON 样本，单步执行当前规则；预览不会保存书源或 Cookie。")
                 }
+                .listRowBackground(AppThemeRowSurface())
                 if !previewHistory.isEmpty {
                     Section("预览历史") {
                         ForEach(previewHistory) { entry in
@@ -253,6 +258,7 @@ struct SourceRuleEditorView: View {
                         }
                         .font(.caption)
                     }
+                    .listRowBackground(AppThemeRowSurface())
                 }
                 if !issues.isEmpty {
                     Section("校验结果") {
@@ -272,12 +278,14 @@ struct SourceRuleEditorView: View {
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
+                    .listRowBackground(AppThemeRowSurface())
                 }
                 Section("说明") {
                     Text("支持 CSS、XPath、JSONPath、@js: 和 <js> 规则。保存前会保留原书源字段，并只覆盖当前规则分组。")
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                 }
+                .listRowBackground(AppThemeRowSurface())
             }
             .onChange(of: searchURL) { _ in clearValidation(); persistDraftIfLoaded() }
             .onChange(of: searchRule) { _ in clearValidation(); persistDraftIfLoaded() }
@@ -288,6 +296,7 @@ struct SourceRuleEditorView: View {
             .onAppear {
                 loadPersistedDraftIfNeeded()
             }
+            .pageBackground()
             .navigationTitle("规则编辑 · \(source.bookSourceName)")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {

@@ -29,6 +29,7 @@ struct PrivacyLegalHubView: View {
                     Label("开源软件许可与致谢 (Licenses)", systemImage: "curlybraces")
                 }
             }
+            .listRowBackground(AppThemeRowSurface())
 
             Section("核心隐私承诺") {
                 VStack(alignment: .leading, spacing: 8) {
@@ -44,7 +45,9 @@ struct PrivacyLegalHubView: View {
                 }
                 .padding(.vertical, 4)
             }
+            .listRowBackground(AppThemeRowSurface())
         }
+        .pageBackground()
         .navigationTitle("合规与隐私")
         .navigationBarTitleDisplayMode(.inline)
     }
@@ -100,6 +103,7 @@ struct PrivacyPolicyDetailView: View {
             .padding()
             .frame(maxWidth: .infinity, alignment: .leading)
         }
+        .pageBackground()
         .navigationTitle("隐私政策")
         .navigationBarTitleDisplayMode(.inline)
     }
@@ -148,6 +152,7 @@ struct UserAgreementDetailView: View {
             .padding()
             .frame(maxWidth: .infinity, alignment: .leading)
         }
+        .pageBackground()
         .navigationTitle("用户协议")
         .navigationBarTitleDisplayMode(.inline)
     }
@@ -186,6 +191,7 @@ struct DisclaimerDetailView: View {
             .padding()
             .frame(maxWidth: .infinity, alignment: .leading)
         }
+        .pageBackground()
         .navigationTitle("免责声明")
         .navigationBarTitleDisplayMode(.inline)
     }
@@ -200,6 +206,7 @@ struct OpenSourceLicensesDetailView: View {
                     .font(.footnote)
                     .foregroundStyle(.secondary)
             }
+            .listRowBackground(AppThemeRowSurface())
 
             Section("SwiftSoup") {
                 VStack(alignment: .leading, spacing: 6) {
@@ -210,6 +217,7 @@ struct OpenSourceLicensesDetailView: View {
                         .foregroundStyle(.secondary)
                 }
             }
+            .listRowBackground(AppThemeRowSurface())
 
             Section("ZIPFoundation") {
                 VStack(alignment: .leading, spacing: 6) {
@@ -220,6 +228,7 @@ struct OpenSourceLicensesDetailView: View {
                         .foregroundStyle(.secondary)
                 }
             }
+            .listRowBackground(AppThemeRowSurface())
 
             Section("CryptoSwift") {
                 VStack(alignment: .leading, spacing: 6) {
@@ -230,6 +239,7 @@ struct OpenSourceLicensesDetailView: View {
                         .foregroundStyle(.secondary)
                 }
             }
+            .listRowBackground(AppThemeRowSurface())
 
             Section("Legado & 源阅读社区") {
                 VStack(alignment: .leading, spacing: 6) {
@@ -240,7 +250,9 @@ struct OpenSourceLicensesDetailView: View {
                         .foregroundStyle(.secondary)
                 }
             }
+            .listRowBackground(AppThemeRowSurface())
         }
+        .pageBackground()
         .navigationTitle("开源许可")
         .navigationBarTitleDisplayMode(.inline)
     }

@@ -66,12 +66,14 @@ struct WebsiteSourceBuilderView: View {
                     TextField("目录容器 CSS / JSONPath", text: $tocCSS).textInputAutocapitalization(.never).autocorrectionDisabled()
                     TextField("正文容器 CSS / JSONPath", text: $contentCSS).textInputAutocapitalization(.never).autocorrectionDisabled()
                     Button("按当前选择器重新生成") { build() }.disabled(working)
-                }.disabled(working)
+                }
+                .listRowBackground(AppThemeRowSurface()).disabled(working)
                 if let draft {
                     Section("本地样本已解析：\(draft.chapterCount) 章") {
                         Text(draft.example.name).font(.headline)
                         ForEach(draft.preview.indices, id: \.self) { Text(draft.preview[$0]).font(.subheadline).lineLimit(4) }
                     }
+                    .listRowBackground(AppThemeRowSurface())
                     Section("验证后导入") {
                         Text("仅验证已采集的目录与正文模板，不代表整站兼容。HTML 提供此书发现入口；直接 JSON 仅生成已提供的接口规则，不猜搜索、发现、签名或加密接口。分页、付费与验证码需另行处理。")
                             .font(.footnote).foregroundStyle(.secondary)
@@ -79,15 +81,18 @@ struct WebsiteSourceBuilderView: View {
                         Button(working ? "验证中…" : "联网验证目录和正文") { validate(draft) }.disabled(working)
                         Button("导入书源管理") { importDraft(draft) }.disabled(!validated || working)
                     }
+                    .listRowBackground(AppThemeRowSurface())
                     Section("将保存的 JSON（不包含浏览器 Cookie）") {
                         Text(json(draft.source)).font(.system(.caption, design: .monospaced)).textSelection(.enabled)
                     }
+                    .listRowBackground(AppThemeRowSurface())
                 }
             }
             .scrollDismissesKeyboard(.interactively)
             .onChange(of: name) { _ in validated = false }
             .onChange(of: tocCSS) { _ in validated = false }
             .onChange(of: contentCSS) { _ in validated = false }
+            .pageBackground()
             .navigationTitle("本地规则预览").navigationBarTitleDisplayMode(.inline)
             .toolbar { ToolbarItem(placement: .cancellationAction) { Button("返回网页") { showPreview = false } } }
         }

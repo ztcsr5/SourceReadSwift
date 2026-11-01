@@ -65,6 +65,7 @@ struct ReaderPerformanceDiagnosticsView: View {
                 } footer: {
                     Text("阅读器局部采样，仅用于辅助定位。回调耗时不等于整帧耗时，不能单凭这个数字判断是重建、排版还是 GPU 瓶颈。使用上方全局采样和真机 Instruments 交叉验证。")
                 }
+                .listRowBackground(AppThemeRowSurface())
                 .id(perfRefreshToken)
 
         }

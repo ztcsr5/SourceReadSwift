@@ -50,6 +50,7 @@ struct TTSSettingsView: View {
             } header: {
                 Text("引擎")
             }
+            .listRowBackground(AppThemeRowSurface())
 
             if engine == .http {
                 Section {
@@ -75,6 +76,7 @@ struct TTSSettingsView: View {
                 } footer: {
                     Text("百度公共预设可能限流；晓萱、晓伊、晓晓、云希使用 Azure 官方服务，需自己的 Speech Key，可能产生服务费用。风格名称仅供选声参考。")
                 }
+                .listRowBackground(AppThemeRowSurface())
                 Section {
                     TextField("资源区域（如 eastasia）", text: $azureRegion)
                         .textInputAutocapitalization(.never).autocorrectionDisabled()
@@ -96,6 +98,7 @@ struct TTSSettingsView: View {
                         } catch { statusMessage = error.localizedDescription }
                     }
                 } header: { Text("Azure 特色音色") }
+                .listRowBackground(AppThemeRowSurface())
             }
 
             if engine == .file {
@@ -144,6 +147,7 @@ struct TTSSettingsView: View {
                 } footer: {
                     Text("按段落序号一一对应：朗读到第 N 段就播 N.*，缺文件的段落直接跳过，不会联网合成。音频存在 App 沙盒内，不参与 iCloud 备份。")
                 }
+                .listRowBackground(AppThemeRowSurface())
             }
 
             Section {
@@ -164,12 +168,14 @@ struct TTSSettingsView: View {
             } footer: {
                 Text("凭据保存在系统 Keychain，不写入 UserDefaults，也不会随备份导出。")
             }
+            .listRowBackground(AppThemeRowSurface())
 
             Section("合成参数") {
                 sliderRow(title: "语速", value: $speed)
                 sliderRow(title: "音量", value: $volume)
                 sliderRow(title: "音调", value: $pitch)
             }
+            .listRowBackground(AppThemeRowSurface())
 
             Section {
                 Button {
@@ -197,6 +203,7 @@ struct TTSSettingsView: View {
                     Label("清除凭据", systemImage: "trash")
                 }
             }
+            .listRowBackground(AppThemeRowSurface())
 
             if let statusMessage {
                 Section("状态") {
@@ -209,14 +216,17 @@ struct TTSSettingsView: View {
                             .foregroundStyle(.secondary)
                     }
                 }
+                .listRowBackground(AppThemeRowSurface())
             } else if let voiceStatusMessage {
                 Section("状态") {
                     Text(voiceStatusMessage)
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                 }
+                .listRowBackground(AppThemeRowSurface())
             }
         }
+        .pageBackground()
         .navigationTitle("语音朗读")
         .navigationBarTitleDisplayMode(.inline)
         .fileImporter(

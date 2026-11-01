@@ -50,6 +50,7 @@ struct CustomFontManagementView: View {
             } header: {
                 Text("当前排版字体")
             }
+            .listRowBackground(AppThemeRowSurface())
 
             Section {
                 ForEach([ReaderFontFamily.system, .light, .bold, .songti, .kaiti, .rounded], id: \.self) { family in
@@ -77,6 +78,7 @@ struct CustomFontManagementView: View {
             } header: {
                 Text("内置字体")
             }
+            .listRowBackground(AppThemeRowSurface())
 
             Section {
                 if fontManager.installedFonts.isEmpty {
@@ -141,7 +143,9 @@ struct CustomFontManagementView: View {
             } footer: {
                 Text("从微信、百度网盘或 iCloud Drive 下载的字体文件均可通过系统“文件”导入。")
             }
+            .listRowBackground(AppThemeRowSurface())
         }
+        .pageBackground()
         .navigationTitle("字体管理")
         .navigationBarTitleDisplayMode(.inline)
         .fileImporter(

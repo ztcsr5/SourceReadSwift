@@ -15,6 +15,7 @@ struct SourceProxySettingsView: View {
             } footer: {
                 Text("开启后，所有书源的网络请求（搜索、目录、正文加载、分类发现等）都将通过指定的本地或局域网代理服务器转发。")
             }
+            .listRowBackground(AppThemeRowSurface())
 
             if proxyManager.isEnabled {
                 Section("代理协议与配置") {
@@ -46,6 +47,7 @@ struct SourceProxySettingsView: View {
                             .focused($focusedField, equals: .port)
                     }
                 }
+                .listRowBackground(AppThemeRowSurface())
 
                 Section("代理连通性测试") {
                     Button {
@@ -63,6 +65,7 @@ struct SourceProxySettingsView: View {
                     }
                     .disabled(isTesting)
                 }
+                .listRowBackground(AppThemeRowSurface())
 
                 Section("常见代理软件端口参考") {
                     VStack(alignment: .leading, spacing: 6) {
@@ -74,6 +77,7 @@ struct SourceProxySettingsView: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
                 }
+                .listRowBackground(AppThemeRowSurface())
             }
         }
         .scrollDismissesKeyboard(.interactively)
@@ -86,6 +90,7 @@ struct SourceProxySettingsView: View {
         .onChange(of: proxyManager.isEnabled) { enabled in
             if !enabled { focusedField = nil }
         }
+        .pageBackground()
         .navigationTitle("书源网络代理")
         .navigationBarTitleDisplayMode(.inline)
         .alert("代理测试结果", isPresented: $showingTestResult) {

@@ -30,6 +30,7 @@ struct CookieManagerView: View {
                 }
                 .padding(.vertical, 4)
             }
+            .listRowBackground(AppThemeRowSurface())
 
             if hosts.isEmpty {
                 Section {
@@ -49,6 +50,7 @@ struct CookieManagerView: View {
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 28)
                 }
+                .listRowBackground(AppThemeRowSurface())
             } else {
                 Section("站点列表 (\(hosts.count))") {
                     ForEach(hosts, id: \.self) { host in
@@ -114,8 +116,10 @@ struct CookieManagerView: View {
                         }
                     }
                 }
+                .listRowBackground(AppThemeRowSurface())
             }
         }
+        .pageBackground()
         .navigationTitle("Cookie 会话")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {

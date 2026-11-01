@@ -40,6 +40,7 @@ struct SettingsView: View {
                         Label("朗读引擎与云端凭据", systemImage: "waveform")
                     }
                 }
+                .listRowBackground(AppThemeRowSurface())
 
                 Section("内容设置") {
                     NavigationLink {
@@ -103,6 +104,7 @@ struct SettingsView: View {
                         }
                     }
                 }
+                .listRowBackground(AppThemeRowSurface())
 
                 Section("交互与性能") {
                     Toggle("触控震动反馈", isOn: $hapticsEnabled)
@@ -112,6 +114,7 @@ struct SettingsView: View {
                     Stepper("搜书并发线程数: \(searchThreads) 线程", value: $searchThreads, in: 2...32)
                     Stepper("书源校验并发线程数: \(batchCheckThreads) 线程", value: $batchCheckThreads, in: 1...16)
                 }
+                .listRowBackground(AppThemeRowSurface())
 
                 Section("通用") {
                     Button {
@@ -170,6 +173,7 @@ struct SettingsView: View {
                         Label("关于纸间", systemImage: "info.circle")
                     }
                 }
+                .listRowBackground(AppThemeRowSurface())
 
                 Section("数据") {
                     NavigationLink {
@@ -192,6 +196,7 @@ struct SettingsView: View {
                         Label("恢复完整数据", systemImage: "arrow.clockwise.icloud")
                     }
                 }
+                .listRowBackground(AppThemeRowSurface())
 
 
                 Section("诊断") {
@@ -206,6 +211,7 @@ struct SettingsView: View {
                         Label("最近诊断 · 查看与复制", systemImage: "doc.text.magnifyingglass")
                     }
                 }
+                .listRowBackground(AppThemeRowSurface())
             }
             .scrollDismissesKeyboard(.interactively)
             .scrollContentBackground(.hidden)
@@ -257,6 +263,7 @@ struct SettingsView: View {
             .listRowBackground(Color.clear)
             .listRowSeparator(.hidden)
         }
+        .listRowBackground(AppThemeRowSurface())
     }
 
     private func settingsHeroMetric(_ title: String, value: String) -> some View {
@@ -509,6 +516,7 @@ struct ReadingHistoryView: View {
                 }
             }
         }
+        .pageBackground()
         .navigationTitle("阅读历史")
         .toolbar {
             if !history.isEmpty {
@@ -623,6 +631,7 @@ struct ReadingStatsView: View {
                 } header: {
                     Text("阅读概览")
                 }
+                .listRowBackground(AppThemeRowSurface())
 
                 Section {
                     VStack(alignment: .leading, spacing: 12) {
@@ -690,6 +699,7 @@ struct ReadingStatsView: View {
                 } header: {
                     Text("阅读趋势")
                 }
+                .listRowBackground(AppThemeRowSurface())
 
                 Section("多维媒介生态") {
                     let total = max(1, summary.totalBooks)
@@ -727,6 +737,7 @@ struct ReadingStatsView: View {
                     }
                     .padding(.vertical, 4)
                 }
+                .listRowBackground(AppThemeRowSurface())
 
                 Section("阅读成就勋章") {
                     LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
@@ -756,6 +767,7 @@ struct ReadingStatsView: View {
                     }
                     .padding(.vertical, 4)
                 }
+                .listRowBackground(AppThemeRowSurface())
 
                 Section("书架构成") {
                     metricRow("书架书籍", value: "\(summary.totalBooks) 本")
@@ -764,6 +776,7 @@ struct ReadingStatsView: View {
                     metricRow("已阅读", value: "\(summary.readBooks) 本")
                     metricRow("有书签", value: "\(summary.bookmarkedBooks) 本 (共 \(summary.totalBookmarks) 处)")
                 }
+                .listRowBackground(AppThemeRowSurface())
 
                 if let mostReadBook = summary.mostReadBook {
                     Section("阅读最多") {
@@ -780,6 +793,7 @@ struct ReadingStatsView: View {
                             }
                         }
                     }
+                    .listRowBackground(AppThemeRowSurface())
                 }
 
                 Section("最近阅读") {
@@ -806,8 +820,10 @@ struct ReadingStatsView: View {
                         }
                     }
                 }
+                .listRowBackground(AppThemeRowSurface())
             }
         }
+        .pageBackground()
         .navigationTitle("阅读统计")
     }
 
@@ -941,6 +957,7 @@ private struct RuleHealthView: View {
                 metricRow("可搜索", value: "\(sourceStats.searchable)")
                 metricRow("可读正文", value: "\(sourceStats.readable)")
             }
+            .listRowBackground(AppThemeRowSurface())
 
             Section("需要处理") {
                 if sourceStats.problemSources.isEmpty {
@@ -962,6 +979,7 @@ private struct RuleHealthView: View {
                     }
                 }
             }
+            .listRowBackground(AppThemeRowSurface())
 
             if !sourceStats.problemSources.isEmpty {
                 Section("快捷操作") {
@@ -981,6 +999,7 @@ private struct RuleHealthView: View {
                         Label("一键启用全部书源", systemImage: "checkmark.circle")
                     }
                 }
+                .listRowBackground(AppThemeRowSurface())
             }
 
             Section("说明") {
@@ -988,7 +1007,9 @@ private struct RuleHealthView: View {
                     .font(.footnote)
                     .foregroundStyle(.secondary)
             }
+            .listRowBackground(AppThemeRowSurface())
         }
+        .pageBackground()
         .navigationTitle("规则体检")
     }
 
@@ -1044,6 +1065,7 @@ struct PurifyRulesView: View {
                 }
                 .disabled(newRule.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
             }
+            .listRowBackground(AppThemeRowSurface())
 
             Section("批量导入") {
                 TextEditor(text: $importText)
@@ -1061,6 +1083,7 @@ struct PurifyRulesView: View {
                         .foregroundStyle(.secondary)
                 }
             }
+            .listRowBackground(AppThemeRowSurface())
 
             Section("URL 导入") {
                 TextField("请输入净化规则的 URL 地址", text: $importUrl)
@@ -1077,6 +1100,7 @@ struct PurifyRulesView: View {
                         .foregroundStyle(.secondary)
                 }
             }
+            .listRowBackground(AppThemeRowSurface())
 
             Section("推荐预设") {
                 Text("预设只作为起点导入，后续仍可逐条关闭或删除。导入会自动跳过已存在规则。")
@@ -1121,6 +1145,7 @@ struct PurifyRulesView: View {
                 }
                 .disabled(selectedPresetPatterns.isEmpty)
             }
+            .listRowBackground(AppThemeRowSurface())
 
             Section("快速管理") {
                 HStack {
@@ -1145,6 +1170,7 @@ struct PurifyRulesView: View {
                     .disabled(appState.purifyRuleStore.rules.isEmpty)
                 }
             }
+            .listRowBackground(AppThemeRowSurface())
 
             Section("规则测试") {
                 TextEditor(text: $previewText)
@@ -1160,6 +1186,7 @@ struct PurifyRulesView: View {
                         .textSelection(.enabled)
                 }
             }
+            .listRowBackground(AppThemeRowSurface())
 
             Section("已启用规则") {
                 if appState.purifyRuleStore.rules.isEmpty {
@@ -1185,6 +1212,7 @@ struct PurifyRulesView: View {
                     }
                 }
             }
+            .listRowBackground(AppThemeRowSurface())
         }
         .scrollDismissesKeyboard(.interactively)
         .toolbar {
@@ -1193,6 +1221,7 @@ struct PurifyRulesView: View {
                 Button("完成") { dismissKeyboard() }
             }
         }
+        .pageBackground()
         .navigationTitle("净化规则")
     }
 
@@ -1305,6 +1334,7 @@ private struct AboutReadView: View {
                 }
                 .padding(.vertical, 6)
             }
+            .listRowBackground(AppThemeRowSurface())
 
             Section("合规与条款") {
                 NavigationLink {
@@ -1328,13 +1358,16 @@ private struct AboutReadView: View {
                     Label("开源许可与致谢 (Licenses)", systemImage: "curlybraces")
                 }
             }
+            .listRowBackground(AppThemeRowSurface())
 
             Section("致谢与声明") {
                 Text("感谢 Legado 与源阅读开源社区的无私奉献。\n\n免责声明：本应用为本地阅读与书源解析工具，本身不提供、不存储任何网络图书或数字版权内容。所有网络书源由用户自行添加或抓取自公开站点，相关内容版权归原作者所有。")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
             }
+            .listRowBackground(AppThemeRowSurface())
         }
+        .pageBackground()
         .navigationTitle("关于纸间")
     }
 }

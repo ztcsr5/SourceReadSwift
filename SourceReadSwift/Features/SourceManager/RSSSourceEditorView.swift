@@ -27,6 +27,7 @@ struct RSSSourceEditorView: View {
                     Toggle("启用", isOn: $draft.enabled)
                     Toggle("使用 Cookie", isOn: $draft.enabledCookieJar)
                 }
+                .listRowBackground(AppThemeRowSurface())
                 Section("列表规则") {
                     ruleField("文章列表", keyPath: \.ruleArticles)
                     ruleField("下一页", keyPath: \.ruleNextPage)
@@ -36,15 +37,19 @@ struct RSSSourceEditorView: View {
                     ruleField("图片", keyPath: \.ruleImage)
                     ruleField("链接", keyPath: \.ruleLink)
                 }
+                .listRowBackground(AppThemeRowSurface())
                 Section("正文") {
                     ruleField("正文内容", keyPath: \.ruleContent)
                     ruleField("排序 URL", keyPath: \.sortUrl)
                     ruleField("CSS 样式", keyPath: \.style, axis: .vertical)
                 }
+                .listRowBackground(AppThemeRowSurface())
                 if let validationMessage {
                     Section { Text(validationMessage).foregroundStyle(.red) }
+                    .listRowBackground(AppThemeRowSurface())
                 }
             }
+            .pageBackground()
             .navigationTitle("编辑 RSS")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {

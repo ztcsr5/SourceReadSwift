@@ -17,12 +17,14 @@ struct RecentDiagnosticsView: View {
                 } label: { Label(copied ? "已复制" : "复制最近 100 条诊断", systemImage: "doc.on.doc") }
                 if snapshot.isEmpty { Text("暂无诊断").foregroundStyle(.secondary) }
             }
+            .listRowBackground(AppThemeRowSurface())
             ForEach(snapshot) { event in
                 NavigationLink {
                     ScrollView {
                         Text(Self.export(event)).font(.system(.body, design: .monospaced))
                             .textSelection(.enabled).frame(maxWidth: .infinity, alignment: .leading).padding()
                     }
+                    .pageBackground()
                     .navigationTitle("诊断详情")
                     .toolbar {
                         Button("复制") { UIPasteboard.general.string = Self.export(event) }
@@ -35,6 +37,7 @@ struct RecentDiagnosticsView: View {
                 }
             }
         }
+        .pageBackground()
         .navigationTitle("最近诊断")
         .navigationBarTitleDisplayMode(.inline)
     }

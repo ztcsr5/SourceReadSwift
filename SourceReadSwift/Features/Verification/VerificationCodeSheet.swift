@@ -41,6 +41,7 @@ struct VerificationCodeSheet: View {
                     Text("来源：\(request.sourceName) · 阶段：\(request.stage)\n验证码仅保存在当前书源会话，用于本次请求重试。")
                 }
             }
+            .pageBackground()
             .navigationTitle("需要验证码")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {

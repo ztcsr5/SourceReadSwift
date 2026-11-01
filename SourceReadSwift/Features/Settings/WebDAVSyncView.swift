@@ -147,6 +147,7 @@ struct WebDAVSyncView: View {
                     .font(.footnote)
                     .foregroundStyle(.secondary)
             }
+            .listRowBackground(AppThemeRowSurface())
 
             // MARK: - Cloud Backup Actions
             Section("云端备份操作") {
@@ -181,6 +182,7 @@ struct WebDAVSyncView: View {
                         .foregroundStyle(message.contains("失败") ? .red : .secondary)
                 }
             }
+            .listRowBackground(AppThemeRowSurface())
 
             // MARK: - Remote Backups List
             Section {
@@ -256,7 +258,9 @@ struct WebDAVSyncView: View {
                     .font(.footnote)
                     .foregroundStyle(.secondary)
             }
+            .listRowBackground(AppThemeRowSurface())
         }
+        .pageBackground()
         .navigationTitle("WebDAV 云端同步")
         .navigationBarTitleDisplayMode(.inline)
         .alert("确认从云端恢复？", isPresented: $showRestoreConfirmation) {

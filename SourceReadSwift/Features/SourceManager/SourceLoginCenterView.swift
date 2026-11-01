@@ -72,6 +72,7 @@ struct SourceLoginCenterView: View {
                     } footer: {
                         Text("这些站点已保存 Cookie 会话，请求书源时会自动携带。")
                     }
+                    .listRowBackground(AppThemeRowSurface())
                 }
                 if !signedOutEntries.isEmpty {
                     Section {
@@ -83,11 +84,13 @@ struct SourceLoginCenterView: View {
                     } footer: {
                         Text("带「主页登录」标记的源没有写 loginUrl，会在书源主页打开登录页；登录成功后返回即可。")
                     }
+                    .listRowBackground(AppThemeRowSurface())
                 }
             }
         }
         .listStyle(.insetGrouped)
         .searchable(text: $keyword, placement: .navigationBarDrawer(displayMode: .always), prompt: "搜索书源 / 域名")
+        .pageBackground()
         .navigationTitle("书源登录中心")
         .navigationBarTitleDisplayMode(.inline)
         .task { await refreshSessions() }
@@ -139,6 +142,7 @@ struct SourceLoginCenterView: View {
                 }
             }
         }
+        .listRowBackground(AppThemeRowSurface())
     }
 
     private func statBlock(value: String, label: String, tint: Color) -> some View {
@@ -169,6 +173,7 @@ struct SourceLoginCenterView: View {
             .frame(maxWidth: .infinity)
             .padding(.vertical, 24)
         }
+        .listRowBackground(AppThemeRowSurface())
     }
 
     private func row(_ entry: Entry, signedIn: Bool) -> some View {

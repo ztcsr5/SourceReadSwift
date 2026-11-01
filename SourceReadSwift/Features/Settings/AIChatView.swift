@@ -222,6 +222,7 @@ private struct AIChatConfigurationView: View {
                             .font(.caption).foregroundStyle(.secondary)
                     }
                 }
+                .listRowBackground(AppThemeRowSurface())
                 Section("API Key · 仅钥匙串") {
                     SecureField(savedKey ? "已有密钥，留空保留；填入可替换" : "粘贴 API Key", text: $key)
                         .textInputAutocapitalization(.never).autocorrectionDisabled().focused($focused)
@@ -234,9 +235,11 @@ private struct AIChatConfigurationView: View {
                     Text("密钥绑定到完整接口地址，改地址不会沿用旧密钥。不会写入 UserDefaults、聊天内容或日志。第三方接口可能留存会话并按用量收费。")
                         .font(.caption).foregroundStyle(.secondary)
                 }
+                .listRowBackground(AppThemeRowSurface())
                 if let status { Section { Text(status).font(.footnote).foregroundStyle(.secondary) } }
             }
             .navigationTitle("AI 配置").navigationBarTitleDisplayMode(.inline)
+            .pageBackground()
             .scrollDismissesKeyboard(.interactively)
             .onAppear { savedKey = AIChatCredentials().key(for: config) != nil }
             .onChange(of: config.endpoint) { _ in key = ""; savedKey = AIChatCredentials().key(for: config) != nil }
@@ -273,6 +276,7 @@ private struct AIChatLibraryAttachmentView: View {
                         attach("净化规则.json", appState.purifyRuleStore.rules)
                     }
                 }
+                .listRowBackground(AppThemeRowSurface())
                 Section("选择一个书源") {
                     ForEach(appState.sourceStore.sources.filter { search.isEmpty || $0.bookSourceName.localizedCaseInsensitiveContains(search) }) { source in
                         Button { attach(source.bookSourceName + ".json", source) } label: {
@@ -283,8 +287,10 @@ private struct AIChatLibraryAttachmentView: View {
                         }
                     }
                 }
+                .listRowBackground(AppThemeRowSurface())
             }.searchable(text: $search, prompt: "搜索书源名称")
                 .navigationTitle("选取本地资料").navigationBarTitleDisplayMode(.inline)
+                .pageBackground()
                 .toolbar { ToolbarItem(placement: .cancellationAction) { Button("关闭") { dismiss() } } }
         }
     }
@@ -349,6 +355,7 @@ private struct AIChatSendReview: View {
                     Text("包含以下全部历史和附件，而不只是最新输入。发送即会上传到所配置服务商，可能产生费用。取消不会发起请求。")
                         .font(.caption).foregroundStyle(.secondary)
                 }
+                .listRowBackground(AppThemeRowSurface())
                 ForEach(submission.history) { message in
                     Section(message.role == .user ? "你的消息" : "AI 历史回复") {
                         Text(String(message.text.prefix(8000))).textSelection(.enabled)
@@ -359,8 +366,9 @@ private struct AIChatSendReview: View {
                             NavigationLink(attachment.name) { AIChatInlineAttachment(attachment: attachment) }
                         }
                     }
+                    .listRowBackground(AppThemeRowSurface())
                 }
-            }.navigationTitle("发送前确认").navigationBarTitleDisplayMode(.inline)
+            }.pageBackground().navigationTitle("发送前确认").navigationBarTitleDisplayMode(.inline)
                 .toolbar {
                     ToolbarItem(placement: .cancellationAction) { Button("取消") { dismiss() } }
                     ToolbarItem(placement: .confirmationAction) { Button("确认上传并发送", action: onSend) }

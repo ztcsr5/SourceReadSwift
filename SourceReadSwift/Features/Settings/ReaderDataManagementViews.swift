@@ -86,9 +86,11 @@ struct ReaderBookmarksView: View {
                             }
                         }
                     }
+                    .listRowBackground(AppThemeRowSurface())
                 }
             }
         }
+        .pageBackground()
         .navigationTitle("书签")
         .listStyle(.insetGrouped)
         .sheet(isPresented: Binding(
@@ -208,9 +210,11 @@ struct OfflineChapterCacheView: View {
                     } footer: {
                         Text("\(section.entries.count) 章 · \(byteText(section.entries.reduce(0) { $0 + $1.estimatedByteCount }))")
                     }
+                    .listRowBackground(AppThemeRowSurface())
                 }
             }
         }
+        .pageBackground()
         .navigationTitle("离线章节")
         .listStyle(.insetGrouped)
         .sheet(item: $exportShareURL) { item in

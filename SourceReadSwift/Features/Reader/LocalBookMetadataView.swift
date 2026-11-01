@@ -64,7 +64,7 @@ struct LocalBookMetadataView: View {
         .toolbar { ToolbarItem(placement: .confirmationAction) { Button("完成") { dismiss() } } }
         .sheet(isPresented: $showFullCatalog) {
             NavigationStack {
-                List(chapters, id: \.index) { chapter in chapterButton(chapter).listRowBackground(AppTheme.card) }
+                List(chapters, id: \.index) { chapter in chapterButton(chapter).listRowBackground(AppThemeRowSurface()) }
                     .scrollContentBackground(.hidden).pageBackground()
                     .navigationTitle("目录 · \(chapters.count) 章").navigationBarTitleDisplayMode(.inline)
                     .toolbar { ToolbarItem(placement: .confirmationAction) { Button("完成") { showFullCatalog = false } } }

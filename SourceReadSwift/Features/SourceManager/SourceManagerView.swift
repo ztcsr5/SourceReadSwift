@@ -1253,6 +1253,7 @@ struct SourceManagerView: View {
                 Spacer(minLength: 0)
             }
             .padding(.top)
+            .pageBackground()
             .navigationTitle("导入源")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -1277,6 +1278,7 @@ struct SourceManagerView: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding()
             }
+            .pageBackground()
             .navigationTitle(preview.title)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -1314,6 +1316,7 @@ struct SourceManagerView: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
             .padding()
+            .pageBackground()
             .navigationTitle(editor.title)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -1390,6 +1393,7 @@ struct SourceManagerView: View {
                     .frame(maxHeight: .infinity)
                 }
                 .padding()
+                .pageBackground()
                 .navigationTitle(source.bookSourceName)
                 .navigationBarTitleDisplayMode(.inline)
                 .toolbar {
@@ -1769,6 +1773,7 @@ private struct BatchCheckCoordinatorObserver<Content: View>: View {
                 }
             }
             .padding()
+            .pageBackground()
             .navigationTitle("批量测试")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {

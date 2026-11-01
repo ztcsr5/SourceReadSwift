@@ -56,6 +56,7 @@ struct SourceLoginView: View {
                     formContent
                 }
             }
+            .pageBackground()
             .navigationTitle(source.bookSourceName)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {

@@ -17,7 +17,7 @@ enum AppTheme {
 
     static func color(for key: String, fallback: UInt32, darkFallback: UInt32? = nil) -> UIColor {
         let raw = UserDefaults.standard.string(forKey: key) ?? ""
-        if raw.count != 6 || UInt32(raw, radix: 16) == nil {
+        if raw.count != 6 || UInt32(raw, radix: 16) == nil || UInt32(raw, radix: 16) == fallback {
             return UIColor { traits in
                 AppVisualTheme.uiColor(traits.userInterfaceStyle == .dark ? darkFallback ?? fallback : fallback)
             }
@@ -51,31 +51,13 @@ extension View {
     }
 
     func glassPanel(
-        cornerRadius: CGFloat = AppTheme.cardRadius,
+        cornerRadius: CGFloat? = nil,
         material: Material = .ultraThinMaterial,
         strokeOpacity: Double = 0.10,
         shadowOpacity: Double = 0.08
     ) -> some View {
-        background {
-            let shape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-            if AppVisualTheme.current == .classic { shape.fill(material) }
-            else { shape.fill(AppTheme.card) }
-        }
-            .overlay {
-                RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                    .stroke(
-                        LinearGradient(
-                            colors: [
-                                Color.white.opacity(0.42),
-                                Color.primary.opacity(strokeOpacity)
-                            ],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        ),
-                        lineWidth: AppVisualTheme.current.borderWidth
-                    )
-            }
-            .shadow(color: .black.opacity(shadowOpacity), radius: 6, x: 0, y: 3)
+        modifier(AppThemeSurface(cornerRadius: cornerRadius, material: material,
+                                 strokeOpacity: strokeOpacity, shadowOpacity: shadowOpacity))
     }
 
     func listRowCard(cornerRadius: CGFloat = 16) -> some View {
@@ -88,12 +70,8 @@ extension View {
     }
 
     func glassCircle(material: Material = .ultraThinMaterial) -> some View {
-        background(material, in: Circle())
-            .overlay {
-                Circle()
-                    .stroke(Color.white.opacity(0.35), lineWidth: 0.8)
-            }
-            .shadow(color: .black.opacity(0.06), radius: 5, x: 0, y: 2)
+        modifier(AppThemeSurface(cornerRadius: 999, material: material,
+                                 strokeOpacity: 0.15, shadowOpacity: 0.06))
     }
 }
 
@@ -107,7 +85,11 @@ private struct PageBackgroundModifier: ViewModifier {
         _ = visualTheme
         _ = appearanceRevision
         _ = themeModeRawValue
-        return content.background(AppTheme.background.ignoresSafeArea())
+        return content
+            .scrollContentBackground(.hidden)
+            .font(.system(.body, design: AppVisualTheme.current.fontDesign))
+            .tint(AppTheme.accent)
+            .background(AppTheme.background.ignoresSafeArea())
     }
 }
 
@@ -118,7 +100,7 @@ struct PodcastSectionTitle: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             Text(title)
-                .font(.system(size: 34, weight: .bold, design: .rounded))
+                .font(.system(size: 34, weight: .bold, design: AppVisualTheme.current.fontDesign))
                 .foregroundStyle(.primary)
             if let subtitle {
                 Text(subtitle)
@@ -137,7 +119,7 @@ struct PodcastLargeTitleBar<Trailing: View>: View {
     var body: some View {
         HStack(alignment: .top) {
             Text(title)
-                .font(.system(size: 32, weight: .bold, design: .default))
+                .font(.system(size: 32, weight: .bold, design: AppVisualTheme.current.fontDesign))
                 .foregroundStyle(.primary)
                 .accessibilityAddTraits(.isHeader)
 

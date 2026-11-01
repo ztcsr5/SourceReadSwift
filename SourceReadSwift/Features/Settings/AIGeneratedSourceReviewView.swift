@@ -44,14 +44,17 @@ struct AIGeneratedSourceReviewView: View {
                     if working { Button("停止测试") { worker?.cancel(); working = false } }
                     if !output.isEmpty { Text(output).font(.caption).textSelection(.enabled) }
                 }
+                .listRowBackground(AppThemeRowSurface())
                 Section {
                     Button("导入已测试书源") { confirmImport = true }
                         .disabled(testedJSON != json || working)
                     Text("同 bookSourceUrl 会覆盖旧源。修改 JSON 或关键词将使测试结果失效；无搜索能力的源请复制到书源管理中手工验证。")
                         .font(.caption).foregroundStyle(.secondary)
                 }
+                .listRowBackground(AppThemeRowSurface())
             }
             .scrollDismissesKeyboard(.interactively)
+            .pageBackground()
             .navigationTitle("AI 书源复核").navigationBarTitleDisplayMode(.inline)
             .onChange(of: json) { _ in invalidate() }
             .onChange(of: keyword) { _ in invalidate() }

@@ -20,13 +20,16 @@ struct SourceGroupAssignmentView: View {
                         Button(group) { assign(group) }
                     }
                 }
+                .listRowBackground(AppThemeRowSurface())
                 Section("新建分组并移入") {
                     TextField("分组名称", text: $newName)
                     Button("保存") { assign(newName) }
                         .disabled(newName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                 }
+                .listRowBackground(AppThemeRowSurface())
                 if let error = store.lastError { Text(error).foregroundStyle(.red) }
             }
+            .pageBackground()
             .navigationTitle("设置分组")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar { ToolbarItem(placement: .cancellationAction) { Button("取消") { dismiss() } } }
@@ -79,6 +82,7 @@ struct SourceOrganizationView: View {
                 } footer: {
                     Text("置顶与置底始终优先；自定义顺序下可拖动同一区域的书源。筛选后排序不会改变其他分组。")
                 }
+                .listRowBackground(AppThemeRowSurface())
                 Section {
                     DisclosureGroup("管理分组") {
                     Button {
@@ -99,6 +103,7 @@ struct SourceOrganizationView: View {
                     }
                     }
                 }
+                .listRowBackground(AppThemeRowSurface())
                 ForEach(SourcePlacement.allCases) { placement in
                     let section = visible.filter { organization.placement(for: $0) == placement }
                     if !section.isEmpty {
@@ -125,11 +130,13 @@ struct SourceOrganizationView: View {
                             }
                             .moveDisabled(organization.sort != .custom)
                         }
+                        .listRowBackground(AppThemeRowSurface())
                     }
                 }
                 if let error = store.lastError { Text(error).foregroundStyle(.red) }
             }
             .environment(\.editMode, .constant(.active))
+            .pageBackground()
             .navigationTitle("排序与分组")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar { ToolbarItem(placement: .confirmationAction) { Button("完成") { dismiss() } } }

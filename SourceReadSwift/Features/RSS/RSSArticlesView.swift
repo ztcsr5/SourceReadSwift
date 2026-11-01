@@ -76,6 +76,7 @@ struct RSSArticlesView: View {
                 }
             }
         }
+        .pageBackground()
         .navigationTitle("订阅文章")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
