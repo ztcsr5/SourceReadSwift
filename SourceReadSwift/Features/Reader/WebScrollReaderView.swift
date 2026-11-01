@@ -45,6 +45,7 @@ struct WebScrollReaderView: UIViewRepresentable {
     let currentParagraphIndex: Int
     let scrollTarget: Int?
     let scrollRequestKey: String?
+    var scrollTargetUTF16Offset: Int = 0
     let animatedScrollDuration: Double
     let textSelectionEnabled: Bool
     var showChapterEndBadge: Bool = false
@@ -54,6 +55,7 @@ struct WebScrollReaderView: UIViewRepresentable {
     var imageHeaders: [String: String] = [:]
     var imageColumnWidth: CGFloat = 0
     let onVisibleParagraph: (Int) -> Void
+    var onVisiblePosition: ((Int, Int) -> Void)? = nil
     var onNearBottom: (() -> Void)? = nil
     var onReachTop: (() -> Void)? = nil
     var onNearTop: (() -> Void)? = nil
@@ -104,6 +106,7 @@ struct WebScrollReaderView: UIViewRepresentable {
         private var appliedScrollKey: String?
         private var pendingScrollKey: String?
         private var pendingScrollTarget: Int?
+        private var pendingScrollUTF16Offset = 0
         private var lastSurfaceColor: UIColor?
         /// 文档级脚本错误的自愈次数上限：连坏两次说明是内容或样式的问题，
         /// 再重建只会循环，交给上层占位/错误态。
@@ -263,13 +266,14 @@ struct WebScrollReaderView: UIViewRepresentable {
             lastSentScrollKey = key
             pendingScrollKey = key
             pendingScrollTarget = target
+            pendingScrollUTF16Offset = max(view.scrollTargetUTF16Offset, 0)
             evaluateScrollTarget(webView: webView)
         }
 
         private func evaluateScrollTarget(webView: WKWebView) {
             guard let target = pendingScrollTarget, let key = pendingScrollKey else { return }
             let animated = view.animatedScrollDuration > 0.05
-            let script = "window.__reader.scrollToFlat(\(target), \(animated ? "true" : "false"), \(WebReaderJavaScriptLiteral.string(key)), \(WebReaderJavaScriptLiteral.string(expectedContentRevision)));"
+            let script = "window.__reader.scrollToFlat(\(target), \(animated ? "true" : "false"), \(WebReaderJavaScriptLiteral.string(key)), \(WebReaderJavaScriptLiteral.string(expectedContentRevision)), \(pendingScrollUTF16Offset));"
             webView.evaluateJavaScript(script, completionHandler: nil)
         }
 
@@ -343,7 +347,11 @@ struct WebScrollReaderView: UIViewRepresentable {
                 guard pendingScrollKey == nil,
                       view.scrollTarget == nil || view.scrollRequestKey == appliedScrollKey,
                       let flat = body["flat"] as? Int else { return }
-                if flat >= 0 { view.onVisibleParagraph(flat) }
+                if flat >= 0 {
+                    let offset = (body["utf16Offset"] as? Int) ?? 0
+                    view.onVisiblePosition?(flat, max(offset, 0))
+                    view.onVisibleParagraph(flat)
+                }
             case "near-bottom":
                 guard pendingScrollKey == nil else { return }
                 let start = CACurrentMediaTime()

@@ -1015,6 +1015,7 @@ enum WebReaderHTML {
           flat: parseInt(element.getAttribute("data-flat"), 10) || 0,
           local: parseInt(element.getAttribute("data-local"), 10) || 0,
           key: section ? section.getAttribute("data-key") : "",
+          element: element,
           top: rect.top + window.scrollY,
           height: Math.max(rect.height, 1)
         };
@@ -1092,14 +1093,14 @@ enum WebReaderHTML {
         var viewport = window.innerHeight;
         var height = document.documentElement.scrollHeight;
         var metric = metricAt(y + topInset() + 4);
-        if (metric && metric.flat !== state.visible) {
-          state.visible = metric.flat;
+        if (metric) {
           // 快速滚动时段落每几毫秒就换一次，逐条回传会让 SwiftUI 整棵阅读器
           // 树每帧重算。120ms 一条足够记进度，也不会把主线程塞满。
           var now = performance.now();
           if (now - (state.lastVisiblePostAt || 0) > 120) {
             state.lastVisiblePostAt = now;
-            post({ type: "visible", flat: metric.flat });
+            state.visible = metric.flat;
+            post({ type: "visible", flat: metric.flat, utf16Offset: visibleTextOffset(metric.element) });
           }
         }
         var bottom = y + viewport;
@@ -1212,7 +1213,43 @@ enum WebReaderHTML {
         animateTo(target, 280);
       }
 
-      function scrollToFlat(flat, animated, requestKey, revision) {
+      // Range offsets and Swift's sourceUTF16Offset use the same UTF-16 units.
+      // Walking text leaves also handles bionic reading's nested <b> nodes.
+      function textRectAt(element, offset) {
+        var length = (element.textContent || "").length;
+        if (!length) { return null; }
+        var remaining = Math.min(Math.max(Math.floor(offset || 0), 0), length - 1);
+        var walker = document.createTreeWalker(element, 4);
+        var node;
+        while ((node = walker.nextNode())) {
+          var count = node.textContent.length;
+          if (remaining < count) {
+            var range = document.createRange();
+            range.setStart(node, remaining);
+            range.setEnd(node, remaining + 1);
+            return range.getBoundingClientRect();
+          }
+          remaining -= count;
+        }
+        return null;
+      }
+
+      function visibleTextOffset(element) {
+        var length = (element.textContent || "").length;
+        if (!length) { return 0; }
+        var low = 0, high = length - 1;
+        var edge = topInset() + 1;
+        while (low < high) {
+          var middle = (low + high) >> 1;
+          var rect = textRectAt(element, middle);
+          if (!rect) { return 0; }
+          if (rect.bottom <= edge) { low = middle + 1; }
+          else { high = middle; }
+        }
+        return low;
+      }
+
+      function scrollToFlat(flat, animated, requestKey, revision, utf16Offset) {
         if (revision !== state.revision) { return; }
         state.activeScrollKey = requestKey;
         // Explicit chapter jumps cannot settle on a nearby old paragraph.
@@ -1222,6 +1259,7 @@ enum WebReaderHTML {
           return;
         }
         var rect = element.getBoundingClientRect();
+        if (utf16Offset > 0) { rect = textRectAt(element, utf16Offset) || rect; }
         var target = Math.max(rect.top + window.scrollY - topInset(), 0);
         // Always invalidate old motion, including a jump to the current line.
         // TOC/bookmark jumps stay atomic; speech keeps smooth progression.

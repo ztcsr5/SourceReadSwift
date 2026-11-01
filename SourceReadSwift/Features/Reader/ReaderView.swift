@@ -127,6 +127,7 @@ struct ReaderView: View {
     @State private var sessionStartedAt = Date()
     @State private var previousIdleTimerDisabled = false
     @State private var visibleParagraphIndex = 0
+    @State private var scrollPositionTracker = ReaderScrollPositionTracker()
     @State private var readerContentFingerprint = ""
     @State private var windowSections: [ReaderChapterSection] = []
     @State private var windowCurrentChapterIndex = 0
@@ -239,6 +240,7 @@ struct ReaderView: View {
     @AppStorage("reader.customWallpaperFillMode") private var customWallpaperFillModeRaw = ReaderWallpaperFillMode.fill.rawValue
     @State private var isPerBookOverride: Bool = false
     @AppStorage("reader.mode") private var readerModeRawValue: String = ReaderMode.scroll.rawValue
+    @State private var renderedReaderMode: ReaderMode?
     @AppStorage("reader.tapZones") private var tapZonesRawValue: String = ReaderTapAction.defaultRawValue
     @AppStorage("reader.keepScreenAwake") private var keepScreenAwake = true
     /// -1 follows the system; 0.05...1 overrides while the reader is open.
@@ -1165,6 +1167,7 @@ struct ReaderView: View {
                 if let spacing = ov.lineSpacing { lineSpacing = spacing }
                 if let bg = ov.background { backgroundRawValue = bg.rawValue }
             }
+            renderedReaderMode = readerMode
             if background == .custom {
                 customBackgroundIsDark = ReaderCustomWallpaperStore.isWallpaperDark
             }
@@ -1305,6 +1308,11 @@ struct ReaderView: View {
             trimWindowIfNeeded()
         }
         .onChange(of: readerModeRawValue) { _ in
+            // Capture the departing surface before rebuilding: paragraph-only
+            // lookup sends a continuation page back to the paragraph's start.
+            let anchor = (renderedReaderMode == .scroll ? scrollAnchorPosition() : currentPageAnchor())
+                ?? scrollAnchorPosition()
+            renderedReaderMode = readerMode
             UIImpactFeedbackGenerator(style: .light).impactOccurred()
             // The departing pager cannot publish from SwiftUI dismantle.
             // Its owner releases the gate before rebuilding the new mode.
@@ -1324,17 +1332,20 @@ struct ReaderView: View {
             } else {
                 cancelPaginationWarmup()
             }
-            rebuildPagedBlocksCache(useCachedPageAnchor: false)
-            let paragraph = positionMapping.clampParagraph(visibleParagraphIndex)
+            rebuildPagedBlocksCache(anchorOverride: anchor)
+            let paragraph = positionMapping.clampParagraph(anchor.flatMap {
+                windowLayout.flatIndex(chapterIndex: $0.chapterIndex, paragraphIndex: $0.paragraphIndex)
+            } ?? visibleParagraphIndex)
             stopAutoScroll()
             stopSpeechPlayback()
             scrollParagraphTarget = paragraph
             scrollJumpGeneration &+= 1
-            paragraphJumpRequest = nil
-            pagedPageIndex = ReaderPagedNavigationPolicy.clampedPageIndex(
-                positionMapping.page(containingParagraph: paragraph),
-                pageCount: pagedBlocksCache.count
-            )
+            paragraphJumpRequest = readerMode == .scroll
+                ? ParagraphJumpRequest(index: paragraph, utf16Offset: anchor?.paragraphUTF16Offset ?? 0)
+                : nil
+            // The rebuild restored the UTF-16 anchor. A paragraph-to-page
+            // mapping here would undo that restoration on every mode switch.
+            if readerMode != .scroll { reportCoverVisibleIdentity(pagedPageIndex) }
             persistReadingPosition(paragraphIndexOverride: paragraph)
             syncPerBookOverrideIfNeeded()
         }
@@ -1720,6 +1731,7 @@ struct ReaderView: View {
             currentParagraphIndex: speechFlatParagraphIndex ?? -1,
             scrollTarget: activeScrollTarget,
             scrollRequestKey: nativeScrollRequestKey,
+            scrollTargetUTF16Offset: speechController.isSpeaking ? 0 : (paragraphJumpRequest?.utf16Offset ?? 0),
             animatedScrollDuration: autoScrollEnabled ? max(ReaderAutomationPolicy.clampedDelay(autoScrollDelay) * 0.9, 0.25) : (speechController.isSpeaking ? 0.35 : 0),
             textSelectionEnabled: textSelectionEnabled,
             showChapterEndBadge: false,
@@ -1733,6 +1745,12 @@ struct ReaderView: View {
                     paragraphJumpRequest = nil
                 }
                 updateVisibleParagraphInScroll(index)
+            },
+            onVisiblePosition: { index, offset in
+                // Character changes inside one paragraph do not invalidate
+                // the entire SwiftUI reader tree on every scroll callback.
+                scrollPositionTracker.flatIndex = index
+                scrollPositionTracker.utf16Offset = offset
             },
             onNearBottom: {
                 requestScrollForwardChapter()
@@ -1778,7 +1796,7 @@ struct ReaderView: View {
             }
         }
         .onAppear {
-            if scrollParagraphTarget > 0 {
+            if scrollParagraphTarget > 0, paragraphJumpRequest == nil {
                 didLandInitialPosition = false
                 scrollJumpGeneration &+= 1
                 DispatchQueue.main.async {
@@ -1845,6 +1863,8 @@ struct ReaderView: View {
     }
 
     private func resetWindow() {
+        scrollPositionTracker.flatIndex = -1
+        scrollPositionTracker.utf16Offset = 0
         windowGeneration &+= 1
         cancelChapterJumpPreparation()
         cancelPrefetch()
@@ -2495,7 +2515,8 @@ struct ReaderView: View {
         let position = resolvedReadingPosition(forFlatIndex: flat)
         return ReaderChapterPosition(
             chapterIndex: position.chapterIndex,
-            paragraphIndex: position.paragraphIndex
+            paragraphIndex: position.paragraphIndex,
+            paragraphUTF16Offset: scrollPositionTracker.flatIndex == flat ? scrollPositionTracker.utf16Offset : 0
         )
     }
 
@@ -2517,10 +2538,13 @@ struct ReaderView: View {
         }
         guard newFlat != visibleParagraphIndex else { return }
         let delta = newFlat - visibleParagraphIndex
+        if scrollPositionTracker.flatIndex == visibleParagraphIndex {
+            scrollPositionTracker.flatIndex = newFlat
+        }
         visibleParagraphIndex = newFlat
         scrollParagraphTarget = newFlat
         if let jump = paragraphJumpRequest {
-            paragraphJumpRequest = ParagraphJumpRequest(index: max(jump.index + delta, 0))
+            paragraphJumpRequest = ParagraphJumpRequest(index: max(jump.index + delta, 0), utf16Offset: jump.utf16Offset)
         }
         layoutAnchorRevision &+= 1
     }
@@ -6641,6 +6665,12 @@ private struct ScrollChapterStatus: Equatable {
 private struct ParagraphJumpRequest: Equatable {
     let id = UUID()
     let index: Int
+    var utf16Offset: Int = 0
+}
+
+private final class ReaderScrollPositionTracker {
+    var flatIndex = -1
+    var utf16Offset = 0
 }
 
 struct ReaderPageEntry: Equatable, Identifiable, Sendable {
