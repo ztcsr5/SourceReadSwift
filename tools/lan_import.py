@@ -1,58 +1,96 @@
 # -*- coding: utf-8 -*-
-"""Import a Legado book-source JSON file into the app over LAN, in size-safe batches.
+"""Import source JSON with the phone's current pairing capability.
 
-Usage:
-  python lan_import.py <sources.json> [--base http://192.168.31.205:8080]
+python tools/lan_import.py sources.json --base http://PHONE_ADDRESS:8080
+The key is read from SOURCE_READ_LAN_TOKEN or a non-echoing prompt, never argv.
 """
-import argparse, json, sys, urllib.request, urllib.error
+import argparse
+import getpass
+import json
+import os
+import urllib.error
+import urllib.parse
+import urllib.request
 
-def post(base, payload_bytes, timeout=120):
-    req = urllib.request.Request(base + '/api/sources/import', data=payload_bytes,
-                                 headers={'Content-Type': 'application/json'}, method='POST')
+
+class NoRedirect(urllib.request.HTTPRedirectHandler):
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        return None
+
+
+def client():
+    return urllib.request.build_opener(urllib.request.ProxyHandler({}), NoRedirect())
+
+
+def request(opener, base, path, token, payload=None):
+    headers = {'X-SourceRead-Token': token}
+    if payload is not None:
+        headers['Content-Type'] = 'application/json'
+    req = urllib.request.Request(base + path, data=payload, headers=headers)
     try:
-        with urllib.request.urlopen(req, timeout=timeout) as r:
-            return r.status, r.read(400).decode('utf-8', 'replace')
-    except urllib.error.HTTPError as e:
-        return e.code, e.read(400).decode('utf-8', 'replace')
+        with opener.open(req, timeout=120) as response:
+            return response.status, response.read(2000).decode('utf-8', 'replace')
+    except urllib.error.HTTPError as error:
+        return error.code, error.read(2000).decode('utf-8', 'replace')
+
 
 def main():
-    ap = argparse.ArgumentParser()
+    ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument('path')
-    ap.add_argument('--base', default='http://192.168.31.205:8080')
+    ap.add_argument('--base', required=True)
     ap.add_argument('--limit', type=int, default=1_700_000)
-    a = ap.parse_args()
-    data = json.load(open(a.path, encoding='utf-8'))
+    args = ap.parse_args()
+    url = urllib.parse.urlsplit(args.base)
+    if url.scheme != 'http' or not url.hostname or url.username or url.password or url.query or url.fragment or url.path not in ('', '/'):
+        ap.error('--base must be the phone HTTP origin without credentials, path or query')
+    base = args.base.rstrip('/')
+    if not 1024 <= args.limit <= 12 * 1024 * 1024:
+        ap.error('--limit must be between 1024 and 12582912 bytes')
+    token = (os.environ.get('SOURCE_READ_LAN_TOKEN') or getpass.getpass('Phone pairing key: ')).strip().lower()
+    if len(token) != 32 or any(c not in '0123456789abcdef' for c in token):
+        ap.error('Copy the current 32-character key from the phone')
+    opener = client()
+    status, _ = request(opener, base, '/api/status', token)
+    if status != 200:
+        raise SystemExit(f'Pairing/connection failed: HTTP {status}; no imports attempted')
+    with open(args.path, encoding='utf-8-sig') as stream:
+        data = json.load(stream)
     if isinstance(data, dict):
-        data = [data]
-    batches, cur, size = [], [], 0
-    for s in data:
-        b = json.dumps(s, ensure_ascii=False, separators=(',', ':')).encode('utf-8')
-        if cur and size + len(b) + 2 > a.limit:
-            batches.append(cur); cur, size = [], 0
-        cur.append(b); size += len(b) + 2
-    if cur:
-        batches.append(cur)
+        data = data.get('sources', [data])
+    if not isinstance(data, list) or not data:
+        raise SystemExit('Expected a non-empty source array or source-library snapshot')
+    batches, current, size = [], [], 2
+    for source in data:
+        if not isinstance(source, dict) or not source.get('bookSourceUrl') or not source.get('bookSourceName'):
+            raise SystemExit('Each source needs bookSourceUrl and bookSourceName; no imports attempted')
+        encoded = json.dumps(source, ensure_ascii=False, separators=(',', ':')).encode('utf-8')
+        if len(encoded) + 2 > args.limit:
+            raise SystemExit('One source exceeds batch limit; no imports attempted')
+        if current and size + len(encoded) + 1 > args.limit:
+            batches.append(current)
+            current, size = [], 2
+        current.append(encoded)
+        size += len(encoded) + 1
+    if current:
+        batches.append(current)
     print(f'sources={len(data)} batches={len(batches)}')
-    ok = fail = 0
+    imported = 0
     for i, batch in enumerate(batches, 1):
         payload = b'[' + b','.join(batch) + b']'
-        st, body = post(a.base, payload)
-        print(f'batch {i}/{len(batches)} bytes={len(payload)} -> {st} {body[:120]}')
-        if st == 200:
-            ok += len(batch); continue
-        for one in batch:  # retry individually to isolate the bad source
-            st2, body2 = post(a.base, b'[' + one + b']')
-            if st2 == 200:
-                ok += 1
-            else:
-                fail += 1
-                print('  FAIL', one[:120].decode('utf-8', 'replace'), st2, body2[:120])
-    print(f'imported={ok} failed={fail}')
-    try:
-        with urllib.request.urlopen(a.base + '/api/status', timeout=15) as r:
-            print('status', r.read(200).decode('utf-8', 'replace'))
-    except Exception as e:
-        print('status check failed', e)
+        status, body = request(opener, base, '/api/sources/import', token, payload)
+        print(f'batch {i}/{len(batches)} bytes={len(payload)} -> HTTP {status}')
+        if status != 200:
+            # A failed response can follow a partial server-side change.
+            # Do not repeat requests or print raw source headers and secrets.
+            raise SystemExit(f'Import not confirmed; check the phone before retrying. Earlier confirmed: {imported} sources')
+        if json.loads(body).get('ok') is not True:
+            raise SystemExit('Import not confirmed; inspect phone diagnostics before retrying')
+        imported += len(batch)
+    print(f'confirmed_imported={imported}')
+
 
 if __name__ == '__main__':
-    main()
+    try:
+        main()
+    except (OSError, ValueError) as error:
+        raise SystemExit(f'{type(error).__name__}: import stopped; check the phone before retrying')

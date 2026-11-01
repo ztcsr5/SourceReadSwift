@@ -129,6 +129,24 @@ struct SourceWritingView: View {
                 }
                 .padding(.vertical, 4)
 
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("本次配对密钥")
+                        .font(.caption.weight(.semibold))
+                    Text(server.pairingToken)
+                        .font(.system(.footnote, design: .monospaced))
+                        .textSelection(.enabled)
+                        .lineLimit(2)
+                    Button {
+                        UIPasteboard.general.string = server.pairingToken
+                    } label: {
+                        Label("复制配对密钥", systemImage: "key")
+                    }
+                    .buttonStyle(.bordered)
+                    Text("网页输入此密钥后才能读取或修改源库。重启服务后失效。请使用可信 Wi-Fi；HTTP 不提供传输加密。")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+
                 HStack(spacing: 12) {
                     Button {
                         UIPasteboard.general.string = server.localURLs.joined(separator: "\n")
@@ -275,6 +293,8 @@ struct SourceWritingView: View {
 final class LightweightHTTPServer: ObservableObject {
     @Published var isRunning = false
     @Published var isStarting = false
+    @Published private(set) var pairingToken = ""
+    private let access = LANWorkbenchAccess()
     @Published var port: UInt16 = 8080
     @Published var localIP: String = "127.0.0.1"
     @Published var localURLs: [String] = []
@@ -366,6 +386,7 @@ final class LightweightHTTPServer: ObservableObject {
 
     func start() {
         guard !isRunning && !isStarting else { return }
+        pairingToken = access.renew()
         isStarting = true
         lastError = nil
         logMessages.removeAll()
@@ -440,6 +461,8 @@ final class LightweightHTTPServer: ObservableObject {
     }
 
     func stop() {
+        access.revoke()
+        pairingToken = ""
         lockQueue.sync {
             for conn in connections {
                 conn.cancel()
@@ -542,6 +565,14 @@ final class LightweightHTTPServer: ObservableObject {
         let path = request.path
         let keepAlive = request.headers["connection"]?.lowercased() != "close"
         log("HTTP 请求: \(method) \(path)")
+        if path.hasPrefix("/api/") || path == "/import" {
+            guard access.permits(request) else {
+                sendResponse(connection: connection, statusCode: 401, statusText: "Unauthorized",
+                             contentType: "application/json; charset=utf-8",
+                             body: #"{"ok":false,"error":"Pairing required"}"#, keepAlive: false)
+                return
+            }
+        }
 
         if method == "OPTIONS" {
             sendResponse(connection: connection, statusCode: 204, statusText: "No Content", contentType: "text/plain; charset=utf-8", body: "", keepAlive: keepAlive)
@@ -569,6 +600,18 @@ final class LightweightHTTPServer: ObservableObject {
                     enabledCount: sources.filter(\.enabled).count,
                     data: sources
                 ), keepAlive: keepAlive)
+            }
+        } else if method == "GET" && path == "/api/source" {
+            let components = URLComponents(string: "http://local/?" + (request.query ?? ""))
+            let sourceURL = components?.queryItems?.first { $0.name == "url" }?.value
+            respondWithSourceStore(connection: connection) { store in
+                guard let sourceURL, let source = store?.sources.first(where: { $0.bookSourceUrl == sourceURL }) else {
+                    self.sendResponse(connection: connection, statusCode: 404, statusText: "Not Found",
+                                      contentType: "application/json; charset=utf-8",
+                                      body: #"{"ok":false,"error":"Source not found"}"#, keepAlive: keepAlive)
+                    return
+                }
+                self.sendJSON(connection: connection, value: WebSingleSourceResponse(ok: true, data: source), keepAlive: keepAlive)
             }
         } else if method == "GET" && path == "/api/sources/health" {
             handleSourcesHealth(connection: connection, keepAlive: keepAlive)
@@ -956,10 +999,13 @@ final class LightweightHTTPServer: ObservableObject {
         var header = "HTTP/1.1 \(statusCode) \(statusText)\r\n"
         header += "Content-Type: \(contentType)\r\n"
         header += "Content-Length: \(bodyData.count)\r\n"
-        header += "Access-Control-Allow-Origin: *\r\n"
-        header += "Access-Control-Allow-Methods: GET, POST, OPTIONS, PUT, DELETE\r\n"
-        header += "Access-Control-Allow-Headers: Content-Type, Accept\r\n"
-        header += keepAlive ? "Connection: keep-alive\r\n" : "Connection: close\r\n"
+        header += "Cache-Control: no-store\r\n"
+        header += "X-Content-Type-Options: nosniff\r\n"
+        header += "Referrer-Policy: no-referrer\r\n"
+        header += "Content-Security-Policy: default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; connect-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'none'; frame-ancestors 'none'\r\n"
+        // This parser handles one request per connection, not HTTP pipelining.
+        // Advertising keep-alive previously left reused browser sockets idle.
+        header += "Connection: close\r\n"
         header += "\r\n"
 
         guard let headerData = header.data(using: .utf8) else {
@@ -979,9 +1025,7 @@ final class LightweightHTTPServer: ObservableObject {
                 connection.cancel()
                 return
             }
-            if !keepAlive {
-                connection.cancel()
-            }
+            connection.cancel()
         })
     }
 
@@ -994,999 +1038,8 @@ final class LightweightHTTPServer: ObservableObject {
             .replacingOccurrences(of: "\t", with: "\\t")
     }
 
-    private func getWebPageHtml() -> String {
-        return #"""
-<!DOCTYPE html>
-<html lang="zh-CN">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>纸间 · 书源工作台</title>
-  <style>
-    :root {
-      color-scheme: light dark;
-      --bg: #f5f5f7; --card-bg: #ffffff; --card-border: #e6e6ec;
-      --text: #20202a; --text-muted: #70717e; --primary: #594fdb;
-      --primary-hover: #4840bb; --success: #237c5c; --warning: #ad711b;
-      --danger: #c94150; --editor-bg: #fafafd;
-    }
-    @media (prefers-color-scheme: dark) {
-      :root { --bg: #17171d; --card-bg: #23232d; --card-border: #383844;
-        --text: #f0f0f5; --text-muted: #aaaab8; --primary: #a19aff;
-        --primary-hover: #8880ec; --editor-bg: #1c1c24; }
-    }
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
-      background-color: var(--bg);
-      color: var(--text);
-      line-height: 1.5;
-      padding: 20px;
-    }
-    .container { max-width: 1200px; margin: 0 auto; }
-    .header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      padding-bottom: 16px;
-      margin-bottom: 20px;
-      border-bottom: 1px solid var(--card-border);
-    }
-    .header h1 { font-size: 22px; font-weight: 700; display: flex; align-items: center; gap: 10px; }
-    .status-badge {
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      padding: 4px 12px;
-      border-radius: 9999px;
-      background: rgba(16, 185, 129, 0.15);
-      color: #34d399;
-      font-size: 13px;
-      font-weight: 500;
-    }
-    .status-dot { width: 8px; height: 8px; border-radius: 50%; background: #10b981; }
+    private func getWebPageHtml() -> String { LANWorkbenchDocument.html }
 
-    /* Nav Tabs */
-    .tabs {
-      display: flex;
-      gap: 8px;
-      margin-bottom: 20px;
-      background: var(--card-bg);
-      padding: 6px;
-      border-radius: 12px;
-      border: 1px solid var(--card-border);
-    }
-    .tab-btn {
-      flex: 1;
-      padding: 10px 16px;
-      border: none;
-      background: transparent;
-      color: var(--text-muted);
-      font-size: 14px;
-      font-weight: 600;
-      border-radius: 8px;
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 8px;
-      transition: all 0.2s ease;
-    }
-    .tab-btn:hover { color: var(--text); background: rgba(255, 255, 255, 0.05); }
-    .tab-btn.active { color: #fff; background: var(--primary); }
-
-    .tab-pane { display: none; }
-    .tab-pane.active { display: block; }
-
-    /* Cards */
-    .card {
-      background: var(--card-bg);
-      border: 1px solid var(--card-border);
-      border-radius: 12px;
-      padding: 20px;
-      margin-bottom: 20px;
-    }
-    .card-title {
-      font-size: 16px;
-      font-weight: 600;
-      margin-bottom: 12px;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-    }
-
-    /* Buttons */
-    .btn {
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      padding: 8px 16px;
-      border-radius: 8px;
-      font-size: 13px;
-      font-weight: 600;
-      border: none;
-      cursor: pointer;
-      transition: all 0.2s;
-    }
-    .btn-primary { background: var(--primary); color: white; }
-    .btn-primary:hover { background: var(--primary-hover); }
-    .btn-success { background: var(--success); color: white; }
-    .btn-success:hover { background: #059669; }
-    .btn-danger { background: var(--danger); color: white; }
-    .btn-danger:hover { background: #dc2626; }
-    .btn-outline { background: transparent; border: 1px solid var(--card-border); color: var(--text); }
-    .btn-outline:hover { background: rgba(255, 255, 255, 0.08); }
-    .btn:disabled { opacity: 0.5; cursor: not-allowed; }
-
-    /* Inputs */
-    .input {
-      background: #0f172a;
-      border: 1px solid var(--card-border);
-      color: var(--text);
-      padding: 8px 12px;
-      border-radius: 6px;
-      font-size: 13px;
-    }
-    .input:focus { outline: none; border-color: var(--primary); }
-
-    /* Editor */
-    .editor-wrapper {
-      position: relative;
-      border-radius: 8px;
-      overflow: hidden;
-      border: 1px solid var(--card-border);
-      margin-bottom: 16px;
-    }
-    textarea.code-editor {
-      width: 100%;
-      height: 480px;
-      background: var(--editor-bg);
-      color: #38bdf8;
-      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-      font-size: 13px;
-      line-height: 1.6;
-      padding: 16px;
-      border: none;
-      resize: vertical;
-      white-space: pre;
-    }
-    textarea.code-editor:focus { outline: none; }
-
-    /* Terminal Console */
-    .terminal {
-      background: #090d16;
-      border: 1px solid #1e293b;
-      border-radius: 8px;
-      padding: 14px;
-      font-family: ui-monospace, Menlo, Consolas, monospace;
-      font-size: 12px;
-      color: #a5f3fc;
-      max-height: 280px;
-      overflow-y: auto;
-      line-height: 1.6;
-      margin-bottom: 16px;
-    }
-    .log-line { display: block; word-break: break-all; }
-    .log-success { color: #34d399; }
-    .log-error { color: #f87171; }
-    .log-warn { color: #fbbf24; }
-
-    /* Table */
-    .table-responsive { overflow-x: auto; }
-    table { width: 100%; border-collapse: collapse; font-size: 13px; text-align: left; }
-    th { padding: 10px 12px; background: rgba(255, 255, 255, 0.03); color: var(--text-muted); border-bottom: 1px solid var(--card-border); font-weight: 600; }
-    td { padding: 12px; border-bottom: 1px solid rgba(255, 255, 255, 0.05); vertical-align: middle; }
-    tr:hover td { background: rgba(255, 255, 255, 0.02); }
-
-    /* Badges */
-    .pill {
-      display: inline-block;
-      padding: 2px 8px;
-      border-radius: 9999px;
-      font-size: 11px;
-      font-weight: 600;
-    }
-    .pill-green { background: rgba(16, 185, 129, 0.2); color: #34d399; }
-    .pill-yellow { background: rgba(245, 158, 11, 0.2); color: #fbbf24; }
-    .pill-red { background: rgba(239, 68, 68, 0.2); color: #f87171; }
-    .pill-gray { background: rgba(148, 163, 184, 0.2); color: #94a3b8; }
-
-    /* Result preview grids */
-    .result-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
-      gap: 12px;
-      margin-top: 12px;
-    }
-    .book-card {
-      background: rgba(255, 255, 255, 0.03);
-      border: 1px solid var(--card-border);
-      border-radius: 8px;
-      padding: 12px;
-    }
-    .book-card h4 { font-size: 14px; margin-bottom: 4px; color: #60a5fa; }
-    .book-card p { font-size: 12px; color: var(--text-muted); margin-bottom: 2px; }
-
-    .toast {
-      position: fixed;
-      bottom: 24px;
-      right: 24px;
-      padding: 12px 20px;
-      border-radius: 8px;
-      background: var(--card-bg);
-      border: 1px solid var(--card-border);
-      color: #fff;
-      font-size: 13px;
-      box-shadow: 0 10px 25px rgba(0,0,0,0.5);
-      display: none;
-      z-index: 1000;
-    }
-
-    /* InPage workbench: system typography, quiet grouped surfaces and a
-       segmented navigation. Entirely local assets; no CDN/font dependency. */
-    body { padding: 44px 28px; letter-spacing: -.012em; }
-    .container { max-width: 1180px; }
-    .header { border: 0; padding: 0 4px 28px; margin: 0; gap: 24px; }
-    .header h1 { font-size: 30px; font-weight: 650; letter-spacing: -.045em; }
-    .header p { margin-top: 10px !important; line-height: 1.7; }
-    .brand-kicker { font-size: 11px; font-weight: 650; letter-spacing: .18em; color: var(--primary); margin-bottom: 9px; }
-    .status-badge { background: color-mix(in srgb, var(--success) 10%, transparent); color: var(--success); padding: 8px 14px; flex-shrink: 0; }
-    .tabs { width: fit-content; max-width: 100%; padding: 4px; gap: 4px; border: 0; border-radius: 14px; background: rgba(128,128,150,.12); margin-bottom: 30px; }
-    .tab-btn { flex: none; min-height: 42px; padding: 9px 22px; font-weight: 550; white-space: nowrap; border-radius: 11px; }
-    .tab-btn.active { color: var(--text); background: var(--card-bg); box-shadow: 0 2px 7px rgba(30,30,50,.09); }
-    .card { border-radius: 22px; padding: 26px; border-color: var(--card-border); box-shadow: 0 8px 32px rgba(30,30,55,.025); }
-    .card-title { font-size: 17px; gap: 16px; flex-wrap: wrap; margin-bottom: 20px; }
-    .card-title > div { flex-wrap: wrap; }
-    .btn { min-height: 38px; border-radius: 10px; padding: 9px 14px; font-weight: 550; transition: background .15s, transform .15s; }
-    .btn:active { transform: scale(.97); }
-    .btn-primary { background: #594fdb; color: #fff; }
-    .btn-outline { background: rgba(128,128,150,.065); }
-    .btn:focus-visible, .tab-btn:focus-visible, .input:focus-visible, textarea:focus-visible { outline: 3px solid var(--primary); outline-offset: 3px; }
-    .input { background: var(--editor-bg); color: var(--text); border-radius: 9px; min-height: 40px; }
-    .editor-wrapper { border-radius: 15px; overflow: hidden; border: 1px solid var(--card-border); }
-    .code-editor { background: var(--editor-bg); color: var(--text); min-height: 440px; line-height: 1.65; padding: 22px; font-size: 13px; }
-    .terminal { background: var(--editor-bg); color: var(--text); border-radius: 14px; border: 1px solid var(--card-border); }
-    .book-card { background: var(--editor-bg); border-radius: 13px; }
-    .book-card h4 { color: var(--primary); }
-    .toast { color: var(--text); border-radius: 14px; box-shadow: 0 8px 32px rgba(20,20,40,.14); }
-    #current-source-title, #debug-content-card { color: var(--text) !important; }
-    #debug-toc-list, #debug-content-card { background: var(--editor-bg) !important; border-radius: 12px !important; }
-    @media (max-width: 640px) {
-      body { padding: 24px 14px; }
-      .header { flex-direction: column; align-items: flex-start; gap: 16px; padding-bottom: 24px; }
-      .header h1 { font-size: 27px; }
-      .tabs { width: 100%; overflow-x: auto; }
-      .tab-btn { flex: 1; padding: 9px 13px; font-size: 13px; }
-      .card { padding: 18px; border-radius: 18px; }
-      .card-title > div { width: 100%; }
-      .code-editor { min-height: 360px; padding: 15px; }
-    }
-    @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
-  </style>
-</head>
-<body>
-  <div class="container">
-    <div class="header">
-      <div>
-        <div class="brand-kicker">INPAGE / WORKSPACE</div>
-        <h1>纸间 · 书源工作台</h1>
-        <p style="font-size: 13px; color: var(--text-muted); margin-top: 4px;">编写、调试、体检并一键推送到您的手机端</p>
-      </div>
-      <div class="status-badge">
-        <span class="status-dot"></span>
-        <span id="server-status">已连接手机</span>
-      </div>
-    </div>
-
-    <!-- Navigation Tabs -->
-    <div class="tabs">
-      <button class="tab-btn active" onclick="switchTab('editor')">书源编辑</button>
-      <button class="tab-btn" onclick="switchTab('debugger')">解析调试</button>
-      <button class="tab-btn" onclick="switchTab('library')">源库管理</button>
-    </div>
-
-    <!-- TAB 1: Editor -->
-    <div id="tab-editor" class="tab-pane active">
-      <div class="card">
-        <div class="card-title">
-          <span>书源 JSON 代码编辑</span>
-          <div style="display: flex; gap: 8px;">
-            <button class="btn btn-outline" onclick="loadTemplate()">📋 载入模版</button>
-            <button class="btn btn-outline" onclick="formatJSON()">⚡ 格式化</button>
-            <button class="btn btn-primary" onclick="pushToPhone()">📲 一键推送到手机</button>
-            <button class="btn btn-success" onclick="transferToDebug()">🧪 载入调试控制台 ➡️</button>
-          </div>
-        </div>
-        <div class="editor-wrapper">
-          <textarea id="source-code" class="code-editor" placeholder="在此粘贴或编写书源 JSON（支持单个书源对象或书源数组）..."></textarea>
-        </div>
-      </div>
-    </div>
-
-    <!-- TAB 2: Live Debugger -->
-    <div id="tab-debugger" class="tab-pane">
-      <!-- 当前调试目标书源高亮看板 -->
-      <div id="debug-current-source-banner" class="card" style="background: rgba(59, 130, 246, 0.08); border-color: rgba(59, 130, 246, 0.25); padding: 14px 18px; margin-bottom: 16px;">
-        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
-          <div>
-            <div style="font-size: 11px; text-transform: uppercase; color: #60a5fa; font-weight: 700; letter-spacing: 0.5px; display: flex; align-items: center; gap: 6px;">
-              <span style="display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: #60a5fa;"></span> 当前调试目标书源
-            </div>
-            <div style="font-size: 16px; font-weight: 700; color: #fff; margin-top: 4px;" id="current-source-title">待指定（请在“书源编辑”或“源库管理”中选择）</div>
-            <div style="font-size: 12px; color: var(--text-muted); margin-top: 3px;" id="current-source-meta">URL: 未加载 | 分组: - | 权重: -</div>
-          </div>
-          <button class="btn btn-outline" style="font-size: 12px;" onclick="switchTab('editor')">✏️ 查看/编辑该书源码</button>
-        </div>
-      </div>
-
-      <div class="card">
-        <div class="card-title">
-          <span>书源测试与运行参数</span>
-          <div id="debug-status-pill" class="pill pill-gray">就绪</div>
-        </div>
-        <div style="display: flex; gap: 12px; align-items: center; flex-wrap: wrap; margin-bottom: 16px;">
-          <div>
-            <label style="font-size: 12px; color: var(--text-muted); display: block; margin-bottom: 4px;">测试环节:</label>
-            <select id="debug-step" class="input" style="width: 170px;">
-              <option value="all">⚡ 全流程一键体检</option>
-              <option value="search">🔍 仅测试搜索 (Search)</option>
-              <option value="detail">📖 仅测试详情 (Detail)</option>
-              <option value="toc">📑 仅测试目录 (TOC)</option>
-              <option value="content">📄 仅测试正文 (Content)</option>
-            </select>
-          </div>
-          <div>
-            <label style="font-size: 12px; color: var(--text-muted); display: block; margin-bottom: 4px;">搜索测试关键词:</label>
-            <input type="text" id="debug-keyword" class="input" value="剑来" style="width: 160px;" placeholder="例如: 剑来">
-          </div>
-          <div style="flex: 1; min-width: 200px;">
-            <label style="font-size: 12px; color: var(--text-muted); display: block; margin-bottom: 4px;">指定书籍/章节 URL (可选，留空则自动联动上一环节):</label>
-            <input type="text" id="debug-override-url" class="input" style="width: 100%;" placeholder="留空时自动读取搜索返回的第一本书与第一章">
-          </div>
-          <div style="align-self: flex-end;">
-            <button id="btn-run-debug" class="btn btn-success" onclick="runDebug()">▶️ 开始调试</button>
-          </div>
-        </div>
-
-        <div class="card-title" style="margin-top: 20px;">
-          <span>执行日志输出 (Live Logs)</span>
-          <span id="debug-duration" style="font-size: 12px; color: var(--text-muted);">耗时: 0ms</span>
-        </div>
-        <div id="debug-terminal" class="terminal">
-          <span class="log-line">点击“开始调试”后，此处将实时展示手机引擎解析各环节的详细日志与耗时...</span>
-        </div>
-
-        <!-- Structured Results Accordion/Sections -->
-        <div id="debug-results-container" style="display: none; margin-top: 16px;">
-          <h3 style="font-size: 15px; margin-bottom: 10px;">📊 解析结果提取面板</h3>
-          <div id="debug-search-section" style="margin-bottom: 16px; display: none;">
-            <h4 style="font-size: 13px; color: #60a5fa; margin-bottom: 6px;">🔍 搜索结果列表 (共 <span id="debug-search-count">0</span> 本)</h4>
-            <div id="debug-search-grid" class="result-grid"></div>
-          </div>
-
-          <div id="debug-detail-section" style="margin-bottom: 16px; display: none;">
-            <h4 style="font-size: 13px; color: #a78bfa; margin-bottom: 6px;">📖 书籍详情页解析</h4>
-            <div id="debug-detail-card" class="book-card" style="background: rgba(167, 139, 250, 0.05);"></div>
-          </div>
-
-          <div id="debug-toc-section" style="margin-bottom: 16px; display: none;">
-            <h4 style="font-size: 13px; color: #34d399; margin-bottom: 6px;">📑 章节目录解析 (展示前 30 章)</h4>
-            <div id="debug-toc-list" style="max-height: 200px; overflow-y: auto; background: #090d16; border: 1px solid var(--card-border); border-radius: 6px; padding: 8px; font-size: 12px;"></div>
-          </div>
-
-          <div id="debug-content-section" style="margin-bottom: 16px; display: none;">
-            <h4 style="font-size: 13px; color: #fbbf24; margin-bottom: 6px;">📄 正文内容提取预览</h4>
-            <div id="debug-content-card" style="background: #090d16; border: 1px solid var(--card-border); border-radius: 6px; padding: 12px; font-size: 13px; max-height: 220px; overflow-y: auto; line-height: 1.8; color: #e2e8f0;"></div>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- TAB 3: Source Library & Diagnostics -->
-    <div id="tab-library" class="tab-pane">
-      <div class="card">
-        <div class="card-title">
-          <span>手机已安装书源列表与健康状态</span>
-          <div style="display: flex; gap: 8px;">
-            <button class="btn btn-outline" onclick="loadSourceHealthList()">🔄 刷新源列表</button>
-            <button class="btn btn-outline" onclick="exportBackup()">💾 导出备份</button>
-          </div>
-        </div>
-
-        <div style="display: flex; gap: 10px; margin-bottom: 16px; flex-wrap: wrap;">
-          <input type="text" id="filter-search" class="input" placeholder="按名称/分组/URL 快速过滤..." style="width: 240px;" oninput="applyFilter()">
-          <button class="btn btn-outline" style="font-size: 12px;" onclick="setHealthFilter('all')">全部 (<span id="count-all">0</span>)</button>
-          <button class="btn btn-outline" style="font-size: 12px;" onclick="setHealthFilter('passed')">🟢 正常 (<span id="count-passed">0</span>)</button>
-          <button class="btn btn-outline" style="font-size: 12px;" onclick="setHealthFilter('failed')">🔴 异常/失效 (<span id="count-failed">0</span>)</button>
-          <button class="btn btn-outline" style="font-size: 12px;" onclick="setHealthFilter('untested')">⚪ 未测试 (<span id="count-untested">0</span>)</button>
-        </div>
-
-        <div class="table-responsive">
-          <table>
-            <thead>
-              <tr>
-                <th style="width: 220px;">书源名称</th>
-                <th>分组</th>
-                <th>根地址</th>
-                <th style="width: 140px;">健康状态</th>
-                <th style="width: 80px;">启用</th>
-                <th style="width: 180px;">快捷操作</th>
-              </tr>
-            </thead>
-            <tbody id="sources-table-body">
-              <tr><td colspan="6" style="text-align: center; color: var(--text-muted); padding: 24px;">加载中...</td></tr>
-            </tbody>
-          </table>
-        </div>
-
-        <!-- 分页控制器 -->
-        <div id="library-pagination" style="display: flex; justify-content: space-between; align-items: center; margin-top: 16px; flex-wrap: wrap; gap: 10px; font-size: 13px;">
-          <div style="color: var(--text-muted);">
-            显示第 <span id="page-start">0</span> - <span id="page-end">0</span> 条 / 共 <span id="page-total">0</span> 条书源
-          </div>
-          <div style="display: flex; align-items: center; gap: 8px;">
-            <select id="page-size-select" class="input" style="padding: 4px 8px; font-size: 12px;" onchange="changePageSize(this.value)">
-              <option value="20" selected>每页 20 条</option>
-              <option value="50">每页 50 条</option>
-              <option value="100">每页 100 条</option>
-            </select>
-            <button class="btn btn-outline" style="padding: 4px 10px; font-size: 12px;" onclick="goToPage(1)" id="btn-page-first">« 首页</button>
-            <button class="btn btn-outline" style="padding: 4px 10px; font-size: 12px;" onclick="goToPage(currentPage - 1)" id="btn-page-prev">‹ 上一页</button>
-            <span style="font-weight: 600; padding: 0 4px;" id="page-indicator">第 1 / 1 页</span>
-            <button class="btn btn-outline" style="padding: 4px 10px; font-size: 12px;" onclick="goToPage(currentPage + 1)" id="btn-page-next">下一页 ›</button>
-            <button class="btn btn-outline" style="padding: 4px 10px; font-size: 12px;" onclick="goToPage(totalPageCount())" id="btn-page-last">末页 »</button>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <div id="toast" class="toast"></div>
-
-  <script>
-    let allSources = [];
-    let currentHealthFilter = 'all';
-    let currentPage = 1;
-    let pageSize = 20;
-    let currentFilteredSources = [];
-
-    function updateDebugBannerFromEditor() {
-      const code = document.getElementById('source-code').value.trim();
-      const titleElem = document.getElementById('current-source-title');
-      const metaElem = document.getElementById('current-source-meta');
-      if (!code) {
-        titleElem.innerText = '未指定（请在“书源编辑”中输入或“源库”载入）';
-        titleElem.style.color = 'var(--text-muted)';
-        metaElem.innerText = 'URL: 未加载 | 分组: - | 权重: -';
-        return;
-      }
-      try {
-        const parsed = JSON.parse(code);
-        const s = Array.isArray(parsed) ? parsed[0] : parsed;
-        titleElem.innerText = (s.bookSourceName || '未命名书源') + ' (' + (s.bookSourceUrl || '无 URL') + ')';
-        titleElem.style.color = '#fff';
-        metaElem.innerText = `根地址: ${s.bookSourceUrl || '-'} | 分组: ${s.bookSourceGroup || '未分组'} | 权重: ${s.weight ?? 0} | 类型: ${s.bookSourceType === 1 ? '音频' : (s.bookSourceType === 2 ? '图片' : '文本')}`;
-      } catch (e) {
-        titleElem.innerText = 'JSON 格式解析中或格式未完成';
-        titleElem.style.color = 'var(--warning)';
-        metaElem.innerText = e.message;
-      }
-    }
-
-    function showToast(msg, isError = false) {
-      const toast = document.getElementById('toast');
-      toast.innerText = msg;
-      toast.style.borderColor = isError ? 'var(--danger)' : 'var(--success)';
-      toast.style.display = 'block';
-      setTimeout(() => { toast.style.display = 'none'; }, 3000);
-    }
-
-    function switchTab(tab) {
-      document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
-      document.querySelectorAll('.tab-pane').forEach(pane => pane.classList.remove('active'));
-      if (tab === 'editor') {
-        document.querySelector('.tab-btn:nth-child(1)').classList.add('active');
-        document.getElementById('tab-editor').classList.add('active');
-      } else if (tab === 'debugger') {
-        document.querySelector('.tab-btn:nth-child(2)').classList.add('active');
-        document.getElementById('tab-debugger').classList.add('active');
-        updateDebugBannerFromEditor();
-      } else if (tab === 'library') {
-        document.querySelector('.tab-btn:nth-child(3)').classList.add('active');
-        document.getElementById('tab-library').classList.add('active');
-        loadSourceHealthList();
-      }
-    }
-
-    // TAB 1: Editor operations
-    function formatJSON() {
-      const editor = document.getElementById('source-code');
-      try {
-        const val = JSON.parse(editor.value.trim());
-        editor.value = JSON.stringify(val, null, 2);
-        showToast('JSON 格式化成功');
-      } catch (e) {
-        showToast('JSON 语法错误: ' + e.message, true);
-      }
-    }
-
-    function loadTemplate() {
-      const template = {
-        "bookSourceName": "自定义测试书源",
-        "bookSourceUrl": "https://example.com",
-        "bookSourceGroup": "自写源",
-        "bookSourceType": 0,
-        "enabled": true,
-        "weight": 90,
-        "searchUrl": "https://example.com/search?q={{key}}",
-        "ruleSearch": {
-          "bookList": ".search-list .item",
-          "name": "h3 a@text",
-          "author": ".author@text",
-          "bookUrl": "h3 a@href",
-          "coverUrl": "img@src",
-          "lastChapter": ".last-chapter a@text"
-        },
-        "ruleBookInfo": {
-          "name": ".book-info h1@text",
-          "author": ".book-info .author@text",
-          "coverUrl": ".book-info img@src",
-          "intro": "#intro@text",
-          "tocUrl": "a:contains(完整目录)@href"
-        },
-        "ruleToc": {
-          "chapterList": "#chapter-list a",
-          "chapterName": "@text",
-          "chapterUrl": "@href"
-        },
-        "ruleContent": {
-          "content": "#content@html",
-          "nextContentUrl": "a:contains(下一页)@href"
-        }
-      };
-      document.getElementById('source-code').value = JSON.stringify(template, null, 2);
-      showToast('已填入标准书源模版');
-    }
-
-    async function pushToPhone() {
-      const text = document.getElementById('source-code').value.trim();
-      if (!text) {
-        showToast('请先输入书源 JSON', true);
-        return;
-      }
-      try {
-        JSON.parse(text);
-      } catch (e) {
-        showToast('JSON 格式校验失败: ' + e.message, true);
-        return;
-      }
-
-      try {
-        const res = await fetch('/api/sources/import', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: text
-        });
-        const data = await res.json();
-        if (data.ok) {
-          showToast('🎉 推送成功: ' + (data.message || '书源已保存'));
-        } else {
-          showToast('❌ 推送失败: ' + (data.error || '未知错误'), true);
-        }
-      } catch (e) {
-        showToast('请求失败: ' + e.message, true);
-      }
-    }
-
-    function transferToDebug() {
-      const text = document.getElementById('source-code').value.trim();
-      if (!text) {
-        showToast('请先在编辑器编写或载入书源', true);
-        return;
-      }
-      try {
-        JSON.parse(text);
-        switchTab('debugger');
-        showToast('已载入书源到调试控制台');
-      } catch (e) {
-        showToast('JSON 格式无效: ' + e.message, true);
-      }
-    }
-
-    // TAB 2: Live Debugger
-    async function runDebug() {
-      const code = document.getElementById('source-code').value.trim();
-      if (!code) {
-        showToast('请先在“书源编辑”中输入待调试的书源代码', true);
-        switchTab('editor');
-        return;
-      }
-
-      let sourceObj;
-      try {
-        const parsed = JSON.parse(code);
-        sourceObj = Array.isArray(parsed) ? parsed[0] : parsed;
-      } catch (e) {
-        showToast('书源 JSON 解析失败: ' + e.message, true);
-        return;
-      }
-
-      const step = document.getElementById('debug-step').value;
-      const keyword = document.getElementById('debug-keyword').value.trim() || '剑来';
-      const overrideUrl = document.getElementById('debug-override-url').value.trim();
-
-      const runBtn = document.getElementById('btn-run-debug');
-      const terminal = document.getElementById('debug-terminal');
-      const pill = document.getElementById('debug-status-pill');
-      const durationLabel = document.getElementById('debug-duration');
-
-      runBtn.disabled = true;
-      runBtn.innerText = '⏳ 调试运行中...';
-      pill.className = 'pill pill-yellow';
-      pill.innerText = '运行中';
-      terminal.innerHTML = '<span class="log-line">🚀 正在将书源发送至手机端引擎执行实时解析...</span>';
-
-      // Hide results container initially
-      document.getElementById('debug-results-container').style.display = 'none';
-
-      try {
-        const payload = {
-          source: sourceObj,
-          keyword: keyword,
-          step: step,
-          bookUrl: overrideUrl,
-          chapterUrl: overrideUrl
-        };
-
-        updateDebugBannerFromEditor();
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 25000);
-
-        const res = await fetch('/api/source/debug', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload),
-          signal: controller.signal
-        });
-        clearTimeout(timeoutId);
-
-        const data = await res.json();
-        durationLabel.innerText = '耗时: ' + (data.durationMs || 0) + 'ms';
-
-        if (data.logs && data.logs.length > 0) {
-          terminal.innerHTML = data.logs.map(line => {
-            let cls = 'log-line';
-            if (line.includes('✅') || line.includes('成功')) cls += ' log-success';
-            if (line.includes('❌') || line.includes('失败') || line.includes('异常')) cls += ' log-error';
-            if (line.includes('⚠️')) cls += ' log-warn';
-            return `<span class="${cls}">${escapeHtml(line)}</span>`;
-          }).join('');
-        }
-
-        if (data.ok) {
-          pill.className = 'pill pill-green';
-          pill.innerText = '通过 (PASS)';
-          showToast('✅ 调试完成：书源各环节解析正常');
-        } else {
-          pill.className = 'pill pill-red';
-          pill.innerText = '异常 (FAIL)';
-          showToast('❌ 调试提示异常: ' + (data.error || '解析失败'), true);
-        }
-
-        renderDebugResults(data);
-
-      } catch (e) {
-        if (e.name === 'AbortError') {
-          terminal.innerHTML += `<span class="log-line log-error">⏱️ 调试请求超时 (25秒)：目标书源网站无响应或网络受阻，请检查书源 URL 或单独测试搜索环节。</span>`;
-          pill.className = 'pill pill-red';
-          pill.innerText = '超时异常';
-          showToast('调试请求超时 (25s)', true);
-        } else {
-          terminal.innerHTML += `<span class="log-line log-error">❌ 请求异常: ${escapeHtml(e.message)}</span>`;
-          pill.className = 'pill pill-red';
-          pill.innerText = '请求失败';
-          showToast('调试连接出错: ' + e.message, true);
-        }
-      } finally {
-        runBtn.disabled = false;
-        runBtn.innerText = '▶️ 开始调试';
-      }
-    }
-
-    function renderDebugResults(data) {
-      const container = document.getElementById('debug-results-container');
-      const searchSec = document.getElementById('debug-search-section');
-      const detailSec = document.getElementById('debug-detail-section');
-      const tocSec = document.getElementById('debug-toc-section');
-      const contentSec = document.getElementById('debug-content-section');
-
-      let hasResults = false;
-
-      // 1. Search
-      if (data.search && data.search.length > 0) {
-        hasResults = true;
-        searchSec.style.display = 'block';
-        document.getElementById('debug-search-count').innerText = data.search.length;
-        const grid = document.getElementById('debug-search-grid');
-        grid.innerHTML = data.search.slice(0, 8).map(b => `
-          <div class="book-card">
-            <h4>${escapeHtml(b.name)}</h4>
-            <p>作者: ${escapeHtml(b.author || '未知')}</p>
-            <p style="word-break: break-all;">链接: <a href="${escapeHtml(b.bookUrl)}" target="_blank" style="color: #60a5fa;">${escapeHtml(b.bookUrl)}</a></p>
-            <p>最新: ${escapeHtml(b.latestChapter || '无')}</p>
-          </div>
-        `).join('');
-      } else {
-        searchSec.style.display = 'none';
-      }
-
-      // 2. Detail
-      if (data.detail) {
-        hasResults = true;
-        detailSec.style.display = 'block';
-        const d = data.detail;
-        document.getElementById('debug-detail-card').innerHTML = `
-          <h4 style="color: #c084fc; font-size: 15px;">${escapeHtml(d.name)}</h4>
-          <p>作者: ${escapeHtml(d.author || '未知')} · 状态: ${escapeHtml(d.status || '连载')}</p>
-          <p>目录地址: <a href="${escapeHtml(d.tocUrl || d.bookUrl)}" target="_blank" style="color: #c084fc;">${escapeHtml(d.tocUrl || d.bookUrl)}</a></p>
-          <p style="margin-top: 6px; color: #cbd5e1;">简介: ${escapeHtml(d.intro || '无简介')}</p>
-        `;
-      } else {
-        detailSec.style.display = 'none';
-      }
-
-      // 3. TOC
-      if (data.toc && data.toc.length > 0) {
-        hasResults = true;
-        tocSec.style.display = 'block';
-        const list = document.getElementById('debug-toc-list');
-        list.innerHTML = data.toc.map((c, i) => `
-          <div style="padding: 3px 0; border-bottom: 1px solid rgba(255,255,255,0.04); display: flex; justify-content: space-between;">
-            <span>#${i+1} ${escapeHtml(c.title)}</span>
-            <span style="color: var(--text-muted); font-size: 11px;">${escapeHtml(c.url)}</span>
-          </div>
-        `).join('');
-      } else {
-        tocSec.style.display = 'none';
-      }
-
-      // 4. Content
-      if (data.content && data.content.paragraphs && data.content.paragraphs.length > 0) {
-        hasResults = true;
-        contentSec.style.display = 'block';
-        const card = document.getElementById('debug-content-card');
-        const paras = data.content.paragraphs.slice(0, 10).map(p => `<p style="margin-bottom: 8px;">　　${escapeHtml(p)}</p>`).join('');
-        card.innerHTML = `
-          <div style="margin-bottom: 8px; font-weight: 600; color: #fbbf24;">${escapeHtml(data.content.title)}</div>
-          <div>${paras}</div>
-        `;
-      } else {
-        contentSec.style.display = 'none';
-      }
-
-      container.style.display = hasResults ? 'block' : 'none';
-    }
-
-    // TAB 3: Library & Diagnostics
-    async function loadSourceHealthList() {
-      const tbody = document.getElementById('sources-table-body');
-      tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; color: var(--text-muted); padding: 24px;">正在读取手机书源与健康诊断...</td></tr>';
-
-      try {
-        const res = await fetch('/api/sources/health', { cache: 'no-store' });
-        const data = await res.json();
-        allSources = data.items || [];
-        updateCounts();
-        applyFilter();
-      } catch (e) {
-        tbody.innerHTML = `<tr><td colspan="6" style="text-align: center; color: var(--danger); padding: 24px;">加载失败: ${escapeHtml(e.message)}</td></tr>`;
-      }
-    }
-
-    function updateCounts() {
-      document.getElementById('count-all').innerText = allSources.length;
-      document.getElementById('count-passed').innerText = allSources.filter(s => s.healthStatus === 'passed').length;
-      document.getElementById('count-failed').innerText = allSources.filter(s => s.healthStatus === 'failed' || s.healthStatus === 'blocked').length;
-      document.getElementById('count-untested').innerText = allSources.filter(s => s.healthStatus === 'untested').length;
-    }
-
-    function setHealthFilter(filter) {
-      currentHealthFilter = filter;
-      applyFilter();
-    }
-
-    function totalPageCount() {
-      return Math.max(1, Math.ceil(currentFilteredSources.length / pageSize));
-    }
-
-    function changePageSize(val) {
-      pageSize = parseInt(val, 10) || 20;
-      currentPage = 1;
-      renderCurrentPage();
-    }
-
-    function goToPage(p) {
-      const maxPages = totalPageCount();
-      currentPage = Math.min(Math.max(1, p), maxPages);
-      renderCurrentPage();
-    }
-
-    function applyFilter() {
-      const query = (document.getElementById('filter-search').value || '').trim().toLowerCase();
-      currentFilteredSources = allSources.filter(s => {
-        const matchesQuery = !query ||
-          s.name.toLowerCase().includes(query) ||
-          (s.group && s.group.toLowerCase().includes(query)) ||
-          s.url.toLowerCase().includes(query);
-
-        if (!matchesQuery) return false;
-
-        if (currentHealthFilter === 'all') return true;
-        if (currentHealthFilter === 'passed') return s.healthStatus === 'passed';
-        if (currentHealthFilter === 'failed') return s.healthStatus === 'failed' || s.healthStatus === 'blocked';
-        if (currentHealthFilter === 'untested') return s.healthStatus === 'untested';
-        return true;
-      });
-
-      currentPage = 1;
-      renderCurrentPage();
-    }
-
-    function renderCurrentPage() {
-      const total = currentFilteredSources.length;
-      const maxPages = totalPageCount();
-      if (currentPage > maxPages) currentPage = maxPages;
-
-      const startIndex = total === 0 ? 0 : (currentPage - 1) * pageSize;
-      const endIndex = Math.min(startIndex + pageSize, total);
-      const pageData = currentFilteredSources.slice(startIndex, endIndex);
-
-      // 更新分页指示器
-      document.getElementById('page-start').innerText = total === 0 ? 0 : startIndex + 1;
-      document.getElementById('page-end').innerText = endIndex;
-      document.getElementById('page-total').innerText = total;
-      document.getElementById('page-indicator').innerText = `第 ${currentPage} / ${maxPages} 页`;
-
-      const btnFirst = document.getElementById('btn-page-first');
-      const btnPrev = document.getElementById('btn-page-prev');
-      const btnNext = document.getElementById('btn-page-next');
-      const btnLast = document.getElementById('btn-page-last');
-
-      if (btnFirst) btnFirst.disabled = currentPage <= 1;
-      if (btnPrev) btnPrev.disabled = currentPage <= 1;
-      if (btnNext) btnNext.disabled = currentPage >= maxPages;
-      if (btnLast) btnLast.disabled = currentPage >= maxPages;
-
-      const tbody = document.getElementById('sources-table-body');
-      if (pageData.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; color: var(--text-muted); padding: 24px;">没有符合条件的书源</td></tr>';
-        return;
-      }
-
-      tbody.innerHTML = pageData.map(s => {
-        let statusBadge = '<span class="pill pill-gray">未测试</span>';
-        if (s.healthStatus === 'passed') {
-          statusBadge = '<span class="pill pill-green" title="' + escapeHtml(s.healthMessage) + '">🟢 正常</span>';
-        } else if (s.healthStatus === 'failed' || s.healthStatus === 'blocked') {
-          statusBadge = '<span class="pill pill-red" title="' + escapeHtml(s.healthMessage) + '">🔴 异常</span>';
-        } else if (s.healthStatus === 'warning') {
-          statusBadge = '<span class="pill pill-yellow" title="' + escapeHtml(s.healthMessage) + '">🟡 延迟高</span>';
-        }
-
-        return `
-          <tr>
-            <td>
-              <div style="font-weight: 600;">${escapeHtml(s.name)}</div>
-              <div style="font-size: 11px; color: var(--text-muted);">权重: ${s.weight}</div>
-            </td>
-            <td><span class="pill pill-gray">${escapeHtml(s.group || '未分组')}</span></td>
-            <td><a href="${escapeHtml(s.url)}" target="_blank" style="color: #60a5fa; font-size: 12px;">${escapeHtml(s.url)}</a></td>
-            <td>
-              ${statusBadge}
-              ${s.healthMessage && s.healthMessage !== '未检测' ? `<div style="font-size: 11px; color: var(--text-muted); margin-top: 2px;">${escapeHtml(s.healthMessage)}</div>` : ''}
-            </td>
-            <td>
-              <input type="checkbox" ${s.enabled ? 'checked' : ''} onchange="toggleSource('${escapeJs(s.url)}', this.checked)">
-            </td>
-            <td>
-              <div style="display: flex; gap: 6px;">
-                <button class="btn btn-outline" style="padding: 4px 8px; font-size: 11px;" onclick="loadSourceIntoEditor('${escapeJs(s.url)}')">✏️ 编辑</button>
-                <button class="btn btn-primary" style="padding: 4px 8px; font-size: 11px;" onclick="quickDebugSource('${escapeJs(s.url)}')">🧪 调试</button>
-                <button class="btn btn-danger" style="padding: 4px 8px; font-size: 11px;" onclick="deleteSource('${escapeJs(s.url)}')">🗑️</button>
-              </div>
-            </td>
-          </tr>
-        `;
-      }).join('');
-    }
-
-    async function toggleSource(url, enabled) {
-      try {
-        const res = await fetch('/api/sources/toggle', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ url: url, enabled: enabled })
-        });
-        const data = await res.json();
-        if (data.ok) {
-          showToast(enabled ? '已启用该书源' : '已禁用该书源');
-        }
-      } catch (e) {
-        showToast('切换失败: ' + e.message, true);
-      }
-    }
-
-    async function deleteSource(url) {
-      if (!confirm(`确定要从手机删除此书源吗？\n${url}`)) return;
-      try {
-        const res = await fetch('/api/sources/delete', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ url: url })
-        });
-        const data = await res.json();
-        if (data.ok) {
-          showToast('书源已成功删除');
-          loadSourceHealthList();
-        } else {
-          showToast('删除失败: ' + (data.error || '未知错误'), true);
-        }
-      } catch (e) {
-        showToast('请求出错: ' + e.message, true);
-      }
-    }
-
-    async function loadSourceIntoEditor(url) {
-      try {
-        const res = await fetch('/api/sources', { cache: 'no-store' });
-        const data = await res.json();
-        const found = (data.data || []).find(s => s.bookSourceUrl === url);
-        if (found) {
-          document.getElementById('source-code').value = JSON.stringify(found, null, 2);
-          switchTab('editor');
-          showToast(`已载入书源 [${found.bookSourceName}] 到编辑器`);
-        } else {
-          showToast('未找到指定书源数据', true);
-        }
-      } catch (e) {
-        showToast('载入失败: ' + e.message, true);
-      }
-    }
-
-    async function quickDebugSource(url) {
-      await loadSourceIntoEditor(url);
-      switchTab('debugger');
-      runDebug();
-    }
-
-    async function exportBackup() {
-      try {
-        window.open('/api/sources/export', '_blank');
-      } catch (e) {
-        showToast('导出失败: ' + e.message, true);
-      }
-    }
-
-    function escapeHtml(str) {
-      if (!str) return '';
-      return String(str)
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;')
-        .replace(/'/g, '&#039;');
-    }
-
-    function escapeJs(str) {
-      if (!str) return '';
-      return String(str).replace(/'/g, "\\'");
-    }
-  </script>
-</body>
-</html>
-
-"""#
-    }
 }
 
 private struct WebSourceListResponse: Encodable {
@@ -2052,4 +1105,9 @@ private func getLocalIPAddresses() -> [String] {
     let sortedPrimary = primary.sorted { rank($0) < rank($1) }
     let sortedSecondary = secondary.sorted { rank($0) < rank($1) }
     return (sortedPrimary + sortedSecondary).filter { seen.insert($0).inserted }
+}
+
+private struct WebSingleSourceResponse: Encodable {
+    let ok: Bool
+    let data: BookSource
 }
