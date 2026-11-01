@@ -885,13 +885,12 @@ struct ReaderView: View {
                     .allowsHitTesting(false)
                 }
 
-            // The web view scrolls body text beneath the forced system status
-            // bar. Paint one theme-coloured scrim over that band so the clock
-            // and battery never sit on moving text; the optional in-reader
-            // header is drawn above this layer.
-            if readerMode == .scroll, showSystemStatusBar, !showOverlay {
-                statusBarScrollScrim
+            // A fixed, opaque chapter band also protects immersive reading;
+            // it must not depend on whether the system clock is visible.
+            if readerMode == .scroll, !showOverlay {
+                readerHeader
                     .transition(.opacity)
+                    .zIndex(1)
             }
 
             // 分页模式的页眉页脚画在每一页内部（见 pageSurface），
@@ -899,11 +898,6 @@ struct ReaderView: View {
             // 「全局页眉压在页面上、位置又跟安全区打架」的问题。
             if readerMode == .scroll,
                !showOverlay, !speechController.isSpeaking, !autoScrollEnabled {
-                if statusPosition == "top" || statusPosition == "both" {
-                    readerHeader
-                        .transition(.opacity)
-                        .zIndex(1)
-                }
                 if statusPosition == "bottom" || statusPosition == "both" {
                     readerFooter
                         .ignoresSafeArea(.container, edges: .bottom)
@@ -1642,20 +1636,23 @@ struct ReaderView: View {
 
     /// 滚动模式的正文顶部内边距：显示页眉时让出页眉带，否则只避让刘海。
     private var scrollContentTopInset: Double {
-        if statusPosition == "top" || statusPosition == "both" {
-            // 22pt 页眉行 + 6pt 呼吸间距；与 readerHeader 使用同一个常量。
-            return Double(
-                readerTopSafeInset
-                    + ReaderPageChrome.headerTopGap
-                    + ReaderPageChrome.scrollHeaderBandHeight
-                    + 6
-            )
+        if scrollChromeGeometry.headerVisible {
+            return Double(scrollChromeGeometry.protectedHeight)
         }
         return Double(
             ReaderPageLayoutEngine.minimumTopInset(
                 pagePadding: CGFloat(pagePadding),
                 safeTop: readerTopSafeInset
             )
+        )
+    }
+
+    private var scrollChromeGeometry: ReaderScrollChromeGeometry {
+        ReaderScrollChromeGeometry(
+            safeTop: readerTopSafeInset,
+            headerVisible: ReaderScrollChromePolicy.headerVisible(
+                chapterStyle: chapterHeadingStyle, statusPosition: statusPosition),
+            showSystemStatusBar: showSystemStatusBar
         )
     }
 
@@ -3343,74 +3340,30 @@ struct ReaderView: View {
         .buttonStyle(.plain)
     }
 
-    /// Fixed top scrim for scroll mode when the system status bar is forced
-    /// visible. Height comes from ReaderScrollChromePolicy so the band keeps
-    /// covering the status bar and the in-reader header after safe-area changes.
-    private var statusBarScrollScrim: some View {
-        let scrimHeight = ReaderScrollChromePolicy.statusScrimHeight(
-            safeTop: readerTopSafeInset,
-            headerVisible: statusPosition == "top" || statusPosition == "both"
-        )
-        return VStack(spacing: 0) {
-            // Solid band over the status bar; only the last 10pt fade into
-            // the first line so the header band never goes half-transparent.
-            readerThemeBackground.opacity(0.97)
-                .frame(height: max(scrimHeight - 10, 0))
-            LinearGradient(
-                colors: [readerThemeBackground.opacity(0.97), readerThemeBackground.opacity(0)],
-                startPoint: .top,
-                endPoint: .bottom
-            )
-            .frame(height: 10)
-            Spacer(minLength: 0)
-        }
-        .ignoresSafeArea(edges: .top)
-        .allowsHitTesting(false)
-        .accessibilityHidden(true)
-    }
-
-    /// The reader already reserves `footerHeight` below the last line in every
-    /// mode, but the band stayed empty, so a full-screen page showed no clock,
-    /// battery or progress once the chrome auto-hid.  This fills that reserved
-    /// band and never intercepts taps.
     private var readerHeader: some View {
         TimelineView(.everyMinute) { context in
-            VStack {
-                HStack(spacing: 12) {
-                    Text(currentDisplayChapterTitle)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.75)
-                        .font(.system(size: 11, weight: .medium))
-                        .foregroundStyle(readerThemeTextColor.opacity(0.55))
-
-                    Spacer(minLength: 8)
-
-                    if footerShowTime {
-                        Text(context.date, format: .dateTime.hour().minute())
-                            .font(.system(size: 11, weight: .medium).monospacedDigit())
-                            .foregroundStyle(readerThemeTextColor.opacity(0.55))
-                    }
-
-                    if footerShowBatteryIcon || footerShowBatteryPercent {
-                        HStack(spacing: 3) {
-                            if footerShowBatteryIcon {
-                                Image(systemName: batterySymbolName)
+            VStack(spacing: 0) {
+                ReaderScrollChapterHeader(
+                    title: chapterHeadingStyle == .hidden ? nil : currentDisplayChapterTitle,
+                    geometry: scrollChromeGeometry,
+                    horizontalPadding: CGFloat(pagePadding),
+                    foreground: readerThemeTextColor,
+                    paper: readerThemeBackground
+                ) {
+                    // Keep explicit top-clock/battery preferences; the default
+                    // bottom-status layout leaves only the chapter name here.
+                    if statusPosition == "top" || statusPosition == "both" {
+                        HStack(spacing: 8) {
+                            if footerShowTime {
+                                Text(context.date, format: .dateTime.hour().minute())
                             }
-                            if footerShowBatteryPercent {
-                                Text(batteryPercentageText)
-                            }
+                            if footerShowBatteryIcon { Image(systemName: batterySymbolName) }
+                            if footerShowBatteryPercent { Text(batteryPercentageText) }
                         }
-                        .font(.system(size: 10, weight: .medium).monospacedDigit())
+                        .font(.system(size: 11, weight: .medium).monospacedDigit())
                         .foregroundStyle(readerThemeTextColor.opacity(0.55))
                     }
                 }
-                .padding(.horizontal, max(CGFloat(pagePadding), 18))
-                .frame(height: ReaderPageChrome.scrollHeaderBandHeight)
-                // 页眉必须整体落在安全区内：旧版 0.45×safeTop 会把时间/电量
-                // 塞进刘海或系统状态栏里，视觉上就是「状态栏位置不对」。
-                // 顺序必须是 frame → padding：先固定行高再加安全区偏移，
-                // 否则 padding 会先吃掉整个行高，文字被压扁或裁切。
-                .padding(.top, readerTopSafeInset + ReaderPageChrome.headerTopGap)
                 Spacer(minLength: 0)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)

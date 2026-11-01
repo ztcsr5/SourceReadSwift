@@ -68,16 +68,30 @@ enum ReaderSettingsLayoutPolicy {
     }
 }
 
-/// Keeps the fixed status-bar scrim in scroll mode large enough for the system
-/// bar plus (optionally) the in-reader chapter/clock band. Without it the
-/// WKWebView text scrolls visibly underneath the clock and battery.
+/// The chapter label is independent from the user's clock/battery placement.
+/// One geometry controls both the opaque top band and the initial body inset.
 enum ReaderScrollChromePolicy {
-    static func statusScrimHeight(safeTop: CGFloat, headerVisible: Bool) -> CGFloat {
-        let statusBar = max(safeTop, 20)
-        let headerBand = headerVisible
-            ? ReaderPageChrome.headerTopGap + ReaderPageChrome.scrollHeaderBandHeight
-            : 0
-        return statusBar + headerBand + 10
+    static func headerVisible(chapterStyle: ReaderPageChromeLayout, statusPosition: String) -> Bool {
+        chapterStyle != .hidden || statusPosition == "top" || statusPosition == "both"
+    }
+}
+
+struct ReaderScrollChromeGeometry: Equatable {
+    static let bodyGap: CGFloat = 6
+    let safeTop: CGFloat
+    let headerVisible: Bool
+
+    init(safeTop: CGFloat, headerVisible: Bool, showSystemStatusBar: Bool) {
+        let finiteTop = safeTop.isFinite ? max(safeTop, 0) : 0
+        self.safeTop = max(finiteTop, showSystemStatusBar ? 20 : 0)
+        self.headerVisible = headerVisible
+    }
+
+    var headerTop: CGFloat { safeTop + ReaderPageChrome.headerTopGap }
+    var protectedHeight: CGFloat {
+        headerVisible
+            ? headerTop + ReaderPageChrome.scrollHeaderBandHeight + Self.bodyGap
+            : safeTop
     }
 }
 

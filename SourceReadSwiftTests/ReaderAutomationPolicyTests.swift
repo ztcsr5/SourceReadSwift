@@ -91,22 +91,22 @@ final class ReaderAutomationPolicyTests: XCTestCase {
     }
 
     func testScrollStatusScrimCoversStatusBarAndOptionalHeaderBand() {
-        // Dynamic Island portrait: 59pt safe area + 10pt fade.
+        // Opaque protection ends at the actual safe-area boundary; no fade.
         XCTAssertEqual(
-            ReaderScrollChromePolicy.statusScrimHeight(safeTop: 59, headerVisible: false),
-            69,
+            ReaderScrollChromeGeometry(safeTop: 59, headerVisible: false, showSystemStatusBar: true).protectedHeight,
+            59,
             accuracy: 0.001
         )
-        // With the in-reader header: add headerTopGap (2) + band (22).
+        // Header: safe59 + top gap2 + band22 + body gap6.
         XCTAssertEqual(
-            ReaderScrollChromePolicy.statusScrimHeight(safeTop: 59, headerVisible: true),
-            93,
+            ReaderScrollChromeGeometry(safeTop: 59, headerVisible: true, showSystemStatusBar: true).protectedHeight,
+            89,
             accuracy: 0.001
         )
         // Unknown safe area still leaves a usable status-bar band.
         XCTAssertEqual(
-            ReaderScrollChromePolicy.statusScrimHeight(safeTop: 0, headerVisible: false),
-            30,
+            ReaderScrollChromeGeometry(safeTop: 0, headerVisible: false, showSystemStatusBar: true).protectedHeight,
+            20,
             accuracy: 0.001
         )
     }
