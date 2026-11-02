@@ -2,7 +2,7 @@ import SwiftUI
 
 @main
 struct SourceReadSwiftApp: App {
-    @StateObject private var appState = AppState()
+    @StateObject private var appState = ReaderRegressionLaunch.makeAppState()
     @AppStorage("settings.themeMode") private var themeModeRawValue = ThemeMode.system.rawValue
     @Environment(\.scenePhase) private var scenePhase
 

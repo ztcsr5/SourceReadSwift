@@ -725,6 +725,7 @@ struct BookshelfView: View {
                 .frame(maxWidth: .infinity, alignment: .topLeading)
                 .padding(.vertical, 3)
         }
+        .accessibilityIdentifier("bookshelf.continue." + book.id)
         .overlay(alignment: .topTrailing) {
             Menu {
                 NavigationLink {

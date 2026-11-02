@@ -3657,6 +3657,7 @@ struct ReaderView: View {
                 chromeIconButton(systemName: "chevron.left") {
                     dismiss()
                 }
+                .accessibilityIdentifier("reader.returnToShelf")
 
                 VStack(alignment: .leading, spacing: 2) {
                     Text(currentDisplayChapterTitle)
@@ -3814,6 +3815,7 @@ struct ReaderView: View {
                     toolButton(icon: "gearshape", title: "设置") {
                         toggleSettingsPanel()
                     }
+                    .accessibilityIdentifier("reader.openSettings")
                     .overlay(alignment: .topTrailing) {
                         if let badge = sleepTimerBadgeText {
                             Text(badge)

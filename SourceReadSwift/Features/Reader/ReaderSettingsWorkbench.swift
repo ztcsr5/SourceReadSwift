@@ -99,6 +99,7 @@ struct ReaderSettingsWorkbench: View {
         ToolbarItem(placement: .navigationBarTrailing) {
             Button(action: actions.close) { Image(systemName: "xmark").frame(width: 44, height: 44) }
                 .accessibilityLabel("关闭阅读设置")
+                .accessibilityIdentifier("reader.settings.close")
         }
     }
     private var handle: some View {
@@ -145,6 +146,7 @@ struct ReaderSettingsWorkbench: View {
                         .background(AppTheme.accent.opacity(0.08), in: RoundedRectangle(cornerRadius: 20))
                         .overlay { RoundedRectangle(cornerRadius: 20).strokeBorder(AppTheme.accent.opacity(0.18), lineWidth: 0.8) }
                 }.buttonStyle(AppPressStyle())
+                    .accessibilityIdentifier("reader.settings.route.themes")
                 LazyVGrid(columns: typeSize.isAccessibilitySize ? [GridItem(.flexible())] : [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
                     ForEach(Array(ReaderWorkbenchRoute.allCases.filter { $0 != .themes }.enumerated()), id: \.element) { index, route in
                         NavigationLink(value: route) {
@@ -158,6 +160,7 @@ struct ReaderSettingsWorkbench: View {
                                 .background(context.ink.opacity(0.035), in: RoundedRectangle(cornerRadius: 16))
                                 .overlay { RoundedRectangle(cornerRadius: 16).strokeBorder(context.ink.opacity(0.08), lineWidth: 0.6) }
                         }.buttonStyle(AppPressStyle())
+                            .accessibilityIdentifier("reader.settings.route." + route.rawValue)
                     }
                 }
                 Button("切换经典设置") { usesWorkbench = false }

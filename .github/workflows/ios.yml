@@ -6,6 +6,11 @@ concurrency:
 
 on:
   workflow_dispatch:
+    inputs:
+      reader_settings_only:
+        description: Run the real reader settings UI reproduction without packaging
+        type: boolean
+        default: false
   push:
     branches:
       - main
@@ -20,7 +25,7 @@ on:
 
 jobs:
   native-tabs:
-    runs-on: ${{ github.ref == 'refs/heads/codex/reader-motion-117' && 'macos-26-intel' || 'macos-26' }}
+    runs-on: ${{ (github.ref == 'refs/heads/codex/reader-motion-117' || inputs.reader_settings_only) && 'macos-26-intel' || 'macos-26' }}
     timeout-minutes: 45
     env:
       DEVELOPER_DIR: /Applications/Xcode_26.2.app/Contents/Developer
@@ -29,6 +34,7 @@ jobs:
       - run: brew install xcodegen
       - run: xcodegen generate
       - name: iOS26 native tab runtime regression
+        if: ${{ !inputs.reader_settings_only }}
         timeout-minutes: 35
         run: |
           set -euo pipefail
@@ -70,7 +76,20 @@ jobs:
             -only-testing:SourceReadSwiftTests/ReaderBindingTests \
             -only-testing:SourceReadSwiftTests/ReaderWorkbenchVisualTests \
             -only-testing:SourceReadSwiftTests/ReaderPanController119Tests \
+            -only-testing:SourceReadSwiftUITests/ReaderSettingsFlowUITests \
             -destination-timeout 120 -test-timeouts-enabled YES -maximum-test-execution-time-allowance 60 \
+            -resultBundlePath NativeTabResults.xcresult test 2>&1 | tee native-tab-test.log
+      - name: Reproduce real reader settings UI on iOS26
+        if: ${{ inputs.reader_settings_only }}
+        timeout-minutes: 35
+        run: |
+          set -euo pipefail
+          RUNTIME_ID="$(xcrun simctl list runtimes -j | python3 -c 'import json,sys; print(next(r["identifier"] for r in json.load(sys.stdin)["runtimes"] if r.get("isAvailable") and r["version"].startswith("26.")))')"
+          python3 -u scripts/boot_native_simulator.py "$RUNTIME_ID" --output native-device-id.txt 2>&1 | tee native-boot.log
+          DEVICE_ID="$(cat native-device-id.txt)"
+          xcodebuild -project SourceReadSwift.xcodeproj -scheme SourceReadSwift \
+            -destination "id=$DEVICE_ID" CODE_SIGNING_ALLOWED=NO \
+            -parallel-testing-enabled NO -only-testing:SourceReadSwiftUITests/ReaderSettingsFlowUITests \
             -resultBundlePath NativeTabResults.xcresult test 2>&1 | tee native-tab-test.log
       - name: Export iOS26 attachments
         if: always()
@@ -98,7 +117,7 @@ jobs:
           if-no-files-found: ignore
           retention-days: 7
   build:
-    runs-on: ${{ github.ref == 'refs/heads/codex/reader-motion-117' && 'macos-15-intel' || 'macos-15' }}
+    runs-on: ${{ (github.ref == 'refs/heads/codex/reader-motion-117' || inputs.reader_settings_only) && 'macos-15-intel' || 'macos-15' }}
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@v5
@@ -140,12 +159,17 @@ jobs:
             xcrun simctl list devices available
             exit 1
           fi
+          TEST_SELECTION=()
+          if [ "${{ inputs.reader_settings_only }}" = "true" ]; then
+            TEST_SELECTION=(-only-testing:SourceReadSwiftUITests/ReaderSettingsFlowUITests)
+          fi
           xcodebuild \
             -project SourceReadSwift.xcodeproj \
             -scheme SourceReadSwift \
             -destination "id=$DEVICE_ID" \
             CODE_SIGNING_ALLOWED=NO \
             -parallel-testing-enabled NO \
+            "${TEST_SELECTION[@]}" \
             -resultBundlePath TestResults.xcresult \
             test 2>&1 | tee xcodebuild-test.log
       - name: Export test attachments

@@ -102,3 +102,22 @@ targets:
       - package: SwiftSoup
       - package: ZIPFoundation
       - package: CryptoSwift
+  SourceReadSwiftUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    sources:
+      - SourceReadSwiftUITests
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: YES
+    dependencies:
+      - target: SourceReadSwift
+schemes:
+  SourceReadSwift:
+    build:
+      targets:
+        SourceReadSwift: all
+    test:
+      targets:
+        - SourceReadSwiftTests
+        - SourceReadSwiftUITests
