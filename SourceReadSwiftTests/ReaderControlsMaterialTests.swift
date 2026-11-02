@@ -18,6 +18,8 @@ final class ReaderControlsMaterialTests: XCTestCase {
     }
 
     @MainActor func testSystemAndPaperChoicesActuallyChangeTheSettingsSurface() async throws {
+        XCTAssertFalse(UIAccessibility.isReduceTransparencyEnabled,
+            "The material fixture requires the runner's default transparency permission")
         let defaults = UserDefaults.standard
         let keys = ["reader.menuSurfaceStyle", "reader.menuUsesWallpaper"]
         let previous = keys.map { defaults.object(forKey: $0) }
@@ -42,10 +44,13 @@ final class ReaderControlsMaterialTests: XCTestCase {
                 ReaderSettingsWorkbench(context: ReaderWorkbenchContext(bookTitle: "材质集成测试", background: .white,
                     bottomInset: 0, initialRoute: .typography), preview: { AnyView(Text("书页")) },
                     page: { _ in AnyView(Text("字体与纸面")) }, actions: ReaderWorkbenchActions(close: {}))
-            }.environment(\.accessibilityReduceTransparency, false).environment(\.colorSchemeContrast, .standard)
-                .environment(\.colorScheme, .light))
+            }.environment(\.colorScheme, .light))
             host.overrideUserInterfaceStyle = .light
-            window.rootViewController = host; window.makeKeyAndVisible()
+            let parent = UIViewController(); window.rootViewController = parent
+            parent.addChild(host)
+            parent.setOverrideTraitCollection(UITraitCollection(accessibilityContrast: .normal), forChild: host)
+            parent.view.addSubview(host.view); host.view.frame = window.bounds; host.didMove(toParent: parent)
+            window.makeKeyAndVisible()
             try await Task.sleep(nanoseconds: 300_000_000)
             host.view.layoutIfNeeded()
             let renderer = UIGraphicsImageRenderer(size: CGSize(width: 390, height: 844))
