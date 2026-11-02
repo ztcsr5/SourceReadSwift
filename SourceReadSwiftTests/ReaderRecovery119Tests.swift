@@ -381,6 +381,18 @@ final class ReaderPanController119Tests: XCTestCase {
         XCTAssertEqual(current.view.transform, .identity)
     }
 
+    func testIdenticalIdleUpdatesDoNotRestartWarmupOrPublishInteraction() async {
+        let controller = makeController()
+        apply(controller, style: .slide)
+        await drainMainQueue()
+        let count = interactions.count
+        let children = controller.children.map(ObjectIdentifier.init)
+        for _ in 0..<30 { apply(controller, style: .slide) }
+        await drainMainQueue()
+        XCTAssertEqual(controller.children.map(ObjectIdentifier.init), children)
+        XCTAssertEqual(interactions.count, count, "An unchanged SwiftUI pass is not a new completed gesture")
+    }
+
     func testCoverAndSlideHaveDifferentPhysicalDisplacement() {
         let controller = makeController()
         apply(controller, style: .cover)
