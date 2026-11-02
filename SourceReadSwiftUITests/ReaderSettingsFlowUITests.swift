@@ -24,12 +24,13 @@ final class ReaderSettingsFlowUITests: XCTestCase {
             let link = element("reader.settings.route." + route)
             XCTAssertTrue(link.waitForExistence(timeout: 5))
             link.tap()
-            assertPanelRemainsOpen()
+            assertPanelRemainsOpen(route)
             let close = element("reader.settings.close")
             XCTAssertTrue(close.isHittable, "Settings must retain a visible, local close control")
             close.tap()
             XCTAssertTrue(element("reader.openSettings").waitForExistence(timeout: 3))
             XCTAssertFalse(shelfEntry.isHittable, "Closing settings must not return to the shelf")
+            capture("reader-menu-real-" + route)
         }
     }
 
@@ -37,18 +38,18 @@ final class ReaderSettingsFlowUITests: XCTestCase {
         launchReader(mode: "pageTurn")
         openSettings()
         element("reader.settings.route.typography").tap()
-        assertPanelRemainsOpen()
+        assertPanelRemainsOpen("paged-typography")
         element("reader.settings.close").tap()
         XCTAssertTrue(element("reader.returnToShelf").isHittable)
         XCTAssertFalse(shelfEntry.isHittable)
     }
 
     func testHeadingAndChromeReturnToSettingsNotTheBookshelf() {
-        checkLocalReturn(routes: ["heading", "chrome"])
+        checkLocalReturn(routes: ["heading", "chrome"], paper: "bamboo")
     }
 
     func testBindingsAndAssistanceReturnToSettingsNotTheBookshelf() {
-        checkLocalReturn(routes: ["themes", "assistance"])
+        checkLocalReturn(routes: ["themes", "assistance"], paper: "dark")
     }
 
     func testReturningToShelfRestoresBottomNavigationWithTheRoot() {
@@ -64,6 +65,7 @@ final class ReaderSettingsFlowUITests: XCTestCase {
         let tabs = app.tabBars.firstMatch
         let home = tabs.exists ? tabs.buttons["主页"] : app.buttons["主页"]
         XCTAssertTrue(home.isHittable, "The home tab must return with the shelf, not later")
+        capture("reader-returned-root")
     }
 
     private var shelfEntry: XCUIElement {
@@ -74,8 +76,8 @@ final class ReaderSettingsFlowUITests: XCTestCase {
         app.descendants(matching: .any).matching(identifier: identifier).firstMatch
     }
 
-    private func checkLocalReturn(routes: [String]) {
-        launchReader(mode: "scroll")
+    private func checkLocalReturn(routes: [String], paper: String) {
+        launchReader(mode: "scroll", paper: paper)
         openSettings()
         for route in routes {
             let link = element("reader.settings.route." + route)
@@ -85,7 +87,7 @@ final class ReaderSettingsFlowUITests: XCTestCase {
             }
             XCTAssertTrue(link.isHittable)
             link.tap()
-            assertPanelRemainsOpen()
+            assertPanelRemainsOpen(paper + "-" + route)
             let back = element("reader.settings.back")
             XCTAssertTrue(back.isHittable)
             back.tap()
@@ -94,9 +96,9 @@ final class ReaderSettingsFlowUITests: XCTestCase {
         }
     }
 
-    private func launchReader(mode: String) {
+    private func launchReader(mode: String, paper: String = "white") {
         app.launchArguments = ["--reader-settings-regression", "-reader.mode", mode,
-            "-reader.atelierEnabled", "YES", "-reader.background", "white",
+            "-reader.atelierEnabled", "YES", "-reader.background", paper,
             "-reader.menuSurfaceStyle", "system", "-reader.menuUsesWallpaper", "NO"]
         app.launch()
         XCTAssertTrue(shelfEntry.waitForExistence(timeout: 10))
@@ -116,12 +118,21 @@ final class ReaderSettingsFlowUITests: XCTestCase {
         revealMenu()
         element("reader.openSettings").tap()
         XCTAssertTrue(element("reader.settingsWorkbench").waitForExistence(timeout: 3))
+        capture("reader-settings-real-home")
     }
 
-    private func assertPanelRemainsOpen() {
+    private func assertPanelRemainsOpen(_ route: String) {
         let panel = element("reader.settingsWorkbench")
         let unexpectedlyClosed = XCTNSPredicateExpectation(predicate: NSPredicate(format: "exists == false"), object: panel)
         XCTAssertEqual(XCTWaiter.wait(for: [unexpectedlyClosed], timeout: 1), .timedOut,
             "Entering a settings section must not dismiss the panel or pop the reader")
+        capture("reader-settings-real-" + route)
+    }
+
+    private func capture(_ phase: String) {
+        let attachment = XCTAttachment(screenshot: app.screenshot())
+        attachment.name = phase
+        attachment.lifetime = .keepAlways
+        add(attachment)
     }
 }

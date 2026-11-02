@@ -3842,6 +3842,7 @@ struct ReaderView: View {
             .padding(.bottom, max(readerFooterSafeInset, 10) + 10)
         }
         .foregroundStyle(chromeForeground)
+        .environment(\.colorScheme, readerIsNight ? .dark : .light)
     }
 
     private func navChapterButton(icon: String, title: String, action: @escaping () -> Void) -> some View {
