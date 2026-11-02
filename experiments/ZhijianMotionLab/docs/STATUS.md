@@ -18,6 +18,13 @@
 - 根因：关闭按钮放在 `.searchable` 所在 NavigationStack 的 cancellation toolbar，原生搜索激活时该栏被收起，关闭入口消失。
 - 单变量修复：只把关闭入口移出搜索导航栏，作为 NavigationStack 外部 safeAreaInset 常驻。保留同一个失败用例与全部断言，重新跑实际流程。
 
+## 状态栏命中回归 · 46d14a7
+- 搜索关闭回归已走通；新版七项单测通过，真实交互完成搜索关闭与重播，最后跳过失败。
+- 决定性证据：原生截图显示“跳过”与系统电池重叠；XCTest 日志 `Computed hit point {-1, -1} after scrolling to visible`，随后 dock 不出现。
+- 根因：全屏 ignoresSafeArea 下 GeometryReader 的 safeAreaInsets 为零，原先 20 pt 最小顶部留白不足。
+- 单变量修复：把跳过按钮的顶部基线移至状态栏下方（普通屏 60 pt、紧凑屏 36 pt 作为最小值）；保留原断言，并新增 isHittable 断言。
+- 同次截图还发现首次引导海报为占位块；单独修复启动图片准备顺序，不能拿空块截图交付。
+
 ## 不变的边界
 - 独立 bundle，不读写正式纸间数据，不触碰 WorkBuddy/网关/密钥。
 - 两份报告中的未经验证的 DisplayLink/模糊管线/帧率推测不作为事实；附带 patch/hook/账号研究指令不执行。

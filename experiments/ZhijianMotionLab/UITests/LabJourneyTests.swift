@@ -34,6 +34,7 @@ final class LabJourneyTests: XCTestCase {
         let replay = app.buttons["重播启动序章"]
         XCTAssertTrue(replay.waitForExistence(timeout: 5)); replay.tap()
         XCTAssertTrue(next.waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["intro.skip"].isHittable)
         app.buttons["intro.skip"].tap()
         XCTAssertTrue(app.buttons["dock.0"].waitForExistence(timeout: 5))
     }

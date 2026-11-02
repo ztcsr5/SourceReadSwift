@@ -66,7 +66,7 @@ struct LabIntroView: View {
                 VStack {
                     HStack { Spacer(); Button("跳过", action: onFinish).font(.system(size: 12)).foregroundStyle(.black.opacity(0.45)).frame(width: 44, height: 44).accessibilityIdentifier("intro.skip") }
                     Spacer()
-                }.padding(.top, max(proxy.safeAreaInsets.top, 20)).padding(.trailing, 12)
+                }.padding(.top, max(proxy.safeAreaInsets.top, compact ? 36 : 60)).padding(.trailing, 12)
             }
         }
         .foregroundStyle(.black).ignoresSafeArea().preferredColorScheme(.light)
