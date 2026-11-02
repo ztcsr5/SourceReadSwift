@@ -5,6 +5,9 @@ struct CoverTone: Equatable, Sendable {
     let red: Double
     let green: Double
     let blue: Double
+    let vividRed: Double
+    let vividGreen: Double
+    let vividBlue: Double
 }
 
 private final class CachedCoverTone: NSObject {
@@ -67,6 +70,10 @@ final class CoverToneSampler: @unchecked Sendable {
         let muted = UIColor(hue: hue, saturation: min(saturation, 0.22), brightness: 0.72, alpha: 1)
         var r: CGFloat = 0, g: CGFloat = 0, b: CGFloat = 0
         guard muted.getRed(&r, green: &g, blue: &b, alpha: &alpha) else { return nil }
-        return CoverTone(red: Double(r), green: Double(g), blue: Double(b))
+        let vivid = UIColor(hue: hue, saturation: min(saturation, 0.65), brightness: 0.70, alpha: 1)
+        var vr: CGFloat = 0, vg: CGFloat = 0, vb: CGFloat = 0
+        guard vivid.getRed(&vr, green: &vg, blue: &vb, alpha: &alpha) else { return nil }
+        return CoverTone(red: Double(r), green: Double(g), blue: Double(b),
+                         vividRed: Double(vr), vividGreen: Double(vg), vividBlue: Double(vb))
     }
 }

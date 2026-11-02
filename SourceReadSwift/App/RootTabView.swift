@@ -10,6 +10,7 @@ struct RootTabView: View {
     @AppStorage("settings.visualTheme") private var visualTheme = AppVisualTheme.classic.rawValue
     @AppStorage("settings.appearanceRevision") private var appearanceRevision = 0
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @AppMotion private var motion
     @Namespace private var tabSelection
     @State private var selectedTab = 0
     @State private var legacySearchRequest: UUID?
@@ -31,7 +32,7 @@ struct RootTabView: View {
                 }
             }
         }
-        .animation(.interactiveSpring(response: 0.28, dampingFraction: 0.86), value: appState.isTabChromeHidden)
+        .animation(motion.animation(.navigation), value: appState.isTabChromeHidden)
         .font(.system(.body, design: AppVisualTheme.current.fontDesign))
         .tint(AppTheme.accent)
         .onReceive(audioCoordinator.$currentBook.map { $0 != nil }.removeDuplicates()) { hasAudio = $0 }

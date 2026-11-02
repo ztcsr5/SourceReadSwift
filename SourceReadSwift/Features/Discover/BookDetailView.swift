@@ -3,6 +3,9 @@ import UIKit
 
 struct BookDetailView: View {
     @EnvironmentObject private var appState: AppState
+    @Namespace private var detailHero
+    @AppMotion private var motion
+    @State private var isHeaderCollapsed = false
     let initialBook: SearchBook
     var availableSources: [SearchBook] = []
     @State private var book: SearchBook
@@ -93,12 +96,13 @@ struct BookDetailView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: AppLayout.sectionGap) {
-                BookDetailHeader(book: displayBook)
+                BookDetailHero(book: displayBook, readerSourceID: "reader|" + book.id, namespace: detailHero)
 
                 if !chapters.isEmpty {
                     HStack(spacing: 12) {
                         if let target = targetReadingChapter {
                             NavigationLink {
+                                Group {
                                 if let shelfBook = localShelfBook {
                                     BookshelfReaderGatewayView(book: shelfBook, initialChapterIndex: target.index)
                                 } else {
@@ -110,6 +114,8 @@ struct BookDetailView: View {
                                         chapters: chapters
                                     )
                                 }
+                                }
+                                .bookHeroDestination("reader|" + book.id, in: detailHero)
                             } label: {
                                 HStack(spacing: 8) {
                                     Image(systemName: "book.fill")
@@ -121,7 +127,7 @@ struct BookDetailView: View {
                                 .background(AppTheme.accent, in: RoundedRectangle(cornerRadius: AppTheme.cardRadius, style: .continuous))
                                 .foregroundStyle(.white)
                             }
-                            .buttonStyle(.plain)
+                            .buttonStyle(AppPressStyle())
                         }
 
                         Button {
@@ -137,7 +143,7 @@ struct BookDetailView: View {
                             .background(AppTheme.card, in: RoundedRectangle(cornerRadius: AppTheme.cardRadius, style: .continuous))
                             .foregroundStyle(isBookInBookshelf ? .secondary : AppTheme.accent)
                         }
-                        .buttonStyle(.plain)
+                        .buttonStyle(AppPressStyle())
                     }
                 }
 
@@ -186,8 +192,13 @@ struct BookDetailView: View {
             }
             .padding(AppTheme.pagePadding)
         }
+        .coordinateSpace(name: "bookDetailScroll")
+        .onPreferenceChange(BookDetailHeaderOffset.self) { bottom in
+            let collapsed = bottom < 60
+            if collapsed != isHeaderCollapsed { isHeaderCollapsed = collapsed }
+        }
         .pageBackground()
-        .navigationTitle(book.name)
+        .navigationTitle(isHeaderCollapsed ? book.name : "书籍详情")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .navigationBarTrailing) {
@@ -315,7 +326,7 @@ struct BookDetailView: View {
                 .background(AppTheme.accent, in: RoundedRectangle(cornerRadius: AppTheme.cardRadius, style: .continuous))
                 .foregroundStyle(.white)
             }
-            .buttonStyle(.plain)
+            .buttonStyle(AppPressStyle())
             .disabled(isDownloadingZlib)
         }
         .podcastCard()
@@ -486,7 +497,7 @@ struct BookDetailView: View {
                     .padding(.vertical, 5)
                     .background(AppTheme.accent.opacity(0.1), in: Capsule())
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(AppPressStyle())
 
                 Text("\(chapters.count) 章")
                     .font(.subheadline.weight(.semibold))
@@ -534,7 +545,7 @@ struct BookDetailView: View {
                             .padding(.horizontal, 14)
                             .contentShape(Rectangle())
                         }
-                        .buttonStyle(.plain)
+                        .buttonStyle(AppPressStyle())
 
                     case .comic:
                         Button {
@@ -556,7 +567,7 @@ struct BookDetailView: View {
                             .padding(.horizontal, 14)
                             .contentShape(Rectangle())
                         }
-                        .buttonStyle(.plain)
+                        .buttonStyle(AppPressStyle())
 
                     case .video:
                         Button {
@@ -578,7 +589,7 @@ struct BookDetailView: View {
                             .padding(.horizontal, 14)
                             .contentShape(Rectangle())
                         }
-                        .buttonStyle(.plain)
+                        .buttonStyle(AppPressStyle())
 
                     case .text:
                         // Local imports have no book source, and ChapterLoadingView
@@ -619,7 +630,7 @@ struct BookDetailView: View {
             } label: {
                 textChapterRowLabel(chapter)
             }
-            .buttonStyle(.plain)
+            .buttonStyle(AppPressStyle())
         } else {
             NavigationLink {
                 ChapterLoadingView(
@@ -632,7 +643,7 @@ struct BookDetailView: View {
             } label: {
                 textChapterRowLabel(chapter)
             }
-            .buttonStyle(.plain)
+            .buttonStyle(AppPressStyle())
         }
     }
 
@@ -1508,7 +1519,7 @@ private struct BookDetailAllChaptersView: View {
                                 .font(.system(size: 14))
                                 .foregroundStyle(.secondary)
                         }
-                        .buttonStyle(.plain)
+                        .buttonStyle(AppPressStyle())
                     }
                 }
                 .padding(.horizontal, 12)
@@ -1566,7 +1577,7 @@ private struct BookDetailAllChaptersView: View {
                                 }
                                 .contentShape(Rectangle())
                             }
-                            .buttonStyle(.plain)
+                            .buttonStyle(AppPressStyle())
                             }
                         }
                     }

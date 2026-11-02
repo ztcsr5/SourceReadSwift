@@ -17,76 +17,69 @@ enum ReadingHeroStatus {
     }
 }
 
-/// A horizontal cover-and-position card; colour never replaces semantic text contrast.
+/// One current book, with a large physical cover and a cached cover-derived surface.
 struct ReadingHeroCard: View {
     let book: BookshelfBook
+    var heroNamespace: Namespace.ID? = nil
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
-    @Environment(\.colorScheme) private var colorScheme
     @Environment(\.colorSchemeContrast) private var contrast
     @AppStorage("settings.visualTheme") private var visualTheme = AppVisualTheme.classic.rawValue
     @AppStorage("settings.appearanceRevision") private var appearanceRevision = 0
+    @AppMotion private var motion
     @State private var coverImage: UIImage?
     @State private var tone: CoverTone?
+
+    private var hasCoverTone: Bool { tone != nil && coverImage != nil }
+    private var ink: Color { hasCoverTone ? .white : .primary }
 
     var body: some View {
         let _ = visualTheme
         let _ = appearanceRevision
-        HStack(alignment: .top, spacing: 12) {
-            AsyncBookCover(urlString: book.coverURL, width: 88, height: 128,
-                           baseURLString: book.bookURL, sourceURLString: book.sourceURL,
-                           onImageLoad: { coverImage = $0 })
-                .accessibilityHidden(true)
+        VStack(alignment: .leading, spacing: 16) {
+            HStack {
+                Spacer(minLength: 0)
+                cover
+                    .rotation3DEffect(.degrees(motion.reducesMotion ? 0 : -4), axis: (x: 0, y: 1, z: 0), perspective: 0.35)
+                    .shadow(color: .black.opacity(contrast == .increased ? 0 : 0.28), radius: 16, y: 12)
+                Spacer(minLength: 0)
+            }.padding(.vertical, 12)
             VStack(alignment: .leading, spacing: 8) {
-                Text(ReadingHeroStatus.progress(for: book))
-                    .font(.caption.weight(.medium)).foregroundStyle(.secondary)
-                Text(book.title)
-                    .font(.headline).foregroundStyle(.primary)
+                Text(ReadingHeroStatus.progress(for: book)).font(.caption.weight(.medium)).foregroundStyle(ink.opacity(0.75))
+                Text(book.title).font(.title2.weight(.semibold))
                     .lineLimit(dynamicTypeSize.isAccessibilitySize ? nil : 2)
                 Text(book.author.isEmpty ? "作者未记录" : book.author)
-                    .font(.subheadline).foregroundStyle(.secondary)
-                    .lineLimit(dynamicTypeSize.isAccessibilitySize ? nil : 1)
-                Text(ReadingHeroStatus.chapter(for: book))
-                    .font(.caption).foregroundStyle(.secondary)
+                    .font(.subheadline).foregroundStyle(ink.opacity(0.80))
+                Text(ReadingHeroStatus.chapter(for: book)).font(.caption).foregroundStyle(ink.opacity(0.80))
                     .lineLimit(dynamicTypeSize.isAccessibilitySize ? nil : 2)
-                if book.hasUpdates {
-                    Label("目录有更新", systemImage: "text.badge.plus")
-                        .font(.caption).foregroundStyle(.secondary)
-                }
-                Label(book.lastReadAt == nil ? "开始阅读" : "继续阅读", systemImage: "book.fill")
-                    .font(.subheadline.weight(.semibold)).foregroundStyle(.primary)
-                    .padding(.top, 4)
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .fixedSize(horizontal: false, vertical: true)
+                if book.hasUpdates { Label("目录有更新", systemImage: "text.badge.plus").font(.caption) }
+                HStack {
+                    Label(book.lastReadAt == nil ? "开始阅读" : "继续阅读", systemImage: "book.fill")
+                        .font(.subheadline.weight(.semibold)).padding(.horizontal, 16).frame(minHeight: 44)
+                        .background(ink.opacity(0.14), in: Capsule())
+                    Spacer()
+                    Color.clear.frame(width: 44, height: 44).accessibilityHidden(true)
+                }.padding(.top, 4)
+            }.fixedSize(horizontal: false, vertical: true)
         }
-        .padding(16)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background {
-            ZStack {
-                AppTheme.card
-                LinearGradient(colors: [surfaceTint, .clear], startPoint: .topLeading, endPoint: .bottomTrailing)
-            }
-        }
+        .foregroundStyle(ink).padding(20).frame(maxWidth: .infinity, alignment: .leading)
+        .background { CoverAtmosphere(tone: hasCoverTone ? tone : nil) }
         .clipShape(RoundedRectangle(cornerRadius: AppTheme.cardRadius, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: AppTheme.cardRadius, style: .continuous)
-                .stroke(Color.primary.opacity(contrast == .increased ? 0.32 : 0.08), lineWidth: 1)
-        }
+        .overlay { RoundedRectangle(cornerRadius: AppTheme.cardRadius, style: .continuous)
+            .stroke(ink.opacity(contrast == .increased ? 0.45 : 0.12), lineWidth: 1).allowsHitTesting(false) }
         .accessibilityElement(children: .combine)
         .task(id: coverImage.map(ObjectIdentifier.init)) {
-            tone = nil
-            guard let coverImage else { return }
+            guard let coverImage else { tone = nil; return }
             let sampled = await CoverToneSampler.shared.tone(for: coverImage)
             guard !Task.isCancelled else { return }
             tone = sampled
         }
     }
 
-    private var surfaceTint: Color {
-        guard contrast != .increased else { return .clear }
-        guard CoverURLResolver.url(from: book.coverURL, base: book.bookURL, fallbackBase: book.sourceURL) != nil,
-              coverImage != nil, let tone else { return AppTheme.accent.opacity(0.04) }
-        return Color(red: tone.red, green: tone.green, blue: tone.blue)
-            .opacity(colorScheme == .dark ? 0.14 : 0.10)
+    @ViewBuilder private var cover: some View {
+        let image = AsyncBookCover(urlString: book.coverURL, width: 160, height: 224,
+                                   baseURLString: book.bookURL, sourceURLString: book.sourceURL,
+                                   onImageLoad: { coverImage = $0 }).accessibilityHidden(true)
+        if let heroNamespace { image.bookHeroSource("continue|" + book.id, in: heroNamespace) }
+        else { image }
     }
 }

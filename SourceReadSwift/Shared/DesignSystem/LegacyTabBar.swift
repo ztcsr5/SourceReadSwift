@@ -4,7 +4,7 @@ import SwiftUI
 struct LegacyTabBar: View {
     @Binding var selection: Int
     var onSearch: () -> Void
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @AppMotion private var motion
     @Namespace private var highlight
 
     var body: some View {
@@ -25,7 +25,7 @@ struct LegacyTabBar: View {
                     .background(.regularMaterial, in: Circle())
                     .overlay(Circle().strokeBorder(Color.primary.opacity(0.07), lineWidth: 0.6))
             }
-            .buttonStyle(.plain)
+            .buttonStyle(AppPressStyle())
             .accessibilityLabel("全网搜书")
         }
         .padding(.horizontal, 12)
@@ -36,12 +36,13 @@ struct LegacyTabBar: View {
         Button {
             guard selection != value else { return }
             HapticFeedback.light()
-            withAnimation(reduceMotion ? nil : .interactiveSpring(response: 0.3, dampingFraction: 0.88)) {
+            withAnimation(motion.animation(.navigation)) {
                 selection = value
             }
         } label: {
             VStack(spacing: 2) {
                 Image(systemName: selection == value ? icon + ".fill" : icon).font(.system(size: 21, weight: .medium))
+                    .scaleEffect(selection == value && !motion.reducesMotion ? 1.04 : 1)
                 Text(title).font(.system(size: 10, weight: .semibold))
             }
             .foregroundStyle(selection == value ? AppTheme.accent : .primary)
@@ -54,7 +55,7 @@ struct LegacyTabBar: View {
             }
             .contentShape(Capsule())
         }
-        .buttonStyle(.plain)
+        .buttonStyle(AppPressStyle())
         .accessibilityAddTraits(selection == value ? [.isSelected] : [])
     }
 }

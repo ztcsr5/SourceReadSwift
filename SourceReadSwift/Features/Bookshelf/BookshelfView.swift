@@ -4,6 +4,8 @@ import UniformTypeIdentifiers
 struct BookshelfView: View {
     @EnvironmentObject private var appState: AppState
     @Environment(\.colorScheme) private var colorScheme
+    @Namespace private var bookHero
+    @AppMotion private var motion
     @State private var showFileImporter = false
     @State private var importMessage: String?
     @State private var isRefreshingBooks = false
@@ -267,16 +269,7 @@ struct BookshelfView: View {
             if recentBooks.isEmpty {
                 emptyImportCard
             } else {
-                ScrollView(.horizontal, showsIndicators: false) {
-                    LazyHStack(spacing: 14) {
-                        ForEach(recentBooks.prefix(10)) { book in
-                            heroCard(book)
-                        }
-                    }
-                    .padding(.horizontal, AppTheme.pagePadding)
-                    .padding(.vertical, 4)
-                }
-                .padding(.horizontal, -AppTheme.pagePadding)
+                if let book = recentBooks.first { heroCard(book) }
             }
         }
     }
@@ -297,7 +290,7 @@ struct BookshelfView: View {
                             .frame(width: 32, height: 32)
                             .contentShape(Rectangle())
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(AppPressStyle())
                     .accessibilityLabel("检查书籍更新")
                 }
             }
@@ -335,7 +328,7 @@ struct BookshelfView: View {
                         .font(.system(size: 14))
                         .foregroundStyle(.secondary)
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(AppPressStyle())
                 .accessibilityLabel("清空搜索")
             }
         }
@@ -430,7 +423,7 @@ struct BookshelfView: View {
                 .foregroundStyle(.primary)
                 .contentShape(Rectangle())
             }
-            .buttonStyle(.plain)
+            .buttonStyle(AppPressStyle())
 
             Spacer()
 
@@ -459,7 +452,7 @@ struct BookshelfView: View {
 
                 Button {
                     UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                    withAnimation(.spring(response: 0.32, dampingFraction: 0.8)) {
+                    withAnimation(motion.animation(.expansion)) {
                         isGridMode.toggle()
                     }
                 } label: {
@@ -469,7 +462,7 @@ struct BookshelfView: View {
                         .frame(width: 32, height: 32)
                         .background(Color.secondary.opacity(0.12), in: Circle())
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(AppPressStyle())
                 .accessibilityLabel(isGridMode ? "切换为列表视图" : "切换为网格视图")
             }
         }
@@ -492,7 +485,7 @@ struct BookshelfView: View {
                     }
                 }
         }
-        .buttonStyle(.plain)
+        .buttonStyle(AppPressStyle())
     }
 
     @ViewBuilder
@@ -511,7 +504,7 @@ struct BookshelfView: View {
             .foregroundStyle(.primary)
             .contentShape(Rectangle())
         }
-        .buttonStyle(.plain)
+        .buttonStyle(AppPressStyle())
         .accessibilityAddTraits(.isHeader)
     }
 
@@ -547,7 +540,7 @@ struct BookshelfView: View {
             .padding(16)
             .glassPanel(cornerRadius: 22, material: .thinMaterial, shadowOpacity: 0.08)
         }
-        .buttonStyle(.plain)
+        .buttonStyle(AppPressStyle())
     }
 
     private func compactEmptyState(icon: String, title: String, message: String) -> some View {
@@ -705,13 +698,35 @@ struct BookshelfView: View {
         }
     }
 
+    @ViewBuilder private func bookDestination(_ book: BookshelfBook, placement: String) -> some View {
+        if mediaKind(for: book) == nil || mediaKind(for: book) == .text {
+            BookDetailView(book: book.asSearchBook)
+                .bookHeroDestination(placement + "|" + book.id, in: bookHero)
+        } else {
+            BookshelfReaderGatewayView(book: book)
+                .bookHeroDestination(placement + "|" + book.id, in: bookHero)
+        }
+    }
+
     private func heroCard(_ book: BookshelfBook) -> some View {
         NavigationLink {
             BookshelfReaderGatewayView(book: book)
+                .bookHeroDestination("continue|" + book.id, in: bookHero)
         } label: {
-            ReadingHeroCard(book: book)
-                .frame(width: AppLayout.continueCardWidth, alignment: .topLeading)
+            ReadingHeroCard(book: book, heroNamespace: bookHero)
+                .frame(maxWidth: .infinity, alignment: .topLeading)
                 .padding(.vertical, 3)
+        }
+        .overlay(alignment: .bottomTrailing) {
+            Menu {
+                NavigationLink {
+                    BookDetailView(book: book.asSearchBook)
+                        .bookHeroDestination("continue|" + book.id, in: bookHero)
+                } label: { Label("书籍详情", systemImage: "info.circle") }
+            } label: {
+                Image(systemName: "ellipsis").font(.title3.weight(.semibold))
+                    .frame(width: 44, height: 44).background(.regularMaterial, in: Circle())
+            }.padding(20).accessibilityLabel("正在阅读书籍的更多操作")
         }
         .buttonStyle(PressableScaleButtonStyle())
         .simultaneousGesture(TapGesture().onEnded {
@@ -771,10 +786,11 @@ struct BookshelfView: View {
 
     private func bookshelfRow(_ book: BookshelfBook) -> some View {
         NavigationLink {
-            BookshelfReaderGatewayView(book: book)
+            bookDestination(book, placement: "list")
         } label: {
             HStack(spacing: 14) {
                 AsyncBookCover(urlString: book.coverURL, width: 52, height: 72, baseURLString: book.bookURL, sourceURLString: book.sourceURL)
+                    .bookHeroSource("list|" + book.id, in: bookHero)
                     .overlay(alignment: .topLeading) {
                         if book.isPinned {
                             Image(systemName: "pin.fill")
@@ -893,7 +909,7 @@ struct BookshelfView: View {
 
     private func bookshelfGridCard(_ book: BookshelfBook) -> some View {
         NavigationLink {
-            BookshelfReaderGatewayView(book: book)
+            bookDestination(book, placement: "grid")
         } label: {
             VStack(alignment: .leading, spacing: 8) {
                 ZStack(alignment: .topTrailing) {
@@ -916,6 +932,7 @@ struct BookshelfView: View {
                                     .shadow(radius: 2)
                             }
                         }
+                        .bookHeroSource("grid|" + book.id, in: bookHero)
                         .shadow(color: .black.opacity(colorScheme == .dark ? 0.35 : 0.12), radius: 6, x: 0, y: 4)
 
                     if book.hasUpdates {
@@ -1094,7 +1111,7 @@ private struct BookshelfCollectionView: View {
                                 .font(.system(size: 14))
                                 .foregroundStyle(.secondary)
                         }
-                        .buttonStyle(.plain)
+                        .buttonStyle(AppPressStyle())
                     }
                 }
                 .padding(.horizontal, 12)
@@ -1376,7 +1393,7 @@ private struct BookshelfCollectionView: View {
                 .padding(.vertical, 8)
                 .background(selected ? AppTheme.accent : AppTheme.card, in: Capsule())
         }
-        .buttonStyle(.plain)
+        .buttonStyle(AppPressStyle())
     }
 }
 
@@ -1391,10 +1408,7 @@ private extension Array {
 
 private struct PressableScaleButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .scaleEffect(configuration.isPressed ? 0.965 : 1)
-            .opacity(configuration.isPressed ? 0.88 : 1)
-            .animation(.easeOut(duration: 0.105), value: configuration.isPressed)
+        AppPressStyle().makeBody(configuration: configuration)
     }
 }
 
