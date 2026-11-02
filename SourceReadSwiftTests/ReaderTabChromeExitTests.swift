@@ -6,6 +6,9 @@ import UIKit
 final class ReaderTabChromeExitTests: XCTestCase {
     @MainActor func testRealUIKitPopReleasesOwnershipBeforeTheSourceDisappears() async throws {
         let app = AppState(), owner = UUID()
+        let animationsWereEnabled = UIView.areAnimationsEnabled
+        UIView.setAnimationsEnabled(true)
+        defer { UIView.setAnimationsEnabled(animationsWereEnabled) }
         let previous = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }
             .flatMap(\.windows).first(where: \.isKeyWindow)
         let scene = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.first
@@ -20,15 +23,21 @@ final class ReaderTabChromeExitTests: XCTestCase {
         source.addChild(host); source.view.addSubview(host.view)
         host.view.frame = window.bounds; host.didMove(toParent: source)
         navigation.pushViewController(source, animated: false)
-        for _ in 0..<20 {
-            if host.view.window != nil { break }
+        for _ in 0..<50 {
+            if source.hasAppeared && host.view.window != nil { break }
             try await Task.sleep(nanoseconds: 50_000_000)
         }
+        XCTAssertTrue(source.hasAppeared)
         XCTAssertNotNil(host.view.window)
         app.acquireTabChromeHidden(owner: owner)
         navigation.popViewController(animated: true)
         XCTAssertFalse(app.isTabChromeHidden, "A real pop must release before its completion callback")
         XCTAssertFalse(source.hasDisappeared, "This assertion must run before onDisappear, not after waiting for it")
+        for _ in 0..<50 {
+            if source.hasDisappeared { break }
+            try await Task.sleep(nanoseconds: 50_000_000)
+        }
+        XCTAssertTrue(source.hasDisappeared)
     }
 
     @MainActor func testBothReaderOwnersReleaseBeforeCompletionAndReacquireOnCancelledPop() {
@@ -68,7 +77,12 @@ final class ReaderTabChromeExitTests: XCTestCase {
 }
 
 private final class ReaderExitTimingHost: UIViewController {
+    private(set) var hasAppeared = false
     private(set) var hasDisappeared = false
+    override func viewDidAppear(_ animated: Bool) {
+        super.viewDidAppear(animated)
+        hasAppeared = true
+    }
     override func viewDidDisappear(_ animated: Bool) {
         super.viewDidDisappear(animated)
         hasDisappeared = true
