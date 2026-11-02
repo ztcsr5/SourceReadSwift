@@ -82,14 +82,14 @@ struct LabRootView: View {
             .background(LabPalette.paper)
             .navigationDestination(for: ReferenceMedia.self) { ReferenceDetailView(item: $0) }
             .toolbar(.hidden, for: .navigationBar)
-        }.tint(.primary)
+        }.tint(.primary).preferredColorScheme(tab == 0 && route.isEmpty ? .dark : .light)
     }
 
     private var dock: some View {
         HStack(spacing: 10) {
             LabGlass {
                 HStack(spacing: 0) {
-                    dockButton(0, title: "发现", symbol: "sparkles.tv")
+                    dockButton(0, title: "发现", symbol: "play.tv.fill")
                     dockButton(1, title: "我的", symbol: "person.crop.circle.fill")
                     dockButton(2, title: "资源库", symbol: "externaldrive.fill")
                     dockButton(3, title: "设置", symbol: "gearshape.fill")

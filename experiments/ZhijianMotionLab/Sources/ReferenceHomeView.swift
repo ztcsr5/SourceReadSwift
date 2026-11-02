@@ -31,7 +31,7 @@ struct ReferenceHomeView: View {
                         .font(.caption2).foregroundStyle(.white.opacity(0.5)).padding(24)
                 }.padding(.bottom, 100)
             }.background(canvas).ignoresSafeArea(edges: .top)
-        }.preferredColorScheme(.dark)
+        }
     }
 
     private func hero(_ item: ReferenceMedia, height: CGFloat) -> some View {
