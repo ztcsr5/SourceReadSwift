@@ -5,12 +5,15 @@ import XCTest
 
 final class ReaderScrollCadenceTests: XCTestCase {
     @MainActor func testPositionOnlyUpdatesDoNotRebuildTypographyOrFontLookup() async throws {
-        var fixture = WebScrollReaderView(sections: [.init(chapterIndex: 0, title: "第一章", paragraphs: ["正文"])],
-            contentFingerprint: "cadence", fontSize: 20, lineSpacing: 8, pagePadding: 20, letterSpacing: 0,
+        func fixture(index: Int = -1, size: Double = 20) -> WebScrollReaderView {
+            WebScrollReaderView(sections: [.init(chapterIndex: 0, title: "第一章", paragraphs: ["正文"])],
+            contentFingerprint: "cadence", fontSize: size, lineSpacing: 8, pagePadding: 20, letterSpacing: 0,
             paragraphSpacing: 12, paragraphIndent: 40, titleSpacing: 12, footerHeight: 40,
-            textColor: .black, highlightColor: .yellow, currentParagraphIndex: -1, scrollTarget: nil,
+            textColor: .black, highlightColor: .yellow, currentParagraphIndex: index, scrollTarget: nil,
             scrollRequestKey: nil, animatedScrollDuration: 0, textSelectionEnabled: false, onVisibleParagraph: { _ in })
-        let coordinator = fixture.makeCoordinator(), web = coordinator.makeWebView(initialView: fixture)
+        }
+        let initial = fixture()
+        let coordinator = initial.makeCoordinator(), web = coordinator.makeWebView(initialView: initial)
         let scene = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.first
         let previous = scene?.windows.first(where: \.isKeyWindow)
         let window = scene.map { UIWindow(windowScene: $0) } ?? UIWindow(frame: UIScreen.main.bounds)
@@ -23,9 +26,9 @@ final class ReaderScrollCadenceTests: XCTestCase {
         }
         XCTAssertGreaterThan(coordinator.styleBuildCount, 0)
         let before = coordinator.styleBuildCount
-        for index in 0..<50 { fixture.currentParagraphIndex = index; coordinator.update(view: fixture, webView: web) }
+        for index in 0..<50 { coordinator.update(view: fixture(index: index), webView: web) }
         XCTAssertEqual(coordinator.styleBuildCount, before, "Scroll updates must not repeat font resolution even when the final payload is equal")
-        fixture.fontSize += 1; coordinator.update(view: fixture, webView: web)
+        coordinator.update(view: fixture(size: 21), webView: web)
         XCTAssertEqual(coordinator.styleBuildCount, before + 1, "Real typography changes must still reach the document")
     }
 }
