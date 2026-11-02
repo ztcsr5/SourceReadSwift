@@ -4,6 +4,55 @@ import XCTest
 @testable import SourceReadSwift
 
 final class ReaderScrollCadenceTests: XCTestCase {
+    @MainActor func testCharacterJumpReportsItsPositionAfterAcknowledgementWithAnimationFramesHeld() async throws {
+        let messages = ReaderPositionMessageProbe()
+        let configuration = WKWebViewConfiguration()
+        configuration.userContentController.add(messages, name: "reader")
+        let web = WKWebView(frame: CGRect(x: 0, y: 0, width: 390, height: 760), configuration: configuration)
+        let scene = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.first
+        let previous = scene?.windows.first(where: \.isKeyWindow)
+        let window = scene.map { UIWindow(windowScene: $0) } ?? UIWindow(frame: UIScreen.main.bounds)
+        let host = UIViewController(); window.rootViewController = host; window.makeKeyAndVisible(); host.view.addSubview(web)
+        defer {
+            web.stopLoading(); configuration.userContentController.removeScriptMessageHandler(forName: "reader")
+            window.isHidden = true; previous?.makeKey()
+        }
+        let shell = WebReaderHTML.shell.replacingOccurrences(of: "<head>",
+            with: "<head><script>window.requestAnimationFrame=function(){return 0;};</script>")
+        web.loadHTMLString(shell, baseURL: nil)
+        var ready = false
+        for _ in 0..<100 {
+            ready = (try? await web.evaluateJavaScript("!!window.__reader")) as? Bool == true
+            if ready { break }; try await Task.sleep(nanoseconds: 100_000_000)
+        }
+        XCTAssertTrue(ready)
+        let style = WebReaderStylePayload.make(fontFamily: .system, fontSize: 20, lineSpacing: 8,
+            pagePadding: 20, letterSpacing: 0, paragraphSpacing: 12, paragraphIndent: 40,
+            titleSpacing: 16, footerHeight: 12, topInset: 50, textColor: .black, surfaceColor: .white,
+            highlightColor: .yellow, accentColor: .blue, selectable: false)
+        let encodedStyle = try JSONSerialization.data(withJSONObject: style.jsonObject)
+        let styleJSON = String(decoding: encodedStyle, as: UTF8.self)
+        _ = try await web.evaluateJavaScript("window.__reader.setStyle(JSON.parse(\(WebReaderJavaScriptLiteral.string(styleJSON))));")
+        let text = String(repeating: "长段正文，模式切换不能回到段首。👩🏽‍💻", count: 150)
+        let content = try XCTUnwrap(WebReaderContentPayloadBuilder.json(
+            sections: [.init(chapterIndex: 0, title: "长段落", paragraphs: [text, "末段"])],
+            showChapterEndBadge: false, traditionalChineseEnabled: false, revision: "held-frames"))
+        _ = try await web.evaluateJavaScript("window.__reader.setContent(JSON.parse(\(WebReaderJavaScriptLiteral.string(content))));")
+        _ = try await web.evaluateJavaScript("window.__reader.scrollToFlat(0,false,'character600','held-frames',600);")
+        for _ in 0..<30 {
+            if messages.bodies.contains(where: { $0["type"] as? String == "visible" }) { break }
+            try await Task.sleep(nanoseconds: 100_000_000)
+        }
+        let acknowledgement = try XCTUnwrap(messages.bodies.firstIndex(where: { $0["type"] as? String == "scroll-applied" }))
+        let visible = try XCTUnwrap(messages.bodies.firstIndex(where: { $0["type"] as? String == "visible" }),
+            "A covered reader must commit its restored position without a compositor frame")
+        XCTAssertGreaterThan(visible, acknowledgement, "The native pending key is cleared by acknowledgement first")
+        XCTAssertEqual(messages.bodies[visible]["revision"] as? String, "held-frames")
+        let offset = try XCTUnwrap(messages.bodies[visible]["utf16Offset"] as? Int)
+        XCTAssertGreaterThan(offset, 500)
+        XCTAssertLessThanOrEqual(offset, 600)
+    }
+
     @MainActor func testAppendingAPrefetchDoesNotIssueAScrollCommandButPrependingStillAnchors() async throws {
         let web = WKWebView(frame: CGRect(x: 0, y: 0, width: 390, height: 760))
         let scene = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.first
@@ -62,5 +111,12 @@ final class ReaderScrollCadenceTests: XCTestCase {
         XCTAssertEqual(coordinator.styleBuildCount, before, "Scroll updates must not repeat font resolution even when the final payload is equal")
         coordinator.update(view: fixture(size: 21), webView: web)
         XCTAssertEqual(coordinator.styleBuildCount, before + 1, "Real typography changes must still reach the document")
+    }
+}
+
+private final class ReaderPositionMessageProbe: NSObject, WKScriptMessageHandler {
+    var bodies: [[String: Any]] = []
+    func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
+        if let body = message.body as? [String: Any] { bodies.append(body) }
     }
 }

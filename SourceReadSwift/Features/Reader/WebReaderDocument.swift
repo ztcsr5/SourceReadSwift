@@ -1079,6 +1079,17 @@ enum WebReaderHTML {
         return best;
       }
 
+      function reportVisiblePosition(now) {
+        var metric = metricAt(window.scrollY + topInset() + 4);
+        if (!metric) { return false; }
+        window.clearTimeout(state.visiblePostTimer);
+        state.visiblePostTimer = null;
+        state.lastVisiblePostAt = now;
+        state.visible = metric.flat;
+        post({ type: "visible", flat: metric.flat, utf16Offset: visibleTextOffset(metric.element) });
+        return true;
+      }
+
       function onScroll() {
         state.ticking = false;
         var y = window.scrollY;
@@ -1089,13 +1100,7 @@ enum WebReaderHTML {
           // 树每帧重算。120ms 一条足够记进度，也不会把主线程塞满。
           var now = performance.now();
           if (now - (state.lastVisiblePostAt || 0) > 120) {
-            var metric = metricAt(y + topInset() + 4);
-            if (!metric) { return; }
-            window.clearTimeout(state.visiblePostTimer);
-            state.visiblePostTimer = null;
-            state.lastVisiblePostAt = now;
-            state.visible = metric.flat;
-            post({ type: "visible", flat: metric.flat, utf16Offset: visibleTextOffset(metric.element) });
+            if (!reportVisiblePosition(now)) { return; }
           } else if (!state.visiblePostTimer) {
             // Keep the final line even when scrolling stops within the throttle
             // interval. Otherwise a quick swipe persists the previous position.
@@ -1274,6 +1279,9 @@ enum WebReaderHTML {
           state.visible = -1;
           state.lastVisiblePostAt = 0;
           post({ type: "scroll-applied", flat: flat, requestKey: requestKey });
+          // Compositor frames can pause while a native transition covers the
+          // reader. Commit the acknowledged position before relying on rAF.
+          reportVisiblePosition(performance.now());
           window.requestAnimationFrame(onScroll);
         };
         if (animated) { window.setTimeout(finish, 400); } else { finish(); }
