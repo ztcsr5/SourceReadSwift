@@ -17,6 +17,8 @@ struct BookshelfView: View {
     @State private var selectedMainGroup: String? = nil
     @State private var searchKeyword = ""
     @State private var selectedMediaFilter: String? = nil
+    @State private var readingBookID: String?
+    @AppStorage("settings.readingDeskEnabled") private var readingDeskEnabled = true
 
     enum BookshelfSortMode: String, CaseIterable, Identifiable {
         case recentRead = "最近阅读"
@@ -269,7 +271,13 @@ struct BookshelfView: View {
             if recentBooks.isEmpty {
                 emptyImportCard
             } else {
-                if let book = recentBooks.first { heroCard(book) }
+                if readingDeskEnabled {
+                    let books = ReadingDeskSelection.books(from: recentBooks)
+                    ReadingDeskPager(books: books, selection: Binding(
+                        get: { ReadingDeskSelection.resolve(readingBookID, in: books) },
+                        set: { readingBookID = $0 }), card: { heroCard($0) })
+                    .onChange(of: recentBooks.first?.id) { readingBookID = $0 }
+                } else if let book = recentBooks.first { heroCard(book) }
             }
         }
     }
@@ -713,7 +721,7 @@ struct BookshelfView: View {
             BookshelfReaderGatewayView(book: book)
                 .bookHeroDestination("continue|" + book.id, in: bookHero)
         } label: {
-            ReadingHeroCard(book: book, heroNamespace: bookHero)
+            ReadingHeroCard(book: book, heroNamespace: bookHero, usesSpatialStyle: readingDeskEnabled)
                 .frame(maxWidth: .infinity, alignment: .topLeading)
                 .padding(.vertical, 3)
         }
@@ -913,7 +921,7 @@ struct BookshelfView: View {
         } label: {
             VStack(alignment: .leading, spacing: 8) {
                 ZStack(alignment: .topTrailing) {
-                    AsyncBookCover(urlString: book.coverURL, width: nil, height: 145, baseURLString: book.bookURL, sourceURLString: book.sourceURL)
+                    AsyncBookCover(urlString: book.coverURL, width: nil, height: 145, baseURLString: book.bookURL, sourceURLString: book.sourceURL, title: book.title)
                         .frame(maxWidth: .infinity)
                         .frame(height: 145)
                         .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
@@ -1432,6 +1440,7 @@ struct AsyncBookCover: View {
     /// form by an older build.
     var sourceURLString: String? = nil
     var onImageLoad: ((UIImage?) -> Void)? = nil
+    var title: String? = nil
 
     var body: some View {
         Group {
@@ -1444,6 +1453,11 @@ struct AsyncBookCover: View {
         .frame(width: width, height: height)
         .frame(maxWidth: width == nil ? .infinity : nil)
         .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .task(id: urlString) {
+            if CoverURLResolver.url(from: urlString, base: baseURLString, fallbackBase: sourceURLString) == nil {
+                onImageLoad?(nil)
+            }
+        }
     }
 
     /// Decode at the size this cover is actually drawn. The shelf grid shows
@@ -1455,12 +1469,6 @@ struct AsyncBookCover: View {
     }
 
     private var placeholder: some View {
-        RoundedRectangle(cornerRadius: 10, style: .continuous)
-            .fill(style == .onDark ? Color.white.opacity(0.12) : Color.primary.opacity(0.06))
-            .overlay {
-                Image(systemName: "book.closed")
-                    .font(.system(size: max(13, height * 0.2), weight: .light))
-                    .foregroundStyle(style == .onDark ? Color.white.opacity(0.9) : Color.secondary.opacity(0.5))
-            }
+        BookCoverPlaceholder(title: title, height: height, isOnDark: style == .onDark)
     }
 }

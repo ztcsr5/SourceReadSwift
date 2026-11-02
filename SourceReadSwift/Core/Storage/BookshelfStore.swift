@@ -170,31 +170,37 @@ final class BookshelfStore: ObservableObject {
         paragraphIndex: Int? = nil
     ) {
         guard let index = books.firstIndex(where: { $0.id == bookID }) else { return }
-        books[index].currentChapterIndex = max(0, chapterIndex)
-        books[index].currentChapterTitle = chapterTitle
-        books[index].currentParagraphIndex = paragraphIndex.map { max(0, $0) }
-        books[index].totalChapters = max(totalChapters, books[index].totalChapters)
-        books[index].seenTotalChapters = max(
-            books[index].seenTotalChapters ?? 0,
-            books[index].currentChapterIndex + 1
+        var updated = books[index]
+        updated.currentChapterIndex = max(0, chapterIndex)
+        updated.currentChapterTitle = chapterTitle
+        updated.currentParagraphIndex = paragraphIndex.map { max(0, $0) }
+        updated.totalChapters = max(totalChapters, updated.totalChapters)
+        updated.seenTotalChapters = max(
+            updated.seenTotalChapters ?? 0,
+            updated.currentChapterIndex < Int.max ? updated.currentChapterIndex + 1 : Int.max
         )
-        books[index].lastReadAt = Date()
-        moveToFront(index: index)
+        updated.lastReadAt = Date()
+        // @Published array element mutation emits per field. Build the complete
+        // position locally, then publish exactly one coherent shelf snapshot.
+        var nextBooks = books
+        nextBooks.remove(at: index)
+        nextBooks.insert(updated, at: 0)
+        books = nextBooks
         persistReadingProgress()
-        if let updated = books.first {
-            onBookRead?(updated)
-        }
+        onBookRead?(updated)
     }
 
     func markReaderOpened(bookID: String) {
         guard let index = books.firstIndex(where: { $0.id == bookID }) else { return }
-        books[index].lastOpenedAt = Date()
-        books[index].lastReadAt = Date()
-        moveToFront(index: index)
+        var updated = books[index]
+        updated.lastOpenedAt = Date()
+        updated.lastReadAt = Date()
+        var nextBooks = books
+        nextBooks.remove(at: index)
+        nextBooks.insert(updated, at: 0)
+        books = nextBooks
         persistReadingProgress()
-        if let updated = books.first {
-            onBookRead?(updated)
-        }
+        onBookRead?(updated)
     }
 
     func recordReadingSession(bookID: String, duration: TimeInterval) {

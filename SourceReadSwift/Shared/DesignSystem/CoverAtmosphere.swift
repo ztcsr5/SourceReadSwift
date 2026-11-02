@@ -4,16 +4,21 @@ import SwiftUI
 struct CoverAtmosphere: View {
     let tone: CoverTone?
     @Environment(\.colorSchemeContrast) private var contrast
-    private var inkSurface: Color {
-        guard let tone else { return Color(uiColor: .secondarySystemBackground) }
-        return Color(red: max(0.025, tone.vividRed * 0.22), green: max(0.025, tone.vividGreen * 0.22), blue: max(0.025, tone.vividBlue * 0.22))
-    }
+    @Environment(\.colorScheme) private var scheme
+    @AppStorage("settings.visualTheme") private var theme = AppVisualTheme.classic.rawValue
+    @AppStorage("settings.appearanceRevision") private var revision = 0
     var body: some View {
         ZStack {
-            if tone == nil { AppTheme.card } else { inkSurface }
-            if contrast != .increased, let tone {
-                RadialGradient(colors: [Color(red: tone.vividRed, green: tone.vividGreen, blue: tone.vividBlue).opacity(0.32), .clear],
-                               center: .top, startRadius: 0, endRadius: 340)
+            let _ = theme
+            let _ = revision
+            AppTheme.card
+            if contrast != .increased {
+                let pigment = tone.map { Color(red: $0.vividRed, green: $0.vividGreen, blue: $0.vividBlue) } ?? AppTheme.accent
+                // The theme remains the paper; the cover contributes only a restrained wash.
+                LinearGradient(colors: [pigment.opacity(scheme == .dark ? 0.14 : 0.09), .clear, AppTheme.background.opacity(0.45)],
+                    startPoint: .topLeading, endPoint: .bottomTrailing)
+                RadialGradient(colors: [pigment.opacity(scheme == .dark ? 0.16 : 0.08), .clear],
+                    center: .leading, startRadius: 0, endRadius: 240)
             }
         }
         .allowsHitTesting(false)

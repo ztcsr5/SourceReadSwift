@@ -17,6 +17,7 @@ struct CachedRemoteImage<Placeholder: View>: View {
     let placeholder: () -> Placeholder
 
     @State private var image: UIImage?
+    @State private var loadedIdentifier: String?
 
     init(
         url: URL?,
@@ -38,7 +39,7 @@ struct CachedRemoteImage<Placeholder: View>: View {
 
     var body: some View {
         Group {
-            if let image {
+            if let image, loadedIdentifier == taskIdentifier {
                 Image(uiImage: image)
                     .resizable()
                     .aspectRatio(contentMode: contentMode)
@@ -65,15 +66,12 @@ struct CachedRemoteImage<Placeholder: View>: View {
     }
 
     private func loadImage() async {
-        await MainActor.run {
-            guard !Task.isCancelled else { return }
-            image = nil
-            onImageLoad?(nil)
-        }
         guard !Task.isCancelled else { return }
         guard let url else {
             await MainActor.run {
                 image = nil
+                loadedIdentifier = nil
+                onImageLoad?(nil)
                 onSizeChange?(.zero)
             }
             return
@@ -83,10 +81,16 @@ struct CachedRemoteImage<Placeholder: View>: View {
             await MainActor.run {
                 guard !Task.isCancelled else { return }
                 image = cached
+                loadedIdentifier = taskIdentifier
                 onSizeChange?(cached.size)
                 onImageLoad?(cached)
             }
             return
+        }
+
+        await MainActor.run {
+            guard !Task.isCancelled else { return }
+            onImageLoad?(nil)
         }
 
         let loaded = await RemoteImageLoader.shared.image(
@@ -98,6 +102,7 @@ struct CachedRemoteImage<Placeholder: View>: View {
         await MainActor.run {
             guard !Task.isCancelled else { return }
             image = loaded
+            loadedIdentifier = taskIdentifier
             onSizeChange?(loaded.size)
             onImageLoad?(loaded)
         }

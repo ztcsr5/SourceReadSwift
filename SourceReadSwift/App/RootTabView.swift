@@ -30,9 +30,9 @@ struct RootTabView: View {
                     if hasAudio { miniAudioPlayerBar }
                     customTabBar
                 }
+                .animation(motion.animation(.navigation), value: appState.isTabChromeHidden)
             }
         }
-        .animation(motion.animation(.navigation), value: appState.isTabChromeHidden)
         .font(.system(.body, design: AppVisualTheme.current.fontDesign))
         .tint(AppTheme.accent)
         .onReceive(audioCoordinator.$currentBook.map { $0 != nil }.removeDuplicates()) { hasAudio = $0 }

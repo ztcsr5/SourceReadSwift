@@ -5,6 +5,7 @@ struct AppearanceSettingsView: View {
     @AppStorage("settings.visualTheme") private var visualTheme = AppVisualTheme.classic.rawValue
     @AppStorage("settings.appearanceRevision") private var appearanceRevision = 0
     @AppStorage("settings.reducesMotion") private var reducesMotion = false
+    @AppStorage("settings.readingDeskEnabled") private var readingDeskEnabled = true
 
     var body: some View {
         Form {
@@ -20,9 +21,15 @@ struct AppearanceSettingsView: View {
             } header: { Text("全局主题") } footer: {
                 Text("主题同时调整背景、卡片纸色、圆角、边框、默认字形与装饰，登录中心、规则体检和二级页面同步；不覆盖阅读背景或网页原始内容。每套主题的自定义配色独立保存。")
                 Text(AppThemeSurfaceStyle.nativeGlassAvailable
-                     ? "当前系统支持原生玻璃：原初主题使用系统玻璃，其它主题保留各自纸面。减少透明度或增强对比度时自动使用不透明卡片。"
-                     : "当前系统使用兼容材质，不模拟更高系统版本；减少透明度或增强对比度时自动使用不透明卡片。")
+                     ? "当前系统支持原生玻璃；浮动控件按需使用，滚动卡片保留主题纸面，避免叠加实时模糊。"
+                     : "当前系统使用兼容材质；滚动卡片使用主题纸面，减少透明度或增强对比度时不叠加实时模糊。")
             }
+            .listRowBackground(AppThemeRowSurface())
+            Section {
+                Toggle("空间书桌与藏书档案", isOn: $readingDeskEnabled)
+                Text("关闭后使用经典紧凑展示。书籍、阅读位置、主题和系统导航保持不变。")
+                    .font(.caption).foregroundStyle(.secondary)
+            } header: { Text("书籍展示") }
             .listRowBackground(AppThemeRowSurface())
             Section {
                 Toggle("减少 App 动态效果", isOn: $reducesMotion)

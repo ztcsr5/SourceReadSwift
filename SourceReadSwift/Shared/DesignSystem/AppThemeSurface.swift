@@ -34,6 +34,7 @@ struct AppThemeSurface: ViewModifier {
     let material: Material
     let strokeOpacity: Double
     let shadowOpacity: Double
+    var usesLiveMaterial = false
     @AppStorage("settings.visualTheme") private var themeRawValue = AppVisualTheme.classic.rawValue
     @AppStorage("settings.appearanceRevision") private var appearanceRevision = 0
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
@@ -44,9 +45,11 @@ struct AppThemeSurface: ViewModifier {
     @ViewBuilder func body(content: Content) -> some View {
         let _ = appearanceRevision
         let radius = cornerRadius ?? theme.radius
-        let style = AppThemeSurfaceStyle.resolve(theme: theme,
+        // Repeated scrolling cards are opaque paper. Reserve live backdrop
+        // sampling for a few explicit floating controls, not every list row.
+        let style: AppThemeSurfaceStyle = usesLiveMaterial ? AppThemeSurfaceStyle.resolve(theme: theme,
             nativeGlassAvailable: AppThemeSurfaceStyle.nativeGlassAvailable,
-            reduceTransparency: reduceTransparency, increasedContrast: contrast == .increased)
+            reduceTransparency: reduceTransparency, increasedContrast: contrast == .increased) : .paper
         #if compiler(>=6.2)
         if #available(iOS 26.0, *), style == .nativeGlass {
             content.glassEffect(.regular.tint(AppTheme.card.opacity(0.25)),

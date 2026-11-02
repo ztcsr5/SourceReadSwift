@@ -71,15 +71,26 @@ final class ReaderModePositionRegressionTests: XCTestCase {
             onVisibleParagraph: { _ in }, onVisiblePosition: { _, value in offset = value },
             onScrollTargetApplied: { applied = true })
         let scene = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.first
+        let previousKeyWindow = scene?.windows.first(where: \.isKeyWindow)
         let window = scene.map { UIWindow(windowScene: $0) } ?? UIWindow(frame: UIScreen.main.bounds)
         window.frame = CGRect(x: 0, y: 0, width: 390, height: 844)
         let host = UIHostingController(rootView: fixture)
         window.rootViewController = host
         window.makeKeyAndVisible()
-        defer { window.isHidden = true }
+        defer { window.isHidden = true; previousKeyWindow?.makeKey() }
         for _ in 0..<150 {
             if applied && offset > 0 { break }
             try await Task.sleep(nanoseconds: 100_000_000)
+        }
+        if !applied || offset <= 500 {
+            func findWeb(_ root: UIView) -> WKWebView? {
+                if let web = root as? WKWebView { return web }
+                return root.subviews.lazy.compactMap(findWeb).first
+            }
+            if let web = findWeb(host.view) {
+                let diagnostic = try? await web.evaluateJavaScript("JSON.stringify({ready:document.readyState,bridge:!!window.__reader,paragraphs:document.querySelectorAll('.para').length,y:window.scrollY,height:document.documentElement.scrollHeight,visibility:document.visibilityState})")
+                print("WEB_POSITION_DIAGNOSTIC \(diagnostic ?? "no JavaScript response") loading=\(web.isLoading) bounds=\(web.bounds)")
+            }
         }
         XCTAssertTrue(applied, "The real WebKit document must acknowledge the character jump")
         XCTAssertGreaterThan(offset, 500, "Paragraph zero must not silently restore to its start")

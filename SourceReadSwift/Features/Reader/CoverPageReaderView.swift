@@ -82,6 +82,7 @@ final class CoverPageHostController: UIViewController, UIGestureRecognizerDelega
     }
     private var window: Window?
     private var pendingWindow: Window?
+    private var idlePublicationGeneration = 0
     private var hosts: [String: UIHostingController<AnyView>] = [:]
     private var active: [UIHostingController<AnyView>?] = []
     private var animator: UIViewPropertyAnimator?
@@ -164,7 +165,11 @@ final class CoverPageHostController: UIViewController, UIGestureRecognizerDelega
             pendingWindow = nextWindow
             return
         }
-        install(nextWindow)
+        let wasAwaitingLayout = window?.identity != nextWindow.identity || window?.keys != nextWindow.keys
+            || window?.revision != nextWindow.revision || window?.style != nextWindow.style
+            || window?.hasPrevious != nextWindow.hasPrevious || window?.hasNext != nextWindow.hasNext
+            || window?.appearance != nextWindow.appearance || window?.paper != nextWindow.paper
+        if wasAwaitingLayout { install(nextWindow) }
         // Completed flicks belong to their own immutable input, not the finger
         // that may already be dragging again while SwiftUI delivers this model.
         while !completedGestures.isEmpty {
@@ -189,11 +194,14 @@ final class CoverPageHostController: UIViewController, UIGestureRecognizerDelega
         }
         if isDragging {
             updateInteraction(translation: rawTranslation)
-        } else {
+        } else if wasAwaitingLayout {
             // updateUIViewController must not synchronously flush SwiftUI
             // @State. Recheck ownership after the representable update ends.
+            idlePublicationGeneration += 1
+            let idleGeneration = idlePublicationGeneration
             DispatchQueue.main.async { [weak self] in
                 guard let self, !self.isTornDown, !self.isDragging, self.animator == nil,
+                      self.idlePublicationGeneration == idleGeneration,
                       self.awaitingIdentityChangeFrom == nil, self.completedGestures.isEmpty else { return }
                 self.onInteractionChange?(false)
             }
@@ -372,7 +380,9 @@ final class CoverPageHostController: UIViewController, UIGestureRecognizerDelega
             completion()
             return
         }
-        let animator = UIViewPropertyAnimator(duration: 0.18, curve: .easeOut) { [weak self] in
+        let distance = abs(target - translation)
+        let duration = min(max(Double(distance / max(abs(velocity), 900)), 0.12), 0.28)
+        let animator = UIViewPropertyAnimator(duration: duration, curve: .easeOut) { [weak self] in
             self?.layoutPages(translation: target)
         }
         self.animator = animator
@@ -410,6 +420,7 @@ final class CoverPageHostController: UIViewController, UIGestureRecognizerDelega
     func tearDown() {
         guard !isTornDown else { return }
         isTornDown = true
+        idlePublicationGeneration += 1
         onCommit = nil
         onInteractionChange = nil
         onPageContainerLayout = nil

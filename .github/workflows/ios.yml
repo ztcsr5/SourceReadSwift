@@ -100,7 +100,7 @@ jobs:
           retention-days: 7
   build:
     runs-on: ${{ github.ref == 'refs/heads/codex/reader-motion-117' && 'macos-15-intel' || 'macos-15' }}
-    timeout-minutes: 30
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v5
 

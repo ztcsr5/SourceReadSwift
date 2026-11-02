@@ -25,6 +25,10 @@ struct AppMotionPolicy: Equatable {
         }
     }
 
+    func arrivalAnimation(stage: Int) -> Animation? {
+        animation(.expansion)?.delay(Double(min(max(stage, 0), 2)) * 0.045)
+    }
+
     func backgroundAnimation(hasPreviousPalette: Bool, hasNextPalette: Bool) -> Animation? {
         // A light placeholder and a dark cover surface use different semantic ink.
         // Crossfading only the surface would temporarily put white text on white.
@@ -54,8 +58,9 @@ private struct BookHeroSource: ViewModifier {
     let id: String
     let namespace: Namespace.ID
     @AppMotion private var motion
+    @AppStorage("settings.readingDeskEnabled") private var usesSpatialStyle = true
     @ViewBuilder func body(content: Content) -> some View {
-        if #available(iOS 18.0, *), !motion.reducesMotion {
+        if #available(iOS 18.0, *), !motion.reducesMotion, usesSpatialStyle {
             content.matchedTransitionSource(id: id, in: namespace)
         } else { content }
     }
@@ -65,8 +70,9 @@ private struct BookHeroDestination: ViewModifier {
     let id: String
     let namespace: Namespace.ID
     @AppMotion private var motion
+    @AppStorage("settings.readingDeskEnabled") private var usesSpatialStyle = true
     @ViewBuilder func body(content: Content) -> some View {
-        if #available(iOS 18.0, *), !motion.reducesMotion {
+        if #available(iOS 18.0, *), !motion.reducesMotion, usesSpatialStyle {
             content.navigationTransition(.zoom(sourceID: id, in: namespace))
         } else { content }
     }

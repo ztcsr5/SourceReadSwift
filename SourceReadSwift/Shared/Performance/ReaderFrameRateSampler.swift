@@ -70,15 +70,31 @@ final class ReaderFrameRateSampler {
     private static let framesKey = "reader.frameRate.frames"
     private static let droppedKey = "reader.frameRate.dropped"
     private static let secondsKey = "reader.frameRate.seconds"
-    private static let flushInterval = 600
 
     private var link: CADisplayLink?
     private var lastTimestamp: CFTimeInterval = 0
     private var expectedFrameDuration: Double = 1.0 / 60.0
     private var activeCount = 0
     private var pending = ReaderFrameRateAccumulator()
+    private var observers: [NSObjectProtocol] = []
 
-    private init() {}
+    private init() {
+        observers.append(NotificationCenter.default.addObserver(forName: UIApplication.willResignActiveNotification,
+            object: nil, queue: .main) { [weak self] _ in
+                Task { @MainActor in
+                    self?.link?.isPaused = true
+                    self?.lastTimestamp = 0
+                    self?.flush()
+                }
+            })
+        observers.append(NotificationCenter.default.addObserver(forName: UIApplication.didBecomeActiveNotification,
+            object: nil, queue: .main) { [weak self] _ in
+                Task { @MainActor in
+                    self?.lastTimestamp = 0
+                    self?.link?.isPaused = false
+                }
+            })
+    }
 
     func begin() {
         activeCount += 1
@@ -139,9 +155,9 @@ final class ReaderFrameRateSampler {
         let delta = link.timestamp - lastTimestamp
         guard delta > 0, delta <= 0.5 else { return }
         pending.recordFrame(delta: delta, expectedFrameDuration: expectedFrameDuration)
-        if pending.frames >= Self.flushInterval {
-            flush()
-        }
+        // Keep samples in memory throughout a reading session. Periodic writes
+        // to three defaults keys used to land in the middle of page gestures.
+        // `snapshot` already merges this pending accumulator; end() persists it.
     }
 
     private func flush() {

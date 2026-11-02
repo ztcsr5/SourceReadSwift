@@ -87,6 +87,7 @@ final class CustomFontManager: ObservableObject {
         let attr = (try? FileManager.default.attributesOfItem(atPath: url.path)) ?? [:]
         let size = (attr[.size] as? NSNumber)?.int64Value ?? 0
         let date = (attr[.creationDate] as? Date) ?? Date()
+        CustomFontLocations.register(postScriptName: psName, file: url)
 
         return CustomFontItem(
             fileName: url.lastPathComponent,
@@ -136,7 +137,33 @@ final class CustomFontManager: ObservableObject {
         return item
     }
 
+    /// The picker path keeps provider coordination, copying and CoreText parsing off main.
+    func importPickedFont(from sourceURL: URL) async throws -> CustomFontItem {
+        let directory = fontsDirectory
+        let installed = installedFonts
+        do {
+            let item = try await Task.detached(priority: .userInitiated) {
+                try FontImportOperation.prepare(source: sourceURL, directory: directory, installed: installed)
+            }.value
+            guard UIFont(name: item.postScriptName, size: 16) != nil else {
+                throw NSError(domain: "FontImport", code: 4,
+                    userInfo: [NSLocalizedDescriptionKey: "字体已读取，但系统无法启用它。请尝试另一份 TTF 或 OTF 文件。"])
+            }
+            if !installedFonts.contains(where: { $0.postScriptName == item.postScriptName }) {
+                installedFonts.insert(item, at: 0)
+            }
+            CustomFontLocations.register(postScriptName: item.postScriptName,
+                file: fontsDirectory.appendingPathComponent(item.fileName))
+            lastErrorMessage = nil
+            return item
+        } catch {
+            lastErrorMessage = error.localizedDescription
+            throw error
+        }
+    }
+
     func deleteFont(_ item: CustomFontItem) {
+        CustomFontLocations.remove(item.postScriptName)
         let fileURL = fontsDirectory.appendingPathComponent(item.fileName)
         var error: Unmanaged<CFError>?
         CTFontManagerUnregisterFontsForURL(fileURL as CFURL, .process, &error)

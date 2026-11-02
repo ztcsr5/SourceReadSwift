@@ -152,65 +152,28 @@ enum ReaderTextTransform {
 }
 
 enum WebReaderCustomFontCache {
-    private static let lock = NSLock()
-    private static var cachedPostScriptName: String = ""
-    private static var cachedCSS: String = ""
-
     static func fontFaceCSSForActiveCustomFont() -> String {
-        let postScript = (UserDefaults.standard.string(forKey: "reader.customFontPostScriptName") ?? "")
+        let name = (UserDefaults.standard.string(forKey: "reader.customFontPostScriptName") ?? "")
             .trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !postScript.isEmpty else { return "" }
-
-        lock.lock()
-        if cachedPostScriptName == postScript, !cachedCSS.isEmpty {
-            let hit = cachedCSS
-            lock.unlock()
-            return hit
-        }
-        lock.unlock()
-
-        let fm = FileManager.default
-        guard let appSupport = fm.urls(for: .applicationSupportDirectory, in: .userDomainMask).first else {
-            return ""
-        }
-        let fontsDir = appSupport
-            .appendingPathComponent("SourceReadSwift", isDirectory: true)
-            .appendingPathComponent("Fonts", isDirectory: true)
-        guard let files = try? fm.contentsOfDirectory(at: fontsDir, includingPropertiesForKeys: nil) else {
-            return ""
-        }
-
-        for fileURL in files {
-            guard let provider = CGDataProvider(url: fileURL as CFURL),
-                  let cgFont = CGFont(provider) else { continue }
-            let psName = (cgFont.postScriptName as String?) ?? fileURL.deletingPathExtension().lastPathComponent
-            guard psName == postScript else { continue }
-            guard let data = try? Data(contentsOf: fileURL), !data.isEmpty else { continue }
-            let ext = fileURL.pathExtension.lowercased()
-            let (mime, format): (String, String) = {
-                switch ext {
-                case "otf": return ("font/otf", "opentype")
-                case "woff": return ("font/woff", "woff")
-                case "ttc": return ("font/collection", "truetype")
-                default: return ("font/ttf", "truetype")
-                }
-            }()
-            let base64 = data.base64EncodedString()
-            let escapedName = postScript.replacingOccurrences(of: "\"", with: "\\\"")
-            let css = "@font-face { font-family: \"\(escapedName)\"; src: url(\"data:\(mime);base64,\(base64)\") format(\"\(format)\"); font-weight: 100 900; font-style: normal; font-display: swap; }"
-            lock.lock()
-            cachedPostScriptName = postScript
-            cachedCSS = css
-            lock.unlock()
-            return css
+        guard !name.isEmpty else { return "" }
+        if let cached = CustomFontLocations.file(for: name) { return ReaderFontResource.css(name: name, file: cached) }
+        guard let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first else { return "" }
+        let root = appSupport.appendingPathComponent("SourceReadSwift/Fonts", isDirectory: true)
+        guard let files = try? FileManager.default.contentsOfDirectory(at: root, includingPropertiesForKeys: nil) else { return "" }
+        for file in files where FontImportPolicy.extensions.contains(file.pathExtension.lowercased()) {
+            guard let descriptors = CTFontManagerCreateFontDescriptorsFromURL(file as CFURL) as? [CTFontDescriptor] else { continue }
+            for descriptor in descriptors {
+                let face = CTFontCreateWithFontDescriptor(descriptor, 16, nil)
+                let postScriptName = CTFontCopyPostScriptName(face) as String
+                CustomFontLocations.register(postScriptName: postScriptName, file: file)
+                if postScriptName == name { return ReaderFontResource.css(name: name, file: file) }
+            }
         }
         return ""
     }
 }
 
 enum WebReaderBundledFontCache {
-    private static let lock = NSLock()
-    private static var entries: [String: String] = [:]
     static func css(for family: ReaderFontFamily) -> String {
         let name: String
         switch family {
@@ -218,13 +181,8 @@ enum WebReaderBundledFontCache {
         case .zhiMangXing: name = "ZhiMangXing-Regular"
         default: return ""
         }
-        lock.lock(); defer { lock.unlock() }
-        if let css = entries[name] { return css }
-        guard let url = Bundle.main.url(forResource: name, withExtension: "ttf"),
-              let data = try? Data(contentsOf: url) else { return "" }
-        let css = "@font-face { font-family: \"\(name)\"; src: url(\"data:font/ttf;base64,\(data.base64EncodedString())\") format(\"truetype\"); font-weight: 100 900; font-style: normal; font-display: swap; }"
-        entries[name] = css
-        return css
+        guard let url = Bundle.main.url(forResource: name, withExtension: "ttf") else { return "" }
+        return ReaderFontResource.css(name: name, file: url, isBundled: true)
     }
 }
 

@@ -6,6 +6,7 @@ struct BookDetailView: View {
     @Namespace private var detailHero
     @AppMotion private var motion
     @State private var isHeaderCollapsed = false
+    @AppStorage("settings.readingDeskEnabled") private var readingDeskEnabled = true
     let initialBook: SearchBook
     var availableSources: [SearchBook] = []
     @State private var book: SearchBook
@@ -96,7 +97,11 @@ struct BookDetailView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: AppLayout.sectionGap) {
-                BookDetailHero(book: displayBook, readerSourceID: "reader|" + book.id, namespace: detailHero)
+                if readingDeskEnabled {
+                    BookDetailHero(book: displayBook, readerSourceID: "reader|" + book.id, namespace: detailHero)
+                } else {
+                    BookDetailHeader(book: displayBook)
+                }
 
                 if !chapters.isEmpty {
                     HStack(spacing: 12) {

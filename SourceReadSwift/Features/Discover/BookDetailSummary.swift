@@ -4,6 +4,7 @@ import SwiftUI
 struct BookDetailSummary: View {
     let detail: BookDetail
     @State private var expanded = false
+    @AppMotion private var motion
 
     private var metadata: [String] {
         [detail.kind?.nilIfEmpty, detail.status?.nilIfEmpty,
@@ -19,9 +20,12 @@ struct BookDetailSummary: View {
                         .lineLimit(intro.count > 60 && !expanded ? 4 : nil)
                         .textSelection(.enabled)
                     if intro.count > 60 {
-                        Button(expanded ? "收起简介" : "展开简介") { expanded.toggle() }
+                        Button(expanded ? "收起简介" : "展开简介") {
+                            withAnimation(motion.animation(.expansion)) { expanded.toggle() }
+                        }
                             .font(.caption.weight(.semibold)).tint(AppTheme.accent)
-                            .frame(minHeight: 30)
+                            .frame(minHeight: 44)
+                            .buttonStyle(AppPressStyle())
                     }
                 }
                 if !metadata.isEmpty {

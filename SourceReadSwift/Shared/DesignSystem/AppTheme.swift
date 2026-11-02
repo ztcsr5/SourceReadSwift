@@ -34,6 +34,7 @@ enum AppTheme {
         return String(format: "%02X%02X%02X", Int((r * 255).rounded()), Int((g * 255).rounded()), Int((b * 255).rounded()))
     }
     static let secondaryText = Color.secondary
+    static let danger = Color(uiColor: .systemRed)
 
     static var cardRadius: CGFloat { AppVisualTheme.current.radius }
     static let pagePadding: CGFloat = AppLayout.pageMargin
@@ -54,10 +55,12 @@ extension View {
         cornerRadius: CGFloat? = nil,
         material: Material = .ultraThinMaterial,
         strokeOpacity: Double = 0.10,
-        shadowOpacity: Double = 0.08
+        shadowOpacity: Double = 0.08,
+        usesLiveMaterial: Bool = false
     ) -> some View {
         modifier(AppThemeSurface(cornerRadius: cornerRadius, material: material,
-                                 strokeOpacity: strokeOpacity, shadowOpacity: shadowOpacity))
+                                 strokeOpacity: strokeOpacity, shadowOpacity: shadowOpacity,
+                                 usesLiveMaterial: usesLiveMaterial))
     }
 
     func listRowCard(cornerRadius: CGFloat = 16) -> some View {
@@ -71,7 +74,7 @@ extension View {
 
     func glassCircle(material: Material = .ultraThinMaterial) -> some View {
         modifier(AppThemeSurface(cornerRadius: 999, material: material,
-                                 strokeOpacity: 0.15, shadowOpacity: 0.06))
+                                 strokeOpacity: 0.15, shadowOpacity: 0.06, usesLiveMaterial: true))
     }
 }
 

@@ -95,9 +95,10 @@ struct WebScrollReaderView: UIViewRepresentable {
         private var view: WebScrollReaderView
         private weak var webView: WKWebView?
         private let imageHandler = ReaderImageSchemeHandler()
+        private let fontHandler = ReaderFontSchemeHandler()
 
         private var isDocumentReady = false
-        private var lastStyleSignature: String?
+        private var lastStylePayload: WebReaderStylePayload?
         private var lastContentFingerprint: String?
         private var expectedContentRevision = ""
         private var contentBuildTask: Task<Void, Never>?
@@ -131,6 +132,7 @@ struct WebScrollReaderView: UIViewRepresentable {
             // 关掉才不会被提取出来的正文里的号码触发链接改写。
             configuration.dataDetectorTypes = []
             configuration.setURLSchemeHandler(imageHandler, forURLScheme: WebReaderImageScheme.name)
+            configuration.setURLSchemeHandler(fontHandler, forURLScheme: ReaderFontResource.scheme)
             configuration.userContentController.add(self, name: "reader")
 
             let webView = WKWebView(frame: .zero, configuration: configuration)
@@ -164,6 +166,7 @@ struct WebScrollReaderView: UIViewRepresentable {
             webView.navigationDelegate = nil
             webView.uiDelegate = nil
             imageHandler.cancelAll()
+            fontHandler.cancelAll()
         }
 
         func update(view newView: WebScrollReaderView, webView: WKWebView) {
@@ -222,9 +225,10 @@ struct WebScrollReaderView: UIViewRepresentable {
             )
             payload.applyChapterHeading(size: view.chapterTitleSize, family: view.chapterTitleFamily,
                                         isBold: view.chapterTitleBold, bodyFamily: view.fontFamily)
-            let signature = Self.signature(for: payload.jsonObject)
-            guard signature != lastStyleSignature else { return }
-            lastStyleSignature = signature
+            // Custom font CSS may be several MB. Never stringify the whole JSON
+            // merely to decide whether an unchanged scroll update needs a bridge call.
+            guard payload != lastStylePayload else { return }
+            lastStylePayload = payload
             call(function: "setStyle", jsonObject: payload.jsonObject, webView: webView)
         }
 
@@ -307,14 +311,6 @@ struct WebScrollReaderView: UIViewRepresentable {
             let literal = WebReaderJavaScriptLiteral.string(text)
             let script = "window.__reader.\(function)(JSON.parse(\(literal)));"
             webView.evaluateJavaScript(script, completionHandler: nil)
-        }
-
-        private static func signature(for object: [String: Any]) -> String {
-            let keys = object.keys.sorted()
-            return keys.map { key in
-                let value = object[key] ?? ""
-                return "\(key)=\(value)"
-            }.joined(separator: "|")
         }
 
         // MARK: WKScriptMessageHandler
@@ -403,7 +399,7 @@ struct WebScrollReaderView: UIViewRepresentable {
                     contentBuildTask?.cancel()
                     expectedContentRevision = UUID().uuidString
                     lastContentFingerprint = nil
-                    lastStyleSignature = nil
+                    lastStylePayload = nil
                     lastSentScrollKey = nil
                     pendingScrollKey = nil
                     pendingScrollTarget = nil

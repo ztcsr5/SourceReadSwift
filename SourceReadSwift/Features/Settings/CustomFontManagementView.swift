@@ -8,6 +8,9 @@ struct CustomFontManagementView: View {
     @State private var isImportingFont = false
     @State private var importErrorMessage: String?
     @State private var showingErrorAlert = false
+    @State private var isPreparingFont = false
+    @State private var importedFontTitle: String?
+    @State private var pendingFontURL: URL?
 
     private var currentFontFamily: ReaderFontFamily {
         ReaderFontFamily(rawValue: fontFamilyRawValue) ?? .system
@@ -16,11 +19,7 @@ struct CustomFontManagementView: View {
     private var allowedFontTypes: [UTType] {
         // Some cloud providers label TTF/TTC as generic items, making a font-only picker grey them out.
         // The import boundary validates extension, size and CoreText descriptors instead.
-        var types: [UTType] = [.item, .data, .font]
-        if let ttf = UTType(filenameExtension: "ttf") { types.append(ttf) }
-        if let otf = UTType(filenameExtension: "otf") { types.append(otf) }
-        if let ttc = UTType(filenameExtension: "ttc") { types.append(ttc) }
-        return types
+        [.item]
     }
 
     init() {}
@@ -137,8 +136,22 @@ struct CustomFontManagementView: View {
                 Button {
                     isImportingFont = true
                 } label: {
-                    Label("从“文件”导入字体 (.ttf / .otf)", systemImage: "plus.circle.fill")
+                    Label(isPreparingFont ? "正在读取并启用字体…" : "从“文件”导入字体", systemImage: "plus.circle.fill")
                         .font(.body)
+                }
+                .disabled(isPreparingFont)
+                if isPreparingFont {
+                    HStack(spacing: 12) { ProgressView(); Text("正在复制文件和解析字体，请稍候") }
+                        .font(.subheadline).accessibilityLabel("正在导入字体")
+                } else if let importedFontTitle {
+                    Label("已启用 · \(importedFontTitle)", systemImage: "checkmark.circle")
+                        .font(.subheadline).foregroundStyle(.secondary)
+                        .accessibilityAddTraits(.updatesFrequently)
+                }
+                if let importErrorMessage {
+                    Label(importErrorMessage, systemImage: "exclamationmark.triangle")
+                        .font(.subheadline).foregroundStyle(AppTheme.danger)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
             } header: {
                 Text("自定义导入字体")
@@ -150,32 +163,41 @@ struct CustomFontManagementView: View {
         .pageBackground()
         .navigationTitle("字体管理")
         .navigationBarTitleDisplayMode(.inline)
-        .fileImporter(
-            isPresented: $isImportingFont,
-            allowedContentTypes: allowedFontTypes,
-            allowsMultipleSelection: false
-        ) { result in
-            switch result {
-            case .success(let urls):
-                guard let url = urls.first else { return }
-                do {
-                    let imported = try fontManager.importFont(from: url)
-                    customFontPostScriptName = imported.postScriptName
-                    fontFamilyRawValue = ReaderFontFamily.custom.rawValue
-                    HapticFeedback.success()
-                } catch {
-                    importErrorMessage = error.localizedDescription
-                    showingErrorAlert = true
-                }
-            case .failure(let error):
-                importErrorMessage = error.localizedDescription
-                showingErrorAlert = true
-            }
+        .sheet(isPresented: $isImportingFont, onDismiss: importPendingFont) {
+            UniversalDocumentPicker(contentTypes: allowedFontTypes, opensAllFiles: false,
+                onPick: { urls in
+                    isImportingFont = false
+                    guard let url = urls.first, !isPreparingFont else { return }
+                    // The native delegate fires before dismissal; acknowledge the pick immediately.
+                    isPreparingFont = true
+                    importedFontTitle = nil
+                    importErrorMessage = nil
+                    pendingFontURL = url
+                }, onCancel: { isImportingFont = false })
+                .ignoresSafeArea()
         }
         .alert("字体导入提示", isPresented: $showingErrorAlert) {
             Button("好的", role: .cancel) {}
         } message: {
             Text(importErrorMessage ?? "导入字体失败，请检查字体文件是否损坏。")
+        }
+    }
+
+    private func importPendingFont() {
+        guard let url = pendingFontURL else { return }
+        pendingFontURL = nil
+        Task { @MainActor in
+            defer { isPreparingFont = false }
+            do {
+                let imported = try await fontManager.importPickedFont(from: url)
+                customFontPostScriptName = imported.postScriptName
+                fontFamilyRawValue = ReaderFontFamily.custom.rawValue
+                importedFontTitle = imported.displayName
+                HapticFeedback.success()
+            } catch {
+                importErrorMessage = "导入字体失败：\(error.localizedDescription)"
+                showingErrorAlert = true
+            }
         }
     }
 

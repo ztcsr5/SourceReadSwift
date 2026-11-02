@@ -13,3 +13,21 @@ enum FontImportPolicy {
         }
     }
 }
+
+/// Shares registered font locations without coupling storage to the reader renderer.
+enum CustomFontLocations {
+    private static let lock = NSLock()
+    private static var files: [String: URL] = [:]
+    static func register(postScriptName: String, file: URL) {
+        lock.lock(); defer { lock.unlock() }
+        files[postScriptName] = file
+    }
+    static func file(for name: String) -> URL? {
+        lock.lock(); defer { lock.unlock() }
+        return files[name]
+    }
+    static func remove(_ name: String) {
+        lock.lock(); defer { lock.unlock() }
+        files.removeValue(forKey: name)
+    }
+}
