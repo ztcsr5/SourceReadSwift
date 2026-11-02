@@ -3943,8 +3943,8 @@ struct ReaderView: View {
         case .themes: return AnyView(ReaderBindingLibraryView())
         case .heading: return AnyView(ReaderChapterDesignEditor())
         case .chrome: return AnyView(ReaderChromeEditor())
-        case .typography: return AnyView(settingsPage(for: 1))
-        case .appearance: return AnyView(settingsPage(for: 0))
+        case .typography: return AnyView(ReaderSettingsContent { layoutSettingsBody(showsPreview: false) })
+        case .appearance: return AnyView(ReaderSettingsContent { appearanceSettingsBody(showsPreview: false) })
         case .assistance: return AnyView(settingsPage(for: 2))
         }
     }
@@ -4040,12 +4040,12 @@ struct ReaderView: View {
     }
 
     private var appearanceSettings: ReaderSettingsContent {
-        ReaderSettingsContent { appearanceSettingsBody }
+        ReaderSettingsContent { appearanceSettingsBody(showsPreview: true) }
     }
 
-    private var appearanceSettingsBody: some View {
+    private func appearanceSettingsBody(showsPreview: Bool) -> some View {
         Group {
-            appearancePreview
+            if showsPreview { appearancePreview }
             readerModeSection
             perBookOverrideToggle
             backgroundPickerSection
@@ -4371,12 +4371,12 @@ struct ReaderView: View {
     }
 
     private var layoutSettings: ReaderSettingsContent {
-        ReaderSettingsContent { layoutSettingsBody }
+        ReaderSettingsContent { layoutSettingsBody(showsPreview: true) }
     }
 
-    private var layoutSettingsBody: some View {
+    private func layoutSettingsBody(showsPreview: Bool) -> some View {
         VStack(alignment: .leading, spacing: 14) {
-            appearancePreview
+            if showsPreview { appearancePreview }
 
             VStack(alignment: .leading, spacing: 8) {
                 HStack {
