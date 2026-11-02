@@ -309,6 +309,8 @@ struct WebReaderStylePayload: Equatable {
     var customFontFaceCSS: String = ""
     var traditionalChineseEnabled: Bool = false
     var bionicReadingEnabled: Bool = false
+    var titleFontFamilyCSS: String = "inherit"
+    var titleWeight: Int = 700
 
     /// `lineSpacing` in the TextKit surface is *extra* leading between lines, so
     /// the CSS line box has to grow by that amount instead of replacing it.
@@ -336,6 +338,8 @@ struct WebReaderStylePayload: Equatable {
             "topInset": topInset,
             "bottomInset": bottomInset,
             "titleSize": titleSize,
+            "titleFontFamily": titleFontFamilyCSS,
+            "titleWeight": titleWeight,
             "titleSpacing": titleSpacing,
             "textColor": textColor,
             "surfaceColor": surfaceColor,
@@ -685,8 +689,9 @@ enum WebReaderHTML {
       padding-left: 0.62em;
       border-left: 3px solid var(--accent);
       font-size: var(--title-size);
+      font-family: var(--title-font, inherit);
+      font-weight: var(--title-weight, 700);
       line-height: 1.36;
-      font-weight: 700;
       letter-spacing: 0.01em;
       color: var(--text);
     }
@@ -856,6 +861,8 @@ enum WebReaderHTML {
         root.style.setProperty("--top", px(style.topInset));
         root.style.setProperty("--bottom", px(style.bottomInset));
         root.style.setProperty("--title-size", px(style.titleSize));
+        root.style.setProperty("--title-font", style.titleFontFamily || "inherit");
+        root.style.setProperty("--title-weight", String(style.titleWeight || 700));
         root.style.setProperty("--title-gap", px(style.titleSpacing));
         root.style.setProperty("--text", style.textColor);
         root.style.setProperty("--bg", style.surfaceColor);

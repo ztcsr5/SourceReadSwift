@@ -80,17 +80,23 @@ struct ReaderScrollChromeGeometry: Equatable {
     static let bodyGap: CGFloat = 6
     let safeTop: CGFloat
     let headerVisible: Bool
+    let fontSize: CGFloat
+    let topGap: CGFloat
 
-    init(safeTop: CGFloat, headerVisible: Bool, showSystemStatusBar: Bool) {
+    init(safeTop: CGFloat, headerVisible: Bool, showSystemStatusBar: Bool,
+         fontSize: CGFloat = 12, topGap: CGFloat = ReaderPageChrome.headerTopGap) {
         let finiteTop = safeTop.isFinite ? max(safeTop, 0) : 0
         self.safeTop = max(finiteTop, showSystemStatusBar ? 20 : 0)
         self.headerVisible = headerVisible
+        self.fontSize = CGFloat(ReaderHeadingPreferences.headerSize(Double(fontSize)))
+        self.topGap = CGFloat(ReaderHeadingPreferences.headerGap(Double(topGap)))
     }
 
-    var headerTop: CGFloat { safeTop + ReaderPageChrome.headerTopGap }
+    var headerTop: CGFloat { safeTop + topGap }
+    var bandHeight: CGFloat { max(ReaderPageChrome.scrollHeaderBandHeight, fontSize + 6) }
     var protectedHeight: CGFloat {
         headerVisible
-            ? headerTop + ReaderPageChrome.scrollHeaderBandHeight + Self.bodyGap
+            ? headerTop + bandHeight + Self.bodyGap
             : safeTop
     }
 }

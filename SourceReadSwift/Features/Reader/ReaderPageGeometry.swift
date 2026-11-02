@@ -75,6 +75,8 @@ struct ReaderPageGeometry: Equatable {
     let horizontalMargin: CGFloat
     let chromeLayout: ReaderPageChromeLayout
     let contentExtendsIntoChrome: Bool
+    let headerFontSize: CGFloat
+    let headerTopGap: CGFloat
 
     init(
         viewportSize: CGSize,
@@ -82,7 +84,9 @@ struct ReaderPageGeometry: Equatable {
         safeBottom: CGFloat,
         horizontalMargin: CGFloat,
         chromeLayout: ReaderPageChromeLayout = .header,
-        contentExtendsIntoChrome: Bool = false
+        contentExtendsIntoChrome: Bool = false,
+        headerFontSize: CGFloat = ReaderPageChrome.headerFontSize,
+        headerTopGap: CGFloat = ReaderPageChrome.headerTopGap
     ) {
         let width = max(viewportSize.width, 1)
         let height = max(viewportSize.height, 1)
@@ -92,6 +96,8 @@ struct ReaderPageGeometry: Equatable {
         self.horizontalMargin = max(min(horizontalMargin, max((width - 80) * 0.5, 0)), 0)
         self.chromeLayout = chromeLayout
         self.contentExtendsIntoChrome = contentExtendsIntoChrome
+        self.headerFontSize = CGFloat(ReaderHeadingPreferences.headerSize(Double(headerFontSize)))
+        self.headerTopGap = CGFloat(ReaderHeadingPreferences.headerGap(Double(headerTopGap)))
     }
 
     var contentWidth: CGFloat {
@@ -100,14 +106,15 @@ struct ReaderPageGeometry: Equatable {
 
     var showsHeader: Bool { chromeLayout == .header }
 
-    var headerTop: CGFloat { safeTop + ReaderPageChrome.headerTopGap }
+    var headerTop: CGFloat { safeTop + headerTopGap }
+    var headerHeight: CGFloat { max(ReaderPageChrome.headerHeight, headerFontSize + 3) }
 
     var headerRect: CGRect {
         CGRect(
             x: horizontalMargin,
             y: headerTop,
             width: contentWidth,
-            height: ReaderPageChrome.headerHeight
+            height: headerHeight
         )
     }
 
@@ -133,8 +140,8 @@ struct ReaderPageGeometry: Equatable {
         if contentExtendsIntoChrome { return safeTop + 8 }
         switch chromeLayout {
         case .header:
-            return safeTop + ReaderPageChrome.headerTopGap
-                + ReaderPageChrome.headerHeight
+            return safeTop + headerTopGap
+                + headerHeight
                 + ReaderPageChrome.headerToBodyGap
         case .inline:
             return safeTop + 8
@@ -205,7 +212,9 @@ struct ReaderPageContainerMetrics: Equatable {
     func geometry(
         horizontalMargin: CGFloat,
         chromeLayout: ReaderPageChromeLayout,
-        contentExtendsIntoChrome: Bool
+        contentExtendsIntoChrome: Bool,
+        headerFontSize: CGFloat = ReaderPageChrome.headerFontSize,
+        headerTopGap: CGFloat = ReaderPageChrome.headerTopGap
     ) -> ReaderPageGeometry {
         ReaderPageGeometry(
             viewportSize: size,
@@ -213,7 +222,8 @@ struct ReaderPageContainerMetrics: Equatable {
             safeBottom: resolvedSafeBottom,
             horizontalMargin: horizontalMargin,
             chromeLayout: chromeLayout,
-            contentExtendsIntoChrome: contentExtendsIntoChrome
+            contentExtendsIntoChrome: contentExtendsIntoChrome,
+            headerFontSize: headerFontSize, headerTopGap: headerTopGap
         )
     }
 }

@@ -6,6 +6,7 @@ import UIKit
 
 struct ReaderView: View {
     @EnvironmentObject private var appState: AppState
+    @AppMotion private var motion
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.readerTemporaryCoverPresented) private var temporaryCoverPresented
     let bookID: String
@@ -222,6 +223,13 @@ struct ReaderView: View {
     @AppStorage("reader.letterSpacing") private var letterSpacing: Double = ReaderTypographyDefaults.letterSpacing
     @AppStorage("reader.paragraphSpacing") private var paragraphSpacing: Double = ReaderTypographyDefaults.paragraphSpacing
     @AppStorage("reader.paragraphIndent") private var paragraphIndent: Double = ReaderTypographyDefaults.paragraphIndent
+    @AppStorage("reader.chapterTitleSize") private var chapterTitleSize = 0.0
+    @AppStorage("reader.chapterTitleBold") private var chapterTitleBold = true
+    @AppStorage("reader.chapterTitleFamily") private var chapterTitleFamilyRaw = ""
+    @AppStorage("reader.headerFontSize") private var headerFontSize = 12.0
+    @AppStorage("reader.headerTopGap") private var headerTopGap = 2.0
+    @AppStorage("reader.headerOpacity") private var headerOpacity = 0.82
+    @AppStorage("reader.allowsDuplicateTopStatus") private var allowsDuplicateTopStatus = false
     @AppStorage("reader.titleSpacing") private var titleSpacing: Double = ReaderTypographyDefaults.titleSpacing
     /// One-shot migration for the 1.0.64 defaults (`paragraphSpacing = 0`,
     /// `titleSpacing = 8`). A value the reader already customised is kept.
@@ -595,7 +603,8 @@ struct ReaderView: View {
             return metrics.geometry(
                 horizontalMargin: margin,
                 chromeLayout: chapterHeadingStyle,
-                contentExtendsIntoChrome: contentExtendsIntoChrome
+                contentExtendsIntoChrome: contentExtendsIntoChrome,
+                headerFontSize: CGFloat(headerFontSize), headerTopGap: CGFloat(headerTopGap)
             )
         }
         return ReaderPageGeometry(
@@ -604,7 +613,8 @@ struct ReaderView: View {
             safeBottom: readerFooterSafeInset,
             horizontalMargin: margin,
             chromeLayout: chapterHeadingStyle,
-            contentExtendsIntoChrome: contentExtendsIntoChrome
+            contentExtendsIntoChrome: contentExtendsIntoChrome,
+                headerFontSize: CGFloat(headerFontSize), headerTopGap: CGFloat(headerTopGap)
         )
     }
 
@@ -750,6 +760,7 @@ struct ReaderView: View {
             readerLayoutKey,
             chapterViewportSignature,
             textSelectionEnabled ? "selectable" : "page-taps",
+            "header-render:\(headerOpacity):\(allowsDuplicateTopStatus)",
             "\(footerShowTime)-\(footerShowBatteryIcon)-\(footerShowBatteryPercent)",
             backgroundRawValue,
             backgroundWallpaperRevision.uuidString,
@@ -772,6 +783,8 @@ struct ReaderView: View {
             String(format: "%.1f", titleSpacing),
             String(format: "%.1f", footerHeight),
             chapterHeadingStyleRaw,
+            "title:\(chapterTitleSize):\(chapterTitleBold):\(chapterTitleFamilyRaw)",
+            "header:\(headerFontSize):\(headerTopGap)",
             contentExtendsIntoChrome ? "extend" : "inset",
             statusPosition,
             showSystemStatusBar ? "sysbar" : "immersive",
@@ -797,6 +810,8 @@ struct ReaderView: View {
             String(format: "%.1f", titleSpacing),
             String(format: "%.1f", footerHeight),
             chapterHeadingStyleRaw,
+            "title:\(chapterTitleSize):\(chapterTitleBold):\(chapterTitleFamilyRaw)",
+            "header:\(headerFontSize):\(headerTopGap)",
             contentExtendsIntoChrome ? "extend" : "inset",
             statusPosition,
             showSystemStatusBar ? "sysbar" : "immersive",
@@ -1485,6 +1500,12 @@ struct ReaderView: View {
         background.textColor(isNight: readerIsNight)
     }
 
+    private var resolvedTitleSize: Double { ReaderHeadingPreferences.titleSize(custom: chapterTitleSize, body: fontSize) }
+    private var chapterTitleFamily: ReaderFontFamily { ReaderFontFamily(rawValue: chapterTitleFamilyRaw) ?? fontFamily }
+    private var showsTopStatus: Bool {
+        ReaderHeadingPreferences.showsTopStatus(position: statusPosition, systemBar: showSystemStatusBar, allowsDuplicates: allowsDuplicateTopStatus)
+    }
+
     private var readerThemeBackground: Color {
         background.color(isNight: readerIsNight)
     }
@@ -1728,7 +1749,7 @@ struct ReaderView: View {
             safeTop: readerTopSafeInset,
             headerVisible: ReaderScrollChromePolicy.headerVisible(
                 chapterStyle: chapterHeadingStyle, statusPosition: statusPosition),
-            showSystemStatusBar: showSystemStatusBar
+            showSystemStatusBar: showSystemStatusBar, fontSize: CGFloat(headerFontSize), topGap: CGFloat(headerTopGap)
         )
     }
 
@@ -1747,6 +1768,8 @@ struct ReaderView: View {
             resetToken: bookID,
             fontFamily: fontFamily,
             fontSize: fontSize,
+            chapterTitleSize: chapterTitleSize, chapterTitleBold: chapterTitleBold,
+            chapterTitleFamily: chapterTitleFamily,
             lineSpacing: lineSpacing,
             pagePadding: pagePadding,
             letterSpacing: letterSpacing,
@@ -2968,7 +2991,7 @@ struct ReaderView: View {
         VStack(alignment: .leading, spacing: 0) {
             if page.includesTitle {
                 Text(ReaderTextTransform.displayText(page.chapterTitle.isEmpty ? chapterTitle(for: page.chapterIndex) : page.chapterTitle, traditionalChinese: traditionalChineseEnabled))
-                    .font(fontFamily.swiftUIFont(size: CGFloat(ReaderTypographyDefaults.titleFontSize(for: fontSize)), weight: .bold, customPostScriptName: customFontPostScriptName))
+                    .font(chapterTitleFamily.swiftUIFont(size: CGFloat(resolvedTitleSize), weight: chapterTitleBold ? .bold : .regular, customPostScriptName: customFontPostScriptName))
                     .foregroundStyle(readerThemeTextColor)
                     .padding(.bottom, CGFloat(titleSpacing))
                     .readerSelectableText(textSelectionEnabled)
@@ -3018,9 +3041,9 @@ struct ReaderView: View {
             weight: .regular,
             customPostScriptName: customFontPostScriptName
         )
-        let titleFont = fontFamily.uiFont(
-            ofSize: CGFloat(ReaderTypographyDefaults.titleFontSize(for: fontSize)),
-            weight: .bold,
+        let titleFont = chapterTitleFamily.uiFont(
+            ofSize: CGFloat(resolvedTitleSize),
+            weight: chapterTitleBold ? .bold : .regular,
             customPostScriptName: customFontPostScriptName
         )
         let rawTitle = page.inlineTitleText ?? (page.chapterTitle.isEmpty ? chapterTitle(for: page.chapterIndex) : page.chapterTitle)
@@ -3257,18 +3280,18 @@ struct ReaderView: View {
             // header is what users reported as a duplicated heading.
             if !(page.includesTitle && chapterHeadingStyle == .inline) {
                 Text(page.chapterTitle.isEmpty ? chapterTitle(for: page.chapterIndex) : page.chapterTitle)
-                    .font(.system(size: ReaderPageChrome.headerFontSize, weight: .regular))
-                    .foregroundStyle(readerThemeTextColor.opacity(0.55))
+                    .font(.system(size: CGFloat(ReaderHeadingPreferences.headerSize(headerFontSize)), weight: .regular))
+                    .foregroundStyle(readerThemeTextColor.opacity(ReaderHeadingPreferences.opacity(headerOpacity)))
                     .lineLimit(1)
                     .minimumScaleFactor(0.75)
             }
 
             Spacer(minLength: 8)
 
-            if statusPosition == "top" || statusPosition == "both" {
+            if showsTopStatus {
                 if footerShowTime {
                     Text(now, format: .dateTime.hour().minute())
-                        .font(.system(size: ReaderPageChrome.headerFontSize, weight: .medium).monospacedDigit())
+                        .font(.system(size: CGFloat(ReaderHeadingPreferences.headerSize(headerFontSize)), weight: .medium).monospacedDigit())
                         .foregroundStyle(readerThemeTextColor.opacity(0.50))
                 }
                 if footerShowBatteryIcon || footerShowBatteryPercent {
@@ -3280,7 +3303,7 @@ struct ReaderView: View {
                             Text(batteryPercentageText)
                         }
                     }
-                    .font(.system(size: ReaderPageChrome.headerFontSize - 1, weight: .medium).monospacedDigit())
+                    .font(.system(size: CGFloat(ReaderHeadingPreferences.headerSize(headerFontSize)) - 1, weight: .medium).monospacedDigit())
                     .foregroundStyle(readerThemeTextColor.opacity(0.50))
                 }
             }
@@ -3290,7 +3313,7 @@ struct ReaderView: View {
             width: geometry.contentExtendsIntoChrome
                 ? geometry.contentWidth + 12
                 : geometry.contentWidth,
-            height: ReaderPageChrome.headerHeight,
+            height: geometry.headerHeight,
             alignment: .leading
         )
         .background(
@@ -3439,11 +3462,15 @@ struct ReaderView: View {
                     geometry: scrollChromeGeometry,
                     horizontalPadding: CGFloat(pagePadding),
                     foreground: readerThemeTextColor,
-                    paper: readerThemeBackground
+                    paper: readerThemeBackground,
+                    textOpacity: ReaderHeadingPreferences.opacity(headerOpacity),
+                    wallpaper: background == .custom || background.hasTexture
+                        ? AnyView(readerBackdrop.frame(height: effectiveViewportSize.height)
+                            .frame(height: scrollChromeGeometry.protectedHeight, alignment: .top).clipped()) : nil
                 ) {
                     // Keep explicit top-clock/battery preferences; the default
                     // bottom-status layout leaves only the chapter name here.
-                    if statusPosition == "top" || statusPosition == "both" {
+                    if showsTopStatus {
                         HStack(spacing: 8) {
                             if footerShowTime {
                                 Text(context.date, format: .dateTime.hour().minute())
@@ -3452,7 +3479,7 @@ struct ReaderView: View {
                             if footerShowBatteryPercent { Text(batteryPercentageText) }
                         }
                         .font(.system(size: 11, weight: .medium).monospacedDigit())
-                        .foregroundStyle(readerThemeTextColor.opacity(0.55))
+                        .foregroundStyle(readerThemeTextColor.opacity(ReaderHeadingPreferences.opacity(headerOpacity)))
                     }
                 }
                 Spacer(minLength: 0)
@@ -3651,7 +3678,7 @@ struct ReaderView: View {
             .modifier(ReaderChromeSurface(paper: readerThemeBackground, ink: readerThemeTextColor))
             .padding(.horizontal, 16)
             .padding(.top, readerTopSafeInset + 4)
-            .background(readerThemeBackground.ignoresSafeArea(edges: .top))
+            .background((background == .custom ? Color.clear : readerThemeBackground).ignoresSafeArea(edges: .top))
 
             Spacer()
 
@@ -4466,6 +4493,25 @@ struct ReaderView: View {
                     .font(.caption2)
                     .foregroundStyle(readerThemeTextColor.opacity(0.62))
                     .fixedSize(horizontal: false, vertical: true)
+            }
+
+            VStack(alignment: .leading, spacing: 10) {
+                Text("章节名 · 独立排版").font(.headline)
+                Toggle("章节名加粗", isOn: $chapterTitleBold)
+                Picker("章节名字体", selection: $chapterTitleFamilyRaw) {
+                    Text("跟随正文").tag("")
+                    ForEach(ReaderFontFamily.allCases) { family in Text(family.title).tag(family.rawValue) }
+                }
+                readerValueSlider("章节名字号", value: Binding(get: { resolvedTitleSize }, set: { chapterTitleSize = $0 }), range: 14...44, step: 1, unit: "pt", help: "只改变章节名，不改变正文字号；滚动与分页模式共用。")
+                Button("章节名字号跟随正文") { chapterTitleSize = 0 }
+            }
+
+            VStack(alignment: .leading, spacing: 10) {
+                Text("页眉 · 独立排版").font(.headline)
+                readerValueSlider("页眉字号", value: $headerFontSize, range: 9...18, step: 1, unit: "pt", help: "增大字号会同步预留页眉高度，不覆盖正文。")
+                readerValueSlider("页眉顶部间距", value: $headerTopGap, range: 0...24, step: 1, unit: "pt", help: "从安全区下沿开始计算，避免挡住灵动岛。")
+                readerValueSlider("页眉文字浓度", value: $headerOpacity, range: 0.35...1, step: 0.05, unit: "", help: "独立于正文颜色；背景图仍连续覆盖顶部。")
+                Toggle("系统状态栏可见时仍重复顶部时间电量", isOn: $allowsDuplicateTopStatus)
             }
 
             readerValueSlider("章节标题间距", value: $titleSpacing, range: 0...36, step: 2, unit: "pt", help: "仅「正文大标题」模式生效：大章节标题与正文第一行之间的垂直留白（推荐 8~16pt）。页眉模式不占用正文高度。")
@@ -5668,7 +5714,7 @@ struct ReaderView: View {
     }
 
     private func toggleOverlay() {
-        withAnimation(.easeOut(duration: 0.2)) {
+        withAnimation(motion.animation(.navigation)) {
             if chromeState.isSettingsVisible {
                 chromeState.closeSettings()
             } else {
@@ -5684,7 +5730,7 @@ struct ReaderView: View {
     }
 
     private func toggleSettingsPanel() {
-        withAnimation(.easeOut(duration: 0.2)) {
+        withAnimation(motion.animation(.navigation)) {
             if chromeState.isSettingsVisible {
                 chromeState.closeSettings()
             } else {
@@ -5694,7 +5740,7 @@ struct ReaderView: View {
     }
 
     private func closeReaderChrome() {
-        withAnimation(.easeOut(duration: 0.2)) {
+        withAnimation(motion.animation(.navigation)) {
             chromeState.closeAll()
         }
     }
@@ -6435,7 +6481,7 @@ struct ReaderView: View {
         let geometry = pagedPageGeometry
         let typography = ReaderPageTypography(
             font: fontFamily.uiFont(ofSize: CGFloat(fontSize), customPostScriptName: customFontPostScriptName),
-            titleFont: fontFamily.uiFont(ofSize: CGFloat(ReaderTypographyDefaults.titleFontSize(for: fontSize)), weight: .bold, customPostScriptName: customFontPostScriptName),
+            titleFont: chapterTitleFamily.uiFont(ofSize: CGFloat(resolvedTitleSize), weight: chapterTitleBold ? .bold : .regular, customPostScriptName: customFontPostScriptName),
             lineSpacing: CGFloat(lineSpacing),
             letterSpacing: CGFloat(letterSpacing),
             paragraphSpacing: CGFloat(paragraphSpacing),

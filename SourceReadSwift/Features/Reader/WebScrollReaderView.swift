@@ -29,6 +29,9 @@ struct WebScrollReaderView: UIViewRepresentable {
     var resetToken: String = ""
     var fontFamily: ReaderFontFamily = .system
     let fontSize: Double
+    var chapterTitleSize: Double = 0
+    var chapterTitleBold: Bool = true
+    var chapterTitleFamily: ReaderFontFamily? = nil
     let lineSpacing: Double
     let pagePadding: Double
     let letterSpacing: Double
@@ -199,7 +202,7 @@ struct WebScrollReaderView: UIViewRepresentable {
         }
 
         private func pushStyleIfNeeded(webView: WKWebView) {
-            let payload = WebReaderStylePayload.make(
+            var payload = WebReaderStylePayload.make(
                 fontFamily: view.fontFamily,
                 fontSize: view.fontSize,
                 lineSpacing: view.lineSpacing,
@@ -217,6 +220,9 @@ struct WebScrollReaderView: UIViewRepresentable {
                 selectable: view.textSelectionEnabled,
                 bionicReadingEnabled: view.bionicReadingEnabled
             )
+            payload.titleSize = ReaderHeadingPreferences.titleSize(custom: view.chapterTitleSize, body: view.fontSize)
+            payload.titleFontFamilyCSS = view.chapterTitleFamily?.webCSSFamily ?? payload.fontFamilyCSS
+            payload.titleWeight = view.chapterTitleBold ? 700 : 400
             let signature = Self.signature(for: payload.jsonObject)
             guard signature != lastStyleSignature else { return }
             lastStyleSignature = signature
