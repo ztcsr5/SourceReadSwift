@@ -38,6 +38,7 @@ struct BookshelfReaderGatewayView: View {
 
     var body: some View {
         gatewayContent
+        .background(ReaderTabChromeExitBridge(owner: gatewayTabChromeOwner))
         .toolbar(.hidden, for: .tabBar)
         .environment(\.readerTemporaryCoverPresented, showSourceSwitcher)
         .onAppear {

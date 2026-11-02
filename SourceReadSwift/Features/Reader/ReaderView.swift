@@ -1068,6 +1068,7 @@ struct ReaderView: View {
             .ignoresSafeArea()
         }
         .background(ReaderNavigationPopLock())
+        .background(ReaderTabChromeExitBridge(owner: tabChromeOwner))
         .background(ReaderExitSwipeBridge(
             enabled: ReaderExitSwipePolicy.isEnabled(
                 menuVisible: showOverlay, settingsVisible: showSettings,
