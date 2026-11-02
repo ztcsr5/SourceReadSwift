@@ -25,7 +25,8 @@ final class ReaderScrollCadenceTests: XCTestCase {
             _ = try await web.evaluateJavaScript("window.__reader.setContent(JSON.parse(\(WebReaderJavaScriptLiteral.string(json))));")
         }
         try await setContent([0])
-        _ = try await web.evaluateJavaScript("window.readerScrollCommands=0;window.readerOriginalScroll=window.scrollTo.bind(window);window.scrollTo=function(){window.readerScrollCommands++;return window.readerOriginalScroll.apply(window,arguments);};")
+        let isSpyInstalled = try await web.evaluateJavaScript("window.readerScrollCommands=0;window.readerOriginalScroll=window.scrollTo.bind(window);window.scrollTo=function(){window.readerScrollCommands++;return window.readerOriginalScroll.apply(window,arguments);};typeof window.scrollTo === 'function';") as? Bool
+        XCTAssertEqual(isSpyInstalled, true, "Return a bridge-supported value after installing the scroll spy")
         try await setContent([0, 1])
         let appendCommands = try await web.evaluateJavaScript("window.readerScrollCommands") as? Int
         XCTAssertEqual(appendCommands, 0, "Appending below the viewport must not cancel native deceleration")
