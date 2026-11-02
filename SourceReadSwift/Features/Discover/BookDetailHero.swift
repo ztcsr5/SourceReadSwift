@@ -19,14 +19,14 @@ struct BookDetailHero: View {
     var body: some View {
         VStack(spacing: 20) {
             GeometryReader { proxy in
-                let collapse = min(max(-proxy.frame(in: .named("bookDetailScroll")).minY / 240, 0), 1)
+                let collapse: CGFloat = min(max(-proxy.frame(in: .named("bookDetailScroll")).minY / 240, 0), 1)
                 AsyncBookCover(urlString: book.coverUrl, width: 144, height: 200,
                            baseURLString: book.bookUrl, sourceURLString: book.sourceUrl,
                            onImageLoad: { coverImage = $0 })
                 .bookHeroSource(readerSourceID, in: namespace)
                 .shadow(color: .black.opacity(0.24), radius: 16, y: 12)
                 .scaleEffect(1 - collapse * 0.10, anchor: .top)
-                .opacity(1 - collapse * 0.25)
+                .opacity(1 - Double(collapse) * 0.25)
             }.frame(width: 144, height: 200)
                 .padding(.top, 12).accessibilityHidden(true)
             VStack(spacing: 8) {
