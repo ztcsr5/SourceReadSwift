@@ -39,10 +39,10 @@ final class CustomFontManager: ObservableObject {
 
     let fontsDirectory: URL
 
-    init(fileManager: FileManager = .default) {
+    init(fileManager: FileManager = .default, rootURL: URL? = nil) {
         let appSupport = fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
             ?? fileManager.temporaryDirectory
-        let dir = appSupport
+        let dir = rootURL ?? appSupport
             .appendingPathComponent("SourceReadSwift", isDirectory: true)
             .appendingPathComponent("Fonts", isDirectory: true)
         try? fileManager.createDirectory(at: dir, withIntermediateDirectories: true)
@@ -58,7 +58,7 @@ final class CustomFontManager: ObservableObject {
         }
 
         var items: [CustomFontItem] = []
-        let allowedExtensions: Set<String> = ["ttf", "otf", "ttc", "woff"]
+        let allowedExtensions = FontImportPolicy.extensions
 
         for fileURL in files {
             let ext = fileURL.pathExtension.lowercased()
@@ -76,13 +76,14 @@ final class CustomFontManager: ObservableObject {
         var error: Unmanaged<CFError>?
         _ = CTFontManagerRegisterFontsForURL(url as CFURL, .process, &error)
 
-        guard let provider = CGDataProvider(url: url as CFURL),
-              let cgFont = CGFont(provider) else {
+        guard let descriptors = CTFontManagerCreateFontDescriptorsFromURL(url as CFURL) as? [CTFontDescriptor],
+              let descriptor = descriptors.first else {
             return nil
         }
 
-        let psName = (cgFont.postScriptName as String?) ?? url.deletingPathExtension().lastPathComponent
-        let fullName = (cgFont.fullName as String?) ?? psName
+        let face = CTFontCreateWithFontDescriptor(descriptor, 16, nil)
+        let psName = CTFontCopyPostScriptName(face) as String
+        let fullName = CTFontCopyFullName(face) as String
         let attr = (try? FileManager.default.attributesOfItem(atPath: url.path)) ?? [:]
         let size = (attr[.size] as? NSNumber)?.int64Value ?? 0
         let date = (attr[.creationDate] as? Date) ?? Date()
@@ -105,13 +106,17 @@ final class CustomFontManager: ObservableObject {
         }
 
         let fileName = sourceURL.lastPathComponent
-        let destinationURL = fontsDirectory.appendingPathComponent(fileName)
-
-        if FileManager.default.fileExists(atPath: destinationURL.path) {
-            var error: Unmanaged<CFError>?
-            CTFontManagerUnregisterFontsForURL(destinationURL as CFURL, .process, &error)
-            try? FileManager.default.removeItem(at: destinationURL)
+        let properties = try sourceURL.resourceValues(forKeys: [.fileSizeKey, .isRegularFileKey])
+        try FontImportPolicy.validate(suffix: sourceURL.pathExtension, bytes: properties.fileSize ?? 0)
+        guard properties.isRegularFile == true,
+              let descriptors = CTFontManagerCreateFontDescriptorsFromURL(sourceURL as CFURL) as? [CTFontDescriptor],
+              let descriptor = descriptors.first else {
+            throw NSError(domain: "FontImport", code: 3, userInfo: [NSLocalizedDescriptionKey: "文件不是可读取的字体，请先下载完整文件或重新导出。"])
         }
+        let postScriptName = CTFontCopyPostScriptName(CTFontCreateWithFontDescriptor(descriptor, 16, nil)) as String
+        if let existing = installedFonts.first(where: { $0.postScriptName == postScriptName }) { return existing }
+        // A failed import must never destroy a previously usable font with the same filename.
+        let destinationURL = fontsDirectory.appendingPathComponent(UUID().uuidString + "-" + fileName)
 
         try FileManager.default.copyItem(at: sourceURL, to: destinationURL)
 

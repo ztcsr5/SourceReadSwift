@@ -14,7 +14,9 @@ struct CustomFontManagementView: View {
     }
 
     private var allowedFontTypes: [UTType] {
-        var types: [UTType] = [.font]
+        // Some cloud providers label TTF/TTC as generic items, making a font-only picker grey them out.
+        // The import boundary validates extension, size and CoreText descriptors instead.
+        var types: [UTType] = [.item, .data, .font]
         if let ttf = UTType(filenameExtension: "ttf") { types.append(ttf) }
         if let otf = UTType(filenameExtension: "otf") { types.append(otf) }
         if let ttc = UTType(filenameExtension: "ttc") { types.append(ttc) }
@@ -141,7 +143,7 @@ struct CustomFontManagementView: View {
             } header: {
                 Text("自定义导入字体")
             } footer: {
-                Text("从微信、百度网盘或 iCloud Drive 下载的字体文件均可通过系统“文件”导入。")
+                Text("支持 TTF、OTF、TTC、OTC。网盘文件请先下载；压缩包请先解压。文件列表允许选择普通文件，选中后会校验是否为有效字体。")
             }
             .listRowBackground(AppThemeRowSurface())
         }
