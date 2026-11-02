@@ -34,13 +34,13 @@ struct ReaderWorkbenchActions {
     var routeChanged: (ReaderWorkbenchRoute?) -> Void = { _ in }
 }
 
-/// One persistent sheet-like container; native navigation owns interactive child-page returns.
+/// Settings own a local route, never the reader's outer navigation stack.
 struct ReaderSettingsWorkbench: View {
     let context: ReaderWorkbenchContext
     private let preview: () -> AnyView
     private let page: (ReaderWorkbenchRoute) -> AnyView
     private let actions: ReaderWorkbenchActions
-    @State private var path: [ReaderWorkbenchRoute]
+    @State private var route: ReaderWorkbenchRoute?
     @State private var drag: CGFloat = 0
     @AppStorage("reader.atelierEnabled") private var usesWorkbench = true
     @AppMotion private var motion
@@ -49,7 +49,7 @@ struct ReaderSettingsWorkbench: View {
     init(context: ReaderWorkbenchContext, preview: @escaping () -> AnyView,
          page: @escaping (ReaderWorkbenchRoute) -> AnyView, actions: ReaderWorkbenchActions) {
         self.context = context; self.preview = preview; self.page = page; self.actions = actions
-        _path = State(initialValue: context.initialRoute.map { [$0] } ?? [])
+        _route = State(initialValue: context.initialRoute)
     }
     var body: some View {
         GeometryReader { proxy in
@@ -57,29 +57,23 @@ struct ReaderSettingsWorkbench: View {
             ZStack(alignment: .bottom) {
                 VStack(spacing: 0) {
                     handle
-                    NavigationStack(path: $path) {
-                        home
-                            .navigationTitle("阅读工坊").navigationBarTitleDisplayMode(.inline)
-                            .navigationDestination(for: ReaderWorkbenchRoute.self) { route in
-                                ReaderSettingsContent {
-                                    ScrollView {
-                                        VStack(alignment: .leading, spacing: 24) {
-                                            page(route)
-                                        }.padding(16)
-                                    }.safeAreaInset(edge: .top, spacing: 0) {
-                                        if !typeSize.isAccessibilitySize && proxy.size.height >= 600 {
-                                            preview().padding(.horizontal, 16).padding(.bottom, 12)
-                                        }
-                                    }.navigationTitle(route.title).navigationBarTitleDisplayMode(.inline)
-                                        .background { surface }
-                                        .toolbar { closeToolbar }
+                    header
+                    ReaderSettingsContent {
+                        if let route {
+                            ScrollView {
+                                VStack(alignment: .leading, spacing: 24) {
+                                    page(route)
+                                }.padding(16)
+                            }.safeAreaInset(edge: .top, spacing: 0) {
+                                if !typeSize.isAccessibilitySize && proxy.size.height >= 600 {
+                                    preview().padding(.horizontal, 16).padding(.bottom, 12)
                                 }
                             }
-                            .toolbar { closeToolbar }
+                            .id(route)
+                        } else {
+                            home
+                        }
                     }
-                    .toolbarBackground(context.paper, for: .navigationBar)
-                    .toolbarBackground(.visible, for: .navigationBar)
-                    .toolbarColorScheme(context.background.isDark ? .dark : .light, for: .navigationBar)
                     .tint(AppTheme.accent)
                     .transaction { if motion.reducesMotion { $0.disablesAnimations = true } }
                 }
@@ -92,15 +86,24 @@ struct ReaderSettingsWorkbench: View {
             }.frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
                 .foregroundStyle(context.ink)
                 .environment(\.colorScheme, context.background.isDark ? .dark : .light)
-        }.onChange(of: path) { actions.routeChanged($0.last) }
+        }.onChange(of: route) { actions.routeChanged($0) }
+            .accessibilityElement(children: .contain)
             .accessibilityIdentifier("reader.settingsWorkbench")
     }
-    private var closeToolbar: some ToolbarContent {
-        ToolbarItem(placement: .navigationBarTrailing) {
+    private var header: some View {
+        HStack(spacing: 8) {
+            if route != nil {
+                Button { route = nil } label: {
+                    Image(systemName: "chevron.left").frame(width: 44, height: 44)
+                }.accessibilityLabel("返回阅读设置")
+                    .accessibilityIdentifier("reader.settings.back")
+            }
+            Text(route?.title ?? "阅读工坊").font(.headline).lineLimit(1)
+            Spacer(minLength: 8)
             Button(action: actions.close) { Image(systemName: "xmark").frame(width: 44, height: 44) }
                 .accessibilityLabel("关闭阅读设置")
                 .accessibilityIdentifier("reader.settings.close")
-        }
+        }.padding(.horizontal, 12).padding(.bottom, 8).buttonStyle(AppPressStyle())
     }
     private var handle: some View {
         Capsule().fill(context.ink.opacity(0.22)).frame(width: 32, height: 4)
@@ -136,7 +139,7 @@ struct ReaderSettingsWorkbench: View {
                     Text(context.bookTitle).font(.caption).foregroundStyle(.secondary).lineLimit(1)
                     Text("调好书页，再回到故事里。") .font(.title3.weight(.semibold))
                 }
-                NavigationLink(value: ReaderWorkbenchRoute.themes) {
+                Button { route = .themes } label: {
                     VStack(alignment: .leading, spacing: 12) {
                         HStack { Label("你的阅读装帧", systemImage: "books.vertical").font(.caption); Spacer(); Image(systemName: "arrow.up.right") }
                         Text("让纸张、字与留白\n成为同一种气质。") .font(.title3.weight(.semibold))
@@ -149,7 +152,7 @@ struct ReaderSettingsWorkbench: View {
                     .accessibilityIdentifier("reader.settings.route.themes")
                 LazyVGrid(columns: typeSize.isAccessibilitySize ? [GridItem(.flexible())] : [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
                     ForEach(Array(ReaderWorkbenchRoute.allCases.filter { $0 != .themes }.enumerated()), id: \.element) { index, route in
-                        NavigationLink(value: route) {
+                        Button { self.route = route } label: {
                             VStack(alignment: .leading, spacing: 12) {
                                 HStack { Text(String(format: "%02d", index + 1)).font(.caption.monospaced()); Spacer(); Image(systemName: "arrow.up.right").font(.caption) }
                                     .foregroundStyle(.secondary)
