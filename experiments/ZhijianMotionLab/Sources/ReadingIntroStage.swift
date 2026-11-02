@@ -8,7 +8,7 @@ struct ReadingIntroStage: View, Animatable {
     let chapter: Int
     let onNextChapter: () -> Void
     var sampledTime: Double?
-    @State private var showsTicketReverse = false
+    @State private var flippedTickets: Set<Int> = []
 
     var animatableData: Double {
         get { position }
@@ -42,16 +42,18 @@ struct ReadingIntroStage: View, Animatable {
         ZStack {
             ForEach(0..<3) { index in
                 Button {
-                    withAnimation(isAnimated ? .easeInOut(duration: 0.22) : nil) { showsTicketReverse.toggle() }
+                    withAnimation(isAnimated ? .easeInOut(duration: 0.22) : nil) {
+                        if flippedTickets.contains(index) { flippedTickets.remove(index) } else { flippedTickets.insert(index) }
+                    }
                 } label: {
-                    ReadingTicket(book: LabBook.samples[index], hidesCover: index == 0, showsReverse: showsTicketReverse)
+                    ReadingTicket(book: LabBook.samples[index], hidesCover: index == 0, showsReverse: flippedTickets.contains(index))
                         .frame(width: size.width * 0.89, height: size.width * 0.34)
                 }.buttonStyle(.plain)
                     .rotationEffect(.degrees(index == 0 ? 0 : (index == 1 ? -4 : 3)))
                     .offset(x: index == 2 ? 10 : 0, y: CGFloat(index - 1) * size.width * 0.29 + CGFloat(2 - position) * CGFloat(index + 1) * 20)
                     .zIndex(Double(3 - index))
                     .accessibilityLabel("翻转藏书票 \(index + 1)")
-                    .accessibilityValue(showsTicketReverse ? "背面" : "正面")
+                    .accessibilityValue(flippedTickets.contains(index) ? "背面" : "正面")
                     .accessibilityIdentifier("intro.ticket.\(index)")
             }
         }.frame(width: size.width, height: size.height)

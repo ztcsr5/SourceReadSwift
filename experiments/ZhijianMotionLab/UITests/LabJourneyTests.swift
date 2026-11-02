@@ -27,6 +27,7 @@ final class LabJourneyTests: XCTestCase {
         let ticket = app.buttons["intro.ticket.0"]
         XCTAssertTrue(ticket.waitForExistence(timeout: 4)); ticket.tap()
         XCTAssertEqual(ticket.value as? String, "背面")
+        XCTAssertEqual(app.buttons["intro.ticket.1"].value as? String, "正面")
         addSnapshot("reading-intro-2-live-ticket", app: app)
         app.swipeLeft()
         let chapter = app.buttons["intro.nextChapter"]
@@ -49,7 +50,11 @@ final class LabJourneyTests: XCTestCase {
         XCTAssertTrue(quote.waitForExistence(timeout: 8)); quote.tap()
         XCTAssertTrue(app.staticTexts["已收进我的书笺"].waitForExistence(timeout: 4))
         addSnapshot("reading-reader-saved", app: app)
-        app.buttons["reader.close"].tap(); app.buttons["dock.1"].tap()
+        app.buttons["reader.close"].tap()
+        app.buttons["home.detail"].firstMatch.tap()
+        XCTAssertTrue(app.buttons["detail.read"].waitForExistence(timeout: 5))
+        addSnapshot("reading-detail", app: app)
+        app.buttons["detail.back"].tap(); app.buttons["dock.1"].tap()
         XCTAssertTrue(app.staticTexts["我的书笺"].waitForExistence(timeout: 5))
         let saved = app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "这里是《三体》的阅读器交互体验页")).firstMatch
         XCTAssertTrue(saved.waitForExistence(timeout: 5))

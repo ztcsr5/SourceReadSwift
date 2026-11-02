@@ -8,11 +8,14 @@ struct ReadingStatistics: View {
                 HStack {
                     Text("阅读看板 · 样式演示").font(.caption.weight(.medium))
                     Spacer()
-                    Button(showsWeek ? "切换今日" : "切换本周") { showsWeek.toggle() }
-                        .font(.caption).frame(minWidth: 70, minHeight: 44).accessibilityIdentifier("intro.stats.period")
                 }.padding(.horizontal, 4)
                 VStack(alignment: .leading, spacing: 18) {
-                    Text(showsWeek ? "本周阅读" : "今日阅读").font(.headline)
+                    HStack {
+                        Text(showsWeek ? "本周阅读" : "今日阅读").font(.headline)
+                        Spacer()
+                        Button(showsWeek ? "切换今日" : "切换本周") { showsWeek.toggle() }
+                            .font(.caption).frame(minWidth: 70, minHeight: 44).accessibilityIdentifier("intro.stats.period")
+                    }
                     HStack(alignment: .bottom) {
                         VStack(alignment: .leading, spacing: 8) {
                             HStack(alignment: .firstTextBaseline, spacing: 5) {

@@ -9,6 +9,7 @@ struct LabIntroView: View {
     let onFinish: () -> Void
     var sampledTime: Double? = nil
     var sampledPosition: Double? = nil
+    @GestureState private var isPanActive = false
     @State private var position: Double = 0
     @State private var dragOrigin: Double?
     @State private var dragStep = 0
@@ -44,6 +45,15 @@ struct LabIntroView: View {
         }
         .foregroundStyle(.black).ignoresSafeArea().preferredColorScheme(.light)
         .onAppear { position = Double(IntroChoreography.safeStep(step)) }
+        .onChange(of: isPanActive) { active in
+            guard !active, dragOrigin != nil else { return }
+            dragOrigin = nil
+            move(to: step)
+        }
+        .onChange(of: scenePhase) { phase in
+            guard phase != .active, dragOrigin != nil else { return }
+            dragOrigin = nil; position = Double(step)
+        }
         .onChange(of: step) { proposed in
             guard dragOrigin == nil else { return }
             withAnimation(animates ? .spring(response: 0.42, dampingFraction: 0.87) : nil) { position = Double(IntroChoreography.safeStep(proposed)) }
@@ -52,6 +62,7 @@ struct LabIntroView: View {
 
     private func pagingGesture(width: CGFloat) -> some Gesture {
         DragGesture(minimumDistance: 12)
+            .updating($isPanActive) { _, active, _ in active = true }
             .onChanged { gesture in
                 guard sampledPosition == nil, abs(gesture.translation.width) > abs(gesture.translation.height) * 1.15 else { return }
                 if dragOrigin == nil { dragOrigin = position; dragStep = step }
@@ -78,7 +89,7 @@ struct LabIntroView: View {
                         Text(subtitles[index]).font(typeSize.isAccessibilitySize ? .subheadline : .system(size: compact ? 12 : 14, weight: .semibold))
                             .multilineTextAlignment(.center).fixedSize(horizontal: false, vertical: true)
                     }
-                    .opacity(max(0, 1 - abs(renderedPosition - Double(index))))
+                    .opacity(max(0, 1 - abs(renderedPosition - Double(index)) * 2.4))
                     .offset(x: CGFloat(Double(index) - renderedPosition) * 18)
                     .accessibilityHidden(step != index)
                 }

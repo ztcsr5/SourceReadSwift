@@ -45,10 +45,10 @@ struct ReadingCoverField: View {
                             .position(x: proxy.size.width * 0.5, y: proxy.size.height * 0.49 + scrollOffset * (1 - blend))
                             .opacity(1 - blend).zIndex(10)
                         shelfModules(width: proxy.size.width)
-                            .position(x: proxy.size.width / 2, y: proxy.size.height * 0.77 + 160)
+                            .offset(y: proxy.size.width * 1.75 + 24)
                             .opacity(blend)
                     }
-                    .frame(width: proxy.size.width, height: proxy.size.height + 460)
+                    .frame(width: proxy.size.width, height: max(proxy.size.height, proxy.size.width * 1.75 + 584))
                 }
                 .background {
                     GeometryReader { geometry in
