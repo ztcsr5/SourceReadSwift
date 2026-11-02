@@ -75,6 +75,8 @@ jobs:
             -only-testing:SourceReadSwiftTests/ReaderScrollCadenceTests \
             -only-testing:SourceReadSwiftTests/ReaderBindingTests \
             -only-testing:SourceReadSwiftTests/ReaderWorkbenchVisualTests \
+            -only-testing:SourceReadSwiftTests/ReaderControlsMaterialTests \
+            -only-testing:SourceReadSwiftTests/ReaderTabChromeExitTests \
             -only-testing:SourceReadSwiftTests/ReaderPanController119Tests \
             -only-testing:SourceReadSwiftUITests/ReaderSettingsFlowUITests \
             -destination-timeout 120 -test-timeouts-enabled YES -maximum-test-execution-time-allowance 60 \
@@ -159,7 +161,7 @@ jobs:
             xcrun simctl list devices available
             exit 1
           fi
-          TEST_SELECTION=()
+          TEST_SELECTION=(-only-testing:SourceReadSwiftTests -only-testing:SourceReadSwiftUITests)
           if [ "${{ inputs.reader_settings_only }}" = "true" ]; then
             TEST_SELECTION=(-only-testing:SourceReadSwiftUITests/ReaderSettingsFlowUITests)
           fi
