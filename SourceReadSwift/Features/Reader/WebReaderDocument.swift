@@ -269,6 +269,8 @@ struct WebReaderStylePayload: Equatable {
     var bionicReadingEnabled: Bool = false
     var titleFontFamilyCSS: String = "inherit"
     var titleWeight: Int = 700
+    var chapterArt: String = "none"
+    var chapterAlignment: String = "left"
 
     /// `lineSpacing` in the TextKit surface is *extra* leading between lines, so
     /// the CSS line box has to grow by that amount instead of replacing it.
@@ -318,7 +320,9 @@ struct WebReaderStylePayload: Equatable {
             "selectable": selectable,
             "customFontFaceCSS": customFontFaceCSS,
             "traditionalChinese": traditionalChineseEnabled,
-            "bionicReading": bionicReadingEnabled
+            "bionicReading": bionicReadingEnabled,
+            "chapterArt": chapterArt,
+            "chapterAlignment": chapterAlignment
         ]
     }
 
@@ -666,6 +670,13 @@ enum WebReaderHTML {
       color: var(--text);
     }
     .chapter.first .chapter-title { margin-top: calc(var(--title-gap) * 0.5); }
+    .chapter-title { text-align: var(--chapter-alignment, left); }
+    .chapter-title::before {
+      content: ""; display: var(--chapter-art-display, none); height: 40px;
+      background-image: var(--chapter-art, none); background-size: 160px 40px;
+      background-repeat: no-repeat; background-position: var(--chapter-alignment, left);
+      margin-bottom: 8px; pointer-events: none;
+    }
     .para {
       margin: 0 0 var(--para-gap) 0;
       text-indent: var(--indent);
@@ -833,6 +844,9 @@ enum WebReaderHTML {
         root.style.setProperty("--title-size", px(style.titleSize));
         root.style.setProperty("--title-font", style.titleFontFamily || "inherit");
         root.style.setProperty("--title-weight", String(style.titleWeight || 700));
+        root.style.setProperty("--chapter-alignment", style.chapterAlignment || "left");
+        root.style.setProperty("--chapter-art", style.chapterArt || "none");
+        root.style.setProperty("--chapter-art-display", style.chapterArt && style.chapterArt !== "none" ? "block" : "none");
         root.style.setProperty("--title-gap", px(style.titleSpacing));
         root.style.setProperty("--text", style.textColor);
         root.style.setProperty("--bg", style.surfaceColor);
@@ -930,8 +944,6 @@ enum WebReaderHTML {
       }
 
       function setContent(payload) {
-        stopScrollAnimation();
-        state.activeScrollKey = null;
         state.revision = payload.revision || "";
         var anchor = captureAnchor();
         var nextSections = Object.create(null);
@@ -957,6 +969,10 @@ enum WebReaderHTML {
         var sameShape = isPrefixPreserved(payload)
           && nextOrder.length >= previousLength
           && !prefixRebuilt;
+
+        // An appended prefetch must not issue scrollTo(currentY): doing that
+        // cancels native inertia even though no visible content moved.
+        if (!sameShape) { stopScrollAnimation(); state.activeScrollKey = null; }
 
         if (sameShape) {
           for (var tail = previousLength; tail < nextOrder.length; tail += 1) {
@@ -1065,16 +1081,16 @@ enum WebReaderHTML {
 
       function onScroll() {
         state.ticking = false;
-        state.lastScrollAt = performance.now();
         var y = window.scrollY;
         var viewport = window.innerHeight;
         var height = document.documentElement.scrollHeight;
-        var metric = metricAt(y + topInset() + 4);
-        if (metric) {
+        if (state.nodes.length) {
           // 快速滚动时段落每几毫秒就换一次，逐条回传会让 SwiftUI 整棵阅读器
           // 树每帧重算。120ms 一条足够记进度，也不会把主线程塞满。
           var now = performance.now();
           if (now - (state.lastVisiblePostAt || 0) > 120) {
+            var metric = metricAt(y + topInset() + 4);
+            if (!metric) { return; }
             window.clearTimeout(state.visiblePostTimer);
             state.visiblePostTimer = null;
             state.lastVisiblePostAt = now;

@@ -161,6 +161,7 @@ final class ReaderFrameRateSampler {
     }
 
     private func flush() {
+        ReaderScrollPerfMeter.flush()
         guard pending.frames > 0 else { return }
         let defaults = UserDefaults.standard
         let combined = ReaderFrameRateAccumulator(

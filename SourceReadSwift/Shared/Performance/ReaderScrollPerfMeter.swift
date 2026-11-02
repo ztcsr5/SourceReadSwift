@@ -47,20 +47,16 @@ struct ReaderScrollPerfAccumulator: Equatable {
 /// 滚动性能采样：让用户**不连 Xcode**也能在设置里读到数字。
 ///
 /// 线程约定：只在主线程使用（`scrollViewDidScroll` 与设置页都在主线程）。
-/// 写盘节流到每 240 帧一次，避免每帧都打 UserDefaults。
+/// 阅读期间只累加内存；退出或切到后台时才落盘，不打断惯性滚动。
 enum ReaderScrollPerfMeter {
     private static let framesKey = "reader.scrollPerf.frames"
     private static let totalKey = "reader.scrollPerf.totalMs"
     private static let worstKey = "reader.scrollPerf.worstMs"
-    private static let flushInterval = 240
 
     private static var pending = ReaderScrollPerfAccumulator()
 
     static func record(cost: Double) {
         pending.record(cost: cost)
-        if pending.frames >= flushInterval {
-            flush()
-        }
     }
 
     /// 历史（已落盘）+ 本次未落盘的采样。
@@ -85,7 +81,7 @@ enum ReaderScrollPerfMeter {
         )
     }
 
-    private static func flush() {
+    static func flush() {
         guard pending.frames > 0 else { return }
         let combined = persisted.merged(with: pending)
         let defaults = UserDefaults.standard

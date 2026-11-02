@@ -4,6 +4,29 @@ import XCTest
 /// 滚动耗时聚合的纯逻辑。数字要能被人读懂，先得保证算法本身对。
 final class ReaderScrollPerfMeterTests: XCTestCase {
 
+    @MainActor func testScrollSamplesStayInMemoryUntilTheSessionFlushes() {
+        let defaults = UserDefaults.standard
+        let keys = ["reader.scrollPerf.frames", "reader.scrollPerf.totalMs", "reader.scrollPerf.worstMs"]
+        ReaderScrollPerfMeter.flush()
+        let original = keys.map { defaults.object(forKey: $0) }
+        defer {
+            ReaderScrollPerfMeter.reset()
+            for (key, value) in zip(keys, original) {
+                if let value { defaults.set(value, forKey: key) }
+                else { defaults.removeObject(forKey: key) }
+            }
+        }
+        ReaderScrollPerfMeter.reset()
+        for _ in 0..<600 { ReaderScrollPerfMeter.record(cost: 0.001) }
+        for key in keys { XCTAssertNil(defaults.object(forKey: key), "Scrolling must not periodically write defaults") }
+        XCTAssertEqual(ReaderScrollPerfMeter.snapshot.frames, 600)
+        ReaderScrollPerfMeter.flush()
+        XCTAssertEqual(defaults.integer(forKey: keys[0]), 600)
+        XCTAssertEqual(ReaderScrollPerfMeter.snapshot.frames, 600)
+        ReaderScrollPerfMeter.flush()
+        XCTAssertEqual(defaults.integer(forKey: keys[0]), 600, "Flushing twice cannot double-count samples")
+    }
+
     func testEmptyAccumulatorHasZeroAverage() {
         let accumulator = ReaderScrollPerfAccumulator()
         XCTAssertEqual(accumulator.frames, 0)

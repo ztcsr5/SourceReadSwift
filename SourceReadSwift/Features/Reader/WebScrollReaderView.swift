@@ -32,6 +32,8 @@ struct WebScrollReaderView: UIViewRepresentable {
     var chapterTitleSize: Double = 0
     var chapterTitleBold: Bool = true
     var chapterTitleFamily: ReaderFontFamily? = nil
+    var chapterDecoration: ReaderChapterDecoration = .none
+    var chapterAlignment: ReaderChapterAlignment = .leading
     let lineSpacing: Double
     let pagePadding: Double
     let letterSpacing: Double
@@ -99,6 +101,7 @@ struct WebScrollReaderView: UIViewRepresentable {
 
         private var isDocumentReady = false
         private var lastStylePayload: WebReaderStylePayload?
+        private var lastStyleInputs: [AnyHashable]?
         private(set) var styleBuildCount = 0
         private var lastContentFingerprint: String?
         private var expectedContentRevision = ""
@@ -145,6 +148,7 @@ struct WebScrollReaderView: UIViewRepresentable {
             webView.scrollView.contentInsetAdjustmentBehavior = .never
             webView.scrollView.showsVerticalScrollIndicator = false
             webView.scrollView.showsHorizontalScrollIndicator = false
+            webView.scrollView.decelerationRate = .normal
             webView.scrollView.bounces = true
             webView.scrollView.alwaysBounceVertical = true
             webView.scrollView.scrollsToTop = true
@@ -206,6 +210,17 @@ struct WebScrollReaderView: UIViewRepresentable {
         }
 
         private func pushStyleIfNeeded(webView: WKWebView) {
+            let accent = AppTheme.accentUIColor
+            var inputs: [AnyHashable] = [view.fontFamily.rawValue, view.fontSize, view.lineSpacing,
+                view.pagePadding, view.letterSpacing, view.paragraphSpacing, view.paragraphIndent,
+                view.titleSpacing, view.footerHeight, view.topInset ?? -1]
+            inputs += [WebReaderColor.hex(view.textColor), WebReaderColor.hex(view.surfaceColor),
+                WebReaderColor.hex(view.highlightColor), WebReaderColor.hex(accent),
+                view.textSelectionEnabled, view.bionicReadingEnabled, view.chapterTitleSize, view.chapterTitleBold]
+            inputs += [view.chapterTitleFamily?.rawValue ?? "", view.chapterDecoration.rawValue, view.chapterAlignment.rawValue,
+                UserDefaults.standard.string(forKey: "reader.customFontPostScriptName") ?? "", CustomFontLocations.revision]
+            guard inputs != lastStyleInputs else { return }
+            lastStyleInputs = inputs
             styleBuildCount += 1
             var payload = WebReaderStylePayload.make(
                 fontFamily: view.fontFamily,
@@ -221,12 +236,14 @@ struct WebScrollReaderView: UIViewRepresentable {
                 textColor: view.textColor,
                 surfaceColor: view.surfaceColor,
                 highlightColor: view.highlightColor,
-                accentColor: AppTheme.accentUIColor,
+                accentColor: accent,
                 selectable: view.textSelectionEnabled,
                 bionicReadingEnabled: view.bionicReadingEnabled
             )
             payload.applyChapterHeading(size: view.chapterTitleSize, family: view.chapterTitleFamily,
                                         isBold: view.chapterTitleBold, bodyFamily: view.fontFamily)
+            payload.chapterArt = view.chapterDecoration.cssImage(ink: view.textColor)
+            payload.chapterAlignment = view.chapterAlignment.css
             // Custom font CSS may be several MB. Never stringify the whole JSON
             // merely to decide whether an unchanged scroll update needs a bridge call.
             guard payload != lastStylePayload else { return }
@@ -402,6 +419,7 @@ struct WebScrollReaderView: UIViewRepresentable {
                     expectedContentRevision = UUID().uuidString
                     lastContentFingerprint = nil
                     lastStylePayload = nil
+                    lastStyleInputs = nil
                     lastSentScrollKey = nil
                     pendingScrollKey = nil
                     pendingScrollTarget = nil
