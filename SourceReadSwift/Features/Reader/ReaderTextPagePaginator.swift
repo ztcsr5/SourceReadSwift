@@ -24,8 +24,9 @@ enum ReaderTextPagePaginator {
         )
         guard document.length > 0 else { return [] }
 
-        let titleRange = NSRange(location: 0, length: inlineTitle?.utf16.count ?? 0)
-        var cursor = inlineTitle.map { $0.utf16.count + 1 } ?? 0
+        let ornamentPrefix = inlineTitle == nil ? 0 : typography.effectiveChapterDecoration.prefixLength
+        let titleRange = NSRange(location: ornamentPrefix, length: inlineTitle?.utf16.count ?? 0)
+        var cursor = inlineTitle.map { $0.utf16.count + 1 + ornamentPrefix } ?? 0
         var sourceRanges: [NSRange] = []
         for (index, text) in display.enumerated() {
             sourceRanges.append(NSRange(location: cursor, length: text.utf16.count))
@@ -92,7 +93,7 @@ enum ReaderTextPagePaginator {
                     chapterIndex: chapterIndex,
                     chapterTitle: title,
                     pageOrdinal: pages.count,
-                    inlineTitleText: hasTitle ? (title as NSString).substring(with: titlePart) : nil
+                    inlineTitleText: hasTitle ? (title as NSString).substring(with: NSRange(location: titlePart.location - ornamentPrefix, length: titlePart.length)) : nil
                 ))
             }
         }

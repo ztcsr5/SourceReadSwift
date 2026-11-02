@@ -16,6 +16,8 @@ enum ReaderPageTextBuilder {
         let paragraphSpacing: CGFloat
         let titleSpacing: CGFloat
         var firstLineIndent: CGFloat = 0
+        var chapterDecoration: ReaderChapterDecoration = .none
+        var chapterAlignment: ReaderChapterAlignment = .leading
     }
 
     struct Paragraph {
@@ -29,19 +31,30 @@ enum ReaderPageTextBuilder {
               textColor: textColor, highlightColor: highlightColor,
               lineSpacing: typography.lineSpacing, letterSpacing: typography.letterSpacing,
               paragraphSpacing: typography.paragraphSpacing, titleSpacing: typography.titleSpacing,
-              firstLineIndent: typography.firstLineIndent)
+              firstLineIndent: typography.firstLineIndent, chapterDecoration: typography.effectiveChapterDecoration,
+              chapterAlignment: typography.chapterAlignment)
     }
 
     static func make(title: String?, paragraphs: [Paragraph], style: Style) -> NSAttributedString {
         let output = NSMutableAttributedString()
 
         if let title, !title.isEmpty {
+            if style.chapterDecoration != .none {
+                let attachment = NSTextAttachment()
+                attachment.image = style.chapterDecoration.image(ink: style.textColor)
+                attachment.bounds = CGRect(x: 0, y: 0, width: 160, height: style.chapterDecoration.height)
+                let ornament = NSMutableAttributedString(attributedString: NSAttributedString(attachment: attachment))
+                let ornamentStyle = NSMutableParagraphStyle(); ornamentStyle.alignment = style.chapterAlignment.textAlignment
+                ornament.append(NSAttributedString(string: "\n"))
+                ornament.addAttribute(.paragraphStyle, value: ornamentStyle, range: NSRange(location: 0, length: ornament.length))
+                output.append(ornament)
+            }
             let titleStyle = NSMutableParagraphStyle()
             titleStyle.minimumLineHeight = style.titleFont.lineHeight
             titleStyle.lineSpacing = 0
             titleStyle.paragraphSpacing = style.titleSpacing
             titleStyle.lineBreakStrategy = ReaderPageLayoutEngine.lineBreakStrategy
-            titleStyle.alignment = .natural
+            titleStyle.alignment = style.chapterAlignment.textAlignment
             output.append(NSAttributedString(
                 string: title + "\n",
                 attributes: [

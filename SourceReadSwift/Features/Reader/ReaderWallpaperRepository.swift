@@ -4,6 +4,7 @@ import ImageIO
 struct ReaderWallpaperSnapshot {
     let image: UIImage
     let adjustment: ReaderWallpaperAdjustment
+    var jpeg: Data? = nil
 }
 
 /// One atomic envelope commits image and crop together; legacy JPEG stays readable.
@@ -23,7 +24,18 @@ struct ReaderWallpaperRepository {
         guard encoded.count <= maximumRecordBytes else { throw ReaderWallpaperFailure.tooLarge }
         try FileManager.default.createDirectory(at: rootURL, withIntermediateDirectories: true)
         try encoded.write(to: recordURL, options: .atomic)
-        return ReaderWallpaperSnapshot(image: prepared, adjustment: adjustment)
+        return ReaderWallpaperSnapshot(image: prepared, adjustment: adjustment, jpeg: jpeg)
+    }
+
+    func saveEncodedJPEG(_ jpeg: Data, adjustment: ReaderWallpaperAdjustment) throws -> ReaderWallpaperSnapshot {
+        try adjustment.validate()
+        guard !jpeg.isEmpty, jpeg.count <= 8_000_000 else { throw ReaderWallpaperFailure.tooLarge }
+        let image = try Self.decodeImage(jpeg)
+        let encoded = try JSONEncoder().encode(Envelope(version: 2, jpeg: jpeg, adjustment: adjustment))
+        guard encoded.count <= maximumRecordBytes else { throw ReaderWallpaperFailure.tooLarge }
+        try FileManager.default.createDirectory(at: rootURL, withIntermediateDirectories: true)
+        try encoded.write(to: recordURL, options: .atomic)
+        return ReaderWallpaperSnapshot(image: image, adjustment: adjustment, jpeg: jpeg)
     }
 
     func load() throws -> ReaderWallpaperSnapshot? {
@@ -33,7 +45,7 @@ struct ReaderWallpaperRepository {
             guard envelope.version == 2 else { throw ReaderWallpaperFailure.unsupportedVersion }
             try envelope.adjustment.validate()
             let image = try Self.decodeImage(envelope.jpeg)
-            return ReaderWallpaperSnapshot(image: image, adjustment: envelope.adjustment)
+            return ReaderWallpaperSnapshot(image: image, adjustment: envelope.adjustment, jpeg: envelope.jpeg)
         }
         guard FileManager.default.fileExists(atPath: legacyURL.path) else { return nil }
         let image = try Self.decodeImage(readBounded(legacyURL, limit: 20_000_000))

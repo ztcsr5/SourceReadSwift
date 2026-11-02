@@ -79,6 +79,12 @@ struct ReaderView: View {
     @State private var confirmClearWallpaper = false
     @State private var backgroundWallpaperRevision = UUID()
     @State private var settingsTab = 0
+    @AppStorage("reader.atelierEnabled") private var usesAtelier = true
+    @AppStorage("reader.bindingRevision") private var bindingRevision = ""
+    @AppStorage("reader.chapterDecoration") private var chapterDecorationRaw = ReaderChapterDecoration.none.rawValue
+    @AppStorage("reader.chapterAlignment") private var chapterAlignmentRaw = ReaderChapterAlignment.leading.rawValue
+    @AppStorage("reader.menuPaperOpacity") private var menuPaperOpacity = 0.97
+    @AppStorage("reader.menuUsesWallpaper") private var menuUsesWallpaper = false
 
     private var showOverlay: Bool { chromeState.isOverlayVisible }
     private var showSettings: Bool { chromeState.isSettingsVisible }
@@ -784,6 +790,7 @@ struct ReaderView: View {
             String(format: "%.1f", footerHeight),
             chapterHeadingStyleRaw,
             "title:\(chapterTitleSize):\(chapterTitleBold):\(chapterTitleFamilyRaw)",
+            chapterDecorationRaw, chapterAlignmentRaw,
             "header:\(headerFontSize):\(headerTopGap)",
             contentExtendsIntoChrome ? "extend" : "inset",
             statusPosition,
@@ -811,6 +818,7 @@ struct ReaderView: View {
             String(format: "%.1f", footerHeight),
             chapterHeadingStyleRaw,
             "title:\(chapterTitleSize):\(chapterTitleBold):\(chapterTitleFamilyRaw)",
+            chapterDecorationRaw, chapterAlignmentRaw,
             "header:\(headerFontSize):\(headerTopGap)",
             contentExtendsIntoChrome ? "extend" : "inset",
             statusPosition,
@@ -1007,7 +1015,8 @@ struct ReaderView: View {
 
                 settingsPanel
                     .zIndex(20)
-                    .transition(.move(edge: .bottom).combined(with: .opacity))
+                    .transition(motion.reducesMotion ? .opacity : .offset(y: ReaderSettingsLayoutPolicy.maxPanelHeight(
+                        viewportHeight: effectiveViewportSize.height, bottomInset: readerFooterSafeInset) + readerFooterSafeInset + 16))
             }
 
             if showGoalCelebrationToast {
@@ -1307,6 +1316,10 @@ struct ReaderView: View {
                 }
             }
         }
+        .onChange(of: bindingRevision) { _ in
+            backgroundWallpaperRevision = UUID()
+            schedulePagedBlocksCacheRebuild()
+        }
         .onChange(of: scrollParagraphTarget) { _ in
             // Persisting the whole bookshelf serializes JSON to disk. Debounce
             // target changes so paging/auto-scroll stays on the rendering path.
@@ -1500,6 +1513,8 @@ struct ReaderView: View {
         background.textColor(isNight: readerIsNight)
     }
 
+    private var chapterDecoration: ReaderChapterDecoration { ReaderChapterDecoration(rawValue: chapterDecorationRaw) ?? .none }
+    private var chapterAlignment: ReaderChapterAlignment { ReaderChapterAlignment(rawValue: chapterAlignmentRaw) ?? .leading }
     private var resolvedTitleSize: Double { ReaderHeadingPreferences.titleSize(custom: chapterTitleSize, body: fontSize) }
     private var chapterTitleFamily: ReaderFontFamily { ReaderFontFamily(rawValue: chapterTitleFamilyRaw) ?? fontFamily }
     private var showsTopStatus: Bool {
@@ -1770,6 +1785,7 @@ struct ReaderView: View {
             fontSize: fontSize,
             chapterTitleSize: chapterTitleSize, chapterTitleBold: chapterTitleBold,
             chapterTitleFamily: chapterTitleFamily,
+            chapterDecoration: chapterDecoration, chapterAlignment: chapterAlignment,
             lineSpacing: lineSpacing,
             pagePadding: pagePadding,
             letterSpacing: letterSpacing,
@@ -2990,9 +3006,15 @@ struct ReaderView: View {
     private func legacyTextStack(for page: ReaderPageBlock) -> some View {
         VStack(alignment: .leading, spacing: 0) {
             if page.includesTitle {
+                if page.pageOrdinal == 0, chapterDecoration != .none {
+                    ReaderChapterMotif(decoration: chapterDecoration).padding(.bottom, 8)
+                        .frame(maxWidth: .infinity, alignment: chapterAlignment == .center ? .center : chapterAlignment == .trailing ? .trailing : .leading)
+                }
                 Text(ReaderTextTransform.displayText(page.chapterTitle.isEmpty ? chapterTitle(for: page.chapterIndex) : page.chapterTitle, traditionalChinese: traditionalChineseEnabled))
                     .font(chapterTitleFamily.swiftUIFont(size: CGFloat(resolvedTitleSize), weight: chapterTitleBold ? .bold : .regular, customPostScriptName: customFontPostScriptName))
                     .foregroundStyle(readerThemeTextColor)
+                    .multilineTextAlignment(chapterAlignment.swiftUI)
+                    .frame(maxWidth: .infinity, alignment: chapterAlignment == .center ? .center : chapterAlignment == .trailing ? .trailing : .leading)
                     .padding(.bottom, CGFloat(titleSpacing))
                     .readerSelectableText(textSelectionEnabled)
             }
@@ -3072,7 +3094,9 @@ struct ReaderView: View {
                 letterSpacing: CGFloat(letterSpacing),
                 paragraphSpacing: CGFloat(paragraphSpacing),
                 titleSpacing: CGFloat(titleSpacing),
-                firstLineIndent: CGFloat(paragraphIndent)
+                firstLineIndent: CGFloat(paragraphIndent),
+                chapterDecoration: page.pageOrdinal == 0 && pagedPageGeometry.contentHeight >= chapterDecoration.height + titleFont.lineHeight + CGFloat(titleSpacing) + 8 ? chapterDecoration : .none,
+                chapterAlignment: chapterAlignment
             )
         )
     }
@@ -3892,118 +3916,36 @@ struct ReaderView: View {
         }
     }
 
-    private var settingsPanel: some View {
-        GeometryReader { proxy in
-            let bottomPadding = max(readerFooterSafeInset, 10) + 10
-            let maxHeight = ReaderSettingsLayoutPolicy.maxPanelHeight(
-                viewportHeight: proxy.size.height,
-                bottomInset: readerFooterSafeInset
-            )
-            let panelWidth = ReaderSettingsLayoutPolicy.maxPanelWidth(
-                viewportWidth: proxy.size.width
-            )
+    @ViewBuilder private var settingsPanel: some View {
+        if usesAtelier { atelierPanel }
+        else {
+            ReaderClassicSettingsPanel(context: ReaderWorkbenchContext(bookTitle: content.title, background: background, bottomInset: readerFooterSafeInset),
+                selection: $settingsTab, page: { AnyView(settingsPage(for: $0)) }, close: closeSettingsPanel)
+        }
+    }
 
-            VStack {
-                Spacer(minLength: 0)
+    private var atelierPanel: some View {
+        ReaderSettingsWorkbench(context: ReaderWorkbenchContext(
+            bookTitle: appState.bookshelfStore.book(id: bookID)?.title ?? content.title,
+            background: background, bottomInset: readerFooterSafeInset,
+            menuOpacity: menuPaperOpacity, usesWallpaper: menuUsesWallpaper), preview: {
+                let paragraphs = windowSections.first(where: { $0.chapterIndex == currentDisplayChapterIndex })?.paragraphs ?? content.paragraphs
+                let excerpt = paragraphs.first(where: { ReaderImageSizingPolicy.imageURL(in: $0) == nil }) ?? ""
+                return AnyView(ReaderAtelierPreview(title: currentDisplayChapterTitle, excerpt: String(excerpt.prefix(512)), paperRevision: backgroundWallpaperRevision))
+            }, page: { workbenchPage($0) }, actions: ReaderWorkbenchActions(close: closeSettingsPanel, routeChanged: {
+                settingsTab = $0 == .assistance ? 2 : $0 == .typography ? 1 : 0
+            }))
+    }
 
-                VStack(spacing: 16) {
-                    HStack {
-                        VStack(alignment: .leading, spacing: 3) {
-                            Text("阅读设置")
-                                .font(.headline.weight(.semibold))
-                            Text(settingsTab == 0 ? "外观和翻页感" : (settingsTab == 1 ? "字号与排版细节" : "阅读辅助与行为"))
-                                .font(.caption)
-                                .foregroundStyle(readerThemeTextColor.opacity(0.62))
-                        }
-                        Spacer()
-                        Button {
-                            withAnimation(.easeOut(duration: 0.18)) {
-                                closeSettingsPanel()
-                            }
-                        } label: {
-                            Image(systemName: "xmark")
-                                .font(.system(size: 13, weight: .bold))
-                                .foregroundStyle(readerThemeTextColor.opacity(0.62))
-                                .frame(width: 44, height: 44)
-                                .background(readerThemeTextColor.opacity(0.12), in: Circle())
-                        }
-                        .buttonStyle(.plain)
-                        .accessibilityLabel("关闭阅读设置")
-                    }
-                    .padding(.top, 10)
-                    .padding(.horizontal)
-                    .contentShape(Rectangle())
-                    .simultaneousGesture(
-                        DragGesture(minimumDistance: 12)
-                            .onEnded { value in
-                                guard value.translation.height > 70,
-                                      abs(value.translation.height) > abs(value.translation.width) else { return }
-                                closeSettingsPanel()
-                            }
-                    )
-
-                    HStack(spacing: 0) {
-                        settingsTabButton(title: "外观", tag: 0)
-                        settingsTabButton(title: "排版", tag: 1)
-                        settingsTabButton(title: "高级", tag: 2)
-                    }
-                    .padding(3)
-                    .background(readerThemeTextColor.opacity(background.isDark ? 0.16 : 0.08), in: Capsule())
-                    .overlay {
-                        Capsule()
-                            .stroke(readerThemeTextColor.opacity(0.12), lineWidth: 0.8)
-                    }
-                    .padding(.horizontal)
-
-                    Text(settingsHint)
-                        .font(.caption2)
-                        .foregroundStyle(readerThemeTextColor.opacity(0.62))
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(.horizontal)
-
-                    ScrollView(showsIndicators: false) {
-                        VStack(alignment: .leading, spacing: 14) {
-                            settingsPage(for: settingsTab)
-                        }
-                        .padding(.horizontal)
-                        .padding(.bottom, 22)
-                    }
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .clipped()
-                }
-                .frame(width: panelWidth)
-                .frame(maxWidth: .infinity)
-                .frame(height: maxHeight)
-                // 面板内所有系统控件（分段控件、开关、输入框）跟随阅读主题，
-                // 而不是跟随系统深色/浅色，否则浅色背景 + 系统深色会整片发黑。
-                .environment(\.colorScheme, background.isDark ? .dark : .light)
-                // Match the top and bottom bars: one opaque theme layer, one
-                // hairline, one 16pt gutter. Stacking .ultraThinMaterial on
-                // top of the theme colour made the sheet read wider than the
-                // chrome and let body text ghost through.
-                .background(
-                    readerThemeBackground.opacity(0.97),
-                    in: RoundedRectangle(cornerRadius: 18, style: .continuous)
-                )
-                .overlay {
-                    RoundedRectangle(cornerRadius: 18, style: .continuous)
-                        .stroke(
-                            readerThemeTextColor.opacity(background.isDark ? 0.09 : 0.12),
-                            lineWidth: 0.6
-                        )
-                }
-                .shadow(
-                    color: Color.black.opacity(background.isDark ? 0.24 : 0.08),
-                    radius: 8,
-                    x: 0,
-                    y: 4
-                )
-                .contentShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
-                .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
-                .padding(.bottom, bottomPadding)
-                .zIndex(3)
-            }
-            .ignoresSafeArea(edges: .bottom)
+    /// Routes to production controls; legacy page boundaries remain stack-bounded.
+    func workbenchPage(_ route: ReaderWorkbenchRoute) -> AnyView {
+        switch route {
+        case .themes: return AnyView(ReaderBindingLibraryView())
+        case .heading: return AnyView(ReaderChapterDesignEditor())
+        case .chrome: return AnyView(ReaderChromeEditor())
+        case .typography: return AnyView(settingsPage(for: 1))
+        case .appearance: return AnyView(settingsPage(for: 0))
+        case .assistance: return AnyView(settingsPage(for: 2))
         }
     }
 
@@ -4072,7 +4014,7 @@ struct ReaderView: View {
 
     private func closeSettingsPanel() {
         guard showSettings else { return }
-        withAnimation(.easeOut(duration: 0.18)) {
+        withAnimation(motion.animation(.expansion)) {
             chromeState.closeSettings()
         }
     }
@@ -5764,7 +5706,7 @@ struct ReaderView: View {
     }
 
     private func toggleSettingsPanel() {
-        withAnimation(motion.animation(.navigation)) {
+        withAnimation(motion.animation(.expansion)) {
             if chromeState.isSettingsVisible {
                 chromeState.closeSettings()
             } else {
@@ -6525,7 +6467,8 @@ struct ReaderView: View {
             // Text pages use final attributed-document TextKit containers.
             // The body rect already excludes header/footer; do not hide layout
             // disagreements behind a fixed subtraction.
-            contentHeight: geometry.contentHeight
+            contentHeight: geometry.contentHeight,
+            chapterDecoration: chapterDecoration, chapterAlignment: chapterAlignment
         )
         var titleTypography = typography
         titleTypography.lineSpacing = 0

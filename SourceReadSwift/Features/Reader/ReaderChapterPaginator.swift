@@ -59,7 +59,7 @@ enum ReaderChapterPaginator {
                 typography: titleTypography,
                 font: typography.titleFont,
                 alignment: .natural
-            ) + typography.titleSpacing
+            ) + typography.titleSpacing + (typography.effectiveChapterDecoration == .none ? 0 : typography.effectiveChapterDecoration.height + 8)
             currentIncludesTitle = true
         }
 

@@ -19,6 +19,11 @@ struct ReaderPageTypography {
     var titleSpacing: CGFloat
     var contentWidth: CGFloat
     var contentHeight: CGFloat
+    var chapterDecoration: ReaderChapterDecoration = .none
+    var chapterAlignment: ReaderChapterAlignment = .leading
+    var effectiveChapterDecoration: ReaderChapterDecoration {
+        contentHeight >= chapterDecoration.height + titleFont.lineHeight + titleSpacing + 8 ? chapterDecoration : .none
+    }
 }
 
 enum ReaderPageLayoutEngine {

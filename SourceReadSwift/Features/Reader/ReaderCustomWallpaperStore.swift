@@ -12,6 +12,7 @@ enum ReaderCustomWallpaperStore {
     static var wallpaperURL: URL { repository.legacyURL }
     static var hasEditedWallpaper: Bool { FileManager.default.fileExists(atPath: repository.recordURL.path) }
     static var cachedWallpaper: UIImage? { lock.lock(); defer { lock.unlock() }; return cached?.image }
+    static var cachedJPEG: Data? { lock.lock(); defer { lock.unlock() }; return cached?.jpeg }
     static var adjustment: ReaderWallpaperAdjustment { lock.lock(); defer { lock.unlock() }; return cached?.adjustment ?? .init() }
     static var lastError: String? { lock.lock(); defer { lock.unlock() }; return failure }
     static var hasCustomWallpaper: Bool {
@@ -39,6 +40,13 @@ enum ReaderCustomWallpaperStore {
         advanceRevision()
         let target = repository
         let snapshot = try await Task.detached(priority: .userInitiated) { try target.save(image: image, adjustment: adjustment) }.value
+        accept(snapshot)
+    }
+
+    @MainActor static func restoreEncodedWallpaper(_ jpeg: Data, adjustment: ReaderWallpaperAdjustment) async throws {
+        advanceRevision()
+        let target = repository
+        let snapshot = try await Task.detached(priority: .userInitiated) { try target.saveEncodedJPEG(jpeg, adjustment: adjustment) }.value
         accept(snapshot)
     }
 
