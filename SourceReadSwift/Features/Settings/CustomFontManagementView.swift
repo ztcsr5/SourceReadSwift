@@ -55,7 +55,7 @@ struct CustomFontManagementView: View {
             .listRowBackground(AppThemeRowSurface())
 
             Section {
-                ForEach([ReaderFontFamily.system, .light, .bold, .songti, .kaiti, .rounded], id: \.self) { family in
+                ForEach([ReaderFontFamily.system, .light, .bold, .songti, .kaiti, .rounded, .maShanZheng, .zhiMangXing], id: \.self) { family in
                     HStack {
                         VStack(alignment: .leading, spacing: 4) {
                             Text(family.title)

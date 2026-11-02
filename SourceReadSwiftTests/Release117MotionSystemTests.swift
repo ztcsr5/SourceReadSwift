@@ -44,6 +44,19 @@ final class Release117MotionSystemTests: XCTestCase {
         XCTAssertNotEqual(AppVisualTheme.folio.preferenceKey("accent"), AppVisualTheme.editorial.preferenceKey("accent"))
     }
 
+    func testWebChapterTitleStyleDoesNotChangeBodyTypography() {
+        var style = WebReaderStylePayload.make(fontFamily: .system, fontSize: 20, lineSpacing: 8,
+            pagePadding: 21, letterSpacing: 0, paragraphSpacing: 16, paragraphIndent: 40,
+            titleSpacing: 12, footerHeight: 72, topInset: 80, textColor: .black,
+            surfaceColor: .white, highlightColor: .yellow, accentColor: .blue, selectable: true)
+        style.titleSize = 34; style.titleWeight = 400; style.titleFontFamilyCSS = "serif"
+        XCTAssertEqual(style.fontSize, 20)
+        XCTAssertEqual(style.fontFamilyWeight, 400)
+        XCTAssertEqual(style.jsonObject["titleSize"] as? Double, 34)
+        XCTAssertEqual(style.jsonObject["titleWeight"] as? Int, 400)
+        XCTAssertEqual(style.jsonObject["titleFontFamily"] as? String, "serif")
+    }
+
     func testFontSelectionValidatesContentsInsteadOfProviderTypeLabels() throws {
         for suffix in ["ttf", "OTF", "ttc", "otc"] { XCTAssertNoThrow(try FontImportPolicy.validate(suffix: suffix, bytes: 1024)) }
         XCTAssertThrowsError(try FontImportPolicy.validate(suffix: "zip", bytes: 1024))
