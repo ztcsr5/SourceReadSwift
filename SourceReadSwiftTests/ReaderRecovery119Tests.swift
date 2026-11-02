@@ -364,6 +364,23 @@ final class ReaderPanController119Tests: XCTestCase {
         XCTAssertEqual(commits, [1])
     }
 
+    func testSlideDragMovesCompositedPagesWithoutRelayingOutHostingGeometry() throws {
+        let controller = makeController()
+        apply(controller, style: .slide)
+        let current = try XCTUnwrap(controller.children.first { $0.view.accessibilityIdentifier == "reader.page.p0" })
+        let bounds = current.view.bounds, center = current.view.center
+        controller.beginInteraction()
+        for distance in stride(from: CGFloat(-4), through: -240, by: -4) {
+            controller.updateInteraction(translation: distance)
+            XCTAssertEqual(current.view.bounds, bounds)
+            XCTAssertEqual(current.view.center, center, "A pan frame must not rewrite UIHostingController layout geometry")
+            XCTAssertEqual(current.view.transform.tx, distance, accuracy: 0.01)
+        }
+        XCTAssertTrue(commits.isEmpty)
+        controller.cancelInteraction()
+        XCTAssertEqual(current.view.transform, .identity)
+    }
+
     func testCoverAndSlideHaveDifferentPhysicalDisplacement() {
         let controller = makeController()
         apply(controller, style: .cover)
