@@ -37,10 +37,18 @@ enum FontImportOperation {
         var registrationError: Unmanaged<CFError>?
         let didRegister = CTFontManagerRegisterFontsForURL(destination as CFURL, .process, &registrationError)
         let failure = registrationError?.takeRetainedValue()
-        if !didRegister, failure.map({ CFErrorGetCode($0) }) != Int(CTFontManagerError.alreadyRegistered.rawValue) {
-            if let failure { throw failure as Error }
-            throw NSError(domain: "FontImport", code: 4,
-                userInfo: [NSLocalizedDescriptionKey: "系统未能注册此字体，请尝试另一份 TTF 或 OTF 文件。"])
+        if !didRegister {
+            let code = failure.map { CFErrorGetCode($0) }
+            let isKnownCollision = code == Int(CTFontManagerError.alreadyRegistered.rawValue)
+                || code == Int(CTFontManagerError.duplicatedName.rawValue)
+            // Bundled/system faces may already own this exact PostScript name.
+            // Accept only a real resolvable face, never a silent fallback font.
+            let available = CTFontCreateWithName(name as CFString, 16, nil)
+            if !isKnownCollision || CTFontCopyPostScriptName(available) as String != name {
+                if let failure { throw failure as Error }
+                throw NSError(domain: "FontImport", code: 4,
+                    userInfo: [NSLocalizedDescriptionKey: "系统未能注册此字体，请尝试另一份 TTF 或 OTF 文件。"])
+            }
         }
         shouldKeep = true
         return CustomFontItem(fileName: destination.lastPathComponent,

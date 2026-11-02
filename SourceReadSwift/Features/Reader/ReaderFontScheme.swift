@@ -30,7 +30,9 @@ enum ReaderFontResource {
             .appendingPathComponent("SourceReadSwift/Fonts", isDirectory: true))?.resolvingSymlinksInPath()
         guard let root else { return nil }
         let candidate = root.appendingPathComponent(name).resolvingSymlinksInPath()
-        return candidate.deletingLastPathComponent() == root ? candidate : nil
+        // URL equality also compares a directory marker; security containment
+        // concerns the canonical path, not whether the caller appended a slash.
+        return candidate.deletingLastPathComponent().path == root.path ? candidate : nil
     }
 }
 

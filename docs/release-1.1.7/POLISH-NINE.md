@@ -35,3 +35,7 @@ Device correction from user: iPhone 13 **Pro**, reported iOS 27.0.1, subjective 
 - Whole-reader page interaction and position semantics retained; new idle-update/position-publication tests lock bounded invalidation. Distance-aware settle does not change commit/cancel ownership.
 - Native source candidate will include exact nine-theme assertions (not a relaxed >= check) and WebKit failure diagnostics without skipping or increasing the existing position-test timeout. Regular Intel job budget45min because build+full suite exceeded30min; individual assertions retained.
 - Local preflight:29 Swift edits/new files parsed with no new syntax errors; YAML and git diff --check passed. Parsing is not SDK typechecking or XCTest.
+
+## Native41b5a14 regression results (not acceptance)
+- Unsigned device build passed. Regular simulator executed1580 tests/2skipped/3assertion failures, solely in new font-boundary checks: canonical directoryURL marker comparison and CoreText duplicatedName305 (plus missing imported result). Existing compact-height/idle-notification/typed-style/theme/position and new WebContent local-font-load tests passed. Failed logs retained under exact41b5a14 evidence.
+- Fix the actual boundary code, retain original assertions: compare symlink-resolved parent paths rather than URL directory markers; accept documented alreadyRegistered/duplicatedName only when the exact PostScript face resolves (no fallback). Full new-head native gates still required.
