@@ -1,0 +1,6 @@
+*.xcodeproj/
+Generated/
+DerivedData/
+*.xcresult/
+evidence/
+*.log

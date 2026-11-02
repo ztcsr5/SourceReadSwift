@@ -1,0 +1,50 @@
+name: ZhijianMotionLab
+options:
+  deploymentTarget:
+    iOS: '16.0'
+settings:
+  base:
+    SWIFT_VERSION: '5.9'
+    IPHONEOS_DEPLOYMENT_TARGET: '16.0'
+targets:
+  ZhijianMotionLab:
+    type: application
+    platform: iOS
+    sources: [Sources]
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.edc21.ZhijianMotionLab
+        MARKETING_VERSION: '0.1.0'
+        CURRENT_PROJECT_VERSION: '1'
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        GENERATE_INFOPLIST_FILE: YES
+        TARGETED_DEVICE_FAMILY: '1,2'
+    info:
+      path: Generated/Info.plist
+      properties:
+        CFBundleDisplayName: 纸间·动效实验
+        CFBundleShortVersionString: '$(MARKETING_VERSION)'
+        CFBundleVersion: '$(CURRENT_PROJECT_VERSION)'
+        UILaunchScreen: {}
+        CADisableMinimumFrameDurationOnPhone: true
+        UIApplicationSceneManifest:
+          UIApplicationSupportsMultipleScenes: false
+  ZhijianMotionLabTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources: [Tests]
+    dependencies:
+      - target: ZhijianMotionLab
+  ZhijianMotionLabUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    sources: [UITests]
+    dependencies:
+      - target: ZhijianMotionLab
+schemes:
+  ZhijianMotionLab:
+    build:
+      targets:
+        ZhijianMotionLab: all
+    test:
+      targets: [ZhijianMotionLabTests, ZhijianMotionLabUITests]

@@ -1,0 +1,100 @@
+name: Motion Lab
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [codex/motion-lab]
+    paths:
+      - 'experiments/ZhijianMotionLab/**'
+      - '.github/workflows/motion-lab.yml'
+
+concurrency:
+  group: motion-lab-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  prototype:
+    runs-on: macos-26
+    timeout-minutes: 35
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_26.2.app/Contents/Developer
+    defaults:
+      run:
+        working-directory: experiments/ZhijianMotionLab
+    steps:
+      - uses: actions/checkout@v5
+      - name: Install project generator
+        run: brew install xcodegen
+      - name: Generate isolated project
+        run: xcodegen generate
+      - name: Select and boot simulator
+        run: |
+          set -euo pipefail
+          RUNTIME_ID="$(xcrun simctl list runtimes -j | python3 -c 'import json,sys; print(next(r["identifier"] for r in json.load(sys.stdin)["runtimes"] if r.get("isAvailable") and r["version"].startswith("26.")))')"
+          DEVICE_ID="$(xcrun simctl create ZhijianMotionLab com.apple.CoreSimulator.SimDeviceType.iPhone-16-Pro "$RUNTIME_ID")"
+          echo "LAB_DEVICE_ID=$DEVICE_ID" >> "$GITHUB_ENV"
+          xcrun simctl boot "$DEVICE_ID"
+          xcrun simctl bootstatus "$DEVICE_ID" -b
+          xcrun simctl status_bar "$DEVICE_ID" override --time '9:41' --batteryState charged --batteryLevel 100
+          xcodebuild -version | tee toolchain.log
+      - name: Test actual simulator build and journey
+        run: |
+          set -euo pipefail
+          xcodebuild -project ZhijianMotionLab.xcodeproj -scheme ZhijianMotionLab \
+            -destination "id=$LAB_DEVICE_ID" -derivedDataPath build/Simulator \
+            CODE_SIGNING_ALLOWED=NO -parallel-testing-enabled NO \
+            -test-timeouts-enabled YES -maximum-test-execution-time-allowance 90 \
+            -resultBundlePath MotionLab.xcresult test 2>&1 | tee simulator-test.log
+      - name: Export screenshots
+        if: always()
+        run: |
+          if [ -d MotionLab.xcresult ]; then
+            xcrun xcresulttool export attachments --path MotionLab.xcresult --output-path evidence/screenshots
+          fi
+      - name: Record real intro to poster journey
+        run: |
+          set -euo pipefail
+          mkdir -p evidence
+          xcrun simctl terminate "$LAB_DEVICE_ID" com.edc21.ZhijianMotionLab || true
+          xcrun simctl io "$LAB_DEVICE_ID" recordVideo --codec=h264 evidence/intro-to-home.mp4 > evidence/recording.log 2>&1 &
+          RECORD_PID=$!
+          sleep 1
+          xcrun simctl launch "$LAB_DEVICE_ID" com.edc21.ZhijianMotionLab --lab-tour
+          sleep 27
+          kill -INT "$RECORD_PID"
+          wait "$RECORD_PID" || true
+          xcrun simctl io "$LAB_DEVICE_ID" screenshot evidence/poster-home.png
+          test -s evidence/intro-to-home.mp4
+      - name: Build unsigned isolated device app
+        run: |
+          set -euo pipefail
+          xcodebuild -project ZhijianMotionLab.xcodeproj -scheme ZhijianMotionLab \
+            -configuration Release -sdk iphoneos -destination 'generic/platform=iOS' \
+            -derivedDataPath build/Device CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY='' \
+            build 2>&1 | tee device-build.log
+          mkdir -p build/package/Payload
+          cp -R build/Device/Build/Products/Release-iphoneos/ZhijianMotionLab.app build/package/Payload/
+          ditto -c -k --keepParent build/package/Payload ZhijianMotionLab-0.1.0-build1-unsigned.ipa
+          shasum -a 256 ZhijianMotionLab-0.1.0-build1-unsigned.ipa | tee evidence/ipa-sha256.txt
+      - name: Preserve failure excerpts
+        if: failure()
+        run: |
+          grep -E 'error:|Test Case.*failed|TEST FAILED|BUILD FAILED' simulator-test.log device-build.log 2>/dev/null | tail -n 60 || true
+      - name: Upload independent test IPA
+        uses: actions/upload-artifact@v4
+        with:
+          name: motion-lab-ipa-${{ github.sha }}
+          path: experiments/ZhijianMotionLab/*.ipa
+          retention-days: 14
+          if-no-files-found: error
+      - name: Upload visual and test evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: motion-lab-evidence-${{ github.sha }}
+          path: |
+            experiments/ZhijianMotionLab/evidence
+            experiments/ZhijianMotionLab/*test.log
+            experiments/ZhijianMotionLab/*build.log
+            experiments/ZhijianMotionLab/toolchain.log
+          retention-days: 14
