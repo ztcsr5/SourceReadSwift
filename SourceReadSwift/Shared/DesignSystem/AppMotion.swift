@@ -24,6 +24,12 @@ struct AppMotionPolicy: Equatable {
         case .bookmark: return .spring(response: duration(event), dampingFraction: 0.82)
         }
     }
+
+    func backgroundAnimation(hasPreviousPalette: Bool, hasNextPalette: Bool) -> Animation? {
+        // A light placeholder and a dark cover surface use different semantic ink.
+        // Crossfading only the surface would temporarily put white text on white.
+        hasPreviousPalette && hasNextPalette ? animation(.background) : nil
+    }
 }
 
 /// Combines the system accessibility preference and the app's explicit opt-out.

@@ -10,6 +10,10 @@ final class Release117MotionSystemTests: XCTestCase {
         }
         XCTAssertEqual(normal.duration(.navigation), 0.30)
         XCTAssertEqual(normal.duration(.expansion), 0.44)
+        XCTAssertNil(normal.backgroundAnimation(hasPreviousPalette: false, hasNextPalette: true))
+        XCTAssertNil(normal.backgroundAnimation(hasPreviousPalette: true, hasNextPalette: false))
+        XCTAssertNotNil(normal.backgroundAnimation(hasPreviousPalette: true, hasNextPalette: true))
+        XCTAssertNil(reduced.backgroundAnimation(hasPreviousPalette: true, hasNextPalette: true))
     }
 
     func testHeaderAndChapterNamePreferencesAreBoundedAndIndependent() {

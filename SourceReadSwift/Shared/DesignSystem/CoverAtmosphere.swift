@@ -4,7 +4,6 @@ import SwiftUI
 struct CoverAtmosphere: View {
     let tone: CoverTone?
     @Environment(\.colorSchemeContrast) private var contrast
-    @AppMotion private var motion
     private var inkSurface: Color {
         guard let tone else { return Color(uiColor: .secondarySystemBackground) }
         return Color(red: max(0.025, tone.vividRed * 0.22), green: max(0.025, tone.vividGreen * 0.22), blue: max(0.025, tone.vividBlue * 0.22))
@@ -17,7 +16,6 @@ struct CoverAtmosphere: View {
                                center: .top, startRadius: 0, endRadius: 340)
             }
         }
-        .animation(motion.animation(.background), value: tone)
         .allowsHitTesting(false)
     }
 }

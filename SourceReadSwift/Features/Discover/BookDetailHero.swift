@@ -54,7 +54,7 @@ struct BookDetailHero: View {
             guard let coverImage else { tone = nil; return }
             let sampled = await CoverToneSampler.shared.tone(for: coverImage)
             guard !Task.isCancelled else { return }
-            tone = sampled
+            withAnimation(motion.backgroundAnimation(hasPreviousPalette: tone != nil, hasNextPalette: sampled != nil)) { tone = sampled }
         }
     }
 }
