@@ -32,6 +32,10 @@ final class Release117MotionSystemTests: XCTestCase {
         XCTAssertGreaterThanOrEqual(custom.headerRect.height, 21)
         XCTAssertGreaterThan(custom.bodyRect.minY, custom.headerRect.maxY)
         XCTAssertGreaterThan(custom.contentHeight, ReaderPageChrome.minimumBodyHeight)
+        let metrics = ReaderPageContainerMetrics(size: size, globalMinY: 0, rootViewportHeight: size.height, rootSafeTop: 44, rootSafeBottom: 34)
+        XCTAssertEqual(metrics.geometry(horizontalMargin: 21, chromeLayout: .header, contentExtendsIntoChrome: false,
+                                        headerFontSize: 18, headerTopGap: 24), custom,
+                       "Measured and fallback page geometry must reserve the same custom header")
         let scroll = ReaderScrollChromeGeometry(safeTop: 44, headerVisible: true, showSystemStatusBar: true, fontSize: 18, topGap: 24)
         XCTAssertGreaterThanOrEqual(scroll.protectedHeight, scroll.headerTop + 24)
     }
@@ -49,12 +53,13 @@ final class Release117MotionSystemTests: XCTestCase {
             pagePadding: 21, letterSpacing: 0, paragraphSpacing: 16, paragraphIndent: 40,
             titleSpacing: 12, footerHeight: 72, topInset: 80, textColor: .black,
             surfaceColor: .white, highlightColor: .yellow, accentColor: .blue, selectable: true)
-        style.titleSize = 34; style.titleWeight = 400; style.titleFontFamilyCSS = "serif"
+        style.applyChapterHeading(size: 34, family: .maShanZheng, isBold: false, bodyFamily: .system)
         XCTAssertEqual(style.fontSize, 20)
         XCTAssertEqual(style.fontFamilyWeight, 400)
         XCTAssertEqual(style.jsonObject["titleSize"] as? Double, 34)
         XCTAssertEqual(style.jsonObject["titleWeight"] as? Int, 400)
-        XCTAssertEqual(style.jsonObject["titleFontFamily"] as? String, "serif")
+        XCTAssertEqual(style.jsonObject["titleFontFamily"] as? String, ReaderFontFamily.maShanZheng.webCSSFamily)
+        XCTAssertTrue(style.customFontFaceCSS.contains("@font-face"), "A title-only font must reach the WebContent process")
     }
 
     func testFontSelectionValidatesContentsInsteadOfProviderTypeLabels() throws {

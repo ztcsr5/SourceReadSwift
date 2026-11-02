@@ -3213,7 +3213,8 @@ struct ReaderView: View {
             let geometry = metrics.geometry(
                 horizontalMargin: CGFloat(pagePadding),
                 chromeLayout: chapterHeadingStyle,
-                contentExtendsIntoChrome: contentExtendsIntoChrome
+                contentExtendsIntoChrome: contentExtendsIntoChrome,
+                headerFontSize: CGFloat(headerFontSize), headerTopGap: CGFloat(headerTopGap)
             )
 
             ZStack(alignment: .topLeading) {

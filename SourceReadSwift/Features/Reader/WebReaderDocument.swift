@@ -325,6 +325,18 @@ struct WebReaderStylePayload: Equatable {
         max(fontSize * 1.3, fontSize + 6)
     }
 
+    mutating func applyChapterHeading(size: Double, family: ReaderFontFamily?, isBold: Bool, bodyFamily: ReaderFontFamily) {
+        titleSize = ReaderHeadingPreferences.titleSize(custom: size, body: fontSize)
+        titleFontFamilyCSS = family?.webCSSFamily ?? fontFamilyCSS
+        titleWeight = isBold ? 700 : 400
+        guard let family, family != bodyFamily else { return }
+        // The WebContent process cannot see fonts registered only in the app process.
+        // A title-only imported/bundled face needs its own cached @font-face too.
+        customFontFaceCSS += family == .custom
+            ? WebReaderCustomFontCache.fontFaceCSSForActiveCustomFont()
+            : WebReaderBundledFontCache.css(for: family)
+    }
+
     var jsonObject: [String: Any] {
         [
             "fontFamily": fontFamilyCSS,

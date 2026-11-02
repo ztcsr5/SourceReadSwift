@@ -220,9 +220,8 @@ struct WebScrollReaderView: UIViewRepresentable {
                 selectable: view.textSelectionEnabled,
                 bionicReadingEnabled: view.bionicReadingEnabled
             )
-            payload.titleSize = ReaderHeadingPreferences.titleSize(custom: view.chapterTitleSize, body: view.fontSize)
-            payload.titleFontFamilyCSS = view.chapterTitleFamily?.webCSSFamily ?? payload.fontFamilyCSS
-            payload.titleWeight = view.chapterTitleBold ? 700 : 400
+            payload.applyChapterHeading(size: view.chapterTitleSize, family: view.chapterTitleFamily,
+                                        isBold: view.chapterTitleBold, bodyFamily: view.fontFamily)
             let signature = Self.signature(for: payload.jsonObject)
             guard signature != lastStyleSignature else { return }
             lastStyleSignature = signature
