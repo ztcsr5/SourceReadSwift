@@ -39,6 +39,9 @@ struct ReaderChromeEditor: View {
                 Text("菜单纸面").font(.headline)
                 Picker("菜单材质", selection: $surface) { Text("系统材质").tag("system"); Text("阅读纸面").tag("paper") }.pickerStyle(.segmented)
                 Toggle("沿用阅读壁纸与纸纹", isOn: $wallpaper)
+                if wallpaper && surface == "system" {
+                    Text("沿用壁纸时使用阅读纸面；关闭后恢复系统玻璃。") .font(.caption).foregroundStyle(.secondary)
+                }
                 slider("纸面浓度", value: $menuOpacity, range: 0.85...1)
                     .disabled(!wallpaper)
                 if !wallpaper { Text("开启沿用壁纸后可调节纸面浓度。") .font(.caption).foregroundStyle(.secondary) }

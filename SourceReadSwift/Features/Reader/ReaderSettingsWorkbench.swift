@@ -78,7 +78,7 @@ struct ReaderSettingsWorkbench: View {
                     .transaction { if motion.reducesMotion { $0.disablesAnimations = true } }
                 }
                 .frame(width: ReaderSettingsLayoutPolicy.maxPanelWidth(viewportWidth: proxy.size.width), height: height)
-                .background { surface }
+                .modifier(ReaderChromeSurface(paper: context.paper, ink: context.ink))
                 .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
                 .overlay { RoundedRectangle(cornerRadius: 24).strokeBorder(context.ink.opacity(0.10), lineWidth: 0.6).allowsHitTesting(false) }
                 .shadow(color: context.ink.opacity(0.10), radius: 16, y: 8)
@@ -115,22 +115,6 @@ struct ReaderSettingsWorkbench: View {
                 else { withAnimation(motion.animation(.expansion)) { drag = 0 } }
             })
             .accessibilityHidden(true)
-    }
-    private var surface: some View {
-        ZStack {
-            context.paper
-            if context.usesWallpaper {
-                if context.background == .custom, let image = ReaderCustomWallpaperStore.cachedWallpaper {
-                    ReaderWallpaperView(image: image, fillMode: ReaderCustomWallpaperStore.adjustment.fillMode,
-                        adjustment: ReaderCustomWallpaperStore.adjustment)
-                        .opacity(1 - min(max(context.menuOpacity, 0.85), 1))
-                } else {
-                    ReaderPaperTextureView(background: context.background, night: context.background.isDark)
-                        .opacity(1 - min(max(context.menuOpacity, 0.85), 1))
-                }
-            }
-        }.allowsHitTesting(false)
-            .animation(motion.animation(.background), value: context.background)
     }
     private var home: some View {
         ScrollView {
@@ -169,7 +153,7 @@ struct ReaderSettingsWorkbench: View {
                 Button("切换经典设置") { usesWorkbench = false }
                     .font(.caption).frame(minHeight: 44).frame(maxWidth: .infinity)
             }.padding(16)
-        }.background { surface }
+        }
     }
 }
 
@@ -197,7 +181,8 @@ struct ReaderClassicSettingsPanel: View {
                 }.padding(16)
                     .frame(width: ReaderSettingsLayoutPolicy.maxPanelWidth(viewportWidth: proxy.size.width),
                            height: ReaderSettingsLayoutPolicy.maxPanelHeight(viewportHeight: proxy.size.height, bottomInset: context.bottomInset))
-                    .foregroundStyle(context.ink).background(context.paper, in: RoundedRectangle(cornerRadius: 18))
+                    .foregroundStyle(context.ink)
+                    .modifier(ReaderChromeSurface(paper: context.paper, ink: context.ink))
                     .padding(.bottom, max(context.bottomInset, 8) + 8)
             }.frame(maxWidth: .infinity).environment(\.colorScheme, context.background.isDark ? .dark : .light)
         }

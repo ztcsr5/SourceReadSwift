@@ -85,6 +85,7 @@ struct ReaderView: View {
     @AppStorage("reader.chapterAlignment") private var chapterAlignmentRaw = ReaderChapterAlignment.leading.rawValue
     @AppStorage("reader.menuPaperOpacity") private var menuPaperOpacity = 0.97
     @AppStorage("reader.menuUsesWallpaper") private var menuUsesWallpaper = false
+    @AppStorage("reader.menuSurfaceStyle") private var menuSurfaceStyle = "system"
 
     private var showOverlay: Bool { chromeState.isOverlayVisible }
     private var showSettings: Bool { chromeState.isSettingsVisible }
@@ -3695,7 +3696,7 @@ struct ReaderView: View {
                 ReaderNativeMenuButton(
                     menu: readerNativeMenu,
                     foregroundColor: background.uiTextColor(isNight: readerIsNight),
-                    backgroundColor: readerUsesNativeGlass ? .clear : background.uiColor(isNight: readerIsNight)
+                    backgroundColor: readerUsesTranslucentChrome ? .clear : background.uiColor(isNight: readerIsNight)
                 )
                 .frame(width: 44, height: 44)
             }
@@ -3704,7 +3705,6 @@ struct ReaderView: View {
             .modifier(ReaderChromeSurface(paper: readerThemeBackground, ink: readerThemeTextColor))
             .padding(.horizontal, 16)
             .padding(.top, readerTopSafeInset + 4)
-            .background((background == .custom ? Color.clear : readerThemeBackground).ignoresSafeArea(edges: .top))
 
             Spacer()
 
@@ -3887,14 +3887,16 @@ struct ReaderView: View {
             Image(systemName: systemName)
                 .font(.system(size: 17, weight: .semibold))
                 .frame(width: 44, height: 44)
-                .background(Circle().fill(readerUsesNativeGlass ? Color.clear : readerThemeBackground))
+                .background(Circle().fill(readerUsesTranslucentChrome ? Color.clear : readerThemeBackground))
                 .contentShape(Circle())
         }
         .buttonStyle(.plain)
     }
 
-    private var readerUsesNativeGlass: Bool {
-        ReaderChromeSurface.usesNativeGlass(reduceTransparency: UIAccessibility.isReduceTransparencyEnabled)
+    private var readerUsesTranslucentChrome: Bool {
+        ReaderChromeSurface.permitsTranslucency(reduceTransparency: UIAccessibility.isReduceTransparencyEnabled,
+            increasedContrast: UIAccessibility.isDarkerSystemColorsEnabled, menuStyle: menuSurfaceStyle,
+            usesWallpaper: menuUsesWallpaper)
     }
 
     private var settingsHint: String {
