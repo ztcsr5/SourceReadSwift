@@ -3963,14 +3963,7 @@ struct ReaderView: View {
 
                     ScrollView(showsIndicators: false) {
                         VStack(alignment: .leading, spacing: 14) {
-                            switch settingsTab {
-                            case 0:
-                                appearanceSettings
-                            case 1:
-                                layoutSettings
-                            default:
-                                advancedSettings
-                            }
+                            settingsPage
                         }
                         .padding(.horizontal)
                         .padding(.bottom, 22)
@@ -4012,6 +4005,31 @@ struct ReaderView: View {
             }
             .ignoresSafeArea(edges: .bottom)
         }
+    }
+
+    @ViewBuilder private var settingsPage: some View {
+        switch settingsTab {
+        case 0:
+            appearanceSettings
+        case 1:
+            layoutSettings
+        default:
+            advancedSettings
+        }
+    }
+
+    // Inspect the concrete values without evaluating AppStorage or building UI.
+    // A 1 MB device stack cannot tolerate repeated copies of a giant page tuple.
+    func settingsViewValueSizes() -> [String: Int] {
+        func byteCount<Content: View>(_ build: () -> Content) -> Int {
+            MemoryLayout<Content>.size
+        }
+        return [
+            "appearance": byteCount { appearanceSettings },
+            "layout": byteCount { layoutSettings },
+            "advanced": byteCount { advancedSettings },
+            "selection": byteCount { settingsPage }
+        ]
     }
 
     private var readerNativeMenu: UIMenu {
