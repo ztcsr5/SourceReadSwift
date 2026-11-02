@@ -92,7 +92,19 @@ final class Release117PolishTests: XCTestCase {
         XCTAssertEqual(fonts.installedFonts.first?.postScriptName, first.postScriptName)
     }
 
-    @MainActor func testMountedDeskAndDossierAcrossEveryThemeAndAppearance() async throws {
+    @MainActor func testMountedClassicBotanicalEditorialDeskAndDossier() async throws {
+        try await captureThemes([.classic, .botanical, .editorial])
+    }
+
+    @MainActor func testMountedCoastRoseGraphiteDeskAndDossier() async throws {
+        try await captureThemes([.coast, .rose, .graphite])
+    }
+
+    @MainActor func testMountedFolioInkwashBlueprintDeskAndDossier() async throws {
+        try await captureThemes([.folio, .inkwash, .blueprint])
+    }
+
+    @MainActor private func captureThemes(_ themes: [AppVisualTheme]) async throws {
         let defaults = UserDefaults.standard
         let previousTheme = defaults.object(forKey: "settings.visualTheme")
         let previousKey = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }
@@ -102,7 +114,7 @@ final class Release117PolishTests: XCTestCase {
             else { defaults.removeObject(forKey: "settings.visualTheme") }
             previousKey?.makeKey()
         }
-        for theme in AppVisualTheme.allCases {
+        for theme in themes {
             defaults.set(theme.rawValue, forKey: "settings.visualTheme")
             for style in [UIUserInterfaceStyle.light, .dark] {
                 let width: CGFloat = style == .dark ? 390 : 320
