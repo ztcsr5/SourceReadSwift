@@ -28,7 +28,7 @@ struct ReadingDeskPager<Card: View>: View {
     @State private var heights: [String: CGFloat] = [:]
 
     private var index: Int { books.firstIndex(where: { $0.id == selection }) ?? 0 }
-    private var height: CGFloat { max(books.compactMap { heights[$0.id] }.max() ?? 248, 160) }
+    private var height: CGFloat { max(books.compactMap { heights[$0.id] }.max() ?? (books.contains(where: { $0.hasUpdates }) ? 196 : 176), 160) }
     private var current: BookshelfBook? { books.indices.contains(index) ? books[index] : books.first }
 
     var body: some View {

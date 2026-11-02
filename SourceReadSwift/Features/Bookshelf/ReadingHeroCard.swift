@@ -27,22 +27,19 @@ struct ReadingHeroCard: View {
     @State private var coverImage: UIImage?
     @State private var tone: CoverTone?
 
-    var body: some View {
+    @ViewBuilder var body: some View {
+        if let heroNamespace { card.bookHeroSource("continue|" + book.id, in: heroNamespace) }
+        else { card }
+    }
+
+    private var card: some View {
         VStack(alignment: .leading, spacing: 12) {
             if dynamicTypeSize.isAccessibilitySize {
                 VStack(alignment: .leading, spacing: 16) { cover; description }
             } else {
                 HStack(alignment: .center, spacing: 20) { cover; description }
             }
-            HStack {
-                Label(book.lastReadAt == nil ? "开始阅读" : "继续阅读", systemImage: "book.fill")
-                    .font(.subheadline.weight(.semibold))
-                    .padding(.horizontal, 16).frame(minHeight: 44)
-                    .background(AppTheme.accent.opacity(0.10), in: Capsule())
-                    .foregroundStyle(AppTheme.accent)
-                Spacer(minLength: 8)
-                Color.clear.frame(width: 44, height: 44).accessibilityHidden(true)
-            }
+
         }
         .padding(16).frame(maxWidth: .infinity, alignment: .leading)
         .foregroundStyle(.primary)
@@ -50,7 +47,9 @@ struct ReadingHeroCard: View {
         .clipShape(RoundedRectangle(cornerRadius: AppTheme.cardRadius, style: .continuous))
         .overlay { RoundedRectangle(cornerRadius: AppTheme.cardRadius, style: .continuous)
             .strokeBorder(AppTheme.accent.opacity(0.14), lineWidth: 0.8).allowsHitTesting(false) }
+        .contentShape(RoundedRectangle(cornerRadius: AppTheme.cardRadius, style: .continuous))
         .accessibilityElement(children: .combine)
+        .accessibilityHint("轻点打开书籍，长按管理")
         .task(id: coverImage.map(ObjectIdentifier.init)) {
             guard let coverImage else { tone = nil; return }
             let sampled = await CoverToneSampler.shared.tone(for: coverImage)
@@ -69,7 +68,7 @@ struct ReadingHeroCard: View {
             Text(ReadingHeroStatus.chapter(for: book)).font(.caption).foregroundStyle(.secondary)
                 .lineLimit(dynamicTypeSize.isAccessibilitySize ? nil : 2)
             if book.hasUpdates { Label("目录有更新", systemImage: "text.badge.plus").font(.caption) }
-        }.fixedSize(horizontal: false, vertical: true).frame(maxWidth: .infinity, alignment: .leading)
+        }.padding(.trailing, 28).fixedSize(horizontal: false, vertical: true).frame(maxWidth: .infinity, alignment: .leading)
             .id(book.id)
             .transition(motion.reducesMotion ? .identity : .opacity.combined(with: .offset(y: 6)))
             .animation(motion.arrivalAnimation(stage: 1), value: book.id)
@@ -86,7 +85,6 @@ struct ReadingHeroCard: View {
         .transition(motion.reducesMotion ? .identity : .opacity.combined(with: .scale(scale: 0.96)))
         .animation(motion.animation(.expansion), value: book.id)
         .accessibilityHidden(true)
-        if let heroNamespace { jacket.bookHeroSource("continue|" + book.id, in: heroNamespace) }
-        else { jacket }
+        jacket
     }
 }

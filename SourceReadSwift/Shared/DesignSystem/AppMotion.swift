@@ -53,6 +53,15 @@ struct AppPressStyle: ButtonStyle {
     }
 }
 
+/// Native zoom owns displacement; a second scale animation causes a visible handoff bump.
+struct BookOpenPressStyle: ButtonStyle {
+    @AppMotion private var motion
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label.opacity(configuration.isPressed ? 0.88 : 1)
+            .animation(motion.animation(.press), value: configuration.isPressed)
+    }
+}
+
 /// Only the system navigation transition owns the hero and its interactive return.
 private struct BookHeroSource: ViewModifier {
     let id: String

@@ -725,7 +725,7 @@ struct BookshelfView: View {
                 .frame(maxWidth: .infinity, alignment: .topLeading)
                 .padding(.vertical, 3)
         }
-        .overlay(alignment: .bottomTrailing) {
+        .overlay(alignment: .topTrailing) {
             Menu {
                 NavigationLink {
                     BookDetailView(book: book.asSearchBook)
@@ -733,8 +733,8 @@ struct BookshelfView: View {
                 } label: { Label("书籍详情", systemImage: "info.circle") }
             } label: {
                 Image(systemName: "ellipsis").font(.title3.weight(.semibold))
-                    .frame(width: 44, height: 44).background(.regularMaterial, in: Circle())
-            }.padding(20).accessibilityLabel("正在阅读书籍的更多操作")
+                    .frame(width: 44, height: 44).background(AppTheme.elevatedCard, in: Circle())
+            }.padding(12).accessibilityLabel("正在阅读书籍的更多操作")
         }
         .buttonStyle(PressableScaleButtonStyle())
         .simultaneousGesture(TapGesture().onEnded {
@@ -1416,7 +1416,7 @@ private extension Array {
 
 private struct PressableScaleButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
-        AppPressStyle().makeBody(configuration: configuration)
+        BookOpenPressStyle().makeBody(configuration: configuration)
     }
 }
 

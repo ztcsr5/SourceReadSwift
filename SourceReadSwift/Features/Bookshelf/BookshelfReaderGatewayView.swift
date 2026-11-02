@@ -161,9 +161,7 @@ struct BookshelfReaderGatewayView: View {
             return AnyView(readerRecoveryErrorView(errorMessage))
         } else {
             return AnyView(
-                ProgressView("正在恢复阅读进度")
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .pageBackground()
+                ReaderOpeningPage(book: currentBook)
             )
         }
     }
