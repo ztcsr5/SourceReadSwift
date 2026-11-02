@@ -7,6 +7,31 @@ import boot_native_simulator as boot
 
 
 class NativeSimulatorBootTests(unittest.TestCase):
+    def test_creation_timeout_retries_once_without_shutting_down_an_unknown_device(self):
+        identifier = '00000000-0000-0000-0000-000000000001'
+        commands = []
+
+        def run(command, timeout=30):
+            commands.append(command)
+            if len(commands) == 1:
+                raise subprocess.TimeoutExpired(command, timeout)
+            return identifier if command[2] == 'create' else ''
+
+        with patch.object(boot, 'run', side_effect=run), patch.object(boot.subprocess, 'run',
+            return_value=subprocess.CompletedProcess([], 0)) as status:
+            self.assertEqual(boot.boot_fresh('runtime'), identifier)
+        self.assertEqual(len([command for command in commands if command[2] == 'create']), 2)
+        self.assertFalse(any(command[2] == 'shutdown' for command in commands))
+        self.assertEqual(status.call_count, 1)
+
+    def test_two_creation_timeouts_preserve_the_cause_and_stop_after_two_attempts(self):
+        with patch.object(boot, 'run', side_effect=subprocess.TimeoutExpired('create', 30)) as command:
+            with self.assertRaisesRegex(RuntimeError, 'Both fresh simulator boot attempts failed') as failure:
+                boot.boot_fresh('runtime')
+        self.assertIsInstance(failure.exception.__cause__, subprocess.TimeoutExpired)
+        self.assertEqual(command.call_count, 2)
+        self.assertTrue(all(call.args[0][2] == 'create' for call in command.call_args_list))
+
     def test_cold_migration_can_finish_after_the_previous_180_second_cutoff(self):
         identifier = '00000000-0000-0000-0000-000000000001'
 

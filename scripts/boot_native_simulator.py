@@ -18,11 +18,13 @@ def run(command, timeout=30):
 def boot_fresh(runtime):
     last_failure = None
     for attempt in range(2):
-        device = run(['xcrun', 'simctl', 'create', f'PaperReaderCI-{attempt + 1}',
-                      'com.apple.CoreSimulator.SimDeviceType.iPhone-16', runtime])
-        uuid.UUID(device)
-        print('BOOT_ATTEMPT', attempt + 1, 'fresh', device, flush=True)
+        device = None
         try:
+            created_device = run(['xcrun', 'simctl', 'create', f'PaperReaderCI-{attempt + 1}',
+                                  'com.apple.CoreSimulator.SimDeviceType.iPhone-16', runtime])
+            uuid.UUID(created_device)
+            device = created_device
+            print('BOOT_ATTEMPT', attempt + 1, 'fresh', device, flush=True)
             run(['xcrun', 'simctl', 'boot', device])
             # simctl owns headless readiness; launching the GUI is neither a
             # readiness check nor reliable on unattended CI login sessions.
@@ -35,6 +37,8 @@ def boot_fresh(runtime):
         except (subprocess.CalledProcessError, subprocess.TimeoutExpired) as failure:
             last_failure = failure
             print('BOOT_FAILED', attempt + 1, type(failure).__name__, flush=True)
+            if device is None:
+                continue
             # This identifier was created above; never shut down arbitrary runner devices.
             try:
                 run(['xcrun', 'simctl', 'shutdown', device])
