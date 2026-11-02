@@ -1,5 +1,6 @@
 import SwiftUI
 import XCTest
+import UIKit
 @testable import SourceReadSwift
 
 final class ReaderControlsMaterialTests: XCTestCase {
@@ -35,6 +36,7 @@ final class ReaderControlsMaterialTests: XCTestCase {
             let scene = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.first
             let window = scene.map { UIWindow(windowScene: $0) } ?? UIWindow(frame: UIScreen.main.bounds)
             window.frame = CGRect(x: 0, y: 0, width: 390, height: 844)
+            window.overrideUserInterfaceStyle = .light
             let host = UIHostingController(rootView: ZStack {
                 LinearGradient(colors: [.blue, .orange], startPoint: .topLeading, endPoint: .bottomTrailing)
                 ReaderSettingsWorkbench(context: ReaderWorkbenchContext(bookTitle: "材质集成测试", background: .white,
@@ -42,6 +44,7 @@ final class ReaderControlsMaterialTests: XCTestCase {
                     page: { _ in AnyView(Text("字体与纸面")) }, actions: ReaderWorkbenchActions(close: {}))
             }.environment(\.accessibilityReduceTransparency, false).environment(\.colorSchemeContrast, .standard)
                 .environment(\.colorScheme, .light))
+            host.overrideUserInterfaceStyle = .light
             window.rootViewController = host; window.makeKeyAndVisible()
             try await Task.sleep(nanoseconds: 300_000_000)
             host.view.layoutIfNeeded()
@@ -68,7 +71,7 @@ final class ReaderControlsMaterialTests: XCTestCase {
                 bitsPerComponent: 8, bytesPerRow: width * 4, space: CGColorSpaceCreateDeviceRGB(),
                 bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) else { return false }
             context.translateBy(x: 0, y: CGFloat(height)); context.scaleBy(x: 1, y: -1)
-            context.draw(picture, in: CGRect(x: 0, y: 0, width: width, height: height))
+            context.draw(picture, in: CGRect(x: 0, y: 0, width: CGFloat(width), height: CGFloat(height)))
             return true
         }
         XCTAssertTrue(rendered)
