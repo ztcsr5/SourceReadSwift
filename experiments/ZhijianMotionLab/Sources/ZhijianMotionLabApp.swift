@@ -20,6 +20,7 @@ import SwiftUI
 }
 
 struct LabRootView: View {
+    @EnvironmentObject private var artwork: LabArtwork
     @EnvironmentObject private var library: LabLibrary
     @EnvironmentObject private var shelf: ReferenceShelf
     @Environment(\.accessibilityReduceMotion) private var reducedMotion
@@ -39,14 +40,17 @@ struct LabRootView: View {
 
     var body: some View {
         ZStack {
-            if showsIntro || !hasSeenIntro {
+            if !artwork.isReferenceReady {
+                launchStage.transition(.opacity)
+            } else if showsIntro || !hasSeenIntro {
                 LabIntroView(step: $introStep, onFinish: finishIntro).transition(.opacity).zIndex(3)
             } else { mainContent.transition(.opacity) }
         }
         .animation(animates ? .easeInOut(duration: 0.65) : nil, value: showsIntro || !hasSeenIntro)
+        .animation(animates ? .easeInOut(duration: 0.65) : nil, value: artwork.isReferenceReady)
         .sheet(isPresented: $showsSearch) { ReferenceSearchView(onDetail: { route.append($0) }) }
-        .task(id: scenePhase) {
-            guard isTour, !isTourStarted, scenePhase == .active else { return }
+        .task(id: "\(scenePhase)-\(artwork.isReferenceReady)") {
+            guard isTour, !isTourStarted, artwork.isReferenceReady, scenePhase == .active else { return }
             isTourStarted = true
             route = []; tab = 0; heroIndex = 0; introStep = 0; showsIntro = true
             do {
@@ -66,6 +70,20 @@ struct LabRootView: View {
                 route = []
             } catch { return }
         }
+    }
+
+    private var launchStage: some View {
+        GeometryReader { proxy in
+            ZStack {
+                LabPalette.paper
+                RadialGradient(colors: [.pink.opacity(0.15), .clear], center: .topLeading, startRadius: 0, endRadius: 600)
+                RadialGradient(colors: [.purple.opacity(0.13), .clear], center: .bottomTrailing, startRadius: 0, endRadius: 650)
+                ReferenceMark().fill(.black).frame(width: proxy.size.width * 0.24, height: proxy.size.width * 0.24)
+                    .position(x: proxy.size.width * 0.5, y: proxy.size.height * 0.4273)
+                Text("正在准备海报").font(.caption2).foregroundStyle(.secondary)
+                    .position(x: proxy.size.width * 0.5, y: proxy.size.height * 0.84)
+            }
+        }.ignoresSafeArea().preferredColorScheme(.light).accessibilityIdentifier("intro.loading")
     }
 
     private var mainContent: some View {

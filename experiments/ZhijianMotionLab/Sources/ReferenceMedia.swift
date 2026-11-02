@@ -49,7 +49,7 @@ struct ReferenceImage: View {
                 Image(uiImage: image).resizable()
                     .aspectRatio(contentMode: fits ? .fit : .fill)
                     .frame(width: proxy.size.width, height: proxy.size.height).clipped()
-            } else { Color.gray.opacity(0.12) }
+            } else { (name.hasPrefix("RefTitle") ? Color.clear : Color.gray.opacity(0.12)) }
         }.accessibilityHidden(true)
     }
 }

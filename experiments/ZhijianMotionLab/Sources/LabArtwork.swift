@@ -10,31 +10,51 @@ private struct PreparedArtwork {
 /// Decode and preblur once off main, never a live full-screen Gaussian blur.
 @MainActor final class LabArtwork: ObservableObject {
     @Published private var prepared: [String: PreparedArtwork] = [:]
+    @Published private(set) var isReferenceReady = false
+    private var isPreparing = false
+    private var isComplete = false
 
     func image(_ name: String) -> UIImage? { prepared[name]?.cover }
     func haze(_ name: String) -> UIImage? { prepared[name]?.haze }
 
     func prepare() async {
-        guard prepared.isEmpty else { return }
-        let bundle = Bundle.main
-        let rendered = await Task.detached(priority: .userInitiated) {
-            let context = CIContext(options: [.cacheIntermediates: false])
-            var result: [String: PreparedArtwork] = [:]
-            let names = Set(LabBook.samples.map(\.artwork) + ReferenceMedia.samples.flatMap { [$0.poster, $0.backdrop, $0.logo] }.filter { !$0.isEmpty })
-            for name in names {
-                guard let original = UIImage(named: name, in: bundle, compatibleWith: nil),
-                      let cg = original.cgImage else { continue }
-                let image = Self.thumbnail(cg, maximum: 1200)
+        guard !isComplete, !isPreparing else { return }
+        isPreparing = true
+        defer { isPreparing = false }
+        let posters = Set(ReferenceMedia.samples.map(\.poster))
+        let first = await Task.detached(priority: .userInitiated) {
+            Self.render(posters, hazes: [])
+        }.value
+        guard !Task.isCancelled else { return }
+        prepared = first
+        isReferenceReady = true
+
+        let legacy = Set(LabBook.samples.map(\.artwork))
+        let remaining = Set(ReferenceMedia.samples.flatMap { [$0.backdrop, $0.logo] }.filter { !$0.isEmpty }).union(legacy)
+        let rest = await Task.detached(priority: .utility) {
+            Self.render(remaining, hazes: legacy)
+        }.value
+        guard !Task.isCancelled else { return }
+        prepared.merge(rest) { _, complete in complete }
+        isComplete = true
+    }
+
+    nonisolated private static func render(_ names: Set<String>, hazes: Set<String>) -> [String: PreparedArtwork] {
+        let context = hazes.isEmpty ? nil : CIContext(options: [.cacheIntermediates: false])
+        var result: [String: PreparedArtwork] = [:]
+        for name in names {
+            guard let original = UIImage(named: name, in: Bundle.main, compatibleWith: nil), let cg = original.cgImage else { continue }
+            let image = Self.thumbnail(cg, maximum: 1200)
+            var haze: UIImage?
+            if hazes.contains(name), let context {
                 let small = Self.thumbnail(cg, maximum: 96)
                 let input = CIImage(cgImage: small)
                 let blurred = input.clampedToExtent().applyingFilter("CIGaussianBlur", parameters: [kCIInputRadiusKey: 9])
-                let haze = context.createCGImage(blurred, from: input.extent).map { UIImage(cgImage: $0) }
-                result[name] = PreparedArtwork(cover: UIImage(cgImage: image), haze: haze)
+                haze = context.createCGImage(blurred, from: input.extent).map { UIImage(cgImage: $0) }
             }
-            return result
-        }.value
-        guard !Task.isCancelled else { return }
-        prepared = rendered
+            result[name] = PreparedArtwork(cover: UIImage(cgImage: image), haze: haze)
+        }
+        return result
     }
 
     nonisolated private static func thumbnail(_ image: CGImage, maximum: CGFloat) -> CGImage {

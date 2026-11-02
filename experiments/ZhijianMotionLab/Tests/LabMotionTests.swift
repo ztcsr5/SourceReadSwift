@@ -72,6 +72,8 @@ final class LabMotionTests: XCTestCase {
 
     @MainActor func testDecodePreparesCoverAndPreblurredBackgroundOnce() async throws {
         let artwork = LabArtwork(); await artwork.prepare()
+        XCTAssertTrue(artwork.isReferenceReady)
+        for item in ReferenceMedia.samples { XCTAssertNotNil(artwork.image(item.poster)) }
         for book in LabBook.samples {
             let cover = try XCTUnwrap(artwork.image(book.artwork))
             XCTAssertLessThanOrEqual(max(cover.size.width, cover.size.height), 1200)
