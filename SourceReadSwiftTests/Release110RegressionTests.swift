@@ -18,6 +18,7 @@ final class Release110RegressionTests: XCTestCase {
         context.exceptionHandler = { _, value in exception = value?.toString() }
         context.evaluateScript("""
         var scrollAnimationGeneration = 0, timers = [], messages = [], nextTarget = 200;
+        var performance = {now: function() { return 123; }};
         var state = {revision: 'r', visible: 0};
         var content = {querySelector: function() { return {getBoundingClientRect: function() { return {top: nextTarget - window.scrollY}; }}; }};
         var window = {scrollY: 0, nativeTarget: null,
@@ -26,6 +27,9 @@ final class Release110RegressionTests: XCTestCase {
         function topInset() { return 0; }
         function onScroll() {}
         function post(m) { messages.push(m); }
+        // This isolated cancellation test has no DOM; real position geometry is
+        // exercised by ReaderScrollCadenceTests with the complete WebKit shell.
+        function reportVisiblePosition(now) { post({type: 'visible', requestKey: state.activeScrollKey, at: now}); }
         """)
         context.evaluateScript(String(shell[motionStart..<motionEnd]) + String(shell[jumpStart..<jumpEnd]))
         context.evaluateScript("""
@@ -39,6 +43,8 @@ final class Release110RegressionTests: XCTestCase {
         XCTAssertEqual(context.evaluateScript("window.scrollY")?.toInt32(), 0)
         XCTAssertEqual(context.evaluateScript("messages.filter(function(m) { return m.type === 'scroll-applied' && m.requestKey === 'old-speech'; }).length")?.toInt32(), 0)
         XCTAssertEqual(context.evaluateScript("messages.filter(function(m) { return m.type === 'scroll-applied' && m.requestKey === 'new-toc'; }).length")?.toInt32(), 1)
+        XCTAssertEqual(context.evaluateScript("messages.filter(function(m) { return m.type === 'visible'; }).length")?.toInt32(), 1)
+        XCTAssertEqual(context.evaluateScript("messages[messages.length - 1].requestKey")?.toString(), "new-toc")
     }
 
     func testWebSectionRevisionSeesMiddleParagraphChanges() {
