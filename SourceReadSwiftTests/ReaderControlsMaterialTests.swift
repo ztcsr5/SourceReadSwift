@@ -4,6 +4,17 @@ import UIKit
 @testable import SourceReadSwift
 
 final class ReaderControlsMaterialTests: XCTestCase {
+    @MainActor func testSurfaceSamplerReadsTheLowerPanelNotTheUpperBackdrop() throws {
+        let picture = UIGraphicsImageRenderer(size: CGSize(width: 390, height: 844)).image { renderer in
+            UIColor.black.setFill(); renderer.fill(CGRect(x: 0, y: 0, width: 390, height: 844))
+            UIColor.red.setFill(); renderer.fill(CGRect(x: 0, y: 422, width: 390, height: 422))
+        }
+        let channels = try surfaceChannels(picture)
+        XCTAssertEqual(channels[0], 255, accuracy: 1)
+        XCTAssertEqual(channels[1], 0, accuracy: 1)
+        XCTAssertEqual(channels[2], 0, accuracy: 1)
+    }
+
     func testSystemMaterialRequiresTheActualUserPermissionAndSelection() {
         XCTAssertTrue(ReaderChromeSurface.permitsTranslucency(reduceTransparency: false,
             increasedContrast: false, menuStyle: "system", usesWallpaper: false))
@@ -75,7 +86,8 @@ final class ReaderControlsMaterialTests: XCTestCase {
             guard let context = CGContext(data: bytes.baseAddress, width: width, height: height,
                 bitsPerComponent: 8, bytesPerRow: width * 4, space: CGColorSpaceCreateDeviceRGB(),
                 bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) else { return false }
-            context.translateBy(x: 0, y: CGFloat(height)); context.scaleBy(x: 1, y: -1)
+            // CGImage scanlines already match the bitmap's row order. A UIKit
+            // drawing flip here would sample the upper backdrop instead.
             context.draw(picture, in: CGRect(x: 0, y: 0, width: CGFloat(width), height: CGFloat(height)))
             return true
         }
