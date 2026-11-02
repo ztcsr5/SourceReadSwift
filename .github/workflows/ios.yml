@@ -71,6 +71,8 @@ jobs:
             -only-testing:SourceReadSwiftTests/Release117MotionSystemTests \
             -only-testing:SourceReadSwiftTests/Release117PolishTests \
             -only-testing:SourceReadSwiftTests/ReaderSettingsStackTests \
+            -only-testing:SourceReadSwiftTests/FontImportRequestTests \
+            -only-testing:SourceReadSwiftTests/ReaderScrollCadenceTests \
             -only-testing:SourceReadSwiftTests/ReaderPanController119Tests \
             -destination-timeout 120 -test-timeouts-enabled YES -maximum-test-execution-time-allowance 60 \
             -resultBundlePath NativeTabResults.xcresult test 2>&1 | tee native-tab-test.log

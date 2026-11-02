@@ -99,6 +99,7 @@ struct WebScrollReaderView: UIViewRepresentable {
 
         private var isDocumentReady = false
         private var lastStylePayload: WebReaderStylePayload?
+        private(set) var styleBuildCount = 0
         private var lastContentFingerprint: String?
         private var expectedContentRevision = ""
         private var contentBuildTask: Task<Void, Never>?
@@ -205,6 +206,7 @@ struct WebScrollReaderView: UIViewRepresentable {
         }
 
         private func pushStyleIfNeeded(webView: WKWebView) {
+            styleBuildCount += 1
             var payload = WebReaderStylePayload.make(
                 fontFamily: view.fontFamily,
                 fontSize: view.fontSize,
