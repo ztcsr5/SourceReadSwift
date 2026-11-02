@@ -32,3 +32,11 @@
 - Hero 返回取消、连续滑动、壁纸全屏、字体文件提供方属于实际交互验收；60/120 FPS 必须测量，不把刷新率配置当成实测。
 - 暂不把未接通的“保存选中文字→票根→书笺收藏”宣称完成；沿用既有书签/金句功能，下一阶段打通真实选区和保存结果后再加生成动画。
 - 回滚只 revert 本分支本轮提交，不回退用户原有修改；旧 build 128 IPA 保留。
+
+## 首轮原生验收与基础设施修正
+- cacbed8 设备编译抓到 BookDetailHero.swift:29 `ambiguous use of operator '-'`；已显式区分 CGFloat 几何与 Double 透明度，不把本地解析通过冒充编译通过。
+- 200c949/iOS run 41422678298：native-tabs/job 125202035136 在 `simctl bootstatus` 的 180 秒预算超时，尚未进入产品测试；普通回归另行运行。日志保留同 HEAD 证据目录。
+- 同 HEAD IPA run 41422678034/job 125201735050 被托管服务取消，check annotation 明确 `The job was not acquired by Runner of type hosted even after multiple attempts`，并报告 macOS arm64 capacity constraints；不是产品构建绿灯。
+- 只为本分支将三项 CI 的 runner 路由切到官方标准 Intel 标签；其它分支仍用原标签，SDK、完整测试、断言、启动预算不变。不是跳过失败测试。标签及 Xcode 安装表已查 GitHub 官方文档。
+- 复核补上两处一致性：标题单独选内置/导入字体时也发送缓存 @font-face 给 WebContent；页面实际绘制与分页测量均传递同一页眉字号/顶部间距。新增断言，不放宽旧断言。
+- 本地检查仅为 25 个 Swift 文件无新增解析错误、git diff --check、CI 辅助脚本 py_compile 与 YAML 解析；最终本 HEAD 原生结果未出前不交付 build 129 IPA，不称真机/FPS 已通过。
