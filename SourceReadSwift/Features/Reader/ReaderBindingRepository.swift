@@ -92,12 +92,18 @@ actor ReaderBindingRepository {
     func reload() async throws { records = try await repository.records() }
     func save(title: String, defaults: UserDefaults = .standard) async throws {
         await ReaderCustomWallpaperStore.warmWallpaper()
-        let preferences = try ReaderBindingPreferences.capture(defaults)
+        var preferences = try ReaderBindingPreferences.capture(defaults)
         let usesWallpaper = preferences.text("reader.background") == "custom"
         var wallpaper: ReaderBindingWallpaper?
         if usesWallpaper {
             guard let image = ReaderCustomWallpaperStore.cachedWallpaper else { throw ReaderWallpaperFailure.invalidImage }
-            let adjustment = ReaderCustomWallpaperStore.adjustment
+            var adjustment = ReaderCustomWallpaperStore.adjustment
+            adjustment.fillMode = ReaderWallpaperFillMode(rawValue: preferences.text("reader.customWallpaperFillMode")) ?? .fill
+            adjustment.usesLightText = ReaderCustomWallpaperStore.isWallpaperDark
+            var values = preferences.values
+            values["reader.customBackgroundIsDark"] = .flag(adjustment.usesLightText)
+            values["reader.customBackgroundIsDarkManual"] = .flag(true)
+            preferences = ReaderBindingPreferences(values: values)
             let bytes: Data?
             if let cached = ReaderCustomWallpaperStore.cachedJPEG { bytes = cached }
             else { bytes = await Task.detached(priority: .userInitiated) { image.jpegData(compressionQuality: 0.85) }.value }
@@ -113,8 +119,13 @@ actor ReaderBindingRepository {
         let preferences = record.preferences
         if preferences.text("reader.fontFamily") == ReaderFontFamily.custom.rawValue || preferences.text("reader.chapterTitleFamily") == ReaderFontFamily.custom.rawValue {
             let name = preferences.text("reader.customFontPostScriptName")
-            guard let file = CustomFontLocations.file(for: name), FileManager.default.fileExists(atPath: file.path) else {
-                throw NSError(domain: "ReaderBinding", code: 4, userInfo: [NSLocalizedDescriptionKey: "此方案使用的自定义字体尚未安装，请先导入原字体；原设置未改变。"])
+            if CustomFontLocations.file(for: name).map({ FileManager.default.fileExists(atPath: $0.path) }) != true {
+                let support = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first ?? FileManager.default.temporaryDirectory
+                let directory = support.appendingPathComponent("SourceReadSwift/Fonts", isDirectory: true)
+                let font = try await FontImportRequest.perform(operation: { cancellation in
+                    try FontImportOperation.restoreInstalled(name: name, directory: directory, cancellation: cancellation)
+                })
+                CustomFontLocations.register(postScriptName: name, file: directory.appendingPathComponent(font.fileName))
             }
         }
         if record.hasWallpaper {

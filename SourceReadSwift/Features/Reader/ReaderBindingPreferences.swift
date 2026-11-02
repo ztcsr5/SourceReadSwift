@@ -25,6 +25,7 @@ struct ReaderBindingPreferences: Codable, Equatable, Sendable {
         "reader.showSystemStatusBar": .flag(false), "reader.statusPosition": .text("bottom"),
         "reader.allowsDuplicateTopStatus": .flag(false), "reader.contentExtendsIntoChrome": .flag(false),
         "reader.background": .text(ReaderBackground.white.rawValue), "reader.customBackgroundIsDark": .flag(false),
+        "reader.customBackgroundIsDarkManual": .flag(false),
         "reader.customWallpaperFillMode": .text(ReaderWallpaperFillMode.fill.rawValue),
         "reader.menuSurfaceStyle": .text("system"), "reader.menuPaperOpacity": .number(0.97), "reader.menuUsesWallpaper": .flag(false)
     ]

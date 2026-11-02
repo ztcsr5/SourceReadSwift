@@ -89,7 +89,8 @@ struct ReaderSettingsWorkbench: View {
                 .overlay { RoundedRectangle(cornerRadius: 24).strokeBorder(context.ink.opacity(0.10), lineWidth: 0.6).allowsHitTesting(false) }
                 .shadow(color: context.ink.opacity(0.10), radius: 16, y: 8)
                 .padding(.bottom, max(context.bottomInset, 8) + 8).offset(y: drag)
-            }.foregroundStyle(context.ink)
+            }.frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
+                .foregroundStyle(context.ink)
                 .environment(\.colorScheme, context.background.isDark ? .dark : .light)
         }.onChange(of: path) { actions.routeChanged($0.last) }
             .accessibilityIdentifier("reader.settingsWorkbench")

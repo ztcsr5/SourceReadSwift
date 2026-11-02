@@ -3,6 +3,35 @@ import XCTest
 @testable import SourceReadSwift
 
 final class ReaderBindingTests: XCTestCase {
+    @MainActor func testSavedBindingReloadsAndAppliesAsOneAppearanceWithoutMovingTheBook() async throws {
+        let suite = UUID().uuidString
+        let defaults = UserDefaults(suiteName: suite)!
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { defaults.removePersistentDomain(forName: suite); try? FileManager.default.removeItem(at: root) }
+        defaults.set("bamboo", forKey: "reader.background")
+        defaults.set(ReaderFontFamily.rounded.rawValue, forKey: "reader.fontFamily")
+        defaults.set(25, forKey: "reader.fontSize")
+        defaults.set("branch", forKey: "reader.chapterDecoration")
+        defaults.set("center", forKey: "reader.chapterAlignment")
+        defaults.set("paper", forKey: "reader.menuSurfaceStyle")
+        defaults.set(15, forKey: "reader.headerFontSize")
+        let expected = try ReaderBindingPreferences.capture(defaults)
+        let firstSession = ReaderBindingStore(root: root)
+        try await firstSession.save(title: "枝影夜读", defaults: defaults)
+        let secondSession = ReaderBindingStore(root: root)
+        try await secondSession.reload()
+        let record = try XCTUnwrap(secondSession.records.first)
+        XCTAssertEqual(secondSession.records.count, 1)
+        defaults.set(17, forKey: "reader.fontSize")
+        defaults.set("none", forKey: "reader.chapterDecoration")
+        defaults.set(712, forKey: "reader.currentParagraphIndex")
+        defaults.set("pageCurl", forKey: "reader.mode")
+        try await secondSession.apply(record, defaults: defaults)
+        XCTAssertEqual(try ReaderBindingPreferences.capture(defaults), expected)
+        XCTAssertEqual(defaults.integer(forKey: "reader.currentParagraphIndex"), 712)
+        XCTAssertEqual(defaults.string(forKey: "reader.mode"), "pageCurl")
+        XCTAssertNotNil(defaults.string(forKey: "reader.bindingRevision"))
+    }
     func testAppearanceSnapshotIsCompleteButCannotContainProgressOrCredentials() throws {
         let defaults = UserDefaults(suiteName: UUID().uuidString)!
         defaults.set("must-not-export", forKey: "reader.bookID")

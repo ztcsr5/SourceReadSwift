@@ -16,8 +16,10 @@ struct ReaderBindingLibraryView: View {
             }
             VStack(alignment: .leading, spacing: 8) {
                 Text("装帧名称（1–32 个字）").font(.caption)
-                TextField("例如：夜读山岚", text: $title).textFieldStyle(.roundedBorder)
+                TextField("装帧名称", text: $title, prompt: Text("例如：夜读山岚")).textFieldStyle(.roundedBorder)
+                    .disabled(isWorking)
                     .submitLabel(.done).onSubmit { saveCurrent() }
+                if title.count > 32 { Text("名称过长，请缩短为 32 个字以内。") .font(.caption).foregroundStyle(AppTheme.danger) }
                 Button(action: saveCurrent) {
                     HStack { Image(systemName: "bookmark.fill"); Text(isWorking ? "正在处理…" : "保存当前整套装帧") }
                         .frame(maxWidth: .infinity, minHeight: 44)

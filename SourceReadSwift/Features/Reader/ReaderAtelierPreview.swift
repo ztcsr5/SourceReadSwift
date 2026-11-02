@@ -48,6 +48,7 @@ struct ReaderAtelierPreview: View {
 }
 
 struct ReaderChapterDesignEditor: View {
+    @Environment(\.dynamicTypeSize) private var typeSize
     @AppStorage("reader.chapterDecoration") private var decorationRaw = "none"
     @AppStorage("reader.chapterAlignment") private var alignmentRaw = "leading"
     @AppStorage("reader.chapterTitleFamily") private var familyRaw = ""
@@ -61,7 +62,7 @@ struct ReaderChapterDesignEditor: View {
             Text("让每一章，有自己的开场。") .font(.title3.weight(.semibold))
             Text("章饰只出现在章节开头。正文、书签和阅读位置保持原有逻辑。")
                 .font(.caption).foregroundStyle(.secondary)
-            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
+            LazyVGrid(columns: typeSize.isAccessibilitySize ? [GridItem(.flexible())] : [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
                 ForEach(ReaderChapterDecoration.allCases, id: \.self) { decoration in
                     Button {
                         withAnimation(motion.animation(.navigation)) { decorationRaw = decoration.rawValue }
