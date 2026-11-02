@@ -53,7 +53,8 @@ struct ReaderSettingsWorkbench: View {
     }
     var body: some View {
         GeometryReader { proxy in
-            let height = ReaderSettingsLayoutPolicy.maxPanelHeight(viewportHeight: proxy.size.height, bottomInset: context.bottomInset)
+            let maximum = ReaderSettingsLayoutPolicy.maxPanelHeight(viewportHeight: proxy.size.height, bottomInset: context.bottomInset)
+            let height = typeSize.isAccessibilitySize ? maximum : min(maximum, max(proxy.size.height * 0.72, 360))
             ZStack(alignment: .bottom) {
                 VStack(spacing: 0) {
                     handle
@@ -65,7 +66,7 @@ struct ReaderSettingsWorkbench: View {
                                     page(route)
                                 }.padding(16)
                             }.safeAreaInset(edge: .top, spacing: 0) {
-                                if !typeSize.isAccessibilitySize && proxy.size.height >= 600 {
+                                if route == .heading && !typeSize.isAccessibilitySize && proxy.size.height >= 600 {
                                     preview().padding(.horizontal, 16).padding(.bottom, 12)
                                 }
                             }
@@ -98,7 +99,10 @@ struct ReaderSettingsWorkbench: View {
                 }.accessibilityLabel("返回阅读设置")
                     .accessibilityIdentifier("reader.settings.back")
             }
-            Text(route?.title ?? "阅读工坊").font(.headline).lineLimit(1)
+            VStack(alignment: .leading, spacing: 4) {
+                Text(route?.title ?? "阅读设置").font(.headline).lineLimit(1)
+                Text(context.bookTitle).font(.caption).foregroundStyle(.secondary).lineLimit(1)
+            }
             Spacer(minLength: 8)
             Button(action: actions.close) { Image(systemName: "xmark").frame(width: 44, height: 44) }
                 .accessibilityLabel("关闭阅读设置")
@@ -107,7 +111,7 @@ struct ReaderSettingsWorkbench: View {
     }
     private var handle: some View {
         Capsule().fill(context.ink.opacity(0.22)).frame(width: 32, height: 4)
-            .frame(maxWidth: .infinity, minHeight: 32).contentShape(Rectangle())
+            .frame(maxWidth: .infinity, minHeight: 44).contentShape(Rectangle())
             .gesture(DragGesture(minimumDistance: 8).onChanged { value in
                 if value.translation.height > abs(value.translation.width) { drag = max(value.translation.height, 0) }
             }.onEnded { value in
@@ -118,42 +122,47 @@ struct ReaderSettingsWorkbench: View {
     }
     private var home: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 24) {
-                VStack(alignment: .leading, spacing: 8) {
-                    Text(context.bookTitle).font(.caption).foregroundStyle(.secondary).lineLimit(1)
-                    Text("调好书页，再回到故事里。") .font(.title3.weight(.semibold))
-                }
-                Button { route = .themes } label: {
-                    VStack(alignment: .leading, spacing: 12) {
-                        HStack { Label("你的阅读装帧", systemImage: "books.vertical").font(.caption); Spacer(); Image(systemName: "arrow.up.right") }
-                        Text("让纸张、字与留白\n成为同一种气质。") .font(.title3.weight(.semibold))
-                        ReaderChapterMotif(decoration: .folio).foregroundStyle(AppTheme.accent)
-                        Text("查看与保存整套方案").font(.caption.weight(.semibold))
-                    }.padding(20).frame(maxWidth: .infinity, alignment: .leading)
-                        .background(AppTheme.accent.opacity(0.08), in: RoundedRectangle(cornerRadius: 20))
-                        .overlay { RoundedRectangle(cornerRadius: 20).strokeBorder(AppTheme.accent.opacity(0.18), lineWidth: 0.8) }
-                }.buttonStyle(AppPressStyle())
-                    .accessibilityIdentifier("reader.settings.route.themes")
-                LazyVGrid(columns: typeSize.isAccessibilitySize ? [GridItem(.flexible())] : [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
-                    ForEach(Array(ReaderWorkbenchRoute.allCases.filter { $0 != .themes }.enumerated()), id: \.element) { index, route in
-                        Button { self.route = route } label: {
-                            VStack(alignment: .leading, spacing: 12) {
-                                HStack { Text(String(format: "%02d", index + 1)).font(.caption.monospaced()); Spacer(); Image(systemName: "arrow.up.right").font(.caption) }
-                                    .foregroundStyle(.secondary)
-                                Image(systemName: route.symbol).font(.title2).foregroundStyle(AppTheme.accent).frame(height: 32)
-                                Text(route.title).font(.headline)
-                                Text(route.subtitle).font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
-                            }.padding(16).frame(maxWidth: .infinity, minHeight: 160, alignment: .topLeading)
-                                .background(context.ink.opacity(0.035), in: RoundedRectangle(cornerRadius: 16))
-                                .overlay { RoundedRectangle(cornerRadius: 16).strokeBorder(context.ink.opacity(0.08), lineWidth: 0.6) }
-                        }.buttonStyle(AppPressStyle())
-                            .accessibilityIdentifier("reader.settings.route." + route.rawValue)
-                    }
-                }
+            VStack(alignment: .leading, spacing: 0) {
+                primaryRow(.typography, index: "字")
+                Divider().padding(.leading, 56)
+                primaryRow(.appearance, index: "纸")
+                Divider().padding(.leading, 56)
+                primaryRow(.heading, index: "章")
+                Divider().padding(.vertical, 12)
+                secondaryRow(.chrome)
+                secondaryRow(.assistance)
+                secondaryRow(.themes)
                 Button("切换经典设置") { usesWorkbench = false }
-                    .font(.caption).frame(minHeight: 44).frame(maxWidth: .infinity)
+                    .font(.caption).foregroundStyle(.secondary)
+                    .frame(minHeight: 44).frame(maxWidth: .infinity).padding(.top, 8)
             }.padding(16)
         }
+    }
+
+    private func primaryRow(_ route: ReaderWorkbenchRoute, index: String) -> some View {
+        Button { self.route = route } label: {
+            HStack(spacing: 16) {
+                Text(index).font(.system(.title2, design: .serif).weight(.medium))
+                    .foregroundStyle(AppTheme.accent).frame(width: 40).accessibilityHidden(true)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(route.title).font(.headline)
+                    Text(route.subtitle).font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                }
+                Spacer(minLength: 8)
+                Image(systemName: "chevron.right").font(.caption.weight(.semibold)).foregroundStyle(.secondary)
+            }.frame(maxWidth: .infinity, minHeight: 72, alignment: .leading).contentShape(Rectangle())
+        }.buttonStyle(AppPressStyle()).accessibilityIdentifier("reader.settings.route." + route.rawValue)
+    }
+
+    private func secondaryRow(_ route: ReaderWorkbenchRoute) -> some View {
+        Button { self.route = route } label: {
+            HStack(spacing: 12) {
+                Image(systemName: route.symbol).frame(width: 28).foregroundStyle(AppTheme.accent)
+                Text(route.title).font(.subheadline.weight(.medium))
+                Spacer(minLength: 8)
+                Image(systemName: "chevron.right").font(.caption).foregroundStyle(.secondary)
+            }.frame(maxWidth: .infinity, minHeight: 48, alignment: .leading).contentShape(Rectangle())
+        }.buttonStyle(AppPressStyle()).accessibilityIdentifier("reader.settings.route." + route.rawValue)
     }
 }
 
