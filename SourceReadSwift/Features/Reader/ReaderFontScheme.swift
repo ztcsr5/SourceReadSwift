@@ -19,7 +19,11 @@ enum ReaderFontResource {
     static func file(for url: URL, customDirectory: URL? = nil) -> URL? {
         guard url.scheme == scheme, url.user == nil, url.password == nil,
               url.query == nil, url.fragment == nil, url.pathComponents.count == 2 else { return nil }
-        let name = url.lastPathComponent
+        // Foundation's lastPathComponent can normalize an encoded slash away.
+        // Validate the original encoded segment before accepting any basename.
+        guard let encodedPath = URLComponents(url: url, resolvingAgainstBaseURL: false)?.percentEncodedPath,
+              encodedPath.hasPrefix("/"),
+              let name = String(encodedPath.dropFirst()).removingPercentEncoding else { return nil }
         guard !name.contains("\\"), !name.contains("/"), FontImportPolicy.extensions.contains(url.pathExtension.lowercased()) else { return nil }
         if url.host == "bundle" {
             guard ["MaShanZheng-Regular.ttf", "ZhiMangXing-Regular.ttf"].contains(name) else { return nil }
