@@ -50,6 +50,15 @@ jobs:
         run: |
           if [ -d MotionLab.xcresult ]; then
             xcrun xcresulttool export attachments --path MotionLab.xcresult --output-path evidence/screenshots
+            mkdir -p evidence/previews
+            sips --help > evidence/sips-help.txt
+            grep -q -- '--resampleHeightWidthMax' evidence/sips-help.txt
+            cp evidence/screenshots/manifest.json evidence/previews/
+            for SCREENSHOT in evidence/screenshots/*.png; do
+              [ -f "$SCREENSHOT" ] || continue
+              BASENAME="$(basename "$SCREENSHOT" .png)"
+              sips -Z 1280 -s format jpeg -s formatOptions 70 "$SCREENSHOT" --out "evidence/previews/$BASENAME.jpg" > /dev/null
+            done
           fi
       - name: Record real intro to poster journey
         run: |
@@ -64,6 +73,7 @@ jobs:
           kill -INT "$RECORD_PID"
           wait "$RECORD_PID" || true
           xcrun simctl io "$LAB_DEVICE_ID" screenshot evidence/poster-home.png
+          sips -Z 1280 -s format jpeg -s formatOptions 70 evidence/poster-home.png --out evidence/previews/poster-home.jpg > /dev/null
           test -s evidence/intro-to-home.mp4
       - name: Build unsigned isolated device app
         run: |
@@ -97,4 +107,11 @@ jobs:
             experiments/ZhijianMotionLab/*test.log
             experiments/ZhijianMotionLab/*build.log
             experiments/ZhijianMotionLab/toolchain.log
+          retention-days: 14
+      - name: Upload lightweight native previews
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: motion-lab-preview-${{ github.sha }}
+          path: experiments/ZhijianMotionLab/evidence/previews
           retention-days: 14

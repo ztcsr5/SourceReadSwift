@@ -21,6 +21,7 @@ def main() -> None:
     """Read only this branch/head's independent workflow and optionally collect artifacts."""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--download', action='store_true')
+    parser.add_argument('--ipa-only', action='store_true', help='Download only the small installable artifact')
     options = parser.parse_args()
     head = subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=ROOT, text=True).strip()
     out = Path('F:/SourceReadSwift/motion-lab') / head
@@ -41,10 +42,12 @@ def main() -> None:
                 log = out / f"job-{job['id']}.log"
                 if not log.exists():
                     log.write_bytes(github.signed_download(f"actions/jobs/{job['id']}/logs"))
-        if options.download:
+        if options.download or options.ipa_only:
             artifacts = github.api(f"actions/runs/{run['id']}/artifacts")['artifacts']
             for artifact in artifacts:
                 if not artifact['name'].startswith('motion-lab-') or artifact.get('expired'):
+                    continue
+                if options.ipa_only and not artifact['name'].startswith('motion-lab-ipa-'):
                     continue
                 archive = out / (artifact['name'] + '.zip')
                 if not archive.exists():
