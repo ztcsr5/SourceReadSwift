@@ -3,6 +3,34 @@ import Foundation
 
 /// Coordinates file-provider access and font IO away from the UI actor.
 enum FontImportOperation {
+    /// Resolves an already installed face after relaunch without constructing the UI font catalog on main.
+    static func restoreInstalled(name: String, directory: URL, cancellation: FontImportCancellation) throws -> CustomFontItem {
+        precondition(!Thread.isMainThread)
+        try cancellation.check()
+        guard !name.isEmpty else { throw missingFont() }
+        guard FileManager.default.fileExists(atPath: directory.path) else { throw missingFont() }
+        let files = try FileManager.default.contentsOfDirectory(at: directory, includingPropertiesForKeys: [.fileSizeKey, .isRegularFileKey])
+        for file in files where FontImportPolicy.extensions.contains(file.pathExtension.lowercased()) {
+            try cancellation.check()
+            let properties = try file.resourceValues(forKeys: [.fileSizeKey, .isRegularFileKey])
+            guard properties.isRegularFile == true, let size = properties.fileSize, size > 0, size <= FontImportPolicy.maximumBytes,
+                  let descriptors = CTFontManagerCreateFontDescriptorsFromURL(file as CFURL) as? [CTFontDescriptor] else { continue }
+            for descriptor in descriptors {
+                let face = CTFontCreateWithFontDescriptor(descriptor, 16, nil)
+                guard CTFontCopyPostScriptName(face) as String == name else { continue }
+                _ = try registerFont(at: file, name: name)
+                try cancellation.check()
+                return CustomFontItem(fileName: file.lastPathComponent, displayName: CTFontCopyFullName(face) as String,
+                    postScriptName: name, fileSize: Int64(size))
+            }
+        }
+        throw missingFont()
+    }
+
+    private static func missingFont() -> NSError {
+        NSError(domain: "ReaderBinding", code: 4, userInfo: [NSLocalizedDescriptionKey: "此方案使用的自定义字体尚未安装，请先导入原字体；原设置未改变。"])
+    }
+
     static func preparePickedCopy(source: URL, directory: URL, installed: [CustomFontItem], cancellation: FontImportCancellation) throws -> CustomFontItem {
         precondition(!Thread.isMainThread)
         try cancellation.check()
@@ -73,8 +101,21 @@ enum FontImportOperation {
         let name = CTFontCopyPostScriptName(face) as String
         if let existing = installed.first(where: { $0.postScriptName == name }) { return existing }
         try cancellation.check()
+        let didRegister = try registerFont(at: destination, name: name)
+        do { try cancellation.check() }
+        catch {
+            if didRegister { CTFontManagerUnregisterFontsForURL(destination as CFURL, .process, nil) }
+            throw error
+        }
+        shouldKeep = true
+        return CustomFontItem(fileName: destination.lastPathComponent,
+            displayName: CTFontCopyFullName(face) as String, postScriptName: name,
+            fileSize: Int64(properties.fileSize ?? 0))
+    }
+
+    private static func registerFont(at file: URL, name: String) throws -> Bool {
         var registrationError: Unmanaged<CFError>?
-        let didRegister = CTFontManagerRegisterFontsForURL(destination as CFURL, .process, &registrationError)
+        let didRegister = CTFontManagerRegisterFontsForURL(file as CFURL, .process, &registrationError)
         let failure = registrationError?.takeRetainedValue()
         if !didRegister {
             let code = failure.map { CFErrorGetCode($0) }
@@ -89,14 +130,6 @@ enum FontImportOperation {
                     userInfo: [NSLocalizedDescriptionKey: "系统未能注册此字体，请尝试另一份 TTF 或 OTF 文件。"])
             }
         }
-        do { try cancellation.check() }
-        catch {
-            if didRegister { CTFontManagerUnregisterFontsForURL(destination as CFURL, .process, nil) }
-            throw error
-        }
-        shouldKeep = true
-        return CustomFontItem(fileName: destination.lastPathComponent,
-            displayName: CTFontCopyFullName(face) as String, postScriptName: name,
-            fileSize: Int64(properties.fileSize ?? 0))
+        return didRegister
     }
 }

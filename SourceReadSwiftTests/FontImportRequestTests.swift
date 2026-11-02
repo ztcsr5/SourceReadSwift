@@ -1,4 +1,5 @@
 import XCTest
+import UIKit
 @testable import SourceReadSwift
 
 final class FontImportRequestTests: XCTestCase {
@@ -78,5 +79,13 @@ final class FontImportRequestTests: XCTestCase {
         XCTAssertEqual(item.fileSize, Int64(bytes.count))
         XCTAssertEqual(fonts.installedFonts.map(\.postScriptName), [item.postScriptName])
         XCTAssertTrue(FileManager.default.fileExists(atPath: fonts.fontsDirectory.appendingPathComponent(item.fileName).path))
+        CustomFontLocations.remove(item.postScriptName)
+        let directory = fonts.fontsDirectory
+        let restored = try await FontImportRequest.perform(operation: { cancellation in
+            try FontImportOperation.restoreInstalled(name: item.postScriptName, directory: directory, cancellation: cancellation)
+        })
+        XCTAssertEqual(restored.postScriptName, item.postScriptName)
+        XCTAssertEqual(restored.fileName, item.fileName, "Relaunch restoration must not make another 12 MB copy")
+        XCTAssertNotNil(UIFont(name: restored.postScriptName, size: 20))
     }
 }
