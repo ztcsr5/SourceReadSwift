@@ -11,7 +11,7 @@ final class LabMotionTests: XCTestCase {
         XCTAssertEqual(IntroChoreography.nextIndex(6, direction: 1, count: 7), 0)
     }
 
-    func testEveryOriginalBookHasStableIdentityAndUsableArtwork() throws {
+    func testEveryBookHasStableIdentityAndUsableArtwork() throws {
         XCTAssertEqual(LabBook.samples.count, 7)
         XCTAssertEqual(Set(LabBook.samples.map(\.id)).count, 7)
         for book in LabBook.samples {
@@ -21,24 +21,32 @@ final class LabMotionTests: XCTestCase {
         }
     }
 
-    @MainActor func testReferenceCatalogArtworkAndSavedMoviesSurviveReopening() throws {
-        XCTAssertEqual(ReferenceMedia.samples.count, 24)
-        XCTAssertEqual(Set(ReferenceMedia.samples.map(\.id)).count, 24)
-        XCTAssertEqual(ReferenceMedia.item(82728).title, "布鲁伊")
-        for item in ReferenceMedia.samples {
-            XCTAssertNotNil(UIImage(named: item.poster)); XCTAssertNotNil(UIImage(named: item.backdrop))
-            if !item.logo.isEmpty { XCTAssertNotNil(UIImage(named: item.logo)) }
-        }
-        XCTAssertNil(UIImage(named: "CoverTide"), "Rejected generated poster must not ship")
-        let suite = "motionlab.reference.\(UUID().uuidString)"
-        let preferences = try XCTUnwrap(UserDefaults(suiteName: suite))
-        defer { preferences.removePersistentDomain(forName: suite) }
-        let shelf = ReferenceShelf(preferences: preferences), item = ReferenceMedia.samples[0]
-        XCTAssertTrue(shelf.saved.isEmpty)
-        shelf.toggle(item)
-        XCTAssertTrue(ReferenceShelf(preferences: preferences).saved.contains(item.id))
-        shelf.toggle(item)
-        XCTAssertTrue(ReferenceShelf(preferences: preferences).saved.isEmpty)
+    func testPagingTracksFingerSettlesInBothDirectionsAndRejectsInvalidGeometry() {
+        XCTAssertEqual(IntroPaging.position(start: 0, translation: -195, width: 390), 0.5)
+        XCTAssertEqual(IntroPaging.position(start: 1, translation: 195, width: 390), 0.5)
+        XCTAssertEqual(IntroPaging.position(start: 0, translation: 200, width: 390), 0)
+        XCTAssertEqual(IntroPaging.position(start: 5, translation: -200, width: 390), 5)
+        XCTAssertEqual(IntroPaging.position(start: 2, translation: 20, width: 0), 2)
+        XCTAssertEqual(IntroPaging.position(start: 2, translation: .nan, width: 390), 2)
+        XCTAssertEqual(IntroPaging.target(origin: 0, translation: -150, predicted: -180, width: 390), 1)
+        XCTAssertEqual(IntroPaging.target(origin: 1, translation: 150, predicted: 180, width: 390), 0)
+        XCTAssertEqual(IntroPaging.target(origin: 1, translation: 30, predicted: 40, width: 390), 1)
+        XCTAssertEqual(IntroPaging.target(origin: 1, translation: -25, predicted: -250, width: 390), 2)
+        XCTAssertEqual(IntroPaging.target(origin: Int.max, translation: -300, predicted: -300, width: 390), 5)
+        XCTAssertEqual(IntroPaging.blend(10, 30, fraction: 0.5), 20)
+        XCTAssertEqual(IntroPaging.blend(10, 30, fraction: .nan), 10)
+    }
+
+    func testReadingBundleContainsRealBooksButNoRexPosterOrMovieFile() throws {
+        XCTAssertEqual(LabBook.samples[0].title, "三体")
+        XCTAssertEqual(Set(LabBook.samples.map(\.artwork)).count, 7)
+        XCTAssertTrue(LabBook.samples.allSatisfy { $0.artwork.hasPrefix("Book") })
+        XCTAssertNil(UIImage(named: "CoverTide"))
+        XCTAssertNil(UIImage(named: "Ref106379"))
+        let paths = FileManager.default.enumerator(at: Bundle.main.bundleURL, includingPropertiesForKeys: nil)?.allObjects.compactMap { $0 as? URL } ?? []
+        XCTAssertTrue(paths.filter { ["mp4", "mov", "m4v"].contains($0.pathExtension.lowercased()) }.isEmpty)
+        XCTAssertNil(Bundle.main.url(forResource: "ReferenceMedia", withExtension: "json"))
+        XCTAssertTrue(LabBook.samples[0].paragraphs[0].contains("不是原书正文"))
     }
 
     @MainActor func testLocalPositionAndQuoteRoundTripDeduplicationAndReset() throws {
@@ -72,16 +80,16 @@ final class LabMotionTests: XCTestCase {
 
     @MainActor func testDecodePreparesCoverAndPreblurredBackgroundOnce() async throws {
         let artwork = LabArtwork(); await artwork.prepare()
-        XCTAssertTrue(artwork.isReferenceReady)
-        for item in ReferenceMedia.samples { XCTAssertNotNil(artwork.image(item.poster)) }
+        XCTAssertTrue(artwork.isReady)
+        for book in LabBook.samples { XCTAssertNotNil(artwork.image(book.artwork)) }
         for book in LabBook.samples {
             let cover = try XCTUnwrap(artwork.image(book.artwork))
             XCTAssertLessThanOrEqual(max(cover.size.width, cover.size.height), 1200)
             let haze = try XCTUnwrap(artwork.haze(book.artwork))
             XCTAssertLessThanOrEqual(max(haze.size.width, haze.size.height), 96)
         }
-        let first = artwork.image("Ref106379"); await artwork.prepare()
-        XCTAssertTrue(first === artwork.image("Ref106379"))
+        let first = artwork.image("BookThreeBody"); await artwork.prepare()
+        XCTAssertTrue(first === artwork.image("BookThreeBody"))
     }
 
     @MainActor func testSixIntroScenesAndPosterHomeMountedAtPhoneWidths() async throws {
@@ -97,9 +105,12 @@ final class LabMotionTests: XCTestCase {
                                     .environmentObject(library).environmentObject(artwork))
             }
             try await capture("poster-home-\(Int(width))", width: width, height: height,
-                              content: ReferenceHomeView(selectedIndex: .constant(0), onDetail: { _ in })
+                              content: ReadingHomeView(selectedIndex: .constant(0), onDetail: { _ in }, onRead: { _ in })
                                 .environmentObject(library).environmentObject(artwork), style: .dark)
         }
+        try await capture("intro-mid-drag-390", width: 390, height: 844,
+                          content: LabIntroView(step: .constant(0), onFinish: {}, sampledTime: 2, sampledPosition: 0.5)
+                            .environmentObject(library).environmentObject(artwork))
         library.minimizesMotion = true
         try await capture("intro-accessibility-static", width: 320, height: 568,
                           content: LabIntroView(step: .constant(0), onFinish: {}, sampledTime: 0)

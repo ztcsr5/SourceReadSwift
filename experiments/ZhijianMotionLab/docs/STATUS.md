@@ -1,3 +1,45 @@
+# 当前 · build 3 书籍交互版 · 2026-11-02
+
+## 用户反馈与决定
+- build 2 虽是 SwiftUI 原生绘制，缺少滑动手势且按钮强制等 1.8 秒；用户认为只能观看演示、没有阅读产品自己的内容，效果不如原视频。
+- 不再只替换文字：引导、首页、书笺、章节进度、格式轨道、阅读统计全部改为书籍；只用真实 ISBN 书封，不复活用户否决的原创海报。
+- build 2 影视源码/72 图像/元数据/原测试原样归档 `ReferenceArchive/`，不进入 Sources、资源包或新测试目标。既有改动和已验证证据保留。
+
+## 红灯复现（先于修复）
+- 44f1dc4b589528a18be8b8d64f48de4c02f85198 原生 CI 41406634241 失败，回归用例为 `testIntroCanSwipeForwardAndBackwardWithoutContinueButton`。
+- 决定性错误：`XCTAssertTrue failed - A left swipe must change the live intro scene`。现象与源代码无 DragGesture、装饰层禁用 hit testing、继续按钮延迟 1.8 秒一致。
+- 不跳过该用例，不放宽断言；build 3 必须在真实 iPhone 模拟器通过前进/后退手势。
+
+## 本轮实现
+- `IntroPaging` 纯策略与 `LabIntroView` 接入横向真实拖动、速度预测、短拖回弹、前后按钮及 VoiceOver 调节；不再有等待锁定。
+- 同一组封面节点按 0..1 浮点进度插值，拖到一半就显示一半形态；第一、二幕不再只等松手后离散切页。
+- 书架模块和统计可真实纵向滚动；票根可以点击翻面；样段进度可以点击变化；这些是本地状态，不是视频播放时间。
+- 删除 App 内 `--lab-tour` 自动推进逻辑。CI 改为真正运行 XCTest 手势/点击流程时从模拟器录屏，录屏不是 App 输入素材。
+- 7 张未改动书封来自明确选择的 Open Library 版本，仅供私人离线 UI 测试；来源/尺寸/哈希见 BOOK-COVERS.json。App 不在运行时抓封面。
+- 试读样段是本实验自行撰写，明确不是原著；保存的书笺/位置是真实本地状态。引导图表明确为样式演示，不伪造个人历史。
+- 正式纸间、用户 RECOVERY、网关/密钥均不触碰；旧实验记录不批量删除。
+
+## 待验收
+- Apple SDK 编译、8 项单测、真实左右滑动回归与完整交互流程、320/390/中途拖动截图、IPA CRC/plist/arm64 校验。
+- 没有实测 FPS，不承诺 60/120；物理设备的跟手性仍需用户安装验收。
+
+---
+
+# 已交付候选 · 2026-11-02 · build 2
+
+- 原生验证 HEAD：`69a0032379feb215e3203060751652b85edfb672`，独立 Motion Lab CI `41370705027` success。
+- Xcode 原生 7 项单测 + 1 条完整 UI 流程全部通过，设备 Release 构建 `BUILD SUCCEEDED`。不复用首版结果。
+- 已人工查看新 HEAD 的六幕真实 UI 截图、320 窄屏统计、海报主页：首幕已是真实封面，标记没有被前景遮住；跳过位于状态栏下方；搜索关闭、重播、跳过的原始失败用例仍保留且绿。未进行 FPS 测量，不声称逐像素/逐帧完全一致。
+- 桌面候选：`C:/Users/Edc21/Desktop/ZhijianMotionLab-0.1.0-build2-69a0032-unsigned.ipa`，6,017,489 bytes，SHA256 `a0cb22330b8367e1a15ffd3b855e160972fe46a50050191d435e3c8a8d1a1c6d`。
+- IPA ZIP CRC、独立 bundle `com.edc21.ZhijianMotionLab`、版本 0.1.0/build 2、arm64/iPhoneOS/min16.0 均核对。未签名，需要用户签名侧载；没有宣称真机已经验收。
+- 证据：`F:/SourceReadSwift/motion-lab/69a0032379feb215e3203060751652b85edfb672/`，包含 exact-head CI 状态、原始日志、原生截图、IPA_VERIFICATION.json。
+- 桌面录屏：`C:/Users/Edc21/Desktop/ZhijianMotionLab-build2-preview.mp4`。原始模拟器录屏保留在证据目录；桌面副本保留全部原始帧与相对时间戳，仅降低分辨率以便预览，不用于声称 App 帧率。
+- 该状态段在原生成功后本地写入，没有再改 App 源码或为文档触发一次无意义重建。当前 HEAD 仍是已测 69a0032。
+- 正式纸间源码、测试、project.yml 与其已验证 89c9a51 比较无 diff；用户原有 RECOVERY 改动和所有未跟踪备份保留。
+- 保留的差异：首页采用同包内“辐射”等样本，未补齐视频末尾联网“德里镇”素材。测试版不提供真实播放器/服务器/付费功能，不合入正式纸间。
+
+---
+
 # 当前检查点 · 2026-11-02 · 视频对照修订
 
 ## 用户最新决定

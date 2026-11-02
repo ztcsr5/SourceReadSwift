@@ -43,6 +43,8 @@ jobs:
           xcodebuild -project ZhijianMotionLab.xcodeproj -scheme ZhijianMotionLab \
             -destination "id=$LAB_DEVICE_ID" -derivedDataPath build/Simulator \
             CODE_SIGNING_ALLOWED=NO -parallel-testing-enabled NO \
+            -only-testing:ZhijianMotionLabTests \
+            -only-testing:ZhijianMotionLabUITests/LabJourneyTests/testIntroCanSwipeForwardAndBackwardWithoutContinueButton \
             -test-timeouts-enabled YES -maximum-test-execution-time-allowance 180 \
             -resultBundlePath MotionLab.xcresult test 2>&1 | tee simulator-test.log
       - name: Export screenshots
@@ -60,21 +62,50 @@ jobs:
               sips -Z 1280 -s format jpeg -s formatOptions 70 "$SCREENSHOT" --out "evidence/previews/$BASENAME.jpg" > /dev/null
             done
           fi
-      - name: Record real intro to poster journey
+      - name: Record actual swipe-driven reading journey
         run: |
           set -euo pipefail
           mkdir -p evidence
-          xcrun simctl terminate "$LAB_DEVICE_ID" com.edc21.ZhijianMotionLab || true
-          xcrun simctl io "$LAB_DEVICE_ID" recordVideo --codec=h264 evidence/intro-to-home.mp4 > evidence/recording.log 2>&1 &
+          xcrun simctl io "$LAB_DEVICE_ID" recordVideo --codec=h264 build/native-swipes.mp4 > evidence/recording.log 2>&1 &
           RECORD_PID=$!
-          sleep 1
-          xcrun simctl launch "$LAB_DEVICE_ID" com.edc21.ZhijianMotionLab --lab-tour
-          sleep 27
+          trap 'kill -INT "$RECORD_PID" 2>/dev/null || true' EXIT
+          set +e
+          xcodebuild -project ZhijianMotionLab.xcodeproj -scheme ZhijianMotionLab \
+            -destination "id=$LAB_DEVICE_ID" -derivedDataPath build/Simulator \
+            CODE_SIGNING_ALLOWED=NO -parallel-testing-enabled NO \
+            -only-testing:ZhijianMotionLabUITests/LabJourneyTests/testReadingJourneyUsesRealSwipesLiveControlsAndSavedQuotes \
+            -test-timeouts-enabled YES -maximum-test-execution-time-allowance 180 \
+            -resultBundlePath InteractiveJourney.xcresult test 2>&1 | tee interactive-test.log
+          TEST_EXIT=$?
+          set -e
           kill -INT "$RECORD_PID"
           wait "$RECORD_PID" || true
-          xcrun simctl io "$LAB_DEVICE_ID" screenshot evidence/poster-home.png
-          sips -Z 1280 -s format jpeg -s formatOptions 70 evidence/poster-home.png --out evidence/previews/poster-home.jpg > /dev/null
-          test -s evidence/intro-to-home.mp4
+          trap - EXIT
+          if [ "$TEST_EXIT" -ne 0 ]; then exit "$TEST_EXIT"; fi
+          avconvert --help > evidence/avconvert-help.txt 2>&1 || true
+          if grep -q 'Preset960x540' evidence/avconvert-help.txt; then
+            if ! avconvert --source build/native-swipes.mp4 --preset Preset960x540 --output evidence/reading-swipes.mp4 > evidence/avconvert.log 2>&1; then
+              echo 'Preview conversion unavailable; retaining the original native capture.'
+              cp build/native-swipes.mp4 evidence/reading-swipes.mp4
+            fi
+          else
+            cp build/native-swipes.mp4 evidence/reading-swipes.mp4
+          fi
+          shasum -a 256 build/native-swipes.mp4 evidence/reading-swipes.mp4 > evidence/capture-sha256.txt
+          test -s evidence/reading-swipes.mp4
+      - name: Export live reading journey screenshots
+        if: always()
+        run: |
+          if [ -d InteractiveJourney.xcresult ]; then
+            xcrun xcresulttool export attachments --path InteractiveJourney.xcresult --output-path evidence/interactive-screenshots
+            mkdir -p evidence/interactive-previews
+            cp evidence/interactive-screenshots/manifest.json evidence/interactive-previews/
+            for SCREENSHOT in evidence/interactive-screenshots/*.png; do
+              [ -f "$SCREENSHOT" ] || continue
+              BASENAME="$(basename "$SCREENSHOT" .png)"
+              sips -Z 1280 -s format jpeg -s formatOptions 70 "$SCREENSHOT" --out "evidence/interactive-previews/$BASENAME.jpg" > /dev/null
+            done
+          fi
       - name: Build unsigned isolated device app
         run: |
           set -euo pipefail
@@ -84,12 +115,12 @@ jobs:
             build 2>&1 | tee device-build.log
           mkdir -p build/package/Payload
           cp -R build/Device/Build/Products/Release-iphoneos/ZhijianMotionLab.app build/package/Payload/
-          ditto -c -k --keepParent build/package/Payload ZhijianMotionLab-0.1.0-build2-unsigned.ipa
-          shasum -a 256 ZhijianMotionLab-0.1.0-build2-unsigned.ipa | tee evidence/ipa-sha256.txt
+          ditto -c -k --keepParent build/package/Payload ZhijianMotionLab-0.1.0-build3-unsigned.ipa
+          shasum -a 256 ZhijianMotionLab-0.1.0-build3-unsigned.ipa | tee evidence/ipa-sha256.txt
       - name: Preserve failure excerpts
         if: failure()
         run: |
-          grep -E 'error:|Test Case.*failed|TEST FAILED|BUILD FAILED' simulator-test.log device-build.log 2>/dev/null | tail -n 60 || true
+          grep -E 'error:|Test Case.*failed|TEST FAILED|BUILD FAILED' simulator-test.log interactive-test.log device-build.log 2>/dev/null | tail -n 60 || true
       - name: Upload independent test IPA
         uses: actions/upload-artifact@v4
         with:
@@ -113,5 +144,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: motion-lab-preview-${{ github.sha }}
-          path: experiments/ZhijianMotionLab/evidence/previews
+          path: |
+            experiments/ZhijianMotionLab/evidence/previews
+            experiments/ZhijianMotionLab/evidence/interactive-previews
           retention-days: 14

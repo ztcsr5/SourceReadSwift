@@ -1,0 +1,104 @@
+{
+  "purpose": "Seven hand-selected, unmodified publisher book covers for a private offline UI experiment; not a redistribution license.",
+  "api_documentation": "https://openlibrary.org/dev/docs/api/covers",
+  "covers": [
+    {
+      "title": "三体",
+      "asset": "BookThreeBody",
+      "isbn": "9787536692930",
+      "cover_id": 10246665,
+      "source": "https://covers.openlibrary.org/b/id/10246665-L.jpg?default=false",
+      "credit": "https://openlibrary.org/isbn/9787536692930",
+      "bytes": 58405,
+      "dimensions": [
+        350,
+        500
+      ],
+      "sha256": "1fbfa1805cc503177e770be4ba834a1e107a996837f270f8bb0cf15484dd55ad"
+    },
+    {
+      "title": "沙丘",
+      "asset": "BookDune",
+      "isbn": "9780441172719",
+      "cover_id": 15166231,
+      "source": "https://covers.openlibrary.org/b/id/15166231-L.jpg?default=false",
+      "credit": "https://openlibrary.org/isbn/9780441172719",
+      "bytes": 30428,
+      "dimensions": [
+        265,
+        475
+      ],
+      "sha256": "86348e04b3644b9a2b1cb709a04765c5ddfd040c8de3243fed0fb0840892fc46"
+    },
+    {
+      "title": "小王子",
+      "asset": "BookPrince",
+      "isbn": "9780156012195",
+      "cover_id": 115508,
+      "source": "https://covers.openlibrary.org/b/id/115508-L.jpg?default=false",
+      "credit": "https://openlibrary.org/isbn/9780156012195",
+      "bytes": 27559,
+      "dimensions": [
+        309,
+        475
+      ],
+      "sha256": "ea0377711a7fd1410a21a7e93b063f9a55e1378c8ed1f4f7bf206830bfb3e0dd"
+    },
+    {
+      "title": "霍比特人",
+      "asset": "BookHobbit",
+      "isbn": "9780547928227",
+      "cover_id": 12003329,
+      "source": "https://covers.openlibrary.org/b/id/12003329-L.jpg?default=false",
+      "credit": "https://openlibrary.org/isbn/9780547928227",
+      "bytes": 42124,
+      "dimensions": [
+        325,
+        500
+      ],
+      "sha256": "42ea46cd613d5800d47ea3b5ae39430af175324a65a014150602faec9a35f17d"
+    },
+    {
+      "title": "哈利·波特与魔法石",
+      "asset": "BookPotter",
+      "isbn": "9780439708180",
+      "cover_id": 14656855,
+      "source": "https://covers.openlibrary.org/b/id/14656855-L.jpg?default=false",
+      "credit": "https://openlibrary.org/isbn/9780439708180",
+      "bytes": 80121,
+      "dimensions": [
+        344,
+        500
+      ],
+      "sha256": "3f902379fb3b09e1f28f40b2152b83478dadc323597ec48d20fb672877f0eb9c"
+    },
+    {
+      "title": "1984",
+      "asset": "Book1984",
+      "isbn": "9780451524935",
+      "cover_id": 15257377,
+      "source": "https://covers.openlibrary.org/b/id/15257377-L.jpg?default=false",
+      "credit": "https://openlibrary.org/isbn/9780451524935",
+      "bytes": 37829,
+      "dimensions": [
+        303,
+        500
+      ],
+      "sha256": "d68d7d748b11fe4879fcf38d202bd97338e36ea791771bf3506e6b24698de31f"
+    },
+    {
+      "title": "银河系漫游指南",
+      "asset": "BookHitchhiker",
+      "isbn": "9780345391803",
+      "cover_id": 8774325,
+      "source": "https://covers.openlibrary.org/b/id/8774325-L.jpg?default=false",
+      "credit": "https://openlibrary.org/isbn/9780345391803",
+      "bytes": 54987,
+      "dimensions": [
+        332,
+        500
+      ],
+      "sha256": "85c3e02c1709fa75f569d9921f7a39865a078205f1d670a72880dba3d1c8a703"
+    }
+  ]
+}

@@ -1,6 +1,6 @@
 import Foundation
 
-/// Original offline fiction; these records never enter the production bookshelf.
+/// Real book metadata with explicitly original interaction-only sample passages.
 struct LabBook: Identifiable, Hashable, Sendable {
     let id: String
     let title: String
@@ -10,31 +10,31 @@ struct LabBook: Identifiable, Hashable, Sendable {
     let tagline: String
     let synopsis: String
 
-    var chapters: [String] { ["第一章 · 风带来的信", "第二章 · 潮汐之外", "第三章 · 尚未抵达的明天"] }
+    var chapters: [String] { ["样段一 · 翻开书页", "样段二 · 让阅读继续", "样段三 · 留下片刻"] }
 
     var paragraphs: [String] {
-        ["午夜，城市的灯光一盏一盏熄灭，海上的那道门却亮了起来。她停在最后一级石阶前，听见风翻动纸页的声音。",
-         "信封里没有署名，只有一张画着星辰的地图。地图的边缘留着一行小字：有些远方，必须亲自翻开。",
-         "她把那句话念了两遍，收进口袋。潮水掠过脚边，像是另一个世界递来的邀请。",
-         "晨光缓缓落在旧书的扉页。她终于知道，故事从来不是答案，而是通往答案的另一扇门。",
-         "这是《\(title)》的原创离线演示片段。你可以试读、翻章、保存书笺；不会修改正式纸间的书架或阅读位置。"]
+        ["这里是《\(title)》的阅读器交互体验页。以下文字由纸间自行编写，用于演示排版与定位，不是原书正文。",
+         "一本书的封面只是入口。真正让人停留的，是翻开之后的某一行字，是愿意在忙碌生活中留给自己的片刻。",
+         "风吹动窗边的书页。你可以调大字号，翻到下一段，也可以把这一句留成书笺；下次打开时，从停下的地方继续。",
+         "每一次读到这里，都可以按下“记到这里”。位置会保存在这个独立测试 App 内，不会写入正式纸间的阅读记录。",
+         "这张书笺来自你刚刚点击的实际段落，而不是预先播放的画面。返回首页、重新进入阅读器，保存的内容仍然在这里。"]
     }
 
     static let samples: [LabBook] = [
-        .init(id: "tide", title: "潮汐之门", author: "闻屿", artwork: "Ref106379", genre: "奇境 · 小说",
-              tagline: "在故事的另一边，遇见自己。", synopsis: "每逢满月，海上会升起一座通往失落图书馆的门。年轻的修书师收到一封来自明天的信，循着潮汐走向那扇门。她不知道，那里收藏的不是书，而是每个人未曾选择的人生。"),
-        .init(id: "mist", title: "雾都遗信", author: "林时雨", artwork: "CoverMisty", genre: "悬疑 · 小说",
-              tagline: "没有寄出的信，终会找到你。", synopsis: "在终年起雾的城里，未寄出的信件会在午夜找到收信人。她收到一封写着明天日期的来信，从此开始寻找那条地图上不存在的街。"),
-        .init(id: "sea", title: "海边失眠者", author: "陆遥", artwork: "CoverSea", genre: "治愈 · 本地",
-              tagline: "把忙碌留在岸上。", synopsis: "离开城市后的第一个夏天，她在海边开了一间只在深夜营业的小书店。每个人都把秘密留在书页里，而潮水总能带来新的故事。"),
-        .init(id: "star", title: "星河折叠", author: "宋见川", artwork: "CoverStar", genre: "科幻 · 小说",
-              tagline: "每颗星，都是未完的故事。", synopsis: "宇宙被折成一封信。一位孤独的领航员，在返航信标消失之前，决定把它送回地球。"),
-        .init(id: "arch", title: "遗迹之门", author: "陈风", artwork: "CoverArchaeology", genre: "冒险 · 小说",
-              tagline: "答案，藏在最后一道门后。", synopsis: "一封来自旧时代的密信指向一座失落遗迹。年轻研究者走入雨林，发现所有地图都在隐瞒同一个秘密。"),
-        .init(id: "mountain", title: "山雨入梦", author: "闻溪", artwork: "CoverMountain", genre: "幻想 · 图文",
-              tagline: "山中无日月，书里有光阴。", synopsis: "少年循着古老歌谣走进群山，在云雨之间，看见另一个未被记载的世界。本实验只提供文字试读，不冒充漫画引擎。"),
-        .init(id: "letter", title: "荒原来信", author: "岑末", artwork: "CoverLetter", genre: "旅途 · 小说",
-              tagline: "风经过时，故事有了声音。", synopsis: "一位邮差穿过荒原，把无法寄达的信交给每一个等待过的人。漫长的路上，时间忽然有了形状。")
+        .init(id: "threebody", title: "三体", author: "刘慈欣", artwork: "BookThreeBody", genre: "科幻 · 小说",
+              tagline: "把目光，从书页投向星空。", synopsis: "一场横跨文明与宇宙的故事，从人类发出的一次呼唤开始。个人的选择与文明的命运交织，让遥远星空成为切近的疑问。这里仅提供交互样段，不含原书正文。"),
+        .init(id: "dune", title: "沙丘", author: "弗兰克·赫伯特", artwork: "BookDune", genre: "科幻 · 小说",
+              tagline: "穿过沙海，走进另一个世界。", synopsis: "在沙漠星球厄拉科斯，权力、生态与人的命运紧密相连。一位年轻人的旅程，牵动了庞大帝国的未来。本页简介为实验编写。"),
+        .init(id: "prince", title: "小王子", author: "安托万·德·圣埃克苏佩里", artwork: "BookPrince", genre: "童话 · 图文",
+              tagline: "为一朵花，重新认识整个世界。", synopsis: "从一颗小小的星球出发，小王子在旅途中遇见不同的人，也重新理解陪伴与牵挂。这是一本可以在不同年纪重新翻开的书。"),
+        .init(id: "hobbit", title: "霍比特人", author: "J. R. R. 托尔金", artwork: "BookHobbit", genre: "奇幻 · 小说",
+              tagline: "一扇家门之外，就是远方。", synopsis: "安静的生活被一次意外来访打断。比尔博踏上离家很远的旅程，在山川、谜题和未知之间，发现从前未曾认识的自己。"),
+        .init(id: "potter", title: "哈利·波特与魔法石", author: "J. K. 罗琳", artwork: "BookPotter", genre: "奇幻 · 小说",
+              tagline: "等待你的，也许是另一种日常。", synopsis: "一封来信打开了哈利从未想过的世界。魔法学校里的友谊、秘密与冒险，让平凡日子有了不同的方向。"),
+        .init(id: "1984", title: "1984", author: "乔治·奥威尔", artwork: "Book1984", genre: "文学 · 本地",
+              tagline: "在文字之间，保留自己的目光。", synopsis: "一部围绕权力、语言与个体展开的小说。温斯顿的生活让读者思考：记忆、表达与自由，如何影响一个人对世界的理解。"),
+        .init(id: "hitchhiker", title: "银河系漫游指南", author: "道格拉斯·亚当斯", artwork: "BookHitchhiker", genre: "科幻 · 小说",
+              tagline: "别慌，宇宙还很大。", synopsis: "一次突如其来的宇宙旅行，把阿瑟带离熟悉的生活。荒诞的想象与幽默相遇，让宏大的宇宙问题有了轻盈的入口。")
     ]
 }
 

@@ -20,7 +20,11 @@ struct LabCollectionView: View {
                     ForEach(library.snapshot.quotes) { quote in
                         if let book = library.books.first(where: { $0.id == quote.bookID }) {
                             VStack(alignment: .trailing, spacing: 8) {
-                                LabTicket(book: book, quote: quote.text, serial: "私藏")
+                                VStack(alignment: .leading, spacing: 12) {
+                                    ReadingTicket(book: book).frame(height: 130)
+                                    Text(quote.text).font(.subheadline).lineSpacing(5)
+                                }
+                                .accessibilityIdentifier("quote.saved.\(book.id)")
                                 Button("删除书笺", role: .destructive) { pendingDeletion = quote.id }
                                     .font(.caption).frame(minHeight: 44)
                             }
@@ -53,7 +57,7 @@ struct LabSettingsView: View {
                         Text("PROLOGUE / 0.1.0").font(.caption.monospaced()).foregroundStyle(.secondary)
                     }
                 }.padding(.vertical, 12)
-                Text("一座故事的入口。探索景深书海、纸质藏书票、资源轨道与电影感海报；不覆盖正式纸间。")
+                Text("一座故事的入口。探索可自由滑动的景深书海、藏书票、阅读进度、格式轨道与大封面；不覆盖正式纸间。")
                     .font(.subheadline).foregroundStyle(.secondary)
             }
             Section("视觉偏好") {
@@ -69,8 +73,13 @@ struct LabSettingsView: View {
                 Button("清空实验记录", role: .destructive) { showsReset = true }
                 if let message = library.persistenceMessage { Text(message).font(.caption) }
             }
+            Section("封面来源") {
+                Link("查看 Open Library", destination: URL(string: "https://openlibrary.org")!)
+                Text("三体 ISBN 9787536692930，其余为所选英文版本；完整版本来源记录随源码提供。")
+                    .font(.caption).foregroundStyle(.secondary)
+            }
             Section("边界") {
-                Text("全部离线，无书源调用、账号或权限申请。首页样本并非全网推荐；不显示伪造评分、趋势、时长、网络延迟。正式版六主题、书架、漫画、有声、精确定位均未改动。")
+                Text("封面来自 Open Library 的指定版本；内容仅供私人 UI 测试。试读文字由实验自行编写，不是原书正文；引导图表是样式示例，不冒充你的阅读统计。正式纸间和书源没有改动。")
                     .font(.footnote).foregroundStyle(.secondary)
             }
         }

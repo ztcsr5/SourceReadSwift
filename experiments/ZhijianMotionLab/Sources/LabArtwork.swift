@@ -10,7 +10,7 @@ private struct PreparedArtwork {
 /// Decode and preblur once off main, never a live full-screen Gaussian blur.
 @MainActor final class LabArtwork: ObservableObject {
     @Published private var prepared: [String: PreparedArtwork] = [:]
-    @Published private(set) var isReferenceReady = false
+    @Published private(set) var isReady = false
     private var isPreparing = false
     private var isComplete = false
 
@@ -21,16 +21,16 @@ private struct PreparedArtwork {
         guard !isComplete, !isPreparing else { return }
         isPreparing = true
         defer { isPreparing = false }
-        let posters = Set(ReferenceMedia.samples.map(\.poster))
+        let posters = Set(LabBook.samples.map(\.artwork))
         let first = await Task.detached(priority: .userInitiated) {
             Self.render(posters, hazes: [])
         }.value
         guard !Task.isCancelled else { return }
         prepared = first
-        isReferenceReady = true
+        isReady = true
 
         let legacy = Set(LabBook.samples.map(\.artwork))
-        let remaining = Set(ReferenceMedia.samples.flatMap { [$0.backdrop, $0.logo] }.filter { !$0.isEmpty }).union(legacy)
+        let remaining = legacy
         let rest = await Task.detached(priority: .utility) {
             Self.render(remaining, hazes: legacy)
         }.value
@@ -81,13 +81,6 @@ struct LabCover: View {
                     Image(uiImage: image).resizable().scaledToFill()
                 } else {
                     LinearGradient(colors: [.indigo, .black], startPoint: .topLeading, endPoint: .bottomTrailing)
-                }
-                if book.id == "tide", showsTitle {
-                    LinearGradient(colors: [.clear, .black.opacity(0.85)], startPoint: .center, endPoint: .bottom)
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(book.title).font(.system(size: max(14, proxy.size.width * 0.14), weight: .semibold, design: .serif))
-                        Text("闻屿 / 原创演示").font(.system(size: max(8, proxy.size.width * 0.045)))
-                    }.foregroundStyle(.white).padding(max(10, proxy.size.width * 0.08))
                 }
                 LinearGradient(colors: [.black.opacity(0.3), .clear, .white.opacity(0.15), .clear], startPoint: .leading, endPoint: .trailing)
                     .frame(width: 9)
