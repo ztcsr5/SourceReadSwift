@@ -1,8 +1,36 @@
 import SwiftUI
 import XCTest
+import UIKit
 @testable import SourceReadSwift
 
 final class ReaderTabChromeExitTests: XCTestCase {
+    @MainActor func testRealUIKitPopReleasesOwnershipBeforeTheSourceDisappears() async throws {
+        let app = AppState(), owner = UUID()
+        let previous = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }
+            .flatMap(\.windows).first(where: \.isKeyWindow)
+        let scene = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.first
+        let window = scene.map { UIWindow(windowScene: $0) } ?? UIWindow(frame: UIScreen.main.bounds)
+        window.frame = UIScreen.main.bounds
+        let navigation = UINavigationController(rootViewController: UIViewController())
+        window.rootViewController = navigation; window.makeKeyAndVisible()
+        defer { window.isHidden = true; previous?.makeKey() }
+        let source = ReaderExitTimingHost()
+        let host = UIHostingController(rootView: Color.clear
+            .background(ReaderTabChromeExitBridge(owner: owner)).environmentObject(app))
+        source.addChild(host); source.view.addSubview(host.view)
+        host.view.frame = window.bounds; host.didMove(toParent: source)
+        navigation.pushViewController(source, animated: false)
+        for _ in 0..<20 {
+            if host.view.window != nil { break }
+            try await Task.sleep(nanoseconds: 50_000_000)
+        }
+        XCTAssertNotNil(host.view.window)
+        app.acquireTabChromeHidden(owner: owner)
+        navigation.popViewController(animated: true)
+        XCTAssertFalse(app.isTabChromeHidden, "A real pop must release before its completion callback")
+        XCTAssertFalse(source.hasDisappeared, "This assertion must run before onDisappear, not after waiting for it")
+    }
+
     @MainActor func testBothReaderOwnersReleaseBeforeCompletionAndReacquireOnCancelledPop() {
         let app = AppState(), gateway = UUID(), reader = UUID()
         let gatewayExit = ReaderTabChromeExitController(), readerExit = ReaderTabChromeExitController()
@@ -36,5 +64,13 @@ final class ReaderTabChromeExitTests: XCTestCase {
         XCTAssertEqual(restores, 0)
         app.releaseTabChromeHidden(owner: unrelated)
         XCTAssertFalse(app.isTabChromeHidden)
+    }
+}
+
+private final class ReaderExitTimingHost: UIViewController {
+    private(set) var hasDisappeared = false
+    override func viewDidDisappear(_ animated: Bool) {
+        super.viewDidDisappear(animated)
+        hasDisappeared = true
     }
 }
