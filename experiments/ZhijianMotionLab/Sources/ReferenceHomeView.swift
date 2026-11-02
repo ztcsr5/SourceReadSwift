@@ -153,7 +153,14 @@ struct ReferenceSearchView: View {
                 }
             }.searchable(text: $query, prompt: "搜索离线样本")
                 .overlay { if matches.isEmpty { Text("没有匹配的离线片目").foregroundStyle(.secondary) } }
-                .navigationTitle("搜索").toolbar { ToolbarItem(placement: .cancellationAction) { Button("关闭") { dismiss() } } }
+                .navigationTitle("搜索")
+        }
+        .safeAreaInset(edge: .top, spacing: 0) {
+            HStack {
+                Text("离线片目").font(.caption).foregroundStyle(.secondary)
+                Spacer()
+                Button("关闭") { dismiss() }.frame(minWidth: 44, minHeight: 44)
+            }.padding(.horizontal, 20).background(LabPalette.paper)
         }
     }
 }
