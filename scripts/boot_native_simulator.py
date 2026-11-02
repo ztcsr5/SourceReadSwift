@@ -1,12 +1,14 @@
 """Boot a fresh CI-only iOS simulator; retry one fresh device after migration stalls.
 
 Usage (macOS CI): python3 -u scripts/boot_native_simulator.py <RUNTIME_ID> --output native-device-id.txt
-Preserves the original 180-second boot gate on each attempt; never skips native tests.
+Allows bounded cold-runtime migration before tests; never changes product test timeouts.
 """
 import argparse
 from pathlib import Path
 import subprocess
 import uuid
+
+BOOT_READINESS_TIMEOUT = 600
 
 
 def run(command, timeout=30):
@@ -24,7 +26,10 @@ def boot_fresh(runtime):
             run(['xcrun', 'simctl', 'boot', device])
             # simctl owns headless readiness; launching the GUI is neither a
             # readiness check nor reliable on unattended CI login sessions.
-            subprocess.run(['xcrun', 'simctl', 'bootstatus', device, '-b'], check=True, timeout=180)
+            # CI has completed cold migration at 187s. Killing it at 180s and
+            # recreating the device restarts that work; allow at most ten minutes.
+            subprocess.run(['xcrun', 'simctl', 'bootstatus', device, '-b'], check=True,
+                           timeout=BOOT_READINESS_TIMEOUT)
             print('BOOT_VERIFIED', device, flush=True)
             return device
         except (subprocess.CalledProcessError, subprocess.TimeoutExpired) as failure:
