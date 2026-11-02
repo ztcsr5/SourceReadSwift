@@ -22,7 +22,8 @@ def boot_fresh(runtime):
         print('BOOT_ATTEMPT', attempt + 1, 'fresh', device, flush=True)
         try:
             run(['xcrun', 'simctl', 'boot', device])
-            run(['open', '-a', 'Simulator', '--args', '-CurrentDeviceUDID', device])
+            # simctl owns headless readiness; launching the GUI is neither a
+            # readiness check nor reliable on unattended CI login sessions.
             subprocess.run(['xcrun', 'simctl', 'bootstatus', device, '-b'], check=True, timeout=180)
             print('BOOT_VERIFIED', device, flush=True)
             return device

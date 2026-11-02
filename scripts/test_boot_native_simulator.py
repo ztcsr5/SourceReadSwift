@@ -7,6 +7,22 @@ import boot_native_simulator as boot
 
 
 class NativeSimulatorBootTests(unittest.TestCase):
+    def test_headless_boot_does_not_wait_for_the_Simulator_graphical_app(self):
+        identifier = '00000000-0000-0000-0000-000000000001'
+        commands = []
+
+        def run(command, timeout=30):
+            commands.append(command)
+            if command[0] == 'open':
+                raise subprocess.TimeoutExpired(command, timeout)
+            return identifier if command[2] == 'create' else ''
+
+        with patch.object(boot, 'run', side_effect=run), patch.object(boot.subprocess, 'run',
+            return_value=subprocess.CompletedProcess([], 0)) as status:
+            self.assertEqual(boot.boot_fresh('runtime'), identifier)
+        self.assertEqual(status.call_count, 1)
+        self.assertFalse(any(command[0] == 'open' for command in commands))
+
     def test_one_stalled_boot_gets_one_fresh_device_without_shutting_down_others(self):
         identifiers = ['00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000002']
         commands = []
