@@ -7,10 +7,10 @@ struct CustomFontManagementView: View {
     @AppStorage("reader.customFontPostScriptName") private var customFontPostScriptName: String = ""
     @State private var isImportingFont = false
     @State private var importErrorMessage: String?
-    @State private var showingErrorAlert = false
     @State private var isPreparingFont = false
     @State private var importedFontTitle: String?
-    @State private var pendingFontURL: URL?
+    @State private var fontImportTask: Task<Void, Never>?
+    @State private var fontImportRevision = UUID()
 
     private var currentFontFamily: ReaderFontFamily {
         ReaderFontFamily(rawValue: fontFamilyRawValue) ?? .system
@@ -141,8 +141,9 @@ struct CustomFontManagementView: View {
                 }
                 .disabled(isPreparingFont)
                 if isPreparingFont {
-                    HStack(spacing: 12) { ProgressView(); Text("正在复制文件和解析字体，请稍候") }
+                    HStack(spacing: 12) { ProgressView(); Text("正在复制、校验并启用字体（最长等待 20 秒）") }
                         .font(.subheadline).accessibilityLabel("正在导入字体")
+                    Button("取消导入") { cancelFontImport() }.buttonStyle(.borderless)
                 } else if let importedFontTitle {
                     Label("已启用 · \(importedFontTitle)", systemImage: "checkmark.circle")
                         .font(.subheadline).foregroundStyle(.secondary)
@@ -163,42 +164,45 @@ struct CustomFontManagementView: View {
         .pageBackground()
         .navigationTitle("字体管理")
         .navigationBarTitleDisplayMode(.inline)
-        .sheet(isPresented: $isImportingFont, onDismiss: importPendingFont) {
+        .sheet(isPresented: $isImportingFont) {
             UniversalDocumentPicker(contentTypes: allowedFontTypes, opensAllFiles: false,
                 onPick: { urls in
                     isImportingFont = false
                     guard let url = urls.first, !isPreparingFont else { return }
-                    // The native delegate fires before dismissal; acknowledge the pick immediately.
-                    isPreparingFont = true
-                    importedFontTitle = nil
-                    importErrorMessage = nil
-                    pendingFontURL = url
+                    beginFontImport(url)
                 }, onCancel: { isImportingFont = false })
                 .ignoresSafeArea()
         }
-        .alert("字体导入提示", isPresented: $showingErrorAlert) {
-            Button("好的", role: .cancel) {}
-        } message: {
-            Text(importErrorMessage ?? "导入字体失败，请检查字体文件是否损坏。")
-        }
+        .onDisappear { cancelFontImport() }
     }
 
-    private func importPendingFont() {
-        guard let url = pendingFontURL else { return }
-        pendingFontURL = nil
-        Task { @MainActor in
-            defer { isPreparingFont = false }
+    private func beginFontImport(_ url: URL) {
+        fontImportTask?.cancel()
+        let revision = UUID(); fontImportRevision = revision
+        isPreparingFont = true; importedFontTitle = nil; importErrorMessage = nil
+        // Begin from the delegate, not sheet.onDismiss: nested presentations may
+        // not deliver that callback, leaving a permanent spinner with no IO task.
+        fontImportTask = Task { @MainActor in
+            defer { if fontImportRevision == revision { isPreparingFont = false; fontImportTask = nil } }
             do {
                 let imported = try await fontManager.importPickedFont(from: url)
+                guard !Task.isCancelled, fontImportRevision == revision else { return }
                 customFontPostScriptName = imported.postScriptName
                 fontFamilyRawValue = ReaderFontFamily.custom.rawValue
                 importedFontTitle = imported.displayName
                 HapticFeedback.success()
+            } catch is CancellationError {
+                if fontImportRevision == revision { importErrorMessage = "已取消导入，原字体未改变。" }
             } catch {
-                importErrorMessage = "导入字体失败：\(error.localizedDescription)"
-                showingErrorAlert = true
+                if fontImportRevision == revision { importErrorMessage = "导入字体失败：\(error.localizedDescription)" }
             }
         }
+    }
+
+    private func cancelFontImport() {
+        guard isPreparingFont else { return }
+        fontImportTask?.cancel(); fontImportTask = nil; fontImportRevision = UUID()
+        isPreparingFont = false; importErrorMessage = "已取消导入，原字体未改变。"
     }
 
     private var currentFontTitle: String {

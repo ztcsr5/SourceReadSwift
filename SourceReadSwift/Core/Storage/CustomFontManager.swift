@@ -142,12 +142,12 @@ final class CustomFontManager: ObservableObject {
         let directory = fontsDirectory
         let installed = installedFonts
         do {
-            let item = try await Task.detached(priority: .userInitiated) {
-                try FontImportOperation.prepare(source: sourceURL, directory: directory, installed: installed)
-            }.value
-            guard UIFont(name: item.postScriptName, size: 16) != nil else {
-                throw NSError(domain: "FontImport", code: 4,
-                    userInfo: [NSLocalizedDescriptionKey: "字体已读取，但系统无法启用它。请尝试另一份 TTF 或 OTF 文件。"])
+            let item = try await FontImportRequest.perform(operation: { cancellation in
+                try FontImportOperation.prepare(source: sourceURL, directory: directory, installed: installed, cancellation: cancellation)
+            }, discard: { FontImportOperation.discardCandidate($0, directory: directory, installed: installed) })
+            if Task.isCancelled {
+                FontImportOperation.discardCandidate(item, directory: directory, installed: installed)
+                throw CancellationError()
             }
             if !installedFonts.contains(where: { $0.postScriptName == item.postScriptName }) {
                 installedFonts.insert(item, at: 0)
