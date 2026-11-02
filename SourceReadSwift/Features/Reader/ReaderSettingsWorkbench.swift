@@ -100,7 +100,7 @@ struct ReaderSettingsWorkbench: View {
         HStack(spacing: 8) {
             if route != nil {
                 Button { route = nil } label: {
-                    Image(systemName: "chevron.left").frame(width: 44, height: 44)
+                    Image(systemName: "chevron.left").frame(width: 44, height: 44).contentShape(Rectangle())
                 }.accessibilityLabel("返回阅读设置")
                     .accessibilityIdentifier("reader.settings.back")
             }
@@ -110,7 +110,7 @@ struct ReaderSettingsWorkbench: View {
                     .accessibilityIdentifier("reader.settings.bookTitle")
             }
             Spacer(minLength: 8)
-            Button(action: actions.close) { Image(systemName: "xmark").frame(width: 44, height: 44) }
+            Button(action: actions.close) { Image(systemName: "xmark").frame(width: 44, height: 44).contentShape(Rectangle()) }
                 .accessibilityLabel("关闭阅读设置")
                 .accessibilityIdentifier("reader.settings.close")
         }.padding(.horizontal, 12).padding(.bottom, 8).buttonStyle(AppPressStyle())
@@ -186,7 +186,7 @@ struct ReaderClassicSettingsPanel: View {
                 VStack(spacing: 16) {
                     HStack {
                         Text("阅读设置").font(.headline); Spacer()
-                        Button(action: close) { Image(systemName: "xmark").frame(width: 44, height: 44) }.accessibilityLabel("关闭阅读设置")
+                        Button(action: close) { Image(systemName: "xmark").frame(width: 44, height: 44).contentShape(Rectangle()) }.accessibilityLabel("关闭阅读设置")
                     }
                     Picker("设置分类", selection: $selection) {
                         Text("外观").tag(0); Text("排版").tag(1); Text("高级").tag(2)
