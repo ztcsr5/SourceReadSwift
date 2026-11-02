@@ -18,9 +18,11 @@ enum FontImportPolicy {
 enum CustomFontLocations {
     private static let lock = NSLock()
     private static var files: [String: URL] = [:]
+    private static var generation = 0
+    static var revision: Int { lock.lock(); defer { lock.unlock() }; return generation }
     static func register(postScriptName: String, file: URL) {
         lock.lock(); defer { lock.unlock() }
-        files[postScriptName] = file
+        if files[postScriptName] != file { files[postScriptName] = file; generation &+= 1 }
     }
     static func file(for name: String) -> URL? {
         lock.lock(); defer { lock.unlock() }
@@ -28,6 +30,6 @@ enum CustomFontLocations {
     }
     static func remove(_ name: String) {
         lock.lock(); defer { lock.unlock() }
-        files.removeValue(forKey: name)
+        if files.removeValue(forKey: name) != nil { generation &+= 1 }
     }
 }

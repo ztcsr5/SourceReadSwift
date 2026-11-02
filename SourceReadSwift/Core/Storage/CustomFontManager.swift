@@ -143,7 +143,7 @@ final class CustomFontManager: ObservableObject {
         let installed = installedFonts
         do {
             let item = try await FontImportRequest.perform(operation: { cancellation in
-                try FontImportOperation.prepare(source: sourceURL, directory: directory, installed: installed, cancellation: cancellation)
+                try FontImportOperation.preparePickedCopy(source: sourceURL, directory: directory, installed: installed, cancellation: cancellation)
             }, discard: { FontImportOperation.discardCandidate($0, directory: directory, installed: installed) })
             if Task.isCancelled {
                 FontImportOperation.discardCandidate(item, directory: directory, installed: installed)

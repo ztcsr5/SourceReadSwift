@@ -3,6 +3,17 @@ import Foundation
 
 /// Coordinates file-provider access and font IO away from the UI actor.
 enum FontImportOperation {
+    static func preparePickedCopy(source: URL, directory: URL, installed: [CustomFontItem], cancellation: FontImportCancellation) throws -> CustomFontItem {
+        precondition(!Thread.isMainThread)
+        try cancellation.check()
+        guard source.isFileURL else { throw CocoaError(.fileReadUnsupportedScheme) }
+        let scoped = source.startAccessingSecurityScopedResource()
+        defer { if scoped { source.stopAccessingSecurityScopedResource() } }
+        // The picker contract is asCopy=true, including hosted/container apps
+        // where the copy's URL may not share NSHomeDirectory's guest prefix.
+        return try copyFont(source: source, directory: directory, installed: installed, cancellation: cancellation)
+    }
+
     static func prepare(source: URL, directory: URL, installed: [CustomFontItem], cancellation: FontImportCancellation = .init()) throws -> CustomFontItem {
         precondition(!Thread.isMainThread, "Font file access must not block the picker dismissal")
         try cancellation.check()
