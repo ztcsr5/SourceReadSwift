@@ -2,9 +2,9 @@ import SwiftUI
 
 enum LabPalette {
     static let ink = Color(red: 0.10, green: 0.12, blue: 0.18)
-    static let paper = Color(red: 0.95, green: 0.94, blue: 0.98)
+    static let paper = Color(red: 0.97, green: 0.965, blue: 0.98)
     static let midnight = Color(red: 0.035, green: 0.07, blue: 0.085)
-    static let accent = Color(red: 0.32, green: 0.25, blue: 0.70)
+    static let accent = Color(red: 0, green: 0.48, blue: 1)
     static let gold = Color(red: 0.91, green: 0.77, blue: 0.53)
     static let navigation = Animation.spring(response: 0.65, dampingFraction: 0.87)
     static let feedback = Animation.spring(response: 0.32, dampingFraction: 0.78)

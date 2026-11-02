@@ -5,7 +5,7 @@ import XCTest
 final class LabMotionTests: XCTestCase {
     func testChoreographyClampsStepsAndWrapsOnlyNonemptyCollections() {
         XCTAssertEqual(IntroChoreography.safeStep(-1), 0)
-        XCTAssertEqual(IntroChoreography.safeStep(Int.max), 4)
+        XCTAssertEqual(IntroChoreography.safeStep(Int.max), 5)
         XCTAssertNil(IntroChoreography.nextIndex(0, direction: 1, count: 0))
         XCTAssertEqual(IntroChoreography.nextIndex(0, direction: -1, count: 7), 6)
         XCTAssertEqual(IntroChoreography.nextIndex(6, direction: 1, count: 7), 0)
@@ -19,6 +19,26 @@ final class LabMotionTests: XCTestCase {
             XCTAssertEqual(book.chapters.count, 3); XCTAssertEqual(book.paragraphs.count, 5)
             XCTAssertNotNil(UIImage(named: book.artwork))
         }
+    }
+
+    @MainActor func testReferenceCatalogArtworkAndSavedMoviesSurviveReopening() throws {
+        XCTAssertEqual(ReferenceMedia.samples.count, 23)
+        XCTAssertEqual(Set(ReferenceMedia.samples.map(\.id)).count, 23)
+        XCTAssertEqual(ReferenceMedia.item(82728).title, "布鲁伊")
+        for item in ReferenceMedia.samples {
+            XCTAssertNotNil(UIImage(named: item.poster)); XCTAssertNotNil(UIImage(named: item.backdrop))
+            if !item.logo.isEmpty { XCTAssertNotNil(UIImage(named: item.logo)) }
+        }
+        XCTAssertNil(UIImage(named: "CoverTide"), "Rejected generated poster must not ship")
+        let suite = "motionlab.reference.\(UUID().uuidString)"
+        let preferences = try XCTUnwrap(UserDefaults(suiteName: suite))
+        defer { preferences.removePersistentDomain(forName: suite) }
+        let shelf = ReferenceShelf(preferences: preferences), item = ReferenceMedia.samples[0]
+        XCTAssertTrue(shelf.saved.isEmpty)
+        shelf.toggle(item)
+        XCTAssertTrue(ReferenceShelf(preferences: preferences).saved.contains(item.id))
+        shelf.toggle(item)
+        XCTAssertTrue(ReferenceShelf(preferences: preferences).saved.isEmpty)
     }
 
     @MainActor func testLocalPositionAndQuoteRoundTripDeduplicationAndReset() throws {
@@ -58,24 +78,24 @@ final class LabMotionTests: XCTestCase {
             let haze = try XCTUnwrap(artwork.haze(book.artwork))
             XCTAssertLessThanOrEqual(max(haze.size.width, haze.size.height), 96)
         }
-        let first = artwork.image("CoverTide"); await artwork.prepare()
-        XCTAssertTrue(first === artwork.image("CoverTide"))
+        let first = artwork.image("Ref106379"); await artwork.prepare()
+        XCTAssertTrue(first === artwork.image("Ref106379"))
     }
 
-    @MainActor func testFiveIntroScenesAndPosterHomeMountedAtPhoneWidths() async throws {
+    @MainActor func testSixIntroScenesAndPosterHomeMountedAtPhoneWidths() async throws {
         let suite = "motionlab.snapshots.\(UUID().uuidString)"
         let preferences = try XCTUnwrap(UserDefaults(suiteName: suite))
         defer { preferences.removePersistentDomain(forName: suite) }
         let library = LabLibrary(preferences: preferences), artwork = LabArtwork(); await artwork.prepare()
         for width: CGFloat in [320, 390] {
             let height: CGFloat = width == 320 ? 568 : 844
-            for step in 0..<5 {
+            for step in 0..<IntroChoreography.stepCount {
                 try await capture("intro-\(step)-\(Int(width))", width: width, height: height,
                                   content: LabIntroView(step: .constant(step), onFinish: {}, sampledTime: 2)
                                     .environmentObject(library).environmentObject(artwork))
             }
             try await capture("poster-home-\(Int(width))", width: width, height: height,
-                              content: LabHomeView(selectedIndex: .constant(0), onDetail: { _ in }, onRead: { _ in }, onReplay: {})
+                              content: ReferenceHomeView(selectedIndex: .constant(0), onDetail: { _ in })
                                 .environmentObject(library).environmentObject(artwork), style: .dark)
         }
         library.minimizesMotion = true

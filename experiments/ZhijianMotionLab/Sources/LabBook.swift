@@ -21,7 +21,7 @@ struct LabBook: Identifiable, Hashable, Sendable {
     }
 
     static let samples: [LabBook] = [
-        .init(id: "tide", title: "潮汐之门", author: "闻屿", artwork: "CoverTide", genre: "奇境 · 小说",
+        .init(id: "tide", title: "潮汐之门", author: "闻屿", artwork: "Ref106379", genre: "奇境 · 小说",
               tagline: "在故事的另一边，遇见自己。", synopsis: "每逢满月，海上会升起一座通往失落图书馆的门。年轻的修书师收到一封来自明天的信，循着潮汐走向那扇门。她不知道，那里收藏的不是书，而是每个人未曾选择的人生。"),
         .init(id: "mist", title: "雾都遗信", author: "林时雨", artwork: "CoverMisty", genre: "悬疑 · 小说",
               tagline: "没有寄出的信，终会找到你。", synopsis: "在终年起雾的城里，未寄出的信件会在午夜找到收信人。她收到一封写着明天日期的来信，从此开始寻找那条地图上不存在的街。"),
@@ -58,7 +58,7 @@ struct LabSnapshot: Codable, Equatable {
 
 /// The intro's normalized poses keep a single set of cover identities across scenes.
 enum IntroChoreography {
-    static let stepCount = 5
+    static let stepCount = 6
 
     static func safeStep(_ proposed: Int) -> Int { min(max(proposed, 0), stepCount - 1) }
 

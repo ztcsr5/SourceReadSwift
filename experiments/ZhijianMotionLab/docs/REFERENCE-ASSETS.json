@@ -1,0 +1,425 @@
+{
+  "purpose": "Private comparison against user-provided REX video; not redistribution clearance.",
+  "ipa_sha256": "132a5f72e8c8b0eda80673f54c16fbcc7b24e839035664c53bc4734d30a9ee4d",
+  "attribution": {
+    "source": "TMDB",
+    "url": "https://www.themoviedb.org",
+    "notice": "This product uses the TMDB API but is not endorsed or certified by TMDB."
+  },
+  "assets": [
+    {
+      "asset": "Ref106379",
+      "entry": "Payload/Rex.app/RexDesign_RexDesign.bundle/showcase-tv-106379.jpg",
+      "bytes": 50773,
+      "sha256": "10d3384210b7a085a0e774a617d5c8fbbb8c7ca522ea604a4765f7a652c59e20"
+    },
+    {
+      "asset": "RefBack106379",
+      "entry": "Payload/Rex.app/RexDesign_RexDesign.bundle/showcase-art-coaPCIqQBPUZsOnJcWZxhaORcDT.jpg",
+      "bytes": 115868,
+      "sha256": "581b9d7aad0ae60fbc8b7cdcc90a27f1ff1a9398b9f7004e2c75b2e080b3d2a6"
+    },
+    {
+      "asset": "RefTitle106379",
+      "entry": "Payload/Rex.app/RexDesign_RexDesign.bundle/showcase-art-uro0cwAtpfx3WEPwtQ7WPVeNv7w.png",
+      "bytes": 19894,
+      "sha256": "b8f4419ceb577e2ad313b9c157fab002a5e4556fdbd7b3e82fc6ef2a8643e7a0"
+    },
+    {
+      "asset": "Ref157336",
+      "entry": "Payload/Rex.app/RexDesign_RexDesign.bundle/showcase-movie-157336.jpg",
+      "bytes": 32249,
+      "sha256": "fba03598d99582586eeb593af04de79b5b738ff32a8aecfb34ede3211fb5a616"
+    },
+    {
+      "asset": "RefBack157336",
+      "entry": "Payload/Rex.app/RexDesign_RexDesign.bundle/showcase-art-5XNQBqnBwPA9yT0jZ0p3s8bbLh0.jpg",
+      "bytes": 74271,
+      "sha256": "190bd260f6c8be58e23da5f0e6d1ab38653f867982edf8135ba39bc66e07b4f5"
+    },
+    {
+      "asset": "RefTitle157336",
+      "entry": "Payload/Rex.app/RexDesign_RexDesign.bundle/showcase-art-zHoDJoAnUIEaHER3xqKxDWLaJAK.png",
+      "bytes": 39649,
+      "sha256": "cb93020eef8327e7d4c3bd41d884f73cf375802e0f3a2c466e50353f46ddb12d"
+    },
+    {
+      "asset": "Ref82728",
+      "entry": "Payload/Rex.app/RexDesign_RexDesign.bundle/showcase-tv-82728.jpg",
+      "bytes": 43927,
+      "sha256": "6932e7867d27e2e1419b1a2aa12edc7f651fdb6510aeaecdd81f186eef8ba35c"
+    },
+    {
+      "asset": "RefBack82728",
+      "entry": "Payload/Rex.app/RexDesign_RexDesign.bundle/showcase-art-g88VMPtog8sl8riaIRtz4U80dMK.jpg",
+      "bytes": 135899,
+      "sha256": "3dc530dce1fd3dbcbeb80b24c84bbcab1196e7bdbab2699defcd785e0af74762"
+    },
+    {
+      "asset": "RefTitle82728",
+      "entry": "Payload/Rex.app/RexDesign_RexDesign.bundle/showcase-art-jAYagTydcQIeASQZgwXlbxifm4v.png",
+      "bytes": 20001,
+      "sha256": "4ebd09e92408efbaf61d4a98d4224b096ce961e47248021aeebbb03676a97743"
+    },
+    {
+      "asset": "Ref496243",
+      "entry": "Payload/Rex.app/RexDesign_RexDesign.bundle/showcase-movie-496243.jpg",
+      "bytes": 49797,
+      "sha256": "3cb37a96d9be24c4582821126ad04df4aeb006d8351fcbea1cc86969587d1043"
+    },
+    {
+      "asset": "RefBack496243",
+      "entry": "Payload/Rex.app/RexDesign_RexDesign.bundle/showcase-art-vbC0rzdrb7Ohc2TkbEbxtOABECe.jpg",
+      "bytes": 211916,
+      "sha256": "66f2f927e46e294dcab60f7810c23be9fb76cb10e94e3bfd8afe83358d265ddd"
+    },
+    {
+      "asset": "RefTitle496243",
+      "entry": "Payload/Rex.app/RexDesign_RexDesign.bundle/showcase-art-iIorWd81rDGoEgMRbKrcGISNGGm.png",
+      "bytes": 8656,
+      "sha256": "fcd2d21fa093c50566ac2566a976c981974c0573128f5530fd833d8107be6b89"
+    },
+    {
+      "asset": "Ref508943",
+      "entry": "Payload/Rex.app/RexDesign_RexDesign.bundle/showcase-movie-508943.jpg",
+      "bytes": 47527,
+      "sha256": "02a58383da133ea4ec0f3c4ffab51541bb9fbfd81266898a0025f79021d0f2f1"
+    },
+    {
+      "asset": "RefBack508943",
+      "entry": "Payload/Rex.app/RexDesign_RexDesign.bundle/showcase-art-620hnMVLu6RSZW6a5rwO8gqpt0t.jpg",
+      "bytes": 235695,
+      "sha256": "325387ae0c59648256c5727ebcd30b06a657fce9ca142b3d62c3fa22830130cb"
+    },
+    {
+      "asset": "RefTitle508943",
+      "entry": "Payload/Rex.app/RexDesign_RexDesign.bundle/showcase-art-j8byCXebpQ7DAvHKddT00XrxMG2.png",
+      "bytes": 17344,
+      "sha256": "e4cfb88983c4ae2a9a4559cd5f700ae09610c0eb720b1112cdbeb156ee60c196"
+    },
+    {
+      "asset": "Ref87739",
+      "entry": "Payload/Rex.app/RexDesign_RexDesign.bundle/showcase-tv-87739.jpg",
+      "bytes": 37922,
+      "sha256": "93d9652e02d5ae3f85a8a1dbb77fc726f75e92d5bb8a6d3732f77e0dd89701b2"
+    },
+    {
+      "asset": "RefBack87739",
+      "entry": "Payload/Rex.app/RexDesign_RexDesign.bundle/showcase-art-34OGjFEbHj0E3lE2w0iTUVq0CBz.jpg",
+      "bytes": 129716,
+      "sha256": "a60e9759d0534da2cc8a60dbe30216c7fd99e154438dbd85cad68b9f57fc586f"
+    },
+    {
+      "asset": "RefTitle87739",
+      "entry": "Payload/Rex.app/RexDesign_RexDesign.bundle/showcase-art-wc637Lw0Q97f5d2QeRJf5zTv73r.png",
+      "bytes": 14925,
+      "sha256": "d40cd3880fbce9ec8143622e1c679116d97baa53705c8b679fad80554295309e"
+    },
+    {
+      "asset": "Ref560057",
+      "entry": "Payload/Rex.app/RexDesign_RexDesign.bundle/showcase-movie-560057.jpg",
+      "bytes": 38335,
+      "sha256": "def6c14f1d3294e9670ef664ad13c9a6cdf5f4c9927e8eadabd5798a3837b219"
+    },
+    {
+      "asset": "RefBack560057",
+      "entry": "Payload/Rex.app/RexDesign_RexDesign.bundle/showcase-art-wUwizGzbTk5CTiKBnE4Pq1MONwD.jpg",
+      "bytes": 147665,
+      "sha256": "c83f95470a1fffa3cd90bcaf7d2ce994e79745ecedabf8f906bfb6757504ffbe"
+    },
+    {
+      "asset": "RefTitle560057",
+      "entry": "Payload/Rex.app/RexDesign_RexDesign.bundle/showcase-art-r13WhbudLjVsiEuwgZl6oWXUyUZ.png",
+      "bytes": 14037,
+      "sha256": "694b053e8eed4fe02efdec9e8935edd2851de4202ff973ee85c3922ccacc9e28"
+    },
+    {
+      "asset": "Ref475557",
+      "entry": "Payload/Rex.app/RexDesign_RexDesign.bundle/showcase-movie-475557.jpg",
+      "bytes": 41795,
+      "sha256": "3f16c080c0a6acb5fa901eb434a67387ada0f63b0a9531419063f66d520ddd07"
+    },
+    {
+      "asset": "RefBack475557",
+      "entry": "Payload/Rex.app/RexDesign_RexDesign.bundle/showcase-art-rlay2M5QYvi6igbGcFjq8jxeusY.jpg",
+      "bytes": 202035,
+      "sha256": "67c2cd5828b2f7fa80d6f6150a18b974565ecaf3146cb26e4e77e3d2e336ff9d"
+    },
+    {
+      "asset": "RefTitle475557",
+      "entry": "Payload/Rex.app/RexDesign_RexDesign.bundle/showcase-art-o6Ciob3VbBdLCi670TWWqLho6vN.png",
+      "bytes": 83637,
+      "sha256": "a099d4e3e7dd55fbde93f32edffb994c05592fb6487b012ab63908577aa8a5e7"
+    },
+    {
+      "asset": "Ref603",
+      "entry": "Payload/Rex.app/RexDesign_RexDesign.bundle/showcase-movie-603.jpg",
+      "bytes": 52982,
+      "sha256": "c29853224259ded935f15514f53ee365d8497e74c4d171d36043394188d7512e"
+    },
+    {
+      "asset": "RefBack603",
+      "entry": "Payload/Rex.app/RexDesign_RexDesign.bundle/showcase-art-tlm8UkiQsitc8rSuIAscQDCnP8d.jpg",
+      "bytes": 103064,
+      "sha256": "a27e6b234f3f8d01f2e94c9483c4be3fd51602406de2355dff0a6030798f7749"
+    },
+    {
+      "asset": "RefTitle603",
+      "entry": "Payload/Rex.app/RexDesign_RexDesign.bundle/showcase-art-dnH4eEECywzcyTcwwM7MxqmCLzQ.png",
+      "bytes": 7920,
+      "sha256": "bf9a2464334ee34e93d1f15b9ffa0ede9494412f5742ca0b68c68df4f5c7e88c"
+    },
+    {
+      "asset": "Ref240",
+      "entry": "Payload/Rex.app/RexDesign_RexDesign.bundle/showcase-movie-240.jpg",
+      "bytes": 37082,
+      "sha256": "190716e36629b06fd374a63d576ac1329ef173b2fd3c6beed9d430f4d5c8813f"
+    },
+    {
+      "asset": "RefBack240",
+      "entry": "Payload/Rex.app/RexDesign_RexDesign.bundle/showcase-art-pGzqRKrYeK4LogoysNro0vG8d8N.jpg",
+      "bytes": 116268,
+      "sha256": "c511703ead7973a5345c223fa3bec62fe7571a548e14bbc5cb555d6f7009b7a0"
+    },
+    {
+      "asset": "RefTitle240",
+      "entry": "Payload/Rex.app/RexDesign_RexDesign.bundle/showcase-art-gr4SImMiTbHzD7tIBTzpRe6gnth.png",
+      "bytes": 18121,
+      "sha256": "b1f0e25cccaddd4331112d29e9a70bd1ddc958031f035b0c6f0da048595e9b02"
+    },
+    {
+      "asset": "Ref60573",
+      "entry": "Payload/Rex.app/RexDesign_RexDesign.bundle/showcase-tv-60573.jpg",
+      "bytes": 24863,
+      "sha256": "3d6e9f1473ff40662e1b9d0daa01a9f90e56da76d8dadf7d4dc3279ba5b3743a"
+    },
+    {
+      "asset": "RefBack60573",
+      "entry": "Payload/Rex.app/RexDesign_RexDesign.bundle/showcase-art-4pfXAnWxOfEJsUgDPW0zqzs5UWv.jpg",
+      "bytes": 197358,
+      "sha256": "1326c49b8fb44bfa45deeb65e06840e5d0d9c504c13db90d7354ce37dc2ced3b"
+    },
+    {
+      "asset": "RefTitle60573",
+      "entry": "Payload/Rex.app/RexDesign_RexDesign.bundle/showcase-art-3BH3fuGH0jtZiVPkS9Cd9N5WgwT.png",
+      "bytes": 8910,
+      "sha256": "9153d02bf5ae202a274e2b28ec53ef68cd0292dbbf987c4de38554a000c38ddb"
+    },
+    {
+      "asset": "Ref12971",
+      "entry": "Payload/Rex.app/RexDesign_RexDesign.bundle/showcase-tv-12971.jpg",
+      "bytes": 50379,
+      "sha256": "6d182a1a9bcc817aeff4333ec0df1303bfa8f7ca9669478f13ebde37ba6faec5"
+    },
+    {
+      "asset": "RefBack12971",
+      "entry": "Payload/Rex.app/RexDesign_RexDesign.bundle/showcase-art-ydf1CeiBLfdxiyNTpskM0802TKl.jpg",
+      "bytes": 196041,
+      "sha256": "5b40ed1ce893ea5c3442463c371d5db5e889df8d20c15e1561b50ec7b1653a40"
+    },
+    {
+      "asset": "RefTitle12971",
+      "entry": "Payload/Rex.app/RexDesign_RexDesign.bundle/showcase-art-yMoktMFgvqnsQ1Pii9xwturAHx4.png",
+      "bytes": 12061,
+      "sha256": "bddea7475f91d154354b95c3b54169cc48126b446abeae47f22b37304452bbd7"
+    },
+    {
+      "asset": "Ref277834",
+      "entry": "Payload/Rex.app/RexDesign_RexDesign.bundle/showcase-movie-277834.jpg",
+      "bytes": 58163,
+      "sha256": "2b6a02e918cd92d852b5f718d18f9d6f2cfcd465b8f48307a582e7992a630d19"
+    },
+    {
+      "asset": "RefBack277834",
+      "entry": "Payload/Rex.app/RexDesign_RexDesign.bundle/showcase-art-qLVNZFHYUR6Li64He67SWl6BHQe.jpg",
+      "bytes": 253223,
+      "sha256": "9c72419cd79e539267eb454db9f7c51d7c54f30c2be494fb323d812519c30517"
+    },
+    {
+      "asset": "RefTitle277834",
+      "entry": "Payload/Rex.app/RexDesign_RexDesign.bundle/showcase-art-wVU9ZWUQOqaIq75udSdTuyjgjl9.png",
+      "bytes": 19860,
+      "sha256": "7d4c554e8742fe96064522bd46fa24d79c73f32aef60532528ff8af5e05a97b7"
+    },
+    {
+      "asset": "Ref823219",
+      "entry": "Payload/Rex.app/RexDesign_RexDesign.bundle/showcase-movie-823219.jpg",
+      "bytes": 39840,
+      "sha256": "2be514df0d52d104b795f65b8ec569da0f4f6b9f2e17ed4f5fadedd547964940"
+    },
+    {
+      "asset": "RefBack823219",
+      "entry": "Payload/Rex.app/RexDesign_RexDesign.bundle/showcase-art-4XPNNt0zfZKBqxxVWaQALd57UHl.jpg",
+      "bytes": 85238,
+      "sha256": "65ae765b1d98dc78e1e21f7e5c9ba3ee54b3345cf87e7eb57c7093e76c378ab6"
+    },
+    {
+      "asset": "RefTitle823219",
+      "entry": "Payload/Rex.app/RexDesign_RexDesign.bundle/showcase-art-nLH6ExamFwTouDmWX7fZKrlKnCJ.png",
+      "bytes": 15498,
+      "sha256": "f2f6b405f2c9ff0897652de099008d05d87700d517dc6a8a64c1d6fbd28f37bc"
+    },
+    {
+      "asset": "Ref10997",
+      "entry": "Payload/Rex.app/RexDesign_RexDesign.bundle/showcase-movie-10997.jpg",
+      "bytes": 51392,
+      "sha256": "96aeb7f87159d7d9899fbcc4ea6d39c60771f969e48c840f2e7dc4d7780ecb1d"
+    },
+    {
+      "asset": "RefBack10997",
+      "entry": "Payload/Rex.app/RexDesign_RexDesign.bundle/showcase-art-bBiZN1epQTu3F8iFLBuMhc4TRzr.jpg",
+      "bytes": 160820,
+      "sha256": "c7573018578ce8ac3c70c1a3d5ec9c21a726fa4eee7014ef5c5250e3bec21655"
+    },
+    {
+      "asset": "RefTitle10997",
+      "entry": "Payload/Rex.app/RexDesign_RexDesign.bundle/showcase-art-hTqI4wIQbUWbwHIouq3Bz43he4s.png",
+      "bytes": 31273,
+      "sha256": "41230fd7cdc438a5a5981ccdd51795c02ddda0876e78ae6ae6faa952e4b0e4b6"
+    },
+    {
+      "asset": "Ref110356",
+      "entry": "Payload/Rex.app/RexDesign_RexDesign.bundle/showcase-tv-110356.jpg",
+      "bytes": 41203,
+      "sha256": "5cb7a0a78ceac4650a7a7525683bfa9016030eea007ca6006130a95e420318ac"
+    },
+    {
+      "asset": "RefBack110356",
+      "entry": "Payload/Rex.app/RexDesign_RexDesign.bundle/showcase-art-x0eIZv8bJYjfTu7VkTOxHU8B91c.jpg",
+      "bytes": 108179,
+      "sha256": "010dd1b461d57efc08fc15a7fc9987415ed9edae1d43d5f4ee527d1243cabcbe"
+    },
+    {
+      "asset": "RefTitle110356",
+      "entry": "Payload/Rex.app/RexDesign_RexDesign.bundle/showcase-art-jNOQxs7N9ZOVu5RAeHp242M0BQI.png",
+      "bytes": 19122,
+      "sha256": "cc7df0d373080e0d77d7cf8bb3cf1a53107ebf0f8a42be56848669c8e14bc2e3"
+    },
+    {
+      "asset": "Ref71712",
+      "entry": "Payload/Rex.app/RexDesign_RexDesign.bundle/showcase-tv-71712.jpg",
+      "bytes": 34629,
+      "sha256": "7304b45f0494f68ace3887c67d9381cdb14b4ef35c80050c84f3efa6c3e98b4c"
+    },
+    {
+      "asset": "RefBack71712",
+      "entry": "Payload/Rex.app/RexDesign_RexDesign.bundle/showcase-art-f3cin9kOz4nOrlYEMxGFQhv4bdN.jpg",
+      "bytes": 111860,
+      "sha256": "d68ab2121e80dc15e0ed9865459a3a5958cea5788023f87c83a35cccb51649cc"
+    },
+    {
+      "asset": "RefTitle71712",
+      "entry": "Payload/Rex.app/RexDesign_RexDesign.bundle/showcase-art-yn8tTbMma8Zyd9sfJaRkqbXXANI.png",
+      "bytes": 13846,
+      "sha256": "ae39a9198dec25eefc4e3b7d1bd93a70ce130b24fe22a9a2f4613f561251ddc5"
+    },
+    {
+      "asset": "Ref46298",
+      "entry": "Payload/Rex.app/RexDesign_RexDesign.bundle/showcase-tv-46298.jpg",
+      "bytes": 55198,
+      "sha256": "012eba6203a0fc5f2cfa2000fe6da59989734d301ad800059559a13e1dcf465f"
+    },
+    {
+      "asset": "RefBack46298",
+      "entry": "Payload/Rex.app/RexDesign_RexDesign.bundle/showcase-art-bFKKyCI89Xq98Gul8cGox8K3sZa.jpg",
+      "bytes": 174020,
+      "sha256": "6e5f190b394560f8754d9cb9ec4b09945d90dc48cf47272b27d078a2eb0e131a"
+    },
+    {
+      "asset": "RefTitle46298",
+      "entry": "Payload/Rex.app/RexDesign_RexDesign.bundle/showcase-art-r20WExRYrZ37WXVxBhqT5s8GwwO.png",
+      "bytes": 38730,
+      "sha256": "19b2f69b031b26c00e695ca236984baea6152a327c3d754cdbf7786fc91e8175"
+    },
+    {
+      "asset": "Ref799876",
+      "entry": "Payload/Rex.app/RexDesign_RexDesign.bundle/showcase-movie-799876.jpg",
+      "bytes": 34495,
+      "sha256": "a7031b689468314c61b1f019c7ef9be25e90d4811c708737e8ab218d896fc007"
+    },
+    {
+      "asset": "RefBack799876",
+      "entry": "Payload/Rex.app/RexDesign_RexDesign.bundle/showcase-art-jjXnYpRQMqzylAmYqKL7VFa3l9w.jpg",
+      "bytes": 93429,
+      "sha256": "c81c9851b33e25e86ff05cfe920f854ef9759293fb7ecf913844e283add84514"
+    },
+    {
+      "asset": "RefTitle799876",
+      "entry": "Payload/Rex.app/RexDesign_RexDesign.bundle/showcase-art-dbnhsPSPqOPoMo3FCP0ox3LpJam.png",
+      "bytes": 12917,
+      "sha256": "b7bd76f96e9c4eebcc862260fc6c3d7f970c545f93d86e63611a3d1c866e7483"
+    },
+    {
+      "asset": "Ref39852",
+      "entry": "Payload/Rex.app/RexDesign_RexDesign.bundle/showcase-tv-39852.jpg",
+      "bytes": 31841,
+      "sha256": "2cfa0d5e8a6dd0569527438204ed01a37e63485004b841591006bd327d3cf811"
+    },
+    {
+      "asset": "RefBack39852",
+      "entry": "Payload/Rex.app/RexDesign_RexDesign.bundle/showcase-art-lVWku9LX2qdJTtAbRzaCDhhWeTK.jpg",
+      "bytes": 120562,
+      "sha256": "4ee9b45ce52c7c913d218d4db48b5d24039848265dc21013b5785dc7bff79fb3"
+    },
+    {
+      "asset": "RefTitle39852",
+      "entry": "Payload/Rex.app/RexDesign_RexDesign.bundle/showcase-art-nfZiyIDzjPgjlHANu12u1VzozO8.png",
+      "bytes": 6536,
+      "sha256": "c4c1a99b69f47b277f9375625d1ea9884905f80ec71a7cb4a8701d81c6abc828"
+    },
+    {
+      "asset": "Ref1416",
+      "entry": "Payload/Rex.app/RexDesign_RexDesign.bundle/showcase-tv-1416.jpg",
+      "bytes": 28632,
+      "sha256": "12a07a741eff09dc1a067a292e84acf3d9fc2d70df3aca648f2bb458b7a17a35"
+    },
+    {
+      "asset": "RefBack1416",
+      "entry": "Payload/Rex.app/RexDesign_RexDesign.bundle/showcase-art-jP0Rhj9OTPDAwQlHQwOLFDdeE8t.jpg",
+      "bytes": 132567,
+      "sha256": "0c2c2aaedccad6eefecdafea8cb0ccbc447f8c1ef95535948921bfa5005eaf2a"
+    },
+    {
+      "asset": "RefTitle1416",
+      "entry": "Payload/Rex.app/RexDesign_RexDesign.bundle/showcase-art-iBiN9EYTvVpx85h2JvrJ0dI33gF.png",
+      "bytes": 5684,
+      "sha256": "cd18a5d358a99411c4ac167f2622b19be3cd56ba010381f45c850214bda806d4"
+    },
+    {
+      "asset": "Ref238",
+      "entry": "Payload/Rex.app/RexDesign_RexDesign.bundle/showcase-movie-238.jpg",
+      "bytes": 26705,
+      "sha256": "0e2bc44a84a9c765990e899e55a07b488b9804652f79e30a15954c4d467d4908"
+    },
+    {
+      "asset": "RefBack238",
+      "entry": "Payload/Rex.app/RexDesign_RexDesign.bundle/showcase-art-ejdD20cdHNFAYAN2DlqPToXKyzx.jpg",
+      "bytes": 117520,
+      "sha256": "114e282913523e35cf4ad34d5ab169b94a6c7cac6411529c2a9808f27bd310a9"
+    },
+    {
+      "asset": "RefTitle238",
+      "entry": "Payload/Rex.app/RexDesign_RexDesign.bundle/showcase-art-iIgaMBoblguG61gqBft9bRIW4yX.png",
+      "bytes": 22953,
+      "sha256": "b3db7c94e7e0f5abdc37d3b9ea599da696f83d731629304bcf71ab5d607368a9"
+    },
+    {
+      "asset": "Ref10376",
+      "entry": "Payload/Rex.app/RexDesign_RexDesign.bundle/showcase-movie-10376.jpg",
+      "bytes": 28072,
+      "sha256": "0df1b7e143e3b4bb7697e60a4081046523b67392cff6cf34c66c88476bffe191"
+    },
+    {
+      "asset": "RefBack10376",
+      "entry": "Payload/Rex.app/RexDesign_RexDesign.bundle/showcase-art-muSeX7fnNw0pv4zHK7RSwZln6Hk.jpg",
+      "bytes": 169346,
+      "sha256": "0915a4f4d0089d1dee949cb938bc0339fe0735c97e27c0fd694e0bab80bf522c"
+    },
+    {
+      "asset": "RefTitle10376",
+      "entry": "Payload/Rex.app/RexDesign_RexDesign.bundle/showcase-art-yFhCKKqzZGXyxQVEtT5s8mBYVJu.png",
+      "bytes": 14425,
+      "sha256": "cca7be231c6cd4e36fad516f909501394c9cec4d50b1b3c09007cf1508a28b71"
+    }
+  ]
+}

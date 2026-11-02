@@ -20,15 +20,16 @@ private struct PreparedArtwork {
         let rendered = await Task.detached(priority: .userInitiated) {
             let context = CIContext(options: [.cacheIntermediates: false])
             var result: [String: PreparedArtwork] = [:]
-            for book in LabBook.samples {
-                guard let original = UIImage(named: book.artwork, in: bundle, compatibleWith: nil),
+            let names = Set(LabBook.samples.map(\.artwork) + ReferenceMedia.samples.flatMap { [$0.poster, $0.backdrop, $0.logo] }.filter { !$0.isEmpty })
+            for name in names {
+                guard let original = UIImage(named: name, in: bundle, compatibleWith: nil),
                       let cg = original.cgImage else { continue }
                 let image = Self.thumbnail(cg, maximum: 1200)
                 let small = Self.thumbnail(cg, maximum: 96)
                 let input = CIImage(cgImage: small)
                 let blurred = input.clampedToExtent().applyingFilter("CIGaussianBlur", parameters: [kCIInputRadiusKey: 9])
                 let haze = context.createCGImage(blurred, from: input.extent).map { UIImage(cgImage: $0) }
-                result[book.artwork] = PreparedArtwork(cover: UIImage(cgImage: image), haze: haze)
+                result[name] = PreparedArtwork(cover: UIImage(cgImage: image), haze: haze)
             }
             return result
         }.value

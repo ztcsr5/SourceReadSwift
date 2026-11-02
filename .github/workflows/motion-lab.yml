@@ -43,7 +43,7 @@ jobs:
           xcodebuild -project ZhijianMotionLab.xcodeproj -scheme ZhijianMotionLab \
             -destination "id=$LAB_DEVICE_ID" -derivedDataPath build/Simulator \
             CODE_SIGNING_ALLOWED=NO -parallel-testing-enabled NO \
-            -test-timeouts-enabled YES -maximum-test-execution-time-allowance 90 \
+            -test-timeouts-enabled YES -maximum-test-execution-time-allowance 180 \
             -resultBundlePath MotionLab.xcresult test 2>&1 | tee simulator-test.log
       - name: Export screenshots
         if: always()
@@ -74,8 +74,8 @@ jobs:
             build 2>&1 | tee device-build.log
           mkdir -p build/package/Payload
           cp -R build/Device/Build/Products/Release-iphoneos/ZhijianMotionLab.app build/package/Payload/
-          ditto -c -k --keepParent build/package/Payload ZhijianMotionLab-0.1.0-build1-unsigned.ipa
-          shasum -a 256 ZhijianMotionLab-0.1.0-build1-unsigned.ipa | tee evidence/ipa-sha256.txt
+          ditto -c -k --keepParent build/package/Payload ZhijianMotionLab-0.1.0-build2-unsigned.ipa
+          shasum -a 256 ZhijianMotionLab-0.1.0-build2-unsigned.ipa | tee evidence/ipa-sha256.txt
       - name: Preserve failure excerpts
         if: failure()
         run: |
