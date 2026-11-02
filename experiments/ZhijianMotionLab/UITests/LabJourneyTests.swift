@@ -1,6 +1,16 @@
 import XCTest
 
 final class LabJourneyTests: XCTestCase {
+    @MainActor func testIntroCanSwipeForwardAndBackwardWithoutContinueButton() throws {
+        let app = XCUIApplication(); app.launchArguments = ["--lab-ui-testing"]; app.launch()
+        XCTAssertTrue(app.buttons["intro.continue"].waitForExistence(timeout: 12))
+        app.swipeLeft()
+        XCTAssertTrue(app.staticTexts["首页，由你定义"].waitForExistence(timeout: 3), "A left swipe must change the live intro scene")
+        app.swipeRight()
+        let firstTitle = app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "正在来到眼前")).firstMatch
+        XCTAssertTrue(firstTitle.waitForExistence(timeout: 3), "A right swipe must return to the opening scene")
+    }
+
     @MainActor func testSixVideoScenesHomeDetailsSavedMoviesSearchAndReplay() throws {
         let app = XCUIApplication(); app.launchArguments = ["--lab-ui-testing"]; app.launch()
         let next = app.buttons["intro.continue"]
