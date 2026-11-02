@@ -53,7 +53,35 @@ final class ReaderControlsMaterialTests: XCTestCase {
             attachment.lifetime = .keepAlways; add(attachment)
             window.isHidden = true
         }
-        XCTAssertNotEqual(pictures[0].pngData(), pictures[1].pngData(),
-            "The actual settings panel must honor the system/paper choice, not ignore it")
+        let glass = try surfaceChannels(pictures[0]), paper = try surfaceChannels(pictures[1])
+        let difference = zip(glass, paper).map { abs($0 - $1) }.reduce(0, +) / 3
+        XCTAssertGreaterThan(difference, 8,
+            "Settings must visibly honor system/paper selection; mean channel difference was \(difference)")
+    }
+
+    private func surfaceChannels(_ image: UIImage) throws -> [Double] {
+        let picture = try XCTUnwrap(image.cgImage)
+        let width = 390, height = 844
+        var pixels = [UInt8](repeating: 0, count: width * height * 4)
+        let rendered = pixels.withUnsafeMutableBytes { bytes -> Bool in
+            guard let context = CGContext(data: bytes.baseAddress, width: width, height: height,
+                bitsPerComponent: 8, bytesPerRow: width * 4, space: CGColorSpaceCreateDeviceRGB(),
+                bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) else { return false }
+            context.translateBy(x: 0, y: CGFloat(height)); context.scaleBy(x: 1, y: -1)
+            context.draw(picture, in: CGRect(x: 0, y: 0, width: width, height: height))
+            return true
+        }
+        XCTAssertTrue(rendered)
+        // The empty lower-middle panel excludes labels, buttons and the screen's
+        // status area. Compare actual pixels, not PNG encoding or changing text.
+        var channels = [0.0, 0.0, 0.0], count = 0.0
+        for y in stride(from: 540, to: 680, by: 8) {
+            for x in stride(from: 80, to: 310, by: 8) {
+                let offset = (y * width + x) * 4
+                for channel in 0..<3 { channels[channel] += Double(pixels[offset + channel]) }
+                count += 1
+            }
+        }
+        return channels.map { $0 / count }
     }
 }

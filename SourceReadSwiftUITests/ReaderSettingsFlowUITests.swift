@@ -43,11 +43,21 @@ final class ReaderSettingsFlowUITests: XCTestCase {
         XCTAssertFalse(shelfEntry.isHittable)
     }
 
+    func testHeadingAndChromeReturnToSettingsNotTheBookshelf() {
+        checkLocalReturn(routes: ["heading", "chrome"])
+    }
+
+    func testBindingsAndAssistanceReturnToSettingsNotTheBookshelf() {
+        checkLocalReturn(routes: ["themes", "assistance"])
+    }
+
     func testReturningToShelfRestoresBottomNavigationWithTheRoot() {
         launchReader(mode: "scroll")
         revealMenu()
         element("reader.returnToShelf").tap()
         XCTAssertTrue(shelfEntry.waitForExistence(timeout: 3))
+        let rootReady = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in self.shelfEntry.isHittable }, object: nil)
+        XCTAssertEqual(XCTWaiter.wait(for: [rootReady], timeout: 3), .completed)
         XCTAssertTrue(shelfEntry.isHittable)
         // Query immediately after the real root is ready, not after an arbitrary
         // five-second eventual-visibility window like the older placeholder test.
@@ -62,6 +72,26 @@ final class ReaderSettingsFlowUITests: XCTestCase {
 
     private func element(_ identifier: String) -> XCUIElement {
         app.descendants(matching: .any).matching(identifier: identifier).firstMatch
+    }
+
+    private func checkLocalReturn(routes: [String]) {
+        launchReader(mode: "scroll")
+        openSettings()
+        for route in routes {
+            let link = element("reader.settings.route." + route)
+            for _ in 0..<3 {
+                if link.isHittable { break }
+                element("reader.settingsWorkbench").scrollViews.firstMatch.swipeUp()
+            }
+            XCTAssertTrue(link.isHittable)
+            link.tap()
+            assertPanelRemainsOpen()
+            let back = element("reader.settings.back")
+            XCTAssertTrue(back.isHittable)
+            back.tap()
+            XCTAssertTrue(element("reader.settings.route.typography").isHittable)
+            XCTAssertFalse(shelfEntry.isHittable)
+        }
     }
 
     private func launchReader(mode: String) {
