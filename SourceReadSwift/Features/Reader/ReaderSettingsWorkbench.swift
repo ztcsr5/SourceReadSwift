@@ -79,6 +79,11 @@ struct ReaderSettingsWorkbench: View {
                     .transaction { if motion.reducesMotion { $0.disablesAnimations = true } }
                 }
                 .frame(width: ReaderSettingsLayoutPolicy.maxPanelWidth(viewportWidth: proxy.size.width), height: height)
+                .background {
+                    // Glass is not a hit-test surface. Empty panel space must
+                    // consume taps instead of forwarding them to the dismiss scrim.
+                    Color.clear.contentShape(Rectangle()).onTapGesture { }
+                }
                 .modifier(ReaderChromeSurface(paper: context.paper, ink: context.ink))
                 .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
                 .overlay { RoundedRectangle(cornerRadius: 24).strokeBorder(context.ink.opacity(0.10), lineWidth: 0.6).allowsHitTesting(false) }
@@ -102,6 +107,7 @@ struct ReaderSettingsWorkbench: View {
             VStack(alignment: .leading, spacing: 4) {
                 Text(route?.title ?? "阅读设置").font(.headline).lineLimit(1)
                 Text(context.bookTitle).font(.caption).foregroundStyle(.secondary).lineLimit(1)
+                    .accessibilityIdentifier("reader.settings.bookTitle")
             }
             Spacer(minLength: 8)
             Button(action: actions.close) { Image(systemName: "xmark").frame(width: 44, height: 44) }
@@ -191,6 +197,7 @@ struct ReaderClassicSettingsPanel: View {
                     .frame(width: ReaderSettingsLayoutPolicy.maxPanelWidth(viewportWidth: proxy.size.width),
                            height: ReaderSettingsLayoutPolicy.maxPanelHeight(viewportHeight: proxy.size.height, bottomInset: context.bottomInset))
                     .foregroundStyle(context.ink)
+                    .background { Color.clear.contentShape(Rectangle()).onTapGesture { } }
                     .modifier(ReaderChromeSurface(paper: context.paper, ink: context.ink))
                     .padding(.bottom, max(context.bottomInset, 8) + 8)
             }.frame(maxWidth: .infinity).environment(\.colorScheme, context.background.isDark ? .dark : .light)

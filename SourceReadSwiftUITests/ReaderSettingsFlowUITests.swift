@@ -21,6 +21,10 @@ final class ReaderSettingsFlowUITests: XCTestCase {
         launchReader(mode: "scroll")
         for route in ["typography", "appearance"] {
             openSettings()
+            if route == "typography" {
+                element("reader.settings.bookTitle").tap()
+                assertPanelRemainsOpen("header-whitespace")
+            }
             let link = element("reader.settings.route." + route)
             XCTAssertTrue(link.waitForExistence(timeout: 5))
             link.tap()
