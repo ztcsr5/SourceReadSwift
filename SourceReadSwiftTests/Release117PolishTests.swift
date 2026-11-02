@@ -7,6 +7,39 @@ import XCTest
 @testable import SourceReadSwift
 
 final class Release117PolishTests: XCTestCase {
+    @MainActor func testDetailIdentityIsReadableBeforeArrivalAnimationStarts() throws {
+        let previousTheme = UserDefaults.standard.object(forKey: "settings.visualTheme")
+        UserDefaults.standard.set("classic", forKey: "settings.visualTheme")
+        defer {
+            if let previousTheme { UserDefaults.standard.set(previousTheme, forKey: "settings.visualTheme") }
+            else { UserDefaults.standard.removeObject(forKey: "settings.visualTheme") }
+        }
+        let renderer = ImageRenderer(content: ImmediateDossierFixture().frame(width: 358, height: 360)
+            .background(.white).environment(\.colorScheme, .light))
+        renderer.scale = 1
+        let image = try XCTUnwrap(renderer.uiImage?.cgImage)
+        let width = image.width, height = image.height
+        var pixels = [UInt8](repeating: 255, count: width * height * 4)
+        let rendered = pixels.withUnsafeMutableBytes { bytes -> Bool in
+            guard let context = CGContext(data: bytes.baseAddress, width: width, height: height, bitsPerComponent: 8,
+                bytesPerRow: width * 4, space: CGColorSpaceCreateDeviceRGB(),
+                bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) else { return false }
+            context.translateBy(x: 0, y: CGFloat(height)); context.scaleBy(x: 1, y: -1)
+            context.draw(image, in: CGRect(x: 0, y: 0, width: width, height: height))
+            return true
+        }
+        XCTAssertTrue(rendered)
+        // The right-middle region excludes the jacket, top label and source footer.
+        // A hidden title leaves only near-white paper here; count actual text ink.
+        var inkPixels = 0
+        for y in 90..<230 {
+            for x in 190..<330 {
+                let offset = (y * width + x) * 4
+                if pixels[offset] < 100 && pixels[offset + 1] < 100 && pixels[offset + 2] < 100 { inkPixels += 1 }
+            }
+        }
+        XCTAssertGreaterThan(inkPixels, 40, "Book identity must be legible even before onAppear/animation runs")
+    }
     func testFontResourcesAreBoundedAndCannotEscapeTheFontDirectory() throws {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         XCTAssertNil(ReaderFontResource.file(for: URL(string: "readerfont://custom/../outside.ttf")!, customDirectory: root))
@@ -189,5 +222,14 @@ private struct PolishVisualFixture: View {
                 ReadingHeroCard(book: book, usesSpatialStyle: false)
             }.padding(16)
         }.coordinateSpace(name: "bookDetailScroll").pageBackground()
+    }
+}
+
+private struct ImmediateDossierFixture: View {
+    @Namespace private var namespace
+    var body: some View {
+        BookDetailHero(book: SearchBook(name: "书籍标题保持清晰", author: "作者姓名", coverUrl: nil,
+            bookUrl: "local://immediate", sourceName: "本地", sourceUrl: "local://text", intro: nil),
+            readerSourceID: "immediate", namespace: namespace)
     }
 }

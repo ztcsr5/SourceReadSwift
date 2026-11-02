@@ -75,7 +75,8 @@ struct BookDetailHero: View {
             Text(book.author?.nilIfEmpty ?? "作者未知").font(.subheadline).foregroundStyle(.secondary)
             Image(systemName: "bookmark.fill").font(.title3).foregroundStyle(AppTheme.accent.opacity(0.65))
         }.frame(maxWidth: .infinity, alignment: .leading)
-            .opacity(hasAppeared || motion.reducesMotion ? 1 : 0)
+            // Reading identity is never gated by an animation or task. System
+            // navigation already provides the reveal; delayed frames stay legible.
             .offset(y: hasAppeared || motion.reducesMotion ? 0 : 8)
     }
 }
