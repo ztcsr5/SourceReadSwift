@@ -121,6 +121,7 @@ final class CoverPageHostController: UIViewController, UIGestureRecognizerDelega
         let size = view.bounds.size
         guard size.width > 1, size.height > 1 else { return }
         if lastSize != size {
+            sizePagesIfNeeded()
             cancelInteraction()
             layoutPages(translation: 0)
         }
@@ -237,35 +238,48 @@ final class CoverPageHostController: UIViewController, UIGestureRecognizerDelega
             host?.overrideUserInterfaceStyle = next.appearance
             host?.view.isHidden = index == 0 || index == 4
         }
+        sizePagesIfNeeded()
         layoutPages(translation: translation)
         scheduleWarmup()
+    }
+
+    private func sizePagesIfNeeded() {
+        let size = view.bounds.size
+        let center = CGPoint(x: view.bounds.midX, y: view.bounds.midY)
+        for host in active {
+            guard let page = host?.view, page.bounds.size != size else { continue }
+            // Never set frame while a nonidentity transform is active.
+            // Hosting geometry changes only on installation or a viewport resize.
+            page.bounds = CGRect(origin: .zero, size: size)
+            page.center = center
+            page.layer.shadowPath = UIBezierPath(rect: page.bounds).cgPath
+        }
     }
 
     private func layoutPages(translation x: CGFloat) {
         guard !isTornDown, active.count == 5, let window else { return }
         let width = view.bounds.width
-        for host in active { host?.view.frame = view.bounds }
         let previous = active[1]?.view
         let current = active[2]?.view
         let next = active[3]?.view
         if window.style == .slide {
-            previous?.frame.origin.x = x - width
-            current?.frame.origin.x = x
-            next?.frame.origin.x = x + width
+            previous?.transform = CGAffineTransform(translationX: x - width, y: 0)
+            current?.transform = CGAffineTransform(translationX: x, y: 0)
+            next?.transform = CGAffineTransform(translationX: x + width, y: 0)
             for page in [previous, current, next] { page?.layer.shadowOpacity = 0 }
         } else {
-            if let next { view.sendSubviewToBack(next) }
-            if let current { view.bringSubviewToFront(current) }
-            if let previous { view.bringSubviewToFront(previous) }
-            previous?.frame.origin.x = x > 0 ? x - width : -width
-            current?.frame.origin.x = min(x, 0)
-            next?.frame.origin.x = 0
+            if let next, view.subviews.first !== next { view.sendSubviewToBack(next) }
+            if let current, let previous, view.subviews.last !== previous {
+                view.bringSubviewToFront(current); view.bringSubviewToFront(previous)
+            }
+            previous?.transform = CGAffineTransform(translationX: x > 0 ? x - width : -width, y: 0)
+            current?.transform = CGAffineTransform(translationX: min(x, 0), y: 0)
+            next?.transform = .identity
             for page in [previous, current] {
                 page?.layer.shadowColor = UIColor.black.cgColor
                 page?.layer.shadowOpacity = abs(x) > 0.5 ? 0.18 : 0
                 page?.layer.shadowRadius = 5
                 page?.layer.shadowOffset = CGSize(width: 3, height: 0)
-                page?.layer.shadowPath = UIBezierPath(rect: view.bounds).cgPath
             }
         }
     }
