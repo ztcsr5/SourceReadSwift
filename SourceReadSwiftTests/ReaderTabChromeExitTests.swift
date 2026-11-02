@@ -1,6 +1,7 @@
 import SwiftUI
 import XCTest
 import UIKit
+import Combine
 @testable import SourceReadSwift
 
 final class ReaderTabChromeExitTests: XCTestCase {
@@ -30,9 +31,20 @@ final class ReaderTabChromeExitTests: XCTestCase {
         XCTAssertTrue(source.hasAppeared)
         XCTAssertNotNil(host.view.window)
         app.acquireTabChromeHidden(owner: owner)
+        let released = expectation(description: "The real pop releases its reader owner")
+        var releasedBeforeDisappearance = false
+        let observation = app.$isTabChromeHidden.dropFirst().filter { !$0 }.prefix(1).sink { _ in
+            releasedBeforeDisappearance = !source.hasDisappeared
+            XCTAssertFalse(source.hasDisappeared, "The release must precede onDisappear, not merely follow the completed pop")
+            released.fulfill()
+        }
+        defer { observation.cancel() }
         navigation.popViewController(animated: true)
+        // UIKit can start the transition on the next run-loop turn. Observe the
+        // actual ownership event, while still requiring it before disappearance.
+        await fulfillment(of: [released], timeout: 2.5)
         XCTAssertFalse(app.isTabChromeHidden, "A real pop must release before its completion callback")
-        XCTAssertFalse(source.hasDisappeared, "This assertion must run before onDisappear, not after waiting for it")
+        XCTAssertTrue(releasedBeforeDisappearance)
         for _ in 0..<50 {
             if source.hasDisappeared { break }
             try await Task.sleep(nanoseconds: 50_000_000)
