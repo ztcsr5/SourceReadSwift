@@ -30,6 +30,7 @@ struct LabIntroView: View {
                     if step == 5 { ReferenceStatistics(isAnimated: animates, sampledTime: sampledTime).transition(.opacity) }
                 }
                 .frame(width: proxy.size.width, height: proxy.size.height * 0.77)
+                .offset(y: proxy.size.height * 0.05)
                 .frame(maxHeight: .infinity, alignment: .top).clipped()
 
                 LinearGradient(stops: [.init(color: .clear, location: 0), .init(color: LabPalette.paper.opacity(0.96), location: 0.26), .init(color: LabPalette.paper, location: 1)], startPoint: .top, endPoint: .bottom)
@@ -61,14 +62,14 @@ struct LabIntroView: View {
                     Text(step == 5 ? "引导统计为示例，不是你的观看记录" : "影片信息来源 TheMovieDB · 私人视频对照测试")
                         .font(.system(size: 7)).foregroundStyle(.gray.opacity(0.65))
                 }
-                .padding(.horizontal, 20).padding(.bottom, max(proxy.safeAreaInsets.bottom, 24) + 14)
+                .padding(.horizontal, 20).padding(.bottom, max(proxy.safeAreaInsets.bottom, 24))
                 VStack {
                     HStack { Spacer(); Button("跳过", action: onFinish).font(.system(size: 12)).foregroundStyle(.black.opacity(0.45)).frame(width: 44, height: 44).accessibilityIdentifier("intro.skip") }
                     Spacer()
                 }.padding(.top, max(proxy.safeAreaInsets.top, 20)).padding(.trailing, 12)
             }
         }
-        .foregroundStyle(.black).ignoresSafeArea()
+        .foregroundStyle(.black).ignoresSafeArea().preferredColorScheme(.light)
         .animation(animates ? .spring(response: 0.65, dampingFraction: 0.9) : nil, value: step)
         .task(id: "\(step)-\(animates)") {
             isReady = sampledTime != nil || !animates

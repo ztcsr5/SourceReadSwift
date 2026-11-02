@@ -420,6 +420,24 @@
       "entry": "Payload/Rex.app/RexDesign_RexDesign.bundle/showcase-art-yFhCKKqzZGXyxQVEtT5s8mBYVJu.png",
       "bytes": 14425,
       "sha256": "cca7be231c6cd4e36fad516f909501394c9cec4d50b1b3c09007cf1508a28b71"
+    },
+    {
+      "asset": "Ref1160164",
+      "entry": "Payload/Rex.app/RexDesign_RexDesign.bundle/showcase-movie-1160164.jpg",
+      "bytes": 43623,
+      "sha256": "22ac4d0b422c1fc39da712078e500154ce4623d30e0e22f82e995cc4945c663e"
+    },
+    {
+      "asset": "RefBack1160164",
+      "entry": "Payload/Rex.app/RexDesign_RexDesign.bundle/showcase-art-wVJG3u5Ru9tInxYiTCrJr4MpJ7Z.jpg",
+      "bytes": 76639,
+      "sha256": "4285189e5125c5505b878c137eda6edef53a48615d19ce9cca33ef4e894cae66"
+    },
+    {
+      "asset": "RefTitle1160164",
+      "entry": "Payload/Rex.app/RexDesign_RexDesign.bundle/showcase-art-6EAJXix5dS4cW0r5xx3XgmyKFiD.png",
+      "bytes": 65038,
+      "sha256": "df9a5ed5a599ebbca8b386761486a33f32490ca3745c932616bd4dfba6778457"
     }
   ]
 }

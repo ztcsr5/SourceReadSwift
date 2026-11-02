@@ -22,8 +22,8 @@ final class LabMotionTests: XCTestCase {
     }
 
     @MainActor func testReferenceCatalogArtworkAndSavedMoviesSurviveReopening() throws {
-        XCTAssertEqual(ReferenceMedia.samples.count, 23)
-        XCTAssertEqual(Set(ReferenceMedia.samples.map(\.id)).count, 23)
+        XCTAssertEqual(ReferenceMedia.samples.count, 24)
+        XCTAssertEqual(Set(ReferenceMedia.samples.map(\.id)).count, 24)
         XCTAssertEqual(ReferenceMedia.item(82728).title, "布鲁伊")
         for item in ReferenceMedia.samples {
             XCTAssertNotNil(UIImage(named: item.poster)); XCTAssertNotNil(UIImage(named: item.backdrop))

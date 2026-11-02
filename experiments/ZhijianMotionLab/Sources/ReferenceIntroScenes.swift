@@ -6,7 +6,7 @@ struct ReferencePosterField: View {
     let isAnimated: Bool
     var sampledTime: Double?
     @State private var origin = Date()
-    private let ids = [157336, 82728, 496243, 508943, 87739, 560057, 475557, 603, 240, 60573, 12971, 823219, 10997, 10376, 110356]
+    private let ids = [157336, 82728, 496243, 508943, 87739, 560057, 475557, 603, 240, 60573, 12971, 823219, 10997, 10376, 110356, 71712, 1160164]
 
     var body: some View {
         GeometryReader { proxy in
@@ -32,7 +32,7 @@ struct ReferencePosterField: View {
                     if step == 0 {
                         ReferenceMark().fill(.black).frame(width: width * 0.24, height: width * 0.24)
                             .position(x: width * 0.50, y: proxy.size.height * 0.49)
-                            .transition(.opacity.combined(with: .scale))
+                            .transition(.opacity.combined(with: .scale)).zIndex(10)
                     }
                     if step == 1 {
                         previewModules(width: width)
@@ -65,9 +65,9 @@ struct ReferencePosterField: View {
             let y = firstRow ? width * 0.255 : width * 0.65 + CGFloat(row - 1) * width * 0.31
             return Pose(x: x, y: y - scroll, width: cover, scale: 1, blur: 0, opacity: 1)
         }
-        let columns: [CGFloat] = [0.72, 0.20, 0.42, 0.90, 0.54, 0.12, 0.83, 0.69, 0.32, 0.88, 0.07, 0.09, 0.54, 0.24, 0.62]
-        let rows: [CGFloat] = [0.65, 0.35, 0.12, 0.24, 0.16, 0.68, 0.40, 0.82, 0.79, 0.73, 0.22, 0.44, 0.86, 0.58, 0.49]
-        let back = index % 3 == 1
+        let columns: [CGFloat] = [0.72, 0.48, 0.44, 0.20, 0.03, 0.66, 0.99, 0.01, 0.98, 0.78, 0.99, 0.12, 0.56, 0.03, 0.34, 0.66, 0.95]
+        let rows: [CGFloat] = [0.65, 0.76, 0.28, 0.48, 0.69, 0.48, 0.70, 0.36, 0.73, 0.19, 0.40, 0.27, 0.23, 0.69, 0.82, 0.87, 0.42]
+        let back = [1, 2, 4, 5, 7, 9, 10, 13, 15].contains(index)
         let drift = sin(time * 0.30 + Double(index) * 0.72) * Double(size.height * 0.045)
         return Pose(x: columns[index] * width + CGFloat(cos(time * 0.12 + Double(index)) * 3),
                     y: rows[index] * size.height + CGFloat(drift), width: width * 0.18,

@@ -1,7 +1,7 @@
 # Artwork provenance · video-reference revision
 
 - 用户于 2026-11-02 明确否决生成海报及自由创作方向。`CoverTide` 已从 app 资源删除，原图只在 Codex 生成图片历史保留，不再打包或展示。
-- 当前界面图片来自用户提供 `D:/QQ游戏/Rex.1.0.2(b4).ipa` 中的 `RexDesign_RexDesign.bundle`：23 部影片的海报、背景与标题图，共 69 个未经改动的图片文件。原路径、字节数、SHA256 及 TMDB attribution 见 `REFERENCE-ASSETS.json`。
+- 当前界面图片来自用户提供 `D:/QQ游戏/Rex.1.0.2(b4).ipa` 中的 `RexDesign_RexDesign.bundle`：24 部影片的海报、背景与标题图，共 72 个未经改动的图片文件。原路径、字节数、SHA256 及 TMDB attribution 见 `REFERENCE-ASSETS.json`。
 - 只用于用户明确授权的私人静态 UI 研究/视频对照。本地使用与正式发布的素材许可不是同一件事；这些参考图片不随正式纸间发布。
 - 没有复制主程序、私有 Swift 代码、shader、字体、签名、补丁、账号或播放器。所有界面和动画用 SwiftUI 重新编写。
 - 原先用户提供 MotionLab 的六张演示封面及图标仍在仓库，既有试读组件保留；不出现在当前对照版的首页及引导。
