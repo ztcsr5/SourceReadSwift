@@ -4,6 +4,7 @@ struct AppearanceSettingsView: View {
     @AppStorage("settings.themeMode") private var themeModeRawValue = ThemeMode.system.rawValue
     @AppStorage("settings.visualTheme") private var visualTheme = AppVisualTheme.classic.rawValue
     @AppStorage("settings.appearanceRevision") private var appearanceRevision = 0
+    @AppStorage("settings.reducesMotion") private var reducesMotion = false
 
     var body: some View {
         Form {
@@ -22,6 +23,12 @@ struct AppearanceSettingsView: View {
                      ? "当前系统支持原生玻璃：原初主题使用系统玻璃，其它主题保留各自纸面。减少透明度或增强对比度时自动使用不透明卡片。"
                      : "当前系统使用兼容材质，不模拟更高系统版本；减少透明度或增强对比度时自动使用不透明卡片。")
             }
+            .listRowBackground(AppThemeRowSurface())
+            Section {
+                Toggle("减少 App 动态效果", isOn: $reducesMotion)
+                Text("同时尊重系统的“减弱动态效果”。关闭空间缩放和弹性反馈，不改变阅读进度或系统返回手势。")
+                    .font(.caption).foregroundStyle(.secondary)
+            } header: { Text("统一动效") }
             .listRowBackground(AppThemeRowSurface())
             Section("显示模式") {
                 Picker("明暗", selection: $themeModeRawValue) {
@@ -78,6 +85,7 @@ struct AppThemePreview: View {
             .frame(width: 56, height: 56)
             .background(theme.dynamicColor(light: theme.backgroundHex, dark: theme.darkBackgroundHex),
                         in: RoundedRectangle(cornerRadius: min(theme.radius, 14)))
+            .overlay { AppThemeOrnament(theme: theme, isCard: true) }
             VStack(alignment: .leading, spacing: 4) {
                 Text(theme.title).font(.system(.subheadline, design: theme.fontDesign).weight(.semibold))
                 Text(theme.detail).font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)

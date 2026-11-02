@@ -89,7 +89,10 @@ private struct PageBackgroundModifier: ViewModifier {
             .scrollContentBackground(.hidden)
             .font(.system(.body, design: AppVisualTheme.current.fontDesign))
             .tint(AppTheme.accent)
-            .background(AppTheme.background.ignoresSafeArea())
+            .background {
+                AppTheme.background.ignoresSafeArea()
+                    .overlay { AppThemeOrnament(theme: AppVisualTheme.current).ignoresSafeArea() }
+            }
     }
 }
 

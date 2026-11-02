@@ -65,12 +65,14 @@ struct AppThemeSurface: ViewModifier {
             if style == .legacyMaterial { shape.fill(material) }
             else { shape.fill(AppTheme.card) }
         }
+        .overlay { AppThemeOrnament(theme: theme, isCard: true) }
         .overlay {
             RoundedRectangle(cornerRadius: radius, style: .continuous)
                 .stroke(Color.primary.opacity(contrast == .increased ? max(strokeOpacity, 0.35) : strokeOpacity),
                         lineWidth: theme.borderWidth)
                 .allowsHitTesting(false)
         }
-        .shadow(color: .black.opacity(shadowOpacity), radius: 6, x: 0, y: 3)
+        .clipShape(AppThemeCardShape(theme: theme, radius: radius), style: FillStyle(eoFill: true))
+        .shadow(color: .black.opacity(theme == .inkwash || theme == .blueprint ? 0 : shadowOpacity), radius: 6, x: 0, y: 3)
     }
 }
