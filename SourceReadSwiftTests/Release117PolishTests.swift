@@ -25,7 +25,7 @@ final class Release117PolishTests: XCTestCase {
                 bytesPerRow: width * 4, space: CGColorSpaceCreateDeviceRGB(),
                 bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) else { return false }
             context.translateBy(x: 0, y: CGFloat(height)); context.scaleBy(x: 1, y: -1)
-            context.draw(image, in: CGRect(x: 0, y: 0, width: width, height: height))
+            context.draw(image, in: CGRect(x: 0, y: 0, width: CGFloat(width), height: CGFloat(height)))
             return true
         }
         XCTAssertTrue(rendered)
