@@ -3963,7 +3963,7 @@ struct ReaderView: View {
 
                     ScrollView(showsIndicators: false) {
                         VStack(alignment: .leading, spacing: 14) {
-                            settingsPage
+                            settingsPage(for: settingsTab)
                         }
                         .padding(.horizontal)
                         .padding(.bottom, 22)
@@ -4007,8 +4007,9 @@ struct ReaderView: View {
         }
     }
 
-    @ViewBuilder private var settingsPage: some View {
-        switch settingsTab {
+    /// Builds the real settings page behind a bounded, deferred view boundary.
+    @ViewBuilder func settingsPage(for tab: Int) -> some View {
+        switch tab {
         case 0:
             appearanceSettings
         case 1:
@@ -4028,7 +4029,7 @@ struct ReaderView: View {
             "appearance": byteCount { appearanceSettings },
             "layout": byteCount { layoutSettings },
             "advanced": byteCount { advancedSettings },
-            "selection": byteCount { settingsPage }
+            "selection": byteCount { settingsPage(for: 0) }
         ]
     }
 
@@ -4096,7 +4097,11 @@ struct ReaderView: View {
         .buttonStyle(.plain)
     }
 
-    private var appearanceSettings: some View {
+    private var appearanceSettings: ReaderSettingsContent {
+        ReaderSettingsContent { appearanceSettingsBody }
+    }
+
+    private var appearanceSettingsBody: some View {
         Group {
             appearancePreview
             readerModeSection
@@ -4423,7 +4428,11 @@ struct ReaderView: View {
         .accessibilityIdentifier("reader.speechErrorBanner")
     }
 
-    private var layoutSettings: some View {
+    private var layoutSettings: ReaderSettingsContent {
+        ReaderSettingsContent { layoutSettingsBody }
+    }
+
+    private var layoutSettingsBody: some View {
         VStack(alignment: .leading, spacing: 14) {
             appearancePreview
 
@@ -4631,7 +4640,11 @@ struct ReaderView: View {
         schedulePagedBlocksCacheRebuild()
     }
 
-    private var advancedSettings: some View {
+    private var advancedSettings: ReaderSettingsContent {
+        ReaderSettingsContent { advancedSettingsBody }
+    }
+
+    private var advancedSettingsBody: some View {
         VStack(alignment: .leading, spacing: 14) {
             Text("高级里只放阅读辅助，不再重复前面的翻页和字号入口。朗读速度只管语速，自动滚动在主阅读菜单。")
                 .font(.caption)
@@ -4702,97 +4715,99 @@ struct ReaderView: View {
         unit: String,
         help: String
     ) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack(alignment: .center, spacing: 8) {
-                Text(title)
-                    .font(.subheadline.weight(.bold))
-                    .foregroundStyle(readerThemeTextColor)
-                    // 标题独占左侧剩余宽度，右侧固定给精确输入框；
-                    // 「行距（行高间距）」不再被数值胶囊挤成两行。
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.75)
-                    .layoutPriority(1)
+        ReaderSettingsContent {
+            VStack(alignment: .leading, spacing: 8) {
+                HStack(alignment: .center, spacing: 8) {
+                    Text(title)
+                        .font(.subheadline.weight(.bold))
+                        .foregroundStyle(readerThemeTextColor)
+                        // 标题独占左侧剩余宽度，右侧固定给精确输入框；
+                        // 「行距（行高间距）」不再被数值胶囊挤成两行。
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.75)
+                        .layoutPriority(1)
 
-                Spacer(minLength: 6)
+                    Spacer(minLength: 6)
 
-                ReaderNumberInput(
-                    title: title,
-                    value: value,
-                    range: range,
-                    step: step,
-                    unit: unit
-                )
-            }
-
-            HStack(spacing: 8) {
-                Text("\(ReaderValueNormalizer.formatted(value.wrappedValue, step: step)) \(unit)")
-                    .font(.caption.weight(.bold))
-                    .foregroundStyle(AppTheme.accent)
-                    .lineLimit(1)
-                    .fixedSize()
-                    .padding(.horizontal, 7)
-                    .padding(.vertical, 3)
-                    .background(AppTheme.accent.opacity(0.12), in: Capsule())
-
-                Spacer(minLength: 0)
-
-                Text("范围 \(ReaderValueNormalizer.formatted(range.lowerBound, step: step)) ~ \(ReaderValueNormalizer.formatted(range.upperBound, step: step))")
-                    .font(.caption2)
-                    .foregroundStyle(readerThemeTextColor.opacity(0.42))
-                    .lineLimit(1)
-            }
-
-            // 醒目的功能说明卡片，让用户清楚知道每一项调整的是什么，告别盲测
-            HStack(alignment: .top, spacing: 6) {
-                Image(systemName: "info.circle.fill")
-                    .font(.caption2)
-                    .foregroundStyle(AppTheme.accent.opacity(0.85))
-                    .padding(.top, 1)
-
-                Text(help)
-                    .font(.caption)
-                    .foregroundStyle(readerThemeTextColor.opacity(0.62))
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-            .padding(.horizontal, 10)
-            .padding(.vertical, 6)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(readerThemeTextColor.opacity(0.04), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
-
-            HStack(spacing: 12) {
-                Button {
-                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                    value.wrappedValue = max(range.lowerBound, (value.wrappedValue - step))
-                } label: {
-                    Image(systemName: "minus.circle.fill")
-                        .font(.system(size: 22))
-                        .foregroundStyle(value.wrappedValue <= range.lowerBound ? readerThemeTextColor.opacity(0.25) : AppTheme.accent)
+                    ReaderNumberInput(
+                        title: title,
+                        value: value,
+                        range: range,
+                        step: step,
+                        unit: unit
+                    )
                 }
-                .disabled(value.wrappedValue <= range.lowerBound)
-                .buttonStyle(.plain)
 
-                Slider(value: value, in: range, step: step)
+                HStack(spacing: 8) {
+                    Text("\(ReaderValueNormalizer.formatted(value.wrappedValue, step: step)) \(unit)")
+                        .font(.caption.weight(.bold))
+                        .foregroundStyle(AppTheme.accent)
+                        .lineLimit(1)
+                        .fixedSize()
+                        .padding(.horizontal, 7)
+                        .padding(.vertical, 3)
+                        .background(AppTheme.accent.opacity(0.12), in: Capsule())
 
-                Button {
-                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                    value.wrappedValue = min(range.upperBound, (value.wrappedValue + step))
-                } label: {
-                    Image(systemName: "plus.circle.fill")
-                        .font(.system(size: 22))
-                        .foregroundStyle(value.wrappedValue >= range.upperBound ? readerThemeTextColor.opacity(0.25) : AppTheme.accent)
+                    Spacer(minLength: 0)
+
+                    Text("范围 \(ReaderValueNormalizer.formatted(range.lowerBound, step: step)) ~ \(ReaderValueNormalizer.formatted(range.upperBound, step: step))")
+                        .font(.caption2)
+                        .foregroundStyle(readerThemeTextColor.opacity(0.42))
+                        .lineLimit(1)
                 }
-                .disabled(value.wrappedValue >= range.upperBound)
-                .buttonStyle(.plain)
-            }
 
+                // 醒目的功能说明卡片，让用户清楚知道每一项调整的是什么，告别盲测
+                HStack(alignment: .top, spacing: 6) {
+                    Image(systemName: "info.circle.fill")
+                        .font(.caption2)
+                        .foregroundStyle(AppTheme.accent.opacity(0.85))
+                        .padding(.top, 1)
+
+                    Text(help)
+                        .font(.caption)
+                        .foregroundStyle(readerThemeTextColor.opacity(0.62))
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                .padding(.horizontal, 10)
+                .padding(.vertical, 6)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(readerThemeTextColor.opacity(0.04), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+
+                HStack(spacing: 12) {
+                    Button {
+                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                        value.wrappedValue = max(range.lowerBound, (value.wrappedValue - step))
+                    } label: {
+                        Image(systemName: "minus.circle.fill")
+                            .font(.system(size: 22))
+                            .foregroundStyle(value.wrappedValue <= range.lowerBound ? readerThemeTextColor.opacity(0.25) : AppTheme.accent)
+                    }
+                    .disabled(value.wrappedValue <= range.lowerBound)
+                    .buttonStyle(.plain)
+
+                    Slider(value: value, in: range, step: step)
+
+                    Button {
+                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                        value.wrappedValue = min(range.upperBound, (value.wrappedValue + step))
+                    } label: {
+                        Image(systemName: "plus.circle.fill")
+                            .font(.system(size: 22))
+                            .foregroundStyle(value.wrappedValue >= range.upperBound ? readerThemeTextColor.opacity(0.25) : AppTheme.accent)
+                    }
+                    .disabled(value.wrappedValue >= range.upperBound)
+                    .buttonStyle(.plain)
+                }
+
+            }
+            .padding(12)
+            .background(readerThemeTextColor.opacity(0.055), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .stroke(readerThemeTextColor.opacity(0.06), lineWidth: 0.8)
+            }
+            .padding(.vertical, 2)
         }
-        .padding(12)
-        .background(readerThemeTextColor.opacity(0.055), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .stroke(readerThemeTextColor.opacity(0.06), lineWidth: 0.8)
-        }
-        .padding(.vertical, 2)
     }
 
     private var tapZoneSettings: some View {

@@ -37,6 +37,7 @@ jobs:
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGN_IDENTITY="" \
+            DEBUG_INFORMATION_FORMAT=dwarf-with-dsym \
             build 2>&1 | tee xcodebuild-package.log
 
       - name: Summarize package failure
@@ -61,6 +62,12 @@ jobs:
           rm -rf unsigned-ipa
           mkdir -p unsigned-ipa/Payload
           cp -R "$APP_PATH" unsigned-ipa/Payload/
+          DSYM_PATH="${APP_PATH}.dSYM"
+          if [ ! -d "$DSYM_PATH" ]; then
+            echo "::error::Matching device dSYM not found beside the built app"
+            exit 1
+          fi
+          ditto -c -k --keepParent "$DSYM_PATH" SourceReadSwift-device-symbols.zip
           VERSION="$(grep 'MARKETING_VERSION:' project.yml | awk '{print $2}' | tr -d '\"')"
           echo "Packaging version: ${VERSION}"
           ditto -c -k --keepParent unsigned-ipa/Payload "SourceReadSwift-${VERSION}-unsigned.ipa"
@@ -97,3 +104,11 @@ jobs:
           name: SourceReadSwift-unsigned-ipa
           path: SourceReadSwift-*.ipa
           if-no-files-found: error
+
+      - name: Preserve matching device symbols
+        uses: actions/upload-artifact@v4
+        with:
+          name: SourceReadSwift-device-symbols-${{ github.sha }}
+          path: SourceReadSwift-device-symbols.zip
+          if-no-files-found: error
+          retention-days: 30
