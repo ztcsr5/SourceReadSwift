@@ -99,7 +99,14 @@ final class FloatingReadingDeskUITests: XCTestCase {
         cover.tap()
         XCTAssertTrue(detail.waitForExistence(timeout: 5))
         app.navigationBars.buttons.element(boundBy: 0).tap()
+        // iOS 18 may return from tap() while the native zoom is still hiding
+        // its source. Wait for the end condition, never a fixed sleep.
+        let restored = XCTNSPredicateExpectation(predicate: NSPredicate(format: "hittable == YES"), object: cover)
+        XCTAssertEqual(XCTWaiter.wait(for: [restored], timeout: 5), .completed)
         XCTAssertTrue(cover.isHittable)
+        XCTAssertFalse(detail.isHittable)
+        XCTAssertEqual(cover.frame.midX, origin.midX, accuracy: 3)
+        XCTAssertEqual(cover.frame.midY, origin.midY, accuracy: 8)
     }
 
     func testOtherThemesAndIndependentOldStyleSwitch() throws {
