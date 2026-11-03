@@ -1360,7 +1360,26 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
             chapter: chapter,
             response: response,
             globalPurifyRules: globalPurifyRules
-        )
+        ).map { stripKnownSitePromotion(from: $0, responseURL: response.url) }
+    }
+
+    /// The observed Yanmo footer is a standalone, host-specific signature.
+    /// Do not match other sites, prose containing a URL, or bare author notes.
+    private func stripKnownSitePromotion(from content: ChapterContent, responseURL: URL) -> ChapterContent {
+        guard let host = responseURL.host?.lowercased(),
+              host == "ymxshuwu.com" || host == "www.ymxshuwu.com" else { return content }
+        let filtered = content.paragraphs.filter { paragraph in
+            guard paragraph.count <= 180, paragraph.contains("ymxshuwu.com"),
+                  paragraph.contains("全网最快") else { return true }
+            let compact = String(paragraph.filter { !$0.isWhitespace })
+            return compact.range(
+                of: #"^喜欢[^：:「」“”]{1,48}请大家收藏[：:]?[（(]www\.ymxshuwu\.com[)）][^「」“”]{0,48}衍墨轩书屋更新速度全网最快[。！!]?$"#,
+                options: .regularExpression
+            ) == nil
+        }
+        guard !filtered.isEmpty, filtered.count != content.paragraphs.count else { return content }
+        return ChapterContent(chapter: content.chapter, title: content.title, paragraphs: filtered,
+            nextContentUrl: content.nextContentUrl, imageStyle: content.imageStyle, payAction: content.payAction)
     }
 
     private func parseChapterListPage(
@@ -1818,7 +1837,7 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
                     executionContext: executionContext
                 ) {
                 case .success(let nextPage):
-                    appendUniqueParagraphs(nextPage.paragraphs, to: &paragraphs)
+                    appendContentContinuation(nextPage.paragraphs, to: &paragraphs)
                     nextURLText = nextPage.nextContentUrl?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty
                     finalNextURL = nextURLText
                     pagesLoaded += 1
@@ -1860,23 +1879,29 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
         ))
     }
 
-    /// Paginated sources often repeat the last paragraph of page N at the top
-    /// of page N+1 to make the split look seamless. Blind concatenation showed
-    /// that paragraph twice in the reader.
-    private func appendUniqueParagraphs(_ incoming: [String], to existing: inout [String]) {
-        for paragraph in incoming {
-            let trimmed = paragraph.trimmingCharacters(in: .whitespacesAndNewlines)
-            guard !trimmed.isEmpty else { continue }
-            if existing.last?.trimmingCharacters(in: .whitespacesAndNewlines) == trimmed {
-                continue
+    /// Join only a matching suffix/prefix. Refrains and repeated dialogue
+    /// inside either page are part of the chapter, not pagination overlap.
+    private func appendContentContinuation(_ incoming: [String], to existing: inout [String]) {
+        let next = incoming.filter { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+        let markers: Set<String> = ["（本章未完，请翻页）", "(本章未完,请翻页)"]
+        let trimsMarker = existing.count > 1 && existing.last.map {
+            markers.contains($0.trimmingCharacters(in: .whitespacesAndNewlines))
+        } == true
+        let preceding = trimsMarker ? existing.dropLast() : existing[...]
+        // Keep the existing three-paragraph overlap window, but match it as a
+        // contiguous sequence across the join, not anywhere in the new page.
+        let maxOverlap = min(3, min(preceding.count, next.count))
+        let overlap = stride(from: maxOverlap, through: 1, by: -1).first { count in
+            zip(preceding.suffix(count), next.prefix(count)).allSatisfy { pair in
+                pair.0.trimmingCharacters(in: .whitespacesAndNewlines) ==
+                    pair.1.trimmingCharacters(in: .whitespacesAndNewlines)
             }
-            if existing.suffix(3).contains(where: {
-                $0.trimmingCharacters(in: .whitespacesAndNewlines) == trimmed
-            }) {
-                continue
-            }
-            existing.append(paragraph)
-        }
+        } ?? 0
+        // An empty/repeated response does not prove that the unfinished
+        // chapter was continued. Preserve the marker in that case.
+        guard next.count > overlap else { return }
+        if trimsMarker { existing.removeLast() }
+        existing.append(contentsOf: next.dropFirst(overlap))
     }
 
     private func chapterURLIdentity(_ value: String, identity: SourcePaginationURLIdentity) -> String {

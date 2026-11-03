@@ -135,6 +135,55 @@ final class SourceEngineStage18FixtureTests: XCTestCase {
         XCTAssertEqual(stop.details["pagesLoaded"], "2")
     }
 
+    func testContentPaginationOnlyDeduplicatesAtThePageBoundary() async throws {
+        let source = paginationSource(contentRule: "#content@html")
+        let first = "https://fixture.local/content/1"
+        let second = "https://fixture.local/content/2"
+        let network = Stage18FixtureNetwork(responses: [
+            first: html("<div id='content'><p>正文起始</p><p>横跨网页的重叠段落</p><p>（本章未完，请翻页）</p></div><a class='next' href='/content/2'>next</a>"),
+            second: html("<div id='content'><p>横跨网页的重叠段落</p><p>他说：再等一等。</p><p>他说：再等一等。</p><p>她低声说：“本章未完，请翻页。”</p></div>")
+        ])
+        let engine = LegadoSourceEngine(network: network)
+        let chapter = BookChapter(title: "Chapter", url: first, bookUrl: "https://fixture.local/book", index: 0, isVip: false)
+
+        let content = try await engine.getContent(source: source, chapter: chapter).get()
+        XCTAssertEqual(content.paragraphs, ["正文起始", "横跨网页的重叠段落", "他说：再等一等。", "他说：再等一等。", "她低声说：“本章未完，请翻页。”"])
+        XCTAssertNil(content.nextContentUrl)
+        XCTAssertEqual(network.requestedURLs, [first, second])
+    }
+
+    func testUnfulfilledContentPaginationKeepsItsUnfinishedMarker() async throws {
+        let source = paginationSource(contentRule: "#content@html")
+        let first = "https://fixture.local/content/1"
+        let second = "https://fixture.local/content/2"
+        let network = Stage18FixtureNetwork(responses: [
+            first: html("<div id='content'><p>目前只抓到这一段</p><p>（本章未完，请翻页）</p></div><a class='next' href='/content/2'>next</a>")
+        ])
+        let engine = LegadoSourceEngine(network: network)
+        let chapter = BookChapter(title: "Chapter", url: first, bookUrl: "https://fixture.local/book", index: 0, isVip: false)
+
+        let content = try await engine.getContent(source: source, chapter: chapter).get()
+        XCTAssertEqual(content.paragraphs, ["目前只抓到这一段", "（本章未完，请翻页）"])
+        XCTAssertEqual(content.nextContentUrl, second)
+    }
+
+    func testSourcePromotionMatchesOnlyObservedStandaloneSignatureAndHost() async throws {
+        let footer = "喜 欢 剑 来 请 大 家 收 藏：(www.ymxshuwu.com)剑来衍墨轩书屋更新速度全网最快。"
+        let dialogue = "她指着纸条说：“喜欢剑来请大家收藏。”"
+        let chapterHTML = html("<div id='content'><p>正文段落</p><p>\(footer)</p><p>\(dialogue)</p></div>")
+        let source = paginationSource(contentRule: "#content@html")
+        let hosts = ["www.ymxshuwu.com", "fixture.local"]
+        for host in hosts {
+            let url = "https://\(host)/content/1"
+            let network = Stage18FixtureNetwork(responses: [url: chapterHTML])
+            let engine = LegadoSourceEngine(network: network)
+            let chapter = BookChapter(title: "Chapter", url: url, bookUrl: url, index: 0, isVip: false)
+            let content = try await engine.getContent(source: source, chapter: chapter).get()
+            let expected = host == hosts[0] ? ["正文段落", dialogue] : ["正文段落", footer, dialogue]
+            XCTAssertEqual(content.paragraphs, expected)
+        }
+    }
+
     func testContentPaginationFollowsNinePages() async throws {
         let source = paginationSource()
         var responses: [String: Stage18FixtureNetwork.Payload] = [:]
@@ -158,12 +207,12 @@ final class SourceEngineStage18FixtureTests: XCTestCase {
         XCTAssertTrue(network.requestedURLs.contains("https://fixture.local/content/9"))
     }
 
-    private func paginationSource() -> BookSource {
+    private func paginationSource(contentRule: String = "#content@text") -> BookSource {
         BookSource(
             bookSourceName: "Stage18 pagination",
             bookSourceUrl: "https://fixture.local",
             ruleToc: SourceRule(fields: ["chapterList": ".chapter", "chapterName": "a@text", "chapterUrl": "a@href", "nextTocUrl": "a.next@href"]),
-            ruleContent: SourceRule(fields: ["content": "#content@text", "nextContentUrl": "a.next@href"])
+            ruleContent: SourceRule(fields: ["content": contentRule, "nextContentUrl": "a.next@href"])
         )
     }
 
