@@ -10,25 +10,31 @@ final class FloatingReadingDeskUITests: XCTestCase {
 
     override func tearDownWithError() throws { app.terminate() }
 
-    func testWhiteVioletPagingDetailsReaderAndReturnInTheRealApp() {
-        launch(theme: "classic")
+    func testWhiteVioletPagingAndCancelledDragInTheRealApp() throws {
+        try launch(theme: "classic")
         capture("01-pearl-violet-home")
-        XCTAssertTrue(app.staticTexts["最近阅读 · 1 / 3"].waitForExistence(timeout: 3))
+        assertCurrentBook("剑来")
+        XCTAssertFalse(app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH %@", "最近阅读 · ")).firstMatch.exists)
         let pager = element("bookshelf.readingPager")
         XCTAssertTrue(pager.isHittable)
         let start = pager.coordinate(withNormalizedOffset: CGVector(dx: 0.76, dy: 0.5))
         let shortDrag = pager.coordinate(withNormalizedOffset: CGVector(dx: 0.60, dy: 0.5))
         start.press(forDuration: 0.05, thenDragTo: shortDrag, withVelocity: .slow, thenHoldForDuration: 0.3)
-        XCTAssertTrue(app.staticTexts["最近阅读 · 1 / 3"].waitForExistence(timeout: 3), "A cancelled short drag must keep the same book")
+        assertCurrentBook("剑来")
         capture("01b-short-drag-cancelled")
         pager.swipeLeft()
-        XCTAssertTrue(app.staticTexts["最近阅读 · 2 / 3"].waitForExistence(timeout: 3))
+        assertCurrentBook("月亮与六便士")
         capture("02-plain-cover")
         pager.swipeLeft()
-        XCTAssertTrue(app.staticTexts["最近阅读 · 3 / 3"].waitForExistence(timeout: 3))
+        assertCurrentBook("白昼之后")
         capture("03-missing-cover-long-title")
         pager.swipeRight(); pager.swipeRight()
-        XCTAssertTrue(app.staticTexts["最近阅读 · 1 / 3"].waitForExistence(timeout: 3))
+        assertCurrentBook("剑来")
+    }
+
+    func testReadingDeskDetailsAndReturnInTheRealApp() throws {
+        try launch(theme: "classic")
+        let pager = element("bookshelf.readingPager")
         app.buttons["正在阅读书籍的更多操作"].firstMatch.tap()
         app.buttons["书籍详情"].firstMatch.tap()
         XCTAssertFalse(pager.isHittable)
@@ -36,7 +42,13 @@ final class FloatingReadingDeskUITests: XCTestCase {
         app.navigationBars.buttons.element(boundBy: 0).tap()
         XCTAssertTrue(pager.waitForExistence(timeout: 3))
         capture("05-return-to-desk")
-        let entry = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "bookshelf.continue.")).firstMatch
+        assertCurrentBook("剑来")
+    }
+
+    func testReadingDeskReaderAndReturnInTheRealApp() throws {
+        try launch(theme: "classic")
+        let pager = element("bookshelf.readingPager")
+        let entry = assertCurrentBook("剑来")
         XCTAssertTrue(entry.isHittable); entry.tap()
         let returnButton = element("reader.returnToShelf")
         if !returnButton.isHittable { app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.42)).tap() }
@@ -48,8 +60,8 @@ final class FloatingReadingDeskUITests: XCTestCase {
         capture("06-reader-return-root")
     }
 
-    func testOtherThemesAndIndependentOldStyleSwitch() {
-        launch(theme: "botanical")
+    func testOtherThemesAndIndependentOldStyleSwitch() throws {
+        try launch(theme: "botanical")
         capture("07-botanical-home")
         app.buttons["正在阅读书籍的更多操作"].firstMatch.tap()
         element("bookshelf.floatingDeskToggle").tap()
@@ -60,23 +72,23 @@ final class FloatingReadingDeskUITests: XCTestCase {
         XCTAssertTrue(element("bookshelf.readingPager").waitForExistence(timeout: 3))
         capture("09-restored-floating-desk")
         app.terminate()
-        launch(theme: "classic", mode: "dark")
+        try launch(theme: "classic", mode: "dark")
         capture("10-dark-home")
         app.terminate()
-        launch(theme: "classic", reducesMotion: true)
+        try launch(theme: "classic", reducesMotion: true)
         XCTAssertFalse(element("bookshelf.readingPager").exists)
         app.buttons["下一本最近阅读"].tap()
-        XCTAssertTrue(app.staticTexts["最近阅读 · 2 / 3"].waitForExistence(timeout: 3))
+        assertCurrentBook("月亮与六便士")
         capture("11-reduced-motion-stepper")
     }
 
-    func testSimulatorPagingPerformanceEvidenceNotADeviceFPSClaim() {
-        launch(theme: "classic")
+    func testSimulatorPagingPerformanceEvidenceNotADeviceFPSClaim() throws {
+        try launch(theme: "classic")
         measurePaging("bookshelf.readingPager")
     }
 
-    func testPreviousStyleSimulatorPagingPerformanceBaseline() {
-        launch(theme: "classic")
+    func testPreviousStyleSimulatorPagingPerformanceBaseline() throws {
+        try launch(theme: "classic")
         app.buttons["正在阅读书籍的更多操作"].firstMatch.tap()
         element("bookshelf.floatingDeskToggle").tap()
         measurePaging("bookshelf.legacyReadingPager")
@@ -89,10 +101,14 @@ final class FloatingReadingDeskUITests: XCTestCase {
             let pager = element(identifier)
             pager.swipeLeft(); pager.swipeLeft(); pager.swipeRight(); pager.swipeRight()
         }
-        XCTAssertTrue(app.staticTexts["最近阅读 · 1 / 3"].exists)
+        assertCurrentBook("剑来")
     }
 
-    private func launch(theme: String, mode: String = "light", reducesMotion: Bool = false) {
+    private func launch(theme: String, mode: String = "light", reducesMotion: Bool = false) throws {
+        let reference = try XCTUnwrap(Bundle(for: Self.self).url(forResource: "jianlai-cover", withExtension: "jpg"))
+        let cover = try Data(contentsOf: reference)
+        XCTAssertLessThanOrEqual(cover.count, 128_000)
+        app.launchEnvironment["SOURCEREAD_UI_COVER_JPEG"] = cover.base64EncodedString()
         app.launchArguments = ["--floating-desk-regression", "-settings.visualTheme", theme,
             "-settings.themeMode", mode, "-settings.readingDeskEnabled", "YES",
             "-settings.reducesMotion", reducesMotion ? "YES" : "NO", "-reader.mode", "scroll"]
@@ -101,7 +117,16 @@ final class FloatingReadingDeskUITests: XCTestCase {
     }
 
     private func element(_ identifier: String) -> XCUIElement {
-        app.descendants(matching: .any).matching(identifier: identifier).firstMatch
+        if identifier == "bookshelf.readingPager" { return app.scrollViews[identifier].firstMatch }
+        return app.descendants(matching: .any).matching(identifier: identifier).firstMatch
+    }
+
+    @discardableResult private func assertCurrentBook(_ title: String) -> XCUIElement {
+        let book = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@ AND label CONTAINS %@",
+            "bookshelf.continue.", title)).firstMatch
+        XCTAssertTrue(book.waitForExistence(timeout: 5), "The selected real book must exist")
+        XCTAssertTrue(book.isHittable, "The selected book must be onscreen, not an offscreen page")
+        return book
     }
 
     private func capture(_ name: String) {

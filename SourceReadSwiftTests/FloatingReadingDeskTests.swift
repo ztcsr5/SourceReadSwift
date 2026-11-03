@@ -51,9 +51,25 @@ final class FloatingReadingDeskTests: XCTestCase {
         let accessible = measure(usesFloatingStyle: true, type: .accessibility3)
         XCTAssertEqual(regular.width, 342, accuracy: 1)
         XCTAssertGreaterThanOrEqual(regular.height, 280)
-        XCTAssertLessThanOrEqual(regular.height, 330)
+        XCTAssertLessThanOrEqual(regular.height, 290, "The revised composition must reclaim height, not shrink the bookshelf")
         XCTAssertLessThan(old.height, regular.height, "The independent switch must really preserve the previous compact card")
         XCTAssertGreaterThan(accessible.height, regular.height, "Accessibility text must grow, not get clipped by a fixed card")
+    }
+
+    func testContextUsesPersistedChapterOrRealIntroductionWithoutInventingAtmosphere() {
+        var book = makeBook()
+        book.latestChapterTitle = "最新一章不能冒充阅读位置"
+        XCTAssertEqual(ReadingDeskContent.chapterNumber(for: book), "64")
+        XCTAssertEqual(ReadingDeskContent.contextLine(for: book), "上次读到 · 第六十四章 · 写给下一页的信")
+        book.currentChapterIndex = Int.max
+        XCTAssertEqual(ReadingDeskContent.chapterNumber(for: book), "100")
+        book.currentChapterIndex = Int.min
+        XCTAssertEqual(ReadingDeskContent.chapterNumber(for: book), "1")
+        book.currentChapterTitle = nil; book.intro = "<p>山中有信。&nbsp;\n 书页未尽。</p>"
+        XCTAssertEqual(ReadingDeskContent.contextLine(for: book), "山中有信。 书页未尽。")
+        book.lastReadAt = nil; book.intro = nil
+        XCTAssertNil(ReadingDeskContent.chapterNumber(for: book))
+        XCTAssertEqual(ReadingDeskContent.contextLine(for: book), "从第一页开始")
     }
 
     @MainActor func testMountedThemesLongTitlesAndAccessibilityEvidence() async throws {

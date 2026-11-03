@@ -13,7 +13,8 @@ struct FloatingReadingDesk: View {
     @AppStorage("settings.visualTheme") private var themeRaw = AppVisualTheme.classic.rawValue
     @AppStorage("settings.appearanceRevision") private var appearanceRevision = 0
     @AppMotion private var motion
-    @ScaledMetric(relativeTo: .title3) private var titleRowHeight = 26
+    @ScaledMetric(relativeTo: .title2) private var titleRowHeight: CGFloat = 32
+    @ScaledMetric(relativeTo: .title2) private var titleFontSize: CGFloat = 24
     @State private var conservesEnergy = ProcessInfo.processInfo.isLowPowerModeEnabled || ProcessInfo.processInfo.thermalState.rawValue >= 2
     @State private var coverImage: UIImage?
     @State private var tone: CoverTone?
@@ -30,21 +31,21 @@ struct FloatingReadingDesk: View {
     }
 
     var body: some View {
-        VStack(spacing: 12) {
+        VStack(spacing: 8) {
             GeometryReader { geometry in
-                let width: CGFloat = geometry.size.width < 310 ? 156 : 168
-                let height: CGFloat = geometry.size.width < 310 ? 208 : 224
+                let width: CGFloat = geometry.size.width < 310 ? 140 : 148
+                let height: CGFloat = geometry.size.width < 310 ? 192 : 200
                 ZStack(alignment: .top) {
-                    environment.frame(height: 248)
+                    environment.frame(height: 220)
                         .modifier(FloatingDeskParallax(depth: 3 * palette.finish.parallaxStrength, reducesDepth: policy.reducesDepth))
-                    stage.frame(height: 148).padding(.top, 88)
+                    stage.frame(height: 132).padding(.top, 80)
                         .modifier(FloatingDeskParallax(depth: 7 * palette.finish.parallaxStrength, reducesDepth: policy.reducesDepth))
-                    sideNotes(coverWidth: width).padding(.top, 132)
+                    makeMarginNotes(coverWidth: width).padding(.top, 122)
                         .modifier(FloatingDeskParallax(depth: 30 * palette.finish.parallaxStrength, reducesDepth: policy.reducesDepth))
                     jacket(width: width, height: height).frame(maxWidth: .infinity)
                         .modifier(FloatingDeskParallax(depth: 22 * palette.finish.parallaxStrength, reducesDepth: policy.reducesDepth))
                 }
-            }.frame(height: 240)
+            }.frame(height: 220)
             caption
                 .modifier(FloatingDeskParallax(depth: 34 * palette.finish.parallaxStrength, reducesDepth: policy.reducesDepth))
         }
@@ -84,16 +85,16 @@ struct FloatingReadingDesk: View {
             if contrast != .increased {
                 LinearGradient(colors: [palette.pearl.opacity(0.45), .clear, palette.light.opacity(0.14)],
                     startPoint: .topLeading, endPoint: .bottomTrailing)
-                    .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
+                    .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
                 Ellipse().fill(RadialGradient(colors: [palette.shadow.opacity(scheme == .dark ? 0.28 : 0.13), .clear],
                     center: .center, startRadius: 0, endRadius: 84))
-                    .frame(width: 190, height: 20).offset(y: 59)
+                    .frame(width: 176, height: 18).offset(x: -8, y: 57)
             }
         }.overlay {
             if contrast == .increased {
-                RoundedRectangle(cornerRadius: 24, style: .continuous).strokeBorder(palette.ink.opacity(0.45), lineWidth: 1.5)
+                RoundedRectangle(cornerRadius: 16, style: .continuous).strokeBorder(palette.ink.opacity(0.45), lineWidth: 1.5)
             } else {
-                RoundedRectangle(cornerRadius: 24, style: .continuous)
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
                     .strokeBorder(LinearGradient(colors: [palette.pearl.opacity(0.85), palette.mist.opacity(0.10), palette.pearl.opacity(0.28)],
                         startPoint: .topLeading, endPoint: .bottomTrailing), lineWidth: 0.75)
             }
@@ -103,7 +104,7 @@ struct FloatingReadingDesk: View {
     }
 
     @ViewBuilder private var glassPlane: some View {
-        let shape = RoundedRectangle(cornerRadius: 24, style: .continuous)
+        let shape = RoundedRectangle(cornerRadius: 16, style: .continuous)
         #if compiler(>=6.2)
         if #available(iOS 26.0, *), policy.surface == .liquidGlass {
             shape.fill(.clear).glassEffect(.regular.tint(palette.glassTint.opacity(palette.finish.glassTintOpacity)), in: shape)
@@ -129,7 +130,15 @@ struct FloatingReadingDesk: View {
             }
             .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
             .overlay(RoundedRectangle(cornerRadius: 8).strokeBorder(palette.pearl.opacity(0.35), lineWidth: 0.5))
-            .shadow(color: palette.shadow.opacity(scheme == .dark ? 0.35 : 0.20), radius: 14, x: 6, y: 12)
+            .background(alignment: .trailing) {
+                RoundedRectangle(cornerRadius: 2).fill(palette.pearl)
+                    .frame(width: 6, height: height - 8).offset(x: 3, y: 1)
+            }
+            .shadow(color: palette.shadow.opacity(scheme == .dark ? 0.30 : 0.18), radius: 10, x: 7, y: 10)
+            // A resting pose, not a looping animation. The book stays physical even with Reduce Motion.
+            .rotation3DEffect(.degrees(-8), axis: (x: 0, y: 1, z: 0), perspective: 0.24)
+            .rotationEffect(.degrees(-3.5))
+            .offset(x: -8, y: 6)
             .brightness(isPressed ? 0.045 : 0)
             .animation(motion.animation(.press), value: isPressed)
             .accessibilityHidden(true)
@@ -148,40 +157,54 @@ struct FloatingReadingDesk: View {
         else { image }
     }
 
-    private func sideNotes(coverWidth: CGFloat) -> some View {
+    private func makeMarginNotes(coverWidth: CGFloat) -> some View {
         HStack(alignment: .center, spacing: coverWidth + 24) {
-            VStack(spacing: 6) {
-                Image(systemName: "bookmark").font(.system(size: 16, weight: .light))
-                Text(book.hasUpdates ? "有更新" : "续读").font(.system(size: 12, weight: .medium))
+            VStack(spacing: 2) {
+                if let number = ReadingDeskContent.chapterNumber(for: book) {
+                    Text("第").font(.caption2)
+                    Text(number).font(.caption.monospacedDigit()).lineLimit(1).minimumScaleFactor(0.7)
+                    Text("章").font(.caption2)
+                }
             }.frame(maxWidth: .infinity)
-            Text(ReadingHeroStatus.progress(for: book).replacingOccurrences(of: "章节进度 ", with: ""))
-                .font(.system(size: 16, weight: .medium, design: .rounded)).monospacedDigit()
-                .lineLimit(2).minimumScaleFactor(0.8).frame(maxWidth: .infinity)
-                .accessibilityLabel(ReadingHeroStatus.progress(for: book))
+            VStack(spacing: 4) {
+                Text(ReadingHeroStatus.progress(for: book).replacingOccurrences(of: "章节进度 ", with: ""))
+                    .font(.system(size: 20, weight: .semibold, design: .rounded)).monospacedDigit()
+                    .lineLimit(2).minimumScaleFactor(0.8)
+                if book.lastReadAt != nil, book.totalChapters > 0 { Text("章节进度").font(.caption2) }
+            }.frame(maxWidth: .infinity).accessibilityLabel(ReadingHeroStatus.progress(for: book))
         }.foregroundStyle(palette.ink.opacity(0.72)).padding(.horizontal, 12)
     }
 
     private var caption: some View {
         VStack(alignment: .leading, spacing: 6) {
             if typeSize.isAccessibilitySize {
-                Text(book.title).font(.system(.title3, design: theme.fontDesign).weight(.semibold))
+                Text(book.title).font(titleFont)
                     .fixedSize(horizontal: false, vertical: true)
-                Text(book.author.isEmpty ? "作者未记录" : book.author).font(.caption)
-                    .foregroundStyle(palette.ink.opacity(0.7))
+                if let author { Text(author).font(.caption).foregroundStyle(palette.ink.opacity(0.7)) }
             } else {
                 GeometryReader { geometry in
                     HStack(alignment: .firstTextBaseline, spacing: 12) {
-                        Text(book.title).font(.system(.title3, design: theme.fontDesign).weight(.semibold))
+                        Text(book.title).font(titleFont).tracking(0.4)
                             .lineLimit(1).frame(maxWidth: .infinity, alignment: .leading)
-                        Text(book.author.isEmpty ? "作者未记录" : book.author).font(.caption)
-                            .lineLimit(1).foregroundStyle(palette.ink.opacity(0.7))
-                            .frame(width: geometry.size.width * 0.28, alignment: .trailing)
+                        if let author {
+                            Text(author).font(.caption).lineLimit(1).foregroundStyle(palette.ink.opacity(0.7))
+                                .frame(width: geometry.size.width * 0.28, alignment: .trailing)
+                        }
                     }
                 }.frame(height: titleRowHeight)
             }
-            Text(ReadingHeroStatus.chapter(for: book)).font(.caption)
+            Text(ReadingDeskContent.contextLine(for: book)).font(.caption)
                 .foregroundStyle(palette.ink.opacity(0.72)).lineLimit(typeSize.isAccessibilitySize ? nil : 1)
         }.frame(maxWidth: .infinity, alignment: .leading).padding(.horizontal, 8)
+    }
+
+    private var titleFont: Font {
+        .system(size: titleFontSize, weight: .semibold, design: theme == .classic ? .serif : theme.fontDesign)
+    }
+
+    private var author: String? {
+        let name = book.author.trimmingCharacters(in: .whitespacesAndNewlines)
+        return name.isEmpty ? nil : name
     }
 
     private func updateEnergyPolicy() {

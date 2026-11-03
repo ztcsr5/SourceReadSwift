@@ -9,10 +9,17 @@ import UIKit
         let root = FileManager.default.temporaryDirectory.appendingPathComponent("floating-desk-ui-" + UUID().uuidString)
         let shelf = BookshelfStore(persistence: BookshelfPersistence(rootURL: root),
             groupPersistence: BookshelfGroupPersistence(rootURL: root))
-        let chapters = OnboardingClassicBook.makeWelcomeBook().chapters
-        for (index, title) in ["白昼之后，我们把很长很长的信写给远方与尚未相逢的人", "月色与六便士", "山海来信"].enumerated() {
-            let cover = index == 0 ? nil : makeCover(at: root, index: index, title: title)
-            shelf.addLocalTextBook(LocalTextBook(title: title, author: "离线验收样本", chapters: chapters, coverURL: cover))
+        // Titles/covers are visual fixtures; the original QA prose is not either novel's content.
+        let chapters = [LocalTextChapter(title: "剑气长城", paragraphs: [
+            "这是纸间的隔离视觉验证书库。封面用于对照构图，正文为原创验证文字，不提供所展示作品的原文。",
+            "阅读位置与书架入口仍走真实存储和导航；实验不会覆盖用户的书籍。"
+        ], index: 0), LocalTextChapter(title: "山中来信", paragraphs: ["翻过这一页，继续阅读。"], index: 1)]
+        let reference = makeReferenceCover(at: root)
+        let titles = ["白昼之后，我们把很长很长的信写给远方与尚未相逢的人", "月亮与六便士", "剑来"]
+        let authors = ["纸间", "毛姆", "烽火戏诸侯"]
+        for (index, title) in titles.enumerated() {
+            let cover = index == 0 ? nil : index == 2 ? reference ?? makeCover(at: root, index: index, title: title) : makeCover(at: root, index: index, title: title)
+            shelf.addLocalTextBook(LocalTextBook(title: title, author: authors[index], chapters: chapters, coverURL: cover))
             if let book = shelf.books.first { shelf.markReaderOpened(bookID: book.id) }
         }
         return AppState(sourceStore: SourceStore(persistence: SourcePersistence(rootURL: root)), bookshelfStore: shelf)
@@ -39,11 +46,24 @@ import UIKit
             let ink: UIColor = index == 1 ? .darkGray : .white
             (title as NSString).draw(in: CGRect(x: 32, y: 40, width: 272, height: 180), withAttributes: [
                 .font: UIFont.systemFont(ofSize: 36, weight: .medium), .foregroundColor: ink])
-            ("纸间 · 离线视觉验收" as NSString).draw(at: CGPoint(x: 32, y: 398), withAttributes: [
-                .font: UIFont.systemFont(ofSize: 15), .foregroundColor: ink.withAlphaComponent(0.8)])
         }
         do { try image.pngData()?.write(to: path); return path }
         catch { assertionFailure("Could not write isolated floating-desk cover: \(error)"); return nil }
+    }
+
+    private static func makeReferenceCover(at root: URL) -> URL? {
+        guard let encoded = ProcessInfo.processInfo.environment["SOURCEREAD_UI_COVER_JPEG"] else { return nil }
+        guard encoded.utf8.count <= 192_000, let bytes = Data(base64Encoded: encoded),
+              bytes.count <= 128_000, UIImage(data: bytes) != nil else {
+            assertionFailure("Expected a valid bounded UI-test reference cover"); return nil
+        }
+        let path = root.appendingPathComponent("reference-cover.jpg")
+        do {
+            try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+            try bytes.write(to: path); return path
+        } catch {
+            assertionFailure("Could not write isolated reference cover: \(error)"); return nil
+        }
     }
 }
 #endif

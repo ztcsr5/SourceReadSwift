@@ -66,6 +66,27 @@ class FloatingDeskScopeTests(unittest.TestCase):
         self.assertIn('COMMAND+=(-test-timeouts-enabled YES -maximum-test-execution-time-allowance 60)', native)
         self.assertIn('"${COMMAND[@]}" "${TESTS[@]}"', workflow)
 
+    def test_revised_desk_removes_redundant_chrome_and_keeps_actual_context(self):
+        module = (ROOT / 'SourceReadSwift/Features/Bookshelf/FloatingReadingDesk.swift').read_text(encoding='utf8')
+        self.assertNotIn('Text(book.hasUpdates ? "有更新" : "续读")', module)
+        self.assertNotIn('"作者未记录"', module)
+        self.assertIn('rotation3DEffect(.degrees(-8)', module)
+        self.assertIn('rotationEffect(.degrees(-3.5))', module)
+        self.assertIn('ReadingDeskContent.contextLine(for: book)', module)
+        fixture = (ROOT / 'SourceReadSwift/App/FloatingDeskRegressionLaunch.swift').read_text(encoding='utf8')
+        self.assertNotIn('离线验收样本', fixture)
+        self.assertNotIn('纸间 · 离线视觉验收', fixture)
+        pager = (ROOT / 'SourceReadSwift/Features/Bookshelf/ReadingDeskPager.swift').read_text(encoding='utf8')
+        self.assertIn('if !usesFloatingStyle {\n                        Text("最近阅读', pager)
+
+    def test_ui_flow_is_split_without_removing_navigation_or_cancel_assertions(self):
+        ui = (ROOT / 'SourceReadSwiftUITests/FloatingReadingDeskUITests.swift').read_text(encoding='utf8')
+        for name in ['testWhiteVioletPagingAndCancelledDragInTheRealApp', 'testReadingDeskDetailsAndReturnInTheRealApp', 'testReadingDeskReaderAndReturnInTheRealApp']:
+            self.assertIn(name, ui)
+        self.assertIn('thenHoldForDuration: 0.3', ui)
+        self.assertIn('Returning to the real shelf must restore navigation with it', ui)
+        self.assertNotIn('app.staticTexts["最近阅读 · 1 / 3"]', ui)
+
 
 if __name__ == '__main__':
     unittest.main()

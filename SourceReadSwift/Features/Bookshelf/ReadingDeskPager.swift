@@ -29,7 +29,7 @@ struct ReadingDeskPager<Card: View>: View {
     @State private var heights: [String: CGFloat] = [:]
 
     private var index: Int { books.firstIndex(where: { $0.id == selection }) ?? 0 }
-    private var height: CGFloat { max(books.compactMap { heights[$0.id] }.max() ?? (usesFloatingStyle ? 310 : books.contains(where: { $0.hasUpdates }) ? 196 : 176), 160) }
+    private var height: CGFloat { max(books.compactMap { heights[$0.id] }.max() ?? (usesFloatingStyle ? 288 : books.contains(where: { $0.hasUpdates }) ? 196 : 176), 160) }
     private var current: BookshelfBook? { books.indices.contains(index) ? books[index] : books.first }
 
     var body: some View {
@@ -61,9 +61,11 @@ struct ReadingDeskPager<Card: View>: View {
                 .frame(height: height)
                 .onPreferenceChange(ReadingDeskHeights.self, perform: updateHeights)
             }
-            if books.count > 1 {
+            if books.count > 1, !usesFloatingStyle || typeSize.isAccessibilitySize || motion.reducesMotion {
                 HStack(spacing: 8) {
-                    Text("最近阅读 · \(index + 1) / \(books.count)").font(.caption).foregroundStyle(.secondary)
+                    if !usesFloatingStyle {
+                        Text("最近阅读 · \(index + 1) / \(books.count)").font(.caption).foregroundStyle(.secondary)
+                    }
                     Spacer(minLength: 0)
                     step(-1, symbol: "chevron.left", title: "上一本最近阅读")
                     step(1, symbol: "chevron.right", title: "下一本最近阅读")
@@ -77,6 +79,7 @@ struct ReadingDeskPager<Card: View>: View {
 
     private func measuredCard(_ book: BookshelfBook) -> some View {
         card(book).fixedSize(horizontal: false, vertical: true)
+            .accessibilityValue("第 \((books.firstIndex(where: { $0.id == book.id }) ?? 0) + 1) 本，共 \(books.count) 本")
             .background {
                 GeometryReader { proxy in
                     Color.clear.preference(key: ReadingDeskHeights.self, value: [book.id: proxy.size.height])

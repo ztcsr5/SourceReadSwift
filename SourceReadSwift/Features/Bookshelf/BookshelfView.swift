@@ -271,7 +271,7 @@ struct BookshelfView: View {
     private var readingSection: some View {
         VStack(alignment: .leading, spacing: 8) {
             collectionHeader(title: "正在阅读", books: recentBooks)
-            if !recentBooks.isEmpty {
+            if !recentBooks.isEmpty, !(readingDeskEnabled && floatingReadingDeskEnabled) {
                 Text("把这一刻，留给下一页。")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
