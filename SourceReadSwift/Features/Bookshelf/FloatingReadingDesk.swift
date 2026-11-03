@@ -9,6 +9,7 @@ struct FloatingReadingDesk: View {
     @Environment(\.colorSchemeContrast) private var contrast
     @Environment(\.accessibilityReduceTransparency) private var reducesTransparency
     @Environment(\.isFloatingDeskPressed) private var isPressed
+    @Environment(\.readingCoverHandoff) private var readingCoverHandoff
     @AppStorage("settings.visualTheme") private var themeRaw = AppVisualTheme.classic.rawValue
     @AppStorage("settings.appearanceRevision") private var appearanceRevision = 0
     @AppMotion private var motion
@@ -137,7 +138,12 @@ struct FloatingReadingDesk: View {
     @ViewBuilder private func cover(width: CGFloat, height: CGFloat) -> some View {
         let image = AsyncBookCover(urlString: book.coverURL, width: width, height: height,
             baseURLString: book.bookURL, sourceURLString: book.sourceURL,
-            onImageLoad: { coverImage = $0 }, title: book.title)
+            onImageLoad: { image in
+                coverImage = image
+                if let image, let url = CoverURLResolver.url(from: book.coverURL, base: book.bookURL, fallbackBase: book.sourceURL) {
+                    readingCoverHandoff?.retain(image, for: url)
+                }
+            }, title: book.title)
         if let heroNamespace { image.bookHeroSource("continue|" + book.id, in: heroNamespace) }
         else { image }
     }

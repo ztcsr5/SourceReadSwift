@@ -22,6 +22,29 @@ final class FloatingReadingDeskTests: XCTestCase {
         XCTAssertGreaterThan(luminous.parallaxStrength, quiet.parallaxStrength)
     }
 
+    @MainActor func testCoverHandoffRendersTheSameDecodedImageOnTheFirstFrameAndIsURLScoped() throws {
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".png")
+        let other = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".png")
+        let cover = UIGraphicsImageRenderer(size: CGSize(width: 100, height: 150)).image { context in
+            UIColor.magenta.setFill(); context.fill(CGRect(x: 0, y: 0, width: 100, height: 150))
+        }
+        let handoff = ReadingCoverHandoff(); handoff.retain(cover, for: url)
+        XCTAssertTrue(handoff.image(for: url) === cover, "Handoff must retain the already-decoded bitmap, not copy or decode it again")
+        XCTAssertNil(handoff.image(for: other), "A different book URL must never borrow this cover")
+        let scenarios: [(URL, ReadingCoverHandoff?, Bool)] = [(url, handoff, false), (url, nil, true), (other, handoff, true)]
+        for (address, context, expectedGreen) in scenarios {
+            let renderer = ImageRenderer(content: AsyncBookCover(urlString: address.absoluteString, width: 100, height: 150)
+                .environment(\.readingCoverHandoff, context).environment(\.colorScheme, .light))
+            renderer.scale = 1
+            let image = try XCTUnwrap(renderer.uiImage)
+            let green = try measureAverageGreen(image)
+            if expectedGreen { XCTAssertGreaterThan(green, 0.5, "No opt-in/context match must preserve the normal paper placeholder") }
+            else { XCTAssertLessThan(green, 0.2, "The very first render must already show the source cover, before any async task") }
+        }
+        handoff.clear()
+        XCTAssertNil(handoff.image(for: url), "Disabling the experiment must release the handoff references")
+    }
+
     @MainActor func testLargeCoverAndCompactEnvelopeWithoutChangingTheOldCard() {
         let regular = measure(usesFloatingStyle: true, type: .large)
         let old = measure(usesFloatingStyle: false, type: .large)
@@ -108,5 +131,17 @@ final class FloatingReadingDeskTests: XCTestCase {
     @MainActor private func measure(usesFloatingStyle: Bool, type: DynamicTypeSize) -> CGSize {
         UIHostingController(rootView: ReadingHeroCard(book: makeBook(), usesFloatingStyle: usesFloatingStyle)
             .environment(\.dynamicTypeSize, type)).sizeThatFits(in: CGSize(width: 342, height: 6000))
+    }
+
+    private func measureAverageGreen(_ image: UIImage) throws -> Double {
+        let source = try XCTUnwrap(image.cgImage)
+        var pixel = [UInt8](repeating: 0, count: 4)
+        let green: Double = try pixel.withUnsafeMutableBytes { bytes in
+            let context = try XCTUnwrap(CGContext(data: bytes.baseAddress, width: 1, height: 1, bitsPerComponent: 8,
+                bytesPerRow: 4, space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue))
+            context.draw(source, in: CGRect(x: 0, y: 0, width: 1, height: 1))
+            return Double(bytes[1]) / 255
+        }
+        return green
     }
 }

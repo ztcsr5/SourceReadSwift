@@ -20,6 +20,7 @@ struct BookshelfView: View {
     @State private var readingBookID: String?
     @AppStorage("settings.readingDeskEnabled") private var readingDeskEnabled = true
     @AppStorage("settings.floatingReadingDeskEnabled") private var floatingReadingDeskEnabled = true
+    @StateObject private var readingCoverHandoff = ReadingCoverHandoff()
 
     enum BookshelfSortMode: String, CaseIterable, Identifiable {
         case recentRead = "最近阅读"
@@ -146,6 +147,12 @@ struct BookshelfView: View {
                 await refreshBookshelf()
             }
             .background(bookshelfBackdrop)
+            .onChange(of: floatingReadingDeskEnabled) { isEnabled in
+                if !isEnabled { readingCoverHandoff.clear() }
+            }
+            .onChange(of: readingDeskEnabled) { isEnabled in
+                if !isEnabled { readingCoverHandoff.clear() }
+            }
             .navigationTitle("主页")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -721,9 +728,11 @@ struct BookshelfView: View {
         NavigationLink {
             BookshelfReaderGatewayView(book: book)
                 .bookHeroDestination("continue|" + book.id, in: bookHero)
+                .environment(\.readingCoverHandoff, readingDeskEnabled && floatingReadingDeskEnabled ? readingCoverHandoff : nil)
         } label: {
             ReadingHeroCard(book: book, heroNamespace: bookHero, usesSpatialStyle: readingDeskEnabled,
                 usesFloatingStyle: floatingReadingDeskEnabled)
+                .environment(\.readingCoverHandoff, readingDeskEnabled && floatingReadingDeskEnabled ? readingCoverHandoff : nil)
                 .frame(maxWidth: .infinity, alignment: .topLeading)
                 .padding(.vertical, 3)
         }
@@ -735,6 +744,7 @@ struct BookshelfView: View {
                 NavigationLink {
                     BookDetailView(book: book.asSearchBook)
                         .bookHeroDestination("continue|" + book.id, in: bookHero)
+                        .environment(\.readingCoverHandoff, readingDeskEnabled && floatingReadingDeskEnabled ? readingCoverHandoff : nil)
                 } label: { Label("书籍详情", systemImage: "info.circle") }
             } label: {
                 Image(systemName: "ellipsis").font(.title3.weight(.semibold))
@@ -1428,6 +1438,7 @@ private struct PressableScaleButtonStyle: ButtonStyle {
 
 struct AsyncBookCover: View {
     @Environment(\.displayScale) private var displayScale
+    @Environment(\.readingCoverHandoff) private var readingCoverHandoff
 
     /// 占位块要跟着承载它的底色走：白卡片上用浅灰，深色主视觉上用半透明白。
     enum Style {
@@ -1474,7 +1485,12 @@ struct AsyncBookCover: View {
         return points * max(displayScale, 1)
     }
 
-    private var placeholder: some View {
-        BookCoverPlaceholder(title: title, height: height, isOnDark: style == .onDark)
+    @ViewBuilder private var placeholder: some View {
+        if let url = CoverURLResolver.url(from: urlString, base: baseURLString, fallbackBase: sourceURLString),
+           let image = readingCoverHandoff?.image(for: url) {
+            Image(uiImage: image).resizable().scaledToFill()
+        } else {
+            BookCoverPlaceholder(title: title, height: height, isOnDark: style == .onDark)
+        }
     }
 }
