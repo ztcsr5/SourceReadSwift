@@ -72,10 +72,21 @@ final class FloatingReadingDeskUITests: XCTestCase {
 
     func testSimulatorPagingPerformanceEvidenceNotADeviceFPSClaim() {
         launch(theme: "classic")
+        measurePaging("bookshelf.readingPager")
+    }
+
+    func testPreviousStyleSimulatorPagingPerformanceBaseline() {
+        launch(theme: "classic")
+        app.buttons["正在阅读书籍的更多操作"].firstMatch.tap()
+        element("bookshelf.floatingDeskToggle").tap()
+        measurePaging("bookshelf.legacyReadingPager")
+    }
+
+    private func measurePaging(_ identifier: String) {
         let options = XCTMeasureOptions(); options.iterationCount = 3
         measure(metrics: [XCTClockMetric(), XCTCPUMetric(application: app), XCTMemoryMetric(application: app),
             XCTOSSignpostMetric.scrollingAndDecelerationMetric], options: options) {
-            let pager = element("bookshelf.readingPager")
+            let pager = element(identifier)
             pager.swipeLeft(); pager.swipeLeft(); pager.swipeRight(); pager.swipeRight()
         }
         XCTAssertTrue(app.staticTexts["最近阅读 · 1 / 3"].exists)

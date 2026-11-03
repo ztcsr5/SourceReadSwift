@@ -59,7 +59,7 @@ def main():
                 save_job_log(job, destination)
             if options.download:
                 download_evidence(run, destination)
-        signature = [(run['id'], run['status'], run['conclusion'], [(job['id'], job['status'], job['conclusion'],
+        signature = [(run['id'], run['status'], run['conclusion'], [(job['id'], job['name'], job['status'], job['conclusion'],
             [step['name'] for step in job.get('steps', []) if step['status'] == 'in_progress']) for job in run['jobs']]) for run in records]
         if signature != previous:
             print(json.dumps(signature, ensure_ascii=False), flush=True)

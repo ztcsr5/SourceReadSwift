@@ -57,6 +57,7 @@ struct ReadingDeskPager<Card: View>: View {
                     }
                 }
                 .tabViewStyle(.page(indexDisplayMode: .never))
+                .accessibilityIdentifier("bookshelf.legacyReadingPager")
                 .frame(height: height)
                 .onPreferenceChange(ReadingDeskHeights.self, perform: updateHeights)
             }
