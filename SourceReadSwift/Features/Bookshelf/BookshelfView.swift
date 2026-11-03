@@ -798,27 +798,11 @@ struct BookshelfView: View {
         }
         .accessibilityIdentifier("bookshelf.continue." + book.id)
         .buttonStyle(FloatingDeskPressStyle(isEnabled: readingDeskEnabled && floatingReadingDeskEnabled))
-        .contextMenu {
-            Button {
-                guard contextualBookRoute == nil else { return }
-                pinReturnOrder(placement: "continue")
-                contextualBookRoute = .detail(book, placement: "continue")
-            } label: {
-                Label("书籍详情", systemImage: "info.circle")
-            }
-            Button {
-                UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-                clearReturnOrder()
-                appState.bookshelfStore.togglePin(bookID: book.id)
-            } label: {
-                Label(book.isPinned ? "取消置顶" : "置顶书籍", systemImage: book.isPinned ? "pin.slash" : "pin")
-            }
-            Button("从书架删除", role: .destructive) {
-                bookToRemove = book
-            }
-        }
+        .contextMenu { readingDeskBookActions(book) }
         .overlay(alignment: .topTrailing) {
             Menu {
+                readingDeskBookActions(book)
+                Divider()
                 Toggle("悬浮玻璃书台", isOn: $floatingReadingDeskEnabled)
                     .accessibilityIdentifier("bookshelf.floatingDeskToggle")
             } label: {
@@ -826,6 +810,26 @@ struct BookshelfView: View {
                     .frame(width: 44, height: 44)
                     .background(AppTheme.elevatedCard.opacity(readingDeskEnabled && floatingReadingDeskEnabled ? 0.6 : 1), in: Circle())
             }.padding(12).accessibilityLabel("正在阅读书籍的更多操作")
+        }
+    }
+
+    @ViewBuilder private func readingDeskBookActions(_ book: BookshelfBook) -> some View {
+        Button {
+            guard contextualBookRoute == nil else { return }
+            pinReturnOrder(placement: "continue")
+            contextualBookRoute = .detail(book, placement: "continue")
+        } label: {
+            Label("书籍详情", systemImage: "info.circle")
+        }
+        Button {
+            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+            clearReturnOrder()
+            appState.bookshelfStore.togglePin(bookID: book.id)
+        } label: {
+            Label(book.isPinned ? "取消置顶" : "置顶书籍", systemImage: book.isPinned ? "pin.slash" : "pin")
+        }
+        Button("从书架删除", role: .destructive) {
+            bookToRemove = book
         }
     }
 

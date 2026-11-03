@@ -32,12 +32,12 @@ struct FloatingReadingDesk: View {
     var body: some View {
         VStack(spacing: 8) {
             GeometryReader { geometry in
-                let width: CGFloat = geometry.size.width < 310 ? 136 : 144
-                let height: CGFloat = geometry.size.width < 310 ? 188 : 196
+                let width: CGFloat = geometry.size.width < 310 ? 128 : 138
+                let height: CGFloat = geometry.size.width < 310 ? 176 : 188
                 ZStack(alignment: .top) {
-                    environment.frame(height: 220)
+                    environment.frame(height: 208)
                         .modifier(FloatingDeskParallax(depth: 3 * palette.finish.parallaxStrength, reducesDepth: policy.reducesDepth))
-                    stage.frame(height: 124).padding(.top, 86)
+                    stage.frame(height: 116).padding(.top, 84)
                         .modifier(FloatingDeskParallax(depth: 7 * palette.finish.parallaxStrength, reducesDepth: policy.reducesDepth))
                     if !typeSize.isAccessibilitySize {
                         makeMarginNotes(coverWidth: width).padding(.top, 122)
@@ -46,14 +46,14 @@ struct FloatingReadingDesk: View {
                     jacket(width: width, height: height).frame(maxWidth: .infinity)
                         .modifier(FloatingDeskParallax(depth: 22 * palette.finish.parallaxStrength, reducesDepth: policy.reducesDepth))
                 }
-            }.frame(height: 220)
+            }.frame(height: 208)
             caption
                 .modifier(FloatingDeskParallax(depth: 34 * palette.finish.parallaxStrength, reducesDepth: policy.reducesDepth))
         }
         .foregroundStyle(palette.ink)
         .contentShape(Rectangle())
         .accessibilityElement(children: .combine)
-        .accessibilityHint("轻点打开书籍详情，长按管理")
+        .accessibilityHint("轻点继续阅读，长按管理")
         .task(id: coverImage.map(ObjectIdentifier.init)) {
             guard let coverImage else { tone = nil; return }
             let sampled = await CoverToneSampler.shared.tone(for: coverImage)
