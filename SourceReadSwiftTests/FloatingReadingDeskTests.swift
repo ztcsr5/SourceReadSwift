@@ -50,12 +50,14 @@ final class FloatingReadingDeskTests: XCTestCase {
         ] {
             defaults.set(theme.rawValue, forKey: key)
             defaults.set(accessible, forKey: motionKey)
-            let content = VStack(alignment: .leading, spacing: 8) {
-                Text("正在阅读").font(.title2.weight(.semibold))
-                ReadingHeroCard(book: makeBook(), usesFloatingStyle: true)
-                Text("我的书架").font(.title2.weight(.semibold))
-                Text("书架必须在首屏继续可见，不因主视觉挤到屏幕之外。")
-            }.padding(24).frame(maxHeight: .infinity, alignment: .top).background(AppTheme.background)
+            let content = ScrollView {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("正在阅读").font(.title2.weight(.semibold))
+                    ReadingHeroCard(book: makeBook(), usesFloatingStyle: true)
+                    Text("我的书架").font(.title2.weight(.semibold))
+                    Text("书架必须在首屏继续可见，不因主视觉挤到屏幕之外。")
+                }.padding(24)
+            }.frame(maxHeight: .infinity, alignment: .top).background(AppTheme.background)
                 .environment(\.dynamicTypeSize, accessible ? .accessibility3 : .large)
                 .preferredColorScheme(dark ? .dark : .light)
             let host = UIHostingController(rootView: content)

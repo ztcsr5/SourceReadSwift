@@ -16,6 +16,11 @@ final class FloatingReadingDeskUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["最近阅读 · 1 / 3"].waitForExistence(timeout: 3))
         let pager = element("bookshelf.readingPager")
         XCTAssertTrue(pager.isHittable)
+        let start = pager.coordinate(withNormalizedOffset: CGVector(dx: 0.76, dy: 0.5))
+        let shortDrag = pager.coordinate(withNormalizedOffset: CGVector(dx: 0.60, dy: 0.5))
+        start.press(forDuration: 0.05, thenDragTo: shortDrag, withVelocity: .slow, thenHoldForDuration: 0.3)
+        XCTAssertTrue(app.staticTexts["最近阅读 · 1 / 3"].waitForExistence(timeout: 3), "A cancelled short drag must keep the same book")
+        capture("01b-short-drag-cancelled")
         pager.swipeLeft()
         XCTAssertTrue(app.staticTexts["最近阅读 · 2 / 3"].waitForExistence(timeout: 3))
         capture("02-plain-cover")
@@ -37,6 +42,9 @@ final class FloatingReadingDeskUITests: XCTestCase {
         if !returnButton.isHittable { app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.42)).tap() }
         XCTAssertTrue(returnButton.waitForExistence(timeout: 5)); returnButton.tap()
         XCTAssertTrue(pager.waitForExistence(timeout: 3))
+        let tabs = app.tabBars.firstMatch
+        let home = tabs.exists ? tabs.buttons["主页"] : app.buttons["主页"]
+        XCTAssertTrue(home.isHittable, "Returning to the real shelf must restore navigation with it")
         capture("06-reader-return-root")
     }
 
