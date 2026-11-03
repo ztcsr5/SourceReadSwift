@@ -21,6 +21,7 @@ struct BookDetailHero: View {
     @AppMotion private var motion
 
     private var theme: AppVisualTheme { AppVisualTheme(rawValue: themeRaw) ?? .classic }
+    private var sourceLabel: String? { book.sourceUrl.hasPrefix("local://") ? "本地藏书" : book.sourceName.nilIfEmpty }
     private var palette: FloatingDeskPalette {
         let _ = revision
         return .resolve(theme: theme)
@@ -93,7 +94,7 @@ struct BookDetailHero: View {
                     Label(readingContext, systemImage: "bookmark")
                         .lineLimit(typeSize.isAccessibilitySize ? nil : 2)
                 }
-                Text([book.sourceName.nilIfEmpty, book.wordCount?.nilIfEmpty].compactMap { $0 }.joined(separator: " · "))
+                Text([sourceLabel, book.wordCount?.nilIfEmpty].compactMap { $0 }.joined(separator: " · "))
                     .lineLimit(typeSize.isAccessibilitySize ? nil : 2)
             }
             .font(.caption)

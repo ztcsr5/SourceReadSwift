@@ -39,8 +39,10 @@ struct FloatingReadingDesk: View {
                         .modifier(FloatingDeskParallax(depth: 3 * palette.finish.parallaxStrength, reducesDepth: policy.reducesDepth))
                     stage.frame(height: 124).padding(.top, 86)
                         .modifier(FloatingDeskParallax(depth: 7 * palette.finish.parallaxStrength, reducesDepth: policy.reducesDepth))
-                    makeMarginNotes(coverWidth: width).padding(.top, 122)
-                        .modifier(FloatingDeskParallax(depth: 30 * palette.finish.parallaxStrength, reducesDepth: policy.reducesDepth))
+                    if !typeSize.isAccessibilitySize {
+                        makeMarginNotes(coverWidth: width).padding(.top, 122)
+                            .modifier(FloatingDeskParallax(depth: 30 * palette.finish.parallaxStrength, reducesDepth: policy.reducesDepth))
+                    }
                     jacket(width: width, height: height).frame(maxWidth: .infinity)
                         .modifier(FloatingDeskParallax(depth: 22 * palette.finish.parallaxStrength, reducesDepth: policy.reducesDepth))
                 }
@@ -172,6 +174,10 @@ struct FloatingReadingDesk: View {
             }
             Text(ReadingDeskContent.contextLine(for: book)).font(.caption)
                 .foregroundStyle(palette.ink.opacity(0.72)).lineLimit(typeSize.isAccessibilitySize ? nil : 1)
+            if typeSize.isAccessibilitySize, book.lastReadAt != nil, book.totalChapters > 0 {
+                Text(ReadingHeroStatus.progress(for: book))
+                    .font(.caption).foregroundStyle(palette.ink.opacity(0.72))
+            }
         }.frame(maxWidth: .infinity, alignment: .leading).padding(.horizontal, 8)
     }
 
