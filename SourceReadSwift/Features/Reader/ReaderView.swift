@@ -5724,7 +5724,7 @@ struct ReaderView: View {
         }
         let resolvedParagraphIndex = positionMapping.paragraph(for: target, mode: readerMode)
         visibleParagraphIndex = resolvedParagraphIndex
-        scheduleReadingPositionPersistence(paragraphIndex: resolvedParagraphIndex)
+        scheduleReadingPositionPersistence()
     }
 
     private var currentReaderTarget: Int {

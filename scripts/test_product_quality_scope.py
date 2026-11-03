@@ -37,6 +37,7 @@ class ProductQualityScopeTests(unittest.TestCase):
         declaration = reader.split("private func scheduleReadingPositionPersistence(", 1)[1].split(
             "private func checkDailyReadingGoal", 1)[0]
         self.assertTrue(declaration.startswith(")"))
+        self.assertNotRegex(reader, r"scheduleReadingPositionPersistence\(\s*paragraphIndex:")
         self.assertIn("persistReadingPosition()", declaration)
         self.assertIn("guard !Task.isCancelled", declaration)
 
@@ -71,6 +72,13 @@ class ProductQualityScopeTests(unittest.TestCase):
         self.assertIn("layoutSettingsBody(showsPreview: true)", reader)
         self.assertIn("if includesLegacySections { legacyLayoutHeadingControls }", reader)
         self.assertIn("if includesLegacySections { legacyLayoutStatusControls }", reader)
+
+    def test_cache_cancellation_owns_its_generation_and_resume_uses_actual_cached_urls(self):
+        cache = read_source(APP + "Core/Storage/ChapterDownloadStore.swift")
+        self.assertIn("tasks[bookID]?.generation == generation", cache)
+        self.assertIn("cacheStore.cachedChapterURLs(", cache)
+        self.assertIn("cachedChapterIndexes: Array(completed)", cache)
+        self.assertGreaterEqual(cache.count("guard self.isCurrentJob(bookID, generation: generation)"), 2)
 
     def test_diagnostic_clipboard_does_not_include_raw_urls_or_transport_messages(self):
         export = read_source(DETAIL).split("private func chapterDiagnosticText(", 1)[1].split("    init(", 1)[0]
