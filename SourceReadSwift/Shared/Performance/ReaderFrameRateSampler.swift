@@ -1,21 +1,13 @@
 import Foundation
-import QuartzCore
-import UIKit
 
-/// 帧率采样累加器。
-///
-/// `#12` 的投诉是「滑动不够丝滑」，这跟「滚动回调耗时」不是一回事：
-/// 回调只占一帧里的一小段，真正决定体感的是**每秒出了几帧、有多少帧超时**。
-/// 这个累加器只做算术，便于在 CI 上锁住判定口径。
+/// Legacy callback accumulator retained for historical diagnostic compatibility.
+/// Its threshold counts long callbacks, not the number of frames presented or dropped.
 struct ReaderFrameRateAccumulator: Equatable {
     private(set) var frames: Int
     private(set) var droppedFrames: Int
     private(set) var totalSeconds: Double
 
-    /// 超过期望帧间隔 2 倍才算掉一帧（60Hz 下约 33ms，即真正丢了 2 帧）。
-    ///
-    /// 原来用 1.5 倍：60Hz 下 25ms 就判掉帧，而 27fps 场景每帧约 37ms，
-    /// 于是掉帧率虚高到 99%（诊断页实测 2508/2524），指标失去意义。
+    /// Historical threshold; not a render-deadline or dropped-frame metric.
     static let dropThreshold: Double = 2.0
 
     init(frames: Int = 0, droppedFrames: Int = 0, totalSeconds: Double = 0) {
@@ -59,119 +51,27 @@ struct ReaderFrameRateAccumulator: Equatable {
     }
 }
 
-/// 用 `CADisplayLink` 采样阅读器的实际出帧情况，结果落到 UserDefaults，
-/// 于是用户在 设置 → 阅读器性能（诊断）里能直接读到，不用连 Xcode。
-///
-/// 只在有阅读器存活时运行；多个阅读器实例用引用计数管理同一个 link。
+/// Read-only compatibility for old diagnostic records. Normal reading never starts a sampler.
+/// These counters describe historical main-run-loop callbacks, not presented frames.
 @MainActor
-final class ReaderFrameRateSampler {
-    static let shared = ReaderFrameRateSampler()
-
+enum ReaderFrameRateSampler {
     private static let framesKey = "reader.frameRate.frames"
     private static let droppedKey = "reader.frameRate.dropped"
     private static let secondsKey = "reader.frameRate.seconds"
 
-    private var link: CADisplayLink?
-    private var lastTimestamp: CFTimeInterval = 0
-    private var expectedFrameDuration: Double = 1.0 / 60.0
-    private var activeCount = 0
-    private var pending = ReaderFrameRateAccumulator()
-    private var observers: [NSObjectProtocol] = []
-
-    private init() {
-        observers.append(NotificationCenter.default.addObserver(forName: UIApplication.willResignActiveNotification,
-            object: nil, queue: .main) { [weak self] _ in
-                Task { @MainActor in
-                    self?.link?.isPaused = true
-                    self?.lastTimestamp = 0
-                    self?.flush()
-                }
-            })
-        observers.append(NotificationCenter.default.addObserver(forName: UIApplication.didBecomeActiveNotification,
-            object: nil, queue: .main) { [weak self] _ in
-                Task { @MainActor in
-                    self?.lastTimestamp = 0
-                    self?.link?.isPaused = false
-                }
-            })
-    }
-
-    func begin() {
-        activeCount += 1
-        guard link == nil else { return }
-        let scene = UIApplication.shared.connectedScenes
-            .compactMap { $0 as? UIWindowScene }
-            .first { $0.activationState == .foregroundActive }
-        let maximum = scene?.screen.maximumFramesPerSecond ?? 60
-        let ceiling = ReaderPerformancePolicy.preferredRefreshRate(maximumFramesPerSecond: maximum)
-        expectedFrameDuration = 1.0 / Double(max(ceiling, 60))
-        lastTimestamp = 0
-        let link = CADisplayLink(target: self, selector: #selector(handleFrame(_:)))
-        // Ask for the display's full refresh rate instead of letting the system
-        // pin this link to 60Hz: on ProMotion devices that is what makes the
-        // reader's own frame budget honest.
-        if #available(iOS 15.0, *) {
-            let target = Float(max(ceiling, 60))
-            link.preferredFrameRateRange = CAFrameRateRange(
-                minimum: min(target, 80),
-                maximum: target,
-                preferred: target
-            )
-        }
-        link.add(to: .main, forMode: .common)
-        self.link = link
-    }
-
-    func end() {
-        activeCount = max(activeCount - 1, 0)
-        guard activeCount == 0 else { return }
-        link?.invalidate()
-        link = nil
-        lastTimestamp = 0
-        flush()
-    }
-
     static var snapshot: ReaderFrameRateAccumulator {
         let defaults = UserDefaults.standard
-        let persisted = ReaderFrameRateAccumulator(
+        return ReaderFrameRateAccumulator(
             frames: defaults.integer(forKey: framesKey),
             droppedFrames: defaults.integer(forKey: droppedKey),
             totalSeconds: defaults.double(forKey: secondsKey)
         )
-        return persisted.merged(with: shared.pending)
     }
 
     static func reset() {
-        shared.pending.reset()
         let defaults = UserDefaults.standard
         defaults.removeObject(forKey: framesKey)
         defaults.removeObject(forKey: droppedKey)
         defaults.removeObject(forKey: secondsKey)
-    }
-
-    @objc private func handleFrame(_ link: CADisplayLink) {
-        defer { lastTimestamp = link.timestamp }
-        guard lastTimestamp > 0 else { return }
-        let delta = link.timestamp - lastTimestamp
-        guard delta > 0, delta <= 0.5 else { return }
-        pending.recordFrame(delta: delta, expectedFrameDuration: expectedFrameDuration)
-        // Keep samples in memory throughout a reading session. Periodic writes
-        // to three defaults keys used to land in the middle of page gestures.
-        // `snapshot` already merges this pending accumulator; end() persists it.
-    }
-
-    private func flush() {
-        ReaderScrollPerfMeter.flush()
-        guard pending.frames > 0 else { return }
-        let defaults = UserDefaults.standard
-        let combined = ReaderFrameRateAccumulator(
-            frames: defaults.integer(forKey: Self.framesKey),
-            droppedFrames: defaults.integer(forKey: Self.droppedKey),
-            totalSeconds: defaults.double(forKey: Self.secondsKey)
-        ).merged(with: pending)
-        defaults.set(combined.frames, forKey: Self.framesKey)
-        defaults.set(combined.droppedFrames, forKey: Self.droppedKey)
-        defaults.set(combined.totalSeconds, forKey: Self.secondsKey)
-        pending.reset()
     }
 }

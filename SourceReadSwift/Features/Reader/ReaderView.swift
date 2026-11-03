@@ -682,7 +682,6 @@ struct ReaderView: View {
             UIScreen.main.brightness = brightnessBeforeReader
         }
         appState.releaseTabChromeHidden(owner: tabChromeOwner)
-        ReaderFrameRateSampler.shared.end()
         appState.bookshelfStore.recordReadingSession(
             bookID: bookID,
             duration: Date().timeIntervalSince(sessionStartedAt)
@@ -1229,9 +1228,6 @@ struct ReaderView: View {
                 customBackgroundIsDark = ReaderCustomWallpaperStore.isWallpaperDark
             }
             appState.acquireTabChromeHidden(owner: tabChromeOwner)
-            // 阅读器存活期间采样真实出帧情况，退出时落盘；
-            // 用户在设置里能直接读到平均帧率与掉帧率，不必连 Xcode。
-            ReaderFrameRateSampler.shared.begin()
             chromeState.setInitialOverlayVisible(initialOverlayVisible)
             sessionStartedAt = Date()
             seedWindow()
@@ -1300,7 +1296,13 @@ struct ReaderView: View {
             if autoScrollEnabled { startAutoScroll() }
         }
         .onChange(of: scenePhase) { phase in
+            guard !readerSessionEnded else { return }
             if phase != .active {
+                positionPersistTask?.cancel()
+                positionPersistTask = nil
+                appState.finishReadingWritesInBackground {
+                    persistReadingPosition(paragraphIndexOverride: currentParagraphIndexForPersistence())
+                }
                 if autoScrollEnabled {
                     autoScrollPausedForScene = true
                     stopAutoScroll(clearScenePause: false)

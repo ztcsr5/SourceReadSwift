@@ -56,16 +56,23 @@ struct ReadingHistoryItem: Identifiable, Codable, Hashable, Sendable {
 }
 
 struct ReadingHistoryPersistence: Sendable {
+    private static let diskQueue = DispatchQueue(label: "SourceReadSwift.reading-history.disk", qos: .utility)
     private let fileManager: FileManager
     private let fileName = "reading_history.json"
     private let rootURL: URL?
+    private let writeObserver: (@Sendable () -> Void)?
 
-    init(fileManager: FileManager = .default, rootURL: URL? = nil) {
+    init(fileManager: FileManager = .default, rootURL: URL? = nil, writeObserver: (@Sendable () -> Void)? = nil) {
         self.fileManager = fileManager
         self.rootURL = rootURL
+        self.writeObserver = writeObserver
     }
 
     func load() throws -> [ReadingHistoryItem] {
+        try Self.diskQueue.sync { try readSnapshot() }
+    }
+
+    private func readSnapshot() throws -> [ReadingHistoryItem] {
         let url = try storageURL()
         guard fileManager.fileExists(atPath: url.path) else { return [] }
         let data = try Data(contentsOf: url)
@@ -75,6 +82,24 @@ struct ReadingHistoryPersistence: Sendable {
     }
 
     func save(_ items: [ReadingHistoryItem]) throws {
+        try Self.diskQueue.sync { try writeSnapshot(items) }
+    }
+
+    /// Completion runs on the ordered writer queue, not MainActor.
+    func saveInBackground(_ items: [ReadingHistoryItem], completion: @escaping @Sendable (Result<Void, Error>) -> Void) {
+        Self.diskQueue.async { completion(Result { try writeSnapshot(items) }) }
+    }
+
+    func waitForPendingWrites() async {
+        await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+            Self.diskQueue.async { continuation.resume() }
+        }
+    }
+
+    private func writeSnapshot(_ items: [ReadingHistoryItem]) throws {
+        writeObserver?()
+        let span = PerformanceSignpost.begin("reading-history.write")
+        defer { PerformanceSignpost.end("reading-history.write", id: span) }
         let url = try storageURL()
         try fileManager.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
         let encoder = JSONEncoder()
@@ -105,6 +130,7 @@ final class ReadingHistoryStore: ObservableObject {
     @Published private(set) var lastError: String?
 
     private let persistence: ReadingHistoryPersistence
+    private var persistenceRevision = 0
 
     init(persistence: ReadingHistoryPersistence = ReadingHistoryPersistence()) {
         self.persistence = persistence
@@ -132,8 +158,9 @@ final class ReadingHistoryStore: ObservableObject {
         incrementSession: Bool = false
     ) {
         let now = Date()
-        if let idx = history.firstIndex(where: { $0.id == bookID }) {
-            var item = history[idx]
+        var nextHistory = history
+        if let idx = nextHistory.firstIndex(where: { $0.id == bookID }) {
+            var item = nextHistory[idx]
             item.title = title
             item.author = author
             item.coverURL = coverURL ?? item.coverURL
@@ -156,8 +183,8 @@ final class ReadingHistoryStore: ObservableObject {
                 item.readingSessionCount += 1
             }
             item.lastReadAt = now
-            history.remove(at: idx)
-            history.insert(item, at: 0)
+            nextHistory.remove(at: idx)
+            nextHistory.insert(item, at: 0)
         } else {
             let newItem = ReadingHistoryItem(
                 id: bookID,
@@ -176,12 +203,13 @@ final class ReadingHistoryStore: ObservableObject {
                 totalReadingSeconds: sessionDuration ?? 0,
                 readingSessionCount: incrementSession ? 1 : 0
             )
-            history.insert(newItem, at: 0)
+            nextHistory.insert(newItem, at: 0)
         }
-        if history.count > 500 {
-            history.removeLast(history.count - 500)
+        if nextHistory.count > 500 {
+            nextHistory.removeLast(nextHistory.count - 500)
         }
-        persist()
+        history = nextHistory
+        persist(inBackground: true)
     }
 
     func record(book: BookshelfBook, sessionDuration: TimeInterval? = nil, incrementSession: Bool = false) {
@@ -214,12 +242,36 @@ final class ReadingHistoryStore: ObservableObject {
         persist()
     }
 
-    private func persist() {
+    /// Waits without running encoding or disk IO on MainActor.
+    func waitForPendingWrites() async { await persistence.waitForPendingWrites() }
+
+    private func persist(inBackground: Bool = false) {
+        persistenceRevision &+= 1
+        let revision = persistenceRevision
+        if inBackground {
+            persistence.saveInBackground(history) { [weak self] result in
+                Task { @MainActor [weak self] in self?.completePersistence(result, revision: revision) }
+            }
+            return
+        }
         do {
             try persistence.save(history)
-            lastError = nil
+            if lastError != nil { lastError = nil }
         } catch {
             lastError = error.localizedDescription
         }
+    }
+
+    private func completePersistence(_ result: Result<Void, Error>, revision: Int) {
+        guard revision == persistenceRevision else {
+            if case .failure = result { PerformanceSignpost.event("reading-history.write", "Superseded background write failed") }
+            return
+        }
+        let message: String?
+        switch result {
+        case .success: message = nil
+        case .failure(let error): message = "保存阅读历史失败：\(error.localizedDescription)"
+        }
+        if lastError != message { lastError = message }
     }
 }

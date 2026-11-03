@@ -27,6 +27,7 @@ struct SourceReadSwiftApp: App {
                     FrameRateCoordinator.apply(to: notification.object as? UIScene)
                 }
                 .onChange(of: scenePhase) { phase in
+                    if phase != .active { appState.finishReadingWritesInBackground() }
                     guard phase == .active else { return }
                     FrameRateCoordinator.apply()
                 }

@@ -9,7 +9,10 @@ final class ReaderScrollPerfMeterTests: XCTestCase {
         let keys = ["reader.scrollPerf.frames", "reader.scrollPerf.totalMs", "reader.scrollPerf.worstMs"]
         ReaderScrollPerfMeter.flush()
         let original = keys.map { defaults.object(forKey: $0) }
+        let wasRecording = ReaderScrollPerfMeter.isRecording
+        ReaderScrollPerfMeter.isRecording = true
         defer {
+            ReaderScrollPerfMeter.isRecording = wasRecording
             ReaderScrollPerfMeter.reset()
             for (key, value) in zip(keys, original) {
                 if let value { defaults.set(value, forKey: key) }

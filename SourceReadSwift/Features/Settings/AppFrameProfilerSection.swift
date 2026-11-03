@@ -10,9 +10,9 @@ struct AppFrameProfilerSection: View {
             Text(profiler.report).font(.caption.monospaced()).textSelection(.enabled)
             Button("复制全局采样报告") { UIPasteboard.general.string = profiler.report }
         } header: {
-            Text("全应用帧时间")
+            Text("显式诊断 · 主线程回调节奏")
         } footer: {
-            Text("开始后返回主页、发现、目录或漫画页持续操作，再回来查看 P95/P99。120fps 的单帧预算为 8.33ms；完整呈现与 GPU 卡顿需在真机用 Instruments 的 Animation Hitches 验证。静止、低电量与发热时系统会降低刷新率。")
+            Text("仅点击开始后采样。离开此页可测试其他页面，最多持续 30 秒；手动结束、退后台或锁屏即停止，回到前台不会自动恢复。不主动请求高刷新率，回调频率降低不等于画面变慢。这里测的是回调节奏，不是显示帧率；实际呈现与 GPU 卡顿仍需真机 Instruments 验证。")
         }
         .listRowBackground(AppThemeRowSurface())
     }

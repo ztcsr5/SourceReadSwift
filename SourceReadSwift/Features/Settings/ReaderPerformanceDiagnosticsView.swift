@@ -25,37 +25,14 @@ struct ReaderPerformanceDiagnosticsView: View {
                             .foregroundStyle(.secondary)
                     }
                     HStack {
-                        Text("样本帧数")
+                        Text("诊断回调样本")
                         Spacer()
                         Text("\(perf.frames)")
                             .monospacedDigit()
                             .foregroundStyle(.secondary)
                     }
 
-                    let frameRate = ReaderFrameRateSampler.snapshot
-                    HStack {
-                        Text("平均帧率")
-                        Spacer()
-                        Text(String(format: "%.1f fps", frameRate.averageFPS))
-                            .monospacedDigit()
-                            .foregroundStyle(.secondary)
-                    }
-                    HStack {
-                        Text("掉帧率")
-                        Spacer()
-                        Text(String(format: "%.1f%%（%d 帧）", frameRate.droppedRatio * 100, frameRate.droppedFrames))
-                            .monospacedDigit()
-                            .foregroundStyle(.secondary)
-                    }
-                    HStack {
-                        Text("出帧样本")
-                        Spacer()
-                        Text("\(frameRate.frames)")
-                            .monospacedDigit()
-                            .foregroundStyle(.secondary)
-                    }
-
-                    Button("清零重新采样") {
+                    Button("清零诊断回调记录") {
                         ReaderScrollPerfMeter.reset()
                         ReaderFrameRateSampler.reset()
                         perfRefreshToken = UUID()
@@ -63,7 +40,7 @@ struct ReaderPerformanceDiagnosticsView: View {
                 } header: {
                     Text("阅读器性能（诊断）")
                 } footer: {
-                    Text("阅读器局部采样，仅用于辅助定位。回调耗时不等于整帧耗时，不能单凭这个数字判断是重建、排版还是 GPU 瓶颈。使用上方全局采样和真机 Instruments 交叉验证。")
+                    Text("仅在上方显式诊断窗口内采集，新诊断会清零回调记录。这里是业务回调耗时，不是整帧耗时或显示帧率；不能单凭它判断是重建、排版还是 GPU 瓶颈。")
                 }
                 .listRowBackground(AppThemeRowSurface())
                 .id(perfRefreshToken)

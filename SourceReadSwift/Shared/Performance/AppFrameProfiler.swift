@@ -53,6 +53,9 @@ final class AppFrameProfiler: ObservableObject {
     private var startingPower = false
     private var startingThermal = 0
     private var observer: NSObjectProtocol?
+    private var deadlineTask: Task<Void, Never>?
+    var hasActiveDisplayLink: Bool { link != nil }
+    var hasPendingDeadline: Bool { deadlineTask != nil }
 
     private init() {
         observer = NotificationCenter.default.addObserver(forName: UIApplication.willResignActiveNotification,
@@ -61,7 +64,7 @@ final class AppFrameProfiler: ObservableObject {
         }
     }
 
-    func start() {
+    func start(duration: TimeInterval = 30) {
         guard !isRecording else { return }
         histogram = AppFrameHistogram()
         previous = 0
@@ -69,23 +72,35 @@ final class AppFrameProfiler: ObservableObject {
             .first { $0.activationState == .foregroundActive }?.screen.maximumFramesPerSecond ?? 60
         startingPower = ProcessInfo.processInfo.isLowPowerModeEnabled
         startingThermal = ProcessInfo.processInfo.thermalState.rawValue
-        deadline = CACurrentMediaTime() + 30
+        let duration = duration.isFinite ? min(max(duration, 0.01), 30) : 30
+        deadline = CACurrentMediaTime() + duration
         let displayLink = CADisplayLink(target: self, selector: #selector(frame(_:)))
-        if let range = FrameRateCoordinator.preferredRange(maximumFramesPerSecond: maximum) {
-            displayLink.preferredFrameRateRange = range
-        }
+        // Observe the default callback cadence; do not request an 80–120 Hz floor
+        // just by opening diagnostics. This still isn't GPU presentation timing.
         displayLink.add(to: .main, forMode: .common)
         link = displayLink
         isRecording = true
+        ReaderScrollPerfMeter.reset()
+        ReaderScrollPerfMeter.isRecording = true
+        deadlineTask = Task { @MainActor [weak self] in
+            try? await Task.sleep(nanoseconds: UInt64(duration * 1_000_000_000))
+            guard !Task.isCancelled else { return }
+            self?.stop()
+        }
     }
 
     func stop() {
         guard isRecording else { return }
-        link?.invalidate()
+        deadlineTask?.cancel()
+        deadlineTask = nil
+        if let displayLink = link { displayLink.invalidate() }
         link = nil
+        previous = 0
+        ReaderScrollPerfMeter.isRecording = false
+        ReaderScrollPerfMeter.flush()
         isRecording = false
         let h = histogram
-        report = String(format: "屏幕能力：%d Hz\n采样：%d 帧 / %.2f 秒\n平均回调频率：%.1f fps\nP95 / P99：%.0f / %.0f ms\n最慢间隔：%.2f ms\n超过 120fps 预算：%d 帧\n估算错过系统调度：%d 帧\n低电量：%@ → %@\n温度等级：%d → %d\n口径：主线程 CADisplayLink 回调，不代表 GPU 实际呈现。包含静止时系统降频，不是‘最低帧率’承诺。",
+        report = String(format: "屏幕能力：%d Hz\n采样：%d 次回调 / %.2f 秒\n平均回调频率：%.1f 次/秒\n回调间隔 P95 / P99：%.0f / %.0f ms\n最慢间隔：%.2f ms\n超过 120Hz 参考间隔（非掉帧）：%d 次\n估算回调调度缺口（非呈现丢帧）：%d 次\n低电量：%@ → %@\n温度等级：%d → %d\n口径：主线程 CADisplayLink 回调，不代表 GPU 实际呈现。包含静止时系统降频，不是‘最低帧率’承诺。",
                         maximum, h.samples, h.totalSeconds, h.averageFPS,
                         h.percentileMilliseconds(0.95), h.percentileMilliseconds(0.99), h.worstSeconds * 1000,
                         h.over120Budget, h.missedScheduledFrames,

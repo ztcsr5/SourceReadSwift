@@ -49,6 +49,7 @@ struct ReaderScrollPerfAccumulator: Equatable {
 /// 线程约定：只在主线程使用（`scrollViewDidScroll` 与设置页都在主线程）。
 /// 阅读期间只累加内存；退出或切到后台时才落盘，不打断惯性滚动。
 enum ReaderScrollPerfMeter {
+    static var isRecording = false
     private static let framesKey = "reader.scrollPerf.frames"
     private static let totalKey = "reader.scrollPerf.totalMs"
     private static let worstKey = "reader.scrollPerf.worstMs"
@@ -56,6 +57,7 @@ enum ReaderScrollPerfMeter {
     private static var pending = ReaderScrollPerfAccumulator()
 
     static func record(cost: Double) {
+        guard isRecording else { return }
         pending.record(cost: cost)
     }
 

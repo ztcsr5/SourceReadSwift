@@ -3,6 +3,25 @@ import XCTest
 
 @MainActor
 final class BookshelfProgressPerformanceTests: XCTestCase {
+    func testOpeningAndClearingUpdateBadgeDoesNotRewriteBookText() async throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let persistence = BookshelfPersistence(rootURL: root)
+        let store = BookshelfStore(persistence: persistence)
+        store.addLocalTextBook(LocalTextBook(title: "Local", author: "Test", chapters: [
+            LocalTextChapter(title: "1", paragraphs: ["text"], index: 0)
+        ]))
+        let id = try XCTUnwrap(store.books.first?.id)
+        store.updateDetails(bookID: id, latestChapterTitle: "2", intro: nil, totalChapters: 2)
+        let canonical = root.appendingPathComponent("bookshelf_books.json")
+        let before = try Data(contentsOf: canonical)
+        store.markReaderOpened(bookID: id)
+        store.markUpdatesSeen(bookID: id)
+        store.markUpdatesSeen(bookID: id)
+        await store.waitForPendingWrites()
+        XCTAssertEqual(try Data(contentsOf: canonical), before)
+        XCTAssertEqual(try persistence.load().first?.seenTotalChapters, 2)
+    }
     func testProgressWriteDoesNotRewriteLocalBookTextAndReloadsImmediately() throws {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         defer { try? FileManager.default.removeItem(at: root) }
@@ -15,10 +34,11 @@ final class BookshelfProgressPerformanceTests: XCTestCase {
         let before = try Data(contentsOf: canonicalURL)
         let start = Date()
         store.updateReadingProgress(bookID: id, chapterIndex: 172, chapterTitle: "目标章", totalChapters: 850, paragraphIndex: 3)
+        // Reopening is a FIFO durability barrier; direct filesystem reads do not await a queued save.
+        let reloaded = BookshelfStore(persistence: persistence)
         XCTAssertEqual(try Data(contentsOf: canonicalURL), before, "Interactive progress must not encode/write the multi-MB book again")
         let sidecar = try Data(contentsOf: root.appendingPathComponent("bookshelf_reading_positions.json"))
         XCTAssertLessThan(sidecar.count, 2_048)
-        let reloaded = BookshelfStore(persistence: persistence)
         XCTAssertEqual(reloaded.book(id: id)?.currentChapterIndex, 172)
         XCTAssertEqual(reloaded.book(id: id)?.currentParagraphIndex, 3)
         XCTAssertEqual(reloaded.book(id: id)?.currentChapterTitle, "目标章")
@@ -35,8 +55,9 @@ final class BookshelfProgressPerformanceTests: XCTestCase {
         let id = try XCTUnwrap(store.books.first?.id)
         store.updateReadingProgress(bookID: id, chapterIndex: 0, chapterTitle: "1", totalChapters: 1, paragraphIndex: 2)
         store.recordReadingSession(bookID: id, duration: 5)
+        let folded = try persistence.load()
         XCTAssertFalse(FileManager.default.fileExists(atPath: root.appendingPathComponent("bookshelf_reading_positions.json").path))
-        XCTAssertEqual(try persistence.load().first?.currentParagraphIndex, 2)
+        XCTAssertEqual(folded.first?.currentParagraphIndex, 2)
         store.updateReadingProgress(bookID: id, chapterIndex: 0, chapterTitle: "1", totalChapters: 1)
         store.remove(bookID: id)
         XCTAssertTrue(try persistence.load().isEmpty)

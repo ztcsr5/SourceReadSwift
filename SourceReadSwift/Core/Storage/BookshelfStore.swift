@@ -10,6 +10,7 @@ final class BookshelfStore: ObservableObject {
     private let groupPersistence: BookshelfGroupPersistence
     private var persistenceBatchDepth = 0
     private var persistenceBatchDirty = false
+    private var persistenceRevision = 0
     var onBookRead: ((BookshelfBook) -> Void)?
 
     init(persistence: BookshelfPersistence = BookshelfPersistence(), groupPersistence: BookshelfGroupPersistence = BookshelfGroupPersistence()) {
@@ -112,8 +113,12 @@ final class BookshelfStore: ObservableObject {
 
     func markUpdatesSeen(bookID: String) {
         guard let index = books.firstIndex(where: { $0.id == bookID }) else { return }
+        guard books[index].seenTotalChapters != books[index].totalChapters else { return }
         books[index].seenTotalChapters = books[index].totalChapters
-        persist()
+        // The reader marks the book opened before clearing its update badge.
+        // For a never-read book the legacy sidecar intentionally does not restore.
+        if books[index].lastReadAt != nil { persistReadingProgress() }
+        else { persist() }
     }
 
     func markUpdatesSeen(bookIDs: Set<String>) {
@@ -206,14 +211,17 @@ final class BookshelfStore: ObservableObject {
     func recordReadingSession(bookID: String, duration: TimeInterval) {
         guard duration > 1,
               let index = books.firstIndex(where: { $0.id == bookID }) else { return }
-        books[index].readingSessionCount = (books[index].readingSessionCount ?? 0) + 1
-        books[index].totalReadingSeconds = (books[index].totalReadingSeconds ?? 0) + duration
-        books[index].lastReadAt = Date()
-        moveToFront(index: index)
-        persist()
-        if let updated = books.first {
-            onBookRead?(updated)
-        }
+        var updated = books[index]
+        updated.readingSessionCount = (updated.readingSessionCount ?? 0) + 1
+        updated.totalReadingSeconds = (updated.totalReadingSeconds ?? 0) + duration
+        updated.lastReadAt = Date()
+        var nextBooks = books
+        nextBooks.remove(at: index)
+        let target = updated.isPinned ? 0 : (nextBooks.firstIndex(where: { !$0.isPinned }) ?? nextBooks.count)
+        nextBooks.insert(updated, at: target)
+        books = nextBooks
+        persistInBackground()
+        onBookRead?(updated)
     }
 
     func remove(bookID: String) {
@@ -339,6 +347,7 @@ final class BookshelfStore: ObservableObject {
         }
         let previousBooks = books
         let previousGroups = groups
+        persistenceRevision &+= 1
         do {
             // Save both files before publishing the new in-memory state. If
             // the second write fails, put the first file back so a restore
@@ -424,18 +433,46 @@ final class BookshelfStore: ObservableObject {
             persistenceBatchDirty = true
             return
         }
-        do {
-            try persistence.saveReadingProgress(books)
-            lastError = nil
-        } catch {
-            lastError = error.localizedDescription
+        persistenceRevision &+= 1
+        let revision = persistenceRevision
+        persistence.saveReadingProgressInBackground(books) { [weak self] result in
+            Task { @MainActor [weak self] in self?.completePersistence(result, revision: revision) }
         }
     }
 
+    private func persistInBackground() {
+        if persistenceBatchDepth > 0 {
+            persistenceBatchDirty = true
+            return
+        }
+        persistenceRevision &+= 1
+        let revision = persistenceRevision
+        persistence.saveInBackground(books) { [weak self] result in
+            Task { @MainActor [weak self] in self?.completePersistence(result, revision: revision) }
+        }
+    }
+
+    /// Waits without blocking MainActor; used before relinquishing background time.
+    func waitForPendingWrites() async { await persistence.waitForPendingWrites() }
+
+    private func completePersistence(_ result: Result<Void, Error>, revision: Int) {
+        guard revision == persistenceRevision else {
+            if case .failure = result { PerformanceSignpost.event("bookshelf.write", "Superseded background write failed") }
+            return
+        }
+        let message: String?
+        switch result {
+        case .success: message = nil
+        case .failure(let error): message = "保存书架或阅读进度失败：\(error.localizedDescription)"
+        }
+        if lastError != message { lastError = message }
+    }
+
     private func persistNow() {
+        persistenceRevision &+= 1
         do {
             try persistence.save(books)
-            lastError = nil
+            if lastError != nil { lastError = nil }
         } catch {
             lastError = error.localizedDescription
         }

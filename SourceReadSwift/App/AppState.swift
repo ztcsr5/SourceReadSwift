@@ -23,6 +23,7 @@ final class AppState: ObservableObject {
     lazy var batchCheckCoordinator: SourceBatchCheckCoordinator = SourceBatchCheckCoordinator()
     private let injectedEngine: SourceEngine?
     private var cancellables: Set<AnyCancellable> = []
+    private var hasPendingStoreNotification = false
     lazy var engine: SourceEngine = {
         if let injectedEngine {
             return injectedEngine
@@ -102,6 +103,31 @@ final class AppState: ObservableObject {
         }
     }
 
+    /// Finishes already-enqueued progress/history writes under one finite OS lease.
+    func finishReadingWritesInBackground(capturingPosition: () -> Void = {}) {
+        let lease = ReadingWriteBackgroundLease()
+        capturingPosition()
+        let bookshelfStore = bookshelfStore
+        let readingHistoryStore = readingHistoryStore
+        Task { @MainActor in
+            await bookshelfStore.waitForPendingWrites()
+            await readingHistoryStore.waitForPendingWrites()
+            lease.end()
+        }
+    }
+
+    private func scheduleStoreNotification() {
+        guard !hasPendingStoreNotification else { return }
+        hasPendingStoreNotification = true
+        // Store publishers emit before their mutation. Forward after the current
+        // turn so observers read the final state, once for a synchronous burst.
+        DispatchQueue.main.async { [weak self] in
+            guard let self else { return }
+            self.hasPendingStoreNotification = false
+            self.objectWillChange.send()
+        }
+    }
+
     func acquireTabChromeHidden(owner: UUID) {
         activeTabChromeOwners.insert(owner)
         isTabChromeHidden = true
@@ -164,91 +190,70 @@ final class AppState: ObservableObject {
     }
 
     private func bindChildStores() {
+        // All child stores are MainActor-isolated; no per-mutation Task is needed.
         sourceStore.objectWillChange
             .sink { [weak self] _ in
-                Task { @MainActor [weak self] in
-                    self?.objectWillChange.send()
-                }
+                self?.scheduleStoreNotification()
             }
             .store(in: &cancellables)
 
         bookshelfStore.objectWillChange
             .sink { [weak self] _ in
-                Task { @MainActor [weak self] in
-                    self?.objectWillChange.send()
-                }
+                self?.scheduleStoreNotification()
             }
             .store(in: &cancellables)
 
         purifyRuleStore.objectWillChange
             .sink { [weak self] _ in
-                Task { @MainActor [weak self] in
-                    self?.objectWillChange.send()
-                }
+                self?.scheduleStoreNotification()
             }
             .store(in: &cancellables)
 
         chapterContentCacheStore.objectWillChange
             .sink { [weak self] _ in
-                Task { @MainActor [weak self] in
-                    self?.objectWillChange.send()
-                }
+                self?.scheduleStoreNotification()
             }
             .store(in: &cancellables)
 
         chapterDownloadStore.objectWillChange
             .sink { [weak self] _ in
-                Task { @MainActor [weak self] in
-                    self?.objectWillChange.send()
-                }
+                self?.scheduleStoreNotification()
             }
             .store(in: &cancellables)
 
         rssArticleStateStore.objectWillChange
             .sink { [weak self] _ in
-                Task { @MainActor [weak self] in
-                    self?.objectWillChange.send()
-                }
+                self?.scheduleStoreNotification()
             }
             .store(in: &cancellables)
 
         rssFeedCacheStore.objectWillChange
             .sink { [weak self] _ in
-                Task { @MainActor [weak self] in
-                    self?.objectWillChange.send()
-                }
+                self?.scheduleStoreNotification()
             }
             .store(in: &cancellables)
 
         rssArticleContentCacheStore.objectWillChange
             .sink { [weak self] _ in
-                Task { @MainActor [weak self] in
-                    self?.objectWillChange.send()
-                }
+                self?.scheduleStoreNotification()
             }
             .store(in: &cancellables)
 
         sourceHealthStore.objectWillChange
             .sink { [weak self] _ in
-                Task { @MainActor [weak self] in
-                    self?.objectWillChange.send()
-                }
+                self?.scheduleStoreNotification()
             }
             .store(in: &cancellables)
 
         sourceDiagnosticHistoryStore.objectWillChange
             .sink { [weak self] _ in
-                Task { @MainActor [weak self] in
-                    self?.objectWillChange.send()
-                }
+                self?.scheduleStoreNotification()
             }
             .store(in: &cancellables)
 
         readingHistoryStore.objectWillChange
             .sink { [weak self] _ in
-                Task { @MainActor [weak self] in
-                    self?.objectWillChange.send()
-                }
+                self?.scheduleStoreNotification()
             }
             .store(in: &cancellables)
 

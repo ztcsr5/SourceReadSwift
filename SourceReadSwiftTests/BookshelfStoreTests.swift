@@ -133,7 +133,7 @@ final class BookshelfStoreTests: XCTestCase {
         try? FileManager.default.removeItem(at: root)
     }
 
-    func testRecordsReadingSessionStats() throws {
+    func testRecordsReadingSessionStats() async throws {
         let root = FileManager.default.temporaryDirectory
             .appendingPathComponent(UUID().uuidString, isDirectory: true)
         let store = BookshelfStore(persistence: BookshelfPersistence(fileManager: .default, rootURL: root))
@@ -156,6 +156,7 @@ final class BookshelfStoreTests: XCTestCase {
         XCTAssertEqual(book.readingSessionCount, 1)
         XCTAssertEqual(book.totalReadingSeconds, 125)
         XCTAssertNotNil(book.lastReadAt)
+        await store.waitForPendingWrites()
         try? FileManager.default.removeItem(at: root)
     }
 

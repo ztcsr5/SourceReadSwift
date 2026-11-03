@@ -1,16 +1,25 @@
 import Foundation
 
-struct BookshelfPersistence {
+struct BookshelfPersistence: Sendable {
+    // Full saves, progress sidecars and reloads share one FIFO across instances.
+    // A pending progress write must never resurrect a sidecar after a deletion.
+    private static let diskQueue = DispatchQueue(label: "SourceReadSwift.bookshelf.disk", qos: .utility)
     private let fileManager: FileManager
     private let fileName = "bookshelf_books.json"
     private let rootURL: URL?
+    private let writeObserver: (@Sendable () -> Void)?
 
-    init(fileManager: FileManager = .default, rootURL: URL? = nil) {
+    init(fileManager: FileManager = .default, rootURL: URL? = nil, writeObserver: (@Sendable () -> Void)? = nil) {
         self.fileManager = fileManager
         self.rootURL = rootURL
+        self.writeObserver = writeObserver
     }
 
     func load() throws -> [BookshelfBook] {
+        try Self.diskQueue.sync { try readSnapshot() }
+    }
+
+    private func readSnapshot() throws -> [BookshelfBook] {
         let url = try storageURL()
         guard fileManager.fileExists(atPath: url.path) else { return [] }
         let data = try Data(contentsOf: url)
@@ -29,6 +38,18 @@ struct BookshelfPersistence {
     }
 
     func save(_ books: [BookshelfBook]) throws {
+        try Self.diskQueue.sync { try writeSnapshot(books) }
+    }
+
+    /// Completes on the disk queue. UI callers must return to MainActor.
+    func saveInBackground(_ books: [BookshelfBook], completion: @escaping @Sendable (Result<Void, Error>) -> Void) {
+        Self.diskQueue.async { completion(Result { try writeSnapshot(books) }) }
+    }
+
+    private func writeSnapshot(_ books: [BookshelfBook]) throws {
+        writeObserver?()
+        let span = PerformanceSignpost.begin("bookshelf.snapshot.write")
+        defer { PerformanceSignpost.end("bookshelf.snapshot.write", id: span) }
         let url = try storageURL()
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.sortedKeys]
@@ -45,6 +66,25 @@ struct BookshelfPersistence {
     /// synchronously. Persist only these small fields on the interactive path.
     /// Full saves, backup/restore and the canonical shelf format stay unchanged.
     func saveReadingProgress(_ books: [BookshelfBook]) throws {
+        try Self.diskQueue.sync { try writeReadingProgress(books) }
+    }
+
+    /// Enqueues an immutable snapshot; encoding and filesystem work run off main.
+    func saveReadingProgressInBackground(_ books: [BookshelfBook], completion: @escaping @Sendable (Result<Void, Error>) -> Void) {
+        Self.diskQueue.async { completion(Result { try writeReadingProgress(books) }) }
+    }
+
+    /// An asynchronous durability boundary, including writes from other instances.
+    func waitForPendingWrites() async {
+        await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+            Self.diskQueue.async { continuation.resume() }
+        }
+    }
+
+    private func writeReadingProgress(_ books: [BookshelfBook]) throws {
+        writeObserver?()
+        let span = PerformanceSignpost.begin("bookshelf.progress.write")
+        defer { PerformanceSignpost.end("bookshelf.progress.write", id: span) }
         let positions = Dictionary(uniqueKeysWithValues: books.map { ($0.id, ReadingPosition($0)) })
         let data = try JSONEncoder().encode(positions)
         try AppStorageDirectory.safeWrite(data, to: progressURL(), fileManager: fileManager)
