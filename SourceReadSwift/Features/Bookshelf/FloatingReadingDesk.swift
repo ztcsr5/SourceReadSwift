@@ -35,17 +35,17 @@ struct FloatingReadingDesk: View {
                 let height: CGFloat = geometry.size.width < 310 ? 208 : 224
                 ZStack(alignment: .top) {
                     environment.frame(height: 248)
-                        .modifier(FloatingDeskParallax(depth: 3, reducesDepth: policy.reducesDepth))
+                        .modifier(FloatingDeskParallax(depth: 3 * palette.finish.parallaxStrength, reducesDepth: policy.reducesDepth))
                     stage.frame(height: 148).padding(.top, 88)
-                        .modifier(FloatingDeskParallax(depth: 7, reducesDepth: policy.reducesDepth))
+                        .modifier(FloatingDeskParallax(depth: 7 * palette.finish.parallaxStrength, reducesDepth: policy.reducesDepth))
                     sideNotes(coverWidth: width).padding(.top, 132)
-                        .modifier(FloatingDeskParallax(depth: 30, reducesDepth: policy.reducesDepth))
+                        .modifier(FloatingDeskParallax(depth: 30 * palette.finish.parallaxStrength, reducesDepth: policy.reducesDepth))
                     jacket(width: width, height: height).frame(maxWidth: .infinity)
-                        .modifier(FloatingDeskParallax(depth: 22, reducesDepth: policy.reducesDepth))
+                        .modifier(FloatingDeskParallax(depth: 22 * palette.finish.parallaxStrength, reducesDepth: policy.reducesDepth))
                 }
             }.frame(height: 240)
             caption
-                .modifier(FloatingDeskParallax(depth: 34, reducesDepth: policy.reducesDepth))
+                .modifier(FloatingDeskParallax(depth: 34 * palette.finish.parallaxStrength, reducesDepth: policy.reducesDepth))
         }
         .foregroundStyle(palette.ink)
         .contentShape(Rectangle())
@@ -70,7 +70,7 @@ struct FloatingReadingDesk: View {
                 RadialGradient(colors: [pigment.opacity(0.08), .clear],
                     center: UnitPoint(x: 0.28, y: 0.4), startRadius: 0, endRadius: 140)
             }
-        }.allowsHitTesting(false)
+        }.opacity(palette.finish.environmentStrength).allowsHitTesting(false)
     }
 
     private var pigment: Color {
@@ -89,9 +89,13 @@ struct FloatingReadingDesk: View {
                     .frame(width: 190, height: 20).offset(y: 59)
             }
         }.overlay {
-            RoundedRectangle(cornerRadius: 24, style: .continuous)
-                .strokeBorder(LinearGradient(colors: [palette.pearl.opacity(0.85), palette.mist.opacity(0.10), palette.pearl.opacity(0.28)],
-                    startPoint: .topLeading, endPoint: .bottomTrailing), lineWidth: contrast == .increased ? 1.5 : 0.75)
+            if contrast == .increased {
+                RoundedRectangle(cornerRadius: 24, style: .continuous).strokeBorder(palette.ink.opacity(0.45), lineWidth: 1.5)
+            } else {
+                RoundedRectangle(cornerRadius: 24, style: .continuous)
+                    .strokeBorder(LinearGradient(colors: [palette.pearl.opacity(0.85), palette.mist.opacity(0.10), palette.pearl.opacity(0.28)],
+                        startPoint: .topLeading, endPoint: .bottomTrailing), lineWidth: 0.75)
+            }
         }
         .shadow(color: palette.shadow.opacity(contrast == .increased ? 0 : 0.06), radius: 12, y: 8)
         .allowsHitTesting(false)
@@ -101,7 +105,7 @@ struct FloatingReadingDesk: View {
         let shape = RoundedRectangle(cornerRadius: 24, style: .continuous)
         #if compiler(>=6.2)
         if #available(iOS 26.0, *), policy.surface == .liquidGlass {
-            shape.fill(.clear).glassEffect(.regular.tint(palette.glassTint.opacity(0.18)), in: shape)
+            shape.fill(.clear).glassEffect(.regular.tint(palette.glassTint.opacity(palette.finish.glassTintOpacity)), in: shape)
         } else { compatiblePlane(shape) }
         #else
         compatiblePlane(shape)
@@ -110,7 +114,7 @@ struct FloatingReadingDesk: View {
 
     @ViewBuilder private func compatiblePlane(_ shape: RoundedRectangle) -> some View {
         if policy.surface == .opaque { shape.fill(palette.pearl) }
-        else { shape.fill(.ultraThinMaterial).overlay { shape.fill(palette.glassTint.opacity(0.16)) } }
+        else { shape.fill(.ultraThinMaterial).overlay { shape.fill(palette.glassTint.opacity(palette.finish.glassTintOpacity)) } }
     }
 
     private func jacket(width: CGFloat, height: CGFloat) -> some View {

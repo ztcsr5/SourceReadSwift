@@ -14,6 +14,14 @@ final class FloatingReadingDeskTests: XCTestCase {
         }
     }
 
+    func testThemeAdaptationIncludesMaterialAndDepthNotOnlyColor() {
+        let luminous = FloatingDeskPalette.resolve(theme: .classic).finish
+        let quiet = FloatingDeskPalette.resolve(theme: .editorial).finish
+        XCTAssertGreaterThan(luminous.environmentStrength, quiet.environmentStrength)
+        XCTAssertLessThan(luminous.glassTintOpacity, quiet.glassTintOpacity)
+        XCTAssertGreaterThan(luminous.parallaxStrength, quiet.parallaxStrength)
+    }
+
     @MainActor func testLargeCoverAndCompactEnvelopeWithoutChangingTheOldCard() {
         let regular = measure(usesFloatingStyle: true, type: .large)
         let old = measure(usesFloatingStyle: false, type: .large)

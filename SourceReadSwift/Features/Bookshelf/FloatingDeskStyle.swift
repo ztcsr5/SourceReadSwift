@@ -1,5 +1,13 @@
 import SwiftUI
 
+/// Finish changes material presence and depth, not the book's layout or navigation.
+enum FloatingDeskFinish {
+    case luminous, quiet
+    var glassTintOpacity: Double { self == .luminous ? 0.18 : 0.34 }
+    var environmentStrength: Double { self == .luminous ? 1 : 0.55 }
+    var parallaxStrength: CGFloat { self == .luminous ? 1 : 0.7 }
+}
+
 /// Semantic atmosphere for the reading desk only; it never rewrites the global theme.
 struct FloatingDeskPalette {
     let pearl: Color
@@ -8,6 +16,7 @@ struct FloatingDeskPalette {
     let ink: Color
     let shadow: Color
     let glassTint: Color
+    let finish: FloatingDeskFinish
 
     static func resolve(theme: AppVisualTheme) -> Self {
         if theme == .classic {
@@ -15,11 +24,12 @@ struct FloatingDeskPalette {
                 mist: AppTheme.accent, light: theme.dynamicColor(light: 0xDAD0F5, dark: 0x75638F),
                 ink: theme.dynamicColor(light: 0x352644, dark: 0xF3EDFF),
                 shadow: theme.dynamicColor(light: 0x51416E, dark: 0x000000),
-                glassTint: theme.dynamicColor(light: 0xEEE8FC, dark: 0x352C49))
+                glassTint: theme.dynamicColor(light: 0xEEE8FC, dark: 0x352C49), finish: .luminous)
         }
         return Self(pearl: AppTheme.card, mist: AppTheme.accent, light: AppTheme.secondaryAccent,
             ink: theme.dynamicColor(light: 0x29282D, dark: 0xF5F3EF),
-            shadow: theme.dynamicColor(light: theme.accentHex, dark: 0x000000), glassTint: AppTheme.card)
+            shadow: theme.dynamicColor(light: theme.accentHex, dark: 0x000000), glassTint: AppTheme.card,
+            finish: [.editorial, .folio, .inkwash].contains(theme) ? .quiet : .luminous)
     }
 }
 
