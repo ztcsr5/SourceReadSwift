@@ -489,7 +489,7 @@ struct ReadingHistoryView: View {
                                     Label("\(item.readingSessionCount) 次", systemImage: "book")
                                     Label(readingDurationText(item.totalReadingSeconds), systemImage: "timer")
                                     Spacer()
-                                    Text(item.lastReadAt.formatted(date: .abbreviated, time: .shortened))
+                                    Text(item.lastReadAt, format: .dateTime.year().month(.twoDigits).day(.twoDigits).hour().minute())
                                         .font(.caption2)
                                         .foregroundStyle(.tertiary)
                                 }
@@ -812,7 +812,7 @@ struct ReadingStatsView: View {
                                         .foregroundStyle(AppTheme.accent)
                                 }
                                 if let lastReadAt = book.lastReadAt {
-                                    Text(lastReadAt.formatted(date: .abbreviated, time: .shortened))
+                                    Text(lastReadAt, format: .dateTime.year().month(.twoDigits).day(.twoDigits).hour().minute())
                                         .font(.caption)
                                         .foregroundStyle(.secondary)
                                 }

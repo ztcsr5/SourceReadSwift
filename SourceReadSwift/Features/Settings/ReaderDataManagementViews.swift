@@ -275,7 +275,7 @@ struct OfflineChapterCacheView: View {
             Text(entry.title)
                 .font(.headline)
                 .lineLimit(1)
-            Text("\(entry.paragraphs.count) 段 · \(entry.cachedAt.formatted(date: .abbreviated, time: .shortened))")
+            Text("\(entry.paragraphs.count) 段 · \(entry.cachedAt, format: .dateTime.year().month(.twoDigits).day(.twoDigits).hour().minute())")
                 .font(.caption)
                 .foregroundStyle(.secondary)
             if appState.bookshelfStore.books.contains(where: {
