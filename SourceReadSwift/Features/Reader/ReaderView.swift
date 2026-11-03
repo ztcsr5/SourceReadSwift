@@ -1329,12 +1329,12 @@ struct ReaderView: View {
         .onChange(of: scrollParagraphTarget) { _ in
             // Persisting the whole bookshelf serializes JSON to disk. Debounce
             // target changes so paging/auto-scroll stays on the rendering path.
-            scheduleReadingPositionPersistence(paragraphIndex: currentParagraphIndexForPersistence())
+            scheduleReadingPositionPersistence()
         }
         .onChange(of: pagedPageIndex) { _ in
             guard pendingWindowJump == nil else { return }
             ensurePagedContinuationBuffer(pageIndex: pagedPageIndex)
-            scheduleReadingPositionPersistence(paragraphIndex: currentParagraphIndexForPersistence())
+            scheduleReadingPositionPersistence()
         }
         .onChange(of: content) { updatedContent in
             // Chapter handoff normally recreates the reader, but keeping a
@@ -1404,6 +1404,7 @@ struct ReaderView: View {
             stopAutoScroll()
             stopSpeechPlayback()
             scrollParagraphTarget = paragraph
+            visibleParagraphIndex = paragraph
             scrollJumpGeneration &+= 1
             paragraphJumpRequest = readerMode == .scroll
                 ? ParagraphJumpRequest(index: paragraph, utf16Offset: anchor?.paragraphUTF16Offset ?? 0)
@@ -1411,7 +1412,11 @@ struct ReaderView: View {
             // The rebuild restored the UTF-16 anchor. A paragraph-to-page
             // mapping here would undo that restoration on every mode switch.
             if readerMode != .scroll { reportCoverVisibleIdentity(pagedPageIndex) }
-            persistReadingPosition(paragraphIndexOverride: paragraph)
+            positionPersistTask?.cancel()
+            positionPersistTask = nil
+            // The scroll target is window-flat; the sidecar always stores
+            // the chapter-local cursor resolved from the committed surface.
+            persistReadingPosition()
             syncPerBookOverrideIfNeeded()
         }
         .onChange(of: fontFamilyRawValue) { _ in
@@ -2764,8 +2769,7 @@ struct ReaderView: View {
             trimWindowIfNeeded()
             touchChapterCache(resolved.chapterIndex)
         }
-        let final = resolvedReadingPosition(forFlatIndex: visibleParagraphIndex)
-        scheduleReadingPositionPersistence(paragraphIndex: final.paragraphIndex)
+        scheduleReadingPositionPersistence()
     }
 
     /// Adopts the chapter shown by a freshly built page model. Page-curl moves
@@ -6250,12 +6254,14 @@ struct ReaderView: View {
         )
     }
 
-    private func scheduleReadingPositionPersistence(paragraphIndex: Int) {
+    private func scheduleReadingPositionPersistence() {
         positionPersistTask?.cancel()
         positionPersistTask = Task { @MainActor in
             try? await Task.sleep(nanoseconds: ReaderPerformancePolicy.positionPersistenceDebounceNanoseconds)
             guard !Task.isCancelled else { return }
-            persistReadingPosition(paragraphIndexOverride: paragraphIndex)
+            // Capture chapter and paragraph together after the debounce.
+            // A previously captured local paragraph may belong to another chapter.
+            persistReadingPosition()
             checkDailyReadingGoal()
             positionPersistTask = nil
         }
@@ -6329,8 +6335,7 @@ struct ReaderView: View {
         let flat = positionMapping.paragraph(forPage: pageIndex)
         guard flat != visibleParagraphIndex || chapterChanged else { return }
         visibleParagraphIndex = flat
-        let resolved = resolvedReadingPosition(forFlatIndex: flat)
-        scheduleReadingPositionPersistence(paragraphIndex: resolved.paragraphIndex)
+        scheduleReadingPositionPersistence()
     }
 
     /// 读到本章倒数第 3 页时就把下一章拉进来；窗口尾部再向外多预取一章。
@@ -6471,7 +6476,7 @@ struct ReaderView: View {
             }
             rebuildPagedBlocksCache()
             pagedPageIndex = min(max(pagedPageIndex, 0), positionMapping.maximumPageIndex)
-            scheduleReadingPositionPersistence(paragraphIndex: currentParagraphIndexForPersistence())
+            scheduleReadingPositionPersistence()
             pageLayoutTask = nil
         }
     }
