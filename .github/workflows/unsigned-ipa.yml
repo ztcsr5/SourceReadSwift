@@ -12,6 +12,7 @@ on:
 
 jobs:
   package:
+    if: github.ref != 'refs/heads/codex/floating-reading-desk'
     runs-on: ${{ github.ref == 'refs/heads/codex/reader-motion-117' && 'macos-15-intel' || 'macos-15' }}
     timeout-minutes: 30
     env:

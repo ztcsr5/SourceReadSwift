@@ -22,13 +22,16 @@ struct ReadingHeroCard: View {
     let book: BookshelfBook
     var heroNamespace: Namespace.ID? = nil
     var usesSpatialStyle = true
+    var usesFloatingStyle = false
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @AppMotion private var motion
     @State private var coverImage: UIImage?
     @State private var tone: CoverTone?
 
     @ViewBuilder var body: some View {
-        if let heroNamespace { card.bookHeroSource("continue|" + book.id, in: heroNamespace) }
+        if usesSpatialStyle && usesFloatingStyle {
+            FloatingReadingDesk(book: book, heroNamespace: heroNamespace)
+        } else if let heroNamespace { card.bookHeroSource("continue|" + book.id, in: heroNamespace) }
         else { card }
     }
 

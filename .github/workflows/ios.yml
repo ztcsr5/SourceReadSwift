@@ -25,6 +25,7 @@ on:
 
 jobs:
   native-tabs:
+    if: github.ref != 'refs/heads/codex/floating-reading-desk'
     runs-on: ${{ (github.ref == 'refs/heads/codex/reader-motion-117' || inputs.reader_settings_only) && 'macos-26-intel' || 'macos-26' }}
     timeout-minutes: 60
     env:
@@ -134,6 +135,7 @@ jobs:
           if-no-files-found: ignore
           retention-days: 7
   build:
+    if: github.ref != 'refs/heads/codex/floating-reading-desk'
     runs-on: ${{ (github.ref == 'refs/heads/codex/reader-motion-117' || inputs.reader_settings_only) && 'macos-15-intel' || 'macos-15' }}
     timeout-minutes: 45
     steps:

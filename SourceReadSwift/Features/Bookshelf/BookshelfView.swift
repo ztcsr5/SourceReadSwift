@@ -19,6 +19,7 @@ struct BookshelfView: View {
     @State private var selectedMediaFilter: String? = nil
     @State private var readingBookID: String?
     @AppStorage("settings.readingDeskEnabled") private var readingDeskEnabled = true
+    @AppStorage("settings.floatingReadingDeskEnabled") private var floatingReadingDeskEnabled = true
 
     enum BookshelfSortMode: String, CaseIterable, Identifiable {
         case recentRead = "最近阅读"
@@ -275,7 +276,7 @@ struct BookshelfView: View {
                     let books = ReadingDeskSelection.books(from: recentBooks)
                     ReadingDeskPager(books: books, selection: Binding(
                         get: { ReadingDeskSelection.resolve(readingBookID, in: books) },
-                        set: { readingBookID = $0 }), card: { heroCard($0) })
+                        set: { readingBookID = $0 }), usesFloatingStyle: floatingReadingDeskEnabled, card: { heroCard($0) })
                     .onChange(of: recentBooks.first?.id) { readingBookID = $0 }
                 } else if let book = recentBooks.first { heroCard(book) }
             }
@@ -721,23 +722,27 @@ struct BookshelfView: View {
             BookshelfReaderGatewayView(book: book)
                 .bookHeroDestination("continue|" + book.id, in: bookHero)
         } label: {
-            ReadingHeroCard(book: book, heroNamespace: bookHero, usesSpatialStyle: readingDeskEnabled)
+            ReadingHeroCard(book: book, heroNamespace: bookHero, usesSpatialStyle: readingDeskEnabled,
+                usesFloatingStyle: floatingReadingDeskEnabled)
                 .frame(maxWidth: .infinity, alignment: .topLeading)
                 .padding(.vertical, 3)
         }
         .accessibilityIdentifier("bookshelf.continue." + book.id)
         .overlay(alignment: .topTrailing) {
             Menu {
+                Toggle("悬浮玻璃书台", isOn: $floatingReadingDeskEnabled)
+                    .accessibilityIdentifier("bookshelf.floatingDeskToggle")
                 NavigationLink {
                     BookDetailView(book: book.asSearchBook)
                         .bookHeroDestination("continue|" + book.id, in: bookHero)
                 } label: { Label("书籍详情", systemImage: "info.circle") }
             } label: {
                 Image(systemName: "ellipsis").font(.title3.weight(.semibold))
-                    .frame(width: 44, height: 44).background(AppTheme.elevatedCard, in: Circle())
+                    .frame(width: 44, height: 44)
+                    .background(AppTheme.elevatedCard.opacity(readingDeskEnabled && floatingReadingDeskEnabled ? 0.6 : 1), in: Circle())
             }.padding(12).accessibilityLabel("正在阅读书籍的更多操作")
         }
-        .buttonStyle(PressableScaleButtonStyle())
+        .buttonStyle(FloatingDeskPressStyle(isEnabled: readingDeskEnabled && floatingReadingDeskEnabled))
         .simultaneousGesture(TapGesture().onEnded {
             UIImpactFeedbackGenerator(style: .light).impactOccurred()
         })

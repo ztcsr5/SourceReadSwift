@@ -4,6 +4,9 @@ import Foundation
 @MainActor enum ReaderRegressionLaunch {
     static func makeAppState() -> AppState {
         #if DEBUG
+        if ProcessInfo.processInfo.arguments.contains("--floating-desk-regression") {
+            return FloatingDeskRegressionLaunch.makeAppState()
+        }
         if ProcessInfo.processInfo.arguments.contains("--reader-settings-regression") {
             let root = FileManager.default.temporaryDirectory.appendingPathComponent("reader-ui-" + UUID().uuidString)
             let shelf = BookshelfStore(persistence: BookshelfPersistence(rootURL: root),

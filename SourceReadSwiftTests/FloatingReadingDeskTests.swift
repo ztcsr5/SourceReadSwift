@@ -1,0 +1,82 @@
+import SwiftUI
+import XCTest
+@testable import SourceReadSwift
+
+final class FloatingReadingDeskTests: XCTestCase {
+    func testAccessibilityAndEnergyPoliciesCoverEveryCombination() {
+        for bits in 0..<32 {
+            let motion = bits & 1 != 0, transparency = bits & 2 != 0, contrast = bits & 4 != 0
+            let energy = bits & 8 != 0, native = bits & 16 != 0
+            let policy = FloatingDeskPolicy.resolve(.init(reducesMotion: motion, reducesTransparency: transparency,
+                increasedContrast: contrast, conservesEnergy: energy), hasLiquidGlass: native)
+            XCTAssertEqual(policy.reducesDepth, motion || energy)
+            XCTAssertEqual(policy.surface, transparency || contrast || energy ? .opaque : native ? .liquidGlass : .material)
+        }
+    }
+
+    @MainActor func testLargeCoverAndCompactEnvelopeWithoutChangingTheOldCard() {
+        let regular = measure(usesFloatingStyle: true, type: .large)
+        let old = measure(usesFloatingStyle: false, type: .large)
+        let accessible = measure(usesFloatingStyle: true, type: .accessibility3)
+        XCTAssertEqual(regular.width, 342, accuracy: 1)
+        XCTAssertGreaterThanOrEqual(regular.height, 280)
+        XCTAssertLessThanOrEqual(regular.height, 330)
+        XCTAssertLessThan(old.height, regular.height, "The independent switch must really preserve the previous compact card")
+        XCTAssertGreaterThan(accessible.height, regular.height, "Accessibility text must grow, not get clipped by a fixed card")
+    }
+
+    @MainActor func testMountedThemesLongTitlesAndAccessibilityEvidence() async throws {
+        let defaults = UserDefaults.standard
+        let key = "settings.visualTheme", oldTheme = defaults.object(forKey: key)
+        defer { if let oldTheme { defaults.set(oldTheme, forKey: key) } else { defaults.removeObject(forKey: key) } }
+        let previous = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.flatMap(\.windows).first(where: \.isKeyWindow)
+        defer { previous?.makeKey() }
+        for (theme, dark, width, accessible) in [
+            (AppVisualTheme.classic, false, CGFloat(390), false), (.classic, true, 390, false),
+            (.botanical, false, 390, false), (.editorial, false, 390, false),
+            (.classic, false, 320, false), (.classic, false, 320, true)
+        ] {
+            defaults.set(theme.rawValue, forKey: key)
+            let content = VStack(alignment: .leading, spacing: 8) {
+                Text("正在阅读").font(.title2.weight(.semibold))
+                ReadingHeroCard(book: makeBook(), usesFloatingStyle: true)
+                Text("我的书架").font(.title2.weight(.semibold))
+                Text("书架必须在首屏继续可见，不因主视觉挤到屏幕之外。")
+            }.padding(24).frame(maxHeight: .infinity, alignment: .top).background(AppTheme.background)
+                .environment(\.dynamicTypeSize, accessible ? .accessibility3 : .large)
+                .environment(\.accessibilityReduceTransparency, accessible)
+                .environment(\.accessibilityReduceMotion, accessible)
+                .environment(\.colorSchemeContrast, accessible ? .increased : .standard)
+                .preferredColorScheme(dark ? .dark : .light)
+            let host = UIHostingController(rootView: content)
+            let scene = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.first
+            let window = scene.map { UIWindow(windowScene: $0) } ?? UIWindow(frame: UIScreen.main.bounds)
+            window.frame = CGRect(x: 0, y: 0, width: width, height: 844)
+            window.overrideUserInterfaceStyle = dark ? .dark : .light
+            window.rootViewController = host; window.makeKeyAndVisible()
+            try await Task.sleep(nanoseconds: 350_000_000)
+            host.view.layoutIfNeeded()
+            XCTAssertEqual(host.view.bounds.width, width, accuracy: 1)
+            let image = UIGraphicsImageRenderer(size: host.view.bounds.size).image { _ in
+                host.view.drawHierarchy(in: host.view.bounds, afterScreenUpdates: true)
+            }
+            let attachment = XCTAttachment(image: image)
+            attachment.name = "floating-desk-\(theme.rawValue)-\(dark ? "dark" : "light")-\(Int(width))-\(accessible ? "accessible" : "normal")"
+            attachment.lifetime = .keepAlways; add(attachment)
+            window.isHidden = true
+        }
+    }
+
+    private func makeBook() -> BookshelfBook {
+        var book = BookshelfBook(id: "desk-long-title", title: "白昼之后，我们把很长很长的信写给远方与尚未相逢的人",
+            author: "一位名字也非常长的作者", coverURL: nil, sourceName: "离线验收", sourceURL: "local://text", bookURL: "local://desk", intro: nil)
+        book.lastReadAt = Date(timeIntervalSince1970: 1)
+        book.totalChapters = 100; book.currentChapterIndex = 63; book.currentChapterTitle = "第六十四章 · 写给下一页的信"
+        return book
+    }
+
+    @MainActor private func measure(usesFloatingStyle: Bool, type: DynamicTypeSize) -> CGSize {
+        UIHostingController(rootView: ReadingHeroCard(book: makeBook(), usesFloatingStyle: usesFloatingStyle)
+            .environment(\.dynamicTypeSize, type)).sizeThatFits(in: CGSize(width: 342, height: 6000))
+    }
+}
