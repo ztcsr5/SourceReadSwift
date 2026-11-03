@@ -28,7 +28,11 @@ final class FloatingReadingDeskTests: XCTestCase {
     @MainActor func testMountedThemesLongTitlesAndAccessibilityEvidence() async throws {
         let defaults = UserDefaults.standard
         let key = "settings.visualTheme", oldTheme = defaults.object(forKey: key)
-        defer { if let oldTheme { defaults.set(oldTheme, forKey: key) } else { defaults.removeObject(forKey: key) } }
+        let motionKey = "settings.reducesMotion", oldMotion = defaults.object(forKey: motionKey)
+        defer {
+            if let oldTheme { defaults.set(oldTheme, forKey: key) } else { defaults.removeObject(forKey: key) }
+            if let oldMotion { defaults.set(oldMotion, forKey: motionKey) } else { defaults.removeObject(forKey: motionKey) }
+        }
         let previous = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.flatMap(\.windows).first(where: \.isKeyWindow)
         defer { previous?.makeKey() }
         for (theme, dark, width, accessible) in [
@@ -37,6 +41,7 @@ final class FloatingReadingDeskTests: XCTestCase {
             (.classic, false, 320, false), (.classic, false, 320, true)
         ] {
             defaults.set(theme.rawValue, forKey: key)
+            defaults.set(accessible, forKey: motionKey)
             let content = VStack(alignment: .leading, spacing: 8) {
                 Text("正在阅读").font(.title2.weight(.semibold))
                 ReadingHeroCard(book: makeBook(), usesFloatingStyle: true)
@@ -44,19 +49,22 @@ final class FloatingReadingDeskTests: XCTestCase {
                 Text("书架必须在首屏继续可见，不因主视觉挤到屏幕之外。")
             }.padding(24).frame(maxHeight: .infinity, alignment: .top).background(AppTheme.background)
                 .environment(\.dynamicTypeSize, accessible ? .accessibility3 : .large)
-                .environment(\.accessibilityReduceTransparency, accessible)
-                .environment(\.accessibilityReduceMotion, accessible)
-                .environment(\.colorSchemeContrast, accessible ? .increased : .standard)
                 .preferredColorScheme(dark ? .dark : .light)
             let host = UIHostingController(rootView: content)
             let scene = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.first
             let window = scene.map { UIWindow(windowScene: $0) } ?? UIWindow(frame: UIScreen.main.bounds)
-            window.frame = CGRect(x: 0, y: 0, width: width, height: 844)
+            window.frame = UIScreen.main.bounds
             window.overrideUserInterfaceStyle = dark ? .dark : .light
-            window.rootViewController = host; window.makeKeyAndVisible()
+            let parent = UIViewController(); window.rootViewController = parent; window.makeKeyAndVisible()
+            parent.addChild(host)
+            parent.setOverrideTraitCollection(UITraitCollection(accessibilityContrast: accessible ? .high : .normal), forChild: host)
+            parent.view.addSubview(host.view)
+            host.view.frame = CGRect(x: 0, y: 0, width: width, height: 844); host.didMove(toParent: parent)
             try await Task.sleep(nanoseconds: 350_000_000)
             host.view.layoutIfNeeded()
             XCTAssertEqual(host.view.bounds.width, width, accuracy: 1)
+            XCTAssertEqual(host.traitCollection.accessibilityContrast, accessible ? .high : .normal)
+            XCTAssertEqual(host.traitCollection.userInterfaceStyle, dark ? .dark : .light)
             let image = UIGraphicsImageRenderer(size: host.view.bounds.size).image { _ in
                 host.view.drawHierarchy(in: host.view.bounds, afterScreenUpdates: true)
             }
