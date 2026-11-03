@@ -10,7 +10,7 @@ struct BookshelfView: View {
     @State private var importMessage: String?
     @State private var isRefreshingBooks = false
     @State private var isImportingBook = false
-    @State private var contextualDetail: ContextualBookDetail?
+    @State private var contextualBookRoute: ContextualBookRoute?
     @State private var bookToRemove: BookshelfBook?
     @State private var shelfReturnOrder: [String] = []
     @State private var deskReturnOrder: [String] = []
@@ -25,9 +25,9 @@ struct BookshelfView: View {
     @AppStorage("settings.floatingReadingDeskEnabled") private var floatingReadingDeskEnabled = true
     @StateObject private var readingCoverHandoff = ReadingCoverHandoff()
 
-    private struct ContextualBookDetail {
-        let book: BookshelfBook
-        let placement: String
+    private enum ContextualBookRoute {
+        case read(BookshelfBook)
+        case detail(BookshelfBook, placement: String)
     }
 
     enum BookshelfSortMode: String, CaseIterable, Identifiable {
@@ -221,10 +221,18 @@ struct BookshelfView: View {
                 .ignoresSafeArea()
             }
             .navigationDestination(isPresented: Binding(
-                get: { contextualDetail != nil }, set: { if !$0 { contextualDetail = nil } }
+                get: { contextualBookRoute != nil }, set: { if !$0 { contextualBookRoute = nil } }
             )) {
-                if let route = contextualDetail {
-                    detailDestination(route.book, placement: route.placement)
+                if let route = contextualBookRoute {
+                    switch route {
+                    case .read(let book):
+                        BookshelfReaderGatewayView(book: book)
+                            .bookHeroDestination("continue|" + book.id, in: bookHero)
+                            .environment(\.readingCoverHandoff, readingDeskEnabled && floatingReadingDeskEnabled ? readingCoverHandoff : nil)
+                            .environment(\.bookOpeningCover, readingDeskEnabled && floatingReadingDeskEnabled ? book.asSearchBook : nil)
+                    case .detail(let book, let placement):
+                        detailDestination(book, placement: placement)
+                    }
                 }
             }
             .alert("从书架删除？", isPresented: Binding(
@@ -769,12 +777,13 @@ struct BookshelfView: View {
     }
 
     private func heroCard(_ book: BookshelfBook) -> some View {
-        NavigationLink {
-            BookshelfReaderGatewayView(book: book)
-                .bookHeroDestination("continue|" + book.id, in: bookHero)
-                .environment(\.readingCoverHandoff, readingDeskEnabled && floatingReadingDeskEnabled ? readingCoverHandoff : nil)
-                .environment(\.bookOpeningCover, readingDeskEnabled && floatingReadingDeskEnabled ? book.asSearchBook : nil)
-                .onAppear { pinReturnOrder(placement: "continue") }
+        // Let the system Button and context menu arbitrate activation. A
+        // simultaneous tap recognizer on a link can open the reader after a hold.
+        Button {
+            guard contextualBookRoute == nil else { return }
+            pinReturnOrder(placement: "continue")
+            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+            contextualBookRoute = .read(book)
         } label: {
             ReadingHeroCard(book: book, heroNamespace: bookHero, usesSpatialStyle: readingDeskEnabled,
                 usesFloatingStyle: floatingReadingDeskEnabled)
@@ -783,24 +792,12 @@ struct BookshelfView: View {
                 .padding(.vertical, 3)
         }
         .accessibilityIdentifier("bookshelf.continue." + book.id)
-        .overlay(alignment: .topTrailing) {
-            Menu {
-                Toggle("悬浮玻璃书台", isOn: $floatingReadingDeskEnabled)
-                    .accessibilityIdentifier("bookshelf.floatingDeskToggle")
-            } label: {
-                Image(systemName: "ellipsis").font(.title3.weight(.semibold))
-                    .frame(width: 44, height: 44)
-                    .background(AppTheme.elevatedCard.opacity(readingDeskEnabled && floatingReadingDeskEnabled ? 0.6 : 1), in: Circle())
-            }.padding(12).accessibilityLabel("正在阅读书籍的更多操作")
-        }
         .buttonStyle(FloatingDeskPressStyle(isEnabled: readingDeskEnabled && floatingReadingDeskEnabled))
-        .simultaneousGesture(TapGesture().onEnded {
-            UIImpactFeedbackGenerator(style: .light).impactOccurred()
-        })
         .contextMenu {
             Button {
+                guard contextualBookRoute == nil else { return }
                 pinReturnOrder(placement: "continue")
-                contextualDetail = ContextualBookDetail(book: book, placement: "continue")
+                contextualBookRoute = .detail(book, placement: "continue")
             } label: {
                 Label("书籍详情", systemImage: "info.circle")
             }
@@ -814,6 +811,16 @@ struct BookshelfView: View {
             Button("从书架删除", role: .destructive) {
                 bookToRemove = book
             }
+        }
+        .overlay(alignment: .topTrailing) {
+            Menu {
+                Toggle("悬浮玻璃书台", isOn: $floatingReadingDeskEnabled)
+                    .accessibilityIdentifier("bookshelf.floatingDeskToggle")
+            } label: {
+                Image(systemName: "ellipsis").font(.title3.weight(.semibold))
+                    .frame(width: 44, height: 44)
+                    .background(AppTheme.elevatedCard.opacity(readingDeskEnabled && floatingReadingDeskEnabled ? 0.6 : 1), in: Circle())
+            }.padding(12).accessibilityLabel("正在阅读书籍的更多操作")
         }
     }
 
@@ -950,7 +957,7 @@ struct BookshelfView: View {
         .contextMenu {
             Button {
                 pinReturnOrder(placement: "list")
-                contextualDetail = ContextualBookDetail(book: book, placement: "list")
+                contextualBookRoute = .detail(book, placement: "list")
             } label: {
                 Label("书籍详情", systemImage: "info.circle")
             }
@@ -1083,7 +1090,7 @@ struct BookshelfView: View {
         .contextMenu {
             Button {
                 pinReturnOrder(placement: "grid")
-                contextualDetail = ContextualBookDetail(book: book, placement: "grid")
+                contextualBookRoute = .detail(book, placement: "grid")
             } label: {
                 Label("书籍详情", systemImage: "info.circle")
             }

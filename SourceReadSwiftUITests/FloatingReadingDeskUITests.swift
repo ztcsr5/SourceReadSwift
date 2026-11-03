@@ -39,6 +39,7 @@ final class FloatingReadingDeskUITests: XCTestCase {
         entry.coordinate(withNormalizedOffset: CGVector(dx: 0.47, dy: 0.34)).press(forDuration: 0.8)
         let detail = app.buttons["书籍详情"].firstMatch
         XCTAssertTrue(detail.waitForExistence(timeout: 5))
+        XCTAssertFalse(element("reader.webScrollSurface").exists, "Holding the book must not activate the reader")
         XCTAssertTrue(app.buttons["从书架删除"].firstMatch.exists)
         detail.tap()
         XCTAssertTrue(element("bookDetail.title").waitForExistence(timeout: 5))
@@ -47,8 +48,7 @@ final class FloatingReadingDeskUITests: XCTestCase {
         let read = app.buttons["bookDetail.read"]
         XCTAssertTrue(read.waitForExistence(timeout: 5))
         read.tap()
-        let prose = app.webViews.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "这是纸间的隔离视觉验证书库")).firstMatch
-        XCTAssertTrue(prose.waitForExistence(timeout: 12), "Check actual chapter prose, not only the existence of a WebView")
+        assertReaderProse()
         capture("04a-reader-first-chapter")
         returnFromReader()
         XCTAssertTrue(read.waitForExistence(timeout: 5), "Reader must return to the same detail, not the shelf")
@@ -64,6 +64,7 @@ final class FloatingReadingDeskUITests: XCTestCase {
         let pager = element("bookshelf.readingPager")
         let entry = assertCurrentBook("剑来")
         XCTAssertTrue(entry.isHittable); entry.tap()
+        assertReaderProse()
         returnFromReader()
         XCTAssertTrue(pager.waitForExistence(timeout: 3))
         let tabs = app.tabBars.firstMatch
@@ -176,6 +177,11 @@ final class FloatingReadingDeskUITests: XCTestCase {
         if !returnButton.isHittable { app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.42)).tap() }
         XCTAssertTrue(returnButton.waitForExistence(timeout: 5))
         returnButton.tap()
+    }
+
+    private func assertReaderProse() {
+        let prose = app.webViews.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "这是纸间的隔离视觉验证书库")).firstMatch
+        XCTAssertTrue(prose.waitForExistence(timeout: 12), "Check actual chapter prose, not only the existence of a WebView")
     }
 
     @discardableResult private func assertCurrentBook(_ title: String) -> XCUIElement {
