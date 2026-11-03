@@ -9,7 +9,6 @@ struct FloatingReadingDesk: View {
     @Environment(\.colorSchemeContrast) private var contrast
     @Environment(\.accessibilityReduceTransparency) private var reducesTransparency
     @Environment(\.isFloatingDeskPressed) private var isPressed
-    @Environment(\.readingCoverHandoff) private var readingCoverHandoff
     @AppStorage("settings.visualTheme") private var themeRaw = AppVisualTheme.classic.rawValue
     @AppStorage("settings.appearanceRevision") private var appearanceRevision = 0
     @AppMotion private var motion
@@ -33,12 +32,12 @@ struct FloatingReadingDesk: View {
     var body: some View {
         VStack(spacing: 8) {
             GeometryReader { geometry in
-                let width: CGFloat = geometry.size.width < 310 ? 140 : 148
-                let height: CGFloat = geometry.size.width < 310 ? 192 : 200
+                let width: CGFloat = geometry.size.width < 310 ? 136 : 144
+                let height: CGFloat = geometry.size.width < 310 ? 188 : 196
                 ZStack(alignment: .top) {
                     environment.frame(height: 220)
                         .modifier(FloatingDeskParallax(depth: 3 * palette.finish.parallaxStrength, reducesDepth: policy.reducesDepth))
-                    stage.frame(height: 132).padding(.top, 80)
+                    stage.frame(height: 124).padding(.top, 86)
                         .modifier(FloatingDeskParallax(depth: 7 * palette.finish.parallaxStrength, reducesDepth: policy.reducesDepth))
                     makeMarginNotes(coverWidth: width).padding(.top, 122)
                         .modifier(FloatingDeskParallax(depth: 30 * palette.finish.parallaxStrength, reducesDepth: policy.reducesDepth))
@@ -52,7 +51,7 @@ struct FloatingReadingDesk: View {
         .foregroundStyle(palette.ink)
         .contentShape(Rectangle())
         .accessibilityElement(children: .combine)
-        .accessibilityHint("轻点打开书籍，长按管理")
+        .accessibilityHint("轻点打开书籍详情，长按管理")
         .task(id: coverImage.map(ObjectIdentifier.init)) {
             guard let coverImage else { tone = nil; return }
             let sampled = await CoverToneSampler.shared.tone(for: coverImage)
@@ -86,9 +85,9 @@ struct FloatingReadingDesk: View {
                 LinearGradient(colors: [palette.pearl.opacity(0.45), .clear, palette.light.opacity(0.14)],
                     startPoint: .topLeading, endPoint: .bottomTrailing)
                     .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-                Ellipse().fill(RadialGradient(colors: [palette.shadow.opacity(scheme == .dark ? 0.28 : 0.13), .clear],
+                Ellipse().fill(RadialGradient(colors: [palette.shadow.opacity(scheme == .dark ? 0.32 : 0.19), .clear],
                     center: .center, startRadius: 0, endRadius: 84))
-                    .frame(width: 176, height: 18).offset(x: -8, y: 57)
+                    .frame(width: 170, height: 18).offset(x: -3, y: 51)
             }
         }.overlay {
             if contrast == .increased {
@@ -119,42 +118,20 @@ struct FloatingReadingDesk: View {
         else { shape.fill(.ultraThinMaterial).overlay { shape.fill(palette.glassTint.opacity(palette.finish.glassTintOpacity)) } }
     }
 
-    private func jacket(width: CGFloat, height: CGFloat) -> some View {
-        cover(width: width, height: height)
-            .overlay(alignment: .leading) {
-                LinearGradient(colors: [palette.shadow.opacity(0.24), palette.pearl.opacity(0.30), .clear],
-                    startPoint: .leading, endPoint: .trailing).frame(width: 10)
-            }
-            .overlay(alignment: .trailing) {
-                Rectangle().fill(palette.pearl.opacity(0.8)).frame(width: 2).padding(.vertical, 5)
-            }
-            .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-            .overlay(RoundedRectangle(cornerRadius: 8).strokeBorder(palette.pearl.opacity(0.35), lineWidth: 0.5))
-            .background(alignment: .trailing) {
-                RoundedRectangle(cornerRadius: 2).fill(palette.pearl)
-                    .frame(width: 6, height: height - 8).offset(x: 3, y: 1)
-            }
-            .shadow(color: palette.shadow.opacity(scheme == .dark ? 0.30 : 0.18), radius: 10, x: 7, y: 10)
-            // A resting pose, not a looping animation. The book stays physical even with Reduce Motion.
-            .rotation3DEffect(.degrees(-8), axis: (x: 0, y: 1, z: 0), perspective: 0.24)
-            .rotationEffect(.degrees(-3.5))
-            .offset(x: -8, y: 6)
+    @ViewBuilder private func jacket(width: CGFloat, height: CGFloat) -> some View {
+        let image = EditorialBookJacket(height: height, palette: palette, stance: .shelf) {
+            cover(width: width, height: height)
+        }
             .brightness(isPressed ? 0.045 : 0)
             .animation(motion.animation(.press), value: isPressed)
-            .accessibilityHidden(true)
+        if let heroNamespace { image.bookHeroSource("continue|" + book.id, in: heroNamespace).offset(x: -6, y: 8) }
+        else { image.offset(x: -6, y: 8) }
     }
 
-    @ViewBuilder private func cover(width: CGFloat, height: CGFloat) -> some View {
-        let image = AsyncBookCover(urlString: book.coverURL, width: width, height: height,
+    private func cover(width: CGFloat, height: CGFloat) -> some View {
+        AsyncBookCover(urlString: book.coverURL, width: width, height: height,
             baseURLString: book.bookURL, sourceURLString: book.sourceURL,
-            onImageLoad: { image in
-                coverImage = image
-                if let image, let url = CoverURLResolver.url(from: book.coverURL, base: book.bookURL, fallbackBase: book.sourceURL) {
-                    readingCoverHandoff?.retain(image, for: url)
-                }
-            }, title: book.title)
-        if let heroNamespace { image.bookHeroSource("continue|" + book.id, in: heroNamespace) }
-        else { image }
+            onImageLoad: { coverImage = $0 }, title: book.title)
     }
 
     private func makeMarginNotes(coverWidth: CGFloat) -> some View {

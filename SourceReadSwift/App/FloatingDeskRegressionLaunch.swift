@@ -20,9 +20,14 @@ import UIKit
         for (index, title) in titles.enumerated() {
             let cover = index == 0 ? nil : index == 2 ? reference ?? makeCover(at: root, index: index, title: title) : makeCover(at: root, index: index, title: title)
             shelf.addLocalTextBook(LocalTextBook(title: title, author: authors[index], chapters: chapters, coverURL: cover))
-            if let book = shelf.books.first { shelf.markReaderOpened(bookID: book.id) }
+            if let book = shelf.books.first {
+                shelf.markReaderOpened(bookID: book.id)
+                shelf.updateReadingProgress(bookID: book.id, chapterIndex: 0, chapterTitle: chapters[0].title,
+                    totalChapters: chapters.count, paragraphIndex: 0)
+            }
         }
-        return AppState(sourceStore: SourceStore(persistence: SourcePersistence(rootURL: root)), bookshelfStore: shelf)
+        return AppState(sourceStore: SourceStore(persistence: SourcePersistence(rootURL: root)), bookshelfStore: shelf,
+            readingHistoryStore: ReadingHistoryStore(persistence: ReadingHistoryPersistence(rootURL: root)))
     }
 
     private static func makeCover(at root: URL, index: Int, title: String) -> URL? {

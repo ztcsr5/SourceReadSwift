@@ -1,7 +1,7 @@
 import SwiftUI
 
 /// Short-lived references to the existing pipeline's decoded covers, not a second decoder.
-/// Only the reading-desk entry and its destinations receive this environment value.
+/// Scoped to a bookshelf navigation stack; never publishes image arrival to the shelf.
 final class ReadingCoverHandoff: ObservableObject {
     private let images = NSCache<NSURL, UIImage>()
 
@@ -12,6 +12,8 @@ final class ReadingCoverHandoff: ObservableObject {
 
     func retain(_ image: UIImage, for url: URL) {
         let cost = image.cgImage.map { $0.bytesPerRow * $0.height } ?? 1
+        if let previous = images.object(forKey: url as NSURL)?.cgImage,
+           previous.bytesPerRow * previous.height > cost { return }
         images.setObject(image, forKey: url as NSURL, cost: cost)
     }
 

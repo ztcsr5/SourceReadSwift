@@ -67,6 +67,9 @@ jobs:
               -only-testing:SourceReadSwiftTests/Release117PolishTests \
               -only-testing:SourceReadSwiftTests/TabChromeRegressionTests \
               -only-testing:SourceReadSwiftTests/AppFrameProfilerTests \
+              -only-testing:SourceReadSwiftTests/ExplicitFrameDiagnosticsTests \
+              -only-testing:SourceReadSwiftTests/OrderedReadingPersistenceTests \
+              -only-testing:SourceReadSwiftTests/BookshelfProgressPerformanceTests \
               -only-testing:SourceReadSwiftTests/ContentImagePipelineRegressionTests)
           fi
           "${COMMAND[@]}" "${TESTS[@]}" \

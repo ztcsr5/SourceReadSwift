@@ -35,10 +35,21 @@ final class FloatingReadingDeskUITests: XCTestCase {
     func testReadingDeskDetailsAndReturnInTheRealApp() throws {
         try launch(theme: "classic")
         let pager = element("bookshelf.readingPager")
-        app.buttons["正在阅读书籍的更多操作"].firstMatch.tap()
-        app.buttons["书籍详情"].firstMatch.tap()
+        let entry = assertCurrentBook("剑来")
+        entry.coordinate(withNormalizedOffset: CGVector(dx: 0.47, dy: 0.34)).press(forDuration: 0.8)
+        let detail = app.buttons["书籍详情"].firstMatch
+        XCTAssertTrue(detail.waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["从书架删除"].firstMatch.exists)
+        detail.tap()
+        XCTAssertTrue(element("bookDetail.title").waitForExistence(timeout: 5))
         XCTAssertFalse(pager.isHittable)
         capture("04-real-book-details")
+        let read = app.buttons["bookDetail.read"]
+        XCTAssertTrue(read.waitForExistence(timeout: 5))
+        read.tap()
+        returnFromReader()
+        XCTAssertTrue(read.waitForExistence(timeout: 5), "Reader must return to the same detail, not the shelf")
+        capture("04b-reader-returned-to-detail")
         app.navigationBars.buttons.element(boundBy: 0).tap()
         XCTAssertTrue(pager.waitForExistence(timeout: 3))
         capture("05-return-to-desk")
@@ -50,14 +61,42 @@ final class FloatingReadingDeskUITests: XCTestCase {
         let pager = element("bookshelf.readingPager")
         let entry = assertCurrentBook("剑来")
         XCTAssertTrue(entry.isHittable); entry.tap()
-        let returnButton = element("reader.returnToShelf")
-        if !returnButton.isHittable { app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.42)).tap() }
-        XCTAssertTrue(returnButton.waitForExistence(timeout: 5)); returnButton.tap()
+        returnFromReader()
         XCTAssertTrue(pager.waitForExistence(timeout: 3))
         let tabs = app.tabBars.firstMatch
         let home = tabs.exists ? tabs.buttons["主页"] : app.buttons["主页"]
         XCTAssertTrue(home.isHittable, "Returning to the real shelf must restore navigation with it")
         capture("06-reader-return-root")
+    }
+
+    func testShelfCoverReturnsToItsSlotAfterCancelledAndCompletedEdgeGestures() throws {
+        try launch(theme: "classic")
+        let cover = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@ AND label CONTAINS %@",
+            "bookshelf.grid.", "月亮与六便士")).firstMatch
+        if !cover.isHittable { app.swipeUp() }
+        XCTAssertTrue(cover.isHittable)
+        let origin = cover.frame
+        cover.tap()
+        let detail = element("bookDetail.title")
+        XCTAssertTrue(detail.waitForExistence(timeout: 5))
+        XCTAssertEqual(detail.label, "月亮与六便士")
+        let edge = app.coordinate(withNormalizedOffset: CGVector(dx: 0.008, dy: 0.52))
+        edge.press(forDuration: 0.05, thenDragTo: app.coordinate(withNormalizedOffset: CGVector(dx: 0.15, dy: 0.52)),
+            withVelocity: .slow, thenHoldForDuration: 0.3)
+        XCTAssertTrue(detail.isHittable, "A cancelled native pop must leave the same detail active")
+        capture("12-shelf-pop-cancelled")
+        edge.press(forDuration: 0.05, thenDragTo: app.coordinate(withNormalizedOffset: CGVector(dx: 0.85, dy: 0.52)),
+            withVelocity: .default, thenHoldForDuration: 0.15)
+        XCTAssertTrue(cover.waitForExistence(timeout: 5))
+        XCTAssertTrue(cover.isHittable)
+        XCTAssertEqual(cover.frame.midX, origin.midX, accuracy: 3)
+        XCTAssertEqual(cover.frame.midY, origin.midY, accuracy: 8)
+        capture("13-shelf-pop-original-slot")
+        // Reopen immediately after the completed pop; a single back must reach home.
+        cover.tap()
+        XCTAssertTrue(detail.waitForExistence(timeout: 5))
+        app.navigationBars.buttons.element(boundBy: 0).tap()
+        XCTAssertTrue(cover.isHittable)
     }
 
     func testOtherThemesAndIndependentOldStyleSwitch() throws {
@@ -119,6 +158,14 @@ final class FloatingReadingDeskUITests: XCTestCase {
     private func element(_ identifier: String) -> XCUIElement {
         if identifier == "bookshelf.readingPager" { return app.scrollViews[identifier].firstMatch }
         return app.descendants(matching: .any).matching(identifier: identifier).firstMatch
+    }
+
+    private func returnFromReader() {
+        let returnButton = element("reader.returnToShelf")
+        XCTAssertTrue(element("reader.webScrollSurface").waitForExistence(timeout: 8))
+        if !returnButton.isHittable { app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.42)).tap() }
+        XCTAssertTrue(returnButton.waitForExistence(timeout: 5))
+        returnButton.tap()
     }
 
     @discardableResult private func assertCurrentBook(_ title: String) -> XCUIElement {

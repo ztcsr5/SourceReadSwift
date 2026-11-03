@@ -3,6 +3,17 @@ import XCTest
 @testable import SourceReadSwift
 
 final class FloatingReadingDeskTests: XCTestCase {
+    func testReturnSlotsKeepLatestMetadataAndInvalidateWhenMembershipChanges() {
+        let first = makeBook()
+        var second = BookshelfBook(id: "other", title: "第二本", author: "", coverURL: nil,
+            sourceName: "本地", sourceURL: "local://text", bookURL: "local://other", intro: nil)
+        second.currentChapterIndex = 5
+        let restored = BookReturnOrder.restore([second, first], ids: [first.id, second.id])
+        XCTAssertEqual(restored?.map(\.id), [first.id, second.id])
+        XCTAssertEqual(restored?.last?.currentChapterIndex, 5)
+        XCTAssertNil(BookReturnOrder.restore([second], ids: [first.id, second.id]))
+        XCTAssertNil(BookReturnOrder.restore([second], ids: [first.id]))
+    }
     func testAccessibilityAndEnergyPoliciesCoverEveryCombination() {
         for bits in 0..<32 {
             let motion = bits & 1 != 0, transparency = bits & 2 != 0, contrast = bits & 4 != 0

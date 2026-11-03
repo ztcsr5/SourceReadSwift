@@ -5,51 +5,47 @@ struct BookDetailHeaderOffset: PreferenceKey {
     static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) { value = nextValue() }
 }
 
-/// A small editorial reading room; the system still owns navigation and interactive back.
+/// An open book above a shallow paper plane, sharing the desk's physical jacket.
 struct BookDetailHero: View {
     let book: SearchBook
     let readerSourceID: String
     let namespace: Namespace.ID
+    var readingContext: String? = nil
     @State private var coverImage: UIImage?
     @State private var tone: CoverTone?
-    @State private var hasAppeared = false
-    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    @State private var hasArrived = false
+    @Environment(\.dynamicTypeSize) private var typeSize
     @Environment(\.colorSchemeContrast) private var contrast
+    @AppStorage("settings.visualTheme") private var themeRaw = AppVisualTheme.classic.rawValue
+    @AppStorage("settings.appearanceRevision") private var revision = 0
     @AppMotion private var motion
 
+    private var theme: AppVisualTheme { AppVisualTheme(rawValue: themeRaw) ?? .classic }
+    private var palette: FloatingDeskPalette {
+        let _ = revision
+        return .resolve(theme: theme)
+    }
+
     var body: some View {
-        VStack(alignment: .leading, spacing: 24) {
-            HStack(spacing: 8) {
-                Image(systemName: "text.book.closed").foregroundStyle(AppTheme.accent)
-                Text("纸间 · 书籍档案").font(.caption.weight(.medium)).tracking(2)
-                Rectangle().fill(AppTheme.accent.opacity(0.18)).frame(height: 1)
-            }.foregroundStyle(.secondary)
-            if dynamicTypeSize.isAccessibilitySize {
-                VStack(alignment: .leading, spacing: 24) { cover; title }
+        Group {
+            if typeSize.isAccessibilitySize {
+                VStack(alignment: .leading, spacing: 16) { cover; title }
             } else {
                 HStack(alignment: .center, spacing: 24) { cover; title }
             }
-            HStack(spacing: 8) {
-                Text(book.sourceName).lineLimit(2)
-                Spacer()
-                if let count = book.wordCount?.nilIfEmpty { Text(count).lineLimit(2) }
-            }.font(.caption).foregroundStyle(.secondary)
-                .padding(.top, 12)
-                .overlay(alignment: .top) { Rectangle().fill(AppTheme.accent.opacity(0.16)).frame(height: 1) }
         }
-        .padding(24).frame(maxWidth: .infinity, alignment: .leading)
-        .foregroundStyle(.primary)
-        .background { CoverAtmosphere(tone: tone) }
-        .clipShape(RoundedRectangle(cornerRadius: AppTheme.cardRadius, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: AppTheme.cardRadius)
-            .strokeBorder(AppTheme.accent.opacity(contrast == .increased ? 0.45 : 0.16), lineWidth: 1))
+        .padding(.horizontal, 16)
+        .padding(.vertical, 12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .foregroundStyle(palette.ink)
+        .background(alignment: .bottom) { paperPlane }
         .background {
             GeometryReader { proxy in
                 Color.clear.preference(key: BookDetailHeaderOffset.self,
                     value: proxy.frame(in: .named("bookDetailScroll")).maxY)
             }
         }
-        .onAppear { withAnimation(motion.animation(.expansion)) { hasAppeared = true } }
+        .onAppear { hasArrived = true }
         .task(id: coverImage.map(ObjectIdentifier.init)) {
             guard let coverImage else { tone = nil; return }
             let sampled = await CoverToneSampler.shared.tone(for: coverImage)
@@ -58,25 +54,55 @@ struct BookDetailHero: View {
         }
     }
 
+    private var paperPlane: some View {
+        let shape = RoundedRectangle(cornerRadius: 16, style: .continuous)
+        return CoverAtmosphere(tone: tone)
+            .frame(height: typeSize.isAccessibilitySize ? 120 : 108)
+            .clipShape(shape)
+            .overlay { shape.strokeBorder(palette.mist.opacity(contrast == .increased ? 0.65 : 0.22), lineWidth: 1) }
+            .allowsHitTesting(false)
+    }
+
     private var cover: some View {
-        BookJacket {
-            AsyncBookCover(urlString: book.coverUrl, width: 128, height: 184,
+        EditorialBookJacket(height: 146, palette: palette, stance: .detail) {
+            AsyncBookCover(urlString: book.coverUrl, width: 106, height: 146,
                 baseURLString: book.bookUrl, sourceURLString: book.sourceUrl,
                 onImageLoad: { coverImage = $0 }, title: book.name)
         }
         .bookHeroSource(readerSourceID, in: namespace)
-        .accessibilityHidden(true)
     }
 
     private var title: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text(book.name).font(.title2.weight(.semibold)).fixedSize(horizontal: false, vertical: true)
+        VStack(alignment: .leading, spacing: 8) {
+            Text("纸间 / 书籍档案")
+                .font(.caption2.weight(.semibold)).tracking(1.1)
+                .foregroundStyle(palette.ink.opacity(0.74))
+                .accessibilityHidden(true)
+            Text(book.name)
+                .font(.system(.title2, design: theme == .classic ? .serif : theme.fontDesign).weight(.semibold))
+                .lineLimit(typeSize.isAccessibilitySize ? nil : 3)
+                .fixedSize(horizontal: false, vertical: true)
                 .accessibilityAddTraits(.isHeader)
-            Text(book.author?.nilIfEmpty ?? "作者未知").font(.subheadline).foregroundStyle(.secondary)
-            Image(systemName: "bookmark.fill").font(.title3).foregroundStyle(AppTheme.accent.opacity(0.65))
-        }.frame(maxWidth: .infinity, alignment: .leading)
-            // Reading identity is never gated by an animation or task. System
-            // navigation already provides the reveal; delayed frames stay legible.
-            .offset(y: hasAppeared || motion.reducesMotion ? 0 : 8)
+                .accessibilityIdentifier("bookDetail.title")
+            if let author = book.author?.nilIfEmpty {
+                Text(author).font(.subheadline).foregroundStyle(palette.ink.opacity(0.78))
+                    .lineLimit(typeSize.isAccessibilitySize ? nil : 2)
+            }
+            VStack(alignment: .leading, spacing: 4) {
+                if let readingContext {
+                    Label(readingContext, systemImage: "bookmark")
+                        .lineLimit(typeSize.isAccessibilitySize ? nil : 2)
+                }
+                Text([book.sourceName.nilIfEmpty, book.wordCount?.nilIfEmpty].compactMap { $0 }.joined(separator: " · "))
+                    .lineLimit(typeSize.isAccessibilitySize ? nil : 2)
+            }
+            .font(.caption)
+            .foregroundStyle(palette.ink.opacity(0.72))
+            .offset(y: hasArrived || motion.reducesMotion ? 0 : 7)
+            .animation(motion.arrivalAnimation(stage: 1), value: hasArrived)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .offset(y: hasArrived || motion.reducesMotion ? 0 : 4)
+        .animation(motion.arrivalAnimation(stage: 0), value: hasArrived)
     }
 }

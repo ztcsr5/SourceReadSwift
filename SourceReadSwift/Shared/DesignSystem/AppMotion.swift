@@ -78,10 +78,11 @@ private struct BookHeroSource: ViewModifier {
 private struct BookHeroDestination: ViewModifier {
     let id: String
     let namespace: Namespace.ID
+    let enabled: Bool
     @AppMotion private var motion
     @AppStorage("settings.readingDeskEnabled") private var usesSpatialStyle = true
     @ViewBuilder func body(content: Content) -> some View {
-        if #available(iOS 18.0, *), !motion.reducesMotion, usesSpatialStyle {
+        if #available(iOS 18.0, *), enabled, !motion.reducesMotion, usesSpatialStyle {
             content.navigationTransition(.zoom(sourceID: id, in: namespace))
         } else { content }
     }
@@ -91,7 +92,7 @@ extension View {
     func bookHeroSource(_ id: String, in namespace: Namespace.ID) -> some View {
         modifier(BookHeroSource(id: id, namespace: namespace))
     }
-    func bookHeroDestination(_ id: String, in namespace: Namespace.ID) -> some View {
-        modifier(BookHeroDestination(id: id, namespace: namespace))
+    func bookHeroDestination(_ id: String, in namespace: Namespace.ID, enabled: Bool = true) -> some View {
+        modifier(BookHeroDestination(id: id, namespace: namespace, enabled: enabled))
     }
 }

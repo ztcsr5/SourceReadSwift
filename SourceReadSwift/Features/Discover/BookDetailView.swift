@@ -3,9 +3,13 @@ import UIKit
 
 struct BookDetailView: View {
     @EnvironmentObject private var appState: AppState
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Namespace private var detailHero
     @AppMotion private var motion
     @State private var isHeaderCollapsed = false
+    @State private var hasArrived = false
+    @Environment(\.readingCoverHandoff) private var incomingCoverHandoff
+    @StateObject private var detailCoverHandoff = ReadingCoverHandoff()
     @AppStorage("settings.readingDeskEnabled") private var readingDeskEnabled = true
     let initialBook: SearchBook
     var availableSources: [SearchBook] = []
@@ -65,7 +69,12 @@ struct BookDetailView: View {
     /// primary result has no cover but a sibling source does, show the sibling
     /// cover instead of a blank placeholder.
     private var displayBook: SearchBook {
-        let cover = detail?.coverUrl?.nilIfEmpty ?? book.coverUrl?.nilIfEmpty
+        // A retained source cover stays the same edition through push and pop.
+        // A deliberate source switch still uses the newly selected edition.
+        let initialCover = book.coverUrl?.nilIfEmpty
+        let address = CoverURLResolver.url(from: initialCover, base: book.bookUrl, fallbackBase: book.sourceUrl)
+        let retainedCover = address.flatMap { incomingCoverHandoff?.image(for: $0) } != nil ? initialCover : nil
+        let cover = retainedCover ?? detail?.coverUrl?.nilIfEmpty ?? initialCover
             ?? availableSources.compactMap({ $0.coverUrl?.nilIfEmpty }).first
         return SearchBook(
             name: detail?.name.nilIfEmpty ?? book.name,
@@ -94,62 +103,34 @@ struct BookDetailView: View {
         isAscending ? Array(chapters.prefix(20)) : Array(chapters.reversed().prefix(20))
     }
 
+    private var shelfReadingContext: String? {
+        guard let shelf = appState.bookshelfStore.book(id: readerBookID),
+              shelf.lastReadAt != nil, shelf.currentChapterTitle?.nilIfEmpty != nil else { return nil }
+        return ReadingHeroStatus.chapter(for: shelf)
+    }
+
+    private var readerHeroID: String { "reader|" + book.id }
+    private var coverHandoff: ReadingCoverHandoff { incomingCoverHandoff ?? detailCoverHandoff }
+
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: AppLayout.sectionGap) {
+            VStack(alignment: .leading, spacing: readingDeskEnabled ? 16 : AppLayout.sectionGap) {
                 if readingDeskEnabled {
-                    BookDetailHero(book: displayBook, readerSourceID: "reader|" + book.id, namespace: detailHero)
+                    BookDetailHero(book: displayBook, readerSourceID: readerHeroID,
+                        namespace: detailHero, readingContext: shelfReadingContext)
                 } else {
                     BookDetailHeader(book: displayBook)
                 }
 
-                if !chapters.isEmpty {
-                    HStack(spacing: 12) {
-                        if let target = targetReadingChapter {
-                            NavigationLink {
-                                Group {
-                                if let shelfBook = localShelfBook {
-                                    BookshelfReaderGatewayView(book: shelfBook, initialChapterIndex: target.index)
-                                } else {
-                                    ChapterLoadingView(
-                                        bookID: readerBookID,
-                                        sourceUrl: book.sourceUrl,
-                                        chapter: target,
-                                        totalChapters: chapters.count,
-                                        chapters: chapters
-                                    )
-                                }
-                                }
-                                .bookHeroDestination("reader|" + book.id, in: detailHero)
-                            } label: {
-                                HStack(spacing: 8) {
-                                    Image(systemName: "book.fill")
-                                    Text(isBookInBookshelf ? "继续阅读" : "开始阅读")
-                                }
-                                .font(.subheadline.weight(.semibold))
-                                .frame(maxWidth: .infinity)
-                                .padding(.vertical, 12)
-                                .background(AppTheme.accent, in: RoundedRectangle(cornerRadius: AppTheme.cardRadius, style: .continuous))
-                                .foregroundStyle(.white)
-                            }
-                            .buttonStyle(AppPressStyle())
-                        }
-
-                        Button {
-                            addCurrentBookToShelf()
-                        } label: {
-                            HStack(spacing: 6) {
-                                Image(systemName: isBookInBookshelf ? "checkmark" : "plus")
-                                Text(isBookInBookshelf ? "已在书架" : "加入书架")
-                            }
-                            .font(.subheadline.weight(.semibold))
-                            .padding(.horizontal, 14)
-                            .padding(.vertical, 12)
-                            .background(AppTheme.card, in: RoundedRectangle(cornerRadius: AppTheme.cardRadius, style: .continuous))
-                            .foregroundStyle(isBookInBookshelf ? .secondary : AppTheme.accent)
-                        }
-                        .buttonStyle(AppPressStyle())
+                if let target = targetReadingChapter {
+                    let layout = dynamicTypeSize.isAccessibilitySize
+                        ? AnyLayout(VStackLayout(spacing: 8)) : AnyLayout(HStackLayout(spacing: 8))
+                    layout {
+                        readAction(target)
+                        shelfAction
                     }
+                    .offset(y: hasArrived || motion.reducesMotion ? 0 : 8)
+                    .animation(motion.arrivalAnimation(stage: 2), value: hasArrived)
                 }
 
                 if availableSources.count > 1 {
@@ -197,6 +178,8 @@ struct BookDetailView: View {
             }
             .padding(AppTheme.pagePadding)
         }
+        .environment(\.readingCoverHandoff, readingDeskEnabled ? coverHandoff : nil)
+        .accessibilityIdentifier("bookDetail.scroll")
         .coordinateSpace(name: "bookDetailScroll")
         .onPreferenceChange(BookDetailHeaderOffset.self) { bottom in
             let collapsed = bottom < 60
@@ -267,6 +250,7 @@ struct BookDetailView: View {
             }
         }
         .onAppear {
+            hasArrived = true
             promptToAddAfterPreviewIfNeeded()
         }
         .confirmationDialog(
@@ -282,6 +266,46 @@ struct BookDetailView: View {
         } message: {
             Text("如果这本书符合预期，可以加入书架，后续会记录阅读进度和更新状态。")
         }
+    }
+
+    private func readAction(_ target: BookChapter) -> some View {
+        NavigationLink {
+            Group {
+                if let shelfBook = localShelfBook {
+                    BookshelfReaderGatewayView(book: shelfBook, initialChapterIndex: target.index)
+                } else {
+                    let shelf = appState.bookshelfStore.book(id: readerBookID)
+                    ChapterLoadingView(bookID: readerBookID, sourceUrl: book.sourceUrl,
+                        chapter: target, totalChapters: chapters.count, chapters: chapters,
+                        initialParagraphIndex: shelf?.currentChapterIndex == target.index ? shelf?.currentParagraphIndex : nil,
+                        openingBook: readingDeskEnabled && sourceKind == .text ? BookshelfBook(searchBook: displayBook) : nil)
+                }
+            }
+            // The header is offscreen after scrolling deep into the TOC. Let
+            // system navigation use its ordinary fallback instead of a stale source.
+            .bookHeroDestination(readerHeroID, in: detailHero, enabled: !isHeaderCollapsed && sourceKind == .text)
+        } label: {
+            Label(isBookInBookshelf ? "继续阅读" : "开始阅读", systemImage: "book")
+                .font(.subheadline.weight(.semibold))
+                .frame(maxWidth: .infinity, minHeight: 44)
+                .padding(.horizontal, 12)
+                .background(AppTheme.accent, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                .foregroundStyle(.white)
+        }
+        .buttonStyle(BookOpenPressStyle())
+        .accessibilityIdentifier("bookDetail.read")
+    }
+
+    private var shelfAction: some View {
+        Button { addCurrentBookToShelf() } label: {
+            Label(isBookInBookshelf ? "已在书架" : "加入书架", systemImage: isBookInBookshelf ? "checkmark" : "plus")
+                .font(.subheadline.weight(.medium))
+                .frame(minHeight: 44)
+                .padding(.horizontal, 12)
+                .background(AppTheme.card, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                .foregroundStyle(isBookInBookshelf ? .secondary : AppTheme.accent)
+        }
+        .buttonStyle(AppPressStyle())
     }
 
     @State private var isDownloadingZlib = false
@@ -483,7 +507,8 @@ struct BookDetailView: View {
     }
 
     private var chapterList: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        let visibleChapters = displayedChapters
+        return VStack(alignment: .leading, spacing: 12) {
             HStack {
                 Text("目录")
                     .font(.title2.bold())
@@ -510,9 +535,9 @@ struct BookDetailView: View {
             }
 
             VStack(spacing: 0) {
-                ForEach(displayedChapters.indices, id: \.self) { index in
-                    let chapter = displayedChapters[index]
-                    if let volume = ChapterListPresenter.volumeHeader(at: index, in: displayedChapters) {
+                ForEach(visibleChapters.indices, id: \.self) { index in
+                    let chapter = visibleChapters[index]
+                    if let volume = ChapterListPresenter.volumeHeader(at: index, in: visibleChapters) {
                         Text(volume)
                             .font(.caption.weight(.bold))
                             .foregroundStyle(.secondary)
@@ -607,7 +632,7 @@ struct BookDetailView: View {
                             })
                     }
 
-                    if index < displayedChapters.count - 1 {
+                    if index < visibleChapters.count - 1 {
                         Divider()
                             .padding(.leading, 14)
                     }
@@ -615,7 +640,7 @@ struct BookDetailView: View {
             }
             .background(Color(UIColor.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: AppTheme.cardRadius, style: .continuous))
 
-            if chapters.count > displayedChapters.count {
+            if chapters.count > visibleChapters.count {
                 Button {
                     showAllChapters = true
                 } label: {
@@ -1103,6 +1128,7 @@ struct ChapterLoadingView: View {
     var totalChapters: Int? = nil
     var chapters: [BookChapter] = []
     var initialParagraphIndex: Int? = nil
+    var openingBook: BookshelfBook? = nil
     var extraToolbarActions: () -> AnyView = { AnyView(EmptyView()) }
     var onRequestSourceSwitch: (() -> Void)?
     var onRequestBookDetail: (() -> Void)? = nil
@@ -1174,9 +1200,14 @@ struct ChapterLoadingView: View {
             } else if let errorMessage {
                 chapterLoadErrorView(errorMessage)
             } else {
-                chapterLoadingView
+                if let openingBook {
+                    ReaderOpeningPage(book: openingBook, chapterTitle: effectiveChapter.title)
+                } else {
+                    chapterLoadingView
+                }
             }
         }
+        .background(ReaderTabChromeExitBridge(owner: chapterLoadingTabChromeOwner))
         .onAppear {
             appState.acquireTabChromeHidden(owner: chapterLoadingTabChromeOwner)
         }
@@ -1468,6 +1499,7 @@ struct ChapterLoadingView: View {
         totalChapters: Int? = nil,
         chapters: [BookChapter] = [],
         initialParagraphIndex: Int? = nil,
+        openingBook: BookshelfBook? = nil,
         extraToolbarActions: @escaping () -> AnyView = { AnyView(EmptyView()) },
         onRequestSourceSwitch: (() -> Void)? = nil,
         onRequestBookDetail: (() -> Void)? = nil
@@ -1478,6 +1510,7 @@ struct ChapterLoadingView: View {
         self.totalChapters = totalChapters
         self.chapters = chapters
         self.initialParagraphIndex = initialParagraphIndex
+        self.openingBook = openingBook
         self.extraToolbarActions = extraToolbarActions
         self.onRequestSourceSwitch = onRequestSourceSwitch
         self.onRequestBookDetail = onRequestBookDetail

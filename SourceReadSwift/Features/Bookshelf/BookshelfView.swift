@@ -10,7 +10,10 @@ struct BookshelfView: View {
     @State private var importMessage: String?
     @State private var isRefreshingBooks = false
     @State private var isImportingBook = false
-    @State private var selectedBookForDetail: BookshelfBook?
+    @State private var contextualDetail: ContextualBookDetail?
+    @State private var bookToRemove: BookshelfBook?
+    @State private var shelfReturnOrder: [String] = []
+    @State private var deskReturnOrder: [String] = []
     @AppStorage("settings.themeMode") private var themeModeRawValue = ThemeMode.system.rawValue
     @AppStorage("bookshelf.isGridMode") private var isGridMode = true
     @AppStorage("bookshelf.sortMode") private var sortModeRawValue = BookshelfSortMode.recentRead.rawValue
@@ -21,6 +24,11 @@ struct BookshelfView: View {
     @AppStorage("settings.readingDeskEnabled") private var readingDeskEnabled = true
     @AppStorage("settings.floatingReadingDeskEnabled") private var floatingReadingDeskEnabled = true
     @StateObject private var readingCoverHandoff = ReadingCoverHandoff()
+
+    private struct ContextualBookDetail {
+        let book: BookshelfBook
+        let placement: String
+    }
 
     enum BookshelfSortMode: String, CaseIterable, Identifiable {
         case recentRead = "最近阅读"
@@ -113,6 +121,7 @@ struct BookshelfView: View {
         }
 
         let mode = BookshelfSortMode(rawValue: sortModeRawValue) ?? .recentRead
+        if let anchored = BookReturnOrder.restore(list, ids: shelfReturnOrder) { return anchored }
         return list.sorted { lhs, rhs in
             if lhs.isPinned != rhs.isPinned {
                 return lhs.isPinned && !rhs.isPinned
@@ -144,8 +153,13 @@ struct BookshelfView: View {
                 .padding(.bottom, AppLayout.contentTail)
             }
             .refreshable {
+                clearReturnOrder()
                 await refreshBookshelf()
             }
+            .onChange(of: sortModeRawValue) { _ in clearReturnOrder() }
+            .onChange(of: searchKeyword) { _ in clearReturnOrder() }
+            .onChange(of: selectedMainGroup) { _ in clearReturnOrder() }
+            .onChange(of: selectedMediaFilter) { _ in clearReturnOrder() }
             .background(bookshelfBackdrop)
             .onChange(of: floatingReadingDeskEnabled) { isEnabled in
                 if !isEnabled { readingCoverHandoff.clear() }
@@ -206,17 +220,24 @@ struct BookshelfView: View {
                 )
                 .ignoresSafeArea()
             }
-            .sheet(item: $selectedBookForDetail) { book in
-                NavigationStack {
-                    BookDetailView(book: book.asSearchBook)
-                        .toolbar {
-                            ToolbarItem(placement: .cancellationAction) {
-                                Button("关闭") {
-                                    selectedBookForDetail = nil
-                                }
-                            }
-                        }
+            .navigationDestination(isPresented: Binding(
+                get: { contextualDetail != nil }, set: { if !$0 { contextualDetail = nil } }
+            )) {
+                if let route = contextualDetail {
+                    detailDestination(route.book, placement: route.placement)
                 }
+            }
+            .alert("从书架删除？", isPresented: Binding(
+                get: { bookToRemove != nil }, set: { if !$0 { bookToRemove = nil } }
+            ), presenting: bookToRemove) { book in
+                Button("从书架删除", role: .destructive) {
+                    clearReturnOrder()
+                    appState.bookshelfStore.remove(bookID: book.id)
+                    bookToRemove = nil
+                }
+                Button("取消", role: .cancel) { bookToRemove = nil }
+            } message: { book in
+                Text("将移除《\(book.title)》及其书架阅读进度。")
             }
             .overlay {
                 if isImportingBook {
@@ -280,11 +301,10 @@ struct BookshelfView: View {
                 emptyImportCard
             } else {
                 if readingDeskEnabled {
-                    let books = ReadingDeskSelection.books(from: recentBooks)
+                    let books = deskBooks
                     ReadingDeskPager(books: books, selection: Binding(
                         get: { ReadingDeskSelection.resolve(readingBookID, in: books) },
                         set: { readingBookID = $0 }), usesFloatingStyle: floatingReadingDeskEnabled, card: { heroCard($0) })
-                    .onChange(of: recentBooks.first?.id) { readingBookID = $0 }
                 } else if let book = recentBooks.first { heroCard(book) }
             }
         }
@@ -714,10 +734,34 @@ struct BookshelfView: View {
         }
     }
 
+    private var deskBooks: [BookshelfBook] {
+        let books = ReadingDeskSelection.books(from: recentBooks)
+        return BookReturnOrder.restore(books, ids: deskReturnOrder) ?? books
+    }
+
+    private func pinReturnOrder(placement: String) {
+        if placement == "continue" {
+            deskReturnOrder = deskBooks.map(\.id)
+        } else {
+            shelfReturnOrder = displayedShelfBooks.map(\.id)
+        }
+    }
+
+    private func clearReturnOrder() {
+        shelfReturnOrder = []
+        deskReturnOrder = []
+    }
+
+    private func detailDestination(_ book: BookshelfBook, placement: String) -> some View {
+        BookDetailView(book: book.asSearchBook)
+            .bookHeroDestination(placement + "|" + book.id, in: bookHero)
+            .environment(\.readingCoverHandoff, readingDeskEnabled ? readingCoverHandoff : nil)
+            .onAppear { pinReturnOrder(placement: placement) }
+    }
+
     @ViewBuilder private func bookDestination(_ book: BookshelfBook, placement: String) -> some View {
         if mediaKind(for: book) == nil || mediaKind(for: book) == .text {
-            BookDetailView(book: book.asSearchBook)
-                .bookHeroDestination(placement + "|" + book.id, in: bookHero)
+            detailDestination(book, placement: placement)
         } else {
             BookshelfReaderGatewayView(book: book)
                 .bookHeroDestination(placement + "|" + book.id, in: bookHero)
@@ -729,6 +773,7 @@ struct BookshelfView: View {
             BookshelfReaderGatewayView(book: book)
                 .bookHeroDestination("continue|" + book.id, in: bookHero)
                 .environment(\.readingCoverHandoff, readingDeskEnabled && floatingReadingDeskEnabled ? readingCoverHandoff : nil)
+                .onAppear { pinReturnOrder(placement: "continue") }
         } label: {
             ReadingHeroCard(book: book, heroNamespace: bookHero, usesSpatialStyle: readingDeskEnabled,
                 usesFloatingStyle: floatingReadingDeskEnabled)
@@ -741,11 +786,6 @@ struct BookshelfView: View {
             Menu {
                 Toggle("悬浮玻璃书台", isOn: $floatingReadingDeskEnabled)
                     .accessibilityIdentifier("bookshelf.floatingDeskToggle")
-                NavigationLink {
-                    BookDetailView(book: book.asSearchBook)
-                        .bookHeroDestination("continue|" + book.id, in: bookHero)
-                        .environment(\.readingCoverHandoff, readingDeskEnabled && floatingReadingDeskEnabled ? readingCoverHandoff : nil)
-                } label: { Label("书籍详情", systemImage: "info.circle") }
             } label: {
                 Image(systemName: "ellipsis").font(.title3.weight(.semibold))
                     .frame(width: 44, height: 44)
@@ -758,18 +798,20 @@ struct BookshelfView: View {
         })
         .contextMenu {
             Button {
-                selectedBookForDetail = book
+                pinReturnOrder(placement: "continue")
+                contextualDetail = ContextualBookDetail(book: book, placement: "continue")
             } label: {
                 Label("书籍详情", systemImage: "info.circle")
             }
             Button {
                 UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                clearReturnOrder()
                 appState.bookshelfStore.togglePin(bookID: book.id)
             } label: {
                 Label(book.isPinned ? "取消置顶" : "置顶书籍", systemImage: book.isPinned ? "pin.slash" : "pin")
             }
             Button("从书架删除", role: .destructive) {
-                appState.bookshelfStore.remove(bookID: book.id)
+                bookToRemove = book
             }
         }
     }
@@ -814,6 +856,7 @@ struct BookshelfView: View {
         } label: {
             HStack(spacing: 14) {
                 AsyncBookCover(urlString: book.coverURL, width: 52, height: 72, baseURLString: book.bookURL, sourceURLString: book.sourceURL)
+                    .environment(\.readingCoverHandoff, readingDeskEnabled ? readingCoverHandoff : nil)
                     .bookHeroSource("list|" + book.id, in: bookHero)
                     .overlay(alignment: .topLeading) {
                         if book.isPinned {
@@ -883,13 +926,15 @@ struct BookshelfView: View {
             .padding(14)
             .glassPanel(cornerRadius: 16, material: .thinMaterial, shadowOpacity: 0.06)
         }
-        .buttonStyle(PressableScaleButtonStyle())
+        .buttonStyle(BookOpenPressStyle())
+        .accessibilityIdentifier("bookshelf.list." + book.id)
         .simultaneousGesture(TapGesture().onEnded {
             UIImpactFeedbackGenerator(style: .light).impactOccurred()
         })
         .swipeActions(edge: .leading) {
             Button {
                 UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                clearReturnOrder()
                 appState.bookshelfStore.togglePin(bookID: book.id)
             } label: {
                 Label(book.isPinned ? "取消置顶" : "置顶", systemImage: book.isPinned ? "pin.slash.fill" : "pin.fill")
@@ -898,17 +943,19 @@ struct BookshelfView: View {
         }
         .swipeActions(edge: .trailing) {
             Button("删除", role: .destructive) {
-                appState.bookshelfStore.remove(bookID: book.id)
+                bookToRemove = book
             }
         }
         .contextMenu {
             Button {
-                selectedBookForDetail = book
+                pinReturnOrder(placement: "list")
+                contextualDetail = ContextualBookDetail(book: book, placement: "list")
             } label: {
                 Label("书籍详情", systemImage: "info.circle")
             }
             Button {
                 UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                clearReturnOrder()
                 appState.bookshelfStore.togglePin(bookID: book.id)
             } label: {
                 Label(book.isPinned ? "取消置顶" : "置顶书籍", systemImage: book.isPinned ? "pin.slash" : "pin")
@@ -926,7 +973,7 @@ struct BookshelfView: View {
                 }
             }
             Button("从书架删除", role: .destructive) {
-                appState.bookshelfStore.remove(bookID: book.id)
+                bookToRemove = book
             }
         }
     }
@@ -956,7 +1003,8 @@ struct BookshelfView: View {
                                     .shadow(radius: 2)
                             }
                         }
-                        .bookHeroSource("grid|" + book.id, in: bookHero)
+                        .environment(\.readingCoverHandoff, readingDeskEnabled ? readingCoverHandoff : nil)
+                    .bookHeroSource("grid|" + book.id, in: bookHero)
                         .shadow(color: .black.opacity(colorScheme == .dark ? 0.35 : 0.12), radius: 6, x: 0, y: 4)
 
                     if book.hasUpdates {
@@ -1026,18 +1074,21 @@ struct BookshelfView: View {
                 }
             }
         }
-        .buttonStyle(PressableScaleButtonStyle())
+        .buttonStyle(BookOpenPressStyle())
+        .accessibilityIdentifier("bookshelf.grid." + book.id)
         .simultaneousGesture(TapGesture().onEnded {
             UIImpactFeedbackGenerator(style: .light).impactOccurred()
         })
         .contextMenu {
             Button {
-                selectedBookForDetail = book
+                pinReturnOrder(placement: "grid")
+                contextualDetail = ContextualBookDetail(book: book, placement: "grid")
             } label: {
                 Label("书籍详情", systemImage: "info.circle")
             }
             Button {
                 UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                clearReturnOrder()
                 appState.bookshelfStore.togglePin(bookID: book.id)
             } label: {
                 Label(book.isPinned ? "取消置顶" : "置顶书籍", systemImage: book.isPinned ? "pin.slash" : "pin")
@@ -1055,7 +1106,7 @@ struct BookshelfView: View {
                 }
             }
             Button("从书架删除", role: .destructive) {
-                appState.bookshelfStore.remove(bookID: book.id)
+                bookToRemove = book
             }
         }
     }
@@ -1462,7 +1513,10 @@ struct AsyncBookCover: View {
     var body: some View {
         Group {
             if let url = CoverURLResolver.url(from: urlString, base: baseURLString, fallbackBase: sourceURLString) {
-                CachedRemoteImage(url: url, maxPixelSize: coverMaxPixelSize, onImageLoad: onImageLoad) { placeholder }
+                CachedRemoteImage(url: url, maxPixelSize: coverMaxPixelSize, onImageLoad: { image in
+                    if let image { readingCoverHandoff?.retain(image, for: url) }
+                    onImageLoad?(image ?? readingCoverHandoff?.image(for: url))
+                }) { placeholder }
             } else {
                 placeholder
             }
