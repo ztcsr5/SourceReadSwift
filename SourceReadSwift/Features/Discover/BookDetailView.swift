@@ -165,12 +165,7 @@ struct BookDetailView: View {
                         case .video:
                             videoActionCard
                         case .text:
-                            // Local imports have no book source, so the batch cache
-                            // card could only ever render dead buttons; keep it for
-                            // source-backed books.
-                            if !chapters.isEmpty, !book.sourceUrl.hasPrefix("local://") {
-                                downloadSection
-                            }
+                            break
                         }
                         chapterList
                     }
@@ -178,6 +173,7 @@ struct BookDetailView: View {
             }
             .padding(AppTheme.pagePadding)
         }
+        .hideRootTabBar()
         .environment(\.readingCoverHandoff, readingDeskEnabled ? coverHandoff : nil)
         .accessibilityIdentifier("bookDetail.scroll")
         .coordinateSpace(name: "bookDetailScroll")
@@ -530,9 +526,16 @@ struct BookDetailView: View {
                 }
                 .buttonStyle(AppPressStyle())
 
+                if canDownloadTextChapters {
+                    chapterDownloadMenu
+                }
+
                 Text("\(chapters.count) 章")
                     .font(.subheadline.weight(.semibold))
                     .foregroundStyle(.secondary)
+            }
+            if canDownloadTextChapters, let record = downloadRecord {
+                chapterDownloadStatus(record)
             }
 
             VStack(spacing: 0) {
@@ -1031,69 +1034,54 @@ struct BookDetailView: View {
         .background(Color(UIColor.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
     }
 
-    private var downloadSection: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack {
-                Image(systemName: "arrow.down.circle.fill")
-                    .foregroundStyle(AppTheme.accent)
-                Text("批量离线缓存")
-                    .font(.headline)
-                Spacer()
-                if isDownloading {
-                    ProgressView()
-                        .controlSize(.small)
-                    Button("停止") {
-                        appState.chapterDownloadCoordinator.cancel(bookID: book.id)
-                    }
-                    .font(.caption.weight(.semibold))
-                    .buttonStyle(.bordered)
-                    .controlSize(.mini)
-                }
-            }
+    private var canDownloadTextChapters: Bool {
+        sourceKind == .text && !chapters.isEmpty && !book.sourceUrl.hasPrefix("local://")
+    }
 
-            if let record = downloadRecord {
-                VStack(alignment: .leading, spacing: 4) {
-                    ProgressView(value: Double(record.completedCount), total: Double(max(record.chapterCount, 1)))
-                        .tint(AppTheme.accent)
-                    HStack {
-                        Text("已缓存 \(record.completedCount)/\(record.chapterCount) 章")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                        if record.failedCount > 0 {
-                            Text("(\(record.failedCount) 章失败)")
-                                .font(.caption)
-                                .foregroundStyle(.red)
-                        }
-                        Spacer()
-                    }
+    private var chapterDownloadMenu: some View {
+        Menu {
+            if isDownloading {
+                Button(role: .destructive) {
+                    appState.chapterDownloadCoordinator.cancel(bookID: book.id)
+                } label: {
+                    Label("停止缓存", systemImage: "stop.circle")
                 }
-            }
-
-            HStack(spacing: 12) {
+            } else {
                 Button {
                     downloadChapters(limit: 50)
                 } label: {
-                    Label("缓存后50章", systemImage: "arrow.down.to.line")
-                        .font(.subheadline.weight(.semibold))
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 8)
+                    Label("缓存后 50 章", systemImage: "arrow.down.to.line")
                 }
-                .buttonStyle(.bordered)
-                .disabled(chapters.isEmpty || isDownloading)
-
                 Button {
                     downloadChapters(limit: nil)
                 } label: {
-                    Label("全本缓存", systemImage: "arrow.down.circle")
-                        .font(.subheadline.weight(.semibold))
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 8)
+                    Label("缓存全本", systemImage: "arrow.down.circle")
                 }
-                .buttonStyle(.borderedProminent)
-                .disabled(chapters.isEmpty || isDownloading)
             }
+        } label: {
+            Image(systemName: isDownloading ? "arrow.down.circle.fill" : "arrow.down.circle")
+                .font(.title3)
+                .foregroundStyle(AppTheme.accent)
+                .frame(width: 44, height: 44)
+                .contentShape(Rectangle())
         }
-        .podcastCard()
+        .accessibilityLabel("离线缓存")
+        .accessibilityIdentifier("bookDetail.chapterDownload")
+    }
+
+    private func chapterDownloadStatus(_ record: ChapterDownloadRecord) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            ProgressView(value: Double(record.completedCount), total: Double(max(record.chapterCount, 1)))
+                .tint(AppTheme.accent)
+            HStack(spacing: 8) {
+                Text("已缓存 \(record.completedCount)/\(record.chapterCount) 章")
+                    .foregroundStyle(.secondary)
+                if record.failedCount > 0 {
+                    Text("\(record.failedCount) 章失败").foregroundStyle(.red)
+                }
+            }
+            .font(.caption)
+        }
     }
 
     private func downloadChapters(limit: Int?) {
