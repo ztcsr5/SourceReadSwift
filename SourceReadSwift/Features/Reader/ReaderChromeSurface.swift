@@ -5,6 +5,8 @@ import SwiftUI
 struct ReaderChromeSurface: ViewModifier {
     let paper: Color
     let ink: Color
+    var protectsReadingControls = false
+    @Environment(\.colorScheme) private var colorScheme
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
     @Environment(\.colorSchemeContrast) private var contrast
     @AppStorage("reader.menuSurfaceStyle") private var menuStyle = "system"
@@ -39,7 +41,7 @@ struct ReaderChromeSurface: ViewModifier {
     @ViewBuilder private func translucent(_ content: Content) -> some View {
         #if compiler(>=6.2)
         if #available(iOS 26.0, *) {
-            content.glassEffect(.regular.tint(paper.opacity(0.08)),
+            content.glassEffect(.regular.tint(paper.opacity(glassTintOpacity)),
                                 in: RoundedRectangle(cornerRadius: 24, style: .continuous))
         } else {
             material(content)
@@ -49,9 +51,20 @@ struct ReaderChromeSurface: ViewModifier {
         #endif
     }
 
+    private var glassTintOpacity: Double {
+        // Toolbars share one recipe; the larger settings surface needs
+        // stronger diffusion so lines of prose cannot compete with controls.
+        if protectsReadingControls { return colorScheme == .dark ? 0.34 : 0.28 }
+        return 0.10
+    }
+
     private func material(_ content: Content) -> some View {
         content
-            .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+            .background {
+                let shape = RoundedRectangle(cornerRadius: 24, style: .continuous)
+                shape.fill(.regularMaterial)
+                    .overlay { shape.fill(paper.opacity(glassTintOpacity)) }
+            }
             .overlay {
                 RoundedRectangle(cornerRadius: 24, style: .continuous)
                     .strokeBorder(ink.opacity(0.12), lineWidth: 0.6).allowsHitTesting(false)

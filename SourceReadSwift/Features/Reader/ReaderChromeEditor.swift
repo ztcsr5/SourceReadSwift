@@ -11,6 +11,7 @@ struct ReaderChromeEditor: View {
     @AppStorage("reader.showSystemStatusBar") private var showSystem = false
     @AppStorage("reader.statusPosition") private var position = "bottom"
     @AppStorage("reader.allowsDuplicateTopStatus") private var duplicates = false
+    @AppStorage("reader.contentExtendsIntoChrome") private var extendsContent = false
     @AppStorage("reader.menuPaperOpacity") private var menuOpacity = 0.97
     @AppStorage("reader.menuUsesWallpaper") private var wallpaper = false
     @AppStorage("reader.menuSurfaceStyle") private var surface = "system"
@@ -34,6 +35,7 @@ struct ReaderChromeEditor: View {
                 Toggle("显示电量百分比", isOn: $showPercent)
                 Toggle("允许与系统顶部信息重复", isOn: $duplicates)
                 slider("底部安全留白", value: $footerHeight, range: 40...180)
+                Toggle("内容延伸至页眉页脚区域", isOn: $extendsContent)
             }
             VStack(alignment: .leading, spacing: 12) {
                 Text("菜单纸面").font(.headline)

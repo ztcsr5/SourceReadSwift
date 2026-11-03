@@ -3980,7 +3980,7 @@ struct ReaderView: View {
         case .themes: return AnyView(ReaderBindingLibraryView())
         case .heading: return AnyView(ReaderChapterDesignEditor())
         case .chrome: return AnyView(ReaderChromeEditor())
-        case .typography: return AnyView(ReaderSettingsContent { layoutSettingsBody(showsPreview: false) })
+        case .typography: return AnyView(ReaderSettingsContent { layoutSettingsBody(showsPreview: false, includesLegacySections: false) })
         case .appearance: return AnyView(ReaderSettingsContent { appearanceSettingsBody(showsPreview: false) })
         case .assistance: return AnyView(settingsPage(for: 2))
         }
@@ -4411,7 +4411,7 @@ struct ReaderView: View {
         ReaderSettingsContent { layoutSettingsBody(showsPreview: true) }
     }
 
-    private func layoutSettingsBody(showsPreview: Bool) -> some View {
+    private func layoutSettingsBody(showsPreview: Bool, includesLegacySections: Bool = true) -> some View {
         VStack(alignment: .leading, spacing: 14) {
             if showsPreview { appearancePreview }
 
@@ -4485,55 +4485,16 @@ struct ReaderView: View {
             // 6. 屏幕边距（左右留白）
             readerValueSlider("屏幕边距（左右留白）", value: $pagePadding, range: 10...40, step: 1, unit: "pt", help: "正文文字距离手机屏幕左右两侧边缘的距离，防止文字贴边（推荐 18~22pt）")
 
-            // 7. 章节标题
-            VStack(alignment: .leading, spacing: 8) {
-                Text("章节标题位置")
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(readerThemeTextColor.opacity(0.62))
-                Picker("章节标题位置", selection: $chapterHeadingStyleRaw) {
-                    ForEach(ReaderPageChromeLayout.allCases) { layout in
-                        Text(layout.title).tag(layout.rawValue)
-                    }
-                }
-                .pickerStyle(.segmented)
-                Text(chapterHeadingStyle.help)
-                    .font(.caption2)
-                    .foregroundStyle(readerThemeTextColor.opacity(0.62))
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-
-            VStack(alignment: .leading, spacing: 10) {
-                Text("章节名 · 独立排版").font(.headline)
-                Toggle("章节名加粗", isOn: $chapterTitleBold)
-                Picker("章节名字体", selection: $chapterTitleFamilyRaw) {
-                    Text("跟随正文").tag("")
-                    ForEach(ReaderFontFamily.allCases) { family in Text(family.title).tag(family.rawValue) }
-                }
-                readerValueSlider("章节名字号", value: Binding(get: { resolvedTitleSize }, set: { chapterTitleSize = $0 }), range: 14...44, step: 1, unit: "pt", help: "只改变章节名，不改变正文字号；滚动与分页模式共用。")
-                Button("章节名字号跟随正文") { chapterTitleSize = 0 }
-            }
-
-            VStack(alignment: .leading, spacing: 10) {
-                Text("页眉 · 独立排版").font(.headline)
-                readerValueSlider("页眉字号", value: $headerFontSize, range: 9...18, step: 1, unit: "pt", help: "增大字号会同步预留页眉高度，不覆盖正文。")
-                readerValueSlider("页眉顶部间距", value: $headerTopGap, range: 0...24, step: 1, unit: "pt", help: "从安全区下沿开始计算，避免挡住灵动岛。")
-                readerValueSlider("页眉文字浓度", value: $headerOpacity, range: 0.35...1, step: 0.05, unit: "", help: "独立于正文颜色；背景图仍连续覆盖顶部。")
-                Toggle("系统状态栏可见时仍重复顶部时间电量", isOn: $allowsDuplicateTopStatus)
-            }
-
-            readerValueSlider("章节标题间距", value: $titleSpacing, range: 0...36, step: 2, unit: "pt", help: "仅「正文大标题」模式生效：大章节标题与正文第一行之间的垂直留白（推荐 8~16pt）。页眉模式不占用正文高度。")
-
-            Toggle("内容延伸至页眉页脚区域", isOn: $contentExtendsIntoChrome)
-                .font(.subheadline.weight(.semibold))
+            if includesLegacySections { legacyLayoutHeadingControls }
 
             Button {
-                applyCompetitiveReaderPreset()
+                applyReaderTypographyPreset(includesLegacySections: includesLegacySections)
             } label: {
                 HStack(spacing: 8) {
                     Image(systemName: "wand.and.stars")
                     VStack(alignment: .leading, spacing: 2) {
-                        Text("一键对齐成熟阅读器排版").font(.subheadline.weight(.semibold))
-                        Text("字号 20 / 行距 12 / 段距 10 / 边距 21 / 首行缩进 2 字 / 页眉小标题 / 页码右下角")
+                        Text("应用纸间推荐排版").font(.subheadline.weight(.semibold))
+                        Text("调整正文的字号、行距、段距、边距和首行缩进。")
                             .font(.caption2)
                             .foregroundStyle(readerThemeTextColor.opacity(0.62))
                     }
@@ -4544,36 +4505,83 @@ struct ReaderView: View {
             }
             .buttonStyle(.plain)
 
-            // 8. 底部安全留白
-            readerValueSlider("底部安全留白", value: $footerHeight, range: 40...180, step: 8, unit: "pt", help: "屏幕最底部向上预留的安全空隙，防止手势遮挡最后一行正文（推荐 80~100pt）")
-
-            // 9. 页脚内容开关。对照同类阅读器（香色闺阁的 tr_showTime / tr_showBatView /
-            // tr_showBatLabel 就是三个独立开关），把「时间 / 电量图标 / 电量百分比」拆开，
-            // 全屏时不想看就不显示，也就不存在「位置奇怪」这件事。
-            VStack(alignment: .leading, spacing: 10) {
-                Text("页眉与页脚状态栏")
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(readerThemeTextColor.opacity(0.62))
-
-                HStack {
-                    Text("状态栏位置")
-                    Spacer()
-                    Picker("位置", selection: $statusPosition) {
-                        Text("仅页脚").tag("bottom")
-                        Text("仅页眉").tag("top")
-                        Text("页眉+页脚").tag("both")
-                    }
-                    .pickerStyle(.segmented)
-                    .frame(width: 200)
-                }
-
-                Toggle("始终保留系统原生状态栏", isOn: $showSystemStatusBar)
-                Toggle("显示时间", isOn: $footerShowTime)
-                Toggle("显示电量图标", isOn: $footerShowBatteryIcon)
-                Toggle("显示电量百分比", isOn: $footerShowBatteryPercent)
-            }
-            .font(.subheadline)
+            if includesLegacySections { legacyLayoutStatusControls }
         }
+    }
+
+    @ViewBuilder private var legacyLayoutHeadingControls: some View {
+        // 7. 章节标题
+        VStack(alignment: .leading, spacing: 8) {
+            Text("章节标题位置")
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(readerThemeTextColor.opacity(0.62))
+            Picker("章节标题位置", selection: $chapterHeadingStyleRaw) {
+                ForEach(ReaderPageChromeLayout.allCases) { layout in
+                    Text(layout.title).tag(layout.rawValue)
+                }
+            }
+            .pickerStyle(.segmented)
+            Text(chapterHeadingStyle.help)
+                .font(.caption2)
+                .foregroundStyle(readerThemeTextColor.opacity(0.62))
+                .fixedSize(horizontal: false, vertical: true)
+        }
+
+        VStack(alignment: .leading, spacing: 10) {
+            Text("章节名 · 独立排版").font(.headline)
+            Toggle("章节名加粗", isOn: $chapterTitleBold)
+            Picker("章节名字体", selection: $chapterTitleFamilyRaw) {
+                Text("跟随正文").tag("")
+                ForEach(ReaderFontFamily.allCases) { family in Text(family.title).tag(family.rawValue) }
+            }
+            readerValueSlider("章节名字号", value: Binding(get: { resolvedTitleSize }, set: { chapterTitleSize = $0 }), range: 14...44, step: 1, unit: "pt", help: "只改变章节名，不改变正文字号；滚动与分页模式共用。")
+            Button("章节名字号跟随正文") { chapterTitleSize = 0 }
+        }
+
+        VStack(alignment: .leading, spacing: 10) {
+            Text("页眉 · 独立排版").font(.headline)
+            readerValueSlider("页眉字号", value: $headerFontSize, range: 9...18, step: 1, unit: "pt", help: "增大字号会同步预留页眉高度，不覆盖正文。")
+            readerValueSlider("页眉顶部间距", value: $headerTopGap, range: 0...24, step: 1, unit: "pt", help: "从安全区下沿开始计算，避免挡住灵动岛。")
+            readerValueSlider("页眉文字浓度", value: $headerOpacity, range: 0.35...1, step: 0.05, unit: "", help: "独立于正文颜色；背景图仍连续覆盖顶部。")
+            Toggle("系统状态栏可见时仍重复顶部时间电量", isOn: $allowsDuplicateTopStatus)
+        }
+
+        readerValueSlider("章节标题间距", value: $titleSpacing, range: 0...36, step: 2, unit: "pt", help: "仅「正文大标题」模式生效：大章节标题与正文第一行之间的垂直留白（推荐 8~16pt）。页眉模式不占用正文高度。")
+
+        Toggle("内容延伸至页眉页脚区域", isOn: $contentExtendsIntoChrome)
+            .font(.subheadline.weight(.semibold))
+    }
+
+    @ViewBuilder private var legacyLayoutStatusControls: some View {
+        // 8. 底部安全留白
+        readerValueSlider("底部安全留白", value: $footerHeight, range: 40...180, step: 8, unit: "pt", help: "屏幕最底部向上预留的安全空隙，防止手势遮挡最后一行正文（推荐 80~100pt）")
+
+        // 9. 页脚内容开关。对照同类阅读器（香色闺阁的 tr_showTime / tr_showBatView /
+        // tr_showBatLabel 就是三个独立开关），把「时间 / 电量图标 / 电量百分比」拆开，
+        // 全屏时不想看就不显示，也就不存在「位置奇怪」这件事。
+        VStack(alignment: .leading, spacing: 10) {
+            Text("页眉与页脚状态栏")
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(readerThemeTextColor.opacity(0.62))
+
+            HStack {
+                Text("状态栏位置")
+                Spacer()
+                Picker("位置", selection: $statusPosition) {
+                    Text("仅页脚").tag("bottom")
+                    Text("仅页眉").tag("top")
+                    Text("页眉+页脚").tag("both")
+                }
+                .pickerStyle(.segmented)
+                .frame(width: 200)
+            }
+
+            Toggle("始终保留系统原生状态栏", isOn: $showSystemStatusBar)
+            Toggle("显示时间", isOn: $footerShowTime)
+            Toggle("显示电量图标", isOn: $footerShowBatteryIcon)
+            Toggle("显示电量百分比", isOn: $footerShowBatteryPercent)
+        }
+        .font(.subheadline)
     }
 
     /// 1.0.64 shipped `paragraphSpacing = 0`, which made every paragraph touch
@@ -4601,13 +4609,17 @@ struct ReaderView: View {
         }
     }
 
-    /// 一档对标栖阅 / 开元阅读截图的排版参数。用户随时可以再微调。
-    private func applyCompetitiveReaderPreset() {
+    private func applyReaderTypographyPreset(includesLegacySections: Bool) {
+        defer {
+            HapticFeedback.medium()
+            schedulePagedBlocksCacheRebuild()
+        }
         fontSize = 20
         lineSpacing = ReaderTypographyDefaults.lineSpacing
         pagePadding = 21
         paragraphIndent = 40
         paragraphSpacing = ReaderTypographyDefaults.paragraphSpacing
+        guard includesLegacySections else { return }
         titleSpacing = ReaderTypographyDefaults.titleSpacing
         chapterHeadingStyleRaw = ReaderPageChromeLayout.header.rawValue
         contentExtendsIntoChrome = false
@@ -4615,8 +4627,6 @@ struct ReaderView: View {
         footerShowTime = true
         footerShowBatteryIcon = true
         footerShowBatteryPercent = true
-        HapticFeedback.medium()
-        schedulePagedBlocksCacheRebuild()
     }
 
     private var advancedSettings: ReaderSettingsContent {

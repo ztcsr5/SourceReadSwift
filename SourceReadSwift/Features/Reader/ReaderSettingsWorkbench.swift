@@ -84,7 +84,7 @@ struct ReaderSettingsWorkbench: View {
                     // consume taps instead of forwarding them to the dismiss scrim.
                     Color.clear.contentShape(Rectangle()).onTapGesture { }
                 }
-                .modifier(ReaderChromeSurface(paper: context.paper, ink: context.ink))
+                .modifier(ReaderChromeSurface(paper: context.paper, ink: context.ink, protectsReadingControls: true))
                 .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
                 .overlay { RoundedRectangle(cornerRadius: 24).strokeBorder(context.ink.opacity(0.10), lineWidth: 0.6).allowsHitTesting(false) }
                 .shadow(color: context.ink.opacity(0.10), radius: 16, y: 8)
@@ -198,7 +198,7 @@ struct ReaderClassicSettingsPanel: View {
                            height: ReaderSettingsLayoutPolicy.maxPanelHeight(viewportHeight: proxy.size.height, bottomInset: context.bottomInset))
                     .foregroundStyle(context.ink)
                     .background { Color.clear.contentShape(Rectangle()).onTapGesture { } }
-                    .modifier(ReaderChromeSurface(paper: context.paper, ink: context.ink))
+                    .modifier(ReaderChromeSurface(paper: context.paper, ink: context.ink, protectsReadingControls: true))
                     .padding(.bottom, max(context.bottomInset, 8) + 8)
             }.frame(maxWidth: .infinity).environment(\.colorScheme, context.background.isDark ? .dark : .light)
         }

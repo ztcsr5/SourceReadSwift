@@ -54,6 +54,8 @@ struct ReaderChapterDesignEditor: View {
     @AppStorage("reader.chapterTitleFamily") private var familyRaw = ""
     @AppStorage("reader.chapterTitleSize") private var size = 0.0
     @AppStorage("reader.chapterTitleBold") private var isBold = true
+    @AppStorage("reader.chapterHeadingStyle") private var placement = ReaderPageChromeLayout.header.rawValue
+    @AppStorage("reader.titleSpacing") private var titleSpacing = ReaderTypographyDefaults.titleSpacing
     @AppStorage("reader.fontSize") private var bodySize = 20.0
     @Namespace private var selection
     @AppMotion private var motion
@@ -87,6 +89,21 @@ struct ReaderChapterDesignEditor: View {
             Picker("章节名对齐", selection: $alignmentRaw) {
                 ForEach(ReaderChapterAlignment.allCases, id: \.self) { Text($0.title).tag($0.rawValue) }
             }.pickerStyle(.segmented)
+            VStack(alignment: .leading, spacing: 8) {
+                Text("章节标题位置").font(.subheadline.weight(.semibold))
+                Picker("章节标题位置", selection: $placement) {
+                    ForEach(ReaderPageChromeLayout.allCases) { layout in
+                        Text(layout.title).tag(layout.rawValue)
+                    }
+                }.pickerStyle(.segmented)
+                Text((ReaderPageChromeLayout(rawValue: placement) ?? .header).help)
+                    .font(.caption).foregroundStyle(.secondary)
+                if placement != ReaderPageChromeLayout.hidden.rawValue {
+                    Text("标题下方留白 · \(Int(titleSpacing)) pt").font(.subheadline)
+                    Slider(value: $titleSpacing, in: 0...36, step: 2)
+                        .accessibilityLabel("标题下方留白")
+                }
+            }
             Toggle("章节名加粗", isOn: $isBold)
             Picker("章节名字体", selection: $familyRaw) {
                 Text("跟随正文").tag("")
