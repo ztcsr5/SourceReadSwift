@@ -51,7 +51,7 @@ struct FloatingDeskParallax: ViewModifier {
         if #available(iOS 17.0, *), !reducesDepth {
             content.visualEffect { effect, geometry in
                 let phase = Self.phase(geometry)
-                effect.offset(x: -phase * depth, y: abs(phase) * depth * 0.22)
+                return effect.offset(x: -phase * depth, y: abs(phase) * depth * 0.22)
                     .scaleEffect(1 - abs(phase) * depth * 0.0015)
             }
         } else { content }

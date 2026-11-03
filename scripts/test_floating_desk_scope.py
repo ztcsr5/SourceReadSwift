@@ -32,6 +32,12 @@ class FloatingDeskScopeTests(unittest.TestCase):
         shelf = (ROOT / 'SourceReadSwift/Features/Bookshelf/BookshelfView.swift').read_text(encoding='utf8')
         self.assertIn('Toggle("悬浮玻璃书台", isOn: $floatingReadingDeskEnabled)', shelf)
 
+    def test_visual_effect_closure_returns_its_effect_after_local_geometry_calculation(self):
+        style = (ROOT / 'SourceReadSwift/Features/Bookshelf/FloatingDeskStyle.swift').read_text(encoding='utf8')
+        closure = style.split('content.visualEffect { effect, geometry in', 1)[1].split('} else', 1)[0]
+        self.assertIn('let phase = Self.phase(geometry)', closure)
+        self.assertIn('return effect.offset', closure)
+
     def test_offline_fixture_is_debug_only_and_requires_an_explicit_argument(self):
         launch = (ROOT / 'SourceReadSwift/App/ReaderRegressionLaunch.swift').read_text(encoding='utf8')
         self.assertGreater(launch.index('--floating-desk-regression'), launch.index('#if DEBUG'))
