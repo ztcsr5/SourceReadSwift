@@ -116,6 +116,14 @@ final class ChapterContentCacheStore: ObservableObject {
         )
     }
 
+    /// Snapshot existing cached URLs without rebuilding chapter bodies or touching the LRU.
+    func cachedChapterURLs(sourceURL: String, purifyRules: [String]) -> Set<String> {
+        let signature = purifySignature(purifyRules)
+        return Set(entries.lazy.filter {
+            $0.sourceURL == sourceURL && $0.purifySignature == signature
+        }.map(\.chapterURL))
+    }
+
     func isCached(sourceURL: String, chapter: BookChapter, purifyRules: [String]) -> Bool {
         content(sourceURL: sourceURL, chapter: chapter, purifyRules: purifyRules) != nil
     }

@@ -123,7 +123,8 @@ final class ChapterDownloadStore: ObservableObject {
         sourceURL: String,
         bookURL: String,
         title: String,
-        chapterCount: Int
+        chapterCount: Int,
+        cachedChapterIndexes: [Int]? = nil
     ) {
         let old = records[bookID]
         let canResume = old?.sourceURL == sourceURL && old?.bookURL == bookURL && old?.chapterCount == chapterCount
@@ -133,7 +134,7 @@ final class ChapterDownloadStore: ObservableObject {
             bookURL: bookURL,
             title: title,
             chapterCount: chapterCount,
-            completedIndexes: canResume ? (old?.completedIndexes ?? []) : [],
+            completedIndexes: cachedChapterIndexes ?? (canResume ? (old?.completedIndexes ?? []) : []),
             failedIndexes: [],
             status: .queued,
             lastError: nil,
@@ -197,8 +198,13 @@ final class ChapterDownloadStore: ObservableObject {
 /// lets the next launch resume from the persisted chapter indexes.
 @MainActor
 final class ChapterDownloadCoordinator: ObservableObject {
+    private struct DownloadJob {
+        let generation: UUID
+        let task: Task<Void, Never>
+    }
+
     private let store: ChapterDownloadStore
-    private var tasks: [String: Task<Void, Never>] = [:]
+    private var tasks: [String: DownloadJob] = [:]
 
     init(store: ChapterDownloadStore) { self.store = store }
 
@@ -214,33 +220,27 @@ final class ChapterDownloadCoordinator: ObservableObject {
         purifyRules: [String]
     ) {
         guard !chapters.isEmpty, tasks[bookID] == nil else { return }
+        let generation = UUID()
+        let cachedURLs = cacheStore.cachedChapterURLs(sourceURL: source.bookSourceUrl, purifyRules: purifyRules)
+        let completed = Set(chapters.lazy.filter { cachedURLs.contains($0.url) }.map(\.index))
         store.begin(
             bookID: bookID,
             sourceURL: source.bookSourceUrl,
             bookURL: chapters[0].bookUrl,
             title: title,
-            chapterCount: chapters.count
+            chapterCount: chapters.count,
+            cachedChapterIndexes: Array(completed)
         )
         store.markRunning(bookID: bookID)
         let task = Task { @MainActor [weak self, weak store] in
             guard let self, let store else { return }
-            let current = store.record(bookID: bookID)
-            let completed = Set(current?.completedIndexes ?? [])
             for chapter in chapters {
-                guard !Task.isCancelled else {
-                    store.markPaused(bookID: bookID)
-                    self.tasks.removeValue(forKey: bookID)
-                    return
-                }
+                guard self.isCurrentJob(bookID, generation: generation) else { return }
                 guard !completed.contains(chapter.index) else { continue }
                 let result = await AsyncTimeout.run(seconds: 14) {
                     await engine.getContent(source: source, chapter: chapter)
                 } ?? .failure(.network("Download timed out"))
-                guard !Task.isCancelled else {
-                    store.markPaused(bookID: bookID)
-                    self.tasks.removeValue(forKey: bookID)
-                    return
-                }
+                guard self.isCurrentJob(bookID, generation: generation) else { return }
                 switch result {
                 case .success(let content):
                     cacheStore.save(content, sourceURL: source.bookSourceUrl, purifyRules: purifyRules)
@@ -249,15 +249,22 @@ final class ChapterDownloadCoordinator: ObservableObject {
                     store.markFailed(bookID: bookID, chapterIndex: chapter.index, message: error.displayMessage)
                 }
             }
+            guard self.isCurrentJob(bookID, generation: generation) else { return }
             store.finish(bookID: bookID)
             self.tasks.removeValue(forKey: bookID)
         }
-        tasks[bookID] = task
+        tasks[bookID] = DownloadJob(generation: generation, task: task)
     }
 
-    func cancel(bookID: String) {
-        tasks[bookID]?.cancel()
-        tasks.removeValue(forKey: bookID)
+    private func isCurrentJob(_ bookID: String, generation: UUID) -> Bool {
+        !Task.isCancelled && tasks[bookID]?.generation == generation
+    }
+
+    /// Cancel this generation only; callers can optionally await network cleanup.
+    @discardableResult func cancel(bookID: String) -> Task<Void, Never>? {
+        let job = tasks.removeValue(forKey: bookID)
+        job?.task.cancel()
         store.markCancelled(bookID: bookID)
+        return job?.task
     }
 }

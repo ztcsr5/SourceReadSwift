@@ -16,3 +16,8 @@
 本机门禁：python -B -X utf8 -m unittest discover -s scripts -p 'test_*.py' -q；git diff --check。Swift 语法检查与真机结果分开记录。
 
 待真机：iPhone 13 Pro 完整 A–F 流程、横向书台与进退中断、后台与重启位置、真实 QQ 本地 12 MB TTF、复杂壁纸明暗、动画与 Instruments。回退从此分支按提交逆序 revert；不 reset、不清理工作树、不覆盖旧 IPA。
+
+## 首个原生候选回执
+
+- 68eb30e 的 iOS 兼容 job 126285023465 在编译失败：ReaderView.swift:5727:60 — argument passed to call that takes no arguments。滑条的移动入口还在调用旧防抖签名；接入同一无参保存路径，并将所有旧签名调用列入本机检查。原始日志及 SHA256 保存于该 HEAD 的外部证据目录。
+- 同轮发现离线缓存两个明确问题：旧取消任务能清除刚启动的新任务；重新缓存会信任历史任务索引而不检查实际文件。增加任务代际和实际缓存 URL 交叉检查，并补原生回归。现有 500 章 LRU 上限仍在；超过容量的全本任务不能保证所有章节永久离线，界面不再把历史完成当作全本仍在缓存。

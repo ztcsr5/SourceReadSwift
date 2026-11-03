@@ -938,7 +938,7 @@ struct BookDetailView: View {
         if isDownloading { return "停止缓存" }
         guard let record = downloadRecord else { return "缓存全本章节" }
         switch record.status {
-        case .completed: return "全本已缓存"
+        case .completed: return "重新检查离线缓存"
         case .paused: return "继续缓存 \(record.completedCount)/\(record.chapterCount)"
         case .failed: return "重试缓存（失败 \(record.failedCount)）"
         case .cancelled, .queued, .running: return "继续缓存 \(record.completedCount)/\(record.chapterCount)"
@@ -1074,7 +1074,7 @@ struct BookDetailView: View {
             ProgressView(value: Double(record.completedCount), total: Double(max(record.chapterCount, 1)))
                 .tint(AppTheme.accent)
             HStack(spacing: 8) {
-                Text("已缓存 \(record.completedCount)/\(record.chapterCount) 章")
+                Text("下载进度 \(record.completedCount)/\(record.chapterCount) 章")
                     .foregroundStyle(.secondary)
                 if record.failedCount > 0 {
                     Text("\(record.failedCount) 章失败").foregroundStyle(.red)
