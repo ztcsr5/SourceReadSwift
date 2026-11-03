@@ -3,7 +3,10 @@ import Foundation
 /// Source TOCs contain adverts, prefaces and different numbering conventions.
 /// Never use the gateway's initial chapter once the live reader has advanced.
 enum SourceChapterAlignment {
-    static func match(title: String?, index: Int, in chapters: [BookChapter]) -> BookChapter? {
+    /// Resolves a chapter by title/number; a source switch can reject missing numbered chapters.
+    static func match(
+        title: String?, index: Int, in chapters: [BookChapter], requiresNumberedChapterMatch: Bool = false
+    ) -> BookChapter? {
         guard !chapters.isEmpty else { return nil }
         let title = title ?? ""
         let normalized = key(title)
@@ -17,6 +20,7 @@ enum SourceChapterAlignment {
         let suffix = body(title)
         let titled = suffix.isEmpty ? [] : chapters.filter { body($0.title) == suffix }
         if titled.count == 1 { return titled[0] }
+        if requiresNumberedChapterMatch, number(title) != nil { return nil }
         return chapters[min(max(0, index), chapters.count - 1)]
     }
 

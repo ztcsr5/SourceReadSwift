@@ -577,6 +577,7 @@ struct BookshelfReaderGatewayView: View {
                                 sourceSwitchSearchTrigger &+= 1
                                 isApplyingSource = true
                                 sourceSwitchState.isLoading = false
+                                sourceSwitchState.message = nil
                                 sourceSwitchApplyTask?.cancel()
                                 sourceSwitchApplyTask = Task { await applySwitch(candidate) }
                             } label: {
@@ -783,9 +784,23 @@ struct BookshelfReaderGatewayView: View {
         guard !Task.isCancelled, sourceSwitchGeneration == token, showSourceSwitcher else { return }
         guard let (newDetail, newChapters) = loaded,
               let target = SourceChapterAlignment.match(title: progress.currentChapterTitle,
-                  index: progress.currentChapterIndex, in: newChapters) else {
-            sourceSwitchState.message = "无法读取该源目录，阅读进度未改变；请选择其他源或重试。"
+                  index: progress.currentChapterIndex, in: newChapters,
+                  requiresNumberedChapterMatch: true) else {
+            sourceSwitchState.message = "该书源未找到对应章节，已保留当前书源和阅读位置。"
             return
+        }
+        if candidate.source.sourceKind == .text {
+            let rules = appState.purifyRuleStore.enabledPatterns
+            let content = await loadSourceSwitchPreview(chapter: target, source: candidate.source, rules: rules)
+            guard !Task.isCancelled, sourceSwitchGeneration == token, showSourceSwitcher else { return }
+            guard let content, !content.paragraphs.isEmpty else {
+                sourceSwitchState.message = "新书源的对应章节未能加载正文，已保留当前书源和阅读位置。"
+                return
+            }
+            if !appState.chapterContentCacheStore.isCached(sourceURL: candidate.source.bookSourceUrl,
+                chapter: target, purifyRules: rules) {
+                appState.chapterContentCacheStore.save(content, sourceURL: candidate.source.bookSourceUrl, purifyRules: rules)
+            }
         }
         appState.bookTOCacheStore.save(detail: newDetail, chapters: newChapters,
             sourceURL: candidate.source.bookSourceUrl, bookURL: candidate.book.bookUrl)
@@ -803,6 +818,15 @@ struct BookshelfReaderGatewayView: View {
         showSourceSwitcher = false
     }
 
+    private func loadSourceSwitchPreview(chapter: BookChapter, source: BookSource, rules: [String]) async -> ChapterContent? {
+        if let cached = appState.chapterContentCacheStore.content(sourceURL: source.bookSourceUrl,
+            chapter: chapter, purifyRules: rules) { return cached }
+        let engine = appState.engine
+        let result = await AsyncTimeout.run(seconds: 14) {
+            await engine.getContent(source: source, chapter: chapter)
+        }
+        return result.flatMap { try? $0.get() }
+    }
 }
 
 private struct SourceSwitchState: Sendable {

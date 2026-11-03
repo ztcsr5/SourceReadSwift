@@ -41,6 +41,10 @@ final class Release111RegressionTests: XCTestCase {
         let chapters = [chapter("第十章 上", 0), chapter("第十章 下", 1), chapter("后记", 2)]
         XCTAssertEqual(SourceChapterAlignment.match(title: "第10章 下", index: 0, in: chapters)?.index, 1)
         XCTAssertEqual(SourceChapterAlignment.match(title: "不同章节", index: 100, in: chapters)?.index, 2)
+        XCTAssertNil(SourceChapterAlignment.match(title: "第300章 丢失的章", index: 100,
+            in: chapters, requiresNumberedChapterMatch: true))
+        XCTAssertEqual(SourceChapterAlignment.match(title: "第10章 下", index: 0,
+            in: chapters, requiresNumberedChapterMatch: true)?.index, 1)
     }
 
     func testJSONListAcceptsOrderModifiersBeforeJSONAndJS() {

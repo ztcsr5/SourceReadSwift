@@ -80,6 +80,17 @@ class ProductQualityScopeTests(unittest.TestCase):
         self.assertIn("cachedChapterIndexes: Array(completed)", cache)
         self.assertGreaterEqual(cache.count("guard self.isCurrentJob(bookID, generation: generation)"), 2)
 
+    def test_source_switch_validates_replacement_before_mutating_current_book(self):
+        switch = read_source(SHELF + "BookshelfReaderGatewayView.swift").split("private func applySwitch(", 1)[1].split(
+            "private func loadSourceSwitchPreview", 1)[0]
+        self.assertIn("await loadSourceSwitchPreview", switch)
+        validation = switch.index("await loadSourceSwitchPreview")
+        mutation = switch.index("bookshelfStore.switchSource")
+        self.assertLess(validation, mutation)
+        self.assertIn("requiresNumberedChapterMatch: true", switch)
+        self.assertIn("sourceSwitchGeneration == token", switch[validation:mutation])
+        self.assertIn("guard let content, !content.paragraphs.isEmpty", switch[validation:mutation])
+
     def test_diagnostic_clipboard_does_not_include_raw_urls_or_transport_messages(self):
         export = read_source(DETAIL).split("private func chapterDiagnosticText(", 1)[1].split("    init(", 1)[0]
         self.assertTrue(export.startswith(")"))
