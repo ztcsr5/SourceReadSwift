@@ -53,6 +53,18 @@ class FloatingDeskScopeTests(unittest.TestCase):
         self.assertIn('XCTCPUMetric(application: app)', test)
         self.assertIn('XCTMemoryMetric(application: app)', test)
 
+    def test_each_page_clips_its_displaced_caption_before_the_viewport(self):
+        pager = (ROOT / 'SourceReadSwift/Features/Bookshelf/ReadingDeskPager.swift').read_text(encoding='utf8')
+        self.assertIn('measuredCard(book).containerRelativeFrame(.horizontal).clipped().id(book.id)', pager)
+
+    def test_full_suite_keeps_its_original_probe_environment_and_not_native_deadline(self):
+        workflow = (ROOT / '.github/workflows/floating-desk.yml').read_text(encoding='utf8')
+        self.assertIn('TEST_RUNNER_COMIC_CORPUS_PROBE: "1"', workflow)
+        self.assertIn('DEADLINES=()', workflow)
+        native = workflow.split('if [ "${{ matrix.name }}" = "liquid-glass" ]; then', 1)[1].split('fi', 1)[0]
+        self.assertIn('DEADLINES=(-test-timeouts-enabled YES -maximum-test-execution-time-allowance 60)', native)
+        self.assertIn('"${DEADLINES[@]}"', workflow)
+
 
 if __name__ == '__main__':
     unittest.main()

@@ -51,11 +51,15 @@ jobs:
             build-for-testing 2>&1 | tee desk-build.log
       - name: Run unit and mounted visual regressions
         timeout-minutes: 20
+        env:
+          TEST_RUNNER_COMIC_CORPUS_PROBE: "1"
         run: |
           set -euo pipefail
           DEVICE_ID="$(cat desk-device.txt)"
           TESTS=(-only-testing:SourceReadSwiftTests)
+          DEADLINES=()
           if [ "${{ matrix.name }}" = "liquid-glass" ]; then
+            DEADLINES=(-test-timeouts-enabled YES -maximum-test-execution-time-allowance 60)
             TESTS=(-only-testing:SourceReadSwiftTests/FloatingReadingDeskTests \
               -only-testing:SourceReadSwiftTests/Release117ReadingHeroTests \
               -only-testing:SourceReadSwiftTests/Release117MotionSystemTests \
@@ -66,7 +70,7 @@ jobs:
           fi
           xcodebuild -project SourceReadSwift.xcodeproj -scheme SourceReadSwift \
             -destination "id=$DEVICE_ID" CODE_SIGNING_ALLOWED=NO -parallel-testing-enabled NO \
-            "${TESTS[@]}" -test-timeouts-enabled YES -maximum-test-execution-time-allowance 60 \
+            "${TESTS[@]}" "${DEADLINES[@]}" \
             -resultBundlePath DeskUnit.xcresult test-without-building 2>&1 | tee desk-unit.log
       - name: Record real home gestures navigation and performance
         timeout-minutes: 15
