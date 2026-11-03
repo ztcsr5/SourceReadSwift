@@ -75,6 +75,18 @@ final class FloatingReadingDeskTests: XCTestCase {
         }
     }
 
+    @MainActor func testPagingDoesNotChangeHeightWhenTheNextTitleIsLong() {
+        let long = makeBook()
+        var short = long; short.title = "山海来信"; short.author = "纸间"
+        for width: CGFloat in [288, 342, 398] {
+            let longHeight = UIHostingController(rootView: ReadingHeroCard(book: long, usesFloatingStyle: true))
+                .sizeThatFits(in: CGSize(width: width, height: 6000)).height
+            let shortHeight = UIHostingController(rootView: ReadingHeroCard(book: short, usesFloatingStyle: true))
+                .sizeThatFits(in: CGSize(width: width, height: 6000)).height
+            XCTAssertEqual(longHeight, shortHeight, accuracy: 1, "Horizontal paging must not resize the shelf underneath a drag")
+        }
+    }
+
     private func makeBook() -> BookshelfBook {
         var book = BookshelfBook(id: "desk-long-title", title: "白昼之后，我们把很长很长的信写给远方与尚未相逢的人",
             author: "一位名字也非常长的作者", coverURL: nil, sourceName: "离线验收", sourceURL: "local://text", bookURL: "local://desk", intro: nil)

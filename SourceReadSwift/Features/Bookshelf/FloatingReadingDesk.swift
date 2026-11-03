@@ -12,13 +12,15 @@ struct FloatingReadingDesk: View {
     @AppStorage("settings.visualTheme") private var themeRaw = AppVisualTheme.classic.rawValue
     @AppStorage("settings.appearanceRevision") private var appearanceRevision = 0
     @AppMotion private var motion
+    @ScaledMetric(relativeTo: .title3) private var titleRowHeight = 26
     @State private var conservesEnergy = ProcessInfo.processInfo.isLowPowerModeEnabled || ProcessInfo.processInfo.thermalState.rawValue >= 2
     @State private var coverImage: UIImage?
     @State private var tone: CoverTone?
 
+    private var theme: AppVisualTheme { AppVisualTheme(rawValue: themeRaw) ?? .classic }
     private var palette: FloatingDeskPalette {
         let _ = appearanceRevision
-        return .resolve(theme: AppVisualTheme(rawValue: themeRaw) ?? .classic)
+        return .resolve(theme: theme)
     }
     private var policy: FloatingDeskPolicy {
         .resolve(.init(reducesMotion: motion.reducesMotion, reducesTransparency: reducesTransparency,
@@ -151,15 +153,21 @@ struct FloatingReadingDesk: View {
 
     private var caption: some View {
         VStack(alignment: .leading, spacing: 6) {
-            ViewThatFits(in: .horizontal) {
-                HStack(alignment: .firstTextBaseline, spacing: 12) {
-                    Text(book.title).font(.title3.weight(.semibold)).lineLimit(1)
-                        .layoutPriority(1)
-                    Spacer(minLength: 0)
+            if typeSize.isAccessibilitySize {
+                Text(book.title).font(.system(.title3, design: theme.fontDesign).weight(.semibold))
+                    .fixedSize(horizontal: false, vertical: true)
+                Text(book.author.isEmpty ? "作者未记录" : book.author).font(.caption)
+                    .foregroundStyle(palette.ink.opacity(0.7))
+            } else {
+                GeometryReader { geometry in
+                    HStack(alignment: .firstTextBaseline, spacing: 12) {
+                        Text(book.title).font(.system(.title3, design: theme.fontDesign).weight(.semibold))
+                            .lineLimit(1).frame(maxWidth: .infinity, alignment: .leading)
                     Text(book.author.isEmpty ? "作者未记录" : book.author).font(.caption)
-                        .lineLimit(1).foregroundStyle(palette.ink.opacity(0.7))
-                }
-                Text(book.title).font(.title3.weight(.semibold)).lineLimit(typeSize.isAccessibilitySize ? nil : 2)
+                            .lineLimit(1).foregroundStyle(palette.ink.opacity(0.7))
+                            .frame(width: geometry.size.width * 0.28, alignment: .trailing)
+                    }
+                }.frame(height: titleRowHeight)
             }
             Text(ReadingHeroStatus.chapter(for: book)).font(.caption)
                 .foregroundStyle(palette.ink.opacity(0.72)).lineLimit(typeSize.isAccessibilitySize ? nil : 1)
