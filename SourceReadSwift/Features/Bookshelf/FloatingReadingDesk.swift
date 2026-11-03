@@ -167,7 +167,7 @@ struct FloatingReadingDesk: View {
                     HStack(alignment: .firstTextBaseline, spacing: 12) {
                         Text(book.title).font(.system(.title3, design: theme.fontDesign).weight(.semibold))
                             .lineLimit(1).frame(maxWidth: .infinity, alignment: .leading)
-                    Text(book.author.isEmpty ? "作者未记录" : book.author).font(.caption)
+                        Text(book.author.isEmpty ? "作者未记录" : book.author).font(.caption)
                             .lineLimit(1).foregroundStyle(palette.ink.opacity(0.7))
                             .frame(width: geometry.size.width * 0.28, alignment: .trailing)
                     }
