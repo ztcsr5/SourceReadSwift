@@ -17,6 +17,7 @@ struct SettingsView: View {
     @State private var showBackupExporter = false
     @State private var showBackupImporter = false
     @State private var backupMessage: String?
+    @State private var confirmsChapterCacheClear = false
 
     var body: some View {
         NavigationStack {
@@ -118,9 +119,7 @@ struct SettingsView: View {
 
                 Section("通用") {
                     Button {
-                        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-                        appState.chapterContentCacheStore.removeAll()
-                        updateCacheSummary()
+                        confirmsChapterCacheClear = true
                     } label: {
                         HStack {
                             Label("清理章节缓存", systemImage: "trash")
@@ -245,6 +244,16 @@ struct SettingsView: View {
                 allowsMultipleSelection: false
             ) { result in
                 importBackup(result)
+            }
+            .confirmationDialog("清除离线章节？", isPresented: $confirmsChapterCacheClear, titleVisibility: .visible) {
+                Button("清除章节缓存", role: .destructive) {
+                    appState.chapterDownloadCoordinator.cancelAll()
+                    appState.chapterContentCacheStore.removeAll()
+                    updateCacheSummary()
+                }
+                Button("取消", role: .cancel) {}
+            } message: {
+                Text("停止当前批量下载并清除已缓存正文。书架、书签和阅读进度不受影响。")
             }
             .alert("数据备份", isPresented: Binding(
                 get: { backupMessage != nil },

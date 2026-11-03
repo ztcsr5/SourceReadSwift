@@ -260,6 +260,11 @@ final class ChapterDownloadCoordinator: ObservableObject {
         !Task.isCancelled && tasks[bookID]?.generation == generation
     }
 
+    /// Invalidates active jobs before clearing their offline chapters.
+    func cancelAll() {
+        for bookID in Array(tasks.keys) { cancel(bookID: bookID) }
+    }
+
     /// Cancel this generation only; callers can optionally await network cleanup.
     @discardableResult func cancel(bookID: String) -> Task<Void, Never>? {
         let job = tasks.removeValue(forKey: bookID)
