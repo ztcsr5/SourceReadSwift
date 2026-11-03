@@ -227,9 +227,9 @@ struct BookshelfView: View {
                     switch route {
                     case .read(let book):
                         BookshelfReaderGatewayView(book: book)
+                            .readerOpeningPresentation(for: managedOpeningBook(book))
                             .bookHeroDestination("continue|" + book.id, in: bookHero)
                             .environment(\.readingCoverHandoff, readingDeskEnabled && floatingReadingDeskEnabled ? readingCoverHandoff : nil)
-                            .environment(\.bookOpeningCover, readingDeskEnabled && floatingReadingDeskEnabled ? book.asSearchBook : nil)
                     case .detail(let book, let placement):
                         detailDestination(book, placement: placement)
                     }
@@ -774,6 +774,11 @@ struct BookshelfView: View {
             BookshelfReaderGatewayView(book: book)
                 .bookHeroDestination(placement + "|" + book.id, in: bookHero)
         }
+    }
+
+    private func managedOpeningBook(_ book: BookshelfBook) -> BookshelfBook? {
+        guard readingDeskEnabled, floatingReadingDeskEnabled else { return nil }
+        return (mediaKind(for: book) ?? .text) == .text ? book : nil
     }
 
     private func heroCard(_ book: BookshelfBook) -> some View {

@@ -277,15 +277,14 @@ struct BookDetailView: View {
                     let shelf = appState.bookshelfStore.book(id: readerBookID)
                     ChapterLoadingView(bookID: readerBookID, sourceUrl: book.sourceUrl,
                         chapter: target, totalChapters: chapters.count, chapters: chapters,
-                        initialParagraphIndex: shelf?.currentChapterIndex == target.index ? shelf?.currentParagraphIndex : nil,
-                        openingBook: readingDeskEnabled && sourceKind == .text ? BookshelfBook(searchBook: displayBook) : nil)
+                        initialParagraphIndex: shelf?.currentChapterIndex == target.index ? shelf?.currentParagraphIndex : nil)
                 }
             }
             // The header is offscreen after scrolling deep into the TOC. Let
             // system navigation use its ordinary fallback instead of a stale source.
+            .readerOpeningPresentation(for: readingDeskEnabled && sourceKind == .text ? BookshelfBook(searchBook: displayBook) : nil)
             .bookHeroDestination(readerHeroID, in: detailHero, enabled: !isHeaderCollapsed && sourceKind == .text)
             .environment(\.readingCoverHandoff, readingDeskEnabled ? coverHandoff : nil)
-            .environment(\.bookOpeningCover, readingDeskEnabled && sourceKind == .text ? displayBook : nil)
         } label: {
             Label(isBookInBookshelf ? "继续阅读" : "开始阅读", systemImage: "book")
                 .font(.subheadline.weight(.semibold))
@@ -1124,6 +1123,7 @@ struct BookDetailView: View {
 struct ChapterLoadingView: View {
     @EnvironmentObject private var appState: AppState
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.readerOpeningManaged) private var readerOpeningManaged
     let bookID: String?
     let sourceUrl: String
     let chapter: BookChapter
@@ -1200,7 +1200,9 @@ struct ChapterLoadingView: View {
             } else if let loadedContent = content {
                 readerView(loadedContent)
             } else if let errorMessage {
-                chapterLoadErrorView(errorMessage)
+                chapterLoadErrorView(errorMessage).readerOpeningContentReady()
+            } else if readerOpeningManaged {
+                Color.clear
             } else {
                 if let openingBook {
                     ReaderOpeningPage(book: openingBook, chapterTitle: effectiveChapter.title)

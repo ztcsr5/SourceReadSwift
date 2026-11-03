@@ -3,6 +3,7 @@ import SwiftUI
 struct BookshelfReaderGatewayView: View {
     @EnvironmentObject private var appState: AppState
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.readerOpeningManaged) private var readerOpeningManaged
     let book: BookshelfBook
     var initialBookmark: ReaderBookmark? = nil
     var initialChapterIndex: Int? = nil
@@ -159,11 +160,11 @@ struct BookshelfReaderGatewayView: View {
                 .id("remote-reader|\(currentBook.sourceURL)|\(currentBook.bookURL)")
             )
         } else if let errorMessage {
-            return AnyView(readerRecoveryErrorView(errorMessage))
+            return AnyView(readerRecoveryErrorView(errorMessage).readerOpeningContentReady())
+        } else if readerOpeningManaged {
+            return AnyView(Color.clear)
         } else {
-            return AnyView(
-                ReaderOpeningPage(book: currentBook)
-            )
+            return AnyView(ReaderOpeningPage(book: currentBook))
         }
     }
 

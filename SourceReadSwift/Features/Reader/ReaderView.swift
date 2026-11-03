@@ -50,7 +50,7 @@ struct ReaderView: View {
 
     @Environment(\.dismiss) private var dismiss
     @Environment(\.scenePhase) private var scenePhase
-    @Environment(\.bookOpeningCover) private var bookOpeningCover
+    @Environment(\.readerOpeningManaged) private var readerOpeningManaged
     @State private var hasResolvedOpeningPreview = false
     @State private var chromeState = ReaderChromeStateMachine()
     @State private var tabChromeOwner = UUID()
@@ -897,6 +897,15 @@ struct ReaderView: View {
             // revision instead (PageCurlReaderView.contentRevision, cover
             // data and TabView tags).
             .id(readerMode.rawValue)
+            .readerOpeningContentReady(hasResolvedOpeningPreview)
+            .task(id: readerOpeningManaged && !hasResolvedOpeningPreview) {
+                // A missing bridge report must not permanently cover the reader.
+                // This is a recovery ceiling, not a minimum display duration.
+                guard readerOpeningManaged, !hasResolvedOpeningPreview else { return }
+                try? await Task.sleep(nanoseconds: 8_000_000_000)
+                guard !Task.isCancelled else { return }
+                resolveOpeningPreview()
+            }
             .onPreferenceChange(ReaderPageContainerMetricsKey.self) { metrics in
                 if let metrics {
                     adoptPageContainerMetrics(metrics)
@@ -1874,22 +1883,9 @@ struct ReaderView: View {
             // 只有「这一段窗口里确实没有任何段落」才盖占位层。
             // 之前只判 scrollModeParagraphs 是否为空：滑动跨章时它会被重算成空数组，
             // 于是整屏被不透明占位盖住 —— 就是「往上滑一点突然全白」。
-            if let bookOpeningCover, !hasResolvedOpeningPreview {
-                ReaderOpeningPage(book: BookshelfBook(searchBook: bookOpeningCover), chapterTitle: currentDisplayChapterTitle)
-                    .allowsHitTesting(false)
-                    .accessibilityHidden(true)
-            } else if scrollSections.allSatisfy({ $0.paragraphs.isEmpty }) {
+            if scrollSections.allSatisfy({ $0.paragraphs.isEmpty }) {
                 readerLoadingPlaceholder
             }
-        }
-        .task(id: bookOpeningCover?.id) {
-            // A cold WKWebView can take several seconds on a simulator. Prefer
-            // the first visible-position report (also respects jump acks);
-            // this bound just prevents a broken bridge from retaining the cover.
-            guard bookOpeningCover != nil, !hasResolvedOpeningPreview else { return }
-            try? await Task.sleep(nanoseconds: 8_000_000_000)
-            guard !Task.isCancelled else { return }
-            resolveOpeningPreview()
         }
         .onAppear {
             if scrollParagraphTarget > 0, paragraphJumpRequest == nil {
@@ -2830,7 +2826,7 @@ struct ReaderView: View {
             },
             onPageContainerLayout: pageContainerLayoutHandler,
             onVisiblePageIdentity: { key in
-                pageIdentityTracker.key = key
+                recordVisiblePageIdentity(key)
             },
             onInteractionChanged: { active in
                 handlePageInteraction(active)
@@ -2868,7 +2864,7 @@ struct ReaderView: View {
             },
             onPageContainerLayout: pageContainerLayoutHandler,
             onVisiblePageIdentity: { key in
-                pageIdentityTracker.key = key
+                recordVisiblePageIdentity(key)
             },
             onInteractionChanged: { active in
                 handlePageInteraction(active)
@@ -3002,7 +2998,20 @@ struct ReaderView: View {
     /// identity. Without it the page model fell back to a raw array index.
     private func reportCoverVisibleIdentity(_ index: Int) {
         guard pagedBlocksCache.indices.contains(index) else { return }
-        pageIdentityTracker.key = ReaderPageIdentity(page: pagedBlocksCache[index]).key
+        recordVisiblePageIdentity(ReaderPageIdentity(page: pagedBlocksCache[index]).key)
+    }
+
+    private func recordVisiblePageIdentity(_ key: String) {
+        pageIdentityTracker.key = key
+        guard readerOpeningManaged, !hasResolvedOpeningPreview,
+              pagedBlocksCache.indices.contains(pagedPageIndex) else { return }
+        let page = pagedBlocksCache[pagedPageIndex]
+        guard !page.isPlaceholder, ReaderPageIdentity(page: page).key == key else { return }
+        // UIKit can publish the identity from updateUIViewController.
+        DispatchQueue.main.async {
+            guard pageIdentityTracker.key == key else { return }
+            resolveOpeningPreview()
+        }
     }
 
     @ViewBuilder
@@ -6230,7 +6239,7 @@ struct ReaderView: View {
     }
 
     private func resolveOpeningPreview() {
-        guard bookOpeningCover != nil, !hasResolvedOpeningPreview else { return }
+        guard readerOpeningManaged, !hasResolvedOpeningPreview else { return }
         hasResolvedOpeningPreview = true
     }
 
