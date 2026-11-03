@@ -2,6 +2,13 @@ import XCTest
 @testable import SourceReadSwift
 
 final class SourceDiagnosticReportTests: XCTestCase {
+    func testChapterDiagnosticOriginOmitsCredentialsAndRequestDirectives() {
+        let url = #"https://sample-user:sample-password@reader.example/chapter/private?token=sample#session,{"headers":{"Cookie":"sample"}}"#
+        XCTAssertEqual(SourceDiagnosticRedactor.originHost(url), "reader.example")
+        XCTAssertNil(SourceDiagnosticRedactor.originHost("file:///private/chapter"))
+        XCTAssertNil(SourceDiagnosticRedactor.originHost("not a URL"))
+    }
+
     func testReportSortsStagesAndComputesWorstStatus() {
         let report = SourceDiagnosticReport(
             sourceName: "Fixture",

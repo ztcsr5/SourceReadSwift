@@ -1438,9 +1438,9 @@ struct ChapterLoadingView: View {
 
             Button {
                 UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                UIPasteboard.general.string = chapterDiagnosticText(message)
+                UIPasteboard.general.string = chapterDiagnosticText()
             } label: {
-                Label("Copy diagnostics", systemImage: "doc.on.doc")
+                Label("复制精简诊断", systemImage: "doc.on.doc")
                     .frame(maxWidth: .infinity)
             }
             .buttonStyle(.bordered)
@@ -1472,15 +1472,16 @@ struct ChapterLoadingView: View {
         .pageBackground()
     }
 
-    private func chapterDiagnosticText(_ message: String) -> String {
-        [
-            "Chapter load failed",
-            "sourceUrl: \(sourceUrl)",
-            "bookUrl: \(effectiveChapter.bookUrl)",
-            "chapterIndex: \(effectiveChapter.index)",
-            "chapterTitle: \(effectiveChapter.title)",
-            "chapterUrl: \(effectiveChapter.url)",
-            "message: \(message)"
+    private func chapterDiagnosticText() -> String {
+        // Rule URLs can embed headers and authentication; even path segments
+        // may be signed. Keep the origin and chapter index, not raw errors.
+        let chapterHost = SourceDiagnosticRedactor.originHost(effectiveChapter.url) ?? "未知"
+        let sourceHost = SourceDiagnosticRedactor.originHost(sourceUrl) ?? "未知"
+        return [
+            "正文加载失败",
+            "书源主机: \(sourceHost)",
+            "正文主机: \(chapterHost)",
+            "章节序号: \(effectiveChapter.index + 1)"
         ].joined(separator: "\n")
     }
 

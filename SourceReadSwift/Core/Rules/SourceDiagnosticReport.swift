@@ -248,6 +248,15 @@ enum SourceDiagnosticRedactor {
         "refresh-token", "password", "passwd", "secret"
     ]
 
+    /// Returns only the HTTP(S) origin hostname, without credentials or rule directives.
+    static func originHost(_ url: String) -> String? {
+        let (address, _) = SearchURLResolver.splitURLAndDirectiveSuffix(url)
+        guard let components = URLComponents(string: address),
+              let scheme = components.scheme?.lowercased(),
+              scheme == "https" || scheme == "http" else { return nil }
+        return components.host
+    }
+
     static func headers(_ headers: [String: String]) -> [String: String] {
         headers.reduce(into: [String: String]()) { result, item in
             let key = item.key
