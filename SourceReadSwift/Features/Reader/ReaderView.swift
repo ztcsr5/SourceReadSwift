@@ -1828,6 +1828,7 @@ struct ReaderView: View {
                 // the entire SwiftUI reader tree on every scroll callback.
                 scrollPositionTracker.flatIndex = index
                 scrollPositionTracker.utf16Offset = offset
+                resolveOpeningPreview()
             },
             onNearBottom: {
                 requestScrollForwardChapter()
@@ -1854,9 +1855,7 @@ struct ReaderView: View {
             },
             onScrollTargetApplied: {
                 didLandInitialPosition = true
-                resolveOpeningPreview()
             },
-            onContentReady: { resolveOpeningPreview() },
             onTap: { point in
                 // 文档内部已经做过位移 / 时长 / 惯性三重判定，这里只把坐标
                 // 换成 3x3 点击区，配置与三种翻页模式共用同一套。
@@ -1879,9 +1878,11 @@ struct ReaderView: View {
             }
         }
         .task(id: bookOpeningCover?.id) {
-            // Guard against a dead WebKit process without delaying a successful first paint.
+            // A cold WKWebView can take several seconds on a simulator. Prefer
+            // the first visible-position report (also respects jump acks);
+            // this bound just prevents a broken bridge from retaining the cover.
             guard bookOpeningCover != nil, !hasResolvedOpeningPreview else { return }
-            try? await Task.sleep(nanoseconds: 2_500_000_000)
+            try? await Task.sleep(nanoseconds: 8_000_000_000)
             guard !Task.isCancelled else { return }
             resolveOpeningPreview()
         }
