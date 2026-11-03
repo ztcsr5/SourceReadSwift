@@ -59,6 +59,21 @@ final class FloatingReadingDeskUITests: XCTestCase {
         assertCurrentBook("剑来")
     }
 
+    func testReadingDeskOverflowOffersTheSameBookActionsWithoutActivatingReader() throws {
+        try launch(theme: "classic")
+        app.buttons["正在阅读书籍的更多操作"].firstMatch.tap()
+        let detail = app.buttons["书籍详情"].firstMatch
+        XCTAssertTrue(detail.waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["从书架删除"].firstMatch.exists)
+        XCTAssertFalse(element("reader.webScrollSurface").exists)
+        detail.tap()
+        XCTAssertTrue(element("bookDetail.title").waitForExistence(timeout: 5))
+        let tabs = app.tabBars.firstMatch
+        let home = tabs.exists ? tabs.buttons["主页"] : app.buttons["主页"]
+        XCTAssertFalse(home.isHittable, "Root navigation must not overlap detail chapters")
+        capture("14-overflow-to-detail")
+    }
+
     func testReadingDeskReaderAndReturnInTheRealApp() throws {
         try launch(theme: "classic")
         let pager = element("bookshelf.readingPager")

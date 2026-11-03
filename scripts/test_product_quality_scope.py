@@ -1,0 +1,84 @@
+"""Run SourceRead product-quality source contracts on a host without the iOS SDK.
+
+Usage: python -B -X utf8 -m unittest discover -s scripts -p test_product_quality_scope.py
+Use SOURCEREAD_SCOPE_REV to compare the same checks against a committed revision.
+"""
+import os
+from pathlib import Path
+import subprocess
+import unittest
+
+ROOT = Path(__file__).resolve().parents[1]
+APP = "SourceReadSwift/"
+READER = APP + "Features/Reader/ReaderView.swift"
+SHELF = APP + "Features/Bookshelf/"
+DETAIL = APP + "Features/Discover/BookDetailView.swift"
+
+
+def read_source(path):
+    revision = os.environ.get("SOURCEREAD_SCOPE_REV")
+    if revision:
+        return subprocess.check_output(["git", "show", f"{revision}:{path}"], cwd=ROOT).decode()
+    return (ROOT / path).read_text(encoding="utf8")
+
+
+class ProductQualityScopeTests(unittest.TestCase):
+    def test_mode_switch_saves_resolved_chapter_and_local_paragraph(self):
+        mode = read_source(READER).split(".onChange(of: readerModeRawValue)", 1)[1].split(
+            ".onChange(of: fontFamilyRawValue)", 1)[0]
+        self.assertIn("visibleParagraphIndex = paragraph", mode)
+        self.assertIn("positionPersistTask?.cancel()", mode)
+        self.assertIn("persistReadingPosition()", mode)
+        self.assertNotIn("paragraphIndexOverride:", mode)
+        self.assertIn("utf16Offset: anchor?.paragraphUTF16Offset", mode)
+
+    def test_delayed_save_does_not_pair_an_old_paragraph_with_a_new_chapter(self):
+        reader = read_source(READER)
+        declaration = reader.split("private func scheduleReadingPositionPersistence(", 1)[1].split(
+            "private func checkDailyReadingGoal", 1)[0]
+        self.assertTrue(declaration.startswith(")"))
+        self.assertIn("persistReadingPosition()", declaration)
+        self.assertIn("guard !Task.isCancelled", declaration)
+
+    def test_cover_is_owned_by_navigation_destination_until_content_and_arrival(self):
+        opening = read_source(SHELF + "ReaderOpeningPage.swift")
+        shelf = read_source(SHELF + "BookshelfView.swift")
+        self.assertIn("guard !didReveal, didArrive, isContentReady", opening)
+        self.assertIn("override func viewDidAppear", opening)
+        self.assertNotIn("Task.sleep", opening)
+        self.assertIn(".readerOpeningPresentation(for: managedOpeningBook(book))", shelf)
+        self.assertNotIn("ReaderOpeningPage(", read_source(READER))
+
+    def test_desk_menus_share_actions_but_tap_still_reads(self):
+        shelf = read_source(SHELF + "BookshelfView.swift")
+        card = shelf.split("private func heroCard", 1)[1].split("private func updateRow", 1)[0]
+        self.assertIn("contextualBookRoute = .read(book)", card)
+        self.assertIn(".contextMenu { readingDeskBookActions(book) }", card)
+        self.assertEqual(card.count("readingDeskBookActions(book)"), 2)
+        self.assertIn('contextualBookRoute = .detail(book, placement: "continue")', card)
+
+    def test_detail_keeps_cache_actions_without_a_block_over_the_directory(self):
+        detail = read_source(DETAIL)
+        self.assertIn(".hideRootTabBar()", detail)
+        self.assertIn("chapterDownloadMenu", detail)
+        self.assertIn("downloadChapters(limit: 50)", detail)
+        self.assertIn("downloadChapters(limit: nil)", detail)
+        self.assertNotIn("private var downloadSection", detail)
+
+    def test_workbench_typography_and_classic_settings_keep_separate_boundaries(self):
+        reader = read_source(READER)
+        self.assertIn("layoutSettingsBody(showsPreview: false, includesLegacySections: false)", reader)
+        self.assertIn("layoutSettingsBody(showsPreview: true)", reader)
+        self.assertIn("if includesLegacySections { legacyLayoutHeadingControls }", reader)
+        self.assertIn("if includesLegacySections { legacyLayoutStatusControls }", reader)
+
+    def test_diagnostic_clipboard_does_not_include_raw_urls_or_transport_messages(self):
+        export = read_source(DETAIL).split("private func chapterDiagnosticText(", 1)[1].split("    init(", 1)[0]
+        self.assertTrue(export.startswith(")"))
+        self.assertIn("SourceDiagnosticRedactor.originHost(effectiveChapter.url)", export)
+        self.assertNotIn("effectiveChapter.bookUrl", export)
+        self.assertNotIn("chapterTitle:", export)
+
+
+if __name__ == "__main__":
+    unittest.main()

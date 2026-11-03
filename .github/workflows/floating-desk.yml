@@ -2,7 +2,7 @@ name: Floating Reading Desk
 
 on:
   push:
-    branches: [codex/floating-reading-desk]
+    branches: [codex/floating-reading-desk, codex/product-quality]
   workflow_dispatch:
 
 concurrency:
