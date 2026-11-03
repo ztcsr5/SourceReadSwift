@@ -40,7 +40,7 @@ struct ReadingDeskPager<Card: View>: View {
                 ScrollView(.horizontal) {
                     LazyHStack(spacing: 0) {
                         ForEach(books) { book in
-                            measuredCard(book).containerRelativeFrame(.horizontal).id(book.id)
+                            measuredCard(book).containerRelativeFrame(.horizontal).clipped().id(book.id)
                         }
                     }.scrollTargetLayout()
                 }
