@@ -60,10 +60,11 @@ class FloatingDeskScopeTests(unittest.TestCase):
     def test_full_suite_keeps_its_original_probe_environment_and_not_native_deadline(self):
         workflow = (ROOT / '.github/workflows/floating-desk.yml').read_text(encoding='utf8')
         self.assertIn('TEST_RUNNER_COMIC_CORPUS_PROBE: "1"', workflow)
-        self.assertIn('DEADLINES=()', workflow)
+        self.assertNotIn('DEADLINES=()', workflow)
+        self.assertIn('COMMAND=(xcodebuild -project SourceReadSwift.xcodeproj', workflow)
         native = workflow.split('if [ "${{ matrix.name }}" = "liquid-glass" ]; then', 1)[1].split('fi', 1)[0]
-        self.assertIn('DEADLINES=(-test-timeouts-enabled YES -maximum-test-execution-time-allowance 60)', native)
-        self.assertIn('"${DEADLINES[@]}"', workflow)
+        self.assertIn('COMMAND+=(-test-timeouts-enabled YES -maximum-test-execution-time-allowance 60)', native)
+        self.assertIn('"${COMMAND[@]}" "${TESTS[@]}"', workflow)
 
 
 if __name__ == '__main__':

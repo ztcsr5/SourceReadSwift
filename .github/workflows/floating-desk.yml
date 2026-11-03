@@ -57,9 +57,10 @@ jobs:
           set -euo pipefail
           DEVICE_ID="$(cat desk-device.txt)"
           TESTS=(-only-testing:SourceReadSwiftTests)
-          DEADLINES=()
+          COMMAND=(xcodebuild -project SourceReadSwift.xcodeproj -scheme SourceReadSwift
+            -destination "id=$DEVICE_ID" CODE_SIGNING_ALLOWED=NO -parallel-testing-enabled NO)
           if [ "${{ matrix.name }}" = "liquid-glass" ]; then
-            DEADLINES=(-test-timeouts-enabled YES -maximum-test-execution-time-allowance 60)
+            COMMAND+=(-test-timeouts-enabled YES -maximum-test-execution-time-allowance 60)
             TESTS=(-only-testing:SourceReadSwiftTests/FloatingReadingDeskTests \
               -only-testing:SourceReadSwiftTests/Release117ReadingHeroTests \
               -only-testing:SourceReadSwiftTests/Release117MotionSystemTests \
@@ -68,9 +69,7 @@ jobs:
               -only-testing:SourceReadSwiftTests/AppFrameProfilerTests \
               -only-testing:SourceReadSwiftTests/ContentImagePipelineRegressionTests)
           fi
-          xcodebuild -project SourceReadSwift.xcodeproj -scheme SourceReadSwift \
-            -destination "id=$DEVICE_ID" CODE_SIGNING_ALLOWED=NO -parallel-testing-enabled NO \
-            "${TESTS[@]}" "${DEADLINES[@]}" \
+          "${COMMAND[@]}" "${TESTS[@]}" \
             -resultBundlePath DeskUnit.xcresult test-without-building 2>&1 | tee desk-unit.log
       - name: Record real home gestures navigation and performance
         timeout-minutes: 15
