@@ -46,6 +46,11 @@ class FloatingDeskScopeTests(unittest.TestCase):
         self.assertIn('temporaryDirectory', fixture)
         self.assertNotIn('URLSession', fixture)
 
+    def test_performance_metrics_observe_the_app_not_the_ui_test_runner(self):
+        test = (ROOT / 'SourceReadSwiftUITests/FloatingReadingDeskUITests.swift').read_text(encoding='utf8')
+        self.assertIn('XCTCPUMetric(application: app)', test)
+        self.assertIn('XCTMemoryMetric(application: app)', test)
+
 
 if __name__ == '__main__':
     unittest.main()

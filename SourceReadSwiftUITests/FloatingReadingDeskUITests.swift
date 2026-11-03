@@ -65,7 +65,8 @@ final class FloatingReadingDeskUITests: XCTestCase {
     func testSimulatorPagingPerformanceEvidenceNotADeviceFPSClaim() {
         launch(theme: "classic")
         let options = XCTMeasureOptions(); options.iterationCount = 3
-        measure(metrics: [XCTClockMetric(), XCTCPUMetric(), XCTMemoryMetric()], options: options) {
+        measure(metrics: [XCTClockMetric(), XCTCPUMetric(application: app), XCTMemoryMetric(application: app),
+            XCTOSSignpostMetric.scrollingAndDecelerationMetric], options: options) {
             let pager = element("bookshelf.readingPager")
             pager.swipeLeft(); pager.swipeLeft(); pager.swipeRight(); pager.swipeRight()
         }
