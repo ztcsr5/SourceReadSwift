@@ -9,6 +9,17 @@ final class SourceDiagnosticReportTests: XCTestCase {
         XCTAssertNil(SourceDiagnosticRedactor.originHost("not a URL"))
     }
 
+    func testRecentDiagnosticsKeepPaginationEvidenceButNotRequestPayloads() {
+        let details = ["status": "401", "reason": "load-failure", "pagesLoaded": "3",
+            "attemptedURL": "https://sample-user:sample-password@reader.example/signed/path?token=sample",
+            "Cookie": "sample", "requestBody": "sample", "keyword": "private-search"]
+        let event = DiagnosticEvent(level: .error, stage: "content.next.load",
+            message: "Authorization: Bearer sample", details: details)
+        XCTAssertEqual(SourceDiagnosticRedactor.recentDetails(details),
+            ["status": "401", "reason": "load-failure", "pagesLoaded": "3", "attemptedURLHost": "reader.example"])
+        XCTAssertFalse(SourceDiagnosticRedactor.recentSummary(event).contains("sample"))
+    }
+
     func testReportSortsStagesAndComputesWorstStatus() {
         let report = SourceDiagnosticReport(
             sourceName: "Fixture",

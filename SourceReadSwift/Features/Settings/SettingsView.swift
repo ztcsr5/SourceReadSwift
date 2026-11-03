@@ -395,22 +395,7 @@ struct SettingsView: View {
     }
 
     private func diagnosticExportText(events: [DiagnosticEvent]) -> String {
-        let formatter = ISO8601DateFormatter()
-        return events.prefix(200).map { event in
-            var lines = [
-                "[\(event.level.rawValue.uppercased())] \(formatter.string(from: event.date))",
-                "stage: \(event.stage)",
-                "message: \(event.message)"
-            ]
-            if let sourceName = event.sourceName {
-                lines.append("source: \(sourceName)")
-            }
-            for item in event.details.sorted(by: { $0.key < $1.key }) {
-                lines.append("\(item.key): \(item.value)")
-            }
-            return lines.joined(separator: "\n")
-        }
-        .joined(separator: "\n\n---\n\n")
+        events.prefix(200).map(RecentDiagnosticsView.export).joined(separator: "\n\n---\n\n")
     }
 }
 

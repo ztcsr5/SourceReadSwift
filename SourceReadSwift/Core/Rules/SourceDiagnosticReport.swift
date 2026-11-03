@@ -257,6 +257,35 @@ enum SourceDiagnosticRedactor {
         return components.host
     }
 
+    private static let diagnosticCounts: Set<String> = [
+        "status", "bytes", "page", "pagesLoaded", "retainedItemCount", "maxPages", "elapsedMilliseconds", "resultCount"
+    ]
+    private static let paginationReasons: Set<String> = [
+        "no-next-url", "max-pages", "duplicate-url", "duplicate-final-url", "empty-page", "load-failure", "parse-failure"
+    ]
+    private static let diagnosticMessages: Set<String> = ["收到书源响应", "目录分页停止", "正文分页停止"]
+
+    /// Export only structural diagnostics; rule payloads and freeform transport errors may contain credentials.
+    static func recentSummary(_ event: DiagnosticEvent) -> String {
+        if diagnosticMessages.contains(event.message) { return event.message }
+        return event.level == .error ? "操作失败 · 未包含原始错误文本" : "仅显示结构化诊断"
+    }
+
+    static func recentDetails(_ details: [String: String]) -> [String: String] {
+        details.reduce(into: [:]) { safe, field in
+            let (key, value) = field
+            if diagnosticCounts.contains(key), let count = Int(value), count >= 0 {
+                safe[key] = String(count)
+            } else if ["url", "attemptedURL", "canonicalURL"].contains(key), let host = originHost(value) {
+                safe[key + "Host"] = host
+            } else if key == "reason", paginationReasons.contains(value) {
+                safe[key] = value
+            } else if key == "method", ["GET", "HEAD", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"].contains(value) {
+                safe[key] = value
+            }
+        }
+    }
+
     static func headers(_ headers: [String: String]) -> [String: String] {
         headers.reduce(into: [String: String]()) { result, item in
             let key = item.key

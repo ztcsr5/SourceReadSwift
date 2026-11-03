@@ -31,7 +31,8 @@ struct RecentDiagnosticsView: View {
                     }
                 } label: {
                     VStack(alignment: .leading, spacing: 5) {
-                        Text("[\(event.stage)] \(event.message)").font(.subheadline).lineLimit(2)
+                        Text("[\(event.stage)] \(SourceDiagnosticRedactor.recentSummary(event))")
+                            .font(.subheadline).lineLimit(2)
                         Text(event.date, style: .time).font(.caption).foregroundStyle(.secondary)
                     }
                 }
@@ -43,7 +44,9 @@ struct RecentDiagnosticsView: View {
     }
 
     static func export(_ event: DiagnosticEvent) -> String {
-        let details = event.details.sorted { $0.key < $1.key }.map { "\($0.key): \($0.value)" }.joined(separator: "\n")
-        return "\(event.date.formatted()) [\(event.level.rawValue)] [\(event.stage)] \(event.sourceName ?? "")\n\(event.message)\n\(details)"
+        let details = SourceDiagnosticRedactor.recentDetails(event.details)
+            .sorted { $0.key < $1.key }.map { "\($0.key): \($0.value)" }.joined(separator: "\n")
+        let message = SourceDiagnosticRedactor.recentSummary(event)
+        return "\(event.date.formatted()) [\(event.level.rawValue)] [\(event.stage)]\n\(message)\n\(details)"
     }
 }
