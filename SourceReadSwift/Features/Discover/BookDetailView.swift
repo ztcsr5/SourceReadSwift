@@ -284,6 +284,7 @@ struct BookDetailView: View {
             // The header is offscreen after scrolling deep into the TOC. Let
             // system navigation use its ordinary fallback instead of a stale source.
             .bookHeroDestination(readerHeroID, in: detailHero, enabled: !isHeaderCollapsed && sourceKind == .text)
+            .environment(\.bookOpeningCover, readingDeskEnabled && sourceKind == .text ? displayBook : nil)
         } label: {
             Label(isBookInBookshelf ? "继续阅读" : "开始阅读", systemImage: "book")
                 .font(.subheadline.weight(.semibold))

@@ -1,5 +1,17 @@
 import SwiftUI
 
+private struct BookOpeningCoverKey: EnvironmentKey {
+    static let defaultValue: SearchBook? = nil
+}
+
+extension EnvironmentValues {
+    /// Only book-cover navigation paths provide an opening identity to the reader.
+    var bookOpeningCover: SearchBook? {
+        get { self[BookOpeningCoverKey.self] }
+        set { self[BookOpeningCoverKey.self] = newValue }
+    }
+}
+
 /// Real book identity remains visible while the gateway restores its actual chapter.
 struct ReaderOpeningPage: View {
     let book: BookshelfBook

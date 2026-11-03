@@ -69,6 +69,7 @@ struct WebScrollReaderView: UIViewRepresentable {
     var pageStepGeneration: Int = 0
     var onPageStepBoundary: ((Int) -> Void)? = nil
     var onScrollTargetApplied: (() -> Void)? = nil
+    var onContentReady: (() -> Void)? = nil
     /// Short tap reported by the document, in CSS pixels (== points inside a
     /// `width=device-width` viewport). The reader turns it into a tap-zone
     /// action so scroll mode keeps the same 3x3 configuration as the paged
@@ -360,6 +361,8 @@ struct WebScrollReaderView: UIViewRepresentable {
             case "content-ready":
                 if pendingScrollKey != nil, pendingScrollKey != appliedScrollKey, let webView {
                     evaluateScrollTarget(webView: webView)
+                } else if let total = body["total"] as? Int, total > 0 {
+                    view.onContentReady?()
                 }
             case "visible":
                 let start = CACurrentMediaTime()

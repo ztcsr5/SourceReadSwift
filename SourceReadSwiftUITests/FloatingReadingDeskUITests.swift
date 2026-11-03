@@ -47,6 +47,9 @@ final class FloatingReadingDeskUITests: XCTestCase {
         let read = app.buttons["bookDetail.read"]
         XCTAssertTrue(read.waitForExistence(timeout: 5))
         read.tap()
+        let prose = app.webViews.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "这是纸间的隔离视觉验证书库")).firstMatch
+        XCTAssertTrue(prose.waitForExistence(timeout: 12), "Check actual chapter prose, not only the existence of a WebView")
+        capture("04a-reader-first-chapter")
         returnFromReader()
         XCTAssertTrue(read.waitForExistence(timeout: 5), "Reader must return to the same detail, not the shelf")
         capture("04b-reader-returned-to-detail")

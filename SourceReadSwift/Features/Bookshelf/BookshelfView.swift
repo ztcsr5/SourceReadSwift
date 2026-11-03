@@ -773,6 +773,7 @@ struct BookshelfView: View {
             BookshelfReaderGatewayView(book: book)
                 .bookHeroDestination("continue|" + book.id, in: bookHero)
                 .environment(\.readingCoverHandoff, readingDeskEnabled && floatingReadingDeskEnabled ? readingCoverHandoff : nil)
+                .environment(\.bookOpeningCover, readingDeskEnabled && floatingReadingDeskEnabled ? book.asSearchBook : nil)
                 .onAppear { pinReturnOrder(placement: "continue") }
         } label: {
             ReadingHeroCard(book: book, heroNamespace: bookHero, usesSpatialStyle: readingDeskEnabled,

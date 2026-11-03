@@ -50,6 +50,8 @@ struct ReaderView: View {
 
     @Environment(\.dismiss) private var dismiss
     @Environment(\.scenePhase) private var scenePhase
+    @Environment(\.bookOpeningCover) private var bookOpeningCover
+    @State private var hasResolvedOpeningPreview = false
     @State private var chromeState = ReaderChromeStateMachine()
     @State private var tabChromeOwner = UUID()
     @State private var readerSessionEnded = false
@@ -1852,7 +1854,9 @@ struct ReaderView: View {
             },
             onScrollTargetApplied: {
                 didLandInitialPosition = true
+                resolveOpeningPreview()
             },
+            onContentReady: { resolveOpeningPreview() },
             onTap: { point in
                 // 文档内部已经做过位移 / 时长 / 惯性三重判定，这里只把坐标
                 // 换成 3x3 点击区，配置与三种翻页模式共用同一套。
@@ -1866,9 +1870,20 @@ struct ReaderView: View {
             // 只有「这一段窗口里确实没有任何段落」才盖占位层。
             // 之前只判 scrollModeParagraphs 是否为空：滑动跨章时它会被重算成空数组，
             // 于是整屏被不透明占位盖住 —— 就是「往上滑一点突然全白」。
-            if scrollSections.allSatisfy({ $0.paragraphs.isEmpty }) {
+            if let bookOpeningCover, !hasResolvedOpeningPreview {
+                ReaderOpeningPage(book: BookshelfBook(searchBook: bookOpeningCover), chapterTitle: currentDisplayChapterTitle)
+                    .allowsHitTesting(false)
+                    .accessibilityHidden(true)
+            } else if scrollSections.allSatisfy({ $0.paragraphs.isEmpty }) {
                 readerLoadingPlaceholder
             }
+        }
+        .task(id: bookOpeningCover?.id) {
+            // Guard against a dead WebKit process without delaying a successful first paint.
+            guard bookOpeningCover != nil, !hasResolvedOpeningPreview else { return }
+            try? await Task.sleep(nanoseconds: 2_500_000_000)
+            guard !Task.isCancelled else { return }
+            resolveOpeningPreview()
         }
         .onAppear {
             if scrollParagraphTarget > 0, paragraphJumpRequest == nil {
@@ -6207,6 +6222,11 @@ struct ReaderView: View {
         let safeParagraph = positionMapping.clampParagraph(flat)
         visibleParagraphIndex = safeParagraph
         return (safeParagraph, positionMapping.page(containingParagraph: safeParagraph))
+    }
+
+    private func resolveOpeningPreview() {
+        guard bookOpeningCover != nil, !hasResolvedOpeningPreview else { return }
+        hasResolvedOpeningPreview = true
     }
 
     private func persistReadingPosition(paragraphIndexOverride: Int? = nil) {
