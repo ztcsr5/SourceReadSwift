@@ -4,6 +4,8 @@ import UIKit
 /// Offline fixtures are reachable only by an explicit UI-test launch argument and isolated store.
 @MainActor enum FloatingDeskRegressionLaunch {
     static func makeAppState() -> AppState {
+        // An argument-domain override would mask writes made by the real style toggle.
+        UserDefaults.standard.set(true, forKey: "settings.floatingReadingDeskEnabled")
         let root = FileManager.default.temporaryDirectory.appendingPathComponent("floating-desk-ui-" + UUID().uuidString)
         let shelf = BookshelfStore(persistence: BookshelfPersistence(rootURL: root),
             groupPersistence: BookshelfGroupPersistence(rootURL: root))

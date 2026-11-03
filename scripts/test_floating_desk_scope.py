@@ -45,6 +45,8 @@ class FloatingDeskScopeTests(unittest.TestCase):
         self.assertIn('#if DEBUG', fixture)
         self.assertIn('temporaryDirectory', fixture)
         self.assertNotIn('URLSession', fixture)
+        ui = (ROOT / 'SourceReadSwiftUITests/FloatingReadingDeskUITests.swift').read_text(encoding='utf8')
+        self.assertNotIn('"-settings.floatingReadingDeskEnabled"', ui)
 
     def test_performance_metrics_observe_the_app_not_the_ui_test_runner(self):
         test = (ROOT / 'SourceReadSwiftUITests/FloatingReadingDeskUITests.swift').read_text(encoding='utf8')

@@ -75,7 +75,7 @@ final class FloatingReadingDeskUITests: XCTestCase {
 
     private func launch(theme: String, mode: String = "light", reducesMotion: Bool = false) {
         app.launchArguments = ["--floating-desk-regression", "-settings.visualTheme", theme,
-            "-settings.themeMode", mode, "-settings.floatingReadingDeskEnabled", "YES", "-settings.readingDeskEnabled", "YES",
+            "-settings.themeMode", mode, "-settings.readingDeskEnabled", "YES",
             "-settings.reducesMotion", reducesMotion ? "YES" : "NO", "-reader.mode", "scroll"]
         app.launch()
         XCTAssertTrue(app.buttons["正在阅读书籍的更多操作"].firstMatch.waitForExistence(timeout: 10))
