@@ -203,6 +203,9 @@ struct ReaderView: View {
     @State private var chapterSeekTask: Task<Void, Never>? = nil
     /// 首帧是否已经落到「上次读到的那一段」。为 false 时文字层先透明，
     /// 避免用户先看到第 1 章章首、随后被切成恢复位置的那一下闪跳。
+    @State private var hasOpeningPositionTimedOut = false
+    @State private var openingPositionAttempt = 0
+    @State private var isRetryingOpeningPosition = false
     @State private var didLandInitialPosition = false
     private final class ReaderTapGestureTracker {
         var startedAt: Date?
@@ -897,14 +900,15 @@ struct ReaderView: View {
             // revision instead (PageCurlReaderView.contentRevision, cover
             // data and TabView tags).
             .id(readerMode.rawValue)
-            .readerOpeningContentReady(hasResolvedOpeningPreview)
-            .task(id: readerOpeningManaged && !hasResolvedOpeningPreview) {
-                // A missing bridge report must not permanently cover the reader.
-                // This is a recovery ceiling, not a minimum display duration.
-                guard readerOpeningManaged, !hasResolvedOpeningPreview else { return }
+            .readerOpeningContentReady(hasResolvedOpeningPreview || hasOpeningPositionTimedOut)
+            .task(id: openingPositionAttempt) {
+                guard readerOpeningManaged || hasOpeningPositionTimedOut else { return }
                 try? await Task.sleep(nanoseconds: 8_000_000_000)
-                guard !Task.isCancelled else { return }
-                resolveOpeningPreview()
+                guard !Task.isCancelled, !hasResolvedOpeningPreview else { return }
+                // A stalled restore is an actionable error, not permission to
+                // reveal or persist the unpositioned first page.
+                hasOpeningPositionTimedOut = true
+                isRetryingOpeningPosition = false
             }
             .onPreferenceChange(ReaderPageContainerMetricsKey.self) { metrics in
                 if let metrics {
@@ -920,13 +924,23 @@ struct ReaderView: View {
                         guard readerMode != .scroll, !textSelectionEnabled else { return }
                         handleReaderTap(at: value.location)
                     }
-                , including: textSelectionEnabled ? .none : .all
+                , including: readerMode == .scroll ? .subviews : (textSelectionEnabled ? .none : .all)
             )
 
             if showSettings && settingsTab == 2 {
                 tapZoneOverlay
                     .allowsHitTesting(false)
                 }
+
+            if hasOpeningPositionTimedOut {
+                openingPositionRecovery
+                    .zIndex(25)
+            }
+
+            // Menus change system-bar visibility, not the document inset.
+            // Keep ink out of the status strip without moving the reading anchor.
+            readerStatusBarBackdrop
+                .zIndex(1)
 
             // A fixed, opaque chapter band also protects immersive reading;
             // it must not depend on whether the system clock is visible.
@@ -1242,7 +1256,7 @@ struct ReaderView: View {
             chromeState.setInitialOverlayVisible(initialOverlayVisible)
             sessionStartedAt = Date()
             seedWindow()
-            rebuildPagedBlocksCache()
+            if readerMode != .scroll { rebuildPagedBlocksCache() }
             readerContentFingerprint = makeContentFingerprint(content)
             let initial = initialAutoScrollTarget()
             scrollParagraphTarget = initial.paragraph
@@ -1261,7 +1275,7 @@ struct ReaderView: View {
             applyIdleTimerPreference()
             scheduleSleepTimer()
             appState.bookshelfStore.markReaderOpened(bookID: bookID)
-            persistReadingPosition(paragraphIndexOverride: initial.paragraph)
+            if !readerOpeningManaged { persistReadingPosition() }
             if autoplaySpeechOnAppear {
                 onSpeechAutoplayConsumed?()
                 DispatchQueue.main.async {
@@ -1832,12 +1846,14 @@ struct ReaderView: View {
             imageHeaders: imageRequestHeaders,
             imageColumnWidth: illustrationColumnWidth,
             onVisibleParagraph: { index in
+                guard didLandInitialPosition else { return }
                 if paragraphJumpRequest != nil {
                     paragraphJumpRequest = nil
                 }
                 updateVisibleParagraphInScroll(index)
             },
             onVisiblePosition: { index, offset in
+                guard didLandInitialPosition else { return }
                 // Character changes inside one paragraph do not invalidate
                 // the entire SwiftUI reader tree on every scroll callback.
                 scrollPositionTracker.flatIndex = index
@@ -3003,8 +3019,8 @@ struct ReaderView: View {
 
     private func recordVisiblePageIdentity(_ key: String) {
         pageIdentityTracker.key = key
-        guard readerOpeningManaged, !hasResolvedOpeningPreview,
-              pagedBlocksCache.indices.contains(pagedPageIndex) else { return }
+        guard readerOpeningManaged || hasOpeningPositionTimedOut,
+              !hasResolvedOpeningPreview, pagedBlocksCache.indices.contains(pagedPageIndex) else { return }
         let page = pagedBlocksCache[pagedPageIndex]
         guard !page.isPlaceholder, ReaderPageIdentity(page: page).key == key else { return }
         // UIKit can publish the identity from updateUIViewController.
@@ -3510,6 +3526,16 @@ struct ReaderView: View {
             )
         }
         .buttonStyle(.plain)
+    }
+
+    private var readerStatusBarBackdrop: some View {
+        readerThemeBackground
+            .frame(height: readerTopSafeInset)
+            .frame(maxHeight: .infinity, alignment: .top)
+            .opacity(showOverlay || showSystemStatusBar ? 1 : 0)
+            .animation(nil, value: showOverlay)
+            .allowsHitTesting(false)
+            .accessibilityHidden(true)
     }
 
     private var readerHeader: some View {
@@ -6249,13 +6275,44 @@ struct ReaderView: View {
         return (safeParagraph, positionMapping.page(containingParagraph: safeParagraph))
     }
 
+    private var openingPositionRecovery: some View {
+        VStack(spacing: 16) {
+            Text("未能恢复阅读位置").font(.headline)
+            Text("已保存的位置未更改。")
+                .font(.subheadline).foregroundStyle(.secondary)
+            Button(isRetryingOpeningPosition ? "正在重试…" : "重试定位") {
+                isRetryingOpeningPosition = true
+                openingPositionAttempt &+= 1
+                if readerMode == .scroll {
+                    didLandInitialPosition = false
+                    scrollJumpGeneration &+= 1
+                    paragraphJumpRequest = ParagraphJumpRequest(index: scrollParagraphTarget)
+                } else {
+                    rebuildPagedBlocksCache()
+                    if readerMode == .cover { reportCoverVisibleIdentity(pagedPageIndex) }
+                    if let key = pageIdentityTracker.key { recordVisiblePageIdentity(key) }
+                }
+            }
+            .buttonStyle(.borderedProminent)
+            .disabled(isRetryingOpeningPosition)
+            Button("返回") { dismiss() }.buttonStyle(.bordered)
+        }
+        .padding(24)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .foregroundStyle(readerThemeTextColor)
+        .background(readerThemeBackground.ignoresSafeArea())
+    }
+
     private func resolveOpeningPreview() {
-        guard readerOpeningManaged, !hasResolvedOpeningPreview else { return }
+        guard readerOpeningManaged || hasOpeningPositionTimedOut, !hasResolvedOpeningPreview else { return }
         hasResolvedOpeningPreview = true
+        hasOpeningPositionTimedOut = false
+        scheduleReadingPositionPersistence()
     }
 
     private func persistReadingPosition(paragraphIndexOverride: Int? = nil) {
-        guard pendingWindowJump == nil else { return }
+        guard pendingWindowJump == nil, !hasOpeningPositionTimedOut,
+              !readerOpeningManaged || hasResolvedOpeningPreview else { return }
         let resolved: (chapterIndex: Int, chapterTitle: String, paragraphIndex: Int)
         switch readerMode {
         case .scroll:

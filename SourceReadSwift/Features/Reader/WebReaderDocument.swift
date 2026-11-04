@@ -732,7 +732,8 @@ enum WebReaderHTML {
         visible: -1,
         highlightEl: null,
         lastScrollAt: 0,
-        ticking: false,
+        visiblePostTimer: null,
+        reachTop: false,
         nearTop: false,
         nearBottom: false,
         reachBottom: false,
@@ -1085,30 +1086,23 @@ enum WebReaderHTML {
         window.clearTimeout(state.visiblePostTimer);
         state.visiblePostTimer = null;
         state.lastVisiblePostAt = now;
+        var offset = visibleTextOffset(metric.element);
+        if (state.visible === metric.flat && state.visibleOffset === offset
+            && state.visibleRevision === state.revision) { return true; }
         state.visible = metric.flat;
-        post({ type: "visible", flat: metric.flat, utf16Offset: visibleTextOffset(metric.element) });
+        state.visibleOffset = offset;
+        state.visibleRevision = state.revision;
+        post({ type: "visible", flat: metric.flat, utf16Offset: offset });
         return true;
       }
 
       function onScroll() {
-        state.ticking = false;
         var y = window.scrollY;
         var viewport = window.innerHeight;
         var height = document.documentElement.scrollHeight;
-        if (state.nodes.length) {
-          // 快速滚动时段落每几毫秒就换一次，逐条回传会让 SwiftUI 整棵阅读器
-          // 树每帧重算。120ms 一条足够记进度，也不会把主线程塞满。
-          var now = performance.now();
-          if (now - (state.lastVisiblePostAt || 0) > 120) {
-            if (!reportVisiblePosition(now)) { return; }
-          } else if (!state.visiblePostTimer) {
-            // Keep the final line even when scrolling stops within the throttle
-            // interval. Otherwise a quick swipe persists the previous position.
-            state.visiblePostTimer = window.setTimeout(function () {
-              state.visiblePostTimer = null;
-              onScroll();
-            }, 125 - (now - (state.lastVisiblePostAt || 0)));
-          }
+        var now = performance.now();
+        if (state.nodes.length && now - (state.lastVisiblePostAt || 0) >= 120) {
+          reportVisiblePosition(now);
         }
         var bottom = y + viewport;
         // 预取要早于「看不见下一章」的那一刻：离末尾还剩约 3.5 屏就开始要下一章，
@@ -1130,16 +1124,28 @@ enum WebReaderHTML {
         } else if (bottom < height) {
           state.reachBottom = false;
         }
-        if (y <= -40) { post({ type: "reach-top" }); }
+      }
+
+      function checkTopBounce(y) {
+        if (y <= -40) {
+          if (!state.reachTop) { state.reachTop = true; post({ type: "reach-top" }); }
+        } else if (y > -20) {
+          state.reachTop = false;
+        }
       }
 
       window.addEventListener("scroll", function () {
-        // 时间戳必须在事件当帧同步记下：`onScroll` 是 rAF 延迟执行的，
-        // 若等它再记，紧接着的一次轻点会读到过期时间，滑动立刻被当成点击。
-        state.lastScrollAt = performance.now();
-        if (state.ticking) { return; }
-        state.ticking = true;
-        window.requestAnimationFrame(onScroll);
+        // Keep tap arbitration synchronous, but do not read layout every frame.
+        // One trailing sample reads the latest offset even after a reversal.
+        var now = performance.now();
+        state.lastScrollAt = now;
+        checkTopBounce(window.scrollY);
+        if (state.visiblePostTimer !== null) { return; }
+        var wait = Math.max(0, 125 - (now - (state.lastVisiblePostAt || 0)));
+        state.visiblePostTimer = window.setTimeout(function () {
+          state.visiblePostTimer = null;
+          onScroll();
+        }, wait);
       }, { passive: true });
 
       var pointer = null;

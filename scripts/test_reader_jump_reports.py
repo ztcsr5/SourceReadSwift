@@ -103,5 +103,49 @@ window.requestAnimationFrame=function(){return 0;};
                 browser.close()
 
 
+    def test_scroll_burst_batches_layout_reads_and_reports_the_final_reverse_position(self):
+        source = (Path(__file__).resolve().parents[1] /
+                  'SourceReadSwift/Features/Reader/WebReaderDocument.swift').read_text(encoding='utf8')
+        start = source.index('<!doctype html>')
+        shell = source[start:source.index('"""#', start)]
+        candidates = [Path('C:/Program Files/Google/Chrome/Application/chrome.exe'),
+                      Path('C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe')]
+        executable = next((path for path in candidates if path.exists()), None)
+        with sync_playwright() as runtime:
+            browser = runtime.chromium.launch(executable_path=str(executable) if executable else None, headless=True)
+            try:
+                page = browser.new_page(viewport={'width': 390, 'height': 844})
+                page.route('**/*', lambda route: route.abort())
+                page.set_content(shell, wait_until='domcontentloaded')
+                outcome = page.evaluate("""async () => {
+                    const messages = [];
+                    window.webkit = {messageHandlers:{reader:{postMessage:m=>messages.push(m)}}};
+                    const reader = window.__reader;
+                    reader.setContent({revision:'burst', total:60, sections:[{
+                      key:'c0', chapter:0, title:'章', sig:'burst', start:0, titleFlat:0, first:true,
+                      paragraphs:Array.from({length:60}, (_, i)=>({
+                        flat:i, local:i, text:'可反向拖动的长段文字。'.repeat(45)
+                      }))
+                    }]});
+                    const root = document.documentElement;
+                    const height = root.scrollHeight;
+                    let reads = 0;
+                    Object.defineProperty(root, 'scrollHeight', { get(){ reads++; return height; } });
+                    const wait = ms => new Promise(resolve=>setTimeout(resolve, ms));
+                    for (let i=0; i<20; i++) {
+                        window.scrollTo(0, i<10 ? (i+1)*130 : (19-i)*130);
+                        await wait(12);
+                    }
+                    await wait(185);
+                    return {reads, y:window.scrollY, last:messages.filter(m=>m.type==='visible').at(-1)};
+                }""")
+                self.assertEqual(outcome['y'], 0)
+                self.assertEqual(outcome['last']['flat'], 0)
+                self.assertEqual(outcome['last']['revision'], 'burst')
+                self.assertLessEqual(outcome['reads'], 6, outcome)
+            finally:
+                browser.close()
+
+
 if __name__ == '__main__':
     unittest.main()
