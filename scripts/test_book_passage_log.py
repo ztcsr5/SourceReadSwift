@@ -3,6 +3,36 @@ import unittest
 from verify_book_passage_log import inspect_passages
 
 class BookPassageLogTests(unittest.TestCase):
+    def zoom_ui(self, before=0, after=1, passed=True):
+        case = "Test Case '-[SourceReadSwiftUITests.FloatingReadingDeskUITests testReaderSystemReturnCanCancelWithoutLosingItsSavedParagraph]'"
+        return (case + " started.\n" +
+                f"BOOK_NATIVE_CANCEL_VERIFIED motion_before={before} motion_after={after}\n" +
+                case + (" passed (3 seconds)." if passed else " failed (3 seconds)."))
+
+    def test_zoom_cancel_before_pop_requires_native_motion_and_passed_ui_postconditions(self):
+        log = "PAN_MOVED native=1 count=1\nBEGIN interactive=1\nEND cancelled=0"
+        self.assertEqual(inspect_passages(log, self.zoom_ui()),
+                         {"interactive_cancel": 1, "interactive_finish": 1})
+
+    def test_zoom_ui_marker_alone_cannot_prove_native_motion(self):
+        with self.assertRaises(ValueError):
+            inspect_passages("BEGIN interactive=1\nEND cancelled=0", self.zoom_ui())
+
+    def test_native_motion_without_a_passed_cancel_test_cannot_prove_cancellation(self):
+        with self.assertRaises(ValueError):
+            inspect_passages("PAN_MOVED native=1 count=1\nBEGIN interactive=1\nEND cancelled=0",
+                             self.zoom_ui(passed=False))
+
+    def test_native_motion_counter_must_really_advance(self):
+        with self.assertRaises(ValueError):
+            inspect_passages("PAN_MOVED native=1 count=1\nBEGIN interactive=1\nEND cancelled=0",
+                             self.zoom_ui(before=1, after=1))
+
+    def test_cancelled_zoom_still_requires_a_real_interactive_finish(self):
+        with self.assertRaises(ValueError):
+            inspect_passages("PAN_MOVED native=1 count=1\nBEGIN interactive=0\nEND cancelled=0",
+                             self.zoom_ui())
+
     def test_requires_both_real_interactive_outcomes(self):
         log = "BEGIN interactive=1\nEND cancelled=1\nBEGIN interactive=1\nEND cancelled=0"
         self.assertEqual(inspect_passages(log), {"interactive_cancel": 1, "interactive_finish": 1})

@@ -119,6 +119,7 @@ private struct ReaderOpeningArrivalProbe: UIViewControllerRepresentable {
 
     static func dismantleUIViewController(_ controller: ReaderBookPassageController, coordinator: ()) {
         controller.removeReturnSurface()
+        controller.detachGestureEvidence()
     }
 
     private func update(_ controller: ReaderBookPassageController) {

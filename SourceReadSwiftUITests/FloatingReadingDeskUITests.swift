@@ -197,6 +197,10 @@ final class FloatingReadingDeskUITests: XCTestCase {
             NSPredicate(format: "label BEGINSWITH %@", "【已保存的阅读段落】")).firstMatch
         XCTAssertTrue(saved.waitForExistence(timeout: 10))
         XCTAssertFalse(element("reader.returnToShelf").isHittable, "Prose can return interactively without first opening its menu")
+        let nativeEvidence = element("reader.nativeBookGestureEvidence")
+        XCTAssertTrue(nativeEvidence.waitForExistence(timeout: 5))
+        let motionBefore = Int(nativeEvidence.value as? String ?? "") ?? -1
+        XCTAssertGreaterThanOrEqual(motionBefore, 0)
         let edge = app.coordinate(withNormalizedOffset: CGVector(dx: 0.008, dy: 0.52))
         // XCTest's .slow is 250 px/s: native zoom can correctly commit that
         // flick even over a short distance. Cancel with a deliberately slow drag.
@@ -206,6 +210,9 @@ final class FloatingReadingDeskUITests: XCTestCase {
         XCTAssertTrue(surface.isHittable, "Cancel must keep the same real reader active")
         XCTAssertTrue(saved.exists && surface.frame.intersects(saved.frame))
         XCTAssertFalse(rootTab("主页", legacyID: "tabs.legacy.home").isHittable)
+        let motionAfter = Int(nativeEvidence.value as? String ?? "") ?? -1
+        XCTAssertGreaterThan(motionAfter, motionBefore, "A real native gesture must move; an ignored drag is not cancellation")
+        print("BOOK_NATIVE_CANCEL_VERIFIED motion_before=\(motionBefore) motion_after=\(motionAfter)")
         capture("18-reader-native-return-cancelled")
         edge.press(forDuration: 0.05,
             thenDragTo: app.coordinate(withNormalizedOffset: CGVector(dx: 0.88, dy: 0.52)),

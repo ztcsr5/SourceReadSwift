@@ -1,13 +1,13 @@
 """Require real interactive book-return completion AND cancellation in simulator logs.
 
-Usage: python -B -X utf8 scripts/verify_book_passage_log.py desk-passage.log
+Usage: python -B -X utf8 scripts/verify_book_passage_log.py desk-passage.log --ui-log desk-ui.log
 No frame polling, user book identity or source URL is recorded.
 """
 import argparse
 from pathlib import Path
 import re
 
-def inspect_passages(text):
+def inspect_passages(text, ui_text=""):
     active = None
     cancelled = 0
     completed = 0
@@ -27,6 +27,17 @@ def inspect_passages(text):
             active = None
     if active is not None:
         raise ValueError("Book return has no completion event")
+    # Native zoom may reverse before committing a navigation pop, so there is
+    # no transitionCoordinator cancellation callback. Require BOTH a real
+    # native recognizer's motion and the unchanged real-reader UI assertions.
+    case = re.escape("Test Case '-[SourceReadSwiftUITests.FloatingReadingDeskUITests testReaderSystemReturnCanCancelWithoutLosingItsSavedParagraph]'")
+    passed = re.search(case + r" started\.(.*?)" + case + r" passed \(", ui_text, re.S)
+    if not cancelled and passed:
+        motion = re.search(r"BOOK_NATIVE_CANCEL_VERIFIED motion_before=(\d+) motion_after=(\d+)", passed.group(1))
+        if motion:
+            before, after = map(int, motion.groups())
+            counts = {int(count) for count in re.findall(r"PAN_MOVED native=1 count=(\d+)", text)}
+            cancelled = int(after > before and after in counts)
     if not cancelled or not completed:
         raise ValueError(f"Expected native interactive cancel and finish; actual cancel={cancelled}, finish={completed}")
     return {"interactive_cancel": cancelled, "interactive_finish": completed}
@@ -34,5 +45,7 @@ def inspect_passages(text):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("log", type=Path)
+    parser.add_argument("--ui-log", type=Path)
     args = parser.parse_args()
-    print(inspect_passages(args.log.read_text(encoding="utf8", errors="replace")))
+    print(inspect_passages(args.log.read_text(encoding="utf8", errors="replace"),
+                          args.ui_log.read_text(encoding="utf8", errors="replace") if args.ui_log else ""))

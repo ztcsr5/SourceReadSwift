@@ -99,7 +99,7 @@ jobs:
           kill "$LOG_PID" 2>/dev/null || true
           wait "$LOG_PID" || true
           trap - EXIT
-          python3 scripts/verify_book_passage_log.py desk-passage.log
+          python3 scripts/verify_book_passage_log.py desk-passage.log --ui-log desk-ui.log
       - name: Export real app screenshots
         if: always()
         run: |

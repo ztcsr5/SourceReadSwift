@@ -9,17 +9,34 @@ final class ReaderBookPassageController: UIViewController {
     var canPrepareReturn = false
     var makeReturnSurface: () -> AnyView = { AnyView(EmptyView()) }
     private(set) var returnHost: UIHostingController<AnyView>?
+    #if DEBUG
+    private var observedGestures: [UIGestureRecognizer] = []
+    private var activeGestures = Set<ObjectIdentifier>()
+    private var movedGestures = Set<ObjectIdentifier>()
+    private var nativeMotionCount = 0
+    #endif
 
     override func loadView() {
         view = UIView()
         view.backgroundColor = .clear
         view.isUserInteractionEnabled = false
+        #if DEBUG
+        view.isAccessibilityElement = true
+        view.accessibilityIdentifier = "reader.nativeBookGestureEvidence"
+        view.accessibilityValue = "0"
+        #endif
     }
 
     override func viewDidAppear(_ animated: Bool) {
         super.viewDidAppear(animated)
         removeReturnSurface()
+        attachGestureEvidence()
         DispatchQueue.main.async { [weak self] in self?.onArrival() }
+    }
+
+    override func viewDidLayoutSubviews() {
+        super.viewDidLayoutSubviews()
+        attachGestureEvidence()
     }
 
     override func viewWillDisappear(_ animated: Bool) {
@@ -45,6 +62,7 @@ final class ReaderBookPassageController: UIViewController {
     override func viewDidDisappear(_ animated: Bool) {
         super.viewDidDisappear(animated)
         removeReturnSurface()
+        detachGestureEvidence()
     }
 
     @discardableResult
@@ -76,6 +94,61 @@ final class ReaderBookPassageController: UIViewController {
         host.view.removeFromSuperview()
         host.removeFromParent()
     }
+
+    private func attachGestureEvidence() {
+        #if DEBUG
+        guard canPrepareReturn, let navigation = navigationController,
+              let source = navigation.topViewController, belongs(to: source),
+              let navigationView = navigation.view, let sourceView = source.view else { return }
+        // Zoom can cancel before a pop is committed, without appearance callbacks.
+        // Observe existing native recognizers; never replace their delegate/driver.
+        var containers = [navigationView, sourceView]
+        var ancestor = sourceView.superview
+        while let container = ancestor, container !== navigationView {
+            containers.append(container)
+            ancestor = container.superview
+        }
+        for container in containers {
+            for gesture in container.gestureRecognizers ?? [] {
+                guard !(gesture is UITapGestureRecognizer), !(gesture is UILongPressGestureRecognizer),
+                      !observedGestures.contains(where: { $0 === gesture }) else { continue }
+                gesture.addTarget(self, action: #selector(observeNativeMotion(_:)))
+                observedGestures.append(gesture)
+            }
+        }
+        #endif
+    }
+
+    func detachGestureEvidence() {
+        #if DEBUG
+        for gesture in observedGestures {
+            gesture.removeTarget(self, action: #selector(observeNativeMotion(_:)))
+        }
+        observedGestures.removeAll()
+        activeGestures.removeAll()
+        movedGestures.removeAll()
+        #endif
+    }
+
+    #if DEBUG
+    @objc private func observeNativeMotion(_ gesture: UIGestureRecognizer) {
+        let identity = ObjectIdentifier(gesture)
+        switch gesture.state {
+        case .began:
+            activeGestures.insert(identity)
+        case .changed:
+            guard gesture.numberOfTouches > 0, activeGestures.contains(identity),
+                  movedGestures.insert(identity).inserted else { return }
+            nativeMotionCount += 1
+            view.accessibilityValue = String(nativeMotionCount)
+            Self.events.notice("PAN_MOVED native=1 count=\(self.nativeMotionCount, privacy: .public)")
+        case .ended, .cancelled, .failed:
+            activeGestures.remove(identity)
+            movedGestures.remove(identity)
+        default: break
+        }
+    }
+    #endif
 
     private func belongs(to controller: UIViewController) -> Bool {
         var ancestor: UIViewController? = self
