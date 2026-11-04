@@ -130,7 +130,7 @@ final class AppState: ObservableObject {
 
     func acquireTabChromeHidden(owner: UUID) {
         activeTabChromeOwners.insert(owner)
-        isTabChromeHidden = true
+        if !isTabChromeHidden { isTabChromeHidden = true }
     }
 
     func releaseTabChromeHidden(owner: UUID? = nil) {
@@ -139,7 +139,8 @@ final class AppState: ObservableObject {
         } else {
             activeTabChromeOwners.removeAll()
         }
-        isTabChromeHidden = !activeTabChromeOwners.isEmpty
+        let shouldHide = !activeTabChromeOwners.isEmpty
+        if isTabChromeHidden != shouldHide { isTabChromeHidden = shouldHide }
     }
 
     func importSharedDocument(_ url: URL) {

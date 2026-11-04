@@ -933,10 +933,11 @@ enum WebReaderHTML {
         }
       }
 
-      function isPrefixPreserved(payload) {
+      function isReadingPrefixPreserved(payload, anchor) {
         var previous = state.order;
-        if (!previous.length) { return false; }
-        for (var index = 0; index < previous.length; index += 1) {
+        var anchorIndex = anchor ? previous.indexOf(anchor.key) : -1;
+        if (anchorIndex < 0) { return false; }
+        for (var index = 0; index <= anchorIndex; index += 1) {
           if (!payload.sections[index] || payload.sections[index].key !== previous[index]) { return false; }
           var node = state.sections[previous[index]];
           if (!node || node.getAttribute("data-sig") !== payload.sections[index].sig) { return false; }
@@ -949,8 +950,9 @@ enum WebReaderHTML {
         var anchor = captureAnchor();
         var nextSections = Object.create(null);
         var nextOrder = [];
-        var prefixRebuilt = false;
-        var previousLength = state.order.length;
+        // Only changes at/before the reading anchor may interrupt inertia.
+        // A pre-existing next-chapter placeholder is also below the viewport.
+        var preservesReadingPrefix = isReadingPrefixPreserved(payload, anchor);
 
         for (var index = 0; index < payload.sections.length; index += 1) {
           var section = payload.sections[index];
@@ -960,38 +962,35 @@ enum WebReaderHTML {
             nextSections[section.key] = existing;
           } else {
             nextSections[section.key] = buildSection(section);
-            if (index < previousLength) {
-              prefixRebuilt = true;
-            }
           }
           nextOrder.push(section.key);
         }
 
-        var sameShape = isPrefixPreserved(payload)
-          && nextOrder.length >= previousLength
-          && !prefixRebuilt;
+        if (!preservesReadingPrefix) { stopScrollAnimation(); state.activeScrollKey = null; }
 
-        // An appended prefetch must not issue scrollTo(currentY): doing that
-        // cancels native inertia even though no visible content moved.
-        if (!sameShape) { stopScrollAnimation(); state.activeScrollKey = null; }
-
-        if (sameShape) {
-          for (var tail = previousLength; tail < nextOrder.length; tail += 1) {
-            content.appendChild(nextSections[nextOrder[tail]]);
+        // Keep unchanged chapter nodes connected. Moving every section into a
+        // fragment invalidates the live surface even if its text did not change.
+        for (var nodeIndex = 0; nodeIndex < nextOrder.length; nodeIndex += 1) {
+          var nextNode = nextSections[nextOrder[nodeIndex]];
+          var currentNode = content.children[nodeIndex];
+          if (currentNode === nextNode) { continue; }
+          if (currentNode && currentNode.getAttribute("data-key") === nextOrder[nodeIndex]) {
+            content.replaceChild(nextNode, currentNode);
+          } else {
+            content.insertBefore(nextNode, currentNode || null);
           }
-        } else {
-          var fragment = document.createDocumentFragment();
-          for (var nodeIndex = 0; nodeIndex < nextOrder.length; nodeIndex += 1) {
-            fragment.appendChild(nextSections[nextOrder[nodeIndex]]);
-          }
-          content.replaceChildren(fragment);
+        }
+        var mounted = Array.prototype.slice.call(content.children);
+        for (var staleIndex = 0; staleIndex < mounted.length; staleIndex += 1) {
+          var stale = mounted[staleIndex];
+          if (nextSections[stale.getAttribute("data-key")] !== stale) { content.removeChild(stale); }
         }
 
         state.sections = nextSections;
         state.order = nextOrder;
         state.visible = -1;
         refreshMetrics();
-        if (!sameShape) {
+        if (!preservesReadingPrefix) {
           restoreAnchor(anchor);
         }
         post({ type: "content-ready", total: payload.total });

@@ -183,7 +183,9 @@ final class WebReaderDocumentTests: XCTestCase {
         XCTAssertTrue(shell.contains("window.__reader"))
         XCTAssertTrue(shell.contains("data-flat"))
         XCTAssertTrue(shell.contains("setContent"))
-        XCTAssertTrue(shell.contains("replaceChildren"))
+        XCTAssertTrue(shell.contains("content.replaceChild"))
+        XCTAssertTrue(shell.contains("content.insertBefore"))
+        XCTAssertFalse(shell.contains("content.replaceChildren"), "A chapter patch must not unmount unchanged reading sections")
     }
 
     func testShellCanResetToDocumentTop() {

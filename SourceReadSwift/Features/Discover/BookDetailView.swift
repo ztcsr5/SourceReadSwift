@@ -20,7 +20,7 @@ struct BookDetailView: View {
     @State private var tocExpansionTask: Task<Void, Never>?
     @State private var isLoading = false
     @State private var errorMessage: String?
-    @State private var didOpenReader = false
+    @State private var previewPosition: ReaderPreviewPosition?
     @State private var hasPromptedAddAfterPreview = false
     @State private var showAddAfterPreviewPrompt = false
     @State private var isAscending = true
@@ -102,6 +102,8 @@ struct BookDetailView: View {
            chapters.indices.contains(currentIdx) {
             return chapters[currentIdx]
         }
+        if let position = previewPosition, position.bookID == readerBookID,
+           let chapter = chapters.first(where: { $0.index == position.chapterIndex }) { return chapter }
         return chapters.first
     }
 
@@ -235,7 +237,11 @@ struct BookDetailView: View {
                 chapters: chapters,
                 book: book,
                 bookID: readerBookID,
-                localBook: localShelfBook
+                localBook: localShelfBook,
+                onPreviewPosition: recordPreviewPosition,
+                onReaderReturn: { promptToAddAfterPreviewIfNeeded() },
+                addPrompt: $showAddAfterPreviewPrompt,
+                addBook: addCurrentBookToShelf
             )
         }
         .sheet(isPresented: $showAudioPlayer) {
@@ -265,23 +271,12 @@ struct BookDetailView: View {
                 )
             }
         }
-        .onAppear {
-            hasArrived = true
-            promptToAddAfterPreviewIfNeeded()
-        }
-        .confirmationDialog(
-            "加入书架？",
-            isPresented: $showAddAfterPreviewPrompt,
-            titleVisibility: .visible
-        ) {
-            Button("加入书架") {
-                UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                addCurrentBookToShelf()
-            }
-            Button("暂不加入", role: .cancel) {}
-        } message: {
-            Text("如果这本书符合预期，可以加入书架，后续会记录阅读进度和更新状态。")
-        }
+        .onAppear { hasArrived = true }
+        .onChange(of: readingRoute != nil) { if !$0 { promptToAddAfterPreviewIfNeeded() } }
+        .onChange(of: showAllChapters) { if !$0 { promptToAddAfterPreviewIfNeeded() } }
+        .modifier(ReaderPreviewShelfPrompt(isPresented: Binding(
+            get: { readingRoute == nil && !showAllChapters && showAddAfterPreviewPrompt }, set: { showAddAfterPreviewPrompt = $0 }
+        ), addBook: addCurrentBookToShelf))
     }
 
     private var shouldShowTitlePage: Bool {
@@ -295,8 +290,13 @@ struct BookDetailView: View {
 
     private func titlePage(for target: BookChapter) -> some View {
         BookTitlePage(book: displayBook, chapterCount: chapters.count, readLabel: readingActionLabel) {
-            readDestination(targetReadingChapter ?? target, usesDetailHero: false)
+            readDestination(target, usesDetailHero: false)
         }
+        .onAppear { promptToAddAfterPreviewIfNeeded(onTitlePage: true) }
+        .modifier(ReaderPreviewShelfPrompt(isPresented: Binding(
+            get: { readingRoute?.showsTitlePage == true && showAddAfterPreviewPrompt },
+            set: { showAddAfterPreviewPrompt = $0 }
+        ), addBook: addCurrentBookToShelf))
     }
 
     @ViewBuilder private func readDestination(_ target: BookChapter, usesDetailHero: Bool) -> some View {
@@ -305,9 +305,11 @@ struct BookDetailView: View {
                 BookshelfReaderGatewayView(book: shelfBook, initialChapterIndex: target.index)
             } else {
                 let shelf = appState.bookshelfStore.book(id: readerBookID)
+                let preview = previewPosition.flatMap { $0.bookID == readerBookID && $0.chapterIndex == target.index ? $0 : nil }
                 ChapterLoadingView(bookID: readerBookID, sourceUrl: book.sourceUrl,
                     chapter: target, totalChapters: chapters.count, chapters: chapters,
-                    initialParagraphIndex: shelf?.currentChapterIndex == target.index ? shelf?.currentParagraphIndex : nil)
+                    initialParagraphIndex: shelf?.currentChapterIndex == target.index ? shelf?.currentParagraphIndex : preview?.paragraphIndex,
+                    onPreviewPosition: recordPreviewPosition)
             }
         }
         // Deep TOC scrolling or the title page has no visible detail hero source.
@@ -679,11 +681,8 @@ struct BookDetailView: View {
                         // Local imports have no book source, and ChapterLoadingView
                         // bails out with 「找不到书源」 for them. They open through the
                         // same local reader route the shelf uses instead.
-                        textChapterLink(chapter)
-                            .simultaneousGesture(TapGesture().onEnded {
-                                UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                                didOpenReader = true
-                            })
+                        Button { openReadingRoute(chapter, showsTitlePage: false) } label: { textChapterRowLabel(chapter) }
+                            .buttonStyle(AppPressStyle())
                     }
 
                     if index < visibleChapters.count - 1 {
@@ -703,31 +702,6 @@ struct BookDetailView: View {
                 }
                 .buttonStyle(.bordered)
             }
-        }
-    }
-
-    @ViewBuilder
-    private func textChapterLink(_ chapter: BookChapter) -> some View {
-        if let shelfBook = localShelfBook {
-            NavigationLink {
-                BookshelfReaderGatewayView(book: shelfBook, initialChapterIndex: chapter.index)
-            } label: {
-                textChapterRowLabel(chapter)
-            }
-            .buttonStyle(AppPressStyle())
-        } else {
-            NavigationLink {
-                ChapterLoadingView(
-                    bookID: readerBookID,
-                    sourceUrl: book.sourceUrl,
-                    chapter: chapter,
-                    totalChapters: chapters.count,
-                    chapters: chapters
-                )
-            } label: {
-                textChapterRowLabel(chapter)
-            }
-            .buttonStyle(AppPressStyle())
         }
     }
 
@@ -1014,6 +988,7 @@ struct BookDetailView: View {
     }
 
     private func addCurrentBookToShelf() {
+        guard !isBookInBookshelf else { return }
         appState.bookshelfStore.addOrUpdate(book)
         if let detail {
             appState.bookshelfStore.updateDetails(
@@ -1024,17 +999,22 @@ struct BookDetailView: View {
                 coverURL: detail.coverUrl
             )
         }
+        if let position = previewPosition, position.bookID == readerBookID {
+            appState.bookshelfStore.updateReadingProgress(bookID: position.bookID, chapterIndex: position.chapterIndex,
+                chapterTitle: position.chapterTitle, totalChapters: chapters.count, paragraphIndex: position.paragraphIndex)
+        }
     }
 
-    private func promptToAddAfterPreviewIfNeeded() {
-        guard didOpenReader else { return }
-        didOpenReader = false
-        guard !hasPromptedAddAfterPreview,
-              !appState.bookshelfStore.contains(book) else { return }
+    private func recordPreviewPosition(_ position: ReaderPreviewPosition) {
+        guard position.bookID == readerBookID, !isBookInBookshelf else { return }
+        previewPosition = position
+    }
+
+    private func promptToAddAfterPreviewIfNeeded(onTitlePage: Bool = false) {
+        guard (readingRoute?.showsTitlePage == true) == onTitlePage,
+              !hasPromptedAddAfterPreview, previewPosition?.bookID == readerBookID, !isBookInBookshelf else { return }
         hasPromptedAddAfterPreview = true
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
-            showAddAfterPreviewPrompt = true
-        }
+        showAddAfterPreviewPrompt = true
     }
 
     init(book: SearchBook, availableSources: [SearchBook] = []) {
@@ -1172,6 +1152,7 @@ struct ChapterLoadingView: View {
     var extraToolbarActions: () -> AnyView = { AnyView(EmptyView()) }
     var onRequestSourceSwitch: (() -> Void)?
     var onRequestBookDetail: (() -> Void)? = nil
+    var onPreviewPosition: ((ReaderPreviewPosition) -> Void)? = nil
     @State private var content: ChapterContent?
     @State private var loadedChapter: BookChapter?
     @State private var currentChapter: BookChapter?
@@ -1236,7 +1217,7 @@ struct ChapterLoadingView: View {
                 case .text:
                     EmptyView()
                 }
-            } else if let loadedContent = content {
+            } else if let loadedContent = content ?? (errorMessage == nil ? cachedOpeningContent : nil) {
                 readerView(loadedContent)
             } else if let errorMessage {
                 chapterLoadErrorView(errorMessage).readerOpeningContentReady()
@@ -1276,6 +1257,11 @@ struct ChapterLoadingView: View {
                 BookDetailView(book: detailSheetSearchBook)
             }
         }
+    }
+
+    private var cachedOpeningContent: ChapterContent? {
+        appState.chapterContentCacheStore.content(sourceURL: sourceUrl, chapter: effectiveChapter,
+            purifyRules: appState.purifyRuleStore.enabledPatterns)
     }
 
     private var detailSheetSearchBook: SearchBook {
@@ -1430,7 +1416,8 @@ struct ChapterLoadingView: View {
                     )
                 }
             },
-            initialOverlayVisible: showReaderChromeAfterChapterSelection
+            initialOverlayVisible: showReaderChromeAfterChapterSelection,
+            onPreviewPosition: onPreviewPosition
         )
         // 书级稳定身份：换章只更新 content，不再销毁 ReaderView + WKWebView。
         .id("reader-\(bookID ?? sourceUrl)")
@@ -1546,7 +1533,8 @@ struct ChapterLoadingView: View {
         openingBook: BookshelfBook? = nil,
         extraToolbarActions: @escaping () -> AnyView = { AnyView(EmptyView()) },
         onRequestSourceSwitch: (() -> Void)? = nil,
-        onRequestBookDetail: (() -> Void)? = nil
+        onRequestBookDetail: (() -> Void)? = nil,
+        onPreviewPosition: ((ReaderPreviewPosition) -> Void)? = nil
     ) {
         self.bookID = bookID
         self.sourceUrl = sourceUrl
@@ -1558,6 +1546,7 @@ struct ChapterLoadingView: View {
         self.extraToolbarActions = extraToolbarActions
         self.onRequestSourceSwitch = onRequestSourceSwitch
         self.onRequestBookDetail = onRequestBookDetail
+        self.onPreviewPosition = onPreviewPosition
     }
 }
 
@@ -1570,6 +1559,10 @@ private struct BookDetailAllChaptersView: View {
     /// Local imports resolve through the bookshelf record because they have no
     /// book source to read chapters from.
     let localBook: BookshelfBook?
+    let onPreviewPosition: (ReaderPreviewPosition) -> Void
+    let onReaderReturn: () -> Void
+    @Binding var addPrompt: Bool
+    let addBook: () -> Void
     @State private var query = ""
     @State private var debouncedQuery = ""
     @State private var isAscending = true
@@ -1679,7 +1672,8 @@ private struct BookDetailAllChaptersView: View {
                                 sourceUrl: book.sourceUrl,
                                 chapter: chapter,
                                 totalChapters: chapters.count,
-                                chapters: chapters
+                                chapters: chapters,
+                                onPreviewPosition: onPreviewPosition
                             )
                         }
                     }
@@ -1696,6 +1690,8 @@ private struct BookDetailAllChaptersView: View {
             }
             .navigationTitle("完整目录 (\(chapters.count) 章)")
             .navigationBarTitleDisplayMode(.inline)
+            .onChange(of: selectedChapterForReading != nil) { if !$0 { onReaderReturn() } }
+            .modifier(ReaderPreviewShelfPrompt(isPresented: $addPrompt, addBook: addBook))
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
                     Button(isAscending ? "倒序" : "正序") {
@@ -1708,6 +1704,20 @@ private struct BookDetailAllChaptersView: View {
                     }
                 }
             }
+        }
+    }
+}
+
+private struct ReaderPreviewShelfPrompt: ViewModifier {
+    @Binding var isPresented: Bool
+    let addBook: () -> Void
+
+    func body(content: Content) -> some View {
+        content.confirmationDialog("加入书架？", isPresented: $isPresented, titleVisibility: .visible) {
+            Button("加入书架", action: addBook)
+            Button("暂不加入", role: .cancel) {}
+        } message: {
+            Text("加入书架并保留这次的阅读位置。")
         }
     }
 }

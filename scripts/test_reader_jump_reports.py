@@ -128,6 +128,61 @@ window.requestAnimationFrame=function(){return 0;};
                 browser.close()
 
 
+    def test_prefetch_placeholder_resolution_keeps_the_visible_chapter_mounted(self):
+        source = (Path(__file__).resolve().parents[1] /
+                  'SourceReadSwift/Features/Reader/WebReaderDocument.swift').read_text(encoding='utf8')
+        start = source.index('<!doctype html>')
+        shell = source[start:source.index('"""#', start)]
+        candidates = [Path('C:/Program Files/Google/Chrome/Application/chrome.exe'),
+                      Path('C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe')]
+        executable = next((path for path in candidates if path.exists()), None)
+        with sync_playwright() as runtime:
+            browser = runtime.chromium.launch(executable_path=str(executable) if executable else None, headless=True)
+            try:
+                page = browser.new_page(viewport={'width': 390, 'height': 844})
+                page.route('**/*', lambda route: route.abort())
+                page.set_content(shell, wait_until='domcontentloaded')
+                outcome = page.evaluate("""async () => {
+                    const reader = window.__reader;
+                    const first = {key:'c0', chapter:0, title:'当前章', sig:'current', start:0,
+                      titleFlat:0, first:true, paragraphs:Array.from({length:80}, (_, i)=>({
+                        flat:i, local:i, text:'当前正在惯性滚动的正文不应离开文档。'.repeat(12)
+                      }))};
+                    const pending = {key:'c1', chapter:1, title:'下一章', sig:'pending',
+                      start:80, titleFlat:80, first:false, loading:true, paragraphs:[]};
+                    reader.setContent({revision:'pending',total:81,sections:[first,pending]});
+                    window.scrollTo(0,600);
+                    const content = document.getElementById('content');
+                    const current = content.firstElementChild;
+                    const previousY = window.scrollY;
+                    const removals = [];
+                    const observer = new MutationObserver(records=>{
+                      for (const record of records) for (const node of record.removedNodes) {
+                        if (node === current) removals.push(node.getAttribute('data-key'));
+                      }
+                    });
+                    observer.observe(content,{childList:true});
+                    let scrollCommands = 0;
+                    const originalScroll = window.scrollTo.bind(window);
+                    window.scrollTo = (...args)=>{scrollCommands++;originalScroll(...args);};
+                    const ready = {...pending,sig:'ready',loading:false,paragraphs:[
+                      {flat:80,local:0,text:'预取完成，只应替换视口下面的占位。'}]};
+                    reader.setContent({revision:'ready',total:81,sections:[first,ready]});
+                    await Promise.resolve();
+                    observer.disconnect();
+                    return {removals,scrollCommands,previousY,y:window.scrollY,
+                      sameNode:content.firstElementChild===current,
+                      nextText:content.lastElementChild.textContent};
+                }""")
+                self.assertEqual(outcome['removals'], [],
+                                 'Resolving a prefetched chapter must not detach the visible reading surface')
+                self.assertTrue(outcome['sameNode'])
+                self.assertEqual(outcome['scrollCommands'], 0, 'Do not interrupt native inertia below the viewport')
+                self.assertAlmostEqual(outcome['y'], outcome['previousY'], delta=1)
+                self.assertIn('预取完成', outcome['nextText'])
+            finally:
+                browser.close()
+
     def test_scroll_burst_batches_layout_reads_and_reports_the_final_reverse_position(self):
         source = (Path(__file__).resolve().parents[1] /
                   'SourceReadSwift/Features/Reader/WebReaderDocument.swift').read_text(encoding='utf8')

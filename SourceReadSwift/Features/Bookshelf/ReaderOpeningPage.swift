@@ -28,7 +28,7 @@ private struct ReaderOpeningReadyKey: PreferenceKey {
     }
 }
 
-/// One destination-owned cover across TOC lookup, chapter load and reader layout.
+/// A destination-owned readiness gate, separate from the book's formal title page.
 private struct ReaderOpeningPresentation: ViewModifier {
     private static let revealDuration = 0.18
     let book: BookshelfBook
@@ -54,7 +54,7 @@ private struct ReaderOpeningPresentation: ViewModifier {
             .accessibilityHidden(!didReveal)
             .overlay {
                 if !didReveal {
-                    ReaderOpeningPage(book: book, coverFrame: coverFrame, isWaiting: didArrive)
+                    ReaderOpeningStatus(showsWait: didArrive)
                         .toolbar(.hidden, for: .navigationBar)
                         .overlay(alignment: .topLeading) {
                             if didArrive {
@@ -97,8 +97,26 @@ private struct ReaderOpeningPresentation: ViewModifier {
     }
 }
 
+/// A blocked cursor never exposes the wrong page; only an actual wait needs a label.
+private struct ReaderOpeningStatus: View {
+    let showsWait: Bool
+    @AppStorage("reader.background") private var paperRaw = ReaderBackground.white.rawValue
+
+    var body: some View {
+        let paper = ReaderBackground(rawValue: paperRaw) ?? .white
+        ZStack {
+            paper.color(isNight: paper.isDark).ignoresSafeArea()
+            if showsWait {
+                ProgressView("正在打开正文")
+                    .foregroundStyle(paper.textColor(isNight: paper.isDark))
+                    .accessibilityIdentifier("reader.openingProgress")
+            }
+        }
+    }
+}
+
 extension View {
-    /// Keeps the book visible until native navigation and the first real page have arrived.
+    /// Prevents an unpositioned page from becoming visible during native navigation.
     @ViewBuilder func readerOpeningPresentation(for book: BookshelfBook?, coverFrame: UIImage? = nil,
                                                 usesDeskHero: Bool = false) -> some View {
         if let book { modifier(ReaderOpeningPresentation(book: book, coverFrame: coverFrame, usesDeskHero: usesDeskHero)) } else { self }

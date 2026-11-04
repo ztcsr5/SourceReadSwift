@@ -145,8 +145,9 @@ final class ChapterContentCacheStore: ObservableObject {
         guard let index = entries.firstIndex(where: { $0.key == key && $0.purifySignature == signature }) else {
             return
         }
-        let entry = entries.remove(at: index)
-        entries.insert(
+        var nextEntries = entries
+        let entry = nextEntries.remove(at: index)
+        nextEntries.insert(
             ChapterContentCacheEntry(
                 key: entry.key,
                 sourceURL: entry.sourceURL,
@@ -163,6 +164,7 @@ final class ChapterContentCacheStore: ObservableObject {
             ),
             at: 0
         )
+        entries = nextEntries
         persist()
     }
 

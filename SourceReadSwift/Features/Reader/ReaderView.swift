@@ -47,6 +47,7 @@ struct ReaderView: View {
     /// chapter list. A fresh chapter view otherwise starts with the chrome
     /// hidden and can be mistaken for the root tab UI.
     var initialOverlayVisible: Bool = false
+    var onPreviewPosition: ((ReaderPreviewPosition) -> Void)? = nil
 
     @Environment(\.dismiss) private var dismiss
     @Environment(\.scenePhase) private var scenePhase
@@ -143,8 +144,15 @@ struct ReaderView: View {
     @State private var viewportSize: CGSize = .zero
     @State private var sessionStartedAt = Date()
     @State private var previousIdleTimerDisabled = false
-    @State private var visibleParagraphIndex = 0
+    @State private var committedParagraphIndex = 0
     @State private var scrollPositionTracker = ReaderScrollPositionTracker()
+    private var visibleParagraphIndex: Int {
+        get { scrollPositionTracker.visibleIndex ?? committedParagraphIndex }
+        nonmutating set {
+            scrollPositionTracker.visibleIndex = nil
+            if committedParagraphIndex != newValue { committedParagraphIndex = newValue }
+        }
+    }
     @State private var readerContentFingerprint = ""
     @State private var windowSections: [ReaderChapterSection] = []
     @State private var windowCurrentChapterIndex = 0
@@ -945,9 +953,8 @@ struct ReaderView: View {
 
             // A fixed, opaque chapter band also protects immersive reading;
             // it must not depend on whether the system clock is visible.
-            if readerMode == .scroll, !showOverlay {
+            if readerMode == .scroll {
                 readerHeader
-                    .transition(.opacity)
                     .zIndex(1)
             }
 
@@ -2774,7 +2781,9 @@ struct ReaderView: View {
         guard total > 0 else { return }
         let safeIndex = min(max(index, 0), total - 1)
         guard visibleParagraphIndex != safeIndex else { return }
-        visibleParagraphIndex = safeIndex
+        // Only a chapter change needs to redraw the reader chrome. The latest
+        // paragraph remains synchronous for bookmarks, mode switches and saves.
+        scrollPositionTracker.visibleIndex = safeIndex
         let resolved = resolvedReadingPosition(forFlatIndex: safeIndex)
         if resolved.chapterIndex != windowCurrentChapterIndex {
             windowCurrentChapterIndex = resolved.chapterIndex
@@ -3549,6 +3558,7 @@ struct ReaderView: View {
                     foreground: readerThemeTextColor,
                     paper: readerThemeBackground,
                     textOpacity: ReaderHeadingPreferences.opacity(headerOpacity),
+                    showsLabels: !showOverlay,
                     wallpaper: background == .custom || background.hasTexture
                         ? AnyView(readerBackdrop.frame(height: effectiveViewportSize.height)
                             .frame(height: scrollChromeGeometry.protectedHeight, alignment: .top).clipped()) : nil
@@ -3771,7 +3781,7 @@ struct ReaderView: View {
             }
             .padding(.horizontal, 12)
             .padding(.vertical, 10)
-            .modifier(ReaderChromeSurface(paper: readerThemeBackground, ink: readerThemeTextColor))
+            .modifier(ReaderChromeSurface(paper: readerThemeBackground, ink: readerThemeTextColor, protectsReadingControls: true))
             .padding(.horizontal, 16)
             .padding(.top, readerTopSafeInset + 4)
 
@@ -4051,34 +4061,33 @@ struct ReaderView: View {
     }
 
     private var readerNativeMenu: UIMenu {
-        func action(_ title: String, _ symbol: String, enabled: Bool = true, destructive: Bool = false, run: @escaping () -> Void) -> UIAction {
+        func action(_ title: String, _ symbol: String, enabled: Bool = true, leavesReader: Bool = false, run: @escaping () -> Void) -> UIAction {
             var attributes: UIMenuElement.Attributes = []
             if !enabled { attributes.insert(.disabled) }
-            if destructive { attributes.insert(.destructive) }
             return UIAction(title: title, image: UIImage(systemName: symbol), attributes: attributes) { _ in
-                closeReaderChromeFromMenu()
+                if leavesReader { closeReaderChromeFromMenu() }
                 run()
             }
         }
         var chapterActions: [UIMenuElement] = [
             action("刷新本章", "arrow.clockwise", enabled: onRefreshChapter != nil) { onRefreshChapter?() },
             action("缓存前后章节", "square.and.arrow.down", enabled: onCacheNextChapters != nil) { onCacheNextChapters?(windowCurrentChapterIndex) },
-            action("网页打开本章", "safari", enabled: currentChapterWebURL != nil) { showChapterWebPage = true }
+            action("网页打开本章", "safari", enabled: currentChapterWebURL != nil, leavesReader: true) { showChapterWebPage = true }
         ]
         if canShowPayAction {
-            chapterActions.append(action("购买本章", "cart", enabled: !isPerformingPayAction) { showPayActionConfirmation = true })
+            chapterActions.append(action("购买本章", "cart", enabled: !isPerformingPayAction, leavesReader: true) { showPayActionConfirmation = true })
         }
         let playback: [UIMenuElement] = [
             action(autoScrollEnabled ? "暂停自动翻页" : "开始自动翻页", autoScrollEnabled ? "pause.fill" : "play.fill") { toggleAutoScroll() }
         ]
         let bookActions: [UIMenuElement] = [
-            action("书籍详情", "info.circle") {
+            action("书籍详情", "info.circle", leavesReader: true) {
                 if appState.bookshelfStore.book(id: bookID)?.sourceURL.hasPrefix("local://") == true {
                     showBookDetailSheet = true
                 } else if let onRequestBookDetail { onRequestBookDetail() } else { showBookDetailSheet = true }
             },
-            action("内容过滤", "line.3.horizontal.decrease.circle") { showContentFilter = true },
-            action("登录书源", "person.badge.key", enabled: currentBookSource != nil) { readerLoginSource = currentBookSource }
+            action("内容过滤", "line.3.horizontal.decrease.circle", leavesReader: true) { showContentFilter = true },
+            action("登录书源", "person.badge.key", enabled: currentBookSource != nil, leavesReader: true) { readerLoginSource = currentBookSource }
         ]
         return UIMenu(children: [
             UIMenu(options: .displayInline, children: chapterActions),
@@ -5777,18 +5786,11 @@ struct ReaderView: View {
         }
     }
 
-    /// The overflow `Menu` collapses with UIKit's own animation. Closing the
-    /// chrome in the same frame started a second animation over the same
-    /// views, which read as the panel flickering. Let the menu finish first,
-    /// then hide the chrome without another transition.
+    /// A delayed dismissal can close a newly reopened menu or settings panel.
     private func closeReaderChromeFromMenu() {
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.24) {
-            var transaction = Transaction()
-            transaction.disablesAnimations = true
-            withTransaction(transaction) {
-                chromeState.closeAll()
-            }
-        }
+        var transaction = Transaction()
+        transaction.disablesAnimations = true
+        withTransaction(transaction) { chromeState.closeAll() }
     }
 
     private func setTapZone(index: Int, action: ReaderTapAction) {
@@ -6304,6 +6306,12 @@ struct ReaderView: View {
                 ?? resolvedReadingPosition(forFlatIndex: visibleParagraphIndex)
         }
         let paragraphIndex = paragraphIndexOverride ?? resolved.paragraphIndex
+        if let onPreviewPosition, appState.bookshelfStore.book(id: bookID) == nil {
+            guard readerMode != .scroll || didLandInitialPosition else { return }
+            onPreviewPosition(ReaderPreviewPosition(bookID: bookID, chapterIndex: resolved.chapterIndex,
+                chapterTitle: resolved.chapterTitle, paragraphIndex: paragraphIndex))
+            return
+        }
         appState.bookshelfStore.updateReadingProgress(
             bookID: bookID,
             chapterIndex: resolved.chapterIndex,
@@ -6834,7 +6842,15 @@ private struct ParagraphJumpRequest: Equatable {
     var utf16Offset: Int = 0
 }
 
+struct ReaderPreviewPosition: Equatable {
+    let bookID: String
+    let chapterIndex: Int
+    let chapterTitle: String
+    let paragraphIndex: Int
+}
+
 private final class ReaderScrollPositionTracker {
+    var visibleIndex: Int?
     var flatIndex = -1
     var utf16Offset = 0
 }

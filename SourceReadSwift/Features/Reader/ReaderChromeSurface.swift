@@ -54,7 +54,7 @@ struct ReaderChromeSurface: ViewModifier {
     private var glassTintOpacity: Double {
         // Toolbars share one recipe; the larger settings surface needs
         // stronger diffusion so lines of prose cannot compete with controls.
-        if protectsReadingControls { return colorScheme == .dark ? 0.34 : 0.28 }
+        if protectsReadingControls { return colorScheme == .dark ? 0.70 : 0.66 }
         return 0.10
     }
 

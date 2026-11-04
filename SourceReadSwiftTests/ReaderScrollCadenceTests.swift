@@ -98,6 +98,56 @@ final class ReaderScrollCadenceTests: XCTestCase {
         XCTAssertGreaterThan(prependCommands ?? 0, 0, "A real prefix change must still restore its anchor")
     }
 
+    @MainActor func testResolvingANextChapterPlaceholderDoesNotUnmountTheVisibleChapterOrStopInertia() async throws {
+        let web = WKWebView(frame: CGRect(x: 0, y: 0, width: 390, height: 760))
+        let scene = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.first
+        let previous = scene?.windows.first(where: \.isKeyWindow)
+        let window = scene.map { UIWindow(windowScene: $0) } ?? UIWindow(frame: UIScreen.main.bounds)
+        let host = UIViewController(); window.rootViewController = host; window.makeKeyAndVisible(); host.view.addSubview(web)
+        defer { web.stopLoading(); window.isHidden = true; previous?.makeKey() }
+        web.loadHTMLString(WebReaderHTML.shell, baseURL: nil)
+        var ready = false
+        for _ in 0..<100 {
+            ready = (try? await web.evaluateJavaScript("!!window.__reader")) as? Bool == true
+            if ready { break }; try await Task.sleep(nanoseconds: 100_000_000)
+        }
+        XCTAssertTrue(ready)
+        let result = try await web.evaluateJavaScript("""
+        (() => {
+          const reader = window.__reader;
+          const first = {key:'c0',chapter:0,title:'当前章',sig:'current',start:0,titleFlat:0,first:true,
+            paragraphs:Array.from({length:80},(_,i)=>({flat:i,local:i,text:'正在惯性滚动的正文不能重挂。'.repeat(12)}))};
+          const pending = {key:'c1',chapter:1,title:'下一章',sig:'pending',start:80,titleFlat:80,first:false,
+            loading:true,paragraphs:[]};
+          reader.setContent({revision:'pending',total:81,sections:[first,pending]});
+          window.scrollTo(0,600);
+          const content = document.getElementById('content');
+          const current = content.firstElementChild;
+          const previousY = window.scrollY;
+          const observer = new MutationObserver(()=>{});
+          observer.observe(content,{childList:true});
+          let scrollCommands = 0;
+          const originalScroll = window.scrollTo.bind(window);
+          window.scrollTo = (...args)=>{scrollCommands++;originalScroll(...args);};
+          const next = {...pending,sig:'ready',loading:false,paragraphs:[{flat:80,local:0,text:'预取就绪'}]};
+          reader.setContent({revision:'ready',total:81,sections:[first,next]});
+          const detached = observer.takeRecords().reduce((count,record)=>count+
+            Array.from(record.removedNodes).filter(node=>node===current).length,0);
+          observer.disconnect();
+          return {detached,scrollCommands,previousY,y:window.scrollY,
+            sameNode:content.firstElementChild===current,nextText:content.lastElementChild.textContent};
+        })();
+        """) as? [String: Any]
+        let outcome = try XCTUnwrap(result)
+        XCTAssertEqual(outcome["detached"] as? Int, 0, "The current chapter must remain mounted when the next one becomes ready")
+        XCTAssertEqual(outcome["scrollCommands"] as? Int, 0, "A below-viewport patch must not interrupt native deceleration")
+        XCTAssertEqual(outcome["sameNode"] as? Bool, true)
+        let before = try XCTUnwrap(outcome["previousY"] as? Double)
+        let after = try XCTUnwrap(outcome["y"] as? Double)
+        XCTAssertEqual(after, before, accuracy: 1)
+        XCTAssertTrue((outcome["nextText"] as? String)?.contains("预取就绪") == true)
+    }
+
     @MainActor func testPositionOnlyUpdatesDoNotRebuildTypographyOrFontLookup() async throws {
         func fixture(index: Int = -1, size: Double = 20) -> WebScrollReaderView {
             WebScrollReaderView(sections: [.init(chapterIndex: 0, title: "第一章", paragraphs: ["正文"])],

@@ -9,6 +9,7 @@ struct ReaderScrollChapterHeader<Status: View>: View {
     let foreground: Color
     let paper: Color
     var textOpacity: Double = 0.82
+    var showsLabels = true
     var wallpaper: AnyView? = nil
     @ViewBuilder var status: () -> Status
 
@@ -30,6 +31,8 @@ struct ReaderScrollChapterHeader<Status: View>: View {
                 .frame(height: geometry.bandHeight)
                 .padding(.horizontal, max(horizontalPadding, 18))
                 .padding(.top, geometry.headerTop)
+                .opacity(showsLabels ? 1 : 0)
+                .animation(nil, value: showsLabels)
             }
         }
         .frame(maxWidth: .infinity)
