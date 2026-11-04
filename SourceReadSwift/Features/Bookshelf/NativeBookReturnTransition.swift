@@ -21,8 +21,10 @@ import OSLog
         self.handoff = handoff
     }
 
-    func install(in destination: UIViewController, anchor: UIView) {
-        guard let source = handoff?.nativeCover(for: sourceID), !source.bounds.isEmpty,
+    func install(in destination: UIViewController, anchor: UIView, allowsDeferredSource: Bool = false) {
+        let liveSource = handoff?.nativeCover(for: sourceID)
+        let hasLiveSource = liveSource.map { !$0.bounds.isEmpty } == true
+        guard hasLiveSource || allowsDeferredSource,
               let rect = BookReturnGeometry.alignment(of: anchor, in: destination) else { return }
         self.anchor = anchor
         lastAlignment = rect
@@ -51,15 +53,22 @@ import OSLog
             }
             return resolved
         }
-        let transition = UIViewController.Transition.zoom(options: options) { [weak self] _ in
+        let transition = UIViewController.Transition.zoom(options: options) { [weak self] context in
             guard let self else { return nil }
+            // SwiftUI may unmount the lazy home cover while the reader is open.
+            // Ask the returning source controller for layout only at this boundary.
+            let existingSource = self.handoff?.nativeCover(for: self.sourceID)
+            if existingSource.map({ !$0.bounds.isEmpty }) != true {
+                context.sourceViewController.view.setNeedsLayout()
+                context.sourceViewController.view.layoutIfNeeded()
+            }
             let source = self.handoff?.nativeCover(for: self.sourceID)
-            let isReady = source != nil
+            let isReady = source.map { !$0.bounds.isEmpty } == true
             if self.lastSourceAvailability != isReady {
                 self.lastSourceAvailability = isReady
                 Self.events.notice("ALIGN_SOURCE ready=\(isReady ? 1 : 0, privacy: .public)")
             }
-            return source
+            return isReady ? source : nil
         }
         installed = transition
         destination.preferredTransition = transition

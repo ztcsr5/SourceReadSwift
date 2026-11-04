@@ -19,6 +19,13 @@ final class ReadingCoverHandoff: ObservableObject {
     }
 
     func image(for url: URL) -> UIImage? { images.object(forKey: url as NSURL) }
+
+    /// Resolve the correctly sized hot frame before an asynchronous image callback.
+    func resolveNativeFrame(for url: URL, maxPixelSize: CGFloat, current: NativeReadingCoverFrame?) -> NativeReadingCoverFrame? {
+        let bitmap = RemoteImageLoader.shared.cachedImage(for: url, maxPixelSize: maxPixelSize, reuseCoverBytes: true)
+            ?? (current?.url == url ? current?.image : nil) ?? image(for: url)
+        return bitmap.map { NativeReadingCoverFrame(url: url, image: $0) }
+    }
     /// Capture the current frame at activation, not a later cache replacement.
     func frame(for book: BookshelfBook) -> UIImage? {
         guard let url = CoverURLResolver.url(from: book.coverURL, base: book.bookURL, fallbackBase: book.sourceURL) else { return nil }

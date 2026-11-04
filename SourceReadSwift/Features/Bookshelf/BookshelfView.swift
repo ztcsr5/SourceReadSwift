@@ -1541,14 +1541,14 @@ struct AsyncBookCover: View {
     var cornerRadius: CGFloat = 10
     var nativeSourceID: String? = nil
 
-    private var usesNativeCover: Bool {
-        guard #available(iOS 18.0, *), case .fill = contentMode, nativeSourceID != nil, readingCoverHandoff != nil,
-              let nativeFrame,
-              nativeFrame.url == CoverURLResolver.url(from: urlString, base: baseURLString, fallbackBase: sourceURLString) else { return false }
-        return true
+    private var readyNativeCover: NativeReadingCoverFrame? {
+        guard #available(iOS 18.0, *), case .fill = contentMode, nativeSourceID != nil, let readingCoverHandoff,
+              let url = CoverURLResolver.url(from: urlString, base: baseURLString, fallbackBase: sourceURLString) else { return nil }
+        return readingCoverHandoff.resolveNativeFrame(for: url, maxPixelSize: coverMaxPixelSize, current: nativeFrame)
     }
 
     var body: some View {
+        let nativeCover = readyNativeCover
         Group {
             if let url = CoverURLResolver.url(from: urlString, base: baseURLString, fallbackBase: sourceURLString) {
                 CachedRemoteImage(url: url, contentMode: contentMode, maxPixelSize: coverMaxPixelSize,
@@ -1562,12 +1562,12 @@ struct AsyncBookCover: View {
             }
         }
         // Leave the pipeline mounted so a cached frame can still upgrade to HD.
-        .opacity(usesNativeCover ? 0 : 1)
+        .opacity(nativeCover == nil ? 1 : 0)
         .frame(width: width, height: height)
         .frame(maxWidth: width == nil ? .infinity : nil)
         .overlay {
-            if usesNativeCover, let nativeFrame, let nativeSourceID, let readingCoverHandoff {
-                NativeReadingCover(image: nativeFrame.image, sourceID: nativeSourceID,
+            if let nativeCover, let nativeSourceID, let readingCoverHandoff {
+                NativeReadingCover(image: nativeCover.image, sourceID: nativeSourceID,
                     handoff: readingCoverHandoff, cornerRadius: cornerRadius)
             }
         }

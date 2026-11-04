@@ -77,6 +77,7 @@ private struct ReaderOpeningPresentation: ViewModifier {
                 canPrepareReturn: didReveal,
                 nativeSourceID: nativeSourceID,
                 handoff: incomingCovers,
+                hasCapturedCover: coverFrame != nil || incomingCovers?.frame(for: book) != nil,
                 allowsAlignment: !motion.reducesMotion,
                 allowsInteraction: allowsInteractiveReturn,
                 returnSurface: AnyView(ReaderOpeningPage(book: book, coverFrame: coverFrame,
@@ -123,6 +124,7 @@ private struct ReaderOpeningArrivalProbe: UIViewControllerRepresentable {
     let canPrepareReturn: Bool
     let nativeSourceID: String?
     let handoff: ReadingCoverHandoff?
+    let hasCapturedCover: Bool
     let allowsAlignment: Bool
     let allowsInteraction: Bool
     let returnSurface: AnyView
@@ -148,6 +150,7 @@ private struct ReaderOpeningArrivalProbe: UIViewControllerRepresentable {
         controller.onArrival = onArrival
         controller.nativeSourceID = nativeSourceID
         controller.coverHandoff = handoff
+        controller.hasCapturedCover = hasCapturedCover
         controller.allowsNativeAlignment = allowsAlignment
         controller.allowsNativeInteraction = allowsInteraction
         let surface = returnSurface

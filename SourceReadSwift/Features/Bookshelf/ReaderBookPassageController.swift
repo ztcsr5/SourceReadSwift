@@ -23,6 +23,7 @@ final class ReaderBookPassageController: UIViewController {
         }
     }
     weak var coverHandoff: ReadingCoverHandoff?
+    var hasCapturedCover = false
     var allowsNativeAlignment = false
     var allowsNativeInteraction = false
     private weak var returnAnchor: UIView?
@@ -117,7 +118,7 @@ final class ReaderBookPassageController: UIViewController {
         defer { reportNativePreparation() }
         #endif
         guard canPrepareReturn, allowsNativeAlignment, let sourceID = nativeSourceID,
-              let handoff = coverHandoff, handoff.nativeCover(for: sourceID) != nil,
+              let handoff = coverHandoff, hasCapturedCover || handoff.nativeCover(for: sourceID) != nil,
               let source = navigationController?.viewControllers.first(where: { belongs(to: $0) }) else {
             if !allowsNativeAlignment { restoreNativeReturn(prefersDefault: true) }
             return
@@ -129,7 +130,7 @@ final class ReaderBookPassageController: UIViewController {
             ?? NativeBookReturnTransition(sourceID: sourceID, handoff: handoff)
         nativeReturnTransition = transition
         transition.allowsInteractiveReturn = allowsNativeInteraction
-        transition.install(in: source, anchor: returnAnchor)
+        transition.install(in: source, anchor: returnAnchor, allowsDeferredSource: hasCapturedCover)
     }
 
     func updateReturnAnchor(_ anchor: UIView) {
@@ -227,6 +228,7 @@ final class ReaderBookPassageController: UIViewController {
 
     #if DEBUG
     private func reportNativePreparation() {
+        guard ProcessInfo.processInfo.arguments.contains("--floating-desk-regression") else { return }
         let source = navigationController?.viewControllers.first(where: { belongs(to: $0) })
         let liveCover = nativeSourceID.flatMap { coverHandoff?.nativeCover(for: $0) }
         var flags = canPrepareReturn ? 1 : 0
@@ -238,6 +240,7 @@ final class ReaderBookPassageController: UIViewController {
         if returnHost != nil { flags |= 64 }
         if returnAnchor != nil { flags |= 128 }
         if let source, let returnAnchor, BookReturnGeometry.alignment(of: returnAnchor, in: source) != nil { flags |= 256 }
+        if hasCapturedCover { flags |= 512 }
         guard lastPreparationFlags != flags else { return }
         lastPreparationFlags = flags
         // One event per lifecycle change, never per frame or with book identity.

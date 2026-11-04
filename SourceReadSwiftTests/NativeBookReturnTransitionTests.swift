@@ -4,6 +4,54 @@ import XCTest
 @testable import SourceReadSwift
 
 final class NativeBookReturnTransitionTests: XCTestCase {
+    @MainActor func testHotNativeFrameResolvesBeforeCallbacksWithoutBorrowingAShelfThumbnail() async throws {
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".png")
+        defer { try? FileManager.default.removeItem(at: url) }
+        let format = UIGraphicsImageRendererFormat(); format.scale = 1
+        let original = UIGraphicsImageRenderer(size: CGSize(width: 400, height: 600), format: format).image { context in
+            UIColor.green.setFill(); context.fill(CGRect(x: 0, y: 0, width: 400, height: 600))
+        }
+        try XCTUnwrap(original.pngData()).write(to: url)
+        let small = UIGraphicsImageRenderer(size: CGSize(width: 40, height: 60), format: format).image { context in
+            UIColor.red.setFill(); context.fill(CGRect(x: 0, y: 0, width: 40, height: 60))
+        }
+        let handoff = ReadingCoverHandoff(); handoff.retain(small, for: url)
+        let budget = ReadingDeskCoverRaster.maximumPixelSize(points: 202, scale: 1)
+        XCTAssertTrue(handoff.resolveNativeFrame(for: url, maxPixelSize: budget, current: nil)?.image === small,
+            "A retained frame is immediately available even after the source UIView was unmounted")
+        let loaded = await RemoteImageLoader.shared.image(for: url, maxPixelSize: budget, reuseCoverBytes: true)
+        let hot = try XCTUnwrap(loaded)
+        let frame = try XCTUnwrap(handoff.resolveNativeFrame(for: url, maxPixelSize: budget,
+            current: NativeReadingCoverFrame(url: url, image: small)))
+        XCTAssertTrue(frame.image === hot, "Correct-raster hot cache wins before any async callback can replace the source")
+        XCTAssertEqual(frame.image.cgImage?.height, 243)
+        XCTAssertNil(handoff.resolveNativeFrame(for: URL(fileURLWithPath: "/different.png"),
+            maxPixelSize: budget, current: frame), "A different URL must never borrow this source")
+    }
+
+    @MainActor func testCapturedCoverCanDeferItsLazySourceUntilTheReturnBoundary() throws {
+        guard #available(iOS 18.0, *) else { throw XCTSkip("Native zoom requires iOS18") }
+        let controller = UIViewController()
+        controller.view.frame = CGRect(x: 0, y: 0, width: 390, height: 844)
+        let book = UIView(frame: CGRect(x: 124, y: 230, width: 142, height: 190))
+        controller.view.addSubview(book)
+        let original = UIViewController.Transition.crossDissolve
+        controller.preferredTransition = original
+        let handoff = ReadingCoverHandoff()
+        let transition = NativeBookReturnTransition(sourceID: "book", handoff: handoff)
+        transition.install(in: controller, anchor: book)
+        XCTAssertTrue(controller.preferredTransition === original, "An unknown cover still retains the fallback")
+        transition.install(in: controller, anchor: book, allowsDeferredSource: true)
+        let installed = try XCTUnwrap(controller.preferredTransition)
+        XCTAssertFalse(installed === original, "A captured bitmap can prepare while SwiftUI unmounts its home view")
+        let source = UIView(frame: CGRect(x: 0, y: 0, width: 152, height: 202))
+        handoff.registerNativeCover(source, for: "book")
+        transition.install(in: controller, anchor: book)
+        XCTAssertTrue(controller.preferredTransition === installed, "Late source mounting must not rebuild the transition")
+        transition.restore()
+        XCTAssertTrue(controller.preferredTransition === original)
+    }
+
     @MainActor func testHiddenReturnCarrierMountsAMeasurableBookBeforeAnyPop() async throws {
         var anchor: UIView?
         let book = BookshelfBook(id: "probe", title: "书封挂载", author: "作者", coverURL: nil,
