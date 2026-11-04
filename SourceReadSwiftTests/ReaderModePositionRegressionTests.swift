@@ -56,6 +56,53 @@ final class ReaderModePositionRegressionTests: XCTestCase {
         }
     }
 
+    @MainActor func testCompletedShellWithMissingBridgeRecoversWithoutChangingItsCharacterCursor() async throws {
+        var offset = -1, applied = false
+        let text = String(repeating: "长段正文，恢复不能回到段首。👩🏽‍💻", count: 150)
+        let fixture = WebScrollReaderView(
+            sections: [WebReaderSection(chapterIndex: 0, title: "启动恢复", paragraphs: [text, "末段"])],
+            contentFingerprint: "missing-bridge-regression", fontSize: 20, lineSpacing: 8,
+            pagePadding: 20, letterSpacing: 0, paragraphSpacing: 12, paragraphIndent: 40,
+            titleSpacing: 16, footerHeight: 12, topInset: 50, textColor: .black,
+            highlightColor: .yellow, currentParagraphIndex: -1, scrollTarget: 0,
+            scrollRequestKey: "restore-character-600", scrollTargetUTF16Offset: 600,
+            animatedScrollDuration: 0, textSelectionEnabled: false,
+            onVisibleParagraph: { _ in }, onVisiblePosition: { _, value in offset = value },
+            onScrollTargetApplied: { applied = true })
+        let coordinator = fixture.makeCoordinator()
+        let web = coordinator.makeWebView(initialView: fixture)
+        let fault = ReaderStartupBridgeFault()
+        web.configuration.userContentController.add(fault, name: "bridgeFault")
+        web.configuration.userContentController.addUserScript(WKUserScript(
+            source: """
+                Object.defineProperty(window, '__reader', {configurable:true, get:function(){return undefined;}, set:function(){}});
+                window.addEventListener('DOMContentLoaded', function(){window.webkit.messageHandlers.bridgeFault.postMessage('injected');});
+                """,
+            injectionTime: .atDocumentStart, forMainFrameOnly: true))
+        let scene = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.first
+        let previous = scene?.windows.first(where: \.isKeyWindow)
+        let window = scene.map { UIWindow(windowScene: $0) } ?? UIWindow(frame: UIScreen.main.bounds)
+        window.frame = CGRect(x: 0, y: 0, width: 390, height: 844)
+        let host = UIViewController()
+        window.rootViewController = host
+        host.view.addSubview(web); web.frame = window.bounds
+        window.makeKeyAndVisible()
+        defer {
+            coordinator.tearDown(webView: web)
+            web.configuration.userContentController.removeScriptMessageHandler(forName: "bridgeFault")
+            window.isHidden = true; previous?.makeKey()
+        }
+        for _ in 0..<150 {
+            if applied && offset > 0 { break }
+            try await Task.sleep(nanoseconds: 100_000_000)
+        }
+        XCTAssertEqual(fault.injections, 1)
+        XCTAssertEqual(coordinator.startupRecoveryCount, 1)
+        XCTAssertTrue(applied, "A verified complete shell without its bridge must recover, not spin forever")
+        XCTAssertGreaterThan(offset, 500)
+        XCTAssertLessThanOrEqual(offset, 600, "Recovery must replay the unchanged character cursor, not reset to paragraph start")
+    }
+
     @MainActor func testWebScrollRestoresAndReportsInsideOneLongParagraph() async throws {
         var offset = -1
         var applied = false
@@ -95,5 +142,13 @@ final class ReaderModePositionRegressionTests: XCTestCase {
         XCTAssertTrue(applied, "The real WebKit document must acknowledge the character jump")
         XCTAssertGreaterThan(offset, 500, "Paragraph zero must not silently restore to its start")
         XCTAssertLessThanOrEqual(offset, 600, "The visible line should contain the requested character")
+    }
+}
+
+private final class ReaderStartupBridgeFault: NSObject, WKScriptMessageHandler {
+    private(set) var injections = 0
+    func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
+        injections += 1
+        userContentController.removeAllUserScripts()
     }
 }

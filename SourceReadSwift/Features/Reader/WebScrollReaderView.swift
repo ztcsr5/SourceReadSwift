@@ -100,6 +100,9 @@ struct WebScrollReaderView: UIViewRepresentable {
         private let fontHandler = ReaderFontSchemeHandler()
 
         private var isDocumentReady = false
+        private var startupProbeTask: Task<Void, Never>?
+        private var hasReportedPosition = false
+        private(set) var startupRecoveryCount = 0
         private var lastStylePayload: WebReaderStylePayload?
         private var lastStyleInputs: [AnyHashable]?
         private(set) var styleBuildCount = 0
@@ -160,10 +163,13 @@ struct WebScrollReaderView: UIViewRepresentable {
             lastSurfaceColor = view.surfaceColor
 
             webView.loadHTMLString(WebReaderHTML.shell, baseURL: nil)
+            scheduleStartupProbe(webView: webView)
             return webView
         }
 
         func tearDown(webView: WKWebView) {
+            startupProbeTask?.cancel()
+            startupProbeTask = nil
             contentBuildTask?.cancel()
             expectedContentRevision = UUID().uuidString
             webView.stopLoading()
@@ -347,16 +353,7 @@ struct WebScrollReaderView: UIViewRepresentable {
 
             switch type {
             case "ready":
-                isDocumentReady = true
-                if let webView {
-                    pushStyleIfNeeded(webView: webView)
-                    lastContentFingerprint = effectiveContentFingerprint(for: view)
-                    pushContent(webView: webView)
-                    pushResetIfNeeded(webView: webView)
-                    pushScrollTargetIfNeeded(webView: webView)
-                    pushPageStepIfNeeded(webView: webView)
-                    pushHighlightIfNeeded(webView: webView)
-                }
+                if let webView { activateDocumentIfNeeded(webView: webView) }
             case "content-ready":
                 if pendingScrollKey != nil, pendingScrollKey != appliedScrollKey, let webView {
                     evaluateScrollTarget(webView: webView)
@@ -368,6 +365,11 @@ struct WebScrollReaderView: UIViewRepresentable {
                       view.scrollTarget == nil || view.scrollRequestKey == appliedScrollKey,
                       let flat = body["flat"] as? Int else { return }
                 if flat >= 0 {
+                    if !hasReportedPosition {
+                        hasReportedPosition = true
+                        startupProbeTask?.cancel()
+                        startupProbeTask = nil
+                    }
                     let offset = (body["utf16Offset"] as? Int) ?? 0
                     view.onVisiblePosition?(flat, max(offset, 0))
                     view.onVisibleParagraph(flat)
@@ -443,16 +445,77 @@ struct WebScrollReaderView: UIViewRepresentable {
         }
 
         func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
-            // The document itself reports readiness through the message bridge;
-            // this only covers a reload where the script failed to run.
-            if !isDocumentReady {
-                isDocumentReady = true
-                pushStyleIfNeeded(webView: webView)
-                lastContentFingerprint = effectiveContentFingerprint(for: view)
-                pushContent(webView: webView)
-                pushResetIfNeeded(webView: webView)
-                pushScrollTargetIfNeeded(webView: webView)
+            verifyStartupBridge(webView: webView)
+        }
+
+        private func activateDocumentIfNeeded(webView: WKWebView) {
+            guard !isDocumentReady else { return }
+            isDocumentReady = true
+            pushStyleIfNeeded(webView: webView)
+            lastContentFingerprint = effectiveContentFingerprint(for: view)
+            pushContent(webView: webView)
+            pushResetIfNeeded(webView: webView)
+            pushScrollTargetIfNeeded(webView: webView)
+            pushPageStepIfNeeded(webView: webView)
+            pushHighlightIfNeeded(webView: webView)
+        }
+
+        private func scheduleStartupProbe(webView: WKWebView) {
+            startupProbeTask?.cancel()
+            // Only startup checks at 2/5/7 seconds; a valid position cancels
+            // all of them. This is not a sampler during normal reading.
+            startupProbeTask = Task { @MainActor [weak self, weak webView] in
+                for delay: UInt64 in [2_000_000_000, 3_000_000_000, 2_000_000_000] {
+                    try? await Task.sleep(nanoseconds: delay)
+                    guard !Task.isCancelled, let self, let webView, !self.hasReportedPosition,
+                          webView.navigationDelegate === self else { return }
+                    self.verifyStartupBridge(webView: webView)
+                }
             }
+        }
+
+        private func verifyStartupBridge(webView: WKWebView) {
+            guard !hasReportedPosition else { return }
+            let script = """
+                (function() {
+                  if (window.__reader && typeof window.__reader.setContent === 'function') { return 1; }
+                  return document.readyState === 'complete' && document.getElementById('content') ? -1 : 0;
+                })()
+                """
+            webView.evaluateJavaScript(script) { [weak self, weak webView] value, error in
+                guard let self, let webView, webView.navigationDelegate === self,
+                      !self.hasReportedPosition else { return }
+                if let error {
+                    NSLog("Reader startup bridge probe failed, code=%ld", (error as NSError).code)
+                    return
+                }
+                if (value as? Int) == 1 { self.activateDocumentIfNeeded(webView: webView) }
+                else if (value as? Int) == -1 { self.recoverStartupShell(webView: webView) }
+            }
+        }
+
+        private func recoverStartupShell(webView: WKWebView) {
+            guard !hasReportedPosition, startupRecoveryCount == 0, recoveredDocumentFailures < 2 else { return }
+            startupRecoveryCount += 1
+            recoveredDocumentFailures += 1
+            NSLog("Reader completed shell has no bridge; bounded startup recovery")
+            isDocumentReady = false
+            contentBuildTask?.cancel()
+            isBuildingContent = false
+            expectedContentRevision = UUID().uuidString
+            lastContentFingerprint = nil
+            lastStylePayload = nil
+            lastStyleInputs = nil
+            lastResetToken = nil
+            lastSentScrollKey = nil
+            appliedScrollKey = nil
+            pendingScrollKey = nil
+            pendingScrollTarget = nil
+            lastHighlight = Int.min
+            // The input cursor stays unchanged, and no visible position has
+            // been published yet. Never apply this recovery to active reading.
+            webView.loadHTMLString(WebReaderHTML.shell, baseURL: nil)
+            scheduleStartupProbe(webView: webView)
         }
     }
 }
