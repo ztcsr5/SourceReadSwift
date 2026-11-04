@@ -6,6 +6,8 @@ struct LegacyTabBar: View {
     var onSearch: () -> Void
     @AppMotion private var motion
     @Namespace private var highlight
+    @AppStorage(AppVisualTheme.selectionKey) private var themeRaw = AppVisualTheme.initialSelection.rawValue
+    private var theme: AppVisualTheme { AppVisualTheme(rawValue: themeRaw) ?? .classic }
 
     var body: some View {
         HStack(spacing: 10) {
@@ -19,14 +21,17 @@ struct LegacyTabBar: View {
             }
             .padding(4)
             .background {
-                Capsule().fill(.regularMaterial)
-                    .modifier(PearlGlassFinish(outline: Capsule(), pearl: .white, mist: AppTheme.accent))
+                if theme.usesNeutralGlass { BrandGlass(outline: Capsule()) }
+                else {
+                    Capsule().fill(.regularMaterial)
+                        .modifier(PearlGlassFinish(outline: Capsule(), pearl: .white, mist: AppTheme.accent))
+                }
             }
             .overlay(Capsule().strokeBorder(Color.primary.opacity(0.07), lineWidth: 0.6).allowsHitTesting(false))
             Button(action: onSearch) {
                 Image(systemName: "magnifyingglass")
                     .font(.system(size: 23, weight: .medium))
-                    .foregroundStyle(.primary)
+                    .foregroundStyle(theme.primaryInk)
                     .frame(width: 54, height: 54)
                     .background(.regularMaterial, in: Circle())
                     .overlay(Circle().strokeBorder(Color.primary.opacity(0.07), lineWidth: 0.6))
@@ -48,12 +53,12 @@ struct LegacyTabBar: View {
                 Image(systemName: icon).font(.system(size: 21, weight: .medium))
                 Text(title).font(.system(size: 10, weight: .semibold))
             }
-            .foregroundStyle(selection == value ? AppTheme.accent : .primary)
+            .foregroundStyle(selection == value ? AppTheme.accent : theme.usesNeutralGlass ? theme.secondaryInk : .primary)
             .frame(maxWidth: .infinity, minHeight: 46)
             .background {
                 ZStack {
                     if selection == value {
-                        Capsule().fill(AppTheme.accent.opacity(0.12))
+                        Capsule().fill(theme.usesNeutralGlass ? theme.controlFill : AppTheme.accent.opacity(0.12))
                             .matchedGeometryEffect(id: "selection", in: highlight)
                     }
                 }

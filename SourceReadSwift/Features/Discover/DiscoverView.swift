@@ -111,6 +111,9 @@ struct DiscoverView: View {
         self._viewModel = ObservedObject(wrappedValue: viewModel ?? DiscoverViewModel())
     }
 
+    @AppStorage(AppVisualTheme.selectionKey) private var themeRaw = AppVisualTheme.initialSelection.rawValue
+    private var usesForestGlass: Bool { themeRaw == AppVisualTheme.forest.rawValue }
+
     var body: some View {
         NavigationStack {
             ScrollView {
@@ -119,35 +122,41 @@ struct DiscoverView: View {
                         clipboardSourceBanner
                     }
 
-                    HStack(spacing: 0) {
-                        ForEach(DiscoverTab.allCases) { tab in
-                            let isSelected = selectedTab == tab
-                            Button {
-                                UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                                selectedTab = tab
-                            } label: {
-                                HStack(spacing: 6) {
-                                    Image(systemName: tab.icon)
-                                        .font(.system(size: 13, weight: .semibold))
-                                    Text(tab.rawValue)
-                                        .font(.system(size: 14, weight: isSelected ? .semibold : .medium))
-                                }
-                                .foregroundStyle(isSelected ? Color.white : Color.primary)
-                                .frame(maxWidth: .infinity)
-                                .padding(.vertical, 8)
-                                .background {
-                                    if isSelected {
-                                        RoundedRectangle(cornerRadius: 10, style: .continuous)
-                                            .fill(AppTheme.accent)
-                                            .shadow(color: AppTheme.accent.opacity(0.24), radius: 3, y: 1)
+                    if usesForestGlass {
+                        BrandSegmentedControl("寻书方式", selection: $selectedTab,
+                            options: DiscoverTab.allCases.map { ($0, $0.rawValue) },
+                            symbols: Dictionary(uniqueKeysWithValues: DiscoverTab.allCases.map { ($0, $0.icon) }))
+                    } else {
+                        HStack(spacing: 0) {
+                            ForEach(DiscoverTab.allCases) { tab in
+                                let isSelected = selectedTab == tab
+                                Button {
+                                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                                    selectedTab = tab
+                                } label: {
+                                    HStack(spacing: 6) {
+                                        Image(systemName: tab.icon)
+                                            .font(.system(size: 13, weight: .semibold))
+                                        Text(tab.rawValue)
+                                            .font(.system(size: 14, weight: isSelected ? .semibold : .medium))
+                                    }
+                                    .foregroundStyle(isSelected ? Color.white : Color.primary)
+                                    .frame(maxWidth: .infinity)
+                                    .padding(.vertical, 8)
+                                    .background {
+                                        if isSelected {
+                                            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                                                .fill(AppTheme.accent)
+                                                .shadow(color: AppTheme.accent.opacity(0.24), radius: 3, y: 1)
+                                        }
                                     }
                                 }
+                                .buttonStyle(.plain)
                             }
-                            .buttonStyle(.plain)
                         }
+                        .padding(3)
+                        .background(Color(UIColor.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 13, style: .continuous))
                     }
-                    .padding(3)
-                    .background(Color(UIColor.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 13, style: .continuous))
 
                     mediumFilterPillBar
 
@@ -332,13 +341,7 @@ struct DiscoverView: View {
             }
             .padding(.horizontal, 13)
             .padding(.vertical, 7)
-            .background(isSelected ? AppTheme.accent : Color(UIColor.secondarySystemGroupedBackground), in: Capsule())
-            .foregroundStyle(isSelected ? Color.white : Color.primary)
-            .overlay {
-                if !isSelected {
-                    Capsule().stroke(Color.primary.opacity(0.06), lineWidth: 0.8)
-                }
-            }
+            .modifier(BrandFilterFinish(isSelected: isSelected, legacyFill: Color(UIColor.secondarySystemGroupedBackground)))
         }
         .buttonStyle(.plain)
     }
@@ -408,51 +411,26 @@ struct DiscoverView: View {
     private var matchModePicker: some View {
         HStack {
             Spacer()
-            HStack(spacing: 0) {
-                ForEach(SearchMatchMode.allCases) { mode in
-                    let isSelected = viewModel.matchMode == mode
-                    Button {
-                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                        viewModel.matchMode = mode
-                    } label: {
-                        Text(mode.title)
-                            .font(.system(size: 13, weight: isSelected ? .semibold : .medium))
-                            .foregroundStyle(isSelected ? Color.white : Color.primary)
-                            .padding(.horizontal, 16)
-                            .padding(.vertical, 6)
-                            .background {
-                                if isSelected {
-                                    RoundedRectangle(cornerRadius: 8, style: .continuous)
-                                        .fill(AppTheme.accent)
-                                }
-                            }
-                    }
-                    .buttonStyle(.plain)
-                }
-            }
-            .padding(2)
-            .background(Color(UIColor.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
-        }
-    }
-
-    private var resultFilterPicker: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            if viewModel.hasUnfilteredResults {
+            if usesForestGlass {
+                BrandSegmentedControl("匹配方式", selection: $viewModel.matchMode,
+                    options: SearchMatchMode.allCases.map { ($0, $0.title) })
+                    .frame(maxWidth: 238)
+            } else {
                 HStack(spacing: 0) {
-                    ForEach(SearchResultFilterScope.allCases) { scope in
-                        let isSelected = viewModel.resultFilterScope == scope
+                    ForEach(SearchMatchMode.allCases) { mode in
+                        let isSelected = viewModel.matchMode == mode
                         Button {
                             UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                            viewModel.resultFilterScope = scope
+                            viewModel.matchMode = mode
                         } label: {
-                            Text(scope.title)
-                                .font(.system(size: 12, weight: isSelected ? .semibold : .medium))
+                            Text(mode.title)
+                                .font(.system(size: 13, weight: isSelected ? .semibold : .medium))
                                 .foregroundStyle(isSelected ? Color.white : Color.primary)
-                                .padding(.horizontal, 10)
-                                .padding(.vertical, 5)
+                                .padding(.horizontal, 16)
+                                .padding(.vertical, 6)
                                 .background {
                                     if isSelected {
-                                        RoundedRectangle(cornerRadius: 7, style: .continuous)
+                                        RoundedRectangle(cornerRadius: 8, style: .continuous)
                                             .fill(AppTheme.accent)
                                     }
                                 }
@@ -461,7 +439,43 @@ struct DiscoverView: View {
                     }
                 }
                 .padding(2)
-                .background(Color(UIColor.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 9, style: .continuous))
+                .background(Color(UIColor.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+            }
+        }
+    }
+
+    private var resultFilterPicker: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            if viewModel.hasUnfilteredResults {
+                if usesForestGlass {
+                    BrandSegmentedControl("结果筛选", selection: $viewModel.resultFilterScope,
+                        options: SearchResultFilterScope.allCases.map { ($0, $0.title) })
+                } else {
+                    HStack(spacing: 0) {
+                        ForEach(SearchResultFilterScope.allCases) { scope in
+                            let isSelected = viewModel.resultFilterScope == scope
+                            Button {
+                                UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                                viewModel.resultFilterScope = scope
+                            } label: {
+                                Text(scope.title)
+                                    .font(.system(size: 12, weight: isSelected ? .semibold : .medium))
+                                    .foregroundStyle(isSelected ? Color.white : Color.primary)
+                                    .padding(.horizontal, 10)
+                                    .padding(.vertical, 5)
+                                    .background {
+                                        if isSelected {
+                                            RoundedRectangle(cornerRadius: 7, style: .continuous)
+                                                .fill(AppTheme.accent)
+                                        }
+                                    }
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                    .padding(2)
+                    .background(Color(UIColor.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 9, style: .continuous))
+                }
 
                 TextField(viewModel.resultFilterScope.placeholder, text: $viewModel.resultFilter)
                     .textInputAutocapitalization(.never)

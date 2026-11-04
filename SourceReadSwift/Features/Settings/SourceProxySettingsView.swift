@@ -19,11 +19,8 @@ struct SourceProxySettingsView: View {
 
             if proxyManager.isEnabled {
                 Section("代理协议与配置") {
-                    Picker("代理类型", selection: $proxyManager.proxyType) {
-                        Text("HTTP / HTTPS").tag("http")
-                        Text("SOCKS5").tag("socks5")
-                    }
-                    .pickerStyle(.segmented)
+                    BrandSegmentedControl("代理类型", selection: $proxyManager.proxyType, options:
+                            [("http", "HTTP / HTTPS"), ("socks5", "SOCKS5")])
 
                     HStack {
                         Text("代理主机")

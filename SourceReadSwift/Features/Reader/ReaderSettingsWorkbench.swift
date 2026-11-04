@@ -190,9 +190,8 @@ struct ReaderClassicSettingsPanel: View {
                         Text("阅读设置").font(.headline); Spacer()
                         Button(action: close) { Image(systemName: "xmark").frame(width: 44, height: 44).contentShape(Rectangle()) }.accessibilityLabel("关闭阅读设置")
                     }
-                    Picker("设置分类", selection: $selection) {
-                        Text("外观").tag(0); Text("排版").tag(1); Text("高级").tag(2)
-                    }.pickerStyle(.segmented)
+                    BrandSegmentedControl("设置分类", selection: $selection, options:
+                            [(0, "外观"), (1, "排版"), (2, "高级")])
                     ScrollView { page(selection).padding(.bottom, 16) }
                     Button("启用阅读工坊") { usesWorkbench = true }.font(.caption).frame(minHeight: 44)
                 }.padding(16)

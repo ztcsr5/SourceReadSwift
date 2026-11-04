@@ -26,9 +26,8 @@ struct ReaderChromeEditor: View {
             }
             VStack(alignment: .leading, spacing: 12) {
                 Text("页脚与系统状态栏").font(.headline)
-                Picker("时间电量位置", selection: $position) {
-                    Text("页脚").tag("bottom"); Text("页眉").tag("top"); Text("两处").tag("both")
-                }.pickerStyle(.segmented)
+                BrandSegmentedControl("时间电量位置", selection: $position, options:
+                            [("bottom", "页脚"), ("top", "页眉"), ("both", "两处")])
                 Toggle("显示系统状态栏", isOn: $showSystem)
                 Toggle("显示时间", isOn: $showTime)
                 Toggle("显示电量图标", isOn: $showBattery)
@@ -39,7 +38,8 @@ struct ReaderChromeEditor: View {
             }
             VStack(alignment: .leading, spacing: 12) {
                 Text("菜单纸面").font(.headline)
-                Picker("菜单材质", selection: $surface) { Text("系统材质").tag("system"); Text("阅读纸面").tag("paper") }.pickerStyle(.segmented)
+                BrandSegmentedControl("菜单材质", selection: $surface, options:
+                            [("system", "系统材质"), ("paper", "阅读纸面")])
                 Toggle("沿用阅读壁纸与纸纹", isOn: $wallpaper)
                 if wallpaper && surface == "system" {
                     Text("沿用壁纸时使用阅读纸面；关闭后恢复系统玻璃。") .font(.caption).foregroundStyle(.secondary)

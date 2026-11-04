@@ -58,13 +58,8 @@ struct SourceRuleEditorView: View {
         NavigationStack {
             Form {
                 Section {
-                    Picker("规则阶段", selection: $selectedSection) {
-                        Text("搜索").tag(0)
-                        Text("详情").tag(1)
-                        Text("目录").tag(2)
-                        Text("正文").tag(3)
-                    }
-                    .pickerStyle(.segmented)
+                    BrandSegmentedControl("规则阶段", selection: $selectedSection, options:
+                            [ (0, "搜索"), (1, "详情"), (2, "目录"), (3, "正文") ])
                 }
                 .listRowBackground(AppThemeRowSurface())
                 if let diagnosticStep {

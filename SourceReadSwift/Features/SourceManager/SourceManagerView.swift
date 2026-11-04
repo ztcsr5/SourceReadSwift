@@ -538,12 +538,8 @@ struct SourceManagerView: View {
     }
 
     private var tabPicker: some View {
-        Picker("源类型", selection: $selectedTab) {
-            ForEach(SourceManagerTab.allCases) { tab in
-                Text(tab.title).tag(tab)
-            }
-        }
-        .pickerStyle(.segmented)
+        BrandSegmentedControl("源类型", selection: $selectedTab, options:
+                            SourceManagerTab.allCases.map { ($0, $0.title) })
         .onChange(of: selectedTab) { _ in
             searchText = ""
             isManagingBookSources = false
@@ -1568,14 +1564,10 @@ private struct BatchCheckCoordinatorObserver<Content: View>: View {
                         Text("测试范围")
                             .font(.caption.weight(.bold))
                             .foregroundStyle(.secondary)
-                        Picker("测试范围", selection: $batchCheckScope) {
-                            Text("已启用 (\(appState.sourceStore.sources.filter(\.enabled).count))").tag(BatchCheckScope.enabled)
-                            Text("全部 (\(appState.sourceStore.sources.count))").tag(BatchCheckScope.all)
-                            if !selectedBookSourceURLs.isEmpty {
-                                Text("选定 (\(selectedBookSourceURLs.count))").tag(BatchCheckScope.selected)
-                            }
-                        }
-                        .pickerStyle(.segmented)
+                        BrandSegmentedControl("测试范围", selection: $batchCheckScope, options:
+                            [(BatchCheckScope.enabled, "已启用 (\(appState.sourceStore.sources.filter(\.enabled).count))"),
+                              (.all, "全部 (\(appState.sourceStore.sources.count))")]
+                              + (selectedBookSourceURLs.isEmpty ? [] : [(.selected, "选定 (\(selectedBookSourceURLs.count))")]))
                     }
 
                     VStack(alignment: .leading, spacing: 6) {

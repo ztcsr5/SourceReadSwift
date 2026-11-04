@@ -86,16 +86,12 @@ struct ReaderChapterDesignEditor: View {
                     }.buttonStyle(AppPressStyle()).accessibilityAddTraits(decoration.rawValue == decorationRaw ? .isSelected : [])
                 }
             }
-            Picker("章节名对齐", selection: $alignmentRaw) {
-                ForEach(ReaderChapterAlignment.allCases, id: \.self) { Text($0.title).tag($0.rawValue) }
-            }.pickerStyle(.segmented)
+            BrandSegmentedControl("章节名对齐", selection: $alignmentRaw, options:
+                            ReaderChapterAlignment.allCases.map { ($0.rawValue, $0.title) })
             VStack(alignment: .leading, spacing: 8) {
                 Text("章节标题位置").font(.subheadline.weight(.semibold))
-                Picker("章节标题位置", selection: $placement) {
-                    ForEach(ReaderPageChromeLayout.allCases) { layout in
-                        Text(layout.title).tag(layout.rawValue)
-                    }
-                }.pickerStyle(.segmented)
+                BrandSegmentedControl("章节标题位置", selection: $placement, options:
+                            ReaderPageChromeLayout.allCases.map { ($0.rawValue, $0.title) })
                 Text((ReaderPageChromeLayout(rawValue: placement) ?? .header).help)
                     .font(.caption).foregroundStyle(.secondary)
                 if placement != ReaderPageChromeLayout.hidden.rawValue {

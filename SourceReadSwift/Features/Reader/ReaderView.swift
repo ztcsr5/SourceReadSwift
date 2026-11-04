@@ -4139,12 +4139,8 @@ struct ReaderView: View {
             Text(readerModeHint)
                 .font(.caption2)
                 .foregroundStyle(readerThemeTextColor.opacity(0.62))
-            Picker("翻页模式", selection: $readerModeRawValue) {
-                ForEach(ReaderMode.allCases) { mode in
-                    Text(mode.title).tag(mode.rawValue)
-                }
-            }
-            .pickerStyle(.segmented)
+            BrandSegmentedControl("翻页模式", selection: $readerModeRawValue, options:
+                            ReaderMode.allCases.map { ($0.rawValue, $0.title) })
             .padding(.bottom, 8)
         }
     }
@@ -4247,11 +4243,8 @@ struct ReaderView: View {
                 }.buttonStyle(.bordered)
             }
 
-            Picker("壁纸基底与文字风格", selection: $customBackgroundIsDark) {
-                Text("浅色壁纸 (深色字)").tag(false)
-                Text("深色壁纸 (浅色字)").tag(true)
-            }
-            .pickerStyle(.segmented)
+            BrandSegmentedControl("壁纸基底与文字风格", selection: $customBackgroundIsDark, options:
+                            [(false, "浅色壁纸 (深色字)"), (true, "深色壁纸 (浅色字)")])
             .padding(.top, 2)
             .onChange(of: customBackgroundIsDark) { newValue in
                 UserDefaults.standard.set(true, forKey: "reader.customBackgroundIsDarkManual")
@@ -4260,12 +4253,8 @@ struct ReaderView: View {
                 rebuildPagedBlocksCache()
             }
 
-            Picker("壁纸填充方式", selection: $customWallpaperFillModeRaw) {
-                ForEach(ReaderWallpaperFillMode.allCases) { mode in
-                    Text(mode.title).tag(mode.rawValue)
-                }
-            }
-            .pickerStyle(.segmented)
+            BrandSegmentedControl("壁纸填充方式", selection: $customWallpaperFillModeRaw, options:
+                            ReaderWallpaperFillMode.allCases.map { ($0.rawValue, $0.title) })
             .padding(.top, 2)
 
             if ReaderCustomWallpaperStore.hasCustomWallpaper {
@@ -4553,12 +4542,8 @@ struct ReaderView: View {
             Text("章节标题位置")
                 .font(.subheadline.weight(.semibold))
                 .foregroundStyle(readerThemeTextColor.opacity(0.62))
-            Picker("章节标题位置", selection: $chapterHeadingStyleRaw) {
-                ForEach(ReaderPageChromeLayout.allCases) { layout in
-                    Text(layout.title).tag(layout.rawValue)
-                }
-            }
-            .pickerStyle(.segmented)
+            BrandSegmentedControl("章节标题位置", selection: $chapterHeadingStyleRaw, options:
+                            ReaderPageChromeLayout.allCases.map { ($0.rawValue, $0.title) })
             Text(chapterHeadingStyle.help)
                 .font(.caption2)
                 .foregroundStyle(readerThemeTextColor.opacity(0.62))
@@ -4605,12 +4590,8 @@ struct ReaderView: View {
             HStack {
                 Text("状态栏位置")
                 Spacer()
-                Picker("位置", selection: $statusPosition) {
-                    Text("仅页脚").tag("bottom")
-                    Text("仅页眉").tag("top")
-                    Text("页眉+页脚").tag("both")
-                }
-                .pickerStyle(.segmented)
+                BrandSegmentedControl("位置", selection: $statusPosition, options:
+                            [("bottom", "仅页脚"), ("top", "仅页眉"), ("both", "页眉+页脚")])
                 .frame(width: 200)
             }
 
@@ -4691,14 +4672,8 @@ struct ReaderView: View {
             Text("睡眠定时")
                 .font(.subheadline.weight(.semibold))
                 .foregroundStyle(readerThemeTextColor.opacity(0.62))
-            Picker("睡眠定时", selection: $sleepTimerMinutes) {
-                Text("关闭").tag(0)
-                Text("播完当章").tag(-1)
-                Text("15 分钟").tag(15)
-                Text("30 分钟").tag(30)
-                Text("60 分钟").tag(60)
-            }
-            .pickerStyle(.segmented)
+            BrandSegmentedControl("睡眠定时", selection: $sleepTimerMinutes, options:
+                            [(0, "关闭"), (-1, "播完当章"), (15, "15 分钟"), (30, "30 分钟"), (60, "60 分钟")])
 
             Toggle("阅读时保持屏幕常亮", isOn: $keepScreenAwake)
                 .font(.subheadline.weight(.semibold))
@@ -4716,12 +4691,8 @@ struct ReaderView: View {
                 Text("插图排版样式")
                     .font(.subheadline.weight(.semibold))
                     .foregroundStyle(readerThemeTextColor.opacity(0.62))
-                Picker("插图排版样式", selection: $globalImageStyleRaw) {
-                    ForEach(ReaderImageStyle.allCases) { style in
-                        Text(style.title).tag(style.rawValue)
-                    }
-                }
-                .pickerStyle(.segmented)
+                BrandSegmentedControl("插图排版样式", selection: $globalImageStyleRaw, options:
+                            ReaderImageStyle.allCases.map { ($0.rawValue, $0.title) })
             }
 
             settingStepper(title: "预加载章节", value: ReaderPreloadPolicy.title(for: preloadChapterCount)) {
