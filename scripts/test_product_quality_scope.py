@@ -66,6 +66,7 @@ class ProductQualityScopeTests(unittest.TestCase):
         self.assertIn("downloadChapters(limit: 50)", detail)
         self.assertIn("downloadChapters(limit: nil)", detail)
         self.assertNotIn("private var downloadSection", detail)
+        self.assertNotRegex(detail, r"case \.text:\s*break\b")
 
     def test_workbench_typography_and_classic_settings_keep_separate_boundaries(self):
         reader = read_source(READER)

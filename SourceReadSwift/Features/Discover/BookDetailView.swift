@@ -165,7 +165,7 @@ struct BookDetailView: View {
                         case .video:
                             videoActionCard
                         case .text:
-                            break
+                            EmptyView()
                         }
                         chapterList
                     }
