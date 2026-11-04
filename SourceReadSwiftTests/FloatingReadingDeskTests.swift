@@ -170,6 +170,18 @@ final class FloatingReadingDeskTests: XCTestCase {
         XCTAssertNil(probe.returnHost, "Cancelled interactive return must restore the original reader immediately")
     }
 
+    @MainActor func testOldReturnCompletionCannotRemoveANewerCarrier() {
+        let source = UIViewController(), probe = ReaderBookPassageController()
+        source.addChild(probe); source.view.addSubview(probe.view); probe.didMove(toParent: source)
+        let old = probe.installReturnSurface(in: source)
+        probe.removeReturnSurface()
+        let next = probe.installReturnSurface(in: source)
+        probe.finishReturnSurface(old)
+        XCTAssertTrue(probe.returnHost === next)
+        probe.finishReturnSurface(next)
+        XCTAssertNil(probe.returnHost)
+    }
+
     func testPlinthHasIndependentTopAndFrontEdgesEvenAfterInsets() {
         let bounds = CGRect(x: 0, y: 0, width: 342, height: 132)
         let outline = ReadingPlinthOutline().path(in: bounds)

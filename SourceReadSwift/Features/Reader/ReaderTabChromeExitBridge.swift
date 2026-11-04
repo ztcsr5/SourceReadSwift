@@ -1,6 +1,16 @@
 import SwiftUI
 import UIKit
 
+/// An interactive pop may begin before UIKit removes the source from the stack.
+enum ReaderNativePopPolicy {
+    static func isPop(from source: UIViewController, to target: UIViewController?,
+                      in navigation: UINavigationController, isInteractive: Bool) -> Bool {
+        let stack = navigation.viewControllers
+        return source.isMovingFromParent || !stack.contains(where: { $0 === source })
+            || (isInteractive && target.map { target in stack.contains(where: { $0 === target }) } == true)
+    }
+}
+
 /// Releases only this reader's tab-bar ownership when a real pop starts, restoring it on cancellation.
 struct ReaderTabChromeExitBridge: UIViewControllerRepresentable {
     let owner: UUID
@@ -43,7 +53,8 @@ final class ReaderTabChromeExitController: UIViewController {
         guard let transition = transitionCoordinator,
               let source = transition.viewController(forKey: .from), belongs(to: source),
               let navigation = source.navigationController ?? navigationController,
-              source.isMovingFromParent || !navigation.viewControllers.contains(where: { $0 === source }) else { return }
+              ReaderNativePopPolicy.isPop(from: source, to: transition.viewController(forKey: .to),
+                in: navigation, isInteractive: transition.isInteractive) else { return }
         prepareForExit()
         transition.animate(alongsideTransition: nil) { [weak self] context in
             self?.finishExit(cancelled: context.isCancelled)

@@ -63,6 +63,8 @@ jobs:
             COMMAND+=(-test-timeouts-enabled YES -maximum-test-execution-time-allowance 60)
             TESTS=(-only-testing:SourceReadSwiftTests/FloatingReadingDeskTests \
               -only-testing:SourceReadSwiftTests/ReaderExitSwipeTests \
+              -only-testing:SourceReadSwiftTests/ReaderTabChromeExitTests \
+              -only-testing:SourceReadSwiftTests/ReaderModePositionRegressionTests \
               -only-testing:SourceReadSwiftTests/Release117ReadingHeroTests \
               -only-testing:SourceReadSwiftTests/Release117MotionSystemTests \
               -only-testing:SourceReadSwiftTests/Release117PolishTests \

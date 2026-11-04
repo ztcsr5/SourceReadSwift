@@ -34,6 +34,7 @@ private struct ReaderOpeningPresentation: ViewModifier {
     let book: BookshelfBook
     let coverFrame: UIImage?
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.readingCoverHandoff) private var incomingCovers
     @AppMotion private var motion
     @State private var didArrive = false
     @State private var isContentReady = false
@@ -68,7 +69,8 @@ private struct ReaderOpeningPresentation: ViewModifier {
             .background(ReaderOpeningArrivalProbe(
                 canPrepareReturn: didReveal,
                 returnSurface: AnyView(ReaderOpeningPage(book: book, coverFrame: coverFrame,
-                    isWaiting: false, isReturning: true)),
+                    isWaiting: false, isReturning: true)
+                    .environment(\.readingCoverHandoff, incomingCovers)),
                 onArrival: {
                     didArrive = true
                     revealWhenReady()
@@ -133,13 +135,15 @@ struct ReaderOpeningPage: View {
     var coverFrame: UIImage? = nil
     var isWaiting = true
     var isReturning = false
+    @AppMotion private var motion
+    @Environment(\.readingCoverHandoff) private var incomingCovers
     @AppStorage("reader.background") private var paperRaw = ReaderBackground.white.rawValue
     private var paper: ReaderBackground { ReaderBackground(rawValue: paperRaw) ?? .white }
 
     var body: some View {
         VStack(spacing: 20) {
             EditorialBookJacket(height: 190, palette: .resolve(theme: AppVisualTheme.current), stance: .detail) {
-                if let coverFrame {
+                if let coverFrame = coverFrame ?? incomingCovers?.frame(for: book) {
                     Image(uiImage: coverFrame).resizable().scaledToFill()
                         .frame(width: 142, height: 190)
                         .clipShape(RoundedRectangle(cornerRadius: 3))
@@ -163,6 +167,9 @@ struct ReaderOpeningPage: View {
                         .font(.caption).opacity(0.65).lineLimit(2).multilineTextAlignment(.center)
                 }
             }
+            .opacity(isWaiting || isReturning ? 1 : 0)
+            .offset(y: isWaiting || isReturning || motion.reducesMotion ? 0 : 8)
+            .animation(isReturning ? nil : motion.arrivalAnimation(stage: 1), value: isWaiting)
             Group {
                 if isWaiting {
                     ProgressView(chapterTitle == nil ? "正在恢复阅读位置" : "正在加载正文")

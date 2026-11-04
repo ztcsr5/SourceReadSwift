@@ -5,6 +5,15 @@ import Combine
 @testable import SourceReadSwift
 
 final class ReaderTabChromeExitTests: XCTestCase {
+    @MainActor func testInteractivePopIsRecognizedBeforeTheSourceLeavesTheStack() {
+        let root = UIViewController(), reader = UIViewController(), pushed = UIViewController()
+        let navigation = UINavigationController(rootViewController: root)
+        navigation.pushViewController(reader, animated: false)
+        XCTAssertTrue(ReaderNativePopPolicy.isPop(from: reader, to: root, in: navigation, isInteractive: true))
+        XCTAssertFalse(ReaderNativePopPolicy.isPop(from: reader, to: pushed, in: navigation, isInteractive: true))
+        XCTAssertFalse(ReaderNativePopPolicy.isPop(from: reader, to: pushed, in: navigation, isInteractive: false))
+    }
+
     @MainActor func testRealUIKitPopReleasesOwnershipBeforeTheSourceDisappears() async throws {
         let app = AppState(), owner = UUID()
         let animationsWereEnabled = UIView.areAnimationsEnabled

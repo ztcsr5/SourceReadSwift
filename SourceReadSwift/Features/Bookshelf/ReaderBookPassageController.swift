@@ -27,7 +27,8 @@ final class ReaderBookPassageController: UIViewController {
         guard canPrepareReturn, let transition = transitionCoordinator,
               let source = transition.viewController(forKey: .from), belongs(to: source),
               let navigation = source.navigationController ?? navigationController,
-              source.isMovingFromParent || !navigation.viewControllers.contains(where: { $0 === source }) else { return }
+              ReaderNativePopPolicy.isPop(from: source, to: transition.viewController(forKey: .to),
+                in: navigation, isInteractive: transition.isInteractive) else { return }
         Self.events.notice("BEGIN interactive=\(transition.isInteractive ? 1 : 0, privacy: .public)")
         let carrier = installReturnSurface(in: source)
         carrier.view.alpha = 0
@@ -37,7 +38,7 @@ final class ReaderBookPassageController: UIViewController {
             Self.events.notice("END cancelled=\(context.isCancelled ? 1 : 0, privacy: .public)")
             // UIKit reverses this same opacity on an interactive cancellation.
             // Reading content and its WebView have never been replaced.
-            self?.removeReturnSurface()
+            self?.finishReturnSurface(carrier)
         })
     }
 
@@ -61,6 +62,11 @@ final class ReaderBookPassageController: UIViewController {
         host.view.layoutIfNeeded()
         returnHost = host
         return host
+    }
+
+    func finishReturnSurface(_ carrier: UIHostingController<AnyView>) {
+        guard returnHost === carrier else { return }
+        removeReturnSurface()
     }
 
     func removeReturnSurface() {

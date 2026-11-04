@@ -11,7 +11,7 @@ baseline patch saved at F:/SourceReadSwift/book-passage-135/baseline.
    edges and tight corners. Same book/theme must be compared to Build134.
 2. The current reader locks native pop at all times; its fallback edge only
    dismisses after touch-up. Let book entry paths use the native edge return
-   while the reader menu is visible, not while paging/selection/settings.
+   during vertical prose (without selection) or with the menu visible; never steal page turns/selection/settings.
    Keep the legacy/non-book fallback. Never replace the navigation delegate.
 3. One destination-owned opening book, spinner only after arrival. No fixed
    wait before the real saved cursor is ready. On native pop, a book carrier
@@ -30,3 +30,16 @@ timing / tactile quality remain device acceptance items, not simulator FPS.
 Scope: desk and entry/return only. Search visual, source engine, pagination,
 cursor format and global themes remain unchanged. Restore guard, original
 Build134 artifacts, Songti fallback and high-raster pipeline retained.
+
+## First native checkpoint
+Source a4bcce4: native mounted/layout suites passed. UI11 navigation assertions
+also passed on26, but the stronger log gate correctly failed: every return
+was noninteractive. The hidden-back-button flag and the old content-pop lock
+were still contradicting the requested native gesture. Keep the log gate;
+align SwiftUI's back policy and both documented UIKit recognizers (26 SDK).
+An 18 WK regression also captured ready=complete / bridge=false / no paragraphs;
+the old didFinish fallback invoked an API that did not exist. A startup-only
+bridge verification and one bounded reload are added with real WK fault
+injection, original >500/<=600 UTF16 assertions unchanged. No active reading
+is reloaded, and checks cancel on first position or teardown. Original logs
+remain under F:/SourceReadSwift/book-passage-135/a4bcce4430c65fd48caff3763a5908e1e4ab04f1.

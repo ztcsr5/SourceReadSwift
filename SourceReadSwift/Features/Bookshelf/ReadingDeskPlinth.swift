@@ -21,11 +21,15 @@ struct ReadingDeskPlinth: View {
                 ], startPoint: .top, endPoint: .bottom))
             }
             .overlay(alignment: .top) {
-                shape.strokeBorder(LinearGradient(colors: [
-                    palette.pearl.opacity(scheme == .dark ? 0.30 : 0.88),
-                    palette.light.opacity(0.20), palette.pearl.opacity(0.24)
-                ], startPoint: .topLeading, endPoint: .bottomTrailing),
-                    lineWidth: contrast == .increased ? 1.5 : 0.75)
+                if policy.surface == .opaque {
+                    shape.strokeBorder(palette.ink.opacity(contrast == .increased ? 0.50 : 0.20),
+                        lineWidth: contrast == .increased ? 1.5 : 0.75)
+                } else {
+                    shape.strokeBorder(LinearGradient(colors: [
+                        palette.pearl.opacity(scheme == .dark ? 0.30 : 0.88),
+                        palette.light.opacity(0.20), palette.pearl.opacity(0.24)
+                    ], startPoint: .topLeading, endPoint: .bottomTrailing), lineWidth: 0.75)
+                }
             }
             .overlay(alignment: .bottom) {
                 if policy.surface != .opaque {

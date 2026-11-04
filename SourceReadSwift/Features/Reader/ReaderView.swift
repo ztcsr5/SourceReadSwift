@@ -1092,9 +1092,7 @@ struct ReaderView: View {
             }
             .ignoresSafeArea()
         }
-        .background(ReaderNavigationPopLock(allowSystemReturn: readerUsesBookReturn
-            && ReaderExitSwipePolicy.isEnabled(menuVisible: showOverlay, settingsVisible: showSettings,
-                coverPresented: showChapterList || temporaryCoverPresented)))
+        .background(ReaderNavigationPopLock(allowSystemReturn: allowsNativeBookReturn))
         .background(ReaderTabChromeExitBridge(owner: tabChromeOwner))
         .background(ReaderExitSwipeBridge(
             enabled: ReaderExitSwipePolicy.isEnabled(
@@ -1103,7 +1101,7 @@ struct ReaderView: View {
             ),
             onExit: { dismiss() }, prefersSystemReturn: readerUsesBookReturn
         ))
-        .navigationBarBackButtonHidden(true)
+        .navigationBarBackButtonHidden(!allowsNativeBookReturn)
         .toolbar(.hidden, for: .navigationBar, .tabBar)
         .statusBarHidden(!showOverlay && !showSystemStatusBar)
         // 全屏阅读时连 home indicator 一起淡出；打开菜单或强制系统状态栏时恢复。
@@ -3711,6 +3709,16 @@ struct ReaderView: View {
         if level < 0.65 { return "battery.50" }
         if level < 0.9 { return "battery.75" }
         return "battery.100"
+    }
+
+    private var allowsNativeBookReturn: Bool {
+        if #available(iOS 18.0, *) {
+            return readerUsesBookReturn && ReaderSystemReturnPolicy.isEnabled(
+                isScroll: readerMode == .scroll, menuVisible: showOverlay,
+                blocked: showSettings || showChapterList || temporaryCoverPresented,
+                selectionEnabled: textSelectionEnabled)
+        }
+        return false
     }
 
     private var readerOverlay: some View {
@@ -7831,21 +7839,21 @@ private struct ReaderNavigationPopLock: UIViewControllerRepresentable {
             } else {
                 nav.interactivePopGestureRecognizer?.isEnabled = false
             }
-            let selector = Selector(("interactiveContentPopGestureRecognizer"))
-            if nav.responds(to: selector),
-               let contentPop = nav.value(forKey: "interactiveContentPopGestureRecognizer") as? UIGestureRecognizer {
-                contentPop.isEnabled = false
+            #if compiler(>=6.2)
+            if #available(iOS 26.0, *) {
+                nav.interactiveContentPopGestureRecognizer?.isEnabled = allowSystemReturn
             }
+            #endif
         }
 
         func restorePopLock() {
             guard let nav = lockedNavigationController ?? navigationController else { return }
             nav.interactivePopGestureRecognizer?.isEnabled = true
-            let selector = Selector(("interactiveContentPopGestureRecognizer"))
-            if nav.responds(to: selector),
-               let contentPop = nav.value(forKey: "interactiveContentPopGestureRecognizer") as? UIGestureRecognizer {
-                contentPop.isEnabled = true
+            #if compiler(>=6.2)
+            if #available(iOS 26.0, *) {
+                nav.interactiveContentPopGestureRecognizer?.isEnabled = true
             }
+            #endif
             lockedNavigationController = nil
         }
     }

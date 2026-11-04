@@ -1,5 +1,13 @@
 import SwiftUI
 import UIKit
+import OSLog
+
+/// Native edge return is safe in vertical prose, but must not steal page turns or text selection.
+enum ReaderSystemReturnPolicy {
+    static func isEnabled(isScroll: Bool, menuVisible: Bool, blocked: Bool, selectionEnabled: Bool) -> Bool {
+        !blocked && (menuVisible || (isScroll && !selectionEnabled))
+    }
+}
 
 enum ReaderExitSwipePolicy {
     static func isEnabled(menuVisible: Bool, settingsVisible: Bool, coverPresented: Bool) -> Bool {
@@ -42,6 +50,7 @@ struct ReaderExitSwipeBridge: UIViewControllerRepresentable {
 }
 
 final class ReaderExitSwipeController: UIViewController, UIGestureRecognizerDelegate {
+    private static let decisions = Logger(subsystem: "com.edc21.SourceReadSwift.book-passage", category: "gesture")
     private(set) var exitEnabled = false
     private var didExit = false
     private var prefersSystemReturn = false
@@ -79,6 +88,9 @@ final class ReaderExitSwipeController: UIViewController, UIGestureRecognizerDele
     override func viewDidAppear(_ animated: Bool) {
         super.viewDidAppear(animated)
         attachIfNeeded()
+        if prefersSystemReturn {
+            Self.decisions.notice("READY native=\(usesSystemReturn ? 1 : 0, privacy: .public) fallback=\(edgePan.isEnabled ? 1 : 0, privacy: .public)")
+        }
     }
 
     override func viewDidLayoutSubviews() {
@@ -94,6 +106,9 @@ final class ReaderExitSwipeController: UIViewController, UIGestureRecognizerDele
     private var usesSystemReturn: Bool {
         if #available(iOS 18.0, *), prefersSystemReturn,
            let navigation = navigationController, navigation.viewControllers.count > 1 {
+            #if compiler(>=6.2)
+            if #available(iOS 26.0, *), navigation.interactiveContentPopGestureRecognizer?.isEnabled == true { return true }
+            #endif
             return navigation.interactivePopGestureRecognizer?.isEnabled == true
         }
         return false

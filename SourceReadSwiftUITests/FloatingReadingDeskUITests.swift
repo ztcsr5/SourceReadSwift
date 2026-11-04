@@ -196,8 +196,7 @@ final class FloatingReadingDeskUITests: XCTestCase {
         let saved = app.webViews.staticTexts.matching(
             NSPredicate(format: "label BEGINSWITH %@", "【已保存的阅读段落】")).firstMatch
         XCTAssertTrue(saved.waitForExistence(timeout: 10))
-        app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.42)).tap()
-        XCTAssertTrue(element("reader.returnToShelf").waitForExistence(timeout: 5))
+        XCTAssertFalse(element("reader.returnToShelf").isHittable, "Prose can return interactively without first opening its menu")
         let edge = app.coordinate(withNormalizedOffset: CGVector(dx: 0.008, dy: 0.52))
         edge.press(forDuration: 0.05,
             thenDragTo: app.coordinate(withNormalizedOffset: CGVector(dx: 0.16, dy: 0.52)),
@@ -271,7 +270,8 @@ final class FloatingReadingDeskUITests: XCTestCase {
         app.launchEnvironment["SOURCEREAD_UI_COVER_JPEG"] = cover.base64EncodedString()
         app.launchArguments = ["--floating-desk-regression", "-settings.visualTheme", theme,
             "-settings.themeMode", mode, "-settings.readingDeskEnabled", "YES",
-            "-settings.reducesMotion", reducesMotion ? "YES" : "NO", "-reader.mode", "scroll"]
+            "-settings.reducesMotion", reducesMotion ? "YES" : "NO", "-reader.mode", "scroll",
+            "-reader.textSelectionEnabled", "NO"]
         if let fixture { app.launchArguments.append(fixture) }
         app.launch()
         XCTAssertTrue(app.buttons["正在阅读书籍的更多操作"].firstMatch.waitForExistence(timeout: 10))
