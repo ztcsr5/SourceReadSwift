@@ -13,7 +13,8 @@ struct FloatingReadingDesk: View {
     @AppMotion private var motion
     // Reserve room for two title lines without changing the measured desk height.
     private static let stageEnvelopeHeight: CGFloat = 204
-    @ScaledMetric(relativeTo: .title2) private var metadataHeight: CGFloat = 72
+    // Two regular Songti lines, caption and spacing measured 75.67 pt on iOS 26.
+    @ScaledMetric(relativeTo: .title2) private var metadataHeight: CGFloat = 78
     @ScaledMetric(relativeTo: .title2) private var titleFontSize: CGFloat = 24
     @State private var conservesEnergy = ProcessInfo.processInfo.isLowPowerModeEnabled || ProcessInfo.processInfo.thermalState.rawValue >= 2
     @State private var coverImage: UIImage?
