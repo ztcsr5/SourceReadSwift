@@ -12,10 +12,10 @@ struct FloatingReadingDesk: View {
     @AppStorage("settings.appearanceRevision") private var appearanceRevision = 0
     @AppMotion private var motion
     // Reserve room for two title lines without changing the measured desk height.
-    private static let stageEnvelopeHeight: CGFloat = 204
-    // Two regular Songti lines, caption and spacing measured 75.67 pt on iOS 26.
-    @ScaledMetric(relativeTo: .title2) private var metadataHeight: CGFloat = 78
-    @ScaledMetric(relativeTo: .title2) private var titleFontSize: CGFloat = 24
+    private static let stageEnvelopeHeight: CGFloat = 214
+    // Reserve two scaled Songti lines and the actual reading context.
+    @ScaledMetric(relativeTo: .title2) private var metadataHeight: CGFloat = 72
+    @ScaledMetric(relativeTo: .title2) private var titleFontSize: CGFloat = 22
     @State private var conservesEnergy = ProcessInfo.processInfo.isLowPowerModeEnabled || ProcessInfo.processInfo.thermalState.rawValue >= 2
     @State private var coverImage: UIImage?
     @State private var tone: CoverTone?
@@ -32,21 +32,24 @@ struct FloatingReadingDesk: View {
     }
 
     var body: some View {
-        VStack(spacing: 8) {
+        VStack(spacing: 4) {
             GeometryReader { geometry in
-                let width: CGFloat = geometry.size.width < 310 ? 134 : 146
-                let height: CGFloat = geometry.size.width < 310 ? 182 : 194
+                let width: CGFloat = geometry.size.width < 310 ? 134 : 152
+                let height: CGFloat = geometry.size.width < 310 ? 178 : 202
                 ZStack(alignment: .top) {
                     environment.frame(height: Self.stageEnvelopeHeight)
                         .modifier(FloatingDeskParallax(depth: 3 * palette.finish.parallaxStrength, reducesDepth: policy.reducesDepth))
-                    stage.frame(height: 116).padding(.top, 83)
+                    stage.frame(height: 132).padding(.top, 82)
                         .modifier(FloatingDeskParallax(depth: 7 * palette.finish.parallaxStrength, reducesDepth: policy.reducesDepth))
                     if !typeSize.isAccessibilitySize {
-                        makeMarginNotes(coverWidth: width).padding(.top, 111)
+                        makeMarginNotes(coverWidth: width).padding(.top, 123)
                             .modifier(FloatingDeskParallax(depth: 30 * palette.finish.parallaxStrength, reducesDepth: policy.reducesDepth))
                     }
                     jacket(width: width, height: height).frame(maxWidth: .infinity)
                         .modifier(FloatingDeskParallax(depth: 22 * palette.finish.parallaxStrength, reducesDepth: policy.reducesDepth))
+                    ReadingDeskFrontEdge(palette: palette)
+                        .frame(height: 4).padding(.top, Self.stageEnvelopeHeight - 4)
+                        .modifier(FloatingDeskParallax(depth: 7 * palette.finish.parallaxStrength, reducesDepth: policy.reducesDepth))
                 }
             }.frame(height: Self.stageEnvelopeHeight)
             caption
@@ -83,54 +86,7 @@ struct FloatingReadingDesk: View {
     }
 
     private var stage: some View {
-        let outline = RoundedRectangle(cornerRadius: 16, style: .continuous)
-        return glassPlane
-            .overlay {
-                if policy.surface != .opaque {
-                    // Darker near the lower edge so the jacket stands on a plane,
-                    // rather than on the centre of a uniformly white tile.
-                    outline.fill(LinearGradient(stops: [
-                        .init(color: palette.pearl.opacity(scheme == .dark ? 0.06 : 0.26), location: 0),
-                        .init(color: .clear, location: 0.38),
-                        .init(color: palette.light.opacity(scheme == .dark ? 0.13 : 0.24), location: 0.77),
-                        .init(color: palette.shadow.opacity(scheme == .dark ? 0.20 : 0.14), location: 1)
-                    ], startPoint: .topLeading, endPoint: .bottomTrailing))
-                    .modifier(PearlGlassFinish(outline: outline, pearl: palette.pearl, mist: palette.light))
-                }
-            }
-            .overlay(alignment: .bottom) {
-                if policy.surface != .opaque {
-                    Ellipse().fill(RadialGradient(colors: [
-                        palette.shadow.opacity(scheme == .dark ? 0.50 : 0.31), .clear
-                    ], center: .center, startRadius: 0, endRadius: 74))
-                    .frame(width: 150, height: 12)
-                    .offset(x: 5, y: 2)
-                }
-            }
-            .overlay {
-                if policy.surface == .opaque {
-                    outline.strokeBorder(palette.ink.opacity(contrast == .increased ? 0.45 : 0.18),
-                        lineWidth: contrast == .increased ? 1.5 : 0.75)
-                }
-            }
-            .shadow(color: palette.shadow.opacity(policy.surface == .opaque ? 0 : 0.09), radius: 10, y: 6)
-            .allowsHitTesting(false)
-    }
-
-    @ViewBuilder private var glassPlane: some View {
-        let shape = RoundedRectangle(cornerRadius: 16, style: .continuous)
-        #if compiler(>=6.2)
-        if #available(iOS 26.0, *), policy.surface == .liquidGlass {
-            shape.fill(.clear).glassEffect(.regular.tint(palette.glassTint.opacity(palette.finish.glassTintOpacity)), in: shape)
-        } else { compatiblePlane(shape) }
-        #else
-        compatiblePlane(shape)
-        #endif
-    }
-
-    @ViewBuilder private func compatiblePlane(_ shape: RoundedRectangle) -> some View {
-        if policy.surface == .opaque { shape.fill(palette.pearl) }
-        else { shape.fill(.ultraThinMaterial).overlay { shape.fill(palette.glassTint.opacity(palette.finish.glassTintOpacity)) } }
+        ReadingDeskPlinth(palette: palette, policy: policy)
     }
 
     @ViewBuilder private func jacket(width: CGFloat, height: CGFloat) -> some View {
@@ -146,7 +102,7 @@ struct FloatingReadingDesk: View {
     private func cover(width: CGFloat, height: CGFloat) -> some View {
         AsyncBookCover(urlString: book.coverURL, width: width, height: height,
             baseURLString: book.bookURL, sourceURLString: book.sourceURL,
-            onImageLoad: { coverImage = $0 }, title: book.title, prefersDeskRaster: true)
+            onImageLoad: { coverImage = $0 }, title: book.title, prefersDeskRaster: true, cornerRadius: 3)
     }
 
     private func makeMarginNotes(coverWidth: CGFloat) -> some View {

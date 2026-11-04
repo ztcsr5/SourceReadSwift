@@ -73,7 +73,7 @@ class FloatingDeskScopeTests(unittest.TestCase):
         jacket = (ROOT / 'SourceReadSwift/Features/Bookshelf/EditorialBookJacket.swift').read_text(encoding='utf8')
         self.assertIn('EditorialBookJacket(height: height, palette: palette, stance: .shelf)', module)
         self.assertIn('rotation3DEffect(.degrees(stance == .shelf ? -9 : -5)', jacket)
-        self.assertIn('rotationEffect(.degrees(stance == .shelf ? -4 : -2))', jacket)
+        self.assertIn('rotationEffect(.degrees(stance == .shelf ? -3 : -2))', jacket)
         self.assertIn('ReadingDeskContent.contextLine(for: book)', module)
         fixture = (ROOT / 'SourceReadSwift/App/FloatingDeskRegressionLaunch.swift').read_text(encoding='utf8')
         self.assertNotIn('离线验收样本', fixture)

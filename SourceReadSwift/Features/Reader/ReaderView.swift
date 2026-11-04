@@ -51,6 +51,7 @@ struct ReaderView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.readerOpeningManaged) private var readerOpeningManaged
+    @Environment(\.readerUsesBookReturn) private var readerUsesBookReturn
     @State private var hasResolvedOpeningPreview = false
     @State private var chromeState = ReaderChromeStateMachine()
     @State private var tabChromeOwner = UUID()
@@ -1091,14 +1092,16 @@ struct ReaderView: View {
             }
             .ignoresSafeArea()
         }
-        .background(ReaderNavigationPopLock())
+        .background(ReaderNavigationPopLock(allowSystemReturn: readerUsesBookReturn
+            && ReaderExitSwipePolicy.isEnabled(menuVisible: showOverlay, settingsVisible: showSettings,
+                coverPresented: showChapterList || temporaryCoverPresented)))
         .background(ReaderTabChromeExitBridge(owner: tabChromeOwner))
         .background(ReaderExitSwipeBridge(
             enabled: ReaderExitSwipePolicy.isEnabled(
                 menuVisible: showOverlay, settingsVisible: showSettings,
                 coverPresented: showChapterList || temporaryCoverPresented
             ),
-            onExit: { dismiss() }
+            onExit: { dismiss() }, prefersSystemReturn: readerUsesBookReturn
         ))
         .navigationBarBackButtonHidden(true)
         .toolbar(.hidden, for: .navigationBar, .tabBar)
@@ -7780,11 +7783,16 @@ struct ReaderIllustrationView: View {
 /// is on screen so horizontal page swipes in `.pageTurn`, `.cover`, and
 /// `.pageCurl` never pop the reader back to the root TabView ("书架/发现/设置").
 private struct ReaderNavigationPopLock: UIViewControllerRepresentable {
+    let allowSystemReturn: Bool
+
     func makeUIViewController(context: Context) -> LockViewController {
-        LockViewController()
+        let controller = LockViewController()
+        controller.allowSystemReturn = allowSystemReturn
+        return controller
     }
 
     func updateUIViewController(_ uiViewController: LockViewController, context: Context) {
+        uiViewController.allowSystemReturn = allowSystemReturn
         uiViewController.applyPopLock()
     }
 
@@ -7793,6 +7801,7 @@ private struct ReaderNavigationPopLock: UIViewControllerRepresentable {
     }
 
     final class LockViewController: UIViewController {
+        var allowSystemReturn = false
         private weak var lockedNavigationController: UINavigationController?
 
         override func viewWillAppear(_ animated: Bool) {
@@ -7817,7 +7826,11 @@ private struct ReaderNavigationPopLock: UIViewControllerRepresentable {
         func applyPopLock() {
             guard let nav = navigationController else { return }
             lockedNavigationController = nav
-            nav.interactivePopGestureRecognizer?.isEnabled = false
+            if #available(iOS 18.0, *) {
+                nav.interactivePopGestureRecognizer?.isEnabled = allowSystemReturn
+            } else {
+                nav.interactivePopGestureRecognizer?.isEnabled = false
+            }
             let selector = Selector(("interactiveContentPopGestureRecognizer"))
             if nav.responds(to: selector),
                let contentPop = nav.value(forKey: "interactiveContentPopGestureRecognizer") as? UIGestureRecognizer {

@@ -188,6 +188,38 @@ final class FloatingReadingDeskUITests: XCTestCase {
         XCTAssertEqual(cover.frame.midY, origin.midY, accuracy: 8)
     }
 
+    func testReaderSystemReturnCanCancelWithoutLosingItsSavedParagraph() throws {
+        try launch(theme: "classic", fixture: "--desk-resume-paragraph")
+        let entry = assertCurrentBook("剑来")
+        entry.tap()
+        let surface = element("reader.webScrollSurface")
+        let saved = app.webViews.staticTexts.matching(
+            NSPredicate(format: "label BEGINSWITH %@", "【已保存的阅读段落】")).firstMatch
+        XCTAssertTrue(saved.waitForExistence(timeout: 10))
+        app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.42)).tap()
+        XCTAssertTrue(element("reader.returnToShelf").waitForExistence(timeout: 5))
+        let edge = app.coordinate(withNormalizedOffset: CGVector(dx: 0.008, dy: 0.52))
+        edge.press(forDuration: 0.05,
+            thenDragTo: app.coordinate(withNormalizedOffset: CGVector(dx: 0.16, dy: 0.52)),
+            withVelocity: .slow, thenHoldForDuration: 0.8)
+        XCTAssertTrue(surface.isHittable, "Cancel must keep the same real reader active")
+        XCTAssertTrue(saved.exists && surface.frame.intersects(saved.frame))
+        XCTAssertFalse(rootTab("主页", legacyID: "tabs.legacy.home").isHittable)
+        capture("18-reader-native-return-cancelled")
+        edge.press(forDuration: 0.05,
+            thenDragTo: app.coordinate(withNormalizedOffset: CGVector(dx: 0.88, dy: 0.52)),
+            withVelocity: .default, thenHoldForDuration: 0.4)
+        let restored = XCTNSPredicateExpectation(predicate: NSPredicate(format: "hittable == YES"), object: entry)
+        XCTAssertEqual(XCTWaiter.wait(for: [restored], timeout: 5), .completed)
+        XCTAssertTrue(rootTab("主页", legacyID: "tabs.legacy.home").isHittable)
+        capture("19-reader-native-return-completed")
+        entry.tap()
+        XCTAssertTrue(saved.waitForExistence(timeout: 10))
+        XCTAssertTrue(surface.frame.intersects(saved.frame), "Reopening after cancel/finish must preserve the saved paragraph")
+        returnFromReader()
+        XCTAssertTrue(entry.waitForExistence(timeout: 5))
+    }
+
     func testOtherThemesAndIndependentOldStyleSwitch() throws {
         try launch(theme: "botanical")
         capture("07-botanical-home")

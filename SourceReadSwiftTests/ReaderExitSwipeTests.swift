@@ -71,6 +71,23 @@ final class ReaderExitSwipeTests: XCTestCase {
         XCTAssertFalse(controller.gestureRecognizer(controller.edgePan, shouldBeRequiredToFailBy: controller.edgePan))
     }
 
+    @MainActor func testBookReturnLeavesTheSystemRecognizerInChargeWhenItIsEnabled() {
+        if #available(iOS 18.0, *) {
+            let root = UIViewController(), source = UIViewController()
+            let navigation = UINavigationController(rootViewController: root)
+            navigation.loadViewIfNeeded()
+            navigation.pushViewController(source, animated: false)
+            let bridge = ReaderExitSwipeController()
+            source.addChild(bridge); source.view.addSubview(bridge.view); bridge.didMove(toParent: source)
+            navigation.interactivePopGestureRecognizer?.isEnabled = true
+            bridge.configure(enabled: true, prefersSystemReturn: true, onExit: {})
+            XCTAssertFalse(bridge.edgePan.isEnabled, "A second edge recognizer must not wait until touch-up to compete with the native transition")
+            XCTAssertTrue(navigation.interactivePopGestureRecognizer?.isEnabled == true)
+            bridge.configure(enabled: true, prefersSystemReturn: false, onExit: {})
+            XCTAssertTrue(bridge.edgePan.isEnabled, "Non-book and legacy entry paths keep the existing fallback")
+        }
+    }
+
     @MainActor func testSuccessfulSwipeDismissesExactlyOnce() {
         let (parent, controller) = mountedController()
         defer { _ = parent }

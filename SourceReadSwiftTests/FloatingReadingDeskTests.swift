@@ -137,6 +137,48 @@ final class FloatingReadingDeskTests: XCTestCase {
         }
     }
 
+    @MainActor func testReturnCarrierDoesNotReplaceTheReadingSurfaceAndAlwaysCleansUp() {
+        let source = UIViewController()
+        source.loadViewIfNeeded()
+        source.view.frame = CGRect(x: 0, y: 0, width: 390, height: 844)
+        let readingSurface = UIView()
+        source.view.addSubview(readingSurface)
+        let probe = ReaderBookPassageController()
+        source.addChild(probe); source.view.addSubview(probe.view); probe.didMove(toParent: source)
+        probe.makeReturnSurface = { AnyView(Color.purple) }
+        let childCount = source.children.count
+        let originalSubviews = source.view.subviews
+        let carrier = probe.installReturnSurface(in: source)
+        XCTAssertTrue(probe.installReturnSurface(in: source) === carrier)
+        XCTAssertEqual(source.children.count, childCount + 1)
+        XCTAssertTrue(source.view.subviews.contains(where: { $0 === readingSurface }))
+        XCTAssertFalse(carrier.view.isUserInteractionEnabled)
+        XCTAssertTrue(carrier.view.accessibilityElementsHidden)
+        probe.removeReturnSurface()
+        probe.removeReturnSurface()
+        XCTAssertNil(probe.returnHost)
+        XCTAssertEqual(source.children.count, childCount)
+        XCTAssertEqual(source.view.subviews.map(ObjectIdentifier.init), originalSubviews.map(ObjectIdentifier.init))
+    }
+
+    @MainActor func testAReappearingReaderRemovesACancelledReturnCarrier() {
+        let source = UIViewController(), probe = ReaderBookPassageController()
+        source.addChild(probe); source.view.addSubview(probe.view); probe.didMove(toParent: source)
+        probe.makeReturnSurface = { AnyView(Color.purple) }
+        probe.installReturnSurface(in: source)
+        probe.viewDidAppear(true)
+        XCTAssertNil(probe.returnHost, "Cancelled interactive return must restore the original reader immediately")
+    }
+
+    func testPlinthHasIndependentTopAndFrontEdgesEvenAfterInsets() {
+        let bounds = CGRect(x: 0, y: 0, width: 342, height: 132)
+        let outline = ReadingPlinthOutline().path(in: bounds)
+        XCTAssertEqual(outline.boundingRect, bounds)
+        let inset = ReadingPlinthOutline(insetAmount: 1).path(in: bounds)
+        XCTAssertEqual(inset.boundingRect, bounds.insetBy(dx: 1, dy: 1))
+        XCTAssertTrue(ReadingPlinthOutline(insetAmount: 100).path(in: bounds).isEmpty)
+    }
+
     func testOpeningIntroductionSharesTheBoundedPlainTextOfTheDesk() {
         XCTAssertEqual(ReadingDeskContent.introduction(from: "<p>山中有信。&nbsp;\n书页未尽。</p>"), "山中有信。 书页未尽。")
         XCTAssertNil(ReadingDeskContent.introduction(from: "<p> &nbsp; </p>"))

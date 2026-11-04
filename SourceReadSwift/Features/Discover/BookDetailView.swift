@@ -311,7 +311,8 @@ struct BookDetailView: View {
             }
         }
         // Deep TOC scrolling or the title page has no visible detail hero source.
-        .readerOpeningPresentation(for: sourceKind == .text ? BookshelfBook(searchBook: displayBook) : nil)
+        .readerOpeningPresentation(for: sourceKind == .text ? BookshelfBook(searchBook: displayBook) : nil,
+            coverFrame: coverHandoff.frame(for: BookshelfBook(searchBook: displayBook)))
         .bookHeroDestination(readerHeroID, in: detailHero,
             enabled: usesDetailHero && !isHeaderCollapsed && sourceKind == .text)
         .environment(\.readingCoverHandoff, readingDeskEnabled ? coverHandoff : nil)

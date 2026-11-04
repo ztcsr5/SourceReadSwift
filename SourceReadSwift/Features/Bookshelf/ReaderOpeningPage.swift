@@ -1,11 +1,20 @@
 import SwiftUI
 import UIKit
 
+private struct ReaderBookReturnKey: EnvironmentKey {
+    static let defaultValue = false
+}
+
 private struct ReaderOpeningManagedKey: EnvironmentKey {
     static let defaultValue = false
 }
 
 extension EnvironmentValues {
+    var readerUsesBookReturn: Bool {
+        get { self[ReaderBookReturnKey.self] }
+        set { self[ReaderBookReturnKey.self] = newValue }
+    }
+
     var readerOpeningManaged: Bool {
         get { self[ReaderOpeningManagedKey.self] }
         set { self[ReaderOpeningManagedKey.self] = newValue }
@@ -33,11 +42,12 @@ private struct ReaderOpeningPresentation: ViewModifier {
     func body(content: Content) -> some View {
         content
             .environment(\.readerOpeningManaged, !didReveal)
+            .environment(\.readerUsesBookReturn, true)
             .allowsHitTesting(didReveal)
             .accessibilityHidden(!didReveal)
             .overlay {
                 if !didReveal {
-                    ReaderOpeningPage(book: book, coverFrame: coverFrame)
+                    ReaderOpeningPage(book: book, coverFrame: coverFrame, isWaiting: didArrive)
                         .toolbar(.hidden, for: .navigationBar)
                         .overlay(alignment: .topLeading) {
                             if didArrive {
@@ -55,10 +65,15 @@ private struct ReaderOpeningPresentation: ViewModifier {
                         .transition(.opacity)
                 }
             }
-            .background(ReaderOpeningArrivalProbe {
-                didArrive = true
-                revealWhenReady()
-            })
+            .background(ReaderOpeningArrivalProbe(
+                canPrepareReturn: didReveal,
+                returnSurface: AnyView(ReaderOpeningPage(book: book, coverFrame: coverFrame,
+                    isWaiting: false, isReturning: true)),
+                onArrival: {
+                    didArrive = true
+                    revealWhenReady()
+                }
+            ))
             .onPreferenceChange(ReaderOpeningReadyKey.self) { ready in
                 isContentReady = ready
                 revealWhenReady()
@@ -86,64 +101,81 @@ extension View {
 }
 
 private struct ReaderOpeningArrivalProbe: UIViewControllerRepresentable {
+    let canPrepareReturn: Bool
+    let returnSurface: AnyView
     let onArrival: () -> Void
 
-    func makeUIViewController(context: Context) -> Controller {
-        let controller = Controller()
-        controller.onArrival = onArrival
+    func makeUIViewController(context: Context) -> ReaderBookPassageController {
+        let controller = ReaderBookPassageController()
+        update(controller)
         return controller
     }
 
-    func updateUIViewController(_ controller: Controller, context: Context) {
-        controller.onArrival = onArrival
+    func updateUIViewController(_ controller: ReaderBookPassageController, context: Context) {
+        update(controller)
     }
 
-    final class Controller: UIViewController {
-        var onArrival: () -> Void = {}
+    static func dismantleUIViewController(_ controller: ReaderBookPassageController, coordinator: ()) {
+        controller.removeReturnSurface()
+    }
 
-        override func loadView() {
-            let probe = UIView()
-            probe.isUserInteractionEnabled = false
-            view = probe
-        }
-
-        override func viewDidAppear(_ animated: Bool) {
-            super.viewDidAppear(animated)
-            DispatchQueue.main.async { [weak self] in self?.onArrival() }
-        }
+    private func update(_ controller: ReaderBookPassageController) {
+        controller.onArrival = onArrival
+        controller.canPrepareReturn = canPrepareReturn
+        controller.makeReturnSurface = { returnSurface }
     }
 }
 
-/// Real book identity remains visible while the gateway restores its actual chapter.
+/// One book identity for arrival and return; readiness is never delayed for its animation.
 struct ReaderOpeningPage: View {
     let book: BookshelfBook
     var chapterTitle: String? = nil
     var coverFrame: UIImage? = nil
+    var isWaiting = true
+    var isReturning = false
     @AppStorage("reader.background") private var paperRaw = ReaderBackground.white.rawValue
     private var paper: ReaderBackground { ReaderBackground(rawValue: paperRaw) ?? .white }
+
     var body: some View {
-        VStack(spacing: 16) {
-            BookJacket {
+        VStack(spacing: 20) {
+            EditorialBookJacket(height: 190, palette: .resolve(theme: AppVisualTheme.current), stance: .detail) {
                 if let coverFrame {
                     Image(uiImage: coverFrame).resizable().scaledToFill()
-                        .frame(width: 84, height: 120)
-                        .clipShape(RoundedRectangle(cornerRadius: 10))
+                        .frame(width: 142, height: 190)
+                        .clipShape(RoundedRectangle(cornerRadius: 3))
+                } else if isReturning {
+                    BookCoverPlaceholder(title: book.title, height: 190)
+                        .frame(width: 142, height: 190)
                 } else {
-                    AsyncBookCover(urlString: book.coverURL, width: 84, height: 120,
-                        baseURLString: book.bookURL, sourceURLString: book.sourceURL, title: book.title)
+                    AsyncBookCover(urlString: book.coverURL, width: 142, height: 190,
+                        baseURLString: book.bookURL, sourceURLString: book.sourceURL,
+                        title: book.title, prefersDeskRaster: true, cornerRadius: 3)
                 }
             }
-            Text(book.title)
-                .font(.system(.title3, design: .serif).weight(.semibold))
-                .lineLimit(2)
-            ProgressView(chapterTitle == nil ? "正在恢复阅读位置" : "正在加载正文")
-                .font(.caption)
-                .accessibilityIdentifier("reader.openingProgress")
+            VStack(spacing: 8) {
+                Text(book.title).font(.system(.title2, design: .serif).weight(.regular))
+                    .multilineTextAlignment(.center).lineLimit(2)
+                if !book.author.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                    Text(book.author).font(.caption).opacity(0.65).lineLimit(1)
+                }
+                if !isReturning {
+                    Text(ReadingDeskContent.contextLine(for: book))
+                        .font(.caption).opacity(0.65).lineLimit(2).multilineTextAlignment(.center)
+                }
+            }
+            Group {
+                if isWaiting {
+                    ProgressView(chapterTitle == nil ? "正在恢复阅读位置" : "正在加载正文")
+                        .font(.caption).accessibilityIdentifier("reader.openingProgress")
+                } else { Color.clear }
+            }.frame(height: 20)
         }
-        .padding(24)
+        .padding(32)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .foregroundStyle(paper.textColor(isNight: paper.isDark))
-        .background(paper.color(isNight: paper.isDark).ignoresSafeArea())
+        .background {
+            paper.color(isNight: paper.isDark).ignoresSafeArea()
+        }
         .environment(\.colorScheme, paper.isDark ? .dark : .light)
     }
 }

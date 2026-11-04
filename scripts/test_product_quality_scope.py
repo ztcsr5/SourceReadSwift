@@ -45,7 +45,7 @@ class ProductQualityScopeTests(unittest.TestCase):
         opening = read_source(SHELF + "ReaderOpeningPage.swift")
         shelf = read_source(SHELF + "BookshelfView.swift")
         self.assertIn("guard !didReveal, didArrive, isContentReady", opening)
-        self.assertIn("override func viewDidAppear", opening)
+        self.assertIn("override func viewDidAppear", read_source(SHELF + "ReaderBookPassageController.swift"))
         self.assertIn(r".environment(\.readerOpeningManaged, !didReveal)", opening)
         self.assertNotIn("Task.sleep", opening)
         self.assertIn(".readerOpeningPresentation(for: managedOpeningBook(book), coverFrame: coverFrame)", shelf)

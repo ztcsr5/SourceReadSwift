@@ -24,15 +24,16 @@ enum ReaderExitSwipePolicy {
 struct ReaderExitSwipeBridge: UIViewControllerRepresentable {
     let enabled: Bool
     let onExit: () -> Void
+    var prefersSystemReturn = false
 
     func makeUIViewController(context: Context) -> ReaderExitSwipeController {
         let controller = ReaderExitSwipeController()
-        controller.configure(enabled: enabled, onExit: onExit)
+        controller.configure(enabled: enabled, prefersSystemReturn: prefersSystemReturn, onExit: onExit)
         return controller
     }
 
     func updateUIViewController(_ controller: ReaderExitSwipeController, context: Context) {
-        controller.configure(enabled: enabled, onExit: onExit)
+        controller.configure(enabled: enabled, prefersSystemReturn: prefersSystemReturn, onExit: onExit)
     }
 
     static func dismantleUIViewController(_ controller: ReaderExitSwipeController, coordinator: ()) {
@@ -43,6 +44,7 @@ struct ReaderExitSwipeBridge: UIViewControllerRepresentable {
 final class ReaderExitSwipeController: UIViewController, UIGestureRecognizerDelegate {
     private(set) var exitEnabled = false
     private var didExit = false
+    private var prefersSystemReturn = false
     private var onExit: () -> Void = {}
     lazy var edgePan: UIScreenEdgePanGestureRecognizer = {
         let gesture = UIScreenEdgePanGestureRecognizer(target: self, action: #selector(handlePan(_:)))
@@ -60,8 +62,9 @@ final class ReaderExitSwipeController: UIViewController, UIGestureRecognizerDele
         view.isUserInteractionEnabled = false
     }
 
-    func configure(enabled: Bool, onExit: @escaping () -> Void) {
+    func configure(enabled: Bool, prefersSystemReturn: Bool = false, onExit: @escaping () -> Void) {
         exitEnabled = enabled
+        self.prefersSystemReturn = prefersSystemReturn
         self.onExit = onExit
         if !enabled { didExit = false }
         edgePan.isEnabled = enabled
@@ -88,7 +91,16 @@ final class ReaderExitSwipeController: UIViewController, UIGestureRecognizerDele
         detach()
     }
 
+    private var usesSystemReturn: Bool {
+        if #available(iOS 18.0, *), prefersSystemReturn,
+           let navigation = navigationController, navigation.viewControllers.count > 1 {
+            return navigation.interactivePopGestureRecognizer?.isEnabled == true
+        }
+        return false
+    }
+
     private func attachIfNeeded() {
+        edgePan.isEnabled = exitEnabled && !usesSystemReturn
         guard let host = parent?.view, host !== view else { return }
         if edgePan.view !== host {
             edgePan.view?.removeGestureRecognizer(edgePan)
@@ -133,7 +145,7 @@ final class ReaderExitSwipeController: UIViewController, UIGestureRecognizerDele
     }
 
     func completeSwipe(translation: CGPoint, velocity: CGPoint, cancelled: Bool) {
-        guard exitEnabled, !didExit, !cancelled,
+        guard exitEnabled, edgePan.isEnabled, !didExit, !cancelled,
               ReaderExitSwipePolicy.shouldFinish(translation: translation, velocity: velocity,
                                                 width: edgePan.view?.bounds.width ?? 0) else { return }
         didExit = true

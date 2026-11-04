@@ -1536,6 +1536,7 @@ struct AsyncBookCover: View {
     var title: String? = nil
     var contentMode: ContentMode = .fill
     var prefersDeskRaster = false
+    var cornerRadius: CGFloat = 10
 
     var body: some View {
         Group {
@@ -1551,7 +1552,7 @@ struct AsyncBookCover: View {
         }
         .frame(width: width, height: height)
         .frame(maxWidth: width == nil ? .infinity : nil)
-        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
         .task(id: urlString) {
             if CoverURLResolver.url(from: urlString, base: baseURLString, fallbackBase: sourceURLString) == nil {
                 onImageLoad?(nil)
