@@ -69,9 +69,10 @@ final class FloatingReadingDeskUITests: XCTestCase {
         detail.tap()
         XCTAssertTrue(element("bookDetail.title").waitForExistence(timeout: 5))
         let tabs = app.tabBars.firstMatch
-        let home = tabs.exists ? tabs.buttons["主页"] : app.buttons["主页"]
-        XCTAssertFalse(home.isHittable, "Root navigation must not overlap detail chapters")
+        let home = tabs.exists ? tabs.buttons["主页"] : app.buttons["tabs.legacy.home"]
+        // The iOS 18 back button is also labelled “主页”; query the actual bottom control.
         capture("14-overflow-to-detail")
+        XCTAssertFalse(home.isHittable, "Root navigation must not overlap detail chapters")
     }
 
     func testReadingDeskReaderAndReturnInTheRealApp() throws {
@@ -83,7 +84,7 @@ final class FloatingReadingDeskUITests: XCTestCase {
         returnFromReader()
         XCTAssertTrue(pager.waitForExistence(timeout: 3))
         let tabs = app.tabBars.firstMatch
-        let home = tabs.exists ? tabs.buttons["主页"] : app.buttons["主页"]
+        let home = tabs.exists ? tabs.buttons["主页"] : app.buttons["tabs.legacy.home"]
         XCTAssertTrue(home.isHittable, "Returning to the real shelf must restore navigation with it")
         capture("06-reader-return-root")
     }

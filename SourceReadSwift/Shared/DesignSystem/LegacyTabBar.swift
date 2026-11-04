@@ -11,6 +11,7 @@ struct LegacyTabBar: View {
         HStack(spacing: 10) {
             HStack(spacing: 2) {
                 tab(0, title: "主页", icon: "house")
+                    .accessibilityIdentifier("tabs.legacy.home")
                 tab(1, title: AppNavigationLabels.findBooks, icon: AppNavigationLabels.findBooksSymbol)
                 tab(2, title: "设置", icon: "gearshape")
             }
