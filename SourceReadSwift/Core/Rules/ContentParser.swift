@@ -27,6 +27,9 @@ struct ContentParser {
         // Applying HTML/JSON rules to that response loses the actual page URL.
         let mime = response.headers.first { $0.key.lowercased() == "content-type" }?.value.lowercased() ?? ""
         if source.bookSourceType == 2, mime.hasPrefix("image/") {
+            guard InlineImageDecoder.imageFileExtension(for: response.data) != nil else {
+                return .failure(.empty("书源返回的漫画图片无效"))
+            }
             return .success(ChapterContent(chapter: chapter, title: chapter.title,
                 paragraphs: ["[img]\(response.url.absoluteString)[/img]"], nextContentUrl: nil))
         }
@@ -80,6 +83,33 @@ struct ContentParser {
         "#main-text", ".post-content", "#textcontent", ".txtcontent", "#contenttxt",
         ".read_content", "div#content", "div#chaptercontent"
     ]
+
+    private static let comicContainers = "#chapter-images, .chapter-images, #comic-images, .comic-images, .manga-pages, .comic-pages"
+
+    /// Fallback only inside an unambiguous comic page container, never whole-page images.
+    private func extractComicFallback(from response: SourceResponse) -> [String] {
+        guard let document = try? SwiftSoup.parse(response.body, response.url.absoluteString),
+              let containers = try? document.select(Self.comicContainers), containers.count == 1,
+              let root = containers.first() else { return [] }
+        try? root.select("nav,header,footer,aside,script,style,.ad,.advert,[data-ad]").remove()
+        guard let html = try? root.html() else { return [] }
+        return splitParagraphs(html)
+    }
+
+    /// Keep the configured chapter identity; normalize only resource addresses against the final response URL.
+    private func validatedComic(_ content: ChapterContent, response: SourceResponse) -> Result<ChapterContent, SourceEngineError> {
+        let pages = ComicContentParser.parsePages(from: content, responseURL: response.url)
+        guard !pages.isEmpty else { return .failure(.empty("未在当前章节解析到漫画图片")) }
+        let objects: [[String: Any]] = pages.map { ["url": $0.url, "headers": $0.headers] }
+        do {
+            let encoded = try JSONSerialization.data(withJSONObject: objects, options: [.sortedKeys])
+            return .success(ChapterContent(chapter: content.chapter, title: content.title,
+                paragraphs: [String(decoding: encoded, as: UTF8.self)], nextContentUrl: content.nextContentUrl,
+                imageStyle: content.imageStyle, payAction: content.payAction))
+        } catch {
+            return .failure(.rule("漫画图片列表无法整理"))
+        }
+    }
 
     private func extractFallbackParagraphs(from body: String, baseUrl: URL, title: String) -> [String] {
         if let document = try? SwiftSoup.parse(body, baseUrl.absoluteString) {
@@ -160,7 +190,9 @@ struct ContentParser {
             }
 
             // Four-level fallback: if paragraphs are empty, try common novel containers and SmartWebArticleExtractor
-            if paragraphs.isEmpty {
+            if paragraphs.isEmpty, source.sourceKind == .comic, contentRule == nil {
+                paragraphs = extractComicFallback(from: response)
+            } else if paragraphs.isEmpty, source.sourceKind != .comic {
                 paragraphs = extractFallbackParagraphs(from: response.body, baseUrl: response.url, title: chapter.title)
             }
 
@@ -194,10 +226,15 @@ struct ContentParser {
                 paragraphs: paragraphs,
                 fallbackTitle: chapter.title
             )
+            if source.sourceKind == .comic {
+                return validatedComic(ChapterContent(chapter: chapter, title: sanitized.title, paragraphs: sanitized.paragraphs,
+                    nextContentUrl: next, imageStyle: style, payAction: payActionRule(source.ruleContent)), response: response)
+            }
             return sanitized.paragraphs.isEmpty
                 ? .failure(.empty("正文解析结果为空"))
                 : .success(ChapterContent(chapter: chapter, title: sanitized.title.isEmpty ? chapter.title : sanitized.title, paragraphs: sanitized.paragraphs, nextContentUrl: next, imageStyle: style, payAction: payActionRule(source.ruleContent)))
         } catch {
+            guard source.sourceKind != .comic else { return .failure(.rule(error.localizedDescription)) }
             let fallback = extractFallbackParagraphs(from: response.body, baseUrl: response.url, title: chapter.title)
             if !fallback.isEmpty {
                 let sanitized = ChapterTextSanitizer.normalize(
@@ -274,6 +311,9 @@ struct ContentParser {
             let text = jsonExtractor.stringify(rootObject)
             if !text.isEmpty { content = text }
         }
+        if content == nil, source.sourceKind == .comic, contentRule == nil, JSONSerialization.isValidJSONObject(rootObject) {
+            content = (try? JSONSerialization.data(withJSONObject: rootObject)).map { String(decoding: $0, as: UTF8.self) }
+        }
         let cleaned = applyContentTransforms(content ?? "", rule: rule, globalPurifyRules: globalPurifyRules, variables: variables)
         let paragraphs = applyingImageDecode(
             to: splitParagraphs(cleaned),
@@ -305,6 +345,10 @@ struct ContentParser {
             paragraphs: paragraphs,
             fallbackTitle: chapter.title
         )
+        if source.sourceKind == .comic {
+            return validatedComic(ChapterContent(chapter: chapter, title: sanitized.title, paragraphs: sanitized.paragraphs,
+                nextContentUrl: next, imageStyle: imageStyleRule(rule), payAction: payActionRule(rule)), response: response)
+        }
         return sanitized.paragraphs.isEmpty
             ? .failure(.empty("JSON \u{6b63}\u{6587}\u{89e3}\u{6790}\u{7ed3}\u{679c}\u{4e3a}\u{7a7a}"))
             : .success(ChapterContent(chapter: chapter, title: sanitized.title.isEmpty ? chapter.title : sanitized.title, paragraphs: sanitized.paragraphs, nextContentUrl: next, imageStyle: imageStyleRule(rule), payAction: payActionRule(rule)))

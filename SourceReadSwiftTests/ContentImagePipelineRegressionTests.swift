@@ -81,6 +81,22 @@ final class ContentImagePipelineRegressionTests: XCTestCase {
         XCTAssertTrue(pages(["正文不是图片", "javascript:alert(1)", #"<img src="data:image/gif;base64,AAAA">"#]).isEmpty)
     }
 
+    func testComicFallbackUsesOneMediaContainerAndResolvesAgainstRedirectDestination() throws {
+        let source = BookSource(bookSourceName: "Comic fixture", bookSourceUrl: "https://comic.example", bookSourceType: 2)
+        let body = #"<html><body><img src="/cover.png"><div class="chapter-images"><img data-src="pages/01.png" src="/placeholder.gif"><aside><img src="/advert.png"></aside><img src="pages/02.png"></div></body></html>"#
+        let url = try XCTUnwrap(URL(string: "https://cdn.example/redirected/chapters/1"))
+        let response = SourceResponse(url: url, statusCode: 200, headers: ["Content-Type": "text/html"], body: body, data: Data(body.utf8))
+        let content = try ContentParser().parse(source: source, chapter: chapter, response: response).get()
+        XCTAssertEqual(content.chapter.url, chapter.url)
+        XCTAssertEqual(ComicContentParser.parsePages(from: content).map(\.url),
+            ["https://cdn.example/redirected/chapters/pages/01.png", "https://cdn.example/redirected/chapters/pages/02.png"])
+        let notAChapter = #"<html><body><img src="/cover.png"><p>站点导航和宣传文字并不是漫画章节。</p></body></html>"#
+        let junk = SourceResponse(url: url, statusCode: 200, headers: ["Content-Type": "text/html"], body: notAChapter, data: Data(notAChapter.utf8))
+        guard case .failure = ContentParser().parse(source: source, chapter: chapter, response: junk) else {
+            return XCTFail("A cover and navigation outside the page container are not a comic chapter")
+        }
+    }
+
     func testChapterRefererDefaultAndExplicitSourceHeaderPrecedence() {
         let source = BookSource(bookSourceName: "fixture", bookSourceUrl: "https://comic.example")
         XCTAssertEqual(SourceRequestBuilder().imageRequestHeaders(for: source, chapterURL: chapter.url)["Referer"], chapter.url)

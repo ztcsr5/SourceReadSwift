@@ -11,8 +11,8 @@ enum ComicContentParser {
         pattern: #"\[img\]([\s\S]*?)\[/img\]|!\[[^\]]*\]\(([^\s\)]+)\)"#, options: .caseInsensitive)
     private static let pageContainers = ["pages", "images", "imageList", "list", "data", "result"]
 
-    static func parsePages(from content: ChapterContent) -> [ComicPage] {
-        let base = content.chapter.url
+    static func parsePages(from content: ChapterContent, responseURL: URL? = nil) -> [ComicPage] {
+        let base = responseURL?.absoluteString ?? content.chapter.url
         var requests: [ComicImageRequest] = []
         var seen = Set<ComicImageRequest>()
         for paragraph in content.paragraphs {
@@ -38,11 +38,14 @@ enum ComicContentParser {
             return pages.flatMap { parsePageEnvelope($0, base: base, remainingDepth: remainingDepth - 1) }
         }
         guard let object = value as? [String: Any] else { return [] }
+        var foundContainer = false
         for field in pageContainers {
             guard let nested = object[field], nested is [Any] || nested is [String: Any] else { continue }
+            foundContainer = true
             let pages = parsePageEnvelope(nested, base: base, remainingDepth: remainingDepth - 1)
             if !pages.isEmpty { return pages }
         }
+        if foundContainer { return [] }
         return ComicImageRequest.resolve(object: object, base: base).map { [$0] } ?? []
     }
 

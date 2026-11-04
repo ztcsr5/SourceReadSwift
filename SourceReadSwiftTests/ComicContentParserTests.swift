@@ -124,4 +124,12 @@ final class ComicContentParserTests: XCTestCase {
             2: CGRect(x: 0, y: 600, width: 390, height: 540)
         ]), 1)
     }
+
+    func testComicTapSidesMirrorWithoutReversingLogicalPageNumbers() {
+        XCTAssertEqual(ComicPagePositionPolicy.tapStep(0.1, rtl: false), -1)
+        XCTAssertEqual(ComicPagePositionPolicy.tapStep(0.9, rtl: false), 1)
+        XCTAssertEqual(ComicPagePositionPolicy.tapStep(0.1, rtl: true), 1)
+        XCTAssertEqual(ComicPagePositionPolicy.tapStep(0.9, rtl: true), -1)
+        XCTAssertEqual(ComicPagePositionPolicy.tapStep(0.5, rtl: true), 0)
+    }
 }

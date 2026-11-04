@@ -46,6 +46,7 @@ struct ComicReaderView: View {
     @State private var pendingChapterIndex: Int?
     @State private var resumeTarget: Int?
     @State private var positionSaveTask: Task<Void, Never>?
+    @State private var inspectedPage: ComicInspectedPage?
     @AppStorage("comic_dimming_level") private var dimmingLevel: Double = 0.0
     @AppStorage("reader.showSystemStatusBar") private var showSystemStatusBar = false
     @AppStorage("reader.statusPosition") private var statusPosition = "bottom"
@@ -59,6 +60,12 @@ struct ComicReaderView: View {
 
     private var prefetchIdentity: String {
         "\(currentChapterIndex)|\(currentPageIndex)|\(pages.count)|\(pageDirection)"
+    }
+
+    private var nextChapterPrefetchIndex: Int? {
+        guard !pages.isEmpty, currentPageIndex >= max(pages.count - 3, 0),
+              chapters.indices.contains(currentChapterIndex + 1) else { return nil }
+        return currentChapterIndex + 1
     }
 
     private var filteredChapterIndices: [Int] {
@@ -128,11 +135,6 @@ struct ComicReaderView: View {
                 .padding()
             } else {
                 mainContentView
-                    .onTapGesture {
-                        withAnimation(reducesMotion ? nil : .easeInOut(duration: 0.16)) {
-                            showChrome.toggle()
-                        }
-                    }
             }
             if !pages.isEmpty, let errorMessage {
                 VStack {
@@ -187,6 +189,9 @@ struct ComicReaderView: View {
             if pages.isEmpty, !isLoading { loadChapter(at: currentChapterIndex, restoresPosition: true) }
         }
         .task(id: prefetchIdentity) { await prefetchVisibleNeighbours() }
+        .task(id: nextChapterPrefetchIndex, priority: .utility) {
+            if let index = nextChapterPrefetchIndex { await prefetchNextChapter(at: index) }
+        }
         .onChange(of: scenePhase) { if $0 != .active { flushComicPosition() } }
         .onChange(of: currentPageIndex) { _ in scheduleComicPositionSave() }
         .onChange(of: readingMode) { mode in
@@ -195,10 +200,21 @@ struct ComicReaderView: View {
         .sheet(isPresented: $showChapterDrawer) {
             chapterDrawerSheet
         }
+        .fullScreenCover(item: $inspectedPage) { inspected in
+            ComicPageZoomView(image: inspected.image, reducesMotion: reducesMotion)
+                .ignoresSafeArea()
+                .overlay(alignment: .topTrailing) {
+                    Button { inspectedPage = nil } label: {
+                        Image(systemName: "xmark").frame(width: 44, height: 44)
+                            .background(.regularMaterial, in: Circle())
+                    }.padding(16).accessibilityLabel("关闭图片")
+                }
+        }
         .statusBarHidden(!showChrome && !showSystemStatusBar)
         .toolbar(.hidden, for: .navigationBar)
         .hideRootTabBar()
         .onDisappear {
+            guard inspectedPage == nil else { return }
             flushComicPosition()
             loadGeneration &+= 1
             chapterTask?.cancel()
@@ -229,7 +245,9 @@ struct ComicReaderView: View {
                             url: page.url,
                             pageNumber: page.id + 1,
                             totalPages: pages.count,
-                            headers: pageRequestHeaders(page)
+                            headers: pageRequestHeaders(page),
+                            onTap: { _ in toggleComicChrome() },
+                            onInspect: { inspectedPage = ComicInspectedPage(image: $0) }
                         )
                         .background {
                             GeometryReader { geometry in
@@ -296,12 +314,32 @@ struct ComicReaderView: View {
                     url: page.url,
                     pageNumber: page.id + 1,
                     totalPages: pages.count,
-                    headers: pageRequestHeaders(page)
+                    headers: pageRequestHeaders(page),
+                    usesNativeZoom: true,
+                    onTap: { fraction in handlePageTap(fraction, rtl: rtl) }
                 )
                 .tag(page.id)
             }
         }
         .tabViewStyle(.page(indexDisplayMode: .never))
+    }
+
+    private func toggleComicChrome() {
+        withAnimation(reducesMotion ? nil : .easeInOut(duration: 0.16)) { showChrome.toggle() }
+    }
+
+    private func handlePageTap(_ fraction: CGFloat, rtl: Bool) {
+        let step = ComicPagePositionPolicy.tapStep(fraction, rtl: rtl)
+        guard step != 0 else { toggleComicChrome(); return }
+        let target = currentPageIndex + step
+        if pages.indices.contains(target) {
+            pageDirection = step
+            withAnimation(reducesMotion ? nil : .easeInOut(duration: 0.16)) { currentPageIndex = target }
+        } else if step > 0, chapters.indices.contains(currentChapterIndex + 1) {
+            loadChapter(at: currentChapterIndex + 1)
+        } else if step < 0, chapters.indices.contains(currentChapterIndex - 1) {
+            loadChapter(at: currentChapterIndex - 1, startsAtEnd: true)
+        }
     }
 
     // MARK: - Chrome Overlay
@@ -706,6 +744,20 @@ struct ComicReaderView: View {
         }
     }
 
+    private func prefetchNextChapter(at index: Int) async {
+        guard !ProcessInfo.processInfo.isLowPowerModeEnabled,
+              ProcessInfo.processInfo.thermalState.rawValue < 2,
+              pendingChapterIndex == nil, chapters.indices.contains(index) else { return }
+        let chapter = chapters[index]
+        let rules = appState.purifyRuleStore.enabledPatterns
+        guard !appState.chapterContentCacheStore.isCached(sourceURL: source.bookSourceUrl, chapter: chapter, purifyRules: rules) else { return }
+        guard case .success(let loaded) = await engine.getContent(source: source, chapter: chapter),
+              !Task.isCancelled, pendingChapterIndex != index, nextChapterPrefetchIndex == index else { return }
+        let hasPages = await Task.detached(priority: .utility) { !ComicContentParser.parsePages(from: loaded).isEmpty }.value
+        guard hasPages, !Task.isCancelled, pendingChapterIndex != index, nextChapterPrefetchIndex == index else { return }
+        appState.chapterContentCacheStore.save(loaded, sourceURL: source.bookSourceUrl, purifyRules: rules)
+    }
+
     private func pageRequestHeaders(_ page: ComicPage) -> [String: String] {
         ComicImageRequest(url: page.url, headers: page.headers)
             .mergingHeaders(imageHeaders, chapterURL: currentChapter?.url ?? source.cleanSourceURL)
@@ -741,12 +793,14 @@ private struct ComicPageImageView: View {
     let pageNumber: Int
     let totalPages: Int
     let headers: [String: String]
+    var usesNativeZoom = false
+    var onTap: (CGFloat) -> Void
+    var onInspect: ((UIImage) -> Void)? = nil
+    @Environment(\.accessibilityReduceMotion) private var reducesMotion
 
     @State private var loaded: (request: ComicImageRequest, image: UIImage)?
     @State private var failure: ComicImageFailure?
     @State private var attempt = 0
-    @State private var scale: CGFloat = 1.0
-    @State private var lastScale: CGFloat = 1.0
 
     private var request: ComicImageRequest { ComicImageRequest(url: url, headers: headers) }
     private var image: UIImage? {
@@ -777,9 +831,16 @@ private struct ComicPageImageView: View {
     var body: some View {
         ZStack {
             if let image {
-                Image(uiImage: image).resizable().aspectRatio(contentMode: .fit)
+                if usesNativeZoom {
+                    ComicPageZoomView(image: image, reducesMotion: reducesMotion, onFitTap: onTap)
+                } else {
+                    Image(uiImage: image).resizable().aspectRatio(contentMode: .fit)
+                        .onTapGesture(count: 2) { onInspect?(image) }
+                        .onTapGesture { onTap(0.5) }
+                        .accessibilityAction(named: Text("查看大图")) { onInspect?(image) }
+                }
             } else {
-                placeholder
+                placeholder.onTapGesture { onTap(0.5) }
             }
         }
         .task(id: ComicPageLoadIdentity(request: request, attempt: attempt)) {
@@ -794,40 +855,12 @@ private struct ComicPageImageView: View {
             case .failure(let error): failure = error
             }
         }
-        .scaleEffect(scale)
-        .gesture(
-            MagnificationGesture()
-                .onChanged { value in
-                    scale = max(1.0, min(lastScale * value, 3.5))
-                }
-                .onEnded { _ in
-                    lastScale = scale
-                    if scale < 1.05 {
-                        withAnimation {
-                            scale = 1.0
-                            lastScale = 1.0
-                        }
-                    }
-                }
-        )
-        .onChange(of: url) { _ in
-            // TabView reuses the page view across chapter switches; without
-            // this reset the next chapter inherited the previous zoom level.
-            scale = 1.0
-            lastScale = 1.0
-        }
-        .onTapGesture(count: 2) {
-            withAnimation(.spring()) {
-                if scale > 1.2 {
-                    scale = 1.0
-                    lastScale = 1.0
-                } else {
-                    scale = 2.0
-                    lastScale = 2.0
-                }
-            }
-        }
     }
+}
+
+private struct ComicInspectedPage: Identifiable {
+    let id = UUID()
+    let image: UIImage
 }
 
 private struct ComicPageLoadIdentity: Equatable {
@@ -854,6 +887,12 @@ enum ComicPagePositionPolicy {
     static func neighbours(of page: Int, count: Int, direction: Int) -> [Int] {
         let step = direction < 0 ? -1 : 1
         return [page + step, page + 2 * step, page - step].filter { (0..<max(count, 0)).contains($0) }
+    }
+
+    static func tapStep(_ fraction: CGFloat, rtl: Bool) -> Int {
+        if fraction < 0.26 { return rtl ? 1 : -1 }
+        if fraction > 0.74 { return rtl ? -1 : 1 }
+        return 0
     }
 
     static func page(at line: CGFloat, frames: [Int: CGRect]) -> Int? {
