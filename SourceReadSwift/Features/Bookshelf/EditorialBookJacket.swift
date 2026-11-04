@@ -12,12 +12,16 @@ struct EditorialBookJacket<Cover: View>: View {
     @Environment(\.colorSchemeContrast) private var contrast
 
     var body: some View {
-        let corner = RoundedRectangle(cornerRadius: 8, style: .continuous)
+        let corner = RoundedRectangle(cornerRadius: stance == .shelf ? 6 : 8, style: .continuous)
         cover()
             .overlay(alignment: .leading) {
-                LinearGradient(colors: [.black.opacity(0.28), palette.pearl.opacity(0.35), .clear],
-                    startPoint: .leading, endPoint: .trailing)
-                    .frame(width: 10)
+                LinearGradient(stops: [
+                    .init(color: .black.opacity(0.33), location: 0),
+                    .init(color: palette.pearl.opacity(0.24), location: 0.28),
+                    .init(color: .black.opacity(0.10), location: 0.63),
+                    .init(color: .clear, location: 1)
+                ], startPoint: .leading, endPoint: .trailing)
+                    .frame(width: stance == .shelf ? 9 : 8)
             }
             .clipShape(corner)
             .overlay {
@@ -25,13 +29,13 @@ struct EditorialBookJacket<Cover: View>: View {
             }
             .background(alignment: .trailing) {
                 RoundedRectangle(cornerRadius: 4)
-                    .fill(LinearGradient(colors: [palette.pearl, palette.glassTint, palette.pearl],
-                        startPoint: .top, endPoint: .bottom))
-                    .frame(width: 7, height: height - 7)
-                    .offset(x: 4, y: 1)
+                    .fill(LinearGradient(colors: [palette.shadow.opacity(0.56), palette.pearl, palette.light, palette.shadow.opacity(0.34)],
+                        startPoint: .leading, endPoint: .trailing))
+                    .frame(width: stance == .shelf ? 10 : 7, height: height - 8)
+                    .offset(x: stance == .shelf ? 6 : 4, y: 2)
             }
             .shadow(color: palette.shadow.opacity(contrast == .increased ? 0 : scheme == .dark ? 0.32 : 0.20),
-                radius: 9, x: 6, y: 9)
+                radius: stance == .shelf ? 8 : 9, x: 7, y: 8)
             .rotation3DEffect(.degrees(stance == .shelf ? -9 : -5),
                 axis: (x: 0, y: 1, z: 0), perspective: 0.28)
             .rotationEffect(.degrees(stance == .shelf ? -4 : -2))

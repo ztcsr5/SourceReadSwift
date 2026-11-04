@@ -295,7 +295,7 @@ struct BookDetailView: View {
 
     private func titlePage(for target: BookChapter) -> some View {
         BookTitlePage(book: displayBook, chapterCount: chapters.count, readLabel: readingActionLabel) {
-            readDestination(target, usesDetailHero: false)
+            readDestination(targetReadingChapter ?? target, usesDetailHero: false)
         }
     }
 

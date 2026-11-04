@@ -8,13 +8,12 @@ struct FloatingReadingDesk: View {
     @Environment(\.colorScheme) private var scheme
     @Environment(\.colorSchemeContrast) private var contrast
     @Environment(\.accessibilityReduceTransparency) private var reducesTransparency
-    @Environment(\.isFloatingDeskPressed) private var isPressed
     @AppStorage("settings.visualTheme") private var themeRaw = AppVisualTheme.classic.rawValue
     @AppStorage("settings.appearanceRevision") private var appearanceRevision = 0
     @AppMotion private var motion
-    // Keep the measured desk envelope while tightening the jacket within it.
-    private static let stageEnvelopeHeight: CGFloat = 220
-    @ScaledMetric(relativeTo: .title2) private var titleRowHeight: CGFloat = 32
+    // Reserve room for two title lines without changing the measured desk height.
+    private static let stageEnvelopeHeight: CGFloat = 204
+    @ScaledMetric(relativeTo: .title2) private var metadataHeight: CGFloat = 72
     @ScaledMetric(relativeTo: .title2) private var titleFontSize: CGFloat = 24
     @State private var conservesEnergy = ProcessInfo.processInfo.isLowPowerModeEnabled || ProcessInfo.processInfo.thermalState.rawValue >= 2
     @State private var coverImage: UIImage?
@@ -34,15 +33,15 @@ struct FloatingReadingDesk: View {
     var body: some View {
         VStack(spacing: 8) {
             GeometryReader { geometry in
-                let width: CGFloat = geometry.size.width < 310 ? 128 : 138
-                let height: CGFloat = geometry.size.width < 310 ? 176 : 188
+                let width: CGFloat = geometry.size.width < 310 ? 134 : 146
+                let height: CGFloat = geometry.size.width < 310 ? 182 : 194
                 ZStack(alignment: .top) {
                     environment.frame(height: Self.stageEnvelopeHeight)
                         .modifier(FloatingDeskParallax(depth: 3 * palette.finish.parallaxStrength, reducesDepth: policy.reducesDepth))
-                    stage.frame(height: 116).padding(.top, 94)
+                    stage.frame(height: 116).padding(.top, 83)
                         .modifier(FloatingDeskParallax(depth: 7 * palette.finish.parallaxStrength, reducesDepth: policy.reducesDepth))
                     if !typeSize.isAccessibilitySize {
-                        makeMarginNotes(coverWidth: width).padding(.top, 122)
+                        makeMarginNotes(coverWidth: width).padding(.top, 111)
                             .modifier(FloatingDeskParallax(depth: 30 * palette.finish.parallaxStrength, reducesDepth: policy.reducesDepth))
                     }
                     jacket(width: width, height: height).frame(maxWidth: .infinity)
@@ -69,11 +68,11 @@ struct FloatingReadingDesk: View {
 
     private var environment: some View {
         ZStack {
-            if contrast != .increased {
-                RadialGradient(colors: [palette.light.opacity(scheme == .dark ? 0.22 : 0.34), .clear],
-                    center: UnitPoint(x: 0.5, y: 0.62), startRadius: 4, endRadius: 180)
-                RadialGradient(colors: [pigment.opacity(0.08), .clear],
-                    center: UnitPoint(x: 0.28, y: 0.4), startRadius: 0, endRadius: 140)
+            if policy.surface != .opaque {
+                RadialGradient(colors: [palette.light.opacity(scheme == .dark ? 0.18 : 0.40), .clear],
+                    center: UnitPoint(x: 0.52, y: 0.64), startRadius: 12, endRadius: 164)
+                RadialGradient(colors: [pigment.opacity(scheme == .dark ? 0.06 : 0.09), .clear],
+                    center: UnitPoint(x: 0.33, y: 0.44), startRadius: 0, endRadius: 124)
             }
         }.opacity(palette.finish.environmentStrength).allowsHitTesting(false)
     }
@@ -83,25 +82,38 @@ struct FloatingReadingDesk: View {
     }
 
     private var stage: some View {
-        ZStack {
-            glassPlane
-                .modifier(PearlGlassFinish(outline: RoundedRectangle(cornerRadius: 16, style: .continuous),
-                    pearl: palette.pearl, mist: palette.light))
-            if contrast != .increased && !reducesTransparency {
-                Ellipse().fill(RadialGradient(colors: [palette.shadow.opacity(scheme == .dark ? 0.32 : 0.19), .clear],
-                    center: .center, startRadius: 0, endRadius: 84))
-                    .frame(width: 170, height: 18).offset(x: -3, y: 51)
+        let outline = RoundedRectangle(cornerRadius: 16, style: .continuous)
+        return glassPlane
+            .overlay {
+                if policy.surface != .opaque {
+                    // Darker near the lower edge so the jacket stands on a plane,
+                    // rather than on the centre of a uniformly white tile.
+                    outline.fill(LinearGradient(stops: [
+                        .init(color: palette.pearl.opacity(scheme == .dark ? 0.06 : 0.26), location: 0),
+                        .init(color: .clear, location: 0.38),
+                        .init(color: palette.light.opacity(scheme == .dark ? 0.13 : 0.24), location: 0.77),
+                        .init(color: palette.shadow.opacity(scheme == .dark ? 0.20 : 0.14), location: 1)
+                    ], startPoint: .topLeading, endPoint: .bottomTrailing))
+                    .modifier(PearlGlassFinish(outline: outline, pearl: palette.pearl, mist: palette.light))
+                }
             }
-        }.overlay {
-            if contrast == .increased {
-                RoundedRectangle(cornerRadius: 16, style: .continuous).strokeBorder(palette.ink.opacity(0.45), lineWidth: 1.5)
-            } else if reducesTransparency {
-                RoundedRectangle(cornerRadius: 16, style: .continuous)
-                    .strokeBorder(palette.ink.opacity(0.18), lineWidth: 0.75)
+            .overlay(alignment: .bottom) {
+                if policy.surface != .opaque {
+                    Ellipse().fill(RadialGradient(colors: [
+                        palette.shadow.opacity(scheme == .dark ? 0.50 : 0.31), .clear
+                    ], center: .center, startRadius: 0, endRadius: 74))
+                    .frame(width: 150, height: 12)
+                    .offset(x: 5, y: 2)
+                }
             }
-        }
-        .shadow(color: palette.shadow.opacity(contrast == .increased ? 0 : 0.06), radius: 12, y: 8)
-        .allowsHitTesting(false)
+            .overlay {
+                if policy.surface == .opaque {
+                    outline.strokeBorder(palette.ink.opacity(contrast == .increased ? 0.45 : 0.18),
+                        lineWidth: contrast == .increased ? 1.5 : 0.75)
+                }
+            }
+            .shadow(color: palette.shadow.opacity(policy.surface == .opaque ? 0 : 0.09), radius: 10, y: 6)
+            .allowsHitTesting(false)
     }
 
     @ViewBuilder private var glassPlane: some View {
@@ -124,16 +136,16 @@ struct FloatingReadingDesk: View {
         let image = EditorialBookJacket(height: height, palette: palette, stance: .shelf) {
             cover(width: width, height: height)
         }
-            .brightness(isPressed ? 0.045 : 0)
-            .animation(motion.animation(.press), value: isPressed)
-        if let heroNamespace { image.bookHeroSource("continue|" + book.id, in: heroNamespace).offset(x: -6, y: 8) }
-        else { image.offset(x: -6, y: 8) }
+        // Both sizes sit on the same stage line, including narrow-screen covers.
+        let elevation = Self.stageEnvelopeHeight - height - 8
+        if let heroNamespace { image.bookHeroSource("continue|" + book.id, in: heroNamespace).offset(y: elevation) }
+        else { image.offset(y: elevation) }
     }
 
     private func cover(width: CGFloat, height: CGFloat) -> some View {
         AsyncBookCover(urlString: book.coverURL, width: width, height: height,
             baseURLString: book.bookURL, sourceURLString: book.sourceURL,
-            onImageLoad: { coverImage = $0 }, title: book.title)
+            onImageLoad: { coverImage = $0 }, title: book.title, prefersDeskRaster: true)
     }
 
     private func makeMarginNotes(coverWidth: CGFloat) -> some View {
@@ -155,22 +167,18 @@ struct FloatingReadingDesk: View {
     }
 
     private var caption: some View {
-        VStack(alignment: .leading, spacing: 6) {
+        VStack(alignment: .leading, spacing: 4) {
             if typeSize.isAccessibilitySize {
-                Text(book.title).font(titleFont)
-                    .fixedSize(horizontal: false, vertical: true)
+                title
                 if let author { Text(author).font(.caption).foregroundStyle(palette.ink.opacity(0.7)) }
             } else {
-                GeometryReader { geometry in
-                    HStack(alignment: .firstTextBaseline, spacing: 12) {
-                        Text(book.title).font(titleFont).tracking(0.4)
-                            .lineLimit(1).frame(maxWidth: .infinity, alignment: .leading)
-                        if let author {
-                            Text(author).font(.caption).lineLimit(1).foregroundStyle(palette.ink.opacity(0.7))
-                                .frame(width: geometry.size.width * 0.28, alignment: .trailing)
-                        }
+                HStack(alignment: .firstTextBaseline, spacing: 12) {
+                    title.frame(maxWidth: .infinity, alignment: .leading)
+                    if let author {
+                        Text(author).font(.caption).lineLimit(1).foregroundStyle(palette.ink.opacity(0.7))
+                            .frame(maxWidth: 86, alignment: .trailing)
                     }
-                }.frame(height: titleRowHeight)
+                }
             }
             Text(ReadingDeskContent.contextLine(for: book)).font(.caption)
                 .foregroundStyle(palette.ink.opacity(0.72)).lineLimit(typeSize.isAccessibilitySize ? nil : 1)
@@ -178,11 +186,18 @@ struct FloatingReadingDesk: View {
                 Text(ReadingHeroStatus.progress(for: book))
                     .font(.caption).foregroundStyle(palette.ink.opacity(0.72))
             }
-        }.frame(maxWidth: .infinity, alignment: .leading).padding(.horizontal, 8)
+        }
+        .frame(maxWidth: .infinity, minHeight: typeSize.isAccessibilitySize ? nil : metadataHeight, alignment: .topLeading)
+        .padding(.horizontal, 8)
     }
 
-    private var titleFont: Font {
-        .system(size: titleFontSize, weight: .semibold, design: theme == .classic ? .serif : theme.fontDesign)
+    private var title: some View {
+        Text(book.title)
+            .font(ReadingDeskTitleTypography.font(size: titleFontSize))
+            .tracking(0.3)
+            .lineLimit(2)
+            .fixedSize(horizontal: false, vertical: true)
+            .accessibilityLabel(book.title)
     }
 
     private var author: String? {

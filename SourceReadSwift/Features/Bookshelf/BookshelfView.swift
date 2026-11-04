@@ -26,7 +26,7 @@ struct BookshelfView: View {
     @StateObject private var readingCoverHandoff = ReadingCoverHandoff()
 
     private enum ContextualBookRoute {
-        case read(BookshelfBook)
+        case read(BookshelfBook, coverFrame: UIImage?)
         case detail(BookshelfBook, placement: String)
     }
 
@@ -225,9 +225,9 @@ struct BookshelfView: View {
             )) {
                 if let route = contextualBookRoute {
                     switch route {
-                    case .read(let book):
+                    case .read(let book, let coverFrame):
                         BookshelfReaderGatewayView(book: book)
-                            .readerOpeningPresentation(for: managedOpeningBook(book))
+                            .readerOpeningPresentation(for: managedOpeningBook(book), coverFrame: coverFrame)
                             .bookHeroDestination("continue|" + book.id, in: bookHero)
                             .environment(\.readingCoverHandoff, readingDeskEnabled && floatingReadingDeskEnabled ? readingCoverHandoff : nil)
                     case .detail(let book, let placement):
@@ -794,7 +794,7 @@ struct BookshelfView: View {
             guard contextualBookRoute == nil else { return }
             pinReturnOrder(placement: "continue")
             UIImpactFeedbackGenerator(style: .light).impactOccurred()
-            contextualBookRoute = .read(book)
+            contextualBookRoute = .read(book, coverFrame: readingCoverHandoff.frame(for: book))
         } label: {
             ReadingHeroCard(book: book, heroNamespace: bookHero, usesSpatialStyle: readingDeskEnabled,
                 usesFloatingStyle: floatingReadingDeskEnabled)
@@ -1535,11 +1535,13 @@ struct AsyncBookCover: View {
     var onImageLoad: ((UIImage?) -> Void)? = nil
     var title: String? = nil
     var contentMode: ContentMode = .fill
+    var prefersDeskRaster = false
 
     var body: some View {
         Group {
             if let url = CoverURLResolver.url(from: urlString, base: baseURLString, fallbackBase: sourceURLString) {
-                CachedRemoteImage(url: url, contentMode: contentMode, maxPixelSize: coverMaxPixelSize, onImageLoad: { image in
+                CachedRemoteImage(url: url, contentMode: contentMode, maxPixelSize: coverMaxPixelSize,
+                    reuseCoverBytes: true, onImageLoad: { image in
                     if let image { readingCoverHandoff?.retain(image, for: url) }
                     onImageLoad?(image ?? readingCoverHandoff?.image(for: url))
                 }) { placeholder }
@@ -1562,6 +1564,7 @@ struct AsyncBookCover: View {
     /// alive for every row was the main scroll hitch on the home page.
     private var coverMaxPixelSize: CGFloat {
         let points = max(width ?? 220, height)
+        if prefersDeskRaster { return ReadingDeskCoverRaster.maximumPixelSize(points: points, scale: displayScale) }
         return points * max(displayScale, 1)
     }
 

@@ -23,6 +23,7 @@ private struct ReaderOpeningReadyKey: PreferenceKey {
 private struct ReaderOpeningPresentation: ViewModifier {
     private static let revealDuration = 0.18
     let book: BookshelfBook
+    let coverFrame: UIImage?
     @Environment(\.dismiss) private var dismiss
     @AppMotion private var motion
     @State private var didArrive = false
@@ -36,7 +37,7 @@ private struct ReaderOpeningPresentation: ViewModifier {
             .accessibilityHidden(!didReveal)
             .overlay {
                 if !didReveal {
-                    ReaderOpeningPage(book: book)
+                    ReaderOpeningPage(book: book, coverFrame: coverFrame)
                         .toolbar(.hidden, for: .navigationBar)
                         .overlay(alignment: .topLeading) {
                             if didArrive {
@@ -74,8 +75,8 @@ private struct ReaderOpeningPresentation: ViewModifier {
 
 extension View {
     /// Keeps the book visible until native navigation and the first real page have arrived.
-    @ViewBuilder func readerOpeningPresentation(for book: BookshelfBook?) -> some View {
-        if let book { modifier(ReaderOpeningPresentation(book: book)) } else { self }
+    @ViewBuilder func readerOpeningPresentation(for book: BookshelfBook?, coverFrame: UIImage? = nil) -> some View {
+        if let book { modifier(ReaderOpeningPresentation(book: book, coverFrame: coverFrame)) } else { self }
     }
 
     /// Report actual reader readiness, or an actionable error that must replace the cover.
@@ -117,13 +118,20 @@ private struct ReaderOpeningArrivalProbe: UIViewControllerRepresentable {
 struct ReaderOpeningPage: View {
     let book: BookshelfBook
     var chapterTitle: String? = nil
+    var coverFrame: UIImage? = nil
     @AppStorage("reader.background") private var paperRaw = ReaderBackground.white.rawValue
     private var paper: ReaderBackground { ReaderBackground(rawValue: paperRaw) ?? .white }
     var body: some View {
         VStack(spacing: 16) {
             BookJacket {
-                AsyncBookCover(urlString: book.coverURL, width: 84, height: 120,
-                    baseURLString: book.bookURL, sourceURLString: book.sourceURL, title: book.title)
+                if let coverFrame {
+                    Image(uiImage: coverFrame).resizable().scaledToFill()
+                        .frame(width: 84, height: 120)
+                        .clipShape(RoundedRectangle(cornerRadius: 10))
+                } else {
+                    AsyncBookCover(urlString: book.coverURL, width: 84, height: 120,
+                        baseURLString: book.bookURL, sourceURLString: book.sourceURL, title: book.title)
+                }
             }
             Text(book.title)
                 .font(.system(.title3, design: .serif).weight(.semibold))

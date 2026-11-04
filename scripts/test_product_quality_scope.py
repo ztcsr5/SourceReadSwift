@@ -48,18 +48,21 @@ class ProductQualityScopeTests(unittest.TestCase):
         self.assertIn("override func viewDidAppear", opening)
         self.assertIn(r".environment(\.readerOpeningManaged, !didReveal)", opening)
         self.assertNotIn("Task.sleep", opening)
-        self.assertIn(".readerOpeningPresentation(for: managedOpeningBook(book))", shelf)
+        self.assertIn(".readerOpeningPresentation(for: managedOpeningBook(book), coverFrame: coverFrame)", shelf)
         self.assertNotIn("ReaderOpeningPage(", read_source(READER))
 
     def test_desk_keeps_the_large_cover_envelope_guard(self):
         desk = read_source(SHELF + "FloatingReadingDesk.swift")
-        self.assertIn("stageEnvelopeHeight: CGFloat = 220", desk)
+        envelope = desk.split("stageEnvelopeHeight: CGFloat = ", 1)[1].splitlines()[0]
+        self.assertLessEqual(int(envelope), 220)
+        self.assertIn("ReadingDeskTitleTypography.font(size: titleFontSize)", desk)
+        self.assertIn(".lineLimit(2)", desk)
         self.assertIn("}.frame(height: Self.stageEnvelopeHeight)", desk)
 
     def test_desk_has_independent_management_and_no_hold_menu(self):
         shelf = read_source(SHELF + "BookshelfView.swift")
         card = shelf.split("private func heroCard", 1)[1].split("private func updateRow", 1)[0]
-        self.assertIn("contextualBookRoute = .read(book)", card)
+        self.assertIn("contextualBookRoute = .read(book, coverFrame: readingCoverHandoff.frame(for: book))", card)
         self.assertNotIn(".contextMenu", card)
         self.assertNotIn(".onLongPressGesture", card)
         self.assertIn("readingDeskEntry(book)", card)

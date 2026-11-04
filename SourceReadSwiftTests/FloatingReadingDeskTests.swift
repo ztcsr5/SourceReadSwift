@@ -67,6 +67,66 @@ final class FloatingReadingDeskTests: XCTestCase {
         XCTAssertGreaterThan(accessible.height, regular.height, "Accessibility text must grow, not get clipped by a fixed card")
     }
 
+    @MainActor func testDeskFirstFrameUsesExactRasterInsteadOfShelfHandoff() async throws {
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".png")
+        defer { try? FileManager.default.removeItem(at: url) }
+        let original = makeCoverRaster(size: CGSize(width: 400, height: 600), color: .green)
+        let shelf = makeCoverRaster(size: CGSize(width: 40, height: 60), color: .magenta)
+        try XCTUnwrap(original.pngData()).write(to: url)
+        let budget = ReadingDeskCoverRaster.maximumPixelSize(points: 150, scale: 1)
+        let image = await RemoteImageLoader.shared.image(for: url, maxPixelSize: budget, reuseCoverBytes: true)
+        XCTAssertEqual(image?.cgImage?.height, 180)
+        let handoff = ReadingCoverHandoff()
+        handoff.retain(shelf, for: url)
+        let renderer = ImageRenderer(content: AsyncBookCover(urlString: url.absoluteString, width: 100, height: 150, prefersDeskRaster: true)
+            .environment(\.readingCoverHandoff, handoff).environment(\.displayScale, 1))
+        renderer.scale = 1
+        XCTAssertGreaterThan(try measureAverageGreen(XCTUnwrap(renderer.uiImage)), 0.8)
+    }
+
+    @MainActor func testDeskCoverSizesShareOriginalAndKeepLowResolutionNative() async throws {
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.urlCache = nil
+        configuration.protocolClasses = [DeskCoverURLProtocol.self]
+        let session = URLSession(configuration: configuration)
+        defer { session.invalidateAndCancel() }
+        let loader = RemoteImageLoader(session: session)
+        let original = try XCTUnwrap(makeCoverRaster(size: CGSize(width: 800, height: 1200), color: .purple).pngData())
+        let low = try XCTUnwrap(makeCoverRaster(size: CGSize(width: 48, height: 72), color: .green).pngData())
+        let shelfPixels: CGFloat = 176
+        let deskPixels = ReadingDeskCoverRaster.maximumPixelSize(points: 194, scale: 3)
+        XCTAssertEqual(deskPixels, 699)
+        for (bytes, cacheControl, expectsSharedBytes) in [(original, "max-age=120", true), (low, "no-store", false)] {
+            let url = URL(string: "https://desk-cover-fixture.invalid/\(UUID().uuidString).png")!
+            DeskCoverURLProtocol.register(bytes, cacheControl: cacheControl, for: url)
+            defer { DeskCoverURLProtocol.remove(url) }
+            let shelf = await loader.image(for: url, maxPixelSize: shelfPixels, reuseCoverBytes: true)
+            let desk = await loader.image(for: url, maxPixelSize: deskPixels, reuseCoverBytes: true)
+            XCTAssertEqual(shelf?.cgImage?.height, expectsSharedBytes ? 176 : 72)
+            XCTAssertEqual(desk?.cgImage?.height, expectsSharedBytes ? 699 : 72)
+            XCTAssertEqual(DeskCoverURLProtocol.count(for: url), expectsSharedBytes ? 1 : 2)
+            XCTAssertNil(loader.cachedImage(for: url, maxPixelSize: deskPixels), "The cover raster cannot leak into the illustration namespace")
+            XCTAssertTrue(loader.cachedImage(for: url, maxPixelSize: deskPixels, reuseCoverBytes: true) === desk)
+        }
+    }
+
+    func testCoverByteCacheDoesNotExtendServerFreshness() {
+        XCTAssertEqual(CoverSourceBytes.freshness(cacheControl: "max-age=90", age: "80", hasExplicitExpiry: false), 10)
+        XCTAssertEqual(CoverSourceBytes.freshness(cacheControl: "max-age=2", age: "12", hasExplicitExpiry: false), 0)
+        XCTAssertEqual(CoverSourceBytes.freshness(cacheControl: "public, max-age=3600", age: nil, hasExplicitExpiry: false), 300)
+        XCTAssertEqual(CoverSourceBytes.freshness(cacheControl: "private, max-age=3600", age: nil, hasExplicitExpiry: false), 0)
+        XCTAssertEqual(CoverSourceBytes.freshness(cacheControl: "", age: nil, hasExplicitExpiry: true), 0)
+    }
+
+    @MainActor private func makeCoverRaster(size: CGSize, color: UIColor) -> UIImage {
+        let format = UIGraphicsImageRendererFormat()
+        format.scale = 1
+        return UIGraphicsImageRenderer(size: size, format: format).image { context in
+            color.setFill()
+            context.fill(CGRect(origin: .zero, size: size))
+        }
+    }
+
     func testOpeningIntroductionSharesTheBoundedPlainTextOfTheDesk() {
         XCTAssertEqual(ReadingDeskContent.introduction(from: "<p>山中有信。&nbsp;\n书页未尽。</p>"), "山中有信。 书页未尽。")
         XCTAssertNil(ReadingDeskContent.introduction(from: "<p> &nbsp; </p>"))
@@ -144,13 +204,15 @@ final class FloatingReadingDeskTests: XCTestCase {
 
     @MainActor func testPagingDoesNotChangeHeightWhenTheNextTitleIsLong() {
         let long = makeBook()
-        var short = long; short.title = "山海来信"; short.author = "纸间"
         for width: CGFloat in [288, 342, 398] {
             let longHeight = UIHostingController(rootView: ReadingHeroCard(book: long, usesFloatingStyle: true))
                 .sizeThatFits(in: CGSize(width: width, height: 6000)).height
-            let shortHeight = UIHostingController(rootView: ReadingHeroCard(book: short, usesFloatingStyle: true))
-                .sizeThatFits(in: CGSize(width: width, height: 6000)).height
-            XCTAssertEqual(longHeight, shortHeight, accuracy: 1, "Horizontal paging must not resize the shelf underneath a drag")
+            for name in ["剑来", "凡人修仙传", "第 12 卷：夜航 Lab 2.0 / 封印·回声与时间的裂缝"] {
+                var book = long; book.title = name; book.author = "纸间"
+                let height = UIHostingController(rootView: ReadingHeroCard(book: book, usesFloatingStyle: true))
+                    .sizeThatFits(in: CGSize(width: width, height: 6000)).height
+                XCTAssertEqual(longHeight, height, accuracy: 1, "Horizontal paging must not resize the shelf underneath a drag")
+            }
         }
     }
 
@@ -178,4 +240,52 @@ final class FloatingReadingDeskTests: XCTestCase {
         }
         return green
     }
+}
+
+private final class DeskCoverURLProtocol: URLProtocol, @unchecked Sendable {
+    private struct Fixture {
+        let bytes: Data
+        let cacheControl: String
+        var requests = 0
+    }
+    private static let lock = NSLock()
+    private static var fixtures: [URL: Fixture] = [:]
+
+    static func register(_ bytes: Data, cacheControl: String, for url: URL) {
+        lock.lock(); defer { lock.unlock() }
+        fixtures[url] = Fixture(bytes: bytes, cacheControl: cacheControl)
+    }
+
+    static func remove(_ url: URL) {
+        lock.lock(); defer { lock.unlock() }
+        fixtures[url] = nil
+    }
+
+    static func count(for url: URL) -> Int {
+        lock.lock(); defer { lock.unlock() }
+        return fixtures[url]?.requests ?? 0
+    }
+
+    private static func consume(_ url: URL) -> Fixture? {
+        lock.lock(); defer { lock.unlock() }
+        fixtures[url]?.requests += 1
+        return fixtures[url]
+    }
+
+    override class func canInit(with request: URLRequest) -> Bool { request.url?.host == "desk-cover-fixture.invalid" }
+    override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
+
+    override func startLoading() {
+        guard let url = request.url, let fixture = Self.consume(url),
+              let response = HTTPURLResponse(url: url, statusCode: 200, httpVersion: nil,
+                  headerFields: ["Content-Type": "image/png", "Cache-Control": fixture.cacheControl]) else {
+            client?.urlProtocol(self, didFailWithError: URLError(.resourceUnavailable))
+            return
+        }
+        client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
+        client?.urlProtocol(self, didLoad: fixture.bytes)
+        client?.urlProtocolDidFinishLoading(self)
+    }
+
+    override func stopLoading() {}
 }

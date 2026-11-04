@@ -12,6 +12,7 @@ struct CachedRemoteImage<Placeholder: View>: View {
     /// size × screen scale so a 2000 px source never becomes a 2000 px texture
     /// in a 70 pt shelf cell.
     let maxPixelSize: CGFloat?
+    let reuseCoverBytes: Bool
     let onSizeChange: ((CGSize) -> Void)?
     let onImageLoad: ((UIImage?) -> Void)?
     let placeholder: () -> Placeholder
@@ -24,6 +25,7 @@ struct CachedRemoteImage<Placeholder: View>: View {
         contentMode: ContentMode = .fill,
         headers: [String: String] = [:],
         maxPixelSize: CGFloat? = nil,
+        reuseCoverBytes: Bool = false,
         onSizeChange: ((CGSize) -> Void)? = nil,
         onImageLoad: ((UIImage?) -> Void)? = nil,
         @ViewBuilder placeholder: @escaping () -> Placeholder
@@ -32,6 +34,7 @@ struct CachedRemoteImage<Placeholder: View>: View {
         self.contentMode = contentMode
         self.headers = headers
         self.maxPixelSize = maxPixelSize
+        self.reuseCoverBytes = reuseCoverBytes
         self.onSizeChange = onSizeChange
         self.onImageLoad = onImageLoad
         self.placeholder = placeholder
@@ -39,8 +42,8 @@ struct CachedRemoteImage<Placeholder: View>: View {
 
     var body: some View {
         Group {
-            if let image, loadedIdentifier == taskIdentifier {
-                Image(uiImage: image)
+            if let rendered = readyBitmap {
+                Image(uiImage: rendered)
                     .resizable()
                     .aspectRatio(contentMode: contentMode)
             } else {
@@ -52,11 +55,19 @@ struct CachedRemoteImage<Placeholder: View>: View {
         }
     }
 
+    private var readyBitmap: UIImage? {
+        if let image, loadedIdentifier == taskIdentifier { return image }
+        // A hot, correctly sized cover wins the very first frame, before the
+        // navigation handoff's lower-resolution placeholder has a chance to draw.
+        guard reuseCoverBytes, headers.isEmpty, let url else { return nil }
+        return RemoteImageLoader.shared.cachedImage(for: url, maxPixelSize: maxPixelSize, reuseCoverBytes: true)
+    }
+
     private var taskIdentifier: String {
         guard let url else { return "" }
         let sizeKey = maxPixelSize.map { "px\(Int($0.rounded()))" } ?? "full"
         if headers.isEmpty {
-            return url.absoluteString + "#" + sizeKey
+            return (reuseCoverBytes ? "cover|" : "image|") + url.absoluteString + "#" + sizeKey
         }
         let headerKey = headers
             .sorted { $0.key < $1.key }
@@ -77,7 +88,7 @@ struct CachedRemoteImage<Placeholder: View>: View {
             return
         }
 
-        if let cached = RemoteImageLoader.shared.cachedImage(for: url, maxPixelSize: maxPixelSize) {
+        if let cached = RemoteImageLoader.shared.cachedImage(for: url, maxPixelSize: maxPixelSize, reuseCoverBytes: reuseCoverBytes && headers.isEmpty) {
             await MainActor.run {
                 guard !Task.isCancelled else { return }
                 image = cached
@@ -96,7 +107,8 @@ struct CachedRemoteImage<Placeholder: View>: View {
         let loaded = await RemoteImageLoader.shared.image(
             for: url,
             headers: headers,
-            maxPixelSize: maxPixelSize
+            maxPixelSize: maxPixelSize,
+            reuseCoverBytes: reuseCoverBytes
         )
         guard let loaded, !Task.isCancelled else { return }
         await MainActor.run {

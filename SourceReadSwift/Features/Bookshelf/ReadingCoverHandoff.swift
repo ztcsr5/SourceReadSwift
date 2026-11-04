@@ -18,6 +18,12 @@ final class ReadingCoverHandoff: ObservableObject {
     }
 
     func image(for url: URL) -> UIImage? { images.object(forKey: url as NSURL) }
+    /// Capture the current frame at activation, not a later cache replacement.
+    func frame(for book: BookshelfBook) -> UIImage? {
+        guard let url = CoverURLResolver.url(from: book.coverURL, base: book.bookURL, fallbackBase: book.sourceURL) else { return nil }
+        return image(for: url)
+    }
+
     func clear() { images.removeAllObjects() }
 }
 

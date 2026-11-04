@@ -29,6 +29,7 @@ struct ReadingHeroCard: View {
     var usesSpatialStyle = true
     var usesFloatingStyle = false
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    @ScaledMetric(relativeTo: .title3) private var titleSize: CGFloat = 21
     @AppMotion private var motion
     @State private var coverImage: UIImage?
     @State private var tone: CoverTone?
@@ -69,8 +70,9 @@ struct ReadingHeroCard: View {
     private var description: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text(ReadingHeroStatus.progress(for: book)).font(.caption.weight(.medium)).foregroundStyle(AppTheme.accent)
-            Text(book.title).font(.title3.weight(.semibold))
-                .lineLimit(dynamicTypeSize.isAccessibilitySize ? nil : 2)
+            Text(book.title).font(ReadingDeskTitleTypography.font(size: titleSize))
+                .lineLimit(2)
+                .accessibilityLabel(book.title)
             Text(book.author.isEmpty ? "作者未记录" : book.author)
                 .font(.caption).foregroundStyle(.secondary)
             Text(ReadingHeroStatus.chapter(for: book)).font(.caption).foregroundStyle(.secondary)
