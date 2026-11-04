@@ -23,6 +23,27 @@ def read_source(path):
 
 
 class ProductQualityScopeTests(unittest.TestCase):
+    def test_startup_evidence_requires_explicit_regression_mode_and_has_no_prose_or_url(self):
+        web = read_source(APP + "Features/Reader/WebScrollReaderView.swift")
+        snapshot = web.split("private func recordStartupEvidence(", 1)[1].split("#endif", 1)[0]
+        self.assertIn('ProcessInfo.processInfo.arguments.contains("--floating-desk-regression")', snapshot)
+        for forbidden in ["textContent", "innerHTML", "location.href", "absoluteString", "CADisplayLink", "Timer"]:
+            self.assertNotIn(forbidden, snapshot)
+        probe = web.split("private func verifyStartupBridge(", 1)[1].split("private func recordStartupEvidence(", 1)[0]
+        self.assertIn("guard !hasReportedPosition else { return }", probe)
+        self.assertIn("#if DEBUG", probe)
+
+    def test_startup_fault_is_installed_before_the_first_navigation(self):
+        web = read_source(APP + "Features/Reader/WebScrollReaderView.swift")
+        creation = web.split("func makeWebView(", 1)[1].split("func tearDown(", 1)[0]
+        self.assertLess(creation.index("prepareBeforeNavigation?(webView)"),
+                        creation.index("webView.loadHTMLString("))
+        fixture = read_source("SourceReadSwiftTests/ReaderModePositionRegressionTests.swift")
+        self.assertIn("makeWebView(initialView: fixture, prepareBeforeNavigation:", fixture)
+        for original in ["XCTAssertEqual(fault.injections, 1)", "XCTAssertEqual(coordinator.startupRecoveryCount, 1)",
+                         "XCTAssertGreaterThan(offset, 500)", "XCTAssertLessThanOrEqual(offset, 600"]:
+            self.assertIn(original, fixture)
+
     def test_mode_switch_saves_resolved_chapter_and_local_paragraph(self):
         mode = read_source(READER).split(".onChange(of: readerModeRawValue)", 1)[1].split(
             ".onChange(of: fontFamilyRawValue)", 1)[0]

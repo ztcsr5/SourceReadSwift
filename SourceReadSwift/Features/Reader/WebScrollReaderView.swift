@@ -1,6 +1,9 @@
 import SwiftUI
 import UIKit
 import WebKit
+#if DEBUG
+import OSLog
+#endif
 
 /// Continuous reading surface rendered by `WKWebView`.
 ///
@@ -98,6 +101,9 @@ struct WebScrollReaderView: UIViewRepresentable {
         private weak var webView: WKWebView?
         private let imageHandler = ReaderImageSchemeHandler()
         private let fontHandler = ReaderFontSchemeHandler()
+        #if DEBUG
+        private static let startupEvents = Logger(subsystem: "com.edc21.SourceReadSwift.book-passage", category: "startup")
+        #endif
 
         private var isDocumentReady = false
         private var startupProbeTask: Task<Void, Never>?
@@ -129,7 +135,7 @@ struct WebScrollReaderView: UIViewRepresentable {
             super.init()
         }
 
-        func makeWebView(initialView: WebScrollReaderView) -> WKWebView {
+        func makeWebView(initialView: WebScrollReaderView, prepareBeforeNavigation: ((WKWebView) -> Void)? = nil) -> WKWebView {
             view = initialView
             let configuration = WKWebViewConfiguration()
             configuration.defaultWebpagePreferences.allowsContentJavaScript = true
@@ -162,6 +168,7 @@ struct WebScrollReaderView: UIViewRepresentable {
             self.webView = webView
             lastSurfaceColor = view.surfaceColor
 
+            prepareBeforeNavigation?(webView)
             webView.loadHTMLString(WebReaderHTML.shell, baseURL: nil)
             scheduleStartupProbe(webView: webView)
             return webView
@@ -483,6 +490,9 @@ struct WebScrollReaderView: UIViewRepresentable {
 
         private func verifyStartupBridge(webView: WKWebView) {
             guard !hasReportedPosition else { return }
+            #if DEBUG
+            recordStartupEvidence(webView: webView)
+            #endif
             let script = """
                 (function() {
                   if (window.__reader && typeof window.__reader.setContent === 'function') { return 1; }
@@ -500,6 +510,36 @@ struct WebScrollReaderView: UIViewRepresentable {
                 else if (value as? Int) == -1 { self.recoverStartupShell(webView: webView) }
             }
         }
+
+        #if DEBUG
+        private func recordStartupEvidence(webView: WKWebView) {
+            guard ProcessInfo.processInfo.arguments.contains("--floating-desk-regression") else { return }
+            let script = """
+                (function(){ return {ready:document.readyState,
+                  bridge:!!(window.__reader && typeof window.__reader.setContent === 'function'),
+                  shell:!!document.getElementById('content'), paragraphs:document.querySelectorAll('p').length}; })()
+                """
+            webView.evaluateJavaScript(script) { [weak self, weak webView] value, error in
+                guard let self, let webView, !self.hasReportedPosition else { return }
+                if let error {
+                    let code = (error as NSError).code
+                    Self.startupEvents.notice("BOOT_CHECK_ERROR code=\(code, privacy: .public)")
+                    return
+                }
+                guard let snapshot = value as? [String: Any], let ready = snapshot["ready"] as? String,
+                      ["loading", "interactive", "complete"].contains(ready) else { return }
+                let bridge = (snapshot["bridge"] as? Bool) == true ? 1 : 0
+                let shell = (snapshot["shell"] as? Bool) == true ? 1 : 0
+                let paragraphs = snapshot["paragraphs"] as? Int ?? -1
+                let loading = webView.isLoading ? 1 : 0
+                let document = self.isDocumentReady ? 1 : 0
+                let building = self.isBuildingContent ? 1 : 0
+                let pending = self.pendingScrollKey != nil ? 1 : 0
+                let applied = self.appliedScrollKey != nil ? 1 : 0
+                Self.startupEvents.notice("BOOT ready=\(ready, privacy: .public) bridge=\(bridge, privacy: .public) shell=\(shell, privacy: .public) paragraphs=\(paragraphs, privacy: .public) loading=\(loading, privacy: .public) document=\(document, privacy: .public) building=\(building, privacy: .public) pending=\(pending, privacy: .public) applied=\(applied, privacy: .public)")
+            }
+        }
+        #endif
 
         private func recoverStartupShell(webView: WKWebView) {
             guard !hasReportedPosition, startupRecoveryCount == 0, recoveredDocumentFailures < 2 else { return }

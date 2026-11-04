@@ -70,17 +70,18 @@ final class ReaderModePositionRegressionTests: XCTestCase {
             onVisibleParagraph: { _ in }, onVisiblePosition: { _, value in offset = value },
             onScrollTargetApplied: { applied = true })
         let coordinator = fixture.makeCoordinator()
-        let web = coordinator.makeWebView(initialView: fixture)
         let fault = ReaderStartupBridgeFault(coordinator: coordinator)
-        web.configuration.userContentController.removeScriptMessageHandler(forName: "reader")
-        web.configuration.userContentController.add(fault, name: "reader")
-        web.configuration.userContentController.add(fault, name: "bridgeFault")
-        web.configuration.userContentController.addUserScript(WKUserScript(
-            source: """
-                Object.defineProperty(window, '__reader', {configurable:true, get:function(){return undefined;}, set:function(){}});
-                window.addEventListener('DOMContentLoaded', function(){window.webkit.messageHandlers.bridgeFault.postMessage('injected');});
-                """,
-            injectionTime: .atDocumentStart, forMainFrameOnly: true))
+        let web = coordinator.makeWebView(initialView: fixture, prepareBeforeNavigation: { web in
+            web.configuration.userContentController.removeScriptMessageHandler(forName: "reader")
+            web.configuration.userContentController.add(fault, name: "reader")
+            web.configuration.userContentController.add(fault, name: "bridgeFault")
+            web.configuration.userContentController.addUserScript(WKUserScript(
+                source: """
+                    Object.defineProperty(window, '__reader', {configurable:true, get:function(){return undefined;}, set:function(){}});
+                    window.addEventListener('DOMContentLoaded', function(){window.webkit.messageHandlers.bridgeFault.postMessage('injected');});
+                    """,
+                injectionTime: .atDocumentStart, forMainFrameOnly: true))
+        })
         let scene = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.first
         let previous = scene?.windows.first(where: \.isKeyWindow)
         let window = scene.map { UIWindow(windowScene: $0) } ?? UIWindow(frame: UIScreen.main.bounds)
