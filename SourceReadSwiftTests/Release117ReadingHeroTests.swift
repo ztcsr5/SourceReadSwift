@@ -25,6 +25,11 @@ final class Release117ReadingHeroTests: XCTestCase {
         var book = makeBook()
         XCTAssertTrue(ReaderLaunchCursor.shouldShowTitlePage(for: nil))
         XCTAssertTrue(ReaderLaunchCursor.shouldShowTitlePage(for: book))
+        let imported = BookshelfBook(localTextBook: LocalTextBook(title: "新导入", author: "",
+            chapters: [LocalTextChapter(title: "第一章", paragraphs: ["正文"], index: 0)]))
+        XCTAssertEqual(imported.currentChapterTitle, "第一章")
+        XCTAssertTrue(ReaderLaunchCursor.shouldShowTitlePage(for: imported))
+        book.currentChapterTitle = imported.currentChapterTitle
         book.lastOpenedAt = Date()
         book.lastReadAt = book.lastOpenedAt
         XCTAssertTrue(ReaderLaunchCursor.shouldShowTitlePage(for: book))

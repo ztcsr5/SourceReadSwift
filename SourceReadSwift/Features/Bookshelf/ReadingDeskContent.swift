@@ -42,7 +42,9 @@ struct ReaderLaunchCursor {
 
     static func shouldShowTitlePage(for book: BookshelfBook?) -> Bool {
         guard let book else { return true }
+        // Imports prefill the first chapter's title, and a failed open may set
+        // lastReadAt. Neither is a committed cursor or a reading session.
         return book.currentChapterIndex == 0 && book.currentParagraphIndex == nil
-            && book.currentChapterTitle == nil && (book.readingSessionCount ?? 0) == 0
+            && (book.readingSessionCount ?? 0) == 0
     }
 }
