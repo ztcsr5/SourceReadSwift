@@ -28,24 +28,17 @@ private struct ReaderOpeningReadyKey: PreferenceKey {
     }
 }
 
-private struct ReaderNativeReturnAllowedKey: PreferenceKey {
-    static let defaultValue = false
-    static func reduce(value: inout Bool, nextValue: () -> Bool) { value = value || nextValue() }
-}
-
 /// One destination-owned cover across TOC lookup, chapter load and reader layout.
 private struct ReaderOpeningPresentation: ViewModifier {
     private static let revealDuration = 0.18
     let book: BookshelfBook
     let coverFrame: UIImage?
-    let nativeSourceID: String?
     @Environment(\.dismiss) private var dismiss
     @Environment(\.readingCoverHandoff) private var incomingCovers
     @AppMotion private var motion
     @State private var didArrive = false
     @State private var isContentReady = false
     @State private var didReveal = false
-    @State private var allowsInteractiveReturn = false
 
     func body(content: Content) -> some View {
         content
@@ -75,11 +68,6 @@ private struct ReaderOpeningPresentation: ViewModifier {
             }
             .background(ReaderOpeningArrivalProbe(
                 canPrepareReturn: didReveal,
-                nativeSourceID: nativeSourceID,
-                handoff: incomingCovers,
-                hasCapturedCover: coverFrame != nil || incomingCovers?.frame(for: book) != nil,
-                allowsAlignment: !motion.reducesMotion,
-                allowsInteraction: allowsInteractiveReturn,
                 returnSurface: AnyView(ReaderOpeningPage(book: book, coverFrame: coverFrame,
                     isWaiting: false, isReturning: true)
                     .environment(\.readingCoverHandoff, incomingCovers)),
@@ -92,7 +80,6 @@ private struct ReaderOpeningPresentation: ViewModifier {
                 isContentReady = ready
                 revealWhenReady()
             }
-            .onPreferenceChange(ReaderNativeReturnAllowedKey.self) { allowsInteractiveReturn = $0 }
     }
 
     private func revealWhenReady() {
@@ -105,28 +92,18 @@ private struct ReaderOpeningPresentation: ViewModifier {
 
 extension View {
     /// Keeps the book visible until native navigation and the first real page have arrived.
-    @ViewBuilder func readerOpeningPresentation(for book: BookshelfBook?, coverFrame: UIImage? = nil,
-                                                nativeSourceID: String? = nil) -> some View {
-        if let book { modifier(ReaderOpeningPresentation(book: book, coverFrame: coverFrame, nativeSourceID: nativeSourceID)) } else { self }
+    @ViewBuilder func readerOpeningPresentation(for book: BookshelfBook?, coverFrame: UIImage? = nil) -> some View {
+        if let book { modifier(ReaderOpeningPresentation(book: book, coverFrame: coverFrame)) } else { self }
     }
 
     /// Report actual reader readiness, or an actionable error that must replace the cover.
     func readerOpeningContentReady(_ ready: Bool = true) -> some View {
         preference(key: ReaderOpeningReadyKey.self, value: ready)
     }
-
-    func readerOpeningAllowsNativeReturn(_ allowed: Bool) -> some View {
-        preference(key: ReaderNativeReturnAllowedKey.self, value: allowed)
-    }
 }
 
 private struct ReaderOpeningArrivalProbe: UIViewControllerRepresentable {
     let canPrepareReturn: Bool
-    let nativeSourceID: String?
-    let handoff: ReadingCoverHandoff?
-    let hasCapturedCover: Bool
-    let allowsAlignment: Bool
-    let allowsInteraction: Bool
     let returnSurface: AnyView
     let onArrival: () -> Void
 
@@ -143,24 +120,12 @@ private struct ReaderOpeningArrivalProbe: UIViewControllerRepresentable {
     static func dismantleUIViewController(_ controller: ReaderBookPassageController, coordinator: ()) {
         controller.removeReturnSurface()
         controller.detachGestureEvidence()
-        controller.restoreNativeReturn()
     }
 
     private func update(_ controller: ReaderBookPassageController) {
         controller.onArrival = onArrival
-        controller.nativeSourceID = nativeSourceID
-        controller.coverHandoff = handoff
-        controller.hasCapturedCover = hasCapturedCover
-        controller.allowsNativeAlignment = allowsAlignment
-        controller.allowsNativeInteraction = allowsInteraction
-        let surface = returnSurface
-        controller.makeReturnSurface = { [weak controller] in
-            AnyView(surface.environment(\.bookReturnAnchor, { [weak controller] anchor in
-                controller?.updateReturnAnchor(anchor)
-            }))
-        }
         controller.canPrepareReturn = canPrepareReturn
-        controller.prepareNativeReturnIfPossible()
+        controller.makeReturnSurface = { returnSurface }
     }
 }
 
@@ -173,7 +138,6 @@ struct ReaderOpeningPage: View {
     var isReturning = false
     @AppMotion private var motion
     @Environment(\.readingCoverHandoff) private var incomingCovers
-    @Environment(\.bookReturnAnchor) private var returnAnchor
     @AppStorage("reader.background") private var paperRaw = ReaderBackground.white.rawValue
     private var paper: ReaderBackground { ReaderBackground(rawValue: paperRaw) ?? .white }
 
@@ -192,9 +156,6 @@ struct ReaderOpeningPage: View {
                         baseURLString: book.bookURL, sourceURLString: book.sourceURL,
                         title: book.title, prefersDeskRaster: true, cornerRadius: 3)
                 }
-            }
-            .background {
-                if isReturning, let returnAnchor { BookReturnAnchorProbe(onLayout: returnAnchor) }
             }
             VStack(spacing: 8) {
                 Text(book.title).font(.system(.title2, design: .serif).weight(.regular))

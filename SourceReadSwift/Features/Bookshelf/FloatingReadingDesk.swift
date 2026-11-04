@@ -102,8 +102,7 @@ struct FloatingReadingDesk: View {
     private func cover(width: CGFloat, height: CGFloat) -> some View {
         AsyncBookCover(urlString: book.coverURL, width: width, height: height,
             baseURLString: book.bookURL, sourceURLString: book.sourceURL,
-            onImageLoad: { coverImage = $0 }, title: book.title, prefersDeskRaster: true, cornerRadius: 3,
-            nativeSourceID: "continue|" + book.id)
+            onImageLoad: { coverImage = $0 }, title: book.title, prefersDeskRaster: true, cornerRadius: 3)
     }
 
     private func makeMarginNotes(coverWidth: CGFloat) -> some View {

@@ -11,24 +11,8 @@ final class ReaderBookPassageController: UIViewController {
             guard canPrepareReturn != oldValue, isViewLoaded else { return }
             // Removing the opening overlay need not relayout the UIKit probe.
             if canPrepareReturn { attachGestureEvidence() } else { detachGestureEvidence() }
-            if canPrepareReturn { prepareNativeReturnIfPossible() }
         }
     }
-    var nativeSourceID: String? {
-        didSet {
-            guard nativeSourceID != oldValue else { return }
-            restoreNativeReturn()
-            removeReturnSurface()
-            returnAnchor = nil
-        }
-    }
-    weak var coverHandoff: ReadingCoverHandoff?
-    var hasCapturedCover = false
-    var allowsNativeAlignment = false
-    var allowsNativeInteraction = false
-    private weak var returnAnchor: UIView?
-    // Availability-erased storage keeps the iOS 16 deployment path unchanged.
-    private var nativeReturnTransition: AnyObject?
     var makeReturnSurface: () -> AnyView = { AnyView(EmptyView()) }
     private(set) var returnHost: UIHostingController<AnyView>?
     #if DEBUG
@@ -36,7 +20,6 @@ final class ReaderBookPassageController: UIViewController {
     private var activeGestures = Set<ObjectIdentifier>()
     private var movedGestures = Set<ObjectIdentifier>()
     private var nativeMotionCount = 0
-    private var lastPreparationFlags: Int?
     #endif
 
     override func loadView() {
@@ -54,19 +37,12 @@ final class ReaderBookPassageController: UIViewController {
         super.viewDidAppear(animated)
         removeReturnSurface()
         attachGestureEvidence()
-        DispatchQueue.main.async { [weak self] in
-            self?.onArrival()
-            self?.prepareNativeReturnIfPossible()
-        }
-        transitionCoordinator?.animate(alongsideTransition: nil) { [weak self] _ in
-            self?.prepareNativeReturnIfPossible()
-        }
+        DispatchQueue.main.async { [weak self] in self?.onArrival() }
     }
 
     override func viewDidLayoutSubviews() {
         super.viewDidLayoutSubviews()
         attachGestureEvidence()
-        prepareNativeReturnIfPossible()
     }
 
     override func viewWillDisappear(_ animated: Bool) {
@@ -99,9 +75,7 @@ final class ReaderBookPassageController: UIViewController {
     func installReturnSurface(in source: UIViewController) -> UIHostingController<AnyView> {
         if let returnHost { return returnHost }
         let host = UIHostingController(rootView: makeReturnSurface())
-        returnHost = host
         host.view.backgroundColor = .clear
-        host.view.alpha = 0
         host.view.isUserInteractionEnabled = false
         host.view.accessibilityElementsHidden = true
         source.addChild(host)
@@ -110,39 +84,8 @@ final class ReaderBookPassageController: UIViewController {
         source.view.addSubview(host.view)
         host.didMove(toParent: source)
         host.view.layoutIfNeeded()
+        returnHost = host
         return host
-    }
-
-    func prepareNativeReturnIfPossible() {
-        #if DEBUG
-        defer { reportNativePreparation() }
-        #endif
-        guard canPrepareReturn, allowsNativeAlignment, let sourceID = nativeSourceID,
-              let handoff = coverHandoff, hasCapturedCover || handoff.nativeCover(for: sourceID) != nil,
-              let source = navigationController?.viewControllers.first(where: { belongs(to: $0) }) else {
-            if !allowsNativeAlignment { restoreNativeReturn(prefersDefault: true) }
-            return
-        }
-        guard #available(iOS 18.0, *) else { return }
-        if returnHost == nil { installReturnSurface(in: source) }
-        guard let returnAnchor else { return }
-        let transition = (nativeReturnTransition as? NativeBookReturnTransition)
-            ?? NativeBookReturnTransition(sourceID: sourceID, handoff: handoff)
-        nativeReturnTransition = transition
-        transition.allowsInteractiveReturn = allowsNativeInteraction
-        transition.install(in: source, anchor: returnAnchor, allowsDeferredSource: hasCapturedCover)
-    }
-
-    func updateReturnAnchor(_ anchor: UIView) {
-        returnAnchor = anchor
-        prepareNativeReturnIfPossible()
-    }
-
-    func restoreNativeReturn(prefersDefault: Bool = false) {
-        if #available(iOS 18.0, *) {
-            (nativeReturnTransition as? NativeBookReturnTransition)?.restore(prefersDefault: prefersDefault)
-        }
-        nativeReturnTransition = nil
     }
 
     func finishReturnSurface(_ carrier: UIHostingController<AnyView>) {
@@ -225,26 +168,4 @@ final class ReaderBookPassageController: UIViewController {
         }
         return false
     }
-
-    #if DEBUG
-    private func reportNativePreparation() {
-        guard ProcessInfo.processInfo.arguments.contains("--floating-desk-regression") else { return }
-        let source = navigationController?.viewControllers.first(where: { belongs(to: $0) })
-        let liveCover = nativeSourceID.flatMap { coverHandoff?.nativeCover(for: $0) }
-        var flags = canPrepareReturn ? 1 : 0
-        if allowsNativeAlignment { flags |= 2 }
-        if nativeSourceID != nil { flags |= 4 }
-        if coverHandoff != nil { flags |= 8 }
-        if liveCover != nil { flags |= 16 }
-        if source != nil { flags |= 32 }
-        if returnHost != nil { flags |= 64 }
-        if returnAnchor != nil { flags |= 128 }
-        if let source, let returnAnchor, BookReturnGeometry.alignment(of: returnAnchor, in: source) != nil { flags |= 256 }
-        if hasCapturedCover { flags |= 512 }
-        guard lastPreparationFlags != flags else { return }
-        lastPreparationFlags = flags
-        // One event per lifecycle change, never per frame or with book identity.
-        Self.events.notice("PREPARE flags=\(flags, privacy: .public)")
-    }
-    #endif
 }

@@ -227,8 +227,7 @@ struct BookshelfView: View {
                     switch route {
                     case .read(let book, let coverFrame):
                         BookshelfReaderGatewayView(book: book)
-                            .readerOpeningPresentation(for: managedOpeningBook(book), coverFrame: coverFrame,
-                                nativeSourceID: readingDeskEnabled && floatingReadingDeskEnabled ? "continue|" + book.id : nil)
+                            .readerOpeningPresentation(for: managedOpeningBook(book), coverFrame: coverFrame)
                             .bookHeroDestination("continue|" + book.id, in: bookHero)
                             .environment(\.readingCoverHandoff, readingDeskEnabled && floatingReadingDeskEnabled ? readingCoverHandoff : nil)
                     case .detail(let book, let placement):
@@ -1516,7 +1515,6 @@ private struct PressableScaleButtonStyle: ButtonStyle {
 struct AsyncBookCover: View {
     @Environment(\.displayScale) private var displayScale
     @Environment(\.readingCoverHandoff) private var readingCoverHandoff
-    @State private var nativeFrame: NativeReadingCoverFrame?
 
     /// 占位块要跟着承载它的底色走：白卡片上用浅灰，深色主视觉上用半透明白。
     enum Style {
@@ -1539,51 +1537,26 @@ struct AsyncBookCover: View {
     var contentMode: ContentMode = .fill
     var prefersDeskRaster = false
     var cornerRadius: CGFloat = 10
-    var nativeSourceID: String? = nil
-
-    private var readyNativeCover: NativeReadingCoverFrame? {
-        guard #available(iOS 18.0, *), case .fill = contentMode, nativeSourceID != nil, let readingCoverHandoff,
-              let url = CoverURLResolver.url(from: urlString, base: baseURLString, fallbackBase: sourceURLString) else { return nil }
-        return readingCoverHandoff.resolveNativeFrame(for: url, maxPixelSize: coverMaxPixelSize, current: nativeFrame)
-    }
 
     var body: some View {
-        let nativeCover = readyNativeCover
         Group {
             if let url = CoverURLResolver.url(from: urlString, base: baseURLString, fallbackBase: sourceURLString) {
                 CachedRemoteImage(url: url, contentMode: contentMode, maxPixelSize: coverMaxPixelSize,
                     reuseCoverBytes: true, onImageLoad: { image in
                     if let image { readingCoverHandoff?.retain(image, for: url) }
-                    updateNativeFrame(image ?? readingCoverHandoff?.image(for: url), for: url)
                     onImageLoad?(image ?? readingCoverHandoff?.image(for: url))
                 }) { placeholder }
             } else {
                 placeholder
             }
         }
-        // Leave the pipeline mounted so a cached frame can still upgrade to HD.
-        .opacity(nativeCover == nil ? 1 : 0)
         .frame(width: width, height: height)
         .frame(maxWidth: width == nil ? .infinity : nil)
-        .overlay {
-            if let nativeCover, let nativeSourceID, let readingCoverHandoff {
-                NativeReadingCover(image: nativeCover.image, sourceID: nativeSourceID,
-                    handoff: readingCoverHandoff, cornerRadius: cornerRadius)
-            }
-        }
         .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
         .task(id: urlString) {
             if CoverURLResolver.url(from: urlString, base: baseURLString, fallbackBase: sourceURLString) == nil {
                 onImageLoad?(nil)
             }
-        }
-    }
-
-    private func updateNativeFrame(_ image: UIImage?, for url: URL) {
-        guard #available(iOS 18.0, *), nativeSourceID != nil, readingCoverHandoff != nil,
-              image != nil || nativeFrame != nil else { return }
-        if nativeFrame?.image !== image || nativeFrame?.url != url {
-            nativeFrame = image.map { NativeReadingCoverFrame(url: url, image: $0) }
         }
     }
 
