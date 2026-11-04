@@ -136,7 +136,7 @@ jobs:
           retention-days: 7
   build:
     if: github.ref != 'refs/heads/codex/floating-reading-desk'
-    runs-on: ${{ (github.ref == 'refs/heads/codex/reader-motion-117' || inputs.reader_settings_only) && 'macos-15-intel' || 'macos-15' }}
+    runs-on: ${{ (github.ref == 'refs/heads/codex/reader-motion-117' || github.ref == 'refs/heads/codex/forest-brand-136' || inputs.reader_settings_only) && 'macos-15-intel' || 'macos-15' }}
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@v5

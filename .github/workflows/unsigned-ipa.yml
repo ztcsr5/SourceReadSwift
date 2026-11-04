@@ -13,7 +13,7 @@ on:
 jobs:
   package:
     if: github.ref != 'refs/heads/codex/floating-reading-desk'
-    runs-on: ${{ github.ref == 'refs/heads/codex/reader-motion-117' && 'macos-15-intel' || 'macos-15' }}
+    runs-on: ${{ (github.ref == 'refs/heads/codex/reader-motion-117' || github.ref == 'refs/heads/codex/forest-brand-136') && 'macos-15-intel' || 'macos-15' }}
     timeout-minutes: 30
     env:
       DEVELOPER_DIR: /Applications/Xcode_26.0.1.app/Contents/Developer
