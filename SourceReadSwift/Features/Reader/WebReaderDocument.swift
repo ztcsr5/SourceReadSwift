@@ -1294,6 +1294,9 @@ enum WebReaderHTML {
         state.activeScrollKey = null;
         state.visible = -1;
         window.scrollTo(0, 0);
+        // This one-shot restore also runs behind the opening cover, where
+        // WebKit may suspend rAF. Publish readiness without waiting for it.
+        reportVisiblePosition(performance.now());
         window.requestAnimationFrame(onScroll);
       }
 

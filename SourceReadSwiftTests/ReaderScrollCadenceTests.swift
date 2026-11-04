@@ -51,6 +51,20 @@ final class ReaderScrollCadenceTests: XCTestCase {
         let offset = try XCTUnwrap(messages.bodies[visible]["utf16Offset"] as? Int)
         XCTAssertGreaterThan(offset, 500)
         XCTAssertLessThanOrEqual(offset, 600)
+
+        messages.bodies.removeAll()
+        _ = try await web.evaluateJavaScript("window.__reader.resetScroll();")
+        for _ in 0..<30 {
+            if messages.bodies.contains(where: { $0["type"] as? String == "visible" }) { break }
+            try await Task.sleep(nanoseconds: 100_000_000)
+        }
+        let initial = try XCTUnwrap(messages.bodies.first { $0["type"] as? String == "visible" },
+            "Opening at paragraph zero must report without a compositor frame")
+        XCTAssertEqual(initial["flat"] as? Int, 0)
+        XCTAssertEqual(initial["utf16Offset"] as? Int, 0)
+        XCTAssertEqual(initial["revision"] as? String, "held-frames")
+        let initialY = try await web.evaluateJavaScript("window.scrollY") as? Int
+        XCTAssertEqual(initialY, 0)
     }
 
     @MainActor func testAppendingAPrefetchDoesNotIssueAScrollCommandButPrependingStillAnchors() async throws {

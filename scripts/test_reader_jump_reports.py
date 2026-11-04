@@ -73,6 +73,11 @@ window.requestAnimationFrame=function(){return 0;};
                                text='长段正文，模式切换不能回到段首。👩🏽‍💻' * 150)])
                 page.evaluate('(payload)=>window.__reader.setContent(payload)',
                               dict(revision='jump-report', sections=[section], total=1))
+                page.evaluate("window.readerMessages=[];window.__reader.resetScroll()")
+                opening = page.evaluate("window.readerMessages.filter(message=>message.type==='visible')")
+                self.assertTrue(opening, 'A first-page reader covered by its book jacket must not wait for a compositor frame')
+                self.assertEqual(opening[-1]['flat'], 0)
+                self.assertEqual(opening[-1]['utf16Offset'], 0)
                 page.evaluate("window.readerMessages=[];window.__reader.scrollToFlat(0,false,'character600','jump-report',600)")
                 page.wait_for_timeout(180)
                 messages = page.evaluate('window.readerMessages')

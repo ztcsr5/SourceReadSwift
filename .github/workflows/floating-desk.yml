@@ -68,6 +68,7 @@ jobs:
               -only-testing:SourceReadSwiftTests/TabChromeRegressionTests \
               -only-testing:SourceReadSwiftTests/AppFrameProfilerTests \
               -only-testing:SourceReadSwiftTests/ExplicitFrameDiagnosticsTests \
+              -only-testing:SourceReadSwiftTests/ReaderScrollCadenceTests \
               -only-testing:SourceReadSwiftTests/OrderedReadingPersistenceTests \
               -only-testing:SourceReadSwiftTests/BookshelfProgressPerformanceTests \
               -only-testing:SourceReadSwiftTests/ContentImagePipelineRegressionTests)
