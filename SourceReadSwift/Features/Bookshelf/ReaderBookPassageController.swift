@@ -35,6 +35,7 @@ final class ReaderBookPassageController: UIViewController {
     private var activeGestures = Set<ObjectIdentifier>()
     private var movedGestures = Set<ObjectIdentifier>()
     private var nativeMotionCount = 0
+    private var lastPreparationFlags: Int?
     #endif
 
     override func loadView() {
@@ -112,6 +113,9 @@ final class ReaderBookPassageController: UIViewController {
     }
 
     func prepareNativeReturnIfPossible() {
+        #if DEBUG
+        defer { reportNativePreparation() }
+        #endif
         guard canPrepareReturn, allowsNativeAlignment, let sourceID = nativeSourceID,
               let handoff = coverHandoff, handoff.nativeCover(for: sourceID) != nil,
               let source = navigationController?.viewControllers.first(where: { belongs(to: $0) }) else {
@@ -220,4 +224,24 @@ final class ReaderBookPassageController: UIViewController {
         }
         return false
     }
+
+    #if DEBUG
+    private func reportNativePreparation() {
+        let source = navigationController?.viewControllers.first(where: { belongs(to: $0) })
+        let liveCover = nativeSourceID.flatMap { coverHandoff?.nativeCover(for: $0) }
+        var flags = canPrepareReturn ? 1 : 0
+        if allowsNativeAlignment { flags |= 2 }
+        if nativeSourceID != nil { flags |= 4 }
+        if coverHandoff != nil { flags |= 8 }
+        if liveCover != nil { flags |= 16 }
+        if source != nil { flags |= 32 }
+        if returnHost != nil { flags |= 64 }
+        if returnAnchor != nil { flags |= 128 }
+        if let source, let returnAnchor, BookReturnGeometry.alignment(of: returnAnchor, in: source) != nil { flags |= 256 }
+        guard lastPreparationFlags != flags else { return }
+        lastPreparationFlags = flags
+        // One event per lifecycle change, never per frame or with book identity.
+        Self.events.notice("PREPARE flags=\(flags, privacy: .public)")
+    }
+    #endif
 }

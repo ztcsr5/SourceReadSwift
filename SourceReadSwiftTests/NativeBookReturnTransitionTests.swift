@@ -4,6 +4,36 @@ import XCTest
 @testable import SourceReadSwift
 
 final class NativeBookReturnTransitionTests: XCTestCase {
+    @MainActor func testHiddenReturnCarrierMountsAMeasurableBookBeforeAnyPop() async throws {
+        var anchor: UIView?
+        let book = BookshelfBook(id: "probe", title: "书封挂载", author: "作者", coverURL: nil,
+            sourceName: "本地", sourceURL: "local://text", bookURL: "local://probe", intro: nil)
+        let host = UIHostingController(rootView: ReaderOpeningPage(book: book, isWaiting: false, isReturning: true)
+            .environment(\.bookReturnAnchor, { anchor = $0 }))
+        let parent = UIViewController()
+        let scene = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.first
+        let previous = scene?.windows.first(where: \.isKeyWindow)
+        let window = scene.map { UIWindow(windowScene: $0) } ?? UIWindow(frame: UIScreen.main.bounds)
+        window.frame = CGRect(x: 0, y: 0, width: 390, height: 844)
+        window.rootViewController = parent
+        window.makeKeyAndVisible()
+        defer { window.isHidden = true; previous?.makeKeyAndVisible() }
+        parent.addChild(host)
+        host.view.alpha = 0
+        host.view.frame = parent.view.bounds
+        parent.view.addSubview(host.view)
+        host.didMove(toParent: parent)
+        host.view.layoutIfNeeded()
+        for _ in 0..<100 {
+            if let anchor, BookReturnGeometry.alignment(of: anchor, in: parent) != nil { break }
+            try await Task.sleep(nanoseconds: 50_000_000)
+        }
+        let rect = try XCTUnwrap(anchor.flatMap { BookReturnGeometry.alignment(of: $0, in: parent) },
+            "The hidden carrier must supply a real mounted book rect before configuring native zoom")
+        XCTAssertEqual(rect.width, 142, accuracy: 2)
+        XCTAssertEqual(rect.height, 190, accuracy: 2)
+    }
+
     @MainActor func testNativeSourceOwnershipCannotRemoveANewerCover() {
         let handoff = ReadingCoverHandoff()
         let old = UIView(), next = UIView()
