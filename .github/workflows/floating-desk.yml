@@ -24,7 +24,7 @@ jobs:
             runner: macos-26
             xcode: Xcode_26.2.app
             name: liquid-glass
-    runs-on: ${{ (github.ref == 'refs/heads/codex/forest-brand-136' && matrix.name == 'compatibility') && 'macos-15-intel' || matrix.runner }}
+    runs-on: ${{ matrix.runner }}
     timeout-minutes: 90
     env:
       DEVELOPER_DIR: /Applications/${{ matrix.xcode }}/Contents/Developer
