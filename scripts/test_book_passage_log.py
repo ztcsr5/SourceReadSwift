@@ -1,8 +1,26 @@
 """Test the native return evidence validator. Usage: unittest discover -s scripts -p test_book_passage_log.py."""
 import unittest
 from verify_book_passage_log import inspect_passages
+import verify_book_passage_log as verifier
 
 class BookPassageLogTests(unittest.TestCase):
+    def test_home_pop_uses_system_surface_for_cancel_and_finish(self):
+        log = ("BEGIN interactive=1\nSURFACE system-book\nEND cancelled=1\n"
+               "BEGIN interactive=1\nSURFACE system-book\nEND cancelled=0")
+        self.assertEqual(verifier.inspect_system_surface(log), 2)
+
+    def test_system_surface_marker_outside_an_interactive_pop_does_not_count(self):
+        log = ("SURFACE system-book\nBEGIN interactive=1\nEND cancelled=0\n"
+               "BEGIN interactive=0\nSURFACE system-book\nEND cancelled=0")
+        with self.assertRaises(ValueError):
+            verifier.inspect_system_surface(log)
+
+    def test_a_cancelled_system_surface_does_not_prove_the_completed_return(self):
+        log = ("BEGIN interactive=1\nSURFACE system-book\nEND cancelled=1\n"
+               "BEGIN interactive=1\nEND cancelled=0")
+        with self.assertRaises(ValueError):
+            verifier.inspect_system_surface(log)
+
     def zoom_ui(self, before=0, after=1, passed=True):
         case = "Test Case '-[SourceReadSwiftUITests.FloatingReadingDeskUITests testReaderSystemReturnCanCancelWithoutLosingItsSavedParagraph]'"
         return (case + " started.\n" +

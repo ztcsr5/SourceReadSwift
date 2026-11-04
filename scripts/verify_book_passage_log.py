@@ -7,6 +7,25 @@ import argparse
 from pathlib import Path
 import re
 
+def inspect_system_surface(text):
+    """Confirm the actual desk return skips its synthetic paper carrier."""
+    active = False
+    is_system_surface = False
+    outcomes = set()
+    for line in text.splitlines():
+        if match := re.search(r"\bBEGIN interactive=([01])\b", line):
+            active = match[1] == "1"
+            is_system_surface = False
+        elif active and re.search(r"\bSURFACE system-book\b", line):
+            is_system_surface = True
+        elif match := re.search(r"\bEND cancelled=([01])\b", line):
+            if active and is_system_surface:
+                outcomes.add(match[1])
+            active = False
+    if outcomes != {"0", "1"}:
+        raise ValueError("Expected both interactive desk returns to leave the surface to UIKit")
+    return len(outcomes)
+
 def inspect_passages(text, ui_text=""):
     active = None
     cancelled = 0
@@ -46,6 +65,10 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("log", type=Path)
     parser.add_argument("--ui-log", type=Path)
+    parser.add_argument("--require-system-surface", action="store_true")
     args = parser.parse_args()
-    print(inspect_passages(args.log.read_text(encoding="utf8", errors="replace"),
+    passage_log = args.log.read_text(encoding="utf8", errors="replace")
+    print(inspect_passages(passage_log,
                           args.ui_log.read_text(encoding="utf8", errors="replace") if args.ui_log else ""))
+    if args.require_system_surface:
+        print({"system_surface_outcomes": inspect_system_surface(passage_log)})

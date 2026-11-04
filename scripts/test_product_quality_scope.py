@@ -69,7 +69,7 @@ class ProductQualityScopeTests(unittest.TestCase):
         self.assertIn("override func viewDidAppear", read_source(SHELF + "ReaderBookPassageController.swift"))
         self.assertIn(r".environment(\.readerOpeningManaged, !didReveal)", opening)
         self.assertNotIn("Task.sleep", opening)
-        self.assertIn(".readerOpeningPresentation(for: managedOpeningBook(book), coverFrame: coverFrame)", shelf)
+        self.assertIn(".readerOpeningPresentation(for: managedOpeningBook(book), coverFrame: coverFrame, usesDeskHero: true)", shelf)
         self.assertNotIn("ReaderOpeningPage(", read_source(READER))
 
     def test_desk_keeps_the_large_cover_envelope_guard(self):

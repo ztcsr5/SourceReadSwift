@@ -33,12 +33,18 @@ private struct ReaderOpeningPresentation: ViewModifier {
     private static let revealDuration = 0.18
     let book: BookshelfBook
     let coverFrame: UIImage?
+    let usesDeskHero: Bool
     @Environment(\.dismiss) private var dismiss
     @Environment(\.readingCoverHandoff) private var incomingCovers
     @AppMotion private var motion
     @State private var didArrive = false
     @State private var isContentReady = false
     @State private var didReveal = false
+
+    private var usesNativeDeskReturn: Bool {
+        if #available(iOS 18.0, *) { return usesDeskHero && !motion.reducesMotion }
+        return false
+    }
 
     func body(content: Content) -> some View {
         content
@@ -68,6 +74,7 @@ private struct ReaderOpeningPresentation: ViewModifier {
             }
             .background(ReaderOpeningArrivalProbe(
                 canPrepareReturn: didReveal,
+                usesNativeDeskReturn: usesNativeDeskReturn,
                 returnSurface: AnyView(ReaderOpeningPage(book: book, coverFrame: coverFrame,
                     isWaiting: false, isReturning: true)
                     .environment(\.readingCoverHandoff, incomingCovers)),
@@ -92,8 +99,9 @@ private struct ReaderOpeningPresentation: ViewModifier {
 
 extension View {
     /// Keeps the book visible until native navigation and the first real page have arrived.
-    @ViewBuilder func readerOpeningPresentation(for book: BookshelfBook?, coverFrame: UIImage? = nil) -> some View {
-        if let book { modifier(ReaderOpeningPresentation(book: book, coverFrame: coverFrame)) } else { self }
+    @ViewBuilder func readerOpeningPresentation(for book: BookshelfBook?, coverFrame: UIImage? = nil,
+                                                usesDeskHero: Bool = false) -> some View {
+        if let book { modifier(ReaderOpeningPresentation(book: book, coverFrame: coverFrame, usesDeskHero: usesDeskHero)) } else { self }
     }
 
     /// Report actual reader readiness, or an actionable error that must replace the cover.
@@ -104,6 +112,7 @@ extension View {
 
 private struct ReaderOpeningArrivalProbe: UIViewControllerRepresentable {
     let canPrepareReturn: Bool
+    let usesNativeDeskReturn: Bool
     let returnSurface: AnyView
     let onArrival: () -> Void
 
@@ -124,6 +133,7 @@ private struct ReaderOpeningArrivalProbe: UIViewControllerRepresentable {
 
     private func update(_ controller: ReaderBookPassageController) {
         controller.onArrival = onArrival
+        controller.usesNativeDeskReturn = usesNativeDeskReturn
         controller.canPrepareReturn = canPrepareReturn
         controller.makeReturnSurface = { returnSurface }
     }

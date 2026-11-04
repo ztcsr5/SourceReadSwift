@@ -227,7 +227,7 @@ struct BookshelfView: View {
                     switch route {
                     case .read(let book, let coverFrame):
                         BookshelfReaderGatewayView(book: book)
-                            .readerOpeningPresentation(for: managedOpeningBook(book), coverFrame: coverFrame)
+                            .readerOpeningPresentation(for: managedOpeningBook(book), coverFrame: coverFrame, usesDeskHero: true)
                             .bookHeroDestination("continue|" + book.id, in: bookHero)
                             .environment(\.readingCoverHandoff, readingDeskEnabled && floatingReadingDeskEnabled ? readingCoverHandoff : nil)
                     case .detail(let book, let placement):

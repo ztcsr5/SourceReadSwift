@@ -2,10 +2,11 @@ import SwiftUI
 import UIKit
 import OSLog
 
-/// Supplies a book carrier to UIKit's existing pop, without replacing its driver or gestures.
+/// Observes UIKit's existing pop and adds a carrier only on routes without the desk zoom.
 final class ReaderBookPassageController: UIViewController {
     private static let events = Logger(subsystem: "com.edc21.SourceReadSwift.book-passage", category: "return")
     var onArrival: () -> Void = {}
+    var usesNativeDeskReturn = false
     var canPrepareReturn = false {
         didSet {
             guard canPrepareReturn != oldValue, isViewLoaded else { return }
@@ -53,6 +54,15 @@ final class ReaderBookPassageController: UIViewController {
               ReaderNativePopPolicy.isPop(from: source, to: transition.viewController(forKey: .to),
                 in: navigation, isInteractive: transition.isInteractive) else { return }
         Self.events.notice("BEGIN interactive=\(transition.isInteractive ? 1 : 0, privacy: .public)")
+        if usesNativeDeskReturn {
+            // The system already owns both surfaces. A second opaque paper
+            // sheet here becomes a white card over the actual book landing.
+            Self.events.notice("SURFACE system-book")
+            transition.animate(alongsideTransition: nil) { context in
+                Self.events.notice("END cancelled=\(context.isCancelled ? 1 : 0, privacy: .public)")
+            }
+            return
+        }
         let carrier = installReturnSurface(in: source)
         carrier.view.alpha = 0
         transition.animate(alongsideTransition: { _ in
