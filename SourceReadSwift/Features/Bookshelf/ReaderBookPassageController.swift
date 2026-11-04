@@ -6,7 +6,13 @@ import OSLog
 final class ReaderBookPassageController: UIViewController {
     private static let events = Logger(subsystem: "com.edc21.SourceReadSwift.book-passage", category: "return")
     var onArrival: () -> Void = {}
-    var canPrepareReturn = false
+    var canPrepareReturn = false {
+        didSet {
+            guard canPrepareReturn != oldValue, isViewLoaded else { return }
+            // Removing the opening overlay need not relayout the UIKit probe.
+            if canPrepareReturn { attachGestureEvidence() } else { detachGestureEvidence() }
+        }
+    }
     var makeReturnSurface: () -> AnyView = { AnyView(EmptyView()) }
     private(set) var returnHost: UIHostingController<AnyView>?
     #if DEBUG
