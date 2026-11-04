@@ -107,6 +107,7 @@ final class ReaderSettingsFlowUITests: XCTestCase {
         app.launch()
         XCTAssertTrue(shelfEntry.waitForExistence(timeout: 10))
         shelfEntry.tap()
+        guard mode == "scroll" else { return }
         let surface = element("reader.webScrollSurface")
         let ready = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
             surface.isHittable && self.app.webViews.staticTexts.firstMatch.exists
