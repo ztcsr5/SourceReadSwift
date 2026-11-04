@@ -33,7 +33,6 @@ struct BookDetailView: View {
         let showsTitlePage: Bool
     }
     @State private var readingRoute: ReadingRoute?
-    @State private var hasStartedPreview = false
     @State private var selectedChapterIndexForReader = 0
 
     private var sourceKind: BookSourceKind {
@@ -70,6 +69,8 @@ struct BookDetailView: View {
     private var isBookInBookshelf: Bool {
         appState.bookshelfStore.contains(book)
     }
+
+    private var hasStartedPreview: Bool { previewPosition?.bookID == readerBookID }
 
     /// The detail header is the first place all source results meet. When the
     /// primary result has no cover but a sibling source does, show the sibling
@@ -302,28 +303,34 @@ struct BookDetailView: View {
     @ViewBuilder private func readDestination(_ target: BookChapter, usesDetailHero: Bool) -> some View {
         Group {
             if let shelfBook = localShelfBook {
-                BookshelfReaderGatewayView(book: shelfBook, initialChapterIndex: target.index)
+                BookshelfReaderGatewayView(book: shelfBook, initialChapterIndex: target.index,
+                    onRequestExit: usesDetailHero ? closeDirectReadingRoute : nil)
             } else {
                 let shelf = appState.bookshelfStore.book(id: readerBookID)
                 let preview = previewPosition.flatMap { $0.bookID == readerBookID && $0.chapterIndex == target.index ? $0 : nil }
                 ChapterLoadingView(bookID: readerBookID, sourceUrl: book.sourceUrl,
                     chapter: target, totalChapters: chapters.count, chapters: chapters,
                     initialParagraphIndex: shelf?.currentChapterIndex == target.index ? shelf?.currentParagraphIndex : preview?.paragraphIndex,
-                    onPreviewPosition: recordPreviewPosition)
+                    onPreviewPosition: recordPreviewPosition, onRequestExit: usesDetailHero ? closeDirectReadingRoute : nil)
             }
         }
         // Deep TOC scrolling or the title page has no visible detail hero source.
         .readerOpeningPresentation(for: sourceKind == .text ? BookshelfBook(searchBook: displayBook) : nil,
-            coverFrame: coverHandoff.frame(for: BookshelfBook(searchBook: displayBook)))
+            coverFrame: coverHandoff.frame(for: BookshelfBook(searchBook: displayBook)), usesSystemReturnSurface: true)
         .bookHeroDestination(readerHeroID, in: detailHero,
             enabled: usesDetailHero && !isHeaderCollapsed && sourceKind == .text)
         .environment(\.readingCoverHandoff, readingDeskEnabled ? coverHandoff : nil)
-        .onAppear { hasStartedPreview = true }
     }
 
     private func openReadingRoute(_ chapter: BookChapter, showsTitlePage: Bool) {
         guard readingRoute == nil else { return }
         readingRoute = ReadingRoute(chapter: chapter, showsTitlePage: showsTitlePage)
+    }
+
+    /// This button owns only the detail's nested route, never the bookshelf route.
+    private func closeDirectReadingRoute() {
+        guard readingRoute?.showsTitlePage == false else { return }
+        readingRoute = nil
     }
 
     private func readAction(_ target: BookChapter) -> some View {
@@ -1006,7 +1013,7 @@ struct BookDetailView: View {
     }
 
     private func recordPreviewPosition(_ position: ReaderPreviewPosition) {
-        guard position.bookID == readerBookID, !isBookInBookshelf else { return }
+        guard position.bookID == readerBookID, position != previewPosition, !isBookInBookshelf else { return }
         previewPosition = position
     }
 
@@ -1153,6 +1160,7 @@ struct ChapterLoadingView: View {
     var onRequestSourceSwitch: (() -> Void)?
     var onRequestBookDetail: (() -> Void)? = nil
     var onPreviewPosition: ((ReaderPreviewPosition) -> Void)? = nil
+    var onRequestExit: (() -> Void)? = nil
     @State private var content: ChapterContent?
     @State private var loadedChapter: BookChapter?
     @State private var currentChapter: BookChapter?
@@ -1417,7 +1425,8 @@ struct ChapterLoadingView: View {
                 }
             },
             initialOverlayVisible: showReaderChromeAfterChapterSelection,
-            onPreviewPosition: onPreviewPosition
+            onPreviewPosition: onPreviewPosition,
+            onRequestExit: onRequestExit
         )
         // 书级稳定身份：换章只更新 content，不再销毁 ReaderView + WKWebView。
         .id("reader-\(bookID ?? sourceUrl)")
@@ -1534,7 +1543,8 @@ struct ChapterLoadingView: View {
         extraToolbarActions: @escaping () -> AnyView = { AnyView(EmptyView()) },
         onRequestSourceSwitch: (() -> Void)? = nil,
         onRequestBookDetail: (() -> Void)? = nil,
-        onPreviewPosition: ((ReaderPreviewPosition) -> Void)? = nil
+        onPreviewPosition: ((ReaderPreviewPosition) -> Void)? = nil,
+        onRequestExit: (() -> Void)? = nil
     ) {
         self.bookID = bookID
         self.sourceUrl = sourceUrl
@@ -1547,6 +1557,7 @@ struct ChapterLoadingView: View {
         self.onRequestSourceSwitch = onRequestSourceSwitch
         self.onRequestBookDetail = onRequestBookDetail
         self.onPreviewPosition = onPreviewPosition
+        self.onRequestExit = onRequestExit
     }
 }
 

@@ -38,6 +38,31 @@ final class ReaderSettingsFlowUITests: XCTestCase {
         }
     }
 
+    func testSearchPreviewHasATitlePageAndOffersToKeepReadingPositionOnExit() {
+        app.launchArguments = ["--reader-preview-regression", "-reader.mode", "scroll"]
+        app.launch()
+        let legacy = app.buttons["tabs.legacy.discover"]
+        let discover = legacy.exists ? legacy : app.tabBars.buttons["寻书"]
+        XCTAssertTrue(discover.waitForExistence(timeout: 5)); discover.tap()
+        let search = app.textFields["搜索书名或作者"]
+        XCTAssertTrue(search.waitForExistence(timeout: 5)); search.tap(); search.typeText("Preview\n")
+        let result = app.staticTexts["Preview · 未入架阅读样本"].firstMatch
+        XCTAssertTrue(result.waitForExistence(timeout: 10)); result.tap()
+        let read = element("bookDetail.read")
+        XCTAssertTrue(read.waitForExistence(timeout: 6)); read.tap()
+        let titleRead = element("bookTitlePage.read")
+        XCTAssertTrue(titleRead.waitForExistence(timeout: 5)); titleRead.tap()
+        let surface = element("reader.webScrollSurface")
+        let landed = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in surface.isHittable && !self.element("reader.openingProgress").exists }, object: nil)
+        XCTAssertEqual(XCTWaiter.wait(for: [landed], timeout: 12), .completed)
+        revealMenu()
+        element("reader.returnToShelf").tap()
+        let prompt = app.buttons["暂不加入"].firstMatch
+        XCTAssertTrue(prompt.waitForExistence(timeout: 5), "A successful preview must offer shelf membership on return")
+        prompt.tap()
+        XCTAssertTrue(titleRead.isHittable)
+    }
+
     func testPagedReaderRetainsItsSettingsAndReadingSession() {
         launchReader(mode: "pageTurn")
         openSettings()

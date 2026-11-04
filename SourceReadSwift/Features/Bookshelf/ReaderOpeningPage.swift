@@ -34,6 +34,7 @@ private struct ReaderOpeningPresentation: ViewModifier {
     let book: BookshelfBook
     let coverFrame: UIImage?
     let usesDeskHero: Bool
+    let usesSystemReturnSurface: Bool
     @Environment(\.dismiss) private var dismiss
     @Environment(\.readingCoverHandoff) private var incomingCovers
     @AppMotion private var motion
@@ -42,6 +43,7 @@ private struct ReaderOpeningPresentation: ViewModifier {
     @State private var didReveal = false
 
     private var usesNativeDeskReturn: Bool {
+        if usesSystemReturnSurface { return true }
         if #available(iOS 18.0, *) { return usesDeskHero && !motion.reducesMotion }
         return false
     }
@@ -118,8 +120,9 @@ private struct ReaderOpeningStatus: View {
 extension View {
     /// Prevents an unpositioned page from becoming visible during native navigation.
     @ViewBuilder func readerOpeningPresentation(for book: BookshelfBook?, coverFrame: UIImage? = nil,
-                                                usesDeskHero: Bool = false) -> some View {
-        if let book { modifier(ReaderOpeningPresentation(book: book, coverFrame: coverFrame, usesDeskHero: usesDeskHero)) } else { self }
+                                                usesDeskHero: Bool = false, usesSystemReturnSurface: Bool = false) -> some View {
+        if let book { modifier(ReaderOpeningPresentation(book: book, coverFrame: coverFrame,
+            usesDeskHero: usesDeskHero, usesSystemReturnSurface: usesSystemReturnSurface)) } else { self }
     }
 
     /// Report actual reader readiness, or an actionable error that must replace the cover.

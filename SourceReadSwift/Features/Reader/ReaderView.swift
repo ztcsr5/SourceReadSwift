@@ -48,6 +48,7 @@ struct ReaderView: View {
     /// hidden and can be mistaken for the root tab UI.
     var initialOverlayVisible: Bool = false
     var onPreviewPosition: ((ReaderPreviewPosition) -> Void)? = nil
+    var onRequestExit: (() -> Void)? = nil
 
     @Environment(\.dismiss) private var dismiss
     @Environment(\.scenePhase) private var scenePhase
@@ -1106,7 +1107,7 @@ struct ReaderView: View {
                 menuVisible: showOverlay, settingsVisible: showSettings,
                 coverPresented: showChapterList || temporaryCoverPresented
             ),
-            onExit: { dismiss() }, prefersSystemReturn: readerUsesBookReturn
+            onExit: requestReaderExit, prefersSystemReturn: readerUsesBookReturn
         ))
         .navigationBarBackButtonHidden(!allowsNativeBookReturn)
         .toolbar(.hidden, for: .navigationBar, .tabBar)
@@ -3735,7 +3736,7 @@ struct ReaderView: View {
         VStack {
             HStack {
                 chromeIconButton(systemName: "chevron.left") {
-                    dismiss()
+                    requestReaderExit()
                 }
                 .accessibilityIdentifier("reader.returnToShelf")
 
@@ -3921,6 +3922,11 @@ struct ReaderView: View {
         }
         .foregroundStyle(chromeForeground)
         .environment(\.colorScheme, readerIsNight ? .dark : .light)
+    }
+
+    private func requestReaderExit() {
+        if onPreviewPosition != nil { persistReadingPosition() }
+        if let onRequestExit { onRequestExit() } else { dismiss() }
     }
 
     private func navChapterButton(icon: String, title: String, action: @escaping () -> Void) -> some View {

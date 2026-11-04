@@ -76,7 +76,6 @@ final class ReaderExitSwipeController: UIViewController, UIGestureRecognizerDele
         self.prefersSystemReturn = prefersSystemReturn
         self.onExit = onExit
         if !enabled { didExit = false }
-        edgePan.isEnabled = enabled
         if isViewLoaded { attachIfNeeded() }
     }
 
@@ -115,7 +114,8 @@ final class ReaderExitSwipeController: UIViewController, UIGestureRecognizerDele
     }
 
     private func attachIfNeeded() {
-        edgePan.isEnabled = exitEnabled && !usesSystemReturn
+        let needsFallback = exitEnabled && !usesSystemReturn
+        if edgePan.isEnabled != needsFallback { edgePan.isEnabled = needsFallback }
         guard let host = parent?.view, host !== view else { return }
         if edgePan.view !== host {
             edgePan.view?.removeGestureRecognizer(edgePan)

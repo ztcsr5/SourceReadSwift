@@ -5,6 +5,7 @@ struct BookshelfReaderGatewayView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.readerOpeningManaged) private var readerOpeningManaged
     let book: BookshelfBook
+    let onRequestExit: (() -> Void)?
     @State private var launchCursor: ReaderLaunchCursor
     @State private var selectedRemoteParagraphIndex: Int?
 
@@ -28,8 +29,10 @@ struct BookshelfReaderGatewayView: View {
     @State private var showBookDetailSheet = false
     @State private var gatewayTabChromeOwner = UUID()
 
-    init(book: BookshelfBook, initialBookmark: ReaderBookmark? = nil, initialChapterIndex: Int? = nil) {
+    init(book: BookshelfBook, initialBookmark: ReaderBookmark? = nil, initialChapterIndex: Int? = nil,
+         onRequestExit: (() -> Void)? = nil) {
         self.book = book
+        self.onRequestExit = onRequestExit
         _launchCursor = State(initialValue: ReaderLaunchCursor(book: book, bookmark: initialBookmark,
             requestedChapterIndex: initialChapterIndex))
     }
@@ -81,7 +84,8 @@ struct BookshelfReaderGatewayView: View {
                     ),
                     chapterIndex: 0,
                     totalChapters: 1,
-                    initialParagraphIndex: launchCursor.paragraph(in: 0)
+                    initialParagraphIndex: launchCursor.paragraph(in: 0),
+                    onRequestExit: onRequestExit
                 )
             )
         } else if let selectedChapter {
@@ -152,7 +156,8 @@ struct BookshelfReaderGatewayView: View {
                     },
                     onRequestBookDetail: {
                         showBookDetailSheet = true
-                    }
+                    },
+                    onRequestExit: onRequestExit
                 )
                 .id("remote-reader|\(currentBook.sourceURL)|\(currentBook.bookURL)")
             )
@@ -309,7 +314,8 @@ struct BookshelfReaderGatewayView: View {
                     totalChapters: chapters.count
                 )
             },
-            initialOverlayVisible: showReaderChromeAfterChapterSelection
+            initialOverlayVisible: showReaderChromeAfterChapterSelection,
+            onRequestExit: onRequestExit
         )
         .id("reader-\(book.id)")
     }
