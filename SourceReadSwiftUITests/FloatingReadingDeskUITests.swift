@@ -37,9 +37,13 @@ final class FloatingReadingDeskUITests: XCTestCase {
         let pager = element("bookshelf.readingPager")
         let entry = assertCurrentBook("剑来")
         entry.coordinate(withNormalizedOffset: CGVector(dx: 0.47, dy: 0.34)).press(forDuration: 0.8)
+        XCTAssertFalse(app.buttons["书籍详情"].firstMatch.exists, "A hold must not show the desk management menu")
+        // Some OS versions deliver the final touch-up as an ordinary tap.
+        if element("reader.webScrollSurface").isHittable { returnFromReader() }
+        app.buttons["正在阅读书籍的更多操作"].firstMatch.tap()
         let detail = app.buttons["书籍详情"].firstMatch
         XCTAssertTrue(detail.waitForExistence(timeout: 5))
-        XCTAssertFalse(element("reader.webScrollSurface").exists, "Holding the book must not activate the reader")
+        XCTAssertFalse(element("reader.webScrollSurface").isHittable, "Three dots must not activate the reader")
         XCTAssertTrue(app.buttons["从书架删除"].firstMatch.exists)
         detail.tap()
         XCTAssertTrue(element("bookDetail.title").waitForExistence(timeout: 5))
@@ -68,11 +72,69 @@ final class FloatingReadingDeskUITests: XCTestCase {
         XCTAssertFalse(element("reader.webScrollSurface").exists)
         detail.tap()
         XCTAssertTrue(element("bookDetail.title").waitForExistence(timeout: 5))
-        let tabs = app.tabBars.firstMatch
-        let home = tabs.exists ? tabs.buttons["主页"] : app.buttons["tabs.legacy.home"]
-        // The iOS 18 back button is also labelled “主页”; query the actual bottom control.
+        let home = rootTab("主页", legacyID: "tabs.legacy.home")
+        XCTAssertTrue(home.isHittable, "The main bar stays visible on a normal detail")
+        let lastChapter = app.buttons["山中来信"].firstMatch
+        if !lastChapter.isHittable { element("bookDetail.scroll").swipeUp() }
+        XCTAssertTrue(lastChapter.isHittable, "The last chapter can scroll fully above the bar")
+        XCTAssertLessThanOrEqual(lastChapter.frame.maxY, home.frame.minY)
         capture("14-overflow-to-detail")
-        XCTAssertFalse(home.isHittable, "Root navigation must not overlap detail chapters")
+
+        let settings = rootTab("设置", legacyID: "tabs.legacy.settings")
+        settings.tap()
+        let appearance = app.buttons["外观"].firstMatch
+        XCTAssertTrue(appearance.waitForExistence(timeout: 5)); appearance.tap()
+        XCTAssertTrue(app.navigationBars["外观"].waitForExistence(timeout: 5))
+        XCTAssertTrue(home.isHittable, "Normal settings subpages keep the main bar")
+        home.tap()
+        XCTAssertTrue(element("bookDetail.title").waitForExistence(timeout: 5), "Home retains its pushed detail")
+        settings.tap()
+        XCTAssertTrue(app.navigationBars["外观"].waitForExistence(timeout: 5), "Settings retains its pushed editor")
+        capture("15-settings-tab-retained")
+    }
+
+    func testFirstReadingHasARealTitlePageAndLaterResumesDirectly() throws {
+        try launch(theme: "classic", fixture: "--desk-first-reading")
+        let cover = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@ AND label CONTAINS %@",
+            "bookshelf.grid.", "月亮与六便士")).firstMatch
+        if !cover.isHittable { app.swipeUp() }
+        XCTAssertTrue(cover.isHittable); cover.tap()
+        let read = app.buttons["bookDetail.read"]
+        XCTAssertTrue(read.waitForExistence(timeout: 5)); read.tap()
+        let start = app.buttons["bookTitlePage.read"]
+        XCTAssertTrue(start.waitForExistence(timeout: 5))
+        XCTAssertFalse(element("reader.webScrollSurface").isHittable, "The title page is not a loading overlay")
+        XCTAssertTrue(rootTab("主页", legacyID: "tabs.legacy.home").isHittable)
+        capture("16-first-reading-title-page")
+        app.navigationBars.buttons.element(boundBy: 0).tap()
+        XCTAssertTrue(read.waitForExistence(timeout: 5)); read.tap()
+        XCTAssertTrue(start.waitForExistence(timeout: 5), "Looking at the title page cannot mark the book read")
+        start.tap()
+        assertReaderProse()
+        returnFromReader()
+        XCTAssertTrue(start.waitForExistence(timeout: 5))
+        app.navigationBars.buttons.element(boundBy: 0).tap()
+        XCTAssertTrue(read.waitForExistence(timeout: 5)); read.tap()
+        assertReaderProse()
+        XCTAssertFalse(start.isHittable, "An existing position skips the title page")
+    }
+
+    func testContinueRestoresTheSavedParagraphInTheRealWebView() throws {
+        try launch(theme: "classic", fixture: "--desk-resume-paragraph")
+        assertCurrentBook("剑来").tap()
+        let surface = element("reader.webScrollSurface")
+        XCTAssertTrue(surface.waitForExistence(timeout: 10))
+        let saved = app.webViews.staticTexts.matching(
+            NSPredicate(format: "label BEGINSWITH %@", "【已保存的阅读段落】")).firstMatch
+        XCTAssertTrue(saved.waitForExistence(timeout: 10))
+        XCTAssertTrue(surface.frame.intersects(saved.frame), "The saved paragraph must be in the actual viewport")
+        XCTAssertFalse(rootTab("主页", legacyID: "tabs.legacy.home").isHittable)
+        capture("17-restored-paragraph")
+        surface.swipeUp()
+        surface.swipeDown()
+        XCTAssertTrue(surface.isHittable)
+        returnFromReader()
+        XCTAssertTrue(rootTab("主页", legacyID: "tabs.legacy.home").isHittable)
     }
 
     func testReadingDeskReaderAndReturnInTheRealApp() throws {
@@ -83,8 +145,7 @@ final class FloatingReadingDeskUITests: XCTestCase {
         assertReaderProse()
         returnFromReader()
         XCTAssertTrue(pager.waitForExistence(timeout: 3))
-        let tabs = app.tabBars.firstMatch
-        let home = tabs.exists ? tabs.buttons["主页"] : app.buttons["tabs.legacy.home"]
+        let home = rootTab("主页", legacyID: "tabs.legacy.home")
         XCTAssertTrue(home.isHittable, "Returning to the real shelf must restore navigation with it")
         capture("06-reader-return-root")
     }
@@ -170,7 +231,7 @@ final class FloatingReadingDeskUITests: XCTestCase {
         assertCurrentBook("剑来")
     }
 
-    private func launch(theme: String, mode: String = "light", reducesMotion: Bool = false) throws {
+    private func launch(theme: String, mode: String = "light", reducesMotion: Bool = false, fixture: String? = nil) throws {
         let reference = try XCTUnwrap(Bundle(for: Self.self).url(forResource: "jianlai-cover", withExtension: "jpg"))
         let cover = try Data(contentsOf: reference)
         XCTAssertLessThanOrEqual(cover.count, 128_000)
@@ -178,8 +239,14 @@ final class FloatingReadingDeskUITests: XCTestCase {
         app.launchArguments = ["--floating-desk-regression", "-settings.visualTheme", theme,
             "-settings.themeMode", mode, "-settings.readingDeskEnabled", "YES",
             "-settings.reducesMotion", reducesMotion ? "YES" : "NO", "-reader.mode", "scroll"]
+        if let fixture { app.launchArguments.append(fixture) }
         app.launch()
         XCTAssertTrue(app.buttons["正在阅读书籍的更多操作"].firstMatch.waitForExistence(timeout: 10))
+    }
+
+    private func rootTab(_ label: String, legacyID: String) -> XCUIElement {
+        let legacy = app.buttons[legacyID]
+        return legacy.exists ? legacy : app.tabBars.firstMatch.buttons[label]
     }
 
     private func element(_ identifier: String) -> XCUIElement {

@@ -120,31 +120,22 @@ struct ReaderOpeningPage: View {
     @AppStorage("reader.background") private var paperRaw = ReaderBackground.white.rawValue
     private var paper: ReaderBackground { ReaderBackground(rawValue: paperRaw) ?? .white }
     var body: some View {
-        VStack(alignment: .leading, spacing: 24) {
-            Spacer()
+        VStack(spacing: 16) {
             BookJacket {
-                AsyncBookCover(urlString: book.coverURL, width: 96, height: 136,
+                AsyncBookCover(urlString: book.coverURL, width: 84, height: 120,
                     baseURLString: book.bookURL, sourceURLString: book.sourceURL, title: book.title)
             }
-            VStack(alignment: .leading, spacing: 12) {
-                Text("纸间 · 继续你的故事").font(.caption).foregroundStyle(.secondary)
-                Text(book.title)
-                    .font(.system(.largeTitle, design: .serif).weight(.semibold))
-                    .lineLimit(3)
-                if !book.author.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                    Text(book.author).font(.subheadline).foregroundStyle(.secondary).lineLimit(1)
-                }
-                if let intro = ReadingDeskContent.introduction(from: book.intro) {
-                    Text(intro).font(.subheadline).lineLimit(2)
-                }
-                Text(chapterTitle ?? ReadingHeroStatus.chapter(for: book)).font(.caption).foregroundStyle(.secondary)
-            }
-            Divider()
-            ProgressView(chapterTitle == nil ? "正在恢复阅读位置" : "正在加载正文").font(.caption)
-            Spacer(); Spacer()
-        }.padding(32).frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
-            .foregroundStyle(paper.textColor(isNight: paper.isDark))
-            .background(paper.color(isNight: paper.isDark).ignoresSafeArea())
-            .environment(\.colorScheme, paper.isDark ? .dark : .light)
+            Text(book.title)
+                .font(.system(.title3, design: .serif).weight(.semibold))
+                .lineLimit(2)
+            ProgressView(chapterTitle == nil ? "正在恢复阅读位置" : "正在加载正文")
+                .font(.caption)
+                .accessibilityIdentifier("reader.openingProgress")
+        }
+        .padding(24)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .foregroundStyle(paper.textColor(isNight: paper.isDark))
+        .background(paper.color(isNight: paper.isDark).ignoresSafeArea())
+        .environment(\.colorScheme, paper.isDark ? .dark : .light)
     }
 }

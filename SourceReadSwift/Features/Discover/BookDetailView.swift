@@ -28,6 +28,12 @@ struct BookDetailView: View {
     @State private var showAudioPlayer = false
     @State private var showComicReader = false
     @State private var showVideoPlayer = false
+    private struct ReadingRoute {
+        let chapter: BookChapter
+        let showsTitlePage: Bool
+    }
+    @State private var readingRoute: ReadingRoute?
+    @State private var hasStartedPreview = false
     @State private var selectedChapterIndexForReader = 0
 
     private var sourceKind: BookSourceKind {
@@ -83,7 +89,7 @@ struct BookDetailView: View {
             bookUrl: book.bookUrl,
             sourceName: book.sourceName,
             sourceUrl: book.sourceUrl,
-            intro: book.intro,
+            intro: detail?.intro?.nilIfEmpty ?? book.intro,
             kind: book.kind,
             lastChapter: book.lastChapter,
             wordCount: detail?.wordCount?.nilIfEmpty ?? book.wordCount,
@@ -173,7 +179,6 @@ struct BookDetailView: View {
             }
             .padding(AppTheme.pagePadding)
         }
-        .hideRootTabBar()
         .environment(\.readingCoverHandoff, readingDeskEnabled ? coverHandoff : nil)
         .accessibilityIdentifier("bookDetail.scroll")
         .coordinateSpace(name: "bookDetailScroll")
@@ -187,6 +192,12 @@ struct BookDetailView: View {
         .toolbar {
             ToolbarItem(placement: .navigationBarTrailing) {
                 Menu {
+                    if sourceKind == .text, let target = targetReadingChapter {
+                        Button { openReadingRoute(target, showsTitlePage: true) } label: {
+                            Label("查看书籍扉页", systemImage: "book.closed")
+                        }
+                        .accessibilityIdentifier("bookDetail.titlePage")
+                    }
                     Button { markAsRead() } label: {
                         Label("标记为已读", systemImage: "checkmark.circle")
                     }
@@ -207,8 +218,17 @@ struct BookDetailView: View {
             }
         }
         .task {
+            guard chapters.isEmpty, errorMessage == nil else { return }
             SourceSwitchCacheStore.shared.remember(books: availableSources + [book])
             await load()
+        }
+        .navigationDestination(isPresented: Binding(
+            get: { readingRoute != nil }, set: { if !$0 { readingRoute = nil } }
+        )) {
+            if let route = readingRoute {
+                if route.showsTitlePage { titlePage(for: route.chapter) }
+                else { readDestination(route.chapter, usesDetailHero: true) }
+            }
         }
         .sheet(isPresented: $showAllChapters) {
             BookDetailAllChaptersView(
@@ -264,25 +284,50 @@ struct BookDetailView: View {
         }
     }
 
-    private func readAction(_ target: BookChapter) -> some View {
-        NavigationLink {
-            Group {
-                if let shelfBook = localShelfBook {
-                    BookshelfReaderGatewayView(book: shelfBook, initialChapterIndex: target.index)
-                } else {
-                    let shelf = appState.bookshelfStore.book(id: readerBookID)
-                    ChapterLoadingView(bookID: readerBookID, sourceUrl: book.sourceUrl,
-                        chapter: target, totalChapters: chapters.count, chapters: chapters,
-                        initialParagraphIndex: shelf?.currentChapterIndex == target.index ? shelf?.currentParagraphIndex : nil)
-                }
+    private var shouldShowTitlePage: Bool {
+        sourceKind == .text && !hasStartedPreview
+            && ReaderLaunchCursor.shouldShowTitlePage(for: appState.bookshelfStore.book(id: readerBookID))
+    }
+
+    private var readingActionLabel: String {
+        shouldShowTitlePage || (!isBookInBookshelf && !hasStartedPreview) ? "开始阅读" : "继续阅读"
+    }
+
+    private func titlePage(for target: BookChapter) -> some View {
+        BookTitlePage(book: displayBook, chapterCount: chapters.count, readLabel: readingActionLabel) {
+            readDestination(target, usesDetailHero: false)
+        }
+    }
+
+    @ViewBuilder private func readDestination(_ target: BookChapter, usesDetailHero: Bool) -> some View {
+        Group {
+            if let shelfBook = localShelfBook {
+                BookshelfReaderGatewayView(book: shelfBook, initialChapterIndex: target.index)
+            } else {
+                let shelf = appState.bookshelfStore.book(id: readerBookID)
+                ChapterLoadingView(bookID: readerBookID, sourceUrl: book.sourceUrl,
+                    chapter: target, totalChapters: chapters.count, chapters: chapters,
+                    initialParagraphIndex: shelf?.currentChapterIndex == target.index ? shelf?.currentParagraphIndex : nil)
             }
-            // The header is offscreen after scrolling deep into the TOC. Let
-            // system navigation use its ordinary fallback instead of a stale source.
-            .readerOpeningPresentation(for: readingDeskEnabled && sourceKind == .text ? BookshelfBook(searchBook: displayBook) : nil)
-            .bookHeroDestination(readerHeroID, in: detailHero, enabled: !isHeaderCollapsed && sourceKind == .text)
-            .environment(\.readingCoverHandoff, readingDeskEnabled ? coverHandoff : nil)
+        }
+        // Deep TOC scrolling or the title page has no visible detail hero source.
+        .readerOpeningPresentation(for: sourceKind == .text ? BookshelfBook(searchBook: displayBook) : nil)
+        .bookHeroDestination(readerHeroID, in: detailHero,
+            enabled: usesDetailHero && !isHeaderCollapsed && sourceKind == .text)
+        .environment(\.readingCoverHandoff, readingDeskEnabled ? coverHandoff : nil)
+        .onAppear { hasStartedPreview = true }
+    }
+
+    private func openReadingRoute(_ chapter: BookChapter, showsTitlePage: Bool) {
+        guard readingRoute == nil else { return }
+        readingRoute = ReadingRoute(chapter: chapter, showsTitlePage: showsTitlePage)
+    }
+
+    private func readAction(_ target: BookChapter) -> some View {
+        Button {
+            openReadingRoute(target, showsTitlePage: shouldShowTitlePage)
         } label: {
-            Label(isBookInBookshelf ? "继续阅读" : "开始阅读", systemImage: "book")
+            Label(readingActionLabel, systemImage: "book")
                 .font(.subheadline.weight(.semibold))
                 .frame(maxWidth: .infinity, minHeight: 44)
                 .padding(.horizontal, 12)
@@ -1121,12 +1166,13 @@ struct ChapterLoadingView: View {
     let chapter: BookChapter
     var totalChapters: Int? = nil
     var chapters: [BookChapter] = []
-    var initialParagraphIndex: Int? = nil
+    @State private var initialParagraphIndex: Int?
     var openingBook: BookshelfBook? = nil
     var extraToolbarActions: () -> AnyView = { AnyView(EmptyView()) }
     var onRequestSourceSwitch: (() -> Void)?
     var onRequestBookDetail: (() -> Void)? = nil
     @State private var content: ChapterContent?
+    @State private var loadedChapter: BookChapter?
     @State private var currentChapter: BookChapter?
     @State private var currentParagraphIndex: Int? = nil
     @State private var errorMessage: String?
@@ -1220,13 +1266,9 @@ struct ChapterLoadingView: View {
                     .padding(.top, 14)
             }
         }
-        .task {
-            await load()
-        }
-        .onChange(of: currentChapter) { _ in
-            Task {
-                await load(force: true)
-            }
+        .task(id: effectiveChapter) {
+            guard loadedChapter != effectiveChapter else { return }
+            await load(force: content != nil)
         }
         .sheet(isPresented: $showBookDetailSheet) {
             NavigationStack {
@@ -1272,6 +1314,7 @@ struct ChapterLoadingView: View {
             purifyRules: purifyRules
         ) {
             content = cached
+            loadedChapter = targetChapter
             isUsingStaleCache = false
             return
         }
@@ -1279,10 +1322,12 @@ struct ChapterLoadingView: View {
         let contentResult = await AsyncTimeout.run(seconds: 20) {
             await engine.getContent(source: source, chapter: targetChapter)
         } ?? .failure(.network("Content load timed out"))
+        guard !Task.isCancelled, effectiveChapter == targetChapter else { return }
         switch contentResult {
         case .success(let loaded):
             appState.chapterContentCacheStore.save(loaded, sourceURL: source.bookSourceUrl, purifyRules: purifyRules)
             content = loaded
+            loadedChapter = targetChapter
             isUsingStaleCache = false
         case .failure(let error):
             if let cached = appState.chapterContentCacheStore.staleContent(
@@ -1290,6 +1335,7 @@ struct ChapterLoadingView: View {
                 chapter: targetChapter
             ) {
                 content = cached
+                loadedChapter = targetChapter
                 isUsingStaleCache = true
             } else {
                 errorMessage = error.displayMessage
@@ -1506,7 +1552,7 @@ struct ChapterLoadingView: View {
         self.chapter = chapter
         self.totalChapters = totalChapters
         self.chapters = chapters
-        self.initialParagraphIndex = initialParagraphIndex
+        _initialParagraphIndex = State(initialValue: initialParagraphIndex)
         self.openingBook = openingBook
         self.extraToolbarActions = extraToolbarActions
         self.onRequestSourceSwitch = onRequestSourceSwitch

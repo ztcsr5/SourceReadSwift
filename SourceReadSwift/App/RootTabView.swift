@@ -1,5 +1,6 @@
 import Foundation
 import SwiftUI
+import UIKit
 
 struct RootTabView: View {
     @EnvironmentObject private var appState: AppState
@@ -56,17 +57,42 @@ struct RootTabView: View {
         #if compiler(>=6.2)
         if #available(iOS 26.0, *) {
             TabView(selection: $selectedTab) {
-                nativeTabRoot(BookshelfView()).tabItem { Label("主页", systemImage: "house") }.tag(0)
-                nativeTabRoot(DiscoverView(viewModel: appState.discoverViewModel)).tabItem { Label(AppNavigationLabels.findBooks, systemImage: AppNavigationLabels.findBooksSymbol) }.tag(1)
-                nativeTabRoot(SettingsView()).tabItem { Label("设置", systemImage: "gearshape") }.tag(2)
+                nativeTabRoot(BookshelfView()).tabItem { nativeTabLabel("主页", symbol: "house") }.tag(0)
+                nativeTabRoot(DiscoverView(viewModel: appState.discoverViewModel))
+                    .tabItem { nativeTabLabel(AppNavigationLabels.findBooks, symbol: AppNavigationLabels.findBooksSymbol) }.tag(1)
+                nativeTabRoot(SettingsView()).tabItem { nativeTabLabel("设置", symbol: "gearshape") }.tag(2)
             }
-            .tabBarMinimizeBehavior(.onScrollDown)
+            .tabBarMinimizeBehavior(.never)
         } else {
             legacyNavigationContent
         }
         #else
         legacyNavigationContent
         #endif
+    }
+
+    // A template keeps the native selection tint but does not let the system
+    // interpolate symbol paths while a user rapidly switches among tabs.
+    @MainActor private static let nativeTabGlyphs: [String: UIImage] = {
+        var glyphs: [String: UIImage] = [:]
+        for name in ["house", AppNavigationLabels.findBooksSymbol, "gearshape"] {
+            guard let symbol = UIImage(systemName: name,
+                withConfiguration: UIImage.SymbolConfiguration(pointSize: 22, weight: .medium)) else { continue }
+            let image = UIGraphicsImageRenderer(size: symbol.size).image { _ in
+                symbol.withTintColor(.black, renderingMode: .alwaysOriginal).draw(at: .zero)
+            }
+            glyphs[name] = image.withRenderingMode(.alwaysTemplate)
+        }
+        return glyphs
+    }()
+
+    @MainActor private func nativeTabLabel(_ title: String, symbol: String) -> some View {
+        Label {
+            Text(title)
+        } icon: {
+            if let glyph = Self.nativeTabGlyphs[symbol] { Image(uiImage: glyph) }
+            else { Image(systemName: symbol) }
+        }
     }
 
     private func nativeTabRoot<Content: View>(_ content: Content) -> some View {
@@ -83,12 +109,17 @@ struct RootTabView: View {
     }
 
     private var legacyNavigationContent: some View {
-        Group {
-            switch selectedTab {
-            case 0: BookshelfView()
-            case 1: DiscoverView(viewModel: appState.discoverViewModel, searchRequestID: legacySearchRequest)
-            default: SettingsView()
-            }
+        // Retain each navigation stack while the custom bar changes selection.
+        TabView(selection: $selectedTab) {
+            BookshelfView()
+                .toolbar(.hidden, for: .tabBar)
+                .tabItem { Label("主页", systemImage: "house") }.tag(0)
+            DiscoverView(viewModel: appState.discoverViewModel, searchRequestID: legacySearchRequest)
+                .toolbar(.hidden, for: .tabBar)
+                .tabItem { Label(AppNavigationLabels.findBooks, systemImage: AppNavigationLabels.findBooksSymbol) }.tag(1)
+            SettingsView()
+                .toolbar(.hidden, for: .tabBar)
+                .tabItem { Label("设置", systemImage: "gearshape") }.tag(2)
         }
     }
 

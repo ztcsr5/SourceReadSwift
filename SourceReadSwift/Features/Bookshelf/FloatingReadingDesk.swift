@@ -55,7 +55,7 @@ struct FloatingReadingDesk: View {
         .foregroundStyle(palette.ink)
         .contentShape(Rectangle())
         .accessibilityElement(children: .combine)
-        .accessibilityHint("轻点继续阅读，长按管理")
+        .accessibilityHint("轻点继续阅读，使用更多操作管理")
         .task(id: coverImage.map(ObjectIdentifier.init)) {
             guard let coverImage else { tone = nil; return }
             let sampled = await CoverToneSampler.shared.tone(for: coverImage)
@@ -85,10 +85,9 @@ struct FloatingReadingDesk: View {
     private var stage: some View {
         ZStack {
             glassPlane
-            if contrast != .increased {
-                LinearGradient(colors: [palette.pearl.opacity(0.45), .clear, palette.light.opacity(0.14)],
-                    startPoint: .topLeading, endPoint: .bottomTrailing)
-                    .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+                .modifier(PearlGlassFinish(outline: RoundedRectangle(cornerRadius: 16, style: .continuous),
+                    pearl: palette.pearl, mist: palette.light))
+            if contrast != .increased && !reducesTransparency {
                 Ellipse().fill(RadialGradient(colors: [palette.shadow.opacity(scheme == .dark ? 0.32 : 0.19), .clear],
                     center: .center, startRadius: 0, endRadius: 84))
                     .frame(width: 170, height: 18).offset(x: -3, y: 51)
@@ -96,10 +95,9 @@ struct FloatingReadingDesk: View {
         }.overlay {
             if contrast == .increased {
                 RoundedRectangle(cornerRadius: 16, style: .continuous).strokeBorder(palette.ink.opacity(0.45), lineWidth: 1.5)
-            } else {
+            } else if reducesTransparency {
                 RoundedRectangle(cornerRadius: 16, style: .continuous)
-                    .strokeBorder(LinearGradient(colors: [palette.pearl.opacity(0.85), palette.mist.opacity(0.10), palette.pearl.opacity(0.28)],
-                        startPoint: .topLeading, endPoint: .bottomTrailing), lineWidth: 0.75)
+                    .strokeBorder(palette.ink.opacity(0.18), lineWidth: 0.75)
             }
         }
         .shadow(color: palette.shadow.opacity(contrast == .increased ? 0 : 0.06), radius: 12, y: 8)
@@ -148,10 +146,10 @@ struct FloatingReadingDesk: View {
                 }
             }.frame(maxWidth: .infinity)
             VStack(spacing: 4) {
-                Text(ReadingHeroStatus.progress(for: book).replacingOccurrences(of: "章节进度 ", with: ""))
+                Text(ReadingHeroStatus.progressValue(for: book))
                     .font(.system(size: 20, weight: .semibold, design: .rounded)).monospacedDigit()
                     .lineLimit(2).minimumScaleFactor(0.8)
-                if book.lastReadAt != nil, book.totalChapters > 0 { Text("章节进度").font(.caption2) }
+                if book.lastReadAt != nil, book.totalChapters > 0 { Text("全书进度").font(.caption2) }
             }.frame(maxWidth: .infinity).accessibilityLabel(ReadingHeroStatus.progress(for: book))
         }.foregroundStyle(palette.ink.opacity(0.72)).padding(.horizontal, 12)
     }

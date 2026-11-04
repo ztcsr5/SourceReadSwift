@@ -3,11 +3,16 @@ import SwiftUI
 /// Reports only persisted reading state; chapter-count progress is not elapsed reading time.
 enum ReadingHeroStatus {
     static func progress(for book: BookshelfBook) -> String {
+        let value = progressValue(for: book)
+        return book.lastReadAt != nil && book.totalChapters > 0 ? "全书进度 " + value : value
+    }
+
+    static func progressValue(for book: BookshelfBook) -> String {
         guard book.lastReadAt != nil else { return "待开始" }
         guard book.totalChapters > 0 else { return "进度待记录" }
         let index = min(max(book.currentChapterIndex, 0), book.totalChapters - 1)
         let percent = Int((Double(index) + 1) / Double(book.totalChapters) * 100)
-        return "章节进度 \(percent)%"
+        return percent == 0 ? "<1%" : "\(percent)%"
     }
 
     static func chapter(for book: BookshelfBook) -> String {
@@ -52,7 +57,7 @@ struct ReadingHeroCard: View {
             .strokeBorder(AppTheme.accent.opacity(0.14), lineWidth: 0.8).allowsHitTesting(false) }
         .contentShape(RoundedRectangle(cornerRadius: AppTheme.cardRadius, style: .continuous))
         .accessibilityElement(children: .combine)
-        .accessibilityHint("轻点打开书籍，长按管理")
+        .accessibilityHint("轻点继续阅读，使用更多操作管理")
         .task(id: coverImage.map(ObjectIdentifier.init)) {
             guard let coverImage else { tone = nil; return }
             let sampled = await CoverToneSampler.shared.tone(for: coverImage)

@@ -5,6 +5,8 @@ struct DiscoverView: View {
     @EnvironmentObject private var appState: AppState
     @ObservedObject var viewModel: DiscoverViewModel
     let searchRequestID: UUID?
+    @State private var handledSearchRequestID: UUID?
+    @State private var hasBoundModels = false
     @FocusState private var searchIsFocused: Bool
     @StateObject private var exploreViewModel = ExploreViewModel()
     @State private var selectedTab: DiscoverTab = .search
@@ -186,21 +188,22 @@ struct DiscoverView: View {
                     .accessibilityLabel("智能网页阅读")
                 }
             }
-            .onChange(of: searchRequestID) { request in
-                if request != nil { selectedTab = .search; searchIsFocused = true }
+            .task(id: searchRequestID) {
+                guard let request = searchRequestID, request != handledSearchRequestID else { return }
+                await Task.yield()
+                guard !Task.isCancelled else { return }
+                handledSearchRequestID = request
+                selectedTab = .search
+                searchIsFocused = true
             }
             .task {
-                if searchRequestID != nil {
-                    selectedTab = .search
-                    await Task.yield()
-                    searchIsFocused = true
-                }
+                guard !hasBoundModels else { return }
+                hasBoundModels = true
                 viewModel.bind(appState: appState)
                 exploreViewModel.bind(appState: appState)
                 if cachedSearchHistory.isEmpty {
                     cachedSearchHistory = Self.decodeSearchHistory(searchHistoryJSON)
                 }
-                checkClipboard()
             }
             .onChange(of: searchHistoryJSON) { value in
                 let decoded = Self.decodeSearchHistory(value)

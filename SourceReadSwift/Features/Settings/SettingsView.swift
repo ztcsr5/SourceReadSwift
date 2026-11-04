@@ -11,6 +11,7 @@ struct SettingsView: View {
     @AppStorage("app.hapticsEnabled") private var hapticsEnabled = false
     @AppStorage("search_concurrent_threads") private var searchThreads = 12
     @AppStorage("batch_check_concurrent_threads") private var batchCheckThreads = SandboxEnvironment.recommendedBatchConcurrency
+    @State private var hasPrunedExpiredCache = false
     @State private var cacheSize = "无缓存"
     @State private var rssCacheSize = "无缓存"
     @State private var backupDocument: AppDataBackupDocument?
@@ -26,17 +27,17 @@ struct SettingsView: View {
 
                 Section("阅读与外观") {
                     NavigationLink {
-                        AppearanceSettingsView().hideRootTabBar()
+                        AppearanceSettingsView()
                     } label: {
                         Label("外观", systemImage: "paintpalette")
                     }
                     NavigationLink {
-                        CustomFontManagementView().hideRootTabBar()
+                        CustomFontManagementView()
                     } label: {
                         Label("字体管理与自定义导入", systemImage: "textformat")
                     }
                     NavigationLink {
-                        TTSSettingsView().hideRootTabBar()
+                        TTSSettingsView()
                     } label: {
                         Label("朗读引擎与云端凭据", systemImage: "waveform")
                     }
@@ -45,14 +46,13 @@ struct SettingsView: View {
 
                 Section("内容设置") {
                     NavigationLink {
-                        AIChatView().hideRootTabBar()
+                        AIChatView()
                     } label: {
                         Label("AI 助手 · 对话与写源", systemImage: "bubble.left.and.bubble.right")
                     }
                     NavigationLink {
                         SourceManagerView()
                             .environmentObject(appState)
-                            .hideRootTabBar()
                     } label: {
                         Label("书源管理", systemImage: "books.vertical")
                     }
@@ -68,7 +68,7 @@ struct SettingsView: View {
                     }
 
                     NavigationLink {
-                        CookieManagerView(cookieStore: appState.sourceCookieStore).hideRootTabBar()
+                        CookieManagerView(cookieStore: appState.sourceCookieStore)
                     } label: {
                         Label("会话与 Cookie 管理", systemImage: "network.badge.shield.half.filled")
                     }
@@ -76,25 +76,24 @@ struct SettingsView: View {
                     NavigationLink {
                         SourceWritingView(server: appState.sourceWritingServer)
                             .environmentObject(appState)
-                            .hideRootTabBar()
                     } label: {
                         Label("Web 写源与传输服务", systemImage: "globe")
                     }
 
                     NavigationLink {
-                        RuleHealthView().hideRootTabBar()
+                        RuleHealthView()
                     } label: {
                         Label("规则体检", systemImage: "shield")
                     }
 
                     NavigationLink {
-                        PurifyRulesView().hideRootTabBar()
+                        PurifyRulesView()
                     } label: {
                         Label("净化规则", systemImage: "wand.and.stars")
                     }
 
                     NavigationLink {
-                        SourceProxySettingsView().hideRootTabBar()
+                        SourceProxySettingsView()
                     } label: {
                         HStack {
                             Label("书源网络代理", systemImage: "network")
@@ -200,12 +199,12 @@ struct SettingsView: View {
 
                 Section("诊断") {
                     NavigationLink {
-                        ReaderPerformanceDiagnosticsView().hideRootTabBar()
+                        ReaderPerformanceDiagnosticsView()
                     } label: {
                         Label("阅读器性能", systemImage: "speedometer")
                     }
                     NavigationLink {
-                        RecentDiagnosticsView(events: appState.diagnostics).hideRootTabBar()
+                        RecentDiagnosticsView(events: appState.diagnostics)
                     } label: {
                         Label("最近诊断 · 查看与复制", systemImage: "doc.text.magnifyingglass")
                     }
@@ -220,8 +219,10 @@ struct SettingsView: View {
             .navigationBarTitleDisplayMode(.inline)
             .animation(.easeInOut(duration: 0.22), value: themeModeRawValue)
             .onAppear {
-                updateCacheSummary()
-                appState.chapterContentCacheStore.removeExpired()
+                if !hasPrunedExpiredCache {
+                    hasPrunedExpiredCache = true
+                    appState.chapterContentCacheStore.removeExpired()
+                }
                 updateCacheSummary()
                 updateRSSCacheSummary()
             }

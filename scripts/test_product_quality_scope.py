@@ -56,22 +56,52 @@ class ProductQualityScopeTests(unittest.TestCase):
         self.assertIn("stageEnvelopeHeight: CGFloat = 220", desk)
         self.assertIn("}.frame(height: Self.stageEnvelopeHeight)", desk)
 
-    def test_desk_menus_share_actions_but_tap_still_reads(self):
+    def test_desk_has_independent_management_and_no_hold_menu(self):
         shelf = read_source(SHELF + "BookshelfView.swift")
         card = shelf.split("private func heroCard", 1)[1].split("private func updateRow", 1)[0]
         self.assertIn("contextualBookRoute = .read(book)", card)
-        self.assertIn(".contextMenu { readingDeskBookActions(book) }", card)
-        self.assertEqual(card.count("readingDeskBookActions(book)"), 2)
+        self.assertNotIn(".contextMenu", card)
+        self.assertNotIn(".onLongPressGesture", card)
+        self.assertIn("readingDeskEntry(book)", card)
+        self.assertIn("readingDeskMenu(book)", card)
+        self.assertEqual(card.count("readingDeskBookActions(book)"), 1)
+        self.assertIn(".contextMenu", shelf.split("private func updateRow", 1)[1])
         self.assertIn('contextualBookRoute = .detail(book, placement: "continue")', card)
 
     def test_detail_keeps_cache_actions_without_a_block_over_the_directory(self):
         detail = read_source(DETAIL)
-        self.assertIn(".hideRootTabBar()", detail)
+        self.assertNotIn(".hideRootTabBar()", detail)
         self.assertIn("chapterDownloadMenu", detail)
         self.assertIn("downloadChapters(limit: 50)", detail)
         self.assertIn("downloadChapters(limit: nil)", detail)
         self.assertNotIn("private var downloadSection", detail)
         self.assertNotRegex(detail, r"case \.text:\s*break\b")
+
+    def test_shell_retains_tabs_and_limits_hiding_to_readers(self):
+        shell = read_source(APP + "App/RootTabView.swift")
+        self.assertIn(".tabBarMinimizeBehavior(.never)", shell)
+        self.assertNotIn("switch selectedTab", shell)
+        self.assertIn(".safeAreaInset(edge: .bottom, spacing: 0)", shell)
+        for path in ("Features/Settings/SettingsView.swift", "Features/SourceManager/SourceManagerView.swift"):
+            self.assertNotIn(".hideRootTabBar()", read_source(APP + path))
+        self.assertIn(".toolbar(.hidden, for: .navigationBar, .tabBar)", read_source(READER))
+
+    def test_loading_error_does_not_reveal_or_write_unpositioned_prose(self):
+        reader = read_source(READER)
+        waiting = reader.split(".task(id: openingPositionAttempt)", 1)[1].split(".onPreferenceChange", 1)[0]
+        self.assertIn("hasOpeningPositionTimedOut = true", waiting)
+        self.assertNotIn("resolveOpeningPreview()", waiting)
+        self.assertIn("guard didLandInitialPosition", reader)
+        self.assertIn("!readerOpeningManaged || hasResolvedOpeningPreview", reader)
+
+    def test_remote_chapter_has_one_owner_and_frozen_cursor(self):
+        gateway = read_source(SHELF + "BookshelfReaderGatewayView.swift")
+        self.assertNotIn("prefetchChapterContent", gateway)
+        self.assertIn("initialParagraphIndex: selectedRemoteParagraphIndex", gateway)
+        self.assertIn("launchCursor.paragraph(in: chapter.index)", gateway)
+        chapter_loader = read_source(DETAIL).split("struct ChapterLoadingView", 1)[1]
+        self.assertIn(".task(id: effectiveChapter)", chapter_loader)
+        self.assertIn("guard !Task.isCancelled, effectiveChapter == targetChapter", chapter_loader)
 
     def test_workbench_typography_and_classic_settings_keep_separate_boundaries(self):
         reader = read_source(READER)

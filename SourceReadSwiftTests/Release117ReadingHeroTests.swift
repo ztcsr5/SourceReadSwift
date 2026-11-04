@@ -13,12 +13,42 @@ final class Release117ReadingHeroTests: XCTestCase {
         XCTAssertEqual(ReadingHeroStatus.chapter(for: book), "上次位置待记录")
         book.totalChapters = 20; book.currentChapterIndex = 6
         book.currentChapterTitle = "  第七章 · 灯塔  "
-        XCTAssertEqual(ReadingHeroStatus.progress(for: book), "章节进度 35%")
+        XCTAssertEqual(ReadingHeroStatus.progress(for: book), "全书进度 35%")
         XCTAssertEqual(ReadingHeroStatus.chapter(for: book), "上次读到 · 第七章 · 灯塔")
         book.currentChapterIndex = Int.max
-        XCTAssertEqual(ReadingHeroStatus.progress(for: book), "章节进度 100%")
+        XCTAssertEqual(ReadingHeroStatus.progress(for: book), "全书进度 100%")
         book.currentChapterIndex = Int.min
-        XCTAssertEqual(ReadingHeroStatus.progress(for: book), "章节进度 5%")
+        XCTAssertEqual(ReadingHeroStatus.progress(for: book), "全书进度 5%")
+    }
+
+    func testFirstReadingDoesNotConfuseAnOpenAttemptWithAStoredCursor() {
+        var book = makeBook()
+        XCTAssertTrue(ReaderLaunchCursor.shouldShowTitlePage(for: nil))
+        XCTAssertTrue(ReaderLaunchCursor.shouldShowTitlePage(for: book))
+        book.lastOpenedAt = Date()
+        book.lastReadAt = book.lastOpenedAt
+        XCTAssertTrue(ReaderLaunchCursor.shouldShowTitlePage(for: book))
+        book.currentParagraphIndex = 0
+        XCTAssertFalse(ReaderLaunchCursor.shouldShowTitlePage(for: book))
+        book.totalChapters = 813
+        XCTAssertEqual(ReadingHeroStatus.progress(for: book), "全书进度 <1%")
+    }
+
+    func testLaunchCursorDoesNotReuseTheOldParagraphForAnotherChapterOrBookmark() {
+        var book = makeBook()
+        book.currentChapterIndex = 9; book.currentParagraphIndex = 14
+        let resume = ReaderLaunchCursor(book: book, bookmark: nil, requestedChapterIndex: nil)
+        XCTAssertEqual(resume.chapterIndex, 9)
+        XCTAssertEqual(resume.paragraph(in: 9), 14)
+        book.currentParagraphIndex = 20
+        XCTAssertEqual(resume.paragraph(in: 9), 14)
+        let toc = ReaderLaunchCursor(book: book, bookmark: nil, requestedChapterIndex: 8)
+        XCTAssertEqual(toc.chapterIndex, 8)
+        XCTAssertNil(toc.paragraph(in: 8))
+        let bookmark = ReaderBookmark(chapterIndex: 4, chapterTitle: "第四章", snippet: "")
+        let jump = ReaderLaunchCursor(book: book, bookmark: bookmark, requestedChapterIndex: nil)
+        XCTAssertEqual(jump.chapterIndex, 4)
+        XCTAssertNil(jump.paragraph(in: 4))
     }
 
     @MainActor func testCoverSamplingLeavesMainActorAndCachesMutedResultsAndFallbacks() async throws {

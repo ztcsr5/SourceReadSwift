@@ -782,8 +782,14 @@ struct BookshelfView: View {
     }
 
     private func heroCard(_ book: BookshelfBook) -> some View {
-        // Let the system Button and context menu arbitrate activation. A
-        // simultaneous tap recognizer on a link can open the reader after a hold.
+        // The management menu is a sibling, not part of the reading hit area.
+        ZStack(alignment: .topTrailing) {
+            readingDeskEntry(book)
+            readingDeskMenu(book)
+        }
+    }
+
+    private func readingDeskEntry(_ book: BookshelfBook) -> some View {
         Button {
             guard contextualBookRoute == nil else { return }
             pinReturnOrder(placement: "continue")
@@ -798,19 +804,22 @@ struct BookshelfView: View {
         }
         .accessibilityIdentifier("bookshelf.continue." + book.id)
         .buttonStyle(FloatingDeskPressStyle(isEnabled: readingDeskEnabled && floatingReadingDeskEnabled))
-        .contextMenu { readingDeskBookActions(book) }
-        .overlay(alignment: .topTrailing) {
-            Menu {
-                readingDeskBookActions(book)
-                Divider()
-                Toggle("悬浮玻璃书台", isOn: $floatingReadingDeskEnabled)
-                    .accessibilityIdentifier("bookshelf.floatingDeskToggle")
-            } label: {
-                Image(systemName: "ellipsis").font(.title3.weight(.semibold))
-                    .frame(width: 44, height: 44)
-                    .background(AppTheme.elevatedCard.opacity(readingDeskEnabled && floatingReadingDeskEnabled ? 0.6 : 1), in: Circle())
-            }.padding(12).accessibilityLabel("正在阅读书籍的更多操作")
+    }
+
+    private func readingDeskMenu(_ book: BookshelfBook) -> some View {
+        Menu {
+            readingDeskBookActions(book)
+            Divider()
+            Toggle("悬浮玻璃书台", isOn: $floatingReadingDeskEnabled)
+                .accessibilityIdentifier("bookshelf.floatingDeskToggle")
+        } label: {
+            Image(systemName: "ellipsis").font(.title3.weight(.semibold))
+                .frame(width: 44, height: 44)
+                .background(AppTheme.elevatedCard.opacity(readingDeskEnabled && floatingReadingDeskEnabled ? 0.6 : 1), in: Circle())
+                .contentShape(Rectangle())
         }
+        .padding(12)
+        .accessibilityLabel("正在阅读书籍的更多操作")
     }
 
     @ViewBuilder private func readingDeskBookActions(_ book: BookshelfBook) -> some View {
@@ -1282,7 +1291,6 @@ private struct BookshelfCollectionView: View {
         .scrollDismissesKeyboard(.interactively)
         .pageBackground()
         .navigationTitle(title)
-        .hideRootTabBar()
         // iOS 16 paints the large title directly above the first row; the
         // custom search field then reads as if it overlaps the navigation bar.
         // The collection is a utility screen, so a compact title is both safer
@@ -1526,11 +1534,12 @@ struct AsyncBookCover: View {
     var sourceURLString: String? = nil
     var onImageLoad: ((UIImage?) -> Void)? = nil
     var title: String? = nil
+    var contentMode: ContentMode = .fill
 
     var body: some View {
         Group {
             if let url = CoverURLResolver.url(from: urlString, base: baseURLString, fallbackBase: sourceURLString) {
-                CachedRemoteImage(url: url, maxPixelSize: coverMaxPixelSize, onImageLoad: { image in
+                CachedRemoteImage(url: url, contentMode: contentMode, maxPixelSize: coverMaxPixelSize, onImageLoad: { image in
                     if let image { readingCoverHandoff?.retain(image, for: url) }
                     onImageLoad?(image ?? readingCoverHandoff?.image(for: url))
                 }) { placeholder }
@@ -1559,7 +1568,7 @@ struct AsyncBookCover: View {
     @ViewBuilder private var placeholder: some View {
         if let url = CoverURLResolver.url(from: urlString, base: baseURLString, fallbackBase: sourceURLString),
            let image = readingCoverHandoff?.image(for: url) {
-            Image(uiImage: image).resizable().scaledToFill()
+            Image(uiImage: image).resizable().aspectRatio(contentMode: contentMode)
         } else {
             BookCoverPlaceholder(title: title, height: height, isOnDark: style == .onDark)
         }
