@@ -107,6 +107,13 @@ final class ReaderSettingsFlowUITests: XCTestCase {
         app.launch()
         XCTAssertTrue(shelfEntry.waitForExistence(timeout: 10))
         shelfEntry.tap()
+        let surface = element("reader.webScrollSurface")
+        let ready = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
+            surface.isHittable && self.app.webViews.staticTexts.firstMatch.exists
+                && !self.element("reader.openingProgress").exists
+        }, object: nil)
+        XCTAssertEqual(XCTWaiter.wait(for: [ready], timeout: 10), .completed,
+            "Reveal the menu only after the actual prose is ready to receive a tap")
     }
 
     private func revealMenu() {
