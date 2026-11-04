@@ -108,13 +108,18 @@ final class ReaderBookPassageController: UIViewController {
             containers.append(container)
             ancestor = container.superview
         }
-        for container in containers {
-            for gesture in container.gestureRecognizers ?? [] {
-                guard !(gesture is UITapGestureRecognizer), !(gesture is UILongPressGestureRecognizer),
-                      !observedGestures.contains(where: { $0 === gesture }) else { continue }
-                gesture.addTarget(self, action: #selector(observeNativeMotion(_:)))
-                observedGestures.append(gesture)
-            }
+        var candidates = containers.flatMap { $0.gestureRecognizers ?? [] }
+        if let edge = navigation.interactivePopGestureRecognizer { candidates.append(edge) }
+        #if compiler(>=6.2)
+        if #available(iOS 26.0, *), let content = navigation.interactiveContentPopGestureRecognizer {
+            candidates.append(content)
+        }
+        #endif
+        for gesture in candidates {
+            guard !(gesture is UITapGestureRecognizer), !(gesture is UILongPressGestureRecognizer),
+                  !observedGestures.contains(where: { $0 === gesture }) else { continue }
+            gesture.addTarget(self, action: #selector(observeNativeMotion(_:)))
+            observedGestures.append(gesture)
         }
         #endif
     }
