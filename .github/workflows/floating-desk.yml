@@ -1,4 +1,5 @@
 name: Floating Reading Desk
+run-name: "SourceRead 1.1.7 · Build 136 · UI 专项（无 IPA） · #${{ github.run_number }}"
 
 on:
   push:

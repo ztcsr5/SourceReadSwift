@@ -10,6 +10,31 @@ import unittest
 WORKFLOW = Path(__file__).resolve().parents[1] / '.github/workflows/ios.yml'
 
 
+class WorkflowRunNameTests(unittest.TestCase):
+    def test_run_titles_state_the_project_version_build_and_purpose(self):
+        root = WORKFLOW.parents[2]
+        project = (root / 'project.yml').read_text(encoding='utf8')
+        version = re.search(r'MARKETING_VERSION: "([^"]+)"', project).group(1)
+        build = re.search(r'CURRENT_PROJECT_VERSION: "([^"]+)"', project).group(1)
+        for filename, purpose in [('unsigned-ipa.yml', 'IPA 未签名测试包'),
+                                  ('ios.yml', 'iOS 完整验证'),
+                                  ('floating-desk.yml', 'UI 专项（无 IPA）')]:
+            with self.subTest(workflow=filename):
+                workflow = (WORKFLOW.parent / filename).read_text(encoding='utf8')
+                title = re.search(r'^run-name: (.+)$', workflow, re.M)
+                self.assertIsNotNone(title, 'Do not use the commit message as the release identity')
+                self.assertIn(f'{version} · Build {build}', title.group(1))
+                self.assertIn(purpose, title.group(1))
+                self.assertIn('github.run_number', title.group(1))
+
+    def test_ipa_filename_includes_build_and_commit_without_changing_artifact_contract(self):
+        workflow = (WORKFLOW.parent / 'unsigned-ipa.yml').read_text(encoding='utf8')
+        filename = 'SourceReadSwift-${VERSION}-build${BUILD}-${SHORT_SHA}-unsigned.ipa'
+        self.assertEqual(workflow.count(filename), 2, 'Packaging and summary must identify the same IPA')
+        self.assertIn('name: SourceReadSwift-unsigned-ipa', workflow)
+        self.assertIn('echo "- commit: \\`', workflow)
+
+
 class ReaderControlsWorkflowTests(unittest.TestCase):
     def setUp(self):
         self.native = WORKFLOW.read_text(encoding='utf8').split('  native-tabs:', 1)[1].split('  build:', 1)[0]

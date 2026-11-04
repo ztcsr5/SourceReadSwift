@@ -1,4 +1,5 @@
 name: Unsigned IPA
+run-name: "SourceRead 1.1.7 · Build 136 · IPA 未签名测试包 · #${{ github.run_number }}"
 
 concurrency:
   group: ios-${{ github.workflow }}-${{ github.ref }}
@@ -70,8 +71,10 @@ jobs:
           fi
           ditto -c -k --keepParent "$DSYM_PATH" SourceReadSwift-device-symbols.zip
           VERSION="$(grep 'MARKETING_VERSION:' project.yml | awk '{print $2}' | tr -d '\"')"
-          echo "Packaging version: ${VERSION}"
-          ditto -c -k --keepParent unsigned-ipa/Payload "SourceReadSwift-${VERSION}-unsigned.ipa"
+          BUILD="$(grep 'CURRENT_PROJECT_VERSION:' project.yml | awk '{print $2}' | tr -d '\"')"
+          SHORT_SHA="${GITHUB_SHA:0:7}"
+          echo "Packaging version: ${VERSION} / Build ${BUILD} / ${SHORT_SHA}"
+          ditto -c -k --keepParent unsigned-ipa/Payload "SourceReadSwift-${VERSION}-build${BUILD}-${SHORT_SHA}-unsigned.ipa"
           ls -lh SourceReadSwift*.ipa
 
       - name: Summarize IPA artifact
@@ -87,13 +90,15 @@ jobs:
             echo "::error::Version drift: Info.plist=${PLIST_VERSION} (${PLIST_BUILD}) project.yml=${VERSION} (${BUILD})"
             exit 1
           fi
-          IPA_NAME="SourceReadSwift-${VERSION}-unsigned.ipa"
+          SHORT_SHA="${GITHUB_SHA:0:7}"
+          IPA_NAME="SourceReadSwift-${VERSION}-build${BUILD}-${SHORT_SHA}-unsigned.ipa"
           SIZE_BYTES="$(stat -f%z "$IPA_NAME")"
           SHA256="$(shasum -a 256 "$IPA_NAME" | awk '{print $1}')"
           echo "IPA size: ${SIZE_BYTES} bytes"
           echo "IPA SHA-256: ${SHA256}"
           {
-            echo "## Unsigned IPA (v${VERSION})"
+            echo "## SourceRead ${VERSION} / Build ${BUILD} / unsigned"
+            echo "- commit: \`${GITHUB_SHA}\`"
             echo "- file: \`$IPA_NAME\`"
             echo "- size: ${SIZE_BYTES} bytes"
             echo "- SHA-256: \`${SHA256}\`"

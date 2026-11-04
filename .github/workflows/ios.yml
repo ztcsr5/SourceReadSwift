@@ -1,4 +1,5 @@
 name: iOS
+run-name: "SourceRead 1.1.7 · Build 136 · iOS 完整验证 · #${{ github.run_number }}"
 
 concurrency:
   group: ios-${{ github.workflow }}-${{ github.ref }}
