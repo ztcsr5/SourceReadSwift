@@ -1,11 +1,20 @@
 """Require real interactive book-return completion AND cancellation in simulator logs.
 
-Usage: python -B -X utf8 scripts/verify_book_passage_log.py desk-passage.log --ui-log desk-ui.log
+Usage: python -B -X utf8 scripts/verify_book_passage_log.py desk-passage.log --ui-log desk-ui.log --require-alignment
 No frame polling, user book identity or source URL is recorded.
 """
 import argparse
 from pathlib import Path
 import re
+
+def inspect_alignment(text):
+    """Require UIKit to consume both the real source view and mounted book rectangle."""
+    has_configuration = re.search(r"\bALIGN_CONFIGURED\b", text) is not None
+    source_flags = re.findall(r"\bALIGN_SOURCE ready=([01])\b", text)
+    rect_flags = re.findall(r"\bALIGN_RECT ready=([01])\b", text)
+    if not has_configuration or not source_flags or not rect_flags or "0" in source_flags + rect_flags:
+        raise ValueError("Native book alignment was not consumed with a valid source and rectangle")
+    return {"native_source": True, "native_alignment": True}
 
 def inspect_passages(text, ui_text=""):
     active = None
@@ -46,6 +55,10 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("log", type=Path)
     parser.add_argument("--ui-log", type=Path)
+    parser.add_argument("--require-alignment", action="store_true")
     args = parser.parse_args()
-    print(inspect_passages(args.log.read_text(encoding="utf8", errors="replace"),
+    passage_log = args.log.read_text(encoding="utf8", errors="replace")
+    print(inspect_passages(passage_log,
                           args.ui_log.read_text(encoding="utf8", errors="replace") if args.ui_log else ""))
+    if args.require_alignment:
+        print(inspect_alignment(passage_log))

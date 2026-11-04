@@ -11,8 +11,23 @@ final class ReaderBookPassageController: UIViewController {
             guard canPrepareReturn != oldValue, isViewLoaded else { return }
             // Removing the opening overlay need not relayout the UIKit probe.
             if canPrepareReturn { attachGestureEvidence() } else { detachGestureEvidence() }
+            if canPrepareReturn { prepareNativeReturnIfPossible() }
         }
     }
+    var nativeSourceID: String? {
+        didSet {
+            guard nativeSourceID != oldValue else { return }
+            restoreNativeReturn()
+            removeReturnSurface()
+            returnAnchor = nil
+        }
+    }
+    weak var coverHandoff: ReadingCoverHandoff?
+    var allowsNativeAlignment = false
+    var allowsNativeInteraction = false
+    private weak var returnAnchor: UIView?
+    // Availability-erased storage keeps the iOS 16 deployment path unchanged.
+    private var nativeReturnTransition: AnyObject?
     var makeReturnSurface: () -> AnyView = { AnyView(EmptyView()) }
     private(set) var returnHost: UIHostingController<AnyView>?
     #if DEBUG
@@ -37,12 +52,19 @@ final class ReaderBookPassageController: UIViewController {
         super.viewDidAppear(animated)
         removeReturnSurface()
         attachGestureEvidence()
-        DispatchQueue.main.async { [weak self] in self?.onArrival() }
+        DispatchQueue.main.async { [weak self] in
+            self?.onArrival()
+            self?.prepareNativeReturnIfPossible()
+        }
+        transitionCoordinator?.animate(alongsideTransition: nil) { [weak self] _ in
+            self?.prepareNativeReturnIfPossible()
+        }
     }
 
     override func viewDidLayoutSubviews() {
         super.viewDidLayoutSubviews()
         attachGestureEvidence()
+        prepareNativeReturnIfPossible()
     }
 
     override func viewWillDisappear(_ animated: Bool) {
@@ -75,7 +97,9 @@ final class ReaderBookPassageController: UIViewController {
     func installReturnSurface(in source: UIViewController) -> UIHostingController<AnyView> {
         if let returnHost { return returnHost }
         let host = UIHostingController(rootView: makeReturnSurface())
+        returnHost = host
         host.view.backgroundColor = .clear
+        host.view.alpha = 0
         host.view.isUserInteractionEnabled = false
         host.view.accessibilityElementsHidden = true
         source.addChild(host)
@@ -84,8 +108,36 @@ final class ReaderBookPassageController: UIViewController {
         source.view.addSubview(host.view)
         host.didMove(toParent: source)
         host.view.layoutIfNeeded()
-        returnHost = host
         return host
+    }
+
+    func prepareNativeReturnIfPossible() {
+        guard canPrepareReturn, allowsNativeAlignment, let sourceID = nativeSourceID,
+              let handoff = coverHandoff, handoff.nativeCover(for: sourceID) != nil,
+              let source = navigationController?.viewControllers.first(where: { belongs(to: $0) }) else {
+            if !allowsNativeAlignment { restoreNativeReturn(prefersDefault: true) }
+            return
+        }
+        guard #available(iOS 18.0, *) else { return }
+        if returnHost == nil { installReturnSurface(in: source) }
+        guard let returnAnchor else { return }
+        let transition = (nativeReturnTransition as? NativeBookReturnTransition)
+            ?? NativeBookReturnTransition(sourceID: sourceID, handoff: handoff)
+        nativeReturnTransition = transition
+        transition.allowsInteractiveReturn = allowsNativeInteraction
+        transition.install(in: source, anchor: returnAnchor)
+    }
+
+    func updateReturnAnchor(_ anchor: UIView) {
+        returnAnchor = anchor
+        prepareNativeReturnIfPossible()
+    }
+
+    func restoreNativeReturn(prefersDefault: Bool = false) {
+        if #available(iOS 18.0, *) {
+            (nativeReturnTransition as? NativeBookReturnTransition)?.restore(prefersDefault: prefersDefault)
+        }
+        nativeReturnTransition = nil
     }
 
     func finishReturnSurface(_ carrier: UIHostingController<AnyView>) {

@@ -4,6 +4,7 @@ import SwiftUI
 /// Scoped to a bookshelf navigation stack; never publishes image arrival to the shelf.
 final class ReadingCoverHandoff: ObservableObject {
     private let images = NSCache<NSURL, UIImage>()
+    private var nativeCovers: [String: NativeCoverAnchor] = [:]
 
     init() {
         images.countLimit = 5
@@ -25,6 +26,24 @@ final class ReadingCoverHandoff: ObservableObject {
     }
 
     func clear() { images.removeAllObjects() }
+
+    @MainActor func registerNativeCover(_ view: UIView, for sourceID: String) {
+        if nativeCovers[sourceID]?.view === view { return }
+        nativeCovers = nativeCovers.filter { $0.value.view != nil }
+        nativeCovers[sourceID] = NativeCoverAnchor(view)
+    }
+
+    @MainActor func nativeCover(for sourceID: String) -> UIView? { nativeCovers[sourceID]?.view }
+
+    @MainActor func removeNativeCover(_ view: UIView, for sourceID: String) {
+        guard nativeCovers[sourceID]?.view === view else { return }
+        nativeCovers[sourceID] = nil
+    }
+}
+
+private final class NativeCoverAnchor {
+    weak var view: UIView?
+    init(_ view: UIView) { self.view = view }
 }
 
 private struct ReadingCoverHandoffKey: EnvironmentKey {

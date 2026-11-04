@@ -1,8 +1,27 @@
 """Test the native return evidence validator. Usage: unittest discover -s scripts -p test_book_passage_log.py."""
 import unittest
 from verify_book_passage_log import inspect_passages
+import verify_book_passage_log as verifier
 
 class BookPassageLogTests(unittest.TestCase):
+    def test_alignment_requires_actual_source_and_rectangle_callbacks(self):
+        self.assertEqual(verifier.inspect_alignment("ALIGN_CONFIGURED\nALIGN_SOURCE ready=1\nALIGN_RECT ready=1"),
+                         {"native_source": True, "native_alignment": True})
+
+    def test_configuring_an_alignment_without_using_it_cannot_pass(self):
+        with self.assertRaises(ValueError):
+            verifier.inspect_alignment("ALIGN_CONFIGURED")
+
+    def test_a_missing_source_or_rectangle_cannot_pass(self):
+        for log in ["ALIGN_CONFIGURED\nALIGN_SOURCE ready=0\nALIGN_RECT ready=1",
+                    "ALIGN_CONFIGURED\nALIGN_SOURCE ready=1\nALIGN_RECT ready=0"]:
+            with self.assertRaises(ValueError):
+                verifier.inspect_alignment(log)
+
+    def test_a_silent_fallback_after_success_cannot_pass(self):
+        with self.assertRaises(ValueError):
+            verifier.inspect_alignment("ALIGN_CONFIGURED\nALIGN_SOURCE ready=1\nALIGN_RECT ready=1\nALIGN_SOURCE ready=0")
+
     def zoom_ui(self, before=0, after=1, passed=True):
         case = "Test Case '-[SourceReadSwiftUITests.FloatingReadingDeskUITests testReaderSystemReturnCanCancelWithoutLosingItsSavedParagraph]'"
         return (case + " started.\n" +

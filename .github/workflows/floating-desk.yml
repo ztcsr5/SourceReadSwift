@@ -63,6 +63,7 @@ jobs:
             COMMAND+=(-test-timeouts-enabled YES -maximum-test-execution-time-allowance 60)
             TESTS=(-only-testing:SourceReadSwiftTests/FloatingReadingDeskTests \
               -only-testing:SourceReadSwiftTests/NativeBookGestureProbeTests \
+              -only-testing:SourceReadSwiftTests/NativeBookReturnTransitionTests \
               -only-testing:SourceReadSwiftTests/ReaderExitSwipeTests \
               -only-testing:SourceReadSwiftTests/ReaderTabChromeExitTests \
               -only-testing:SourceReadSwiftTests/ReaderModePositionRegressionTests \
@@ -100,7 +101,7 @@ jobs:
           kill "$LOG_PID" 2>/dev/null || true
           wait "$LOG_PID" || true
           trap - EXIT
-          python3 scripts/verify_book_passage_log.py desk-passage.log --ui-log desk-ui.log
+          python3 scripts/verify_book_passage_log.py desk-passage.log --ui-log desk-ui.log --require-alignment
       - name: Export real app screenshots
         if: always()
         run: |

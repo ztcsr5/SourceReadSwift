@@ -1093,6 +1093,7 @@ struct ReaderView: View {
             .ignoresSafeArea()
         }
         .background(ReaderNavigationPopLock(allowSystemReturn: allowsNativeBookReturn))
+        .readerOpeningAllowsNativeReturn(allowsNativeBookReturn)
         .background(ReaderTabChromeExitBridge(owner: tabChromeOwner))
         .background(ReaderExitSwipeBridge(
             enabled: ReaderExitSwipePolicy.isEnabled(
