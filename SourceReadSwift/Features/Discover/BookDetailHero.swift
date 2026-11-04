@@ -16,7 +16,7 @@ struct BookDetailHero: View {
     @State private var hasArrived = false
     @Environment(\.dynamicTypeSize) private var typeSize
     @Environment(\.colorSchemeContrast) private var contrast
-    @AppStorage("settings.visualTheme") private var themeRaw = AppVisualTheme.classic.rawValue
+    @AppStorage(AppVisualTheme.selectionKey) private var themeRaw = AppVisualTheme.initialSelection.rawValue
     @AppStorage("settings.appearanceRevision") private var revision = 0
     @AppMotion private var motion
 

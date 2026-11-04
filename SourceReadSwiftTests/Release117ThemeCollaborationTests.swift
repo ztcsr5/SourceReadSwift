@@ -5,8 +5,8 @@ import XCTest
 final class Release117ThemeCollaborationTests: XCTestCase {
     func testSurfacePolicyUsesRuntimeCapabilitiesAndAccessibilityRatherThanThemeSelection() {
         for theme in AppVisualTheme.allCases {
-            XCTAssertEqual(AppThemeSurfaceStyle.resolve(theme: theme, nativeGlassAvailable: false, reduceTransparency: false, increasedContrast: false), theme == .classic ? .legacyMaterial : .paper)
-            XCTAssertEqual(AppThemeSurfaceStyle.resolve(theme: theme, nativeGlassAvailable: true, reduceTransparency: false, increasedContrast: false), theme == .classic ? .nativeGlass : .paper)
+            XCTAssertEqual(AppThemeSurfaceStyle.resolve(theme: theme, nativeGlassAvailable: false, reduceTransparency: false, increasedContrast: false), [AppVisualTheme.classic, .forest].contains(theme) ? .legacyMaterial : .paper)
+            XCTAssertEqual(AppThemeSurfaceStyle.resolve(theme: theme, nativeGlassAvailable: true, reduceTransparency: false, increasedContrast: false), [AppVisualTheme.classic, .forest].contains(theme) ? .nativeGlass : .paper)
             XCTAssertEqual(AppThemeSurfaceStyle.resolve(theme: theme, nativeGlassAvailable: true, reduceTransparency: true, increasedContrast: false), .paper)
             XCTAssertEqual(AppThemeSurfaceStyle.resolve(theme: theme, nativeGlassAvailable: true, reduceTransparency: false, increasedContrast: true), .paper)
         }

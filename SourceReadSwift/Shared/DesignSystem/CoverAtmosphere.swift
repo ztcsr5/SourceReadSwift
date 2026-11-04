@@ -5,14 +5,14 @@ struct CoverAtmosphere: View {
     let tone: CoverTone?
     @Environment(\.colorSchemeContrast) private var contrast
     @Environment(\.colorScheme) private var scheme
-    @AppStorage("settings.visualTheme") private var theme = AppVisualTheme.classic.rawValue
+    @AppStorage(AppVisualTheme.selectionKey) private var theme = AppVisualTheme.initialSelection.rawValue
     @AppStorage("settings.appearanceRevision") private var revision = 0
     var body: some View {
         ZStack {
             let _ = theme
             let _ = revision
             AppTheme.card
-            if contrast != .increased {
+            if contrast != .increased, theme != AppVisualTheme.forest.rawValue {
                 let pigment = tone.map { Color(red: $0.vividRed, green: $0.vividGreen, blue: $0.vividBlue) } ?? AppTheme.accent
                 // The theme remains the paper; the cover contributes only a restrained wash.
                 LinearGradient(colors: [pigment.opacity(scheme == .dark ? 0.14 : 0.09), .clear, AppTheme.background.opacity(0.45)],

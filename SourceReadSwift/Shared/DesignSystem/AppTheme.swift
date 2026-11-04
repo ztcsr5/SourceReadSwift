@@ -81,7 +81,7 @@ extension View {
 private struct PageBackgroundModifier: ViewModifier {
     @AppStorage("settings.themeMode") private var themeModeRawValue = ThemeMode.system.rawValue
 
-    @AppStorage("settings.visualTheme") private var visualTheme = AppVisualTheme.classic.rawValue
+    @AppStorage(AppVisualTheme.selectionKey) private var visualTheme = AppVisualTheme.initialSelection.rawValue
     @AppStorage("settings.appearanceRevision") private var appearanceRevision = 0
 
     func body(content: Content) -> some View {

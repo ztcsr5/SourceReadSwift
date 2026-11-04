@@ -2,7 +2,7 @@ import SwiftUI
 
 struct AppearanceSettingsView: View {
     @AppStorage("settings.themeMode") private var themeModeRawValue = ThemeMode.system.rawValue
-    @AppStorage("settings.visualTheme") private var visualTheme = AppVisualTheme.classic.rawValue
+    @AppStorage(AppVisualTheme.selectionKey) private var visualTheme = AppVisualTheme.initialSelection.rawValue
     @AppStorage("settings.appearanceRevision") private var appearanceRevision = 0
     @AppStorage("settings.reducesMotion") private var reducesMotion = false
     @AppStorage("settings.readingDeskEnabled") private var readingDeskEnabled = true
@@ -15,6 +15,7 @@ struct AppearanceSettingsView: View {
                         AppThemePreview(theme: theme, selected: visualTheme == theme.rawValue)
                     }
                     .buttonStyle(.plain)
+                    .accessibilityIdentifier("app.theme." + theme.rawValue)
                     .accessibilityAddTraits(visualTheme == theme.rawValue ? [.isSelected] : [])
                     .listRowBackground(AppThemeRowSurface())
                 }

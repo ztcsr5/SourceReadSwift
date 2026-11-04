@@ -6,7 +6,7 @@ struct BookCoverPlaceholder: View {
     let height: CGFloat
     var isOnDark = false
     @Environment(\.colorScheme) private var scheme
-    @AppStorage("settings.visualTheme") private var themeRaw = AppVisualTheme.classic.rawValue
+    @AppStorage(AppVisualTheme.selectionKey) private var themeRaw = AppVisualTheme.initialSelection.rawValue
 
     private var theme: AppVisualTheme { AppVisualTheme(rawValue: themeRaw) ?? .classic }
     private var isDark: Bool { isOnDark || scheme == .dark }

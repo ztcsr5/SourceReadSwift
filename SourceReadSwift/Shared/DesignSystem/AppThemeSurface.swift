@@ -2,7 +2,7 @@ import SwiftUI
 
 /// A row observes palette changes itself, including inside an already-open sheet.
 struct AppThemeRowSurface: View {
-    @AppStorage("settings.visualTheme") private var theme = AppVisualTheme.classic.rawValue
+    @AppStorage(AppVisualTheme.selectionKey) private var theme = AppVisualTheme.initialSelection.rawValue
     @AppStorage("settings.appearanceRevision") private var revision = 0
     var body: some View {
         let _ = theme
@@ -22,7 +22,7 @@ enum AppThemeSurfaceStyle: Equatable {
     }
 
     static func resolve(theme: AppVisualTheme, nativeGlassAvailable: Bool, reduceTransparency: Bool, increasedContrast: Bool) -> Self {
-        guard theme == .classic, !reduceTransparency, !increasedContrast else { return .paper }
+        guard theme.supportsLiveGlass, !reduceTransparency, !increasedContrast else { return .paper }
         return nativeGlassAvailable ? .nativeGlass : .legacyMaterial
     }
 }
@@ -35,7 +35,7 @@ struct AppThemeSurface: ViewModifier {
     let strokeOpacity: Double
     let shadowOpacity: Double
     var usesLiveMaterial = false
-    @AppStorage("settings.visualTheme") private var themeRawValue = AppVisualTheme.classic.rawValue
+    @AppStorage(AppVisualTheme.selectionKey) private var themeRawValue = AppVisualTheme.initialSelection.rawValue
     @AppStorage("settings.appearanceRevision") private var appearanceRevision = 0
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
     @Environment(\.colorSchemeContrast) private var contrast

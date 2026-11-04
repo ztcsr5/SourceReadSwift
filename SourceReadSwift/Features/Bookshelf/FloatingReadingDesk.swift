@@ -8,7 +8,7 @@ struct FloatingReadingDesk: View {
     @Environment(\.colorScheme) private var scheme
     @Environment(\.colorSchemeContrast) private var contrast
     @Environment(\.accessibilityReduceTransparency) private var reducesTransparency
-    @AppStorage("settings.visualTheme") private var themeRaw = AppVisualTheme.classic.rawValue
+    @AppStorage(AppVisualTheme.selectionKey) private var themeRaw = AppVisualTheme.initialSelection.rawValue
     @AppStorage("settings.appearanceRevision") private var appearanceRevision = 0
     @AppMotion private var motion
     // Reserve room for two title lines without changing the measured desk height.

@@ -7,6 +7,7 @@ struct SourceReadSwiftApp: App {
     @Environment(\.scenePhase) private var scenePhase
 
     init() {
+        AppVisualTheme.bootstrapSelection(in: .standard)
         UIImpactFeedbackGenerator.initializeHapticsControl()
         UINotificationFeedbackGenerator.initializeNotificationHapticsControl()
     }

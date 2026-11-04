@@ -71,8 +71,10 @@ final class BookshelfStore: ObservableObject {
     }
 
     /// 首次启动或空书架时引导填充预置经典读物，提升开箱即用品质并满足 App Store 审核准则
+    nonisolated static let welcomeSeedPreferenceKey = "bookshelf.hasSeededOnboardingBook.v1"
+
     func seedOnboardingBookIfNeeded(force: Bool = false) {
-        let hasSeededKey = "bookshelf.hasSeededOnboardingBook.v1"
+        let hasSeededKey = Self.welcomeSeedPreferenceKey
         if !force && UserDefaults.standard.bool(forKey: hasSeededKey) {
             return
         }

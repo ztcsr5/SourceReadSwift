@@ -8,7 +8,7 @@ struct RootTabView: View {
     @State private var hasAudio = false
     @AppStorage("settings.accentHex") private var accentHex = "594FDB"
     @AppStorage("settings.secondaryAccentHex") private var secondaryAccentHex = "419BDC"
-    @AppStorage("settings.visualTheme") private var visualTheme = AppVisualTheme.classic.rawValue
+    @AppStorage(AppVisualTheme.selectionKey) private var visualTheme = AppVisualTheme.initialSelection.rawValue
     @AppStorage("settings.appearanceRevision") private var appearanceRevision = 0
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @AppMotion private var motion
