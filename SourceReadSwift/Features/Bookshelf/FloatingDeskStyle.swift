@@ -19,6 +19,11 @@ struct FloatingDeskPalette {
     let finish: FloatingDeskFinish
 
     static func resolve(theme: AppVisualTheme) -> Self {
+        if theme.usesNeutralGlass {
+            return Self(pearl: theme.dynamicColor(light: 0xFAF9F5, dark: 0xC8C4B9),
+                mist: theme.controlFill, light: theme.dynamicColor(light: 0xD9D6CE, dark: 0x918B7D),
+                ink: theme.primaryInk, shadow: .black, glassTint: theme.controlFill, finish: .quiet)
+        }
         if theme == .classic {
             return Self(pearl: theme.dynamicColor(light: 0xFAF8FF, dark: 0x201D2C),
                 mist: AppTheme.accent, light: theme.dynamicColor(light: 0xDAD0F5, dark: 0x75638F),

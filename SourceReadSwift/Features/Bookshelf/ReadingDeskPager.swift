@@ -23,13 +23,14 @@ struct ReadingDeskPager<Card: View>: View {
     let books: [BookshelfBook]
     @Binding var selection: String
     var usesFloatingStyle = false
+    var preferredFloatingHeight: CGFloat = 288
     @ViewBuilder var card: (BookshelfBook) -> Card
     @Environment(\.dynamicTypeSize) private var typeSize
     @AppMotion private var motion
     @State private var heights: [String: CGFloat] = [:]
 
     private var index: Int { books.firstIndex(where: { $0.id == selection }) ?? 0 }
-    private var height: CGFloat { max(books.compactMap { heights[$0.id] }.max() ?? (usesFloatingStyle ? 288 : books.contains(where: { $0.hasUpdates }) ? 196 : 176), 160) }
+    private var height: CGFloat { max(books.compactMap { heights[$0.id] }.max() ?? (usesFloatingStyle ? preferredFloatingHeight : books.contains(where: { $0.hasUpdates }) ? 196 : 176), 160) }
     private var current: BookshelfBook? { books.indices.contains(index) ? books[index] : books.first }
 
     var body: some View {
@@ -74,6 +75,7 @@ struct ReadingDeskPager<Card: View>: View {
         }
         .onChange(of: typeSize) { _ in heights = [:] }
         .onChange(of: usesFloatingStyle) { _ in heights = [:] }
+        .onChange(of: preferredFloatingHeight) { _ in heights = [:] }
         .onChange(of: books.map(\.id)) { ids in heights = heights.filter { ids.contains($0.key) } }
     }
 

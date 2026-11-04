@@ -6,6 +6,9 @@ import UIKit
     static func makeAppState() -> AppState {
         // An argument-domain override would mask writes made by the real style toggle.
         UserDefaults.standard.set(true, forKey: "settings.floatingReadingDeskEnabled")
+        if ProcessInfo.processInfo.arguments.contains("--forest-appearance-regression") {
+            UserDefaults.standard.set(AppVisualTheme.forest.rawValue, forKey: AppVisualTheme.selectionKey)
+        }
         let root = FileManager.default.temporaryDirectory.appendingPathComponent("floating-desk-ui-" + UUID().uuidString)
         let shelf = BookshelfStore(persistence: BookshelfPersistence(rootURL: root),
             groupPersistence: BookshelfGroupPersistence(rootURL: root))

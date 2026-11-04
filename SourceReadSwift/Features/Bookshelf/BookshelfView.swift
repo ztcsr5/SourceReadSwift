@@ -24,6 +24,8 @@ struct BookshelfView: View {
     @AppStorage("settings.readingDeskEnabled") private var readingDeskEnabled = true
     @AppStorage("settings.floatingReadingDeskEnabled") private var floatingReadingDeskEnabled = true
     @StateObject private var readingCoverHandoff = ReadingCoverHandoff()
+    @AppStorage(AppVisualTheme.selectionKey) private var themeRaw = AppVisualTheme.initialSelection.rawValue
+    private var theme: AppVisualTheme { AppVisualTheme(rawValue: themeRaw) ?? .classic }
 
     private enum ContextualBookRoute {
         case read(BookshelfBook, coverFrame: UIImage?)
@@ -64,29 +66,6 @@ struct BookshelfView: View {
         return appState.sourceStore.source(for: book.sourceURL)?.sourceKind
     }
 
-    private func formatTag(for book: BookshelfBook) -> (title: String, color: Color, icon: String)? {
-        if book.sourceURL == "local://text" || book.sourceURL.hasPrefix("local://") {
-            // `book.id` is always `local|<UUID>` and an imported EPUB title comes
-            // from OPF `dc:title`, so the old `id/title contains ".epub"` probe was
-            // dead code and every EPUB was labelled TXT. Use the persisted EPUB
-            // shape instead (chapters carry a package path / navigation entries).
-            if book.isLocalEPUB {
-                return ("EPUB", .indigo, "doc.richtext")
-            }
-            return ("TXT", .blue, "doc.text")
-        }
-        guard let source = appState.sourceStore.source(for: book.sourceURL) else { return nil }
-        switch source.sourceKind {
-        case .audio:
-            return ("有声", .green, "headphones")
-        case .comic:
-            return ("漫画", .purple, "character.book.closed.fill")
-        case .video:
-            return ("影视", .red, "play.tv.fill")
-        case .text:
-            return nil
-        }
-    }
 
     private var displayedShelfBooks: [BookshelfBook] {
         var list = allBooks
@@ -168,7 +147,7 @@ struct BookshelfView: View {
                 if !isEnabled { readingCoverHandoff.clear() }
             }
             .navigationTitle("主页")
-            .navigationBarTitleDisplayMode(.inline)
+            .navigationBarTitleDisplayMode(theme.usesNeutralGlass ? .large : .inline)
             .toolbar {
                 // 左上角「管理」入口已移除：书架管理与分组都在书架区标题里点进去，
                 // 工具栏只保留右侧的统计与导入，避免大标题左肩挂一个孤零零的图标。
@@ -178,6 +157,7 @@ struct BookshelfView: View {
                     } label: {
                         Image(systemName: "chart.bar.xaxis")
                             .font(.system(size: 16, weight: .semibold))
+                            .foregroundStyle(theme.usesNeutralGlass ? theme.primaryInk : AppTheme.accent)
                     }
                     .accessibilityLabel("阅读统计看板")
 
@@ -187,6 +167,7 @@ struct BookshelfView: View {
                     } label: {
                         Image(systemName: "folder.badge.plus")
                             .font(.system(size: 18, weight: .semibold))
+                            .foregroundStyle(theme.usesNeutralGlass ? theme.primaryInk : AppTheme.accent)
                     }
                     .accessibilityLabel("导入本地书籍")
                 }
@@ -272,27 +253,29 @@ struct BookshelfView: View {
     }
 
     private var bookshelfBackdrop: some View {
-        _ = themeModeRawValue
+        let _ = themeModeRawValue
         return ZStack {
             AppTheme.background
-            LinearGradient(
-                colors: [
-                    AppTheme.accent.opacity(colorScheme == .dark ? 0.16 : 0.08),
-                    Color.clear,
-                    Color.black.opacity(colorScheme == .dark ? 0.18 : 0.03)
-                ],
-                startPoint: .topTrailing,
-                endPoint: .bottomLeading
-            )
-            RadialGradient(
-                colors: [
-                    Color.white.opacity(colorScheme == .dark ? 0.03 : 0.45),
-                    Color.clear
-                ],
-                center: .topLeading,
-                startRadius: 40,
-                endRadius: 420
-            )
+            if !theme.usesNeutralGlass {
+                LinearGradient(
+                    colors: [
+                        AppTheme.accent.opacity(colorScheme == .dark ? 0.16 : 0.08),
+                        Color.clear,
+                        Color.black.opacity(colorScheme == .dark ? 0.18 : 0.03)
+                    ],
+                    startPoint: .topTrailing,
+                    endPoint: .bottomLeading
+                )
+                RadialGradient(
+                    colors: [
+                        Color.white.opacity(colorScheme == .dark ? 0.03 : 0.45),
+                        Color.clear
+                    ],
+                    center: .topLeading,
+                    startRadius: 40,
+                    endRadius: 420
+                )
+            }
         }
         .ignoresSafeArea()
     }
@@ -312,7 +295,8 @@ struct BookshelfView: View {
                     let books = deskBooks
                     ReadingDeskPager(books: books, selection: Binding(
                         get: { ReadingDeskSelection.resolve(readingBookID, in: books) },
-                        set: { readingBookID = $0 }), usesFloatingStyle: floatingReadingDeskEnabled, card: { heroCard($0) })
+                        set: { readingBookID = $0 }), usesFloatingStyle: floatingReadingDeskEnabled,
+                        preferredFloatingHeight: theme.usesNeutralGlass ? 194 : 288, card: { heroCard($0) })
                 } else if let book = recentBooks.first { heroCard(book) }
             }
         }
@@ -378,7 +362,7 @@ struct BookshelfView: View {
         }
         .padding(.horizontal, 12)
         .frame(height: 38)
-        .background(AppTheme.elevatedCard)
+        .background(theme.usesNeutralGlass ? theme.controlFill : AppTheme.elevatedCard)
         .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
     }
 
@@ -488,9 +472,10 @@ struct BookshelfView: View {
                 } label: {
                     Image(systemName: "arrow.up.arrow.down")
                         .font(.system(size: 15, weight: .medium))
-                        .foregroundStyle(.secondary)
-                        .frame(width: 32, height: 32)
-                        .background(Color.secondary.opacity(0.12), in: Circle())
+                        .foregroundStyle(theme.usesNeutralGlass ? theme.secondaryInk : .secondary)
+                        .frame(width: theme.usesNeutralGlass ? 44 : 32, height: theme.usesNeutralGlass ? 44 : 32)
+                        .background(theme.usesNeutralGlass ? Color.clear : Color.secondary.opacity(0.12), in: Circle())
+                        .contentShape(Rectangle())
                 }
                 .accessibilityLabel("排序方式")
 
@@ -502,9 +487,10 @@ struct BookshelfView: View {
                 } label: {
                     Image(systemName: isGridMode ? "rectangle.grid.1x2" : "square.grid.2x2")
                         .font(.system(size: 15, weight: .medium))
-                        .foregroundStyle(.secondary)
-                        .frame(width: 32, height: 32)
-                        .background(Color.secondary.opacity(0.12), in: Circle())
+                        .foregroundStyle(theme.usesNeutralGlass ? theme.secondaryInk : .secondary)
+                        .frame(width: theme.usesNeutralGlass ? 44 : 32, height: theme.usesNeutralGlass ? 44 : 32)
+                        .background(theme.usesNeutralGlass ? Color.clear : Color.secondary.opacity(0.12), in: Circle())
+                        .contentShape(Rectangle())
                 }
                 .buttonStyle(AppPressStyle())
                 .accessibilityLabel(isGridMode ? "切换为列表视图" : "切换为网格视图")
@@ -521,13 +507,7 @@ struct BookshelfView: View {
                 .font(.system(size: 13, weight: isSelected ? .semibold : .regular))
                 .padding(.horizontal, 14)
                 .padding(.vertical, 7)
-                .background(isSelected ? AppTheme.accent : AppTheme.card, in: Capsule())
-                .foregroundStyle(isSelected ? Color.white : Color.primary)
-                .overlay {
-                    if !isSelected {
-                        Capsule().stroke(Color.primary.opacity(0.06), lineWidth: 0.8)
-                    }
-                }
+                .modifier(BrandFilterFinish(isSelected: isSelected, legacyFill: AppTheme.card))
         }
         .buttonStyle(AppPressStyle())
     }
@@ -796,8 +776,14 @@ struct BookshelfView: View {
             UIImpactFeedbackGenerator(style: .light).impactOccurred()
             contextualBookRoute = .read(book, coverFrame: readingCoverHandoff.frame(for: book))
         } label: {
-            ReadingHeroCard(book: book, heroNamespace: bookHero, usesSpatialStyle: readingDeskEnabled,
-                usesFloatingStyle: floatingReadingDeskEnabled)
+            Group {
+                if theme.usesNeutralGlass && readingDeskEnabled && floatingReadingDeskEnabled {
+                    ForestReadingCard(book: book, heroNamespace: bookHero)
+                } else {
+                    ReadingHeroCard(book: book, heroNamespace: bookHero, usesSpatialStyle: readingDeskEnabled,
+                        usesFloatingStyle: floatingReadingDeskEnabled)
+                }
+            }
                 .environment(\.readingCoverHandoff, readingDeskEnabled && floatingReadingDeskEnabled ? readingCoverHandoff : nil)
                 .frame(maxWidth: .infinity, alignment: .topLeading)
                 .padding(.vertical, 3)
@@ -815,10 +801,11 @@ struct BookshelfView: View {
         } label: {
             Image(systemName: "ellipsis").font(.title3.weight(.semibold))
                 .frame(width: 44, height: 44)
-                .background(AppTheme.elevatedCard.opacity(readingDeskEnabled && floatingReadingDeskEnabled ? 0.6 : 1), in: Circle())
+                .foregroundStyle(theme.usesNeutralGlass ? theme.secondaryInk : AppTheme.accent)
+                .background(theme.usesNeutralGlass ? Color.clear : AppTheme.elevatedCard.opacity(readingDeskEnabled && floatingReadingDeskEnabled ? 0.6 : 1), in: Circle())
                 .contentShape(Rectangle())
         }
-        .padding(12)
+        .padding(theme.usesNeutralGlass ? 8 : 12)
         .accessibilityLabel("正在阅读书籍的更多操作")
     }
 
@@ -881,32 +868,9 @@ struct BookshelfView: View {
             bookDestination(book, placement: "list")
         } label: {
             HStack(spacing: 14) {
-                AsyncBookCover(urlString: book.coverURL, width: 52, height: 72, baseURLString: book.bookURL, sourceURLString: book.sourceURL)
+                ShelfBookCover(book: book, width: 52, height: 72)
                     .environment(\.readingCoverHandoff, readingDeskEnabled ? readingCoverHandoff : nil)
                     .bookHeroSource("list|" + book.id, in: bookHero)
-                    .overlay(alignment: .topLeading) {
-                        if book.isPinned {
-                            Image(systemName: "pin.fill")
-                                .font(.system(size: 7, weight: .bold))
-                                .foregroundStyle(.white)
-                                .padding(4)
-                                .background(AppTheme.accent, in: Circle())
-                                .offset(x: -2, y: -2)
-                                .shadow(radius: 2)
-                        }
-                    }
-                    .overlay(alignment: .topTrailing) {
-                        if book.hasUpdates {
-                            Circle()
-                                .fill(Color.red)
-                                .frame(width: 10, height: 10)
-                                .overlay {
-                                    Circle().stroke(Color.white, lineWidth: 1.2)
-                                }
-                                .offset(x: 3, y: -3)
-                                .shadow(color: .red.opacity(0.5), radius: 3)
-                        }
-                    }
                 VStack(alignment: .leading, spacing: 5) {
                     HStack(spacing: 5) {
                         if book.isPinned {
@@ -917,22 +881,14 @@ struct BookshelfView: View {
                                 .padding(.vertical, 1)
                                 .background(AppTheme.accent.opacity(0.12), in: RoundedRectangle(cornerRadius: 3))
                         }
-                        if let tag = formatTag(for: book) {
-                            HStack(spacing: 2) {
-                                Image(systemName: tag.icon)
-                                    .font(.system(size: 8))
-                                Text(tag.title)
-                                    .font(.system(size: 9, weight: .bold))
-                            }
-                            .foregroundStyle(tag.color)
-                            .padding(.horizontal, 4)
-                            .padding(.vertical, 1)
-                            .background(tag.color.opacity(0.12), in: RoundedRectangle(cornerRadius: 3))
-                        }
                         Text(book.title)
                             .font(.headline)
                             .foregroundStyle(.primary)
                             .lineLimit(1)
+                        if book.hasUpdates {
+                            Image(systemName: "circle.fill").font(.system(size: 5)).foregroundStyle(theme.secondaryInk)
+                                .accessibilityLabel("有更新")
+                        }
                     }
                     Text(book.author)
                         .font(.subheadline)
@@ -1009,89 +965,27 @@ struct BookshelfView: View {
             bookDestination(book, placement: "grid")
         } label: {
             VStack(alignment: .leading, spacing: 8) {
-                ZStack(alignment: .topTrailing) {
-                    AsyncBookCover(urlString: book.coverURL, width: nil, height: 145, baseURLString: book.bookURL, sourceURLString: book.sourceURL, title: book.title)
-                        .frame(maxWidth: .infinity)
-                        .frame(height: 145)
-                        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-                        .overlay {
-                            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                                .stroke(Color.white.opacity(0.12), lineWidth: 0.8)
-                        }
-                        .overlay(alignment: .topLeading) {
-                            if book.isPinned {
-                                Image(systemName: "pin.fill")
-                                    .font(.system(size: 8, weight: .bold))
-                                    .foregroundStyle(.white)
-                                    .padding(4)
-                                    .background(AppTheme.accent, in: Circle())
-                                    .offset(x: 4, y: 4)
-                                    .shadow(radius: 2)
-                            }
-                        }
-                        .environment(\.readingCoverHandoff, readingDeskEnabled ? readingCoverHandoff : nil)
+                ShelfBookCover(book: book, width: nil, height: 145)
+                    .environment(\.readingCoverHandoff, readingDeskEnabled ? readingCoverHandoff : nil)
                     .bookHeroSource("grid|" + book.id, in: bookHero)
-                        .shadow(color: .black.opacity(colorScheme == .dark ? 0.35 : 0.12), radius: 6, x: 0, y: 4)
-
-                    if book.hasUpdates {
-                        Circle()
-                            .fill(Color.red)
-                            .frame(width: 10, height: 10)
-                            .overlay {
-                                Circle().stroke(Color.white, lineWidth: 1.5)
-                            }
-                            .offset(x: 2, y: -2)
-                            .shadow(color: .red.opacity(0.6), radius: 3)
-                    }
-
-                    if let current = book.currentChapterTitle {
-                        VStack {
-                            Spacer()
-                            HStack {
-                                Text(current)
-                                    .font(.system(size: 9, weight: .medium))
-                                    .foregroundStyle(.white)
-                                    .lineLimit(1)
-                                    .padding(.horizontal, 6)
-                                    .padding(.vertical, 3)
-                                    .background(.ultraThinMaterial.opacity(0.95))
-                                    .background(Color.black.opacity(0.45))
-                                    .clipShape(Capsule())
-                                Spacer()
-                            }
-                            .padding(5)
-                        }
-                    }
-
-                    if let tag = formatTag(for: book) {
-                        VStack {
-                            Spacer()
-                            HStack {
-                                Spacer()
-                                HStack(spacing: 3) {
-                                    Image(systemName: tag.icon)
-                                        .font(.system(size: 7, weight: .bold))
-                                    Text(tag.title)
-                                        .font(.system(size: 8, weight: .bold))
-                                }
-                                .foregroundStyle(.white)
-                                .padding(.horizontal, 5)
-                                .padding(.vertical, 2.5)
-                                .background(tag.color.opacity(0.88), in: Capsule())
-                                .shadow(color: .black.opacity(0.3), radius: 2)
-                            }
-                            .padding(5)
-                        }
-                    }
-                }
 
                 VStack(alignment: .leading, spacing: 3) {
-                    Text(book.title)
-                        .font(.system(size: 13, weight: .semibold))
-                        .foregroundStyle(.primary)
-                        .lineLimit(2)
-                        .multilineTextAlignment(.leading)
-                        .frame(height: 34, alignment: .topLeading)
+                    HStack(alignment: .top, spacing: 4) {
+                        Text(book.title)
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundStyle(theme.primaryInk)
+                            .lineLimit(2)
+                            .multilineTextAlignment(.leading)
+                        if book.isPinned {
+                            Image(systemName: "pin.fill").font(.caption2).foregroundStyle(theme.secondaryInk)
+                                .accessibilityLabel("已置顶")
+                        }
+                        if book.hasUpdates {
+                            Image(systemName: "circle.fill").font(.system(size: 5)).foregroundStyle(theme.secondaryInk)
+                                .accessibilityLabel("有更新")
+                        }
+                    }
+                    .frame(height: 34, alignment: .topLeading)
 
                     Text(book.author.isEmpty ? (book.groupName ?? "未知作者") : book.author)
                         .font(.system(size: 11))
@@ -1452,21 +1346,15 @@ private struct BookshelfCollectionView: View {
 
     private func collectionBookLabel(_ book: BookshelfBook) -> some View {
         HStack(spacing: 14) {
-            AsyncBookCover(urlString: book.coverURL, width: 58, height: 82, baseURLString: book.bookURL, sourceURLString: book.sourceURL)
-                .overlay(alignment: .topTrailing) {
+            ShelfBookCover(book: book, width: 58, height: 82)
+            VStack(alignment: .leading, spacing: 5) {
+                HStack(spacing: 6) {
+                    Text(book.title).font(.headline).foregroundStyle(.primary).lineLimit(2)
                     if book.hasUpdates {
-                        Circle()
-                            .fill(Color.red)
-                            .frame(width: 10, height: 10)
-                            .overlay {
-                                Circle().stroke(Color.white, lineWidth: 1.2)
-                            }
-                            .offset(x: 3, y: -3)
-                            .shadow(color: .red.opacity(0.5), radius: 3)
+                        Image(systemName: "circle.fill").font(.system(size: 5)).foregroundStyle(.secondary)
+                            .accessibilityLabel("有更新")
                     }
                 }
-            VStack(alignment: .leading, spacing: 5) {
-                Text(book.title).font(.headline).foregroundStyle(.primary).lineLimit(2)
                 Text(book.author).font(.subheadline).foregroundStyle(.secondary).lineLimit(1)
                 Text(book.currentChapterTitle ?? book.latestChapterTitle ?? "尚未开始阅读")
                     .font(.caption).foregroundStyle(.secondary).lineLimit(1)
@@ -1488,10 +1376,9 @@ private struct BookshelfCollectionView: View {
         Button(action: action) {
             Text(title)
                 .font(.caption.weight(.semibold))
-                .foregroundStyle(selected ? .white : .primary)
                 .padding(.horizontal, 13)
                 .padding(.vertical, 8)
-                .background(selected ? AppTheme.accent : AppTheme.card, in: Capsule())
+                .modifier(BrandFilterFinish(isSelected: selected, legacyFill: AppTheme.card))
         }
         .buttonStyle(AppPressStyle())
     }
@@ -1537,6 +1424,7 @@ struct AsyncBookCover: View {
     var contentMode: ContentMode = .fill
     var prefersDeskRaster = false
     var cornerRadius: CGFloat = 10
+    var usesPlainPlaceholder = false
 
     var body: some View {
         Group {
@@ -1573,6 +1461,8 @@ struct AsyncBookCover: View {
         if let url = CoverURLResolver.url(from: urlString, base: baseURLString, fallbackBase: sourceURLString),
            let image = readingCoverHandoff?.image(for: url) {
             Image(uiImage: image).resizable().aspectRatio(contentMode: contentMode)
+        } else if usesPlainPlaceholder {
+            PlainShelfJacket(title: title)
         } else {
             BookCoverPlaceholder(title: title, height: height, isOnDark: style == .onDark)
         }

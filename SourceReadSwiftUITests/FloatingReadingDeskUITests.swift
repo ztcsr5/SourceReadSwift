@@ -10,6 +10,49 @@ final class FloatingReadingDeskUITests: XCTestCase {
 
     override func tearDownWithError() throws { app.terminate() }
 
+    func testForestHomeAndAppearanceSwitchInTheRealApp() throws {
+        try launch(theme: nil, fixture: "--forest-appearance-regression")
+        let entry = assertCurrentBook("剑来")
+        XCTAssertLessThan(entry.frame.height, 215, "The foreground book and glass must not occupy the old tall stage")
+        let shelf = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "bookshelf.grid.")).firstMatch
+        XCTAssertTrue(shelf.isHittable, "A shelf cover remains visible on the first screen")
+        XCTAssertFalse(shelf.label.contains("TXT"), "A grid jacket cannot expose an overlaid format badge")
+        capture("20-forest-home")
+
+        let overflow = app.buttons["正在阅读书籍的更多操作"].firstMatch
+        overflow.tap()
+        let details = app.buttons["书籍详情"].firstMatch
+        XCTAssertTrue(details.waitForExistence(timeout: 5))
+        XCTAssertFalse(element("reader.webScrollSurface").exists)
+        details.tap()
+        XCTAssertTrue(element("bookDetail.title").waitForExistence(timeout: 5))
+        app.navigationBars.buttons.element(boundBy: 0).tap()
+        XCTAssertTrue(entry.waitForExistence(timeout: 5))
+
+        rootTab("设置", legacyID: "tabs.legacy.settings").tap()
+        let appearance = app.buttons["外观"].firstMatch
+        XCTAssertTrue(appearance.waitForExistence(timeout: 5)); appearance.tap()
+        let forest = app.buttons["app.theme.forest"]
+        let classic = app.buttons["app.theme.classic"]
+        XCTAssertTrue(forest.waitForExistence(timeout: 5))
+        XCTAssertTrue(forest.isSelected)
+        capture("21-forest-appearance")
+        classic.tap()
+        XCTAssertTrue(classic.isSelected)
+        let home = rootTab("主页", legacyID: "tabs.legacy.home")
+        home.tap()
+        XCTAssertGreaterThan(assertCurrentBook("剑来").frame.height, 250)
+        capture("22-classic-retained")
+
+        rootTab("设置", legacyID: "tabs.legacy.settings").tap()
+        XCTAssertTrue(forest.waitForExistence(timeout: 5)); forest.tap()
+        home.tap()
+        XCTAssertLessThan(assertCurrentBook("剑来").frame.height, 215)
+        rootTab("寻书", legacyID: "tabs.legacy.discover").tap()
+        XCTAssertTrue(app.textFields["搜索书名或作者"].waitForExistence(timeout: 5))
+        capture("23-forest-search-segments")
+    }
+
     func testWhiteVioletPagingAndCancelledDragInTheRealApp() throws {
         try launch(theme: "classic")
         capture("01-pearl-violet-home")
@@ -272,16 +315,17 @@ final class FloatingReadingDeskUITests: XCTestCase {
         assertCurrentBook("剑来")
     }
 
-    private func launch(theme: String, mode: String = "light", reducesMotion: Bool = false, fixture: String? = nil) throws {
+    private func launch(theme: String?, mode: String = "light", reducesMotion: Bool = false, fixture: String? = nil) throws {
         let reference = try XCTUnwrap(Bundle(for: Self.self).url(forResource: "jianlai-cover", withExtension: "jpg"))
         let cover = try Data(contentsOf: reference)
         XCTAssertLessThanOrEqual(cover.count, 128_000)
         app.launchEnvironment["SOURCEREAD_UI_COVER_JPEG"] = cover.base64EncodedString()
-        app.launchArguments = ["--floating-desk-regression", "-settings.visualTheme", theme,
+        app.launchArguments = ["--floating-desk-regression",
             "-settings.themeMode", mode, "-settings.readingDeskEnabled", "YES",
             "-settings.reducesMotion", reducesMotion ? "YES" : "NO", "-reader.mode", "scroll",
             "-reader.textSelectionEnabled", "NO"]
         if let fixture { app.launchArguments.append(fixture) }
+        if let theme { app.launchArguments += ["-settings.visualTheme", theme] }
         app.launch()
         XCTAssertTrue(app.buttons["正在阅读书籍的更多操作"].firstMatch.waitForExistence(timeout: 10))
     }
