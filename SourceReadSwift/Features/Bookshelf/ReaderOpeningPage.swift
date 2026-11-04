@@ -134,7 +134,7 @@ struct ReaderOpeningPage: View {
                 if !book.author.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                     Text(book.author).font(.subheadline).foregroundStyle(.secondary).lineLimit(1)
                 }
-                if let intro = book.intro?.split(whereSeparator: \.isWhitespace).joined(separator: " "), !intro.isEmpty {
+                if let intro = ReadingDeskContent.introduction(from: book.intro) {
                     Text(intro).font(.subheadline).lineLimit(2)
                 }
                 Text(chapterTitle ?? ReadingHeroStatus.chapter(for: book)).font(.caption).foregroundStyle(.secondary)

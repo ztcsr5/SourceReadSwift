@@ -67,6 +67,13 @@ final class FloatingReadingDeskTests: XCTestCase {
         XCTAssertGreaterThan(accessible.height, regular.height, "Accessibility text must grow, not get clipped by a fixed card")
     }
 
+    func testOpeningIntroductionSharesTheBoundedPlainTextOfTheDesk() {
+        XCTAssertEqual(ReadingDeskContent.introduction(from: "<p>山中有信。&nbsp;\n书页未尽。</p>"), "山中有信。 书页未尽。")
+        XCTAssertNil(ReadingDeskContent.introduction(from: "<p> &nbsp; </p>"))
+        XCTAssertNil(ReadingDeskContent.introduction(from: nil))
+        XCTAssertEqual(ReadingDeskContent.introduction(from: String(repeating: "正文", count: 5000))?.count, 120)
+    }
+
     func testContextUsesPersistedChapterOrRealIntroductionWithoutInventingAtmosphere() {
         var book = makeBook()
         book.latestChapterTitle = "最新一章不能冒充阅读位置"
