@@ -71,7 +71,9 @@ final class ReaderModePositionRegressionTests: XCTestCase {
             onScrollTargetApplied: { applied = true })
         let coordinator = fixture.makeCoordinator()
         let web = coordinator.makeWebView(initialView: fixture)
-        let fault = ReaderStartupBridgeFault()
+        let fault = ReaderStartupBridgeFault(coordinator: coordinator)
+        web.configuration.userContentController.removeScriptMessageHandler(forName: "reader")
+        web.configuration.userContentController.add(fault, name: "reader")
         web.configuration.userContentController.add(fault, name: "bridgeFault")
         web.configuration.userContentController.addUserScript(WKUserScript(
             source: """
@@ -147,8 +149,24 @@ final class ReaderModePositionRegressionTests: XCTestCase {
 
 private final class ReaderStartupBridgeFault: NSObject, WKScriptMessageHandler {
     private(set) var injections = 0
+    private let coordinator: WebScrollReaderView.Coordinator
+    private var canForwardReaderMessages = false
+
+    init(coordinator: WebScrollReaderView.Coordinator) {
+        self.coordinator = coordinator
+    }
+
     func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
+        if message.name == "reader" {
+            if canForwardReaderMessages {
+                coordinator.userContentController(userContentController, didReceive: message)
+            }
+            return
+        }
+        // Model a shell whose bootstrap never acknowledged readiness. Otherwise
+        // the intact script's ready/fatal messages exercise a different recovery.
         injections += 1
         userContentController.removeAllUserScripts()
+        canForwardReaderMessages = true
     }
 }
