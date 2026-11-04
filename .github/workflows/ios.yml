@@ -182,6 +182,10 @@ jobs:
           if [ "${{ inputs.reader_settings_only }}" = "true" ]; then
             TEST_SELECTION=(-only-testing:SourceReadSwiftUITests/ReaderSettingsFlowUITests)
           fi
+          xcrun simctl spawn "$DEVICE_ID" log stream --level info --style compact \
+            --predicate 'subsystem == "com.edc21.SourceReadSwift.book-passage"' > reader-startup.log 2>&1 &
+          LOG_PID=$!
+          trap 'kill "$LOG_PID" 2>/dev/null || true; wait "$LOG_PID" || true' EXIT
           xcodebuild \
             -project SourceReadSwift.xcodeproj \
             -scheme SourceReadSwift \
@@ -225,6 +229,7 @@ jobs:
           path: |
             xcodebuild-build.log
             xcodebuild-test.log
+            reader-startup.log
             TestResults.xcresult
             ui-snapshots
           retention-days: 7
