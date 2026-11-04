@@ -353,6 +353,13 @@ struct WebScrollReaderView: UIViewRepresentable {
 
             switch type {
             case "ready":
+                // A fresh shell must reapply its style/content even if a ready
+                // message from the cancelled startup navigation arrived first.
+                if !hasReportedPosition {
+                    isDocumentReady = false
+                    lastStyleInputs = nil
+                    lastStylePayload = nil
+                }
                 if let webView { activateDocumentIfNeeded(webView: webView) }
             case "content-ready":
                 if pendingScrollKey != nil, pendingScrollKey != appliedScrollKey, let webView {
