@@ -193,6 +193,7 @@ struct DiscoverView: View {
                         showSmartWebReader = true
                     } label: {
                         Image(systemName: "safari")
+                            .foregroundStyle(usesForestGlass ? AppVisualTheme.forest.primaryInk : AppTheme.accent)
                     }
                     .accessibilityLabel("智能网页阅读")
                 }
@@ -398,7 +399,7 @@ struct DiscoverView: View {
         }
         .padding(.horizontal, 16)
         .frame(height: 50)
-        .background(Color(.systemGray5))
+        .background(usesForestGlass ? AppVisualTheme.forest.controlFill : Color(.systemGray5))
         .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
         .onChange(of: viewModel.keyword) { value in
             if value.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
@@ -666,30 +667,36 @@ struct DiscoverView: View {
                         .font(.caption.weight(.semibold))
                         .foregroundStyle(.secondary)
                     Spacer()
-                    HStack(spacing: 0) {
-                        ForEach(SearchDisplayMode.allCases) { mode in
-                            let isSelected = viewModel.displayMode == mode
-                            Button {
-                                UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                                viewModel.displayMode = mode
-                            } label: {
-                                Text(mode.title)
-                                    .font(.system(size: 12, weight: isSelected ? .semibold : .medium))
-                                    .foregroundStyle(isSelected ? Color.white : Color.primary)
-                                    .padding(.horizontal, 12)
-                                    .padding(.vertical, 5)
-                                    .background {
-                                        if isSelected {
-                                            RoundedRectangle(cornerRadius: 7, style: .continuous)
-                                                .fill(AppTheme.accent)
+                    if usesForestGlass {
+                        BrandSegmentedControl("结果显示", selection: $viewModel.displayMode,
+                            options: SearchDisplayMode.allCases.map { ($0, $0.title) })
+                            .frame(maxWidth: 152)
+                    } else {
+                        HStack(spacing: 0) {
+                            ForEach(SearchDisplayMode.allCases) { mode in
+                                let isSelected = viewModel.displayMode == mode
+                                Button {
+                                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                                    viewModel.displayMode = mode
+                                } label: {
+                                    Text(mode.title)
+                                        .font(.system(size: 12, weight: isSelected ? .semibold : .medium))
+                                        .foregroundStyle(isSelected ? Color.white : Color.primary)
+                                        .padding(.horizontal, 12)
+                                        .padding(.vertical, 5)
+                                        .background {
+                                            if isSelected {
+                                                RoundedRectangle(cornerRadius: 7, style: .continuous)
+                                                    .fill(AppTheme.accent)
+                                            }
                                         }
-                                    }
+                                }
+                                .buttonStyle(.plain)
                             }
-                            .buttonStyle(.plain)
                         }
+                        .padding(2)
+                        .background(Color(UIColor.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 9, style: .continuous))
                     }
-                    .padding(2)
-                    .background(Color(UIColor.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 9, style: .continuous))
 
                     if viewModel.displayMode == .aggregated {
                         Button {

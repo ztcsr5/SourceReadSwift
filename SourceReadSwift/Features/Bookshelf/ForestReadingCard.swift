@@ -14,10 +14,11 @@ struct ForestReadingCard: View {
             ? AnyLayout(VStackLayout(alignment: .leading, spacing: 16))
             : AnyLayout(HStackLayout(alignment: .center, spacing: 18))
         layout {
-            jacket.frame(width: 110)
+            jacket.frame(width: 116)
             readingInformation
         }
-        .padding(16)
+        .padding(.horizontal, 16)
+        .padding(.vertical, 12)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background { BrandGlass(outline: RoundedRectangle(cornerRadius: 24, style: .continuous)) }
         .contentShape(RoundedRectangle(cornerRadius: 24))
@@ -31,6 +32,10 @@ struct ForestReadingCard: View {
                 baseURLString: book.bookURL, sourceURLString: book.sourceURL,
                 title: book.title, prefersDeskRaster: true, cornerRadius: 3, usesPlainPlaceholder: true)
         }
+        // The matched source clips its capture on iOS 18. Measure the jacket
+        // together with its page edge and shadow, rather than the raw bitmap.
+        .padding(.horizontal, 6)
+        .padding(.vertical, 10)
         if let heroNamespace { cover.bookHeroSource("continue|" + book.id, in: heroNamespace) }
         else { cover }
     }

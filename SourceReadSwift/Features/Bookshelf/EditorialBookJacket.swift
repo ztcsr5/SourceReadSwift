@@ -35,7 +35,8 @@ struct EditorialBookJacket<Cover: View>: View {
                     .offset(x: stance == .floating ? 5 : stance == .shelf ? 3 : 2, y: 2)
             }
             .shadow(color: palette.shadow.opacity(contrast == .increased ? 0 : scheme == .dark ? 0.32 : 0.20),
-                radius: stance == .shelf ? 6 : 8, x: 5, y: 7)
+                radius: stance == .floating ? 5 : stance == .shelf ? 6 : 8, x: stance == .floating ? 3 : 5,
+                y: stance == .floating ? 4 : 7)
             .rotation3DEffect(.degrees(stance == .shelf ? -9 : stance == .floating ? -12 : -5),
                 axis: (x: 0, y: 1, z: 0), perspective: 0.28)
             .rotationEffect(.degrees(stance == .shelf ? -3 : stance == .floating ? -4 : -2))

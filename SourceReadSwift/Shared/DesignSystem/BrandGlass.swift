@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// A single live surface per control, with a static selection layer above it.
+/// A single quiet system material; native tab chrome owns its own Liquid Glass.
 struct BrandGlass<Outline: InsettableShape>: View {
     let outline: Outline
     @AppStorage(AppVisualTheme.selectionKey) private var themeRaw = AppVisualTheme.initialSelection.rawValue
@@ -21,18 +21,10 @@ struct BrandGlass<Outline: InsettableShape>: View {
         if reducesTransparency || contrast == .increased {
             outline.fill(AppTheme.card)
         } else {
-            #if compiler(>=6.2)
-            if #available(iOS 26.0, *) {
-                outline.fill(.clear).glassEffect(.regular.tint(AppTheme.card.opacity(0.18)), in: outline)
-            } else { materialSurface }
-            #else
-            materialSurface
-            #endif
+            // Liquid Glass's projected shadow is clipped by the book pager.
+            // Keep stationary cards clean and let the native tab own the depth.
+            outline.fill(.thinMaterial).overlay(outline.fill(AppTheme.card.opacity(0.32)))
         }
-    }
-
-    private var materialSurface: some View {
-        outline.fill(.thinMaterial).overlay(outline.fill(AppTheme.card.opacity(0.32)))
     }
 }
 
