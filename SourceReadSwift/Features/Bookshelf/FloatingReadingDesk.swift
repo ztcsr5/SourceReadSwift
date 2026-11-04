@@ -12,6 +12,8 @@ struct FloatingReadingDesk: View {
     @AppStorage("settings.visualTheme") private var themeRaw = AppVisualTheme.classic.rawValue
     @AppStorage("settings.appearanceRevision") private var appearanceRevision = 0
     @AppMotion private var motion
+    // Keep the measured desk envelope while tightening the jacket within it.
+    private static let stageEnvelopeHeight: CGFloat = 220
     @ScaledMetric(relativeTo: .title2) private var titleRowHeight: CGFloat = 32
     @ScaledMetric(relativeTo: .title2) private var titleFontSize: CGFloat = 24
     @State private var conservesEnergy = ProcessInfo.processInfo.isLowPowerModeEnabled || ProcessInfo.processInfo.thermalState.rawValue >= 2
@@ -35,9 +37,9 @@ struct FloatingReadingDesk: View {
                 let width: CGFloat = geometry.size.width < 310 ? 128 : 138
                 let height: CGFloat = geometry.size.width < 310 ? 176 : 188
                 ZStack(alignment: .top) {
-                    environment.frame(height: 208)
+                    environment.frame(height: Self.stageEnvelopeHeight)
                         .modifier(FloatingDeskParallax(depth: 3 * palette.finish.parallaxStrength, reducesDepth: policy.reducesDepth))
-                    stage.frame(height: 116).padding(.top, 84)
+                    stage.frame(height: 116).padding(.top, 94)
                         .modifier(FloatingDeskParallax(depth: 7 * palette.finish.parallaxStrength, reducesDepth: policy.reducesDepth))
                     if !typeSize.isAccessibilitySize {
                         makeMarginNotes(coverWidth: width).padding(.top, 122)
@@ -46,7 +48,7 @@ struct FloatingReadingDesk: View {
                     jacket(width: width, height: height).frame(maxWidth: .infinity)
                         .modifier(FloatingDeskParallax(depth: 22 * palette.finish.parallaxStrength, reducesDepth: policy.reducesDepth))
                 }
-            }.frame(height: 208)
+            }.frame(height: Self.stageEnvelopeHeight)
             caption
                 .modifier(FloatingDeskParallax(depth: 34 * palette.finish.parallaxStrength, reducesDepth: policy.reducesDepth))
         }

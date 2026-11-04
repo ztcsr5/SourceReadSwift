@@ -51,6 +51,11 @@ class ProductQualityScopeTests(unittest.TestCase):
         self.assertIn(".readerOpeningPresentation(for: managedOpeningBook(book))", shelf)
         self.assertNotIn("ReaderOpeningPage(", read_source(READER))
 
+    def test_desk_keeps_the_large_cover_envelope_guard(self):
+        desk = read_source(SHELF + "FloatingReadingDesk.swift")
+        self.assertIn("stageEnvelopeHeight: CGFloat = 220", desk)
+        self.assertIn("}.frame(height: Self.stageEnvelopeHeight)", desk)
+
     def test_desk_menus_share_actions_but_tap_still_reads(self):
         shelf = read_source(SHELF + "BookshelfView.swift")
         card = shelf.split("private func heroCard", 1)[1].split("private func updateRow", 1)[0]
