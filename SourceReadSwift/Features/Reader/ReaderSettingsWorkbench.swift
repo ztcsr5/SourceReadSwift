@@ -25,8 +25,10 @@ struct ReaderWorkbenchContext {
     var initialRoute: ReaderWorkbenchRoute? = nil
     var menuOpacity = 0.97
     var usesWallpaper = false
-    var paper: Color { background.color(isNight: background.isDark) }
-    var ink: Color { background.textColor(isNight: background.isDark) }
+    var isNightOverride: Bool? = nil
+    var isNight: Bool { isNightOverride ?? background.isDark }
+    var paper: Color { background.color(isNight: isNight) }
+    var ink: Color { background.textColor(isNight: isNight) }
 }
 
 struct ReaderWorkbenchActions {
@@ -91,7 +93,7 @@ struct ReaderSettingsWorkbench: View {
                 .padding(.bottom, max(context.bottomInset, 8) + 8).offset(y: drag)
             }.frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
                 .foregroundStyle(context.ink)
-                .environment(\.colorScheme, context.background.isDark ? .dark : .light)
+                .environment(\.colorScheme, context.isNight ? .dark : .light)
         }.onChange(of: route) { actions.routeChanged($0) }
             .accessibilityElement(children: .contain)
             .accessibilityIdentifier("reader.settingsWorkbench")
@@ -200,7 +202,7 @@ struct ReaderClassicSettingsPanel: View {
                     .background { Color.clear.contentShape(Rectangle()).onTapGesture { } }
                     .modifier(ReaderChromeSurface(paper: context.paper, ink: context.ink, protectsReadingControls: true))
                     .padding(.bottom, max(context.bottomInset, 8) + 8)
-            }.frame(maxWidth: .infinity).environment(\.colorScheme, context.background.isDark ? .dark : .light)
+            }.frame(maxWidth: .infinity).environment(\.colorScheme, context.isNight ? .dark : .light)
         }
     }
 }

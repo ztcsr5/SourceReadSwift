@@ -1117,7 +1117,7 @@ struct ReaderView: View {
         // builds `UIHostingController`s outside the SwiftUI environment, and
         // system controls inside the chrome read `colorScheme` directly, so
         // the reader theme is also pushed into the environment here.
-        .environment(\.colorScheme, background.isDark ? .dark : .light)
+        .environment(\.colorScheme, readerIsNight ? .dark : .light)
         .highRefreshRateSurface()
         .ignoresSafeArea()
         .confirmationDialog("购买本章", isPresented: $showPayActionConfirmation, titleVisibility: .visible) {
@@ -3956,7 +3956,8 @@ struct ReaderView: View {
     @ViewBuilder private var settingsPanel: some View {
         if usesAtelier { atelierPanel }
         else {
-            ReaderClassicSettingsPanel(context: ReaderWorkbenchContext(bookTitle: content.title, background: background, bottomInset: readerFooterSafeInset),
+            ReaderClassicSettingsPanel(context: ReaderWorkbenchContext(bookTitle: content.title, background: background, bottomInset: readerFooterSafeInset,
+                isNightOverride: readerIsNight),
                 selection: $settingsTab, page: { AnyView(settingsPage(for: $0)) }, close: closeSettingsPanel)
         }
     }
@@ -3965,7 +3966,7 @@ struct ReaderView: View {
         ReaderSettingsWorkbench(context: ReaderWorkbenchContext(
             bookTitle: appState.bookshelfStore.book(id: bookID)?.title ?? content.title,
             background: background, bottomInset: readerFooterSafeInset,
-            menuOpacity: menuPaperOpacity, usesWallpaper: menuUsesWallpaper), preview: {
+            menuOpacity: menuPaperOpacity, usesWallpaper: menuUsesWallpaper, isNightOverride: readerIsNight), preview: {
                 let paragraphs = windowSections.first(where: { $0.chapterIndex == currentDisplayChapterIndex })?.paragraphs ?? content.paragraphs
                 let excerpt = paragraphs.first(where: { ReaderImageSizingPolicy.imageURL(in: $0) == nil }) ?? ""
                 return AnyView(ReaderAtelierPreview(title: currentDisplayChapterTitle, excerpt: String(excerpt.prefix(512)), paperRevision: backgroundWallpaperRevision))
