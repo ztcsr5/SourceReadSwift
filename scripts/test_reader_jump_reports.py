@@ -14,6 +14,31 @@ from playwright.sync_api import sync_playwright
 
 
 class ReaderJumpReportTests(unittest.TestCase):
+    def test_startup_probe_recovers_a_completed_empty_document(self):
+        source = (Path(__file__).resolve().parents[1] /
+                  'SourceReadSwift/Features/Reader/WebScrollReaderView.swift').read_text(encoding='utf8')
+        method = source[source.index('private func verifyStartupBridge'):]
+        probe = re.search(r'let script = """(.*?)"""', method, re.S)
+        self.assertIsNotNone(probe)
+        runner = """const vm=require('vm');let script='';
+process.stdin.setEncoding('utf8');process.stdin.on('data',chunk=>script+=chunk);
+process.stdin.on('end',()=>{
+  const outcomes=[];
+  for (const [ready,bridge,shell] of [['complete',false,false],['complete',false,true],
+                                    ['loading',false,false],['complete',true,true]]) {
+    outcomes.push(vm.runInNewContext(script,{
+      window:{__reader:bridge?{setContent(){}}:undefined},
+      document:{readyState:ready,getElementById(){return shell?{}:null}}
+    }));
+  }
+  process.stdout.write(JSON.stringify(outcomes));
+});"""
+        result = subprocess.run(['node', '-e', runner], input=probe.group(1), text=True,
+                                encoding='utf8', capture_output=True, timeout=15)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(json.loads(result.stdout), [-1, -1, 0, 1],
+                         'A completed empty document needs bounded recovery, not indefinite startup waiting')
+
     def test_isolated_cancellation_fixture_has_all_explicit_jump_dependencies(self):
         root = Path(__file__).resolve().parents[1]
         fixture = (root / 'SourceReadSwiftTests/Release110RegressionTests.swift').read_text(encoding='utf8')

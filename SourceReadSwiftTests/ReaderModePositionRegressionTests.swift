@@ -57,6 +57,14 @@ final class ReaderModePositionRegressionTests: XCTestCase {
     }
 
     @MainActor func testCompletedShellWithMissingBridgeRecoversWithoutChangingItsCharacterCursor() async throws {
+        try await assertStartupRecovery(emptiesDocument: false)
+    }
+
+    @MainActor func testCompletedEmptyDocumentRecoversWithoutChangingItsCharacterCursor() async throws {
+        try await assertStartupRecovery(emptiesDocument: true)
+    }
+
+    @MainActor private func assertStartupRecovery(emptiesDocument: Bool) async throws {
         var offset = -1, applied = false
         let text = String(repeating: "长段正文，恢复不能回到段首。👩🏽‍💻", count: 150)
         let fixture = WebScrollReaderView(
@@ -78,7 +86,10 @@ final class ReaderModePositionRegressionTests: XCTestCase {
             web.configuration.userContentController.addUserScript(WKUserScript(
                 source: """
                     Object.defineProperty(window, '__reader', {configurable:true, get:function(){return undefined;}, set:function(){}});
-                    window.addEventListener('DOMContentLoaded', function(){window.webkit.messageHandlers.bridgeFault.postMessage('injected');});
+                    window.addEventListener('DOMContentLoaded', function(){
+                      \(emptiesDocument ? "document.body.replaceChildren();" : "")
+                      window.webkit.messageHandlers.bridgeFault.postMessage('injected');
+                    });
                     """,
                 injectionTime: .atDocumentStart, forMainFrameOnly: true))
         })

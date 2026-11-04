@@ -496,7 +496,7 @@ struct WebScrollReaderView: UIViewRepresentable {
             let script = """
                 (function() {
                   if (window.__reader && typeof window.__reader.setContent === 'function') { return 1; }
-                  return document.readyState === 'complete' && document.getElementById('content') ? -1 : 0;
+                  return document.readyState === 'complete' ? -1 : 0;
                 })()
                 """
             webView.evaluateJavaScript(script) { [weak self, weak webView] value, error in
@@ -507,7 +507,9 @@ struct WebScrollReaderView: UIViewRepresentable {
                     return
                 }
                 if (value as? Int) == 1 { self.activateDocumentIfNeeded(webView: webView) }
-                else if (value as? Int) == -1 { self.recoverStartupShell(webView: webView) }
+                // A completed empty document needs the same bounded recovery
+                // as a broken shell. Do not cancel a navigation still loading.
+                else if (value as? Int) == -1, !webView.isLoading { self.recoverStartupShell(webView: webView) }
             }
         }
 
