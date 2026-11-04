@@ -10,17 +10,14 @@ struct AppearanceSettingsView: View {
     var body: some View {
         Form {
             Section {
-                ForEach(AppVisualTheme.allCases) { theme in
-                    Button { visualTheme = theme.rawValue } label: {
-                        AppThemePreview(theme: theme, selected: visualTheme == theme.rawValue)
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityIdentifier("app.theme." + theme.rawValue)
-                    .accessibilityAddTraits(visualTheme == theme.rawValue ? [.isSelected] : [])
-                    .listRowBackground(AppThemeRowSurface())
-                }
-            } header: { Text("全局主题") } footer: {
-                Text("主题同时调整背景、卡片纸色、圆角、边框、默认字形与装饰，登录中心、规则体检和二级页面同步；不覆盖阅读背景或网页原始内容。每套主题的自定义配色独立保存。")
+                themeRows(AppVisualTheme.classicDeskThemes)
+            } header: { Text("经典书台") } footer: {
+                Text("保留原初白紫及纸面、藏书票和蓝图。")
+            }
+            Section {
+                themeRows(AppVisualTheme.floatingBookThemes)
+            } header: { Text("悬浮书籍") } footer: {
+                Text("森林绿保持纯白。竹影、潮汐、银杏与远山使用独立插画背景，不会覆盖正文的阅读壁纸。")
                 Text(AppThemeSurfaceStyle.nativeGlassAvailable
                      ? "当前系统支持原生玻璃；浮动控件按需使用，滚动卡片保留主题纸面，避免叠加实时模糊。"
                      : "当前系统使用兼容材质；滚动卡片使用主题纸面，减少透明度或增强对比度时不叠加实时模糊。")
@@ -61,6 +58,18 @@ struct AppearanceSettingsView: View {
         .navigationTitle("外观")
         .navigationBarTitleDisplayMode(.inline)
         .tint(AppTheme.accent)
+    }
+
+    private func themeRows(_ themes: [AppVisualTheme]) -> some View {
+        ForEach(themes) { theme in
+            Button { visualTheme = theme.rawValue } label: {
+                AppThemePreview(theme: theme, selected: visualTheme == theme.rawValue)
+            }
+            .buttonStyle(.plain)
+            .accessibilityIdentifier("app.theme." + theme.rawValue)
+            .accessibilityAddTraits(visualTheme == theme.rawValue ? [.isSelected] : [])
+            .listRowBackground(AppThemeRowSurface())
+        }
     }
 
     private func colorBinding(_ component: String) -> Binding<Color> {

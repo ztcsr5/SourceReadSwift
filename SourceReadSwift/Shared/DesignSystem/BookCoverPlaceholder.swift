@@ -16,7 +16,6 @@ struct BookCoverPlaceholder: View {
     var body: some View {
         ZStack(alignment: .leading) {
             paper
-            LinearGradient(colors: [ink.opacity(0.14), .clear], startPoint: .topLeading, endPoint: .bottomTrailing)
             Rectangle().fill(ink.opacity(0.25)).frame(width: 2).padding(.leading, 7)
             VStack(spacing: 8) {
                 Image(systemName: "book.closed")

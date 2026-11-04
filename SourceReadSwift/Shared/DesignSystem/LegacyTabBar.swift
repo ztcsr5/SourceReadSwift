@@ -22,10 +22,7 @@ struct LegacyTabBar: View {
             .padding(4)
             .background {
                 if theme.usesNeutralGlass { BrandGlass(outline: Capsule()) }
-                else {
-                    Capsule().fill(.regularMaterial)
-                        .modifier(PearlGlassFinish(outline: Capsule(), pearl: .white, mist: AppTheme.accent))
-                }
+                else { Capsule().fill(.regularMaterial) }
             }
             .overlay(Capsule().strokeBorder(Color.primary.opacity(0.07), lineWidth: 0.6).allowsHitTesting(false))
             Button(action: onSearch) {

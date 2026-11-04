@@ -10,9 +10,10 @@ struct BookJacket<Cover: View>: View {
     var body: some View {
         cover()
             .overlay(alignment: .leading) {
-                LinearGradient(colors: [.black.opacity(0.20), .white.opacity(0.14), .clear],
-                    startPoint: .leading, endPoint: .trailing)
-                    .frame(width: 12).allowsHitTesting(false)
+                HStack(spacing: 0) {
+                    Rectangle().fill(.black.opacity(0.20)).frame(width: 3)
+                    Rectangle().fill(.white.opacity(0.14)).frame(width: 1)
+                }.allowsHitTesting(false)
             }
             .overlay(alignment: .trailing) {
                 Rectangle().fill(Color(uiColor: .systemGray5)).frame(width: 2).padding(.vertical, 5)

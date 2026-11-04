@@ -3,6 +3,18 @@ import XCTest
 @testable import SourceReadSwift
 
 final class ForestBrandThemeTests: XCTestCase {
+    func testThemeFamiliesKeepExistingKeysAndDistinctIllustratedBackgrounds() {
+        let classic = AppVisualTheme.classicDeskThemes
+        let floating = AppVisualTheme.floatingBookThemes
+        XCTAssertEqual(classic.first, .classic)
+        XCTAssertEqual(floating.first, .forest)
+        XCTAssertEqual(Set(classic + floating), Set(AppVisualTheme.allCases))
+        XCTAssertEqual(classic.count + floating.count, AppVisualTheme.allCases.count)
+        XCTAssertNil(AppVisualTheme.forest.illustratedPaper)
+        let assets = floating.compactMap { $0.illustratedPaper?.wallpaperAssetName }
+        XCTAssertEqual(Set(assets).count, 4)
+    }
+
     func testFreshInstallDefaultsToForestWithoutChangingAfterWelcomeSeed() throws {
         try withDefaults { defaults in
             AppVisualTheme.bootstrapSelection(in: defaults)

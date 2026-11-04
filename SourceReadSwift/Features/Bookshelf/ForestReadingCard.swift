@@ -6,7 +6,7 @@ struct ForestReadingCard: View {
     let heroNamespace: Namespace.ID?
     @Environment(\.dynamicTypeSize) private var typeSize
     @ScaledMetric(relativeTo: .title2) private var titleSize: CGFloat = 22
-    private let theme = AppVisualTheme.forest
+    var theme: AppVisualTheme = .forest
     private let bookHeight: CGFloat = 156
 
     var body: some View {

@@ -11,8 +11,6 @@ struct BookDetailHero: View {
     let readerSourceID: String
     let namespace: Namespace.ID
     var readingContext: String? = nil
-    @State private var coverImage: UIImage?
-    @State private var tone: CoverTone?
     @State private var hasArrived = false
     @Environment(\.dynamicTypeSize) private var typeSize
     @Environment(\.colorSchemeContrast) private var contrast
@@ -47,17 +45,11 @@ struct BookDetailHero: View {
             }
         }
         .onAppear { hasArrived = true }
-        .task(id: coverImage.map(ObjectIdentifier.init)) {
-            guard let coverImage else { tone = nil; return }
-            let sampled = await CoverToneSampler.shared.tone(for: coverImage)
-            guard !Task.isCancelled else { return }
-            withAnimation(motion.animation(.background)) { tone = sampled }
-        }
     }
 
     private var paperPlane: some View {
         let shape = RoundedRectangle(cornerRadius: 16, style: .continuous)
-        return CoverAtmosphere(tone: tone)
+        return AppTheme.card
             .frame(height: typeSize.isAccessibilitySize ? 120 : 108)
             .clipShape(shape)
             .overlay { shape.strokeBorder(palette.mist.opacity(contrast == .increased ? 0.65 : 0.22), lineWidth: 1) }
@@ -68,7 +60,7 @@ struct BookDetailHero: View {
         EditorialBookJacket(height: 146, palette: palette, stance: .detail) {
             AsyncBookCover(urlString: book.coverUrl, width: 106, height: 146,
                 baseURLString: book.bookUrl, sourceURLString: book.sourceUrl,
-                onImageLoad: { coverImage = $0 }, title: book.name)
+                title: book.name)
         }
         .bookHeroSource(readerSourceID, in: namespace)
     }

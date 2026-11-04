@@ -1296,16 +1296,7 @@ private struct AboutReadView: View {
                 VStack(alignment: .leading, spacing: 14) {
                     HStack(spacing: 14) {
                         RoundedRectangle(cornerRadius: 22, style: .continuous)
-                            .fill(
-                                LinearGradient(
-                                    colors: [
-                                        AppTheme.accent.opacity(0.95),
-                                        Color(red: 0.46, green: 0.54, blue: 1.0)
-                                    ],
-                                    startPoint: .topLeading,
-                                    endPoint: .bottomTrailing
-                                )
-                            )
+                            .fill(AppTheme.accent)
                             .frame(width: 56, height: 56)
                             .overlay {
                                 Image(systemName: "book.closed.fill")

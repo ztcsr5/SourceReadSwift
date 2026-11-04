@@ -254,30 +254,7 @@ struct BookshelfView: View {
 
     private var bookshelfBackdrop: some View {
         let _ = themeModeRawValue
-        return ZStack {
-            AppTheme.background
-            if !theme.usesNeutralGlass {
-                LinearGradient(
-                    colors: [
-                        AppTheme.accent.opacity(colorScheme == .dark ? 0.16 : 0.08),
-                        Color.clear,
-                        Color.black.opacity(colorScheme == .dark ? 0.18 : 0.03)
-                    ],
-                    startPoint: .topTrailing,
-                    endPoint: .bottomLeading
-                )
-                RadialGradient(
-                    colors: [
-                        Color.white.opacity(colorScheme == .dark ? 0.03 : 0.45),
-                        Color.clear
-                    ],
-                    center: .topLeading,
-                    startRadius: 40,
-                    endRadius: 420
-                )
-            }
-        }
-        .ignoresSafeArea()
+        return AppPagePaper(theme: theme).ignoresSafeArea()
     }
 
     private var readingSection: some View {
@@ -777,8 +754,8 @@ struct BookshelfView: View {
             contextualBookRoute = .read(book, coverFrame: readingCoverHandoff.frame(for: book))
         } label: {
             Group {
-                if theme.usesNeutralGlass && readingDeskEnabled && floatingReadingDeskEnabled {
-                    ForestReadingCard(book: book, heroNamespace: bookHero)
+                if theme.usesFloatingBook && readingDeskEnabled && floatingReadingDeskEnabled {
+                    ForestReadingCard(book: book, heroNamespace: bookHero, theme: theme)
                 } else {
                     ReadingHeroCard(book: book, heroNamespace: bookHero, usesSpatialStyle: readingDeskEnabled,
                         usesFloatingStyle: floatingReadingDeskEnabled)

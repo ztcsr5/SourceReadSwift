@@ -22,7 +22,8 @@ class FloatingDeskScopeTests(unittest.TestCase):
         module = (ROOT / 'SourceReadSwift/Features/Bookshelf/FloatingReadingDesk.swift').read_text(encoding='utf8')
         for forbidden in ['Timer', 'TimelineView', 'CADisplayLink', 'DragGesture', 'updateReadingProgress', 'bookshelfStore']:
             self.assertNotIn(forbidden, module)
-        self.assertIn('CoverToneSampler.shared.tone', module)
+        for decoration in ['CoverToneSampler.shared.tone', 'LinearGradient', 'RadialGradient']:
+            self.assertNotIn(decoration, module)
         self.assertIn('.bookHeroSource("continue|" + book.id', module)
 
     def test_old_style_remains_explicitly_available(self):

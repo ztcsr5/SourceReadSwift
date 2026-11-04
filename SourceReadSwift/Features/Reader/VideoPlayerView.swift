@@ -444,13 +444,7 @@ struct VideoPlayerView: View {
             }
             .padding(.horizontal, 20)
             .padding(.bottom, 24)
-            .background(
-                LinearGradient(
-                    colors: [Color.clear, Color.black.opacity(0.8)],
-                    startPoint: .top,
-                    endPoint: .bottom
-                )
-            )
+            .background(Color.black.opacity(0.72))
         }
         .transition(.opacity)
     }

@@ -34,9 +34,12 @@ final class FloatingReadingDeskUITests: XCTestCase {
         XCTAssertTrue(appearance.waitForExistence(timeout: 5)); appearance.tap()
         let forest = app.buttons["app.theme.forest"]
         let classic = app.buttons["app.theme.classic"]
+        let themes = app.collectionViews.firstMatch
+        if !forest.isHittable { themes.swipeUp() }
         XCTAssertTrue(forest.waitForExistence(timeout: 5))
         XCTAssertTrue(forest.isSelected)
         capture("21-forest-appearance")
+        if !classic.isHittable { themes.swipeDown() }
         classic.tap()
         XCTAssertTrue(classic.isSelected)
         let home = rootTab("主页", legacyID: "tabs.legacy.home")
@@ -45,6 +48,7 @@ final class FloatingReadingDeskUITests: XCTestCase {
         capture("22-classic-retained")
 
         rootTab("设置", legacyID: "tabs.legacy.settings").tap()
+        if !forest.isHittable { themes.swipeUp() }
         XCTAssertTrue(forest.waitForExistence(timeout: 5)); forest.tap()
         home.tap()
         XCTAssertLessThan(assertCurrentBook("剑来").frame.height, 215)

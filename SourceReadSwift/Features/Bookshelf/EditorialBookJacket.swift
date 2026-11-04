@@ -15,13 +15,11 @@ struct EditorialBookJacket<Cover: View>: View {
         let corner = RoundedRectangle(cornerRadius: stance == .detail ? 6 : 3, style: .continuous)
         cover()
             .overlay(alignment: .leading) {
-                LinearGradient(stops: [
-                    .init(color: .black.opacity(0.33), location: 0),
-                    .init(color: palette.pearl.opacity(0.24), location: 0.28),
-                    .init(color: .black.opacity(0.10), location: 0.63),
-                    .init(color: .clear, location: 1)
-                ], startPoint: .leading, endPoint: .trailing)
-                    .frame(width: stance == .shelf ? 9 : 8)
+                HStack(spacing: 0) {
+                    Rectangle().fill(.black.opacity(0.26)).frame(width: 2)
+                    Rectangle().fill(palette.pearl.opacity(0.24)).frame(width: 0.75)
+                    Rectangle().fill(.black.opacity(0.08)).frame(width: 4)
+                }.allowsHitTesting(false)
             }
             .clipShape(corner)
             .overlay {
@@ -29,8 +27,8 @@ struct EditorialBookJacket<Cover: View>: View {
             }
             .background(alignment: .trailing) {
                 RoundedRectangle(cornerRadius: 1)
-                    .fill(LinearGradient(colors: [palette.shadow.opacity(0.56), palette.pearl, palette.light, palette.shadow.opacity(0.34)],
-                        startPoint: .leading, endPoint: .trailing))
+                    .fill(palette.pearl)
+                    .overlay { RoundedRectangle(cornerRadius: 1).strokeBorder(palette.shadow.opacity(0.36), lineWidth: 0.75) }
                     .frame(width: stance == .floating ? 7 : stance == .shelf ? 5 : 4, height: height - 5)
                     .offset(x: stance == .floating ? 5 : stance == .shelf ? 3 : 2, y: 2)
             }

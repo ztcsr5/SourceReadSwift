@@ -7,6 +7,19 @@ enum AppVisualTheme: String, CaseIterable, Identifiable, Codable, Sendable {
     var id: String { rawValue }
     static let selectionKey = "settings.visualTheme"
     static let initialSelection = Self.forest
+    static let classicDeskThemes: [Self] = [.classic, .editorial, .graphite, .folio, .blueprint]
+    static let floatingBookThemes: [Self] = [.forest, .botanical, .coast, .rose, .inkwash]
+
+    var usesFloatingBook: Bool { Self.floatingBookThemes.contains(self) }
+    var illustratedPaper: ReaderBackground? {
+        switch self {
+        case .botanical: return .bamboo
+        case .coast: return .tide
+        case .rose: return .ginkgo
+        case .inkwash: return .mountains
+        default: return nil
+        }
+    }
     static var current: Self { selected(in: .standard) }
 
     static func selected(in defaults: UserDefaults) -> Self {

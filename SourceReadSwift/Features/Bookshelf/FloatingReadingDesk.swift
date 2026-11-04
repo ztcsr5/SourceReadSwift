@@ -17,8 +17,6 @@ struct FloatingReadingDesk: View {
     @ScaledMetric(relativeTo: .title2) private var metadataHeight: CGFloat = 72
     @ScaledMetric(relativeTo: .title2) private var titleFontSize: CGFloat = 22
     @State private var conservesEnergy = ProcessInfo.processInfo.isLowPowerModeEnabled || ProcessInfo.processInfo.thermalState.rawValue >= 2
-    @State private var coverImage: UIImage?
-    @State private var tone: CoverTone?
 
     private var theme: AppVisualTheme { AppVisualTheme(rawValue: themeRaw) ?? .classic }
     private var palette: FloatingDeskPalette {
@@ -37,8 +35,6 @@ struct FloatingReadingDesk: View {
                 let width: CGFloat = geometry.size.width < 310 ? 134 : 152
                 let height: CGFloat = geometry.size.width < 310 ? 178 : 202
                 ZStack(alignment: .top) {
-                    environment.frame(height: Self.stageEnvelopeHeight)
-                        .modifier(FloatingDeskParallax(depth: 3 * palette.finish.parallaxStrength, reducesDepth: policy.reducesDepth))
                     stage.frame(height: 132).padding(.top, 82)
                         .modifier(FloatingDeskParallax(depth: 7 * palette.finish.parallaxStrength, reducesDepth: policy.reducesDepth))
                     if !typeSize.isAccessibilitySize {
@@ -59,30 +55,8 @@ struct FloatingReadingDesk: View {
         .contentShape(Rectangle())
         .accessibilityElement(children: .combine)
         .accessibilityHint("轻点继续阅读，使用更多操作管理")
-        .task(id: coverImage.map(ObjectIdentifier.init)) {
-            guard let coverImage else { tone = nil; return }
-            let sampled = await CoverToneSampler.shared.tone(for: coverImage)
-            guard !Task.isCancelled else { return }
-            // Never resample during a drag. New palettes enter only when a cached/downsampled cover arrives.
-            withAnimation(policy.reducesDepth ? nil : motion.animation(.background)) { tone = sampled }
-        }
         .onReceive(NotificationCenter.default.publisher(for: .NSProcessInfoPowerStateDidChange)) { _ in updateEnergyPolicy() }
         .onReceive(NotificationCenter.default.publisher(for: ProcessInfo.thermalStateDidChangeNotification)) { _ in updateEnergyPolicy() }
-    }
-
-    private var environment: some View {
-        ZStack {
-            if policy.surface != .opaque {
-                RadialGradient(colors: [palette.light.opacity(scheme == .dark ? 0.18 : 0.40), .clear],
-                    center: UnitPoint(x: 0.52, y: 0.64), startRadius: 12, endRadius: 164)
-                RadialGradient(colors: [pigment.opacity(scheme == .dark ? 0.06 : 0.09), .clear],
-                    center: UnitPoint(x: 0.33, y: 0.44), startRadius: 0, endRadius: 124)
-            }
-        }.opacity(palette.finish.environmentStrength).allowsHitTesting(false)
-    }
-
-    private var pigment: Color {
-        tone.map { Color(red: $0.vividRed, green: $0.vividGreen, blue: $0.vividBlue) } ?? palette.mist
     }
 
     private var stage: some View {
@@ -102,7 +76,7 @@ struct FloatingReadingDesk: View {
     private func cover(width: CGFloat, height: CGFloat) -> some View {
         AsyncBookCover(urlString: book.coverURL, width: width, height: height,
             baseURLString: book.bookURL, sourceURLString: book.sourceURL,
-            onImageLoad: { coverImage = $0 }, title: book.title, prefersDeskRaster: true, cornerRadius: 3)
+            title: book.title, prefersDeskRaster: true, cornerRadius: 3)
     }
 
     private func makeMarginNotes(coverWidth: CGFloat) -> some View {

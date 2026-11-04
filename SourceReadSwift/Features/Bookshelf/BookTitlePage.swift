@@ -49,12 +49,7 @@ struct BookTitlePage<ReaderDestination: View>: View {
             .padding(24)
             .frame(maxWidth: .infinity)
         }
-        .background {
-            LinearGradient(colors: [AppTheme.accent.opacity(0.10), AppTheme.background, AppTheme.background],
-                startPoint: .topLeading, endPoint: .bottomTrailing)
-                .background(AppTheme.background)
-                .ignoresSafeArea()
-        }
+        .pageBackground()
         .navigationTitle("书籍扉页")
         .navigationBarTitleDisplayMode(.inline)
     }

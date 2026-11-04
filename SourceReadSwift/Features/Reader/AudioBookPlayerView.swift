@@ -234,11 +234,7 @@ struct AudioBookPlayerView: View {
 
     private var defaultCoverArt: some View {
         ZStack {
-            LinearGradient(
-                colors: [Color.blue.opacity(0.7), Color.purple.opacity(0.8)],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
+            AppTheme.accent
             Image(systemName: "headphones")
                 .font(.system(size: 64, weight: .semibold))
                 .foregroundStyle(.white.opacity(0.9))

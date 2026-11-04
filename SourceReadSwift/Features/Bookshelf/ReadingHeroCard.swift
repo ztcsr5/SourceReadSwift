@@ -31,8 +31,6 @@ struct ReadingHeroCard: View {
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @ScaledMetric(relativeTo: .title3) private var titleSize: CGFloat = 21
     @AppMotion private var motion
-    @State private var coverImage: UIImage?
-    @State private var tone: CoverTone?
 
     @ViewBuilder var body: some View {
         if usesSpatialStyle && usesFloatingStyle {
@@ -52,19 +50,13 @@ struct ReadingHeroCard: View {
         }
         .padding(16).frame(maxWidth: .infinity, alignment: .leading)
         .foregroundStyle(.primary)
-        .background { if usesSpatialStyle { CoverAtmosphere(tone: tone) } else { AppTheme.card } }
+        .background(AppTheme.card)
         .clipShape(RoundedRectangle(cornerRadius: AppTheme.cardRadius, style: .continuous))
         .overlay { RoundedRectangle(cornerRadius: AppTheme.cardRadius, style: .continuous)
             .strokeBorder(AppTheme.accent.opacity(0.14), lineWidth: 0.8).allowsHitTesting(false) }
         .contentShape(RoundedRectangle(cornerRadius: AppTheme.cardRadius, style: .continuous))
         .accessibilityElement(children: .combine)
         .accessibilityHint("轻点继续阅读，使用更多操作管理")
-        .task(id: coverImage.map(ObjectIdentifier.init)) {
-            guard let coverImage else { tone = nil; return }
-            let sampled = await CoverToneSampler.shared.tone(for: coverImage)
-            guard !Task.isCancelled else { return }
-            withAnimation(motion.animation(.background)) { tone = sampled }
-        }
     }
 
     private var description: some View {
@@ -87,7 +79,7 @@ struct ReadingHeroCard: View {
     @ViewBuilder private var cover: some View {
         let image = AsyncBookCover(urlString: book.coverURL, width: usesSpatialStyle ? 104 : 88, height: usesSpatialStyle ? 144 : 128,
                 baseURLString: book.bookURL, sourceURLString: book.sourceURL,
-                onImageLoad: { coverImage = $0 }, title: book.title)
+                title: book.title)
         let jacket = Group {
             if usesSpatialStyle { BookJacket { image } } else { image }
         }

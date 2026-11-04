@@ -1476,11 +1476,7 @@ private struct BatchCheckCoordinatorObserver<Content: View>: View {
                 .padding(.vertical, 10)
                 .foregroundStyle(.white)
                 .background(
-                    LinearGradient(
-                        colors: [Color.blue, Color.indigo],
-                        startPoint: .leading,
-                        endPoint: .trailing
-                    ),
+                    AppTheme.accent,
                     in: RoundedRectangle(cornerRadius: 14, style: .continuous)
                 )
             }

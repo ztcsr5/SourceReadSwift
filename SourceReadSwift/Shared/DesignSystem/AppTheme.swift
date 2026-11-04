@@ -93,9 +93,29 @@ private struct PageBackgroundModifier: ViewModifier {
             .font(.system(.body, design: AppVisualTheme.current.fontDesign))
             .tint(AppTheme.accent)
             .background {
-                AppTheme.background.ignoresSafeArea()
-                    .overlay { AppThemeOrnament(theme: AppVisualTheme.current).ignoresSafeArea() }
+                AppPagePaper(theme: AppVisualTheme.current).ignoresSafeArea()
             }
+    }
+}
+
+/// Use existing book-paper artwork without changing the reader's own wallpaper.
+struct AppPagePaper: View {
+    let theme: AppVisualTheme
+    @Environment(\.colorScheme) private var scheme
+    @Environment(\.colorSchemeContrast) private var contrast
+
+    var body: some View {
+        ZStack {
+            AppTheme.background
+            if contrast != .increased, let asset = theme.illustratedPaper?.wallpaperAssetName {
+                ReaderIllustratedBackgroundView(name: asset, paper: AppTheme.background, night: scheme == .dark)
+                    .id(asset)
+                    .opacity(scheme == .dark ? 0.65 : 0.26)
+            }
+            AppThemeOrnament(theme: theme)
+        }
+        .allowsHitTesting(false)
+        .accessibilityHidden(true)
     }
 }
 

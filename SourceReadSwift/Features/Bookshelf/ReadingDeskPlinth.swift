@@ -10,34 +10,12 @@ struct ReadingDeskPlinth: View {
     var body: some View {
         let shape = ReadingPlinthOutline()
         glass(shape)
-            .overlay {
-                shape.fill(LinearGradient(stops: [
-                    .init(color: palette.pearl.opacity(scheme == .dark ? 0.08 : 0.32), location: 0),
-                    .init(color: palette.light.opacity(scheme == .dark ? 0.20 : 0.32), location: 0.27),
-                    .init(color: palette.glassTint.opacity(0.18), location: 0.28),
-                    .init(color: palette.shadow.opacity(scheme == .dark ? 0.12 : 0.07), location: 0.85),
-                    .init(color: palette.light.opacity(0.36), location: 0.87),
-                    .init(color: palette.pearl.opacity(0.52), location: 1)
-                ], startPoint: .top, endPoint: .bottom))
-            }
             .overlay(alignment: .top) {
                 if policy.surface == .opaque {
                     shape.strokeBorder(palette.ink.opacity(contrast == .increased ? 0.50 : 0.20),
                         lineWidth: contrast == .increased ? 1.5 : 0.75)
                 } else {
-                    shape.strokeBorder(LinearGradient(colors: [
-                        palette.pearl.opacity(scheme == .dark ? 0.30 : 0.88),
-                        palette.light.opacity(0.20), palette.pearl.opacity(0.24)
-                    ], startPoint: .topLeading, endPoint: .bottomTrailing), lineWidth: 0.75)
-                }
-            }
-            .overlay(alignment: .bottom) {
-                if policy.surface != .opaque {
-                    Ellipse().fill(RadialGradient(colors: [
-                        palette.shadow.opacity(scheme == .dark ? 0.66 : 0.40), .clear
-                    ], center: .center, startRadius: 0, endRadius: 80))
-                    .frame(width: 164, height: 8)
-                    .padding(.bottom, 2)
+                    shape.strokeBorder(palette.pearl.opacity(scheme == .dark ? 0.30 : 0.70), lineWidth: 0.75)
                 }
             }
             .shadow(color: palette.shadow.opacity(policy.surface == .opaque ? 0 : 0.09), radius: 3, y: 3)
@@ -69,8 +47,7 @@ struct ReadingDeskFrontEdge: View {
     var body: some View {
         VStack(spacing: 0) {
             Rectangle().fill(palette.pearl.opacity(scheme == .dark ? 0.28 : 0.88)).frame(height: 0.75)
-            LinearGradient(colors: [palette.light.opacity(0.42), palette.glassTint.opacity(0.72)],
-                startPoint: .top, endPoint: .bottom)
+            Rectangle().fill(palette.glassTint.opacity(0.58))
             Rectangle().fill(palette.shadow.opacity(scheme == .dark ? 0.36 : 0.16)).frame(height: 0.75)
         }
         .clipShape(RoundedRectangle(cornerRadius: 2))
