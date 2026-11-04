@@ -62,6 +62,7 @@ targets:
         UIAppFonts:
           - MaShanZheng-Regular.ttf
           - ZhiMangXing-Regular.ttf
+          - ReadingDeskSong-Regular.ttf
         CFBundleDocumentTypes:
           - CFBundleTypeName: Readable text, EPUB and source JSON
             CFBundleTypeRole: Viewer
