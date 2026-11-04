@@ -803,7 +803,7 @@ struct BookshelfView: View {
                 .padding(.vertical, 3)
         }
         .accessibilityIdentifier("bookshelf.continue." + book.id)
-        .buttonStyle(FloatingDeskPressStyle(isEnabled: readingDeskEnabled && floatingReadingDeskEnabled))
+        .buttonStyle(ReadingDeskTapStyle())
     }
 
     private func readingDeskMenu(_ book: BookshelfBook) -> some View {

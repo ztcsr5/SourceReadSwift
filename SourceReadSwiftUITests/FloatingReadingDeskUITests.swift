@@ -38,9 +38,10 @@ final class FloatingReadingDeskUITests: XCTestCase {
         let entry = assertCurrentBook("剑来")
         entry.coordinate(withNormalizedOffset: CGVector(dx: 0.47, dy: 0.34)).press(forDuration: 0.8)
         XCTAssertFalse(app.buttons["书籍详情"].firstMatch.exists, "A hold must not show the desk management menu")
-        // Some OS versions deliver the final touch-up as an ordinary tap.
-        if element("reader.webScrollSurface").isHittable { returnFromReader() }
-        app.buttons["正在阅读书籍的更多操作"].firstMatch.tap()
+        let overflow = app.buttons["正在阅读书籍的更多操作"].firstMatch
+        XCTAssertTrue(overflow.isHittable, "A hold and release must leave the desk on screen")
+        XCTAssertFalse(element("reader.webScrollSurface").exists)
+        overflow.tap()
         let detail = app.buttons["书籍详情"].firstMatch
         XCTAssertTrue(detail.waitForExistence(timeout: 5))
         XCTAssertFalse(element("reader.webScrollSurface").isHittable, "Three dots must not activate the reader")

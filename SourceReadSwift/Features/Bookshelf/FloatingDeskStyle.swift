@@ -93,3 +93,14 @@ struct FloatingDeskPressStyle: ButtonStyle {
         else { BookOpenPressStyle().makeBody(configuration: configuration) }
     }
 }
+
+/// Only a completed tap activates reading; touch-up after a hold is not a tap.
+struct ReadingDeskTapStyle: PrimitiveButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .contentShape(Rectangle())
+            .onTapGesture { configuration.trigger() }
+            .accessibilityAddTraits(.isButton)
+            .accessibilityAction { configuration.trigger() }
+    }
+}
