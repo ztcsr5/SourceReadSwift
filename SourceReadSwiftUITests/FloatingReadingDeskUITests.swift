@@ -198,9 +198,11 @@ final class FloatingReadingDeskUITests: XCTestCase {
         XCTAssertTrue(saved.waitForExistence(timeout: 10))
         XCTAssertFalse(element("reader.returnToShelf").isHittable, "Prose can return interactively without first opening its menu")
         let edge = app.coordinate(withNormalizedOffset: CGVector(dx: 0.008, dy: 0.52))
+        // XCTest's .slow is 250 px/s: native zoom can correctly commit that
+        // flick even over a short distance. Cancel with a deliberately slow drag.
         edge.press(forDuration: 0.05,
             thenDragTo: app.coordinate(withNormalizedOffset: CGVector(dx: 0.16, dy: 0.52)),
-            withVelocity: .slow, thenHoldForDuration: 0.8)
+            withVelocity: XCUIGestureVelocity(rawValue: 40), thenHoldForDuration: 0.8)
         XCTAssertTrue(surface.isHittable, "Cancel must keep the same real reader active")
         XCTAssertTrue(saved.exists && surface.frame.intersects(saved.frame))
         XCTAssertFalse(rootTab("主页", legacyID: "tabs.legacy.home").isHittable)
