@@ -31,7 +31,7 @@ private struct ReaderOpeningPresentation: ViewModifier {
 
     func body(content: Content) -> some View {
         content
-            .environment(\.readerOpeningManaged, true)
+            .environment(\.readerOpeningManaged, !didReveal)
             .allowsHitTesting(didReveal)
             .accessibilityHidden(!didReveal)
             .overlay {
