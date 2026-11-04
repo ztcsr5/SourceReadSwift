@@ -38,7 +38,7 @@ enum ContentImageNormalizer {
     }
 }
 
-struct ComicImageRequest: Equatable, Sendable {
+struct ComicImageRequest: Hashable, Sendable {
     let url: String
     let headers: [String: String]
 

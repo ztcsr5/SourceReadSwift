@@ -3,6 +3,24 @@ import UIKit
 @testable import SourceReadSwift
 
 final class RemoteComicImageTests: XCTestCase {
+    func testComicFailureStatusAndAuthenticatedCacheContextStaySeparate() async throws {
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [ComicImageURLProtocol.self]
+        let session = URLSession(configuration: configuration)
+        defer { session.invalidateAndCancel() }
+        let loader = RemoteImageLoader(session: session)
+        let url = try XCTUnwrap(URL(string: "https://comic-image-fixture.invalid/page.png"))
+        ComicImageURLProtocol.setSuccess(true)
+        let validHeaders = ["Referer": "https://comic.example/chapter/1"]
+        let loaded = await loader.comicPage(for: url, headers: validHeaders, maxPixelSize: 4096)
+        XCTAssertNotNil(try loaded.get())
+        XCTAssertNotNil(loader.cachedComicPage(for: url, headers: validHeaders, maxPixelSize: 4096))
+        XCTAssertNil(loader.cachedComicPage(for: url, headers: [:], maxPixelSize: 4096))
+        let rejected = await loader.comicPage(for: url, headers: [:], maxPixelSize: 4096)
+        guard case .failure(let reason) = rejected else { return XCTFail("A different context must not reuse the authenticated bitmap") }
+        XCTAssertEqual(reason, .http(403))
+    }
+
     func testHTTPFailureEndsAndFollowingRetryCanDecodeImage() async throws {
         let configuration = URLSessionConfiguration.ephemeral
         configuration.protocolClasses = [ComicImageURLProtocol.self]
