@@ -519,9 +519,11 @@ struct BookDetailView: View {
                         Text(isAscending ? "正序" : "倒序")
                     }
                     .font(.subheadline.weight(.semibold))
+                    .lineLimit(1)
+                    .fixedSize(horizontal: true, vertical: false)
                     .foregroundStyle(AppTheme.accent)
                     .padding(.horizontal, 10)
-                    .padding(.vertical, 5)
+                    .frame(minHeight: 44)
                     .background(AppTheme.accent.opacity(0.1), in: Capsule())
                 }
                 .buttonStyle(AppPressStyle())
@@ -531,7 +533,9 @@ struct BookDetailView: View {
                 }
 
                 Text("\(chapters.count) 章")
-                    .font(.subheadline.weight(.semibold))
+                    .font(.caption.weight(.medium))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
                     .foregroundStyle(.secondary)
             }
             if canDownloadTextChapters, let record = downloadRecord {
