@@ -108,24 +108,23 @@ final class ReaderBookPassageController: UIViewController {
               let navigationView = navigation.view, let sourceView = source.view else { return }
         // Zoom can cancel before a pop is committed, without appearance callbacks.
         // Observe existing native recognizers; never replace their delegate/driver.
-        var containers = [navigationView, sourceView]
-        var ancestor = sourceView.superview
-        while let container = ancestor, container !== navigationView {
-            containers.append(container)
-            ancestor = container.superview
-        }
-        var candidates = containers.flatMap { $0.gestureRecognizers ?? [] }
+        var candidates = NativeBookGestureProbe.collect(in: navigationView)
+        candidates.append(contentsOf: NativeBookGestureProbe.collect(in: sourceView))
         if let edge = navigation.interactivePopGestureRecognizer { candidates.append(edge) }
         #if compiler(>=6.2)
         if #available(iOS 26.0, *), let content = navigation.interactiveContentPopGestureRecognizer {
             candidates.append(content)
         }
         #endif
+        let previousCount = observedGestures.count
         for gesture in candidates {
             guard !(gesture is UITapGestureRecognizer), !(gesture is UILongPressGestureRecognizer),
                   !observedGestures.contains(where: { $0 === gesture }) else { continue }
             gesture.addTarget(self, action: #selector(observeNativeMotion(_:)))
             observedGestures.append(gesture)
+        }
+        if previousCount != observedGestures.count {
+            Self.events.notice("OBSERVERS attached=\(self.observedGestures.count, privacy: .public)")
         }
         #endif
     }
