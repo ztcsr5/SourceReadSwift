@@ -88,6 +88,13 @@ final class WebsiteSourceFamilyInferenceTests: XCTestCase {
         let web = WKWebView(frame: CGRect(x: 0, y: 0, width: 320, height: 568))
         container.view.addSubview(web)
         defer { web.stopLoading(); web.navigationDelegate = nil; window.isHidden = true; previousWindow?.makeKeyAndVisible() }
+        // A hosted CI WebContent process has taken 18–44 seconds to cold-start.
+        // Separate that fixture readiness from the unchanged 8-second capture waits.
+        let warmed = expectation(description: "WebKit fixture process ready")
+        let bootstrap = WebsiteSampleNavigation(loaded: warmed)
+        web.navigationDelegate = bootstrap
+        web.loadHTMLString("<!doctype html><html><body>fixture ready</body></html>", baseURL: nil)
+        await fulfillment(of: [warmed], timeout: 60)
         for (index, html) in pages.enumerated() {
             let loaded = expectation(description: "local page \(index)")
             let observer = WebsiteSampleNavigation(loaded: loaded)
