@@ -89,7 +89,7 @@ final class ReaderExitSwipeController: UIViewController, UIGestureRecognizerDele
         super.viewDidAppear(animated)
         attachIfNeeded()
         if prefersSystemReturn {
-            Self.decisions.notice("READY native=\(usesSystemReturn ? 1 : 0, privacy: .public) fallback=\(edgePan.isEnabled ? 1 : 0, privacy: .public)")
+            Self.decisions.notice("READY native=\(self.usesSystemReturn ? 1 : 0, privacy: .public) fallback=\(self.edgePan.isEnabled ? 1 : 0, privacy: .public)")
         }
     }
 
