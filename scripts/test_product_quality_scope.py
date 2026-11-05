@@ -26,23 +26,61 @@ class ProductQualityScopeTests(unittest.TestCase):
     def test_startup_evidence_requires_explicit_regression_mode_and_has_no_prose_or_url(self):
         web = read_source(APP + "Features/Reader/WebScrollReaderView.swift")
         snapshot = web.split("private func recordStartupEvidence(", 1)[1].split("#endif", 1)[0]
-        self.assertIn('ProcessInfo.processInfo.arguments.contains("--floating-desk-regression")', snapshot)
+        fixtures = web.split("private static let recordsStartupEvidence =", 1)[1].split("#endif", 1)[0]
+        self.assertIn('ProcessInfo.processInfo.arguments.contains("--floating-desk-regression")', fixtures)
+        self.assertIn('ProcessInfo.processInfo.arguments.contains("--reader-settings-regression")', fixtures)
+        self.assertIn("guard Self.recordsStartupEvidence else { return }", snapshot)
         for forbidden in ["textContent", "innerHTML", "location.href", "absoluteString", "CADisplayLink", "Timer"]:
             self.assertNotIn(forbidden, snapshot)
         probe = web.split("private func verifyStartupBridge(", 1)[1].split("private func recordStartupEvidence(", 1)[0]
         self.assertIn("guard !hasReportedPosition else { return }", probe)
         self.assertIn("#if DEBUG", probe)
 
+    def test_native_more_menu_consumes_its_dismissal_without_toggling_the_prose_overlay(self):
+        reader = read_source(READER)
+        button = read_source(APP + "Features/Reader/ReaderNativeMenuButton.swift")
+        tap = reader.split("private func handleReaderTap(", 1)[1].split("private func runTapAction", 1)[0]
+        self.assertIn("!nativeMoreMenuPresentation.isActive", tap)
+        self.assertLess(tap.index("nativeMoreMenuPresentation.isActive"), tap.index("tapCooldownUntil"))
+        self.assertIn("presentation: nativeMoreMenuPresentation", reader)
+        self.assertIn("willDisplayMenuFor configuration", button)
+        self.assertIn("willEndFor configuration", button)
+        self.assertIn("animator.addCompletion(finish)", button)
+
+    def test_comic_streaming_playlists_are_classified_before_generic_rule_parsing(self):
+        parser = read_source(APP + "Core/Rules/ContentParser.swift")
+        header = "if source.sourceKind == .comic, Self.isStreamingPlaylist("
+        self.assertIn(header, parser)
+        self.assertLess(parser.index(header), parser.index("let contentRuleStr"))
+        self.assertIn("return .failure(.unsupported(", parser[parser.index(header):parser.index("let contentRuleStr")])
+        self.assertIn('body.hasPrefix("#EXTM3U', parser)
+
     def test_startup_fault_is_installed_before_the_first_navigation(self):
         web = read_source(APP + "Features/Reader/WebScrollReaderView.swift")
         creation = web.split("func makeWebView(", 1)[1].split("func tearDown(", 1)[0]
         self.assertLess(creation.index("prepareBeforeNavigation?(webView)"),
-                        creation.index("webView.loadHTMLString("))
+                        creation.index("navigateToShell(webView: webView)"))
+        navigation = web.split("private func navigateToShell(", 1)[1].split("private func scheduleStartupProbe", 1)[0]
+        self.assertLess(navigation.index("navigationToken ="), navigation.index("webView.loadHTMLString("))
+        self.assertIn("WebReaderHTML.renderShell(for: navigationID)", navigation)
         fixture = read_source("SourceReadSwiftTests/ReaderModePositionRegressionTests.swift")
         self.assertIn("makeWebView(initialView: fixture, prepareBeforeNavigation:", fixture)
         for original in ["XCTAssertEqual(fault.injections, 1)", "XCTAssertEqual(coordinator.startupRecoveryCount, 1)",
                          "XCTAssertGreaterThan(offset, 500)", "XCTAssertLessThanOrEqual(offset, 600"]:
             self.assertIn(original, fixture)
+
+    def test_late_shell_readiness_cannot_invalidate_already_mounted_prose(self):
+        web = read_source(APP + "Features/Reader/WebScrollReaderView.swift")
+        ready = web.split('case "ready":', 1)[1].split('case "content-ready":', 1)[0]
+        for reset in ["isDocumentReady = false", "mountedContent = nil", "expectedContentRevision ="]:
+            self.assertNotIn(reset, ready)
+        messages = web.split("func userContentController(", 1)[1].split('case "ready":', 1)[0]
+        self.assertIn('body["navigationToken"] as? String == navigationToken', messages)
+        probe = web.split("private func verifyStartupBridge(", 1)[1].split("private func recordStartupEvidence(", 1)[0]
+        self.assertIn("self.navigationToken == navigationToken", probe)
+        fixture = read_source("SourceReadSwiftTests/ReaderModePositionRegressionTests.swift")
+        self.assertIn("testLateReadyFromTheMountedShellDoesNotInvalidateItsFirstVisiblePosition", fixture)
+        self.assertIn('XCTAssertEqual(bridge.mountedRevisions.count, 1', fixture)
 
     def test_mode_switch_saves_resolved_chapter_and_local_paragraph(self):
         mode = read_source(READER).split(".onChange(of: readerModeRawValue)", 1)[1].split(

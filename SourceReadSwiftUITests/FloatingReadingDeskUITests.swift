@@ -174,7 +174,7 @@ final class FloatingReadingDeskUITests: XCTestCase {
         XCTAssertTrue(surface.waitForExistence(timeout: 10))
         let saved = app.webViews.staticTexts.matching(
             NSPredicate(format: "label BEGINSWITH %@", "【已保存的阅读段落】")).firstMatch
-        XCTAssertTrue(saved.waitForExistence(timeout: 10))
+        XCTAssertTrue(saved.waitForExistence(timeout: 10), "Web startup state: \(surface.value ?? "unavailable")")
         XCTAssertTrue(surface.frame.intersects(saved.frame), "The saved paragraph must be in the actual viewport")
         XCTAssertFalse(rootTab("主页", legacyID: "tabs.legacy.home").isHittable)
         capture("17-restored-paragraph")
@@ -233,6 +233,57 @@ final class FloatingReadingDeskUITests: XCTestCase {
         XCTAssertFalse(detail.isHittable)
         XCTAssertEqual(cover.frame.midX, origin.midX, accuracy: 3)
         XCTAssertEqual(cover.frame.midY, origin.midY, accuracy: 8)
+    }
+
+    func testContinuousChapterCrossingKeepsProseHeadingAndReopenedPositionTogether() throws {
+        try launch(theme: "classic", fixture: "--desk-cross-chapter")
+        let entry = assertCurrentBook("剑来")
+        entry.tap()
+        let surface = element("reader.webScrollSurface")
+        let secondChapter = app.webViews.staticTexts.matching(
+            NSPredicate(format: "label BEGINSWITH %@", "【连续章2·段1】")).firstMatch
+        XCTAssertTrue(secondChapter.waitForExistence(timeout: 10))
+        let back = element("reader.returnToShelf")
+        if !back.isHittable { app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.42)).tap() }
+        XCTAssertTrue(back.isHittable)
+        assertChapterAtViewportTop(2, surface: surface)
+        var previousChapter = 2
+        for chapter in [3, 2, 1, 2, 3] {
+            let heading = element("reader.currentChapterHeading")
+            let isForward = chapter > previousChapter
+            for _ in 0..<10 {
+                if heading.label == "连续阅读第\(chapter)章" { break }
+                if isForward { surface.swipeUp() } else { surface.swipeDown() }
+            }
+            assertChapterAtViewportTop(chapter, surface: surface)
+            capture("cross-chapter-\(chapter)")
+            previousChapter = chapter
+        }
+        back.tap()
+        XCTAssertTrue(entry.waitForExistence(timeout: 5))
+        entry.tap()
+        XCTAssertTrue(surface.waitForExistence(timeout: 10))
+        if !back.isHittable { app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.42)).tap() }
+        assertChapterAtViewportTop(3, surface: surface)
+        capture("cross-chapter-reopened")
+    }
+
+    private func assertChapterAtViewportTop(_ chapter: Int, surface: XCUIElement) {
+        let heading = element("reader.currentChapterHeading")
+        let synchronized = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
+            guard heading.label == "连续阅读第\(chapter)章" else { return false }
+            let prose = self.app.webViews.staticTexts.matching(
+                NSPredicate(format: "label BEGINSWITH %@", "【连续章\(chapter)·")).allElementsBoundByIndex
+            // A prefetched offscreen paragraph is not evidence of crossing.
+            return prose.contains { paragraph in
+                let visible = paragraph.frame.intersection(surface.frame)
+                return !visible.isNull && visible.height > 20 && visible.minY < surface.frame.midY
+            }
+        }, object: nil)
+        XCTAssertEqual(XCTWaiter.wait(for: [synchronized], timeout: 5), .completed,
+                       "The real visible prose and native heading must agree on chapter \(chapter)")
+        XCTAssertFalse(element("reader.openingRecovery").exists)
+        XCTAssertFalse(rootTab("主页", legacyID: "tabs.legacy.home").isHittable)
     }
 
     func testReaderSystemReturnCanCancelWithoutLosingItsSavedParagraph() throws {

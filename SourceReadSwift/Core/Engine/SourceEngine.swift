@@ -6,6 +6,8 @@ protocol SourceEngine: Sendable {
     func getBookDetail(source: BookSource, book: SearchBook) async -> Result<BookDetail, SourceEngineError>
     func getChapterList(source: BookSource, book: BookDetail) async -> Result<[BookChapter], SourceEngineError>
     func getChapterList(source: BookSource, book: BookDetail, maxPages: Int) async -> Result<[BookChapter], SourceEngineError>
+    /// A download list must reach the end of directory pagination, never a readable prefix.
+    func getCompleteChapterList(source: BookSource, book: BookDetail) async -> Result<[BookChapter], SourceEngineError>
     func getContent(source: BookSource, chapter: BookChapter) async -> Result<ChapterContent, SourceEngineError>
     func getContent(source: BookSource, chapter: BookChapter, maxPages: Int) async -> Result<ChapterContent, SourceEngineError>
     /// Executes a Legado `ruleContent.payAction` (purchase operation) with the
@@ -35,6 +37,10 @@ extension SourceEngine {
 
     func getChapterList(source: BookSource, book: BookDetail, maxPages: Int) async -> Result<[BookChapter], SourceEngineError> {
         await getChapterList(source: source, book: book)
+    }
+
+    func getCompleteChapterList(source: BookSource, book: BookDetail) async -> Result<[BookChapter], SourceEngineError> {
+        .failure(.unsupported("此书源引擎不能核验完整目录。请下载单话。"))
     }
 
     func getContent(source: BookSource, chapter: BookChapter, maxPages: Int) async -> Result<ChapterContent, SourceEngineError> {
@@ -410,6 +416,15 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
     }
 
     func getChapterList(source: BookSource, book: BookDetail, maxPages: Int) async -> Result<[BookChapter], SourceEngineError> {
+        await loadChapterList(source: source, book: book, maxPages: maxPages, requiresCompleteDirectory: false)
+    }
+
+    func getCompleteChapterList(source: BookSource, book: BookDetail) async -> Result<[BookChapter], SourceEngineError> {
+        await loadChapterList(source: source, book: book, maxPages: 30, requiresCompleteDirectory: true)
+    }
+
+    private func loadChapterList(source: BookSource, book: BookDetail, maxPages: Int,
+                                 requiresCompleteDirectory: Bool) async -> Result<[BookChapter], SourceEngineError> {
         let executionState = persistentState(for: source)
         restoreBookVariables(source: source, bookURL: book.bookUrl, into: executionState)
         let executionContext = RuleExecutionContext(persistentState: executionState, source: source, logHandler: { [diagnostics] message in
@@ -500,6 +515,7 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
                 book: book,
                 firstURL: response.url,
                 maxPages: maxPages,
+                requiresCompleteDirectory: requiresCompleteDirectory,
                 executionContext: executionContext
             )
             switch result {
@@ -1556,6 +1572,7 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
         book: BookDetail,
         firstURL: URL,
         maxPages: Int = 30,
+        requiresCompleteDirectory: Bool = false,
         executionContext: RuleExecutionContext
     ) async -> Result<[BookChapter], SourceEngineError> {
         let urlIdentity = SourcePaginationURLIdentity()
@@ -1565,7 +1582,7 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
         // case, fragments or percent-encoding.
         var chapters = deduplicatedChapters(firstPage.chapters, identity: urlIdentity)
         var inheritedVolume = firstPage.trailingVolume
-        guard maxPages > 1 else {
+        guard maxPages > 1 || requiresCompleteDirectory else {
             return chapters.isEmpty ? .failure(.empty("Chapter list is empty")) : .success(chapters)
         }
         var nextURLText = firstPage.nextTocUrl?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty
@@ -1576,6 +1593,7 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
         var attemptedCanonicalURL = nextURLText.flatMap(urlIdentity.canonical)
 
         while let currentNext = nextURLText {
+            if Task.isCancelled { return .failure(.network("目录请求已取消")) }
             attemptedURL = currentNext
             attemptedCanonicalURL = urlIdentity.canonical(currentNext)
             if pagesLoaded >= maxPages {
@@ -1662,6 +1680,12 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
             )
         }
 
+        guard !requiresCompleteDirectory || stopReason == "no-next-url" else {
+            if stopReason == "max-pages" {
+                return .failure(.rule("目录超过 \(maxPages) 页，无法核验全本。请单独下载需要的章节。"))
+            }
+            return .failure(.rule("目录未读到末页，未开始全本下载。请刷新书源目录后重试，或下载单话。"))
+        }
         return chapters.isEmpty ? .failure(.empty("Chapter list is empty")) : .success(chapters)
     }
 
