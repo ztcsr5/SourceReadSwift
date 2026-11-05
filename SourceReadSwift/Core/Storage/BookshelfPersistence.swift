@@ -100,6 +100,7 @@ struct BookshelfPersistence: Sendable {
         let chapter: Int
         let title: String?
         let paragraph: Int?
+        let comicPosition: ComicReadingPosition?
         let total: Int
         let seen: Int?
         let lastReadAt: Date?
@@ -108,6 +109,7 @@ struct BookshelfPersistence: Sendable {
         init(_ book: BookshelfBook) {
             chapter = book.currentChapterIndex; title = book.currentChapterTitle
             paragraph = book.currentParagraphIndex; total = book.totalChapters
+            comicPosition = book.comicPosition
             seen = book.seenTotalChapters; lastReadAt = book.lastReadAt
             lastOpenedAt = book.lastOpenedAt
         }
@@ -119,6 +121,7 @@ struct BookshelfPersistence: Sendable {
                   lastReadAt.timeIntervalSince1970.rounded(.down) >= (book.lastReadAt ?? .distantPast).timeIntervalSince1970 else { return }
             book.currentChapterIndex = chapter; book.currentChapterTitle = title
             book.currentParagraphIndex = paragraph; book.totalChapters = max(book.totalChapters, total)
+            book.comicPosition = comicPosition
             book.seenTotalChapters = seen; book.lastReadAt = lastReadAt
             book.lastOpenedAt = lastOpenedAt
         }

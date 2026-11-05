@@ -6,6 +6,8 @@ protocol SourceEngine: Sendable {
     func getBookDetail(source: BookSource, book: SearchBook) async -> Result<BookDetail, SourceEngineError>
     func getChapterList(source: BookSource, book: BookDetail) async -> Result<[BookChapter], SourceEngineError>
     func getChapterList(source: BookSource, book: BookDetail, maxPages: Int) async -> Result<[BookChapter], SourceEngineError>
+    /// A download list must reach the end of directory pagination, never a readable prefix.
+    func getCompleteChapterList(source: BookSource, book: BookDetail) async -> Result<[BookChapter], SourceEngineError>
     func getContent(source: BookSource, chapter: BookChapter) async -> Result<ChapterContent, SourceEngineError>
     func getContent(source: BookSource, chapter: BookChapter, maxPages: Int) async -> Result<ChapterContent, SourceEngineError>
     /// Executes a Legado `ruleContent.payAction` (purchase operation) with the
@@ -18,9 +20,19 @@ protocol SourceEngine: Sendable {
     func login(source: BookSource, credentials: [String: String]) async -> Result<SourceLoginVerification, SourceEngineError>
     func loginFields(source: BookSource) async -> Result<[SourceLoginField], SourceEngineError>
     func performLoginAction(source: BookSource, action: String, credentials: [String: String]) async -> Result<[SourceLoginField], SourceEngineError>
+    func exploreMenu(source: BookSource) async -> Result<SourceExploreMenu, SourceEngineError>
+    func performExploreAction(source: BookSource, action: String, inputs: [String: String]) async -> Result<SourceExploreActionResult, SourceEngineError>
 }
 
 extension SourceEngine {
+    func exploreMenu(source: BookSource) async -> Result<SourceExploreMenu, SourceEngineError> {
+        .success(SourceExploreMenu(categories: ExploreCategoryParser.parse(exploreUrl: source.exploreUrl), controls: []))
+    }
+
+    func performExploreAction(source: BookSource, action: String, inputs: [String: String]) async -> Result<SourceExploreActionResult, SourceEngineError> {
+        .failure(.unsupported("此引擎不支持书源发现操作"))
+    }
+
     func loginFields(source: BookSource) async -> Result<[SourceLoginField], SourceEngineError> {
         .success(SourceLoginFieldParser.parse(source.loginUi))
     }
@@ -35,6 +47,10 @@ extension SourceEngine {
 
     func getChapterList(source: BookSource, book: BookDetail, maxPages: Int) async -> Result<[BookChapter], SourceEngineError> {
         await getChapterList(source: source, book: book)
+    }
+
+    func getCompleteChapterList(source: BookSource, book: BookDetail) async -> Result<[BookChapter], SourceEngineError> {
+        .failure(.unsupported("此书源引擎不能核验完整目录。请下载单话。"))
     }
 
     func getContent(source: BookSource, chapter: BookChapter, maxPages: Int) async -> Result<ChapterContent, SourceEngineError> {
@@ -105,6 +121,7 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
     private let diagnostics: DiagnosticSink
     private let cookieStore: SourceCookieStore
     private let purifyRules: () async -> [String]
+    private let sourceVariables: SourceVariableStore?
     private let stateLock = NSLock()
     private var states: [String: RulePersistentState] = [:]
     private var stateAccessOrder: [String] = []
@@ -138,15 +155,51 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
         network: SourceNetworkClient? = nil,
         cookieStore: SourceCookieStore = SourceCookieStore(),
         diagnostics: DiagnosticSink = .noop,
-        purifyRules: @escaping () async -> [String] = { [] }
+        purifyRules: @escaping () async -> [String] = { [] },
+        sourceVariables: SourceVariableStore? = nil
     ) {
         self.cookieStore = cookieStore
         self.network = network ?? URLSessionSourceNetworkClient(cookieStore: cookieStore)
         self.diagnostics = diagnostics
         self.purifyRules = purifyRules
+        self.sourceVariables = sourceVariables
     }
 
     // MARK: - Per-book rule variables
+
+    func exploreMenu(source: BookSource) async -> Result<SourceExploreMenu, SourceEngineError> {
+        let context = await makeExploreContext(source: source)
+        return await BlockingRuleExecutor.run {
+            defer { context.cleanUp() }
+            return SourceExploreMenuParser.evaluate(source: source, context: context)
+        }
+    }
+
+    func performExploreAction(source: BookSource, action: String, inputs: [String: String]) async -> Result<SourceExploreActionResult, SourceEngineError> {
+        let context = await makeExploreContext(source: source)
+        return await BlockingRuleExecutor.run {
+            defer { context.cleanUp() }
+            let result = SourceExploreMenuParser.perform(source: source, action: action, inputs: inputs, context: context)
+            guard let warning = self.persistentState(for: source).persistenceFailure else { return result }
+            return result.map { SourceExploreActionResult(menu: $0.menu, searchKeyword: $0.searchKeyword, message: warning) }
+        }
+    }
+
+    private func makeExploreContext(source: BookSource) async -> RuleExecutionContext {
+        let state = persistentState(for: source)
+        let cookie: String
+        if let address = URL(string: source.networkBaseURL) {
+            cookie = await cookieStore.cookieHeader(for: address) ?? ""
+        } else { cookie = "" }
+        let context = RuleExecutionContext(initialValues: ["cookieHeader": cookie],
+            persistentState: state, source: source, stage: "explore.menu")
+        context.responseHandler = { [network, weak context] encoded in
+            SynchronousSourceNetworkBridge.loadResponse(urlText: encoded, source: source, network: network,
+                cookieHeader: context?.string(for: "cookieHeader"), persistentValues: state.snapshot(), persistentState: state)
+        }
+        context.networkHandler = { [weak context] encoded in context?.responseHandler?(encoded)?.body ?? "" }
+        return context
+    }
 
     private func bookVariableKey(source: BookSource, bookURL: String) -> String {
         source.bookSourceUrl + "\u{1F}" + bookURL
@@ -218,7 +271,11 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
         ))
 
         let searchUrl: String
-        switch searchURLResolver.resolve(source: source, keyword: keyword, page: page, persistentState: executionState, network: network, executionContext: executionContext) {
+        let resolvedSearch = await BlockingRuleExecutor.run { [self] in
+            searchURLResolver.resolve(source: source, keyword: keyword, page: page, persistentState: executionState,
+                network: network, executionContext: executionContext)
+        }
+        switch resolvedSearch {
         case .success(let value):
             searchUrl = value
         case .failure(let error):
@@ -236,7 +293,7 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
         switch await loadWithOptionalWebViewFallback(request, source: source, stage: "search.load") {
         case .success(let response):
             let transformedResponse: SourceResponse
-            switch transformBodyIfNeeded(response, source: source, rules: [source.ruleSearch], network: network, stateOverride: executionState, executionContext: executionContext, requestText: searchUrl, variables: ["key": keyword, "keyword": keyword, "page": page]) {
+            switch await transformBodyIfNeeded(response, source: source, rules: [source.ruleSearch], network: network, stateOverride: executionState, executionContext: executionContext, requestText: searchUrl, variables: ["key": keyword, "keyword": keyword, "page": page]) {
             case .success(let value): transformedResponse = value
             case .failure(let error):
                 await emitFailure(error, stage: "search.bodyJs", source: source)
@@ -252,7 +309,8 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
             parser.onBookVariables = { [weak self] bookURL, delta in
                 self?.storeBookVariables(source: source, bookURL: bookURL, delta: delta)
             }
-            let parsed = parser.parse(source: source, response: transformedResponse, keyword: keyword)
+            let configuredParser = parser
+            let parsed = await BlockingRuleExecutor.run { configuredParser.parse(source: source, response: transformedResponse, keyword: keyword) }
             if case .failure(let error) = parsed {
                 await emitFailure(error, stage: "search.parse", source: source, details: ["url": transformedResponse.url.absoluteString])
             }
@@ -308,7 +366,7 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
         switch await loadWithOptionalWebViewFallback(request, source: source, stage: "explore.load") {
         case .success(let response):
             let transformedResponse: SourceResponse
-            switch transformBodyIfNeeded(
+            switch await transformBodyIfNeeded(
                 response, source: source, rules: [source.ruleExplore, source.ruleSearch],
                 network: network, stateOverride: executionState, executionContext: executionContext,
                 requestText: url, variables: ["page": page]
@@ -328,11 +386,10 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
             parser.onBookVariables = { [weak self] bookURL, delta in
                 self?.storeBookVariables(source: source, bookURL: bookURL, delta: delta)
             }
-            let parsed = parser.parse(
-                source: source,
-                response: transformedResponse,
-                ruleOverride: source.ruleExplore
-            )
+            let configuredParser = parser
+            let parsed = await BlockingRuleExecutor.run {
+                configuredParser.parse(source: source, response: transformedResponse, ruleOverride: source.ruleExplore)
+            }
             if case .failure(let error) = parsed {
                 await emitFailure(error, stage: "explore.parse", source: source, details: ["url": transformedResponse.url.absoluteString])
             }
@@ -344,6 +401,7 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
     }
 
     func getBookDetail(source: BookSource, book: SearchBook) async -> Result<BookDetail, SourceEngineError> {
+        let source = source.resolvingMediaKind(book.mediaKind)
         let executionState = persistentState(for: source)
         restoreBookVariables(source: source, bookURL: book.bookUrl, into: executionState)
         let executionContext = RuleExecutionContext(persistentState: executionState, source: source, logHandler: { [diagnostics] message in
@@ -372,13 +430,13 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
                 persistentState: executionState
             )
         }
-        let resolvedBookUrl = DynamicURLResolver.resolve(
+        let resolvedBookUrl = await BlockingRuleExecutor.run { [self] in DynamicURLResolver.resolve(
             book.bookUrl,
             baseUrl: book.bookUrl.nilIfEmpty ?? source.cleanSourceURL,
             source: source,
             variables: ["book": book],
             context: executionContext
-        )
+        ) }
         let request = requestBuilder.buildPageRequest(
             source: source,
             urlText: resolvedBookUrl,
@@ -387,14 +445,16 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
         switch await loadWithOptionalWebViewFallback(request, source: source, stage: "detail.load") {
         case .success(let response):
             let transformedResponse: SourceResponse
-            switch transformBodyIfNeeded(response, source: source, rules: [source.ruleBookInfo], network: network, stateOverride: executionState, executionContext: executionContext, requestText: resolvedBookUrl, variables: ["book": book]) {
+            switch await transformBodyIfNeeded(response, source: source, rules: [source.ruleBookInfo], network: network, stateOverride: executionState, executionContext: executionContext, requestText: resolvedBookUrl, variables: ["book": book]) {
             case .success(let value): transformedResponse = value
             case .failure(let error):
                 await emitFailure(error, stage: "detail.bodyJs", source: source)
                 return .failure(error)
             }
             recordJavaScriptEvidence(source: source, stage: "detail", context: executionContext)
-            let parsed = BookDetailParser(executionContext: executionContext).parse(source: source, book: book, response: transformedResponse)
+            let parsed = await BlockingRuleExecutor.run {
+                BookDetailParser(executionContext: executionContext).parse(source: source, book: book, response: transformedResponse)
+            }
             if case .failure(let error) = parsed {
                 await emitFailure(error, stage: "detail.parse", source: source, details: ["url": transformedResponse.url.absoluteString])
             }
@@ -410,6 +470,16 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
     }
 
     func getChapterList(source: BookSource, book: BookDetail, maxPages: Int) async -> Result<[BookChapter], SourceEngineError> {
+        await loadChapterList(source: source, book: book, maxPages: maxPages, requiresCompleteDirectory: false)
+    }
+
+    func getCompleteChapterList(source: BookSource, book: BookDetail) async -> Result<[BookChapter], SourceEngineError> {
+        await loadChapterList(source: source, book: book, maxPages: 30, requiresCompleteDirectory: true)
+    }
+
+    private func loadChapterList(source: BookSource, book: BookDetail, maxPages: Int,
+                                 requiresCompleteDirectory: Bool) async -> Result<[BookChapter], SourceEngineError> {
+        let source = source.resolvingMediaKind(book.mediaKind)
         let executionState = persistentState(for: source)
         restoreBookVariables(source: source, bookURL: book.bookUrl, into: executionState)
         let executionContext = RuleExecutionContext(persistentState: executionState, source: source, logHandler: { [diagnostics] message in
@@ -447,7 +517,7 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
         // preUpdateJs can flip the chapter order.
         executionContext.setValue(nil, for: "book.reverseToc")
         executionContext.setValue(nil, for: "book.tocUrl")
-        runTocPreUpdateJs(
+        await runTocPreUpdateJs(
             source: source,
             book: book,
             baseUrl: book.bookUrl.nilIfEmpty ?? book.tocUrl?.nilIfEmpty ?? source.cleanSourceURL,
@@ -455,13 +525,13 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
         )
         let dynamicTocUrl = executionContext.string(for: "book.tocUrl").trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty
         let tocURL = dynamicTocUrl ?? book.tocUrl?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty ?? book.bookUrl
-        let resolvedTocURL = DynamicURLResolver.resolve(
+        let resolvedTocURL = await BlockingRuleExecutor.run { [self] in DynamicURLResolver.resolve(
             tocURL,
             baseUrl: book.bookUrl.nilIfEmpty ?? book.tocUrl?.nilIfEmpty ?? source.cleanSourceURL,
             source: source,
             variables: ["book": book],
             context: executionContext
-        )
+        ) }
         let request = requestBuilder.buildPageRequest(
             source: source,
             urlText: resolvedTocURL,
@@ -470,14 +540,14 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
         switch await loadWithOptionalWebViewFallback(request, source: source, stage: "toc.load") {
         case .success(let response):
             let transformedResponse: SourceResponse
-            switch transformBodyIfNeeded(response, source: source, rules: [source.ruleToc], network: network, stateOverride: executionState, executionContext: executionContext, requestText: resolvedTocURL, variables: ["book": book]) {
+            switch await transformBodyIfNeeded(response, source: source, rules: [source.ruleToc], network: network, stateOverride: executionState, executionContext: executionContext, requestText: resolvedTocURL, variables: ["book": book]) {
             case .success(let value): transformedResponse = value
             case .failure(let error):
                 await emitFailure(error, stage: "toc.bodyJs", source: source)
                 return .failure(error)
             }
             recordJavaScriptEvidence(source: source, stage: "toc", context: executionContext)
-            let parsed = parseChapterListPage(source: source, book: book, response: transformedResponse, executionContext: executionContext)
+            let parsed = await parseChapterListPage(source: source, book: book, response: transformedResponse, executionContext: executionContext)
             if case .failure(let error) = parsed {
                 await emitFailure(error, stage: "toc.parse", source: source, details: ["url": response.url.absoluteString])
                 await emitPaginationStop(
@@ -500,6 +570,7 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
                 book: book,
                 firstURL: response.url,
                 maxPages: maxPages,
+                requiresCompleteDirectory: requiresCompleteDirectory,
                 executionContext: executionContext
             )
             switch result {
@@ -508,11 +579,9 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
                 // preUpdateJs) restores reading order before titles are
                 // formatted, so `formatJs` sees the final 1-based index.
                 let ordered = applyReverseTocIfNeeded(chapters, executionContext: executionContext)
-                let formatted = applyTocFormatJs(
-                    ordered,
-                    source: source,
-                    executionContext: executionContext
-                )
+                let formatted = await BlockingRuleExecutor.run { [self] in
+                    applyTocFormatJs(ordered, source: source, executionContext: executionContext)
+                }
                 recordJavaScriptEvidence(source: source, stage: "toc.format", context: executionContext)
                 return .success(formatted)
             case .failure:
@@ -570,13 +639,13 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
                 persistentState: executionState
             )
         }
-        let resolvedChapterUrl = DynamicURLResolver.resolve(
+        let resolvedChapterUrl = await BlockingRuleExecutor.run { [self] in DynamicURLResolver.resolve(
             chapter.url,
             baseUrl: chapter.bookUrl.nilIfEmpty ?? source.cleanSourceURL,
             source: source,
             variables: ["chapter": chapter],
             context: executionContext
-        )
+        ) }
         let request = requestBuilder.buildPageRequest(
             source: source,
             urlText: resolvedChapterUrl,
@@ -587,14 +656,14 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
         switch await loadWithOptionalWebViewFallback(request, source: source, stage: "content.load") {
         case .success(let response):
             let transformedResponse: SourceResponse
-            switch transformBodyIfNeeded(response, source: source, rules: [source.ruleContent], network: network, stateOverride: executionState, executionContext: executionContext, requestText: resolvedChapterUrl, variables: ["chapter": chapter]) {
+            switch await transformBodyIfNeeded(response, source: source, rules: [source.ruleContent], network: network, stateOverride: executionState, executionContext: executionContext, requestText: resolvedChapterUrl, variables: ["chapter": chapter]) {
             case .success(let value): transformedResponse = value
             case .failure(let error):
                 await emitFailure(error, stage: "content.bodyJs", source: source)
                 return .failure(error)
             }
             recordJavaScriptEvidence(source: source, stage: "content", context: executionContext)
-            let parsed = parseContentPage(
+            let parsed = await parseContentPage(
                 source: source,
                 chapter: chapter,
                 response: transformedResponse,
@@ -687,12 +756,12 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
         )
         context.setExecutionStage("login")
         defer { context.cleanUp() }
-        let runtime = JSCoreRuntime(executionContext: context)
-        switch runtime.evaluate(script, variables: [
-            "source": source,
-            "baseUrl": baseURL.absoluteString,
-            "cookieHeader": cookieHeader ?? ""
-        ]) {
+        let evaluated = await BlockingRuleExecutor.run {
+            JSCoreRuntime(executionContext: context).evaluate(script, variables: [
+                "source": source, "baseUrl": baseURL.absoluteString, "cookieHeader": cookieHeader ?? ""
+            ])
+        }
+        switch evaluated {
         case .success:
             break
         case .failure(let error):
@@ -729,12 +798,11 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
         )
         context.setExecutionStage("login")
         defer { context.cleanUp() }
-        let runtime = JSCoreRuntime(executionContext: context)
-        let evaluated = runtime.evaluate(script, variables: [
-            "source": source,
-            "baseUrl": baseURL.absoluteString,
-            "cookieHeader": cookieHeader ?? ""
-        ])
+        let evaluated = await BlockingRuleExecutor.run {
+            JSCoreRuntime(executionContext: context).evaluate(script, variables: [
+                "source": source, "baseUrl": baseURL.absoluteString, "cookieHeader": cookieHeader ?? ""
+            ])
+        }
         let value: String
         switch evaluated {
         case .success(let output):
@@ -770,7 +838,7 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
         case .failure(let error): return .failure(error)
         case .success(let context):
             defer { context.cleanUp() }
-            return evaluateLoginFields(source: source, context: context)
+            return await BlockingRuleExecutor.run { [self] in evaluateLoginFields(source: source, context: context) }
         }
     }
 
@@ -788,12 +856,14 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
         case .failure(let error): return .failure(error)
         case .success(let context):
             defer { context.cleanUp() }
-            let runtime = context.jsRuntime(ajaxHandler: { _ in "" })
-            let values = loginUIVariables(source: source, context: context)
-            if case .failure(let error) = runtime.evaluate(action, variables: values) {
-                return .failure(error)
+            return await BlockingRuleExecutor.run { [self] in
+                let runtime = context.jsRuntime(ajaxHandler: { _ in "" })
+                let values = loginUIVariables(source: source, context: context)
+                if case .failure(let error) = runtime.evaluate(action, variables: values) {
+                    return .failure(error)
+                }
+                return evaluateLoginFields(source: source, context: context)
             }
-            return evaluateLoginFields(source: source, context: context)
         }
     }
 
@@ -823,8 +893,11 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
         }
         if let definitions = SourceLoginScript.script(from: source.loginUrl),
            !SourceLoginScript.isPageURL(source.loginUrl) {
-            let runtime = context.jsRuntime(ajaxHandler: { _ in "" })
-            if case .failure(let error) = runtime.evaluate(definitions, variables: loginUIVariables(source: source, context: context)) {
+            let evaluated = await BlockingRuleExecutor.run { [self] in
+                context.jsRuntime(ajaxHandler: { _ in "" }).evaluate(definitions,
+                    variables: loginUIVariables(source: source, context: context))
+            }
+            if case .failure(let error) = evaluated {
                 context.cleanUp()
                 return .failure(error)
             }
@@ -872,7 +945,8 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
         let rateRule = SourceRateRule(request.concurrentRate)
         let rateKey = request.rateLimitKey
         if let rateRule, let rateKey {
-            await rateLimiter.acquire(key: rateKey, rule: rateRule)
+            do { try await rateLimiter.acquire(key: rateKey, rule: rateRule) }
+            catch { return .failure(.network("请求已取消")) }
         }
         defer {
             if let rateRule, let rateKey {
@@ -880,9 +954,11 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
             }
         }
 
+        guard !Task.isCancelled else { return .failure(.network("请求已取消")) }
         var result = await network.load(request)
         var remaining = min(max(attempts, 0), 5)
         while remaining > 0 {
+            guard !Task.isCancelled else { return .failure(.network("请求已取消")) }
             if case .success = result { break }
             remaining -= 1
             result = await network.load(request)
@@ -923,6 +999,7 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
                 return .success(response)
             }
         }
+        guard !Task.isCancelled else { return .failure(.network("请求已取消")) }
         let shouldFallback: Bool
         if forcedWebView {
             shouldFallback = true
@@ -1228,124 +1305,127 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
         executionContext sharedExecutionContext: RuleExecutionContext? = nil,
         requestText: String? = nil,
         variables additionalVariables: [String: Any] = [:]
-    ) -> Result<SourceResponse, SourceEngineError> {
-        var scripts: [String] = []
-        if let sourceScript = bodyJSScript(source) { scripts.append(sourceScript) }
-        if let requestText, let script = SourceURLDirectiveParser().parse(requestText).bodyJavaScript {
-            scripts.append(script)
-        }
-        for rule in rules {
-            if let script = bodyJSScript(rule) { scripts.append(script) }
-        }
-        guard !scripts.isEmpty else { return .success(response) }
-        let state = stateOverride ?? persistentState(for: source)
-        let context: RuleExecutionContext
-        if let sharedExecutionContext {
-            context = sharedExecutionContext
-            context.bind([
-                "baseUrl": response.url.absoluteString,
-                "source": source,
-                "result": response.body,
-                "html": response.body,
-                "body": response.body
-            ])
-        } else {
-            let localContext = RuleExecutionContext(
-                initialValues: ["baseUrl": response.url.absoluteString, "source": source],
-                persistentState: state,
-                networkHandler: { encoded in
-                    if let network {
-                        return SynchronousSourceNetworkBridge.loadBody(
+    ) async -> Result<SourceResponse, SourceEngineError> {
+        return await BlockingRuleExecutor.run { [self] in
+            var scripts: [String] = []
+            if let sourceScript = bodyJSScript(source) { scripts.append(sourceScript) }
+            if let requestText, let script = SourceURLDirectiveParser().parse(requestText).bodyJavaScript {
+                scripts.append(script)
+            }
+            for rule in rules {
+                if let script = bodyJSScript(rule) { scripts.append(script) }
+            }
+            guard !scripts.isEmpty else { return .success(response) }
+            let state = stateOverride ?? persistentState(for: source)
+            let context: RuleExecutionContext
+            if let sharedExecutionContext {
+                context = sharedExecutionContext
+                context.bind([
+                    "baseUrl": response.url.absoluteString,
+                    "source": source,
+                    "result": response.body,
+                    "html": response.body,
+                    "body": response.body
+                ])
+            } else {
+                let localContext = RuleExecutionContext(
+                    initialValues: ["baseUrl": response.url.absoluteString, "source": source],
+                    persistentState: state,
+                    networkHandler: { encoded in
+                        if let network {
+                            return SynchronousSourceNetworkBridge.loadBody(
+                                urlText: encoded,
+                                source: source,
+                                network: network,
+                                cookieHeader: state.get("cookieHeader").nilIfEmpty,
+                                persistentValues: state.snapshot(),
+                                persistentState: state
+                            )
+                        }
+                        return SynchronousSourceLoader().load(
                             urlText: encoded,
                             source: source,
-                            network: network,
                             cookieHeader: state.get("cookieHeader").nilIfEmpty,
                             persistentValues: state.snapshot(),
                             persistentState: state
                         )
                     }
-                    return SynchronousSourceLoader().load(
+                )
+                localContext.responseHandler = { encoded in
+                    if let network {
+                        return SynchronousSourceNetworkBridge.loadResponse(
+                            urlText: encoded,
+                            source: source,
+                            network: network,
+                            cookieHeader: localContext.string(for: "cookieHeader"),
+                            persistentValues: state.snapshot(),
+                            persistentState: state
+                        )
+                    }
+                    return SynchronousSourceLoader().loadResponse(
                         urlText: encoded,
                         source: source,
-                        cookieHeader: state.get("cookieHeader").nilIfEmpty,
-                        persistentValues: state.snapshot(),
-                        persistentState: state
-                    )
-                }
-            )
-            localContext.responseHandler = { encoded in
-                if let network {
-                    return SynchronousSourceNetworkBridge.loadResponse(
-                        urlText: encoded,
-                        source: source,
-                        network: network,
                         cookieHeader: localContext.string(for: "cookieHeader"),
                         persistentValues: state.snapshot(),
                         persistentState: state
                     )
                 }
-                return SynchronousSourceLoader().loadResponse(
-                    urlText: encoded,
-                    source: source,
-                    cookieHeader: localContext.string(for: "cookieHeader"),
-                    persistentValues: state.snapshot(),
-                    persistentState: state
-                )
+                context = localContext
             }
-            context = localContext
+            var output = response.body
+            for script in scripts {
+                var variables: [String: Any] = context.persistentSnapshot().mapValues { $0 as Any }
+                for (key, value) in additionalVariables { variables[key] = value }
+                variables.merge([
+                    "result": output,
+                    "html": output,
+                    "body": output,
+                    "baseUrl": response.url.absoluteString,
+                    "source": source
+                ], uniquingKeysWith: { _, current in current })
+                // URL construction, jsLib and body transforms share declarations
+                // and the injected network/cookies, instead of reloading the library
+                // in a new runtime for each hook.
+                let runtime = context.jsRuntime(ajaxHandler: context.networkHandler ?? { _ in "" })
+                let evaluated = runtime.evaluate(script, variables: variables)
+                let result: Result<String, SourceEngineError>
+                // Only a parse-time top-level return can be retried safely.
+                // A nested function may contain return while the script already
+                // performed requests; replaying an arbitrary runtime error would
+                // duplicate those side effects.
+                if case .failure(.javascript(let message)) = evaluated,
+                   message.lowercased().contains("syntaxerror"),
+                   message.lowercased().contains("return"),
+                   (message.lowercased().contains("only valid inside functions")
+                    || message.lowercased().contains("illegal return")
+                    || message.lowercased().contains("return not in function")) {
+                    result = runtime.evaluate("(function(){\(script)})()", variables: variables)
+                } else {
+                    result = evaluated
+                }
+                if case .failure(let error) = result {
+                    context.recordJavaScriptError("bodyJs: " + error.displayMessage)
+                    recordJavaScriptEvidence(source: source, stage: context.currentExecutionStage ?? "bodyJs", context: context)
+                    return .failure(.javascript("bodyJs: " + error.displayMessage))
+                }
+                guard case .success(let value) = result else { return .failure(.javascript("bodyJs 未返回结果")) }
+                // An empty transformed response is still the script's result,
+                // not permission to parse an untransformed response instead.
+                output = value
+            }
+            guard output != response.body else { return .success(response) }
+            return .success(SourceResponse(
+                url: response.url,
+                statusCode: response.statusCode,
+                headers: response.headers,
+                body: output,
+                data: Data(output.utf8),
+                encodedByteCount: response.encodedByteCount,
+                bodyWasDecoded: response.bodyWasDecoded,
+                contentEncodings: response.contentEncodings
+            ))
+
         }
-        var output = response.body
-        for script in scripts {
-            var variables: [String: Any] = context.persistentSnapshot().mapValues { $0 as Any }
-            for (key, value) in additionalVariables { variables[key] = value }
-            variables.merge([
-                "result": output,
-                "html": output,
-                "body": output,
-                "baseUrl": response.url.absoluteString,
-                "source": source
-            ], uniquingKeysWith: { _, current in current })
-            // URL construction, jsLib and body transforms share declarations
-            // and the injected network/cookies, instead of reloading the library
-            // in a new runtime for each hook.
-            let runtime = context.jsRuntime(ajaxHandler: context.networkHandler ?? { _ in "" })
-            let evaluated = runtime.evaluate(script, variables: variables)
-            let result: Result<String, SourceEngineError>
-            // Only a parse-time top-level return can be retried safely.
-            // A nested function may contain return while the script already
-            // performed requests; replaying an arbitrary runtime error would
-            // duplicate those side effects.
-            if case .failure(.javascript(let message)) = evaluated,
-               message.lowercased().contains("syntaxerror"),
-               message.lowercased().contains("return"),
-               (message.lowercased().contains("only valid inside functions")
-                || message.lowercased().contains("illegal return")
-                || message.lowercased().contains("return not in function")) {
-                result = runtime.evaluate("(function(){\(script)})()", variables: variables)
-            } else {
-                result = evaluated
-            }
-            if case .failure(let error) = result {
-                context.recordJavaScriptError("bodyJs: " + error.displayMessage)
-                recordJavaScriptEvidence(source: source, stage: context.currentExecutionStage ?? "bodyJs", context: context)
-                return .failure(.javascript("bodyJs: " + error.displayMessage))
-            }
-            guard case .success(let value) = result else { return .failure(.javascript("bodyJs 未返回结果")) }
-            // An empty transformed response is still the script's result,
-            // not permission to parse an untransformed response instead.
-            output = value
-        }
-        guard output != response.body else { return .success(response) }
-        return .success(SourceResponse(
-            url: response.url,
-            statusCode: response.statusCode,
-            headers: response.headers,
-            body: output,
-            data: Data(output.utf8),
-            encodedByteCount: response.encodedByteCount,
-            bodyWasDecoded: response.bodyWasDecoded,
-            contentEncodings: response.contentEncodings
-        ))
     }
 
     private func parseContentPage(
@@ -1354,13 +1434,16 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
         response: SourceResponse,
         globalPurifyRules: [String],
         executionContext: RuleExecutionContext = RuleExecutionContext()
-    ) -> Result<ChapterContent, SourceEngineError> {
-        return ContentParser(executionContext: executionContext).parse(
-            source: source,
-            chapter: chapter,
-            response: response,
-            globalPurifyRules: globalPurifyRules
-        ).map { stripKnownSitePromotion(from: $0, responseURL: response.url) }
+    ) async -> Result<ChapterContent, SourceEngineError> {
+        return await BlockingRuleExecutor.run { [self] in
+            return ContentParser(executionContext: executionContext).parse(
+                source: source,
+                chapter: chapter,
+                response: response,
+                globalPurifyRules: globalPurifyRules
+            ).map { stripKnownSitePromotion(from: $0, responseURL: response.url) }
+
+        }
     }
 
     /// The observed Yanmo footer is a standalone, host-specific signature.
@@ -1388,13 +1471,16 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
         response: SourceResponse,
         inheritedVolume: String? = nil,
         executionContext: RuleExecutionContext = RuleExecutionContext()
-    ) -> Result<ChapterListPage, SourceEngineError> {
-        return ChapterListParser(executionContext: executionContext).parsePage(
-            source: source,
-            book: book,
-            response: response,
-            inheritedVolume: inheritedVolume
-        )
+    ) async -> Result<ChapterListPage, SourceEngineError> {
+        return await BlockingRuleExecutor.run { [self] in
+            return ChapterListParser(executionContext: executionContext).parsePage(
+                source: source,
+                book: book,
+                response: response,
+                inheritedVolume: inheritedVolume
+            )
+
+        }
     }
 
     /// Runs the Legado `ruleToc.preUpdateJs` hook once, immediately before the
@@ -1407,41 +1493,44 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
         book: BookDetail,
         baseUrl: String,
         executionContext: RuleExecutionContext
-    ) {
-        guard let raw = source.ruleToc?.fields["preUpdateJs"]?
-            .trimmingCharacters(in: .whitespacesAndNewlines),
-              !raw.isEmpty else { return }
+    ) async {
+        return await BlockingRuleExecutor.run { [self] in
+            guard let raw = source.ruleToc?.fields["preUpdateJs"]?
+                .trimmingCharacters(in: .whitespacesAndNewlines),
+                  !raw.isEmpty else { return }
 
-        var script = raw
-        if script.hasPrefix("@js:") {
-            script = String(script.dropFirst(4)).trimmingCharacters(in: .whitespacesAndNewlines)
-        } else if script.hasPrefix("<js>"), script.hasSuffix("</js>") {
-            script = String(script.dropFirst(4).dropLast(5)).trimmingCharacters(in: .whitespacesAndNewlines)
-        }
-        guard !script.isEmpty else { return }
+            var script = raw
+            if script.hasPrefix("@js:") {
+                script = String(script.dropFirst(4)).trimmingCharacters(in: .whitespacesAndNewlines)
+            } else if script.hasPrefix("<js>"), script.hasSuffix("</js>") {
+                script = String(script.dropFirst(4).dropLast(5)).trimmingCharacters(in: .whitespacesAndNewlines)
+            }
+            guard !script.isEmpty else { return }
 
-        let runtime = executionContext.jsRuntime(ajaxHandler: { urlText in
-            executionContext.networkHandler?(urlText)
-                ?? SynchronousSourceLoader().load(urlText: urlText, source: source)
-        })
-        let variables: [String: Any] = [
-            "book": book,
-            "baseUrl": baseUrl,
-            "source": source
-        ]
-        var outcome = runtime.evaluate(script, variables: variables)
-        // Same compatibility retry as `formatJs`: Legado sources often use a
-        // top-level `return`, which a bare script rejects.
-        if case .failure = outcome, script.contains("return") {
-            outcome = runtime.evaluate("(function(){\n\(script)\n})()", variables: variables)
-        }
-        if case .failure(let error) = outcome {
-            executionContext.log("toc.preUpdateJs failed: \(error)")
-        }
-        if let jsBook = runtime.context.objectForKeyedSubscript("book"),
-           let updatedToc = jsBook.forProperty("tocUrl")?.toString(),
-           !updatedToc.isEmpty, updatedToc != "undefined", updatedToc != "null" {
-            executionContext.setValue(updatedToc, for: "book.tocUrl")
+            let runtime = executionContext.jsRuntime(ajaxHandler: { urlText in
+                executionContext.networkHandler?(urlText)
+                    ?? SynchronousSourceLoader().load(urlText: urlText, source: source)
+            })
+            let variables: [String: Any] = [
+                "book": book,
+                "baseUrl": baseUrl,
+                "source": source
+            ]
+            var outcome = runtime.evaluate(script, variables: variables)
+            // Same compatibility retry as `formatJs`: Legado sources often use a
+            // top-level `return`, which a bare script rejects.
+            if case .failure = outcome, script.contains("return") {
+                outcome = runtime.evaluate("(function(){\n\(script)\n})()", variables: variables)
+            }
+            if case .failure(let error) = outcome {
+                executionContext.log("toc.preUpdateJs failed: \(error)")
+            }
+            if let jsBook = runtime.context.objectForKeyedSubscript("book"),
+               let updatedToc = jsBook.forProperty("tocUrl")?.toString(),
+               !updatedToc.isEmpty, updatedToc != "undefined", updatedToc != "null" {
+                executionContext.setValue(updatedToc, for: "book.tocUrl")
+            }
+
         }
     }
 
@@ -1556,6 +1645,7 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
         book: BookDetail,
         firstURL: URL,
         maxPages: Int = 30,
+        requiresCompleteDirectory: Bool = false,
         executionContext: RuleExecutionContext
     ) async -> Result<[BookChapter], SourceEngineError> {
         let urlIdentity = SourcePaginationURLIdentity()
@@ -1565,7 +1655,7 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
         // case, fragments or percent-encoding.
         var chapters = deduplicatedChapters(firstPage.chapters, identity: urlIdentity)
         var inheritedVolume = firstPage.trailingVolume
-        guard maxPages > 1 else {
+        guard maxPages > 1 || requiresCompleteDirectory else {
             return chapters.isEmpty ? .failure(.empty("Chapter list is empty")) : .success(chapters)
         }
         var nextURLText = firstPage.nextTocUrl?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty
@@ -1576,6 +1666,7 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
         var attemptedCanonicalURL = nextURLText.flatMap(urlIdentity.canonical)
 
         while let currentNext = nextURLText {
+            if Task.isCancelled { return .failure(.network("目录请求已取消")) }
             attemptedURL = currentNext
             attemptedCanonicalURL = urlIdentity.canonical(currentNext)
             if pagesLoaded >= maxPages {
@@ -1612,13 +1703,13 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
                 seenURLs.insert(responseCanonicalURL)
                 let state = persistentState(for: source)
                 let transformedResponse: SourceResponse
-                switch transformBodyIfNeeded(response, source: source, rules: [source.ruleToc], network: network, stateOverride: state, executionContext: executionContext, requestText: currentNext, variables: ["book": book]) {
+                switch await transformBodyIfNeeded(response, source: source, rules: [source.ruleToc], network: network, stateOverride: state, executionContext: executionContext, requestText: currentNext, variables: ["book": book]) {
                 case .success(let value): transformedResponse = value
                 case .failure(let error):
                     await emitFailure(error, stage: "toc.next.bodyJs", source: source)
                     return .failure(error)
                 }
-                switch parseChapterListPage(source: source, book: book, response: transformedResponse, inheritedVolume: inheritedVolume, executionContext: executionContext) {
+                switch await parseChapterListPage(source: source, book: book, response: transformedResponse, inheritedVolume: inheritedVolume, executionContext: executionContext) {
                 case .success(let page):
                     inheritedVolume = page.trailingVolume ?? inheritedVolume
                     let uniquePageChapters = page.chapters.filter { chapter in
@@ -1662,6 +1753,12 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
             )
         }
 
+        guard !requiresCompleteDirectory || stopReason == "no-next-url" else {
+            if stopReason == "max-pages" {
+                return .failure(.rule("目录超过 \(maxPages) 页，无法核验全本。请单独下载需要的章节。"))
+            }
+            return .failure(.rule("目录未读到末页，未开始全本下载。请刷新书源目录后重试，或下载单话。"))
+        }
         return chapters.isEmpty ? .failure(.empty("Chapter list is empty")) : .success(chapters)
     }
 
@@ -1737,19 +1834,15 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
             "baseUrl": chapter.url,
             "result": ""
         ]
-        let runtime = executionContext.jsRuntime { [network] encoded in
-            self.syncLoad(
-                encoded: encoded,
-                source: source,
-                network: network,
-                cookieHeader: executionContext.string(for: "cookieHeader"),
-                persistentValues: executionState.snapshot(),
-                persistentState: executionState
-            )
-        }
-
-        let outcome = PayActionPolicy.evaluate(rule: rule) { script in
-            runtime.evaluate(script, variables: variables)
+        let outcome = await BlockingRuleExecutor.run { [self] in
+            let runtime = executionContext.jsRuntime { [network] encoded in
+                self.syncLoad(encoded: encoded, source: source, network: network,
+                    cookieHeader: executionContext.string(for: "cookieHeader"),
+                    persistentValues: executionState.snapshot(), persistentState: executionState)
+            }
+            return PayActionPolicy.evaluate(rule: rule) { script in
+                runtime.evaluate(script, variables: variables)
+            }
         }
         recordJavaScriptEvidence(source: source, stage: "payAction", context: executionContext)
         switch outcome {
@@ -1823,13 +1916,13 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
                 seenURLs.insert(responseCanonicalURL)
                 let state = persistentState(for: source)
                 let transformedResponse: SourceResponse
-                switch transformBodyIfNeeded(response, source: source, rules: [source.ruleContent], network: network, stateOverride: state, executionContext: executionContext, requestText: currentNext, variables: ["chapter": chapter]) {
+                switch await transformBodyIfNeeded(response, source: source, rules: [source.ruleContent], network: network, stateOverride: state, executionContext: executionContext, requestText: currentNext, variables: ["chapter": chapter]) {
                 case .success(let value): transformedResponse = value
                 case .failure(let error):
                     await emitFailure(error, stage: "content.next.bodyJs", source: source)
                     return .failure(error)
                 }
-                switch parseContentPage(
+                switch await parseContentPage(
                     source: source,
                     chapter: chapter,
                     response: transformedResponse,
@@ -2085,7 +2178,18 @@ final class LegadoSourceEngine: SourceEngine, SourceDiagnosticEvidenceProvider, 
         if states.count >= Self.maximumPersistentStates {
             evictLeastRecentlyUsedStateLocked()
         }
-        let state = RulePersistentState()
+        var saved: [String: String] = [:]
+        if let sourceVariables {
+            do { saved = try sourceVariables.restore(sourceKey: key) }
+            catch {
+                let sink = diagnostics
+                Task { await sink.emit(.init(level: .warning, stage: "source.variables.restore",
+                    sourceName: source.bookSourceName, message: "读取已保存源设置失败", details: ["reason": error.localizedDescription])) }
+            }
+        }
+        let state = RulePersistentState(initialValues: saved, saveSourceVariables: sourceVariables.map { store in
+            { values in try store.save(values, sourceKey: key) }
+        })
         states[key] = state
         touchStateKeyLocked(key)
         return state
