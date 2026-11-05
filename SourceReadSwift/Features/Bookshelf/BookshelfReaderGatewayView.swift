@@ -53,7 +53,7 @@ struct BookshelfReaderGatewayView: View {
             appState.releaseTabChromeHidden(owner: gatewayTabChromeOwner)
         }
         .task {
-            if let source = appState.sourceStore.source(for: currentBook.sourceURL), source.sourceKind != .text {
+            if let source = appState.sourceStore.source(for: currentBook.sourceURL)?.resolvingMediaKind(currentBook.mediaKind), source.sourceKind != .text {
                 appState.bookshelfStore.markReaderOpened(bookID: book.id)
             }
             appState.bookshelfStore.markUpdatesSeen(bookID: book.id)
@@ -70,7 +70,12 @@ struct BookshelfReaderGatewayView: View {
     }
 
     private var gatewayContent: AnyView {
-        if !localBookChapters.isEmpty {
+        if book.sourceURL == "local://comic" {
+            let localEngine = LocalComicSourceEngine(book: currentBook)
+            return AnyView(ComicReaderView(bookID: book.id, bookTitle: currentBook.title,
+                source: LocalComicSourceEngine.source, initialChapterIndex: launchCursor.chapterIndex,
+                chapters: localEngine.chapters, engine: localEngine, onRequestExit: requestGatewayExit))
+        } else if !localBookChapters.isEmpty {
             return AnyView(localReader)
         } else if let localContent = book.localContent {
             return AnyView(
@@ -85,11 +90,11 @@ struct BookshelfReaderGatewayView: View {
                     chapterIndex: 0,
                     totalChapters: 1,
                     initialParagraphIndex: launchCursor.paragraph(in: 0),
-                    onRequestExit: onRequestExit
+                    onRequestExit: requestGatewayExit
                 )
             )
         } else if let selectedChapter {
-            if let source = appState.sourceStore.source(for: currentBook.sourceURL) {
+            if let source = appState.sourceStore.source(for: currentBook.sourceURL)?.resolvingMediaKind(currentBook.mediaKind) {
                 switch source.sourceKind {
                 case .audio:
                     return AnyView(
@@ -101,7 +106,8 @@ struct BookshelfReaderGatewayView: View {
                                     coverUrl: currentBook.coverURL,
                                     bookUrl: currentBook.bookURL,
                                     sourceName: source.bookSourceName,
-                                    sourceUrl: source.bookSourceUrl
+                                    sourceUrl: source.bookSourceUrl,
+                                    mediaKind: currentBook.mediaKind ?? source.sourceKind
                                 )
                                 AudioBookPlaybackCoordinator.shared.startBook(
                                     bookID: currentBook.id,
@@ -123,7 +129,8 @@ struct BookshelfReaderGatewayView: View {
                             source: source,
                             initialChapterIndex: selectedChapter.index,
                             chapters: chapters,
-                            engine: appState.engine
+                            engine: appState.engine,
+                            onRequestExit: requestGatewayExit
                         )
                     )
                 case .video:
@@ -157,7 +164,7 @@ struct BookshelfReaderGatewayView: View {
                     onRequestBookDetail: {
                         showBookDetailSheet = true
                     },
-                    onRequestExit: onRequestExit
+                    onRequestExit: requestGatewayExit
                 )
                 .id("remote-reader|\(currentBook.sourceURL)|\(currentBook.bookURL)")
             )
@@ -176,6 +183,13 @@ struct BookshelfReaderGatewayView: View {
 
     private var localNavigationEntries: [LocalTextNavigationEntry] {
         currentBook.localNavigationEntries ?? []
+    }
+
+    private func requestGatewayExit() {
+        // This view owns the shelf route; nested reader panels must never
+        // supply the dismiss environment used to pop that route.
+        if let onRequestExit { onRequestExit() }
+        else { dismiss() }
     }
 
     private func readerRecoveryErrorView(_ message: String) -> some View {
@@ -315,7 +329,7 @@ struct BookshelfReaderGatewayView: View {
                 )
             },
             initialOverlayVisible: showReaderChromeAfterChapterSelection,
-            onRequestExit: onRequestExit
+            onRequestExit: requestGatewayExit
         )
         .id("reader-\(book.id)")
     }
@@ -329,17 +343,20 @@ struct BookshelfReaderGatewayView: View {
         let activeBook = currentBook
         guard activeBook.localChapters == nil, activeBook.localContent == nil else { return }
         guard selectedChapter == nil, errorMessage == nil else { return }
-        guard let source = appState.sourceStore.source(for: activeBook.sourceURL) else {
+        guard let source = appState.sourceStore.source(for: activeBook.sourceURL)?.resolvingMediaKind(activeBook.mediaKind) else {
             errorMessage = "找不到书源：\(activeBook.sourceName)"
             return
         }
 
         // 0. TOC CACHE：上次成功落盘的完整目录。命中就立刻打开目标章，
         //    详情与目录在后台刷新——“点进书要等半天”卡的就是这里。
-        if let cached = appState.bookTOCacheStore.entry(
+        let cachedTOC = await appState.bookTOCacheStore.entryForReader(
             sourceURL: source.bookSourceUrl,
             bookURL: activeBook.bookURL
-        ), !cached.chapters.isEmpty {
+        )
+        guard !Task.isCancelled, selectedChapter == nil,
+              currentBook.sourceURL == activeBook.sourceURL, currentBook.bookURL == activeBook.bookURL else { return }
+        if let cached = cachedTOC, !cached.chapters.isEmpty {
             let targetIndex = launchCursor.chapterIndex
             let target = cached.chapters.first(where: { $0.index == targetIndex })
             if let target {
@@ -347,6 +364,17 @@ struct BookshelfReaderGatewayView: View {
                 if detail == nil { detail = cached.detail }
                 openRestoredChapter(target)
                 refreshBookDetailAndTOC(source: source, book: activeBook)
+                return
+            }
+        }
+
+        if source.sourceKind == .comic {
+            let archived = await appState.comicOfflineArchive.chapters(sourceURL: source.bookSourceUrl, bookURL: activeBook.bookURL)
+            guard !Task.isCancelled, currentBook.id == activeBook.id,
+                  currentBook.sourceURL == activeBook.sourceURL else { return }
+            if let target = archived.first(where: { $0.index == launchCursor.chapterIndex }) {
+                chapters = archived
+                openRestoredChapter(target)
                 return
             }
         }
@@ -376,7 +404,8 @@ struct BookshelfReaderGatewayView: View {
             bookUrl: activeBook.bookURL,
             sourceName: activeBook.sourceName,
             sourceUrl: activeBook.sourceURL,
-            intro: activeBook.intro
+            intro: activeBook.intro,
+            mediaKind: activeBook.mediaKind
         )
 
         let engine = appState.engine
@@ -463,7 +492,8 @@ struct BookshelfReaderGatewayView: View {
                 bookUrl: activeBook.bookURL,
                 sourceName: activeBook.sourceName,
                 sourceUrl: activeBook.sourceURL,
-                intro: activeBook.intro
+                intro: activeBook.intro,
+                mediaKind: activeBook.mediaKind
             )
             guard let detailResult = try? await appState.engine
                 .getBookDetail(source: source, book: searchBook)
@@ -614,15 +644,15 @@ struct BookshelfReaderGatewayView: View {
         let token = UUID(); sourceSwitchGeneration = token
         switchRefreshRequested = false
         sourceSwitchState.message = nil
-        let kind = appState.sourceStore.source(for: active.sourceURL)?.sourceKind
+        let kind = active.mediaKind ?? appState.sourceStore.source(for: active.sourceURL)?.sourceKind
         let sources = Array(appState.sourceStore.sourceSwitchCandidates(for: active.bookURL, excluding: active.sourceURL)
-            .filter { kind == nil || $0.sourceKind == kind }.prefix(60))
+            .filter { source in kind.map { source.canSearch(mediaKind: $0) } ?? true }.prefix(60))
         if !force, let cached = SourceSwitchCacheStore.shared.candidates(title: active.title, author: active.author) {
             sourceSwitchState.candidates = cached.compactMap { entry in
                 guard entry.sourceURL != active.sourceURL,
                       let source = appState.sourceStore.source(for: entry.sourceURL), source.enabled,
-                      kind == nil || source.sourceKind == kind else { return nil }
-                return SourceSwitchCandidate(source: source, book: entry.book, chapterCount: entry.chapterCount)
+                      kind == nil || (entry.book.mediaKind ?? source.sourceKind) == kind else { return nil }
+                return SourceSwitchCandidate(source: source.resolvingMediaKind(entry.book.mediaKind), book: entry.book, chapterCount: entry.chapterCount)
             }
             // A fresh cache opens without triggering another search. Refresh is explicit.
             if !sourceSwitchState.candidates.isEmpty {
@@ -645,12 +675,13 @@ struct BookshelfReaderGatewayView: View {
                     }
                     guard !Task.isCancelled, let result, case .success(let books) = result,
                           let match = books.first(where: {
-                              SearchBookMatcher.cleanTitle($0.name) == SearchBookMatcher.cleanTitle(active.title)
+                              (kind == nil || ($0.mediaKind ?? source.sourceKind) == kind)
+                                && SearchBookMatcher.cleanTitle($0.name) == SearchBookMatcher.cleanTitle(active.title)
                                 && (SearchBookMatcher.cleanAuthor($0.author ?? "").isEmpty
                                     || SearchBookMatcher.cleanAuthor(active.author).isEmpty
                                     || SearchBookMatcher.cleanAuthor($0.author ?? "") == SearchBookMatcher.cleanAuthor(active.author))
                           }) else { return }
-                    let candidate = SourceSwitchCandidate(source: source, book: match)
+                    let candidate = SourceSwitchCandidate(source: source.resolvingMediaKind(match.mediaKind), book: match)
                     let accepted = await MainActor.run { () -> Bool in
                         guard sourceSwitchGeneration == token, !isApplyingSource else { return false }
                         if !sourceSwitchState.candidates.contains(where: { $0.id == candidate.id }) {
@@ -744,7 +775,12 @@ struct BookshelfReaderGatewayView: View {
             sourceSwitchState.message = "该书源未找到对应章节，已保留当前书源和阅读位置。"
             return
         }
-        if candidate.source.sourceKind == .text {
+        let resolvedSource = candidate.source.resolvingMediaKind(newDetail.mediaKind ?? candidate.book.mediaKind)
+        guard kindMatchesCurrentBook(resolvedSource.sourceKind) else {
+            sourceSwitchState.message = "新书源返回了不同媒体类型，已保留当前书源和阅读位置。"
+            return
+        }
+        if resolvedSource.sourceKind == .text {
             let rules = appState.purifyRuleStore.enabledPatterns
             let content = await loadSourceSwitchPreview(chapter: target, source: candidate.source, rules: rules)
             guard !Task.isCancelled, sourceSwitchGeneration == token, showSourceSwitcher else { return }
@@ -764,6 +800,10 @@ struct BookshelfReaderGatewayView: View {
         appState.bookshelfStore.switchSource(bookID: book.id, to: candidate.book,
             latestChapterTitle: newDetail.latestChapter ?? newChapters.last?.title,
             intro: newDetail.intro, totalChapters: newChapters.count)
+        appState.bookshelfStore.updateDetails(bookID: book.id,
+            latestChapterTitle: newDetail.latestChapter ?? newChapters.last?.title,
+            intro: newDetail.intro, totalChapters: newChapters.count,
+            coverURL: newDetail.coverUrl, mediaKind: resolvedSource.sourceKind)
         appState.bookshelfStore.updateReadingProgress(bookID: book.id, chapterIndex: target.index,
             chapterTitle: target.title, totalChapters: newChapters.count, paragraphIndex: 0)
         detail = newDetail
@@ -782,6 +822,11 @@ struct BookshelfReaderGatewayView: View {
             await engine.getContent(source: source, chapter: chapter)
         }
         return result.flatMap { try? $0.get() }
+    }
+
+    private func kindMatchesCurrentBook(_ kind: BookSourceKind) -> Bool {
+        let currentKind = currentBook.mediaKind ?? appState.sourceStore.source(for: currentBook.sourceURL)?.sourceKind
+        return currentKind == nil || currentKind == kind
     }
 }
 

@@ -13,6 +13,7 @@ struct DiscoverView: View {
     @State private var pendingShelfAddBook: SearchBook?
     @State private var showSmartWebReader = false
     @State private var showExploreSourcePickerSheet = false
+    @State private var showExploreCategoryPicker = false
     @State private var selectedAggregatedBookForSources: AggregatedSearchBook? = nil
     @State private var detectedClipboardSourceURL: String? = nil
     @State private var lastCheckedPasteboardChangeCount: Int = -1
@@ -358,10 +359,12 @@ struct DiscoverView: View {
                 viewModel.applyMatchMode()
             }
 
-            Text("搜索结果")
-                .font(.system(size: 20, weight: .bold))
-                .foregroundStyle(.primary)
-                .accessibilityAddTraits(.isHeader)
+            if viewModel.hasSearchState {
+                Text("搜索结果")
+                    .font(.system(size: 20, weight: .bold))
+                    .foregroundStyle(.primary)
+                    .accessibilityAddTraits(.isHeader)
+            }
 
             content
         }
@@ -412,36 +415,14 @@ struct DiscoverView: View {
     private var matchModePicker: some View {
         HStack {
             Spacer()
-            if usesForestGlass {
-                BrandSegmentedControl("匹配方式", selection: $viewModel.matchMode,
-                    options: SearchMatchMode.allCases.map { ($0, $0.title) })
-                    .frame(maxWidth: 238)
-            } else {
-                HStack(spacing: 0) {
-                    ForEach(SearchMatchMode.allCases) { mode in
-                        let isSelected = viewModel.matchMode == mode
-                        Button {
-                            UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                            viewModel.matchMode = mode
-                        } label: {
-                            Text(mode.title)
-                                .font(.system(size: 13, weight: isSelected ? .semibold : .medium))
-                                .foregroundStyle(isSelected ? Color.white : Color.primary)
-                                .padding(.horizontal, 16)
-                                .padding(.vertical, 6)
-                                .background {
-                                    if isSelected {
-                                        RoundedRectangle(cornerRadius: 8, style: .continuous)
-                                            .fill(AppTheme.accent)
-                                    }
-                                }
-                        }
-                        .buttonStyle(.plain)
-                    }
+            Picker("匹配方式", selection: $viewModel.matchMode) {
+                ForEach(SearchMatchMode.allCases) { mode in
+                    Text(mode.title).tag(mode)
                 }
-                .padding(2)
-                .background(Color(UIColor.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
             }
+            .pickerStyle(.segmented)
+            .frame(width: 156, height: 44)
+            .accessibilityIdentifier("discover.matchMode")
         }
     }
 
@@ -1086,6 +1067,10 @@ struct DiscoverView: View {
             } else {
                 sourceSelectorSection
 
+                ExploreSourceControls(controls: exploreViewModel.sourceControls,
+                    inputs: $exploreViewModel.sourceInputs, isLoading: exploreViewModel.isLoadingMenu,
+                    message: exploreViewModel.sourceActionMessage,
+                    onAction: exploreViewModel.performSourceAction)
                 categorySelectorSection
 
                 exploreBooksSection
@@ -1152,51 +1137,28 @@ struct DiscoverView: View {
     }
 
     private var categorySelectorSection: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            if exploreViewModel.groups.count > 1 {
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 6) {
-                        ForEach(exploreViewModel.groups, id: \.self) { grp in
-                            let isSelected = exploreViewModel.selectedGroup == grp
-                            Button {
-                                UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                                exploreViewModel.selectGroup(grp)
-                            } label: {
-                                Text(grp)
-                                    .font(.caption.weight(isSelected ? .bold : .regular))
-                                    .padding(.horizontal, 10)
-                                    .padding(.vertical, 4)
-                                    .background(isSelected ? Color.accentColor.opacity(0.15) : Color.clear, in: RoundedRectangle(cornerRadius: 6))
-                                    .foregroundStyle(isSelected ? AppTheme.accent : .secondary)
-                            }
-                            .buttonStyle(.plain)
-                        }
-                    }
-                }
+        Button { showExploreCategoryPicker = true } label: {
+            HStack(spacing: 8) {
+                Image(systemName: "square.grid.2x2")
+                Text(exploreViewModel.selectedCategory?.title ?? "选择分类")
+                    .lineLimit(1)
+                Spacer()
+                Text("\(exploreViewModel.categories.count) 个分类").foregroundStyle(.secondary)
+                Image(systemName: "chevron.down").font(.caption.weight(.semibold))
             }
-
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 8) {
-                    ForEach(exploreViewModel.filteredCategories) { cat in
-                        let isSelected = exploreViewModel.selectedCategory?.id == cat.id
-                        Button {
-                            UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                            exploreViewModel.selectCategory(cat)
-                        } label: {
-                            Text(cat.title)
-                                .font(.footnote.weight(isSelected ? .semibold : .regular))
-                                .padding(.horizontal, 12)
-                                .padding(.vertical, 6)
-                                .background(
-                                    isSelected ? Color.primary.opacity(0.12) : Color(UIColor.tertiarySystemGroupedBackground),
-                                    in: RoundedRectangle(cornerRadius: 8, style: .continuous)
-                                )
-                                .foregroundStyle(isSelected ? Color.primary : .secondary)
-                        }
-                        .buttonStyle(.plain)
-                    }
-                }
-                .padding(.vertical, 2)
+            .font(.subheadline)
+            .padding(.horizontal, 12)
+            .frame(minHeight: 44)
+            .background(AppTheme.card, in: RoundedRectangle(cornerRadius: 12))
+        }
+        .buttonStyle(AppPressStyle())
+        .disabled(exploreViewModel.categories.isEmpty)
+        .accessibilityIdentifier("discover.chooseCategory")
+        .sheet(isPresented: $showExploreCategoryPicker) {
+            ExploreCategorySelectionSheet(categories: exploreViewModel.categories,
+                selectedID: exploreViewModel.selectedCategory?.id) { category in
+                exploreViewModel.selectedGroup = category.group
+                exploreViewModel.selectCategory(category)
             }
         }
     }
@@ -1297,13 +1259,14 @@ enum SearchDisplayMode: String, CaseIterable, Identifiable {
 }
 
 struct AggregatedSearchBook: Identifiable, Sendable {
-    var id: String { "\(name.lowercased())|\(author?.lowercased() ?? "")" }
+    var id: String { "\(name.lowercased())|\(author?.lowercased() ?? "")|\(mediaKind.rawValue)" }
     let name: String
     let author: String?
     let coverUrl: String?
     let intro: String?
     let latestChapter: String?
     let sources: [SearchBook]
+    let mediaKind: BookSourceKind
 
     var sourceCount: Int { sources.count }
     var primaryBook: SearchBook { sources.first! }
@@ -1363,7 +1326,7 @@ final class DiscoverViewModel: ObservableObject {
     /// Recomputed only when `results` changes, never per layout pass.
     private func rebuildDerivedResults() {
         groupedResults = Self.makeGroupedResults(from: results)
-        aggregatedResults = Self.makeAggregatedResults(from: results)
+        aggregatedResults = Self.makeAggregatedResults(from: results, kinds: sourceKindCache)
         resultPage = min(resultPage, resultPageCount - 1)
     }
 
@@ -1378,7 +1341,7 @@ final class DiscoverViewModel: ObservableObject {
             }
     }
 
-    nonisolated private static func makeAggregatedResults(from results: [SearchBook]) -> [AggregatedSearchBook] {
+    nonisolated private static func makeAggregatedResults(from results: [SearchBook], kinds: [String: BookSourceKind] = [:]) -> [AggregatedSearchBook] {
         var groups: [String: [SearchBook]] = [:]
         var orderedKeys: [String] = []
         var seen: [String: Set<SourceBookIdentity>] = [:]
@@ -1386,7 +1349,8 @@ final class DiscoverViewModel: ObservableObject {
         for book in results {
             let cleanName = book.name.trimmingCharacters(in: .whitespacesAndNewlines)
             let cleanAuthor = (book.author ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
-            let key = "\(cleanName.lowercased())|\(cleanAuthor.lowercased())"
+            let media = book.mediaKind ?? kinds[book.sourceUrl] ?? .text
+            let key = "\(cleanName.lowercased())|\(cleanAuthor.lowercased())|\(media.rawValue)"
 
             if groups[key] == nil {
                 groups[key] = []
@@ -1413,7 +1377,8 @@ final class DiscoverViewModel: ObservableObject {
                 coverUrl: bestCover,
                 intro: bestIntro,
                 latestChapter: bestLatest,
-                sources: list
+                sources: list,
+                mediaKind: bestBook.mediaKind ?? kinds[bestBook.sourceUrl] ?? .text
             )
         }
     }
@@ -1429,10 +1394,10 @@ final class DiscoverViewModel: ObservableObject {
     nonisolated static func makeProjection(_ books: [SearchBook], kinds: [String: BookSourceKind],
                                            kind: BookSourceKind?, query: String,
                                            scope: SearchResultFilterScope) -> ResultProjection {
-        let base = kind.map { selected in books.filter { (kinds[$0.sourceUrl] ?? .text) == selected } } ?? books
+        let base = kind.map { selected in books.filter { ($0.mediaKind ?? kinds[$0.sourceUrl] ?? .text) == selected } } ?? books
         let filtered = SearchResultFilter.apply(base, query: query, scope: scope)
         return .init(results: filtered, groups: makeGroupedResults(from: filtered),
-                     aggregated: makeAggregatedResults(from: filtered))
+                     aggregated: makeAggregatedResults(from: filtered, kinds: kinds))
     }
 
     /// A streamed batch does all folding, grouping and source aggregation off
@@ -1587,7 +1552,7 @@ final class DiscoverViewModel: ObservableObject {
             sourceKindCache = map
             sourceKindCacheToken = token
         }
-        return sourceKindCache[book.sourceUrl] ?? .text
+        return book.mediaKind ?? sourceKindCache[book.sourceUrl] ?? .text
     }
 
     func selectSourceKind(_ kind: BookSourceKind?) {
@@ -1654,7 +1619,7 @@ final class DiscoverViewModel: ObservableObject {
         let sources = appState.sourceStore.sources.filter { source in
             guard source.enabled else { return false }
             if let kind = selectedSourceKind {
-                return source.sourceKind == kind
+                return source.canSearch(mediaKind: kind)
             }
             return true
         }
