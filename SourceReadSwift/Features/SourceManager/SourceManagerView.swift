@@ -3,6 +3,11 @@ import UniformTypeIdentifiers
 import UIKit
 
 struct SourceManagerView: View {
+    init(initialSearch: String = "") {
+        _searchText = State(initialValue: initialSearch)
+        _debouncedSearchText = State(initialValue: initialSearch)
+    }
+
     @EnvironmentObject private var appState: AppState
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @State private var selectedTab: SourceManagerTab = .bookSources

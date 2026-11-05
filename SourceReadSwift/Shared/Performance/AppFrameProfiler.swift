@@ -3,6 +3,20 @@ import Combine
 import QuartzCore
 import UIKit
 
+/// A callback's target describes the next interval, not the interval that just elapsed.
+struct AppFrameCadence {
+    private var previous: (timestamp: Double, scheduled: Double)?
+
+    mutating func sample(timestamp: Double, scheduledSeconds: Double) -> (elapsed: Double, scheduled: Double)? {
+        guard timestamp.isFinite, scheduledSeconds.isFinite, scheduledSeconds >= 0.001 else { return nil }
+        defer { previous = (timestamp, scheduledSeconds) }
+        guard let previous, timestamp > previous.timestamp else { return nil }
+        // Adaptive refresh can change on either side of the callback. Use the
+        // longer declared schedule so an idle-to-touch transition is not a hitch.
+        return (timestamp - previous.timestamp, max(previous.scheduled, scheduledSeconds))
+    }
+}
+
 /// Fixed-size histogram: no sort/allocation/SwiftUI publication per frame.
 /// This measures main-run-loop display-link cadence, NOT GPU presentation.
 struct AppFrameHistogram: Equatable {
@@ -47,7 +61,7 @@ final class AppFrameProfiler: ObservableObject {
     @Published private(set) var report = "暂无全局采样。开始后切换到需要测试的页面操作 30 秒。"
     private var link: CADisplayLink?
     private var histogram = AppFrameHistogram()
-    private var previous: CFTimeInterval = 0
+    private var cadence = AppFrameCadence()
     private var deadline: CFTimeInterval = 0
     private var maximum = 60
     private var startingPower = false
@@ -67,7 +81,7 @@ final class AppFrameProfiler: ObservableObject {
     func start(duration: TimeInterval = 30) {
         guard !isRecording else { return }
         histogram = AppFrameHistogram()
-        previous = 0
+        cadence = AppFrameCadence()
         maximum = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }
             .first { $0.activationState == .foregroundActive }?.screen.maximumFramesPerSecond ?? 60
         startingPower = ProcessInfo.processInfo.isLowPowerModeEnabled
@@ -95,7 +109,7 @@ final class AppFrameProfiler: ObservableObject {
         deadlineTask = nil
         if let displayLink = link { displayLink.invalidate() }
         link = nil
-        previous = 0
+        cadence = AppFrameCadence()
         ReaderScrollPerfMeter.isRecording = false
         ReaderScrollPerfMeter.flush()
         isRecording = false
@@ -109,11 +123,10 @@ final class AppFrameProfiler: ObservableObject {
     }
 
     @objc private func frame(_ link: CADisplayLink) {
-        if previous > 0 {
-            histogram.record(seconds: link.timestamp - previous,
-                             scheduledSeconds: link.targetTimestamp - link.timestamp)
+        if let sample = cadence.sample(timestamp: link.timestamp,
+                                       scheduledSeconds: link.targetTimestamp - link.timestamp) {
+            histogram.record(seconds: sample.elapsed, scheduledSeconds: sample.scheduled)
         }
-        previous = link.timestamp
         if CACurrentMediaTime() >= deadline { stop() }
     }
 }

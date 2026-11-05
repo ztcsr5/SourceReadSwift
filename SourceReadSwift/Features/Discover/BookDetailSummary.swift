@@ -3,7 +3,7 @@ import SwiftUI
 /// Identity and word count are already in BookDetailHeader; do not repeat them.
 struct BookDetailSummary: View {
     let detail: BookDetail
-    @State private var expanded = false
+    @State private var expanded = true
     @AppMotion private var motion
 
     private var metadata: [String] {
@@ -18,6 +18,7 @@ struct BookDetailSummary: View {
                     Text("简介").font(.subheadline.weight(.semibold))
                     Text(intro).font(.subheadline).foregroundStyle(.secondary).lineSpacing(3)
                         .lineLimit(intro.count > 60 && !expanded ? 4 : nil)
+                        .fixedSize(horizontal: false, vertical: true)
                         .textSelection(.enabled)
                     if intro.count > 60 {
                         Button(expanded ? "收起简介" : "展开简介") {

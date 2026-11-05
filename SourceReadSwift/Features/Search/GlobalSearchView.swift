@@ -1,0 +1,124 @@
+import SwiftUI
+
+/// Searches local destinations and hands an explicit online query to Discover.
+struct GlobalSearchView: View {
+    @ObservedObject var bookshelf: BookshelfStore
+    @ObservedObject var sources: SourceStore
+    let onSearchOnline: (String) -> Void
+    @Environment(\.dismiss) private var dismiss
+    @FocusState private var isFocused: Bool
+    @State private var query = ""
+    @State private var results: [GlobalSearchEntry] = []
+    @State private var isSearching = false
+
+    private var keyword: String { query.trimmingCharacters(in: .whitespacesAndNewlines) }
+
+    var body: some View {
+        NavigationStack {
+            List {
+                Section {
+                    TextField("搜索书籍、作者、摘录、书源或设置", text: $query)
+                        .focused($isFocused)
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled()
+                        .submitLabel(.search)
+                        .accessibilityIdentifier("globalSearch.query")
+                        .onChange(of: query) { if $0.count > 200 { query = String($0.prefix(200)) } }
+                }
+                if keyword.isEmpty {
+                    Section("快捷入口") {
+                        ForEach(GlobalSearchIndex.settings) { entry in resultLink(entry) }
+                    }
+                    Text("搜索书架、书签摘录和应用功能，也可以在已启用的书源中联网找书。")
+                        .font(.footnote).foregroundStyle(.secondary)
+                } else {
+                    Section {
+                        Button {
+                            onSearchOnline(keyword)
+                        } label: { Label("联网搜索「\(keyword)」", systemImage: "globe") }
+                        .accessibilityIdentifier("globalSearch.online")
+                    }
+                    Section("本机结果") {
+                        if isSearching { ProgressView("正在查找").frame(minHeight: 44) }
+                        else if results.isEmpty {
+                            Text("本机没有匹配项，可以在上方联网搜索。")
+                                .foregroundStyle(.secondary)
+                        } else {
+                            ForEach(results) { entry in resultLink(entry) }
+                            if results.count == 100 {
+                                Text("已显示前 100 项，输入更具体的关键词可以缩小范围。")
+                                    .font(.footnote).foregroundStyle(.secondary)
+                            }
+                        }
+                    }
+                }
+            }
+            .navigationTitle("全局搜索")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) { Button("关闭") { dismiss() } }
+            }
+            .task { isFocused = true }
+            .task(id: query) {
+                guard !keyword.isEmpty else { results = []; isSearching = false; return }
+                isSearching = true
+                do { try await Task.sleep(nanoseconds: 150_000_000) }
+                catch { return }
+                let submitted = keyword
+                let books = bookshelf.books
+                let sourceList = sources.sources
+                let matches = await Task.detached(priority: .userInitiated) {
+                    GlobalSearchIndex.search(submitted,
+                        entries: GlobalSearchIndex.entries(books: books, sources: sourceList))
+                }.value
+                guard !Task.isCancelled else { return }
+                results = matches
+                isSearching = false
+            }
+        }
+        .tint(AppTheme.accent)
+    }
+
+    private func resultLink(_ entry: GlobalSearchEntry) -> some View {
+        NavigationLink { destination(entry) } label: {
+            HStack(spacing: 12) {
+                Image(systemName: symbol(entry.kind)).foregroundStyle(AppTheme.accent).frame(width: 24)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(entry.title).lineLimit(2)
+                    Text(entry.subtitle).font(.caption).foregroundStyle(.secondary).lineLimit(2)
+                }
+            }
+            .frame(minHeight: 44)
+        }
+    }
+
+    @ViewBuilder private func destination(_ entry: GlobalSearchEntry) -> some View {
+        switch entry.kind {
+        case .book:
+            if let book = bookshelf.book(id: entry.target) { BookDetailView(book: book.asSearchBook) }
+            else { Text("这本书已移出书架，请重新搜索。") }
+        case .bookmark:
+            if let book = bookshelf.book(id: entry.target),
+               let bookmark = book.bookmarks?.first(where: { $0.id == entry.bookmarkID }) {
+                BookshelfReaderGatewayView(book: book, initialBookmark: bookmark)
+            } else { Text("这条书签已删除，请重新搜索。") }
+        case .source: SourceManagerView(initialSearch: entry.target)
+        case .setting:
+            switch entry.target {
+            case "appearance": AppearanceSettingsView()
+            case "sources": SourceManagerView()
+            case "bookmarks": ReaderBookmarksView()
+            default: ReadingHistoryView()
+            }
+        }
+    }
+
+    private func symbol(_ kind: GlobalSearchEntry.Kind) -> String {
+        switch kind {
+        case .book: return "book.closed"
+        case .bookmark: return "bookmark"
+        case .source: return "network"
+        case .setting: return "gearshape"
+        }
+    }
+}

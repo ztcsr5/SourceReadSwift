@@ -112,6 +112,68 @@ final class ChapterDownloadStoreTests: XCTestCase {
         XCTAssertEqual(store.record(bookID: "book")?.completedIndexes, [0])
         try? FileManager.default.removeItem(at: root)
     }
+
+    func testComicDownloadRequiresAllImageBytesAndRetriesFailedPages() async throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let store = ChapterDownloadStore(persistence: ChapterDownloadPersistence(rootURL: root))
+        let cache = ChapterContentCacheStore(persistence: ChapterContentCachePersistence(rootURL: root))
+        let archive = ComicOfflineArchive(directory: root.appendingPathComponent("comics"))
+        let source = BookSource(bookSourceName: "Comic fixture", bookSourceUrl: "https://fixture.local", bookSourceType: 2)
+        let chapter = downloadChapter(7)
+        let engine = ImmediateComicDownloadEngine()
+        cache.save(ChapterContent(chapter: chapter, title: chapter.title, paragraphs: ["https://cdn.invalid/page.png"]),
+                   sourceURL: source.bookSourceUrl, purifyRules: [])
+        let failed = ChapterDownloadCoordinator(store: store, comicArchive: archive, fetchComicPage: { _ in .failure(.http(422)) })
+        failed.start(bookID: "comic", source: source, title: "Comic", chapters: [chapter], engine: engine,
+                     cacheStore: cache, purifyRules: [])
+        for _ in 0..<200 {
+            if !failed.isRunning(bookID: "comic") { break }
+            try await Task.sleep(nanoseconds: 10_000_000)
+        }
+        XCTAssertEqual(store.record(bookID: "comic")?.status, .failed)
+        XCTAssertEqual(store.record(bookID: "comic")?.completedIndexes, [])
+        let missing = await archive.pages(sourceURL: source.bookSourceUrl, chapter: chapter)
+        XCTAssertNil(missing, "A cached URL and a failed image are not offline success")
+
+        let png = Data(base64Encoded: "iVBORw0KGgoAAAANSUhEUgAAAAMAAAACCAIAAAASFvFNAAAAGklEQVR42mNgYGhg0ADiACBmCACygTggoAEAMGgE4bJ9Q/wAAAAASUVORK5CYII=")!
+        let retry = ChapterDownloadCoordinator(store: store, comicArchive: archive, fetchComicPage: { _ in .success(png) })
+        retry.start(bookID: "comic", source: source, title: "Comic", chapters: [chapter], engine: engine,
+                    cacheStore: cache, purifyRules: [])
+        for _ in 0..<200 {
+            if !retry.isRunning(bookID: "comic") { break }
+            try await Task.sleep(nanoseconds: 10_000_000)
+        }
+        XCTAssertEqual(store.record(bookID: "comic")?.status, .completed)
+        XCTAssertEqual(store.record(bookID: "comic")?.completedIndexes, [7])
+        XCTAssertEqual(store.record(bookID: "comic")?.failedIndexes, [])
+        let saved = await archive.contains(sourceURL: source.bookSourceUrl, chapter: chapter)
+        XCTAssertTrue(saved)
+    }
+
+    func testClearingChapterCacheCancelsTextDownloadButKeepsComicDownloadActive() async {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let store = ChapterDownloadStore(persistence: ChapterDownloadPersistence(rootURL: root))
+        let cache = ChapterContentCacheStore(persistence: ChapterContentCachePersistence(rootURL: root))
+        let archive = ComicOfflineArchive(directory: root.appendingPathComponent("comics"))
+        let coordinator = ChapterDownloadCoordinator(store: store, comicArchive: archive)
+        let engine = ImmediateComicDownloadEngine()
+        let text = BookSource(bookSourceName: "Text", bookSourceUrl: "https://text.invalid")
+        let comic = BookSource(bookSourceName: "Comic", bookSourceUrl: "https://comic.invalid", bookSourceType: 2)
+        coordinator.start(bookID: "text", source: text, title: "Text", chapters: [downloadChapter(0)],
+                          engine: engine, cacheStore: cache, purifyRules: [])
+        coordinator.start(bookID: "comic", source: comic, title: "Comic", chapters: [downloadChapter(1)],
+                          engine: engine, cacheStore: cache, purifyRules: [])
+
+        coordinator.cancelChapterCacheDownloads()
+        cache.removeAll()
+        XCTAssertEqual(store.record(bookID: "text")?.status, .cancelled)
+        XCTAssertFalse(coordinator.isRunning(bookID: "text"))
+        XCTAssertTrue(coordinator.isRunning(bookID: "comic"))
+        XCTAssertEqual(store.record(bookID: "comic")?.hasComicImageArchive, true)
+        await coordinator.cancel(bookID: "comic")?.value
+    }
 }
 
 private enum DownloadFixtureFailure: Error {
@@ -132,5 +194,14 @@ private actor HeldChapterDownloadEngine: SourceEngine {
     }
     func searchBooks(source: BookSource, keyword: String, page: Int) async -> Result<[SearchBook], SourceEngineError> { .success([]) }
     func getBookDetail(source: BookSource, book: SearchBook) async -> Result<BookDetail, SourceEngineError> { .failure(.rule("Not used by cache fixture")) }
+    func getChapterList(source: BookSource, book: BookDetail) async -> Result<[BookChapter], SourceEngineError> { .success([]) }
+}
+
+private actor ImmediateComicDownloadEngine: SourceEngine {
+    func getContent(source: BookSource, chapter: BookChapter) async -> Result<ChapterContent, SourceEngineError> {
+        .success(ChapterContent(chapter: chapter, title: chapter.title, paragraphs: ["https://cdn.invalid/page.png"]))
+    }
+    func searchBooks(source: BookSource, keyword: String, page: Int) async -> Result<[SearchBook], SourceEngineError> { .success([]) }
+    func getBookDetail(source: BookSource, book: SearchBook) async -> Result<BookDetail, SourceEngineError> { .failure(.rule("Not used")) }
     func getChapterList(source: BookSource, book: BookDetail) async -> Result<[BookChapter], SourceEngineError> { .success([]) }
 }

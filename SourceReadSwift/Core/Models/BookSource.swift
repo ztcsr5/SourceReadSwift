@@ -100,6 +100,17 @@ struct BookSource: Identifiable, Codable, Hashable, Sendable {
     let bookSourceGroup: String?
     let bookSourceType: Int
     var sourceKind: BookSourceKind { BookSourceKind(rawValue: bookSourceType) ?? .text }
+
+    /// Uses a book's declared media without changing the stored aggregate-source definition.
+    func resolvingMediaKind(_ kind: BookSourceKind?) -> BookSource {
+        guard let kind, kind != sourceKind else { return self }
+        return BookSource(bookSourceName: bookSourceName, bookSourceUrl: bookSourceUrl,
+            bookSourceGroup: bookSourceGroup, bookSourceType: kind.rawValue, enabled: enabled,
+            weight: weight, searchUrl: searchUrl, exploreUrl: exploreUrl, ruleSearch: ruleSearch,
+            ruleBookInfo: ruleBookInfo, ruleToc: ruleToc, ruleContent: ruleContent, ruleExplore: ruleExplore,
+            header: header, loginUrl: loginUrl, loginCheckJs: loginCheckJs, loginUi: loginUi,
+            customConfig: customConfig, raw: raw)
+    }
     let enabled: Bool
     let weight: Int
     let searchUrl: String?
