@@ -2,16 +2,24 @@ import Foundation
 import ImageIO
 import UIKit
 
-enum ComicImageFailure: Error, Equatable {
-    case http(Int), timedOut, invalidResponse, invalidImage, tooLarge, network, cancelled
+enum ComicImageFailure: Error, Equatable, Sendable {
+    case http(Int), timedOut, invalidResponse, emptyResponse, invalidImage, tooLarge, network, cancelled
+
+    var canRefreshAddress: Bool {
+        switch self {
+        case .http(403), .http(404), .http(410), .http(422): return true
+        default: return false
+        }
+    }
 
     var message: String {
         switch self {
         case .http(403): return "图片访问被拒绝，可检查书源登录状态后重试。"
-        case .http(404): return "图片地址已失效，可重试或换源。"
+        case .http(404), .http(410): return "图片地址已失效，可重试或换源。"
         case .http(422): return "书源未接受图片请求，可重试或换源。"
         case .http(let status): return "图片请求失败（HTTP \(status)）。"
         case .timedOut: return "图片请求超时，可重试。"
+        case .emptyResponse: return "书源返回了空图片，可重试。"
         case .invalidResponse, .invalidImage: return "书源未返回可显示的图片。"
         case .tooLarge: return "图片超出安全加载大小。"
         case .network: return "无法连接到图片服务器。"
@@ -44,7 +52,18 @@ final class RemoteImageLoader: @unchecked Sendable {
     private let thumbnailCache = NSCache<NSString, UIImage>()
     private let lock = NSLock()
     private var inFlight: [String: Task<UIImage?, Never>] = [:]
-    private var comicInFlight: [String: Task<Result<UIImage, ComicImageFailure>, Never>] = [:]
+    private struct ComicFlight {
+        let id: UUID
+        let task: Task<Result<UIImage, ComicImageFailure>, Never>
+        var readers: Set<UUID>
+    }
+    private struct ComicResource {
+        let url: URL
+        let headers: [String: String]
+        let maxPixelSize: CGFloat
+    }
+    private var comicInFlight: [String: ComicFlight] = [:]
+    private let comicBudget = ComicImageBudget()
     private let coverSources = CoverSourceBytes()
     private let inlineImages: InlineImageStore
     private let session: URLSession
@@ -79,7 +98,7 @@ final class RemoteImageLoader: @unchecked Sendable {
     func clearCache() {
         lock.lock()
         let pending = Array(inFlight.values)
-        let pendingComic = Array(comicInFlight.values)
+        let pendingComic = comicInFlight.values.map(\.task)
         inFlight.removeAll()
         comicInFlight.removeAll()
         lock.unlock()
@@ -97,13 +116,28 @@ final class RemoteImageLoader: @unchecked Sendable {
         guard !Task.isCancelled else { return .failure(.cancelled) }
         let key = comicKey(url, headers: headers, maxPixelSize: maxPixelSize)
         if let image = thumbnailCache.object(forKey: key as NSString) { return .success(image) }
-        let task = comicPageTask(key: key, url: url, headers: headers, maxPixelSize: maxPixelSize)
-        let result = await task.value
-        return Task.isCancelled ? .failure(.cancelled) : result
+        let reader = UUID()
+        let resource = ComicResource(url: url, headers: headers, maxPixelSize: maxPixelSize)
+        let flight = acquireComicPage(key: key, resource: resource, reader: reader)
+        return await withTaskCancellationHandler(operation: {
+            let result = await flight.task.value
+            releaseComicPage(key: key, flight: flight.id, reader: reader)
+            return Task.isCancelled ? .failure(.cancelled) : result
+        }, onCancel: {
+            self.releaseComicPage(key: key, flight: flight.id, reader: reader)
+        })
     }
 
     func cachedComicPage(for url: URL, headers: [String: String], maxPixelSize: CGFloat) -> UIImage? {
         thumbnailCache.object(forKey: comicKey(url, headers: headers, maxPixelSize: maxPixelSize) as NSString)
+    }
+
+    /// Test probe for shared-request cancellation; does not expose request headers.
+    func comicSubscriberCount(for url: URL, headers: [String: String], maxPixelSize: CGFloat) -> Int {
+        let key = comicKey(url, headers: headers, maxPixelSize: maxPixelSize)
+        lock.lock()
+        defer { lock.unlock() }
+        return comicInFlight[key]?.readers.count ?? 0
     }
 
     private func comicKey(_ url: URL, headers: [String: String], maxPixelSize: CGFloat) -> String {
@@ -111,55 +145,112 @@ final class RemoteImageLoader: @unchecked Sendable {
         return "comic|\(url.absoluteString.count):\(url.absoluteString)|\(Int(maxPixelSize))|" + fields.joined()
     }
 
-    private func comicPageTask(key: String, url: URL, headers: [String: String], maxPixelSize: CGFloat) -> Task<Result<UIImage, ComicImageFailure>, Never> {
+    private func acquireComicPage(key: String, resource: ComicResource, reader: UUID) -> ComicFlight {
         lock.lock()
         defer { lock.unlock() }
-        if let existing = comicInFlight[key] { return existing }
+        if var existing = comicInFlight[key] {
+            existing.readers.insert(reader)
+            comicInFlight[key] = existing
+            return existing
+        }
+        let id = UUID()
         let task = Task<Result<UIImage, ComicImageFailure>, Never> { [self] in
-            let result = await downloadComicPage(url, headers: headers, maxPixelSize: maxPixelSize)
-            finishComicPage(key: key, result: result)
+            let permit = UUID()
+            guard await comicBudget.acquire(permit) else {
+                finishComicPage(key: key, flight: id, result: .failure(.cancelled))
+                return .failure(.cancelled)
+            }
+            let result = await downloadComicPage(resource.url, headers: resource.headers, maxPixelSize: resource.maxPixelSize)
+            await comicBudget.release(permit)
+            finishComicPage(key: key, flight: id, result: result)
             return result
         }
-        comicInFlight[key] = task
-        return task
+        let flight = ComicFlight(id: id, task: task, readers: [reader])
+        comicInFlight[key] = flight
+        return flight
     }
 
-    private func finishComicPage(key: String, result: Result<UIImage, ComicImageFailure>) {
+    private func releaseComicPage(key: String, flight: UUID, reader: UUID) {
+        lock.lock()
+        guard var active = comicInFlight[key], active.id == flight,
+              active.readers.remove(reader) != nil else { lock.unlock(); return }
+        let shouldCancel = active.readers.isEmpty
+        if shouldCancel { comicInFlight.removeValue(forKey: key) }
+        else { comicInFlight[key] = active }
+        lock.unlock()
+        if shouldCancel { active.task.cancel() }
+    }
+
+    private func finishComicPage(key: String, flight: UUID, result: Result<UIImage, ComicImageFailure>) {
         lock.lock()
         defer { lock.unlock() }
-        guard !Task.isCancelled else { return }
+        guard comicInFlight[key]?.id == flight else { return }
         comicInFlight.removeValue(forKey: key)
+        guard !Task.isCancelled else { return }
         if case .success(let image) = result {
             let cost = Int(image.size.width * image.size.height * image.scale * image.scale * 4)
             thumbnailCache.setObject(image, forKey: key as NSString, cost: max(cost, 1))
         }
     }
 
-    private func downloadComicPage(_ url: URL, headers: [String: String], maxPixelSize: CGFloat) async -> Result<UIImage, ComicImageFailure> {
+    /// Offline downloads use the same authenticated transport as visible pages.
+    func comicBytesForArchive(_ request: ComicImageRequest) async -> Result<Data, ComicImageFailure> {
+        guard let url = URL(string: request.url), !url.isFileURL else { return .failure(.invalidResponse) }
+        return await fetchComicBytes(url, headers: request.headers).map(\.bytes)
+    }
+
+    private struct ComicTransfer {
         let bytes: Data
+        let request: URLRequest?
+    }
+
+    private func fetchComicBytes(_ url: URL, headers: [String: String]) async -> Result<ComicTransfer, ComicImageFailure> {
+        guard !Task.isCancelled else { return .failure(.cancelled) }
         if InlineImageStore.isInlineURL(url) {
-            guard let inline = inlineImages.data(for: url) else { return .failure(.invalidImage) }
-            bytes = inline
+            guard let bytes = inlineImages.data(for: url) else { return .failure(.invalidImage) }
+            return .success(.init(bytes: bytes, request: nil))
+        }
+        guard let scheme = url.scheme?.lowercased(), scheme == "http" || scheme == "https" else { return .failure(.invalidResponse) }
+        var request = URLRequest(url: url, timeoutInterval: 18)
+        for (name, value) in headers { request.setValue(value, forHTTPHeaderField: name) }
+        do {
+            let (bytes, response) = try await session.data(for: request)
+            guard !Task.isCancelled else { return .failure(.cancelled) }
+            guard let http = response as? HTTPURLResponse else { return .failure(.invalidResponse) }
+            guard (200..<300).contains(http.statusCode) else {
+                session.configuration.urlCache?.removeCachedResponse(for: request)
+                return .failure(.http(http.statusCode))
+            }
+            guard !bytes.isEmpty else {
+                session.configuration.urlCache?.removeCachedResponse(for: request)
+                return .failure(.emptyResponse)
+            }
+            guard bytes.count <= ComicOfflineArchive.maximumPageBytes else { return .failure(.tooLarge) }
+            return .success(.init(bytes: bytes, request: request))
+        } catch let error as URLError {
+            if error.code == .cancelled { return .failure(.cancelled) }
+            return .failure(error.code == .timedOut ? .timedOut : .network)
+        } catch { return .failure(.network) }
+    }
+
+    private func downloadComicPage(_ url: URL, headers: [String: String], maxPixelSize: CGFloat) async -> Result<UIImage, ComicImageFailure> {
+        let transfer: ComicTransfer
+        if url.isFileURL {
+            // External rules cannot produce file URLs; only verified offline/local imports supply them.
+            guard let bytes = try? Data(contentsOf: url, options: .mappedIfSafe),
+                  !bytes.isEmpty, bytes.count <= ComicOfflineArchive.maximumPageBytes else { return .failure(.invalidImage) }
+            transfer = .init(bytes: bytes, request: nil)
         } else {
-            guard let scheme = url.scheme?.lowercased(), scheme == "http" || scheme == "https" else { return .failure(.invalidResponse) }
-            var request = URLRequest(url: url, timeoutInterval: 18)
-            for (name, value) in headers { request.setValue(value, forHTTPHeaderField: name) }
-            do {
-                let (received, response) = try await session.data(for: request)
-                guard let http = response as? HTTPURLResponse else { return .failure(.invalidResponse) }
-                guard (200..<300).contains(http.statusCode) else {
-                    session.configuration.urlCache?.removeCachedResponse(for: request)
-                    return .failure(.http(http.statusCode))
-                }
-                bytes = received
-            } catch let error as URLError {
-                if error.code == .cancelled { return .failure(.cancelled) }
-                return .failure(error.code == .timedOut ? .timedOut : .network)
-            } catch { return .failure(.network) }
+            switch await fetchComicBytes(url, headers: headers) {
+            case .success(let loaded): transfer = loaded
+            case .failure(let failure): return .failure(failure)
+            }
         }
         guard !Task.isCancelled else { return .failure(.cancelled) }
-        guard bytes.count <= 24 * 1024 * 1024 else { return .failure(.tooLarge) }
-        guard let image = await Self.downsampleImageOffMainThread(bytes, maxPixelSize: maxPixelSize) else { return .failure(.invalidImage) }
+        guard let image = await Self.downsampleImageOffMainThread(transfer.bytes, maxPixelSize: maxPixelSize) else {
+            if let request = transfer.request { session.configuration.urlCache?.removeCachedResponse(for: request) }
+            return .failure(.invalidImage)
+        }
         return .success(image)
     }
 

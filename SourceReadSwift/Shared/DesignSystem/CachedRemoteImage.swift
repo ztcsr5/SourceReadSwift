@@ -59,8 +59,8 @@ struct CachedRemoteImage<Placeholder: View>: View {
         if let image, loadedIdentifier == taskIdentifier { return image }
         // A hot, correctly sized cover wins the very first frame, before the
         // navigation handoff's lower-resolution placeholder has a chance to draw.
-        guard reuseCoverBytes, headers.isEmpty, let url else { return nil }
-        return RemoteImageLoader.shared.cachedImage(for: url, maxPixelSize: maxPixelSize, reuseCoverBytes: true)
+        guard headers.isEmpty, let url else { return nil }
+        return RemoteImageLoader.shared.cachedImage(for: url, maxPixelSize: maxPixelSize, reuseCoverBytes: reuseCoverBytes)
     }
 
     private var taskIdentifier: String {

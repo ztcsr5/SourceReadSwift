@@ -2,9 +2,12 @@ import Foundation
 
 struct SynchronousSourceLoader {
     private let requestBuilder = SourceRequestBuilder()
+    private let session: URLSession
+
+    init(session: URLSession? = nil) { self.session = session ?? Self.defaultSession }
 
     private static let sessionDelegate = InsecureTrustSessionDelegate()
-    private static let session: URLSession = {
+    private static let defaultSession: URLSession = {
         let configuration = URLSessionConfiguration.ephemeral
         configuration.urlCache = nil
         configuration.requestCachePolicy = .reloadIgnoringLocalCacheData
@@ -63,7 +66,7 @@ struct SynchronousSourceLoader {
         let semaphore = DispatchSemaphore(value: 0)
         let resultBox = SynchronousLoadResultBox()
 
-        Self.session.dataTask(with: urlRequest) { data, response, _ in
+        let requestTask = session.dataTask(with: urlRequest) { data, response, _ in
             var headers: [String: String] = [:]
             var finalURL: URL?
             var statusCode = 200
@@ -76,11 +79,13 @@ struct SynchronousSourceLoader {
             }
             resultBox.store(data: data, headers: headers, url: finalURL, statusCode: statusCode)
             semaphore.signal()
-        }.resume()
+        }
+        requestTask.resume()
 
         let deadline = DispatchTime.now() + effectiveTimeout
         guard semaphore.wait(timeout: deadline) == .success,
               let result = resultBox.load() else {
+            requestTask.cancel()
             return nil
         }
         let responseURL = result.url ?? request.url
