@@ -10,6 +10,9 @@ import Foundation
         if ProcessInfo.processInfo.arguments.contains("--reader-preview-regression") {
             return ReaderPreviewRegressionFixture.makeAppState()
         }
+        if ProcessInfo.processInfo.arguments.contains("--comic-reader-regression") {
+            return ComicRegressionLaunch.makeAppState()
+        }
         if ProcessInfo.processInfo.arguments.contains("--reader-settings-regression") {
             let root = FileManager.default.temporaryDirectory.appendingPathComponent("reader-ui-" + UUID().uuidString)
             let shelf = BookshelfStore(persistence: BookshelfPersistence(rootURL: root),

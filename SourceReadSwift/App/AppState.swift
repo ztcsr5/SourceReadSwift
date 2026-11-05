@@ -210,12 +210,7 @@ final class AppState: ObservableObject {
             }
             .store(in: &cancellables)
 
-        chapterContentCacheStore.objectWillChange
-            .sink { [weak self] _ in
-                self?.scheduleStoreNotification()
-            }
-            .store(in: &cancellables)
-
+        // Prefetch and LRU touches are cache-local; the offline list observes its store directly.
         chapterDownloadStore.objectWillChange
             .sink { [weak self] _ in
                 self?.scheduleStoreNotification()

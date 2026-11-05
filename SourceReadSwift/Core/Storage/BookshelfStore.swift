@@ -98,18 +98,24 @@ final class BookshelfStore: ObservableObject {
         coverURL: String? = nil
     ) {
         guard let index = books.firstIndex(where: { $0.id == bookID }) else { return }
-        let previousTotalChapters = books[index].totalChapters
-        if books[index].seenTotalChapters == nil {
-            books[index].seenTotalChapters = previousTotalChapters > 0
-                ? previousTotalChapters
+        let previous = books[index]
+        var updated = previous
+        if updated.seenTotalChapters == nil {
+            updated.seenTotalChapters = previous.totalChapters > 0
+                ? previous.totalChapters
                 : totalChapters
         }
-        books[index].latestChapterTitle = latestChapterTitle
-        books[index].intro = intro ?? books[index].intro
+        updated.latestChapterTitle = latestChapterTitle
+        updated.intro = intro ?? previous.intro
         if let coverURL = coverURL?.trimmingCharacters(in: .whitespacesAndNewlines), !coverURL.isEmpty {
-            books[index].coverURL = coverURL
+            updated.coverURL = coverURL
         }
-        books[index].totalChapters = max(totalChapters, books[index].totalChapters)
+        updated.totalChapters = max(totalChapters, previous.totalChapters)
+        // Compare only metadata; local books may hold their entire text here.
+        guard updated.latestChapterTitle != previous.latestChapterTitle || updated.intro != previous.intro
+                || updated.coverURL != previous.coverURL || updated.totalChapters != previous.totalChapters
+                || updated.seenTotalChapters != previous.seenTotalChapters else { return }
+        books[index] = updated
         persist()
     }
 
@@ -157,6 +163,7 @@ final class BookshelfStore: ObservableObject {
         books[index].currentChapterIndex = 0
         books[index].currentChapterTitle = nil
         books[index].currentParagraphIndex = nil
+        books[index].comicPosition = nil
         books[index].bookmarks = nil
         books[index].lastReadAt = Date()
         moveToFront(index: index)
@@ -174,13 +181,15 @@ final class BookshelfStore: ObservableObject {
         chapterIndex: Int,
         chapterTitle: String?,
         totalChapters: Int,
-        paragraphIndex: Int? = nil
+        paragraphIndex: Int? = nil,
+        comicPosition: ComicReadingPosition? = nil
     ) {
         guard let index = books.firstIndex(where: { $0.id == bookID }) else { return }
         var updated = books[index]
         updated.currentChapterIndex = max(0, chapterIndex)
         updated.currentChapterTitle = chapterTitle
         updated.currentParagraphIndex = paragraphIndex.map { max(0, $0) }
+        updated.comicPosition = comicPosition
         updated.totalChapters = max(totalChapters, updated.totalChapters)
         updated.seenTotalChapters = max(
             updated.seenTotalChapters ?? 0,

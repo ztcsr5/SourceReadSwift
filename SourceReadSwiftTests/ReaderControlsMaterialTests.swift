@@ -4,6 +4,45 @@ import UIKit
 @testable import SourceReadSwift
 
 final class ReaderControlsMaterialTests: XCTestCase {
+    @MainActor func testComicControlsRemainLegibleOverAWhiteImage() throws {
+        let surface = ZStack {
+            Color.white
+            ComicChromeSurface(shape: Rectangle())
+        }.frame(width: 390, height: 844)
+        let bitmap = try XCTUnwrap(ImageRenderer(content: surface).uiImage)
+        let background = try surfaceChannels(bitmap).map { $0 / 255 }
+        func luminance(_ channels: [Double]) -> Double {
+            zip(channels, [0.2126, 0.7152, 0.0722]).reduce(0) { total, channel in
+                let value = channel.0
+                let linear = value <= 0.04045 ? value / 12.92 : pow((value + 0.055) / 1.055, 2.4)
+                return total + channel.1 * linear
+            }
+        }
+        let secondaryInk = background.map { $0 + (1 - $0) * ComicChromePalette.secondaryInkOpacity }
+        let contrast = (luminance(secondaryInk) + 0.05) / (luminance(background) + 0.05)
+        XCTAssertGreaterThanOrEqual(contrast, 4.5, "The chapter label must remain readable above a bright image")
+    }
+
+    @MainActor func testUnchangedReadingProgressDoesNotReplaceTheOpenNativeMenu() {
+        let button = UIButton(type: .system)
+        let coordinator = ReaderNativeMenuButton.Coordinator()
+        var builds = 0
+        func makeMenu() -> UIMenu {
+            builds += 1
+            return UIMenu(children: [UIAction(title: "当前章节 \(builds)") { _ in }])
+        }
+        coordinator.apply(to: button, identity: "chapter-1|idle", makeMenu: makeMenu)
+        let original = button.menu
+        for _ in 0..<50 {
+            coordinator.apply(to: button, identity: "chapter-1|idle", makeMenu: makeMenu)
+        }
+        XCTAssertEqual(builds, 1)
+        XCTAssertTrue(button.menu === original, "Progress-only refreshes must not replace UIKit's presented menu")
+        coordinator.apply(to: button, identity: "chapter-2|idle", makeMenu: makeMenu)
+        XCTAssertEqual(builds, 2)
+        XCTAssertFalse(button.menu === original, "Changing the real chapter must refresh the actions")
+    }
+
     @MainActor func testSurfaceSamplerReadsTheLowerPanelNotTheUpperBackdrop() throws {
         let picture = UIGraphicsImageRenderer(size: CGSize(width: 390, height: 844)).image { renderer in
             UIColor.black.setFill(); renderer.fill(CGRect(x: 0, y: 0, width: 390, height: 844))

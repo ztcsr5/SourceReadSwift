@@ -3774,7 +3774,8 @@ struct ReaderView: View {
                 }
 
                 ReaderNativeMenuButton(
-                    menu: readerNativeMenu,
+                    menuIdentity: readerNativeMenuIdentity,
+                    makeMenu: { readerNativeMenu },
                     foregroundColor: background.uiTextColor(isNight: readerIsNight),
                     backgroundColor: readerUsesTranslucentChrome ? .clear : background.uiColor(isNight: readerIsNight)
                 )
@@ -4064,6 +4065,16 @@ struct ReaderView: View {
             "advanced": byteCount { advancedSettings },
             "selection": byteCount { settingsPage(for: 0) }
         ]
+    }
+
+    private var readerNativeMenuIdentity: String {
+        [
+            bookID, String(windowCurrentChapterIndex), windowSourceURL ?? "",
+            currentChapterWebURL?.absoluteString ?? "",
+            String(onRefreshChapter != nil), String(onCacheNextChapters != nil),
+            String(canShowPayAction), String(isPerformingPayAction), String(autoScrollEnabled),
+            String(currentBookSource != nil)
+        ].joined(separator: "\n")
     }
 
     private var readerNativeMenu: UIMenu {
@@ -6853,6 +6864,7 @@ struct ReaderPreviewPosition: Equatable {
     let chapterIndex: Int
     let chapterTitle: String
     let paragraphIndex: Int
+    var comicPosition: ComicReadingPosition? = nil
 }
 
 private final class ReaderScrollPositionTracker {

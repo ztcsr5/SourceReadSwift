@@ -140,16 +140,18 @@ struct ReaderBookmarksView: View {
 
 struct OfflineChapterCacheView: View {
     @EnvironmentObject private var appState: AppState
+    @ObservedObject var store: ChapterContentCacheStore
     @State private var exportShareURL: IdentifiableURL?
 
     private var grouped: [CacheSection] {
-        let map = Dictionary(grouping: appState.chapterContentCacheStore.entries, by: \.bookURL)
+        let map = Dictionary(grouping: store.entries, by: \.bookURL)
         return map.keys.sorted().map { CacheSection(bookURL: $0, entries: map[$0]!.sorted { $0.cachedAt > $1.cachedAt }) }
     }
 
     var body: some View {
+        let sections = grouped
         List {
-            if grouped.isEmpty {
+            if sections.isEmpty {
                 VStack(spacing: 10) {
                     Image(systemName: "arrow.down.circle")
                         .font(.system(size: 38, weight: .semibold))
@@ -164,7 +166,7 @@ struct OfflineChapterCacheView: View {
                 .padding(.vertical, 44)
                 .listRowBackground(Color.clear)
             } else {
-                ForEach(grouped) { section in
+                ForEach(sections) { section in
                     Section {
                         ForEach(section.entries) { entry in
                             let cachedBook = appState.bookshelfStore.books.first(where: {
@@ -188,7 +190,7 @@ struct OfflineChapterCacheView: View {
                             }
                             .swipeActions {
                                 Button("删除", role: .destructive) {
-                                    appState.chapterContentCacheStore.remove(key: entry.key)
+                                    store.remove(key: entry.key)
                                 }
                             }
                         }

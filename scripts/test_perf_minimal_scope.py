@@ -2,6 +2,7 @@
 
 Usage: python -B -m unittest discover -s scripts -p test_perf_minimal_scope.py -v
 """
+import re
 from pathlib import Path
 import unittest
 
@@ -59,7 +60,12 @@ class MinimalPerformanceScopeTests(unittest.TestCase):
         app = read_source("SourceReadSwift/App/AppState.swift")
         subscriptions = app.split("private func bindChildStores()", 1)[1].split("// MARK:", 1)[0]
         self.assertExcludes("Task {", subscriptions)
-        self.assertEqual(subscriptions.count("scheduleStoreNotification()"), 11)
+        self.assertCountEqual(re.findall(r"(\w+)\.objectWillChange\s*\.sink", subscriptions), [
+            "sourceStore", "bookshelfStore", "purifyRuleStore", "chapterDownloadStore",
+            "rssArticleStateStore", "rssFeedCacheStore", "rssArticleContentCacheStore",
+            "sourceHealthStore", "sourceDiagnosticHistoryStore", "readingHistoryStore",
+        ])
+        self.assertEqual(subscriptions.count("scheduleStoreNotification()"), 10)
 
     def test_progress_and_session_writes_are_ordered_off_main(self):
         persistence = read_source("SourceReadSwift/Core/Storage/BookshelfPersistence.swift")
@@ -81,12 +87,59 @@ class MinimalPerformanceScopeTests(unittest.TestCase):
         self.assertContains("Self.diskQueue.sync", history)
         self.assertContains("history = nextHistory", history)
 
-    def test_global_notifications_coalesce_without_removing_subscriptions(self):
+    def test_global_notifications_keep_remaining_shared_subscriptions(self):
         app = read_source("SourceReadSwift/App/AppState.swift")
         self.assertContains("guard !hasPendingStoreNotification else { return }", app)
-        for store in ["bookshelfStore", "readingHistoryStore", "chapterContentCacheStore", "chapterDownloadStore"]:
+        for store in ["bookshelfStore", "readingHistoryStore", "chapterDownloadStore"]:
             self.assertContains(f"{store}.objectWillChange", app)
         self.assertContains("scheduleStoreNotification()", app)
+
+    def test_chapter_prefetch_invalidates_only_the_cache_consumers(self):
+        app = read_source("SourceReadSwift/App/AppState.swift")
+        self.assertExcludes("chapterContentCacheStore.objectWillChange", app)
+        settings = read_source("SourceReadSwift/Features/Settings/SettingsView.swift")
+        self.assertContains("OfflineChapterCacheView(store: appState.chapterContentCacheStore)", settings)
+        cache_views = read_source("SourceReadSwift/Features/Settings/ReaderDataManagementViews.swift")
+        body = cache_views.split("struct OfflineChapterCacheView: View", 1)[1].split("var body:", 1)[0]
+        self.assertContains("@ObservedObject var store: ChapterContentCacheStore", body)
+
+    def test_curl_controller_reservation_does_not_eagerly_load_distant_page_trees(self):
+        curl = read_source("SourceReadSwift/Features/Reader/PageCurlReaderView.swift")
+        reserve = curl.split("func reservePageController(at index:", 1)[1].split("func noteContentRevision", 1)[0]
+        self.assertExcludes("controller.view.", reserve)
+        setup = curl.split("func mountReaderPage()", 1)[1].split("override func viewDidLayoutSubviews", 1)[0]
+        self.assertContains("view.backgroundColor = pageBackgroundColor ?? .clear", setup)
+        self.assertContains("view.isOpaque = pageBackgroundColor != nil", setup)
+        self.assertLess(setup.index("view.isOpaque"), setup.index("view.backgroundColor"))
+
+    def test_each_global_palette_lookup_resolves_the_selected_theme_once(self):
+        source = read_source("SourceReadSwift/Shared/DesignSystem/AppTheme.swift")
+        for token in ("background", "card", "accentUIColor", "secondaryAccent"):
+            with self.subTest(token=token):
+                getter = source.split(f"static var {token}:", 1)[1].split("static var", 1)[0]
+                self.assertEqual(getter.count("AppVisualTheme.current"), 1)
+        color = source.split("static func color(for", 1)[1].split("static func hex", 1)[0]
+        self.assertEqual(color.count("UInt32(raw, radix: 16)"), 1)
+
+    def test_background_detail_refresh_does_not_write_unchanged_book_metadata(self):
+        shelf = read_source("SourceReadSwift/Core/Storage/BookshelfStore.swift")
+        refresh = shelf.split("func updateDetails(", 1)[1].split("func markUpdatesSeen", 1)[0]
+        self.assertExcludes("books[index].", refresh)
+        self.assertEqual(refresh.count("books[index] = updated"), 1)
+        self.assertLess(refresh.index("guard updated.latestChapterTitle != previous.latestChapterTitle"),
+                        refresh.index("books[index] = updated"))
+
+    def test_reader_startup_does_not_wait_on_a_synchronous_toc_disk_read(self):
+        gateway = read_source("SourceReadSwift/Features/Bookshelf/BookshelfReaderGatewayView.swift")
+        opening = gateway.split("private func resumeReading() async", 1)[1].split("private func refreshBookDetailAndTOC", 1)[0]
+        self.assertContains("await appState.bookTOCacheStore.entryForReader(", opening)
+        self.assertExcludes("bookTOCacheStore.entry(", opening)
+
+    def test_white_comic_controls_have_a_readable_surface_over_light_images(self):
+        comic = read_source("SourceReadSwift/Features/Reader/ComicReaderView.swift")
+        chrome = comic.split("private var chromeOverlay", 1)[1].split("private var comicMenuIdentity", 1)[0]
+        self.assertEqual(chrome.count("ComicChromeSurface(shape: Rectangle())"), 2)
+        self.assertExcludes(".background(.ultraThinMaterial)", chrome)
 
     def test_background_boundary_captures_position_before_draining_writes(self):
         reader = read_source("SourceReadSwift/Features/Reader/ReaderView.swift")
