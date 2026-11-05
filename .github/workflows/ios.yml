@@ -64,6 +64,13 @@ jobs:
             -only-testing:SourceReadSwiftTests/ReaderTocPerformanceTests \
             -only-testing:SourceReadSwiftTests/ContentImagePipelineRegressionTests \
             -only-testing:SourceReadSwiftTests/RemoteComicImageTests \
+            -only-testing:SourceReadSwiftTests/ComicOfflineArchiveTests \
+            -only-testing:SourceReadSwiftTests/ComicStripLayoutTests \
+            -only-testing:SourceReadSwiftTests/ComicReadingPositionTests \
+            -only-testing:SourceReadSwiftTests/ChapterDownloadStoreTests \
+            -only-testing:SourceReadSwiftTests/ComicContentParserTests \
+            -only-testing:SourceReadSwiftTests/SourceEngineStage18FixtureTests \
+            -only-testing:SourceReadSwiftTests/WebReaderDocumentTests \
             -only-testing:SourceReadSwiftTests/AppFrameProfilerTests \
             -only-testing:SourceReadSwiftTests/Release116VisualTests \
             -only-testing:SourceReadSwiftTests/ReaderModePositionRegressionTests \
@@ -102,6 +109,8 @@ jobs:
           xcodebuild -project SourceReadSwift.xcodeproj -scheme SourceReadSwift \
             -destination "id=$DEVICE_ID" CODE_SIGNING_ALLOWED=NO \
             -parallel-testing-enabled NO -only-testing:SourceReadSwiftUITests/ReaderSettingsFlowUITests \
+            -only-testing:SourceReadSwiftUITests/ComicReaderFlowUITests \
+            -only-testing:SourceReadSwiftUITests/FloatingReadingDeskUITests/testContinueRestoresTheSavedParagraphInTheRealWebView \
             -destination-timeout 120 -test-timeouts-enabled YES -maximum-test-execution-time-allowance 180 \
             -resultBundlePath NativeReaderUIResults.xcresult test-without-building 2>&1 | tee native-reader-ui-test.log
       - name: Export iOS26 attachments
@@ -183,6 +192,7 @@ jobs:
           if [ "${{ inputs.reader_settings_only }}" = "true" ]; then
             TEST_SELECTION=(-only-testing:SourceReadSwiftUITests/ReaderSettingsFlowUITests)
           fi
+          xcrun simctl bootstatus "$DEVICE_ID" -b
           xcrun simctl spawn "$DEVICE_ID" log stream --level info --style compact \
             --predicate 'subsystem == "com.edc21.SourceReadSwift.book-passage"' > reader-startup.log 2>&1 &
           LOG_PID=$!

@@ -3,6 +3,15 @@ import XCTest
 @testable import SourceReadSwift
 
 final class Release117AppearanceTests: XCTestCase {
+    func testThemesWithoutOrnamentsDoNotCreateEmptyCanvasLayers() {
+        for theme in AppVisualTheme.allCases {
+            XCTAssertEqual(AppThemeOrnament.hasArtwork(theme: theme, isCard: true),
+                           [.folio, .blueprint].contains(theme))
+            XCTAssertEqual(AppThemeOrnament.hasArtwork(theme: theme, isCard: false),
+                           [.folio, .blueprint, .inkwash].contains(theme))
+        }
+    }
+
     @MainActor func testSystemModeTracksLiveWindowTraitChanges() async throws {
         try await check(mode: .system, expected: [.light, .dark, .light])
     }

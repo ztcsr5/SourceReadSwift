@@ -174,7 +174,7 @@ final class FloatingReadingDeskUITests: XCTestCase {
         XCTAssertTrue(surface.waitForExistence(timeout: 10))
         let saved = app.webViews.staticTexts.matching(
             NSPredicate(format: "label BEGINSWITH %@", "【已保存的阅读段落】")).firstMatch
-        XCTAssertTrue(saved.waitForExistence(timeout: 10))
+        XCTAssertTrue(saved.waitForExistence(timeout: 10), "Web startup state: \(surface.value ?? "unavailable")")
         XCTAssertTrue(surface.frame.intersects(saved.frame), "The saved paragraph must be in the actual viewport")
         XCTAssertFalse(rootTab("主页", legacyID: "tabs.legacy.home").isHittable)
         capture("17-restored-paragraph")

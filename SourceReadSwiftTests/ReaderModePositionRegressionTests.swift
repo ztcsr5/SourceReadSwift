@@ -64,7 +64,11 @@ final class ReaderModePositionRegressionTests: XCTestCase {
         try await assertStartupRecovery(emptiesDocument: true)
     }
 
-    @MainActor private func assertStartupRecovery(emptiesDocument: Bool) async throws {
+    @MainActor func testTerminatedStartupProcessReplaysTheCursorWithOneBoundedRecovery() async throws {
+        try await assertStartupRecovery(emptiesDocument: false, simulatesTermination: true)
+    }
+
+    @MainActor private func assertStartupRecovery(emptiesDocument: Bool, simulatesTermination: Bool = false) async throws {
         var offset = -1, applied = false
         let text = String(repeating: "长段正文，恢复不能回到段首。👩🏽‍💻", count: 150)
         let fixture = WebScrollReaderView(
@@ -80,6 +84,7 @@ final class ReaderModePositionRegressionTests: XCTestCase {
         let coordinator = fixture.makeCoordinator()
         let fault = ReaderStartupBridgeFault(coordinator: coordinator)
         let web = coordinator.makeWebView(initialView: fixture, prepareBeforeNavigation: { web in
+            guard !simulatesTermination else { return }
             web.configuration.userContentController.removeScriptMessageHandler(forName: "reader")
             web.configuration.userContentController.add(fault, name: "reader")
             web.configuration.userContentController.add(fault, name: "bridgeFault")
@@ -93,6 +98,10 @@ final class ReaderModePositionRegressionTests: XCTestCase {
                     """,
                 injectionTime: .atDocumentStart, forMainFrameOnly: true))
         })
+        if simulatesTermination {
+            coordinator.webViewWebContentProcessDidTerminate(web)
+            coordinator.webViewWebContentProcessDidTerminate(web)
+        }
         let scene = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.first
         let previous = scene?.windows.first(where: \.isKeyWindow)
         let window = scene.map { UIWindow(windowScene: $0) } ?? UIWindow(frame: UIScreen.main.bounds)
@@ -110,7 +119,8 @@ final class ReaderModePositionRegressionTests: XCTestCase {
             if applied && offset > 0 { break }
             try await Task.sleep(nanoseconds: 100_000_000)
         }
-        XCTAssertEqual(fault.injections, 1)
+        if simulatesTermination { XCTAssertEqual(fault.injections, 0) }
+        else { XCTAssertEqual(fault.injections, 1) }
         XCTAssertEqual(coordinator.startupRecoveryCount, 1)
         XCTAssertTrue(applied, "A verified complete shell without its bridge must recover, not spin forever")
         XCTAssertGreaterThan(offset, 500)
