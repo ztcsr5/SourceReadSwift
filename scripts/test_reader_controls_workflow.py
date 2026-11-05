@@ -57,6 +57,7 @@ class ReaderControlsWorkflowTests(unittest.TestCase):
     def test_all_original_native_product_suites_remain_selected(self):
         expected = '''TabChromeRegressionTests ReaderCoverTeardownTests AppLayoutDensityTests SourceOrganizationTests
             ReaderTocPerformanceTests ContentImagePipelineRegressionTests RemoteComicImageTests AppFrameProfilerTests
+            ComicOfflineArchiveTests ComicStripLayoutTests ChapterDownloadStoreTests ComicContentParserTests SourceEngineStage18FixtureTests WebReaderDocumentTests
             Release116VisualTests ReaderModePositionRegressionTests Release117DetailTests Release117ComicCompatibilityTests
             Release117AppearanceTests Release117SearchProjectionTests Release117ChromeTests WebsiteSourceInferenceTests
             WebsiteSourceFamilyInferenceTests AIChatTests Release117PurificationTests LANWorkbenchTests ReadingNotesNavigationTests
@@ -74,6 +75,13 @@ class ReaderControlsWorkflowTests(unittest.TestCase):
         self.assertIn('-maximum-test-execution-time-allowance 180', ui)
         self.assertIn('timeout-minutes: 15', ui)
         self.assertNotIn('-only-testing:SourceReadSwiftTests/', ui)
+
+    def test_general_startup_logging_starts_after_the_simulator_is_booted(self):
+        workflow = WORKFLOW.read_text(encoding='utf8')
+        general = workflow.split('  build:', 1)[1]
+        boot = general.index('xcrun simctl bootstatus "$DEVICE_ID" -b')
+        capture = general.index('xcrun simctl spawn "$DEVICE_ID" log stream')
+        self.assertLess(boot, capture)
 
     def test_unit_and_ui_results_and_attempt_artifacts_are_preserved_separately(self):
         self.assertIn('NativeTabResults.xcresult', self.native)

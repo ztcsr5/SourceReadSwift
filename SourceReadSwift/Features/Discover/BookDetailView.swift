@@ -59,7 +59,9 @@ struct BookDetailView: View {
     }
 
     private var downloadRecord: ChapterDownloadRecord? {
-        appState.chapterDownloadStore.record(bookID: book.id)
+        let record = appState.chapterDownloadStore.record(bookID: book.id)
+        if sourceKind == .comic, record?.hasComicImageArchive != true { return nil }
+        return record
     }
 
     private var isDownloading: Bool {
@@ -256,7 +258,9 @@ struct BookDetailView: View {
                     source: source,
                     initialChapterIndex: selectedChapterIndexForReader,
                     chapters: chapters,
-                    engine: appState.engine
+                    engine: appState.engine,
+                    initialPageIndex: previewPosition.flatMap { $0.chapterIndex == selectedChapterIndexForReader ? $0.paragraphIndex : nil },
+                    onPreviewPosition: recordPreviewPosition
                 )
             }
         }
@@ -275,6 +279,7 @@ struct BookDetailView: View {
         .onAppear { hasArrived = true }
         .onChange(of: readingRoute != nil) { if !$0 { promptToAddAfterPreviewIfNeeded() } }
         .onChange(of: showAllChapters) { if !$0 { promptToAddAfterPreviewIfNeeded() } }
+        .onChange(of: showComicReader) { if !$0 { promptToAddAfterPreviewIfNeeded() } }
         .modifier(ReaderPreviewShelfPrompt(isPresented: Binding(
             get: { readingRoute == nil && !showAllChapters && showAddAfterPreviewPrompt }, set: { showAddAfterPreviewPrompt = $0 }
         ), addBook: addCurrentBookToShelf))
@@ -335,7 +340,12 @@ struct BookDetailView: View {
 
     private func readAction(_ target: BookChapter) -> some View {
         Button {
-            openReadingRoute(target, showsTitlePage: shouldShowTitlePage)
+            if sourceKind == .comic {
+                selectedChapterIndexForReader = target.index
+                showComicReader = true
+            } else {
+                openReadingRoute(target, showsTitlePage: shouldShowTitlePage)
+            }
         } label: {
             Label(readingActionLabel, systemImage: "book")
                 .font(.subheadline.weight(.semibold))
@@ -489,7 +499,7 @@ struct BookDetailView: View {
     private var comicActionCard: some View {
         Button {
             UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-            selectedChapterIndexForReader = 0
+            selectedChapterIndexForReader = targetReadingChapter?.index ?? 0
             showComicReader = true
         } label: {
             HStack(spacing: 14) {
@@ -593,7 +603,7 @@ struct BookDetailView: View {
                     .minimumScaleFactor(0.8)
                     .foregroundStyle(.secondary)
             }
-            if canDownloadTextChapters, let record = downloadRecord {
+            if canDownloadTextChapters || sourceKind == .comic, let record = downloadRecord {
                 chapterDownloadStatus(record)
             }
 
@@ -967,7 +977,7 @@ struct BookDetailView: View {
 
     private var downloadLabel: String {
         if isDownloading { return "停止缓存" }
-        guard let record = downloadRecord else { return "缓存全本章节" }
+        guard let record = downloadRecord else { return sourceKind == .comic ? "下载全本漫画" : "缓存全本章节" }
         switch record.status {
         case .completed: return "重新检查离线缓存"
         case .paused: return "继续缓存 \(record.completedCount)/\(record.chapterCount)"
@@ -1563,6 +1573,7 @@ struct ChapterLoadingView: View {
 
 private struct BookDetailAllChaptersView: View {
     @Environment(\.dismiss) private var dismiss
+    @EnvironmentObject private var appState: AppState
     let chapters: [BookChapter]
     @State private var selectedChapterForReading: BookChapter? = nil
     let book: SearchBook
@@ -1677,6 +1688,10 @@ private struct BookDetailAllChaptersView: View {
                     if let chapter = selectedChapterForReading {
                         if let shelfBook = localBook {
                             BookshelfReaderGatewayView(book: shelfBook, initialChapterIndex: chapter.index)
+                        } else if let source = appState.sourceStore.source(for: book.sourceUrl), source.sourceKind == .comic {
+                            ComicReaderView(bookID: bookID, bookTitle: book.name, source: source,
+                                initialChapterIndex: chapter.index, chapters: chapters, engine: appState.engine,
+                                onPreviewPosition: onPreviewPosition)
                         } else {
                             ChapterLoadingView(
                                 bookID: bookID,
@@ -1724,7 +1739,9 @@ private struct ReaderPreviewShelfPrompt: ViewModifier {
     let addBook: () -> Void
 
     func body(content: Content) -> some View {
-        content.confirmationDialog("加入书架？", isPresented: $isPresented, titleVisibility: .visible) {
+        // A popover-style confirmation dialog can omit its cancel action.
+        // Declining is a visible choice in the preview flow, not outside-tap only.
+        content.alert("加入书架？", isPresented: $isPresented) {
             Button("加入书架", action: addBook)
             Button("暂不加入", role: .cancel) {}
         } message: {

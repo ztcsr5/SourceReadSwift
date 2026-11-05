@@ -18,6 +18,7 @@ struct ChapterDownloadRecord: Identifiable, Codable, Hashable, Sendable {
     var bookURL: String
     var title: String
     var chapterCount: Int
+    var hasComicImageArchive: Bool?
     var completedIndexes: [Int]
     var failedIndexes: [Int]
     var status: Status
@@ -38,6 +39,7 @@ struct ChapterDownloadRecord: Identifiable, Codable, Hashable, Sendable {
         bookURL: String,
         title: String,
         chapterCount: Int,
+        hasComicImageArchive: Bool? = nil,
         completedIndexes: [Int] = [],
         failedIndexes: [Int] = [],
         status: Status = .queued,
@@ -50,6 +52,7 @@ struct ChapterDownloadRecord: Identifiable, Codable, Hashable, Sendable {
         self.bookURL = bookURL
         self.title = title
         self.chapterCount = max(0, chapterCount)
+        self.hasComicImageArchive = hasComicImageArchive
         self.completedIndexes = Array(Set(completedIndexes.filter { $0 >= 0 })).sorted()
         self.failedIndexes = Array(Set(failedIndexes.filter { $0 >= 0 })).sorted()
         self.status = status
@@ -124,6 +127,7 @@ final class ChapterDownloadStore: ObservableObject {
         bookURL: String,
         title: String,
         chapterCount: Int,
+        hasComicImageArchive: Bool? = nil,
         cachedChapterIndexes: [Int]? = nil
     ) {
         let old = records[bookID]
@@ -134,6 +138,7 @@ final class ChapterDownloadStore: ObservableObject {
             bookURL: bookURL,
             title: title,
             chapterCount: chapterCount,
+            hasComicImageArchive: hasComicImageArchive,
             completedIndexes: cachedChapterIndexes ?? (canResume ? (old?.completedIndexes ?? []) : []),
             failedIndexes: [],
             status: .queued,
@@ -175,6 +180,11 @@ final class ChapterDownloadStore: ObservableObject {
         persist()
     }
 
+    func removeComicRecords() {
+        records = records.filter { $0.value.hasComicImageArchive != true }
+        persist()
+    }
+
     private func update(_ bookID: String, _ mutation: (inout ChapterDownloadRecord) -> Void) {
         guard var record = records[bookID] else { return }
         mutation(&record)
@@ -204,9 +214,16 @@ final class ChapterDownloadCoordinator: ObservableObject {
     }
 
     private let store: ChapterDownloadStore
+    private let comicArchive: ComicOfflineArchive
+    private let fetchComicPage: ComicOfflineArchive.PageFetcher
     private var tasks: [String: DownloadJob] = [:]
 
-    init(store: ChapterDownloadStore) { self.store = store }
+    init(store: ChapterDownloadStore, comicArchive: ComicOfflineArchive = .shared,
+         fetchComicPage: @escaping ComicOfflineArchive.PageFetcher = { await RemoteImageLoader.shared.comicBytesForArchive($0) }) {
+        self.store = store
+        self.comicArchive = comicArchive
+        self.fetchComicPage = fetchComicPage
+    }
 
     func isRunning(bookID: String) -> Bool { tasks[bookID] != nil }
 
@@ -221,7 +238,8 @@ final class ChapterDownloadCoordinator: ObservableObject {
     ) {
         guard !chapters.isEmpty, tasks[bookID] == nil else { return }
         let generation = UUID()
-        let cachedURLs = cacheStore.cachedChapterURLs(sourceURL: source.bookSourceUrl, purifyRules: purifyRules)
+        let isComic = source.sourceKind == .comic
+        let cachedURLs = isComic ? [] : cacheStore.cachedChapterURLs(sourceURL: source.bookSourceUrl, purifyRules: purifyRules)
         let completed = Set(chapters.lazy.filter { cachedURLs.contains($0.url) }.map(\.index))
         store.begin(
             bookID: bookID,
@@ -229,6 +247,7 @@ final class ChapterDownloadCoordinator: ObservableObject {
             bookURL: chapters[0].bookUrl,
             title: title,
             chapterCount: chapters.count,
+            hasComicImageArchive: isComic ? true : nil,
             cachedChapterIndexes: Array(completed)
         )
         store.markRunning(bookID: bookID)
@@ -237,6 +256,10 @@ final class ChapterDownloadCoordinator: ObservableObject {
             for chapter in chapters {
                 guard self.isCurrentJob(bookID, generation: generation) else { return }
                 guard !completed.contains(chapter.index) else { continue }
+                if isComic {
+                    await self.downloadComic(chapter, plan: (bookID, generation, source, engine))
+                    continue
+                }
                 let result = await AsyncTimeout.run(seconds: 14) {
                     await engine.getContent(source: source, chapter: chapter)
                 } ?? .failure(.network("Download timed out"))
@@ -256,6 +279,32 @@ final class ChapterDownloadCoordinator: ObservableObject {
         tasks[bookID] = DownloadJob(generation: generation, task: task)
     }
 
+    private func downloadComic(_ chapter: BookChapter,
+                               plan: (bookID: String, generation: UUID, source: BookSource, engine: SourceEngine)) async {
+        let sourceURL = plan.source.bookSourceUrl
+        let saved = await comicArchive.contains(sourceURL: sourceURL, chapter: chapter)
+        guard isCurrentJob(plan.bookID, generation: plan.generation) else { return }
+        if saved {
+            store.markCompleted(bookID: plan.bookID, chapterIndex: chapter.index)
+            return
+        }
+        let response = await AsyncTimeout.run(seconds: 30) {
+            await plan.engine.getContent(source: plan.source, chapter: chapter)
+        } ?? .failure(.network("漫画章节请求超时"))
+        guard isCurrentJob(plan.bookID, generation: plan.generation) else { return }
+        do {
+            let content = try response.get()
+            let headers = SourceRequestBuilder().imageRequestHeaders(for: plan.source, chapterURL: chapter.url)
+            try await comicArchive.save(content, sourceURL: sourceURL, headers: headers, fetch: fetchComicPage)
+            guard isCurrentJob(plan.bookID, generation: plan.generation) else { return }
+            store.markCompleted(bookID: plan.bookID, chapterIndex: chapter.index)
+        } catch {
+            guard isCurrentJob(plan.bookID, generation: plan.generation) else { return }
+            let message = (error as? SourceEngineError)?.displayMessage ?? error.localizedDescription
+            store.markFailed(bookID: plan.bookID, chapterIndex: chapter.index, message: message)
+        }
+    }
+
     private func isCurrentJob(_ bookID: String, generation: UUID) -> Bool {
         !Task.isCancelled && tasks[bookID]?.generation == generation
     }
@@ -263,6 +312,12 @@ final class ChapterDownloadCoordinator: ObservableObject {
     /// Invalidates active jobs before clearing their offline chapters.
     func cancelAll() {
         for bookID in Array(tasks.keys) { cancel(bookID: bookID) }
+    }
+
+    func cancelComicDownloads() {
+        for bookID in Array(tasks.keys) where store.record(bookID: bookID)?.hasComicImageArchive == true {
+            cancel(bookID: bookID)
+        }
     }
 
     /// Cancel this generation only; callers can optionally await network cleanup.
