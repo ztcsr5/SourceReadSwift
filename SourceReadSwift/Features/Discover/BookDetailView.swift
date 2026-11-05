@@ -20,6 +20,8 @@ struct BookDetailView: View {
     @State private var tocExpansionTask: Task<Void, Never>?
     @State private var isLoading = false
     @State private var errorMessage: String?
+    @State private var comicDownloadRequest: UUID?
+    @State private var comicDownloadError: String?
     @State private var previewPosition: ReaderPreviewPosition?
     @State private var hasPromptedAddAfterPreview = false
     @State private var showAddAfterPreviewPrompt = false
@@ -59,11 +61,13 @@ struct BookDetailView: View {
     }
 
     private var downloadRecord: ChapterDownloadRecord? {
-        appState.chapterDownloadStore.record(bookID: book.id)
+        let record = appState.chapterDownloadStore.record(bookID: book.id)
+        if sourceKind == .comic, record?.hasComicImageArchive != true { return nil }
+        return record
     }
 
     private var isDownloading: Bool {
-        appState.chapterDownloadCoordinator.isRunning(bookID: book.id)
+        comicDownloadRequest != nil || appState.chapterDownloadCoordinator.isRunning(bookID: book.id)
     }
 
     private var isBookInBookshelf: Bool {
@@ -225,6 +229,18 @@ struct BookDetailView: View {
             SourceSwitchCacheStore.shared.remember(books: availableSources + [book])
             await load()
         }
+        .task(id: comicDownloadRequest) {
+            if let request = comicDownloadRequest { await prepareComicDownload(request: request) }
+        }
+        .onChange(of: book.id) { _ in comicDownloadRequest = nil }
+        .onDisappear { comicDownloadRequest = nil }
+        .alert("无法下载全本漫画", isPresented: Binding(
+            get: { comicDownloadError != nil }, set: { if !$0 { comicDownloadError = nil } }
+        )) {
+            Button("关闭", role: .cancel) {}
+        } message: {
+            Text(comicDownloadError ?? "")
+        }
         .navigationDestination(isPresented: Binding(
             get: { readingRoute != nil }, set: { if !$0 { readingRoute = nil } }
         )) {
@@ -256,7 +272,10 @@ struct BookDetailView: View {
                     source: source,
                     initialChapterIndex: selectedChapterIndexForReader,
                     chapters: chapters,
-                    engine: appState.engine
+                    engine: appState.engine,
+                    initialPageIndex: previewPosition.flatMap { $0.chapterIndex == selectedChapterIndexForReader ? $0.paragraphIndex : nil },
+                    initialComicPosition: previewPosition?.comicPosition,
+                    onPreviewPosition: recordPreviewPosition
                 )
             }
         }
@@ -275,6 +294,7 @@ struct BookDetailView: View {
         .onAppear { hasArrived = true }
         .onChange(of: readingRoute != nil) { if !$0 { promptToAddAfterPreviewIfNeeded() } }
         .onChange(of: showAllChapters) { if !$0 { promptToAddAfterPreviewIfNeeded() } }
+        .onChange(of: showComicReader) { if !$0 { promptToAddAfterPreviewIfNeeded() } }
         .modifier(ReaderPreviewShelfPrompt(isPresented: Binding(
             get: { readingRoute == nil && !showAllChapters && showAddAfterPreviewPrompt }, set: { showAddAfterPreviewPrompt = $0 }
         ), addBook: addCurrentBookToShelf))
@@ -335,7 +355,12 @@ struct BookDetailView: View {
 
     private func readAction(_ target: BookChapter) -> some View {
         Button {
-            openReadingRoute(target, showsTitlePage: shouldShowTitlePage)
+            if sourceKind == .comic {
+                selectedChapterIndexForReader = target.index
+                showComicReader = true
+            } else {
+                openReadingRoute(target, showsTitlePage: shouldShowTitlePage)
+            }
         } label: {
             Label(readingActionLabel, systemImage: "book")
                 .font(.subheadline.weight(.semibold))
@@ -489,7 +514,7 @@ struct BookDetailView: View {
     private var comicActionCard: some View {
         Button {
             UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-            selectedChapterIndexForReader = 0
+            selectedChapterIndexForReader = targetReadingChapter?.index ?? 0
             showComicReader = true
         } label: {
             HStack(spacing: 14) {
@@ -585,6 +610,17 @@ struct BookDetailView: View {
 
                 if canDownloadTextChapters {
                     chapterDownloadMenu
+                } else if sourceKind == .comic, !chapters.isEmpty {
+                    Button(action: toggleDownload) {
+                        Image(systemName: isDownloading ? "stop.circle" : "arrow.down.circle")
+                            .font(.title3)
+                            .foregroundStyle(AppTheme.accent)
+                            .frame(width: 44, height: 44)
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(AppPressStyle())
+                    .accessibilityLabel(downloadLabel)
+                    .accessibilityIdentifier("bookDetail.downloadComic")
                 }
 
                 Text("\(chapters.count) 章")
@@ -593,8 +629,12 @@ struct BookDetailView: View {
                     .minimumScaleFactor(0.8)
                     .foregroundStyle(.secondary)
             }
-            if canDownloadTextChapters, let record = downloadRecord {
+            if canDownloadTextChapters || sourceKind == .comic, let record = downloadRecord {
                 chapterDownloadStatus(record)
+            }
+            if comicDownloadRequest != nil {
+                ProgressView("正在核对全本目录")
+                    .font(.caption)
             }
 
             VStack(spacing: 0) {
@@ -966,8 +1006,8 @@ struct BookDetailView: View {
     }
 
     private var downloadLabel: String {
-        if isDownloading { return "停止缓存" }
-        guard let record = downloadRecord else { return "缓存全本章节" }
+        if isDownloading { return sourceKind == .comic ? "停止漫画下载" : "停止缓存" }
+        guard let record = downloadRecord else { return sourceKind == .comic ? "下载全本漫画" : "缓存全本章节" }
         switch record.status {
         case .completed: return "重新检查离线缓存"
         case .paused: return "继续缓存 \(record.completedCount)/\(record.chapterCount)"
@@ -977,12 +1017,53 @@ struct BookDetailView: View {
     }
 
     private func toggleDownload() {
+        if comicDownloadRequest != nil {
+            comicDownloadRequest = nil
+            return
+        }
         if isDownloading {
             appState.chapterDownloadCoordinator.cancel(bookID: book.id)
             return
         }
         guard !chapters.isEmpty,
               let source = appState.sourceStore.source(for: book.sourceUrl) else { return }
+        if source.sourceKind == .comic {
+            comicDownloadRequest = UUID()
+            return
+        }
+        enqueueDownload(source: source, chapters: chapters)
+    }
+
+    private func prepareComicDownload(request: UUID) async {
+        defer { if comicDownloadRequest == request { comicDownloadRequest = nil } }
+        let selectedBook = book
+        let engine = appState.engine
+        guard let source = appState.sourceStore.source(for: selectedBook.sourceUrl) else {
+            comicDownloadError = "找不到漫画书源。请恢复书源后重试。"
+            return
+        }
+        let verified: Result<[BookChapter], SourceEngineError>? = await AsyncTimeout.run(seconds: 30) {
+            switch await engine.getBookDetail(source: source, book: selectedBook) {
+            case .success(let downloadDetail):
+                guard !Task.isCancelled else { return .failure(.network("目录请求已取消")) }
+                return await engine.getCompleteChapterList(source: source, book: downloadDetail)
+            case .failure(let error): return .failure(error)
+            }
+        }
+        guard !Task.isCancelled, comicDownloadRequest == request, book.id == selectedBook.id else { return }
+        switch verified {
+        case .some(.success(let complete)) where !complete.isEmpty:
+            enqueueDownload(source: source, chapters: complete)
+        case .some(.failure(let error)):
+            comicDownloadError = String(SourceDiagnosticRedactor.value(error.displayMessage).prefix(240))
+        case .some(.success):
+            comicDownloadError = "书源目录为空，未开始全本下载。"
+        case nil:
+            comicDownloadError = "核对目录超时，未开始全本下载。请重试或下载单话。"
+        }
+    }
+
+    private func enqueueDownload(source: BookSource, chapters: [BookChapter]) {
         appState.chapterDownloadCoordinator.start(
             bookID: book.id,
             source: source,
@@ -1008,7 +1089,8 @@ struct BookDetailView: View {
         }
         if let position = previewPosition, position.bookID == readerBookID {
             appState.bookshelfStore.updateReadingProgress(bookID: position.bookID, chapterIndex: position.chapterIndex,
-                chapterTitle: position.chapterTitle, totalChapters: chapters.count, paragraphIndex: position.paragraphIndex)
+                chapterTitle: position.chapterTitle, totalChapters: chapters.count, paragraphIndex: position.paragraphIndex,
+                comicPosition: position.comicPosition)
         }
     }
 
@@ -1107,14 +1189,15 @@ struct BookDetailView: View {
     }
 
     private func chapterDownloadStatus(_ record: ChapterDownloadRecord) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
+        let unit = record.hasComicImageArchive == true ? "话" : "章"
+        return VStack(alignment: .leading, spacing: 4) {
             ProgressView(value: Double(record.completedCount), total: Double(max(record.chapterCount, 1)))
                 .tint(AppTheme.accent)
             HStack(spacing: 8) {
-                Text("下载进度 \(record.completedCount)/\(record.chapterCount) 章")
+                Text("下载进度 \(record.completedCount)/\(record.chapterCount) \(unit)")
                     .foregroundStyle(.secondary)
                 if record.failedCount > 0 {
-                    Text("\(record.failedCount) 章失败").foregroundStyle(.red)
+                    Text("\(record.failedCount) \(unit)失败").foregroundStyle(.red)
                 }
             }
             .font(.caption)
@@ -1563,6 +1646,7 @@ struct ChapterLoadingView: View {
 
 private struct BookDetailAllChaptersView: View {
     @Environment(\.dismiss) private var dismiss
+    @EnvironmentObject private var appState: AppState
     let chapters: [BookChapter]
     @State private var selectedChapterForReading: BookChapter? = nil
     let book: SearchBook
@@ -1677,6 +1761,10 @@ private struct BookDetailAllChaptersView: View {
                     if let chapter = selectedChapterForReading {
                         if let shelfBook = localBook {
                             BookshelfReaderGatewayView(book: shelfBook, initialChapterIndex: chapter.index)
+                        } else if let source = appState.sourceStore.source(for: book.sourceUrl), source.sourceKind == .comic {
+                            ComicReaderView(bookID: bookID, bookTitle: book.name, source: source,
+                                initialChapterIndex: chapter.index, chapters: chapters, engine: appState.engine,
+                                onPreviewPosition: onPreviewPosition)
                         } else {
                             ChapterLoadingView(
                                 bookID: bookID,
@@ -1724,7 +1812,9 @@ private struct ReaderPreviewShelfPrompt: ViewModifier {
     let addBook: () -> Void
 
     func body(content: Content) -> some View {
-        content.confirmationDialog("加入书架？", isPresented: $isPresented, titleVisibility: .visible) {
+        // A popover-style confirmation dialog can omit its cancel action.
+        // Declining is a visible choice in the preview flow, not outside-tap only.
+        content.alert("加入书架？", isPresented: $isPresented) {
             Button("加入书架", action: addBook)
             Button("暂不加入", role: .cancel) {}
         } message: {

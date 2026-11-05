@@ -11,6 +11,7 @@ final class AppState: ObservableObject {
     let bookTOCacheStore: BookTOCacheStore
     let chapterDownloadStore: ChapterDownloadStore
     let chapterDownloadCoordinator: ChapterDownloadCoordinator
+    let comicOfflineArchive: ComicOfflineArchive
     let rssArticleStateStore: RSSArticleStateStore
     let rssFeedCacheStore: RSSFeedCacheStore
     let rssArticleContentCacheStore: RSSArticleContentCacheStore
@@ -64,7 +65,8 @@ final class AppState: ObservableObject {
         sourceCookieStore: SourceCookieStore? = nil,
         readingHistoryStore: ReadingHistoryStore? = nil,
         discoverViewModel: DiscoverViewModel? = nil,
-        engine: SourceEngine? = nil
+        engine: SourceEngine? = nil,
+        comicOfflineArchive: ComicOfflineArchive = .shared
     ) {
         self.sourceStore = sourceStore ?? SourceStore()
         let resolvedBookshelfStore = bookshelfStore ?? BookshelfStore()
@@ -74,7 +76,8 @@ final class AppState: ObservableObject {
         self.bookTOCacheStore = bookTOCacheStore ?? BookTOCacheStore()
         let resolvedChapterDownloadStore = chapterDownloadStore ?? ChapterDownloadStore()
         self.chapterDownloadStore = resolvedChapterDownloadStore
-        self.chapterDownloadCoordinator = ChapterDownloadCoordinator(store: resolvedChapterDownloadStore)
+        self.comicOfflineArchive = comicOfflineArchive
+        self.chapterDownloadCoordinator = ChapterDownloadCoordinator(store: resolvedChapterDownloadStore, comicArchive: comicOfflineArchive)
         self.rssArticleStateStore = rssArticleStateStore ?? RSSArticleStateStore()
         self.rssFeedCacheStore = rssFeedCacheStore ?? RSSFeedCacheStore()
         self.rssArticleContentCacheStore = rssArticleContentCacheStore ?? RSSArticleContentCacheStore()
@@ -210,12 +213,7 @@ final class AppState: ObservableObject {
             }
             .store(in: &cancellables)
 
-        chapterContentCacheStore.objectWillChange
-            .sink { [weak self] _ in
-                self?.scheduleStoreNotification()
-            }
-            .store(in: &cancellables)
-
+        // Prefetch and LRU touches are cache-local; the offline list observes its store directly.
         chapterDownloadStore.objectWillChange
             .sink { [weak self] _ in
                 self?.scheduleStoreNotification()

@@ -13,12 +13,7 @@ struct ComicPageZoomView: UIViewRepresentable {
         let view = ComicZoomScrollView(frame: .zero)
         let coordinator = context.coordinator
         view.delegate = coordinator
-        let single = UITapGestureRecognizer(target: coordinator, action: #selector(Coordinator.tapped(_:)))
-        let double = UITapGestureRecognizer(target: coordinator, action: #selector(Coordinator.doubleTapped(_:)))
-        double.numberOfTapsRequired = 2
-        single.require(toFail: double)
-        view.addGestureRecognizer(single)
-        view.addGestureRecognizer(double)
+        coordinator.installGestures(on: view)
         return view
     }
 
@@ -30,7 +25,17 @@ struct ComicPageZoomView: UIViewRepresentable {
 
     final class Coordinator: NSObject, UIScrollViewDelegate {
         var onFitTap: ((CGFloat) -> Void)?
+        var onZoomChanged: ((Bool) -> Void)?
         var reducesMotion = false
+
+        func installGestures(on view: ComicZoomScrollView) {
+            let single = UITapGestureRecognizer(target: self, action: #selector(tapped(_:)))
+            let double = UITapGestureRecognizer(target: self, action: #selector(doubleTapped(_:)))
+            double.numberOfTapsRequired = 2
+            single.require(toFail: double)
+            view.addGestureRecognizer(single)
+            view.addGestureRecognizer(double)
+        }
 
         func viewForZooming(in scrollView: UIScrollView) -> UIView? {
             (scrollView as? ComicZoomScrollView)?.artwork
@@ -38,6 +43,15 @@ struct ComicPageZoomView: UIViewRepresentable {
 
         func scrollViewDidZoom(_ scrollView: UIScrollView) {
             (scrollView as? ComicZoomScrollView)?.recenterArtwork()
+            onZoomChanged?(scrollView.zoomScale > 1.01)
+        }
+
+        func scrollViewWillBeginZooming(_ scrollView: UIScrollView, with view: UIView?) {
+            onZoomChanged?(true)
+        }
+
+        func scrollViewDidEndZooming(_ scrollView: UIScrollView, with view: UIView?, atScale scale: CGFloat) {
+            onZoomChanged?(scale > 1.01)
         }
 
         @objc func tapped(_ gesture: UITapGestureRecognizer) {
@@ -86,6 +100,13 @@ final class ComicZoomScrollView: UIScrollView {
         artwork.image = image
         fittedSize = .zero
         setNeedsLayout()
+    }
+
+    func resetImage() {
+        setZoomScale(1, animated: false)
+        artwork.image = nil
+        fittedSize = .zero
+        panGestureRecognizer.isEnabled = false
     }
 
     override func layoutSubviews() {

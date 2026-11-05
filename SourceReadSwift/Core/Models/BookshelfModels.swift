@@ -20,6 +20,7 @@ struct BookshelfBook: Identifiable, Codable, Hashable, Sendable {
     var currentChapterIndex: Int
     var currentChapterTitle: String?
     var currentParagraphIndex: Int?
+    var comicPosition: ComicReadingPosition?
     var bookmarks: [ReaderBookmark]?
     var lastReadAt: Date?
     var lastOpenedAt: Date?
@@ -34,7 +35,7 @@ struct BookshelfBook: Identifiable, Codable, Hashable, Sendable {
         case id, title, author, coverURL, sourceName, sourceURL, bookURL, intro,
              localContent, localChapters, localNavigationEntries, latestChapterTitle,
              totalChapters, seenTotalChapters, currentChapterIndex, currentChapterTitle,
-             currentParagraphIndex, bookmarks, lastReadAt, lastOpenedAt,
+             currentParagraphIndex, comicPosition, bookmarks, lastReadAt, lastOpenedAt,
              readingSessionCount, totalReadingSeconds, groupName, isPinned, addedAt
     }
 
@@ -57,6 +58,7 @@ struct BookshelfBook: Identifiable, Codable, Hashable, Sendable {
         currentChapterIndex = try c.decodeIfPresent(Int.self, forKey: .currentChapterIndex) ?? 0
         currentChapterTitle = try c.decodeIfPresent(String.self, forKey: .currentChapterTitle)
         currentParagraphIndex = try c.decodeIfPresent(Int.self, forKey: .currentParagraphIndex)
+        comicPosition = try c.decodeIfPresent(ComicReadingPosition.self, forKey: .comicPosition)
         bookmarks = try c.decodeIfPresent([ReaderBookmark].self, forKey: .bookmarks)
         lastReadAt = try c.decodeIfPresent(Date.self, forKey: .lastReadAt)
         lastOpenedAt = try c.decodeIfPresent(Date.self, forKey: .lastOpenedAt)

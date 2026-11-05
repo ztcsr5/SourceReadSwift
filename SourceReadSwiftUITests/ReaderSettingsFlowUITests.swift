@@ -73,6 +73,35 @@ final class ReaderSettingsFlowUITests: XCTestCase {
         XCTAssertFalse(shelfEntry.isHittable)
     }
 
+    func testRepeatedNativeMoreMenuCancellationKeepsTheReaderAndSettingsUsable() {
+        launchReader(mode: "scroll")
+        revealMenu()
+        let more = element("reader.more")
+        for visit in 0..<6 {
+            XCTAssertTrue(more.isHittable, "The native menu must remain reachable on visit \(visit)")
+            more.tap()
+            let details = app.buttons["书籍详情"].firstMatch
+            XCTAssertTrue(details.waitForExistence(timeout: 3))
+            XCTAssertTrue(details.isHittable)
+            if visit == 0 || visit == 5 { capture("reader-more-open-\(visit)") }
+            app.coordinate(withNormalizedOffset: CGVector(dx: 0.08, dy: 0.5)).tap()
+            let dismissed = XCTNSPredicateExpectation(predicate: NSPredicate(format: "exists == false"), object: details)
+            XCTAssertEqual(XCTWaiter.wait(for: [dismissed], timeout: 3), .completed)
+            XCTAssertTrue(element("reader.openSettings").isHittable)
+            XCTAssertFalse(shelfEntry.isHittable)
+        }
+        // An independent prose tap still dismisses the chrome once the menu is gone.
+        app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.42)).tap()
+        let settings = element("reader.openSettings")
+        let chromeHidden = XCTNSPredicateExpectation(predicate: NSPredicate(format: "exists == false"), object: settings)
+        XCTAssertEqual(XCTWaiter.wait(for: [chromeHidden], timeout: 3), .completed)
+        openSettings()
+        element("reader.settings.close").tap()
+        XCTAssertTrue(more.isHittable)
+        element("reader.returnToShelf").tap()
+        XCTAssertTrue(shelfEntry.waitForExistence(timeout: 3))
+    }
+
     func testHeadingAndChromeReturnToSettingsNotTheBookshelf() {
         checkLocalReturn(routes: ["heading", "chrome"], paper: "bamboo")
     }
@@ -138,8 +167,10 @@ final class ReaderSettingsFlowUITests: XCTestCase {
             surface.isHittable && self.app.webViews.staticTexts.firstMatch.exists
                 && !self.element("reader.openingProgress").exists
         }, object: nil)
-        XCTAssertEqual(XCTWaiter.wait(for: [ready], timeout: 10), .completed,
-            "Reveal the menu only after the actual prose is ready to receive a tap")
+        let outcome = XCTWaiter.wait(for: [ready], timeout: 10)
+        if outcome != .completed { capture("reader-settings-prose-startup-failure") }
+        XCTAssertEqual(outcome, .completed,
+            "Actual prose not ready; recovery=\(element("reader.openingRecovery").exists); startup=\(surface.value ?? "unavailable")")
     }
 
     private func revealMenu() {
