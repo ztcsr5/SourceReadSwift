@@ -85,7 +85,7 @@ struct BookshelfReaderGatewayView: View {
                     chapterIndex: 0,
                     totalChapters: 1,
                     initialParagraphIndex: launchCursor.paragraph(in: 0),
-                    onRequestExit: onRequestExit
+                    onRequestExit: requestGatewayExit
                 )
             )
         } else if let selectedChapter {
@@ -157,7 +157,7 @@ struct BookshelfReaderGatewayView: View {
                     onRequestBookDetail: {
                         showBookDetailSheet = true
                     },
-                    onRequestExit: onRequestExit
+                    onRequestExit: requestGatewayExit
                 )
                 .id("remote-reader|\(currentBook.sourceURL)|\(currentBook.bookURL)")
             )
@@ -176,6 +176,13 @@ struct BookshelfReaderGatewayView: View {
 
     private var localNavigationEntries: [LocalTextNavigationEntry] {
         currentBook.localNavigationEntries ?? []
+    }
+
+    private func requestGatewayExit() {
+        // This view owns the shelf route; nested reader panels must never
+        // supply the dismiss environment used to pop that route.
+        if let onRequestExit { onRequestExit() }
+        else { dismiss() }
     }
 
     private func readerRecoveryErrorView(_ message: String) -> some View {
@@ -315,7 +322,7 @@ struct BookshelfReaderGatewayView: View {
                 )
             },
             initialOverlayVisible: showReaderChromeAfterChapterSelection,
-            onRequestExit: onRequestExit
+            onRequestExit: requestGatewayExit
         )
         .id("reader-\(book.id)")
     }
@@ -336,10 +343,13 @@ struct BookshelfReaderGatewayView: View {
 
         // 0. TOC CACHE：上次成功落盘的完整目录。命中就立刻打开目标章，
         //    详情与目录在后台刷新——“点进书要等半天”卡的就是这里。
-        if let cached = appState.bookTOCacheStore.entry(
+        let cachedTOC = await appState.bookTOCacheStore.entryForReader(
             sourceURL: source.bookSourceUrl,
             bookURL: activeBook.bookURL
-        ), !cached.chapters.isEmpty {
+        )
+        guard !Task.isCancelled, selectedChapter == nil,
+              currentBook.sourceURL == activeBook.sourceURL, currentBook.bookURL == activeBook.bookURL else { return }
+        if let cached = cachedTOC, !cached.chapters.isEmpty {
             let targetIndex = launchCursor.chapterIndex
             let target = cached.chapters.first(where: { $0.index == targetIndex })
             if let target {
@@ -347,6 +357,17 @@ struct BookshelfReaderGatewayView: View {
                 if detail == nil { detail = cached.detail }
                 openRestoredChapter(target)
                 refreshBookDetailAndTOC(source: source, book: activeBook)
+                return
+            }
+        }
+
+        if source.sourceKind == .comic {
+            let archived = await appState.comicOfflineArchive.chapters(sourceURL: source.bookSourceUrl, bookURL: activeBook.bookURL)
+            guard !Task.isCancelled, currentBook.id == activeBook.id,
+                  currentBook.sourceURL == activeBook.sourceURL else { return }
+            if let target = archived.first(where: { $0.index == launchCursor.chapterIndex }) {
+                chapters = archived
+                openRestoredChapter(target)
                 return
             }
         }

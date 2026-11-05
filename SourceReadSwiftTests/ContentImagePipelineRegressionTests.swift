@@ -1,7 +1,34 @@
 import XCTest
+import SwiftUI
+import UIKit
 @testable import SourceReadSwift
 
 final class ContentImagePipelineRegressionTests: XCTestCase {
+    @MainActor func testHeaderlessImageUsesItsHotBitmapOnTheFirstRenderedFrame() throws {
+        let address = try XCTUnwrap(URL(string: "https://first-frame.invalid/\(UUID().uuidString).png"))
+        let bitmap = UIGraphicsImageRenderer(size: CGSize(width: 24, height: 24)).image { renderer in
+            UIColor.red.setFill()
+            renderer.fill(CGRect(x: 0, y: 0, width: 24, height: 24))
+        }
+        RemoteImageLoader.shared.insert(bitmap, for: address)
+        func renderPixel(headers: [String: String]) throws -> [UInt8] {
+            let view = CachedRemoteImage(url: address, headers: headers) { Color.blue }
+                .frame(width: 24, height: 24)
+            let rendered = try XCTUnwrap(ImageRenderer(content: view).uiImage?.cgImage)
+            var channels = [UInt8](repeating: 0, count: 4)
+            let context = try XCTUnwrap(CGContext(data: &channels, width: 1, height: 1, bitsPerComponent: 8,
+                bytesPerRow: 4, space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue))
+            context.draw(rendered, in: CGRect(x: 0, y: 0, width: 1, height: 1))
+            return channels
+        }
+        let hot = try renderPixel(headers: [:])
+        XCTAssertGreaterThan(hot[0], 240)
+        XCTAssertLessThan(hot[2], 15, "An ordinary image must not flash its blue placeholder while the bitmap is cached")
+        let contextBound = try renderPixel(headers: ["X-Fixture": "separate-context"])
+        XCTAssertLessThan(contextBound[0], 15, "A header-bound request must not synchronously borrow an unrelated bitmap")
+        XCTAssertGreaterThan(contextBound[2], 240)
+    }
+
     private let chapter = BookChapter(title: "第一话", url: "https://comic.example/chapter/1", bookUrl: "https://comic.example/book/1", index: 0, isVip: false)
 
     func testLazyOriginalWinsRegardlessOfAttributeOrder() {

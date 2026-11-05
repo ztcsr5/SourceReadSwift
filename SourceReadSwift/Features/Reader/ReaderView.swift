@@ -56,6 +56,7 @@ struct ReaderView: View {
     @Environment(\.readerUsesBookReturn) private var readerUsesBookReturn
     @State private var hasResolvedOpeningPreview = false
     @State private var chromeState = ReaderChromeStateMachine()
+    @State private var nativeMoreMenuPresentation = ReaderMenuPresentation()
     @State private var tabChromeOwner = UUID()
     @State private var readerSessionEnded = false
     @State private var showChapterList = false
@@ -3742,6 +3743,7 @@ struct ReaderView: View {
 
                 VStack(alignment: .leading, spacing: 2) {
                     Text(currentDisplayChapterTitle)
+                        .accessibilityIdentifier("reader.currentChapterHeading")
                         .font(.system(size: 16, weight: .semibold))
                         .foregroundStyle(chromeForeground)
                         .lineLimit(1)
@@ -3774,9 +3776,11 @@ struct ReaderView: View {
                 }
 
                 ReaderNativeMenuButton(
-                    menu: readerNativeMenu,
+                    menuIdentity: readerNativeMenuIdentity,
+                    makeMenu: { readerNativeMenu },
                     foregroundColor: background.uiTextColor(isNight: readerIsNight),
-                    backgroundColor: readerUsesTranslucentChrome ? .clear : background.uiColor(isNight: readerIsNight)
+                    backgroundColor: readerUsesTranslucentChrome ? .clear : background.uiColor(isNight: readerIsNight),
+                    presentation: nativeMoreMenuPresentation
                 )
                 .frame(width: 44, height: 44)
             }
@@ -4064,6 +4068,16 @@ struct ReaderView: View {
             "advanced": byteCount { advancedSettings },
             "selection": byteCount { settingsPage(for: 0) }
         ]
+    }
+
+    private var readerNativeMenuIdentity: String {
+        [
+            bookID, String(windowCurrentChapterIndex), windowSourceURL ?? "",
+            currentChapterWebURL?.absoluteString ?? "",
+            String(onRefreshChapter != nil), String(onCacheNextChapters != nil),
+            String(canShowPayAction), String(isPerformingPayAction), String(autoScrollEnabled),
+            String(currentBookSource != nil)
+        ].joined(separator: "\n")
     }
 
     private var readerNativeMenu: UIMenu {
@@ -5661,7 +5675,7 @@ struct ReaderView: View {
     }
 
     private func handleReaderTap(at location: CGPoint) {
-        guard !textSelectionEnabled else { return }
+        guard !textSelectionEnabled, !nativeMoreMenuPresentation.isActive else { return }
         let now = Date()
         guard now >= tapCooldownUntil else { return }
         tapCooldownUntil = now.addingTimeInterval(0.28)
@@ -6291,6 +6305,7 @@ struct ReaderView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .foregroundStyle(readerThemeTextColor)
         .background(readerThemeBackground.ignoresSafeArea())
+        .accessibilityIdentifier("reader.openingRecovery")
     }
 
     private func resolveOpeningPreview() {
@@ -6853,6 +6868,7 @@ struct ReaderPreviewPosition: Equatable {
     let chapterIndex: Int
     let chapterTitle: String
     let paragraphIndex: Int
+    var comicPosition: ComicReadingPosition? = nil
 }
 
 private final class ReaderScrollPositionTracker {
