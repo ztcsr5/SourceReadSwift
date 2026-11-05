@@ -226,8 +226,6 @@ struct PageCurlReaderView<Item: Identifiable, Content: View>: UIViewControllerRe
                 userInterfaceStyle: parent.userInterfaceStyle,
                 onLayout: parent.onPageContainerLayout
             )
-            controller.view.backgroundColor = parent.pageBackgroundColor ?? .clear
-            controller.view.isOpaque = parent.pageBackgroundColor != nil
             controller.overrideUserInterfaceStyle = parent.userInterfaceStyle
             // A rebuilt page (typography or theme change) replaces the cached
             // entry in place; the key stays the same so the LRU order holds.

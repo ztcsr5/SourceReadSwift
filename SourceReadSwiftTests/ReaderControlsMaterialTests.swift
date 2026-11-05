@@ -4,6 +4,26 @@ import UIKit
 @testable import SourceReadSwift
 
 final class ReaderControlsMaterialTests: XCTestCase {
+    @MainActor func testUnchangedReadingProgressDoesNotReplaceTheOpenNativeMenu() {
+        let button = UIButton(type: .system)
+        let coordinator = ReaderNativeMenuButton.Coordinator()
+        var builds = 0
+        func makeMenu() -> UIMenu {
+            builds += 1
+            return UIMenu(children: [UIAction(title: "当前章节 \(builds)") { _ in }])
+        }
+        coordinator.apply(to: button, identity: "chapter-1|idle", makeMenu: makeMenu)
+        let original = button.menu
+        for _ in 0..<50 {
+            coordinator.apply(to: button, identity: "chapter-1|idle", makeMenu: makeMenu)
+        }
+        XCTAssertEqual(builds, 1)
+        XCTAssertTrue(button.menu === original, "Progress-only refreshes must not replace UIKit's presented menu")
+        coordinator.apply(to: button, identity: "chapter-2|idle", makeMenu: makeMenu)
+        XCTAssertEqual(builds, 2)
+        XCTAssertFalse(button.menu === original, "Changing the real chapter must refresh the actions")
+    }
+
     @MainActor func testSurfaceSamplerReadsTheLowerPanelNotTheUpperBackdrop() throws {
         let picture = UIGraphicsImageRenderer(size: CGSize(width: 390, height: 844)).image { renderer in
             UIColor.black.setFill(); renderer.fill(CGRect(x: 0, y: 0, width: 390, height: 844))
