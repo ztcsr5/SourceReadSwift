@@ -41,6 +41,10 @@ final class SourceStore: ObservableObject {
     @Published private(set) var organization = SourceOrganization()
     @Published private(set) var lastError: String?
     private let persistence: SourcePersistence
+    private var lookupRevision: UInt64?
+    private var exactSourceIndex: [String: Int] = [:]
+    private var normalizedSourceIndex: [String: Int] = [:]
+    private var firstSourceByHost: [String: Int] = [:]
 
     nonisolated static let defaultRSSSources: [RSSSource] = [
         RSSSource(
@@ -649,19 +653,30 @@ final class SourceStore: ObservableObject {
     }
 
     func source(for sourceUrl: String) -> BookSource? {
-        if let exact = sources.first(where: { $0.bookSourceUrl == sourceUrl }) {
-            return exact
-        }
+        if lookupRevision != sourcesRevision { rebuildSourceIndex() }
+        if let index = exactSourceIndex[sourceUrl] { return sources[index] }
         let trimmed = sourceUrl.trimmingCharacters(in: CharacterSet(charactersIn: "/ "))
-        if let match = sources.first(where: { $0.bookSourceUrl.trimmingCharacters(in: CharacterSet(charactersIn: "/ ")) == trimmed }) {
-            return match
-        }
-        if let host = URL(string: sourceUrl)?.host?.lowercased(), !host.isEmpty {
-            if let match = sources.first(where: { URL(string: $0.bookSourceUrl)?.host?.lowercased() == host }) {
-                return match
-            }
+        if let index = normalizedSourceIndex[trimmed] { return sources[index] }
+        if let host = URL(string: sourceUrl)?.host?.lowercased(), let index = firstSourceByHost[host] {
+            return sources[index]
         }
         return nil
+    }
+
+    private func rebuildSourceIndex() {
+        exactSourceIndex.removeAll(keepingCapacity: true)
+        normalizedSourceIndex.removeAll(keepingCapacity: true)
+        firstSourceByHost.removeAll(keepingCapacity: true)
+        for (index, source) in sources.enumerated() {
+            let address = source.bookSourceUrl
+            let normalized = address.trimmingCharacters(in: CharacterSet(charactersIn: "/ "))
+            if exactSourceIndex[address] == nil { exactSourceIndex[address] = index }
+            if normalizedSourceIndex[normalized] == nil { normalizedSourceIndex[normalized] = index }
+            if let host = URL(string: address)?.host?.lowercased(), !host.isEmpty, firstSourceByHost[host] == nil {
+                firstSourceByHost[host] = index
+            }
+        }
+        lookupRevision = sourcesRevision
     }
 
     /// Portable export used by the all-data backup. Credentials and cookies

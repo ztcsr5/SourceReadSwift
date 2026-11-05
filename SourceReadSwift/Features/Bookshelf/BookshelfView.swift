@@ -10,6 +10,7 @@ struct BookshelfView: View {
     @State private var importMessage: String?
     @State private var isRefreshingBooks = false
     @State private var isImportingBook = false
+    @State private var bookImportTask: Task<Void, Never>?
     @State private var contextualBookRoute: ContextualBookRoute?
     @State private var bookToRemove: BookshelfBook?
     @State private var shelfReturnOrder: [String] = []
@@ -191,7 +192,8 @@ struct BookshelfView: View {
                         UTType(importedAs: "com.edc21.sourceread.source-json"),
                         UTType(filenameExtension: "txt") ?? .plainText,
                         UTType(filenameExtension: "text") ?? .text,
-                        UTType(filenameExtension: "epub") ?? UTType(importedAs: "org.idpf.epub-container")
+                        UTType(filenameExtension: "epub") ?? UTType(importedAs: "org.idpf.epub-container"),
+                        UTType(filenameExtension: "cbz") ?? .zip
                     ],
                     onPick: { urls in
                         showFileImporter = false
@@ -207,7 +209,7 @@ struct BookshelfView: View {
                 if let route = contextualBookRoute {
                     switch route {
                     case .read(let book, let coverFrame):
-                        BookshelfReaderGatewayView(book: book)
+                        BookshelfReaderGatewayView(book: book, onRequestExit: { contextualBookRoute = nil })
                             .readerOpeningPresentation(for: managedOpeningBook(book), coverFrame: coverFrame, usesDeskHero: true)
                             .bookHeroDestination("continue|" + book.id, in: bookHero)
                             .environment(\.readingCoverHandoff, readingDeskEnabled && floatingReadingDeskEnabled ? readingCoverHandoff : nil)
@@ -237,6 +239,9 @@ struct BookshelfView: View {
                             ProgressView()
                                 .scaleEffect(1.3)
                                 .tint(.white)
+                            Button("取消导入", action: cancelBookImport)
+                                .frame(minHeight: 44)
+                                .accessibilityIdentifier("bookshelf.cancelImport")
                             Text("正在智能分章与构建目录...")
                                 .font(.system(size: 15, weight: .medium))
                                 .foregroundColor(.white)
@@ -566,11 +571,16 @@ struct BookshelfView: View {
 
     private func importLocalBook(_ result: Result<[URL], Error>) {
         guard !isImportingBook else { return }
+        guard bookImportTask == nil else {
+            importMessage = "上一项导入正在取消，请稍后再导入。"
+            return
+        }
         isImportingBook = true
-        Task {
+        bookImportTask = Task { @MainActor in
             defer {
                 Task { @MainActor in
                     isImportingBook = false
+                    bookImportTask = nil
                 }
             }
             do {
@@ -581,22 +591,40 @@ struct BookshelfView: View {
                     }
                     return
                 }
-                let localURL = try PickedDocumentAccess.copiedURL(from: url)
-                let parsed: LocalTextBook = try await Task.detached(priority: .userInitiated) {
+                let parserTask = Task.detached(priority: .userInitiated) {
+                    try Task.checkCancellation()
+                    let localURL = try PickedDocumentAccess.copiedURL(from: url)
+                    try Task.checkCancellation()
                     // Same container sniff as the share-sheet entry: never decide
                     // "this is TXT" from the copied file name alone.
-                    if LocalEPUBBookParser.looksLikeEPUB(localURL) {
+                    if localURL.pathExtension.lowercased() == "cbz" {
+                        return try LocalComicBookParser().parse(fileURL: localURL)
+                    } else if LocalEPUBBookParser.looksLikeEPUB(localURL) {
                         return try LocalEPUBBookParser().parse(fileURL: localURL)
                     } else {
                         let data = try Data(contentsOf: localURL)
                         return LocalTxtSmartDivider().divide(data: data, fileName: localURL.lastPathComponent)
                     }
-                }.value
-
+                }
+                let parsed = try await withTaskCancellationHandler(operation: {
+                    try await parserTask.value
+                }, onCancel: { parserTask.cancel() })
+                if Task.isCancelled {
+                    try await Task.detached(priority: .utility) {
+                        try LocalComicBookParser.removeFiles(for: BookshelfBook(localTextBook: parsed))
+                    }.value
+                    throw CancellationError()
+                }
+                // This task owns MainActor: do not suspend between the final
+                // cancellation check and committing the imported book.
+                appState.bookshelfStore.addLocalTextBook(parsed)
+                HapticFeedback.success()
+                importMessage = parsed.mediaKind == .comic
+                    ? "已导入《\(parsed.title)》，共 \(parsed.paragraphs.count) 页漫画。"
+                    : "已导入《\(parsed.title)》，共 \(parsed.chapters.count) 章、\(parsed.paragraphs.count) 段。"
+            } catch is CancellationError {
                 await MainActor.run {
-                    appState.bookshelfStore.addLocalTextBook(parsed)
-                    HapticFeedback.success()
-                    importMessage = "已导入《\(parsed.title)》，共 \(parsed.chapters.count) 章、\(parsed.paragraphs.count) 段。"
+                    if isImportingBook { importMessage = "已取消导入，未加入书架。" }
                 }
             } catch {
                 await MainActor.run {
@@ -605,6 +633,12 @@ struct BookshelfView: View {
                 }
             }
         }
+    }
+
+    private func cancelBookImport() {
+        bookImportTask?.cancel()
+        isImportingBook = false
+        importMessage = "已取消导入，未加入书架。"
     }
 
     private func refreshBookshelf() async {

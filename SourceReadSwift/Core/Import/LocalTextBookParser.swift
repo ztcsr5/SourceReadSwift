@@ -95,6 +95,7 @@ struct LocalTextBookParser {
 }
 
 struct LocalTextBook: Equatable {
+    let mediaKind: BookSourceKind
     let title: String
     let author: String
     let chapters: [LocalTextChapter]
@@ -113,7 +114,8 @@ struct LocalTextBook: Equatable {
         coverURL: URL? = nil,
         language: String? = nil,
         publisher: String? = nil,
-        navigationEntries: [LocalTextNavigationEntry] = []
+        navigationEntries: [LocalTextNavigationEntry] = [],
+        mediaKind: BookSourceKind = .text
     ) {
         self.title = title
         self.author = author
@@ -122,6 +124,7 @@ struct LocalTextBook: Equatable {
         self.language = language
         self.publisher = publisher
         self.navigationEntries = navigationEntries
+        self.mediaKind = mediaKind
     }
 
     var paragraphs: [String] {
