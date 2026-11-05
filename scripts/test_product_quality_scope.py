@@ -26,12 +26,26 @@ class ProductQualityScopeTests(unittest.TestCase):
     def test_startup_evidence_requires_explicit_regression_mode_and_has_no_prose_or_url(self):
         web = read_source(APP + "Features/Reader/WebScrollReaderView.swift")
         snapshot = web.split("private func recordStartupEvidence(", 1)[1].split("#endif", 1)[0]
-        self.assertIn('ProcessInfo.processInfo.arguments.contains("--floating-desk-regression")', snapshot)
+        fixtures = web.split("private static let recordsStartupEvidence =", 1)[1].split("#endif", 1)[0]
+        self.assertIn('ProcessInfo.processInfo.arguments.contains("--floating-desk-regression")', fixtures)
+        self.assertIn('ProcessInfo.processInfo.arguments.contains("--reader-settings-regression")', fixtures)
+        self.assertIn("guard Self.recordsStartupEvidence else { return }", snapshot)
         for forbidden in ["textContent", "innerHTML", "location.href", "absoluteString", "CADisplayLink", "Timer"]:
             self.assertNotIn(forbidden, snapshot)
         probe = web.split("private func verifyStartupBridge(", 1)[1].split("private func recordStartupEvidence(", 1)[0]
         self.assertIn("guard !hasReportedPosition else { return }", probe)
         self.assertIn("#if DEBUG", probe)
+
+    def test_native_more_menu_consumes_its_dismissal_without_toggling_the_prose_overlay(self):
+        reader = read_source(READER)
+        button = read_source(APP + "Features/Reader/ReaderNativeMenuButton.swift")
+        tap = reader.split("private func handleReaderTap(", 1)[1].split("private func runTapAction", 1)[0]
+        self.assertIn("!nativeMoreMenuPresentation.isActive", tap)
+        self.assertLess(tap.index("nativeMoreMenuPresentation.isActive"), tap.index("tapCooldownUntil"))
+        self.assertIn("presentation: nativeMoreMenuPresentation", reader)
+        self.assertIn("willDisplayMenuFor configuration", button)
+        self.assertIn("willEndFor configuration", button)
+        self.assertIn("animator.addCompletion(finish)", button)
 
     def test_startup_fault_is_installed_before_the_first_navigation(self):
         web = read_source(APP + "Features/Reader/WebScrollReaderView.swift")

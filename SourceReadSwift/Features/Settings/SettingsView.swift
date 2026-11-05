@@ -127,6 +127,7 @@ struct SettingsView: View {
                                 .foregroundStyle(.secondary)
                         }
                     }
+                    .accessibilityIdentifier("settings.clearChapterCache")
 
                     Button {
                         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
@@ -161,10 +162,16 @@ struct SettingsView: View {
                     }
 
                     NavigationLink {
-                        OfflineChapterCacheView()
+                        OfflineChapterCacheView(store: appState.chapterContentCacheStore)
                     } label: {
                         Label("离线章节", systemImage: "arrow.down.circle")
                     }
+                    NavigationLink {
+                        OfflineComicLibraryView()
+                    } label: {
+                        Label("离线漫画", systemImage: "photo.on.rectangle.angled")
+                    }
+                    .accessibilityIdentifier("settings.offlineComics")
                     NavigationLink {
                         AboutReadView()
                     } label: {
@@ -248,13 +255,13 @@ struct SettingsView: View {
             }
             .confirmationDialog("清除离线章节？", isPresented: $confirmsChapterCacheClear, titleVisibility: .visible) {
                 Button("清除章节缓存", role: .destructive) {
-                    appState.chapterDownloadCoordinator.cancelAll()
+                    appState.chapterDownloadCoordinator.cancelChapterCacheDownloads()
                     appState.chapterContentCacheStore.removeAll()
                     updateCacheSummary()
                 }
                 Button("取消", role: .cancel) {}
             } message: {
-                Text("停止当前批量下载并清除已缓存正文。书架、书签和阅读进度不受影响。")
+                Text("停止正文缓存任务并清除已缓存正文。离线漫画、书架、书签和阅读进度不受影响。")
             }
             .alert("数据备份", isPresented: Binding(
                 get: { backupMessage != nil },

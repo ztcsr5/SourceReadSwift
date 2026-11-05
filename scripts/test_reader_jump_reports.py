@@ -167,19 +167,47 @@ window.requestAnimationFrame=function(){return 0;};
                     window.scrollTo = (...args)=>{scrollCommands++;originalScroll(...args);};
                     const ready = {...pending,sig:'ready',loading:false,paragraphs:[
                       {flat:80,local:0,text:'预取完成，只应替换视口下面的占位。'}]};
-                    reader.setContent({revision:'ready',total:81,sections:[first,ready]});
+                    const reused = {key:first.key,sig:first.sig,start:first.start,
+                      titleFlat:first.titleFlat,first:first.first,reuse:true};
+                    const staleAccepted = reader.setContent({revision:'stale',baseRevision:'wrong',
+                      total:81,sections:[reused,ready]});
+                    const missingAccepted = reader.setContent({revision:'missing',baseRevision:'pending',
+                      total:81,sections:[ready,{...reused,key:'missing'}]});
+                    const accepted = reader.setContent({revision:'ready',baseRevision:'pending',
+                      total:81,sections:[reused,ready]});
                     await Promise.resolve();
                     observer.disconnect();
-                    return {removals,scrollCommands,previousY,y:window.scrollY,
-                      sameNode:content.firstElementChild===current,
-                      nextText:content.lastElementChild.textContent};
+                    const prefetchScrollCommands = scrollCommands;
+                    const readyY = window.scrollY;
+                    const nextText = content.lastElementChild.textContent;
+                    const firstParagraph = current.querySelector('.para');
+                    const previous = {...pending,key:'c-1',chapter:-1,sig:'previous',first:true,
+                      start:0,titleFlat:0,loading:false,paragraphs:[{flat:0,local:0,text:'上一章'}]};
+                    const prepended = reader.setContent({revision:'prepend',baseRevision:'ready',
+                      total:83,sections:[previous,{...reused,first:false,start:2,titleFlat:1},
+                        {key:ready.key,sig:ready.sig,first:false,start:82,titleFlat:81,reuse:true}]});
+                    return {staleAccepted,missingAccepted,accepted,removals,prefetchScrollCommands,previousY,y:window.scrollY,
+                      readyY, prepended, nextText, sameNode:content.children[1]===current,
+                      sameParagraph:current.querySelector('.para')===firstParagraph,
+                      firstTag:current.firstElementChild.tagName,
+                      headingFlat:current.firstElementChild.getAttribute('data-flat'),
+                      paragraphFlat:firstParagraph.getAttribute('data-flat')};
                 }""")
+                self.assertIs(outcome.get('staleAccepted'), False, 'Reject an out-of-order patch before changing the DOM')
+                self.assertIs(outcome.get('missingAccepted'), False, 'Reject a missing reuse target atomically')
+                self.assertIs(outcome.get('accepted'), True, 'Reuse the mounted chapter without transferring its text')
                 self.assertEqual(outcome['removals'], [],
                                  'Resolving a prefetched chapter must not detach the visible reading surface')
                 self.assertTrue(outcome['sameNode'])
-                self.assertEqual(outcome['scrollCommands'], 0, 'Do not interrupt native inertia below the viewport')
-                self.assertAlmostEqual(outcome['y'], outcome['previousY'], delta=1)
+                self.assertEqual(outcome['prefetchScrollCommands'], 0, 'Do not interrupt native inertia below the viewport')
+                self.assertAlmostEqual(outcome['readyY'], outcome['previousY'], delta=1)
                 self.assertIn('预取完成', outcome['nextText'])
+                self.assertTrue(outcome['prepended'])
+                self.assertGreater(outcome['y'], outcome['readyY'], 'Inserting above the viewport must preserve its reading anchor')
+                self.assertTrue(outcome['sameParagraph'], 'Inserting the previous chapter must not rebuild the current text')
+                self.assertEqual(outcome['firstTag'], 'H2')
+                self.assertEqual(outcome['headingFlat'], '1')
+                self.assertEqual(outcome['paragraphFlat'], '2')
             finally:
                 browser.close()
 
@@ -214,12 +242,17 @@ window.requestAnimationFrame=function(){return 0;};
                     const wait = ms => new Promise(resolve=>setTimeout(resolve, ms));
                     for (let i=0; i<20; i++) {
                         window.scrollTo(0, i<10 ? (i+1)*130 : (19-i)*130);
+                        // Headless Chrome may coalesce every visual scroll into
+                        // no event when the burst returns to its starting offset.
+                        // Exercise all inputs without depending on compositor frames.
+                        window.dispatchEvent(new Event('scroll'));
                         await wait(12);
                     }
                     await wait(185);
                     return {reads, y:window.scrollY, last:messages.filter(m=>m.type==='visible').at(-1)};
                 }""")
                 self.assertEqual(outcome['y'], 0)
+                self.assertIsNotNone(outcome['last'], outcome)
                 self.assertEqual(outcome['last']['flat'], 0)
                 self.assertEqual(outcome['last']['revision'], 'burst')
                 self.assertLessEqual(outcome['reads'], 6, outcome)
