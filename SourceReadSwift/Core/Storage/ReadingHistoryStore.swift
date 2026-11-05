@@ -16,6 +16,7 @@ struct ReadingHistoryItem: Identifiable, Codable, Hashable, Sendable {
     var lastReadAt: Date
     var totalReadingSeconds: TimeInterval
     var readingSessionCount: Int
+    var mediaKind: BookSourceKind? = nil
 
     var readingProgress: Double {
         guard totalChapters > 0 else { return 0 }
@@ -38,7 +39,8 @@ struct ReadingHistoryItem: Identifiable, Codable, Hashable, Sendable {
             currentParagraphIndex: currentParagraphIndex,
             lastReadAt: lastReadAt,
             readingSessionCount: readingSessionCount,
-            totalReadingSeconds: totalReadingSeconds
+            totalReadingSeconds: totalReadingSeconds,
+            mediaKind: mediaKind
         )
     }
 
@@ -50,7 +52,8 @@ struct ReadingHistoryItem: Identifiable, Codable, Hashable, Sendable {
             bookUrl: bookURL,
             sourceName: sourceName,
             sourceUrl: sourceURL,
-            intro: intro
+            intro: intro,
+            mediaKind: mediaKind
         )
     }
 }
@@ -155,7 +158,8 @@ final class ReadingHistoryStore: ObservableObject {
         paragraphIndex: Int? = nil,
         totalChapters: Int = 0,
         sessionDuration: TimeInterval? = nil,
-        incrementSession: Bool = false
+        incrementSession: Bool = false,
+        mediaKind: BookSourceKind? = nil
     ) {
         let now = Date()
         var nextHistory = history
@@ -168,6 +172,7 @@ final class ReadingHistoryStore: ObservableObject {
             item.sourceURL = sourceURL
             item.bookURL = bookURL
             item.intro = intro ?? item.intro
+            item.mediaKind = mediaKind ?? item.mediaKind
             item.currentChapterIndex = max(chapterIndex, 0)
             item.currentChapterTitle = chapterTitle ?? item.currentChapterTitle
             if let paragraphIndex {
@@ -201,7 +206,8 @@ final class ReadingHistoryStore: ObservableObject {
                 totalChapters: totalChapters,
                 lastReadAt: now,
                 totalReadingSeconds: sessionDuration ?? 0,
-                readingSessionCount: incrementSession ? 1 : 0
+                readingSessionCount: incrementSession ? 1 : 0,
+                mediaKind: mediaKind
             )
             nextHistory.insert(newItem, at: 0)
         }
@@ -227,7 +233,8 @@ final class ReadingHistoryStore: ObservableObject {
             paragraphIndex: book.currentParagraphIndex,
             totalChapters: book.totalChapters,
             sessionDuration: sessionDuration,
-            incrementSession: incrementSession
+            incrementSession: incrementSession,
+            mediaKind: book.mediaKind
         )
     }
 

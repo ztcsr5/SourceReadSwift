@@ -4,6 +4,40 @@ import XCTest
 @MainActor
 final class AudioBookPlaybackCoordinatorTests: XCTestCase {
 
+    override func setUp() async throws {
+        AudioBookPlaybackCoordinator.shared.stop()
+        AudioBookPlaybackCoordinator.shared.setPlaybackRate(1)
+    }
+
+    override func tearDown() async throws {
+        AudioBookPlaybackCoordinator.shared.stop()
+    }
+
+    func testPlayWithoutAnActivePlayerKeepsPlaybackStopped() {
+        let coordinator = AudioBookPlaybackCoordinator.shared
+        coordinator.play()
+        XCTAssertFalse(coordinator.isPlaying)
+    }
+
+    func testStopClearsLoadingAndChapterState() {
+        let coordinator = AudioBookPlaybackCoordinator.shared
+        coordinator.chapters = [BookChapter(title: "旧章节", url: "https://fixture.invalid/1", bookUrl: "book", index: 0)]
+        coordinator.isLoading = true
+        coordinator.errorMessage = "旧加载错误"
+        coordinator.stop()
+        XCTAssertFalse(coordinator.isLoading)
+        XCTAssertTrue(coordinator.chapters.isEmpty)
+        XCTAssertNil(coordinator.currentChapter)
+        XCTAssertNil(coordinator.errorMessage)
+    }
+
+    func testNonfiniteProgressNeverEscapesIntoTheSeekSlider() {
+        let coordinator = AudioBookPlaybackCoordinator.shared
+        coordinator.duration = .infinity
+        coordinator.currentTime = .infinity
+        XCTAssertEqual(coordinator.progress, 0)
+    }
+
     func testInitialState() {
         let coordinator = AudioBookPlaybackCoordinator.shared
         XCTAssertNotNil(coordinator)
