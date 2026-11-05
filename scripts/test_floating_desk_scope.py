@@ -9,6 +9,33 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 class FloatingDeskScopeTests(unittest.TestCase):
+    def test_zoom_suspends_only_the_parent_pager_and_restores_it_on_dismantle(self):
+        source = (ROOT / 'SourceReadSwift/Features/Reader/ComicPageZoomView.swift').read_text(encoding='utf8')
+        begin = source.split("func scrollViewWillBeginZooming(", 1)[1].split("func scrollViewDidEndZooming", 1)[0]
+        self.assertIn("suspendParentPaging(of: scrollView)", begin)
+        self.assertIn("parent.isPagingEnabled", source)
+        self.assertIn("parentWasScrollEnabled", source)
+        teardown = source.split("static func dismantleUIView(", 1)[1].split("final class Coordinator", 1)[0]
+        self.assertIn("coordinator.restoreParentPaging()", teardown)
+
+    def test_continuous_cross_chapter_ui_checks_visible_prose_and_the_real_heading(self):
+        ui = (ROOT / 'SourceReadSwiftUITests/FloatingReadingDeskUITests.swift').read_text(encoding='utf8')
+        self.assertIn("for chapter in [3, 2, 1, 2, 3]", ui)
+        self.assertIn("paragraph.frame.intersection(surface.frame)", ui)
+        self.assertIn('element("reader.currentChapterHeading")', ui)
+        self.assertIn('assertChapterAtViewportTop(3, surface: surface)', ui)
+        workflow = (ROOT / '.github/workflows/ios.yml').read_text(encoding='utf8')
+        self.assertIn("-only-testing:SourceReadSwiftUITests/FloatingReadingDeskUITests/testContinuousChapterCrossingKeepsProseHeadingAndReopenedPositionTogether", workflow)
+
+    def test_comic_horizontal_ui_checks_both_directions_and_decoded_pages_at_boundaries(self):
+        ui = (ROOT / 'SourceReadSwiftUITests/ComicPagingBoundaryUITests.swift').read_text(encoding='utf8')
+        for required in ["checkTapBoundaries(rtl: false)", "checkTapBoundaries(rtl: true)",
+                         "assertComicPage(chapter: 1, page: 6, app: app)",
+                         "assertComicPage(chapter: 2, page: 6, app: app)",
+                         'pager.images.matching(NSPredicate(format: "label == %@", "漫画图片"))']:
+            self.assertIn(required, ui)
+        self.assertNotIn("sleep(", ui)
+
     def test_experimental_branch_never_packages_an_ipa(self):
         workflow = (ROOT / '.github/workflows/unsigned-ipa.yml').read_text(encoding='utf8')
         self.assertIn("if: github.ref != 'refs/heads/codex/floating-reading-desk'", workflow)

@@ -34,6 +34,9 @@ struct ContentParser {
                 paragraphs: ["[img]\(response.url.absoluteString)[/img]"], nextContentUrl: nil))
         }
         let body = ResponseFormatDetector.normalizedBody(response.body)
+        if source.sourceKind == .comic, Self.isStreamingPlaylist(body, mime: mime, url: response.url) {
+            return .failure(.unsupported("书源返回的是串流播放列表，不是漫画图片。请换用漫画书源。"))
+        }
         let normalizedResponse = SourceResponse(
             url: response.url,
             statusCode: response.statusCode,
@@ -85,6 +88,16 @@ struct ContentParser {
     ]
 
     private static let comicContainers = "#chapter-images, .chapter-images, #comic-images, .comic-images, .manga-pages, .comic-pages"
+
+    private static func isStreamingPlaylist(_ body: String, mime: String, url: URL) -> Bool {
+        // RFC 8216 §§4 and 4.3.1.1: identify by MIME or path, then confirm the
+        // first line so a mislabeled HTML/JSON response still reaches its rules.
+        guard body.hasPrefix("#EXTM3U\n") || body.hasPrefix("#EXTM3U\r\n") else { return false }
+        let mediaType = mime.split(separator: ";", maxSplits: 1).first?.trimmingCharacters(in: .whitespaces)
+        let pathExtension = url.pathExtension.lowercased()
+        return mediaType == "application/vnd.apple.mpegurl" || mediaType == "audio/mpegurl"
+            || pathExtension == "m3u8" || pathExtension == "m3u"
+    }
 
     /// Fallback only inside an unambiguous comic page container, never whole-page images.
     private func extractComicFallback(from response: SourceResponse) -> [String] {

@@ -99,6 +99,22 @@ final class Release116VisualTests: XCTestCase {
         }
     }
 
+    @MainActor func testReaderWorkbenchRemainsReadableOnNarrowAndLargeTextScreens() async throws {
+        for width: CGFloat in [320, 390] {
+            for background in [ReaderBackground.white, .dark] {
+                try await snapshot("workbench-\(Int(width))-\(background.rawValue)-large-text", width: width,
+                                   height: 844, style: background.isDark ? .dark : .light) {
+                    ReaderSettingsWorkbench(context: .init(bookTitle: "长篇阅读与漫画设置", background: background,
+                        bottomInset: 34), preview: { AnyView(Text("第一章 · 阅读预览")) },
+                        page: { route in AnyView(Text(route.title)) }, actions: .init(close: {}))
+                        .environment(\.dynamicTypeSize, .accessibility3)
+                        .environment(\.accessibilityReduceMotion, true)
+                        .background(background.color(isNight: background.isDark))
+                }
+            }
+        }
+    }
+
     @MainActor private func snapshot<V: View>(_ name: String, width: CGFloat, height: CGFloat, style: UIUserInterfaceStyle = .light, @ViewBuilder content: () -> V) async throws {
         let scene = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.first
         let window = scene.map { UIWindow(windowScene: $0) } ?? UIWindow(frame: UIScreen.main.bounds)

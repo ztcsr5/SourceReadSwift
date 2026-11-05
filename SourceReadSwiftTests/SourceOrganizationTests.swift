@@ -2,6 +2,31 @@ import XCTest
 @testable import SourceReadSwift
 
 final class SourceOrganizationTests: XCTestCase {
+    @MainActor func testSourceLookupKeepsExactNormalizedAndFirstHostMatchesAfterMutationAndReload() throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let persistence = SourcePersistence(rootURL: root)
+        let store = SourceStore(persistence: persistence)
+        let first = BookSource(bookSourceName: "first", bookSourceUrl: "https://lookup.example/first")
+        let second = BookSource(bookSourceName: "second", bookSourceUrl: "https://lookup.example/second/")
+        let unrelated = BookSource(bookSourceName: "other", bookSourceUrl: "https://elsewhere.example/book")
+        XCTAssertTrue(store.restore(.init(sources: [first, second, unrelated], rssSources: [], catalogs: [])))
+        for _ in 0..<20 {
+            XCTAssertEqual(store.source(for: second.bookSourceUrl)?.bookSourceName, "second")
+            XCTAssertEqual(store.source(for: " /https://lookup.example/second/ " )?.bookSourceName, "second")
+            XCTAssertEqual(store.source(for: "http://LOOKUP.EXAMPLE/new")?.bookSourceName, "first")
+            XCTAssertNil(store.source(for: "not a URL"))
+        }
+        store.remove(first)
+        XCTAssertEqual(store.source(for: "https://lookup.example/new")?.bookSourceName, "second")
+        try store.importSources([BookSource(bookSourceName: "updated", bookSourceUrl: second.bookSourceUrl)])
+        XCTAssertEqual(store.source(for: second.bookSourceUrl)?.bookSourceName, "updated")
+        let reloaded = SourceStore(persistence: persistence)
+        XCTAssertEqual(reloaded.source(for: "https://lookup.example/second")?.bookSourceName, "updated")
+        XCTAssertTrue(reloaded.restore(.init(sources: [], rssSources: [], catalogs: [])))
+        XCTAssertNil(reloaded.source(for: second.bookSourceUrl))
+    }
+
     private func source(_ id: String, group: String? = nil, enabled: Bool = true, weight: Int = 0) -> BookSource {
         BookSource(bookSourceName: id, bookSourceUrl: "https://\(id).test", bookSourceGroup: group,
                    enabled: enabled, weight: weight)
