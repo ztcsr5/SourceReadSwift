@@ -161,9 +161,14 @@ struct SettingsView: View {
                     }
 
                     NavigationLink {
-                        OfflineChapterCacheView()
+                        OfflineChapterCacheView(store: appState.chapterContentCacheStore)
                     } label: {
                         Label("离线章节", systemImage: "arrow.down.circle")
+                    }
+                    NavigationLink {
+                        OfflineComicLibraryView()
+                    } label: {
+                        Label("离线漫画", systemImage: "photo.on.rectangle.angled")
                     }
                     NavigationLink {
                         AboutReadView()

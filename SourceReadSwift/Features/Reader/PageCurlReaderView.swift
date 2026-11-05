@@ -207,8 +207,15 @@ struct PageCurlReaderView<Item: Identifiable, Content: View>: UIViewControllerRe
         /// swipe. Thirty-two entries cover fast flicks in both directions and
         /// keep a page that was just left alive when the reader swipes back.
         func viewController(at index: Int) -> UIViewController {
+            guard let controller = reservePageController(at: index) else { return UIViewController() }
+            controller.mountReaderPage()
+            return controller
+        }
+
+        /// Reserve identity without touching UIHostingController.view.
+        func reservePageController(at index: Int) -> PageHostingController<Content>? {
             guard parent.pages.indices.contains(index) else {
-                return UIViewController()
+                return nil
             }
             let item = parent.pages[index]
             let key = parent.pageKey(item)
@@ -226,8 +233,6 @@ struct PageCurlReaderView<Item: Identifiable, Content: View>: UIViewControllerRe
                 userInterfaceStyle: parent.userInterfaceStyle,
                 onLayout: parent.onPageContainerLayout
             )
-            controller.view.backgroundColor = parent.pageBackgroundColor ?? .clear
-            controller.view.isOpaque = parent.pageBackgroundColor != nil
             controller.overrideUserInterfaceStyle = parent.userInterfaceStyle
             // A rebuilt page (typography or theme change) replaces the cached
             // entry in place; the key stays the same so the LRU order holds.
@@ -297,8 +302,7 @@ struct PageCurlReaderView<Item: Identifiable, Content: View>: UIViewControllerRe
                           !self.isUserInteracting,
                           self.cachedRevision == self.parent.contentRevision else { return }
                     guard self.parent.pages.indices.contains(candidate) else { return }
-                    let controller = self.viewController(at: candidate)
-                    guard let host = controller as? PageHostingController<Content> else { return }
+                    guard let host = self.reservePageController(at: candidate) else { return }
                     // Stage the work by distance. Laying out every neighbour
                     // made UIPageViewController wait for six pages while the
                     // finger was already moving - the stall at the start of
@@ -307,16 +311,13 @@ struct PageCurlReaderView<Item: Identifiable, Content: View>: UIViewControllerRe
                     //   ±3/±4 build the hosting view only
                     //   ±5/±6 reserve the controller; the body stays lazy
                     guard offset <= 7 else { return }
-                    // `viewController(at:)` is typed as UIViewController so
-                    // UIPageViewController can consume it directly; the
-                    // layout-report flag only exists on the hosting subclass.
                     host.suppressesLayoutReport = true
-                    controller.loadViewIfNeeded()
+                    host.mountReaderPage()
                     if offset <= 3 {
                         let size = self.parent.prewarmSize
                         if size.width > 1, size.height > 1 {
-                            controller.view.frame = CGRect(origin: .zero, size: size)
-                            controller.view.layoutIfNeeded()
+                            host.view.frame = CGRect(origin: .zero, size: size)
+                            host.view.layoutIfNeeded()
                         }
                     }
                     host.suppressesLayoutReport = false
@@ -554,7 +555,7 @@ struct PageCurlReaderView<Item: Identifiable, Content: View>: UIViewControllerRe
     }
 }
 
-private final class PageHostingController<Content: View>: UIHostingController<Content> {
+final class PageHostingController<Content: View>: UIHostingController<Content> {
     let pageIndex: Int
     let pageKey: String
     let contentRevision: String
@@ -598,6 +599,14 @@ private final class PageHostingController<Content: View>: UIHostingController<Co
         view.insetsLayoutMarginsFromSafeArea = false
         view.layoutMargins = .zero
         additionalSafeAreaInsets = .zero
+    }
+
+    /// SwiftUI may replace the default opaque background during the initial view load.
+    func mountReaderPage() {
+        loadViewIfNeeded()
+        let paper = pageBackgroundColor ?? .clear
+        if view.backgroundColor != paper { view.backgroundColor = paper }
+        if view.isOpaque != (pageBackgroundColor != nil) { view.isOpaque = pageBackgroundColor != nil }
     }
 
     override func viewDidLayoutSubviews() {

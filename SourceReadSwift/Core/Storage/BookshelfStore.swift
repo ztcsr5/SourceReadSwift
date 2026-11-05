@@ -157,6 +157,7 @@ final class BookshelfStore: ObservableObject {
         books[index].currentChapterIndex = 0
         books[index].currentChapterTitle = nil
         books[index].currentParagraphIndex = nil
+        books[index].comicPosition = nil
         books[index].bookmarks = nil
         books[index].lastReadAt = Date()
         moveToFront(index: index)
@@ -174,13 +175,15 @@ final class BookshelfStore: ObservableObject {
         chapterIndex: Int,
         chapterTitle: String?,
         totalChapters: Int,
-        paragraphIndex: Int? = nil
+        paragraphIndex: Int? = nil,
+        comicPosition: ComicReadingPosition? = nil
     ) {
         guard let index = books.firstIndex(where: { $0.id == bookID }) else { return }
         var updated = books[index]
         updated.currentChapterIndex = max(0, chapterIndex)
         updated.currentChapterTitle = chapterTitle
         updated.currentParagraphIndex = paragraphIndex.map { max(0, $0) }
+        updated.comicPosition = comicPosition
         updated.totalChapters = max(totalChapters, updated.totalChapters)
         updated.seenTotalChapters = max(
             updated.seenTotalChapters ?? 0,

@@ -73,6 +73,30 @@ final class ReaderSettingsFlowUITests: XCTestCase {
         XCTAssertFalse(shelfEntry.isHittable)
     }
 
+    func testRepeatedNativeMoreMenuCancellationKeepsTheReaderAndSettingsUsable() {
+        launchReader(mode: "scroll")
+        revealMenu()
+        let more = element("reader.more")
+        for visit in 0..<6 {
+            XCTAssertTrue(more.isHittable, "The native menu must remain reachable on visit \(visit)")
+            more.tap()
+            let details = app.buttons["书籍详情"].firstMatch
+            XCTAssertTrue(details.waitForExistence(timeout: 3))
+            XCTAssertTrue(details.isHittable)
+            if visit == 0 || visit == 5 { capture("reader-more-open-\(visit)") }
+            app.coordinate(withNormalizedOffset: CGVector(dx: 0.08, dy: 0.5)).tap()
+            let dismissed = XCTNSPredicateExpectation(predicate: NSPredicate(format: "exists == false"), object: details)
+            XCTAssertEqual(XCTWaiter.wait(for: [dismissed], timeout: 3), .completed)
+            XCTAssertTrue(element("reader.openSettings").isHittable)
+            XCTAssertFalse(shelfEntry.isHittable)
+        }
+        openSettings()
+        element("reader.settings.close").tap()
+        XCTAssertTrue(more.isHittable)
+        element("reader.returnToShelf").tap()
+        XCTAssertTrue(shelfEntry.waitForExistence(timeout: 3))
+    }
+
     func testHeadingAndChromeReturnToSettingsNotTheBookshelf() {
         checkLocalReturn(routes: ["heading", "chrome"], paper: "bamboo")
     }
