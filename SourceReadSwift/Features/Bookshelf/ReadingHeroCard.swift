@@ -56,7 +56,7 @@ struct ReadingHeroCard: View {
             .strokeBorder(AppTheme.accent.opacity(0.14), lineWidth: 0.8).allowsHitTesting(false) }
         .contentShape(RoundedRectangle(cornerRadius: AppTheme.cardRadius, style: .continuous))
         .accessibilityElement(children: .combine)
-        .accessibilityHint("轻点继续阅读，使用更多操作管理")
+        .accessibilityHint("轻点继续阅读，长按管理书籍")
     }
 
     private var description: some View {
@@ -70,7 +70,7 @@ struct ReadingHeroCard: View {
             Text(ReadingHeroStatus.chapter(for: book)).font(.caption).foregroundStyle(.secondary)
                 .lineLimit(dynamicTypeSize.isAccessibilitySize ? nil : 2)
             if book.hasUpdates { Label("目录有更新", systemImage: "text.badge.plus").font(.caption) }
-        }.padding(.trailing, 28).fixedSize(horizontal: false, vertical: true).frame(maxWidth: .infinity, alignment: .leading)
+        }.fixedSize(horizontal: false, vertical: true).frame(maxWidth: .infinity, alignment: .leading)
             .id(book.id)
             .transition(motion.reducesMotion ? .identity : .opacity.combined(with: .offset(y: 6)))
             .animation(motion.arrivalAnimation(stage: 1), value: book.id)

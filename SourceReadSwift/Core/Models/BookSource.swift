@@ -100,6 +100,27 @@ struct BookSource: Identifiable, Codable, Hashable, Sendable {
     let bookSourceGroup: String?
     let bookSourceType: Int
     var sourceKind: BookSourceKind { BookSourceKind(rawValue: bookSourceType) ?? .text }
+    /// A declared book.type write can produce another medium; results must still confirm the actual kind.
+    var hasDynamicMediaType: Bool {
+        let fragments = [searchUrl, raw["jsLib"]].compactMap { $0 }
+            + [ruleSearch, ruleExplore, ruleBookInfo].compactMap { $0 }.flatMap { $0.fields.values }
+        return fragments.contains { $0.range(of: #"\bbook\s*\.\s*type\s*=(?!=)|\bbook\s*\.\s*setType\s*\("#, options: .regularExpression) != nil }
+    }
+
+    func canSearch(mediaKind: BookSourceKind) -> Bool {
+        sourceKind == mediaKind || hasDynamicMediaType
+    }
+
+    /// Uses a book's declared media without changing the stored aggregate-source definition.
+    func resolvingMediaKind(_ kind: BookSourceKind?) -> BookSource {
+        guard let kind, kind != sourceKind else { return self }
+        return BookSource(bookSourceName: bookSourceName, bookSourceUrl: bookSourceUrl,
+            bookSourceGroup: bookSourceGroup, bookSourceType: kind.rawValue, enabled: enabled,
+            weight: weight, searchUrl: searchUrl, exploreUrl: exploreUrl, ruleSearch: ruleSearch,
+            ruleBookInfo: ruleBookInfo, ruleToc: ruleToc, ruleContent: ruleContent, ruleExplore: ruleExplore,
+            header: header, loginUrl: loginUrl, loginCheckJs: loginCheckJs, loginUi: loginUi,
+            customConfig: customConfig, raw: raw)
+    }
     let enabled: Bool
     let weight: Int
     let searchUrl: String?
