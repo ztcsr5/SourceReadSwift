@@ -18,6 +18,8 @@ struct SettingsView: View {
     @State private var showBackupExporter = false
     @State private var showBackupImporter = false
     @State private var backupMessage: String?
+    @State private var pendingBackup: AppDataBackupSnapshot?
+    @State private var confirmsBackupRestore = false
     @State private var confirmsChapterCacheClear = false
 
     var body: some View {
@@ -127,6 +129,7 @@ struct SettingsView: View {
                                 .foregroundStyle(.secondary)
                         }
                     }
+                    .accessibilityIdentifier("settings.clearChapterCache")
 
                     Button {
                         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
@@ -143,7 +146,7 @@ struct SettingsView: View {
                     }
 
                     NavigationLink {
-                        ReadingHistoryView()
+                        ReadingHistoryView(store: appState.readingHistoryStore)
                     } label: {
                         Label("阅读历史", systemImage: "clock")
                     }
@@ -161,10 +164,16 @@ struct SettingsView: View {
                     }
 
                     NavigationLink {
-                        OfflineChapterCacheView()
+                        OfflineChapterCacheView(store: appState.chapterContentCacheStore)
                     } label: {
                         Label("离线章节", systemImage: "arrow.down.circle")
                     }
+                    NavigationLink {
+                        OfflineComicLibraryView()
+                    } label: {
+                        Label("离线漫画", systemImage: "photo.on.rectangle.angled")
+                    }
+                    .accessibilityIdentifier("settings.offlineComics")
                     NavigationLink {
                         AboutReadView()
                     } label: {
@@ -173,7 +182,7 @@ struct SettingsView: View {
                 }
                 .listRowBackground(AppThemeRowSurface())
 
-                Section("数据") {
+                Section {
                     NavigationLink {
                         WebDAVSyncView()
                             .environmentObject(appState)
@@ -185,14 +194,18 @@ struct SettingsView: View {
                         backupDocument = AppDataBackupDocument(snapshot: appState.makeAppDataBackupSnapshot())
                         showBackupExporter = true
                     } label: {
-                        Label("导出完整数据", systemImage: "externaldrive.badge.icloud")
+                        Label("导出书架与设置", systemImage: "externaldrive.badge.icloud")
                     }
 
                     Button {
                         showBackupImporter = true
                     } label: {
-                        Label("恢复完整数据", systemImage: "arrow.clockwise.icloud")
+                        Label("恢复书架与设置", systemImage: "arrow.clockwise.icloud")
                     }
+                } header: {
+                    Text("数据")
+                } footer: {
+                    Text("包含书架、文本正文、书源、书签与阅读设置；本地漫画图片、自定义字体、壁纸和离线下载文件需另行保留。")
                 }
                 .listRowBackground(AppThemeRowSurface())
 
@@ -234,7 +247,7 @@ struct SettingsView: View {
             ) { result in
                 switch result {
                 case .success:
-                    backupMessage = "完整数据已导出"
+                    backupMessage = "书架与设置已导出；本地媒体文件未包含在此 JSON 中。"
                 case .failure(let error):
                     backupMessage = "导出失败：\(error.localizedDescription)"
                 }
@@ -246,15 +259,25 @@ struct SettingsView: View {
             ) { result in
                 importBackup(result)
             }
+            .alert("替换当前书架与设置？", isPresented: $confirmsBackupRestore) {
+                Button("取消", role: .cancel) { pendingBackup = nil }
+                Button("替换书架与设置", role: .destructive) {
+                    guard let snapshot = pendingBackup else { return }
+                    pendingBackup = nil
+                    restoreBackup(snapshot)
+                }
+            } message: {
+                Text("备份将替换现有书架、书源、净化规则和阅读设置。建议先导出当前数据。")
+            }
             .confirmationDialog("清除离线章节？", isPresented: $confirmsChapterCacheClear, titleVisibility: .visible) {
                 Button("清除章节缓存", role: .destructive) {
-                    appState.chapterDownloadCoordinator.cancelAll()
+                    appState.chapterDownloadCoordinator.cancelChapterCacheDownloads()
                     appState.chapterContentCacheStore.removeAll()
                     updateCacheSummary()
                 }
                 Button("取消", role: .cancel) {}
             } message: {
-                Text("停止当前批量下载并清除已缓存正文。书架、书签和阅读进度不受影响。")
+                Text("停止正文缓存任务并清除已缓存正文。离线漫画、书架、书签和阅读进度不受影响。")
             }
             .alert("数据备份", isPresented: Binding(
                 get: { backupMessage != nil },
@@ -311,18 +334,16 @@ struct SettingsView: View {
                 fallbackPurifyRules: appState.purifyRuleStore.backupSnapshot(),
                 fallbackRSSState: appState.rssArticleStateStore.backupSnapshot()
             )
-            // Capture the complete current state before the first mutation so
-            // any later store failure can restore all stores and preferences.
-            let previousSnapshot = appDataBackupSnapshot()
-            try AppDataBackupRestorer.restore(
-                snapshot,
-                previous: previousSnapshot,
-                restoreBookshelf: { appState.bookshelfStore.restore($0) },
-                restoreSources: { appState.sourceStore.restore($0) },
-                restorePurifyRules: { appState.purifyRuleStore.restore($0) },
-                restoreRSSState: { appState.rssArticleStateStore.restore($0) },
-                restorePreferences: { restoreReaderPreferences($0) }
-            )
+            pendingBackup = snapshot
+            confirmsBackupRestore = true
+        } catch {
+            backupMessage = "读取备份失败：\(error.localizedDescription)"
+        }
+    }
+
+    private func restoreBackup(_ snapshot: AppDataBackupSnapshot) {
+        do {
+            try appState.restoreAppDataBackup(snapshot)
             updateCacheSummary()
             updateRSSCacheSummary()
             backupMessage = "已恢复 \(snapshot.bookshelf.books.count) 本书、\(snapshot.sources.sources.count) 个书源和 \(snapshot.purifyRules.count) 条规则"
@@ -336,57 +357,6 @@ struct SettingsView: View {
         cacheSize = chapters == 0
             ? "无缓存"
             : "\(chapters) 章 / \(byteCountText(appState.chapterContentCacheStore.estimatedByteCount))"
-    }
-
-    private func appDataBackupSnapshot() -> AppDataBackupSnapshot {
-        let keys = [
-            "reader.fontSize", "reader.lineSpacing", "reader.pagePadding", "reader.letterSpacing",
-            "reader.paragraphSpacing", "reader.paragraphIndent", "reader.titleSpacing", "reader.footerHeight",
-            "reader.ttsRate", "reader.autoScrollDelay", "reader.sleepTimerMinutes", "reader.background",
-            "reader.mode", "reader.tapZones", "reader.keepScreenAwake", "reader.preloadChapterCount",
-            "reader.textSelectionEnabled", "settings.themeMode"
-        ]
-        let defaults = UserDefaults.standard
-        let doubleKeys: Set<String> = [
-            "reader.fontSize", "reader.lineSpacing", "reader.pagePadding", "reader.letterSpacing",
-            "reader.paragraphSpacing", "reader.paragraphIndent", "reader.titleSpacing", "reader.footerHeight",
-            "reader.ttsRate", "reader.autoScrollDelay"
-        ]
-        let integerKeys: Set<String> = ["reader.sleepTimerMinutes", "reader.preloadChapterCount"]
-        let boolKeys: Set<String> = ["reader.keepScreenAwake", "reader.textSelectionEnabled"]
-        let preferences = Dictionary(uniqueKeysWithValues: keys.compactMap { key -> (String, BackupPreferenceValue)? in
-            guard let value = defaults.object(forKey: key) else { return nil }
-            if doubleKeys.contains(key) {
-                return (key, .double((value as? NSNumber)?.doubleValue ?? (value as? Double) ?? 0))
-            }
-            if integerKeys.contains(key) {
-                return (key, .integer((value as? NSNumber)?.intValue ?? (value as? Int) ?? 0))
-            }
-            if boolKeys.contains(key) {
-                return (key, .bool((value as? NSNumber)?.boolValue ?? (value as? Bool) ?? false))
-            }
-            if let string = value as? String { return (key, .string(string)) }
-            return nil
-        })
-        return AppDataBackupSnapshot(
-            bookshelf: appState.bookshelfStore.backupSnapshot(),
-            sources: appState.sourceStore.backupSnapshot(),
-            purifyRules: appState.purifyRuleStore.backupSnapshot(),
-            rssState: appState.rssArticleStateStore.backupSnapshot(),
-            readerPreferences: preferences
-        )
-    }
-
-    private func restoreReaderPreferences(_ preferences: [String: BackupPreferenceValue]) {
-        let defaults = UserDefaults.standard
-        for (key, value) in preferences {
-            switch value {
-            case .string(let value): defaults.set(value, forKey: key)
-            case .double(let value): defaults.set(value, forKey: key)
-            case .integer(let value): defaults.set(value, forKey: key)
-            case .bool(let value): defaults.set(value, forKey: key)
-            }
-        }
     }
 
     private func updateRSSCacheSummary() {
@@ -437,10 +407,11 @@ enum ThemeMode: String, CaseIterable, Identifiable {
 
 struct ReadingHistoryView: View {
     @EnvironmentObject private var appState: AppState
+    @ObservedObject var store: ReadingHistoryStore
     @State private var confirmClearAll = false
 
     private var history: [ReadingHistoryItem] {
-        appState.readingHistoryStore.history
+        store.history
     }
 
     var body: some View {
@@ -495,7 +466,7 @@ struct ReadingHistoryView: View {
                     }
                     .swipeActions(edge: .trailing) {
                         Button("删除记录", role: .destructive) {
-                            appState.readingHistoryStore.remove(id: item.id)
+                            store.remove(id: item.id)
                         }
                     }
                     .swipeActions(edge: .leading) {
@@ -524,7 +495,7 @@ struct ReadingHistoryView: View {
         }
         .confirmationDialog("确定清空全部阅读历史？", isPresented: $confirmClearAll, titleVisibility: .visible) {
             Button("清空全部历史", role: .destructive) {
-                appState.readingHistoryStore.removeAll()
+                store.removeAll()
             }
             Button("取消", role: .cancel) {}
         }

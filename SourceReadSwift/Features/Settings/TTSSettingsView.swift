@@ -19,6 +19,8 @@ struct TTSSettingsView: View {
     @State private var isTesting = false
     @State private var isTestingHTTP = false
     @State private var previewPlayer: CloudTTSPlayer?
+    @State private var previewTask: Task<Void, Never>?
+    @State private var previewID = UUID()
     @State private var showVoiceImporter = false
     @State private var importedVoiceNames: [String] = []
     @State private var voiceStatusMessage: String?
@@ -70,7 +72,7 @@ struct TTSSettingsView: View {
                             }
                         }
                     }
-                    .disabled(isTestingHTTP)
+                    .disabled(isTesting || isTestingHTTP)
                 } header: {
                     Text("在线 HTTP 语音")
                 } footer: {
@@ -195,7 +197,7 @@ struct TTSSettingsView: View {
                         }
                     }
                 }
-                .disabled(isTesting || !draftCredentials.isConfigured)
+                .disabled(isTesting || isTestingHTTP || !draftCredentials.isConfigured)
 
                 Button(role: .destructive) {
                     self.clearCredentials()
@@ -210,6 +212,12 @@ struct TTSSettingsView: View {
                     Text(statusMessage)
                         .font(.footnote)
                         .foregroundStyle(.secondary)
+                    if isTesting || isTestingHTTP {
+                        Button("取消试听") {
+                            stopPreview()
+                            self.statusMessage = "已取消试听"
+                        }
+                    }
                     if let voiceStatusMessage {
                         Text(voiceStatusMessage)
                             .font(.footnote)
@@ -255,6 +263,11 @@ struct TTSSettingsView: View {
                let first = HttpTTSVoice.defaultVoices.first {
                 httpVoiceID = first.id
             }
+        }
+        .onDisappear { stopPreview() }
+        .onChange(of: engineRawValue) { _ in
+            stopPreview()
+            statusMessage = nil
         }
     }
 
@@ -325,38 +338,8 @@ struct TTSSettingsView: View {
             statusMessage = "请先填写 App ID、API Key、API Secret"
             return
         }
-        isTesting = true
-        statusMessage = "正在请求讯飞合成…"
-        Task {
-            do {
-                let audio = try await self.client.synthesize(text: "纸间阅读，云端语音测试。", credentials: credentials)
-                await MainActor.run {
-                    let player = CloudTTSPlayer()
-                    player.onFinish = {
-                        Task { @MainActor in
-                            self.statusMessage = "合成成功：\(audio.count) 字节，播放完成"
-                        }
-                    }
-                    player.onError = { error in
-                        Task { @MainActor in
-                            self.statusMessage = "播放失败：\(error.localizedDescription)"
-                        }
-                    }
-                    self.previewPlayer = player
-                    do {
-                        try player.play(data: audio)
-                        self.statusMessage = "合成成功：\(audio.count) 字节，正在播放"
-                    } catch {
-                        self.statusMessage = "播放失败：\(error.localizedDescription)"
-                    }
-                    self.isTesting = false
-                }
-            } catch {
-                await MainActor.run {
-                    self.statusMessage = "合成失败：\(error.localizedDescription)"
-                    self.isTesting = false
-                }
-            }
+        beginPreview(isHTTP: false) {
+            try await client.synthesize(text: "纸间阅读，云端语音测试。", credentials: credentials)
         }
     }
 
@@ -370,42 +353,62 @@ struct TTSSettingsView: View {
             statusMessage = "没有可用的 HTTP 语音预设"
             return
         }
-        isTestingHTTP = true
-        statusMessage = "正在请求 HTTP 语音…"
-        Task {
+        beginPreview(isHTTP: true) {
+            try await httpClient.synthesize(voice: voice, text: "纸间阅读，在线语音测试。", speed: 5)
+        }
+    }
+
+    private func stopPreview() {
+        previewID = UUID()
+        previewTask?.cancel()
+        previewTask = nil
+        previewPlayer?.onFinish = nil
+        previewPlayer?.onError = nil
+        previewPlayer?.stop()
+        previewPlayer = nil
+        isTesting = false
+        isTestingHTTP = false
+    }
+
+    private func beginPreview(isHTTP: Bool, synthesize: @escaping () async throws -> Data) {
+        stopPreview()
+        let requestID = UUID()
+        previewID = requestID
+        let channel = isHTTP ? "HTTP 语音" : "讯飞语音"
+        isTesting = !isHTTP
+        isTestingHTTP = isHTTP
+        statusMessage = "正在请求\(channel)…"
+        previewTask = Task { @MainActor in
             do {
-                let audio = try await self.httpClient.synthesize(
-                    voice: voice,
-                    text: "纸间阅读，在线语音测试。",
-                    speed: 5
-                )
-                await MainActor.run {
-                    let player = CloudTTSPlayer()
-                    player.onFinish = {
-                        Task { @MainActor in
-                            self.statusMessage = "HTTP 语音成功：\(audio.count) 字节，播放完成"
-                        }
-                    }
-                    player.onError = { error in
-                        Task { @MainActor in
-                            self.statusMessage = "HTTP 语音播放失败：\(error.localizedDescription)"
-                        }
-                    }
-                    self.previewPlayer = player
-                    do {
-                        try player.play(data: audio)
-                        self.statusMessage = "HTTP 语音成功：\(audio.count) 字节，正在播放"
-                    } catch {
-                        self.statusMessage = "HTTP 语音播放失败：\(error.localizedDescription)"
-                    }
-                    self.isTestingHTTP = false
-                }
+                let audio = try await synthesize()
+                guard !Task.isCancelled, previewID == requestID else { return }
+                try playPreview(audio, channel: channel, requestID: requestID)
+                statusMessage = "\(channel)合成成功：\(audio.count) 字节，正在播放"
             } catch {
-                await MainActor.run {
-                    self.statusMessage = "HTTP 语音失败：\(error.localizedDescription)"
-                    self.isTestingHTTP = false
-                }
+                guard !Task.isCancelled, previewID == requestID else { return }
+                statusMessage = "\(channel)失败：\(error.localizedDescription)"
+            }
+            isTesting = false
+            isTestingHTTP = false
+            previewTask = nil
+        }
+    }
+
+    private func playPreview(_ audio: Data, channel: String, requestID: UUID) throws {
+        let player = CloudTTSPlayer()
+        player.onFinish = {
+            Task { @MainActor in
+                guard previewID == requestID else { return }
+                statusMessage = "\(channel)播放完成"
             }
         }
+        player.onError = { error in
+            Task { @MainActor in
+                guard previewID == requestID else { return }
+                statusMessage = "\(channel)播放失败：\(error.localizedDescription)"
+            }
+        }
+        previewPlayer = player
+        try player.play(data: audio)
     }
 }
