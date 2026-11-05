@@ -351,6 +351,17 @@ struct BookshelfReaderGatewayView: View {
             }
         }
 
+        if source.sourceKind == .comic {
+            let archived = await ComicOfflineArchive.shared.chapters(sourceURL: source.bookSourceUrl, bookURL: activeBook.bookURL)
+            guard !Task.isCancelled, currentBook.id == activeBook.id,
+                  currentBook.sourceURL == activeBook.sourceURL else { return }
+            if let target = archived.first(where: { $0.index == launchCursor.chapterIndex }) {
+                chapters = archived
+                openRestoredChapter(target)
+                return
+            }
+        }
+
         // 1. FAST PATH: Instant-Open using cached chapters if available!
         let cached = appState.chapterContentCacheStore.cachedChapters(
             sourceURL: source.bookSourceUrl,

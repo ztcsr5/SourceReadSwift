@@ -113,6 +113,7 @@ struct WebScrollReaderView: UIViewRepresentable {
         private var lastStyleInputs: [AnyHashable]?
         private(set) var styleBuildCount = 0
         private var lastContentFingerprint: String?
+        private var mountedContent: WebReaderContentPayloadBuilder.Snapshot?
         private var expectedContentRevision = ""
         private var contentBuildTask: Task<Void, Never>?
         private var isBuildingContent = false
@@ -264,28 +265,52 @@ struct WebScrollReaderView: UIViewRepresentable {
             call(function: "setStyle", jsonObject: payload.jsonObject, webView: webView)
         }
 
-        private func pushContent(webView: WKWebView) {
+        private func pushContent(webView: WKWebView, canReuseMountedSections: Bool = true) {
             contentBuildTask?.cancel()
             let revision = UUID().uuidString
             expectedContentRevision = revision
             isBuildingContent = true
             let sections = view.sections
-            let badge = view.showChapterEndBadge
-            let traditional = view.traditionalChineseEnabled
+            let snapshot = WebReaderContentPayloadBuilder.Snapshot(
+                sections: sections, showChapterEndBadge: view.showChapterEndBadge,
+                traditionalChineseEnabled: view.traditionalChineseEnabled, revision: revision
+            )
+            let base = canReuseMountedSections ? mountedContent : nil
             contentBuildTask = Task { @MainActor [weak self, weak webView] in
                 let literal = await Task.detached(priority: .userInitiated) {
-                    WebReaderContentPayloadBuilder.json(sections: sections, showChapterEndBadge: badge,
-                        traditionalChineseEnabled: traditional, revision: revision).map(WebReaderJavaScriptLiteral.string)
+                    WebReaderContentPayloadBuilder.json(sections: sections, snapshot: snapshot, reusing: base)
+                        .map(WebReaderJavaScriptLiteral.string)
                 }.value
                 guard !Task.isCancelled, let self, let webView,
                       self.expectedContentRevision == revision, self.isDocumentReady else { return }
-                self.isBuildingContent = false
-                guard let literal else { return }
-                webView.evaluateJavaScript("window.__reader.setContent(JSON.parse(\(literal)));", completionHandler: nil)
-                self.pushResetIfNeeded(webView: webView)
-                self.pushScrollTargetIfNeeded(webView: webView)
-                self.pushPageStepIfNeeded(webView: webView)
-                self.pushHighlightIfNeeded(webView: webView)
+                guard let literal else {
+                    self.isBuildingContent = false
+                    NSLog("Reader could not serialize a chapter window")
+                    return
+                }
+                // A newer update racing an in-flight call must use a full window,
+                // not assume either revision is the one mounted in WebKit.
+                self.mountedContent = nil
+                webView.evaluateJavaScript("window.__reader.setContent(JSON.parse(\(literal)));") {
+                    [weak self, weak webView] value, error in
+                    guard let self, let webView, self.expectedContentRevision == revision,
+                          self.isDocumentReady else { return }
+                    guard error == nil, (value as? Bool) == true else {
+                        if base != nil {
+                            self.pushContent(webView: webView, canReuseMountedSections: false)
+                        } else {
+                            self.isBuildingContent = false
+                            NSLog("Reader did not mount a full chapter window, bridge code=%ld", (error as NSError?)?.code ?? 0)
+                        }
+                        return
+                    }
+                    self.mountedContent = snapshot
+                    self.isBuildingContent = false
+                    self.pushResetIfNeeded(webView: webView)
+                    self.pushScrollTargetIfNeeded(webView: webView)
+                    self.pushPageStepIfNeeded(webView: webView)
+                    self.pushHighlightIfNeeded(webView: webView)
+                }
             }
         }
 
@@ -364,6 +389,7 @@ struct WebScrollReaderView: UIViewRepresentable {
                 // message from the cancelled startup navigation arrived first.
                 if !hasReportedPosition {
                     isDocumentReady = false
+                    mountedContent = nil
                     lastStyleInputs = nil
                     lastStylePayload = nil
                 }
@@ -432,6 +458,7 @@ struct WebScrollReaderView: UIViewRepresentable {
                     recoveredDocumentFailures += 1
                     isDocumentReady = false
                     contentBuildTask?.cancel()
+                    mountedContent = nil
                     expectedContentRevision = UUID().uuidString
                     lastContentFingerprint = nil
                     lastStylePayload = nil
@@ -551,6 +578,7 @@ struct WebScrollReaderView: UIViewRepresentable {
             isDocumentReady = false
             contentBuildTask?.cancel()
             isBuildingContent = false
+            mountedContent = nil
             expectedContentRevision = UUID().uuidString
             lastContentFingerprint = nil
             lastStylePayload = nil

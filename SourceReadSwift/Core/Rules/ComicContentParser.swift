@@ -6,6 +6,24 @@ struct ComicPage: Identifiable, Hashable, Sendable {
     var headers: [String: String] = [:]
 }
 
+/// Distinguishes a readable prefix from a finished chapter.
+struct ComicChapterResources: Sendable {
+    let pages: [ComicPage]
+    let hasPendingContinuation: Bool
+
+    init(content: ChapterContent) {
+        pages = ComicContentParser.parsePages(from: content)
+        hasPendingContinuation = content.nextContentUrl?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false
+    }
+
+    init(offlinePages: [ComicPage]) {
+        pages = offlinePages
+        hasPendingContinuation = false
+    }
+
+    var canReuseFromCache: Bool { !pages.isEmpty && !hasPendingContinuation }
+}
+
 enum ComicContentParser {
     private static let wrappedImage = try! NSRegularExpression(
         pattern: #"\[img\]([\s\S]*?)\[/img\]|!\[[^\]]*\]\(([^\s\)]+)\)"#, options: .caseInsensitive)

@@ -2,6 +2,7 @@
 
 Usage: python -B -m unittest discover -s scripts -p test_perf_minimal_scope.py -v
 """
+import re
 from pathlib import Path
 import unittest
 
@@ -59,7 +60,12 @@ class MinimalPerformanceScopeTests(unittest.TestCase):
         app = read_source("SourceReadSwift/App/AppState.swift")
         subscriptions = app.split("private func bindChildStores()", 1)[1].split("// MARK:", 1)[0]
         self.assertExcludes("Task {", subscriptions)
-        self.assertEqual(subscriptions.count("scheduleStoreNotification()"), 11)
+        self.assertCountEqual(re.findall(r"(\w+)\.objectWillChange\s*\.sink", subscriptions), [
+            "sourceStore", "bookshelfStore", "purifyRuleStore", "chapterDownloadStore",
+            "rssArticleStateStore", "rssFeedCacheStore", "rssArticleContentCacheStore",
+            "sourceHealthStore", "sourceDiagnosticHistoryStore", "readingHistoryStore",
+        ])
+        self.assertEqual(subscriptions.count("scheduleStoreNotification()"), 10)
 
     def test_progress_and_session_writes_are_ordered_off_main(self):
         persistence = read_source("SourceReadSwift/Core/Storage/BookshelfPersistence.swift")
@@ -81,12 +87,21 @@ class MinimalPerformanceScopeTests(unittest.TestCase):
         self.assertContains("Self.diskQueue.sync", history)
         self.assertContains("history = nextHistory", history)
 
-    def test_global_notifications_coalesce_without_removing_subscriptions(self):
+    def test_global_notifications_keep_remaining_shared_subscriptions(self):
         app = read_source("SourceReadSwift/App/AppState.swift")
         self.assertContains("guard !hasPendingStoreNotification else { return }", app)
-        for store in ["bookshelfStore", "readingHistoryStore", "chapterContentCacheStore", "chapterDownloadStore"]:
+        for store in ["bookshelfStore", "readingHistoryStore", "chapterDownloadStore"]:
             self.assertContains(f"{store}.objectWillChange", app)
         self.assertContains("scheduleStoreNotification()", app)
+
+    def test_chapter_prefetch_invalidates_only_the_cache_consumers(self):
+        app = read_source("SourceReadSwift/App/AppState.swift")
+        self.assertExcludes("chapterContentCacheStore.objectWillChange", app)
+        settings = read_source("SourceReadSwift/Features/Settings/SettingsView.swift")
+        self.assertContains("OfflineChapterCacheView(store: appState.chapterContentCacheStore)", settings)
+        cache_views = read_source("SourceReadSwift/Features/Settings/ReaderDataManagementViews.swift")
+        body = cache_views.split("struct OfflineChapterCacheView: View", 1)[1].split("var body:", 1)[0]
+        self.assertContains("@ObservedObject var store: ChapterContentCacheStore", body)
 
     def test_background_boundary_captures_position_before_draining_writes(self):
         reader = read_source("SourceReadSwift/Features/Reader/ReaderView.swift")

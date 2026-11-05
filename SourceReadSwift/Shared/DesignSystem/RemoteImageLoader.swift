@@ -2,16 +2,24 @@ import Foundation
 import ImageIO
 import UIKit
 
-enum ComicImageFailure: Error, Equatable {
-    case http(Int), timedOut, invalidResponse, invalidImage, tooLarge, network, cancelled
+enum ComicImageFailure: Error, Equatable, Sendable {
+    case http(Int), timedOut, invalidResponse, emptyResponse, invalidImage, tooLarge, network, cancelled
+
+    var canRefreshAddress: Bool {
+        switch self {
+        case .http(403), .http(404), .http(410), .http(422): return true
+        default: return false
+        }
+    }
 
     var message: String {
         switch self {
         case .http(403): return "图片访问被拒绝，可检查书源登录状态后重试。"
-        case .http(404): return "图片地址已失效，可重试或换源。"
+        case .http(404), .http(410): return "图片地址已失效，可重试或换源。"
         case .http(422): return "书源未接受图片请求，可重试或换源。"
         case .http(let status): return "图片请求失败（HTTP \(status)）。"
         case .timedOut: return "图片请求超时，可重试。"
+        case .emptyResponse: return "书源返回了空图片，可重试。"
         case .invalidResponse, .invalidImage: return "书源未返回可显示的图片。"
         case .tooLarge: return "图片超出安全加载大小。"
         case .network: return "无法连接到图片服务器。"
@@ -135,31 +143,64 @@ final class RemoteImageLoader: @unchecked Sendable {
         }
     }
 
-    private func downloadComicPage(_ url: URL, headers: [String: String], maxPixelSize: CGFloat) async -> Result<UIImage, ComicImageFailure> {
+    /// Offline downloads use the same authenticated transport as visible pages.
+    func comicBytesForArchive(_ request: ComicImageRequest) async -> Result<Data, ComicImageFailure> {
+        guard let url = URL(string: request.url), !url.isFileURL else { return .failure(.invalidResponse) }
+        return await fetchComicBytes(url, headers: request.headers).map(\.bytes)
+    }
+
+    private struct ComicTransfer {
         let bytes: Data
+        let request: URLRequest?
+    }
+
+    private func fetchComicBytes(_ url: URL, headers: [String: String]) async -> Result<ComicTransfer, ComicImageFailure> {
+        guard !Task.isCancelled else { return .failure(.cancelled) }
         if InlineImageStore.isInlineURL(url) {
-            guard let inline = inlineImages.data(for: url) else { return .failure(.invalidImage) }
-            bytes = inline
+            guard let bytes = inlineImages.data(for: url) else { return .failure(.invalidImage) }
+            return .success(.init(bytes: bytes, request: nil))
+        }
+        guard let scheme = url.scheme?.lowercased(), scheme == "http" || scheme == "https" else { return .failure(.invalidResponse) }
+        var request = URLRequest(url: url, timeoutInterval: 18)
+        for (name, value) in headers { request.setValue(value, forHTTPHeaderField: name) }
+        do {
+            let (bytes, response) = try await session.data(for: request)
+            guard !Task.isCancelled else { return .failure(.cancelled) }
+            guard let http = response as? HTTPURLResponse else { return .failure(.invalidResponse) }
+            guard (200..<300).contains(http.statusCode) else {
+                session.configuration.urlCache?.removeCachedResponse(for: request)
+                return .failure(.http(http.statusCode))
+            }
+            guard !bytes.isEmpty else {
+                session.configuration.urlCache?.removeCachedResponse(for: request)
+                return .failure(.emptyResponse)
+            }
+            guard bytes.count <= ComicOfflineArchive.maximumPageBytes else { return .failure(.tooLarge) }
+            return .success(.init(bytes: bytes, request: request))
+        } catch let error as URLError {
+            if error.code == .cancelled { return .failure(.cancelled) }
+            return .failure(error.code == .timedOut ? .timedOut : .network)
+        } catch { return .failure(.network) }
+    }
+
+    private func downloadComicPage(_ url: URL, headers: [String: String], maxPixelSize: CGFloat) async -> Result<UIImage, ComicImageFailure> {
+        let transfer: ComicTransfer
+        if url.isFileURL {
+            // External comic rules cannot produce file URLs; only the offline archive supplies them.
+            guard let bytes = try? Data(contentsOf: url, options: .mappedIfSafe),
+                  !bytes.isEmpty, bytes.count <= ComicOfflineArchive.maximumPageBytes else { return .failure(.invalidImage) }
+            transfer = .init(bytes: bytes, request: nil)
         } else {
-            guard let scheme = url.scheme?.lowercased(), scheme == "http" || scheme == "https" else { return .failure(.invalidResponse) }
-            var request = URLRequest(url: url, timeoutInterval: 18)
-            for (name, value) in headers { request.setValue(value, forHTTPHeaderField: name) }
-            do {
-                let (received, response) = try await session.data(for: request)
-                guard let http = response as? HTTPURLResponse else { return .failure(.invalidResponse) }
-                guard (200..<300).contains(http.statusCode) else {
-                    session.configuration.urlCache?.removeCachedResponse(for: request)
-                    return .failure(.http(http.statusCode))
-                }
-                bytes = received
-            } catch let error as URLError {
-                if error.code == .cancelled { return .failure(.cancelled) }
-                return .failure(error.code == .timedOut ? .timedOut : .network)
-            } catch { return .failure(.network) }
+            switch await fetchComicBytes(url, headers: headers) {
+            case .success(let loaded): transfer = loaded
+            case .failure(let failure): return .failure(failure)
+            }
         }
         guard !Task.isCancelled else { return .failure(.cancelled) }
-        guard bytes.count <= 24 * 1024 * 1024 else { return .failure(.tooLarge) }
-        guard let image = await Self.downsampleImageOffMainThread(bytes, maxPixelSize: maxPixelSize) else { return .failure(.invalidImage) }
+        guard let image = await Self.downsampleImageOffMainThread(transfer.bytes, maxPixelSize: maxPixelSize) else {
+            if let request = transfer.request { session.configuration.urlCache?.removeCachedResponse(for: request) }
+            return .failure(.invalidImage)
+        }
         return .success(image)
     }
 

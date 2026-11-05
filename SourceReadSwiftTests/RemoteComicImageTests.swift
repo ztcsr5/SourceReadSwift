@@ -37,6 +37,30 @@ final class RemoteComicImageTests: XCTestCase {
         XCTAssertNotNil(loaded)
         XCTAssertNotNil(loader.cachedImage(for: url))
     }
+
+    func testComicDistinguishesEmptyCorruptAndRejectedPages() async throws {
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [ComicImageURLProtocol.self]
+        let session = URLSession(configuration: configuration)
+        defer { session.invalidateAndCancel() }
+        let loader = RemoteImageLoader(session: session)
+        let headers = ["Referer": "https://comic.example/chapter/1"]
+        let failures: [(String, ComicImageFailure)] = [
+            ("/empty", .emptyResponse), ("/invalid", .invalidImage), ("/unaccepted", .http(422))
+        ]
+        for (path, expected) in failures {
+            let url = try XCTUnwrap(URL(string: "https://comic-image-fixture.invalid" + path))
+            let result = await loader.comicPage(for: url, headers: headers, maxPixelSize: 4096)
+            guard case .failure(let actual) = result else { return XCTFail("Expected a failed page for \(path)") }
+            XCTAssertEqual(actual, expected)
+            XCTAssertNil(loader.cachedComicPage(for: url, headers: headers, maxPixelSize: 4096))
+        }
+        XCTAssertTrue(ComicImageFailure.http(422).canRefreshAddress)
+        XCTAssertFalse(ComicImageFailure.timedOut.canRefreshAddress)
+        let good = try XCTUnwrap(URL(string: "https://comic-image-fixture.invalid/good"))
+        let result = await loader.comicPage(for: good, headers: headers, maxPixelSize: 4096)
+        XCTAssertNotNil(try result.get(), "A failed page must not prevent another page from decoding")
+    }
 }
 
 private final class ComicImageURLProtocol: URLProtocol, @unchecked Sendable {
@@ -48,11 +72,19 @@ private final class ComicImageURLProtocol: URLProtocol, @unchecked Sendable {
     override func startLoading() {
         Self.lock.lock(); let ok = Self.success; Self.lock.unlock()
         let authorized = request.value(forHTTPHeaderField: "Referer") == "https://comic.example/chapter/1"
-        let code = ok && authorized ? 200 : 403
-        let response = HTTPURLResponse(url: request.url!, statusCode: code, httpVersion: nil, headerFields: ["Content-Type": "image/png"])!
+        let path = request.url?.path ?? ""
         let data = Data(base64Encoded: "iVBORw0KGgoAAAANSUhEUgAAAAMAAAACCAIAAAASFvFNAAAAGklEQVR42mNgYGhg0ADiACBmCACygTggoAEAMGgE4bJ9Q/wAAAAASUVORK5CYII=")!
+        let (code, body): (Int, Data)
+        switch path {
+        case "/empty": (code, body) = (200, Data())
+        case "/invalid": (code, body) = (200, Data("<html>not an image</html>".utf8))
+        case "/unaccepted": (code, body) = (422, Data("unprocessable".utf8))
+        case "/good": (code, body) = (200, data)
+        default: (code, body) = ok && authorized ? (200, data) : (403, Data("forbidden".utf8))
+        }
+        let response = HTTPURLResponse(url: request.url!, statusCode: code, httpVersion: nil, headerFields: ["Content-Type": "image/png"])!
         client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
-        client?.urlProtocol(self, didLoad: code == 200 ? data : Data("forbidden".utf8))
+        client?.urlProtocol(self, didLoad: body)
         client?.urlProtocolDidFinishLoading(self)
     }
     override func stopLoading() {}

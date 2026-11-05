@@ -132,4 +132,20 @@ final class ComicContentParserTests: XCTestCase {
         XCTAssertEqual(ComicPagePositionPolicy.tapStep(0.9, rtl: true), -1)
         XCTAssertEqual(ComicPagePositionPolicy.tapStep(0.5, rtl: true), 0)
     }
+
+    func testIncompleteChapterKeepsReadablePagesButIsNotACompleteCacheHit() {
+        let chapter = BookChapter(title: "分页漫画", url: "https://example.com/comic/1",
+                                  bookUrl: "https://example.com/comic", index: 0)
+        let paragraphs = [#"[{"url":"/page-1.webp"},{"url":"/page-2.webp"}]"#]
+        let truncated = ChapterContent(chapter: chapter, title: chapter.title, paragraphs: paragraphs,
+                                       nextContentUrl: "/comic/1?p=2")
+        let complete = ChapterContent(chapter: chapter, title: chapter.title, paragraphs: paragraphs, nextContentUrl: nil)
+        let invalid = ChapterContent(chapter: chapter, title: chapter.title, paragraphs: ["暂无漫画"], nextContentUrl: nil)
+
+        XCTAssertEqual(ComicChapterResources(content: truncated).pages.map(\.id), [0, 1])
+        XCTAssertTrue(ComicChapterResources(content: truncated).hasPendingContinuation)
+        XCTAssertFalse(ComicChapterResources(content: truncated).canReuseFromCache)
+        XCTAssertTrue(ComicChapterResources(content: complete).canReuseFromCache)
+        XCTAssertFalse(ComicChapterResources(content: invalid).canReuseFromCache)
+    }
 }

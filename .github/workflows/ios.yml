@@ -64,6 +64,11 @@ jobs:
             -only-testing:SourceReadSwiftTests/ReaderTocPerformanceTests \
             -only-testing:SourceReadSwiftTests/ContentImagePipelineRegressionTests \
             -only-testing:SourceReadSwiftTests/RemoteComicImageTests \
+            -only-testing:SourceReadSwiftTests/ComicOfflineArchiveTests \
+            -only-testing:SourceReadSwiftTests/ChapterDownloadStoreTests \
+            -only-testing:SourceReadSwiftTests/ComicContentParserTests \
+            -only-testing:SourceReadSwiftTests/SourceEngineStage18FixtureTests \
+            -only-testing:SourceReadSwiftTests/WebReaderDocumentTests \
             -only-testing:SourceReadSwiftTests/AppFrameProfilerTests \
             -only-testing:SourceReadSwiftTests/Release116VisualTests \
             -only-testing:SourceReadSwiftTests/ReaderModePositionRegressionTests \

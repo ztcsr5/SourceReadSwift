@@ -57,6 +57,7 @@ class ReaderControlsWorkflowTests(unittest.TestCase):
     def test_all_original_native_product_suites_remain_selected(self):
         expected = '''TabChromeRegressionTests ReaderCoverTeardownTests AppLayoutDensityTests SourceOrganizationTests
             ReaderTocPerformanceTests ContentImagePipelineRegressionTests RemoteComicImageTests AppFrameProfilerTests
+            ComicOfflineArchiveTests ChapterDownloadStoreTests ComicContentParserTests SourceEngineStage18FixtureTests WebReaderDocumentTests
             Release116VisualTests ReaderModePositionRegressionTests Release117DetailTests Release117ComicCompatibilityTests
             Release117AppearanceTests Release117SearchProjectionTests Release117ChromeTests WebsiteSourceInferenceTests
             WebsiteSourceFamilyInferenceTests AIChatTests Release117PurificationTests LANWorkbenchTests ReadingNotesNavigationTests

@@ -59,7 +59,9 @@ struct BookDetailView: View {
     }
 
     private var downloadRecord: ChapterDownloadRecord? {
-        appState.chapterDownloadStore.record(bookID: book.id)
+        let record = appState.chapterDownloadStore.record(bookID: book.id)
+        if sourceKind == .comic, record?.hasComicImageArchive != true { return nil }
+        return record
     }
 
     private var isDownloading: Bool {
@@ -593,7 +595,7 @@ struct BookDetailView: View {
                     .minimumScaleFactor(0.8)
                     .foregroundStyle(.secondary)
             }
-            if canDownloadTextChapters, let record = downloadRecord {
+            if canDownloadTextChapters || sourceKind == .comic, let record = downloadRecord {
                 chapterDownloadStatus(record)
             }
 
@@ -967,7 +969,7 @@ struct BookDetailView: View {
 
     private var downloadLabel: String {
         if isDownloading { return "停止缓存" }
-        guard let record = downloadRecord else { return "缓存全本章节" }
+        guard let record = downloadRecord else { return sourceKind == .comic ? "下载全本漫画" : "缓存全本章节" }
         switch record.status {
         case .completed: return "重新检查离线缓存"
         case .paused: return "继续缓存 \(record.completedCount)/\(record.chapterCount)"
@@ -1724,7 +1726,9 @@ private struct ReaderPreviewShelfPrompt: ViewModifier {
     let addBook: () -> Void
 
     func body(content: Content) -> some View {
-        content.confirmationDialog("加入书架？", isPresented: $isPresented, titleVisibility: .visible) {
+        // A popover-style confirmation dialog can omit its cancel action.
+        // Declining is a visible choice in the preview flow, not outside-tap only.
+        content.alert("加入书架？", isPresented: $isPresented) {
             Button("加入书架", action: addBook)
             Button("暂不加入", role: .cancel) {}
         } message: {
