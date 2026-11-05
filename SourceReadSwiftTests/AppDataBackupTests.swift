@@ -2,6 +2,39 @@ import XCTest
 @testable import SourceReadSwift
 
 final class AppDataBackupTests: XCTestCase {
+    func testRestoreIgnoresUnrelatedDefaultsAndRejectsInvalidReadingValues() throws {
+        let suite = "BackupPreferences.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suite)!
+        defer { defaults.removePersistentDomain(forName: suite) }
+        defaults.set("original", forKey: "webdav.serverURL")
+        try AppBackupPreferences.apply(["reader.fontSize": .double(22),
+            "webdav.serverURL": .string("https://unrelated.invalid"),
+            "source_proxy_enabled": .bool(true)], to: defaults)
+        XCTAssertEqual(defaults.double(forKey: "reader.fontSize"), 22)
+        try AppBackupPreferences.apply(["reader.fontSize": .string("20.5"), "reader.keepScreenAwake": .string("true"),
+            "reader.mode": .string("paged")], to: defaults)
+        XCTAssertEqual(defaults.double(forKey: "reader.fontSize"), 20.5)
+        XCTAssertTrue(defaults.bool(forKey: "reader.keepScreenAwake"))
+        XCTAssertEqual(defaults.string(forKey: "reader.mode"), "pageTurn")
+        XCTAssertEqual(defaults.string(forKey: "webdav.serverURL"), "original")
+        XCTAssertNil(defaults.object(forKey: "source_proxy_enabled"))
+        XCTAssertThrowsError(try AppBackupPreferences.apply(["reader.fontSize": .double(-500)], to: defaults))
+        XCTAssertEqual(defaults.double(forKey: "reader.fontSize"), 20.5)
+    }
+
+    @MainActor func testRestorerRejectsUnknownSchemaBeforeChangingAnyStore() {
+        let snapshot = AppDataBackupSnapshot(schemaVersion: 99,
+            bookshelf: BookshelfBackupSnapshot(books: [], groups: []), sources: SourceLibrarySnapshot(sources: []),
+            purifyRules: [], rssState: RSSArticleStateSnapshot(readIDs: [], favoriteIDs: []), readerPreferences: [:])
+        var writes = 0
+        XCTAssertThrowsError(try AppDataBackupRestorer.restore(snapshot, previous: snapshot,
+            restoreBookshelf: { _ in writes += 1; return true },
+            restoreSources: { _ in writes += 1; return true },
+            restorePurifyRules: { _ in writes += 1; return true },
+            restoreRSSState: { _ in writes += 1 }, restorePreferences: { _ in writes += 1 }))
+        XCTAssertEqual(writes, 0)
+    }
+
     func testPreferenceValueRoundTripPreservesTypes() throws {
         let values: [String: BackupPreferenceValue] = [
             "string": .string("paper"),

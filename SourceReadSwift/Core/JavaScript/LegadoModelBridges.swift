@@ -17,6 +17,7 @@ import JavaScriptCore
     var latestChapterTitle: String { get set }
     var wordCount: String { get set }
     var variable: String { get set }
+    var type: Int { get set }
     func putVariable(_ key: String, _ value: String)
     func getVariable(_ key: String) -> String
     func putCustomVariable(_ value: String)
@@ -27,6 +28,8 @@ final class LegadoSearchBookBridge: NSObject, LegadoSearchBookExport {
     var bookUrl = ""; var tocUrl = ""; var origin = ""; var originName = ""
     var name = ""; var author = ""; var kind = ""; var coverUrl = ""; var intro = ""
     var latestChapterTitle = ""; var wordCount = ""; var variable = ""
+    var type = 0
+    var mediaKind: BookSourceKind? { BookSourceKind(legadoBookType: type) }
     private var variables: [String: String] = [:]
     func putVariable(_ key: String, _ value: String) { variables[key] = value; variable = value }
     func getVariable(_ key: String) -> String { variables[key] ?? "" }
@@ -35,7 +38,17 @@ final class LegadoSearchBookBridge: NSObject, LegadoSearchBookExport {
     init(book: SearchBook) {
         bookUrl = book.bookUrl; origin = book.sourceUrl; originName = book.sourceName
         name = book.name; author = book.author ?? ""; coverUrl = book.coverUrl ?? ""; intro = book.intro ?? ""
+        kind = book.kind ?? ""
+        type = book.mediaKind?.legadoBookType ?? 0
         super.init()
+    }
+
+    convenience init(book: BookDetail) {
+        self.init(book: SearchBook(name: book.name, author: book.author, coverUrl: book.coverUrl,
+            bookUrl: book.bookUrl, sourceName: book.sourceName, sourceUrl: book.sourceUrl,
+            intro: book.intro, kind: book.kind, mediaKind: book.mediaKind))
+        tocUrl = book.tocUrl ?? book.bookUrl
+        latestChapterTitle = book.latestChapter ?? ""
     }
 }
 

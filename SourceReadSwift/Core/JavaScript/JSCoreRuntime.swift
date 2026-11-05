@@ -105,13 +105,7 @@ final class JSCoreRuntime {
         } else if let book = value as? SearchBook {
             return LegadoSearchBookBridge(book: book)
         } else if let book = value as? BookDetail {
-            let bridge = LegadoSearchBookBridge(book: SearchBook(
-                name: book.name, author: book.author, coverUrl: book.coverUrl,
-                bookUrl: book.bookUrl, sourceName: book.sourceName, sourceUrl: book.sourceUrl, intro: book.intro
-            ))
-            bridge.tocUrl = book.tocUrl ?? ""
-            bridge.latestChapterTitle = book.latestChapter ?? ""
-            return bridge
+            return LegadoSearchBookBridge(book: book)
         } else if let elements = value as? [SwiftSoup.Element] {
             return LegadoElementsBridge(elements: elements, baseURL: baseUrl)
         } else if let elements = value as? SwiftSoup.Elements {

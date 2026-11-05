@@ -89,6 +89,65 @@ final class SourceEngineStage18FixtureTests: XCTestCase {
         XCTAssertEqual(stop.details["retainedItemCount"], "1")
     }
 
+    func testComicContinuationFailureKeepsThePrefixAndARefreshRestoresPageOrder() async throws {
+        let first = "https://fixture.local/comic/chapter?p=1"
+        let second = "https://fixture.local/comic/chapter?p=2"
+        let source = BookSource(bookSourceName: "Comic pagination", bookSourceUrl: "https://fixture.local",
+                                bookSourceType: 2, ruleContent: SourceRule(fields: [
+                                    "content": "#content@html", "nextContentUrl": "a.next@href"
+                                ]))
+        let chapter = BookChapter(title: "Comic", url: first, bookUrl: "https://fixture.local/comic", index: 0)
+        let prefix = html("<div id='content'><img data-src='/img/01.webp'></div><a class='next' href='/comic/chapter?p=2'>next</a>")
+        let continuation = html("<div id='content'><img src='/img/02.webp'></div>")
+        let rejected = Stage18FixtureNetwork(responses: [first: prefix], failures: [second: .network("HTTP 422")])
+        let incomplete = try await LegadoSourceEngine(network: rejected).getContent(source: source, chapter: chapter).get()
+        let partial = ComicChapterResources(content: incomplete)
+        XCTAssertEqual(partial.pages.map(\.url), ["https://fixture.local/img/01.webp"])
+        XCTAssertEqual(incomplete.nextContentUrl, second)
+        XCTAssertFalse(partial.canReuseFromCache)
+        XCTAssertEqual(rejected.requestedURLs, [first, second])
+
+        let recovered = Stage18FixtureNetwork(responses: [first: prefix, second: continuation])
+        let complete = try await LegadoSourceEngine(network: recovered).getContent(source: source, chapter: chapter).get()
+        let resources = ComicChapterResources(content: complete)
+        XCTAssertTrue(resources.canReuseFromCache)
+        XCTAssertEqual(resources.pages.map(\.url), ["https://fixture.local/img/01.webp", "https://fixture.local/img/02.webp"])
+        XCTAssertEqual(recovered.requestedURLs, [first, second])
+    }
+
+    func testComicChapterIdentifiesAStreamingPlaylistWithoutFetchingItsSegments() async {
+        let bookURL = "https://fixture.local/comic"
+        let source = BookSource(bookSourceName: "Comic media", bookSourceUrl: "https://fixture.local",
+                                bookSourceType: 2, ruleContent: SourceRule(fields: ["content": "#content@html"]))
+        let playlist = "#EXTM3U\r\n#EXT-X-TARGETDURATION:8\r\n#EXTINF:8.0,\r\n/segment.ts"
+        for (path, mime) in [("/chapter", "Application/Vnd.Apple.MpegURL; charset=utf-8"),
+                             ("/chapter.m3u8", "text/plain")] {
+            let url = bookURL + path
+            let chapter = BookChapter(title: "Mixed media", url: url, bookUrl: bookURL, index: 0)
+            let network = Stage18FixtureNetwork(responses: [url: .init(body: playlist, contentType: mime)])
+            let result = await LegadoSourceEngine(network: network).getContent(source: source, chapter: chapter)
+            guard case .failure(let error) = result, case .unsupported = error else {
+                XCTFail("A confirmed streaming playlist is not an empty or readable comic chapter: \(result)")
+                continue
+            }
+            XCTAssertEqual(SourceDiagnosticClassifier.kind(error: error, stage: "content"), .unsupported)
+            XCTAssertEqual(network.requestedURLs, [url], "Comic reading must not follow a streaming playlist")
+        }
+    }
+
+    func testComicImageRulesStillRunWithAnIncorrectPlaylistContentType() async throws {
+        let url = "https://fixture.local/comic/chapter"
+        let source = BookSource(bookSourceName: "Comic media", bookSourceUrl: "https://fixture.local",
+                                bookSourceType: 2, ruleContent: SourceRule(fields: ["content": "#content@html"]))
+        let chapter = BookChapter(title: "Pictures", url: url, bookUrl: "https://fixture.local/comic", index: 0)
+        let mislabeled = Stage18FixtureNetwork.Payload(
+            body: "<html><body><div id='content'><img src='/img/01.webp'></div></body></html>",
+            contentType: "application/vnd.apple.mpegurl")
+        let network = Stage18FixtureNetwork(responses: [url: mislabeled])
+        let result = try await LegadoSourceEngine(network: network).getContent(source: source, chapter: chapter).get()
+        XCTAssertEqual(ComicChapterResources(content: result).pages.map(\.url), ["https://fixture.local/img/01.webp"])
+    }
+
     func testTOCPaginationStopsAtThirtyPages() async throws {
         let source = paginationSource()
         var responses: [String: Stage18FixtureNetwork.Payload] = [:]
@@ -207,6 +266,57 @@ final class SourceEngineStage18FixtureTests: XCTestCase {
         XCTAssertTrue(network.requestedURLs.contains("https://fixture.local/content/9"))
     }
 
+    func testWholeBookDirectoryRejectsAPrefixAndCanRetryWhenTheLastPageReturns() async throws {
+        let source = paginationSource()
+        let book = BookDetail(name: "Fixture", author: nil, coverUrl: nil, bookUrl: "https://fixture.local/book",
+                              tocUrl: "https://fixture.local/toc/1", sourceName: source.bookSourceName,
+                              sourceUrl: source.bookSourceUrl, intro: nil, latestChapter: nil)
+        let first = "https://fixture.local/toc/1", second = "https://fixture.local/toc/2"
+        let firstHTML = html("<div class='chapter'><a href='/c/1'>第一话</a></div><a class='next' href='/toc/2'>next</a>")
+        let unavailable = LegadoSourceEngine(network: Stage18FixtureNetwork(responses: [first: firstHTML],
+            failures: [second: .network("fixture second page unavailable")]))
+        let readable = try await unavailable.getChapterList(source: source, book: book).get()
+        XCTAssertEqual(readable.map(\.title), ["第一话"], "The ordinary reader may still open the available prefix")
+        let strict = await unavailable.getCompleteChapterList(source: source, book: book)
+        guard case .failure = strict else { return XCTFail("A readable prefix must never become a whole-book download") }
+
+        let recovered = LegadoSourceEngine(network: Stage18FixtureNetwork(responses: [first: firstHTML,
+            second: html("<div class='chapter'><a href='/c/2'>第二话</a></div>")]))
+        let complete = try await recovered.getCompleteChapterList(source: source, book: book).get()
+        XCTAssertEqual(complete.map(\.title), ["第一话", "第二话"])
+        XCTAssertEqual(complete.map(\.index), [0, 1])
+    }
+
+    func testWholeBookDirectoryRejectsLoopsRatherThanReportingFalseCompletion() async {
+        let source = paginationSource()
+        let first = "https://fixture.local/toc/1"
+        let book = BookDetail(name: "Fixture", author: nil, coverUrl: nil, bookUrl: first, tocUrl: first,
+                              sourceName: source.bookSourceName, sourceUrl: source.bookSourceUrl, intro: nil, latestChapter: nil)
+        let network = Stage18FixtureNetwork(responses: [first:
+            html("<div class='chapter'><a href='/c/1'>第一话</a></div><a class='next' href='/toc/1'>next</a>")])
+        let engine = LegadoSourceEngine(network: network)
+        let result = await engine.getCompleteChapterList(source: source, book: book)
+        guard case .failure = result else { return XCTFail("A repeated next URL is not a verified directory end") }
+        XCTAssertEqual(network.requestedURLs, [first])
+    }
+
+    func testWholeBookDirectoryDoesNotCountThePaginationSafetyCapAsCompletion() async {
+        let source = paginationSource()
+        let first = "https://fixture.local/toc/1"
+        let book = BookDetail(name: "Fixture", author: nil, coverUrl: nil, bookUrl: first, tocUrl: first,
+                              sourceName: source.bookSourceName, sourceUrl: source.bookSourceUrl, intro: nil, latestChapter: nil)
+        let responses = Dictionary(uniqueKeysWithValues: (1...30).map { page in
+            ("https://fixture.local/toc/\(page)", html("<div class='chapter'><a href='/c/\(page)'>第\(page)话</a></div><a class='next' href='/toc/\(page + 1)'>next</a>"))
+        })
+        let network = Stage18FixtureNetwork(responses: responses)
+        let engine = LegadoSourceEngine(network: network)
+        let result = await engine.getCompleteChapterList(source: source, book: book)
+        guard case .failure(let error) = result else { return XCTFail("A capped directory must not be called complete") }
+        XCTAssertTrue(error.displayMessage.contains("30 页"))
+        XCTAssertEqual(network.requestedURLs.count, 30)
+        XCTAssertFalse(network.requestedURLs.contains("https://fixture.local/toc/31"))
+    }
+
     private func paginationSource(contentRule: String = "#content@text") -> BookSource {
         BookSource(
             bookSourceName: "Stage18 pagination",
@@ -224,14 +334,22 @@ final class SourceEngineStage18FixtureTests: XCTestCase {
 private final class Stage18FixtureNetwork: SourceNetworkClient, @unchecked Sendable {
     struct Payload: Sendable {
         let body: String
-        init(body: String) { self.body = body }
+        let contentType: String
+        init(body: String, contentType: String = "text/html") {
+            self.body = body
+            self.contentType = contentType
+        }
     }
 
     private let responses: [String: Payload]
+    private let failures: [String: SourceEngineError]
     private let lock = NSLock()
     private var recorded: [SourceRequest] = []
 
-    init(responses: [String: Payload]) { self.responses = responses }
+    init(responses: [String: Payload], failures: [String: SourceEngineError] = [:]) {
+        self.responses = responses
+        self.failures = failures
+    }
 
     var requests: [SourceRequest] {
         lock.lock(); defer { lock.unlock() }
@@ -242,13 +360,14 @@ private final class Stage18FixtureNetwork: SourceNetworkClient, @unchecked Senda
 
     func load(_ request: SourceRequest) async -> Result<SourceResponse, SourceEngineError> {
         lock.lock(); recorded.append(request); lock.unlock()
+        if let failure = failures[request.url.absoluteString] { return .failure(failure) }
         guard let payload = responses[request.url.absoluteString] else {
             return .failure(.network("fixture missing: \(request.url.absoluteString)"))
         }
         return .success(SourceResponse(
             url: request.url,
             statusCode: 200,
-            headers: ["Content-Type": "text/html"],
+            headers: ["Content-Type": payload.contentType],
             body: payload.body,
             data: Data(payload.body.utf8)
         ))
