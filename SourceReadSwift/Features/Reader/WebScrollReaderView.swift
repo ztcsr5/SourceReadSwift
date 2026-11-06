@@ -5,6 +5,47 @@ import WebKit
 import OSLog
 #endif
 
+/// Gives an edge swipe to UIKit before the prose scroll pan can claim it.
+final class ReaderEdgeReturnWebView: WKWebView {
+    private(set) weak var prioritizedEdgeReturn: UIGestureRecognizer?
+
+    override func didMoveToWindow() {
+        super.didMoveToWindow()
+        installEdgeReturnPriority()
+    }
+
+    override func didMoveToSuperview() {
+        super.didMoveToSuperview()
+        installEdgeReturnPriority()
+    }
+
+    override func layoutSubviews() {
+        super.layoutSubviews()
+        // A hosting/navigation ancestor may acquire its recognizer after the
+        // web view enters the window. Retry at layout, not just on that move.
+        installEdgeReturnPriority()
+    }
+
+    private func installEdgeReturnPriority() {
+        guard #available(iOS 18.0, *), window != nil else { return }
+        var responder: UIResponder? = next
+        while let current = responder {
+            if let host = current as? UIViewController,
+               let navigation = host.navigationController ?? (host as? UINavigationController),
+               let edgeReturn = navigation.interactivePopGestureRecognizer,
+               let gestureHost = edgeReturn.view, isDescendant(of: gestureHost) {
+                guard edgeReturn !== prioritizedEdgeReturn else { return }
+                // This public recognizer handles only the leading edge. Do
+                // not depend on iOS 26's full-content pop or replace delegates.
+                scrollView.panGestureRecognizer.require(toFail: edgeReturn)
+                prioritizedEdgeReturn = edgeReturn
+                return
+            }
+            responder = current.next
+        }
+    }
+}
+
 /// Continuous reading surface rendered by `WKWebView`.
 ///
 /// The TextKit surface rebuilt one giant attributed string for the whole
@@ -62,6 +103,7 @@ struct WebScrollReaderView: UIViewRepresentable {
     var imageStyle: ReaderImageStyle = .standard
     var imageHeaders: [String: String] = [:]
     var imageColumnWidth: CGFloat = 0
+    var prioritizesSystemEdgeReturn = false
     let onVisibleParagraph: (Int) -> Void
     var onVisiblePosition: ((Int, Int) -> Void)? = nil
     var onNearBottom: (() -> Void)? = nil
@@ -103,9 +145,14 @@ struct WebScrollReaderView: UIViewRepresentable {
         private let fontHandler = ReaderFontSchemeHandler()
         #if DEBUG
         private static let startupEvents = Logger(subsystem: "com.edc21.SourceReadSwift.book-passage", category: "startup")
+        private static let recordsStartupEvidence =
+            ProcessInfo.processInfo.arguments.contains("--floating-desk-regression")
+            || ProcessInfo.processInfo.arguments.contains("--reader-settings-regression")
         #endif
 
         private var isDocumentReady = false
+        private var navigationToken: String?
+        private var shellNavigation: WKNavigation?
         private var startupProbeTask: Task<Void, Never>?
         private var hasReportedPosition = false
         private(set) var startupRecoveryCount = 0
@@ -113,6 +160,7 @@ struct WebScrollReaderView: UIViewRepresentable {
         private var lastStyleInputs: [AnyHashable]?
         private(set) var styleBuildCount = 0
         private var lastContentFingerprint: String?
+        private var mountedContent: WebReaderContentPayloadBuilder.Snapshot?
         private var expectedContentRevision = ""
         private var contentBuildTask: Task<Void, Never>?
         private var isBuildingContent = false
@@ -148,7 +196,9 @@ struct WebScrollReaderView: UIViewRepresentable {
             configuration.setURLSchemeHandler(fontHandler, forURLScheme: ReaderFontResource.scheme)
             configuration.userContentController.add(self, name: "reader")
 
-            let webView = WKWebView(frame: .zero, configuration: configuration)
+            let webView: WKWebView = view.prioritizesSystemEdgeReturn
+                ? ReaderEdgeReturnWebView(frame: .zero, configuration: configuration)
+                : WKWebView(frame: .zero, configuration: configuration)
             webView.navigationDelegate = self
             webView.uiDelegate = self
             webView.isOpaque = false
@@ -169,8 +219,7 @@ struct WebScrollReaderView: UIViewRepresentable {
             lastSurfaceColor = view.surfaceColor
 
             prepareBeforeNavigation?(webView)
-            webView.loadHTMLString(WebReaderHTML.shell, baseURL: nil)
-            scheduleStartupProbe(webView: webView)
+            navigateToShell(webView: webView)
             return webView
         }
 
@@ -178,6 +227,8 @@ struct WebScrollReaderView: UIViewRepresentable {
             startupProbeTask?.cancel()
             startupProbeTask = nil
             contentBuildTask?.cancel()
+            navigationToken = nil
+            shellNavigation = nil
             expectedContentRevision = UUID().uuidString
             webView.stopLoading()
             webView.configuration.userContentController.removeScriptMessageHandler(forName: "reader")
@@ -264,28 +315,61 @@ struct WebScrollReaderView: UIViewRepresentable {
             call(function: "setStyle", jsonObject: payload.jsonObject, webView: webView)
         }
 
-        private func pushContent(webView: WKWebView) {
+        private func pushContent(webView: WKWebView, canReuseMountedSections: Bool = true) {
             contentBuildTask?.cancel()
             let revision = UUID().uuidString
             expectedContentRevision = revision
             isBuildingContent = true
             let sections = view.sections
-            let badge = view.showChapterEndBadge
-            let traditional = view.traditionalChineseEnabled
+            let snapshot = WebReaderContentPayloadBuilder.Snapshot(
+                sections: sections, showChapterEndBadge: view.showChapterEndBadge,
+                traditionalChineseEnabled: view.traditionalChineseEnabled, revision: revision
+            )
+            let base = canReuseMountedSections ? mountedContent : nil
             contentBuildTask = Task { @MainActor [weak self, weak webView] in
                 let literal = await Task.detached(priority: .userInitiated) {
-                    WebReaderContentPayloadBuilder.json(sections: sections, showChapterEndBadge: badge,
-                        traditionalChineseEnabled: traditional, revision: revision).map(WebReaderJavaScriptLiteral.string)
+                    WebReaderContentPayloadBuilder.json(sections: sections, snapshot: snapshot, reusing: base)
+                        .map(WebReaderJavaScriptLiteral.string)
                 }.value
                 guard !Task.isCancelled, let self, let webView,
                       self.expectedContentRevision == revision, self.isDocumentReady else { return }
-                self.isBuildingContent = false
-                guard let literal else { return }
-                webView.evaluateJavaScript("window.__reader.setContent(JSON.parse(\(literal)));", completionHandler: nil)
-                self.pushResetIfNeeded(webView: webView)
-                self.pushScrollTargetIfNeeded(webView: webView)
-                self.pushPageStepIfNeeded(webView: webView)
-                self.pushHighlightIfNeeded(webView: webView)
+                guard let literal else {
+                    self.isBuildingContent = false
+                    NSLog("Reader could not serialize a chapter window")
+                    return
+                }
+                // A newer update racing an in-flight call must use a full window,
+                // not assume either revision is the one mounted in WebKit.
+                self.mountedContent = nil
+                let resetToken = self.view.resetToken
+                let reportsOpeningPosition = !self.hasReportedPosition && self.view.scrollTarget == nil
+                let resetsOpeningPosition = reportsOpeningPosition && self.lastResetToken != resetToken
+                // A first-page open can publish from this same WebKit call.
+                // Explicit character targets still wait for their own acknowledgement.
+                let script = "window.__reader.setContent(JSON.parse(\(literal)), \(resetsOpeningPosition), \(reportsOpeningPosition));"
+                webView.evaluateJavaScript(script) {
+                    [weak self, weak webView] value, error in
+                    guard let self, let webView, self.expectedContentRevision == revision,
+                          self.isDocumentReady else { return }
+                    guard error == nil, (value as? Bool) == true else {
+                        if base != nil {
+                            self.pushContent(webView: webView, canReuseMountedSections: false)
+                        } else {
+                            self.isBuildingContent = false
+                            NSLog("Reader did not mount a full chapter window, bridge code=%ld", (error as NSError?)?.code ?? 0)
+                        }
+                        return
+                    }
+                    self.mountedContent = snapshot
+                    self.isBuildingContent = false
+                    if resetsOpeningPosition, self.view.resetToken == resetToken, self.view.scrollTarget == nil {
+                        self.lastResetToken = resetToken
+                    }
+                    self.pushResetIfNeeded(webView: webView)
+                    self.pushScrollTargetIfNeeded(webView: webView)
+                    self.pushPageStepIfNeeded(webView: webView)
+                    self.pushHighlightIfNeeded(webView: webView)
+                }
             }
         }
 
@@ -352,21 +436,18 @@ struct WebScrollReaderView: UIViewRepresentable {
                   let body = message.body as? [String: Any],
                   let type = body["type"] as? String else { return }
 
-            // A flat index only has meaning in the DOM version that produced
-            // it. Old WebKit messages must never be mapped through a new window.
-            if type != "ready" && type != "fatal" {
+            // Bootstrap messages predate the first chapter revision. Use the
+            // shell identity so an aborted load cannot activate or reload its successor.
+            if type == "ready" || type == "fatal" {
+                guard let navigationToken, body["navigationToken"] as? String == navigationToken else { return }
+            } else {
                 guard ReaderWebMessagePolicy.matchesRevision(body["revision"] as? String, expected: expectedContentRevision) else { return }
             }
 
             switch type {
             case "ready":
-                // A fresh shell must reapply its style/content even if a ready
-                // message from the cancelled startup navigation arrived first.
-                if !hasReportedPosition {
-                    isDocumentReady = false
-                    lastStyleInputs = nil
-                    lastStylePayload = nil
-                }
+                // didFinish or a bounded probe may already have activated it.
+                // A late acknowledgement cannot discard a valid mounted revision.
                 if let webView { activateDocumentIfNeeded(webView: webView) }
             case "content-ready":
                 if pendingScrollKey != nil, pendingScrollKey != appliedScrollKey, let webView {
@@ -383,6 +464,13 @@ struct WebScrollReaderView: UIViewRepresentable {
                         hasReportedPosition = true
                         startupProbeTask?.cancel()
                         startupProbeTask = nil
+                        #if DEBUG
+                        if Self.recordsStartupEvidence {
+                            let requested = view.scrollTarget == nil ? 0 : 1
+                            let applied = appliedScrollKey == nil ? 0 : 1
+                            Self.startupEvents.notice("BOOT_VISIBLE requested=\(requested, privacy: .public) applied=\(applied, privacy: .public)")
+                        }
+                        #endif
                     }
                     let offset = (body["utf16Offset"] as? Int) ?? 0
                     view.onVisiblePosition?(flat, max(offset, 0))
@@ -432,6 +520,7 @@ struct WebScrollReaderView: UIViewRepresentable {
                     recoveredDocumentFailures += 1
                     isDocumentReady = false
                     contentBuildTask?.cancel()
+                    mountedContent = nil
                     expectedContentRevision = UUID().uuidString
                     lastContentFingerprint = nil
                     lastStylePayload = nil
@@ -439,7 +528,7 @@ struct WebScrollReaderView: UIViewRepresentable {
                     lastSentScrollKey = nil
                     pendingScrollKey = nil
                     pendingScrollTarget = nil
-                    webView.loadHTMLString(WebReaderHTML.shell, baseURL: nil)
+                    navigateToShell(webView: webView)
                 }
             default:
                 break
@@ -459,7 +548,13 @@ struct WebScrollReaderView: UIViewRepresentable {
         }
 
         func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
+            guard let shellNavigation, navigation === shellNavigation else { return }
             verifyStartupBridge(webView: webView)
+        }
+
+        func webViewWebContentProcessDidTerminate(_ webView: WKWebView) {
+            NSLog("Reader WebKit content process terminated before position=%d", hasReportedPosition ? 0 : 1)
+            if !hasReportedPosition { recoverStartupShell(webView: webView) }
         }
 
         private func activateDocumentIfNeeded(webView: WKWebView) {
@@ -472,6 +567,13 @@ struct WebScrollReaderView: UIViewRepresentable {
             pushScrollTargetIfNeeded(webView: webView)
             pushPageStepIfNeeded(webView: webView)
             pushHighlightIfNeeded(webView: webView)
+        }
+
+        private func navigateToShell(webView: WKWebView) {
+            let navigationID = UUID()
+            navigationToken = navigationID.uuidString
+            shellNavigation = webView.loadHTMLString(WebReaderHTML.renderShell(for: navigationID), baseURL: nil)
+            if !hasReportedPosition { scheduleStartupProbe(webView: webView) }
         }
 
         private func scheduleStartupProbe(webView: WKWebView) {
@@ -490,18 +592,23 @@ struct WebScrollReaderView: UIViewRepresentable {
 
         private func verifyStartupBridge(webView: WKWebView) {
             guard !hasReportedPosition else { return }
+            guard let navigationToken else { return }
+            let navigationLiteral = WebReaderJavaScriptLiteral.string(navigationToken)
             #if DEBUG
             recordStartupEvidence(webView: webView)
             #endif
             let script = """
                 (function() {
-                  if (window.__reader && typeof window.__reader.setContent === 'function') { return 1; }
+                  var bridge = window.__reader;
+                  if (bridge && bridge.navigationToken === \(navigationLiteral) && typeof bridge.setContent === 'function') {
+                    return 1;
+                  }
                   return document.readyState === 'complete' ? -1 : 0;
                 })()
                 """
             webView.evaluateJavaScript(script) { [weak self, weak webView] value, error in
                 guard let self, let webView, webView.navigationDelegate === self,
-                      !self.hasReportedPosition else { return }
+                      self.navigationToken == navigationToken, !self.hasReportedPosition else { return }
                 if let error {
                     NSLog("Reader startup bridge probe failed, code=%ld", (error as NSError).code)
                     return
@@ -515,7 +622,7 @@ struct WebScrollReaderView: UIViewRepresentable {
 
         #if DEBUG
         private func recordStartupEvidence(webView: WKWebView) {
-            guard ProcessInfo.processInfo.arguments.contains("--floating-desk-regression") else { return }
+            guard Self.recordsStartupEvidence else { return }
             let script = """
                 (function(){ return {ready:document.readyState,
                   bridge:!!(window.__reader && typeof window.__reader.setContent === 'function'),
@@ -538,6 +645,7 @@ struct WebScrollReaderView: UIViewRepresentable {
                 let building = self.isBuildingContent ? 1 : 0
                 let pending = self.pendingScrollKey != nil ? 1 : 0
                 let applied = self.appliedScrollKey != nil ? 1 : 0
+                webView.accessibilityValue = "ready=\(ready) bridge=\(bridge) shell=\(shell) paragraphs=\(paragraphs) loading=\(loading) document=\(document) building=\(building) pending=\(pending) applied=\(applied)"
                 Self.startupEvents.notice("BOOT ready=\(ready, privacy: .public) bridge=\(bridge, privacy: .public) shell=\(shell, privacy: .public) paragraphs=\(paragraphs, privacy: .public) loading=\(loading, privacy: .public) document=\(document, privacy: .public) building=\(building, privacy: .public) pending=\(pending, privacy: .public) applied=\(applied, privacy: .public)")
             }
         }
@@ -551,6 +659,7 @@ struct WebScrollReaderView: UIViewRepresentable {
             isDocumentReady = false
             contentBuildTask?.cancel()
             isBuildingContent = false
+            mountedContent = nil
             expectedContentRevision = UUID().uuidString
             lastContentFingerprint = nil
             lastStylePayload = nil
@@ -563,8 +672,7 @@ struct WebScrollReaderView: UIViewRepresentable {
             lastHighlight = Int.min
             // The input cursor stays unchanged, and no visible position has
             // been published yet. Never apply this recovery to active reading.
-            webView.loadHTMLString(WebReaderHTML.shell, baseURL: nil)
-            scheduleStartupProbe(webView: webView)
+            navigateToShell(webView: webView)
         }
     }
 }

@@ -39,6 +39,11 @@ final class BookTOCacheStore {
     private let fileManager: FileManager
     private let rootURL: URL?
     private var memory: [String: BookTOCacheEntry] = [:]
+    private struct ColdRead {
+        let id: UUID
+        let task: Task<BookTOCacheEntry?, Never>
+    }
+    private var coldReads: [String: ColdRead] = [:]
     private var memoryOrder: [String] = []
     private let memoryLimit = 6
 
@@ -53,13 +58,50 @@ final class BookTOCacheStore {
             touch(key)
             return cached
         }
-        guard let decoded = loadFromDisk(key: key),
-              decoded.entry.version == BookTOCacheEntry.schemaVersion,
-              !decoded.entry.chapters.isEmpty else { return nil }
-        memory[key] = decoded.entry
+        let url = storageURL(key: key)
+        guard let bytes = Self.writer.sync(execute: { try? Data(contentsOf: url) }),
+              let entry = Self.decodeEntry(bytes) else { return nil }
+        memory[key] = entry
         touch(key)
         trimMemory()
-        return decoded.entry
+        return entry
+    }
+
+    /// Keeps a memory hit immediate, but does not block the reader transition on the disk queue.
+    func entryForReader(sourceURL: String, bookURL: String) async -> BookTOCacheEntry? {
+        guard !Task.isCancelled else { return nil }
+        let key = cacheKey(sourceURL: sourceURL, bookURL: bookURL)
+        if let cached = memory[key] {
+            touch(key)
+            return cached
+        }
+        let read = coldReads[key] ?? beginColdRead(key: key)
+        let entry = await read.task.value
+        if coldReads[key]?.id == read.id {
+            coldReads.removeValue(forKey: key)
+            if let entry, entry.sourceURL == sourceURL, entry.bookURL == bookURL {
+                memory[key] = entry
+                touch(key)
+                trimMemory()
+            }
+        }
+        return Task.isCancelled ? nil : memory[key]
+    }
+
+    private func beginColdRead(key: String) -> ColdRead {
+        let manager = fileManager, root = rootURL
+        let task = Task<BookTOCacheEntry?, Never> {
+            await withCheckedContinuation { continuation in
+                Self.writer.async {
+                    let url = Self.storageURL(key: key, fileManager: manager, rootURL: root)
+                    let bytes = try? Data(contentsOf: url)
+                    continuation.resume(returning: bytes.flatMap { Self.decodeEntry($0) })
+                }
+            }
+        }
+        let read = ColdRead(id: UUID(), task: task)
+        coldReads[key] = read
+        return read
     }
 
     func chapters(sourceURL: String, bookURL: String) -> [BookChapter] {
@@ -87,6 +129,7 @@ final class BookTOCacheStore {
             updatedAt: date
         )
         entry.isComplete = isComplete
+        coldReads.removeValue(forKey: key)
         memory[key] = entry
         touch(key)
         trimMemory()
@@ -95,9 +138,10 @@ final class BookTOCacheStore {
 
     func invalidate(sourceURL: String, bookURL: String) {
         let key = cacheKey(sourceURL: sourceURL, bookURL: bookURL)
+        coldReads.removeValue(forKey: key)
         memory.removeValue(forKey: key)
         memoryOrder.removeAll { $0 == key }
-        guard let url = try? storageURL(key: key) else { return }
+        let url = storageURL(key: key)
         let manager = fileManager
         Self.writer.async { try? manager.removeItem(at: url) }
     }
@@ -122,7 +166,11 @@ final class BookTOCacheStore {
 
     // MARK: - Disk
 
-    private func storageURL(key: String) throws -> URL {
+    private func storageURL(key: String) -> URL {
+        Self.storageURL(key: key, fileManager: fileManager, rootURL: rootURL)
+    }
+
+    nonisolated private static func storageURL(key: String, fileManager: FileManager, rootURL: URL?) -> URL {
         var hash: UInt64 = 0xcbf2_9ce4_8422_2325
         for byte in key.utf8 {
             hash ^= UInt64(byte)
@@ -136,12 +184,11 @@ final class BookTOCacheStore {
         )
     }
 
-    private func loadFromDisk(key: String) -> (entry: BookTOCacheEntry, url: URL)? {
-        guard let url = try? storageURL(key: key),
-              let data = Self.writer.sync(execute: { try? Data(contentsOf: url) }) else { return nil }
+    nonisolated private static func decodeEntry(_ bytes: Data) -> BookTOCacheEntry? {
         let decoder = JSONDecoder()
         decoder.dateDecodingStrategy = .iso8601
-        guard let persisted = try? decoder.decode(Persisted.self, from: data) else { return nil }
+        guard let persisted = try? decoder.decode(Persisted.self, from: bytes),
+              persisted.version == BookTOCacheEntry.schemaVersion, !persisted.chapters.isEmpty else { return nil }
         var entry = BookTOCacheEntry(
             version: persisted.version,
             sourceURL: persisted.sourceURL,
@@ -151,11 +198,11 @@ final class BookTOCacheStore {
             updatedAt: persisted.updatedAt
         )
         entry.isComplete = persisted.isComplete
-        return (entry, url)
+        return entry
     }
 
     private func writeToDisk(_ entry: BookTOCacheEntry, key: String) {
-        guard let url = try? storageURL(key: key) else { return }
+        let url = storageURL(key: key)
         var persisted = Persisted(
             version: entry.version,
             sourceURL: entry.sourceURL,

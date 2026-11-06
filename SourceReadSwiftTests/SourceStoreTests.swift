@@ -3,6 +3,23 @@ import XCTest
 
 @MainActor
 final class SourceStoreTests: XCTestCase {
+    func testHuaHuoComicLibraryImportAndReloadPreserveMediaAndSharedScripts() throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let persistence = SourcePersistence(fileManager: .default, rootURL: root)
+        let store = SourceStore(persistence: persistence)
+        let exported = ##"{"items":[{"sourceName":"Comic fixture","sourceUrl":"https://comic.fixture.invalid","bookSourceType":2,"jsLib":"function fixture(){return 7;}","ruleSearch":{"searchBookList":".item","searchName":"h2@text"}}]}"##
+        try store.importJSON(exported)
+        let reloaded = SourceStore(persistence: persistence)
+        for library in [store, reloaded] {
+            let source = try XCTUnwrap(library.source(for: "https://comic.fixture.invalid"))
+            XCTAssertEqual(source.sourceKind, .comic)
+            XCTAssertEqual(source.raw["jsLib"], "function fixture(){return 7;}")
+            XCTAssertEqual(source.ruleSearch?.fields["bookList"], ".item")
+            XCTAssertEqual(source.sourceFormat, .huahuo)
+        }
+    }
+
     func testRestoresCompleteSourceLibrarySnapshot() throws {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
         let store = SourceStore(persistence: SourcePersistence(fileManager: .default, rootURL: root))
@@ -494,6 +511,22 @@ final class SourceStoreTests: XCTestCase {
     }
 
     // MARK: - Specialized adapter dispatch (sync/async parity)
+
+    func testMixedFormatImportPreservesEverySourceAndItsRules() async throws {
+        let exported = ##"[{"bookSourceName":"Canonical","bookSourceUrl":"https://canonical.invalid","ruleContent":{"content":"#body@text","nextContentUrl":"a.next@href"}},{"sourceName":"HuaHuo","sourceUrl":"https://huahuo.invalid","ruleSearch":{"searchBookList":".book","searchName":"h2@text","searchBookUrl":"a@href"}},{"title":"HaiKuo","url":"https://haikuo.invalid","search_rule":".result"}]"##
+        for asynchronous in [false, true] {
+            let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+            defer { try? FileManager.default.removeItem(at: root) }
+            let store = SourceStore(persistence: SourcePersistence(rootURL: root))
+            let report: SourceImportReport
+            if asynchronous { report = try await store.importJSONDataAsync(Data(exported.utf8)) }
+            else { report = try store.importJSONData(Data(exported.utf8)) }
+            XCTAssertEqual(report.addedBookSources, 3, "A mixed export must not silently discard formats after the first match")
+            XCTAssertEqual(store.source(for: "https://canonical.invalid")?.ruleContent?.fields["nextContentUrl"], "a.next@href")
+            XCTAssertEqual(store.source(for: "https://huahuo.invalid")?.ruleSearch?.fields["bookList"], ".book")
+            XCTAssertEqual(store.source(for: "https://haikuo.invalid")?.ruleSearch?.fields["bookList"], ".result")
+        }
+    }
 
     func testAsyncImportHuaHuoSourceUsesSpecializedAdapter() async throws {
         let root = FileManager.default.temporaryDirectory

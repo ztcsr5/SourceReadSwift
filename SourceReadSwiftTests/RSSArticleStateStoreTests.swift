@@ -3,6 +3,30 @@ import XCTest
 
 @MainActor
 final class RSSArticleStateStoreTests: XCTestCase {
+    func testRestoredNegativePositionsAreClampedBeforeTheReaderUsesThem() {
+        let suite = "RSSArticleStateStoreTests.negative.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suite)!
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let store = RSSArticleStateStore(defaults: defaults)
+        store.restore(RSSArticleStateSnapshot(readIDs: [], favoriteIDs: [], paragraphPositions: ["broken": -50, "valid": 7]))
+        XCTAssertEqual(store.paragraphPositions, ["broken": 0, "valid": 7])
+        XCTAssertEqual(RSSArticleStateStore(defaults: defaults).paragraphPositions, store.paragraphPositions)
+    }
+
+    func testMarkingAnAlreadyReadArticleDoesNotPublishAnotherChange() {
+        let suite = "RSSArticleStateStoreTests.repeated.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suite)!
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let article = RSSArticlePreview(title: "A", link: "https://example.com/a", pubDate: nil, description: nil)
+        let store = RSSArticleStateStore(defaults: defaults)
+        store.markRead(article)
+        var changes = 0
+        let subscription = store.objectWillChange.sink { changes += 1 }
+        store.markRead(article)
+        XCTAssertEqual(changes, 0)
+        withExtendedLifetime(subscription) {}
+    }
+
     func testRestoresReadAndFavoriteSnapshot() {
         let suite = "RSSArticleStateStoreTests.restore.\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suite)!

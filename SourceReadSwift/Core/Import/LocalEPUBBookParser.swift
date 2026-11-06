@@ -64,6 +64,7 @@ struct LocalEPUBBookParser {
             : (linearSpine.isEmpty ? spine.map(\.id) : linearSpine)
         var chapterHTMLByPath: [String: String] = [:]
         let parsedChapters = try orderedIDs.enumerated().compactMap { index, id -> LocalTextChapter? in
+            try Task.checkCancellation()
             guard let item = manifest.first(where: { $0.id == id }) else { return nil }
             let href = item.href
             let path = normalizeEPUBPath(basePath: basePath, href: href)
