@@ -3,7 +3,7 @@ import XCTest
 
 @MainActor
 final class RSSArticleContentCacheStoreTests: XCTestCase {
-    func testPersistsAndReloadsArticleParagraphs() {
+    func testPersistsAndReloadsArticleParagraphs() async {
         let url = FileManager.default.temporaryDirectory.appendingPathComponent("rss-content-cache-\(UUID().uuidString).json")
         let article = RSSArticlePreview(title: "Article", link: "https://example.com/article", pubDate: nil, description: nil)
         let store = RSSArticleContentCacheStore(fileURL: url)
@@ -12,10 +12,11 @@ final class RSSArticleContentCacheStoreTests: XCTestCase {
         let reloaded = RSSArticleContentCacheStore(fileURL: url)
         XCTAssertEqual(reloaded.paragraphs(for: article), ["First", "Second"])
         XCTAssertNotNil(reloaded.cachedAt(for: article))
+        await store.waitForPendingWrites()
         try? FileManager.default.removeItem(at: url)
     }
 
-    func testRemovesSingleArticleWithoutTouchingOtherEntries() {
+    func testRemovesSingleArticleWithoutTouchingOtherEntries() async {
         let url = FileManager.default.temporaryDirectory.appendingPathComponent("rss-content-cache-\(UUID().uuidString).json")
         let first = RSSArticlePreview(title: "First", link: "https://example.com/1", pubDate: nil, description: nil)
         let second = RSSArticlePreview(title: "Second", link: "https://example.com/2", pubDate: nil, description: nil)
@@ -27,10 +28,11 @@ final class RSSArticleContentCacheStoreTests: XCTestCase {
 
         XCTAssertNil(store.paragraphs(for: first))
         XCTAssertEqual(store.paragraphs(for: second), ["Two"])
+        await store.waitForPendingWrites()
         try? FileManager.default.removeItem(at: url)
     }
 
-    func testStaleContentRemainsReadableAndCanBeDetected() {
+    func testStaleContentRemainsReadableAndCanBeDetected() async {
         let url = FileManager.default.temporaryDirectory.appendingPathComponent("rss-content-stale-\(UUID().uuidString).json")
         let article = RSSArticlePreview(title: "Stale", link: "https://example.com/stale", pubDate: nil, description: nil)
         let store = RSSArticleContentCacheStore(fileURL: url)
@@ -41,10 +43,11 @@ final class RSSArticleContentCacheStoreTests: XCTestCase {
         XCTAssertTrue(store.isStale(for: article, maxAge: -1))
         XCTAssertNil(store.paragraphs(for: article, maxAge: -1))
         XCTAssertNil(store.contentHTML(for: article, maxAge: -1))
+        await store.waitForPendingWrites()
         try? FileManager.default.removeItem(at: url)
     }
 
-    func testReadsLegacyCacheAfterStableArticleIdentityUpgrade() {
+    func testReadsLegacyCacheAfterStableArticleIdentityUpgrade() async {
         let url = FileManager.default.temporaryDirectory.appendingPathComponent("rss-content-cache-migration-\(UUID().uuidString).json")
         let article = RSSArticlePreview(title: "New title", link: "https://example.com/new", pubDate: "today", description: nil, sourceURL: "https://feed.one", guid: "post-1")
         let encoder = JSONEncoder()
@@ -56,6 +59,7 @@ final class RSSArticleContentCacheStoreTests: XCTestCase {
         XCTAssertEqual(store.paragraphs(for: article), ["Legacy body"])
         store.save(["Fresh body"], for: article)
         XCTAssertEqual(store.entries.map(\.articleID), [article.id])
+        await store.waitForPendingWrites()
         try? FileManager.default.removeItem(at: url)
     }
 }

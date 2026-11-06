@@ -6,6 +6,24 @@ struct ComicPage: Identifiable, Hashable, Sendable {
     var headers: [String: String] = [:]
 }
 
+/// Distinguishes a readable prefix from a finished chapter.
+struct ComicChapterResources: Sendable {
+    let pages: [ComicPage]
+    let hasPendingContinuation: Bool
+
+    init(content: ChapterContent) {
+        pages = ComicContentParser.parsePages(from: content)
+        hasPendingContinuation = content.nextContentUrl?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false
+    }
+
+    init(offlinePages: [ComicPage]) {
+        pages = offlinePages
+        hasPendingContinuation = false
+    }
+
+    var canReuseFromCache: Bool { !pages.isEmpty && !hasPendingContinuation }
+}
+
 enum ComicContentParser {
     private static let wrappedImage = try! NSRegularExpression(
         pattern: #"\[img\]([\s\S]*?)\[/img\]|!\[[^\]]*\]\(([^\s\)]+)\)"#, options: .caseInsensitive)
@@ -18,8 +36,8 @@ enum ComicContentParser {
         for paragraph in content.paragraphs {
             let text = paragraph.trimmingCharacters(in: .whitespacesAndNewlines)
             let candidates: [ComicImageRequest]
-            if let first = text.first, first == "[" || first == "{", let data = text.data(using: .utf8),
-               let json = try? JSONSerialization.jsonObject(with: data) {
+            if let first = text.first, first == "[" || first == "{" || first == "\"", let data = text.data(using: .utf8),
+               let json = try? JSONSerialization.jsonObject(with: data, options: [.fragmentsAllowed]) {
                 candidates = parsePageEnvelope(json, base: base, remainingDepth: 6)
             } else {
                 candidates = parseImageParagraph(text, base: base)
@@ -33,15 +51,27 @@ enum ComicContentParser {
 
     private static func parsePageEnvelope(_ value: Any, base: String, remainingDepth: Int) -> [ComicImageRequest] {
         guard remainingDepth > 0 else { return [] }
-        if let address = value as? String { return ComicImageRequest.resolve(address, base: base).map { [$0] } ?? [] }
+        if let address = value as? String {
+            let text = address.trimmingCharacters(in: .whitespacesAndNewlines)
+            if let first = text.first, first == "[" || first == "{" || first == "\"",
+               let bytes = text.data(using: .utf8),
+               let nested = try? JSONSerialization.jsonObject(with: bytes, options: [.fragmentsAllowed]) {
+                return parsePageEnvelope(nested, base: base, remainingDepth: remainingDepth - 1)
+            }
+            return ComicImageRequest.resolve(text, base: base).map { [$0] } ?? []
+        }
         if let pages = value as? [Any] {
             return pages.flatMap { parsePageEnvelope($0, base: base, remainingDepth: remainingDepth - 1) }
         }
         guard let object = value as? [String: Any] else { return [] }
         var foundContainer = false
         for field in pageContainers {
-            guard let nested = object[field], nested is [Any] || nested is [String: Any] else { continue }
+            guard let nested = object[field], nested is [Any] || nested is [String: Any] || nested is String else { continue }
             foundContainer = true
+            if let text = nested as? String {
+                let first = text.trimmingCharacters(in: .whitespacesAndNewlines).first
+                guard first == "[" || first == "{" || first == "\"" else { continue }
+            }
             let pages = parsePageEnvelope(nested, base: base, remainingDepth: remainingDepth - 1)
             if !pages.isEmpty { return pages }
         }

@@ -1,6 +1,7 @@
 import XCTest
 import SwiftUI
 import UIKit
+import WebKit
 @testable import SourceReadSwift
 
 final class ReaderExitSwipeTests: XCTestCase {
@@ -94,6 +95,29 @@ final class ReaderExitSwipeTests: XCTestCase {
             bridge.configure(enabled: true, prefersSystemReturn: false, onExit: {})
             XCTAssertTrue(bridge.edgePan.isEnabled, "Non-book and legacy entry paths keep the existing fallback")
         }
+    }
+
+    @MainActor func testProsePrioritizesOnlyTheMountedNavigationEdgeRecognizer() throws {
+        guard #available(iOS 18.0, *) else { return }
+        let destination = UIViewController()
+        let navigation = UINavigationController(rootViewController: UIViewController())
+        navigation.pushViewController(destination, animated: false)
+        let scene = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.first
+        let previous = scene?.windows.first(where: \.isKeyWindow)
+        let window = scene.map { UIWindow(windowScene: $0) } ?? UIWindow(frame: UIScreen.main.bounds)
+        window.rootViewController = navigation
+        window.makeKeyAndVisible()
+        defer { window.isHidden = true; previous?.makeKey() }
+
+        let edgeReturn = try XCTUnwrap(navigation.interactivePopGestureRecognizer)
+        let web = ReaderEdgeReturnWebView(frame: destination.view.bounds, configuration: WKWebViewConfiguration())
+        let scrollDelegate = web.scrollView.panGestureRecognizer.delegate
+        let edgeDelegate = edgeReturn.delegate
+        XCTAssertNil(web.prioritizedEdgeReturn)
+        destination.view.addSubview(web)
+        XCTAssertTrue(web.prioritizedEdgeReturn === edgeReturn)
+        XCTAssertTrue(edgeReturn.delegate === edgeDelegate)
+        XCTAssertTrue(web.scrollView.panGestureRecognizer.delegate === scrollDelegate)
     }
 
     @MainActor func testSuccessfulSwipeDismissesExactlyOnce() {
