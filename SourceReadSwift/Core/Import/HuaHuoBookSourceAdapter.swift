@@ -9,29 +9,25 @@ struct HuaHuoBookSourceAdapter: Sendable {
     // MARK: - Format Detection
 
     static func isHuaHuoJSON(_ text: String) -> Bool {
-        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard trimmed.hasPrefix("{") || trimmed.hasPrefix("[") else { return false }
-        
-        let hasHuaHuoRuleKeys = trimmed.contains("\"exploreBookList\"") ||
-            trimmed.contains("\"searchBookList\"") ||
-            trimmed.contains("\"infoName\"") ||
-            trimmed.contains("\"infoTocUrl\"") ||
-            trimmed.contains("\"infoCoverUrl\"") ||
-            trimmed.contains("\"tocList\"") ||
-            trimmed.contains("\"nextContentUrl\"")
-        
-        let hasRuleContainers = trimmed.contains("\"ruleSearch\"") ||
-            trimmed.contains("\"ruleBookInfo\"") ||
-            trimmed.contains("\"ruleToc\"") ||
-            trimmed.contains("\"ruleContent\"") ||
-            trimmed.contains("\"ruleExplore\"")
-
-        return hasHuaHuoRuleKeys && hasRuleContainers
+        isHuaHuoData(Data(text.utf8))
     }
 
     static func isHuaHuoData(_ data: Data) -> Bool {
-        guard let text = String(data: data, encoding: .utf8) else { return false }
-        return isHuaHuoJSON(text)
+        let decoder = JSONDecoder()
+        if let rows = try? decoder.decode([HuaHuoRawSource].self, from: data) {
+            return rows.contains(where: hasSpecializedRules)
+        }
+        guard let row = try? decoder.decode(HuaHuoRawSource.self, from: data) else { return false }
+        return hasSpecializedRules(row)
+    }
+
+    /// Shared pagination fields alone also occur in ordinary Legado sources.
+    static func hasSpecializedRules(_ source: HuaHuoRawSource) -> Bool {
+        [source.ruleSearch?.searchBookList, source.ruleSearch?.searchName,
+         source.ruleExplore?.exploreBookList, source.ruleExplore?.exploreName,
+         source.ruleBookInfo?.infoName, source.ruleBookInfo?.infoTocUrl,
+         source.ruleBookInfo?.infoCoverUrl, source.ruleToc?.tocList]
+            .contains { $0?.nilIfEmpty != nil }
     }
 
     // MARK: - Import & Conversion
@@ -45,10 +41,10 @@ struct HuaHuoBookSourceAdapter: Sendable {
         let decoder = JSONDecoder()
         
         if let array = try? decoder.decode([HuaHuoRawSource].self, from: data) {
-            return array.compactMap { adapt(raw: $0) }
+            return array.filter(hasSpecializedRules).compactMap { adapt(raw: $0) }
         }
         
-        if let single = try? decoder.decode(HuaHuoRawSource.self, from: data) {
+        if let single = try? decoder.decode(HuaHuoRawSource.self, from: data), hasSpecializedRules(single) {
             if let adapted = adapt(raw: single) {
                 return [adapted]
             }

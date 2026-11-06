@@ -11,6 +11,12 @@ WORKFLOW = Path(__file__).resolve().parents[1] / '.github/workflows/ios.yml'
 
 
 class WorkflowRunNameTests(unittest.TestCase):
+    def test_quality_snapshots_require_explicit_dispatch_instead_of_push_autoruns(self):
+        for filename in ["ios.yml", "unsigned-ipa.yml"]:
+            workflow = (WORKFLOW.parent / filename).read_text(encoding="utf8")
+            push = workflow.split("  push:", 1)[1].split("jobs:", 1)[0]
+            self.assertIn("- '!codex/reader-quality-137-*'", push, filename)
+
     def test_run_titles_state_the_project_version_build_and_purpose(self):
         root = WORKFLOW.parents[2]
         project = (root / 'project.yml').read_text(encoding='utf8')
@@ -56,8 +62,17 @@ class ReaderControlsWorkflowTests(unittest.TestCase):
 
     def test_all_original_native_product_suites_remain_selected(self):
         expected = '''TabChromeRegressionTests ReaderCoverTeardownTests AppLayoutDensityTests SourceOrganizationTests
-            ReaderTocPerformanceTests ContentImagePipelineRegressionTests RemoteComicImageTests AppFrameProfilerTests
-            Release116VisualTests ReaderModePositionRegressionTests Release117DetailTests Release117ComicCompatibilityTests
+            AggregateSourceRegressionTests GlobalSearchIndexTests ForestBrandThemeTests FloatingReadingDeskTests
+            UXXAggregatePipelineTests AudioBookPlaybackCoordinatorTests CloudTTSCompletionTests LocalVoiceLibraryTests BookExportRegressionTests
+            HomeLayoutEvidenceTests AsyncTimeoutTests ReaderPerformancePolicyTests SourcePipelineTests
+            HaiKuoShiJieSourceAdapterTests HuaHuoBookSourceAdapterTests ReadingStatsSummaryTests SourceStoreTests
+            SourcePublisherLinksTests SourceVariablePersistenceTests SourceImportDownloaderTests SourceRateLimiterTests
+            CookieHeaderParserTests AppDataBackupTests WebDAVCredentialStoreTests WebDAVSyncServiceTests
+            CloudTTSCredentialsTests RSSArticleStateStoreTests
+            RSSCachePersistenceTests RSSFeedCacheStoreTests RSSArticleContentCacheStoreTests
+            ReaderTocPerformanceTests Release111RegressionTests OrderedReadingPersistenceTests ContentImagePipelineRegressionTests RemoteComicImageTests AppFrameProfilerTests
+            ComicOfflineArchiveTests ComicStripLayoutTests ComicZoomInteractionTests LocalComicBookParserTests BlockingRuleExecutorTests ComicReadingPositionTests ChapterDownloadStoreTests ComicContentParserTests SourceEngineStage18FixtureTests WebReaderDocumentTests
+            Release116VisualTests ReaderModePositionRegressionTests ReaderPageHostingTests Release117DetailTests Release117ComicCompatibilityTests
             Release117AppearanceTests Release117SearchProjectionTests Release117ChromeTests WebsiteSourceInferenceTests
             WebsiteSourceFamilyInferenceTests AIChatTests Release117PurificationTests LANWorkbenchTests ReadingNotesNavigationTests
             Release117ThemeCollaborationTests Release117ReaderPersonalizationTests Release117WallpaperEditorTests
@@ -74,6 +89,19 @@ class ReaderControlsWorkflowTests(unittest.TestCase):
         self.assertIn('-maximum-test-execution-time-allowance 180', ui)
         self.assertIn('timeout-minutes: 15', ui)
         self.assertNotIn('-only-testing:SourceReadSwiftTests/', ui)
+
+    def test_compiled_iOS26_ui_keeps_running_to_capture_independent_failures(self):
+        build = self.step('Build iOS26 tests')
+        self.assertIn('id: native-build', build)
+        for step in ['Exercise real reader settings UI on iOS26', 'Exercise reader chapter continuity on iOS26']:
+            self.assertIn("!cancelled() && steps.native-build.outcome == 'success'", self.step(step))
+
+    def test_general_startup_logging_starts_after_the_simulator_is_booted(self):
+        workflow = WORKFLOW.read_text(encoding='utf8')
+        general = workflow.split('  build:', 1)[1]
+        boot = general.index('xcrun simctl bootstatus "$DEVICE_ID" -b')
+        capture = general.index('xcrun simctl spawn "$DEVICE_ID" log stream')
+        self.assertLess(boot, capture)
 
     def test_unit_and_ui_results_and_attempt_artifacts_are_preserved_separately(self):
         self.assertIn('NativeTabResults.xcresult', self.native)
