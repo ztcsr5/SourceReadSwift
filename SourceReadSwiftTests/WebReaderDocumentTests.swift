@@ -106,6 +106,52 @@ final class WebReaderDocumentTests: XCTestCase {
         XCTAssertEqual(encoded.first?["loading"] as? Bool, true)
     }
 
+    func testIncrementalPayloadOmitsUnchangedTextAndRetainsFlatIndices() throws {
+        let current = WebReaderSection(chapterIndex: 0, title: "当前章",
+                                       paragraphs: Array(repeating: String(repeating: "原文", count: 120), count: 180))
+        let loading = WebReaderSection(chapterIndex: 1, title: "下一章", paragraphs: [], isReady: false)
+        let ready = WebReaderSection(chapterIndex: 1, title: "下一章", paragraphs: ["下一章正文"])
+        let base = WebReaderContentPayloadBuilder.Snapshot(sections: [current, loading], showChapterEndBadge: false,
+                                                           traditionalChineseEnabled: false, revision: "base")
+        let sections = [current, ready]
+        let next = WebReaderContentPayloadBuilder.Snapshot(sections: sections, showChapterEndBadge: false,
+                                                           traditionalChineseEnabled: false, revision: "next")
+        let full = try XCTUnwrap(WebReaderContentPayloadBuilder.json(sections: sections, snapshot: next))
+        let delta = try XCTUnwrap(WebReaderContentPayloadBuilder.json(sections: sections, snapshot: next, reusing: base))
+        let body = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(delta.utf8)) as? [String: Any])
+        let encoded = try XCTUnwrap(body["sections"] as? [[String: Any]])
+        XCTAssertLessThan(delta.utf8.count, full.utf8.count / 10)
+        XCTAssertEqual(body["baseRevision"] as? String, "base")
+        XCTAssertEqual(body["revision"] as? String, "next")
+        XCTAssertEqual(body["total"] as? Int, 182)
+        XCTAssertEqual(encoded[0]["reuse"] as? Bool, true)
+        XCTAssertNil(encoded[0]["paragraphs"])
+        XCTAssertEqual(encoded[1]["start"] as? Int, 181)
+        XCTAssertEqual(encoded[1]["titleFlat"] as? Int, 180)
+        XCTAssertEqual((encoded[1]["paragraphs"] as? [[String: Any]])?.first?["text"] as? String, "下一章正文")
+    }
+
+    func testIncrementalPayloadRefreshesBadgeButCanReuseTextAcrossHeadingRoles() throws {
+        let prior = WebReaderSection(chapterIndex: 0, title: "上章", paragraphs: ["甲"])
+        let current = WebReaderSection(chapterIndex: 1, title: "当前章", paragraphs: ["乙"])
+        let sections = [current]
+        for (before, after, nextBadge, shouldReuse) in [
+            ([current], sections, true, false),
+            ([prior, current], sections, false, true)
+        ] {
+            let base = WebReaderContentPayloadBuilder.Snapshot(sections: before, showChapterEndBadge: false,
+                                                               traditionalChineseEnabled: false, revision: "base")
+            let next = WebReaderContentPayloadBuilder.Snapshot(sections: after, showChapterEndBadge: nextBadge,
+                                                               traditionalChineseEnabled: false, revision: "next")
+            let delta = try XCTUnwrap(WebReaderContentPayloadBuilder.json(sections: after, snapshot: next, reusing: base))
+            let body = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(delta.utf8)) as? [String: Any])
+            let entry = try XCTUnwrap((body["sections"] as? [[String: Any]])?.first)
+            XCTAssertEqual(entry["reuse"] as? Bool, shouldReuse ? true : nil)
+            XCTAssertEqual(entry["first"] as? Bool, true)
+            XCTAssertEqual(entry["end"] as? Bool, nextBadge ? true : nil)
+        }
+    }
+
     // MARK: - Typography
 
     func testTitleIsVisiblyLargerThanBodyText() {

@@ -140,16 +140,27 @@ struct ReaderBookmarksView: View {
 
 struct OfflineChapterCacheView: View {
     @EnvironmentObject private var appState: AppState
+    @ObservedObject var store: ChapterContentCacheStore
     @State private var exportShareURL: IdentifiableURL?
+    @State private var exportingBookURL: String?
+    @State private var exportError: String?
+    @State private var exportTask: Task<Void, Never>?
 
     private var grouped: [CacheSection] {
-        let map = Dictionary(grouping: appState.chapterContentCacheStore.entries, by: \.bookURL)
+        let map = Dictionary(grouping: store.entries, by: \.bookURL)
         return map.keys.sorted().map { CacheSection(bookURL: $0, entries: map[$0]!.sorted { $0.cachedAt > $1.cachedAt }) }
     }
 
     var body: some View {
+        let sections = grouped
         List {
-            if grouped.isEmpty {
+            if let exportError {
+                Section {
+                    Label("导出失败：\(exportError)", systemImage: "exclamationmark.triangle")
+                        .font(.footnote)
+                }
+            }
+            if sections.isEmpty {
                 VStack(spacing: 10) {
                     Image(systemName: "arrow.down.circle")
                         .font(.system(size: 38, weight: .semibold))
@@ -164,7 +175,7 @@ struct OfflineChapterCacheView: View {
                 .padding(.vertical, 44)
                 .listRowBackground(Color.clear)
             } else {
-                ForEach(grouped) { section in
+                ForEach(sections) { section in
                     Section {
                         ForEach(section.entries) { entry in
                             let cachedBook = appState.bookshelfStore.books.first(where: {
@@ -188,7 +199,7 @@ struct OfflineChapterCacheView: View {
                             }
                             .swipeActions {
                                 Button("删除", role: .destructive) {
-                                    appState.chapterContentCacheStore.remove(key: entry.key)
+                                    store.remove(key: entry.key)
                                 }
                             }
                         }
@@ -201,11 +212,12 @@ struct OfflineChapterCacheView: View {
                             } label: {
                                 HStack(spacing: 3) {
                                     Image(systemName: "square.and.arrow.up")
-                                    Text("导出 TXT")
+                                    Text(exportingBookURL == section.bookURL ? "正在导出…" : "导出 TXT")
                                 }
                                 .font(.caption2.weight(.semibold))
                                 .foregroundStyle(AppTheme.accent)
                             }
+                            .disabled(exportingBookURL != nil)
                         }
                     } footer: {
                         Text("\(section.entries.count) 章 · \(byteText(section.entries.reduce(0) { $0 + $1.estimatedByteCount }))")
@@ -220,9 +232,15 @@ struct OfflineChapterCacheView: View {
         .sheet(item: $exportShareURL) { item in
             ShareSheet(items: [item.url])
         }
+        .onDisappear {
+            exportTask?.cancel()
+            exportTask = nil
+            exportingBookURL = nil
+        }
     }
 
     private func exportBook(section: CacheSection) {
+        guard exportingBookURL == nil else { return }
         let matchedBook = appState.bookshelfStore.books.first(where: { $0.bookURL == section.bookURL })
             ?? BookshelfBook(
                 id: section.bookURL,
@@ -234,13 +252,13 @@ struct OfflineChapterCacheView: View {
                 bookURL: section.bookURL,
                 intro: nil
             )
-        let chapters = section.entries.map { entry in
+        let chapters = section.entries.enumerated().map { offset, entry in
             ChapterContent(
                 chapter: BookChapter(
                     title: entry.title,
                     url: entry.chapterURL,
                     bookUrl: entry.bookURL,
-                    index: entry.chapterIndex ?? 0,
+                    index: entry.chapterIndex ?? offset,
                     isVip: false
                 ),
                 title: entry.title,
@@ -248,9 +266,25 @@ struct OfflineChapterCacheView: View {
                 nextContentUrl: nil
             )
         }
-        if let url = try? BookExportService().exportBookToPlainText(book: matchedBook, cachedChapters: chapters) {
-            exportShareURL = IdentifiableURL(url: url)
-            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+        exportError = nil
+        exportingBookURL = section.bookURL
+        exportTask = Task { @MainActor in
+            let result = await Task.detached(priority: .userInitiated) {
+                Result { try BookExportService().exportBookToPlainText(book: matchedBook, cachedChapters: chapters) }
+            }.value
+            guard !Task.isCancelled else {
+                if case .success(let url) = result { try? FileManager.default.removeItem(at: url) }
+                return
+            }
+            exportingBookURL = nil
+            exportTask = nil
+            switch result {
+            case .success(let url):
+                exportShareURL = IdentifiableURL(url: url)
+                HapticFeedback.success()
+            case .failure(let error):
+                exportError = error.localizedDescription
+            }
         }
     }
 

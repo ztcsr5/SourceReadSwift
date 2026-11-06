@@ -24,20 +24,22 @@ class ReaderJumpReportTests(unittest.TestCase):
 process.stdin.setEncoding('utf8');process.stdin.on('data',chunk=>script+=chunk);
 process.stdin.on('end',()=>{
   const outcomes=[];
-  for (const [ready,bridge,shell] of [['complete',false,false],['complete',false,true],
-                                    ['loading',false,false],['complete',true,true]]) {
+  for (const [ready,bridge,shell,token] of [['complete',false,false,''],['complete',false,true,''],
+                                    ['loading',false,false,''],['complete',true,true,'active-shell'],
+                                    ['complete',true,true,'obsolete-shell'],['loading',true,true,'obsolete-shell']]) {
     outcomes.push(vm.runInNewContext(script,{
-      window:{__reader:bridge?{setContent(){}}:undefined},
+      window:{__reader:bridge?{setContent(){},navigationToken:token}:undefined},
       document:{readyState:ready,getElementById(){return shell?{}:null}}
     }));
   }
   process.stdout.write(JSON.stringify(outcomes));
 });"""
-        result = subprocess.run(['node', '-e', runner], input=probe.group(1), text=True,
+        program = probe.group(1).replace(r'\(navigationLiteral)', '"active-shell"')
+        result = subprocess.run(['node', '-e', runner], input=program, text=True,
                                 encoding='utf8', capture_output=True, timeout=15)
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertEqual(json.loads(result.stdout), [-1, -1, 0, 1],
-                         'A completed empty document needs bounded recovery, not indefinite startup waiting')
+        self.assertEqual(json.loads(result.stdout), [-1, -1, 0, 1, -1, 0],
+                         'Only the current navigation may activate; empty completed shells still need bounded recovery')
 
     def test_isolated_cancellation_fixture_has_all_explicit_jump_dependencies(self):
         root = Path(__file__).resolve().parents[1]
@@ -96,11 +98,10 @@ window.requestAnimationFrame=function(){return 0;};
                 section = dict(key='c0', chapter=0, title='长段落', sig='long-text', start=0,
                                titleFlat=0, first=True, paragraphs=[dict(flat=0, local=0,
                                text='长段正文，模式切换不能回到段首。👩🏽‍💻' * 150)])
-                page.evaluate('(payload)=>window.__reader.setContent(payload)',
+                page.evaluate('(payload)=>window.__reader.setContent(payload, true)',
                               dict(revision='jump-report', sections=[section], total=1))
-                page.evaluate("window.readerMessages=[];window.__reader.resetScroll()")
                 opening = page.evaluate("window.readerMessages.filter(message=>message.type==='visible')")
-                self.assertTrue(opening, 'A first-page reader covered by its book jacket must not wait for a compositor frame')
+                self.assertTrue(opening, 'The first mount must report its reset position without a second bridge call or compositor frame')
                 self.assertEqual(opening[-1]['flat'], 0)
                 self.assertEqual(opening[-1]['utf16Offset'], 0)
                 page.evaluate("window.readerMessages=[];window.__reader.scrollToFlat(0,false,'character600','jump-report',600)")
@@ -114,9 +115,12 @@ window.requestAnimationFrame=function(){return 0;};
                 self.assertGreater(reports[0][1]['utf16Offset'], 500)
                 self.assertLessEqual(reports[0][1]['utf16Offset'], 600)
                 self.assertEqual(reports[0][1]['revision'], 'jump-report')
-                before = len(messages)
-                page.evaluate("window.__reader.scrollToFlat(0,false,'stale','old-revision',0)")
-                self.assertEqual(len(page.evaluate('window.readerMessages')), before, 'An obsolete document must not publish a jump')
+                emitted_by_stale_jump = page.evaluate("""() => {
+                    const before = window.readerMessages.length;
+                    window.__reader.scrollToFlat(0,false,'stale','old-revision',0);
+                    return window.readerMessages.slice(before);
+                }""")
+                self.assertEqual(emitted_by_stale_jump, [], 'An obsolete document must not publish a jump')
                 anchored_y = page.evaluate('window.scrollY')
                 page.evaluate("window.readerMessages=[];window.__reader.scrollToFlat(0,true,'old-animation','jump-report',0);window.__reader.scrollToFlat(0,false,'new-explicit','jump-report',600)")
                 page.wait_for_timeout(480)
@@ -167,19 +171,47 @@ window.requestAnimationFrame=function(){return 0;};
                     window.scrollTo = (...args)=>{scrollCommands++;originalScroll(...args);};
                     const ready = {...pending,sig:'ready',loading:false,paragraphs:[
                       {flat:80,local:0,text:'预取完成，只应替换视口下面的占位。'}]};
-                    reader.setContent({revision:'ready',total:81,sections:[first,ready]});
+                    const reused = {key:first.key,sig:first.sig,start:first.start,
+                      titleFlat:first.titleFlat,first:first.first,reuse:true};
+                    const staleAccepted = reader.setContent({revision:'stale',baseRevision:'wrong',
+                      total:81,sections:[reused,ready]});
+                    const missingAccepted = reader.setContent({revision:'missing',baseRevision:'pending',
+                      total:81,sections:[ready,{...reused,key:'missing'}]});
+                    const accepted = reader.setContent({revision:'ready',baseRevision:'pending',
+                      total:81,sections:[reused,ready]});
                     await Promise.resolve();
                     observer.disconnect();
-                    return {removals,scrollCommands,previousY,y:window.scrollY,
-                      sameNode:content.firstElementChild===current,
-                      nextText:content.lastElementChild.textContent};
+                    const prefetchScrollCommands = scrollCommands;
+                    const readyY = window.scrollY;
+                    const nextText = content.lastElementChild.textContent;
+                    const firstParagraph = current.querySelector('.para');
+                    const previous = {...pending,key:'c-1',chapter:-1,sig:'previous',first:true,
+                      start:0,titleFlat:0,loading:false,paragraphs:[{flat:0,local:0,text:'上一章'}]};
+                    const prepended = reader.setContent({revision:'prepend',baseRevision:'ready',
+                      total:83,sections:[previous,{...reused,first:false,start:2,titleFlat:1},
+                        {key:ready.key,sig:ready.sig,first:false,start:82,titleFlat:81,reuse:true}]});
+                    return {staleAccepted,missingAccepted,accepted,removals,prefetchScrollCommands,previousY,y:window.scrollY,
+                      readyY, prepended, nextText, sameNode:content.children[1]===current,
+                      sameParagraph:current.querySelector('.para')===firstParagraph,
+                      firstTag:current.firstElementChild.tagName,
+                      headingFlat:current.firstElementChild.getAttribute('data-flat'),
+                      paragraphFlat:firstParagraph.getAttribute('data-flat')};
                 }""")
+                self.assertIs(outcome.get('staleAccepted'), False, 'Reject an out-of-order patch before changing the DOM')
+                self.assertIs(outcome.get('missingAccepted'), False, 'Reject a missing reuse target atomically')
+                self.assertIs(outcome.get('accepted'), True, 'Reuse the mounted chapter without transferring its text')
                 self.assertEqual(outcome['removals'], [],
                                  'Resolving a prefetched chapter must not detach the visible reading surface')
                 self.assertTrue(outcome['sameNode'])
-                self.assertEqual(outcome['scrollCommands'], 0, 'Do not interrupt native inertia below the viewport')
-                self.assertAlmostEqual(outcome['y'], outcome['previousY'], delta=1)
+                self.assertEqual(outcome['prefetchScrollCommands'], 0, 'Do not interrupt native inertia below the viewport')
+                self.assertAlmostEqual(outcome['readyY'], outcome['previousY'], delta=1)
                 self.assertIn('预取完成', outcome['nextText'])
+                self.assertTrue(outcome['prepended'])
+                self.assertGreater(outcome['y'], outcome['readyY'], 'Inserting above the viewport must preserve its reading anchor')
+                self.assertTrue(outcome['sameParagraph'], 'Inserting the previous chapter must not rebuild the current text')
+                self.assertEqual(outcome['firstTag'], 'H2')
+                self.assertEqual(outcome['headingFlat'], '1')
+                self.assertEqual(outcome['paragraphFlat'], '2')
             finally:
                 browser.close()
 
@@ -214,12 +246,17 @@ window.requestAnimationFrame=function(){return 0;};
                     const wait = ms => new Promise(resolve=>setTimeout(resolve, ms));
                     for (let i=0; i<20; i++) {
                         window.scrollTo(0, i<10 ? (i+1)*130 : (19-i)*130);
+                        // Headless Chrome may coalesce every visual scroll into
+                        // no event when the burst returns to its starting offset.
+                        // Exercise all inputs without depending on compositor frames.
+                        window.dispatchEvent(new Event('scroll'));
                         await wait(12);
                     }
                     await wait(185);
                     return {reads, y:window.scrollY, last:messages.filter(m=>m.type==='visible').at(-1)};
                 }""")
                 self.assertEqual(outcome['y'], 0)
+                self.assertIsNotNone(outcome['last'], outcome)
                 self.assertEqual(outcome['last']['flat'], 0)
                 self.assertEqual(outcome['last']['revision'], 'burst')
                 self.assertLessEqual(outcome['reads'], 6, outcome)

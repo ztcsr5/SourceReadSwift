@@ -74,7 +74,7 @@ final class CloudTTSClient {
         timeout: TimeInterval = 30
     ) {
         self.factory = factory
-        self.timeout = timeout
+        self.timeout = timeout.isFinite && timeout > 0 ? timeout : 30
     }
 
     func synthesize(text: String, credentials: CloudTTSCredentials) async throws -> Data {
@@ -88,15 +88,17 @@ final class CloudTTSClient {
     }
 
     private func run(url: URL, payload: Data) async throws -> Data {
+        try Task.checkCancellation()
         let socket = factory.makeWebSocket(url: url)
         defer { socket.cancel() }
         socket.resume()
 
-        try await withTimeout { try await self.send(payload, on: socket) }
+        try await send(payload, on: socket)
 
         var audio = Data()
         while true {
-            let frameData = try await withTimeout { try await self.receive(on: socket) }
+            try Task.checkCancellation()
+            let frameData = try await receive(on: socket)
             let frame = try XunfeiTTSFrame.decode(frameData)
             if frame.code != 0 {
                 throw XunfeiTTSError.server(code: frame.code, message: frame.message ?? "unknown")
@@ -111,37 +113,77 @@ final class CloudTTSClient {
     }
 
     private func send(_ data: Data, on socket: CloudTTSWebSocket) async throws {
-        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+        let _: Void = try await awaitCallback(on: socket) { finish in
             socket.send(data) { error in
                 if let error {
-                    continuation.resume(throwing: error)
+                    finish(.failure(error))
                 } else {
-                    continuation.resume()
+                    finish(.success(Void()))
                 }
             }
         }
     }
 
     private func receive(on socket: CloudTTSWebSocket) async throws -> Data {
-        try await withCheckedThrowingContinuation { continuation in
-            socket.receive { result in
-                continuation.resume(with: result)
-            }
+        try await awaitCallback(on: socket) { finish in
+            socket.receive(completion: finish)
         }
     }
 
-    private func withTimeout<T>(_ operation: @escaping () async throws -> T) async throws -> T {
-        try await withThrowingTaskGroup(of: T.self) { group in
-            group.addTask { try await operation() }
-            group.addTask {
-                try await Task.sleep(nanoseconds: UInt64(self.timeout * 1_000_000_000))
-                throw XunfeiTTSError.timeout
+    private func awaitCallback<T>(on socket: CloudTTSWebSocket,
+                                  start: (@escaping (Result<T, Error>) -> Void) -> Void) async throws -> T {
+        let operation = TTSCallbackOperation<T>()
+        return try await withTaskCancellationHandler(operation: {
+            try await withCheckedThrowingContinuation { continuation in
+                guard operation.install(continuation) else { return }
+                operation.armTimeout(seconds: timeout)
+                start { operation.finish($0) }
             }
-            guard let result = try await group.next() else {
-                throw XunfeiTTSError.timeout
-            }
-            group.cancelAll()
-            return result
+        }, onCancel: {
+            operation.finish(.failure(CancellationError()))
+            socket.cancel()
+        })
+    }
+}
+
+/// Socket callbacks can outlive cancellation. Complete the caller once without waiting for them.
+private final class TTSCallbackOperation<Value>: @unchecked Sendable {
+    private let lock = NSLock()
+    private var continuation: CheckedContinuation<Value, Error>?
+    private var outcome: Result<Value, Error>?
+    private var timer: DispatchWorkItem?
+
+    func install(_ continuation: CheckedContinuation<Value, Error>) -> Bool {
+        lock.lock()
+        if let outcome {
+            lock.unlock()
+            continuation.resume(with: outcome)
+            return false
         }
+        self.continuation = continuation
+        lock.unlock()
+        return true
+    }
+
+    func armTimeout(seconds: TimeInterval) {
+        let timeout = DispatchWorkItem { [weak self] in self?.finish(.failure(XunfeiTTSError.timeout)) }
+        lock.lock()
+        guard outcome == nil else { lock.unlock(); return }
+        timer = timeout
+        lock.unlock()
+        DispatchQueue.global(qos: .utility).asyncAfter(deadline: .now() + seconds, execute: timeout)
+    }
+
+    func finish(_ result: Result<Value, Error>) {
+        lock.lock()
+        guard outcome == nil else { lock.unlock(); return }
+        outcome = result
+        let pending = continuation
+        continuation = nil
+        let timeout = timer
+        timer = nil
+        lock.unlock()
+        timeout?.cancel()
+        pending?.resume(with: result)
     }
 }
