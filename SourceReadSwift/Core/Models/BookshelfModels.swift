@@ -9,6 +9,7 @@ struct BookshelfBook: Identifiable, Codable, Hashable, Sendable {
     var sourceURL: String
     var bookURL: String
     var intro: String?
+    var mediaKind: BookSourceKind?
     var localContent: [String]?
     var localChapters: [LocalTextChapter]?
     /// EPUB3/NCX navigation entries, including fragment links that point into
@@ -20,22 +21,24 @@ struct BookshelfBook: Identifiable, Codable, Hashable, Sendable {
     var currentChapterIndex: Int
     var currentChapterTitle: String?
     var currentParagraphIndex: Int?
+    var comicPosition: ComicReadingPosition?
     var bookmarks: [ReaderBookmark]?
     var lastReadAt: Date?
     var lastOpenedAt: Date?
     var readingSessionCount: Int?
     var totalReadingSeconds: TimeInterval?
+    var readingSecondsByDay: [Int: TimeInterval]?
     /// Optional user-managed bookshelf group. Nil means the default "全部" view.
     var groupName: String?
     var isPinned: Bool = false
     var addedAt: Date
 
     private enum CodingKeys: String, CodingKey {
-        case id, title, author, coverURL, sourceName, sourceURL, bookURL, intro,
+        case id, title, author, coverURL, sourceName, sourceURL, bookURL, intro, mediaKind,
              localContent, localChapters, localNavigationEntries, latestChapterTitle,
              totalChapters, seenTotalChapters, currentChapterIndex, currentChapterTitle,
-             currentParagraphIndex, bookmarks, lastReadAt, lastOpenedAt,
-             readingSessionCount, totalReadingSeconds, groupName, isPinned, addedAt
+             currentParagraphIndex, comicPosition, bookmarks, lastReadAt, lastOpenedAt,
+             readingSessionCount, totalReadingSeconds, readingSecondsByDay, groupName, isPinned, addedAt
     }
 
     init(from decoder: Decoder) throws {
@@ -48,6 +51,7 @@ struct BookshelfBook: Identifiable, Codable, Hashable, Sendable {
         sourceURL = try c.decode(String.self, forKey: .sourceURL)
         bookURL = try c.decode(String.self, forKey: .bookURL)
         intro = try c.decodeIfPresent(String.self, forKey: .intro)
+        mediaKind = try c.decodeIfPresent(BookSourceKind.self, forKey: .mediaKind)
         localContent = try c.decodeIfPresent([String].self, forKey: .localContent)
         localChapters = try c.decodeIfPresent([LocalTextChapter].self, forKey: .localChapters)
         localNavigationEntries = try c.decodeIfPresent([LocalTextNavigationEntry].self, forKey: .localNavigationEntries)
@@ -57,11 +61,13 @@ struct BookshelfBook: Identifiable, Codable, Hashable, Sendable {
         currentChapterIndex = try c.decodeIfPresent(Int.self, forKey: .currentChapterIndex) ?? 0
         currentChapterTitle = try c.decodeIfPresent(String.self, forKey: .currentChapterTitle)
         currentParagraphIndex = try c.decodeIfPresent(Int.self, forKey: .currentParagraphIndex)
+        comicPosition = try c.decodeIfPresent(ComicReadingPosition.self, forKey: .comicPosition)
         bookmarks = try c.decodeIfPresent([ReaderBookmark].self, forKey: .bookmarks)
         lastReadAt = try c.decodeIfPresent(Date.self, forKey: .lastReadAt)
         lastOpenedAt = try c.decodeIfPresent(Date.self, forKey: .lastOpenedAt)
         readingSessionCount = try c.decodeIfPresent(Int.self, forKey: .readingSessionCount)
         totalReadingSeconds = try c.decodeIfPresent(TimeInterval.self, forKey: .totalReadingSeconds)
+        readingSecondsByDay = try c.decodeIfPresent([Int: TimeInterval].self, forKey: .readingSecondsByDay)
         groupName = try c.decodeIfPresent(String.self, forKey: .groupName)
         isPinned = try c.decodeIfPresent(Bool.self, forKey: .isPinned) ?? false
         addedAt = try c.decodeIfPresent(Date.self, forKey: .addedAt) ?? Date()
@@ -94,7 +100,8 @@ struct BookshelfBook: Identifiable, Codable, Hashable, Sendable {
             bookUrl: bookURL,
             sourceName: sourceName,
             sourceUrl: sourceURL,
-            intro: intro
+            intro: intro,
+            mediaKind: mediaKind
         )
     }
 
@@ -121,9 +128,11 @@ struct BookshelfBook: Identifiable, Codable, Hashable, Sendable {
         lastOpenedAt: Date? = nil,
         readingSessionCount: Int? = nil,
         totalReadingSeconds: TimeInterval? = nil,
+        readingSecondsByDay: [Int: TimeInterval]? = nil,
         groupName: String? = nil,
         isPinned: Bool = false,
-        addedAt: Date = Date()
+        addedAt: Date = Date(),
+        mediaKind: BookSourceKind? = nil
     ) {
         self.id = id
         self.title = title
@@ -133,6 +142,7 @@ struct BookshelfBook: Identifiable, Codable, Hashable, Sendable {
         self.sourceURL = sourceURL
         self.bookURL = bookURL
         self.intro = intro
+        self.mediaKind = mediaKind
         self.localContent = localContent
         self.localChapters = localChapters
         self.localNavigationEntries = localNavigationEntries
@@ -147,6 +157,7 @@ struct BookshelfBook: Identifiable, Codable, Hashable, Sendable {
         self.lastOpenedAt = lastOpenedAt
         self.readingSessionCount = readingSessionCount
         self.totalReadingSeconds = totalReadingSeconds
+        self.readingSecondsByDay = readingSecondsByDay
         self.groupName = groupName
         self.isPinned = isPinned
         self.addedAt = addedAt
@@ -161,7 +172,8 @@ struct BookshelfBook: Identifiable, Codable, Hashable, Sendable {
             sourceName: searchBook.sourceName,
             sourceURL: searchBook.sourceUrl,
             bookURL: searchBook.bookUrl,
-            intro: searchBook.intro
+            intro: searchBook.intro,
+            mediaKind: searchBook.mediaKind
         )
     }
 
@@ -175,8 +187,8 @@ struct BookshelfBook: Identifiable, Codable, Hashable, Sendable {
             title: localTextBook.title,
             author: localTextBook.author,
             coverURL: localTextBook.coverURL?.absoluteString,
-            sourceName: "Local",
-            sourceURL: "local://text",
+            sourceName: localTextBook.mediaKind == .comic ? "本地漫画" : "Local",
+            sourceURL: localTextBook.mediaKind == .comic ? "local://comic" : "local://text",
             bookURL: id,
             intro: metadata.nilIfEmpty,
             localContent: nil,

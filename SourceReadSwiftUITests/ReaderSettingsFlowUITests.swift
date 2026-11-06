@@ -73,6 +73,75 @@ final class ReaderSettingsFlowUITests: XCTestCase {
         XCTAssertFalse(shelfEntry.isHittable)
     }
 
+    func testCurlTurnsForwardAndBackWithoutLosingTextOrItsSettingsRoute() {
+        launchReader(mode: "pageCurl")
+        func currentPageText() -> String? {
+            let center = CGPoint(x: app.frame.midX, y: app.frame.midY)
+            return app.textViews.allElementsBoundByIndex.first {
+                $0.isHittable && $0.frame.contains(center)
+            }?.value as? String
+        }
+        let opened = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
+            currentPageText()?.isEmpty == false
+        }, object: nil)
+        XCTAssertEqual(XCTWaiter.wait(for: [opened], timeout: 12), .completed)
+        guard let first = currentPageText() else { return XCTFail("The curl must mount a real text page") }
+        var previous = first
+        for direction in [1, 1, 1, -1, -1, -1] {
+            app.coordinate(withNormalizedOffset: CGVector(dx: direction > 0 ? 0.85 : 0.15, dy: 0.5)).tap()
+            let advanced = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
+                guard let text = currentPageText() else { return false }
+                return !text.isEmpty && text != previous
+            }, object: nil)
+            XCTAssertEqual(XCTWaiter.wait(for: [advanced], timeout: 5), .completed,
+                           "A real curl page must change its rendered text after each turn")
+            previous = currentPageText() ?? ""
+            XCTAssertFalse(shelfEntry.isHittable)
+        }
+        XCTAssertEqual(currentPageText(), first, "Three reverse turns must return to the same original page")
+        openSettings()
+        element("reader.settings.close").tap()
+        XCTAssertTrue(element("reader.returnToShelf").isHittable)
+        capture("reader-curl-forward-back-restored")
+    }
+
+    func testRepeatedNativeMoreMenuCancellationKeepsTheReaderAndSettingsUsable() {
+        launchReader(mode: "scroll")
+        revealMenu()
+        let more = element("reader.more")
+        for visit in 0..<6 {
+            XCTAssertTrue(more.isHittable, "The native menu must remain reachable on visit \(visit)")
+            more.tap()
+            let details = app.buttons["书籍详情"].firstMatch
+            XCTAssertTrue(details.waitForExistence(timeout: 3))
+            XCTAssertTrue(details.isHittable)
+            if visit == 0 || visit == 5 { capture("reader-more-open-\(visit)") }
+            app.coordinate(withNormalizedOffset: CGVector(dx: 0.08, dy: 0.5)).tap()
+            let dismissed = XCTNSPredicateExpectation(predicate: NSPredicate(format: "exists == false"), object: details)
+            let dismissalResult = XCTWaiter.wait(for: [dismissed], timeout: 3)
+            if dismissalResult != .completed {
+                capture("reader-more-dismissal-failure-\(visit)")
+                let hierarchy = XCTAttachment(string: app.debugDescription)
+                hierarchy.name = "reader-more-dismissal-hierarchy-\(visit)"
+                hierarchy.lifetime = .keepAlways
+                add(hierarchy)
+            }
+            XCTAssertEqual(dismissalResult, .completed, "Native menu cancellation failed on visit \(visit)")
+            XCTAssertTrue(element("reader.openSettings").isHittable)
+            XCTAssertFalse(shelfEntry.isHittable)
+        }
+        // An independent prose tap still dismisses the chrome once the menu is gone.
+        app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.42)).tap()
+        let settings = element("reader.openSettings")
+        let chromeHidden = XCTNSPredicateExpectation(predicate: NSPredicate(format: "exists == false"), object: settings)
+        XCTAssertEqual(XCTWaiter.wait(for: [chromeHidden], timeout: 3), .completed)
+        openSettings()
+        element("reader.settings.close").tap()
+        XCTAssertTrue(more.isHittable)
+        element("reader.returnToShelf").tap()
+        XCTAssertTrue(shelfEntry.waitForExistence(timeout: 3))
+    }
+
     func testHeadingAndChromeReturnToSettingsNotTheBookshelf() {
         checkLocalReturn(routes: ["heading", "chrome"], paper: "bamboo")
     }
@@ -138,8 +207,10 @@ final class ReaderSettingsFlowUITests: XCTestCase {
             surface.isHittable && self.app.webViews.staticTexts.firstMatch.exists
                 && !self.element("reader.openingProgress").exists
         }, object: nil)
-        XCTAssertEqual(XCTWaiter.wait(for: [ready], timeout: 10), .completed,
-            "Reveal the menu only after the actual prose is ready to receive a tap")
+        let outcome = XCTWaiter.wait(for: [ready], timeout: 10)
+        if outcome != .completed { capture("reader-settings-prose-startup-failure") }
+        XCTAssertEqual(outcome, .completed,
+            "Actual prose not ready; recovery=\(element("reader.openingRecovery").exists); startup=\(surface.value ?? "unavailable")")
     }
 
     private func revealMenu() {

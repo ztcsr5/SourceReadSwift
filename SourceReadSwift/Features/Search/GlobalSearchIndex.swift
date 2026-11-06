@@ -1,0 +1,92 @@
+import Foundation
+
+/// Searchable local destinations contain metadata only, never whole chapter bodies.
+struct GlobalSearchEntry: Identifiable, Sendable, Equatable {
+    enum Kind: String, Sendable { case book, bookmark, source, setting }
+    let id: String
+    let kind: Kind
+    let title: String
+    let subtitle: String
+    let target: String
+    var bookmarkID: String? = nil
+}
+
+struct GlobalSearchIndex: Sendable {
+    private struct IndexedEntry: Sendable {
+        let destination: GlobalSearchEntry
+        let title: String
+        let searchable: String
+    }
+    private let indexedEntries: [IndexedEntry]
+
+    init(entries: [GlobalSearchEntry]) {
+        var indexed: [IndexedEntry] = []
+        indexed.reserveCapacity(entries.count)
+        for entry in entries {
+            guard !Task.isCancelled else { break }
+            let title = Self.normalize(entry.title)
+            indexed.append(IndexedEntry(destination: entry, title: title,
+                searchable: title + " " + Self.normalize(entry.subtitle)))
+        }
+        indexedEntries = indexed
+    }
+
+    static let settings: [GlobalSearchEntry] = [
+        .init(id: "settings.appearance", kind: .setting, title: "主题与外观", subtitle: "颜色 布局 动效 深色模式", target: "appearance"),
+        .init(id: "settings.sources", kind: .setting, title: "书源管理", subtitle: "导入 登录 规则 检测", target: "sources"),
+        .init(id: "settings.bookmarks", kind: .setting, title: "书签与摘录", subtitle: "阅读笔记 书摘 收藏", target: "bookmarks"),
+        .init(id: "settings.history", kind: .setting, title: "阅读历史", subtitle: "最近阅读 记录", target: "history")
+    ]
+
+    /// Builds a value-only catalog suitable for the background search task.
+    static func entries(books: [BookshelfBook], sources: [BookSource]) -> [GlobalSearchEntry] {
+        var entries = settings
+        for book in books {
+            guard !Task.isCancelled else { return [] }
+            entries.append(.init(id: "book:" + book.id, kind: .book, title: book.title,
+                subtitle: [book.author, book.groupName, book.intro].compactMap { $0 }.joined(separator: " · "),
+                target: book.id))
+            for bookmark in book.bookmarks ?? [] {
+                guard !Task.isCancelled else { return [] }
+                entries.append(.init(id: "bookmark:" + book.id + ":" + bookmark.id, kind: .bookmark,
+                    title: bookmark.chapterTitle, subtitle: book.title + " · " + bookmark.snippet,
+                    target: book.id, bookmarkID: bookmark.id))
+            }
+        }
+        for source in sources {
+            guard !Task.isCancelled else { return [] }
+            entries.append(.init(id: "source:" + source.id, kind: .source, title: source.bookSourceName,
+                                 subtitle: source.bookSourceGroup ?? "书源", target: source.bookSourceName))
+        }
+        return entries
+    }
+
+    /// Matches every query token, ranks titles first and bounds the rendered result count.
+    static func search(_ query: String, entries: [GlobalSearchEntry], limit: Int = 100) -> [GlobalSearchEntry] {
+        guard !Task.isCancelled else { return [] }
+        return Self(entries: entries).search(query, limit: limit)
+    }
+
+    /// Reuses the normalized catalog for each query until the underlying metadata changes.
+    func search(_ query: String, limit: Int = 100) -> [GlobalSearchEntry] {
+        let tokens = Self.normalize(String(query.prefix(200))).split(whereSeparator: \.isWhitespace).map(String.init)
+        guard !tokens.isEmpty, limit > 0 else { return [] }
+        var matches: [(GlobalSearchEntry, Int)] = []
+        for entry in indexedEntries {
+            guard !Task.isCancelled else { return [] }
+            guard tokens.allSatisfy({ entry.searchable.contains($0) }) else { continue }
+            let score = tokens.reduce(0) { $0 + (entry.title.hasPrefix($1) ? 4 : entry.title.contains($1) ? 2 : 0) }
+            matches.append((entry.destination, score))
+        }
+        matches.sort {
+            if $0.1 != $1.1 { return $0.1 > $1.1 }
+            return $0.0.id < $1.0.id
+        }
+        return Task.isCancelled ? [] : matches.prefix(limit).map(\.0)
+    }
+
+    private static func normalize(_ text: String) -> String {
+        text.folding(options: [.caseInsensitive, .diacriticInsensitive, .widthInsensitive],
+                     locale: Locale(identifier: "en_US_POSIX"))
+    }
+}
