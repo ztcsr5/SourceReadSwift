@@ -49,15 +49,22 @@ final class CloudTTSPlayer: NSObject, AVAudioPlayerDelegate {
     }
 
     func resume() {
-        player?.play()
+        guard let player else { return }
+        if !player.play() {
+            stop()
+            onError?(XunfeiTTSError.playbackUnavailable)
+        }
     }
 
     func stop() {
+        player?.delegate = nil
         player?.stop()
         player = nil
     }
 
     func audioPlayerDidFinishPlaying(_ player: AVAudioPlayer, successfully flag: Bool) {
+        guard let activePlayer = self.player, activePlayer === player else { return }
+        player.delegate = nil
         self.player = nil
         if flag {
             onFinish?()
@@ -67,6 +74,8 @@ final class CloudTTSPlayer: NSObject, AVAudioPlayerDelegate {
     }
 
     func audioPlayerDecodeErrorDidOccur(_ player: AVAudioPlayer, error: Error?) {
+        guard let activePlayer = self.player, activePlayer === player else { return }
+        player.delegate = nil
         self.player = nil
         onError?(error ?? XunfeiTTSError.playbackUnavailable)
     }

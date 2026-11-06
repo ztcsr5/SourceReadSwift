@@ -172,6 +172,11 @@ struct SearchResultParser {
                 "html": response.body
             ]
             for element in elements {
+                let ruleBook = LegadoSearchBookBridge(book: SearchBook(name: "", author: nil, coverUrl: nil,
+                    bookUrl: "", sourceName: source.bookSourceName, sourceUrl: source.bookSourceUrl,
+                    mediaKind: source.sourceKind))
+                var variables = variables
+                variables["book"] = ruleBook
                 var rawName = (try? htmlExtractor.value(from: element, rule: firstRule(rule, fallback: source.ruleSearch, keys: ["name", "bookName"]), fallback: nil, baseUrl: response.url, variables: variables))?.nilIfEmpty
                 if rawName == nil {
                     rawName = (try? htmlExtractor.value(from: element, rule: "a.track@text", fallback: nil, baseUrl: response.url, variables: variables))?.nilIfEmpty
@@ -182,6 +187,7 @@ struct SearchResultParser {
                 let name = rawName?.components(separatedBy: .newlines).first(where: { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty })?.trimmingCharacters(in: .whitespacesAndNewlines) ?? rawName
 
                 let variablesBeforeBookURL = executionContext.persistentSnapshot()
+                ruleBook.name = name ?? ""
                 var rawBookUrl = (try? htmlExtractor.value(from: element, rule: firstRule(rule, fallback: source.ruleSearch, keys: ["bookUrl", "url"]), fallback: nil, baseUrl: response.url, variables: variables))?.nilIfEmpty
                 if rawBookUrl == nil {
                     rawBookUrl = (try? htmlExtractor.value(from: element, rule: "a.track@href", fallback: nil, baseUrl: response.url, variables: variables))?.nilIfEmpty
@@ -226,7 +232,8 @@ struct SearchResultParser {
                     kind: kind,
                     lastChapter: lastChapter,
                     wordCount: wordCount,
-                    checkKeyWord: checkKeyWord
+                    checkKeyWord: checkKeyWord,
+                    mediaKind: ruleBook.mediaKind
                 ))
             }
             if elements.isEmpty {
@@ -306,6 +313,11 @@ struct SearchResultParser {
         }
         let candidates = extractor.list(from: rootObject, rule: listRule, variables: variables).prefix(120)
         let books = candidates.compactMap { item -> SearchBook? in
+            let ruleBook = LegadoSearchBookBridge(book: SearchBook(name: "", author: nil, coverUrl: nil,
+                bookUrl: "", sourceName: source.bookSourceName, sourceUrl: source.bookSourceUrl,
+                mediaKind: source.sourceKind))
+            var variables = variables
+            variables["book"] = ruleBook
             let name = extractor.string(
                 from: item,
                 rule: firstRule(rule, fallback: source.ruleSearch, keys: ["name", "bookName"]),
@@ -313,6 +325,7 @@ struct SearchResultParser {
                 variables: variables
             )
             let variablesBeforeBookURL = executionContext.persistentSnapshot()
+            ruleBook.name = name ?? ""
             let bookUrlRule = firstRule(rule, fallback: source.ruleSearch, keys: ["bookUrl", "url"])
             var bookURLFallbackKeys = ["bookUrl", "url", "link", "book_url"]
             // A bare `id` is not a book URL.  Only sources without any
@@ -406,7 +419,8 @@ struct SearchResultParser {
                     rule: firstRule(rule, fallback: source.ruleSearch, keys: ["checkKeyWord"]),
                     fallbackKeys: [],
                     variables: variables
-                )
+                ),
+                mediaKind: ruleBook.mediaKind
             )
         }
         let filtered = books

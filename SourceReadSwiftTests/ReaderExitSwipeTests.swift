@@ -1,6 +1,7 @@
 import XCTest
 import SwiftUI
 import UIKit
+import WebKit
 @testable import SourceReadSwift
 
 final class ReaderExitSwipeTests: XCTestCase {
@@ -17,6 +18,15 @@ final class ReaderExitSwipeTests: XCTestCase {
         XCTAssertTrue(ReaderSystemReturnPolicy.isEnabled(isScroll: false, menuVisible: true, blocked: false, selectionEnabled: false))
         XCTAssertFalse(ReaderSystemReturnPolicy.isEnabled(isScroll: true, menuVisible: false, blocked: false, selectionEnabled: true))
         XCTAssertFalse(ReaderSystemReturnPolicy.isEnabled(isScroll: true, menuVisible: true, blocked: true, selectionEnabled: false))
+    }
+
+    func testOnlyAnActiveOrCompletedNativeReturnSuppressesFallback() {
+        for state in [UIGestureRecognizer.State.began, .changed, .ended] {
+            XCTAssertTrue(ReaderExitSwipePolicy.isSystemReturnActive(state))
+        }
+        for state in [UIGestureRecognizer.State.possible, .failed, .cancelled] {
+            XCTAssertFalse(ReaderExitSwipePolicy.isSystemReturnActive(state))
+        }
     }
 
     func testDeliberateRightwardSwipePassesDistanceThreshold() {
@@ -79,7 +89,7 @@ final class ReaderExitSwipeTests: XCTestCase {
         XCTAssertFalse(controller.gestureRecognizer(controller.edgePan, shouldBeRequiredToFailBy: controller.edgePan))
     }
 
-    @MainActor func testBookReturnLeavesTheSystemRecognizerInChargeWhenItIsEnabled() {
+    @MainActor func testEnabledSystemReturnDoesNotDisableFallbackOrReplaceItsDelegate() {
         if #available(iOS 18.0, *) {
             let root = UIViewController(), source = UIViewController()
             let navigation = UINavigationController(rootViewController: root)
@@ -88,12 +98,60 @@ final class ReaderExitSwipeTests: XCTestCase {
             let bridge = ReaderExitSwipeController()
             source.addChild(bridge); source.view.addSubview(bridge.view); bridge.didMove(toParent: source)
             navigation.interactivePopGestureRecognizer?.isEnabled = true
+            let nativeDelegate = navigation.interactivePopGestureRecognizer?.delegate
+            navigation.setNavigationBarHidden(true, animated: false)
             bridge.configure(enabled: true, prefersSystemReturn: true, onExit: {})
-            XCTAssertFalse(bridge.edgePan.isEnabled, "A second edge recognizer must not wait until touch-up to compete with the native transition")
+            XCTAssertTrue(bridge.edgePan.isEnabled, "An enabled flag alone cannot prove that the hidden-bar native return will begin")
+            XCTAssertTrue(navigation.interactivePopGestureRecognizer?.delegate === nativeDelegate)
             XCTAssertTrue(navigation.interactivePopGestureRecognizer?.isEnabled == true)
             bridge.configure(enabled: true, prefersSystemReturn: false, onExit: {})
             XCTAssertTrue(bridge.edgePan.isEnabled, "Non-book and legacy entry paths keep the existing fallback")
         }
+    }
+
+    @MainActor func testProsePrioritizesOnlyTheMountedNavigationEdgeRecognizer() throws {
+        guard #available(iOS 18.0, *) else { return }
+        let destination = UIViewController()
+        let navigation = UINavigationController(rootViewController: UIViewController())
+        navigation.pushViewController(destination, animated: false)
+        let scene = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.first
+        let previous = scene?.windows.first(where: \.isKeyWindow)
+        let window = scene.map { UIWindow(windowScene: $0) } ?? UIWindow(frame: UIScreen.main.bounds)
+        window.rootViewController = navigation
+        window.makeKeyAndVisible()
+        defer { window.isHidden = true; previous?.makeKey() }
+
+        let edgeReturn = try XCTUnwrap(navigation.interactivePopGestureRecognizer)
+        let web = ReaderEdgeReturnWebView(frame: destination.view.bounds, configuration: WKWebViewConfiguration())
+        let scrollDelegate = web.scrollView.panGestureRecognizer.delegate
+        let edgeDelegate = edgeReturn.delegate
+        XCTAssertNil(web.prioritizedEdgeReturn)
+        destination.view.addSubview(web)
+        window.layoutIfNeeded()
+        web.layoutIfNeeded()
+        XCTAssertTrue(web.prioritizedEdgeReturn === edgeReturn, "The mounted and laid-out prose view must install edge priority")
+        XCTAssertTrue(edgeReturn.delegate === edgeDelegate)
+        XCTAssertTrue(web.scrollView.panGestureRecognizer.delegate === scrollDelegate)
+    }
+
+    @MainActor func testProseEdgePriorityInstallsWhenItsParentIsMountedLater() throws {
+        guard #available(iOS 18.0, *) else { return }
+        let destination = UIViewController()
+        let navigation = UINavigationController(rootViewController: UIViewController())
+        navigation.pushViewController(destination, animated: false)
+        let web = ReaderEdgeReturnWebView(frame: CGRect(x: 0, y: 0, width: 320, height: 640), configuration: WKWebViewConfiguration())
+        destination.view.addSubview(web)
+        XCTAssertNil(web.prioritizedEdgeReturn)
+        let scene = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.first
+        let previous = scene?.windows.first(where: \.isKeyWindow)
+        let window = scene.map { UIWindow(windowScene: $0) } ?? UIWindow(frame: UIScreen.main.bounds)
+        window.rootViewController = navigation
+        window.makeKeyAndVisible()
+        defer { window.isHidden = true; previous?.makeKey() }
+        window.layoutIfNeeded()
+        web.layoutIfNeeded()
+        let edgeReturn = try XCTUnwrap(navigation.interactivePopGestureRecognizer)
+        XCTAssertTrue(web.prioritizedEdgeReturn === edgeReturn)
     }
 
     @MainActor func testSuccessfulSwipeDismissesExactlyOnce() {

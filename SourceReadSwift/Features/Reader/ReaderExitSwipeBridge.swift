@@ -19,6 +19,10 @@ enum ReaderExitSwipePolicy {
             && movement.x > 0 && movement.x > abs(movement.y) * 1.5
     }
 
+    static func isSystemReturnActive(_ state: UIGestureRecognizer.State) -> Bool {
+        state == .began || state == .changed || state == .ended
+    }
+
     static func shouldFinish(translation: CGPoint, velocity: CGPoint, width: CGFloat) -> Bool {
         guard width.isFinite, width > 0, isRightward(translation) else { return false }
         let threshold = max(72, min(width * 0.22, 140))
@@ -28,7 +32,7 @@ enum ReaderExitSwipePolicy {
 }
 
 /// Only the reader's hosting subtree receives the recognizer, never the window.
-/// The normal page gestures remain untouched while the reading menu is hidden.
+/// Only allowed prose/menu routes enable it; page turns and selection remain protected.
 struct ReaderExitSwipeBridge: UIViewControllerRepresentable {
     let enabled: Bool
     let onExit: () -> Void
@@ -114,7 +118,7 @@ final class ReaderExitSwipeController: UIViewController, UIGestureRecognizerDele
     }
 
     private func attachIfNeeded() {
-        let needsFallback = exitEnabled && !usesSystemReturn
+        let needsFallback = exitEnabled
         if edgePan.isEnabled != needsFallback { edgePan.isEnabled = needsFallback }
         guard let host = parent?.view, host !== view else { return }
         if edgePan.view !== host {
@@ -127,9 +131,19 @@ final class ReaderExitSwipeController: UIViewController, UIGestureRecognizerDele
         edgePan.view?.removeGestureRecognizer(edgePan)
     }
 
+    private var hasActiveSystemReturn: Bool {
+        if let pop = navigationController?.interactivePopGestureRecognizer,
+           ReaderExitSwipePolicy.isSystemReturnActive(pop.state) { return true }
+        #if compiler(>=6.2)
+        if #available(iOS 26.0, *), let pop = navigationController?.interactiveContentPopGestureRecognizer,
+           ReaderExitSwipePolicy.isSystemReturnActive(pop.state) { return true }
+        #endif
+        return false
+    }
+
     func gestureRecognizerShouldBegin(_ gestureRecognizer: UIGestureRecognizer) -> Bool {
-        exitEnabled && !didExit && gestureRecognizer === edgePan
-            && ReaderExitSwipePolicy.isRightward(edgePan.velocity(in: edgePan.view))
+        guard exitEnabled, !didExit, gestureRecognizer === edgePan, !hasActiveSystemReturn else { return false }
+        return ReaderExitSwipePolicy.isRightward(edgePan.velocity(in: edgePan.view))
     }
 
     func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldReceive touch: UITouch) -> Bool {
@@ -147,6 +161,10 @@ final class ReaderExitSwipeController: UIViewController, UIGestureRecognizerDele
 
     func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer,
                            shouldBeRequiredToFailBy otherGestureRecognizer: UIGestureRecognizer) -> Bool {
+        if otherGestureRecognizer === navigationController?.interactivePopGestureRecognizer { return false }
+        #if compiler(>=6.2)
+        if #available(iOS 26.0, *), otherGestureRecognizer === navigationController?.interactiveContentPopGestureRecognizer { return false }
+        #endif
         // Dynamic priority prevents an edge-exit swipe from also turning a page.
         guard exitEnabled, gestureRecognizer === edgePan,
               let host = edgePan.view, let other = otherGestureRecognizer.view else { return false }
@@ -160,7 +178,7 @@ final class ReaderExitSwipeController: UIViewController, UIGestureRecognizerDele
     }
 
     func completeSwipe(translation: CGPoint, velocity: CGPoint, cancelled: Bool) {
-        guard exitEnabled, edgePan.isEnabled, !didExit, !cancelled,
+        guard exitEnabled, edgePan.isEnabled, !didExit, !cancelled, !hasActiveSystemReturn,
               ReaderExitSwipePolicy.shouldFinish(translation: translation, velocity: velocity,
                                                 width: edgePan.view?.bounds.width ?? 0) else { return }
         didExit = true
