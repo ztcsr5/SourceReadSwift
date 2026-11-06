@@ -56,6 +56,7 @@ struct ReaderView: View {
     @Environment(\.readerUsesBookReturn) private var readerUsesBookReturn
     @State private var hasResolvedOpeningPreview = false
     @State private var chromeState = ReaderChromeStateMachine()
+    @State private var nativeMoreMenuPresentation = ReaderMenuPresentation()
     @State private var tabChromeOwner = UUID()
     @State private var readerSessionEnded = false
     @State private var showChapterList = false
@@ -143,7 +144,8 @@ struct ReaderView: View {
     /// actual container size instead of using UIScreen.main, which describes
     /// the physical display and can be stale for the current scene.
     @State private var viewportSize: CGSize = .zero
-    @State private var sessionStartedAt = Date()
+    @State private var foregroundReading = ForegroundReadingSession()
+    @State private var isReaderVisible = false
     @State private var previousIdleTimerDisabled = false
     @State private var committedParagraphIndex = 0
     @State private var scrollPositionTracker = ReaderScrollPositionTracker()
@@ -697,10 +699,19 @@ struct ReaderView: View {
             UIScreen.main.brightness = brightnessBeforeReader
         }
         appState.releaseTabChromeHidden(owner: tabChromeOwner)
-        appState.bookshelfStore.recordReadingSession(
-            bookID: bookID,
-            duration: Date().timeIntervalSince(sessionStartedAt)
-        )
+        pauseReadingActivity()
+    }
+
+    private func resumeReadingActivity() {
+        guard isReaderVisible, !readerSessionEnded, !readerOpeningManaged, scenePhase == .active else { return }
+        foregroundReading.resume(at: Date())
+    }
+
+    private func pauseReadingActivity() {
+        let calendar = ReadingDayActivity.calendar(in: .current)
+        guard let interval = foregroundReading.pause(at: Date(), calendar: calendar) else { return }
+        appState.bookshelfStore.recordReadingActivity(bookID: bookID, days: interval.days,
+                                                       startsSession: interval.startsSession)
     }
 
     private func scheduleGeometrySettle() {
@@ -1037,21 +1048,25 @@ struct ReaderView: View {
                     .zIndex(4)
             }
 
-            if showSettings {
-                Color.black.opacity(0.35)
-                    .ignoresSafeArea()
-                    .contentShape(Rectangle())
-                    .onTapGesture {
-                        closeSettingsPanel()
-                    }
-                    .transition(.opacity)
-                    .zIndex(15)
+            ZStack {
+                if showSettings {
+                    Color.black.opacity(0.35)
+                        .ignoresSafeArea()
+                        .contentShape(Rectangle())
+                        .onTapGesture {
+                            closeSettingsPanel()
+                        }
+                        .transition(.opacity)
 
-                settingsPanel
-                    .zIndex(20)
-                    .transition(motion.reducesMotion ? .opacity : .offset(y: ReaderSettingsLayoutPolicy.maxPanelHeight(
-                        viewportHeight: effectiveViewportSize.height, bottomInset: readerFooterSafeInset) + readerFooterSafeInset + 16))
+                    settingsPanel
+                        .transition(motion.reducesMotion ? .opacity : .offset(y: ReaderSettingsLayoutPolicy.maxPanelHeight(
+                            viewportHeight: effectiveViewportSize.height, bottomInset: readerFooterSafeInset) + readerFooterSafeInset + 16))
+                }
             }
+            // The outgoing scrim remains drawn during its transition, but it
+            // must release touches as soon as the reader controls reappear.
+            .allowsHitTesting(showSettings)
+            .zIndex(20)
 
             if showGoalCelebrationToast {
                 VStack {
@@ -1246,8 +1261,14 @@ struct ReaderView: View {
             appState.acquireTabChromeHidden(owner: tabChromeOwner)
             // Dismissing the full-screen TOC must not replay initial position,
             // markReaderOpened or the initial synchronous pagination pass.
-            guard readerPresentationLifecycle.beginAppearance() else { return }
+            isReaderVisible = true
+            guard readerPresentationLifecycle.beginAppearance() else {
+                resumeReadingActivity()
+                return
+            }
             readerSessionEnded = false
+            foregroundReading = ForegroundReadingSession()
+            resumeReadingActivity()
             migrateTypographyDefaultsIfNeeded()
             if let ov = ReaderOverrideStore.shared.override(for: bookID) {
                 isPerBookOverride = true
@@ -1263,7 +1284,6 @@ struct ReaderView: View {
             }
             appState.acquireTabChromeHidden(owner: tabChromeOwner)
             chromeState.setInitialOverlayVisible(initialOverlayVisible)
-            sessionStartedAt = Date()
             seedWindow()
             if readerMode != .scroll { rebuildPagedBlocksCache() }
             readerContentFingerprint = makeContentFingerprint(content)
@@ -1301,7 +1321,12 @@ struct ReaderView: View {
         .task(id: imageHeaderCacheKey) {
             refreshImageRequestHeaders()
         }
+        .onChange(of: readerOpeningManaged) { isOpening in
+            if !isOpening { resumeReadingActivity() }
+        }
         .onDisappear {
+            isReaderVisible = false
+            pauseReadingActivity()
             // Ownership is visibility-scoped even for temporary covers.
             appState.releaseTabChromeHidden(owner: tabChromeOwner)
             // Cover presentation is not a reader exit. Keep the live session
@@ -1335,6 +1360,7 @@ struct ReaderView: View {
                 positionPersistTask?.cancel()
                 positionPersistTask = nil
                 appState.finishReadingWritesInBackground {
+                    pauseReadingActivity()
                     persistReadingPosition(paragraphIndexOverride: currentParagraphIndexForPersistence())
                 }
                 if autoScrollEnabled {
@@ -1343,6 +1369,7 @@ struct ReaderView: View {
                 }
                 // Speech continues playing in background / screen lock
             } else {
+                resumeReadingActivity()
                 if autoScrollPausedForScene {
                     autoScrollPausedForScene = false
                     startAutoScroll()
@@ -3742,6 +3769,7 @@ struct ReaderView: View {
 
                 VStack(alignment: .leading, spacing: 2) {
                     Text(currentDisplayChapterTitle)
+                        .accessibilityIdentifier("reader.currentChapterHeading")
                         .font(.system(size: 16, weight: .semibold))
                         .foregroundStyle(chromeForeground)
                         .lineLimit(1)
@@ -3774,9 +3802,11 @@ struct ReaderView: View {
                 }
 
                 ReaderNativeMenuButton(
-                    menu: readerNativeMenu,
+                    menuIdentity: readerNativeMenuIdentity,
+                    makeMenu: { readerNativeMenu },
                     foregroundColor: background.uiTextColor(isNight: readerIsNight),
-                    backgroundColor: readerUsesTranslucentChrome ? .clear : background.uiColor(isNight: readerIsNight)
+                    backgroundColor: readerUsesTranslucentChrome ? .clear : background.uiColor(isNight: readerIsNight),
+                    presentation: nativeMoreMenuPresentation
                 )
                 .frame(width: 44, height: 44)
             }
@@ -4064,6 +4094,16 @@ struct ReaderView: View {
             "advanced": byteCount { advancedSettings },
             "selection": byteCount { settingsPage(for: 0) }
         ]
+    }
+
+    private var readerNativeMenuIdentity: String {
+        [
+            bookID, String(windowCurrentChapterIndex), windowSourceURL ?? "",
+            currentChapterWebURL?.absoluteString ?? "",
+            String(onRefreshChapter != nil), String(onCacheNextChapters != nil),
+            String(canShowPayAction), String(isPerformingPayAction), String(autoScrollEnabled),
+            String(currentBookSource != nil)
+        ].joined(separator: "\n")
     }
 
     private var readerNativeMenu: UIMenu {
@@ -5661,7 +5701,7 @@ struct ReaderView: View {
     }
 
     private func handleReaderTap(at location: CGPoint) {
-        guard !textSelectionEnabled else { return }
+        guard !textSelectionEnabled, !nativeMoreMenuPresentation.isActive else { return }
         let now = Date()
         guard now >= tapCooldownUntil else { return }
         tapCooldownUntil = now.addingTimeInterval(0.28)
@@ -6291,6 +6331,7 @@ struct ReaderView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .foregroundStyle(readerThemeTextColor)
         .background(readerThemeBackground.ignoresSafeArea())
+        .accessibilityIdentifier("reader.openingRecovery")
     }
 
     private func resolveOpeningPreview() {
@@ -6341,24 +6382,23 @@ struct ReaderView: View {
     }
 
     private func checkDailyReadingGoal() {
-        let todayKey = Date().formatted(date: .numeric, time: .omitted)
-        guard lastGoalCelebratedDate != todayKey else { return }
-        let goalSeconds = Double(dailyGoalMinutes) * 60.0
-        guard goalSeconds > 0 else { return }
-        let summary = ReadingStatsSummary(books: appState.bookshelfStore.books)
-        let activeSeconds = Date().timeIntervalSince(sessionStartedAt)
-        if (summary.todayReadingSeconds + activeSeconds) >= goalSeconds {
-            lastGoalCelebratedDate = todayKey
-            streakDaysCount = max(1, summary.streakDays)
-            withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
-                showGoalCelebrationToast = true
-            }
-            HapticFeedback.success()
-            DispatchQueue.main.asyncAfter(deadline: .now() + 4.0) {
-                withAnimation(.easeOut(duration: 0.3)) {
-                    showGoalCelebrationToast = false
-                }
-            }
+        let now = Date()
+        let todayKey = now.formatted(date: .numeric, time: .omitted)
+        guard dailyGoalMinutes > 0, lastGoalCelebratedDate != todayKey else { return }
+        let calendar = ReadingDayActivity.calendar(in: .current)
+        let books = appState.bookshelfStore.books
+        let storedSeconds = ReadingDayActivity.seconds(on: now, calendar: calendar, books: books)
+        let activeSeconds = foregroundReading.todaySeconds(at: now, calendar: calendar)
+        guard storedSeconds + activeSeconds >= Double(dailyGoalMinutes) * 60 else { return }
+
+        let summary = ReadingStatsSummary(books: books, referenceDate: now)
+        lastGoalCelebratedDate = todayKey
+        streakDaysCount = max(1, summary.streakDays + (storedSeconds == 0 ? 1 : 0))
+        let animation = motion.animation(.expansion)
+        withAnimation(animation) { showGoalCelebrationToast = true }
+        HapticFeedback.success()
+        DispatchQueue.main.asyncAfter(deadline: .now() + 4.0) {
+            withAnimation(animation) { showGoalCelebrationToast = false }
         }
     }
 
@@ -6853,6 +6893,7 @@ struct ReaderPreviewPosition: Equatable {
     let chapterIndex: Int
     let chapterTitle: String
     let paragraphIndex: Int
+    var comicPosition: ComicReadingPosition? = nil
 }
 
 private final class ReaderScrollPositionTracker {

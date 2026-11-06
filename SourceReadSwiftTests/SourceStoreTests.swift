@@ -495,6 +495,22 @@ final class SourceStoreTests: XCTestCase {
 
     // MARK: - Specialized adapter dispatch (sync/async parity)
 
+    func testMixedFormatImportPreservesEverySourceAndItsRules() async throws {
+        let exported = ##"[{"bookSourceName":"Canonical","bookSourceUrl":"https://canonical.invalid","ruleContent":{"content":"#body@text","nextContentUrl":"a.next@href"}},{"sourceName":"HuaHuo","sourceUrl":"https://huahuo.invalid","ruleSearch":{"searchBookList":".book","searchName":"h2@text","searchBookUrl":"a@href"}},{"title":"HaiKuo","url":"https://haikuo.invalid","search_rule":".result"}]"##
+        for asynchronous in [false, true] {
+            let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+            defer { try? FileManager.default.removeItem(at: root) }
+            let store = SourceStore(persistence: SourcePersistence(rootURL: root))
+            let report: SourceImportReport
+            if asynchronous { report = try await store.importJSONDataAsync(Data(exported.utf8)) }
+            else { report = try store.importJSONData(Data(exported.utf8)) }
+            XCTAssertEqual(report.addedBookSources, 3, "A mixed export must not silently discard formats after the first match")
+            XCTAssertEqual(store.source(for: "https://canonical.invalid")?.ruleContent?.fields["nextContentUrl"], "a.next@href")
+            XCTAssertEqual(store.source(for: "https://huahuo.invalid")?.ruleSearch?.fields["bookList"], ".book")
+            XCTAssertEqual(store.source(for: "https://haikuo.invalid")?.ruleSearch?.fields["bookList"], ".result")
+        }
+    }
+
     func testAsyncImportHuaHuoSourceUsesSpecializedAdapter() async throws {
         let root = FileManager.default.temporaryDirectory
             .appendingPathComponent(UUID().uuidString, isDirectory: true)

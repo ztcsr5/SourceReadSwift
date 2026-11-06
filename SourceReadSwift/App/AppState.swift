@@ -11,6 +11,7 @@ final class AppState: ObservableObject {
     let bookTOCacheStore: BookTOCacheStore
     let chapterDownloadStore: ChapterDownloadStore
     let chapterDownloadCoordinator: ChapterDownloadCoordinator
+    let comicOfflineArchive: ComicOfflineArchive
     let rssArticleStateStore: RSSArticleStateStore
     let rssFeedCacheStore: RSSFeedCacheStore
     let rssArticleContentCacheStore: RSSArticleContentCacheStore
@@ -39,7 +40,8 @@ final class AppState: ObservableObject {
                 await MainActor.run { [weak self] in
                     self?.purifyRuleStore.enabledPatterns ?? []
                 }
-            }
+            },
+            sourceVariables: .shared
         )
     }()
 
@@ -64,7 +66,8 @@ final class AppState: ObservableObject {
         sourceCookieStore: SourceCookieStore? = nil,
         readingHistoryStore: ReadingHistoryStore? = nil,
         discoverViewModel: DiscoverViewModel? = nil,
-        engine: SourceEngine? = nil
+        engine: SourceEngine? = nil,
+        comicOfflineArchive: ComicOfflineArchive = .shared
     ) {
         self.sourceStore = sourceStore ?? SourceStore()
         let resolvedBookshelfStore = bookshelfStore ?? BookshelfStore()
@@ -74,7 +77,8 @@ final class AppState: ObservableObject {
         self.bookTOCacheStore = bookTOCacheStore ?? BookTOCacheStore()
         let resolvedChapterDownloadStore = chapterDownloadStore ?? ChapterDownloadStore()
         self.chapterDownloadStore = resolvedChapterDownloadStore
-        self.chapterDownloadCoordinator = ChapterDownloadCoordinator(store: resolvedChapterDownloadStore)
+        self.comicOfflineArchive = comicOfflineArchive
+        self.chapterDownloadCoordinator = ChapterDownloadCoordinator(store: resolvedChapterDownloadStore, comicArchive: comicOfflineArchive)
         self.rssArticleStateStore = rssArticleStateStore ?? RSSArticleStateStore()
         self.rssFeedCacheStore = rssFeedCacheStore ?? RSSFeedCacheStore()
         self.rssArticleContentCacheStore = rssArticleContentCacheStore ?? RSSArticleContentCacheStore()
@@ -147,6 +151,22 @@ final class AppState: ObservableObject {
         do {
             let localURL = try PickedDocumentAccess.copiedURL(from: url)
             let ext = localURL.pathExtension.lowercased()
+            if ext == "cbz" {
+                Task { @MainActor in
+                    do {
+                        let parsed = try await Task.detached(priority: .userInitiated) {
+                            try LocalComicBookParser().parse(fileURL: localURL)
+                        }.value
+                        bookshelfStore.addLocalTextBook(parsed)
+                        record(DiagnosticEvent(level: .info, stage: "import", sourceName: parsed.title,
+                            message: "已导入本地漫画，共 \(parsed.paragraphs.count) 页"))
+                    } catch {
+                        record(DiagnosticEvent(level: .error, stage: "import",
+                            message: "漫画导入失败：\(error.localizedDescription)"))
+                    }
+                }
+                return
+            }
             // Sniff the container instead of trusting the copied file name: a
             // share-sheet Inbox copy can drop the ".epub" extension, and the
             // TXT branch below would then render a ZIP as one 全文 chapter.
@@ -210,12 +230,7 @@ final class AppState: ObservableObject {
             }
             .store(in: &cancellables)
 
-        chapterContentCacheStore.objectWillChange
-            .sink { [weak self] _ in
-                self?.scheduleStoreNotification()
-            }
-            .store(in: &cancellables)
-
+        // Prefetch and LRU touches are cache-local; the offline list observes its store directly.
         chapterDownloadStore.objectWillChange
             .sink { [weak self] _ in
                 self?.scheduleStoreNotification()
@@ -252,11 +267,8 @@ final class AppState: ObservableObject {
             }
             .store(in: &cancellables)
 
-        readingHistoryStore.objectWillChange
-            .sink { [weak self] _ in
-                self?.scheduleStoreNotification()
-            }
-            .store(in: &cancellables)
+        // ReadingHistoryView observes its store; periodic position writes
+        // must not invalidate every screen through the app container.
 
         // DiscoverView observes this model directly. Forwarding every search
         // progress / keyword update through AppState redrew every app screen.
@@ -266,13 +278,7 @@ final class AppState: ObservableObject {
     // MARK: - Centralized App Data Backup & Restore
 
     func makeAppDataBackupSnapshot() -> AppDataBackupSnapshot {
-        let keys = [
-            "reader.fontSize", "reader.lineSpacing", "reader.pagePadding", "reader.letterSpacing",
-            "reader.paragraphSpacing", "reader.paragraphIndent", "reader.titleSpacing", "reader.footerHeight",
-            "reader.ttsRate", "reader.autoScrollDelay", "reader.sleepTimerMinutes", "reader.background",
-            "reader.mode", "reader.tapZones", "reader.keepScreenAwake", "reader.preloadChapterCount",
-            "reader.textSelectionEnabled", "settings.themeMode", "settings.visualTheme"
-        ] + AppVisualTheme.allCases.flatMap { [$0.preferenceKey("accent"), $0.preferenceKey("secondaryAccent")] }
+        let keys = AppBackupPreferences.keys
         let defaults = UserDefaults.standard
         let doubleKeys: Set<String> = [
             "reader.fontSize", "reader.lineSpacing", "reader.pagePadding", "reader.letterSpacing",
@@ -318,14 +324,9 @@ final class AppState: ObservableObject {
     }
 
     func restoreReaderPreferences(_ preferences: [String: BackupPreferenceValue]) {
-        let defaults = UserDefaults.standard
-        for (key, value) in preferences {
-            switch value {
-            case .string(let val): defaults.set(val, forKey: key)
-            case .double(let val): defaults.set(val, forKey: key)
-            case .integer(let val): defaults.set(val, forKey: key)
-            case .bool(let val): defaults.set(val, forKey: key)
-            }
+        do { try AppBackupPreferences.apply(preferences, to: .standard) }
+        catch {
+            record(DiagnosticEvent(level: .error, stage: "backup.preferences", message: error.localizedDescription))
         }
     }
 }

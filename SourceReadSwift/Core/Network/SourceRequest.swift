@@ -159,7 +159,7 @@ final class URLSessionSourceNetworkClient: SourceNetworkClient, @unchecked Senda
         let configuration = URLSessionConfiguration.ephemeral
         configuration.urlCache = nil
         configuration.requestCachePolicy = .reloadIgnoringLocalCacheData
-        SourceProxyManager.shared.applyProxy(to: configuration)
+        configuration.connectionProxyDictionary = SourceProxyConfiguration.load(from: .standard).connectionProxyDictionary
         let newSession = URLSession(configuration: configuration, delegate: sessionDelegate, delegateQueue: nil)
         _currentSession = newSession
         return newSession

@@ -41,6 +41,10 @@ final class SourceStore: ObservableObject {
     @Published private(set) var organization = SourceOrganization()
     @Published private(set) var lastError: String?
     private let persistence: SourcePersistence
+    private var lookupRevision: UInt64?
+    private var exactSourceIndex: [String: Int] = [:]
+    private var normalizedSourceIndex: [String: Int] = [:]
+    private var firstSourceByHost: [String: Int] = [:]
 
     nonisolated static let defaultRSSSources: [RSSSource] = [
         RSSSource(
@@ -456,6 +460,12 @@ final class SourceStore: ObservableObject {
             case .failure(let error):
                 throw error
             }
+            let publisher = await Task.detached(priority: .userInitiated) {
+                SourcePublisherLinks.discover(in: payload.text, at: payload.url)
+            }.value
+            if let publisher {
+                throw SourceImportError.publisherPage(publisher)
+            }
             let report: SourceImportReport
             do {
                 report = try await importJSONDataAsync(payload.data)
@@ -547,22 +557,10 @@ final class SourceStore: ObservableObject {
         return try self.importItems(decodedItems)
     }
 
-    /// Single source of truth for specialized import adapters.
-    ///
-    /// Sync and async imports must never drift: every adapter is probed here in
-    /// the same order. `nil` means "no specialized format matched", so generic
-    /// Legado JSON decoding still gets its chance.
+    /// XBS archives and legacy XBS JSON keep their existing importer.
     nonisolated static func specializedBookSources(from data: Data) -> [BookSource]? {
         if XbsBookSourceAdapter.isXbsData(data) {
             let adapted = XbsBookSourceAdapter.importSources(from: data)
-            if !adapted.isEmpty { return adapted }
-        }
-        if HuaHuoBookSourceAdapter.isHuaHuoData(data) {
-            let adapted = HuaHuoBookSourceAdapter.importSources(from: data)
-            if !adapted.isEmpty { return adapted }
-        }
-        if HaiKuoShiJieSourceAdapter.isHaiKuoData(data) {
-            let adapted = HaiKuoShiJieSourceAdapter.importSources(from: data)
             if !adapted.isEmpty { return adapted }
         }
         return nil
@@ -649,19 +647,30 @@ final class SourceStore: ObservableObject {
     }
 
     func source(for sourceUrl: String) -> BookSource? {
-        if let exact = sources.first(where: { $0.bookSourceUrl == sourceUrl }) {
-            return exact
-        }
+        if lookupRevision != sourcesRevision { rebuildSourceIndex() }
+        if let index = exactSourceIndex[sourceUrl] { return sources[index] }
         let trimmed = sourceUrl.trimmingCharacters(in: CharacterSet(charactersIn: "/ "))
-        if let match = sources.first(where: { $0.bookSourceUrl.trimmingCharacters(in: CharacterSet(charactersIn: "/ ")) == trimmed }) {
-            return match
-        }
-        if let host = URL(string: sourceUrl)?.host?.lowercased(), !host.isEmpty {
-            if let match = sources.first(where: { URL(string: $0.bookSourceUrl)?.host?.lowercased() == host }) {
-                return match
-            }
+        if let index = normalizedSourceIndex[trimmed] { return sources[index] }
+        if let host = URL(string: sourceUrl)?.host?.lowercased(), let index = firstSourceByHost[host] {
+            return sources[index]
         }
         return nil
+    }
+
+    private func rebuildSourceIndex() {
+        exactSourceIndex.removeAll(keepingCapacity: true)
+        normalizedSourceIndex.removeAll(keepingCapacity: true)
+        firstSourceByHost.removeAll(keepingCapacity: true)
+        for (index, source) in sources.enumerated() {
+            let address = source.bookSourceUrl
+            let normalized = address.trimmingCharacters(in: CharacterSet(charactersIn: "/ "))
+            if exactSourceIndex[address] == nil { exactSourceIndex[address] = index }
+            if normalizedSourceIndex[normalized] == nil { normalizedSourceIndex[normalized] = index }
+            if let host = URL(string: address)?.host?.lowercased(), !host.isEmpty, firstSourceByHost[host] == nil {
+                firstSourceByHost[host] = index
+            }
+        }
+        lookupRevision = sourcesRevision
     }
 
     /// Portable export used by the all-data backup. Credentials and cookies
@@ -1091,6 +1100,13 @@ private struct AnySourceImportItem: Decodable {
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: DynamicCodingKey.self)
         let keys = Set(container.allKeys.map(\.stringValue))
+        if let source = Self.adaptDialect(from: decoder, container: container, keys: keys) {
+            kind = .bookSource
+            bookSource = source
+            rssSource = RSSSource(sourceName: "", sourceUrl: "")
+            catalog = SourceCatalog(name: "", url: "")
+            return
+        }
         let loweredKeys = Set(keys.map { $0.lowercased() })
         let sourceUrl = (try? container.decode(String.self, forKey: DynamicCodingKey("sourceUrl"))) ?? ""
         let url = (try? container.decode(String.self, forKey: DynamicCodingKey("url"))) ?? ""
@@ -1185,6 +1201,27 @@ private struct AnySourceImportItem: Decodable {
         rssSource = (try? RSSSource(from: decoder)) ?? RSSSource(sourceName: "", sourceUrl: "")
         catalog = (try? SourceCatalog(from: decoder)) ?? SourceCatalog(name: "", url: "")
     }
+
+    /// Adapt one row at a time so a format match cannot discard the rest of a mixed export.
+    private static func adaptDialect(from decoder: Decoder, container: KeyedDecodingContainer<DynamicCodingKey>,
+                                     keys: Set<String>) -> BookSource? {
+        guard !keys.contains("bookSourceUrl") else { return nil }
+        if !keys.isDisjoint(with: ["ruleSearch", "ruleBookInfo", "ruleToc", "ruleExplore"]),
+           let raw = try? HuaHuoRawSource(from: decoder),
+           HuaHuoBookSourceAdapter.hasSpecializedRules(raw),
+           let source = HuaHuoBookSourceAdapter.adapt(raw: raw) {
+            return source
+        }
+        guard keys.contains("url"), !keys.isDisjoint(with: ["search_rule", "find_rule", "col_type"]) else { return nil }
+        let fields = ["title", "name", "url", "group", "search_url", "searchUrl", "search_rule", "find_url", "find_rule", "ua"]
+        let values = fields.reduce(into: [String: Any]()) { result, field in
+            if let value = try? container.decode(String.self, forKey: DynamicCodingKey(field)) {
+                result[field] = value
+            }
+        }
+        return HaiKuoShiJieSourceAdapter.adapt(dict: values)
+    }
+
 }
 
 private struct WrappedSourceImportItems: Decodable {
@@ -1254,6 +1291,7 @@ enum SourceImportError: Error, LocalizedError, Equatable, Sendable {
     case responseTooLarge(Int)
     case emptyResponse
     case notSourceJSON
+    case publisherPage(SourcePublisherPage)
     case network(String)
 
     var errorDescription: String? {
@@ -1278,6 +1316,8 @@ enum SourceImportError: Error, LocalizedError, Equatable, Sendable {
             return "服务器返回空内容。"
         case .notSourceJSON:
             return "下载内容是网页而不是书源 JSON，可能是错误页、登录页或需要验证。"
+        case .publisherPage:
+            return "这是书源发布目录，请选择一个链接查看或导入。"
         case .network(let message):
             return "下载失败：\(message)"
         }

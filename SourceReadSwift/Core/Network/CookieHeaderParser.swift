@@ -60,7 +60,7 @@ enum CookieHeaderParser {
             ? splitSetCookie(incoming).compactMap { cookiePair(fromSetCookie: $0) }
             : pairs(fromCookieHeader: incoming)
         for pair in incomingPairs {
-            merged.removeAll { $0.name.caseInsensitiveCompare(pair.name) == .orderedSame }
+            merged.removeAll { $0.name == pair.name }
             merged.append(pair)
         }
         return merged.map { "\($0.name)=\($0.value)" }.joined(separator: "; ")
