@@ -207,8 +207,15 @@ struct PageCurlReaderView<Item: Identifiable, Content: View>: UIViewControllerRe
         /// swipe. Thirty-two entries cover fast flicks in both directions and
         /// keep a page that was just left alive when the reader swipes back.
         func viewController(at index: Int) -> UIViewController {
+            guard let controller = reservePageController(at: index) else { return UIViewController() }
+            controller.mountReaderPage()
+            return controller
+        }
+
+        /// Reserve identity without touching UIHostingController.view.
+        func reservePageController(at index: Int) -> PageHostingController<Content>? {
             guard parent.pages.indices.contains(index) else {
-                return UIViewController()
+                return nil
             }
             let item = parent.pages[index]
             let key = parent.pageKey(item)
@@ -226,8 +233,6 @@ struct PageCurlReaderView<Item: Identifiable, Content: View>: UIViewControllerRe
                 userInterfaceStyle: parent.userInterfaceStyle,
                 onLayout: parent.onPageContainerLayout
             )
-            controller.view.backgroundColor = parent.pageBackgroundColor ?? .clear
-            controller.view.isOpaque = parent.pageBackgroundColor != nil
             controller.overrideUserInterfaceStyle = parent.userInterfaceStyle
             // A rebuilt page (typography or theme change) replaces the cached
             // entry in place; the key stays the same so the LRU order holds.
@@ -297,26 +302,22 @@ struct PageCurlReaderView<Item: Identifiable, Content: View>: UIViewControllerRe
                           !self.isUserInteracting,
                           self.cachedRevision == self.parent.contentRevision else { return }
                     guard self.parent.pages.indices.contains(candidate) else { return }
-                    let controller = self.viewController(at: candidate)
-                    guard let host = controller as? PageHostingController<Content> else { return }
+                    guard let host = self.reservePageController(at: candidate) else { return }
                     // Stage the work by distance. Laying out every neighbour
                     // made UIPageViewController wait for six pages while the
                     // finger was already moving - the stall at the start of
                     // every swipe.
-                    //   ±1/±2 build + lay out: nothing left for the swipe
-                    //   ±3/±4 build the hosting view only
-                    //   ±5/±6 reserve the controller; the body stays lazy
-                    guard offset <= 7 else { return }
-                    // `viewController(at:)` is typed as UIViewController so
-                    // UIPageViewController can consume it directly; the
-                    // layout-report flag only exists on the hosting subclass.
+                    //   ±1 build + lay out for the next gesture
+                    //   ±2 mount for a quick repeated flick
+                    //   ±3...±6 reserve without evaluating SwiftUI bodies
+                    guard offset <= 3 else { return }
                     host.suppressesLayoutReport = true
-                    controller.loadViewIfNeeded()
-                    if offset <= 3 {
+                    host.mountReaderPage()
+                    if offset <= 1 {
                         let size = self.parent.prewarmSize
                         if size.width > 1, size.height > 1 {
-                            controller.view.frame = CGRect(origin: .zero, size: size)
-                            controller.view.layoutIfNeeded()
+                            host.view.frame = CGRect(origin: .zero, size: size)
+                            host.view.layoutIfNeeded()
                         }
                     }
                     host.suppressesLayoutReport = false
@@ -554,13 +555,14 @@ struct PageCurlReaderView<Item: Identifiable, Content: View>: UIViewControllerRe
     }
 }
 
-private final class PageHostingController<Content: View>: UIHostingController<Content> {
+final class PageHostingController<Content: View>: UIHostingController<Content> {
     let pageIndex: Int
     let pageKey: String
     let contentRevision: String
     private let onLayout: ((CGSize, CGFloat) -> Void)?
     private let pageBackgroundColor: UIColor?
     private let pageUserInterfaceStyle: UIUserInterfaceStyle
+    private var hasMountedReaderPaper = false
     private var lastReportedSize: CGSize = .zero
     private var lastReportedMinY: CGFloat = .greatestFiniteMagnitude
     /// Off-screen prewarming lays a page out before it enters the page
@@ -588,8 +590,7 @@ private final class PageHostingController<Content: View>: UIHostingController<Co
 
     override func viewDidLoad() {
         super.viewDidLoad()
-        view.backgroundColor = pageBackgroundColor ?? .clear
-        view.isOpaque = pageBackgroundColor != nil
+        hasMountedReaderPaper = false
         overrideUserInterfaceStyle = pageUserInterfaceStyle
         view.clipsToBounds = true
         edgesForExtendedLayout = .all
@@ -600,9 +601,20 @@ private final class PageHostingController<Content: View>: UIHostingController<Co
         additionalSafeAreaInsets = .zero
     }
 
+    /// SwiftUI may replace the default opaque background during the initial view load.
+    func mountReaderPage() {
+        loadViewIfNeeded()
+        guard !hasMountedReaderPaper else { return }
+        hasMountedReaderPaper = true
+        view.isOpaque = pageBackgroundColor != nil
+        view.backgroundColor = pageBackgroundColor ?? .clear
+        applyReaderPaperToBackingLayer()
+    }
+
     override func viewDidLayoutSubviews() {
         super.viewDidLayoutSubviews()
         view.clipsToBounds = true
+        if hasMountedReaderPaper { applyReaderPaperToBackingLayer() }
 
         guard !suppressesLayoutReport else { return }
         let size = view.bounds.size
@@ -618,6 +630,17 @@ private final class PageHostingController<Content: View>: UIHostingController<Co
         DispatchQueue.main.async {
             onLayout(size, minY)
         }
+    }
+
+    private func applyReaderPaperToBackingLayer() {
+        // UIHostingView can resolve its own dynamic system color, regardless of
+        // the assigned UIView property. The curl captures the actual layer.
+        let color = (pageBackgroundColor ?? .clear).resolvedColor(with: view.traitCollection).cgColor
+        guard view.layer.backgroundColor != color else { return }
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        view.layer.backgroundColor = color
+        CATransaction.commit()
     }
 
     @MainActor required dynamic init?(coder aDecoder: NSCoder) {
