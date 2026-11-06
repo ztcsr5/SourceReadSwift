@@ -6,7 +6,12 @@ import Security
 protocol SecretStoring: AnyObject {
     func set(_ value: String, for key: String) throws
     func value(for key: String) -> String?
+    func readValue(for key: String) throws -> String?
     func removeValue(for key: String) throws
+}
+
+extension SecretStoring {
+    func readValue(for key: String) throws -> String? { value(for: key) }
 }
 
 enum SecretStoreError: LocalizedError, Equatable {
@@ -56,6 +61,14 @@ final class KeychainSecretStore: SecretStoring {
     }
 
     func value(for key: String) -> String? {
+        do { return try readValue(for: key) }
+        catch {
+            NSLog("Keychain read failed: code=%ld", (error as NSError).code)
+            return nil
+        }
+    }
+
+    func readValue(for key: String) throws -> String? {
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
@@ -64,11 +77,13 @@ final class KeychainSecretStore: SecretStoring {
             kSecMatchLimit as String: kSecMatchLimitOne
         ]
         var item: CFTypeRef?
-        guard SecItemCopyMatching(query as CFDictionary, &item) == errSecSuccess,
-              let data = item as? Data else {
-            return nil
+        let status = SecItemCopyMatching(query as CFDictionary, &item)
+        if status == errSecItemNotFound { return nil }
+        guard status == errSecSuccess else { throw SecretStoreError.unexpectedStatus(status) }
+        guard let data = item as? Data, let text = String(data: data, encoding: .utf8) else {
+            throw SecretStoreError.encodingFailed
         }
-        return String(data: data, encoding: .utf8)
+        return text
     }
 
     func removeValue(for key: String) throws {

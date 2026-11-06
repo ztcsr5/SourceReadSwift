@@ -6,6 +6,26 @@ enum BookSourceKind: Int, Codable, CaseIterable, Identifiable, Sendable {
     case comic = 2
     case video = 3
 
+    /// Legado book flags differ from bookSourceType (the aggregate rule uses these values).
+    var legadoBookType: Int {
+        switch self {
+        case .text: return 8
+        case .audio: return 32
+        case .comic: return 64
+        case .video: return 4
+        }
+    }
+
+    init?(legadoBookType: Int) {
+        switch legadoBookType {
+        case 8: self = .text
+        case 32: self = .audio
+        case 64: self = .comic
+        case 4: self = .video
+        default: return nil
+        }
+    }
+
     var id: Int { rawValue }
 
     var displayName: String {
@@ -53,6 +73,8 @@ struct SearchBook: Identifiable, Codable, Hashable, Sendable {
     /// Legado `ruleSearch.checkKeyWord` – extracted from each result and used
     /// to discard rows that do not actually contain the searched keyword.
     let checkKeyWord: String?
+    /// Optional per-book override for mixed-media sources; older caches decode as nil.
+    let mediaKind: BookSourceKind?
 
     init(
         name: String,
@@ -65,7 +87,8 @@ struct SearchBook: Identifiable, Codable, Hashable, Sendable {
         kind: String? = nil,
         lastChapter: String? = nil,
         wordCount: String? = nil,
-        checkKeyWord: String? = nil
+        checkKeyWord: String? = nil,
+        mediaKind: BookSourceKind? = nil
     ) {
         self.name = name
         self.author = author
@@ -78,6 +101,7 @@ struct SearchBook: Identifiable, Codable, Hashable, Sendable {
         self.lastChapter = lastChapter
         self.wordCount = wordCount
         self.checkKeyWord = checkKeyWord
+        self.mediaKind = mediaKind
     }
 }
 
@@ -100,6 +124,7 @@ struct BookDetail: Identifiable, Codable, Hashable, Sendable {
     let updateTime: String?
     /// Legado `ruleBookInfo.kind` – category / tag text from the detail page.
     let kind: String?
+    let mediaKind: BookSourceKind?
 
     init(
         name: String,
@@ -114,7 +139,8 @@ struct BookDetail: Identifiable, Codable, Hashable, Sendable {
         wordCount: String? = nil,
         status: String? = nil,
         updateTime: String? = nil,
-        kind: String? = nil
+        kind: String? = nil,
+        mediaKind: BookSourceKind? = nil
     ) {
         self.name = name
         self.author = author
@@ -129,6 +155,7 @@ struct BookDetail: Identifiable, Codable, Hashable, Sendable {
         self.status = status
         self.updateTime = updateTime
         self.kind = kind
+        self.mediaKind = mediaKind
     }
 }
 

@@ -5,6 +5,32 @@ import XCTest
 /// 文件名解析错 = 朗读到错段落，所以这里把常见命名都锁成用例。
 final class LocalVoiceLibraryTests: XCTestCase {
 
+    func testFailedReplacementPreservesThePreviouslyImportedAudio() throws {
+        LocalVoiceLibrary.ensureDirectory()
+        let name = UUID().uuidString + ".mp3"
+        let destination = LocalVoiceLibrary.directory.appendingPathComponent(name)
+        let original = Data("previous-audio".utf8)
+        try original.write(to: destination)
+        defer { try? FileManager.default.removeItem(at: destination) }
+        let missing = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true).appendingPathComponent(name)
+
+        XCTAssertEqual(LocalVoiceLibrary.importFiles([missing]), 0)
+        XCTAssertEqual(try Data(contentsOf: destination), original,
+                       "An unavailable replacement must not delete audio that already works")
+    }
+
+    func testImportingAnAlreadyStoredFileDoesNotDeleteIt() throws {
+        LocalVoiceLibrary.ensureDirectory()
+        let destination = LocalVoiceLibrary.directory.appendingPathComponent(UUID().uuidString + ".mp3")
+        let original = Data("existing-audio".utf8)
+        try original.write(to: destination)
+        defer { try? FileManager.default.removeItem(at: destination) }
+
+        XCTAssertEqual(LocalVoiceLibrary.importFiles([destination]), 1)
+        XCTAssertEqual(try Data(contentsOf: destination), original)
+    }
+
     func testPlainNumericNames() {
         XCTAssertEqual(LocalVoiceLibrary.paragraphIndex(ofFileName: "0.mp3"), 0)
         XCTAssertEqual(LocalVoiceLibrary.paragraphIndex(ofFileName: "12.m4a"), 12)

@@ -11,6 +11,39 @@ final class OrderedReadingPersistenceTests: XCTestCase {
         }
     }
 
+    func testRepeatedBookDetailRefreshPublishesAndWritesOnlyTheChangedSnapshot() async throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: root) }
+        var book = try XCTUnwrap(makeBooks().first)
+        book.latestChapterTitle = "Chapter 5"
+        book.totalChapters = 5
+        book.seenTotalChapters = 5
+        book.currentChapterIndex = 2
+        book.currentParagraphIndex = 9
+        let initial = BookshelfPersistence(rootURL: root)
+        try initial.save([book])
+        let write = expectation(description: "Only changed details reach persistence")
+        write.assertForOverFulfill = true
+        let store = BookshelfStore(persistence: BookshelfPersistence(rootURL: root, writeObserver: { write.fulfill() }))
+        var published: [BookshelfBook] = []
+        let observation = store.$books.dropFirst().sink { published.append(contentsOf: $0) }
+        defer { observation.cancel() }
+
+        for _ in 0..<10 {
+            store.updateDetails(bookID: book.id, latestChapterTitle: "Chapter 5", intro: nil, totalChapters: 5)
+        }
+        XCTAssertTrue(published.isEmpty, "An identical background refresh must not invalidate the reading or shelf tree")
+        store.updateDetails(bookID: book.id, latestChapterTitle: "Chapter 6", intro: "New intro", totalChapters: 6)
+        XCTAssertEqual(published.count, 1)
+        XCTAssertEqual(published.first?.currentParagraphIndex, 9)
+        XCTAssertEqual(published.first?.seenTotalChapters, 5)
+        XCTAssertEqual(published.first?.hasUpdates, true)
+        await fulfillment(of: [write], timeout: 5)
+        await store.waitForPendingWrites()
+        XCTAssertEqual(try initial.load().first?.latestChapterTitle, "Chapter 6")
+        XCTAssertEqual(try initial.load().first?.intro, "New intro")
+    }
+
     func testProgressAndSessionEncodingRunOffMainAndReloadNewestPosition() async throws {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         defer { try? FileManager.default.removeItem(at: root) }
