@@ -25,6 +25,15 @@ final class AudioBookPlaybackCoordinator: ObservableObject {
 
     private var player: AVPlayer?
     private var timeObserverToken: Any?
+    private var chapterEndObserver: NSObjectProtocol?
+    private var interruptionObserver: NSObjectProtocol?
+    private var itemStatusObservation: NSKeyValueObservation?
+    private var artworkTask: Task<Void, Never>?
+    private var artworkLoadID = UUID()
+    private var shouldPlayWhenReady = false
+    private var shouldResumeAfterInterruption = false
+    private var seekID = UUID()
+    private var isSeeking = false
     private var sleepTimer: Timer?
     private var fadeTimer: Timer?
     private var currentArtwork: MPMediaItemArtwork?
@@ -39,7 +48,7 @@ final class AudioBookPlaybackCoordinator: ObservableObject {
     }
 
     var progress: Double {
-        guard duration > 0 else { return 0 }
+        guard duration.isFinite, duration > 0, currentTime.isFinite else { return 0 }
         return max(0, min(currentTime / duration, 1.0))
     }
 
@@ -55,7 +64,10 @@ final class AudioBookPlaybackCoordinator: ObservableObject {
         }
         sleepTimer?.invalidate()
         fadeTimer?.invalidate()
-        NotificationCenter.default.removeObserver(self)
+        artworkTask?.cancel()
+        chapterLoadTask?.cancel()
+        if let chapterEndObserver { NotificationCenter.default.removeObserver(chapterEndObserver) }
+        if let interruptionObserver { NotificationCenter.default.removeObserver(interruptionObserver) }
     }
 
     // MARK: - Setup
@@ -152,7 +164,7 @@ final class AudioBookPlaybackCoordinator: ObservableObject {
     }
 
     private func setupNotificationObservers() {
-        NotificationCenter.default.addObserver(
+        interruptionObserver = NotificationCenter.default.addObserver(
             forName: AVAudioSession.interruptionNotification,
             object: AVAudioSession.sharedInstance(),
             queue: .main
@@ -165,11 +177,13 @@ final class AudioBookPlaybackCoordinator: ObservableObject {
             }
 
             if type == .began {
+                self.shouldResumeAfterInterruption = self.isPlaying
                 self.pause()
             } else if type == .ended {
+                defer { self.shouldResumeAfterInterruption = false }
                 if let optionsValue = userInfo[AVAudioSessionInterruptionOptionKey] as? UInt {
                     let options = AVAudioSession.InterruptionOptions(rawValue: optionsValue)
-                    if options.contains(.shouldResume) {
+                    if options.contains(.shouldResume), self.shouldResumeAfterInterruption {
                         self.play()
                     }
                 }
@@ -189,16 +203,20 @@ final class AudioBookPlaybackCoordinator: ObservableObject {
         engine: SourceEngine,
         bookshelfStore: BookshelfStore? = nil
     ) {
+        stop()
         self.currentBookID = bookID
         self.currentBook = book
         self.currentSource = source
         self.chapters = chapters
         self.currentEngine = engine
         self.bookshelfStore = bookshelfStore
-        self.pendingResumeSeconds = initialPositionSeconds
         self.currentChapterIndex = max(0, min(initialChapterIndex, chapters.count - 1))
         loadCoverArtwork(url: book.coverUrl)
-        playChapter(at: self.currentChapterIndex)
+        guard !chapters.isEmpty else {
+            errorMessage = "此书暂无可播放章节"
+            return
+        }
+        playChapter(at: self.currentChapterIndex, resumeSeconds: initialPositionSeconds)
     }
 
     private var chapterLoadTask: Task<Void, Never>?
@@ -206,16 +224,20 @@ final class AudioBookPlaybackCoordinator: ObservableObject {
 
     func playChapter(at index: Int, resumeSeconds: Double? = nil) {
         guard chapters.indices.contains(index) else { return }
+        persistProgressIfNeeded(force: true)
         chapterLoadTask?.cancel()
+        chapterLoadTask = nil
         chapterLoadID = UUID()
         let loadID = chapterLoadID
+        releasePlayer()
         currentChapterIndex = index
-        if let resumeSeconds, resumeSeconds > 0 {
-            pendingResumeSeconds = resumeSeconds
-        }
+        pendingResumeSeconds = resumeSeconds.flatMap { $0.isFinite && $0 > 0 ? $0 : nil }
+        lastPersistedSecond = 0
+        shouldPlayWhenReady = true
         let chapter = chapters[index]
         isLoading = true
         errorMessage = nil
+        updateNowPlayingInfo()
 
         // If audio url is already known in chapter url or content
         if let directURL = AudioContentParser.parseURL(chapter.url, base: chapter.url), AudioContentParser.isMediaURL(directURL) {
@@ -234,6 +256,7 @@ final class AudioBookPlaybackCoordinator: ObservableObject {
             guard let self else { return }
             let contentResult = await engine.getContent(source: source, chapter: chapter)
             guard !Task.isCancelled, self.chapterLoadID == loadID else { return }
+            self.chapterLoadTask = nil
             switch contentResult {
             case .success(let content):
                 if let audioURL = AudioContentParser.parseURL(content.text, base: chapter.url) {
@@ -252,28 +275,22 @@ final class AudioBookPlaybackCoordinator: ObservableObject {
     private func setupPlayer(with urlString: String) {
         guard let url = URL(string: urlString.trimmingCharacters(in: .whitespacesAndNewlines)) else {
             isLoading = false
-            errorMessage = "无效的音频链接: \(urlString)"
+            errorMessage = "音频链接无效，请刷新章节或更换书源"
             return
         }
         self.currentAudioURL = urlString
 
-        if let token = timeObserverToken {
-            player?.removeTimeObserver(token)
-            timeObserverToken = nil
-        }
-        player?.pause()
-
         let asset = AVURLAsset(url: url)
         let item = AVPlayerItem(asset: asset)
+        let loadID = chapterLoadID
 
-        NotificationCenter.default.removeObserver(self, name: .AVPlayerItemDidPlayToEndTime, object: nil)
-        NotificationCenter.default.addObserver(
+        chapterEndObserver = NotificationCenter.default.addObserver(
             forName: .AVPlayerItemDidPlayToEndTime,
             object: item,
             queue: .main
         ) { [weak self] _ in
             Task { @MainActor [weak self] in
-                guard let self else { return }
+                guard let self, self.chapterLoadID == loadID, self.player?.currentItem === item else { return }
                 if self.stopAtChapterEnd {
                     self.pause()
                     self.stopAtChapterEnd = false
@@ -285,37 +302,68 @@ final class AudioBookPlaybackCoordinator: ObservableObject {
         }
 
         let newPlayer = AVPlayer(playerItem: item)
-        newPlayer.rate = playbackRate
         self.player = newPlayer
+        itemStatusObservation = item.observe(\.status, options: [.initial, .new]) { [weak self] item, _ in
+            Task { @MainActor [weak self] in
+                guard let self, self.chapterLoadID == loadID, self.player?.currentItem === item else { return }
+                if item.status == .failed {
+                    self.pause()
+                    self.isLoading = false
+                    self.errorMessage = "音频无法播放，请重试或更换书源"
+                } else if item.status == .readyToPlay {
+                    self.isLoading = false
+                    self.updateDuration(from: item)
+                }
+            }
+        }
 
         let interval = CMTime(seconds: 0.5, preferredTimescale: CMTimeScale(NSEC_PER_SEC))
         timeObserverToken = newPlayer.addPeriodicTimeObserver(forInterval: interval, queue: .main) { [weak self] time in
-            guard let self else { return }
-            self.currentTime = time.seconds
-            if let currentItem = self.player?.currentItem, currentItem.duration.isNumeric {
-                self.duration = currentItem.duration.seconds
-                self.isLoading = false
-
-                if let pending = self.pendingResumeSeconds, pending > 0, pending < self.duration {
-                    self.seek(to: pending)
-                    self.pendingResumeSeconds = nil
-                }
-            }
+            guard let self, self.chapterLoadID == loadID, self.player?.currentItem === item else { return }
+            self.currentTime = time.seconds.isFinite ? max(0, time.seconds) : 0
+            self.updateDuration(from: item)
             self.persistProgressIfNeeded()
             self.updateNowPlayingInfo()
         }
 
-        newPlayer.play()
-        newPlayer.rate = playbackRate
-        isPlaying = true
-        isLoading = false
+        if shouldPlayWhenReady { play() }
         updateNowPlayingInfo()
     }
 
-    private func persistProgressIfNeeded() {
-        guard let bookID = currentBookID, let bookshelfStore else { return }
+    private func updateDuration(from item: AVPlayerItem) {
+        guard item.duration.isNumeric, item.duration.seconds.isFinite, item.duration.seconds > 0 else { return }
+        duration = item.duration.seconds
+        if let pending = pendingResumeSeconds {
+            pendingResumeSeconds = nil
+            if pending < duration { seek(to: pending) }
+        }
+    }
+
+    private func releasePlayer() {
+        seekID = UUID()
+        isSeeking = false
+        fadeTimer?.invalidate()
+        fadeTimer = nil
+        itemStatusObservation?.invalidate()
+        itemStatusObservation = nil
+        if let chapterEndObserver { NotificationCenter.default.removeObserver(chapterEndObserver) }
+        chapterEndObserver = nil
+        if let token = timeObserverToken { player?.removeTimeObserver(token) }
+        timeObserverToken = nil
+        player?.pause()
+        player = nil
+        isPlaying = false
+        currentAudioURL = nil
+        currentTime = 0
+        duration = 0
+    }
+
+    private func persistProgressIfNeeded(force: Bool = false) {
+        guard player != nil, pendingResumeSeconds == nil, !isSeeking,
+              let bookID = currentBookID, let bookshelfStore,
+              currentTime.isFinite, currentTime >= 0, currentTime < Double(Int.max) else { return }
         let currentSec = Int(currentTime)
-        guard abs(currentSec - lastPersistedSecond) >= 3 else { return }
+        guard force || abs(currentSec - lastPersistedSecond) >= 3 else { return }
         lastPersistedSecond = currentSec
         bookshelfStore.updateReadingProgress(
             bookID: bookID,
@@ -327,41 +375,48 @@ final class AudioBookPlaybackCoordinator: ObservableObject {
     }
 
     func play() {
+        guard let player, player.currentItem?.status != .failed else {
+            isPlaying = false
+            return
+        }
+        shouldPlayWhenReady = true
         fadeTimer?.invalidate()
         fadeTimer = nil
-        player?.volume = 1.0
-        player?.play()
-        player?.rate = playbackRate
+        player.volume = 1.0
+        player.play()
+        player.rate = playbackRate
         isPlaying = true
         updateNowPlayingInfo()
     }
 
     func pause() {
+        shouldPlayWhenReady = false
         fadeTimer?.invalidate()
         fadeTimer = nil
         player?.pause()
         isPlaying = false
-        persistProgressIfNeeded()
+        persistProgressIfNeeded(force: true)
         updateNowPlayingInfo()
     }
 
     func fadeOutAndPause(duration: TimeInterval = 8.0, completion: (() -> Void)? = nil) {
         fadeTimer?.invalidate()
         fadeTimer = nil
-        guard let player = self.player, isPlaying, isFadeOutEnabled else {
+        guard duration.isFinite, duration > 0, let player = self.player, isPlaying, isFadeOutEnabled else {
             self.pause()
             completion?()
             return
         }
 
         let initialVolume = player.volume
+        let loadID = chapterLoadID
         let steps = 16
         let interval = duration / Double(steps)
         var currentStep = 0
 
         fadeTimer = Timer.scheduledTimer(withTimeInterval: interval, repeats: true) { [weak self] timer in
             Task { @MainActor [weak self] in
-                guard let self, let player = self.player else {
+                guard let self, self.chapterLoadID == loadID, let player = self.player else {
                     timer.invalidate()
                     return
                 }
@@ -388,17 +443,22 @@ final class AudioBookPlaybackCoordinator: ObservableObject {
     }
 
     func stop() {
+        persistProgressIfNeeded(force: true)
         chapterLoadID = UUID()
         chapterLoadTask?.cancel()
         chapterLoadTask = nil
-        fadeTimer?.invalidate()
-        fadeTimer = nil
-        pause()
-        if let token = timeObserverToken {
-            player?.removeTimeObserver(token)
-            timeObserverToken = nil
-        }
-        player = nil
+        releasePlayer()
+        artworkLoadID = UUID()
+        artworkTask?.cancel()
+        artworkTask = nil
+        currentArtwork = nil
+        currentEngine = nil
+        chapters = []
+        currentChapterIndex = 0
+        isLoading = false
+        errorMessage = nil
+        shouldPlayWhenReady = false
+        shouldResumeAfterInterruption = false
         currentBook = nil
         currentSource = nil
         currentAudioURL = nil
@@ -416,10 +476,20 @@ final class AudioBookPlaybackCoordinator: ObservableObject {
     }
 
     func seek(to seconds: Double) {
+        guard seconds.isFinite, duration.isFinite, duration > 0, let player else { return }
+        let loadID = chapterLoadID
+        seekID = UUID()
+        let requestID = seekID
+        isSeeking = true
         let targetTime = CMTime(seconds: max(0, min(seconds, duration)), preferredTimescale: CMTimeScale(NSEC_PER_SEC))
-        player?.seek(to: targetTime, toleranceBefore: .zero, toleranceAfter: .zero) { [weak self] _ in
+        player.seek(to: targetTime, toleranceBefore: .zero, toleranceAfter: .zero) { [weak self] finished in
             Task { @MainActor [weak self] in
-                self?.updateNowPlayingInfo()
+                guard let self, self.chapterLoadID == loadID, self.seekID == requestID else { return }
+                self.isSeeking = false
+                guard finished else { return }
+                self.currentTime = targetTime.seconds
+                self.persistProgressIfNeeded(force: true)
+                self.updateNowPlayingInfo()
             }
         }
     }
@@ -445,9 +515,10 @@ final class AudioBookPlaybackCoordinator: ObservableObject {
     }
 
     func setPlaybackRate(_ rate: Float) {
-        playbackRate = rate
+        guard rate.isFinite else { return }
+        playbackRate = min(max(rate, 0.5), 3)
         if isPlaying {
-            player?.rate = rate
+            player?.rate = playbackRate
         }
         updateNowPlayingInfo()
     }
@@ -459,7 +530,7 @@ final class AudioBookPlaybackCoordinator: ObservableObject {
         sleepTimer = nil
         stopAtChapterEnd = false
 
-        guard let minutes else {
+        guard let minutes, minutes >= 0 else {
             sleepTimerMinutesRemaining = nil
             return
         }
@@ -516,14 +587,17 @@ final class AudioBookPlaybackCoordinator: ObservableObject {
     }
 
     private func loadCoverArtwork(url: String?) {
+        artworkTask?.cancel()
+        artworkLoadID = UUID()
+        let loadID = artworkLoadID
+        currentArtwork = nil
         guard let urlString = url, let coverURL = URL(string: urlString) else { return }
-        Task.detached(priority: .background) {
-            guard let data = try? Data(contentsOf: coverURL), let image = UIImage(data: data) else { return }
-            let artwork = MPMediaItemArtwork(boundsSize: image.size) { _ in image }
-            Task { @MainActor [weak self] in
-                self?.currentArtwork = artwork
-                self?.updateNowPlayingInfo()
-            }
+        artworkTask = Task { @MainActor [weak self] in
+            guard let image = await RemoteImageLoader.shared.image(for: coverURL, maxPixelSize: 512, reuseCoverBytes: true),
+                  !Task.isCancelled, let self, self.artworkLoadID == loadID else { return }
+            self.currentArtwork = MPMediaItemArtwork(boundsSize: image.size) { _ in image }
+            self.updateNowPlayingInfo()
+            self.artworkTask = nil
         }
     }
 

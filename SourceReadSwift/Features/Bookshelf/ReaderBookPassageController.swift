@@ -24,7 +24,18 @@ final class ReaderBookPassageController: UIViewController {
     #endif
 
     override func loadView() {
+        #if DEBUG
+        let evidence = NativeBookGestureEvidenceView()
+        evidence.readGestureState = { [weak self] in
+            guard let self else { return "detached" }
+            let edgeEnabled = self.navigationController?.interactivePopGestureRecognizer?.isEnabled ?? false
+            return "ready=\(self.canPrepareReturn),zoom=\(self.usesNativeDeskReturn),edge=\(edgeEnabled);"
+                + NativeBookGestureProbe.describe(self.observedGestures)
+        }
+        view = evidence
+        #else
         view = UIView()
+        #endif
         view.backgroundColor = .clear
         view.isUserInteractionEnabled = false
         #if DEBUG
@@ -54,7 +65,7 @@ final class ReaderBookPassageController: UIViewController {
               ReaderNativePopPolicy.isPop(from: source, to: transition.viewController(forKey: .to),
                 in: navigation, isInteractive: transition.isInteractive) else { return }
         Self.events.notice("BEGIN interactive=\(transition.isInteractive ? 1 : 0, privacy: .public)")
-        if usesNativeDeskReturn {
+        if usesNativeDeskReturn || String(describing: type(of: source)).contains("UIHostingController") {
             // The system already owns both surfaces. A second opaque paper
             // sheet here becomes a white card over the actual book landing.
             Self.events.notice("SURFACE system-book")

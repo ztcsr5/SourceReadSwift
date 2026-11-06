@@ -44,7 +44,7 @@ private struct ReaderOpeningPresentation: ViewModifier {
 
     private var usesNativeDeskReturn: Bool {
         if usesSystemReturnSurface { return true }
-        if #available(iOS 18.0, *) { return usesDeskHero && !motion.reducesMotion }
+        if #available(iOS 18.0, *) { return usesDeskHero }
         return false
     }
 
@@ -189,7 +189,7 @@ struct ReaderOpeningPage: View {
                 }
             }
             VStack(spacing: 8) {
-                Text(book.title).font(.system(.title2, design: .serif).weight(.regular))
+                Text(book.title).font(.title2.weight(.regular))
                     .multilineTextAlignment(.center).lineLimit(2)
                 if !book.author.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                     Text(book.author).font(.caption).opacity(0.65).lineLimit(1)

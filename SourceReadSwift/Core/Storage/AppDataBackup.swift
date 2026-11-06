@@ -107,6 +107,7 @@ enum AppDataBackupError: LocalizedError, Equatable {
     case bookshelfRestoreFailed
     case sourceRestoreFailed
     case purifyRulesRestoreFailed
+    case invalidPreferences
 
     var errorDescription: String? {
         switch self {
@@ -118,6 +119,7 @@ enum AppDataBackupError: LocalizedError, Equatable {
         case .bookshelfRestoreFailed: return "书架数据恢复失败"
         case .sourceRestoreFailed: return "书源数据恢复失败"
         case .purifyRulesRestoreFailed: return "净化规则恢复失败"
+        case .invalidPreferences: return "备份中的阅读设置类型或范围无效，未恢复数据"
         }
     }
 }
@@ -158,13 +160,18 @@ enum AppDataBackupCodec {
             throw AppDataBackupError.invalidJSON
         }
 
+        try validate(snapshot)
+        return snapshot
+    }
+
+    static func validate(_ snapshot: AppDataBackupSnapshot) throws {
         guard supportedSchemas.contains(snapshot.schemaVersion) else {
             throw AppDataBackupError.unsupportedSchema(snapshot.schemaVersion)
         }
         guard snapshot.bookshelf.schemaVersion == 1 else {
             throw AppDataBackupError.unsupportedBookshelfSchema(snapshot.bookshelf.schemaVersion)
         }
-        return snapshot
+        try AppBackupPreferences.validate(snapshot.readerPreferences)
     }
 }
 
@@ -182,6 +189,7 @@ enum AppDataBackupRestorer {
         restoreRSSState: (RSSArticleStateSnapshot) -> Void,
         restorePreferences: ([String: BackupPreferenceValue]) -> Void
     ) throws {
+        try AppDataBackupCodec.validate(snapshot)
         do {
             guard restoreBookshelf(snapshot.bookshelf) else {
                 throw AppDataBackupError.bookshelfRestoreFailed

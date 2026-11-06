@@ -112,14 +112,20 @@ final class ReaderScrollCadenceTests: XCTestCase {
             if ready { break }; try await Task.sleep(nanoseconds: 100_000_000)
         }
         XCTAssertTrue(ready)
+        let first = WebReaderSection(chapterIndex: 0, title: "当前章",
+            paragraphs: Array(repeating: String(repeating: "正在惯性滚动的正文不能重挂。", count: 12), count: 80))
+        let pending = WebReaderSection(chapterIndex: 1, title: "下一章", paragraphs: [], isReady: false)
+        let base = WebReaderContentPayloadBuilder.Snapshot(sections: [first, pending], showChapterEndBadge: false,
+                                                           traditionalChineseEnabled: false, revision: "pending")
+        let resolved = [first, WebReaderSection(chapterIndex: 1, title: "下一章", paragraphs: ["预取就绪"])]
+        let next = WebReaderContentPayloadBuilder.Snapshot(sections: resolved, showChapterEndBadge: false,
+                                                           traditionalChineseEnabled: false, revision: "ready")
+        let full = try XCTUnwrap(WebReaderContentPayloadBuilder.json(sections: [first, pending], snapshot: base))
+        let delta = try XCTUnwrap(WebReaderContentPayloadBuilder.json(sections: resolved, snapshot: next, reusing: base))
         let result = try await web.evaluateJavaScript("""
         (() => {
           const reader = window.__reader;
-          const first = {key:'c0',chapter:0,title:'当前章',sig:'current',start:0,titleFlat:0,first:true,
-            paragraphs:Array.from({length:80},(_,i)=>({flat:i,local:i,text:'正在惯性滚动的正文不能重挂。'.repeat(12)}))};
-          const pending = {key:'c1',chapter:1,title:'下一章',sig:'pending',start:80,titleFlat:80,first:false,
-            loading:true,paragraphs:[]};
-          reader.setContent({revision:'pending',total:81,sections:[first,pending]});
+          const started = reader.setContent(JSON.parse(\(WebReaderJavaScriptLiteral.string(full))));
           window.scrollTo(0,600);
           const content = document.getElementById('content');
           const current = content.firstElementChild;
@@ -129,16 +135,20 @@ final class ReaderScrollCadenceTests: XCTestCase {
           let scrollCommands = 0;
           const originalScroll = window.scrollTo.bind(window);
           window.scrollTo = (...args)=>{scrollCommands++;originalScroll(...args);};
-          const next = {...pending,sig:'ready',loading:false,paragraphs:[{flat:80,local:0,text:'预取就绪'}]};
-          reader.setContent({revision:'ready',total:81,sections:[first,next]});
+          const delta = JSON.parse(\(WebReaderJavaScriptLiteral.string(delta)));
+          const stale = reader.setContent({...delta,baseRevision:'stale'});
+          const accepted = reader.setContent(delta);
           const detached = observer.takeRecords().reduce((count,record)=>count+
             Array.from(record.removedNodes).filter(node=>node===current).length,0);
           observer.disconnect();
-          return {detached,scrollCommands,previousY,y:window.scrollY,
+          return {started,stale,accepted,detached,scrollCommands,previousY,y:window.scrollY,
             sameNode:content.firstElementChild===current,nextText:content.lastElementChild.textContent};
         })();
         """) as? [String: Any]
         let outcome = try XCTUnwrap(result)
+        XCTAssertEqual(outcome["started"] as? Bool, true)
+        XCTAssertEqual(outcome["stale"] as? Bool, false)
+        XCTAssertEqual(outcome["accepted"] as? Bool, true)
         XCTAssertEqual(outcome["detached"] as? Int, 0, "The current chapter must remain mounted when the next one becomes ready")
         XCTAssertEqual(outcome["scrollCommands"] as? Int, 0, "A below-viewport patch must not interrupt native deceleration")
         XCTAssertEqual(outcome["sameNode"] as? Bool, true)
