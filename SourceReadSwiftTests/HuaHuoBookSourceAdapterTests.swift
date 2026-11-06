@@ -3,6 +3,11 @@ import XCTest
 
 final class HuaHuoBookSourceAdapterTests: XCTestCase {
 
+    func testLegadoPaginationFieldDoesNotMisclassifyTheSourceAsHuaHuo() {
+        let exported = ##"{"bookSourceName":"Canonical","bookSourceUrl":"https://fixture.invalid","ruleContent":{"content":"#body@text","nextContentUrl":"a.next@href"}}"##
+        XCTAssertFalse(HuaHuoBookSourceAdapter.isHuaHuoJSON(exported))
+    }
+
     func testHuaHuoJSONDetection() {
         let sampleJSON = """
         {

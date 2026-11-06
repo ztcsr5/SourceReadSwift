@@ -2,6 +2,17 @@ import XCTest
 @testable import SourceReadSwift
 
 final class ReadingStatsSummaryTests: XCTestCase {
+    func testLegacyLifetimeTotalIsNotInventedAsTodaysReading() {
+        let now = Date()
+        var book = BookshelfBook(searchBook: SearchBook(name: "Legacy", author: nil, coverUrl: nil,
+            bookUrl: "https://fixture.invalid/book", sourceName: "Fixture", sourceUrl: "https://fixture.invalid"))
+        book.totalReadingSeconds = 100_000
+        book.lastReadAt = now
+        let summary = ReadingStatsSummary(books: [book], referenceDate: now)
+        XCTAssertEqual(summary.totalReadingSeconds, 100_000, "Keep old lifetime totals")
+        XCTAssertEqual(summary.todayReadingSeconds, 0, "The last opened date cannot date every historical session")
+        XCTAssertTrue(summary.weeklyDistribution.allSatisfy { $0.seconds == 0 })
+    }
     func testAggregatesReadingStatsFromBookshelfBooks() {
         let now = Date()
         let remote = BookshelfBook(
