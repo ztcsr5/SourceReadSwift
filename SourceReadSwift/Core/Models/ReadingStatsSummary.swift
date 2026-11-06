@@ -15,6 +15,67 @@ struct DayReadingStat: Identifiable, Equatable, Sendable {
     }
 }
 
+/// Local civil dates are stored as Gregorian YYYYMMDD keys, so travelling does not
+/// reassign previously recorded activity to a different day.
+enum ReadingDayActivity {
+    static func calendar(in timeZone: TimeZone) -> Calendar {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = timeZone
+        return calendar
+    }
+
+    static func key(for date: Date, calendar: Calendar) -> Int {
+        let components = calendar.dateComponents([.year, .month, .day], from: date)
+        return (components.year ?? 0) * 10_000 + (components.month ?? 0) * 100 + (components.day ?? 0)
+    }
+
+    /// Hot-path lookup for the live goal; never aggregates unrelated days.
+    static func seconds(on date: Date, calendar: Calendar, books: [BookshelfBook]) -> TimeInterval {
+        let day = key(for: date, calendar: calendar)
+        return books.reduce(0) { total, book in
+            let seconds = book.readingSecondsByDay?[day] ?? 0
+            return seconds.isFinite && seconds > 0 ? total + seconds : total
+        }
+    }
+
+    static func split(from start: Date, to end: Date, calendar: Calendar) -> [Int: TimeInterval] {
+        var result: [Int: TimeInterval] = [:]
+        var cursor = start
+        while cursor < end, let day = calendar.dateInterval(of: .day, for: cursor), day.end > cursor {
+            let boundary = min(day.end, end)
+            result[key(for: cursor, calendar: calendar), default: 0] += boundary.timeIntervalSince(cursor)
+            cursor = boundary
+        }
+        return result
+    }
+}
+
+/// Tracks only the foreground intervals of one reader presentation.
+struct ForegroundReadingSession {
+    private var startedAt: Date?
+    private var hasRecordedSession = false
+
+    mutating func resume(at date: Date) {
+        if startedAt == nil { startedAt = date }
+    }
+
+    mutating func pause(at date: Date, calendar: Calendar) -> (days: [Int: TimeInterval], startsSession: Bool)? {
+        guard let start = startedAt else { return nil }
+        startedAt = nil
+        guard date.timeIntervalSince(start) > 1 else { return nil }
+        let days = ReadingDayActivity.split(from: start, to: date, calendar: calendar)
+        guard !days.isEmpty else { return nil }
+        let startsSession = !hasRecordedSession
+        hasRecordedSession = true
+        return (days, startsSession)
+    }
+
+    func todaySeconds(at date: Date, calendar: Calendar) -> TimeInterval {
+        guard let start = startedAt, let day = calendar.dateInterval(of: .day, for: date) else { return 0 }
+        return max(0, date.timeIntervalSince(max(day.start, start)))
+    }
+}
+
 struct ReadingStatsSummary: Equatable, Sendable {
     let totalBooks: Int
     let localBooks: Int
@@ -32,7 +93,7 @@ struct ReadingStatsSummary: Equatable, Sendable {
     let streakDays: Int
     let weeklyDistribution: [DayReadingStat]
 
-    init(books: [BookshelfBook], referenceDate: Date = Date()) {
+    init(books: [BookshelfBook], referenceDate: Date = Date(), timeZone: TimeZone = .current) {
         totalBooks = books.count
         localBooks = books.filter { $0.sourceURL.hasPrefix("local://") }.count
         remoteBooks = totalBooks - localBooks
@@ -56,62 +117,35 @@ struct ReadingStatsSummary: Equatable, Sendable {
         // Average Chinese reading speed is roughly 380 - 450 words per minute.
         estimatedWordsRead = Int((totalReadingSeconds / 60.0) * 380.0)
 
-        let calendar = Calendar.current
+        let calendar = ReadingDayActivity.calendar(in: timeZone)
         let today = calendar.startOfDay(for: referenceDate)
-
-        todayReadingSeconds = books.reduce(0.0) { sum, book in
-            guard let lastRead = book.lastReadAt, calendar.isDate(lastRead, inSameDayAs: referenceDate) else {
-                return sum
+        var secondsByDay: [Int: TimeInterval] = [:]
+        for book in books {
+            for (key, seconds) in book.readingSecondsByDay ?? [:] where seconds.isFinite && seconds > 0 {
+                secondsByDay[key, default: 0] += seconds
             }
-            return sum + (book.totalReadingSeconds ?? 0)
         }
+        func seconds(on date: Date) -> TimeInterval {
+            secondsByDay[ReadingDayActivity.key(for: date, calendar: calendar), default: 0]
+        }
+        todayReadingSeconds = seconds(on: today)
 
         let weekdaySymbols = ["周日", "周一", "周二", "周三", "周四", "周五", "周六"]
-        var days: [DayReadingStat] = []
-        for offset in (0..<7).reversed() {
-            guard let dayDate = calendar.date(byAdding: .day, value: -offset, to: today) else { continue }
-            let isCurrentDay = (offset == 0)
-            let weekday = calendar.component(.weekday, from: dayDate) - 1
-            let label = isCurrentDay ? "今天" : weekdaySymbols[max(0, min(weekday, 6))]
-
-            let daySeconds = books.reduce(0.0) { sum, book in
-                guard let lastRead = book.lastReadAt, calendar.isDate(lastRead, inSameDayAs: dayDate) else {
-                    return sum
-                }
-                return sum + (book.totalReadingSeconds ?? 0)
-            }
-            days.append(DayReadingStat(dayLabel: label, date: dayDate, seconds: daySeconds, isToday: isCurrentDay))
+        weeklyDistribution = (0..<7).reversed().compactMap { offset in
+            guard let date = calendar.date(byAdding: .day, value: -offset, to: today) else { return nil }
+            let weekday = calendar.component(.weekday, from: date) - 1
+            return DayReadingStat(dayLabel: offset == 0 ? "今天" : weekdaySymbols[weekday],
+                                  date: date, seconds: seconds(on: date), isToday: offset == 0)
         }
-        weeklyDistribution = days
 
-        // Calculate consecutive streak
+        // Yesterday's run remains active until today ends, but opening a book
+        // without recording foreground time cannot create a day in the streak.
         var streak = 0
-        var checkDate = today
-        while true {
-            let hasReadOnDate = books.contains { book in
-                guard let lastRead = book.lastReadAt else { return false }
-                return calendar.isDate(lastRead, inSameDayAs: checkDate)
-            }
-            if hasReadOnDate {
-                streak += 1
-                guard let previousDay = calendar.date(byAdding: .day, value: -1, to: checkDate) else { break }
-                checkDate = previousDay
-            } else if streak == 0, let yesterday = calendar.date(byAdding: .day, value: -1, to: today) {
-                // If user hasn't read today yet, check yesterday to continue yesterday's streak
-                let hasReadYesterday = books.contains { book in
-                    guard let lastRead = book.lastReadAt else { return false }
-                    return calendar.isDate(lastRead, inSameDayAs: yesterday)
-                }
-                if hasReadYesterday {
-                    streak += 1
-                    guard let dayBefore = calendar.date(byAdding: .day, value: -1, to: yesterday) else { break }
-                    checkDate = dayBefore
-                } else {
-                    break
-                }
-            } else {
-                break
-            }
+        var date = todayReadingSeconds > 0 ? today : calendar.date(byAdding: .day, value: -1, to: today) ?? today
+        while seconds(on: date) > 0 {
+            streak += 1
+            guard let previous = calendar.date(byAdding: .day, value: -1, to: date), previous < date else { break }
+            date = previous
         }
         streakDays = streak
     }

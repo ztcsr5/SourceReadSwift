@@ -95,37 +95,8 @@ protocol SourceNetworkClient: Sendable {
     func load(_ request: SourceRequest) async -> Result<SourceResponse, SourceEngineError>
 }
 
-/// Allows book source HTTP requests to connect to community novel hosts with
-/// expired, self-signed, or Let's Encrypt certificates, matching Android Legado's
-/// default OkHttpClient `trustAllCerts` behavior.
-final class InsecureTrustSessionDelegate: NSObject, URLSessionDelegate, URLSessionTaskDelegate, Sendable {
-    func urlSession(
-        _ session: URLSession,
-        didReceive challenge: URLAuthenticationChallenge,
-        completionHandler: @escaping (URLSession.AuthChallengeDisposition, URLCredential?) -> Void
-    ) {
-        if challenge.protectionSpace.authenticationMethod == NSURLAuthenticationMethodServerTrust,
-           let serverTrust = challenge.protectionSpace.serverTrust {
-            completionHandler(.useCredential, URLCredential(trust: serverTrust))
-            return
-        }
-        completionHandler(.performDefaultHandling, nil)
-    }
-
-    func urlSession(
-        _ session: URLSession,
-        task: URLSessionTask,
-        didReceive challenge: URLAuthenticationChallenge,
-        completionHandler: @escaping (URLSession.AuthChallengeDisposition, URLCredential?) -> Void
-    ) {
-        if challenge.protectionSpace.authenticationMethod == NSURLAuthenticationMethodServerTrust,
-           let serverTrust = challenge.protectionSpace.serverTrust {
-            completionHandler(.useCredential, URLCredential(trust: serverTrust))
-            return
-        }
-        completionHandler(.performDefaultHandling, nil)
-    }
-
+/// Keep redirect resolution under source control while using system TLS validation.
+final class SourceRedirectSessionDelegate: NSObject, URLSessionTaskDelegate, Sendable {
     func urlSession(
         _ session: URLSession,
         task: URLSessionTask,
@@ -142,7 +113,7 @@ final class InsecureTrustSessionDelegate: NSObject, URLSessionDelegate, URLSessi
 }
 
 final class URLSessionSourceNetworkClient: SourceNetworkClient, @unchecked Sendable {
-    private static let sessionDelegate = InsecureTrustSessionDelegate()
+    private static let sessionDelegate = SourceRedirectSessionDelegate()
     private static let lock = NSLock()
     private static var _currentSession: URLSession?
 
@@ -158,8 +129,9 @@ final class URLSessionSourceNetworkClient: SourceNetworkClient, @unchecked Senda
         if let s = _currentSession { return s }
         let configuration = URLSessionConfiguration.ephemeral
         configuration.urlCache = nil
+        configuration.httpShouldSetCookies = false
         configuration.requestCachePolicy = .reloadIgnoringLocalCacheData
-        SourceProxyManager.shared.applyProxy(to: configuration)
+        configuration.connectionProxyDictionary = SourceProxyConfiguration.load(from: .standard).connectionProxyDictionary
         let newSession = URLSession(configuration: configuration, delegate: sessionDelegate, delegateQueue: nil)
         _currentSession = newSession
         return newSession
@@ -182,9 +154,7 @@ final class URLSessionSourceNetworkClient: SourceNetworkClient, @unchecked Senda
         var currentBody = request.body
         var currentHeaders = request.headers
         var redirectCount = 0
-        // One scheme repair per request: HTTPS→HTTP for broken TLS hosts,
-        // HTTP→HTTPS for hosts whose port 80 resets but TLS answers. A single
-        // guard stops a dead host from ping-ponging between the two.
+        // A failed idempotent HTTP probe may upgrade once, never downgrade TLS.
         var schemeFallbackUsed = false
         // One cookie reset per request when the server answers with an
         // anti-flood guard page instead of content.
@@ -207,7 +177,7 @@ final class URLSessionSourceNetworkClient: SourceNetworkClient, @unchecked Senda
             for (key, value) in currentHeaders {
                 urlRequest.setValue(value, forHTTPHeaderField: key)
             }
-            if currentHeaders["Cookie"] == nil, let cookieHeader = await cookieStore.cookieHeader(for: currentURL) {
+            if urlRequest.value(forHTTPHeaderField: "Cookie") == nil, let cookieHeader = await cookieStore.cookieHeader(for: currentURL) {
                 urlRequest.setValue(cookieHeader, forHTTPHeaderField: "Cookie")
             }
 
@@ -223,28 +193,12 @@ final class URLSessionSourceNetworkClient: SourceNetworkClient, @unchecked Senda
                     return .failure(.network("响应不是 HTTPURLResponse"))
                 }
             } catch let urlError as URLError {
-                // 1. Automatic HTTP Fallback when HTTPS fails with TLS/certificate/connection error
-                if !schemeFallbackUsed,
-                   currentURL.scheme?.lowercased() == "https",
-                   (urlError.code == .secureConnectionFailed ||
-                    urlError.code == .serverCertificateUntrusted ||
-                    urlError.code == .serverCertificateHasBadDate ||
-                    urlError.code == .serverCertificateNotYetValid ||
-                    urlError.code == .serverCertificateHasUnknownRoot ||
-                    urlError.code == .cannotConnectToHost ||
-                    urlError.code == .networkConnectionLost) {
-                    if let httpURL = URL(string: currentURL.absoluteString.replacingOccurrences(of: "https://", with: "http://", options: .anchored)) {
-                        schemeFallbackUsed = true
-                        currentURL = httpURL
-                        continue
-                    }
-                }
-
                 // 1b. Upgrade HTTP→HTTPS when cleartext is reset. 言情小说网
                 // (m.bgnovel.com) drops port-80 connections from iOS while the
                 // TLS endpoint serves the identical page, so an http-only
                 // bookSourceUrl looked like a dead site.
                 if !schemeFallbackUsed,
+                   (currentMethod == .get || currentMethod == .head),
                    currentURL.scheme?.lowercased() == "http",
                    (urlError.code == .networkConnectionLost || urlError.code == .cannotConnectToHost),
                    let httpsURL = URL(string: currentURL.absoluteString.replacingOccurrences(of: "http://", with: "https://", options: .anchored)) {
@@ -281,7 +235,7 @@ final class URLSessionSourceNetworkClient: SourceNetworkClient, @unchecked Senda
                 }
 
                 guard let nextURL = resolveRedirectLocation(location, relativeTo: currentURL) else {
-                    return .failure(.network("重定向地址无效: \(location)"))
+                    return .failure(.network("重定向地址无效，书源需要更新跳转规则"))
                 }
 
                 // Preserve / store cookies from redirect response
@@ -290,30 +244,19 @@ final class URLSessionSourceNetworkClient: SourceNetworkClient, @unchecked Senda
                 }
                 await cookieStore.storeSetCookieHeaders(respHeaders, for: currentURL)
 
-                // Update Referer and Origin for redirected requests
-                if let nextHost = nextURL.host?.lowercased(),
-                   let currentHost = currentURL.host?.lowercased(),
-                   nextHost != currentHost {
-                    // Cross-domain redirect: set Referer to the target domain's origin to satisfy WAF and anti-hotlink checks
-                    let nextScheme = nextURL.scheme ?? "https"
-                    currentHeaders["Referer"] = "\(nextScheme)://\(nextURL.host ?? "")/"
-                    if currentHeaders["Origin"] != nil {
-                        currentHeaders["Origin"] = "\(nextScheme)://\(nextURL.host ?? "")"
-                    }
-                } else {
-                    currentHeaders["Referer"] = currentURL.absoluteString
+                do {
+                    let current = SourceRedirectRequest(url: currentURL, method: currentMethod,
+                                                        headers: currentHeaders, body: currentBody)
+                    let next = try SourceRedirectPolicy.redirect(current, to: nextURL, statusCode: http.statusCode)
+                    currentURL = next.url
+                    currentMethod = next.method
+                    currentHeaders = next.headers
+                    currentBody = next.body
+                } catch let error as SourceEngineError {
+                    return .failure(error)
+                } catch {
+                    return .failure(.network("书源重定向失败：\(error.localizedDescription)"))
                 }
-
-                // HTTP RFC 7231: switch POST/PUT to GET on 301, 302, 303
-                if http.statusCode == 301 || http.statusCode == 302 || http.statusCode == 303 {
-                    currentMethod = .get
-                    currentBody = nil
-                    currentHeaders.removeValue(forKey: "Content-Type")
-                    currentHeaders.removeValue(forKey: "Content-Length")
-                    currentHeaders.removeValue(forKey: "Origin")
-                }
-
-                currentURL = nextURL
                 continue
             }
 
@@ -327,27 +270,24 @@ final class URLSessionSourceNetworkClient: SourceNetworkClient, @unchecked Senda
                    let nextURL = resolveRedirectLocation(redirectTarget, relativeTo: currentURL),
                    nextURL != currentURL {
                     redirectCount += 1
-                    if redirectCount <= maxRedirects {
-                        await cookieStore.storeSetCookieHeaders(respHeaders, for: currentURL)
-                        if let nextHost = nextURL.host?.lowercased(),
-                           let currentHost = currentURL.host?.lowercased(),
-                           nextHost != currentHost {
-                            let nextScheme = nextURL.scheme ?? "https"
-                            currentHeaders["Referer"] = "\(nextScheme)://\(nextURL.host ?? "")/"
-                            if currentHeaders["Origin"] != nil {
-                                currentHeaders["Origin"] = "\(nextScheme)://\(nextURL.host ?? "")"
-                            }
-                        } else {
-                            currentHeaders["Referer"] = currentURL.absoluteString
-                        }
-                        currentMethod = .get
-                        currentBody = nil
-                        currentHeaders.removeValue(forKey: "Content-Type")
-                        currentHeaders.removeValue(forKey: "Content-Length")
-                        currentHeaders.removeValue(forKey: "Origin")
-                        currentURL = nextURL
-                        continue
+                    guard redirectCount <= maxRedirects else {
+                        return .failure(.network("重定向次数过多 (\(redirectCount))"))
                     }
+                    await cookieStore.storeSetCookieHeaders(respHeaders, for: currentURL)
+                    do {
+                        let current = SourceRedirectRequest(url: currentURL, method: currentMethod,
+                                                            headers: currentHeaders, body: currentBody)
+                        let next = try SourceRedirectPolicy.redirect(current, to: nextURL, statusCode: 200)
+                        currentURL = next.url
+                        currentMethod = next.method
+                        currentHeaders = next.headers
+                        currentBody = next.body
+                    } catch let error as SourceEngineError {
+                        return .failure(error)
+                    } catch {
+                        return .failure(.network("书源页面跳转失败：\(error.localizedDescription)"))
+                    }
+                    continue
                 }
             }
 
@@ -473,12 +413,12 @@ final class URLSessionSourceNetworkClient: SourceNetworkClient, @unchecked Senda
             }
         }
 
-        // Strip accidental double domain prefix, e.g. "http://domain.comhttp://target.com/..."
-        if trimmed.count > 8 {
-            let searchStart = trimmed.index(trimmed.startIndex, offsetBy: 7)
-            if let secondSchemeRange = trimmed.range(of: "https?://", options: .regularExpression, range: searchStart..<trimmed.endIndex) {
-                trimmed = String(trimmed[secondSchemeRange.lowerBound...])
-            }
+        // Repair only a second scheme glued to the host. A URL embedded in
+        // a path/query (login?next=https://...) is not a redirect destination.
+        if let regex = try? NSRegularExpression(pattern: #"^https?://[^/?#\s]+(https?://.+)$"#),
+           let match = regex.firstMatch(in: trimmed, range: NSRange(trimmed.startIndex..<trimmed.endIndex, in: trimmed)),
+           let target = Range(match.range(at: 1), in: trimmed) {
+            trimmed = String(trimmed[target])
         }
 
         // Handle protocol-relative URL: //example.com/path

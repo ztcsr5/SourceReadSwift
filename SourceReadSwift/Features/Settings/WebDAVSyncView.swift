@@ -38,7 +38,10 @@ struct WebDAVSyncView: View {
 
     @AppStorage("webdav.serverURL") private var serverURL: String = "https://dav.jianguoyun.com/dav/"
     @AppStorage("webdav.username") private var username: String = ""
-    @AppStorage("webdav.password") private var password: String = ""
+    @State private var password = ""
+    @State private var passwordStorageError: String?
+    @State private var didLoadPassword = false
+    private let credentialStore = WebDAVCredentialStore()
     @AppStorage("webdav.remoteDirectory") private var remoteDirectory: String = "SourceReadSwift"
     @AppStorage("webdav.lastSyncDate") private var lastSyncTimestamp: Double = 0
     @AppStorage("webdav.autoSyncOnExit") private var autoSyncOnExit: Bool = false
@@ -51,6 +54,8 @@ struct WebDAVSyncView: View {
     @State private var remoteBackups: [WebDAVRemoteItem] = []
     @State private var actionMessage: String?
     @State private var selectedBackupToRestore: WebDAVRemoteItem?
+    @State private var selectedBackupToDelete: WebDAVRemoteItem?
+    @State private var showDeleteConfirmation = false
     @State private var showRestoreConfirmation = false
     @State private var isRestoring = false
 
@@ -114,6 +119,12 @@ struct WebDAVSyncView: View {
                     TextField("SourceReadSwift", text: $remoteDirectory)
                         .textInputAutocapitalization(.never)
                         .autocorrectionDisabled()
+                }
+
+                if let passwordStorageError {
+                    Text(passwordStorageError)
+                        .font(.footnote)
+                        .foregroundStyle(AppTheme.danger)
                 }
 
                 Button {
@@ -244,7 +255,8 @@ struct WebDAVSyncView: View {
                         }
                         .swipeActions(edge: .trailing, allowsFullSwipe: false) {
                             Button(role: .destructive) {
-                                deleteRemoteBackup(item)
+                                selectedBackupToDelete = item
+                                showDeleteConfirmation = true
                             } label: {
                                 Label("删除", systemImage: "trash")
                             }
@@ -254,7 +266,7 @@ struct WebDAVSyncView: View {
             } header: {
                 Text("云端备份历史")
             } footer: {
-                Text("从云端恢复将合并与更新您现有的书架藏书、书源规则、净化设置与阅读偏好。左滑可删除历史备份。")
+                Text("恢复会替换书架、书源、净化规则与阅读偏好。JSON 不包含本地漫画图片、字体、壁纸和离线下载文件，迁移设备时需另行保留。")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
             }
@@ -263,6 +275,11 @@ struct WebDAVSyncView: View {
         .pageBackground()
         .navigationTitle("WebDAV 云端同步")
         .navigationBarTitleDisplayMode(.inline)
+        .onChange(of: password) { value in
+            guard didLoadPassword else { return }
+            do { try credentialStore.save(value); passwordStorageError = nil }
+            catch { passwordStorageError = "密码未保存到设备：\(error.localizedDescription)" }
+        }
         .alert("确认从云端恢复？", isPresented: $showRestoreConfirmation) {
             Button("取消", role: .cancel) { selectedBackupToRestore = nil }
             Button("立即恢复", role: .destructive) {
@@ -272,12 +289,28 @@ struct WebDAVSyncView: View {
             }
         } message: {
             if let item = selectedBackupToRestore {
-                Text("即将从云端备份「\(item.filename)」恢复完整数据。请确认操作。")
+                Text("将使用「\(item.filename)」替换当前书架与设置。建议先备份当前数据。")
             } else {
-                Text("即将恢复完整数据。")
+                Text("将替换当前书架与设置。")
             }
         }
+        .alert("删除云端备份？", isPresented: $showDeleteConfirmation) {
+            Button("取消", role: .cancel) { selectedBackupToDelete = nil }
+            Button("删除这份云端备份", role: .destructive) {
+                if let item = selectedBackupToDelete { deleteRemoteBackup(item) }
+                selectedBackupToDelete = nil
+            }
+        } message: {
+            Text(selectedBackupToDelete?.filename ?? "")
+        }
         .onAppear {
+            if !didLoadPassword {
+                do { password = try credentialStore.load(); didLoadPassword = true }
+                catch {
+                    passwordStorageError = "无法读取已保存密码：\(error.localizedDescription)"
+                    didLoadPassword = true
+                }
+            }
             if currentConfig.isConfigured && remoteBackups.isEmpty {
                 fetchRemoteBackups()
             }

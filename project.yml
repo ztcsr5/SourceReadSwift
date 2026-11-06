@@ -64,7 +64,7 @@ targets:
           - ZhiMangXing-Regular.ttf
           - ReadingDeskSong-Regular.ttf
         CFBundleDocumentTypes:
-          - CFBundleTypeName: Readable text, EPUB and source JSON
+          - CFBundleTypeName: Readable text, EPUB, CBZ and source JSON
             CFBundleTypeRole: Viewer
             LSHandlerRank: Alternate
             LSItemContentTypes:
@@ -76,7 +76,17 @@ targets:
               - public.content
               - com.edc21.sourceread.source-json
               - org.idpf.epub-container
+              - com.edc21.sourceread.cbz
         UTImportedTypeDeclarations:
+          - UTTypeIdentifier: com.edc21.sourceread.cbz
+            UTTypeDescription: Comic book ZIP archive
+            UTTypeConformsTo:
+              - public.zip-archive
+            UTTypeTagSpecification:
+              public.filename-extension:
+                - cbz
+              public.mime-type:
+                - application/vnd.comicbook+zip
           - UTTypeIdentifier: com.edc21.sourceread.source-json
             UTTypeDescription: SourceRead book source JSON or plain text
             UTTypeConformsTo:

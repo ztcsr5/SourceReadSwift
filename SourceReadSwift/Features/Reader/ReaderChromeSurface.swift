@@ -63,12 +63,19 @@ struct ReaderChromeSurface: ViewModifier {
             .background {
                 let shape = RoundedRectangle(cornerRadius: 24, style: .continuous)
                 shape.fill(.regularMaterial)
-                    .overlay { shape.fill(paper.opacity(glassTintOpacity)) }
+                    .overlay { shape.fill(paper.opacity(legacyTintOpacity)) }
             }
             .overlay {
                 RoundedRectangle(cornerRadius: 24, style: .continuous)
                     .strokeBorder(ink.opacity(0.12), lineWidth: 0.6).allowsHitTesting(false)
             }
+    }
+
+    private var legacyTintOpacity: Double {
+        // Regular Material already diffuses the page; the extra paper tint
+        // must not make the user's glass choice indistinguishable from opaque paper.
+        if protectsReadingControls, colorScheme == .light { return 0.58 }
+        return glassTintOpacity
     }
 
     private func opaque(_ content: Content) -> some View {

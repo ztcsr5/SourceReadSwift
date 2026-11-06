@@ -70,14 +70,8 @@ struct BookDetailParser {
             } else {
                 root = document
             }
-            let bookMap: [String: Any] = [
-                "name": book.name,
-                "author": book.author ?? "",
-                "coverUrl": book.coverUrl ?? "",
-                "bookUrl": book.bookUrl,
-                "intro": book.intro ?? "",
-                "kind": book.kind ?? ""
-            ]
+            let bookMap = LegadoSearchBookBridge(book: book)
+            if bookMap.type == 0 { bookMap.type = source.sourceKind.legadoBookType }
             let variables: [String: Any] = [
                 "source": source,
                 "book": bookMap,
@@ -185,7 +179,8 @@ struct BookDetailParser {
                 wordCount: wordCount,
                 status: status,
                 updateTime: updateTime,
-                kind: kind
+                kind: kind,
+                mediaKind: bookMap.mediaKind
             ))
         } catch {
             return .failure(.rule(error.localizedDescription))
@@ -194,14 +189,8 @@ struct BookDetailParser {
 
     private func parseJSON(source: BookSource, book: SearchBook, response: SourceResponse) -> Result<BookDetail, SourceEngineError> {
         let rule = source.ruleBookInfo
-        let bookMap: [String: Any] = [
-            "name": book.name,
-            "author": book.author ?? "",
-            "coverUrl": book.coverUrl ?? "",
-            "bookUrl": book.bookUrl,
-            "intro": book.intro ?? "",
-            "kind": book.kind ?? ""
-        ]
+        let bookMap = LegadoSearchBookBridge(book: book)
+        if bookMap.type == 0 { bookMap.type = source.sourceKind.legadoBookType }
         // `init` is a normal Legado rule and can be JavaScript.  Build the
         // same context that the field rules receive (`book`, `baseUrl`,
         // `result`, ...) before evaluating it; otherwise a JS init that reads
@@ -343,7 +332,8 @@ struct BookDetailParser {
             wordCount: wordCount,
             status: status,
             updateTime: updateTime,
-            kind: kind
+            kind: kind,
+            mediaKind: bookMap.mediaKind
         ))
     }
 
