@@ -54,7 +54,7 @@ struct FloatingReadingDesk: View {
         .foregroundStyle(palette.ink)
         .contentShape(Rectangle())
         .accessibilityElement(children: .combine)
-        .accessibilityHint("轻点继续阅读，使用更多操作管理")
+        .accessibilityHint("轻点继续阅读，长按管理书籍")
         .onReceive(NotificationCenter.default.publisher(for: .NSProcessInfoPowerStateDidChange)) { _ in updateEnergyPolicy() }
         .onReceive(NotificationCenter.default.publisher(for: ProcessInfo.thermalStateDidChangeNotification)) { _ in updateEnergyPolicy() }
     }

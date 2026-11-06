@@ -315,9 +315,33 @@ final class RulePersistentState: @unchecked Sendable {
     private let lock = NSLock()
     private var values: [String: String] = [:]
     private var objects: [String: Any] = [:]
+    private let saveSourceVariables: (([String: String]) throws -> Void)?
+    private var persistenceError: String?
+
+    init(initialValues: [String: String] = [:], saveSourceVariables: (([String: String]) throws -> Void)? = nil) {
+        values = initialValues
+        self.saveSourceVariables = saveSourceVariables
+    }
+
+    var persistenceFailure: String? {
+        lock.lock(); defer { lock.unlock() }
+        return persistenceError
+    }
+
+    private func persistSourceVariablesLocked() {
+        do {
+            try saveSourceVariables?(values.filter { SourceVariableStore.isSourceVariable($0.key) })
+            persistenceError = nil
+        } catch {
+            persistenceError = "源设置已在本次会话生效，但保存失败：\(error.localizedDescription)"
+        }
+    }
 
     func put(_ value: String, for key: String) {
-        lock.lock(); values[key] = value; lock.unlock()
+        lock.lock(); defer { lock.unlock() }
+        guard values[key] != value else { return }
+        values[key] = value
+        if SourceVariableStore.isSourceVariable(key) { persistSourceVariablesLocked() }
     }
 
     func get(_ key: String) -> String {
@@ -345,6 +369,7 @@ final class RulePersistentState: @unchecked Sendable {
         lock.lock()
         values.removeValue(forKey: key)
         objects.removeValue(forKey: key)
+        if SourceVariableStore.isSourceVariable(key) { persistSourceVariablesLocked() }
         lock.unlock()
     }
 
@@ -357,6 +382,7 @@ final class RulePersistentState: @unchecked Sendable {
             values.removeValue(forKey: key)
             objects.removeValue(forKey: key)
         }
+        if keys.contains(where: SourceVariableStore.isSourceVariable) { persistSourceVariablesLocked() }
         lock.unlock()
     }
 
