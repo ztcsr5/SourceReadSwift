@@ -9,8 +9,8 @@ struct AppMotionPolicy: Equatable {
         switch event {
         case .press: return 0.14
         case .navigation: return 0.30
-        case .expansion: return 0.44
-        case .background: return 0.48
+        case .expansion: return 0.28
+        case .background: return 0.32
         case .bookmark: return 0.32
         }
     }

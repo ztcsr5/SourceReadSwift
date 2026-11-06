@@ -110,14 +110,9 @@ final class FloatingReadingDeskTests: XCTestCase {
         }
     }
 
-    @MainActor func testDeskTitleResolvesSongtiOrRegisteredChineseSerif() throws {
-        let bundled = try XCTUnwrap(UIFont(name: ReadingDeskTitleTypography.fallbackPostScriptName, size: 24))
-        XCTAssertEqual(bundled.fontName, "ReadingDeskSong-Regular")
-        let selected = try XCTUnwrap(ReadingDeskTitleTypography.postScriptName)
-        let availableSystemName = ["STSongti-SC-Regular", "SongtiSC-Regular", "Songti SC Regular"]
-            .lazy.compactMap { UIFont(name: $0, size: 24)?.fontName }.first
-        XCTAssertEqual(selected, availableSystemName ?? bundled.fontName)
-        print("DESK_TITLE_FACE: " + selected)
+    func testDeskTitleUsesTheSystemFaceAtTheCallersDynamicTypeSize() {
+        XCTAssertEqual(ReadingDeskTitleTypography.font(size: 24), Font.system(size: 24, weight: .semibold))
+        XCTAssertEqual(ReadingDeskTitleTypography.font(size: 40), Font.system(size: 40, weight: .semibold))
     }
 
     func testCoverByteCacheDoesNotExtendServerFreshness() {

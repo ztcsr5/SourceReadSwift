@@ -9,29 +9,25 @@ struct HuaHuoBookSourceAdapter: Sendable {
     // MARK: - Format Detection
 
     static func isHuaHuoJSON(_ text: String) -> Bool {
-        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard trimmed.hasPrefix("{") || trimmed.hasPrefix("[") else { return false }
-        
-        let hasHuaHuoRuleKeys = trimmed.contains("\"exploreBookList\"") ||
-            trimmed.contains("\"searchBookList\"") ||
-            trimmed.contains("\"infoName\"") ||
-            trimmed.contains("\"infoTocUrl\"") ||
-            trimmed.contains("\"infoCoverUrl\"") ||
-            trimmed.contains("\"tocList\"") ||
-            trimmed.contains("\"nextContentUrl\"")
-        
-        let hasRuleContainers = trimmed.contains("\"ruleSearch\"") ||
-            trimmed.contains("\"ruleBookInfo\"") ||
-            trimmed.contains("\"ruleToc\"") ||
-            trimmed.contains("\"ruleContent\"") ||
-            trimmed.contains("\"ruleExplore\"")
-
-        return hasHuaHuoRuleKeys && hasRuleContainers
+        isHuaHuoData(Data(text.utf8))
     }
 
     static func isHuaHuoData(_ data: Data) -> Bool {
-        guard let text = String(data: data, encoding: .utf8) else { return false }
-        return isHuaHuoJSON(text)
+        let decoder = JSONDecoder()
+        if let rows = try? decoder.decode([HuaHuoRawSource].self, from: data) {
+            return rows.contains(where: hasSpecializedRules)
+        }
+        guard let row = try? decoder.decode(HuaHuoRawSource.self, from: data) else { return false }
+        return hasSpecializedRules(row)
+    }
+
+    /// Shared pagination fields alone also occur in ordinary Legado sources.
+    static func hasSpecializedRules(_ source: HuaHuoRawSource) -> Bool {
+        [source.ruleSearch?.searchBookList, source.ruleSearch?.searchName,
+         source.ruleExplore?.exploreBookList, source.ruleExplore?.exploreName,
+         source.ruleBookInfo?.infoName, source.ruleBookInfo?.infoTocUrl,
+         source.ruleBookInfo?.infoCoverUrl, source.ruleToc?.tocList]
+            .contains { $0?.nilIfEmpty != nil }
     }
 
     // MARK: - Import & Conversion
@@ -45,10 +41,10 @@ struct HuaHuoBookSourceAdapter: Sendable {
         let decoder = JSONDecoder()
         
         if let array = try? decoder.decode([HuaHuoRawSource].self, from: data) {
-            return array.compactMap { adapt(raw: $0) }
+            return array.filter(hasSpecializedRules).compactMap { adapt(raw: $0) }
         }
         
-        if let single = try? decoder.decode(HuaHuoRawSource.self, from: data) {
+        if let single = try? decoder.decode(HuaHuoRawSource.self, from: data), hasSpecializedRules(single) {
             if let adapted = adapt(raw: single) {
                 return [adapted]
             }
@@ -133,13 +129,15 @@ struct HuaHuoBookSourceAdapter: Sendable {
             if let v = e.exploreWordCount?.nilIfEmpty { exploreFields["wordCount"] = v }
         }
 
+        var preserved = raw.metadata.raw
+        preserved["sourceFormat"] = BookSourceFormat.huahuo.rawValue
         return BookSource(
             bookSourceName: name,
             bookSourceUrl: url,
             bookSourceGroup: group,
-            bookSourceType: 0,
-            enabled: true,
-            weight: 100,
+            bookSourceType: raw.metadata.bookSourceType,
+            enabled: raw.metadata.enabled,
+            weight: raw.metadata.raw["weight"] == nil ? 100 : raw.metadata.weight,
             searchUrl: raw.searchUrl,
             exploreUrl: raw.exploreUrl,
             ruleSearch: searchFields.isEmpty ? nil : SourceRule(fields: searchFields),
@@ -149,7 +147,10 @@ struct HuaHuoBookSourceAdapter: Sendable {
             ruleExplore: exploreFields.isEmpty ? nil : SourceRule(fields: exploreFields),
             header: raw.header,
             loginUrl: raw.loginUrl,
-            raw: ["sourceFormat": BookSourceFormat.huahuo.rawValue]
+            loginCheckJs: raw.metadata.loginCheckJs,
+            loginUi: raw.metadata.loginUi,
+            customConfig: raw.metadata.customConfig,
+            raw: preserved
         )
     }
 }
@@ -171,6 +172,33 @@ struct HuaHuoRawSource: Codable, Sendable {
     var ruleBookInfo: HuaHuoRawBookInfoRule?
     var ruleToc: HuaHuoRawTocRule?
     var ruleContent: HuaHuoRawContentRule?
+    let metadata: BookSource
+
+    enum CodingKeys: String, CodingKey {
+        case sourceName, name, sourceUrl, url, sourceGroup, searchUrl, exploreUrl, header, loginUrl, ruleExplore, ruleSearch, ruleBookInfo, ruleToc, ruleContent
+    }
+
+    init(from decoder: Decoder) throws {
+        // Reuse canonical tolerant scalar/JSON decoding and preserve jsLib,
+        // login configuration and future source extensions in one place.
+        metadata = try BookSource(from: decoder)
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        sourceName = try container.decodeIfPresent(String.self, forKey: .sourceName)
+        name = try container.decodeIfPresent(String.self, forKey: .name)
+        sourceUrl = try container.decodeIfPresent(String.self, forKey: .sourceUrl)
+        url = try container.decodeIfPresent(String.self, forKey: .url)
+        sourceGroup = try container.decodeIfPresent(String.self, forKey: .sourceGroup)
+        searchUrl = try container.decodeIfPresent(String.self, forKey: .searchUrl)
+        exploreUrl = try container.decodeIfPresent(String.self, forKey: .exploreUrl)
+        header = metadata.header
+        loginUrl = metadata.loginUrl
+        ruleExplore = try container.decodeIfPresent(HuaHuoRawExploreRule.self, forKey: .ruleExplore)
+        ruleSearch = try container.decodeIfPresent(HuaHuoRawSearchRule.self, forKey: .ruleSearch)
+        ruleBookInfo = try container.decodeIfPresent(HuaHuoRawBookInfoRule.self, forKey: .ruleBookInfo)
+        ruleToc = try container.decodeIfPresent(HuaHuoRawTocRule.self, forKey: .ruleToc)
+        ruleContent = try container.decodeIfPresent(HuaHuoRawContentRule.self, forKey: .ruleContent)
+    }
+
 }
 
 struct HuaHuoRawExploreRule: Codable, Sendable {
