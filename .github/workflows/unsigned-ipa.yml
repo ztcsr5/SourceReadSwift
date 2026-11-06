@@ -10,6 +10,7 @@ on:
   push:
     branches:
       - codex/**
+      - '!codex/reader-quality-137-*'
 
 jobs:
   package:

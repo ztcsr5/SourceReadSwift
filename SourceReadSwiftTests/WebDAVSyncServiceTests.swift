@@ -42,6 +42,26 @@ final class WebDAVSyncServiceTests: XCTestCase {
         XCTAssertEqual(header, "Basic YWxhZGRpbjpvcGVuIHNlc2FtZQ==")
     }
 
+    func testBackupPathsCannotEscapeTheirDirectoryOrChangeURLComponents() throws {
+        let service = WebDAVSyncService()
+        let config = WebDAVConfig(serverURL: "https://example.com/dav/", remoteDirectory: "纸间/backup")
+        let file = try XCTUnwrap(service.buildFileURL(config: config, filename: "book?#%.json"))
+        XCTAssertNil(file.query)
+        XCTAssertNil(file.fragment)
+        XCTAssertEqual(file.lastPathComponent, "book?#%.json")
+        for filename in ["../other.json", "folder/other.json", "", "..", "a\u{0000}.json"] {
+            XCTAssertNil(service.buildFileURL(config: config, filename: filename))
+        }
+        XCTAssertNil(service.buildDirectoryURL(config: .init(serverURL: "file:///tmp")))
+        XCTAssertNil(service.buildDirectoryURL(config: .init(serverURL: "https://example.com/dav?override=true")))
+        XCTAssertNil(service.buildDirectoryURL(config: .init(serverURL: "https://example.com/dav", remoteDirectory: "../outside")))
+    }
+
+    func testMalformedRemoteListingDoesNotReturnPartialSuccess() {
+        let parser = WebDAVXMLParser(data: Data("<multistatus><response><href>/a.json</href></response>".utf8))
+        XCTAssertThrowsError(try parser.parseValidated())
+    }
+
     func testWebDAVXMLParserWithStandardPropfindResponse() {
         let sampleXML = """
         <?xml version="1.0" encoding="utf-8"?>
