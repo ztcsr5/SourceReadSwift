@@ -15,7 +15,7 @@ final class RSSFeedCacheStore: ObservableObject {
     private let maxSources: Int
 
     init(fileURL: URL? = nil, maxSources: Int = 50) {
-        self.maxSources = maxSources
+        self.maxSources = max(0, maxSources)
         if let fileURL {
             self.fileURL = fileURL
         } else {
@@ -23,12 +23,8 @@ final class RSSFeedCacheStore: ObservableObject {
                 ?? FileManager.default.temporaryDirectory
             self.fileURL = base.appendingPathComponent("SourceReadSwift/RSSFeedCache.json")
         }
-        let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .iso8601
-        if let data = try? Data(contentsOf: self.fileURL),
-           let decoded = try? decoder.decode([RSSFeedCacheEntry].self, from: data) {
-            entries = decoded
-        }
+        do { entries = Array((try RSSCacheFile<[RSSFeedCacheEntry]>(url: self.fileURL).load() ?? []).prefix(self.maxSources)) }
+        catch { NSLog("RSS feed cache read failed: code=%ld", (error as NSError).code) }
     }
 
     func articles(for sourceURL: String, maxAge: TimeInterval? = nil) -> [RSSArticlePreview]? {
@@ -65,13 +61,8 @@ final class RSSFeedCacheStore: ObservableObject {
     }
 
     private func persist() {
-        do {
-            try FileManager.default.createDirectory(at: fileURL.deletingLastPathComponent(), withIntermediateDirectories: true)
-            let encoder = JSONEncoder()
-            encoder.dateEncodingStrategy = .iso8601
-            try encoder.encode(entries).write(to: fileURL, options: [.atomic])
-        } catch {
-            // Cache is best-effort; network reading remains functional when disk writes fail.
-        }
+        RSSCacheFile<[RSSFeedCacheEntry]>(url: fileURL).save(entries)
     }
+
+    func waitForPendingWrites() async { await RSSCacheFile<[RSSFeedCacheEntry]>(url: fileURL).waitForPendingWrites() }
 }

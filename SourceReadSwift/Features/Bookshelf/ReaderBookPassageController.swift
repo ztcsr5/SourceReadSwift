@@ -24,7 +24,18 @@ final class ReaderBookPassageController: UIViewController {
     #endif
 
     override func loadView() {
+        #if DEBUG
+        let evidence = NativeBookGestureEvidenceView()
+        evidence.readGestureState = { [weak self] in
+            guard let self else { return "detached" }
+            let edgeEnabled = self.navigationController?.interactivePopGestureRecognizer?.isEnabled ?? false
+            return "ready=\(self.canPrepareReturn),zoom=\(self.usesNativeDeskReturn),edge=\(edgeEnabled);"
+                + NativeBookGestureProbe.describe(self.observedGestures)
+        }
+        view = evidence
+        #else
         view = UIView()
+        #endif
         view.backgroundColor = .clear
         view.isUserInteractionEnabled = false
         #if DEBUG

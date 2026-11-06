@@ -105,13 +105,7 @@ final class JSCoreRuntime {
         } else if let book = value as? SearchBook {
             return LegadoSearchBookBridge(book: book)
         } else if let book = value as? BookDetail {
-            let bridge = LegadoSearchBookBridge(book: SearchBook(
-                name: book.name, author: book.author, coverUrl: book.coverUrl,
-                bookUrl: book.bookUrl, sourceName: book.sourceName, sourceUrl: book.sourceUrl, intro: book.intro
-            ))
-            bridge.tocUrl = book.tocUrl ?? ""
-            bridge.latestChapterTitle = book.latestChapter ?? ""
-            return bridge
+            return LegadoSearchBookBridge(book: book)
         } else if let elements = value as? [SwiftSoup.Element] {
             return LegadoElementsBridge(elements: elements, baseURL: baseUrl)
         } else if let elements = value as? SwiftSoup.Elements {
@@ -1002,6 +996,18 @@ final class JSCoreRuntime {
                 .replacingOccurrences(of: "ss", with: "ss")
             return formatter.string(from: date)
         }
+        let timeFormatUTC: @convention(block) (Double, String, Double) -> String = { timestamp, format, offset in
+            guard timestamp.isFinite, abs(timestamp) <= 8.64e15,
+                  offset.isFinite, abs(offset) <= 64_800_000, format.utf8.count <= 256,
+                  let zone = TimeZone(secondsFromGMT: Int(offset / 1000)) else { return "" }
+            let formatter = DateFormatter()
+            formatter.locale = Locale(identifier: "en_US_POSIX")
+            formatter.calendar = Calendar(identifier: .gregorian)
+            formatter.timeZone = zone
+            formatter.dateFormat = format
+            // Legado passes milliseconds to both Date(time) and SimpleTimeZone(rawOffset).
+            return formatter.string(from: Date(timeIntervalSince1970: timestamp / 1000))
+        }
         let getString: @convention(block) (String, String, String) -> String = { [weak self] html, rule, baseUrl in
             guard let self else { return "" }
             do {
@@ -1236,6 +1242,7 @@ final class JSCoreRuntime {
         context.setObject(hexEncode, forKeyedSubscript: "__native_hexEncode" as NSString)
         context.setObject(hexDecode, forKeyedSubscript: "__native_hexDecode" as NSString)
         context.setObject(timeFormat, forKeyedSubscript: "__native_timeFormat" as NSString)
+        context.setObject(timeFormatUTC, forKeyedSubscript: "__native_timeFormatUTC" as NSString)
         context.setObject(getString, forKeyedSubscript: "__native_getString" as NSString)
         context.setObject(getStringList, forKeyedSubscript: "__native_getStringList" as NSString)
         context.setObject(countElements, forKeyedSubscript: "__native_countElements" as NSString)
@@ -1586,7 +1593,10 @@ final class JSCoreRuntime {
           });
         };
         globalThis.toNumChapter = java.toNumChapter;
-        java.timeFormatUTC = function(timestamp) { return new Date(timestamp == null ? Date.now() : Number(timestamp)).toISOString().replace('T', ' ').substring(0, 19); };
+        java.timeFormatUTC = function(timestamp, format, offset) {
+          return __native_timeFormatUTC(timestamp == null ? Date.now() : Number(timestamp),
+            String(format || 'yyyy-MM-dd HH:mm:ss'), offset == null ? 0 : Number(offset));
+        };
         java.putCache = function(key, value) { return cache.put(key, value); };
         java.getCache = function(key) { return cache.get(key); };
         java.putField = function(key, value) { __field_store[String(key)] = value; return value; };
@@ -5175,7 +5185,7 @@ final class JSCoreRuntime {
           globalThis.digestBase64Str = function(value, algorithm) { return java.digestBase64Str(value, algorithm); };
           globalThis.uriEncode = function(value) { return java.uriEncode(value); };
           globalThis.uriDecode = function(value) { return java.uriDecode(value); };
-          globalThis.timeFormatUTC = function(value) { return java.timeFormatUTC(value); };
+          globalThis.timeFormatUTC = function(value, format, offset) { return java.timeFormatUTC(value, format, offset); };
           globalThis.putCache = function(key, value) { return java.putCache(key, value); };
           globalThis.getCache = function(key) { return java.getCache(key); };
           globalThis.putField = function(key, value) { return java.putField(key, value); };

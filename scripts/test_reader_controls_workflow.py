@@ -11,6 +11,12 @@ WORKFLOW = Path(__file__).resolve().parents[1] / '.github/workflows/ios.yml'
 
 
 class WorkflowRunNameTests(unittest.TestCase):
+    def test_quality_snapshots_require_explicit_dispatch_instead_of_push_autoruns(self):
+        for filename in ["ios.yml", "unsigned-ipa.yml"]:
+            workflow = (WORKFLOW.parent / filename).read_text(encoding="utf8")
+            push = workflow.split("  push:", 1)[1].split("jobs:", 1)[0]
+            self.assertIn("- '!codex/reader-quality-137-*'", push, filename)
+
     def test_run_titles_state_the_project_version_build_and_purpose(self):
         root = WORKFLOW.parents[2]
         project = (root / 'project.yml').read_text(encoding='utf8')
@@ -56,16 +62,34 @@ class ReaderControlsWorkflowTests(unittest.TestCase):
 
     def test_all_original_native_product_suites_remain_selected(self):
         expected = '''TabChromeRegressionTests ReaderCoverTeardownTests AppLayoutDensityTests SourceOrganizationTests
-            ReaderTocPerformanceTests ContentImagePipelineRegressionTests RemoteComicImageTests AppFrameProfilerTests
-            Release116VisualTests ReaderModePositionRegressionTests Release117DetailTests Release117ComicCompatibilityTests
+            AggregateSourceRegressionTests GlobalSearchIndexTests ForestBrandThemeTests FloatingReadingDeskTests
+            UXXAggregatePipelineTests AudioBookPlaybackCoordinatorTests CloudTTSCompletionTests LocalVoiceLibraryTests BookExportRegressionTests
+            HomeLayoutEvidenceTests AsyncTimeoutTests ReaderPerformancePolicyTests SourcePipelineTests SourceProxyConfigurationTests
+            HaiKuoShiJieSourceAdapterTests HuaHuoBookSourceAdapterTests ReadingStatsSummaryTests SourceStoreTests
+            SourcePublisherLinksTests SourceVariablePersistenceTests SourceImportDownloaderTests SourceRequestTransportTests SourceCookieStoreTests SourceRateLimiterTests
+            CookieHeaderParserTests AppDataBackupTests WebDAVCredentialStoreTests WebDAVSyncServiceTests
+            CloudTTSCredentialsTests RSSArticleStateStoreTests
+            RSSCachePersistenceTests RSSFeedCacheStoreTests RSSArticleContentCacheStoreTests
+            ReaderTocPerformanceTests Release111RegressionTests OrderedReadingPersistenceTests ContentImagePipelineRegressionTests RemoteComicImageTests AppFrameProfilerTests
+            ComicOfflineArchiveTests ComicStripLayoutTests ComicZoomInteractionTests LocalComicBookParserTests BlockingRuleExecutorTests ComicReadingPositionTests ChapterDownloadStoreTests ComicContentParserTests SourceEngineStage18FixtureTests WebReaderDocumentTests
+            Release116VisualTests ReaderModePositionRegressionTests ReaderPageHostingTests Release117DetailTests Release117ComicCompatibilityTests
             Release117AppearanceTests Release117SearchProjectionTests Release117ChromeTests WebsiteSourceInferenceTests
             WebsiteSourceFamilyInferenceTests AIChatTests Release117PurificationTests LANWorkbenchTests ReadingNotesNavigationTests
             Release117ThemeCollaborationTests Release117ReaderPersonalizationTests Release117WallpaperEditorTests
             Release117ReadingHeroTests Release117MotionSystemTests Release117PolishTests ReaderSettingsStackTests
             FontImportRequestTests ReaderScrollCadenceTests ReaderBindingTests ReaderWorkbenchVisualTests
-            ReaderControlsMaterialTests ReaderTabChromeExitTests ReaderPanController119Tests'''.split()
+            ReaderControlsMaterialTests ReaderTabChromeExitTests ReaderExitSwipeTests ReaderPanController119Tests'''.split()
         actual = re.findall(r'-only-testing:SourceReadSwiftTests/(\w+)', self.step('iOS26 native tab runtime regression'))
         self.assertEqual(set(actual), set(expected))
+
+    def test_new_source_library_integration_and_early_failure_log_are_not_skipped(self):
+        runtime = self.step('iOS26 native tab runtime regression')
+        self.assertIn('-only-testing:SourceReadSwiftTests/SourceStoreTests/testHuaHuoComicLibraryImportAndReloadPreserveMediaAndSharedScripts', runtime)
+        log = self.step('Preserve iOS26 unit log before UI flows')
+        self.assertIn('always()', log)
+        self.assertIn('native-tab-test.log', log)
+        self.assertLess(self.native.index('Preserve iOS26 unit log before UI flows'),
+                        self.native.index('Exercise real reader settings UI on iOS26'))
 
     def test_multi_screen_ui_flows_have_their_own_bounded_budget_not_longer_product_deadlines(self):
         ui = self.step('Exercise real reader settings UI on iOS26')
@@ -74,6 +98,31 @@ class ReaderControlsWorkflowTests(unittest.TestCase):
         self.assertIn('-maximum-test-execution-time-allowance 180', ui)
         self.assertIn('timeout-minutes: 15', ui)
         self.assertNotIn('-only-testing:SourceReadSwiftTests/', ui)
+
+    def test_compiled_iOS26_ui_keeps_running_to_capture_independent_failures(self):
+        build = self.step('Build iOS26 tests')
+        self.assertIn('id: native-build', build)
+        for step in ['Exercise real reader settings UI on iOS26', 'Exercise reader chapter continuity on iOS26',
+                     'Exercise reader return gestures on iOS26']:
+            self.assertIn("!cancelled() && steps.native-build.outcome == 'success'", self.step(step))
+
+    def test_return_gestures_are_bounded_and_cannot_be_skipped_by_continuity_budget(self):
+        stage = self.step('Exercise reader return gestures on iOS26')
+        self.assertIn('timeout-minutes: 8', stage)
+        self.assertIn('-maximum-test-execution-time-allowance 180', stage)
+        for case in ['testReaderSystemReturnCanCancelWithoutLosingItsSavedParagraph',
+                     'testReaderSystemReturnCanCancelWithReducedMotion',
+                     'testReaderLongEdgeReturnCompletesWithReducedMotion']:
+            self.assertIn(f'-only-testing:SourceReadSwiftUITests/FloatingReadingDeskUITests/{case}', stage)
+            self.assertNotIn(case, self.step('Exercise reader chapter continuity on iOS26'))
+        self.assertIn('--output-path native-ui-snapshots/gestures', self.step('Export iOS26 attachments'))
+
+    def test_general_startup_logging_starts_after_the_simulator_is_booted(self):
+        workflow = WORKFLOW.read_text(encoding='utf8')
+        general = workflow.split('  build:', 1)[1]
+        boot = general.index('xcrun simctl bootstatus "$DEVICE_ID" -b')
+        capture = general.index('xcrun simctl spawn "$DEVICE_ID" log stream')
+        self.assertLess(boot, capture)
 
     def test_unit_and_ui_results_and_attempt_artifacts_are_preserved_separately(self):
         self.assertIn('NativeTabResults.xcresult', self.native)
