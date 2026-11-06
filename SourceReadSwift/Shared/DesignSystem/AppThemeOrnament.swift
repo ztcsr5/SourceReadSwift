@@ -4,7 +4,22 @@ import SwiftUI
 struct AppThemeOrnament: View {
     let theme: AppVisualTheme
     var isCard = false
-    var body: some View {
+
+    static func hasArtwork(theme: AppVisualTheme, isCard: Bool) -> Bool {
+        switch theme {
+        case .folio, .blueprint: return true
+        case .inkwash: return !isCard
+        default: return false
+        }
+    }
+
+    @ViewBuilder var body: some View {
+        if Self.hasArtwork(theme: theme, isCard: isCard) {
+            artwork
+        }
+    }
+
+    private var artwork: some View {
         Canvas { context, size in
             let ink = theme.dynamicColor(light: theme.accentHex, dark: theme.darkAccentHex)
             var path = Path()

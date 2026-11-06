@@ -25,6 +25,8 @@ final class RSSArticleStateStore: ObservableObject {
     func isFavorite(_ article: RSSArticlePreview) -> Bool { article.stateIDs.contains(where: favoriteIDs.contains) }
 
     func markRead(_ article: RSSArticlePreview) {
+        let hasLegacyEntries = article.stateIDs.contains { $0 != article.id && readIDs.contains($0) }
+        guard !readIDs.contains(article.id) || hasLegacyEntries else { return }
         for legacyID in article.stateIDs where legacyID != article.id {
             readIDs.remove(legacyID)
         }
@@ -77,7 +79,7 @@ final class RSSArticleStateStore: ObservableObject {
     func restore(_ snapshot: RSSArticleStateSnapshot) {
         readIDs = Set(snapshot.readIDs)
         favoriteIDs = Set(snapshot.favoriteIDs)
-        paragraphPositions = snapshot.paragraphPositions
+        paragraphPositions = snapshot.paragraphPositions.mapValues { max(0, $0) }
         persist()
     }
 

@@ -14,6 +14,11 @@ final class CookieHeaderParserTests: XCTestCase {
         XCTAssertEqual(merged, "lang=zh; sid=new; theme=dark")
     }
 
+    func testCookieNamesRemainCaseSensitiveWhenAResponseRefreshesOneToken() {
+        let merged = CookieHeaderParser.merge("sid=new", into: "SID=upper; sid=old; language=zh")
+        XCTAssertEqual(merged, "SID=upper; language=zh; sid=new")
+    }
+
     func testResponseCookiesEnterRulePersistentState() {
         let context = RuleExecutionContext()
         context.ingestResponse(SourceResponse(

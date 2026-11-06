@@ -76,6 +76,23 @@ final class Release111RegressionTests: XCTestCase {
         XCTAssertEqual(restored?.chapters.count, 2)
     }
 
+    @MainActor func testReaderColdTOCLookupReadsTheOrderedSnapshotAndHonorsInvalidation() async {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let writer = BookTOCacheStore(rootURL: root)
+        writer.save(detail: nil, chapters: [chapter("第一章", 0), chapter("第二章", 1)], sourceURL: "s", bookURL: "b")
+        let reader = BookTOCacheStore(rootURL: root)
+        async let first = reader.entryForReader(sourceURL: "s", bookURL: "b")
+        async let second = reader.entryForReader(sourceURL: "s", bookURL: "b")
+        let (left, right) = await (first, second)
+        XCTAssertEqual(left?.chapters.map(\.index), [0, 1])
+        XCTAssertEqual(right?.chapters.map(\.index), [0, 1])
+        XCTAssertEqual(right?.isComplete, true)
+        reader.invalidate(sourceURL: "s", bookURL: "b")
+        let missing = await reader.entryForReader(sourceURL: "s", bookURL: "b")
+        XCTAssertNil(missing)
+    }
+
     func testMediaSignedQueriesAndRelativeLazyImagesSurviveParsing() {
         let chapter = chapter("媒体", 0)
         let images = ChapterContent(chapter: chapter, title: "媒体", paragraphs: [

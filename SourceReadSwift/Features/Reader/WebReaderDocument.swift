@@ -378,13 +378,40 @@ struct WebReaderStylePayload: Equatable {
 
 /// Builds the JSON body posted into `window.__reader.setContent`.
 enum WebReaderContentPayloadBuilder {
+    /// Render identities for one revision, without retaining the chapter text.
+    struct Snapshot: Sendable {
+        let revision: String
+        let showChapterEndBadge: Bool
+        let traditionalChineseEnabled: Bool
+        fileprivate let signatures: [String: String]
+
+        init(sections: [WebReaderSection], showChapterEndBadge: Bool,
+             traditionalChineseEnabled: Bool, revision: String) {
+            self.revision = revision
+            self.showChapterEndBadge = showChapterEndBadge
+            self.traditionalChineseEnabled = traditionalChineseEnabled
+            var signatures: [String: String] = [:]
+            for section in sections {
+                let badge = showChapterEndBadge && (section.isReady || !section.paragraphs.isEmpty)
+                signatures[section.key] = "\(section.contentSignature)|tc=\(traditionalChineseEnabled)|end=\(badge)"
+            }
+            self.signatures = signatures
+        }
+    }
+
     /// Value-only work. Return a JSON string so no mutable Foundation/Any graph
     /// crosses actors and serialization never occupies the swipe's UI frame.
     static func json(sections: [WebReaderSection], showChapterEndBadge: Bool,
                      traditionalChineseEnabled: Bool, revision: String) -> String? {
-        var body = payload(sections: sections, showChapterEndBadge: showChapterEndBadge,
-                           traditionalChineseEnabled: traditionalChineseEnabled)
-        body["revision"] = revision
+        let snapshot = Snapshot(sections: sections, showChapterEndBadge: showChapterEndBadge,
+                                traditionalChineseEnabled: traditionalChineseEnabled, revision: revision)
+        return json(sections: sections, snapshot: snapshot)
+    }
+
+    /// Serializes only changed sections when WebKit has acknowledged the base.
+    static func json(sections: [WebReaderSection], snapshot: Snapshot, reusing base: Snapshot? = nil) -> String? {
+        var body = payload(sections: sections, snapshot: snapshot, reusing: base)
+        body["revision"] = snapshot.revision
         guard let data = try? JSONSerialization.data(withJSONObject: body) else { return nil }
         return String(data: data, encoding: .utf8)
     }
@@ -394,14 +421,38 @@ enum WebReaderContentPayloadBuilder {
         showChapterEndBadge: Bool,
         traditionalChineseEnabled: Bool = false
     ) -> [String: Any] {
-        let starts = WebReaderFlatIndexPolicy.starts(forParagraphCounts: sections.map { $0.paragraphs.count })
+        let snapshot = Snapshot(sections: sections, showChapterEndBadge: showChapterEndBadge,
+                                traditionalChineseEnabled: traditionalChineseEnabled, revision: "")
+        return payload(sections: sections, snapshot: snapshot, reusing: nil)
+    }
+
+    private static func payload(
+        sections: [WebReaderSection], snapshot: Snapshot, reusing base: Snapshot?
+    ) -> [String: Any] {
+        let counts = sections.map { $0.paragraphs.count }
+        let starts = WebReaderFlatIndexPolicy.starts(forParagraphCounts: counts)
+        let traditionalChineseEnabled = snapshot.traditionalChineseEnabled
         var encoded: [[String: Any]] = []
         encoded.reserveCapacity(sections.count)
 
         for (offset, section) in sections.enumerated() {
-            let start = offset < starts.count ? starts[offset] : 0
+            let start = starts[offset]
             let isFirst = offset == 0
             let titleFlat = isFirst ? start : max(start - 1, 0)
+            let signature = snapshot.signatures[section.key] ?? ""
+            var entry: [String: Any] = [
+                "key": section.key,
+                "start": start,
+                "titleFlat": titleFlat,
+                "first": isFirst,
+                "sig": signature
+            ]
+            if base?.signatures[section.key] == signature {
+                entry["reuse"] = true
+                encoded.append(entry)
+                continue
+            }
+
             var paragraphs: [[String: Any]] = []
             paragraphs.reserveCapacity(section.paragraphs.count)
 
@@ -424,31 +475,24 @@ enum WebReaderContentPayloadBuilder {
                 paragraphs.append(["flat": flat, "local": index, "text": text])
             }
 
-            let displayTitle = ReaderTextTransform.displayText(section.title, traditionalChineseEnabled: traditionalChineseEnabled)
-            let sigSuffix = traditionalChineseEnabled ? "|tc1" : ""
-            var entry: [String: Any] = [
-                "key": section.key,
-                "chapter": section.chapterIndex,
-                "title": displayTitle,
-                "start": start,
-                "titleFlat": titleFlat,
-                "first": isFirst,
-                "sig": section.contentSignature + sigSuffix,
-                "paragraphs": paragraphs
-            ]
+            entry["chapter"] = section.chapterIndex
+            entry["title"] = ReaderTextTransform.displayText(section.title, traditionalChineseEnabled: traditionalChineseEnabled)
+            entry["paragraphs"] = paragraphs
             if !section.isReady, section.paragraphs.isEmpty {
                 entry["loading"] = true
             }
-            if showChapterEndBadge {
+            if snapshot.showChapterEndBadge {
                 entry["end"] = true
             }
             encoded.append(entry)
         }
 
-        return [
+        var body: [String: Any] = [
             "sections": encoded,
-            "total": WebReaderFlatIndexPolicy.totalCount(forParagraphCounts: sections.map { $0.paragraphs.count })
+            "total": WebReaderFlatIndexPolicy.totalCount(forParagraphCounts: counts)
         ]
+        if let base { body["baseRevision"] = base.revision }
+        return body
     }
 
     private static func strippingLegacyDividerDecoration(_ text: String) -> String {
@@ -608,6 +652,11 @@ extension ReaderFontFamily {
 /// of reloading the document — reloading is what used to blank the screen on a
 /// chapter jump.
 enum WebReaderHTML {
+    /// Binds bootstrap messages to this WebKit navigation, not a chapter revision.
+    static func renderShell(for navigationID: UUID) -> String {
+        shell.replacingOccurrences(of: "__READER_NAVIGATION_TOKEN__", with: navigationID.uuidString)
+    }
+
     static let shell: String = #"""
     <!doctype html>
     <html lang="zh-Hans">
@@ -723,6 +772,7 @@ enum WebReaderHTML {
       "use strict";
       var content = document.getElementById("content");
       var root = document.documentElement;
+      var navigationToken = "__READER_NAVIGATION_TOKEN__";
       var scrollAnimationGeneration = 0;
       var state = {
         style: null,
@@ -745,6 +795,7 @@ enum WebReaderHTML {
       function post(message) {
         try {
           message.revision = state.revision || "";
+          if (message.type === "ready" || message.type === "fatal") { message.navigationToken = navigationToken; }
           var bridge = window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.reader;
           if (bridge) { bridge.postMessage(message); }
         } catch (error) {}
@@ -922,6 +973,17 @@ enum WebReaderHTML {
       // 段落节点被复用（内容没变），但它们的 data-flat 必须跟着章节起点重算，
       // 否则可见段落回报与跳转会落在旧编号上——正是「跳章后位置乱掉」的成因。
       function rebaseSection(node, section) {
+        var isFirst = node.classList.contains("first");
+        if (isFirst !== section.first) {
+          var oldHeading = node.firstElementChild;
+          var newHeading = document.createElement(section.first ? "h1" : "h2");
+          newHeading.className = "chapter-title";
+          newHeading.setAttribute("data-flat", String(section.titleFlat));
+          newHeading.setAttribute("data-local", "-1");
+          newHeading.textContent = oldHeading.textContent;
+          node.replaceChild(newHeading, oldHeading);
+          node.classList.toggle("first", section.first);
+        }
         if (node.getAttribute("data-start") === String(section.start)) { return; }
         node.setAttribute("data-start", String(section.start));
         var children = node.querySelectorAll("[data-flat]");
@@ -945,7 +1007,16 @@ enum WebReaderHTML {
         return true;
       }
 
-      function setContent(payload) {
+      function setContent(payload, resetOpeningPosition, reportsOpeningPosition) {
+        if (payload.baseRevision !== undefined && payload.baseRevision !== state.revision) { return false; }
+        // Reject the entire patch before touching positions or DOM nodes.
+        for (var check = 0; check < payload.sections.length; check += 1) {
+          var descriptor = payload.sections[check];
+          if (!descriptor.reuse) { continue; }
+          var mountedSection = state.sections[descriptor.key];
+          if (payload.baseRevision === undefined || !mountedSection ||
+              mountedSection.getAttribute("data-sig") !== descriptor.sig) { return false; }
+        }
         state.revision = payload.revision || "";
         var anchor = captureAnchor();
         var nextSections = Object.create(null);
@@ -994,7 +1065,15 @@ enum WebReaderHTML {
           restoreAnchor(anchor);
         }
         post({ type: "content-ready", total: payload.total });
-        window.requestAnimationFrame(onScroll);
+        // A cover or cold compositor may defer both animation frames and
+        // subsequent native bridge calls. A first mount can report immediately.
+        if (resetOpeningPosition) {
+          resetScroll();
+        } else {
+          if (reportsOpeningPosition) { reportVisiblePosition(performance.now()); }
+          window.requestAnimationFrame(onScroll);
+        }
+        return true;
       }
 
       function refreshMetrics() {
@@ -1027,6 +1106,13 @@ enum WebReaderHTML {
           else { high = middle - 1; }
         }
         var picked = found < 0 ? list[0] : list[found];
+        // A margin belongs to the next visible node. Reporting the preceding
+        // paragraph after its bottom left the viewport advertises a chapter
+        // whose prose is entirely offscreen, especially during reverse scroll.
+        if (found >= 0 && found + 1 < list.length &&
+            picked.getBoundingClientRect().bottom + window.scrollY <= y) {
+          picked = list[found + 1];
+        }
         return nodeMetric(picked);
       }
 
@@ -1082,6 +1168,14 @@ enum WebReaderHTML {
       function reportVisiblePosition(now) {
         var metric = metricAt(window.scrollY + topInset() + 4);
         if (!metric) { return false; }
+        // A divider's flat slot maps to the preceding chapter in the paged
+        // model. Scroll progress must instead name the title's own prose.
+        if (metric.local < 0) {
+          var section = metric.element.closest("[data-key]");
+          var firstParagraph = section && section.querySelector('[data-local="0"]');
+          if (!firstParagraph) { return false; }
+          metric = nodeMetric(firstParagraph);
+        }
         window.clearTimeout(state.visiblePostTimer);
         state.visiblePostTimer = null;
         state.lastVisiblePostAt = now;
@@ -1318,6 +1412,7 @@ enum WebReaderHTML {
       }
 
       window.__reader = {
+        navigationToken: navigationToken,
         setStyle: setStyle,
         setContent: setContent,
         scrollToFlat: scrollToFlat,

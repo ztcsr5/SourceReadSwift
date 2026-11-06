@@ -96,25 +96,30 @@ final class WebDAVSyncService: Sendable {
     // MARK: - URL & Auth Utilities
 
     func buildDirectoryURL(config: WebDAVConfig) -> URL? {
-        var base = config.serverURL.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !base.isEmpty else { return nil }
-        if !base.hasSuffix("/") {
-            base += "/"
+        let base = config.serverURL.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let components = URLComponents(string: base),
+              ["http", "https"].contains(components.scheme?.lowercased() ?? ""),
+              components.host?.isEmpty == false, components.user == nil, components.password == nil,
+              components.query == nil, components.fragment == nil,
+              var directory = components.url else { return nil }
+        let parts = config.remoteDirectory.trimmingCharacters(in: .whitespacesAndNewlines).split(separator: "/")
+        for part in parts {
+            guard isValidPathComponent(String(part)) else { return nil }
+            directory.appendPathComponent(String(part), isDirectory: true)
         }
-        let dir = config.remoteDirectory.trimmingCharacters(in: CharacterSet(charactersIn: "/ "))
-        if dir.isEmpty {
-            return URL(string: base)
-        }
-        return URL(string: base + dir + "/")
+        return directory.hasDirectoryPath ? directory : directory.appendingPathComponent("", isDirectory: true)
     }
 
     func buildFileURL(config: WebDAVConfig, filename: String) -> URL? {
         guard let dirURL = buildDirectoryURL(config: config) else { return nil }
-        let cleanedFilename = filename.trimmingCharacters(in: CharacterSet(charactersIn: "/ "))
-        guard let encodedFilename = cleanedFilename.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) else {
-            return dirURL.appendingPathComponent(cleanedFilename)
-        }
-        return URL(string: dirURL.absoluteString + encodedFilename)
+        guard isValidPathComponent(filename) else { return nil }
+        return dirURL.appendingPathComponent(filename, isDirectory: false)
+    }
+
+    private func isValidPathComponent(_ component: String) -> Bool {
+        !component.isEmpty && component != "." && component != ".." && component.utf8.count <= 255
+            && !component.contains("/") && !component.contains("\\")
+            && component.rangeOfCharacter(from: .controlCharacters) == nil
     }
 
     func authHeader(config: WebDAVConfig) -> String {
@@ -257,7 +262,7 @@ final class WebDAVSyncService: Sendable {
         }
 
         let parser = WebDAVXMLParser(data: data)
-        let allItems = parser.parse()
+        let allItems = try parser.parseValidated()
 
         // Filter to backup files only (excluding folders and non-backup resources)
         return allItems.filter { item in
@@ -299,6 +304,7 @@ final class WebDAVSyncService: Sendable {
         guard let snapshot = try? decoder.decode(AppDataBackupSnapshot.self, from: data) else {
             throw WebDAVError.decodingFailed
         }
+        try AppDataBackupCodec.validate(snapshot)
         return snapshot
     }
 
@@ -353,12 +359,18 @@ final class WebDAVXMLParser: NSObject, XMLParserDelegate {
     }
 
     func parse() -> [WebDAVRemoteItem] {
+        do { return try parseValidated() }
+        catch { return [] }
+    }
+
+    func parseValidated() throws -> [WebDAVRemoteItem] {
+        items.removeAll()
         let parser = XMLParser(data: data)
         parser.delegate = self
         parser.shouldProcessNamespaces = false
         parser.shouldReportNamespacePrefixes = false
         parser.shouldResolveExternalEntities = false
-        parser.parse()
+        guard parser.parse() else { throw WebDAVError.invalidResponse }
         return items
     }
 
