@@ -4,11 +4,17 @@ import Foundation
 @MainActor enum ReaderRegressionLaunch {
     static func makeAppState() -> AppState {
         #if DEBUG
+        if ProcessInfo.processInfo.arguments.contains("--local-comic-regression") {
+            return LocalComicRegressionLaunch.makeAppState()
+        }
         if ProcessInfo.processInfo.arguments.contains("--floating-desk-regression") {
             return FloatingDeskRegressionLaunch.makeAppState()
         }
         if ProcessInfo.processInfo.arguments.contains("--reader-preview-regression") {
             return ReaderPreviewRegressionFixture.makeAppState()
+        }
+        if ProcessInfo.processInfo.arguments.contains("--comic-reader-regression") {
+            return ComicRegressionLaunch.makeAppState()
         }
         if ProcessInfo.processInfo.arguments.contains("--reader-settings-regression") {
             let root = FileManager.default.temporaryDirectory.appendingPathComponent("reader-ui-" + UUID().uuidString)

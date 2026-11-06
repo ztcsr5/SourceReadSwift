@@ -13,12 +13,7 @@ struct ComicPageZoomView: UIViewRepresentable {
         let view = ComicZoomScrollView(frame: .zero)
         let coordinator = context.coordinator
         view.delegate = coordinator
-        let single = UITapGestureRecognizer(target: coordinator, action: #selector(Coordinator.tapped(_:)))
-        let double = UITapGestureRecognizer(target: coordinator, action: #selector(Coordinator.doubleTapped(_:)))
-        double.numberOfTapsRequired = 2
-        single.require(toFail: double)
-        view.addGestureRecognizer(single)
-        view.addGestureRecognizer(double)
+        coordinator.installGestures(on: view)
         return view
     }
 
@@ -28,9 +23,27 @@ struct ComicPageZoomView: UIViewRepresentable {
         view.setImage(image)
     }
 
+    static func dismantleUIView(_ view: ComicZoomScrollView, coordinator: Coordinator) {
+        coordinator.restoreParentPaging()
+        view.delegate = nil
+    }
+
     final class Coordinator: NSObject, UIScrollViewDelegate {
         var onFitTap: ((CGFloat) -> Void)?
+        var onZoomChanged: ((Bool) -> Void)?
         var reducesMotion = false
+        private weak var suspendedParent: UIScrollView?
+        private var parentWasScrollEnabled = false
+        private var isZoomGestureActive = false
+
+        func installGestures(on view: ComicZoomScrollView) {
+            let single = UITapGestureRecognizer(target: self, action: #selector(tapped(_:)))
+            let double = UITapGestureRecognizer(target: self, action: #selector(doubleTapped(_:)))
+            double.numberOfTapsRequired = 2
+            single.require(toFail: double)
+            view.addGestureRecognizer(single)
+            view.addGestureRecognizer(double)
+        }
 
         func viewForZooming(in scrollView: UIScrollView) -> UIView? {
             (scrollView as? ComicZoomScrollView)?.artwork
@@ -38,6 +51,43 @@ struct ComicPageZoomView: UIViewRepresentable {
 
         func scrollViewDidZoom(_ scrollView: UIScrollView) {
             (scrollView as? ComicZoomScrollView)?.recenterArtwork()
+            let isZoomed = scrollView.zoomScale > 1.01
+            if isZoomed || isZoomGestureActive { suspendParentPaging(of: scrollView) }
+            else { restoreParentPaging() }
+            onZoomChanged?(isZoomed || isZoomGestureActive)
+        }
+
+        func scrollViewWillBeginZooming(_ scrollView: UIScrollView, with view: UIView?) {
+            isZoomGestureActive = true
+            suspendParentPaging(of: scrollView)
+            onZoomChanged?(true)
+        }
+
+        func scrollViewDidEndZooming(_ scrollView: UIScrollView, with view: UIView?, atScale scale: CGFloat) {
+            isZoomGestureActive = false
+            if scale <= 1.01 { restoreParentPaging() }
+            onZoomChanged?(scale > 1.01)
+        }
+
+        private func suspendParentPaging(of scrollView: UIScrollView) {
+            guard suspendedParent == nil else { return }
+            var ancestor = scrollView.superview
+            while let candidate = ancestor {
+                if let parent = candidate as? UIScrollView, parent.isPagingEnabled {
+                    parentWasScrollEnabled = parent.isScrollEnabled
+                    suspendedParent = parent
+                    parent.isScrollEnabled = false
+                    return
+                }
+                ancestor = candidate.superview
+            }
+        }
+
+        func restoreParentPaging() {
+            // Restore the previous state, not an unconditional true: another
+            // screen may have deliberately disabled paging before this zoom.
+            suspendedParent?.isScrollEnabled = parentWasScrollEnabled
+            suspendedParent = nil
         }
 
         @objc func tapped(_ gesture: UITapGestureRecognizer) {
@@ -88,6 +138,13 @@ final class ComicZoomScrollView: UIScrollView {
         setNeedsLayout()
     }
 
+    func resetImage() {
+        setZoomScale(1, animated: false)
+        artwork.image = nil
+        fittedSize = .zero
+        panGestureRecognizer.isEnabled = false
+    }
+
     override func layoutSubviews() {
         super.layoutSubviews()
         guard bounds.size.width > 0, bounds.size.height > 0, let image = artwork.image,
@@ -109,5 +166,7 @@ final class ComicZoomScrollView: UIScrollView {
         if artwork.center != center { artwork.center = center }
         let canPan = zoomScale > 1.01
         if panGestureRecognizer.isEnabled != canPan { panGestureRecognizer.isEnabled = canPan }
+        let zoomDescription = "放大 \(Int((zoomScale * 100).rounded()))%"
+        if artwork.accessibilityValue != zoomDescription { artwork.accessibilityValue = zoomDescription }
     }
 }

@@ -39,7 +39,7 @@
 	<array>
 		<dict>
 			<key>CFBundleTypeName</key>
-			<string>Readable text, EPUB and source JSON</string>
+			<string>Readable text, EPUB, CBZ and source JSON</string>
 			<key>CFBundleTypeRole</key>
 			<string>Viewer</string>
 			<key>LSHandlerRank</key>
@@ -54,11 +54,33 @@
 				<string>public.content</string>
 				<string>com.edc21.sourceread.source-json</string>
 				<string>org.idpf.epub-container</string>
+				<string>com.edc21.sourceread.cbz</string>
 			</array>
 		</dict>
 	</array>
 	<key>UTImportedTypeDeclarations</key>
 	<array>
+		<dict>
+			<key>UTTypeIdentifier</key>
+			<string>com.edc21.sourceread.cbz</string>
+			<key>UTTypeDescription</key>
+			<string>Comic book ZIP archive</string>
+			<key>UTTypeConformsTo</key>
+			<array>
+				<string>public.zip-archive</string>
+			</array>
+			<key>UTTypeTagSpecification</key>
+			<dict>
+				<key>public.filename-extension</key>
+				<array>
+					<string>cbz</string>
+				</array>
+				<key>public.mime-type</key>
+				<array>
+					<string>application/vnd.comicbook+zip</string>
+				</array>
+			</dict>
+		</dict>
 		<dict>
 			<key>UTTypeIdentifier</key>
 			<string>com.edc21.sourceread.source-json</string>

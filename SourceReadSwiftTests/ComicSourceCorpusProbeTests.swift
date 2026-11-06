@@ -42,11 +42,13 @@ final class ComicSourceCorpusProbeTests: XCTestCase {
         var chapterTitle: String = ""
         var contentPreview: String = ""
         var firstImageURL: String = ""
+        var firstImageHost: String = ""
         var imageCount = 0
         var decoded = false
         var failureKind = ""
         var sampledPositions: [Int] = []
         var sampledDecoded: [Bool] = []
+        var sampledFailures: [String] = []
         var responseStatus: Int?
         var responseType: String?
         var responseSnippet: String?
@@ -80,11 +82,11 @@ final class ComicSourceCorpusProbeTests: XCTestCase {
                         return row
                     }
                 }
-                row.message = String(error.displayMessage.prefix(200))
+                row.message = String(SourceDiagnosticRedactor.value(error.displayMessage).prefix(200))
                 return row
             }
             guard let content = result.result.content else { row.stage = "content"; row.message = "No chapter content"; return row }
-            row.contentPreview = String(content.paragraphs.prefix(2).joined(separator: "\n").prefix(400))
+            row.contentPreview = "\(content.paragraphs.count) 个解析段；不输出原始图片地址或请求选项。"
             let pages = ComicContentParser.parsePages(from: content)
             row.stage = "image-parse"; row.imageCount = pages.count
             guard let first = pages.first else {
@@ -92,7 +94,7 @@ final class ComicSourceCorpusProbeTests: XCTestCase {
                 row.message = "No image URL extracted; homepage, source guard, empty list or non-image media must not count as a bitmap failure"
                 return row
             }
-            row.firstImageURL = first.url
+            row.firstImageHost = SourceDiagnosticRedactor.originHost(first.url) ?? "local-resource"
             let sourceHeaders = SourceRequestBuilder().imageRequestHeaders(for: source, chapterURL: content.chapter.url)
             row.stage = "image-decode"
             let positions = Array(Set([0, pages.count / 2, pages.count - 1])).sorted()
@@ -100,12 +102,25 @@ final class ComicSourceCorpusProbeTests: XCTestCase {
                 let page = pages[position]
                 let headers = ComicImageRequest(url: page.url, headers: page.headers).mergingHeaders(sourceHeaders, chapterURL: content.chapter.url)
                 let imageURL = URL(string: page.url)
-                let image = await AsyncTimeout.run(seconds: 10) {
-                    guard let imageURL else { return UIImage?.none }
-                    return await RemoteImageLoader.shared.image(for: imageURL, headers: headers)
+                let result = await AsyncTimeout.run(seconds: 10) {
+                    guard let imageURL else { return Result<UIImage, ComicImageFailure>.failure(.invalidResponse) }
+                    return await RemoteImageLoader.shared.comicPage(for: imageURL, headers: headers,
+                        maxPixelSize: ComicPagePositionPolicy.maxImagePixels)
                 }
                 row.sampledPositions.append(position)
-                row.sampledDecoded.append(image.flatMap { $0 } != nil)
+                guard let result else {
+                    row.sampledDecoded.append(false)
+                    row.sampledFailures.append(ComicImageFailure.timedOut.message)
+                    continue
+                }
+                switch result {
+                case .success:
+                    row.sampledDecoded.append(true)
+                    row.sampledFailures.append("")
+                case .failure(let failure):
+                    row.sampledDecoded.append(false)
+                    row.sampledFailures.append(failure.message)
+                }
             }
             row.decoded = row.sampledDecoded.first == true
             row.failureKind = row.sampledDecoded.allSatisfy { $0 } ? "" : "image-transport-or-decode"
