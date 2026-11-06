@@ -20,6 +20,7 @@ enum ExploreCategoryParser {
         guard let raw = exploreUrl?.trimmingCharacters(in: .whitespacesAndNewlines), !raw.isEmpty else {
             return []
         }
+        guard !raw.hasPrefix("@js:"), !raw.hasPrefix("<js>") else { return [] }
 
         // 1. Check if the string is formatted as JSON (array of objects or items)
         if raw.hasPrefix("[") {
@@ -95,6 +96,8 @@ enum ExploreCategoryParser {
 
         func processItem(_ item: Any) {
             if let dict = item as? [String: Any] {
+                if let type = dict["type"] as? String, ["button", "text"].contains(type.lowercased()),
+                   (dict["url"] as? String ?? "").isEmpty { return }
                 let title = (dict["title"] as? String ?? dict["name"] as? String ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
                 let url = (dict["url"] as? String ?? dict["path"] as? String ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
 

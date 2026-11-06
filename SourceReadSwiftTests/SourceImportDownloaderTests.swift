@@ -119,6 +119,20 @@ final class SourceImportDownloaderTests: XCTestCase {
 
     // MARK: - URL normalization
 
+    func testStoreOffersPublisherLinksWithoutImportingThem() async throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        let store = SourceStore(persistence: SourcePersistence(rootURL: root))
+        let downloader = SourceImportDownloader(client: StubImportNetwork(.success(makeResponse(
+            body: "<html><a href='/books.json'>导入书源</a></html>"))))
+        do {
+            _ = try await store.importSmartInputAsync("https://example.com/index.html", downloader: downloader)
+            XCTFail("Expected an explicit publisher selection")
+        } catch SourceImportError.publisherPage(let publisher) {
+            XCTAssertEqual(publisher.links.count, 1)
+            XCTAssertTrue(store.sources.isEmpty)
+        }
+    }
+
     func testNormalizesGitHubBlobURLToRaw() {
         let normalized = SourceImportURLNormalizer.normalizedString(
             "https://github.com/ztcsr5/SourceReadSwift/blob/main/sources.json"

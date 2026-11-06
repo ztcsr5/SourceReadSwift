@@ -2,7 +2,20 @@ import SwiftUI
 
 struct SourceProxySettingsView: View {
     @ObservedObject private var proxyManager = SourceProxyManager.shared
-    @State private var isTesting = false
+    @State private var isEnabled = false
+    @State private var host = ""
+    @State private var port = ""
+    @State private var protocolKind = SourceProxyConfiguration.ProtocolKind.http
+    @State private var validationMessage: String?
+    @State private var testTask: Task<Void, Never>?
+
+    private var hasChanges: Bool {
+        let saved = proxyManager.configuration
+        return saved.isEnabled != isEnabled ||
+            (isEnabled && (saved.host != host || String(saved.port) != port || saved.protocolKind != protocolKind))
+    }
+
+    private var isTesting: Bool { testTask != nil }
     @State private var testResult: String?
     @State private var showingTestResult = false
     private enum Field: Hashable { case host, port }
@@ -11,21 +24,21 @@ struct SourceProxySettingsView: View {
     var body: some View {
         Form {
             Section {
-                Toggle("启用书源网络代理", isOn: $proxyManager.isEnabled)
+                Toggle("启用书源网络代理", isOn: $isEnabled)
             } footer: {
-                Text("开启后，所有书源的网络请求（搜索、目录、正文加载、分类发现等）都将通过指定的本地或局域网代理服务器转发。")
+                Text("保存后，使用书源网络会话的新请求会通过此代理。部分书源脚本使用独立网络通道。")
             }
             .listRowBackground(AppThemeRowSurface())
 
-            if proxyManager.isEnabled {
+            if isEnabled {
                 Section("代理协议与配置") {
-                    BrandSegmentedControl("代理类型", selection: $proxyManager.proxyType, options:
-                            [("http", "HTTP / HTTPS"), ("socks5", "SOCKS5")])
+                    BrandSegmentedControl("代理类型", selection: $protocolKind, options:
+                            [(.http, "HTTP / HTTPS"), (.socks5, "SOCKS5")])
 
                     HStack {
                         Text("代理主机")
                         Spacer()
-                        TextField("127.0.0.1", text: $proxyManager.host)
+                        TextField("127.0.0.1", text: $host)
                             .multilineTextAlignment(.trailing)
                             .autocorrectionDisabled()
                             .textInputAutocapitalization(.never)
@@ -38,14 +51,29 @@ struct SourceProxySettingsView: View {
                     HStack {
                         Text("代理端口")
                         Spacer()
-                        TextField("7890", value: $proxyManager.port, format: .number.grouping(.never))
+                        TextField("7890", text: $port)
                             .keyboardType(.numberPad)
                             .multilineTextAlignment(.trailing)
                             .focused($focusedField, equals: .port)
                     }
                 }
                 .listRowBackground(AppThemeRowSurface())
+            }
 
+            Section {
+                Button("保存代理设置", action: saveSettings)
+                    .disabled(!hasChanges)
+                if let validationMessage {
+                    Label(validationMessage, systemImage: "exclamationmark.circle")
+                        .foregroundStyle(.red)
+                        .font(.footnote)
+                }
+            } footer: {
+                Text("保存后才会应用到新请求。")
+            }
+            .listRowBackground(AppThemeRowSurface())
+
+            if isEnabled {
                 Section("代理连通性测试") {
                     Button {
                         focusedField = nil
@@ -60,7 +88,10 @@ struct SourceProxySettingsView: View {
                                 .foregroundStyle(AppTheme.accent)
                         }
                     }
-                    .disabled(isTesting)
+                    .disabled(isTesting || hasChanges)
+                    if hasChanges {
+                        Text("保存配置后再测试连接。").font(.footnote).foregroundStyle(.secondary)
+                    }
                 }
                 .listRowBackground(AppThemeRowSurface())
 
@@ -84,7 +115,13 @@ struct SourceProxySettingsView: View {
                 Button("完成") { focusedField = nil }
             }
         }
-        .onChange(of: proxyManager.isEnabled) { enabled in
+        .onAppear(perform: loadDraft)
+        .onDisappear {
+            testTask?.cancel()
+            testTask = nil
+        }
+        .onChange(of: isEnabled) { enabled in
+            validationMessage = nil
             if !enabled { focusedField = nil }
         }
         .pageBackground()
@@ -97,45 +134,56 @@ struct SourceProxySettingsView: View {
         }
     }
 
+    private func loadDraft() {
+        let saved = proxyManager.configuration
+        isEnabled = saved.isEnabled
+        host = saved.host
+        port = String(saved.port)
+        protocolKind = saved.protocolKind
+    }
+
+    private func saveSettings() {
+        focusedField = nil
+        do {
+            try proxyManager.save(isEnabled: isEnabled, host: host, port: port, protocolKind: protocolKind)
+            testTask?.cancel()
+            testTask = nil
+            validationMessage = nil
+            loadDraft()
+        } catch {
+            validationMessage = error.localizedDescription
+        }
+    }
+
     private func testProxyConnection() {
-        isTesting = true
+        guard testTask == nil, !hasChanges, let url = URL(string: "https://www.baidu.com") else { return }
+        let proxy = proxyManager.configuration
         UIImpactFeedbackGenerator(style: .light).impactOccurred()
-        Task {
-            let start = Date()
+        testTask = Task { @MainActor in
+            let start = ProcessInfo.processInfo.systemUptime
             let config = URLSessionConfiguration.ephemeral
             config.timeoutIntervalForRequest = 8
-            proxyManager.applyProxy(to: config)
+            config.timeoutIntervalForResource = 8
+            config.connectionProxyDictionary = proxy.connectionProxyDictionary
             let session = URLSession(configuration: config)
+            defer { session.invalidateAndCancel() }
 
-            guard let url = URL(string: "https://www.baidu.com") else {
-                await MainActor.run {
-                    isTesting = false
-                    testResult = "测试 URL 非法"
-                    showingTestResult = true
-                }
-                return
-            }
-
+            let message: String
             do {
-                let (_, response) = try await session.data(from: url)
-                let elapsed = Int(Date().timeIntervalSince(start) * 1000)
-                let statusCode = (response as? HTTPURLResponse)?.statusCode ?? 0
-                await MainActor.run {
-                    isTesting = false
-                    if (200...399).contains(statusCode) {
-                        testResult = "连接成功！耗时: \(elapsed)ms (状态码: \(statusCode))"
-                    } else {
-                        testResult = "代理响应异常，状态码: \(statusCode)"
-                    }
-                    showingTestResult = true
-                }
+                var request = URLRequest(url: url)
+                request.httpMethod = "HEAD"
+                let (_, response) = try await session.data(for: request)
+                let status = (response as? HTTPURLResponse)?.statusCode ?? 0
+                let elapsed = Int((ProcessInfo.processInfo.systemUptime - start) * 1000)
+                message = (200...399).contains(status) ? "连接成功，耗时 \(elapsed) 毫秒（HTTP \(status)）。"
+                    : "测试站点响应异常（HTTP \(status)）。"
             } catch {
-                await MainActor.run {
-                    isTesting = false
-                    testResult = "连接失败: \(error.localizedDescription)\n请检查代理客户端是否正常运行并开启了允许局域网连接。"
-                    showingTestResult = true
-                }
+                message = "连接失败：\(error.localizedDescription)\n检查代理是否正在运行并允许局域网连接。"
             }
+            guard !Task.isCancelled else { return }
+            testTask = nil
+            testResult = message
+            showingTestResult = true
         }
     }
 }

@@ -72,21 +72,17 @@ final class SourceRateLimiter: @unchecked Sendable {
         self.now = now
     }
 
-    /// 取得一个请求名额；需要等待时挂起，不阻塞线程。
-    func acquire(key: String, rule: SourceRateRule) async {
+    /// 取得名额；取消时抛出错误，调用方仅在取得名额后归还。
+    func acquire(key: String, rule: SourceRateRule) async throws {
         while true {
+            try Task.checkCancellation()
             let wait = step(key: key, rule: rule)
             guard wait > 0 else { return }
-            do {
-                try await Task.sleep(nanoseconds: wait)
-            } catch {
-                // 任务取消：让上层看到取消，而不是无限重试。
-                return
-            }
+            try await Task.sleep(nanoseconds: wait)
         }
     }
 
-    /// 归还名额。窗口模式不需要归还，多次调用无副作用。
+    /// 归还已取得的名额，每次取得仅归还一次。窗口模式无需归还。
     func release(key: String, rule: SourceRateRule) {
         guard !rule.isWindowed else { return }
         lock.lock()

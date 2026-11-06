@@ -14,12 +14,19 @@ final class ExploreViewModel: ObservableObject {
     @Published var canLoadMore: Bool = true
     @Published var errorMessage: String?
     @Published var currentPage: Int = 1
+    @Published var sourceControls: [SourceExploreControl] = []
+    @Published var sourceInputs: [String: String] = [:]
+    @Published var isLoadingMenu = false
+    @Published var sourceActionMessage: String?
 
     private weak var appState: AppState?
     private var activeTask: Task<Void, Never>?
     /// Guards against a cancelled request clearing the flags of the request that
     /// replaced it, and against a cancelled request leaving `isLoading` stuck.
     private var loadGeneration = 0
+    private var menuTask: Task<Void, Never>?
+    private var menuGeneration = 0
+    private var activeSearchKeyword: String?
 
     func bind(appState: AppState) {
         self.appState = appState
@@ -48,8 +55,11 @@ final class ExploreViewModel: ObservableObject {
         if let first = availableSources.first {
             selectSource(first)
         } else {
+            cancelSourceLoads()
             selectedSource = nil
             categories = []
+            sourceControls = []
+            sourceInputs = [:]
             books = []
             selectedCategory = nil
             errorMessage = "该类型暂无配置分类寻书的书源"
@@ -69,19 +79,89 @@ final class ExploreViewModel: ObservableObject {
     }
 
     func selectSource(_ source: BookSource) {
+        cancelSourceLoads()
         selectedSource = source
-        categories = ExploreCategoryParser.parse(exploreUrl: source.exploreUrl, source: source)
+        selectedCategory = nil
+        categories = []
+        books = []
+        sourceControls = []
+        sourceInputs = [:]
+        sourceActionMessage = nil
+        errorMessage = nil
+        guard let engine = appState?.engine else { return }
+        isLoadingMenu = true
+        let generation = menuGeneration
+        menuTask = Task { [weak self] in
+            let result = await engine.exploreMenu(source: source)
+            guard let self, !Task.isCancelled, self.menuGeneration == generation else { return }
+            self.isLoadingMenu = false
+            switch result {
+            case .success(let menu): self.applyMenu(menu)
+            case .failure(let error): self.errorMessage = error.displayMessage
+            }
+        }
+    }
+
+    func performSourceAction(_ control: SourceExploreControl) {
+        guard !isLoadingMenu, control.kind == .button,
+              sourceControls.contains(control), let source = selectedSource,
+              let engine = appState?.engine else { return }
+        cancelSourceLoads()
+        isLoadingMenu = true
+        errorMessage = nil
+        sourceActionMessage = nil
+        let generation = menuGeneration
+        let inputs = sourceInputs
+        menuTask = Task { [weak self] in
+            let result = await engine.performExploreAction(source: source, action: control.action, inputs: inputs)
+            guard let self, !Task.isCancelled, self.menuGeneration == generation else { return }
+            self.isLoadingMenu = false
+            switch result {
+            case .failure(let error): self.errorMessage = error.displayMessage
+            case .success(let outcome):
+                self.sourceActionMessage = outcome.message
+                self.applyMenu(outcome.menu, loadsFirstCategory: outcome.searchKeyword == nil)
+                if let keyword = outcome.searchKeyword {
+                    self.activeSearchKeyword = keyword
+                    self.selectedCategory = nil
+                    self.currentPage = 1
+                    self.books = []
+                    self.canLoadMore = true
+                    self.loadBooks(page: 1)
+                }
+            }
+        }
+    }
+
+    private func cancelSourceLoads() {
+        activeTask?.cancel()
+        menuTask?.cancel()
+        loadGeneration &+= 1
+        menuGeneration &+= 1
+        activeSearchKeyword = nil
+        isLoading = false
+        isLoadingMore = false
+        isLoadingMenu = false
+    }
+
+    private func applyMenu(_ menu: SourceExploreMenu, loadsFirstCategory: Bool = true) {
+        categories = menu.categories
+        sourceControls = menu.controls
+        sourceInputs = menu.controls.filter { $0.kind == .text }.reduce(into: [:]) {
+            $0[$1.title] = sourceInputs[$1.title] ?? $1.defaultValue
+        }
         selectedGroup = groups.first
-        if let first = filteredCategories.first ?? categories.first {
+        if loadsFirstCategory, let first = filteredCategories.first ?? categories.first {
             selectCategory(first)
         } else {
             selectedCategory = nil
             books = []
-            errorMessage = "该书源暂无可解析的分类"
+            errorMessage = categories.isEmpty && sourceControls.isEmpty ? "该书源暂无可解析的分类" : nil
         }
     }
 
     func selectCategory(_ category: ExploreCategory) {
+        activeSearchKeyword = nil
         selectedCategory = category
         currentPage = 1
         books = []
@@ -118,7 +198,9 @@ final class ExploreViewModel: ObservableObject {
             errorMessage = "尚未选择书源，请在上方选择一个书源后重试。"
             return
         }
-        guard let category = selectedCategory else {
+        let category = selectedCategory
+        let keyword = activeSearchKeyword
+        guard category != nil || keyword != nil else {
             isLoading = false
             isLoadingMore = false
             errorMessage = categories.isEmpty ? "该书源暂无可解析的分类" : "尚未选择分类，请点一个分类后重试。"
@@ -142,7 +224,8 @@ final class ExploreViewModel: ObservableObject {
         activeTask = Task { @MainActor [weak self] in
             guard let self else { return }
             let result = await AsyncTimeout.run(seconds: 12) {
-                await engine.exploreBooks(source: source, url: category.url, page: page)
+                if let keyword { return await engine.searchBooks(source: source, keyword: keyword, page: page) }
+                return await engine.exploreBooks(source: source, url: category?.url ?? "", page: page)
             } ?? .failure(.network("请求超时，已停止加载，请点重试或换个分类"))
 
             // A superseded request must not touch the state of the newer one,
@@ -191,6 +274,7 @@ final class ExploreViewModel: ObservableObject {
     }
 
     func refresh() async {
+        if activeSearchKeyword != nil { loadBooks(page: 1); return }
         // Pull-to-refresh used to do nothing when the category list had failed to
         // parse, so the sheet looked dead. Re-parse, then retry, then explain.
         if let source = selectedSource, categories.isEmpty {

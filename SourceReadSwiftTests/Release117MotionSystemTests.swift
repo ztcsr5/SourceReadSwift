@@ -9,7 +9,7 @@ final class Release117MotionSystemTests: XCTestCase {
             XCTAssertNotNil(normal.animation(event)); XCTAssertNil(reduced.animation(event))
         }
         XCTAssertEqual(normal.duration(.navigation), 0.30)
-        XCTAssertEqual(normal.duration(.expansion), 0.44)
+        XCTAssertEqual(normal.duration(.expansion), 0.28)
         XCTAssertNil(normal.backgroundAnimation(hasPreviousPalette: false, hasNextPalette: true))
         XCTAssertNil(normal.backgroundAnimation(hasPreviousPalette: true, hasNextPalette: false))
         XCTAssertNotNil(normal.backgroundAnimation(hasPreviousPalette: true, hasNextPalette: true))
