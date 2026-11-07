@@ -2,6 +2,22 @@ import XCTest
 @testable import SourceReadSwift
 
 final class SourceCookieStoreTests: XCTestCase {
+    func testPersistentCookieRoundTripPreservesHTTPOnlyAndSecureAttributes() async throws {
+        let location = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".json")
+        defer { try? FileManager.default.removeItem(at: location) }
+        let url = try XCTUnwrap(URL(string: "https://cookie.fixture.invalid/account"))
+        let cookie = try XCTUnwrap(HTTPCookie.cookies(withResponseHeaderFields: [
+            "Set-Cookie": "session=fixture; Path=/account; Secure; HttpOnly"
+        ], for: url).first)
+        XCTAssertTrue(cookie.isHTTPOnly)
+        await SourceCookieStore(storageURL: location).store([cookie], for: url)
+        let restored = await SourceCookieStore(storageURL: location).cookies(for: url)
+        let persisted = try XCTUnwrap(restored.first)
+        XCTAssertTrue(persisted.isHTTPOnly, "Disk restoration must not expose a server-only cookie to script")
+        XCTAssertTrue(persisted.isSecure)
+        XCTAssertEqual(persisted.path, "/account")
+    }
+
     func testSecureCookieNeverLeavesHTTPSAndStillMatchesPathAndDomain() async throws {
         let store = SourceCookieStore(storageURL: nil)
         let origin = URL(string: "https://cookie.fixture.invalid/account/login")!

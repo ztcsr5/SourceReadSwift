@@ -70,15 +70,15 @@ struct RuleEditorValidator {
 
         for rule in executableRules {
             guard let script = javaScriptBody(rule) else { continue }
-            let context = JSContext()
-            // JSContext does not expose a separate syntax-check API on all
-            // supported iOS SDKs.  Evaluating a function expression validates
-            // the complete body without executing the rule itself.
-            let candidate = "(function(){\(script)})"
-            context?.exception = nil
-            _ = context?.evaluateScript(candidate)
-            guard context?.exception == nil else {
-                let reason = context?.exception?.toString().trimmingCharacters(in: .whitespacesAndNewlines)
+            guard let context = JSContext(), let encoded = try? JSONEncoder().encode(script) else {
+                return [.init(field: field, message: "无法校验 JS 规则，请重试")]
+            }
+            // Compiling a string argument prevents source from escaping a
+            // function-expression wrapper and executing during validation.
+            let candidate = "new Function(\(String(decoding: encoded, as: UTF8.self)))"
+            _ = context.evaluateScript(candidate)
+            guard context.exception == nil else {
+                let reason = context.exception?.toString().trimmingCharacters(in: .whitespacesAndNewlines)
                 return [.init(field: field, message: "JS 语法错误：\(reason?.nilIfEmpty ?? "无法解析")")]
             }
         }

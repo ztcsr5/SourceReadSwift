@@ -54,6 +54,8 @@ jobs:
       - name: iOS26 native tab runtime regression
         if: ${{ !inputs.reader_settings_only }}
         timeout-minutes: 15
+        env:
+          TEST_RUNNER_SOURCE_READ_COMIC_DIAGNOSTICS: "1"
         run: |
           set -euo pipefail
           DEVICE_ID="$(cat native-device-id.txt)"
@@ -70,8 +72,11 @@ jobs:
             -only-testing:SourceReadSwiftTests/LocalVoiceLibraryTests \
             -only-testing:SourceReadSwiftTests/AsyncTimeoutTests \
             -only-testing:SourceReadSwiftTests/ReaderPerformancePolicyTests \
+            -only-testing:SourceReadSwiftTests/ReaderBackgroundChapterPrecacheTests \
+            -only-testing:SourceReadSwiftTests/ReaderOpeningTransitionTests \
             -only-testing:SourceReadSwiftTests/BookExportRegressionTests \
             -only-testing:SourceReadSwiftTests/HomeLayoutEvidenceTests \
+            -only-testing:SourceReadSwiftTests/AtelierThemeTests \
             -only-testing:SourceReadSwiftTests/SourcePipelineTests \
             -only-testing:SourceReadSwiftTests/SourceProxyConfigurationTests \
             -only-testing:SourceReadSwiftTests/HaiKuoShiJieSourceAdapterTests \
@@ -125,6 +130,10 @@ jobs:
             -only-testing:SourceReadSwiftTests/WebsiteSourceFamilyInferenceTests \
             -only-testing:SourceReadSwiftTests/AIChatTests \
             -only-testing:SourceReadSwiftTests/Release117PurificationTests \
+            -only-testing:SourceReadSwiftTests/PurifyRuleStoreTests \
+            -only-testing:SourceReadSwiftTests/VideoContentParserTests \
+            -only-testing:SourceReadSwiftTests/RuleEditorValidatorTests \
+            -only-testing:SourceReadSwiftTests/ContentParserTests \
             -only-testing:SourceReadSwiftTests/LANWorkbenchTests \
             -only-testing:SourceReadSwiftTests/ReadingNotesNavigationTests \
             -only-testing:SourceReadSwiftTests/Release117ThemeCollaborationTests \
@@ -194,6 +203,7 @@ jobs:
             -only-testing:SourceReadSwiftUITests/FloatingReadingDeskUITests/testReaderSystemReturnCanCancelWithoutLosingItsSavedParagraph \
             -only-testing:SourceReadSwiftUITests/FloatingReadingDeskUITests/testReaderSystemReturnCanCancelWithReducedMotion \
             -only-testing:SourceReadSwiftUITests/FloatingReadingDeskUITests/testReaderLongEdgeReturnCompletesWithReducedMotion \
+            -only-testing:SourceReadSwiftUITests/FloatingReadingDeskUITests/testFirstDetailEdgeReturnRestoresInteractiveHomeAndOnlyOneTabBar \
             -destination-timeout 120 -test-timeouts-enabled YES -maximum-test-execution-time-allowance 180 \
             -resultBundlePath NativeReaderGestureResults.xcresult test-without-building 2>&1 | tee native-reader-gesture-test.log
       - name: Export iOS26 attachments
@@ -273,6 +283,7 @@ jobs:
       - name: Test
         env:
           TEST_RUNNER_COMIC_CORPUS_PROBE: "1"
+          TEST_RUNNER_SOURCE_READ_COMIC_DIAGNOSTICS: "1"
         run: |
           set -euo pipefail
           DEVICE_ID="$(xcrun simctl list devices available | awk -F '[()]' '/iPhone/ {print $2; exit}')"

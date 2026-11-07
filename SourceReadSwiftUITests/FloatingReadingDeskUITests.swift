@@ -267,6 +267,32 @@ final class FloatingReadingDeskUITests: XCTestCase {
         XCTAssertEqual(cover.frame.midY, origin.midY, accuracy: 8)
     }
 
+    func testFirstDetailEdgeReturnRestoresInteractiveHomeAndOnlyOneTabBar() throws {
+        try launch(theme: "forest")
+        let cover = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@ AND label CONTAINS %@",
+            "bookshelf.grid.", "月亮与六便士")).firstMatch
+        if !cover.isHittable { app.swipeUp() }
+        XCTAssertTrue(cover.isHittable)
+        cover.tap()
+        XCTAssertTrue(element("bookDetail.title").waitForExistence(timeout: 5))
+        app.coordinate(withNormalizedOffset: CGVector(dx: 0.008, dy: 0.52))
+            .press(forDuration: 0.05,
+                thenDragTo: app.coordinate(withNormalizedOffset: CGVector(dx: 0.85, dy: 0.52)),
+                withVelocity: .default, thenHoldForDuration: 0.15)
+        let restored = XCTNSPredicateExpectation(predicate: NSPredicate(format: "hittable == YES"), object: cover)
+        XCTAssertEqual(XCTWaiter.wait(for: [restored], timeout: 1), .completed,
+            "The first completed detail pop must restore the shelf without a multi-second blocked interval")
+        XCTAssertFalse(element("bookDetail.title").isHittable)
+        XCTAssertTrue(app.buttons["tabs.legacy.home"].isHittable)
+        XCTAssertEqual(app.tabBars.allElementsBoundByIndex.filter(\.isHittable).count, 0,
+            "A second system tab bar must never overlay the custom navigation")
+        let search = app.buttons["bookshelf.globalSearch"]
+        XCTAssertTrue(search.isHittable)
+        search.tap()
+        XCTAssertTrue(app.textFields["globalSearch.query"].waitForExistence(timeout: 1))
+        capture("detail-first-pop-responsive-home")
+    }
+
     func testContinuousChapterCrossingKeepsProseHeadingAndReopenedPositionTogether() throws {
         try launch(theme: "classic", fixture: "--desk-cross-chapter")
         let entry = assertCurrentBook("剑来")

@@ -22,6 +22,7 @@ struct LegacyTabBar: View {
             .padding(4)
             .background {
                 if theme.usesNeutralGlass { BrandGlass(outline: Capsule()) }
+                else if theme.isAtelier { Capsule().fill(AppTheme.card) }
                 else { Capsule().fill(.regularMaterial) }
             }
             .overlay(Capsule().strokeBorder(Color.primary.opacity(0.07), lineWidth: 0.6).allowsHitTesting(false))
@@ -31,7 +32,10 @@ struct LegacyTabBar: View {
                     .font(.system(size: 22, weight: .semibold))
                     .foregroundStyle(theme.primaryInk)
                     .frame(width: 52, height: 52)
-                    .background(.regularMaterial, in: Circle())
+                    .background {
+                        if theme.isAtelier { Circle().fill(AppTheme.card) }
+                        else { Circle().fill(.regularMaterial) }
+                    }
                     .overlay(Circle().strokeBorder(Color.primary.opacity(0.08), lineWidth: 0.8))
                     .shadow(color: Color.black.opacity(0.10), radius: 8, x: 0, y: 3)
             }

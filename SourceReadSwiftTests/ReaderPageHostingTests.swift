@@ -49,6 +49,38 @@ final class ReaderPageHostingTests: XCTestCase {
         XCTAssertEqual(page.overrideUserInterfaceStyle, .dark)
     }
 
+    func testSlideMountsOnlyVisibleNeighboursBeforeAnImmediateDrag() async {
+        let controller = CoverPageHostController()
+        controller.loadViewIfNeeded()
+        controller.view.frame = CGRect(x: 0, y: 0, width: 390, height: 844)
+        controller.view.layoutIfNeeded()
+        controller.apply(pageIdentity: "p2", contentRevision: "paper",
+            previousIdentity: "p1", currentIdentity: "p2", nextIdentity: "p3",
+            previous2Identity: "p0", next2Identity: "p4", hasPrevious: true, hasNext: true,
+            previous: AnyView(Text("上一页")), current: AnyView(Text("当前页")), next: AnyView(Text("下一页")),
+            previous2: AnyView(Text("前两页")), next2: AnyView(Text("后两页")),
+            onCommit: { _ in }, onInteractionChange: { _ in }, onPageContainerLayout: nil, turnStyle: .slide)
+        XCTAssertEqual(controller.children.count, 3, "Offscreen ±2 pages must not mount in the turn's installation transaction")
+        controller.beginInteraction()
+        controller.updateInteraction(translation: -100)
+        for _ in 0..<5 {
+            await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+                DispatchQueue.main.async { continuation.resume() }
+            }
+        }
+        XCTAssertEqual(controller.children.count, 3, "An immediate new drag must cancel distant warmup")
+        let current = controller.children.first { $0.view.accessibilityIdentifier == "reader.page.p2" }
+        XCTAssertEqual(current?.view.transform.tx, -100)
+        controller.endInteraction(velocity: 0, cancelled: true, animated: false)
+        for _ in 0..<6 {
+            await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+                DispatchQueue.main.async { continuation.resume() }
+            }
+        }
+        XCTAssertEqual(controller.children.count, 5, "Both distant pages should still warm once the interaction ends")
+        controller.tearDown()
+    }
+
     private func renderPaperPixel(_ view: UIView) throws -> [UInt8] {
         view.frame = CGRect(x: 0, y: 0, width: 80, height: 120)
         view.setNeedsLayout()

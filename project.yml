@@ -51,8 +51,8 @@ targets:
         NSAppTransportSecurity:
           NSAllowsArbitraryLoads: true
         NSLocalNetworkUsageDescription: Used to import, export and manage book sources on the local network.
-        NSPhotoLibraryAddUsageDescription: 需要相册权限以保存生成的金句分享卡片到系统相册�?
-        NSPhotoLibraryUsageDescription: 需要访问相册以选择阅读页自定义背景壁纸与保存金句分享卡片�?
+        NSPhotoLibraryAddUsageDescription: 需要相册权限以保存生成的金句分享卡片到系统相册。
+        NSPhotoLibraryUsageDescription: 需要访问相册以选择阅读页自定义背景壁纸与保存金句分享卡片。
         NSBonjourServices:
           - _http._tcp
         UIBackgroundModes:

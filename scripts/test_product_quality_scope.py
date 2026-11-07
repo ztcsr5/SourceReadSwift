@@ -176,7 +176,13 @@ class ProductQualityScopeTests(unittest.TestCase):
 
     def test_shell_retains_tabs_and_limits_hiding_to_readers(self):
         shell = read_source(APP + "App/RootTabView.swift")
-        self.assertIn(".tabBarMinimizeBehavior(.never)", shell)
+        self.assertEqual(shell.count("TabView(selection: $selectedTab)"), 1)
+        self.assertEqual(shell.count(".modifier(RootTabChromeVisibilityModifier())"), 3)
+        visibility = shell.split("struct RootTabChromeVisibilityModifier", 1)[1].split("struct HideRootTabBarModifier", 1)[0]
+        self.assertIn("content.toolbar(.hidden, for: .tabBar)", visibility)
+        self.assertNotIn(".visible", visibility)
+        self.assertIn("if !appState.isTabChromeHidden", shell)
+        self.assertIn("LegacyTabBar(selection: $selectedTab)", shell)
         self.assertNotIn("switch selectedTab", shell)
         self.assertIn(".safeAreaInset(edge: .bottom, spacing: 0)", shell)
         for path in ("Features/Settings/SettingsView.swift", "Features/SourceManager/SourceManagerView.swift"):

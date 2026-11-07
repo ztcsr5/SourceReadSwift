@@ -66,14 +66,28 @@ final class RemoteComicImageTests: XCTestCase {
             let server = try HeldComicHTTPServer(mode: mode)
             defer { server.stop() }
             server.start()
+            let control = HeldComicResponseProbe()
+            var controlServer: HeldComicHTTPServer?
+            if mode == .declared {
+                let peer = try HeldComicHTTPServer(mode: .declared)
+                peer.start()
+                controlServer = peer
+            }
+            defer { control.stop(); controlServer?.stop() }
             for _ in 0..<100 {
-                if server.snapshot.address != nil || server.snapshot.failure != nil { break }
+                let primaryReady = server.snapshot.address != nil || server.snapshot.failure != nil
+                let controlReady = controlServer == nil || controlServer?.snapshot.address != nil || controlServer?.snapshot.failure != nil
+                if primaryReady && controlReady { break }
                 try await Task.sleep(nanoseconds: 50_000_000)
             }
             let address = try XCTUnwrap(server.snapshot.address, server.snapshot.failure ?? "Loopback listener did not become ready")
             let configuration = URLSessionConfiguration.ephemeral
             configuration.protocolClasses = []
             configuration.connectionProxyDictionary = [:]
+            if let peer = controlServer {
+                let controlAddress = try XCTUnwrap(peer.snapshot.address, peer.snapshot.failure ?? "Foundation control not ready")
+                control.start(url: controlAddress, configuration: configuration)
+            }
             let session = URLSession(configuration: configuration)
             defer { session.invalidateAndCancel() }
             let loader = RemoteImageLoader(session: session, configuration: configuration)
@@ -87,6 +101,10 @@ final class RemoteComicImageTests: XCTestCase {
             }
             let wait = await XCTWaiter.fulfillment(of: [finished], timeout: 4)
             print("[DIAG-TEST] \(mode) waiter finished with \(wait), server snapshot: \(server.snapshot)")
+            if let peer = controlServer {
+                print("[DIAG-FOUNDATION] \(control.summary) server=\(peer.snapshot)")
+                XCTAssertEqual(peer.snapshot.sentBodyBytes, 0, "The independent control must also withhold every body byte")
+            }
             if wait != .completed { load.cancel() }
             let result = await load.value
             XCTAssertEqual(wait, .completed)
@@ -101,6 +119,7 @@ final class RemoteComicImageTests: XCTestCase {
             XCTAssertTrue(server.snapshot.sentHeaders)
             XCTAssertTrue(server.snapshot.peerClosed, "The client must stop the actual held-open connection")
             if mode == .declared { XCTAssertEqual(server.snapshot.sentBodyBytes, 0) }
+            if mode == .declaredPrefix { XCTAssertLessThanOrEqual(server.snapshot.sentBodyBytes, 1) }
         }
     }
 

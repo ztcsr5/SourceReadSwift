@@ -37,7 +37,7 @@ final class HomeLayoutEvidenceTests: XCTestCase {
             }
         }
 
-        for theme in [AppVisualTheme.forest, .editorial, .blueprint, .folio] {
+        for theme in [AppVisualTheme.forest, .editorial, .blueprint, .folio] + AppVisualTheme.atelierThemes {
             defaults.set(theme.rawValue, forKey: AppVisualTheme.selectionKey)
             for (width, dark, accessible) in [(CGFloat(320), false, false), (390, true, false), (320, false, true)] {
                 let screen = BookshelfView().environmentObject(appState)

@@ -132,11 +132,9 @@ struct ContentParser {
             for selector in Self.commonNovelContentSelectors {
                 if let elem = try? document.select(selector).first {
                     let html = (try? elem.html()) ?? ""
-                    let clean = html
-                        .replacingOccurrences(of: "<br\\s*/?>", with: "\n", options: .regularExpression)
-                        .replacingOccurrences(of: "</p>", with: "\n", options: .caseInsensitive)
-                    let text = ((try? SwiftSoup.parse(clean).text()) ?? (try? elem.text()) ?? "")
-                    let paragraphs = splitParagraphs(text)
+                    // SwiftSoup.text() collapses paragraph boundaries before
+                    // line-anchored purification can see advertisement lines.
+                    let paragraphs = splitParagraphs(html)
                     if !paragraphs.isEmpty && paragraphs.joined().count >= 30 {
                         return paragraphs
                     }
@@ -157,6 +155,23 @@ struct ContentParser {
         globalPurifyRules: [String]
     ) -> Result<ChapterContent, SourceEngineError> {
         let contentRule = htmlExtractor.firstRule(source.ruleContent, keys: ["content", "bookContent"])
+        let chapterMap: [String: Any] = [
+            "title": chapter.title,
+            "url": chapter.url,
+            "bookUrl": chapter.bookUrl,
+            "index": chapter.index
+        ]
+        let variables: [String: Any] = [
+            "source": source,
+            "chapter": chapterMap,
+            "book": ["bookUrl": chapter.bookUrl, "type": source.sourceKind.legadoBookType],
+            "title": chapter.title,
+            "src": response.body,
+            "html": response.body,
+            "body": response.body,
+            "baseUrl": response.url.absoluteString,
+            "result": response.body
+        ]
 
         do {
             let rootRule = htmlExtractor.firstRule(source.ruleContent, keys: ["init"]) ?? "html"
@@ -177,23 +192,6 @@ struct ContentParser {
             // (e.g. an `<h1>` in the page header), so evaluate it against the
             // document root and only fall back to the content root.
             let titleRoot = (try? htmlExtractor.select(response.body, baseUrl: response.url, listRule: "html").first) ?? root
-            let chapterMap: [String: Any] = [
-                "title": chapter.title,
-                "url": chapter.url,
-                "bookUrl": chapter.bookUrl,
-                "index": chapter.index
-            ]
-            let variables: [String: Any] = [
-                "source": source,
-                "chapter": chapterMap,
-                "book": ["bookUrl": chapter.bookUrl, "type": source.sourceKind.legadoBookType],
-                "title": chapter.title,
-                "src": response.body,
-                "html": response.body,
-                "body": response.body,
-                "baseUrl": response.url.absoluteString,
-                "result": response.body
-            ]
 
             var paragraphs: [String] = []
             if let contentRule, !contentRule.isEmpty {
@@ -207,7 +205,10 @@ struct ContentParser {
             if paragraphs.isEmpty, source.sourceKind == .comic, contentRule == nil {
                 paragraphs = extractComicFallback(from: response)
             } else if paragraphs.isEmpty, source.sourceKind != .comic {
-                paragraphs = extractFallbackParagraphs(from: response.body, baseUrl: response.url, title: chapter.title)
+                let fallback = extractFallbackParagraphs(from: response.body, baseUrl: response.url, title: chapter.title)
+                let cleaned = applyContentTransforms(fallback.joined(separator: "\n"), rule: source.ruleContent,
+                                                     globalPurifyRules: globalPurifyRules, variables: variables)
+                paragraphs = splitParagraphs(cleaned)
             }
 
             paragraphs = applyingImageDecode(
@@ -249,7 +250,10 @@ struct ContentParser {
                 : .success(ChapterContent(chapter: chapter, title: sanitized.title.isEmpty ? chapter.title : sanitized.title, paragraphs: sanitized.paragraphs, nextContentUrl: next, imageStyle: style, payAction: payActionRule(source.ruleContent)))
         } catch {
             guard source.sourceKind != .comic else { return .failure(.rule(error.localizedDescription)) }
-            let fallback = extractFallbackParagraphs(from: response.body, baseUrl: response.url, title: chapter.title)
+            let extracted = extractFallbackParagraphs(from: response.body, baseUrl: response.url, title: chapter.title)
+            let cleaned = applyContentTransforms(extracted.joined(separator: "\n"), rule: source.ruleContent,
+                                                 globalPurifyRules: globalPurifyRules, variables: variables)
+            let fallback = splitParagraphs(cleaned)
             if !fallback.isEmpty {
                 let sanitized = ChapterTextSanitizer.normalize(
                     title: chapter.title,

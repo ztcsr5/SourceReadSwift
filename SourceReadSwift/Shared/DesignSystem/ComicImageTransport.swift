@@ -101,17 +101,17 @@ final class ComicImageReceiver: NSObject, URLSessionDataDelegate, @unchecked Sen
         lock.lock()
         let transfer = transfers.removeValue(forKey: task.taskIdentifier)
         lock.unlock()
-        print("[DIAG-RECEIVER] complete task=\(task.taskIdentifier) transferPresent=\(transfer != nil) result=\(result)")
+        trace("complete task=\(task.taskIdentifier) transferPresent=\(transfer != nil)")
         transfer?.continuation.resume(returning: result)
     }
 
     func urlSession(_ session: URLSession, dataTask: URLSessionDataTask, didReceive response: URLResponse,
                     completionHandler: @escaping (URLSession.ResponseDisposition) -> Void) {
-        print("[DIAG-RECEIVER] didReceiveResponse url=\(response.url?.absoluteString ?? "") status=\((response as? HTTPURLResponse)?.statusCode ?? -1) expected=\(response.expectedContentLength)")
+        trace("response task=\(dataTask.taskIdentifier) status=\((response as? HTTPURLResponse)?.statusCode ?? -1) expected=\(response.expectedContentLength)")
         if let failure = ComicImageResponsePolicy.failure(for: response,
                                                            expectedBodyBytes: dataTask.countOfBytesExpectedToReceive,
                                                            limit: limit) {
-            print("[DIAG-RECEIVER] failure=\(failure)")
+            trace("rejected task=\(dataTask.taskIdentifier) failure=\(failure)")
             // Commit the application rejection before cancellation can re-enter
             // didCompleteWithError and replace it with a transport error.
             complete(dataTask, result: .failure(failure))
@@ -122,10 +122,10 @@ final class ComicImageReceiver: NSObject, URLSessionDataDelegate, @unchecked Sen
     }
 
     func urlSession(_ session: URLSession, dataTask: URLSessionDataTask, didReceive chunk: Data) {
-        print("[DIAG-RECEIVER] didReceiveChunk bytes=\(chunk.count)")
+        trace("chunk task=\(dataTask.taskIdentifier) bytes=\(chunk.count)")
         guard let transfer = transfer(for: dataTask) else { return }
         guard chunk.count <= limit - transfer.bytes.count else {
-            print("[DIAG-RECEIVER] chunk exceeded limit, completing tooLarge")
+            trace("chunk exceeded limit task=\(dataTask.taskIdentifier)")
             complete(dataTask, result: .failure(.tooLarge))
             dataTask.cancel()
             return
@@ -136,12 +136,12 @@ final class ComicImageReceiver: NSObject, URLSessionDataDelegate, @unchecked Sen
     func urlSession(_ session: URLSession, task: URLSessionTask, didFinishCollecting metrics: URLSessionTaskMetrics) {
         for metric in metrics.transactionMetrics {
             let proto = metric.networkProtocolName ?? "unknown"
-            print("[DIAG-RECEIVER] metrics requestStart=\(String(describing: metric.requestStartDate)) responseStart=\(String(describing: metric.responseStartDate)) responseEnd=\(String(describing: metric.responseEndDate)) protocol=\(proto)")
+            trace("metrics task=\(task.taskIdentifier) responseStarted=\(metric.responseStartDate != nil) responseEnded=\(metric.responseEndDate != nil) protocol=\(proto)")
         }
     }
 
     func urlSession(_ session: URLSession, task: URLSessionTask, didCompleteWithError error: Error?) {
-        print("[DIAG-RECEIVER] didCompleteWithError error=\(String(describing: error))")
+        trace("finished task=\(task.taskIdentifier) errorCode=\((error as NSError?)?.code ?? 0)")
         guard let transfer = transfer(for: task) else { return }
         if let error {
             let failure: ComicImageFailure
@@ -156,6 +156,14 @@ final class ComicImageReceiver: NSObject, URLSessionDataDelegate, @unchecked Sen
         } else {
             complete(task, result: .success(transfer.bytes))
         }
+    }
+
+    private func trace(_ event: @autoclosure () -> String) {
+        #if DEBUG
+        if ProcessInfo.processInfo.environment["SOURCE_READ_COMIC_DIAGNOSTICS"] == "1" {
+            print("[DIAG-RECEIVER] \(event())")
+        }
+        #endif
     }
 }
 

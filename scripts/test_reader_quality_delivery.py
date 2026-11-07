@@ -10,6 +10,10 @@ import deliver_reader_quality as delivery
 
 
 class ReaderQualityDeliveryTests(unittest.TestCase):
+    def test_package_name_uses_verified_metadata_instead_of_historical_release(self):
+        self.assertEqual(delivery.package_filename({"CFBundleShortVersionString": "1.1.8",
+            "CFBundleVersion": "138"}, "a" * 40), "SourceReadSwift-1.1.8-build138-aaaaaaa-unsigned.ipa")
+
     def test_rejects_a_candidate_when_runtime_changes_are_not_in_its_snapshot(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

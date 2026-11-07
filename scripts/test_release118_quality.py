@@ -78,13 +78,6 @@ class Release118QualityTests(unittest.TestCase):
         self.assertIn("scrollView.delaysContentTouches = false", curl)
         self.assertIn("scrollView.canCancelContentTouches = true", curl)
 
-    def test_reader_opening_page_literary_quotes_and_mark(self):
-        opening = read_text("SourceReadSwift/Features/Bookshelf/ReaderOpeningPage.swift")
-        self.assertIn("PaperBetweenMark(size: 62)", opening)
-        self.assertIn("literaryQuotes", opening)
-        self.assertIn("reader.openingProgress", opening)
-        self.assertIn("正在翻开篇章…", opening)
-
     def test_title_page_completely_removed(self):
         detail = read_text("SourceReadSwift/Features/Discover/BookDetailView.swift")
         self.assertNotIn("查看书籍扉页", detail)
