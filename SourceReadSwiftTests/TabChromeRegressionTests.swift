@@ -15,7 +15,7 @@ final class TabChromeRegressionTests: XCTestCase {
         XCTAssertFalse(app.isTabChromeHidden)
     }
 
-    @MainActor func testNativeRootHasNoEmptyAccessoryAndHonorsVisibilityOwner() async throws {
+    @MainActor func testCustomRootNeverRevealsASecondNativeBar() async throws {
         #if compiler(>=6.2)
         guard #available(iOS 26.0, *) else { throw XCTSkip("Requires iOS26 runtime") }
         let app = AppState()
@@ -24,17 +24,18 @@ final class TabChromeRegressionTests: XCTestCase {
         let ready = await eventually { self.tabs(in: window.rootViewController) != nil }
         XCTAssertTrue(ready)
         let tabs = try XCTUnwrap(self.tabs(in: window.rootViewController))
-        let labelsReady = await eventually { tabs.tabBar.items?.count == 3 }
+        let labelsReady = await eventually { tabs.tabBar.items?.count == 3 && tabs.isTabBarHidden }
         XCTAssertTrue(labelsReady)
         XCTAssertEqual(tabs.tabBar.items?[1].title, AppNavigationLabels.findBooks)
         XCTAssertNil(tabs.bottomAccessory, "No playback must not create a blank glass accessory")
+        XCTAssertTrue(tabs.isTabBarHidden, "The custom bar must be the only bar even before opening a reader")
         let owner = UUID()
         app.acquireTabChromeHidden(owner: owner)
         let hidden = await eventually { tabs.isTabBarHidden }
         XCTAssertTrue(hidden, "Active child must receive the hidden preference")
         XCTAssertTrue(tabs === self.tabs(in: window.rootViewController), "Visibility cannot replace the TabView/navigation tree")
         app.releaseTabChromeHidden(owner: owner)
-        let restored = await eventually { !tabs.isTabBarHidden }
+        let restored = await eventually { !app.isTabChromeHidden && tabs.isTabBarHidden }
         XCTAssertTrue(restored)
         XCTAssertNil(tabs.bottomAccessory)
         #else
@@ -42,7 +43,7 @@ final class TabChromeRegressionTests: XCTestCase {
         #endif
     }
 
-    @MainActor func testNativePushedReaderHidesTabsAndPopRestoresThem() async throws {
+    @MainActor func testPopRestoresCustomChromeOwnershipWithoutRevealingNativeTabs() async throws {
         #if compiler(>=6.2)
         guard #available(iOS 26.0, *) else { throw XCTSkip("Requires iOS26 runtime") }
         let app = AppState(), route = TabChromeTestRoute()
@@ -56,8 +57,8 @@ final class TabChromeRegressionTests: XCTestCase {
         XCTAssertTrue(app.isTabChromeHidden, "Pushed destination must acquire the visibility owner")
         XCTAssertTrue(tabs.isTabBarHidden, "Pushed hideRootTabBar destination must hide the real native tab bar")
         route.path = []
-        let restored = await eventually { !tabs.isTabBarHidden && !app.isTabChromeHidden }
-        XCTAssertTrue(restored, "Popping must restore navigation rather than leave it permanently hidden")
+        let restored = await eventually { tabs.isTabBarHidden && !app.isTabChromeHidden }
+        XCTAssertTrue(restored, "Popping restores the custom bar owner while keeping the duplicate native bar hidden")
         #else
         throw XCTSkip("Requires Xcode26 SDK")
         #endif

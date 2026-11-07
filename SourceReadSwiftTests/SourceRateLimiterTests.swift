@@ -42,28 +42,59 @@ final class SourceRateLimiterTests: XCTestCase {
         XCTAssertEqual(request.rateLimitKey, "https://example.com")
     }
 
-    func testIntervalModeWaitsBetweenRequests() async {
+    func testIntervalModeWaitsBetweenRequests() async throws {
         let limiter = SourceRateLimiter()
         guard let rule = SourceRateRule("120") else { return XCTFail("rule") }
-        await limiter.acquire(key: "interval", rule: rule)
+        try await limiter.acquire(key: "interval", rule: rule)
         limiter.release(key: "interval", rule: rule)
 
         let start = DispatchTime.now().uptimeNanoseconds
-        await limiter.acquire(key: "interval", rule: rule)
+        try await limiter.acquire(key: "interval", rule: rule)
         limiter.release(key: "interval", rule: rule)
         let elapsedMs = Double(DispatchTime.now().uptimeNanoseconds - start) / 1_000_000
         XCTAssertGreaterThanOrEqual(elapsedMs, 80)
     }
 
-    func testWindowModeBlocksBeyondLimit() async {
+    func testWindowModeBlocksBeyondLimit() async throws {
         let limiter = SourceRateLimiter()
         guard let rule = SourceRateRule("2/200") else { return XCTFail("rule") }
-        await limiter.acquire(key: "window", rule: rule)
-        await limiter.acquire(key: "window", rule: rule)
+        try await limiter.acquire(key: "window", rule: rule)
+        try await limiter.acquire(key: "window", rule: rule)
 
         let start = DispatchTime.now().uptimeNanoseconds
-        await limiter.acquire(key: "window", rule: rule)
+        try await limiter.acquire(key: "window", rule: rule)
         let elapsedMs = Double(DispatchTime.now().uptimeNanoseconds - start) / 1_000_000
         XCTAssertGreaterThanOrEqual(elapsedMs, 150)
+    }
+
+    func testCancelledWaiterCannotReleaseTheActiveRequestsPermit() async throws {
+        let limiter = SourceRateLimiter()
+        let rule = try XCTUnwrap(SourceRateRule("10"))
+        try await limiter.acquire(key: "held", rule: rule)
+        let cancelled = Task {
+            try await limiter.acquire(key: "held", rule: rule)
+            defer { limiter.release(key: "held", rule: rule) }
+            XCTFail("A cancelled waiter must not enter the request or release another request's permit")
+        }
+        cancelled.cancel()
+        let cancellationResult = await cancelled.result
+        switch cancellationResult {
+        case .success: XCTFail("Expected CancellationError while waiting for a permit")
+        case .failure(let error): XCTAssertTrue(error is CancellationError)
+        }
+
+        let entered = expectation(description: "The first request still owns the permit")
+        entered.isInverted = true
+        let next = Task {
+            try await limiter.acquire(key: "held", rule: rule)
+            defer { limiter.release(key: "held", rule: rule) }
+            entered.fulfill()
+        }
+        await fulfillment(of: [entered], timeout: 0.05)
+        next.cancel()
+        _ = await next.result
+        limiter.release(key: "held", rule: rule)
+        try await limiter.acquire(key: "held", rule: rule)
+        limiter.release(key: "held", rule: rule)
     }
 }

@@ -15,7 +15,9 @@ struct RootTabView: View {
     @Namespace private var tabSelection
     @State private var selectedTab = 0
     @State private var legacySearchRequest: UUID?
+    @State private var shouldFocusRequestedSearch = true
     @State private var showFullAudioPlayer = false
+    @State private var showsGlobalSearch = false
     @ObservedObject private var verificationCoordinator = VerificationCodeCoordinator.shared
 
     var body: some View {
@@ -26,7 +28,7 @@ struct RootTabView: View {
         return navigationContent
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .safeAreaInset(edge: .bottom, spacing: 0) {
-            if !usesNativeTabs, !appState.isTabChromeHidden {
+            if !appState.isTabChromeHidden {
                 VStack(spacing: 8) {
                     if hasAudio { miniAudioPlayerBar }
                     customTabBar
@@ -39,6 +41,16 @@ struct RootTabView: View {
         .onReceive(audioCoordinator.$currentBook.map { $0 != nil }.removeDuplicates()) { hasAudio = $0 }
         .onChange(of: selectedTab) { _ in dismissKeyboard() }
         .sheet(isPresented: $showFullAudioPlayer) { AudioBookPlayerView() }
+        .sheet(isPresented: $showsGlobalSearch) {
+            GlobalSearchView(bookshelf: appState.bookshelfStore, sources: appState.sourceStore) { keyword in
+                appState.discoverViewModel.keyword = keyword
+                appState.discoverViewModel.startSearch()
+                showsGlobalSearch = false
+                shouldFocusRequestedSearch = false
+                legacySearchRequest = UUID()
+                selectedTab = 1
+            }
+        }
         .sheet(item: verificationRequestBinding) { request in
             VerificationCodeSheet(request: request,
                 onSubmit: { verificationCoordinator.submit(id: request.id, code: $0) },
@@ -46,79 +58,22 @@ struct RootTabView: View {
         }
     }
 
-    private var usesNativeTabs: Bool {
-        #if compiler(>=6.2)
-        if #available(iOS 26.0, *) { return true }
-        #endif
-        return false
-    }
-
     @ViewBuilder private var navigationContent: some View {
-        #if compiler(>=6.2)
-        if #available(iOS 26.0, *) {
-            TabView(selection: $selectedTab) {
-                nativeTabRoot(BookshelfView()).tabItem { nativeTabLabel("主页", symbol: "house") }.tag(0)
-                nativeTabRoot(DiscoverView(viewModel: appState.discoverViewModel))
-                    .tabItem { nativeTabLabel(AppNavigationLabels.findBooks, symbol: AppNavigationLabels.findBooksSymbol) }.tag(1)
-                nativeTabRoot(SettingsView()).tabItem { nativeTabLabel("设置", symbol: "gearshape") }.tag(2)
-            }
-            .tabBarMinimizeBehavior(.never)
-        } else {
-            legacyNavigationContent
-        }
-        #else
         legacyNavigationContent
-        #endif
-    }
-
-    // A template keeps the native selection tint but does not let the system
-    // interpolate symbol paths while a user rapidly switches among tabs.
-    @MainActor private static let nativeTabGlyphs: [String: UIImage] = {
-        var glyphs: [String: UIImage] = [:]
-        for name in ["house", AppNavigationLabels.findBooksSymbol, "gearshape"] {
-            guard let symbol = UIImage(systemName: name,
-                withConfiguration: UIImage.SymbolConfiguration(pointSize: 22, weight: .medium)) else { continue }
-            let image = UIGraphicsImageRenderer(size: symbol.size).image { _ in
-                symbol.withTintColor(.black, renderingMode: .alwaysOriginal).draw(at: .zero)
-            }
-            glyphs[name] = image.withRenderingMode(.alwaysTemplate)
-        }
-        return glyphs
-    }()
-
-    @MainActor private func nativeTabLabel(_ title: String, symbol: String) -> some View {
-        Label {
-            Text(title)
-        } icon: {
-            if let glyph = Self.nativeTabGlyphs[symbol] { Image(uiImage: glyph) }
-            else { Image(systemName: symbol) }
-        }
-    }
-
-    private func nativeTabRoot<Content: View>(_ content: Content) -> some View {
-        content
-            .modifier(RootTabChromeVisibilityModifier())
-            .safeAreaInset(edge: .bottom, spacing: 0) {
-                // An empty native accessory still reserves a glass container on
-                // some iOS26 releases. Keep the TabView identity stable instead
-                // of conditionally attaching/removing its accessory modifier.
-                if hasAudio, !appState.isTabChromeHidden {
-                    miniAudioPlayerBar
-                }
-            }
     }
 
     private var legacyNavigationContent: some View {
         // Retain each navigation stack while the custom bar changes selection.
         TabView(selection: $selectedTab) {
-            BookshelfView()
-                .toolbar(.hidden, for: .tabBar)
+            BookshelfView(onRequestGlobalSearch: { showsGlobalSearch = true })
+                .modifier(RootTabChromeVisibilityModifier())
                 .tabItem { Label("主页", systemImage: "house") }.tag(0)
-            DiscoverView(viewModel: appState.discoverViewModel, searchRequestID: legacySearchRequest)
-                .toolbar(.hidden, for: .tabBar)
+            DiscoverView(viewModel: appState.discoverViewModel, searchRequestID: legacySearchRequest,
+                         shouldFocusRequestedSearch: shouldFocusRequestedSearch)
+                .modifier(RootTabChromeVisibilityModifier())
                 .tabItem { Label(AppNavigationLabels.findBooks, systemImage: AppNavigationLabels.findBooksSymbol) }.tag(1)
             SettingsView()
-                .toolbar(.hidden, for: .tabBar)
+                .modifier(RootTabChromeVisibilityModifier())
                 .tabItem { Label("设置", systemImage: "gearshape") }.tag(2)
         }
     }
@@ -148,8 +103,7 @@ struct RootTabView: View {
 
     private var customTabBar: some View {
         LegacyTabBar(selection: $selectedTab) {
-            legacySearchRequest = UUID()
-            selectedTab = 1
+            showsGlobalSearch = true
         }
     }
 
@@ -173,10 +127,10 @@ private struct RootTabPressableButtonStyle: ButtonStyle {
 }
 
 struct RootTabChromeVisibilityModifier: ViewModifier {
-    @EnvironmentObject private var appState: AppState
-
     func body(content: Content) -> some View {
-        content.toolbar(appState.isTabChromeHidden ? .hidden : .visible, for: .tabBar)
+        // RootTabView owns the sole visible bar. Reader ownership controls that
+        // inset, never the hidden UITabBar retained for navigation stacks.
+        content.toolbar(.hidden, for: .tabBar)
     }
 }
 

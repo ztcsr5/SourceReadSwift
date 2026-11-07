@@ -2,6 +2,16 @@ import XCTest
 @testable import SourceReadSwift
 
 final class RuleEditorValidatorTests: XCTestCase {
+    func testValidationCompilesWithoutExecutingOrAllowingWrapperEscape() {
+        let source = BookSource(bookSourceName: "Fixture", bookSourceUrl: "https://example.com")
+        let valid = RuleEditorValidator().validate(source: source,
+            drafts: ["ruleContent": "@js: throw new Error('must not execute');"])
+        XCTAssertTrue(valid.isEmpty)
+        let escaped = RuleEditorValidator().validate(source: source,
+            drafts: ["ruleContent": "@js: }); globalThis.validationEscaped = true; (function(){"])
+        XCTAssertTrue(escaped.contains { $0.field == "ruleContent" })
+    }
+
     func testValidatesAndAppliesStructuredRuleDrafts() throws {
         let source = BookSource(
             bookSourceName: "Fixture",

@@ -2,14 +2,17 @@ import SwiftUI
 import UniformTypeIdentifiers
 
 struct BookshelfView: View {
+    var onRequestGlobalSearch: () -> Void = {}
     @EnvironmentObject private var appState: AppState
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.dynamicTypeSize) private var typeSize
     @Namespace private var bookHero
     @AppMotion private var motion
     @State private var showFileImporter = false
     @State private var importMessage: String?
     @State private var isRefreshingBooks = false
     @State private var isImportingBook = false
+    @State private var bookImportTask: Task<Void, Never>?
     @State private var contextualBookRoute: ContextualBookRoute?
     @State private var bookToRemove: BookshelfBook?
     @State private var shelfReturnOrder: [String] = []
@@ -20,6 +23,8 @@ struct BookshelfView: View {
     @State private var selectedMainGroup: String? = nil
     @State private var searchKeyword = ""
     @State private var selectedMediaFilter: String? = nil
+    @State private var showsShelfFilters = false
+    @State private var usesThemeShelfLayout = true
     @State private var readingBookID: String?
     @AppStorage("settings.readingDeskEnabled") private var readingDeskEnabled = true
     @AppStorage("settings.floatingReadingDeskEnabled") private var floatingReadingDeskEnabled = true
@@ -62,6 +67,8 @@ struct BookshelfView: View {
     }
 
     private func mediaKind(for book: BookshelfBook) -> BookSourceKind? {
+        if let kind = book.mediaKind { return kind }
+        if book.sourceURL == "local://comic" { return .comic }
         if book.sourceURL.hasPrefix("local://") { return nil }
         return appState.sourceStore.source(for: book.sourceURL)?.sourceKind
     }
@@ -139,6 +146,7 @@ struct BookshelfView: View {
             .onChange(of: searchKeyword) { _ in clearReturnOrder() }
             .onChange(of: selectedMainGroup) { _ in clearReturnOrder() }
             .onChange(of: selectedMediaFilter) { _ in clearReturnOrder() }
+            .onChange(of: themeRaw) { _ in usesThemeShelfLayout = true }
             .background(bookshelfBackdrop)
             .onChange(of: floatingReadingDeskEnabled) { isEnabled in
                 if !isEnabled { readingCoverHandoff.clear() }
@@ -149,8 +157,7 @@ struct BookshelfView: View {
             .navigationTitle("主页")
             .navigationBarTitleDisplayMode(theme.usesNeutralGlass ? .large : .inline)
             .toolbar {
-                // 左上角「管理」入口已移除：书架管理与分组都在书架区标题里点进去，
-                // 工具栏只保留右侧的统计与导入，避免大标题左肩挂一个孤零零的图标。
+                // 工具栏只保留右侧的统计与导入，顶部不再放置搜索按钮（统一放到底部导航栏最右侧）
                 ToolbarItemGroup(placement: .navigationBarTrailing) {
                     NavigationLink {
                         ReadingStatsView()
@@ -191,7 +198,8 @@ struct BookshelfView: View {
                         UTType(importedAs: "com.edc21.sourceread.source-json"),
                         UTType(filenameExtension: "txt") ?? .plainText,
                         UTType(filenameExtension: "text") ?? .text,
-                        UTType(filenameExtension: "epub") ?? UTType(importedAs: "org.idpf.epub-container")
+                        UTType(filenameExtension: "epub") ?? UTType(importedAs: "org.idpf.epub-container"),
+                        UTType(filenameExtension: "cbz") ?? .zip
                     ],
                     onPick: { urls in
                         showFileImporter = false
@@ -207,7 +215,7 @@ struct BookshelfView: View {
                 if let route = contextualBookRoute {
                     switch route {
                     case .read(let book, let coverFrame):
-                        BookshelfReaderGatewayView(book: book)
+                        BookshelfReaderGatewayView(book: book, onRequestExit: { contextualBookRoute = nil })
                             .readerOpeningPresentation(for: managedOpeningBook(book), coverFrame: coverFrame, usesDeskHero: true)
                             .bookHeroDestination("continue|" + book.id, in: bookHero)
                             .environment(\.readingCoverHandoff, readingDeskEnabled && floatingReadingDeskEnabled ? readingCoverHandoff : nil)
@@ -237,6 +245,9 @@ struct BookshelfView: View {
                             ProgressView()
                                 .scaleEffect(1.3)
                                 .tint(.white)
+                            Button("取消导入", action: cancelBookImport)
+                                .frame(minHeight: 44)
+                                .accessibilityIdentifier("bookshelf.cancelImport")
                             Text("正在智能分章与构建目录...")
                                 .font(.system(size: 15, weight: .medium))
                                 .foregroundColor(.white)
@@ -320,10 +331,11 @@ struct BookshelfView: View {
             Image(systemName: "magnifyingglass")
                 .font(.system(size: 14))
                 .foregroundStyle(.secondary)
-            TextField("在书架中搜索书名或作者...", text: $searchKeyword)
+            TextField("在书架查找", text: $searchKeyword)
                 .font(.system(size: 14))
                 .textInputAutocapitalization(.never)
                 .autocorrectionDisabled(true)
+                .accessibilityIdentifier("bookshelf.filterQuery")
             if !searchKeyword.isEmpty {
                 Button {
                     UIImpactFeedbackGenerator(style: .light).impactOccurred()
@@ -344,10 +356,11 @@ struct BookshelfView: View {
     }
 
     private var shelfSection: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        let shelfBooks = displayedShelfBooks
+        return VStack(alignment: .leading, spacing: 8) {
             shelfHeader
 
-            if !allBooks.isEmpty {
+            if !allBooks.isEmpty, showsShelfFilters {
                 shelfSearchBar
 
                 ScrollView(.horizontal, showsIndicators: false) {
@@ -388,24 +401,21 @@ struct BookshelfView: View {
 
             if allBooks.isEmpty {
                 compactEmptyState(icon: "books.vertical", title: "书架还是空的", message: "支持 TXT、EPUB 与在线书源书籍")
-            } else if displayedShelfBooks.isEmpty {
+            } else if shelfBooks.isEmpty {
                 compactEmptyState(icon: "folder", title: "没有符合筛选的书籍", message: "尝试清空搜索词或切换分组与类型")
-            } else if isGridMode {
+            } else if showsGridShelf {
                 LazyVGrid(
-                    columns: [
-                        GridItem(.flexible(), spacing: 14),
-                        GridItem(.flexible(), spacing: 14),
-                        GridItem(.flexible(), spacing: 14)
-                    ],
+                    columns: Array(repeating: GridItem(.flexible(), spacing: 16),
+                                   count: theme.homeComposition == .gallery || typeSize.isAccessibilitySize ? 2 : 3),
                     spacing: 18
                 ) {
-                    ForEach(displayedShelfBooks) { book in
+                    ForEach(shelfBooks) { book in
                         bookshelfGridCard(book)
                     }
                 }
             } else {
                 LazyVStack(spacing: AppLayout.rowGap) {
-                    ForEach(displayedShelfBooks) { book in
+                    ForEach(shelfBooks) { book in
                         bookshelfRow(book)
                     }
                 }
@@ -433,6 +443,20 @@ struct BookshelfView: View {
             Spacer()
 
             if !allBooks.isEmpty {
+                Button {
+                    withAnimation(motion.animation(.expansion)) { showsShelfFilters.toggle() }
+                } label: {
+                    Image(systemName: hasShelfFilter ? "line.3.horizontal.decrease.circle.fill" : "line.3.horizontal.decrease.circle")
+                        .font(.system(size: 18, weight: .medium))
+                        .foregroundStyle(hasShelfFilter ? AppTheme.accent : theme.secondaryInk)
+                        .frame(width: 44, height: 44)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(AppPressStyle())
+                .accessibilityIdentifier("bookshelf.filters")
+                .accessibilityLabel(showsShelfFilters ? "收起书架筛选" : "展开书架筛选")
+                .accessibilityValue(hasShelfFilter ? "已启用筛选" : "未筛选")
+
                 Menu {
                     ForEach(BookshelfSortMode.allCases) { mode in
                         Button {
@@ -450,7 +474,7 @@ struct BookshelfView: View {
                     Image(systemName: "arrow.up.arrow.down")
                         .font(.system(size: 15, weight: .medium))
                         .foregroundStyle(theme.usesNeutralGlass ? theme.secondaryInk : .secondary)
-                        .frame(width: theme.usesNeutralGlass ? 44 : 32, height: theme.usesNeutralGlass ? 44 : 32)
+                        .frame(width: 44, height: 44)
                         .background(theme.usesNeutralGlass ? Color.clear : Color.secondary.opacity(0.12), in: Circle())
                         .contentShape(Rectangle())
                 }
@@ -459,20 +483,29 @@ struct BookshelfView: View {
                 Button {
                     UIImpactFeedbackGenerator(style: .light).impactOccurred()
                     withAnimation(motion.animation(.expansion)) {
-                        isGridMode.toggle()
+                        isGridMode = !showsGridShelf
+                        usesThemeShelfLayout = false
                     }
                 } label: {
-                    Image(systemName: isGridMode ? "rectangle.grid.1x2" : "square.grid.2x2")
+                    Image(systemName: showsGridShelf ? "rectangle.grid.1x2" : "square.grid.2x2")
                         .font(.system(size: 15, weight: .medium))
                         .foregroundStyle(theme.usesNeutralGlass ? theme.secondaryInk : .secondary)
-                        .frame(width: theme.usesNeutralGlass ? 44 : 32, height: theme.usesNeutralGlass ? 44 : 32)
+                        .frame(width: 44, height: 44)
                         .background(theme.usesNeutralGlass ? Color.clear : Color.secondary.opacity(0.12), in: Circle())
                         .contentShape(Rectangle())
                 }
                 .buttonStyle(AppPressStyle())
-                .accessibilityLabel(isGridMode ? "切换为列表视图" : "切换为网格视图")
+                .accessibilityLabel(showsGridShelf ? "切换为列表视图" : "切换为网格视图")
             }
         }
+    }
+
+    private var hasShelfFilter: Bool {
+        selectedMainGroup != nil || selectedMediaFilter != nil || !searchKeyword.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    private var showsGridShelf: Bool {
+        usesThemeShelfLayout && theme.homeComposition == .index ? false : isGridMode
     }
 
     private func mainGroupChip(_ name: String, isSelected: Bool, action: @escaping () -> Void) -> some View {
@@ -566,11 +599,16 @@ struct BookshelfView: View {
 
     private func importLocalBook(_ result: Result<[URL], Error>) {
         guard !isImportingBook else { return }
+        guard bookImportTask == nil else {
+            importMessage = "上一项导入正在取消，请稍后再导入。"
+            return
+        }
         isImportingBook = true
-        Task {
+        bookImportTask = Task { @MainActor in
             defer {
                 Task { @MainActor in
                     isImportingBook = false
+                    bookImportTask = nil
                 }
             }
             do {
@@ -581,22 +619,40 @@ struct BookshelfView: View {
                     }
                     return
                 }
-                let localURL = try PickedDocumentAccess.copiedURL(from: url)
-                let parsed: LocalTextBook = try await Task.detached(priority: .userInitiated) {
+                let parserTask = Task.detached(priority: .userInitiated) {
+                    try Task.checkCancellation()
+                    let localURL = try PickedDocumentAccess.copiedURL(from: url)
+                    try Task.checkCancellation()
                     // Same container sniff as the share-sheet entry: never decide
                     // "this is TXT" from the copied file name alone.
-                    if LocalEPUBBookParser.looksLikeEPUB(localURL) {
+                    if localURL.pathExtension.lowercased() == "cbz" {
+                        return try LocalComicBookParser().parse(fileURL: localURL)
+                    } else if LocalEPUBBookParser.looksLikeEPUB(localURL) {
                         return try LocalEPUBBookParser().parse(fileURL: localURL)
                     } else {
                         let data = try Data(contentsOf: localURL)
                         return LocalTxtSmartDivider().divide(data: data, fileName: localURL.lastPathComponent)
                     }
-                }.value
-
+                }
+                let parsed = try await withTaskCancellationHandler(operation: {
+                    try await parserTask.value
+                }, onCancel: { parserTask.cancel() })
+                if Task.isCancelled {
+                    try await Task.detached(priority: .utility) {
+                        try LocalComicBookParser.removeFiles(for: BookshelfBook(localTextBook: parsed))
+                    }.value
+                    throw CancellationError()
+                }
+                // This task owns MainActor: do not suspend between the final
+                // cancellation check and committing the imported book.
+                appState.bookshelfStore.addLocalTextBook(parsed)
+                HapticFeedback.success()
+                importMessage = parsed.mediaKind == .comic
+                    ? "已导入《\(parsed.title)》，共 \(parsed.paragraphs.count) 页漫画。"
+                    : "已导入《\(parsed.title)》，共 \(parsed.chapters.count) 章、\(parsed.paragraphs.count) 段。"
+            } catch is CancellationError {
                 await MainActor.run {
-                    appState.bookshelfStore.addLocalTextBook(parsed)
-                    HapticFeedback.success()
-                    importMessage = "已导入《\(parsed.title)》，共 \(parsed.chapters.count) 章、\(parsed.paragraphs.count) 段。"
+                    if isImportingBook { importMessage = "已取消导入，未加入书架。" }
                 }
             } catch {
                 await MainActor.run {
@@ -605,6 +661,12 @@ struct BookshelfView: View {
                 }
             }
         }
+    }
+
+    private func cancelBookImport() {
+        bookImportTask?.cancel()
+        isImportingBook = false
+        importMessage = "已取消导入，未加入书架。"
     }
 
     private func refreshBookshelf() async {
@@ -622,16 +684,8 @@ struct BookshelfView: View {
                 failed += 1
                 return nil
             }
-            let searchBook = SearchBook(
-                name: book.title,
-                author: book.author,
-                coverUrl: book.coverURL,
-                bookUrl: book.bookURL,
-                sourceName: book.sourceName,
-                sourceUrl: book.sourceURL,
-                intro: book.intro
-            )
-            return BookshelfRefreshCandidate(bookID: book.id, source: source, book: searchBook)
+            return BookshelfRefreshCandidate(bookID: book.id, source: source.resolvingMediaKind(book.mediaKind),
+                                              book: book.asSearchBook)
         }
 
         // Refresh results arrive in bounded parallel batches. Keep the UI
@@ -739,11 +793,13 @@ struct BookshelfView: View {
     }
 
     private func heroCard(_ book: BookshelfBook) -> some View {
-        // The management menu is a sibling, not part of the reading hit area.
-        ZStack(alignment: .topTrailing) {
-            readingDeskEntry(book)
-            readingDeskMenu(book)
-        }
+        readingDeskEntry(book)
+            .contextMenu {
+                readingDeskBookActions(book)
+                Divider()
+                Toggle("悬浮玻璃书台", isOn: $floatingReadingDeskEnabled)
+                    .accessibilityIdentifier("bookshelf.floatingDeskToggle")
+            }
     }
 
     private func readingDeskEntry(_ book: BookshelfBook) -> some View {
@@ -754,7 +810,9 @@ struct BookshelfView: View {
             contextualBookRoute = .read(book, coverFrame: readingCoverHandoff.frame(for: book))
         } label: {
             Group {
-                if theme.usesFloatingBook && readingDeskEnabled && floatingReadingDeskEnabled {
+                if theme.homeComposition != .readingDesk, readingDeskEnabled {
+                    ThemedReadingCard(book: book, theme: theme, heroNamespace: bookHero)
+                } else if theme.usesFloatingBook && readingDeskEnabled && floatingReadingDeskEnabled {
                     ForestReadingCard(book: book, heroNamespace: bookHero, theme: theme)
                 } else {
                     ReadingHeroCard(book: book, heroNamespace: bookHero, usesSpatialStyle: readingDeskEnabled,
@@ -767,23 +825,6 @@ struct BookshelfView: View {
         }
         .accessibilityIdentifier("bookshelf.continue." + book.id)
         .buttonStyle(ReadingDeskTapStyle())
-    }
-
-    private func readingDeskMenu(_ book: BookshelfBook) -> some View {
-        Menu {
-            readingDeskBookActions(book)
-            Divider()
-            Toggle("悬浮玻璃书台", isOn: $floatingReadingDeskEnabled)
-                .accessibilityIdentifier("bookshelf.floatingDeskToggle")
-        } label: {
-            Image(systemName: "ellipsis").font(.title3.weight(.semibold))
-                .frame(width: 44, height: 44)
-                .foregroundStyle(theme.usesNeutralGlass ? theme.secondaryInk : AppTheme.accent)
-                .background(theme.usesNeutralGlass ? Color.clear : AppTheme.elevatedCard.opacity(readingDeskEnabled && floatingReadingDeskEnabled ? 0.6 : 1), in: Circle())
-                .contentShape(Rectangle())
-        }
-        .padding(theme.usesNeutralGlass ? 8 : 12)
-        .accessibilityLabel("正在阅读书籍的更多操作")
     }
 
     @ViewBuilder private func readingDeskBookActions(_ book: BookshelfBook) -> some View {
@@ -844,7 +885,10 @@ struct BookshelfView: View {
         NavigationLink {
             bookDestination(book, placement: "list")
         } label: {
-            HStack(spacing: 14) {
+            let layout = typeSize.isAccessibilitySize
+                ? AnyLayout(VStackLayout(alignment: .leading, spacing: 12))
+                : AnyLayout(HStackLayout(spacing: 14))
+            layout {
                 ShelfBookCover(book: book, width: 52, height: 72)
                     .environment(\.readingCoverHandoff, readingDeskEnabled ? readingCoverHandoff : nil)
                     .bookHeroSource("list|" + book.id, in: bookHero)
@@ -861,7 +905,7 @@ struct BookshelfView: View {
                         Text(book.title)
                             .font(.headline)
                             .foregroundStyle(.primary)
-                            .lineLimit(1)
+                            .lineLimit(typeSize.isAccessibilitySize ? nil : 1)
                         if book.hasUpdates {
                             Image(systemName: "circle.fill").font(.system(size: 5)).foregroundStyle(theme.secondaryInk)
                                 .accessibilityLabel("有更新")
@@ -870,17 +914,19 @@ struct BookshelfView: View {
                     Text(book.author)
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
-                        .lineLimit(1)
+                        .lineLimit(typeSize.isAccessibilitySize ? nil : 1)
                     if let current = book.currentChapterTitle {
                         Text("读到：\(current)")
                             .font(.caption)
                             .foregroundStyle(.secondary)
-                            .lineLimit(1)
+                            .lineLimit(typeSize.isAccessibilitySize ? nil : 1)
                     }
                 }
-                Spacer()
-                Image(systemName: "chevron.right")
-                    .foregroundStyle(.secondary)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                if !typeSize.isAccessibilitySize {
+                    Image(systemName: "chevron.right")
+                        .foregroundStyle(.secondary)
+                }
             }
             .padding(14)
             .glassPanel(cornerRadius: 16, material: .thinMaterial, shadowOpacity: 0.06)
@@ -942,14 +988,14 @@ struct BookshelfView: View {
             bookDestination(book, placement: "grid")
         } label: {
             VStack(alignment: .leading, spacing: 8) {
-                ShelfBookCover(book: book, width: nil, height: 145)
+                ShelfBookCover(book: book, width: nil, height: 120)
                     .environment(\.readingCoverHandoff, readingDeskEnabled ? readingCoverHandoff : nil)
                     .bookHeroSource("grid|" + book.id, in: bookHero)
 
                 VStack(alignment: .leading, spacing: 3) {
                     HStack(alignment: .top, spacing: 4) {
                         Text(book.title)
-                            .font(.system(size: 13, weight: .semibold))
+                            .font(.caption.weight(.semibold))
                             .foregroundStyle(theme.primaryInk)
                             .lineLimit(2)
                             .multilineTextAlignment(.leading)
@@ -962,12 +1008,19 @@ struct BookshelfView: View {
                                 .accessibilityLabel("有更新")
                         }
                     }
-                    .frame(height: 34, alignment: .topLeading)
+                    .frame(minHeight: 34, alignment: .topLeading)
 
                     Text(book.author.isEmpty ? (book.groupName ?? "未知作者") : book.author)
-                        .font(.system(size: 11))
+                        .font(.caption2)
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
+                }
+            }
+            .padding(theme.homeComposition == .gallery ? 12 : 0)
+            .background {
+                if theme.homeComposition == .gallery {
+                    AppTheme.card.clipShape(AppThemeCardShape(theme: theme, radius: theme.radius), style: FillStyle(eoFill: true))
+                        .overlay { AppThemeOrnament(theme: theme, isCard: true) }
                 }
             }
         }

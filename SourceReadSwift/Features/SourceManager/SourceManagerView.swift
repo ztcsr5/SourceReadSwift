@@ -3,6 +3,11 @@ import UniformTypeIdentifiers
 import UIKit
 
 struct SourceManagerView: View {
+    init(initialSearch: String = "") {
+        _searchText = State(initialValue: initialSearch)
+        _debouncedSearchText = State(initialValue: initialSearch)
+    }
+
     @EnvironmentObject private var appState: AppState
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @State private var selectedTab: SourceManagerTab = .bookSources
@@ -12,6 +17,8 @@ struct SourceManagerView: View {
     @State private var importURL = ""
     @State private var importError: String?
     @State private var importMessage: String?
+    @State private var importPublisher: SourcePublisherPage?
+    @State private var isImporting = false
     @State private var showFileImporter = false
     @State private var showImportSheet = false
     @State private var openFileImporterAfterSheetDismiss = false
@@ -1176,13 +1183,20 @@ struct SourceManagerView: View {
     private var importSheet: some View {
         NavigationStack {
             VStack(spacing: 14) {
+                if let publisher = importPublisher {
+                    SourcePublisherLinksView(page: publisher, isLoading: isImporting) { link in
+                        Task { await performImport(text: link.url.absoluteString, catalogURL: nil) }
+                    }
+                    Button("返回输入") { importPublisher = nil }
+                        .disabled(isImporting)
+                } else {
                 Text("支持书源 JSON、仓库 JSON、RSS/Atom、阅读导入链接、普通 URL 和网页分享文本。")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
                     .padding(.horizontal)
 
-                TextField("JSON URL，可选", text: $importURL)
+                TextField("JSON 或发布页 URL，可选", text: $importURL)
                     .textInputAutocapitalization(.never)
                     .keyboardType(.URL)
                     .textFieldStyle(.roundedBorder)
@@ -1241,6 +1255,8 @@ struct SourceManagerView: View {
                     .disabled(importText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                 }
                 .padding(.horizontal)
+                .disabled(isImporting)
+                }
 
                 importStatus
                     .padding(.horizontal)
@@ -1450,7 +1466,7 @@ private struct BatchCheckCoordinatorObserver<Content: View>: View {
                 HStack(spacing: 12) {
                     ProgressView()
                         .controlSize(.small)
-                        .tint(.white)
+                        .tint(AppTheme.prominentInk)
                     VStack(alignment: .leading, spacing: 4) {
                         HStack {
                             Text("书源体检进行中")
@@ -1460,7 +1476,7 @@ private struct BatchCheckCoordinatorObserver<Content: View>: View {
                                 .font(.caption.weight(.bold).monospacedDigit())
                         }
                         ProgressView(value: coordinator.progressFraction)
-                            .tint(.white)
+                            .tint(AppTheme.prominentInk)
                         if !coordinator.currentSourceName.isEmpty {
                             Text("正在检测：\(coordinator.currentSourceName)")
                                 .font(.caption2)
@@ -1474,9 +1490,9 @@ private struct BatchCheckCoordinatorObserver<Content: View>: View {
                 }
                 .padding(.horizontal, 14)
                 .padding(.vertical, 10)
-                .foregroundStyle(.white)
+                .foregroundStyle(AppTheme.prominentInk)
                 .background(
-                    AppTheme.accent,
+                    AppTheme.prominentFill,
                     in: RoundedRectangle(cornerRadius: 14, style: .continuous)
                 )
             }
@@ -2095,6 +2111,7 @@ private struct BatchCheckCoordinatorObserver<Content: View>: View {
     /// charset decoding live in `SourceImportDownloader`. The paste field, the
     /// URL field and catalog rows all funnel through here so they cannot drift.
     private func performImport(text: String, catalogURL: String?) async {
+        guard !isImporting else { return }
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else {
             importMessage = nil
@@ -2103,6 +2120,8 @@ private struct BatchCheckCoordinatorObserver<Content: View>: View {
         }
         importMessage = "正在识别并导入书源..."
         importError = nil
+        isImporting = true
+        defer { isImporting = false }
         do {
             let result = try await appState.sourceStore.importSmartInputAsync(trimmed)
             if let catalogURL {
@@ -2117,6 +2136,11 @@ private struct BatchCheckCoordinatorObserver<Content: View>: View {
                 ? "URL \(result.report.userMessage)"
                 : result.report.userMessage
             showImportSheet = false
+            importPublisher = nil
+        } catch SourceImportError.publisherPage(let publisher) {
+            importPublisher = publisher
+            importMessage = "已找到 \(publisher.links.count) 个链接，请选择。"
+            showImportSheet = true
         } catch {
             importMessage = nil
             importError = error.localizedDescription

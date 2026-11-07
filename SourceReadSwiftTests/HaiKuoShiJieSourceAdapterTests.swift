@@ -3,6 +3,16 @@ import XCTest
 
 final class HaiKuoShiJieSourceAdapterTests: XCTestCase {
 
+    func testUserAgentQuotesAndBackslashesRemainValidHeaderJSON() throws {
+        let agent = "Reader/1.0 \"quoted\" \\ device"
+        let source = try XCTUnwrap(HaiKuoShiJieSourceAdapter.adapt(dict: [
+            "title": "Header fixture", "url": "https://fixture.invalid", "ua": agent
+        ]))
+        let encoded = try XCTUnwrap(source.header?.data(using: .utf8))
+        let headers = try JSONDecoder().decode([String: String].self, from: encoded)
+        XCTAssertEqual(headers["User-Agent"], agent)
+    }
+
     func testHaiKuoJSONDetection() {
         let sampleJSON = """
         {

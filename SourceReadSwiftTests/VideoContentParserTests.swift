@@ -3,6 +3,22 @@ import XCTest
 
 final class VideoContentParserTests: XCTestCase {
 
+    func testEmptyOrInvalidPrimaryFieldDoesNotHideValidPlaybackURL() {
+        let chapter = BookChapter(title: "第1集", url: "https://example.com/play/1", bookUrl: "https://example.com/show", index: 0, isVip: false)
+        for primary in ["", "javascript:alert(1)"] {
+            let json = "{\"url\":\"\(primary)\",\"playUrl\":\"../stream?token=a%2Bb&expires=7\"}"
+            let content = ChapterContent(chapter: chapter, title: chapter.title, paragraphs: [json], nextContentUrl: nil)
+            XCTAssertEqual(VideoContentParser.parseVideoURL(from: content), "https://example.com/stream?token=a%2Bb&expires=7")
+        }
+    }
+
+    func testAudioSourceBeforeVideoDoesNotBecomeTheVideoStream() {
+        let chapter = BookChapter(title: "第1集", url: "https://example.com/play/1", bookUrl: "https://example.com/show", index: 0, isVip: false)
+        let html = "<audio><source src='/advert.mp3'></audio><video><source src='//cdn.example.com/episode.m3u8?token=abc&amp;v=2'></video>"
+        let content = ChapterContent(chapter: chapter, title: chapter.title, paragraphs: [html], nextContentUrl: nil)
+        XCTAssertEqual(VideoContentParser.parseVideoURL(from: content), "https://cdn.example.com/episode.m3u8?token=abc&v=2")
+    }
+
     func testParseDirectHLSStream() {
         let chapter = BookChapter(title: "第1集", url: "https://example.com/play/1", bookUrl: "https://example.com/drama/1", index: 0, isVip: false)
         let text = "Here is the video stream: https://stream.example.com/hls/ep01.m3u8 and more text"

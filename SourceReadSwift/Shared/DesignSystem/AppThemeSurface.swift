@@ -44,7 +44,7 @@ struct AppThemeSurface: ViewModifier {
 
     @ViewBuilder func body(content: Content) -> some View {
         let _ = appearanceRevision
-        let radius = cornerRadius ?? theme.radius
+        let radius = theme.surfaceRadius(preferred: cornerRadius)
         // Repeated scrolling cards are opaque paper. Reserve live backdrop
         // sampling for a few explicit floating controls, not every list row.
         let style: AppThemeSurfaceStyle = usesLiveMaterial ? AppThemeSurfaceStyle.resolve(theme: theme,
