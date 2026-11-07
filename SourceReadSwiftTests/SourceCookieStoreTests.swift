@@ -2,6 +2,33 @@ import XCTest
 @testable import SourceReadSwift
 
 final class SourceCookieStoreTests: XCTestCase {
+    func testSecureCookieNeverLeavesHTTPSAndStillMatchesPathAndDomain() async throws {
+        let store = SourceCookieStore(storageURL: nil)
+        let origin = URL(string: "https://cookie.fixture.invalid/account/login")!
+        let cookie = try XCTUnwrap(HTTPCookie(properties: [
+            .name: "session", .value: "fixture", .domain: ".fixture.invalid",
+            .path: "/account", .secure: "TRUE"
+        ]))
+        XCTAssertTrue(cookie.isSecure)
+        await store.storeWebViewCookies([cookie])
+        let secure = await store.cookieHeader(for: origin)
+        let insecure = await store.cookieHeader(for: URL(string: "http://cookie.fixture.invalid/account/read")!)
+        let siblingPath = await store.cookieHeader(for: URL(string: "https://cookie.fixture.invalid/accounts")!)
+        let unrelated = await store.cookieHeader(for: URL(string: "https://notfixture.invalid/account")!)
+        XCTAssertEqual(secure, "session=fixture")
+        XCTAssertNil(insecure)
+        XCTAssertNil(siblingPath)
+        XCTAssertNil(unrelated)
+    }
+
+    func testNonSecureCookieStillSupportsExplicitHTTPSource() async throws {
+        let store = SourceCookieStore(storageURL: nil)
+        let origin = URL(string: "http://cookie.fixture.invalid/read")!
+        await store.storeSetCookieHeaders(["Set-Cookie": "legacy=fixture; Path=/"], for: origin)
+        let header = await store.cookieHeader(for: origin)
+        XCTAssertEqual(header, "legacy=fixture")
+    }
+
     func testCookieHeaderRoundTrip() async throws {
         let store = SourceCookieStore(storageURL: nil)
         let url = URL(string: "https://example.com/path")!

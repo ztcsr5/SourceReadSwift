@@ -113,6 +113,8 @@ final class CoverPageHostController: UIViewController, UIGestureRecognizerDelega
         view.clipsToBounds = true
         pan.delegate = self
         pan.cancelsTouchesInView = false
+        pan.delaysTouchesBegan = false
+        pan.delaysTouchesEnded = false
         view.addGestureRecognizer(pan)
     }
 
@@ -260,7 +262,10 @@ final class CoverPageHostController: UIViewController, UIGestureRecognizerDelega
             // Hosting geometry changes only on installation or a viewport resize.
             page.bounds = CGRect(origin: .zero, size: size)
             page.center = center
-            page.layer.shadowPath = UIBezierPath(rect: page.bounds).cgPath
+            page.layer.shadowColor = UIColor.black.cgColor
+            page.layer.shadowRadius = 6
+            page.layer.shadowOffset = CGSize(width: -2, height: 0)
+            page.layer.shadowPath = UIBezierPath(rect: CGRect(origin: .zero, size: size)).cgPath
         }
     }
 
@@ -276,19 +281,19 @@ final class CoverPageHostController: UIViewController, UIGestureRecognizerDelega
             next?.transform = CGAffineTransform(translationX: x + width, y: 0)
             for page in [previous, current, next] { page?.layer.shadowOpacity = 0 }
         } else {
+            // Stable z-ordering: next (back) -> current (middle) -> previous (front)
+            // avoids layout thrashing / subview re-insertion on every 120Hz frame.
             if let next, view.subviews.first !== next { view.sendSubviewToBack(next) }
-            if let current, let previous, view.subviews.last !== previous {
-                view.bringSubviewToFront(current); view.bringSubviewToFront(previous)
+            if let previous, view.subviews.last !== previous {
+                if let current { view.bringSubviewToFront(current) }
+                view.bringSubviewToFront(previous)
             }
             previous?.transform = CGAffineTransform(translationX: x > 0 ? x - width : -width, y: 0)
             current?.transform = CGAffineTransform(translationX: min(x, 0), y: 0)
             next?.transform = .identity
-            for page in [previous, current] {
-                page?.layer.shadowColor = UIColor.black.cgColor
-                page?.layer.shadowOpacity = abs(x) > 0.5 ? 0.18 : 0
-                page?.layer.shadowRadius = 5
-                page?.layer.shadowOffset = CGSize(width: 3, height: 0)
-            }
+            let shadowOpacity: Float = abs(x) > 0.5 ? 0.18 : 0
+            if previous?.layer.shadowOpacity != shadowOpacity { previous?.layer.shadowOpacity = shadowOpacity }
+            if current?.layer.shadowOpacity != shadowOpacity { current?.layer.shadowOpacity = shadowOpacity }
         }
     }
 

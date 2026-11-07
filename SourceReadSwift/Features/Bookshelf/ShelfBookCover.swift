@@ -1,18 +1,29 @@
 import SwiftUI
 
-/// Shelves show the unmodified jacket; management and format remain outside it.
+enum ShelfCoverGeometry {
+    /// Keep the cover and page block in one 2:3 silhouette at every shelf size.
+    static func size(maxWidth: CGFloat?, height: CGFloat) -> CGSize {
+        let width = min(max(maxWidth ?? .greatestFiniteMagnitude, 1), max(height, 1) * 2 / 3)
+        return CGSize(width: width, height: width * 1.5)
+    }
+}
+
+/// The raster, spine and page edges share their bounds and transform together.
 struct ShelfBookCover: View {
     let book: BookshelfBook
     let width: CGFloat?
     let height: CGFloat
-    private let outline = RoundedRectangle(cornerRadius: 8, style: .continuous)
 
     var body: some View {
-        AsyncBookCover(urlString: book.coverURL, width: width, height: height,
-            baseURLString: book.bookURL, sourceURLString: book.sourceURL,
-            title: book.title, contentMode: .fit, cornerRadius: 8, usesPlainPlaceholder: true)
-        .background(AppVisualTheme.current.controlFill, in: outline)
-        .overlay(outline.strokeBorder(AppVisualTheme.current.controlBorder, lineWidth: 0.6).allowsHitTesting(false))
+        let size = ShelfCoverGeometry.size(maxWidth: width, height: height)
+        EditorialBookJacket(height: size.height, palette: .resolve(theme: AppVisualTheme.current), stance: .shelf) {
+            AsyncBookCover(urlString: book.coverURL, width: size.width, height: size.height,
+                baseURLString: book.bookURL, sourceURLString: book.sourceURL,
+                title: book.title, contentMode: .fill, cornerRadius: 3, usesPlainPlaceholder: true)
+        }
+        .frame(width: size.width, height: size.height)
+        .padding(.vertical, 4)
+        .frame(maxWidth: width == nil ? .infinity : nil, alignment: .leading)
         .accessibilityHidden(true)
     }
 }
@@ -24,7 +35,7 @@ struct PlainShelfJacket: View {
 
     var body: some View {
         Text(title?.nilIfEmpty ?? "未命名书籍")
-            .font(.system(.caption, design: .serif).weight(.medium))
+            .font(.caption.weight(.medium))
             .lineLimit(2)
             .padding(8)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)

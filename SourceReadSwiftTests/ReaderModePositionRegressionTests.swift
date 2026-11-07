@@ -64,7 +64,127 @@ final class ReaderModePositionRegressionTests: XCTestCase {
         try await assertStartupRecovery(emptiesDocument: true)
     }
 
-    @MainActor private func assertStartupRecovery(emptiesDocument: Bool) async throws {
+    @MainActor func testTerminatedStartupProcessReplaysTheCursorWithOneBoundedRecovery() async throws {
+        try await assertStartupRecovery(emptiesDocument: false, simulatesTermination: true)
+    }
+
+    @MainActor func testLateReadyFromTheMountedShellDoesNotInvalidateItsFirstVisiblePosition() async {
+        let position = expectation(description: "The mounted first page reports its position behind the cover")
+        var visiblePositions: [Int] = []
+        let fixture = WebScrollReaderView(
+            sections: [WebReaderSection(chapterIndex: 0, title: "启动顺序", paragraphs: ["正文首段", "第二段"])],
+            contentFingerprint: "late-ready-regression", fontSize: 20, lineSpacing: 8,
+            pagePadding: 20, letterSpacing: 0, paragraphSpacing: 12, paragraphIndent: 40,
+            titleSpacing: 16, footerHeight: 12, topInset: 50, textColor: .black,
+            highlightColor: .yellow, currentParagraphIndex: -1, scrollTarget: nil,
+            scrollRequestKey: nil, animatedScrollDuration: 0, textSelectionEnabled: false,
+            onVisibleParagraph: { _ in }, onVisiblePosition: { flat, _ in
+                if visiblePositions.isEmpty { position.fulfill() }
+                visiblePositions.append(flat)
+            })
+        let coordinator = fixture.makeCoordinator()
+        let bridge = ReaderLateReadyBridge(coordinator: coordinator)
+        let web = coordinator.makeWebView(initialView: fixture, prepareBeforeNavigation: { web in
+            let controller = web.configuration.userContentController
+            controller.removeScriptMessageHandler(forName: "reader")
+            controller.add(bridge, name: "reader")
+            controller.addUserScript(WKUserScript(source: "window.requestAnimationFrame = function() { return 0; };",
+                injectionTime: .atDocumentStart, forMainFrameOnly: true))
+        })
+        let close = mountReaderSurface(web)
+        defer { coordinator.tearDown(webView: web); close() }
+        await fulfillment(of: [position], timeout: 10)
+        XCTAssertEqual(bridge.releasedReadyCount, 1, "The fixture must deliver ready after content has a position")
+        XCTAssertEqual(bridge.mountedRevisions.count, 1, "The same shell must not rebuild its already mounted window")
+        XCTAssertEqual(visiblePositions.first, 0)
+    }
+
+    @MainActor func testChapterHeadingReportsItsOwnProseAcrossForwardAndReverseScroll() async throws {
+        let opened = expectation(description: "The real WebKit document has visible prose")
+        var hasOpened = false
+        var positions: [Int] = []
+        var boundary: XCTestExpectation?
+        var expectedFlat = -1
+        let sections = (0..<2).map { chapter in
+            WebReaderSection(chapterIndex: chapter, title: "连续阅读第\(chapter + 1)章",
+                paragraphs: (0..<8).map { paragraph in
+                    String(repeating: "【连续章\(chapter + 1)·段\(paragraph + 1)】窗外的风吹过树梢。", count: 8)
+                })
+        }
+        let fixture = WebScrollReaderView(
+            sections: sections, contentFingerprint: "heading-boundary-regression", fontSize: 20, lineSpacing: 8,
+            pagePadding: 20, letterSpacing: 0, paragraphSpacing: 12, paragraphIndent: 40,
+            titleSpacing: 16, footerHeight: 12, topInset: 50, textColor: .black,
+            highlightColor: .yellow, currentParagraphIndex: -1, scrollTarget: nil,
+            scrollRequestKey: nil, animatedScrollDuration: 0, textSelectionEnabled: false,
+            onVisibleParagraph: { flat in
+                positions.append(flat)
+                if !hasOpened { hasOpened = true; opened.fulfill() }
+                if flat == expectedFlat { boundary?.fulfill(); boundary = nil }
+            })
+        let coordinator = fixture.makeCoordinator()
+        let web = coordinator.makeWebView(initialView: fixture)
+        let close = mountReaderSurface(web)
+        defer { coordinator.tearDown(webView: web); close() }
+        let readiness = await XCTWaiter.fulfillment(of: [opened], timeout: 18)
+        guard readiness == .completed else {
+            let reported = expectation(description: "Capture reader startup diagnostics")
+            var diagnostic = "JavaScript did not return"
+            web.evaluateJavaScript("""
+                JSON.stringify({ready:document.readyState,bridge:!!window.__reader,
+                  paragraphs:document.querySelectorAll('.para').length,
+                  height:document.documentElement.scrollHeight,y:window.scrollY,
+                  visibility:document.visibilityState})
+                """) { value, error in
+                diagnostic = (value as? String) ?? "JavaScript error code=\((error as NSError?)?.code ?? 0)"
+                reported.fulfill()
+            }
+            _ = await XCTWaiter.fulfillment(of: [reported], timeout: 2)
+            XCTFail("No visible prose within 10 seconds: \(diagnostic), loading=\(web.isLoading), bounds=\(web.bounds), recoveries=\(coordinator.startupRecoveryCount)")
+            return
+        }
+        let layout = ReaderChapterWindowPolicy.layout([
+            ReaderChapterSlice(chapterIndex: 0, paragraphCount: 8),
+            ReaderChapterSlice(chapterIndex: 1, paragraphCount: 8)
+        ])
+        for (selector, flat) in [("[data-flat='7']", 7), ("h2", 9), ("[data-flat='10']", 10),
+                                 ("h2", 9), ("[data-flat='7']", 7)] {
+            expectedFlat = flat
+            let reached = expectation(description: "Visible prose at \(selector) reports paragraph \(flat)")
+            boundary = reached
+            _ = try await web.evaluateJavaScript("""
+                (function() {
+                  var element = document.querySelector(\(WebReaderJavaScriptLiteral.string(selector)));
+                  window.scrollTo(0, element.getBoundingClientRect().top + window.scrollY - 50);
+                  window.dispatchEvent(new Event('scroll'));
+                  return true;
+                })();
+                """)
+            await fulfillment(of: [reached], timeout: 3)
+            XCTAssertEqual(positions.last, flat, "Native callbacks: \(positions)")
+            if selector == "h2" {
+                let position = ReaderChapterWindowPolicy.resolvedPosition(flatIndex: positions.last ?? -1, layout: layout)
+                XCTAssertEqual(position?.chapterIndex, 1, "The heading cannot advertise the previous chapter")
+                XCTAssertEqual(position?.paragraphIndex, 0)
+                let proseTop = try await web.evaluateJavaScript("document.querySelector('[data-key=\"c1\"] .para').getBoundingClientRect().top")
+                XCTAssertLessThan(try XCTUnwrap(proseTop as? Double), 422)
+            }
+        }
+    }
+
+    @MainActor private func mountReaderSurface(_ web: WKWebView) -> () -> Void {
+        let scene = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.first
+        let previous = scene?.windows.first(where: \.isKeyWindow)
+        let window = scene.map { UIWindow(windowScene: $0) } ?? UIWindow(frame: UIScreen.main.bounds)
+        window.frame = CGRect(x: 0, y: 0, width: 390, height: 844)
+        let host = UIViewController()
+        window.rootViewController = host
+        host.view.addSubview(web); web.frame = window.bounds
+        window.makeKeyAndVisible()
+        return { window.isHidden = true; previous?.makeKey() }
+    }
+
+    @MainActor private func assertStartupRecovery(emptiesDocument: Bool, simulatesTermination: Bool = false) async throws {
         var offset = -1, applied = false
         let text = String(repeating: "长段正文，恢复不能回到段首。👩🏽‍💻", count: 150)
         let fixture = WebScrollReaderView(
@@ -80,6 +200,7 @@ final class ReaderModePositionRegressionTests: XCTestCase {
         let coordinator = fixture.makeCoordinator()
         let fault = ReaderStartupBridgeFault(coordinator: coordinator)
         let web = coordinator.makeWebView(initialView: fixture, prepareBeforeNavigation: { web in
+            guard !simulatesTermination else { return }
             web.configuration.userContentController.removeScriptMessageHandler(forName: "reader")
             web.configuration.userContentController.add(fault, name: "reader")
             web.configuration.userContentController.add(fault, name: "bridgeFault")
@@ -93,24 +214,26 @@ final class ReaderModePositionRegressionTests: XCTestCase {
                     """,
                 injectionTime: .atDocumentStart, forMainFrameOnly: true))
         })
-        let scene = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.first
-        let previous = scene?.windows.first(where: \.isKeyWindow)
-        let window = scene.map { UIWindow(windowScene: $0) } ?? UIWindow(frame: UIScreen.main.bounds)
-        window.frame = CGRect(x: 0, y: 0, width: 390, height: 844)
-        let host = UIViewController()
-        window.rootViewController = host
-        host.view.addSubview(web); web.frame = window.bounds
-        window.makeKeyAndVisible()
+        if simulatesTermination {
+            coordinator.webViewWebContentProcessDidTerminate(web)
+            coordinator.webViewWebContentProcessDidTerminate(web)
+        }
+        let close = mountReaderSurface(web)
         defer {
             coordinator.tearDown(webView: web)
             web.configuration.userContentController.removeScriptMessageHandler(forName: "bridgeFault")
-            window.isHidden = true; previous?.makeKey()
+            close()
         }
         for _ in 0..<150 {
             if applied && offset > 0 { break }
             try await Task.sleep(nanoseconds: 100_000_000)
         }
-        XCTAssertEqual(fault.injections, 1)
+        if !applied || offset <= 500 {
+            let diagnostic = try? await web.evaluateJavaScript("JSON.stringify({ready:document.readyState,bridge:!!window.__reader,paragraphs:document.querySelectorAll('.para').length,y:window.scrollY,height:document.documentElement.scrollHeight,visibility:document.visibilityState})")
+            print("WEB_STARTUP_RECOVERY_DIAGNOSTIC \(diagnostic ?? "no JavaScript response") loading=\(web.isLoading) bounds=\(web.bounds) injections=\(fault.injections) recoveries=\(coordinator.startupRecoveryCount) applied=\(applied) offset=\(offset)")
+        }
+        if simulatesTermination { XCTAssertEqual(fault.injections, 0) }
+        else { XCTAssertEqual(fault.injections, 1) }
         XCTAssertEqual(coordinator.startupRecoveryCount, 1)
         XCTAssertTrue(applied, "A verified complete shell without its bridge must recover, not spin forever")
         XCTAssertGreaterThan(offset, 500)
@@ -156,6 +279,32 @@ final class ReaderModePositionRegressionTests: XCTestCase {
         XCTAssertTrue(applied, "The real WebKit document must acknowledge the character jump")
         XCTAssertGreaterThan(offset, 500, "Paragraph zero must not silently restore to its start")
         XCTAssertLessThanOrEqual(offset, 600, "The visible line should contain the requested character")
+    }
+}
+
+@MainActor private final class ReaderLateReadyBridge: NSObject, WKScriptMessageHandler {
+    private let coordinator: WebScrollReaderView.Coordinator
+    private var heldReady: WKScriptMessage?
+    private(set) var releasedReadyCount = 0
+    private(set) var mountedRevisions: Set<String> = []
+
+    init(coordinator: WebScrollReaderView.Coordinator) { self.coordinator = coordinator }
+
+    func userContentController(_ controller: WKUserContentController, didReceive message: WKScriptMessage) {
+        let body = message.body as? [String: Any]
+        if body?["type"] as? String == "ready" {
+            heldReady = message
+            return
+        }
+        if body?["type"] as? String == "content-ready", let revision = body?["revision"] as? String {
+            mountedRevisions.insert(revision)
+        }
+        if body?["type"] as? String == "visible", let ready = heldReady {
+            heldReady = nil
+            releasedReadyCount += 1
+            coordinator.userContentController(controller, didReceive: ready)
+        }
+        coordinator.userContentController(controller, didReceive: message)
     }
 }
 

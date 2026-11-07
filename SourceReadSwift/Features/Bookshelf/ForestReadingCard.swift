@@ -23,7 +23,7 @@ struct ForestReadingCard: View {
         .background { BrandGlass(outline: RoundedRectangle(cornerRadius: 24, style: .continuous)) }
         .contentShape(RoundedRectangle(cornerRadius: 24))
         .accessibilityElement(children: .combine)
-        .accessibilityHint("轻点继续阅读，使用更多操作管理")
+        .accessibilityHint("轻点继续阅读，长按管理书籍")
     }
 
     @ViewBuilder private var jacket: some View {
@@ -47,11 +47,9 @@ struct ForestReadingCard: View {
                 .foregroundStyle(theme.primaryInk)
                 .lineLimit(2)
                 .fixedSize(horizontal: false, vertical: true)
-                .padding(.trailing, typeSize.isAccessibilitySize ? 0 : 36)
             if let author = book.author.nilIfEmpty {
                 Text(author).font(.subheadline).foregroundStyle(theme.secondaryInk)
                     .lineLimit(1).padding(.top, 5)
-                    .padding(.trailing, typeSize.isAccessibilitySize ? 0 : 24)
             }
 
             VStack(alignment: .leading, spacing: 4) {

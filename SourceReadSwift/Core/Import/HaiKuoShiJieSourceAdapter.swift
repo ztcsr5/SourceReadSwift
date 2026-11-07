@@ -92,7 +92,8 @@ struct HaiKuoShiJieSourceAdapter: Sendable {
         // Header / UA
         let headerStr: String?
         if let ua = dict["ua"] as? String {
-            headerStr = "{\"User-Agent\": \"\(ua)\"}"
+            guard let encoded = try? JSONEncoder().encode(["User-Agent": ua]) else { return nil }
+            headerStr = String(data: encoded, encoding: .utf8)
         } else {
             headerStr = nil
         }

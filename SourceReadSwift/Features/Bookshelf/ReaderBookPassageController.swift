@@ -24,7 +24,18 @@ final class ReaderBookPassageController: UIViewController {
     #endif
 
     override func loadView() {
+        #if DEBUG
+        let evidence = NativeBookGestureEvidenceView()
+        evidence.readGestureState = { [weak self] in
+            guard let self else { return "detached" }
+            let edgeEnabled = self.navigationController?.interactivePopGestureRecognizer?.isEnabled ?? false
+            return "ready=\(self.canPrepareReturn),zoom=\(self.usesNativeDeskReturn),edge=\(edgeEnabled);"
+                + NativeBookGestureProbe.describe(self.observedGestures)
+        }
+        view = evidence
+        #else
         view = UIView()
+        #endif
         view.backgroundColor = .clear
         view.isUserInteractionEnabled = false
         #if DEBUG
@@ -54,7 +65,7 @@ final class ReaderBookPassageController: UIViewController {
               ReaderNativePopPolicy.isPop(from: source, to: transition.viewController(forKey: .to),
                 in: navigation, isInteractive: transition.isInteractive) else { return }
         Self.events.notice("BEGIN interactive=\(transition.isInteractive ? 1 : 0, privacy: .public)")
-        if usesNativeDeskReturn {
+        if usesNativeDeskReturn || String(describing: type(of: source)).contains("UIHostingController") {
             // The system already owns both surfaces. A second opaque paper
             // sheet here becomes a white card over the actual book landing.
             Self.events.notice("SURFACE system-book")
@@ -156,12 +167,17 @@ final class ReaderBookPassageController: UIViewController {
         switch gesture.state {
         case .began:
             activeGestures.insert(identity)
+            if movedGestures.insert(identity).inserted {
+                nativeMotionCount += 1
+                view.accessibilityValue = String(nativeMotionCount)
+                Self.events.notice("PAN_MOVED began native=1 count=\(self.nativeMotionCount, privacy: .public)")
+            }
         case .changed:
-            guard gesture.numberOfTouches > 0, activeGestures.contains(identity),
-                  movedGestures.insert(identity).inserted else { return }
-            nativeMotionCount += 1
-            view.accessibilityValue = String(nativeMotionCount)
-            Self.events.notice("PAN_MOVED native=1 count=\(self.nativeMotionCount, privacy: .public)")
+            if movedGestures.insert(identity).inserted {
+                nativeMotionCount += 1
+                view.accessibilityValue = String(nativeMotionCount)
+                Self.events.notice("PAN_MOVED changed native=1 count=\(self.nativeMotionCount, privacy: .public)")
+            }
         case .ended, .cancelled, .failed:
             activeGestures.remove(identity)
             movedGestures.remove(identity)
