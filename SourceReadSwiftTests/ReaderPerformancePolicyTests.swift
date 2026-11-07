@@ -2,9 +2,23 @@ import XCTest
 import Foundation
 import CoreGraphics
 import QuartzCore
+import UIKit
 @testable import SourceReadSwift
 
 final class ReaderPerformancePolicyTests: XCTestCase {
+    @MainActor func testFrameRateAnchorDoesNotKeepItsWindowAlive() {
+        let anchor = FrameRateSceneAnchor.AnchorView()
+        weak var releasedWindow: UIWindow?
+        autoreleasepool {
+            let window = UIWindow(frame: CGRect(x: 0, y: 0, width: 390, height: 844))
+            window.addSubview(anchor)
+            anchor.applyIfNeeded()
+            releasedWindow = window
+            XCTAssertNotNil(anchor.window)
+        }
+        XCTAssertNil(releasedWindow, "The refresh-rate anchor must not retain an otherwise released window")
+    }
+
     func testRefreshRateNeverExceedsDeviceOr120HzCeiling() {
         XCTAssertEqual(ReaderPerformancePolicy.preferredRefreshRate(maximumFramesPerSecond: 60), 60)
         XCTAssertEqual(ReaderPerformancePolicy.preferredRefreshRate(maximumFramesPerSecond: 120), 120)

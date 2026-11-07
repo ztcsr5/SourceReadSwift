@@ -44,7 +44,7 @@ private struct ReaderOpeningPresentation: ViewModifier {
 
     private var usesNativeDeskReturn: Bool {
         if usesSystemReturnSurface { return true }
-        if #available(iOS 18.0, *) { return usesDeskHero && !motion.reducesMotion }
+        if #available(iOS 18.0, *) { return usesDeskHero }
         return false
     }
 
@@ -99,19 +99,102 @@ private struct ReaderOpeningPresentation: ViewModifier {
     }
 }
 
-/// A blocked cursor never exposes the wrong page; only an actual wait needs a label.
+/// Editorial gallery-grade literary opening transition screen with ambient light and breathing golden emblem.
 private struct ReaderOpeningStatus: View {
     let showsWait: Bool
     @AppStorage("reader.background") private var paperRaw = ReaderBackground.white.rawValue
+    @State private var isBreathing = false
+    @State private var quoteIndex: Int = {
+        Int.random(in: 0..<7)
+    }()
+
+    private static let literaryQuotes = [
+        "翻开一页，遇见另一个世界。",
+        "万卷古今消永昼，一窗昏晓送流年。",
+        "字里行间，皆有山海与星辰。",
+        "读书随处净土，闭门即是深山。",
+        "与其喧嚣中奔波，不如在书里小坐片刻。",
+        "世间万物皆有回响，开卷即见远方。",
+        "且听风吟，静候墨香。"
+    ]
 
     var body: some View {
         let paper = ReaderBackground(rawValue: paperRaw) ?? .white
+        let paperColor = paper.color(isNight: paper.isDark)
+        let textColor = paper.textColor(isNight: paper.isDark)
+
         ZStack {
-            paper.color(isNight: paper.isDark).ignoresSafeArea()
+            paperColor.ignoresSafeArea()
+
+            // Soft radial ambient illumination behind the brand emblem
+            RadialGradient(
+                colors: [textColor.opacity(paper.isDark ? 0.08 : 0.04), .clear],
+                center: .center,
+                startRadius: 20,
+                endRadius: 260
+            )
+            .ignoresSafeArea()
+
             if showsWait {
-                ProgressView("正在打开正文")
-                    .foregroundStyle(paper.textColor(isNight: paper.isDark))
+                VStack(spacing: 28) {
+                    // Breathing master brand mark with golden aura
+                    PaperBetweenMark(size: 62)
+                        .shadow(color: Color(red: 1.0, green: 0.72, blue: 0.15).opacity(0.28), radius: 18, x: 0, y: 6)
+                        .scaleEffect(isBreathing ? 1.03 : 0.97)
+                        .animation(.easeInOut(duration: 2.0).repeatForever(autoreverses: true), value: isBreathing)
+
+                    // Refined literary typography
+                    VStack(spacing: 12) {
+                        Image(systemName: "quote.opening")
+                            .font(.system(size: 14, weight: .light, design: .serif))
+                            .foregroundStyle(textColor.opacity(0.28))
+
+                        Text(Self.literaryQuotes[quoteIndex])
+                            .font(.system(size: 16, weight: .medium, design: .serif))
+                            .foregroundStyle(textColor.opacity(0.88))
+                            .multilineTextAlignment(.center)
+                            .lineSpacing(7)
+                            .tracking(1.2)
+                            .padding(.horizontal, 36)
+
+                        Capsule()
+                            .fill(textColor.opacity(0.12))
+                            .frame(width: 30, height: 1.5)
+                            .padding(.top, 4)
+
+                        Text("纸 间 · 浸 润 墨 香")
+                            .font(.system(size: 11, weight: .semibold, design: .serif))
+                            .foregroundStyle(textColor.opacity(0.36))
+                            .tracking(3.5)
+                    }
+
+                    // Refined loading capsule
+                    HStack(spacing: 8) {
+                        Circle()
+                            .fill(AppTheme.accent)
+                            .frame(width: 5, height: 5)
+                            .scaleEffect(isBreathing ? 1.25 : 0.75)
+                            .animation(.easeInOut(duration: 1.0).repeatForever(autoreverses: true), value: isBreathing)
+
+                        Text("正在翻开篇章…")
+                            .font(.system(size: 12, weight: .medium))
+                            .foregroundStyle(textColor.opacity(0.55))
+                            .tracking(1.2)
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 7)
+                    .background(
+                        Capsule()
+                            .fill(textColor.opacity(0.04))
+                            .overlay(Capsule().strokeBorder(textColor.opacity(0.08), lineWidth: 0.6))
+                    )
                     .accessibilityIdentifier("reader.openingProgress")
+                }
+                .padding(24)
+                .transition(.opacity)
+                .onAppear {
+                    isBreathing = true
+                }
             }
         }
     }
@@ -189,7 +272,7 @@ struct ReaderOpeningPage: View {
                 }
             }
             VStack(spacing: 8) {
-                Text(book.title).font(.system(.title2, design: .serif).weight(.regular))
+                Text(book.title).font(.title2.weight(.regular))
                     .multilineTextAlignment(.center).lineLimit(2)
                 if !book.author.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                     Text(book.author).font(.caption).opacity(0.65).lineLimit(1)

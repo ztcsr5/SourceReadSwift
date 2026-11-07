@@ -11,6 +11,23 @@ enum AppVisualTheme: String, CaseIterable, Identifiable, Codable, Sendable {
     static let floatingBookThemes: [Self] = [.forest, .botanical, .coast, .rose, .inkwash]
 
     var usesFloatingBook: Bool { Self.floatingBookThemes.contains(self) }
+    enum HomeComposition: String, CaseIterable, Hashable { case readingDesk, editorial, index, gallery }
+    var homeComposition: HomeComposition {
+        switch self {
+        case .editorial: return .editorial
+        case .graphite, .blueprint: return .index
+        case .folio: return .gallery
+        default: return .readingDesk
+        }
+    }
+    var compositionTitle: String {
+        switch homeComposition {
+        case .readingDesk: return "书台 · 三列藏书"
+        case .editorial: return "书刊 · 分栏阅读卡"
+        case .index: return "索引 · 紧凑目录"
+        case .gallery: return "藏书票 · 双列陈列"
+        }
+    }
     var illustratedPaper: ReaderBackground? {
         switch self {
         case .botanical: return .bamboo
@@ -50,20 +67,20 @@ enum AppVisualTheme: String, CaseIterable, Identifiable, Codable, Sendable {
     }
     var detail: String {
         switch self {
-        case .forest: return "纯白纸面 · 清透玻璃 · 深林绿交互"
+        case .forest: return "纯白纸面 · 清透玻璃 · 柔和森林绿"
         case .classic: return "原有紫蓝配色 · 柔和圆角 · 轻透卡片"
         case .botanical: return "米绿纸面 · 圆润卡片 · 草木细线"
-        case .editorial: return "暖白书刊 · 衬线正文 · 小圆角墨线"
+        case .editorial: return "书刊分栏 · 章节边注 · 暖纸墨线"
         case .coast: return "雾蓝背景 · 大圆角 · 轻盈白卡"
         case .rose: return "淡粉花笺 · 圆润字形 · 细边卡片"
-        case .graphite: return "中性灰阶 · 等宽正文 · 利落边框"
-        case .folio: return "票根切口 · 竖向齿线 · 衬线藏书卡"
+        case .graphite: return "紧凑索引 · 等宽标注 · 利落边框"
+        case .folio: return "双列藏书票 · 票根切口 · 竖向齿线"
         case .inkwash: return "山形留白 · 极简纸面 · 细墨线"
-        case .blueprint: return "坐标网格 · 等宽索引 · 双线边框"
+        case .blueprint: return "目录索引 · 坐标网格 · 双线边框"
         }
     }
     var accentHex: UInt32 {
-        switch self { case .forest: return 0x294631; case .classic: return 0x594FDB; case .botanical: return 0x326953; case .editorial: return 0x77512C; case .coast: return 0x2B698A; case .rose: return 0x994C66; case .graphite: return 0x505664; case .folio: return 0x785239; case .inkwash: return 0x3E5A52; case .blueprint: return 0x285F93 }
+        switch self { case .forest: return 0x3D6348; case .classic: return 0x594FDB; case .botanical: return 0x326953; case .editorial: return 0x77512C; case .coast: return 0x2B698A; case .rose: return 0x994C66; case .graphite: return 0x505664; case .folio: return 0x785239; case .inkwash: return 0x3E5A52; case .blueprint: return 0x285F93 }
     }
     var secondaryHex: UInt32 {
         switch self { case .forest: return 0x526458; case .classic: return 0x419BDC; case .botanical: return 0x8C784F; case .editorial: return 0x7B6260; case .coast: return 0x548C87; case .rose: return 0x8C7291; case .graphite: return 0x63778A; case .folio: return 0xA17A45; case .inkwash: return 0x768B7E; case .blueprint: return 0x477F99 }
@@ -91,6 +108,13 @@ enum AppVisualTheme: String, CaseIterable, Identifiable, Codable, Sendable {
     }
     var usesNeutralGlass: Bool { self == .forest }
     var supportsLiveGlass: Bool { self == .forest || self == .classic }
+
+    /// Circular controls keep their shape; content cards follow the chosen theme.
+    func surfaceRadius(preferred: CGFloat?) -> CGFloat {
+        guard let preferred else { return radius }
+        if preferred >= 44 || supportsLiveGlass { return preferred }
+        return min(preferred, radius)
+    }
 
     var primaryInk: Color { usesNeutralGlass ? dynamicColor(light: 0x1C211D, dark: 0xF0F2EF) : .primary }
     // The suggested #858A85 is too light for small copy on white.
@@ -122,18 +146,95 @@ enum AppVisualTheme: String, CaseIterable, Identifiable, Codable, Sendable {
 /// Tiny vector brand mark: two leaves of paper and an open fold. No bitmap
 /// decoding, rotating effects, blur, or per-frame geometry on Settings.
 struct PaperBetweenMark: View {
+    var size: CGFloat = 44
+
     var body: some View {
+        let corner = size * (12.0 / 44.0)
         ZStack {
-            RoundedRectangle(cornerRadius: 11, style: .continuous).fill(AppTheme.accent.opacity(0.10))
-            HStack(spacing: 2) {
-                RoundedRectangle(cornerRadius: 2).fill(AppTheme.accent)
-                    .frame(width: 9, height: 23).rotationEffect(.degrees(-12))
-                RoundedRectangle(cornerRadius: 2).fill(AppTheme.secondaryAccent)
-                    .frame(width: 9, height: 23).rotationEffect(.degrees(12))
+            RoundedRectangle(cornerRadius: corner, style: .continuous)
+                .fill(
+                    LinearGradient(
+                        colors: [
+                            Color(red: 0.08, green: 0.11, blue: 0.22),
+                            Color(red: 0.05, green: 0.07, blue: 0.14)
+                        ],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
+                .overlay {
+                    RoundedRectangle(cornerRadius: corner, style: .continuous)
+                        .strokeBorder(
+                            LinearGradient(
+                                colors: [Color.white.opacity(0.24), Color.white.opacity(0.06)],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            ),
+                            lineWidth: 0.8
+                        )
+                }
+                .shadow(color: Color(red: 0.05, green: 0.07, blue: 0.14).opacity(0.40), radius: size * 0.18, x: 0, y: size * 0.09)
+
+            // Sculpted open pages
+            ZStack {
+                HStack(spacing: size * 0.02) {
+                    RoundedRectangle(cornerRadius: size * 0.04, style: .continuous)
+                        .fill(
+                            LinearGradient(
+                                colors: [Color(white: 0.91), Color(white: 0.95)],
+                                startPoint: .leading,
+                                endPoint: .trailing
+                            )
+                        )
+                        .frame(width: size * 0.31, height: size * 0.46)
+                        .rotationEffect(.degrees(-7))
+                        .shadow(color: Color.black.opacity(0.22), radius: size * 0.04, x: -1, y: 2)
+
+                    RoundedRectangle(cornerRadius: size * 0.04, style: .continuous)
+                        .fill(
+                            LinearGradient(
+                                colors: [Color.white, Color(white: 0.96)],
+                                startPoint: .top,
+                                endPoint: .bottom
+                            )
+                        )
+                        .frame(width: size * 0.31, height: size * 0.46)
+                        .rotationEffect(.degrees(7))
+                        .shadow(color: Color.black.opacity(0.22), radius: size * 0.04, x: 1, y: 2)
+                }
+
+                // Spine crevice
+                Rectangle()
+                    .fill(Color.black.opacity(0.18))
+                    .frame(width: size * 0.03, height: size * 0.42)
+
+                // Golden silk ribbon bookmark with swallowtail chevron cut
+                VStack(spacing: 0) {
+                    RoundedRectangle(cornerRadius: 1)
+                        .fill(
+                            LinearGradient(
+                                colors: [
+                                    Color(red: 1.0, green: 0.90, blue: 0.50),
+                                    Color(red: 1.0, green: 0.72, blue: 0.15),
+                                    Color(red: 0.90, green: 0.46, blue: 0.08)
+                                ],
+                                startPoint: .top,
+                                endPoint: .bottom
+                            )
+                        )
+                        .frame(width: size * 0.095, height: size * 0.52)
+                        .shadow(color: Color.black.opacity(0.18), radius: 2, x: 1, y: 2)
+                        .overlay(alignment: .top) {
+                            Circle()
+                                .fill(Color.white.opacity(0.85))
+                                .frame(width: size * 0.025, height: size * 0.025)
+                                .padding(.top, size * 0.05)
+                        }
+                }
+                .offset(y: size * 0.05)
             }
-            Rectangle().fill(AppTheme.card).frame(width: 1.5, height: 17).offset(y: 3)
         }
-        .frame(width: 40, height: 44)
+        .frame(width: size, height: size)
         .accessibilityLabel("纸间，书页之间")
     }
 }

@@ -15,7 +15,9 @@ struct RootTabView: View {
     @Namespace private var tabSelection
     @State private var selectedTab = 0
     @State private var legacySearchRequest: UUID?
+    @State private var shouldFocusRequestedSearch = true
     @State private var showFullAudioPlayer = false
+    @State private var showsGlobalSearch = false
     @ObservedObject private var verificationCoordinator = VerificationCodeCoordinator.shared
 
     var body: some View {
@@ -39,6 +41,16 @@ struct RootTabView: View {
         .onReceive(audioCoordinator.$currentBook.map { $0 != nil }.removeDuplicates()) { hasAudio = $0 }
         .onChange(of: selectedTab) { _ in dismissKeyboard() }
         .sheet(isPresented: $showFullAudioPlayer) { AudioBookPlayerView() }
+        .sheet(isPresented: $showsGlobalSearch) {
+            GlobalSearchView(bookshelf: appState.bookshelfStore, sources: appState.sourceStore) { keyword in
+                appState.discoverViewModel.keyword = keyword
+                appState.discoverViewModel.startSearch()
+                showsGlobalSearch = false
+                shouldFocusRequestedSearch = false
+                legacySearchRequest = UUID()
+                selectedTab = 1
+            }
+        }
         .sheet(item: verificationRequestBinding) { request in
             VerificationCodeSheet(request: request,
                 onSubmit: { verificationCoordinator.submit(id: request.id, code: $0) },
@@ -47,18 +59,18 @@ struct RootTabView: View {
     }
 
     private var usesNativeTabs: Bool {
-        #if compiler(>=6.2)
-        if #available(iOS 26.0, *) { return true }
-        #endif
-        return false
+        // Universal floating tab bar with aligned global search button (aligned with p1).
+        false
     }
 
     @ViewBuilder private var navigationContent: some View {
         #if compiler(>=6.2)
         if #available(iOS 26.0, *) {
             TabView(selection: $selectedTab) {
-                nativeTabRoot(BookshelfView()).tabItem { nativeTabLabel("主页", symbol: "house") }.tag(0)
-                nativeTabRoot(DiscoverView(viewModel: appState.discoverViewModel))
+                nativeTabRoot(BookshelfView(onRequestGlobalSearch: { showsGlobalSearch = true }))
+                    .tabItem { nativeTabLabel("主页", symbol: "house") }.tag(0)
+                nativeTabRoot(DiscoverView(viewModel: appState.discoverViewModel, searchRequestID: legacySearchRequest,
+                                          shouldFocusRequestedSearch: shouldFocusRequestedSearch))
                     .tabItem { nativeTabLabel(AppNavigationLabels.findBooks, symbol: AppNavigationLabels.findBooksSymbol) }.tag(1)
                 nativeTabRoot(SettingsView()).tabItem { nativeTabLabel("设置", symbol: "gearshape") }.tag(2)
             }
@@ -111,10 +123,11 @@ struct RootTabView: View {
     private var legacyNavigationContent: some View {
         // Retain each navigation stack while the custom bar changes selection.
         TabView(selection: $selectedTab) {
-            BookshelfView()
+            BookshelfView(onRequestGlobalSearch: { showsGlobalSearch = true })
                 .toolbar(.hidden, for: .tabBar)
                 .tabItem { Label("主页", systemImage: "house") }.tag(0)
-            DiscoverView(viewModel: appState.discoverViewModel, searchRequestID: legacySearchRequest)
+            DiscoverView(viewModel: appState.discoverViewModel, searchRequestID: legacySearchRequest,
+                         shouldFocusRequestedSearch: shouldFocusRequestedSearch)
                 .toolbar(.hidden, for: .tabBar)
                 .tabItem { Label(AppNavigationLabels.findBooks, systemImage: AppNavigationLabels.findBooksSymbol) }.tag(1)
             SettingsView()
@@ -148,8 +161,7 @@ struct RootTabView: View {
 
     private var customTabBar: some View {
         LegacyTabBar(selection: $selectedTab) {
-            legacySearchRequest = UUID()
-            selectedTab = 1
+            showsGlobalSearch = true
         }
     }
 
