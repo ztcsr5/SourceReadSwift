@@ -59,7 +59,7 @@ struct FrameRateSceneAnchor: UIViewRepresentable {
     }
 
     final class AnchorView: UIView {
-        private var appliedWindow: UIWindow?
+        private weak var appliedWindow: UIWindow?
 
         override func didMoveToWindow() {
             super.didMoveToWindow()

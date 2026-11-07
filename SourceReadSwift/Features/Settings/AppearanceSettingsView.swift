@@ -10,9 +10,9 @@ struct AppearanceSettingsView: View {
     var body: some View {
         Form {
             Section {
-                themeRows(AppVisualTheme.classicDeskThemes)
+                themeRows(AppVisualTheme.classicDeskThemes.filter { !$0.isAtelier })
             } header: { Text("经典书台") } footer: {
-                Text("保留原初白紫及纸面、藏书票和蓝图。")
+                Text("主题同时切换首页编排、书架陈列、页面纸面和控件边框。原初白紫保留现有书台；书刊、索引和藏书票各有独立布局。")
             }
             Section {
                 themeRows(AppVisualTheme.floatingBookThemes)
@@ -23,6 +23,11 @@ struct AppearanceSettingsView: View {
                      : "当前系统使用兼容材质；滚动卡片使用主题纸面，减少透明度或增强对比度时不叠加实时模糊。")
             }
             .listRowBackground(AppThemeRowSurface())
+            Section {
+                themeRows(AppVisualTheme.atelierThemes)
+            } header: { Text("色彩沙龙") } footer: {
+                Text("四组双色搭配，同时改变纸面、卡片轮廓、边缘装饰、阅读卡和书架编排。明暗模式分别调色，保留你已保存的阅读背景。")
+            }
             Section {
                 Toggle("空间书桌与藏书档案", isOn: $readingDeskEnabled)
                 Text("关闭后使用经典紧凑展示。书籍、阅读位置、主题和系统导航保持不变。")
@@ -90,14 +95,7 @@ struct AppThemePreview: View {
     var selected = false
     var body: some View {
         HStack(spacing: 12) {
-            VStack(alignment: .leading, spacing: 5) {
-                Image(systemName: theme.ornament).font(.system(size: 15))
-                RoundedRectangle(cornerRadius: theme.radius / 6)
-                    .fill(theme.dynamicColor(light: theme.cardHex, dark: theme.darkCardHex))
-                    .overlay(RoundedRectangle(cornerRadius: theme.radius / 6)
-                        .stroke(.primary.opacity(0.18), lineWidth: theme.borderWidth))
-                    .frame(width: 35, height: 15)
-            }
+            compositionPreview
             .foregroundStyle(theme.dynamicColor(light: theme.accentHex, dark: theme.darkAccentHex))
             .frame(width: 56, height: 56)
             .background(theme.dynamicColor(light: theme.backgroundHex, dark: theme.darkBackgroundHex),
@@ -106,6 +104,7 @@ struct AppThemePreview: View {
             VStack(alignment: .leading, spacing: 4) {
                 Text(theme.title).font(.system(.subheadline, design: theme.fontDesign).weight(.semibold))
                 Text(theme.detail).font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                Text(theme.compositionTitle).font(.caption2).foregroundStyle(.secondary)
             }
             Spacer(minLength: 0)
             if selected { Image(systemName: "checkmark.circle.fill").foregroundStyle(AppTheme.accent) }
@@ -113,5 +112,37 @@ struct AppThemePreview: View {
         .foregroundStyle(.primary)
         .frame(maxWidth: .infinity, minHeight: 60, alignment: .leading)
         .contentShape(Rectangle())
+    }
+
+    @ViewBuilder private var compositionPreview: some View {
+        switch theme.homeComposition {
+        case .readingDesk:
+            HStack(spacing: 4) {
+                previewTile(width: 14, height: 26)
+                VStack(alignment: .leading, spacing: 4) {
+                    previewTile(width: 18, height: 3)
+                    previewTile(width: 13, height: 3)
+                }
+            }
+        case .editorial:
+            VStack(alignment: .leading, spacing: 4) {
+                previewTile(width: 35, height: 3)
+                HStack(spacing: 4) { previewTile(width: 17, height: 21); previewTile(width: 13, height: 21) }
+            }
+        case .index:
+            VStack(spacing: 4) {
+                ForEach(0..<3) { _ in
+                    HStack(spacing: 4) { previewTile(width: 6, height: 6); previewTile(width: 25, height: 3) }
+                }
+            }
+        case .gallery:
+            HStack(spacing: 5) { previewTile(width: 15, height: 27); previewTile(width: 15, height: 27) }
+        }
+    }
+
+    private func previewTile(width: CGFloat, height: CGFloat) -> some View {
+        RoundedRectangle(cornerRadius: min(theme.radius / 6, 3))
+            .fill(theme.dynamicColor(light: theme.accentHex, dark: theme.darkAccentHex).opacity(0.65))
+            .frame(width: width, height: height)
     }
 }

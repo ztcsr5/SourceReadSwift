@@ -3,6 +3,41 @@ import XCTest
 @testable import SourceReadSwift
 
 final class Release117AppearanceTests: XCTestCase {
+    func testThemesWithoutOrnamentsDoNotCreateEmptyCanvasLayers() {
+        for theme in AppVisualTheme.allCases {
+            XCTAssertEqual(AppThemeOrnament.hasArtwork(theme: theme, isCard: true),
+                           [.folio, .blueprint, .berryLake, .blushInk, .periwinkleCocoa, .peachMoss].contains(theme), theme.rawValue)
+            XCTAssertEqual(AppThemeOrnament.hasArtwork(theme: theme, isCard: false),
+                           [.folio, .blueprint, .inkwash, .berryLake, .blushInk, .periwinkleCocoa].contains(theme), theme.rawValue)
+        }
+    }
+
+    @MainActor func testLivePaletteStillResolvesDefaultDarkCustomAndInvalidAccentColors() {
+        let defaults = UserDefaults.standard
+        let forestAccent = AppVisualTheme.forest.preferenceKey("accent")
+        let classicAccent = AppVisualTheme.classic.preferenceKey("accent")
+        let keys = [AppVisualTheme.selectionKey, forestAccent, classicAccent]
+        let previous = keys.map { defaults.object(forKey: $0) }
+        defer {
+            for (key, value) in zip(keys, previous) {
+                if let value { defaults.set(value, forKey: key) }
+                else { defaults.removeObject(forKey: key) }
+            }
+        }
+        let light = UITraitCollection(userInterfaceStyle: .light)
+        let dark = UITraitCollection(userInterfaceStyle: .dark)
+        defaults.set(AppVisualTheme.forest.rawValue, forKey: AppVisualTheme.selectionKey)
+        defaults.set("INVALID", forKey: forestAccent)
+        XCTAssertEqual(AppTheme.accentUIColor.resolvedColor(with: light), AppVisualTheme.uiColor(AppVisualTheme.forest.accentHex))
+        XCTAssertEqual(AppTheme.accentUIColor.resolvedColor(with: dark), AppVisualTheme.uiColor(AppVisualTheme.forest.darkAccentHex))
+        defaults.set("123456", forKey: forestAccent)
+        XCTAssertEqual(AppTheme.accentUIColor.resolvedColor(with: light), AppVisualTheme.uiColor(0x123456))
+        XCTAssertEqual(AppTheme.accentUIColor.resolvedColor(with: dark), AppVisualTheme.uiColor(0x123456))
+        defaults.set(AppVisualTheme.classic.rawValue, forKey: AppVisualTheme.selectionKey)
+        defaults.set(String(format: "%06X", AppVisualTheme.classic.accentHex), forKey: classicAccent)
+        XCTAssertEqual(AppTheme.accentUIColor.resolvedColor(with: dark), AppVisualTheme.uiColor(AppVisualTheme.classic.darkAccentHex))
+    }
+
     @MainActor func testSystemModeTracksLiveWindowTraitChanges() async throws {
         try await check(mode: .system, expected: [.light, .dark, .light])
     }

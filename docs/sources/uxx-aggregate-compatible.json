@@ -1,0 +1,56 @@
+[
+  {
+    "bookSourceGroup": "聚合·UXX",
+    "bookSourceName": "UXX聚合·全类型",
+    "bookSourceType": 0,
+    "bookSourceUrl": "https://uxxtv.com",
+    "concurrentRate": "600",
+    "customButton": false,
+    "customOrder": 1,
+    "enabled": true,
+    "enabledCookieJar": false,
+    "enabledExplore": true,
+    "eventListener": false,
+    "exploreUrl": "@js:\nvar FULL = {layout_flexGrow:1, layout_flexBasisPercent:1};\nvar W2 = {layout_flexGrow:1, layout_flexBasisPercent:0.47};\nvar BASE = 'https://uxxtv.com';\nvar CID = {'小说':2,'有声':3,'漫画':4,'视频':1};\nvar ICON = {'小说':'📖','有声':'🎧','漫画':'🖼','视频':'🎬'};\n\n// 【核心修复】使用 getVariable() 读取并解析\nvar mode = '小说';\ntry {\n    var savedStr = source.getVariable();\n    if (savedStr) {\n        var savedObj = JSON.parse(savedStr);\n        if (savedObj && savedObj.mode && CID[savedObj.mode]) {\n            mode = savedObj.mode;\n        }\n    }\n} catch(e) {}\n\nvar arr = [];\narr.push({title:'当前模式：' + mode, type:'button', style:FULL});\n\nvar KS = ['小说','有声','漫画','视频'];\nfor (var i = 0; i < KS.length; i++) {\n    var nm = KS[i];\n    var t = (nm === mode ? '✅ ' : '') + ICON[nm] + ' ' + nm;\n    \n    // 【核心修复】使用 setVariable() 保存 JSON 字符串\n    var a = \"source.setVariable(JSON.stringify({mode:'\" + nm + \"'})); java.toast('已切换至 \" + nm + \"'); java.refreshExplore();\";\n    \n    arr.push({title: t, type: 'button', action: a, style: W2});\n}\n\narr.push({title:'关键字', type:'text', default:'', style:FULL});\narr.push({title:'🔍 搜索', type:'button', action:\"var k=infoMap['关键字'];if(!k){java.toast('请输入关键字');}else{java.searchBook(k,source);}\", style:FULL});\narr.push({title:'查看全部【' + mode + '】', url: BASE + '/type/' + CID[mode] + '/{{page}}.html?uxt=' + CID[mode], style:FULL});\n\nJSON.stringify(arr);",
+    "header": "{\"User-Agent\": \"Mozilla/5.0 (Linux; Android 12) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/110.0.0.0 Mobile Safari/537.36\", \"Referer\": \"https://uxxtv.com/\"}",
+    "lastUpdateTime": 1793844694829,
+    "respondTime": 180000,
+    "ruleBookInfo": {
+      "author": "@js:(function(){var m=String(src||'').match(/作者：\\s*([^<\\n]+)/);return m?m[1].replace(/^\\s+|\\s+$/g,''):'';})()",
+      "coverUrl": ".novel_box img.cover@src",
+      "intro": ".brief@text##^(小说|有声|漫画|视频)简介：##",
+      "kind": ".info_box .update_state@text",
+      "lastChapter": "@js:(function(){var T={'1':4,'2':8,'3':32,'4':64};var bk=(typeof book!=='undefined'&&book)?book:{};var bu=String(baseUrl||'')+'|'+String(bk.bookUrl||'');var m=bu.match(/[?&]uxt=(\\d)/);var c=m?m[1]:'';if(!c){var ty=Number(bk.type||0);c=(ty===4)?'1':((ty===32)?'3':((ty===64)?'4':'2'));}try{if(book) book.type=T[c]||8;}catch(e){}var m2=String(src||'').match(/最新章节：\\s*([^<\\n]+)/);return m2?m2[1].replace(/^\\s+|\\s+$/g,''):'';})()",
+      "name": ".info_box h1@text"
+    },
+    "ruleContent": {
+      "content": "@js:(function(){\nvar bk=(typeof book!=='undefined'&&book)?book:{};\nvar bu=String(baseUrl||'')+'|'+String(bk.bookUrl||'')+'|'+String(bk.type||'');\nvar m=bu.match(/[?&]uxt=([1-4])/);\nvar t=m?m[1]:'';\nif(!t){\nvar kd=String(bk.kind||'')+String(bk.name||'');\nif(kd.indexOf('有声')>=0){t='3';}\nelse if(kd.indexOf('漫画')>=0){t='4';}\nelse if(kd.indexOf('视频')>=0){t='1';}\nelse if(kd.indexOf('小说')>=0){t='2';}\n}\nif(!t){\nvar ty=Number(bk.type||0);\nt=(ty===4)?'1':((ty===32)?'3':((ty===64)?'4':'2'));\n}\nvar Q=String.fromCharCode(34);\nvar CFG=','+'{'+Q+'headers'+Q+':'+'{'+Q+'Referer'+Q+':'+Q+'https://uxxtv.com/'+Q+'}'+'}'\nvar d=String(src||'');\nvar ajax=function(u){\nvar h='';\ntry{h=String(java.ajax(u));}catch(e){}\nif(!h||h.length<30||h.indexOf('Access denied')>=0){\ntry{h=String(java.ajax(u+CFG));}catch(e2){}\n}\nreturn h;\n};\nif(t==='1'){\nvar mv=d.match(/(https?:)?\\/\\/[^\"'<>\\s]+?\\.m3u8[^\"'<>\\s]*/);\nif(!mv){return '';}\nvar u1=mv[0];\nreturn (u1.indexOf('//')===0)?('https:'+u1):u1;\n}\nif(t==='3'){\nvar ma=d.match(/<audio[^>]*\\ssrc=\"([^\"]+)\"/);\nif(ma){return ma[1];}\nvar ma2=d.match(/src=\"(https?:[^\"]+?\\.(?:mp3|m4a|aac)[^\"]*)\"/);\nreturn ma2?ma2[1]:'';\n}\nif(t==='4'){\nvar hm=d.match(/uxxhmapi\\.php\\?([^\"'<>\\s]+)/);\nif(!hm){return '';}\nvar hc=ajax('https://uxxtv.com/uxxhmapi.php?'+hm[1]);\nif(!hc){return '';}\nvar imgs=hc.match(/<img[^>]+>/g)||[];\nvar oi=[];\nfor(var i=0;i<imgs.length;i++){\nvar s=imgs[i].match(/(?:data-src|src)=\"([^\"]+)\"/);\nif(s&&s[1].indexOf('data:')<0&&s[1].indexOf('javascript:')<0){oi.push('<img src=\"'+s[1]+'\">');}\n}\nreturn oi.join('\\n');\n}\nvar gc=d.match(/_getcontent\\.php\\?([^\"'<>\\s]+)/);\nif(!gc){return '';}\nvar hg=ajax('https://uxxtv.com/_getcontent.php?'+gc[1]);\nif(!hg){return '';}\nvar ps=hg.split('<script');\nvar keep=ps[0];\nfor(var j=1;j<ps.length;j++){\nvar e2=ps[j].indexOf('</script>');\nkeep+=(e2>=0)?ps[j].substring(e2+9):'';\n}\nvar AMP=String.fromCharCode(38);\nvar QT=String.fromCharCode(34);\nvar NB=String.fromCharCode(160);\nvar s2=keep.split('<br>').join('\\n').split('<br/>').join('\\n').split('<br />').join('\\n');\ns2=s2.split('</p>').join('\\n').split('</div>').join('\\n');\ns2=s2.replace(/<[^>]+>/g,'');\ns2=s2.split(AMP+'nbsp;').join(' ').split(AMP+'amp;').join(AMP).split(AMP+'quot;').join(QT).split(NB).join(' ');\nvar L=s2.split('\\n');\nvar out=[];\nfor(var k=0;k<L.length;k++){\nvar x=L[k].replace(/^[\\s\\u3000]+|[\\s\\u3000]+$/g,'');\nif(!x){continue;}\nif(/uxx\\d+\\.com|uxxdizhi\\.com|永久地址|最新地址|更多精彩|加入收藏/.test(x)){continue;}\nout.push('\\u3000\\u3000'+x);\n}\nreturn out.join('\\n');\n})()",
+      "replaceRegex": "##有声.*地址.*|导航地址.*"
+    },
+    "ruleExplore": {
+      "author": ".brief_box .author@text",
+      "bookList": ".list_1_box ul > li || .list_3_box ul > li",
+      "bookUrl": ".cover_box a@href@js:var T={'1':4,'2':8,'3':32,'4':64};var bu=String(baseUrl||'');var cm=bu.match(/[?&](?:cid|uxt)=(\\d)/)||bu.match(/\\/type\\/(\\d)\\//);var c=cm?cm[1]:'2';try{if(book) book.type=T[c]||8;}catch(e){}var m=String(result||'').match(/\\/(?:show|play)\\/(\\d+)/);'https://uxxtv.com/show/'+(m?m[1]:'')+'.html?uxt='+c;",
+      "coverUrl": ".cover_box img.cover@src",
+      "kind": "//div[@class='brief_box']//div[@class='info_box'][1]/div[@class='view']/span/text()",
+      "name": ".brief_box .title a@text"
+    },
+    "ruleSearch": {
+      "author": ".brief_box .author@text",
+      "bookList": ".list_1_box ul > li || .list_3_box ul > li",
+      "bookUrl": ".cover_box a@href@js:var T={'1':4,'2':8,'3':32,'4':64};var bu=String(baseUrl||'');var cm=bu.match(/[?&](?:cid|uxt)=(\\d)/)||bu.match(/\\/type\\/(\\d)\\//);var c=cm?cm[1]:'2';try{if(book) book.type=T[c]||8;}catch(e){}var m=String(result||'').match(/\\/(?:show|play)\\/(\\d+)/);'https://uxxtv.com/show/'+(m?m[1]:'')+'.html?uxt='+c;",
+      "checkKeyWord": "警花",
+      "coverUrl": ".cover_box img.cover@src",
+      "kind": "//div[@class='brief_box']//div[@class='info_box'][1]/div[@class='view']/span/text()",
+      "name": ".brief_box .title a@text"
+    },
+    "ruleToc": {
+      "chapterList": ".catalog_ul li a",
+      "chapterName": "text",
+      "chapterUrl": "href",
+      "nextTocUrl": "@js:(function(){var T={'1':4,'2':8,'3':32,'4':64};var bk=(typeof book!=='undefined'&&book)?book:{};var bu=String(baseUrl||'')+'|'+String(bk.bookUrl||'');var m=bu.match(/[?&]uxt=(\\d)/);var c=m?m[1]:'';if(!c){var ty=Number(bk.type||0);c=(ty===4)?'1':((ty===32)?'3':((ty===64)?'4':'2'));}try{if(book) book.type=T[c]||8;}catch(e){}return '';})()"
+    },
+    "searchUrl": "@js:var CID={'小说':2,'有声':3,'漫画':4,'视频':1};var mode='小说';try{var saved=source.getVariable();if(saved){var parsed;try{parsed=JSON.parse(saved);}catch(e){parsed=saved;}var selected=(parsed&&typeof parsed==='object')?parsed.mode:parsed;if(CID[selected]){mode=selected;}}}catch(e){}'https://uxxtv.com/?c=search&wd={{key}}&cid='+CID[mode];",
+    "weight": 0
+  }
+]

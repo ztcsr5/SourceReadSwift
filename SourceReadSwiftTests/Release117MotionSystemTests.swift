@@ -9,7 +9,7 @@ final class Release117MotionSystemTests: XCTestCase {
             XCTAssertNotNil(normal.animation(event)); XCTAssertNil(reduced.animation(event))
         }
         XCTAssertEqual(normal.duration(.navigation), 0.30)
-        XCTAssertEqual(normal.duration(.expansion), 0.44)
+        XCTAssertEqual(normal.duration(.expansion), 0.28)
         XCTAssertNil(normal.backgroundAnimation(hasPreviousPalette: false, hasNextPalette: true))
         XCTAssertNil(normal.backgroundAnimation(hasPreviousPalette: true, hasNextPalette: false))
         XCTAssertNotNil(normal.backgroundAnimation(hasPreviousPalette: true, hasNextPalette: true))
@@ -45,7 +45,7 @@ final class Release117MotionSystemTests: XCTestCase {
     }
 
     func testNewThemesPreserveOldIDsAndIntroduceDistinctStructures() {
-        XCTAssertEqual(Set(AppVisualTheme.allCases.map(\.rawValue)), Set(["forest", "classic", "botanical", "editorial", "coast", "rose", "graphite", "folio", "inkwash", "blueprint"]))
+        XCTAssertEqual(Set(AppVisualTheme.allCases.map(\.rawValue)), Set(["forest", "classic", "botanical", "editorial", "coast", "rose", "graphite", "folio", "inkwash", "blueprint", "berryLake", "blushInk", "periwinkleCocoa", "peachMoss"]))
         XCTAssertNotEqual(AppVisualTheme.folio.radius, AppVisualTheme.inkwash.radius)
         XCTAssertNotEqual(AppVisualTheme.folio.ornament, AppVisualTheme.blueprint.ornament)
         XCTAssertEqual(AppVisualTheme.classic.preferenceKey("accent"), "settings.accentHex")

@@ -22,5 +22,22 @@ enum NativeBookGestureProbe {
                 && $0.name != "reader.menuSwipeExit"
         }
     }
+
+    /// Captures public recognizer state on demand without changing native gesture arbitration.
+    static func describe(_ gestures: [UIGestureRecognizer]) -> String {
+        gestures.map { gesture in
+            let host = gesture.view.map { String(describing: type(of: $0)) } ?? "detached"
+            return "\(String(describing: type(of: gesture)))@\(host):enabled=\(gesture.isEnabled),state=\(gesture.state.rawValue)"
+        }.joined(separator: ";")
+    }
+}
+
+final class NativeBookGestureEvidenceView: UIView {
+    var readGestureState: () -> String = { "" }
+
+    override var accessibilityLabel: String? {
+        get { readGestureState() }
+        set { }
+    }
 }
 #endif

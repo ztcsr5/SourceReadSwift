@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// iOS 16–25 only. Native iOS 26 TabView remains owned by RootTabView.
+/// Universal floating tab bar with aligned global search button.
 struct LegacyTabBar: View {
     @Binding var selection: Int
     var onSearch: () -> Void
@@ -22,19 +22,26 @@ struct LegacyTabBar: View {
             .padding(4)
             .background {
                 if theme.usesNeutralGlass { BrandGlass(outline: Capsule()) }
+                else if theme.isAtelier { Capsule().fill(AppTheme.card) }
                 else { Capsule().fill(.regularMaterial) }
             }
             .overlay(Capsule().strokeBorder(Color.primary.opacity(0.07), lineWidth: 0.6).allowsHitTesting(false))
+            .shadow(color: Color.black.opacity(0.08), radius: 8, x: 0, y: 3)
             Button(action: onSearch) {
                 Image(systemName: "magnifyingglass")
-                    .font(.system(size: 23, weight: .medium))
+                    .font(.system(size: 22, weight: .semibold))
                     .foregroundStyle(theme.primaryInk)
-                    .frame(width: 54, height: 54)
-                    .background(.regularMaterial, in: Circle())
-                    .overlay(Circle().strokeBorder(Color.primary.opacity(0.07), lineWidth: 0.6))
+                    .frame(width: 52, height: 52)
+                    .background {
+                        if theme.isAtelier { Circle().fill(AppTheme.card) }
+                        else { Circle().fill(.regularMaterial) }
+                    }
+                    .overlay(Circle().strokeBorder(Color.primary.opacity(0.08), lineWidth: 0.8))
+                    .shadow(color: Color.black.opacity(0.10), radius: 8, x: 0, y: 3)
             }
             .buttonStyle(AppPressStyle())
             .accessibilityLabel("全网搜书")
+            .accessibilityIdentifier("bookshelf.globalSearch")
         }
         .padding(.horizontal, 12)
         .padding(.bottom, 6)

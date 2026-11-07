@@ -36,15 +36,18 @@ final class Release117ThemeCollaborationTests: XCTestCase {
         row.view.frame = CGRect(x: 0, y: 0, width: 80, height: 80)
         let window = mount(row)
         defer { window.isHidden = true }
-        try await Task.sleep(nanoseconds: 200_000_000)
+        let mounted = await eventually { row.view.window === window && !row.view.bounds.isEmpty }
+        XCTAssertTrue(mounted)
         let before = snapshot(row.view).pngData()
         defaults.set("coast", forKey: key)
-        try await Task.sleep(nanoseconds: 200_000_000)
+        let repainted = await eventually { before != self.snapshot(row.view).pngData() }
+        XCTAssertTrue(repainted, "An existing mounted row must apply the new palette")
         XCTAssertNotEqual(before, snapshot(row.view).pngData(), "An existing row must repaint without recreating its screen")
         let editor = UIHostingController(rootView: ThemeDraftFixture())
         window.rootViewController = editor
         editor.view.frame = window.bounds
-        try await Task.sleep(nanoseconds: 200_000_000)
+        let editorMounted = await eventually { self.findField(editor.view) != nil }
+        XCTAssertTrue(editorMounted, "Form must mount its real input before editing the draft")
         let field = try XCTUnwrap(findField(editor.view))
         field.text = "unsaved-theme-draft"; field.sendActions(for: .editingChanged)
         defaults.set("graphite", forKey: key)
@@ -100,6 +103,13 @@ final class Release117ThemeCollaborationTests: XCTestCase {
     @MainActor private func snapshot(_ view: UIView) -> UIImage {
         view.layoutIfNeeded()
         return UIGraphicsImageRenderer(size: view.bounds.size).image { _ in view.drawHierarchy(in: view.bounds, afterScreenUpdates: true) }
+    }
+    @MainActor private func eventually(_ condition: () -> Bool) async -> Bool {
+        for _ in 0..<60 {
+            if condition() { return true }
+            try? await Task.sleep(nanoseconds: 50_000_000)
+        }
+        return condition()
     }
     @MainActor private func findField(_ view: UIView) -> UITextField? {
         if let field = view as? UITextField { return field }

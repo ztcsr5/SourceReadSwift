@@ -44,7 +44,7 @@ private struct ReaderOpeningPresentation: ViewModifier {
 
     private var usesNativeDeskReturn: Bool {
         if usesSystemReturnSurface { return true }
-        if #available(iOS 18.0, *) { return usesDeskHero && !motion.reducesMotion }
+        if #available(iOS 18.0, *) { return usesDeskHero }
         return false
     }
 
@@ -56,7 +56,7 @@ private struct ReaderOpeningPresentation: ViewModifier {
             .accessibilityHidden(!didReveal)
             .overlay {
                 if !didReveal {
-                    ReaderOpeningStatus(showsWait: didArrive)
+                    ReaderOpeningStatus(book: book, showsWait: didArrive)
                         .toolbar(.hidden, for: .navigationBar)
                         .overlay(alignment: .topLeading) {
                             if didArrive {
@@ -99,21 +99,63 @@ private struct ReaderOpeningPresentation: ViewModifier {
     }
 }
 
-/// A blocked cursor never exposes the wrong page; only an actual wait needs a label.
-private struct ReaderOpeningStatus: View {
+/// Keeps the destination recognisable while its actual saved position is prepared.
+/// Static type and paragraph scaffolding share the reader's paper; no logo or timer delays entry.
+struct ReaderOpeningStatus: View {
+    let book: BookshelfBook
     let showsWait: Bool
+    var chapterTitle: String? = nil
     @AppStorage("reader.background") private var paperRaw = ReaderBackground.white.rawValue
 
+    private var context: String {
+        let chapter = (chapterTitle ?? book.currentChapterTitle ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        if !chapter.isEmpty { return chapter }
+        return book.currentParagraphIndex == nil ? "准备开始阅读" : "回到上次阅读的位置"
+    }
+
     var body: some View {
-        let paper = ReaderBackground(rawValue: paperRaw) ?? .white
-        ZStack {
-            paper.color(isNight: paper.isDark).ignoresSafeArea()
-            if showsWait {
-                ProgressView("正在打开正文")
-                    .foregroundStyle(paper.textColor(isNight: paper.isDark))
-                    .accessibilityIdentifier("reader.openingProgress")
+        let paper = ReaderOverrideStore.shared.override(for: book.id)?.background
+            ?? ReaderBackground(rawValue: paperRaw) ?? .paper
+        let ink = paper.textColor(isNight: paper.isDark)
+        GeometryReader { geometry in
+            ScrollView {
+                VStack(alignment: .leading, spacing: 24) {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text(book.title)
+                            .font(.title2.weight(.semibold))
+                            .fixedSize(horizontal: false, vertical: true)
+                            .accessibilityIdentifier("reader.openingTitle")
+                        if !book.author.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                            Text(book.author).font(.subheadline).foregroundStyle(ink.opacity(0.7))
+                        }
+                    }
+                    Rectangle().fill(ink.opacity(0.16)).frame(height: 1)
+                    Text(context).font(.headline).fixedSize(horizontal: false, vertical: true)
+                    VStack(alignment: .leading, spacing: 16) {
+                        ForEach(0..<7) { line in
+                            RoundedRectangle(cornerRadius: 4)
+                                .fill(ink.opacity(0.07))
+                                .frame(maxWidth: line == 3 || line == 6 ? geometry.size.width * 0.56 : .infinity)
+                                .frame(height: 8)
+                        }
+                    }
+                    .accessibilityHidden(true)
+                    Text(book.currentParagraphIndex == nil ? "正在准备正文" : "正在恢复阅读位置")
+                        .font(.footnote).foregroundStyle(ink.opacity(0.7))
+                        .opacity(showsWait ? 1 : 0)
+                        .accessibilityHidden(!showsWait)
+                        .accessibilityIdentifier("reader.openingProgress")
+                }
+                .padding(.horizontal, 32)
+                .padding(.top, 80)
+                .padding(.bottom, 32)
+                .frame(maxWidth: 560, alignment: .leading)
+                .frame(maxWidth: .infinity)
             }
         }
+        .foregroundStyle(ink)
+        .background { paper.color(isNight: paper.isDark).ignoresSafeArea() }
+        .environment(\.colorScheme, paper.isDark ? .dark : .light)
     }
 }
 
@@ -170,9 +212,20 @@ struct ReaderOpeningPage: View {
     @AppMotion private var motion
     @Environment(\.readingCoverHandoff) private var incomingCovers
     @AppStorage("reader.background") private var paperRaw = ReaderBackground.white.rawValue
-    private var paper: ReaderBackground { ReaderBackground(rawValue: paperRaw) ?? .white }
+    @MainActor private var paper: ReaderBackground {
+        ReaderOverrideStore.shared.override(for: book.id)?.background
+            ?? ReaderBackground(rawValue: paperRaw) ?? .paper
+    }
 
     var body: some View {
+        if isWaiting && !isReturning {
+            ReaderOpeningStatus(book: book, showsWait: true, chapterTitle: chapterTitle)
+        } else {
+            returnPage
+        }
+    }
+
+    private var returnPage: some View {
         VStack(spacing: 20) {
             EditorialBookJacket(height: 190, palette: .resolve(theme: AppVisualTheme.current), stance: .detail) {
                 if let coverFrame = coverFrame ?? incomingCovers?.frame(for: book) {
@@ -189,7 +242,7 @@ struct ReaderOpeningPage: View {
                 }
             }
             VStack(spacing: 8) {
-                Text(book.title).font(.system(.title2, design: .serif).weight(.regular))
+                Text(book.title).font(.title2.weight(.regular))
                     .multilineTextAlignment(.center).lineLimit(2)
                 if !book.author.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                     Text(book.author).font(.caption).opacity(0.65).lineLimit(1)
@@ -202,12 +255,7 @@ struct ReaderOpeningPage: View {
             .opacity(isWaiting || isReturning ? 1 : 0)
             .offset(y: isWaiting || isReturning || motion.reducesMotion ? 0 : 8)
             .animation(isReturning ? nil : motion.arrivalAnimation(stage: 1), value: isWaiting)
-            Group {
-                if isWaiting {
-                    ProgressView(chapterTitle == nil ? "正在恢复阅读位置" : "正在加载正文")
-                        .font(.caption).accessibilityIdentifier("reader.openingProgress")
-                } else { Color.clear }
-            }.frame(height: 20)
+            Color.clear.frame(height: 20)
         }
         .padding(32)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
