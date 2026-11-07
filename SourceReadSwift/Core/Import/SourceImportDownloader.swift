@@ -72,7 +72,8 @@ struct SourceImportDownloader: SourceImportDownloading, Sendable {
             if Self.looksLikeChallenge(text: response.body, headers: response.headers) {
                 return .failure(.challengePage)
             }
-            if Self.looksLikeHTMLErrorPage(text: response.body) {
+            if Self.looksLikeHTMLErrorPage(text: response.body),
+               SourcePublisherLinks.discover(in: response.body, at: response.url) == nil {
                 return .failure(.notSourceJSON)
             }
             return .success(SourceImportPayload(

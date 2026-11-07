@@ -113,6 +113,8 @@ final class CoverPageHostController: UIViewController, UIGestureRecognizerDelega
         view.clipsToBounds = true
         pan.delegate = self
         pan.cancelsTouchesInView = false
+        pan.delaysTouchesBegan = false
+        pan.delaysTouchesEnded = false
         view.addGestureRecognizer(pan)
     }
 
@@ -288,6 +290,9 @@ final class CoverPageHostController: UIViewController, UIGestureRecognizerDelega
                 page?.layer.shadowOpacity = abs(x) > 0.5 ? 0.18 : 0
                 page?.layer.shadowRadius = 5
                 page?.layer.shadowOffset = CGSize(width: 3, height: 0)
+                if let bounds = page?.bounds, !bounds.isEmpty {
+                    page?.layer.shadowPath = UIBezierPath(rect: bounds).cgPath
+                }
             }
         }
     }

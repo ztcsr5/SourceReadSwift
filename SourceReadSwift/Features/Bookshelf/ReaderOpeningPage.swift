@@ -44,7 +44,7 @@ private struct ReaderOpeningPresentation: ViewModifier {
 
     private var usesNativeDeskReturn: Bool {
         if usesSystemReturnSurface { return true }
-        if #available(iOS 18.0, *) { return usesDeskHero && !motion.reducesMotion }
+        if #available(iOS 18.0, *) { return usesDeskHero }
         return false
     }
 
@@ -103,15 +103,51 @@ private struct ReaderOpeningPresentation: ViewModifier {
 private struct ReaderOpeningStatus: View {
     let showsWait: Bool
     @AppStorage("reader.background") private var paperRaw = ReaderBackground.white.rawValue
+    @State private var quoteIndex: Int = {
+        Int.random(in: 0..<7)
+    }()
+
+    private static let literaryQuotes = [
+        "翻开一页，遇见另一个世界。",
+        "万卷古今消永昼，一窗昏晓送流年。",
+        "字里行间，皆有山海与星辰。",
+        "读书随处净土，闭门即是深山。",
+        "与其喧嚣中奔波，不如在书里小坐片刻。",
+        "世间万物皆有回响，开卷即见远方。",
+        "且听风吟，静候墨香。"
+    ]
 
     var body: some View {
         let paper = ReaderBackground(rawValue: paperRaw) ?? .white
+        let textColor = paper.textColor(isNight: paper.isDark)
         ZStack {
             paper.color(isNight: paper.isDark).ignoresSafeArea()
             if showsWait {
-                ProgressView("正在打开正文")
-                    .foregroundStyle(paper.textColor(isNight: paper.isDark))
-                    .accessibilityIdentifier("reader.openingProgress")
+                VStack(spacing: 20) {
+                    PaperBetweenMark(size: 48)
+                        .shadow(color: AppTheme.accent.opacity(0.18), radius: 10, x: 0, y: 4)
+
+                    VStack(spacing: 8) {
+                        Text(Self.literaryQuotes[quoteIndex])
+                            .font(.system(.subheadline, design: .serif))
+                            .foregroundStyle(textColor.opacity(0.85))
+                            .multilineTextAlignment(.center)
+                            .lineSpacing(4)
+                            .padding(.horizontal, 32)
+
+                        Text("纸间 · 字里行间")
+                            .font(.system(size: 11, weight: .medium))
+                            .foregroundStyle(textColor.opacity(0.40))
+                            .tracking(2)
+                    }
+
+                    ProgressView("正在打开正文")
+                        .font(.caption2)
+                        .foregroundStyle(textColor.opacity(0.65))
+                        .accessibilityIdentifier("reader.openingProgress")
+                }
+                .padding(24)
+                .transition(.opacity)
             }
         }
     }
@@ -189,7 +225,7 @@ struct ReaderOpeningPage: View {
                 }
             }
             VStack(spacing: 8) {
-                Text(book.title).font(.system(.title2, design: .serif).weight(.regular))
+                Text(book.title).font(.title2.weight(.regular))
                     .multilineTextAlignment(.center).lineLimit(2)
                 if !book.author.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                     Text(book.author).font(.caption).opacity(0.65).lineLimit(1)

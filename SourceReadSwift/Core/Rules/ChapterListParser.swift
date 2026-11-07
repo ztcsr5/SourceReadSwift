@@ -96,7 +96,8 @@ struct ChapterListParser {
             "intro": book.intro ?? "",
             "tocUrl": book.tocUrl ?? "",
             "kind": book.kind ?? "",
-            "latestChapterTitle": book.latestChapter ?? ""
+            "latestChapterTitle": book.latestChapter ?? "",
+            "type": (book.mediaKind ?? source.sourceKind).legadoBookType
         ]
         let variables: [String: Any] = [
             "source": source,
@@ -342,7 +343,8 @@ struct ChapterListParser {
             "intro": book.intro ?? "",
             "tocUrl": book.tocUrl ?? "",
             "kind": book.kind ?? "",
-            "latestChapterTitle": book.latestChapter ?? ""
+            "latestChapterTitle": book.latestChapter ?? "",
+            "type": (book.mediaKind ?? source.sourceKind).legadoBookType
         ]
         let variables: [String: Any] = [
             "source": source,

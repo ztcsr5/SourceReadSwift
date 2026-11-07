@@ -1,5 +1,5 @@
 name: Unsigned IPA
-run-name: "SourceRead 1.1.7 · Build 137 · IPA 未签名测试包 · #${{ github.run_number }}"
+run-name: "SourceRead 1.1.8 · Build 138 · IPA 未签名测试包 · #${{ github.run_number }}"
 
 concurrency:
   group: ios-${{ github.workflow }}-${{ github.ref }}
@@ -10,6 +10,7 @@ on:
   push:
     branches:
       - codex/**
+      - '!codex/reader-quality-137-*'
 
 jobs:
   package:

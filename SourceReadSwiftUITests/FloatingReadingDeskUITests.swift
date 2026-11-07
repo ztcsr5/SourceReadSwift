@@ -10,6 +10,43 @@ final class FloatingReadingDeskUITests: XCTestCase {
 
     override func tearDownWithError() throws { app.terminate() }
 
+    func testHomeGlobalSearchFindsTheLocalBookAndOpensItsDetails() throws {
+        try launch(theme: "forest")
+        let search = element("bookshelf.globalSearch")
+        XCTAssertTrue(search.isHittable)
+        search.tap()
+        let query = app.textFields["globalSearch.query"]
+        XCTAssertTrue(query.waitForExistence(timeout: 5))
+        query.tap()
+        query.typeText("剑来")
+        let result = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "globalSearch.result.book:")).firstMatch
+        XCTAssertTrue(result.waitForExistence(timeout: 5))
+        XCTAssertTrue(result.label.contains("剑来"))
+        capture("25-global-search-local-book")
+        result.tap()
+        let title = element("bookDetail.title")
+        let transitionStarted = Date()
+        let reachedDetails = title.waitForExistence(timeout: 10)
+        print("GLOBAL_SEARCH_DETAIL_WAIT_SECONDS \(Date().timeIntervalSince(transitionStarted))")
+        if !reachedDetails { capture("global-search-detail-navigation-failure") }
+        XCTAssertTrue(reachedDetails)
+        XCTAssertEqual(title.label, "剑来")
+        let keyboardGone = XCTNSPredicateExpectation(predicate: NSPredicate(format: "exists == NO"), object: app.keyboards.firstMatch)
+        XCTAssertEqual(XCTWaiter.wait(for: [keyboardGone], timeout: 5), .completed)
+        capture("global-search-detail-keyboard-dismissed")
+    }
+
+    func testDiscoverStartsWithoutAResultsHeadingAndUsesACompactMatchControl() throws {
+        try launch(theme: "forest")
+        rootTab("寻书", legacyID: "tabs.legacy.discover").tap()
+        XCTAssertTrue(app.textFields["搜索书名或作者"].waitForExistence(timeout: 5))
+        XCTAssertFalse(app.staticTexts["搜索结果"].exists)
+        let matchMode = element("discover.matchMode")
+        XCTAssertTrue(matchMode.exists)
+        XCTAssertLessThanOrEqual(matchMode.frame.width, 160)
+        capture("26-discover-initial-state")
+    }
+
     func testForestHomeAndAppearanceSwitchInTheRealApp() throws {
         try launch(theme: nil, fixture: "--forest-appearance-regression")
         let entry = assertCurrentBook("剑来")
@@ -19,8 +56,7 @@ final class FloatingReadingDeskUITests: XCTestCase {
         XCTAssertFalse(shelf.label.contains("TXT"), "A grid jacket cannot expose an overlaid format badge")
         capture("20-forest-home")
 
-        let overflow = app.buttons["正在阅读书籍的更多操作"].firstMatch
-        overflow.tap()
+        entry.press(forDuration: 0.8)
         let details = app.buttons["书籍详情"].firstMatch
         XCTAssertTrue(details.waitForExistence(timeout: 5))
         XCTAssertFalse(element("reader.webScrollSurface").exists)
@@ -84,14 +120,10 @@ final class FloatingReadingDeskUITests: XCTestCase {
         let pager = element("bookshelf.readingPager")
         let entry = assertCurrentBook("剑来")
         entry.coordinate(withNormalizedOffset: CGVector(dx: 0.47, dy: 0.34)).press(forDuration: 0.8)
-        XCTAssertFalse(app.buttons["书籍详情"].firstMatch.exists, "A hold must not show the desk management menu")
-        let overflow = app.buttons["正在阅读书籍的更多操作"].firstMatch
-        XCTAssertTrue(overflow.isHittable, "A hold and release must leave the desk on screen")
         XCTAssertFalse(element("reader.webScrollSurface").exists)
-        overflow.tap()
         let detail = app.buttons["书籍详情"].firstMatch
         XCTAssertTrue(detail.waitForExistence(timeout: 5))
-        XCTAssertFalse(element("reader.webScrollSurface").isHittable, "Three dots must not activate the reader")
+        XCTAssertFalse(element("reader.webScrollSurface").isHittable, "A management hold must not activate the reader")
         XCTAssertTrue(app.buttons["从书架删除"].firstMatch.exists)
         detail.tap()
         XCTAssertTrue(element("bookDetail.title").waitForExistence(timeout: 5))
@@ -111,9 +143,9 @@ final class FloatingReadingDeskUITests: XCTestCase {
         assertCurrentBook("剑来")
     }
 
-    func testReadingDeskOverflowOffersTheSameBookActionsWithoutActivatingReader() throws {
+    func testReadingDeskLongPressOffersTheSameBookActionsWithoutActivatingReader() throws {
         try launch(theme: "classic")
-        app.buttons["正在阅读书籍的更多操作"].firstMatch.tap()
+        assertCurrentBook("剑来").press(forDuration: 0.8)
         let detail = app.buttons["书籍详情"].firstMatch
         XCTAssertTrue(detail.waitForExistence(timeout: 5))
         XCTAssertTrue(app.buttons["从书架删除"].firstMatch.exists)
@@ -174,7 +206,7 @@ final class FloatingReadingDeskUITests: XCTestCase {
         XCTAssertTrue(surface.waitForExistence(timeout: 10))
         let saved = app.webViews.staticTexts.matching(
             NSPredicate(format: "label BEGINSWITH %@", "【已保存的阅读段落】")).firstMatch
-        XCTAssertTrue(saved.waitForExistence(timeout: 10))
+        XCTAssertTrue(saved.waitForExistence(timeout: 10), "Web startup state: \(surface.value ?? "unavailable")")
         XCTAssertTrue(surface.frame.intersects(saved.frame), "The saved paragraph must be in the actual viewport")
         XCTAssertFalse(rootTab("主页", legacyID: "tabs.legacy.home").isHittable)
         capture("17-restored-paragraph")
@@ -235,8 +267,95 @@ final class FloatingReadingDeskUITests: XCTestCase {
         XCTAssertEqual(cover.frame.midY, origin.midY, accuracy: 8)
     }
 
+    func testContinuousChapterCrossingKeepsProseHeadingAndReopenedPositionTogether() throws {
+        try launch(theme: "classic", fixture: "--desk-cross-chapter")
+        let entry = assertCurrentBook("剑来")
+        entry.tap()
+        let surface = element("reader.webScrollSurface")
+        let secondChapter = app.webViews.staticTexts.matching(
+            NSPredicate(format: "label BEGINSWITH %@", "【连续章2·段1】")).firstMatch
+        XCTAssertTrue(secondChapter.waitForExistence(timeout: 10))
+        let back = element("reader.returnToShelf")
+        if !back.isHittable { app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.42)).tap() }
+        XCTAssertTrue(back.isHittable)
+        assertChapterAtViewportTop(2, surface: surface)
+        var previousChapter = 2
+        for chapter in [3, 2, 1, 2, 3] {
+            let heading = element("reader.currentChapterHeading")
+            let isForward = chapter > previousChapter
+            for _ in 0..<10 {
+                if heading.exists && heading.label == "连续阅读第\(chapter)章" { break }
+                if isForward { surface.swipeUp() } else { surface.swipeDown() }
+            }
+            assertChapterAtViewportTop(chapter, surface: surface)
+            capture("cross-chapter-\(chapter)")
+            previousChapter = chapter
+        }
+        back.tap()
+        XCTAssertTrue(entry.waitForExistence(timeout: 5))
+        entry.tap()
+        XCTAssertTrue(surface.waitForExistence(timeout: 10))
+        if !back.isHittable { app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.42)).tap() }
+        assertChapterAtViewportTop(3, surface: surface)
+        capture("cross-chapter-reopened")
+    }
+
+    private func assertChapterAtViewportTop(_ chapter: Int, surface: XCUIElement) {
+        let heading = element("reader.currentChapterHeading")
+        let synchronized = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
+            guard heading.label == "连续阅读第\(chapter)章" else { return false }
+            // XCUI resolves each frame via the remote accessibility service.
+            // Use one coherent viewport for every paragraph in this sample.
+            let viewport = surface.frame
+            guard !viewport.isEmpty else { return false }
+            let prose = self.app.webViews.staticTexts.matching(
+                NSPredicate(format: "label BEGINSWITH %@", "【连续章\(chapter)·")).allElementsBoundByIndex
+            // A prefetched offscreen paragraph is not evidence of crossing.
+            return prose.contains { paragraph in
+                let visible = paragraph.frame.intersection(viewport)
+                return !visible.isNull && visible.height > 20 && visible.minY < viewport.midY
+            }
+        }, object: nil)
+        let outcome = XCTWaiter.wait(for: [synchronized], timeout: 5)
+        if outcome != .completed { capture("cross-chapter-failure-\(chapter)") }
+        XCTAssertEqual(outcome, .completed,
+                       "The real visible prose and native heading must agree on chapter \(chapter)")
+        XCTAssertFalse(element("reader.openingRecovery").exists)
+        XCTAssertFalse(rootTab("主页", legacyID: "tabs.legacy.home").isHittable)
+    }
+
+    func testReaderLongEdgeReturnCompletesWithReducedMotion() throws {
+        try launch(theme: "classic", reducesMotion: true, fixture: "--desk-resume-paragraph")
+        let entry = assertCurrentBook("剑来")
+        entry.tap()
+        let saved = app.webViews.staticTexts.matching(
+            NSPredicate(format: "label BEGINSWITH %@", "【已保存的阅读段落】")).firstMatch
+        XCTAssertTrue(saved.waitForExistence(timeout: 10))
+        XCTAssertFalse(element("reader.returnToShelf").isHittable)
+
+        let edge = app.coordinate(withNormalizedOffset: CGVector(dx: 0.008, dy: 0.52))
+        edge.press(forDuration: 0.05,
+            thenDragTo: app.coordinate(withNormalizedOffset: CGVector(dx: 0.88, dy: 0.52)),
+            withVelocity: .default, thenHoldForDuration: 0.4)
+        let restored = XCTNSPredicateExpectation(predicate: NSPredicate(format: "hittable == YES"), object: entry)
+        XCTAssertEqual(XCTWaiter.wait(for: [restored], timeout: 5), .completed)
+        XCTAssertTrue(rootTab("主页", legacyID: "tabs.legacy.home").isHittable)
+        capture("27-reader-long-edge-return-control")
+        entry.tap()
+        XCTAssertTrue(saved.waitForExistence(timeout: 10))
+        XCTAssertTrue(element("reader.webScrollSurface").frame.intersects(saved.frame))
+    }
+
     func testReaderSystemReturnCanCancelWithoutLosingItsSavedParagraph() throws {
-        try launch(theme: "classic", fixture: "--desk-resume-paragraph")
+        try verifyNativeReturn(reducesMotion: false)
+    }
+
+    func testReaderSystemReturnCanCancelWithReducedMotion() throws {
+        try verifyNativeReturn(reducesMotion: true)
+    }
+
+    private func verifyNativeReturn(reducesMotion: Bool) throws {
+        try launch(theme: "classic", reducesMotion: reducesMotion, fixture: "--desk-resume-paragraph")
         let entry = assertCurrentBook("剑来")
         entry.tap()
         let surface = element("reader.webScrollSurface")
@@ -246,20 +365,34 @@ final class FloatingReadingDeskUITests: XCTestCase {
         XCTAssertFalse(element("reader.returnToShelf").isHittable, "Prose can return interactively without first opening its menu")
         let nativeEvidence = element("reader.nativeBookGestureEvidence")
         XCTAssertTrue(nativeEvidence.waitForExistence(timeout: 5))
+        let fallbackEvidence = element("reader.fallbackGestureEvidence")
+        if reducesMotion { XCTAssertTrue(fallbackEvidence.waitForExistence(timeout: 5)) }
+        let fallbackBefore = reducesMotion ? Int((fallbackEvidence.value as? String) ?? "") ?? (-1) : 0
+        XCTAssertGreaterThanOrEqual(fallbackBefore, 0)
         let motionBefore = Int((nativeEvidence.value as? String) ?? "") ?? (-1)
         XCTAssertGreaterThanOrEqual(motionBefore, 0)
+        print("BOOK_NATIVE_CANCEL_BEFORE \(nativeEvidence.label)")
         let edge = app.coordinate(withNormalizedOffset: CGVector(dx: 0.008, dy: 0.52))
         // Recording proved 40 px/s was ignored. Keep the recognized 250 px/s
         // control, but release below the previous 16%-width commit distance.
         edge.press(forDuration: 0.05,
-            thenDragTo: app.coordinate(withNormalizedOffset: CGVector(dx: 0.10, dy: 0.52)),
+            thenDragTo: app.coordinate(withNormalizedOffset: CGVector(dx: 0.13, dy: 0.52)),
             withVelocity: .slow, thenHoldForDuration: 0.8)
         XCTAssertTrue(surface.isHittable, "Cancel must keep the same real reader active")
         XCTAssertTrue(saved.exists && surface.frame.intersects(saved.frame))
         XCTAssertFalse(rootTab("主页", legacyID: "tabs.legacy.home").isHittable)
         let motionAfter = Int((nativeEvidence.value as? String) ?? "") ?? (-1)
-        XCTAssertGreaterThan(motionAfter, motionBefore, "A real native gesture must move; an ignored drag is not cancellation")
-        print("BOOK_NATIVE_CANCEL_VERIFIED motion_before=\(motionBefore) motion_after=\(motionAfter)")
+        print("BOOK_NATIVE_CANCEL_AFTER \(nativeEvidence.label)")
+        if reducesMotion {
+            let fallbackAfter = Int((fallbackEvidence.value as? String) ?? "") ?? (-1)
+            XCTAssertGreaterThanOrEqual(fallbackAfter, 0)
+            XCTAssertGreaterThan(motionAfter + fallbackAfter, motionBefore + fallbackBefore,
+                                 "Reduced motion still requires a real recognized native or fallback drag; stable ignored input is not cancellation")
+            print("BOOK_REDUCED_CANCEL_VERIFIED native_before=\(motionBefore) native_after=\(motionAfter) fallback_before=\(fallbackBefore) fallback_after=\(fallbackAfter)")
+        } else {
+            XCTAssertGreaterThan(motionAfter, motionBefore, "A real native gesture must move; an ignored drag is not cancellation")
+            print("BOOK_NATIVE_CANCEL_VERIFIED motion_before=\(motionBefore) motion_after=\(motionAfter)")
+        }
         capture("18-reader-native-return-cancelled")
         edge.press(forDuration: 0.05,
             thenDragTo: app.coordinate(withNormalizedOffset: CGVector(dx: 0.88, dy: 0.52)),
@@ -278,11 +411,11 @@ final class FloatingReadingDeskUITests: XCTestCase {
     func testOtherThemesAndIndependentOldStyleSwitch() throws {
         try launch(theme: "botanical")
         capture("07-botanical-home")
-        app.buttons["正在阅读书籍的更多操作"].firstMatch.tap()
+        assertCurrentBook("剑来").press(forDuration: 0.8)
         element("bookshelf.floatingDeskToggle").tap()
         XCTAssertFalse(element("bookshelf.readingPager").exists)
         capture("08-previous-compact-desk")
-        app.buttons["正在阅读书籍的更多操作"].firstMatch.tap()
+        assertCurrentBook("剑来").press(forDuration: 0.8)
         element("bookshelf.floatingDeskToggle").tap()
         XCTAssertTrue(element("bookshelf.readingPager").waitForExistence(timeout: 3))
         capture("09-restored-floating-desk")
@@ -297,6 +430,36 @@ final class FloatingReadingDeskUITests: XCTestCase {
         capture("11-reduced-motion-stepper")
     }
 
+    func testCollapsedShelfFiltersPreserveQueryAndThemeLayoutsHaveRealEntries() throws {
+        try launch(theme: "forest")
+        let search = app.textFields["在书架中搜索书名或作者..."]
+        XCTAssertFalse(search.exists)
+        let filters = app.buttons["bookshelf.filters"]
+        XCTAssertTrue(filters.isHittable)
+        filters.tap()
+        XCTAssertTrue(search.waitForExistence(timeout: 3))
+        search.tap()
+        search.typeText("剑来")
+        filters.tap()
+        XCTAssertFalse(search.exists)
+        XCTAssertEqual(filters.value as? String, "已启用筛选")
+        filters.tap()
+        XCTAssertEqual(search.value as? String, "剑来")
+        capture("23-collapsed-shelf-filter")
+        app.terminate()
+        for theme in ["editorial", "blueprint", "folio"] {
+            try launch(theme: theme)
+            let entry = assertCurrentBook("剑来")
+            XCTAssertTrue(entry.isHittable)
+            XCTAssertTrue(app.buttons["bookshelf.globalSearch"].isHittable)
+            capture("24-theme-layout-" + theme)
+            entry.press(forDuration: 0.8)
+            XCTAssertTrue(app.buttons["书籍详情"].firstMatch.waitForExistence(timeout: 3))
+            XCTAssertFalse(element("reader.webScrollSurface").exists)
+            app.terminate()
+        }
+    }
+
     func testSimulatorPagingPerformanceEvidenceNotADeviceFPSClaim() throws {
         try launch(theme: "classic")
         measurePaging("bookshelf.readingPager")
@@ -304,7 +467,7 @@ final class FloatingReadingDeskUITests: XCTestCase {
 
     func testPreviousStyleSimulatorPagingPerformanceBaseline() throws {
         try launch(theme: "classic")
-        app.buttons["正在阅读书籍的更多操作"].firstMatch.tap()
+        assertCurrentBook("剑来").press(forDuration: 0.8)
         element("bookshelf.floatingDeskToggle").tap()
         measurePaging("bookshelf.legacyReadingPager")
     }
@@ -331,7 +494,8 @@ final class FloatingReadingDeskUITests: XCTestCase {
         if let fixture { app.launchArguments.append(fixture) }
         if let theme { app.launchArguments += ["-settings.visualTheme", theme] }
         app.launch()
-        XCTAssertTrue(app.buttons["正在阅读书籍的更多操作"].firstMatch.waitForExistence(timeout: 10))
+        let entry = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "bookshelf.continue.")).firstMatch
+        XCTAssertTrue(entry.waitForExistence(timeout: 10))
     }
 
     private func rootTab(_ label: String, legacyID: String) -> XCUIElement {

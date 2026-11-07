@@ -25,21 +25,34 @@ struct SynchronousSourceNetworkBridge {
         let effectiveTimeout = timeout ?? request.timeout
         let semaphore = DispatchSemaphore(value: 0)
         let box = ResultBox()
-        Task.detached(priority: nil) {
+        let requestTask = Task.detached(priority: nil) {
+            defer { semaphore.signal() }
             // Legado 的 JS 网络调用同样走并发率限制（getConcurrentRecordBlocking）。
             let rateRule = SourceRateRule(request.concurrentRate)
             let rateKey = request.rateLimitKey
             if let rateRule, let rateKey {
-                await SourceRateLimiter.shared.acquire(key: rateKey, rule: rateRule)
+                do { try await SourceRateLimiter.shared.acquire(key: rateKey, rule: rateRule) }
+                catch {
+                    box.store(.failure(.network("请求已取消")))
+                    return
+                }
+            }
+            defer {
+                if let rateRule, let rateKey {
+                    SourceRateLimiter.shared.release(key: rateKey, rule: rateRule)
+                }
+            }
+            guard !Task.isCancelled else {
+                box.store(.failure(.network("请求已取消")))
+                return
             }
             let result = await network.load(request)
-            if let rateRule, let rateKey {
-                SourceRateLimiter.shared.release(key: rateKey, rule: rateRule)
-            }
             box.store(result)
-            semaphore.signal()
         }
-        guard semaphore.wait(timeout: .now() + effectiveTimeout) == .success else { return nil }
+        guard semaphore.wait(timeout: .now() + effectiveTimeout) == .success else {
+            requestTask.cancel()
+            return nil
+        }
         let result = box.load()
         guard case .success(let response) = result else { return result }
         let normalized = ResponseBodyDecoder().normalize(response, preferredCharset: request.expectedCharset)

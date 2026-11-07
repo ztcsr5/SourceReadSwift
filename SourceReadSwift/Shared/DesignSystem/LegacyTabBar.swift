@@ -35,6 +35,7 @@ struct LegacyTabBar: View {
             }
             .buttonStyle(AppPressStyle())
             .accessibilityLabel("全网搜书")
+            .accessibilityIdentifier("bookshelf.globalSearch")
         }
         .padding(.horizontal, 12)
         .padding(.bottom, 6)

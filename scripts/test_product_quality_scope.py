@@ -23,26 +23,99 @@ def read_source(path):
 
 
 class ProductQualityScopeTests(unittest.TestCase):
+    def test_cbz_import_uses_atomic_files_and_the_comic_route_not_the_novel_surface(self):
+        parser = read_source(APP + "Core/Import/LocalComicBookParser.swift")
+        self.assertIn("guard checksum == entry.checksum", parser)
+        self.assertIn("entry.type != .symlink", parser)
+        self.assertIn("FileManager.default.moveItem(at: staging, to: destination)", parser)
+        self.assertIn("guard paths.count <= 600", parser)
+        gateway = read_source(SHELF + "BookshelfReaderGatewayView.swift")
+        self.assertLess(gateway.index('book.sourceURL == "local://comic"'),
+                        gateway.index("else if !localBookChapters.isEmpty"))
+        self.assertIn("LocalComicSourceEngine(book: currentBook)", gateway)
+        project = read_source("project.yml")
+        self.assertIn("UTTypeIdentifier: com.edc21.sourceread.cbz", project)
+        library = read_source(SHELF + "BookshelfView.swift")
+        self.assertIn("bookImportTask?.cancel()", library)
+        self.assertIn("onCancel: { parserTask.cancel() }", library)
+
+    def test_preview_membership_acknowledges_disk_writes_and_resume_ignores_temporary_top(self):
+        detail = read_source(DETAIL)
+        addition = detail.split("private func addCurrentBookToShelf()", 1)[1].split(
+            "private func recordPreviewPosition", 1)[0]
+        self.assertIn("appState.finishReadingWritesInBackground()", addition)
+        self.assertLess(addition.index("await appState.bookshelfStore.waitForPendingWrites()"),
+                        addition.index("isSavingShelfPosition = false"))
+        comic = read_source(APP + "Features/Reader/ComicReaderView.swift")
+        position = comic.split("onPosition: { anchor, isSettled in", 1)[1].split(")", 1)[0]
+        self.assertLess(position.index("guard resumeTarget == nil"),
+                        position.index("viewportPosition.anchor = anchor"))
+
+    def test_shelf_reader_returns_through_the_route_owner_after_child_presentations(self):
+        gateway = read_source(SHELF + "BookshelfReaderGatewayView.swift")
+        self.assertEqual(gateway.count("onRequestExit: requestGatewayExit"), 5)
+        route = gateway.split("private func requestGatewayExit()", 1)[1].split("    private ", 1)[0]
+        self.assertIn("if let onRequestExit", route)
+        self.assertIn("dismiss()", route)
+
     def test_startup_evidence_requires_explicit_regression_mode_and_has_no_prose_or_url(self):
         web = read_source(APP + "Features/Reader/WebScrollReaderView.swift")
         snapshot = web.split("private func recordStartupEvidence(", 1)[1].split("#endif", 1)[0]
-        self.assertIn('ProcessInfo.processInfo.arguments.contains("--floating-desk-regression")', snapshot)
+        fixtures = web.split("private static let recordsStartupEvidence =", 1)[1].split("#endif", 1)[0]
+        self.assertIn('ProcessInfo.processInfo.arguments.contains("--floating-desk-regression")', fixtures)
+        self.assertIn('ProcessInfo.processInfo.arguments.contains("--reader-settings-regression")', fixtures)
+        self.assertIn("guard Self.recordsStartupEvidence else { return }", snapshot)
         for forbidden in ["textContent", "innerHTML", "location.href", "absoluteString", "CADisplayLink", "Timer"]:
             self.assertNotIn(forbidden, snapshot)
         probe = web.split("private func verifyStartupBridge(", 1)[1].split("private func recordStartupEvidence(", 1)[0]
         self.assertIn("guard !hasReportedPosition else { return }", probe)
         self.assertIn("#if DEBUG", probe)
 
+    def test_native_more_menu_consumes_its_dismissal_without_toggling_the_prose_overlay(self):
+        reader = read_source(READER)
+        button = read_source(APP + "Features/Reader/ReaderNativeMenuButton.swift")
+        tap = reader.split("private func handleReaderTap(", 1)[1].split("private func runTapAction", 1)[0]
+        self.assertIn("!nativeMoreMenuPresentation.isActive", tap)
+        self.assertLess(tap.index("nativeMoreMenuPresentation.isActive"), tap.index("tapCooldownUntil"))
+        self.assertIn("presentation: nativeMoreMenuPresentation", reader)
+        self.assertIn("willDisplayMenuFor configuration", button)
+        self.assertIn("willEndFor configuration", button)
+        self.assertIn("animator.addCompletion(finish)", button)
+
+    def test_comic_streaming_playlists_are_classified_before_generic_rule_parsing(self):
+        parser = read_source(APP + "Core/Rules/ContentParser.swift")
+        header = "if source.sourceKind == .comic, Self.isStreamingPlaylist("
+        self.assertIn(header, parser)
+        self.assertLess(parser.index(header), parser.index("let contentRuleStr"))
+        self.assertIn("return .failure(.unsupported(", parser[parser.index(header):parser.index("let contentRuleStr")])
+        self.assertIn('body.hasPrefix("#EXTM3U', parser)
+
     def test_startup_fault_is_installed_before_the_first_navigation(self):
         web = read_source(APP + "Features/Reader/WebScrollReaderView.swift")
         creation = web.split("func makeWebView(", 1)[1].split("func tearDown(", 1)[0]
         self.assertLess(creation.index("prepareBeforeNavigation?(webView)"),
-                        creation.index("webView.loadHTMLString("))
+                        creation.index("navigateToShell(webView: webView)"))
+        navigation = web.split("private func navigateToShell(", 1)[1].split("private func scheduleStartupProbe", 1)[0]
+        self.assertLess(navigation.index("navigationToken ="), navigation.index("webView.loadHTMLString("))
+        self.assertIn("WebReaderHTML.renderShell(for: navigationID)", navigation)
         fixture = read_source("SourceReadSwiftTests/ReaderModePositionRegressionTests.swift")
         self.assertIn("makeWebView(initialView: fixture, prepareBeforeNavigation:", fixture)
         for original in ["XCTAssertEqual(fault.injections, 1)", "XCTAssertEqual(coordinator.startupRecoveryCount, 1)",
                          "XCTAssertGreaterThan(offset, 500)", "XCTAssertLessThanOrEqual(offset, 600"]:
             self.assertIn(original, fixture)
+
+    def test_late_shell_readiness_cannot_invalidate_already_mounted_prose(self):
+        web = read_source(APP + "Features/Reader/WebScrollReaderView.swift")
+        ready = web.split('case "ready":', 1)[1].split('case "content-ready":', 1)[0]
+        for reset in ["isDocumentReady = false", "mountedContent = nil", "expectedContentRevision ="]:
+            self.assertNotIn(reset, ready)
+        messages = web.split("func userContentController(", 1)[1].split('case "ready":', 1)[0]
+        self.assertIn('body["navigationToken"] as? String == navigationToken', messages)
+        probe = web.split("private func verifyStartupBridge(", 1)[1].split("private func recordStartupEvidence(", 1)[0]
+        self.assertIn("self.navigationToken == navigationToken", probe)
+        fixture = read_source("SourceReadSwiftTests/ReaderModePositionRegressionTests.swift")
+        self.assertIn("testLateReadyFromTheMountedShellDoesNotInvalidateItsFirstVisiblePosition", fixture)
+        self.assertIn('XCTAssertEqual(bridge.mountedRevisions.count, 1', fixture)
 
     def test_mode_switch_saves_resolved_chapter_and_local_paragraph(self):
         mode = read_source(READER).split(".onChange(of: readerModeRawValue)", 1)[1].split(
@@ -80,14 +153,14 @@ class ProductQualityScopeTests(unittest.TestCase):
         self.assertIn(".lineLimit(2)", desk)
         self.assertIn("}.frame(height: Self.stageEnvelopeHeight)", desk)
 
-    def test_desk_has_independent_management_and_no_hold_menu(self):
+    def test_desk_restores_native_hold_management_and_keeps_direct_reading(self):
         shelf = read_source(SHELF + "BookshelfView.swift")
         card = shelf.split("private func heroCard", 1)[1].split("private func updateRow", 1)[0]
         self.assertIn("contextualBookRoute = .read(book, coverFrame: readingCoverHandoff.frame(for: book))", card)
-        self.assertNotIn(".contextMenu", card)
+        self.assertIn(".contextMenu", card)
         self.assertNotIn(".onLongPressGesture", card)
         self.assertIn("readingDeskEntry(book)", card)
-        self.assertIn("readingDeskMenu(book)", card)
+        self.assertNotIn("readingDeskMenu(book)", card)
         self.assertEqual(card.count("readingDeskBookActions(book)"), 1)
         self.assertIn(".contextMenu", shelf.split("private func updateRow", 1)[1])
         self.assertIn('contextualBookRoute = .detail(book, placement: "continue")', card)
