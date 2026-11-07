@@ -17,7 +17,7 @@ struct BookDetailView: View {
     @State private var detail: BookDetail?
     @State private var chapters: [BookChapter] = []
     @State private var loadGeneration = UUID()
-    @State private var tocExpansionTask: Task<Void, Never>?
+    @State private var needsTOCExpansion = false
     @State private var isLoading = false
     @State private var errorMessage: String?
     @State private var comicDownloadRequest: UUID?
@@ -222,9 +222,13 @@ struct BookDetailView: View {
             }
         }
         .task {
-            guard chapters.isEmpty, errorMessage == nil else { return }
-            SourceSwitchCacheStore.shared.remember(books: availableSources + [book])
-            await load()
+            if chapters.isEmpty, errorMessage == nil {
+                SourceSwitchCacheStore.shared.remember(books: availableSources + [book])
+                await load()
+            } else if needsTOCExpansion, let detail,
+                      let source = appState.sourceStore.source(for: book.sourceUrl) {
+                await extendTOC(source: source, detail: detail, generation: loadGeneration)
+            }
         }
         .task(id: comicDownloadRequest) {
             if let request = comicDownloadRequest { await prepareComicDownload(request: request) }
@@ -360,8 +364,8 @@ struct BookDetailView: View {
                 .font(.subheadline.weight(.semibold))
                 .frame(maxWidth: .infinity, minHeight: 44)
                 .padding(.horizontal, 12)
-                .background(AppTheme.accent, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-                .foregroundStyle(.white)
+                .background(AppTheme.prominentFill, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                .foregroundStyle(AppTheme.prominentInk)
         }
         .buttonStyle(BookOpenPressStyle())
         .accessibilityIdentifier("bookDetail.read")
@@ -416,7 +420,7 @@ struct BookDetailView: View {
                 HStack {
                     if isDownloadingZlib {
                         ProgressView()
-                            .tint(.white)
+                            .tint(AppTheme.prominentInk)
                             .padding(.trailing, 6)
                         Text("正在高速下载中...")
                     } else {
@@ -427,8 +431,8 @@ struct BookDetailView: View {
                 .font(.headline)
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 14)
-                .background(AppTheme.accent, in: RoundedRectangle(cornerRadius: AppTheme.cardRadius, style: .continuous))
-                .foregroundStyle(.white)
+                .background(AppTheme.prominentFill, in: RoundedRectangle(cornerRadius: AppTheme.cardRadius, style: .continuous))
+                .foregroundStyle(AppTheme.prominentInk)
             }
             .buttonStyle(AppPressStyle())
             .disabled(isDownloadingZlib)
@@ -462,7 +466,7 @@ struct BookDetailView: View {
     }
 
     private func detailCard(_ detail: BookDetail?) -> some View {
-        BookDetailSummary(detail: detail, fallbackIntro: displayBook.intro)
+        BookDetailSummary(detail: detail, fallbackIntro: book.intro)
     }
 
     private var audioBookActionCard: some View {
@@ -482,11 +486,11 @@ struct BookDetailView: View {
             HStack(spacing: 14) {
                 ZStack {
                     Circle()
-                        .fill(AppTheme.accent)
+                        .fill(AppTheme.prominentFill)
                         .frame(width: 48, height: 48)
                     Image(systemName: "headphones")
                         .font(.title3)
-                        .foregroundStyle(.white)
+                        .foregroundStyle(AppTheme.prominentInk)
                 }
 
                 VStack(alignment: .leading, spacing: 3) {
@@ -855,16 +859,21 @@ struct BookDetailView: View {
 
         // 目录缓存命中：先把上次的详情 + 目录画出来，网络请求放到后台，
         // 详情页不再为了等 `getChapterList` 的几十页分页而白屏。
+        let requestedBookID = book.id
+        let requestGeneration = loadGeneration
         if !ignoreCache,
-           let cached = appState.bookTOCacheStore.entry(sourceURL: book.sourceUrl, bookURL: book.bookUrl),
+           let cached = await appState.bookTOCacheStore.entryForReader(sourceURL: book.sourceUrl, bookURL: book.bookUrl),
            !cached.chapters.isEmpty {
+            guard !Task.isCancelled, book.id == requestedBookID, loadGeneration == requestGeneration else { return }
             if detail == nil { detail = cached.detail }
             chapters = cached.chapters
             errorMessage = nil
-            Task { await refreshDetailAndTOC(source: source, reportErrors: false) }
+            // Keep refresh in the page task so a pop cancels outstanding work.
+            await refreshDetailAndTOC(source: source, reportErrors: false)
             return
         }
 
+        guard !Task.isCancelled, book.id == requestedBookID, loadGeneration == requestGeneration else { return }
         guard detail == nil || ignoreCache else { return }
 
         isLoading = true
@@ -884,7 +893,7 @@ struct BookDetailView: View {
         let selectedBook = book
         let generation = UUID()
         loadGeneration = generation
-        tocExpansionTask?.cancel()
+        defer { if loadGeneration == generation { isLoading = false } }
         let stagedFirstPaint = chapters.isEmpty
         let placeholder = BookDetail(name: selectedBook.name, author: selectedBook.author,
             coverUrl: selectedBook.coverUrl, bookUrl: selectedBook.bookUrl, tocUrl: nil,
@@ -951,7 +960,8 @@ struct BookDetailView: View {
         guard current() else { return }
         if appState.bookshelfStore.contains(selectedBook), let fetchedDetail {
             appState.bookshelfStore.updateDetails(bookID: selectedBook.id,
-                latestChapterTitle: fetchedDetail.latestChapter, intro: fetchedDetail.intro,
+                latestChapterTitle: fetchedDetail.latestChapter,
+                intro: BookDetailSummary.preferredIntro(detail: fetchedDetail.intro, fallback: selectedBook.intro),
                 totalChapters: chapters.count, coverURL: fetchedDetail.coverUrl, mediaKind: fetchedDetail.mediaKind)
         }
         isLoading = false
@@ -960,30 +970,32 @@ struct BookDetailView: View {
         if !chapters.isEmpty {
             appState.bookTOCacheStore.save(detail: cacheDetail, chapters: chapters,
                 sourceURL: selectedBook.sourceUrl, bookURL: selectedBook.bookUrl, isComplete: !stagedFirstPaint)
-            if stagedFirstPaint { extendTOCInBackground(source: source, detail: cacheDetail, generation: generation) }
+            if stagedFirstPaint {
+                needsTOCExpansion = true
+                await extendTOC(source: source, detail: cacheDetail, generation: generation)
+            }
         }
     }
 
-    private func extendTOCInBackground(source: BookSource, detail loadedDetail: BookDetail, generation: UUID) {
+    private func extendTOC(source: BookSource, detail loadedDetail: BookDetail, generation: UUID) async {
         let engine = appState.engine
         let bookURL = book.bookUrl
         let sourceURL = book.sourceUrl
-        tocExpansionTask = Task { @MainActor in
-            let result = await engine.getChapterList(source: source, book: loadedDetail)
-            guard !Task.isCancelled, loadGeneration == generation,
-                  book.bookUrl == bookURL, book.sourceUrl == sourceURL,
-                  case .success(let full) = result, !full.isEmpty, full.count >= chapters.count else { return }
-            chapters = full
-            appState.bookTOCacheStore.save(detail: loadedDetail, chapters: full,
-                sourceURL: sourceURL, bookURL: bookURL)
-        }
+        let result = await engine.getChapterList(source: source, book: loadedDetail)
+        guard !Task.isCancelled, loadGeneration == generation,
+              book.bookUrl == bookURL, book.sourceUrl == sourceURL,
+              case .success(let full) = result, !full.isEmpty, full.count >= chapters.count else { return }
+        chapters = full
+        needsTOCExpansion = false
+        appState.bookTOCacheStore.save(detail: loadedDetail, chapters: full,
+            sourceURL: sourceURL, bookURL: bookURL)
     }
 
     private func reload() async {
         // A source switch supersedes an in-flight load; it must not be dropped
         // by load()'s duplicate-request guard after the page has been cleared.
         loadGeneration = UUID()
-        tocExpansionTask?.cancel()
+        needsTOCExpansion = false
         isLoading = false
         detail = nil
         chapters = []

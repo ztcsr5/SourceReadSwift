@@ -21,7 +21,9 @@ class HomePresentationTests(unittest.TestCase):
         self.assertIn('if !allBooks.isEmpty, showsShelfFilters', source)
         header = source.split('private var shelfHeader:', 1)[1].split('private func mainGroupChip', 1)[0]
         self.assertLess(header.index('bookshelf.filters'), header.index('BookshelfSortMode.allCases'))
-        self.assertIn('bookshelf.globalSearch', source)
+        self.assertIn('bookshelf.filterQuery', source)
+        tab_bar = (ROOT / 'SourceReadSwift/Shared/DesignSystem/LegacyTabBar.swift').read_text(encoding='utf8')
+        self.assertIn('bookshelf.globalSearch', tab_bar)
 
     def test_shelf_cover_has_one_fixed_book_silhouette(self):
         source = (ROOT / 'SourceReadSwift/Features/Bookshelf/ShelfBookCover.swift').read_text(encoding='utf8')
@@ -35,6 +37,14 @@ class HomePresentationTests(unittest.TestCase):
         self.assertIn('if accessible { try await attachScrolledLayouts', source)
         self.assertIn('Evidence must reach the final shelf row', source)
         self.assertIn('animated: false', source)
+
+    def test_theme_evidence_is_batched_without_omitting_any_theme(self):
+        source = (ROOT / 'SourceReadSwiftTests/HomeLayoutEvidenceTests.swift').read_text(encoding='utf8')
+        for group in ('originalThemes', 'initialAtelierThemes', 'addedAtelierThemes'):
+            self.assertIn(f'try await captureHomeLayouts(themes: Self.{group})', source)
+        self.assertIn('testHomeEvidenceGroupsCoverEveryRequestedThemeExactlyOnce', source)
+        self.assertIn('AppVisualTheme.atelierThemes', source)
+        self.assertIn('XCTAssertEqual(grouped.map', source)
 
 
 if __name__ == '__main__':

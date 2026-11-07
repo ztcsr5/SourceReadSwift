@@ -20,6 +20,8 @@ enum AppTheme {
         return color(for: theme.preferenceKey("accent"), fallback: theme.accentHex, darkFallback: theme.darkAccentHex)
     }
     static var accent: Color { Color(uiColor: accentUIColor) }
+    static var prominentFill: Color { AppVisualTheme.current.atelierPalette?.emphasisFill ?? accent }
+    static var prominentInk: Color { AppVisualTheme.current.atelierPalette?.emphasisInk ?? .white }
     static var secondaryAccent: Color {
         let theme = AppVisualTheme.current
         return Color(uiColor: color(for: theme.preferenceKey("secondaryAccent"), fallback: theme.secondaryHex,

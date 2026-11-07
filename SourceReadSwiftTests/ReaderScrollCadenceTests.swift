@@ -158,6 +158,65 @@ final class ReaderScrollCadenceTests: XCTestCase {
         XCTAssertTrue((outcome["nextText"] as? String)?.contains("预取就绪") == true)
     }
 
+    @MainActor func testNextChapterBodyArrivalPreservesItsVisibleTitleAndInertia() async throws {
+        let web = WKWebView(frame: CGRect(x: 0, y: 0, width: 390, height: 760))
+        let scene = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.first
+        let previous = scene?.windows.first(where: \.isKeyWindow)
+        let window = scene.map { UIWindow(windowScene: $0) } ?? UIWindow(frame: UIScreen.main.bounds)
+        let host = UIViewController(); window.rootViewController = host; window.makeKeyAndVisible(); host.view.addSubview(web)
+        defer { web.stopLoading(); window.isHidden = true; previous?.makeKey() }
+        web.loadHTMLString(WebReaderHTML.shell, baseURL: nil)
+        for _ in 0..<100 {
+            if (try? await web.evaluateJavaScript("!!window.__reader")) as? Bool == true { break }
+            try await Task.sleep(nanoseconds: 100_000_000)
+        }
+        let first = WebReaderSection(chapterIndex: 0, title: "第一章",
+            paragraphs: Array(repeating: String(repeating: "窗外的风穿过树梢。", count: 10), count: 40))
+        let pending = WebReaderSection(chapterIndex: 1, title: "第二章", paragraphs: [], isReady: false)
+        let base = WebReaderContentPayloadBuilder.Snapshot(sections: [first, pending], showChapterEndBadge: false,
+            traditionalChineseEnabled: false, revision: "pending-title")
+        let resolved = [first, WebReaderSection(chapterIndex: 1, title: "第二章",
+            paragraphs: Array(repeating: String(repeating: "下一章的正文已经到达。", count: 8), count: 30))]
+        let next = WebReaderContentPayloadBuilder.Snapshot(sections: resolved, showChapterEndBadge: false,
+            traditionalChineseEnabled: false, revision: "resolved-title")
+        let full = try XCTUnwrap(WebReaderContentPayloadBuilder.json(sections: [first, pending], snapshot: base))
+        let delta = try XCTUnwrap(WebReaderContentPayloadBuilder.json(sections: resolved, snapshot: next, reusing: base))
+        for footer in [24, 900] {
+            let outcome = try await web.evaluateJavaScript("""
+            (() => {
+              window.__reader.setStyle({fontFamily:'sans-serif',fontWeight:400,fontSize:20,lineHeight:1.4,
+                letterSpacing:0,paragraphSpacing:12,paragraphIndent:40,sidePadding:20,topInset:50,
+                bottomInset:\(footer),titleSize:26,titleSpacing:16,textColor:'#000000',surfaceColor:'#ffffff',
+                highlightColor:'#ffff00',accentColor:'#6666cc',selectable:false});
+              window.__reader.setContent(JSON.parse(\(WebReaderJavaScriptLiteral.string(full))));
+              const section = document.querySelector('[data-key="c1"]');
+              const heading = section.firstElementChild;
+              window.scrollTo(0,heading.getBoundingClientRect().top + window.scrollY - 50);
+              const before = heading.getBoundingClientRect().top;
+              const original = window.scrollTo.bind(window);
+              let commands = 0;
+              window.scrollTo = (...args)=>{commands++;original(...args);};
+              const accepted = window.__reader.setContent(JSON.parse(\(WebReaderJavaScriptLiteral.string(delta))));
+              window.scrollTo = original;
+              return {accepted,commands,before,after:heading.getBoundingClientRect().top,
+                sameHeading:document.querySelector('[data-key="c1"]').firstElementChild===heading,
+                connected:heading.isConnected,paragraphs:section.querySelectorAll('.para').length};
+            })();
+            """) as? [String: Any]
+            let result = try XCTUnwrap(outcome)
+            XCTAssertEqual(result["accepted"] as? Bool, true)
+            XCTAssertEqual(result["sameHeading"] as? Bool, true)
+            XCTAssertEqual(result["connected"] as? Bool, true)
+            XCTAssertEqual(result["commands"] as? Int, 0, "Resolving prose below the visible title must not cancel WebKit deceleration")
+            XCTAssertEqual(result["paragraphs"] as? Int, 30)
+            let before = try XCTUnwrap(result["before"] as? Double)
+            let after = try XCTUnwrap(result["after"] as? Double)
+            XCTAssertEqual(after, before, accuracy: 1)
+            XCTAssertGreaterThan(before, 0)
+            XCTAssertLessThan(before, 760)
+        }
+    }
+
     @MainActor func testPositionOnlyUpdatesDoNotRebuildTypographyOrFontLookup() async throws {
         func fixture(index: Int = -1, size: Double = 20) -> WebScrollReaderView {
             WebScrollReaderView(sections: [.init(chapterIndex: 0, title: "第一章", paragraphs: ["正文"])],

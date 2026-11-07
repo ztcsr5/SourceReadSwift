@@ -10,7 +10,7 @@ struct AppearanceSettingsView: View {
     var body: some View {
         Form {
             Section {
-                themeRows(AppVisualTheme.classicDeskThemes)
+                themeRows(AppVisualTheme.classicDeskThemes.filter { !$0.isAtelier })
             } header: { Text("经典书台") } footer: {
                 Text("主题同时切换首页编排、书架陈列、页面纸面和控件边框。原初白紫保留现有书台；书刊、索引和藏书票各有独立布局。")
             }
@@ -23,6 +23,11 @@ struct AppearanceSettingsView: View {
                      : "当前系统使用兼容材质；滚动卡片使用主题纸面，减少透明度或增强对比度时不叠加实时模糊。")
             }
             .listRowBackground(AppThemeRowSurface())
+            Section {
+                themeRows(AppVisualTheme.atelierThemes)
+            } header: { Text("色彩沙龙") } footer: {
+                Text("七组双色搭配，同时改变纸面、卡片轮廓、边缘装饰、阅读卡和书架编排。明暗模式分别调色，保留你已保存的阅读背景。")
+            }
             Section {
                 Toggle("空间书桌与藏书档案", isOn: $readingDeskEnabled)
                 Text("关闭后使用经典紧凑展示。书籍、阅读位置、主题和系统导航保持不变。")
@@ -93,6 +98,17 @@ struct AppThemePreview: View {
             compositionPreview
             .foregroundStyle(theme.dynamicColor(light: theme.accentHex, dark: theme.darkAccentHex))
             .frame(width: 56, height: 56)
+            .overlay(alignment: .bottom) {
+                if let palette = theme.atelierPalette {
+                    HStack(spacing: 0) {
+                        Rectangle().fill(palette.primary)
+                        Rectangle().fill(palette.secondary)
+                    }
+                    .frame(width: 36, height: 5)
+                    .padding(.bottom, 4)
+                    .accessibilityHidden(true)
+                }
+            }
             .background(theme.dynamicColor(light: theme.backgroundHex, dark: theme.darkBackgroundHex),
                         in: RoundedRectangle(cornerRadius: min(theme.radius, 14)))
             .overlay { AppThemeOrnament(theme: theme, isCard: true) }

@@ -40,8 +40,8 @@ final class RemoteImageLoader: @unchecked Sendable {
     static let shared = RemoteImageLoader()
     private static let boundedSession: URLSession = {
         let configuration = URLSessionConfiguration.default
-        configuration.timeoutIntervalForRequest = 18
-        configuration.timeoutIntervalForResource = 30
+        configuration.timeoutIntervalForRequest = ComicImageTimeoutPolicy.defaultRequest
+        configuration.timeoutIntervalForResource = ComicImageTimeoutPolicy.defaultResource
         return URLSession(configuration: configuration)
     }()
 
@@ -226,7 +226,7 @@ final class RemoteImageLoader: @unchecked Sendable {
             return .success(.init(bytes: bytes, request: nil))
         }
         guard let scheme = url.scheme?.lowercased(), scheme == "http" || scheme == "https" else { return .failure(.invalidResponse) }
-        var request = URLRequest(url: url, timeoutInterval: 18)
+        var request = URLRequest(url: url, timeoutInterval: ComicImageTimeoutPolicy.defaultRequest)
         for (name, value) in headers { request.setValue(value, forHTTPHeaderField: name) }
         let result = await comicTransport.load(request)
         if case .failure(let error) = result, error != .cancelled {

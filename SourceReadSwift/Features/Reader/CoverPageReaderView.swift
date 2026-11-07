@@ -233,13 +233,10 @@ final class CoverPageHostController: UIViewController, UIGestureRecognizerDelega
                     if oldRevision != next.revision { host.rootView = root }
                     return host
                 }
-                let host = UIHostingController(rootView: root)
-                host.view.accessibilityIdentifier = "reader.page.\(key)"
-                addChild(host)
-                view.addSubview(host.view)
-                host.didMove(toParent: self)
-                hosts[key] = host
-                return host
+                // Distant pages are not visible in this transaction. Mounting
+                // their hosting trees here steals the first frame after a turn.
+                guard index > 0 && index < 4 else { return nil }
+                return mountPage(key: key, root: root)
             }
         }
         for (index, host) in active.enumerated() {
@@ -297,12 +294,44 @@ final class CoverPageHostController: UIViewController, UIGestureRecognizerDelega
         }
     }
 
+    private func mountPage(key: String, root: AnyView) -> UIHostingController<AnyView> {
+        let host = UIHostingController(rootView: root)
+        host.view.accessibilityIdentifier = "reader.page.\(key)"
+        addChild(host)
+        view.addSubview(host.view)
+        host.didMove(toParent: self)
+        hosts[key] = host
+        return host
+    }
+
     private func scheduleWarmup() {
         let generation = warmupGeneration
         DispatchQueue.main.async { [weak self] in
-            guard let self, !self.isTornDown, self.warmupGeneration == generation, !self.isDragging,
-                  self.animator == nil, self.awaitingIdentityChangeFrom == nil else { return }
-            for host in self.active { host?.view.layoutIfNeeded() }
+            guard let self, self.canWarmPages(generation: generation) else { return }
+            for index in 1...3 { self.active[index]?.view.layoutIfNeeded() }
+            self.warmDistantPage(at: 4, generation: generation)
+        }
+    }
+
+    private func canWarmPages(generation: Int) -> Bool {
+        !isTornDown && warmupGeneration == generation && !isDragging
+            && animator == nil && awaitingIdentityChangeFrom == nil && active.count == 5
+    }
+
+    private func warmDistantPage(at index: Int, generation: Int) {
+        DispatchQueue.main.async { [weak self] in
+            guard let self, self.canWarmPages(generation: generation), let window = self.window else { return }
+            if self.active[index] == nil, !window.keys[index].isEmpty, let root = window.roots[index] {
+                let host = self.mountPage(key: window.keys[index], root: root)
+                self.active[index] = host
+                host.view.backgroundColor = window.paper ?? .clear
+                host.view.isOpaque = window.paper != nil
+                host.overrideUserInterfaceStyle = window.appearance
+                host.view.isHidden = true
+                self.sizePagesIfNeeded()
+                host.view.layoutIfNeeded()
+            }
+            if index == 4 { self.warmDistantPage(at: 0, generation: generation) }
         }
     }
 

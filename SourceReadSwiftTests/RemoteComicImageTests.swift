@@ -61,8 +61,8 @@ final class RemoteComicImageTests: XCTestCase {
         }
     }
 
-    func testOversizedComicResponsesStopBeforeTheServerFinishes() async throws {
-        for mode in HeldComicHTTPServer.Mode.allCases {
+    func testDeliveredOversizedComicResponsesStopBeforeTheServerFinishes() async throws {
+        for mode in [HeldComicHTTPServer.Mode.declaredPrefix, .chunked] {
             let server = try HeldComicHTTPServer(mode: mode)
             defer { server.stop() }
             server.start()
@@ -79,19 +79,17 @@ final class RemoteComicImageTests: XCTestCase {
             let loader = RemoteImageLoader(session: session, configuration: configuration)
             let finished = expectation(description: "\(mode) must reject while the real HTTP peer withholds EOF")
             let load = Task {
-                print("[DIAG-TEST] \(mode) calling comicBytesForArchive for \(address.absoluteString)")
                 let result = await loader.comicBytesForArchive(ComicImageRequest(url: address.absoluteString, headers: [:]))
-                print("[DIAG-TEST] \(mode) comicBytesForArchive returned \(result)")
                 finished.fulfill()
                 return result
             }
             let wait = await XCTWaiter.fulfillment(of: [finished], timeout: 4)
-            print("[DIAG-TEST] \(mode) waiter finished with \(wait), server snapshot: \(server.snapshot)")
+            print("[DIAG-TEST] \(mode) waiter=\(wait) server=\(server.snapshot)")
             if wait != .completed { load.cancel() }
             let result = await load.value
             XCTAssertEqual(wait, .completed)
             guard case .failure(.tooLarge) = result else {
-                XCTFail("Expected the \(mode) real HTTP transfer to fail at the byte limit; received \(result); server snapshot: \(server.snapshot)")
+                XCTFail("Expected the visible \(mode) HTTP response to fail at the byte limit; received \(result)")
                 continue
             }
             for _ in 0..<100 {
@@ -100,7 +98,209 @@ final class RemoteComicImageTests: XCTestCase {
             }
             XCTAssertTrue(server.snapshot.sentHeaders)
             XCTAssertTrue(server.snapshot.peerClosed, "The client must stop the actual held-open connection")
-            if mode == .declared { XCTAssertEqual(server.snapshot.sentBodyBytes, 0) }
+            if mode == .declaredPrefix { XCTAssertEqual(server.snapshot.sentBodyBytes, 1) }
+        }
+    }
+
+    func testZeroBodyResponsesHonorConfiguredTimeoutAndNeverEnterTheImageCache() async throws {
+        for variant in HeldComicHTTPServer.HeaderVariant.allCases {
+            let server = try HeldComicHTTPServer(mode: .declared, headerVariant: variant)
+            defer { server.stop() }
+            server.start()
+            for _ in 0..<100 {
+                if server.snapshot.address != nil || server.snapshot.failure != nil { break }
+                try await Task.sleep(nanoseconds: 10_000_000)
+            }
+            let address = try XCTUnwrap(server.snapshot.address, server.snapshot.failure ?? "Loopback peer not ready")
+            let configuration = URLSessionConfiguration.ephemeral
+            configuration.protocolClasses = []
+            configuration.connectionProxyDictionary = [:]
+            configuration.timeoutIntervalForRequest = 2
+            configuration.timeoutIntervalForResource = 30
+            let session = URLSession(configuration: configuration)
+            defer { session.invalidateAndCancel() }
+            let loader = RemoteImageLoader(session: session, configuration: configuration)
+            let finished = expectation(description: "Invisible \(variant) response must use the configured deadline")
+            let startedAt = ProcessInfo.processInfo.systemUptime
+            let load = Task {
+                let result = await loader.comicPage(for: address, headers: [:], maxPixelSize: 4096)
+                finished.fulfill()
+                return result
+            }
+            let wait = await XCTWaiter.fulfillment(of: [finished], timeout: 4)
+            if wait != .completed { load.cancel() }
+            let result = await load.value
+            let elapsed = ProcessInfo.processInfo.systemUptime - startedAt
+            let outcome: String
+            switch result {
+            case .success: outcome = "unexpected-image"
+            case .failure(let failure): outcome = "failure=\(failure)"
+            }
+            print("[DIAG-ZERO-BODY-TIMEOUT] variant=\(variant.rawValue) elapsed=\(elapsed) result=\(outcome) server=\(server.snapshot)")
+            XCTAssertEqual(wait, .completed, "Do not extend the original four-second test budget")
+            guard case .failure(.timedOut) = result else {
+                XCTFail("Without a delivered response, expected timedOut, never invented tooLarge: \(result)")
+                continue
+            }
+            XCTAssertGreaterThanOrEqual(elapsed, 1.5, "A network failure before the configured deadline is not the expected timeout")
+            for _ in 0..<100 {
+                if server.snapshot.peerClosed { break }
+                try await Task.sleep(nanoseconds: 10_000_000)
+            }
+            XCTAssertNil(server.snapshot.failure)
+            XCTAssertTrue(server.snapshot.sentHeaders)
+            XCTAssertEqual(server.snapshot.sentBodyBytes, 0)
+            XCTAssertTrue(server.snapshot.peerClosed, "Timeout must close the real socket without server EOF")
+            XCTAssertNil(loader.cachedComicPage(for: address, headers: [:], maxPixelSize: 4096))
+            XCTAssertEqual(loader.comicSubscriberCount(for: address, headers: [:], maxPixelSize: 4096), 0)
+        }
+    }
+
+    func testZeroBodyResponseHonorsAShorterPerRequestDeadline() async throws {
+        let server = try HeldComicHTTPServer(mode: .declared)
+        defer { server.stop() }
+        server.start()
+        for _ in 0..<100 {
+            if server.snapshot.address != nil || server.snapshot.failure != nil { break }
+            try await Task.sleep(nanoseconds: 10_000_000)
+        }
+        let address = try XCTUnwrap(server.snapshot.address)
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.timeoutIntervalForRequest = 18
+        configuration.timeoutIntervalForResource = 30
+        configuration.protocolClasses = []
+        configuration.connectionProxyDictionary = [:]
+        let transport = ComicImageTransport(configuration: configuration)
+        let finished = expectation(description: "A shorter caller deadline must win over session defaults")
+        let load = Task {
+            let result = await transport.load(URLRequest(url: address, timeoutInterval: 2))
+            finished.fulfill()
+            return result
+        }
+        let wait = await XCTWaiter.fulfillment(of: [finished], timeout: 4)
+        if wait != .completed { load.cancel() }
+        let result = await load.value
+        XCTAssertEqual(wait, .completed)
+        guard case .failure(.timedOut) = result else { return XCTFail("Expected caller timeout: \(result)") }
+        for _ in 0..<100 {
+            if server.snapshot.peerClosed { break }
+            try await Task.sleep(nanoseconds: 10_000_000)
+        }
+        XCTAssertTrue(server.snapshot.sentHeaders)
+        XCTAssertEqual(server.snapshot.sentBodyBytes, 0)
+        XCTAssertTrue(server.snapshot.peerClosed)
+    }
+
+    func testComicTimeoutPolicyKeepsFiniteDefaultsAndTheShortestValidBound() {
+        XCTAssertEqual(ComicImageTimeoutPolicy.effectiveRequest(requested: 18, configured: 18, resource: 30), 18)
+        XCTAssertEqual(ComicImageTimeoutPolicy.effectiveRequest(requested: 18, configured: 2, resource: 30), 2)
+        XCTAssertEqual(ComicImageTimeoutPolicy.effectiveRequest(requested: 2, configured: 18, resource: 30), 2)
+        XCTAssertEqual(ComicImageTimeoutPolicy.effectiveRequest(requested: 18, configured: 18, resource: 2), 2)
+        for invalid in [0, -1, Double.infinity, Double.nan] {
+            XCTAssertEqual(ComicImageTimeoutPolicy.effectiveRequest(requested: invalid, configured: invalid, resource: invalid), 18)
+        }
+    }
+
+    func testZeroBodyFoundationDeliveryWithSingleVariableResponseHeaders() async throws {
+        // This measures delivery separately from the product's byte-limit and
+        // finite-timeout contracts. Neither server closes the response.
+        for variant in HeldComicHTTPServer.HeaderVariant.allCases {
+            let peer = try HeldComicHTTPServer(mode: .declaredPrefix, headerVariant: variant,
+                                              holdsPrefixUntilReleased: true)
+            let productionPeer = try HeldComicHTTPServer(mode: .declaredPrefix, headerVariant: variant,
+                                                        holdsPrefixUntilReleased: true)
+            let probe = HeldComicResponseProbe()
+            defer { probe.stop(); peer.stop(); productionPeer.stop() }
+            peer.start()
+            productionPeer.start()
+            for _ in 0..<100 {
+                if peer.snapshot.address != nil && productionPeer.snapshot.address != nil { break }
+                if peer.snapshot.failure != nil || productionPeer.snapshot.failure != nil { break }
+                try await Task.sleep(nanoseconds: 10_000_000)
+            }
+            let address = try XCTUnwrap(peer.snapshot.address, peer.snapshot.failure ?? "Loopback control not ready")
+            let productionAddress = try XCTUnwrap(productionPeer.snapshot.address,
+                                                  productionPeer.snapshot.failure ?? "Production peer not ready")
+            let configuration = URLSessionConfiguration.ephemeral
+            configuration.protocolClasses = []
+            configuration.connectionProxyDictionary = [:]
+            probe.start(url: address, configuration: configuration)
+            let session = URLSession(configuration: configuration)
+            defer { session.invalidateAndCancel() }
+            let loader = RemoteImageLoader(session: session, configuration: configuration)
+            let production = HeldComicTransferProbe()
+            let transfer = Task {
+                let result = await loader.comicBytesForArchive(ComicImageRequest(url: productionAddress.absoluteString, headers: [:]))
+                production.record(result)
+                return result
+            }
+            defer { transfer.cancel() }
+            for _ in 0..<100 {
+                if peer.snapshot.sentHeaders && productionPeer.snapshot.sentHeaders { break }
+                if peer.snapshot.failure != nil || productionPeer.snapshot.failure != nil { break }
+                try await Task.sleep(nanoseconds: 10_000_000)
+            }
+            XCTAssertNil(peer.snapshot.failure)
+            XCTAssertNil(productionPeer.snapshot.failure)
+            XCTAssertTrue(peer.snapshot.sentHeaders)
+            XCTAssertTrue(productionPeer.snapshot.sentHeaders)
+            let deadline = ProcessInfo.processInfo.systemUptime + 4
+            while (!probe.hasReceivedResponse || production.snapshot == nil) && ProcessInfo.processInfo.systemUptime < deadline {
+                try await Task.sleep(nanoseconds: 10_000_000)
+            }
+            print("[DIAG-HEADER-VARIANT] variant=\(variant.rawValue) phase=zero-body control=\(probe.summary) server=\(peer.snapshot)")
+            print("[DIAG-HEADER-VARIANT] variant=\(variant.rawValue) phase=zero-body production=\(production.summary) server=\(productionPeer.snapshot)")
+            XCTAssertEqual(peer.snapshot.sentBodyBytes, 0, "The control must first hold exactly zero body bytes")
+            XCTAssertEqual(productionPeer.snapshot.sentBodyBytes, 0, "The production peer must first hold exactly zero body bytes")
+
+            // These are measurement steps, not presumed CFNetwork thresholds.
+            // Headers and connection identity stay fixed, and neither peer sends EOF.
+            let targets = [variant.bodyPrefix.count, 256, 512, 1024, 4096, 16_384, 65_536]
+            let releasedAt = ProcessInfo.processInfo.systemUptime
+            let observationDeadline = releasedAt + 4
+            var finalTarget = 0
+            for target in targets {
+                finalTarget = target
+                if !probe.hasReceivedResponse { peer.releasePrefix(upTo: target) }
+                if production.snapshot == nil { productionPeer.releasePrefix(upTo: target) }
+                let stepDeadline = min(ProcessInfo.processInfo.systemUptime + 0.5, observationDeadline)
+                while (!probe.hasReceivedResponse || production.snapshot == nil) && ProcessInfo.processInfo.systemUptime < stepDeadline {
+                    try await Task.sleep(nanoseconds: 10_000_000)
+                }
+                print("[DIAG-HEADER-VARIANT] variant=\(variant.rawValue) phase=prefix targetBytes=\(target) elapsed=\(ProcessInfo.processInfo.systemUptime - releasedAt) control=\(probe.summary) server=\(peer.snapshot)")
+                print("[DIAG-HEADER-VARIANT] variant=\(variant.rawValue) phase=prefix targetBytes=\(target) production=\(production.summary) server=\(productionPeer.snapshot)")
+                XCTAssertLessThanOrEqual(peer.snapshot.sentBodyBytes, target)
+                XCTAssertLessThanOrEqual(productionPeer.snapshot.sentBodyBytes, target)
+                if !probe.hasReceivedResponse { XCTAssertEqual(peer.snapshot.sentBodyBytes, target) }
+                if production.snapshot == nil { XCTAssertEqual(productionPeer.snapshot.sentBodyBytes, target) }
+                if probe.hasReceivedResponse && production.snapshot != nil { break }
+                if ProcessInfo.processInfo.systemUptime >= observationDeadline { break }
+            }
+            while (!probe.hasReceivedResponse || production.snapshot == nil) && ProcessInfo.processInfo.systemUptime < observationDeadline {
+                try await Task.sleep(nanoseconds: 10_000_000)
+            }
+            print("[DIAG-HEADER-VARIANT] variant=\(variant.rawValue) phase=final control=\(probe.summary) server=\(peer.snapshot)")
+            print("[DIAG-HEADER-VARIANT] variant=\(variant.rawValue) phase=final production=\(production.summary) server=\(productionPeer.snapshot)")
+            peer.finishPrefix()
+            productionPeer.finishPrefix()
+            XCTAssertTrue(probe.hasReceivedResponse,
+                          "No Foundation response delivered within the bounded prefix experiment; inspect exact sent-byte logs")
+            XCTAssertNotNil(production.snapshot,
+                            "Production must reject the delivered oversized response within the same bounded experiment")
+            if production.snapshot == nil { transfer.cancel() }
+            let result = await transfer.value
+            guard case .failure(.tooLarge) = result else {
+                XCTFail("Production must reject the visible oversized response, not pass by cancellation: \(result)")
+                continue
+            }
+            XCTAssertLessThanOrEqual(peer.snapshot.sentBodyBytes, finalTarget)
+            XCTAssertLessThanOrEqual(productionPeer.snapshot.sentBodyBytes, finalTarget)
+            for _ in 0..<100 {
+                if peer.snapshot.peerClosed && productionPeer.snapshot.peerClosed { break }
+                try await Task.sleep(nanoseconds: 10_000_000)
+            }
+            XCTAssertTrue(peer.snapshot.peerClosed, "Foundation rejection must close the actual socket")
+            XCTAssertTrue(productionPeer.snapshot.peerClosed, "Production rejection must close the actual socket")
         }
     }
 

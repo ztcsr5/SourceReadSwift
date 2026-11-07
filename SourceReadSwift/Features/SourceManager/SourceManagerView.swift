@@ -1466,7 +1466,7 @@ private struct BatchCheckCoordinatorObserver<Content: View>: View {
                 HStack(spacing: 12) {
                     ProgressView()
                         .controlSize(.small)
-                        .tint(.white)
+                        .tint(AppTheme.prominentInk)
                     VStack(alignment: .leading, spacing: 4) {
                         HStack {
                             Text("书源体检进行中")
@@ -1476,7 +1476,7 @@ private struct BatchCheckCoordinatorObserver<Content: View>: View {
                                 .font(.caption.weight(.bold).monospacedDigit())
                         }
                         ProgressView(value: coordinator.progressFraction)
-                            .tint(.white)
+                            .tint(AppTheme.prominentInk)
                         if !coordinator.currentSourceName.isEmpty {
                             Text("正在检测：\(coordinator.currentSourceName)")
                                 .font(.caption2)
@@ -1490,9 +1490,9 @@ private struct BatchCheckCoordinatorObserver<Content: View>: View {
                 }
                 .padding(.horizontal, 14)
                 .padding(.vertical, 10)
-                .foregroundStyle(.white)
+                .foregroundStyle(AppTheme.prominentInk)
                 .background(
-                    AppTheme.accent,
+                    AppTheme.prominentFill,
                     in: RoundedRectangle(cornerRadius: 14, style: .continuous)
                 )
             }

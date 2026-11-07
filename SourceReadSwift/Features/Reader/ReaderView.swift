@@ -119,6 +119,7 @@ struct ReaderView: View {
     /// of the chapter the reader is about to cross into.
     @State private var prefetchQueue: [Int] = []
     @State private var prefetchTask: Task<Void, Never>?
+    @State private var backgroundChapterPrecache = ReaderBackgroundChapterPrecache()
     @State private var paginationWarmupTask: Task<Void, Never>?
     @State private var paginationWarmupGeneration = 0
     @State private var prefetchGeneration = 0
@@ -2103,48 +2104,37 @@ struct ReaderView: View {
         }
     }
 
-    /// Silently pre-warms 5 chapters forward and 5 chapters backward directly into
-    /// ChapterContentCacheStore on background priority without modifying the DOM.
+    /// Forward chapters already belong to the visible-window queue. Only warm
+    /// the backward disk-only side in scroll mode, without inserting DOM above it.
     private func precacheDiskWindow(around chapter: Int) {
-        guard let sourceURL = windowSourceURL,
-              let source = appState.sourceStore.source(for: sourceURL) else { return }
-        let bookChapters = self.chapters
-        guard !bookChapters.isEmpty else { return }
-        let lower = max(0, chapter - 5)
-        let upper = min(windowChapterUpperBound - 1, chapter + 5)
-        guard lower <= upper else { return }
-
-        var targetIndices: [Int] = []
-        for offset in 1...5 {
-            if chapter + offset <= upper { targetIndices.append(chapter + offset) }
-            if chapter - offset >= lower { targetIndices.append(chapter - offset) }
+        guard readerMode == .scroll,
+              let sourceURL = windowSourceURL,
+              let source = appState.sourceStore.source(for: sourceURL) else {
+            backgroundChapterPrecache.cancel()
+            return
         }
-        guard !targetIndices.isEmpty else { return }
-
+        let available = Set(windowSections.map(\.chapterIndex)).union(windowLoadingIndices)
+        let targetIndices = (1...5).map { chapter - $0 }.filter { $0 >= 0 && !available.contains($0) }
+        let targets = targetIndices.compactMap { index -> BookChapter? in
+            if chapters.indices.contains(index), chapters[index].index == index { return chapters[index] }
+            return chapters.first(where: { $0.index == index })
+        }
         let engine = appState.engine
         let cacheStore = appState.chapterContentCacheStore
         let purifyRules = appState.purifyRuleStore.enabledPatterns
-
-        Task.detached(priority: .background) {
-            for idx in targetIndices {
-                guard !Task.isCancelled else { break }
-                let ch: BookChapter?
-                if bookChapters.indices.contains(idx) && bookChapters[idx].index == idx {
-                    ch = bookChapters[idx]
-                } else {
-                    ch = bookChapters.first(where: { $0.index == idx })
-                }
-                guard let targetChapter = ch else { continue }
-                if await cacheStore.content(sourceURL: source.bookSourceUrl, chapter: targetChapter, purifyRules: purifyRules) != nil {
-                    continue
-                }
-                let res = await engine.getContent(source: source, chapter: targetChapter)
-                if case .success(let loaded) = res {
-                    await cacheStore.save(loaded, sourceURL: source.bookSourceUrl, purifyRules: purifyRules)
-                }
-                try? await Task.sleep(nanoseconds: 60_000_000)
+        let key = "\(windowGeneration)|\(sourceURL)|\(chapter)"
+        backgroundChapterPrecache.start(key: key, chapters: targets, load: { targetChapter in
+            guard cacheStore.content(sourceURL: sourceURL, chapter: targetChapter, purifyRules: purifyRules) == nil else {
+                return nil
             }
-        }
+            let result = await AsyncTimeout.run(seconds: 12) {
+                await engine.getContent(source: source, chapter: targetChapter)
+            }
+            guard case .success(let content)? = result else { return nil }
+            return content
+        }, commit: { content in
+            cacheStore.save(content, sourceURL: sourceURL, purifyRules: purifyRules)
+        })
     }
 
     private func requestScrollForwardChapter() {
@@ -2202,6 +2192,7 @@ struct ReaderView: View {
     }
 
     private func cancelPrefetch() {
+        backgroundChapterPrecache.cancel()
         prefetchGeneration &+= 1
         prefetchTask?.cancel()
         prefetchTask = nil

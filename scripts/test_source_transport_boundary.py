@@ -41,9 +41,15 @@ class SourceTransportBoundaryTests(unittest.TestCase):
                          "HTML redirect overflow must return failure, not fall through to success")
     def test_comic_non_eof_safety_is_exercised_over_real_loopback_http(self):
         tests = (ROOT / "SourceReadSwiftTests/RemoteComicImageTests.swift").read_text(encoding="utf8")
-        case = tests.split('func testOversizedComicResponsesStopBeforeTheServerFinishes', 1)[1].split('    func ', 1)[0]
+        case = tests.split('func testDeliveredOversizedComicResponsesStopBeforeTheServerFinishes', 1)[1].split('    func ', 1)[0]
         self.assertTrue('HeldComicHTTPServer' in case, "Use a real held-open socket for the non-EOF requirement")
         self.assertTrue('timeout: 4' in case)
+        self.assertIn('case .failure(.tooLarge)', case)
+        zero_body = tests.split('func testZeroBodyResponsesHonorConfiguredTimeoutAndNeverEnterTheImageCache', 1)[1].split('    func ', 1)[0]
+        for required in ['mode: .declared', 'configuration.timeoutIntervalForRequest = 2', 'timeout: 4',
+                         'case .failure(.timedOut)', 'XCTAssertEqual(server.snapshot.sentBodyBytes, 0)',
+                         'XCTAssertTrue(server.snapshot.peerClosed', 'XCTAssertNil(loader.cachedComicPage']:
+            self.assertIn(required, zero_body)
     def test_global_search_selection_explicitly_releases_keyboard_focus(self):
         source = (ROOT / "SourceReadSwift/Features/Search/GlobalSearchView.swift").read_text(encoding="utf8")
         link = source.split('private func resultLink', 1)[1].split('@ViewBuilder', 1)[0]

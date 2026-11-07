@@ -4,7 +4,31 @@ import XCTest
 
 /// Mounted home screens supplement the navigation tests with narrow, dark and large-text evidence.
 final class HomeLayoutEvidenceTests: XCTestCase {
-    @MainActor func testRealHomeLayoutsAtNarrowDarkAndAccessibleSizes() async throws {
+    private static let originalThemes: [AppVisualTheme] = [.forest, .editorial, .blueprint, .folio]
+    private static let initialAtelierThemes: [AppVisualTheme] = [.berryLake, .blushInk, .periwinkleCocoa, .peachMoss]
+    private static let addedAtelierThemes: [AppVisualTheme] = [.inkViolet, .pineMist, .kleinSage]
+
+    func testHomeEvidenceGroupsCoverEveryRequestedThemeExactlyOnce() {
+        let grouped = Self.originalThemes + Self.initialAtelierThemes + Self.addedAtelierThemes
+        let expected = Self.originalThemes + AppVisualTheme.atelierThemes
+        XCTAssertEqual(grouped.map(\.rawValue).sorted(), expected.map(\.rawValue).sorted())
+        XCTAssertEqual(Set(grouped.map(\.rawValue)).count, grouped.count)
+    }
+
+    @MainActor func testOriginalHomeLayoutsAtNarrowDarkAndAccessibleSizes() async throws {
+        try await captureHomeLayouts(themes: Self.originalThemes)
+    }
+
+    @MainActor func testInitialAtelierHomeLayoutsAtNarrowDarkAndAccessibleSizes() async throws {
+        try await captureHomeLayouts(themes: Self.initialAtelierThemes)
+    }
+
+    @MainActor func testAddedAtelierHomeLayoutsAtNarrowDarkAndAccessibleSizes() async throws {
+        try await captureHomeLayouts(themes: Self.addedAtelierThemes)
+    }
+
+    // Keep the same screenshot matrix and assertions within the existing per-test time limit.
+    @MainActor private func captureHomeLayouts(themes: [AppVisualTheme]) async throws {
         let defaults = UserDefaults.standard
         let keys = [AppVisualTheme.selectionKey, "settings.reducesMotion", "settings.floatingReadingDeskEnabled",
                     "settings.readingDeskEnabled", "bookshelf.isGridMode", "bookshelf.sortMode"]
@@ -37,7 +61,7 @@ final class HomeLayoutEvidenceTests: XCTestCase {
             }
         }
 
-        for theme in [AppVisualTheme.forest, .editorial, .blueprint, .folio] {
+        for theme in themes {
             defaults.set(theme.rawValue, forKey: AppVisualTheme.selectionKey)
             for (width, dark, accessible) in [(CGFloat(320), false, false), (390, true, false), (320, false, true)] {
                 let screen = BookshelfView().environmentObject(appState)

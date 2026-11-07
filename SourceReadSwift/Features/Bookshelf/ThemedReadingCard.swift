@@ -15,7 +15,13 @@ struct ThemedReadingCard: View {
                 Spacer()
                 Text(ReadingHeroStatus.progressValue(for: book)).font(.caption.monospacedDigit())
             }
-            .foregroundStyle(AppTheme.accent)
+            .foregroundStyle(theme.atelierPalette?.emphasisInk ?? AppTheme.accent)
+            .padding(theme.isAtelier ? 12 : 0)
+            .background {
+                if let palette = theme.atelierPalette {
+                    RoundedRectangle(cornerRadius: min(theme.radius, 8)).fill(palette.emphasisFill)
+                }
+            }
 
             if theme.homeComposition == .gallery {
                 gallery

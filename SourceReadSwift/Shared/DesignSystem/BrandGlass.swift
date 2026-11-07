@@ -38,10 +38,10 @@ struct BrandFilterFinish: ViewModifier {
 
     func body(content: Content) -> some View {
         content
-            .foregroundStyle(isSelected ? (theme.usesNeutralGlass ? AppTheme.accent : .white) : theme.primaryInk)
+            .foregroundStyle(isSelected ? (theme.usesNeutralGlass ? AppTheme.accent : AppTheme.prominentInk) : theme.primaryInk)
             .background {
                 Capsule().fill(theme.usesNeutralGlass ? (isSelected ? theme.controlFill : .clear)
-                    : (isSelected ? AppTheme.accent : legacyFill))
+                    : (isSelected ? AppTheme.prominentFill : legacyFill))
             }
             .overlay {
                 Capsule().strokeBorder(theme.usesNeutralGlass ? theme.controlBorder : .primary.opacity(isSelected ? 0 : 0.06),

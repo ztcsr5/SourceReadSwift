@@ -1,6 +1,6 @@
 """Validate the current reader changes on iOS without triggering IPA packaging.
 
-Usage: python -B -X utf8 scripts/verify_reader_quality.py snapshot|status
+Usage: python -B -X utf8 scripts/verify_reader_quality.py snapshot|status [--base <COMMIT>]
 Uses a temporary Git index; the checkout, user index and original dirty documents remain unchanged.
 """
 import argparse
@@ -50,7 +50,12 @@ def select_reader_paths(paths):
                    {".github/workflows/ios.yml", ".github/workflows/unsigned-ipa.yml", ".github/workflows/reader-diagnostics.yml", "project.yml", "SourceReadSwift/App/Info.plist",
                     "scripts/prepare_model_image.py", "scripts/verify_reader_quality.py", "scripts/verify_reader_diagnostics.py",
                     "scripts/deliver_reader_quality.py",
-                    "docs/sources/uxx-aggregate-compatible.json"}})
+                    "scripts/verify_device_ipa.py", "scripts/generate_master_app_icon.py",
+                    "scripts/watch_reader_build.py",
+                    "docs/project-audit-20261108/REVIEW.md", "docs/project-audit-20261108/NAVIGATION.md",
+                    "docs/project-audit-20261108/READER.md", "docs/project-audit-20261108/PARSERS.md",
+                    "docs/project-audit-20261108/DESIGN.md", "docs/project-audit-20261108/ICON-REVIEW.png",
+                    "CHANGELOG.md", "docs/sources/uxx-aggregate-compatible.json"}})
 
 
 def dispatch_snapshot(record, record_path):
@@ -80,7 +85,8 @@ def snapshot_tree():
     candidate_paths = run_git("diff", "--name-only", "HEAD").splitlines()
     candidate_paths += run_git("ls-files", "--others", "--exclude-standard",
                                "SourceReadSwift", "SourceReadSwiftTests", "SourceReadSwiftUITests",
-                               ".github/workflows", "scripts", "docs/sources/uxx-aggregate-compatible.json").splitlines()
+                               ".github/workflows", "scripts", "docs/project-audit-20261108",
+                               "docs/sources/uxx-aggregate-compatible.json").splitlines()
     selected = select_reader_paths(candidate_paths)
     if not selected:
         raise RuntimeError("No reader changes selected for native validation")
@@ -92,18 +98,19 @@ def snapshot_tree():
     return tree, selected
 
 
-def snapshot_changes():
+def snapshot_changes(base=None):
     tree, selected = snapshot_tree()
     record_path = EVIDENCE / (tree + ".json")
     if record_path.exists():
         record = json.loads(record_path.read_text(encoding="utf8"))
         persist_snapshot(record, record_path)
         return record
-    commit = run_git("commit-tree", tree, "-p", run_git("rev-parse", "HEAD"), "-m",
-                     "test(reader): snapshot complete quality fixes for native validation")
+    parent = run_git("rev-parse", "--verify", (base or "HEAD") + "^{commit}")
+    commit = run_git("commit-tree", tree, "-p", parent, "-m",
+                     "fix(reader): unify navigation and stabilize reading with atelier themes")
     branch = "codex/reader-quality-137-" + commit[:12]
     run_git("push", "origin", commit + ":refs/heads/" + branch)
-    record = {"tree": tree, "head": commit, "branch": branch, "paths": selected,
+    record = {"tree": tree, "head": commit, "parent": parent, "branch": branch, "paths": selected,
               "purpose": "iOS regression only; no IPA"}
     return dispatch_snapshot(record, record_path)
 
@@ -166,6 +173,7 @@ def download_visuals():
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("action", choices=["snapshot", "status", "visual"])
+    parser.add_argument("--base", help="Preserved workspace baseline commit, keeping the new review independently revertible")
     arguments = parser.parse_args()
-    actions = {"snapshot": snapshot_changes, "status": read_status, "visual": download_visuals}
+    actions = {"snapshot": lambda: snapshot_changes(arguments.base), "status": read_status, "visual": download_visuals}
     print(json.dumps(actions[arguments.action](), ensure_ascii=False))

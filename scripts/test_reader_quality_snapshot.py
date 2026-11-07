@@ -12,6 +12,12 @@ from verify_reader_quality import dispatch_snapshot, select_reader_paths
 
 
 class ReaderQualitySnapshotTests(unittest.TestCase):
+    def test_audit_and_delivery_sources_are_uploaded_without_mutable_status_receipts(self):
+        expected = ["docs/project-audit-20261108/REVIEW.md", "scripts/generate_master_app_icon.py",
+                    "scripts/verify_device_ipa.py"]
+        self.assertEqual(select_reader_paths(expected + ["docs/project-audit-20261108/STATUS.md",
+            "docs/project-audit-20261108/BASELINE.json"]), expected)
+
     def test_failed_dispatch_preserves_pushed_identity_for_reconciliation(self):
         with tempfile.TemporaryDirectory() as directory:
             receipt = Path(directory) / "tree.json"
@@ -46,16 +52,17 @@ class ReaderQualitySnapshotTests(unittest.TestCase):
         self.assertEqual(select_reader_paths([".github/workflows/unsigned-ipa.yml"]),
                          [".github/workflows/unsigned-ipa.yml"])
 
-    def test_sources_unit_and_ui_tests_are_included_but_documents_and_backups_are_not(self):
+    def test_release_notes_sources_and_tests_are_kept_but_unrelated_documents_and_backups_are_not(self):
         expected = [
             ".github/workflows/ios.yml",
+            "CHANGELOG.md",
             "SourceReadSwift/Features/Reader/ComicStripReaderView.swift",
             "SourceReadSwiftTests/ComicStripLayoutTests.swift",
             "SourceReadSwiftUITests/ComicReaderFlowUITests.swift",
             "scripts/test_reader_controls_workflow.py",
         ]
         candidates = expected + [
-            "CHANGELOG.md", "docs/release-1.1.7/RECOVERY.md",
+            "docs/release-1.1.7/RECOVERY.md",
             "SourceReadSwift/Features/Reader/ReaderView.swift.bak114", "secret.swift",
         ]
         self.assertEqual(select_reader_paths(candidates), expected)

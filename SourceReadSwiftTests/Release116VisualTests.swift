@@ -7,9 +7,9 @@ import XCTest
 final class Release116VisualTests: XCTestCase {
     func testThemesChangeGeometryTypographyAndSurfaceNotOnlyAccent() {
         XCTAssertEqual(AppVisualTheme.allCases.map(\.rawValue),
-            ["forest", "classic", "botanical", "editorial", "coast", "rose", "graphite", "folio", "inkwash", "blueprint"])
-        XCTAssertEqual(Set(AppVisualTheme.allCases.map(\.radius)).count, 9)
-        XCTAssertEqual(Set(AppVisualTheme.allCases.map(\.backgroundHex)).count, 10)
+            ["forest", "classic", "botanical", "editorial", "coast", "rose", "graphite", "folio", "inkwash", "blueprint", "berryLake", "blushInk", "periwinkleCocoa", "peachMoss", "inkViolet", "pineMist", "kleinSage"])
+        XCTAssertEqual(Set(AppVisualTheme.allCases.map(\.radius)).count, 10)
+        XCTAssertEqual(Set(AppVisualTheme.allCases.map(\.backgroundHex)).count, 17)
         XCTAssertEqual(AppVisualTheme.classic.preferenceKey("accent"), "settings.accentHex")
         XCTAssertNotEqual(AppVisualTheme.coast.preferenceKey("accent"), AppVisualTheme.rose.preferenceKey("accent"))
         XCTAssertEqual(AppVisualTheme.editorial.borderWidth, 1)

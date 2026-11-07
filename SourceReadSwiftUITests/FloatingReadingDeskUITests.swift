@@ -173,7 +173,7 @@ final class FloatingReadingDeskUITests: XCTestCase {
         capture("15-settings-tab-retained")
     }
 
-    func testFirstReadingHasARealTitlePageAndLaterResumesDirectly() throws {
+    func testFirstReadingOpensProseAndLaterResumesDirectly() throws {
         try launch(theme: "classic", fixture: "--desk-first-reading")
         let cover = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@ AND label CONTAINS %@",
             "bookshelf.grid.", "月亮与六便士")).firstMatch
@@ -181,22 +181,22 @@ final class FloatingReadingDeskUITests: XCTestCase {
         XCTAssertTrue(cover.isHittable); cover.tap()
         let read = app.buttons["bookDetail.read"]
         XCTAssertTrue(read.waitForExistence(timeout: 5)); read.tap()
-        let start = app.buttons["bookTitlePage.read"]
-        XCTAssertTrue(start.waitForExistence(timeout: 5))
-        XCTAssertFalse(element("reader.webScrollSurface").isHittable, "The title page is not a loading overlay")
-        XCTAssertTrue(rootTab("主页", legacyID: "tabs.legacy.home").isHittable)
-        capture("16-first-reading-title-page")
-        app.navigationBars["书籍扉页"].buttons.element(boundBy: 0).tap()
-        XCTAssertTrue(read.waitForExistence(timeout: 5)); read.tap()
-        XCTAssertTrue(start.waitForExistence(timeout: 5), "Looking at the title page cannot mark the book read")
-        start.tap()
         assertReaderProse()
+        XCTAssertFalse(app.buttons["bookTitlePage.read"].exists, "First reading must enter prose without an extra title-page route")
+        XCTAssertFalse(rootTab("主页", legacyID: "tabs.legacy.home").isHittable)
+        capture("16-first-reading-prose")
         returnFromReader()
-        XCTAssertTrue(start.waitForExistence(timeout: 5))
-        app.navigationBars["书籍扉页"].buttons.element(boundBy: 0).tap()
-        XCTAssertTrue(read.waitForExistence(timeout: 5)); read.tap()
+        XCTAssertTrue(read.waitForExistence(timeout: 5), "The first reader must return directly to its owning detail")
+        XCTAssertEqual(element("bookDetail.title").label, "月亮与六便士")
+        XCTAssertTrue(rootTab("主页", legacyID: "tabs.legacy.home").isHittable)
+        read.tap()
         assertReaderProse()
-        XCTAssertFalse(start.isHittable, "An existing position skips the title page")
+        XCTAssertFalse(app.buttons["bookTitlePage.read"].exists)
+        returnFromReader()
+        XCTAssertTrue(read.waitForExistence(timeout: 5))
+        app.navigationBars.buttons.element(boundBy: 0).tap()
+        XCTAssertTrue(cover.waitForExistence(timeout: 3))
+        XCTAssertTrue(cover.isHittable)
     }
 
     func testContinueRestoresTheSavedParagraphInTheRealWebView() throws {
@@ -265,6 +265,40 @@ final class FloatingReadingDeskUITests: XCTestCase {
         XCTAssertFalse(detail.isHittable)
         XCTAssertEqual(cover.frame.midX, origin.midX, accuracy: 3)
         XCTAssertEqual(cover.frame.midY, origin.midY, accuracy: 8)
+    }
+
+    func testFirstDetailEdgeReturnRestoresInteractiveHomeAndOnlyOneTabBar() throws {
+        try launch(theme: "forest")
+        let cover = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@ AND label CONTAINS %@",
+            "bookshelf.grid.", "月亮与六便士")).firstMatch
+        if !cover.isHittable { app.swipeUp() }
+        XCTAssertTrue(cover.isHittable)
+        cover.tap()
+        XCTAssertTrue(element("bookDetail.title").waitForExistence(timeout: 5))
+        app.coordinate(withNormalizedOffset: CGVector(dx: 0.008, dy: 0.52))
+            .press(forDuration: 0.05,
+                thenDragTo: app.coordinate(withNormalizedOffset: CGVector(dx: 0.85, dy: 0.52)),
+                withVelocity: .default, thenHoldForDuration: 0.15)
+        let started = ProcessInfo.processInfo.systemUptime
+        let isRestored = waitForImmediateHittability(cover, timeout: 1)
+        print("DETAIL_FIRST_RETURN_HITTABLE seconds=\(ProcessInfo.processInfo.systemUptime - started) restored=\(isRestored)")
+        if !isRestored {
+            capture("detail-first-pop-not-responsive")
+            let hierarchy = XCTAttachment(string: app.debugDescription)
+            hierarchy.name = "detail-first-pop-failed-hierarchy"
+            hierarchy.lifetime = .keepAlways
+            add(hierarchy)
+        }
+        XCTAssertTrue(isRestored, "The first completed detail pop must restore the shelf within one second")
+        XCTAssertFalse(element("bookDetail.title").isHittable)
+        XCTAssertTrue(app.buttons["tabs.legacy.home"].isHittable)
+        XCTAssertEqual(app.tabBars.allElementsBoundByIndex.filter(\.isHittable).count, 0,
+            "A second system tab bar must never overlay the custom navigation")
+        let search = app.buttons["bookshelf.globalSearch"]
+        XCTAssertTrue(search.isHittable)
+        search.tap()
+        XCTAssertTrue(app.textFields["globalSearch.query"].waitForExistence(timeout: 1))
+        capture("detail-first-pop-responsive-home")
     }
 
     func testContinuousChapterCrossingKeepsProseHeadingAndReopenedPositionTogether() throws {
@@ -432,7 +466,7 @@ final class FloatingReadingDeskUITests: XCTestCase {
 
     func testCollapsedShelfFiltersPreserveQueryAndThemeLayoutsHaveRealEntries() throws {
         try launch(theme: "forest")
-        let search = app.textFields["在书架中搜索书名或作者..."]
+        let search = app.textFields["bookshelf.filterQuery"]
         XCTAssertFalse(search.exists)
         let filters = app.buttons["bookshelf.filters"]
         XCTAssertTrue(filters.isHittable)
@@ -534,5 +568,19 @@ final class FloatingReadingDeskUITests: XCTestCase {
     private func capture(_ name: String) {
         let attachment = XCTAttachment(screenshot: app.screenshot())
         attachment.name = "floating-desk-" + name; attachment.lifetime = .keepAlways; add(attachment)
+    }
+
+    private func waitForImmediateHittability(_ target: XCUIElement, timeout: TimeInterval) -> Bool {
+        // A predicate expectation's first poll can consume this entire one-second
+        // budget. Sample immediately and keep the original monotonic deadline.
+        let deadline = ProcessInfo.processInfo.systemUptime + timeout
+        repeat {
+            let isHittable = target.isHittable
+            let remaining = deadline - ProcessInfo.processInfo.systemUptime
+            if isHittable { return remaining >= 0 }
+            guard remaining > 0 else { return false }
+            RunLoop.current.run(until: Date().addingTimeInterval(min(0.02, remaining)))
+        } while ProcessInfo.processInfo.systemUptime < deadline
+        return false
     }
 }

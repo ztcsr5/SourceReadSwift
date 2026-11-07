@@ -995,8 +995,8 @@ struct DiscoverView: View {
                 .font(.caption.weight(.bold))
                 .padding(.horizontal, 10)
                 .padding(.vertical, 5)
-                .background(AppTheme.accent, in: Capsule())
-                .foregroundStyle(.white)
+                .background(AppTheme.prominentFill, in: Capsule())
+                .foregroundStyle(AppTheme.prominentInk)
 
                 Button {
                     detectedClipboardSourceURL = nil

@@ -38,8 +38,8 @@ struct BookTitlePage<ReaderDestination: View>: View {
                     Label(readLabel, systemImage: "book")
                         .font(.headline)
                         .frame(maxWidth: .infinity, minHeight: 48)
-                        .foregroundStyle(.white)
-                        .background(AppTheme.accent, in: RoundedRectangle(cornerRadius: 12))
+                        .foregroundStyle(AppTheme.prominentInk)
+                        .background(AppTheme.prominentFill, in: RoundedRectangle(cornerRadius: 12))
                 }
                 .buttonStyle(BookOpenPressStyle())
                 .accessibilityIdentifier("bookTitlePage.read")
