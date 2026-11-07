@@ -14,8 +14,13 @@ struct BookDetailSummary: View {
     }
 
     private var effectiveIntro: String? {
-        let cleanDetail = Self.sanitizeIntro(detail?.intro)
-        let cleanFallback = Self.sanitizeIntro(fallbackIntro)
+        Self.preferredIntro(detail: detail?.intro, fallback: fallbackIntro)
+    }
+
+    /// Preserve the fullest synopsis received for this edition across metadata refreshes.
+    static func preferredIntro(detail: String?, fallback: String?) -> String? {
+        let cleanDetail = sanitizeIntro(detail)
+        let cleanFallback = sanitizeIntro(fallback)
         guard let d = cleanDetail, !d.isEmpty else { return cleanFallback }
         guard let f = cleanFallback, !f.isEmpty else { return d }
         // Pick the richer synopsis if detail intro is truncated or significantly shorter
@@ -39,12 +44,7 @@ struct BookDetailSummary: View {
                         .lineLimit(intro.count > 100 && !expanded ? 5 : nil)
                         .fixedSize(horizontal: false, vertical: true)
                         .textSelection(.enabled)
-                        .contentShape(Rectangle())
-                        .onTapGesture {
-                            if intro.count > 100 {
-                                withAnimation(motion.animation(.expansion)) { expanded.toggle() }
-                            }
-                        }
+                        .accessibilityIdentifier("bookDetail.synopsis")
                     if intro.count > 100 {
                         Button {
                             withAnimation(motion.animation(.expansion)) { expanded.toggle() }
@@ -57,8 +57,9 @@ struct BookDetailSummary: View {
                         }
                         .font(.caption.weight(.semibold))
                         .tint(AppTheme.accent)
-                        .frame(minHeight: 36)
+                        .frame(minHeight: 44)
                         .buttonStyle(AppPressStyle())
+                        .accessibilityIdentifier("bookDetail.toggleSynopsis")
                     }
                 }
                 if !metadata.isEmpty {

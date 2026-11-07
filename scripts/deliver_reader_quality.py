@@ -9,6 +9,7 @@ import importlib.util
 import json
 from pathlib import Path
 import plistlib
+import re
 import io
 import os
 import shutil
@@ -17,7 +18,7 @@ import tempfile
 import urllib.request
 import zipfile
 
-from verify_reader_quality import EVIDENCE, github, snapshot_tree
+from verify_reader_quality import EVIDENCE, github, snapshot_tree, run_git
 
 
 def read_candidate():
@@ -68,6 +69,14 @@ def hash_file(path):
         for block in iter(lambda: payload.read(1024 * 1024), b""):
             digest.update(block)
     return digest.hexdigest()
+
+
+def package_filename(plist: dict, head: str) -> str:
+    """Name the desktop package from verified metadata, with safe path components."""
+    version, build = plist["CFBundleShortVersionString"], plist["CFBundleVersion"]
+    if not re.fullmatch(r"[0-9.]+", version) or not re.fullmatch(r"[0-9]+", build) or not re.fullmatch(r"[0-9a-f]{40}", head):
+        raise ValueError("Expected a numeric app version/build and full commit SHA")
+    return f"SourceReadSwift-{version}-build{build}-{head[:7]}-unsigned.ipa"
 
 
 def publish_verified_ipa(source, target, expected_sha256):
@@ -136,7 +145,9 @@ def deliver_package():
     ipa = verification.read_payload(package_run["id"], "SourceReadSwift-unsigned-ipa", ".ipa")
     symbols = verification.read_payload(package_run["id"],
         "SourceReadSwift-device-symbols-" + candidate["head"], ".zip")
-    verified = verification.verify_ipa(ipa, symbols)
+    from verify_device_ipa import verify_device_ipa
+    project = run_git("show", candidate["head"] + ":project.yml")
+    verified = verify_device_ipa(ipa, symbols, project, folder)
     with zipfile.ZipFile(io.BytesIO(ipa)) as package:
         plist = plistlib.loads(package.read("Payload/SourceReadSwift.app/Info.plist"))
         comic_type = "com.edc21.sourceread.cbz"
@@ -144,7 +155,7 @@ def deliver_package():
         assert any(entry.get("UTTypeIdentifier") == comic_type for entry in declarations), "Missing CBZ UTI"
         assert any(comic_type in entry.get("LSItemContentTypes", [])
                    for entry in plist.get("CFBundleDocumentTypes", [])), "Missing CBZ document registration"
-    filename = f"SourceReadSwift-1.1.7-build137-{candidate['head'][:7]}-unsigned.ipa"
+    filename = package_filename(plist, candidate["head"])
     output = folder / filename
     for path, payload in [(output, ipa), (folder / "SourceReadSwift-device-symbols.zip", symbols)]:
         if path.exists():

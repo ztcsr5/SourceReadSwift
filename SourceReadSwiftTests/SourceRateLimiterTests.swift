@@ -77,7 +77,8 @@ final class SourceRateLimiterTests: XCTestCase {
             XCTFail("A cancelled waiter must not enter the request or release another request's permit")
         }
         cancelled.cancel()
-        switch await cancelled.result {
+        let cancellationResult = await cancelled.result
+        switch cancellationResult {
         case .success: XCTFail("Expected CancellationError while waiting for a permit")
         case .failure(let error): XCTAssertTrue(error is CancellationError)
         }

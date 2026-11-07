@@ -21,7 +21,9 @@ class HomePresentationTests(unittest.TestCase):
         self.assertIn('if !allBooks.isEmpty, showsShelfFilters', source)
         header = source.split('private var shelfHeader:', 1)[1].split('private func mainGroupChip', 1)[0]
         self.assertLess(header.index('bookshelf.filters'), header.index('BookshelfSortMode.allCases'))
-        self.assertIn('bookshelf.globalSearch', source)
+        self.assertIn('bookshelf.filterQuery', source)
+        tab_bar = (ROOT / 'SourceReadSwift/Shared/DesignSystem/LegacyTabBar.swift').read_text(encoding='utf8')
+        self.assertIn('bookshelf.globalSearch', tab_bar)
 
     def test_shelf_cover_has_one_fixed_book_silhouette(self):
         source = (ROOT / 'SourceReadSwift/Features/Bookshelf/ShelfBookCover.swift').read_text(encoding='utf8')

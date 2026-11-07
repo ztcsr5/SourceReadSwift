@@ -6,6 +6,7 @@ struct AppThemeOrnament: View {
     var isCard = false
 
     static func hasArtwork(theme: AppVisualTheme, isCard: Bool) -> Bool {
+        if theme.isAtelier { return theme != .peachMoss || isCard }
         switch theme {
         case .folio, .blueprint: return true
         case .inkwash: return !isCard
@@ -14,7 +15,9 @@ struct AppThemeOrnament: View {
     }
 
     @ViewBuilder var body: some View {
-        if Self.hasArtwork(theme: theme, isCard: isCard) {
+        if theme.isAtelier && Self.hasArtwork(theme: theme, isCard: isCard) {
+            AppAtelierImprint(theme: theme, isCard: isCard)
+        } else if Self.hasArtwork(theme: theme, isCard: isCard) {
             artwork
         }
     }
@@ -54,6 +57,17 @@ struct AppThemeCardShape: Shape {
     let theme: AppVisualTheme
     let radius: CGFloat
     func path(in rect: CGRect) -> Path {
+        if theme == .berryLake, radius < 44 {
+            let cut: CGFloat = min(12, min(rect.width, rect.height) / 4)
+            var path = Path()
+            path.move(to: CGPoint(x: rect.minX, y: rect.minY))
+            path.addLine(to: CGPoint(x: rect.maxX - cut, y: rect.minY))
+            path.addLine(to: CGPoint(x: rect.maxX, y: rect.minY + cut))
+            path.addLine(to: CGPoint(x: rect.maxX, y: rect.maxY))
+            path.addLine(to: CGPoint(x: rect.minX, y: rect.maxY))
+            path.closeSubpath()
+            return path
+        }
         guard theme == .folio else { return Path(roundedRect: rect, cornerRadius: radius) }
         var path = Path(roundedRect: rect, cornerRadius: radius)
         for x in [rect.minX, rect.maxX] {

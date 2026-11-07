@@ -56,7 +56,7 @@ private struct ReaderOpeningPresentation: ViewModifier {
             .accessibilityHidden(!didReveal)
             .overlay {
                 if !didReveal {
-                    ReaderOpeningStatus(showsWait: didArrive)
+                    ReaderOpeningStatus(book: book, showsWait: didArrive)
                         .toolbar(.hidden, for: .navigationBar)
                         .overlay(alignment: .topLeading) {
                             if didArrive {
@@ -99,104 +99,63 @@ private struct ReaderOpeningPresentation: ViewModifier {
     }
 }
 
-/// Editorial gallery-grade literary opening transition screen with ambient light and breathing golden emblem.
-private struct ReaderOpeningStatus: View {
+/// Keeps the destination recognisable while its actual saved position is prepared.
+/// Static type and paragraph scaffolding share the reader's paper; no logo or timer delays entry.
+struct ReaderOpeningStatus: View {
+    let book: BookshelfBook
     let showsWait: Bool
+    var chapterTitle: String? = nil
     @AppStorage("reader.background") private var paperRaw = ReaderBackground.white.rawValue
-    @State private var isBreathing = false
-    @State private var quoteIndex: Int = {
-        Int.random(in: 0..<7)
-    }()
 
-    private static let literaryQuotes = [
-        "翻开一页，遇见另一个世界。",
-        "万卷古今消永昼，一窗昏晓送流年。",
-        "字里行间，皆有山海与星辰。",
-        "读书随处净土，闭门即是深山。",
-        "与其喧嚣中奔波，不如在书里小坐片刻。",
-        "世间万物皆有回响，开卷即见远方。",
-        "且听风吟，静候墨香。"
-    ]
+    private var context: String {
+        let chapter = (chapterTitle ?? book.currentChapterTitle ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        if !chapter.isEmpty { return chapter }
+        return book.currentParagraphIndex == nil ? "准备开始阅读" : "回到上次阅读的位置"
+    }
 
     var body: some View {
-        let paper = ReaderBackground(rawValue: paperRaw) ?? .white
-        let paperColor = paper.color(isNight: paper.isDark)
-        let textColor = paper.textColor(isNight: paper.isDark)
-
-        ZStack {
-            paperColor.ignoresSafeArea()
-
-            // Soft radial ambient illumination behind the brand emblem
-            RadialGradient(
-                colors: [textColor.opacity(paper.isDark ? 0.08 : 0.04), .clear],
-                center: .center,
-                startRadius: 20,
-                endRadius: 260
-            )
-            .ignoresSafeArea()
-
-            if showsWait {
-                VStack(spacing: 28) {
-                    // Breathing master brand mark with golden aura
-                    PaperBetweenMark(size: 62)
-                        .shadow(color: Color(red: 1.0, green: 0.72, blue: 0.15).opacity(0.28), radius: 18, x: 0, y: 6)
-                        .scaleEffect(isBreathing ? 1.03 : 0.97)
-                        .animation(.easeInOut(duration: 2.0).repeatForever(autoreverses: true), value: isBreathing)
-
-                    // Refined literary typography
-                    VStack(spacing: 12) {
-                        Image(systemName: "quote.opening")
-                            .font(.system(size: 14, weight: .light, design: .serif))
-                            .foregroundStyle(textColor.opacity(0.28))
-
-                        Text(Self.literaryQuotes[quoteIndex])
-                            .font(.system(size: 16, weight: .medium, design: .serif))
-                            .foregroundStyle(textColor.opacity(0.88))
-                            .multilineTextAlignment(.center)
-                            .lineSpacing(7)
-                            .tracking(1.2)
-                            .padding(.horizontal, 36)
-
-                        Capsule()
-                            .fill(textColor.opacity(0.12))
-                            .frame(width: 30, height: 1.5)
-                            .padding(.top, 4)
-
-                        Text("纸 间 · 浸 润 墨 香")
-                            .font(.system(size: 11, weight: .semibold, design: .serif))
-                            .foregroundStyle(textColor.opacity(0.36))
-                            .tracking(3.5)
+        let paper = ReaderOverrideStore.shared.override(for: book.id)?.background
+            ?? ReaderBackground(rawValue: paperRaw) ?? .paper
+        let ink = paper.textColor(isNight: paper.isDark)
+        GeometryReader { geometry in
+            ScrollView {
+                VStack(alignment: .leading, spacing: 24) {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text(book.title)
+                            .font(.title2.weight(.semibold))
+                            .fixedSize(horizontal: false, vertical: true)
+                            .accessibilityIdentifier("reader.openingTitle")
+                        if !book.author.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                            Text(book.author).font(.subheadline).foregroundStyle(ink.opacity(0.7))
+                        }
                     }
-
-                    // Refined loading capsule
-                    HStack(spacing: 8) {
-                        Circle()
-                            .fill(AppTheme.accent)
-                            .frame(width: 5, height: 5)
-                            .scaleEffect(isBreathing ? 1.25 : 0.75)
-                            .animation(.easeInOut(duration: 1.0).repeatForever(autoreverses: true), value: isBreathing)
-
-                        Text("正在翻开篇章…")
-                            .font(.system(size: 12, weight: .medium))
-                            .foregroundStyle(textColor.opacity(0.55))
-                            .tracking(1.2)
+                    Rectangle().fill(ink.opacity(0.16)).frame(height: 1)
+                    Text(context).font(.headline).fixedSize(horizontal: false, vertical: true)
+                    VStack(alignment: .leading, spacing: 16) {
+                        ForEach(0..<7) { line in
+                            RoundedRectangle(cornerRadius: 4)
+                                .fill(ink.opacity(0.07))
+                                .frame(maxWidth: line == 3 || line == 6 ? geometry.size.width * 0.56 : .infinity)
+                                .frame(height: 8)
+                        }
                     }
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 7)
-                    .background(
-                        Capsule()
-                            .fill(textColor.opacity(0.04))
-                            .overlay(Capsule().strokeBorder(textColor.opacity(0.08), lineWidth: 0.6))
-                    )
-                    .accessibilityIdentifier("reader.openingProgress")
+                    .accessibilityHidden(true)
+                    Text(book.currentParagraphIndex == nil ? "正在准备正文" : "正在恢复阅读位置")
+                        .font(.footnote).foregroundStyle(ink.opacity(0.7))
+                        .opacity(showsWait ? 1 : 0)
+                        .accessibilityHidden(!showsWait)
+                        .accessibilityIdentifier("reader.openingProgress")
                 }
-                .padding(24)
-                .transition(.opacity)
-                .onAppear {
-                    isBreathing = true
-                }
+                .padding(.horizontal, 32)
+                .padding(.top, 80)
+                .padding(.bottom, 32)
+                .frame(maxWidth: 560, alignment: .leading)
+                .frame(maxWidth: .infinity)
             }
         }
+        .foregroundStyle(ink)
+        .background { paper.color(isNight: paper.isDark).ignoresSafeArea() }
+        .environment(\.colorScheme, paper.isDark ? .dark : .light)
     }
 }
 
@@ -253,9 +212,20 @@ struct ReaderOpeningPage: View {
     @AppMotion private var motion
     @Environment(\.readingCoverHandoff) private var incomingCovers
     @AppStorage("reader.background") private var paperRaw = ReaderBackground.white.rawValue
-    private var paper: ReaderBackground { ReaderBackground(rawValue: paperRaw) ?? .white }
+    @MainActor private var paper: ReaderBackground {
+        ReaderOverrideStore.shared.override(for: book.id)?.background
+            ?? ReaderBackground(rawValue: paperRaw) ?? .paper
+    }
 
     var body: some View {
+        if isWaiting && !isReturning {
+            ReaderOpeningStatus(book: book, showsWait: true, chapterTitle: chapterTitle)
+        } else {
+            returnPage
+        }
+    }
+
+    private var returnPage: some View {
         VStack(spacing: 20) {
             EditorialBookJacket(height: 190, palette: .resolve(theme: AppVisualTheme.current), stance: .detail) {
                 if let coverFrame = coverFrame ?? incomingCovers?.frame(for: book) {
@@ -285,12 +255,7 @@ struct ReaderOpeningPage: View {
             .opacity(isWaiting || isReturning ? 1 : 0)
             .offset(y: isWaiting || isReturning || motion.reducesMotion ? 0 : 8)
             .animation(isReturning ? nil : motion.arrivalAnimation(stage: 1), value: isWaiting)
-            Group {
-                if isWaiting {
-                    ProgressView(chapterTitle == nil ? "正在恢复阅读位置" : "正在加载正文")
-                        .font(.caption).accessibilityIdentifier("reader.openingProgress")
-                } else { Color.clear }
-            }.frame(height: 20)
+            Color.clear.frame(height: 20)
         }
         .padding(32)
         .frame(maxWidth: .infinity, maxHeight: .infinity)

@@ -32,6 +32,9 @@ struct StoredCookieRecord: Codable, Equatable {
         if isSecure {
             properties[.secure] = "TRUE"
         }
+        if isHTTPOnly {
+            properties[HTTPCookiePropertyKey("HttpOnly")] = "TRUE"
+        }
         return HTTPCookie(properties: properties)
     }
 }

@@ -48,7 +48,8 @@ class Release118QualityTests(unittest.TestCase):
         shelf = read_text("SourceReadSwift/Features/Bookshelf/BookshelfView.swift")
         # Magnifying glass button must not be in the top toolbar
         self.assertNotIn('Button { showsSearch = true } label: { Image(systemName: "magnifyingglass")', shelf)
-        self.assertIn('"bookshelf.globalSearch"', shelf)
+        self.assertIn('"bookshelf.filterQuery"', shelf)
+        self.assertNotIn('"bookshelf.globalSearch"', shelf)
 
         tab_bar = read_text("SourceReadSwift/Shared/DesignSystem/LegacyTabBar.swift")
         self.assertIn('"bookshelf.globalSearch"', tab_bar)
@@ -77,13 +78,6 @@ class Release118QualityTests(unittest.TestCase):
         curl = read_text("SourceReadSwift/Features/Reader/PageCurlReaderView.swift")
         self.assertIn("scrollView.delaysContentTouches = false", curl)
         self.assertIn("scrollView.canCancelContentTouches = true", curl)
-
-    def test_reader_opening_page_literary_quotes_and_mark(self):
-        opening = read_text("SourceReadSwift/Features/Bookshelf/ReaderOpeningPage.swift")
-        self.assertIn("PaperBetweenMark(size: 62)", opening)
-        self.assertIn("literaryQuotes", opening)
-        self.assertIn("reader.openingProgress", opening)
-        self.assertIn("正在翻开篇章…", opening)
 
     def test_title_page_completely_removed(self):
         detail = read_text("SourceReadSwift/Features/Discover/BookDetailView.swift")

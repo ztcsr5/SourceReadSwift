@@ -335,7 +335,7 @@ struct BookshelfView: View {
                 .font(.system(size: 14))
                 .textInputAutocapitalization(.never)
                 .autocorrectionDisabled(true)
-                .accessibilityIdentifier("bookshelf.globalSearch")
+                .accessibilityIdentifier("bookshelf.filterQuery")
             if !searchKeyword.isEmpty {
                 Button {
                     UIImpactFeedbackGenerator(style: .light).impactOccurred()

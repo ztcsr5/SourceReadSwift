@@ -1010,6 +1010,8 @@ struct PurifyRulesView: View {
     @State private var message: String?
     @State private var urlMessage: String?
     @State private var isDownloadingRules = false
+    @State private var previewResult: String?
+    @State private var isTestingRules = false
 
     var body: some View {
         List {
@@ -1018,10 +1020,14 @@ struct PurifyRulesView: View {
                     .textInputAutocapitalization(.never)
                     .autocorrectionDisabled()
                 Button("添加") {
-                    appState.purifyRuleStore.add(newRule)
-                    newRule = ""
+                    if appState.purifyRuleStore.add(newRule) { newRule = "" }
                 }
                 .disabled(newRule.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                if let error = appState.purifyRuleStore.lastError {
+                    Text(error)
+                        .font(.caption)
+                        .foregroundStyle(.red)
+                }
             }
             .listRowBackground(AppThemeRowSurface())
 
@@ -1031,8 +1037,12 @@ struct PurifyRulesView: View {
                     .frame(minHeight: 120)
                 Button("按行导入") {
                     let count = appState.purifyRuleStore.importLines(importText)
-                    importText = ""
-                    message = "已导入 \(count) 条净化规则"
+                    if let error = appState.purifyRuleStore.lastError {
+                        message = error
+                    } else {
+                        importText = ""
+                        message = "已导入 \(count) 条净化规则"
+                    }
                 }
                 .disabled(importText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                 if let message {
@@ -1098,8 +1108,12 @@ struct PurifyRulesView: View {
 
                 Button("导入选中预设") {
                     let imported = appState.purifyRuleStore.importPatterns(selectedPresetPatterns)
-                    selectedPresetIDs.removeAll()
-                    message = "已导入 \(imported) 条预设规则"
+                    if let error = appState.purifyRuleStore.lastError {
+                        message = error
+                    } else {
+                        selectedPresetIDs.removeAll()
+                        message = "已导入 \(imported) 条预设规则"
+                    }
                 }
                 .disabled(selectedPresetPatterns.isEmpty)
             }
@@ -1134,11 +1148,18 @@ struct PurifyRulesView: View {
                 TextEditor(text: $previewText)
                     .font(.system(.footnote, design: .monospaced))
                     .frame(minHeight: 90)
+                Button(isTestingRules ? "正在测试…" : "运行规则测试") {
+                    runRulePreview()
+                }
+                .disabled(isTestingRules || previewText.isEmpty)
+                Text("测试当前启用规则，最多预览 10,000 字。修改规则后重新测试；已缓存正文需重新加载才能应用新规则。")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
                 VStack(alignment: .leading, spacing: 6) {
                     Text("净化结果")
                         .font(.caption.weight(.semibold))
                         .foregroundStyle(.secondary)
-                    Text(appState.purifyRuleStore.preview(text: previewText))
+                    Text(previewResult ?? "输入样本文字后运行测试，结果会显示在这里。")
                         .font(.system(.footnote, design: .monospaced))
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .textSelection(.enabled)
@@ -1146,7 +1167,7 @@ struct PurifyRulesView: View {
             }
             .listRowBackground(AppThemeRowSurface())
 
-            Section("已启用规则") {
+            Section("全部规则") {
                 if appState.purifyRuleStore.rules.isEmpty {
                     Text("暂无净化规则。规则会在正文解析后执行，用于删除广告、站点尾巴或固定乱码片段。")
                         .foregroundStyle(.secondary)
@@ -1160,6 +1181,11 @@ struct PurifyRulesView: View {
                                 Text(rule.pattern)
                                     .font(.system(.body, design: .monospaced))
                                     .lineLimit(3)
+                            }
+                            if let error = appState.purifyRuleStore.validationErrors[rule.id] {
+                                Text(error)
+                                    .font(.caption)
+                                    .foregroundStyle(.red)
                             }
                         }
                         .swipeActions {
@@ -1190,10 +1216,24 @@ struct PurifyRulesView: View {
             .filter { !appState.purifyRuleStore.containsPattern($0) }
     }
 
+    private func runRulePreview() {
+        let sample = String(previewText.prefix(10_000))
+        let patterns = appState.purifyRuleStore.enabledPatterns
+        isTestingRules = true
+        Task { @MainActor in
+            // Executing imported JS or a costly regex must not run in View.body.
+            previewResult = await BlockingRuleExecutor.run {
+                PurifyRuleEvaluator.apply(rules: patterns, to: sample)
+            }
+            isTestingRules = false
+        }
+    }
+
     private func importRulesFromUrl() async {
         let trimmed = importUrl.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard let url = URL(string: trimmed) else {
-            urlMessage = "无效的 URL 地址"
+        guard let url = URL(string: trimmed), let scheme = url.scheme?.lowercased(),
+              ["https", "http"].contains(scheme), url.host != nil else {
+            urlMessage = "请输入完整的 HTTP 或 HTTPS 地址"
             return
         }
 
@@ -1215,9 +1255,13 @@ struct PurifyRulesView: View {
             }
 
             let count = appState.purifyRuleStore.importLines(text)
-            importUrl = ""
             isDownloadingRules = false
-            urlMessage = "已成功从网络导入 \(count) 条净化规则"
+            if let error = appState.purifyRuleStore.lastError {
+                urlMessage = error
+            } else {
+                importUrl = ""
+                urlMessage = "已成功从网络导入 \(count) 条净化规则"
+            }
         } catch {
             isDownloadingRules = false
             urlMessage = "下载失败：\(error.localizedDescription)"

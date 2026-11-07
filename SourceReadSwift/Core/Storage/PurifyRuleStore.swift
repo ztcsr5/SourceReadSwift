@@ -84,9 +84,9 @@ struct PurifyRulePreset: Identifiable, Hashable, Sendable {
         PurifyRulePreset(
             id: "anti-scraping",
             title: "防盗与伪源水印",
-            detail: "过滤“首发域名、笔趣阁/69书吧/飘天文学首发、最新网址”等站点防盗水印行。",
+            detail: "删除固定首发、发布与网址提示行；按需导入，先预览，避免误删作者原文。",
             patterns: [
-                "(?im)^\\s*(?:请记住本书首发域名|本文由.*整理发布|笔趣阁.*首发|69书吧.*首发|飘天文学|最新网址)[^\\r\\n]*(?:\\r?\\n|$)##",
+                "(?im)^[ \\t]*(?:请记住本书首发域名[：:]|本文由[^\\r\\n]*整理发布|(?:笔趣阁|69书吧|飘天文学(?:网)?)[^\\r\\n]*首发[：: \\t]|最新网址[：:])[^\\r\\n]*(?:\\r?\\n|$)##",
                 "(?im)^\\s*(?:天才一秒记住|顶点小说.*提供|小说网.*更新最快|本章未完，请点击下一页)[^\\r\\n]*(?:\\r?\\n|$)##"
             ]
         ),
@@ -101,8 +101,8 @@ struct PurifyRulePreset: Identifiable, Hashable, Sendable {
         ),
         PurifyRulePreset(
             id: "author-notes",
-            title: "求票打赏与尾巴",
-            detail: "清理求月票、求推荐票、求打赏、求订阅、求全订、投推荐票等尾部催票内容。",
+            title: "作者附言与求票 · 可选",
+            detail: "会删除任意位置以 PS、作者有话说或求票开头的整行，包括作者原文；只在确定不需要附言时导入。",
             patterns: [
                 "(?im)^\\s*(?:求月票|求推荐票|求打赏|求订阅|求全订|投推荐票|投月票|感谢各位书友的打赏)[^\\r\\n]*(?:\\r?\\n|$)##",
                 "(?im)^\\s*(?:PS[:：]|作者有话说[:：]|PS：今日已更新)[^\\r\\n]*(?:\\r?\\n|$)##"
@@ -124,6 +124,7 @@ struct PurifyRulePreset: Identifiable, Hashable, Sendable {
 final class PurifyRuleStore: ObservableObject {
     @Published private(set) var rules: [PurifyRule] = []
     @Published private(set) var lastError: String?
+    @Published private(set) var validationErrors: [String: String] = [:]
 
     private let persistence: PurifyRulePersistence
 
@@ -131,6 +132,7 @@ final class PurifyRuleStore: ObservableObject {
         self.persistence = persistence
         do {
             rules = try persistence.load()
+            updateValidationErrors()
         } catch {
             lastError = error.localizedDescription
         }
@@ -138,21 +140,26 @@ final class PurifyRuleStore: ObservableObject {
 
     var enabledPatterns: [String] {
         rules
-            .filter(\.enabled)
+            .filter { $0.enabled && validationErrors[$0.id] == nil }
             .map(\.pattern)
             .filter { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
     }
 
-    func add(_ pattern: String) {
+    @discardableResult
+    func add(_ pattern: String) -> Bool {
         let clean = pattern.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !clean.isEmpty else { return }
-        guard !rules.contains(where: { $0.pattern == clean }) else { return }
-        rules.insert(PurifyRule(pattern: clean), at: 0)
-        persist()
+        if let failure = PurifyRuleValidator.error(in: clean) {
+            lastError = failure
+            return false
+        }
+        guard !containsPattern(clean) else { lastError = nil; return true }
+        return persist([PurifyRule(pattern: clean)] + rules)
     }
 
     func importLines(_ text: String) -> Int {
-        let values = text.components(separatedBy: CharacterSet.newlines)
+        let clean = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        let values = clean.hasPrefix("@js:") || clean.hasPrefix("<js>")
+            ? [clean] : text.components(separatedBy: CharacterSet.newlines)
         return importPatterns(values)
     }
 
@@ -163,11 +170,14 @@ final class PurifyRuleStore: ObservableObject {
             .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
             .filter { !$0.isEmpty }
             .filter { seen.insert($0).inserted }
-        for value in values.reversed() {
-            rules.insert(PurifyRule(pattern: value), at: 0)
+        for (offset, value) in values.enumerated() {
+            if let failure = PurifyRuleValidator.error(in: value) {
+                lastError = "第 \(offset + 1) 条待导入规则：\(failure)。本次未导入，请修改后重试。"
+                return 0
+            }
         }
-        persist()
-        return values.count
+        guard !values.isEmpty else { lastError = nil; return 0 }
+        return persist(values.map { PurifyRule(pattern: $0) } + rules) ? values.count : 0
     }
 
     func containsPattern(_ pattern: String) -> Bool {
@@ -178,18 +188,27 @@ final class PurifyRuleStore: ObservableObject {
 
     func setEnabled(_ enabled: Bool, ruleID: String) {
         guard let index = rules.firstIndex(where: { $0.id == ruleID }) else { return }
-        rules[index].enabled = enabled
-        persist()
+        if enabled, let failure = PurifyRuleValidator.error(in: rules[index].pattern) {
+            lastError = failure
+            return
+        }
+        var updated = rules
+        updated[index].enabled = enabled
+        persist(updated)
     }
 
     func setAllEnabled(_ enabled: Bool) {
         guard rules.contains(where: { $0.enabled != enabled }) else { return }
-        rules = rules.map { rule in
+        if enabled, let invalid = rules.first(where: { PurifyRuleValidator.error(in: $0.pattern) != nil }) {
+            lastError = PurifyRuleValidator.error(in: invalid.pattern)
+            return
+        }
+        let updated = rules.map { rule in
             var updated = rule
             updated.enabled = enabled
             return updated
         }
-        persist()
+        persist(updated)
     }
 
     func preview(text: String) -> String {
@@ -201,28 +220,30 @@ final class PurifyRuleStore: ObservableObject {
     @discardableResult
     func restore(_ snapshot: [PurifyRule]) -> Bool {
         let normalized = snapshot.filter { !$0.pattern.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+        return persist(normalized)
+    }
+
+    func remove(ruleID: String) {
+        persist(rules.filter { $0.id != ruleID })
+    }
+
+    @discardableResult
+    private func persist(_ updated: [PurifyRule]) -> Bool {
         do {
-            try persistence.save(normalized)
-            rules = normalized
+            try persistence.save(updated)
+            rules = updated
+            updateValidationErrors()
             lastError = nil
             return true
         } catch {
-            lastError = error.localizedDescription
+            lastError = "保存净化规则失败，原规则未改变：\(error.localizedDescription)"
             return false
         }
     }
 
-    func remove(ruleID: String) {
-        rules.removeAll { $0.id == ruleID }
-        persist()
-    }
-
-    private func persist() {
-        do {
-            try persistence.save(rules)
-            lastError = nil
-        } catch {
-            lastError = error.localizedDescription
+    private func updateValidationErrors() {
+        validationErrors = rules.reduce(into: [:]) { errors, rule in
+            errors[rule.id] = PurifyRuleValidator.error(in: rule.pattern)
         }
     }
 }

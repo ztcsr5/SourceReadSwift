@@ -6,9 +6,9 @@ final class Release117AppearanceTests: XCTestCase {
     func testThemesWithoutOrnamentsDoNotCreateEmptyCanvasLayers() {
         for theme in AppVisualTheme.allCases {
             XCTAssertEqual(AppThemeOrnament.hasArtwork(theme: theme, isCard: true),
-                           [.folio, .blueprint].contains(theme))
+                           [.folio, .blueprint, .berryLake, .blushInk, .periwinkleCocoa, .peachMoss].contains(theme), theme.rawValue)
             XCTAssertEqual(AppThemeOrnament.hasArtwork(theme: theme, isCard: false),
-                           [.folio, .blueprint, .inkwash].contains(theme))
+                           [.folio, .blueprint, .inkwash, .berryLake, .blushInk, .periwinkleCocoa].contains(theme), theme.rawValue)
         }
     }
 

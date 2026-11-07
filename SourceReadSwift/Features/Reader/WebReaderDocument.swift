@@ -995,6 +995,23 @@ enum WebReaderHTML {
         }
       }
 
+      function canResolveChapterBody(node, section) {
+        return !!(node && !section.loading && node.querySelector(".chapter-loading") &&
+          node.classList.contains("first") === section.first &&
+          node.firstElementChild.textContent === section.title);
+      }
+
+      function resolveChapterBody(node, section) {
+        var replacement = buildSection(section);
+        // A loading title may already be visible. Its node and geometry must
+        // survive the body arriving so WebKit can keep its scroll anchor/layer.
+        while (node.children.length > 1) { node.removeChild(node.lastElementChild); }
+        while (replacement.children.length > 1) { node.appendChild(replacement.children[1]); }
+        rebaseSection(node, section);
+        node.setAttribute("data-sig", section.sig);
+        return node;
+      }
+
       function isPureAppend(payload) {
         if (!payload || !payload.sections) { return false; }
         var curOrder = state.order;
@@ -1036,7 +1053,14 @@ enum WebReaderHTML {
         for (var index = 0; index <= anchorIndex; index += 1) {
           if (!payload.sections[index] || payload.sections[index].key !== previous[index]) { return false; }
           var node = state.sections[previous[index]];
-          if (!node || node.getAttribute("data-sig") !== payload.sections[index].sig) { return false; }
+          if (!node || node.getAttribute("data-sig") !== payload.sections[index].sig) {
+            // Only new prose below an unchanged title can preserve this prefix.
+            // Editing visible prose or changing earlier chapters still anchors.
+            if (index === anchorIndex && anchor.local < 0 && canResolveChapterBody(node, payload.sections[index])) {
+              continue;
+            }
+            return false;
+          }
         }
         return true;
       }
@@ -1082,6 +1106,8 @@ enum WebReaderHTML {
           if (existing && existing.getAttribute("data-sig") === section.sig) {
             rebaseSection(existing, section);
             nextSections[section.key] = existing;
+          } else if (canResolveChapterBody(existing, section)) {
+            nextSections[section.key] = resolveChapterBody(existing, section);
           } else {
             nextSections[section.key] = buildSection(section);
           }

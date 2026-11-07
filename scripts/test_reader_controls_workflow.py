@@ -64,7 +64,7 @@ class ReaderControlsWorkflowTests(unittest.TestCase):
         expected = '''TabChromeRegressionTests ReaderCoverTeardownTests AppLayoutDensityTests SourceOrganizationTests
             AggregateSourceRegressionTests GlobalSearchIndexTests ForestBrandThemeTests FloatingReadingDeskTests
             UXXAggregatePipelineTests AudioBookPlaybackCoordinatorTests CloudTTSCompletionTests LocalVoiceLibraryTests BookExportRegressionTests
-            HomeLayoutEvidenceTests AsyncTimeoutTests ReaderPerformancePolicyTests SourcePipelineTests SourceProxyConfigurationTests
+            HomeLayoutEvidenceTests AtelierThemeTests AsyncTimeoutTests ReaderPerformancePolicyTests ReaderBackgroundChapterPrecacheTests ReaderOpeningTransitionTests SourcePipelineTests SourceProxyConfigurationTests
             HaiKuoShiJieSourceAdapterTests HuaHuoBookSourceAdapterTests ReadingStatsSummaryTests SourceStoreTests
             SourcePublisherLinksTests SourceVariablePersistenceTests SourceImportDownloaderTests SourceRequestTransportTests SourceCookieStoreTests SourceRateLimiterTests
             CookieHeaderParserTests AppDataBackupTests WebDAVCredentialStoreTests WebDAVSyncServiceTests
@@ -74,7 +74,7 @@ class ReaderControlsWorkflowTests(unittest.TestCase):
             ComicOfflineArchiveTests ComicStripLayoutTests ComicZoomInteractionTests LocalComicBookParserTests BlockingRuleExecutorTests ComicReadingPositionTests ChapterDownloadStoreTests ComicContentParserTests SourceEngineStage18FixtureTests WebReaderDocumentTests
             Release116VisualTests ReaderModePositionRegressionTests ReaderPageHostingTests Release117DetailTests Release117ComicCompatibilityTests
             Release117AppearanceTests Release117SearchProjectionTests Release117ChromeTests WebsiteSourceInferenceTests
-            WebsiteSourceFamilyInferenceTests AIChatTests Release117PurificationTests LANWorkbenchTests ReadingNotesNavigationTests
+            WebsiteSourceFamilyInferenceTests AIChatTests Release117PurificationTests PurifyRuleStoreTests VideoContentParserTests RuleEditorValidatorTests ContentParserTests LANWorkbenchTests ReadingNotesNavigationTests
             Release117ThemeCollaborationTests Release117ReaderPersonalizationTests Release117WallpaperEditorTests
             Release117ReadingHeroTests Release117MotionSystemTests Release117PolishTests ReaderSettingsStackTests
             FontImportRequestTests ReaderScrollCadenceTests ReaderBindingTests ReaderWorkbenchVisualTests

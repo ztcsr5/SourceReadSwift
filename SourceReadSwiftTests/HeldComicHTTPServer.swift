@@ -1,237 +1,314 @@
-import Foundation
-#if canImport(Darwin)
-import Darwin
-#endif
-@testable import SourceReadSwift
-
-/// A loopback-only HTTP peer that withholds EOF until the reader cancels it.
-final class HeldComicHTTPServer: @unchecked Sendable {
-    enum Mode: CaseIterable, Equatable { case declared, chunked }
-    struct Observation {
-        var address: URL?
-        var failure: String?
-        var sentHeaders = false
-        var sentBodyBytes = 0
-        var peerClosed = false
-    }
-
-    private let lock = NSLock()
-    private let mode: Mode
-    private var observation = Observation()
-    private var serverSocket: Int32 = -1
-    private var clientSocket: Int32 = -1
-    private var running = false
-    private let queue = DispatchQueue(label: "tests.comic-held-http", qos: .userInitiated)
-    private static let chunkBytes = 1024 * 1024
-    private lazy var chunkFrame: Data = {
-        var frame = Data("100000\r\n".utf8)
-        frame.append(Data(repeating: 0, count: Self.chunkBytes))
-        frame.append(Data("\r\n".utf8))
-        return frame
-    }()
-
-    init(mode: Mode) throws {
-        self.mode = mode
-    }
-
-    var snapshot: Observation {
-        lock.lock()
-        defer { lock.unlock() }
-        return observation
-    }
-
-    func start() {
-        queue.async { [weak self] in
-            self?.runServer()
-        }
-    }
-
-    func stop() {
-        lock.lock()
-        running = false
-        let sSock = serverSocket
-        let cSock = clientSocket
-        serverSocket = -1
-        clientSocket = -1
-        lock.unlock()
-
-        #if canImport(Darwin)
-        if cSock >= 0 {
-            Darwin.close(cSock)
-        }
-        if sSock >= 0 {
-            Darwin.close(sSock)
-        }
-        #endif
-    }
-
-    private func updateObservation(_ update: (inout Observation) -> Void) {
-        lock.lock()
-        defer { lock.unlock() }
-        update(&observation)
-    }
-
-    private func runServer() {
-        #if canImport(Darwin)
-        let fd = Darwin.socket(AF_INET, SOCK_STREAM, 0)
-        guard fd >= 0 else {
-            let err = errno
-            print("[DIAG-SERVER] socket() failed errno=\(err)")
-            updateObservation { $0.failure = "socket() failed: \(err)" }
-            return
-        }
-
-        var opt: Int32 = 1
-        Darwin.setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &opt, socklen_t(MemoryLayout<Int32>.size))
-        Darwin.setsockopt(fd, SOL_SOCKET, SO_NOSIGPIPE, &opt, socklen_t(MemoryLayout<Int32>.size))
-        Darwin.setsockopt(fd, IPPROTO_TCP, TCP_NODELAY, &opt, socklen_t(MemoryLayout<Int32>.size))
-
-        var addr = sockaddr_in()
-        addr.sin_len = __uint8_t(MemoryLayout<sockaddr_in>.size)
-        addr.sin_family = sa_family_t(AF_INET)
-        addr.sin_addr.s_addr = inet_addr("127.0.0.1")
-        addr.sin_port = 0
-
-        let bindResult = withUnsafePointer(to: &addr) { ptr in
-            ptr.withMemoryRebound(to: sockaddr.self, capacity: 1) { sa in
-                Darwin.bind(fd, sa, socklen_t(MemoryLayout<sockaddr_in>.size))
-            }
-        }
-        guard bindResult == 0 else {
-            let err = errno
-            Darwin.close(fd)
-            print("[DIAG-SERVER] bind() failed errno=\(err)")
-            updateObservation { $0.failure = "bind() failed: \(err)" }
-            return
-        }
-
-        guard Darwin.listen(fd, 5) == 0 else {
-            let err = errno
-            Darwin.close(fd)
-            print("[DIAG-SERVER] listen() failed errno=\(err)")
-            updateObservation { $0.failure = "listen() failed: \(err)" }
-            return
-        }
-
-        var assignedAddr = sockaddr_in()
-        var assignedLen = socklen_t(MemoryLayout<sockaddr_in>.size)
-        let nameResult = withUnsafeMutablePointer(to: &assignedAddr) { ptr in
-            ptr.withMemoryRebound(to: sockaddr.self, capacity: 1) { sa in
-                Darwin.getsockname(fd, sa, &assignedLen)
-            }
-        }
-        guard nameResult == 0 else {
-            let err = errno
-            Darwin.close(fd)
-            print("[DIAG-SERVER] getsockname() failed errno=\(err)")
-            updateObservation { $0.failure = "getsockname() failed: \(err)" }
-            return
-        }
-
-        let port = UInt16(bigEndian: assignedAddr.sin_port)
-        guard let url = URL(string: "http://127.0.0.1:\(port)/page") else {
-            Darwin.close(fd)
-            print("[DIAG-SERVER] URL construction failed for port \(port)")
-            updateObservation { $0.failure = "URL construction failed" }
-            return
-        }
-
-        lock.lock()
-        serverSocket = fd
-        running = true
-        lock.unlock()
-
-        print("[DIAG-SERVER] Listening on \(url)")
-        updateObservation { $0.address = url }
-
-        let client = Darwin.accept(fd, nil, nil)
-        guard client >= 0 else {
-            print("[DIAG-SERVER] accept() returned \(client) errno=\(errno)")
-            return
-        }
-
-        Darwin.setsockopt(client, SOL_SOCKET, SO_NOSIGPIPE, &opt, socklen_t(MemoryLayout<Int32>.size))
-        let nodelayRes = Darwin.setsockopt(client, IPPROTO_TCP, TCP_NODELAY, &opt, socklen_t(MemoryLayout<Int32>.size))
-        print("[DIAG-SERVER] setsockopt TCP_NODELAY result=\(nodelayRes)")
-
-        lock.lock()
-        clientSocket = client
-        lock.unlock()
-
-        print("[DIAG-SERVER] Client accepted fd=\(client)")
-        handleClient(client)
-        #endif
-    }
-
-    #if canImport(Darwin)
-    private func handleClient(_ client: Int32) {
-        var accumulated = Data()
-        var buffer = [UInt8](repeating: 0, count: 4096)
-        while true {
-            let bytesRead = Darwin.recv(client, &buffer, buffer.count, 0)
-            if bytesRead <= 0 {
-                print("[DIAG-SERVER] recv returned \(bytesRead) errno=\(errno) before full headers")
-                updateObservation { $0.failure = "Client closed before headers" }
-                return
-            }
-            accumulated.append(buffer, count: bytesRead)
-            if accumulated.range(of: Data("\r\n\r\n".utf8)) != nil {
-                break
-            }
-            if accumulated.count > 16384 {
-                print("[DIAG-SERVER] Headers exceeded 16 KiB")
-                updateObservation { $0.failure = "Request headers exceeded 16 KiB" }
-                return
-            }
-        }
-
-        print("[DIAG-SERVER] Received request (\(accumulated.count) bytes): \(String(decoding: accumulated, as: UTF8.self).replacingOccurrences(of: "\r\n", with: " \\r\\n "))")
-
-        let framing = mode == .declared
-            ? "Content-Length: \(ComicOfflineArchive.maximumPageBytes + 1)\r\n"
-            : "Transfer-Encoding: chunked\r\n"
-        let headerStr = "HTTP/1.1 200 OK\r\nServer: HeldComic\r\nDate: Fri, 06 Nov 2026 18:43:49 GMT\r\nContent-Type: application/octet-stream\r\n" + framing + "Connection: close\r\n\r\n"
-        let headerData = Data(headerStr.utf8)
-        let sentHeaderBytes = headerData.withUnsafeBytes { ptr -> Int in
-            guard let base = ptr.baseAddress else { return -1 }
-            return Darwin.send(client, base, headerData.count, 0)
-        }
-        guard sentHeaderBytes == headerData.count else {
-            print("[DIAG-SERVER] send() header failed sent=\(sentHeaderBytes) expected=\(headerData.count) errno=\(errno)")
-            updateObservation { $0.failure = "Failed to send response headers" }
-            return
-        }
-        updateObservation { $0.sentHeaders = true }
-        print("[DIAG-SERVER] Sent response headers successfully (\(sentHeaderBytes) bytes)")
-
-        if mode == .declared {
-            var trigger: UInt8 = 0
-            _ = Darwin.send(client, &trigger, 1, 0)
-        } else if mode == .chunked {
-            let chunks = ComicOfflineArchive.maximumPageBytes / Self.chunkBytes + 1
-            for i in 0..<chunks {
-                let sent = chunkFrame.withUnsafeBytes { ptr -> Int in
-                    guard let base = ptr.baseAddress else { return -1 }
-                    return Darwin.send(client, base, chunkFrame.count, 0)
-                }
-                print("[DIAG-SERVER] Sent chunk \(i+1)/\(chunks) sentBytes=\(sent)")
-                if sent <= 0 {
-                    break
-                }
-                updateObservation { $0.sentBodyBytes += Self.chunkBytes }
-            }
-        }
-
-        print("[DIAG-SERVER] Waiting for peer closure...")
-        var discard = [UInt8](repeating: 0, count: 256)
-        while true {
-            let ret = Darwin.recv(client, &discard, discard.count, 0)
-            if ret <= 0 {
-                print("[DIAG-SERVER] Peer closed fd=\(client) ret=\(ret) errno=\(errno)")
-                updateObservation { $0.peerClosed = true }
-                break
-            }
-        }
-    }
-    #endif
-}
+import Foundation
+#if canImport(Darwin)
+import Darwin
+#endif
+@testable import SourceReadSwift
+
+/// A loopback HTTP peer that withholds EOF until the reader cancels it.
+final class HeldComicHTTPServer: @unchecked Sendable {
+    enum Mode: CaseIterable, Equatable { case declared, declaredPrefix, chunked }
+    enum HeaderVariant: String, CaseIterable {
+        case octetStream, png, octetStreamNoSniff
+
+        var responseHeader: String {
+            switch self {
+            case .octetStream: return "Content-Type: application/octet-stream\r\n"
+            case .png: return "Content-Type: image/png\r\n"
+            case .octetStreamNoSniff:
+                return "Content-Type: application/octet-stream\r\nX-Content-Type-Options: nosniff\r\n"
+            }
+        }
+
+        var bodyPrefix: Data {
+            guard self == .png else { return Data([0]) }
+            // The existing 3x2 PNG fixture is a readable image, but still only
+            // a prefix of the advertised 24 MiB+1 HTTP body. No EOF is sent.
+            return Data(base64Encoded: "iVBORw0KGgoAAAANSUhEUgAAAAMAAAACCAIAAAASFvFNAAAAGklEQVR42mNgYGhg0ADiACBmCACygTggoAEAMGgE4bJ9Q/wAAAAASUVORK5CYII=")!
+        }
+    }
+    struct Observation {
+        var address: URL?
+        var failure: String?
+        var acceptedClient = false
+        var receivedRequestHeaders = false
+        var sentHeaders = false
+        var sentHeaderBytes = 0
+        var sentBodyBytes = 0
+        var peerClosed = false
+    }
+
+    private let lock = NSLock()
+    private let mode: Mode
+    private let headerVariant: HeaderVariant
+    private let holdsPrefixUntilReleased: Bool
+    private let prefixRelease = DispatchSemaphore(value: 0)
+    private var observation = Observation()
+    private var serverSocket: Int32 = -1
+    private var clientSocket: Int32 = -1
+    private var hasStarted = false
+    private var isStopped = false
+    private let queue = DispatchQueue(label: "tests.comic-held-http", qos: .userInitiated)
+    private static let chunkBytes = 1024 * 1024
+    private static let chunkPrefix = Data("100000\r\n".utf8)
+    private lazy var chunkFrame: Data = {
+        var frame = Self.chunkPrefix
+        frame.append(Data(repeating: 0, count: Self.chunkBytes))
+        frame.append(Data("\r\n".utf8))
+        return frame
+    }()
+
+    init(mode: Mode, headerVariant: HeaderVariant = .octetStream, holdsPrefixUntilReleased: Bool = false) throws {
+        self.mode = mode
+        self.headerVariant = headerVariant
+        self.holdsPrefixUntilReleased = holdsPrefixUntilReleased
+    }
+
+    /// Releases the counted MIME-specific prefix after the zero-body observation.
+    func releasePrefix() { prefixRelease.signal() }
+
+    var snapshot: Observation {
+        lock.lock()
+        defer { lock.unlock() }
+        return observation
+    }
+
+    func start() {
+        lock.lock()
+        guard !hasStarted, !isStopped else { lock.unlock(); return }
+        hasStarted = true
+        lock.unlock()
+        queue.async { [weak self] in self?.runServer() }
+    }
+
+    func stop() {
+        lock.lock()
+        defer { lock.unlock() }
+        isStopped = true
+        prefixRelease.signal()
+        #if canImport(Darwin)
+        // The worker owns close(). Shutdown wakes blocked accept/recv/send,
+        // without another thread closing and then reusing its descriptor.
+        if clientSocket >= 0 { Darwin.shutdown(clientSocket, SHUT_RDWR) }
+        if serverSocket >= 0 { Darwin.shutdown(serverSocket, SHUT_RDWR) }
+        #endif
+    }
+
+    private func updateObservation(_ update: (inout Observation) -> Void) {
+        lock.lock()
+        defer { lock.unlock() }
+        update(&observation)
+    }
+
+    private func runServer() {
+        #if canImport(Darwin)
+        let fd = Darwin.socket(AF_INET, SOCK_STREAM, 0)
+        guard fd >= 0 else { recordFailure("socket", code: errno); return }
+        lock.lock()
+        guard !isStopped else { lock.unlock(); Darwin.close(fd); return }
+        serverSocket = fd
+        lock.unlock()
+        defer { closeSockets() }
+
+        var option: Int32 = 1
+        Darwin.setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &option, socklen_t(MemoryLayout<Int32>.size))
+        Darwin.setsockopt(fd, SOL_SOCKET, SO_NOSIGPIPE, &option, socklen_t(MemoryLayout<Int32>.size))
+        var address = sockaddr_in()
+        address.sin_len = __uint8_t(MemoryLayout<sockaddr_in>.size)
+        address.sin_family = sa_family_t(AF_INET)
+        address.sin_addr.s_addr = inet_addr("127.0.0.1")
+        address.sin_port = 0
+        let bound = withUnsafePointer(to: &address) { pointer in
+            pointer.withMemoryRebound(to: sockaddr.self, capacity: 1) {
+                Darwin.bind(fd, $0, socklen_t(MemoryLayout<sockaddr_in>.size))
+            }
+        }
+        guard bound == 0 else { recordFailure("bind", code: errno); return }
+        guard Darwin.listen(fd, 1) == 0 else { recordFailure("listen", code: errno); return }
+        lock.lock()
+        let stoppedBeforeAccept = isStopped
+        lock.unlock()
+        guard !stoppedBeforeAccept else { return }
+        var assigned = sockaddr_in()
+        var length = socklen_t(MemoryLayout<sockaddr_in>.size)
+        let named = withUnsafeMutablePointer(to: &assigned) { pointer in
+            pointer.withMemoryRebound(to: sockaddr.self, capacity: 1) { Darwin.getsockname(fd, $0, &length) }
+        }
+        guard named == 0 else { recordFailure("getsockname", code: errno); return }
+        let port = UInt16(bigEndian: assigned.sin_port)
+        guard let url = URL(string: "http://127.0.0.1:\(port)/page") else {
+            updateObservation { $0.failure = "Invalid loopback URL" }; return
+        }
+        updateObservation { $0.address = url }
+        let client = Darwin.accept(fd, nil, nil)
+        guard client >= 0 else { recordFailure("accept", code: errno); return }
+        lock.lock()
+        guard !isStopped else { lock.unlock(); Darwin.close(client); return }
+        clientSocket = client
+        observation.acceptedClient = true
+        lock.unlock()
+        Darwin.setsockopt(client, SOL_SOCKET, SO_NOSIGPIPE, &option, socklen_t(MemoryLayout<Int32>.size))
+        Darwin.setsockopt(client, IPPROTO_TCP, TCP_NODELAY, &option, socklen_t(MemoryLayout<Int32>.size))
+        serve(client)
+        #endif
+    }
+
+    #if canImport(Darwin)
+    private func recordFailure(_ operation: String, code: Int32) {
+        updateObservation { $0.failure = "\(operation) failed, errno=\(code)" }
+    }
+
+    private func closeSockets() {
+        lock.lock()
+        defer { lock.unlock() }
+        if clientSocket >= 0 { Darwin.close(clientSocket); clientSocket = -1 }
+        if serverSocket >= 0 { Darwin.close(serverSocket); serverSocket = -1 }
+    }
+
+    private func readRequest(_ client: Int32) -> Bool {
+        var received = Data()
+        var buffer = [UInt8](repeating: 0, count: 4096)
+        while received.count <= 16_384 {
+            let count = Darwin.recv(client, &buffer, buffer.count, 0)
+            if count < 0, errno == EINTR { continue }
+            guard count > 0 else { recordFailure("recv request", code: errno); return false }
+            received.append(buffer, count: count)
+            if received.range(of: Data("\r\n\r\n".utf8)) != nil {
+                updateObservation { $0.receivedRequestHeaders = true }
+                return true
+            }
+        }
+        updateObservation { $0.failure = "Request headers exceeded 16 KiB" }
+        return false
+    }
+
+    private func serve(_ client: Int32) {
+        guard readRequest(client) else { return }
+        let framing = mode == .chunked ? "Transfer-Encoding: chunked\r\n"
+            : "Content-Length: \(ComicOfflineArchive.maximumPageBytes + 1)\r\n"
+        let headers = Data(("HTTP/1.1 200 OK\r\n" + headerVariant.responseHeader
+                            + framing + "Connection: close\r\n\r\n").utf8)
+        let headerCount = sendAll(headers, client: client, bodyRange: nil)
+        updateObservation { $0.sentHeaderBytes = headerCount; $0.sentHeaders = headerCount == headers.count }
+        guard headerCount == headers.count else { recordFailure("send headers", code: errno); return }
+        if mode == .declaredPrefix {
+            if holdsPrefixUntilReleased {
+                // Wait only on this dedicated socket worker, never on Swift's
+                // cooperative executor or the URLSession delegate queue.
+                prefixRelease.wait()
+                lock.lock()
+                let stoppedBeforePrefix = isStopped
+                lock.unlock()
+                guard !stoppedBeforePrefix else { return }
+            }
+            let prefix = headerVariant.bodyPrefix
+            _ = sendAll(prefix, client: client, bodyRange: 0..<prefix.count)
+        } else if mode == .chunked {
+            let payloadRange = Self.chunkPrefix.count..<(Self.chunkPrefix.count + Self.chunkBytes)
+            let chunks = ComicOfflineArchive.maximumPageBytes / Self.chunkBytes + 1
+            for _ in 0..<chunks {
+                if sendAll(chunkFrame, client: client, bodyRange: payloadRange) != chunkFrame.count { break }
+            }
+        }
+        // .declared sends exactly zero bytes after the header terminator.
+        var discard = [UInt8](repeating: 0, count: 256)
+        while true {
+            let count = Darwin.recv(client, &discard, discard.count, 0)
+            let receiveError = errno
+            if count < 0, receiveError == EINTR { continue }
+            if count <= 0 {
+                lock.lock()
+                observation.peerClosed = !isStopped && (count == 0 || receiveError == ECONNRESET)
+                lock.unlock()
+                return
+            }
+        }
+    }
+
+    private func sendAll(_ bytes: Data, client: Int32, bodyRange: Range<Int>?) -> Int {
+        var offset = 0
+        bytes.withUnsafeBytes { buffer in
+            guard let pointer = buffer.baseAddress else { return }
+            while offset < bytes.count {
+                let count = Darwin.send(client, pointer.advanced(by: offset), bytes.count - offset, 0)
+                if count < 0, errno == EINTR { continue }
+                guard count > 0 else { return }
+                if let bodyRange {
+                    let payloadCount = max(0, min(offset + count, bodyRange.upperBound) - max(offset, bodyRange.lowerBound))
+                    updateObservation { $0.sentBodyBytes += payloadCount }
+                }
+                offset += count
+            }
+        }
+        return offset
+    }
+    #endif
+}
+
+/// Independent Foundation control, using the same held-open HTTP response.
+final class HeldComicResponseProbe: NSObject, URLSessionDataDelegate, @unchecked Sendable {
+    private let lock = NSLock()
+    private var receivedResponse = false
+    private var completedErrorCode: Int?
+    private var session: URLSession?
+    private var task: URLSessionDataTask?
+
+    var hasReceivedResponse: Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        return receivedResponse
+    }
+
+    func start(url: URL, configuration: URLSessionConfiguration) {
+        let queue = OperationQueue()
+        queue.maxConcurrentOperationCount = 1
+        let session = URLSession(configuration: configuration, delegate: self, delegateQueue: queue)
+        self.session = session
+        let task = session.dataTask(with: url)
+        self.task = task
+        task.resume()
+    }
+
+    func stop() { session?.invalidateAndCancel(); session = nil }
+
+    var summary: String {
+        lock.lock()
+        defer { lock.unlock() }
+        return "responseCallback=\(receivedResponse) taskResponse=\(task?.response != nil) expectedBytes=\(task?.countOfBytesExpectedToReceive ?? -1) responseExpectedBytes=\(task?.response?.expectedContentLength ?? -1) errorCode=\(completedErrorCode.map(String.init) ?? "none")"
+    }
+
+    func urlSession(_ session: URLSession, dataTask: URLSessionDataTask, didReceive response: URLResponse,
+                    completionHandler: @escaping (URLSession.ResponseDisposition) -> Void) {
+        lock.lock(); receivedResponse = true; lock.unlock()
+        completionHandler(.cancel)
+    }
+
+    func urlSession(_ session: URLSession, task: URLSessionTask, didCompleteWithError error: Error?) {
+        lock.lock(); completedErrorCode = (error as NSError?)?.code; lock.unlock()
+    }
+}
+
+/// Records a production transfer without interpreting an observation timeout as a response.
+final class HeldComicTransferProbe: @unchecked Sendable {
+    private let lock = NSLock()
+    private var result: Result<Data, ComicImageFailure>?
+
+    var snapshot: Result<Data, ComicImageFailure>? {
+        lock.lock()
+        defer { lock.unlock() }
+        return result
+    }
+
+    var summary: String {
+        guard let result = snapshot else { return "pending" }
+        switch result {
+        case .success(let bytes): return "success bytes=\(bytes.count)"
+        case .failure(let failure): return "failure=\(failure)"
+        }
+    }
+
+    func record(_ result: Result<Data, ComicImageFailure>) {
+        lock.lock()
+        self.result = result
+        lock.unlock()
+    }
+}
