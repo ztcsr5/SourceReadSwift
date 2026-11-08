@@ -16,8 +16,10 @@ final class AppRefreshRateKeeper: UIView {
 
     func start() {
         guard link == nil else { return }
-        let maximum = Float(UIScreen.main.maximumFramesPerSecond)
-        let rate = min(maximum, 120)
+        // 必须从所在场景的屏幕取上限：UIScreen.main 在新系统上可能返回 60，
+        // 那样就会一直按 60 要帧，看起来「常驻 120 没生效」。
+        let screen = window?.windowScene?.screen ?? UIScreen.main
+        let rate = min(Float(screen.maximumFramesPerSecond), 120)
         let displayLink = CADisplayLink(target: WeakProxy(target: self),
                                         selector: #selector(WeakProxy.tick))
         if #available(iOS 15.0, *) {

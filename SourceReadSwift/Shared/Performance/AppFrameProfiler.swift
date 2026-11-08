@@ -96,8 +96,12 @@ final class AppFrameProfiler: ObservableObject {
         let duration = duration.isFinite ? min(max(duration, 0.01), 30) : 30
         deadline = CACurrentMediaTime() + duration
         let displayLink = CADisplayLink(target: self, selector: #selector(frame(_:)))
-        // Observe the default callback cadence; do not request an 80–120 Hz floor
-        // just by opening diagnostics. This still isn't GPU presentation timing.
+        // 采样必须按设备上限要帧：沿用系统默认调度只会拿到 60Hz 回调，
+        // 会把「跑满 120」误判成「掉到 60」。
+        if #available(iOS 15.0, *) {
+            let rate = Float(maximum)
+            displayLink.preferredFrameRateRange = CAFrameRateRange(minimum: rate, maximum: rate, preferred: rate)
+        }
         displayLink.add(to: .main, forMode: .common)
         link = displayLink
         isRecording = true

@@ -30,6 +30,7 @@ struct RootTabView: View {
         return navigationContent
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(AppRefreshRateKeeperView())
+        .overlay(alignment: .topLeading) { ReaderFrameHUD() }
         .safeAreaInset(edge: .bottom, spacing: 0) {
             if !appState.isTabChromeHidden {
                 VStack(spacing: 8) {
