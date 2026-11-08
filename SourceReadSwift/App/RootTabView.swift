@@ -27,6 +27,7 @@ struct RootTabView: View {
         let _ = secondaryAccentHex
         return navigationContent
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(AppRefreshRateKeeperView())
         .safeAreaInset(edge: .bottom, spacing: 0) {
             if !appState.isTabChromeHidden {
                 VStack(spacing: 8) {
