@@ -779,6 +779,7 @@ enum WebReaderHTML {
         sections: Object.create(null),
         order: [],
         nodes: [],
+        flatIndex: Object.create(null),
         visible: -1,
         highlightEl: null,
         lastScrollAt: 0,
@@ -1080,15 +1081,17 @@ enum WebReaderHTML {
         // Ultra-fluid zero-stutter fast path for pure downward appends:
         if (isPureAppend(payload)) {
           var appendFragment = document.createDocumentFragment();
+          var appendedSections = [];
           for (var appIdx = state.order.length; appIdx < payload.sections.length; appIdx += 1) {
             var appSec = payload.sections[appIdx];
             var appNode = buildSection(appSec);
             state.sections[appSec.key] = appNode;
             state.order.push(appSec.key);
+            appendedSections.push(appNode);
             appendFragment.appendChild(appNode);
           }
           content.appendChild(appendFragment);
-          refreshMetrics();
+          refreshMetrics(appendedSections);
           post({ type: "content-ready", total: payload.total });
           return true;
         }
@@ -1153,8 +1156,34 @@ enum WebReaderHTML {
         return true;
       }
 
-      function refreshMetrics() {
+      // addedSections 只在「纯追加」路径传入：只索引新增章节的节点。
+      // 整篇 querySelectorAll 在滚动中是最贵的一次 DOM 遍历，追加时不应重扫全文。
+      function refreshMetrics(addedSections) {
+        if (addedSections && addedSections.length) {
+          for (var scanIndex = 0; scanIndex < addedSections.length; scanIndex += 1) {
+            var sectionNode = addedSections[scanIndex];
+            if (sectionNode.matches && sectionNode.matches("[data-flat]")) { state.nodes.push(sectionNode); }
+            var addedNodes = sectionNode.querySelectorAll("[data-flat]");
+            for (var addedIndex = 0; addedIndex < addedNodes.length; addedIndex += 1) {
+              state.nodes.push(addedNodes[addedIndex]);
+            }
+          }
+          rebuildFlatIndex();
+          return;
+        }
         state.nodes = Array.prototype.slice.call(content.querySelectorAll("[data-flat]"));
+        rebuildFlatIndex();
+      }
+
+      // flat 序号 -> 节点，避免 elementForFlat 退化成线性扫描。
+      function rebuildFlatIndex() {
+        var index = Object.create(null);
+        for (var nodeIndex = 0; nodeIndex < state.nodes.length; nodeIndex += 1) {
+          var node = state.nodes[nodeIndex];
+          var flat = parseInt(node.getAttribute("data-flat"), 10);
+          if (!isNaN(flat) && index[flat] === undefined) { index[flat] = node; }
+        }
+        state.flatIndex = index;
       }
 
       function nodeMetric(element) {
@@ -1228,6 +1257,8 @@ enum WebReaderHTML {
       }
 
       function elementForFlat(flat) {
+        var cached = state.flatIndex && state.flatIndex[flat];
+        if (cached) { return cached; }
         var exact = content.querySelector('[data-flat="' + flat + '"]');
         if (exact) { return exact; }
         var list = state.nodes;
