@@ -74,11 +74,16 @@ struct GlobalSearchView: View {
                 }
             }
             .scrollDismissesKeyboard(.interactively)
-            // 点列表空白处收起键盘；同时不拦截行点击。
-            .simultaneousGesture(TapGesture().onEnded { if isFocused { isFocused = false } })
             .navigationTitle("全局搜索")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
+                // 键盘上的「完成」是收键盘的正规入口：
+                // 之前用整块 TapGesture 收键盘，会把手点输入框的那一下也吃掉，导致无法输入。
+                ToolbarItemGroup(placement: .keyboard) {
+                    Spacer()
+                    Button("完成") { isFocused = false }
+                        .accessibilityIdentifier("globalSearch.dismissKeyboard")
+                }
                 if showsCloseButton {
                     ToolbarItem(placement: .cancellationAction) {
                         Button("关闭") {
