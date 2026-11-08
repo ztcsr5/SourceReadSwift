@@ -10,8 +10,11 @@ enum ReaderSystemReturnPolicy {
 }
 
 enum ReaderExitSwipePolicy {
-    static func isEnabled(menuVisible: Bool, settingsVisible: Bool, coverPresented: Bool) -> Bool {
-        menuVisible && !settingsVisible && !coverPresented
+    /// 滚动模式下菜单不可见时仍要能用左缘右滑退出——这正是阅读中唯一的返回手势。
+    static func isEnabled(menuVisible: Bool, settingsVisible: Bool, coverPresented: Bool,
+                          scrollMode: Bool = false) -> Bool {
+        guard !settingsVisible, !coverPresented else { return false }
+        return menuVisible || scrollMode
     }
 
     static func isRightward(_ movement: CGPoint) -> Bool {

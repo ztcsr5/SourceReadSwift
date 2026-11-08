@@ -1123,7 +1123,8 @@ struct ReaderView: View {
                 reducesMotion: motion.reducesMotion, allowsBookReturn: allowsNativeBookReturn
             ) || ReaderExitSwipePolicy.isEnabled(
                 menuVisible: showOverlay, settingsVisible: showSettings,
-                coverPresented: showChapterList || temporaryCoverPresented
+                coverPresented: showChapterList || temporaryCoverPresented,
+                scrollMode: readerMode == .scroll
             ),
             onExit: requestReaderExit, prefersSystemReturn: readerUsesBookReturn
         ))
