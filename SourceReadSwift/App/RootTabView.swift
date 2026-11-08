@@ -109,7 +109,8 @@ struct RootTabView: View {
                         selectedTab = 1
                     },
                     autoFocus: false,
-                    onClose: { selectedTab = lastNonSearchTab }
+                    onClose: { selectedTab = lastNonSearchTab },
+                    showsCloseButton: false
                 )
             }
         }

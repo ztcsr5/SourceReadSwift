@@ -10,6 +10,8 @@ struct GlobalSearchView: View {
     var autoFocus: Bool = true
     /// 作为 tab 呈现时没有可 dismiss 的容器，交给调用方切回上一个 tab。
     var onClose: (() -> Void)? = nil
+    /// tab 形态由系统栏收起/展开承担返回，不显示左上角关闭按钮。
+    var showsCloseButton: Bool = true
     @Environment(\.dismiss) private var dismiss
     @FocusState private var isFocused: Bool
     @State private var query = ""
@@ -77,12 +79,14 @@ struct GlobalSearchView: View {
             .navigationTitle("全局搜索")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("关闭") {
-                        isFocused = false
-                        if let onClose { onClose() } else { dismiss() }
+                if showsCloseButton {
+                    ToolbarItem(placement: .cancellationAction) {
+                        Button("关闭") {
+                            isFocused = false
+                            if let onClose { onClose() } else { dismiss() }
+                        }
+                        .accessibilityIdentifier("globalSearch.close")
                     }
-                    .accessibilityIdentifier("globalSearch.close")
                 }
             }
             .navigationDestination(isPresented: Binding(
