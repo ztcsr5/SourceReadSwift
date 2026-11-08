@@ -1,0 +1,78 @@
+name: Continuous Scroll Verification
+run-name: "SourceRead · 连续滑动章节加载与章界验证 · #${{ github.run_number }}"
+on:
+  workflow_dispatch:
+concurrency:
+  group: reader-scroll-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  scroll:
+    strategy:
+      fail-fast: false
+      max-parallel: 1
+      matrix:
+        runtime: ['26', '18']
+    runs-on: ${{ matrix.runtime == '26' && 'macos-26' || 'macos-15' }}
+    timeout-minutes: 35
+    env:
+      DEVELOPER_DIR: ${{ matrix.runtime == '26' && '/Applications/Xcode_26.2.app/Contents/Developer' || '/Applications/Xcode_16.4.app/Contents/Developer' }}
+      DIAGNOSTIC_RUNTIME: ${{ matrix.runtime }}
+    steps:
+      - uses: actions/checkout@v5
+      - name: Generate project
+        run: |
+          brew install xcodegen
+          xcodegen generate
+      - name: Boot simulator
+        run: |
+          set -euo pipefail
+          RUNTIME_ID="$(xcrun simctl list runtimes -j | python3 -c 'import json,sys,os; print(next(r["identifier"] for r in json.load(sys.stdin)["runtimes"] if r.get("isAvailable") and r["version"].startswith(os.environ["DIAGNOSTIC_RUNTIME"]+".")))')"
+          python3 -u scripts/boot_native_simulator.py "$RUNTIME_ID" --output scroll-device.txt
+      - name: Compile app and tests
+        id: build
+        run: |
+          set -euo pipefail
+          xcodebuild -project SourceReadSwift.xcodeproj -scheme SourceReadSwift -destination "id=$(cat scroll-device.txt)" CODE_SIGNING_ALLOWED=NO -parallel-testing-enabled NO build-for-testing 2>&1 | tee scroll-build.log
+      - name: Verify chapter arrival scheduling and positions
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        timeout-minutes: 10
+        run: |
+          set -euo pipefail
+          xcodebuild -project SourceReadSwift.xcodeproj -scheme SourceReadSwift -destination "id=$(cat scroll-device.txt)" CODE_SIGNING_ALLOWED=NO -parallel-testing-enabled NO \
+            -only-testing:SourceReadSwiftTests/ReaderScrollSchedulingTests \
+            -only-testing:SourceReadSwiftTests/ReaderScrollAnchorTests \
+            -only-testing:SourceReadSwiftTests/ReaderScrollCadenceTests \
+            -only-testing:SourceReadSwiftTests/ReaderBackgroundChapterPrecacheTests \
+            -only-testing:SourceReadSwiftTests/ReaderChapterWindowPolicyTests \
+            -only-testing:SourceReadSwiftTests/WebReaderDocumentTests \
+            -only-testing:SourceReadSwiftTests/ReaderModePositionRegressionTests \
+            -only-testing:SourceReadSwiftTests/ChapterCacheWriterPerformanceTests \
+            -test-timeouts-enabled YES -maximum-test-execution-time-allowance 60 \
+            -resultBundlePath ScrollUnit.xcresult test-without-building 2>&1 | tee scroll-unit.log
+      - name: Publish unit feedback before UI
+        if: ${{ always() && steps.build.outcome == 'success' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: reader-scroll-unit-${{ github.sha }}-ios${{ matrix.runtime }}
+          path: scroll-unit.log
+          if-no-files-found: error
+          retention-days: 7
+      - name: Verify real continuous reading and reopened position
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        timeout-minutes: 8
+        run: |
+          set -euo pipefail
+          xcodebuild -project SourceReadSwift.xcodeproj -scheme SourceReadSwift -destination "id=$(cat scroll-device.txt)" CODE_SIGNING_ALLOWED=NO -parallel-testing-enabled NO \
+            -only-testing:SourceReadSwiftUITests/FloatingReadingDeskUITests/testContinuousChapterCrossingKeepsProseHeadingAndReopenedPositionTogether \
+            -test-timeouts-enabled YES -maximum-test-execution-time-allowance 180 \
+            -resultBundlePath ScrollUI.xcresult test-without-building 2>&1 | tee scroll-ui.log
+      - name: Preserve results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: reader-scroll-${{ github.sha }}-ios${{ matrix.runtime }}
+          path: |
+            scroll-*.log
+            ScrollUnit.xcresult
+            ScrollUI.xcresult
+          retention-days: 7

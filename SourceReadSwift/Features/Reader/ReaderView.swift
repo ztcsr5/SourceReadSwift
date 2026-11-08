@@ -1445,6 +1445,8 @@ struct ReaderView: View {
             // Its owner releases the gate before rebuilding the new mode.
             interactionGate.isPageInteractionActive = false
             interactionGate.rebuildDeferred = false
+            interactionGate.isScrollInteractionActive = false
+            interactionGate.scrollTrimDeferred = false
             paginationRebuildPending = false
             paginationWarmupPending = false
             // A mode switch changes the page model itself. Rebuild now so the
@@ -1899,6 +1901,12 @@ struct ReaderView: View {
                 scrollPositionTracker.flatIndex = index
                 scrollPositionTracker.utf16Offset = offset
                 resolveOpeningPreview()
+            },
+            onScrollInteractionChanged: { active in
+                interactionGate.isScrollInteractionActive = active
+                guard !active, !readerSessionEnded, interactionGate.scrollTrimDeferred else { return }
+                interactionGate.scrollTrimDeferred = false
+                trimWindowIfNeeded()
             },
             onNearBottom: {
                 requestScrollForwardChapter()
@@ -2443,6 +2451,7 @@ struct ReaderView: View {
         let outcome = await fetchWindowChapter(index)
         guard windowGeneration == generation else { return false }
         windowLoadingIndices.remove(index)
+        guard !Task.isCancelled else { return false }
         switch outcome {
         case .success(let loaded):
             guard acceptsWindowChapter(index) else { return false }
@@ -2486,7 +2495,7 @@ struct ReaderView: View {
            localChapters.indices.contains(index) {
             let local = localChapters[index]
             return .success(
-                ReaderChapterSection(
+                await ReaderChapterSection.prepare(
                     chapterIndex: index,
                     title: local.title,
                     paragraphs: local.paragraphs
@@ -2515,7 +2524,7 @@ struct ReaderView: View {
             purifyRules: purifyRules
         ) {
             return .success(
-                ReaderChapterSection(
+                await ReaderChapterSection.prepare(
                     chapterIndex: index,
                     title: chapter.title,
                     paragraphs: cached.paragraphs
@@ -2535,7 +2544,7 @@ struct ReaderView: View {
                 purifyRules: purifyRules
             )
             return .success(
-                ReaderChapterSection(
+                await ReaderChapterSection.prepare(
                     chapterIndex: index,
                     title: loaded.title,
                     paragraphs: loaded.paragraphs
@@ -2744,6 +2753,10 @@ struct ReaderView: View {
     /// disk: opening one again is a synchronous cache hit, not a new request.
     /// In-flight chapters and the cursor chapter are never evicted.
     private func trimWindowIfNeeded() {
+        if readerMode == .scroll, interactionGate.isScrollInteractionActive {
+            interactionGate.scrollTrimDeferred = true
+            return
+        }
         var keep = ReaderChapterWindowPolicy.retainedIndices(
             around: windowCurrentChapterIndex,
             radius: windowRadius,
@@ -7008,6 +7021,8 @@ final class ReaderVisiblePageTracker {
 final class ReaderInteractionGate {
     var isPageInteractionActive = false
     var rebuildDeferred = false
+    var isScrollInteractionActive = false
+    var scrollTrimDeferred = false
 }
 
 /// Bounded attributed-string cache keyed by stable page identity. Mutated
