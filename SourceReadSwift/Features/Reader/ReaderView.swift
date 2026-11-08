@@ -1,4 +1,4 @@
-﻿import AVFoundation
+import AVFoundation
 import MediaPlayer
 import PhotosUI
 import SwiftUI
@@ -134,8 +134,8 @@ struct ReaderView: View {
     @State private var paginationRebuildPending = false
     @State private var tocFilterCache = ReaderTocFilterCache()
     @State private var pageIdentityTracker = ReaderVisiblePageTracker()
-    /// 椤甸潰瀹瑰櫒鐨勭湡瀹炲嚑浣曪紙UIPageViewController 瀛愭帶鍒跺櫒鍙兘姣旀牴瑙嗗浘灏忎竴鍦堬級銆?
-    /// 鍒嗛〉寮曟搸浣跨敤杩欎竴浠斤紝鑰屼笉鏄洸鐩浉淇℃牴瑙嗗浘鐨?viewport銆?
+    /// 页面容器的真实几何（UIPageViewController 子控制器可能比根视图小一圈）。
+    /// 分页引擎使用这一份，而不是盲目相信根视图的 viewport。
     @State private var pagedPageContainerMetrics: ReaderPageContainerMetrics?
     /// Page-to-paragraph mapping is immutable between layout-cache revisions.
     /// Keep it in state instead of rebuilding an array with `compactMap` every
@@ -184,7 +184,7 @@ struct ReaderView: View {
     /// stops moving, chapters outside the cursor's neighbours stay cheap
     /// placeholders instead of being measured twice (fallback viewport first,
     /// real container second). That double pass was the pause on
-    /// "姝ｅ湪鍔犺浇涓嬩竴绔? for chapters the local book already had in memory.
+    /// "正在加载下一章" for chapters the local book already had in memory.
     @State private var chapterGeometrySettled = false
     @State private var geometrySettleTask: Task<Void, Never>?
     @State private var paginationWarmupRestartTask: Task<Void, Never>?
@@ -211,11 +211,11 @@ struct ReaderView: View {
     @State private var autoScrollPausedForScene = false
     @State private var scrollJumpGeneration = 0
     @State private var chapterSliderTarget: Double? = nil
-    /// 鎷栧姩绔犺妭杩涘害鏉℃椂鐨勫疄鏃惰烦绔犱换鍔°€傛墜鎸囪繕鍦ㄦ粦灏变笉鍋滈噸鎺掞紝
-    /// 鍋滀綇 0.12s 鎵嶇湡姝ｈ烦锛岄伩鍏嶄竴娆℃嫋鍔ㄩ噷濉炶繘鍗佸嚑涓珷鑺傚姞杞姐€?
+    /// 拖动章节进度条时的实时跳章任务。手指还在滑就不停重排，
+    /// 停住 0.12s 才真正跳，避免一次拖动里塞进十几个章节加载。
     @State private var chapterSeekTask: Task<Void, Never>? = nil
-    /// 棣栧抚鏄惁宸茬粡钀藉埌銆屼笂娆¤鍒扮殑閭ｄ竴娈点€嶃€備负 false 鏃舵枃瀛楀眰鍏堥€忔槑锛?
-    /// 閬垮厤鐢ㄦ埛鍏堢湅鍒扮 1 绔犵珷棣栥€侀殢鍚庤鍒囨垚鎭㈠浣嶇疆鐨勯偅涓€涓嬮棯璺炽€?
+    /// 首帧是否已经落到「上次读到的那一段」。为 false 时文字层先透明，
+    /// 避免用户先看到第 1 章章首、随后被切成恢复位置的那一下闪跳。
     @State private var hasOpeningPositionTimedOut = false
     @State private var openingPositionAttempt = 0
     @State private var isRetryingOpeningPosition = false
@@ -224,8 +224,8 @@ struct ReaderView: View {
         var startedAt: Date?
     }
     @State private var tapGestureTracker = ReaderTapGestureTracker()
-    /// 涓€娆＄偣鍑诲彧澶勭悊涓€娆°€俻aged 妯″紡閲屽揩鐓ч〉瀹瑰櫒涓?SwiftUI 鎵嬪娍鍙兘鍦ㄥ悓涓€甯?
-    /// 鍚勬姤涓€娆★紝鐢ㄦ埛鐪嬪埌鐨勫氨鏄€岀偣涓€涓嬭烦浜嗕袱椤点€嶃€?
+    /// 一次点击只处理一次。paged 模式里快照页容器与 SwiftUI 手势可能在同一帧
+    /// 各报一次，用户看到的就是「点一下跳了两页」。
     @State private var tapCooldownUntil: Date = .distantPast
     @AppStorage("reader.customBackgroundIsDark") private var customBackgroundIsDark: Bool = false
     @State private var pageStepDirection: Int = 0
@@ -238,7 +238,7 @@ struct ReaderView: View {
     @AppStorage("reader.fontSize") private var fontSize: Double = ReaderTypographyDefaults.fontSize
     @AppStorage("reader.lineSpacing") private var lineSpacing: Double = ReaderTypographyDefaults.lineSpacing
     @AppStorage("reader.pagePadding") private var pagePadding: Double = ReaderTypographyDefaults.pagePadding
-    // 椤佃剼涓変欢濂楀悇鑷彲鍏筹紙瀵圭収棣欒壊闂洪榿 tr_showTime / tr_showBatView / tr_showBatLabel锛夈€?
+    // 页脚三件套各自可关（对照香色闺阁 tr_showTime / tr_showBatView / tr_showBatLabel）。
     @AppStorage("reader.footerShowTime") private var footerShowTime = true
     @AppStorage("reader.footerShowBatteryIcon") private var footerShowBatteryIcon = true
     @AppStorage("reader.footerShowBatteryPercent") private var footerShowBatteryPercent = true
@@ -264,10 +264,10 @@ struct ReaderView: View {
     /// are rewritten; a manually tuned value is kept.
     @AppStorage("reader.typographyMigrated.v66") private var typographyMigratedV66 = false
     @AppStorage("reader.footerHeight") private var footerHeight: Double = ReaderTypographyDefaults.footerHeight
-    /// 绔犺妭鏍囬鍛堢幇鏂瑰紡銆傞粯璁ゃ€岄〉鐪夊皬鏍囬銆嶏細姣忛〉椤堕儴 12pt 绔犺妭鍚嶏紝姝ｆ枃浠庨〉鐪変笅寮€濮嬶紝
-    /// 涓庢爾闃?/ 寮€鍏冮槄璇荤殑闃呰椤典竴鑷淬€?
+    /// 章节标题呈现方式。默认「页眉小标题」：每页顶部 12pt 章节名，正文从页眉下开始，
+    /// 与栖阅 / 开元阅读的阅读页一致。
     @AppStorage("reader.chapterHeadingStyle") private var chapterHeadingStyleRaw = ReaderPageChromeLayout.header.rawValue
-    /// 鏍栭槄鐨勩€屽唴瀹瑰欢浼歌嚦椤电湁椤佃剼鍖哄煙銆嶏細寮€鍚悗姝ｆ枃璺ㄨ繃椤电湁椤佃剼甯︼紝椤电湁椤佃剼娴湪姝ｆ枃涓娿€?
+    /// 栖阅的「内容延伸至页眉页脚区域」：开启后正文跨过页眉页脚带，页眉页脚浮在正文上。
     @AppStorage("reader.contentExtendsIntoChrome") private var contentExtendsIntoChrome = false
     @AppStorage("reader.ttsRate") private var ttsRate: Double = 0.52
     @AppStorage("reader.ttsEngine") private var ttsEngineRawValue: String = TTSEngineKind.local.rawValue
@@ -275,7 +275,7 @@ struct ReaderView: View {
     @AppStorage("reader.autoScrollDelay") private var autoScrollDelay: Double = 2.0
     @AppStorage("reader.sleepTimerMinutes") private var sleepTimerMinutes: Int = 0
     @AppStorage("reader.background") private var backgroundRawValue: String = ReaderBackground.white.rawValue
-    /// 澹佺焊濉厖鏂瑰紡锛氬～鍏?/ 閫傚簲 / 鎷変几銆傚榻愬紑鍏?BoxFit 涓庢爾闃?UIImageView contentMode銆?
+    /// 壁纸填充方式：填充 / 适应 / 拉伸。对齐开元 BoxFit 与栖阅 UIImageView contentMode。
     @AppStorage("reader.customWallpaperFillMode") private var customWallpaperFillModeRaw = ReaderWallpaperFillMode.fill.rawValue
     @State private var isPerBookOverride: Bool = false
     @AppStorage("reader.mode") private var readerModeRawValue: String = ReaderMode.scroll.rawValue
@@ -380,10 +380,10 @@ struct ReaderView: View {
                 max(declaredChapterNumber(in: currentDisplayChapterTitle) ?? (displayIndex + 1), 1),
                 displayTotal
             )
-            parts.append("绗?\(chapterNumber) / \(displayTotal) 绔?)
+            parts.append("第 \(chapterNumber) / \(displayTotal) 章")
             parts.append("\(percentage)%")
         } else {
-            parts.append("绗?\(displayIndex + 1) 绔?)
+            parts.append("第 \(displayIndex + 1) 章")
         }
         if readerMode != .scroll {
             if let chapterPages = currentChapterPageStatus {
@@ -391,10 +391,10 @@ struct ReaderView: View {
             } else {
                 let pageCount = max(pagedBlocks.count, 1)
                 let page = min(max(pagedPageIndex + 1, 1), pageCount)
-                parts.append("椤?\(page)/\(pageCount)")
+                parts.append("页 \(page)/\(pageCount)")
             }
         }
-        return parts.joined(separator: " 路 ")
+        return parts.joined(separator: " · ")
     }
 
     /// Live chapter total for the footer. The bookshelf's `totalChapters`
@@ -419,7 +419,7 @@ struct ReaderView: View {
         guard !block.isPlaceholder, block.chapterIndex >= 0 else { return nil }
         let ordinal = block.pageOrdinal + 1
         let count = chapterPageTotal(for: block.chapterIndex, fallback: ordinal)
-        return "椤?\(min(ordinal, count))/\(count)"
+        return "页 \(min(ordinal, count))/\(count)"
     }
 
     /// Total pages of one chapter, reconciled across every source of truth:
@@ -435,10 +435,10 @@ struct ReaderView: View {
         return max(windowTotal, cached, fallback, 1)
     }
 
-    /// The chapter number printed in the TOC title ("绗?5绔?鍦板鍏ㄥ浘"), which
+    /// The chapter number printed in the TOC title ("第25章 地宫全图"), which
     /// can differ from the array index when a source ships extra volumes.
     private func declaredChapterNumber(in title: String) -> Int? {
-        guard let range = title.range(of: #"绗琝s*[0-9]+\s*绔?#, options: .regularExpression) else { return nil }
+        guard let range = title.range(of: #"第\s*[0-9]+\s*章"#, options: .regularExpression) else { return nil }
         let digits = title[range].filter(\.isNumber)
         guard let value = Int(digits), value > 0 else { return nil }
         return value
@@ -457,14 +457,14 @@ struct ReaderView: View {
                 if let failure = windowFailures[next] {
                     return ScrollChapterStatus(
                         chapterIndex: next,
-                        message: "绗?\(next + 1) 绔犲姞杞藉け璐ワ細\(failure)",
+                        message: "第 \(next + 1) 章加载失败：\(failure)",
                         isFailure: true
                     )
                 }
                 if windowLoadingIndices.contains(next) {
                     return ScrollChapterStatus(
                         chapterIndex: next,
-                        message: "姝ｅ湪鍔犺浇绗?\(next + 1) 绔犫€?,
+                        message: "正在加载第 \(next + 1) 章…",
                         isFailure: false
                     )
                 }
@@ -476,14 +476,14 @@ struct ReaderView: View {
                 if let failure = windowFailures[previous] {
                     return ScrollChapterStatus(
                         chapterIndex: previous,
-                        message: "绗?\(previous + 1) 绔犲姞杞藉け璐ワ細\(failure)",
+                        message: "第 \(previous + 1) 章加载失败：\(failure)",
                         isFailure: true
                     )
                 }
                 if windowLoadingIndices.contains(previous) {
                     return ScrollChapterStatus(
                         chapterIndex: previous,
-                        message: "姝ｅ湪鍔犺浇绗?\(previous + 1) 绔犫€?,
+                        message: "正在加载第 \(previous + 1) 章…",
                         isFailure: false
                     )
                 }
@@ -509,8 +509,8 @@ struct ReaderView: View {
     }
 
     private var sleepTimerBadgeText: String? {
-        if sleepTimerMinutes == -1 { return "鎾畬褰撶珷" }
-        if sleepTimerMinutes > 0 { return "\(sleepTimerMinutes)鍒? }
+        if sleepTimerMinutes == -1 { return "播完当章" }
+        if sleepTimerMinutes > 0 { return "\(sleepTimerMinutes)分" }
         return nil
     }
 
@@ -546,9 +546,9 @@ struct ReaderView: View {
         return isLocalChapterBook ? max(base, ReaderPreloadPolicy.maximumCount) : max(base, 5)
     }
 
-    /// 鏈湴瀵煎叆鐨勪功锛坙ocalChapters 鍦ㄤ功鏋舵ā鍨嬮噷锛夛紝绔犺妭璇诲彇涓嶇粡杩囦功婧愩€?
-    /// `localChapters` 鏄悗鍔犵殑鍙€夊瓧娈碉紝鏃т功鏋跺彲鑳借В鐮佹垚 nil锛涙湰鍦板鍏ョ殑
-    /// 韬唤鏍囪杩樺湪锛屼笉鑳借鏁存潯鏈湴蹇矾寰勶紙瀹界獥鍙?+ 鍚屾 seed锛夊洜姝ゅけ鏁堛€?
+    /// 本地导入的书（localChapters 在书架模型里），章节读取不经过书源。
+    /// `localChapters` 是后加的可选字段，旧书架可能解码成 nil；本地导入的
+    /// 身份标记还在，不能让整条本地快路径（宽窗口 + 同步 seed）因此失效。
     private var isLocalChapterBook: Bool {
         guard let book = appState.bookshelfStore.book(id: bookID) else { return false }
         if book.localChapters?.isEmpty == false { return true }
@@ -572,7 +572,7 @@ struct ReaderView: View {
         if let chapter = chapters.first(where: { $0.index == index }) {
             return chapter.title
         }
-        return "绗?\(index + 1) 绔?
+        return "第 \(index + 1) 章"
     }
 
     private var filteredChapters: [BookChapter] {
@@ -612,8 +612,8 @@ struct ReaderView: View {
         return viewportSize
     }
 
-    /// 鍒嗛〉鐪熷疄鍙敤鐨勮鍙ｃ€傞娆℃覆鏌撳墠鍥為€€鍒版牴瑙嗗彛锛岄〉闈㈤娆″竷灞€鍚庣珛鍗虫崲鎴愬疄娴嬪€笺€?
-    /// 杩欒В鍐充簡銆屽垎椤垫寜 852pt 鎺掋€乁IPageViewController 鍙粰 793pt銆嶅鑷寸殑椤靛熬鎴柇銆?
+    /// 分页真实可用的视口。首次渲染前回退到根视口，页面首次布局后立即换成实测值。
+    /// 这解决了「分页按 852pt 排、UIPageViewController 只给 793pt」导致的页尾截断。
     private var pagedLayoutViewportSize: CGSize {
         if let metrics = pagedPageContainerMetrics, metrics.isValid {
             return metrics.size
@@ -621,7 +621,7 @@ struct ReaderView: View {
         return effectiveViewportSize
     }
 
-    /// 鍒嗛〉涓庢覆鏌撳叡鐢ㄧ殑鍞竴鍑犱綍鏉ユ簮銆?
+    /// 分页与渲染共用的唯一几何来源。
     private var pagedPageGeometry: ReaderPageGeometry {
         let margin = CGFloat(pagePadding)
         if let metrics = pagedPageContainerMetrics, metrics.isValid {
@@ -643,12 +643,12 @@ struct ReaderView: View {
         )
     }
 
-    /// cover 妯″紡鐨勯〉闈㈠湪鍚屼竴妫?SwiftUI 鏍戦噷锛岀敤 PreferenceKey 鍥炰紶锛沺age-curl /
-    /// 婊戝姩妯″紡鐨勯〉闈㈠湪鐙珛 UIHostingController 閲岋紝preference 鍑轰笉鏉ワ紝鏀圭敱
-    /// PageCurlReaderView 鐨勫竷灞€鍥炶皟鎶婄湡瀹?bounds 浼犲洖鏉ャ€備袱鏉¤矾閮芥眹鍒拌繖閲屻€?
+    /// cover 模式的页面在同一棵 SwiftUI 树里，用 PreferenceKey 回传；page-curl /
+    /// 滑动模式的页面在独立 UIHostingController 里，preference 出不来，改由
+    /// PageCurlReaderView 的布局回调把真实 bounds 传回来。两条路都汇到这里。
     private func adoptPageContainerMetrics(_ metrics: ReaderPageContainerMetrics) {
         guard metrics.isValid else { return }
-        // 0.5pt 鍚搁檮锛岄伩鍏嶅儚绱犵骇鎶栧姩瑙﹀彂鏃犱紤姝㈢殑閲嶆柊鍒嗛〉銆?
+        // 0.5pt 吸附，避免像素级抖动触发无休止的重新分页。
         let snapped = ReaderPageContainerMetrics(
             size: CGSize(
                 width: (metrics.size.width * 2).rounded() / 2,
@@ -668,8 +668,8 @@ struct ReaderView: View {
     /// Holds the pagination warmup until the page container stops reporting new
     /// bounds. `pagedPageGeometry` feeds the chapter signature, so measuring a
     /// chapter against the fallback viewport and then again against the real
-    /// one throws the first result away 鈥?the reason a freshly opened local
-    /// book paused on "姝ｅ湪鍔犺浇涓嬩竴绔? for chapters it already had in memory.
+    /// one throws the first result away — the reason a freshly opened local
+    /// book paused on "正在加载下一章" for chapters it already had in memory.
     private func endReaderSession() {
         guard !readerSessionEnded else { return }
         readerSessionEnded = true
@@ -773,9 +773,9 @@ struct ReaderView: View {
             ReaderPerformancePolicy.viewportCacheKey(viewport),
             readerContentFingerprint,
             windowSignature,
-            // 涓婚/澶栬涔熸槸椤甸潰娓叉煋鐨勪竴閮ㄥ垎锛歱age-curl 鐨勯〉闈㈡槸鍒涘缓鏃跺揩鐓х殑
-            // hosting controller锛屼笉鎹?key 灏变笉浼氶噸鐢?鈥斺€?杩欐鏄€屾崲涓婚瑕佺炕椤?
-            // 鎵嶇敓鏁堛€嶇殑鎴愬洜銆?
+            // 主题/外观也是页面渲染的一部分：page-curl 的页面是创建时快照的
+            // hosting controller，不换 key 就不会重画 —— 这正是「换主题要翻页
+            // 才生效」的成因。
             backgroundRawValue,
             backgroundWallpaperRevision.uuidString,
             customFontPostScriptName,
@@ -939,8 +939,8 @@ struct ReaderView: View {
             }
             .contentShape(Rectangle())
             .simultaneousGesture(
-                // 浠呴拡瀵归潪婊氬姩鍒嗛〉妯″紡浣跨敤杞昏Е鎵嬪娍锛岀粷涓嶅湪璺濈涓?鏃舵嫤鎴嫋鎷斤紝
-                // 褰诲簳閲婃斁 iOS 16 鍙婂叏鏈哄瀷鍦?WKWebView 涓?UIPageViewController 鐨勫師鐢熸粦鍔ㄤ笌缈婚〉鍝嶅簲銆?
+                // 仅针对非滚动分页模式使用轻触手势，绝不在距离为0时拦截拖拽，
+                // 彻底释放 iOS 16 及全机型在 WKWebView 与 UIPageViewController 的原生滑动与翻页响应。
                 SpatialTapGesture()
                     .onEnded { value in
                         guard readerMode != .scroll, !textSelectionEnabled else { return }
@@ -971,9 +971,9 @@ struct ReaderView: View {
                     .zIndex(1)
             }
 
-            // 鍒嗛〉妯″紡鐨勯〉鐪夐〉鑴氱敾鍦ㄦ瘡涓€椤靛唴閮紙瑙?pageSurface锛夛紝
-            // 杩欐牱 page-curl 鐨勬瘡涓€寮犵焊閮借嚜甯﹂〉鐮佸拰绔犺妭鍚嶏紝涔熶笉浼氬嚭鐜?
-            // 銆屽叏灞€椤电湁鍘嬪湪椤甸潰涓娿€佷綅缃張璺熷畨鍏ㄥ尯鎵撴灦銆嶇殑闂銆?
+            // 分页模式的页眉页脚画在每一页内部（见 pageSurface），
+            // 这样 page-curl 的每一张纸都自带页码和章节名，也不会出现
+            // 「全局页眉压在页面上、位置又跟安全区打架」的问题。
             if readerMode == .scroll,
                !showOverlay, !speechController.isSpeaking, !autoScrollEnabled {
                 if statusPosition == "bottom" || statusPosition == "both" {
@@ -1005,7 +1005,7 @@ struct ReaderView: View {
                 VStack {
                     HStack {
                         Spacer()
-                        Button("瀹屾垚閫夋嫨") {
+                        Button("完成选择") {
                             textSelectionEnabled = false
                             presentOverlay()
                         }
@@ -1025,7 +1025,7 @@ struct ReaderView: View {
                 VStack {
                     HStack(spacing: 10) {
                         ProgressView().tint(readerThemeTextColor)
-                        Text("姝ｅ湪鎵撳紑 路 \(chapterTitle(for: jump.chapterIndex))")
+                        Text("正在打开 · \(chapterTitle(for: jump.chapterIndex))")
                             .font(.subheadline).lineLimit(1)
                     }
                     .padding(12)
@@ -1072,9 +1072,9 @@ struct ReaderView: View {
             if showGoalCelebrationToast {
                 VStack {
                     HStack(spacing: 8) {
-                        Text("馃帀")
+                        Text("🎉")
                             .font(.system(size: 16))
-                        Text("浠婃棩闃呰鐩爣杈炬垚锛佸凡杩炵画闃呰 \(streakDaysCount) 澶?)
+                        Text("今日阅读目标达成！已连续阅读 \(streakDaysCount) 天")
                             .font(.system(size: 13, weight: .semibold))
                             .foregroundColor(.white)
                     }
@@ -1118,6 +1118,7 @@ struct ReaderView: View {
         }
         .background(ReaderNavigationPopLock(allowSystemReturn: allowsNativeBookReturn))
         .background(ReaderTabChromeExitBridge(owner: tabChromeOwner))
+        .background(ReaderRefreshRateKeeperView())
         .background(ReaderExitSwipeBridge(
             enabled: ReaderExitSwipePolicy.isProseFallbackEnabled(
                 reducesMotion: motion.reducesMotion, allowsBookReturn: allowsNativeBookReturn
@@ -1132,7 +1133,7 @@ struct ReaderView: View {
         .navigationBarBackButtonHidden(!allowsNativeBookReturn)
         .toolbar(.hidden, for: .navigationBar, .tabBar)
         .statusBarHidden(!showOverlay && !showSystemStatusBar)
-        // 鍏ㄥ睆闃呰鏃惰繛 home indicator 涓€璧锋贰鍑猴紱鎵撳紑鑿滃崟鎴栧己鍒剁郴缁熺姸鎬佹爮鏃舵仮澶嶃€?
+        // 全屏阅读时连 home indicator 一起淡出；打开菜单或强制系统状态栏时恢复。
         .persistentSystemOverlays(showOverlay || showSystemStatusBar ? .automatic : .hidden)
         .task(id: backgroundRawValue) {
             if background == .custom {
@@ -1163,16 +1164,16 @@ struct ReaderView: View {
         .environment(\.colorScheme, readerIsNight ? .dark : .light)
         .highRefreshRateSurface()
         .ignoresSafeArea()
-        .confirmationDialog("璐拱鏈珷", isPresented: $showPayActionConfirmation, titleVisibility: .visible) {
-            Button("缁х画璐拱") {
+        .confirmationDialog("购买本章", isPresented: $showPayActionConfirmation, titleVisibility: .visible) {
+            Button("继续购买") {
                 Task { await performPayAction() }
             }
-            Button("鍙栨秷", role: .cancel) {}
+            Button("取消", role: .cancel) {}
         } message: {
             Text(content.title)
         }
-        .alert("璐拱鎻愮ず", isPresented: $showPayActionResult) {
-            Button("濂?, role: .cancel) {}
+        .alert("购买提示", isPresented: $showPayActionResult) {
+            Button("好", role: .cancel) {}
         } message: {
             Text(payActionResultMessage)
         }
@@ -1197,7 +1198,7 @@ struct ReaderView: View {
                 CustomFontManagementView()
                     .toolbar {
                         ToolbarItem(placement: .cancellationAction) {
-                            Button("瀹屾垚") {
+                            Button("完成") {
                                 showFontManagementSheet = false
                                 rebuildPagedBlocksCache()
                             }
@@ -1223,7 +1224,7 @@ struct ReaderView: View {
         .sheet(isPresented: $showContentFilter) {
             NavigationStack {
                 PurifyRulesView()
-                    .toolbar { ToolbarItem(placement: .cancellationAction) { Button("瀹屾垚") { showContentFilter = false } } }
+                    .toolbar { ToolbarItem(placement: .cancellationAction) { Button("完成") { showContentFilter = false } } }
             }
         }
         .sheet(isPresented: $showBookDetailSheet) {
@@ -1241,7 +1242,7 @@ struct ReaderView: View {
                         author: nil,
                         coverUrl: nil,
                         bookUrl: content.chapter.bookUrl,
-                        sourceName: "褰撳墠涔︽簮",
+                        sourceName: "当前书源",
                         sourceUrl: content.chapter.url,
                         intro: nil
                     ))
@@ -1516,8 +1517,8 @@ struct ReaderView: View {
             warmPaginationCache(around: windowCurrentChapterIndex)
         }
         .onChange(of: chapterViewportSignature) { _ in
-            // Geometry only. Cached chapters stay around 鈥?they are simply not
-            // reusable for the new container 鈥?and the warmup restarts after
+            // Geometry only. Cached chapters stay around — they are simply not
+            // reusable for the new container — and the warmup restarts after
             // the container stops moving instead of being cancelled mid-flight.
             guard readerMode != .scroll else { return }
             schedulePagedBlocksCacheRebuild()
@@ -1571,8 +1572,8 @@ struct ReaderView: View {
         .ignoresSafeArea()
     }
 
-    // 椤舵爮鏂囧瓧涔熷睘浜庝富棰橈細绯荤粺娣辫壊 + 娴呰壊涓婚鏃?.primary/.secondary
-    // 浼氳В鏋愭垚鐧借壊锛屽帇鍦ㄧ背鑹叉爮涓婄洿鎺ョ湅涓嶈銆?
+    // 顶栏文字也属于主题：系统深色 + 浅色主题时 .primary/.secondary
+    // 会解析成白色，压在米色栏上直接看不见。
     private var chromeForeground: Color {
         readerThemeTextColor.opacity(0.94)
     }
@@ -1581,9 +1582,9 @@ struct ReaderView: View {
         readerThemeTextColor.opacity(0.62)
     }
 
-    /// 闃呰鍣ㄦ槑鏆楀畬鍏ㄧ敱鎵€閫変富棰樺喅瀹氾紝涓嶅啀璺熼殢绯荤粺 colorScheme銆?
-    /// 涔嬪墠杩欓噷璇?readerIsNight锛岀郴缁熸繁鑹叉椂姣忎釜涓婚閮藉彇澶滈厤鑹诧紝
-    /// 鐢ㄦ埛鎬庝箞鎹富棰橀兘鏄粦鐨勩€?
+    /// 阅读器明暗完全由所选主题决定，不再跟随系统 colorScheme。
+    /// 之前这里读 readerIsNight，系统深色时每个主题都取夜配色，
+    /// 用户怎么换主题都是黑的。
     private var readerIsNight: Bool { background.isDark }
 
     private var readerThemeTextColor: Color {
@@ -1613,15 +1614,15 @@ struct ReaderView: View {
     }
 
     private var scrollModeParagraphs: [String] {
-        // 姣忔 body 姹傚€奸兘閲嶅缓杩欎釜鏁扮粍锛堝嚑鐧惧埌涓婂崈娈碉級鏄粴鍔ㄦ湡鏈€绋冲畾鐨勪竴绗旀氮璐癸細
-        // 鎸囩汗娌″彉灏卞鐢ㄤ笂娆＄殑缁撴灉锛屽彧鏈夌珷鑺傜獥鍙ｆ垨姝ｆ枃鐪熺殑鍙樹簡鎵嶉噸寤恒€?
+        // 每次 body 求值都重建这个数组（几百到上千段）是滚动期最稳定的一笔浪费：
+        // 指纹没变就复用上次的结果，只有章节窗口或正文真的变了才重建。
         let key = "\(bookID)|\(scrollContentFingerprint)"
         return ReaderScrollParagraphCache.shared.paragraphs(for: key) {
             guard !windowSections.isEmpty else { return content.paragraphs }
             var result: [String] = []
             for (offset, section) in windowSections.enumerated() {
                 if offset > 0 {
-                    // 绔犺妭鏍囬涓嶅啀鍔犵牬鎶樺彿锛氶槄璇诲櫒閲屾爣棰樺簲褰撳乏瀵归綈銆佸共鍑€涓€琛屻€?
+                    // 章节标题不再加破折号：阅读器里标题应当左对齐、干净一行。
         result.append(section.title)
                 }
                 result.append(contentsOf: section.paragraphs)
@@ -1640,10 +1641,10 @@ struct ReaderView: View {
         return "\(readerContentFingerprint)|\(window)"
     }
 
-    /// 缁撴瀯鍖栫珷鑺傜獥鍙ｏ紝婊氬姩闈㈢敤瀹冪敓鎴愮珷鑺傛爣棰樹笌娈佃惤鍏冪礌銆?
+    /// 结构化章节窗口，滚动面用它生成章节标题与段落元素。
     ///
-    /// 鏃у疄鐜版妸绐楀彛鍘嬫垚涓€缁?`[String]`锛氬垎闅旂敤鐨勭珷鑺傛爣棰樺拰姝ｆ枃娈佃惤闀垮緱涓€妯′竴鏍凤紝
-    /// 浜庢槸鏍囬鍙兘缁ф壙姝ｆ枃瀛楀彿涓庨鑹层€傜幇鍦ㄦ爣棰樻湁鐙珛鍏冪礌锛屾牱寮忚〃閲屾敼涓€澶勫氨澶熴€?
+    /// 旧实现把窗口压成一维 `[String]`：分隔用的章节标题和正文段落长得一模一样，
+    /// 于是标题只能继承正文字号与颜色。现在标题有独立元素，样式表里改一处就够。
     private var scrollSections: [WebReaderSection] {
         if windowSections.isEmpty {
             return [
@@ -1734,13 +1735,13 @@ struct ReaderView: View {
         return source.loginUrl?.nilIfEmpty != nil || source.loginCheckJs?.nilIfEmpty != nil
     }
 
-    /// Legado `ReadBookActivity.payAction()`锛氱‘璁ゅ悗鎵ц涔︽簮鐨勮喘涔拌鍒欍€?
-    /// 寮曟搸璐熻矗 JS銆乧ookie 涓庢寔涔呯姸鎬侊紱瑙嗗浘鍙鐞嗕笁绉嶇粨鏋溿€?
+    /// Legado `ReadBookActivity.payAction()`：确认后执行书源的购买规则。
+    /// 引擎负责 JS、cookie 与持久状态；视图只处理三种结果。
     private func performPayAction() async {
         guard let payAction = content.payAction?.trimmingCharacters(in: .whitespacesAndNewlines),
               !payAction.isEmpty else { return }
         guard let source = currentBookSource else {
-            payActionResultMessage = "鎵句笉鍒颁功婧愶紝鏃犳硶鎵ц璐拱鎿嶄綔"
+            payActionResultMessage = "找不到书源，无法执行购买操作"
             showPayActionResult = true
             return
         }
@@ -1756,7 +1757,7 @@ struct ReaderView: View {
         case .success(.openURL(let url)):
             let opened = await UIApplication.shared.open(url)
             if !opened {
-                payActionResultMessage = "鏃犳硶鎵撳紑璐拱椤甸潰"
+                payActionResultMessage = "无法打开购买页面"
                 showPayActionResult = true
             }
         case .success(.purchased):
@@ -1767,7 +1768,7 @@ struct ReaderView: View {
                 sourceURL: source.bookSourceUrl,
                 chapter: content.chapter
             )
-            payActionResultMessage = "璐拱鎴愬姛锛屾鍦ㄥ埛鏂版湰绔?
+            payActionResultMessage = "购买成功，正在刷新本章"
             showPayActionResult = true
             onRefreshChapter?()
         case .success(.failed(let message)):
@@ -1805,12 +1806,12 @@ struct ReaderView: View {
         return ReaderImageStyle(rawValue: globalImageStyleRaw) ?? .default
     }
 
-    /// 棣栫珷鍔犺浇涓殑鍗犱綅锛氫富棰樿壊搴?+ 杩涘害鎸囩ず锛岄伩鍏嶃€岀偣杩涗功鍏堢櫧涓€浼氬効銆嶃€?
+    /// 首章加载中的占位：主题色底 + 进度指示，避免「点进书先白一会儿」。
     private var readerLoadingPlaceholder: some View {
         VStack(spacing: 12) {
             ProgressView()
                 .tint(readerThemeTextColor.opacity(0.55))
-            Text("姝ｅ湪鍔犺浇绔犺妭鈥?)
+            Text("正在加载章节…")
                 .font(.footnote)
                 .foregroundStyle(readerThemeTextColor.opacity(0.6))
         }
@@ -1823,7 +1824,7 @@ struct ReaderView: View {
         1
     }
 
-    /// 婊氬姩妯″紡鐨勬鏂囬《閮ㄥ唴杈硅窛锛氭樉绀洪〉鐪夋椂璁╁嚭椤电湁甯︼紝鍚﹀垯鍙伩璁╁垬娴枫€?
+    /// 滚动模式的正文顶部内边距：显示页眉时让出页眉带，否则只避让刘海。
     private var scrollContentTopInset: Double {
         if scrollChromeGeometry.headerVisible {
             return Double(scrollChromeGeometry.protectedHeight)
@@ -1845,15 +1846,15 @@ struct ReaderView: View {
         )
     }
 
-    /// 婊氬姩妯″紡搴曢儴鐘舵€佸甫锛氱粰椤佃剼鐙珛楂樺害锛屾鏂囪鍙ｅ湪椤佃剼涓婃柟鎴銆?
+    /// 滚动模式底部状态带：给页脚独立高度，正文视口在页脚上方截止。
     private var scrollFooterReservedHeight: CGFloat {
         ReaderPageChrome.scrollFooterReservedHeight(statusPosition: statusPosition)
     }
 
     private var scrollReaderContent: some View {
-        // 婊氬姩妯″紡鏀圭敱 WKWebView 娓叉煋銆傜珷鑺傜獥鍙ｇ殑澧炲垹鍦ㄦ枃妗ｅ唴鍋?DOM 琛ヤ竵锛?
-        // 涓嶅啀鏁翠覆閲嶅缓 attributed string 鈥斺€?璺崇珷/璺ㄧ珷婊戝姩涓嶅啀鏈夈€屽厛娓呯┖鍐嶆帓鐗堛€?
-        // 鐨勯偅涓€甯э紝涔熷氨涓嶄細鏁村睆绌虹櫧锛涙爣棰樻垚涓虹嫭绔嬬殑 h1/h2锛屽彲浠ュ拰姝ｆ枃鍒嗗紑閫犲瀷銆?
+        // 滚动模式改由 WKWebView 渲染。章节窗口的增删在文档内做 DOM 补丁，
+        // 不再整串重建 attributed string —— 跳章/跨章滑动不再有「先清空再排版」
+        // 的那一帧，也就不会整屏空白；标题成为独立的 h1/h2，可以和正文分开造型。
         WebScrollReaderView(
             sections: scrollSections,
             contentFingerprint: scrollContentFingerprint,
@@ -1870,8 +1871,8 @@ struct ReaderView: View {
             paragraphIndent: paragraphIndent,
             titleSpacing: titleSpacing,
             footerHeight: footerHeight,
-            // 宸ュ叿鏍忔槸娴眰锛氭鏂囩殑椤堕儴鍐呰竟璺濆繀椤讳笌鑿滃崟寮€鍚堟棤鍏筹紝
-            // 鍚﹀垯姣忔鍛煎嚭鑿滃崟鏁撮〉鏂囧瓧閮戒細寰€涓嬫帀涓€鏍硷紙鍏虫帀鍐嶅脊鍥炴潵锛夈€?
+            // 工具栏是浮层：正文的顶部内边距必须与菜单开合无关，
+            // 否则每次呼出菜单整页文字都会往下掉一格（关掉再弹回来）。
             topInset: scrollContentTopInset,
             textColor: background.uiTextColor(isNight: readerIsNight),
             surfaceColor: background == .custom || background.hasTexture ? .clear : background.uiColor(isNight: readerIsNight),
@@ -1937,18 +1938,18 @@ struct ReaderView: View {
                 didLandInitialPosition = true
             },
             onTap: { point in
-                // 鏂囨。鍐呴儴宸茬粡鍋氳繃浣嶇Щ / 鏃堕暱 / 鎯€т笁閲嶅垽瀹氾紝杩欓噷鍙妸鍧愭爣
-                // 鎹㈡垚 3x3 鐐瑰嚮鍖猴紝閰嶇疆涓庝笁绉嶇炕椤垫ā寮忓叡鐢ㄥ悓涓€濂椼€?
+                // 文档内部已经做过位移 / 时长 / 惯性三重判定，这里只把坐标
+                // 换成 3x3 点击区，配置与三种翻页模式共用同一套。
                 handleReaderTap(at: point)
             }
         )
         .ignoresSafeArea(.container, edges: .bottom)
-        // 鍏堥摵婊＄墿鐞嗗睆锛屽啀浠庡簳閮ㄨ鍑虹姸鎬佸甫锛氶〉鑴氫笉鍐嶅拰姝ｆ枃閲嶅彔銆?
+        // 先铺满物理屏，再从底部让出状态带：页脚不再和正文重叠。
         .padding(.bottom, scrollFooterReservedHeight)
         .overlay {
-            // 鍙湁銆岃繖涓€娈电獥鍙ｉ噷纭疄娌℃湁浠讳綍娈佃惤銆嶆墠鐩栧崰浣嶅眰銆?
-            // 涔嬪墠鍙垽 scrollModeParagraphs 鏄惁涓虹┖锛氭粦鍔ㄨ法绔犳椂瀹冧細琚噸绠楁垚绌烘暟缁勶紝
-            // 浜庢槸鏁村睆琚笉閫忔槑鍗犱綅鐩栦綇 鈥斺€?灏辨槸銆屽線涓婃粦涓€鐐圭獊鐒跺叏鐧姐€嶃€?
+            // 只有「这一段窗口里确实没有任何段落」才盖占位层。
+            // 之前只判 scrollModeParagraphs 是否为空：滑动跨章时它会被重算成空数组，
+            // 于是整屏被不透明占位盖住 —— 就是「往上滑一点突然全白」。
             if scrollSections.allSatisfy({ $0.paragraphs.isEmpty }) {
                 readerLoadingPlaceholder
             }
@@ -1963,8 +1964,8 @@ struct ReaderView: View {
             }
         }
         .onChange(of: chapterIndex) { newValue in
-            // 鐖跺眰鍙兘鍏堝彂甯冩柊绔犲彿銆佸悗鎷垮埌姝ｆ枃锛涙鏃堕噸缃細鎶婁笂涓€绔犵殑
-            // 娈佃惤鎸傚埌鏂扮珷鍙蜂笂銆傜瓑 content 杩戒笂鍐嶉噸缃€?
+            // 父层可能先发布新章号、后拿到正文；此时重置会把上一章的
+            // 段落挂到新章号上。等 content 追上再重置。
             guard content.chapter.index == newValue else { return }
             resetWindow()
         }
@@ -2512,11 +2513,11 @@ struct ReaderView: View {
             chapter = chapters.first(where: { $0.index == index })
         }
         guard let chapter else {
-            return .failure("鐩綍涓病鏈夌 \(index + 1) 绔狅紝鍙兘宸茶涔︽簮绉婚櫎")
+            return .failure("目录中没有第 \(index + 1) 章，可能已被书源移除")
         }
         guard let sourceURL = windowSourceURL,
               let source = appState.sourceStore.source(for: sourceURL) else {
-            return .failure("涔︽簮涓嶅瓨鍦ㄦ垨宸茶鍒犻櫎")
+            return .failure("书源不存在或已被删除")
         }
         let purifyRules = appState.purifyRuleStore.enabledPatterns
 
@@ -2818,7 +2819,7 @@ struct ReaderView: View {
     /// A UIPageViewController gesture owns the screen until its curl or
     /// scroll settles. Rebuilding the page model in that window replaces the
     /// hosting controllers under the finger and is the main cause of the
-    /// dropped frame plus the 鈥減age jumps back鈥?symptom. Defer the rebuild
+    /// dropped frame plus the “page jumps back” symptom. Defer the rebuild
     /// until `didFinishAnimating` has committed the new page cursor.
     private func handlePageInteraction(_ active: Bool) {
         guard !readerSessionEnded else { return }
@@ -3250,8 +3251,8 @@ struct ReaderView: View {
         )
     }
 
-    /// 棰勫缓鍓嶅悗鍚?radius 椤电殑瀵屾枃鏈紙鍓?5 鍚?5锛夈€?
-    /// 缈婚〉棣栧抚鍙繚鐣?TextKit 鎺掑瓧锛岄€愬瓧绗︾殑鏍囩偣鍘嬬缉鍦ㄦ姮鎵嬪墠灏卞凡绠楀畬銆?
+    /// 预建前后各 radius 页的富文本（前 5 后 5）。
+    /// 翻页首帧只保留 TextKit 排字，逐字符的标点压缩在抬手前就已算完。
     private func prewarmPageText(around index: Int, radius: Int = 4) {
         guard readerMode != .scroll, !pagedBlocks.isEmpty else { return }
         let lower = max(0, index - radius)
@@ -3285,9 +3286,9 @@ struct ReaderView: View {
     private func chapterFailureSuggestsLogin(_ message: String) -> Bool {
         let text = message.lowercased()
         return text.contains("401") || text.contains("403")
-            || text.contains("鐧诲綍") || text.contains("鐧婚檰")
-            || text.contains("vip") || text.contains("鏉冮檺")
-            || text.contains("璁㈤槄") || text.contains("璐拱")
+            || text.contains("登录") || text.contains("登陆")
+            || text.contains("vip") || text.contains("权限")
+            || text.contains("订阅") || text.contains("购买")
     }
 
     private func chapterPlaceholderPage(_ page: ReaderPageBlock) -> some View {
@@ -3297,7 +3298,7 @@ struct ReaderView: View {
                     Image(systemName: "exclamationmark.triangle.fill")
                         .font(.system(size: 26))
                         .foregroundStyle(.orange)
-                    Text(page.placeholderDirection < 0 ? "涓婁竴绔犲姞杞藉け璐? : "绔犺妭鍔犺浇澶辫触")
+                    Text(page.placeholderDirection < 0 ? "上一章加载失败" : "章节加载失败")
                         .font(.footnote.weight(.semibold))
                     if !page.chapterTitle.isEmpty {
                         Text(page.chapterTitle)
@@ -3312,7 +3313,7 @@ struct ReaderView: View {
                         .multilineTextAlignment(.center)
                         .lineLimit(4)
                         .padding(.horizontal, 24)
-                    Button("閲嶈瘯") {
+                    Button("重试") {
                         retryChapterManually(page.chapterIndex)
                     }
                     .font(.footnote.weight(.semibold))
@@ -3321,7 +3322,7 @@ struct ReaderView: View {
                     if let source = currentBookSource,
                        SourceLoginURLResolver.resolve(source: source) != nil,
                        chapterFailureSuggestsLogin(failure) {
-                        Button("鐧诲綍涔︽簮") {
+                        Button("登录书源") {
                             readerLoginSource = source
                         }
                         .font(.footnote.weight(.semibold))
@@ -3332,8 +3333,8 @@ struct ReaderView: View {
                     ProgressView()
                     Text(
                         page.placeholderDirection < 0
-                            ? "姝ｅ湪鍔犺浇涓婁竴绔?
-                            : (page.placeholderDirection > 0 ? "姝ｅ湪鍔犺浇涓嬩竴绔? : "姝ｅ湪鍔犺浇绔犺妭")
+                            ? "正在加载上一章"
+                            : (page.placeholderDirection > 0 ? "正在加载下一章" : "正在加载章节")
                     )
                     .font(.footnote.weight(.semibold))
                     .foregroundStyle(readerThemeTextColor.opacity(0.65))
@@ -3344,7 +3345,7 @@ struct ReaderView: View {
                             .multilineTextAlignment(.center)
                             .lineLimit(2)
                     }
-                    Button("閲嶆柊鍔犺浇") {
+                    Button("重新加载") {
                         retryChapterManually(page.chapterIndex)
                     }
                     .font(.footnote.weight(.semibold))
@@ -3368,11 +3369,11 @@ struct ReaderView: View {
         return String(hasher.finalize())
     }
 
-    /// 闃呰椤靛敮涓€鐢诲竷銆?
+    /// 阅读页唯一画布。
     ///
-    /// 鍑犱綍鏉ユ簮鍙湁 `ReaderPageGeometry`锛氶〉鐪夊甫銆佹鏂囩煩褰€侀〉鑴氬甫鍚勮嚜鏈夌‘瀹氬潗鏍囷紝
-    /// 涓嶅啀閫氳繃涓夊眰 padding / frame / safeArea 鍙犲姞鍘汇€岀寽銆嶃€傞〉闈㈠鍣ㄥ昂瀵镐細鍥炰紶缁?
-    /// 鍒嗛〉寮曟搸锛圧eaderPageContainerMetricsKey锛夛紝鎵€浠ュ垎椤甸珮搴︿笌瀹為檯鍙敾楂樺害姘歌繙涓€鑷淬€?
+    /// 几何来源只有 `ReaderPageGeometry`：页眉带、正文矩形、页脚带各自有确定坐标，
+    /// 不再通过三层 padding / frame / safeArea 叠加去「猜」。页面容器尺寸会回传给
+    /// 分页引擎（ReaderPageContainerMetricsKey），所以分页高度与实际可画高度永远一致。
     private func pageSurface<Content: View>(for page: ReaderPageBlock, @ViewBuilder content: @escaping () -> Content) -> some View {
         GeometryReader { proxy in
             let globalFrame = proxy.frame(in: .global)
@@ -3446,7 +3447,7 @@ struct ReaderView: View {
         }
     }
 
-    /// 椤电湁锛?2pt 绔犺妭鍚?+锛堝彲閫夛級鏃堕棿 / 鐢甸噺銆備綅缃敱 geometry 鍐冲畾锛屾案杩滃湪瀹夊叏鍖哄唴銆?
+    /// 页眉：12pt 章节名 +（可选）时间 / 电量。位置由 geometry 决定，永远在安全区内。
     private func pagedPageHeader(page: ReaderPageBlock, geometry: ReaderPageGeometry, now: Date) -> some View {
         HStack(spacing: 10) {
             // In inline mode the first page already carries the large
@@ -3505,7 +3506,7 @@ struct ReaderView: View {
         .accessibilityHidden(true)
     }
 
-    /// 椤佃剼锛氬彸涓嬭 `褰撳墠椤?鏈珷鎬婚〉`锛堢珵鍝佹牸寮?3/35锛夛紝鏃堕棿涓庣數閲忔寜寮€鍏虫帓鍒椼€?
+    /// 页脚：右下角 `当前页/本章总页`（竞品格式 3/35），时间与电量按开关排列。
     private func pagedPageFooter(page: ReaderPageBlock, geometry: ReaderPageGeometry, now: Date) -> some View {
         HStack(spacing: 10) {
             if statusPosition == "bottom" || statusPosition == "both" {
@@ -3563,7 +3564,7 @@ struct ReaderView: View {
         return "\(min(page.pageOrdinal + 1, total))/\(total)"
     }
 
-    /// 椤佃剼瀹為檯鍗犵敤楂樺害锛?0pt 鏉?+ 6pt 闂磋窛锛夛紝鍒嗛〉妯″紡鍥哄畾棰勭暀 26pt銆?
+    /// 页脚实际占用高度（20pt 条 + 6pt 间距），分页模式固定预留 26pt。
     private var readerFooterReservedHeight: CGFloat {
         26
     }
@@ -3710,9 +3711,9 @@ struct ReaderView: View {
                 .foregroundStyle(readerThemeTextColor.opacity(0.45))
                 .padding(.horizontal, max(CGFloat(pagePadding), 18))
                 .frame(height: 20, alignment: .center)
-                // 闃呰椤靛拷鐣ヤ簡瀹夊叏鍖猴紝椤佃剼瑕佽嚜宸辫寮€ home indicator銆?
-                // 0.35脳搴曢儴瀹夊叏鍖猴紙34pt 鈫?12pt锛変笌绔炲搧椤电爜绂诲簳 12.3pt 瀵归綈锛?
-                // 鏂囧瓧钀藉湪鎵嬪娍鏉′笂鏂癸紝浣嗕笉浼氬儚鏃х増 0.25脳 閭ｆ牱鍘嬪埌鎸囩ず鏉′笂銆?
+                // 阅读页忽略了安全区，页脚要自己让开 home indicator。
+                // 0.35×底部安全区（34pt → 12pt）与竞品页码离底 12.3pt 对齐：
+                // 文字落在手势条上方，但不会像旧版 0.25× 那样压到指示条上。
                 .padding(.bottom, max(readerFooterSafeInset * 0.35, ReaderPageChrome.footerBottomInset))
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -3735,7 +3736,7 @@ struct ReaderView: View {
                         .lineLimit(2)
                         .multilineTextAlignment(.leading)
                     Spacer(minLength: 8)
-                    Button("閲嶈瘯") {
+                    Button("重试") {
                         retryChapterManually(status.chapterIndex)
                     }
                     .font(.caption.weight(.semibold))
@@ -3762,9 +3763,9 @@ struct ReaderView: View {
         .animation(.easeInOut(duration: 0.2), value: status)
     }
 
-    /// 鍏ㄥ睆闃呰蹇界暐浜嗗畨鍏ㄥ尯锛岄〉鐪夐〉鑴氬繀椤昏嚜宸辫寮€鍒樻捣涓?home indicator銆?
-    /// 鎵€鏈夌獥鍙ｅ彇鏈€澶у畨鍏ㄥ尯锛歬ey window 鍙兘鏄鍣ㄧ獥鍙ｏ紙瀹夊叏鍖轰负 0锛夛紝
-    /// 鍙彇 key window 浼氳椤电湁鐩存帴鍘嬪埌鐘舵€佹爮涓嬮潰銆?
+    /// 全屏阅读忽略了安全区，页眉页脚必须自己让开刘海与 home indicator。
+    /// 所有窗口取最大安全区：key window 可能是容器窗口（安全区为 0），
+    /// 只取 key window 会让页眉直接压到状态栏下面。
     private var readerResolvedSafeInsets: ReaderSafeAreaResolver.Insets {
         let scenes = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }
         var windowTop: CGFloat = 0
@@ -3856,7 +3857,7 @@ struct ReaderView: View {
                         rebuildPagedBlocksCache()
                         HapticFeedback.light()
                     }
-                    .accessibilityLabel("鍒囨崲澹佺焊鏂囧瓧榛戠櫧鑹?)
+                    .accessibilityLabel("切换壁纸文字黑白色")
                 }
 
                 chromeIconButton(systemName: isCurrentChapterBookmarked ? "bookmark.fill" : "bookmark") {
@@ -3881,15 +3882,15 @@ struct ReaderView: View {
             Spacer()
 
             VStack(spacing: 12) {
-                // 婊氬姩妯″紡鏄剧ず钀界偣绔犺妭锛屽垎椤垫ā寮忔樉绀烘湰绔犻〉鐮侊紱涓よ€呰涔変笉鍚岋紝
-                // 鍒嗛〉鏃舵嫋绔犺妭婊戞潯浼氳鏁寸珷閲嶆帓锛屾鏄€岀炕椤靛崱浣忋€嶇殑鏉ユ簮涔嬩竴銆?
+                // 滚动模式显示落点章节，分页模式显示本章页码；两者语义不同，
+                // 分页时拖章节滑条会让整章重排，正是「翻页卡住」的来源之一。
                 Text(readerMode == .scroll ? chapterSliderLabel : pageSliderLabel)
                     .font(.caption2.weight(.semibold).monospacedDigit())
                     .foregroundStyle(readerThemeTextColor.opacity(0.55))
                     .frame(height: 13)
 
                 HStack(spacing: 10) {
-                    navChapterButton(icon: "chevron.left", title: "涓婁竴绔?) {
+                    navChapterButton(icon: "chevron.left", title: "上一章") {
                         selectRelativeChapter(offset: -1)
                     }
                     .disabled(!canSelectRelativeChapter(offset: -1))
@@ -3925,7 +3926,7 @@ struct ReaderView: View {
                             .background(readerThemeBackground.opacity(0.98), in: Capsule())
                             .clipShape(Capsule())
                             .disabled(totalChapterCount <= 1)
-                            .accessibilityLabel("绔犺妭杩涘害")
+                            .accessibilityLabel("章节进度")
                     } else {
                         let maxPageSlider = max(currentChapterPageTotalForSlider - 1, 1)
                         Slider(
@@ -3944,10 +3945,10 @@ struct ReaderView: View {
                             .background(readerThemeBackground.opacity(0.98), in: Capsule())
                             .clipShape(Capsule())
                             .disabled(currentChapterPageTotalForSlider <= 1)
-                            .accessibilityLabel("鏈珷椤电爜")
+                            .accessibilityLabel("本章页码")
                     }
 
-                    navChapterButton(icon: "chevron.right", title: "涓嬩竴绔?) {
+                    navChapterButton(icon: "chevron.right", title: "下一章") {
                         selectRelativeChapter(offset: 1)
                     }
                     .disabled(!canSelectRelativeChapter(offset: 1))
@@ -3958,33 +3959,33 @@ struct ReaderView: View {
                 // busiest part of the reader; the two primary actions stay
                 // here and every secondary action is one tap away.
                 HStack(spacing: 8) {
-                    toolButton(icon: "list.bullet", title: "鐩綍") {
+                    toolButton(icon: "list.bullet", title: "目录") {
                         tocTab = 0
                         tocScrollIntent = .currentChapter
                         showChapterList = true
                         closeSettingsPanel()
                     }
 
-                    // 鎹㈡簮鍏ュ彛浠庡彸涓婅婧㈠嚭鑿滃崟鎻愬埌甯搁┗搴曟爮锛氭崲婧愭槸杩芥洿鏃?
-                    // 鏈€楂橀鐨勬搷浣滀箣涓€锛岃棌鍦ㄤ簩绾ц彍鍗曢噷姣忔瑕佸涓ゆ鐐瑰嚮銆?
-                    toolButton(icon: "arrow.triangle.2.circlepath", title: "鎹㈡簮") {
+                    // 换源入口从右上角溢出菜单提到常驻底栏：换源是追更时
+                    // 最高频的操作之一，藏在二级菜单里每次要多两次点击。
+                    toolButton(icon: "arrow.triangle.2.circlepath", title: "换源") {
                         closeSettingsPanel()
                         onRequestSourceSwitch?()
                     }
                     .disabled(onRequestSourceSwitch == nil)
                     .opacity(onRequestSourceSwitch == nil ? 0.35 : 1)
 
-                    // 绗簲涓叆鍙ｇ粰鏈楄/鏆傚仠锛歍TS 鍘熸潵鍙湪鍙充笂瑙掓孩鍑鸿彍鍗曢噷锛?
-                    // 杩芥洿鏃朵竴杈瑰惉涓€杈圭炕椤垫槸楂橀鎿嶄綔锛屽簳鏍忎竴閿彲杈俱€?
+                    // 第五个入口给朗读/暂停：TTS 原来只在右上角溢出菜单里，
+                    // 追更时一边听一边翻页是高频操作，底栏一键可达。
                     toolButton(
                         icon: speechController.isSpeaking && !speechController.isPaused ? "pause.fill" : "speaker.wave.2",
-                        title: speechController.isSpeaking && !speechController.isPaused ? "鏆傚仠" : "鏈楄"
+                        title: speechController.isSpeaking && !speechController.isPaused ? "暂停" : "朗读"
                     ) {
                         closeSettingsPanel()
                         toggleSpeech()
                     }
 
-                    toolButton(icon: "gearshape", title: "璁剧疆") {
+                    toolButton(icon: "gearshape", title: "设置") {
                         toggleSettingsPanel()
                     }
                     .accessibilityIdentifier("reader.openSettings")
@@ -4080,21 +4081,21 @@ struct ReaderView: View {
     private var settingsHint: String {
         switch settingsTab {
         case 0: return readerModeHint
-        case 1: return "鍙充晶鍙洿鎺ヨ緭鍏ユ暟鍊硷紝绮捐皟瀛楀彿銆侀棿璺濆拰杈硅窛銆?
-        default: return "杩欓噷淇濈暀涓嶉噸澶嶇殑闃呰杈呭姪锛氳嚜鍔ㄦ粴鍔ㄩ棿闅斻€佹湕璇婚€熷害銆佺潯鐪犲畾鏃朵笌鐐瑰嚮鍖哄煙銆?
+        case 1: return "右侧可直接输入数值，精调字号、间距和边距。"
+        default: return "这里保留不重复的阅读辅助：自动滚动间隔、朗读速度、睡眠定时与点击区域。"
         }
     }
 
     private var readerModeHint: String {
         switch readerMode {
         case .scroll:
-            return "涓婁笅杩炵画婊戝姩锛岀珷鑺傛湯灏捐嚜鍔ㄨ鎺ヤ笅涓€绔狅紱椤靛唴娌℃湁妯悜缈婚〉鎵嬪娍銆?
+            return "上下连续滑动，章节末尾自动衔接下一章；页内没有横向翻页手势。"
         case .pageTurn:
-            return "宸﹀彸骞崇Щ缈婚〉锛屾瘡椤靛浐瀹氫笉婊氬姩锛岄€傚悎涔犳儻鏁撮〉闃呰銆?
+            return "左右平移翻页，每页固定不滚动，适合习惯整页阅读。"
         case .cover:
-            return "鎷栧姩鏃朵笅涓€椤典粠鍙充晶瑕嗙洊褰撳墠椤碉紝鏉炬墜鎸変綅绉诲拰閫熷害鍐冲畾鏄惁缈婚〉銆?
+            return "拖动时下一页从右侧覆盖当前页，松手按位移和速度决定是否翻页。"
         case .pageCurl:
-            return "绯荤粺鍘熺敓绾稿紶鍗锋洸鍔ㄧ敾锛屽彲鎷栧埌涓€鍗婂啀鏉炬墜鍥炲脊鎴栧畬鎴愩€?
+            return "系统原生纸张卷曲动画，可拖到一半再松手回弹或完成。"
         }
     }
 
@@ -4178,24 +4179,24 @@ struct ReaderView: View {
             }
         }
         var chapterActions: [UIMenuElement] = [
-            action("鍒锋柊鏈珷", "arrow.clockwise", enabled: onRefreshChapter != nil) { onRefreshChapter?() },
-            action("缂撳瓨鍓嶅悗绔犺妭", "square.and.arrow.down", enabled: onCacheNextChapters != nil) { onCacheNextChapters?(windowCurrentChapterIndex) },
-            action("缃戦〉鎵撳紑鏈珷", "safari", enabled: currentChapterWebURL != nil, leavesReader: true) { showChapterWebPage = true }
+            action("刷新本章", "arrow.clockwise", enabled: onRefreshChapter != nil) { onRefreshChapter?() },
+            action("缓存前后章节", "square.and.arrow.down", enabled: onCacheNextChapters != nil) { onCacheNextChapters?(windowCurrentChapterIndex) },
+            action("网页打开本章", "safari", enabled: currentChapterWebURL != nil, leavesReader: true) { showChapterWebPage = true }
         ]
         if canShowPayAction {
-            chapterActions.append(action("璐拱鏈珷", "cart", enabled: !isPerformingPayAction, leavesReader: true) { showPayActionConfirmation = true })
+            chapterActions.append(action("购买本章", "cart", enabled: !isPerformingPayAction, leavesReader: true) { showPayActionConfirmation = true })
         }
         let playback: [UIMenuElement] = [
-            action(autoScrollEnabled ? "鏆傚仠鑷姩缈婚〉" : "寮€濮嬭嚜鍔ㄧ炕椤?, autoScrollEnabled ? "pause.fill" : "play.fill") { toggleAutoScroll() }
+            action(autoScrollEnabled ? "暂停自动翻页" : "开始自动翻页", autoScrollEnabled ? "pause.fill" : "play.fill") { toggleAutoScroll() }
         ]
         let bookActions: [UIMenuElement] = [
-            action("涔︾睄璇︽儏", "info.circle", leavesReader: true) {
+            action("书籍详情", "info.circle", leavesReader: true) {
                 if appState.bookshelfStore.book(id: bookID)?.sourceURL.hasPrefix("local://") == true {
                     showBookDetailSheet = true
                 } else if let onRequestBookDetail { onRequestBookDetail() } else { showBookDetailSheet = true }
             },
-            action("鍐呭杩囨护", "line.3.horizontal.decrease.circle", leavesReader: true) { showContentFilter = true },
-            action("鐧诲綍涔︽簮", "person.badge.key", enabled: currentBookSource != nil, leavesReader: true) { readerLoginSource = currentBookSource }
+            action("内容过滤", "line.3.horizontal.decrease.circle", leavesReader: true) { showContentFilter = true },
+            action("登录书源", "person.badge.key", enabled: currentBookSource != nil, leavesReader: true) { readerLoginSource = currentBookSource }
         ]
         return UIMenu(children: [
             UIMenu(options: .displayInline, children: chapterActions),
@@ -4250,20 +4251,20 @@ struct ReaderView: View {
 
     private var readerModeSection: some View {
         VStack(alignment: .leading, spacing: 6) {
-            Text("缈婚〉妯″紡")
+            Text("翻页模式")
                 .font(.subheadline.weight(.semibold))
                 .foregroundStyle(readerThemeTextColor.opacity(0.62))
             Text(readerModeHint)
                 .font(.caption2)
                 .foregroundStyle(readerThemeTextColor.opacity(0.62))
-            BrandSegmentedControl("缈婚〉妯″紡", selection: $readerModeRawValue, options:
+            BrandSegmentedControl("翻页模式", selection: $readerModeRawValue, options:
                             ReaderMode.allCases.map { ($0.rawValue, $0.title) })
             .padding(.bottom, 8)
         }
     }
 
     private var perBookOverrideToggle: some View {
-        Toggle("浠呭鏈功鐢熸晥鐙珛閰嶇疆", isOn: Binding(
+        Toggle("仅对本书生效独立配置", isOn: Binding(
             get: { isPerBookOverride },
             set: { enabled in
                 isPerBookOverride = enabled
@@ -4287,7 +4288,7 @@ struct ReaderView: View {
 
     private var backgroundPickerSection: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("闃呰鑳屾櫙 路 绾哥汗涓庢彃鐢?)
+            Text("阅读背景 · 纸纹与插画")
                 .font(.subheadline.weight(.semibold))
                 .foregroundStyle(readerThemeTextColor.opacity(0.62))
             ScrollView(.horizontal, showsIndicators: false) {
@@ -4329,7 +4330,7 @@ struct ReaderView: View {
             PhotosPicker(selection: $selectedPhotoItem, matching: .images) {
                 HStack(spacing: 8) {
                     Image(systemName: "photo.badge.plus")
-                    Text(ReaderCustomWallpaperStore.hasCustomWallpaper ? "鏇存崲鑷畾涔夊绾? : "浠庣浉鍐岄€夋嫨澹佺焊")
+                    Text(ReaderCustomWallpaperStore.hasCustomWallpaper ? "更换自定义壁纸" : "从相册选择壁纸")
                         .font(.subheadline.weight(.semibold))
                 }
                 .frame(maxWidth: .infinity)
@@ -4343,14 +4344,14 @@ struct ReaderView: View {
             }
             .disabled(isPreparingWallpaper)
 
-            if isPreparingWallpaper { Text("姝ｅ湪鍑嗗澹佺焊棰勮鈥?).font(.caption) }
+            if isPreparingWallpaper { Text("正在准备壁纸预览…").font(.caption) }
             if let wallpaperMessage { Text(wallpaperMessage).font(.caption).foregroundStyle(.secondary) }
             if ReaderCustomWallpaperStore.hasCustomWallpaper {
-                Button("缂栬緫宸蹭繚瀛樺绾?) {
+                Button("编辑已保存壁纸") {
                     Task { @MainActor in
                         await ReaderCustomWallpaperStore.warmWallpaper()
                         guard let image = ReaderCustomWallpaperStore.cachedWallpaper else {
-                            wallpaperMessage = ReaderCustomWallpaperStore.lastError ?? "澹佺焊鏃犳硶璇诲彇锛岃閲嶆柊閫夋嫨鍥剧墖銆?; return
+                            wallpaperMessage = ReaderCustomWallpaperStore.lastError ?? "壁纸无法读取，请重新选择图片。"; return
                         }
                         var adjustment = ReaderCustomWallpaperStore.adjustment
                         adjustment.fillMode = ReaderWallpaperFillMode(rawValue: customWallpaperFillModeRaw) ?? .fill
@@ -4360,8 +4361,8 @@ struct ReaderView: View {
                 }.buttonStyle(.bordered)
             }
 
-            BrandSegmentedControl("澹佺焊鍩哄簳涓庢枃瀛楅鏍?, selection: $customBackgroundIsDark, options:
-                            [(false, "娴呰壊澹佺焊 (娣辫壊瀛?"), (true, "娣辫壊澹佺焊 (娴呰壊瀛?")])
+            BrandSegmentedControl("壁纸基底与文字风格", selection: $customBackgroundIsDark, options:
+                            [(false, "浅色壁纸 (深色字)"), (true, "深色壁纸 (浅色字)")])
             .padding(.top, 2)
             .onChange(of: customBackgroundIsDark) { newValue in
                 UserDefaults.standard.set(true, forKey: "reader.customBackgroundIsDarkManual")
@@ -4370,7 +4371,7 @@ struct ReaderView: View {
                 rebuildPagedBlocksCache()
             }
 
-            BrandSegmentedControl("澹佺焊濉厖鏂瑰紡", selection: $customWallpaperFillModeRaw, options:
+            BrandSegmentedControl("壁纸填充方式", selection: $customWallpaperFillModeRaw, options:
                             ReaderWallpaperFillMode.allCases.map { ($0.rawValue, $0.title) })
             .padding(.top, 2)
 
@@ -4380,29 +4381,29 @@ struct ReaderView: View {
                 } label: {
                     HStack(spacing: 4) {
                         Image(systemName: "trash")
-                        Text("鍒犻櫎鑷畾涔夊绾革紝鎭㈠绱犵櫧鑳屾櫙")
+                        Text("删除自定义壁纸，恢复素白背景")
                     }
                     .font(.caption)
                     .foregroundStyle(.red)
                 }
                 .padding(.top, 2)
-                .confirmationDialog("鍒犻櫎鑷畾涔夊绾革紵瑁佸垏涓庡師鍥惧皢涓€骞剁Щ闄ゃ€?, isPresented: $confirmClearWallpaper, titleVisibility: .visible) {
-                    Button("鍒犻櫎鑷畾涔夊绾?, role: .destructive) {
+                .confirmationDialog("删除自定义壁纸？裁切与原图将一并移除。", isPresented: $confirmClearWallpaper, titleVisibility: .visible) {
+                    Button("删除自定义壁纸", role: .destructive) {
                         Task { @MainActor in
                             do {
                                 try await ReaderCustomWallpaperStore.clearEditedWallpaper()
                                 backgroundRawValue = ReaderBackground.white.rawValue
                                 backgroundWallpaperRevision = UUID(); rebuildPagedBlocksCache()
-                            } catch { wallpaperMessage = "鍒犻櫎鏈畬鎴愶紝璇烽噸璇曘€? + error.localizedDescription }
+                            } catch { wallpaperMessage = "删除未完成，请重试。" + error.localizedDescription }
                         }
                     }
-                    Button("淇濈暀澹佺焊", role: .cancel) {}
+                    Button("保留壁纸", role: .cancel) {}
                 }
             }
 
             Text(ReaderCustomWallpaperStore.hasCustomWallpaper
-                 ? "澹佺焊宸茬敓鏁堬紝鏀寔鑷富鍒囨崲娴呰壊/娣辫壊鏂囧瓧鏍峰紡浠ヤ繚璇佹渶浣冲姣斿害銆?
-                 : "鍙粠鐩稿唽閫夋嫨澹佺焊锛屾敮鎸佽嚜鐢辨惌閰嶆祬鑹叉垨娣辫壊鏂囧瓧銆?)
+                 ? "壁纸已生效，支持自主切换浅色/深色文字样式以保证最佳对比度。"
+                 : "可从相册选择壁纸，支持自由搭配浅色或深色文字。")
                 .font(.caption2)
                 .foregroundStyle(readerThemeTextColor.opacity(0.42))
         }
@@ -4433,14 +4434,14 @@ struct ReaderView: View {
     private var readerBrightnessSection: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
-                Text("闃呰浜害")
+                Text("阅读亮度")
                     .font(.subheadline.weight(.semibold))
                     .foregroundStyle(readerThemeTextColor.opacity(0.62))
                 Spacer()
-                Text(readerBrightness < 0 ? "鑷姩浜害" : "\(Int(readerBrightness * 100))%")
+                Text(readerBrightness < 0 ? "自动亮度" : "\(Int(readerBrightness * 100))%")
                     .font(.caption.weight(.bold))
                     .foregroundStyle(AppTheme.accent)
-                Button("璺熼殢绯荤粺") {
+                Button("跟随系统") {
                     readerBrightness = -1
                 }
                 .font(.caption.weight(.semibold))
@@ -4455,7 +4456,7 @@ struct ReaderView: View {
                 in: 0.05...1.0
             )
             .tint(AppTheme.accent)
-            Text("鍙奖鍝嶉槄璇婚〉锛岄€€鍑洪槄璇诲櫒浼氭仮澶嶇郴缁熶寒搴︺€?)
+            Text("只影响阅读页，退出阅读器会恢复系统亮度。")
                 .font(.caption2)
                 .foregroundStyle(readerThemeTextColor.opacity(0.42))
         }
@@ -4464,16 +4465,16 @@ struct ReaderView: View {
     private var appearancePreview: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack {
-                Text("闃呰棰勮")
+                Text("阅读预览")
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(readerThemeTextColor.opacity(0.64))
                 Spacer()
-                Text("\(fontFamily.title) 路 \(Int(fontSize))pt 路 缂╄繘\(Int(paragraphIndent))pt")
+                Text("\(fontFamily.title) · \(Int(fontSize))pt · 缩进\(Int(paragraphIndent))pt")
                     .font(.caption2)
                     .foregroundStyle(readerThemeTextColor.opacity(0.55))
             }
 
-            Text("銆€銆€澶滆壊娌変笅鏉ヤ互鍚庯紝鏂囧瓧搴旇瀹夐潤銆佹竻妤氥€佽€愮湅銆傝皟鏁村瑙備笌鎺掔増鏃讹紝杩欓噷浼氱珛鍒昏窡闅忓瓧浣撱€佸瓧鍙枫€佽璺濄€佹棣栫缉杩涘拰鑳屾櫙鍙樺寲銆?)
+            Text("　　夜色沉下来以后，文字应该安静、清楚、耐看。调整外观与排版时，这里会立刻跟随字体、字号、行距、段首缩进和背景变化。")
                 .font(fontFamily.swiftUIFont(size: min(CGFloat(fontSize), 24), weight: .regular))
                 .foregroundStyle(readerThemeTextColor)
                 .lineSpacing(lineSpacing)
@@ -4532,7 +4533,7 @@ struct ReaderView: View {
                         .foregroundStyle(readerThemeTextColor.opacity(0.62))
                 }
                 .buttonStyle(.plain)
-                .accessibilityLabel("鍏抽棴璇煶閿欒鎻愮ず")
+                .accessibilityLabel("关闭语音错误提示")
             }
             .foregroundStyle(readerThemeTextColor)
             .padding(.horizontal, 14)
@@ -4561,7 +4562,7 @@ struct ReaderView: View {
 
             VStack(alignment: .leading, spacing: 8) {
                 HStack {
-                    Text("瀛椾綋")
+                    Text("字体")
                         .font(.subheadline.weight(.semibold))
                         .foregroundStyle(readerThemeTextColor.opacity(0.62))
                     Spacer()
@@ -4569,7 +4570,7 @@ struct ReaderView: View {
                         showFontManagementSheet = true
                     } label: {
                         HStack(spacing: 4) {
-                            Text("瀛椾綋绠＄悊 / 瀵煎叆")
+                            Text("字体管理 / 导入")
                             Image(systemName: "chevron.right")
                         }
                         .font(.caption)
@@ -4604,30 +4605,30 @@ struct ReaderView: View {
                 }
             }
 
-            Text("馃挕 鎺掔増璇存槑锛氭瘡椤瑰潎鏍囨槑鍏蜂綋浣滅敤涓庢帹鑽愬€笺€傚彸渚у彲鐐规暟瀛楃洿鎺ヨ緭鍏ワ紝婊戝潡鐢ㄤ簬蹇€熸粦鍔ㄧ矖璋冦€傚凡閲囩敤涓绘祦灏忚鏍囧噯鎺掔増瑙勮寖銆?)
+            Text("💡 排版说明：每项均标明具体作用与推荐值。右侧可点数字直接输入，滑块用于快速滑动粗调。已采用主流小说标准排版规范。")
                 .font(.caption)
                 .foregroundStyle(readerThemeTextColor.opacity(0.62))
                 .padding(.horizontal, 10)
                 .padding(.vertical, 8)
                 .background(readerThemeTextColor.opacity(0.10), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
 
-            // 1. 娈佃惤宸紙娈甸棿璺濓級- 鏀惧湪鏈€鍓嶉潰涔嬩竴锛岀敤鎴峰弽棣堟渶楂橀鏌ユ壘椤?
-            readerValueSlider("娈佃惤宸紙娈甸棿璺濓級", value: $paragraphSpacing, range: 0...28, step: 1, unit: "pt", help: "璋冩暣涓婁笅涓ゆ鏂囧瓧涔嬮棿鐨勫瀭鐩寸暀鐧姐€傛闂磋窛搴斿ぇ浜庤璺濓紝姝ｆ枃鎵嶄笉浼氱硦鎴愪竴鐗囷紙鎺ㄨ崘 10~14pt锛?)
+            // 1. 段落差（段间距）- 放在最前面之一，用户反馈最高频查找项
+            readerValueSlider("段落差（段间距）", value: $paragraphSpacing, range: 0...28, step: 1, unit: "pt", help: "调整上下两段文字之间的垂直留白。段间距应大于行距，正文才不会糊成一片（推荐 10~14pt）")
 
-            // 2. 姝ｆ枃瀛楀彿
-            readerValueSlider("姝ｆ枃瀛楀彿", value: $fontSize, range: 12...34, step: 1, unit: "pt", help: "鏁翠綋鏀惧ぇ鎴栫缉灏忓皬璇存鏂囨枃瀛楀ぇ灏忥紙涓绘祦闃呰鎺ㄨ崘 18~20pt锛?)
+            // 2. 正文字号
+            readerValueSlider("正文字号", value: $fontSize, range: 12...34, step: 1, unit: "pt", help: "整体放大或缩小小说正文文字大小（主流阅读推荐 18~20pt）")
 
-            // 3. 琛岃窛锛堣楂橀棿璺濓級
-            readerValueSlider("琛岃窛", value: $lineSpacing, range: 0...18, step: 1, unit: "pt", help: "琛岄珮闂磋窛锛氬悓涓€娈佃惤鍐呬笂涓嬫瘡涓€琛屾枃瀛椾箣闂寸殑鍨傜洿闂撮殭涓庡懠鍚告劅锛堟帹鑽?8~10pt锛?)
+            // 3. 行距（行高间距）
+            readerValueSlider("行距", value: $lineSpacing, range: 0...18, step: 1, unit: "pt", help: "行高间距：同一段落内上下每一行文字之间的垂直间隙与呼吸感（推荐 8~10pt）")
 
-            // 4. 娈甸缂╄繘
-            readerValueSlider("娈甸缂╄繘", value: $paragraphIndent, range: 0...50, step: 2, unit: "pt", help: "姣忎釜娈佃惤绗竴琛屽紑澶寸殑缂╄繘绌烘牸銆?8pt 鍒氬ソ涓烘爣鍑嗙┖涓や釜姹夊瓧")
+            // 4. 段首缩进
+            readerValueSlider("段首缩进", value: $paragraphIndent, range: 0...50, step: 2, unit: "pt", help: "每个段落第一行开头的缩进空格。38pt 刚好为标准空两个汉字")
 
-            // 5. 瀛楅棿璺濓紙瀛楄窛锛?
-            readerValueSlider("瀛楅棿璺濓紙瀛楄窛锛?, value: $letterSpacing, range: 0...4, step: 0.2, unit: "pt", help: "鍚屼竴琛屼腑姣忎釜姹夊瓧宸﹀彸涔嬮棿鐨勭揣鍑戝害锛堟帹鑽?0~0.5pt锛?)
+            // 5. 字间距（字距）
+            readerValueSlider("字间距（字距）", value: $letterSpacing, range: 0...4, step: 0.2, unit: "pt", help: "同一行中每个汉字左右之间的紧凑度（推荐 0~0.5pt）")
 
-            // 6. 灞忓箷杈硅窛锛堝乏鍙崇暀鐧斤級
-            readerValueSlider("灞忓箷杈硅窛锛堝乏鍙崇暀鐧斤級", value: $pagePadding, range: 10...40, step: 1, unit: "pt", help: "姝ｆ枃鏂囧瓧璺濈鎵嬫満灞忓箷宸﹀彸涓や晶杈圭紭鐨勮窛绂伙紝闃叉鏂囧瓧璐磋竟锛堟帹鑽?18~22pt锛?)
+            // 6. 屏幕边距（左右留白）
+            readerValueSlider("屏幕边距（左右留白）", value: $pagePadding, range: 10...40, step: 1, unit: "pt", help: "正文文字距离手机屏幕左右两侧边缘的距离，防止文字贴边（推荐 18~22pt）")
 
             if includesLegacySections { legacyLayoutHeadingControls }
 
@@ -4637,8 +4638,8 @@ struct ReaderView: View {
                 HStack(spacing: 8) {
                     Image(systemName: "wand.and.stars")
                     VStack(alignment: .leading, spacing: 2) {
-                        Text("搴旂敤绾搁棿鎺ㄨ崘鎺掔増").font(.subheadline.weight(.semibold))
-                        Text("璋冩暣姝ｆ枃鐨勫瓧鍙枫€佽璺濄€佹璺濄€佽竟璺濆拰棣栬缂╄繘銆?)
+                        Text("应用纸间推荐排版").font(.subheadline.weight(.semibold))
+                        Text("调整正文的字号、行距、段距、边距和首行缩进。")
                             .font(.caption2)
                             .foregroundStyle(readerThemeTextColor.opacity(0.62))
                     }
@@ -4654,12 +4655,12 @@ struct ReaderView: View {
     }
 
     @ViewBuilder private var legacyLayoutHeadingControls: some View {
-        // 7. 绔犺妭鏍囬
+        // 7. 章节标题
         VStack(alignment: .leading, spacing: 8) {
-            Text("绔犺妭鏍囬浣嶇疆")
+            Text("章节标题位置")
                 .font(.subheadline.weight(.semibold))
                 .foregroundStyle(readerThemeTextColor.opacity(0.62))
-            BrandSegmentedControl("绔犺妭鏍囬浣嶇疆", selection: $chapterHeadingStyleRaw, options:
+            BrandSegmentedControl("章节标题位置", selection: $chapterHeadingStyleRaw, options:
                             ReaderPageChromeLayout.allCases.map { ($0.rawValue, $0.title) })
             Text(chapterHeadingStyle.help)
                 .font(.caption2)
@@ -4668,54 +4669,54 @@ struct ReaderView: View {
         }
 
         VStack(alignment: .leading, spacing: 10) {
-            Text("绔犺妭鍚?路 鐙珛鎺掔増").font(.headline)
-            Toggle("绔犺妭鍚嶅姞绮?, isOn: $chapterTitleBold)
-            Picker("绔犺妭鍚嶅瓧浣?, selection: $chapterTitleFamilyRaw) {
-                Text("璺熼殢姝ｆ枃").tag("")
+            Text("章节名 · 独立排版").font(.headline)
+            Toggle("章节名加粗", isOn: $chapterTitleBold)
+            Picker("章节名字体", selection: $chapterTitleFamilyRaw) {
+                Text("跟随正文").tag("")
                 ForEach(ReaderFontFamily.allCases) { family in Text(family.title).tag(family.rawValue) }
             }
-            readerValueSlider("绔犺妭鍚嶅瓧鍙?, value: Binding(get: { resolvedTitleSize }, set: { chapterTitleSize = $0 }), range: 14...44, step: 1, unit: "pt", help: "鍙敼鍙樼珷鑺傚悕锛屼笉鏀瑰彉姝ｆ枃瀛楀彿锛涙粴鍔ㄤ笌鍒嗛〉妯″紡鍏辩敤銆?)
-            Button("绔犺妭鍚嶅瓧鍙疯窡闅忔鏂?) { chapterTitleSize = 0 }
+            readerValueSlider("章节名字号", value: Binding(get: { resolvedTitleSize }, set: { chapterTitleSize = $0 }), range: 14...44, step: 1, unit: "pt", help: "只改变章节名，不改变正文字号；滚动与分页模式共用。")
+            Button("章节名字号跟随正文") { chapterTitleSize = 0 }
         }
 
         VStack(alignment: .leading, spacing: 10) {
-            Text("椤电湁 路 鐙珛鎺掔増").font(.headline)
-            readerValueSlider("椤电湁瀛楀彿", value: $headerFontSize, range: 9...18, step: 1, unit: "pt", help: "澧炲ぇ瀛楀彿浼氬悓姝ラ鐣欓〉鐪夐珮搴︼紝涓嶈鐩栨鏂囥€?)
-            readerValueSlider("椤电湁椤堕儴闂磋窛", value: $headerTopGap, range: 0...24, step: 1, unit: "pt", help: "浠庡畨鍏ㄥ尯涓嬫部寮€濮嬭绠楋紝閬垮厤鎸′綇鐏靛姩宀涖€?)
-            readerValueSlider("椤电湁鏂囧瓧娴撳害", value: $headerOpacity, range: 0.35...1, step: 0.05, unit: "", help: "鐙珛浜庢鏂囬鑹诧紱鑳屾櫙鍥句粛杩炵画瑕嗙洊椤堕儴銆?)
-            Toggle("绯荤粺鐘舵€佹爮鍙鏃朵粛閲嶅椤堕儴鏃堕棿鐢甸噺", isOn: $allowsDuplicateTopStatus)
+            Text("页眉 · 独立排版").font(.headline)
+            readerValueSlider("页眉字号", value: $headerFontSize, range: 9...18, step: 1, unit: "pt", help: "增大字号会同步预留页眉高度，不覆盖正文。")
+            readerValueSlider("页眉顶部间距", value: $headerTopGap, range: 0...24, step: 1, unit: "pt", help: "从安全区下沿开始计算，避免挡住灵动岛。")
+            readerValueSlider("页眉文字浓度", value: $headerOpacity, range: 0.35...1, step: 0.05, unit: "", help: "独立于正文颜色；背景图仍连续覆盖顶部。")
+            Toggle("系统状态栏可见时仍重复顶部时间电量", isOn: $allowsDuplicateTopStatus)
         }
 
-        readerValueSlider("绔犺妭鏍囬闂磋窛", value: $titleSpacing, range: 0...36, step: 2, unit: "pt", help: "浠呫€屾鏂囧ぇ鏍囬銆嶆ā寮忕敓鏁堬細澶х珷鑺傛爣棰樹笌姝ｆ枃绗竴琛屼箣闂寸殑鍨傜洿鐣欑櫧锛堟帹鑽?8~16pt锛夈€傞〉鐪夋ā寮忎笉鍗犵敤姝ｆ枃楂樺害銆?)
+        readerValueSlider("章节标题间距", value: $titleSpacing, range: 0...36, step: 2, unit: "pt", help: "仅「正文大标题」模式生效：大章节标题与正文第一行之间的垂直留白（推荐 8~16pt）。页眉模式不占用正文高度。")
 
-        Toggle("鍐呭寤朵几鑷抽〉鐪夐〉鑴氬尯鍩?, isOn: $contentExtendsIntoChrome)
+        Toggle("内容延伸至页眉页脚区域", isOn: $contentExtendsIntoChrome)
             .font(.subheadline.weight(.semibold))
     }
 
     @ViewBuilder private var legacyLayoutStatusControls: some View {
-        // 8. 搴曢儴瀹夊叏鐣欑櫧
-        readerValueSlider("搴曢儴瀹夊叏鐣欑櫧", value: $footerHeight, range: 40...180, step: 8, unit: "pt", help: "灞忓箷鏈€搴曢儴鍚戜笂棰勭暀鐨勫畨鍏ㄧ┖闅欙紝闃叉鎵嬪娍閬尅鏈€鍚庝竴琛屾鏂囷紙鎺ㄨ崘 80~100pt锛?)
+        // 8. 底部安全留白
+        readerValueSlider("底部安全留白", value: $footerHeight, range: 40...180, step: 8, unit: "pt", help: "屏幕最底部向上预留的安全空隙，防止手势遮挡最后一行正文（推荐 80~100pt）")
 
-        // 9. 椤佃剼鍐呭寮€鍏炽€傚鐓у悓绫婚槄璇诲櫒锛堥鑹查椇闃佺殑 tr_showTime / tr_showBatView /
-        // tr_showBatLabel 灏辨槸涓変釜鐙珛寮€鍏筹級锛屾妸銆屾椂闂?/ 鐢甸噺鍥炬爣 / 鐢甸噺鐧惧垎姣斻€嶆媶寮€锛?
-        // 鍏ㄥ睆鏃朵笉鎯崇湅灏变笉鏄剧ず锛屼篃灏变笉瀛樺湪銆屼綅缃鎬€嶈繖浠朵簨銆?
+        // 9. 页脚内容开关。对照同类阅读器（香色闺阁的 tr_showTime / tr_showBatView /
+        // tr_showBatLabel 就是三个独立开关），把「时间 / 电量图标 / 电量百分比」拆开，
+        // 全屏时不想看就不显示，也就不存在「位置奇怪」这件事。
         VStack(alignment: .leading, spacing: 10) {
-            Text("椤电湁涓庨〉鑴氱姸鎬佹爮")
+            Text("页眉与页脚状态栏")
                 .font(.subheadline.weight(.semibold))
                 .foregroundStyle(readerThemeTextColor.opacity(0.62))
 
             HStack {
-                Text("鐘舵€佹爮浣嶇疆")
+                Text("状态栏位置")
                 Spacer()
-                BrandSegmentedControl("浣嶇疆", selection: $statusPosition, options:
-                            [("bottom", "浠呴〉鑴?), ("top", "浠呴〉鐪?), ("both", "椤电湁+椤佃剼")])
+                BrandSegmentedControl("位置", selection: $statusPosition, options:
+                            [("bottom", "仅页脚"), ("top", "仅页眉"), ("both", "页眉+页脚")])
                 .frame(width: 200)
             }
 
-            Toggle("濮嬬粓淇濈暀绯荤粺鍘熺敓鐘舵€佹爮", isOn: $showSystemStatusBar)
-            Toggle("鏄剧ず鏃堕棿", isOn: $footerShowTime)
-            Toggle("鏄剧ず鐢甸噺鍥炬爣", isOn: $footerShowBatteryIcon)
-            Toggle("鏄剧ず鐢甸噺鐧惧垎姣?, isOn: $footerShowBatteryPercent)
+            Toggle("始终保留系统原生状态栏", isOn: $showSystemStatusBar)
+            Toggle("显示时间", isOn: $footerShowTime)
+            Toggle("显示电量图标", isOn: $footerShowBatteryIcon)
+            Toggle("显示电量百分比", isOn: $footerShowBatteryPercent)
         }
         .font(.subheadline)
     }
@@ -4771,48 +4772,48 @@ struct ReaderView: View {
 
     private var advancedSettingsBody: some View {
         VStack(alignment: .leading, spacing: 14) {
-            Text("楂樼骇閲屽彧鏀鹃槄璇昏緟鍔╋紝涓嶅啀閲嶅鍓嶉潰鐨勭炕椤靛拰瀛楀彿鍏ュ彛銆傛湕璇婚€熷害鍙璇€燂紝鑷姩婊氬姩鍦ㄤ富闃呰鑿滃崟銆?)
+            Text("高级里只放阅读辅助，不再重复前面的翻页和字号入口。朗读速度只管语速，自动滚动在主阅读菜单。")
                 .font(.caption)
                 .foregroundStyle(readerThemeTextColor.opacity(0.62))
 
             readerValueSlider(
-                "鑷姩婊氬姩闂撮殧",
+                "自动滚动间隔",
                 value: $autoScrollDelay,
                 range: ReaderAutomationPolicy.minDelay...ReaderAutomationPolicy.maxDelay,
                 step: 0.25,
-                unit: "绉?,
-                help: "鑷姩婊氬姩闂撮殧鏈€闀?60 绉掞紝鏁板€艰秺澶ф粴鍔ㄨ秺鎱紱杩愯涓慨鏀圭珛鍗抽噸鏂拌鏃躲€傛湕璇讳笌鑷姩婊氬姩浜掓枼銆?
+                unit: "秒",
+                help: "自动滚动间隔最长 60 秒，数值越大滚动越慢；运行中修改立即重新计时。朗读与自动滚动互斥。"
             )
 
-            readerValueSlider("鏈楄閫熷害", value: $ttsRate, range: 0.35...0.65, step: 0.01, unit: "鍊嶉€?, help: "璋冩暣璇煶鏈楄璇€燂紙0.35x ~ 0.65x锛夛紝浠庡綋鍓嶅彲瑙佹钀藉紑濮嬫湕璇伙紝涓嶄細璺冲洖绔犺妭寮€澶?)
+            readerValueSlider("朗读速度", value: $ttsRate, range: 0.35...0.65, step: 0.01, unit: "倍速", help: "调整语音朗读语速（0.35x ~ 0.65x），从当前可见段落开始朗读，不会跳回章节开头")
 
-            Text("鐫＄湢瀹氭椂")
+            Text("睡眠定时")
                 .font(.subheadline.weight(.semibold))
                 .foregroundStyle(readerThemeTextColor.opacity(0.62))
-            BrandSegmentedControl("鐫＄湢瀹氭椂", selection: $sleepTimerMinutes, options:
-                            [(0, "鍏抽棴"), (-1, "鎾畬褰撶珷"), (15, "15 鍒嗛挓"), (30, "30 鍒嗛挓"), (60, "60 鍒嗛挓")])
+            BrandSegmentedControl("睡眠定时", selection: $sleepTimerMinutes, options:
+                            [(0, "关闭"), (-1, "播完当章"), (15, "15 分钟"), (30, "30 分钟"), (60, "60 分钟")])
 
-            Toggle("闃呰鏃朵繚鎸佸睆骞曞父浜?, isOn: $keepScreenAwake)
+            Toggle("阅读时保持屏幕常亮", isOn: $keepScreenAwake)
                 .font(.subheadline.weight(.semibold))
 
-            Toggle("鍏佽姝ｆ枃鏂囧瓧閫夋嫨", isOn: $textSelectionEnabled)
+            Toggle("允许正文文字选择", isOn: $textSelectionEnabled)
                 .font(.subheadline.weight(.semibold))
 
-            Toggle("绻佷綋涓枃鏄剧ず锛堢畝杞箒锛?, isOn: $traditionalChineseEnabled)
+            Toggle("繁体中文显示（简转繁）", isOn: $traditionalChineseEnabled)
                 .font(.subheadline.weight(.semibold))
 
-            Toggle("浠跨敓闃呰锛圔ionic Reading 璇嶉鍔犵矖锛?, isOn: $bionicReadingEnabled)
+            Toggle("仿生阅读（Bionic Reading 词首加粗）", isOn: $bionicReadingEnabled)
                 .font(.subheadline.weight(.semibold))
 
             VStack(alignment: .leading, spacing: 6) {
-                Text("鎻掑浘鎺掔増鏍峰紡")
+                Text("插图排版样式")
                     .font(.subheadline.weight(.semibold))
                     .foregroundStyle(readerThemeTextColor.opacity(0.62))
-                BrandSegmentedControl("鎻掑浘鎺掔増鏍峰紡", selection: $globalImageStyleRaw, options:
+                BrandSegmentedControl("插图排版样式", selection: $globalImageStyleRaw, options:
                             ReaderImageStyle.allCases.map { ($0.rawValue, $0.title) })
             }
 
-            settingStepper(title: "棰勫姞杞界珷鑺?, value: ReaderPreloadPolicy.title(for: preloadChapterCount)) {
+            settingStepper(title: "预加载章节", value: ReaderPreloadPolicy.title(for: preloadChapterCount)) {
                 preloadChapterCount = ReaderPreloadPolicy.clamp(preloadChapterCount - 1)
             } increase: {
                 preloadChapterCount = ReaderPreloadPolicy.clamp(preloadChapterCount + 1)
@@ -4836,8 +4837,8 @@ struct ReaderView: View {
                     Text(title)
                         .font(.subheadline.weight(.bold))
                         .foregroundStyle(readerThemeTextColor)
-                        // 鏍囬鐙崰宸︿晶鍓╀綑瀹藉害锛屽彸渚у浐瀹氱粰绮剧‘杈撳叆妗嗭紱
-                        // 銆岃璺濓紙琛岄珮闂磋窛锛夈€嶄笉鍐嶈鏁板€艰兌鍥婃尋鎴愪袱琛屻€?
+                        // 标题独占左侧剩余宽度，右侧固定给精确输入框；
+                        // 「行距（行高间距）」不再被数值胶囊挤成两行。
                         .lineLimit(1)
                         .minimumScaleFactor(0.75)
                         .layoutPriority(1)
@@ -4865,13 +4866,13 @@ struct ReaderView: View {
 
                     Spacer(minLength: 0)
 
-                    Text("鑼冨洿 \(ReaderValueNormalizer.formatted(range.lowerBound, step: step)) ~ \(ReaderValueNormalizer.formatted(range.upperBound, step: step))")
+                    Text("范围 \(ReaderValueNormalizer.formatted(range.lowerBound, step: step)) ~ \(ReaderValueNormalizer.formatted(range.upperBound, step: step))")
                         .font(.caption2)
                         .foregroundStyle(readerThemeTextColor.opacity(0.42))
                         .lineLimit(1)
                 }
 
-                // 閱掔洰鐨勫姛鑳借鏄庡崱鐗囷紝璁╃敤鎴锋竻妤氱煡閬撴瘡涓€椤硅皟鏁寸殑鏄粈涔堬紝鍛婂埆鐩叉祴
+                // 醒目的功能说明卡片，让用户清楚知道每一项调整的是什么，告别盲测
                 HStack(alignment: .top, spacing: 6) {
                     Image(systemName: "info.circle.fill")
                         .font(.caption2)
@@ -4927,7 +4928,7 @@ struct ReaderView: View {
 
     private var tapZoneSettings: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("涔濆鏍肩偣鍑诲尯鍩?)
+            Text("九宫格点击区域")
                 .font(.subheadline.weight(.semibold))
                 .foregroundStyle(readerThemeTextColor.opacity(0.62))
             LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 6), count: 3), spacing: 6) {
@@ -4948,7 +4949,7 @@ struct ReaderView: View {
                     }
                 }
             }
-            Button("鎭㈠榛樿鐐瑰嚮鍖哄煙") {
+            Button("恢复默认点击区域") {
                 tapZonesRawValue = ReaderTapAction.defaultRawValue
             }
             .font(.caption.weight(.semibold))
@@ -5011,16 +5012,16 @@ struct ReaderView: View {
                     }
                 }
             }
-            // List 鑷甫 systemBackground锛屽彔鍦ㄤ富棰樿儗鏅笂灏辨槸銆岀珷鑺?(N)銆嶄笅闈㈤偅鏉＄櫧甯︺€?
-            // 鎶婃粴鍔ㄥ唴瀹硅儗鏅涓洪€忔槑锛岃 readerBackdrop 閫忎笂鏉ワ紱琛岃儗鏅凡缁忔槸 clear銆?
+            // List 自带 systemBackground，叠在主题背景上就是「章节 (N)」下面那条白带。
+            // 把滚动内容背景设为透明，让 readerBackdrop 透上来；行背景已经是 clear。
             .scrollContentBackground(.hidden)
             .background(readerThemeBackground.ignoresSafeArea())
-            .navigationTitle(tocTab == 0 ? "鐩綍" : "涔︾")
+            .navigationTitle(tocTab == 0 ? "目录" : "书签")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 if tocTab == 0 {
                     ToolbarItem(placement: .navigationBarLeading) {
-                        Button(tocReversed ? "鍊掑簭" : "椤哄簭") {
+                        Button(tocReversed ? "倒序" : "顺序") {
                             tocScrollTask?.cancel()
                             tocScrollTask = nil
                             tocScrollIntent = .firstRow
@@ -5033,7 +5034,7 @@ struct ReaderView: View {
                     }
                 }
                 ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("瀹屾垚") {
+                    Button("完成") {
                         showChapterList = false
                     }
                     .foregroundStyle(readerThemeTextColor)
@@ -5043,7 +5044,7 @@ struct ReaderView: View {
             .toolbarColorScheme(background.isDark ? .dark : .light, for: .navigationBar)
         }
         .readerSheetPresentation(color: readerThemeBackground)
-        // 鐩綍鍥哄畾鍏ㄥ睆锛氬甫 .medium 鏃?SwiftUI 榛樿閫夋渶灏?detent锛屾瘡娆￠兘瑕佹墜鍔ㄤ笂鎷夈€?
+        // 目录固定全屏：带 .medium 时 SwiftUI 默认选最小 detent，每次都要手动上拉。
         .presentationDetents([.large])
         .presentationDragIndicator(.hidden)
         .tint(AppTheme.accent)
@@ -5052,8 +5053,8 @@ struct ReaderView: View {
 
     private var customTocSegmentedPicker: some View {
         HStack(spacing: 0) {
-            tocTabButton(title: "鐩綍", tag: 0)
-            tocTabButton(title: "涔︾", tag: 1)
+            tocTabButton(title: "目录", tag: 0)
+            tocTabButton(title: "书签", tag: 1)
         }
         .padding(3)
         .background(readerThemeTextColor.opacity(background.isDark ? 0.16 : 0.08), in: Capsule())
@@ -5101,7 +5102,7 @@ struct ReaderView: View {
                     .font(.system(size: 14))
                     .foregroundStyle(readerThemeTextColor.opacity(0.6))
 
-                TextField("绛涢€夌珷鑺傚悕鎴栧簭鍙?, text: $tocQuery)
+                TextField("筛选章节名或序号", text: $tocQuery)
                     .font(.system(size: 14))
                     .textInputAutocapitalization(.never)
                     .autocorrectionDisabled(true)
@@ -5130,17 +5131,17 @@ struct ReaderView: View {
             .padding(.horizontal)
             .padding(.top, 10)
 
-            // 娌℃湁 ScrollViewReader 鏃讹紝姣忔鎵撳紑鐩綍閮藉仠鍦ㄧ涓€琛岋細
-            // 璇讳簡涓ょ櫨绔犲啀鐐圭洰褰曪紝杩樿鑷繁寰€涓嬬炕銆傝繖閲岀敤琛?identity
-            // 鐩存帴瀹氫綅鍒板綋鍓嶉槄璇荤珷銆?
+            // 没有 ScrollViewReader 时，每次打开目录都停在第一行：
+            // 读了两百章再点目录，还要自己往下翻。这里用行 identity
+            // 直接定位到当前阅读章。
             ScrollViewReader { proxy in
             List {
                 if chapters.isEmpty && navigationEntries.isEmpty {
-                    Text("褰撳墠绔犺妭娌℃湁鍙垏鎹㈢洰褰?)
+                    Text("当前章节没有可切换目录")
                         .foregroundStyle(readerThemeTextColor.opacity(0.6))
                         .listRowBackground(Color.clear)
                 } else if visibleChapters.isEmpty && visibleNavigationEntries.isEmpty {
-                    Text("娌℃湁鍖归厤绔犺妭")
+                    Text("没有匹配章节")
                         .foregroundStyle(readerThemeTextColor.opacity(0.6))
                         .listRowBackground(Color.clear)
                 } else {
@@ -5155,7 +5156,7 @@ struct ReaderView: View {
                                     // Apply the jump before dismissing the sheet:
                                     // `showChapterList = false` tears the window down
                                     // with the old chapter, and a jump landing in the
-                                    // same runloop was dropped 鈥?after which the reader
+                                    // same runloop was dropped — after which the reader
                                     // could not continue into the next chapter.
                                     presentOverlay()
                                     selectChapter(index: chapter.index)
@@ -5177,7 +5178,7 @@ struct ReaderView: View {
                                 .listRowSeparatorTint(readerThemeTextColor.opacity(0.15))
                             }
                         } header: {
-                            Text("绔犺妭 (\(visibleChapters.count))")
+                            Text("章节 (\(visibleChapters.count))")
                                 .font(.footnote.weight(.semibold))
                                 .foregroundStyle(readerThemeTextColor.opacity(0.65))
                         }
@@ -5199,7 +5200,7 @@ struct ReaderView: View {
                                 .listRowSeparatorTint(readerThemeTextColor.opacity(0.15))
                             }
                         } header: {
-                            Text("椤甸潰鍐呯洰褰?)
+                            Text("页面内目录")
                                 .font(.footnote.weight(.semibold))
                                 .foregroundStyle(readerThemeTextColor.opacity(0.65))
                         }
@@ -5217,8 +5218,8 @@ struct ReaderView: View {
                 tocScrollTask = nil
             })
             .onAppear {
-                // 棣栧抚鐨勮杩樻病寤哄嚭鏉ワ紝鍚屼竴 runloop 閲?scrollTo 浼氳惤绌猴紝
-                // 鎸埌涓嬩竴鎷嶅啀婊氬姩銆?
+                // 首帧的行还没建出来，同一 runloop 里 scrollTo 会落空，
+                // 挪到下一拍再滚动。
                 tocUserHasScrolled = false
                 scrollTocToCurrentChapter(proxy)
             }
@@ -5263,7 +5264,7 @@ struct ReaderView: View {
         }
     }
 
-    /// 鎵撳紑鐩綍瀹氫綅褰撳墠绔狅紱鎵嬪姩鎺掑簭鎴栫瓫閫夊畾浣嶆柊鍒楄〃棣栬銆?
+    /// 打开目录定位当前章；手动排序或筛选定位新列表首行。
     private func scrollTocToCurrentChapter(_ proxy: ScrollViewProxy) {
         let id: AnyHashable
         if let row = tocScrollIntent.row(in: filteredChapters, preferred: windowCurrentChapterIndex,
@@ -5294,7 +5295,7 @@ struct ReaderView: View {
                     .foregroundStyle(readerThemeTextColor)
                     .lineLimit(1)
                 if let chapterIndex = entry.chapterIndex {
-                    Text("绗?\(chapterIndex + 1) 绔? + (entry.paragraphIndex.map { " 路 绗?\($0 + 1) 娈? } ?? ""))
+                    Text("第 \(chapterIndex + 1) 章" + (entry.paragraphIndex.map { " · 第 \($0 + 1) 段" } ?? ""))
                         .font(.caption2)
                         .foregroundStyle(readerThemeTextColor.opacity(0.6))
                 }
@@ -5311,11 +5312,11 @@ struct ReaderView: View {
             ZStack {
                 readerBackdrop
                 bookmarkList(includeAddButton: true)
-                    .navigationTitle("涔︾")
+                    .navigationTitle("书签")
                     .navigationBarTitleDisplayMode(.inline)
                     .toolbar {
                         ToolbarItem(placement: .navigationBarTrailing) {
-                            Button("瀹屾垚") {
+                            Button("完成") {
                                 showBookmarks = false
                             }
                             .foregroundStyle(readerThemeTextColor)
@@ -5338,7 +5339,7 @@ struct ReaderView: View {
                     toggleCurrentBookmark(openList: false)
                 } label: {
                     Label(
-                        isCurrentChapterBookmarked ? "鍙栨秷褰撳墠娈佃惤涔︾" : "鍔犲叆褰撳墠娈佃惤涔︾",
+                        isCurrentChapterBookmarked ? "取消当前段落书签" : "加入当前段落书签",
                         systemImage: isCurrentChapterBookmarked ? "bookmark.slash" : "bookmark"
                     )
                     .foregroundStyle(AppTheme.accent)
@@ -5348,15 +5349,15 @@ struct ReaderView: View {
             }
 
             if bookmarks.isEmpty {
-                Text("鏆傛棤涔︾")
+                Text("暂无书签")
                     .foregroundStyle(readerThemeTextColor.opacity(0.6))
                     .listRowBackground(Color.clear)
             } else {
                 Section {
                     HStack {
-                        Label("\(bookmarks.count) 涓功绛?, systemImage: "bookmark")
+                        Label("\(bookmarks.count) 个书签", systemImage: "bookmark")
                         Spacer()
-                        Text("鏈珷 \(currentChapterBookmarkCount)")
+                        Text("本章 \(currentChapterBookmarkCount)")
                             .foregroundStyle(readerThemeTextColor.opacity(0.6))
                     }
                     .font(.caption.weight(.semibold))
@@ -5377,7 +5378,7 @@ struct ReaderView: View {
                                         Text(bookmarkLocationText(bookmark))
                                         Text(bookmark.createdAt.formatted(date: .abbreviated, time: .shortened))
                                         if isCurrentBookmark(bookmark) {
-                                            Text("褰撳墠")
+                                            Text("当前")
                                                 .padding(.horizontal, 6)
                                                 .padding(.vertical, 2)
                                                 .background(AppTheme.accent.opacity(0.12))
@@ -5414,12 +5415,12 @@ struct ReaderView: View {
                             Button {
                                 quoteCardBookmark = bookmark
                             } label: {
-                                Label("鍗＄墖", systemImage: "quote.bubble.fill")
+                                Label("卡片", systemImage: "quote.bubble.fill")
                             }
                             .tint(AppTheme.accent)
                         }
                         .swipeActions(edge: .trailing) {
-                            Button("鍒犻櫎", role: .destructive) {
+                            Button("删除", role: .destructive) {
                                 appState.bookshelfStore.removeBookmark(bookID: bookID, bookmarkID: bookmark.id)
                             }
                         }
@@ -5427,15 +5428,15 @@ struct ReaderView: View {
                             Button {
                                 quoteCardBookmark = bookmark
                             } label: {
-                                Label("鐢熸垚閲戝彞鍗＄墖", systemImage: "quote.bubble")
+                                Label("生成金句卡片", systemImage: "quote.bubble")
                             }
-                            Button("鍒犻櫎涔︾", role: .destructive) {
+                            Button("删除书签", role: .destructive) {
                                 appState.bookshelfStore.removeBookmark(bookID: bookID, bookmarkID: bookmark.id)
                             }
                         }
                     }
                 } header: {
-                    Text("鎴戠殑涔︾")
+                    Text("我的书签")
                         .font(.footnote.weight(.semibold))
                         .foregroundStyle(readerThemeTextColor.opacity(0.65))
                 }
@@ -5448,9 +5449,9 @@ struct ReaderView: View {
 
     private func bookmarkLocationText(_ bookmark: ReaderBookmark) -> String {
         if let paragraphIndex = bookmark.paragraphIndex {
-            return "绗?\(bookmark.chapterIndex + 1) 绔?路 绗?\(paragraphIndex + 1) 娈?
+            return "第 \(bookmark.chapterIndex + 1) 章 · 第 \(paragraphIndex + 1) 段"
         }
-        return "绗?\(bookmark.chapterIndex + 1) 绔?
+        return "第 \(bookmark.chapterIndex + 1) 章"
     }
 
     private func isCurrentBookmark(_ bookmark: ReaderBookmark) -> Bool {
@@ -5694,7 +5695,7 @@ struct ReaderView: View {
         case .activate:
             activateWindowChapter(index)
         case .loadIntoWindow:
-            // 鎷栧姩杩涘害鏉℃椂涓嶈兘椤烘墜鎶婃帶鍒堕潰鏉垮叧鎺夛紝鍚﹀垯婊戝埌涓€鍗婇潰鏉垮氨娑堝け浜嗐€?
+            // 拖动进度条时不能顺手把控制面板关掉，否则滑到一半面板就消失了。
             if !keepChrome { closeReaderChrome() }
             stopAutoScroll()
             stopSpeechPlayback()
@@ -5704,26 +5705,26 @@ struct ReaderView: View {
         }
     }
 
-    /// 褰撳墠椤靛湪鏈珷鍐呯殑 0-based 搴忓彿銆?
+    /// 当前页在本章内的 0-based 序号。
     private var currentChapterPageOrdinal: Int {
         guard pagedBlocks.indices.contains(pagedPageIndex) else { return 0 }
         return pagedBlocks[pagedPageIndex].pageOrdinal
     }
 
-    /// 褰撳墠绔犳€婚〉鏁帮紝鐢ㄤ簬鍒嗛〉妯″紡婊戞潯涓婇檺銆?
+    /// 当前章总页数，用于分页模式滑条上限。
     private var currentChapterPageTotalForSlider: Int {
         guard pagedBlocks.indices.contains(pagedPageIndex) else { return max(pagedBlocks.count, 1) }
         let block = pagedBlocks[pagedPageIndex]
         return max(chapterPageTotal(for: block.chapterIndex, fallback: block.pageOrdinal + 1), 1)
     }
 
-    /// 鍒嗛〉妯″紡搴曟爮鏂囨锛氭湰绔犵鍑犻〉 / 鍏卞嚑椤点€?
+    /// 分页模式底栏文案：本章第几页 / 共几页。
     private var pageSliderLabel: String {
         let total = currentChapterPageTotalForSlider
-        return "绗?\(min(currentChapterPageOrdinal + 1, total)) / \(total) 椤?
+        return "第 \(min(currentChapterPageOrdinal + 1, total)) / \(total) 页"
     }
 
-    /// 鍒嗛〉妯″紡璺抽〉锛氬彧鍦ㄥ綋鍓嶇珷鑺傚唴绉诲姩锛屼笉瑙﹀彂绔犺妭閲嶆帓銆?
+    /// 分页模式跳页：只在当前章节内移动，不触发章节重排。
     private func seekPagedPage(ordinal: Int) {
         guard pagedBlocks.indices.contains(pagedPageIndex) else { return }
         let block = pagedBlocks[pagedPageIndex]
@@ -5744,16 +5745,16 @@ struct ReaderView: View {
         updatePagedVisibleParagraph(pageIndex: index)
     }
 
-    /// 鎷栧姩杩涘害鏉℃椂鐨勮惤鐐规枃妗堬紱涓嶆嫋鍔ㄦ椂杩斿洖褰撳墠绔狅紙閰嶅悎 opacity 闅愯棌锛夈€?
+    /// 拖动进度条时的落点文案；不拖动时返回当前章（配合 opacity 隐藏）。
     private var chapterSliderLabel: String {
         let total = max(displayTotalChapters ?? chapters.count, 1)
         let raw = Int((chapterSliderTarget ?? Double(currentDisplayChapterIndex)).rounded())
         let clamped = min(max(raw, 0), total - 1)
-        return "绗?\(clamped + 1) / \(total) 绔?
+        return "第 \(clamped + 1) / \(total) 章"
     }
 
-    /// 鎷栧姩杩涘害鏉℃椂鐨勩€岃竟鎷栬竟璺炽€嶏細鍋?0.12s 灏辫惤涓€绔犮€?
-    /// 浠ュ墠鍙湁鎵嬫寚鎶捣锛坥nEditingChanged == false锛夋墠璺筹紝鎷栧埌鍝兘鐪嬩笉鍒板唴瀹瑰彉鍖栥€?
+    /// 拖动进度条时的「边拖边跳」：停 0.12s 就落一章。
+    /// 以前只有手指抬起（onEditingChanged == false）才跳，拖到哪都看不到内容变化。
     private func scheduleLiveChapterSeek(to rawValue: Double) {
         chapterSeekTask?.cancel()
         let index = Int(rawValue.rounded())
@@ -5951,7 +5952,7 @@ struct ReaderView: View {
                     Image(systemName: speechController.isPaused ? "speaker.slash" : "waveform")
                         .font(.system(size: 11, weight: .bold))
                         .foregroundStyle(AppTheme.accent)
-                    Text(speechController.isPaused ? "鏈楄宸叉殏鍋? : "AI 璇煶鏈楄涓?)
+                    Text(speechController.isPaused ? "朗读已暂停" : "AI 语音朗读中")
                         .font(.system(size: 11, weight: .semibold))
                         .foregroundStyle(readerThemeTextColor)
                 }
@@ -6024,11 +6025,11 @@ struct ReaderView: View {
                     Image(systemName: "arrow.down.circle")
                         .font(.system(size: 11, weight: .bold))
                         .foregroundStyle(AppTheme.accent)
-                    Text("鑷姩婊氬睆涓?)
+                    Text("自动滚屏中")
                         .font(.system(size: 11, weight: .semibold))
                         .foregroundStyle(readerThemeTextColor)
                 }
-                Text(String(format: "%.1f 绉?灞?, autoScrollDelay))
+                Text(String(format: "%.1f 秒/屏", autoScrollDelay))
                     .font(.system(size: 10))
                     .foregroundStyle(readerThemeTextColor.opacity(0.62))
             }
@@ -6141,7 +6142,7 @@ struct ReaderView: View {
                 coordinator.stop()
                 if sleepTimerMinutes == -1 {
                     sleepTimerMinutes = 0
-                    appState.record(DiagnosticEvent(level: .info, stage: "reader.sleepTimer", sourceName: currentChapterTitle, message: "鐫＄湢瀹氭椂宸茬敓鏁堬細褰撳墠绔犺妭鎾斁瀹屾瘯宸茶嚜鍔ㄥ仠姝?))
+                    appState.record(DiagnosticEvent(level: .info, stage: "reader.sleepTimer", sourceName: currentChapterTitle, message: "睡眠定时已生效：当前章节播放完毕已自动停止"))
                     return
                 }
                 let nextIndex = currentChapterIndex + 1
@@ -6311,7 +6312,7 @@ struct ReaderView: View {
             stopAutoScroll()
             stopSpeechPlayback()
             sleepTimerMinutes = 0
-            appState.record(DiagnosticEvent(level: .info, stage: "reader.sleepTimer", sourceName: content.title, message: "鐫＄湢瀹氭椂宸茬粨鏉?))
+            appState.record(DiagnosticEvent(level: .info, stage: "reader.sleepTimer", sourceName: content.title, message: "睡眠定时已结束"))
             sleepTimerTask = nil
         }
     }
@@ -6372,10 +6373,10 @@ struct ReaderView: View {
 
     private var openingPositionRecovery: some View {
         VStack(spacing: 16) {
-            Text("鏈兘鎭㈠闃呰浣嶇疆").font(.headline)
-            Text("宸蹭繚瀛樼殑浣嶇疆鏈洿鏀广€?)
+            Text("未能恢复阅读位置").font(.headline)
+            Text("已保存的位置未更改。")
                 .font(.subheadline).foregroundStyle(.secondary)
-            Button(isRetryingOpeningPosition ? "姝ｅ湪閲嶈瘯鈥? : "閲嶈瘯瀹氫綅") {
+            Button(isRetryingOpeningPosition ? "正在重试…" : "重试定位") {
                 isRetryingOpeningPosition = true
                 openingPositionAttempt &+= 1
                 if readerMode == .scroll {
@@ -6390,7 +6391,7 @@ struct ReaderView: View {
             }
             .buttonStyle(.borderedProminent)
             .disabled(isRetryingOpeningPosition)
-            Button("杩斿洖") { dismiss() }.buttonStyle(.bordered)
+            Button("返回") { dismiss() }.buttonStyle(.bordered)
         }
         .padding(24)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -6516,8 +6517,8 @@ struct ReaderView: View {
         scheduleReadingPositionPersistence()
     }
 
-    /// 璇诲埌鏈珷鍊掓暟绗?3 椤垫椂灏辨妸涓嬩竴绔犳媺杩涙潵锛涚獥鍙ｅ熬閮ㄥ啀鍚戝澶氶鍙栦竴绔犮€?
-    /// 杩欐槸銆岀炕椤佃兘鏃犳劅缁笂涓嬩竴绔犮€嶇殑鍏抽敭锛氫笉鑳界瓑鐢ㄦ埛婊戝埌鏈€鍚庝竴椤垫墠鍙戣姹傘€?
+    /// 读到本章倒数第 3 页时就把下一章拉进来；窗口尾部再向外多预取一章。
+    /// 这是「翻页能无感续上下一章」的关键：不能等用户滑到最后一页才发请求。
     private func ensurePagedContinuationBuffer(pageIndex: Int) {
         guard readerMode != .scroll, pagedBlocks.indices.contains(pageIndex) else { return }
         let block = pagedBlocks[pageIndex]
@@ -6637,7 +6638,7 @@ struct ReaderView: View {
         pageLayoutTask?.cancel()
         // Never rebuild the page model while the finger owns a page turn:
         // swapping the hosting controllers mid-gesture drops a frame and can
-        // commit a stale index (the 鈥渃hapter 5 jumps back to chapter 2鈥?
+        // commit a stale index (the “chapter 5 jumps back to chapter 2”
         // report). The rebuild is re-issued by `handlePageInteraction(false)`.
         if interactionGate.isPageInteractionActive {
             interactionGate.rebuildDeferred = true
@@ -6740,8 +6741,8 @@ struct ReaderView: View {
             chapterPageCacheSignature = layoutSignature
         }
 
-        // 鍒嗛〉涓庨〉闈㈡覆鏌撳叡鐢ㄥ悓涓€浠藉嚑浣曪細ReaderPageGeometry 宸茬粡鎶婂畨鍏ㄥ尯銆侀〉鐪夊甫銆?
-        // 姝ｆ枃甯﹀拰椤佃剼甯︾畻鎴愮‘瀹氬潗鏍囷紝杩欓噷涓嶅啀閲嶅鎵?safeArea / padding銆?
+        // 分页与页面渲染共用同一份几何：ReaderPageGeometry 已经把安全区、页眉带、
+        // 正文带和页脚带算成确定坐标，这里不再重复扣 safeArea / padding。
         let (typography, titleTypography) = chapterPaginationTypography()
 
         var pages: [ReaderPageBlock] = []
@@ -7179,8 +7180,8 @@ private extension View {
     }
 }
 
-/// 鐩綍琛岀嫭绔嬫垚 Equatable 瑙嗗浘锛氭粴鍔ㄦ椂鍙湁鐪熸鍙樺寲鐨勮浼氶噸鏂版眰鍊硷紝
-/// 鑰屼笉鏄瘡涓粴鍔ㄥ抚閲嶅缓鏁存帓 HStack锛堢珷鑺傚鏃惰繖灏辨槸鎺夊抚鐨勬潵婧愶級銆?
+/// 目录行独立成 Equatable 视图：滚动时只有真正变化的行会重新求值，
+/// 而不是每个滚动帧重建整排 HStack（章节多时这就是掉帧的来源）。
 private struct TocChapterRow: View, Equatable {
     let index: Int
     let title: String
@@ -7226,7 +7227,7 @@ final class ReaderSpeechController: NSObject, ObservableObject, AVSpeechSynthesi
     private let cloudPlayer = CloudTTSPlayer()
     private let httpClient = HttpTTSClient()
     private var httpVoice: HttpTTSVoice = HttpTTSVoice.defaultVoices.first
-        ?? HttpTTSVoice(id: HttpTTSVoice.defaultVoiceID, name: "榛樿璇煶", url: "")
+        ?? HttpTTSVoice(id: HttpTTSVoice.defaultVoiceID, name: "默认语音", url: "")
     private var cloudTask: Task<Void, Never>?
     private var cloudGeneration = 0
     private var engineKind: TTSEngineKind = .local
@@ -7274,11 +7275,11 @@ final class ReaderSpeechController: NSObject, ObservableObject, AVSpeechSynthesi
         }
         var resolvedEngine = engine
         if resolvedEngine == .cloud && !cloudCredentialsStore.isConfigured {
-            lastErrorMessage = "鏈厤缃椋炰簯绔闊冲嚟鎹紝宸插洖閫€绯荤粺璇煶"
+            lastErrorMessage = "未配置讯飞云端语音凭据，已回退系统语音"
             resolvedEngine = .local
         }
         if resolvedEngine == .file && LocalVoiceLibrary.isEmpty {
-            lastErrorMessage = "杩樻病瀵煎叆鏈湴澹伴煶锛屽凡鍥為€€绯荤粺璇煶锛堣缃?鈫?璇煶鏈楄 鈫?鏈湴澹伴煶锛?
+            lastErrorMessage = "还没导入本地声音，已回退系统语音（设置 → 语音朗读 → 本地声音）"
             resolvedEngine = .local
         }
         engineKind = resolvedEngine
@@ -7434,9 +7435,9 @@ final class ReaderSpeechController: NSObject, ObservableObject, AVSpeechSynthesi
         cloudPlayer.stop()
     }
 
-    /// 鏈湴闊抽閫氶亾锛氱 N 娈电洿鎺ユ挱 `N.mp3`锛堜篃鎺ュ彈 `pN.mp3` / `N - 鏍囬.mp3`锛夈€?
-    /// 缂哄摢涓钀藉氨璺宠繃閭ｄ竴娈碉紙鍜屽浘鐗囨钀藉悓鏍峰鐞嗭級锛屼笉鍚堟垚銆佷笉鑱旂綉锛?
-    /// 鎾斁澶辫触鏃舵妸寮曟搸閫€鍥炵郴缁熻闊冲苟閲嶅康杩欎竴娈碉紝涓嶈鏁寸珷鍝戞帀銆?
+    /// 本地音频通道：第 N 段直接播 `N.mp3`（也接受 `pN.mp3` / `N - 标题.mp3`）。
+    /// 缺哪个段落就跳过那一段（和图片段落同样处理），不合成、不联网；
+    /// 播放失败时把引擎退回系统语音并重念这一段，不让整章哑掉。
     private func playLocalVoiceSegment(_ segment: (index: Int, text: String)) {
         guard let url = LocalVoiceLibrary.fileURL(forParagraph: segment.index) else {
             speakNext()
@@ -7450,7 +7451,7 @@ final class ReaderSpeechController: NSObject, ObservableObject, AVSpeechSynthesi
                 cloudPlayer.pause()
             }
         } catch {
-            lastErrorMessage = "鏈湴闊抽鎾斁澶辫触锛歕(error.localizedDescription)锛屽凡鍥為€€绯荤粺璇煶"
+            lastErrorMessage = "本地音频播放失败：\(error.localizedDescription)，已回退系统语音"
             engineKind = .local
             playSegment(segment)
         }
@@ -7458,7 +7459,7 @@ final class ReaderSpeechController: NSObject, ObservableObject, AVSpeechSynthesi
 
     private func playCloudSegment(_ segment: (index: Int, text: String)) {
         guard let credentials = cloudCredentialsStore.load(), credentials.isConfigured else {
-            lastErrorMessage = "鏈厤缃椋炰簯绔闊冲嚟鎹紝宸插洖閫€绯荤粺璇煶"
+            lastErrorMessage = "未配置讯飞云端语音凭据，已回退系统语音"
             engineKind = .local
             playSegment(segment)
             return
@@ -7544,9 +7545,9 @@ final class ReaderSpeechController: NSObject, ObservableObject, AVSpeechSynthesi
         guard generation == cloudGeneration, isSpeaking else { return }
         cloudPlayer.stop()
         let message = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
-        // 鍚屼竴濂楀洖閫€閫昏緫涔熸湇鍔?`.file` 閫氶亾锛屾枃妗堜笉鑳戒竴寰嬪啓銆屼簯绔€嶃€?
-        let label = engineKind == .file ? "鏈湴闊抽涓嶅彲鐢? : "浜戠璇煶涓嶅彲鐢?
-        lastErrorMessage = "\(label)锛屽凡鍥為€€绯荤粺璇煶锛歕(message)"
+        // 同一套回退逻辑也服务 `.file` 通道，文案不能一律写「云端」。
+        let label = engineKind == .file ? "本地音频不可用" : "云端语音不可用"
+        lastErrorMessage = "\(label)，已回退系统语音：\(message)"
         engineKind = .local
         if let segment = activeSegment {
             playSegment(segment)
@@ -7557,9 +7558,9 @@ final class ReaderSpeechController: NSObject, ObservableObject, AVSpeechSynthesi
 
     private func updateNowPlayingInfo() {
         var info = [String: Any]()
-        info[MPMediaItemPropertyTitle] = currentTitle.isEmpty ? "姝ｆ枃鏈楄" : currentTitle
-        info[MPMediaItemPropertyArtist] = "绾搁棿璇煶鏈楄"
-        info[MPMediaItemPropertyAlbumTitle] = "绾搁棿 (SourceRead)"
+        info[MPMediaItemPropertyTitle] = currentTitle.isEmpty ? "正文朗读" : currentTitle
+        info[MPMediaItemPropertyArtist] = "纸间语音朗读"
+        info[MPMediaItemPropertyAlbumTitle] = "纸间 (SourceRead)"
         info[MPNowPlayingInfoPropertyPlaybackRate] = isPaused ? 0.0 : (isSpeaking ? 1.0 : 0.0)
         let total = queue.totalSegments
         let current = queue.currentSegmentPosition
@@ -7697,10 +7698,10 @@ final class ReaderSpeechController: NSObject, ObservableObject, AVSpeechSynthesi
     }
 }
 
-/// 婊氬姩妯″紡娈佃惤鏁扮粍鐨勬寚绾圭紦瀛樸€?
-/// `ReaderView.body` 鍦ㄦ粴鍔ㄦ湡闂翠細琚弽澶嶆眰鍊硷紙鍙娈佃惤鍥炶皟銆佽繘搴﹁惤鍦般€侀〉鑴氬埛鏂帮級锛?
-/// 姣忔閮芥妸绐楀彛鍐呭叏閮ㄦ钀芥嫾鎴愭柊鏁扮粍鏄ǔ瀹氱殑娴垂锛涜繖閲屾寜銆屼功 + 鍐呭鎸囩汗銆嶅彧鐣欎竴浠姐€?
-/// 鍗曚緥鍙湪涓荤嚎绋嬭闂紙SwiftUI body 涓?Coordinator 鍥炶皟閮藉湪涓荤嚎绋嬶級銆?
+/// 滚动模式段落数组的指纹缓存。
+/// `ReaderView.body` 在滚动期间会被反复求值（可见段落回调、进度落地、页脚刷新），
+/// 每次都把窗口内全部段落拼成新数组是稳定的浪费；这里按「书 + 内容指纹」只留一份。
+/// 单例只在主线程访问（SwiftUI body 与 Coordinator 回调都在主线程）。
 private final class ReaderScrollParagraphCache {
     static let shared = ReaderScrollParagraphCache()
     private var key = ""
@@ -7786,11 +7787,11 @@ private struct IllustrationZoomViewer: View {
                     }
                 }
             }
-            .navigationTitle("鎻掑浘鏌ョ湅")
+            .navigationTitle("插图查看")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("鍏抽棴") { dismiss() }
+                    Button("关闭") { dismiss() }
                         .foregroundStyle(.white)
                 }
                 ToolbarItem(placement: .primaryAction) {
@@ -7859,7 +7860,7 @@ struct ReaderIllustrationView: View {
                             Image(systemName: "photo")
                                 .font(.title2)
                                 .foregroundStyle(textColor.opacity(0.4))
-                            Text("鍔犺浇鎻掑浘涓?..")
+                            Text("加载插图中...")
                                 .font(.caption)
                                 .foregroundStyle(textColor.opacity(0.4))
                         }
@@ -7878,7 +7879,7 @@ struct ReaderIllustrationView: View {
             HStack(spacing: 4) {
                 Image(systemName: "arrow.up.left.and.arrow.down.right")
                     .font(.system(size: 10))
-                Text("鐐瑰嚮鏌ョ湅鎻掑浘澶у浘")
+                Text("点击查看插图大图")
                     .font(.system(size: 11))
             }
             .foregroundStyle(textColor.opacity(0.45))
@@ -7890,7 +7891,7 @@ struct ReaderIllustrationView: View {
 
 /// Locks `UINavigationController`'s interactive pop gestures while the reader
 /// is on screen so horizontal page swipes in `.pageTurn`, `.cover`, and
-/// `.pageCurl` never pop the reader back to the root TabView ("涔︽灦/鍙戠幇/璁剧疆").
+/// `.pageCurl` never pop the reader back to the root TabView ("书架/发现/设置").
 private struct ReaderNavigationPopLock: UIViewControllerRepresentable {
     let allowSystemReturn: Bool
 
