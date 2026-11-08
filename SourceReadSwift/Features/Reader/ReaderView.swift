@@ -1118,6 +1118,7 @@ struct ReaderView: View {
         }
         .background(ReaderNavigationPopLock(allowSystemReturn: allowsNativeBookReturn))
         .background(ReaderTabChromeExitBridge(owner: tabChromeOwner))
+        .background(ReaderRefreshRateKeeperView())
         .background(ReaderExitSwipeBridge(
             enabled: ReaderExitSwipePolicy.isProseFallbackEnabled(
                 reducesMotion: motion.reducesMotion, allowsBookReturn: allowsNativeBookReturn
