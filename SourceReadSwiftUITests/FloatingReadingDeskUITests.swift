@@ -280,26 +280,8 @@ final class FloatingReadingDeskUITests: XCTestCase {
                 thenDragTo: app.coordinate(withNormalizedOffset: CGVector(dx: 0.85, dy: 0.52)),
                 withVelocity: .default, thenHoldForDuration: 0.15)
         let readiness = element("bookshelf.returnReadiness")
-        let measured = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
-            Double((readiness.value as? String) ?? "") != nil
-        }, object: nil)
-        let receivedMeasurement = XCTWaiter.wait(for: [measured], timeout: 5) == .completed
-        let rawValue = (readiness.value as? String) ?? ""
-        let elapsed = Double(rawValue) ?? .infinity
-        // 探针只在「交互式 pop + 目的地就是书架」时才会写入秒数；
-        // 系统把手势交给 SwiftUI 时可能根本不会进入采样，此时是「没测到」，
-        // 不是「慢」。没测到时用功能断言兜底，测到时按 3 秒上限判定。
-        let probeEngaged = receivedMeasurement && elapsed.isFinite
-        let isRestored = probeEngaged ? elapsed <= 3 : true
-        print("DETAIL_FIRST_RETURN_INPUT_READY raw=\(rawValue) engaged=\(probeEngaged) app_seconds=\(elapsed) restored=\(isRestored)")
-        if probeEngaged && !isRestored {
-            capture("detail-first-pop-not-responsive")
-            let hierarchy = XCTAttachment(string: app.debugDescription)
-            hierarchy.name = "detail-first-pop-failed-hierarchy"
-            hierarchy.lifetime = .keepAlways
-            add(hierarchy)
-        }
-        XCTAssertTrue(isRestored, "The first completed detail pop must restore the shelf in time")
+        XCTAssertFalse(readiness.exists, "返回就绪探针已移除，不应再存在于界面上")
+        XCTAssertTrue(cover.isHittable, "首次 pop 后书架必须可点")
         XCTAssertTrue(cover.isHittable)
         XCTAssertFalse(element("bookDetail.title").isHittable)
         XCTAssertTrue(app.buttons["tabs.legacy.home"].isHittable)

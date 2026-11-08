@@ -148,9 +148,6 @@ struct BookshelfView: View {
             .onChange(of: selectedMediaFilter) { _ in clearReturnOrder() }
             .onChange(of: themeRaw) { _ in usesThemeShelfLayout = true }
             .background(bookshelfBackdrop)
-            #if DEBUG
-            .background(HomeReturnReadinessProbe())
-            #endif
             .onChange(of: floatingReadingDeskEnabled) { isEnabled in
                 if !isEnabled { readingCoverHandoff.clear() }
             }
