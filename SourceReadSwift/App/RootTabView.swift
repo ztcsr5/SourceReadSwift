@@ -18,6 +18,8 @@ struct RootTabView: View {
     @State private var shouldFocusRequestedSearch = true
     @State private var showFullAudioPlayer = false
     @State private var showsGlobalSearch = false
+    /// 从搜索页关闭时回到的那个 tab。
+    @State private var lastNonSearchTab = 0
     @ObservedObject private var verificationCoordinator = VerificationCodeCoordinator.shared
 
     var body: some View {
@@ -40,7 +42,10 @@ struct RootTabView: View {
         .font(.system(.body, design: AppVisualTheme.current.fontDesign))
         .tint(AppTheme.accent)
         .onReceive(audioCoordinator.$currentBook.map { $0 != nil }.removeDuplicates()) { hasAudio = $0 }
-        .onChange(of: selectedTab) { _ in dismissKeyboard() }
+        .onChange(of: selectedTab) { newValue in
+            if newValue != 3 { lastNonSearchTab = newValue }
+            dismissKeyboard()
+        }
         .sheet(isPresented: $showFullAudioPlayer) { AudioBookPlayerView() }
         .sheet(isPresented: $showsGlobalSearch) {
             GlobalSearchView(bookshelf: appState.bookshelfStore, sources: appState.sourceStore) { keyword in
@@ -93,13 +98,19 @@ struct RootTabView: View {
                 SettingsView()
             }
             Tab("全网搜书", systemImage: "magnifyingglass", value: 3, role: .search) {
-                GlobalSearchView(bookshelf: appState.bookshelfStore, sources: appState.sourceStore) { keyword in
-                    appState.discoverViewModel.keyword = keyword
-                    appState.discoverViewModel.startSearch()
-                    shouldFocusRequestedSearch = false
-                    legacySearchRequest = UUID()
-                    selectedTab = 1
-                }
+                GlobalSearchView(
+                    bookshelf: appState.bookshelfStore,
+                    sources: appState.sourceStore,
+                    onSearchOnline: { keyword in
+                        appState.discoverViewModel.keyword = keyword
+                        appState.discoverViewModel.startSearch()
+                        shouldFocusRequestedSearch = false
+                        legacySearchRequest = UUID()
+                        selectedTab = 1
+                    },
+                    autoFocus: false,
+                    onClose: { selectedTab = lastNonSearchTab }
+                )
             }
         }
     }

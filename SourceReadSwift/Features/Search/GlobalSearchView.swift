@@ -6,6 +6,10 @@ struct GlobalSearchView: View {
     @ObservedObject var bookshelf: BookshelfStore
     @ObservedObject var sources: SourceStore
     let onSearchOnline: (String) -> Void
+    /// 作为 tab 呈现时不要抢焦点，避免一进来就弹键盘。
+    var autoFocus: Bool = true
+    /// 作为 tab 呈现时没有可 dismiss 的容器，交给调用方切回上一个 tab。
+    var onClose: (() -> Void)? = nil
     @Environment(\.dismiss) private var dismiss
     @FocusState private var isFocused: Bool
     @State private var query = ""
@@ -67,10 +71,19 @@ struct GlobalSearchView: View {
                     }
                 }
             }
+            .scrollDismissesKeyboard(.interactively)
+            // 点列表空白处收起键盘；同时不拦截行点击。
+            .simultaneousGesture(TapGesture().onEnded { if isFocused { isFocused = false } })
             .navigationTitle("全局搜索")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) { Button("关闭") { dismiss() } }
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("关闭") {
+                        isFocused = false
+                        if let onClose { onClose() } else { dismiss() }
+                    }
+                    .accessibilityIdentifier("globalSearch.close")
+                }
             }
             .navigationDestination(isPresented: Binding(
                 get: { selectedEntry != nil },
@@ -78,7 +91,7 @@ struct GlobalSearchView: View {
             )) {
                 if let selectedEntry { destination(selectedEntry) }
             }
-            .task { isFocused = true }
+            .task { if autoFocus { isFocused = true } }
             .onReceive(bookshelf.$books.dropFirst()) { _ in catalogRevision &+= 1 }
             .onReceive(sources.$sources.dropFirst()) { _ in catalogRevision &+= 1 }
             .task(id: catalogRevision) {
