@@ -58,6 +58,13 @@ struct AppFrameHistogram: Equatable {
 final class AppFrameProfiler: ObservableObject {
     static let shared = AppFrameProfiler()
     @Published private(set) var isRecording = false
+    /// 采样期间的实时读数，4 Hz 更新；不参与任何布局计算。
+    @Published private(set) var liveHertz: Double = 0
+    @Published private(set) var liveP99Milliseconds: Double = 0
+    @Published private(set) var screenMaximumHertz: Int = 60
+    private var liveWindowStart: CFTimeInterval = 0
+    private var liveWindowFrames = 0
+    private var liveWindowDeltas: [Double] = []
     @Published private(set) var report = "暂无全局采样。开始后切换到需要测试的页面操作 30 秒。"
     private var link: CADisplayLink?
     private var histogram = AppFrameHistogram()
@@ -94,6 +101,12 @@ final class AppFrameProfiler: ObservableObject {
         displayLink.add(to: .main, forMode: .common)
         link = displayLink
         isRecording = true
+        screenMaximumHertz = maximum
+        liveHertz = 0
+        liveP99Milliseconds = 0
+        liveWindowStart = CACurrentMediaTime()
+        liveWindowFrames = 0
+        liveWindowDeltas.removeAll(keepingCapacity: true)
         ReaderScrollPerfMeter.reset()
         ReaderScrollPerfMeter.isRecording = true
         deadlineTask = Task { @MainActor [weak self] in
@@ -126,6 +139,22 @@ final class AppFrameProfiler: ObservableObject {
         if let sample = cadence.sample(timestamp: link.timestamp,
                                        scheduledSeconds: link.targetTimestamp - link.timestamp) {
             histogram.record(seconds: sample.elapsed, scheduledSeconds: sample.scheduled)
+            liveWindowFrames += 1
+            liveWindowDeltas.append(sample.elapsed)
+            if liveWindowDeltas.count > 48 { liveWindowDeltas.removeFirst(liveWindowDeltas.count - 48) }
+            let now = CACurrentMediaTime()
+            if now - liveWindowStart >= 0.25 {
+                let elapsed = now - liveWindowStart
+                liveHertz = elapsed > 0 ? Double(liveWindowFrames) / elapsed : 0
+                let sorted = liveWindowDeltas.sorted()
+                if !sorted.isEmpty {
+                    let rank = min(sorted.count - 1,
+                                   max(0, Int((Double(sorted.count) * 0.99).rounded(.up)) - 1))
+                    liveP99Milliseconds = sorted[rank] * 1000
+                }
+                liveWindowStart = now
+                liveWindowFrames = 0
+            }
         }
         if CACurrentMediaTime() >= deadline { stop() }
     }

@@ -1128,6 +1128,7 @@ struct ReaderView: View {
             ),
             onExit: requestReaderExit, prefersSystemReturn: readerUsesBookReturn
         ))
+        .overlay(alignment: .topLeading) { ReaderFrameHUD() }
         .navigationBarBackButtonHidden(!allowsNativeBookReturn)
         .toolbar(.hidden, for: .navigationBar, .tabBar)
         .statusBarHidden(!showOverlay && !showSystemStatusBar)
