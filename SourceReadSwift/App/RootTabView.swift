@@ -115,7 +115,32 @@ struct RootTabView: View {
                 )
             }
         }
+        // 选中搜索时把系统栏收起来，只留一个「回到上次页面」的控件：
+        // 系统不会自己做这件事，必须显式隐藏 tabBar 并提供返回入口。
+        .toolbar(isSearching ? .hidden : .visible, for: .tabBar)
+        .overlay(alignment: .bottomLeading) {
+            if isSearching {
+                Button {
+                    selectedTab = lastNonSearchTab
+                } label: {
+                    Image(systemName: "chevron.backward")
+                        .font(.system(size: 17, weight: .semibold))
+                        .foregroundStyle(.primary)
+                        .frame(width: 46, height: 46)
+                        .background(.ultraThinMaterial, in: Circle())
+                        .overlay(Circle().strokeBorder(Color.primary.opacity(0.08), lineWidth: 0.6))
+                        .shadow(color: .black.opacity(0.12), radius: 8, y: 3)
+                }
+                .buttonStyle(.plain)
+                .padding(.leading, 16)
+                .padding(.bottom, 12)
+                .accessibilityIdentifier("search.collapsedReturn")
+                .accessibilityLabel("返回上一页")
+            }
+        }
     }
+
+    private var isSearching: Bool { selectedTab == 3 }
 
     private var legacyNavigationContent: some View {
         // Retain each navigation stack while the custom bar changes selection.
