@@ -4,11 +4,13 @@ import XCTest
 
 final class Release117AppearanceTests: XCTestCase {
     func testThemesWithoutOrnamentsDoNotCreateEmptyCanvasLayers() {
+        // atelier 七组主题已按设计不再绘制装饰层（装饰只保留给 folio / blueprint / inkwash），
+        // 这里断言「没有装饰的主题不得创建空的 Canvas 图层」。
         for theme in AppVisualTheme.allCases {
             XCTAssertEqual(AppThemeOrnament.hasArtwork(theme: theme, isCard: true),
-                           [.folio, .blueprint, .berryLake, .blushInk, .periwinkleCocoa, .peachMoss, .inkViolet, .pineMist, .kleinSage].contains(theme), theme.rawValue)
+                           [.folio, .blueprint].contains(theme), theme.rawValue)
             XCTAssertEqual(AppThemeOrnament.hasArtwork(theme: theme, isCard: false),
-                           [.folio, .blueprint, .inkwash, .berryLake, .blushInk, .periwinkleCocoa, .inkViolet, .pineMist, .kleinSage].contains(theme), theme.rawValue)
+                           [.folio, .blueprint, .inkwash].contains(theme), theme.rawValue)
         }
     }
 
