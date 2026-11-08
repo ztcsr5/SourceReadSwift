@@ -780,6 +780,9 @@ enum WebReaderHTML {
         order: [],
         nodes: [],
         flatIndex: Object.create(null),
+        metricsDirty: true,
+        metricTops: [],
+        metricHeights: [],
         visible: -1,
         highlightEl: null,
         lastScrollAt: 0,
@@ -914,6 +917,7 @@ enum WebReaderHTML {
           }
         }
         refreshMetrics();
+        invalidateMetrics();
         restoreAnchor(anchor);
       }
 
@@ -1184,6 +1188,7 @@ enum WebReaderHTML {
           if (!isNaN(flat) && index[flat] === undefined) { index[flat] = node; }
         }
         state.flatIndex = index;
+        invalidateMetrics();
       }
 
       function nodeMetric(element) {
@@ -1202,13 +1207,14 @@ enum WebReaderHTML {
       function metricAt(y) {
         var list = state.nodes;
         if (!list.length) { return null; }
+        ensureMetrics();
+        var tops = state.metricTops;
         var low = 0;
         var high = list.length - 1;
         var found = -1;
         while (low <= high) {
           var middle = (low + high) >> 1;
-          var top = list[middle].getBoundingClientRect().top + window.scrollY;
-          if (top <= y) { found = middle; low = middle + 1; }
+          if (tops[middle] <= y) { found = middle; low = middle + 1; }
           else { high = middle - 1; }
         }
         var picked = found < 0 ? list[0] : list[found];
@@ -1216,10 +1222,32 @@ enum WebReaderHTML {
         // paragraph after its bottom left the viewport advertises a chapter
         // whose prose is entirely offscreen, especially during reverse scroll.
         if (found >= 0 && found + 1 < list.length &&
-            picked.getBoundingClientRect().bottom + window.scrollY <= y) {
+            state.metricTops[found] + state.metricHeights[found] <= y) {
           picked = list[found + 1];
         }
         return nodeMetric(picked);
+      }
+
+      // 滚动中每帧只做一次批量读布局，而不是二分查找里逐次
+      // getBoundingClientRect（每次都是强制同步布局，直接吃掉帧预算）。
+      function invalidateMetrics() {
+        state.metricsDirty = true;
+      }
+
+      function ensureMetrics() {
+        if (!state.metricsDirty && state.metricTops.length === state.nodes.length) { return; }
+        var count = state.nodes.length;
+        var tops = new Array(count);
+        var heights = new Array(count);
+        var scrollY = window.scrollY;
+        for (var index = 0; index < count; index += 1) {
+          var rect = state.nodes[index].getBoundingClientRect();
+          tops[index] = rect.top + scrollY;
+          heights[index] = Math.max(rect.height, 1);
+        }
+        state.metricTops = tops;
+        state.metricHeights = heights;
+        state.metricsDirty = false;
       }
 
       function captureAnchor() {
