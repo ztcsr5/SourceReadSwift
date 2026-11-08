@@ -31,7 +31,7 @@ struct RootTabView: View {
             if !appState.isTabChromeHidden {
                 VStack(spacing: 8) {
                     if hasAudio { miniAudioPlayerBar }
-                    customTabBar
+                    if !usesNativeTabs { customTabBar }
                 }
                 .animation(motion.animation(.navigation), value: appState.isTabChromeHidden)
             }
@@ -58,8 +58,46 @@ struct RootTabView: View {
         }
     }
 
+    /// iOS 26 起交还系统 TabView：只有系统栏带真正的 Liquid Glass、点击动效与滚动边缘效果。
+    /// 26 以下继续用自绘栏，避免出现无玻璃的纯色条。
+    private var usesNativeTabs: Bool {
+        #if compiler(>=6.2)
+        if #available(iOS 26.0, *) { return true }
+        #endif
+        return false
+    }
+
     @ViewBuilder private var navigationContent: some View {
-        legacyNavigationContent
+        if usesNativeTabs {
+            nativeTabContent
+        } else {
+            legacyNavigationContent
+        }
+    }
+
+    /// 原生路径：搜索独立成页，玻璃与动效由系统渲染。
+    private var nativeTabContent: some View {
+        TabView(selection: $selectedTab) {
+            BookshelfView(onRequestGlobalSearch: { selectedTab = 3 })
+                .tabItem { Label("主页", systemImage: "house") }
+                .tag(0)
+            DiscoverView(viewModel: appState.discoverViewModel, searchRequestID: legacySearchRequest,
+                         shouldFocusRequestedSearch: shouldFocusRequestedSearch)
+                .tabItem { Label(AppNavigationLabels.findBooks, systemImage: AppNavigationLabels.findBooksSymbol) }
+                .tag(1)
+            SettingsView()
+                .tabItem { Label("设置", systemImage: "gearshape") }
+                .tag(2)
+            GlobalSearchView(bookshelf: appState.bookshelfStore, sources: appState.sourceStore) { keyword in
+                appState.discoverViewModel.keyword = keyword
+                appState.discoverViewModel.startSearch()
+                shouldFocusRequestedSearch = false
+                legacySearchRequest = UUID()
+                selectedTab = 1
+            }
+            .tabItem { Label("全网搜书", systemImage: "magnifyingglass") }
+            .tag(3)
+        }
     }
 
     private var legacyNavigationContent: some View {
