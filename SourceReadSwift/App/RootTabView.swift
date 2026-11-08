@@ -68,35 +68,38 @@ struct RootTabView: View {
     }
 
     @ViewBuilder private var navigationContent: some View {
-        if usesNativeTabs {
+        if #available(iOS 26.0, *) {
             nativeTabContent
         } else {
             legacyNavigationContent
         }
     }
 
-    /// 原生路径：搜索独立成页，玻璃与动效由系统渲染。
+    /// 原生路径：三个常规 tab + 末尾的 .search 角色 tab。
+    /// .search 角色由系统渲染成导航栏最右端的独立搜索按钮（Liquid Glass 自带玻璃与动效）。
+    @available(iOS 18.0, *)
     private var nativeTabContent: some View {
         TabView(selection: $selectedTab) {
-            BookshelfView(onRequestGlobalSearch: { selectedTab = 3 })
-                .tabItem { Label("主页", systemImage: "house") }
-                .tag(0)
-            DiscoverView(viewModel: appState.discoverViewModel, searchRequestID: legacySearchRequest,
-                         shouldFocusRequestedSearch: shouldFocusRequestedSearch)
-                .tabItem { Label(AppNavigationLabels.findBooks, systemImage: AppNavigationLabels.findBooksSymbol) }
-                .tag(1)
-            SettingsView()
-                .tabItem { Label("设置", systemImage: "gearshape") }
-                .tag(2)
-            GlobalSearchView(bookshelf: appState.bookshelfStore, sources: appState.sourceStore) { keyword in
-                appState.discoverViewModel.keyword = keyword
-                appState.discoverViewModel.startSearch()
-                shouldFocusRequestedSearch = false
-                legacySearchRequest = UUID()
-                selectedTab = 1
+            Tab("主页", systemImage: "house", value: 0) {
+                BookshelfView(onRequestGlobalSearch: { selectedTab = 3 })
             }
-            .tabItem { Label("全网搜书", systemImage: "magnifyingglass") }
-            .tag(3)
+            Tab(AppNavigationLabels.findBooks,
+                systemImage: AppNavigationLabels.findBooksSymbol, value: 1) {
+                DiscoverView(viewModel: appState.discoverViewModel, searchRequestID: legacySearchRequest,
+                             shouldFocusRequestedSearch: shouldFocusRequestedSearch)
+            }
+            Tab("设置", systemImage: "gearshape", value: 2) {
+                SettingsView()
+            }
+            Tab("全网搜书", systemImage: "magnifyingglass", value: 3, role: .search) {
+                GlobalSearchView(bookshelf: appState.bookshelfStore, sources: appState.sourceStore) { keyword in
+                    appState.discoverViewModel.keyword = keyword
+                    appState.discoverViewModel.startSearch()
+                    shouldFocusRequestedSearch = false
+                    legacySearchRequest = UUID()
+                    selectedTab = 1
+                }
+            }
         }
     }
 
