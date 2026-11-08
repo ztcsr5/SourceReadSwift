@@ -7,9 +7,9 @@ import XCTest
 final class Release116VisualTests: XCTestCase {
     func testThemesChangeGeometryTypographyAndSurfaceNotOnlyAccent() {
         XCTAssertEqual(AppVisualTheme.allCases.map(\.rawValue),
-            ["forest", "classic", "botanical", "editorial", "coast", "rose", "graphite", "folio", "inkwash", "blueprint"])
-        XCTAssertEqual(Set(AppVisualTheme.allCases.map(\.radius)).count, 9)
-        XCTAssertEqual(Set(AppVisualTheme.allCases.map(\.backgroundHex)).count, 10)
+            ["forest", "classic", "botanical", "editorial", "coast", "rose", "graphite", "folio", "inkwash", "blueprint", "berryLake", "blushInk", "periwinkleCocoa", "peachMoss", "inkViolet", "pineMist", "kleinSage"])
+        XCTAssertEqual(Set(AppVisualTheme.allCases.map(\.radius)).count, 10)
+        XCTAssertEqual(Set(AppVisualTheme.allCases.map(\.backgroundHex)).count, 17)
         XCTAssertEqual(AppVisualTheme.classic.preferenceKey("accent"), "settings.accentHex")
         XCTAssertNotEqual(AppVisualTheme.coast.preferenceKey("accent"), AppVisualTheme.rose.preferenceKey("accent"))
         XCTAssertEqual(AppVisualTheme.editorial.borderWidth, 1)
@@ -95,6 +95,29 @@ final class Release116VisualTests: XCTestCase {
             if background == "bamboo" { _ = await ReaderIllustratedBackgroundStore.load("ReadingBamboo") }
             try await snapshot("reader-top-\(background)", width: 390, height: 844) {
                 ReaderView(bookID: "", content: content, chapterIndex: 0, totalChapters: 1, initialOverlayVisible: true).environmentObject(app)
+            }
+        }
+    }
+
+    @MainActor func testReaderWorkbenchRemainsReadableOnNarrowAndLargeTextScreens() async throws {
+        let defaults = UserDefaults.standard
+        let motionKey = "settings.reducesMotion"
+        let previousMotion = defaults.object(forKey: motionKey)
+        defaults.set(true, forKey: motionKey)
+        defer {
+            if let previousMotion { defaults.set(previousMotion, forKey: motionKey) }
+            else { defaults.removeObject(forKey: motionKey) }
+        }
+        for width: CGFloat in [320, 390] {
+            for background in [ReaderBackground.white, .dark] {
+                try await snapshot("workbench-\(Int(width))-\(background.rawValue)-large-text", width: width,
+                                   height: 844, style: background.isDark ? .dark : .light) {
+                    ReaderSettingsWorkbench(context: .init(bookTitle: "长篇阅读与漫画设置", background: background,
+                        bottomInset: 34), preview: { AnyView(Text("第一章 · 阅读预览")) },
+                        page: { route in AnyView(Text(route.title)) }, actions: .init(close: {}))
+                        .environment(\.dynamicTypeSize, .accessibility3)
+                        .background(background.color(isNight: background.isDark))
+                }
             }
         }
     }

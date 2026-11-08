@@ -30,8 +30,8 @@ targets:
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.edc21.SourceReadSwift
-        MARKETING_VERSION: "1.1.7"
-        CURRENT_PROJECT_VERSION: "137"
+        MARKETING_VERSION: "1.1.8"
+        CURRENT_PROJECT_VERSION: "138"
         INFOPLIST_FILE: SourceReadSwift/App/Info.plist
         CODE_SIGN_ENTITLEMENTS: SourceReadSwift/SourceReadSwift.entitlements
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
@@ -64,7 +64,7 @@ targets:
           - ZhiMangXing-Regular.ttf
           - ReadingDeskSong-Regular.ttf
         CFBundleDocumentTypes:
-          - CFBundleTypeName: Readable text, EPUB and source JSON
+          - CFBundleTypeName: Readable text, EPUB, CBZ and source JSON
             CFBundleTypeRole: Viewer
             LSHandlerRank: Alternate
             LSItemContentTypes:
@@ -76,7 +76,17 @@ targets:
               - public.content
               - com.edc21.sourceread.source-json
               - org.idpf.epub-container
+              - com.edc21.sourceread.cbz
         UTImportedTypeDeclarations:
+          - UTTypeIdentifier: com.edc21.sourceread.cbz
+            UTTypeDescription: Comic book ZIP archive
+            UTTypeConformsTo:
+              - public.zip-archive
+            UTTypeTagSpecification:
+              public.filename-extension:
+                - cbz
+              public.mime-type:
+                - application/vnd.comicbook+zip
           - UTTypeIdentifier: com.edc21.sourceread.source-json
             UTTypeDescription: SourceRead book source JSON or plain text
             UTTypeConformsTo:

@@ -3,6 +3,60 @@ import XCTest
 @testable import SourceReadSwift
 
 final class SourcePipelineTests: XCTestCase {
+    func testCancelledPipelineDoesNotStartOrReportANetworkTimeout() async {
+        let calls = PipelineSearchCalls()
+        let engine = PipelineStubEngine(search: .failure(.network("503")), detail: nil, toc: nil, content: nil,
+            onSearch: { calls.record() })
+        let source = fixtureSource()
+        let task = Task {
+            withUnsafeCurrentTask { $0?.cancel() }
+            return await engine.runPipelineReport(source: source, keyword: "book", timeout: 1)
+        }
+        let execution = await task.value
+        XCTAssertEqual(calls.count, 0)
+        XCTAssertEqual(execution.error, .network("书源检测已取消"))
+    }
+
+    func testCancellationDuringRetryDelayDoesNotRunAnotherSearch() async {
+        let entered = expectation(description: "first search returns a transient failure")
+        let calls = PipelineSearchCalls()
+        let engine = PipelineStubEngine(search: .failure(.network("503")), detail: nil, toc: nil, content: nil,
+            onSearch: { if calls.record() == 1 { entered.fulfill() } })
+        let source = fixtureSource()
+        let task = Task { await engine.runPipelineReport(source: source, keyword: "book", timeout: 1) }
+        await fulfillment(of: [entered], timeout: 2)
+        task.cancel()
+        let execution = await task.value
+        XCTAssertEqual(calls.count, 1)
+        XCTAssertEqual(execution.error, .network("书源检测已取消"))
+    }
+
+    func testZeroStageTimeoutIsRejectedWithoutStartingSearch() async {
+        let calls = PipelineSearchCalls()
+        let engine = PipelineStubEngine(search: .success([]), detail: nil, toc: nil, content: nil,
+            onSearch: { calls.record() })
+        let execution = await engine.runPipelineReport(source: fixtureSource(), keyword: "book", timeout: 0)
+        guard case .invalidSource? = execution.error else {
+            return XCTFail("Expected invalid timeout, got \(String(describing: execution.error))")
+        }
+        XCTAssertEqual(calls.count, 0)
+        XCTAssertTrue(execution.result.steps.isEmpty)
+    }
+
+    func testInvalidTimeoutBoundsNeverStartWorkOrTrapDuringConversion() async {
+        let calls = PipelineSearchCalls()
+        let engine = PipelineStubEngine(search: .success([]), detail: nil, toc: nil, content: nil,
+            onSearch: { calls.record() })
+        for timeout: TimeInterval in [-1, .nan, .infinity, -.infinity, .greatestFiniteMagnitude] {
+            let execution = await engine.runPipelineReport(source: fixtureSource(), keyword: "book", timeout: timeout)
+            guard case .invalidSource? = execution.error else {
+                return XCTFail("Expected invalid timeout, got \(String(describing: execution.error))")
+            }
+            XCTAssertTrue(execution.result.steps.isEmpty)
+        }
+        XCTAssertEqual(calls.count, 0)
+    }
+
     func testPipelineRunsAllFourStagesAndBuildsReport() async throws {
         let source = fixtureSource()
         let searchBook = SearchBook(
@@ -167,22 +221,26 @@ private struct PipelineStubEngine: SourceEngine {
     let toc: Result<[BookChapter], SourceEngineError>?
     let content: Result<ChapterContent, SourceEngineError>?
     let searchDelayNanoseconds: UInt64
+    let onSearch: (@Sendable () -> Void)?
 
     init(
         search: Result<[SearchBook], SourceEngineError>,
         detail: Result<BookDetail, SourceEngineError>?,
         toc: Result<[BookChapter], SourceEngineError>?,
         content: Result<ChapterContent, SourceEngineError>?,
-        searchDelayNanoseconds: UInt64 = 0
+        searchDelayNanoseconds: UInt64 = 0,
+        onSearch: (@Sendable () -> Void)? = nil
     ) {
         self.search = search
         self.detail = detail
         self.toc = toc
         self.content = content
         self.searchDelayNanoseconds = searchDelayNanoseconds
+        self.onSearch = onSearch
     }
 
     func searchBooks(source: BookSource, keyword: String, page: Int) async -> Result<[SearchBook], SourceEngineError> {
+        onSearch?()
         if searchDelayNanoseconds > 0 {
             try? await Task.sleep(nanoseconds: searchDelayNanoseconds)
         }
@@ -203,6 +261,19 @@ private struct PipelineStubEngine: SourceEngine {
 
     func verifyLogin(source: BookSource) async -> Result<SourceLoginVerification, SourceEngineError> {
         .success(SourceLoginVerification(status: .notConfigured, message: "fixture", cookiePresent: false))
+    }
+}
+
+private final class PipelineSearchCalls: @unchecked Sendable {
+    private let lock = NSLock()
+    private var calls = 0
+
+    var count: Int { lock.lock(); defer { lock.unlock() }; return calls }
+
+    @discardableResult func record() -> Int {
+        lock.lock(); defer { lock.unlock() }
+        calls += 1
+        return calls
     }
 }
 

@@ -2,6 +2,14 @@ import XCTest
 @testable import SourceReadSwift
 
 final class Release117PurificationTests: XCTestCase {
+    func testWatermarkPresetPreservesProseStartingWithASiteName() throws {
+        let preset = try XCTUnwrap(PurifyRulePreset.builtIn.first { $0.id == "anti-scraping" })
+        let original = "飘天文学是他口中提到的网站。\n最新网址写在纸上，他却没有打开。\n正常故事继续。"
+        XCTAssertEqual(PurifyRuleEvaluator.apply(rules: preset.patterns, to: original), original)
+        let advertisement = "正文\n飘天文学网首发：https://example.invalid\n最新网址：https://example.invalid\n结尾"
+        XCTAssertEqual(PurifyRuleEvaluator.apply(rules: preset.patterns, to: advertisement), "正文\n结尾")
+    }
+
     private let added = Set(["navigation-lines", "page-markers", "site-link-prompts", "control-residue"])
     private var rules: [String] { PurifyRulePreset.builtIn.filter { added.contains($0.id) }.flatMap(\.patterns) }
 

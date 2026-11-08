@@ -32,6 +32,9 @@ struct StoredCookieRecord: Codable, Equatable {
         if isSecure {
             properties[.secure] = "TRUE"
         }
+        if isHTTPOnly {
+            properties[HTTPCookiePropertyKey("HttpOnly")] = "TRUE"
+        }
         return HTTPCookie(properties: properties)
     }
 }
@@ -60,11 +63,12 @@ actor SourceCookieStore {
         // and any other subdomain. Login usually happens on one host while
         // search/toc/content live on another, so an exact-host lookup silently
         // dropped the session and every authenticated request returned 401.
+        let isHTTPS = url.scheme?.lowercased() == "https"
         var result: [HTTPCookie] = []
         var seen = Set<String>()
         var candidate = host
         while true {
-            for cookie in cookiesByHost[candidate] ?? [] where cookieMatches(cookie, host: host, path: url.path) {
+            for cookie in cookiesByHost[candidate] ?? [] where (!cookie.isSecure || isHTTPS) && cookieMatches(cookie, host: host, path: url.path) {
                 let key = "\(cookie.name)|\(cookie.domain)|\(cookie.path)"
                 if seen.insert(key).inserted {
                     result.append(cookie)

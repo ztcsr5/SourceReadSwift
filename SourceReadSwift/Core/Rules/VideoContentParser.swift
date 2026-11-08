@@ -6,11 +6,14 @@ enum VideoContentParser {
         let text = content.text.trimmingCharacters(in: .whitespacesAndNewlines)
         let base = chapterURL ?? content.chapter.url
         if let data = text.data(using: .utf8),
-           let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-           let raw = (json["url"] ?? json["playUrl"] ?? json["video"]) as? String,
-           let url = MediaURLResolver.resolve(raw, base: base) { return url }
+           let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+            for key in ["url", "playUrl", "video"] {
+                if let raw = json[key] as? String,
+                   let url = MediaURLResolver.resolve(raw, base: base) { return url }
+            }
+        }
         if text.contains("<"), let doc = try? SwiftSoup.parse(text),
-           let media = try? doc.select("video[src], source[src]") {
+           let media = try? doc.select("video[src], video source[src]") {
             for element in media.array() {
                 if let raw = try? element.attr("src"), let url = MediaURLResolver.resolve(raw, base: base) { return url }
             }
