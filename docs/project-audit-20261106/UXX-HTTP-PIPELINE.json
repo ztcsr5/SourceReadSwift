@@ -1,0 +1,28 @@
+{
+  "scope": "One public first novel result and first chapter; no credentials or purchases",
+  "verdict": "http_html_path_completed_not_native_engine_validation",
+  "stages": [
+    {
+      "stage": "detail",
+      "bytes": 66335,
+      "sha256": "5b18f92cba18600552dab7e48646b55130ff64bde6945c9942142080295ca72d",
+      "path": "F:\\SourceReadSwift\\project-audit-20261106\\sources\\uxx-pipeline\\detail.html",
+      "title_found": true,
+      "intro_characters": 82,
+      "chapters": 101
+    },
+    {
+      "stage": "chapter",
+      "bytes": 10138,
+      "sha256": "1db6158a1a070c2c3d3e4863c38cc782e494b97fca65b7c36b0debe2d3eedcc0",
+      "path": "F:\\SourceReadSwift\\project-audit-20261106\\sources\\uxx-pipeline\\chapter.html"
+    },
+    {
+      "stage": "content",
+      "bytes": 4677,
+      "sha256": "a84a5377eea7d3efa1ace4ea9500444eb60819b5e4c4c4375bcbcd0011bbd5f8",
+      "path": "F:\\SourceReadSwift\\project-audit-20261106\\sources\\uxx-pipeline\\content.html",
+      "text_characters": 1511
+    }
+  ]
+}

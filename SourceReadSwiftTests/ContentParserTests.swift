@@ -2,6 +2,31 @@ import XCTest
 @testable import SourceReadSwift
 
 final class ContentParserTests: XCTestCase {
+    func testFallbackContentStillAppliesSourceAndGlobalPurification() throws {
+        let chapter = BookChapter(title: "第一章", url: "https://example.com/chapter/1",
+                                  bookUrl: "https://example.com/book", index: 0, isVip: false)
+        let response = SourceResponse(url: URL(string: chapter.url)!, statusCode: 200, headers: [:],
+            body: "<div id='content'><p>真实正文应保留，人物与故事继续向前发展。</p><p>站点广告残留，请下载客户端。</p><p>全局广告残留，请关注推广。</p></div>", data: Data())
+        for selector in ["", ".missing@text"] {
+            let source = BookSource(bookSourceName: "Fallback", bookSourceUrl: "https://example.com",
+                ruleContent: SourceRule(fields: ["content": selector, "replaceRegex": "(?m)^站点广告[^\\n]*##"]))
+            let content = try ContentParser().parse(source: source, chapter: chapter, response: response,
+                globalPurifyRules: ["(?m)^全局广告[^\\n]*##"]).get()
+            XCTAssertEqual(content.paragraphs, ["真实正文应保留，人物与故事继续向前发展。"])
+        }
+    }
+
+    func testFallbackDoesNotResurrectTextRemovedByPurification() {
+        let source = BookSource(bookSourceName: "Fallback", bookSourceUrl: "https://example.com")
+        let chapter = BookChapter(title: "第一章", url: "https://example.com/chapter/1",
+                                  bookUrl: "https://example.com/book", index: 0, isVip: false)
+        let response = SourceResponse(url: URL(string: chapter.url)!, statusCode: 200, headers: [:],
+            body: "<div id='content'><p>只含广告的正文内容，这段内容足够长，能够通过通用正文提取器的最小长度检测。</p></div>", data: Data())
+        let result = ContentParser().parse(source: source, chapter: chapter, response: response,
+                                          globalPurifyRules: ["(?s).*##"])
+        if case .success = result { XCTFail("Purified fallback must not restore the original advertisement") }
+    }
+
     func testHTMLContentSplitsParagraphTags() throws {
         let source = BookSource(
             bookSourceName: "Test",

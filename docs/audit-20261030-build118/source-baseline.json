@@ -1,0 +1,1450 @@
+[
+  {
+    "path": "SourceReadSwift\\App\\AppState.swift",
+    "sha256": "8c4cbc68caf547f818ec39da7ed660c741b768654f9888de7e2946457d03cfb3"
+  },
+  {
+    "path": "SourceReadSwift\\App\\RootTabView.swift",
+    "sha256": "3dd11263b5976f3a24a04e7a3a51fba88a57d57eab07354877eb5aa8a8d58e7a"
+  },
+  {
+    "path": "SourceReadSwift\\App\\SourceReadSwiftApp.swift",
+    "sha256": "26e3e54510f838bab606a510164e143204298dad908ccb41c490c8785ebfa738"
+  },
+  {
+    "path": "SourceReadSwift\\Shared\\AppVersion.swift",
+    "sha256": "981935d6f896cb7563ace1b05e8a8522e386c7761ba6bbf8ad1a499ff3dfaec5"
+  },
+  {
+    "path": "SourceReadSwift\\Shared\\HapticFeedback.swift",
+    "sha256": "a0577980d206aa13fa3673b6d61108b67897565c7d466dfa4bcaf4ea1f901e91"
+  },
+  {
+    "path": "SourceReadSwift\\Shared\\ShareSheet.swift",
+    "sha256": "672521d4e3d91cc41de64711bf736a6bd5944f0a8f2796019f88f35d0f4626a5"
+  },
+  {
+    "path": "SourceReadSwift\\Shared\\DesignSystem\\AppTheme.swift",
+    "sha256": "05eadee8c9d74f15840fa8560c8adcd0a69bd0635c9d6cadb2ea31f035f5ba4a"
+  },
+  {
+    "path": "SourceReadSwift\\Shared\\DesignSystem\\CachedRemoteImage.swift",
+    "sha256": "31b5d181d81a784070eb03b1e6301560c787579a24c3c2b6074887f28cbb0f52"
+  },
+  {
+    "path": "SourceReadSwift\\Shared\\DesignSystem\\CoverURLResolver.swift",
+    "sha256": "263f2755f5d59fdb9da6da214b79bbdf37545c11dbd287d3cb0f02203c9c926e"
+  },
+  {
+    "path": "SourceReadSwift\\Shared\\DesignSystem\\EmptyStateCard.swift",
+    "sha256": "2dbfc0e7126c3e3ed5c51b8d80f121d36de6692bbfcd1dfb151956e6e3c94d5e"
+  },
+  {
+    "path": "SourceReadSwift\\Shared\\DesignSystem\\FlowLayout.swift",
+    "sha256": "68a76d42b77a2b9088acad9980e087ac884fce0c8c36d56c01e7352d2bdc0644"
+  },
+  {
+    "path": "SourceReadSwift\\Shared\\DesignSystem\\RemoteImageLoader.swift",
+    "sha256": "e7b09fd0e9591bc99819561d1aaeb5bbf023cf5075abdb60167cbf650c4ebc17"
+  },
+  {
+    "path": "SourceReadSwift\\Shared\\DesignSystem\\SakuraThemeCatalog.swift",
+    "sha256": "ac21eae389c558bc5e82c2b12cafacde8c499ebc43e673dd9391f59705df121a"
+  },
+  {
+    "path": "SourceReadSwift\\Shared\\Diagnostics\\DiagnosticEvent.swift",
+    "sha256": "4e060472e10b39e63912876ea2cf619171d4662d2d9d987551338e24c5fde3f1"
+  },
+  {
+    "path": "SourceReadSwift\\Shared\\Diagnostics\\DiagnosticSink.swift",
+    "sha256": "72c536441051d112b8ab7dc0197c640870a2c1938eab5aeb3a44056f8f2a8992"
+  },
+  {
+    "path": "SourceReadSwift\\Shared\\Diagnostics\\SourceEngineError+Display.swift",
+    "sha256": "9d9223ee1d01d83965080d4db97b87ffcbfca740aec1da3eb27a5154768976ce"
+  },
+  {
+    "path": "SourceReadSwift\\Shared\\Foundation\\AsyncTimeout.swift",
+    "sha256": "da89fe9015b3c2fd5065250a05dbc89f66f28344a8394d2e12bbf02b75d34aa5"
+  },
+  {
+    "path": "SourceReadSwift\\Shared\\Foundation\\String+SourceRead.swift",
+    "sha256": "9d9aa3e0e680d07bf4989155950ac867c20fb0e1df3ea0f3c4f925651bea9930"
+  },
+  {
+    "path": "SourceReadSwift\\Shared\\Import\\PickedDocumentAccess.swift",
+    "sha256": "ac2f4e08bf35dcf82d8f604b8712fd8c96127bd9954f9619e4faf67d15b38bcd"
+  },
+  {
+    "path": "SourceReadSwift\\Shared\\Import\\UniversalDocumentPicker.swift",
+    "sha256": "10bb4b44731ce4440c070e2b8fb52ecf32b115525dd71c98d2631bf8044760bb"
+  },
+  {
+    "path": "SourceReadSwift\\Shared\\Performance\\FrameRateCoordinator.swift",
+    "sha256": "9041f44b793a5dc3a019afa44c27760150f08d26bd0e910159fea7803b2f9126"
+  },
+  {
+    "path": "SourceReadSwift\\Shared\\Performance\\PerformanceSignpost.swift",
+    "sha256": "0e4c4e0fd67f18f651684726a1b12569047da462448f1195873536bc927fddeb"
+  },
+  {
+    "path": "SourceReadSwift\\Shared\\Performance\\ReaderFrameRateSampler.swift",
+    "sha256": "d5e0be52a677b16ee151305db59453541d9887ee9feecb5e8f74b17342593aca"
+  },
+  {
+    "path": "SourceReadSwift\\Shared\\Performance\\ReaderPerformancePolicy.swift",
+    "sha256": "35ab74d3c0d9ff8074ecf7351898ec5a1989295db32e9e1ed0968f0d14df1a72"
+  },
+  {
+    "path": "SourceReadSwift\\Shared\\Performance\\ReaderScrollPerfMeter.swift",
+    "sha256": "81a43c960aa38cbe8bf319bf14799234aa2af0ca4f0760a551a1839d3afdf9e2"
+  },
+  {
+    "path": "SourceReadSwift\\Features\\Bookshelf\\BookshelfReaderGatewayView.swift",
+    "sha256": "2879a246f995179b5417a2afc3991d05fd77f2fbe7832a9d7cf4002cb857413d"
+  },
+  {
+    "path": "SourceReadSwift\\Features\\Bookshelf\\BookshelfView.swift",
+    "sha256": "93b85e4c3647c169c06934a979a3319f32fd1812b04cbfa5a4a0322ad8345b9b"
+  },
+  {
+    "path": "SourceReadSwift\\Features\\Discover\\BookDetailView.swift",
+    "sha256": "919c46d4aa22612edda5946bbf68d454cbb1e3effb291edd944b0fd769c007bf"
+  },
+  {
+    "path": "SourceReadSwift\\Features\\Discover\\ChapterListPresenter.swift",
+    "sha256": "231400b1895931b04c981884ee83209b243f821a5f7ee42740a2965ea870b773"
+  },
+  {
+    "path": "SourceReadSwift\\Features\\Discover\\DiscoverView.swift",
+    "sha256": "018a706d2d72613187e77f0e7e729111ba12a57df83cb706b5c4e8563836aedf"
+  },
+  {
+    "path": "SourceReadSwift\\Features\\Discover\\ExploreViewModel.swift",
+    "sha256": "6bf673fae3eda98124293bb4212593a129c969178e36058d0170c2eded532fbc"
+  },
+  {
+    "path": "SourceReadSwift\\Features\\Discover\\LightweightHTTPMessage.swift",
+    "sha256": "85e5d1d2de4664c31d5ad9e8121c08d12605bfb894f673c724cf6995a581c45b"
+  },
+  {
+    "path": "SourceReadSwift\\Features\\Discover\\SearchBookRow.swift",
+    "sha256": "30221685c174a68c17ce247f253487843a630181299264892692cb3144709035"
+  },
+  {
+    "path": "SourceReadSwift\\Features\\Discover\\SmartWebReaderView.swift",
+    "sha256": "e1fc126d3654516f745e682696ea0611ad28c635a858f0b27dbb27b683165919"
+  },
+  {
+    "path": "SourceReadSwift\\Features\\Discover\\SourceWritingView.swift",
+    "sha256": "bed3dfa432501b60f07e9e7b900e1a14833c27b7a4468ff56f26bedd54bd4e61"
+  },
+  {
+    "path": "SourceReadSwift\\Features\\Reader\\AudioBookPlayerView.swift",
+    "sha256": "b359564ead4f678e3fbd658fe1f096320e443f3ed0d36404f007bb986c74ad4a"
+  },
+  {
+    "path": "SourceReadSwift\\Features\\Reader\\ComicReaderView.swift",
+    "sha256": "51a9cfa590874d38f460cd5d0aab68b49c00e1dabb0a9b25c43877247c78bf24"
+  },
+  {
+    "path": "SourceReadSwift\\Features\\Reader\\CoverPageReaderView.swift",
+    "sha256": "fafde89acd4fd228ba881bc0683a2d89421905f41f222b131749994353530a4a"
+  },
+  {
+    "path": "SourceReadSwift\\Features\\Reader\\NativeReaderTextView.swift",
+    "sha256": "90bcef0e68e8476865bce0826cfdc81984849a7f2403947c7f7cfed5fee17615"
+  },
+  {
+    "path": "SourceReadSwift\\Features\\Reader\\PageCurlReaderView.swift",
+    "sha256": "bca2efbd33f8fa1ebc33bf0447a3718eba9da012a53c1aea9fa5f4894b28927f"
+  },
+  {
+    "path": "SourceReadSwift\\Features\\Reader\\QuoteCardView.swift",
+    "sha256": "04e527f70bcf381cee3c50512c377b61f24cfeaf9a097cd1be08164c081bbb74"
+  },
+  {
+    "path": "SourceReadSwift\\Features\\Reader\\ReaderAutomationPolicy.swift",
+    "sha256": "aaeaae2385278a857858a1d332a3fd22784dafcd960bbbd98382631412e81247"
+  },
+  {
+    "path": "SourceReadSwift\\Features\\Reader\\ReaderChapterPaginator.swift",
+    "sha256": "29111063e8301caaad7d2b9246872af2a0b40f3f4e7c29fd2ba40a14cf4d5eaf"
+  },
+  {
+    "path": "SourceReadSwift\\Features\\Reader\\ReaderChapterWindow.swift",
+    "sha256": "d3a55f0ba5210945e46b9da7a09a65653155b0702be0980b1dd9f268138fc50f"
+  },
+  {
+    "path": "SourceReadSwift\\Features\\Reader\\ReaderCJKPunctuationCompression.swift",
+    "sha256": "3768b492ae66eb36b528fa9ac11b3977d6203ac3e3a6e82c2692d0522c53dfc7"
+  },
+  {
+    "path": "SourceReadSwift\\Features\\Reader\\ReaderFlipTransitionPolicy.swift",
+    "sha256": "1ed1832efe98c199509507e29d4a2a03555a42f3c51757eaf4cf7cf8ef36c30b"
+  },
+  {
+    "path": "SourceReadSwift\\Features\\Reader\\ReaderImageStyle.swift",
+    "sha256": "a62b94e827efe155367f1ddea1b75994915f126d289fa06772edb9d3aa60de46"
+  },
+  {
+    "path": "SourceReadSwift\\Features\\Reader\\ReaderPagedNavigationPolicy.swift",
+    "sha256": "a02ffacad6257595cb58c12e370d57e461e5c9d90deec3d41c4004eb412f49fd"
+  },
+  {
+    "path": "SourceReadSwift\\Features\\Reader\\ReaderPageGeometry.swift",
+    "sha256": "51731d2f3344988c3a5eff2a3eabe6b4e0ff7ba9fabfb4079f8b59ccef2d3842"
+  },
+  {
+    "path": "SourceReadSwift\\Features\\Reader\\ReaderPageLayoutEngine.swift",
+    "sha256": "06a6caaecd052e4009c0711f044576875c90281615f77d229b181b919a56210c"
+  },
+  {
+    "path": "SourceReadSwift\\Features\\Reader\\ReaderPageSelection.swift",
+    "sha256": "edad2a287dc888b2586e4e98b52eea04c7b6bc60366ff98d57c9f08b102664cb"
+  },
+  {
+    "path": "SourceReadSwift\\Features\\Reader\\ReaderPageTextView.swift",
+    "sha256": "434506e4b7d9688d90ee6a89fbfb68dae61834ab639a98465e3ac7e4b4107ee5"
+  },
+  {
+    "path": "SourceReadSwift\\Features\\Reader\\ReaderPositionMapping.swift",
+    "sha256": "f52b89a2aea4fad051213ac6c1ea7af1bc97c9348cd6b8684b73097eb38dffc5"
+  },
+  {
+    "path": "SourceReadSwift\\Features\\Reader\\ReaderSafeAreaResolver.swift",
+    "sha256": "24ccf59a0c90b8a37cdb7d568282427218b9c6d3a8af512c02f9cb4847c315db"
+  },
+  {
+    "path": "SourceReadSwift\\Features\\Reader\\ReaderSettingsModels.swift",
+    "sha256": "3bc34e92e569eba16366e7c647a71c94593218b60a599ffcec67c6eef5015036"
+  },
+  {
+    "path": "SourceReadSwift\\Features\\Reader\\ReaderView.swift",
+    "sha256": "383742d4cbb8f8e8456fecba6fc2ab98d472b41f866dee0e8ab2fe9c056e15f6"
+  },
+  {
+    "path": "SourceReadSwift\\Features\\Reader\\ReaderWallpaperView.swift",
+    "sha256": "c67f2bc0d9810f05e5fcf20eb893e831e992eab07d497873dc7b3d99cb092492"
+  },
+  {
+    "path": "SourceReadSwift\\Features\\Reader\\VideoPlayerView.swift",
+    "sha256": "94c4b936d92c4b66d58f240055a591710f9a63c6272a081960644bad9c7a7058"
+  },
+  {
+    "path": "SourceReadSwift\\Features\\Reader\\WebReaderDocument.swift",
+    "sha256": "0c329216221b0a7e87f6553ec3425ae8fd4f5938dae06d61ad6b17a3a88897cf"
+  },
+  {
+    "path": "SourceReadSwift\\Features\\Reader\\WebScrollReaderView.swift",
+    "sha256": "4f750e7ecf9819502c460989d62519f3d41c2ad03bd619f2c9e8320f66d8e99d"
+  },
+  {
+    "path": "SourceReadSwift\\Features\\RSS\\RSSArticleReaderView.swift",
+    "sha256": "f9584eb549e578316d48e20fb057f3f738ee9d53b9e7876cb9cf86275e5c57c5"
+  },
+  {
+    "path": "SourceReadSwift\\Features\\RSS\\RSSArticlesView.swift",
+    "sha256": "798a4bbbe0c50f8c2f32299930a1977ca28740a7bda5fb3b4ee4025cda4e38b9"
+  },
+  {
+    "path": "SourceReadSwift\\Features\\RSS\\RSSReaderSettingsView.swift",
+    "sha256": "38719a1dbd8630076ad71a6045e34b47a942779e10fe56a374d2467ea974baf7"
+  },
+  {
+    "path": "SourceReadSwift\\Features\\Settings\\CookieManagerView.swift",
+    "sha256": "d7133db02f0ff2957da86011e67503c6d4156e20f6680630f05ef4f02c2262ec"
+  },
+  {
+    "path": "SourceReadSwift\\Features\\Settings\\CustomFontManagementView.swift",
+    "sha256": "bb2c19dfd737cc92c1805da02cbc9754d4ed85aeaf769aaec079dfb517229263"
+  },
+  {
+    "path": "SourceReadSwift\\Features\\Settings\\PrivacyLegalView.swift",
+    "sha256": "ef9db2eb8dd811e20c980fe6844edfb76127c0a8afb39cb6a75e872dc22ea374"
+  },
+  {
+    "path": "SourceReadSwift\\Features\\Settings\\ReaderDataManagementViews.swift",
+    "sha256": "3bf8223c88efd90429c638ed9442e3227bcf0294d6676423a331f4b591981c37"
+  },
+  {
+    "path": "SourceReadSwift\\Features\\Settings\\SettingsView.swift",
+    "sha256": "ea31177cc72dba083747a0c1a70ad6e6f235e89ab355d626a6210231c6077c39"
+  },
+  {
+    "path": "SourceReadSwift\\Features\\Settings\\SourceProxySettingsView.swift",
+    "sha256": "2e3a4035056e917e037ecb75145c238c2aaf2da7ea34f364a8bfc73e4583186c"
+  },
+  {
+    "path": "SourceReadSwift\\Features\\Settings\\TTSSettingsView.swift",
+    "sha256": "18f62871a3fb019db30f2920e8e079842d09079ecbad2ae214cd6b1d3a359912"
+  },
+  {
+    "path": "SourceReadSwift\\Features\\Settings\\WebDAVSyncView.swift",
+    "sha256": "f511589c7e38ff2f29081bdbb18cc42626db15e91b09cc58872084b330b15ddf"
+  },
+  {
+    "path": "SourceReadSwift\\Features\\SourceManager\\RSSSourceEditorView.swift",
+    "sha256": "5c91d0b58b05308b3e18d444613d60126640bae2f60e20e1035c1e654d16c895"
+  },
+  {
+    "path": "SourceReadSwift\\Features\\SourceManager\\SourceDiagnosticHistoryView.swift",
+    "sha256": "a29a1b481cb3565a0860d76b45528f6de585e74caaac5aaeac00ef8083bbba2b"
+  },
+  {
+    "path": "SourceReadSwift\\Features\\SourceManager\\SourceLoginCenterView.swift",
+    "sha256": "76ee49faf1bfe0f66d14ea079437e38929f69b446e5d89a83878419e10281fd7"
+  },
+  {
+    "path": "SourceReadSwift\\Features\\SourceManager\\SourceLoginView.swift",
+    "sha256": "59285d7c339d25a925d3ab0250702569c4fc927311a1cc1a910c717b23a5e2d9"
+  },
+  {
+    "path": "SourceReadSwift\\Features\\SourceManager\\SourceManagerView.swift",
+    "sha256": "2508c07818c32f896095ad1044a6a48c276358cb373e437a6afbc7acba112397"
+  },
+  {
+    "path": "SourceReadSwift\\Features\\SourceManager\\SourceRuleEditorView.swift",
+    "sha256": "85ea3e15d5bc7a2d17dc5581aadc949475b5b09b8b8f1195eed73a1a56eed7a4"
+  },
+  {
+    "path": "SourceReadSwift\\Features\\Verification\\VerificationCodeSheet.swift",
+    "sha256": "d07b964d054553115394888c2a41b68b0c648696fed7dc6337c7719b8f675320"
+  },
+  {
+    "path": "SourceReadSwift\\Core\\Audio\\AudioBookPlaybackCoordinator.swift",
+    "sha256": "d8245a7c9256bdf669aaa8acc94227d291f0eed69f4460becdf1ef2eb4c6fbdf"
+  },
+  {
+    "path": "SourceReadSwift\\Core\\Audio\\CloudTTSClient.swift",
+    "sha256": "016ca0d4af2bb3698e0dff895720c44381a906a84a12f65514e631938b9ee468"
+  },
+  {
+    "path": "SourceReadSwift\\Core\\Audio\\CloudTTSCredentials.swift",
+    "sha256": "74c68f40bc2e36506f5ef79ba8ad38ec7faac071759aa442ce5d1f3b24220e38"
+  },
+  {
+    "path": "SourceReadSwift\\Core\\Audio\\CloudTTSPlayer.swift",
+    "sha256": "b876fd2f7182ffe4d193ce0c0191eb564890c6fc4f3a15d2bcda50408795bb5c"
+  },
+  {
+    "path": "SourceReadSwift\\Core\\Audio\\CloudTTSProtocol.swift",
+    "sha256": "80cb644691a3067b738e5c81bc76fd6eb238783664b2c023532162619e61baf6"
+  },
+  {
+    "path": "SourceReadSwift\\Core\\Audio\\HttpTTSClient.swift",
+    "sha256": "b16dba147b9d6787ad7e4038b2b13a8d5e17e1c56d39c61d8860c8641e77cf1c"
+  },
+  {
+    "path": "SourceReadSwift\\Core\\Audio\\KeychainSecretStore.swift",
+    "sha256": "799b0c734963792a9f7d8da2d65e937a8911f61b11e184c4845d823c6c15341c"
+  },
+  {
+    "path": "SourceReadSwift\\Core\\Audio\\LocalVoiceLibrary.swift",
+    "sha256": "e521ae465b7d3b341d176d85d9737dd5ce0ecc9c2d7cbeabf32d74437581eb5d"
+  },
+  {
+    "path": "SourceReadSwift\\Core\\Audio\\ReaderTTSEngine.swift",
+    "sha256": "fea2cf529c4b6f4b384ab0233e6e34dd078141250cfdb82d66c96a672536fd64"
+  },
+  {
+    "path": "SourceReadSwift\\Core\\Audio\\XunfeiTTSFrame.swift",
+    "sha256": "928864f29f5c50fa51982b60413c755ff753796a174c92a7da9fe208d7ccc3a0"
+  },
+  {
+    "path": "SourceReadSwift\\Core\\Engine\\CryptoHelper.swift",
+    "sha256": "3626700379b334b0940ee86ce7d861172a5edaea997625ed607708e40020e582"
+  },
+  {
+    "path": "SourceReadSwift\\Core\\Engine\\PayActionPolicy.swift",
+    "sha256": "b18c936fcbdfd292e7624dc9a82b018017b046d2ee9cff19d276672b1da09f41"
+  },
+  {
+    "path": "SourceReadSwift\\Core\\Engine\\SourceEngine.swift",
+    "sha256": "14412a948143262710ac556027f8de877e46eea26cd0d6021e6ceb5798a8b262"
+  },
+  {
+    "path": "SourceReadSwift\\Core\\Engine\\SourcePipeline.swift",
+    "sha256": "e3a1b06e00c04333b34d206ce3c4d5a9541301f7873abd6c44ef9995b2b617e0"
+  },
+  {
+    "path": "SourceReadSwift\\Core\\Engine\\ZlibraryEngine.swift",
+    "sha256": "21354420907145fa0d7abf9016917f40297c21bce17652c49b4da3705b604ac8"
+  },
+  {
+    "path": "SourceReadSwift\\Core\\Environment\\BackgroundKeepAliveManager.swift",
+    "sha256": "a40328b55341af6edad54dd81117df5ac911b7d87ddb2b56cec464e36bfbcc4e"
+  },
+  {
+    "path": "SourceReadSwift\\Core\\Environment\\SandboxEnvironment.swift",
+    "sha256": "cb774b3877dcc1656e068d06b486ef06eedb215fa9d00f6e71f9eee36d1b1017"
+  },
+  {
+    "path": "SourceReadSwift\\Core\\Import\\HaiKuoShiJieSourceAdapter.swift",
+    "sha256": "a95c4d3404d0f074219310415c2184cbe0cbf454acb2193dd69f5aa90efcde61"
+  },
+  {
+    "path": "SourceReadSwift\\Core\\Import\\HuaHuoBookSourceAdapter.swift",
+    "sha256": "3f29343e0c68500f5acacad9c3b364fc28c6c67786559852308f2e9ce7a305ce"
+  },
+  {
+    "path": "SourceReadSwift\\Core\\Import\\LocalEPUBBookParser.swift",
+    "sha256": "295bd6c9ef477969294c5b0a41f90ad20b356ce7b3fab08bf0b990ca3351bc4c"
+  },
+  {
+    "path": "SourceReadSwift\\Core\\Import\\LocalTextBookParser.swift",
+    "sha256": "aab5064d70283b7a617341d8507d6c23752fcfff4d6603ede29ec5e3af8022de"
+  },
+  {
+    "path": "SourceReadSwift\\Core\\Import\\LocalTxtSmartDivider.swift",
+    "sha256": "3580720bc27c371cd3249d677efa0615e2c73809abba577e19eb2f61322aa010"
+  },
+  {
+    "path": "SourceReadSwift\\Core\\Import\\OnboardingClassicBook.swift",
+    "sha256": "9f246d2c7cd964e3238e458a47adefd9228de9c90ae0c73396ec2807fce4e23a"
+  },
+  {
+    "path": "SourceReadSwift\\Core\\Import\\SourceImportDownloader.swift",
+    "sha256": "8fd030ea973cd2f947dddd5f09be907b058ca20d4153762edf379d4c8ed42fa1"
+  },
+  {
+    "path": "SourceReadSwift\\Core\\Import\\SourceImportLinkParser.swift",
+    "sha256": "207f63aa23f97fd531a08e846973fd2a552745f4165d0559535576f503e06d81"
+  },
+  {
+    "path": "SourceReadSwift\\Core\\Import\\XbsBookSourceAdapter.swift",
+    "sha256": "657a7201f4f80134d470b0202fa9fe4515339fd734aaa85c1004ea1b832402bf"
+  },
+  {
+    "path": "SourceReadSwift\\Core\\JavaScript\\JSCoreRuntime.swift",
+    "sha256": "73a2986378e24124964397430725a4b662cfb0c886f3a229d54e3c5437c5878a"
+  },
+  {
+    "path": "SourceReadSwift\\Core\\JavaScript\\LegadoCharset.swift",
+    "sha256": "da8c0129956621a8cab70da505ddfc95cb994ff57f376aab6acd9e91ff4d3b98"
+  },
+  {
+    "path": "SourceReadSwift\\Core\\JavaScript\\LegadoHostServices.swift",
+    "sha256": "c6b2c817b466f9e0fb46291f7fbbee9ac12e6174b223c1ceb9f167e0eee657ef"
+  },
+  {
+    "path": "SourceReadSwift\\Core\\JavaScript\\LegadoJavaScriptCompatibility.swift",
+    "sha256": "dba9a668ba559fe95aabcebdc69cb19cc6bc6ead375d0c9ebfd124e70735bac0"
+  },
+  {
+    "path": "SourceReadSwift\\Core\\JavaScript\\LegadoModelBridges.swift",
+    "sha256": "d421150691a254b729ffc90cacb4f708981e8903f6cdd169ed76c26cbea3b1c9"
+  },
+  {
+    "path": "SourceReadSwift\\Core\\JavaScript\\LegadoNativeBridges.swift",
+    "sha256": "89daf2f67c2be47aae7a691130378dacac5ea84da8a72a59455b020ced6a5c6a"
+  },
+  {
+    "path": "SourceReadSwift\\Core\\JavaScript\\QueryTTF.swift",
+    "sha256": "e3022974922aeb1fe35b552b961ab3fe9b9c98560568405b8be74bcfcb85f00e"
+  },
+  {
+    "path": "SourceReadSwift\\Core\\Models\\BookModels.swift",
+    "sha256": "ecea0903c876aa05bcb9f8cc39081c6d3cbffaacbe2ce3a10d17345bbf2b5ef0"
+  },
+  {
+    "path": "SourceReadSwift\\Core\\Models\\BookshelfModels.swift",
+    "sha256": "0af6bf55d29d68c618b0b9514c1e9e383dc6a861321dabb749c5e7c1d9d30322"
+  },
+  {
+    "path": "SourceReadSwift\\Core\\Models\\BookSource.swift",
+    "sha256": "09d7eaf11b355925846837c4c5073bfb94b7547ff7b8e24e96bea9769a6dbb57"
+  },
+  {
+    "path": "SourceReadSwift\\Core\\Models\\BuiltinBrowserSourceProvider.swift",
+    "sha256": "3d7a0a7882225fa6da1f645b716eee33d9edb146f8048fc7b328ebb9ee01e041"
+  },
+  {
+    "path": "SourceReadSwift\\Core\\Models\\ReadingStatsSummary.swift",
+    "sha256": "37ab2994e41f9b98c5d89dc29ee77427a5f363714872da2238b85165d53d0c67"
+  },
+  {
+    "path": "SourceReadSwift\\Core\\Models\\SourceCollections.swift",
+    "sha256": "31c9f58df7c3d4718e3d12035fee4958de45bb462993cb4ffea5edd98e87e256"
+  },
+  {
+    "path": "SourceReadSwift\\Core\\Network\\CookieHeaderParser.swift",
+    "sha256": "58cc72f9ea192d1c4d459690675bd5b5c7da202d0d2549097bad7115351ea939"
+  },
+  {
+    "path": "SourceReadSwift\\Core\\Network\\ResponseBodyDecoder.swift",
+    "sha256": "1d83ef8f47d25d209d9914b611ab3e4892cdfa6dfb6897dc08ac526046c7204c"
+  },
+  {
+    "path": "SourceReadSwift\\Core\\Network\\ResponseTextDecoder.swift",
+    "sha256": "5fa5e51f557a748eeadab15f5d4933caf6da6325ef30e6f0a80bafb734216e37"
+  },
+  {
+    "path": "SourceReadSwift\\Core\\Network\\SourcePaginationURLIdentity.swift",
+    "sha256": "00616931cc413b0a483db8f99bc53917de63dfc4db41bbfb0b56f23c33d4500a"
+  },
+  {
+    "path": "SourceReadSwift\\Core\\Network\\SourceProxyManager.swift",
+    "sha256": "f54ded0c1d2b834c1509d8928b7dfe54666e891a94fa3f81a78d8c74ff0f809f"
+  },
+  {
+    "path": "SourceReadSwift\\Core\\Network\\SourceRateLimiter.swift",
+    "sha256": "eef9f19ec099635691685e051aaf45437eee823ee75d5944254c3af3a81a78b6"
+  },
+  {
+    "path": "SourceReadSwift\\Core\\Network\\SourceRequest.swift",
+    "sha256": "f137dd2d0e944bc02e506e9a20bff0b2cc6a2debccb6cbdb01c93b618927b727"
+  },
+  {
+    "path": "SourceReadSwift\\Core\\Network\\SourceRequestBuilder.swift",
+    "sha256": "f341b5c06a3b074599351fd268c045d806c827267b36cb944c0360cf1a47f162"
+  },
+  {
+    "path": "SourceReadSwift\\Core\\Network\\SourceURLDirective.swift",
+    "sha256": "b5633bbbfe80ce18168020ef8e5734d81247fc280e28702e53b2bbb5401835ab"
+  },
+  {
+    "path": "SourceReadSwift\\Core\\Network\\SynchronousSourceLoader.swift",
+    "sha256": "a621bc3bfba7ab83821bcac17a3e208eac5edca2416406f3f693ece8690025c6"
+  },
+  {
+    "path": "SourceReadSwift\\Core\\Network\\SynchronousSourceNetworkBridge.swift",
+    "sha256": "d2c2a60290783b7004e2c347d6b1506f750a3ea9701e7ff938363b4fa0dc5687"
+  },
+  {
+    "path": "SourceReadSwift\\Core\\Network\\WebDAVSyncService.swift",
+    "sha256": "0cae0b7abbf6c499bcbbff300052291208f92510f2f246efcdaf427aec06c71e"
+  },
+  {
+    "path": "SourceReadSwift\\Core\\Network\\WebViewFallback.swift",
+    "sha256": "4a2139f5858c3675b51d2cd2a36799df37576e775bd4f996d646ea5ac6ae7e3c"
+  },
+  {
+    "path": "SourceReadSwift\\Core\\Reader\\SmartWebArticleExtractor.swift",
+    "sha256": "fd81d9e470363a083a3d0a8adb0b61cf8718a3de033ba964dc3517cb22baba5a"
+  },
+  {
+    "path": "SourceReadSwift\\Core\\Rules\\BookDetailParser.swift",
+    "sha256": "4ef2d420fe1c02380de5681946578b6ef437c8aea2d44459081825062f5b283e"
+  },
+  {
+    "path": "SourceReadSwift\\Core\\Rules\\ChapterListParser.swift",
+    "sha256": "78866160f667d68e743444ef0ceea6571629c843dbb04e85a148d97935a0c6ad"
+  },
+  {
+    "path": "SourceReadSwift\\Core\\Rules\\ChapterTextSanitizer.swift",
+    "sha256": "7f4d980cdb78fcff11841d663b140f85da802edcd2375cc0b2533d144b6bf1d6"
+  },
+  {
+    "path": "SourceReadSwift\\Core\\Rules\\ComicContentParser.swift",
+    "sha256": "0b8cff2a3708133c514a1d93777ea781a8a722acaf296452d63ae189c07b9622"
+  },
+  {
+    "path": "SourceReadSwift\\Core\\Rules\\ContentParser.swift",
+    "sha256": "8ae8449c26dfcef6c45a689185d554e60337133e35c8a5116b1ef366be138cdb"
+  },
+  {
+    "path": "SourceReadSwift\\Core\\Rules\\DynamicURLResolver.swift",
+    "sha256": "5d09a36048ccf1f9dfc956c8a934309d194bc2bc82dc82537653d1605fdbe7ca"
+  },
+  {
+    "path": "SourceReadSwift\\Core\\Rules\\ExploreCategoryParser.swift",
+    "sha256": "3173733b2b7c4e1501a610be97c0ebb89d640c681dd94b013bf3178fa59fe633"
+  },
+  {
+    "path": "SourceReadSwift\\Core\\Rules\\HtmlRuleExtractor.swift",
+    "sha256": "7e8e9278e482fe50ddf185dd51f601bc2850bb5f47b88f5c8c9d9890c88b22cd"
+  },
+  {
+    "path": "SourceReadSwift\\Core\\Rules\\InlineImageCodec.swift",
+    "sha256": "ba924f82d64a722aaf959e5cfab986761397cb8b61938c7def2431b8cc7c9b4a"
+  },
+  {
+    "path": "SourceReadSwift\\Core\\Rules\\JSONRuleExtractor.swift",
+    "sha256": "5384775eaed1d2148252ecb92305aab266a0b5a68c94f034dc6ee5e3b472b60d"
+  },
+  {
+    "path": "SourceReadSwift\\Core\\Rules\\LegadoAllInOneRegex.swift",
+    "sha256": "2bc472a12f462c602e38400c0d0a907d839db0128c18b1917597fc8b97d679de"
+  },
+  {
+    "path": "SourceReadSwift\\Core\\Rules\\LegadoDefaultRuleTranslator.swift",
+    "sha256": "c95f90e562a3c793d0995646e65d703fe566a659e31e6c9374833368772171e7"
+  },
+  {
+    "path": "SourceReadSwift\\Core\\Rules\\LegadoRuleAnalyzer.swift",
+    "sha256": "b126ea4c10cb151ca5ecb21c661dc4fbfdbff2745cf6dc27456760f11e61ba16"
+  },
+  {
+    "path": "SourceReadSwift\\Core\\Rules\\LegadoRuleResolver.swift",
+    "sha256": "b5110abe2f34a14b4433659db5b5cd03c63f6acdcfc728fcc03669799188da8c"
+  },
+  {
+    "path": "SourceReadSwift\\Core\\Rules\\PurifyRuleEvaluator.swift",
+    "sha256": "a1930da6a39a6c4ec95bb30143a08f4f99422919fb805dcfcd54f520708e1d14"
+  },
+  {
+    "path": "SourceReadSwift\\Core\\Rules\\ResponseFormatDetector.swift",
+    "sha256": "50fb3a5335550c77f3cf738bcb61f81f331eb6414890339787c6c74b2f7b3ac8"
+  },
+  {
+    "path": "SourceReadSwift\\Core\\Rules\\RSSFeedParser.swift",
+    "sha256": "db56da49c6eddfa6e3db36e9f29f2c39d3dac9c301e65528fefa0d8374d06581"
+  },
+  {
+    "path": "SourceReadSwift\\Core\\Rules\\RuleDirectiveParser.swift",
+    "sha256": "5330a01277f5b482b2a867e6d9ced4defbc2fbbb8399f0310067586cbdb3cb3b"
+  },
+  {
+    "path": "SourceReadSwift\\Core\\Rules\\RuleEditorValidator.swift",
+    "sha256": "62f9278b8813cf1439124d80b4c2f8720290d1f03f4da7f903054fc23cd3d29f"
+  },
+  {
+    "path": "SourceReadSwift\\Core\\Rules\\RuleExecutionContext.swift",
+    "sha256": "b7dd2060740e2c4cffe1540768a51d6f70dae5444e09908b2ea7c3cbec00db05"
+  },
+  {
+    "path": "SourceReadSwift\\Core\\Rules\\RuleOperatorSplitter.swift",
+    "sha256": "de3bd8fbc2ae1f5f940e6ccbc7cb337929bf473e05d26fb45f29283c0356d57c"
+  },
+  {
+    "path": "SourceReadSwift\\Core\\Rules\\RulePreviewEvaluator.swift",
+    "sha256": "e6cbed3614f9439c39e25b287630931ab612af005cc9699771c3a0b46ea034a9"
+  },
+  {
+    "path": "SourceReadSwift\\Core\\Rules\\RuleTransformParser.swift",
+    "sha256": "38904e89eeb141f1b6634cc82bd43a4ff9f4f2bf7cd46b0dd3d8eaf16e4b0baa"
+  },
+  {
+    "path": "SourceReadSwift\\Core\\Rules\\SearchBookMatcher.swift",
+    "sha256": "1355bf4b5f8d08fed19b7bd4ac96da6f40c1aa5b0b141ae036a097469613746e"
+  },
+  {
+    "path": "SourceReadSwift\\Core\\Rules\\SearchResultFilter.swift",
+    "sha256": "d00624c1281a280896569e31e4b4088d8dcacda9452afeefc97d2a51ab6ce72d"
+  },
+  {
+    "path": "SourceReadSwift\\Core\\Rules\\SearchResultParser.swift",
+    "sha256": "93cc1973f86a224bdd2ef2b1ff0a2d8e19d2badf660bfdb16bd562ff3e7e92fa"
+  },
+  {
+    "path": "SourceReadSwift\\Core\\Rules\\SearchURLResolver.swift",
+    "sha256": "ff3a98348cc24688d8d22757c96601aae72d5e2b1dd6f8cda61d00bc2f5ea562"
+  },
+  {
+    "path": "SourceReadSwift\\Core\\Rules\\SourceBatchCheckCoordinator.swift",
+    "sha256": "010a575313b09138ef388b2c0df47c2cc2a4f3a655a42409bd740daa6f279d21"
+  },
+  {
+    "path": "SourceReadSwift\\Core\\Rules\\SourceBatchDiagnosticRunner.swift",
+    "sha256": "b6c441879017d406726b33009333180cce3070bf3402607a274238bb35ee14da"
+  },
+  {
+    "path": "SourceReadSwift\\Core\\Rules\\SourceDiagnosticClassifier.swift",
+    "sha256": "cb1678742c0be9555633130228fff0cc33c14c7c9abbe921af3c50e8f632c859"
+  },
+  {
+    "path": "SourceReadSwift\\Core\\Rules\\SourceDiagnosticEvidence.swift",
+    "sha256": "82cc42bc2e44fdf37c170e581428767bca67b9f54ce62964114dbd7d9d3ec632"
+  },
+  {
+    "path": "SourceReadSwift\\Core\\Rules\\SourceDiagnosticRepairAdvisor.swift",
+    "sha256": "70b7afdea853e665153a9165c7914bf915adb12c72e11751ea2c310d9fd2f111"
+  },
+  {
+    "path": "SourceReadSwift\\Core\\Rules\\SourceDiagnosticReport.swift",
+    "sha256": "dacb2a4a1f3e21cc4069cf66aac1e09fb94fe83386006dd4cd7ff9210bf0e236"
+  },
+  {
+    "path": "SourceReadSwift\\Core\\Rules\\SourceDiagnosticReportExporter.swift",
+    "sha256": "758e30ea8a5e4e4486e5b1e345cce58c9aa8c208c501cc1dd5906e5108b77787"
+  },
+  {
+    "path": "SourceReadSwift\\Core\\Rules\\SourceLoginField.swift",
+    "sha256": "06ed2d26d47fe9ee18c27bae680dcf32d73d49cde850a39a8f0c86bb88b3c0b7"
+  },
+  {
+    "path": "SourceReadSwift\\Core\\Rules\\SourceLoginURLResolver.swift",
+    "sha256": "0a6f8953458752ba0cb3d7ff855f9210d94af2885d0fa5790d5adbc96feb3ae1"
+  },
+  {
+    "path": "SourceReadSwift\\Core\\Rules\\SourceRuleDraft.swift",
+    "sha256": "e2b8debbf42ee89d530f45fb97ebc374af9e581e90e41b32f43fbeab09ad544d"
+  },
+  {
+    "path": "SourceReadSwift\\Core\\Rules\\VideoContentParser.swift",
+    "sha256": "e5e9936b08f044f103b895c153700406151cf1c73b0d155a1a21076d2ba25836"
+  },
+  {
+    "path": "SourceReadSwift\\Core\\Rules\\XPathRuleTranslator.swift",
+    "sha256": "6c0161e7827808027ad69abac17e5106ff23a05ea1f9ade7a37a284106e368dd"
+  },
+  {
+    "path": "SourceReadSwift\\Core\\Security\\B18PlusService.swift",
+    "sha256": "25f63de724fc76f974778a732c76c692aea82d089fa63ae3705a516ff301feeb"
+  },
+  {
+    "path": "SourceReadSwift\\Core\\Storage\\AppDataBackup.swift",
+    "sha256": "a1561c1599f22a9ce20dfdec32174209f6ddc960671a22d0d2aff78d79883ef6"
+  },
+  {
+    "path": "SourceReadSwift\\Core\\Storage\\AppStorageDirectory.swift",
+    "sha256": "c3893a9f925e8eb17b0fd673b03111f5c115e15cd6961f9c6acda33ef802aa92"
+  },
+  {
+    "path": "SourceReadSwift\\Core\\Storage\\BookExportService.swift",
+    "sha256": "970a52f44070e61512c4429198cc6448ba9504ef0e965a2e1a95652b759deb96"
+  },
+  {
+    "path": "SourceReadSwift\\Core\\Storage\\BookshelfGroupPersistence.swift",
+    "sha256": "9b197595f92f7778b7fb5281462e996f29f5c0df3955d47dd9e0dbdd665bc808"
+  },
+  {
+    "path": "SourceReadSwift\\Core\\Storage\\BookshelfPersistence.swift",
+    "sha256": "1d25f89e1d18e04165a7931ba0da48ce94ed3e607186a2686e6bc796d0ede263"
+  },
+  {
+    "path": "SourceReadSwift\\Core\\Storage\\BookshelfStore.swift",
+    "sha256": "3039b4fe10f53c508f395bfcdd9847669f10edfa1ce49dd63ba735b476b82645"
+  },
+  {
+    "path": "SourceReadSwift\\Core\\Storage\\BookTOCacheStore.swift",
+    "sha256": "950cbb3169346df75dc9c3edc58782e3e1309d6fa77e808620e183d788a0e2ce"
+  },
+  {
+    "path": "SourceReadSwift\\Core\\Storage\\ChapterContentCacheStore.swift",
+    "sha256": "f8f719b0bf90ae6e601d61ef32f4068d6a50b30f4be5d812c3b21ef26192d57f"
+  },
+  {
+    "path": "SourceReadSwift\\Core\\Storage\\ChapterDownloadStore.swift",
+    "sha256": "e23fdf21f7eb0349513279bc51f849afb74e5f356dc9add94e305905aa2fac29"
+  },
+  {
+    "path": "SourceReadSwift\\Core\\Storage\\CustomFontManager.swift",
+    "sha256": "8b2b82d6bd794d5638fd763fe656de5cdeeafa2ed4d18afa6a04c97f86572e0a"
+  },
+  {
+    "path": "SourceReadSwift\\Core\\Storage\\InlineImageStore.swift",
+    "sha256": "ca41e3a22525c397f39462eb89f4dc4a4030beb85a489d6580c0d51299453c30"
+  },
+  {
+    "path": "SourceReadSwift\\Core\\Storage\\PurifyRuleStore.swift",
+    "sha256": "4b8e3d448cc473905c949efe437c1eee96e3b74f36d8e94cec9afd33fe71c05d"
+  },
+  {
+    "path": "SourceReadSwift\\Core\\Storage\\ReaderOverrideStore.swift",
+    "sha256": "b17ef8def4f72fca0a6f17fe4d2492616f6096ffc41872f849fd69f83b61b070"
+  },
+  {
+    "path": "SourceReadSwift\\Core\\Storage\\ReadingHistoryStore.swift",
+    "sha256": "2a69fcb5d720445963617530940b936b04348fe0a69ec75fb722e61f1ef91947"
+  },
+  {
+    "path": "SourceReadSwift\\Core\\Storage\\RSSArticleContentCacheStore.swift",
+    "sha256": "ce4d90d2b2ce1dc6c56c402736e4c62427e8432a0273b6198ae198377af10451"
+  },
+  {
+    "path": "SourceReadSwift\\Core\\Storage\\RSSArticleStateStore.swift",
+    "sha256": "7aecfff492c4e965693c1fc87d1421fb810c390cfa5a6083050a14b69e5a9d11"
+  },
+  {
+    "path": "SourceReadSwift\\Core\\Storage\\RSSFeedCacheStore.swift",
+    "sha256": "0bb7c36cbddd550755250e6643e3c62e80531acc468cdb218911c7ddfed26410"
+  },
+  {
+    "path": "SourceReadSwift\\Core\\Storage\\SourceCookieStore.swift",
+    "sha256": "99b466cc8eade4f524e72ea1d6b59692ab5e4dbfa824a1c69b4bb3d8b01f4950"
+  },
+  {
+    "path": "SourceReadSwift\\Core\\Storage\\SourceDiagnosticHistoryStore.swift",
+    "sha256": "de7fe66907504a841d4d41c7092bff16b1d03296123393dee88ef10c75ce2065"
+  },
+  {
+    "path": "SourceReadSwift\\Core\\Storage\\SourceHealthStore.swift",
+    "sha256": "24a1ca17c54dc32a69e1a00d0638b306a3a3ef5bcbc7b21518295f2e34956be9"
+  },
+  {
+    "path": "SourceReadSwift\\Core\\Storage\\SourcePersistence.swift",
+    "sha256": "b84cf9b14591758b386eff5319bb85f0565150e926427619f234b1d8025eb183"
+  },
+  {
+    "path": "SourceReadSwift\\Core\\Storage\\SourceStore.swift",
+    "sha256": "204caa64fc395d6c26d3a1caf6596f31792434e6d43d3b9c9a5a3b9e348d29db"
+  },
+  {
+    "path": "SourceReadSwift\\Core\\Storage\\SourceSwitchCacheStore.swift",
+    "sha256": "f22c9972ae42d352b3af48bfc3da5be1be47220220a0c923c829e465369d1632"
+  },
+  {
+    "path": "SourceReadSwift\\Core\\Verification\\VerificationCodeCoordinator.swift",
+    "sha256": "9f8d0d595c01fb48a522969d583c6f882dc83bdb9a2fd3ce7c48d875f4f41b97"
+  },
+  {
+    "path": "SourceReadSwiftTests\\AppDataBackupTests.swift",
+    "sha256": "6f7aefbed2b885dedb17aec29b4ce4ef7e3a2636652e220bd6a5a575798f268d"
+  },
+  {
+    "path": "SourceReadSwiftTests\\AudioBookPlaybackCoordinatorTests.swift",
+    "sha256": "dc228e1a35b5227b9e44c59cb08aaedb89d775afbb6be34769234d506c6825e0"
+  },
+  {
+    "path": "SourceReadSwiftTests\\B18PlusServiceTests.swift",
+    "sha256": "a03d2077bf97ae66bddbb6f288b75a230137b839bed4ffa2835e69cdd1b6b6ab"
+  },
+  {
+    "path": "SourceReadSwiftTests\\BookshelfStoreTests.swift",
+    "sha256": "c9ffced03f51f1819c50ced0c578fe83cf58d77df252fe90adebf1cab2eda182"
+  },
+  {
+    "path": "SourceReadSwiftTests\\BookSourceTests.swift",
+    "sha256": "068e0cef4ff355c12e29df11ca555f9a471474af4c55e05707b51e2b8aa5852e"
+  },
+  {
+    "path": "SourceReadSwiftTests\\BuiltinBrowserSourceProviderTests.swift",
+    "sha256": "b68d6de3fba327e6ddbb8c7bfc00932d89db6919a16214760ddd1376f5481c1a"
+  },
+  {
+    "path": "SourceReadSwiftTests\\ChapterContentCacheStoreTests.swift",
+    "sha256": "23a9065b2b13cc9adb9cdb6c5511b73053b242d450b99f6e9f662d5f88a645cb"
+  },
+  {
+    "path": "SourceReadSwiftTests\\ChapterDownloadStoreTests.swift",
+    "sha256": "ebf4a4deb8587cc94b734985f52773e529b13a33dddb615c7ca284074a7e70fc"
+  },
+  {
+    "path": "SourceReadSwiftTests\\ChapterListMetadataTests.swift",
+    "sha256": "e0be7e884a524ed0fd36927243049b3f759e301f3f92c6b000063f9f993a37be"
+  },
+  {
+    "path": "SourceReadSwiftTests\\ChapterTextSanitizerTests.swift",
+    "sha256": "fe1769039bbaf99a59aa5a974c45bdf6c6d5e4b7e9b6e58f5cd20fbacbb11915"
+  },
+  {
+    "path": "SourceReadSwiftTests\\CloudCollectionRuleTests.swift",
+    "sha256": "ae9b1e06a0dd6cf5206195c9636ac84027870872aa05123790645cd54c279fc4"
+  },
+  {
+    "path": "SourceReadSwiftTests\\CloudTTSClientTests.swift",
+    "sha256": "3c2013dcabd37f735b4d24112d46921d8d1a1082737812042f121d4617e509df"
+  },
+  {
+    "path": "SourceReadSwiftTests\\CloudTTSCredentialsTests.swift",
+    "sha256": "dce6c50aadb1d6fa1a96d94846aec9e48823d8d74eb3fab8d5f6a132508bb5fb"
+  },
+  {
+    "path": "SourceReadSwiftTests\\CloudTTSFrameTests.swift",
+    "sha256": "72cfbe92d05d691add58b31aea2470c69b1f83df35f80f7dd7cc3d89f6dbadd3"
+  },
+  {
+    "path": "SourceReadSwiftTests\\CloudTTSProtocolTests.swift",
+    "sha256": "44b747c4d56bc7e856214c4455491fe5dfbdf6842ddc789da998415dcf63387d"
+  },
+  {
+    "path": "SourceReadSwiftTests\\CmbokFeaturesTests.swift",
+    "sha256": "93cebd4f8da34e3fca967e0a9ffebb6892350d2afda8f482e8ce435e4a3793db"
+  },
+  {
+    "path": "SourceReadSwiftTests\\ComicContentParserTests.swift",
+    "sha256": "579292e3d216cbc1f0535f731fb18c381ef77d73d5bf4814ec93395927b14010"
+  },
+  {
+    "path": "SourceReadSwiftTests\\ContentParserTests.swift",
+    "sha256": "41ec39517d4d4cc1a48542fd8bc4cff100fba042c08059585c971298d7d57917"
+  },
+  {
+    "path": "SourceReadSwiftTests\\CookieHeaderParserTests.swift",
+    "sha256": "e8cb643af356e5628ae35028ec7858db76f60548d8f9b627b59cb90edc2227b3"
+  },
+  {
+    "path": "SourceReadSwiftTests\\CoverURLResolverTests.swift",
+    "sha256": "7dfa94e8673a06eab0dc6b3e601a7cc18e940164edcc448e9d505d8c0a337f47"
+  },
+  {
+    "path": "SourceReadSwiftTests\\CustomFontAndExportTests.swift",
+    "sha256": "3665bfee67fd10c19c54ea5534ecb9e3b40a757e7ccb911a60a785f007de4570"
+  },
+  {
+    "path": "SourceReadSwiftTests\\DiscoverViewModelTests.swift",
+    "sha256": "5151fdfd724a084f2831213dc7dbddaf089c1577fc61dc4ba47ece272d577370"
+  },
+  {
+    "path": "SourceReadSwiftTests\\ExploreCategoryParserTests.swift",
+    "sha256": "c9f794f4c651dfd97607f1bab45e867c1544a6802ae4a542c75bcaf76871d603"
+  },
+  {
+    "path": "SourceReadSwiftTests\\HaiKuoShiJieSourceAdapterTests.swift",
+    "sha256": "7e287858e76d2a50c83057107f7fe8eb17da17260cadb15f7f230d25406ce50c"
+  },
+  {
+    "path": "SourceReadSwiftTests\\HtmlAttributeSemanticsTests.swift",
+    "sha256": "df8a71db4ecc99fb087c3f30d426d915008ae6b0fa30815622464d0ce6b4c1bb"
+  },
+  {
+    "path": "SourceReadSwiftTests\\HtmlRuleExtractorTests.swift",
+    "sha256": "a5774edc1cc580a00f3bd98ae2925a26c8ad65a834aaff78de35eaf8da07367d"
+  },
+  {
+    "path": "SourceReadSwiftTests\\HtmlRuleLegacyRegexTests.swift",
+    "sha256": "275d7256226a509c63a599ffe0372db72c8e397a8c9887c95dbeffe40dd0eb00"
+  },
+  {
+    "path": "SourceReadSwiftTests\\HttpTTSClientTests.swift",
+    "sha256": "059bf6419ae893e068f7b44808bac617676341b352d5350008e517b0c6522673"
+  },
+  {
+    "path": "SourceReadSwiftTests\\HuaHuoBookSourceAdapterTests.swift",
+    "sha256": "21c2e85881af21c73d209820d17a5fce7ee8ff31628087f658e9ee3b8a82da85"
+  },
+  {
+    "path": "SourceReadSwiftTests\\InlineImagePipelineTests.swift",
+    "sha256": "f27e5332ffffd108e65e19b1a59746ce97a6eab1d55558468fbef68bb0e780a3"
+  },
+  {
+    "path": "SourceReadSwiftTests\\JavaScriptChallengeDetectionTests.swift",
+    "sha256": "715d64842438dffb5b12b8779d2e02100c55531ebf05bfecd6c8eb4b01c3f706"
+  },
+  {
+    "path": "SourceReadSwiftTests\\JSCoreNetworkBridgeTests.swift",
+    "sha256": "78e148f307f316dd2b7e6682081dce1f650856d6eb2c894d8cce9f5fac85a1a9"
+  },
+  {
+    "path": "SourceReadSwiftTests\\JSCoreRuntimeLifecycleTests.swift",
+    "sha256": "d4e94529d802326654428bc22b7db802bbe224b5141020563e939c4f8ae08be7"
+  },
+  {
+    "path": "SourceReadSwiftTests\\JSCoreRuntimeTests.swift",
+    "sha256": "8f4334d5a7f471ce8cb08df632c3b1050369b0b175ff7c25472584cc9567e425"
+  },
+  {
+    "path": "SourceReadSwiftTests\\JSONListDescendantTests.swift",
+    "sha256": "1946f199fb1a6833dc0ff3d6378bffef477162b5747825f9863d36899a15abb9"
+  },
+  {
+    "path": "SourceReadSwiftTests\\JSONPipelineParserTests.swift",
+    "sha256": "59f81abeb010ff1819879e41063405e56e11c000e4624a306797f190507c887d"
+  },
+  {
+    "path": "SourceReadSwiftTests\\JSONRuleExtractorTests.swift",
+    "sha256": "0add094756bdfa69e136348fb13f27fef665187462f4aa4c71aca7642798823d"
+  },
+  {
+    "path": "SourceReadSwiftTests\\LegadoAdvancedJsonSourceTests.swift",
+    "sha256": "da3372a69aefaafdea98d1da6cc57291e83f948269d01e19750e6100a168ea05"
+  },
+  {
+    "path": "SourceReadSwiftTests\\LegadoAllInOneTests.swift",
+    "sha256": "e560af1798fec7a34eabdb80109e4caeea7bda30f715b709ffdbba695c437e3e"
+  },
+  {
+    "path": "SourceReadSwiftTests\\LegadoCapabilityBankTests.swift",
+    "sha256": "4f221c9fa65dacaaca1a68688475dca27ba08beae03db2ce4f70b20f857b6384"
+  },
+  {
+    "path": "SourceReadSwiftTests\\LegadoCharsetTests.swift",
+    "sha256": "5c6fcff55d0b33094e730e8d1dd67e069e13b8edf819c5dd0fd1b9bf78668763"
+  },
+  {
+    "path": "SourceReadSwiftTests\\LegadoDefaultRuleTranslatorTests.swift",
+    "sha256": "0f48c7f283f268a3301cdb70733bad1a1da82822d21ba990d6c77d1ddf643104"
+  },
+  {
+    "path": "SourceReadSwiftTests\\LegadoFixtureTests.swift",
+    "sha256": "510bee93ea312e2eb04f5610078d8bbb5823472023175958246e2bb0236841ed"
+  },
+  {
+    "path": "SourceReadSwiftTests\\LegadoIndexSyntaxTests.swift",
+    "sha256": "bbc469e98d54715904f14b4c33cb1d400d610a3dbffd1276560c1297c0708e16"
+  },
+  {
+    "path": "SourceReadSwiftTests\\LegadoJavaCompatibilityTests.swift",
+    "sha256": "880336c54536b19982aa07865688c42f76a1b323fc7dfa7deea03e76c7398953"
+  },
+  {
+    "path": "SourceReadSwiftTests\\LegadoJavaScriptCompatibilityTests.swift",
+    "sha256": "dec71287d3aaa7b2a04a09b134d6e82bf3dbac25ea7c836a51a46bfe97ed3029"
+  },
+  {
+    "path": "SourceReadSwiftTests\\LegadoNativeBridgeTests.swift",
+    "sha256": "538e9f524435f276fa352b8706746ed638238c990ab0efe463413bfb7444ad92"
+  },
+  {
+    "path": "SourceReadSwiftTests\\LegadoSourceCapabilityMatrixTests.swift",
+    "sha256": "10aaaede19c5a66b76bf4d5e71fb2136326e88b90d630566b109341cc918a768"
+  },
+  {
+    "path": "SourceReadSwiftTests\\LegadoStage10CompatibilityTests.swift",
+    "sha256": "241ce85af716afb46e0694e172b189cb1cefbe525b997f481426f4a8e7e4d01c"
+  },
+  {
+    "path": "SourceReadSwiftTests\\LegadoStage18CompatibilityTests.swift",
+    "sha256": "498a767e3801224d520781818faeaa341a29329139b370f4139445e4f0f240ab"
+  },
+  {
+    "path": "SourceReadSwiftTests\\LegadoStage25CompatibilityTests.swift",
+    "sha256": "7e75a648a0a7083e8a4dfd8d5bccc81caed445fd7a4b57650e30dc3156e98375"
+  },
+  {
+    "path": "SourceReadSwiftTests\\LegadoStage29CompatibilityTests.swift",
+    "sha256": "da3e8624cedd590905ec52dedfe1347b5b13d75bb1d00fd24d7b392579f61838"
+  },
+  {
+    "path": "SourceReadSwiftTests\\LegadoStage9CompatibilityTests.swift",
+    "sha256": "1d8c878378f6ac2be6b06e5842fb4f495135ef51f7a00b184664e884825591bc"
+  },
+  {
+    "path": "SourceReadSwiftTests\\LightweightHTTPMessageTests.swift",
+    "sha256": "4ed27813fdb16c1013c6060c9ebd0166926fe76e85cdfb9552b2228d4a599f20"
+  },
+  {
+    "path": "SourceReadSwiftTests\\LocalEPUBBookParserTests.swift",
+    "sha256": "2b9133ff44a11a571b58a2009011e7a86096595c02d0652f88ebb5c98a3dcebd"
+  },
+  {
+    "path": "SourceReadSwiftTests\\LocalTextBookParserTests.swift",
+    "sha256": "a7f1bf604e3b324cce97c1944724686ea31563311fc41a4bbbaf9f9080ee1a44"
+  },
+  {
+    "path": "SourceReadSwiftTests\\LocalTxtSmartDividerTests.swift",
+    "sha256": "330dadf1e042daf1ee035d7987760e821c572458310d857917fb05a3b7fb9dd9"
+  },
+  {
+    "path": "SourceReadSwiftTests\\LocalVoiceLibraryTests.swift",
+    "sha256": "2810cce7016a4a02f10a5cab5da148b820cd11a451e6965eaf33469088bb8c03"
+  },
+  {
+    "path": "SourceReadSwiftTests\\OkHttp3BridgeTests.swift",
+    "sha256": "2a0fb1bb1f711c13211473fa10505da9f9ecfe928a673af8b666823e5884ee25"
+  },
+  {
+    "path": "SourceReadSwiftTests\\OnboardingClassicBookTests.swift",
+    "sha256": "82520613c889cf408e75b2c16a827b3d004517713391b99eb3dcd451c434874e"
+  },
+  {
+    "path": "SourceReadSwiftTests\\PayActionTests.swift",
+    "sha256": "ca5f8db14709b8d5c844e88d69f25621c0111044ea12f34d1657d7fe55b21b65"
+  },
+  {
+    "path": "SourceReadSwiftTests\\PrivateBankSourceTests.swift",
+    "sha256": "3ddee8da3cf73b1cc669d40ebf570506ae0467156744af1735988707223bc319"
+  },
+  {
+    "path": "SourceReadSwiftTests\\PurifyRuleStoreTests.swift",
+    "sha256": "bd1914671ece0d9c6fbc3bd071538853131ed8d5c0da0e788ca830366547ea6f"
+  },
+  {
+    "path": "SourceReadSwiftTests\\QimaoSignatureTests.swift",
+    "sha256": "d18ba9855c275bb38c821d5de3c6445628bd8b597844c3c1d0b4baf8f0fda02b"
+  },
+  {
+    "path": "SourceReadSwiftTests\\ReaderAutomationPolicyTests.swift",
+    "sha256": "7934e1105e2b62f62597349e6c26988b7e8171ab4eecb0e489a8b9797b81577f"
+  },
+  {
+    "path": "SourceReadSwiftTests\\ReaderBackgroundPickerTests.swift",
+    "sha256": "ca0e825974236a07d5f8cfe48335a28827474bfee5266ab0c60cd4591b82bcac"
+  },
+  {
+    "path": "SourceReadSwiftTests\\ReaderChapterWindowPolicyTests.swift",
+    "sha256": "d8f1a42a54677886ec506340c467510460ef5c37317ec92c83aed2035dca3bf8"
+  },
+  {
+    "path": "SourceReadSwiftTests\\ReaderCoverSettlePolicyTests.swift",
+    "sha256": "42b196b955e538bff6aef36df21b283cbd142ebf8c70bf1926af66c6c5a1818c"
+  },
+  {
+    "path": "SourceReadSwiftTests\\ReaderFrameRateSamplerTests.swift",
+    "sha256": "d9417e203be964d2de2ea75c84c77fa21d006933248faef2e905a870a6ea87c8"
+  },
+  {
+    "path": "SourceReadSwiftTests\\ReaderImageStyleTests.swift",
+    "sha256": "f52bbb292ae6ef4338d869874adde4b61bf297e761a133502777ca5bd365a1f5"
+  },
+  {
+    "path": "SourceReadSwiftTests\\ReaderPagedNavigationPolicyTests.swift",
+    "sha256": "35ed30a0740b57b5b6556c0a2f130d50466c72b0dcf74566f1619ed67c12c07e"
+  },
+  {
+    "path": "SourceReadSwiftTests\\ReaderPagedOverflowTests.swift",
+    "sha256": "60a5890a7e81116f68717066f70791efe8d80a32e01b23324baaa91c8cbdb28b"
+  },
+  {
+    "path": "SourceReadSwiftTests\\ReaderPageGeometryTests.swift",
+    "sha256": "e81f94ddbc6fbf184bd87dd1067341d38e0efa324b4d0ff0e88fdf62e1f111eb"
+  },
+  {
+    "path": "SourceReadSwiftTests\\ReaderPageLayoutEngineTests.swift",
+    "sha256": "23e71be520e581a509409bee1c18842e39a1b655356d88344f3cec47122bfabd"
+  },
+  {
+    "path": "SourceReadSwiftTests\\ReaderPageSelectionTests.swift",
+    "sha256": "65c99b884b730861a5c80a358f64e27ff58f480ea9c1b1a55048f45d6e6914ec"
+  },
+  {
+    "path": "SourceReadSwiftTests\\ReaderPageTextBuilderTests.swift",
+    "sha256": "2fa28d6f89758d8f5d4e15a78966b00d9d8ce467e4a064590e3236c93c96607e"
+  },
+  {
+    "path": "SourceReadSwiftTests\\ReaderPerformancePolicyTests.swift",
+    "sha256": "44e9f01ee8ec1601bb498f715976a0cb8566ef3eef8790129954cb538a021ce3"
+  },
+  {
+    "path": "SourceReadSwiftTests\\ReaderPositionMappingTests.swift",
+    "sha256": "46d1c4345b63977ba8ecd3425dc461e770c21bcede1718e4a4eb73bb26009e0e"
+  },
+  {
+    "path": "SourceReadSwiftTests\\ReaderSafeAreaResolverTests.swift",
+    "sha256": "8688188c188a0499101601a6401349f2d0f78ded9de7077e322261e090402638"
+  },
+  {
+    "path": "SourceReadSwiftTests\\ReaderScrollAnchorPolicyTests.swift",
+    "sha256": "ca7ccfa15ee283483d1fd18516e9490873eeb14cbfe739ba817dacd4633e7780"
+  },
+  {
+    "path": "SourceReadSwiftTests\\ReaderScrollPerfMeterTests.swift",
+    "sha256": "1f4820ba83216c2e1a832361c53321b64a2fb56337d2d22177e726ed911df338"
+  },
+  {
+    "path": "SourceReadSwiftTests\\ReaderScrollStabilityTests.swift",
+    "sha256": "f9c87b65a260b127ea6ba5b162d1a152e36706af06caacb87743e42128add251"
+  },
+  {
+    "path": "SourceReadSwiftTests\\ReaderSettingsModelsTests.swift",
+    "sha256": "d1a9792797e08ac36db7e21917fe8ebe5de44bc47a3313d5c1e32738ecca1908"
+  },
+  {
+    "path": "SourceReadSwiftTests\\ReaderWallpaperLayoutTests.swift",
+    "sha256": "7a8faedd1970427e595ae305eb5eb9167cc310c428d6cbc66b97a2c7ca3390fb"
+  },
+  {
+    "path": "SourceReadSwiftTests\\ReadingHistoryStoreTests.swift",
+    "sha256": "61785c4c6b0bd71149271b308a3c7253e47b82c04332b9951d7d378ce6bad860"
+  },
+  {
+    "path": "SourceReadSwiftTests\\ReadingStatsSummaryTests.swift",
+    "sha256": "40ce4bdb775560c2aa5ab902bcf6b61d508d193275638305dbe0d176039b98b6"
+  },
+  {
+    "path": "SourceReadSwiftTests\\RealSourceSearchRegressionTests.swift",
+    "sha256": "bb4b4e4ebb7c6985ef9cfe31b6caf9bf94a806cc8a0644ac4795f9ba8dee0e5d"
+  },
+  {
+    "path": "SourceReadSwiftTests\\RealSourceTOCRegressionTests.swift",
+    "sha256": "4985e9bbd3119a68f55c15f33ee7460e645c76a34bdd168ab07f1c6c987a33c5"
+  },
+  {
+    "path": "SourceReadSwiftTests\\ResponseBodyDecoderTests.swift",
+    "sha256": "07e60b8f6158dd617c48fc517c357d1ae3e215846d4c02d9df98c4ce512b54ce"
+  },
+  {
+    "path": "SourceReadSwiftTests\\ResponseFormatDetectorTests.swift",
+    "sha256": "171f44dc350f0bbcfeab09b174a0fe776d270854c8e85004ab1dba74f763ed73"
+  },
+  {
+    "path": "SourceReadSwiftTests\\ResponseTextDecoderTests.swift",
+    "sha256": "318714e30c2f2dd56d8790c7b671816094ceb0e79d4b587df2deb6461c7950d6"
+  },
+  {
+    "path": "SourceReadSwiftTests\\RSSArticleContentCacheStoreTests.swift",
+    "sha256": "7b5427f29f357c249e008fe116b0bef01dd8a92a14cbbc9868752b982af4d621"
+  },
+  {
+    "path": "SourceReadSwiftTests\\RSSArticleStateStoreTests.swift",
+    "sha256": "f3bbd161616c89ff0764cb9ec6382b6c48ca14bc52a1fdeebadae0c8fc5def1b"
+  },
+  {
+    "path": "SourceReadSwiftTests\\RSSFeedCacheStoreTests.swift",
+    "sha256": "e7283e2aee5a21146170e8f2b7a25fce541e52fe19ce9743a0a99c3e2385b8c6"
+  },
+  {
+    "path": "SourceReadSwiftTests\\RSSFeedParserTests.swift",
+    "sha256": "a833e79e6e81a0228f1fa54387191f77df9674a0728b88b48bc61304f9b94ece"
+  },
+  {
+    "path": "SourceReadSwiftTests\\RuleDirectiveParserTests.swift",
+    "sha256": "32333a640b86c0f4a7243644594abae9a51abb18c658cd178ef59e653f8099a0"
+  },
+  {
+    "path": "SourceReadSwiftTests\\RuleEditorRoundTripTests.swift",
+    "sha256": "7289bd30718be891d093e8da0d63607922d8b433ba7472864c8cde0f5e3362b8"
+  },
+  {
+    "path": "SourceReadSwiftTests\\RuleEditorValidatorTests.swift",
+    "sha256": "47f7059ea8777dc01e75458c136a59f73bef849663a48e0af6e36b8f50e3fd04"
+  },
+  {
+    "path": "SourceReadSwiftTests\\RuleExtractorJSTests.swift",
+    "sha256": "b1ade54fc866ec556fb4766c9ed1bb50bf1d343bb80ee38fc9c71a214b59e9e9"
+  },
+  {
+    "path": "SourceReadSwiftTests\\RuleOperatorSplitterTests.swift",
+    "sha256": "a50667dfebcd7d757a54048d0cd07a8caa20ce618c10b0d255e672ca066fd70a"
+  },
+  {
+    "path": "SourceReadSwiftTests\\RulePreviewEvaluatorTests.swift",
+    "sha256": "6c60c5cfe90719205ebfb3c713414acdc76088094836c4a85cc2558929c61ad2"
+  },
+  {
+    "path": "SourceReadSwiftTests\\RuleTransformParserTests.swift",
+    "sha256": "d3136cd3eca95490f9aba62bc18888bc471ab496bcea1f5e64ee63454573c2c6"
+  },
+  {
+    "path": "SourceReadSwiftTests\\SakuraReaderPaletteTests.swift",
+    "sha256": "9ceb285c3aba0b94ef2e07240ab6b8da0e5ca81da39b7ec1e063211aeb8d1cd0"
+  },
+  {
+    "path": "SourceReadSwiftTests\\SakuraThemeCatalogTests.swift",
+    "sha256": "166be1611038ce76d8334c8770a2d00982f1ca36b90162b2b36282b11b811fa7"
+  },
+  {
+    "path": "SourceReadSwiftTests\\SandboxEnvironmentTests.swift",
+    "sha256": "9799398880ac9b0d18f32bd0eaabeae0b6f43b442871f90c354a57c7d7202434"
+  },
+  {
+    "path": "SourceReadSwiftTests\\SearchBookMatcherTests.swift",
+    "sha256": "faad1ee21be18e70623c4dac75093e92fcf15bcdaccccf3970f49307b54cfef8"
+  },
+  {
+    "path": "SourceReadSwiftTests\\SearchResultFilterTests.swift",
+    "sha256": "b461ff5f48df3b512af8e2a5017ed73c0962e51e6a32179152df1add935325bc"
+  },
+  {
+    "path": "SourceReadSwiftTests\\SearchResultParserExploreTests.swift",
+    "sha256": "95e0453ec9d6732d30f79a805f8ef94e5dde1e56bdbfe576079efe6d21e8e879"
+  },
+  {
+    "path": "SourceReadSwiftTests\\SearchResultParserTests.swift",
+    "sha256": "93b9aa9bc7b7f8a4fcb96dc6cb64c538b3894e255750de984bea39fa415d010d"
+  },
+  {
+    "path": "SourceReadSwiftTests\\SearchURLResolverTests.swift",
+    "sha256": "a89cf9919f9bd5255d4d9c358b8f2bc1053779488b3c100a703b56d478b61966"
+  },
+  {
+    "path": "SourceReadSwiftTests\\SmartWebArticleExtractorTests.swift",
+    "sha256": "f9234ef5433a93eca61e9ade81be0e4a745c985da89293c958d866999c9b66ea"
+  },
+  {
+    "path": "SourceReadSwiftTests\\SourceBatchCheckCoordinatorTests.swift",
+    "sha256": "2c2c07dd4e74c0363d3dccd9476332f9ebfc5626e38e712b90b6833866a66a67"
+  },
+  {
+    "path": "SourceReadSwiftTests\\SourceBatchDiagnosticRunnerTests.swift",
+    "sha256": "cf67ff7db3b80e5ec966578700380282bbce749feb134fd89f31fe06763c767f"
+  },
+  {
+    "path": "SourceReadSwiftTests\\SourceCookieStoreTests.swift",
+    "sha256": "f9cb28896752637a29bf3c6c3937cdcb0fe57a4043874b930c39f32d0cdc8651"
+  },
+  {
+    "path": "SourceReadSwiftTests\\SourceDiagnosticBatchReportTests.swift",
+    "sha256": "f42279f3f109052eadf6411dc36a969992feec5663ddda9472e625004983b31d"
+  },
+  {
+    "path": "SourceReadSwiftTests\\SourceDiagnosticClassifierTests.swift",
+    "sha256": "1b49713850d9334e4cf1f17f4154f3242f388200b45f83e4f357b42bba583488"
+  },
+  {
+    "path": "SourceReadSwiftTests\\SourceDiagnosticCorpusRegressionTests.swift",
+    "sha256": "e943c2fd57ea992eb51fc6c0af3bf24b6782240395baeb43c37a0194a41ffb93"
+  },
+  {
+    "path": "SourceReadSwiftTests\\SourceDiagnosticHistoryStoreTests.swift",
+    "sha256": "276b93c0ed26aa567308a65e5ccdda5b7895007e68dd370bfb6f36d06f2246f6"
+  },
+  {
+    "path": "SourceReadSwiftTests\\SourceDiagnosticRepairAdvisorTests.swift",
+    "sha256": "e414b53b41fbc90ced7d1cddc4531d77509b5b6ae9c55742cf8049fb26cbc4ee"
+  },
+  {
+    "path": "SourceReadSwiftTests\\SourceDiagnosticReportExporterTests.swift",
+    "sha256": "1c3bd736fa57eb45481baa65840224e25aee4f973f3ebf63f67fafe6a3b8ec43"
+  },
+  {
+    "path": "SourceReadSwiftTests\\SourceDiagnosticReportTests.swift",
+    "sha256": "fe16c4ad761fce850cab22420505839e06d631c6601bb2b38afe005775b5f4ce"
+  },
+  {
+    "path": "SourceReadSwiftTests\\SourceDynamicLoginTests.swift",
+    "sha256": "6b3ee6493ef36e260caffbfc67ac78c543312c23e4b39d4e2191af0fcc301fef"
+  },
+  {
+    "path": "SourceReadSwiftTests\\SourceEngineBodyJSTests.swift",
+    "sha256": "54fbb09096b4f1f699036e000c17c7cf480c2cb6f3b80b756b13b1cc139d366b"
+  },
+  {
+    "path": "SourceReadSwiftTests\\SourceEngineCLevelFixtureTests.swift",
+    "sha256": "630fe59276af932aa3d0dca5ee16ed3a780b4534d617e3833c9e0c40cd3f496c"
+  },
+  {
+    "path": "SourceReadSwiftTests\\SourceEngineCompressedFixtureTests.swift",
+    "sha256": "07861c9ecd5602cfa109414fdae18fca15e87c78c9bab98332cfb05d45a396d6"
+  },
+  {
+    "path": "SourceReadSwiftTests\\SourceEngineCryptoFixtureTests.swift",
+    "sha256": "26f01dbd307e6e6babe73a9b572bc93708940d336dc2a848bc8c8bddcf7b54b7"
+  },
+  {
+    "path": "SourceReadSwiftTests\\SourceEngineDynamicAjaxFixtureTests.swift",
+    "sha256": "adb167e7b1c705c397d83d9ad44a6307aac9fa21557db5314be9c2ffa162d670"
+  },
+  {
+    "path": "SourceReadSwiftTests\\SourceEngineDynamicTokenFixtureTests.swift",
+    "sha256": "6c5f84c8bdf8c7c40557932c41e545f4a5c5c5e15fc8e92f283849fe013821b3"
+  },
+  {
+    "path": "SourceReadSwiftTests\\SourceEngineFixturePipelineTests.swift",
+    "sha256": "041e93e72da6fa1689008a7f34ca6797768c4247f84385c5a2a989005ad9dad3"
+  },
+  {
+    "path": "SourceReadSwiftTests\\SourceEngineLegadoCorpusTests.swift",
+    "sha256": "32b550ea32e5342b4089cd348c2b9bc2f15c0876595590a527f0a54d81553e85"
+  },
+  {
+    "path": "SourceReadSwiftTests\\SourceEngineMixedResponseFixtureTests.swift",
+    "sha256": "37beda10c666a463f78993cda54c9498b22919ba70ac4070797af3c315d37b3d"
+  },
+  {
+    "path": "SourceReadSwiftTests\\SourceEngineNativeDirectiveTests.swift",
+    "sha256": "9cbc49c53978aae170f30bb35fc0eabca2fee71d26f5dc6e0c06b743c8b65037"
+  },
+  {
+    "path": "SourceReadSwiftTests\\SourceEnginePerBookVariablesTests.swift",
+    "sha256": "e6c6980fba980ec2df7ebdc22ea525170bbd4742844b61f51b6d64464cbf61ab"
+  },
+  {
+    "path": "SourceReadSwiftTests\\SourceEnginePersistentStateTests.swift",
+    "sha256": "c87fb0a5269adb2ea0a5de8536eed854a7859282ac8bae928ff1d2415c82dcd1"
+  },
+  {
+    "path": "SourceReadSwiftTests\\SourceEngineStage18FixtureTests.swift",
+    "sha256": "464eab7f85cf97d05bc70526b4e5ff14c841110bb355a3d48591504731feab2f"
+  },
+  {
+    "path": "SourceReadSwiftTests\\SourceFlowEngineTests.swift",
+    "sha256": "953f82e5f7c3820e5590a79418168f831b1ed449c007d43cda3a4e8ca11d50da"
+  },
+  {
+    "path": "SourceReadSwiftTests\\SourceHealthStoreTests.swift",
+    "sha256": "afe0107de34d9998a95ed5c60613969f22ec3c7488a5f36f077afd223ddb9844"
+  },
+  {
+    "path": "SourceReadSwiftTests\\SourceImportDownloaderTests.swift",
+    "sha256": "d5655bfd18878deb072f10401437bb01dced49b487f63916d8e998c0e9a20a1c"
+  },
+  {
+    "path": "SourceReadSwiftTests\\SourceImportLinkParserTests.swift",
+    "sha256": "141b02048ffdeff0c8ef45cba8b4ae606724eadad812534ae938d910adf9da1b"
+  },
+  {
+    "path": "SourceReadSwiftTests\\SourceLoginFieldTests.swift",
+    "sha256": "dab6f26f1c1195e2d73d42f4baf1e026b74247d3f1c392e836ca0c2caba48b40"
+  },
+  {
+    "path": "SourceReadSwiftTests\\SourceLoginURLResolverTests.swift",
+    "sha256": "cb7a5d0ef1ab86d576dbaa4606b8c90fea10b8202c96178ca0c9f432ab1fecd6"
+  },
+  {
+    "path": "SourceReadSwiftTests\\SourceMetadataChainTests.swift",
+    "sha256": "e3907296de468db36314867ce9b54d9165cecd7060f786c69c49caa2bfbd0fa8"
+  },
+  {
+    "path": "SourceReadSwiftTests\\SourcePaginationURLIdentityTests.swift",
+    "sha256": "c0e7ca3ca377582020d4449047a2205b83d8163aa757a32d69ca18db5cf6fbba"
+  },
+  {
+    "path": "SourceReadSwiftTests\\SourcePipelineTests.swift",
+    "sha256": "0b864f64a76fc36a43d817c0d0d58c509e777dfb8d22d3014cebd5160f785c44"
+  },
+  {
+    "path": "SourceReadSwiftTests\\SourceRateLimiterTests.swift",
+    "sha256": "8281276ba42b6757aa77d7997f12709302f4929dad964fd7e0794825659a3de0"
+  },
+  {
+    "path": "SourceReadSwiftTests\\SourceRequestBuilderDynamicStateTests.swift",
+    "sha256": "3d730cc8d6fb2836b32b0046680bd08eae6f4a5c3df76ba2006c5c22a7f009e2"
+  },
+  {
+    "path": "SourceReadSwiftTests\\SourceRowsCorpusProbeTests.swift",
+    "sha256": "58538b52ca955b19d9b1f3856addb4d6c636ee4aca7f3af24db66427b7649dc9"
+  },
+  {
+    "path": "SourceReadSwiftTests\\SourceRuleDraftStoreTests.swift",
+    "sha256": "4d79aaecc037925862c4b9a2a634b639568bc33e18a7969b06003af5519c67ea"
+  },
+  {
+    "path": "SourceReadSwiftTests\\SourceSearchURLProbeTests.swift",
+    "sha256": "38e4ce85eae02f158dd76aa042fabe87fa18bd8fe4cebf4ed37d433b3ed99024"
+  },
+  {
+    "path": "SourceReadSwiftTests\\SourceStoreTests.swift",
+    "sha256": "605eb9730483b583870a265c5e856be6a0c33c6c01d18d152a0147b85175eb7c"
+  },
+  {
+    "path": "SourceReadSwiftTests\\SourceSwitchCacheStoreTests.swift",
+    "sha256": "4be6d07b1d3259bf53a1465d105d4fdf4f4092d189bc04436388099769b2b398"
+  },
+  {
+    "path": "SourceReadSwiftTests\\SourceTocCorpusProbeTests.swift",
+    "sha256": "271ae06687288119150426b22bce75cee738dea0e19fc1a9949f35924196839a"
+  },
+  {
+    "path": "SourceReadSwiftTests\\SourceURLBodyJSRegressionTests.swift",
+    "sha256": "591bbb95aa440430e22ef7d3ee30b6d3ad408e2e853c15b186252e80aa14c850"
+  },
+  {
+    "path": "SourceReadSwiftTests\\SourceURLDirectiveTests.swift",
+    "sha256": "210d64966010d06e27df4f2555e339a13363b46f7add731ae02cf35964203905"
+  },
+  {
+    "path": "SourceReadSwiftTests\\SourceURLResolutionTests.swift",
+    "sha256": "ddb2ac547af1bf2823239572d18728d3043cc7337144f8718ad5664639252b07"
+  },
+  {
+    "path": "SourceReadSwiftTests\\Stage33ReaderExperienceTests.swift",
+    "sha256": "44ee2d35589d7b5b71505fa84b9a15de0a40eab6f8f11a94fdbe363abb042ca4"
+  },
+  {
+    "path": "SourceReadSwiftTests\\Stage34ComprehensiveParityTests.swift",
+    "sha256": "e7a6cd2fcfc9949f0bedb744697bc6e2ccc33660ea9dbe211c334547814c65fd"
+  },
+  {
+    "path": "SourceReadSwiftTests\\StubURLProtocol.swift",
+    "sha256": "a5bfad6139390d09b74fe4139e558cd45fb6225c296ecbaa133adbe84df9c7b1"
+  },
+  {
+    "path": "SourceReadSwiftTests\\TestFixtureSupport.swift",
+    "sha256": "103e4d4826f20ef8f1b1684ee17ed29f17a40cb2d21dce5cb38a8ee8eb7b22f4"
+  },
+  {
+    "path": "SourceReadSwiftTests\\VerificationCodeCoordinatorTests.swift",
+    "sha256": "0c9b4f4d8aba57aa9599e84c1d5cf57d3a35e1a9d7055b9fb0bd0bd2db55996e"
+  },
+  {
+    "path": "SourceReadSwiftTests\\VideoContentParserTests.swift",
+    "sha256": "65c808b306dc2bdd6b388b8fddd0f2c3065c9cc4830864951208d1d116ef6d5f"
+  },
+  {
+    "path": "SourceReadSwiftTests\\WebDAVSyncServiceTests.swift",
+    "sha256": "b7295d5710de5d151e26e62fc0a2051dfd3349162e8b69a52dced574a6219796"
+  },
+  {
+    "path": "SourceReadSwiftTests\\WebReaderDocumentTests.swift",
+    "sha256": "b620a68073d81fd67332234be18c1068bf335cc27614deb3348a7eaaba17a156"
+  },
+  {
+    "path": "SourceReadSwiftTests\\WebViewFallbackHeuristicTests.swift",
+    "sha256": "65f9fcbc60fdfdd44b39f11839b408ecff203e39f0f99f64a96f25529101f971"
+  },
+  {
+    "path": "SourceReadSwiftTests\\WebViewResourceSniffingTests.swift",
+    "sha256": "124680a7bb0835ce7f3f0b78e530c09146f29feaf4173c42f6f60bec886303b0"
+  },
+  {
+    "path": "SourceReadSwiftTests\\XbsBookSourceAdapterTests.swift",
+    "sha256": "a7f9bffc224205898bb3f943dc4a67bca821859ff4acf95cbc3ac0e1e424e9ed"
+  },
+  {
+    "path": "project.yml",
+    "sha256": "3632eeebfdc1a15f9d66c2a421fe145f53dd8c2c444378292518db55e6a7adb0"
+  }
+]

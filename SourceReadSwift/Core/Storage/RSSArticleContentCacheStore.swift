@@ -33,7 +33,7 @@ final class RSSArticleContentCacheStore: ObservableObject {
     private let maxEntries: Int
 
     init(fileURL: URL? = nil, maxEntries: Int = 200) {
-        self.maxEntries = maxEntries
+        self.maxEntries = max(0, maxEntries)
         if let fileURL {
             self.fileURL = fileURL
         } else {
@@ -42,9 +42,8 @@ final class RSSArticleContentCacheStore: ObservableObject {
             self.fileURL = base.appendingPathComponent("SourceReadSwift/RSSArticleContentCache.json")
         }
 
-        guard let data = try? Data(contentsOf: self.fileURL),
-              let decoded = try? Self.decoder.decode([RSSArticleContentCacheEntry].self, from: data) else { return }
-        entries = decoded
+        do { entries = Array((try RSSCacheFile<[RSSArticleContentCacheEntry]>(url: self.fileURL).load() ?? []).prefix(self.maxEntries)) }
+        catch { NSLog("RSS article cache read failed: code=%ld", (error as NSError).code) }
     }
 
     func paragraphs(for article: RSSArticlePreview, maxAge: TimeInterval? = nil) -> [String]? {
@@ -91,23 +90,8 @@ final class RSSArticleContentCacheStore: ObservableObject {
     }
 
     private func persist() {
-        do {
-            try FileManager.default.createDirectory(at: fileURL.deletingLastPathComponent(), withIntermediateDirectories: true)
-            try Self.encoder.encode(entries).write(to: fileURL, options: [.atomic])
-        } catch {
-            // Best-effort cache; article reading remains functional when disk writes fail.
-        }
+        RSSCacheFile<[RSSArticleContentCacheEntry]>(url: fileURL).save(entries)
     }
 
-    private static let encoder: JSONEncoder = {
-        let encoder = JSONEncoder()
-        encoder.dateEncodingStrategy = .iso8601
-        return encoder
-    }()
-
-    private static let decoder: JSONDecoder = {
-        let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .iso8601
-        return decoder
-    }()
+    func waitForPendingWrites() async { await RSSCacheFile<[RSSArticleContentCacheEntry]>(url: fileURL).waitForPendingWrites() }
 }

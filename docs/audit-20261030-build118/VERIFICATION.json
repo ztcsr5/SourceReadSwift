@@ -1,0 +1,56 @@
+{
+  "checked_at": "2026-10-31T06:40:09.791301+08:00",
+  "head": "5686485045b78cfb17c654a2acf8c30c387a73e8",
+  "baseline_files_checked": 362,
+  "business_sources_unchanged": true,
+  "changed_baseline_files": [],
+  "missing_artifacts": [],
+  "valid_json_files": 19,
+  "python_scripts_compile": "PASS",
+  "executions": [
+    {
+      "command": [
+        "git",
+        "-C",
+        "D:\\Gemini反重力\\SourceReadSwift2",
+        "diff",
+        "--check"
+      ],
+      "exit_code": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "python",
+        "-X",
+        "utf8",
+        "D:\\Gemini反重力\\SourceReadSwift2\\docs\\audit-20261030-build118\\pagination-model-check.py"
+      ],
+      "exit_code": 0,
+      "stdout": "{\n  \"runtime\": \"Python source-level model; no Swift/UIKit execution\",\n  \"checks\": [\n    {\n      \"check\": \"middle-edit-cache-collision\",\n      \"result\": \"REPRODUCED\",\n      \"old\": [\n        \"first\",\n        \"OLD MIDDLE\",\n        \"last\"\n      ],\n      \"new\": [\n        \"first\",\n        \"NEW MIDDLE\",\n        \"last\"\n      ]\n    },\n    {\n      \"check\": \"geometry-repagination-stale-render-key\",\n      \"result\": \"REPRODUCED\",\n      \"old_partition\": [\n        \"ABCD\",\n        \"EFGH\"\n      ],\n      \"new_partition\": [\n        \"ABCDEF\",\n        \"GH\"\n      ],\n      \"first_page_returned\": \"ABCD\",\n      \"note\": \"ABCD/ABCDEF are illustrative partitions, not TextKit output.\"\n    },\n    {\n      \"check\": \"synchronous-radius-equals-window\",\n      \"result\": \"REPRODUCED\",\n      \"loaded_chapters\": 11,\n      \"deferred_inside_window\": 0\n    },\n    {\n      \"check\": \"spacing-contract-with-paragraph-less-than-line\",\n      \"result\": \"MODEL_ONLY\",\n      \"excess_for_10_boundaries\": 180,\n      \"note\": \"Uses the TextKit spacing contract asserted by repository tests; UIKit measurement NOT RUN.\"\n    },\n    {\n      \"check\": \"minimum-body-height-overlaps-footer\",\n      \"result\": \"REPRODUCED\",\n      \"body_end\": 213,\n      \"footer_top\": 152\n    }\n  ]\n}\n",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "python",
+        "-X",
+        "utf8",
+        "D:\\Gemini反重力\\SourceReadSwift2\\docs\\audit-20261030-build118\\check_flip_model.py"
+      ],
+      "exit_code": 0,
+      "stdout": "{\n  \"method\": \"Python translation of source predicates + static assertions; NOT Swift/UIKit execution\",\n  \"source_assertions\": {\n    \"apply_guard_ignores_neighbours\": true,\n    \"five_slot_content_size\": true,\n    \"no_target_offset_clamp\": true,\n    \"commits_one_step_each_direction\": true,\n    \"page_curl_legacy_only_declaration\": true,\n    \"translation_cover_same_route\": true,\n    \"legacy_prewarm_guard_before_enqueue\": true\n  },\n  \"neighbour_change_witness\": {\n    \"before\": [\n      \"P-2\",\n      \"P-1\",\n      \"P\",\n      \"placeholder+1\",\n      \"placeholder+2\"\n    ],\n    \"requested_after\": [\n      \"P-2\",\n      \"P-1\",\n      \"P\",\n      \"real+1\",\n      \"real+2\"\n    ],\n    \"guard_enters\": false,\n    \"installed_after\": [\n      \"P-2\",\n      \"P-1\",\n      \"P\",\n      \"placeholder+1\",\n      \"placeholder+2\"\n    ]\n  },\n  \"slot_landing_witnesses\": [\n    {\n      \"physical_slot\": 0,\n      \"visible_page_delta\": -2,\n      \"settle\": \"previous\",\n      \"committed_delta\": -1,\n      \"agrees\": false\n    },\n    {\n      \"physical_slot\": 1,\n      \"visible_page_delta\": -1,\n      \"settle\": \"previous\",\n      \"committed_delta\": -1,\n      \"agrees\": true\n    },\n    {\n      \"physical_slot\": 2,\n      \"visible_page_delta\": 0,\n      \"settle\": \"springBack\",\n      \"committed_delta\": 0,\n      \"agrees\": true\n    },\n    {\n      \"physical_slot\": 3,\n      \"visible_page_delta\": 1,\n      \"settle\": \"next\",\n      \"committed_delta\": 1,\n      \"agrees\": true\n    },\n    {\n      \"physical_slot\": 4,\n      \"visible_page_delta\": 2,\n      \"settle\": \"next\",\n      \"committed_delta\": 1,\n      \"agrees\": false\n    }\n  ],\n  \"test_files_naming_cover_host\": [],\n  \"source_sha256\": {\n    \"SourceReadSwift/Features/Reader/CoverPageReaderView.swift\": \"fafde89acd4fd228ba881bc0683a2d89421905f41f222b131749994353530a4a\",\n    \"SourceReadSwift/Features/Reader/ReaderView.swift\": \"383742d4cbb8f8e8456fecba6fc2ab98d472b41f866dee0e8ab2fe9c056e15f6\",\n    \"SourceReadSwift/Features/Reader/ReaderPagedNavigationPolicy.swift\": \"a02ffacad6257595cb58c12e370d57e461e5c9d90deec3d41c4004eb412f49fd\",\n    \"SourceReadSwift/Features/Reader/ReaderSettingsModels.swift\": \"3bc34e92e569eba16366e7c647a71c94593218b60a599ffcec67c6eef5015036\",\n    \"SourceReadSwift/Features/Reader/PageCurlReaderView.swift\": \"bca2efbd33f8fa1ebc33bf0447a3718eba9da012a53c1aea9fa5f4894b28927f\"\n  }\n}\n",
+      "stderr": ""
+    }
+  ],
+  "parser_cache_relocated_to_audit": true,
+  "git_status": "?? SourceReadSwift/Features/Reader/CoverPageReaderView.swift.bak114\n?? SourceReadSwift/Features/Reader/PageCurlReaderView.swift.bak110\n?? SourceReadSwift/Features/Reader/ReaderPageGeometry.swift.bak114\n?? SourceReadSwift/Features/Reader/ReaderPageTextView.swift.bak114\n?? SourceReadSwift/Features/Reader/ReaderView.swift.bak110\n?? SourceReadSwift/Features/Reader/ReaderView.swift.bak114\n?? SourceReadSwift/Features/SourceManager/SourceManagerView.swift.bak114\n?? SourceReadSwift/Shared/AppVersion.swift.bak114\n?? docs/audit-20261030-build118/\n?? docs/sources/shareBookSource11-fixed-1.0.95.json.bak-bqg111\n?? docs/sources/shareBookSource11-fixed-1.0.95.json.bak-urlfix110\n?? docs/sources/shareBookSource11-fixed-1.0.96.json.bak-qq112\n?? docs/sources/shareBookSource11-fixed-1.0.96.json.bak-shuqi113\n?? docs/sources/shareBookSource11-fixed-1.0.96.json.bak-shuqi113-toc\n?? docs/sources/shareBookSource11-fixed-1.0.96.json.bak-shuqi113.sha256\n?? project.yml.bak110\n?? project.yml.bak114\n",
+  "not_run": [
+    "New iOS/Xcode build",
+    "New XCTest run",
+    "iOS simulator/physical-device UI reproduction",
+    "Instruments frame-time and memory measurements"
+  ],
+  "note": "Python counterexample models and source assertions are not Swift/UIKit tests.",
+  "pass": true
+}

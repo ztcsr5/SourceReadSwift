@@ -1,0 +1,51 @@
+{
+  "runtime": "Python source-level model; no Swift/UIKit execution",
+  "checks": [
+    {
+      "check": "middle-edit-cache-collision",
+      "result": "REPRODUCED",
+      "old": [
+        "first",
+        "OLD MIDDLE",
+        "last"
+      ],
+      "new": [
+        "first",
+        "NEW MIDDLE",
+        "last"
+      ]
+    },
+    {
+      "check": "geometry-repagination-stale-render-key",
+      "result": "REPRODUCED",
+      "old_partition": [
+        "ABCD",
+        "EFGH"
+      ],
+      "new_partition": [
+        "ABCDEF",
+        "GH"
+      ],
+      "first_page_returned": "ABCD",
+      "note": "ABCD/ABCDEF are illustrative partitions, not TextKit output."
+    },
+    {
+      "check": "synchronous-radius-equals-window",
+      "result": "REPRODUCED",
+      "loaded_chapters": 11,
+      "deferred_inside_window": 0
+    },
+    {
+      "check": "spacing-contract-with-paragraph-less-than-line",
+      "result": "MODEL_ONLY",
+      "excess_for_10_boundaries": 180,
+      "note": "Uses the TextKit spacing contract asserted by repository tests; UIKit measurement NOT RUN."
+    },
+    {
+      "check": "minimum-body-height-overlaps-footer",
+      "result": "REPRODUCED",
+      "body_end": 213,
+      "footer_top": 152
+    }
+  ]
+}

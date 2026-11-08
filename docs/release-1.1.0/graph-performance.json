@@ -1,0 +1,152 @@
+{
+  "scope": "Focused read-only semantic review: search/detail performance, initial reader cost, source badge compression, and article extraction",
+  "baseline_commit": "71156be1ac148d6328dccc2844ed2555a41313b0",
+  "review_date": "2026-10-31",
+  "runtime_verification": "NOT RUN: static source review on Windows, no iOS frame-time measurements and no target-site requests",
+  "path_root": "D:/Gemini反重力/SourceReadSwift2/",
+  "schema_note": "Graphify semantic fragment: source is caller and target is callee; confidence_tag distinguishes explicit relationships from inferred symptom causes.",
+  "nodes": [
+    {"id":"discover","label":"DiscoverView.resultsList","file_type":"code","source_file":"SourceReadSwift/Features/Discover/DiscoverView.swift","source_location":"610-730"},
+    {"id":"groupedRows","label":"Grouped result VStack","file_type":"code","source_file":"SourceReadSwift/Features/Discover/DiscoverView.swift","source_location":"714-728","rationale":"A lazy parent does not virtualize individual rows inside a plain child VStack."},
+    {"id":"searchRow","label":"SearchBookRow","file_type":"code","source_file":"SourceReadSwift/Features/Discover/SearchBookRow.swift","source_location":"10-106"},
+    {"id":"searchVM","label":"DiscoverViewModel","file_type":"code","source_file":"SourceReadSwift/Features/Discover/DiscoverView.swift","source_location":"1260-1685"},
+    {"id":"publish","label":"publishIfNeeded","file_type":"code","source_file":"SourceReadSwift/Features/Discover/DiscoverView.swift","source_location":"1576-1590"},
+    {"id":"ranking","label":"SearchBookMatcher.filteredAndRanked","file_type":"code","source_file":"SourceReadSwift/Core/Rules/SearchBookMatcher.swift","source_location":"130-160"},
+    {"id":"derived","label":"rebuildDerivedResults","file_type":"code","source_file":"SourceReadSwift/Features/Discover/DiscoverView.swift","source_location":"1299-1352"},
+    {"id":"detailView","label":"BookDetailView.load","file_type":"code","source_file":"SourceReadSwift/Features/Discover/BookDetailView.swift","source_location":"734-815"},
+    {"id":"detailRefresh","label":"refreshDetailAndTOC","file_type":"code","source_file":"SourceReadSwift/Features/Discover/BookDetailView.swift","source_location":"821-920"},
+    {"id":"engineDetail","label":"LegadoSourceEngine.getBookDetail","file_type":"code","source_file":"SourceReadSwift/Core/Engine/SourceEngine.swift","source_location":"346-405"},
+    {"id":"engineTOC","label":"LegadoSourceEngine.getChapterList","file_type":"code","source_file":"SourceReadSwift/Core/Engine/SourceEngine.swift","source_location":"408-470"},
+    {"id":"TOCExtend","label":"extendTOCInBackground","file_type":"code","source_file":"SourceReadSwift/Features/Discover/BookDetailView.swift","source_location":"923-940"},
+    {"id":"remoteImage","label":"CachedRemoteImage","file_type":"code","source_file":"SourceReadSwift/Shared/DesignSystem/CachedRemoteImage.swift","source_location":"46-90"},
+    {"id":"imageLoader","label":"RemoteImageLoader","file_type":"code","source_file":"SourceReadSwift/Shared/DesignSystem/RemoteImageLoader.swift","source_location":"63-101","rationale":"Shared in-flight deduplication and off-main thumbnail decode already exist; do not claim all cover decoding occurs on main."},
+    {"id":"imageDecode","label":"downsampleImageOffMainThread","file_type":"code","source_file":"SourceReadSwift/Shared/DesignSystem/RemoteImageLoader.swift","source_location":"170-196"},
+    {"id":"sourceCard","label":"SourceManagerView.sourceCard","file_type":"code","source_file":"SourceReadSwift/Features/SourceManager/SourceManagerView.swift","source_location":"1024-1107"},
+    {"id":"statusPill","label":"SourceManagerView.statusPill","file_type":"code","source_file":"SourceReadSwift/Features/SourceManager/SourceManagerView.swift","source_location":"1114-1121"},
+    {"id":"readerScroll","label":"ReaderView.scrollReaderContent","file_type":"code","source_file":"SourceReadSwift/Features/Reader/ReaderView.swift","source_location":"1589-1627"},
+    {"id":"webScroll","label":"WebScrollReaderView.pushContent","file_type":"code","source_file":"SourceReadSwift/Features/Reader/WebScrollReaderView.swift","source_location":"216-222"},
+    {"id":"webPayload","label":"WebReaderContentPayloadBuilder.payload","file_type":"code","source_file":"SourceReadSwift/Features/Reader/WebReaderDocument.swift","source_location":"374-433"},
+    {"id":"webJSCall","label":"WebScrollReaderView.call","file_type":"code","source_file":"SourceReadSwift/Features/Reader/WebScrollReaderView.swift","source_location":"267-273"},
+    {"id":"webSetContent","label":"JavaScript setContent","file_type":"code","source_file":"SourceReadSwift/Features/Reader/WebReaderDocument.swift","source_location":"911-957"},
+    {"id":"smartView","label":"SmartWebReaderView.extractPage","file_type":"code","source_file":"SourceReadSwift/Features/Discover/SmartWebReaderView.swift","source_location":"103-138"},
+    {"id":"smartExtract","label":"SmartWebArticleExtractor.extract","file_type":"code","source_file":"SourceReadSwift/Core/Reader/SmartWebArticleExtractor.swift","source_location":"15-48"},
+    {"id":"sourceKinds","label":"DiscoverViewModel.sourceKind cache","file_type":"code","source_file":"SourceReadSwift/Features/Discover/DiscoverView.swift","source_location":"1471-1483"}
+  ],
+  "edges": [
+    {"source":"discover","target":"groupedRows","relation":"renders","confidence_tag":"EXTRACTED","confidence":1.0},
+    {"source":"groupedRows","target":"searchRow","relation":"renders all books in a source group","confidence_tag":"EXTRACTED","confidence":1.0},
+    {"source":"searchRow","target":"remoteImage","relation":"calls for thumbnail","confidence_tag":"EXTRACTED","confidence":1.0},
+    {"source":"remoteImage","target":"imageLoader","relation":"calls","confidence_tag":"EXTRACTED","confidence":1.0},
+    {"source":"imageLoader","target":"imageDecode","relation":"calls","confidence_tag":"EXTRACTED","confidence":1.0},
+    {"source":"searchVM","target":"publish","relation":"calls","confidence_tag":"EXTRACTED","confidence":1.0},
+    {"source":"publish","target":"ranking","relation":"calls in detached task","confidence_tag":"EXTRACTED","confidence":1.0},
+    {"source":"searchVM","target":"derived","relation":"results didSet calls on MainActor","confidence_tag":"EXTRACTED","confidence":1.0},
+    {"source":"searchVM","target":"sourceKinds","relation":"calls","confidence_tag":"EXTRACTED","confidence":1.0},
+    {"source":"detailView","target":"detailRefresh","relation":"calls","confidence_tag":"EXTRACTED","confidence":1.0},
+    {"source":"detailRefresh","target":"engineDetail","relation":"calls concurrently, awaits first","confidence_tag":"EXTRACTED","confidence":1.0},
+    {"source":"detailRefresh","target":"engineTOC","relation":"calls concurrently, consumes after detail","confidence_tag":"EXTRACTED","confidence":1.0},
+    {"source":"detailRefresh","target":"TOCExtend","relation":"calls after staged first load","confidence_tag":"EXTRACTED","confidence":1.0},
+    {"source":"TOCExtend","target":"engineTOC","relation":"calls","confidence_tag":"EXTRACTED","confidence":1.0},
+    {"source":"sourceCard","target":"statusPill","relation":"calls in compressed metadata column","confidence_tag":"EXTRACTED","confidence":1.0},
+    {"source":"readerScroll","target":"webScroll","relation":"renders WebScrollReaderView","confidence_tag":"EXTRACTED","confidence":1.0},
+    {"source":"webScroll","target":"webPayload","relation":"calls synchronously","confidence_tag":"EXTRACTED","confidence":1.0},
+    {"source":"webScroll","target":"webJSCall","relation":"calls","confidence_tag":"EXTRACTED","confidence":1.0},
+    {"source":"webJSCall","target":"webSetContent","relation":"invokes via evaluateJavaScript","confidence_tag":"EXTRACTED","confidence":1.0},
+    {"source":"smartView","target":"smartExtract","relation":"calls from WebKit completion","confidence_tag":"EXTRACTED","confidence":1.0},
+    {"source":"groupedRows","target":"imageLoader","relation":"can fan out initial cover tasks for an entire source group","confidence_tag":"INFERRED","confidence":0.9},
+    {"source":"webPayload","target":"readerScroll","relation":"can delay first interaction through full-window serialization work","confidence_tag":"INFERRED","confidence":0.78}
+  ],
+  "hyperedges": [
+    {"id":"firstPaint","nodes":["detailView","detailRefresh","engineDetail","engineTOC"],"relation":"first usable detail page is gated by both tasks and a single isLoading branch","confidence_tag":"EXTRACTED","confidence":1.0},
+    {"id":"scrollCost","nodes":["readerScroll","webScroll","webPayload","webJSCall","webSetContent"],"relation":"whole-window payload build, JSON encoding and DOM mutation cross the Swift/WebKit boundary at content revisions","confidence_tag":"EXTRACTED","confidence":1.0},
+    {"id":"badgeCompression","nodes":["sourceCard","statusPill"],"relation":"fixed trailing actions compress an unconstrained multiline badge column","confidence_tag":"INFERRED","confidence":0.99}
+  ],
+  "findings": [
+    {
+      "id":"PERF-01","priority":"P1","file":"SourceReadSwift/Features/Discover/DiscoverView.swift","lines":[714,728],
+      "claim":"Grouped mode places every source's books inside one ordinary VStack. The parent LazyVStack virtualizes groups, not each book, so one 20+ book group creates its full row and cover-view subtree at once.",
+      "confidence":{"tag":"EXTRACTED","score":0.99,"symptom_causality":"INFERRED: needs Instruments measurement"},
+      "fix":"Flatten section headers and book rows into a stable-identity enum array consumed by one LazyVStack. Keep existing search ordering and source labels. Avoid nesting a plain eager book VStack.",
+      "test":"iOS 16 UI test with one source returning 100 rows: row-appearance/image-request counts near viewport initially; scrolling preserves identity and navigation. Profile Main Thread/SwiftUI body and frame p95 for 20/100/500 fixtures."
+    },
+    {
+      "id":"PERF-02","priority":"P1","file":"SourceReadSwift/Features/Discover/BookDetailView.swift","lines":[156,193,813,815,845,884],
+      "claim":"Detail and TOC requests are started concurrently, but the UI keeps showing only a spinner until refreshDetailAndTOC returns. It awaits detail first, so a fast TOC is hidden behind a slow detail request; a fast detail is likewise hidden while a slow TOC completes. This is UI first-paint gating, not evidence that all networking is serial or MainActor-blocking.",
+      "confidence":{"tag":"EXTRACTED","score":1.0},
+      "fix":"Show search-result placeholder detail immediately; track metadata and TOC loading/errors separately and publish each successful stage when it completes. Use an explicit event/task-group coordinator or actor-safe async child callbacks. Retry TOC with real tocUrl only when required, and retain visible successful data on partial failure.",
+      "test":"Fake SourceEngine tests: detail slow/TOC fast, detail fast/TOC slow, one fails, cancellation/source-switch; assert successful content appears before other request completes and stale result cannot replace a newer book."
+    },
+    {
+      "id":"PERF-03","priority":"P1","file":"SourceReadSwift/Features/Discover/DiscoverView.swift","lines":[1576,1590,1621,1624],
+      "claim":"publishIfNeeded awaits detached ranking and then writes model state without rechecking searchID, generation or cancellation. MainActor can run cancelSearch/startSearch while ranking is suspended; old results can overwrite a newer search despite the guard in the outer task-group loop.",
+      "confidence":{"tag":"EXTRACTED","score":1.0},
+      "fix":"Recheck activeSearchID == searchID, searchGeneration == generation and !Task.isCancelled immediately after await and before every publish. Use generation-scoped snapshots including match mode/filter state. Handle match-mode changes while ranking is suspended.",
+      "test":"Inject a ranking gate: start A, suspend ranking, cancel/start B, release A; assert only B owns visible results, flags, counters and errors."
+    },
+    {
+      "id":"PERF-04","priority":"P2","file":"SourceReadSwift/Features/Discover/DiscoverView.swift","lines":[1268,1275,1299,1352,1448,1455,1670,1673],
+      "claim":"Primary ranking already moved off MainActor, but each publication still filters then synchronously builds both grouped and aggregated arrays via results.didSet on MainActor, regardless of active display mode. Z-Library completion and applyMatchMode also perform full ranking on MainActor.",
+      "confidence":{"tag":"EXTRACTED","score":1.0,"symptom_causality":"INFERRED: 20 rows alone may not explain a hitch"},
+      "fix":"Compute one immutable presentation snapshot off MainActor containing filtered rows and needed groups/aggregates, then publish once under a generation check. Keep value-only work off actor, avoid redundant @Published invalidations, and measure before adding complexity.",
+      "test":"Synthetic 20/200/2000-result benchmark measuring publish duration and frame p95 while scrolling; assert display-mode/filter changes produce identical ordering and duplicate policy."
+    },
+    {
+      "id":"UI-09","priority":"P1","file":"SourceReadSwift/Features/SourceManager/SourceManagerView.swift","lines":[1037,1103,1114,1121],
+      "claim":"The source card puts metadata, login, detail and 44pt menu in the same horizontal row. statusPill Text has no single-line or intrinsic-size protection; trailing action widths compress the metadata/badge HStack into the photographed vertical Legado layout.",
+      "confidence":{"tag":"INFERRED","score":0.99,"basis":"Exact source structure plus user screenshot"},
+      "fix":"Separate metadata/header from a lower action row, use FlowLayout for status badges, and lineLimit(1)+fixedSize(horizontal:true,vertical:false) on each badge. Do not solve only with fixedSize if total header/actions still overflow; use compact layout at narrow width/large Dynamic Type.",
+      "test":"iOS 16 snapshots at widths 320/375/390/430 and Dynamic Type standard/accessibility, long source name/URL, logged-in label. Assert badge text remains horizontal and actions stay within card bounds."
+    },
+    {
+      "id":"READER-18","priority":"P2","file":"SourceReadSwift/Features/Reader/WebScrollReaderView.swift","lines":[216,222,267,273],
+      "related_files":[{"file":"SourceReadSwift/Features/Reader/WebReaderDocument.swift","lines":[374,433,911,957]},{"file":"SourceReadSwift/Features/Reader/ReaderView.swift","lines":[1776,1801]}],
+      "claim":"Active scroll mode is WebScrollReaderView, not NativeReaderTextView. Every content revision builds/trims/transforms every paragraph in the chapter window and JSON-serializes the whole window synchronously on the UIKit update path. The JS side reuses unchanged DOM nodes but receives all paragraph text again; initial load builds all supplied chapters synchronously.",
+      "confidence":{"tag":"EXTRACTED","score":1.0,"symptom_causality":"INFERRED: requires device signposts; no observed FPS"},
+      "fix":"Cache immutable encoded sections by contentSignature plus transform flags, build value-only text/JSON snapshots on a background worker, deliver generation-checked updates. Begin with current chapter and expand neighbors after content-ready/idle; send section patches where possible while preserving flat-index/anchor contracts. Do not disable anchor restoration or remove text to hide cost.",
+      "test":"Fixture with 1 vs 11 chapters and 1k/10k paragraphs, Simplified/Traditional and images. Record payload-build/serialization/DOM-ready timestamps, frames during immediate first swipe; assert exact content, stable chapter/paragraph anchor after prepend/append and TOC jump."
+    },
+    {
+      "id":"WEB-17","priority":"P1","file":"SourceReadSwift/Features/Discover/SmartWebReaderView.swift","lines":[55,56,103,138,146,156],
+      "claim":"Extraction creates a second hidden WKWebView and reloads the original loadedURL instead of reading the visible web view's current DOM. User navigation inside the visible view is not reflected in loadedURL. Authenticated/JS-modified page state can be lost and the page is downloaded again; provisional-load failure has no completion handler.",
+      "confidence":{"tag":"EXTRACTED","score":1.0},
+      "fix":"Expose extraction from the existing visible WKWebView coordinator, evaluate its current document and current URL, parse captured HTML off MainActor, report exactly once, and cancel on dismiss/navigation generation. Reuse this path in SourceLoginView for extract-and-read. Preserve existing login cookie/session environment.",
+      "test":"Local WKURLSchemeHandler fixtures: initial page A navigates to B, DOM modified after load, authenticated/session content, provisional failure, dismiss during extraction. Assert B/current DOM is read without an extra request and spinner always terminates."
+    },
+    {
+      "id":"WEB-19","priority":"P2","file":"SourceReadSwift/Core/Reader/SmartWebArticleExtractor.swift","lines":[24,30,46,48],
+      "claim":"The selector includes body and chooses candidates.first in document order, so body normally wins over the nested article/main/content candidate. It then gathers nested p/headings/li from the broad root. Global paragraph deduplication also deletes legitimate repeated prose, not just adjacent boilerplate.",
+      "confidence":{"tag":"EXTRACTED","score":0.99},
+      "fix":"Score candidate roots by text density/length, link density, paragraph count and boilerplate penalty, prefer strongest specific article root over body; preserve paragraph order and legitimate repetition. Strip only targeted boilerplate or consecutive duplicates. Support common br/div novel content conservatively and retain nonempty short speech.",
+      "test":"Offline HTML fixtures with navigation outside article, body-before-article, repeated intentional dialogue, br-only chapters, short CJK lines, nested li/p and advertisements; assert exact retained prose and no global repeated-text loss."
+    },
+    {
+      "id":"CACHE-01","priority":"P2","file":"SourceReadSwift/Features/Discover/DiscoverView.swift","lines":[1471,1483],
+      "claim":"Source-kind cache invalidates only on source count and first/last URLs. Editing an interior source kind or replacing an interior source with the same collection shape leaves the row badge and kind filter stale.",
+      "confidence":{"tag":"EXTRACTED","score":1.0},
+      "fix":"Use an explicit monotonically increasing SourceStore revision or update the immutable URL-to-kind map when the source store publishes a change. Do not hash the entire collection per row.",
+      "test":"Same count/first/last, mutate middle source text-to-comic and replace middle URL; assert badge/filter maps update without rebinding screen."
+    },
+    {
+      "id":"CACHE-02","priority":"P2","file":"SourceReadSwift/Shared/DesignSystem/RemoteImageLoader.swift","lines":[36,40,63,80,157,167],
+      "claim":"In-flight image tasks include headers in identity, but completed full/thumbnail caches use only URL and size. Two credential- or Referer-dependent responses for the same URL can reuse the wrong image. CachedRemoteImage also leaves the previous image visible when a taskIdentifier changes until the new load finishes.",
+      "confidence":{"tag":"EXTRACTED","score":0.98},
+      "fix":"Use a consistent normalized request identity for cache and in-flight lookup; maintain synchronous no-header API for existing layout callers. Clear or replace stale view image on request identity change, and guard cached assignments against cancellation/generation as well as downloaded assignments.",
+      "test":"Mock URLProtocol returns distinct images for same URL with two headers, validate separate caches/dedup; rapidly change row URL while first task is delayed and assert no stale assignment."
+    },
+    {
+      "id":"DETAIL-TOC-RACE","priority":"P1","file":"SourceReadSwift/Features/Discover/BookDetailView.swift","lines":[923,940],
+      "claim":"The detached TOC extension captures the old source/detail, then later writes self.chapters if it is merely longer. There is no selected book/source generation check and the cache bookURL comes from mutable self.book. Switching sources or reloading can publish a stale TOC and save it under the newly selected book URL.",
+      "confidence":{"tag":"EXTRACTED","score":1.0},
+      "fix":"Capture immutable sourceURL/bookURL/request generation, retain/cancel task handles, recheck all identities after await and before publishing/cache writes. Longer count alone is not identity or correctness validation.",
+      "test":"Delayed TOC for source A, switch to source B and finish B, release longer A; assert B chapters remain and A response is never stored in B cache key."
+    }
+  ],
+  "negative_findings": [
+    "No Core/Rules/RuleEngine.swift exists in this snapshot. Actual entry points are Core/Engine/SourceEngine.swift, class LegadoSourceEngine.",
+    "LegadoSourceEngine is not @MainActor and is not a single serial actor; source review does not support claiming all parsing/network runs on the UI actor.",
+    "RemoteImageLoader already deduplicates in-flight work, downsamples thumbnails and decodes on a global queue. The remaining search hitch must not be attributed to full-size-main-thread image decoding without trace evidence.",
+    "The earlier 119 pagination warmup already uses task-group child work off MainActor. Do not reintroduce main-thread pagination as an alleged fix.",
+    "No new iOS 17-only dependency is necessary for these repairs. FlowLayout/custom Layout, WKWebView, structured concurrency and NavigationStack have an iOS 16 path; native iOS 16 compile plus UI fixtures are still required."
+  ],
+  "cost": {"input_tokens":"not separately metered by execution environment","output_tokens":"not separately metered by execution environment","external_api_cost":0,"network_requests_to_source_sites":0}
+}

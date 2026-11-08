@@ -1,0 +1,2238 @@
+{
+  "scope": "Production Swift inventory; enumeration is not review completion",
+  "files": [
+    {
+      "path": "SourceReadSwift/App/AppState.swift",
+      "lines": 332,
+      "bytes": 15751,
+      "sha256": "ff951f2fecc9eb164e0efacc20b210a84e9ac9181edc1359692bfed56c302ae0",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/App/ComicRegressionLaunch.swift",
+      "lines": 76,
+      "bytes": 5327,
+      "sha256": "d468e10c98e8a729ffe1aa15ecea3d3f5e41fc4112858767773fa5c111616385",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/App/FloatingDeskRegressionLaunch.swift",
+      "lines": 99,
+      "bytes": 6775,
+      "sha256": "e2955ab5bedb12758c6087eb4d73884692a2ed2f10e69e38bb5e4dc680dd0710",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/App/LocalComicRegressionLaunch.swift",
+      "lines": 36,
+      "bytes": 2333,
+      "sha256": "0441a5e3803081002e50e6de0b9321fb3f4e2ee53f90638c2e2d914c1480b68d",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/App/ReaderRegressionLaunch.swift",
+      "lines": 76,
+      "bytes": 4306,
+      "sha256": "2da2912b8bc8238add3c28400d1418e670614a37eb4077a465eca8a76b6a8ae2",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/App/RootTabView.swift",
+      "lines": 229,
+      "bytes": 9475,
+      "sha256": "3cf608dc00fc5c8ce2573a526bc262a24d166a82a2876fd101768437c5e0a9b1",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/App/SourceReadSwiftApp.swift",
+      "lines": 47,
+      "bytes": 1869,
+      "sha256": "f757854a856a371a88726cad905dbc31d806a38af6b0b3bdaea4e63730803308",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Core/AI/AIChatClient.swift",
+      "lines": 199,
+      "bytes": 12129,
+      "sha256": "cd1a871f2ecf8a0402eddc4901a131c3b72551f0100ff59b4e5ec2717938f28a",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Core/Audio/AudioBookPlaybackCoordinator.swift",
+      "lines": 606,
+      "bytes": 22744,
+      "sha256": "16d7cfaff60bcfe13c046f1d7bff075fb96fa9a5df46cc9eba3a0dfd7b3489df",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Core/Audio/AzureTTSVoice.swift",
+      "lines": 64,
+      "bytes": 3524,
+      "sha256": "55336f8ac3df31291c04a5d2ac0a47aabc1bc7774062fd60addb7c356922538f",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Core/Audio/CloudTTSClient.swift",
+      "lines": 189,
+      "bytes": 6337,
+      "sha256": "b15a7d290d51d7efc6d6ff3c6ef5264ce23fb41452a9a4b5c25035fa2f4bf3ac",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Core/Audio/CloudTTSCredentials.swift",
+      "lines": 94,
+      "bytes": 2967,
+      "sha256": "74c68f40bc2e36506f5ef79ba8ad38ec7faac071759aa442ce5d1f3b24220e38",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Core/Audio/CloudTTSPlayer.swift",
+      "lines": 82,
+      "bytes": 2569,
+      "sha256": "eac2a277c4d4da4284893f4acbba3610cabe22097d3258f1662f6c849bb32f93",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Core/Audio/CloudTTSProtocol.swift",
+      "lines": 92,
+      "bytes": 3357,
+      "sha256": "80cb644691a3067b738e5c81bc76fd6eb238783664b2c023532162619e61baf6",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Core/Audio/HttpTTSClient.swift",
+      "lines": 100,
+      "bytes": 4267,
+      "sha256": "ef23134fbb5cea686368695673976cfaa816243ed59121fcac09305de78eb3e6",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Core/Audio/KeychainSecretStore.swift",
+      "lines": 100,
+      "bytes": 3665,
+      "sha256": "fdc64fc5055b72816608c27d4f62a09249c72eee2bd18def0c9842a3ed8f0918",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Core/Audio/LocalVoiceLibrary.swift",
+      "lines": 148,
+      "bytes": 6509,
+      "sha256": "4b81ebbf2e8b02598cb13cbff67fa5ab33b8c30195d91bbd76a92aec34c5a7bc",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Core/Audio/ReaderTTSEngine.swift",
+      "lines": 30,
+      "bytes": 1042,
+      "sha256": "fea2cf529c4b6f4b384ab0233e6e34dd078141250cfdb82d66c96a672536fd64",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Core/Audio/XunfeiTTSFrame.swift",
+      "lines": 62,
+      "bytes": 1766,
+      "sha256": "928864f29f5c50fa51982b60413c755ff753796a174c92a7da9fe208d7ccc3a0",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Core/Engine/BlockingRuleExecutor.swift",
+      "lines": 25,
+      "bytes": 1027,
+      "sha256": "8eeb82cb1fd73aa6269ec487d3d033c08e96675f9b673ca48f66a642087a6304",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Core/Engine/CryptoHelper.swift",
+      "lines": 50,
+      "bytes": 1945,
+      "sha256": "3626700379b334b0940ee86ce7d861172a5edaea997625ed607708e40020e582",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Core/Engine/LocalComicSourceEngine.swift",
+      "lines": 58,
+      "bytes": 2829,
+      "sha256": "386871d685aa8fa47a26888c93533e839c4220ab6e2bccf151f1ec95b68dd30b",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Core/Engine/PayActionPolicy.swift",
+      "lines": 151,
+      "bytes": 6398,
+      "sha256": "b18c936fcbdfd292e7624dc9a82b018017b046d2ee9cff19d276672b1da09f41",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Core/Engine/SourceEngine.swift",
+      "lines": 2225,
+      "bytes": 111335,
+      "sha256": "b89a652b6446ecb77928198513d926399535c18aca693dc656167e4a702f8f79",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Core/Engine/SourcePipeline.swift",
+      "lines": 408,
+      "bytes": 18766,
+      "sha256": "891893b682b0e0ac3d36f22ae655e1ee8af831bab2aac4b14d5cbd35a34721b4",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Core/Engine/ZlibraryEngine.swift",
+      "lines": 336,
+      "bytes": 14774,
+      "sha256": "21354420907145fa0d7abf9016917f40297c21bce17652c49b4da3705b604ac8",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Core/Environment/BackgroundKeepAliveManager.swift",
+      "lines": 210,
+      "bytes": 7429,
+      "sha256": "a40328b55341af6edad54dd81117df5ac911b7d87ddb2b56cec464e36bfbcc4e",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Core/Environment/SandboxEnvironment.swift",
+      "lines": 43,
+      "bytes": 1743,
+      "sha256": "4f3092f6775e578046577b4d9f0d683a56be1ad615560b9c688758c31a0d7309",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Core/Import/HaiKuoShiJieSourceAdapter.swift",
+      "lines": 119,
+      "bytes": 4800,
+      "sha256": "e4d43d249004c23b2eb5ec21651913c1244882a80e8271140d87edee5d101db5",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Core/Import/HuaHuoBookSourceAdapter.swift",
+      "lines": 256,
+      "bytes": 11499,
+      "sha256": "e0ddfbb09475c7c664741d9847999adaca7e149b6f7ff9f96061fcf20f0a7eff",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Core/Import/LocalComicBookParser.swift",
+      "lines": 128,
+      "bytes": 7088,
+      "sha256": "b32a1b4476d8963ffc411dea9b74a91389fb2bb3a79d5a2c44f77cee9a3f516b",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Core/Import/LocalEPUBBookParser.swift",
+      "lines": 532,
+      "bytes": 23944,
+      "sha256": "9c46b425c327b9be8a33e836090cde42a3961499ece0fe31ed3ee3d6ca7fbf1a",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Core/Import/LocalTextBookParser.swift",
+      "lines": 189,
+      "bytes": 8445,
+      "sha256": "37b0f0ce4ab86f20bb0958ad594e29c9ae9b5302af994e0718d4d2a2f0a1d250",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Core/Import/LocalTxtSmartDivider.swift",
+      "lines": 254,
+      "bytes": 12241,
+      "sha256": "3580720bc27c371cd3249d677efa0615e2c73809abba577e19eb2f61322aa010",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Core/Import/OnboardingClassicBook.swift",
+      "lines": 90,
+      "bytes": 12207,
+      "sha256": "9f246d2c7cd964e3238e458a47adefd9228de9c90ae0c73396ec2807fce4e23a",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Core/Import/SourceImportDownloader.swift",
+      "lines": 246,
+      "bytes": 10034,
+      "sha256": "f0fd834c6af7091ebee8619de032725a6da513bf49240a3a659d87fada9506e6",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Core/Import/SourceImportLinkParser.swift",
+      "lines": 151,
+      "bytes": 5995,
+      "sha256": "207f63aa23f97fd531a08e846973fd2a552745f4165d0559535576f503e06d81",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Core/Import/SourcePublisherLinks.swift",
+      "lines": 84,
+      "bytes": 4744,
+      "sha256": "48c7c3f5f45eea31ea29e54911d0e1924b890810b9c0efe6a5b745322ad1b8bb",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Core/Import/XbsBookSourceAdapter.swift",
+      "lines": 374,
+      "bytes": 15097,
+      "sha256": "657a7201f4f80134d470b0202fa9fe4515339fd734aaa85c1004ea1b832402bf",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Core/JavaScript/JSCoreRuntime.swift",
+      "lines": 5725,
+      "bytes": 342754,
+      "sha256": "5e839e1a71e6ca9a2fb8b59152c16df65e45270f81570440b2a8d41c75accb48",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Core/JavaScript/LegadoCharset.swift",
+      "lines": 194,
+      "bytes": 7412,
+      "sha256": "da8c0129956621a8cab70da505ddfc95cb994ff57f376aab6acd9e91ff4d3b98",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Core/JavaScript/LegadoHostServices.swift",
+      "lines": 1269,
+      "bytes": 60634,
+      "sha256": "c6b2c817b466f9e0fb46291f7fbbee9ac12e6174b223c1ceb9f167e0eee657ef",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Core/JavaScript/LegadoJavaScriptCompatibility.swift",
+      "lines": 371,
+      "bytes": 18093,
+      "sha256": "dba9a668ba559fe95aabcebdc69cb19cc6bc6ead375d0c9ebfd124e70735bac0",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Core/JavaScript/LegadoModelBridges.swift",
+      "lines": 115,
+      "bytes": 5637,
+      "sha256": "0fe7befb52533cc50a3ff596d4283d1a8a7eed67b6df43a7cbe5adbaa07bca19",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Core/JavaScript/LegadoNativeBridges.swift",
+      "lines": 1196,
+      "bytes": 63756,
+      "sha256": "89daf2f67c2be47aae7a691130378dacac5ea84da8a72a59455b020ced6a5c6a",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Core/JavaScript/QueryTTF.swift",
+      "lines": 404,
+      "bytes": 17730,
+      "sha256": "e3022974922aeb1fe35b552b961ab3fe9b9c98560568405b8be74bcfcb85f00e",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Core/Models/BookModels.swift",
+      "lines": 298,
+      "bytes": 9156,
+      "sha256": "65060ff480f0c69dc6849cb5b37125ebabcef9ba5ef752a3cdd6675935f80444",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Core/Models/BookshelfModels.swift",
+      "lines": 239,
+      "bytes": 10412,
+      "sha256": "ce336f8acb47f13f8b5cfe4fa650268d512e2efd64b6c66eccb03a24d3af2b8e",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Core/Models/BookSource.swift",
+      "lines": 790,
+      "bytes": 32402,
+      "sha256": "ff0f7bd3b51ca40fc4d0a9029475d4cc117bf477d8c8209fa07534fa412659ee",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Core/Models/BuiltinBrowserSourceProvider.swift",
+      "lines": 47,
+      "bytes": 46692,
+      "sha256": "3d7a0a7882225fa6da1f645b716eee33d9edb146f8048fc7b328ebb9ee01e041",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Core/Models/ComicReadingPosition.swift",
+      "lines": 60,
+      "bytes": 2536,
+      "sha256": "cdc679a023f39953a07d07716c03717e56bd9544d268d4c89bcccf2599041ba2",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Core/Models/ReadingStatsSummary.swift",
+      "lines": 152,
+      "bytes": 6718,
+      "sha256": "2aa82a40fdad21dd89b0573f96550034ffccefe84c637ce61cc6cc7fc609b4a7",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Core/Models/SourceCollections.swift",
+      "lines": 253,
+      "bytes": 9622,
+      "sha256": "c1dab1bf91fb9f9b0a4a4f326c6113be05a237ee599ee51279129a6267b7b6bf",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Core/Models/SourceOrganization.swift",
+      "lines": 107,
+      "bytes": 4560,
+      "sha256": "5f0b3bc38f433af5fc958ffbf5c7cd6247382ba1c0aa348c811d34d2af9f88cc",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Core/Network/CookieHeaderParser.swift",
+      "lines": 117,
+      "bytes": 5618,
+      "sha256": "8f5a4f73a10b0e5b61dbf8da091fc0c0375744b97c5a11d1ae4ce17fd65f0eec",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Core/Network/ResponseBodyDecoder.swift",
+      "lines": 163,
+      "bytes": 6877,
+      "sha256": "1d83ef8f47d25d209d9914b611ab3e4892cdfa6dfb6897dc08ac526046c7204c",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Core/Network/ResponseTextDecoder.swift",
+      "lines": 102,
+      "bytes": 4631,
+      "sha256": "5fa5e51f557a748eeadab15f5d4933caf6da6325ef30e6f0a80bafb734216e37",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Core/Network/SourcePaginationURLIdentity.swift",
+      "lines": 154,
+      "bytes": 6448,
+      "sha256": "00616931cc413b0a483db8f99bc53917de63dfc4db41bbfb0b56f23c33d4500a",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Core/Network/SourceProxyManager.swift",
+      "lines": 111,
+      "bytes": 5396,
+      "sha256": "00708f545b6e3a7cb32dbd5af9e04979186c1f658928a884ee55f050172b99e1",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Core/Network/SourceRateLimiter.swift",
+      "lines": 134,
+      "bytes": 5072,
+      "sha256": "2270402927726e6ce9d5ae0aec3a2ea564ab27c62a30ba27593124117a6cb90c",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Core/Network/SourceRedirectPolicy.swift",
+      "lines": 62,
+      "bytes": 3219,
+      "sha256": "fc605e3358dc30e6ddc090835b52152f925fc5ac652db24306e1a11e2f663dbf",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Core/Network/SourceRequest.swift",
+      "lines": 483,
+      "bytes": 22823,
+      "sha256": "5c9a66605d6db77f73bf41ec2b879aae7321af24a9131062710d943cc3d3a8f2",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Core/Network/SourceRequestBuilder.swift",
+      "lines": 911,
+      "bytes": 42085,
+      "sha256": "e286c7057fc8685816c26c4dcd6464e38c3eab87c2a1d34472d016201546d552",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Core/Network/SourceURLDirective.swift",
+      "lines": 612,
+      "bytes": 25882,
+      "sha256": "b5633bbbfe80ce18168020ef8e5734d81247fc280e28702e53b2bbb5401835ab",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Core/Network/SynchronousSourceLoader.swift",
+      "lines": 155,
+      "bytes": 6876,
+      "sha256": "8f49ca9c200c7df1c77449f75102ecd333010c0cd726fa188412102a99d948db",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Core/Network/SynchronousSourceNetworkBridge.swift",
+      "lines": 117,
+      "bytes": 4426,
+      "sha256": "6a51e91b999b838f958f10b14eab6b974b05eefef824b26c50fea792a769864c",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Core/Network/WebDAVSyncService.swift",
+      "lines": 434,
+      "bytes": 17577,
+      "sha256": "af30d2c16cb4a6a5b93d903006aa5d3be104a957186f27fa1ba3b178c224eeef",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Core/Network/WebViewFallback.swift",
+      "lines": 302,
+      "bytes": 13028,
+      "sha256": "4a2139f5858c3675b51d2cd2a36799df37576e775bd4f996d646ea5ac6ae7e3c",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Core/Reader/SmartWebArticleExtractor.swift",
+      "lines": 54,
+      "bytes": 2730,
+      "sha256": "a4034fe697ed4a615bd0e63560d269e9edc1815f65a195cd79af85943fed413e",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Core/Rules/AudioContentParser.swift",
+      "lines": 33,
+      "bytes": 1743,
+      "sha256": "079941e6a3cc8be799a3cc17bfc948bbfbe87c6bcda86a39243372d0bfe2a9b1",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Core/Rules/BookDetailParser.swift",
+      "lines": 439,
+      "bytes": 20777,
+      "sha256": "584daf93879eea2c6da06dba5a121615d610af1db5353ce6dd133940c665ae1a",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Core/Rules/ChapterListParser.swift",
+      "lines": 733,
+      "bytes": 35910,
+      "sha256": "d40fc35e96d79363af807ce3bc12d7c1c0333b6fe68138cfec2064b6806ed9dc",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Core/Rules/ChapterTextSanitizer.swift",
+      "lines": 208,
+      "bytes": 8407,
+      "sha256": "7f4d980cdb78fcff11841d663b140f85da802edcd2375cc0b2533d144b6bf1d6",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Core/Rules/ComicContentParser.swift",
+      "lines": 109,
+      "bytes": 5804,
+      "sha256": "ae1fb5315364fdab7ed260206b969ac9c15e31566b827c526662ac0f69d4e487",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Core/Rules/ContentImageNormalizer.swift",
+      "lines": 93,
+      "bytes": 4758,
+      "sha256": "f1569a76d0d1adb0b21847b04af4585368c126e1ffd16ddd5703aa972260642d",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Core/Rules/ContentParser.swift",
+      "lines": 621,
+      "bytes": 31603,
+      "sha256": "1c52b727e08070e9c9bdb41b2cfea82babc8d4a863db293a23eff01c03e54882",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Core/Rules/DynamicURLResolver.swift",
+      "lines": 405,
+      "bytes": 21471,
+      "sha256": "5d09a36048ccf1f9dfc956c8a934309d194bc2bc82dc82537653d1605fdbe7ca",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Core/Rules/ExploreCategoryParser.swift",
+      "lines": 197,
+      "bytes": 8541,
+      "sha256": "06f56e163becd40f56e226ac3cd3bb1e70289ffbb3aa6743aaf6d237e11189f2",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Core/Rules/HtmlRuleExtractor.swift",
+      "lines": 1212,
+      "bytes": 54522,
+      "sha256": "7e8e9278e482fe50ddf185dd51f601bc2850bb5f47b88f5c8c9d9890c88b22cd",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Core/Rules/InlineImageCodec.swift",
+      "lines": 211,
+      "bytes": 8748,
+      "sha256": "ba924f82d64a722aaf959e5cfab986761397cb8b61938c7def2431b8cc7c9b4a",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Core/Rules/JSONRuleExtractor.swift",
+      "lines": 2580,
+      "bytes": 116118,
+      "sha256": "0c1c4bbfc40b44056e7c030f2921c685caee7754a94777d3de56313daae0c60a",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Core/Rules/LegadoAllInOneRegex.swift",
+      "lines": 104,
+      "bytes": 4186,
+      "sha256": "2bc472a12f462c602e38400c0d0a907d839db0128c18b1917597fc8b97d679de",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Core/Rules/LegadoDefaultRuleTranslator.swift",
+      "lines": 599,
+      "bytes": 26934,
+      "sha256": "c95f90e562a3c793d0995646e65d703fe566a659e31e6c9374833368772171e7",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Core/Rules/LegadoRuleAnalyzer.swift",
+      "lines": 134,
+      "bytes": 6545,
+      "sha256": "b126ea4c10cb151ca5ecb21c661dc4fbfdbff2745cf6dc27456760f11e61ba16",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Core/Rules/LegadoRuleResolver.swift",
+      "lines": 302,
+      "bytes": 12586,
+      "sha256": "b5110abe2f34a14b4433659db5b5cd03c63f6acdcfc728fcc03669799188da8c",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Core/Rules/MediaURLResolver.swift",
+      "lines": 15,
+      "bytes": 695,
+      "sha256": "36b455f15b01dde7a65ca20e5607c5acc180c973ab90eb97316d382e7e162542",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Core/Rules/PurifyRuleEvaluator.swift",
+      "lines": 103,
+      "bytes": 4251,
+      "sha256": "93650e7e11f968fb71bf417214dba41754a0d220dd317e22e596baee8a5ae22f",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Core/Rules/ResponseFormatDetector.swift",
+      "lines": 286,
+      "bytes": 13099,
+      "sha256": "50fb3a5335550c77f3cf738bcb61f81f331eb6414890339787c6c74b2f7b3ac8",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Core/Rules/RSSFeedParser.swift",
+      "lines": 245,
+      "bytes": 12869,
+      "sha256": "db56da49c6eddfa6e3db36e9f29f2c39d3dac9c301e65528fefa0d8374d06581",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Core/Rules/RuleDirectiveParser.swift",
+      "lines": 315,
+      "bytes": 12308,
+      "sha256": "5330a01277f5b482b2a867e6d9ced4defbc2fbbb8399f0310067586cbdb3cb3b",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Core/Rules/RuleEditorValidator.swift",
+      "lines": 102,
+      "bytes": 4993,
+      "sha256": "395e5d811672e1124a65343fbf9ad3ee49cc4c4a3645302a782f2d1e133afd87",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Core/Rules/RuleExecutionContext.swift",
+      "lines": 423,
+      "bytes": 15860,
+      "sha256": "d6258de3d41123edd2042328db4b2eeee26d7f190ad606646e5907a14db47f66",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Core/Rules/RuleOperatorSplitter.swift",
+      "lines": 137,
+      "bytes": 4368,
+      "sha256": "de3bd8fbc2ae1f5f940e6ccbc7cb337929bf473e05d26fb45f29283c0356d57c",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Core/Rules/RulePreviewEvaluator.swift",
+      "lines": 202,
+      "bytes": 7780,
+      "sha256": "e6cbed3614f9439c39e25b287630931ab612af005cc9699771c3a0b46ea034a9",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Core/Rules/RuleTransformParser.swift",
+      "lines": 79,
+      "bytes": 3619,
+      "sha256": "38904e89eeb141f1b6634cc82bd43a4ff9f4f2bf7cd46b0dd3d8eaf16e4b0baa",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Core/Rules/SearchBookMatcher.swift",
+      "lines": 223,
+      "bytes": 9507,
+      "sha256": "1355bf4b5f8d08fed19b7bd4ac96da6f40c1aa5b0b141ae036a097469613746e",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Core/Rules/SearchResultFilter.swift",
+      "lines": 58,
+      "bytes": 1907,
+      "sha256": "d00624c1281a280896569e31e4b4088d8dcacda9452afeefc97d2a51ab6ce72d",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Core/Rules/SearchResultParser.swift",
+      "lines": 492,
+      "bytes": 29271,
+      "sha256": "64f938760b3f84e845dcb621a36a663dea2aeaa0a1a2370366624fb3cbf0dae1",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Core/Rules/SearchURLResolver.swift",
+      "lines": 524,
+      "bytes": 23820,
+      "sha256": "ff3a98348cc24688d8d22757c96601aae72d5e2b1dd6f8cda61d00bc2f5ea562",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Core/Rules/SourceBatchCheckCoordinator.swift",
+      "lines": 605,
+      "bytes": 24783,
+      "sha256": "6b44a18af9588bb18a06166857105132b8eeb12598776c8ef964ca97d1acc8d4",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Core/Rules/SourceBatchDiagnosticRunner.swift",
+      "lines": 347,
+      "bytes": 15610,
+      "sha256": "bb0ff1c3870d079df8b73f8bc2e96dd32d4d9ec04e0f533167d70c05483d9da2",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Core/Rules/SourceChapterAlignment.swift",
+      "lines": 57,
+      "bytes": 3168,
+      "sha256": "809c7621943721b649c8ded8328758bf375e1be3af064afb1701095cb1e735b6",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Core/Rules/SourceDiagnosticClassifier.swift",
+      "lines": 230,
+      "bytes": 10983,
+      "sha256": "40e29b4c081c76cc6a2c48cf99ad77582832af99a818885e10ab03b0c57dd427",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Core/Rules/SourceDiagnosticEvidence.swift",
+      "lines": 208,
+      "bytes": 8903,
+      "sha256": "82cc42bc2e44fdf37c170e581428767bca67b9f54ce62964114dbd7d9d3ec632",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Core/Rules/SourceDiagnosticRepairAdvisor.swift",
+      "lines": 112,
+      "bytes": 5316,
+      "sha256": "70b7afdea853e665153a9165c7914bf915adb12c72e11751ea2c310d9fd2f111",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Core/Rules/SourceDiagnosticReport.swift",
+      "lines": 533,
+      "bytes": 24979,
+      "sha256": "ddfd07615ad30beab9695b644b5e4fdc8ca0ce156f1a23f2e952c4b9ef192eb8",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Core/Rules/SourceDiagnosticReportExporter.swift",
+      "lines": 544,
+      "bytes": 28911,
+      "sha256": "758e30ea8a5e4e4486e5b1e345cce58c9aa8c208c501cc1dd5906e5108b77787",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Core/Rules/SourceExploreMenu.swift",
+      "lines": 101,
+      "bytes": 5120,
+      "sha256": "d9b7f3e3c17cd3b9239834e670b3779889799dd5695a633ff72014283fa99173",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Core/Rules/SourceLoginField.swift",
+      "lines": 145,
+      "bytes": 6224,
+      "sha256": "06ed2d26d47fe9ee18c27bae680dcf32d73d49cde850a39a8f0c86bb88b3c0b7",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Core/Rules/SourceLoginURLResolver.swift",
+      "lines": 96,
+      "bytes": 4041,
+      "sha256": "0a6f8953458752ba0cb3d7ff855f9210d94af2885d0fa5790d5adbc96feb3ae1",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Core/Rules/SourceRequestContext.swift",
+      "lines": 6,
+      "bytes": 177,
+      "sha256": "afa512771a49beef7553a09390320b4f4dcf558d9c89482767cc2c20efa87475",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Core/Rules/SourceRuleDraft.swift",
+      "lines": 139,
+      "bytes": 4721,
+      "sha256": "e2b8debbf42ee89d530f45fb97ebc374af9e581e90e41b32f43fbeab09ad544d",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Core/Rules/VideoContentParser.swift",
+      "lines": 36,
+      "bytes": 1969,
+      "sha256": "c838ba022908d103614526e6ff9cb06270bc7b2459d7859a5dd57395ae3b8e7d",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Core/Rules/WebsiteJSONSourceInference.swift",
+      "lines": 86,
+      "bytes": 5828,
+      "sha256": "7bb184b45609b7235c86a06c07ad12a4b76b9fc4196d5f05e33725714020c2e2",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Core/Rules/WebsiteSourceInference.swift",
+      "lines": 143,
+      "bytes": 9421,
+      "sha256": "9c2f8518bcd919f5e75ab9882268307ed2a347f52b857291a62d554a890853d3",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Core/Rules/XPathRuleTranslator.swift",
+      "lines": 270,
+      "bytes": 11988,
+      "sha256": "6c0161e7827808027ad69abac17e5106ff23a05ea1f9ade7a37a284106e368dd",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Core/Security/B18PlusService.swift",
+      "lines": 241,
+      "bytes": 5393,
+      "sha256": "25f63de724fc76f974778a732c76c692aea82d089fa63ae3705a516ff301feeb",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Core/Storage/AppBackupPreferences.swift",
+      "lines": 80,
+      "bytes": 4732,
+      "sha256": "bfa06fae6047cd94bfcb9f16c3d86a88dc9c988a7e43b5a3a584ca0532a42bd9",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Core/Storage/AppDataBackup.swift",
+      "lines": 222,
+      "bytes": 8928,
+      "sha256": "fde06695fff7bfe638ef67e6cded5da9944f1ed32aa096eec4d236535b84935d",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Core/Storage/AppStorageDirectory.swift",
+      "lines": 43,
+      "bytes": 1875,
+      "sha256": "c3893a9f925e8eb17b0fd673b03111f5c115e15cd6961f9c6acda33ef802aa92",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Core/Storage/BookExportService.swift",
+      "lines": 66,
+      "bytes": 2677,
+      "sha256": "4c9609756243a91f269da821cc8cfa7d239ad3b91d57523aa0be1136c27a43c5",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Core/Storage/BookshelfGroupPersistence.swift",
+      "lines": 35,
+      "bytes": 1435,
+      "sha256": "9b197595f92f7778b7fb5281462e996f29f5c0df3955d47dd9e0dbdd665bc808",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Core/Storage/BookshelfPersistence.swift",
+      "lines": 133,
+      "bytes": 6388,
+      "sha256": "ab534263d31c51c9a2988717a7f149f16aac9061159705495202de77e8d2b562",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Core/Storage/BookshelfStore.swift",
+      "lines": 545,
+      "bytes": 22273,
+      "sha256": "5b2f2cfb8aea3fb27ac11a5c9935645c5036dd50f7d9cb79306a6ee70edb40f9",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Core/Storage/BookTOCacheStore.swift",
+      "lines": 224,
+      "bytes": 8277,
+      "sha256": "7ded6f81cf3284da1de42bf4a967be4945a2e7d1cdd28d8623534e1c36a42596",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Core/Storage/ChapterContentCacheStore.swift",
+      "lines": 330,
+      "bytes": 12522,
+      "sha256": "c21ffc9e778043ea7508484158f4f067eebe15936820ea83ab3e60d87fb3c770",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Core/Storage/ChapterDownloadStore.swift",
+      "lines": 337,
+      "bytes": 13194,
+      "sha256": "7b918c69617f17105e80181dd224b365ab92e3658942a1c7c0bdc0931dc13b9d",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Core/Storage/ComicOfflineArchive.swift",
+      "lines": 223,
+      "bytes": 11158,
+      "sha256": "057046a6bb3bece35b33064b306f9f571d9e64b9c996825903ed94bd5827c0cf",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Core/Storage/CustomFontManager.swift",
+      "lines": 180,
+      "bytes": 7502,
+      "sha256": "759dad5d14d02b5410468750feeaa9382216466542053cbe350e295a420c0868",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Core/Storage/FontImportOperation.swift",
+      "lines": 135,
+      "bytes": 8497,
+      "sha256": "4dd2f75b76c9bcc83040ac0b6fccb38b74a75ed1cf341026370b4801137b0890",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Core/Storage/FontImportPolicy.swift",
+      "lines": 35,
+      "bytes": 1648,
+      "sha256": "31908c4fc8ab325df0004be29f54ddc336f7fe67cf8e9eb10dba0c3e5d096889",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Core/Storage/FontImportRequest.swift",
+      "lines": 74,
+      "bytes": 3435,
+      "sha256": "f95b7788470561eff55fa8710324104a098ec62373b83a4dc62d5f1115bf372f",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Core/Storage/InlineImageStore.swift",
+      "lines": 160,
+      "bytes": 6034,
+      "sha256": "ca41e3a22525c397f39462eb89f4dc4a4030beb85a489d6580c0d51299453c30",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Core/Storage/PurifyRuleStore.swift",
+      "lines": 269,
+      "bytes": 10592,
+      "sha256": "a21396adf6a939bf2cd0e31efadc60e636389ea998b9d7d593cc05c14447bed1",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Core/Storage/ReaderOverrideStore.swift",
+      "lines": 67,
+      "bytes": 1929,
+      "sha256": "b17ef8def4f72fca0a6f17fe4d2492616f6096ffc41872f849fd69f83b61b070",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Core/Storage/ReadingHistoryStore.swift",
+      "lines": 284,
+      "bytes": 10386,
+      "sha256": "c697d39ca4bdb41f4a41201b22afcf420df93e637d4ae7d5f89c577e872ad2cc",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Core/Storage/ReadingWriteBackgroundLease.swift",
+      "lines": 23,
+      "bytes": 742,
+      "sha256": "a2c235404ff41fa75baf50eddd2cbd535cc3494ff35c1390aae9020fcfdf12e5",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Core/Storage/RSSArticleContentCacheStore.swift",
+      "lines": 97,
+      "bytes": 4068,
+      "sha256": "fea45e273060f662256f6ee666cf296d8649b4b386a09541590f0dce0ecd7948",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Core/Storage/RSSArticleStateStore.swift",
+      "lines": 112,
+      "bytes": 4583,
+      "sha256": "9d4c9852d8b65affdfb4bd5374e670c9ecd48c876d694863ca865e7e4c1368c6",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Core/Storage/RSSCacheFile.swift",
+      "lines": 42,
+      "bytes": 1617,
+      "sha256": "2ef1573aaa445eae1fb3887e4d3da95869a0ea5639af27022d411529d2b8e7a7",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Core/Storage/RSSFeedCacheStore.swift",
+      "lines": 68,
+      "bytes": 2649,
+      "sha256": "ab9cfe18e831d9d7f6ad196e8716efb83de097240c22a6b9f3d929bb6538b5ae",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Core/Storage/SourceCookieStore.swift",
+      "lines": 259,
+      "bytes": 9943,
+      "sha256": "0cd86a617600ee3484a4b306e865b0e589fe8dfaf172d7f0ab08f9079c69c271",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Core/Storage/SourceDiagnosticHistoryStore.swift",
+      "lines": 196,
+      "bytes": 6167,
+      "sha256": "de7fe66907504a841d4d41c7092bff16b1d03296123393dee88ef10c75ce2065",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Core/Storage/SourceHealthStore.swift",
+      "lines": 137,
+      "bytes": 3988,
+      "sha256": "24a1ca17c54dc32a69e1a00d0638b306a3a3ef5bcbc7b21518295f2e34956be9",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Core/Storage/SourcePersistence.swift",
+      "lines": 43,
+      "bytes": 1500,
+      "sha256": "b84cf9b14591758b386eff5319bb85f0565150e926427619f234b1d8025eb183",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Core/Storage/SourceStore.swift",
+      "lines": 1325,
+      "bytes": 59887,
+      "sha256": "0c7c28b4eeb3dd1459ce9bce75d7ce5243a94264e9cc524856acfedab7fc4b01",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Core/Storage/SourceSwitchCacheStore.swift",
+      "lines": 113,
+      "bytes": 4590,
+      "sha256": "ace62ad6fd9d1740f6746ebcb578c4c86befa3f1696786001834888ba3d6f252",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Core/Storage/SourceVariableStore.swift",
+      "lines": 42,
+      "bytes": 1915,
+      "sha256": "eff416b63c7aa08a941b66781cb5c3a2b62ebf500c1cb1d39a1f466f4d895e4b",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Core/Storage/WebDAVCredentialStore.swift",
+      "lines": 30,
+      "bytes": 1074,
+      "sha256": "2c6fa5a552f805285567c66a6227e3fcf273185c93bf7c48fe06bcb0344cd194",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Core/Verification/VerificationCodeCoordinator.swift",
+      "lines": 166,
+      "bytes": 5429,
+      "sha256": "9f8d0d595c01fb48a522969d583c6f882dc83bdb9a2fd3ce7c48d875f4f41b97",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Features/Bookshelf/BookReturnOrder.swift",
+      "lines": 11,
+      "bytes": 505,
+      "sha256": "3310555d1aeb69cba35140fe32bc32f1a7c8bb37cb112c986f0eea4f354b52ee",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Features/Bookshelf/BookshelfReaderGatewayView.swift",
+      "lines": 846,
+      "bytes": 43302,
+      "sha256": "a90685fc1a415c5452ad4b3b2dce4ee2bc02e28c32223332be0d2e48e387f29a",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Features/Bookshelf/BookshelfView.swift",
+      "lines": 1500,
+      "bytes": 68414,
+      "sha256": "242f74819196699659974326db148da0bdf0b8ed9ea86e6812caddc8a582eb24",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Features/Bookshelf/BookTitlePage.swift",
+      "lines": 56,
+      "bytes": 2468,
+      "sha256": "650a3cf4ddaaa6191e197390f1cf733a0d274264a2e27419d01485c685d7e8b1",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Features/Bookshelf/ContinueReadingCardContent.swift",
+      "lines": 39,
+      "bytes": 1590,
+      "sha256": "59f36ec423e0b3e82a673062af369d38b2da961b721a92673e7329a81f895941",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Features/Bookshelf/CoverToneSampler.swift",
+      "lines": 79,
+      "bytes": 3931,
+      "sha256": "1e907f0786de9e3e2f3daf6c37742b7a7c509e2802ab75eb3de088a848b69f92",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Features/Bookshelf/EditorialBookJacket.swift",
+      "lines": 43,
+      "bytes": 2159,
+      "sha256": "b85ecbf453dc699731455b41913f5d148ef389f023120ff8d497762fa41d2266",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Features/Bookshelf/FloatingDeskStyle.swift",
+      "lines": 111,
+      "bytes": 4862,
+      "sha256": "0c5831180499f42b3df40dea26abbd88138a7754bc1c8125cf16410f7d1ee326",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Features/Bookshelf/FloatingReadingDesk.swift",
+      "lines": 142,
+      "bytes": 7793,
+      "sha256": "4d13597f5618093cbe79872f7aa11c419513bb1c024901012af8e8e032d20629",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Features/Bookshelf/ForestReadingCard.swift",
+      "lines": 75,
+      "bytes": 3585,
+      "sha256": "e59199c67b76cfca2df6da2dd79e5a7052695e96832334856568cb54cad3af29",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Features/Bookshelf/NativeBookGestureProbe.swift",
+      "lines": 43,
+      "bytes": 1675,
+      "sha256": "3a1a86d734865521a6188d91388e9dd93b5d464537b40a3b1199d99c8eb8f785",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Features/Bookshelf/ReaderBookPassageController.swift",
+      "lines": 197,
+      "bytes": 8580,
+      "sha256": "0abae53c45eebb036f23ab6313818d66c1afda1e0781786e201c20292dc24278",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Features/Bookshelf/ReaderOpeningPage.swift",
+      "lines": 268,
+      "bytes": 11878,
+      "sha256": "0d796356f8bacea163023645954774f32505f7488fd6d4f8987151aa93f2870e",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Features/Bookshelf/ReadingCoverHandoff.swift",
+      "lines": 39,
+      "bytes": 1489,
+      "sha256": "1b7cc5345941167dfacf144b9483bbda012e476410eb1748b570d4e4847a0238",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Features/Bookshelf/ReadingDeskContent.swift",
+      "lines": 50,
+      "bytes": 2601,
+      "sha256": "e40a2c29b6f9b85cf83b5785785f8be6c100d8a3bd5824102dd0ad8fbcf9f7f6",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Features/Bookshelf/ReadingDeskPager.swift",
+      "lines": 110,
+      "bytes": 5451,
+      "sha256": "6bcd709f6bd9a46da664230c3295f0ee7bb1f01b976c77dcd4087cefdd58288d",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Features/Bookshelf/ReadingDeskPlinth.swift",
+      "lines": 90,
+      "bytes": 3870,
+      "sha256": "b8149b1207f4750d9ab62c5efb9b2f19c3c6edeb47037b3b0a8fd9c27801b8a9",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Features/Bookshelf/ReadingDeskTitleTypography.swift",
+      "lines": 17,
+      "bytes": 564,
+      "sha256": "a0436583007a743a10ab9e24ddcf17de1e700408108d3e04a7b32729d61031ff",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Features/Bookshelf/ReadingHeroCard.swift",
+      "lines": 92,
+      "bytes": 4648,
+      "sha256": "33fc0ed1208511bdb2d4dd3dda9e3639092a897e4065487cef64c418a2e4b5c4",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Features/Bookshelf/ShelfBookCover.swift",
+      "lines": 45,
+      "bytes": 1875,
+      "sha256": "fcab194823e15a4eb608ab264ef02b4995003db19cbd7ee90695641a0b8065f7",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Features/Bookshelf/ThemedReadingCard.swift",
+      "lines": 74,
+      "bytes": 3319,
+      "sha256": "696906fe5e88410319e9ac54d385a5417935a997821150075cd18c1f155c5034",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Features/Discover/BookDetailHeader.swift",
+      "lines": 35,
+      "bytes": 1625,
+      "sha256": "572c1fbbea4d329c5ca1a8f159a00f7d2d990d94f646d94d45061e291c726001",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Features/Discover/BookDetailHero.swift",
+      "lines": 101,
+      "bytes": 4597,
+      "sha256": "4c5f41f21d4f134d72e1f01ee4e36516ddadd1f02f6e66926def7f2d345201ca",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Features/Discover/BookDetailSummary.swift",
+      "lines": 129,
+      "bytes": 6530,
+      "sha256": "2e4195296af4a2ec268b66d251f67b2ccdabc6da80c21a0b65c19e039ac8def2",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Features/Discover/BookDetailView.swift",
+      "lines": 1852,
+      "bytes": 84999,
+      "sha256": "a76f1b9930a7de34a075b895ecf8453e21b8a7aba58c946f84fefc8ad87f2b01",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Features/Discover/ChapterListPresenter.swift",
+      "lines": 42,
+      "bytes": 2047,
+      "sha256": "231400b1895931b04c981884ee83209b243f821a5f7ee42740a2965ea870b773",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Features/Discover/DiscoverView.swift",
+      "lines": 1858,
+      "bytes": 83297,
+      "sha256": "0d684fe31091e1104e7745980d850e6543dc482cbe2a4c8525898bde8223df94",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Features/Discover/ExploreCategorySelectionSheet.swift",
+      "lines": 53,
+      "bytes": 2115,
+      "sha256": "7250e69e3cbbd9c4a6a3901fab1b35c743c4e1487b22d020e4d63ff888d33e38",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Features/Discover/ExploreSourceControls.swift",
+      "lines": 38,
+      "bytes": 1729,
+      "sha256": "6b6451bb0371367ee2e52d2cdf32a2a45e525c330415fa0ec9ffdec18c085f3a",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Features/Discover/ExploreViewModel.swift",
+      "lines": 294,
+      "bytes": 11374,
+      "sha256": "21f217fca29267ba65f068727a6520034464bf65fabbdb935c37c643ce49292c",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Features/Discover/LANWorkbenchAccess.swift",
+      "lines": 43,
+      "bytes": 1960,
+      "sha256": "47c265bd2db6edb69202cb545f9bd38f14e33735dc7dc2c245f9bf2c463a0779",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Features/Discover/LANWorkbenchDocument.swift",
+      "lines": 14,
+      "bytes": 723,
+      "sha256": "9e1ab325e59b44706b4759ea9b3b2234d387fbac133513369993b0fdcdcb32c9",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Features/Discover/LightweightHTTPMessage.swift",
+      "lines": 110,
+      "bytes": 4729,
+      "sha256": "85e5d1d2de4664c31d5ad9e8121c08d12605bfb894f673c724cf6995a581c45b",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Features/Discover/SearchBookRow.swift",
+      "lines": 127,
+      "bytes": 4610,
+      "sha256": "30221685c174a68c17ce247f253487843a630181299264892692cb3144709035",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Features/Discover/SmartWebReaderView.swift",
+      "lines": 74,
+      "bytes": 3678,
+      "sha256": "c5e8449c23a0154fcb67aa601bfdd81654196776bf808737e0fb6b2b91631243",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Features/Discover/SourceWritingView.swift",
+      "lines": 1113,
+      "bytes": 53728,
+      "sha256": "4dd23bd4586e624bb07a40259504cd348e749a209fdbb65e38c1cd14053b9c96",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Features/Discover/WebReadingSession.swift",
+      "lines": 162,
+      "bytes": 7670,
+      "sha256": "3414857445f4d67c7dc4cbf8c496894aceb50826d7f45479e2e68f1b4b987b99",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Features/Reader/AudioBookPlayerView.swift",
+      "lines": 659,
+      "bytes": 26649,
+      "sha256": "e0fe5694818a8122d4550b1a9116ca0da43742c21641ee87def4c380418c62e1",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Features/Reader/ComicChromeSurface.swift",
+      "lines": 18,
+      "bytes": 570,
+      "sha256": "3a3c90fc43d09174205e543a1d7cba586248596150b4bcc257596bc82dec0ef6",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Features/Reader/ComicPageZoomView.swift",
+      "lines": 172,
+      "bytes": 6938,
+      "sha256": "01fef565eb1c168dbd43a43cc2ed2a27fb9ac83992f8306eb6ba81abab98cee2",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Features/Reader/ComicReaderView.swift",
+      "lines": 994,
+      "bytes": 47872,
+      "sha256": "599628b478875015a0df57febe47a778a4475821f66de6b04987b8cbc740c521",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Features/Reader/ComicStripImageCell.swift",
+      "lines": 129,
+      "bytes": 5483,
+      "sha256": "05379d16b1209af6e0befaf8ad306f0a3a10111776cfcc643e9bb65ca20f42a2",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Features/Reader/ComicStripReaderView.swift",
+      "lines": 328,
+      "bytes": 16374,
+      "sha256": "8df8e0778cfd7bbd3181b4a6829a5987520b98028c09c533e3f0aa3d53917672",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Features/Reader/CoverPageReaderView.swift",
+      "lines": 504,
+      "bytes": 23400,
+      "sha256": "8083d92e26a2d0d7f8775684b8ec2e2539ecbe2a0e0765d53c41bae13e3ffb7e",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Features/Reader/LocalBookMetadataView.swift",
+      "lines": 91,
+      "bytes": 4858,
+      "sha256": "0f69785d22d849ce23a36b114669af910158d5c12669daff893017f39a061b72",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Features/Reader/NativeReaderTextView.swift",
+      "lines": 1584,
+      "bytes": 79315,
+      "sha256": "90bcef0e68e8476865bce0826cfdc81984849a7f2403947c7f7cfed5fee17615",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Features/Reader/PageCurlReaderView.swift",
+      "lines": 653,
+      "bytes": 33000,
+      "sha256": "294b7b39a30c8d6c306e48f6aa36917e7c21cb2f54b4ec9749d2a948b2805cda",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Features/Reader/QuoteCardView.swift",
+      "lines": 310,
+      "bytes": 11509,
+      "sha256": "04e527f70bcf381cee3c50512c377b61f24cfeaf9a097cd1be08164c081bbb74",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Features/Reader/ReaderAtelierPreview.swift",
+      "lines": 116,
+      "bytes": 8461,
+      "sha256": "b2c28884e417b3e78a296441506c1095295fa10d3964c78ae467bdf68bb803fb",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Features/Reader/ReaderAutomationPolicy.swift",
+      "lines": 398,
+      "bytes": 15047,
+      "sha256": "6f9f8e821cc7bf7ea03465afb521d975576d4d00e44eda38aee129ad04d11e5b",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Features/Reader/ReaderBackgroundChapterPrecache.swift",
+      "lines": 35,
+      "bytes": 1165,
+      "sha256": "cd548bdf33c8ec0fe45844590b1f9aa3ef4d11ac4a797ed384a4248a396f8a43",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Features/Reader/ReaderBindingLibraryView.swift",
+      "lines": 72,
+      "bytes": 4985,
+      "sha256": "d138969f8d1138fe43a6337c51cf81687034637777054e49025a24e4d0fd6c02",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Features/Reader/ReaderBindingPreferences.swift",
+      "lines": 88,
+      "bytes": 5792,
+      "sha256": "e5a3ef9a0f1a554303783e29f5dfa1d902e98eea97f8cf81656e6bb846e0a656",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Features/Reader/ReaderBindingRepository.swift",
+      "lines": 139,
+      "bytes": 8682,
+      "sha256": "cec63d62b1401dc1214140e5f4f46b33dfa7f9cf6053e39e61fdfb54d4afb3bd",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Features/Reader/ReaderChapterDesign.swift",
+      "lines": 78,
+      "bytes": 4535,
+      "sha256": "eedf692e2992ffd6ead33f814565407bdd38483257758fc728ecb168fd07d1a5",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Features/Reader/ReaderChapterPaginator.swift",
+      "lines": 219,
+      "bytes": 10118,
+      "sha256": "b93cf79f6da1e5bfe7eadddaaa2ca0f515e8dda0fcd8a55f769686208b1f3341",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Features/Reader/ReaderChapterWindow.swift",
+      "lines": 393,
+      "bytes": 15788,
+      "sha256": "f17ec7b8d68d0d51de0abf7999c59b30f01c437ea5c47561bcae9fead1ba2fd5",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Features/Reader/ReaderChromeEditor.swift",
+      "lines": 62,
+      "bytes": 4080,
+      "sha256": "c2928ae2e565462c9ff8ee940a8a2574038eb3d21c55c7fd157a1dc711e729a3",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Features/Reader/ReaderChromeSurface.swift",
+      "lines": 105,
+      "bytes": 4819,
+      "sha256": "1ac0bb76c1a45d65ffb206fceceee7caa2cd8b413427871ca6424a4d466cbdb7",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Features/Reader/ReaderCJKPunctuationCompression.swift",
+      "lines": 67,
+      "bytes": 3268,
+      "sha256": "986a9001a0372fc80a3483bc6a9c999b59783ab9eebab5e6debb7fdd0a808123",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Features/Reader/ReaderCustomWallpaperStore.swift",
+      "lines": 105,
+      "bytes": 5322,
+      "sha256": "4fd19a591db3eabf9f998e4711069b4a4f751211bfe8c66cf5460db6019cce3e",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Features/Reader/ReaderDoodlePattern.swift",
+      "lines": 72,
+      "bytes": 4130,
+      "sha256": "cb2fa6bd79a9799a7b78183519fffe52245cce7eb09fcc432691842bd1edee43",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Features/Reader/ReaderExitSwipeBridge.swift",
+      "lines": 227,
+      "bytes": 9839,
+      "sha256": "eface96540e70d306c03f93583af4ca22440ca23436116fa0f6b8d8e46e5ae23",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Features/Reader/ReaderFlipTransitionPolicy.swift",
+      "lines": 42,
+      "bytes": 1631,
+      "sha256": "1ed1832efe98c199509507e29d4a2a03555a42f3c51757eaf4cf7cf8ef36c30b",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Features/Reader/ReaderFontScheme.swift",
+      "lines": 82,
+      "bytes": 4780,
+      "sha256": "635e5a8e2ad32a7a89101d3fa34fe8c26781182b01bec60572edba0d137ff997",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Features/Reader/ReaderHeadingPreferences.swift",
+      "lines": 15,
+      "bytes": 862,
+      "sha256": "8aeffe8c2432191faa5200a5ac8a5867dcf855ed7bfea7ffa96e2fe5bd6b501e",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Features/Reader/ReaderIllustratedBackground.swift",
+      "lines": 52,
+      "bytes": 1790,
+      "sha256": "26f04991d06826f7d70dfdc2fe9f9746348d5edfbb0903dd16dbb1535888aa71",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Features/Reader/ReaderImageStyle.swift",
+      "lines": 125,
+      "bytes": 5226,
+      "sha256": "a62b94e827efe155367f1ddea1b75994915f126d289fa06772edb9d3aa60de46",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Features/Reader/ReaderNativeMenuButton.swift",
+      "lines": 98,
+      "bytes": 4124,
+      "sha256": "2b08cd32b2318c74af14059034a955c4bb6a4c45490658b03b8e03ab62f8a229",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Features/Reader/ReaderPagedNavigationPolicy.swift",
+      "lines": 277,
+      "bytes": 10679,
+      "sha256": "a02ffacad6257595cb58c12e370d57e461e5c9d90deec3d41c4004eb412f49fd",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Features/Reader/ReaderPageGeometry.swift",
+      "lines": 239,
+      "bytes": 9871,
+      "sha256": "0af17ae90aede987accce283d185425e40b1ff1e1cc42df3716700c06702d6ce",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Features/Reader/ReaderPageLayoutEngine.swift",
+      "lines": 269,
+      "bytes": 11663,
+      "sha256": "16e9a6ea28aa10bd8d7800aa340dd046ab908a24d2b5e84085c3671fcb9ee104",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Features/Reader/ReaderPageSelection.swift",
+      "lines": 140,
+      "bytes": 5784,
+      "sha256": "460f244b16abec4888b029456e7ee5badd3feb60dc949ab9b910025e12af16a3",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Features/Reader/ReaderPageTextView.swift",
+      "lines": 260,
+      "bytes": 13118,
+      "sha256": "d8b0e42d7be21944fe8471c7cf2d9c5b17d99540e6b9cb14537ccc8f72147a56",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Features/Reader/ReaderPageTurnRequest.swift",
+      "lines": 8,
+      "bytes": 255,
+      "sha256": "719983c562a46883e8108a304551339d5466f0fe8aa45c017f9bdb35b39427ee",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Features/Reader/ReaderPaperTexture.swift",
+      "lines": 68,
+      "bytes": 3131,
+      "sha256": "662fac783755bc1f69d2b54ec145458cd6200b3f26f55fab49ba7ef2064e1e20",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Features/Reader/ReaderPositionMapping.swift",
+      "lines": 121,
+      "bytes": 4326,
+      "sha256": "f52b89a2aea4fad051213ac6c1ea7af1bc97c9348cd6b8684b73097eb38dffc5",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Features/Reader/ReaderPresentationLifecycle.swift",
+      "lines": 37,
+      "bytes": 1215,
+      "sha256": "5376957649efa1e86a4b66d121e3f5fb7c9289536491d679e84fcb4a9daef05f",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Features/Reader/ReaderRenderRevision.swift",
+      "lines": 28,
+      "bytes": 980,
+      "sha256": "fe1ea2403d0e8def5b092e80c1e44f5f15a362f63e62bbd0951b35ebd92866dc",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Features/Reader/ReaderSafeAreaResolver.swift",
+      "lines": 49,
+      "bytes": 2018,
+      "sha256": "24ccf59a0c90b8a37cdb7d568282427218b9c6d3a8af512c02f9cb4847c315db",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Features/Reader/ReaderScrollChapterHeader.swift",
+      "lines": 43,
+      "bytes": 1601,
+      "sha256": "fbf1910b2a4abb6ea76ef4906f1f491dc551aea221e848582fbf5b5537396d03",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Features/Reader/ReaderSettingsContent.swift",
+      "lines": 16,
+      "bytes": 521,
+      "sha256": "2e47ad4cdef491ef2aadb962d1ef898ef87f43e729ec12172fc7198f255e0e93",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Features/Reader/ReaderSettingsModels.swift",
+      "lines": 716,
+      "bytes": 27243,
+      "sha256": "e8f7e9b757e3a28ac1ff918ab1826c78206261cf823d0df69905615776bd1792",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Features/Reader/ReaderSettingsWorkbench.swift",
+      "lines": 207,
+      "bytes": 11685,
+      "sha256": "f082015f4e5dfd6bcff4816baae2c98172f72bb68338ee00557378079c51cc94",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Features/Reader/ReaderTabChromeExitBridge.swift",
+      "lines": 91,
+      "bytes": 3508,
+      "sha256": "c172ab7f3d6c559af249ce4b16ccb15c9f46ce74bfe889f6a03dd9bf8e1a1343",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Features/Reader/ReaderTextPagePaginator.swift",
+      "lines": 102,
+      "bytes": 5292,
+      "sha256": "bab129947ad5e433950a50128c7eff7a3acbec1b00211f9c649d0f86febd8b78",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Features/Reader/ReaderTocScrollIntent.swift",
+      "lines": 17,
+      "bytes": 606,
+      "sha256": "2b55ded5ab15ec6d7bce2da6be3641212e8c6c0371c7f2dbc708aeafb8c40b8c",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Features/Reader/ReaderView.swift",
+      "lines": 7944,
+      "bytes": 373701,
+      "sha256": "f9d47bb6ad03d487740f55b215930fbae1cc813c58d692397d6c6859e92b31d2",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Features/Reader/ReaderWallpaperAdjustment.swift",
+      "lines": 45,
+      "bytes": 2499,
+      "sha256": "271c9cf711a17b36859ab0c2e8829ded0189b7fd394ebd65fd9fd37ac7eb1bd3",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Features/Reader/ReaderWallpaperEditorView.swift",
+      "lines": 96,
+      "bytes": 5724,
+      "sha256": "96626dfe23fdad27ee5eb4c8ce2d387205067b0d0c73395b2647fcb81e9285b1",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Features/Reader/ReaderWallpaperRepository.swift",
+      "lines": 87,
+      "bytes": 4715,
+      "sha256": "78fb246fffd53fd2c18939610cf0696076938828f7919113df0a66aa85f5499f",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Features/Reader/ReaderWallpaperView.swift",
+      "lines": 135,
+      "bytes": 5347,
+      "sha256": "218678e917351293c11ed3b6bd8cbae2f68809bf7ce1329fbc07b68f8f8d1788",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Features/Reader/ReaderWebMessagePolicy.swift",
+      "lines": 12,
+      "bytes": 376,
+      "sha256": "01566d57f5c5f7a5ff8620205e55abec8935cb7a81e3a3b0d340b6975307795d",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Features/Reader/VideoPlayerView.swift",
+      "lines": 669,
+      "bytes": 25868,
+      "sha256": "4a703ce1dae56eb3cd11111128c821c835113f0ede79983e4b4331436862b867",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Features/Reader/WebReaderDocument.swift",
+      "lines": 1509,
+      "bytes": 65903,
+      "sha256": "c5b703e9e3b85373ec9c1826dddc69188829292acc40a2f27bb70f65e08b4e23",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Features/Reader/WebScrollReaderView.swift",
+      "lines": 784,
+      "bytes": 39474,
+      "sha256": "a51f930d49acc32a66ee28590686eb79de93116b6b9b487b0c217ee2aeb9bdda",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Features/RSS/RSSArticleReaderView.swift",
+      "lines": 591,
+      "bytes": 27852,
+      "sha256": "f9584eb549e578316d48e20fb057f3f738ee9d53b9e7876cb9cf86275e5c57c5",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Features/RSS/RSSArticlesView.swift",
+      "lines": 222,
+      "bytes": 8973,
+      "sha256": "b951fe40db091a5ffbb9a9870fa1b07776a655ae409109dbace5df1d6463873e",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Features/RSS/RSSReaderSettingsView.swift",
+      "lines": 101,
+      "bytes": 5055,
+      "sha256": "38719a1dbd8630076ad71a6045e34b47a942779e10fe56a374d2467ea974baf7",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Features/Search/GlobalSearchIndex.swift",
+      "lines": 92,
+      "bytes": 4572,
+      "sha256": "ec36f6d247f0237e1b539c47c97a3f3e53b33afa651db98aa5d4a9a2177ea63d",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Features/Search/GlobalSearchView.swift",
+      "lines": 179,
+      "bytes": 8014,
+      "sha256": "5a840e3861391abb7e4f5eef703056a69ccc42735ce1ed4afc7294f002b5c7c3",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Features/Settings/AIChatSession.swift",
+      "lines": 97,
+      "bytes": 5245,
+      "sha256": "2f89d9c1d4cc5923506f42b65370dfd3c68e7ee57ac16ae0d3321070ec5ad750",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Features/Settings/AIChatView.swift",
+      "lines": 665,
+      "bytes": 31815,
+      "sha256": "61a89c9956de2fece7808e410a0ae259639760d61e8cc513e3feacb3c146e765",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Features/Settings/AIGeneratedSourceReviewView.swift",
+      "lines": 100,
+      "bytes": 6288,
+      "sha256": "f48613eb17fcfc7cd4c03316427fe8e5a7baa450135b865206b0a3b83d611352",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Features/Settings/AppearanceSettingsView.swift",
+      "lines": 148,
+      "bytes": 7648,
+      "sha256": "316adaa2d8675fe66cbb8a1fe2a99582e46043618301bb991f7452f21883e155",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Features/Settings/AppFrameProfilerSection.swift",
+      "lines": 19,
+      "bytes": 1077,
+      "sha256": "813443569d9d671f1a94ea58243f94c09349f61c69ec1c98cf9ab094dc0abed2",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Features/Settings/CookieManagerView.swift",
+      "lines": 187,
+      "bytes": 8289,
+      "sha256": "b940dfc099b69d48849cdad78bec5a6f1ac1bb2a157aa6cd24b8d241b7284262",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Features/Settings/CustomFontManagementView.swift",
+      "lines": 231,
+      "bytes": 11690,
+      "sha256": "abc4493d86ea0ff4bbada2b62f2d8179fda3b5a2866e13f482c0bf29e6ee1c69",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Features/Settings/OfflineComicLibraryView.swift",
+      "lines": 130,
+      "bytes": 5959,
+      "sha256": "212abda08c2cd37305f054ecd892d181da7b65072770dc6edb7867941a27af64",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Features/Settings/PrivacyLegalView.swift",
+      "lines": 259,
+      "bytes": 12850,
+      "sha256": "16d392b1dc52320ec04f7d8d3a565f39507fb8ff2dd64fa70fc8e0d51b62672b",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Features/Settings/ReaderDataManagementViews.swift",
+      "lines": 324,
+      "bytes": 14056,
+      "sha256": "7ada5be0c48e158359e825c1989fdaa13bde2e7eb1935fb44d5c75a9483bc028",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Features/Settings/ReaderPerformanceDiagnosticsView.swift",
+      "lines": 55,
+      "bytes": 2265,
+      "sha256": "81cc159449cf615014c9513d192f079f00c59e5399520adcb7d2b307d854cce4",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Features/Settings/ReadingNoteCatalog.swift",
+      "lines": 65,
+      "bytes": 3287,
+      "sha256": "e20d6036dcea6d5086b6a74e7ab12919e1b9d98b096dd6d18a1e3cc27e285129",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Features/Settings/RecentDiagnosticsView.swift",
+      "lines": 52,
+      "bytes": 2384,
+      "sha256": "280898c4e5b754082039956745fa2e43fd272c175efe34bb03f417e430404a96",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Features/Settings/SettingsBrandHeader.swift",
+      "lines": 62,
+      "bytes": 1984,
+      "sha256": "72ff7a1e4c73fb29f349259327e9608f1080e95ea61c75bacb81810d241b4115",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Features/Settings/SettingsView.swift",
+      "lines": 1314,
+      "bytes": 62221,
+      "sha256": "94a0d9553294c0fb63ac18cf5032aa894829d4a8ab2f8a01224d8272df69e169",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Features/Settings/SourceProxySettingsView.swift",
+      "lines": 189,
+      "bytes": 8000,
+      "sha256": "b29f277ac36f481b4be482d791179267e6d1345c2f16bf903943bae05ece02a3",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Features/Settings/TTSSettingsView.swift",
+      "lines": 450,
+      "bytes": 18313,
+      "sha256": "e5d31a8f4c22f34dca036ef9eb058a2d0b6267461f748722480f5b10287a0cdf",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Features/Settings/WebDAVSyncView.swift",
+      "lines": 454,
+      "bytes": 18458,
+      "sha256": "1992a6e70b32ba82716a87a9c5ccdb60fd852b4f79d0199b46723eb26e3adc55",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Features/SourceManager/RSSSourceEditorView.swift",
+      "lines": 110,
+      "bytes": 4632,
+      "sha256": "14acec2b075bf336a0a06025f2731adf0c6e8fc0aa28650d9a5f22898fc15dd8",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Features/SourceManager/SourceDiagnosticHistoryView.swift",
+      "lines": 119,
+      "bytes": 5372,
+      "sha256": "6490874f6219bc1bde5f540ee2dfdc78234b54c838be9fa219f33bc5107abebc",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Features/SourceManager/SourceLoginCenterView.swift",
+      "lines": 276,
+      "bytes": 11128,
+      "sha256": "be6b27b81545e53e492b23b9ee1a4130ef4780f89faa34487e0dfdea5b2cd57d",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Features/SourceManager/SourceLoginView.swift",
+      "lines": 408,
+      "bytes": 15947,
+      "sha256": "2d4153c66fb83592d56ad57ff8026fbcfffb4e7e895e4d9daff5a3b55050863e",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Features/SourceManager/SourceManagerView.swift",
+      "lines": 2737,
+      "bytes": 128686,
+      "sha256": "b7c901cb641e5f137a2a727fef823c5d4a56616098e026e9c62f3e6ff5968723",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Features/SourceManager/SourceOrganizationView.swift",
+      "lines": 174,
+      "bytes": 8851,
+      "sha256": "16740e976015cca3f51e335c52e903c0c7c03391cfdc9698840589e31d6f6a03",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Features/SourceManager/SourcePublisherLinksView.swift",
+      "lines": 30,
+      "bytes": 1362,
+      "sha256": "843f4e627a25ffbb7a65aa38c49d1878605be1381894d0bffd65e5bdb59daaba",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Features/SourceManager/SourceRuleEditorView.swift",
+      "lines": 625,
+      "bytes": 30000,
+      "sha256": "f0def6b1323fee5037c86a2b53c8ec47d786963a3b1477db28a572aa0e192cf0",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Features/SourceManager/WebsitePageCapture.swift",
+      "lines": 23,
+      "bytes": 974,
+      "sha256": "9dbd9e1769d1cf8f498d88cc4795cd444c77d7f2cc599b42778703308cd254e0",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Features/SourceManager/WebsiteSourceBuilderView.swift",
+      "lines": 182,
+      "bytes": 10756,
+      "sha256": "005e6c26b7f9ae613298354af4d9ab0faafe8f5c082df633b4c192246688fd77",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Features/Verification/VerificationCodeSheet.swift",
+      "lines": 140,
+      "bytes": 4973,
+      "sha256": "8b246bd993f6feef9b7ab20fc9e5041e893d9b60816ccc2d2cf6dd411e9f9866",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Shared/AppVersion.swift",
+      "lines": 35,
+      "bytes": 1340,
+      "sha256": "14618408f036fdcf0b3c838e163639356ad57a952190760b4807d8249d3c7ded",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Shared/DesignSystem/AppAtelierTheme.swift",
+      "lines": 52,
+      "bytes": 2924,
+      "sha256": "60b8a6d89929441ad87bb2c1421ef322a01d9c8e68915805312fbc3aa400fc75",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Shared/DesignSystem/AppLayout.swift",
+      "lines": 14,
+      "bytes": 521,
+      "sha256": "0eb73fb5aa40ecaeb8aceb842d476cedfc70991e63d3b3cb13238e19218a83cb",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Shared/DesignSystem/AppMotion.swift",
+      "lines": 98,
+      "bytes": 4106,
+      "sha256": "661c6655980149f3cd165a4c3bdbf7c581820fbbcfe3d5063df3e8d56a25faa3",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Shared/DesignSystem/AppNavigationLabels.swift",
+      "lines": 4,
+      "bytes": 115,
+      "sha256": "20e093a224b53c10e912245e677de67c45e4edf9ce860e68f5dc11ee6d4654a4",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Shared/DesignSystem/AppTheme.swift",
+      "lines": 249,
+      "bytes": 8861,
+      "sha256": "be27e98585094209f1f85c0234641aa3ed82eb895d62607f775273f6763adc1a",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Shared/DesignSystem/AppThemeOrnament.swift",
+      "lines": 78,
+      "bytes": 3560,
+      "sha256": "684bd04f806444dadfb2d793abb01ecce1c269544d06f50143cc14a621565ffe",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Shared/DesignSystem/AppThemeSurface.swift",
+      "lines": 81,
+      "bytes": 3837,
+      "sha256": "c1d04bd53a6ca65bcd1c7b8d46f9ebcdac86b75549e38a749c66bc5752ad4685",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Shared/DesignSystem/AppVisualTheme.swift",
+      "lines": 189,
+      "bytes": 12378,
+      "sha256": "407caf4975334f45886c89f81426b47fbffe66c4cea94fb5ac374363f3dd01b7",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Shared/DesignSystem/BookCoverPlaceholder.swift",
+      "lines": 34,
+      "bytes": 1742,
+      "sha256": "fcd8197c448e16da17084bf5103a6755b76cb06f6dd7e951f733f26a7f3a2b11",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Shared/DesignSystem/BookJacket.swift",
+      "lines": 27,
+      "bytes": 1303,
+      "sha256": "88b3029b35b2fef74560076ceaddad5c9758562f371c503886f8bb7cd319c698",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Shared/DesignSystem/BrandGlass.swift",
+      "lines": 53,
+      "bytes": 2447,
+      "sha256": "dff51ca656393702069ed29b0efa2b5c7ce66bcbecc88a116bb20f1a68c3ca63",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Shared/DesignSystem/BrandSegmentedControl.swift",
+      "lines": 73,
+      "bytes": 2998,
+      "sha256": "c745c75ac81fd90ba1cbda600ba4fa2593d1d338d6e5e6c20c1a82a949e36f44",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Shared/DesignSystem/CachedRemoteImage.swift",
+      "lines": 124,
+      "bytes": 4316,
+      "sha256": "b6c9cd363747597d7d462beeafa6997e79476d3288926957fd1d469b7850d5d5",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Shared/DesignSystem/ComicImageBudget.swift",
+      "lines": 44,
+      "bytes": 1531,
+      "sha256": "fe6478b15defd0e73352e42e65204321b2e3c7dfef7cff2039f6ee59f60b3078",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Shared/DesignSystem/ComicImageTransport.swift",
+      "lines": 176,
+      "bytes": 8161,
+      "sha256": "366a27731c4942ca2ba1dbc0b1adc8e088f3dae5f718f7cf284cf51e7faaa5de",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Shared/DesignSystem/CoverSourceBytes.swift",
+      "lines": 99,
+      "bytes": 4205,
+      "sha256": "296ab5e430730c0a8f113ec8aeec604d932a11cbc4830a7e7cf166b893c4dd8e",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Shared/DesignSystem/CoverURLResolver.swift",
+      "lines": 58,
+      "bytes": 2641,
+      "sha256": "263f2755f5d59fdb9da6da214b79bbdf37545c11dbd287d3cb0f02203c9c926e",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Shared/DesignSystem/EmptyStateCard.swift",
+      "lines": 28,
+      "bytes": 817,
+      "sha256": "2dbfc0e7126c3e3ed5c51b8d80f121d36de6692bbfcd1dfb151956e6e3c94d5e",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Shared/DesignSystem/FlowLayout.swift",
+      "lines": 49,
+      "bytes": 1688,
+      "sha256": "68a76d42b77a2b9088acad9980e087ac884fce0c8c36d56c01e7352d2bdc0644",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Shared/DesignSystem/LegacyTabBar.swift",
+      "lines": 72,
+      "bytes": 3309,
+      "sha256": "ce177ce4f9492d90d02b72dde70c438084d2678da789a372ee4a9406b4f71cb3",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Shared/DesignSystem/RemoteImageLoader.swift",
+      "lines": 461,
+      "bytes": 22832,
+      "sha256": "155fb09264c4b7458dd27d5b65608318433e5f89fc2961484a6cee6e20e75631",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Shared/DesignSystem/SakuraThemeCatalog.swift",
+      "lines": 47,
+      "bytes": 35458,
+      "sha256": "ac21eae389c558bc5e82c2b12cafacde8c499ebc43e673dd9391f59705df121a",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Shared/Diagnostics/DiagnosticEvent.swift",
+      "lines": 45,
+      "bytes": 1038,
+      "sha256": "4e060472e10b39e63912876ea2cf619171d4662d2d9d987551338e24c5fde3f1",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Shared/Diagnostics/DiagnosticSink.swift",
+      "lines": 8,
+      "bytes": 159,
+      "sha256": "72c536441051d112b8ab7dc0197c640870a2c1938eab5aeb3a44056f8f2a8992",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Shared/Diagnostics/SourceEngineError+Display.swift",
+      "lines": 16,
+      "bytes": 410,
+      "sha256": "9d9223ee1d01d83965080d4db97b87ffcbfca740aec1da3eb27a5154768976ce",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Shared/Foundation/AsyncTimeout.swift",
+      "lines": 86,
+      "bytes": 2880,
+      "sha256": "a15a96636d574dbfe8540fefe6e977aa62c5aaffcabdc147eba58e6aa4a64580",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Shared/Foundation/String+SourceRead.swift",
+      "lines": 15,
+      "bytes": 268,
+      "sha256": "9d9aa3e0e680d07bf4989155950ac867c20fb0e1df3ea0f3c4f925651bea9930",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Shared/HapticFeedback.swift",
+      "lines": 95,
+      "bytes": 3698,
+      "sha256": "a0577980d206aa13fa3673b6d61108b67897565c7d466dfa4bcaf4ea1f901e91",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Shared/Import/PickedDocumentAccess.swift",
+      "lines": 54,
+      "bytes": 1975,
+      "sha256": "ac2f4e08bf35dcf82d8f604b8712fd8c96127bd9954f9619e4faf67d15b38bcd",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Shared/Import/UniversalDocumentPicker.swift",
+      "lines": 51,
+      "bytes": 1751,
+      "sha256": "10bb4b44731ce4440c070e2b8fb52ecf32b115525dd71c98d2631bf8044760bb",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Shared/Performance/AppFrameProfiler.swift",
+      "lines": 132,
+      "bytes": 6633,
+      "sha256": "7a2cc8c629736114748734646dd3bb0868b5b39e566215ad91add7813f62d149",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Shared/Performance/FrameRateCoordinator.swift",
+      "lines": 88,
+      "bytes": 3475,
+      "sha256": "5c1fb5a25e1b617583ca2c3e42b475fcfdb0023a500a972c6e369c868c10b0fa",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Shared/Performance/PerformanceSignpost.swift",
+      "lines": 23,
+      "bytes": 651,
+      "sha256": "0e4c4e0fd67f18f651684726a1b12569047da462448f1195873536bc927fddeb",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Shared/Performance/ReaderFrameRateSampler.swift",
+      "lines": 77,
+      "bytes": 2846,
+      "sha256": "9ed4e48bd0134501e5cdc14326fba5e8fdeeec1934c7bb232e2c29961eda444d",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Shared/Performance/ReaderPerformancePolicy.swift",
+      "lines": 126,
+      "bytes": 6059,
+      "sha256": "2a501d07d7c09268b9911d96d553910ac3123226af0778741751e378e5496b4d",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Shared/Performance/ReaderScrollPerfMeter.swift",
+      "lines": 95,
+      "bytes": 3649,
+      "sha256": "1f51a5450064f483029812d1ae3c2243094b2829a76df328e6a5a161b25df6a5",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Shared/ResultPage.swift",
+      "lines": 10,
+      "bytes": 353,
+      "sha256": "5eaf426b78f149566cd6c931ca72cbc6654db428697502876ed018e7f70ef9c5",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    },
+    {
+      "path": "SourceReadSwift/Shared/ShareSheet.swift",
+      "lines": 29,
+      "bytes": 864,
+      "sha256": "672521d4e3d91cc41de64711bf736a6bd5944f0a8f2796019f88f35d0f4626a5",
+      "review": "inventory-only; see module reports for actual inspected scope"
+    }
+  ]
+}

@@ -1,0 +1,4879 @@
+{
+  "started_at_utc": "2026-11-05T18:34:57.753512+00:00",
+  "files": [
+    {
+      "path": ".github/workflows/floating-desk.yml",
+      "bytes": 6763,
+      "lines": 135,
+      "sha256": "022d3b0b9d0a474723b46af61388f89bbf1b611637be43f97a656046c8191c35",
+      "review": "pending"
+    },
+    {
+      "path": ".github/workflows/ios.yml",
+      "bytes": 13845,
+      "lines": 277,
+      "sha256": "143fab493f4a25a2b5e70904e788d4838cf64e68e2a13dd0b79f1bf05397bb59",
+      "review": "pending"
+    },
+    {
+      "path": ".github/workflows/motion-lab.yml",
+      "bytes": 7644,
+      "lines": 150,
+      "sha256": "f8f4b7005c21365fb8e474be9d33ca6b6ea4e24f115f3ed6c725249b8e1a4586",
+      "review": "pending"
+    },
+    {
+      "path": ".github/workflows/source-rows-probe.yml",
+      "bytes": 2065,
+      "lines": 60,
+      "sha256": "d1c35841a53f028db4e4661b917a7019e1a076cd6310bb49c245cc9bc98a01b1",
+      "review": "pending"
+    },
+    {
+      "path": ".github/workflows/unsigned-ipa.yml",
+      "bytes": 5026,
+      "lines": 120,
+      "sha256": "19e17a50a55f4e086ffe19bf89c7385e7dd8eba5e982fd6763f55cd14db63714",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwift/App/AppState.swift",
+      "bytes": 15751,
+      "lines": 332,
+      "sha256": "ff951f2fecc9eb164e0efacc20b210a84e9ac9181edc1359692bfed56c302ae0",
+      "review": "partial",
+      "review_scope": "Assembly, import, background-write lease and backup paths read; restoration now centralized.",
+      "reviewer": "root",
+      "reviewed_at_utc": "2026-11-05T21:17:34.076228+00:00"
+    },
+    {
+      "path": "SourceReadSwift/App/ComicRegressionLaunch.swift",
+      "bytes": 5327,
+      "lines": 76,
+      "sha256": "d468e10c98e8a729ffe1aa15ecea3d3f5e41fc4112858767773fa5c111616385",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwift/App/FloatingDeskRegressionLaunch.swift",
+      "bytes": 6775,
+      "lines": 99,
+      "sha256": "e2955ab5bedb12758c6087eb4d73884692a2ed2f10e69e38bb5e4dc680dd0710",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwift/App/Info.plist",
+      "bytes": 3371,
+      "lines": 114,
+      "sha256": "38a4dd729001ad2068a01335fe21f25c9193bfc29cb8614f5c58196387ad2c4d",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwift/App/LocalComicRegressionLaunch.swift",
+      "bytes": 2333,
+      "lines": 36,
+      "sha256": "0441a5e3803081002e50e6de0b9321fb3f4e2ee53f90638c2e2d914c1480b68d",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwift/App/ReaderRegressionLaunch.swift",
+      "bytes": 4306,
+      "lines": 76,
+      "sha256": "2da2912b8bc8238add3c28400d1418e670614a37eb4077a465eca8a76b6a8ae2",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwift/App/RootTabView.swift",
+      "bytes": 11546,
+      "lines": 275,
+      "sha256": "b900f894aa5be52d1bd1d848de586fdfa5b0f830a38a7f1a679ed27dc71d6c24",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwift/App/SourceReadSwiftApp.swift",
+      "bytes": 1869,
+      "lines": 47,
+      "sha256": "f757854a856a371a88726cad905dbc31d806a38af6b0b3bdaea4e63730803308",
+      "review": "reviewed",
+      "review_scope": "Full app assembly, URL import and scene transitions; no new definite defect in this file.",
+      "reviewer": "root",
+      "reviewed_at_utc": "2026-11-05T21:52:26.996346+00:00"
+    },
+    {
+      "path": "SourceReadSwift/Core/AI/AIChatClient.swift",
+      "bytes": 12129,
+      "lines": 199,
+      "sha256": "cd1a871f2ecf8a0402eddc4901a131c3b72551f0100ff59b4e5ec2717938f28a",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwift/Core/Audio/AudioBookPlaybackCoordinator.swift",
+      "bytes": 18885,
+      "lines": 532,
+      "sha256": "e37e278c72f6f16cf1e379bc2634d879d3e1b42ba48b05ca6be68d6e6ac1e578",
+      "review": "reviewed",
+      "review_scope": "Full playback, progress, notification and artwork lifecycle read; stale session and state cleanup regressions added, fixes pending native red baseline.",
+      "reviewer": "root",
+      "reviewed_at_utc": "2026-11-05T21:27:35.950529+00:00"
+    },
+    {
+      "path": "SourceReadSwift/Core/Audio/AzureTTSVoice.swift",
+      "bytes": 3524,
+      "lines": 64,
+      "sha256": "55336f8ac3df31291c04a5d2ac0a47aabc1bc7774062fd60addb7c356922538f",
+      "review": "reviewed",
+      "review_scope": "Full request, SSML escaping and credentials read; credential read errors still collapse to missing.",
+      "reviewer": "root",
+      "reviewed_at_utc": "2026-11-05T21:27:35.950529+00:00"
+    },
+    {
+      "path": "SourceReadSwift/Core/Audio/CloudTTSClient.swift",
+      "bytes": 4878,
+      "lines": 147,
+      "sha256": "016ca0d4af2bb3698e0dff895720c44381a906a84a12f65514e631938b9ee468",
+      "review": "reviewed",
+      "review_scope": "Full socket lifecycle and timeout task group; native held-callback regression in 8fee410, fixes in separate copy.",
+      "reviewer": "root",
+      "reviewed_at_utc": "2026-11-05T21:52:26.996346+00:00"
+    },
+    {
+      "path": "SourceReadSwift/Core/Audio/CloudTTSCredentials.swift",
+      "bytes": 2967,
+      "lines": 94,
+      "sha256": "74c68f40bc2e36506f5ef79ba8ad38ec7faac071759aa442ce5d1f3b24220e38",
+      "review": "reviewed",
+      "review_scope": "Entire file; single Keychain credential blob and parameter clamps; no live gateway accessed.",
+      "reviewer": "root",
+      "reviewed_at_utc": "2026-11-05T21:17:34.076228+00:00"
+    },
+    {
+      "path": "SourceReadSwift/Core/Audio/CloudTTSPlayer.swift",
+      "bytes": 2174,
+      "lines": 73,
+      "sha256": "b876fd2f7182ffe4d193ce0c0191eb564890c6fc4f3a15d2bcda50408795bb5c",
+      "review": "reviewed",
+      "review_scope": "Full playback and delegate lifecycle; stopped-player callbacks regression in 8fee410, fix in separate copy.",
+      "reviewer": "root",
+      "reviewed_at_utc": "2026-11-05T21:52:26.996346+00:00"
+    },
+    {
+      "path": "SourceReadSwift/Core/Audio/CloudTTSProtocol.swift",
+      "bytes": 3357,
+      "lines": 92,
+      "sha256": "80cb644691a3067b738e5c81bc76fd6eb238783664b2c023532162619e61baf6",
+      "review": "reviewed",
+      "review_scope": "Full HMAC URL and payload construction read; no new concrete defect confirmed in covered path.",
+      "reviewer": "root",
+      "reviewed_at_utc": "2026-11-05T21:27:35.950529+00:00"
+    },
+    {
+      "path": "SourceReadSwift/Core/Audio/HttpTTSClient.swift",
+      "bytes": 4267,
+      "lines": 100,
+      "sha256": "ef23134fbb5cea686368695673976cfaa816243ed59121fcac09305de78eb3e6",
+      "review": "reviewed",
+      "review_scope": "Full HTTP TTS request and response paths read; response size and total request cancellation remain to harden.",
+      "reviewer": "root",
+      "reviewed_at_utc": "2026-11-05T21:27:35.950529+00:00"
+    },
+    {
+      "path": "SourceReadSwift/Core/Audio/KeychainSecretStore.swift",
+      "bytes": 3665,
+      "lines": 100,
+      "sha256": "fdc64fc5055b72816608c27d4f62a09249c72eee2bd18def0c9842a3ed8f0918",
+      "review": "reviewed",
+      "review_scope": "Entire file; throwing read API added with compatibility default; native credential regressions pending.",
+      "reviewer": "root",
+      "reviewed_at_utc": "2026-11-05T21:17:34.076228+00:00"
+    },
+    {
+      "path": "SourceReadSwift/Core/Audio/LocalVoiceLibrary.swift",
+      "bytes": 4484,
+      "lines": 110,
+      "sha256": "e521ae465b7d3b341d176d85d9737dd5ce0ecc9c2d7cbeabf32d74437581eb5d",
+      "review": "reviewed",
+      "review_scope": "Full import, lookup and clear paths; destructive replacement identified, two filesystem regressions pending.",
+      "reviewer": "root",
+      "reviewed_at_utc": "2026-11-05T21:52:26.996346+00:00"
+    },
+    {
+      "path": "SourceReadSwift/Core/Audio/ReaderTTSEngine.swift",
+      "bytes": 1042,
+      "lines": 30,
+      "sha256": "fea2cf529c4b6f4b384ab0233e6e34dd078141250cfdb82d66c96a672536fd64",
+      "review": "reviewed",
+      "review_scope": "Full backend enum and display copy read.",
+      "reviewer": "root",
+      "reviewed_at_utc": "2026-11-05T21:27:35.950529+00:00"
+    },
+    {
+      "path": "SourceReadSwift/Core/Audio/XunfeiTTSFrame.swift",
+      "bytes": 1766,
+      "lines": 62,
+      "sha256": "928864f29f5c50fa51982b60413c755ff753796a174c92a7da9fe208d7ccc3a0",
+      "review": "reviewed",
+      "review_scope": "Full frame decode read; invalid base64 silently skipped by client, may truncate audio.",
+      "reviewer": "root",
+      "reviewed_at_utc": "2026-11-05T21:27:35.950529+00:00"
+    },
+    {
+      "path": "SourceReadSwift/Core/Engine/BlockingRuleExecutor.swift",
+      "bytes": 1027,
+      "lines": 25,
+      "sha256": "8eeb82cb1fd73aa6269ec487d3d033c08e96675f9b673ca48f66a642087a6304",
+      "review": "reviewed",
+      "review_scope": "Dispatch suspension, diagnostic task-local propagation, autoreleasepool and continuation; existing synchronous script cancellation is not added.",
+      "reviewer": "source_audit",
+      "reviewed_at_utc": "2026-11-05T19:47:53.760467+00:00"
+    },
+    {
+      "path": "SourceReadSwift/Core/Engine/CryptoHelper.swift",
+      "bytes": 1945,
+      "lines": 50,
+      "sha256": "3626700379b334b0940ee86ce7d861172a5edaea997625ed607708e40020e582",
+      "review": "reviewed",
+      "review_scope": "Full AES key/IV length, output buffer and decoding checks.",
+      "reviewer": "root",
+      "reviewed_at_utc": "2026-11-05T21:52:26.996346+00:00"
+    },
+    {
+      "path": "SourceReadSwift/Core/Engine/LocalComicSourceEngine.swift",
+      "bytes": 2829,
+      "lines": 58,
+      "sha256": "386871d685aa8fa47a26888c93533e839c4220ab6e2bccf151f1ec95b68dd30b",
+      "review": "reviewed",
+      "review_scope": "Read in preceding serialized audit checkpoint; see STATUS/STORAGE-NETWORK. Reading is not a full runtime or performance acceptance.",
+      "reviewer": "root",
+      "reviewed_at_utc": "2026-11-05T21:17:34.076228+00:00"
+    },
+    {
+      "path": "SourceReadSwift/Core/Engine/PayActionPolicy.swift",
+      "bytes": 6398,
+      "lines": 151,
+      "sha256": "b18c936fcbdfd292e7624dc9a82b018017b046d2ee9cff19d276672b1da09f41",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwift/Core/Engine/SourceEngine.swift",
+      "bytes": 111335,
+      "lines": 2225,
+      "sha256": "b89a652b6446ecb77928198513d926399535c18aca693dc656167e4a702f8f79",
+      "review": "partial",
+      "review_scope": "Source variables, cancellation/retry, dynamic media and pipeline paths read; entire large file not covered.",
+      "reviewer": "root",
+      "reviewed_at_utc": "2026-11-05T21:17:34.076228+00:00"
+    },
+    {
+      "path": "SourceReadSwift/Core/Engine/SourcePipeline.swift",
+      "bytes": 16536,
+      "lines": 371,
+      "sha256": "e3a1b06e00c04333b34d206ce3c4d5a9541301f7873abd6c44ef9995b2b617e0",
+      "review": "reviewed",
+      "review_scope": "Full four-stage pipeline read; invalid timeout and swallowed retry cancellation regression added; fix prepared separately, awaiting native red baseline.",
+      "reviewer": "root",
+      "reviewed_at_utc": "2026-11-06T00:01:59.149420+00:00"
+    },
+    {
+      "path": "SourceReadSwift/Core/Engine/ZlibraryEngine.swift",
+      "bytes": 14774,
+      "lines": 336,
+      "sha256": "21354420907145fa0d7abf9016917f40297c21bce17652c49b4da3705b604ac8",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwift/Core/Environment/BackgroundKeepAliveManager.swift",
+      "bytes": 7429,
+      "lines": 210,
+      "sha256": "a40328b55341af6edad54dd81117df5ac911b7d87ddb2b56cec464e36bfbcc4e",
+      "review": "reviewed",
+      "review_scope": "Full lifecycle read; shared audio-session interference and expiry renewal hazards remain open.",
+      "reviewer": "root",
+      "reviewed_at_utc": "2026-11-06T00:01:59.149540+00:00",
+      "latest_scope": "检查共享音频会话和后台续期生命周期，待修"
+    },
+    {
+      "path": "SourceReadSwift/Core/Environment/SandboxEnvironment.swift",
+      "bytes": 1743,
+      "lines": 43,
+      "sha256": "4f3092f6775e578046577b4d9f0d683a56be1ad615560b9c688758c31a0d7309",
+      "review": "reviewed",
+      "review_scope": "Full runtime detection and bounded configured batch concurrency.",
+      "reviewer": "root",
+      "reviewed_at_utc": "2026-11-05T21:52:26.996346+00:00"
+    },
+    {
+      "path": "SourceReadSwift/Core/Import/HaiKuoShiJieSourceAdapter.swift",
+      "bytes": 4800,
+      "lines": 119,
+      "sha256": "e4d43d249004c23b2eb5ec21651913c1244882a80e8271140d87edee5d101db5",
+      "review": "reviewed",
+      "latest_scope": "通读适配器；修复 UA 转义；详情目录正文未实现"
+    },
+    {
+      "path": "SourceReadSwift/Core/Import/HuaHuoBookSourceAdapter.swift",
+      "bytes": 11499,
+      "lines": 256,
+      "sha256": "e0ddfbb09475c7c664741d9847999adaca7e149b6f7ff9f96061fcf20f0a7eff",
+      "review": "reviewed",
+      "review_scope": "完整规则映射与 Codable 复核；保留原媒体/脚本/登录扩展；原生和线上兼容仍待。",
+      "reviewer": "root",
+      "reviewed_at_utc": "2026-11-06T11:32:18.810647+00:00",
+      "latest_scope": "完整规则映射与 Codable 复核；保留原媒体/脚本/登录扩展；原生和线上兼容仍待。"
+    },
+    {
+      "path": "SourceReadSwift/Core/Import/LocalComicBookParser.swift",
+      "bytes": 7088,
+      "lines": 128,
+      "sha256": "b32a1b4476d8963ffc411dea9b74a91389fb2bb3a79d5a2c44f77cee9a3f516b",
+      "review": "reviewed",
+      "review_scope": "Read in preceding serialized audit checkpoint; see STATUS/STORAGE-NETWORK. Reading is not a full runtime or performance acceptance.",
+      "reviewer": "root",
+      "reviewed_at_utc": "2026-11-05T21:17:34.076228+00:00"
+    },
+    {
+      "path": "SourceReadSwift/Core/Import/LocalEPUBBookParser.swift",
+      "bytes": 23944,
+      "lines": 532,
+      "sha256": "9c46b425c327b9be8a33e836090cde42a3961499ece0fe31ed3ee3d6ca7fbf1a",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwift/Core/Import/LocalTextBookParser.swift",
+      "bytes": 8445,
+      "lines": 189,
+      "sha256": "37b0f0ce4ab86f20bb0958ad594e29c9ae9b5302af994e0718d4d2a2f0a1d250",
+      "review": "reviewed",
+      "review_scope": "Full text adapter, heading matching and model coding; actual smart divider pending separately.",
+      "reviewer": "root",
+      "reviewed_at_utc": "2026-11-05T21:52:26.996346+00:00"
+    },
+    {
+      "path": "SourceReadSwift/Core/Import/LocalTxtSmartDivider.swift",
+      "bytes": 12241,
+      "lines": 254,
+      "sha256": "3580720bc27c371cd3249d677efa0615e2c73809abba577e19eb2f61322aa010",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwift/Core/Import/OnboardingClassicBook.swift",
+      "bytes": 12207,
+      "lines": 90,
+      "sha256": "9f246d2c7cd964e3238e458a47adefd9228de9c90ae0c73396ec2807fce4e23a",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwift/Core/Import/SourceImportDownloader.swift",
+      "bytes": 10034,
+      "lines": 246,
+      "sha256": "f0fd834c6af7091ebee8619de032725a6da513bf49240a3a659d87fada9506e6",
+      "review": "reviewed",
+      "review_scope": "HTTP status, empty/size/challenge handling, charset payload, publisher routing, HTTP URL normalization; added explicit-link selection without executing page JS.",
+      "reviewer": "source_audit",
+      "reviewed_at_utc": "2026-11-05T19:47:53.760129+00:00"
+    },
+    {
+      "path": "SourceReadSwift/Core/Import/SourceImportLinkParser.swift",
+      "bytes": 5995,
+      "lines": 151,
+      "sha256": "207f63aa23f97fd531a08e846973fd2a552745f4165d0559535576f503e06d81",
+      "review": "reviewed",
+      "review_scope": "JSON/import schemes/HTTP extraction, relative import references; no changes in this batch. URL percent-decoding edge cases remain for native integration tests.",
+      "reviewer": "source_audit",
+      "reviewed_at_utc": "2026-11-05T19:47:53.760225+00:00"
+    },
+    {
+      "path": "SourceReadSwift/Core/Import/SourcePublisherLinks.swift",
+      "bytes": 4744,
+      "lines": 84,
+      "sha256": "48c7c3f5f45eea31ea29e54911d0e1924b890810b9c0efe6a5b745322ad1b8bb",
+      "review": "reviewed",
+      "review_scope": "Full HTML and catalog extraction plus URL filtering read; raw definition is not confused with link catalogs; publisher live reading compatibility remains separate.",
+      "reviewer": "root",
+      "reviewed_at_utc": "2026-11-06T00:01:59.149690+00:00"
+    },
+    {
+      "path": "SourceReadSwift/Core/Import/XbsBookSourceAdapter.swift",
+      "bytes": 15097,
+      "lines": 374,
+      "sha256": "657a7201f4f80134d470b0202fa9fe4515339fd734aaa85c1004ea1b832402bf",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwift/Core/JavaScript/JSCoreRuntime.swift",
+      "bytes": 342085,
+      "lines": 5715,
+      "sha256": "11393e16ff4e29554f409992ddc62f4c7990456754f28ce6ef88b0de926c4c58",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwift/Core/JavaScript/LegadoCharset.swift",
+      "bytes": 7412,
+      "lines": 193,
+      "sha256": "da8c0129956621a8cab70da505ddfc95cb994ff57f376aab6acd9e91ff4d3b98",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwift/Core/JavaScript/LegadoHostServices.swift",
+      "bytes": 60634,
+      "lines": 1269,
+      "sha256": "c6b2c817b466f9e0fb46291f7fbbee9ac12e6174b223c1ceb9f167e0eee657ef",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwift/Core/JavaScript/LegadoJavaScriptCompatibility.swift",
+      "bytes": 18093,
+      "lines": 371,
+      "sha256": "dba9a668ba559fe95aabcebdc69cb19cc6bc6ead375d0c9ebfd124e70735bac0",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwift/Core/JavaScript/LegadoModelBridges.swift",
+      "bytes": 5007,
+      "lines": 102,
+      "sha256": "d421150691a254b729ffc90cacb4f708981e8903f6cdd169ed76c26cbea3b1c9",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwift/Core/JavaScript/LegadoNativeBridges.swift",
+      "bytes": 63756,
+      "lines": 1196,
+      "sha256": "89daf2f67c2be47aae7a691130378dacac5ea84da8a72a59455b020ced6a5c6a",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwift/Core/JavaScript/QueryTTF.swift",
+      "bytes": 17730,
+      "lines": 404,
+      "sha256": "e3022974922aeb1fe35b552b961ab3fe9b9c98560568405b8be74bcfcb85f00e",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwift/Core/Models/BookModels.swift",
+      "bytes": 8303,
+      "lines": 271,
+      "sha256": "ecea0903c876aa05bcb9f8cc39081c6d3cbffaacbe2ce3a10d17345bbf2b5ef0",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwift/Core/Models/BookSource.swift",
+      "bytes": 32402,
+      "lines": 790,
+      "sha256": "ff0f7bd3b51ca40fc4d0a9029475d4cc117bf477d8c8209fa07534fa412659ee",
+      "review": "partial",
+      "review_scope": "Source kind and derived single-book source; added declared dynamic book.type capability detection; other decoder/migration fields pending full reread.",
+      "reviewer": "source_audit",
+      "reviewed_at_utc": "2026-11-05T19:47:53.761384+00:00"
+    },
+    {
+      "path": "SourceReadSwift/Core/Models/BookshelfModels.swift",
+      "bytes": 10412,
+      "lines": 239,
+      "sha256": "ce336f8acb47f13f8b5cfe4fa650268d512e2efd64b6c66eccb03a24d3af2b8e",
+      "review": "partial",
+      "review_scope": "Book Codable/migration fields and initializer read through first 170 lines; no per-day session history currently.",
+      "reviewer": "root",
+      "reviewed_at_utc": "2026-11-06T00:01:59.149751+00:00",
+      "latest_scope": "复核书架模型 Codable 与兼容字段"
+    },
+    {
+      "path": "SourceReadSwift/Core/Models/BuiltinBrowserSourceProvider.swift",
+      "bytes": 46692,
+      "lines": 47,
+      "sha256": "3d7a0a7882225fa6da1f645b716eee33d9edb146f8048fc7b328ebb9ee01e041",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwift/Core/Models/ComicReadingPosition.swift",
+      "bytes": 2536,
+      "lines": 60,
+      "sha256": "cdc679a023f39953a07d07716c03717e56bd9544d268d4c89bcccf2599041ba2",
+      "review": "reviewed",
+      "review_scope": "Read in preceding serialized audit checkpoint; see STATUS/STORAGE-NETWORK. Reading is not a full runtime or performance acceptance.",
+      "reviewer": "root",
+      "reviewed_at_utc": "2026-11-05T21:17:34.076228+00:00"
+    },
+    {
+      "path": "SourceReadSwift/Core/Models/ReadingStatsSummary.swift",
+      "bytes": 6275,
+      "lines": 143,
+      "sha256": "55e901ecf30c77d139bb5048afd8d5fc408dafb822413335d737fd0b3ae91016",
+      "review": "reviewed",
+      "review_scope": "Full aggregation read; cumulative duration attributed to last-read day is incorrect; migration and foreground session accounting still pending.",
+      "reviewer": "root",
+      "reviewed_at_utc": "2026-11-06T00:01:59.149827+00:00",
+      "latest_scope": "通读统计、日期分桶、连读及前台区间，增加跨午夜与背景暂停用例"
+    },
+    {
+      "path": "SourceReadSwift/Core/Models/SourceCollections.swift",
+      "bytes": 9622,
+      "lines": 253,
+      "sha256": "c1dab1bf91fb9f9b0a4a4f326c6113be05a237ee599ee51279129a6267b7b6bf",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwift/Core/Models/SourceOrganization.swift",
+      "bytes": 4560,
+      "lines": 107,
+      "sha256": "5f0b3bc38f433af5fc958ffbf5c7cd6247382ba1c0aa348c811d34d2af9f88cc",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwift/Core/Network/CookieHeaderParser.swift",
+      "bytes": 5618,
+      "lines": 117,
+      "sha256": "8f5a4f73a10b0e5b61dbf8da091fc0c0375744b97c5a11d1ae4ce17fd65f0eec",
+      "review": "reviewed",
+      "review_scope": "Entire file; case-sensitive cookie merge fixed; combined Set-Cookie attribute handling still requires broader corpus.",
+      "reviewer": "root",
+      "reviewed_at_utc": "2026-11-05T21:17:34.076228+00:00"
+    },
+    {
+      "path": "SourceReadSwift/Core/Network/ResponseBodyDecoder.swift",
+      "bytes": 6877,
+      "lines": 163,
+      "sha256": "1d83ef8f47d25d209d9914b611ab3e4892cdfa6dfb6897dc08ac526046c7204c",
+      "review": "reviewed",
+      "review_scope": "Read in preceding serialized audit checkpoint; see STATUS/STORAGE-NETWORK. Reading is not a full runtime or performance acceptance.",
+      "reviewer": "root",
+      "reviewed_at_utc": "2026-11-05T21:17:34.076228+00:00"
+    },
+    {
+      "path": "SourceReadSwift/Core/Network/ResponseTextDecoder.swift",
+      "bytes": 4631,
+      "lines": 102,
+      "sha256": "5fa5e51f557a748eeadab15f5d4933caf6da6325ef30e6f0a80bafb734216e37",
+      "review": "reviewed",
+      "review_scope": "Read in preceding serialized audit checkpoint; see STATUS/STORAGE-NETWORK. Reading is not a full runtime or performance acceptance.",
+      "reviewer": "root",
+      "reviewed_at_utc": "2026-11-05T21:17:34.076228+00:00"
+    },
+    {
+      "path": "SourceReadSwift/Core/Network/SourcePaginationURLIdentity.swift",
+      "bytes": 6448,
+      "lines": 154,
+      "sha256": "00616931cc413b0a483db8f99bc53917de63dfc4db41bbfb0b56f23c33d4500a",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwift/Core/Network/SourceProxyManager.swift",
+      "bytes": 5396,
+      "lines": 111,
+      "sha256": "00708f545b6e3a7cb32dbd5af9e04979186c1f658928a884ee55f050172b99e1",
+      "review": "reviewed",
+      "review_scope": "Full settings/session configuration read; unvalidated host/port and per-keystroke session reset remain open.",
+      "reviewer": "root",
+      "reviewed_at_utc": "2026-11-06T00:01:59.149887+00:00",
+      "latest_scope": "通读并修复代理草稿提交与旧配置读取"
+    },
+    {
+      "path": "SourceReadSwift/Core/Network/SourceRateLimiter.swift",
+      "bytes": 5072,
+      "lines": 134,
+      "sha256": "2270402927726e6ce9d5ae0aec3a2ea564ab27c62a30ba27593124117a6cb90c",
+      "review": "reviewed",
+      "review_scope": "Entire file; cancellation permit defect fixed; native regression in 479a264.",
+      "reviewer": "root",
+      "reviewed_at_utc": "2026-11-05T21:17:34.076228+00:00"
+    },
+    {
+      "path": "SourceReadSwift/Core/Network/SourceRequest.swift",
+      "bytes": 22823,
+      "lines": 483,
+      "sha256": "5c9a66605d6db77f73bf41ec2b879aae7321af24a9131062710d943cc3d3a8f2",
+      "review": "reviewed",
+      "latest_scope": "通读请求/重定向/解码；完成 TLS/跨源凭据/HTML 限次修复；原生与旧源兼容未验收。",
+      "review_scope": "通读请求/重定向/解码；完成 TLS/跨源凭据/HTML 限次修复；原生与旧源兼容未验收。",
+      "reviewer": "root",
+      "reviewed_at_utc": "2026-11-06T11:32:18.810647+00:00"
+    },
+    {
+      "path": "SourceReadSwift/Core/Network/SourceRequestBuilder.swift",
+      "bytes": 42085,
+      "lines": 911,
+      "sha256": "e286c7057fc8685816c26c4dcd6464e38c3eab87c2a1d34472d016201546d552",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwift/Core/Network/SourceURLDirective.swift",
+      "bytes": 25882,
+      "lines": 612,
+      "sha256": "b5633bbbfe80ce18168020ef8e5734d81247fc280e28702e53b2bbb5401835ab",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwift/Core/Network/SynchronousSourceLoader.swift",
+      "bytes": 6876,
+      "lines": 155,
+      "sha256": "8f49ca9c200c7df1c77449f75102ecd333010c0cd726fa188412102a99d948db",
+      "review": "reviewed",
+      "latest_scope": "通读同步请求及 cookie 同步；改用系统 TLS 验证，代理和重定向语义未扩展。",
+      "review_scope": "通读同步请求及 cookie 同步；改用系统 TLS 验证，代理和重定向语义未扩展。",
+      "reviewer": "root",
+      "reviewed_at_utc": "2026-11-06T11:32:18.810647+00:00"
+    },
+    {
+      "path": "SourceReadSwift/Core/Network/SynchronousSourceNetworkBridge.swift",
+      "bytes": 4076,
+      "lines": 107,
+      "sha256": "00f482fab854fa462e27dc28fa906278aa51cf12507f42c51aa698bcdc18f9c6",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwift/Core/Network/WebDAVSyncService.swift",
+      "bytes": 17577,
+      "lines": 434,
+      "sha256": "af30d2c16cb4a6a5b93d903006aa5d3be104a957186f27fa1ba3b178c224eeef",
+      "review": "reviewed",
+      "review_scope": "Entire file; URL components, schema validation and malformed XML fixed; live user-account service not contacted.",
+      "reviewer": "root",
+      "reviewed_at_utc": "2026-11-05T21:17:34.076228+00:00"
+    },
+    {
+      "path": "SourceReadSwift/Core/Network/WebViewFallback.swift",
+      "bytes": 13028,
+      "lines": 302,
+      "sha256": "4a2139f5858c3675b51d2cd2a36799df37576e775bd4f996d646ea5ac6ae7e3c",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwift/Core/Reader/SmartWebArticleExtractor.swift",
+      "bytes": 2730,
+      "lines": 54,
+      "sha256": "a4034fe697ed4a615bd0e63560d269e9edc1815f65a195cd79af85943fed413e",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwift/Core/Rules/AudioContentParser.swift",
+      "bytes": 1743,
+      "lines": 33,
+      "sha256": "079941e6a3cc8be799a3cc17bfc948bbfbe87c6bcda86a39243372d0bfe2a9b1",
+      "review": "reviewed",
+      "review_scope": "Full URL extraction read; direct/JSON/HTML audio paths and media extensions checked.",
+      "reviewer": "root",
+      "reviewed_at_utc": "2026-11-05T21:33:54.916255+00:00"
+    },
+    {
+      "path": "SourceReadSwift/Core/Rules/BookDetailParser.swift",
+      "bytes": 20993,
+      "lines": 449,
+      "sha256": "4ef2d420fe1c02380de5681946578b6ef437c8aea2d44459081825062f5b283e",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwift/Core/Rules/ChapterListParser.swift",
+      "bytes": 35029,
+      "lines": 731,
+      "sha256": "78866160f667d68e743444ef0ceea6571629c843dbb04e85a148d97935a0c6ad",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwift/Core/Rules/ChapterTextSanitizer.swift",
+      "bytes": 8407,
+      "lines": 208,
+      "sha256": "7f4d980cdb78fcff11841d663b140f85da802edcd2375cc0b2533d144b6bf1d6",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwift/Core/Rules/ComicContentParser.swift",
+      "bytes": 5804,
+      "lines": 109,
+      "sha256": "ae1fb5315364fdab7ed260206b969ac9c15e31566b827c526662ac0f69d4e487",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwift/Core/Rules/ContentImageNormalizer.swift",
+      "bytes": 4758,
+      "lines": 93,
+      "sha256": "f1569a76d0d1adb0b21847b04af4585368c126e1ffd16ddd5703aa972260642d",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwift/Core/Rules/ContentParser.swift",
+      "bytes": 31409,
+      "lines": 619,
+      "sha256": "ba1f17a40f4cb8c2273142e697f23a3c5ba6f9fa91f4e4d126bc7090e7d4e736",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwift/Core/Rules/DynamicURLResolver.swift",
+      "bytes": 21471,
+      "lines": 405,
+      "sha256": "5d09a36048ccf1f9dfc956c8a934309d194bc2bc82dc82537653d1605fdbe7ca",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwift/Core/Rules/ExploreCategoryParser.swift",
+      "bytes": 8289,
+      "lines": 194,
+      "sha256": "3173733b2b7c4e1501a610be97c0ebb89d640c681dd94b013bf3178fa59fe633",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwift/Core/Rules/HtmlRuleExtractor.swift",
+      "bytes": 54522,
+      "lines": 1212,
+      "sha256": "7e8e9278e482fe50ddf185dd51f601bc2850bb5f47b88f5c8c9d9890c88b22cd",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwift/Core/Rules/InlineImageCodec.swift",
+      "bytes": 8748,
+      "lines": 211,
+      "sha256": "ba924f82d64a722aaf959e5cfab986761397cb8b61938c7def2431b8cc7c9b4a",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwift/Core/Rules/JSONRuleExtractor.swift",
+      "bytes": 116118,
+      "lines": 2580,
+      "sha256": "0c1c4bbfc40b44056e7c030f2921c685caee7754a94777d3de56313daae0c60a",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwift/Core/Rules/LegadoAllInOneRegex.swift",
+      "bytes": 4186,
+      "lines": 104,
+      "sha256": "2bc472a12f462c602e38400c0d0a907d839db0128c18b1917597fc8b97d679de",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwift/Core/Rules/LegadoDefaultRuleTranslator.swift",
+      "bytes": 26934,
+      "lines": 599,
+      "sha256": "c95f90e562a3c793d0995646e65d703fe566a659e31e6c9374833368772171e7",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwift/Core/Rules/LegadoRuleAnalyzer.swift",
+      "bytes": 6545,
+      "lines": 134,
+      "sha256": "b126ea4c10cb151ca5ecb21c661dc4fbfdbff2745cf6dc27456760f11e61ba16",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwift/Core/Rules/LegadoRuleResolver.swift",
+      "bytes": 12586,
+      "lines": 302,
+      "sha256": "b5110abe2f34a14b4433659db5b5cd03c63f6acdcfc728fcc03669799188da8c",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwift/Core/Rules/MediaURLResolver.swift",
+      "bytes": 695,
+      "lines": 15,
+      "sha256": "36b455f15b01dde7a65ca20e5607c5acc180c973ab90eb97316d382e7e162542",
+      "review": "reviewed",
+      "review_scope": "Full URL normalization read; HTTP(S)-only and signed query preservation checked.",
+      "reviewer": "root",
+      "reviewed_at_utc": "2026-11-05T21:33:54.916255+00:00"
+    },
+    {
+      "path": "SourceReadSwift/Core/Rules/PurifyRuleEvaluator.swift",
+      "bytes": 4251,
+      "lines": 103,
+      "sha256": "93650e7e11f968fb71bf417214dba41754a0d220dd317e22e596baee8a5ae22f",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwift/Core/Rules/RSSFeedParser.swift",
+      "bytes": 12869,
+      "lines": 245,
+      "sha256": "db56da49c6eddfa6e3db36e9f29f2c39d3dac9c301e65528fefa0d8374d06581",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwift/Core/Rules/ResponseFormatDetector.swift",
+      "bytes": 13099,
+      "lines": 286,
+      "sha256": "50fb3a5335550c77f3cf738bcb61f81f331eb6414890339787c6c74b2f7b3ac8",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwift/Core/Rules/RuleDirectiveParser.swift",
+      "bytes": 12308,
+      "lines": 314,
+      "sha256": "5330a01277f5b482b2a867e6d9ced4defbc2fbbb8399f0310067586cbdb3cb3b",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwift/Core/Rules/RuleEditorValidator.swift",
+      "bytes": 4769,
+      "lines": 98,
+      "sha256": "62f9278b8813cf1439124d80b4c2f8720290d1f03f4da7f903054fc23cd3d29f",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwift/Core/Rules/RuleExecutionContext.swift",
+      "bytes": 15860,
+      "lines": 423,
+      "sha256": "d6258de3d41123edd2042328db4b2eeee26d7f190ad606646e5907a14db47f66",
+      "review": "partial",
+      "review_scope": "RulePersistentState init/put/remove/removePrefix/snapshot and variable bridging; source-variable persistence callback and write-error retention added.",
+      "reviewer": "source_audit",
+      "reviewed_at_utc": "2026-11-05T19:47:53.760672+00:00"
+    },
+    {
+      "path": "SourceReadSwift/Core/Rules/RuleOperatorSplitter.swift",
+      "bytes": 4368,
+      "lines": 137,
+      "sha256": "de3bd8fbc2ae1f5f940e6ccbc7cb337929bf473e05d26fb45f29283c0356d57c",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwift/Core/Rules/RulePreviewEvaluator.swift",
+      "bytes": 7780,
+      "lines": 202,
+      "sha256": "e6cbed3614f9439c39e25b287630931ab612af005cc9699771c3a0b46ea034a9",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwift/Core/Rules/RuleTransformParser.swift",
+      "bytes": 3619,
+      "lines": 78,
+      "sha256": "38904e89eeb141f1b6634cc82bd43a4ff9f4f2bf7cd46b0dd3d8eaf16e4b0baa",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwift/Core/Rules/SearchBookMatcher.swift",
+      "bytes": 9507,
+      "lines": 223,
+      "sha256": "1355bf4b5f8d08fed19b7bd4ac96da6f40c1aa5b0b141ae036a097469613746e",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwift/Core/Rules/SearchResultFilter.swift",
+      "bytes": 1907,
+      "lines": 58,
+      "sha256": "d00624c1281a280896569e31e4b4088d8dcacda9452afeefc97d2a51ab6ce72d",
+      "review": "reviewed",
+      "review_scope": "Full filtering scopes and empty query behavior.",
+      "reviewer": "root",
+      "reviewed_at_utc": "2026-11-05T21:52:26.996346+00:00"
+    },
+    {
+      "path": "SourceReadSwift/Core/Rules/SearchResultParser.swift",
+      "bytes": 28401,
+      "lines": 478,
+      "sha256": "93cc1973f86a224bdd2ef2b1ff0a2d8e19d2badf660bfdb16bd562ff3e7e92fa",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwift/Core/Rules/SearchURLResolver.swift",
+      "bytes": 23820,
+      "lines": 524,
+      "sha256": "ff3a98348cc24688d8d22757c96601aae72d5e2b1dd6f8cda61d00bc2f5ea562",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwift/Core/Rules/SourceBatchCheckCoordinator.swift",
+      "bytes": 24783,
+      "lines": 605,
+      "sha256": "6b44a18af9588bb18a06166857105132b8eeb12598776c8ef964ca97d1acc8d4",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwift/Core/Rules/SourceBatchDiagnosticRunner.swift",
+      "bytes": 15610,
+      "lines": 347,
+      "sha256": "bb0ff1c3870d079df8b73f8bc2e96dd32d4d9ec04e0f533167d70c05483d9da2",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwift/Core/Rules/SourceChapterAlignment.swift",
+      "bytes": 3168,
+      "lines": 57,
+      "sha256": "809c7621943721b649c8ded8328758bf375e1be3af064afb1701095cb1e735b6",
+      "review": "reviewed",
+      "review_scope": "Full title/number alignment; malformed extremely long numerals still need boundary test.",
+      "reviewer": "root",
+      "reviewed_at_utc": "2026-11-05T21:52:26.996346+00:00"
+    },
+    {
+      "path": "SourceReadSwift/Core/Rules/SourceDiagnosticClassifier.swift",
+      "bytes": 10983,
+      "lines": 230,
+      "sha256": "40e29b4c081c76cc6a2c48cf99ad77582832af99a818885e10ab03b0c57dd427",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwift/Core/Rules/SourceDiagnosticEvidence.swift",
+      "bytes": 8903,
+      "lines": 208,
+      "sha256": "82cc42bc2e44fdf37c170e581428767bca67b9f54ce62964114dbd7d9d3ec632",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwift/Core/Rules/SourceDiagnosticRepairAdvisor.swift",
+      "bytes": 5316,
+      "lines": 112,
+      "sha256": "70b7afdea853e665153a9165c7914bf915adb12c72e11751ea2c310d9fd2f111",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwift/Core/Rules/SourceDiagnosticReport.swift",
+      "bytes": 24979,
+      "lines": 533,
+      "sha256": "ddfd07615ad30beab9695b644b5e4fdc8ca0ce156f1a23f2e952c4b9ef192eb8",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwift/Core/Rules/SourceDiagnosticReportExporter.swift",
+      "bytes": 28911,
+      "lines": 544,
+      "sha256": "758e30ea8a5e4e4486e5b1e345cce58c9aa8c208c501cc1dd5906e5108b77787",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwift/Core/Rules/SourceLoginField.swift",
+      "bytes": 6224,
+      "lines": 145,
+      "sha256": "06ed2d26d47fe9ee18c27bae680dcf32d73d49cde850a39a8f0c86bb88b3c0b7",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwift/Core/Rules/SourceLoginURLResolver.swift",
+      "bytes": 4041,
+      "lines": 96,
+      "sha256": "0a6f8953458752ba0cb3d7ff855f9210d94af2885d0fa5790d5adbc96feb3ae1",
+      "review": "reviewed",
+      "review_scope": "Relative/absolute login URLs, template aliases and dynamic-script exclusion; dynamic login UI full chain not reviewed here.",
+      "reviewer": "source_audit",
+      "reviewed_at_utc": "2026-11-05T19:47:53.760527+00:00"
+    },
+    {
+      "path": "SourceReadSwift/Core/Rules/SourceRequestContext.swift",
+      "bytes": 177,
+      "lines": 6,
+      "sha256": "afa512771a49beef7553a09390320b4f4dcf558d9c89482767cc2c20efa87475",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwift/Core/Rules/SourceRuleDraft.swift",
+      "bytes": 4721,
+      "lines": 139,
+      "sha256": "e2b8debbf42ee89d530f45fb97ebc374af9e581e90e41b32f43fbeab09ad544d",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwift/Core/Rules/VideoContentParser.swift",
+      "bytes": 1969,
+      "lines": 36,
+      "sha256": "c838ba022908d103614526e6ff9cb06270bc7b2459d7859a5dd57395ae3b8e7d",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwift/Core/Rules/WebsiteJSONSourceInference.swift",
+      "bytes": 5828,
+      "lines": 86,
+      "sha256": "7bb184b45609b7235c86a06c07ad12a4b76b9fc4196d5f05e33725714020c2e2",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwift/Core/Rules/WebsiteSourceInference.swift",
+      "bytes": 9421,
+      "lines": 143,
+      "sha256": "9c2f8518bcd919f5e75ab9882268307ed2a347f52b857291a62d554a890853d3",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwift/Core/Rules/XPathRuleTranslator.swift",
+      "bytes": 11988,
+      "lines": 270,
+      "sha256": "6c0161e7827808027ad69abac17e5106ff23a05ea1f9ade7a37a284106e368dd",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwift/Core/Security/B18PlusService.swift",
+      "bytes": 5393,
+      "lines": 241,
+      "sha256": "25f63de724fc76f974778a732c76c692aea82d089fa63ae3705a516ff301feeb",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwift/Core/Storage/AppBackupPreferences.swift",
+      "bytes": 4732,
+      "lines": 80,
+      "sha256": "bfa06fae6047cd94bfcb9f16c3d86a88dc9c988a7e43b5a3a584ca0532a42bd9",
+      "review": "reviewed",
+      "review_scope": "New whitelist/type/range/legacy-value policy; native tests pending.",
+      "reviewer": "root",
+      "reviewed_at_utc": "2026-11-05T21:17:34.076228+00:00"
+    },
+    {
+      "path": "SourceReadSwift/Core/Storage/AppDataBackup.swift",
+      "bytes": 8928,
+      "lines": 222,
+      "sha256": "fde06695fff7bfe638ef67e6cded5da9944f1ed32aa096eec4d236535b84935d",
+      "review": "reviewed",
+      "review_scope": "Entire codec/restorer; unsupported schema and preference boundary fixed. Missing media and rollback-failure reporting remain open.",
+      "reviewer": "root",
+      "reviewed_at_utc": "2026-11-05T21:17:34.076228+00:00"
+    },
+    {
+      "path": "SourceReadSwift/Core/Storage/AppStorageDirectory.swift",
+      "bytes": 1875,
+      "lines": 43,
+      "sha256": "c3893a9f925e8eb17b0fd673b03111f5c115e15cd6961f9c6acda33ef802aa92",
+      "review": "reviewed",
+      "review_scope": "Read in preceding serialized audit checkpoint; see STATUS/STORAGE-NETWORK. Reading is not a full runtime or performance acceptance.",
+      "reviewer": "root",
+      "reviewed_at_utc": "2026-11-05T21:17:34.076228+00:00"
+    },
+    {
+      "path": "SourceReadSwift/Core/Storage/BookExportService.swift",
+      "bytes": 2048,
+      "lines": 55,
+      "sha256": "970a52f44070e61512c4429198cc6448ba9504ef0e965a2e1a95652b759deb96",
+      "review": "reviewed",
+      "review_scope": "Full formatting, chapter order and output path; overwrite/long-name regressions in 8fee410, fix in separate copy.",
+      "reviewer": "root",
+      "reviewed_at_utc": "2026-11-05T21:52:26.996346+00:00"
+    },
+    {
+      "path": "SourceReadSwift/Core/Storage/BookTOCacheStore.swift",
+      "bytes": 8277,
+      "lines": 224,
+      "sha256": "7ded6f81cf3284da1de42bf4a967be4945a2e7d1cdd28d8623534e1c36a42596",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwift/Core/Storage/BookshelfGroupPersistence.swift",
+      "bytes": 1435,
+      "lines": 35,
+      "sha256": "9b197595f92f7778b7fb5281462e996f29f5c0df3955d47dd9e0dbdd665bc808",
+      "review": "reviewed",
+      "review_scope": "Read in preceding serialized audit checkpoint; see STATUS/STORAGE-NETWORK. Reading is not a full runtime or performance acceptance.",
+      "reviewer": "root",
+      "reviewed_at_utc": "2026-11-05T21:17:34.076228+00:00"
+    },
+    {
+      "path": "SourceReadSwift/Core/Storage/BookshelfPersistence.swift",
+      "bytes": 6388,
+      "lines": 133,
+      "sha256": "ab534263d31c51c9a2988717a7f149f16aac9061159705495202de77e8d2b562",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwift/Core/Storage/BookshelfStore.swift",
+      "bytes": 22273,
+      "lines": 545,
+      "sha256": "5b2f2cfb8aea3fb27ac11a5c9935645c5036dd50f7d9cb79306a6ee70edb40f9",
+      "review": "partial",
+      "latest_scope": "复核时长、进度 sidecar、后台落盘与换源；未通读全部入口"
+    },
+    {
+      "path": "SourceReadSwift/Core/Storage/ChapterContentCacheStore.swift",
+      "bytes": 12522,
+      "lines": 330,
+      "sha256": "c21ffc9e778043ea7508484158f4f067eebe15936820ea83ab3e60d87fb3c770",
+      "review": "reviewed",
+      "review_scope": "Full store/persistence read; negative maxEntryCount can trap, writes ordered but not coalesced, entries(forBookURL) ignores source identity.",
+      "reviewer": "root",
+      "reviewed_at_utc": "2026-11-05T21:33:54.916255+00:00"
+    },
+    {
+      "path": "SourceReadSwift/Core/Storage/ChapterDownloadStore.swift",
+      "bytes": 13194,
+      "lines": 337,
+      "sha256": "7b918c69617f17105e80181dd224b365ab92e3658942a1c7c0bdc0931dc13b9d",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwift/Core/Storage/ComicOfflineArchive.swift",
+      "bytes": 11158,
+      "lines": 223,
+      "sha256": "057046a6bb3bece35b33064b306f9f571d9e64b9c996825903ed94bd5827c0cf",
+      "review": "reviewed",
+      "review_scope": "Read in preceding serialized audit checkpoint; see STATUS/STORAGE-NETWORK. Reading is not a full runtime or performance acceptance.",
+      "reviewer": "root",
+      "reviewed_at_utc": "2026-11-05T21:17:34.076228+00:00"
+    },
+    {
+      "path": "SourceReadSwift/Core/Storage/CustomFontManager.swift",
+      "bytes": 7502,
+      "lines": 180,
+      "sha256": "759dad5d14d02b5410468750feeaa9382216466542053cbe350e295a420c0868",
+      "review": "reviewed",
+      "review_scope": "Full catalog/import/delete read; main-thread scanning, unconsumed CFError, duplicate imports and deletion error issues identified.",
+      "reviewer": "root",
+      "reviewed_at_utc": "2026-11-05T21:27:35.950529+00:00"
+    },
+    {
+      "path": "SourceReadSwift/Core/Storage/FontImportOperation.swift",
+      "bytes": 8497,
+      "lines": 135,
+      "sha256": "4dd2f75b76c9bcc83040ac0b6fccb38b74a75ed1cf341026370b4801137b0890",
+      "review": "reviewed",
+      "review_scope": "Full worker path read; concurrency with stale installed snapshot may leave duplicate font files, already-registered mapping needs ownership checks.",
+      "reviewer": "root",
+      "reviewed_at_utc": "2026-11-05T21:27:35.950529+00:00"
+    },
+    {
+      "path": "SourceReadSwift/Core/Storage/FontImportPolicy.swift",
+      "bytes": 1648,
+      "lines": 35,
+      "sha256": "31908c4fc8ab325df0004be29f54ddc336f7fe67cf8e9eb10dba0c3e5d096889",
+      "review": "reviewed",
+      "review_scope": "Full size/extension validation and font mapping read.",
+      "reviewer": "root",
+      "reviewed_at_utc": "2026-11-05T21:27:35.950529+00:00"
+    },
+    {
+      "path": "SourceReadSwift/Core/Storage/FontImportRequest.swift",
+      "bytes": 3435,
+      "lines": 74,
+      "sha256": "f95b7788470561eff55fa8710324104a098ec62373b83a4dc62d5f1115bf372f",
+      "review": "reviewed",
+      "review_scope": "Entire file; one-shot completion and late-result discard reviewed; timeout wording fixed to 20 regardless parameter remains.",
+      "reviewer": "root",
+      "reviewed_at_utc": "2026-11-05T21:17:34.076228+00:00"
+    },
+    {
+      "path": "SourceReadSwift/Core/Storage/InlineImageStore.swift",
+      "bytes": 6034,
+      "lines": 160,
+      "sha256": "ca41e3a22525c397f39462eb89f4dc4a4030beb85a489d6580c0d51299453c30",
+      "review": "reviewed",
+      "review_scope": "Full store/trim read; safe URL token validation present, concurrent trim/store/remove can race, trimming may remove active referenced images.",
+      "reviewer": "root",
+      "reviewed_at_utc": "2026-11-05T21:33:54.916255+00:00"
+    },
+    {
+      "path": "SourceReadSwift/Core/Storage/PurifyRuleStore.swift",
+      "bytes": 8327,
+      "lines": 233,
+      "sha256": "1b3818d927b6b25d1899e2439f53451db9698f0c0050be6dce69dd6712758342",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwift/Core/Storage/RSSArticleContentCacheStore.swift",
+      "bytes": 4068,
+      "lines": 97,
+      "sha256": "fea45e273060f662256f6ee666cf296d8649b4b386a09541590f0dce0ecd7948",
+      "review": "reviewed",
+      "review_scope": "Entire file; async ordered writes and negative-limit clamp; synchronous initial read remains.",
+      "reviewer": "root",
+      "reviewed_at_utc": "2026-11-05T21:17:34.076228+00:00"
+    },
+    {
+      "path": "SourceReadSwift/Core/Storage/RSSArticleStateStore.swift",
+      "bytes": 4583,
+      "lines": 112,
+      "sha256": "9d4c9852d8b65affdfb4bd5374e670c9ecd48c876d694863ca865e7e4c1368c6",
+      "review": "reviewed",
+      "review_scope": "Entire file; normalize restored position and skip duplicate markRead; native tests pending.",
+      "reviewer": "root",
+      "reviewed_at_utc": "2026-11-05T21:17:34.076228+00:00"
+    },
+    {
+      "path": "SourceReadSwift/Core/Storage/RSSCacheFile.swift",
+      "bytes": 1617,
+      "lines": 42,
+      "sha256": "2ef1573aaa445eae1fb3887e4d3da95869a0ea5639af27022d411529d2b8e7a7",
+      "review": "reviewed",
+      "review_scope": "New serial background encoder/writer and ordered read/flush; native tests in 479a264.",
+      "reviewer": "root",
+      "reviewed_at_utc": "2026-11-05T21:17:34.076228+00:00"
+    },
+    {
+      "path": "SourceReadSwift/Core/Storage/RSSFeedCacheStore.swift",
+      "bytes": 2649,
+      "lines": 68,
+      "sha256": "ab9cfe18e831d9d7f6ad196e8716efb83de097240c22a6b9f3d929bb6538b5ae",
+      "review": "reviewed",
+      "review_scope": "Entire file; async ordered writes and negative-limit clamp; synchronous initial read remains.",
+      "reviewer": "root",
+      "reviewed_at_utc": "2026-11-05T21:17:34.076228+00:00"
+    },
+    {
+      "path": "SourceReadSwift/Core/Storage/ReaderOverrideStore.swift",
+      "bytes": 1929,
+      "lines": 67,
+      "sha256": "b17ef8def4f72fca0a6f17fe4d2492616f6096ffc41872f849fd69f83b61b070",
+      "review": "reviewed",
+      "review_scope": "Read in preceding serialized audit checkpoint; see STATUS/STORAGE-NETWORK. Reading is not a full runtime or performance acceptance.",
+      "reviewer": "root",
+      "reviewed_at_utc": "2026-11-05T21:17:34.076228+00:00"
+    },
+    {
+      "path": "SourceReadSwift/Core/Storage/ReadingHistoryStore.swift",
+      "bytes": 10386,
+      "lines": 284,
+      "sha256": "c697d39ca4bdb41f4a41201b22afcf420df93e637d4ae7d5f89c577e872ad2cc",
+      "review": "reviewed",
+      "review_scope": "Full persistence and recording paths read; history stores cumulative time, not daily sessions; invalid duration and paragraph inputs need validation.",
+      "reviewer": "root",
+      "reviewed_at_utc": "2026-11-06T00:01:59.149947+00:00"
+    },
+    {
+      "path": "SourceReadSwift/Core/Storage/ReadingWriteBackgroundLease.swift",
+      "bytes": 742,
+      "lines": 23,
+      "sha256": "a2c235404ff41fa75baf50eddd2cbd535cc3494ff35c1390aae9020fcfdf12e5",
+      "review": "reviewed",
+      "review_scope": "Full finite background lease expiration and idempotent end.",
+      "reviewer": "root",
+      "reviewed_at_utc": "2026-11-05T21:52:26.996346+00:00"
+    },
+    {
+      "path": "SourceReadSwift/Core/Storage/SourceCookieStore.swift",
+      "bytes": 9839,
+      "lines": 256,
+      "sha256": "0b318beeb42407b07e645526814a7958c42a0923b3830c44d5d429aca69cb0fe",
+      "review": "reviewed",
+      "review_scope": "通读匹配/存取/序列化；Secure 修复；读写吞错与 HttpOnly 重建缺口仍开放。",
+      "latest_scope": "通读匹配/存取/序列化；Secure 修复；读写吞错与 HttpOnly 重建缺口仍开放。",
+      "reviewer": "root",
+      "reviewed_at_utc": "2026-11-06T11:32:18.810647+00:00"
+    },
+    {
+      "path": "SourceReadSwift/Core/Storage/SourceDiagnosticHistoryStore.swift",
+      "bytes": 6167,
+      "lines": 196,
+      "sha256": "de7fe66907504a841d4d41c7092bff16b1d03296123393dee88ef10c75ce2065",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwift/Core/Storage/SourceHealthStore.swift",
+      "bytes": 3988,
+      "lines": 137,
+      "sha256": "24a1ca17c54dc32a69e1a00d0638b306a3a3ef5bcbc7b21518295f2e34956be9",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwift/Core/Storage/SourcePersistence.swift",
+      "bytes": 1500,
+      "lines": 43,
+      "sha256": "b84cf9b14591758b386eff5319bb85f0565150e926427619f234b1d8025eb183",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwift/Core/Storage/SourceStore.swift",
+      "bytes": 59887,
+      "lines": 1325,
+      "sha256": "0c7c28b4eeb3dd1459ce9bce75d7ce5243a94264e9cc524856acfedab7fc4b01",
+      "review": "partial",
+      "review_scope": "Async smart import and HTML/catalog result routing, SourceImportError, import type discriminator, source deletion; remaining store methods pending full audit.",
+      "reviewer": "source_audit",
+      "reviewed_at_utc": "2026-11-05T19:47:53.761248+00:00",
+      "latest_scope": "复核同步/异步导入、嵌套容器及混合格式逐条分流"
+    },
+    {
+      "path": "SourceReadSwift/Core/Storage/SourceSwitchCacheStore.swift",
+      "bytes": 4590,
+      "lines": 113,
+      "sha256": "ace62ad6fd9d1740f6746ebcb578c4c86befa3f1696786001834888ba3d6f252",
+      "review": "reviewed",
+      "review_scope": "Full cache lifecycle read; grouping key lacks media kind (consumer filtering still needs verification), unbounded candidate count per entry and silent disk errors remain.",
+      "reviewer": "root",
+      "reviewed_at_utc": "2026-11-05T21:33:54.916255+00:00"
+    },
+    {
+      "path": "SourceReadSwift/Core/Storage/SourceVariableStore.swift",
+      "bytes": 1915,
+      "lines": 42,
+      "sha256": "eff416b63c7aa08a941b66781cb5c3a2b62ebf500c1cb1d39a1f466f4d895e4b",
+      "review": "reviewed",
+      "review_scope": "通读 Keychain 范围/锁/大小限制；只审查未修改，删除撤销代际未实现。",
+      "reviewer": "root",
+      "reviewed_at_utc": "2026-11-06T11:32:18.810647+00:00",
+      "latest_scope": "通读 Keychain 范围/锁/大小限制；只审查未修改，删除撤销代际未实现。"
+    },
+    {
+      "path": "SourceReadSwift/Core/Storage/WebDAVCredentialStore.swift",
+      "bytes": 1074,
+      "lines": 30,
+      "sha256": "2c6fa5a552f805285567c66a6227e3fcf273185c93bf7c48fe06bcb0344cd194",
+      "review": "reviewed",
+      "review_scope": "New transactional plaintext-to-Keychain migration; native tests pending.",
+      "reviewer": "root",
+      "reviewed_at_utc": "2026-11-05T21:17:34.076228+00:00"
+    },
+    {
+      "path": "SourceReadSwift/Core/Verification/VerificationCodeCoordinator.swift",
+      "bytes": 5429,
+      "lines": 166,
+      "sha256": "9f8d0d595c01fb48a522969d583c6f882dc83bdb9a2fd3ce7c48d875f4f41b97",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwift/Features/Bookshelf/BookReturnOrder.swift",
+      "bytes": 505,
+      "lines": 11,
+      "sha256": "3310555d1aeb69cba35140fe32bc32f1a7c8bb37cb112c986f0eea4f354b52ee",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwift/Features/Bookshelf/BookTitlePage.swift",
+      "bytes": 2468,
+      "lines": 56,
+      "sha256": "650a3cf4ddaaa6191e197390f1cf733a0d274264a2e27419d01485c685d7e8b1",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwift/Features/Bookshelf/BookshelfReaderGatewayView.swift",
+      "bytes": 43302,
+      "lines": 846,
+      "sha256": "a90685fc1a415c5452ad4b3b2dce4ee2bc02e28c32223332be0d2e48e387f29a",
+      "review": "partial",
+      "review_scope": "Shelf reconstruction, source-switch candidate filtering/cache/detail confirmation and persisted media; reader drawing and performance not part of this batch.",
+      "reviewer": "source_audit",
+      "reviewed_at_utc": "2026-11-05T19:47:53.761951+00:00"
+    },
+    {
+      "path": "SourceReadSwift/Features/Bookshelf/BookshelfView.swift",
+      "bytes": 68478,
+      "lines": 1481,
+      "sha256": "3a33910eef315ef7a119251e2ef6c0acc2827ce85ffa14c560c206a4e9978444",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwift/Features/Bookshelf/ContinueReadingCardContent.swift",
+      "bytes": 1590,
+      "lines": 39,
+      "sha256": "59f36ec423e0b3e82a673062af369d38b2da961b721a92673e7329a81f895941",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwift/Features/Bookshelf/CoverToneSampler.swift",
+      "bytes": 3931,
+      "lines": 79,
+      "sha256": "1e907f0786de9e3e2f3daf6c37742b7a7c509e2802ab75eb3de088a848b69f92",
+      "review": "reviewed",
+      "review_scope": "Full background bounded sampling and image identity cache.",
+      "reviewer": "root",
+      "reviewed_at_utc": "2026-11-05T21:52:26.996346+00:00"
+    },
+    {
+      "path": "SourceReadSwift/Features/Bookshelf/EditorialBookJacket.swift",
+      "bytes": 2159,
+      "lines": 43,
+      "sha256": "b85ecbf453dc699731455b41913f5d148ef389f023120ff8d497762fa41d2266",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwift/Features/Bookshelf/FloatingDeskStyle.swift",
+      "bytes": 4862,
+      "lines": 111,
+      "sha256": "0c5831180499f42b3df40dea26abbd88138a7754bc1c8125cf16410f7d1ee326",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwift/Features/Bookshelf/FloatingReadingDesk.swift",
+      "bytes": 7799,
+      "lines": 142,
+      "sha256": "b7c280e91ce9bbb178f9d76a692a3fa2efe3ba42f480cef1dae27f2bac95784e",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwift/Features/Bookshelf/ForestReadingCard.swift",
+      "bytes": 3745,
+      "lines": 77,
+      "sha256": "cb3d352dfb516f724cf57f1a972f8ada5d8046a21be982eaf5fe8cb1a532c6d5",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwift/Features/Bookshelf/NativeBookGestureProbe.swift",
+      "bytes": 1003,
+      "lines": 26,
+      "sha256": "b59911c6f84ec9f388f55ad4118185bd7204ef14c8a890e730e246be775586ac",
+      "review": "reviewed",
+      "review_scope": "Full bounded gesture traversal read; excludes scrollviews/controls/tap/long press; recorder failure still under diagnosis.",
+      "reviewer": "root",
+      "reviewed_at_utc": "2026-11-06T00:01:59.150025+00:00"
+    },
+    {
+      "path": "SourceReadSwift/Features/Bookshelf/ReaderBookPassageController.swift",
+      "bytes": 7553,
+      "lines": 181,
+      "sha256": "ebb6089f3044407017a0d856a0c2ba8e6b691213ae4accabdc4b7b18fcb8d063",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwift/Features/Bookshelf/ReaderOpeningPage.swift",
+      "bytes": 9190,
+      "lines": 220,
+      "sha256": "5babf3fc15f83cbfb1fac1c77952baeaab4d16cf137f10ece4132003df01d071",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwift/Features/Bookshelf/ReadingCoverHandoff.swift",
+      "bytes": 1489,
+      "lines": 39,
+      "sha256": "1b7cc5345941167dfacf144b9483bbda012e476410eb1748b570d4e4847a0238",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwift/Features/Bookshelf/ReadingDeskContent.swift",
+      "bytes": 2601,
+      "lines": 50,
+      "sha256": "e40a2c29b6f9b85cf83b5785785f8be6c100d8a3bd5824102dd0ad8fbcf9f7f6",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwift/Features/Bookshelf/ReadingDeskPager.swift",
+      "bytes": 5451,
+      "lines": 110,
+      "sha256": "6bcd709f6bd9a46da664230c3295f0ee7bb1f01b976c77dcd4087cefdd58288d",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwift/Features/Bookshelf/ReadingDeskPlinth.swift",
+      "bytes": 3870,
+      "lines": 90,
+      "sha256": "b8149b1207f4750d9ab62c5efb9b2f19c3c6edeb47037b3b0a8fd9c27801b8a9",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwift/Features/Bookshelf/ReadingDeskTitleTypography.swift",
+      "bytes": 1003,
+      "lines": 24,
+      "sha256": "12b02b944cbfbf79dff2c89f531ec31ea3440de4e1142a29a6bf0e953ddacf23",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwift/Features/Bookshelf/ReadingHeroCard.swift",
+      "bytes": 4677,
+      "lines": 92,
+      "sha256": "e74c087fcaa9f4ca7a051341d0ce1cfc38c8f928881ab7a36e65bcb7ff38a117",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwift/Features/Bookshelf/ShelfBookCover.swift",
+      "bytes": 1440,
+      "lines": 34,
+      "sha256": "c033454509e3e439f5e8d260ce87b47420dc491c89908f2da74af09d255a9b59",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwift/Features/Discover/BookDetailHeader.swift",
+      "bytes": 1625,
+      "lines": 35,
+      "sha256": "572c1fbbea4d329c5ca1a8f159a00f7d2d990d94f646d94d45061e291c726001",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwift/Features/Discover/BookDetailHero.swift",
+      "bytes": 4597,
+      "lines": 101,
+      "sha256": "4c5f41f21d4f134d72e1f01ee4e36516ddadd1f02f6e66926def7f2d345201ca",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwift/Features/Discover/BookDetailSummary.swift",
+      "bytes": 2525,
+      "lines": 51,
+      "sha256": "9beb51bfc708d5d3ff06144895d5f14c2e1a155b9e9e1b2bb5bcad9de84e045e",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwift/Features/Discover/BookDetailView.swift",
+      "bytes": 84921,
+      "lines": 1849,
+      "sha256": "b2810dc7a3bef73394795040d3c21e18111453ea42c4964c434b15d1c78a3079",
+      "review": "partial",
+      "review_scope": "Reconstructed media books and ChapterLoading resolved source; remaining reader/detail UI belongs to parent audit.",
+      "reviewer": "source_audit",
+      "reviewed_at_utc": "2026-11-05T19:47:53.761815+00:00"
+    },
+    {
+      "path": "SourceReadSwift/Features/Discover/ChapterListPresenter.swift",
+      "bytes": 2047,
+      "lines": 42,
+      "sha256": "231400b1895931b04c981884ee83209b243f821a5f7ee42740a2965ea870b773",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwift/Features/Discover/DiscoverView.swift",
+      "bytes": 83122,
+      "lines": 1856,
+      "sha256": "0c36dbb51262181f0b4afbbc69691e30e59083be96d87e5d6ebdef0037709f0e",
+      "review": "partial",
+      "review_scope": "Search source selection, result projection, grouping identity and media lookup; page/UI integration belongs to parent audit.",
+      "reviewer": "source_audit",
+      "reviewed_at_utc": "2026-11-05T19:47:53.761588+00:00"
+    },
+    {
+      "path": "SourceReadSwift/Features/Discover/ExploreViewModel.swift",
+      "bytes": 7845,
+      "lines": 210,
+      "sha256": "9210f7e3c7350e2ab5d96a2d2454c64344af11a799fa1cfe309541b7cb62f3bf",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwift/Features/Discover/LANWorkbenchAccess.swift",
+      "bytes": 1960,
+      "lines": 43,
+      "sha256": "47c265bd2db6edb69202cb545f9bd38f14e33735dc7dc2c245f9bf2c463a0779",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwift/Features/Discover/LANWorkbenchDocument.swift",
+      "bytes": 723,
+      "lines": 14,
+      "sha256": "9e1ab325e59b44706b4759ea9b3b2234d387fbac133513369993b0fdcdcb32c9",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwift/Features/Discover/LightweightHTTPMessage.swift",
+      "bytes": 4729,
+      "lines": 110,
+      "sha256": "85e5d1d2de4664c31d5ad9e8121c08d12605bfb894f673c724cf6995a581c45b",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwift/Features/Discover/SearchBookRow.swift",
+      "bytes": 4610,
+      "lines": 127,
+      "sha256": "30221685c174a68c17ce247f253487843a630181299264892692cb3144709035",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwift/Features/Discover/SmartWebReaderView.swift",
+      "bytes": 3678,
+      "lines": 74,
+      "sha256": "c5e8449c23a0154fcb67aa601bfdd81654196776bf808737e0fb6b2b91631243",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwift/Features/Discover/SourceWritingView.swift",
+      "bytes": 53728,
+      "lines": 1113,
+      "sha256": "4dd23bd4586e624bb07a40259504cd348e749a209fdbb65e38c1cd14053b9c96",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwift/Features/Discover/WebReadingSession.swift",
+      "bytes": 7670,
+      "lines": 162,
+      "sha256": "3414857445f4d67c7dc4cbf8c496894aceb50826d7f45479e2e68f1b4b987b99",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwift/Features/RSS/RSSArticleReaderView.swift",
+      "bytes": 27852,
+      "lines": 591,
+      "sha256": "f9584eb549e578316d48e20fb057f3f738ee9d53b9e7876cb9cf86275e5c57c5",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwift/Features/RSS/RSSArticlesView.swift",
+      "bytes": 8973,
+      "lines": 222,
+      "sha256": "b951fe40db091a5ffbb9a9870fa1b07776a655ae409109dbace5df1d6463873e",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwift/Features/RSS/RSSReaderSettingsView.swift",
+      "bytes": 5055,
+      "lines": 101,
+      "sha256": "38719a1dbd8630076ad71a6045e34b47a942779e10fe56a374d2467ea974baf7",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwift/Features/Reader/AudioBookPlayerView.swift",
+      "bytes": 26649,
+      "lines": 659,
+      "sha256": "e0fe5694818a8122d4550b1a9116ca0da43742c21641ee87def4c380418c62e1",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwift/Features/Reader/ComicChromeSurface.swift",
+      "bytes": 570,
+      "lines": 18,
+      "sha256": "3a3c90fc43d09174205e543a1d7cba586248596150b4bcc257596bc82dec0ef6",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwift/Features/Reader/ComicPageZoomView.swift",
+      "bytes": 6938,
+      "lines": 172,
+      "sha256": "01fef565eb1c168dbd43a43cc2ed2a27fb9ac83992f8306eb6ba81abab98cee2",
+      "review": "reviewed",
+      "review_scope": "Read in preceding serialized audit checkpoint; see STATUS/STORAGE-NETWORK. Reading is not a full runtime or performance acceptance.",
+      "reviewer": "root",
+      "reviewed_at_utc": "2026-11-05T21:17:34.076228+00:00"
+    },
+    {
+      "path": "SourceReadSwift/Features/Reader/ComicReaderView.swift",
+      "bytes": 47872,
+      "lines": 994,
+      "sha256": "599628b478875015a0df57febe47a778a4475821f66de6b04987b8cbc740c521",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwift/Features/Reader/ComicStripImageCell.swift",
+      "bytes": 5483,
+      "lines": 129,
+      "sha256": "05379d16b1209af6e0befaf8ad306f0a3a10111776cfcc643e9bb65ca20f42a2",
+      "review": "reviewed",
+      "review_scope": "Read in preceding serialized audit checkpoint; see STATUS/STORAGE-NETWORK. Reading is not a full runtime or performance acceptance.",
+      "reviewer": "root",
+      "reviewed_at_utc": "2026-11-05T21:17:34.076228+00:00"
+    },
+    {
+      "path": "SourceReadSwift/Features/Reader/ComicStripReaderView.swift",
+      "bytes": 16374,
+      "lines": 328,
+      "sha256": "8df8e0778cfd7bbd3181b4a6829a5987520b98028c09c533e3f0aa3d53917672",
+      "review": "reviewed",
+      "review_scope": "Read in preceding serialized audit checkpoint; see STATUS/STORAGE-NETWORK. Reading is not a full runtime or performance acceptance.",
+      "reviewer": "root",
+      "reviewed_at_utc": "2026-11-05T21:17:34.076228+00:00"
+    },
+    {
+      "path": "SourceReadSwift/Features/Reader/CoverPageReaderView.swift",
+      "bytes": 21542,
+      "lines": 470,
+      "sha256": "0001840cf6673a3f84abfc152e4497a3ccc48eed64e04b01ce41c3d85ccb1df5",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwift/Features/Reader/LocalBookMetadataView.swift",
+      "bytes": 4858,
+      "lines": 91,
+      "sha256": "0f69785d22d849ce23a36b114669af910158d5c12669daff893017f39a061b72",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwift/Features/Reader/NativeReaderTextView.swift",
+      "bytes": 79315,
+      "lines": 1584,
+      "sha256": "90bcef0e68e8476865bce0826cfdc81984849a7f2403947c7f7cfed5fee17615",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwift/Features/Reader/PageCurlReaderView.swift",
+      "bytes": 33581,
+      "lines": 649,
+      "sha256": "e21066e31d9c812c205080d159f0f5b300fcc8b4f296adc5c755bd7af097926e",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwift/Features/Reader/QuoteCardView.swift",
+      "bytes": 11509,
+      "lines": 310,
+      "sha256": "04e527f70bcf381cee3c50512c377b61f24cfeaf9a097cd1be08164c081bbb74",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwift/Features/Reader/ReaderAtelierPreview.swift",
+      "bytes": 8461,
+      "lines": 116,
+      "sha256": "b2c28884e417b3e78a296441506c1095295fa10d3964c78ae467bdf68bb803fb",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwift/Features/Reader/ReaderAutomationPolicy.swift",
+      "bytes": 15047,
+      "lines": 398,
+      "sha256": "6f9f8e821cc7bf7ea03465afb521d975576d4d00e44eda38aee129ad04d11e5b",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwift/Features/Reader/ReaderBindingLibraryView.swift",
+      "bytes": 4985,
+      "lines": 72,
+      "sha256": "d138969f8d1138fe43a6337c51cf81687034637777054e49025a24e4d0fd6c02",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwift/Features/Reader/ReaderBindingPreferences.swift",
+      "bytes": 5792,
+      "lines": 88,
+      "sha256": "e5a3ef9a0f1a554303783e29f5dfa1d902e98eea97f8cf81656e6bb846e0a656",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwift/Features/Reader/ReaderBindingRepository.swift",
+      "bytes": 8682,
+      "lines": 139,
+      "sha256": "cec63d62b1401dc1214140e5f4f46b33dfa7f9cf6053e39e61fdfb54d4afb3bd",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwift/Features/Reader/ReaderCJKPunctuationCompression.swift",
+      "bytes": 3268,
+      "lines": 67,
+      "sha256": "986a9001a0372fc80a3483bc6a9c999b59783ab9eebab5e6debb7fdd0a808123",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwift/Features/Reader/ReaderChapterDesign.swift",
+      "bytes": 4535,
+      "lines": 78,
+      "sha256": "eedf692e2992ffd6ead33f814565407bdd38483257758fc728ecb168fd07d1a5",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwift/Features/Reader/ReaderChapterPaginator.swift",
+      "bytes": 10118,
+      "lines": 219,
+      "sha256": "b93cf79f6da1e5bfe7eadddaaa2ca0f515e8dda0fcd8a55f769686208b1f3341",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwift/Features/Reader/ReaderChapterWindow.swift",
+      "bytes": 15788,
+      "lines": 393,
+      "sha256": "f17ec7b8d68d0d51de0abf7999c59b30f01c437ea5c47561bcae9fead1ba2fd5",
+      "review": "partial",
+      "review_scope": "Data models and flat layout/resolution through resolvedPosition read; paged divider contract retained.",
+      "reviewer": "root",
+      "reviewed_at_utc": "2026-11-06T00:01:59.150080+00:00"
+    },
+    {
+      "path": "SourceReadSwift/Features/Reader/ReaderChromeEditor.swift",
+      "bytes": 4080,
+      "lines": 62,
+      "sha256": "c2928ae2e565462c9ff8ee940a8a2574038eb3d21c55c7fd157a1dc711e729a3",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwift/Features/Reader/ReaderChromeSurface.swift",
+      "bytes": 4819,
+      "lines": 105,
+      "sha256": "1ac0bb76c1a45d65ffb206fceceee7caa2cd8b413427871ca6424a4d466cbdb7",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwift/Features/Reader/ReaderCustomWallpaperStore.swift",
+      "bytes": 5322,
+      "lines": 105,
+      "sha256": "4fd19a591db3eabf9f998e4711069b4a4f751211bfe8c66cf5460db6019cce3e",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwift/Features/Reader/ReaderDoodlePattern.swift",
+      "bytes": 4130,
+      "lines": 72,
+      "sha256": "cb2fa6bd79a9799a7b78183519fffe52245cce7eb09fcc432691842bd1edee43",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwift/Features/Reader/ReaderExitSwipeBridge.swift",
+      "bytes": 9839,
+      "lines": 227,
+      "sha256": "eface96540e70d306c03f93583af4ca22440ca23436116fa0f6b8d8e46e5ae23",
+      "review": "reviewed",
+      "review_scope": "Full return policy, gesture ownership and teardown read; native ignored-cancel failure still under video diagnosis.",
+      "reviewer": "root",
+      "reviewed_at_utc": "2026-11-06T14:34:06.009794+00:00",
+      "latest_scope": "本次收敛路径复核：真实HTTP边界/搜索焦点及导航/普通与减动效返回/独立定向验证；原生尚待验证，不扩大既有整文件审查状态。"
+    },
+    {
+      "path": "SourceReadSwift/Features/Reader/ReaderFlipTransitionPolicy.swift",
+      "bytes": 1631,
+      "lines": 41,
+      "sha256": "1ed1832efe98c199509507e29d4a2a03555a42f3c51757eaf4cf7cf8ef36c30b",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwift/Features/Reader/ReaderFontScheme.swift",
+      "bytes": 4780,
+      "lines": 82,
+      "sha256": "635e5a8e2ad32a7a89101d3fa34fe8c26781182b01bec60572edba0d137ff997",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwift/Features/Reader/ReaderHeadingPreferences.swift",
+      "bytes": 862,
+      "lines": 15,
+      "sha256": "8aeffe8c2432191faa5200a5ac8a5867dcf855ed7bfea7ffa96e2fe5bd6b501e",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwift/Features/Reader/ReaderIllustratedBackground.swift",
+      "bytes": 1790,
+      "lines": 52,
+      "sha256": "26f04991d06826f7d70dfdc2fe9f9746348d5edfbb0903dd16dbb1535888aa71",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwift/Features/Reader/ReaderImageStyle.swift",
+      "bytes": 5226,
+      "lines": 125,
+      "sha256": "a62b94e827efe155367f1ddea1b75994915f126d289fa06772edb9d3aa60de46",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwift/Features/Reader/ReaderNativeMenuButton.swift",
+      "bytes": 4124,
+      "lines": 98,
+      "sha256": "2b08cd32b2318c74af14059034a955c4bb6a4c45490658b03b8e03ab62f8a229",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwift/Features/Reader/ReaderPageGeometry.swift",
+      "bytes": 9871,
+      "lines": 239,
+      "sha256": "0af17ae90aede987accce283d185425e40b1ff1e1cc42df3716700c06702d6ce",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwift/Features/Reader/ReaderPageLayoutEngine.swift",
+      "bytes": 11663,
+      "lines": 269,
+      "sha256": "16e9a6ea28aa10bd8d7800aa340dd046ab908a24d2b5e84085c3671fcb9ee104",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwift/Features/Reader/ReaderPageSelection.swift",
+      "bytes": 5784,
+      "lines": 140,
+      "sha256": "460f244b16abec4888b029456e7ee5badd3feb60dc949ab9b910025e12af16a3",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwift/Features/Reader/ReaderPageTextView.swift",
+      "bytes": 13118,
+      "lines": 260,
+      "sha256": "d8b0e42d7be21944fe8471c7cf2d9c5b17d99540e6b9cb14537ccc8f72147a56",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwift/Features/Reader/ReaderPageTurnRequest.swift",
+      "bytes": 255,
+      "lines": 8,
+      "sha256": "719983c562a46883e8108a304551339d5466f0fe8aa45c017f9bdb35b39427ee",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwift/Features/Reader/ReaderPagedNavigationPolicy.swift",
+      "bytes": 10679,
+      "lines": 277,
+      "sha256": "a02ffacad6257595cb58c12e370d57e461e5c9d90deec3d41c4004eb412f49fd",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwift/Features/Reader/ReaderPaperTexture.swift",
+      "bytes": 3131,
+      "lines": 68,
+      "sha256": "662fac783755bc1f69d2b54ec145458cd6200b3f26f55fab49ba7ef2064e1e20",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwift/Features/Reader/ReaderPositionMapping.swift",
+      "bytes": 4326,
+      "lines": 121,
+      "sha256": "f52b89a2aea4fad051213ac6c1ea7af1bc97c9348cd6b8684b73097eb38dffc5",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwift/Features/Reader/ReaderPresentationLifecycle.swift",
+      "bytes": 1215,
+      "lines": 37,
+      "sha256": "5376957649efa1e86a4b66d121e3f5fb7c9289536491d679e84fcb4a9daef05f",
+      "review": "reviewed",
+      "review_scope": "Full temporary cover lifecycle guard.",
+      "reviewer": "root",
+      "reviewed_at_utc": "2026-11-05T21:52:26.996346+00:00"
+    },
+    {
+      "path": "SourceReadSwift/Features/Reader/ReaderRenderRevision.swift",
+      "bytes": 980,
+      "lines": 28,
+      "sha256": "fe1ea2403d0e8def5b092e80c1e44f5f15a362f63e62bbd0951b35ebd92866dc",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwift/Features/Reader/ReaderSafeAreaResolver.swift",
+      "bytes": 2018,
+      "lines": 49,
+      "sha256": "24ccf59a0c90b8a37cdb7d568282427218b9c6d3a8af512c02f9cb4847c315db",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwift/Features/Reader/ReaderScrollChapterHeader.swift",
+      "bytes": 1601,
+      "lines": 43,
+      "sha256": "fbf1910b2a4abb6ea76ef4906f1f491dc551aea221e848582fbf5b5537396d03",
+      "review": "reviewed",
+      "review_scope": "Full protected-header geometry and hit testing read; not a visual/performance acceptance.",
+      "reviewer": "root",
+      "reviewed_at_utc": "2026-11-06T00:01:59.150225+00:00"
+    },
+    {
+      "path": "SourceReadSwift/Features/Reader/ReaderSettingsContent.swift",
+      "bytes": 521,
+      "lines": 16,
+      "sha256": "2e47ad4cdef491ef2aadb962d1ef898ef87f43e729ec12172fc7198f255e0e93",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwift/Features/Reader/ReaderSettingsModels.swift",
+      "bytes": 27243,
+      "lines": 716,
+      "sha256": "e8f7e9b757e3a28ac1ff918ab1826c78206261cf823d0df69905615776bd1792",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwift/Features/Reader/ReaderSettingsWorkbench.swift",
+      "bytes": 11685,
+      "lines": 207,
+      "sha256": "f082015f4e5dfd6bcff4816baae2c98172f72bb68338ee00557378079c51cc94",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwift/Features/Reader/ReaderTabChromeExitBridge.swift",
+      "bytes": 3508,
+      "lines": 91,
+      "sha256": "c172ab7f3d6c559af249ce4b16ccb15c9f46ce74bfe889f6a03dd9bf8e1a1343",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwift/Features/Reader/ReaderTextPagePaginator.swift",
+      "bytes": 5292,
+      "lines": 102,
+      "sha256": "bab129947ad5e433950a50128c7eff7a3acbec1b00211f9c649d0f86febd8b78",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwift/Features/Reader/ReaderTocScrollIntent.swift",
+      "bytes": 606,
+      "lines": 17,
+      "sha256": "2b55ded5ab15ec6d7bce2da6be3641212e8c6c0371c7f2dbc708aeafb8c40b8c",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwift/Features/Reader/ReaderView.swift",
+      "bytes": 371182,
+      "lines": 7897,
+      "sha256": "ff502e8f1de6f3ed71fd8d85a0a3e8a315c447bc92f274901da5be67c14c42e8",
+      "review": "partial",
+      "review_scope": "Window/visible cursor, chapter callbacks, persistence and session start/end read; background duration issue open; entire 6000-line view not reviewed.",
+      "reviewer": "root",
+      "reviewed_at_utc": "2026-11-06T14:34:06.009794+00:00",
+      "latest_scope": "本次收敛路径复核：真实HTTP边界/搜索焦点及导航/普通与减动效返回/独立定向验证；原生尚待验证，不扩大既有整文件审查状态。"
+    },
+    {
+      "path": "SourceReadSwift/Features/Reader/ReaderWallpaperAdjustment.swift",
+      "bytes": 2499,
+      "lines": 45,
+      "sha256": "271c9cf711a17b36859ab0c2e8829ded0189b7fd394ebd65fd9fd37ac7eb1bd3",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwift/Features/Reader/ReaderWallpaperEditorView.swift",
+      "bytes": 5724,
+      "lines": 96,
+      "sha256": "96626dfe23fdad27ee5eb4c8ce2d387205067b0d0c73395b2647fcb81e9285b1",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwift/Features/Reader/ReaderWallpaperRepository.swift",
+      "bytes": 4715,
+      "lines": 87,
+      "sha256": "78fb246fffd53fd2c18939610cf0696076938828f7919113df0a66aa85f5499f",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwift/Features/Reader/ReaderWallpaperView.swift",
+      "bytes": 5347,
+      "lines": 135,
+      "sha256": "218678e917351293c11ed3b6bd8cbae2f68809bf7ce1329fbc07b68f8f8d1788",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwift/Features/Reader/ReaderWebMessagePolicy.swift",
+      "bytes": 376,
+      "lines": 12,
+      "sha256": "01566d57f5c5f7a5ff8620205e55abec8935cb7a81e3a3b0d340b6975307795d",
+      "review": "reviewed",
+      "review_scope": "Full revision/request identity policy read; stale navigation and exact chapter-boundary tests remain preserved.",
+      "reviewer": "root",
+      "reviewed_at_utc": "2026-11-06T00:01:59.151104+00:00"
+    },
+    {
+      "path": "SourceReadSwift/Features/Reader/VideoPlayerView.swift",
+      "bytes": 25868,
+      "lines": 669,
+      "sha256": "4a703ce1dae56eb3cd11111128c821c835113f0ede79983e4b4331436862b867",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwift/Features/Reader/WebReaderDocument.swift",
+      "bytes": 61834,
+      "lines": 1425,
+      "sha256": "0c94e4f979729c572a06bdc57184f71f231dbc4f6db75d97897e44746d63810e",
+      "review": "partial",
+      "review_scope": "Bootstrap, patch/rebase, visible-node/character cursor and chapter boundary paths read. Heading reports now map to own prose; native WebKit passed both systems on 928b7a3.",
+      "reviewer": "root",
+      "reviewed_at_utc": "2026-11-06T00:01:59.151171+00:00"
+    },
+    {
+      "path": "SourceReadSwift/Features/Reader/WebScrollReaderView.swift",
+      "bytes": 39474,
+      "lines": 784,
+      "sha256": "a51f930d49acc32a66ee28590686eb79de93116b6b9b487b0c217ee2aeb9bdda",
+      "review": "partial",
+      "review_scope": "本轮读取前 55 行生命周期及既有建立/更新路径；增加父/窗口/布局安装重试。其余正文桥接不计全读。",
+      "reviewer": "root",
+      "reviewed_at_utc": "2026-11-06T11:50:48.632779+00:00",
+      "latest_scope": "本轮读取前 55 行生命周期及既有建立/更新路径；增加父/窗口/布局安装重试。其余正文桥接不计全读。"
+    },
+    {
+      "path": "SourceReadSwift/Features/Search/GlobalSearchIndex.swift",
+      "bytes": 4572,
+      "lines": 92,
+      "sha256": "ec36f6d247f0237e1b539c47c97a3f3e53b33afa651db98aa5d4a9a2177ea63d",
+      "review": "reviewed",
+      "review_scope": "Full metadata catalog, normalization, ranking and result cap; no source-body indexing.",
+      "reviewer": "root",
+      "reviewed_at_utc": "2026-11-05T21:52:26.996346+00:00",
+      "latest_scope": "通读目录构造、排名及取消；索引按目录版本重用"
+    },
+    {
+      "path": "SourceReadSwift/Features/Search/GlobalSearchView.swift",
+      "bytes": 8014,
+      "lines": 179,
+      "sha256": "5a840e3861391abb7e4f5eef703056a69ccc42735ce1ed4afc7294f002b5c7c3",
+      "review": "reviewed",
+      "review_scope": "Full local destinations, debounce and detached search; rebuilding/cancellation performance limitation recorded.",
+      "reviewer": "root",
+      "reviewed_at_utc": "2026-11-06T14:34:06.009794+00:00",
+      "latest_scope": "本次收敛路径复核：真实HTTP边界/搜索焦点及导航/普通与减动效返回/独立定向验证；原生尚待验证，不扩大既有整文件审查状态。"
+    },
+    {
+      "path": "SourceReadSwift/Features/Settings/AIChatSession.swift",
+      "bytes": 5245,
+      "lines": 97,
+      "sha256": "2f89d9c1d4cc5923506f42b65370dfd3c68e7ee57ac16ae0d3321070ec5ad750",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwift/Features/Settings/AIChatView.swift",
+      "bytes": 23674,
+      "lines": 419,
+      "sha256": "852964050ff1e5732e701825d95841016321835e18404838e10a4c54e2ca52ad",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwift/Features/Settings/AIGeneratedSourceReviewView.swift",
+      "bytes": 6288,
+      "lines": 100,
+      "sha256": "f48613eb17fcfc7cd4c03316427fe8e5a7baa450135b865206b0a3b83d611352",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwift/Features/Settings/AppFrameProfilerSection.swift",
+      "bytes": 1077,
+      "lines": 19,
+      "sha256": "813443569d9d671f1a94ea58243f94c09349f61c69ec1c98cf9ab094dc0abed2",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwift/Features/Settings/AppearanceSettingsView.swift",
+      "bytes": 6199,
+      "lines": 117,
+      "sha256": "33c016a5c533540086b7598778eb6feb85c0c1405abc7f8c77bdcbd055d580b6",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwift/Features/Settings/CookieManagerView.swift",
+      "bytes": 8289,
+      "lines": 187,
+      "sha256": "b940dfc099b69d48849cdad78bec5a6f1ac1bb2a157aa6cd24b8d241b7284262",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwift/Features/Settings/CustomFontManagementView.swift",
+      "bytes": 11690,
+      "lines": 231,
+      "sha256": "abc4493d86ea0ff4bbada2b62f2d8179fda3b5a2866e13f482c0bf29e6ee1c69",
+      "review": "reviewed",
+      "review_scope": "Full UI read; font deletion resets selection before success; delete failure not shown, missing semantic buttons in selectable rows.",
+      "reviewer": "root",
+      "reviewed_at_utc": "2026-11-05T21:27:35.950529+00:00"
+    },
+    {
+      "path": "SourceReadSwift/Features/Settings/OfflineComicLibraryView.swift",
+      "bytes": 5959,
+      "lines": 130,
+      "sha256": "212abda08c2cd37305f054ecd892d181da7b65072770dc6edb7867941a27af64",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwift/Features/Settings/PrivacyLegalView.swift",
+      "bytes": 12850,
+      "lines": 259,
+      "sha256": "16d392b1dc52320ec04f7d8d3a565f39507fb8ff2dd64fa70fc8e0d51b62672b",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwift/Features/Settings/ReaderDataManagementViews.swift",
+      "bytes": 12748,
+      "lines": 292,
+      "sha256": "2e5269f210890bc8373b451c1a2d4c6d30d886d815c3556e7bdf227713e5e114",
+      "review": "reviewed",
+      "review_scope": "Full bookmarks/cache UI read; source identity collision, swallowed export errors and main-thread export identified.",
+      "reviewer": "root",
+      "reviewed_at_utc": "2026-11-05T21:27:35.950529+00:00"
+    },
+    {
+      "path": "SourceReadSwift/Features/Settings/ReaderPerformanceDiagnosticsView.swift",
+      "bytes": 2265,
+      "lines": 55,
+      "sha256": "81cc159449cf615014c9513d192f079f00c59e5399520adcb7d2b307d854cce4",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwift/Features/Settings/ReadingNoteCatalog.swift",
+      "bytes": 3287,
+      "lines": 65,
+      "sha256": "e20d6036dcea6d5086b6a74e7ab12919e1b9d98b096dd6d18a1e3cc27e285129",
+      "review": "reviewed",
+      "review_scope": "Full immutable catalog and process-local random choice read; no timer or network work.",
+      "reviewer": "root",
+      "reviewed_at_utc": "2026-11-06T00:01:59.151347+00:00"
+    },
+    {
+      "path": "SourceReadSwift/Features/Settings/RecentDiagnosticsView.swift",
+      "bytes": 2384,
+      "lines": 52,
+      "sha256": "280898c4e5b754082039956745fa2e43fd272c175efe34bb03f417e430404a96",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwift/Features/Settings/SettingsBrandHeader.swift",
+      "bytes": 2736,
+      "lines": 73,
+      "sha256": "7d4edd9aef9c3825e76ae9cd99c29687c4739b4613e7655231078ce19a80bbc6",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwift/Features/Settings/SettingsView.swift",
+      "bytes": 62650,
+      "lines": 1330,
+      "sha256": "2bf9e6ca9d6dbbf5857d14ebec9ab32662e405752cd831729f933f3a31234dd7",
+      "review": "partial",
+      "review_scope": "Backup/import/export and data routes read; other settings remain partial.",
+      "reviewer": "root",
+      "reviewed_at_utc": "2026-11-05T21:17:34.076228+00:00"
+    },
+    {
+      "path": "SourceReadSwift/Features/Settings/SourceProxySettingsView.swift",
+      "bytes": 8000,
+      "lines": 189,
+      "sha256": "b29f277ac36f481b4be482d791179267e6d1345c2f16bf903943bae05ece02a3",
+      "review": "reviewed",
+      "review_scope": "Full proxy form/test task read; draft validation and task cancellation remain open.",
+      "reviewer": "root",
+      "reviewed_at_utc": "2026-11-06T00:01:59.151403+00:00",
+      "latest_scope": "通读保存、验证和测试取消路径"
+    },
+    {
+      "path": "SourceReadSwift/Features/Settings/TTSSettingsView.swift",
+      "bytes": 16812,
+      "lines": 411,
+      "sha256": "23f1bf79a8e67742be4b9d3ae61efd548f80bd50faeaf68ede4730ff8cfc80f0",
+      "review": "reviewed",
+      "review_scope": "Full settings view, imports and preview tasks; uncancelled task and error feedback findings recorded.",
+      "reviewer": "root",
+      "reviewed_at_utc": "2026-11-05T21:52:26.996346+00:00"
+    },
+    {
+      "path": "SourceReadSwift/Features/Settings/WebDAVSyncView.swift",
+      "bytes": 18458,
+      "lines": 454,
+      "sha256": "1992a6e70b32ba82716a87a9c5ccdb60fd852b4f79d0199b46723eb26e3adc55",
+      "review": "reviewed",
+      "review_scope": "Entire view; credential migration, truthful backup scope and delete confirmation added; no native UI validation yet.",
+      "reviewer": "root",
+      "reviewed_at_utc": "2026-11-05T21:17:34.076228+00:00"
+    },
+    {
+      "path": "SourceReadSwift/Features/SourceManager/RSSSourceEditorView.swift",
+      "bytes": 4632,
+      "lines": 110,
+      "sha256": "14acec2b075bf336a0a06025f2731adf0c6e8fc0aa28650d9a5f22898fc15dd8",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwift/Features/SourceManager/SourceDiagnosticHistoryView.swift",
+      "bytes": 5372,
+      "lines": 119,
+      "sha256": "6490874f6219bc1bde5f540ee2dfdc78234b54c838be9fa219f33bc5107abebc",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwift/Features/SourceManager/SourceLoginCenterView.swift",
+      "bytes": 11128,
+      "lines": 275,
+      "sha256": "be6b27b81545e53e492b23b9ee1a4130ef4780f89faa34487e0dfdea5b2cd57d",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwift/Features/SourceManager/SourceLoginView.swift",
+      "bytes": 15947,
+      "lines": 408,
+      "sha256": "2d4153c66fb83592d56ad57ff8026fbcfffb4e7e895e4d9daff5a3b55050863e",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwift/Features/SourceManager/SourceManagerView.swift",
+      "bytes": 128686,
+      "lines": 2737,
+      "sha256": "b7c901cb641e5f137a2a727fef823c5d4a56616098e026e9c62f3e6ff5968723",
+      "review": "partial",
+      "review_scope": "Import sheet, loading guard, publisher selection and import error/success path; other 2100+ lines not reread this batch.",
+      "reviewer": "source_audit",
+      "reviewed_at_utc": "2026-11-05T19:47:53.762221+00:00"
+    },
+    {
+      "path": "SourceReadSwift/Features/SourceManager/SourceOrganizationView.swift",
+      "bytes": 8851,
+      "lines": 174,
+      "sha256": "16740e976015cca3f51e335c52e903c0c7c03391cfdc9698840589e31d6f6a03",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwift/Features/SourceManager/SourcePublisherLinksView.swift",
+      "bytes": 1362,
+      "lines": 30,
+      "sha256": "843f4e627a25ffbb7a65aa38c49d1878605be1381894d0bffd65e5bdb59daaba",
+      "review": "reviewed",
+      "review_scope": "Pure link-selection view, visible destination, busy disabled buttons and 44pt targets; native UI unrun.",
+      "reviewer": "source_audit",
+      "reviewed_at_utc": "2026-11-05T19:47:53.760582+00:00"
+    },
+    {
+      "path": "SourceReadSwift/Features/SourceManager/SourceRuleEditorView.swift",
+      "bytes": 30000,
+      "lines": 625,
+      "sha256": "f0def6b1323fee5037c86a2b53c8ec47d786963a3b1477db28a572aa0e192cf0",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwift/Features/SourceManager/WebsitePageCapture.swift",
+      "bytes": 974,
+      "lines": 23,
+      "sha256": "9dbd9e1769d1cf8f498d88cc4795cd444c77d7f2cc599b42778703308cd254e0",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwift/Features/SourceManager/WebsiteSourceBuilderView.swift",
+      "bytes": 10756,
+      "lines": 182,
+      "sha256": "005e6c26b7f9ae613298354af4d9ab0faafe8f5c082df633b4c192246688fd77",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwift/Features/Verification/VerificationCodeSheet.swift",
+      "bytes": 4973,
+      "lines": 140,
+      "sha256": "8b246bd993f6feef9b7ab20fc9e5041e893d9b60816ccc2d2cf6dd411e9f9866",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwift/Resources/LANWorkbench.html",
+      "bytes": 64653,
+      "lines": 1990,
+      "sha256": "2050d31b0d5b7286a930cf97075bee06427cbd5c5cdbd84f0c5ba0c8f2c1b913",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwift/Shared/AppVersion.swift",
+      "bytes": 1340,
+      "lines": 35,
+      "sha256": "14618408f036fdcf0b3c838e163639356ad57a952190760b4807d8249d3c7ded",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwift/Shared/DesignSystem/AppLayout.swift",
+      "bytes": 521,
+      "lines": 14,
+      "sha256": "0eb73fb5aa40ecaeb8aceb842d476cedfc70991e63d3b3cb13238e19218a83cb",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwift/Shared/DesignSystem/AppMotion.swift",
+      "bytes": 4106,
+      "lines": 98,
+      "sha256": "661c6655980149f3cd165a4c3bdbf7c581820fbbcfe3d5063df3e8d56a25faa3",
+      "review": "reviewed",
+      "review_scope": "Full animation policy, reduced-motion and native hero modifiers; hardware frame-rate validation not claimed.",
+      "reviewer": "root",
+      "reviewed_at_utc": "2026-11-05T21:52:26.996346+00:00"
+    },
+    {
+      "path": "SourceReadSwift/Shared/DesignSystem/AppNavigationLabels.swift",
+      "bytes": 115,
+      "lines": 4,
+      "sha256": "20e093a224b53c10e912245e677de67c45e4edf9ce860e68f5dc11ee6d4654a4",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwift/Shared/DesignSystem/AppTheme.swift",
+      "bytes": 8861,
+      "lines": 249,
+      "sha256": "be27e98585094209f1f85c0234641aa3ed82eb895d62607f775273f6763adc1a",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwift/Shared/DesignSystem/AppThemeOrnament.swift",
+      "bytes": 2867,
+      "lines": 64,
+      "sha256": "9884e00300bff2faa96e7d6a1566140b2f41df0f1f2b55ae45976e1db7e4775e",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwift/Shared/DesignSystem/AppThemeSurface.swift",
+      "bytes": 3821,
+      "lines": 81,
+      "sha256": "e0c9c7a65c959170d2b77ff267cea61ccec45475fa50e3b2c0b7f36f166cfe02",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwift/Shared/DesignSystem/AppVisualTheme.swift",
+      "bytes": 9474,
+      "lines": 139,
+      "sha256": "600b18527d6162398ed1cf13630a03783efc4f50c36e445bec486b7230b7ed7c",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwift/Shared/DesignSystem/BookCoverPlaceholder.swift",
+      "bytes": 1742,
+      "lines": 34,
+      "sha256": "fcd8197c448e16da17084bf5103a6755b76cb06f6dd7e951f733f26a7f3a2b11",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwift/Shared/DesignSystem/BookJacket.swift",
+      "bytes": 1303,
+      "lines": 27,
+      "sha256": "88b3029b35b2fef74560076ceaddad5c9758562f371c503886f8bb7cd319c698",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwift/Shared/DesignSystem/BrandGlass.swift",
+      "bytes": 2447,
+      "lines": 53,
+      "sha256": "dff51ca656393702069ed29b0efa2b5c7ce66bcbecc88a116bb20f1a68c3ca63",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwift/Shared/DesignSystem/BrandSegmentedControl.swift",
+      "bytes": 2998,
+      "lines": 73,
+      "sha256": "c745c75ac81fd90ba1cbda600ba4fa2593d1d338d6e5e6c20c1a82a949e36f44",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwift/Shared/DesignSystem/CachedRemoteImage.swift",
+      "bytes": 4316,
+      "lines": 124,
+      "sha256": "b6c9cd363747597d7d462beeafa6997e79476d3288926957fd1d469b7850d5d5",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwift/Shared/DesignSystem/ComicImageBudget.swift",
+      "bytes": 1531,
+      "lines": 44,
+      "sha256": "fe6478b15defd0e73352e42e65204321b2e3c7dfef7cff2039f6ee59f60b3078",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwift/Shared/DesignSystem/CoverSourceBytes.swift",
+      "bytes": 4205,
+      "lines": 99,
+      "sha256": "296ab5e430730c0a8f113ec8aeec604d932a11cbc4830a7e7cf166b893c4dd8e",
+      "review": "reviewed",
+      "review_scope": "Full shared transfer ownership, TTL and cache invalidation; clear cancels transfers.",
+      "reviewer": "root",
+      "reviewed_at_utc": "2026-11-05T21:52:26.996346+00:00"
+    },
+    {
+      "path": "SourceReadSwift/Shared/DesignSystem/CoverURLResolver.swift",
+      "bytes": 2641,
+      "lines": 58,
+      "sha256": "263f2755f5d59fdb9da6da214b79bbdf37545c11dbd287d3cb0f02203c9c926e",
+      "review": "reviewed",
+      "review_scope": "Full relative/base cover resolution; network scheme policy belongs to loader.",
+      "reviewer": "root",
+      "reviewed_at_utc": "2026-11-05T21:52:26.996346+00:00"
+    },
+    {
+      "path": "SourceReadSwift/Shared/DesignSystem/EmptyStateCard.swift",
+      "bytes": 817,
+      "lines": 28,
+      "sha256": "2dbfc0e7126c3e3ed5c51b8d80f121d36de6692bbfcd1dfb151956e6e3c94d5e",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwift/Shared/DesignSystem/FlowLayout.swift",
+      "bytes": 1688,
+      "lines": 49,
+      "sha256": "68a76d42b77a2b9088acad9980e087ac884fce0c8c36d56c01e7352d2bdc0644",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwift/Shared/DesignSystem/LegacyTabBar.swift",
+      "bytes": 3159,
+      "lines": 69,
+      "sha256": "17e06a379f1ac9405d299f5188cb185009cb25fe312ceb2ee087fbd502b60470",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwift/Shared/DesignSystem/RemoteImageLoader.swift",
+      "bytes": 22832,
+      "lines": 461,
+      "sha256": "155fb09264c4b7458dd27d5b65608318433e5f89fc2961484a6cee6e20e75631",
+      "review": "partial",
+      "review_scope": "Comic transport/decode and cover tail read; full ordinary image flow not yet reviewed.",
+      "reviewer": "root",
+      "reviewed_at_utc": "2026-11-06T13:16:38.304959+00:00",
+      "latest_scope": "按用户三点方案复核和修补返回/漫画原始配置/任务长度/转场等待；原生未验，不扩大原review范围。"
+    },
+    {
+      "path": "SourceReadSwift/Shared/DesignSystem/SakuraThemeCatalog.swift",
+      "bytes": 35458,
+      "lines": 47,
+      "sha256": "ac21eae389c558bc5e82c2b12cafacde8c499ebc43e673dd9391f59705df121a",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwift/Shared/Diagnostics/DiagnosticEvent.swift",
+      "bytes": 1038,
+      "lines": 45,
+      "sha256": "4e060472e10b39e63912876ea2cf619171d4662d2d9d987551338e24c5fde3f1",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwift/Shared/Diagnostics/DiagnosticSink.swift",
+      "bytes": 159,
+      "lines": 8,
+      "sha256": "72c536441051d112b8ab7dc0197c640870a2c1938eab5aeb3a44056f8f2a8992",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwift/Shared/Diagnostics/SourceEngineError+Display.swift",
+      "bytes": 410,
+      "lines": 16,
+      "sha256": "9d9223ee1d01d83965080d4db97b87ffcbfca740aec1da3eb27a5154768976ce",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwift/Shared/Foundation/AsyncTimeout.swift",
+      "bytes": 575,
+      "lines": 21,
+      "sha256": "da89fe9015b3c2fd5065250a05dbc89f66f28344a8394d2e12bbf02b75d34aa5",
+      "review": "reviewed",
+      "review_scope": "Full implementation; uncooperative task-group timeout/cancellation identified; new native regression pending.",
+      "reviewer": "root",
+      "reviewed_at_utc": "2026-11-05T21:52:26.996346+00:00"
+    },
+    {
+      "path": "SourceReadSwift/Shared/Foundation/String+SourceRead.swift",
+      "bytes": 268,
+      "lines": 15,
+      "sha256": "9d9aa3e0e680d07bf4989155950ac867c20fb0e1df3ea0f3c4f925651bea9930",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwift/Shared/HapticFeedback.swift",
+      "bytes": 3698,
+      "lines": 95,
+      "sha256": "a0577980d206aa13fa3673b6d61108b67897565c7d466dfa4bcaf4ea1f901e91",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwift/Shared/Import/PickedDocumentAccess.swift",
+      "bytes": 1975,
+      "lines": 54,
+      "sha256": "ac2f4e08bf35dcf82d8f604b8712fd8c96127bd9954f9619e4faf67d15b38bcd",
+      "review": "reviewed",
+      "review_scope": "Full file coordination/copy read; already-copied picker files redundantly coordinated, no cancellation/size gate or automatic temp cleanup.",
+      "reviewer": "root",
+      "reviewed_at_utc": "2026-11-05T21:33:54.916255+00:00"
+    },
+    {
+      "path": "SourceReadSwift/Shared/Import/UniversalDocumentPicker.swift",
+      "bytes": 1751,
+      "lines": 51,
+      "sha256": "10bb4b44731ce4440c070e2b8fb52ecf32b115525dd71c98d2631bf8044760bb",
+      "review": "reviewed",
+      "review_scope": "Full picker bridge read; copies into sandbox correctly, coordinator keeps original callbacks across SwiftUI updates.",
+      "reviewer": "root",
+      "reviewed_at_utc": "2026-11-05T21:33:54.916255+00:00"
+    },
+    {
+      "path": "SourceReadSwift/Shared/Performance/AppFrameProfiler.swift",
+      "bytes": 6633,
+      "lines": 132,
+      "sha256": "7a2cc8c629736114748734646dd3bb0868b5b39e566215ad91add7813f62d149",
+      "review": "reviewed",
+      "review_scope": "Read in preceding serialized audit checkpoint; see STATUS/STORAGE-NETWORK. Reading is not a full runtime or performance acceptance.",
+      "reviewer": "root",
+      "reviewed_at_utc": "2026-11-05T21:17:34.076228+00:00"
+    },
+    {
+      "path": "SourceReadSwift/Shared/Performance/FrameRateCoordinator.swift",
+      "bytes": 3470,
+      "lines": 88,
+      "sha256": "9041f44b793a5dc3a019afa44c27760150f08d26bd0e910159fea7803b2f9126",
+      "review": "reviewed",
+      "review_scope": "Full scene anchor and cadence request path; strong window retention suspected, native deallocation regression pending.",
+      "reviewer": "root",
+      "reviewed_at_utc": "2026-11-05T21:52:26.996346+00:00"
+    },
+    {
+      "path": "SourceReadSwift/Shared/Performance/PerformanceSignpost.swift",
+      "bytes": 651,
+      "lines": 23,
+      "sha256": "0e4c4e0fd67f18f651684726a1b12569047da462448f1195873536bc927fddeb",
+      "review": "reviewed",
+      "review_scope": "Read in preceding serialized audit checkpoint; see STATUS/STORAGE-NETWORK. Reading is not a full runtime or performance acceptance.",
+      "reviewer": "root",
+      "reviewed_at_utc": "2026-11-05T21:17:34.076228+00:00"
+    },
+    {
+      "path": "SourceReadSwift/Shared/Performance/ReaderFrameRateSampler.swift",
+      "bytes": 2846,
+      "lines": 77,
+      "sha256": "9ed4e48bd0134501e5cdc14326fba5e8fdeeec1934c7bb232e2c29961eda444d",
+      "review": "reviewed",
+      "review_scope": "Read in preceding serialized audit checkpoint; see STATUS/STORAGE-NETWORK. Reading is not a full runtime or performance acceptance.",
+      "reviewer": "root",
+      "reviewed_at_utc": "2026-11-05T21:17:34.076228+00:00"
+    },
+    {
+      "path": "SourceReadSwift/Shared/Performance/ReaderPerformancePolicy.swift",
+      "bytes": 6059,
+      "lines": 126,
+      "sha256": "2a501d07d7c09268b9911d96d553910ac3123226af0778741751e378e5496b4d",
+      "review": "reviewed",
+      "review_scope": "Read in preceding serialized audit checkpoint; see STATUS/STORAGE-NETWORK. Reading is not a full runtime or performance acceptance.",
+      "reviewer": "root",
+      "reviewed_at_utc": "2026-11-05T21:17:34.076228+00:00"
+    },
+    {
+      "path": "SourceReadSwift/Shared/Performance/ReaderScrollPerfMeter.swift",
+      "bytes": 3649,
+      "lines": 95,
+      "sha256": "1f51a5450064f483029812d1ae3c2243094b2829a76df328e6a5a161b25df6a5",
+      "review": "reviewed",
+      "review_scope": "Read in preceding serialized audit checkpoint; see STATUS/STORAGE-NETWORK. Reading is not a full runtime or performance acceptance.",
+      "reviewer": "root",
+      "reviewed_at_utc": "2026-11-05T21:17:34.076228+00:00"
+    },
+    {
+      "path": "SourceReadSwift/Shared/ResultPage.swift",
+      "bytes": 353,
+      "lines": 10,
+      "sha256": "5eaf426b78f149566cd6c931ca72cbc6654db428697502876ed018e7f70ef9c5",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwift/Shared/ShareSheet.swift",
+      "bytes": 864,
+      "lines": 29,
+      "sha256": "672521d4e3d91cc41de64711bf736a6bd5944f0a8f2796019f88f35d0f4626a5",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftTests/AIChatTests.swift",
+      "bytes": 14392,
+      "lines": 196,
+      "sha256": "60fdd90a213e6c7f8b48ba98b6a7a157d6e72262f2998baa03ca08729f94cdd9",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftTests/AppDataBackupTests.swift",
+      "bytes": 8007,
+      "lines": 168,
+      "sha256": "6f7aefbed2b885dedb17aec29b4ce4ef7e3a2636652e220bd6a5a575798f268d",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftTests/AppFrameProfilerTests.swift",
+      "bytes": 5232,
+      "lines": 100,
+      "sha256": "635fe5469251199a649dec2c1fabfccb189aff7c30074311b4841436f3d7c71d",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftTests/AppLayoutDensityTests.swift",
+      "bytes": 6578,
+      "lines": 120,
+      "sha256": "ba2ee3242f89f5a6d506cac9a4487987cce8873304d2875d7864e90ff89f74d0",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftTests/AudioBookPlaybackCoordinatorTests.swift",
+      "bytes": 1684,
+      "lines": 51,
+      "sha256": "dc228e1a35b5227b9e44c59cb08aaedb89d775afbb6be34769234d506c6825e0",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftTests/B18PlusServiceTests.swift",
+      "bytes": 844,
+      "lines": 21,
+      "sha256": "a03d2077bf97ae66bddbb6f288b75a230137b839bed4ffa2835e69cdd1b6b6ab",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftTests/BlockingRuleExecutorTests.swift",
+      "bytes": 4505,
+      "lines": 101,
+      "sha256": "55333d915dddb50f4c6bb43c31b08792d6223e43bdd1927eda64b2e06d3df777",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftTests/BookSourceTests.swift",
+      "bytes": 24699,
+      "lines": 649,
+      "sha256": "068e0cef4ff355c12e29df11ca555f9a471474af4c55e05707b51e2b8aa5852e",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftTests/BookshelfProgressPerformanceTests.swift",
+      "bytes": 4980,
+      "lines": 75,
+      "sha256": "68350babc23f1c140ae03fd14cedac65454b99ecf138b9b887e5668b34faba49",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftTests/BookshelfStoreTests.swift",
+      "bytes": 16786,
+      "lines": 358,
+      "sha256": "01e70b0948a677ac07cbf97decb050bee90e79e78e868376a17062f459efddfa",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftTests/BuiltinBrowserSourceProviderTests.swift",
+      "bytes": 1238,
+      "lines": 30,
+      "sha256": "b68d6de3fba327e6ddbb8c7bfc00932d89db6919a16214760ddd1376f5481c1a",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftTests/ChapterCacheWriterPerformanceTests.swift",
+      "bytes": 3315,
+      "lines": 55,
+      "sha256": "d8c841e3642a6980550ffa69ca73d9d71d67932c62c650435e3e2c872f745d9d",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftTests/ChapterContentCacheStoreTests.swift",
+      "bytes": 8010,
+      "lines": 177,
+      "sha256": "23a9065b2b13cc9adb9cdb6c5511b73053b242d450b99f6e9f662d5f88a645cb",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftTests/ChapterDownloadStoreTests.swift",
+      "bytes": 12787,
+      "lines": 207,
+      "sha256": "2982638aaab99e24d3910b9daac2cf3880228a94ca175b0d83f1c091e24d705d",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftTests/ChapterListMetadataTests.swift",
+      "bytes": 23956,
+      "lines": 549,
+      "sha256": "e0be7e884a524ed0fd36927243049b3f759e301f3f92c6b000063f9f993a37be",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftTests/ChapterTextSanitizerTests.swift",
+      "bytes": 4921,
+      "lines": 125,
+      "sha256": "fe1769039bbaf99a59aa5a974c45bdf6c6d5e4b7e9b6e58f5cd20fbacbb11915",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftTests/CloudCollectionRuleTests.swift",
+      "bytes": 11170,
+      "lines": 287,
+      "sha256": "ae9b1e06a0dd6cf5206195c9636ac84027870872aa05123790645cd54c279fc4",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftTests/CloudTTSClientTests.swift",
+      "bytes": 5324,
+      "lines": 151,
+      "sha256": "3c2013dcabd37f735b4d24112d46921d8d1a1082737812042f121d4617e509df",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftTests/CloudTTSCredentialsTests.swift",
+      "bytes": 3607,
+      "lines": 109,
+      "sha256": "dce6c50aadb1d6fa1a96d94846aec9e48823d8d74eb3fab8d5f6a132508bb5fb",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftTests/CloudTTSFrameTests.swift",
+      "bytes": 1966,
+      "lines": 58,
+      "sha256": "72cfbe92d05d691add58b31aea2470c69b1f83df35f80f7dd7cc3d89f6dbadd3",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftTests/CloudTTSProtocolTests.swift",
+      "bytes": 2408,
+      "lines": 62,
+      "sha256": "44b747c4d56bc7e856214c4455491fe5dfbdf6842ddc789da998415dcf63387d",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftTests/CmbokFeaturesTests.swift",
+      "bytes": 2402,
+      "lines": 63,
+      "sha256": "93cebd4f8da34e3fca967e0a9ffebb6892350d2afda8f482e8ce435e4a3793db",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftTests/ComicContentParserTests.swift",
+      "bytes": 9839,
+      "lines": 164,
+      "sha256": "bc3f352d2b834f2f402b3f1616a1019c3d28af49a755bfd0d5f6b0af72df71a3",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftTests/ComicOfflineArchiveTests.swift",
+      "bytes": 8555,
+      "lines": 158,
+      "sha256": "2c0ff68169d07adfbd37b4072d513123cb1f6fcdb6d3816f9a356404834a1a01",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftTests/ComicReadingPositionTests.swift",
+      "bytes": 4892,
+      "lines": 76,
+      "sha256": "f8117afcfcae3fbe8b32dd6748b3ed7d6f1dce189d8f102073dc2d83ef90a960",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftTests/ComicSourceCorpusProbeTests.swift",
+      "bytes": 7746,
+      "lines": 132,
+      "sha256": "28b94df64dfd1ff10349f64478b3ef60cff5836a7bc1d8e1d634d752569a64c6",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftTests/ComicStripLayoutTests.swift",
+      "bytes": 10106,
+      "lines": 188,
+      "sha256": "a8b22735db42606d09ee45b5969a04c153d5d4b42ae5412e3d02382a957d2fc6",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftTests/ComicZoomInteractionTests.swift",
+      "bytes": 4473,
+      "lines": 91,
+      "sha256": "071df1f17dd70b29b08096873bca14141c0388f258713bd8b401b730636f3fa3",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftTests/ContentImagePipelineRegressionTests.swift",
+      "bytes": 10762,
+      "lines": 148,
+      "sha256": "15f91f2a317a41b13078b32ed26aaa5f6d4be750c793380320e53c0dcc236095",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftTests/ContentParserTests.swift",
+      "bytes": 22223,
+      "lines": 617,
+      "sha256": "41ec39517d4d4cc1a48542fd8bc4cff100fba042c08059585c971298d7d57917",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftTests/CookieHeaderParserTests.swift",
+      "bytes": 1301,
+      "lines": 28,
+      "sha256": "e8cb643af356e5628ae35028ec7858db76f60548d8f9b627b59cb90edc2227b3",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftTests/CoverURLResolverTests.swift",
+      "bytes": 1625,
+      "lines": 46,
+      "sha256": "7dfa94e8673a06eab0dc6b3e601a7cc18e940164edcc448e9d505d8c0a337f47",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftTests/CustomFontAndExportTests.swift",
+      "bytes": 3659,
+      "lines": 82,
+      "sha256": "3665bfee67fd10c19c54ea5534ecb9e3b40a757e7ccb911a60a785f007de4570",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftTests/DiscoverViewModelTests.swift",
+      "bytes": 1937,
+      "lines": 59,
+      "sha256": "5151fdfd724a084f2831213dc7dbddaf089c1577fc61dc4ba47ece272d577370",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftTests/ExplicitFrameDiagnosticsTests.swift",
+      "bytes": 2909,
+      "lines": 65,
+      "sha256": "7d8bf3f4188b61e206defec496a564342d28ac2aadc453d2c0d36582be6c3296",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftTests/ExploreCategoryParserTests.swift",
+      "bytes": 3961,
+      "lines": 96,
+      "sha256": "c9f794f4c651dfd97607f1bab45e867c1544a6802ae4a542c75bcaf76871d603",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftTests/Fixtures/bodyjs/qq-browser-response.js",
+      "bytes": 2455,
+      "lines": 44,
+      "sha256": "b8eef0f0364c7ce54cf0b089f9ea662be2b42eca8bfafde6ee6a90ba686a6f9c",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftTests/Fixtures/legado-stage29-content-page-2.html",
+      "bytes": 82,
+      "lines": 1,
+      "sha256": "22e87d0be68c10e5fe3c24980e395341ece0301eff63f000bf1415e7229a9a70",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftTests/Fixtures/legado-stage29-search.html",
+      "bytes": 227,
+      "lines": 12,
+      "sha256": "fc2f14d0045eacd3cf28096fcce22b37a9c464b3e0e5ae3107ec0380b33b635a",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftTests/Fixtures/legado-stage29-toc-page-2.html",
+      "bytes": 222,
+      "lines": 4,
+      "sha256": "051646ef0fd483cd6669c974919a1046faa0381303300f01e8f80a81f11b016a",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftTests/Fixtures/toc-corpus/toc-10a74390d4ec.html",
+      "bytes": 40533,
+      "lines": 779,
+      "sha256": "10a74390d4ec7cc8ed70eb620393eee61921127b127b4c346373adc96d3189e3",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftTests/Fixtures/toc-corpus/toc-17ad8e9a2c91.html",
+      "bytes": 198688,
+      "lines": 2623,
+      "sha256": "17ad8e9a2c91c226a96fcb06cf1a994d24c84d9c1fe67d8a4772fa85e17f0c65",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftTests/Fixtures/toc-corpus/toc-18b4aa92d1c1.html",
+      "bytes": 31958,
+      "lines": 597,
+      "sha256": "18b4aa92d1c17d45cce899669d1ca1585ea60a250e0135513d4c6331304f580d",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftTests/Fixtures/toc-corpus/toc-18d55a25a1e1.html",
+      "bytes": 14732,
+      "lines": 251,
+      "sha256": "18d55a25a1e10ba545debca357023fd9c2556b70bf62d72a29ff05548114a68c",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftTests/Fixtures/toc-corpus/toc-1a2d6d6f0be8.html",
+      "bytes": 128108,
+      "lines": 411,
+      "sha256": "1a2d6d6f0be886de313a1cad73d27d4f1e0062b3089c4c40978dc68ec28ff7db",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftTests/Fixtures/toc-corpus/toc-1df530f09465.html",
+      "bytes": 69244,
+      "lines": 36,
+      "sha256": "1df530f09465b6bfc1f25ba788e8edda069fb16a353fe8867aeeb7a51db8fa12",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftTests/Fixtures/toc-corpus/toc-1ee8bb04a6b9.html",
+      "bytes": 101946,
+      "lines": 1336,
+      "sha256": "1ee8bb04a6b9743b4486cdef5a531b289de356f9c0f34f9518eb8152a1a02ce4",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftTests/Fixtures/toc-corpus/toc-20af3736cf85.html",
+      "bytes": 499192,
+      "lines": 15079,
+      "sha256": "20af3736cf8563d076d01f9089d60788139d299a708355556d3fd6109f4cf17c",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftTests/Fixtures/toc-corpus/toc-298b8a55105a.html",
+      "bytes": 68269,
+      "lines": 1334,
+      "sha256": "298b8a55105a77e9789d53f9f03b65c722a33ddf2287d8dc7ec11b6e614b6ebe",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftTests/Fixtures/toc-corpus/toc-29b193d95407.html",
+      "bytes": 19594,
+      "lines": 124,
+      "sha256": "29b193d954076771e16d27eaa3e3f3d539023d23ff9b4abcf2b3604b98dac247",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftTests/Fixtures/toc-corpus/toc-2c6a622d6c8c.html",
+      "bytes": 46094,
+      "lines": 617,
+      "sha256": "2c6a622d6c8c277934da08f6d33c19e4aa109ea814d5b8d7663417ad00446081",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftTests/Fixtures/toc-corpus/toc-30a222b06fd6.html",
+      "bytes": 25070,
+      "lines": 295,
+      "sha256": "30a222b06fd63930d2ecce11ac3c140e19263fe723e3364cb6e1662e76b24d6b",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftTests/Fixtures/toc-corpus/toc-326f969ff680.html",
+      "bytes": 189206,
+      "lines": 2005,
+      "sha256": "326f969ff68087af1744828e3b01d87318fb94bd84e0d3493ee280f8592076b1",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftTests/Fixtures/toc-corpus/toc-38dbee26b57c.html",
+      "bytes": 70420,
+      "lines": 1178,
+      "sha256": "38dbee26b57cedb0688ac7dabfb4838a355d2996c534273629a4a4d9630ba1a9",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftTests/Fixtures/toc-corpus/toc-3bb57edaf861.html",
+      "bytes": 61521,
+      "lines": 38,
+      "sha256": "3bb57edaf8617ce44a5f284d98b3c462f2dd5da08f9c71bc4a406e4569db4bff",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftTests/Fixtures/toc-corpus/toc-43f467ee00a5.html",
+      "bytes": 688925,
+      "lines": 11762,
+      "sha256": "43f467ee00a5b7879cf7bd1e23932f1ece585e7238e949904b4b60017a0f787a",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftTests/Fixtures/toc-corpus/toc-485f2a1a4f4f.html",
+      "bytes": 291323,
+      "lines": 3735,
+      "sha256": "485f2a1a4f4fdb95388891e6239b5ffc9e073a2d0d029d810db843ba7945500b",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftTests/Fixtures/toc-corpus/toc-51a394820b00.html",
+      "bytes": 43279,
+      "lines": 597,
+      "sha256": "51a394820b00ea74ef3d2fd8bacefcc979214b36a783dd48595eb64a996381bd",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftTests/Fixtures/toc-corpus/toc-55b001305612.html",
+      "bytes": 418536,
+      "lines": 2208,
+      "sha256": "55b00130561295607f62b36be2b0c415d389a054934cd41bf8e91ab302468f17",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftTests/Fixtures/toc-corpus/toc-5e1dbaf61a08.html",
+      "bytes": 8356,
+      "lines": 124,
+      "sha256": "5e1dbaf61a08e49d051d4610d300d79ffa9fdf97616437349913189330fa1ee7",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftTests/Fixtures/toc-corpus/toc-5ed0eb0fd74d.html",
+      "bytes": 2689,
+      "lines": 62,
+      "sha256": "5ed0eb0fd74d5e7e46618be9c6d62a6f775b13cad7157813fe5183ff78dfb093",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftTests/Fixtures/toc-corpus/toc-5ee3ca4ccb12.html",
+      "bytes": 15200,
+      "lines": 296,
+      "sha256": "5ee3ca4ccb1230dd7a6e42ff6cf1ad031389d58186971a27d567a5fdd1ce3202",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftTests/Fixtures/toc-corpus/toc-625c5edba654.html",
+      "bytes": 2544,
+      "lines": 79,
+      "sha256": "625c5edba6540ba184db5ebcddca87d7617cef22561cd54b0f37fbe211a430cb",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftTests/Fixtures/toc-corpus/toc-64f49d703b41.html",
+      "bytes": 220928,
+      "lines": 125,
+      "sha256": "64f49d703b41648ca88f51a8c5ca8e99b824899295f90b9962487ef4da6461c9",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftTests/Fixtures/toc-corpus/toc-692f079ec184.html",
+      "bytes": 31934,
+      "lines": 29,
+      "sha256": "692f079ec18429151718741f2439ce3032cff9c0a5990e2041a1ef874522dece",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftTests/Fixtures/toc-corpus/toc-730c465f4744.html",
+      "bytes": 240415,
+      "lines": 1993,
+      "sha256": "730c465f4744998c00f594183d7c29a9ed5205d138874b958a7525d2cb645de0",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftTests/Fixtures/toc-corpus/toc-7826264ba4e6.html",
+      "bytes": 256896,
+      "lines": 6978,
+      "sha256": "7826264ba4e6d2f3181f80a32fc6b168e437ba277ed63eef4fc25b9c1480ec3d",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftTests/Fixtures/toc-corpus/toc-8b01f53082fe.html",
+      "bytes": 34088,
+      "lines": 737,
+      "sha256": "8b01f53082feaae498f776c785af7e8a1776a7e53558b713e01149c5d8ddf235",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftTests/Fixtures/toc-corpus/toc-8ba64c2f0c11.html",
+      "bytes": 595112,
+      "lines": 17334,
+      "sha256": "8ba64c2f0c1126e348b4e0b036045ec4b508b91c472c595d0d2ef5512e0d74a9",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftTests/Fixtures/toc-corpus/toc-950e193a60b9.html",
+      "bytes": 17972,
+      "lines": 204,
+      "sha256": "950e193a60b9e1bc065493f99653eb2872a34f08dbfc93093bd17fe553ca3629",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftTests/Fixtures/toc-corpus/toc-a20ffd625df2.html",
+      "bytes": 212600,
+      "lines": 3069,
+      "sha256": "a20ffd625df22ed084a182f73a22b3c40a7a6dba3111eb224e60a962f3eaf2c8",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftTests/Fixtures/toc-corpus/toc-add61252fe30.html",
+      "bytes": 198688,
+      "lines": 2623,
+      "sha256": "add61252fe30e8d21a568f1a7af5bad7050424c3096495ee8ed1ad1167b37174",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftTests/Fixtures/toc-corpus/toc-be4735cbe40f.html",
+      "bytes": 229945,
+      "lines": 1958,
+      "sha256": "be4735cbe40f8ba288a3f56c439681795e84ec59ca4c041381426bfa65c83325",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftTests/Fixtures/toc-corpus/toc-bead4127a33d.html",
+      "bytes": 34124,
+      "lines": 615,
+      "sha256": "bead4127a33d4b23f82b48e8ce58a738de43f6aa3f0b39dcb540d3f61cff8503",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftTests/Fixtures/toc-corpus/toc-c001cacd59a7.html",
+      "bytes": 31434,
+      "lines": 602,
+      "sha256": "c001cacd59a719344ec4845bf2bd613ef4938b51899bb37d56a77d5bb21b4409",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftTests/Fixtures/toc-corpus/toc-c3be6a35418c.html",
+      "bytes": 228385,
+      "lines": 3519,
+      "sha256": "c3be6a35418c26d43b806363d4636ead6aba90d34bb317bd13ea5c556f1e8292",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftTests/Fixtures/toc-corpus/toc-c3dad4970647.html",
+      "bytes": 14121,
+      "lines": 253,
+      "sha256": "c3dad4970647798654518ff8787fcc544a2daf6d57b2583402032d2649f37f22",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftTests/Fixtures/toc-corpus/toc-c662227a7156.html",
+      "bytes": 14560,
+      "lines": 216,
+      "sha256": "c662227a71560dd1ed03257c13b6ba792b298b386bac54b6a059f458f4d7ed90",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftTests/Fixtures/toc-corpus/toc-cac8a2c8226c.html",
+      "bytes": 13415,
+      "lines": 216,
+      "sha256": "cac8a2c8226ca899e01c90447935035e04a2642ea82ec5e9e756e129685b5568",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftTests/Fixtures/toc-corpus/toc-ccea560028ca.html",
+      "bytes": 12156,
+      "lines": 189,
+      "sha256": "ccea560028ca0dade6b120cfa1d4ff99de94fef06aa35c45627eedd4a9f07714",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftTests/Fixtures/toc-corpus/toc-cdf268d2f4f6.html",
+      "bytes": 4689708,
+      "lines": 254,
+      "sha256": "cdf268d2f4f63ca397a6622c33ec50b3538512877a33889b838f9e99e116a8d7",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftTests/Fixtures/toc-corpus/toc-d2954efea70d.html",
+      "bytes": 33209,
+      "lines": 615,
+      "sha256": "d2954efea70daf52d7b4eaf7f0236edab7e1c6e4717c65b3a0423518df049e5d",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftTests/Fixtures/toc-corpus/toc-d3d84acb45eb.html",
+      "bytes": 79039,
+      "lines": 999,
+      "sha256": "d3d84acb45eb55c1f589da450304d1deedc9cc32012360393b830019b16bb0bf",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftTests/Fixtures/toc-corpus/toc-d6a9ff28de9c.html",
+      "bytes": 18244,
+      "lines": 359,
+      "sha256": "d6a9ff28de9cbb4c627adcf2e9961e4ba25a02ae2b4e259b2fb6adb2374d9b0e",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftTests/Fixtures/toc-corpus/toc-dad2a3726500.html",
+      "bytes": 170098,
+      "lines": 3068,
+      "sha256": "dad2a372650073e2fe3bbfa2453a66b09a13f8d4a10d1a0756ad71e46e9448a3",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftTests/Fixtures/toc-corpus/toc-deb4833e6f57.html",
+      "bytes": 40533,
+      "lines": 779,
+      "sha256": "deb4833e6f570af749f90cb33e8e0a811cf77824ff470c1251cb6dd995df1640",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftTests/Fixtures/toc-corpus/toc-e65dc110d3c3.html",
+      "bytes": 112295,
+      "lines": 292,
+      "sha256": "e65dc110d3c35515ea3df57bca51d4f49666696e0ae26cae54e7955325678501",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftTests/Fixtures/toc-corpus/toc-e72608fb24ca.html",
+      "bytes": 9655,
+      "lines": 186,
+      "sha256": "e72608fb24cad8b48e4cf9389665066a920e7b604274ee36392f35b92e7ef0ef",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftTests/Fixtures/toc-corpus/toc-e90ddf69aa9c.html",
+      "bytes": 253417,
+      "lines": 2195,
+      "sha256": "e90ddf69aa9c57f9462ddbf5d52b210a8a9557fa588b78ba627380330acc2210",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftTests/Fixtures/toc-corpus/toc-ea3e2143bb8a.html",
+      "bytes": 79039,
+      "lines": 999,
+      "sha256": "ea3e2143bb8a8355a0c57ac6b4d84b259df7c7c0105d6db8b2ca0c9756eb76aa",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftTests/Fixtures/toc-corpus/toc-ed67f99d998f.html",
+      "bytes": 161795,
+      "lines": 2035,
+      "sha256": "ed67f99d998f749aa94c7c21ff442fce8ae2ba64ae9fb26f5dccb578f2f5df45",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftTests/FloatingReadingDeskTests.swift",
+      "bytes": 21623,
+      "lines": 355,
+      "sha256": "b610dfa3dbe48ee0fa2e63f4c3cfe6755084bc6897b6acb528db9d20de7be5ca",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftTests/FontImportRequestTests.swift",
+      "bytes": 5287,
+      "lines": 91,
+      "sha256": "856d2ed1de90f625e790ba1d9c022d247bfd7027cc8eea27cca9ecb4dea4e6a5",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftTests/ForestBrandThemeTests.swift",
+      "bytes": 3340,
+      "lines": 67,
+      "sha256": "5561848dd65c50e09c9979791e6c6d46cb94cf9a00e849176bb6eb0dfca04eee",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftTests/ForestReadingCardTests.swift",
+      "bytes": 1433,
+      "lines": 25,
+      "sha256": "686783acba2085fbf6fd9d837418d5e83dca43eac2e5dcbc39d02c895000b028",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftTests/HaiKuoShiJieSourceAdapterTests.swift",
+      "bytes": 2904,
+      "lines": 85,
+      "sha256": "7e287858e76d2a50c83057107f7fe8eb17da17260cadb15f7f230d25406ce50c",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftTests/HtmlAttributeSemanticsTests.swift",
+      "bytes": 1968,
+      "lines": 53,
+      "sha256": "df8a71db4ecc99fb087c3f30d426d915008ae6b0fa30815622464d0ce6b4c1bb",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftTests/HtmlRuleExtractorTests.swift",
+      "bytes": 28058,
+      "lines": 801,
+      "sha256": "a5774edc1cc580a00f3bd98ae2925a26c8ad65a834aaff78de35eaf8da07367d",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftTests/HtmlRuleLegacyRegexTests.swift",
+      "bytes": 3890,
+      "lines": 86,
+      "sha256": "275d7256226a509c63a599ffe0372db72c8e397a8c9887c95dbeffe40dd0eb00",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftTests/HttpTTSClientTests.swift",
+      "bytes": 7024,
+      "lines": 175,
+      "sha256": "059bf6419ae893e068f7b44808bac617676341b352d5350008e517b0c6522673",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftTests/HuaHuoBookSourceAdapterTests.swift",
+      "bytes": 3706,
+      "lines": 104,
+      "sha256": "21c2e85881af21c73d209820d17a5fce7ee8ff31628087f658e9ee3b8a82da85",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftTests/InlineImagePipelineTests.swift",
+      "bytes": 8498,
+      "lines": 196,
+      "sha256": "f27e5332ffffd108e65e19b1a59746ce97a6eab1d55558468fbef68bb0e780a3",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftTests/JSCoreNetworkBridgeTests.swift",
+      "bytes": 4818,
+      "lines": 159,
+      "sha256": "78e148f307f316dd2b7e6682081dce1f650856d6eb2c894d8cce9f5fac85a1a9",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftTests/JSCoreRuntimeLifecycleTests.swift",
+      "bytes": 6561,
+      "lines": 116,
+      "sha256": "0b5b1403e6892260d1ead99238d0bbd6d1f4010e823d68f057ea65e37823c359",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftTests/JSCoreRuntimeTests.swift",
+      "bytes": 37912,
+      "lines": 877,
+      "sha256": "8f4334d5a7f471ce8cb08df632c3b1050369b0b175ff7c25472584cc9567e425",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftTests/JSONListDescendantTests.swift",
+      "bytes": 1264,
+      "lines": 29,
+      "sha256": "1946f199fb1a6833dc0ff3d6378bffef477162b5747825f9863d36899a15abb9",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftTests/JSONPipelineParserTests.swift",
+      "bytes": 17888,
+      "lines": 470,
+      "sha256": "59f81abeb010ff1819879e41063405e56e11c000e4624a306797f190507c887d",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftTests/JSONRuleExtractorTests.swift",
+      "bytes": 40473,
+      "lines": 1025,
+      "sha256": "0add094756bdfa69e136348fb13f27fef665187462f4aa4c71aca7642798823d",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftTests/JavaScriptChallengeDetectionTests.swift",
+      "bytes": 1987,
+      "lines": 48,
+      "sha256": "715d64842438dffb5b12b8779d2e02100c55531ebf05bfecd6c8eb4b01c3f706",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftTests/LANWorkbenchTests.swift",
+      "bytes": 8722,
+      "lines": 138,
+      "sha256": "7e340762575d6d891cd42d0f28d6fb7757a8c0d7a630116daf5875a380b666c0",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftTests/LegadoAdvancedJsonSourceTests.swift",
+      "bytes": 4823,
+      "lines": 126,
+      "sha256": "da3372a69aefaafdea98d1da6cc57291e83f948269d01e19750e6100a168ea05",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftTests/LegadoAllInOneTests.swift",
+      "bytes": 4616,
+      "lines": 132,
+      "sha256": "e560af1798fec7a34eabdb80109e4caeea7bda30f715b709ffdbba695c437e3e",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftTests/LegadoCapabilityBankTests.swift",
+      "bytes": 5611,
+      "lines": 142,
+      "sha256": "4f221c9fa65dacaaca1a68688475dca27ba08beae03db2ce4f70b20f857b6384",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftTests/LegadoCharsetTests.swift",
+      "bytes": 4225,
+      "lines": 100,
+      "sha256": "5c6fcff55d0b33094e730e8d1dd67e069e13b8edf819c5dd0fd1b9bf78668763",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftTests/LegadoDefaultRuleTranslatorTests.swift",
+      "bytes": 4092,
+      "lines": 103,
+      "sha256": "0f48c7f283f268a3301cdb70733bad1a1da82822d21ba990d6c77d1ddf643104",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftTests/LegadoFixtureTests.swift",
+      "bytes": 996,
+      "lines": 22,
+      "sha256": "510bee93ea312e2eb04f5610078d8bbb5823472023175958246e2bb0236841ed",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftTests/LegadoIndexSyntaxTests.swift",
+      "bytes": 4447,
+      "lines": 103,
+      "sha256": "bbc469e98d54715904f14b4c33cb1d400d610a3dbffd1276560c1297c0708e16",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftTests/LegadoJavaCompatibilityTests.swift",
+      "bytes": 23365,
+      "lines": 457,
+      "sha256": "880336c54536b19982aa07865688c42f76a1b323fc7dfa7deea03e76c7398953",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftTests/LegadoJavaScriptCompatibilityTests.swift",
+      "bytes": 19263,
+      "lines": 413,
+      "sha256": "dec71287d3aaa7b2a04a09b134d6e82bf3dbac25ea7c836a51a46bfe97ed3029",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftTests/LegadoNativeBridgeTests.swift",
+      "bytes": 26402,
+      "lines": 506,
+      "sha256": "538e9f524435f276fa352b8706746ed638238c990ab0efe463413bfb7444ad92",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftTests/LegadoSourceCapabilityMatrixTests.swift",
+      "bytes": 10326,
+      "lines": 232,
+      "sha256": "10aaaede19c5a66b76bf4d5e71fb2136326e88b90d630566b109341cc918a768",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftTests/LegadoStage10CompatibilityTests.swift",
+      "bytes": 12003,
+      "lines": 199,
+      "sha256": "241ce85af716afb46e0694e172b189cb1cefbe525b997f481426f4a8e7e4d01c",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftTests/LegadoStage18CompatibilityTests.swift",
+      "bytes": 11572,
+      "lines": 226,
+      "sha256": "498a767e3801224d520781818faeaa341a29329139b370f4139445e4f0f240ab",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftTests/LegadoStage25CompatibilityTests.swift",
+      "bytes": 19022,
+      "lines": 441,
+      "sha256": "7e75a648a0a7083e8a4dfd8d5bccc81caed445fd7a4b57650e30dc3156e98375",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftTests/LegadoStage29CompatibilityTests.swift",
+      "bytes": 12688,
+      "lines": 248,
+      "sha256": "da3e8624cedd590905ec52dedfe1347b5b13d75bb1d00fd24d7b392579f61838",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftTests/LegadoStage9CompatibilityTests.swift",
+      "bytes": 10119,
+      "lines": 160,
+      "sha256": "1d8c878378f6ac2be6b06e5842fb4f495135ef51f7a00b184664e884825591bc",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftTests/LightweightHTTPMessageTests.swift",
+      "bytes": 3227,
+      "lines": 70,
+      "sha256": "4ed27813fdb16c1013c6060c9ebd0166926fe76e85cdfb9552b2228d4a599f20",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftTests/LocalComicBookParserTests.swift",
+      "bytes": 7120,
+      "lines": 122,
+      "sha256": "2e14fa9141d835a5dd689767d97547f8683d227ab7138002c4deb31f8b04e585",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftTests/LocalEPUBBookParserTests.swift",
+      "bytes": 16554,
+      "lines": 226,
+      "sha256": "2b9133ff44a11a571b58a2009011e7a86096595c02d0652f88ebb5c98a3dcebd",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftTests/LocalTextBookParserTests.swift",
+      "bytes": 1842,
+      "lines": 48,
+      "sha256": "a7f1bf604e3b324cce97c1944724686ea31563311fc41a4bbbaf9f9080ee1a44",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftTests/LocalTxtSmartDividerTests.swift",
+      "bytes": 4289,
+      "lines": 106,
+      "sha256": "330dadf1e042daf1ee035d7987760e821c572458310d857917fb05a3b7fb9dd9",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftTests/LocalVoiceLibraryTests.swift",
+      "bytes": 1836,
+      "lines": 42,
+      "sha256": "2810cce7016a4a02f10a5cab5da148b820cd11a451e6965eaf33469088bb8c03",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftTests/NativeBookGestureProbeTests.swift",
+      "bytes": 1473,
+      "lines": 37,
+      "sha256": "aed898f1e7b3a0d86bde31769d76e9acd924e2d55357fb73e495e1eaaadfa300",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftTests/OkHttp3BridgeTests.swift",
+      "bytes": 2309,
+      "lines": 67,
+      "sha256": "2a0fb1bb1f711c13211473fa10505da9f9ecfe928a673af8b666823e5884ee25",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftTests/OnboardingClassicBookTests.swift",
+      "bytes": 3000,
+      "lines": 75,
+      "sha256": "82520613c889cf408e75b2c16a827b3d004517713391b99eb3dcd451c434874e",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftTests/OrderedReadingPersistenceTests.swift",
+      "bytes": 12534,
+      "lines": 218,
+      "sha256": "fb74c6570e0377b5455a87edb56e8019a9a7189a5624c8a576b1d28baf26a07b",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftTests/PayActionTests.swift",
+      "bytes": 12752,
+      "lines": 311,
+      "sha256": "ca5f8db14709b8d5c844e88d69f25621c0111044ea12f34d1657d7fe55b21b65",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftTests/PrivateBankSourceTests.swift",
+      "bytes": 3387,
+      "lines": 70,
+      "sha256": "3ddee8da3cf73b1cc669d40ebf570506ae0467156744af1735988707223bc319",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftTests/PurifyRuleStoreTests.swift",
+      "bytes": 3559,
+      "lines": 90,
+      "sha256": "bd1914671ece0d9c6fbc3bd071538853131ed8d5c0da0e788ca830366547ea6f",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftTests/QimaoSignatureTests.swift",
+      "bytes": 2230,
+      "lines": 51,
+      "sha256": "d18ba9855c275bb38c821d5de3c6445628bd8b597844c3c1d0b4baf8f0fda02b",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftTests/RSSArticleContentCacheStoreTests.swift",
+      "bytes": 3452,
+      "lines": 61,
+      "sha256": "7b5427f29f357c249e008fe116b0bef01dd8a92a14cbbc9868752b982af4d621",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftTests/RSSArticleStateStoreTests.swift",
+      "bytes": 4215,
+      "lines": 84,
+      "sha256": "f3bbd161616c89ff0764cb9ec6382b6c48ca14bc52a1fdeebadae0c8fc5def1b",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftTests/RSSFeedCacheStoreTests.swift",
+      "bytes": 2258,
+      "lines": 42,
+      "sha256": "e7283e2aee5a21146170e8f2b7a25fce541e52fe19ce9743a0a99c3e2385b8c6",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftTests/RSSFeedParserTests.swift",
+      "bytes": 6312,
+      "lines": 140,
+      "sha256": "a833e79e6e81a0228f1fa54387191f77df9674a0728b88b48bc61304f9b94ece",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftTests/ReaderAutomationPolicyTests.swift",
+      "bytes": 14531,
+      "lines": 378,
+      "sha256": "5e30e7802a440fe612515e388f54b49e9905a3442442ffa000b549f098589056",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftTests/ReaderBackgroundPickerTests.swift",
+      "bytes": 2365,
+      "lines": 50,
+      "sha256": "122d566348b6145b8cc5f23c926fbd74e8118e9c8679cd24cbc881cd8a0c4c6d",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftTests/ReaderBindingTests.swift",
+      "bytes": 9154,
+      "lines": 128,
+      "sha256": "08437716a19aa2662ff807f388eb8bdad61ec48a78fa0952e3234db0c884faf8",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftTests/ReaderChapterWindowPolicyTests.swift",
+      "bytes": 14100,
+      "lines": 388,
+      "sha256": "d8f1a42a54677886ec506340c467510460ef5c37317ec92c83aed2035dca3bf8",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftTests/ReaderControlsMaterialTests.swift",
+      "bytes": 9109,
+      "lines": 160,
+      "sha256": "83164ece3cb60729a84870027a78291b6c0fdb10d7334b84184a0141f1c2e791",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftTests/ReaderCoverSettlePolicyTests.swift",
+      "bytes": 2144,
+      "lines": 78,
+      "sha256": "42b196b955e538bff6aef36df21b283cbd142ebf8c70bf1926af66c6c5a1818c",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftTests/ReaderCoverTeardownTests.swift",
+      "bytes": 10087,
+      "lines": 242,
+      "sha256": "ef67edc8a388fc38c4de26c9967bec946dfbfe89df46f3d0c43267725e003218",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftTests/ReaderExitSwipeTests.swift",
+      "bytes": 13442,
+      "lines": 242,
+      "sha256": "0a17c181a37edf7426b87d3b3a92e7840d51cf8e8c721288fbcb3ce4f116989f",
+      "review": "partial",
+      "latest_scope": "本次收敛路径复核：真实HTTP边界/搜索焦点及导航/普通与减动效返回/独立定向验证；原生尚待验证，不扩大既有整文件审查状态。",
+      "review_scope": "读取/修改挂载、原 delegate、延后窗口回归；其余用例仅先前片段，不冒充全读。",
+      "reviewed_at_utc": "2026-11-06T14:34:06.009794+00:00"
+    },
+    {
+      "path": "SourceReadSwiftTests/ReaderFrameRateSamplerTests.swift",
+      "bytes": 2903,
+      "lines": 70,
+      "sha256": "d9417e203be964d2de2ea75c84c77fa21d006933248faef2e905a870a6ea87c8",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftTests/ReaderImageStyleTests.swift",
+      "bytes": 11946,
+      "lines": 279,
+      "sha256": "f52bbb292ae6ef4338d869874adde4b61bf297e761a133502777ca5bd365a1f5",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftTests/ReaderModePositionRegressionTests.swift",
+      "bytes": 14439,
+      "lines": 256,
+      "sha256": "965c0936b3d7704d3c74a79929343fa8f3f9e89bd8fe3103ae109623c4dc2b78",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftTests/ReaderPageGeometryTests.swift",
+      "bytes": 6660,
+      "lines": 154,
+      "sha256": "e81f94ddbc6fbf184bd87dd1067341d38e0efa324b4d0ff0e88fdf62e1f111eb",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftTests/ReaderPageHostingTests.swift",
+      "bytes": 3398,
+      "lines": 67,
+      "sha256": "80031a5a957606f6c6b2c2c7ae8b1b0aa788bf01e1106040b7c09d86cbca5775",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftTests/ReaderPageLayoutEngineTests.swift",
+      "bytes": 9950,
+      "lines": 234,
+      "sha256": "23e71be520e581a509409bee1c18842e39a1b655356d88344f3cec47122bfabd",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftTests/ReaderPageSelectionTests.swift",
+      "bytes": 7920,
+      "lines": 199,
+      "sha256": "e467cef3218a9ed83e7b5f429d00cb937fd834adcff4d14751b367fb77a5c2e3",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftTests/ReaderPageTextBuilderTests.swift",
+      "bytes": 7580,
+      "lines": 171,
+      "sha256": "822d60d9e0da1ed214e8a5a82f72b176d46c6798ca0d9531d9a15b2dee3c56f1",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftTests/ReaderPagedNavigationPolicyTests.swift",
+      "bytes": 14171,
+      "lines": 401,
+      "sha256": "35ed30a0740b57b5b6556c0a2f130d50466c72b0dcf74566f1619ed67c12c07e",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftTests/ReaderPagedOverflowTests.swift",
+      "bytes": 6828,
+      "lines": 155,
+      "sha256": "60a5890a7e81116f68717066f70791efe8d80a32e01b23324baaa91c8cbdb28b",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftTests/ReaderPerformancePolicyTests.swift",
+      "bytes": 6281,
+      "lines": 128,
+      "sha256": "44e9f01ee8ec1601bb498f715976a0cb8566ef3eef8790129954cb538a021ce3",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftTests/ReaderPositionMappingTests.swift",
+      "bytes": 3584,
+      "lines": 76,
+      "sha256": "46d1c4345b63977ba8ecd3425dc461e770c21bcede1718e4a4eb73bb26009e0e",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftTests/ReaderPresentationLifecycleTests.swift",
+      "bytes": 1113,
+      "lines": 23,
+      "sha256": "a5bf3ad1a092b5d2757dbe51dc9446e3e0647f8e01f9f4434ec29f9df3d596b4",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftTests/ReaderRecovery119Tests.swift",
+      "bytes": 24634,
+      "lines": 422,
+      "sha256": "151259e0524f716a87f7b2a8e11236798e2978e9359574efe7607a214231cf27",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftTests/ReaderSafeAreaResolverTests.swift",
+      "bytes": 2783,
+      "lines": 79,
+      "sha256": "8688188c188a0499101601a6401349f2d0f78ded9de7077e322261e090402638",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftTests/ReaderScrollAnchorPolicyTests.swift",
+      "bytes": 3800,
+      "lines": 98,
+      "sha256": "ca7ccfa15ee283483d1fd18516e9490873eeb14cbfe739ba817dacd4633e7780",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftTests/ReaderScrollCadenceTests.swift",
+      "bytes": 14144,
+      "lines": 196,
+      "sha256": "fdd4e77ef872161a929d82f9fed08f9ffa908a55cbdfab32f18b502b9b2783bf",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftTests/ReaderScrollHeaderTests.swift",
+      "bytes": 3581,
+      "lines": 69,
+      "sha256": "589d3d72f51431a776d223c878e7d1d0d066ac3c5c1ba65cfcf95dfb43373648",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftTests/ReaderScrollPerfMeterTests.swift",
+      "bytes": 3893,
+      "lines": 93,
+      "sha256": "aef7b6155996d1d30a58c757ef78e457cc1403c65dcacc309d6d80a359c303a0",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftTests/ReaderScrollStabilityTests.swift",
+      "bytes": 3416,
+      "lines": 86,
+      "sha256": "f9c87b65a260b127ea6ba5b162d1a152e36706af06caacb87743e42128add251",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftTests/ReaderSettingsModelsTests.swift",
+      "bytes": 4212,
+      "lines": 92,
+      "sha256": "1406a231b0d288ffcee7528a54b8cc72743ba131be0d1bca702a7f5b2a7212ca",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftTests/ReaderSettingsStackTests.swift",
+      "bytes": 4611,
+      "lines": 83,
+      "sha256": "5029c4706acef7f9313a67ea997cc7d23e2109f5a735250aecf3abf6fd39d4a0",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftTests/ReaderTabChromeExitTests.swift",
+      "bytes": 6266,
+      "lines": 111,
+      "sha256": "b15c7c06c21a1f996c7194c35ad923c9fee8e772d653f8dbed0ea0d96803cfd3",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftTests/ReaderTocPerformanceTests.swift",
+      "bytes": 5143,
+      "lines": 95,
+      "sha256": "29f062ea072c8684e40a883054fbe7d7eab7cd222eb936a39457bbd72a2040ab",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftTests/ReaderWallpaperLayoutTests.swift",
+      "bytes": 1149,
+      "lines": 35,
+      "sha256": "7a8faedd1970427e595ae305eb5eb9167cc310c428d6cbc66b97a2c7ca3390fb",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftTests/ReaderWorkbenchVisualTests.swift",
+      "bytes": 4121,
+      "lines": 57,
+      "sha256": "e8d463522ac8e6873c2dba3c8fe5b61fed3a7985e537d02a6f8c8a9bafcca6f3",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftTests/ReadingHistoryStoreTests.swift",
+      "bytes": 2869,
+      "lines": 76,
+      "sha256": "61785c4c6b0bd71149271b308a3c7253e47b82c04332b9951d7d378ce6bad860",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftTests/ReadingNotesNavigationTests.swift",
+      "bytes": 4350,
+      "lines": 79,
+      "sha256": "59dac3211543c87ce2a5cae943187723e4be8fcae0a59c6b388cb8f97b2bcc40",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftTests/ReadingStatsSummaryTests.swift",
+      "bytes": 2799,
+      "lines": 74,
+      "sha256": "40ce4bdb775560c2aa5ab902bcf6b61d508d193275638305dbe0d176039b98b6",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftTests/RealSourceSearchRegressionTests.swift",
+      "bytes": 3838,
+      "lines": 86,
+      "sha256": "bb4b4e4ebb7c6985ef9cfe31b6caf9bf94a806cc8a0644ac4795f9ba8dee0e5d",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftTests/RealSourceTOCRegressionTests.swift",
+      "bytes": 4420,
+      "lines": 99,
+      "sha256": "4985e9bbd3119a68f55c15f33ee7460e645c76a34bdd168ab07f1c6c987a33c5",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftTests/Release110RegressionTests.swift",
+      "bytes": 12529,
+      "lines": 203,
+      "sha256": "39671a0b88958ad40015b20fe6d2501e402c0f37b394a0e8b9e37adcf9af87d3",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftTests/Release111RegressionTests.swift",
+      "bytes": 13985,
+      "lines": 220,
+      "sha256": "6db2abbe8ada73797ad9a84f39c26e9d5f1cff7c711ca18f5162448a12b3399f",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftTests/Release116VisualTests.swift",
+      "bytes": 10341,
+      "lines": 166,
+      "sha256": "60d7c6fa93d9bd19a837052ab46c282c70aa54585d5874558587baeddc22bac4",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftTests/Release117AppearanceTests.swift",
+      "bytes": 3936,
+      "lines": 75,
+      "sha256": "b7135b671f78f8737d54bbacbcea53bd1a233e0d2aecbed1a465952c00e96780",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftTests/Release117ChromeTests.swift",
+      "bytes": 3896,
+      "lines": 71,
+      "sha256": "30dab297e851c9ffc48a6fe04e9c8e24c98589fae685ada3906ee1ec53393ebf",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftTests/Release117ComicCompatibilityTests.swift",
+      "bytes": 6721,
+      "lines": 86,
+      "sha256": "5cba712af2ef56dfc6cf2d2e0a800d00f512fa6f203959af326c40170e0778d3",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftTests/Release117DetailTests.swift",
+      "bytes": 5053,
+      "lines": 81,
+      "sha256": "5167a9ea8279248dcec143ac32887db7e5e9060698324b991c48155b778bbac2",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftTests/Release117MotionSystemTests.swift",
+      "bytes": 9722,
+      "lines": 132,
+      "sha256": "241680390715de2d493df91552b0729d0fe583394863e9507c03c683e82cadf9",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftTests/Release117PolishTests.swift",
+      "bytes": 15152,
+      "lines": 235,
+      "sha256": "be0d3f8037861b6f69c51846ddd1d8ef3ec2c881ec6815ad351ab6a40b6c3f4f",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftTests/Release117PurificationTests.swift",
+      "bytes": 2742,
+      "lines": 46,
+      "sha256": "ac196867905c98805bfb418ab904d42e5b84659c681e4d6933caa1262d304a13",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftTests/Release117ReaderPersonalizationTests.swift",
+      "bytes": 2335,
+      "lines": 36,
+      "sha256": "8ff518a14c8a38844749883ab596c88e4065c9f9f779c23ac380beda1d97c540",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftTests/Release117ReadingHeroTests.swift",
+      "bytes": 9166,
+      "lines": 145,
+      "sha256": "a19ed64e0b9d206abd75aba3c2e7df98e72b0b5cdaa80781dfbad00ee513849e",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftTests/Release117SearchProjectionTests.swift",
+      "bytes": 3252,
+      "lines": 63,
+      "sha256": "7761a9a22f913b3605d53a92bc32eefa53eaf3bb53c32eaaf7a0ae383b9dee50",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftTests/Release117ThemeCollaborationTests.swift",
+      "bytes": 6997,
+      "lines": 115,
+      "sha256": "ee68c1e6e72907a9b4ae7e3c699ba3c8ed3d85873bb36b35afe75e3b06d3fc56",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftTests/Release117WallpaperEditorTests.swift",
+      "bytes": 6873,
+      "lines": 103,
+      "sha256": "b53c161e0acdae25f28294ee8512e42d8c010638e175f58099dac7119131f28c",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftTests/RemoteComicImageTests.swift",
+      "bytes": 26752,
+      "lines": 454,
+      "sha256": "0fb774226340fbc922ddbf74d83ebee494d9007bc9d39e238ef2b1850ef1cef9",
+      "review": "partial",
+      "latest_scope": "本次收敛路径复核：真实HTTP边界/搜索焦点及导航/普通与减动效返回/独立定向验证；原生尚待验证，不扩大既有整文件审查状态。",
+      "review_scope": "读取真实超限请求和 URLProtocol、响应边界与长图片段；其他图片复用路径未全读。",
+      "reviewed_at_utc": "2026-11-06T14:34:06.009794+00:00"
+    },
+    {
+      "path": "SourceReadSwiftTests/ResponseBodyDecoderTests.swift",
+      "bytes": 3809,
+      "lines": 86,
+      "sha256": "07e60b8f6158dd617c48fc517c357d1ae3e215846d4c02d9df98c4ce512b54ce",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftTests/ResponseFormatDetectorTests.swift",
+      "bytes": 4414,
+      "lines": 73,
+      "sha256": "171f44dc350f0bbcfeab09b174a0fe776d270854c8e85004ab1dba74f763ed73",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftTests/ResponseTextDecoderTests.swift",
+      "bytes": 985,
+      "lines": 31,
+      "sha256": "318714e30c2f2dd56d8790c7b671816094ceb0e79d4b587df2deb6461c7950d6",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftTests/RuleDirectiveParserTests.swift",
+      "bytes": 4803,
+      "lines": 115,
+      "sha256": "32333a640b86c0f4a7243644594abae9a51abb18c658cd178ef59e653f8099a0",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftTests/RuleEditorRoundTripTests.swift",
+      "bytes": 3798,
+      "lines": 88,
+      "sha256": "7289bd30718be891d093e8da0d63607922d8b433ba7472864c8cde0f5e3362b8",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftTests/RuleEditorValidatorTests.swift",
+      "bytes": 2500,
+      "lines": 66,
+      "sha256": "47f7059ea8777dc01e75458c136a59f73bef849663a48e0af6e36b8f50e3fd04",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftTests/RuleExtractorJSTests.swift",
+      "bytes": 3895,
+      "lines": 103,
+      "sha256": "b1ade54fc866ec556fb4766c9ed1bb50bf1d343bb80ee38fc9c71a214b59e9e9",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftTests/RuleOperatorSplitterTests.swift",
+      "bytes": 1540,
+      "lines": 38,
+      "sha256": "a50667dfebcd7d757a54048d0cd07a8caa20ce618c10b0d255e672ca066fd70a",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftTests/RulePreviewEvaluatorTests.swift",
+      "bytes": 3442,
+      "lines": 86,
+      "sha256": "6c60c5cfe90719205ebfb3c713414acdc76088094836c4a85cc2558929c61ad2",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftTests/RuleTransformParserTests.swift",
+      "bytes": 4377,
+      "lines": 114,
+      "sha256": "d3136cd3eca95490f9aba62bc18888bc471ab496bcea1f5e64ee63454573c2c6",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftTests/SakuraReaderPaletteTests.swift",
+      "bytes": 7078,
+      "lines": 144,
+      "sha256": "2818a33a6406ac06ee2aa05ca472d80b4f55c8e66b35929fc990878843ee2105",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftTests/SakuraThemeCatalogTests.swift",
+      "bytes": 561,
+      "lines": 17,
+      "sha256": "166be1611038ce76d8334c8770a2d00982f1ca36b90162b2b36282b11b811fa7",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftTests/SandboxEnvironmentTests.swift",
+      "bytes": 1256,
+      "lines": 30,
+      "sha256": "9799398880ac9b0d18f32bd0eaabeae0b6f43b442871f90c354a57c7d7202434",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftTests/SearchBookMatcherTests.swift",
+      "bytes": 4154,
+      "lines": 60,
+      "sha256": "faad1ee21be18e70623c4dac75093e92fcf15bcdaccccf3970f49307b54cfef8",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftTests/SearchResultFilterTests.swift",
+      "bytes": 1066,
+      "lines": 19,
+      "sha256": "b461ff5f48df3b512af8e2a5017ed73c0962e51e6a32179152df1add935325bc",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftTests/SearchResultParserExploreTests.swift",
+      "bytes": 3798,
+      "lines": 113,
+      "sha256": "95e0453ec9d6732d30f79a805f8ef94e5dde1e56bdbfe576079efe6d21e8e879",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftTests/SearchResultParserTests.swift",
+      "bytes": 4592,
+      "lines": 132,
+      "sha256": "93b9aa9bc7b7f8a4fcb96dc6cb64c538b3894e255750de984bea39fa415d010d",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftTests/SearchURLResolverTests.swift",
+      "bytes": 23473,
+      "lines": 512,
+      "sha256": "8228b7d60a9bdf0028efba1f9a11917da36dfbc1ac396e7ef149ed1a733c3f2d",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftTests/SmartWebArticleExtractorTests.swift",
+      "bytes": 1156,
+      "lines": 24,
+      "sha256": "f9234ef5433a93eca61e9ade81be0e4a745c985da89293c958d866999c9b66ea",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftTests/SourceBatchCheckCoordinatorTests.swift",
+      "bytes": 2346,
+      "lines": 53,
+      "sha256": "2c2c07dd4e74c0363d3dccd9476332f9ebfc5626e38e712b90b6833866a66a67",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftTests/SourceBatchDiagnosticRunnerTests.swift",
+      "bytes": 5068,
+      "lines": 97,
+      "sha256": "cf67ff7db3b80e5ec966578700380282bbce749feb134fd89f31fe06763c767f",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftTests/SourceCookieStoreTests.swift",
+      "bytes": 5445,
+      "lines": 133,
+      "sha256": "f9cb28896752637a29bf3c6c3937cdcb0fe57a4043874b930c39f32d0cdc8651",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftTests/SourceDiagnosticBatchReportTests.swift",
+      "bytes": 3951,
+      "lines": 90,
+      "sha256": "f42279f3f109052eadf6411dc36a969992feec5663ddda9472e625004983b31d",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftTests/SourceDiagnosticClassifierTests.swift",
+      "bytes": 3199,
+      "lines": 50,
+      "sha256": "1b49713850d9334e4cf1f17f4154f3242f388200b45f83e4f357b42bba583488",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftTests/SourceDiagnosticCorpusRegressionTests.swift",
+      "bytes": 11832,
+      "lines": 197,
+      "sha256": "e943c2fd57ea992eb51fc6c0af3bf24b6782240395baeb43c37a0194a41ffb93",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftTests/SourceDiagnosticHistoryStoreTests.swift",
+      "bytes": 1814,
+      "lines": 30,
+      "sha256": "276b93c0ed26aa567308a65e5ccdda5b7895007e68dd370bfb6f36d06f2246f6",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftTests/SourceDiagnosticRepairAdvisorTests.swift",
+      "bytes": 1585,
+      "lines": 41,
+      "sha256": "e414b53b41fbc90ced7d1cddc4531d77509b5b6ae9c55742cf8049fb26cbc4ee",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftTests/SourceDiagnosticReportExporterTests.swift",
+      "bytes": 6497,
+      "lines": 156,
+      "sha256": "1c3bd736fa57eb45481baa65840224e25aee4f973f3ebf63f67fafe6a3b8ec43",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftTests/SourceDiagnosticReportTests.swift",
+      "bytes": 2869,
+      "lines": 56,
+      "sha256": "690045127e393bd275c15517a3f5f91cf88ef421803ebdca2d8437ce3995871a",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftTests/SourceDynamicLoginTests.swift",
+      "bytes": 7102,
+      "lines": 115,
+      "sha256": "6b3ee6493ef36e260caffbfc67ac78c543312c23e4b39d4e2191af0fcc301fef",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftTests/SourceEngineBodyJSTests.swift",
+      "bytes": 13649,
+      "lines": 344,
+      "sha256": "54fbb09096b4f1f699036e000c17c7cf480c2cb6f3b80b756b13b1cc139d366b",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftTests/SourceEngineCLevelFixtureTests.swift",
+      "bytes": 9692,
+      "lines": 231,
+      "sha256": "630fe59276af932aa3d0dca5ee16ed3a780b4534d617e3833c9e0c40cd3f496c",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftTests/SourceEngineCompressedFixtureTests.swift",
+      "bytes": 5557,
+      "lines": 109,
+      "sha256": "07861c9ecd5602cfa109414fdae18fca15e87c78c9bab98332cfb05d45a396d6",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftTests/SourceEngineCryptoFixtureTests.swift",
+      "bytes": 10184,
+      "lines": 226,
+      "sha256": "26f01dbd307e6e6babe73a9b572bc93708940d336dc2a848bc8c8bddcf7b54b7",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftTests/SourceEngineDynamicAjaxFixtureTests.swift",
+      "bytes": 3275,
+      "lines": 70,
+      "sha256": "adb167e7b1c705c397d83d9ad44a6307aac9fa21557db5314be9c2ffa162d670",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftTests/SourceEngineDynamicTokenFixtureTests.swift",
+      "bytes": 5182,
+      "lines": 124,
+      "sha256": "6c5f84c8bdf8c7c40557932c41e545f4a5c5c5e15fc8e92f283849fe013821b3",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftTests/SourceEngineFixturePipelineTests.swift",
+      "bytes": 20871,
+      "lines": 401,
+      "sha256": "041e93e72da6fa1689008a7f34ca6797768c4247f84385c5a2a989005ad9dad3",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftTests/SourceEngineLegadoCorpusTests.swift",
+      "bytes": 10452,
+      "lines": 185,
+      "sha256": "32b550ea32e5342b4089cd348c2b9bc2f15c0876595590a527f0a54d81553e85",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftTests/SourceEngineMixedResponseFixtureTests.swift",
+      "bytes": 1978,
+      "lines": 45,
+      "sha256": "37beda10c666a463f78993cda54c9498b22919ba70ac4070797af3c315d37b3d",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftTests/SourceEngineNativeDirectiveTests.swift",
+      "bytes": 5220,
+      "lines": 121,
+      "sha256": "9cbc49c53978aae170f30bb35fc0eabca2fee71d26f5dc6e0c06b743c8b65037",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftTests/SourceEnginePerBookVariablesTests.swift",
+      "bytes": 4727,
+      "lines": 98,
+      "sha256": "e6c6980fba980ec2df7ebdc22ea525170bbd4742844b61f51b6d64464cbf61ab",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftTests/SourceEnginePersistentStateTests.swift",
+      "bytes": 3237,
+      "lines": 73,
+      "sha256": "c87fb0a5269adb2ea0a5de8536eed854a7859282ac8bae928ff1d2415c82dcd1",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftTests/SourceEngineStage18FixtureTests.swift",
+      "bytes": 25002,
+      "lines": 389,
+      "sha256": "3e8ec07a785c17d6354e168a9b4169ab534b86373d0c185dafd87f62c712c9b3",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftTests/SourceFlowEngineTests.swift",
+      "bytes": 20966,
+      "lines": 462,
+      "sha256": "953f82e5f7c3820e5590a79418168f831b1ed449c007d43cda3a4e8ca11d50da",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftTests/SourceHealthStoreTests.swift",
+      "bytes": 1236,
+      "lines": 33,
+      "sha256": "afe0107de34d9998a95ed5c60613969f22ec3c7488a5f36f077afd223ddb9844",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftTests/SourceImportDownloaderTests.swift",
+      "bytes": 13515,
+      "lines": 333,
+      "sha256": "d5655bfd18878deb072f10401437bb01dced49b487f63916d8e998c0e9a20a1c",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftTests/SourceImportLinkParserTests.swift",
+      "bytes": 3390,
+      "lines": 96,
+      "sha256": "141b02048ffdeff0c8ef45cba8b4ae606724eadad812534ae938d910adf9da1b",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftTests/SourceLoginFieldTests.swift",
+      "bytes": 3883,
+      "lines": 94,
+      "sha256": "dab6f26f1c1195e2d73d42f4baf1e026b74247d3f1c392e836ca0c2caba48b40",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftTests/SourceLoginURLResolverTests.swift",
+      "bytes": 2439,
+      "lines": 62,
+      "sha256": "cb7a5d0ef1ab86d576dbaa4606b8c90fea10b8202c96178ca0c9f432ab1fecd6",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftTests/SourceMetadataChainTests.swift",
+      "bytes": 17712,
+      "lines": 412,
+      "sha256": "e3907296de468db36314867ce9b54d9165cecd7060f786c69c49caa2bfbd0fa8",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftTests/SourceOrganizationTests.swift",
+      "bytes": 8961,
+      "lines": 151,
+      "sha256": "a41b84c3b76a07adccaae5ca6860960b7791dd231d291a6b95a3e4d4f9aefefd",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftTests/SourcePaginationURLIdentityTests.swift",
+      "bytes": 1347,
+      "lines": 25,
+      "sha256": "c0e7ca3ca377582020d4449047a2205b83d8163aa757a32d69ca18db5cf6fbba",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftTests/SourcePipelineTests.swift",
+      "bytes": 13855,
+      "lines": 266,
+      "sha256": "0b864f64a76fc36a43d817c0d0d58c509e777dfb8d22d3014cebd5160f785c44",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftTests/SourceRateLimiterTests.swift",
+      "bytes": 2666,
+      "lines": 68,
+      "sha256": "8281276ba42b6757aa77d7997f12709302f4929dad964fd7e0794825659a3de0",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftTests/SourceRequestBuilderDynamicStateTests.swift",
+      "bytes": 6462,
+      "lines": 148,
+      "sha256": "3d730cc8d6fb2836b32b0046680bd08eae6f4a5c3df76ba2006c5c22a7f009e2",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftTests/SourceRowsCorpusProbeTests.swift",
+      "bytes": 9218,
+      "lines": 167,
+      "sha256": "2399a6981d82347e0636d11218cfacc63941ae5fb6e7ead7dae12cbcaab8690d",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftTests/SourceRuleDraftStoreTests.swift",
+      "bytes": 3387,
+      "lines": 83,
+      "sha256": "4d79aaecc037925862c4b9a2a634b639568bc33e18a7969b06003af5519c67ea",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftTests/SourceSearchURLProbeTests.swift",
+      "bytes": 5964,
+      "lines": 119,
+      "sha256": "38e4ce85eae02f158dd76aa042fabe87fa18bd8fe4cebf4ed37d433b3ed99024",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftTests/SourceStoreTests.swift",
+      "bytes": 31653,
+      "lines": 809,
+      "sha256": "605eb9730483b583870a265c5e856be6a0c33c6c01d18d152a0147b85175eb7c",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftTests/SourceSwitchCacheStoreTests.swift",
+      "bytes": 2930,
+      "lines": 74,
+      "sha256": "4be6d07b1d3259bf53a1465d105d4fdf4f4092d189bc04436388099769b2b398",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftTests/SourceTocCorpusProbeTests.swift",
+      "bytes": 6305,
+      "lines": 137,
+      "sha256": "29a9b1cc85b7d8bbde268eac66466a2833a82609b7c2f2d2df4cf824a29b5446",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftTests/SourceURLBodyJSRegressionTests.swift",
+      "bytes": 12190,
+      "lines": 170,
+      "sha256": "591bbb95aa440430e22ef7d3ee30b6d3ad408e2e853c15b186252e80aa14c850",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftTests/SourceURLDirectiveTests.swift",
+      "bytes": 10813,
+      "lines": 250,
+      "sha256": "210d64966010d06e27df4f2555e339a13363b46f7add731ae02cf35964203905",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftTests/SourceURLResolutionTests.swift",
+      "bytes": 2560,
+      "lines": 61,
+      "sha256": "ddb2ac547af1bf2823239572d18728d3043cc7337144f8718ad5664639252b07",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftTests/Stage33ReaderExperienceTests.swift",
+      "bytes": 10657,
+      "lines": 222,
+      "sha256": "f30e336fb5a02ee2cecb94793960a632ed93a2f841f4d79709de8a5c03f8b377",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftTests/Stage34ComprehensiveParityTests.swift",
+      "bytes": 8310,
+      "lines": 214,
+      "sha256": "e7a6cd2fcfc9949f0bedb744697bc6e2ccc33660ea9dbe211c334547814c65fd",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftTests/StubURLProtocol.swift",
+      "bytes": 1596,
+      "lines": 45,
+      "sha256": "a5bfad6139390d09b74fe4139e558cd45fb6225c296ecbaa133adbe84df9c7b1",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftTests/TabChromeRegressionTests.swift",
+      "bytes": 5300,
+      "lines": 116,
+      "sha256": "9a153d0f05cd9370daf911aad2374fcd0939cb57d3b67bdf5d691cff23f8292d",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftTests/TestFixtureSupport.swift",
+      "bytes": 1646,
+      "lines": 35,
+      "sha256": "103e4d4826f20ef8f1b1684ee17ed29f17a40cb2d21dce5cb38a8ee8eb7b22f4",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftTests/VerificationCodeCoordinatorTests.swift",
+      "bytes": 7639,
+      "lines": 215,
+      "sha256": "0c9b4f4d8aba57aa9599e84c1d5cf57d3a35e1a9d7055b9fb0bd0bd2db55996e",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftTests/VideoContentParserTests.swift",
+      "bytes": 3500,
+      "lines": 68,
+      "sha256": "65c808b306dc2bdd6b388b8fddd0f2c3065c9cc4830864951208d1d116ef6d5f",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftTests/WebDAVSyncServiceTests.swift",
+      "bytes": 4619,
+      "lines": 123,
+      "sha256": "b7295d5710de5d151e26e62fc0a2051dfd3349162e8b69a52dced574a6219796",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftTests/WebReaderDocumentTests.swift",
+      "bytes": 18887,
+      "lines": 385,
+      "sha256": "a5cf6eb9bab4cf817e19a379103c6e3d2013e5df2ed2f0bf59e34f5041813bc3",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftTests/WebViewFallbackHeuristicTests.swift",
+      "bytes": 3965,
+      "lines": 93,
+      "sha256": "65f9fcbc60fdfdd44b39f11839b408ecff203e39f0f99f64a96f25529101f971",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftTests/WebViewResourceSniffingTests.swift",
+      "bytes": 4300,
+      "lines": 101,
+      "sha256": "124680a7bb0835ce7f3f0b78e530c09146f29feaf4173c42f6f60bec886303b0",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftTests/WebsiteSourceFamilyInferenceTests.swift",
+      "bytes": 9665,
+      "lines": 133,
+      "sha256": "cae93e94dbfc6e96c8b84f63454f14bd8d6a6c27f5c6780f332e096626a68983",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftTests/WebsiteSourceInferenceTests.swift",
+      "bytes": 4454,
+      "lines": 60,
+      "sha256": "360e9ef9c746a086e01696e76018e15274efa734c2e3178235904cf606c70f5e",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftTests/XbsBookSourceAdapterTests.swift",
+      "bytes": 6663,
+      "lines": 169,
+      "sha256": "a7f9bffc224205898bb3f943dc4a67bca821859ff4acf95cbc3ac0e1e424e9ed",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftUITests/ComicPagingBoundaryUITests.swift",
+      "bytes": 9278,
+      "lines": 175,
+      "sha256": "5e43ebce4c5f4761868fc1cfa2ebb41bf42de245b9ee08a457cccacfa19e6874",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftUITests/ComicReaderFlowUITests.swift",
+      "bytes": 11034,
+      "lines": 210,
+      "sha256": "42f242775b11b6582ff3a44ebca06b8604ac3eeecde6160350c052bd41a02047",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwiftUITests/FloatingReadingDeskUITests.swift",
+      "bytes": 30036,
+      "lines": 538,
+      "sha256": "6026775c87bc2ecdc73bf3ffaffd20a2fab6469a00b86824a1131505be19f94c",
+      "review": "pending",
+      "reviewed_at_utc": "2026-11-06T14:34:06.009794+00:00",
+      "latest_scope": "本次收敛路径复核：真实HTTP边界/搜索焦点及导航/普通与减动效返回/独立定向验证；原生尚待验证，不扩大既有整文件审查状态。"
+    },
+    {
+      "path": "SourceReadSwiftUITests/ReaderSettingsFlowUITests.swift",
+      "bytes": 11580,
+      "lines": 238,
+      "sha256": "bf1dcf09cafc7ef29f79f03c542892457402b39f473b5c00d3b59425a5249aba",
+      "review": "pending"
+    },
+    {
+      "path": "scripts/boot_native_simulator.py",
+      "bytes": 2847,
+      "lines": 62,
+      "sha256": "14a6ca93c872f5e8c7d1e13ee050a44c7781777b7ea2ad92756be5b6f97689ce",
+      "review": "pending"
+    },
+    {
+      "path": "scripts/build_reading_desk_font.py",
+      "bytes": 3013,
+      "lines": 65,
+      "sha256": "924e6549e8b25a492eb4ad586e956113f6ea89e281df6e6cb9d10c67f6e3e159",
+      "review": "pending"
+    },
+    {
+      "path": "scripts/collect_reader_visuals.py",
+      "bytes": 4115,
+      "lines": 83,
+      "sha256": "b63bec854fd9558cb8d1f59ab9785dcc44919c222a24918e7478b0db64f68790",
+      "review": "pending"
+    },
+    {
+      "path": "scripts/deliver_reader_quality.py",
+      "bytes": 6006,
+      "lines": 110,
+      "sha256": "0bd34566ab0c2038fef8b6b4794f7fb427a3913ca5a9374a70f1f5e9008bf1ab",
+      "review": "pending"
+    },
+    {
+      "path": "scripts/floating_desk_ci.py",
+      "bytes": 3708,
+      "lines": 75,
+      "sha256": "08bfbac4d6c52ae15ba607b92f80412fd4cf1657474636ea6399efbc0aa19cef",
+      "review": "pending"
+    },
+    {
+      "path": "scripts/motion_lab_ci.py",
+      "bytes": 3821,
+      "lines": 74,
+      "sha256": "8ed8aa67b89e027a7e039b3ab9930f649d0224c71c4707ecbaac7d8f39598989",
+      "review": "pending"
+    },
+    {
+      "path": "scripts/motion_lab_visual_evidence.py",
+      "bytes": 5810,
+      "lines": 129,
+      "sha256": "8ebc513ed87e271e4666189e6040a20bed1789d4d64e59011dbf94b10b33ec22",
+      "review": "pending"
+    },
+    {
+      "path": "scripts/prepare_model_image.py",
+      "bytes": 3063,
+      "lines": 63,
+      "sha256": "563247991cac1275e2a5d991196a6320d46d55dd06e6fd29095152c74c84ab99",
+      "review": "pending"
+    },
+    {
+      "path": "scripts/prepare_reading_lab_covers.py",
+      "bytes": 3151,
+      "lines": 58,
+      "sha256": "dbcdaae999c0721c50c1d893160ea4133bc6f66f177d0a7eb811d2500a871c25",
+      "review": "pending"
+    },
+    {
+      "path": "scripts/prepare_rex_reference_assets.py",
+      "bytes": 3344,
+      "lines": 55,
+      "sha256": "8d9bc06e5d0cf5a19a8cdd441bb9c9477ba6ca12f8d543ce462579ba6bd3b368",
+      "review": "pending"
+    },
+    {
+      "path": "scripts/reader_controls_ci.py",
+      "bytes": 2535,
+      "lines": 52,
+      "sha256": "18d6732e84dc1e2c3caa19d44c68fd1ac09b2ea9f6d7fe77fb633e6b42db79a4",
+      "review": "pending"
+    },
+    {
+      "path": "scripts/reader_motion_ci.py",
+      "bytes": 4992,
+      "lines": 106,
+      "sha256": "a433cca1aa930b76cfd75022c840c4631e1a003c2fc733e337a4d62ec6134224",
+      "review": "pending"
+    },
+    {
+      "path": "scripts/release117_closeout_intake.py",
+      "bytes": 2257,
+      "lines": 35,
+      "sha256": "b5224a7d86805e359a2e9f451ff2efa72f01a37176a9318cfde6ab68f34da327",
+      "review": "pending"
+    },
+    {
+      "path": "scripts/release117_comic_evidence.py",
+      "bytes": 2715,
+      "lines": 36,
+      "sha256": "88ea0ba1f97cf56cca0b10a5731af2c3fa1f82aacb622628e4f205148bbfd4d3",
+      "review": "pending"
+    },
+    {
+      "path": "scripts/release117_comic_report.py",
+      "bytes": 2164,
+      "lines": 28,
+      "sha256": "93fabd83ec9fac32fdcf55a30ce66136410cacf68e6119e6308a45da466592e5",
+      "review": "pending"
+    },
+    {
+      "path": "scripts/release117_save_closeout_checkpoint.py",
+      "bytes": 1493,
+      "lines": 20,
+      "sha256": "f0efa57687c07c92bfc1792fe191fc410627b0e338ee8613304f75caa5ca3403",
+      "review": "pending"
+    },
+    {
+      "path": "scripts/release117_shelve_theme17.py",
+      "bytes": 2310,
+      "lines": 35,
+      "sha256": "e72ea93f4bc589fd1dfe1d6134df62f365634d89cf8826644de24945f030127a",
+      "review": "pending"
+    },
+    {
+      "path": "scripts/release117_theme_audit.py",
+      "bytes": 1786,
+      "lines": 29,
+      "sha256": "a0090aa662688619cc7c9056d5212afe450e8c30c78fd2c2bf2def54f8332157",
+      "review": "pending"
+    },
+    {
+      "path": "scripts/release117_theme_checkpoint.py",
+      "bytes": 1086,
+      "lines": 18,
+      "sha256": "712379dc120b88a207e4a0b724b0601a48c1e4a8eb44560307d2648084611187",
+      "review": "pending"
+    },
+    {
+      "path": "scripts/release117_theme_pages.py",
+      "bytes": 2200,
+      "lines": 33,
+      "sha256": "8ec12c811b719e31ddbceb8dfbc53486abcda5d11fc7a3312f2cb82121fcf338",
+      "review": "pending"
+    },
+    {
+      "path": "scripts/release117_theme_resume.py",
+      "bytes": 1115,
+      "lines": 22,
+      "sha256": "27709674e013f05df1ab7096cd4875c8da5361580550908b697cf82512180ba3",
+      "review": "pending"
+    },
+    {
+      "path": "scripts/release117_theme_rows.py",
+      "bytes": 2148,
+      "lines": 35,
+      "sha256": "115a28c0eec66a20a93610563519f1b468081ade98186fa10b147b957c821862",
+      "review": "pending"
+    },
+    {
+      "path": "scripts/release117_workbuddy_probe.py",
+      "bytes": 7132,
+      "lines": 119,
+      "sha256": "50a11df3e6b2164af8ae832bb01cfbaabb52e2019767236f541622e1c8dc78ba",
+      "review": "pending"
+    },
+    {
+      "path": "scripts/review_motion_inputs.py",
+      "bytes": 5856,
+      "lines": 99,
+      "sha256": "fc5953cc9d8610ab920ecee9b603820dee91543e0c16fa2c321f2da4c4f081fb",
+      "review": "pending"
+    },
+    {
+      "path": "scripts/symbolicate_reader_crash.py",
+      "bytes": 3519,
+      "lines": 75,
+      "sha256": "4d670647e033dd1ec9f8241e67b16f518500efeca0b2114a29f3b6f033460045",
+      "review": "pending"
+    },
+    {
+      "path": "scripts/test_book_passage_log.py",
+      "bytes": 4433,
+      "lines": 80,
+      "sha256": "9d986ec0eeb9710c15a893093deb61b669710eed76896dd479db6cf21c64d944",
+      "review": "pending"
+    },
+    {
+      "path": "scripts/test_boot_native_simulator.py",
+      "bytes": 5044,
+      "lines": 94,
+      "sha256": "6486e55f30885636d96beb66a874003363dc137460187da65ebed9f8b7dfc5b8",
+      "review": "pending"
+    },
+    {
+      "path": "scripts/test_floating_desk_scope.py",
+      "bytes": 8583,
+      "lines": 122,
+      "sha256": "f4278d61fec65ebe21c432d483fa6caca797ac7323d2fc8b0e58dd856f388d0c",
+      "review": "pending"
+    },
+    {
+      "path": "scripts/test_model_image_limit.py",
+      "bytes": 2140,
+      "lines": 49,
+      "sha256": "e561e497e274845bc5cf94f26cdf10a6a2ea12baab9b7a1597066d8d8d66e747",
+      "review": "pending"
+    },
+    {
+      "path": "scripts/test_perf_minimal_scope.py",
+      "bytes": 13740,
+      "lines": 207,
+      "sha256": "6c3faf0df4dc43eab9a410c1c45368cbd05aa3b42f6408033d73025fa6709611",
+      "review": "pending"
+    },
+    {
+      "path": "scripts/test_product_quality_scope.py",
+      "bytes": 15481,
+      "lines": 237,
+      "sha256": "06cbb73f3d26f70beac3a8cbf6c2e53238c46d57488213c01c4050adbc8aa0c2",
+      "review": "pending"
+    },
+    {
+      "path": "scripts/test_reader_controls_workflow.py",
+      "bytes": 6012,
+      "lines": 97,
+      "sha256": "a7a2bd822ad2dd009af43f3b42aea0e35c0cd99d29303be4f0312ee64e38974c",
+      "review": "pending"
+    },
+    {
+      "path": "scripts/test_reader_jump_reports.py",
+      "bytes": 18587,
+      "lines": 269,
+      "sha256": "d3db85d4ecfb6356a7445b30fd2b47039acaeecd3f496f045e9f05be4c6182dd",
+      "review": "pending"
+    },
+    {
+      "path": "scripts/test_reader_quality_snapshot.py",
+      "bytes": 1327,
+      "lines": 30,
+      "sha256": "f3b2d27af1655823befa9d455a853d494c8288897f9e11820e7297083fc9a7b8",
+      "review": "pending"
+    },
+    {
+      "path": "scripts/verify_book_passage_log.py",
+      "bytes": 3555,
+      "lines": 74,
+      "sha256": "82aa5bd3b1d0aaf4a32e2bfd07be20002c7367b591142c7cf50fde439f86ab19",
+      "review": "pending"
+    },
+    {
+      "path": "scripts/verify_motion_lab_ipa.py",
+      "bytes": 3842,
+      "lines": 65,
+      "sha256": "fb40ee58ec526dee31f2ab747730119842389380161f95e9372a49cf62574b03",
+      "review": "pending"
+    },
+    {
+      "path": "scripts/verify_reader_quality.py",
+      "bytes": 7148,
+      "lines": 137,
+      "sha256": "bf8e7c48eda989065a9ae601daf474c3df2ff7e202e7f950282b881e7150bcd9",
+      "review": "pending"
+    },
+    {
+      "path": "SourceReadSwift/Core/Network/SourceRedirectPolicy.swift",
+      "bytes": 3219,
+      "lines": 62,
+      "sha256": "fc605e3358dc30e6ddc090835b52152f925fc5ac652db24306e1a11e2f663dbf",
+      "review": "reviewed",
+      "review_scope": "完整新策略：origin/default port、跨源正文、凭据隔离、请求方法及 Referrer；原生待验。",
+      "latest_scope": "完整新策略：origin/default port、跨源正文、凭据隔离、请求方法及 Referrer；原生待验。",
+      "reviewer": "root",
+      "reviewed_at_utc": "2026-11-06T11:32:18.810647+00:00"
+    },
+    {
+      "path": "SourceReadSwiftTests/SourceRequestTransportTests.swift",
+      "bytes": 12072,
+      "lines": 225,
+      "sha256": "4783f258ee14eacca31710c3918dc9756137d17bceb277ed04039e16217f966c",
+      "review": "reviewed",
+      "review_scope": "完整隔离 URLProtocol 套件，覆盖 12 类传输边界；未原生运行。",
+      "latest_scope": "完整隔离 URLProtocol 套件，覆盖 12 类传输边界；未原生运行。",
+      "reviewer": "root",
+      "reviewed_at_utc": "2026-11-06T11:32:18.810647+00:00"
+    },
+    {
+      "path": "SourceReadSwiftTests/HomeLayoutEvidenceTests.swift",
+      "bytes": 6388,
+      "lines": 112,
+      "sha256": "2cbb7323b54a41ba04eab60529174c7512cadb8a37d59f30bf4806044c8433b3",
+      "review": "reviewed",
+      "review_scope": "完整挂载/封面预解码/销毁复核；补大字滚动到书架尾的截图要求，未原生生成。",
+      "latest_scope": "完整挂载/封面预解码/销毁复核；补大字滚动到书架尾的截图要求，未原生生成。",
+      "reviewer": "root",
+      "reviewed_at_utc": "2026-11-06T11:32:18.810647+00:00"
+    },
+    {
+      "path": "SourceReadSwift/Shared/DesignSystem/ComicImageTransport.swift",
+      "bytes": 6571,
+      "lines": 153,
+      "sha256": "2358f188a74f480fe4e5dc77cf122e20c21c2d8904f12fe5c487a4a1374d4f5a",
+      "review": "reviewed",
+      "latest_scope": "按用户三点方案复核和修补返回/漫画原始配置/任务长度/转场等待；原生未验，不扩大原review范围。",
+      "review_scope": "通读 delegate 分块/取消/一次完成；补响应头声明长度策略。真实超限分支原生待验。",
+      "reviewed_at_utc": "2026-11-06T13:16:38.304959+00:00"
+    },
+    {
+      "path": "SourceReadSwiftTests/HeldComicHTTPServer.swift",
+      "review": "reviewed",
+      "bytes": 6335,
+      "lines": 156,
+      "sha256": "429337d573fcbda8aa3001df768922ed3252d8bcf6a4b6f8729cab9c23c14721",
+      "reviewed_at_utc": "2026-11-06T14:34:06.009794+00:00",
+      "latest_scope": "本次收敛路径复核：真实HTTP边界/搜索焦点及导航/普通与减动效返回/独立定向验证；原生尚待验证，不扩大既有整文件审查状态。"
+    },
+    {
+      "path": "scripts/verify_reader_diagnostics.py",
+      "review": "reviewed",
+      "bytes": 8077,
+      "lines": 146,
+      "sha256": "5e1f010861b017745c318d0213d095e45c0f9985b491f33a31df6707fb4eacec",
+      "reviewed_at_utc": "2026-11-06T14:34:06.009794+00:00",
+      "latest_scope": "本次收敛路径复核：真实HTTP边界/搜索焦点及导航/普通与减动效返回/独立定向验证；原生尚待验证，不扩大既有整文件审查状态。"
+    },
+    {
+      "path": ".github/workflows/reader-diagnostics.yml",
+      "review": "reviewed",
+      "bytes": 5035,
+      "lines": 92,
+      "sha256": "095e5c18119e74683f0b941a02b8cad079922e061fb2dbce92946f37e1a003ec",
+      "reviewed_at_utc": "2026-11-06T14:34:06.009794+00:00",
+      "latest_scope": "本次收敛路径复核：真实HTTP边界/搜索焦点及导航/普通与减动效返回/独立定向验证；原生尚待验证，不扩大既有整文件审查状态。"
+    }
+  ],
+  "updated_at_utc": "2026-11-06T14:34:06.009794+00:00"
+}

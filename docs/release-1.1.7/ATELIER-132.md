@@ -1,4 +1,19 @@
-# build 132 · 阅读工坊与滚动连续性（候选，未验收）
+# build 132 · 阅读工坊与滚动连续性（CI 已通过，真机待验收）
+
+## 最新修复 · 2026-11-03
+- DELIVERED CI-PASSED TEST CANDIDATE84a43d6d35553fae970bbcfeebe00c416edd3576,1.1.7/build132: regular1255171876231605tests/2originalskips/0fail and native26125517186960182tests/0fail; unsigned125517187074success, both exact-head workflows41515294394/41515294404SUCCESS. Actually viewed7regular+7native route captures at320light/390bamboo+dark: no obvious overflow/wrong route/repeated old preview; themes images show loading only. Desktop C:/Users/Edc21/Desktop/SourceReadSwift-1.1.7-build132-84a43d6-unsigned.ipa,26802434bytes,SHA256f746d5b0da537106ffeb69dc7a2d8c62f80d93518fd28367da9ab8597c535e61. CRC/plist132/minOS16/arm64/iPhoneOS/fonts/ProMotion option/app+dSYM UUIDbaa45b65-bf61-3a0e-8fe1-d784b6210e74/postcopyhash passed. Old131 and463UNVERIFIED hash-preserved. ExactheadDELIVERY/IPA_VERIFICATION/IMPLEMENTATION_CHANGESET and repoATELIER-132-84a43d6-DELIVERY.json saved. No signing/install, userfont, gesture/interactive return, intermittent crash or120fps acceptance claimed; user13Pro retest required. Current dirty docs/backups retained. Monitor reason complete after successful delivery, not paused for failure; startup paused and12manual/no gateway unchanged.
+- Latest candidate84a43d6d35553fae970bbcfeebe00c416edd3576 PUSHED:13605c5 repairs isolated JSContext report/clock boundaries (original cancellation assertions retained plus no-old-report check);757b6f5 changes ONLY pretest cold migration readiness budget180→600sec (observed completion187sec; product60sec timeout unchanged);84a43d6 catches create timeout inside same two-attempt boundary, never shuts down unknown IDs. Each policy change has RED→GREEN reproduction, all8 local tests/py_compile/Swiftsyntax/diff checks passed. Exact-head iOS41515294394(native125517186960/regular125517187623) and unsigned41515294404(job125517187074) now running. Old efe0 actual once-only native retry125508279831 completed PRETEST failure on BOTH cold migrations,101345byte log SHA256a9988f092cd7117c0b705920e400d45554c155b03a9fea386a826cfa9960c17b preserved; no third blind rerun. New push happened AFTER retry completed, not cancelled. Current application/test/script changes committed; previous dirty docs/backups preserved. New exactHEAD evidence CHANGESET/INFRA_RED_GREEN/FOLLOW_UP; no new Desktop delivery or native/FPS acceptance yet. Monitor ACTIVE, repair rather than auto-pause.
+- efe0 full125499623618 completed1605tests/2originalskips/1failure: Release110RegressionTests.swift:38 isolated JSContext extracts jump functions without the newly used reportVisiblePosition/performance fixture dependencies (ReferenceError). BOTH real WebKit long-paragraph restore and held-rAF regressions PASSED; no >500/<=600 assertion changed. Added local VM reproduction RED, supplied explicit test-only report/clock boundaries, retained original cancellation assertions and added no-old-visible assertion; local2tests GREEN plusSwift syntax/diff check. Pending UNCOMMITTED paths: SourceReadSwiftTests/Release110RegressionTests.swift and scripts/test_reader_jump_reports.py. Native sameHEAD rerun actually requested HTTP201 at19:44:14Z, job125508279831; hold commit/push until retry completes so it is not cancelled again. Then commit/push isolated fixture repair, plus evidence-driven bootstrap fix if retry repeats. Do not mistake mirror regular job125508281715 for a rerun.
+- efe0 native125499624142 PRETEST failure: bootstatus remains in LaunchServices data migration, first boot180sec timeout, cleanup30sec timeout, second simctl create30sec timeout outside retry boundary. GUI launch dependency is gone; not a product assertion or proof reader fix failed. Original63003byte log SHA256d7bc8e16a01ace2400e07365a0e00b2c566a90135aefe5b6ffad79d71e17cb2b and native boot artifact retained under exactHEAD/NATIVE_FAILURE_ATTEMPT1.json. SameHEAD reruns0; regular sibling still testing, wait for workflow completion then retry only failed native job once before lifecycle repair. Keep ACTIVE; no test skipped or timeout changed.
+- 当前 efe0b9ebbbe1460efb54f53a45fe2f26ea09c543：跳转确认后立即提交真实位置，不依赖动画帧；手势滚动仍按120ms节流。保留原生字符位置断言，并增加暂停rAF的原生回归。Windows真实DOM复现先红后绿，旧跳转不能覆盖新跳转；不等于WebKit/真机通过。
+- CI启动不再等待Simulator图形进程；simctl与180秒启动门槛未放宽。GUI挂起策略回归先红后绿，3项通过。按要求已对旧e477请求一次同HEAD重跑；新源码需新HEAD全量验证，旧重跑不冒充验证结果。
+- 新CI41509738870/41509739061继续运行；已授权遇错修复重测，不自动暂停。
+
+## 当前检查点 · 2026-11-03（覆盖下方历史候选状态）
+- 当前源码 e4779318c5b2ab1580be6b251304ed3588cba5c8，包含测试桥接返回值及工坊重复预览修复；原断言和经典设置保留。
+- 全量 XCTest 仍运行；native26 在应用测试前的 Simulator GUI 启动超时，同 HEAD job 重跑尚为 0 次，待同一 workflow 的全量任务结束后重跑一次，再按证据修基础设施。
+- 同 HEAD 设备包已编译、下载并校验 CRC/plist/132/minOS16/arm64/字体/ProMotion 与匹配 dSYM UUID，最终验收未完成；桌面暂有旧463 UNVERIFIED测试包，131未覆盖。证据见准确 HEAD 的 IPA_CANDIDATE.json。
+- 自动任务 ACTIVE：可修复失败继续修复和重测，不自动暂停，不跳测试，不将模拟器或截图当真机性能结果。
 
 ## 范围与设计决定
 - 保留紧凑的真实最近阅读卡片，移除重复“继续阅读”按钮；整张卡片作为系统转场来源，按压不再先缩小书封。阅读恢复阶段显示同一本书的书衣与已存章节，不添加人为延迟。
@@ -35,3 +50,8 @@
 用户可在工坊切换经典设置；首页原经典紧凑方案保留。源码按对应 feature commit 执行 git revert，不 reset，不删除原有修改。最后已验证桌面 IPA 仍为 build 131 / 4a5d62d，保持不覆盖。
 
 启动页实验暂停；12 用户手测，不调用网关。原 dirty 文档/备份保留。
+
+## 最终候选 CI 检查 · 2026-11-03
+- HEAD463647d590a8667acdbcbf35b8f2ec98c57d8b58 的 regular125412915494：1604 tests，2 原有 skip，1 unexpected failure。唯一失败位于 ReaderScrollCadenceTests.swift:28，安装 scrollTo spy 的 JavaScript 表达式返回 Function，WKWebView 报 WKErrorDomain5 unsupported result type；尚未执行追加/前插断言，不能据此宣称惯性回归通过。
+- 位置更新排版缓存回归、字体5项、装帧6项、设置工坊4项与旧设置栈3项通过。截图已产生但未做最终视觉验收。native26仍为测试前启动超时，无实际重跑。
+- 原始日志及 SHA 在精确HEAD的 FAILURE.json；heartbeat build132-ci-ipa 已 PAUSED。本次只更新证据和文档，不改源码、不提交、不复制新IPA到桌面。旧131保留。后续修测试脚本返回值时保留所有断言，不跳过用例，再重跑双运行时与视觉检查。

@@ -1,0 +1,5390 @@
+[
+  {
+    "file": "SourceReadSwift/App/RootTabView.swift",
+    "parse_errors": []
+  },
+  {
+    "file": "SourceReadSwift/Core/Reader/SmartWebArticleExtractor.swift",
+    "parse_errors": []
+  },
+  {
+    "file": "SourceReadSwift/Core/Rules/PurifyRuleEvaluator.swift",
+    "parse_errors": []
+  },
+  {
+    "file": "SourceReadSwift/Core/Storage/PurifyRuleStore.swift",
+    "parse_errors": []
+  },
+  {
+    "file": "SourceReadSwift/Core/Storage/SourceStore.swift",
+    "parse_errors": []
+  },
+  {
+    "file": "SourceReadSwift/Features/Discover/BookDetailView.swift",
+    "parse_errors": []
+  },
+  {
+    "file": "SourceReadSwift/Features/Discover/DiscoverView.swift",
+    "parse_errors": [
+      {
+        "line": 1606,
+        "type": "ERROR",
+        "sample": ")"
+      },
+      {
+        "line": 1649,
+        "type": "ERROR",
+        "sample": "guard activeSearchID"
+      },
+      {
+        "line": 1649,
+        "type": "ERROR",
+        "sample": "else"
+      },
+      {
+        "line": 1650,
+        "type": "ERROR",
+        "sample": "await publishIfNeeded"
+      },
+      {
+        "line": 1650,
+        "type": ")",
+        "sample": ""
+      }
+    ]
+  },
+  {
+    "file": "SourceReadSwift/Features/Discover/SmartWebReaderView.swift",
+    "parse_errors": []
+  },
+  {
+    "file": "SourceReadSwift/Features/Discover/SourceWritingView.swift",
+    "parse_errors": [
+      {
+        "line": 275,
+        "type": "ERROR",
+        "sample": "final class LightweightHTTPServer: ObservableObject {\r\n    @Published var isRunning = false\r\n    @Published var isStarti"
+      },
+      {
+        "line": 275,
+        "type": "ERROR",
+        "sample": ": ObservableObject {\r\n    @Published var isRunning = false\r\n    @Published var isStarting = false\r\n    @Published var po"
+      },
+      {
+        "line": 998,
+        "type": "ERROR",
+        "sample": "return #\"\"\"\r\n<!DOCTYPE html>\r\n<html lang=\"zh-CN\">\r\n<head>\r\n  <meta charset=\"UTF-8\">\r\n  <meta name=\"viewport\" content=\"wi"
+      },
+      {
+        "line": 1534,
+        "type": "ERROR",
+        "sample": "tro"
+      },
+      {
+        "line": 1535,
+        "type": "ERROR",
+        "sample": "tocUrl"
+      },
+      {
+        "line": 1535,
+        "type": "ERROR",
+        "sample": "a"
+      },
+      {
+        "line": 1535,
+        "type": "ERROR",
+        "sample": "contains(完整目录)"
+      },
+      {
+        "line": 1537,
+        "type": "ERROR",
+        "sample": "r"
+      },
+      {
+        "line": 1537,
+        "type": "ERROR",
+        "sample": "leToc"
+      },
+      {
+        "line": 1538,
+        "type": "ERROR",
+        "sample": "chapterL"
+      },
+      {
+        "line": 1538,
+        "type": "ERROR",
+        "sample": "chapterL"
+      },
+      {
+        "line": 1538,
+        "type": "ERROR",
+        "sample": "a\","
+      },
+      {
+        "line": 1538,
+        "type": "ERROR",
+        "sample": "a"
+      },
+      {
+        "line": 1539,
+        "type": "ERROR",
+        "sample": "\"chapterName\":"
+      },
+      {
+        "line": 1539,
+        "type": "ERROR",
+        "sample": ","
+      },
+      {
+        "line": 1540,
+        "type": "ERROR",
+        "sample": "\"chapterUrl\":"
+      },
+      {
+        "line": 1541,
+        "type": "ERROR",
+        "sample": "},"
+      },
+      {
+        "line": 1542,
+        "type": "ERROR",
+        "sample": ":"
+      },
+      {
+        "line": 1543,
+        "type": "ERROR",
+        "sample": "\"content\":"
+      },
+      {
+        "line": 1543,
+        "type": "ERROR",
+        "sample": ","
+      },
+      {
+        "line": 1544,
+        "type": "ERROR",
+        "sample": "\"nextContentUrl\":"
+      },
+      {
+        "line": 1546,
+        "type": "ERROR",
+        "sample": "}"
+      },
+      {
+        "line": 1547,
+        "type": "ERROR",
+        "sample": "'source"
+      },
+      {
+        "line": 1547,
+        "type": "ERROR",
+        "sample": "'source"
+      },
+      {
+        "line": 1547,
+        "type": "ERROR",
+        "sample": "'"
+      },
+      {
+        "line": 1547,
+        "type": "ERROR",
+        "sample": "'"
+      },
+      {
+        "line": 1548,
+        "type": "ERROR",
+        "sample": "'已填入标准书源模版'"
+      },
+      {
+        "line": 1548,
+        "type": "ERROR",
+        "sample": "'已填入标准书源模版'"
+      },
+      {
+        "line": 1549,
+        "type": "ERROR",
+        "sample": "}\r\n\r\n    async"
+      },
+      {
+        "line": 1551,
+        "type": "ERROR",
+        "sample": "pushToPhone"
+      },
+      {
+        "line": 1551,
+        "type": "ERROR",
+        "sample": "pushToPhone"
+      },
+      {
+        "line": 1552,
+        "type": "ERROR",
+        "sample": "text"
+      },
+      {
+        "line": 1552,
+        "type": "ERROR",
+        "sample": "'source"
+      },
+      {
+        "line": 1552,
+        "type": "ERROR",
+        "sample": "'source"
+      },
+      {
+        "line": 1552,
+        "type": "ERROR",
+        "sample": "'"
+      },
+      {
+        "line": 1552,
+        "type": "ERROR",
+        "sample": "'"
+      },
+      {
+        "line": 1554,
+        "type": "ERROR",
+        "sample": "'请先输入书源 JSON',"
+      },
+      {
+        "line": 1554,
+        "type": "ERROR",
+        "sample": "'请先输入书源 JSON'"
+      },
+      {
+        "line": 1559,
+        "type": "ERROR",
+        "sample": "catch"
+      },
+      {
+        "line": 1560,
+        "type": "ERROR",
+        "sample": "'JSON 格式校验失败: '"
+      },
+      {
+        "line": 1560,
+        "type": "ERROR",
+        "sample": "'JSON 格式校验失败"
+      },
+      {
+        "line": 1560,
+        "type": "ERROR",
+        "sample": "'"
+      },
+      {
+        "line": 1560,
+        "type": "ERROR",
+        "sample": "e"
+      },
+      {
+        "line": 1560,
+        "type": "ERROR",
+        "sample": "e"
+      },
+      {
+        "line": 1565,
+        "type": "ERROR",
+        "sample": "res"
+      },
+      {
+        "line": 1565,
+        "type": "ERROR",
+        "sample": "'"
+      },
+      {
+        "line": 1565,
+        "type": "ERROR",
+        "sample": "'"
+      },
+      {
+        "line": 1565,
+        "type": "ERROR",
+        "sample": "sources"
+      },
+      {
+        "line": 1565,
+        "type": "ERROR",
+        "sample": "sources"
+      },
+      {
+        "line": 1565,
+        "type": "ERROR",
+        "sample": "', {\r\n          method: 'POST'"
+      },
+      {
+        "line": 1565,
+        "type": "ERROR",
+        "sample": "'"
+      },
+      {
+        "line": 1566,
+        "type": "ERROR",
+        "sample": "'POST'"
+      },
+      {
+        "line": 1567,
+        "type": "ERROR",
+        "sample": "'Content"
+      },
+      {
+        "line": 1567,
+        "type": "ERROR",
+        "sample": "'Content"
+      },
+      {
+        "line": 1567,
+        "type": "ERROR",
+        "sample": "': 'application"
+      },
+      {
+        "line": 1567,
+        "type": "ERROR",
+        "sample": "'"
+      },
+      {
+        "line": 1567,
+        "type": "ERROR",
+        "sample": "'application"
+      },
+      {
+        "line": 1567,
+        "type": "ERROR",
+        "sample": "'"
+      },
+      {
+        "line": 1567,
+        "type": "ERROR",
+        "sample": "'"
+      },
+      {
+        "line": 1569,
+        "type": "ERROR",
+        "sample": "}"
+      },
+      {
+        "line": 1570,
+        "type": "ERROR",
+        "sample": "data"
+      },
+      {
+        "line": 1570,
+        "type": "ERROR",
+        "sample": "data"
+      },
+      {
+        "line": 1572,
+        "type": "ERROR",
+        "sample": "'🎉 推送成功: '"
+      },
+      {
+        "line": 1572,
+        "type": "ERROR",
+        "sample": "'🎉 推送成功"
+      },
+      {
+        "line": 1572,
+        "type": "ERROR",
+        "sample": "'"
+      },
+      {
+        "line": 1572,
+        "type": "ERROR",
+        "sample": "|| '书源已保存'"
+      },
+      {
+        "line": 1572,
+        "type": "ERROR",
+        "sample": "'书源已保存'"
+      },
+      {
+        "line": 1574,
+        "type": "ERROR",
+        "sample": "'"
+      },
+      {
+        "line": 1574,
+        "type": "ERROR",
+        "sample": "'"
+      },
+      {
+        "line": 1574,
+        "type": "ERROR",
+        "sample": ": '"
+      },
+      {
+        "line": 1574,
+        "type": "ERROR",
+        "sample": "'"
+      },
+      {
+        "line": 1574,
+        "type": "ERROR",
+        "sample": "|| '未知错误'"
+      },
+      {
+        "line": 1574,
+        "type": "ERROR",
+        "sample": "'未知错误'"
+      },
+      {
+        "line": 1576,
+        "type": "ERROR",
+        "sample": "catch"
+      },
+      {
+        "line": 1577,
+        "type": "ERROR",
+        "sample": "'请求失败: '"
+      },
+      {
+        "line": 1577,
+        "type": "ERROR",
+        "sample": "'请求失败"
+      },
+      {
+        "line": 1577,
+        "type": "ERROR",
+        "sample": "'"
+      },
+      {
+        "line": 1577,
+        "type": "ERROR",
+        "sample": "e"
+      },
+      {
+        "line": 1577,
+        "type": "ERROR",
+        "sample": "e"
+      },
+      {
+        "line": 1581,
+        "type": "ERROR",
+        "sample": "transferToDebug"
+      },
+      {
+        "line": 1581,
+        "type": "ERROR",
+        "sample": "transferToDeb"
+      },
+      {
+        "line": 1581,
+        "type": "ERROR",
+        "sample": "g"
+      },
+      {
+        "line": 1582,
+        "type": "ERROR",
+        "sample": "text"
+      },
+      {
+        "line": 1582,
+        "type": "ERROR",
+        "sample": "'source"
+      },
+      {
+        "line": 1582,
+        "type": "ERROR",
+        "sample": "'source"
+      },
+      {
+        "line": 1582,
+        "type": "ERROR",
+        "sample": "'"
+      },
+      {
+        "line": 1582,
+        "type": "ERROR",
+        "sample": "'"
+      },
+      {
+        "line": 1584,
+        "type": "ERROR",
+        "sample": "'请先在编辑器编写或载入书源',"
+      },
+      {
+        "line": 1584,
+        "type": "ERROR",
+        "sample": "'请先在编辑器编写或载入书源'"
+      },
+      {
+        "line": 1589,
+        "type": "ERROR",
+        "sample": "'debugger'"
+      },
+      {
+        "line": 1589,
+        "type": "ERROR",
+        "sample": "'deb"
+      },
+      {
+        "line": 1589,
+        "type": "ERROR",
+        "sample": "gger'"
+      },
+      {
+        "line": 1590,
+        "type": "ERROR",
+        "sample": "'已载入书源到调试控制台'"
+      },
+      {
+        "line": 1590,
+        "type": "ERROR",
+        "sample": "'已载入书源到调试控制台'"
+      },
+      {
+        "line": 1591,
+        "type": "ERROR",
+        "sample": "catch"
+      },
+      {
+        "line": 1592,
+        "type": "ERROR",
+        "sample": "'JSON 格式无效: '"
+      },
+      {
+        "line": 1592,
+        "type": "ERROR",
+        "sample": "'JSON 格式无效"
+      },
+      {
+        "line": 1592,
+        "type": "ERROR",
+        "sample": "'"
+      },
+      {
+        "line": 1592,
+        "type": "ERROR",
+        "sample": "e"
+      },
+      {
+        "line": 1592,
+        "type": "ERROR",
+        "sample": "e"
+      },
+      {
+        "line": 1597,
+        "type": "ERROR",
+        "sample": "async function runDebug() {\r\n      const code = document.getElementById('source-code').value.trim();\r\n      if (!code) {"
+      },
+      {
+        "line": 1597,
+        "type": "ERROR",
+        "sample": "runDebug"
+      },
+      {
+        "line": 1597,
+        "type": "ERROR",
+        "sample": "r"
+      },
+      {
+        "line": 1597,
+        "type": "ERROR",
+        "sample": "nDeb"
+      },
+      {
+        "line": 1597,
+        "type": "ERROR",
+        "sample": "g"
+      },
+      {
+        "line": 1598,
+        "type": "ERROR",
+        "sample": "code"
+      },
+      {
+        "line": 1598,
+        "type": "ERROR",
+        "sample": "'source"
+      },
+      {
+        "line": 1598,
+        "type": "ERROR",
+        "sample": "'source"
+      },
+      {
+        "line": 1598,
+        "type": "ERROR",
+        "sample": "'"
+      },
+      {
+        "line": 1598,
+        "type": "ERROR",
+        "sample": "'"
+      },
+      {
+        "line": 1600,
+        "type": "ERROR",
+        "sample": "'请先在“书源编辑”中输入待调试的书源代码',"
+      },
+      {
+        "line": 1600,
+        "type": "ERROR",
+        "sample": "'请先在“书源编辑”中输入待调试的书源代码'"
+      },
+      {
+        "line": 1601,
+        "type": "ERROR",
+        "sample": "'editor'"
+      },
+      {
+        "line": 1601,
+        "type": "ERROR",
+        "sample": "'editor'"
+      },
+      {
+        "line": 1607,
+        "type": "ERROR",
+        "sample": "parsed"
+      },
+      {
+        "line": 1609,
+        "type": "ERROR",
+        "sample": "catch"
+      },
+      {
+        "line": 1610,
+        "type": "ERROR",
+        "sample": "'书源 JSON 解析失败: '"
+      },
+      {
+        "line": 1610,
+        "type": "ERROR",
+        "sample": "'书源 JSON 解析失败"
+      },
+      {
+        "line": 1610,
+        "type": "ERROR",
+        "sample": "'"
+      },
+      {
+        "line": 1610,
+        "type": "ERROR",
+        "sample": "e"
+      },
+      {
+        "line": 1610,
+        "type": "ERROR",
+        "sample": "e"
+      },
+      {
+        "line": 1614,
+        "type": "ERROR",
+        "sample": "step"
+      },
+      {
+        "line": 1614,
+        "type": "ERROR",
+        "sample": "step"
+      },
+      {
+        "line": 1614,
+        "type": "ERROR",
+        "sample": "'debug"
+      },
+      {
+        "line": 1614,
+        "type": "ERROR",
+        "sample": "'deb"
+      },
+      {
+        "line": 1614,
+        "type": "ERROR",
+        "sample": "g"
+      },
+      {
+        "line": 1614,
+        "type": "ERROR",
+        "sample": "'"
+      },
+      {
+        "line": 1614,
+        "type": "ERROR",
+        "sample": "'"
+      },
+      {
+        "line": 1615,
+        "type": "ERROR",
+        "sample": "keyword"
+      },
+      {
+        "line": 1615,
+        "type": "ERROR",
+        "sample": "keyword"
+      },
+      {
+        "line": 1615,
+        "type": "ERROR",
+        "sample": "'debug"
+      },
+      {
+        "line": 1615,
+        "type": "ERROR",
+        "sample": "'deb"
+      },
+      {
+        "line": 1615,
+        "type": "ERROR",
+        "sample": "g"
+      },
+      {
+        "line": 1615,
+        "type": "ERROR",
+        "sample": "'"
+      },
+      {
+        "line": 1615,
+        "type": "ERROR",
+        "sample": "'"
+      },
+      {
+        "line": 1615,
+        "type": "ERROR",
+        "sample": "|| '剑来'"
+      },
+      {
+        "line": 1615,
+        "type": "ERROR",
+        "sample": "'剑来'"
+      },
+      {
+        "line": 1616,
+        "type": "ERROR",
+        "sample": "'debug"
+      },
+      {
+        "line": 1616,
+        "type": "ERROR",
+        "sample": "'deb"
+      },
+      {
+        "line": 1616,
+        "type": "ERROR",
+        "sample": "g"
+      },
+      {
+        "line": 1616,
+        "type": "ERROR",
+        "sample": "'"
+      },
+      {
+        "line": 1616,
+        "type": "ERROR",
+        "sample": "'"
+      },
+      {
+        "line": 1618,
+        "type": "ERROR",
+        "sample": "runBtn"
+      },
+      {
+        "line": 1618,
+        "type": "ERROR",
+        "sample": "r"
+      },
+      {
+        "line": 1618,
+        "type": "ERROR",
+        "sample": "nBtn"
+      },
+      {
+        "line": 1618,
+        "type": "ERROR",
+        "sample": "'btn"
+      },
+      {
+        "line": 1618,
+        "type": "ERROR",
+        "sample": "'btn"
+      },
+      {
+        "line": 1618,
+        "type": "ERROR",
+        "sample": "'"
+      },
+      {
+        "line": 1618,
+        "type": "ERROR",
+        "sample": "'"
+      },
+      {
+        "line": 1619,
+        "type": "ERROR",
+        "sample": "terminal"
+      },
+      {
+        "line": 1619,
+        "type": "ERROR",
+        "sample": "term"
+      },
+      {
+        "line": 1619,
+        "type": "ERROR",
+        "sample": "al"
+      },
+      {
+        "line": 1619,
+        "type": "ERROR",
+        "sample": "'debug"
+      },
+      {
+        "line": 1619,
+        "type": "ERROR",
+        "sample": "'deb"
+      },
+      {
+        "line": 1619,
+        "type": "ERROR",
+        "sample": "g"
+      },
+      {
+        "line": 1619,
+        "type": "ERROR",
+        "sample": "'"
+      },
+      {
+        "line": 1619,
+        "type": "ERROR",
+        "sample": "'"
+      },
+      {
+        "line": 1620,
+        "type": "ERROR",
+        "sample": "pill"
+      },
+      {
+        "line": 1620,
+        "type": "ERROR",
+        "sample": "pill"
+      },
+      {
+        "line": 1620,
+        "type": "ERROR",
+        "sample": "'debug"
+      },
+      {
+        "line": 1620,
+        "type": "ERROR",
+        "sample": "'deb"
+      },
+      {
+        "line": 1620,
+        "type": "ERROR",
+        "sample": "g"
+      },
+      {
+        "line": 1620,
+        "type": "ERROR",
+        "sample": "'"
+      },
+      {
+        "line": 1620,
+        "type": "ERROR",
+        "sample": "'"
+      },
+      {
+        "line": 1621,
+        "type": "ERROR",
+        "sample": "durationLabel"
+      },
+      {
+        "line": 1621,
+        "type": "ERROR",
+        "sample": "d"
+      },
+      {
+        "line": 1621,
+        "type": "ERROR",
+        "sample": "rationLabel"
+      },
+      {
+        "line": 1621,
+        "type": "ERROR",
+        "sample": "'debug"
+      },
+      {
+        "line": 1621,
+        "type": "ERROR",
+        "sample": "'deb"
+      },
+      {
+        "line": 1621,
+        "type": "ERROR",
+        "sample": "g"
+      },
+      {
+        "line": 1621,
+        "type": "ERROR",
+        "sample": "'"
+      },
+      {
+        "line": 1621,
+        "type": "ERROR",
+        "sample": "'"
+      },
+      {
+        "line": 1624,
+        "type": "ERROR",
+        "sample": "'"
+      },
+      {
+        "line": 1624,
+        "type": "ERROR",
+        "sample": "'"
+      },
+      {
+        "line": 1624,
+        "type": "ERROR",
+        "sample": "'"
+      },
+      {
+        "line": 1624,
+        "type": "ERROR",
+        "sample": "'"
+      },
+      {
+        "line": 1625,
+        "type": "ERROR",
+        "sample": "'pill pill"
+      },
+      {
+        "line": 1625,
+        "type": "ERROR",
+        "sample": "'pill pill"
+      },
+      {
+        "line": 1625,
+        "type": "ERROR",
+        "sample": "';\r\n      pill.innerText = '运行中'"
+      },
+      {
+        "line": 1625,
+        "type": "ERROR",
+        "sample": "'"
+      },
+      {
+        "line": 1626,
+        "type": "ERROR",
+        "sample": "'运行中'"
+      },
+      {
+        "line": 1627,
+        "type": "ERROR",
+        "sample": "'"
+      },
+      {
+        "line": 1627,
+        "type": "ERROR",
+        "sample": "'"
+      },
+      {
+        "line": 1627,
+        "type": "ERROR",
+        "sample": "span class"
+      },
+      {
+        "line": 1627,
+        "type": "ERROR",
+        "sample": "span"
+      },
+      {
+        "line": 1627,
+        "type": "ERROR",
+        "sample": "正在将书源发送至手机端引擎执行实时解析"
+      },
+      {
+        "line": 1627,
+        "type": "ERROR",
+        "sample": "正在将书源发送至手机端引擎执行实时解析"
+      },
+      {
+        "line": 1627,
+        "type": "ERROR",
+        "sample": ">';\r\n\r\n      // Hide results container initially\r\n      document.getElementById('debug-results-container').style.display"
+      },
+      {
+        "line": 1627,
+        "type": "ERROR",
+        "sample": "'"
+      },
+      {
+        "line": 1630,
+        "type": "ERROR",
+        "sample": "'debug"
+      },
+      {
+        "line": 1630,
+        "type": "ERROR",
+        "sample": "'deb"
+      },
+      {
+        "line": 1630,
+        "type": "ERROR",
+        "sample": "g"
+      },
+      {
+        "line": 1630,
+        "type": "ERROR",
+        "sample": "'"
+      },
+      {
+        "line": 1630,
+        "type": "ERROR",
+        "sample": "'"
+      },
+      {
+        "line": 1630,
+        "type": "ERROR",
+        "sample": "'none'"
+      },
+      {
+        "line": 1633,
+        "type": "ERROR",
+        "sample": "payload"
+      },
+      {
+        "line": 1634,
+        "type": "ERROR",
+        "sample": "sourceObj"
+      },
+      {
+        "line": 1635,
+        "type": "ERROR",
+        "sample": "keyword"
+      },
+      {
+        "line": 1636,
+        "type": "ERROR",
+        "sample": "step"
+      },
+      {
+        "line": 1637,
+        "type": "ERROR",
+        "sample": "bookUrl:"
+      },
+      {
+        "line": 1637,
+        "type": "ERROR",
+        "sample": ","
+      },
+      {
+        "line": 1638,
+        "type": "ERROR",
+        "sample": "chapterUrl:"
+      },
+      {
+        "line": 1639,
+        "type": "ERROR",
+        "sample": "}"
+      },
+      {
+        "line": 1642,
+        "type": "ERROR",
+        "sample": "controller"
+      },
+      {
+        "line": 1642,
+        "type": "ERROR",
+        "sample": "controller"
+      },
+      {
+        "line": 1642,
+        "type": "ERROR",
+        "sample": "AbortController"
+      },
+      {
+        "line": 1642,
+        "type": "ERROR",
+        "sample": "AbortController"
+      },
+      {
+        "line": 1643,
+        "type": "ERROR",
+        "sample": "timeoutId"
+      },
+      {
+        "line": 1643,
+        "type": "ERROR",
+        "sample": "timeo"
+      },
+      {
+        "line": 1643,
+        "type": "ERROR",
+        "sample": "tId"
+      },
+      {
+        "line": 1643,
+        "type": "!",
+        "sample": ""
+      },
+      {
+        "line": 1645,
+        "type": "ERROR",
+        "sample": "res"
+      },
+      {
+        "line": 1645,
+        "type": "ERROR",
+        "sample": "res"
+      },
+      {
+        "line": 1645,
+        "type": "ERROR",
+        "sample": "'"
+      },
+      {
+        "line": 1645,
+        "type": "ERROR",
+        "sample": "'"
+      },
+      {
+        "line": 1645,
+        "type": "ERROR",
+        "sample": "source"
+      },
+      {
+        "line": 1645,
+        "type": "ERROR",
+        "sample": "source"
+      },
+      {
+        "line": 1645,
+        "type": "ERROR",
+        "sample": "', {\r\n          method: 'POST'"
+      },
+      {
+        "line": 1645,
+        "type": "ERROR",
+        "sample": "'"
+      },
+      {
+        "line": 1646,
+        "type": "ERROR",
+        "sample": "'POST'"
+      },
+      {
+        "line": 1647,
+        "type": "ERROR",
+        "sample": "'Content"
+      },
+      {
+        "line": 1647,
+        "type": "ERROR",
+        "sample": "'Content"
+      },
+      {
+        "line": 1647,
+        "type": "ERROR",
+        "sample": "': 'application"
+      },
+      {
+        "line": 1647,
+        "type": "ERROR",
+        "sample": "'"
+      },
+      {
+        "line": 1647,
+        "type": "ERROR",
+        "sample": "'application"
+      },
+      {
+        "line": 1647,
+        "type": "ERROR",
+        "sample": "'"
+      },
+      {
+        "line": 1647,
+        "type": "ERROR",
+        "sample": "'"
+      },
+      {
+        "line": 1650,
+        "type": "ERROR",
+        "sample": "}"
+      },
+      {
+        "line": 1653,
+        "type": "ERROR",
+        "sample": "data"
+      },
+      {
+        "line": 1653,
+        "type": "ERROR",
+        "sample": "data"
+      },
+      {
+        "line": 1654,
+        "type": "ERROR",
+        "sample": "'耗时: '"
+      },
+      {
+        "line": 1654,
+        "type": "ERROR",
+        "sample": "'耗时"
+      },
+      {
+        "line": 1654,
+        "type": "ERROR",
+        "sample": "'"
+      },
+      {
+        "line": 1654,
+        "type": "ERROR",
+        "sample": "'ms';\r\n\r\n        "
+      },
+      {
+        "line": 1654,
+        "type": "ERROR",
+        "sample": "'ms'"
+      },
+      {
+        "line": 1658,
+        "type": "ERROR",
+        "sample": "'log"
+      },
+      {
+        "line": 1658,
+        "type": "ERROR",
+        "sample": "'log"
+      },
+      {
+        "line": 1658,
+        "type": "ERROR",
+        "sample": "';\r\n            if (line.includes('✅') || line.includes('成功')) cls += ' log-success';\r\n            if (line.includes('❌'"
+      },
+      {
+        "line": 1658,
+        "type": "ERROR",
+        "sample": "'"
+      },
+      {
+        "line": 1659,
+        "type": "ERROR",
+        "sample": "'"
+      },
+      {
+        "line": 1659,
+        "type": "ERROR",
+        "sample": "'"
+      },
+      {
+        "line": 1659,
+        "type": "ERROR",
+        "sample": "'"
+      },
+      {
+        "line": 1659,
+        "type": "ERROR",
+        "sample": "'"
+      },
+      {
+        "line": 1659,
+        "type": "ERROR",
+        "sample": "'成功'"
+      },
+      {
+        "line": 1659,
+        "type": "ERROR",
+        "sample": "'成功'"
+      },
+      {
+        "line": 1659,
+        "type": "ERROR",
+        "sample": "cls"
+      },
+      {
+        "line": 1659,
+        "type": "ERROR",
+        "sample": "cls"
+      },
+      {
+        "line": 1659,
+        "type": "ERROR",
+        "sample": "' log"
+      },
+      {
+        "line": 1659,
+        "type": "ERROR",
+        "sample": "' log"
+      },
+      {
+        "line": 1659,
+        "type": "ERROR",
+        "sample": "'"
+      },
+      {
+        "line": 1660,
+        "type": "ERROR",
+        "sample": "'"
+      },
+      {
+        "line": 1660,
+        "type": "ERROR",
+        "sample": "'"
+      },
+      {
+        "line": 1660,
+        "type": "ERROR",
+        "sample": "'"
+      },
+      {
+        "line": 1660,
+        "type": "ERROR",
+        "sample": "'"
+      },
+      {
+        "line": 1660,
+        "type": "ERROR",
+        "sample": "'失败'"
+      },
+      {
+        "line": 1660,
+        "type": "ERROR",
+        "sample": "'失败'"
+      },
+      {
+        "line": 1660,
+        "type": "ERROR",
+        "sample": "'异常'"
+      },
+      {
+        "line": 1660,
+        "type": "ERROR",
+        "sample": "'异常'"
+      },
+      {
+        "line": 1660,
+        "type": "ERROR",
+        "sample": "cls"
+      },
+      {
+        "line": 1660,
+        "type": "ERROR",
+        "sample": "cls"
+      },
+      {
+        "line": 1660,
+        "type": "ERROR",
+        "sample": "' log"
+      },
+      {
+        "line": 1660,
+        "type": "ERROR",
+        "sample": "' log"
+      },
+      {
+        "line": 1660,
+        "type": "ERROR",
+        "sample": "'"
+      },
+      {
+        "line": 1661,
+        "type": "ERROR",
+        "sample": "'"
+      },
+      {
+        "line": 1661,
+        "type": "ERROR",
+        "sample": "'"
+      },
+      {
+        "line": 1661,
+        "type": "ERROR",
+        "sample": "'"
+      },
+      {
+        "line": 1661,
+        "type": "ERROR",
+        "sample": "'"
+      },
+      {
+        "line": 1661,
+        "type": "ERROR",
+        "sample": "cls"
+      },
+      {
+        "line": 1661,
+        "type": "ERROR",
+        "sample": "cls"
+      },
+      {
+        "line": 1661,
+        "type": "ERROR",
+        "sample": "' log"
+      },
+      {
+        "line": 1661,
+        "type": "ERROR",
+        "sample": "' log"
+      },
+      {
+        "line": 1661,
+        "type": "ERROR",
+        "sample": "'"
+      },
+      {
+        "line": 1662,
+        "type": "ERROR",
+        "sample": "`<span class="
+      },
+      {
+        "line": 1662,
+        "type": "ERROR",
+        "sample": "`<span"
+      },
+      {
+        "line": 1662,
+        "type": "ERROR",
+        "sample": "$"
+      },
+      {
+        "line": 1662,
+        "type": "ERROR",
+        "sample": "$"
+      },
+      {
+        "line": 1662,
+        "type": "ERROR",
+        "sample": ">`;"
+      },
+      {
+        "line": 1662,
+        "type": "ERROR",
+        "sample": "`;"
+      },
+      {
+        "line": 1663,
+        "type": "ERROR",
+        "sample": "''"
+      },
+      {
+        "line": 1663,
+        "type": "ERROR",
+        "sample": "''"
+      },
+      {
+        "line": 1667,
+        "type": "ERROR",
+        "sample": "'pill pill"
+      },
+      {
+        "line": 1667,
+        "type": "ERROR",
+        "sample": "'pill pill"
+      },
+      {
+        "line": 1667,
+        "type": "ERROR",
+        "sample": "'"
+      },
+      {
+        "line": 1667,
+        "type": "ERROR",
+        "sample": "'"
+      },
+      {
+        "line": 1668,
+        "type": "ERROR",
+        "sample": "'通过"
+      },
+      {
+        "line": 1668,
+        "type": "ERROR",
+        "sample": "'通过"
+      },
+      {
+        "line": 1668,
+        "type": "ERROR",
+        "sample": "'"
+      },
+      {
+        "line": 1668,
+        "type": "ERROR",
+        "sample": "'"
+      },
+      {
+        "line": 1669,
+        "type": "ERROR",
+        "sample": "'"
+      },
+      {
+        "line": 1669,
+        "type": "ERROR",
+        "sample": "'"
+      },
+      {
+        "line": 1669,
+        "type": "ERROR",
+        "sample": "：书源各环节解析正常'"
+      },
+      {
+        "line": 1669,
+        "type": "ERROR",
+        "sample": "：书源各环节解析正常'"
+      },
+      {
+        "line": 1671,
+        "type": "ERROR",
+        "sample": "'pill pill"
+      },
+      {
+        "line": 1671,
+        "type": "ERROR",
+        "sample": "'pill pill"
+      },
+      {
+        "line": 1671,
+        "type": "ERROR",
+        "sample": "'"
+      },
+      {
+        "line": 1671,
+        "type": "ERROR",
+        "sample": "'"
+      },
+      {
+        "line": 1672,
+        "type": "ERROR",
+        "sample": "'异常"
+      },
+      {
+        "line": 1672,
+        "type": "ERROR",
+        "sample": "'异常"
+      },
+      {
+        "line": 1672,
+        "type": "ERROR",
+        "sample": "'"
+      },
+      {
+        "line": 1672,
+        "type": "ERROR",
+        "sample": "'"
+      },
+      {
+        "line": 1673,
+        "type": "ERROR",
+        "sample": "'"
+      },
+      {
+        "line": 1673,
+        "type": "ERROR",
+        "sample": "'"
+      },
+      {
+        "line": 1673,
+        "type": "ERROR",
+        "sample": ": '"
+      },
+      {
+        "line": 1673,
+        "type": "ERROR",
+        "sample": "'"
+      },
+      {
+        "line": 1673,
+        "type": "ERROR",
+        "sample": "|| '解析失败'"
+      },
+      {
+        "line": 1673,
+        "type": "ERROR",
+        "sample": "'解析失败'"
+      },
+      {
+        "line": 1678,
+        "type": "ERROR",
+        "sample": "} catch"
+      },
+      {
+        "line": 1679,
+        "type": "ERROR",
+        "sample": "if (e.name === 'AbortError') {\r\n          terminal.innerHTML += `<span class=\"log-line log-error\">⏱️ 调试请求超时 (25秒)：目标书源网站"
+      },
+      {
+        "line": 1679,
+        "type": "ERROR",
+        "sample": "'AbortError')"
+      },
+      {
+        "line": 1679,
+        "type": "ERROR",
+        "sample": "'AbortError'"
+      },
+      {
+        "line": 1680,
+        "type": "ERROR",
+        "sample": "`<span class="
+      },
+      {
+        "line": 1680,
+        "type": "ERROR",
+        "sample": "`<span"
+      },
+      {
+        "line": 1680,
+        "type": "ERROR",
+        "sample": "秒"
+      },
+      {
+        "line": 1680,
+        "type": "ERROR",
+        "sample": "秒"
+      },
+      {
+        "line": 1680,
+        "type": "ERROR",
+        "sample": "：目标书源网站无响应或网络受阻，请检查书源 URL 或单独测试搜索环节"
+      },
+      {
+        "line": 1680,
+        "type": "ERROR",
+        "sample": "：目标书源网站无响应或网络受阻，请检查书源 URL 或单独测试搜索环节"
+      },
+      {
+        "line": 1680,
+        "type": "ERROR",
+        "sample": ">`;"
+      },
+      {
+        "line": 1680,
+        "type": "ERROR",
+        "sample": "`;"
+      },
+      {
+        "line": 1681,
+        "type": "ERROR",
+        "sample": "'pill pill"
+      },
+      {
+        "line": 1681,
+        "type": "ERROR",
+        "sample": "'pill pill"
+      },
+      {
+        "line": 1681,
+        "type": "ERROR",
+        "sample": "';\r\n          pill.innerText = '超时异常'"
+      },
+      {
+        "line": 1681,
+        "type": "ERROR",
+        "sample": "'"
+      },
+      {
+        "line": 1682,
+        "type": "ERROR",
+        "sample": "'超时异常'"
+      },
+      {
+        "line": 1683,
+        "type": "ERROR",
+        "sample": "'调试请求超时"
+      },
+      {
+        "line": 1683,
+        "type": "ERROR",
+        "sample": "'调试请求超时"
+      },
+      {
+        "line": 1683,
+        "type": "ERROR",
+        "sample": "s"
+      },
+      {
+        "line": 1683,
+        "type": "ERROR",
+        "sample": "s"
+      },
+      {
+        "line": 1683,
+        "type": "ERROR",
+        "sample": "'"
+      },
+      {
+        "line": 1683,
+        "type": "ERROR",
+        "sample": "'"
+      },
+      {
+        "line": 1684,
+        "type": "ERROR",
+        "sample": "else"
+      },
+      {
+        "line": 1685,
+        "type": "ERROR",
+        "sample": "`<span class="
+      },
+      {
+        "line": 1685,
+        "type": "ERROR",
+        "sample": "`<span"
+      },
+      {
+        "line": 1685,
+        "type": "ERROR",
+        "sample": ": $"
+      },
+      {
+        "line": 1685,
+        "type": "ERROR",
+        "sample": "$"
+      },
+      {
+        "line": 1685,
+        "type": "ERROR",
+        "sample": ">`;"
+      },
+      {
+        "line": 1685,
+        "type": "ERROR",
+        "sample": "`;"
+      },
+      {
+        "line": 1686,
+        "type": "ERROR",
+        "sample": "'pill pill"
+      },
+      {
+        "line": 1686,
+        "type": "ERROR",
+        "sample": "'pill pill"
+      },
+      {
+        "line": 1686,
+        "type": "ERROR",
+        "sample": "';\r\n          pill.innerText = '请求失败'"
+      },
+      {
+        "line": 1686,
+        "type": "ERROR",
+        "sample": "'"
+      },
+      {
+        "line": 1687,
+        "type": "ERROR",
+        "sample": "'请求失败'"
+      },
+      {
+        "line": 1688,
+        "type": "ERROR",
+        "sample": "'调试连接出错: '"
+      },
+      {
+        "line": 1688,
+        "type": "ERROR",
+        "sample": "'调试连接出错"
+      },
+      {
+        "line": 1688,
+        "type": "ERROR",
+        "sample": "'"
+      },
+      {
+        "line": 1688,
+        "type": "ERROR",
+        "sample": "e"
+      },
+      {
+        "line": 1688,
+        "type": "ERROR",
+        "sample": "e"
+      },
+      {
+        "line": 1692,
+        "type": "ERROR",
+        "sample": "'"
+      },
+      {
+        "line": 1692,
+        "type": "ERROR",
+        "sample": "'"
+      },
+      {
+        "line": 1692,
+        "type": "ERROR",
+        "sample": "'"
+      },
+      {
+        "line": 1692,
+        "type": "ERROR",
+        "sample": "'"
+      },
+      {
+        "line": 1696,
+        "type": "ERROR",
+        "sample": "renderDebugResults"
+      },
+      {
+        "line": 1696,
+        "type": "ERROR",
+        "sample": "renderDeb"
+      },
+      {
+        "line": 1696,
+        "type": "ERROR",
+        "sample": "gResults"
+      },
+      {
+        "line": 1697,
+        "type": "ERROR",
+        "sample": "container"
+      },
+      {
+        "line": 1697,
+        "type": "ERROR",
+        "sample": "'debug"
+      },
+      {
+        "line": 1697,
+        "type": "ERROR",
+        "sample": "'deb"
+      },
+      {
+        "line": 1697,
+        "type": "ERROR",
+        "sample": "g"
+      },
+      {
+        "line": 1697,
+        "type": "ERROR",
+        "sample": "'"
+      },
+      {
+        "line": 1697,
+        "type": "ERROR",
+        "sample": "'"
+      },
+      {
+        "line": 1698,
+        "type": "ERROR",
+        "sample": "searchSec"
+      },
+      {
+        "line": 1698,
+        "type": "ERROR",
+        "sample": "se"
+      },
+      {
+        "line": 1698,
+        "type": "ERROR",
+        "sample": "Sec"
+      },
+      {
+        "line": 1698,
+        "type": "ERROR",
+        "sample": "'debug"
+      },
+      {
+        "line": 1698,
+        "type": "ERROR",
+        "sample": "'deb"
+      },
+      {
+        "line": 1698,
+        "type": "ERROR",
+        "sample": "g"
+      },
+      {
+        "line": 1698,
+        "type": "ERROR",
+        "sample": "'"
+      },
+      {
+        "line": 1698,
+        "type": "ERROR",
+        "sample": "'"
+      },
+      {
+        "line": 1699,
+        "type": "ERROR",
+        "sample": "detailSec"
+      },
+      {
+        "line": 1699,
+        "type": "ERROR",
+        "sample": "detailSec"
+      },
+      {
+        "line": 1699,
+        "type": "ERROR",
+        "sample": "'debug"
+      },
+      {
+        "line": 1699,
+        "type": "ERROR",
+        "sample": "'deb"
+      },
+      {
+        "line": 1699,
+        "type": "ERROR",
+        "sample": "g"
+      },
+      {
+        "line": 1699,
+        "type": "ERROR",
+        "sample": "'"
+      },
+      {
+        "line": 1699,
+        "type": "ERROR",
+        "sample": "'"
+      },
+      {
+        "line": 1700,
+        "type": "ERROR",
+        "sample": "tocSec"
+      },
+      {
+        "line": 1700,
+        "type": "ERROR",
+        "sample": "tocSec"
+      },
+      {
+        "line": 1700,
+        "type": "ERROR",
+        "sample": "'debug"
+      },
+      {
+        "line": 1700,
+        "type": "ERROR",
+        "sample": "'deb"
+      },
+      {
+        "line": 1700,
+        "type": "ERROR",
+        "sample": "g"
+      },
+      {
+        "line": 1700,
+        "type": "ERROR",
+        "sample": "'"
+      },
+      {
+        "line": 1700,
+        "type": "ERROR",
+        "sample": "'"
+      },
+      {
+        "line": 1701,
+        "type": "ERROR",
+        "sample": "contentSec"
+      },
+      {
+        "line": 1701,
+        "type": "ERROR",
+        "sample": "contentSec"
+      },
+      {
+        "line": 1701,
+        "type": "ERROR",
+        "sample": "'debug"
+      },
+      {
+        "line": 1701,
+        "type": "ERROR",
+        "sample": "'deb"
+      },
+      {
+        "line": 1701,
+        "type": "ERROR",
+        "sample": "g"
+      },
+      {
+        "line": 1701,
+        "type": "ERROR",
+        "sample": "'"
+      },
+      {
+        "line": 1701,
+        "type": "ERROR",
+        "sample": "'"
+      },
+      {
+        "line": 1707,
+        "type": "ERROR",
+        "sample": ";\r\n        searchSec.style.display = 'block'"
+      },
+      {
+        "line": 1708,
+        "type": "ERROR",
+        "sample": "'block'"
+      },
+      {
+        "line": 1709,
+        "type": "ERROR",
+        "sample": "'debug"
+      },
+      {
+        "line": 1709,
+        "type": "ERROR",
+        "sample": "'deb"
+      },
+      {
+        "line": 1709,
+        "type": "ERROR",
+        "sample": "g"
+      },
+      {
+        "line": 1709,
+        "type": "ERROR",
+        "sample": "'"
+      },
+      {
+        "line": 1709,
+        "type": "ERROR",
+        "sample": "'"
+      },
+      {
+        "line": 1710,
+        "type": "ERROR",
+        "sample": "grid"
+      },
+      {
+        "line": 1710,
+        "type": "ERROR",
+        "sample": "grid"
+      },
+      {
+        "line": 1710,
+        "type": "ERROR",
+        "sample": "'debug"
+      },
+      {
+        "line": 1710,
+        "type": "ERROR",
+        "sample": "'deb"
+      },
+      {
+        "line": 1710,
+        "type": "ERROR",
+        "sample": "g"
+      },
+      {
+        "line": 1710,
+        "type": "ERROR",
+        "sample": "'"
+      },
+      {
+        "line": 1710,
+        "type": "ERROR",
+        "sample": "'"
+      },
+      {
+        "line": 1711,
+        "type": "ERROR",
+        "sample": "(b => `\r\n          <div class=\"book-card\">\r\n            <h4>${escapeHtml(b.name)}</h4>\r\n            <p>作者: ${escapeHtml("
+      },
+      {
+        "line": 1711,
+        "type": "ERROR",
+        "sample": "`\r\n          "
+      },
+      {
+        "line": 1711,
+        "type": "ERROR",
+        "sample": "`"
+      },
+      {
+        "line": 1712,
+        "type": "ERROR",
+        "sample": "div class"
+      },
+      {
+        "line": 1712,
+        "type": "ERROR",
+        "sample": "div"
+      },
+      {
+        "line": 1713,
+        "type": "ERROR",
+        "sample": "h4"
+      },
+      {
+        "line": 1713,
+        "type": "ERROR",
+        "sample": "h"
+      },
+      {
+        "line": 1713,
+        "type": "ERROR",
+        "sample": "$"
+      },
+      {
+        "line": 1713,
+        "type": "ERROR",
+        "sample": "$"
+      },
+      {
+        "line": 1714,
+        "type": "ERROR",
+        "sample": "p"
+      },
+      {
+        "line": 1714,
+        "type": "ERROR",
+        "sample": "p"
+      },
+      {
+        "line": 1714,
+        "type": "ERROR",
+        "sample": ": $"
+      },
+      {
+        "line": 1714,
+        "type": "ERROR",
+        "sample": "$"
+      },
+      {
+        "line": 1714,
+        "type": "ERROR",
+        "sample": "|| '未知'"
+      },
+      {
+        "line": 1714,
+        "type": "ERROR",
+        "sample": "'未知'"
+      },
+      {
+        "line": 1715,
+        "type": "ERROR",
+        "sample": "p style"
+      },
+      {
+        "line": 1715,
+        "type": "ERROR",
+        "sample": "p style"
+      },
+      {
+        "line": 1715,
+        "type": "ERROR",
+        "sample": ":"
+      },
+      {
+        "line": 1715,
+        "type": "ERROR",
+        "sample": "href"
+      },
+      {
+        "line": 1715,
+        "type": "ERROR",
+        "sample": "href"
+      },
+      {
+        "line": 1715,
+        "type": "ERROR",
+        "sample": "target"
+      },
+      {
+        "line": 1715,
+        "type": "ERROR",
+        "sample": "target"
+      },
+      {
+        "line": 1715,
+        "type": "ERROR",
+        "sample": "style"
+      },
+      {
+        "line": 1715,
+        "type": "ERROR",
+        "sample": "style"
+      },
+      {
+        "line": 1715,
+        "type": "ERROR",
+        "sample": "$"
+      },
+      {
+        "line": 1715,
+        "type": "ERROR",
+        "sample": "$"
+      },
+      {
+        "line": 1716,
+        "type": "ERROR",
+        "sample": "p"
+      },
+      {
+        "line": 1716,
+        "type": "ERROR",
+        "sample": "p"
+      },
+      {
+        "line": 1716,
+        "type": "ERROR",
+        "sample": ": $"
+      },
+      {
+        "line": 1716,
+        "type": "ERROR",
+        "sample": "$"
+      },
+      {
+        "line": 1716,
+        "type": "ERROR",
+        "sample": "|| '无'"
+      },
+      {
+        "line": 1716,
+        "type": "ERROR",
+        "sample": "'无'"
+      },
+      {
+        "line": 1718,
+        "type": "ERROR",
+        "sample": "`).join('');"
+      },
+      {
+        "line": 1720,
+        "type": "ERROR",
+        "sample": "searchSec.style.display = 'none';\r\n      "
+      },
+      {
+        "line": 1720,
+        "type": "ERROR",
+        "sample": "'none'"
+      },
+      {
+        "line": 1725,
+        "type": "ERROR",
+        "sample": ";\r\n        detailSec.style.display = 'block'"
+      },
+      {
+        "line": 1726,
+        "type": "ERROR",
+        "sample": "'block'"
+      },
+      {
+        "line": 1727,
+        "type": "ERROR",
+        "sample": "d"
+      },
+      {
+        "line": 1727,
+        "type": "ERROR",
+        "sample": "d"
+      },
+      {
+        "line": 1728,
+        "type": "ERROR",
+        "sample": "'debug"
+      },
+      {
+        "line": 1728,
+        "type": "ERROR",
+        "sample": "'deb"
+      },
+      {
+        "line": 1728,
+        "type": "ERROR",
+        "sample": "g"
+      },
+      {
+        "line": 1728,
+        "type": "ERROR",
+        "sample": "'"
+      },
+      {
+        "line": 1728,
+        "type": "ERROR",
+        "sample": "'"
+      },
+      {
+        "line": 1728,
+        "type": "ERROR",
+        "sample": "`\r\n          <h"
+      },
+      {
+        "line": 1728,
+        "type": "ERROR",
+        "sample": "`"
+      },
+      {
+        "line": 1729,
+        "type": "ERROR",
+        "sample": "h"
+      },
+      {
+        "line": 1729,
+        "type": "ERROR",
+        "sample": "style"
+      },
+      {
+        "line": 1729,
+        "type": "ERROR",
+        "sample": "style"
+      },
+      {
+        "line": 1729,
+        "type": "ERROR",
+        "sample": "$"
+      },
+      {
+        "line": 1729,
+        "type": "ERROR",
+        "sample": "$"
+      },
+      {
+        "line": 1730,
+        "type": "ERROR",
+        "sample": "p"
+      },
+      {
+        "line": 1730,
+        "type": "ERROR",
+        "sample": "p"
+      },
+      {
+        "line": 1730,
+        "type": "ERROR",
+        "sample": ": $"
+      },
+      {
+        "line": 1730,
+        "type": "ERROR",
+        "sample": "$"
+      },
+      {
+        "line": 1730,
+        "type": "ERROR",
+        "sample": "|| '未知'"
+      },
+      {
+        "line": 1730,
+        "type": "ERROR",
+        "sample": "'未知'"
+      },
+      {
+        "line": 1730,
+        "type": "ERROR",
+        "sample": "· 状态: $"
+      },
+      {
+        "line": 1730,
+        "type": "ERROR",
+        "sample": "· 状态"
+      },
+      {
+        "line": 1730,
+        "type": "ERROR",
+        "sample": "$"
+      },
+      {
+        "line": 1730,
+        "type": "ERROR",
+        "sample": "|| '连载'"
+      },
+      {
+        "line": 1730,
+        "type": "ERROR",
+        "sample": "'连载'"
+      },
+      {
+        "line": 1731,
+        "type": "ERROR",
+        "sample": "p"
+      },
+      {
+        "line": 1731,
+        "type": "ERROR",
+        "sample": "p"
+      },
+      {
+        "line": 1731,
+        "type": "ERROR",
+        "sample": ": <a href"
+      },
+      {
+        "line": 1731,
+        "type": "ERROR",
+        "sample": "href"
+      },
+      {
+        "line": 1731,
+        "type": "ERROR",
+        "sample": "target"
+      },
+      {
+        "line": 1731,
+        "type": "ERROR",
+        "sample": "target"
+      },
+      {
+        "line": 1731,
+        "type": "ERROR",
+        "sample": "style"
+      },
+      {
+        "line": 1731,
+        "type": "ERROR",
+        "sample": "style"
+      },
+      {
+        "line": 1731,
+        "type": "ERROR",
+        "sample": "$"
+      },
+      {
+        "line": 1731,
+        "type": "ERROR",
+        "sample": "$"
+      },
+      {
+        "line": 1732,
+        "type": "ERROR",
+        "sample": "p style"
+      },
+      {
+        "line": 1732,
+        "type": "ERROR",
+        "sample": "p style"
+      },
+      {
+        "line": 1732,
+        "type": "ERROR",
+        "sample": ": $"
+      },
+      {
+        "line": 1732,
+        "type": "ERROR",
+        "sample": "$"
+      },
+      {
+        "line": 1732,
+        "type": "ERROR",
+        "sample": "|| '无简介'"
+      },
+      {
+        "line": 1732,
+        "type": "ERROR",
+        "sample": "'无简介'"
+      },
+      {
+        "line": 1732,
+        "type": "!",
+        "sample": ""
+      },
+      {
+        "line": 1733,
+        "type": "ERROR",
+        "sample": "`;"
+      },
+      {
+        "line": 1733,
+        "type": "ERROR",
+        "sample": "`;"
+      },
+      {
+        "line": 1735,
+        "type": "ERROR",
+        "sample": "detailSec.style.display = 'none';\r\n      "
+      },
+      {
+        "line": 1735,
+        "type": "ERROR",
+        "sample": "'none'"
+      },
+      {
+        "line": 1740,
+        "type": "ERROR",
+        "sample": ";\r\n        tocSec.style.display = 'block'"
+      },
+      {
+        "line": 1741,
+        "type": "ERROR",
+        "sample": "'block'"
+      },
+      {
+        "line": 1742,
+        "type": "ERROR",
+        "sample": "list"
+      },
+      {
+        "line": 1742,
+        "type": "ERROR",
+        "sample": "list"
+      },
+      {
+        "line": 1742,
+        "type": "ERROR",
+        "sample": "'debug"
+      },
+      {
+        "line": 1742,
+        "type": "ERROR",
+        "sample": "'deb"
+      },
+      {
+        "line": 1742,
+        "type": "ERROR",
+        "sample": "g"
+      },
+      {
+        "line": 1742,
+        "type": "ERROR",
+        "sample": "'"
+      },
+      {
+        "line": 1742,
+        "type": "ERROR",
+        "sample": "'"
+      },
+      {
+        "line": 1743,
+        "type": "ERROR",
+        "sample": "((c, i) => `\r\n          <div style=\"padding: 3px 0; border-bottom: 1px solid rgba(255,255,255,0.04); display: flex; just"
+      },
+      {
+        "line": 1743,
+        "type": "ERROR",
+        "sample": "`\r\n          "
+      },
+      {
+        "line": 1743,
+        "type": "ERROR",
+        "sample": "`"
+      },
+      {
+        "line": 1744,
+        "type": "ERROR",
+        "sample": "div style"
+      },
+      {
+        "line": 1744,
+        "type": "ERROR",
+        "sample": "div style"
+      },
+      {
+        "line": 1745,
+        "type": "ERROR",
+        "sample": "<span>#$"
+      },
+      {
+        "line": 1745,
+        "type": "ERROR",
+        "sample": "span"
+      },
+      {
+        "line": 1745,
+        "type": "ERROR",
+        "sample": "$"
+      },
+      {
+        "line": 1745,
+        "type": "ERROR",
+        "sample": "$"
+      },
+      {
+        "line": 1745,
+        "type": "ERROR",
+        "sample": "$"
+      },
+      {
+        "line": 1746,
+        "type": "ERROR",
+        "sample": "span style"
+      },
+      {
+        "line": 1746,
+        "type": "ERROR",
+        "sample": "span style"
+      },
+      {
+        "line": 1746,
+        "type": "ERROR",
+        "sample": "$"
+      },
+      {
+        "line": 1746,
+        "type": "ERROR",
+        "sample": "$"
+      },
+      {
+        "line": 1748,
+        "type": "ERROR",
+        "sample": "`).join('');"
+      },
+      {
+        "line": 1750,
+        "type": "ERROR",
+        "sample": "tocSec.style.display = 'none';\r\n      "
+      },
+      {
+        "line": 1750,
+        "type": "ERROR",
+        "sample": "'none'"
+      },
+      {
+        "line": 1755,
+        "type": "ERROR",
+        "sample": ";\r\n        contentSec.style.display = 'block'"
+      },
+      {
+        "line": 1756,
+        "type": "ERROR",
+        "sample": "'block'"
+      },
+      {
+        "line": 1757,
+        "type": "ERROR",
+        "sample": "card"
+      },
+      {
+        "line": 1757,
+        "type": "ERROR",
+        "sample": "card"
+      },
+      {
+        "line": 1757,
+        "type": "ERROR",
+        "sample": "'debug"
+      },
+      {
+        "line": 1757,
+        "type": "ERROR",
+        "sample": "'deb"
+      },
+      {
+        "line": 1757,
+        "type": "ERROR",
+        "sample": "g"
+      },
+      {
+        "line": 1757,
+        "type": "ERROR",
+        "sample": "'"
+      },
+      {
+        "line": 1757,
+        "type": "ERROR",
+        "sample": "'"
+      },
+      {
+        "line": 1758,
+        "type": "ERROR",
+        "sample": "par"
+      },
+      {
+        "line": 1758,
+        "type": "ERROR",
+        "sample": "par"
+      },
+      {
+        "line": 1758,
+        "type": "ERROR",
+        "sample": "(p => `<p style=\"margin-bottom: 8px;\">　　${escapeHtml(p)}</p>`).join('');\r\n        card.innerHTML = `"
+      },
+      {
+        "line": 1758,
+        "type": "ERROR",
+        "sample": "`<p style"
+      },
+      {
+        "line": 1758,
+        "type": "ERROR",
+        "sample": "`<p style"
+      },
+      {
+        "line": 1758,
+        "type": "ERROR",
+        "sample": "　　$"
+      },
+      {
+        "line": 1758,
+        "type": "ERROR",
+        "sample": "　　$"
+      },
+      {
+        "line": 1758,
+        "type": "ERROR",
+        "sample": "`).join('');"
+      },
+      {
+        "line": 1759,
+        "type": "ERROR",
+        "sample": "`"
+      },
+      {
+        "line": 1760,
+        "type": "ERROR",
+        "sample": "div style"
+      },
+      {
+        "line": 1760,
+        "type": "ERROR",
+        "sample": "div style"
+      },
+      {
+        "line": 1760,
+        "type": "ERROR",
+        "sample": "$"
+      },
+      {
+        "line": 1760,
+        "type": "ERROR",
+        "sample": "$"
+      },
+      {
+        "line": 1761,
+        "type": "ERROR",
+        "sample": "div"
+      },
+      {
+        "line": 1761,
+        "type": "ERROR",
+        "sample": "div"
+      },
+      {
+        "line": 1761,
+        "type": "ERROR",
+        "sample": "$"
+      },
+      {
+        "line": 1761,
+        "type": "ERROR",
+        "sample": "$"
+      },
+      {
+        "line": 1761,
+        "type": "ERROR",
+        "sample": ">\r\n        `;"
+      },
+      {
+        "line": 1762,
+        "type": "ERROR",
+        "sample": "`;"
+      },
+      {
+        "line": 1764,
+        "type": "ERROR",
+        "sample": "contentSec.style.display = 'none';\r\n      "
+      },
+      {
+        "line": 1764,
+        "type": "ERROR",
+        "sample": "'none'"
+      },
+      {
+        "line": 1767,
+        "type": "ERROR",
+        "sample": "? 'block' : 'none'"
+      },
+      {
+        "line": 1767,
+        "type": "ERROR",
+        "sample": "'block'"
+      },
+      {
+        "line": 1767,
+        "type": "ERROR",
+        "sample": "'none'"
+      },
+      {
+        "line": 1771,
+        "type": "ERROR",
+        "sample": "async"
+      },
+      {
+        "line": 1771,
+        "type": "ERROR",
+        "sample": "loadSourceHealthL"
+      },
+      {
+        "line": 1771,
+        "type": "ERROR",
+        "sample": "loadSo"
+      },
+      {
+        "line": 1771,
+        "type": "ERROR",
+        "sample": "rceHealthL"
+      },
+      {
+        "line": 1772,
+        "type": "ERROR",
+        "sample": "tbody"
+      },
+      {
+        "line": 1772,
+        "type": "ERROR",
+        "sample": "'sources"
+      },
+      {
+        "line": 1772,
+        "type": "ERROR",
+        "sample": "'sources"
+      },
+      {
+        "line": 1772,
+        "type": "ERROR",
+        "sample": "'"
+      },
+      {
+        "line": 1772,
+        "type": "ERROR",
+        "sample": "'"
+      },
+      {
+        "line": 1773,
+        "type": "ERROR",
+        "sample": "'"
+      },
+      {
+        "line": 1773,
+        "type": "ERROR",
+        "sample": "'"
+      },
+      {
+        "line": 1773,
+        "type": "ERROR",
+        "sample": "tr"
+      },
+      {
+        "line": 1773,
+        "type": "ERROR",
+        "sample": "tr"
+      },
+      {
+        "line": 1773,
+        "type": "ERROR",
+        "sample": "td colspan"
+      },
+      {
+        "line": 1773,
+        "type": "ERROR",
+        "sample": "td colspan"
+      },
+      {
+        "line": 1773,
+        "type": "ERROR",
+        "sample": "style"
+      },
+      {
+        "line": 1773,
+        "type": "ERROR",
+        "sample": "style"
+      },
+      {
+        "line": 1773,
+        "type": "ERROR",
+        "sample": "';\r\n\r\n      "
+      },
+      {
+        "line": 1773,
+        "type": "ERROR",
+        "sample": "'"
+      },
+      {
+        "line": 1776,
+        "type": "ERROR",
+        "sample": "res"
+      },
+      {
+        "line": 1776,
+        "type": "ERROR",
+        "sample": "'"
+      },
+      {
+        "line": 1776,
+        "type": "ERROR",
+        "sample": "'"
+      },
+      {
+        "line": 1776,
+        "type": "ERROR",
+        "sample": "sources"
+      },
+      {
+        "line": 1776,
+        "type": "ERROR",
+        "sample": "sources"
+      },
+      {
+        "line": 1776,
+        "type": "ERROR",
+        "sample": "'"
+      },
+      {
+        "line": 1776,
+        "type": "ERROR",
+        "sample": "'"
+      },
+      {
+        "line": 1776,
+        "type": "ERROR",
+        "sample": "cache: 'no"
+      },
+      {
+        "line": 1776,
+        "type": "ERROR",
+        "sample": "'no"
+      },
+      {
+        "line": 1776,
+        "type": "ERROR",
+        "sample": "'"
+      },
+      {
+        "line": 1776,
+        "type": "ERROR",
+        "sample": "'"
+      },
+      {
+        "line": 1777,
+        "type": "ERROR",
+        "sample": "data"
+      },
+      {
+        "line": 1777,
+        "type": "ERROR",
+        "sample": "data"
+      },
+      {
+        "line": 1781,
+        "type": "ERROR",
+        "sample": "catch"
+      },
+      {
+        "line": 1782,
+        "type": "ERROR",
+        "sample": "`<tr><td colspan="
+      },
+      {
+        "line": 1782,
+        "type": "ERROR",
+        "sample": "`<tr><td colspan"
+      },
+      {
+        "line": 1782,
+        "type": "ERROR",
+        "sample": "style"
+      },
+      {
+        "line": 1782,
+        "type": "ERROR",
+        "sample": "style"
+      },
+      {
+        "line": 1782,
+        "type": "ERROR",
+        "sample": ": $"
+      },
+      {
+        "line": 1782,
+        "type": "ERROR",
+        "sample": "$"
+      },
+      {
+        "line": 1782,
+        "type": "ERROR",
+        "sample": ">`;"
+      },
+      {
+        "line": 1782,
+        "type": "ERROR",
+        "sample": "`;"
+      },
+      {
+        "line": 1786,
+        "type": "ERROR",
+        "sample": "updateCounts"
+      },
+      {
+        "line": 1786,
+        "type": "ERROR",
+        "sample": "pdateCo"
+      },
+      {
+        "line": 1786,
+        "type": "ERROR",
+        "sample": "nts"
+      },
+      {
+        "line": 1787,
+        "type": "ERROR",
+        "sample": "'count"
+      },
+      {
+        "line": 1787,
+        "type": "ERROR",
+        "sample": "'co"
+      },
+      {
+        "line": 1787,
+        "type": "ERROR",
+        "sample": "nt"
+      },
+      {
+        "line": 1787,
+        "type": "ERROR",
+        "sample": "'"
+      },
+      {
+        "line": 1787,
+        "type": "ERROR",
+        "sample": "'"
+      },
+      {
+        "line": 1788,
+        "type": "ERROR",
+        "sample": "'count"
+      },
+      {
+        "line": 1788,
+        "type": "ERROR",
+        "sample": "'co"
+      },
+      {
+        "line": 1788,
+        "type": "ERROR",
+        "sample": "nt"
+      },
+      {
+        "line": 1788,
+        "type": "ERROR",
+        "sample": "'"
+      },
+      {
+        "line": 1788,
+        "type": "ERROR",
+        "sample": "'"
+      },
+      {
+        "line": 1788,
+        "type": "ERROR",
+        "sample": "=== 'passed'"
+      },
+      {
+        "line": 1788,
+        "type": "ERROR",
+        "sample": "'passed'"
+      },
+      {
+        "line": 1789,
+        "type": "ERROR",
+        "sample": "'count"
+      },
+      {
+        "line": 1789,
+        "type": "ERROR",
+        "sample": "'co"
+      },
+      {
+        "line": 1789,
+        "type": "ERROR",
+        "sample": "nt"
+      },
+      {
+        "line": 1789,
+        "type": "ERROR",
+        "sample": "'"
+      },
+      {
+        "line": 1789,
+        "type": "ERROR",
+        "sample": "'"
+      },
+      {
+        "line": 1789,
+        "type": "ERROR",
+        "sample": "=== 'failed'"
+      },
+      {
+        "line": 1789,
+        "type": "ERROR",
+        "sample": "'failed'"
+      },
+      {
+        "line": 1789,
+        "type": "ERROR",
+        "sample": "=== 'blocked'"
+      },
+      {
+        "line": 1789,
+        "type": "ERROR",
+        "sample": "'blocked'"
+      },
+      {
+        "line": 1790,
+        "type": "ERROR",
+        "sample": "'count"
+      },
+      {
+        "line": 1790,
+        "type": "ERROR",
+        "sample": "'co"
+      },
+      {
+        "line": 1790,
+        "type": "ERROR",
+        "sample": "nt"
+      },
+      {
+        "line": 1790,
+        "type": "ERROR",
+        "sample": "'"
+      },
+      {
+        "line": 1790,
+        "type": "ERROR",
+        "sample": "'"
+      },
+      {
+        "line": 1790,
+        "type": "ERROR",
+        "sample": "=== 'untested'"
+      },
+      {
+        "line": 1790,
+        "type": "ERROR",
+        "sample": "'"
+      },
+      {
+        "line": 1790,
+        "type": "ERROR",
+        "sample": "ntested'"
+      },
+      {
+        "line": 1793,
+        "type": "ERROR",
+        "sample": "setHealthFilter"
+      },
+      {
+        "line": 1793,
+        "type": "ERROR",
+        "sample": "HealthFilter"
+      },
+      {
+        "line": 1798,
+        "type": "ERROR",
+        "sample": "totalPageCount"
+      },
+      {
+        "line": 1798,
+        "type": "ERROR",
+        "sample": "totalPageCo"
+      },
+      {
+        "line": 1798,
+        "type": "ERROR",
+        "sample": "nt"
+      },
+      {
+        "line": 1802,
+        "type": "ERROR",
+        "sample": "changePageSize"
+      },
+      {
+        "line": 1802,
+        "type": "ERROR",
+        "sample": "changePageSize"
+      },
+      {
+        "line": 1808,
+        "type": "ERROR",
+        "sample": "goToPage"
+      },
+      {
+        "line": 1808,
+        "type": "ERROR",
+        "sample": "goToPage"
+      },
+      {
+        "line": 1809,
+        "type": "ERROR",
+        "sample": "maxPages"
+      },
+      {
+        "line": 1814,
+        "type": "ERROR",
+        "sample": "applyFilter"
+      },
+      {
+        "line": 1814,
+        "type": "ERROR",
+        "sample": "applyFilter"
+      },
+      {
+        "line": 1815,
+        "type": "ERROR",
+        "sample": "query"
+      },
+      {
+        "line": 1815,
+        "type": "ERROR",
+        "sample": "'filter"
+      },
+      {
+        "line": 1815,
+        "type": "ERROR",
+        "sample": "'filter"
+      },
+      {
+        "line": 1815,
+        "type": "ERROR",
+        "sample": "'"
+      },
+      {
+        "line": 1815,
+        "type": "ERROR",
+        "sample": "'"
+      },
+      {
+        "line": 1815,
+        "type": "ERROR",
+        "sample": "|| ''"
+      },
+      {
+        "line": 1815,
+        "type": "ERROR",
+        "sample": "''"
+      },
+      {
+        "line": 1817,
+        "type": "ERROR",
+        "sample": "matchesQuery"
+      },
+      {
+        "line": 1822,
+        "type": "ERROR",
+        "sample": "if (!matchesQuery)"
+      },
+      {
+        "line": 1824,
+        "type": "ERROR",
+        "sample": "if (currentHealthFilter === 'all') return true;\r\n        if (currentHealthFilter === 'passed') return s.healthStatus ==="
+      },
+      {
+        "line": 1824,
+        "type": "ERROR",
+        "sample": "'all') return true;\r\n        "
+      },
+      {
+        "line": 1824,
+        "type": "ERROR",
+        "sample": "'all'"
+      },
+      {
+        "line": 1825,
+        "type": "ERROR",
+        "sample": "'passed'"
+      },
+      {
+        "line": 1825,
+        "type": "ERROR",
+        "sample": "'passed';\r\n        "
+      },
+      {
+        "line": 1825,
+        "type": "ERROR",
+        "sample": "'passed'"
+      },
+      {
+        "line": 1826,
+        "type": "ERROR",
+        "sample": "'failed'"
+      },
+      {
+        "line": 1826,
+        "type": "ERROR",
+        "sample": "=== 'failed'"
+      },
+      {
+        "line": 1826,
+        "type": "ERROR",
+        "sample": "'failed'"
+      },
+      {
+        "line": 1826,
+        "type": "ERROR",
+        "sample": "'blocked';\r\n        "
+      },
+      {
+        "line": 1826,
+        "type": "ERROR",
+        "sample": "'blocked'"
+      },
+      {
+        "line": 1827,
+        "type": "ERROR",
+        "sample": "=== 'untested'"
+      },
+      {
+        "line": 1827,
+        "type": "ERROR",
+        "sample": "'"
+      },
+      {
+        "line": 1827,
+        "type": "ERROR",
+        "sample": "ntested'"
+      },
+      {
+        "line": 1827,
+        "type": "ERROR",
+        "sample": "=== 'untested'"
+      },
+      {
+        "line": 1827,
+        "type": "ERROR",
+        "sample": "'"
+      },
+      {
+        "line": 1827,
+        "type": "ERROR",
+        "sample": "ntested'"
+      },
+      {
+        "line": 1835,
+        "type": "ERROR",
+        "sample": "renderCurrentPage"
+      },
+      {
+        "line": 1835,
+        "type": "ERROR",
+        "sample": "renderC"
+      },
+      {
+        "line": 1835,
+        "type": "ERROR",
+        "sample": "rrentPage"
+      },
+      {
+        "line": 1836,
+        "type": "ERROR",
+        "sample": "total"
+      },
+      {
+        "line": 1837,
+        "type": "ERROR",
+        "sample": "maxPages"
+      },
+      {
+        "line": 1837,
+        "type": "ERROR",
+        "sample": "maxPages"
+      },
+      {
+        "line": 1837,
+        "type": "ERROR",
+        "sample": ";\r\n      if (currentPage > maxPages) currentPage = maxPages;"
+      },
+      {
+        "line": 1838,
+        "type": "ERROR",
+        "sample": "currentPage"
+      },
+      {
+        "line": 1838,
+        "type": "ERROR",
+        "sample": "c"
+      },
+      {
+        "line": 1838,
+        "type": "ERROR",
+        "sample": "rrentPage"
+      },
+      {
+        "line": 1840,
+        "type": "ERROR",
+        "sample": "startIndex"
+      },
+      {
+        "line": 1840,
+        "type": "ERROR",
+        "sample": "startIndex"
+      },
+      {
+        "line": 1841,
+        "type": "ERROR",
+        "sample": "endIndex"
+      },
+      {
+        "line": 1841,
+        "type": "ERROR",
+        "sample": "endIndex"
+      },
+      {
+        "line": 1842,
+        "type": "ERROR",
+        "sample": "pageData"
+      },
+      {
+        "line": 1842,
+        "type": "ERROR",
+        "sample": "pageData"
+      },
+      {
+        "line": 1845,
+        "type": "ERROR",
+        "sample": "'page"
+      },
+      {
+        "line": 1845,
+        "type": "ERROR",
+        "sample": "'page"
+      },
+      {
+        "line": 1845,
+        "type": "ERROR",
+        "sample": "'"
+      },
+      {
+        "line": 1845,
+        "type": "ERROR",
+        "sample": "'"
+      },
+      {
+        "line": 1846,
+        "type": "ERROR",
+        "sample": "'page"
+      },
+      {
+        "line": 1846,
+        "type": "ERROR",
+        "sample": "'page"
+      },
+      {
+        "line": 1846,
+        "type": "ERROR",
+        "sample": "'"
+      },
+      {
+        "line": 1846,
+        "type": "ERROR",
+        "sample": "'"
+      },
+      {
+        "line": 1847,
+        "type": "ERROR",
+        "sample": "'page"
+      },
+      {
+        "line": 1847,
+        "type": "ERROR",
+        "sample": "'page"
+      },
+      {
+        "line": 1847,
+        "type": "ERROR",
+        "sample": "'"
+      },
+      {
+        "line": 1847,
+        "type": "ERROR",
+        "sample": "'"
+      },
+      {
+        "line": 1848,
+        "type": "ERROR",
+        "sample": "'page"
+      },
+      {
+        "line": 1848,
+        "type": "ERROR",
+        "sample": "'page"
+      },
+      {
+        "line": 1848,
+        "type": "ERROR",
+        "sample": "'"
+      },
+      {
+        "line": 1848,
+        "type": "ERROR",
+        "sample": "'"
+      },
+      {
+        "line": 1848,
+        "type": "ERROR",
+        "sample": "`第 $"
+      },
+      {
+        "line": 1848,
+        "type": "ERROR",
+        "sample": "`第 $"
+      },
+      {
+        "line": 1848,
+        "type": "ERROR",
+        "sample": "$"
+      },
+      {
+        "line": 1848,
+        "type": "ERROR",
+        "sample": "$"
+      },
+      {
+        "line": 1848,
+        "type": "ERROR",
+        "sample": "页`;"
+      },
+      {
+        "line": 1848,
+        "type": "ERROR",
+        "sample": "页`;"
+      },
+      {
+        "line": 1850,
+        "type": "ERROR",
+        "sample": "btnFirst"
+      },
+      {
+        "line": 1850,
+        "type": "ERROR",
+        "sample": "btnFirst"
+      },
+      {
+        "line": 1850,
+        "type": "ERROR",
+        "sample": "'btn"
+      },
+      {
+        "line": 1850,
+        "type": "ERROR",
+        "sample": "'btn"
+      },
+      {
+        "line": 1850,
+        "type": "ERROR",
+        "sample": "'"
+      },
+      {
+        "line": 1850,
+        "type": "ERROR",
+        "sample": "'"
+      },
+      {
+        "line": 1851,
+        "type": "ERROR",
+        "sample": "btnPrev"
+      },
+      {
+        "line": 1851,
+        "type": "ERROR",
+        "sample": "btnPrev"
+      },
+      {
+        "line": 1851,
+        "type": "ERROR",
+        "sample": "'btn"
+      },
+      {
+        "line": 1851,
+        "type": "ERROR",
+        "sample": "'btn"
+      },
+      {
+        "line": 1851,
+        "type": "ERROR",
+        "sample": "'"
+      },
+      {
+        "line": 1851,
+        "type": "ERROR",
+        "sample": "'"
+      },
+      {
+        "line": 1852,
+        "type": "ERROR",
+        "sample": "btnNext"
+      },
+      {
+        "line": 1852,
+        "type": "ERROR",
+        "sample": "btnNext"
+      },
+      {
+        "line": 1852,
+        "type": "ERROR",
+        "sample": "'btn"
+      },
+      {
+        "line": 1852,
+        "type": "ERROR",
+        "sample": "'btn"
+      },
+      {
+        "line": 1852,
+        "type": "ERROR",
+        "sample": "'"
+      },
+      {
+        "line": 1852,
+        "type": "ERROR",
+        "sample": "'"
+      },
+      {
+        "line": 1853,
+        "type": "ERROR",
+        "sample": "btnLast"
+      },
+      {
+        "line": 1853,
+        "type": "ERROR",
+        "sample": "btnLast"
+      },
+      {
+        "line": 1853,
+        "type": "ERROR",
+        "sample": "'btn"
+      },
+      {
+        "line": 1853,
+        "type": "ERROR",
+        "sample": "'btn"
+      },
+      {
+        "line": 1853,
+        "type": "ERROR",
+        "sample": "'"
+      },
+      {
+        "line": 1853,
+        "type": "ERROR",
+        "sample": "'"
+      },
+      {
+        "line": 1853,
+        "type": "ERROR",
+        "sample": ";\r\n\r\n      if (btnFirst) btnFirst.disabled = currentPage <= 1;\r\n      if (btnPrev) btnPrev.disabled = currentPage <= 1;\r"
+      },
+      {
+        "line": 1855,
+        "type": "ERROR",
+        "sample": "btnFirst"
+      },
+      {
+        "line": 1855,
+        "type": "ERROR",
+        "sample": "btnFirst"
+      },
+      {
+        "line": 1855,
+        "type": "ERROR",
+        "sample": "1;\r\n      "
+      },
+      {
+        "line": 1856,
+        "type": "ERROR",
+        "sample": "btnPrev"
+      },
+      {
+        "line": 1856,
+        "type": "ERROR",
+        "sample": "btnPrev"
+      },
+      {
+        "line": 1856,
+        "type": "ERROR",
+        "sample": "1;\r\n      "
+      },
+      {
+        "line": 1857,
+        "type": "ERROR",
+        "sample": "btnNext"
+      },
+      {
+        "line": 1857,
+        "type": "ERROR",
+        "sample": "btnNext"
+      },
+      {
+        "line": 1857,
+        "type": "ERROR",
+        "sample": ";\r\n      if"
+      },
+      {
+        "line": 1858,
+        "type": "ERROR",
+        "sample": "btnLast"
+      },
+      {
+        "line": 1858,
+        "type": "ERROR",
+        "sample": "btnLast"
+      },
+      {
+        "line": 1860,
+        "type": "ERROR",
+        "sample": "tbody"
+      },
+      {
+        "line": 1860,
+        "type": "ERROR",
+        "sample": "tbody"
+      },
+      {
+        "line": 1860,
+        "type": "ERROR",
+        "sample": "'sources"
+      },
+      {
+        "line": 1860,
+        "type": "ERROR",
+        "sample": "'sources"
+      },
+      {
+        "line": 1860,
+        "type": "ERROR",
+        "sample": "'"
+      },
+      {
+        "line": 1860,
+        "type": "ERROR",
+        "sample": "'"
+      },
+      {
+        "line": 1862,
+        "type": "ERROR",
+        "sample": "'"
+      },
+      {
+        "line": 1862,
+        "type": "ERROR",
+        "sample": "'"
+      },
+      {
+        "line": 1862,
+        "type": "ERROR",
+        "sample": "tr"
+      },
+      {
+        "line": 1862,
+        "type": "ERROR",
+        "sample": "tr"
+      },
+      {
+        "line": 1862,
+        "type": "ERROR",
+        "sample": "td colspan"
+      },
+      {
+        "line": 1862,
+        "type": "ERROR",
+        "sample": "td colspan"
+      },
+      {
+        "line": 1862,
+        "type": "ERROR",
+        "sample": "style"
+      },
+      {
+        "line": 1862,
+        "type": "ERROR",
+        "sample": "style"
+      },
+      {
+        "line": 1862,
+        "type": "ERROR",
+        "sample": ">'"
+      },
+      {
+        "line": 1862,
+        "type": "ERROR",
+        "sample": "'"
+      },
+      {
+        "line": 1867,
+        "type": "ERROR",
+        "sample": "'"
+      },
+      {
+        "line": 1867,
+        "type": "ERROR",
+        "sample": "'"
+      },
+      {
+        "line": 1867,
+        "type": "ERROR",
+        "sample": "span class"
+      },
+      {
+        "line": 1867,
+        "type": "ERROR",
+        "sample": "span"
+      },
+      {
+        "line": 1867,
+        "type": "ERROR",
+        "sample": ">';\r\n        if (s.healthStatus === 'passed') {\r\n          statusBadge = '<span class=\"pill pill-green\" title=\"' + escap"
+      },
+      {
+        "line": 1867,
+        "type": "ERROR",
+        "sample": "';\r\n        "
+      },
+      {
+        "line": 1867,
+        "type": "ERROR",
+        "sample": "'"
+      },
+      {
+        "line": 1868,
+        "type": "ERROR",
+        "sample": "'passed') {\r\n          statusBadge = '<span class=\"pill pill-green\" title=\"' + escapeHtml(s.healthMessage) + '\">🟢 正常</sp"
+      },
+      {
+        "line": 1868,
+        "type": "ERROR",
+        "sample": "'passed'"
+      },
+      {
+        "line": 1869,
+        "type": "ERROR",
+        "sample": "'"
+      },
+      {
+        "line": 1869,
+        "type": "ERROR",
+        "sample": "'"
+      },
+      {
+        "line": 1869,
+        "type": "ERROR",
+        "sample": "span class"
+      },
+      {
+        "line": 1869,
+        "type": "ERROR",
+        "sample": "span"
+      },
+      {
+        "line": 1869,
+        "type": "ERROR",
+        "sample": "title"
+      },
+      {
+        "line": 1869,
+        "type": "ERROR",
+        "sample": "title"
+      },
+      {
+        "line": 1869,
+        "type": "ERROR",
+        "sample": "正常"
+      },
+      {
+        "line": 1869,
+        "type": "ERROR",
+        "sample": "正常"
+      },
+      {
+        "line": 1869,
+        "type": "ERROR",
+        "sample": ">'"
+      },
+      {
+        "line": 1869,
+        "type": "ERROR",
+        "sample": "'"
+      },
+      {
+        "line": 1870,
+        "type": "ERROR",
+        "sample": "=== 'failed'"
+      },
+      {
+        "line": 1870,
+        "type": "ERROR",
+        "sample": "'failed'"
+      },
+      {
+        "line": 1870,
+        "type": "ERROR",
+        "sample": "'blocked') {\r\n          statusBadge = '<span class=\"pill pill-red\" title=\"' + escapeHtml(s.healthMessage) + '\">🔴 异常</spa"
+      },
+      {
+        "line": 1870,
+        "type": "ERROR",
+        "sample": "'blocked'"
+      },
+      {
+        "line": 1871,
+        "type": "ERROR",
+        "sample": "'"
+      },
+      {
+        "line": 1871,
+        "type": "ERROR",
+        "sample": "'"
+      },
+      {
+        "line": 1871,
+        "type": "ERROR",
+        "sample": "span class"
+      },
+      {
+        "line": 1871,
+        "type": "ERROR",
+        "sample": "span"
+      },
+      {
+        "line": 1871,
+        "type": "ERROR",
+        "sample": "title"
+      },
+      {
+        "line": 1871,
+        "type": "ERROR",
+        "sample": "title"
+      },
+      {
+        "line": 1871,
+        "type": "ERROR",
+        "sample": "异常"
+      },
+      {
+        "line": 1871,
+        "type": "ERROR",
+        "sample": "异常"
+      },
+      {
+        "line": 1871,
+        "type": "ERROR",
+        "sample": ">'"
+      },
+      {
+        "line": 1871,
+        "type": "ERROR",
+        "sample": "'"
+      },
+      {
+        "line": 1872,
+        "type": "ERROR",
+        "sample": "'"
+      },
+      {
+        "line": 1873,
+        "type": "ERROR",
+        "sample": "'"
+      },
+      {
+        "line": 1873,
+        "type": "ERROR",
+        "sample": "'"
+      },
+      {
+        "line": 1873,
+        "type": "ERROR",
+        "sample": "span class"
+      },
+      {
+        "line": 1873,
+        "type": "ERROR",
+        "sample": "span"
+      },
+      {
+        "line": 1873,
+        "type": "ERROR",
+        "sample": "title"
+      },
+      {
+        "line": 1873,
+        "type": "ERROR",
+        "sample": "title"
+      },
+      {
+        "line": 1873,
+        "type": "ERROR",
+        "sample": "延迟高"
+      },
+      {
+        "line": 1873,
+        "type": "ERROR",
+        "sample": "延迟高"
+      },
+      {
+        "line": 1873,
+        "type": "ERROR",
+        "sample": ">'"
+      },
+      {
+        "line": 1873,
+        "type": "ERROR",
+        "sample": "'"
+      },
+      {
+        "line": 1876,
+        "type": "ERROR",
+        "sample": "return `\r\n          "
+      },
+      {
+        "line": 1876,
+        "type": "ERROR",
+        "sample": "`"
+      },
+      {
+        "line": 1878,
+        "type": "ERROR",
+        "sample": "td"
+      },
+      {
+        "line": 1878,
+        "type": "ERROR",
+        "sample": "td"
+      },
+      {
+        "line": 1879,
+        "type": "ERROR",
+        "sample": "div style"
+      },
+      {
+        "line": 1879,
+        "type": "ERROR",
+        "sample": "div style"
+      },
+      {
+        "line": 1879,
+        "type": "ERROR",
+        "sample": "$"
+      },
+      {
+        "line": 1879,
+        "type": "ERROR",
+        "sample": "$"
+      },
+      {
+        "line": 1880,
+        "type": "ERROR",
+        "sample": "div style"
+      },
+      {
+        "line": 1880,
+        "type": "ERROR",
+        "sample": "div style"
+      },
+      {
+        "line": 1880,
+        "type": "ERROR",
+        "sample": ": $"
+      },
+      {
+        "line": 1880,
+        "type": "ERROR",
+        "sample": "$"
+      },
+      {
+        "line": 1882,
+        "type": "ERROR",
+        "sample": "td"
+      },
+      {
+        "line": 1882,
+        "type": "ERROR",
+        "sample": "td"
+      },
+      {
+        "line": 1882,
+        "type": "ERROR",
+        "sample": "span class"
+      },
+      {
+        "line": 1882,
+        "type": "ERROR",
+        "sample": "span"
+      },
+      {
+        "line": 1882,
+        "type": "ERROR",
+        "sample": "$"
+      },
+      {
+        "line": 1882,
+        "type": "ERROR",
+        "sample": "$"
+      },
+      {
+        "line": 1882,
+        "type": "ERROR",
+        "sample": "|| '未分组'"
+      },
+      {
+        "line": 1882,
+        "type": "ERROR",
+        "sample": "'未分组'"
+      },
+      {
+        "line": 1883,
+        "type": "ERROR",
+        "sample": "td"
+      },
+      {
+        "line": 1883,
+        "type": "ERROR",
+        "sample": "td"
+      },
+      {
+        "line": 1883,
+        "type": "ERROR",
+        "sample": "a href"
+      },
+      {
+        "line": 1883,
+        "type": "ERROR",
+        "sample": "a href"
+      },
+      {
+        "line": 1883,
+        "type": "ERROR",
+        "sample": "target"
+      },
+      {
+        "line": 1883,
+        "type": "ERROR",
+        "sample": "target"
+      },
+      {
+        "line": 1883,
+        "type": "ERROR",
+        "sample": "style"
+      },
+      {
+        "line": 1883,
+        "type": "ERROR",
+        "sample": "style"
+      },
+      {
+        "line": 1883,
+        "type": "ERROR",
+        "sample": "$"
+      },
+      {
+        "line": 1883,
+        "type": "ERROR",
+        "sample": "$"
+      },
+      {
+        "line": 1884,
+        "type": "ERROR",
+        "sample": "td"
+      },
+      {
+        "line": 1884,
+        "type": "ERROR",
+        "sample": "td"
+      },
+      {
+        "line": 1885,
+        "type": "ERROR",
+        "sample": "$"
+      },
+      {
+        "line": 1885,
+        "type": "ERROR",
+        "sample": "$"
+      },
+      {
+        "line": 1886,
+        "type": "ERROR",
+        "sample": "$"
+      },
+      {
+        "line": 1886,
+        "type": "ERROR",
+        "sample": "$"
+      },
+      {
+        "line": 1886,
+        "type": "ERROR",
+        "sample": "'未检测' ? `<div style"
+      },
+      {
+        "line": 1886,
+        "type": "ERROR",
+        "sample": "'未检测'"
+      },
+      {
+        "line": 1886,
+        "type": "ERROR",
+        "sample": "`<div style"
+      },
+      {
+        "line": 1886,
+        "type": "ERROR",
+        "sample": "$"
+      },
+      {
+        "line": 1886,
+        "type": "ERROR",
+        "sample": "$"
+      },
+      {
+        "line": 1886,
+        "type": "ERROR",
+        "sample": ">` : ''"
+      },
+      {
+        "line": 1886,
+        "type": "ERROR",
+        "sample": "`"
+      },
+      {
+        "line": 1886,
+        "type": "ERROR",
+        "sample": "''"
+      },
+      {
+        "line": 1888,
+        "type": "ERROR",
+        "sample": "td"
+      },
+      {
+        "line": 1888,
+        "type": "ERROR",
+        "sample": "td"
+      },
+      {
+        "line": 1889,
+        "type": "ERROR",
+        "sample": "input type"
+      },
+      {
+        "line": 1889,
+        "type": "ERROR",
+        "sample": "put type"
+      },
+      {
+        "line": 1889,
+        "type": "ERROR",
+        "sample": "$"
+      },
+      {
+        "line": 1889,
+        "type": "ERROR",
+        "sample": "$"
+      },
+      {
+        "line": 1889,
+        "type": "ERROR",
+        "sample": "? 'checked' : ''"
+      },
+      {
+        "line": 1889,
+        "type": "ERROR",
+        "sample": "'checked'"
+      },
+      {
+        "line": 1889,
+        "type": "ERROR",
+        "sample": "''"
+      },
+      {
+        "line": 1889,
+        "type": "ERROR",
+        "sample": "onchange"
+      },
+      {
+        "line": 1891,
+        "type": "ERROR",
+        "sample": "td"
+      },
+      {
+        "line": 1891,
+        "type": "ERROR",
+        "sample": "td"
+      },
+      {
+        "line": 1892,
+        "type": "ERROR",
+        "sample": "div style"
+      },
+      {
+        "line": 1892,
+        "type": "ERROR",
+        "sample": "div style"
+      },
+      {
+        "line": 1893,
+        "type": "ERROR",
+        "sample": "button class"
+      },
+      {
+        "line": 1893,
+        "type": "ERROR",
+        "sample": "b"
+      },
+      {
+        "line": 1893,
+        "type": "ERROR",
+        "sample": "tton"
+      },
+      {
+        "line": 1893,
+        "type": "ERROR",
+        "sample": "style"
+      },
+      {
+        "line": 1893,
+        "type": "ERROR",
+        "sample": "style"
+      },
+      {
+        "line": 1893,
+        "type": "ERROR",
+        "sample": "onclick"
+      },
+      {
+        "line": 1893,
+        "type": "ERROR",
+        "sample": "onclick"
+      },
+      {
+        "line": 1894,
+        "type": "ERROR",
+        "sample": "button class"
+      },
+      {
+        "line": 1894,
+        "type": "ERROR",
+        "sample": "b"
+      },
+      {
+        "line": 1894,
+        "type": "ERROR",
+        "sample": "tton"
+      },
+      {
+        "line": 1894,
+        "type": "ERROR",
+        "sample": "style"
+      },
+      {
+        "line": 1894,
+        "type": "ERROR",
+        "sample": "style"
+      },
+      {
+        "line": 1894,
+        "type": "ERROR",
+        "sample": "onclick"
+      },
+      {
+        "line": 1894,
+        "type": "ERROR",
+        "sample": "onclick"
+      },
+      {
+        "line": 1894,
+        "type": "ERROR",
+        "sample": "调试"
+      },
+      {
+        "line": 1894,
+        "type": "ERROR",
+        "sample": "调试"
+      },
+      {
+        "line": 1895,
+        "type": "ERROR",
+        "sample": "button class"
+      },
+      {
+        "line": 1895,
+        "type": "ERROR",
+        "sample": "b"
+      },
+      {
+        "line": 1895,
+        "type": "ERROR",
+        "sample": "tton"
+      },
+      {
+        "line": 1895,
+        "type": "ERROR",
+        "sample": "style"
+      },
+      {
+        "line": 1895,
+        "type": "ERROR",
+        "sample": "style"
+      },
+      {
+        "line": 1895,
+        "type": "ERROR",
+        "sample": "onclick"
+      },
+      {
+        "line": 1895,
+        "type": "ERROR",
+        "sample": "onclick"
+      },
+      {
+        "line": 1898,
+        "type": "ERROR",
+        "sample": ">\r\n        `;\r\n      }"
+      },
+      {
+        "line": 1899,
+        "type": "ERROR",
+        "sample": "`;"
+      },
+      {
+        "line": 1900,
+        "type": "ERROR",
+        "sample": "''"
+      },
+      {
+        "line": 1900,
+        "type": "ERROR",
+        "sample": "''"
+      },
+      {
+        "line": 1903,
+        "type": "ERROR",
+        "sample": "async"
+      },
+      {
+        "line": 1903,
+        "type": "ERROR",
+        "sample": "toggleSource"
+      },
+      {
+        "line": 1903,
+        "type": "ERROR",
+        "sample": "toggleSo"
+      },
+      {
+        "line": 1903,
+        "type": "ERROR",
+        "sample": "rce"
+      },
+      {
+        "line": 1905,
+        "type": "ERROR",
+        "sample": "res"
+      },
+      {
+        "line": 1905,
+        "type": "ERROR",
+        "sample": "'"
+      },
+      {
+        "line": 1905,
+        "type": "ERROR",
+        "sample": "'"
+      },
+      {
+        "line": 1905,
+        "type": "ERROR",
+        "sample": "sources"
+      },
+      {
+        "line": 1905,
+        "type": "ERROR",
+        "sample": "sources"
+      },
+      {
+        "line": 1905,
+        "type": "ERROR",
+        "sample": "', {\r\n          method: 'POST'"
+      },
+      {
+        "line": 1905,
+        "type": "ERROR",
+        "sample": "'"
+      },
+      {
+        "line": 1906,
+        "type": "ERROR",
+        "sample": "'POST'"
+      },
+      {
+        "line": 1907,
+        "type": "ERROR",
+        "sample": "'Content"
+      },
+      {
+        "line": 1907,
+        "type": "ERROR",
+        "sample": "'Content"
+      },
+      {
+        "line": 1907,
+        "type": "ERROR",
+        "sample": "': 'application"
+      },
+      {
+        "line": 1907,
+        "type": "ERROR",
+        "sample": "'"
+      },
+      {
+        "line": 1907,
+        "type": "ERROR",
+        "sample": "'application"
+      },
+      {
+        "line": 1907,
+        "type": "ERROR",
+        "sample": "'"
+      },
+      {
+        "line": 1907,
+        "type": "ERROR",
+        "sample": "'"
+      },
+      {
+        "line": 1908,
+        "type": "ERROR",
+        "sample": "({ url: url"
+      },
+      {
+        "line": 1908,
+        "type": "ERROR",
+        "sample": "rl"
+      },
+      {
+        "line": 1908,
+        "type": "ERROR",
+        "sample": "}"
+      },
+      {
+        "line": 1909,
+        "type": "ERROR",
+        "sample": ")"
+      },
+      {
+        "line": 1910,
+        "type": "ERROR",
+        "sample": "data"
+      },
+      {
+        "line": 1910,
+        "type": "ERROR",
+        "sample": "data"
+      },
+      {
+        "line": 1912,
+        "type": "ERROR",
+        "sample": "? '已启用该书源' : '已禁用该书源'"
+      },
+      {
+        "line": 1912,
+        "type": "ERROR",
+        "sample": "'已启用该书源'"
+      },
+      {
+        "line": 1912,
+        "type": "ERROR",
+        "sample": "'已禁用该书源'"
+      },
+      {
+        "line": 1914,
+        "type": "ERROR",
+        "sample": "catch"
+      },
+      {
+        "line": 1915,
+        "type": "ERROR",
+        "sample": "'切换失败: '"
+      },
+      {
+        "line": 1915,
+        "type": "ERROR",
+        "sample": "'切换失败"
+      },
+      {
+        "line": 1915,
+        "type": "ERROR",
+        "sample": "'"
+      },
+      {
+        "line": 1915,
+        "type": "ERROR",
+        "sample": "e"
+      },
+      {
+        "line": 1915,
+        "type": "ERROR",
+        "sample": "e"
+      },
+      {
+        "line": 1917,
+        "type": "ERROR",
+        "sample": "}\r\n\r\n    async function de"
+      },
+      {
+        "line": 1919,
+        "type": "ERROR",
+        "sample": "de"
+      },
+      {
+        "line": 1920,
+        "type": "ERROR",
+        "sample": "if (!confirm(`确定要从手机删除此书源吗？\\n${url}`))"
+      },
+      {
+        "line": 1922,
+        "type": "ERROR",
+        "sample": "res"
+      },
+      {
+        "line": 1922,
+        "type": "ERROR",
+        "sample": "'"
+      },
+      {
+        "line": 1922,
+        "type": "ERROR",
+        "sample": "'"
+      },
+      {
+        "line": 1922,
+        "type": "ERROR",
+        "sample": "sources"
+      },
+      {
+        "line": 1922,
+        "type": "ERROR",
+        "sample": "sources"
+      },
+      {
+        "line": 1922,
+        "type": "ERROR",
+        "sample": "', {\r\n          method: 'POST'"
+      },
+      {
+        "line": 1922,
+        "type": "ERROR",
+        "sample": "'"
+      },
+      {
+        "line": 1923,
+        "type": "ERROR",
+        "sample": "'POST'"
+      },
+      {
+        "line": 1924,
+        "type": "ERROR",
+        "sample": "'Content"
+      },
+      {
+        "line": 1924,
+        "type": "ERROR",
+        "sample": "'Content"
+      },
+      {
+        "line": 1924,
+        "type": "ERROR",
+        "sample": "': 'application"
+      },
+      {
+        "line": 1924,
+        "type": "ERROR",
+        "sample": "'"
+      },
+      {
+        "line": 1924,
+        "type": "ERROR",
+        "sample": "'application"
+      },
+      {
+        "line": 1924,
+        "type": "ERROR",
+        "sample": "'"
+      },
+      {
+        "line": 1924,
+        "type": "ERROR",
+        "sample": "'"
+      },
+      {
+        "line": 1925,
+        "type": "ERROR",
+        "sample": "url: url"
+      },
+      {
+        "line": 1925,
+        "type": "ERROR",
+        "sample": "rl"
+      },
+      {
+        "line": 1926,
+        "type": "ERROR",
+        "sample": "}"
+      },
+      {
+        "line": 1927,
+        "type": "ERROR",
+        "sample": "data"
+      },
+      {
+        "line": 1927,
+        "type": "ERROR",
+        "sample": "data"
+      },
+      {
+        "line": 1929,
+        "type": "ERROR",
+        "sample": "'书源已成功删除'"
+      },
+      {
+        "line": 1929,
+        "type": "ERROR",
+        "sample": "'书源已成功删除'"
+      },
+      {
+        "line": 1932,
+        "type": "ERROR",
+        "sample": "'删除失败: '"
+      },
+      {
+        "line": 1932,
+        "type": "ERROR",
+        "sample": "'删除失败"
+      },
+      {
+        "line": 1932,
+        "type": "ERROR",
+        "sample": "'"
+      },
+      {
+        "line": 1932,
+        "type": "ERROR",
+        "sample": "|| '未知错误'"
+      },
+      {
+        "line": 1932,
+        "type": "ERROR",
+        "sample": "'未知错误'"
+      },
+      {
+        "line": 1934,
+        "type": "ERROR",
+        "sample": "catch"
+      },
+      {
+        "line": 1935,
+        "type": "ERROR",
+        "sample": "'请求出错: '"
+      },
+      {
+        "line": 1935,
+        "type": "ERROR",
+        "sample": "'请求出错"
+      },
+      {
+        "line": 1935,
+        "type": "ERROR",
+        "sample": "'"
+      },
+      {
+        "line": 1935,
+        "type": "ERROR",
+        "sample": "e"
+      },
+      {
+        "line": 1935,
+        "type": "ERROR",
+        "sample": "e"
+      },
+      {
+        "line": 1939,
+        "type": "ERROR",
+        "sample": "async"
+      },
+      {
+        "line": 1939,
+        "type": "ERROR",
+        "sample": "loadSourceIntoEditor"
+      },
+      {
+        "line": 1939,
+        "type": "ERROR",
+        "sample": "loadSo"
+      },
+      {
+        "line": 1939,
+        "type": "ERROR",
+        "sample": "rceIntoEditor"
+      },
+      {
+        "line": 1941,
+        "type": "ERROR",
+        "sample": "res"
+      },
+      {
+        "line": 1941,
+        "type": "ERROR",
+        "sample": "'"
+      },
+      {
+        "line": 1941,
+        "type": "ERROR",
+        "sample": "'"
+      },
+      {
+        "line": 1941,
+        "type": "ERROR",
+        "sample": "sources'"
+      },
+      {
+        "line": 1941,
+        "type": "ERROR",
+        "sample": "sources'"
+      },
+      {
+        "line": 1941,
+        "type": "ERROR",
+        "sample": "cache: 'no"
+      },
+      {
+        "line": 1941,
+        "type": "ERROR",
+        "sample": "'no"
+      },
+      {
+        "line": 1941,
+        "type": "ERROR",
+        "sample": "'"
+      },
+      {
+        "line": 1941,
+        "type": "ERROR",
+        "sample": "'"
+      },
+      {
+        "line": 1942,
+        "type": "ERROR",
+        "sample": "data"
+      },
+      {
+        "line": 1942,
+        "type": "ERROR",
+        "sample": "data"
+      },
+      {
+        "line": 1943,
+        "type": "ERROR",
+        "sample": "found"
+      },
+      {
+        "line": 1943,
+        "type": "ERROR",
+        "sample": "fo"
+      },
+      {
+        "line": 1943,
+        "type": "ERROR",
+        "sample": "nd"
+      },
+      {
+        "line": 1945,
+        "type": "ERROR",
+        "sample": "'source"
+      },
+      {
+        "line": 1945,
+        "type": "ERROR",
+        "sample": "'source"
+      },
+      {
+        "line": 1945,
+        "type": "ERROR",
+        "sample": "'"
+      },
+      {
+        "line": 1945,
+        "type": "ERROR",
+        "sample": "'"
+      },
+      {
+        "line": 1946,
+        "type": "ERROR",
+        "sample": "'editor'"
+      },
+      {
+        "line": 1946,
+        "type": "ERROR",
+        "sample": "'editor'"
+      },
+      {
+        "line": 1947,
+        "type": "ERROR",
+        "sample": "(`已载入书源 [${found.bookSourceName}] 到编辑器`);"
+      },
+      {
+        "line": 1947,
+        "type": "ERROR",
+        "sample": "`已载入书源"
+      },
+      {
+        "line": 1947,
+        "type": "ERROR",
+        "sample": "`已载入书源"
+      },
+      {
+        "line": 1947,
+        "type": "ERROR",
+        "sample": "$"
+      },
+      {
+        "line": 1947,
+        "type": "ERROR",
+        "sample": "$"
+      },
+      {
+        "line": 1947,
+        "type": "ERROR",
+        "sample": "到编辑器`);"
+      },
+      {
+        "line": 1949,
+        "type": "ERROR",
+        "sample": "'未找到指定书源数据',"
+      },
+      {
+        "line": 1949,
+        "type": "ERROR",
+        "sample": "'未找到指定书源数据'"
+      },
+      {
+        "line": 1951,
+        "type": "ERROR",
+        "sample": "catch"
+      },
+      {
+        "line": 1952,
+        "type": "ERROR",
+        "sample": "'载入失败: '"
+      },
+      {
+        "line": 1952,
+        "type": "ERROR",
+        "sample": "'载入失败"
+      },
+      {
+        "line": 1952,
+        "type": "ERROR",
+        "sample": "'"
+      },
+      {
+        "line": 1952,
+        "type": "ERROR",
+        "sample": "e"
+      },
+      {
+        "line": 1952,
+        "type": "ERROR",
+        "sample": "e"
+      },
+      {
+        "line": 1956,
+        "type": "ERROR",
+        "sample": "async"
+      },
+      {
+        "line": 1956,
+        "type": "ERROR",
+        "sample": "quickDebugSource"
+      },
+      {
+        "line": 1956,
+        "type": "ERROR",
+        "sample": "q"
+      },
+      {
+        "line": 1956,
+        "type": "ERROR",
+        "sample": "ickDeb"
+      },
+      {
+        "line": 1956,
+        "type": "ERROR",
+        "sample": "gSo"
+      },
+      {
+        "line": 1956,
+        "type": "ERROR",
+        "sample": "rce"
+      },
+      {
+        "line": 1958,
+        "type": "ERROR",
+        "sample": "'debugger'"
+      },
+      {
+        "line": 1958,
+        "type": "ERROR",
+        "sample": "'deb"
+      },
+      {
+        "line": 1958,
+        "type": "ERROR",
+        "sample": "gger'"
+      },
+      {
+        "line": 1962,
+        "type": "ERROR",
+        "sample": "async"
+      },
+      {
+        "line": 1962,
+        "type": "ERROR",
+        "sample": "exportBackup"
+      },
+      {
+        "line": 1962,
+        "type": "ERROR",
+        "sample": "exportBack"
+      },
+      {
+        "line": 1962,
+        "type": "ERROR",
+        "sample": "p"
+      },
+      {
+        "line": 1964,
+        "type": "ERROR",
+        "sample": "'"
+      },
+      {
+        "line": 1964,
+        "type": "ERROR",
+        "sample": "'"
+      },
+      {
+        "line": 1964,
+        "type": "ERROR",
+        "sample": "sources"
+      },
+      {
+        "line": 1964,
+        "type": "ERROR",
+        "sample": "sources"
+      },
+      {
+        "line": 1964,
+        "type": "ERROR",
+        "sample": "'"
+      },
+      {
+        "line": 1964,
+        "type": "ERROR",
+        "sample": "'"
+      },
+      {
+        "line": 1964,
+        "type": "ERROR",
+        "sample": "'_blank'"
+      },
+      {
+        "line": 1964,
+        "type": "ERROR",
+        "sample": "'"
+      },
+      {
+        "line": 1964,
+        "type": "ERROR",
+        "sample": "blank'"
+      },
+      {
+        "line": 1965,
+        "type": "ERROR",
+        "sample": "catch"
+      },
+      {
+        "line": 1966,
+        "type": "ERROR",
+        "sample": "'导出失败: '"
+      },
+      {
+        "line": 1966,
+        "type": "ERROR",
+        "sample": "'导出失败"
+      },
+      {
+        "line": 1966,
+        "type": "ERROR",
+        "sample": "'"
+      },
+      {
+        "line": 1966,
+        "type": "ERROR",
+        "sample": "e"
+      },
+      {
+        "line": 1966,
+        "type": "ERROR",
+        "sample": "e"
+      },
+      {
+        "line": 1970,
+        "type": "ERROR",
+        "sample": "escapeHtml"
+      },
+      {
+        "line": 1970,
+        "type": "ERROR",
+        "sample": "escapeHtml"
+      },
+      {
+        "line": 1971,
+        "type": "ERROR",
+        "sample": "if (!str)"
+      },
+      {
+        "line": 1971,
+        "type": "ERROR",
+        "sample": "''"
+      },
+      {
+        "line": 1971,
+        "type": "ERROR",
+        "sample": "''"
+      },
+      {
+        "line": 1973,
+        "type": "ERROR",
+        "sample": "'"
+      },
+      {
+        "line": 1973,
+        "type": "ERROR",
+        "sample": "'"
+      },
+      {
+        "line": 1973,
+        "type": "ERROR",
+        "sample": ";'"
+      },
+      {
+        "line": 1973,
+        "type": "ERROR",
+        "sample": "'"
+      },
+      {
+        "line": 1974,
+        "type": "ERROR",
+        "sample": "'"
+      },
+      {
+        "line": 1974,
+        "type": "ERROR",
+        "sample": "'"
+      },
+      {
+        "line": 1974,
+        "type": "ERROR",
+        "sample": ";'"
+      },
+      {
+        "line": 1974,
+        "type": "ERROR",
+        "sample": "'"
+      },
+      {
+        "line": 1975,
+        "type": "ERROR",
+        "sample": "'"
+      },
+      {
+        "line": 1975,
+        "type": "ERROR",
+        "sample": "'"
+      },
+      {
+        "line": 1975,
+        "type": "ERROR",
+        "sample": ";'"
+      },
+      {
+        "line": 1975,
+        "type": "ERROR",
+        "sample": "'"
+      },
+      {
+        "line": 1976,
+        "type": "ERROR",
+        "sample": "g"
+      },
+      {
+        "line": 1976,
+        "type": "ERROR",
+        "sample": "g"
+      },
+      {
+        "line": 1976,
+        "type": "ERROR",
+        "sample": "'"
+      },
+      {
+        "line": 1976,
+        "type": "ERROR",
+        "sample": "'"
+      },
+      {
+        "line": 1976,
+        "type": "ERROR",
+        "sample": ";'"
+      },
+      {
+        "line": 1976,
+        "type": "ERROR",
+        "sample": "'"
+      },
+      {
+        "line": 1977,
+        "type": "ERROR",
+        "sample": "g"
+      },
+      {
+        "line": 1977,
+        "type": "ERROR",
+        "sample": "g"
+      },
+      {
+        "line": 1977,
+        "type": "ERROR",
+        "sample": "'&#039;'"
+      },
+      {
+        "line": 1977,
+        "type": "ERROR",
+        "sample": "'"
+      },
+      {
+        "line": 1977,
+        "type": "ERROR",
+        "sample": "'"
+      },
+      {
+        "line": 1980,
+        "type": "ERROR",
+        "sample": "escapeJs"
+      },
+      {
+        "line": 1980,
+        "type": "ERROR",
+        "sample": "escapeJs"
+      },
+      {
+        "line": 1981,
+        "type": "ERROR",
+        "sample": "if (!str)"
+      },
+      {
+        "line": 1981,
+        "type": "ERROR",
+        "sample": "''"
+      },
+      {
+        "line": 1981,
+        "type": "ERROR",
+        "sample": "''"
+      },
+      {
+        "line": 1982,
+        "type": "ERROR",
+        "sample": "g"
+      },
+      {
+        "line": 1982,
+        "type": "ERROR",
+        "sample": "g"
+      },
+      {
+        "line": 2056,
+        "type": "\"\"\"",
+        "sample": ""
+      }
+    ]
+  },
+  {
+    "file": "SourceReadSwift/Features/Discover/WebReadingSession.swift",
+    "parse_errors": []
+  },
+  {
+    "file": "SourceReadSwift/Features/Reader/CoverPageReaderView.swift",
+    "parse_errors": []
+  },
+  {
+    "file": "SourceReadSwift/Features/Reader/LocalBookMetadataView.swift",
+    "parse_errors": []
+  },
+  {
+    "file": "SourceReadSwift/Features/Reader/ReaderCJKPunctuationCompression.swift",
+    "parse_errors": []
+  },
+  {
+    "file": "SourceReadSwift/Features/Reader/ReaderChapterPaginator.swift",
+    "parse_errors": []
+  },
+  {
+    "file": "SourceReadSwift/Features/Reader/ReaderPageGeometry.swift",
+    "parse_errors": []
+  },
+  {
+    "file": "SourceReadSwift/Features/Reader/ReaderPageTextView.swift",
+    "parse_errors": []
+  },
+  {
+    "file": "SourceReadSwift/Features/Reader/ReaderTextPagePaginator.swift",
+    "parse_errors": []
+  },
+  {
+    "file": "SourceReadSwift/Features/Reader/ReaderView.swift",
+    "parse_errors": []
+  },
+  {
+    "file": "SourceReadSwift/Features/Reader/ReaderWebMessagePolicy.swift",
+    "parse_errors": []
+  },
+  {
+    "file": "SourceReadSwift/Features/Reader/WebReaderDocument.swift",
+    "parse_errors": []
+  },
+  {
+    "file": "SourceReadSwift/Features/Reader/WebScrollReaderView.swift",
+    "parse_errors": []
+  },
+  {
+    "file": "SourceReadSwift/Features/Settings/RecentDiagnosticsView.swift",
+    "parse_errors": []
+  },
+  {
+    "file": "SourceReadSwift/Features/Settings/SettingsView.swift",
+    "parse_errors": []
+  },
+  {
+    "file": "SourceReadSwift/Features/SourceManager/SourceLoginView.swift",
+    "parse_errors": []
+  },
+  {
+    "file": "SourceReadSwift/Features/SourceManager/SourceManagerView.swift",
+    "parse_errors": [
+      {
+        "line": 1869,
+        "type": "ERROR",
+        "sample": "UIApplication"
+      },
+      {
+        "line": 1869,
+        "type": "ERROR",
+        "sample": "UIApplication"
+      }
+    ]
+  },
+  {
+    "file": "SourceReadSwift/Shared/AppVersion.swift",
+    "parse_errors": []
+  },
+  {
+    "file": "SourceReadSwift/Shared/DesignSystem/AppTheme.swift",
+    "parse_errors": []
+  },
+  {
+    "file": "SourceReadSwift/Shared/Performance/ReaderPerformancePolicy.swift",
+    "parse_errors": []
+  },
+  {
+    "file": "SourceReadSwiftTests/ReaderRecovery119Tests.swift",
+    "parse_errors": []
+  },
+  {
+    "file": "SourceReadSwiftTests/Release110RegressionTests.swift",
+    "parse_errors": []
+  }
+]

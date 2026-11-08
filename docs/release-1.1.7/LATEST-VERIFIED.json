@@ -1,0 +1,140 @@
+{
+  "head": "89c9a5148d6eeabe4f60af1ff6af1430056413c5",
+  "recorded_at_utc": "2026-11-01T23:26:26.308214+00:00",
+  "state": "Native regression checkpoint; not formally released",
+  "native": [
+    {
+      "run": 41360583494,
+      "job": 125009985531,
+      "name": "package",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/ztcsr5/SourceReadSwift/actions/runs/41360583494",
+      "counts": null,
+      "suites": {
+        "WebsiteSourceFamilyInferenceTests": "Not in this job",
+        "WebsiteSourceInferenceTests": "Not in this job",
+        "Release117ThemeCollaborationTests": "Not in this job",
+        "Release117ReaderPersonalizationTests": "Not in this job",
+        "Release117WallpaperEditorTests": "Not in this job",
+        "Release117ReadingHeroTests": "Not in this job",
+        "AIChatTests": "Not in this job",
+        "Release117ComicCompatibilityTests": "Not in this job",
+        "JSCoreRuntimeLifecycleTests": "Not in this job"
+      },
+      "log": "F:\\SourceReadSwift\\release-1.1.7\\job-125009985531.log",
+      "bytes": 479493,
+      "sha256": "e020fd32f8b7d95d18c6391a6096cf4ebe2da8298f8a24da654ec6f680837d40"
+    },
+    {
+      "run": 41360583462,
+      "job": 125010430695,
+      "name": "build",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/ztcsr5/SourceReadSwift/actions/runs/41360583462",
+      "counts": [
+        "1564",
+        "2",
+        "0"
+      ],
+      "suites": {
+        "WebsiteSourceFamilyInferenceTests": "passed",
+        "WebsiteSourceInferenceTests": "passed",
+        "Release117ThemeCollaborationTests": "passed",
+        "Release117ReaderPersonalizationTests": "passed",
+        "Release117WallpaperEditorTests": "passed",
+        "Release117ReadingHeroTests": "passed",
+        "AIChatTests": "passed",
+        "Release117ComicCompatibilityTests": "passed",
+        "JSCoreRuntimeLifecycleTests": "passed"
+      },
+      "log": "F:\\SourceReadSwift\\release-1.1.7\\job-125010430695.log",
+      "bytes": 2566122,
+      "sha256": "12e4870106d2c36dec6f2c9c833d7ace88f132f27ebb8cb9f29316615ff3daa0"
+    },
+    {
+      "run": 41360583462,
+      "job": 125010430911,
+      "name": "native-tabs",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/ztcsr5/SourceReadSwift/actions/runs/41360583462",
+      "counts": [
+        "131",
+        "",
+        "0"
+      ],
+      "suites": {
+        "WebsiteSourceFamilyInferenceTests": "passed",
+        "WebsiteSourceInferenceTests": "passed",
+        "Release117ThemeCollaborationTests": "passed",
+        "Release117ReaderPersonalizationTests": "passed",
+        "Release117WallpaperEditorTests": "passed",
+        "Release117ReadingHeroTests": "passed",
+        "AIChatTests": "passed",
+        "Release117ComicCompatibilityTests": "passed",
+        "JSCoreRuntimeLifecycleTests": "Not in this job"
+      },
+      "log": "F:\\SourceReadSwift\\release-1.1.7\\job-125010430911.log",
+      "bytes": 1050824,
+      "sha256": "385065c41a18fe0fbe04bc0156c5373ed2a516dca789acb9a4918f464991c783"
+    }
+  ],
+  "implemented_and_native_regressed": [
+    11,
+    17,
+    18,
+    19,
+    20
+  ],
+  "compatibility_3_4": "Nested JS context/persistence fixes and deterministic parser corpus pass; external comic compatibility remains partial.",
+  "ai_api": {
+    "status": "User manual acceptance; no more gateway calls",
+    "observed_preflight": "One authenticated GET models returned401; zero chat or attachment requests; never a provider success claim."
+  },
+  "comics": {
+    "total": 31,
+    "first_image_decoded": 10,
+    "all_sampled_images_decoded": 10,
+    "failure_kinds": {
+      "verification": 1,
+      "blocked": 4,
+      "empty-result": 12,
+      "image-transport-or-decode": 1,
+      "not-image-payload": 3
+    },
+    "scope": "31 original type2 configurations; first chapter only; sample first/middle/last pages, not all books/pages."
+  },
+  "comic_report": "F:\\SourceReadSwift\\release-1.1.7\\closeout34\\89c9a5148d6eeabe4f60af1ff6af1430056413c5\\comic-pipeline-31.json",
+  "ui_review": {
+    "head": "89c9a5148d6eeabe4f60af1ff6af1430056413c5",
+    "status": "Scoped screenshots inspected, not physical/all-page acceptance",
+    "final_hero": "F:\\SourceReadSwift\\release-1.1.7\\native-evidence\\89c9a5148d6eeabe4f60af1ff6af1430056413c5\\visual-review\\hero-final.jpg",
+    "final_hero_sources": "F:\\SourceReadSwift\\release-1.1.7\\native-evidence\\89c9a5148d6eeabe4f60af1ff6af1430056413c5\\visual-review\\index.json",
+    "final_hero_source_count": 6,
+    "observations": [
+      "Both runtimes show actual dark390px hero with light text and muted card; test also asserts UIKit dark traits.",
+      "320px light normal and accessibility3/high-contrast preserve horizontal cover/text order; large content grows vertically.",
+      "42d9f6a editor/theme/doodle sheets inspected; product code unchanged from42d9f6a through89c9a51.",
+      "Wallpaper miniature keeps reader crop aspect ratio; original8 day/night vector tiles visible."
+    ],
+    "prior_partial_review": "F:\\SourceReadSwift\\release-1.1.7\\native-evidence\\42d9f6a8fcb4f82759e7b464e90735707de63b19\\visual-review\\REVIEW.json"
+  },
+  "changeset": "F:\\SourceReadSwift\\release-1.1.7\\resume-closeout\\89c9a5148d6eeabe4f60af1ff6af1430056413c5\\CHANGESET.json",
+  "preservation": "No reset/clean/stash, no unrelated untracked deletion, legacy wallpaper JPEG retained on v2 save.",
+  "dependencies": "No new runtime dependencies; CoreGraphics/UIKit/SwiftUI/Foundation reused.",
+  "local_checks": [
+    "git diff --check passed",
+    "96 changed Swift files: no new tree-sitter syntax errors; this is not a substitute for native compilation"
+  ],
+  "remaining": [
+    "User manual real WorkBuddy provider12 test",
+    "21 external comic failures and full chapter/book coverage",
+    "Physical photo selection/edit/apply/relaunch/gesture acceptance",
+    "Physical iOS16/17/26 and FPS measurements",
+    "Broader secondary-page visual acceptance and formal signed release"
+  ],
+  "next_scope": "Manual acceptance and external compatibility gaps; do not redo verified stages.",
+  "verification_records": "RECOVERY final additions and LATEST-VERIFIED remain local, preserving the exact tested HEAD."
+}

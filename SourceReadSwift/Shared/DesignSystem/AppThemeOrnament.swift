@@ -4,7 +4,23 @@ import SwiftUI
 struct AppThemeOrnament: View {
     let theme: AppVisualTheme
     var isCard = false
-    var body: some View {
+
+    static func hasArtwork(theme: AppVisualTheme, isCard: Bool) -> Bool {
+        if theme.isAtelier { return false }
+        switch theme {
+        case .folio, .blueprint: return true
+        case .inkwash: return !isCard
+        default: return false
+        }
+    }
+
+    @ViewBuilder var body: some View {
+        if Self.hasArtwork(theme: theme, isCard: isCard) {
+            artwork
+        }
+    }
+
+    private var artwork: some View {
         Canvas { context, size in
             let ink = theme.dynamicColor(light: theme.accentHex, dark: theme.darkAccentHex)
             var path = Path()
@@ -39,6 +55,17 @@ struct AppThemeCardShape: Shape {
     let theme: AppVisualTheme
     let radius: CGFloat
     func path(in rect: CGRect) -> Path {
+        if theme == .berryLake, radius < 44 {
+            let cut: CGFloat = min(12, min(rect.width, rect.height) / 4)
+            var path = Path()
+            path.move(to: CGPoint(x: rect.minX, y: rect.minY))
+            path.addLine(to: CGPoint(x: rect.maxX - cut, y: rect.minY))
+            path.addLine(to: CGPoint(x: rect.maxX, y: rect.minY + cut))
+            path.addLine(to: CGPoint(x: rect.maxX, y: rect.maxY))
+            path.addLine(to: CGPoint(x: rect.minX, y: rect.maxY))
+            path.closeSubpath()
+            return path
+        }
         guard theme == .folio else { return Path(roundedRect: rect, cornerRadius: radius) }
         var path = Path(roundedRect: rect, cornerRadius: radius)
         for x in [rect.minX, rect.maxX] {

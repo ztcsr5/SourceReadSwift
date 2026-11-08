@@ -1,0 +1,9 @@
+{
+  "db": "F:\\AntigravityData\\.gemini\\antigravity\\conversations\\2a8bc56d-a010-4246-b869-51077d557ea9.db",
+  "db_size": 60620800,
+  "steps": 5179,
+  "last_idx": 5178,
+  "extracted_records": 438,
+  "errors": [],
+  "note": "Read-only transaction; field-level visible-text extraction, not complete UI/attachment restoration."
+}

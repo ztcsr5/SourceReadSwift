@@ -56,6 +56,7 @@ struct ReaderView: View {
     @Environment(\.readerUsesBookReturn) private var readerUsesBookReturn
     @State private var hasResolvedOpeningPreview = false
     @State private var chromeState = ReaderChromeStateMachine()
+    @State private var nativeMoreMenuPresentation = ReaderMenuPresentation()
     @State private var tabChromeOwner = UUID()
     @State private var readerSessionEnded = false
     @State private var showChapterList = false
@@ -118,6 +119,7 @@ struct ReaderView: View {
     /// of the chapter the reader is about to cross into.
     @State private var prefetchQueue: [Int] = []
     @State private var prefetchTask: Task<Void, Never>?
+    @State private var backgroundChapterPrecache = ReaderBackgroundChapterPrecache()
     @State private var paginationWarmupTask: Task<Void, Never>?
     @State private var paginationWarmupGeneration = 0
     @State private var prefetchGeneration = 0
@@ -143,7 +145,8 @@ struct ReaderView: View {
     /// actual container size instead of using UIScreen.main, which describes
     /// the physical display and can be stale for the current scene.
     @State private var viewportSize: CGSize = .zero
-    @State private var sessionStartedAt = Date()
+    @State private var foregroundReading = ForegroundReadingSession()
+    @State private var isReaderVisible = false
     @State private var previousIdleTimerDisabled = false
     @State private var committedParagraphIndex = 0
     @State private var scrollPositionTracker = ReaderScrollPositionTracker()
@@ -540,7 +543,7 @@ struct ReaderView: View {
         // pagination. Force five chapters on each side so an old AppStorage
         // value of 2 still gets ten chapters of instant back/forward reading.
         let base = ReaderChapterWindowPolicy.radius(forPreloadCount: preloadChapterCount)
-        return isLocalChapterBook ? max(base, ReaderPreloadPolicy.maximumCount) : max(base, 3)
+        return isLocalChapterBook ? max(base, ReaderPreloadPolicy.maximumCount) : max(base, 5)
     }
 
     /// 本地导入的书（localChapters 在书架模型里），章节读取不经过书源。
@@ -697,10 +700,19 @@ struct ReaderView: View {
             UIScreen.main.brightness = brightnessBeforeReader
         }
         appState.releaseTabChromeHidden(owner: tabChromeOwner)
-        appState.bookshelfStore.recordReadingSession(
-            bookID: bookID,
-            duration: Date().timeIntervalSince(sessionStartedAt)
-        )
+        pauseReadingActivity()
+    }
+
+    private func resumeReadingActivity() {
+        guard isReaderVisible, !readerSessionEnded, !readerOpeningManaged, scenePhase == .active else { return }
+        foregroundReading.resume(at: Date())
+    }
+
+    private func pauseReadingActivity() {
+        let calendar = ReadingDayActivity.calendar(in: .current)
+        guard let interval = foregroundReading.pause(at: Date(), calendar: calendar) else { return }
+        appState.bookshelfStore.recordReadingActivity(bookID: bookID, days: interval.days,
+                                                       startsSession: interval.startsSession)
     }
 
     private func scheduleGeometrySettle() {
@@ -1037,21 +1049,25 @@ struct ReaderView: View {
                     .zIndex(4)
             }
 
-            if showSettings {
-                Color.black.opacity(0.35)
-                    .ignoresSafeArea()
-                    .contentShape(Rectangle())
-                    .onTapGesture {
-                        closeSettingsPanel()
-                    }
-                    .transition(.opacity)
-                    .zIndex(15)
+            ZStack {
+                if showSettings {
+                    Color.black.opacity(0.35)
+                        .ignoresSafeArea()
+                        .contentShape(Rectangle())
+                        .onTapGesture {
+                            closeSettingsPanel()
+                        }
+                        .transition(.opacity)
 
-                settingsPanel
-                    .zIndex(20)
-                    .transition(motion.reducesMotion ? .opacity : .offset(y: ReaderSettingsLayoutPolicy.maxPanelHeight(
-                        viewportHeight: effectiveViewportSize.height, bottomInset: readerFooterSafeInset) + readerFooterSafeInset + 16))
+                    settingsPanel
+                        .transition(motion.reducesMotion ? .opacity : .offset(y: ReaderSettingsLayoutPolicy.maxPanelHeight(
+                            viewportHeight: effectiveViewportSize.height, bottomInset: readerFooterSafeInset) + readerFooterSafeInset + 16))
+                }
             }
+            // The outgoing scrim remains drawn during its transition, but it
+            // must release touches as soon as the reader controls reappear.
+            .allowsHitTesting(showSettings)
+            .zIndex(20)
 
             if showGoalCelebrationToast {
                 VStack {
@@ -1103,7 +1119,9 @@ struct ReaderView: View {
         .background(ReaderNavigationPopLock(allowSystemReturn: allowsNativeBookReturn))
         .background(ReaderTabChromeExitBridge(owner: tabChromeOwner))
         .background(ReaderExitSwipeBridge(
-            enabled: ReaderExitSwipePolicy.isEnabled(
+            enabled: ReaderExitSwipePolicy.isProseFallbackEnabled(
+                reducesMotion: motion.reducesMotion, allowsBookReturn: allowsNativeBookReturn
+            ) || ReaderExitSwipePolicy.isEnabled(
                 menuVisible: showOverlay, settingsVisible: showSettings,
                 coverPresented: showChapterList || temporaryCoverPresented
             ),
@@ -1246,8 +1264,14 @@ struct ReaderView: View {
             appState.acquireTabChromeHidden(owner: tabChromeOwner)
             // Dismissing the full-screen TOC must not replay initial position,
             // markReaderOpened or the initial synchronous pagination pass.
-            guard readerPresentationLifecycle.beginAppearance() else { return }
+            isReaderVisible = true
+            guard readerPresentationLifecycle.beginAppearance() else {
+                resumeReadingActivity()
+                return
+            }
             readerSessionEnded = false
+            foregroundReading = ForegroundReadingSession()
+            resumeReadingActivity()
             migrateTypographyDefaultsIfNeeded()
             if let ov = ReaderOverrideStore.shared.override(for: bookID) {
                 isPerBookOverride = true
@@ -1263,7 +1287,6 @@ struct ReaderView: View {
             }
             appState.acquireTabChromeHidden(owner: tabChromeOwner)
             chromeState.setInitialOverlayVisible(initialOverlayVisible)
-            sessionStartedAt = Date()
             seedWindow()
             if readerMode != .scroll { rebuildPagedBlocksCache() }
             readerContentFingerprint = makeContentFingerprint(content)
@@ -1301,7 +1324,12 @@ struct ReaderView: View {
         .task(id: imageHeaderCacheKey) {
             refreshImageRequestHeaders()
         }
+        .onChange(of: readerOpeningManaged) { isOpening in
+            if !isOpening { resumeReadingActivity() }
+        }
         .onDisappear {
+            isReaderVisible = false
+            pauseReadingActivity()
             // Ownership is visibility-scoped even for temporary covers.
             appState.releaseTabChromeHidden(owner: tabChromeOwner)
             // Cover presentation is not a reader exit. Keep the live session
@@ -1335,6 +1363,7 @@ struct ReaderView: View {
                 positionPersistTask?.cancel()
                 positionPersistTask = nil
                 appState.finishReadingWritesInBackground {
+                    pauseReadingActivity()
                     persistReadingPosition(paragraphIndexOverride: currentParagraphIndexForPersistence())
                 }
                 if autoScrollEnabled {
@@ -1343,6 +1372,7 @@ struct ReaderView: View {
                 }
                 // Speech continues playing in background / screen lock
             } else {
+                resumeReadingActivity()
                 if autoScrollPausedForScene {
                     autoScrollPausedForScene = false
                     startAutoScroll()
@@ -1415,6 +1445,8 @@ struct ReaderView: View {
             // Its owner releases the gate before rebuilding the new mode.
             interactionGate.isPageInteractionActive = false
             interactionGate.rebuildDeferred = false
+            interactionGate.isScrollInteractionActive = false
+            interactionGate.scrollTrimDeferred = false
             paginationRebuildPending = false
             paginationWarmupPending = false
             // A mode switch changes the page model itself. Rebuild now so the
@@ -1854,6 +1886,7 @@ struct ReaderView: View {
             imageStyle: currentImageStyle,
             imageHeaders: imageRequestHeaders,
             imageColumnWidth: illustrationColumnWidth,
+            prioritizesSystemEdgeReturn: readerUsesBookReturn && motion.reducesMotion,
             onVisibleParagraph: { index in
                 guard didLandInitialPosition else { return }
                 if paragraphJumpRequest != nil {
@@ -1868,6 +1901,12 @@ struct ReaderView: View {
                 scrollPositionTracker.flatIndex = index
                 scrollPositionTracker.utf16Offset = offset
                 resolveOpeningPreview()
+            },
+            onScrollInteractionChanged: { active in
+                interactionGate.isScrollInteractionActive = active
+                guard !active, !readerSessionEnded, interactionGate.scrollTrimDeferred else { return }
+                interactionGate.scrollTrimDeferred = false
+                trimWindowIfNeeded()
             },
             onNearBottom: {
                 requestScrollForwardChapter()
@@ -2053,6 +2092,7 @@ struct ReaderView: View {
     /// loaded with the same priority as the next one so a backward swipe never
     /// waits for a network round trip.
     private func prefetchWindow(around chapter: Int) {
+        precacheDiskWindow(around: chapter)
         let loaded = Set(windowSections.map(\.chapterIndex)).union(windowLoadingIndices)
         let order = ReaderChapterWindowPolicy.prefetchOrder(
             current: chapter,
@@ -2070,6 +2110,39 @@ struct ReaderView: View {
         } else {
             queuePrefetch(order)
         }
+    }
+
+    /// Forward chapters already belong to the visible-window queue. Only warm
+    /// the backward disk-only side in scroll mode, without inserting DOM above it.
+    private func precacheDiskWindow(around chapter: Int) {
+        guard readerMode == .scroll,
+              let sourceURL = windowSourceURL,
+              let source = appState.sourceStore.source(for: sourceURL) else {
+            backgroundChapterPrecache.cancel()
+            return
+        }
+        let available = Set(windowSections.map(\.chapterIndex)).union(windowLoadingIndices)
+        let targetIndices = (1...5).map { chapter - $0 }.filter { $0 >= 0 && !available.contains($0) }
+        let targets = targetIndices.compactMap { index -> BookChapter? in
+            if chapters.indices.contains(index), chapters[index].index == index { return chapters[index] }
+            return chapters.first(where: { $0.index == index })
+        }
+        let engine = appState.engine
+        let cacheStore = appState.chapterContentCacheStore
+        let purifyRules = appState.purifyRuleStore.enabledPatterns
+        let key = "\(windowGeneration)|\(sourceURL)|\(chapter)"
+        backgroundChapterPrecache.start(key: key, chapters: targets, load: { targetChapter in
+            guard cacheStore.content(sourceURL: sourceURL, chapter: targetChapter, purifyRules: purifyRules) == nil else {
+                return nil
+            }
+            let result = await AsyncTimeout.run(seconds: 12) {
+                await engine.getContent(source: source, chapter: targetChapter)
+            }
+            guard case .success(let content)? = result else { return nil }
+            return content
+        }, commit: { content in
+            cacheStore.save(content, sourceURL: sourceURL, purifyRules: purifyRules)
+        })
     }
 
     private func requestScrollForwardChapter() {
@@ -2127,6 +2200,7 @@ struct ReaderView: View {
     }
 
     private func cancelPrefetch() {
+        backgroundChapterPrecache.cancel()
         prefetchGeneration &+= 1
         prefetchTask?.cancel()
         prefetchTask = nil
@@ -2377,6 +2451,7 @@ struct ReaderView: View {
         let outcome = await fetchWindowChapter(index)
         guard windowGeneration == generation else { return false }
         windowLoadingIndices.remove(index)
+        guard !Task.isCancelled else { return false }
         switch outcome {
         case .success(let loaded):
             guard acceptsWindowChapter(index) else { return false }
@@ -2420,7 +2495,7 @@ struct ReaderView: View {
            localChapters.indices.contains(index) {
             let local = localChapters[index]
             return .success(
-                ReaderChapterSection(
+                await ReaderChapterSection.prepare(
                     chapterIndex: index,
                     title: local.title,
                     paragraphs: local.paragraphs
@@ -2428,7 +2503,13 @@ struct ReaderView: View {
             )
         }
 
-        guard let chapter = chapters.first(where: { $0.index == index }) else {
+        let chapter: BookChapter?
+        if chapters.indices.contains(index) && chapters[index].index == index {
+            chapter = chapters[index]
+        } else {
+            chapter = chapters.first(where: { $0.index == index })
+        }
+        guard let chapter else {
             return .failure("目录中没有第 \(index + 1) 章，可能已被书源移除")
         }
         guard let sourceURL = windowSourceURL,
@@ -2443,7 +2524,7 @@ struct ReaderView: View {
             purifyRules: purifyRules
         ) {
             return .success(
-                ReaderChapterSection(
+                await ReaderChapterSection.prepare(
                     chapterIndex: index,
                     title: chapter.title,
                     paragraphs: cached.paragraphs
@@ -2463,7 +2544,7 @@ struct ReaderView: View {
                 purifyRules: purifyRules
             )
             return .success(
-                ReaderChapterSection(
+                await ReaderChapterSection.prepare(
                     chapterIndex: index,
                     title: loaded.title,
                     paragraphs: loaded.paragraphs
@@ -2563,9 +2644,11 @@ struct ReaderView: View {
             // A distant selection is a foreground transaction, not an append
             // to the old cursor. Do not lay out/prewarm the abandoned window
             // before preparing the requested chapter.
+            windowSections.removeAll { abs($0.chapterIndex - section.chapterIndex) > windowRadius }
             insertWindowSection(section)
             rebuildWindowPositionMapping()
             resumePendingContinuation(for: section.chapterIndex)
+            precacheDiskWindow(around: section.chapterIndex)
             return
         }
         let anchor = scrollAnchorPosition()
@@ -2670,6 +2753,10 @@ struct ReaderView: View {
     /// disk: opening one again is a synchronous cache hit, not a new request.
     /// In-flight chapters and the cursor chapter are never evicted.
     private func trimWindowIfNeeded() {
+        if readerMode == .scroll, interactionGate.isScrollInteractionActive {
+            interactionGate.scrollTrimDeferred = true
+            return
+        }
         var keep = ReaderChapterWindowPolicy.retainedIndices(
             around: windowCurrentChapterIndex,
             radius: windowRadius,
@@ -3742,6 +3829,7 @@ struct ReaderView: View {
 
                 VStack(alignment: .leading, spacing: 2) {
                     Text(currentDisplayChapterTitle)
+                        .accessibilityIdentifier("reader.currentChapterHeading")
                         .font(.system(size: 16, weight: .semibold))
                         .foregroundStyle(chromeForeground)
                         .lineLimit(1)
@@ -3774,9 +3862,11 @@ struct ReaderView: View {
                 }
 
                 ReaderNativeMenuButton(
-                    menu: readerNativeMenu,
+                    menuIdentity: readerNativeMenuIdentity,
+                    makeMenu: { readerNativeMenu },
                     foregroundColor: background.uiTextColor(isNight: readerIsNight),
-                    backgroundColor: readerUsesTranslucentChrome ? .clear : background.uiColor(isNight: readerIsNight)
+                    backgroundColor: readerUsesTranslucentChrome ? .clear : background.uiColor(isNight: readerIsNight),
+                    presentation: nativeMoreMenuPresentation
                 )
                 .frame(width: 44, height: 44)
             }
@@ -4064,6 +4154,16 @@ struct ReaderView: View {
             "advanced": byteCount { advancedSettings },
             "selection": byteCount { settingsPage(for: 0) }
         ]
+    }
+
+    private var readerNativeMenuIdentity: String {
+        [
+            bookID, String(windowCurrentChapterIndex), windowSourceURL ?? "",
+            currentChapterWebURL?.absoluteString ?? "",
+            String(onRefreshChapter != nil), String(onCacheNextChapters != nil),
+            String(canShowPayAction), String(isPerformingPayAction), String(autoScrollEnabled),
+            String(currentBookSource != nil)
+        ].joined(separator: "\n")
     }
 
     private var readerNativeMenu: UIMenu {
@@ -5512,6 +5612,9 @@ struct ReaderView: View {
             jumpToWindowChapter(index, paragraphIndex: startAtEnd ? Int.max : paragraphIndex)
             return
         }
+        if abs(index - windowCurrentChapterIndex) > 5 {
+            windowSections.removeAll { abs($0.chapterIndex - index) > windowRadius }
+        }
         pendingWindowJump = ReaderPendingChapterJump(
             chapterIndex: index,
             paragraphIndex: paragraphIndex,
@@ -5661,7 +5764,7 @@ struct ReaderView: View {
     }
 
     private func handleReaderTap(at location: CGPoint) {
-        guard !textSelectionEnabled else { return }
+        guard !textSelectionEnabled, !nativeMoreMenuPresentation.isActive else { return }
         let now = Date()
         guard now >= tapCooldownUntil else { return }
         tapCooldownUntil = now.addingTimeInterval(0.28)
@@ -6291,6 +6394,7 @@ struct ReaderView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .foregroundStyle(readerThemeTextColor)
         .background(readerThemeBackground.ignoresSafeArea())
+        .accessibilityIdentifier("reader.openingRecovery")
     }
 
     private func resolveOpeningPreview() {
@@ -6341,24 +6445,23 @@ struct ReaderView: View {
     }
 
     private func checkDailyReadingGoal() {
-        let todayKey = Date().formatted(date: .numeric, time: .omitted)
-        guard lastGoalCelebratedDate != todayKey else { return }
-        let goalSeconds = Double(dailyGoalMinutes) * 60.0
-        guard goalSeconds > 0 else { return }
-        let summary = ReadingStatsSummary(books: appState.bookshelfStore.books)
-        let activeSeconds = Date().timeIntervalSince(sessionStartedAt)
-        if (summary.todayReadingSeconds + activeSeconds) >= goalSeconds {
-            lastGoalCelebratedDate = todayKey
-            streakDaysCount = max(1, summary.streakDays)
-            withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
-                showGoalCelebrationToast = true
-            }
-            HapticFeedback.success()
-            DispatchQueue.main.asyncAfter(deadline: .now() + 4.0) {
-                withAnimation(.easeOut(duration: 0.3)) {
-                    showGoalCelebrationToast = false
-                }
-            }
+        let now = Date()
+        let todayKey = now.formatted(date: .numeric, time: .omitted)
+        guard dailyGoalMinutes > 0, lastGoalCelebratedDate != todayKey else { return }
+        let calendar = ReadingDayActivity.calendar(in: .current)
+        let books = appState.bookshelfStore.books
+        let storedSeconds = ReadingDayActivity.seconds(on: now, calendar: calendar, books: books)
+        let activeSeconds = foregroundReading.todaySeconds(at: now, calendar: calendar)
+        guard storedSeconds + activeSeconds >= Double(dailyGoalMinutes) * 60 else { return }
+
+        let summary = ReadingStatsSummary(books: books, referenceDate: now)
+        lastGoalCelebratedDate = todayKey
+        streakDaysCount = max(1, summary.streakDays + (storedSeconds == 0 ? 1 : 0))
+        let animation = motion.animation(.expansion)
+        withAnimation(animation) { showGoalCelebrationToast = true }
+        HapticFeedback.success()
+        DispatchQueue.main.asyncAfter(deadline: .now() + 4.0) {
+            withAnimation(animation) { showGoalCelebrationToast = false }
         }
     }
 
@@ -6853,6 +6956,7 @@ struct ReaderPreviewPosition: Equatable {
     let chapterIndex: Int
     let chapterTitle: String
     let paragraphIndex: Int
+    var comicPosition: ComicReadingPosition? = nil
 }
 
 private final class ReaderScrollPositionTracker {
@@ -6917,6 +7021,8 @@ final class ReaderVisiblePageTracker {
 final class ReaderInteractionGate {
     var isPageInteractionActive = false
     var rebuildDeferred = false
+    var isScrollInteractionActive = false
+    var scrollTrimDeferred = false
 }
 
 /// Bounded attributed-string cache keyed by stable page identity. Mutated

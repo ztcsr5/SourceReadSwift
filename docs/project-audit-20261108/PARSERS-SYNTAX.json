@@ -1,0 +1,75 @@
+{
+  "validation": "tree-sitter syntax only; not iOS typechecking",
+  "files": [
+    {
+      "path": "SourceReadSwift/Core/Rules/PurifyRuleValidator.swift",
+      "sha256": "14d9e359309d25d0a44de9b23eb6773f236215b0c84fb9237e80a8812882be4f",
+      "errors": []
+    },
+    {
+      "path": "SourceReadSwift/Core/Rules/RuleEditorValidator.swift",
+      "sha256": "dc8e9ac693d60b2d0a078c9cf71d079a4099a60fa10cd67d67920657293f5243",
+      "errors": []
+    },
+    {
+      "path": "SourceReadSwift/Core/Rules/ContentParser.swift",
+      "sha256": "41a73a77eb5d9ead285507ee947529281ae95e189a09a4d6b7e616d988da8d88",
+      "errors": []
+    },
+    {
+      "path": "SourceReadSwift/Core/Rules/VideoContentParser.swift",
+      "sha256": "2ed049a3bc5a76c914e46f181cf7df382b6a2b3b5a51d8e53e0af0a8c5eb99ff",
+      "errors": []
+    },
+    {
+      "path": "SourceReadSwift/Core/Storage/PurifyRuleStore.swift",
+      "sha256": "25e394f2f20ce4feb67fd8e16bb5a8cb4e8cd880cdc850b544a23c7de4ed6090",
+      "errors": []
+    },
+    {
+      "path": "SourceReadSwift/Features/Settings/SettingsView.swift",
+      "sha256": "24490d2f3dcb3aa6f2254b442830ef6bf08c0c5bbe9be40523e898197cedb66e",
+      "errors": []
+    },
+    {
+      "path": "SourceReadSwift/Shared/DesignSystem/ComicImageTransport.swift",
+      "sha256": "4a70cd0e6d6ffb5a26e66cd296a9fc66fad59f3f35d5babbe5c47ac3ef9baed7",
+      "errors": []
+    },
+    {
+      "path": "SourceReadSwiftTests/PurifyRuleStoreTests.swift",
+      "sha256": "273929de4ccb20e26927571f2a5b2dd10682bf0c69519db8fe008bf8b44b2b56",
+      "errors": []
+    },
+    {
+      "path": "SourceReadSwiftTests/RuleEditorValidatorTests.swift",
+      "sha256": "f954cea342b0a12368ad56a64270d3ba42c339b5a2c167434e2c25c662d653ba",
+      "errors": []
+    },
+    {
+      "path": "SourceReadSwiftTests/ContentParserTests.swift",
+      "sha256": "77832b92759f5e5d29e46bef69e99b4a0522447f97424ffbec825dd1525de62c",
+      "errors": []
+    },
+    {
+      "path": "SourceReadSwiftTests/VideoContentParserTests.swift",
+      "sha256": "188febc97d21c3608526188448f95fe95308893b527c84fe93d77ad3f1b97f2c",
+      "errors": []
+    },
+    {
+      "path": "SourceReadSwiftTests/Release117PurificationTests.swift",
+      "sha256": "06122616f5dc69d8384f42125b2337374b53323ae50401691ea7f2e71b3f3bd4",
+      "errors": []
+    },
+    {
+      "path": "SourceReadSwiftTests/HeldComicHTTPServer.swift",
+      "sha256": "8b0b9cd2206760c5406eb307aac460e19a04abee6543b5a3dba79f53917e2040",
+      "errors": []
+    },
+    {
+      "path": "SourceReadSwiftTests/RemoteComicImageTests.swift",
+      "sha256": "63ca567a751a564204675c98f66fe3ad6b1da62c800b698dc7733f7dfd23aed7",
+      "errors": []
+    }
+  ]
+}

@@ -94,6 +94,12 @@ extension SourceEngine {
     ) async -> SourcePipelineExecution {
         let startedAt = Date()
         let cleanKeyword = keyword.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard timeout.isFinite, timeout > 0, timeout <= Double(UInt64.max / 1_000_000_000) else {
+            return SourcePipelineExecution(result: SourcePipelineResult(
+                sourceName: source.bookSourceName, sourceURL: source.bookSourceUrl,
+                keyword: cleanKeyword, startedAt: startedAt),
+                error: .invalidSource("检测超时必须是有效的正秒数"))
+        }
         guard !cleanKeyword.isEmpty else {
             return SourcePipelineExecution(
                 result: SourcePipelineResult(
@@ -154,14 +160,24 @@ extension SourceEngine {
         }
 
         let searchStarted = Date()
+        guard !Task.isCancelled else {
+            return failure(.network("书源检测已取消"), stage: .search, start: searchStarted)
+        }
         var search = await AsyncTimeout.run(seconds: timeout) { await self.searchBooks(source: source, keyword: cleanKeyword, page: page) }
             ?? .failure(.network("搜索超时（超过 \(Int(timeout)) 秒）"))
         var searchRetried = false
+        guard !Task.isCancelled else {
+            return failure(.network("书源检测已取消"), stage: .search, start: searchStarted)
+        }
         if case .failure(let error) = search, isTransientNetworkFailure(error) {
-            try? await Task.sleep(nanoseconds: 300_000_000)
+            do { try await Task.sleep(nanoseconds: 300_000_000) }
+            catch { return failure(.network("书源检测已取消"), stage: .search, start: searchStarted) }
             search = await AsyncTimeout.run(seconds: timeout) { await self.searchBooks(source: source, keyword: cleanKeyword, page: page) }
                 ?? .failure(.network("搜索超时（超过 \(Int(timeout)) 秒）"))
             searchRetried = true
+        }
+        guard !Task.isCancelled else {
+            return failure(.network("书源检测已取消"), stage: .search, start: searchStarted)
         }
         switch search {
         case .failure(let error):
@@ -188,11 +204,18 @@ extension SourceEngine {
             var detailResult = await AsyncTimeout.run(seconds: timeout) { await self.getBookDetail(source: source, book: first) }
                 ?? .failure(.network("详情超时（超过 \(Int(timeout)) 秒）"))
             var detailRetried = false
+            guard !Task.isCancelled else {
+                return failure(.network("书源检测已取消"), stage: .detail, start: detailStarted)
+            }
             if case .failure(let error) = detailResult, isTransientNetworkFailure(error) {
-                try? await Task.sleep(nanoseconds: 300_000_000)
+                do { try await Task.sleep(nanoseconds: 300_000_000) }
+                catch { return failure(.network("书源检测已取消"), stage: .detail, start: detailStarted) }
                 detailResult = await AsyncTimeout.run(seconds: timeout) { await self.getBookDetail(source: source, book: first) }
                     ?? .failure(.network("详情超时（超过 \(Int(timeout)) 秒）"))
                 detailRetried = true
+            }
+            guard !Task.isCancelled else {
+                return failure(.network("书源检测已取消"), stage: .detail, start: detailStarted)
             }
             switch detailResult {
             case .failure(let error):
@@ -218,11 +241,18 @@ extension SourceEngine {
         var tocResult = await AsyncTimeout.run(seconds: timeout) { await self.getChapterList(source: source, book: detail, maxPages: tocMaxPages) }
             ?? .failure(.network("目录超时（超过 \(Int(timeout)) 秒）"))
         var tocRetried = false
+        guard !Task.isCancelled else {
+            return failure(.network("书源检测已取消"), stage: .toc, start: tocStarted)
+        }
         if case .failure(let error) = tocResult, isTransientNetworkFailure(error) {
-            try? await Task.sleep(nanoseconds: 300_000_000)
+            do { try await Task.sleep(nanoseconds: 300_000_000) }
+            catch { return failure(.network("书源检测已取消"), stage: .toc, start: tocStarted) }
             tocResult = await AsyncTimeout.run(seconds: timeout) { await self.getChapterList(source: source, book: detail, maxPages: tocMaxPages) }
                 ?? .failure(.network("目录超时（超过 \(Int(timeout)) 秒）"))
             tocRetried = true
+        }
+        guard !Task.isCancelled else {
+            return failure(.network("书源检测已取消"), stage: .toc, start: tocStarted)
         }
         switch tocResult {
         case .failure(let error):
@@ -251,11 +281,18 @@ extension SourceEngine {
         var contentResult = await AsyncTimeout.run(seconds: timeout) { await self.getContent(source: source, chapter: firstChapter, maxPages: contentMaxPages) }
             ?? .failure(.network("正文超时（超过 \(Int(timeout)) 秒）"))
         var contentRetried = false
+        guard !Task.isCancelled else {
+            return failure(.network("书源检测已取消"), stage: .content, start: contentStarted)
+        }
         if case .failure(let error) = contentResult, isTransientNetworkFailure(error) {
-            try? await Task.sleep(nanoseconds: 300_000_000)
+            do { try await Task.sleep(nanoseconds: 300_000_000) }
+            catch { return failure(.network("书源检测已取消"), stage: .content, start: contentStarted) }
             contentResult = await AsyncTimeout.run(seconds: timeout) { await self.getContent(source: source, chapter: firstChapter, maxPages: contentMaxPages) }
                 ?? .failure(.network("正文超时（超过 \(Int(timeout)) 秒）"))
             contentRetried = true
+        }
+        guard !Task.isCancelled else {
+            return failure(.network("书源检测已取消"), stage: .content, start: contentStarted)
         }
         switch contentResult {
         case .failure(let error):

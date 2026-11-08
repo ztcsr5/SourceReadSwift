@@ -1,0 +1,81 @@
+{
+  "method": "Python translation of source predicates + static assertions; NOT Swift/UIKit execution",
+  "source_assertions": {
+    "apply_guard_ignores_neighbours": true,
+    "five_slot_content_size": true,
+    "no_target_offset_clamp": true,
+    "commits_one_step_each_direction": true,
+    "page_curl_legacy_only_declaration": true,
+    "translation_cover_same_route": true,
+    "legacy_prewarm_guard_before_enqueue": true
+  },
+  "neighbour_change_witness": {
+    "before": [
+      "P-2",
+      "P-1",
+      "P",
+      "placeholder+1",
+      "placeholder+2"
+    ],
+    "requested_after": [
+      "P-2",
+      "P-1",
+      "P",
+      "real+1",
+      "real+2"
+    ],
+    "guard_enters": false,
+    "installed_after": [
+      "P-2",
+      "P-1",
+      "P",
+      "placeholder+1",
+      "placeholder+2"
+    ]
+  },
+  "slot_landing_witnesses": [
+    {
+      "physical_slot": 0,
+      "visible_page_delta": -2,
+      "settle": "previous",
+      "committed_delta": -1,
+      "agrees": false
+    },
+    {
+      "physical_slot": 1,
+      "visible_page_delta": -1,
+      "settle": "previous",
+      "committed_delta": -1,
+      "agrees": true
+    },
+    {
+      "physical_slot": 2,
+      "visible_page_delta": 0,
+      "settle": "springBack",
+      "committed_delta": 0,
+      "agrees": true
+    },
+    {
+      "physical_slot": 3,
+      "visible_page_delta": 1,
+      "settle": "next",
+      "committed_delta": 1,
+      "agrees": true
+    },
+    {
+      "physical_slot": 4,
+      "visible_page_delta": 2,
+      "settle": "next",
+      "committed_delta": 1,
+      "agrees": false
+    }
+  ],
+  "test_files_naming_cover_host": [],
+  "source_sha256": {
+    "SourceReadSwift/Features/Reader/CoverPageReaderView.swift": "fafde89acd4fd228ba881bc0683a2d89421905f41f222b131749994353530a4a",
+    "SourceReadSwift/Features/Reader/ReaderView.swift": "383742d4cbb8f8e8456fecba6fc2ab98d472b41f866dee0e8ab2fe9c056e15f6",
+    "SourceReadSwift/Features/Reader/ReaderPagedNavigationPolicy.swift": "a02ffacad6257595cb58c12e370d57e461e5c9d90deec3d41c4004eb412f49fd",
+    "SourceReadSwift/Features/Reader/ReaderSettingsModels.swift": "3bc34e92e569eba16366e7c647a71c94593218b60a599ffcec67c6eef5015036",
+    "SourceReadSwift/Features/Reader/PageCurlReaderView.swift": "bca2efbd33f8fa1ebc33bf0447a3718eba9da012a53c1aea9fa5f4894b28927f"
+  }
+}

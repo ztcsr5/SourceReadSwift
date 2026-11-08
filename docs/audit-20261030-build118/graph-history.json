@@ -1,0 +1,598 @@
+{
+  "nodes": [
+    {
+      "id": "continuous_reading",
+      "label": "连续双向跨章阅读目标",
+      "file_type": "document",
+      "source_file": "docs/audit-20261030-build118/codex-01a15848-1328-7f23-a24e-509b26c7c1a9-visible.json",
+      "source_location": "array[161]; rollout line6739",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0
+    },
+    {
+      "id": "split_reader_state",
+      "label": "多阅读表面与多位置状态",
+      "file_type": "document",
+      "source_file": "docs/audit-20261030-build118/codex-01a15848-1328-7f23-a24e-509b26c7c1a9-visible.json",
+      "source_location": "array[164,166]; rollout line13090/13102",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "rationale": "历史已识别架构收口需求；不把其报告全部技术判断当当前事实"
+    },
+    {
+      "id": "build103_register",
+      "label": "103未闭环问题总账",
+      "file_type": "document",
+      "source_file": "docs/audit-20261030-build118/codex-01a15848-1328-7f23-a24e-509b26c7c1a9-visible.json",
+      "source_location": "array[471]; rollout line42325",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0
+    },
+    {
+      "id": "build103_feedback",
+      "label": "103翻页卡顿、衔接慢、选章后不能下一章",
+      "file_type": "document",
+      "source_file": "docs/audit-20261030-build118/codex-01a1870b-2d3c-7541-97a5-cf146a4daee9-visible.json",
+      "source_location": "array[5]; rollout line2758",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0
+    },
+    {
+      "id": "build106_window",
+      "label": "106稳定reader身份与窗口内跳转",
+      "file_type": "document",
+      "source_file": "docs/audit-20261030-build118/codex-01a1870b-2d3c-7541-97a5-cf146a4daee9-visible.json",
+      "source_location": "array[11,12]; rollout line4196/4568",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "evidence_kind": "historical_assistant_report"
+    },
+    {
+      "id": "build114",
+      "label": "Build114段距与几何修补",
+      "file_type": "document",
+      "source_file": "docs/audit-20261030-build118/codex-01a1870b-2d3c-7541-97a5-cf146a4daee9-visible.json",
+      "source_location": "array[65]; rollout line18988",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "local_commit": "29ba58d"
+    },
+    {
+      "id": "build115",
+      "label": "Build115五槽宿主与预热",
+      "file_type": "document",
+      "source_file": "docs/audit-20261030-build118/codex-01a1870b-2d3c-7541-97a5-cf146a4daee9-visible.json",
+      "source_location": "array[67]; rollout line20844",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "local_commit": "f5c7bfd",
+      "evidence_kind": "report corroborated by local git diff"
+    },
+    {
+      "id": "build115_native_not_run",
+      "label": "115真机验收明确未运行",
+      "file_type": "document",
+      "source_file": "docs/audit-20261030-build118/codex-01a1870b-2d3c-7541-97a5-cf146a4daee9-visible.json",
+      "source_location": "array[67]; rollout line20844: 真机项全部NOT RUN",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0
+    },
+    {
+      "id": "build115_crash_feedback",
+      "label": "115菜单展开崩溃反馈",
+      "file_type": "document",
+      "source_file": "docs/audit-20261030-build118/chat-visible-text.json",
+      "source_location": "array[122]; idx3032",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "evidence_kind": "user_report"
+    },
+    {
+      "id": "build116",
+      "label": "Build116具体状态与排版修补",
+      "file_type": "document",
+      "source_file": "docs/audit-20261030-build118/chat-visible-text.json",
+      "source_location": "array[143]; idx3878",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "local_commit": "fd79a82",
+      "evidence_kind": "report corroborated by local git diff"
+    },
+    {
+      "id": "zero_offset_springback",
+      "label": "零位移springBack即时恢复与0.5s兜底",
+      "file_type": "code",
+      "source_file": "SourceReadSwift/Features/Reader/CoverPageReaderView.swift",
+      "source_location": "git show fd79a82: springBack(width:)",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0
+    },
+    {
+      "id": "slider_single_page",
+      "label": "单页滑条区间下限及禁用保护",
+      "file_type": "document",
+      "source_file": "SourceReadSwift/Features/Reader/ReaderView.swift",
+      "source_location": "git show fd79a82: page/chapter Slider",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0
+    },
+    {
+      "id": "spacing_compensation",
+      "label": "段间距减行距补偿",
+      "file_type": "document",
+      "source_file": "SourceReadSwift/Features/Reader/ReaderPageTextView.swift",
+      "source_location": "git show fd79a82: ReaderPageTextBuilder.effectiveSpacing",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0
+    },
+    {
+      "id": "after116_feedback",
+      "label": "116后末章漏字和快翻拖拽复反馈",
+      "file_type": "document",
+      "source_file": "docs/audit-20261030-build118/chat-visible-text.json",
+      "source_location": "array[144]; idx3879",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "evidence_kind": "user_report"
+    },
+    {
+      "id": "build117",
+      "label": "Build117扩大本地同步范围与8pt预算缓冲",
+      "file_type": "document",
+      "source_file": "docs/audit-20261030-build118/chat-visible-text.json",
+      "source_location": "array[146]; idx4593",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "local_commit": "771d2e4",
+      "evidence_kind": "historical_assistant_report"
+    },
+    {
+      "id": "after117_feedback",
+      "label": "117后菜单、拖拽、底行与设置回归反馈",
+      "file_type": "document",
+      "source_file": "docs/audit-20261030-build118/chat-visible-text.json",
+      "source_location": "array[147]; idx4594",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "evidence_kind": "user_report"
+    },
+    {
+      "id": "build118",
+      "label": "Build118六文件真实改动",
+      "file_type": "document",
+      "source_file": "docs/audit-20261030-build118/chat-visible-text.json",
+      "source_location": "array[329,330,332]; idx4968/4970/4974",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "local_commit": "bffedba"
+    },
+    {
+      "id": "build118_geometry",
+      "label": "118页脚全safeBottom及16pt缓冲",
+      "file_type": "document",
+      "source_file": "SourceReadSwift/Features/Reader/ReaderPageGeometry.swift",
+      "source_location": "git show bffedba; ReaderView.chapterPaginationTypography",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0
+    },
+    {
+      "id": "build118_menu_layers",
+      "label": "118自绘菜单与设置互斥层级",
+      "file_type": "document",
+      "source_file": "SourceReadSwift/Features/Reader/ReaderView.swift",
+      "source_location": "git show bffedba: moreOptionsMenuOverlay, settingsPanel",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0
+    },
+    {
+      "id": "all_window_sync",
+      "label": "118全窗口冷缓存同步分页",
+      "file_type": "document",
+      "source_file": "SourceReadSwift/Features/Reader/ReaderView.swift",
+      "source_location": "6493-6518; git show bffedba synchronousRadius=windowRadius",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0
+    },
+    {
+      "id": "main_actor_cost",
+      "label": "MainActor同步排版成本风险",
+      "file_type": "document",
+      "source_file": "docs/audit-20261030-build118/pagination-audit.md",
+      "source_location": "section3",
+      "confidence": "INFERRED",
+      "confidence_score": 0.93,
+      "rationale": "源码证明同步路径；设备具体耗时仍NOT RUN"
+    },
+    {
+      "id": "build118_raw_failure",
+      "label": "118原始1356测试三断言失败",
+      "file_type": "document",
+      "source_file": "docs/audit-20261030-build118/chat-visible-text.json",
+      "source_location": "array[357]; idx5025: testInsetPageContainerDoesNotDoubleApplySafeArea",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "failed_test_cases": 1,
+      "failed_assertions": 3
+    },
+    {
+      "id": "build118_test_only",
+      "label": "118最终只改三个测试预期",
+      "file_type": "document",
+      "source_file": "docs/audit-20261030-build118/chat-visible-text.json",
+      "source_location": "array[360,361]; idx5033/5035; git show5686485",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "local_commit": "5686485"
+    },
+    {
+      "id": "build118_ci_success",
+      "label": "118最终两workflow成功与IPA下载",
+      "file_type": "document",
+      "source_file": "docs/audit-20261030-build118/chat-visible-text.json",
+      "source_location": "array[363]; idx5039",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "evidence_kind": "historical_tool_output"
+    },
+    {
+      "id": "build118_device_unverified",
+      "label": "118用户设备验收未证实",
+      "file_type": "document",
+      "source_file": "docs/audit-20261030-build118/history-review.md",
+      "source_location": "section5",
+      "confidence": "INFERRED",
+      "confidence_score": 0.97,
+      "rationale": "材料止于交付；无118安装后逐场景验收回执"
+    },
+    {
+      "id": "cache_revision_mismatch",
+      "label": "现存分页/富文本缓存revision不足",
+      "file_type": "document",
+      "source_file": "docs/audit-20261030-build118/pagination-audit.md",
+      "source_location": "sections1-2",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "evidence_kind": "current_code_audit"
+    },
+    {
+      "id": "contract_gap",
+      "label": "正文位置交互契约及设备回归缺口",
+      "file_type": "document",
+      "source_file": "docs/audit-20261030-build118/history-review.md",
+      "source_location": "sections5,7",
+      "confidence": "INFERRED",
+      "confidence_score": 0.9
+    },
+    {
+      "id": "reported_os_ambiguity",
+      "label": "用户系统原文27.0.1与报告17.0.1不一致",
+      "file_type": "document",
+      "source_file": "docs/audit-20261030-build118/chat-visible-text.json",
+      "source_location": "idx3879 vs idx5056/5073",
+      "confidence": "AMBIGUOUS",
+      "confidence_score": 0.25,
+      "rationale": "缺原始系统信息，不能自动归一"
+    },
+    {
+      "id": "source_sweep_axis",
+      "label": "书源PASS4与阅读器体验分离",
+      "file_type": "document",
+      "source_file": "docs/audit-20261030-build118/codex-01a1870b-2d3c-7541-97a5-cf146a4daee9-visible.json",
+      "source_location": "array[67]; rollout line20844: 113 sweep reused, 115 no rerun",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0
+    }
+  ],
+  "edges": [
+    {
+      "source": "continuous_reading",
+      "target": "build103_register",
+      "relation": "references",
+      "source_file": "docs/audit-20261030-build118/codex-01a15848-1328-7f23-a24e-509b26c7c1a9-visible.json",
+      "source_location": "array[161,471]",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "weight": 1.0
+    },
+    {
+      "source": "split_reader_state",
+      "target": "contract_gap",
+      "relation": "rationale_for",
+      "source_file": "docs/audit-20261030-build118/history-review.md",
+      "source_location": "sections1,7",
+      "confidence": "INFERRED",
+      "confidence_score": 0.86,
+      "weight": 1.0
+    },
+    {
+      "source": "build103_register",
+      "target": "build103_feedback",
+      "relation": "precedes",
+      "source_file": "docs/audit-20261030-build118/codex-01a15848-1328-7f23-a24e-509b26c7c1a9-visible.json",
+      "source_location": "array[471]; C2 array[5]",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "weight": 1.0
+    },
+    {
+      "source": "build103_feedback",
+      "target": "build106_window",
+      "relation": "motivates_reported_fix",
+      "source_file": "docs/audit-20261030-build118/codex-01a1870b-2d3c-7541-97a5-cf146a4daee9-visible.json",
+      "source_location": "array[5,11,12]",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "weight": 1.0
+    },
+    {
+      "source": "build106_window",
+      "target": "build114",
+      "relation": "precedes",
+      "source_file": "docs/audit-20261030-build118/codex-01a1870b-2d3c-7541-97a5-cf146a4daee9-visible.json",
+      "source_location": "array[12,65]",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "weight": 1.0
+    },
+    {
+      "source": "build114",
+      "target": "build115",
+      "relation": "precedes",
+      "source_file": "docs/audit-20261030-build118/codex-01a1870b-2d3c-7541-97a5-cf146a4daee9-visible.json",
+      "source_location": "array[65,67]",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "weight": 1.0
+    },
+    {
+      "source": "build115",
+      "target": "build115_native_not_run",
+      "relation": "references",
+      "source_file": "docs/audit-20261030-build118/codex-01a1870b-2d3c-7541-97a5-cf146a4daee9-visible.json",
+      "source_location": "array[67]",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "weight": 1.0
+    },
+    {
+      "source": "build115_crash_feedback",
+      "target": "build115",
+      "relation": "reports_failure_after_release",
+      "source_file": "docs/audit-20261030-build118/chat-visible-text.json",
+      "source_location": "idx3032",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "weight": 1.0
+    },
+    {
+      "source": "build116",
+      "target": "slider_single_page",
+      "relation": "implements",
+      "source_file": "SourceReadSwift/Features/Reader/ReaderView.swift",
+      "source_location": "git show fd79a82",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "weight": 1.0
+    },
+    {
+      "source": "build116",
+      "target": "zero_offset_springback",
+      "relation": "implements",
+      "source_file": "SourceReadSwift/Features/Reader/CoverPageReaderView.swift",
+      "source_location": "git show fd79a82",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "weight": 1.0
+    },
+    {
+      "source": "build116",
+      "target": "spacing_compensation",
+      "relation": "implements",
+      "source_file": "SourceReadSwift/Features/Reader/ReaderPageTextView.swift",
+      "source_location": "git show fd79a82",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "weight": 1.0
+    },
+    {
+      "source": "build115_crash_feedback",
+      "target": "slider_single_page",
+      "relation": "conceptually_related_to",
+      "source_file": "docs/audit-20261030-build118/history-review.md",
+      "source_location": "section3",
+      "confidence": "INFERRED",
+      "confidence_score": 0.85,
+      "weight": 1.0,
+      "rationale": "代码修复潜在零宽区间，缺崩溃栈不能唯一归因"
+    },
+    {
+      "source": "after116_feedback",
+      "target": "build116",
+      "relation": "reports_recurrence_after_release",
+      "source_file": "docs/audit-20261030-build118/chat-visible-text.json",
+      "source_location": "idx3879 follows idx3878",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "weight": 1.0
+    },
+    {
+      "source": "after116_feedback",
+      "target": "build117",
+      "relation": "motivates_reported_fix",
+      "source_file": "docs/audit-20261030-build118/chat-visible-text.json",
+      "source_location": "idx3879,4593",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "weight": 1.0
+    },
+    {
+      "source": "after117_feedback",
+      "target": "build117",
+      "relation": "reports_recurrence_after_release",
+      "source_file": "docs/audit-20261030-build118/chat-visible-text.json",
+      "source_location": "idx4594 follows idx4593",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "weight": 1.0
+    },
+    {
+      "source": "after117_feedback",
+      "target": "build118",
+      "relation": "motivates_fix",
+      "source_file": "docs/audit-20261030-build118/chat-visible-text.json",
+      "source_location": "idx4594,4974",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "weight": 1.0
+    },
+    {
+      "source": "build118",
+      "target": "build118_geometry",
+      "relation": "implements",
+      "source_file": "SourceReadSwift/Features/Reader/ReaderPageGeometry.swift",
+      "source_location": "git show bffedba",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "weight": 1.0
+    },
+    {
+      "source": "build118",
+      "target": "build118_menu_layers",
+      "relation": "implements",
+      "source_file": "SourceReadSwift/Features/Reader/ReaderView.swift",
+      "source_location": "git show bffedba",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "weight": 1.0
+    },
+    {
+      "source": "build118",
+      "target": "all_window_sync",
+      "relation": "implements",
+      "source_file": "SourceReadSwift/Features/Reader/ReaderView.swift",
+      "source_location": "git show bffedba synchronousRadius",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "weight": 1.0
+    },
+    {
+      "source": "all_window_sync",
+      "target": "main_actor_cost",
+      "relation": "rationale_for",
+      "source_file": "docs/audit-20261030-build118/pagination-audit.md",
+      "source_location": "section3",
+      "confidence": "INFERRED",
+      "confidence_score": 0.94,
+      "weight": 1.0
+    },
+    {
+      "source": "build118",
+      "target": "build118_raw_failure",
+      "relation": "references",
+      "source_file": "docs/audit-20261030-build118/chat-visible-text.json",
+      "source_location": "idx5025",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "weight": 1.0
+    },
+    {
+      "source": "build118_raw_failure",
+      "target": "build118_test_only",
+      "relation": "motivates_assertion_update",
+      "source_file": "docs/audit-20261030-build118/chat-visible-text.json",
+      "source_location": "idx5025,5033,5035",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "weight": 1.0
+    },
+    {
+      "source": "build118_test_only",
+      "target": "build118_ci_success",
+      "relation": "precedes",
+      "source_file": "docs/audit-20261030-build118/chat-visible-text.json",
+      "source_location": "idx5035,5039",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "weight": 1.0
+    },
+    {
+      "source": "build118_ci_success",
+      "target": "build118_device_unverified",
+      "relation": "does_not_establish",
+      "source_file": "docs/audit-20261030-build118/history-review.md",
+      "source_location": "sections4-5",
+      "confidence": "INFERRED",
+      "confidence_score": 0.98,
+      "weight": 1.0
+    },
+    {
+      "source": "build118_geometry",
+      "target": "cache_revision_mismatch",
+      "relation": "does_not_resolve",
+      "source_file": "docs/audit-20261030-build118/pagination-audit.md",
+      "source_location": "sections1-3",
+      "confidence": "INFERRED",
+      "confidence_score": 0.95,
+      "weight": 1.0
+    },
+    {
+      "source": "cache_revision_mismatch",
+      "target": "contract_gap",
+      "relation": "rationale_for",
+      "source_file": "docs/audit-20261030-build118/history-review.md",
+      "source_location": "section7",
+      "confidence": "INFERRED",
+      "confidence_score": 0.92,
+      "weight": 1.0
+    },
+    {
+      "source": "build115_native_not_run",
+      "target": "contract_gap",
+      "relation": "rationale_for",
+      "source_file": "docs/audit-20261030-build118/history-review.md",
+      "source_location": "sections2,7",
+      "confidence": "INFERRED",
+      "confidence_score": 0.91,
+      "weight": 1.0
+    },
+    {
+      "source": "source_sweep_axis",
+      "target": "continuous_reading",
+      "relation": "separate_acceptance_axis",
+      "source_file": "docs/audit-20261030-build118/history-review.md",
+      "source_location": "section6",
+      "confidence": "INFERRED",
+      "confidence_score": 0.97,
+      "weight": 1.0
+    }
+  ],
+  "hyperedges": [
+    {
+      "id": "recurring_reader_issues",
+      "label": "跨版本同类阅读反馈",
+      "nodes": [
+        "build103_feedback",
+        "build115_crash_feedback",
+        "after116_feedback",
+        "after117_feedback"
+      ],
+      "relation": "participate_in",
+      "confidence": "INFERRED",
+      "confidence_score": 0.93,
+      "source_file": "docs/audit-20261030-build118/history-review.md",
+      "source_location": "sections1-4"
+    }
+  ],
+  "metadata": {
+    "scope": "historical causal audit; not native device verification",
+    "baseline": "5686485045b78cfb17c654a2acf8c30c387a73e8",
+    "date": "2026-10-31",
+    "timezone": "Asia/Shanghai",
+    "source_records": {
+      "C1": 495,
+      "C2": 68,
+      "A": 379
+    },
+    "provenance_rule": "historical assistant report does not certify technical correctness"
+  }
+}

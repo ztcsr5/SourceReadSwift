@@ -113,6 +113,8 @@ final class CoverPageHostController: UIViewController, UIGestureRecognizerDelega
         view.clipsToBounds = true
         pan.delegate = self
         pan.cancelsTouchesInView = false
+        pan.delaysTouchesBegan = false
+        pan.delaysTouchesEnded = false
         view.addGestureRecognizer(pan)
     }
 
@@ -231,13 +233,10 @@ final class CoverPageHostController: UIViewController, UIGestureRecognizerDelega
                     if oldRevision != next.revision { host.rootView = root }
                     return host
                 }
-                let host = UIHostingController(rootView: root)
-                host.view.accessibilityIdentifier = "reader.page.\(key)"
-                addChild(host)
-                view.addSubview(host.view)
-                host.didMove(toParent: self)
-                hosts[key] = host
-                return host
+                // Distant pages are not visible in this transaction. Mounting
+                // their hosting trees here steals the first frame after a turn.
+                guard index > 0 && index < 4 else { return nil }
+                return mountPage(key: key, root: root)
             }
         }
         for (index, host) in active.enumerated() {
@@ -260,7 +259,10 @@ final class CoverPageHostController: UIViewController, UIGestureRecognizerDelega
             // Hosting geometry changes only on installation or a viewport resize.
             page.bounds = CGRect(origin: .zero, size: size)
             page.center = center
-            page.layer.shadowPath = UIBezierPath(rect: page.bounds).cgPath
+            page.layer.shadowColor = UIColor.black.cgColor
+            page.layer.shadowRadius = 6
+            page.layer.shadowOffset = CGSize(width: -2, height: 0)
+            page.layer.shadowPath = UIBezierPath(rect: CGRect(origin: .zero, size: size)).cgPath
         }
     }
 
@@ -276,28 +278,60 @@ final class CoverPageHostController: UIViewController, UIGestureRecognizerDelega
             next?.transform = CGAffineTransform(translationX: x + width, y: 0)
             for page in [previous, current, next] { page?.layer.shadowOpacity = 0 }
         } else {
+            // Stable z-ordering: next (back) -> current (middle) -> previous (front)
+            // avoids layout thrashing / subview re-insertion on every 120Hz frame.
             if let next, view.subviews.first !== next { view.sendSubviewToBack(next) }
-            if let current, let previous, view.subviews.last !== previous {
-                view.bringSubviewToFront(current); view.bringSubviewToFront(previous)
+            if let previous, view.subviews.last !== previous {
+                if let current { view.bringSubviewToFront(current) }
+                view.bringSubviewToFront(previous)
             }
             previous?.transform = CGAffineTransform(translationX: x > 0 ? x - width : -width, y: 0)
             current?.transform = CGAffineTransform(translationX: min(x, 0), y: 0)
             next?.transform = .identity
-            for page in [previous, current] {
-                page?.layer.shadowColor = UIColor.black.cgColor
-                page?.layer.shadowOpacity = abs(x) > 0.5 ? 0.18 : 0
-                page?.layer.shadowRadius = 5
-                page?.layer.shadowOffset = CGSize(width: 3, height: 0)
-            }
+            let shadowOpacity: Float = abs(x) > 0.5 ? 0.18 : 0
+            if previous?.layer.shadowOpacity != shadowOpacity { previous?.layer.shadowOpacity = shadowOpacity }
+            if current?.layer.shadowOpacity != shadowOpacity { current?.layer.shadowOpacity = shadowOpacity }
         }
+    }
+
+    private func mountPage(key: String, root: AnyView) -> UIHostingController<AnyView> {
+        let host = UIHostingController(rootView: root)
+        host.view.accessibilityIdentifier = "reader.page.\(key)"
+        addChild(host)
+        view.addSubview(host.view)
+        host.didMove(toParent: self)
+        hosts[key] = host
+        return host
     }
 
     private func scheduleWarmup() {
         let generation = warmupGeneration
         DispatchQueue.main.async { [weak self] in
-            guard let self, !self.isTornDown, self.warmupGeneration == generation, !self.isDragging,
-                  self.animator == nil, self.awaitingIdentityChangeFrom == nil else { return }
-            for host in self.active { host?.view.layoutIfNeeded() }
+            guard let self, self.canWarmPages(generation: generation) else { return }
+            for index in 1...3 { self.active[index]?.view.layoutIfNeeded() }
+            self.warmDistantPage(at: 4, generation: generation)
+        }
+    }
+
+    private func canWarmPages(generation: Int) -> Bool {
+        !isTornDown && warmupGeneration == generation && !isDragging
+            && animator == nil && awaitingIdentityChangeFrom == nil && active.count == 5
+    }
+
+    private func warmDistantPage(at index: Int, generation: Int) {
+        DispatchQueue.main.async { [weak self] in
+            guard let self, self.canWarmPages(generation: generation), let window = self.window else { return }
+            if self.active[index] == nil, !window.keys[index].isEmpty, let root = window.roots[index] {
+                let host = self.mountPage(key: window.keys[index], root: root)
+                self.active[index] = host
+                host.view.backgroundColor = window.paper ?? .clear
+                host.view.isOpaque = window.paper != nil
+                host.overrideUserInterfaceStyle = window.appearance
+                host.view.isHidden = true
+                self.sizePagesIfNeeded()
+                host.view.layoutIfNeeded()
+            }
+            if index == 4 { self.warmDistantPage(at: 0, generation: generation) }
         }
     }
 

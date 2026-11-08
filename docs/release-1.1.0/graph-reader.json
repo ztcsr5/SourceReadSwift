@@ -1,0 +1,1052 @@
+{
+  "schema": "graphify-semantic-fragment-v1",
+  "baseline_commit": "71156be1ac148d6328dccc2844ed2555a41313b0",
+  "scope": "Focused read-only semantic extraction; not a device crash reproduction or performance result.",
+  "nodes": [
+    {
+      "id": "reader_toc_scroll",
+      "label": "ReaderView.scrollTocToCurrentChapter",
+      "file_type": "code",
+      "source_file": "SourceReadSwift/Features/Reader/ReaderView.swift",
+      "source_location": "4894",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "reader_toc_list",
+      "label": "ReaderView.tocList",
+      "file_type": "code",
+      "source_file": "SourceReadSwift/Features/Reader/ReaderView.swift",
+      "source_location": "4738",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "reader_chapter_select",
+      "label": "ReaderView.selectChapter",
+      "file_type": "code",
+      "source_file": "SourceReadSwift/Features/Reader/ReaderView.swift",
+      "source_location": "5249",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "reader_activate",
+      "label": "ReaderView.activateWindowChapter",
+      "file_type": "code",
+      "source_file": "SourceReadSwift/Features/Reader/ReaderView.swift",
+      "source_location": "5138",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "reader_jump",
+      "label": "ReaderView.jumpToWindowChapter",
+      "file_type": "code",
+      "source_file": "SourceReadSwift/Features/Reader/ReaderView.swift",
+      "source_location": "5151",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "reader_jump_flat",
+      "label": "ReaderView.jumpToWindowFlat",
+      "file_type": "code",
+      "source_file": "SourceReadSwift/Features/Reader/ReaderView.swift",
+      "source_location": "5124",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "reader_visible",
+      "label": "ReaderView.updateVisibleParagraphInScroll",
+      "file_type": "code",
+      "source_file": "SourceReadSwift/Features/Reader/ReaderView.swift",
+      "source_location": "2513",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "reader_flat_layout",
+      "label": "ReaderChapterWindowPolicy.Layout",
+      "file_type": "code",
+      "source_file": "SourceReadSwift/Features/Reader/ReaderChapterWindow.swift",
+      "source_location": "201",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "reader_web_bridge",
+      "label": "WebScrollReaderView.Coordinator",
+      "file_type": "code",
+      "source_file": "SourceReadSwift/Features/Reader/WebScrollReaderView.swift",
+      "source_location": "286",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "reader_web_update",
+      "label": "WebScrollReaderView.Coordinator.update",
+      "file_type": "code",
+      "source_file": "SourceReadSwift/Features/Reader/WebScrollReaderView.swift",
+      "source_location": "158",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "reader_web_content",
+      "label": "WebScrollReaderView.Coordinator.pushContent",
+      "file_type": "code",
+      "source_file": "SourceReadSwift/Features/Reader/WebScrollReaderView.swift",
+      "source_location": "216",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "reader_web_jump",
+      "label": "WebScrollReaderView.evaluateScrollTarget",
+      "file_type": "code",
+      "source_file": "SourceReadSwift/Features/Reader/WebScrollReaderView.swift",
+      "source_location": "244",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "reader_js_scroll",
+      "label": "WebReaderDocument.scrollToFlat",
+      "file_type": "code",
+      "source_file": "SourceReadSwift/Features/Reader/WebReaderDocument.swift",
+      "source_location": "1158",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "reader_js_visible",
+      "label": "WebReaderDocument.onScroll",
+      "file_type": "code",
+      "source_file": "SourceReadSwift/Features/Reader/WebReaderDocument.swift",
+      "source_location": "1041",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "reader_js_content",
+      "label": "WebReaderDocument.setContent",
+      "file_type": "code",
+      "source_file": "SourceReadSwift/Features/Reader/WebReaderDocument.swift",
+      "source_location": "911",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "reader_js_tap",
+      "label": "WebReaderDocument pointer-up tap arbitration",
+      "file_type": "code",
+      "source_file": "SourceReadSwift/Features/Reader/WebReaderDocument.swift",
+      "source_location": "1102",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "reader_tap",
+      "label": "ReaderView.handleReaderTap",
+      "file_type": "code",
+      "source_file": "SourceReadSwift/Features/Reader/ReaderView.swift",
+      "source_location": "5329",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "reader_page_selection",
+      "label": "ReaderPageTextView.updateUIView selection",
+      "file_type": "code",
+      "source_file": "SourceReadSwift/Features/Reader/ReaderPageTextView.swift",
+      "source_location": "230",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "reader_native_selection",
+      "label": "NativeReaderTextView.updateSelection",
+      "file_type": "code",
+      "source_file": "SourceReadSwift/Features/Reader/NativeReaderTextView.swift",
+      "source_location": "407",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "rationale": "Legacy/native surface must not be confused with the current WebScrollReaderView route."
+    },
+    {
+      "id": "reader_heading",
+      "label": "ReaderView.chapterHeadingStyle",
+      "file_type": "code",
+      "source_file": "SourceReadSwift/Features/Reader/ReaderView.swift",
+      "source_location": "219",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "rationale": "Default is header, not inline; scroll HTML still renders a chapter h1/h2."
+    },
+    {
+      "id": "reader_text_paginator",
+      "label": "ReaderTextPagePaginator.paginate",
+      "file_type": "code",
+      "source_file": "SourceReadSwift/Features/Reader/ReaderTextPagePaginator.swift",
+      "source_location": "22",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "reader_page_restore",
+      "label": "ReaderPageRestoration.index",
+      "file_type": "code",
+      "source_file": "SourceReadSwift/Features/Reader/ReaderPageSelection.swift",
+      "source_location": "61",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "reader_paged_policy",
+      "label": "ReaderPagedNavigationPolicy",
+      "file_type": "code",
+      "source_file": "SourceReadSwift/Features/Reader/ReaderPagedNavigationPolicy.swift",
+      "source_location": "188",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "reader_gateway",
+      "label": "BookshelfReaderGatewayView.localReader",
+      "file_type": "code",
+      "source_file": "SourceReadSwift/Features/Bookshelf/BookshelfReaderGatewayView.swift",
+      "source_location": "236",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "reader_detail_sheet",
+      "label": "BookshelfReaderGatewayView book detail sheet",
+      "file_type": "code",
+      "source_file": "SourceReadSwift/Features/Bookshelf/BookshelfReaderGatewayView.swift",
+      "source_location": "57",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "reader_detail_local",
+      "label": "BookDetailView local metadata load",
+      "file_type": "code",
+      "source_file": "SourceReadSwift/Features/Discover/BookDetailView.swift",
+      "source_location": "766",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "reader_detail_links",
+      "label": "BookDetailView local reader destinations",
+      "file_type": "code",
+      "source_file": "SourceReadSwift/Features/Discover/BookDetailView.swift",
+      "source_location": "109",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "reader_local_resolver",
+      "label": "BookshelfStore.localBook",
+      "file_type": "code",
+      "source_file": "SourceReadSwift/Core/Storage/BookshelfStore.swift",
+      "source_location": "46",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    }
+  ],
+  "edges": [
+    {
+      "source": "reader_toc_list",
+      "target": "reader_toc_scroll",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "SourceReadSwift/Features/Reader/ReaderView.swift",
+      "source_location": "4851",
+      "weight": 1.0
+    },
+    {
+      "source": "reader_toc_list",
+      "target": "reader_chapter_select",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "SourceReadSwift/Features/Reader/ReaderView.swift",
+      "source_location": "4798",
+      "weight": 1.0
+    },
+    {
+      "source": "reader_chapter_select",
+      "target": "reader_activate",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "SourceReadSwift/Features/Reader/ReaderView.swift",
+      "source_location": "5256",
+      "weight": 1.0
+    },
+    {
+      "source": "reader_activate",
+      "target": "reader_jump",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "SourceReadSwift/Features/Reader/ReaderView.swift",
+      "source_location": "5145",
+      "weight": 1.0
+    },
+    {
+      "source": "reader_jump",
+      "target": "reader_jump_flat",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "SourceReadSwift/Features/Reader/ReaderView.swift",
+      "source_location": "5161",
+      "weight": 1.0
+    },
+    {
+      "source": "reader_jump_flat",
+      "target": "reader_web_jump",
+      "relation": "shares_data_with",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "SourceReadSwift/Features/Reader/ReaderView.swift",
+      "source_location": "5129",
+      "weight": 1.0
+    },
+    {
+      "source": "reader_web_update",
+      "target": "reader_web_content",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "SourceReadSwift/Features/Reader/WebScrollReaderView.swift",
+      "source_location": "176",
+      "weight": 1.0
+    },
+    {
+      "source": "reader_web_content",
+      "target": "reader_js_content",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "SourceReadSwift/Features/Reader/WebScrollReaderView.swift",
+      "source_location": "222",
+      "weight": 1.0
+    },
+    {
+      "source": "reader_web_jump",
+      "target": "reader_js_scroll",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "SourceReadSwift/Features/Reader/WebScrollReaderView.swift",
+      "source_location": "247",
+      "weight": 1.0
+    },
+    {
+      "source": "reader_js_scroll",
+      "target": "reader_web_bridge",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "SourceReadSwift/Features/Reader/WebReaderDocument.swift",
+      "source_location": "1171",
+      "weight": 1.0
+    },
+    {
+      "source": "reader_js_visible",
+      "target": "reader_web_bridge",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "SourceReadSwift/Features/Reader/WebReaderDocument.swift",
+      "source_location": "1055",
+      "weight": 1.0
+    },
+    {
+      "source": "reader_web_bridge",
+      "target": "reader_visible",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "SourceReadSwift/Features/Reader/ReaderView.swift",
+      "source_location": "1627",
+      "weight": 1.0
+    },
+    {
+      "source": "reader_visible",
+      "target": "reader_flat_layout",
+      "relation": "shares_data_with",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "SourceReadSwift/Features/Reader/ReaderView.swift",
+      "source_location": "2514",
+      "weight": 1.0
+    },
+    {
+      "source": "reader_js_content",
+      "target": "reader_flat_layout",
+      "relation": "shares_data_with",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "SourceReadSwift/Features/Reader/WebReaderDocument.swift",
+      "source_location": "922",
+      "weight": 1.0
+    },
+    {
+      "source": "reader_js_tap",
+      "target": "reader_tap",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "SourceReadSwift/Features/Reader/WebScrollReaderView.swift",
+      "source_location": "333",
+      "weight": 1.0
+    },
+    {
+      "source": "reader_page_selection",
+      "target": "reader_tap",
+      "relation": "conceptually_related_to",
+      "confidence": "INFERRED",
+      "confidence_score": 0.94,
+      "source_file": "SourceReadSwift/Features/Reader/ReaderView.swift",
+      "source_location": "826",
+      "weight": 1.0
+    },
+    {
+      "source": "reader_native_selection",
+      "target": "reader_page_selection",
+      "relation": "semantically_similar_to",
+      "confidence": "INFERRED",
+      "confidence_score": 0.87,
+      "source_file": "SourceReadSwift/Features/Reader/NativeReaderTextView.swift",
+      "source_location": "407",
+      "weight": 1.0
+    },
+    {
+      "source": "reader_heading",
+      "target": "reader_text_paginator",
+      "relation": "shares_data_with",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "SourceReadSwift/Features/Reader/ReaderView.swift",
+      "source_location": "6213",
+      "weight": 1.0
+    },
+    {
+      "source": "reader_page_restore",
+      "target": "reader_flat_layout",
+      "relation": "conceptually_related_to",
+      "confidence": "INFERRED",
+      "confidence_score": 0.86,
+      "source_file": "SourceReadSwift/Features/Reader/ReaderPageSelection.swift",
+      "source_location": "61",
+      "weight": 1.0
+    },
+    {
+      "source": "reader_paged_policy",
+      "target": "reader_page_restore",
+      "relation": "semantically_similar_to",
+      "confidence": "INFERRED",
+      "confidence_score": 0.82,
+      "source_file": "SourceReadSwift/Features/Reader/ReaderPagedNavigationPolicy.swift",
+      "source_location": "188",
+      "weight": 1.0
+    },
+    {
+      "source": "reader_gateway",
+      "target": "reader_detail_sheet",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "SourceReadSwift/Features/Bookshelf/BookshelfReaderGatewayView.swift",
+      "source_location": "267",
+      "weight": 1.0
+    },
+    {
+      "source": "reader_detail_sheet",
+      "target": "reader_detail_local",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "SourceReadSwift/Features/Bookshelf/BookshelfReaderGatewayView.swift",
+      "source_location": "59",
+      "weight": 1.0
+    },
+    {
+      "source": "reader_detail_local",
+      "target": "reader_local_resolver",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "SourceReadSwift/Features/Discover/BookDetailView.swift",
+      "source_location": "35",
+      "weight": 1.0
+    },
+    {
+      "source": "reader_detail_links",
+      "target": "reader_gateway",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "SourceReadSwift/Features/Discover/BookDetailView.swift",
+      "source_location": "111",
+      "weight": 1.0
+    },
+    {
+      "source": "reader_detail_local",
+      "target": "reader_detail_links",
+      "relation": "shares_data_with",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "SourceReadSwift/Features/Discover/BookDetailView.swift",
+      "source_location": "782",
+      "weight": 1.0
+    }
+  ],
+  "hyperedges": [
+    {
+      "id": "reader_jump_protocol",
+      "label": "Chapter jump atomicity across native model / web document / acknowledgement",
+      "nodes": [
+        "reader_jump_flat",
+        "reader_web_jump",
+        "reader_js_scroll",
+        "reader_web_bridge",
+        "reader_visible",
+        "reader_flat_layout"
+      ],
+      "relation": "participate_in",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "SourceReadSwift/Features/Reader/WebScrollReaderView.swift"
+    },
+    {
+      "id": "reader_selection_arbitration",
+      "label": "Selection-first gesture arbitration in paged and web surfaces",
+      "nodes": [
+        "reader_page_selection",
+        "reader_tap",
+        "reader_js_tap",
+        "reader_native_selection"
+      ],
+      "relation": "participate_in",
+      "confidence": "INFERRED",
+      "confidence_score": 0.93,
+      "source_file": "SourceReadSwift/Features/Reader/ReaderView.swift"
+    },
+    {
+      "id": "reader_local_detail_boundary",
+      "label": "Local reader -> detail -> reader navigation isolation boundary",
+      "nodes": [
+        "reader_gateway",
+        "reader_detail_sheet",
+        "reader_detail_links",
+        "reader_detail_local"
+      ],
+      "relation": "form",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "SourceReadSwift/Features/Bookshelf/BookshelfReaderGatewayView.swift"
+    }
+  ],
+  "findings": [
+    {
+      "id": "R110-TOC-001",
+      "severity": "P1",
+      "claim": "目录初次拖动回弹具有明确源码原因：打开目录后仍有多次无条件自动定位，最晚 1.6 秒，会覆盖用户已发生的拖动。",
+      "confidence": "INFERRED",
+      "confidence_score": 0.98,
+      "observed": "EXTRACTED scheduling of six delayed scrollTo calls; user gesture competition not reproduced on a device here.",
+      "evidence": [
+        {
+          "file": "D:/Gemini反重力/SourceReadSwift2/SourceReadSwift/Features/Reader/ReaderView.swift",
+          "line": 4848,
+          "end_line": 4860,
+          "commit": "71156be1ac148d6328dccc2844ed2555a41313b0"
+        },
+        {
+          "file": "D:/Gemini反重力/SourceReadSwift2/SourceReadSwift/Features/Reader/ReaderView.swift",
+          "line": 4894,
+          "end_line": 4912,
+          "commit": "71156be1ac148d6328dccc2844ed2555a41313b0"
+        }
+      ],
+      "recommended_fix": "每次目录展示只执行一次受展示 generation 保护的初始定位；若需布局重试，在用户开始拖动/更换筛选/离开目录时取消任务，禁止无条件计时重定位。",
+      "verification": [
+        "iOS 16: 打开 1000 章目录，在 0.1/0.4/0.9 秒开始拖动，持续超过 1.6 秒，确认不被拉回。",
+        "目录定位应命中当前章；搜索/倒序仍能合理定位；离开后待执行任务不得触发。"
+      ]
+    },
+    {
+      "id": "R110-JUMP-002",
+      "severity": "P1",
+      "claim": "滚动桥接只传可变 flat index，缺内容 revision 与章节本地坐标，旧 DOM visible 消息可能在新窗口映射中写回错误章节；任何 visible 还会清除未落地的跳转。",
+      "confidence": "INFERRED",
+      "confidence_score": 0.95,
+      "observed": "Bridge payload and unconditional request clearing are explicit source; reported 29 -> 22 transition is not locally reproduced.",
+      "evidence": [
+        {
+          "file": "D:/Gemini反重力/SourceReadSwift2/SourceReadSwift/Features/Reader/WebScrollReaderView.swift",
+          "line": 158,
+          "end_line": 181,
+          "commit": "71156be1ac148d6328dccc2844ed2555a41313b0"
+        },
+        {
+          "file": "D:/Gemini反重力/SourceReadSwift2/SourceReadSwift/Features/Reader/WebReaderDocument.swift",
+          "line": 1041,
+          "end_line": 1056,
+          "commit": "71156be1ac148d6328dccc2844ed2555a41313b0"
+        },
+        {
+          "file": "D:/Gemini反重力/SourceReadSwift2/SourceReadSwift/Features/Reader/WebScrollReaderView.swift",
+          "line": 307,
+          "end_line": 311,
+          "commit": "71156be1ac148d6328dccc2844ed2555a41313b0"
+        },
+        {
+          "file": "D:/Gemini反重力/SourceReadSwift2/SourceReadSwift/Features/Reader/ReaderView.swift",
+          "line": 1623,
+          "end_line": 1627,
+          "commit": "71156be1ac148d6328dccc2844ed2555a41313b0"
+        },
+        {
+          "file": "D:/Gemini反重力/SourceReadSwift2/SourceReadSwift/Features/Reader/ReaderView.swift",
+          "line": 2513,
+          "end_line": 2525,
+          "commit": "71156be1ac148d6328dccc2844ed2555a41313b0"
+        }
+      ],
+      "recommended_fix": "DOM setContent 与 visible 带相同 content revision；visible 同时返回 chapter key/local paragraph，Swift 校验 revision 后按稳定坐标解析。显式跳章等待匹配的落地回执，不被旧 visible 清除。",
+      "verification": [
+        "构造旧内容 visible 在窗口重排后到达，断言新 chapter cursor 不变。",
+        "29 章跳转过程中注入旧 22 章 visible；目标必须保留，落地后第一次滑动仍在 29 章。",
+        "目录连续 A/B 快速跳章并伴随后台预取、上方章节裁剪；校验可见章节/进度/缓存游标一致。"
+      ]
+    },
+    {
+      "id": "R110-JUMP-003",
+      "severity": "P1",
+      "claim": "scroll-applied 回执没有携带 request ID；旧请求 A 回执会被视为当前 pending B 已完成并清空 B。",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "evidence": [
+        {
+          "file": "D:/Gemini反重力/SourceReadSwift2/SourceReadSwift/Features/Reader/WebScrollReaderView.swift",
+          "line": 235,
+          "end_line": 248,
+          "commit": "71156be1ac148d6328dccc2844ed2555a41313b0"
+        },
+        {
+          "file": "D:/Gemini反重力/SourceReadSwift2/SourceReadSwift/Features/Reader/WebReaderDocument.swift",
+          "line": 1158,
+          "end_line": 1171,
+          "commit": "71156be1ac148d6328dccc2844ed2555a41313b0"
+        },
+        {
+          "file": "D:/Gemini反重力/SourceReadSwift2/SourceReadSwift/Features/Reader/WebScrollReaderView.swift",
+          "line": 334,
+          "end_line": 338,
+          "commit": "71156be1ac148d6328dccc2844ed2555a41313b0"
+        }
+      ],
+      "recommended_fix": "scrollToFlat 参数包含 request key/content revision，scroll-applied 原样回传；Swift 仅当两者与当前 pending 匹配时清空。异步 smooth 滚动在真正到达目标后再 ack，或明确区分 accepted/landed。",
+      "verification": [
+        "pending A -> pending B -> ack A：B 必须仍 pending；ack B 仅完成一次。",
+        "scroll-miss、content-ready 重试也必须匹配同一请求与内容 revision。"
+      ]
+    },
+    {
+      "id": "R110-SELECT-004",
+      "severity": "P1",
+      "claim": "文字选择开启并未成为点击区的统一优先级条件。分页 SpatialTapGesture 和 handleReaderTap 不检查选择状态；滚动只检查当前非折叠 selection，尚未形成选区的多次轻点仍可触发翻页。",
+      "confidence": "INFERRED",
+      "confidence_score": 0.96,
+      "evidence": [
+        {
+          "file": "D:/Gemini反重力/SourceReadSwift2/SourceReadSwift/Features/Reader/ReaderView.swift",
+          "line": 825,
+          "end_line": 834,
+          "commit": "71156be1ac148d6328dccc2844ed2555a41313b0"
+        },
+        {
+          "file": "D:/Gemini反重力/SourceReadSwift2/SourceReadSwift/Features/Reader/ReaderView.swift",
+          "line": 2772,
+          "end_line": 2775,
+          "commit": "71156be1ac148d6328dccc2844ed2555a41313b0"
+        },
+        {
+          "file": "D:/Gemini反重力/SourceReadSwift2/SourceReadSwift/Features/Reader/ReaderView.swift",
+          "line": 5329,
+          "end_line": 5353,
+          "commit": "71156be1ac148d6328dccc2844ed2555a41313b0"
+        },
+        {
+          "file": "D:/Gemini反重力/SourceReadSwift2/SourceReadSwift/Features/Reader/WebReaderDocument.swift",
+          "line": 1102,
+          "end_line": 1123,
+          "commit": "71156be1ac148d6328dccc2844ed2555a41313b0"
+        }
+      ],
+      "recommended_fix": "建立共享手势仲裁策略：开启正文选择时，正文区 UIKit/WebKit 选择手势优先，屏蔽正文页切换点击；菜单使用独立明确按钮或非正文带，不用全屏抢手势。保留滑动翻页与文本选中拖柄的边界策略。",
+      "verification": [
+        "iOS 16: 四种阅读模式测试长按、双击选词、拖动选择句柄、复制。",
+        "选择关闭时 3x3 点击区回归；开启选择时正文轻点/双击不得翻页，菜单仍可通过明确入口打开。"
+      ]
+    },
+    {
+      "id": "R110-TITLE-005",
+      "severity": "P2",
+      "claim": "分页大标题缺失是默认 heading=.header 的显式行为，滚动 h1/h2 与分页不一致；不是分页正文测量失效。",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "evidence": [
+        {
+          "file": "D:/Gemini反重力/SourceReadSwift2/SourceReadSwift/Features/Reader/ReaderView.swift",
+          "line": 219,
+          "end_line": 219,
+          "commit": "71156be1ac148d6328dccc2844ed2555a41313b0"
+        },
+        {
+          "file": "D:/Gemini反重力/SourceReadSwift2/SourceReadSwift/Features/Reader/ReaderView.swift",
+          "line": 258,
+          "end_line": 259,
+          "commit": "71156be1ac148d6328dccc2844ed2555a41313b0"
+        },
+        {
+          "file": "D:/Gemini反重力/SourceReadSwift2/SourceReadSwift/Features/Reader/ReaderTextPagePaginator.swift",
+          "line": 22,
+          "end_line": 25,
+          "commit": "71156be1ac148d6328dccc2844ed2555a41313b0"
+        },
+        {
+          "file": "D:/Gemini反重力/SourceReadSwift2/SourceReadSwift/Features/Reader/ReaderView.swift",
+          "line": 3063,
+          "end_line": 3074,
+          "commit": "71156be1ac148d6328dccc2844ed2555a41313b0"
+        }
+      ],
+      "recommended_fix": "用户期望首章/新章正文大标题时，将默认及旧默认迁移为 inline；保留显式选择页眉模式。正文大标题只在章首，续页仍可显示小页眉。先明确迁移键避免覆盖用户已有偏好。",
+      "verification": [
+        "全新安装与从 119 升级：滚动/覆盖/平移/仿真首章大标题一致。",
+        "超长标题跨页及 Unicode/RTL 守恒回归，不重复/不漏标题，原 119 正文行高和底部不裁字测试不削弱。"
+      ]
+    },
+    {
+      "id": "R110-LOCAL-006",
+      "severity": "P1",
+      "claim": "用户报告本地详情闪退尚无本地崩溃栈证实根因。可确认入口复用完整 BookDetailView，包含重新进入重型本地 reader 的 NavigationLink；不能归咎于 local:// 走网络或 id 未解析。",
+      "confidence": "AMBIGUOUS",
+      "confidence_score": 0.25,
+      "evidence": [
+        {
+          "file": "D:/Gemini反重力/SourceReadSwift2/SourceReadSwift/Features/Bookshelf/BookshelfReaderGatewayView.swift",
+          "line": 57,
+          "end_line": 60,
+          "commit": "71156be1ac148d6328dccc2844ed2555a41313b0"
+        },
+        {
+          "file": "D:/Gemini反重力/SourceReadSwift2/SourceReadSwift/Features/Bookshelf/BookshelfReaderGatewayView.swift",
+          "line": 267,
+          "end_line": 269,
+          "commit": "71156be1ac148d6328dccc2844ed2555a41313b0"
+        },
+        {
+          "file": "D:/Gemini反重力/SourceReadSwift2/SourceReadSwift/Features/Discover/BookDetailView.swift",
+          "line": 30,
+          "end_line": 43,
+          "commit": "71156be1ac148d6328dccc2844ed2555a41313b0"
+        },
+        {
+          "file": "D:/Gemini反重力/SourceReadSwift2/SourceReadSwift/Features/Discover/BookDetailView.swift",
+          "line": 109,
+          "end_line": 119,
+          "commit": "71156be1ac148d6328dccc2844ed2555a41313b0"
+        },
+        {
+          "file": "D:/Gemini反重力/SourceReadSwift2/SourceReadSwift/Features/Discover/BookDetailView.swift",
+          "line": 672,
+          "end_line": 679,
+          "commit": "71156be1ac148d6328dccc2844ed2555a41313b0"
+        },
+        {
+          "file": "D:/Gemini反重力/SourceReadSwift2/SourceReadSwift/Features/Discover/BookDetailView.swift",
+          "line": 766,
+          "end_line": 791,
+          "commit": "71156be1ac148d6328dccc2844ed2555a41313b0"
+        }
+      ],
+      "recommended_fix": "安全隔离：新增轻量只读 LocalBookMetadataSheet(snapshot) 用于阅读器右上详情，只呈现书名/作者/格式/章节数/字数/导入信息，不附 reader NavigationLink、不注入全文、不重建 gateway。书架入口保留完整详情功能。若详情内需跳章，通过受控回调关闭 sheet 后向既有 reader 发显式跳转，不创建第二个 reader。",
+      "verification": [
+        "iOS 16 原生 UI: TXT/EPUB/单章节 localContent 及超大本地书，阅读器详情反复开关 20 次，不触发新 reader 实例/分页任务。",
+        "使用 crash log/内存警告/主线程栈区分 stack overflow、jetsam、watchdog；未收集前不得宣称确定根因。",
+        "保留书架完整详情的继续阅读/章节导航与本地 id 兼容测试。"
+      ]
+    }
+  ],
+  "source_manifest": [
+    {
+      "file": "SourceReadSwift/Features/Reader/ReaderView.swift",
+      "sha256_git_blob_content": "fccfc0185524a91a0da80924e4669e0e3be0e87b544770709da832cbb70709b9",
+      "lines": 7430
+    },
+    {
+      "file": "SourceReadSwift/Features/Reader/NativeReaderTextView.swift",
+      "sha256_git_blob_content": "90bcef0e68e8476865bce0826cfdc81984849a7f2403947c7f7cfed5fee17615",
+      "lines": 1584
+    },
+    {
+      "file": "SourceReadSwift/Features/Reader/ReaderPagedNavigationPolicy.swift",
+      "sha256_git_blob_content": "a02ffacad6257595cb58c12e370d57e461e5c9d90deec3d41c4004eb412f49fd",
+      "lines": 277
+    },
+    {
+      "file": "SourceReadSwift/Features/Reader/ReaderChapterWindow.swift",
+      "sha256_git_blob_content": "f17ec7b8d68d0d51de0abf7999c59b30f01c437ea5c47561bcae9fead1ba2fd5",
+      "lines": 393
+    },
+    {
+      "file": "SourceReadSwift/Features/Reader/ReaderPageSelection.swift",
+      "sha256_git_blob_content": "460f244b16abec4888b029456e7ee5badd3feb60dc949ab9b910025e12af16a3",
+      "lines": 140
+    },
+    {
+      "file": "SourceReadSwift/Features/Reader/ReaderPageTextView.swift",
+      "sha256_git_blob_content": "be8e3ca1baafde8bd4fc52ff9ad51cab5f1ee033158792d7b7f7775c080e0c3c",
+      "lines": 238
+    },
+    {
+      "file": "SourceReadSwift/Features/Reader/ReaderTextPagePaginator.swift",
+      "sha256_git_blob_content": "c7f38ebf63fccd14054e5ca47fa8fb7e3c86b520525959aeda1ebd6916a8eb2d",
+      "lines": 105
+    },
+    {
+      "file": "SourceReadSwift/Features/Reader/WebScrollReaderView.swift",
+      "sha256_git_blob_content": "4f750e7ecf9819502c460989d62519f3d41c2ad03bd619f2c9e8320f66d8e99d",
+      "lines": 492
+    },
+    {
+      "file": "SourceReadSwift/Features/Reader/WebReaderDocument.swift",
+      "sha256_git_blob_content": "0c329216221b0a7e87f6553ec3425ae8fd4f5938dae06d61ad6b17a3a88897cf",
+      "lines": 1211
+    },
+    {
+      "file": "SourceReadSwift/Features/Bookshelf/BookshelfReaderGatewayView.swift",
+      "sha256_git_blob_content": "2879a246f995179b5417a2afc3991d05fd77f2fbe7832a9d7cf4002cb857413d",
+      "lines": 808
+    },
+    {
+      "file": "SourceReadSwift/Features/Discover/BookDetailView.swift",
+      "sha256_git_blob_content": "919c46d4aa22612edda5946bbf68d454cbb1e3effb291edd944b0fd769c007bf",
+      "lines": 1692
+    },
+    {
+      "file": "SourceReadSwift/Core/Models/BookshelfModels.swift",
+      "sha256_git_blob_content": "0af6bf55d29d68c618b0b9514c1e9e383dc6a861321dabb749c5e7c1d9d30322",
+      "lines": 227
+    },
+    {
+      "file": "SourceReadSwift/Core/Storage/BookshelfStore.swift",
+      "sha256_git_blob_content": "3039b4fe10f53c508f395bfcdd9847669f10edfa1ce49dd63ba735b476b82645",
+      "lines": 436
+    }
+  ],
+  "prior_graph_orientation": {
+    "file": "docs/audit-20261030-build118/graph.json",
+    "nodes": 1085,
+    "edges": 2774,
+    "matching_nodes": [
+      {
+        "label": "ComicReaderView.swift",
+        "file_type": "code",
+        "source_file": "ComicReaderView.swift",
+        "source_location": "L1",
+        "_origin": "ast",
+        "id": "comicreaderview",
+        "community": 22,
+        "norm_label": "comicreaderview.swift"
+      },
+      {
+        "label": "ComicReaderView",
+        "file_type": "code",
+        "source_file": "ComicReaderView.swift",
+        "source_location": "L19",
+        "_origin": "ast",
+        "id": "comicreaderview_comicreaderview",
+        "community": 22,
+        "norm_label": "comicreaderview"
+      },
+      {
+        "label": "CoverPageReaderView.swift",
+        "file_type": "code",
+        "source_file": "CoverPageReaderView.swift",
+        "source_location": "L1",
+        "_origin": "ast",
+        "id": "coverpagereaderview",
+        "community": 5,
+        "norm_label": "coverpagereaderview.swift"
+      },
+      {
+        "label": "CoverPageReaderView",
+        "file_type": "code",
+        "source_file": "CoverPageReaderView.swift",
+        "source_location": "L24",
+        "_origin": "ast",
+        "id": "coverpagereaderview_coverpagereaderview",
+        "community": 5,
+        "norm_label": "coverpagereaderview"
+      },
+      {
+        "label": "PageCurlReaderView.swift",
+        "file_type": "code",
+        "source_file": "PageCurlReaderView.swift",
+        "source_location": "L1",
+        "_origin": "ast",
+        "id": "pagecurlreaderview",
+        "community": 41,
+        "norm_label": "pagecurlreaderview.swift"
+      },
+      {
+        "label": "PageCurlReaderView",
+        "file_type": "code",
+        "source_file": "PageCurlReaderView.swift",
+        "source_location": "L10",
+        "_origin": "ast",
+        "id": "pagecurlreaderview_pagecurlreaderview",
+        "community": 2,
+        "norm_label": "pagecurlreaderview"
+      },
+      {
+        "label": "ReaderChapterWindow.swift",
+        "file_type": "code",
+        "source_file": "ReaderChapterWindow.swift",
+        "source_location": "L1",
+        "_origin": "ast",
+        "id": "readerchapterwindow",
+        "community": 6,
+        "norm_label": "readerchapterwindow.swift"
+      },
+      {
+        "label": "ReaderChapterWindowPolicy",
+        "file_type": "code",
+        "source_file": "ReaderChapterWindow.swift",
+        "source_location": "L77",
+        "_origin": "ast",
+        "id": "readerchapterwindow_readerchapterwindowpolicy",
+        "community": 6,
+        "norm_label": "readerchapterwindowpolicy"
+      },
+      {
+        "label": "ReaderView.swift",
+        "file_type": "code",
+        "source_file": "ReaderView.swift",
+        "source_location": "L1",
+        "_origin": "ast",
+        "id": "readerview",
+        "community": 1,
+        "norm_label": "readerview.swift"
+      },
+      {
+        "label": "ReaderView",
+        "file_type": "code",
+        "source_file": "ReaderView.swift",
+        "source_location": "L7",
+        "_origin": "ast",
+        "id": "readerview_readerview",
+        "community": 7,
+        "norm_label": "readerview"
+      },
+      {
+        "label": "ReaderChapterWindowPolicy",
+        "file_type": "code",
+        "source_file": "ReaderView.swift",
+        "source_location": "L514",
+        "_origin": "ast",
+        "id": "readerchapterwindowpolicy",
+        "community": 7,
+        "norm_label": "readerchapterwindowpolicy"
+      },
+      {
+        "label": "ReaderViewportSizePreferenceKey",
+        "file_type": "code",
+        "source_file": "ReaderView.swift",
+        "source_location": "L6603",
+        "_origin": "ast",
+        "id": "readerview_readerviewportsizepreferencekey",
+        "community": 1,
+        "norm_label": "readerviewportsizepreferencekey"
+      }
+    ]
+  },
+  "validation": {
+    "dangling_node_references": 0,
+    "evidence_line_ranges": "verified against committed source",
+    "swift_files_modified": false,
+    "device_tests": "NOT RUN"
+  },
+  "input_tokens": 0,
+  "output_tokens": 0,
+  "token_accounting": "Tool/runtime does not expose exact subtask token usage; zero means unavailable, not free."
+}

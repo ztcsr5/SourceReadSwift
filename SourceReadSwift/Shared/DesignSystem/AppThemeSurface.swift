@@ -44,7 +44,7 @@ struct AppThemeSurface: ViewModifier {
 
     @ViewBuilder func body(content: Content) -> some View {
         let _ = appearanceRevision
-        let radius = cornerRadius ?? theme.radius
+        let radius = theme.surfaceRadius(preferred: cornerRadius)
         // Repeated scrolling cards are opaque paper. Reserve live backdrop
         // sampling for a few explicit floating controls, not every list row.
         let style: AppThemeSurfaceStyle = usesLiveMaterial ? AppThemeSurfaceStyle.resolve(theme: theme,
@@ -71,11 +71,11 @@ struct AppThemeSurface: ViewModifier {
         .overlay { AppThemeOrnament(theme: theme, isCard: true) }
         .overlay {
             RoundedRectangle(cornerRadius: radius, style: .continuous)
-                .stroke(Color.primary.opacity(contrast == .increased ? max(strokeOpacity, 0.35) : strokeOpacity),
+                .stroke(Color.primary.opacity(contrast == .increased ? max(strokeOpacity, 0.35) : theme.isAtelier ? min(strokeOpacity, 0.06) : strokeOpacity),
                         lineWidth: theme.borderWidth)
                 .allowsHitTesting(false)
         }
         .clipShape(AppThemeCardShape(theme: theme, radius: radius), style: FillStyle(eoFill: true))
-        .shadow(color: .black.opacity(theme == .inkwash || theme == .blueprint ? 0 : shadowOpacity), radius: 6, x: 0, y: 3)
+        .shadow(color: .black.opacity(theme.isAtelier || theme == .inkwash || theme == .blueprint ? 0 : shadowOpacity), radius: 6, x: 0, y: 3)
     }
 }

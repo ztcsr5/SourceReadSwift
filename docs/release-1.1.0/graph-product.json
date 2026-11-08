@@ -1,0 +1,561 @@
+{
+  "schema": "graphify-semantic-fragment",
+  "scope": "1.1.0 product settings/web/theme focused read-only review",
+  "generated_at": "2026-10-31T10:53:42.193796+00:00",
+  "baseline_commit": "71156be1ac148d6328dccc2844ed2555a41313b0",
+  "review_mode": "read_only_source; only this JSON written inside repo",
+  "nodes": [
+    {
+      "id": "settings",
+      "label": "SettingsView",
+      "file_type": "code",
+      "source_file": "SourceReadSwift/Features/Settings/SettingsView.swift",
+      "source_location": "5"
+    },
+    {
+      "id": "theme",
+      "label": "AppTheme",
+      "file_type": "code",
+      "source_file": "SourceReadSwift/Shared/DesignSystem/AppTheme.swift",
+      "source_location": "4",
+      "rationale": "Keep semantic colors dynamic; changing persistent keys alone must also invalidate visible views."
+    },
+    {
+      "id": "mode",
+      "label": "ThemeMode",
+      "file_type": "code",
+      "source_file": "SourceReadSwift/Features/Settings/SettingsView.swift",
+      "source_location": "553"
+    },
+    {
+      "id": "app",
+      "label": "SourceReadSwiftApp",
+      "file_type": "code",
+      "source_file": "SourceReadSwift/App/SourceReadSwiftApp.swift",
+      "source_location": "4"
+    },
+    {
+      "id": "hero",
+      "label": "settingsHeroSection",
+      "file_type": "code",
+      "source_file": "SourceReadSwift/Features/Settings/SettingsView.swift",
+      "source_location": "355"
+    },
+    {
+      "id": "diagnostics",
+      "label": "Recent diagnostics inline list",
+      "file_type": "code",
+      "source_file": "SourceReadSwift/Features/Settings/SettingsView.swift",
+      "source_location": "277"
+    },
+    {
+      "id": "diagnosticExport",
+      "label": "diagnosticExportText",
+      "file_type": "code",
+      "source_file": "SourceReadSwift/Features/Settings/SettingsView.swift",
+      "source_location": "533"
+    },
+    {
+      "id": "tabs",
+      "label": "RootTabView",
+      "file_type": "code",
+      "source_file": "SourceReadSwift/App/RootTabView.swift",
+      "source_location": "4"
+    },
+    {
+      "id": "tabSwitch",
+      "label": "switchToTab",
+      "file_type": "code",
+      "source_file": "SourceReadSwift/App/RootTabView.swift",
+      "source_location": "201"
+    },
+    {
+      "id": "brightness",
+      "label": "readerBrightnessSection",
+      "file_type": "code",
+      "source_file": "SourceReadSwift/Features/Reader/ReaderView.swift",
+      "source_location": "4109"
+    },
+    {
+      "id": "login",
+      "label": "SourceLoginView",
+      "file_type": "code",
+      "source_file": "SourceReadSwift/Features/SourceManager/SourceLoginView.swift",
+      "source_location": "13"
+    },
+    {
+      "id": "loginWeb",
+      "label": "SourceLoginWebView",
+      "file_type": "code",
+      "source_file": "SourceReadSwift/Features/SourceManager/SourceLoginView.swift",
+      "source_location": "329"
+    },
+    {
+      "id": "web",
+      "label": "SmartWebReaderView",
+      "file_type": "code",
+      "source_file": "SourceReadSwift/Features/Discover/SmartWebReaderView.swift",
+      "source_location": "4"
+    },
+    {
+      "id": "hiddenWeb",
+      "label": "SmartWebView.extract",
+      "file_type": "code",
+      "source_file": "SourceReadSwift/Features/Discover/SmartWebReaderView.swift",
+      "source_location": "132"
+    },
+    {
+      "id": "extractor",
+      "label": "SmartWebArticleExtractor.extract",
+      "file_type": "code",
+      "source_file": "SourceReadSwift/Core/Reader/SmartWebArticleExtractor.swift",
+      "source_location": "15"
+    },
+    {
+      "id": "presets",
+      "label": "PurifyRulePreset.builtIn",
+      "file_type": "code",
+      "source_file": "SourceReadSwift/Core/Storage/PurifyRuleStore.swift",
+      "source_location": "21"
+    },
+    {
+      "id": "ruleStore",
+      "label": "PurifyRuleStore",
+      "file_type": "code",
+      "source_file": "SourceReadSwift/Core/Storage/PurifyRuleStore.swift",
+      "source_location": "60"
+    },
+    {
+      "id": "evaluate",
+      "label": "PurifyRuleEvaluator.apply",
+      "file_type": "code",
+      "source_file": "SourceReadSwift/Core/Rules/PurifyRuleEvaluator.swift",
+      "source_location": "44"
+    },
+    {
+      "id": "ruleUI",
+      "label": "PurifyRulesView",
+      "file_type": "code",
+      "source_file": "SourceReadSwift/Features/Settings/SettingsView.swift",
+      "source_location": "1167"
+    },
+    {
+      "id": "server",
+      "label": "LightweightHTTPServer",
+      "file_type": "code",
+      "source_file": "SourceReadSwift/Features/Discover/SourceWritingView.swift",
+      "source_location": "275"
+    },
+    {
+      "id": "html",
+      "label": "getWebPageHtml",
+      "file_type": "code",
+      "source_file": "SourceReadSwift/Features/Discover/SourceWritingView.swift",
+      "source_location": "997"
+    },
+    {
+      "id": "icon",
+      "label": "AppIcon glass book and purple ribbon",
+      "file_type": "image",
+      "source_file": "SourceReadSwift/App/Assets.xcassets/AppIcon.appiconset/AppIcon-1024.png",
+      "source_location": "1"
+    },
+    {
+      "id": "name",
+      "label": "CFBundleDisplayName: 纸间",
+      "file_type": "code",
+      "source_file": "SourceReadSwift/App/Info.plist",
+      "source_location": "5"
+    },
+    {
+      "id": "deployment",
+      "label": "iOS deployment target 16.0",
+      "file_type": "code",
+      "source_file": "project.yml",
+      "source_location": "5"
+    }
+  ],
+  "edges": [
+    {
+      "source": "settings",
+      "target": "mode",
+      "relation": "renders_cases",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "SourceReadSwift/Features/Settings/SettingsView.swift",
+      "source_location": "31-49"
+    },
+    {
+      "source": "settings",
+      "target": "hero",
+      "relation": "renders",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "SourceReadSwift/Features/Settings/SettingsView.swift",
+      "source_location": "29"
+    },
+    {
+      "source": "settings",
+      "target": "diagnostics",
+      "relation": "renders_inline",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "SourceReadSwift/Features/Settings/SettingsView.swift",
+      "source_location": "277-306"
+    },
+    {
+      "source": "diagnostics",
+      "target": "diagnosticExport",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "SourceReadSwift/Features/Settings/SettingsView.swift",
+      "source_location": "283"
+    },
+    {
+      "source": "app",
+      "target": "mode",
+      "relation": "resolves_color_scheme",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "SourceReadSwift/App/SourceReadSwiftApp.swift",
+      "source_location": "15-25"
+    },
+    {
+      "source": "hero",
+      "target": "theme",
+      "relation": "reads_semantic_colors",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "SourceReadSwift/Features/Settings/SettingsView.swift",
+      "source_location": "360-365"
+    },
+    {
+      "source": "tabs",
+      "target": "tabSwitch",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "SourceReadSwift/App/RootTabView.swift",
+      "source_location": "177"
+    },
+    {
+      "source": "tabs",
+      "target": "theme",
+      "relation": "reads_accent",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "SourceReadSwift/App/RootTabView.swift",
+      "source_location": "183-193"
+    },
+    {
+      "source": "tabs",
+      "target": "app",
+      "relation": "belongs_to_app",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "SourceReadSwift/App/SourceReadSwiftApp.swift",
+      "source_location": "22"
+    },
+    {
+      "source": "login",
+      "target": "loginWeb",
+      "relation": "renders",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "SourceReadSwift/Features/SourceManager/SourceLoginView.swift",
+      "source_location": "91"
+    },
+    {
+      "source": "web",
+      "target": "hiddenWeb",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "SourceReadSwift/Features/Discover/SmartWebReaderView.swift",
+      "source_location": "107"
+    },
+    {
+      "source": "web",
+      "target": "extractor",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "SourceReadSwift/Features/Discover/SmartWebReaderView.swift",
+      "source_location": "111"
+    },
+    {
+      "source": "loginWeb",
+      "target": "extractor",
+      "relation": "can_reuse_current_DOM_extraction",
+      "confidence": "INFERRED",
+      "confidence_score": 0.95,
+      "source_file": "SourceReadSwift/Features/SourceManager/SourceLoginView.swift",
+      "source_location": "338-344"
+    },
+    {
+      "source": "ruleUI",
+      "target": "presets",
+      "relation": "lists_optional_imports",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "SourceReadSwift/Features/Settings/SettingsView.swift",
+      "source_location": "1229-1265"
+    },
+    {
+      "source": "ruleUI",
+      "target": "ruleStore",
+      "relation": "imports_patterns",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "SourceReadSwift/Features/Settings/SettingsView.swift",
+      "source_location": "1261"
+    },
+    {
+      "source": "ruleStore",
+      "target": "evaluate",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "SourceReadSwift/Core/Storage/PurifyRuleStore.swift",
+      "source_location": "131-132"
+    },
+    {
+      "source": "web",
+      "target": "ruleStore",
+      "relation": "can_apply_same_user_rules_after_extraction",
+      "confidence": "INFERRED",
+      "confidence_score": 0.92,
+      "source_file": "SourceReadSwift/Features/Discover/SmartWebReaderView.swift",
+      "source_location": "111-116"
+    },
+    {
+      "source": "server",
+      "target": "html",
+      "relation": "returns_embedded_page",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "SourceReadSwift/Features/Discover/SourceWritingView.swift",
+      "source_location": "997"
+    },
+    {
+      "source": "html",
+      "target": "theme",
+      "relation": "semantically_similar_to",
+      "confidence": "INFERRED",
+      "confidence_score": 0.76,
+      "source_file": "SourceReadSwift/Features/Discover/SourceWritingView.swift",
+      "source_location": "1006-1018"
+    },
+    {
+      "source": "icon",
+      "target": "name",
+      "relation": "shared_reading_brand",
+      "confidence": "INFERRED",
+      "confidence_score": 0.95,
+      "source_file": "SourceReadSwift/App/Info.plist",
+      "source_location": "5-6"
+    }
+  ],
+  "hyperedges": [
+    {
+      "id": "palette-flow",
+      "nodes": [
+        "settings",
+        "theme",
+        "app",
+        "tabs"
+      ],
+      "relation": "persistent_global_palette_must_invalidate_current_surfaces",
+      "confidence": "INFERRED",
+      "confidence_score": 0.95,
+      "source_file": "SourceReadSwift/App/SourceReadSwiftApp.swift",
+      "source_location": "6-25"
+    },
+    {
+      "id": "web-reading-flow",
+      "nodes": [
+        "loginWeb",
+        "web",
+        "extractor",
+        "ruleStore"
+      ],
+      "relation": "reuse_current_DOM_to_native_projection_without_credential_export",
+      "confidence": "INFERRED",
+      "confidence_score": 0.95,
+      "source_file": "SourceReadSwift/Features/Discover/SmartWebReaderView.swift",
+      "source_location": "103-139"
+    },
+    {
+      "id": "conservative-purification",
+      "nodes": [
+        "presets",
+        "ruleStore",
+        "evaluate",
+        "ruleUI"
+      ],
+      "relation": "preview_toggle_versioned_safe_defaults_and_preserve_user_control",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1,
+      "source_file": "SourceReadSwift/Features/Settings/SettingsView.swift",
+      "source_location": "1224-1327"
+    }
+  ],
+  "findings": [
+    {
+      "id": "PROD-001",
+      "severity": "P2",
+      "status": "Observed",
+      "source_file": "SourceReadSwift/Features/Reader/ReaderView.swift",
+      "source_location": "4116-4124",
+      "evidence": "跟随系统 appears as both status Text and Button in the same brightness HStack. ThemeMode itself contains only one .system case.",
+      "reuse_entry": "readerBrightnessSection",
+      "recommendation": "In system mode display a single selected system action; in manual mode show percentage plus restore-system action. Do not change global theme mode to solve this.",
+      "ios16_risk": "Existing Slider/Button and conditional Text are iOS 16 compatible."
+    },
+    {
+      "id": "PROD-002",
+      "severity": "P2",
+      "status": "Observed",
+      "source_file": "SourceReadSwift/Features/Settings/SettingsView.swift",
+      "source_location": "277-306",
+      "evidence": "Settings already limits visible diagnostics to 12 events and copies all, but expands every event detail directly in the main settings list.",
+      "reuse_entry": "diagnosticExportText(events:) and appState.diagnostics",
+      "recommendation": "Replace main list dump with a compact NavigationLink row; dedicated diagnostics list/detail offers copy event, copy all, text selection and clear/export as deliberate actions. Keep counts/caps explicit.",
+      "ios16_risk": "NavigationStack, NavigationLink, UIPasteboard and .textSelection work on iOS 16; avoid iOS 17-only ContentUnavailableView."
+    },
+    {
+      "id": "PROD-003",
+      "severity": "P2",
+      "status": "Observed",
+      "source_file": "SourceReadSwift/Shared/DesignSystem/AppTheme.swift",
+      "source_location": "13-15",
+      "evidence": "App-wide purple accent and UIColor are static let constants, plus softBlue; no custom accent keys or observable theme palette. App entry observes only themeMode.",
+      "reuse_entry": "AppTheme + SourceReadSwiftApp + existing AppStorage",
+      "recommendation": "Add persisted primary/secondary RGB colors with validation/reset; derive both Color and UIColor from one palette. Ensure App-level observed change invalidates SwiftUI and representable updates; use UIKit dynamic colors for dark/light contrast. Include AppState backup/reset key lists.",
+      "ios16_risk": "ColorPicker is compatible. Do not recreate RootTabView with .id on palette changes, which would discard navigation/reader state. iOS 17 onChange(initial:) or symbolEffect unavailable."
+    },
+    {
+      "id": "PROD-004",
+      "severity": "P2",
+      "status": "Observed",
+      "source_file": "SourceReadSwift/App/RootTabView.swift",
+      "source_location": "13-27,53-55,174-208",
+      "evidence": "Only active root exists; selected change uses opacity transition and a selected background created/destroyed per button; outer easeOut 0.16 and explicit spring coexist.",
+      "reuse_entry": "RootTabView.customTabBar/tabButton/switchToTab",
+      "recommendation": "Use one matchedGeometryEffect selection capsule in stable tab row with one animation policy; keep active-root optimization (do not restore three live complex navigation trees). Support Reduce Motion with near-instant or gentle fade.",
+      "ios16_risk": "matchedGeometryEffect and accessibilityReduceMotion work on iOS 16; avoid symbolEffect, phaseAnimator, keyframeAnimator, sensoryFeedback."
+    },
+    {
+      "id": "PROD-005",
+      "severity": "P2",
+      "status": "Observed",
+      "source_file": "SourceReadSwift/Features/Settings/SettingsView.swift",
+      "source_location": "355-402",
+      "evidence": "Settings hero is a large bespoke secondary-card inside a Section with metrics; aesthetics are subjective, not a functional defect.",
+      "reuse_entry": "settingsHeroSection",
+      "recommendation": "Simplify to compact icon + display name + version, move stats to discrete rows or source area; retain readable typography and Dynamic Type without nested borders.",
+      "ios16_risk": "Use system List and text styles. Do not add iOS 26 glass APIs or fixed-height header clipping."
+    },
+    {
+      "id": "PROD-006",
+      "severity": "P1",
+      "status": "Observed",
+      "source_file": "SourceReadSwift/Features/Discover/SmartWebReaderView.swift",
+      "source_location": "55-68,103-139",
+      "evidence": "Extract action loads a brand-new hidden WKWebView from initial loadedURL, not current displayed DOM; redirects/SPA clicks or logged-in current article can be lost. Visible SmartWebView has no navigation coordinator/current URL binding.",
+      "reuse_entry": "SmartWebArticleExtractor.extract and existing visible WKWebView",
+      "recommendation": "Expose controlled browser model holding current webview; extract document.documentElement.outerHTML from that exact view after user action. Track navigated URL. Add loading/failure/provisional-failure and cancellation cleanup with no delegate retain cycle. Reuse for login web browser.",
+      "ios16_risk": "WKWebView evaluateJavaScript is iOS 16-compatible; callbacks should return UI state on MainActor, avoid stale callback updates after dismissal."
+    },
+    {
+      "id": "PROD-007",
+      "severity": "P2",
+      "status": "Observed",
+      "source_file": "SourceReadSwift/Features/SourceManager/SourceLoginView.swift",
+      "source_location": "89-94,329-348",
+      "evidence": "Login web surface uses shared cookie store and supports gestures; no extraction action or current web-view handle. Reloading loginURL elsewhere would not necessarily retain current article path.",
+      "reuse_entry": "SourceLoginWebView with .default() data store + SmartWebArticleExtractor",
+      "recommendation": "Add visible-web snapshot extraction button only for web mode; keep login/finish behavior untouched and show native reader projection in a separate sheet/route. Do not copy credentials or cookie values into diagnostics/artifact.",
+      "ios16_risk": "Use sheet with NavigationStack on iOS 16. No URLSession fallback for authenticated current DOM."
+    },
+    {
+      "id": "PROD-008",
+      "severity": "P2",
+      "status": "Observed",
+      "source_file": "SourceReadSwift/Features/Discover/SmartWebReaderView.swift",
+      "source_location": "124-138",
+      "evidence": "Visible and hidden WKWebViews use default configuration and no WKContentRuleList; boilerplate stripping happens after network load, so it does not block ads.",
+      "reuse_entry": "Shared WKWebView configuration factory for ordinary reading pages",
+      "recommendation": "Add conservative compile-once WKContentRuleList for known third-party ad resources plus popup navigation policy and site allow/disable switch. Distinguish network blocking from native extraction cleanup. Do not apply blanket script/iframe block to login/CAPTCHA. Do not promise all ads blocked.",
+      "ios16_risk": "WKContentRuleListStore is available on iOS 16; compile/cache async and avoid loading until rule installation resolved. Ensure policy does not break auth windows."
+    },
+    {
+      "id": "PROD-009",
+      "severity": "P1",
+      "status": "Observed",
+      "source_file": "SourceReadSwift/Core/Reader/SmartWebArticleExtractor.swift",
+      "source_location": "24-31,46-48",
+      "evidence": "Candidate union ends in body and takes candidates.first (not best text density); structured extraction ignores br-only novel blocks. Global Set deduplication removes repeated legitimate paragraphs/dialogue anywhere in the article.",
+      "reuse_entry": "SmartWebArticleExtractor with current SwiftSoup",
+      "recommendation": "Score article/main/content candidates rather than first traversal result; preserve br/newline paragraphs and single-character meaningful content; only remove structural boilerplate and adjacent exact duplicate chrome, not arbitrary repeated dialogue. Add fixtures with small teaser before body, br-only novel, repeated dialogue, ad iframe, empty auth page.",
+      "ios16_risk": "SwiftSoup and Foundation compatible; process large DOM away from MainActor where data isolation allows."
+    },
+    {
+      "id": "PROD-010",
+      "severity": "P1",
+      "status": "Observed",
+      "source_file": "SourceReadSwift/Core/Storage/PurifyRuleStore.swift",
+      "source_location": "21-55,66-73",
+      "evidence": "Presets are not auto-installed on first launch. Existing optional noise rule 『.*?』## deletes legitimate quoted/emphasized novel text. Broad .*下载.*app.* may delete narrative discussion, and defaults must not silently corrupt existing books.",
+      "reuse_entry": "PurifyRuleStore.importPatterns + PurifyRulePreset + PurifyRulesView preview and enable controls",
+      "recommendation": "Ship versioned conservative standalone line-anchored ad/footer rules; separate safe recommended defaults and aggressive opt-in examples. Remove blanket quote deletion from recommended set; idempotent seed migration must respect explicit user opt-out/deletion. Keep JS/regex import, preview, per-rule toggles and original content recoverability.",
+      "ios16_risk": "Foundation regex works on iOS 16; avoid pathological regex and repeated recompilation in tight reader loop; test source text conservation when no pattern matches."
+    },
+    {
+      "id": "PROD-011",
+      "severity": "P2",
+      "status": "Observed",
+      "source_file": "SourceReadSwift/Features/Discover/SourceWritingView.swift",
+      "source_location": "997-1225",
+      "evidence": "LAN web UI is embedded literal in SourceWritingView.swift getWebPageHtml, not separate HTML resource; fixed dark slate palette, emoji toolbar, 480px editor, no theme-responsive media query in style block.",
+      "reuse_entry": "getWebPageHtml; existing IDs, JS handlers, /api routes",
+      "recommendation": "Restyle embedded UI without breaking IDs/routes: grouped light neutral surfaces, restrained accent, system fonts, compact sidebar/tab workspace, responsive actions, dark-mode and prefers-reduced-motion support. Extract HTML into maintainable factory/resource only if Xcode target includes it. Validate import/export/debug/source list APIs, keyboard focus and mobile widths.",
+      "ios16_risk": "Safari iOS 16 supports CSS grid/flex/dark-mode/reduced-motion. Avoid unguarded view-transitions or newer CSS-only requirements; no external CDN/font dependency on LAN."
+    },
+    {
+      "id": "PROD-012",
+      "severity": "opinion",
+      "status": "Observed",
+      "source_file": "SourceReadSwift/App/Assets.xcassets/AppIcon.appiconset/AppIcon-1024.png",
+      "source_location": "1",
+      "evidence": "Current bundled icon visually shows pearlescent glass open book floating over a purple folded ribbon on white rounded tile; actual CFBundleDisplayName is 纸间, not SourceReadSwift or IPA filename.",
+      "reuse_entry": "AppIcon.appiconset/AppIcon-1024.png + Info.plist + project.yml",
+      "recommendation": "Subjective: 纸间 is concise and literary; keep. Icon palette matches brand and conveys reading, but glass edges lack small-size contrast and ribbon/detail feels more decorative than memorable. Keep current icon for stability; if revised, simplify silhouette and compare 60px/40px previews, dark wallpaper, grayscale. No new icon generated in this review.",
+      "ios16_risk": "Asset catalog universal iOS icon; no platform-specific redesign API needed."
+    }
+  ],
+  "source_hashes": {
+    "SourceReadSwift/Features/Settings/SettingsView.swift": "ea31177cc72dba083747a0c1a70ad6e6f235e89ab355d626a6210231c6077c39",
+    "SourceReadSwift/Shared/DesignSystem/AppTheme.swift": "05eadee8c9d74f15840fa8560c8adcd0a69bd0635c9d6cadb2ea31f035f5ba4a",
+    "SourceReadSwift/App/RootTabView.swift": "3dd11263b5976f3a24a04e7a3a51fba88a57d57eab07354877eb5aa8a8d58e7a",
+    "SourceReadSwift/Features/SourceManager/SourceLoginView.swift": "59285d7c339d25a925d3ab0250702569c4fc927311a1cc1a910c717b23a5e2d9",
+    "SourceReadSwift/Core/Reader/SmartWebArticleExtractor.swift": "fd81d9e470363a083a3d0a8adb0b61cf8718a3de033ba964dc3517cb22baba5a",
+    "SourceReadSwift/Features/Discover/SmartWebReaderView.swift": "e1fc126d3654516f745e682696ea0611ad28c635a858f0b27dbb27b683165919",
+    "SourceReadSwift/Core/Storage/PurifyRuleStore.swift": "4b8e3d448cc473905c949efe437c1eee96e3b74f36d8e94cec9afd33fe71c05d",
+    "SourceReadSwift/Core/Rules/PurifyRuleEvaluator.swift": "a1930da6a39a6c4ec95bb30143a08f4f99422919fb805dcfcd54f520708e1d14",
+    "SourceReadSwift/Features/Discover/SourceWritingView.swift": "bed3dfa432501b60f07e9e7b900e1a14833c27b7a4468ff56f26bedd54bd4e61",
+    "SourceReadSwift/App/SourceReadSwiftApp.swift": "26e3e54510f838bab606a510164e143204298dad908ccb41c490c8785ebfa738",
+    "SourceReadSwift/Features/Reader/ReaderView.swift": "fccfc0185524a91a0da80924e4669e0e3be0e87b544770709da832cbb70709b9",
+    "SourceReadSwift/App/Info.plist": "4d2f66b94a3453bbdef1722b575e4b6d639e0695db359da8faa519a7a9928c79",
+    "SourceReadSwift/App/Assets.xcassets/AppIcon.appiconset/AppIcon-1024.png": "1cf162717418e3624cca4f733e931b0144c59505f0b5e87dade5503e81c27d5b",
+    "project.yml": "7b67ded62920f67b8c2c7bccf5d00b063bb442b6edc6bc6df7551440f4d26772"
+  },
+  "input_tokens": "not_measured",
+  "output_tokens": "not_measured",
+  "limitations": [
+    "No native iOS build or device UI executed by this reviewer.",
+    "Aesthetic appraisal is subjective, not a defect diagnosis.",
+    "Runtime layout/performance claims remain unverified until targeted regression and device checks."
+  ]
+}

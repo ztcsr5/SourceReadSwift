@@ -1,0 +1,117 @@
+[
+  {
+    "thread": "01a15848-1328-7f23-a24e-509b26c7c1a9",
+    "path": "F:\\Codex\\.codex\\sessions\\2026\\10\\20\\rollout-2026-10-20T15-49-36-01a15848-1328-7f23-a24e-509b26c7c1a9_01a15849-88ba-7262-a187-348dff7e901a.jsonl",
+    "bytes": 218511808,
+    "sha256": "6f2fb239b011acc72716709bc1173f237b4dd78e3a3526c544a729d559aa1184",
+    "lines": 59214,
+    "visible_events": 119,
+    "kinds": {
+      "session_meta": 1,
+      "event_msg": 24168,
+      "response_item": 27648,
+      "world_state": 283,
+      "turn_context": 284,
+      "token_usage_record": 6559,
+      "compacted": 271
+    }
+  },
+  {
+    "thread": "01a15848-1328-7f23-a24e-509b26c7c1a9",
+    "path": "F:\\Codex\\.codex\\sessions\\2026\\10\\24\\rollout-2026-10-24T17-18-09-01a15848-1328-7f23-a24e-509b26c7c1a9_01a16d34-0a62-7b10-877c-727950b0661e.jsonl",
+    "bytes": 91472412,
+    "sha256": "4f419c122ae121458cc09e35d63d9bc6294fc351a7972c5edbbf95fa00ea8b52",
+    "lines": 22932,
+    "visible_events": 93,
+    "kinds": {
+      "session_meta": 1,
+      "event_msg": 9490,
+      "response_item": 10348,
+      "world_state": 32,
+      "turn_context": 51,
+      "token_usage_record": 2983,
+      "compacted": 27
+    }
+  },
+  {
+    "thread": "01a15848-1328-7f23-a24e-509b26c7c1a9",
+    "path": "F:\\Codex\\.codex\\sessions\\2026\\10\\28\\rollout-2026-10-28T03-45-32-01a15848-1328-7f23-a24e-509b26c7c1a9_01a17ee5-820a-7253-b31e-1c1ed75465a2.jsonl",
+    "bytes": 178979887,
+    "sha256": "c9d0f11d1d697d17c2d13ab545d89af1bf970cf5113faff8e79b5b6e714527cc",
+    "lines": 42432,
+    "visible_events": 265,
+    "kinds": {
+      "session_meta": 1,
+      "event_msg": 17738,
+      "turn_context": 91,
+      "response_item": 18676,
+      "token_usage_record": 5832,
+      "compacted": 46,
+      "world_state": 48
+    }
+  },
+  {
+    "thread": "01a15848-1328-7f23-a24e-509b26c7c1a9",
+    "path": "F:\\Codex\\.codex\\sessions\\2026\\10\\29\\rollout-2026-10-29T14-44-41-01a15848-1328-7f23-a24e-509b26c7c1a9_01a18667-570f-7ce0-873b-1125c7a0a5bf.jsonl",
+    "bytes": 9815360,
+    "sha256": "fff04b366deae6b52cc460ea482324aace5f2177e33639b1ccf010369333bf67",
+    "lines": 1044,
+    "visible_events": 16,
+    "kinds": {
+      "session_meta": 1,
+      "event_msg": 486,
+      "response_item": 422,
+      "world_state": 3,
+      "turn_context": 11,
+      "token_usage_record": 119,
+      "compacted": 2
+    }
+  },
+  {
+    "thread": "01a15848-1328-7f23-a24e-509b26c7c1a9",
+    "path": "F:\\Codex\\.codex\\sessions\\2026\\10\\29\\rollout-2026-10-29T17-39-17-01a15848-1328-7f23-a24e-509b26c7c1a9_01a18707-2f6a-75a1-bc09-dbb3704ae145.jsonl",
+    "bytes": 108303,
+    "sha256": "69a6d6cdaa3864cfeb1107a8a51ae21369103d75af38944865203312d4635b0e",
+    "lines": 17,
+    "visible_events": 2,
+    "kinds": {
+      "session_meta": 1,
+      "event_msg": 13,
+      "response_item": 3
+    }
+  },
+  {
+    "thread": "01a1870b-2d3c-7541-97a5-cf146a4daee9",
+    "path": "F:\\Codex\\.codex\\sessions\\2026\\10\\29\\rollout-2026-10-29T17-43-39-01a1870b-2d3c-7541-97a5-cf146a4daee9.jsonl",
+    "bytes": 13815199,
+    "sha256": "cde1335116f709d5c760a05b487d79f2b5811696e35955d32c28b666b0cbc565",
+    "lines": 4706,
+    "visible_events": 18,
+    "kinds": {
+      "session_meta": 1,
+      "event_msg": 1943,
+      "response_item": 2147,
+      "world_state": 18,
+      "turn_context": 22,
+      "token_usage_record": 558,
+      "compacted": 17
+    }
+  },
+  {
+    "thread": "01a1870b-2d3c-7541-97a5-cf146a4daee9",
+    "path": "F:\\Codex\\.codex\\sessions\\2026\\10\\29\\rollout-2026-10-29T19-47-15-01a1870b-2d3c-7541-97a5-cf146a4daee9_01a1877c-56cb-7092-8834-2c7ce2c8eb90.jsonl",
+    "bytes": 66269878,
+    "sha256": "5fd6287dd9e26a8469cdc9f35abad9d81afa75f1618605cb989737fe6b0dee7b",
+    "lines": 20856,
+    "visible_events": 50,
+    "kinds": {
+      "session_meta": 1,
+      "event_msg": 8585,
+      "turn_context": 87,
+      "response_item": 9385,
+      "token_usage_record": 2638,
+      "compacted": 79,
+      "world_state": 81
+    }
+  }
+]

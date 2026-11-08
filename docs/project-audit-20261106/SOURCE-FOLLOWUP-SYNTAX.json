@@ -1,0 +1,132 @@
+{
+  "baseline_commit": "2b5e291e1bf284ee6120f404b39ab6aa2a04220c",
+  "native_compilation": "not_run_on_windows",
+  "files": [
+    {
+      "path": "SourceReadSwift/App/AppState.swift",
+      "sha256": "5ab6ad7f0375ea250f92508e56f24d44d02060426abcf5bcf530e97f12c53531",
+      "baseline_exists": true,
+      "new_parser_errors": 0,
+      "error_snippets": []
+    },
+    {
+      "path": "SourceReadSwift/Core/Engine/SourceEngine.swift",
+      "sha256": "f34a91022d051fade7d7eb9b1c80e43e9cdab6709b7c77bd61b488468a1a66a9",
+      "baseline_exists": true,
+      "new_parser_errors": 0,
+      "error_snippets": []
+    },
+    {
+      "path": "SourceReadSwift/Core/Import/SourceImportDownloader.swift",
+      "sha256": "f0fd834c6af7091ebee8619de032725a6da513bf49240a3a659d87fada9506e6",
+      "baseline_exists": true,
+      "new_parser_errors": 0,
+      "error_snippets": []
+    },
+    {
+      "path": "SourceReadSwift/Core/Import/SourcePublisherLinks.swift",
+      "sha256": "48c7c3f5f45eea31ea29e54911d0e1924b890810b9c0efe6a5b745322ad1b8bb",
+      "baseline_exists": false,
+      "new_parser_errors": 0,
+      "error_snippets": []
+    },
+    {
+      "path": "SourceReadSwift/Core/Models/BookSource.swift",
+      "sha256": "ff0f7bd3b51ca40fc4d0a9029475d4cc117bf477d8c8209fa07534fa412659ee",
+      "baseline_exists": true,
+      "new_parser_errors": 0,
+      "error_snippets": []
+    },
+    {
+      "path": "SourceReadSwift/Core/Rules/RuleExecutionContext.swift",
+      "sha256": "d6258de3d41123edd2042328db4b2eeee26d7f190ad606646e5907a14db47f66",
+      "baseline_exists": true,
+      "new_parser_errors": 0,
+      "error_snippets": []
+    },
+    {
+      "path": "SourceReadSwift/Core/Storage/SourceStore.swift",
+      "sha256": "9dcd097da9143427dc5198a0709fead40930540a7e5b927a730e7039e1b3738e",
+      "baseline_exists": true,
+      "new_parser_errors": 0,
+      "error_snippets": []
+    },
+    {
+      "path": "SourceReadSwift/Core/Storage/SourceVariableStore.swift",
+      "sha256": "1809bc81a249cd217e0191f237e934919c2ed447df50045f45699dbfd7990167",
+      "baseline_exists": false,
+      "new_parser_errors": 0,
+      "error_snippets": []
+    },
+    {
+      "path": "SourceReadSwift/Features/Bookshelf/BookshelfReaderGatewayView.swift",
+      "sha256": "a90685fc1a415c5452ad4b3b2dce4ee2bc02e28c32223332be0d2e48e387f29a",
+      "baseline_exists": true,
+      "new_parser_errors": 0,
+      "error_snippets": []
+    },
+    {
+      "path": "SourceReadSwift/Features/Discover/BookDetailView.swift",
+      "sha256": "b2810dc7a3bef73394795040d3c21e18111453ea42c4964c434b15d1c78a3079",
+      "baseline_exists": true,
+      "new_parser_errors": 0,
+      "error_snippets": []
+    },
+    {
+      "path": "SourceReadSwift/Features/Discover/DiscoverView.swift",
+      "sha256": "0c36dbb51262181f0b4afbbc69691e30e59083be96d87e5d6ebdef0037709f0e",
+      "baseline_exists": true,
+      "new_parser_errors": 0,
+      "error_snippets": []
+    },
+    {
+      "path": "SourceReadSwift/Features/Search/GlobalSearchView.swift",
+      "sha256": "aebd25aa88a705ea67a6242fef8809d898e08c07ee66bdf6c053f11c161d01a3",
+      "baseline_exists": true,
+      "new_parser_errors": 0,
+      "error_snippets": []
+    },
+    {
+      "path": "SourceReadSwift/Features/SourceManager/SourceManagerView.swift",
+      "sha256": "b7c901cb641e5f137a2a727fef823c5d4a56616098e026e9c62f3e6ff5968723",
+      "baseline_exists": true,
+      "new_parser_errors": 0,
+      "error_snippets": []
+    },
+    {
+      "path": "SourceReadSwift/Features/SourceManager/SourcePublisherLinksView.swift",
+      "sha256": "843f4e627a25ffbb7a65aa38c49d1878605be1381894d0bffd65e5bdb59daaba",
+      "baseline_exists": false,
+      "new_parser_errors": 0,
+      "error_snippets": []
+    },
+    {
+      "path": "SourceReadSwiftTests/AggregateSourceRegressionTests.swift",
+      "sha256": "b73b152c47be8417a3b5f3f57aa9206be91f9a6ac073f69287616cb944fefc8e",
+      "baseline_exists": true,
+      "new_parser_errors": 0,
+      "error_snippets": []
+    },
+    {
+      "path": "SourceReadSwiftTests/SourceImportDownloaderTests.swift",
+      "sha256": "d81cb9cd5f52fc0301b419eedfb5303c7180599e1cf064d0d7a7ac166fa4ad7c",
+      "baseline_exists": true,
+      "new_parser_errors": 0,
+      "error_snippets": []
+    },
+    {
+      "path": "SourceReadSwiftTests/SourcePublisherLinksTests.swift",
+      "sha256": "50402a567330279fbd989b9ccad3c0f6d8d916bc6d18c187135eda4cbd8fa712",
+      "baseline_exists": false,
+      "new_parser_errors": 0,
+      "error_snippets": []
+    },
+    {
+      "path": "SourceReadSwiftTests/SourceVariablePersistenceTests.swift",
+      "sha256": "c98d33ebcf0968c7b51ee622b30a4f617c749b47db216fa3e5a67daa81ec1b41",
+      "baseline_exists": false,
+      "new_parser_errors": 0,
+      "error_snippets": []
+    }
+  ]
+}

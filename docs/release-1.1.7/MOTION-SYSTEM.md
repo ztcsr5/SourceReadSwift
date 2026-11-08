@@ -42,3 +42,46 @@
 - 本地检查仅为 25 个 Swift 文件无新增解析错误、git diff --check、CI 辅助脚本 py_compile 与 YAML 解析；最终本 HEAD 原生结果未出前不交付 build 129 IPA，不称真机/FPS 已通过。
 - 首次加载封面或回落到主题占位时，文字语义和底色同帧落位，不单独慢慢把白底变暗而提前显示白字；仅已有封面色之间允许背景缓变，减少动态设置仍优先。新增取色首次载入/回落动画策略断言。
 - 最后一次全量本地解析覆盖 27 个本轮 Swift 文件：ReaderRecovery119Tests 存在与 63aaff6 相同的既有解析器限制（第 361 行 `!`），新增语法错误为 0；不将 tree-sitter 当作 Apple 编译器。
+
+## 本轮文件清单（ad81491）
+
+- `D:/Gemini反重力/SourceReadSwift2/.github/workflows/ios.yml`
+- `D:/Gemini反重力/SourceReadSwift2/.github/workflows/unsigned-ipa.yml`
+- `D:/Gemini反重力/SourceReadSwift2/CHANGELOG.md`
+- `D:/Gemini反重力/SourceReadSwift2/SourceReadSwift/App/RootTabView.swift`
+- `D:/Gemini反重力/SourceReadSwift2/SourceReadSwift/Core/Storage/CustomFontManager.swift`
+- `D:/Gemini反重力/SourceReadSwift2/SourceReadSwift/Core/Storage/FontImportPolicy.swift`
+- `D:/Gemini反重力/SourceReadSwift2/SourceReadSwift/Features/Bookshelf/BookshelfView.swift`
+- `D:/Gemini反重力/SourceReadSwift2/SourceReadSwift/Features/Bookshelf/CoverToneSampler.swift`
+- `D:/Gemini反重力/SourceReadSwift2/SourceReadSwift/Features/Bookshelf/ReadingHeroCard.swift`
+- `D:/Gemini反重力/SourceReadSwift2/SourceReadSwift/Features/Discover/BookDetailHero.swift`
+- `D:/Gemini反重力/SourceReadSwift2/SourceReadSwift/Features/Discover/BookDetailView.swift`
+- `D:/Gemini反重力/SourceReadSwift2/SourceReadSwift/Features/Reader/CoverPageReaderView.swift`
+- `D:/Gemini反重力/SourceReadSwift2/SourceReadSwift/Features/Reader/ReaderAutomationPolicy.swift`
+- `D:/Gemini反重力/SourceReadSwift2/SourceReadSwift/Features/Reader/ReaderHeadingPreferences.swift`
+- `D:/Gemini反重力/SourceReadSwift2/SourceReadSwift/Features/Reader/ReaderPageGeometry.swift`
+- `D:/Gemini反重力/SourceReadSwift2/SourceReadSwift/Features/Reader/ReaderScrollChapterHeader.swift`
+- `D:/Gemini反重力/SourceReadSwift2/SourceReadSwift/Features/Reader/ReaderView.swift`
+- `D:/Gemini反重力/SourceReadSwift2/SourceReadSwift/Features/Reader/WebReaderDocument.swift`
+- `D:/Gemini反重力/SourceReadSwift2/SourceReadSwift/Features/Reader/WebScrollReaderView.swift`
+- `D:/Gemini反重力/SourceReadSwift2/SourceReadSwift/Features/Settings/AppearanceSettingsView.swift`
+- `D:/Gemini反重力/SourceReadSwift2/SourceReadSwift/Features/Settings/CustomFontManagementView.swift`
+- `D:/Gemini反重力/SourceReadSwift2/SourceReadSwift/Shared/DesignSystem/AppMotion.swift`
+- `D:/Gemini反重力/SourceReadSwift2/SourceReadSwift/Shared/DesignSystem/AppTheme.swift`
+- `D:/Gemini反重力/SourceReadSwift2/SourceReadSwift/Shared/DesignSystem/AppThemeOrnament.swift`
+- `D:/Gemini反重力/SourceReadSwift2/SourceReadSwift/Shared/DesignSystem/AppThemeSurface.swift`
+- `D:/Gemini反重力/SourceReadSwift2/SourceReadSwift/Shared/DesignSystem/AppVisualTheme.swift`
+- `D:/Gemini反重力/SourceReadSwift2/SourceReadSwift/Shared/DesignSystem/CoverAtmosphere.swift`
+- `D:/Gemini反重力/SourceReadSwift2/SourceReadSwift/Shared/DesignSystem/LegacyTabBar.swift`
+- `D:/Gemini反重力/SourceReadSwift2/SourceReadSwiftTests/ReaderRecovery119Tests.swift`
+- `D:/Gemini反重力/SourceReadSwift2/SourceReadSwiftTests/Release117MotionSystemTests.swift`
+- `D:/Gemini反重力/SourceReadSwift2/docs/adr/0117-system-owned-motion.md`
+- `D:/Gemini反重力/SourceReadSwift2/docs/release-1.1.7/MOTION-SYSTEM.md`
+- `D:/Gemini反重力/SourceReadSwift2/project.yml`
+- `D:/Gemini反重力/SourceReadSwift2/scripts/reader_motion_ci.py`
+
+## CI monitoring / Desktop test-candidate delivery · 2026-11-02
+- User requested monitoring and Desktop download only; no app source changes, new commits/pushes, installation or signing were performed. HEAD remains ad814912685b53ce7c4b4262598e047c168bec55.
+- Delivered C:/Users/Edc21/Desktop/SourceReadSwift-1.1.7-build129-ad81491-unsigned-UNVERIFIED.ipa (26510985 bytes), SHA256 44827ddb73b409a899dd382c71b70ecdcda1ab47ed832fc9e4fa0d520ce82f9a. Exact-head packaging provenance, ZIP CRC, com.edc21.SourceReadSwift / 1.1.7 / 129 / iOS16, arm64 iPhoneOS, bundled fonts and post-copy hash verified. Unsigned, user signing required. Previous Desktop IPAs preserved.
+- Failed test evidence retained under F:/SourceReadSwift/reader-motion-117/ad814912685b53ce7c4b4262598e047c168bec55/. See ci-status.json, IPA_VERIFICATION.json, job-125214553115.log and job-125214553574.log. New motion tests and pan geometry test passed on native26, but this does not override overall CI failure or constitute FPS/physical-device acceptance.
+- Next engineering work (not performed in this monitoring task): reconcile exact new theme identities/geometry expectations in Release116VisualTests without weakening coverage; reproduce WebKit testWebScrollRestoresAndReportsInsideOneLongParagraph failures at lines 84–85 before deciding app vs harness fix. Keep failing logs and rerun full exact-head gates after any fix.

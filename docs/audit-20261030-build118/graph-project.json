@@ -1,0 +1,157 @@
+{
+  "nodes": [
+    {
+      "id": "review_app",
+      "label": "SourceReadSwiftApp",
+      "file_type": "code",
+      "source_file": "SourceReadSwift/App/SourceReadSwiftApp.swift",
+      "source_location": "1"
+    },
+    {
+      "id": "review_root",
+      "label": "RootTabView",
+      "file_type": "code",
+      "source_file": "SourceReadSwift/App/RootTabView.swift",
+      "source_location": "1"
+    },
+    {
+      "id": "review_appstate",
+      "label": "AppState",
+      "file_type": "code",
+      "source_file": "SourceReadSwift/App/AppState.swift",
+      "source_location": "163-258"
+    },
+    {
+      "id": "review_reader",
+      "label": "ReaderView",
+      "file_type": "code",
+      "source_file": "SourceReadSwift/Features/Reader/ReaderView.swift",
+      "source_location": "7"
+    },
+    {
+      "id": "review_webscroll",
+      "label": "WebScrollReaderView",
+      "file_type": "code",
+      "source_file": "SourceReadSwift/Features/Reader/WebScrollReaderView.swift",
+      "source_location": "1"
+    },
+    {
+      "id": "review_cover",
+      "label": "CoverPageReaderView",
+      "file_type": "code",
+      "source_file": "SourceReadSwift/Features/Reader/CoverPageReaderView.swift",
+      "source_location": "1"
+    },
+    {
+      "id": "review_ci",
+      "label": "iOS unit-test workflow",
+      "file_type": "document",
+      "source_file": ".github/workflows/ios.yml",
+      "source_location": "54-69"
+    },
+    {
+      "id": "review_package",
+      "label": "Independent IPA workflow",
+      "file_type": "document",
+      "source_file": ".github/workflows/unsigned-ipa.yml",
+      "source_location": "7-38"
+    },
+    {
+      "id": "review_project",
+      "label": "XcodeGen project",
+      "file_type": "document",
+      "source_file": "project.yml",
+      "source_location": "1-101"
+    },
+    {
+      "id": "review_project_report",
+      "label": "Project audit",
+      "file_type": "document",
+      "source_file": "docs/audit-20261030-build118/project-audit.md",
+      "source_location": "1-116"
+    }
+  ],
+  "edges": [
+    {
+      "source": "review_app",
+      "target": "review_root",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "SourceReadSwift/App/SourceReadSwiftApp.swift",
+      "source_location": "1",
+      "weight": 1.0
+    },
+    {
+      "source": "review_reader",
+      "target": "review_appstate",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "SourceReadSwift/Features/Reader/ReaderView.swift",
+      "source_location": "8",
+      "weight": 1.0
+    },
+    {
+      "source": "review_reader",
+      "target": "review_webscroll",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "SourceReadSwift/Features/Reader/ReaderView.swift",
+      "source_location": "1584-1588",
+      "weight": 1.0
+    },
+    {
+      "source": "review_reader",
+      "target": "review_cover",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "SourceReadSwift/Features/Reader/ReaderView.swift",
+      "source_location": "2553-2614",
+      "weight": 1.0
+    },
+    {
+      "source": "review_ci",
+      "target": "review_project",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": ".github/workflows/ios.yml",
+      "source_location": "54-69",
+      "weight": 1.0
+    },
+    {
+      "source": "review_package",
+      "target": "review_project",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": ".github/workflows/unsigned-ipa.yml",
+      "source_location": "7-38",
+      "weight": 1.0
+    },
+    {
+      "source": "review_project_report",
+      "target": "review_appstate",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/audit-20261030-build118/project-audit.md",
+      "source_location": "54-60",
+      "weight": 1.0
+    },
+    {
+      "source": "review_project_report",
+      "target": "review_ci",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/audit-20261030-build118/project-audit.md",
+      "source_location": "22-28",
+      "weight": 1.0
+    }
+  ],
+  "hyperedges": []
+}

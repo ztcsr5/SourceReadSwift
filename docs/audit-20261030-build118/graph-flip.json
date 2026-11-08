@@ -1,0 +1,285 @@
+{
+  "nodes": [
+    {
+      "id": "flip:route",
+      "label": "ReaderView.pagedReaderContent",
+      "file_type": "code",
+      "source_file": "SourceReadSwift/Features/Reader/ReaderView.swift",
+      "source_location": "2551-2563",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0
+    },
+    {
+      "id": "flip:cover",
+      "label": "ReaderView.coverPagedReaderContent",
+      "file_type": "code",
+      "source_file": "SourceReadSwift/Features/Reader/ReaderView.swift",
+      "source_location": "2721-2775",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0
+    },
+    {
+      "id": "flip:simulated",
+      "label": "ReaderView.flipPagedReaderContent",
+      "file_type": "code",
+      "source_file": "SourceReadSwift/Features/Reader/ReaderView.swift",
+      "source_location": "2579-2630",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0
+    },
+    {
+      "id": "flip:legacy",
+      "label": "ReaderView.pageCurlReaderContent (unreferenced declaration)",
+      "file_type": "code",
+      "source_file": "SourceReadSwift/Features/Reader/ReaderView.swift",
+      "source_location": "2632-2666",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0
+    },
+    {
+      "id": "flip:host",
+      "label": "CoverPageHostController",
+      "file_type": "code",
+      "source_file": "SourceReadSwift/Features/Reader/CoverPageReaderView.swift",
+      "source_location": "131-528",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0
+    },
+    {
+      "id": "flip:apply",
+      "label": "CoverPageHostController.apply",
+      "file_type": "code",
+      "source_file": "SourceReadSwift/Features/Reader/CoverPageReaderView.swift",
+      "source_location": "223-335",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "rationale": "Current identity/revision/style gate precedes neighbour identity comparison."
+    },
+    {
+      "id": "flip:revision",
+      "label": "ReaderView.readerPageRevisionKey",
+      "file_type": "code",
+      "source_file": "SourceReadSwift/Features/Reader/ReaderView.swift",
+      "source_location": "689-701",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "rationale": "Excludes neighbouring window sections so prefetch does not invalidate existing pages."
+    },
+    {
+      "id": "flip:frames",
+      "label": "CoverPageHostController.installFramesIfNeeded",
+      "file_type": "code",
+      "source_file": "SourceReadSwift/Features/Reader/CoverPageReaderView.swift",
+      "source_location": "395-430",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0
+    },
+    {
+      "id": "flip:settle",
+      "label": "CoverPageHostController.settle",
+      "file_type": "code",
+      "source_file": "SourceReadSwift/Features/Reader/CoverPageReaderView.swift",
+      "source_location": "469-488",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0
+    },
+    {
+      "id": "flip:policy",
+      "label": "ReaderCoverSettlePolicy.outcome(shift:)",
+      "file_type": "code",
+      "source_file": "SourceReadSwift/Features/Reader/ReaderPagedNavigationPolicy.swift",
+      "source_location": "262-275",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0
+    },
+    {
+      "id": "flip:commit",
+      "label": "ReaderView.commitCoverTurn",
+      "file_type": "code",
+      "source_file": "SourceReadSwift/Features/Reader/ReaderView.swift",
+      "source_location": "2785-2807",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0
+    },
+    {
+      "id": "flip:prewarm",
+      "label": "CoverPageHostController.prewarmNeighbourSlots",
+      "file_type": "code",
+      "source_file": "SourceReadSwift/Features/Reader/CoverPageReaderView.swift",
+      "source_location": "353-360",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0
+    },
+    {
+      "id": "flip:gesture",
+      "label": "CoverPageHostController.scrollViewWillBeginDragging",
+      "file_type": "code",
+      "source_file": "SourceReadSwift/Features/Reader/CoverPageReaderView.swift",
+      "source_location": "446-453",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0
+    },
+    {
+      "id": "flip:transform",
+      "label": "ReaderFlipTransitionPolicy.rotationAngle",
+      "file_type": "code",
+      "source_file": "SourceReadSwift/Features/Reader/ReaderFlipTransitionPolicy.swift",
+      "source_location": "13-15",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0
+    },
+    {
+      "id": "flip:legacy-prewarm",
+      "label": "PageCurlReaderView.Coordinator.prewarm",
+      "file_type": "code",
+      "source_file": "SourceReadSwift/Features/Reader/PageCurlReaderView.swift",
+      "source_location": "254-319",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0
+    }
+  ],
+  "edges": [
+    {
+      "source": "flip:route",
+      "target": "flip:cover",
+      "relation": "routes_cover_and_pageTurn_to",
+      "source_file": "SourceReadSwift/Features/Reader/ReaderView.swift",
+      "source_location": "2558-2559",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0
+    },
+    {
+      "source": "flip:route",
+      "target": "flip:simulated",
+      "relation": "routes_pageCurl_to",
+      "source_file": "SourceReadSwift/Features/Reader/ReaderView.swift",
+      "source_location": "2560-2561",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0
+    },
+    {
+      "source": "flip:cover",
+      "target": "flip:host",
+      "relation": "creates_via_UIViewControllerRepresentable",
+      "source_file": "SourceReadSwift/Features/Reader/ReaderView.swift",
+      "source_location": "2739-2762",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0
+    },
+    {
+      "source": "flip:simulated",
+      "target": "flip:host",
+      "relation": "creates_with_flip_style",
+      "source_file": "SourceReadSwift/Features/Reader/ReaderView.swift",
+      "source_location": "2592-2616",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0
+    },
+    {
+      "source": "flip:cover",
+      "target": "flip:revision",
+      "relation": "uses_as_contentRevision",
+      "source_file": "SourceReadSwift/Features/Reader/ReaderView.swift",
+      "source_location": "2741",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0
+    },
+    {
+      "source": "flip:simulated",
+      "target": "flip:revision",
+      "relation": "uses_as_contentRevision",
+      "source_file": "SourceReadSwift/Features/Reader/ReaderView.swift",
+      "source_location": "2594",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0
+    },
+    {
+      "source": "flip:host",
+      "target": "flip:apply",
+      "relation": "owns",
+      "source_file": "SourceReadSwift/Features/Reader/CoverPageReaderView.swift",
+      "source_location": "223-335",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0
+    },
+    {
+      "source": "flip:apply",
+      "target": "flip:frames",
+      "relation": "calls",
+      "source_file": "SourceReadSwift/Features/Reader/CoverPageReaderView.swift",
+      "source_location": "330",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0
+    },
+    {
+      "source": "flip:apply",
+      "target": "flip:prewarm",
+      "relation": "calls",
+      "source_file": "SourceReadSwift/Features/Reader/CoverPageReaderView.swift",
+      "source_location": "332-333",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0
+    },
+    {
+      "source": "flip:settle",
+      "target": "flip:policy",
+      "relation": "calls",
+      "source_file": "SourceReadSwift/Features/Reader/CoverPageReaderView.swift",
+      "source_location": "475-480",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0
+    },
+    {
+      "source": "flip:settle",
+      "target": "flip:commit",
+      "relation": "invokes_indirectly_via_onCommit",
+      "source_file": "SourceReadSwift/Features/Reader/CoverPageReaderView.swift",
+      "source_location": "481-494",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0
+    },
+    {
+      "source": "flip:host",
+      "target": "flip:transform",
+      "relation": "calls",
+      "source_file": "SourceReadSwift/Features/Reader/CoverPageReaderView.swift",
+      "source_location": "439",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0
+    },
+    {
+      "source": "flip:frames",
+      "target": "flip:commit",
+      "relation": "five_slot_visible_delta_can_disagree_with_single_step_commit",
+      "source_file": "SourceReadSwift/Features/Reader/CoverPageReaderView.swift",
+      "source_location": "401-404;481-484",
+      "confidence": "INFERRED",
+      "confidence_score": 0.95
+    },
+    {
+      "source": "flip:gesture",
+      "target": "flip:prewarm",
+      "relation": "can_overlap_queued_main_thread_warmup",
+      "source_file": "SourceReadSwift/Features/Reader/CoverPageReaderView.swift",
+      "source_location": "353-359;446-452",
+      "confidence": "INFERRED",
+      "confidence_score": 0.85
+    },
+    {
+      "source": "flip:prewarm",
+      "target": "flip:legacy-prewarm",
+      "relation": "shares_execution_time_interaction_guard_gap",
+      "source_file": "SourceReadSwift/Features/Reader/CoverPageReaderView.swift",
+      "source_location": "353-359",
+      "confidence": "INFERRED",
+      "confidence_score": 0.92
+    }
+  ],
+  "hyperedges": [],
+  "input_tokens": 0,
+  "output_tokens": 0,
+  "metadata": {
+    "scope": "Read-only manual semantic extraction; no runtime reproduction; no separate LLM API cost measured",
+    "source_baseline": "flip-model-results.json"
+  }
+}

@@ -1,0 +1,42 @@
+{
+  "files": {
+    "code": [
+      "D:\\Gemini反重力\\SourceReadSwift2\\SourceReadSwift\\Features\\Reader\\AudioBookPlayerView.swift",
+      "D:\\Gemini反重力\\SourceReadSwift2\\SourceReadSwift\\Features\\Reader\\ComicReaderView.swift",
+      "D:\\Gemini反重力\\SourceReadSwift2\\SourceReadSwift\\Features\\Reader\\CoverPageReaderView.swift",
+      "D:\\Gemini反重力\\SourceReadSwift2\\SourceReadSwift\\Features\\Reader\\NativeReaderTextView.swift",
+      "D:\\Gemini反重力\\SourceReadSwift2\\SourceReadSwift\\Features\\Reader\\PageCurlReaderView.swift",
+      "D:\\Gemini反重力\\SourceReadSwift2\\SourceReadSwift\\Features\\Reader\\QuoteCardView.swift",
+      "D:\\Gemini反重力\\SourceReadSwift2\\SourceReadSwift\\Features\\Reader\\ReaderAutomationPolicy.swift",
+      "D:\\Gemini反重力\\SourceReadSwift2\\SourceReadSwift\\Features\\Reader\\ReaderCJKPunctuationCompression.swift",
+      "D:\\Gemini反重力\\SourceReadSwift2\\SourceReadSwift\\Features\\Reader\\ReaderChapterPaginator.swift",
+      "D:\\Gemini反重力\\SourceReadSwift2\\SourceReadSwift\\Features\\Reader\\ReaderChapterWindow.swift",
+      "D:\\Gemini反重力\\SourceReadSwift2\\SourceReadSwift\\Features\\Reader\\ReaderFlipTransitionPolicy.swift",
+      "D:\\Gemini反重力\\SourceReadSwift2\\SourceReadSwift\\Features\\Reader\\ReaderImageStyle.swift",
+      "D:\\Gemini反重力\\SourceReadSwift2\\SourceReadSwift\\Features\\Reader\\ReaderPageGeometry.swift",
+      "D:\\Gemini反重力\\SourceReadSwift2\\SourceReadSwift\\Features\\Reader\\ReaderPageLayoutEngine.swift",
+      "D:\\Gemini反重力\\SourceReadSwift2\\SourceReadSwift\\Features\\Reader\\ReaderPageSelection.swift",
+      "D:\\Gemini反重力\\SourceReadSwift2\\SourceReadSwift\\Features\\Reader\\ReaderPageTextView.swift",
+      "D:\\Gemini反重力\\SourceReadSwift2\\SourceReadSwift\\Features\\Reader\\ReaderPagedNavigationPolicy.swift",
+      "D:\\Gemini反重力\\SourceReadSwift2\\SourceReadSwift\\Features\\Reader\\ReaderPositionMapping.swift",
+      "D:\\Gemini反重力\\SourceReadSwift2\\SourceReadSwift\\Features\\Reader\\ReaderSafeAreaResolver.swift",
+      "D:\\Gemini反重力\\SourceReadSwift2\\SourceReadSwift\\Features\\Reader\\ReaderSettingsModels.swift",
+      "D:\\Gemini反重力\\SourceReadSwift2\\SourceReadSwift\\Features\\Reader\\ReaderView.swift",
+      "D:\\Gemini反重力\\SourceReadSwift2\\SourceReadSwift\\Features\\Reader\\ReaderWallpaperView.swift",
+      "D:\\Gemini反重力\\SourceReadSwift2\\SourceReadSwift\\Features\\Reader\\VideoPlayerView.swift",
+      "D:\\Gemini反重力\\SourceReadSwift2\\SourceReadSwift\\Features\\Reader\\WebReaderDocument.swift",
+      "D:\\Gemini反重力\\SourceReadSwift2\\SourceReadSwift\\Features\\Reader\\WebScrollReaderView.swift"
+    ],
+    "document": [],
+    "paper": [],
+    "image": [],
+    "video": []
+  },
+  "total_files": 25,
+  "total_words": 63936,
+  "needs_graph": true,
+  "warning": null,
+  "skipped_sensitive": [],
+  "graphifyignore_patterns": 10,
+  "scan_root": "D:\\Gemini反重力\\SourceReadSwift2\\SourceReadSwift\\Features\\Reader"
+}

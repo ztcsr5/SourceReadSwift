@@ -1,0 +1,47 @@
+[
+  {
+    "path": "SourceReadSwift/Features/Bookshelf/ReaderOpeningPage.swift",
+    "new_syntax_errors": 0,
+    "snippets": []
+  },
+  {
+    "path": "SourceReadSwift/Features/Reader/ReaderView.swift",
+    "new_syntax_errors": 0,
+    "snippets": []
+  },
+  {
+    "path": "SourceReadSwift/Features/Reader/ReaderBackgroundChapterPrecache.swift",
+    "new_syntax_errors": 0,
+    "snippets": []
+  },
+  {
+    "path": "SourceReadSwift/Features/Reader/CoverPageReaderView.swift",
+    "new_syntax_errors": 0,
+    "snippets": []
+  },
+  {
+    "path": "SourceReadSwift/Features/Reader/WebReaderDocument.swift",
+    "new_syntax_errors": 0,
+    "snippets": []
+  },
+  {
+    "path": "SourceReadSwiftTests/ReaderBackgroundChapterPrecacheTests.swift",
+    "new_syntax_errors": 0,
+    "snippets": []
+  },
+  {
+    "path": "SourceReadSwiftTests/ReaderOpeningTransitionTests.swift",
+    "new_syntax_errors": 0,
+    "snippets": []
+  },
+  {
+    "path": "SourceReadSwiftTests/ReaderPageHostingTests.swift",
+    "new_syntax_errors": 0,
+    "snippets": []
+  },
+  {
+    "path": "SourceReadSwiftTests/ReaderScrollCadenceTests.swift",
+    "new_syntax_errors": 0,
+    "snippets": []
+  }
+]

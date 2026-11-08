@@ -1,13 +1,11 @@
 import SwiftUI
 
-/// iOS 16–25 only. Native iOS 26 TabView remains owned by RootTabView.
+/// Universal floating tab bar with aligned global search button.
 struct LegacyTabBar: View {
     @Binding var selection: Int
     var onSearch: () -> Void
     @AppMotion private var motion
     @Namespace private var highlight
-    @AppStorage(AppVisualTheme.selectionKey) private var themeRaw = AppVisualTheme.initialSelection.rawValue
-    private var theme: AppVisualTheme { AppVisualTheme(rawValue: themeRaw) ?? .classic }
 
     var body: some View {
         HStack(spacing: 10) {
@@ -20,21 +18,18 @@ struct LegacyTabBar: View {
                     .accessibilityIdentifier("tabs.legacy.settings")
             }
             .padding(4)
-            .background {
-                if theme.usesNeutralGlass { BrandGlass(outline: Capsule()) }
-                else { Capsule().fill(.regularMaterial) }
-            }
-            .overlay(Capsule().strokeBorder(Color.primary.opacity(0.07), lineWidth: 0.6).allowsHitTesting(false))
+            .modifier(RootTabGlassSurface(outline: Capsule()))
             Button(action: onSearch) {
                 Image(systemName: "magnifyingglass")
-                    .font(.system(size: 23, weight: .medium))
-                    .foregroundStyle(theme.primaryInk)
-                    .frame(width: 54, height: 54)
-                    .background(.regularMaterial, in: Circle())
-                    .overlay(Circle().strokeBorder(Color.primary.opacity(0.07), lineWidth: 0.6))
+                    .font(.system(size: 22, weight: .semibold))
+                    .foregroundStyle(.primary)
+                    .frame(width: 52, height: 52)
+                    .modifier(RootTabGlassSurface(outline: Circle(), isInteractive: true))
+                    .contentShape(Circle())
             }
             .buttonStyle(AppPressStyle())
             .accessibilityLabel("全网搜书")
+            .accessibilityIdentifier("bookshelf.globalSearch")
         }
         .padding(.horizontal, 12)
         .padding(.bottom, 6)
@@ -50,12 +45,12 @@ struct LegacyTabBar: View {
                 Image(systemName: icon).font(.system(size: 21, weight: .medium))
                 Text(title).font(.system(size: 10, weight: .semibold))
             }
-            .foregroundStyle(selection == value ? AppTheme.accent : theme.usesNeutralGlass ? theme.secondaryInk : .primary)
+            .foregroundStyle(selection == value ? AppTheme.accent : .primary)
             .frame(maxWidth: .infinity, minHeight: 46)
             .background {
                 ZStack {
                     if selection == value {
-                        Capsule().fill(theme.usesNeutralGlass ? theme.controlFill : AppTheme.accent.opacity(0.12))
+                        Capsule().fill(AppTheme.accent.opacity(0.12))
                             .matchedGeometryEffect(id: "selection", in: highlight)
                     }
                 }

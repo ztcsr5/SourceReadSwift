@@ -1,0 +1,143 @@
+{
+  "nodes": [
+    {
+      "id": "review_reader",
+      "label": "ReaderView",
+      "file_type": "code",
+      "source_file": "SourceReadSwift/Features/Reader/ReaderView.swift",
+      "source_location": "7"
+    },
+    {
+      "id": "review_paginator",
+      "label": "ReaderChapterPaginator",
+      "file_type": "code",
+      "source_file": "SourceReadSwift/Features/Reader/ReaderChapterPaginator.swift",
+      "source_location": "1-213"
+    },
+    {
+      "id": "review_geometry",
+      "label": "ReaderPageGeometry",
+      "file_type": "code",
+      "source_file": "SourceReadSwift/Features/Reader/ReaderPageGeometry.swift",
+      "source_location": "64-229"
+    },
+    {
+      "id": "review_identity",
+      "label": "ReaderPageIdentity",
+      "file_type": "code",
+      "source_file": "SourceReadSwift/Features/Reader/ReaderPageSelection.swift",
+      "source_location": "1-32"
+    },
+    {
+      "id": "review_textcache",
+      "label": "ReaderPageTextCache",
+      "file_type": "code",
+      "source_file": "SourceReadSwift/Features/Reader/ReaderView.swift",
+      "source_location": "6704-6779"
+    },
+    {
+      "id": "review_textview",
+      "label": "ReaderPageTextView",
+      "file_type": "code",
+      "source_file": "SourceReadSwift/Features/Reader/ReaderPageTextView.swift",
+      "source_location": "173-224"
+    },
+    {
+      "id": "review_mapping",
+      "label": "ReaderPositionMapping",
+      "file_type": "code",
+      "source_file": "SourceReadSwift/Features/Reader/ReaderPositionMapping.swift",
+      "source_location": "1-121"
+    },
+    {
+      "id": "review_pagination_report",
+      "label": "Pagination audit",
+      "file_type": "document",
+      "source_file": "docs/audit-20261030-build118/pagination-audit.md",
+      "source_location": "1-152"
+    }
+  ],
+  "edges": [
+    {
+      "source": "review_reader",
+      "target": "review_paginator",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "SourceReadSwift/Features/Reader/ReaderView.swift",
+      "source_location": "6567-6599",
+      "weight": 1.0
+    },
+    {
+      "source": "review_reader",
+      "target": "review_geometry",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "SourceReadSwift/Features/Reader/ReaderView.swift",
+      "source_location": "573-593",
+      "weight": 1.0
+    },
+    {
+      "source": "review_reader",
+      "target": "review_identity",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "SourceReadSwift/Features/Reader/ReaderView.swift",
+      "source_location": "2866-2868",
+      "weight": 1.0
+    },
+    {
+      "source": "review_reader",
+      "target": "review_textcache",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "SourceReadSwift/Features/Reader/ReaderView.swift",
+      "source_location": "2871-2876",
+      "weight": 1.0
+    },
+    {
+      "source": "review_reader",
+      "target": "review_textview",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "SourceReadSwift/Features/Reader/ReaderView.swift",
+      "source_location": "2830-2834",
+      "weight": 1.0
+    },
+    {
+      "source": "review_reader",
+      "target": "review_mapping",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "SourceReadSwift/Features/Reader/ReaderView.swift",
+      "source_location": "6252-6260",
+      "weight": 1.0
+    },
+    {
+      "source": "review_pagination_report",
+      "target": "review_textcache",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/audit-20261030-build118/pagination-audit.md",
+      "source_location": "13-30",
+      "weight": 1.0
+    },
+    {
+      "source": "review_pagination_report",
+      "target": "review_paginator",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/audit-20261030-build118/pagination-audit.md",
+      "source_location": "45-64",
+      "weight": 1.0
+    }
+  ],
+  "hyperedges": []
+}

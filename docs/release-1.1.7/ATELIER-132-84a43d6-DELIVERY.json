@@ -1,0 +1,84 @@
+{
+  "head": "84a43d6d35553fae970bbcfeebe00c416edd3576",
+  "version": "1.1.7",
+  "build": 132,
+  "recorded_at_utc": "2026-11-02T20:34:31.317244+00:00",
+  "state": "CI-passed unsigned test candidate; not formal release or physical acceptance",
+  "ipa_verification": {
+    "CFBundleIdentifier": "com.edc21.SourceReadSwift",
+    "CFBundleShortVersionString": "1.1.7",
+    "CFBundleVersion": "132",
+    "MinimumOSVersion": "16.0",
+    "DTPlatformName": "iphoneos",
+    "CADisableMinimumFrameDurationOnPhone": true,
+    "head": "84a43d6d35553fae970bbcfeebe00c416edd3576",
+    "ipa": "F:\\SourceReadSwift\\reader-motion-117\\84a43d6d35553fae970bbcfeebe00c416edd3576\\SourceReadSwift-unsigned-ipa\\SourceReadSwift-1.1.7-unsigned.ipa",
+    "ipa_bytes": 26802434,
+    "ipa_sha256": "f746d5b0da537106ffeb69dc7a2d8c62f80d93518fd28367da9ab8597c535e61",
+    "zip_crc": "passed",
+    "desktop_delivered": true,
+    "desktop": "C:\\Users\\Edc21\\Desktop\\SourceReadSwift-1.1.7-build132-84a43d6-unsigned.ipa",
+    "matched_dsym_uuid": "baa45b65-bf61-3a0e-8fe1-d784b6210e74",
+    "architecture": "arm64",
+    "dwarf_bytes": 107139364,
+    "dwarf_sha256": "68ae16c4c588c333f49d5bad815dc48f6da0d7432946c592449816b023b4932c",
+    "ci_runs": {
+      "Unsigned IPA": 41515294404,
+      "iOS": 41515294394
+    },
+    "physical_device_verified": false,
+    "scope": "Unsigned test candidate. No signing, install, device font import, gestures or FPS verification performed."
+  },
+  "ci": {
+    "run": 41515294394,
+    "regular": {
+      "job": 125517187623,
+      "tests": 1605,
+      "original_skips": 2,
+      "failures": 0
+    },
+    "native26": {
+      "job": 125517186960,
+      "tests": 182,
+      "failures": 0
+    },
+    "unsigned_run": 41515294404,
+    "unsigned_job": 125517187074
+  },
+  "logs": [
+    {
+      "job": 125517187623,
+      "bytes": 2683215,
+      "sha256": "96fd7e86d618ca0109112c338476c350511142c37997596259c292212adda6a8"
+    },
+    {
+      "job": 125517186960,
+      "bytes": 1143690,
+      "sha256": "37673f23c4bdd571118372423a8ea089c865c9d8f485ec69b8356d80f031a1a4"
+    },
+    {
+      "job": 125517187074,
+      "bytes": 486721,
+      "sha256": "72bf0811ea59875efcc1bf0e98a925d238fac40b472173230cc73d98fd1a9129"
+    }
+  ],
+  "visual_review": {
+    "regular": "atelier-visual-review/VISUAL_REVIEW.json",
+    "native26": "atelier-visual-review-native26/VISUAL_REVIEW.json",
+    "routes_each": 7,
+    "scope": "320pt light /390pt bamboo and dark static viewport; themes loading not saved/apply acceptance"
+  },
+  "old_packages_hash_preserved": {
+    "SourceReadSwift-1.1.7-build131-4a5d62d-unsigned.ipa": "03a7540508149e2046f5c92745f768b245f9057358ed9bf69d85b80634792629",
+    "SourceReadSwift-1.1.7-build132-463647d-unsigned-UNVERIFIED.ipa": "2b0046ffb22626236e8252bea5400fff8a53318e0f879a063258a3745f7b70c3"
+  },
+  "physical_retest": [
+    "QQ saved local12MB TTF pick/import/apply/relaunch",
+    "scroll long chapters then repeatedly open/close menu/workbench/secondary return, retain position",
+    "interrupted native book transitions and interactive return",
+    "13Pro actual hitches/frame timing/60Hz/120Hz"
+  ],
+  "automation": "build132-ci-ipa deleted only after CI passed, actual14-route screenshot review, verified Desktop copy and receipts; not failure pause.",
+  "startup": "still paused",
+  "item12": "user manual; no gateway calls"
+}

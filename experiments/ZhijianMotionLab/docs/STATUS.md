@@ -1,3 +1,14 @@
+# 已交付 · build 3 · 2026-11-02
+
+- 已测 HEAD：63aaff6e1da470b2bd393cec649c4ebdacddd8ed；CI 41411628237 success，8 项单测 + 左右滑动回归 + 完整真实交互均零失败，设备 Release BUILD SUCCEEDED。
+- 已查看该 HEAD 原生截图：390 宽中途拖动不再叠字；纵向滚动后的书架模块不遮封面；统计切换位于卡片内；首页使用真实《三体》书封。没有测量 FPS，真机跟手性仍待安装验收。
+- 桌面交付：C:/Users/Edc21/Desktop/ZhijianMotionLab-0.1.0-build3-63aaff6-unsigned.ipa，871975 bytes，SHA256 e2cb80cab3a043736b4f011e69a27921c3dbe6e14fe705b31f44eff8ba9c76b9。
+- 已运行 `python -X utf8 scripts/verify_motion_lab_ipa.py --head 63aaff6e1da470b2bd393cec649c4ebdacddd8ed --build 3`：ZIP CRC、独立 bundle、build 3、arm64/iPhoneOS/min16.0 通过。未签名，需用户签名安装，不覆盖正式版。
+- 证据：F:/SourceReadSwift/motion-lab/63aaff6e1da470b2bd393cec649c4ebdacddd8ed/，含 CI 原始日志、IPA_VERIFICATION.json、原生 previews 与 latest-layout.jpg。
+- 本段为成功后本地记录，不改 App 源码，不重复触发构建；保留既有修改。回滚仅卸载独立“纸间·动效实验”App，无需回退正式纸间。
+
+---
+
 # 原生书籍交互检查点
 
 - af4c34e 原生 CI 41409498028 success：8 项单测、左右滑动回归 1 项、实际录屏完整书籍交互 1 项均零失败；设备编译通过。

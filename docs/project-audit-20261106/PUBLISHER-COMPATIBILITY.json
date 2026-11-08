@@ -1,0 +1,361 @@
+[
+  {
+    "name": "知秋发布页",
+    "definition_path": "F:\\SourceReadSwift\\project-audit-20261106\\sources\\publisher\\source-01.json",
+    "reading_pipeline": "not_verified",
+    "bytes": 3292,
+    "sha256": "bdbf0d322daf19e8b90af3414241cf0e647185b60576313999ffbfc36f9e6138",
+    "sources": 1,
+    "capabilities": [
+      {
+        "name": "unnamed",
+        "source_type": null,
+        "has_search": false,
+        "has_login": false,
+        "has_jslib": false,
+        "java_methods": [
+          "get",
+          "getString",
+          "put"
+        ],
+        "android_bridges": []
+      }
+    ]
+  },
+  {
+    "name": "✿次元姬（知秋）✿",
+    "definition_path": "F:\\SourceReadSwift\\project-audit-20261106\\sources\\publisher\\source-02.json",
+    "reading_pipeline": "not_verified",
+    "bytes": 43614,
+    "sha256": "25916adc84af15482bb18f3dc5ea8f52fb7922a87dd207451f7cdc35ea5dc6cf",
+    "sources": 1,
+    "capabilities": [
+      {
+        "name": "✿次元姬（知秋）✿",
+        "source_type": 0,
+        "has_search": true,
+        "has_login": true,
+        "has_jslib": true,
+        "java_methods": [
+          "base64Decode",
+          "base64Encode",
+          "getString",
+          "hexDecodeToString",
+          "log",
+          "longToast",
+          "open",
+          "toast",
+          "upLoginData"
+        ],
+        "android_bridges": [
+          "Packages.java.util.HashMap"
+        ]
+      }
+    ]
+  },
+  {
+    "name": "书旗小说（知秋）",
+    "definition_path": "F:\\SourceReadSwift\\project-audit-20261106\\sources\\publisher\\source-03.json",
+    "reading_pipeline": "not_verified",
+    "bytes": 57789,
+    "sha256": "9f7775579e0d7d1446dc0809d729e3142209daead1304ff1e7017c7d13f2721b",
+    "sources": 1,
+    "capabilities": [
+      {
+        "name": "书旗小说（知秋）",
+        "source_type": 0,
+        "has_search": true,
+        "has_login": true,
+        "has_jslib": true,
+        "java_methods": [
+          "ajax",
+          "base64Decode",
+          "get",
+          "getString",
+          "longToast",
+          "md5Encode",
+          "put",
+          "timeFormatUTC",
+          "toast",
+          "upLoginData"
+        ],
+        "android_bridges": [
+          "Packages.java.util.HashMap"
+        ]
+      }
+    ]
+  },
+  {
+    "name": "✿UAA四合一（知秋）✿",
+    "definition_path": "F:\\SourceReadSwift\\project-audit-20261106\\sources\\publisher\\source-04.json",
+    "reading_pipeline": "not_verified",
+    "bytes": 22788,
+    "sha256": "707dc61cc6437c6d02bfed8ca96435c01ea28f6c08126268c8388e85bb957250",
+    "sources": 1,
+    "capabilities": [
+      {
+        "name": "✿UAA四合一（知秋）✿",
+        "source_type": 0,
+        "has_search": true,
+        "has_login": true,
+        "has_jslib": true,
+        "java_methods": [
+          "ajax",
+          "androidId",
+          "base64Encode",
+          "get",
+          "getString",
+          "hexDecodeToString",
+          "log",
+          "longToast",
+          "openVideoPlayer",
+          "startBrowser",
+          "toast"
+        ],
+        "android_bridges": []
+      }
+    ]
+  },
+  {
+    "name": "✿刺猬猫阅读（知秋段评）✿",
+    "definition_path": "F:\\SourceReadSwift\\project-audit-20261106\\sources\\publisher\\source-05.json",
+    "reading_pipeline": "not_verified",
+    "bytes": 54034,
+    "sha256": "5802ab4fb31a4b042dc9174c477b1a43ef8bb993fd91c9242d19cb01e697acc9",
+    "sources": 1,
+    "capabilities": [
+      {
+        "name": "✿刺猬猫阅读（知秋段评）✿",
+        "source_type": 0,
+        "has_search": true,
+        "has_login": true,
+        "has_jslib": true,
+        "java_methods": [
+          "ajax",
+          "base64Encode",
+          "createSymmetricCrypto",
+          "digestHex",
+          "get",
+          "getElement",
+          "getString",
+          "getVerificationCode",
+          "hexDecodeToByteArray",
+          "hexDecodeToString",
+          "log",
+          "longToast",
+          "put",
+          "randomUUID",
+          "showBrowser",
+          "startBrowserAwait",
+          "strToBytes",
+          "toast"
+        ],
+        "android_bridges": [
+          "Packages.android.os.Build",
+          "Packages.io.legado.app.help.http.StrResponse",
+          "Packages.io.legato.kazusa.utils.TimeoutCancellationException",
+          "Packages.java.lang.Thread.sleep"
+        ]
+      }
+    ]
+  },
+  {
+    "name": "✿飞卢（知秋段评版本）✿",
+    "definition_path": "F:\\SourceReadSwift\\project-audit-20261106\\sources\\publisher\\source-06.json",
+    "reading_pipeline": "not_verified",
+    "bytes": 22262,
+    "sha256": "b3eaa7d307ca44c9823697ee784343d7ab03c438c324e49880b5fdb6f1c59a47",
+    "sources": 1,
+    "capabilities": [
+      {
+        "name": "✿飞卢（知秋段评版本）✿",
+        "source_type": 0,
+        "has_search": true,
+        "has_login": true,
+        "has_jslib": true,
+        "java_methods": [
+          "ajax",
+          "androidId",
+          "base64Decode",
+          "base64Encode",
+          "getString",
+          "hexDecodeToString",
+          "log",
+          "longToast",
+          "startBrowser",
+          "toast"
+        ],
+        "android_bridges": [
+          "Packages.java.lang.System.nanoTime"
+        ]
+      }
+    ]
+  },
+  {
+    "name": "✿STV（知秋）✿",
+    "definition_path": "F:\\SourceReadSwift\\project-audit-20261106\\sources\\publisher\\source-07.json",
+    "reading_pipeline": "not_verified",
+    "bytes": 14899,
+    "sha256": "22d8fd3168cee651143c38939c2e8884514489dd876cc0bd692a85ebafc1cca5",
+    "sources": 1,
+    "capabilities": [
+      {
+        "name": "✿STV（知秋）✿",
+        "source_type": 0,
+        "has_search": true,
+        "has_login": true,
+        "has_jslib": true,
+        "java_methods": [
+          "ajax",
+          "androidId",
+          "base64Encode",
+          "getString",
+          "hexDecodeToString",
+          "log",
+          "longToast",
+          "toast"
+        ],
+        "android_bridges": []
+      }
+    ]
+  },
+  {
+    "name": "✿少年梦（知秋）✿",
+    "definition_path": "F:\\SourceReadSwift\\project-audit-20261106\\sources\\publisher\\source-08.json",
+    "reading_pipeline": "not_verified",
+    "bytes": 14823,
+    "sha256": "36c2148c736f6890b9c80ea71f61505e5400c89c2d440f16a28965deecb9e651",
+    "sources": 1,
+    "capabilities": [
+      {
+        "name": "✿少年梦（知秋）✿",
+        "source_type": 0,
+        "has_search": true,
+        "has_login": true,
+        "has_jslib": true,
+        "java_methods": [
+          "ajax",
+          "androidId",
+          "base64Decode",
+          "base64Encode",
+          "getString",
+          "hexDecodeToString",
+          "log",
+          "longToast",
+          "startBrowser",
+          "toast"
+        ],
+        "android_bridges": []
+      }
+    ]
+  },
+  {
+    "name": "✿番茄四合一（知秋段评）✿",
+    "definition_path": "F:\\SourceReadSwift\\project-audit-20261106\\sources\\publisher\\source-09.json",
+    "reading_pipeline": "not_verified",
+    "bytes": 49093,
+    "sha256": "8b0df7e25024147f5419aa22c97900151577bcd420ca446240354eacd6364047",
+    "sources": 1,
+    "capabilities": [
+      {
+        "name": "✿番茄四合一（知秋段评）✿",
+        "source_type": 0,
+        "has_search": true,
+        "has_login": true,
+        "has_jslib": true,
+        "java_methods": [
+          "ajax",
+          "ajaxAll",
+          "androidId",
+          "base64Encode",
+          "getString",
+          "hexDecodeToString",
+          "log",
+          "longToast",
+          "showBrowser",
+          "startBrowser",
+          "startBrowserAwait",
+          "toast"
+        ],
+        "android_bridges": [
+          "Packages.cn.hutool.core.codec",
+          "Packages.cn.hutool.core.util",
+          "Packages.cn.hutool.crypto.digest",
+          "Packages.io.legato.kazusa.utils.TimeoutCancellationException",
+          "Packages.java.lang.System.nanoTime",
+          "Packages.okhttp3"
+        ]
+      }
+    ]
+  },
+  {
+    "name": "✿番茄四合一（知秋无段评）✿",
+    "definition_path": "F:\\SourceReadSwift\\project-audit-20261106\\sources\\publisher\\source-10.json",
+    "reading_pipeline": "not_verified",
+    "bytes": 45437,
+    "sha256": "574fd03dffef60ddbf8341036308a7256e1520c3560c54f638df29e564a27dab",
+    "sources": 1,
+    "capabilities": [
+      {
+        "name": "✿番茄四合一（知秋无段评）✿",
+        "source_type": 0,
+        "has_search": true,
+        "has_login": true,
+        "has_jslib": true,
+        "java_methods": [
+          "ajax",
+          "ajaxAll",
+          "androidId",
+          "base64Encode",
+          "getString",
+          "hexDecodeToString",
+          "log",
+          "longToast",
+          "startBrowser",
+          "startBrowserAwait",
+          "toast"
+        ],
+        "android_bridges": [
+          "Packages.cn.hutool.core.codec",
+          "Packages.cn.hutool.core.util",
+          "Packages.cn.hutool.crypto.digest",
+          "Packages.java.lang.System.nanoTime",
+          "Packages.okhttp3"
+        ]
+      }
+    ]
+  },
+  {
+    "name": "✿爱丽丝书屋（知秋）✿",
+    "definition_path": "F:\\SourceReadSwift\\project-audit-20261106\\sources\\publisher\\source-11.json",
+    "reading_pipeline": "not_verified",
+    "bytes": 26864,
+    "sha256": "d11d4e91071ad2b311734f26672ed1c933073e4b1af08ed578fdf2a50bcbf366",
+    "sources": 1,
+    "capabilities": [
+      {
+        "name": "✿爱丽丝书屋（知秋）✿",
+        "source_type": 0,
+        "has_search": true,
+        "has_login": true,
+        "has_jslib": true,
+        "java_methods": [
+          "ajax",
+          "androidId",
+          "base64Encode",
+          "get",
+          "getElement",
+          "getString",
+          "hexDecodeToString",
+          "log",
+          "longToast",
+          "setContent",
+          "toast"
+        ],
+        "android_bridges": [
+          "cn.cn"
+        ]
+      }
+    ]
+  }
+]

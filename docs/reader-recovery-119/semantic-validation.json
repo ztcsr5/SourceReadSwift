@@ -1,0 +1,428 @@
+{
+  "schema": "graphify-semantic-fragment",
+  "scope": "Build 119 recovery focused semantic validation; not a complete repository graph",
+  "source_snapshot": "Re-reviewed controller at eda34a5; paginator and builder baseline unchanged from 586a5bd at this review. Native diagnostics read from job-124364393951.log.",
+  "runtime_validation": "This reviewer cannot execute UIKit locally. Native CI evidence is explicitly sourced to saved logs; it is not real-device proof.",
+  "nodes": [
+    {
+      "id": "recovery119",
+      "label": "Build 119 reader recovery",
+      "file_type": "document",
+      "source_file": "docs/reader-recovery-119/RECOVERY.md",
+      "source_location": "1-12",
+      "rationale": "Repair actual recent feedback without treating historical AI claims or CI success as device proof."
+    },
+    {
+      "id": "chapter_paginator",
+      "label": "ReaderChapterPaginator.paginate",
+      "file_type": "code",
+      "source_file": "SourceReadSwift/Features/Reader/ReaderChapterPaginator.swift",
+      "source_location": "33-42"
+    },
+    {
+      "id": "text_paginator",
+      "label": "ReaderTextPagePaginator.paginate",
+      "file_type": "code",
+      "source_file": "SourceReadSwift/Features/Reader/ReaderTextPagePaginator.swift",
+      "source_location": "6-99",
+      "rationale": "Measure one attributed chapter in chained TextKit containers rather than summing estimated paragraph heights."
+    },
+    {
+      "id": "text_builder",
+      "label": "ReaderPageTextBuilder.make",
+      "file_type": "code",
+      "source_file": "SourceReadSwift/Features/Reader/ReaderPageTextView.swift",
+      "source_location": "36-104"
+    },
+    {
+      "id": "page_entries",
+      "label": "ReaderPageEntry UTF16 slices",
+      "file_type": "code",
+      "source_file": "SourceReadSwift/Features/Reader/ReaderTextPagePaginator.swift",
+      "source_location": "31-37,63-82"
+    },
+    {
+      "id": "page_text_view",
+      "label": "ReaderPrepaginatedTextView",
+      "file_type": "code",
+      "source_file": "SourceReadSwift/Features/Reader/ReaderPageTextView.swift",
+      "source_location": "129-170"
+    },
+    {
+      "id": "render_revision",
+      "label": "ReaderRenderRevision",
+      "file_type": "code",
+      "source_file": "SourceReadSwift/Features/Reader/ReaderRenderRevision.swift",
+      "source_location": "5-27",
+      "rationale": "Keep content/geometry invalidation distinct from stable navigation identity."
+    },
+    {
+      "id": "reader_wiring",
+      "label": "ReaderView paged host wiring",
+      "file_type": "code",
+      "source_file": "SourceReadSwift/Features/Reader/ReaderView.swift",
+      "source_location": "2666-2752,2811-2823"
+    },
+    {
+      "id": "cover_controller",
+      "label": "CoverPageHostController",
+      "file_type": "code",
+      "source_file": "SourceReadSwift/Features/Reader/CoverPageReaderView.swift",
+      "source_location": "69-369",
+      "rationale": "UIKit owns displacement and interruptible animation; SwiftUI delivers immutable page windows."
+    },
+    {
+      "id": "cover_apply",
+      "label": "CoverPageHostController.apply",
+      "file_type": "code",
+      "source_file": "SourceReadSwift/Features/Reader/CoverPageReaderView.swift",
+      "source_location": "130-186"
+    },
+    {
+      "id": "cover_begin",
+      "label": "CoverPageHostController.beginInteraction",
+      "file_type": "code",
+      "source_file": "SourceReadSwift/Features/Reader/CoverPageReaderView.swift",
+      "source_location": "267-277"
+    },
+    {
+      "id": "cover_end",
+      "label": "CoverPageHostController.endInteraction",
+      "file_type": "code",
+      "source_file": "SourceReadSwift/Features/Reader/CoverPageReaderView.swift",
+      "source_location": "289-329"
+    },
+    {
+      "id": "pan_policy",
+      "label": "ReaderPanTurnPolicy.direction",
+      "file_type": "code",
+      "source_file": "SourceReadSwift/Features/Reader/CoverPageReaderView.swift",
+      "source_location": "58-66"
+    },
+    {
+      "id": "native_menu",
+      "label": "ReaderNativeMenuButton",
+      "file_type": "code",
+      "source_file": "SourceReadSwift/Features/Reader/ReaderNativeMenuButton.swift",
+      "source_location": "6-29"
+    },
+    {
+      "id": "reader_menu",
+      "label": "ReaderView.readerNativeMenu",
+      "file_type": "code",
+      "source_file": "SourceReadSwift/Features/Reader/ReaderView.swift",
+      "source_location": "3877-3914"
+    },
+    {
+      "id": "recovery_tests",
+      "label": "ReaderRecovery119Tests",
+      "file_type": "code",
+      "source_file": "SourceReadSwiftTests/ReaderRecovery119Tests.swift",
+      "source_location": "6-98"
+    },
+    {
+      "id": "pan_tests",
+      "label": "ReaderPanController119Tests",
+      "file_type": "code",
+      "source_file": "SourceReadSwiftTests/ReaderRecovery119Tests.swift",
+      "source_location": "100-300"
+    }
+  ],
+  "edges": [
+    {
+      "source": "recovery119",
+      "target": "text_paginator",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/reader-recovery-119/RECOVERY.md",
+      "source_location": "7",
+      "weight": 1.0
+    },
+    {
+      "source": "chapter_paginator",
+      "target": "text_paginator",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "SourceReadSwift/Features/Reader/ReaderChapterPaginator.swift",
+      "source_location": "40-41",
+      "weight": 1.0
+    },
+    {
+      "source": "text_paginator",
+      "target": "text_builder",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "SourceReadSwift/Features/Reader/ReaderTextPagePaginator.swift",
+      "source_location": "23-28",
+      "weight": 1.0
+    },
+    {
+      "source": "text_paginator",
+      "target": "page_entries",
+      "relation": "shares_data_with",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "SourceReadSwift/Features/Reader/ReaderTextPagePaginator.swift",
+      "source_location": "63-82",
+      "weight": 1.0
+    },
+    {
+      "source": "text_paginator",
+      "target": "page_text_view",
+      "relation": "shares_data_with",
+      "confidence": "INFERRED",
+      "confidence_score": 0.9,
+      "source_file": "SourceReadSwift/Features/Reader/ReaderPageTextView.swift",
+      "source_location": "155-169",
+      "weight": 1.0
+    },
+    {
+      "source": "reader_wiring",
+      "target": "render_revision",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "SourceReadSwift/Features/Reader/ReaderView.swift",
+      "source_location": "2811-2814",
+      "weight": 1.0
+    },
+    {
+      "source": "reader_wiring",
+      "target": "cover_apply",
+      "relation": "calls",
+      "confidence": "INFERRED",
+      "confidence_score": 0.9,
+      "source_file": "SourceReadSwift/Features/Reader/ReaderView.swift",
+      "source_location": "2684-2708",
+      "weight": 1.0
+    },
+    {
+      "source": "cover_apply",
+      "target": "pan_policy",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "SourceReadSwift/Features/Reader/CoverPageReaderView.swift",
+      "source_location": "161-165",
+      "weight": 1.0
+    },
+    {
+      "source": "cover_begin",
+      "target": "cover_end",
+      "relation": "shares_data_with",
+      "confidence": "INFERRED",
+      "confidence_score": 0.9,
+      "source_file": "SourceReadSwift/Features/Reader/CoverPageReaderView.swift",
+      "source_location": "267-294",
+      "weight": 1.0
+    },
+    {
+      "source": "cover_end",
+      "target": "pan_policy",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "SourceReadSwift/Features/Reader/CoverPageReaderView.swift",
+      "source_location": "297-300",
+      "weight": 1.0
+    },
+    {
+      "source": "cover_end",
+      "target": "reader_wiring",
+      "relation": "calls",
+      "confidence": "INFERRED",
+      "confidence_score": 0.9,
+      "source_file": "SourceReadSwift/Features/Reader/ReaderView.swift",
+      "source_location": "2699-2703",
+      "weight": 1.0
+    },
+    {
+      "source": "reader_menu",
+      "target": "native_menu",
+      "relation": "shares_data_with",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "SourceReadSwift/Features/Reader/ReaderView.swift",
+      "source_location": "3500-3505",
+      "weight": 1.0
+    },
+    {
+      "source": "recovery_tests",
+      "target": "chapter_paginator",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "SourceReadSwiftTests/ReaderRecovery119Tests.swift",
+      "source_location": "49",
+      "weight": 1.0
+    },
+    {
+      "source": "recovery_tests",
+      "target": "text_builder",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "SourceReadSwiftTests/ReaderRecovery119Tests.swift",
+      "source_location": "62-65",
+      "weight": 1.0
+    },
+    {
+      "source": "recovery_tests",
+      "target": "render_revision",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "SourceReadSwiftTests/ReaderRecovery119Tests.swift",
+      "source_location": "12,19",
+      "weight": 1.0
+    },
+    {
+      "source": "pan_tests",
+      "target": "cover_controller",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "SourceReadSwiftTests/ReaderRecovery119Tests.swift",
+      "source_location": "111-120,123-128,140-184,235-298",
+      "weight": 1.0
+    },
+    {
+      "source": "pan_tests",
+      "target": "page_text_view",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "SourceReadSwiftTests/ReaderRecovery119Tests.swift",
+      "source_location": "203-231",
+      "weight": 1.0
+    }
+  ],
+  "hyperedges": [
+    {
+      "id": "single_measurement_pipeline",
+      "label": "TextKit measurement / UTF16 slice / actual rendering contract",
+      "nodes": [
+        "text_paginator",
+        "page_entries",
+        "text_builder",
+        "page_text_view",
+        "recovery_tests"
+      ],
+      "relation": "participate_in",
+      "confidence": "INFERRED",
+      "confidence_score": 0.9,
+      "source_file": "SourceReadSwiftTests/ReaderRecovery119Tests.swift"
+    },
+    {
+      "id": "page_turn_transaction",
+      "label": "Gesture input, animation commit, SwiftUI delivery transaction",
+      "nodes": [
+        "cover_begin",
+        "cover_end",
+        "cover_apply",
+        "reader_wiring",
+        "pan_tests"
+      ],
+      "relation": "participate_in",
+      "confidence": "INFERRED",
+      "confidence_score": 0.9,
+      "source_file": "SourceReadSwift/Features/Reader/CoverPageReaderView.swift"
+    }
+  ],
+  "validation_findings": [
+    {
+      "id": "queued_end_consumes_later_gesture",
+      "severity": "P1",
+      "status": "SOURCE FIX VERIFIED; native independent queue tests passed in job-124364393951.log:9319-9332",
+      "evidence": "Original observed source-state inconsistency at 586a5bd; repaired by independent CompletedGesture values and FIFO replay without ending active drag",
+      "source_file": "SourceReadSwift/Features/Reader/CoverPageReaderView.swift",
+      "source_location": "2cdeb63:96-101,159-176,289-294; old 586a5bd:154-160,251-255,276-278",
+      "claim": "The repaired code separates an ended gesture's immutable translation/velocity/cancelled state from a later finger. Two tests independently check active third gesture survival and FIFO translation retention.",
+      "reproduction": "ReaderRecovery119Tests.swift:235-272. Native run for 2cdeb63 still pending; not device proof."
+    },
+    {
+      "id": "queued_commit_reenters_swiftui_update",
+      "severity": "P2",
+      "status": "SOURCE FIX VERIFIED at eda34a5; direct-controller queue and cancellation native tests passed",
+      "evidence": "Observed synchronous callback path; actual SwiftUI runtime warning NOT RUN",
+      "source_file": "SourceReadSwift/Features/Reader/CoverPageReaderView.swift",
+      "source_location": "eda34a5:167-177",
+      "claim": "Queued commits are now deferred out of representable update with animation generation, waiting identity, and installed identity guards. Native testDismantleCancelsDeferredQueuedCommit passed at log lines 9323-9324.",
+      "reproduction": "Host ReaderView as a real SwiftUI representable, queue a completed gesture before prior model delivery, and capture state-modified-during-update diagnostics. Minimal correction is deferred exactly-once queued-commit delivery with cancellation generation/identity guard; direct controller tests need a queue drain before asserting the deferred callback."
+    },
+    {
+      "id": "onboarding_actual_surface_overflow",
+      "severity": "P1",
+      "status": "NATIVE FAILURE AND METRIC MISMATCH OBSERVED; explicit minimum line-height correction proposed, not yet tested",
+      "evidence": "job-124364393951.log:9268-9315",
+      "source_file": "SourceReadSwiftTests/ReaderRecovery119Tests.swift",
+      "source_location": "586a5bd:205",
+      "claim": "Identical glyph line ranges and widths, insets, and fontLeading settings produce standalone maxY691.203125 versus actual maxY756.9453125. Pure CJK standalone line height is 28 (20+8), but actual UITextView is 31.8671875 (UIFont.lineHeight23.8671875+8). This disproves paragraph-tail wrapping as the cause for this fixture. Explicit minimumLineHeight=corresponding body/title UIFont.lineHeight is the smallest proposed common contract; do not set maximumLineHeight, which could clip taller fallback glyphs.",
+      "reproduction": "ReaderPanController119Tests.testActualTextViewFitsTheOnboardingLastChapterWithoutSafetyBuffer using OnboardingClassicBook last chapter, font20,line8,gap16,kern0,width348,height702. Await 2cdeb63 diagnostics to separate UITextView configuration from cut-paragraph reflow."
+    },
+    {
+      "id": "textkit_no_progress_discards_suffix",
+      "severity": "P3",
+      "evidence": "Conditional out-of-normal-UI input robustness risk; native counterexample NOT RUN",
+      "source_file": "SourceReadSwift/Features/Reader/ReaderTextPagePaginator.swift",
+      "source_location": "49-61,98",
+      "claim": "If a container returns zero advancing glyphs, break returns a partial or empty chapter without reporting an incomplete result. Minimum height is only the body font's lineHeight, not titleFont or fallback glyph height. This is not evidence of a normal reader viewport defect: the production geometry enforces a substantially larger body area.",
+      "reproduction": "Use inline title, body font 16, title font 100, contentHeight 20, contentWidth 200, paragraphs:[body]. Assert body UTF16 slices rejoin the full body and title slices rejoin the full title. Check zero glyph condition on actual UIKit before treating this as reproduced. Do not add scrolling or a magic layout reserve to conceal physically impossible input."
+    },
+    {
+      "id": "standalone_page_relayout_not_general_proof",
+      "severity": "P2",
+      "evidence": "Unverified boundary matrix, not a confirmed overflow",
+      "source_file": "SourceReadSwiftTests/ReaderRecovery119Tests.swift",
+      "source_location": "31-80",
+      "claim": "The existing matrix checks conservation and usedRect for mixed CJK/emoji at one width/height, but not long inline titles, embedded newlines, Arabic/RTL shaping, soft hyphen, empty final paragraph, or titles taller than the container. Slicing a paragraph creates a standalone final paragraph and can change terminal-line justification even when height fits.",
+      "reproduction": "Add native conservation + rebuilt-page usedRect assertions for those fixtures at widths 120/280/430 and heights 20/80/320. Compare glyph line character ranges when investigating rerender wrapping, not just total usedRect."
+    },
+    {
+      "id": "rtl_suffix_not_paginated",
+      "severity": "P1",
+      "status": "NATIVE CONSERVATION FAILURE OBSERVED; repair pending",
+      "evidence": "job-124364393951.log:9385-9386",
+      "source_file": "SourceReadSwift/Features/Reader/ReaderTextPagePaginator.swift",
+      "source_location": "43-49,58-64",
+      "claim": "Mixed Arabic/CJK repeated paragraph loses its suffix and a following final paragraph disappears. End-of-document must be checked in UTF16 character coverage rather than a glyph count frozen before container layout. Glyph-count change is a plausible mechanism, not directly proven by these logs.",
+      "reproduction": "ReaderRecovery119Tests.testLongInlineTitleAndEmbeddedNewlinesConserveSourceRanges: long inline title, empty paragraphs, embedded newlines, Arabic/CJK/Latin repeated 60 times, then final Chinese paragraph.",
+      "recommended_minimal_repair": "Ensure glyphs for full document after attaching a container; iterate while characterEnd<document.length; after each container layout derive characterRange and advance by NSMaxRange; detect no character progress and test contiguous coverage. Keep UTF16 offsets and character conservation assertions. Do not call ensureLayout(fullDocument) before enough containers exist as a completion proof."
+    }
+  ],
+  "investigation_hypotheses": [
+    {
+      "id": "paragraph_tail_reflow",
+      "confidence": "INFERRED",
+      "confidence_score": 0.2,
+      "status": "EXCLUDED AS CAUSE OF ONBOARDING FAILURE by identical native glyph line ranges; general edge-case hypothesis only",
+      "source_file": "SourceReadSwift/Features/Reader/ReaderPageLayoutEngine.swift",
+      "source_location": "25-33",
+      "source_url": "https://developer.apple.com/documentation/uikit/nsparagraphstyle/linebreakstrategy-swift.struct/pushout",
+      "claim": "Apple documents pushOut as orphan-word prevention, not CJK punctuation hanging as the source comment suggests. Rebuilding a page slice as a terminal paragraph can change the context for that optimization. The onboarding fixture contains long Latin words absent from the short repeated matrix fixture.",
+      "next_validation": "Use identical onboarding attributed strings in standalone and actual UITextView. If both overflow, compare original chained-container line ranges to rebuilt ranges and run a one-variable lineBreakStrategy=[] experiment. If only UITextView overflows, inspect actual width, font leading, attributedText equality and container configuration before changing paginator."
+    }
+  ],
+  "input_tokens": 0,
+  "output_tokens": 0,
+  "token_accounting": "Unavailable from this tool runtime; zeros are schema placeholders, not a claim that semantic extraction was free.",
+  "final_native_validation": {
+    "commit": "71156be1ac148d6328dccc2844ed2555a41313b0",
+    "ios_run": 41174151682,
+    "package_run": 41174151739,
+    "tests": 1374,
+    "failures": 0,
+    "evidence": "F:\\SourceReadSwift\\recovery-119\\job-124458109539.log",
+    "device_qa": "NOT RUN",
+    "resolved": [
+      "onboarding_actual_surface_overflow",
+      "rtl_suffix_not_paginated",
+      "queued_end_consumes_later_gesture",
+      "queued_commit_reenters_swiftui_update"
+    ],
+    "scope": "Named fixture and controller regression tests passed; this does not prove all viewport/book inputs or SwiftUI-hosted performance."
+  }
+}

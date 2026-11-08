@@ -1,0 +1,112 @@
+{
+  "scope": "Read-only focused review against 71156be, current commit 64c72962ce13246721dff7d483fac82b6b987b8c",
+  "root": "D:/Gemini反重力/SourceReadSwift2",
+  "baseline_commit": "71156be1ac148d6328dccc2844ed2555a41313b0",
+  "reviewed_commit": "64c72962ce13246721dff7d483fac82b6b987b8c",
+  "worktree_recheck": {
+    "PV-01": "Core source-switch request drop fixed in latest uncommitted reload(): invalidate loadGeneration, cancel expansion, clear isLoading before load(). Residual old load() defer at line 816 remains unscoped and can clear the newer request's loading flag.",
+    "PV-02": "FIXED in latest uncommitted worktree: TOC success now installs placeholder detail before setting isLoading=false.",
+    "PV-03": "Still present in latest worktree inspected.",
+    "PV-04": "Still present in latest worktree inspected.",
+    "PV-05": "Still present in latest worktree inspected."
+  },
+  "business_code_modified": false,
+  "native_compile_status": "NOT RUN by this reviewer: Windows environment. No definite new Swift type/API compile blocker was established from source inspection; do not treat that as a successful Xcode build.",
+  "findings": [
+    {
+      "id": "PV-01",
+      "priority": "P1",
+      "file": "D:/Gemini反重力/SourceReadSwift2/SourceReadSwift/Features/Discover/BookDetailView.swift",
+      "lines": [736, 737, 843, 845, 926, 930, 1014, 1019],
+      "claim": "Switching sources before either initial network phase completes drops the replacement request. The switch mutates book and reload clears detail/chapters, but load returns immediately because the old request still owns isLoading. The old request then rejects its events because book identity changed, leaving an empty new-source screen until manual refresh. An old load's unconditional defer can also clear a newer load's busy state after partial completion permits a reload.",
+      "confidence": {"tag": "EXTRACTED", "score": 1.0},
+      "reproduction": "Fake source A blocks detail and TOC. Open detail, select B while spinner is active, then release A. B engine calls never start because guard !isLoading returned; A events fail current().",
+      "fix": "Use a retained load task and request generation scoped to sourceURL/bookURL; invalidate/cancel the old request before clearing state and starting the replacement. Busy state writes and defer cleanup must apply only if their generation is still current. A source switch must not reuse an unrelated request's busy guard.",
+      "test": "Deterministic source-switch test with A blocked before first event, B succeeds; assert B is requested immediately, B content remains after A returns and only B can clear B loading state. Also reload after one A event but before the second."
+    },
+    {
+      "id": "PV-02",
+      "priority": "P1",
+      "file": "D:/Gemini反重力/SourceReadSwift2/SourceReadSwift/Features/Discover/BookDetailView.swift",
+      "lines": [158, 173, 876, 879, 901, 903],
+      "claim": "The fast-TOC-first path is still not rendered independently. TOC success sets chapters and isLoading=false but leaves detail nil until the whole task group finishes and line 903 creates the placeholder. The body renders chapterList only inside else-if-let detail, so a slow metadata request turns the spinner into an empty body rather than exposing the usable TOC.",
+      "confidence": {"tag": "EXTRACTED", "score": 1.0},
+      "reproduction": "No cache; TOC succeeds immediately, detail blocks for 10 seconds. After TOC event, isLoading=false, detail=nil and error=nil, so none of the spinner/error/detail branches render.",
+      "fix": "Install the placeholder detail before starting requests, or render metadata and TOC as independent sections with separate loading/error state. A phase failure must not hide an already successful phase.",
+      "test": "Fake engine detail gated/TOC immediate and inverse ordering; assert TOC can be tapped and reader launched before metadata finishes, and fast metadata remains visible while TOC runs."
+    },
+    {
+      "id": "PV-03",
+      "priority": "P2",
+      "file": "D:/Gemini反重力/SourceReadSwift2/SourceReadSwift/Features/Discover/DiscoverView.swift",
+      "lines": [1497, 1501, 1585, 1592],
+      "claim": "The new post-ranking generation guard fixes old-search overwrites but does not cover match-mode changes. publishIfNeeded captures exactMatch before detached ranking. applyMatchMode recomputes visible results for the new mode without changing searchGeneration. When the old exact/fuzzy ranking resumes, line 1590 passes and overwrites the newly selected mode's results. This can persist when the last publication was in flight.",
+      "confidence": {"tag": "EXTRACTED", "score": 1.0},
+      "reproduction": "Pause detached publication after it captured exact=true, switch UI to fuzzy and execute applyMatchMode, then release ranking; exact-only rows replace fuzzy rows even though the selector still says fuzzy.",
+      "fix": "Include a presentation/ranking revision or captured matchMode equality in the post-await guard. If the mode changed, recompute with the latest mode rather than dropping the final result permanently. Keep filter and source selection state generation-scoped as appropriate.",
+      "test": "Inject gated ranking and change exact/fuzzy in both directions during the final publish; verify result contents match the current selection after release and no further network outcome is needed."
+    },
+    {
+      "id": "PV-04",
+      "priority": "P2",
+      "file": "D:/Gemini反重力/SourceReadSwift2/SourceReadSwift/Features/Discover/WebReadingSession.swift",
+      "lines": [23, 24, 31, 38, 107, 114],
+      "claim": "Extraction identity tracks only the explicit extraction UUID and final URL equality, not the displayed document's navigation epoch. Reloading or replacing a page at the same URL while detached parsing is pending passes every guard and publishes HTML from the previous document. ReadableWebView has no WKNavigationDelegate to invalidate extraction on navigation start; SourceLoginWebView uses its own navigation path as well.",
+      "confidence": {"tag": "EXTRACTED", "score": 0.99},
+      "reproduction": "Capture DOM A at URL U, gate parsing, reload U so DOM B is displayed, then release A parsing. webView.url remains U and extractionID is unchanged, so article A is shown over page B.",
+      "fix": "Track a document/navigation revision for every attached WKWebView, increment it on provisional navigation/reload and invalidate pending extraction. Capture and check that revision before publishing parsed content. Handle same-document changes deliberately, and retain cancel-on-dismiss behavior.",
+      "test": "WKURLSchemeHandler/local fixtures with two responses for the same URL and gated parser; reload while extraction is pending and assert old prose cannot publish. Also test different URL, login redirect and dismiss."
+    },
+    {
+      "id": "PV-05",
+      "priority": "P2",
+      "file": "D:/Gemini反重力/SourceReadSwift2/SourceReadSwift/Features/Discover/WebReadingSession.swift",
+      "lines": [82, 98],
+      "claim": "Ad-toggle rule installation captures destination before asynchronous rule lookup/compilation. Its generation changes only when the representable input URL or blockAds changes, not when the user navigates inside WKWebView. If the user follows a link or goes back while compilation is pending, the late callback still passes and loads the captured older destination, undoing that navigation.",
+      "confidence": {"tag": "EXTRACTED", "score": 0.99},
+      "reproduction": "On visible page B, delay compile callback, enable ads blocking, navigate to C, release compile callback. Coordinator generation is unchanged and callback view.load(destination B) navigates backwards unexpectedly.",
+      "fix": "Associate pending installation with a navigation epoch as well as the toggle generation. On completion install rules only for the current configuration and reload the still-current request only if no user navigation superseded it; do not replay a stale captured URL. Preserve request semantics where a current page was reached via POST.",
+      "test": "Inject asynchronous rule compiler; toggle then navigate/goBack before completion, assert final current URL is not replaced. Test rapid enable-disable-enable, teardown and compile failure."
+    }
+  ],
+  "validated_repairs": [
+    {"file": "SourceReadSwift/Features/Discover/DiscoverView.swift", "lines": [714, 730], "claim": "Grouped rows now use Section rather than an ordinary nested VStack, removing the explicitly eager source-group subtree."},
+    {"file": "SourceReadSwift/Features/Discover/DiscoverView.swift", "lines": [1472, 1484], "claim": "Source kind cache now uses SourceStore.sourcesRevision rather than first/last/count heuristics."},
+    {"file": "SourceReadSwift/Features/Discover/DiscoverView.swift", "lines": [1587, 1592], "claim": "Post-detached-ranking searchID/generation/cancellation guard now rejects results from a cancelled or replaced search, subject to the separate match-mode finding."},
+    {"file": "SourceReadSwift/Features/Discover/BookDetailView.swift", "lines": [911, 922], "claim": "TOC expansion captures source/book identity and checks generation/cancellation before UI/cache writes; the original cross-source late expansion overwrite has been addressed."},
+    {"file": "SourceReadSwift/Features/Discover/WebReadingSession.swift", "lines": [17, 43], "claim": "Extraction now reads the mounted/current WKWebView DOM and parses off MainActor rather than loading a second hidden web page. Different final URL and explicit extraction cancellation are guarded."},
+    {"file": "SourceReadSwift/Core/Reader/SmartWebArticleExtractor.swift", "lines": [24, 53], "claim": "Candidate roots are scored instead of taking body-first; block/BR boundaries and repeated prose are retained. Source review found no definite new SwiftSoup API compile error; native compile and fixtures remain the verification gate."}
+  ],
+  "excluded_hypotheses": [
+    {
+      "claim": "Ad-domain regex was overescaped in Swift raw JSON",
+      "status": "DISPROVED",
+      "evidence": "Actual source extraction and JSON decoding yield 10 raw JSON backslashes and 5 decoded regex backslashes. Python re matched all four standard URL fixtures: doubleclick.net, ads.doubleclick.net, googlesyndication.com, adservice.google.com. The apparent extra escaping was the tool-output JSON display layer.",
+      "verification_command": "python -X utf8 D:/Gemini反重力/SourceReadSwift2/docs/release-1.1.0/validate-ad-rule.py",
+      "limitation": "This checks JSON and standard regex intent, not a native WKContentRuleListStore compilation result."
+    }
+  ],
+  "excluded_from_scope": "WebReaderSection.contentSignature first/last-only bug is already being fixed by parent and intentionally not duplicated.",
+  "nodes": [
+    {"id":"bookLoad","label":"BookDetailView.load/reload","file_type":"code","source_file":"SourceReadSwift/Features/Discover/BookDetailView.swift","source_location":"736-737,926-930"},
+    {"id":"bookEvents","label":"refreshDetailAndTOC events","file_type":"code","source_file":"SourceReadSwift/Features/Discover/BookDetailView.swift","source_location":"828-907"},
+    {"id":"bookBody","label":"BookDetailView loading/detail branch","file_type":"code","source_file":"SourceReadSwift/Features/Discover/BookDetailView.swift","source_location":"158-193"},
+    {"id":"searchPublish","label":"publishIfNeeded","file_type":"code","source_file":"SourceReadSwift/Features/Discover/DiscoverView.swift","source_location":"1577-1592"},
+    {"id":"matchChange","label":"applyMatchMode","file_type":"code","source_file":"SourceReadSwift/Features/Discover/DiscoverView.swift","source_location":"1497-1501"},
+    {"id":"extract","label":"WebReadingSession.extractCurrentPage","file_type":"code","source_file":"SourceReadSwift/Features/Discover/WebReadingSession.swift","source_location":"17-43"},
+    {"id":"articleParse","label":"SmartWebArticleExtractor.extract","file_type":"code","source_file":"SourceReadSwift/Core/Reader/SmartWebArticleExtractor.swift","source_location":"15-53"},
+    {"id":"ruleCompile","label":"WebAdvertisementRules.compile","file_type":"code","source_file":"SourceReadSwift/Features/Discover/WebReadingSession.swift","source_location":"53-61"},
+    {"id":"webUpdate","label":"ReadableWebView.updateUIView","file_type":"code","source_file":"SourceReadSwift/Features/Discover/WebReadingSession.swift","source_location":"82-98"}
+  ],
+  "edges": [
+    {"source":"bookLoad","target":"bookEvents","relation":"calls unless isLoading guard returns","confidence_tag":"EXTRACTED","confidence":1.0},
+    {"source":"bookEvents","target":"bookBody","relation":"writes isLoading/detail/chapters consumed by body","confidence_tag":"EXTRACTED","confidence":1.0},
+    {"source":"matchChange","target":"searchPublish","relation":"can interleave mode mutation while detached ranking awaits","confidence_tag":"INFERRED","confidence":1.0},
+    {"source":"extract","target":"articleParse","relation":"calls in detached task","confidence_tag":"EXTRACTED","confidence":1.0},
+    {"source":"webUpdate","target":"ruleCompile","relation":"calls asynchronous installation","confidence_tag":"EXTRACTED","confidence":1.0}
+  ],
+  "hyperedges": [
+    {"nodes":["bookLoad","bookEvents","bookBody"],"relation":"single loading flag is shared by source replacement and independent detail/TOC events","confidence_tag":"EXTRACTED","confidence":1.0},
+    {"nodes":["webUpdate","ruleCompile","extract"],"relation":"representable configuration generation does not track browser document navigation epoch","confidence_tag":"EXTRACTED","confidence":1.0}
+  ]
+}
