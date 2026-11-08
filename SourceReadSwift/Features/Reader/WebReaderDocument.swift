@@ -1201,6 +1201,9 @@ enum WebReaderHTML {
         return {
           key: metric.key,
           local: metric.local,
+          // In chapter spacing the next node is below the reading line.
+          // Preserve that signed gap; prose still scales with its new height.
+          gapOffset: Math.min(offset, 0),
           fraction: Math.min(Math.max(offset / metric.height, 0), 1)
         };
       }
@@ -1219,7 +1222,7 @@ enum WebReaderHTML {
         var rect = element.getBoundingClientRect();
         var top = rect.top + window.scrollY;
         var height = Math.max(rect.height, 1);
-        var target = Math.max(top - topInset() + height * anchor.fraction, 0);
+        var target = Math.max(top - topInset() - 1 + height * anchor.fraction + anchor.gapOffset, 0);
         if (!isFinite(target) || Math.abs(target - window.scrollY) < 1) { return; }
         safeScrollTo(target);
       }

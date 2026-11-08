@@ -8,9 +8,42 @@ import OSLog
 /// Gives an edge swipe to UIKit before the prose scroll pan can claim it.
 final class ReaderEdgeReturnWebView: WKWebView {
     private(set) weak var prioritizedEdgeReturn: UIGestureRecognizer?
+    #if DEBUG
+    private var isObservingScrollPan = false
+    private var scrollPanBeganCount = 0
+    private var scrollPanChangedCount = 0
+    private var lastScrollPanTranslation = CGPoint.zero
+    private var lastScrollPanState = UIGestureRecognizer.State.possible
+
+    var scrollPanEvidence: String {
+        let pan = scrollView.panGestureRecognizer
+        return "webPan=\(ObjectIdentifier(pan)),enabled=\(pan.isEnabled),state=\(pan.state.rawValue),"
+            + "began=\(scrollPanBeganCount),changed=\(scrollPanChangedCount),"
+            + "lastState=\(lastScrollPanState.rawValue),dx=\(lastScrollPanTranslation.x),dy=\(lastScrollPanTranslation.y),"
+            + "priority=\(prioritizedEdgeReturn.map { String(describing: ObjectIdentifier($0)) } ?? "none")"
+    }
+
+    @objc private func recordScrollPan(_ pan: UIPanGestureRecognizer) {
+        // Observe the existing pan without changing its delegate or failure dependencies.
+        // This counter must remain separate from native-return movement evidence.
+        lastScrollPanTranslation = pan.translation(in: scrollView)
+        lastScrollPanState = pan.state
+        if pan.state == .began { scrollPanBeganCount += 1 }
+        if pan.state == .changed { scrollPanChangedCount += 1 }
+    }
+    #endif
 
     override func didMoveToWindow() {
         super.didMoveToWindow()
+        #if DEBUG
+        if window != nil, !isObservingScrollPan {
+            scrollView.panGestureRecognizer.addTarget(self, action: #selector(recordScrollPan(_:)))
+            isObservingScrollPan = true
+        } else if window == nil, isObservingScrollPan {
+            scrollView.panGestureRecognizer.removeTarget(self, action: #selector(recordScrollPan(_:)))
+            isObservingScrollPan = false
+        }
+        #endif
         installEdgeReturnPriority()
     }
 
@@ -106,6 +139,7 @@ struct WebScrollReaderView: UIViewRepresentable {
     var prioritizesSystemEdgeReturn = false
     let onVisibleParagraph: (Int) -> Void
     var onVisiblePosition: ((Int, Int) -> Void)? = nil
+    var onScrollInteractionChanged: ((Bool) -> Void)? = nil
     var onNearBottom: (() -> Void)? = nil
     var onReachTop: (() -> Void)? = nil
     var onNearTop: (() -> Void)? = nil
@@ -138,7 +172,7 @@ struct WebScrollReaderView: UIViewRepresentable {
 
     // MARK: - Coordinator
 
-    final class Coordinator: NSObject, WKScriptMessageHandler, WKNavigationDelegate, WKUIDelegate {
+    final class Coordinator: NSObject, WKScriptMessageHandler, WKNavigationDelegate, WKUIDelegate, UIScrollViewDelegate {
         private var view: WebScrollReaderView
         private weak var webView: WKWebView?
         private let imageHandler = ReaderImageSchemeHandler()
@@ -161,9 +195,16 @@ struct WebScrollReaderView: UIViewRepresentable {
         private(set) var styleBuildCount = 0
         private var lastContentFingerprint: String?
         private var mountedContent: WebReaderContentPayloadBuilder.Snapshot?
+        private var firstMountedChapter: Int?
+        private var reportingSections: [WebReaderSection] = []
         private var expectedContentRevision = ""
         private var contentBuildTask: Task<Void, Never>?
         private var isBuildingContent = false
+        private var buildingRevision = ""
+        private var hasDeferredContent = false
+        private var deferredContentTask: Task<Void, Never>?
+        private(set) var isScrollInteractionActive = false
+        private(set) var contentMountCount = 0
         private var lastHighlight = Int.min
         private var lastPageStepGeneration: Int
         private var lastResetToken: String?
@@ -215,6 +256,7 @@ struct WebScrollReaderView: UIViewRepresentable {
             webView.scrollView.delaysContentTouches = false
             webView.scrollView.canCancelContentTouches = true
             webView.accessibilityIdentifier = "reader.webScrollSurface"
+            webView.scrollView.delegate = self
             self.webView = webView
             lastSurfaceColor = view.surfaceColor
 
@@ -224,9 +266,14 @@ struct WebScrollReaderView: UIViewRepresentable {
         }
 
         func tearDown(webView: WKWebView) {
+            deferredContentTask?.cancel()
+            deferredContentTask = nil
+            hasDeferredContent = false
+            webView.scrollView.delegate = nil
             startupProbeTask?.cancel()
             startupProbeTask = nil
             contentBuildTask?.cancel()
+            buildingRevision = UUID().uuidString
             navigationToken = nil
             shellNavigation = nil
             expectedContentRevision = UUID().uuidString
@@ -255,6 +302,13 @@ struct WebScrollReaderView: UIViewRepresentable {
 
             let fingerprint = effectiveContentFingerprint(for: newView)
             if lastContentFingerprint != fingerprint {
+                // A completed download must not lay out several offscreen chapters
+                // in the middle of a native fling. Keep only the latest window.
+                if isBuildingContent || shouldDeferContent(in: webView) {
+                    hasDeferredContent = true
+                    return
+                }
+                hasDeferredContent = false
                 lastContentFingerprint = fingerprint
                 pushContent(webView: webView)
             }
@@ -268,6 +322,52 @@ struct WebScrollReaderView: UIViewRepresentable {
         }
 
         // MARK: JavaScript bridge
+
+        func scrollViewWillBeginDragging(_ scrollView: UIScrollView) {
+            deferredContentTask?.cancel()
+            isScrollInteractionActive = true
+            view.onScrollInteractionChanged?(true)
+        }
+
+        func scrollViewDidScroll(_ scrollView: UIScrollView) {
+            guard hasDeferredContent, !isBuildingContent, let webView,
+                  !shouldDeferContent(in: webView) else { return }
+            update(view: view, webView: webView)
+        }
+
+        func scrollViewDidEndDragging(_ scrollView: UIScrollView, willDecelerate decelerate: Bool) {
+            if !decelerate { finishScrollInteraction() }
+        }
+
+        func scrollViewDidEndDecelerating(_ scrollView: UIScrollView) {
+            finishScrollInteraction()
+        }
+
+        private func finishScrollInteraction() {
+            isScrollInteractionActive = false
+            view.onScrollInteractionChanged?(false)
+            deferredContentTask?.cancel()
+            // Give a deferred window trim one update to join the same patch.
+            deferredContentTask = Task { @MainActor [weak self] in
+                do { try await Task.sleep(nanoseconds: 80_000_000) }
+                catch { return }
+                guard let self, !self.isScrollInteractionActive, let webView = self.webView else { return }
+                self.update(view: self.view, webView: webView)
+            }
+        }
+
+        private func shouldDeferContent(in webView: WKWebView) -> Bool {
+            guard hasReportedPosition, lastResetToken == view.resetToken,
+                  view.scrollTarget == nil || view.scrollRequestKey == appliedScrollKey else { return false }
+            let scroll = webView.scrollView
+            guard isScrollInteractionActive || scroll.isTracking || scroll.isDragging || scroll.isDecelerating else { return false }
+            // Backward loading at the top is user-visible work as well.
+            if let first = view.sections.first?.chapterIndex, let mounted = firstMountedChapter,
+               first < mounted, scroll.contentOffset.y < scroll.bounds.height { return false }
+            // Keep three screens of runway even during a long fling.
+            let remaining = scroll.contentSize.height - scroll.contentOffset.y - scroll.bounds.height
+            return remaining > max(scroll.bounds.height * 3, 1)
+        }
 
         private func effectiveContentFingerprint(for currentView: WebScrollReaderView) -> String {
             "\(currentView.contentFingerprint)|tc=\(currentView.traditionalChineseEnabled ? 1 : 0)|end=\(currentView.showChapterEndBadge ? 1 : 0)"
@@ -318,9 +418,10 @@ struct WebScrollReaderView: UIViewRepresentable {
         private func pushContent(webView: WKWebView, canReuseMountedSections: Bool = true) {
             contentBuildTask?.cancel()
             let revision = UUID().uuidString
-            expectedContentRevision = revision
+            buildingRevision = revision
             isBuildingContent = true
             let sections = view.sections
+            let fingerprint = effectiveContentFingerprint(for: view)
             let snapshot = WebReaderContentPayloadBuilder.Snapshot(
                 sections: sections, showChapterEndBadge: view.showChapterEndBadge,
                 traditionalChineseEnabled: view.traditionalChineseEnabled, revision: revision
@@ -332,12 +433,27 @@ struct WebScrollReaderView: UIViewRepresentable {
                         .map(WebReaderJavaScriptLiteral.string)
                 }.value
                 guard !Task.isCancelled, let self, let webView,
-                      self.expectedContentRevision == revision, self.isDocumentReady else { return }
+                      self.buildingRevision == revision, self.isDocumentReady else { return }
                 guard let literal else {
                     self.isBuildingContent = false
                     NSLog("Reader could not serialize a chapter window")
                     return
                 }
+                // A drag may have started while JSON was being built. Keep the
+                // mounted revision valid so visible-position reports still work.
+                while self.shouldDeferContent(in: webView) {
+                    do { try await Task.sleep(nanoseconds: 50_000_000) }
+                    catch { return }
+                    guard !Task.isCancelled, self.buildingRevision == revision, self.isDocumentReady else { return }
+                }
+                if self.hasDeferredContent && self.effectiveContentFingerprint(for: self.view) != fingerprint {
+                    self.isBuildingContent = false
+                    self.update(view: self.view, webView: webView)
+                    return
+                }
+                self.hasDeferredContent = false
+                self.expectedContentRevision = revision
+                self.reportingSections = sections
                 // A newer update racing an in-flight call must use a full window,
                 // not assume either revision is the one mounted in WebKit.
                 self.mountedContent = nil
@@ -361,14 +477,13 @@ struct WebScrollReaderView: UIViewRepresentable {
                         return
                     }
                     self.mountedContent = snapshot
+                    self.firstMountedChapter = sections.first?.chapterIndex
+                    self.contentMountCount += 1
                     self.isBuildingContent = false
                     if resetsOpeningPosition, self.view.resetToken == resetToken, self.view.scrollTarget == nil {
                         self.lastResetToken = resetToken
                     }
-                    self.pushResetIfNeeded(webView: webView)
-                    self.pushScrollTargetIfNeeded(webView: webView)
-                    self.pushPageStepIfNeeded(webView: webView)
-                    self.pushHighlightIfNeeded(webView: webView)
+                    self.update(view: self.view, webView: webView)
                 }
             }
         }
@@ -458,7 +573,8 @@ struct WebScrollReaderView: UIViewRepresentable {
                 defer { ReaderScrollPerfMeter.record(cost: CACurrentMediaTime() - start) }
                 guard pendingScrollKey == nil,
                       view.scrollTarget == nil || view.scrollRequestKey == appliedScrollKey,
-                      let flat = body["flat"] as? Int else { return }
+                      let reportedFlat = body["flat"] as? Int,
+                      let flat = ReaderWebPositionMapper.remap(reportedFlat, from: reportingSections, to: view.sections) else { return }
                 if flat >= 0 {
                     if !hasReportedPosition {
                         hasReportedPosition = true

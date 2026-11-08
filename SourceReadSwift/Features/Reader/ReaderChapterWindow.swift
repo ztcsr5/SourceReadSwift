@@ -3,8 +3,8 @@ import Foundation
 /// One chapter held by the reader's live window. The window keeps the current
 /// chapter plus the chapters on both sides so scroll, cover and page-curl can
 /// cross a chapter boundary without tearing down the reader view.
-struct ReaderChapterSection: Identifiable, Equatable {
-    enum LoadState: Equatable {
+struct ReaderChapterSection: Identifiable, Equatable, Sendable {
+    enum LoadState: Equatable, Sendable {
         case ready
         case loading
         case failed(String)
@@ -39,6 +39,13 @@ struct ReaderChapterSection: Identifiable, Equatable {
     var id: Int { chapterIndex }
     var isReady: Bool { state == .ready }
     var isLoading: Bool { state == .loading }
+
+    /// Normalize and fingerprint an arriving chapter away from the scrolling UI.
+    static func prepare(chapterIndex: Int, title: String, paragraphs: [String]) async -> ReaderChapterSection {
+        await Task.detached(priority: .userInitiated) {
+            ReaderChapterSection(chapterIndex: chapterIndex, title: title, paragraphs: paragraphs)
+        }.value
+    }
 }
 
 /// A chapter start/count pair used to build the flat paragraph space that the
