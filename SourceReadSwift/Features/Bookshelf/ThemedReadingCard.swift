@@ -8,7 +8,15 @@ struct ThemedReadingCard: View {
     @Environment(\.dynamicTypeSize) private var typeSize
     @ScaledMetric(relativeTo: .title2) private var titleSize: CGFloat = 24
 
-    var body: some View {
+    @ViewBuilder var body: some View {
+        if theme.isAtelier {
+            AtelierReadingCard(book: book, theme: theme, heroNamespace: heroNamespace)
+        } else {
+            legacyCard
+        }
+    }
+
+    private var legacyCard: some View {
         VStack(alignment: .leading, spacing: 16) {
             HStack(alignment: .firstTextBaseline) {
                 Text("全书进度").font(.caption.weight(.medium))

@@ -6,7 +6,7 @@ struct AppThemeOrnament: View {
     var isCard = false
 
     static func hasArtwork(theme: AppVisualTheme, isCard: Bool) -> Bool {
-        if theme.isAtelier { return theme != .peachMoss || isCard }
+        if theme.isAtelier { return false }
         switch theme {
         case .folio, .blueprint: return true
         case .inkwash: return !isCard
@@ -15,9 +15,7 @@ struct AppThemeOrnament: View {
     }
 
     @ViewBuilder var body: some View {
-        if theme.isAtelier && Self.hasArtwork(theme: theme, isCard: isCard) {
-            AppAtelierImprint(theme: theme, isCard: isCard)
-        } else if Self.hasArtwork(theme: theme, isCard: isCard) {
+        if Self.hasArtwork(theme: theme, isCard: isCard) {
             artwork
         }
     }

@@ -126,6 +126,22 @@ struct AppThemePreview: View {
     }
 
     @ViewBuilder private var compositionPreview: some View {
+        if theme.isAtelier {
+            HStack(spacing: 4) {
+                if theme.homeComposition != .editorial { previewTile(width: 14, height: 26) }
+                VStack(alignment: .leading, spacing: 4) {
+                    previewTile(width: 18, height: 3)
+                    previewTile(width: 13, height: 3)
+                    previewTile(width: 16, height: 2)
+                }
+                if theme.homeComposition == .editorial { previewTile(width: 14, height: 26) }
+            }
+        } else {
+            legacyCompositionPreview
+        }
+    }
+
+    @ViewBuilder private var legacyCompositionPreview: some View {
         switch theme.homeComposition {
         case .readingDesk:
             HStack(spacing: 4) {

@@ -1,12 +1,12 @@
-name: Root Tab Glass Verification
-run-name: "SourceRead · 底栏玻璃与主页搜索专项 · #${{ github.run_number }}"
+name: Atelier Theme Verification
+run-name: "SourceRead · 七组主题重做与原主页保护 · #${{ github.run_number }}"
 on:
   workflow_dispatch:
 concurrency:
-  group: root-tab-glass-${{ github.ref }}
+  group: atelier-redesign-${{ github.ref }}
   cancel-in-progress: false
 jobs:
-  glass:
+  themes:
     strategy:
       fail-fast: false
       max-parallel: 1
@@ -27,57 +27,61 @@ jobs:
         run: |
           set -euo pipefail
           RUNTIME_ID="$(xcrun simctl list runtimes -j | python3 -c 'import json,sys,os; print(next(r["identifier"] for r in json.load(sys.stdin)["runtimes"] if r.get("isAvailable") and r["version"].startswith(os.environ["DIAGNOSTIC_RUNTIME"]+".")))')"
-          python3 -u scripts/boot_native_simulator.py "$RUNTIME_ID" --output tab-glass-device.txt
+          python3 -u scripts/boot_native_simulator.py "$RUNTIME_ID" --output atelier-device.txt
       - name: Compile app and tests
         id: build
         run: |
           set -euo pipefail
-          xcodebuild -project SourceReadSwift.xcodeproj -scheme SourceReadSwift -destination "id=$(cat tab-glass-device.txt)" CODE_SIGNING_ALLOWED=NO -parallel-testing-enabled NO build-for-testing 2>&1 | tee tab-glass-build.log
-      - name: Verify material pixels and unique tab ownership
+          xcodebuild -project SourceReadSwift.xcodeproj -scheme SourceReadSwift -destination "id=$(cat atelier-device.txt)" CODE_SIGNING_ALLOWED=NO -parallel-testing-enabled NO build-for-testing 2>&1 | tee atelier-build.log
+      - name: Verify themes, compact layouts and glass preservation
         if: ${{ !cancelled() && steps.build.outcome == 'success' }}
-        timeout-minutes: 8
+        timeout-minutes: 12
         run: |
           set -euo pipefail
-          xcodebuild -project SourceReadSwift.xcodeproj -scheme SourceReadSwift -destination "id=$(cat tab-glass-device.txt)" CODE_SIGNING_ALLOWED=NO -parallel-testing-enabled NO \
+          xcodebuild -project SourceReadSwift.xcodeproj -scheme SourceReadSwift -destination "id=$(cat atelier-device.txt)" CODE_SIGNING_ALLOWED=NO -parallel-testing-enabled NO \
+            -only-testing:SourceReadSwiftTests/AtelierThemeTests \
+            -only-testing:SourceReadSwiftTests/AtelierLayoutTests \
+            -only-testing:SourceReadSwiftTests/HomeLayoutEvidenceTests \
             -only-testing:SourceReadSwiftTests/RootTabGlassTests \
             -only-testing:SourceReadSwiftTests/TabChromeRegressionTests \
             -test-timeouts-enabled YES -maximum-test-execution-time-allowance 60 \
-            -resultBundlePath TabGlassUnit.xcresult test-without-building 2>&1 | tee tab-glass-unit.log
-      - name: Publish early material results
+            -resultBundlePath AtelierUnit.xcresult test-without-building 2>&1 | tee atelier-unit.log
+      - name: Publish early theme results
         if: ${{ always() && steps.build.outcome == 'success' }}
         uses: actions/upload-artifact@v4
         with:
-          name: tab-glass-unit-${{ github.sha }}-ios${{ matrix.runtime }}
-          path: tab-glass-unit.log
+          name: atelier-unit-${{ github.sha }}-ios${{ matrix.runtime }}
+          path: atelier-unit.log
           if-no-files-found: error
           retention-days: 7
-      - name: Verify real home glass and global search
+      - name: Verify actual theme homes, paging and global search
         if: ${{ !cancelled() && steps.build.outcome == 'success' }}
-        timeout-minutes: 8
+        timeout-minutes: 12
         run: |
           set -euo pipefail
-          xcodebuild -project SourceReadSwift.xcodeproj -scheme SourceReadSwift -destination "id=$(cat tab-glass-device.txt)" CODE_SIGNING_ALLOWED=NO -parallel-testing-enabled NO \
+          xcodebuild -project SourceReadSwift.xcodeproj -scheme SourceReadSwift -destination "id=$(cat atelier-device.txt)" CODE_SIGNING_ALLOWED=NO -parallel-testing-enabled NO \
+            -only-testing:SourceReadSwiftUITests/AtelierHomeUITests \
             -only-testing:SourceReadSwiftUITests/RootTabGlassUITests \
             -only-testing:SourceReadSwiftUITests/FloatingReadingDeskUITests/testHomeGlobalSearchFindsTheLocalBookAndOpensItsDetails \
             -test-timeouts-enabled YES -maximum-test-execution-time-allowance 180 \
-            -resultBundlePath TabGlassUI.xcresult test-without-building 2>&1 | tee tab-glass-ui.log
+            -resultBundlePath AtelierUI.xcresult test-without-building 2>&1 | tee atelier-ui.log
       - name: Export window and real home screenshots
         if: always()
         run: |
-          if [ -d TabGlassUnit.xcresult ]; then
-            xcrun xcresulttool export attachments --path TabGlassUnit.xcresult --output-path tab-glass-snapshots/unit
+          if [ -d AtelierUnit.xcresult ]; then
+            xcrun xcresulttool export attachments --path AtelierUnit.xcresult --output-path atelier-snapshots/unit
           fi
-          if [ -d TabGlassUI.xcresult ]; then
-            xcrun xcresulttool export attachments --path TabGlassUI.xcresult --output-path tab-glass-snapshots/ui
+          if [ -d AtelierUI.xcresult ]; then
+            xcrun xcresulttool export attachments --path AtelierUI.xcresult --output-path atelier-snapshots/ui
           fi
       - name: Preserve results and screenshots
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: tab-glass-${{ github.sha }}-ios${{ matrix.runtime }}
+          name: atelier-${{ github.sha }}-ios${{ matrix.runtime }}
           path: |
-            tab-glass-*.log
-            TabGlassUnit.xcresult
-            TabGlassUI.xcresult
-            tab-glass-snapshots
+            atelier-*.log
+            AtelierUnit.xcresult
+            AtelierUI.xcresult
+            atelier-snapshots
           retention-days: 7

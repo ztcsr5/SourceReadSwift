@@ -22,7 +22,12 @@ enum AppVisualTheme: String, CaseIterable, Identifiable, Codable, Sendable {
         default: return .readingDesk
         }
     }
+    var usesFramedShelf: Bool { homeComposition == .gallery && !isAtelier }
+
     var compositionTitle: String {
+        if isAtelier {
+            return homeComposition == .index ? "紧凑阅读卡 · 无框目录" : "分栏阅读卡 · 开放书架"
+        }
         switch homeComposition {
         case .readingDesk: return "书台 · 三列藏书"
         case .editorial: return "书刊 · 分栏阅读卡"
@@ -77,13 +82,13 @@ enum AppVisualTheme: String, CaseIterable, Identifiable, Codable, Sendable {
     }
     var detail: String {
         switch self {
-        case .berryLake: return "浆果红 × 湖蓝 · 书刊分栏 · 裁角纸页"
-        case .blushInk: return "胭脂粉 × 墨黑 · 紧凑索引 · 边线刻度"
-        case .periwinkleCocoa: return "长春花蓝 × 可可棕 · 双列陈列 · 拱形留白"
-        case .peachMoss: return "裸桃粉 × 苔青绿 · 双列画廊 · 压印边框"
-        case .inkViolet: return "墨黑 × 星紫 · 等宽索引 · 定位角线"
-        case .pineMist: return "松针绿 × 雾灰白 · 双列档案 · 细叶边注"
-        case .kleinSage: return "克莱因蓝 × 艾绿 · 分栏书刊 · 错位双色线"
+        case .berryLake: return "浆果红 × 湖蓝 · 右置封面 · 季刊留白"
+        case .blushInk: return "胭脂粉 × 墨黑 · 紧凑横卡 · 开放目录"
+        case .periwinkleCocoa: return "长春花蓝 × 可可棕 · 左置书封 · 沙龙陈列"
+        case .peachMoss: return "裸桃粉 × 苔青绿 · 温润纸面 · 无框书架"
+        case .inkViolet: return "墨黑 × 星紫 · 紧凑横卡 · 夜读目录"
+        case .pineMist: return "松针绿 × 雾灰白 · 轻量分栏 · 开放书架"
+        case .kleinSage: return "克莱因蓝 × 艾绿 · 右置封面 · 清晰分栏"
 
         case .forest: return "纯白纸面 · 清透玻璃 · 柔和森林绿"
         case .classic: return "原有紫蓝配色 · 柔和圆角 · 轻透卡片"
@@ -123,25 +128,25 @@ enum AppVisualTheme: String, CaseIterable, Identifiable, Codable, Sendable {
     }
     var backgroundHex: UInt32 {
         switch self {
-        case .inkViolet: return 0xF7F3FC; case .pineMist: return 0xE8E8E4; case .kleinSage: return 0xF0F5F7
+        case .inkViolet: return 0xF7F3FC; case .pineMist: return 0xF4F5F1; case .kleinSage: return 0xF0F5F7
         case .berryLake: return 0xFFF8F6; case .blushInk: return 0xFFF3F7; case .periwinkleCocoa: return 0xF3F4FF; case .peachMoss: return 0xFFF2EE
         case .forest: return 0xFFFFFF; case .classic: return 0xF2F2F7; case .botanical: return 0xEFF3EA; case .editorial: return 0xF3EFE6; case .coast: return 0xEDF4F8; case .rose: return 0xF8EFF1; case .graphite: return 0xECEDEF; case .folio: return 0xF1E9D9; case .inkwash: return 0xF1F2EC; case .blueprint: return 0xEAF1F7 }
     }
     var cardHex: UInt32 {
         switch self {
-        case .inkViolet: return 0xFFFCFF; case .pineMist: return 0xF9FAF6; case .kleinSage: return 0xFAFFFC
+        case .inkViolet: return 0xFFFCFF; case .pineMist: return 0xFFFFFF; case .kleinSage: return 0xFAFFFC
         case .berryLake: return 0xFFFFFF; case .blushInk: return 0xFFFFFF; case .periwinkleCocoa: return 0xFFFAF6; case .peachMoss: return 0xFFFAF6
         case .forest: return 0xFFFFFF; case .classic: return 0xFFFFFF; case .botanical: return 0xFAFCF6; case .editorial: return 0xFFFCF6; case .coast: return 0xFBFDFF; case .rose: return 0xFFF9FA; case .graphite: return 0xFAFAFB; case .folio: return 0xFFFBF1; case .inkwash: return 0xFBFCF7; case .blueprint: return 0xF8FCFF }
     }
     var darkBackgroundHex: UInt32 {
         switch self {
-        case .inkViolet: return 0x0B0C10; case .pineMist: return 0x101A12; case .kleinSage: return 0x0A1231
+        case .inkViolet: return 0x0B0C10; case .pineMist: return 0x141815; case .kleinSage: return 0x0A1231
         case .berryLake: return 0x1F080B; case .blushInk: return 0x000000; case .periwinkleCocoa: return 0x181A2B; case .peachMoss: return 0x101B12
         case .forest: return 0x151716; case .classic: return 0x000000; case .botanical: return 0x101B15; case .editorial: return 0x1B1813; case .coast: return 0x101C25; case .rose: return 0x23171E; case .graphite: return 0x141518; case .folio: return 0x201B14; case .inkwash: return 0x121B18; case .blueprint: return 0x101D2B }
     }
     var darkCardHex: UInt32 {
         switch self {
-        case .inkViolet: return 0x1C1525; case .pineMist: return 0x203023; case .kleinSage: return 0x172344
+        case .inkViolet: return 0x1C1525; case .pineMist: return 0x202722; case .kleinSage: return 0x172344
         case .berryLake: return 0x350B10; case .blushInk: return 0x181015; case .periwinkleCocoa: return 0x282133; case .peachMoss: return 0x1D2C20
         case .forest: return 0x222423; case .classic: return 0x1C1C1E; case .botanical: return 0x1B2A21; case .editorial: return 0x2A261E; case .coast: return 0x1C2B36; case .rose: return 0x35252E; case .graphite: return 0x25272C; case .folio: return 0x30281E; case .inkwash: return 0x1E2A24; case .blueprint: return 0x192D40 }
     }
@@ -171,7 +176,7 @@ enum AppVisualTheme: String, CaseIterable, Identifiable, Codable, Sendable {
 
     var borderWidth: CGFloat { self == .editorial || self == .graphite || self == .blueprint ? 1 : 0.6 }
     var fontDesign: Font.Design {
-        switch self { case .editorial, .folio, .inkwash, .pineMist: return .serif; case .graphite, .blueprint, .inkViolet: return .monospaced; case .botanical, .rose: return .rounded; default: return .default }
+        switch self { case .editorial, .folio, .inkwash: return .serif; case .graphite, .blueprint: return .monospaced; case .botanical, .rose: return .rounded; default: return .default }
     }
     var ornament: String {
         switch self {

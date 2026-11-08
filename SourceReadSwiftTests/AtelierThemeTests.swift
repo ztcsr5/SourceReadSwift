@@ -41,8 +41,8 @@ final class AtelierThemeTests: XCTestCase {
             XCTAssertEqual(theme.rawValue, identity)
             XCTAssertEqual(theme.preferenceKey("accent"), "settings.visualTheme.\(identity).accentHex")
             XCTAssertEqual(AppVisualTheme.classicDeskThemes.filter { $0 == theme }.count, 1)
-            XCTAssertTrue(AppThemeOrnament.hasArtwork(theme: theme, isCard: true))
-            XCTAssertTrue(AppThemeOrnament.hasArtwork(theme: theme, isCard: false))
+            XCTAssertFalse(AppThemeOrnament.hasArtwork(theme: theme, isCard: true))
+            XCTAssertFalse(AppThemeOrnament.hasArtwork(theme: theme, isCard: false))
             XCTAssertFalse(theme.supportsLiveGlass)
         }
     }

@@ -284,7 +284,7 @@ struct BookshelfView: View {
                     ReadingDeskPager(books: books, selection: Binding(
                         get: { ReadingDeskSelection.resolve(readingBookID, in: books) },
                         set: { readingBookID = $0 }), usesFloatingStyle: floatingReadingDeskEnabled,
-                        preferredFloatingHeight: theme.usesNeutralGlass ? 194 : 288, card: { heroCard($0) })
+                        preferredFloatingHeight: theme.usesNeutralGlass ? 194 : theme.isAtelier ? 230 : 288, card: { heroCard($0) })
                 } else if let book = recentBooks.first { heroCard(book) }
             }
         }
@@ -406,7 +406,7 @@ struct BookshelfView: View {
             } else if showsGridShelf {
                 LazyVGrid(
                     columns: Array(repeating: GridItem(.flexible(), spacing: 16),
-                                   count: theme.homeComposition == .gallery || typeSize.isAccessibilitySize ? 2 : 3),
+                                   count: theme.usesFramedShelf || typeSize.isAccessibilitySize ? 2 : 3),
                     spacing: 18
                 ) {
                     ForEach(shelfBooks) { book in
@@ -929,7 +929,7 @@ struct BookshelfView: View {
                 }
             }
             .padding(14)
-            .glassPanel(cornerRadius: 16, material: .thinMaterial, shadowOpacity: 0.06)
+            .modifier(BookshelfRowSurface(theme: theme))
         }
         .buttonStyle(BookOpenPressStyle())
         .accessibilityIdentifier("bookshelf.list." + book.id)
@@ -1016,9 +1016,9 @@ struct BookshelfView: View {
                         .lineLimit(1)
                 }
             }
-            .padding(theme.homeComposition == .gallery ? 12 : 0)
+            .padding(theme.usesFramedShelf ? 12 : 0)
             .background {
-                if theme.homeComposition == .gallery {
+                if theme.usesFramedShelf {
                     AppTheme.card.clipShape(AppThemeCardShape(theme: theme, radius: theme.radius), style: FillStyle(eoFill: true))
                         .overlay { AppThemeOrnament(theme: theme, isCard: true) }
                 }
