@@ -13,13 +13,22 @@ final class AppRefreshRateKeeper: UIView {
     private var link: CADisplayLink?
 
     var isHolding: Bool { link != nil }
+    private(set) var heldRate: Float = 0
+    private var observingResume = false
+
+    /// 从所有已连接场景里取最大的屏幕刷新率：
+    /// `UIScreen.main` 在新系统上可能返回 60，单看它会把上限误判成 60。
+    private static func maximumRate() -> Float {
+        let rates = UIApplication.shared.connectedScenes
+            .compactMap { $0 as? UIWindowScene }
+            .map { Float($0.screen.maximumFramesPerSecond) }
+        let value = rates.max() ?? Float(UIScreen.main.maximumFramesPerSecond)
+        return min(max(value, 60), 120)
+    }
 
     func start() {
         guard link == nil else { return }
-        // 必须从所在场景的屏幕取上限：UIScreen.main 在新系统上可能返回 60，
-        // 那样就会一直按 60 要帧，看起来「常驻 120 没生效」。
-        let screen = window?.windowScene?.screen ?? UIScreen.main
-        let rate = min(Float(screen.maximumFramesPerSecond), 120)
+        let rate = Self.maximumRate()
         let displayLink = CADisplayLink(target: WeakProxy(target: self),
                                         selector: #selector(WeakProxy.tick))
         if #available(iOS 15.0, *) {
@@ -29,16 +38,40 @@ final class AppRefreshRateKeeper: UIView {
         }
         displayLink.add(to: .main, forMode: .common)
         link = displayLink
+        heldRate = rate
+        #if DEBUG
+        accessibilityValue = String(Int(rate))
+        #endif
     }
 
     func stop() {
         link?.invalidate()
         link = nil
+        heldRate = 0
     }
 
     override func didMoveToWindow() {
         super.didMoveToWindow()
         if window == nil { stop() } else { start() }
+    }
+
+    /// 回到前台后系统会重新排帧，必须重新要一次 120，否则会停在 60。
+    override func didMoveToSuperview() {
+        super.didMoveToSuperview()
+        guard !observingResume else { return }
+        observingResume = true
+        NotificationCenter.default.addObserver(
+            self, selector: #selector(resume), name: UIApplication.didBecomeActiveNotification, object: nil
+        )
+    }
+
+    @objc private func resume() {
+        stop()
+        start()
+    }
+
+    deinit {
+        NotificationCenter.default.removeObserver(self)
     }
 }
 
