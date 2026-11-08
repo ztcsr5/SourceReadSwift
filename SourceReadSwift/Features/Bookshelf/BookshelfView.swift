@@ -782,12 +782,8 @@ struct BookshelfView: View {
     }
 
     @ViewBuilder private func bookDestination(_ book: BookshelfBook, placement: String) -> some View {
-        if mediaKind(for: book) == nil || mediaKind(for: book) == .text {
-            detailDestination(book, placement: placement)
-        } else {
-            BookshelfReaderGatewayView(book: book)
-                .bookHeroDestination(placement + "|" + book.id, in: bookHero)
-        }
+        // 书架（网格 / 列表）一律进详情；只有「正在阅读」卡片直接进阅读。
+        detailDestination(book, placement: placement)
     }
 
     private func managedOpeningBook(_ book: BookshelfBook) -> BookshelfBook? {
@@ -1180,8 +1176,9 @@ private struct BookshelfCollectionView: View {
                                     }
                                 }
                             } else {
-                                NavigationLink {
-                                    BookshelfReaderGatewayView(book: book)
+                                // 书架卡片点击只进详情；「正在阅读」卡片才直接进阅读。
+                                Button {
+                                    selectedBookForDetail = book
                                 } label: {
                                     collectionBookLabel(book)
                                 }
