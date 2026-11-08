@@ -759,10 +759,16 @@ struct BookshelfView: View {
     }
 
     private func pinReturnOrder(placement: String) {
+        // 返回首页时 onAppear 会再次调用；内容没变就不写 @State，
+        // 否则会多触发一整轮 body 求值，返回手感直接变卡。
         if placement == "continue" {
-            deskReturnOrder = deskBooks.map(\.id)
+            let next = deskBooks.map(\.id)
+            guard deskReturnOrder != next else { return }
+            deskReturnOrder = next
         } else {
-            shelfReturnOrder = displayedShelfBooks.map(\.id)
+            let next = displayedShelfBooks.map(\.id)
+            guard shelfReturnOrder != next else { return }
+            shelfReturnOrder = next
         }
     }
 
@@ -1112,7 +1118,9 @@ private struct BookshelfCollectionView: View {
     }
 
     var body: some View {
-        ScrollView {
+        // 派生集合一次求值、全 body 复用：原来 body 内两处引用会各跑一遍 filter。
+        let displayBooks = liveDisplayBooks
+        return ScrollView {
             LazyVStack(spacing: 12) {
                 HStack(spacing: 8) {
                     Image(systemName: "magnifyingglass")
@@ -1152,14 +1160,14 @@ private struct BookshelfCollectionView: View {
                         }
                     }
                 }
-                if liveDisplayBooks.isEmpty {
+                if displayBooks.isEmpty {
                     EmptyStateCard(
                         systemImage: "books.vertical",
                         title: selectedGroupName == nil ? "\(title)暂无书籍" : "该分组暂无书籍",
                         message: selectedGroupName == nil ? "返回主页导入或搜索书籍后会显示在这里。" : "长按书籍可移动到其他分组。"
                     )
                 } else {
-                    ForEach(liveDisplayBooks) { book in
+                    ForEach(displayBooks) { book in
                         Group {
                             if isManaging {
                                 Button {
