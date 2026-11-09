@@ -22,7 +22,12 @@ struct BookshelfView: View {
     /// A pushed detail/reader keeps this view alive but offscreen. Store
     /// notifications must not rebuild the filter/sort while the reader is
     /// scrolling; `onAppear` refreshes once when the shelf comes back.
-    @State private var isShelfVisible = true
+    /// Reference flag: tab appear/disappear must not invalidate the whole shelf body.
+    @State private var shelfVisibility = ShelfVisibilityFlag()
+    private var isShelfVisible: Bool {
+        get { shelfVisibility.isVisible }
+        nonmutating set { shelfVisibility.isVisible = newValue }
+    }
     /// Store writes that landed while the shelf was pushed away. Without this
     /// flag every tab return re-filtered and re-sorted the whole shelf even
     /// when nothing had changed, stealing the first frames of the transition.
@@ -1168,6 +1173,10 @@ struct BookshelfView: View {
             }
         }
     }
+}
+
+private final class ShelfVisibilityFlag {
+    var isVisible = true
 }
 
 private struct BookshelfRefreshCandidate: Sendable {

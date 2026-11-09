@@ -17,6 +17,7 @@ struct FloatingReadingDesk: View {
     @ScaledMetric(relativeTo: .title2) private var metadataHeight: CGFloat = 72
     @ScaledMetric(relativeTo: .title2) private var titleFontSize: CGFloat = 22
     @State private var conservesEnergy = ProcessInfo.processInfo.isLowPowerModeEnabled || ProcessInfo.processInfo.thermalState.rawValue >= 2
+    @AppStorage(PerformanceMode.defaultsKey) private var performanceMode = false
 
     private var theme: AppVisualTheme { AppVisualTheme(rawValue: themeRaw) ?? .classic }
     private var palette: FloatingDeskPalette {
@@ -25,7 +26,7 @@ struct FloatingReadingDesk: View {
     }
     private var policy: FloatingDeskPolicy {
         .resolve(.init(reducesMotion: motion.reducesMotion, reducesTransparency: reducesTransparency,
-                 increasedContrast: contrast == .increased, conservesEnergy: conservesEnergy),
+                 increasedContrast: contrast == .increased, conservesEnergy: conservesEnergy || performanceMode),
                  hasLiquidGlass: AppThemeSurfaceStyle.nativeGlassAvailable)
     }
 

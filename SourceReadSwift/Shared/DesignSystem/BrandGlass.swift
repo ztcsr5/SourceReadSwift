@@ -6,6 +6,7 @@ struct BrandGlass<Outline: InsettableShape>: View {
     @AppStorage(AppVisualTheme.selectionKey) private var themeRaw = AppVisualTheme.initialSelection.rawValue
     @Environment(\.accessibilityReduceTransparency) private var reducesTransparency
     @Environment(\.colorSchemeContrast) private var contrast
+    @AppStorage(PerformanceMode.defaultsKey) private var performanceMode = false
 
     private var theme: AppVisualTheme { AppVisualTheme(rawValue: themeRaw) ?? .classic }
 
@@ -18,7 +19,7 @@ struct BrandGlass<Outline: InsettableShape>: View {
     }
 
     @ViewBuilder private var surface: some View {
-        if reducesTransparency || contrast == .increased {
+        if reducesTransparency || contrast == .increased || performanceMode {
             outline.fill(AppTheme.card)
         } else {
             // Liquid Glass's projected shadow is clipped by the book pager.

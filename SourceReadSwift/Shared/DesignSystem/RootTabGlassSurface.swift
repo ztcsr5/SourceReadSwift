@@ -6,13 +6,16 @@ struct RootTabGlassSurface<Outline: InsettableShape>: ViewModifier {
     var isInteractive = false
     @Environment(\.accessibilityReduceTransparency) private var reducesTransparency
     @Environment(\.colorSchemeContrast) private var contrast
+    @AppStorage(PerformanceMode.defaultsKey) private var performanceMode = false
 
-    static func requiresOpaque(reducesTransparency: Bool, increasedContrast: Bool) -> Bool {
-        reducesTransparency || increasedContrast
+    static func requiresOpaque(reducesTransparency: Bool, increasedContrast: Bool,
+                               performanceMode: Bool = false) -> Bool {
+        performanceMode || reducesTransparency || increasedContrast
     }
 
     @ViewBuilder func body(content: Content) -> some View {
-        if Self.requiresOpaque(reducesTransparency: reducesTransparency, increasedContrast: contrast == .increased) {
+        if Self.requiresOpaque(reducesTransparency: reducesTransparency, increasedContrast: contrast == .increased,
+                               performanceMode: performanceMode) {
             content
                 .background(outline.fill(Color(uiColor: .secondarySystemBackground)))
                 .overlay(outline.strokeBorder(.primary.opacity(0.20), lineWidth: 1).allowsHitTesting(false))

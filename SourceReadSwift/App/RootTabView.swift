@@ -10,6 +10,7 @@ struct RootTabView: View {
     @AppStorage("settings.secondaryAccentHex") private var secondaryAccentHex = "419BDC"
     @AppStorage(AppVisualTheme.selectionKey) private var visualTheme = AppVisualTheme.initialSelection.rawValue
     @AppStorage("settings.appearanceRevision") private var appearanceRevision = 0
+    @AppStorage(PerformanceMode.defaultsKey) private var performanceMode = false
     @Namespace private var tabSelection
     @State private var selectedTab = 0
     @State private var legacySearchRequest: UUID?
@@ -72,13 +73,13 @@ struct RootTabView: View {
     /// 26 以下继续用自绘栏，避免出现无玻璃的纯色条。
     private var usesNativeTabs: Bool {
         #if compiler(>=6.2)
-        if #available(iOS 26.0, *) { return true }
+        if #available(iOS 26.0, *), !performanceMode { return true }
         #endif
         return false
     }
 
     @ViewBuilder private var navigationContent: some View {
-        if #available(iOS 26.0, *) {
+        if #available(iOS 26.0, *), !performanceMode {
             nativeTabContent
         } else {
             legacyNavigationContent

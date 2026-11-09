@@ -21,7 +21,9 @@ enum AppThemeSurfaceStyle: Equatable {
         return false
     }
 
-    static func resolve(theme: AppVisualTheme, nativeGlassAvailable: Bool, reduceTransparency: Bool, increasedContrast: Bool) -> Self {
+    static func resolve(theme: AppVisualTheme, nativeGlassAvailable: Bool, reduceTransparency: Bool,
+                        increasedContrast: Bool, performanceMode: Bool = false) -> Self {
+        guard !performanceMode else { return .paper }
         guard theme.supportsLiveGlass, !reduceTransparency, !increasedContrast else { return .paper }
         return nativeGlassAvailable ? .nativeGlass : .legacyMaterial
     }
@@ -37,6 +39,7 @@ struct AppThemeSurface: ViewModifier {
     var usesLiveMaterial = false
     @AppStorage(AppVisualTheme.selectionKey) private var themeRawValue = AppVisualTheme.initialSelection.rawValue
     @AppStorage("settings.appearanceRevision") private var appearanceRevision = 0
+    @AppStorage(PerformanceMode.defaultsKey) private var performanceMode = false
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
     @Environment(\.colorSchemeContrast) private var contrast
 
@@ -44,12 +47,14 @@ struct AppThemeSurface: ViewModifier {
 
     @ViewBuilder func body(content: Content) -> some View {
         let _ = appearanceRevision
+        let _ = performanceMode
         let radius = theme.surfaceRadius(preferred: cornerRadius)
         // Repeated scrolling cards are opaque paper. Reserve live backdrop
         // sampling for a few explicit floating controls, not every list row.
         let style: AppThemeSurfaceStyle = usesLiveMaterial ? AppThemeSurfaceStyle.resolve(theme: theme,
             nativeGlassAvailable: AppThemeSurfaceStyle.nativeGlassAvailable,
-            reduceTransparency: reduceTransparency, increasedContrast: contrast == .increased) : .paper
+            reduceTransparency: reduceTransparency, increasedContrast: contrast == .increased,
+            performanceMode: performanceMode) : .paper
         #if compiler(>=6.2)
         if #available(iOS 26.0, *), style == .nativeGlass {
             content.glassEffect(.regular.tint(AppTheme.card.opacity(0.25)),
@@ -80,7 +85,7 @@ struct AppThemeSurface: ViewModifier {
         // A zero-opacity shadow is not free: SwiftUI still installs the
         // shadow layer and every scrolling row pays for its offscreen pass.
         // Leave the modifier off entirely when a caller opted out of depth.
-        if shadowOpacity > 0, !theme.isAtelier, theme != .inkwash, theme != .blueprint {
+        if shadowOpacity > 0, !performanceMode, !theme.isAtelier, theme != .inkwash, theme != .blueprint {
             surface.shadow(color: .black.opacity(shadowOpacity), radius: 6, x: 0, y: 3)
         } else {
             surface

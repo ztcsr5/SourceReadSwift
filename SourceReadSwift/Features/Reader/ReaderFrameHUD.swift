@@ -13,7 +13,7 @@ struct ReaderFrameHUD: View {
                     .font(.system(size: 15, weight: .semibold, design: .monospaced))
                 Text(String(format: "p99 %.1f ms", profiler.liveP99Milliseconds))
                     .font(.system(size: 12, weight: .medium, design: .monospaced))
-                Text("期望 \(profiler.screenMaximumHertz) Hz")
+                Text("请求 \(Int(AppRefreshRateKeeper.currentHeldRate)) / 上限 \(profiler.screenMaximumHertz)")
                     .font(.system(size: 11, weight: .regular, design: .monospaced))
                     .opacity(0.7)
             }

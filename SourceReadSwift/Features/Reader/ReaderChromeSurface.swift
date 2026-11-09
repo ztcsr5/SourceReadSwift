@@ -13,16 +13,19 @@ struct ReaderChromeSurface: ViewModifier {
     @AppStorage("reader.menuUsesWallpaper") private var usesWallpaper = false
     @AppStorage("reader.menuPaperOpacity") private var paperOpacity = 0.97
     @AppStorage("reader.background") private var backgroundRaw = ReaderBackground.white.rawValue
+    @AppStorage(PerformanceMode.defaultsKey) private var performanceMode = false
 
     static func permitsTranslucency(reduceTransparency: Bool, increasedContrast: Bool,
-                                    menuStyle: String, usesWallpaper: Bool) -> Bool {
-        !reduceTransparency && !increasedContrast && menuStyle == "system" && !usesWallpaper
+                                    menuStyle: String, usesWallpaper: Bool,
+                                    performanceMode: Bool = false) -> Bool {
+        !performanceMode && !reduceTransparency && !increasedContrast && menuStyle == "system" && !usesWallpaper
     }
 
     static func usesNativeGlass(reduceTransparency: Bool, increasedContrast: Bool = false,
-                                menuStyle: String = "system", usesWallpaper: Bool = false) -> Bool {
+                                menuStyle: String = "system", usesWallpaper: Bool = false,
+                                performanceMode: Bool = false) -> Bool {
         guard permitsTranslucency(reduceTransparency: reduceTransparency, increasedContrast: increasedContrast,
-            menuStyle: menuStyle, usesWallpaper: usesWallpaper) else { return false }
+            menuStyle: menuStyle, usesWallpaper: usesWallpaper, performanceMode: performanceMode) else { return false }
         #if compiler(>=6.2)
         if #available(iOS 26.0, *) { return true }
         #endif
@@ -31,7 +34,7 @@ struct ReaderChromeSurface: ViewModifier {
 
     @ViewBuilder func body(content: Content) -> some View {
         if Self.permitsTranslucency(reduceTransparency: reduceTransparency, increasedContrast: contrast == .increased,
-            menuStyle: menuStyle, usesWallpaper: usesWallpaper) {
+            menuStyle: menuStyle, usesWallpaper: usesWallpaper, performanceMode: performanceMode) {
             translucent(content)
         } else {
             opaque(content)

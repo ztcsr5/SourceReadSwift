@@ -8,6 +8,7 @@ struct SettingsView: View {
     // AppearanceSettingsView; keeping this binding updates the whole screen.
     @AppStorage("settings.themeMode") private var themeModeRawValue = ThemeMode.system.rawValue
     @AppStorage("settings.developerDiagnostics") private var developerDiagnosticsEnabled = false
+    @AppStorage(PerformanceMode.defaultsKey) private var performanceModeEnabled = false
     @ObservedObject private var proxyManager = SourceProxyManager.shared
     @AppStorage("app.hapticsEnabled") private var hapticsEnabled = false
     @AppStorage("search_concurrent_threads") private var searchThreads = 12
@@ -214,6 +215,7 @@ struct SettingsView: View {
                 Section {
                     Toggle("开发者调试", isOn: $developerDiagnosticsEnabled)
                     if developerDiagnosticsEnabled {
+                        Toggle("性能优先（关闭玻璃与系统 Tab 栏）", isOn: $performanceModeEnabled)
                         NavigationLink {
                             ReaderPerformanceDiagnosticsView()
                         } label: {
@@ -235,7 +237,7 @@ struct SettingsView: View {
                 } header: {
                     Text("诊断")
                 } footer: {
-                    Text("开发者调试默认关闭；不开启不会启动帧率或滚动采样。开启后才显示采样入口，采样最多 30 秒，退后台即停止。")
+                    Text("开发者调试默认关闭；不开启不会启动帧率或滚动采样。开启后才显示采样入口，采样最多 30 秒，退后台即停止。性能优先仅用于对照：它把玻璃表面换成纸张，并退回自绘 Tab 栏，用来判断掉帧来自合成还是主线程。")
                 }
                 .listRowBackground(AppThemeRowSurface())
             }

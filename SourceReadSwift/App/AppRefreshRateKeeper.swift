@@ -12,6 +12,10 @@ import QuartzCore
 final class AppRefreshRateKeeper: UIView {
     private var link: CADisplayLink?
 
+    /// Read by the frame HUD. This is the rate the app actually asked for,
+    /// which must be distinguished from the screen's reported ceiling.
+    private(set) static var currentHeldRate: Float = 0
+
     var isHolding: Bool { link != nil }
     private(set) var heldRate: Float = 0
     private var observingResume = false
@@ -48,6 +52,7 @@ final class AppRefreshRateKeeper: UIView {
         displayLink.add(to: .main, forMode: .common)
         link = displayLink
         heldRate = rate
+        Self.currentHeldRate = rate
         #if DEBUG
         accessibilityValue = String(Int(rate))
         #endif
@@ -57,6 +62,7 @@ final class AppRefreshRateKeeper: UIView {
         link?.invalidate()
         link = nil
         heldRate = 0
+        Self.currentHeldRate = 0
     }
 
     override func didMoveToWindow() {
