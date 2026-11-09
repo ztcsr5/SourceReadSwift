@@ -112,17 +112,17 @@ struct ReaderView: View {
     @State private var tapPageTurnRequest: ReaderPageTurnRequest?
     @State private var autoScrollTask: Task<Void, Never>?
     @State private var sleepTimerTask: Task<Void, Never>?
-    @State private var positionPersistTask: Task<Void, Never>?
+    @State private var positionPersistScheduler = ReaderPositionPersistScheduler()
     @State private var pageLayoutTask: Task<Void, Never>?
     /// Chapters wait in this queue instead of all hitting the source at once.
     /// Nearest-first, one at a time: a distant prefetch can never finish ahead
     /// of the chapter the reader is about to cross into.
-    @State private var prefetchQueue: [Int] = []
-    @State private var prefetchTask: Task<Void, Never>?
+    @State private var prefetchState = ReaderPrefetchState()
     @State private var backgroundChapterPrecache = ReaderBackgroundChapterPrecache()
     @State private var paginationWarmupTask: Task<Void, Never>?
     @State private var paginationWarmupGeneration = 0
-    @State private var prefetchGeneration = 0
+    // Prefetch bookkeeping lives in `prefetchState`; writing it in `@State`
+    // invalidated the reader while a fling was in flight.
     @State private var paragraphJumpRequest: ParagraphJumpRequest?
     @State private var pagedBlocksCache: [ReaderPageBlock] = []
     @State private var pagedBlocksCacheKey = ""
@@ -683,7 +683,7 @@ struct ReaderView: View {
         chapterSeekTask = nil
         tocScrollTask?.cancel()
         tocScrollTask = nil
-        positionPersistTask?.cancel()
+        positionPersistScheduler.cancel()
         pageLayoutTask?.cancel()
         cancelPrefetch()
         cancelPaginationWarmup()
@@ -1362,8 +1362,7 @@ struct ReaderView: View {
         .onChange(of: scenePhase) { phase in
             guard !readerSessionEnded else { return }
             if phase != .active {
-                positionPersistTask?.cancel()
-                positionPersistTask = nil
+                positionPersistScheduler.cancel()
                 appState.finishReadingWritesInBackground {
                     pauseReadingActivity()
                     persistReadingPosition(paragraphIndexOverride: currentParagraphIndexForPersistence())
@@ -1478,8 +1477,7 @@ struct ReaderView: View {
             // The rebuild restored the UTF-16 anchor. A paragraph-to-page
             // mapping here would undo that restoration on every mode switch.
             if readerMode != .scroll { reportCoverVisibleIdentity(pagedPageIndex) }
-            positionPersistTask?.cancel()
-            positionPersistTask = nil
+            positionPersistScheduler.cancel()
             // The scroll target is window-flat; the sidecar always stores
             // the chapter-local cursor resolved from the committed surface.
             persistReadingPosition()
@@ -1906,7 +1904,17 @@ struct ReaderView: View {
             },
             onScrollInteractionChanged: { active in
                 interactionGate.isScrollInteractionActive = active
-                guard !active, !readerSessionEnded, interactionGate.scrollTrimDeferred else { return }
+                guard !active else { return }
+                if !interactionGate.deferredWindowSections.isEmpty {
+                    let deferred = interactionGate.deferredWindowSections
+                    interactionGate.deferredWindowSections.removeAll()
+                    for section in deferred { upsertWindowSection(section) }
+                }
+                if let pending = interactionGate.pendingScrollChapterIndex {
+                    interactionGate.pendingScrollChapterIndex = nil
+                    adoptScrollChapterCursor(pending)
+                }
+                guard !readerSessionEnded, interactionGate.scrollTrimDeferred else { return }
                 interactionGate.scrollTrimDeferred = false
                 trimWindowIfNeeded()
             },
@@ -2169,44 +2177,44 @@ struct ReaderView: View {
     /// exactly when the reader crossed the boundary. A serial queue also
     /// keeps a large preload setting from bursting the source with requests.
     private func queuePrefetch(_ indices: [Int]) {
-        prefetchQueue = indices.filter { index in
+        prefetchState.queue = indices.filter { index in
             !windowSections.contains { $0.chapterIndex == index && $0.isReady }
                 && !windowLoadingIndices.contains(index)
         }
-        guard !prefetchQueue.isEmpty else { return }
-        guard prefetchTask == nil else { return }
+        guard !prefetchState.queue.isEmpty else { return }
+        guard prefetchState.task == nil else { return }
         let generation = windowGeneration
-        prefetchGeneration &+= 1
-        let token = prefetchGeneration
-        prefetchTask = Task { @MainActor in
+        prefetchState.generation &+= 1
+        let token = prefetchState.generation
+        prefetchState.task = Task { @MainActor in
             // Let the first document/page commit before neighbouring chapters
             // start patching it. Cancellation still takes effect immediately.
             try? await Task.sleep(nanoseconds: 180_000_000)
-            while !prefetchQueue.isEmpty,
+            while !prefetchState.queue.isEmpty,
                   !Task.isCancelled,
-                  prefetchGeneration == token,
+                  prefetchState.generation == token,
                   windowGeneration == generation {
                 // One runloop between chapters: DOM patches and page
                 // rebuilds are main-actor work, and a back-to-back burst is
                 // what made neighbour prefetch stutter.
                 await Task.yield()
-                let index = prefetchQueue.removeFirst()
+                let index = prefetchState.queue.removeFirst()
                 if windowSections.contains(where: { $0.chapterIndex == index && $0.isReady }) { continue }
                 if windowLoadingIndices.contains(index) { continue }
                 await loadWindowChapterNow(index, generation: generation)
             }
-            if prefetchGeneration == token {
-                prefetchTask = nil
+            if prefetchState.generation == token {
+                prefetchState.task = nil
             }
         }
     }
 
     private func cancelPrefetch() {
         backgroundChapterPrecache.cancel()
-        prefetchGeneration &+= 1
-        prefetchTask?.cancel()
-        prefetchTask = nil
-        prefetchQueue.removeAll()
+        prefetchState.generation &+= 1
+        prefetchState.task?.cancel()
+        prefetchState.task = nil
+        prefetchState.queue.removeAll()
     }
 
     private func cancelPaginationWarmup() {
@@ -2642,6 +2650,15 @@ struct ReaderView: View {
     }
 
     private func upsertWindowSection(_ section: ReaderChapterSection) {
+        // A network chapter arriving mid-fling changes the whole window's
+        // paragraph mapping and rebuilds the reader body. The WebView already
+        // defers the DOM patch; defer the SwiftUI mutation to the same moment
+        // so the frame budget belongs to the scroll, not to bookkeeping.
+        if readerMode == .scroll, interactionGate.isScrollInteractionActive,
+           pendingWindowJump == nil {
+            interactionGate.deferredWindowSections.append(section)
+            return
+        }
         if pendingWindowJump?.chapterIndex == section.chapterIndex {
             // A distant selection is a foreground transaction, not an append
             // to the old cursor. Do not lay out/prewarm the abandoned window
@@ -2876,12 +2893,31 @@ struct ReaderView: View {
         scrollPositionTracker.visibleIndex = safeIndex
         let resolved = resolvedReadingPosition(forFlatIndex: safeIndex)
         if resolved.chapterIndex != windowCurrentChapterIndex {
-            windowCurrentChapterIndex = resolved.chapterIndex
-            prefetchWindow(around: resolved.chapterIndex)
-            trimWindowIfNeeded()
-            touchChapterCache(resolved.chapterIndex)
+            if interactionGate.isScrollInteractionActive {
+                // The chapter cursor drives the header and a full SwiftUI body
+                // pass. Committing it mid-fling turned every chapter crossing
+                // into a hitch; keep it in the reference box and adopt it once
+                // the deceleration ends. Prefetch and the cache LRU touch are
+                // deferred with it because both also write window/cache state.
+                if interactionGate.pendingScrollChapterIndex != resolved.chapterIndex {
+                    interactionGate.pendingScrollChapterIndex = resolved.chapterIndex
+                }
+            } else {
+                adoptScrollChapterCursor(resolved.chapterIndex)
+            }
         }
         scheduleReadingPositionPersistence()
+    }
+
+    /// Commits a chapter cursor that was held back during a fling. Running the
+    /// same three follow-ups here keeps prefetch, retention and the header in
+    /// agreement no matter where the crossing happened.
+    private func adoptScrollChapterCursor(_ chapter: Int) {
+        guard chapter != windowCurrentChapterIndex else { return }
+        windowCurrentChapterIndex = chapter
+        prefetchWindow(around: chapter)
+        trimWindowIfNeeded()
+        touchChapterCache(chapter)
     }
 
     /// Adopts the chapter shown by a freshly built page model. Page-curl moves
@@ -5533,7 +5569,7 @@ struct ReaderView: View {
             cancelPaginationWarmup()
             pageLayoutTask?.cancel()
             pageLayoutTask = nil
-            positionPersistTask?.cancel()
+            positionPersistScheduler.cancel()
             pendingWindowJump = ReaderPendingChapterJump(chapterIndex: index, paragraphIndex: paragraphIndex, startAtEnd: false)
             let requestID = chapterJumpRequestID
             let generation = windowGeneration
@@ -5629,12 +5665,12 @@ struct ReaderView: View {
         if windowLoadingIndices.contains(index) {
             // If this exact chapter is already being prefetched, promote its
             // in-flight request instead of cancelling it and waiting for retry.
-            prefetchQueue.removeAll()
+            prefetchState.queue.removeAll()
         } else {
             cancelPrefetch()
         }
         cancelPaginationWarmup()
-        positionPersistTask?.cancel()
+        positionPersistScheduler.cancel()
         loadWindowChapter(index)
     }
 
@@ -6434,15 +6470,17 @@ struct ReaderView: View {
     }
 
     private func scheduleReadingPositionPersistence() {
-        positionPersistTask?.cancel()
-        positionPersistTask = Task { @MainActor in
-            try? await Task.sleep(nanoseconds: ReaderPerformancePolicy.positionPersistenceDebounceNanoseconds)
-            guard !Task.isCancelled else { return }
+        // The scroll callback fires about eight times a second. Cancelling and
+        // rebuilding a `@State` Task on every callback invalidated the whole
+        // reader body just to schedule the same deferred write. The scheduler
+        // extends a single deadline inside a reference box instead.
+        positionPersistScheduler.schedule(
+            debounceNanoseconds: ReaderPerformancePolicy.positionPersistenceDebounceNanoseconds
+        ) {
             // Capture chapter and paragraph together after the debounce.
             // A previously captured local paragraph may belong to another chapter.
             persistReadingPosition()
             checkDailyReadingGoal()
-            positionPersistTask = nil
         }
     }
 
@@ -7016,6 +7054,46 @@ final class ReaderVisiblePageTracker {
     var key: String?
 }
 
+/// Reference-boxed prefetch bookkeeping. These values are never rendered, so
+/// putting them in `@State` only made each prefetch pass rebuild the reader.
+final class ReaderPrefetchState {
+    var queue: [Int] = []
+    var task: Task<Void, Never>?
+    var generation = 0
+}
+
+/// Debounces reading-position writes without touching SwiftUI state on every
+/// scroll callback. A single task extends its deadline while the finger is
+/// moving, then writes once the reader settles.
+final class ReaderPositionPersistScheduler {
+    private var task: Task<Void, Never>?
+    private var revision = 0
+
+    func schedule(debounceNanoseconds: UInt64, action: @escaping @MainActor () -> Void) {
+        revision &+= 1
+        guard task == nil else { return }
+        task = Task { @MainActor [weak self] in
+            guard let self else { return }
+            while !Task.isCancelled {
+                let expected = revision
+                try? await Task.sleep(nanoseconds: debounceNanoseconds)
+                guard !Task.isCancelled else { break }
+                if expected != revision { continue }
+                action()
+                task = nil
+                return
+            }
+            task = nil
+        }
+    }
+
+    func cancel() {
+        revision &+= 1
+        task?.cancel()
+        task = nil
+    }
+}
+
 /// Mutable gesture state that must not invalidate the SwiftUI reader tree.
 /// `PageCurlReaderView` reports the start and end of a page turn from a UIKit
 /// delegate callback; storing that in `@State` re-evaluates the entire reader
@@ -7025,6 +7103,13 @@ final class ReaderInteractionGate {
     var rebuildDeferred = false
     var isScrollInteractionActive = false
     var scrollTrimDeferred = false
+    /// The chapter under the reading line while a fling is in flight. Holding
+    /// it here instead of `@State` keeps the chapter transition from
+    /// re-evaluating the whole reader body in the middle of a scroll frame.
+    var pendingScrollChapterIndex: Int?
+    /// Chapters that finished downloading while a fling was in flight. Applied
+    /// in one batch when the interaction ends.
+    var deferredWindowSections: [ReaderChapterSection] = []
 }
 
 /// Bounded attributed-string cache keyed by stable page identity. Mutated

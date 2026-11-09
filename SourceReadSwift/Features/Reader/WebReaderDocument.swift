@@ -788,6 +788,7 @@ enum WebReaderHTML {
         highlightEl: null,
         lastScrollAt: 0,
         visiblePostTimer: null,
+        scrollIdleTimer: null,
         reachTop: false,
         nearTop: false,
         nearBottom: false,
@@ -1111,19 +1112,30 @@ enum WebReaderHTML {
         // fresh layout, instead of re-measuring the whole window on every
         // chapter arrival (the 60 Hz hitch at chapter boundaries).
         var targetedMetricsNode = null;
-        var targetedMetricsEligible = state.order.length === payload.sections.length;
+        // The window normally grows by one chapter while an existing loading
+        // placeholder resolves to real prose in the same patch. That keeps the
+        // old order as a prefix, so only the first changed section and its
+        // suffix need measuring. Requiring equal lengths made every ordinary
+        // chapter boundary fall back to a full-document layout pass.
+        var targetedMetricsEligible = payload.sections.length >= state.order.length;
 
         for (var index = 0; index < payload.sections.length; index += 1) {
           var section = payload.sections[index];
           var existing = state.sections[section.key];
           var resolvesBody = canResolveChapterBody(existing, section);
-          if (state.order[index] !== section.key || !existing) { targetedMetricsEligible = false; }
-          if (existing && existing.classList.contains("first") !== section.first) { targetedMetricsEligible = false; }
-          if (existing && existing.getAttribute("data-sig") !== section.sig && !resolvesBody) {
+          if (index < state.order.length) {
+            if (state.order[index] !== section.key || !existing) { targetedMetricsEligible = false; }
+            if (existing && existing.classList.contains("first") !== section.first) { targetedMetricsEligible = false; }
+            if (existing && existing.getAttribute("data-sig") !== section.sig && !resolvesBody) {
+              targetedMetricsEligible = false;
+            }
+            if (resolvesBody && state.order[index] === section.key && !targetedMetricsNode) {
+              targetedMetricsNode = existing.firstElementChild;
+            }
+          } else if (existing) {
+            // A new tail key that already has a node means the old order was
+            // not a real prefix; do not trust suffix geometry in that case.
             targetedMetricsEligible = false;
-          }
-          if (resolvesBody && !targetedMetricsNode) {
-            targetedMetricsNode = existing.firstElementChild;
           }
           if (existing && existing.getAttribute("data-sig") === section.sig) {
             rebaseSection(existing, section);
@@ -1366,7 +1378,7 @@ enum WebReaderHTML {
         return best;
       }
 
-      function reportVisiblePosition(now) {
+      function reportVisiblePosition(now, preciseOffset) {
         var metric = metricAt(window.scrollY + topInset() + 4);
         if (!metric) { return false; }
         // A divider's flat slot maps to the preceding chapter in the paged
@@ -1380,7 +1392,21 @@ enum WebReaderHTML {
         window.clearTimeout(state.visiblePostTimer);
         state.visiblePostTimer = null;
         state.lastVisiblePostAt = now;
-        var offset = visibleTextOffset(metric.element);
+        var previousFlat = state.visible;
+        var previousRevision = state.visibleRevision;
+        var previousOffset = state.visibleOffset || 0;
+        // `visibleTextOffset` binary-searches characters and calls
+        // getBoundingClientRect on each step. Running that every 120 ms while
+        // the scroll view is moving forces synchronous layout in the middle of
+        // a fling. Paragraph identity is enough in motion; the exact character
+        // offset is sampled once the scroll settles.
+        var precise = preciseOffset !== false;
+        var offset = 0;
+        if (precise) {
+          offset = visibleTextOffset(metric.element);
+        } else if (previousFlat === metric.flat && previousRevision === state.revision) {
+          offset = previousOffset;
+        }
         if (state.visible === metric.flat && state.visibleOffset === offset
             && state.visibleRevision === state.revision) { return true; }
         state.visible = metric.flat;
@@ -1390,13 +1416,25 @@ enum WebReaderHTML {
         return true;
       }
 
+      function sampleVisibleWhenIdle() {
+        var idleFor = performance.now() - (state.lastScrollAt || 0);
+        if (idleFor < 180) {
+          state.scrollIdleTimer = window.setTimeout(sampleVisibleWhenIdle, Math.max(16, 180 - idleFor));
+          return;
+        }
+        state.scrollIdleTimer = null;
+        window.clearTimeout(state.visiblePostTimer);
+        state.visiblePostTimer = null;
+        reportVisiblePosition(performance.now(), true);
+      }
+
       function onScroll() {
         var y = window.scrollY;
         var viewport = window.innerHeight;
         var height = document.documentElement.scrollHeight;
         var now = performance.now();
         if (state.nodes.length && now - (state.lastVisiblePostAt || 0) >= 120) {
-          reportVisiblePosition(now);
+          reportVisiblePosition(now, false);
         }
         var bottom = y + viewport;
         // 预取要早于「看不见下一章」的那一刻：离末尾还剩约 3.5 屏就开始要下一章，
@@ -1434,6 +1472,11 @@ enum WebReaderHTML {
         var now = performance.now();
         state.lastScrollAt = now;
         checkTopBounce(window.scrollY);
+        // A setTimeout per scroll event is 120 timer allocations a second.
+        // Keep one timer alive and re-arm it for the remaining idle window.
+        if (state.scrollIdleTimer === null) {
+          state.scrollIdleTimer = window.setTimeout(sampleVisibleWhenIdle, 180);
+        }
         if (state.visiblePostTimer !== null) { return; }
         var wait = Math.max(0, 125 - (now - (state.lastVisiblePostAt || 0)));
         state.visiblePostTimer = window.setTimeout(function () {
