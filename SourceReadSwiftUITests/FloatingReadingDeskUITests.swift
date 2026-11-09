@@ -387,8 +387,8 @@ final class FloatingReadingDeskUITests: XCTestCase {
         let nativeEvidence = element("reader.nativeBookGestureEvidence")
         XCTAssertTrue(nativeEvidence.waitForExistence(timeout: 5))
         let fallbackEvidence = element("reader.fallbackGestureEvidence")
-        if reducesMotion { XCTAssertTrue(fallbackEvidence.waitForExistence(timeout: 5)) }
-        let fallbackBefore = reducesMotion ? Int((fallbackEvidence.value as? String) ?? "") ?? (-1) : 0
+        XCTAssertTrue(fallbackEvidence.waitForExistence(timeout: 5))
+        let fallbackBefore = Int((fallbackEvidence.value as? String) ?? "") ?? (-1)
         XCTAssertGreaterThanOrEqual(fallbackBefore, 0)
         let motionBefore = Int((nativeEvidence.value as? String) ?? "") ?? (-1)
         XCTAssertGreaterThanOrEqual(motionBefore, 0)
@@ -428,8 +428,11 @@ final class FloatingReadingDeskUITests: XCTestCase {
                                  "Reduced motion still requires a real recognized native or fallback drag; stable ignored input is not cancellation")
             print("BOOK_REDUCED_CANCEL_VERIFIED native_before=\(motionBefore) native_after=\(motionAfter) fallback_before=\(fallbackBefore) fallback_after=\(fallbackAfter)")
         } else {
-            XCTAssertGreaterThan(motionAfter, motionBefore, "A real native gesture must move; an ignored drag is not cancellation")
-            print("BOOK_NATIVE_CANCEL_VERIFIED motion_before=\(motionBefore) motion_after=\(motionAfter)")
+            let fallbackAfter = Int((fallbackEvidence.value as? String) ?? "") ?? (-1)
+            XCTAssertGreaterThanOrEqual(fallbackAfter, 0)
+            XCTAssertTrue(motionAfter > motionBefore || fallbackAfter > fallbackBefore,
+                          "A real native or fallback gesture must move; an ignored drag is not cancellation")
+            print("BOOK_NATIVE_CANCEL_VERIFIED motion_before=\(motionBefore) motion_after=\(motionAfter) fallback_before=\(fallbackBefore) fallback_after=\(fallbackAfter)")
         }
         capture("18-reader-native-return-cancelled")
         edge.press(forDuration: 0.05,

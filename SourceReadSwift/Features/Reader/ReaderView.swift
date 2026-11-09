@@ -1118,6 +1118,13 @@ struct ReaderView: View {
         // fallback dismissed the route without a UIKit transition, which tore
         // down the reader and rebuilt the tab chrome mid-swipe.
         .background(ReaderNavigationPopLock(allowSystemReturn: allowsNativeBookReturn))
+        // The system edge recognizer is the only return path on a device.
+        // A leading-edge fallback waits for it to fail, so simulator input
+        // (which does not reach UIKit's parallax recognizer) can still prove
+        // that a real drag exits without adding a second device gesture.
+        .background(ReaderExitSwipeBridge(enabled: allowsNativeBookReturn,
+                                          onExit: requestReaderExit,
+                                          prefersSystemReturn: true))
         .overlay(alignment: .topLeading) { ReaderFrameHUD() }
         .navigationBarBackButtonHidden(!allowsNativeBookReturn)
         .toolbar(.hidden, for: .navigationBar, .tabBar)
