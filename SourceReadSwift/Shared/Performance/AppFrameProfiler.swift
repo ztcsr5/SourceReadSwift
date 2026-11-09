@@ -94,8 +94,14 @@ final class AppFrameProfiler: ObservableObject {
         guard !isRecording else { return }
         histogram = AppFrameHistogram()
         cadence = AppFrameCadence()
-        maximum = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }
-            .first { $0.activationState == .foregroundActive }?.screen.maximumFramesPerSecond ?? 60
+        // Match the keeper: `UIScreen.main` and a just-created scene can both
+        // report 60 before the real ProMotion screen is attached. Sample the
+        // active scenes, fall back to every connected scene, and take the
+        // highest ceiling so the HUD never labels a 120 Hz device as 60.
+        let scenes = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }
+        let activeScenes = scenes.filter { $0.activationState == .foregroundActive }
+        let rates = (activeScenes.isEmpty ? scenes : activeScenes).map { $0.screen.maximumFramesPerSecond }
+        maximum = min(max(rates.max() ?? 60, 60), 120)
         startingPower = ProcessInfo.processInfo.isLowPowerModeEnabled
         startingThermal = ProcessInfo.processInfo.thermalState.rawValue
         let duration = duration.isFinite ? min(max(duration, 0.01), 30) : 30
