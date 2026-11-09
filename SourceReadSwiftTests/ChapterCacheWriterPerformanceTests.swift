@@ -4,7 +4,7 @@ import XCTest
 
 @MainActor
 final class ChapterCacheWriterPerformanceTests: XCTestCase {
-    func testLRUTouchPublishesOneCompleteCacheSnapshot() throws {
+    func testLRUTouchPersistsCompleteSnapshotWithoutInvalidatingViews() throws {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         defer { try? FileManager.default.removeItem(at: root) }
         let persistence = ChapterContentCachePersistence(rootURL: root)
@@ -14,11 +14,12 @@ final class ChapterCacheWriterPerformanceTests: XCTestCase {
             store.save(ChapterContent(chapter: chapter, title: chapter.title, paragraphs: ["正文"], nextContentUrl: nil),
                 sourceURL: "source", purifyRules: [])
         }
-        var published: [[String]] = []
-        let subscription = store.$entries.dropFirst().sink { published.append($0.map(\.chapterURL)) }
+        var notifications = 0
+        let subscription = store.objectWillChange.sink { notifications += 1 }
         defer { subscription.cancel() }
         store.markRead(sourceURL: "source", chapter: chapters[0], purifyRules: [])
-        XCTAssertEqual(published, [["chapter-0", "chapter-1"]])
+        XCTAssertEqual(notifications, 0, "An LRU touch must not redraw offscreen cache views")
+        XCTAssertEqual(store.entries.map(\.chapterURL), ["chapter-0", "chapter-1"])
         XCTAssertEqual(try persistence.load().map(\.chapterURL), ["chapter-0", "chapter-1"])
     }
 

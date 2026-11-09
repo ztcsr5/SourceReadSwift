@@ -28,9 +28,9 @@ struct DiscoverView: View {
     /// JSON decode (and two array copies) on every layout pass of the search tab,
     /// including every streaming update during a search.
     @State private var cachedSearchHistory: [String] = []
-    /// AppState no longer relays shelf writes; membership badges subscribe to
-    /// the store themselves so adding a book still updates the result row.
-    @State private var shelfMembershipRevision = 0
+    /// Progress changes do not change search-result membership. Keep the
+    /// snapshot so an offscreen Discover tab is not redrawn on every save.
+    @State private var cachedShelfMembership: BookshelfMembership?
 
     private static func decodeSearchHistory(_ json: String) -> [String] {
         guard let data = json.data(using: .utf8),
@@ -230,8 +230,9 @@ struct DiscoverView: View {
             .onAppear {
                 checkClipboard()
             }
-            .onReceive(appState.bookshelfStore.$books.dropFirst()) { _ in
-                shelfMembershipRevision &+= 1
+            .onReceive(appState.bookshelfStore.$books) { books in
+                let membership = BookshelfMembership(books: books)
+                if cachedShelfMembership != membership { cachedShelfMembership = membership }
             }
             .alert("书源导入结果", isPresented: Binding(
                 get: { clipboardImportToast != nil },
@@ -661,17 +662,14 @@ struct DiscoverView: View {
     /// stutter. The predicate deliberately mirrors `BookshelfStore.resolvedIndex`
     /// (exact `id`, else `local://` rows matched by `bookURL`).
     private var bookshelfMembership: BookshelfMembership {
-        _ = shelfMembershipRevision
-        return BookshelfMembership(store: appState.bookshelfStore)
+        cachedShelfMembership ?? BookshelfMembership(books: appState.bookshelfStore.books)
     }
 
-    @MainActor
-    private struct BookshelfMembership {
+    struct BookshelfMembership: Equatable {
         private let ids: Set<String>
         private let localBookURLs: Set<String>
 
-        init(store: BookshelfStore) {
-            let books = store.books
+        init(books: [BookshelfBook]) {
             ids = Set(books.map(\.id))
             localBookURLs = Set(books.map(\.bookURL))
         }

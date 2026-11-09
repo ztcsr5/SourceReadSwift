@@ -1194,7 +1194,7 @@ enum WebReaderHTML {
         if (resetOpeningPosition) {
           resetScroll();
         } else {
-          if (reportsOpeningPosition) { reportVisiblePosition(performance.now()); }
+          if (reportsOpeningPosition) { reportVisiblePosition(performance.now(), true, false); }
           window.requestAnimationFrame(onScroll);
         }
         return true;
@@ -1279,9 +1279,10 @@ enum WebReaderHTML {
         };
       }
 
-      function metricAt(y) {
+      function metricAt(y, allowMetricsRebuild) {
         var list = state.nodes;
         if (!list.length) { return null; }
+        if (state.metricsDirty && allowMetricsRebuild === false) { return liveMetricAt(y); }
         ensureMetrics();
         var tops = state.metricTops;
         var low = 0;
@@ -1303,8 +1304,7 @@ enum WebReaderHTML {
         return nodeMetric(picked);
       }
 
-      // 滚动中每帧只做一次批量读布局，而不是二分查找里逐次
-      // getBoundingClientRect（每次都是强制同步布局，直接吃掉帧预算）。
+      // A clean cache avoids geometry queries for offscreen paragraphs.
       // `fromIndex` keeps a measured prefix: a chapter body arriving below the
       // reader only changes the geometry from that chapter downward.
       function invalidateMetrics(fromIndex) {
@@ -1337,30 +1337,36 @@ enum WebReaderHTML {
         state.metricsInvalidFrom = 0;
       }
 
-      function cachedVisibleMetric() {
-        var element = state.lastMetricElement;
-        if (!element || !element.isConnected || !state.lastMetricKey) { return null; }
-        var rect = element.getBoundingClientRect();
-        return {
-          flat: state.visible,
-          local: state.lastMetricLocal,
-          key: state.lastMetricKey,
-          element: element,
-          top: rect.top + window.scrollY,
-          height: Math.max(rect.height, 1)
-        };
+      function liveMetricAt(y) {
+        // Appends/images invalidate the table during a fling. Search the live
+        // ordered nodes in O(log N) queries without rebuilding all N metrics or
+        // freezing progress until idle. Reads are consecutive with no DOM writes;
+        // WebKit may still need one layout to service the first geometry query.
+        var low = 0;
+        var high = state.nodes.length - 1;
+        var found = -1;
+        var bottom = 0;
+        var scrollY = window.scrollY;
+        while (low <= high) {
+          var middle = (low + high) >> 1;
+          var rect = state.nodes[middle].getBoundingClientRect();
+          if (rect.top + scrollY <= y) {
+            found = middle;
+            bottom = rect.bottom + scrollY;
+            low = middle + 1;
+          } else { high = middle - 1; }
+        }
+        if (found < 0) { found = 0; }
+        else if (bottom <= y && found + 1 < state.nodes.length) { found += 1; }
+        return nodeMetric(state.nodes[found]);
       }
 
       function captureAnchor() {
         if (!state.nodes.length) { return null; }
-        // Content can arrive in the middle of a fling. Reuse the last reported
-        // paragraph and read one rect instead of rebuilding the whole metric
-        // table before the document patch.
-        var metric = null;
-        if (state.metricsDirty && performance.now() - (state.lastScrollAt || 0) < 320) {
-          metric = cachedVisibleMetric();
-        }
-        if (!metric) { metric = metricAt(window.scrollY + topInset() + 1); }
+        // The last bridge report can be several screens behind a fast fling.
+        // Anchor the current viewport, not that stale paragraph.
+        var isMoving = performance.now() - (state.lastScrollAt || 0) < 320;
+        var metric = metricAt(window.scrollY + topInset() + 1, !isMoving);
         if (!metric) { return null; }
         var offset = window.scrollY + topInset() + 1 - metric.top;
         return {
@@ -1413,15 +1419,7 @@ enum WebReaderHTML {
       }
 
       function reportVisiblePosition(now, preciseOffset, allowMetricsRebuild) {
-        // A dirty cache means the next metricAt() would walk every paragraph
-        // with getBoundingClientRect. Doing that inside a fling is the exact
-        // forced-layout hitch at chapter boundaries. In-motion reports use the
-        // previous metric; the idle sampler rebuilds once the finger is up.
-        if (state.metricsDirty && allowMetricsRebuild === false && state.lastVisiblePostAt > 0) {
-          state.lastVisiblePostAt = now;
-          return false;
-        }
-        var metric = metricAt(window.scrollY + topInset() + 4);
+        var metric = metricAt(window.scrollY + topInset() + 4, allowMetricsRebuild);
         if (!metric) { return false; }
         // A divider's flat slot maps to the preceding chapter in the paged
         // model. Scroll progress must instead name the title's own prose.
@@ -1689,7 +1687,8 @@ enum WebReaderHTML {
           post({ type: "scroll-applied", flat: flat, requestKey: requestKey });
           // Compositor frames can pause while a native transition covers the
           // reader. Commit the acknowledged position before relying on rAF.
-          reportVisiblePosition(performance.now());
+          // Readiness needs the visible line, not every offscreen paragraph.
+          reportVisiblePosition(performance.now(), true, false);
           window.requestAnimationFrame(onScroll);
         };
         if (animated) { window.setTimeout(finish, 400); } else { finish(); }
@@ -1704,7 +1703,7 @@ enum WebReaderHTML {
         window.scrollTo(0, 0);
         // This one-shot restore also runs behind the opening cover, where
         // WebKit may suspend rAF. Publish readiness without waiting for it.
-        reportVisiblePosition(performance.now());
+        reportVisiblePosition(performance.now(), true, false);
         window.requestAnimationFrame(onScroll);
       }
 

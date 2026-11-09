@@ -67,7 +67,7 @@ class WebReaderVisiblePositionTests(unittest.TestCase):
 
     def test_whitespace_after_previous_chapter_does_not_report_offscreen_prose(self):
         source = (ROOT / "SourceReadSwift/Features/Reader/WebReaderDocument.swift").read_text(encoding="utf8")
-        start = source.index("      function metricAt(y) {")
+        start = source.index("      function metricAt(y, allowMetricsRebuild) {")
         end = source.index("      function captureAnchor()", start)
         script = """
         const window = {scrollY: 0};

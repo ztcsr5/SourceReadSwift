@@ -2,6 +2,24 @@ import XCTest
 @testable import SourceReadSwift
 
 final class Release117SearchProjectionTests: XCTestCase {
+    func testShelfMembershipIgnoresProgressButTracksInsertionRemovalAndLocalAliases() {
+        let remote = book(1)
+        var saved = BookshelfBook(searchBook: remote)
+        let original = DiscoverView.BookshelfMembership(books: [saved])
+        saved.currentChapterIndex = 7
+        saved.currentParagraphIndex = 42
+        saved.lastReadAt = Date()
+        XCTAssertEqual(DiscoverView.BookshelfMembership(books: [saved]), original,
+                       "Reading progress must not invalidate an offscreen results list")
+        XCTAssertTrue(original.contains(remote))
+        XCTAssertFalse(DiscoverView.BookshelfMembership(books: []).contains(remote))
+        XCTAssertFalse(original.contains(book(2)))
+        let localAlias = SearchBook(name: remote.name, author: remote.author, coverUrl: nil,
+                                   bookUrl: remote.bookUrl, sourceName: "Local", sourceUrl: "local://text")
+        XCTAssertTrue(original.contains(localAlias))
+        XCTAssertNotEqual(DiscoverView.BookshelfMembership(books: [saved, BookshelfBook(searchBook: book(2))]), original)
+    }
+
     func testLargeDuplicateGroupKeepsStableOrderWithoutQuadraticMembershipScans() async {
         let books = (0..<10_000).map { book($0) }
         let start = Date()
