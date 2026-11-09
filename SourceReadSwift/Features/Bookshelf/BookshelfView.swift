@@ -23,6 +23,10 @@ struct BookshelfView: View {
     /// notifications must not rebuild the filter/sort while the reader is
     /// scrolling; `onAppear` refreshes once when the shelf comes back.
     @State private var isShelfVisible = true
+    /// Store writes that landed while the shelf was pushed away. Without this
+    /// flag every tab return re-filtered and re-sorted the whole shelf even
+    /// when nothing had changed, stealing the first frames of the transition.
+    @State private var shelfProjectionNeedsRefresh = false
     @State private var deskReturnOrder: [String] = []
     @AppStorage("settings.themeMode") private var themeModeRawValue = ThemeMode.system.rawValue
     @AppStorage("bookshelf.isGridMode") private var isGridMode = true
@@ -145,20 +149,44 @@ struct BookshelfView: View {
             }
             .onAppear {
                 isShelfVisible = true
-                refreshShelfProjection()
+                if shelfProjection == nil {
+                    refreshShelfProjection()
+                    shelfProjectionNeedsRefresh = false
+                } else if shelfProjectionNeedsRefresh {
+                    // Let the tab/pop transition finish before sorting the
+                    // shelf. The stale projection is visually identical unless
+                    // progress actually changed, and a frame of old metadata is
+                    // cheaper than a dropped animation frame.
+                    Task { @MainActor in
+                        try? await Task.sleep(nanoseconds: 120_000_000)
+                        guard isShelfVisible else { return }
+                        shelfProjectionNeedsRefresh = false
+                        refreshShelfProjection()
+                    }
+                }
             }
             .onDisappear { isShelfVisible = false }
             .onReceive(appState.bookshelfStore.$books.dropFirst()) { _ in
-                guard isShelfVisible else { return }
+                // A pushed reader keeps this view in the hierarchy. Refreshing
+                // behind its opening transition re-sorted the shelf in the
+                // exact frames the hero zoom was settling.
+                guard isShelfVisible, contextualBookRoute == nil else {
+                    shelfProjectionNeedsRefresh = true
+                    return
+                }
                 // @Published emits from willSet, so reading the store
                 // synchronously here would project the previous array.
                 Task { @MainActor in refreshShelfProjection() }
             }
             .onReceive(appState.bookshelfStore.$groups.dropFirst()) { _ in
                 shelfDataRevision &+= 1
+                if !isShelfVisible { shelfProjectionNeedsRefresh = true }
             }
             .onReceive(appState.sourceStore.$sources) { _ in
-                guard isShelfVisible else { return }
+                guard isShelfVisible, contextualBookRoute == nil else {
+                    shelfProjectionNeedsRefresh = true
+                    return
+                }
                 refreshShelfProjection()
             }
             .onChange(of: sortModeRawValue) { _ in clearReturnOrder() }

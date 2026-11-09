@@ -62,8 +62,9 @@ struct AppThemeSurface: ViewModifier {
         #endif
     }
 
+    @ViewBuilder
     private func legacy(_ content: Content, radius: CGFloat, style: AppThemeSurfaceStyle) -> some View {
-        content.background {
+        let surface = content.background {
             let shape = RoundedRectangle(cornerRadius: radius, style: .continuous)
             if style == .legacyMaterial { shape.fill(material) }
             else { shape.fill(AppTheme.card) }
@@ -76,6 +77,13 @@ struct AppThemeSurface: ViewModifier {
                 .allowsHitTesting(false)
         }
         .clipShape(AppThemeCardShape(theme: theme, radius: radius), style: FillStyle(eoFill: true))
-        .shadow(color: .black.opacity(theme.isAtelier || theme == .inkwash || theme == .blueprint ? 0 : shadowOpacity), radius: 6, x: 0, y: 3)
+        // A zero-opacity shadow is not free: SwiftUI still installs the
+        // shadow layer and every scrolling row pays for its offscreen pass.
+        // Leave the modifier off entirely when a caller opted out of depth.
+        if shadowOpacity > 0, !theme.isAtelier, theme != .inkwash, theme != .blueprint {
+            surface.shadow(color: .black.opacity(shadowOpacity), radius: 6, x: 0, y: 3)
+        } else {
+            surface
+        }
     }
 }

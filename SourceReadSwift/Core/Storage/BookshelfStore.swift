@@ -2,9 +2,15 @@ import Foundation
 
 @MainActor
 final class BookshelfStore: ObservableObject {
-    @Published private(set) var books: [BookshelfBook] = []
+    @Published private(set) var books: [BookshelfBook] = [] {
+        didSet { booksRevision &+= 1 }
+    }
     @Published private(set) var groups: [BookshelfGroup] = []
     @Published private(set) var lastError: String?
+    private var booksRevision = 0
+    private var derivedCacheRevision = -1
+    private var cachedRecentBooks: [BookshelfBook] = []
+    private var cachedUpdatedBooks: [BookshelfBook] = []
 
     private let persistence: BookshelfPersistence
     private let groupPersistence: BookshelfGroupPersistence
@@ -427,23 +433,36 @@ final class BookshelfStore: ObservableObject {
         }
     }
 
+    /// Both projections are consumed several times per shelf body pass.
+    /// Sorting/filtering the whole shelf on every access put a full pass in
+    /// the middle of tab switches; cache them until the book array mutates.
     var recentBooks: [BookshelfBook] {
+        refreshDerivedBookProjectionsIfNeeded()
+        return cachedRecentBooks
+    }
+
+    var updatedBooks: [BookshelfBook] {
+        refreshDerivedBookProjectionsIfNeeded()
+        return cachedUpdatedBooks
+    }
+
+    private func refreshDerivedBookProjectionsIfNeeded() {
+        guard derivedCacheRevision != booksRevision else { return }
         let withReadTime = books
             .filter { $0.lastReadAt != nil }
             .sorted { ($0.lastReadAt ?? .distantPast) > ($1.lastReadAt ?? .distantPast) }
         if withReadTime.count >= 2 || books.isEmpty {
-            return withReadTime
+            cachedRecentBooks = withReadTime
+        } else {
+            var combined = withReadTime
+            let seenIDs = Set(combined.map(\.id))
+            for book in books where !seenIDs.contains(book.id) {
+                combined.append(book)
+            }
+            cachedRecentBooks = combined
         }
-        var combined = withReadTime
-        let seenIDs = Set(combined.map(\.id))
-        for b in books where !seenIDs.contains(b.id) {
-            combined.append(b)
-        }
-        return combined
-    }
-
-    var updatedBooks: [BookshelfBook] {
-        books.filter(\.hasUpdates)
+        cachedUpdatedBooks = books.filter(\.hasUpdates)
+        derivedCacheRevision = booksRevision
     }
 
     func togglePin(bookID: String) {
