@@ -80,6 +80,19 @@ final class GlobalSearchIndexTests: XCTestCase {
         XCTAssertEqual(matches.map(\.id), ["source"])
     }
 
+    func testAuthorScopeOnlyMatchesTheAuthorField() {
+        let entries = [
+            GlobalSearchEntry(id: "a", kind: .book, title: "书", subtitle: "作者甲 · 简介里出现关键词",
+                              target: "a", sourceURL: "source", author: "作者甲"),
+            GlobalSearchEntry(id: "b", kind: .book, title: "书二", subtitle: "作者乙",
+                              target: "b", sourceURL: "source", author: "作者乙")
+        ]
+        let index = GlobalSearchIndex(entries: entries)
+        XCTAssertEqual(index.search("作者甲", scope: .author).map(\.id), ["a"])
+        XCTAssertTrue(index.search("关键词", scope: .author).isEmpty,
+                      "Author scope must not match the synopsis carried by subtitle")
+    }
+
     func testBookmarkSearchRetainsTheOwningBookAndExactBookmark() {
         var book = BookshelfBook(searchBook: SearchBook(name: "原书", author: "作者", coverUrl: nil,
             bookUrl: "https://fixture.invalid/book", sourceName: "测试源", sourceUrl: "https://fixture.invalid"))

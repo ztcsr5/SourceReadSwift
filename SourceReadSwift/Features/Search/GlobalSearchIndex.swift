@@ -13,6 +13,9 @@ struct GlobalSearchEntry: Identifiable, Sendable, Equatable {
     /// this row, so the source-scoped search is a real filter rather than a
     /// subtitle guess.
     var sourceURL: String = ""
+    /// Author is its own scope: the subtitle also carries group and synopsis
+    /// text, so matching it here made "按作者" behave like a global search.
+    var author: String = ""
 }
 
 struct GlobalSearchIndex: Sendable {
@@ -49,12 +52,12 @@ struct GlobalSearchIndex: Sendable {
             guard !Task.isCancelled else { return [] }
             entries.append(.init(id: "book:" + book.id, kind: .book, title: book.title,
                 subtitle: [book.author, book.groupName, book.intro].compactMap { $0 }.joined(separator: " · "),
-                target: book.id, sourceURL: book.sourceURL))
+                target: book.id, sourceURL: book.sourceURL, author: book.author))
             for bookmark in book.bookmarks ?? [] {
                 guard !Task.isCancelled else { return [] }
                 entries.append(.init(id: "bookmark:" + book.id + ":" + bookmark.id, kind: .bookmark,
                     title: bookmark.chapterTitle, subtitle: book.title + " · " + bookmark.snippet,
-                    target: book.id, bookmarkID: bookmark.id, sourceURL: book.sourceURL))
+                    target: book.id, bookmarkID: bookmark.id, sourceURL: book.sourceURL, author: book.author))
             }
         }
         for source in sources {
@@ -122,7 +125,7 @@ struct GlobalSearchIndex: Sendable {
             let haystack: String
             switch scope {
             case .title: haystack = entry.title
-            case .author: haystack = Self.normalize(entry.destination.subtitle)
+            case .author: haystack = Self.normalize(entry.destination.author)
             case .source, .all: haystack = entry.searchable
             }
             guard tokens.allSatisfy({ haystack.contains($0) }) else { continue }
