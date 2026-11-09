@@ -1603,6 +1603,10 @@ final class DiscoverViewModel: ObservableObject {
                 sourceKind(for: book) == kind
             }
         }
+        // A filter changes the number of rows, so an old page number can point
+        // past the new last page (or at a page that only exists in the old
+        // projection). Always return to the first page of the new result set.
+        resultPage = 0
         results = SearchResultFilter.apply(base, query: effectiveResultFilterQuery, scope: resultFilterScope)
     }
 
