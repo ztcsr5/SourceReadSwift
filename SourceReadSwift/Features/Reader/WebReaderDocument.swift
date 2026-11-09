@@ -1417,7 +1417,7 @@ enum WebReaderHTML {
         // with getBoundingClientRect. Doing that inside a fling is the exact
         // forced-layout hitch at chapter boundaries. In-motion reports use the
         // previous metric; the idle sampler rebuilds once the finger is up.
-        if (state.metricsDirty && allowMetricsRebuild === false) {
+        if (state.metricsDirty && allowMetricsRebuild === false && state.lastVisiblePostAt > 0) {
           state.lastVisiblePostAt = now;
           return false;
         }

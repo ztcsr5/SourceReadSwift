@@ -73,7 +73,8 @@ class WebReaderVisiblePositionTests(unittest.TestCase):
         const window = {scrollY: 0};
         const boxes = [[0,40],[60,240],[340,400],[420,640]];
         const state = {nodes: boxes.map(([top,bottom],index)=>({index,
-          getBoundingClientRect:()=>({top,bottom,height:bottom-top})}))};
+          getBoundingClientRect:()=>({top,bottom,height:bottom-top})})),
+          metricsDirty: true, metricsInvalidFrom: 0, metricTops: [], metricHeights: []};
         const nodeMetric = element => ({index:element.index});
         """ + source[start:end] + """
         console.log(JSON.stringify([-10,0,100,239,240,300,340,500,700].map(y=>metricAt(y).index)));
