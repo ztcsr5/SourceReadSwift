@@ -1117,10 +1117,7 @@ struct ReaderView: View {
         // Native interactive pop is the only return path. The fast custom
         // fallback dismissed the route without a UIKit transition, which tore
         // down the reader and rebuilt the tab chrome mid-swipe.
-        .background(ReaderNavigationPopLock(
-            allowSystemReturn: allowsNativeBookReturn,
-            allowContentPopReturn: allowsNativeBookReturn && readerMode == .scroll
-        ))
+        .background(ReaderNavigationPopLock(allowSystemReturn: allowsNativeBookReturn))
         .overlay(alignment: .topLeading) { ReaderFrameHUD() }
         .navigationBarBackButtonHidden(!allowsNativeBookReturn)
         .toolbar(.hidden, for: .navigationBar, .tabBar)
@@ -7968,18 +7965,15 @@ struct ReaderIllustrationView: View {
 /// `.pageCurl` never pop the reader back to the root TabView ("书架/发现/设置").
 private struct ReaderNavigationPopLock: UIViewControllerRepresentable {
     let allowSystemReturn: Bool
-    let allowContentPopReturn: Bool
 
     func makeUIViewController(context: Context) -> LockViewController {
         let controller = LockViewController()
         controller.allowSystemReturn = allowSystemReturn
-        controller.allowContentPopReturn = allowContentPopReturn
         return controller
     }
 
     func updateUIViewController(_ uiViewController: LockViewController, context: Context) {
         uiViewController.allowSystemReturn = allowSystemReturn
-        uiViewController.allowContentPopReturn = allowContentPopReturn
         uiViewController.applyPopLock()
     }
 
@@ -7989,8 +7983,8 @@ private struct ReaderNavigationPopLock: UIViewControllerRepresentable {
 
     final class LockViewController: UIViewController {
         var allowSystemReturn = false
-        var allowContentPopReturn = false
         private weak var lockedNavigationController: UINavigationController?
+        private var contentPopWasEnabled: Bool?
 
         override func viewWillAppear(_ animated: Bool) {
             super.viewWillAppear(animated)
@@ -8014,21 +8008,19 @@ private struct ReaderNavigationPopLock: UIViewControllerRepresentable {
         func applyPopLock() {
             guard let nav = navigationController else { return }
             lockedNavigationController = nav
-            let edge = nav.interactivePopGestureRecognizer
-            if allowSystemReturn {
-                // Hiding the navigation bar leaves UIKit's built-in delegate
-                // attached; clearing it restores the same leading-edge return
-                // used by the rest of the app.
-                edge?.delegate = nil
-            }
-            edge?.isEnabled = allowSystemReturn
+            // Keep UIKit's own delegate. Clearing it makes the parallax
+            // recognizer report enabled while it no longer drives the
+            // navigation transition, so the edge swipe silently does nothing.
+            nav.interactivePopGestureRecognizer?.isEnabled = allowSystemReturn
             #if compiler(>=6.2)
             if #available(iOS 26.0, *) {
-                // Page turns own horizontal pan inside the page controller. Only
-                // continuous prose may use the full-content iOS 26 pop.
                 let content = nav.interactiveContentPopGestureRecognizer
-                if allowContentPopReturn { content?.delegate = nil }
-                content?.isEnabled = allowContentPopReturn
+                if contentPopWasEnabled == nil { contentPopWasEnabled = content?.isEnabled }
+                // iOS 26 exposes a full-content pop next to the leading-edge
+                // pop. Only the edge belongs to the reader exit: two live
+                // recognizers compete with the WebView pan and make a light
+                // edge touch flash the reader menu.
+                content?.isEnabled = false
             }
             #endif
         }
@@ -8038,9 +8030,12 @@ private struct ReaderNavigationPopLock: UIViewControllerRepresentable {
             nav.interactivePopGestureRecognizer?.isEnabled = true
             #if compiler(>=6.2)
             if #available(iOS 26.0, *) {
-                nav.interactiveContentPopGestureRecognizer?.isEnabled = true
+                if let wasEnabled = contentPopWasEnabled {
+                    nav.interactiveContentPopGestureRecognizer?.isEnabled = wasEnabled
+                }
             }
             #endif
+            contentPopWasEnabled = nil
             lockedNavigationController = nil
         }
     }

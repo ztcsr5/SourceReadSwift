@@ -186,6 +186,10 @@ struct BookshelfReaderGatewayView: View {
     }
 
     private func requestGatewayExit() {
+        // Restore the tab bar before the pop transition starts. Waiting for
+        // onDisappear leaves the bar missing for the first frames of the
+        // returned shelf and makes the home screen look frozen.
+        appState.releaseTabChromeHidden(owner: gatewayTabChromeOwner)
         // This view owns the shelf route; nested reader panels must never
         // supply the dismiss environment used to pop that route.
         if let onRequestExit { onRequestExit() }

@@ -1736,7 +1736,10 @@ struct ChapterLoadingView: View {
             },
             initialOverlayVisible: showReaderChromeAfterChapterSelection,
             onPreviewPosition: onPreviewPosition,
-            onRequestExit: onRequestExit
+            onRequestExit: {
+                appState.releaseTabChromeHidden(owner: chapterLoadingTabChromeOwner)
+                if let onRequestExit { onRequestExit() } else { dismiss() }
+            }
         )
         // 书级稳定身份：换章只更新 content，不再销毁 ReaderView + WKWebView。
         .id("reader-\(bookID ?? sourceUrl)")
