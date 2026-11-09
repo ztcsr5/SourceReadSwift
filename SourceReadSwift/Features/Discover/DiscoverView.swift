@@ -28,6 +28,9 @@ struct DiscoverView: View {
     /// JSON decode (and two array copies) on every layout pass of the search tab,
     /// including every streaming update during a search.
     @State private var cachedSearchHistory: [String] = []
+    /// AppState no longer relays shelf writes; membership badges subscribe to
+    /// the store themselves so adding a book still updates the result row.
+    @State private var shelfMembershipRevision = 0
 
     private static func decodeSearchHistory(_ json: String) -> [String] {
         guard let data = json.data(using: .utf8),
@@ -226,6 +229,9 @@ struct DiscoverView: View {
             }
             .onAppear {
                 checkClipboard()
+            }
+            .onReceive(appState.bookshelfStore.$books.dropFirst()) { _ in
+                shelfMembershipRevision &+= 1
             }
             .alert("书源导入结果", isPresented: Binding(
                 get: { clipboardImportToast != nil },
@@ -655,7 +661,8 @@ struct DiscoverView: View {
     /// stutter. The predicate deliberately mirrors `BookshelfStore.resolvedIndex`
     /// (exact `id`, else `local://` rows matched by `bookURL`).
     private var bookshelfMembership: BookshelfMembership {
-        BookshelfMembership(store: appState.bookshelfStore)
+        _ = shelfMembershipRevision
+        return BookshelfMembership(store: appState.bookshelfStore)
     }
 
     @MainActor

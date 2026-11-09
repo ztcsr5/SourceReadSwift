@@ -10,8 +10,6 @@ struct RootTabView: View {
     @AppStorage("settings.secondaryAccentHex") private var secondaryAccentHex = "419BDC"
     @AppStorage(AppVisualTheme.selectionKey) private var visualTheme = AppVisualTheme.initialSelection.rawValue
     @AppStorage("settings.appearanceRevision") private var appearanceRevision = 0
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @AppMotion private var motion
     @Namespace private var tabSelection
     @State private var selectedTab = 0
     @State private var legacySearchRequest: UUID?
@@ -32,12 +30,16 @@ struct RootTabView: View {
         .background(AppRefreshRateKeeperView())
         .overlay(alignment: .topLeading) { ReaderFrameHUD() }
         .safeAreaInset(edge: .bottom, spacing: 0) {
-            if !appState.isTabChromeHidden {
+            // iOS 26 draws the bar itself, so without audio this inset was an
+            // empty view that still joined every layout pass. Mount it only
+            // when it has real content, and never animate the reader handoff:
+            // the implicit animation re-laid out the whole tab tree (including
+            // the WKWebView) during the exact frames the push was settling.
+            if !appState.isTabChromeHidden, hasAudio || !usesNativeTabs {
                 VStack(spacing: 8) {
                     if hasAudio { miniAudioPlayerBar }
                     if !usesNativeTabs { customTabBar }
                 }
-                .animation(motion.animation(.navigation), value: appState.isTabChromeHidden)
             }
         }
         .font(.system(.body, design: AppVisualTheme.current.fontDesign))
