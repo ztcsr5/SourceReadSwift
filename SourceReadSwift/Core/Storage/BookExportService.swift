@@ -42,7 +42,6 @@ struct BookExportService: Sendable {
         let ordered = Self.ordered(cachedChapters)
         let text = plainText(book: book, cachedChapters: ordered, includeIntro: true)
         guard let textData = text.data(using: .utf8) else { throw BookExportError.noContent }
-        guard textData.count <= Int(UInt32.max) else { throw BookExportError.chapterTooLarge }
 
         let metadata = BookArchiveMetadata(
             title: book.title,
@@ -71,10 +70,8 @@ struct BookExportService: Sendable {
         }
         try addEntry("正文.txt", data: textData, to: archive)
         if let coverJPEG, !coverJPEG.isEmpty {
-            guard coverJPEG.count <= Int(UInt32.max) else { throw BookExportError.chapterTooLarge }
             try addEntry("cover.jpg", data: coverJPEG, to: archive)
         }
-        guard metadataData.count <= Int(UInt32.max) else { throw BookExportError.chapterTooLarge }
         try addEntry("metadata.json", data: metadataData, to: archive)
 
         return BookArchiveExport(url: tempURL,
@@ -99,7 +96,7 @@ struct BookExportService: Sendable {
         try archive.addEntry(
             with: name,
             type: .file,
-            uncompressedSize: UInt32(data.count),
+            uncompressedSize: Int64(data.count),
             compressionMethod: .deflate,
             provider: { position, size in
                 let start = Int(position)
