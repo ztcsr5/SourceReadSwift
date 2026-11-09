@@ -7,6 +7,7 @@ struct SettingsView: View {
     // The root still observes the selected scheme while the editor lives in
     // AppearanceSettingsView; keeping this binding updates the whole screen.
     @AppStorage("settings.themeMode") private var themeModeRawValue = ThemeMode.system.rawValue
+    @AppStorage("settings.developerDiagnostics") private var developerDiagnosticsEnabled = false
     @ObservedObject private var proxyManager = SourceProxyManager.shared
     @AppStorage("app.hapticsEnabled") private var hapticsEnabled = false
     @AppStorage("search_concurrent_threads") private var searchThreads = 12
@@ -210,17 +211,31 @@ struct SettingsView: View {
                 .listRowBackground(AppThemeRowSurface())
 
 
-                Section("诊断") {
-                    NavigationLink {
-                        ReaderPerformanceDiagnosticsView()
-                    } label: {
-                        Label("阅读器性能", systemImage: "speedometer")
+                Section {
+                    Toggle("开发者调试", isOn: $developerDiagnosticsEnabled)
+                    if developerDiagnosticsEnabled {
+                        NavigationLink {
+                            ReaderPerformanceDiagnosticsView()
+                        } label: {
+                            Label("阅读器性能", systemImage: "speedometer")
+                        }
+                        NavigationLink {
+                            Form { AppFrameProfilerSection() }
+                                .navigationTitle("全局帧率采样")
+                                .navigationBarTitleDisplayMode(.inline)
+                        } label: {
+                            Label("全局帧率采样", systemImage: "waveform.path.ecg")
+                        }
+                        NavigationLink {
+                            RecentDiagnosticsView(events: appState.diagnostics)
+                        } label: {
+                            Label("最近诊断 · 查看与复制", systemImage: "doc.text.magnifyingglass")
+                        }
                     }
-                    NavigationLink {
-                        RecentDiagnosticsView(events: appState.diagnostics)
-                    } label: {
-                        Label("最近诊断 · 查看与复制", systemImage: "doc.text.magnifyingglass")
-                    }
+                } header: {
+                    Text("诊断")
+                } footer: {
+                    Text("开发者调试默认关闭；不开启不会启动帧率或滚动采样。开启后才显示采样入口，采样最多 30 秒，退后台即停止。")
                 }
                 .listRowBackground(AppThemeRowSurface())
             }

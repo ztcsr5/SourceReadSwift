@@ -57,6 +57,8 @@ struct AppFrameHistogram: Equatable {
 @MainActor
 final class AppFrameProfiler: ObservableObject {
     static let shared = AppFrameProfiler()
+    /// Master switch shared with SettingsView (`@AppStorage` literal).
+    static let developerDiagnosticsDefaultsKey = "settings.developerDiagnostics"
     @Published private(set) var isRecording = false
     /// 采样期间的实时读数，4 Hz 更新；不参与任何布局计算。
     @Published private(set) var liveHertz: Double = 0
@@ -86,6 +88,9 @@ final class AppFrameProfiler: ObservableObject {
     }
 
     func start(duration: TimeInterval = 30) {
+        // 诊断总开关默认关闭：不开启时不创建 CADisplayLink，也不打开
+        // ReaderScrollPerfMeter，避免任何常驻采样吃掉主线程时间。
+        guard UserDefaults.standard.bool(forKey: Self.developerDiagnosticsDefaultsKey) else { return }
         guard !isRecording else { return }
         histogram = AppFrameHistogram()
         cadence = AppFrameCadence()
