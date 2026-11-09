@@ -24,18 +24,19 @@ final class TabChromeRegressionTests: XCTestCase {
         let ready = await eventually { self.tabs(in: window.rootViewController) != nil }
         XCTAssertTrue(ready)
         let tabs = try XCTUnwrap(self.tabs(in: window.rootViewController))
-        let labelsReady = await eventually { tabs.tabBar.items?.count == 3 && tabs.isTabBarHidden }
+        // iOS 26 起交还系统 TabView：3 个常规 tab + 1 个 .search 角色 tab。
+        let labelsReady = await eventually { tabs.tabBar.items?.count == 4 }
         XCTAssertTrue(labelsReady)
         XCTAssertEqual(tabs.tabBar.items?[1].title, AppNavigationLabels.findBooks)
         XCTAssertNil(tabs.bottomAccessory, "No playback must not create a blank glass accessory")
-        XCTAssertTrue(tabs.isTabBarHidden, "The custom bar must be the only bar even before opening a reader")
+        XCTAssertFalse(tabs.isTabBarHidden, "iOS 26 走系统栏，进阅读器之前它必须可见")
         let owner = UUID()
         app.acquireTabChromeHidden(owner: owner)
         let hidden = await eventually { tabs.isTabBarHidden }
-        XCTAssertTrue(hidden, "Active child must receive the hidden preference")
+        XCTAssertTrue(hidden, "进入阅读器后系统栏必须隐藏")
         XCTAssertTrue(tabs === self.tabs(in: window.rootViewController), "Visibility cannot replace the TabView/navigation tree")
         app.releaseTabChromeHidden(owner: owner)
-        let restored = await eventually { !app.isTabChromeHidden && tabs.isTabBarHidden }
+        let restored = await eventually { !app.isTabChromeHidden && !tabs.isTabBarHidden }
         XCTAssertTrue(restored)
         XCTAssertNil(tabs.bottomAccessory)
         #else
