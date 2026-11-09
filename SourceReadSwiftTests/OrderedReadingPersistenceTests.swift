@@ -129,7 +129,7 @@ final class OrderedReadingPersistenceTests: XCTestCase {
         XCTAssertTrue(try ReadingHistoryPersistence(rootURL: root).load().isEmpty)
     }
 
-    func testProgressBurstsPublishOneGlobalSnapshotAndKeepLocalObservation() async throws {
+    func testProgressBurstsStayLocalWithoutRepublishingTheWholeApp() async throws {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         defer { try? FileManager.default.removeItem(at: root) }
         let persistence = BookshelfPersistence(rootURL: root)
@@ -148,15 +148,15 @@ final class OrderedReadingPersistenceTests: XCTestCase {
             store.updateReadingProgress(bookID: books[0].id, chapterIndex: index, chapterTitle: "\(index)", totalChapters: 30)
         }
         await settleMainQueue()
-        XCTAssertEqual(global, 1, "Keep subscriptions, coalesce only the global forwarding burst")
+        XCTAssertEqual(global, 0, "Reading progress must not invalidate every screen")
         XCTAssertEqual(local, 20, "Each coherent history mutation remains observable locally")
         XCTAssertEqual(history.history.first?.currentChapterIndex, 19)
         await store.waitForPendingWrites()
         await history.waitForPendingWrites()
         await settleMainQueue()
-        XCTAssertEqual(global, 1, "Successful writes must not republish unchanged nil errors")
+        XCTAssertEqual(global, 0, "Successful writes must not republish unchanged nil errors")
         app.isTabChromeHidden.toggle()
-        XCTAssertEqual(global, 2, "Navigation state remains immediate")
+        XCTAssertEqual(global, 1, "Navigation state remains immediate")
         withExtendedLifetime((globalSubscription, localSubscription)) {}
     }
 
