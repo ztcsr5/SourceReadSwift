@@ -27,8 +27,17 @@ final class AppRefreshRateKeeper: UIView {
     }
 
     func start() {
-        guard link == nil else { return }
         let rate = Self.maximumRate()
+        // `makeUIView` can run before the scene is attached, where the screen
+        // still reports 60 Hz. Once `didMoveToWindow` runs the real screen is
+        // known, so restart the link instead of keeping the launch-time rate
+        // for the rest of the session.
+        if let link {
+            if abs(link.preferredFrameRateRange.maximum - rate) < 0.5 { return }
+            link.invalidate()
+            self.link = nil
+            heldRate = 0
+        }
         let displayLink = CADisplayLink(target: WeakProxy(target: self),
                                         selector: #selector(WeakProxy.tick))
         if #available(iOS 15.0, *) {

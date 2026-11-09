@@ -61,7 +61,11 @@ struct ChapterContentCacheEntry: Identifiable, Codable, Hashable, Sendable {
 
 @MainActor
 final class ChapterContentCacheStore: ObservableObject {
-    @Published private(set) var entries: [ChapterContentCacheEntry] = []
+    /// Membership changes publish through `objectWillChange`; the LRU touch in
+    /// `markRead` deliberately does not. AppState does not observe this store,
+    /// so the only subscriber is the offline-cache screen; keeping the touch
+    /// silent avoids invalidating it for every chapter the reader crosses.
+    private(set) var entries: [ChapterContentCacheEntry] = []
     @Published private(set) var lastError: String?
 
     private let persistence: ChapterContentCachePersistence
@@ -169,6 +173,11 @@ final class ChapterContentCacheStore: ObservableObject {
     }
 
     func save(_ content: ChapterContent, sourceURL: String, purifyRules: [String]) {
+        // Prefetch saves one chapter every few seconds while the reader is
+        // scrolling. `AppState` does not observe this store, but an offscreen
+        // settings/offline-cache screen would still be invalidated on every
+        // write. Membership changes stay explicit; the offline list recomputes
+        // when it appears instead of during reading.
         let entry = ChapterContentCacheEntry(
             key: cacheKey(sourceURL: sourceURL, chapterURL: content.chapter.url),
             sourceURL: sourceURL,
@@ -183,6 +192,7 @@ final class ChapterContentCacheStore: ObservableObject {
             purifySignature: purifySignature(purifyRules),
             cachedAt: Date()
         )
+        objectWillChange.send()
         entries.removeAll { $0.key == entry.key }
         entries.insert(entry, at: 0)
         if entries.count > maxEntryCount {
@@ -193,17 +203,22 @@ final class ChapterContentCacheStore: ObservableObject {
 
     func removeExpired(olderThanDays days: Int = 30) {
         let cutoff = Date().addingTimeInterval(-Double(days) * 24 * 60 * 60)
+        guard entries.contains(where: { $0.cachedAt < cutoff }) else { return }
+        objectWillChange.send()
         entries.removeAll { $0.cachedAt < cutoff }
         persist()
     }
 
     func removeAll() {
+        guard !entries.isEmpty else { return }
+        objectWillChange.send()
         entries.removeAll()
         persist()
     }
 
     func remove(key: String) {
         guard entries.contains(where: { $0.key == key }) else { return }
+        objectWillChange.send()
         entries.removeAll { $0.key == key }
         persist()
     }

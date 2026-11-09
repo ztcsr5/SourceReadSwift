@@ -203,9 +203,11 @@ final class BookshelfStore: ObservableObject {
         updated.lastReadAt = Date()
         // @Published array element mutation emits per field. Build the complete
         // position locally, then publish exactly one coherent shelf snapshot.
+        // Do not reorder the array: `recentBooks` already sorts by lastReadAt,
+        // and remove+insert rewrote the persisted order on every progress
+        // write. Keeping the slot stable makes the snapshot diff predictable.
         var nextBooks = books
-        nextBooks.remove(at: index)
-        nextBooks.insert(updated, at: 0)
+        nextBooks[index] = updated
         books = nextBooks
         persistReadingProgress()
         onBookRead?(updated)

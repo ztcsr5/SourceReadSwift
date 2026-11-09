@@ -32,16 +32,25 @@ struct EditorialBookJacket<Cover: View>: View {
                     .frame(width: stance == .floating ? 7 : stance == .shelf ? 5 : 4, height: height - 5)
                     .offset(x: stance == .floating ? 5 : stance == .shelf ? 3 : 2, y: 2)
             }
-            .shadow(color: palette.shadow.opacity(contrast == .increased ? 0 : scheme == .dark ? 0.32 : 0.20),
-                radius: stance == .floating ? 5 : stance == .shelf ? 3 : 8, x: stance == .floating ? 3 : 2,
-                y: stance == .floating ? 4 : 3)
         // A zero-degree 3D rotation still installs a transformed layer. Shelf
         // grids can show dozens of jackets, so leave the modifiers off entirely
         // there and keep perspective for the single detail/floating heroes.
         if stance == .shelf {
-            jacket.accessibilityHidden(true)
+            // A blurred Core Animation shadow per cell is expensive while a
+            // lazy grid is scrolling. A 1 px offset plate gives the jacket a
+            // readable edge without an offscreen pass.
+            jacket
+                .background(alignment: .bottomTrailing) {
+                    RoundedRectangle(cornerRadius: 3, style: .continuous)
+                        .fill(palette.shadow.opacity(contrast == .increased ? 0 : scheme == .dark ? 0.26 : 0.16))
+                        .offset(x: 2, y: 3)
+                }
+                .accessibilityHidden(true)
         } else {
             jacket
+                .shadow(color: palette.shadow.opacity(contrast == .increased ? 0 : scheme == .dark ? 0.32 : 0.20),
+                    radius: stance == .floating ? 5 : 8, x: stance == .floating ? 3 : 2,
+                    y: stance == .floating ? 4 : 3)
                 .rotation3DEffect(.degrees(stance == .floating ? -12 : -5),
                     axis: (x: 0, y: 1, z: 0), perspective: 0.28)
                 .rotationEffect(.degrees(stance == .floating ? -4 : -2))
