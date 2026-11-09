@@ -33,11 +33,15 @@ struct EditorialBookJacket<Cover: View>: View {
                     .offset(x: stance == .floating ? 5 : stance == .shelf ? 3 : 2, y: 2)
             }
             .shadow(color: palette.shadow.opacity(contrast == .increased ? 0 : scheme == .dark ? 0.32 : 0.20),
-                radius: stance == .floating ? 5 : stance == .shelf ? 6 : 8, x: stance == .floating ? 3 : 5,
-                y: stance == .floating ? 4 : 7)
-            .rotation3DEffect(.degrees(stance == .shelf ? -9 : stance == .floating ? -12 : -5),
+                radius: stance == .floating ? 5 : stance == .shelf ? 3 : 8, x: stance == .floating ? 3 : 2,
+                y: stance == .floating ? 4 : 3)
+            // Shelf grids can show dozens of jackets at once. A 3D rotation
+            // forces every card into its own transformed layer, which is a
+            // measurable 120 Hz cost during fling scrolling. Keep perspective
+            // for the single detail/floating heroes only.
+            .rotation3DEffect(.degrees(stance == .shelf ? 0 : stance == .floating ? -12 : -5),
                 axis: (x: 0, y: 1, z: 0), perspective: 0.28)
-            .rotationEffect(.degrees(stance == .shelf ? -3 : stance == .floating ? -4 : -2))
+            .rotationEffect(.degrees(stance == .shelf ? 0 : stance == .floating ? -4 : -2))
             .accessibilityHidden(true)
     }
 }

@@ -26,6 +26,19 @@ extension View {
     }
 }
 
+extension View {
+    /// iOS 18 feeds the gate from `onScrollGeometryChange`; emitting a
+    /// preference as well would keep the per-frame layout walk alive.
+    @ViewBuilder
+    func reportsScrollOffsetWhenPreferenceIsUsed(in space: String) -> some View {
+        if #available(iOS 18.0, *) {
+            self
+        } else {
+            reportsScrollOffset(in: space)
+        }
+    }
+}
+
 /// Decides whether a scroll-collapsing navigation bar belongs on screen.
 ///
 /// Two properties matter more than the thresholds themselves:
@@ -87,11 +100,38 @@ extension View {
             .onPreferenceChange(ScrollOffsetPreferenceKey.self) { offset in
                 gate.update(offset: offset) { shouldCollapse in
                     guard collapsed.wrappedValue != shouldCollapse else { return }
-                    withAnimation(.easeOut(duration: 0.18)) {
-                        collapsed.wrappedValue = shouldCollapse
-                    }
+                    // Hiding the bar changes the safe area. Animating that
+                    // change spends 0.18 s re-laying out the whole shelf at
+                    // exactly the scroll position the user is dragging
+                    // through; flip it in one frame instead.
+                    collapsed.wrappedValue = shouldCollapse
                 }
             }
+    }
+
+    /// iOS 18 reads the scroll geometry directly. The preference channel still
+    /// exists for iOS 16/17, but it makes every scroll frame walk a layout pass
+    /// through the whole screen; at 120 Hz that alone costs a visible chunk of
+    /// the frame budget and keeps the bar's 240 pt threshold feeling like a
+    /// hitch. Prefer the native channel whenever it is available.
+    @ViewBuilder
+    func collapsingNavigationBarModern(
+        in space: String,
+        gate: ScrollChromeGate,
+        collapsed: Binding<Bool>
+    ) -> some View {
+        if #available(iOS 18.0, *) {
+            onScrollGeometryChange(for: CGFloat.self) { geometry in
+                geometry.contentOffset.y + geometry.contentInsets.top
+            } action: { _, travelled in
+                gate.update(offset: -travelled) { shouldCollapse in
+                    guard collapsed.wrappedValue != shouldCollapse else { return }
+                    collapsed.wrappedValue = shouldCollapse
+                }
+            }
+        } else {
+            collapsingNavigationBar(in: space, gate: gate, collapsed: collapsed)
+        }
     }
 
     /// Applies navigation-bar visibility from a collapse flag.

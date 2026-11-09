@@ -5,6 +5,15 @@ struct BookDetailHeaderOffset: PreferenceKey {
     static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) { value = nextValue() }
 }
 
+/// The header's own height (not its scroll-relative position). Unlike the
+/// offset key this only changes on layout, so iOS 18 can drive the collapse
+/// from scroll geometry instead of walking a preference through the whole
+/// screen on every frame.
+struct BookDetailHeaderHeight: PreferenceKey {
+    static var defaultValue: CGFloat = 0
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) { value = max(value, nextValue()) }
+}
+
 /// An open book above a shallow paper plane, sharing the desk's physical jacket.
 struct BookDetailHero: View {
     let book: SearchBook
@@ -39,9 +48,15 @@ struct BookDetailHero: View {
         .foregroundStyle(palette.ink)
         .background(alignment: .bottom) { paperPlane }
         .background {
-            GeometryReader { proxy in
-                Color.clear.preference(key: BookDetailHeaderOffset.self,
-                    value: proxy.frame(in: .named("bookDetailScroll")).maxY)
+            if #available(iOS 18.0, *) {
+                GeometryReader { proxy in
+                    Color.clear.preference(key: BookDetailHeaderHeight.self, value: proxy.size.height)
+                }
+            } else {
+                GeometryReader { proxy in
+                    Color.clear.preference(key: BookDetailHeaderOffset.self,
+                        value: proxy.frame(in: .named("bookDetailScroll")).maxY)
+                }
             }
         }
         .onAppear { hasArrived = true }

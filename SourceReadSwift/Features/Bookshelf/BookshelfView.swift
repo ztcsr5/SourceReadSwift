@@ -146,9 +146,9 @@ struct BookshelfView: View {
                 .padding(.horizontal, AppTheme.pagePadding)
                 // RootTabView already owns tab-bar/safe-area clearance.
                 .padding(.bottom, AppLayout.contentTail)
-                .reportsScrollOffset(in: Self.shelfScrollSpace)
+                .reportsScrollOffsetWhenPreferenceIsUsed(in: Self.shelfScrollSpace)
             }
-            .collapsingNavigationBar(
+            .collapsingNavigationBarModern(
                 in: Self.shelfScrollSpace,
                 gate: shelfChromeGate,
                 collapsed: $collapsesShelfChrome
@@ -1137,7 +1137,7 @@ private struct BookshelfCollectionView: View {
     @State private var isManaging = false
     @State private var selectedBookIDs: Set<String> = []
     @State private var confirmBatchDelete = false
-    @State private var selectedBookForDetail: BookshelfBook?
+    @State private var contextDetailBook: BookshelfBook?
     @State private var searchKeyword = ""
     @State private var debouncedSearchKeyword = ""
     @Namespace private var collectionHero
@@ -1274,7 +1274,7 @@ private struct BookshelfCollectionView: View {
                         })
                         .contextMenu {
                             Button {
-                                selectedBookForDetail = book
+                                contextDetailBook = book
                             } label: {
                                 Label("书籍详情", systemImage: "info.circle")
                             }
@@ -1434,16 +1434,12 @@ private struct BookshelfCollectionView: View {
         } message: {
             Text("将从书架删除 \(selectedBookIDs.count) 本书，阅读进度也会一并移除。")
         }
-        .sheet(item: $selectedBookForDetail) { book in
-            NavigationStack {
-                BookDetailView(book: book.asSearchBook)
-                    .toolbar {
-                        ToolbarItem(placement: .cancellationAction) {
-                            Button("关闭") {
-                                selectedBookForDetail = nil
-                            }
-                        }
-                    }
+        .navigationDestination(isPresented: Binding(
+            get: { contextDetailBook != nil },
+            set: { if !$0 { contextDetailBook = nil } }
+        )) {
+            if let book = contextDetailBook {
+                detailDestination(book, placement: "collection")
             }
         }
         .task(id: searchKeyword) {
