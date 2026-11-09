@@ -12,6 +12,10 @@ on:
         description: Run the real reader settings UI reproduction without packaging
         type: boolean
         default: false
+      full_tests_only:
+        description: Run only the simulator build and full XCTest job
+        type: boolean
+        default: false
   push:
     branches:
       - main
@@ -25,7 +29,7 @@ on:
 
 jobs:
   native-tabs:
-    if: github.ref != 'refs/heads/codex/floating-reading-desk'
+    if: github.ref != 'refs/heads/codex/floating-reading-desk' && !inputs.full_tests_only
     runs-on: ${{ (github.ref == 'refs/heads/codex/reader-motion-117' || inputs.reader_settings_only) && 'macos-26-intel' || 'macos-26' }}
     timeout-minutes: 60
     env:
