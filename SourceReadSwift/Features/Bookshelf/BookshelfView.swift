@@ -16,6 +16,9 @@ struct BookshelfView: View {
     @State private var contextualBookRoute: ContextualBookRoute?
     @State private var bookToRemove: BookshelfBook?
     @State private var shelfReturnOrder: [String] = []
+    /// Cached result of `ShelfProjection`. Nil means the first pass still
+    /// needs to compute it; afterwards a store/filter change refreshes it.
+    @State private var shelfProjection: [BookshelfBook]?
     @State private var deskReturnOrder: [String] = []
     @AppStorage("settings.themeMode") private var themeModeRawValue = ThemeMode.system.rawValue
     @AppStorage("bookshelf.isGridMode") private var isGridMode = true
@@ -84,56 +87,25 @@ struct BookshelfView: View {
 
 
     private var displayedShelfBooks: [BookshelfBook] {
-        var list = allBooks
+        shelfProjection ?? makeShelfProjection()
+    }
 
-        if let selectedMainGroup {
-            list = list.filter { $0.groupName == selectedMainGroup }
-        }
+    private func makeShelfProjection() -> [BookshelfBook] {
+        ShelfProjection.books(
+            allBooks,
+            group: selectedMainGroup,
+            media: selectedMediaFilter,
+            query: searchKeyword,
+            sort: BookshelfSortMode(rawValue: sortModeRawValue) ?? .recentRead,
+            returnOrder: shelfReturnOrder,
+            mediaKind: { mediaKind(for: $0) }
+        )
+    }
 
-        if let selectedMediaFilter {
-            switch selectedMediaFilter {
-            case "local":
-                list = list.filter { $0.sourceURL.hasPrefix("local://") }
-            case "comic":
-                list = list.filter { mediaKind(for: $0) == .comic }
-            case "audio":
-                list = list.filter { mediaKind(for: $0) == .audio }
-            case "video":
-                list = list.filter { mediaKind(for: $0) == .video }
-            case "novel":
-                list = list.filter { !($0.sourceURL.hasPrefix("local://")) && (mediaKind(for: $0) == .text || mediaKind(for: $0) == nil) }
-            default:
-                break
-            }
-        }
-
-        let query = searchKeyword.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-        if !query.isEmpty {
-            list = list.filter {
-                $0.title.lowercased().contains(query) ||
-                $0.author.lowercased().contains(query)
-            }
-        }
-
-        let mode = BookshelfSortMode(rawValue: sortModeRawValue) ?? .recentRead
-        if let anchored = BookReturnOrder.restore(list, ids: shelfReturnOrder) { return anchored }
-        return list.sorted { lhs, rhs in
-            if lhs.isPinned != rhs.isPinned {
-                return lhs.isPinned && !rhs.isPinned
-            }
-            switch mode {
-            case .recentRead:
-                let lDate = lhs.lastReadAt ?? lhs.addedAt
-                let rDate = rhs.lastReadAt ?? rhs.addedAt
-                return lDate > rDate
-            case .added:
-                return lhs.addedAt > rhs.addedAt
-            case .title:
-                return lhs.title.localizedStandardCompare(rhs.title) == .orderedAscending
-            case .progress:
-                return lhs.readingProgress > rhs.readingProgress
-            }
-        }
+    /// Called only when an input changed. Keeping the result in `@State` stops
+    /// `pinReturnOrder` and the return transition from re-filtering the shelf.
+    private func refreshShelfProjection() {
+        shelfProjection = makeShelfProjection()
     }
 
     var body: some View {
@@ -158,6 +130,11 @@ struct BookshelfView: View {
                 revealShelfChrome()
                 await refreshBookshelf()
             }
+            .onAppear {
+                if shelfProjection == nil { refreshShelfProjection() }
+            }
+            .onReceive(appState.bookshelfStore.$books) { _ in refreshShelfProjection() }
+            .onReceive(appState.sourceStore.$sources) { _ in refreshShelfProjection() }
             .onChange(of: sortModeRawValue) { _ in clearReturnOrder() }
             .onChange(of: searchKeyword) { _ in clearReturnOrder() }
             .onChange(of: selectedMainGroup) { _ in clearReturnOrder() }
@@ -827,6 +804,7 @@ struct BookshelfView: View {
     private func clearReturnOrder() {
         shelfReturnOrder = []
         deskReturnOrder = []
+        refreshShelfProjection()
     }
 
     private func detailDestination(_ book: BookshelfBook, placement: String) -> some View {
@@ -943,7 +921,7 @@ struct BookshelfView: View {
                 ? AnyLayout(VStackLayout(alignment: .leading, spacing: 12))
                 : AnyLayout(HStackLayout(spacing: 14))
             layout {
-                ShelfBookCover(book: book, width: 52, height: 72)
+                ShelfBookCover(book: book, width: 52, height: 72, theme: theme)
                     .environment(\.readingCoverHandoff, readingDeskEnabled ? readingCoverHandoff : nil)
                     .bookHeroSource("list|" + book.id, in: bookHero)
                 VStack(alignment: .leading, spacing: 5) {
@@ -1042,7 +1020,7 @@ struct BookshelfView: View {
             bookDestination(book, placement: "grid")
         } label: {
             VStack(alignment: .leading, spacing: 8) {
-                ShelfBookCover(book: book, width: nil, height: 120)
+                ShelfBookCover(book: book, width: nil, height: 120, theme: theme)
                     .environment(\.readingCoverHandoff, readingDeskEnabled ? readingCoverHandoff : nil)
                     .bookHeroSource("grid|" + book.id, in: bookHero)
 
@@ -1131,6 +1109,8 @@ private struct BookshelfCollectionView: View {
     @EnvironmentObject private var appState: AppState
     let title: String
     let books: [BookshelfBook]
+    @AppStorage(AppVisualTheme.selectionKey) private var themeRaw = AppVisualTheme.initialSelection.rawValue
+    private var theme: AppVisualTheme { AppVisualTheme(rawValue: themeRaw) ?? .classic }
     @State private var selectedGroupName: String?
     @State private var showGroupEditor = false
     @State private var groupName = ""
@@ -1455,7 +1435,7 @@ private struct BookshelfCollectionView: View {
 
     private func collectionBookLabel(_ book: BookshelfBook) -> some View {
         HStack(spacing: 14) {
-            ShelfBookCover(book: book, width: 58, height: 82)
+            ShelfBookCover(book: book, width: 58, height: 82, theme: theme)
             VStack(alignment: .leading, spacing: 5) {
                 HStack(spacing: 6) {
                     Text(book.title).font(.headline).foregroundStyle(.primary).lineLimit(2)

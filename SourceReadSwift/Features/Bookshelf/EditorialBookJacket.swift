@@ -11,9 +11,9 @@ struct EditorialBookJacket<Cover: View>: View {
     @Environment(\.colorScheme) private var scheme
     @Environment(\.colorSchemeContrast) private var contrast
 
-    var body: some View {
+    @ViewBuilder var body: some View {
         let corner = RoundedRectangle(cornerRadius: stance == .detail ? 6 : 3, style: .continuous)
-        cover()
+        let jacket = cover()
             .overlay(alignment: .leading) {
                 HStack(spacing: 0) {
                     Rectangle().fill(.black.opacity(0.26)).frame(width: 2)
@@ -35,13 +35,17 @@ struct EditorialBookJacket<Cover: View>: View {
             .shadow(color: palette.shadow.opacity(contrast == .increased ? 0 : scheme == .dark ? 0.32 : 0.20),
                 radius: stance == .floating ? 5 : stance == .shelf ? 3 : 8, x: stance == .floating ? 3 : 2,
                 y: stance == .floating ? 4 : 3)
-            // Shelf grids can show dozens of jackets at once. A 3D rotation
-            // forces every card into its own transformed layer, which is a
-            // measurable 120 Hz cost during fling scrolling. Keep perspective
-            // for the single detail/floating heroes only.
-            .rotation3DEffect(.degrees(stance == .shelf ? 0 : stance == .floating ? -12 : -5),
-                axis: (x: 0, y: 1, z: 0), perspective: 0.28)
-            .rotationEffect(.degrees(stance == .shelf ? 0 : stance == .floating ? -4 : -2))
-            .accessibilityHidden(true)
+        // A zero-degree 3D rotation still installs a transformed layer. Shelf
+        // grids can show dozens of jackets, so leave the modifiers off entirely
+        // there and keep perspective for the single detail/floating heroes.
+        if stance == .shelf {
+            jacket.accessibilityHidden(true)
+        } else {
+            jacket
+                .rotation3DEffect(.degrees(stance == .floating ? -12 : -5),
+                    axis: (x: 0, y: 1, z: 0), perspective: 0.28)
+                .rotationEffect(.degrees(stance == .floating ? -4 : -2))
+                .accessibilityHidden(true)
+        }
     }
 }

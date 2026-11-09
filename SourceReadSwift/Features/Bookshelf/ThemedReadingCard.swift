@@ -81,7 +81,7 @@ struct ThemedReadingCard: View {
     }
 
     private func cover(height: CGFloat) -> some View {
-        ShelfBookCover(book: book, width: height * 2 / 3, height: height)
+        ShelfBookCover(book: book, width: height * 2 / 3, height: height, theme: theme)
             .padding(.trailing, 6)
             .bookHeroSource("continue|" + book.id, in: heroNamespace)
     }

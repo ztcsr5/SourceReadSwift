@@ -13,10 +13,14 @@ struct ShelfBookCover: View {
     let book: BookshelfBook
     let width: CGFloat?
     let height: CGFloat
+    /// The shelf already resolved the selected theme once. Passing it down
+    /// avoids one UserDefaults read per card while a lazy grid is scrolling.
+    var theme: AppVisualTheme? = nil
 
     var body: some View {
         let size = ShelfCoverGeometry.size(maxWidth: width, height: height)
-        EditorialBookJacket(height: size.height, palette: .resolve(theme: AppVisualTheme.current), stance: .shelf) {
+        EditorialBookJacket(height: size.height,
+            palette: .resolve(theme: theme ?? AppVisualTheme.current), stance: .shelf) {
             AsyncBookCover(urlString: book.coverURL, width: size.width, height: size.height,
                 baseURLString: book.bookURL, sourceURLString: book.sourceURL,
                 title: book.title, contentMode: .fill, cornerRadius: 3, usesPlainPlaceholder: true)
