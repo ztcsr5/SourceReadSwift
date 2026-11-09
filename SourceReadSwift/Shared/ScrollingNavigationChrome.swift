@@ -1,4 +1,5 @@
 import SwiftUI
+import QuartzCore
 
 /// Reports how far the attached content sits above the top edge of a named
 /// coordinate space. The raw offset travels as a preference, never as `@State`,
@@ -57,14 +58,24 @@ final class ScrollChromeGate {
 
     private var lastTravelled: CGFloat?
     private(set) var isCollapsed = false
+    /// Hiding the bar changes the safe area, which feeds a one-off content
+    /// offset jump straight back into this gate. Without a settle window that
+    /// jump looks like a deliberate upward swipe: the bar reappears, the safe
+    /// area grows again and the shelf flip-flops at the threshold.
+    private var settleUntil: CFTimeInterval = 0
+    private let settleDuration: CFTimeInterval = 0.24
 
-    func update(offset: CGFloat, onChange: (Bool) -> Void) {
+    func update(offset: CGFloat, now: CFTimeInterval = CACurrentMediaTime(),
+                onChange: (Bool) -> Void) {
         let travelled = -offset
         defer { lastTravelled = travelled }
+
+        if now < settleUntil { return }
 
         if isCollapsed {
             if travelled <= 0 {
                 isCollapsed = false
+                settleUntil = now + settleDuration
                 onChange(false)
                 return
             }
@@ -72,10 +83,12 @@ final class ScrollChromeGate {
             let delta = travelled - lastTravelled
             if delta < -revealOnUpward {
                 isCollapsed = false
+                settleUntil = now + settleDuration
                 onChange(false)
             }
         } else if travelled > hideAfter {
             isCollapsed = true
+            settleUntil = now + settleDuration
             onChange(true)
         }
     }
@@ -84,6 +97,7 @@ final class ScrollChromeGate {
     func reset() {
         lastTravelled = nil
         isCollapsed = false
+        settleUntil = 0
     }
 }
 
