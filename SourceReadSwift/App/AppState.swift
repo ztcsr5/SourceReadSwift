@@ -218,12 +218,11 @@ final class AppState: ObservableObject {
             }
             .store(in: &cancellables)
 
-        bookshelfStore.objectWillChange
-            .sink { [weak self] _ in
-                self?.scheduleStoreNotification()
-            }
-            .store(in: &cancellables)
-
+        // Reading-progress writes land on `bookshelfStore` every 700 ms while
+        // the reader is open. Forwarding them here re-evaluated the whole tab
+        // tree - including the 7.5k-line reader - in the middle of a scroll.
+        // Screens that render shelf state subscribe to the store themselves,
+        // so only structural changes need to reach AppState.
         purifyRuleStore.objectWillChange
             .sink { [weak self] _ in
                 self?.scheduleStoreNotification()
