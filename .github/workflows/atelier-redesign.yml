@@ -62,7 +62,7 @@ jobs:
           xcodebuild -project SourceReadSwift.xcodeproj -scheme SourceReadSwift -destination "id=$(cat atelier-device.txt)" CODE_SIGNING_ALLOWED=NO -parallel-testing-enabled NO \
             -only-testing:SourceReadSwiftUITests/AtelierHomeUITests \
             -only-testing:SourceReadSwiftUITests/RootTabGlassUITests \
-            -only-testing:SourceReadSwiftUITests/FloatingReadingDeskUITests/testHomeGlobalSearchFindsTheLocalBookAndOpensItsDetails \
+            -only-testing:SourceReadSwiftUITests/FloatingReadingDeskUITests/testHomeGlobalSearchOnlyFindsAppFunctions \
             -test-timeouts-enabled YES -maximum-test-execution-time-allowance 180 \
             -resultBundlePath AtelierUI.xcresult test-without-building 2>&1 | tee atelier-ui.log
       - name: Export window and real home screenshots

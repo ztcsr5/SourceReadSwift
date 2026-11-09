@@ -193,7 +193,7 @@ jobs:
             -parallel-testing-enabled NO \
             -only-testing:SourceReadSwiftUITests/ComicPagingBoundaryUITests \
             -only-testing:SourceReadSwiftUITests/FloatingReadingDeskUITests/testCollapsedShelfFiltersPreserveQueryAndThemeLayoutsHaveRealEntries \
-            -only-testing:SourceReadSwiftUITests/FloatingReadingDeskUITests/testHomeGlobalSearchFindsTheLocalBookAndOpensItsDetails \
+            -only-testing:SourceReadSwiftUITests/FloatingReadingDeskUITests/testHomeGlobalSearchOnlyFindsAppFunctions \
             -only-testing:SourceReadSwiftUITests/FloatingReadingDeskUITests/testDiscoverStartsWithoutAResultsHeadingAndUsesACompactMatchControl \
             -only-testing:SourceReadSwiftUITests/FloatingReadingDeskUITests/testReadingDeskLongPressOffersTheSameBookActionsWithoutActivatingReader \
             -only-testing:SourceReadSwiftUITests/FloatingReadingDeskUITests/testContinuousChapterCrossingKeepsProseHeadingAndReopenedPositionTogether \
