@@ -80,6 +80,17 @@ final class GlobalSearchIndexTests: XCTestCase {
         XCTAssertEqual(matches.map(\.id), ["source"])
     }
 
+    func testTitleScopeNormalizesCaseLikeTheOtherScopes() {
+        let entries = [
+            GlobalSearchEntry(id: "latin", kind: .book, title: "The Little Prince",
+                              subtitle: "", target: "latin", sourceURL: "source"),
+            GlobalSearchEntry(id: "other", kind: .book, title: "Le Petit Prince",
+                              subtitle: "", target: "other", sourceURL: "source")
+        ]
+        let index = GlobalSearchIndex(entries: entries)
+        XCTAssertEqual(index.search("the little", scope: .title).map(\.id), ["latin"])
+    }
+
     func testAuthorScopeOnlyMatchesTheAuthorField() {
         let entries = [
             GlobalSearchEntry(id: "a", kind: .book, title: "书", subtitle: "作者甲 · 简介里出现关键词",

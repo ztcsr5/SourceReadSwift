@@ -124,7 +124,7 @@ struct GlobalSearchIndex: Sendable {
             guard !Task.isCancelled else { return [] }
             let haystack: String
             switch scope {
-            case .title: haystack = entry.title
+            case .title: haystack = Self.normalize(entry.title)
             case .author: haystack = Self.normalize(entry.destination.author)
             case .source, .all: haystack = entry.searchable
             }
