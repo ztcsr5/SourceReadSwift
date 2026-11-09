@@ -225,7 +225,9 @@ struct BookDetailView: View {
                     Button { startBookArchiveExport() } label: {
                         Label(isExportingBook ? "正在导出…" : "导出本书（ZIP）", systemImage: "square.and.arrow.up")
                     }
-                    .disabled(isExportingBook || !canExportArchive)
+                    // Keep the action reachable: an uncached book must be able
+                    // to explain what to cache, not present a dead menu row.
+                    .disabled(isExportingBook)
                 } label: {
                     Image(systemName: "ellipsis.circle")
                 }
@@ -1146,15 +1148,6 @@ struct BookDetailView: View {
                 imageStyle: entry.imageStyle,
                 payAction: entry.payAction
             )
-        }
-    }
-
-    private var canExportArchive: Bool {
-        if let localBook = localShelfBook {
-            return localBook.localChapters?.isEmpty == false || localBook.localContent?.isEmpty == false
-        }
-        return appState.chapterContentCacheStore.entries.contains {
-            $0.bookURL == book.bookUrl && $0.sourceURL == book.sourceUrl
         }
     }
 

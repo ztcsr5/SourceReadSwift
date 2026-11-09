@@ -407,12 +407,24 @@ struct BookDetailParser {
               container.count > ruleText.count else { return ruleText }
         // `hasPrefix` also recovers sites that hard-truncate the rule value
         // without appending an ellipsis: the rule is a prefix of the same block.
+        // Compare a whitespace-normalized copy: the rule often samples text
+        // with collapsed line breaks while `element.text()` keeps them, which
+        // made a strict prefix check miss every multi-paragraph synopsis.
         // A complete rule value is never a prefix of a *different* block, so it
         // stays untouched.
-        if looksTruncatedIntro(ruleText) || container.hasPrefix(ruleText) {
+        let comparableRule = comparableIntro(ruleText)
+        let comparableContainer = comparableIntro(container)
+        if looksTruncatedIntro(ruleText) || comparableContainer.hasPrefix(comparableRule) {
             return container
         }
         return ruleText
+    }
+
+    /// Collapse whitespace for prefix checks only; the returned synopsis keeps
+    /// its paragraphs intact.
+    private static func comparableIntro(_ text: String) -> String {
+        text.replacingOccurrences(of: "\\s+", with: " ", options: .regularExpression)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
     static func introContainer(in document: Document, bookTitle: String?,
