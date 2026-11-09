@@ -117,7 +117,7 @@ import XCTest
         coordinator.scrollViewWillBeginDragging(web.scrollView)
         coordinator.update(view: surface(chapters: 2, target: 61) { visible = $0 }, webView: web)
         try await waitUntil { coordinator.contentMountCount == 2 && visible == 61 }
-        XCTAssertGreaterThan(web.scrollView.contentOffset.y, web.bounds.height * 3)
+        try await waitUntil { web.scrollView.contentOffset.y > web.bounds.height * 3 }
     }
 
     func testPositionReportsKeepTheirChapterWhileAChangedWindowWaitsToMount() {
