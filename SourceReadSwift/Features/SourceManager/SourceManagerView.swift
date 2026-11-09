@@ -290,6 +290,8 @@ struct SourceManagerView: View {
             // 进入书源管理是阅读器外的二级页面，系统导航栏会多出一条空白
             // 标题区；顶部自绘返回键 + 管理/登录入口，正文直接顶到状态栏下。
             .toolbar(.hidden, for: .navigationBar)
+            // 隐藏导航栏会连带关掉左缘右滑返回，这里单独恢复。
+            .background(InteractivePopGestureEnabler())
             .sheet(isPresented: $showImportSheet) {
                 importSheet
             }
