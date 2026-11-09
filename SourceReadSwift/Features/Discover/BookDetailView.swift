@@ -7,6 +7,7 @@ struct BookDetailView: View {
     @Namespace private var detailHero
     @AppMotion private var motion
     @State private var isHeaderCollapsed = false
+    @State private var detailHeaderHeight: CGFloat = 0
     @State private var hasArrived = false
     @Environment(\.readingCoverHandoff) private var incomingCoverHandoff
     @StateObject private var detailCoverHandoff = ReadingCoverHandoff()
@@ -21,7 +22,6 @@ struct BookDetailView: View {
     @State private var isLoading = false
     @State private var errorMessage: String?
     @State private var comicDownloadRequest: UUID?
-    @State private var comicDownloadError: String?
     @State private var previewPosition: ReaderPreviewPosition?
     @State private var isSavingShelfPosition = false
     @State private var hasPromptedAddAfterPreview = false
@@ -37,6 +37,15 @@ struct BookDetailView: View {
     }
     @State private var readingRoute: ReadingRoute?
     @State private var selectedChapterIndexForReader = 0
+    @State private var isExportingBook = false
+    @State private var exportShareURL: IdentifiableURL?
+    @State private var pendingExportNotice: DetailAlert?
+    private struct DetailAlert: Identifiable {
+        let id = UUID()
+        let title: String
+        let message: String
+    }
+    @State private var activeDetailAlert: DetailAlert?
 
     private var sourceKind: BookSourceKind {
         if localShelfBook?.sourceURL == "local://comic" { return .comic }
@@ -192,10 +201,8 @@ struct BookDetailView: View {
         .environment(\.readingCoverHandoff, readingDeskEnabled ? coverHandoff : nil)
         .accessibilityIdentifier("bookDetail.scroll")
         .coordinateSpace(name: "bookDetailScroll")
-        .onPreferenceChange(BookDetailHeaderOffset.self) { bottom in
-            let collapsed = bottom < 60
-            if collapsed != isHeaderCollapsed { isHeaderCollapsed = collapsed }
-        }
+        .modifier(BookDetailChromeObserver(isCollapsed: $isHeaderCollapsed,
+                                           headerHeight: $detailHeaderHeight))
         .pageBackground()
         .navigationTitle(isHeaderCollapsed ? book.name : "书籍详情")
         .navigationBarTitleDisplayMode(.inline)
@@ -215,6 +222,10 @@ struct BookDetailView: View {
                         Label(downloadLabel, systemImage: isDownloading ? "stop.circle" : "arrow.down.circle")
                     }
                     .disabled(chapters.isEmpty || book.sourceUrl.hasPrefix("local://"))
+                    Button { startBookArchiveExport() } label: {
+                        Label(isExportingBook ? "正在导出…" : "导出本书（ZIP）", systemImage: "square.and.arrow.up")
+                    }
+                    .disabled(isExportingBook || !canExportArchive)
                 } label: {
                     Image(systemName: "ellipsis.circle")
                 }
@@ -235,12 +246,9 @@ struct BookDetailView: View {
         }
         .onChange(of: book.id) { _ in comicDownloadRequest = nil }
         .onDisappear { comicDownloadRequest = nil }
-        .alert("无法下载全本漫画", isPresented: Binding(
-            get: { comicDownloadError != nil }, set: { if !$0 { comicDownloadError = nil } }
-        )) {
-            Button("关闭", role: .cancel) {}
-        } message: {
-            Text(comicDownloadError ?? "")
+        .alert(item: $activeDetailAlert) { alert in
+            Alert(title: Text(alert.title), message: Text(alert.message),
+                  dismissButton: .default(Text("好")))
         }
         .navigationDestination(isPresented: Binding(
             get: { readingRoute != nil }, set: { if !$0 { readingRoute = nil } }
@@ -248,6 +256,14 @@ struct BookDetailView: View {
             if let route = readingRoute {
                 readDestination(route.chapter, usesDetailHero: true)
             }
+        }
+        .sheet(item: $exportShareURL, onDismiss: {
+            if let notice = pendingExportNotice {
+                pendingExportNotice = nil
+                activeDetailAlert = notice
+            }
+        }) { item in
+            ShareSheet(items: [item.url])
         }
         .sheet(isPresented: $showAllChapters) {
             BookDetailAllChaptersView(
@@ -466,7 +482,7 @@ struct BookDetailView: View {
     }
 
     private func detailCard(_ detail: BookDetail?) -> some View {
-        BookDetailSummary(detail: detail, fallbackIntro: book.intro)
+        BookDetailSummary(detail: detail, fallbackIntro: book.intro, fallbackBookURL: book.bookUrl)
     }
 
     private var audioBookActionCard: some View {
@@ -1050,7 +1066,7 @@ struct BookDetailView: View {
         let selectedBook = book
         let engine = appState.engine
         guard let source = appState.sourceStore.source(for: selectedBook.sourceUrl)?.resolvingMediaKind(selectedBook.mediaKind) else {
-            comicDownloadError = "找不到漫画书源。请恢复书源后重试。"
+            activeDetailAlert = DetailAlert(title: "无法下载全本漫画", message: "找不到漫画书源。请恢复书源后重试。")
             return
         }
         let verified: Result<[BookChapter], SourceEngineError>? = await AsyncTimeout.run(seconds: 30) {
@@ -1066,11 +1082,11 @@ struct BookDetailView: View {
         case .some(.success(let complete)) where !complete.isEmpty:
             enqueueDownload(source: source, chapters: complete)
         case .some(.failure(let error)):
-            comicDownloadError = String(SourceDiagnosticRedactor.value(error.displayMessage).prefix(240))
+            activeDetailAlert = DetailAlert(title: "无法下载全本漫画", message: String(SourceDiagnosticRedactor.value(error.displayMessage).prefix(240)))
         case .some(.success):
-            comicDownloadError = "书源目录为空，未开始全本下载。"
+            activeDetailAlert = DetailAlert(title: "无法下载全本漫画", message: "书源目录为空，未开始全本下载。")
         case nil:
-            comicDownloadError = "核对目录超时，未开始全本下载。请重试或下载单话。"
+            activeDetailAlert = DetailAlert(title: "无法下载全本漫画", message: "核对目录超时，未开始全本下载。请重试或下载单话。")
         }
     }
 
@@ -1084,6 +1100,127 @@ struct BookDetailView: View {
             cacheStore: appState.chapterContentCacheStore,
             purifyRules: appState.purifyRuleStore.enabledPatterns
         )
+    }
+
+    /// The archive only carries chapters that are already in the offline
+    /// cache. Local imports already hold their full text in the shelf record.
+    private var cachedExportChapters: [ChapterContent] {
+        if let localBook = localShelfBook {
+            if let localChapters = localBook.localChapters, !localChapters.isEmpty {
+                return localChapters.map { chapter in
+                    ChapterContent(
+                        chapter: BookChapter(title: chapter.title,
+                                             url: "\(localBook.bookURL)#\(chapter.index)",
+                                             bookUrl: localBook.bookURL,
+                                             index: chapter.index),
+                        title: chapter.title,
+                        paragraphs: chapter.paragraphs
+                    )
+                }
+            }
+            if let content = localBook.localContent, !content.isEmpty {
+                return [ChapterContent(
+                    chapter: BookChapter(title: localBook.title, url: localBook.bookURL,
+                                         bookUrl: localBook.bookURL, index: 0),
+                    title: localBook.title,
+                    paragraphs: content
+                )]
+            }
+            return []
+        }
+        let entries = appState.chapterContentCacheStore.entries
+            .filter { $0.bookURL == book.bookUrl && $0.sourceURL == book.sourceUrl }
+        var fallbackIndex: [String: Int] = [:]
+        for chapter in chapters where fallbackIndex[chapter.url] == nil {
+            fallbackIndex[chapter.url] = chapter.index
+        }
+        return entries.map { entry in
+            ChapterContent(
+                chapter: BookChapter(title: entry.title,
+                                     url: entry.chapterURL,
+                                     bookUrl: entry.bookURL,
+                                     index: entry.chapterIndex ?? fallbackIndex[entry.chapterURL] ?? 0),
+                title: entry.title,
+                paragraphs: entry.paragraphs,
+                nextContentUrl: entry.nextContentUrl,
+                imageStyle: entry.imageStyle,
+                payAction: entry.payAction
+            )
+        }
+    }
+
+    private var canExportArchive: Bool {
+        if let localBook = localShelfBook {
+            return localBook.localChapters?.isEmpty == false || localBook.localContent?.isEmpty == false
+        }
+        return appState.chapterContentCacheStore.entries.contains {
+            $0.bookURL == book.bookUrl && $0.sourceURL == book.sourceUrl
+        }
+    }
+
+    private var exportBookRecord: BookshelfBook {
+        if let localBook = localShelfBook { return localBook }
+        if let shelfBook = appState.bookshelfStore.book(id: readerBookID) { return shelfBook }
+        return BookshelfBook(
+            id: readerBookID,
+            title: detail?.name.nilIfEmpty ?? book.name,
+            author: detail?.author?.nilIfEmpty ?? book.author ?? "作者未知",
+            coverURL: displayBook.coverUrl,
+            sourceName: book.sourceName,
+            sourceURL: book.sourceUrl,
+            bookURL: book.bookUrl,
+            intro: detail?.intro ?? book.intro,
+            totalChapters: chapters.count,
+            mediaKind: detail?.mediaKind ?? book.mediaKind
+        )
+    }
+
+    private func startBookArchiveExport() {
+        guard !isExportingBook else { return }
+        let chaptersToExport = cachedExportChapters
+        guard !chaptersToExport.isEmpty else {
+            activeDetailAlert = DetailAlert(title: "无法导出",
+                message: "本书还没有已缓存的章节。请先在目录中缓存章节，或阅读几章后再导出。")
+            return
+        }
+        isExportingBook = true
+        let record = exportBookRecord
+        let total = max(chapters.count, record.totalChapters, chaptersToExport.count)
+        let coverAddress = CoverURLResolver.url(from: displayBook.coverUrl,
+                                                base: book.bookUrl, fallbackBase: book.sourceUrl)
+        Task { @MainActor in
+            var coverJPEG: Data?
+            if let coverAddress,
+               let image = await RemoteImageLoader.shared.image(for: coverAddress,
+                                                               maxPixelSize: 1200,
+                                                               reuseCoverBytes: true),
+               let data = image.jpegData(compressionQuality: 0.85) {
+                coverJPEG = data
+            }
+            do {
+                let result = try await Task.detached(priority: .userInitiated) {
+                    try BookExportService().exportBookArchive(
+                        book: record,
+                        cachedChapters: chaptersToExport,
+                        coverJPEG: coverJPEG,
+                        totalChapterCount: total
+                    )
+                }.value
+                isExportingBook = false
+                exportShareURL = IdentifiableURL(url: result.url)
+                if result.isPartial {
+                    pendingExportNotice = DetailAlert(title: "导出完成",
+                        message: "已导出 \(result.exportedChapterCount) / \(result.totalChapterCount) 章 ZIP，含封面与 metadata.json。其余章节尚未缓存，缓存后可再次导出。")
+                } else {
+                    pendingExportNotice = DetailAlert(title: "导出完成",
+                        message: "已导出 \(result.exportedChapterCount) 章 ZIP，含封面与 metadata.json。")
+                }
+            } catch {
+                isExportingBook = false
+                activeDetailAlert = DetailAlert(title: "导出失败",
+                    message: (error as? LocalizedError)?.errorDescription ?? error.localizedDescription)
+            }
+        }
     }
 
     private func addCurrentBookToShelf() {
@@ -1850,3 +1987,34 @@ private struct ReaderPreviewShelfPrompt: ViewModifier {
     }
 }
 
+/// iOS 18 drives the title collapse from `onScrollGeometryChange`; the
+/// preference path stays only for iOS 16/17. See `BookDetailHeaderHeight`.
+private struct BookDetailChromeObserver: ViewModifier {
+    @Binding var isCollapsed: Bool
+    @Binding var headerHeight: CGFloat
+
+    @ViewBuilder func body(content: Content) -> some View {
+        if #available(iOS 18.0, *) {
+            content
+                .onScrollGeometryChange(for: CGFloat.self) { geometry in
+                    geometry.contentOffset.y + geometry.contentInsets.top
+                } action: { _, offset in
+                    guard headerHeight > 0 else { return }
+                    let collapsed = offset > headerHeight - 60
+                    if collapsed != isCollapsed { isCollapsed = collapsed }
+                }
+                .onPreferenceChange(BookDetailHeaderHeight.self) { height in
+                    if height > 0, abs(height - headerHeight) > 0.5 { headerHeight = height }
+                }
+        } else {
+            content
+                .onPreferenceChange(BookDetailHeaderHeight.self) { height in
+                    if height > 0, abs(height - headerHeight) > 0.5 { headerHeight = height }
+                }
+                .onPreferenceChange(BookDetailHeaderOffset.self) { bottom in
+                    let collapsed = bottom < 60
+                    if collapsed != isCollapsed { isCollapsed = collapsed }
+                }
+        }
+    }
+}
