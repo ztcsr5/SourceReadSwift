@@ -98,6 +98,8 @@ jobs:
             -only-testing:SourceReadSwiftTests/RSSFeedCacheStoreTests \
             -only-testing:SourceReadSwiftTests/RSSArticleContentCacheStoreTests \
             -only-testing:SourceReadSwiftTests/GlobalSearchIndexTests \
+            -only-testing:SourceReadSwiftTests/ShelfProjectionTests \
+            -only-testing:SourceReadSwiftTests/ScrollChromeGateTests \
             -only-testing:SourceReadSwiftTests/ForestBrandThemeTests \
             -only-testing:SourceReadSwiftTests/FloatingReadingDeskTests \
             -only-testing:SourceReadSwiftTests/ReaderTocPerformanceTests \
