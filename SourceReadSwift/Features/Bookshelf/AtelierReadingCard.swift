@@ -110,7 +110,11 @@ struct BookshelfRowSurface: ViewModifier {
                     .frame(height: 1).allowsHitTesting(false)
             }
         } else {
-            content.glassPanel(cornerRadius: 16, material: .thinMaterial, shadowOpacity: 0.06)
+            // Every visible list row used to install a blurred Core Animation
+            // shadow. A lazy list can have a dozen rows on screen, so the
+            // shadow pass dominated the 120 Hz scroll budget. The stroke
+            // already separates the card from the paper.
+            content.glassPanel(cornerRadius: 16, material: .thinMaterial, shadowOpacity: 0)
         }
     }
 }

@@ -935,7 +935,7 @@ struct BookshelfView: View {
                 Spacer()
             }
             .padding(12)
-            .glassPanel(cornerRadius: 18, material: .thinMaterial, shadowOpacity: 0.08)
+            .glassPanel(cornerRadius: 18, material: .thinMaterial, shadowOpacity: 0)
         }
         .buttonStyle(PressableScaleButtonStyle())
         .simultaneousGesture(TapGesture().onEnded {
