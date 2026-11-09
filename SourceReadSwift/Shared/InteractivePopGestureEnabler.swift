@@ -31,6 +31,15 @@ struct InteractivePopGestureEnabler: UIViewControllerRepresentable {
             guard let navigation = navigationController else { return }
             navigation.interactivePopGestureRecognizer?.delegate = nil
             navigation.interactivePopGestureRecognizer?.isEnabled = true
+            // iOS 26 routes the interactive pop through the content gesture.
+            // Enabling only the legacy recognizer leaves a hidden navigation
+            // bar with no working left-edge return.
+            #if compiler(>=6.2)
+            if #available(iOS 26.0, *) {
+                navigation.interactiveContentPopGestureRecognizer?.delegate = nil
+                navigation.interactiveContentPopGestureRecognizer?.isEnabled = true
+            }
+            #endif
         }
     }
 }
