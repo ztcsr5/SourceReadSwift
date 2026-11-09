@@ -67,9 +67,11 @@ private struct BookHeroSource: ViewModifier {
     let id: String
     let namespace: Namespace.ID
     @AppMotion private var motion
-    @AppStorage("settings.readingDeskEnabled") private var usesSpatialStyle = true
     @ViewBuilder func body(content: Content) -> some View {
-        if #available(iOS 18.0, *), !motion.reducesMotion, usesSpatialStyle {
+        // The zoom handoff is a navigation transition, not part of the spatial
+        // reading desk. Turning the desk off must not silently downgrade every
+        // shelf -> detail push to a plain slide.
+        if #available(iOS 18.0, *), !motion.reducesMotion {
             content.matchedTransitionSource(id: id, in: namespace)
         } else { content }
     }
@@ -80,9 +82,8 @@ private struct BookHeroDestination: ViewModifier {
     let namespace: Namespace.ID
     let enabled: Bool
     @AppMotion private var motion
-    @AppStorage("settings.readingDeskEnabled") private var usesSpatialStyle = true
     @ViewBuilder func body(content: Content) -> some View {
-        if #available(iOS 18.0, *), enabled, !motion.reducesMotion, usesSpatialStyle {
+        if #available(iOS 18.0, *), enabled, !motion.reducesMotion {
             content.navigationTransition(.zoom(sourceID: id, in: namespace))
         } else { content }
     }

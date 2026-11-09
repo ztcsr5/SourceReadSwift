@@ -4,6 +4,9 @@ import SwiftUI
 struct BookDetailSummary: View {
     var detail: BookDetail?
     var fallbackIntro: String? = nil
+    /// Detail loads do not always carry a book URL (some rules only return a
+    /// TOC); fall back to the result URL that opened this screen.
+    var fallbackBookURL: String? = nil
     @State private var expanded = false
     @AppMotion private var motion
 
@@ -71,7 +74,8 @@ struct BookDetailSummary: View {
                     }
                     // C 方案：源站本身就只给了半截简介时，给一个「去原网页看」的出口，
                     // 只对以省略号结尾的文本显示，避免正常简介也挂个链接。
-                    if Self.looksTruncated(intro), let raw = detail?.bookUrl,
+                    if Self.looksTruncated(intro),
+                       let raw = detail?.bookUrl?.nilIfEmpty ?? fallbackBookURL?.nilIfEmpty,
                        let url = URL(string: raw), url.scheme?.hasPrefix("http") == true {
                         Link(destination: url) {
                             Label("查看原网页", systemImage: "safari")

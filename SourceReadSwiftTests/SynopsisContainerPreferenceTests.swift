@@ -97,6 +97,39 @@ final class SynopsisContainerPreferenceTests: XCTestCase {
         XCTAssertEqual(parsed.intro, fullSynopsis)
     }
 
+    func testHardTruncatedRuleWithoutEllipsisRecoversTheWholeContainer() throws {
+        // Sites that cut `meta[description]` at N characters without appending
+        // an ellipsis used to slip through: the rule value is a strict prefix
+        // of the real block, so it must widen instead of staying a fragment.
+        let excerpt = String(fullSynopsis.prefix(40))
+        let body = """
+        <html><head>
+          <meta property="og:description" content="\(excerpt)">
+        </head><body>
+          <h1>剑来</h1>
+          <div class="book-intro"><p>\(fullSynopsis)</p></div>
+        </body></html>
+        """
+        let parsed = try detail(introRule: "meta[property=og:description]@content", body: body)
+        XCTAssertEqual(parsed.intro, fullSynopsis)
+        XCTAssertFalse(BookDetailParser.looksTruncatedIntro(excerpt))
+    }
+
+    func testUnlabelledParagraphIsUsedWhenTheRuleSampledItsPrefix() throws {
+        let excerpt = String(fullSynopsis.prefix(40))
+        let body = """
+        <html><head>
+          <meta name="description" content="\(excerpt)">
+        </head><body>
+          <h1>剑来</h1>
+          <p>\(fullSynopsis)</p>
+        </body></html>
+        """
+        let parsed = try detail(introRule: "meta[name=description]@content", body: body)
+        XCTAssertEqual(parsed.intro, fullSynopsis,
+                       "A page with no intro class/id must still recover its one long prose block")
+    }
+
     func testNavigationBlockAndShortLabelAreNotSynopsis() {
         let navigation = """
         <html><body>

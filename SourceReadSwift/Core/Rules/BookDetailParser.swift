@@ -401,35 +401,58 @@ struct BookDetailParser {
         // The scan walks every element in the document, so it only runs when the
         // rule actually left a hole: an empty result or a server-side excerpt.
         guard let ruleText, !ruleText.isEmpty else {
-            return introContainer(in: document, bookTitle: bookTitle)
+            return introContainer(in: document, bookTitle: bookTitle, allowStructuralFallback: false)
         }
-        guard looksTruncatedIntro(ruleText) else { return ruleText }
-        guard let container = introContainer(in: document, bookTitle: bookTitle),
+        guard let container = introContainer(in: document, bookTitle: bookTitle, allowStructuralFallback: true),
               container.count > ruleText.count else { return ruleText }
-        return container
+        // `hasPrefix` also recovers sites that hard-truncate the rule value
+        // without appending an ellipsis: the rule is a prefix of the same block.
+        // A complete rule value is never a prefix of a *different* block, so it
+        // stays untouched.
+        if looksTruncatedIntro(ruleText) || container.hasPrefix(ruleText) {
+            return container
+        }
+        return ruleText
     }
 
-    static func introContainer(in document: Document, bookTitle: String?) -> String? {
+    static func introContainer(in document: Document, bookTitle: String?,
+                               allowStructuralFallback: Bool = false) -> String? {
         guard let elements = try? document.getAllElements() else { return nil }
         let pageText = (try? document.text())?.trimmingCharacters(in: .whitespacesAndNewlines)
-        var best: String?
+        var tokenBest: String?
+        var structuralBest: String?
+        let structuralTags: Set<String> = ["p", "div", "section", "article", "dd", "blockquote"]
         for element in elements {
             let classNames = (try? element.className()) ?? ""
             let identifier = (try? element.attr("id")) ?? ""
             let attributes = (classNames + " " + identifier).lowercased()
-            guard !attributes.isEmpty,
-                  introContainerTokens.contains(where: { attributes.contains($0) }),
-                  let text = try? element.text() else { continue }
+            let hasToken = !attributes.isEmpty
+                && introContainerTokens.contains(where: { attributes.contains($0) })
+            if !hasToken {
+                // Sites without an intro class/id still expose the synopsis as
+                // one of these structural prose blocks. Only used when a rule
+                // value exists to cross-check against, never for a blank rule.
+                guard allowStructuralFallback else { continue }
+                let tag = ((try? element.tagName()) ?? "").lowercased()
+                guard structuralTags.contains(tag) else { continue }
+            }
+            guard let text = try? element.text() else { continue }
             let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
             // Labels ("简介"), whole-page bodies and the title itself are not a synopsis.
-            guard trimmed.count >= 60, trimmed != pageText else { continue }
+            guard trimmed.count >= (hasToken ? 60 : 80) else { continue }
+            if let pageText, trimmed.count >= pageText.count { continue }
             if let bookTitle, !bookTitle.isEmpty, trimmed == bookTitle { continue }
             // Synopsis blocks are prose; a link-heavy block is navigation.
-            guard ((try? element.select("a").count) ?? 0) <= 2 else { continue }
-            if let current = best, current.count >= trimmed.count { continue }
-            best = trimmed
+            guard ((try? element.select("a").count) ?? 0) <= (hasToken ? 2 : 1) else { continue }
+            if hasToken {
+                if tokenBest == nil || tokenBest!.count < trimmed.count { tokenBest = trimmed }
+            } else {
+                if structuralBest == nil || structuralBest!.count < trimmed.count { structuralBest = trimmed }
+            }
         }
-        return best
+        // A named synopsis container always wins; the structural guess is only
+        // used when the page has no class/id hint at all.
+        return tokenBest ?? structuralBest
     }
 
     private func isURLTemplate(_ rule: String) -> Bool {
