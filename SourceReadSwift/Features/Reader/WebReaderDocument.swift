@@ -787,6 +787,12 @@ enum WebReaderHTML {
         visible: -1,
         highlightEl: null,
         lastScrollAt: 0,
+        documentHeight: 0,
+        viewportHeight: 0,
+        lastHeightMeasureAt: 0,
+        lastMetricElement: null,
+        lastMetricKey: "",
+        lastMetricLocal: 0,
         visiblePostTimer: null,
         scrollIdleTimer: null,
         reachTop: false,
@@ -1226,6 +1232,13 @@ enum WebReaderHTML {
         }
         if (!state.metricsDirty && state.metricTops.length === firstAdded &&
             state.metricHeights.length === firstAdded) {
+          // Never force a layout of the freshly appended chapter while the
+          // finger is still moving. The visible-position sampler runs again
+          // after the scroll settles and measures only this suffix then.
+          if (performance.now() - (state.lastScrollAt || 0) < 260) {
+            invalidateMetrics(firstAdded);
+            return;
+          }
           var scrollY = window.scrollY;
           for (var metricIndex = firstAdded; metricIndex < state.nodes.length; metricIndex += 1) {
             var rect = state.nodes[metricIndex].getBoundingClientRect();
@@ -1324,9 +1337,30 @@ enum WebReaderHTML {
         state.metricsInvalidFrom = 0;
       }
 
+      function cachedVisibleMetric() {
+        var element = state.lastMetricElement;
+        if (!element || !element.isConnected || !state.lastMetricKey) { return null; }
+        var rect = element.getBoundingClientRect();
+        return {
+          flat: state.visible,
+          local: state.lastMetricLocal,
+          key: state.lastMetricKey,
+          element: element,
+          top: rect.top + window.scrollY,
+          height: Math.max(rect.height, 1)
+        };
+      }
+
       function captureAnchor() {
         if (!state.nodes.length) { return null; }
-        var metric = metricAt(window.scrollY + topInset() + 1);
+        // Content can arrive in the middle of a fling. Reuse the last reported
+        // paragraph and read one rect instead of rebuilding the whole metric
+        // table before the document patch.
+        var metric = null;
+        if (state.metricsDirty && performance.now() - (state.lastScrollAt || 0) < 320) {
+          metric = cachedVisibleMetric();
+        }
+        if (!metric) { metric = metricAt(window.scrollY + topInset() + 1); }
         if (!metric) { return null; }
         var offset = window.scrollY + topInset() + 1 - metric.top;
         return {
@@ -1378,7 +1412,15 @@ enum WebReaderHTML {
         return best;
       }
 
-      function reportVisiblePosition(now, preciseOffset) {
+      function reportVisiblePosition(now, preciseOffset, allowMetricsRebuild) {
+        // A dirty cache means the next metricAt() would walk every paragraph
+        // with getBoundingClientRect. Doing that inside a fling is the exact
+        // forced-layout hitch at chapter boundaries. In-motion reports use the
+        // previous metric; the idle sampler rebuilds once the finger is up.
+        if (state.metricsDirty && allowMetricsRebuild === false) {
+          state.lastVisiblePostAt = now;
+          return false;
+        }
         var metric = metricAt(window.scrollY + topInset() + 4);
         if (!metric) { return false; }
         // A divider's flat slot maps to the preceding chapter in the paged
@@ -1407,6 +1449,9 @@ enum WebReaderHTML {
         } else if (previousFlat === metric.flat && previousRevision === state.revision) {
           offset = previousOffset;
         }
+        state.lastMetricElement = metric.element;
+        state.lastMetricKey = metric.key;
+        state.lastMetricLocal = metric.local;
         if (state.visible === metric.flat && state.visibleOffset === offset
             && state.visibleRevision === state.revision) { return true; }
         state.visible = metric.flat;
@@ -1430,11 +1475,19 @@ enum WebReaderHTML {
 
       function onScroll() {
         var y = window.scrollY;
-        var viewport = window.innerHeight;
-        var height = document.documentElement.scrollHeight;
         var now = performance.now();
+        // Reading scrollHeight forces a layout query. Four times a second is
+        // enough for the 3.5-screen prefetch runway and leaves the other 116
+        // frames to the actual scroll.
+        if (!state.documentHeight || now - (state.lastHeightMeasureAt || 0) >= 250) {
+          state.documentHeight = document.documentElement.scrollHeight;
+          state.viewportHeight = window.innerHeight;
+          state.lastHeightMeasureAt = now;
+        }
+        var viewport = state.viewportHeight || window.innerHeight;
+        var height = state.documentHeight;
         if (state.nodes.length && now - (state.lastVisiblePostAt || 0) >= 120) {
-          reportVisiblePosition(now, false);
+          reportVisiblePosition(now, false, false);
         }
         var bottom = y + viewport;
         // 预取要早于「看不见下一章」的那一刻：离末尾还剩约 3.5 屏就开始要下一章，
