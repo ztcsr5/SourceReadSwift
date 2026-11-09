@@ -2,11 +2,36 @@ import Foundation
 import UIKit
 import ZIPFoundation
 
+enum BookExportFormat: String, CaseIterable, Equatable, Sendable {
+    case txt
+    case epub
+    case zip
+
+    var displayName: String {
+        switch self {
+        case .txt: return "TXT"
+        case .epub: return "EPUB"
+        case .zip: return "ZIP"
+        }
+    }
+
+    var fileExtension: String { rawValue }
+}
+
 struct BookArchiveExport: Sendable {
     let url: URL
+    let format: BookExportFormat
     let exportedChapterCount: Int
     let totalChapterCount: Int
     var isPartial: Bool { exportedChapterCount < totalChapterCount }
+
+    init(url: URL, format: BookExportFormat = .zip,
+         exportedChapterCount: Int, totalChapterCount: Int) {
+        self.url = url
+        self.format = format
+        self.exportedChapterCount = exportedChapterCount
+        self.totalChapterCount = totalChapterCount
+    }
 }
 
 enum BookExportError: LocalizedError, Equatable {
@@ -19,7 +44,7 @@ enum BookExportError: LocalizedError, Equatable {
         case .noContent:
             return "本书还没有可导出的正文。请先在目录中缓存章节，或阅读几章后再导出。"
         case .archiveCreationFailed:
-            return "无法创建 ZIP 文件，请重试。"
+            return "无法创建导出文件，请重试。"
         case .chapterTooLarge:
             return "正文超过单个 ZIP 条目的 4 GB 上限，无法导出。"
         }

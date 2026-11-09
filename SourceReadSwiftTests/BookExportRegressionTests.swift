@@ -77,6 +77,69 @@ final class BookExportRegressionTests: XCTestCase {
         XCTAssertEqual(Set(archive.map(\.path)), ["正文.txt", "metadata.json"])
     }
 
+    func testUnifiedExportSupportsTXTEPUBAndZIP() throws {
+        let book = fixtureBook()
+        let chapters = [chapter(2), chapter(1)]
+
+        let txt = try BookExportService().exportBook(
+            book: book, cachedChapters: chapters, format: .txt, coverJPEG: nil)
+        defer { try? FileManager.default.removeItem(at: txt.url) }
+        XCTAssertEqual(txt.format, .txt)
+        XCTAssertEqual(txt.url.pathExtension, "txt")
+        XCTAssertEqual(txt.exportedChapterCount, 2)
+        XCTAssertTrue(try String(contentsOf: txt.url, encoding: .utf8).contains("第 2 章 章节1"))
+
+        let epub = try BookExportService().exportBook(
+            book: book, cachedChapters: chapters, format: .epub,
+            coverJPEG: Data([0xFF, 0xD8, 0xFF, 0xD9]), totalChapterCount: 4)
+        defer { try? FileManager.default.removeItem(at: epub.url) }
+        XCTAssertEqual(epub.format, .epub)
+        XCTAssertEqual(epub.url.pathExtension, "epub")
+        XCTAssertTrue(epub.isPartial)
+        let archive = try XCTUnwrap(Archive(url: epub.url, accessMode: .read))
+        let entries = Dictionary(uniqueKeysWithValues: archive.map { ($0.path, $0) })
+        XCTAssertEqual(Array(archive).first?.path, "mimetype")
+        XCTAssertEqual(Set(entries.keys), Set([
+            "mimetype", "META-INF/container.xml", "OEBPS/content.opf",
+            "OEBPS/nav.xhtml", "OEBPS/toc.ncx", "OEBPS/style.css",
+            "OEBPS/cover.jpg", "OEBPS/cover.xhtml",
+            "OEBPS/chapter-0001.xhtml", "OEBPS/chapter-0002.xhtml"
+        ]))
+        let mimetype = try extract("mimetype", from: archive, entries: entries)
+        XCTAssertEqual(String(decoding: mimetype, as: UTF8.self), "application/epub+zip")
+        let firstChapter = try extract("OEBPS/chapter-0001.xhtml", from: archive, entries: entries)
+        XCTAssertTrue(String(decoding: firstChapter, as: UTF8.self).contains("章节1"))
+        let package = try extract("OEBPS/content.opf", from: archive, entries: entries)
+        XCTAssertTrue(String(decoding: package, as: UTF8.self).contains("<dc:title>导出回归</dc:title>"))
+
+        let zip = try BookExportService().exportBook(
+            book: book, cachedChapters: chapters, format: .zip, coverJPEG: nil)
+        defer { try? FileManager.default.removeItem(at: zip.url) }
+        XCTAssertEqual(zip.format, .zip)
+        XCTAssertEqual(zip.url.pathExtension, "zip")
+    }
+
+    func testEPUBEscapesChapterXMLAndOrdersChaptersByDirectoryIndex() throws {
+        let book = fixtureBook()
+        let result = try BookEPUBWriter().export(
+            book: book,
+            chapters: [
+                chapter(3, title: "三 <&>", text: "正文 & <标签>"),
+                chapter(1, title: "一", text: "第一章")
+            ],
+            coverJPEG: nil,
+            totalChapterCount: 3
+        )
+        defer { try? FileManager.default.removeItem(at: result.url) }
+        let archive = try XCTUnwrap(Archive(url: result.url, accessMode: .read))
+        let entries = Dictionary(uniqueKeysWithValues: archive.map { ($0.path, $0) })
+        let first = String(decoding: try extract("OEBPS/chapter-0001.xhtml", from: archive, entries: entries), as: UTF8.self)
+        let third = String(decoding: try extract("OEBPS/chapter-0002.xhtml", from: archive, entries: entries), as: UTF8.self)
+        XCTAssertTrue(first.contains("第一章"))
+        XCTAssertTrue(third.contains("三 &lt;&amp;&gt;"))
+        XCTAssertTrue(third.contains("正文 &amp; &lt;标签&gt;"))
+    }
+
     func testArchiveRejectsAnEmptyChapterCache() {
         XCTAssertThrowsError(try BookExportService().exportBookArchive(
             book: fixtureBook(), cachedChapters: [], coverJPEG: nil)) { error in
@@ -111,8 +174,13 @@ final class BookExportRegressionTests: XCTestCase {
             sourceName: "离线", sourceURL: "fixture", bookURL: "fixture/book", intro: nil)
     }
 
-    private func chapter(_ index: Int) -> ChapterContent {
-        ChapterContent(chapter: BookChapter(title: "章节\(index)", url: "fixture/\(index)", bookUrl: "fixture/book", index: index),
-            title: "章节\(index)", paragraphs: ["正文\(index)"])
+    private func chapter(_ index: Int, title: String? = nil, text: String? = nil) -> ChapterContent {
+        let chapterTitle = title ?? "章节\(index)"
+        return ChapterContent(
+            chapter: BookChapter(title: chapterTitle, url: "fixture/\(index)",
+                                 bookUrl: "fixture/book", index: index),
+            title: chapterTitle,
+            paragraphs: [text ?? "正文\(index)"]
+        )
     }
 }

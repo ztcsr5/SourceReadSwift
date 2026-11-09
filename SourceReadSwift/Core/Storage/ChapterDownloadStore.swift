@@ -253,23 +253,48 @@ final class ChapterDownloadCoordinator: ObservableObject {
         store.markRunning(bookID: bookID)
         let task = Task { @MainActor [weak self, weak store] in
             guard let self, let store else { return }
-            for chapter in chapters {
-                guard self.isCurrentJob(bookID, generation: generation) else { return }
-                guard !completed.contains(chapter.index) else { continue }
-                if isComic {
+            if isComic {
+                // Comic archives hold image data in a separate store. Keep their
+                // writes serialized; text chapters use the bounded batch below.
+                for chapter in chapters {
+                    guard self.isCurrentJob(bookID, generation: generation) else { return }
+                    guard !completed.contains(chapter.index) else { continue }
                     await self.downloadComic(chapter, plan: (bookID, generation, source, engine))
-                    continue
                 }
-                let result = await AsyncTimeout.run(seconds: 14) {
-                    await engine.getContent(source: source, chapter: chapter)
-                } ?? .failure(.network("Download timed out"))
-                guard self.isCurrentJob(bookID, generation: generation) else { return }
-                switch result {
-                case .success(let content):
-                    cacheStore.save(content, sourceURL: source.bookSourceUrl, purifyRules: purifyRules)
-                    store.markCompleted(bookID: bookID, chapterIndex: chapter.index)
-                case .failure(let error):
-                    store.markFailed(bookID: bookID, chapterIndex: chapter.index, message: error.displayMessage)
+            } else {
+                let pending = chapters.filter { !completed.contains($0.index) }
+                let limit = max(1, ChapterFetchPolicy.concurrentRequestLimit)
+                for start in stride(from: 0, to: pending.count, by: limit) {
+                    guard self.isCurrentJob(bookID, generation: generation) else { return }
+                    let end = min(start + limit, pending.count)
+                    let batch = Array(pending[start..<end])
+                    let results = await withTaskGroup(
+                        of: (BookChapter, Result<ChapterContent, SourceEngineError>).self
+                    ) { group in
+                        for chapter in batch {
+                            group.addTask {
+                                let result = await ChapterFetchPolicy.fetch(
+                                    source: source, chapter: chapter, engine: engine)
+                                return (chapter, result)
+                            }
+                        }
+                        var collected: [(BookChapter, Result<ChapterContent, SourceEngineError>)] = []
+                        for await result in group { collected.append(result) }
+                        return collected
+                    }
+                    guard self.isCurrentJob(bookID, generation: generation) else { return }
+                    for (chapter, result) in results {
+                        guard self.isCurrentJob(bookID, generation: generation) else { return }
+                        switch result {
+                        case .success(let content):
+                            cacheStore.save(content, sourceURL: source.bookSourceUrl,
+                                             purifyRules: purifyRules)
+                            store.markCompleted(bookID: bookID, chapterIndex: chapter.index)
+                        case .failure(let error):
+                            store.markFailed(bookID: bookID, chapterIndex: chapter.index,
+                                              message: error.displayMessage)
+                        }
+                    }
                 }
             }
             guard self.isCurrentJob(bookID, generation: generation) else { return }
