@@ -355,7 +355,7 @@ struct DiscoverView: View {
             VStack(spacing: 14) {
                 searchField
                 matchModePicker
-                resultFilterPicker
+                searchResultScopeBar
             }
             .onChange(of: viewModel.matchMode) { _ in
                 viewModel.applyMatchMode()
@@ -428,48 +428,104 @@ struct DiscoverView: View {
         }
     }
 
-    private var resultFilterPicker: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            if viewModel.hasUnfilteredResults {
-                if usesForestGlass {
-                    BrandSegmentedControl("结果筛选", selection: $viewModel.resultFilterScope,
-                        options: SearchResultFilterScope.allCases.map { ($0, $0.title) })
-                } else {
-                    HStack(spacing: 0) {
-                        ForEach(SearchResultFilterScope.allCases) { scope in
-                            let isSelected = viewModel.resultFilterScope == scope
-                            Button {
-                                UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                                viewModel.resultFilterScope = scope
-                            } label: {
-                                Text(scope.title)
-                                    .font(.system(size: 12, weight: isSelected ? .semibold : .medium))
-                                    .foregroundStyle(isSelected ? Color.white : Color.primary)
-                                    .padding(.horizontal, 10)
-                                    .padding(.vertical, 5)
-                                    .background {
-                                        if isSelected {
-                                            RoundedRectangle(cornerRadius: 7, style: .continuous)
-                                                .fill(AppTheme.accent)
-                                        }
-                                    }
-                            }
-                            .buttonStyle(.plain)
-                        }
-                    }
-                    .padding(2)
-                    .background(Color(UIColor.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 9, style: .continuous))
+    /// 取消单独的筛选输入框：两个词义按钮直接复用搜索关键词，第三个入口
+    /// 选择具体书源，并把下一次在线搜索限定在该书源内。
+    private var searchResultScopeBar: some View {
+        HStack(spacing: 8) {
+            resultScopeChip(.title)
+            resultScopeChip(.author)
+            searchSourceMenu
+            Spacer(minLength: 0)
+            if viewModel.resultFilterScope != .all || viewModel.selectedSourceURL != nil {
+                Button {
+                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                    viewModel.resultFilterScope = .all
+                    viewModel.clearSearchSource()
+                    viewModel.applyResultFilter()
+                } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundStyle(.secondary)
+                        .frame(width: 34, height: 34)
                 }
-
-                TextField(viewModel.resultFilterScope.placeholder, text: $viewModel.resultFilter)
-                    .textInputAutocapitalization(.never)
-                    .autocorrectionDisabled(true)
-                    .padding(.horizontal, 12)
-                    .frame(height: 42)
-                    .background(Color(.systemGray6), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
-                    .onChange(of: viewModel.resultFilter) { _ in viewModel.applyResultFilterDebounced() }
-                    .onChange(of: viewModel.resultFilterScope) { _ in viewModel.applyResultFilter() }
+                .buttonStyle(.plain)
+                .accessibilityLabel("清除结果筛选")
             }
+        }
+        .accessibilityIdentifier("discover.resultScopeBar")
+    }
+
+    private func resultScopeChip(_ scope: SearchResultFilterScope) -> some View {
+        let isSelected = viewModel.resultFilterScope == scope
+        return Button {
+            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+            viewModel.resultFilterScope = isSelected ? .all : scope
+            viewModel.applyResultFilter()
+        } label: {
+            Text(scope.title)
+                .font(.system(size: 12, weight: isSelected ? .semibold : .medium))
+                .foregroundStyle(isSelected ? Color.white : Color.primary)
+                .padding(.horizontal, 12)
+                .frame(height: 32)
+                .background {
+                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                        .fill(isSelected ? AppTheme.accent : Color(UIColor.secondarySystemGroupedBackground))
+                }
+        }
+        .buttonStyle(.plain)
+        .accessibilityIdentifier("discover.resultScope." + scope.rawValue)
+    }
+
+    private var searchSourceMenu: some View {
+        Menu {
+            Button {
+                viewModel.clearSearchSource()
+                restartSearchAfterSourceChange()
+            } label: {
+                Label("全部已启用书源", systemImage: viewModel.selectedSourceURL == nil ? "checkmark" : "books.vertical")
+            }
+            Divider()
+            ForEach(searchableSources) { source in
+                Button {
+                    viewModel.setSearchSource(url: source.bookSourceUrl)
+                    restartSearchAfterSourceChange()
+                } label: {
+                    Label(source.bookSourceName,
+                          systemImage: viewModel.selectedSourceURL == source.bookSourceUrl ? "checkmark" : "books.vertical")
+                }
+            }
+        } label: {
+            HStack(spacing: 5) {
+                Image(systemName: "books.vertical")
+                    .font(.system(size: 12, weight: .semibold))
+                Text(viewModel.selectedSourceName ?? "书源")
+                    .font(.system(size: 12, weight: viewModel.selectedSourceURL == nil ? .medium : .semibold))
+                    .lineLimit(1)
+            }
+            .foregroundStyle(viewModel.selectedSourceURL == nil ? Color.primary : AppTheme.accent)
+            .padding(.horizontal, 11)
+            .frame(height: 32)
+            .background {
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .fill(viewModel.selectedSourceURL == nil ? Color(UIColor.secondarySystemGroupedBackground) : AppTheme.accent.opacity(0.12))
+            }
+        }
+        .accessibilityIdentifier("discover.searchSource")
+    }
+
+    private var searchableSources: [BookSource] {
+        appState.sourceStore.sources.filter { source in
+            guard source.enabled else { return false }
+            if let kind = viewModel.selectedSourceKind {
+                return source.canSearch(mediaKind: kind)
+            }
+            return true
+        }
+    }
+
+    private func restartSearchAfterSourceChange() {
+        if !viewModel.keyword.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            viewModel.startSearch()
         }
     }
 
@@ -1287,6 +1343,9 @@ final class DiscoverViewModel: ObservableObject {
     @Published var matchMode: SearchMatchMode = .exact
     @Published var resultFilterScope: SearchResultFilterScope = .all
     @Published var resultFilter = ""
+    /// 第三个搜索入口：把在线搜索限定在一个具体书源内。
+    @Published private(set) var selectedSourceURL: String?
+    @Published private(set) var selectedSourceName: String?
     @Published var selectedSourceKind: BookSourceKind? = nil
     /// Visible, filtered result rows. `didSet` refreshes the derived groupings
     /// once per change; the groupings used to be recomputed on every `body`
@@ -1307,8 +1366,16 @@ final class DiscoverViewModel: ObservableObject {
     var hasRawResults: Bool { !rawResults.isEmpty }
     @Published private(set) var hasFinishedSearch = false
     @Published private(set) var wasCancelled = false
+    /// The result chips reuse the submitted keyword instead of a separate text
+    /// field, so there is no hidden filter string to keep in sync.
+    private var effectiveResultFilterQuery: String {
+        guard resultFilterScope != .all else { return "" }
+        let typed = resultFilter.trimmingCharacters(in: .whitespacesAndNewlines)
+        return typed.isEmpty ? activeKeyword : typed
+    }
+
     var filterSummary: String {
-        resultFilter.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "" : " · 筛选后 \(results.count) 条"
+        effectiveResultFilterQuery.isEmpty ? "" : " · 筛选后 \(results.count) 条"
     }
     @Published var isSearching = false
     @Published var errorMessage: String?
@@ -1394,9 +1461,15 @@ final class DiscoverViewModel: ObservableObject {
     }
 
     nonisolated static func makeProjection(_ books: [SearchBook], kinds: [String: BookSourceKind],
-                                           kind: BookSourceKind?, query: String,
+                                           kind: BookSourceKind?, sourceURL: String? = nil, query: String,
                                            scope: SearchResultFilterScope) -> ResultProjection {
-        let base = kind.map { selected in books.filter { ($0.mediaKind ?? kinds[$0.sourceUrl] ?? .text) == selected } } ?? books
+        var base = books
+        if let sourceURL, !sourceURL.isEmpty {
+            base = base.filter { $0.sourceUrl == sourceURL }
+        }
+        if let kind {
+            base = base.filter { ($0.mediaKind ?? kinds[$0.sourceUrl] ?? .text) == kind }
+        }
         let filtered = SearchResultFilter.apply(base, query: query, scope: scope)
         return .init(results: filtered, groups: makeGroupedResults(from: filtered),
                      aggregated: makeAggregatedResults(from: filtered, kinds: kinds))
@@ -1411,10 +1484,11 @@ final class DiscoverViewModel: ObservableObject {
         let revision = projectionRevision
         let kinds = sourceKindCache
         let kind = selectedSourceKind
-        let query = resultFilter
+        let query = effectiveResultFilterQuery
         let scope = resultFilterScope
+        let sourceURL = selectedSourceURL
         let projection = await Task.detached(priority: .userInitiated) {
-            Self.makeProjection(books, kinds: kinds, kind: kind, query: query, scope: scope)
+            Self.makeProjection(books, kinds: kinds, kind: kind, sourceURL: sourceURL, query: query, scope: scope)
         }.value
         guard !Task.isCancelled, projectionRevision == revision else { return }
         installingProjection = true
@@ -1521,12 +1595,15 @@ final class DiscoverViewModel: ObservableObject {
 
     func applyResultFilter() {
         var base = unfilteredResults
+        if let selectedSourceURL, !selectedSourceURL.isEmpty {
+            base = base.filter { $0.sourceUrl == selectedSourceURL }
+        }
         if let kind = selectedSourceKind {
             base = base.filter { book in
                 sourceKind(for: book) == kind
             }
         }
-        results = SearchResultFilter.apply(base, query: resultFilter, scope: resultFilterScope)
+        results = SearchResultFilter.apply(base, query: effectiveResultFilterQuery, scope: resultFilterScope)
     }
 
     /// Typing in the filter field re-folds every field of every row, so the text
@@ -1559,12 +1636,33 @@ final class DiscoverViewModel: ObservableObject {
 
     func selectSourceKind(_ kind: BookSourceKind?) {
         guard selectedSourceKind != kind else { return }
+        // A concrete source that cannot serve the new medium must not survive
+        // and silently produce an empty search.
+        if let kind, let url = selectedSourceURL,
+           let source = appState?.sourceStore.source(for: url),
+           !source.canSearch(mediaKind: kind) {
+            selectedSourceURL = nil
+            selectedSourceName = nil
+        }
         selectedSourceKind = kind
         applyResultFilter()
         if !keyword.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             lastSubmittedKeyword = ""
             startSearch()
         }
+    }
+
+    /// Set by Global Search (or the source menu) before `startSearch()`.
+    func setSearchSource(url: String?) {
+        let next = url?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty
+        guard selectedSourceURL != next else { return }
+        selectedSourceURL = next
+        selectedSourceName = next.flatMap { appState?.sourceStore.source(for: $0)?.bookSourceName }
+        lastSubmittedKeyword = ""
+    }
+
+    func clearSearchSource() {
+        setSearchSource(url: nil)
     }
 
     func applyMatchMode() {
@@ -1620,6 +1718,7 @@ final class DiscoverViewModel: ObservableObject {
 
         let sources = appState.sourceStore.sources.filter { source in
             guard source.enabled else { return false }
+            if let selectedSourceURL, source.bookSourceUrl != selectedSourceURL { return false }
             if let kind = selectedSourceKind {
                 return source.canSearch(mediaKind: kind)
             }
@@ -1627,7 +1726,11 @@ final class DiscoverViewModel: ObservableObject {
         }
         enabledSourceCount = sources.count
         guard !sources.isEmpty else {
-            errorMessage = selectedSourceKind != nil ? "未找到启用的\(selectedSourceKind!.displayName)书源，请在书源管理中导入或启用相应源。" : "没有可用书源，请先到书源管理导入书源。"
+            if selectedSourceURL != nil {
+                errorMessage = "所选书源当前不可用或与所选类型不匹配，请重新选择。"
+            } else {
+                errorMessage = selectedSourceKind != nil ? "未找到启用的\(selectedSourceKind!.displayName)书源，请在书源管理中导入或启用相应源。" : "没有可用书源，请先到书源管理导入书源。"
+            }
             return
         }
 
@@ -1671,7 +1774,7 @@ final class DiscoverViewModel: ObservableObject {
         // Z-Library is merged when it answers; the source phase never waits for
         // it. Its URLSession resource timeout is 60s, which is why a search with
         // only one or two sources felt slower than a search with many.
-        let shouldSearchZlib = selectedSourceKind == nil || selectedSourceKind == .text
+        let shouldSearchZlib = selectedSourceURL == nil && (selectedSourceKind == nil || selectedSourceKind == .text)
         let zlibSearchTask = Task { () -> [SearchBook] in
             guard shouldSearchZlib else { return [] }
             let res = await ZlibraryEngine.shared.search(keyword: keyword, page: 1)

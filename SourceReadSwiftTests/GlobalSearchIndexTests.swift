@@ -53,6 +53,33 @@ final class GlobalSearchIndexTests: XCTestCase {
         XCTAssertTrue(GlobalSearchIndex.search("书源", entries: entries, limit: 0).isEmpty)
     }
 
+    func testSourceScopeOnlyReturnsEntriesOwnedByTheChosenSource() {
+        let entries = [
+            GlobalSearchEntry(id: "a", kind: .book, title: "同名作品", subtitle: "作者",
+                              target: "a", sourceURL: "https://source-a.invalid"),
+            GlobalSearchEntry(id: "b", kind: .book, title: "同名作品", subtitle: "作者",
+                              target: "b", sourceURL: "https://source-b.invalid")
+        ]
+        let index = GlobalSearchIndex(entries: entries)
+        XCTAssertEqual(index.search("同名", scope: .source, sourceURL: "https://source-a.invalid").map(\.id), ["a"])
+        XCTAssertEqual(index.search("", scope: .source, sourceURL: "https://source-b.invalid").map(\.id), ["b"])
+        XCTAssertTrue(index.search("同名", scope: .source).isEmpty,
+                      "Source scope without a concrete source must not degrade to a subtitle search")
+        XCTAssertTrue(index.search("同名", scope: .source, sourceURL: "https://missing.invalid").isEmpty)
+    }
+
+    func testSourceScopeIgnoresEntriesWhoseSubtitleMentionsTheSourceName() {
+        let entries = [
+            GlobalSearchEntry(id: "book", kind: .book, title: "书", subtitle: "聚合源 · 作者", target: "book",
+                              sourceURL: "https://other.invalid"),
+            GlobalSearchEntry(id: "source", kind: .source, title: "聚合源", subtitle: "书源",
+                              target: "聚合源", sourceURL: "https://aggregate.invalid")
+        ]
+        let matches = GlobalSearchIndex(entries: entries)
+            .search("聚合", scope: .source, sourceURL: "https://aggregate.invalid")
+        XCTAssertEqual(matches.map(\.id), ["source"])
+    }
+
     func testBookmarkSearchRetainsTheOwningBookAndExactBookmark() {
         var book = BookshelfBook(searchBook: SearchBook(name: "原书", author: "作者", coverUrl: nil,
             bookUrl: "https://fixture.invalid/book", sourceName: "测试源", sourceUrl: "https://fixture.invalid"))

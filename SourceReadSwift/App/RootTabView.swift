@@ -49,8 +49,9 @@ struct RootTabView: View {
         }
         .sheet(isPresented: $showFullAudioPlayer) { AudioBookPlayerView() }
         .sheet(isPresented: $showsGlobalSearch) {
-            GlobalSearchView(bookshelf: appState.bookshelfStore, sources: appState.sourceStore) { keyword in
+            GlobalSearchView(bookshelf: appState.bookshelfStore, sources: appState.sourceStore) { keyword, sourceURL in
                 appState.discoverViewModel.keyword = keyword
+                appState.discoverViewModel.setSearchSource(url: sourceURL)
                 appState.discoverViewModel.startSearch()
                 showsGlobalSearch = false
                 shouldFocusRequestedSearch = false
@@ -102,8 +103,9 @@ struct RootTabView: View {
                 GlobalSearchView(
                     bookshelf: appState.bookshelfStore,
                     sources: appState.sourceStore,
-                    onSearchOnline: { keyword in
+                    onSearchOnline: { keyword, sourceURL in
                         appState.discoverViewModel.keyword = keyword
+                        appState.discoverViewModel.setSearchSource(url: sourceURL)
                         appState.discoverViewModel.startSearch()
                         shouldFocusRequestedSearch = false
                         legacySearchRequest = UUID()
@@ -120,27 +122,43 @@ struct RootTabView: View {
         .toolbar(isSearching ? .hidden : .visible, for: .tabBar)
         .overlay(alignment: .bottomLeading) {
             if isSearching {
+                // 用户口径：整条 tab 栏收向左，只保留对应 tab 的控件。系统
+                // TabView 没有“只留一个 item”的形态，因此收起后画一个和原
+                // tab 同图标同名的胶囊，点击回到该 tab。
                 Button {
                     selectedTab = lastNonSearchTab
                 } label: {
-                    Image(systemName: "chevron.backward")
-                        .font(.system(size: 17, weight: .semibold))
-                        .foregroundStyle(.primary)
-                        .frame(width: 46, height: 46)
-                        .background(.ultraThinMaterial, in: Circle())
-                        .overlay(Circle().strokeBorder(Color.primary.opacity(0.08), lineWidth: 0.6))
-                        .shadow(color: .black.opacity(0.12), radius: 8, y: 3)
+                    HStack(spacing: 8) {
+                        Image(systemName: collapsedSearchTab.symbol)
+                            .font(.system(size: 15, weight: .semibold))
+                        Text(collapsedSearchTab.title)
+                            .font(.system(size: 14, weight: .semibold))
+                    }
+                    .foregroundStyle(.primary)
+                    .padding(.horizontal, 16)
+                    .frame(height: 46)
+                    .background(.ultraThinMaterial, in: Capsule())
+                    .overlay(Capsule().strokeBorder(Color.primary.opacity(0.08), lineWidth: 0.6))
+                    .shadow(color: .black.opacity(0.12), radius: 8, y: 3)
                 }
                 .buttonStyle(.plain)
                 .padding(.leading, 16)
                 .padding(.bottom, 12)
                 .accessibilityIdentifier("search.collapsedReturn")
-                .accessibilityLabel("返回上一页")
+                .accessibilityLabel("返回\(collapsedSearchTab.title)")
             }
         }
     }
 
     private var isSearching: Bool { selectedTab == 3 }
+
+    private var collapsedSearchTab: (title: String, symbol: String) {
+        switch lastNonSearchTab {
+        case 1: return (AppNavigationLabels.findBooks, AppNavigationLabels.findBooksSymbol)
+        case 2: return ("设置", "gearshape")
+        default: return ("主页", "house")
+        }
+    }
 
     private var legacyNavigationContent: some View {
         // Retain each navigation stack while the custom bar changes selection.

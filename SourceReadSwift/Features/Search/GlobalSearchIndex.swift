@@ -9,6 +9,10 @@ struct GlobalSearchEntry: Identifiable, Sendable, Equatable {
     let subtitle: String
     let target: String
     var bookmarkID: String? = nil
+    /// Empty for settings entries; otherwise the exact book source that owns
+    /// this row, so the source-scoped search is a real filter rather than a
+    /// subtitle guess.
+    var sourceURL: String = ""
 }
 
 struct GlobalSearchIndex: Sendable {
@@ -45,18 +49,19 @@ struct GlobalSearchIndex: Sendable {
             guard !Task.isCancelled else { return [] }
             entries.append(.init(id: "book:" + book.id, kind: .book, title: book.title,
                 subtitle: [book.author, book.groupName, book.intro].compactMap { $0 }.joined(separator: " · "),
-                target: book.id))
+                target: book.id, sourceURL: book.sourceURL))
             for bookmark in book.bookmarks ?? [] {
                 guard !Task.isCancelled else { return [] }
                 entries.append(.init(id: "bookmark:" + book.id + ":" + bookmark.id, kind: .bookmark,
                     title: bookmark.chapterTitle, subtitle: book.title + " · " + bookmark.snippet,
-                    target: book.id, bookmarkID: bookmark.id))
+                    target: book.id, bookmarkID: bookmark.id, sourceURL: book.sourceURL))
             }
         }
         for source in sources {
             guard !Task.isCancelled else { return [] }
             entries.append(.init(id: "source:" + source.id, kind: .source, title: source.bookSourceName,
-                                 subtitle: source.bookSourceGroup ?? "书源", target: source.bookSourceName))
+                                 subtitle: source.bookSourceGroup ?? "书源", target: source.bookSourceName,
+                                 sourceURL: source.bookSourceUrl))
         }
         return entries
     }
@@ -82,10 +87,35 @@ struct GlobalSearchIndex: Sendable {
     }
 
     /// 在指定范围里搜索；范围过滤在打分之前完成，排序规则与全量搜索一致。
-    func search(_ query: String, scope: Scope, limit: Int = 100) -> [GlobalSearchEntry] {
-        guard scope != .all else { return search(query, limit: limit) }
+    func search(_ query: String, scope: Scope, limit: Int = 100,
+                sourceURL: String? = nil) -> [GlobalSearchEntry] {
+        guard limit > 0 else { return [] }
         let tokens = Self.normalize(String(query.prefix(200))).split(whereSeparator: \.isWhitespace).map(String.init)
-        guard !tokens.isEmpty, limit > 0 else { return [] }
+
+        // Source scope means "inside this source", not "subtitle mentions a
+        // source". Without a concrete source there is nothing to search.
+        if scope == .source {
+            guard let sourceURL, !sourceURL.isEmpty else { return [] }
+            let candidates = indexedEntries.filter { $0.destination.sourceURL == sourceURL }
+            if tokens.isEmpty {
+                return Task.isCancelled ? [] : candidates.prefix(limit).map(\.destination)
+            }
+            var matches: [(GlobalSearchEntry, Int)] = []
+            for entry in candidates {
+                guard !Task.isCancelled else { return [] }
+                guard tokens.allSatisfy({ entry.searchable.contains($0) }) else { continue }
+                let score = tokens.reduce(0) { $0 + (entry.title.hasPrefix($1) ? 4 : entry.title.contains($1) ? 2 : 0) }
+                matches.append((entry.destination, score))
+            }
+            matches.sort {
+                if $0.1 != $1.1 { return $0.1 > $1.1 }
+                return $0.0.id < $1.0.id
+            }
+            return Task.isCancelled ? [] : matches.prefix(limit).map(\.0)
+        }
+
+        guard scope != .all else { return search(query, limit: limit) }
+        guard !tokens.isEmpty else { return [] }
         var matches: [(GlobalSearchEntry, Int)] = []
         for entry in indexedEntries {
             guard !Task.isCancelled else { return [] }
@@ -93,8 +123,7 @@ struct GlobalSearchIndex: Sendable {
             switch scope {
             case .title: haystack = entry.title
             case .author: haystack = Self.normalize(entry.destination.subtitle)
-            case .source: haystack = Self.normalize(entry.destination.subtitle) + " " + Self.normalize(entry.destination.title)
-            case .all: haystack = entry.searchable
+            case .source, .all: haystack = entry.searchable
             }
             guard tokens.allSatisfy({ haystack.contains($0) }) else { continue }
             let score = tokens.reduce(0) { $0 + (entry.title.hasPrefix($1) ? 4 : entry.title.contains($1) ? 2 : 0) }
