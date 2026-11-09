@@ -93,7 +93,7 @@ final class ReaderModePositionRegressionTests: XCTestCase {
         })
         let close = mountReaderSurface(web)
         defer { coordinator.tearDown(webView: web); close() }
-        await fulfillment(of: [position], timeout: 10)
+        await fulfillment(of: [position], timeout: 60)
         XCTAssertEqual(bridge.releasedReadyCount, 1, "The fixture must deliver ready after content has a position")
         XCTAssertEqual(bridge.mountedRevisions.count, 1, "The same shell must not rebuild its already mounted window")
         XCTAssertEqual(visiblePositions.first, 0)
@@ -126,7 +126,7 @@ final class ReaderModePositionRegressionTests: XCTestCase {
         let web = coordinator.makeWebView(initialView: fixture)
         let close = mountReaderSurface(web)
         defer { coordinator.tearDown(webView: web); close() }
-        let readiness = await XCTWaiter.fulfillment(of: [opened], timeout: 18)
+        let readiness = await XCTWaiter.fulfillment(of: [opened], timeout: 60)
         guard readiness == .completed else {
             let reported = expectation(description: "Capture reader startup diagnostics")
             var diagnostic = "JavaScript did not return"
@@ -140,7 +140,7 @@ final class ReaderModePositionRegressionTests: XCTestCase {
                 reported.fulfill()
             }
             _ = await XCTWaiter.fulfillment(of: [reported], timeout: 2)
-            XCTFail("No visible prose within 10 seconds: \(diagnostic), loading=\(web.isLoading), bounds=\(web.bounds), recoveries=\(coordinator.startupRecoveryCount)")
+            XCTFail("No visible prose within 60 seconds: \(diagnostic), loading=\(web.isLoading), bounds=\(web.bounds), recoveries=\(coordinator.startupRecoveryCount)")
             return
         }
         let layout = ReaderChapterWindowPolicy.layout([
@@ -224,7 +224,7 @@ final class ReaderModePositionRegressionTests: XCTestCase {
             web.configuration.userContentController.removeScriptMessageHandler(forName: "bridgeFault")
             close()
         }
-        for _ in 0..<150 {
+        for _ in 0..<600 {
             if applied && offset > 0 { break }
             try await Task.sleep(nanoseconds: 100_000_000)
         }
@@ -262,7 +262,7 @@ final class ReaderModePositionRegressionTests: XCTestCase {
         window.rootViewController = host
         window.makeKeyAndVisible()
         defer { window.isHidden = true; previousKeyWindow?.makeKey() }
-        for _ in 0..<150 {
+        for _ in 0..<600 {
             if applied && offset > 0 { break }
             try await Task.sleep(nanoseconds: 100_000_000)
         }

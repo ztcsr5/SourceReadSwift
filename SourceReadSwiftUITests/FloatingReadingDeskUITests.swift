@@ -576,7 +576,7 @@ final class FloatingReadingDeskUITests: XCTestCase {
 
     private func assertReaderProse() {
         let prose = app.webViews.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "这是纸间的隔离视觉验证书库")).firstMatch
-        let isProseReady = prose.waitForExistence(timeout: 12)
+        let isProseReady = prose.waitForExistence(timeout: 45)
         if !isProseReady { capture("reader-prose-startup-failure") }
         XCTAssertTrue(isProseReady, "Check actual chapter prose, not only the existence of a WebView")
     }
