@@ -476,7 +476,8 @@ struct BookshelfView: View {
     private var shelfHeader: some View {
         HStack(spacing: 12) {
             NavigationLink {
-                BookshelfCollectionView(title: "书架", books: allBooks)
+                BookshelfCollectionView(title: "书架", books: allBooks,
+                    onRequestGlobalSearch: onRequestGlobalSearch)
             } label: {
                 HStack(spacing: 7) {
                     Text("书架")
@@ -575,7 +576,8 @@ struct BookshelfView: View {
     @ViewBuilder
     private func collectionHeader(title: String, books: [BookshelfBook]) -> some View {
         NavigationLink {
-            BookshelfCollectionView(title: title, books: books)
+            BookshelfCollectionView(title: title, books: books,
+                onRequestGlobalSearch: onRequestGlobalSearch)
         } label: {
             HStack(spacing: 7) {
                 Text(title)
@@ -1138,10 +1140,16 @@ private struct BookshelfCollectionView: View {
     @State private var selectedBookForDetail: BookshelfBook?
     @State private var searchKeyword = ""
     @State private var debouncedSearchKeyword = ""
+    @Namespace private var collectionHero
+    /// The root page owns the tab/overlay switch, so the collection screen only
+    /// forwards the request instead of guessing how global search is presented.
+    private let onRequestGlobalSearch: () -> Void
 
-    init(title: String, books: [BookshelfBook], startsManaging: Bool = false) {
+    init(title: String, books: [BookshelfBook], startsManaging: Bool = false,
+         onRequestGlobalSearch: @escaping () -> Void = {}) {
         self.title = title
         self.books = books
+        self.onRequestGlobalSearch = onRequestGlobalSearch
         _isManaging = State(initialValue: startsManaging)
     }
 
@@ -1165,6 +1173,13 @@ private struct BookshelfCollectionView: View {
 
     private var visibleBookIDs: Set<String> {
         Set(liveDisplayBooks.map(\.id))
+    }
+
+    /// The collection screen pushes the same detail destination as the shelf, so
+    /// both entry points share the hero zoom transition.
+    private func detailDestination(_ book: BookshelfBook, placement: String) -> some View {
+        BookDetailView(book: book.asSearchBook)
+            .bookHeroDestination(placement + "|" + book.id, in: collectionHero)
     }
 
     var body: some View {

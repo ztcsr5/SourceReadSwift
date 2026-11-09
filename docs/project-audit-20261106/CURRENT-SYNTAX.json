@@ -1,93 +1,45 @@
 {
-  "baseline": "9334c75b6ab067f86ceee5070a867daee820b95b",
+  "baseline": "974b79b2",
   "files": [
     {
-      "path": "SourceReadSwift/Features/Bookshelf/AtelierReadingCard.swift",
-      "sha256": "fb812796861e9a3afef7f68d59c60ae9e8071e141d42ac4eae4339187cefe22c",
+      "path": "SourceReadSwift/Core/Rules/BookDetailParser.swift",
+      "sha256": "91dcded37fb78ee9358b468cf58a15106133499145b59237f2298e74c5bdc998",
       "new_parser_errors": 0,
       "snippets": []
     },
     {
       "path": "SourceReadSwift/Features/Bookshelf/BookshelfView.swift",
-      "sha256": "a29eba4e13f548c49403822f2f8700add99c29a6bb511f8d92a40caa13b1f8f5",
+      "sha256": "17b60e1fce70b68545d70fbb192b2f611a00ec420f195b69448b1741a0ba5852",
       "new_parser_errors": 0,
       "snippets": []
     },
     {
-      "path": "SourceReadSwift/Features/Bookshelf/HomeReturnReadinessProbe.swift",
-      "sha256": "a298b26bbfe3f82bb87bbe4726a60389e3ec140f48e03124d0ee21dc61cd1776",
+      "path": "SourceReadSwift/Features/Discover/BookDetailSummary.swift",
+      "sha256": "bef4f5c8ec80a4e8ebb0fab07e6f193b698eb71a0e3c16c7622692b6a421dff5",
       "new_parser_errors": 0,
       "snippets": []
     },
     {
-      "path": "SourceReadSwift/Features/Bookshelf/NativeBookGestureProbe.swift",
-      "sha256": "6cb42b01a213e46ae8532aa580bfac3234cdd3861f250fc9fe6b0fc834a2a44f",
+      "path": "SourceReadSwift/Shared/ScrollingNavigationChrome.swift",
+      "sha256": "2cb90c385e7233d4d64ebdf2949a2f719bac22fe6a68b915b23888690eacc496",
       "new_parser_errors": 0,
       "snippets": []
     },
     {
-      "path": "SourceReadSwift/Features/Bookshelf/ReaderBookPassageController.swift",
-      "sha256": "300110e38632e0d6dc98b787a64e62ad7f3f27c2a30985b0cc5f146a81e06b85",
+      "path": "SourceReadSwiftTests/ScrollChromeGateTests.swift",
+      "sha256": "2c3428dc7cce6b1944e319211689ed7b50815380c97a8543088d17a81bd0fbaf",
       "new_parser_errors": 0,
       "snippets": []
     },
     {
-      "path": "SourceReadSwift/Features/Bookshelf/ThemedReadingCard.swift",
-      "sha256": "107d75bdbd586479c66544fd001404e29a7c06db568cab8a7757cebd9693c7e5",
-      "new_parser_errors": 0,
-      "snippets": []
-    },
-    {
-      "path": "SourceReadSwift/Features/Settings/AppearanceSettingsView.swift",
-      "sha256": "c172b7647ee605fac3610c98a273f36701c19b10dfdc8e2b23d773e216ea5b16",
-      "new_parser_errors": 0,
-      "snippets": []
-    },
-    {
-      "path": "SourceReadSwift/Shared/DesignSystem/AppAtelierTheme.swift",
-      "sha256": "af1c15e2939ea2647964c6439af71de348187732b3a4acb8504b1046e4ac0cd9",
-      "new_parser_errors": 0,
-      "snippets": []
-    },
-    {
-      "path": "SourceReadSwift/Shared/DesignSystem/AppThemeOrnament.swift",
-      "sha256": "d3b51ed70ad821b41234fad0cf5dde7b7db705ea681bd692e2b30f8c4a0fcbf4",
-      "new_parser_errors": 0,
-      "snippets": []
-    },
-    {
-      "path": "SourceReadSwift/Shared/DesignSystem/AppThemeSurface.swift",
-      "sha256": "cdd0150264f6ea525fcdcc535d3259980428e060c583d1cdb2acd1e05b6c1a15",
-      "new_parser_errors": 0,
-      "snippets": []
-    },
-    {
-      "path": "SourceReadSwift/Shared/DesignSystem/AppVisualTheme.swift",
-      "sha256": "292d0cbd930f5e5e47f49012913913376bdca48c4509f5f93beec5c4b4f7ec6f",
-      "new_parser_errors": 0,
-      "snippets": []
-    },
-    {
-      "path": "SourceReadSwiftTests/AtelierLayoutTests.swift",
-      "sha256": "0c78887c649535c3986b4851302b037885084e772c711dce0a85e9d998b7f1fb",
-      "new_parser_errors": 0,
-      "snippets": []
-    },
-    {
-      "path": "SourceReadSwiftTests/AtelierThemeTests.swift",
-      "sha256": "b02302b1fa205dce84c6665d792117d7d2bf7cd338be78b8af1b3dc13791cc91",
-      "new_parser_errors": 0,
-      "snippets": []
-    },
-    {
-      "path": "SourceReadSwiftUITests/AtelierHomeUITests.swift",
-      "sha256": "e6cb9264e64137876de03d4b5c7082e7c4df21c1f2c81a3028fd888cf7170f5a",
+      "path": "SourceReadSwiftTests/SynopsisContainerPreferenceTests.swift",
+      "sha256": "928b6ba6f3861e4e665dadf268ddadf778abcbc252876a3d138b22383b298a82",
       "new_parser_errors": 0,
       "snippets": []
     },
     {
       "path": "SourceReadSwiftUITests/FloatingReadingDeskUITests.swift",
-      "sha256": "effd12b41afd70bf303dd5e645bae3310d32501f9d4e2a3346b5e9ac02046aa8",
+      "sha256": "50e5ee03b5dcde5d6eaacd2388783e6fae5a6a03b63ce0b59b07b2b4fd599d67",
       "new_parser_errors": 0,
       "snippets": []
     }
