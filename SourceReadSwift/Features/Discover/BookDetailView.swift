@@ -38,6 +38,7 @@ struct BookDetailView: View {
     @State private var readingRoute: ReadingRoute?
     @State private var selectedChapterIndexForReader = 0
     @State private var isExportingBook = false
+    @State private var exportStatus: String?
     @State private var exportShareURL: IdentifiableURL?
     @State private var pendingExportNotice: DetailAlert?
     private struct DetailAlert: Identifiable {
@@ -223,7 +224,7 @@ struct BookDetailView: View {
                     }
                     .disabled(chapters.isEmpty || book.sourceUrl.hasPrefix("local://"))
                     Button { startBookArchiveExport() } label: {
-                        Label(isExportingBook ? "正在导出…" : "导出本书（ZIP）", systemImage: "square.and.arrow.up")
+                        Label(isExportingBook ? (exportStatus ?? "正在导出…") : "导出本书（ZIP）", systemImage: "square.and.arrow.up")
                     }
                     // Keep the action reachable: an uncached book must be able
                     // to explain what to cache, not present a dead menu row.
@@ -1168,20 +1169,59 @@ struct BookDetailView: View {
         )
     }
 
+    /// Exports what the user asked for: the whole book when the source allows
+    /// it. Chapters that are not cached yet are fetched first through the same
+    /// coordinator the download menu uses, and only then written to the ZIP.
     private func startBookArchiveExport() {
         guard !isExportingBook else { return }
-        let chaptersToExport = cachedExportChapters
-        guard !chaptersToExport.isEmpty else {
+        if localShelfBook == nil, chapters.isEmpty {
             activeDetailAlert = DetailAlert(title: "无法导出",
-                message: "本书还没有已缓存的章节。请先在目录中缓存章节，或阅读几章后再导出。")
+                message: "目录还没有加载完成。请等目录出现后再导出。")
             return
         }
         isExportingBook = true
+        exportStatus = "正在准备…"
         let record = exportBookRecord
-        let total = max(chapters.count, record.totalChapters, chaptersToExport.count)
+        let total = max(chapters.count, record.totalChapters)
+        let allChapters = chapters
+        let textSource = appState.sourceStore.source(for: book.sourceUrl)?
+            .resolvingMediaKind(detail?.mediaKind ?? book.mediaKind)
         let coverAddress = CoverURLResolver.url(from: displayBook.coverUrl,
                                                 base: book.bookUrl, fallbackBase: book.sourceUrl)
         Task { @MainActor in
+            if localShelfBook == nil, let textSource, textSource.sourceKind != .comic {
+                let cachedURLs = Set(cachedExportChapters.map(\.chapter.url))
+                if cachedURLs.count < allChapters.count {
+                    appState.chapterDownloadCoordinator.start(
+                        bookID: book.id,
+                        source: textSource,
+                        title: book.name,
+                        chapters: allChapters,
+                        engine: appState.engine,
+                        cacheStore: appState.chapterContentCacheStore,
+                        purifyRules: appState.purifyRuleStore.enabledPatterns
+                    )
+                    while appState.chapterDownloadCoordinator.isRunning(bookID: book.id) {
+                        if Task.isCancelled {
+                            appState.chapterDownloadCoordinator.cancel(bookID: book.id)
+                            isExportingBook = false
+                            exportStatus = nil
+                            return
+                        }
+                        exportStatus = "正在缓存 \(min(cachedExportChapters.count, allChapters.count))/\(allChapters.count) 章…"
+                        try? await Task.sleep(nanoseconds: 250_000_000)
+                    }
+                }
+            }
+            let chaptersToExport = cachedExportChapters
+            guard !chaptersToExport.isEmpty else {
+                isExportingBook = false
+                exportStatus = nil
+                activeDetailAlert = DetailAlert(title: "无法导出",
+                    message: "没有取到任何章节正文。请确认书源可用后重试。")
+                return
+            }
+            exportStatus = "正在打包…"
             var coverJPEG: Data?
             if let coverAddress,
                let image = await RemoteImageLoader.shared.image(for: coverAddress,
@@ -1196,20 +1236,22 @@ struct BookDetailView: View {
                         book: record,
                         cachedChapters: chaptersToExport,
                         coverJPEG: coverJPEG,
-                        totalChapterCount: total
+                        totalChapterCount: max(total, chaptersToExport.count)
                     )
                 }.value
                 isExportingBook = false
+                exportStatus = nil
                 exportShareURL = IdentifiableURL(url: result.url)
                 if result.isPartial {
                     pendingExportNotice = DetailAlert(title: "导出完成",
-                        message: "已导出 \(result.exportedChapterCount) / \(result.totalChapterCount) 章 ZIP，含封面与 metadata.json。其余章节尚未缓存，缓存后可再次导出。")
+                        message: "已导出 \(result.exportedChapterCount) / \(result.totalChapterCount) 章 ZIP，含封面与 metadata.json。其余章节抓取失败，可稍后重试。")
                 } else {
                     pendingExportNotice = DetailAlert(title: "导出完成",
                         message: "已导出 \(result.exportedChapterCount) 章 ZIP，含封面与 metadata.json。")
                 }
             } catch {
                 isExportingBook = false
+                exportStatus = nil
                 activeDetailAlert = DetailAlert(title: "导出失败",
                     message: (error as? LocalizedError)?.errorDescription ?? error.localizedDescription)
             }
