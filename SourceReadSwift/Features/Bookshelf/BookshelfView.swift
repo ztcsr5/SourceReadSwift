@@ -1142,6 +1142,18 @@ private struct BookshelfCollectionView: View {
                         }
                         .buttonStyle(AppPressStyle())
                     }
+                    // 全局搜索入口：iOS 26 是系统 .search tab，26 以下在自绘栏；
+                    // 这里保留一个稳定的可访问入口，两套架构共用同一个 identifier。
+                    Button {
+                        onRequestGlobalSearch()
+                    } label: {
+                        Image(systemName: "globe")
+                            .font(.system(size: 15, weight: .semibold))
+                            .foregroundStyle(AppTheme.accent)
+                    }
+                    .buttonStyle(AppPressStyle())
+                    .accessibilityLabel("全网搜书")
+                    .accessibilityIdentifier("bookshelf.globalSearch")
                 }
                 .padding(.horizontal, 12)
                 .frame(height: 38)
