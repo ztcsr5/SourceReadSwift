@@ -32,6 +32,10 @@ struct BookshelfView: View {
     @State private var selectedMediaFilter: String? = nil
     @State private var showsShelfFilters = false
     @State private var usesThemeShelfLayout = true
+    /// AppState no longer forwards shelf writes. Bump this after the store has
+    /// settled so the group chips and membership rows pick up structural
+    /// changes without re-evaluating on every reading-progress tick.
+    @State private var shelfDataRevision = 0
     @State private var readingBookID: String?
     @AppStorage("settings.readingDeskEnabled") private var readingDeskEnabled = true
     @AppStorage("settings.floatingReadingDeskEnabled") private var floatingReadingDeskEnabled = true
@@ -109,11 +113,16 @@ struct BookshelfView: View {
     /// Called only when an input changed. Keeping the result in `@State` stops
     /// `pinReturnOrder` and the return transition from re-filtering the shelf.
     private func refreshShelfProjection() {
-        shelfProjection = makeShelfProjection()
+        let next = makeShelfProjection()
+        // `onAppear` runs on every tab return; assigning an equal array still
+        // invalidates the whole shelf body and costs a second layout pass.
+        guard shelfProjection != next else { return }
+        shelfProjection = next
     }
 
     var body: some View {
-        NavigationStack {
+        let _ = shelfDataRevision
+        return NavigationStack {
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: AppLayout.sectionGap) {
                     readingSection
@@ -139,9 +148,14 @@ struct BookshelfView: View {
                 refreshShelfProjection()
             }
             .onDisappear { isShelfVisible = false }
-            .onReceive(appState.bookshelfStore.$books) { _ in
+            .onReceive(appState.bookshelfStore.$books.dropFirst()) { _ in
                 guard isShelfVisible else { return }
-                refreshShelfProjection()
+                // @Published emits from willSet, so reading the store
+                // synchronously here would project the previous array.
+                Task { @MainActor in refreshShelfProjection() }
+            }
+            .onReceive(appState.bookshelfStore.$groups.dropFirst()) { _ in
+                shelfDataRevision &+= 1
             }
             .onReceive(appState.sourceStore.$sources) { _ in
                 guard isShelfVisible else { return }
@@ -911,11 +925,14 @@ struct BookshelfView: View {
     }
 
     private func updateRow(_ book: BookshelfBook) -> some View {
+        // The rule is shelf-card -> detail, only the reading desk opens prose.
+        // This row used to push the reader directly and quietly bypassed it.
         NavigationLink {
-            BookshelfReaderGatewayView(book: book)
+            detailDestination(book, placement: "update")
         } label: {
             HStack(spacing: 14) {
                 AsyncBookCover(urlString: book.coverURL, width: 70, height: 100, baseURLString: book.bookURL, sourceURLString: book.sourceURL)
+                    .bookHeroSource("update|" + book.id, in: bookHero)
 
                 VStack(alignment: .leading, spacing: 6) {
                     Text(book.title)
