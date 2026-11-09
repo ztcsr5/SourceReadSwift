@@ -1193,9 +1193,10 @@ private struct BookshelfCollectionView: View {
                                     }
                                 }
                             } else {
-                                // 书架卡片点击只进详情；「正在阅读」卡片才直接进阅读。
-                                Button {
-                                    selectedBookForDetail = book
+                                // 书架卡片点击只进详情；走 push 而不是 sheet，
+                                // 才能吃到 bookHeroDestination 的 zoom 转场（sheet 没有转场）。
+                                NavigationLink {
+                                    detailDestination(book, placement: "collection")
                                 } label: {
                                     collectionBookLabel(book)
                                 }
