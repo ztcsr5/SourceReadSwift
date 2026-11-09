@@ -30,6 +30,13 @@ struct BookDetailSummary: View {
         return d.count >= f.count ? d : f
     }
 
+    /// 判断简介是否被源站截断（以省略号收尾）。
+    static func looksTruncated(_ text: String) -> Bool {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard trimmed.count > 40 else { return false }
+        return trimmed.hasSuffix("…") || trimmed.hasSuffix("...")
+    }
+
     var body: some View {
         let intro = effectiveIntro
         let latest = detail?.latestChapter?.nilIfEmpty
@@ -60,6 +67,17 @@ struct BookDetailSummary: View {
                         .frame(minHeight: 44)
                         .buttonStyle(AppPressStyle())
                         .accessibilityIdentifier("bookDetail.toggleSynopsis")
+                    }
+                    // C 方案：源站本身就只给了半截简介时，给一个「去原网页看」的出口，
+                    // 只对以省略号结尾的文本显示，避免正常简介也挂个链接。
+                    if Self.looksTruncated(intro), let raw = detail?.bookUrl,
+                       let url = URL(string: raw), url.scheme?.hasPrefix("http") == true {
+                        Link(destination: url) {
+                            Label("查看原网页", systemImage: "safari")
+                        }
+                        .font(.caption.weight(.semibold))
+                        .tint(AppTheme.accent)
+                        .accessibilityIdentifier("bookDetail.openSourcePage")
                     }
                 }
                 if !metadata.isEmpty {
