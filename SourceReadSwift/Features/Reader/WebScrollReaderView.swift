@@ -1,6 +1,7 @@
 import SwiftUI
 import UIKit
 import WebKit
+import QuartzCore
 #if DEBUG
 import OSLog
 #endif
@@ -205,6 +206,7 @@ struct WebScrollReaderView: UIViewRepresentable {
         private var hasDeferredContent = false
         private var deferredContentTask: Task<Void, Never>?
         private(set) var isScrollInteractionActive = false
+        private var lastDeferredScrollUpdate: CFTimeInterval = 0
         private(set) var contentMountCount = 0
         private var lastHighlight = Int.min
         private var lastPageStepGeneration: Int
@@ -333,6 +335,14 @@ struct WebScrollReaderView: UIViewRepresentable {
         func scrollViewDidScroll(_ scrollView: UIScrollView) {
             guard hasDeferredContent, !isBuildingContent, let webView,
                   !shouldDeferContent(in: webView) else { return }
+            // Near the end of the window every scroll frame used to rebuild the
+            // content fingerprint and walk the push* checks while WebKit was
+            // also appending a chapter. 100 ms still gives the three-screen
+            // runway plenty of time; the interaction-end path forces a final
+            // update so a completed download is never stranded.
+            let now = CACurrentMediaTime()
+            guard now - lastDeferredScrollUpdate >= 0.1 else { return }
+            lastDeferredScrollUpdate = now
             update(view: view, webView: webView)
         }
 
