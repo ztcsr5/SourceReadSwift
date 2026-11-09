@@ -75,7 +75,7 @@ struct BookDetailSummary: View {
                     // C 方案：源站本身就只给了半截简介时，给一个「去原网页看」的出口，
                     // 只对以省略号结尾的文本显示，避免正常简介也挂个链接。
                     if Self.looksTruncated(intro),
-                       let raw = detail?.bookUrl?.nilIfEmpty ?? fallbackBookURL?.nilIfEmpty,
+                       let raw = detail?.bookUrl.nilIfEmpty ?? fallbackBookURL?.nilIfEmpty,
                        let url = URL(string: raw), url.scheme?.hasPrefix("http") == true {
                         Link(destination: url) {
                             Label("查看原网页", systemImage: "safari")
