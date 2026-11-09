@@ -20,14 +20,17 @@ struct GlobalSearchView: View {
     @State private var catalog: (revision: Int, index: GlobalSearchIndex)?
     @State private var completedSearch: SearchRequest?
     @State private var selectedEntry: GlobalSearchEntry?
+    @State private var scope: GlobalSearchIndex.Scope = .all
 
     private struct SearchRequest: Equatable, Sendable {
         let revision: Int?
         let keyword: String
+        let scope: String
     }
 
     private var searchRequest: SearchRequest {
-        SearchRequest(revision: catalog?.revision == catalogRevision ? catalogRevision : nil, keyword: keyword)
+        SearchRequest(revision: catalog?.revision == catalogRevision ? catalogRevision : nil,
+                      keyword: keyword, scope: scope.rawValue)
     }
 
     private var keyword: String { query.trimmingCharacters(in: .whitespacesAndNewlines) }
@@ -44,6 +47,16 @@ struct GlobalSearchView: View {
                         .onSubmit { isFocused = false }
                         .accessibilityIdentifier("globalSearch.query")
                         .onChange(of: query) { if $0.count > 200 { query = String($0.prefix(200)) } }
+                }
+                Section {
+                    // 三个入口：按书名 / 按作者 / 限定书源。
+                    Picker("搜索范围", selection: $scope) {
+                        ForEach(GlobalSearchIndex.Scope.allCases) { option in
+                            Text(option.label).tag(option)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+                    .accessibilityIdentifier("globalSearch.scope")
                 }
                 if keyword.isEmpty {
                     Section("快捷入口") {
@@ -134,7 +147,8 @@ struct GlobalSearchView: View {
         do { try await Task.sleep(nanoseconds: 150_000_000) }
         catch { return }
         let worker = Task.detached(priority: .userInitiated) {
-            catalog.index.search(request.keyword)
+            catalog.index.search(request.keyword,
+                                  scope: GlobalSearchIndex.Scope(rawValue: request.scope) ?? .all)
         }
         let matches = await withTaskCancellationHandler {
             await worker.value

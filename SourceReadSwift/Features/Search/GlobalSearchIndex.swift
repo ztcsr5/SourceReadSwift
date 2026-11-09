@@ -67,6 +67,46 @@ struct GlobalSearchIndex: Sendable {
         return Self(entries: entries).search(query, limit: limit)
     }
 
+    /// 搜索范围：全部 / 只按书名 / 只按作者 / 只在该书源内。
+    enum Scope: String, CaseIterable, Sendable, Identifiable {
+        case all, title, author, source
+        var id: String { rawValue }
+        var label: String {
+            switch self {
+            case .all: return "全部"
+            case .title: return "书名"
+            case .author: return "作者"
+            case .source: return "书源"
+            }
+        }
+    }
+
+    /// 在指定范围里搜索；范围过滤在打分之前完成，排序规则与全量搜索一致。
+    func search(_ query: String, scope: Scope, limit: Int = 100) -> [GlobalSearchEntry] {
+        guard scope != .all else { return search(query, limit: limit) }
+        let tokens = Self.normalize(String(query.prefix(200))).split(whereSeparator: \.isWhitespace).map(String.init)
+        guard !tokens.isEmpty, limit > 0 else { return [] }
+        var matches: [(GlobalSearchEntry, Int)] = []
+        for entry in indexedEntries {
+            guard !Task.isCancelled else { return [] }
+            let haystack: String
+            switch scope {
+            case .title: haystack = entry.title
+            case .author: haystack = Self.normalize(entry.destination.subtitle)
+            case .source: haystack = Self.normalize(entry.destination.subtitle) + " " + Self.normalize(entry.destination.title)
+            case .all: haystack = entry.searchable
+            }
+            guard tokens.allSatisfy({ haystack.contains($0) }) else { continue }
+            let score = tokens.reduce(0) { $0 + (entry.title.hasPrefix($1) ? 4 : entry.title.contains($1) ? 2 : 0) }
+            matches.append((entry.destination, score))
+        }
+        matches.sort {
+            if $0.1 != $1.1 { return $0.1 > $1.1 }
+            return $0.0.id < $1.0.id
+        }
+        return Task.isCancelled ? [] : matches.prefix(limit).map(\.0)
+    }
+
     /// Reuses the normalized catalog for each query until the underlying metadata changes.
     func search(_ query: String, limit: Int = 100) -> [GlobalSearchEntry] {
         let tokens = Self.normalize(String(query.prefix(200))).split(whereSeparator: \.isWhitespace).map(String.init)
