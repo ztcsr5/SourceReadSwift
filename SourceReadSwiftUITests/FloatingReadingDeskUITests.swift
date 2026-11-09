@@ -10,7 +10,7 @@ final class FloatingReadingDeskUITests: XCTestCase {
 
     override func tearDownWithError() throws { app.terminate() }
 
-    func testHomeGlobalSearchFindsTheLocalBookAndOpensItsDetails() throws {
+    func testHomeGlobalSearchOnlyFindsAppFunctions() throws {
         try launch(theme: "forest")
         let search = globalSearchButton()
         XCTAssertTrue(search.isHittable)
@@ -19,21 +19,11 @@ final class FloatingReadingDeskUITests: XCTestCase {
         XCTAssertTrue(query.waitForExistence(timeout: 5))
         query.tap()
         query.typeText("剑来")
-        let result = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "globalSearch.result.book:")).firstMatch
-        XCTAssertTrue(result.waitForExistence(timeout: 5))
-        XCTAssertTrue(result.label.contains("剑来"))
-        capture("25-global-search-local-book")
-        result.tap()
-        let title = element("bookDetail.title")
-        let transitionStarted = Date()
-        let reachedDetails = title.waitForExistence(timeout: 10)
-        print("GLOBAL_SEARCH_DETAIL_WAIT_SECONDS \(Date().timeIntervalSince(transitionStarted))")
-        if !reachedDetails { capture("global-search-detail-navigation-failure") }
-        XCTAssertTrue(reachedDetails)
-        XCTAssertEqual(title.label, "剑来")
-        let keyboardGone = XCTNSPredicateExpectation(predicate: NSPredicate(format: "exists == NO"), object: app.keyboards.firstMatch)
-        XCTAssertEqual(XCTWaiter.wait(for: [keyboardGone], timeout: 5), .completed)
-        capture("global-search-detail-keyboard-dismissed")
+        let bookResult = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "globalSearch.result.book:")).firstMatch
+        XCTAssertFalse(bookResult.waitForExistence(timeout: 2),
+                       "Global search must not index books or book details")
+        XCTAssertTrue(app.staticTexts["没有匹配的功能入口。"].waitForExistence(timeout: 5))
+        capture("25-global-search-functions-only")
     }
 
     func testDiscoverStartsWithoutAResultsHeadingAndUsesACompactMatchControl() throws {
@@ -559,8 +549,8 @@ final class FloatingReadingDeskUITests: XCTestCase {
     private func globalSearchButton() -> XCUIElement {
         let legacy = app.buttons["bookshelf.globalSearch"]
         if legacy.exists { return legacy }
-        let native = app.tabBars.buttons["全网搜书"]
-        return native.exists ? native : app.buttons["全网搜书"]
+        let native = app.tabBars.buttons["搜索"]
+        return native.exists ? native : app.buttons["搜索"]
     }
 
     private func rootTab(_ label: String, legacyID: String) -> XCUIElement {

@@ -45,21 +45,12 @@ struct GlobalSearchIndex: Sendable {
         .init(id: "settings.history", kind: .setting, title: "阅读历史", subtitle: "最近阅读 记录", target: "history")
     ]
 
-    /// Builds a value-only catalog suitable for the background search task.
+    /// Builds a value-only catalog of app destinations. Books and bookmarks are
+    /// deliberately excluded: global search is a function launcher, not a
+    /// second shelf or a book-detail jump list.
     static func entries(books: [BookshelfBook], sources: [BookSource]) -> [GlobalSearchEntry] {
+        _ = books
         var entries = settings
-        for book in books {
-            guard !Task.isCancelled else { return [] }
-            entries.append(.init(id: "book:" + book.id, kind: .book, title: book.title,
-                subtitle: [book.author, book.groupName, book.intro].compactMap { $0 }.joined(separator: " · "),
-                target: book.id, sourceURL: book.sourceURL, author: book.author))
-            for bookmark in book.bookmarks ?? [] {
-                guard !Task.isCancelled else { return [] }
-                entries.append(.init(id: "bookmark:" + book.id + ":" + bookmark.id, kind: .bookmark,
-                    title: bookmark.chapterTitle, subtitle: book.title + " · " + bookmark.snippet,
-                    target: book.id, bookmarkID: bookmark.id, sourceURL: book.sourceURL, author: book.author))
-            }
-        }
         for source in sources {
             guard !Task.isCancelled else { return [] }
             entries.append(.init(id: "source:" + source.id, kind: .source, title: source.bookSourceName,

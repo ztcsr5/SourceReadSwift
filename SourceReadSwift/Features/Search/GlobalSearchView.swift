@@ -5,7 +5,6 @@ struct GlobalSearchView: View {
     @EnvironmentObject private var appState: AppState
     @ObservedObject var bookshelf: BookshelfStore
     @ObservedObject var sources: SourceStore
-    let onSearchOnline: (String, String?) -> Void
     /// 作为 tab 呈现时不要抢焦点，避免一进来就弹键盘。
     var autoFocus: Bool = true
     /// 作为 tab 呈现时没有可 dismiss 的容器，交给调用方切回上一个 tab。
@@ -20,25 +19,15 @@ struct GlobalSearchView: View {
     @State private var catalog: (revision: Int, index: GlobalSearchIndex)?
     @State private var completedSearch: SearchRequest?
     @State private var selectedEntry: GlobalSearchEntry?
-    @State private var scope: GlobalSearchIndex.Scope = .all
-    @State private var selectedSourceURL: String?
 
     private struct SearchRequest: Equatable, Sendable {
         let revision: Int?
         let keyword: String
-        let scope: String
-        let sourceURL: String
     }
 
     private var searchRequest: SearchRequest {
         SearchRequest(revision: catalog?.revision == catalogRevision ? catalogRevision : nil,
-                      keyword: keyword, scope: scope.rawValue,
-                      sourceURL: selectedSourceURL ?? "")
-    }
-
-    private var selectedSourceName: String? {
-        guard let selectedSourceURL else { return nil }
-        return sources.sources.first(where: { $0.bookSourceUrl == selectedSourceURL })?.bookSourceName
+                      keyword: keyword)
     }
 
     private var keyword: String { query.trimmingCharacters(in: .whitespacesAndNewlines) }
@@ -47,7 +36,7 @@ struct GlobalSearchView: View {
         NavigationStack {
             List {
                 Section {
-                    TextField("搜索书籍、作者、摘录、书源或设置", text: $query)
+                    TextField("搜索应用功能", text: $query)
                         .focused($isFocused)
                         .textInputAutocapitalization(.never)
                         .autocorrectionDisabled()
@@ -56,60 +45,17 @@ struct GlobalSearchView: View {
                         .accessibilityIdentifier("globalSearch.query")
                         .onChange(of: query) { if $0.count > 200 { query = String($0.prefix(200)) } }
                 }
-                Section {
-                    // 三个入口：按书名 / 按作者 / 限定书源。
-                    Picker("搜索范围", selection: $scope) {
-                        ForEach(GlobalSearchIndex.Scope.allCases) { option in
-                            Text(option.label).tag(option)
-                        }
-                    }
-                    .pickerStyle(.segmented)
-                    .accessibilityIdentifier("globalSearch.scope")
-                    if scope == .source {
-                        Menu {
-                            Button("全部书源") { selectedSourceURL = nil }
-                            Divider()
-                            ForEach(sources.sources.filter { $0.enabled }) { source in
-                                Button {
-                                    selectedSourceURL = source.bookSourceUrl
-                                } label: {
-                                    Label(source.bookSourceName,
-                                          systemImage: selectedSourceURL == source.bookSourceUrl ? "checkmark" : "books.vertical")
-                                }
-                            }
-                        } label: {
-                            Label(selectedSourceName ?? "选择书源", systemImage: "books.vertical")
-                                .frame(maxWidth: .infinity, minHeight: 40, alignment: .leading)
-                        }
-                        .accessibilityIdentifier("globalSearch.sourcePicker")
-                        if selectedSourceURL == nil {
-                            Text("先选择一个书源，再输入关键词。")
-                                .font(.footnote).foregroundStyle(.secondary)
-                        }
-                    }
-                }
                 if keyword.isEmpty {
                     Section("快捷入口") {
                         ForEach(GlobalSearchIndex.settings) { entry in resultLink(entry) }
                     }
-                    Text("搜索书架、书签摘录和应用功能，也可以在已启用的书源中联网找书。")
+                    Text("只搜索应用功能与书源入口，不搜索书架书籍或书籍详情。")
                         .font(.footnote).foregroundStyle(.secondary)
                 } else {
-                    Section {
-                        Button {
-                            onSearchOnline(keyword, scope == .source ? selectedSourceURL : nil)
-                        } label: {
-                            Label(scope == .source && selectedSourceName != nil
-                                  ? "在「\(selectedSourceName ?? "")」中搜索「\(keyword)」"
-                                  : "联网搜索「\(keyword)」", systemImage: "globe")
-                        }
-                        .accessibilityIdentifier("globalSearch.online")
-                        .disabled(scope == .source && selectedSourceURL == nil)
-                    }
-                    Section("本机结果") {
+                    Section("功能") {
                         if completedSearch != searchRequest { ProgressView("正在查找").frame(minHeight: 44) }
                         else if results.isEmpty {
-                            Text("本机没有匹配项，可以在上方联网搜索。")
+                            Text("没有匹配的功能入口。")
                                 .foregroundStyle(.secondary)
                         } else {
                             ForEach(results) { entry in resultLink(entry) }
@@ -149,7 +95,6 @@ struct GlobalSearchView: View {
                 if let selectedEntry { destination(selectedEntry) }
             }
             .task { if autoFocus { isFocused = true } }
-            .onReceive(bookshelf.$books.dropFirst()) { _ in catalogRevision &+= 1 }
             .onReceive(sources.$sources.dropFirst()) { _ in catalogRevision &+= 1 }
             .task(id: catalogRevision) {
                 await rebuildCatalog(revision: catalogRevision)
@@ -182,9 +127,7 @@ struct GlobalSearchView: View {
         do { try await Task.sleep(nanoseconds: 150_000_000) }
         catch { return }
         let worker = Task.detached(priority: .userInitiated) {
-            catalog.index.search(request.keyword,
-                                  scope: GlobalSearchIndex.Scope(rawValue: request.scope) ?? .all,
-                                  sourceURL: request.sourceURL.isEmpty ? nil : request.sourceURL)
+            catalog.index.search(request.keyword)
         }
         let matches = await withTaskCancellationHandler {
             await worker.value

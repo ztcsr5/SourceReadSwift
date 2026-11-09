@@ -104,14 +104,13 @@ final class GlobalSearchIndexTests: XCTestCase {
                       "Author scope must not match the synopsis carried by subtitle")
     }
 
-    func testBookmarkSearchRetainsTheOwningBookAndExactBookmark() {
+    func testGlobalEntriesExcludeBooksAndBookmarks() {
         var book = BookshelfBook(searchBook: SearchBook(name: "原书", author: "作者", coverUrl: nil,
             bookUrl: "https://fixture.invalid/book", sourceName: "测试源", sourceUrl: "https://fixture.invalid"))
         let bookmark = ReaderBookmark(chapterIndex: 3, chapterTitle: "第四章", snippet: "树叶中的光")
         book.bookmarks = [bookmark]
-        let matches = GlobalSearchIndex.search("树叶", entries: GlobalSearchIndex.entries(books: [book], sources: []))
-        XCTAssertEqual(matches.count, 1)
-        XCTAssertEqual(matches.first?.target, book.id)
-        XCTAssertEqual(matches.first?.bookmarkID, bookmark.id)
+        let entries = GlobalSearchIndex.entries(books: [book], sources: [])
+        XCTAssertTrue(entries.allSatisfy { $0.kind == .setting })
+        XCTAssertTrue(GlobalSearchIndex.search("树叶", entries: entries).isEmpty)
     }
 }

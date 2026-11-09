@@ -28,7 +28,7 @@ struct LegacyTabBar: View {
                     .contentShape(Circle())
             }
             .buttonStyle(AppPressStyle())
-            .accessibilityLabel("全网搜书")
+            .accessibilityLabel("搜索")
             .accessibilityIdentifier("bookshelf.globalSearch")
         }
         .padding(.horizontal, 12)

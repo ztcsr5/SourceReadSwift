@@ -50,15 +50,7 @@ struct RootTabView: View {
         }
         .sheet(isPresented: $showFullAudioPlayer) { AudioBookPlayerView() }
         .sheet(isPresented: $showsGlobalSearch) {
-            GlobalSearchView(bookshelf: appState.bookshelfStore, sources: appState.sourceStore) { keyword, sourceURL in
-                appState.discoverViewModel.keyword = keyword
-                appState.discoverViewModel.setSearchSource(url: sourceURL)
-                appState.discoverViewModel.startSearch()
-                showsGlobalSearch = false
-                shouldFocusRequestedSearch = false
-                legacySearchRequest = UUID()
-                selectedTab = 1
-            }
+            GlobalSearchView(bookshelf: appState.bookshelfStore, sources: appState.sourceStore)
         }
         .sheet(item: verificationRequestBinding) { request in
             VerificationCodeSheet(request: request,
@@ -107,18 +99,10 @@ struct RootTabView: View {
                 SettingsView()
                     .modifier(NativeTabChromeVisibilityModifier())
             }
-            Tab("全网搜书", systemImage: "magnifyingglass", value: 3, role: .search) {
+            Tab("搜索", systemImage: "magnifyingglass", value: 3, role: .search) {
                 GlobalSearchView(
                     bookshelf: appState.bookshelfStore,
                     sources: appState.sourceStore,
-                    onSearchOnline: { keyword, sourceURL in
-                        appState.discoverViewModel.keyword = keyword
-                        appState.discoverViewModel.setSearchSource(url: sourceURL)
-                        appState.discoverViewModel.startSearch()
-                        shouldFocusRequestedSearch = false
-                        legacySearchRequest = UUID()
-                        selectedTab = 1
-                    },
                     autoFocus: false,
                     onClose: { selectedTab = lastNonSearchTab },
                     showsCloseButton: false
