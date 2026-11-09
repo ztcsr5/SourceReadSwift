@@ -1,45 +1,93 @@
 {
-  "baseline": "974b79b2",
+  "baseline": "b10982da",
   "files": [
     {
-      "path": "SourceReadSwift/Core/Rules/BookDetailParser.swift",
-      "sha256": "91dcded37fb78ee9358b468cf58a15106133499145b59237f2298e74c5bdc998",
+      "path": "SourceReadSwift/App/AppRefreshRateKeeper.swift",
+      "sha256": "cbf1977b48766f71ffe08ca499f45c2fb7d2b147db9ed819f5c230c24603aa7f",
+      "new_parser_errors": 0,
+      "snippets": []
+    },
+    {
+      "path": "SourceReadSwift/App/RootTabView.swift",
+      "sha256": "b9dd52695fbb9f282f0741db1442f1c1f0077df839841ca1c8520798a7565c68",
       "new_parser_errors": 0,
       "snippets": []
     },
     {
       "path": "SourceReadSwift/Features/Bookshelf/BookshelfView.swift",
-      "sha256": "17b60e1fce70b68545d70fbb192b2f611a00ec420f195b69448b1741a0ba5852",
+      "sha256": "cb901827d9aff2d6940c9bbdc383a34b6c2d8c0bd4fc5a15df242172988339b7",
       "new_parser_errors": 0,
       "snippets": []
     },
     {
-      "path": "SourceReadSwift/Features/Discover/BookDetailSummary.swift",
-      "sha256": "bef4f5c8ec80a4e8ebb0fab07e6f193b698eb71a0e3c16c7622692b6a421dff5",
+      "path": "SourceReadSwift/Features/Bookshelf/FloatingReadingDesk.swift",
+      "sha256": "151bda89391f12e0bc64570fe77adab6b4793afeee6e93d0ecb3f4a5b79a2254",
       "new_parser_errors": 0,
       "snippets": []
     },
     {
-      "path": "SourceReadSwift/Shared/ScrollingNavigationChrome.swift",
-      "sha256": "2cb90c385e7233d4d64ebdf2949a2f719bac22fe6a68b915b23888690eacc496",
+      "path": "SourceReadSwift/Features/Discover/DiscoverView.swift",
+      "sha256": "25f3182231e46a50fe5a889965f5ad4c428d0db045527020e179fd28581637c0",
       "new_parser_errors": 0,
       "snippets": []
     },
     {
-      "path": "SourceReadSwiftTests/ScrollChromeGateTests.swift",
-      "sha256": "2c3428dc7cce6b1944e319211689ed7b50815380c97a8543088d17a81bd0fbaf",
+      "path": "SourceReadSwift/Features/Reader/ReaderChromeSurface.swift",
+      "sha256": "8e109e45d0f3d5c1207e5af1d1068d5e7481773475e70db5625e84fdb9bdd8ba",
       "new_parser_errors": 0,
       "snippets": []
     },
     {
-      "path": "SourceReadSwiftTests/SynopsisContainerPreferenceTests.swift",
-      "sha256": "928b6ba6f3861e4e665dadf268ddadf778abcbc252876a3d138b22383b298a82",
+      "path": "SourceReadSwift/Features/Reader/ReaderFrameHUD.swift",
+      "sha256": "38223bb8ae3dfd2d424c0b278d196f3880194a4213de320fdacf5378118f1c6a",
       "new_parser_errors": 0,
       "snippets": []
     },
     {
-      "path": "SourceReadSwiftUITests/FloatingReadingDeskUITests.swift",
-      "sha256": "50e5ee03b5dcde5d6eaacd2388783e6fae5a6a03b63ce0b59b07b2b4fd599d67",
+      "path": "SourceReadSwift/Features/Reader/WebReaderDocument.swift",
+      "sha256": "60427a9e165ecdef53cc3574f4a2530ff1fdbd0e92ecbc005fdeb47c988f9565",
+      "new_parser_errors": 0,
+      "snippets": []
+    },
+    {
+      "path": "SourceReadSwift/Features/Settings/SettingsView.swift",
+      "sha256": "393be38bdae7515e89885c9a0cba897b5aa0379101aaaf908d1fe511245dc1d0",
+      "new_parser_errors": 0,
+      "snippets": []
+    },
+    {
+      "path": "SourceReadSwift/Shared/DesignSystem/AppThemeSurface.swift",
+      "sha256": "a81f124a587a5cd8fbf1d00d6dd6bcdbe72ff19447a011f4707e3a15ab6a6a0b",
+      "new_parser_errors": 0,
+      "snippets": []
+    },
+    {
+      "path": "SourceReadSwift/Shared/DesignSystem/BrandGlass.swift",
+      "sha256": "99cf9a55b2067b9d6070e047801da40dc63a28c6ed826d753e73f4d34979dcac",
+      "new_parser_errors": 0,
+      "snippets": []
+    },
+    {
+      "path": "SourceReadSwift/Shared/DesignSystem/RootTabGlassSurface.swift",
+      "sha256": "b2f1a7d25880bbd8921aa783fe34375b5d7840539f2e73d5d812a9cc16c48bbe",
+      "new_parser_errors": 0,
+      "snippets": []
+    },
+    {
+      "path": "SourceReadSwift/Shared/Performance/PerformanceMode.swift",
+      "sha256": "c0fa0df1d23e9bb1053d812e6f96d99b3b25a14527c7d0eb1083114b81ce7420",
+      "new_parser_errors": 0,
+      "snippets": []
+    },
+    {
+      "path": "SourceReadSwiftTests/ChapterCacheWriterPerformanceTests.swift",
+      "sha256": "b99480469f412f7e3334e88f4934b96138f0ac4e0c5472e1c865148f04d696db",
+      "new_parser_errors": 0,
+      "snippets": []
+    },
+    {
+      "path": "SourceReadSwiftTests/Release117SearchProjectionTests.swift",
+      "sha256": "0a4c11c579f86d645e4c72c1ae5b02610bc29fd8c2aed1cdf9838caa623c1b6b",
       "new_parser_errors": 0,
       "snippets": []
     }
