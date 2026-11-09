@@ -1371,12 +1371,12 @@ final class DiscoverViewModel: ObservableObject {
     var hasRawResults: Bool { !rawResults.isEmpty }
     @Published private(set) var hasFinishedSearch = false
     @Published private(set) var wasCancelled = false
-    /// The result chips reuse the submitted keyword instead of a separate text
-    /// field, so there is no hidden filter string to keep in sync.
+    /// Typed input wins in every scope; an empty field falls back to the
+    /// submitted keyword only when a specific scope is selected.
     private var effectiveResultFilterQuery: String {
-        guard resultFilterScope != .all else { return "" }
         let typed = resultFilter.trimmingCharacters(in: .whitespacesAndNewlines)
-        return typed.isEmpty ? activeKeyword : typed
+        if !typed.isEmpty { return typed }
+        return resultFilterScope == .all ? "" : activeKeyword
     }
 
     var filterSummary: String {
