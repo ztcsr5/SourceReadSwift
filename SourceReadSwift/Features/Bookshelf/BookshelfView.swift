@@ -19,6 +19,10 @@ struct BookshelfView: View {
     /// Cached result of `ShelfProjection`. Nil means the first pass still
     /// needs to compute it; afterwards a store/filter change refreshes it.
     @State private var shelfProjection: [BookshelfBook]?
+    /// A pushed detail/reader keeps this view alive but offscreen. Store
+    /// notifications must not rebuild the filter/sort while the reader is
+    /// scrolling; `onAppear` refreshes once when the shelf comes back.
+    @State private var isShelfVisible = true
     @State private var deskReturnOrder: [String] = []
     @AppStorage("settings.themeMode") private var themeModeRawValue = ThemeMode.system.rawValue
     @AppStorage("bookshelf.isGridMode") private var isGridMode = true
@@ -131,10 +135,18 @@ struct BookshelfView: View {
                 await refreshBookshelf()
             }
             .onAppear {
-                if shelfProjection == nil { refreshShelfProjection() }
+                isShelfVisible = true
+                refreshShelfProjection()
             }
-            .onReceive(appState.bookshelfStore.$books) { _ in refreshShelfProjection() }
-            .onReceive(appState.sourceStore.$sources) { _ in refreshShelfProjection() }
+            .onDisappear { isShelfVisible = false }
+            .onReceive(appState.bookshelfStore.$books) { _ in
+                guard isShelfVisible else { return }
+                refreshShelfProjection()
+            }
+            .onReceive(appState.sourceStore.$sources) { _ in
+                guard isShelfVisible else { return }
+                refreshShelfProjection()
+            }
             .onChange(of: sortModeRawValue) { _ in clearReturnOrder() }
             .onChange(of: searchKeyword) { _ in clearReturnOrder() }
             .onChange(of: selectedMainGroup) { _ in clearReturnOrder() }
@@ -152,8 +164,20 @@ struct BookshelfView: View {
             .navigationBarTitleDisplayMode(theme.usesNeutralGlass ? .large : .inline)
             .scrollCollapsedNavigationBar(collapsesShelfChrome)
             .toolbar {
-                // 工具栏只保留右侧的统计与导入，顶部不再放置搜索按钮（统一放到底部导航栏最右侧）
                 ToolbarItemGroup(placement: .navigationBarTrailing) {
+                    // Keep one global-search entry visible above the fold. The
+                    // shelf header scrolls under the reading desk, so a button
+                    // there is not reachable on launch; the toolbar is.
+                    Button {
+                        onRequestGlobalSearch()
+                    } label: {
+                        Image(systemName: "globe")
+                            .font(.system(size: 17, weight: .semibold))
+                            .foregroundStyle(theme.usesNeutralGlass ? theme.primaryInk : AppTheme.accent)
+                    }
+                    .accessibilityLabel("全网搜书")
+                    .accessibilityIdentifier(usesNativeTabs ? "bookshelf.globalSearch" : "bookshelf.header.globalSearch")
+
                     NavigationLink {
                         ReadingStatsView()
                     } label: {
@@ -526,6 +550,13 @@ struct BookshelfView: View {
                 .accessibilityLabel(showsGridShelf ? "切换为列表视图" : "切换为网格视图")
             }
         }
+    }
+
+    private var usesNativeTabs: Bool {
+        #if compiler(>=6.2)
+        if #available(iOS 26.0, *) { return true }
+        #endif
+        return false
     }
 
     private var hasShelfFilter: Bool {
@@ -1198,7 +1229,7 @@ private struct BookshelfCollectionView: View {
                     }
                     .buttonStyle(AppPressStyle())
                     .accessibilityLabel("全网搜书")
-                    .accessibilityIdentifier("bookshelf.globalSearch")
+                    .accessibilityIdentifier("bookshelf.collection.globalSearch")
                 }
                 .padding(.horizontal, 12)
                 .frame(height: 38)

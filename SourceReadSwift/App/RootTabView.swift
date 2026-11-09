@@ -119,7 +119,7 @@ struct RootTabView: View {
         }
         // 选中搜索时把系统栏收起来，只留一个「回到上次页面」的控件：
         // 系统不会自己做这件事，必须显式隐藏 tabBar 并提供返回入口。
-        .toolbar(isSearching ? .hidden : .visible, for: .tabBar)
+        .toolbar(isSearching || appState.isTabChromeHidden ? .hidden : .visible, for: .tabBar)
         .overlay(alignment: .bottomLeading) {
             if isSearching {
                 // 用户口径：整条 tab 栏收向左，只保留对应 tab 的控件。系统

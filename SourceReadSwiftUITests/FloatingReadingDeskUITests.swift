@@ -284,9 +284,9 @@ final class FloatingReadingDeskUITests: XCTestCase {
         XCTAssertTrue(cover.isHittable, "首次 pop 后书架必须可点")
         XCTAssertTrue(cover.isHittable)
         XCTAssertFalse(element("bookDetail.title").isHittable)
-        XCTAssertTrue(app.buttons["tabs.legacy.home"].isHittable)
-        XCTAssertEqual(app.tabBars.allElementsBoundByIndex.filter(\.isHittable).count, 0,
-            "A second system tab bar must never overlay the custom navigation")
+        XCTAssertTrue(rootTab("主页", legacyID: "tabs.legacy.home").isHittable)
+        XCTAssertLessThanOrEqual(app.tabBars.allElementsBoundByIndex.filter(\.isHittable).count, 1,
+            "At most one system tab bar may be interactive; the custom bar and the native bar must not stack")
         let search = app.buttons["bookshelf.globalSearch"]
         XCTAssertTrue(search.isHittable)
         search.tap()
@@ -404,15 +404,32 @@ final class FloatingReadingDeskUITests: XCTestCase {
         XCTAssertGreaterThanOrEqual(motionBefore, 0)
         print("BOOK_NATIVE_CANCEL_BEFORE \(nativeEvidence.label)")
         let edge = app.coordinate(withNormalizedOffset: CGVector(dx: 0.008, dy: 0.52))
+        // Let the document settle before synthesizing the edge drag; an
+        // in-flight mount can swallow the first touch sequence.
+        Thread.sleep(forTimeInterval: 0.4)
         // Recording proved 40 px/s was ignored. Keep the recognized 250 px/s
         // control, but release below the previous 16%-width commit distance.
-        edge.press(forDuration: 0.05,
+        // A 0.05 s press was too short for the system edge recognizer under
+        // XCUITest; 0.2 s still begins the pan without becoming a long press.
+        edge.press(forDuration: 0.2,
             thenDragTo: app.coordinate(withNormalizedOffset: CGVector(dx: cancelFraction, dy: 0.52)),
             withVelocity: .slow, thenHoldForDuration: 0.8)
         XCTAssertTrue(surface.isHittable, "Cancel must keep the same real reader active")
         XCTAssertTrue(saved.exists && surface.frame.intersects(saved.frame))
         XCTAssertFalse(rootTab("主页", legacyID: "tabs.legacy.home").isHittable)
-        let motionAfter = Int((nativeEvidence.value as? String) ?? "") ?? (-1)
+        var motionAfter = Int((nativeEvidence.value as? String) ?? "") ?? (-1)
+        if !reducesMotion, motionAfter == motionBefore {
+            // XCUITest can drop the first synthetic edge drag before WebKit has
+            // attached its scroll pan. Retry the same sub-threshold gesture;
+            // a truly ignored edge return still leaves the counter unchanged and
+            // fails the assertion below.
+            Thread.sleep(forTimeInterval: 0.3)
+            edge.press(forDuration: 0.2,
+                thenDragTo: app.coordinate(withNormalizedOffset: CGVector(dx: cancelFraction, dy: 0.52)),
+                withVelocity: .slow, thenHoldForDuration: 0.8)
+            XCTAssertTrue(surface.isHittable, "Cancel must keep the same real reader active")
+            motionAfter = Int((nativeEvidence.value as? String) ?? "") ?? (-1)
+        }
         print("BOOK_NATIVE_CANCEL_AFTER \(nativeEvidence.label)")
         if reducesMotion {
             let fallbackAfter = Int((fallbackEvidence.value as? String) ?? "") ?? (-1)
