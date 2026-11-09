@@ -462,21 +462,30 @@ final class FloatingReadingDeskUITests: XCTestCase {
     }
 
     func testCollapsedShelfFiltersPreserveQueryAndThemeLayoutsHaveRealEntries() throws {
-        try launch(theme: "forest")
+        // The query arrives through the launch-argument domain rather than the
+        // keyboard: the property under test is that collapsing the filter bar
+        // keeps the query, not that the simulator can synthesize CJK input.
+        try launch(theme: "forest", shelfQuery: "剑来")
         let search = app.textFields["bookshelf.filterQuery"]
-        XCTAssertFalse(search.exists)
         let filters = app.buttons["bookshelf.filters"]
         XCTAssertTrue(filters.isHittable)
+        XCTAssertEqual(filters.value as? String, "已启用筛选")
+        XCTAssertFalse(search.exists, "A collapsed filter bar shows no query field")
+
         filters.tap()
         XCTAssertTrue(search.waitForExistence(timeout: 3))
-        search.tap()
-        search.typeText("剑来")
-        filters.tap()
-        XCTAssertFalse(search.exists)
-        XCTAssertEqual(filters.value as? String, "已启用筛选")
-        filters.tap()
         XCTAssertEqual(search.value as? String, "剑来")
+        capture("23-collapsed-shelf-filter-open")
+
+        filters.tap()
+        let gone = XCTNSPredicateExpectation(predicate: NSPredicate(format: "exists == NO"), object: search)
+        XCTAssertEqual(XCTWaiter.wait(for: [gone], timeout: 3), .completed)
+        XCTAssertEqual(filters.value as? String, "已启用筛选")
         capture("23-collapsed-shelf-filter")
+
+        filters.tap()
+        XCTAssertTrue(search.waitForExistence(timeout: 3))
+        XCTAssertEqual(search.value as? String, "剑来", "Reopening the filter bar must restore the typed query")
         app.terminate()
         for theme in ["editorial", "blueprint", "folio"] {
             try launch(theme: theme)
@@ -513,7 +522,7 @@ final class FloatingReadingDeskUITests: XCTestCase {
         assertCurrentBook("剑来")
     }
 
-    private func launch(theme: String?, mode: String = "light", reducesMotion: Bool = false, fixture: String? = nil) throws {
+    private func launch(theme: String?, mode: String = "light", reducesMotion: Bool = false, fixture: String? = nil, shelfQuery: String? = nil) throws {
         let reference = try XCTUnwrap(Bundle(for: Self.self).url(forResource: "jianlai-cover", withExtension: "jpg"))
         let cover = try Data(contentsOf: reference)
         XCTAssertLessThanOrEqual(cover.count, 128_000)
@@ -523,6 +532,7 @@ final class FloatingReadingDeskUITests: XCTestCase {
             "-settings.reducesMotion", reducesMotion ? "YES" : "NO", "-reader.mode", "scroll",
             "-reader.textSelectionEnabled", "NO"]
         if let fixture { app.launchArguments.append(fixture) }
+        if let shelfQuery { app.launchArguments += ["-bookshelf.filterQuerySeed", shelfQuery] }
         if let theme { app.launchArguments += ["-settings.visualTheme", theme] }
         app.launch()
         let entry = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "bookshelf.continue.")).firstMatch

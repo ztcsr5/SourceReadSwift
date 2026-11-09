@@ -30,11 +30,12 @@ struct BookDetailSummary: View {
         return d.count >= f.count ? d : f
     }
 
-    /// 判断简介是否被源站截断（以省略号收尾）。
+    /// 判断简介是否被源站截断（以省略号收尾）。超过 40 字才提示，避免把一句
+    /// 本来就很短的简介当成截断；后缀列表由解析层统一提供。
     static func looksTruncated(_ text: String) -> Bool {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard trimmed.count > 40 else { return false }
-        return trimmed.hasSuffix("…") || trimmed.hasSuffix("...")
+        return BookDetailParser.endsWithExcerptSuffix(trimmed)
     }
 
     var body: some View {

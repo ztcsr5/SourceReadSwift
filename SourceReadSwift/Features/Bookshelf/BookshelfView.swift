@@ -21,7 +21,7 @@ struct BookshelfView: View {
     @AppStorage("bookshelf.isGridMode") private var isGridMode = true
     @AppStorage("bookshelf.sortMode") private var sortModeRawValue = BookshelfSortMode.recentRead.rawValue
     @State private var selectedMainGroup: String? = nil
-    @State private var searchKeyword = ""
+    @State private var searchKeyword = ShelfFilterSeed.query
     @State private var selectedMediaFilter: String? = nil
     @State private var showsShelfFilters = false
     @State private var usesThemeShelfLayout = true
@@ -29,8 +29,17 @@ struct BookshelfView: View {
     @AppStorage("settings.readingDeskEnabled") private var readingDeskEnabled = true
     @AppStorage("settings.floatingReadingDeskEnabled") private var floatingReadingDeskEnabled = true
     @StateObject private var readingCoverHandoff = ReadingCoverHandoff()
+    /// Scroll-collapsing navigation chrome. `shelfChromeGate` owns the offset
+    /// history so 120 Hz scrolling never writes SwiftUI state per frame, and
+    /// `collapsesShelfChrome` only flips at the two thresholds.
+    @State private var collapsesShelfChrome = false
+    @State private var shelfChromeGate = ScrollChromeGate()
     @AppStorage(AppVisualTheme.selectionKey) private var themeRaw = AppVisualTheme.initialSelection.rawValue
     private var theme: AppVisualTheme { AppVisualTheme(rawValue: themeRaw) ?? .classic }
+
+    /// Shared by the offset reader inside the scroll content and the collapse
+    /// modifier on the scroll view itself.
+    private static let shelfScrollSpace = "bookshelf.scroll"
 
     private enum ContextualBookRoute {
         case read(BookshelfBook, coverFrame: UIImage?)
@@ -137,9 +146,16 @@ struct BookshelfView: View {
                 .padding(.horizontal, AppTheme.pagePadding)
                 // RootTabView already owns tab-bar/safe-area clearance.
                 .padding(.bottom, AppLayout.contentTail)
+                .reportsScrollOffset(in: Self.shelfScrollSpace)
             }
+            .collapsingNavigationBar(
+                in: Self.shelfScrollSpace,
+                gate: shelfChromeGate,
+                collapsed: $collapsesShelfChrome
+            )
             .refreshable {
                 clearReturnOrder()
+                revealShelfChrome()
                 await refreshBookshelf()
             }
             .onChange(of: sortModeRawValue) { _ in clearReturnOrder() }
@@ -148,6 +164,7 @@ struct BookshelfView: View {
             .onChange(of: selectedMediaFilter) { _ in clearReturnOrder() }
             .onChange(of: themeRaw) { _ in usesThemeShelfLayout = true }
             .background(bookshelfBackdrop)
+            .overlay(alignment: .topTrailing) { shelfChromeReveal }
             .onChange(of: floatingReadingDeskEnabled) { isEnabled in
                 if !isEnabled { readingCoverHandoff.clear() }
             }
@@ -156,6 +173,7 @@ struct BookshelfView: View {
             }
             .navigationTitle("主页")
             .navigationBarTitleDisplayMode(theme.usesNeutralGlass ? .large : .inline)
+            .scrollCollapsedNavigationBar(collapsesShelfChrome)
             .toolbar {
                 // 工具栏只保留右侧的统计与导入，顶部不再放置搜索按钮（统一放到底部导航栏最右侧）
                 ToolbarItemGroup(placement: .navigationBarTrailing) {
@@ -266,6 +284,38 @@ struct BookshelfView: View {
     private var bookshelfBackdrop: some View {
         let _ = themeModeRawValue
         return AppPagePaper(theme: theme).ignoresSafeArea()
+    }
+
+    /// A long shelf leaves no other way back once the bar is gone, so a parked
+    /// chip on the trailing edge restores it on tap.
+    @ViewBuilder
+    private var shelfChromeReveal: some View {
+        if collapsesShelfChrome {
+            Button {
+                UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                revealShelfChrome()
+            } label: {
+                Image(systemName: "chevron.down")
+                    .font(.system(size: 13, weight: .bold))
+                    .foregroundStyle(theme.usesNeutralGlass ? theme.primaryInk : AppTheme.accent)
+                    .frame(width: 44, height: 44)
+                    .background(.ultraThinMaterial, in: Capsule())
+                    .contentShape(Capsule())
+            }
+            .buttonStyle(AppPressStyle())
+            .padding(.trailing, 10)
+            .accessibilityIdentifier("bookshelf.revealChrome")
+            .accessibilityLabel("显示导航栏")
+            .transition(.opacity.combined(with: .move(edge: .top)))
+        }
+    }
+
+    /// Resets the gate as well as the flag: after a refresh or a popped detail the
+    /// next offset arrives against stale history otherwise.
+    private func revealShelfChrome() {
+        shelfChromeGate.reset()
+        guard collapsesShelfChrome else { return }
+        withAnimation(motion.animation(.expansion)) { collapsesShelfChrome = false }
     }
 
     private var readingSection: some View {
@@ -1514,5 +1564,15 @@ struct AsyncBookCover: View {
         } else {
             BookCoverPlaceholder(title: title, height: height, isOnDark: style == .onDark)
         }
+    }
+}
+
+/// A UI test seeds the shelf query through the launch-argument domain
+/// (`-bookshelf.filterQuerySeed 剑来`), so the collapse/restore assertions read
+/// real state instead of depending on the simulator keyboard synthesizing CJK
+/// text. A normal launch leaves the key absent and the shelf starts unfiltered.
+private enum ShelfFilterSeed {
+    static var query: String {
+        UserDefaults.standard.string(forKey: "bookshelf.filterQuerySeed") ?? ""
     }
 }

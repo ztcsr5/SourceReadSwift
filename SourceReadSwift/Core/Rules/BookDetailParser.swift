@@ -102,13 +102,17 @@ struct BookDetailParser {
                 baseUrl: response.url,
                 variables: variables
             ).nilIfEmpty ?? book.coverUrl
-            let intro = Self.introPlainText(try htmlExtractor.value(
-                from: root,
-                rule: htmlExtractor.firstRule(rule, keys: ["intro", "introduction"]),
-                fallback: nil,
-                baseUrl: response.url,
-                variables: variables
-            )) ?? book.intro
+            let intro = Self.preferredIntro(
+                ruleValue: Self.introPlainText(try htmlExtractor.value(
+                    from: root,
+                    rule: htmlExtractor.firstRule(rule, keys: ["intro", "introduction"]),
+                    fallback: nil,
+                    baseUrl: response.url,
+                    variables: variables
+                )),
+                document: document,
+                bookTitle: name
+            ) ?? book.intro
             let latest = try htmlExtractor.value(
                 from: root,
                 rule: htmlExtractor.firstRule(rule, keys: ["latestChapter", "lastChapter"]),
@@ -358,6 +362,74 @@ struct BookDetailParser {
         text = text.replacingOccurrences(of: "&quot;", with: "\"")
         let cleaned = text.trimmingCharacters(in: .whitespacesAndNewlines)
         return cleaned.isEmpty ? nil : cleaned
+    }
+
+    // MARK: - Whole synopsis container
+
+    /// Suffixes a server-side excerpt ends with. Only these trigger the container
+    /// scan, so a complete rule result is never replaced by a guess.
+    private static let introTruncationSuffixes = ["…", "...", ".."]
+
+    /// Attribute tokens Legado sources use for a synopsis block. This is a
+    /// structural signal (class/id tokens plus link density), not a per-site
+    /// selector: the point is to recover the container the rule only sampled.
+    private static let introContainerTokens = [
+        "intro", "introduction", "jianjie", "summary", "abstract", "description", "desc"
+    ]
+
+    /// Single source of truth for the excerpt suffixes a source site appends.
+    /// `BookDetailSummary.looksTruncated` adds its own length gate on top; the
+    /// parser does not, because here the "a container is longer" guard already
+    /// keeps a legitimately short synopsis from being replaced.
+    static func endsWithExcerptSuffix(_ text: String) -> Bool {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return false }
+        return introTruncationSuffixes.contains { trimmed.hasSuffix($0) }
+    }
+
+    static func looksTruncatedIntro(_ text: String) -> Bool {
+        endsWithExcerptSuffix(text)
+    }
+
+    /// Legado intro rules frequently resolve to a slice of the synopsis: a
+    /// `meta[name=description]` content, the first paragraph of a multi-paragraph
+    /// block, or a site-side excerpt ending in an ellipsis. When the same detail
+    /// document carries a larger synopsis container, prefer it; otherwise keep the
+    /// rule value untouched.
+    static func preferredIntro(ruleValue: String?, document: Document, bookTitle: String?) -> String? {
+        let ruleText = ruleValue?.trimmingCharacters(in: .whitespacesAndNewlines)
+        // The scan walks every element in the document, so it only runs when the
+        // rule actually left a hole: an empty result or a server-side excerpt.
+        guard let ruleText, !ruleText.isEmpty else {
+            return introContainer(in: document, bookTitle: bookTitle)
+        }
+        guard looksTruncatedIntro(ruleText) else { return ruleText }
+        guard let container = introContainer(in: document, bookTitle: bookTitle),
+              container.count > ruleText.count else { return ruleText }
+        return container
+    }
+
+    static func introContainer(in document: Document, bookTitle: String?) -> String? {
+        guard let elements = try? document.getAllElements() else { return nil }
+        let pageText = (try? document.text())?.trimmingCharacters(in: .whitespacesAndNewlines)
+        var best: String?
+        for element in elements {
+            let classNames = (try? element.className()) ?? ""
+            let identifier = (try? element.attr("id")) ?? ""
+            let attributes = (classNames + " " + identifier).lowercased()
+            guard !attributes.isEmpty,
+                  introContainerTokens.contains(where: { attributes.contains($0) }),
+                  let text = try? element.text() else { continue }
+            let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+            // Labels ("简介"), whole-page bodies and the title itself are not a synopsis.
+            guard trimmed.count >= 60, trimmed != pageText else { continue }
+            if let bookTitle, !bookTitle.isEmpty, trimmed == bookTitle { continue }
+            // Synopsis blocks are prose; a link-heavy block is navigation.
+            guard ((try? element.select("a").count) ?? 0) <= 2 else { continue }
+            if let current = best, current.count >= trimmed.count { continue }
+            best = trimmed
+        }
+        return best
     }
 
     private func isURLTemplate(_ rule: String) -> Bool {
