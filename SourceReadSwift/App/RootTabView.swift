@@ -95,14 +95,17 @@ struct RootTabView: View {
         TabView(selection: $selectedTab) {
             Tab("主页", systemImage: "house", value: 0) {
                 BookshelfView(onRequestGlobalSearch: { selectedTab = 3 })
+                    .modifier(NativeTabChromeVisibilityModifier())
             }
             Tab(AppNavigationLabels.findBooks,
                 systemImage: AppNavigationLabels.findBooksSymbol, value: 1) {
                 DiscoverView(viewModel: appState.discoverViewModel, searchRequestID: legacySearchRequest,
                              shouldFocusRequestedSearch: shouldFocusRequestedSearch)
+                    .modifier(NativeTabChromeVisibilityModifier())
             }
             Tab("设置", systemImage: "gearshape", value: 2) {
                 SettingsView()
+                    .modifier(NativeTabChromeVisibilityModifier())
             }
             Tab("全网搜书", systemImage: "magnifyingglass", value: 3, role: .search) {
                 GlobalSearchView(
@@ -120,10 +123,10 @@ struct RootTabView: View {
                     onClose: { selectedTab = lastNonSearchTab },
                     showsCloseButton: false
                 )
+                .modifier(NativeTabChromeVisibilityModifier())
             }
         }
         .modifier(TabBarMinimizeBehaviorModifier())
-        .toolbar(appState.isTabChromeHidden ? .hidden : .visible, for: .tabBar)
     }
 
     private var legacyNavigationContent: some View {
@@ -178,6 +181,17 @@ struct RootTabView: View {
             from: nil,
             for: nil
         )
+    }
+}
+
+/// Toolbar visibility must be owned by each tab's content. Applying it only to
+/// the iOS 26 `TabView` leaves the controller's bar visible when a reader owns
+/// the chrome, and the reader then draws under a second bar.
+private struct NativeTabChromeVisibilityModifier: ViewModifier {
+    @EnvironmentObject private var appState: AppState
+
+    func body(content: Content) -> some View {
+        content.toolbar(appState.isTabChromeHidden ? .hidden : .visible, for: .tabBar)
     }
 }
 
