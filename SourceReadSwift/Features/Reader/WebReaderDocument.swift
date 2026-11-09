@@ -781,6 +781,7 @@ enum WebReaderHTML {
         nodes: [],
         flatIndex: Object.create(null),
         metricsDirty: true,
+        metricsInvalidFrom: 0,
         metricTops: [],
         metricHeights: [],
         visible: -1,
@@ -916,7 +917,6 @@ enum WebReaderHTML {
             renderParagraphText(paras[i], raw, state.bionicReading);
           }
         }
-        refreshMetrics();
         invalidateMetrics();
         restoreAnchor(anchor);
       }
@@ -1106,14 +1106,29 @@ enum WebReaderHTML {
         // Only changes at/before the reading anchor may interrupt inertia.
         // A pre-existing next-chapter placeholder is also below the viewport.
         var preservesReadingPrefix = isReadingPrefixPreserved(payload, anchor);
+        // A loading chapter becoming real keeps every preceding node at the
+        // same DOM position. Track its heading so only that suffix needs a
+        // fresh layout, instead of re-measuring the whole window on every
+        // chapter arrival (the 60 Hz hitch at chapter boundaries).
+        var targetedMetricsNode = null;
+        var targetedMetricsEligible = state.order.length === payload.sections.length;
 
         for (var index = 0; index < payload.sections.length; index += 1) {
           var section = payload.sections[index];
           var existing = state.sections[section.key];
+          var resolvesBody = canResolveChapterBody(existing, section);
+          if (state.order[index] !== section.key || !existing) { targetedMetricsEligible = false; }
+          if (existing && existing.classList.contains("first") !== section.first) { targetedMetricsEligible = false; }
+          if (existing && existing.getAttribute("data-sig") !== section.sig && !resolvesBody) {
+            targetedMetricsEligible = false;
+          }
+          if (resolvesBody && !targetedMetricsNode) {
+            targetedMetricsNode = existing.firstElementChild;
+          }
           if (existing && existing.getAttribute("data-sig") === section.sig) {
             rebaseSection(existing, section);
             nextSections[section.key] = existing;
-          } else if (canResolveChapterBody(existing, section)) {
+          } else if (resolvesBody) {
             nextSections[section.key] = resolveChapterBody(existing, section);
           } else {
             nextSections[section.key] = buildSection(section);
@@ -1144,7 +1159,14 @@ enum WebReaderHTML {
         state.sections = nextSections;
         state.order = nextOrder;
         state.visible = -1;
-        refreshMetrics();
+        if (targetedMetricsEligible && targetedMetricsNode) {
+          state.nodes = Array.prototype.slice.call(content.querySelectorAll("[data-flat]"));
+          rebuildFlatIndexOnly();
+          var targetedMetricsIndex = state.nodes.indexOf(targetedMetricsNode);
+          invalidateMetrics(targetedMetricsIndex < 0 ? 0 : targetedMetricsIndex);
+        } else {
+          refreshMetrics();
+        }
         if (!preservesReadingPrefix) {
           restoreAnchor(anchor);
         }
@@ -1204,7 +1226,7 @@ enum WebReaderHTML {
       }
 
       // flat 序号 -> 节点，避免 elementForFlat 退化成线性扫描。
-      function rebuildFlatIndex() {
+      function rebuildFlatIndexOnly() {
         var index = Object.create(null);
         for (var nodeIndex = 0; nodeIndex < state.nodes.length; nodeIndex += 1) {
           var node = state.nodes[nodeIndex];
@@ -1212,6 +1234,10 @@ enum WebReaderHTML {
           if (!isNaN(flat) && index[flat] === undefined) { index[flat] = node; }
         }
         state.flatIndex = index;
+      }
+
+      function rebuildFlatIndex() {
+        rebuildFlatIndexOnly();
         invalidateMetrics();
       }
 
@@ -1254,17 +1280,28 @@ enum WebReaderHTML {
 
       // 滚动中每帧只做一次批量读布局，而不是二分查找里逐次
       // getBoundingClientRect（每次都是强制同步布局，直接吃掉帧预算）。
-      function invalidateMetrics() {
+      // `fromIndex` keeps a measured prefix: a chapter body arriving below the
+      // reader only changes the geometry from that chapter downward.
+      function invalidateMetrics(fromIndex) {
+        var start = (fromIndex === undefined || fromIndex === null) ? 0 : Math.max(0, Math.floor(fromIndex));
+        if (!state.metricTops.length) { start = 0; }
+        if (!state.metricsDirty) {
+          state.metricsInvalidFrom = start;
+        } else {
+          state.metricsInvalidFrom = Math.min(state.metricsInvalidFrom, start);
+        }
         state.metricsDirty = true;
       }
 
       function ensureMetrics() {
         if (!state.metricsDirty && state.metricTops.length === state.nodes.length) { return; }
         var count = state.nodes.length;
-        var tops = new Array(count);
-        var heights = new Array(count);
+        var start = state.metricsDirty ? Math.min(state.metricsInvalidFrom || 0, count) : 0;
+        if (start > state.metricTops.length) { start = 0; }
+        var tops = start > 0 ? state.metricTops.slice(0, start) : new Array(count);
+        var heights = start > 0 ? state.metricHeights.slice(0, start) : new Array(count);
         var scrollY = window.scrollY;
-        for (var index = 0; index < count; index += 1) {
+        for (var index = start; index < count; index += 1) {
           var rect = state.nodes[index].getBoundingClientRect();
           tops[index] = rect.top + scrollY;
           heights[index] = Math.max(rect.height, 1);
@@ -1272,6 +1309,7 @@ enum WebReaderHTML {
         state.metricTops = tops;
         state.metricHeights = heights;
         state.metricsDirty = false;
+        state.metricsInvalidFrom = 0;
       }
 
       function captureAnchor() {
@@ -1439,8 +1477,20 @@ enum WebReaderHTML {
         state.selection = !!(selection && !selection.isCollapsed);
       });
 
-      document.addEventListener("load", function () { refreshMetrics(); }, true);
-      window.addEventListener("resize", function () { refreshMetrics(); });
+      var metricsRefreshScheduled = false;
+      function scheduleMetricsInvalidation() {
+        if (metricsRefreshScheduled) { return; }
+        metricsRefreshScheduled = true;
+        window.setTimeout(function () {
+          metricsRefreshScheduled = false;
+          invalidateMetrics();
+        }, 80);
+      }
+      document.addEventListener("load", function (event) {
+        if (!event || !event.target || event.target.tagName !== "IMG") { return; }
+        scheduleMetricsInvalidation();
+      }, true);
+      window.addEventListener("resize", function () { scheduleMetricsInvalidation(); });
 
       function stopScrollAnimation() {
         scrollAnimationGeneration += 1;
