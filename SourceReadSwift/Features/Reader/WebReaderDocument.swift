@@ -1164,19 +1164,43 @@ enum WebReaderHTML {
       // 整篇 querySelectorAll 在滚动中是最贵的一次 DOM 遍历，追加时不应重扫全文。
       function refreshMetrics(addedSections) {
         if (addedSections && addedSections.length) {
-          for (var scanIndex = 0; scanIndex < addedSections.length; scanIndex += 1) {
-            var sectionNode = addedSections[scanIndex];
-            if (sectionNode.matches && sectionNode.matches("[data-flat]")) { state.nodes.push(sectionNode); }
-            var addedNodes = sectionNode.querySelectorAll("[data-flat]");
-            for (var addedIndex = 0; addedIndex < addedNodes.length; addedIndex += 1) {
-              state.nodes.push(addedNodes[addedIndex]);
-            }
-          }
-          rebuildFlatIndex();
+          appendMetrics(addedSections);
           return;
         }
         state.nodes = Array.prototype.slice.call(content.querySelectorAll("[data-flat]"));
         rebuildFlatIndex();
+      }
+
+      // Pure downward append: existing paragraphs are above the insertion
+      // point, so their tops/heights cannot move. Rebuilding the flat index
+      // and re-measuring the whole document here forced a full-layout pass at
+      // every chapter boundary (the 60 Hz hitch while reading).
+      function appendMetrics(addedSections) {
+        var firstAdded = state.nodes.length;
+        for (var scanIndex = 0; scanIndex < addedSections.length; scanIndex += 1) {
+          var sectionNode = addedSections[scanIndex];
+          if (sectionNode.matches && sectionNode.matches("[data-flat]")) { state.nodes.push(sectionNode); }
+          var addedNodes = sectionNode.querySelectorAll("[data-flat]");
+          for (var addedIndex = 0; addedIndex < addedNodes.length; addedIndex += 1) {
+            state.nodes.push(addedNodes[addedIndex]);
+          }
+        }
+        for (var flatIndex = firstAdded; flatIndex < state.nodes.length; flatIndex += 1) {
+          var node = state.nodes[flatIndex];
+          var flat = parseInt(node.getAttribute("data-flat"), 10);
+          if (!isNaN(flat) && state.flatIndex[flat] === undefined) { state.flatIndex[flat] = node; }
+        }
+        if (!state.metricsDirty && state.metricTops.length === firstAdded &&
+            state.metricHeights.length === firstAdded) {
+          var scrollY = window.scrollY;
+          for (var metricIndex = firstAdded; metricIndex < state.nodes.length; metricIndex += 1) {
+            var rect = state.nodes[metricIndex].getBoundingClientRect();
+            state.metricTops.push(rect.top + scrollY);
+            state.metricHeights.push(Math.max(rect.height, 1));
+          }
+        } else {
+          invalidateMetrics();
+        }
       }
 
       // flat 序号 -> 节点，避免 elementForFlat 退化成线性扫描。
