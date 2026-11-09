@@ -158,8 +158,7 @@ struct BookshelfView: View {
                     refreshShelfProjection()
                     shelfProjectionNeedsRefresh = false
                 } else if shelfProjectionNeedsRefresh {
-                    // Let the tab/pop transition finish before sorting the
-                    // shelf. The stale projection is visually identical unless
+                    // The shelf projection is visually identical unless
                     // progress actually changed, and a frame of old metadata is
                     // cheaper than a dropped animation frame.
                     Task { @MainActor in
@@ -212,18 +211,6 @@ struct BookshelfView: View {
             .scrollCollapsedNavigationBar(collapsesShelfChrome)
             .toolbar {
                 ToolbarItemGroup(placement: .navigationBarTrailing) {
-                    // Keep one global-search entry visible above the fold. The
-                    // shelf header scrolls under the reading desk, so a button
-                    // there is not reachable on launch; the toolbar is.
-                    Button {
-                        onRequestGlobalSearch()
-                    } label: {
-                        Image(systemName: "globe")
-                            .font(.system(size: 17, weight: .semibold))
-                            .foregroundStyle(theme.usesNeutralGlass ? theme.primaryInk : AppTheme.accent)
-                    }
-                    .accessibilityLabel("全网搜书")
-                    .accessibilityIdentifier(usesNativeTabs ? "bookshelf.globalSearch" : "bookshelf.header.globalSearch")
 
                     NavigationLink {
                         ReadingStatsView()
@@ -597,13 +584,6 @@ struct BookshelfView: View {
                 .accessibilityLabel(showsGridShelf ? "切换为列表视图" : "切换为网格视图")
             }
         }
-    }
-
-    private var usesNativeTabs: Bool {
-        #if compiler(>=6.2)
-        if #available(iOS 26.0, *) { return true }
-        #endif
-        return false
     }
 
     private var hasShelfFilter: Bool {
@@ -1272,18 +1252,6 @@ private struct BookshelfCollectionView: View {
                         }
                         .buttonStyle(AppPressStyle())
                     }
-                    // 全局搜索入口：iOS 26 是系统 .search tab，26 以下在自绘栏；
-                    // 这里保留一个稳定的可访问入口，两套架构共用同一个 identifier。
-                    Button {
-                        onRequestGlobalSearch()
-                    } label: {
-                        Image(systemName: "globe")
-                            .font(.system(size: 15, weight: .semibold))
-                            .foregroundStyle(AppTheme.accent)
-                    }
-                    .buttonStyle(AppPressStyle())
-                    .accessibilityLabel("全网搜书")
-                    .accessibilityIdentifier("bookshelf.collection.globalSearch")
                 }
                 .padding(.horizontal, 12)
                 .frame(height: 38)

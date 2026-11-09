@@ -11,23 +11,23 @@ final class RootTabGlassUITests: XCTestCase {
             app.launchArguments = ["--floating-desk-regression", "-settings.themeMode", mode,
                 "-settings.visualTheme", "pineMist", "-settings.readingDeskEnabled", "YES"]
             app.launch()
-            let search = app.buttons["bookshelf.globalSearch"]
+            let search = searchButton(app)
             XCTAssertTrue(search.waitForExistence(timeout: 10))
             capture(app, name: "home-before-hit-test-" + mode)
-            for identifier in ["tabs.legacy.home", "tabs.legacy.discover", "tabs.legacy.settings"] {
-                let matches = app.buttons.matching(identifier: identifier)
-                XCTAssertEqual(matches.count, 1)
-                XCTAssertTrue(matches.firstMatch.isHittable)
+            let home = tab(app, title: "主页", legacyID: "tabs.legacy.home")
+            let discover = tab(app, title: "寻书", legacyID: "tabs.legacy.discover")
+            let settings = tab(app, title: "设置", legacyID: "tabs.legacy.settings")
+            for button in [home, discover, settings] {
+                XCTAssertTrue(button.waitForExistence(timeout: 5))
+                XCTAssertTrue(button.isHittable)
             }
             XCTAssertTrue(search.isHittable)
             XCTAssertGreaterThanOrEqual(search.frame.width, 44)
-            let home = app.buttons["tabs.legacy.home"]
-            let settings = app.buttons["tabs.legacy.settings"]
             XCTAssertLessThan(settings.frame.maxX, search.frame.minX)
             XCTAssertEqual(home.frame.midY, search.frame.midY, accuracy: 4)
-            app.buttons["tabs.legacy.discover"].tap()
+            discover.tap()
             XCTAssertTrue(app.textFields["搜索书名或作者"].waitForExistence(timeout: 5))
-            XCTAssertTrue(app.buttons["tabs.legacy.discover"].isSelected)
+            XCTAssertTrue(discover.isSelected)
             capture(app, name: "discover-after-tab-tap-" + mode)
             settings.tap()
             XCTAssertTrue(app.buttons["外观"].firstMatch.waitForExistence(timeout: 5))
@@ -39,6 +39,20 @@ final class RootTabGlassUITests: XCTestCase {
             capture(app, name: "real-home-pineMist-" + mode)
             app.terminate()
         }
+    }
+
+    private func tab(_ app: XCUIApplication, title: String, legacyID: String) -> XCUIElement {
+        let legacy = app.buttons[legacyID]
+        if legacy.exists { return legacy }
+        let native = app.tabBars.buttons[title]
+        return native.exists ? native : app.buttons[title]
+    }
+
+    private func searchButton(_ app: XCUIApplication) -> XCUIElement {
+        let legacy = app.buttons["bookshelf.globalSearch"]
+        if legacy.exists { return legacy }
+        let native = app.tabBars.buttons["全网搜书"]
+        return native.exists ? native : app.buttons["全网搜书"]
     }
 
     private func capture(_ app: XCUIApplication, name: String) {

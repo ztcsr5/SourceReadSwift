@@ -12,7 +12,7 @@ final class FloatingReadingDeskUITests: XCTestCase {
 
     func testHomeGlobalSearchFindsTheLocalBookAndOpensItsDetails() throws {
         try launch(theme: "forest")
-        let search = element("bookshelf.globalSearch")
+        let search = globalSearchButton()
         XCTAssertTrue(search.isHittable)
         search.tap()
         let query = app.textFields["globalSearch.query"]
@@ -287,7 +287,7 @@ final class FloatingReadingDeskUITests: XCTestCase {
         XCTAssertTrue(rootTab("主页", legacyID: "tabs.legacy.home").isHittable)
         XCTAssertLessThanOrEqual(app.tabBars.allElementsBoundByIndex.filter(\.isHittable).count, 1,
             "At most one system tab bar may be interactive; the custom bar and the native bar must not stack")
-        let search = app.buttons["bookshelf.globalSearch"]
+        let search = globalSearchButton()
         XCTAssertTrue(search.isHittable)
         search.tap()
         XCTAssertTrue(app.textFields["globalSearch.query"].waitForExistence(timeout: 1))
@@ -508,7 +508,7 @@ final class FloatingReadingDeskUITests: XCTestCase {
             try launch(theme: theme)
             let entry = assertCurrentBook("剑来")
             XCTAssertTrue(entry.isHittable)
-            XCTAssertTrue(app.buttons["bookshelf.globalSearch"].isHittable)
+            XCTAssertTrue(globalSearchButton().isHittable)
             capture("24-theme-layout-" + theme)
             entry.press(forDuration: 0.8)
             XCTAssertTrue(app.buttons["书籍详情"].firstMatch.waitForExistence(timeout: 3))
@@ -554,6 +554,13 @@ final class FloatingReadingDeskUITests: XCTestCase {
         app.launch()
         let entry = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "bookshelf.continue.")).firstMatch
         XCTAssertTrue(entry.waitForExistence(timeout: 10))
+    }
+
+    private func globalSearchButton() -> XCUIElement {
+        let legacy = app.buttons["bookshelf.globalSearch"]
+        if legacy.exists { return legacy }
+        let native = app.tabBars.buttons["全网搜书"]
+        return native.exists ? native : app.buttons["全网搜书"]
     }
 
     private func rootTab(_ label: String, legacyID: String) -> XCUIElement {

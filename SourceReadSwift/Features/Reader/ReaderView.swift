@@ -57,7 +57,6 @@ struct ReaderView: View {
     @State private var hasResolvedOpeningPreview = false
     @State private var chromeState = ReaderChromeStateMachine()
     @State private var nativeMoreMenuPresentation = ReaderMenuPresentation()
-    @State private var tabChromeOwner = UUID()
     @State private var readerSessionEnded = false
     @State private var showChapterList = false
     @State private var showBookmarks = false
@@ -699,7 +698,6 @@ struct ReaderView: View {
         if let brightnessBeforeReader {
             UIScreen.main.brightness = brightnessBeforeReader
         }
-        appState.releaseTabChromeHidden(owner: tabChromeOwner)
         pauseReadingActivity()
     }
 
@@ -1116,17 +1114,12 @@ struct ReaderView: View {
             }
             .ignoresSafeArea()
         }
-        .background(ReaderNavigationPopLock(allowSystemReturn: allowsNativeBookReturn))
-        .background(ReaderTabChromeExitBridge(owner: tabChromeOwner))
-        .background(ReaderExitSwipeBridge(
-            enabled: ReaderExitSwipePolicy.isProseFallbackEnabled(
-                reducesMotion: motion.reducesMotion, allowsBookReturn: allowsNativeBookReturn
-            ) || ReaderExitSwipePolicy.isEnabled(
-                menuVisible: showOverlay, settingsVisible: showSettings,
-                coverPresented: showChapterList || temporaryCoverPresented,
-                scrollMode: readerMode == .scroll
-            ),
-            onExit: requestReaderExit, prefersSystemReturn: readerUsesBookReturn
+        // Native interactive pop is the only return path. The fast custom
+        // fallback dismissed the route without a UIKit transition, which tore
+        // down the reader and rebuilt the tab chrome mid-swipe.
+        .background(ReaderNavigationPopLock(
+            allowSystemReturn: allowsNativeBookReturn,
+            allowContentPopReturn: allowsNativeBookReturn && readerMode == .scroll
         ))
         .overlay(alignment: .topLeading) { ReaderFrameHUD() }
         .navigationBarBackButtonHidden(!allowsNativeBookReturn)
@@ -1263,7 +1256,6 @@ struct ReaderView: View {
             )
         }
         .onAppear {
-            appState.acquireTabChromeHidden(owner: tabChromeOwner)
             // Dismissing the full-screen TOC must not replay initial position,
             // markReaderOpened or the initial synchronous pagination pass.
             isReaderVisible = true
@@ -1287,7 +1279,6 @@ struct ReaderView: View {
             if background == .custom {
                 customBackgroundIsDark = ReaderCustomWallpaperStore.isWallpaperDark
             }
-            appState.acquireTabChromeHidden(owner: tabChromeOwner)
             chromeState.setInitialOverlayVisible(initialOverlayVisible)
             seedWindow()
             if readerMode != .scroll { rebuildPagedBlocksCache() }
@@ -1333,8 +1324,7 @@ struct ReaderView: View {
             isReaderVisible = false
             pauseReadingActivity()
             // Ownership is visibility-scoped even for temporary covers.
-            appState.releaseTabChromeHidden(owner: tabChromeOwner)
-            // Cover presentation is not a reader exit. Keep the live session
+                // Cover presentation is not a reader exit. Keep the live session
             // and any selected chapter's download/pagination transaction alive.
             guard readerPresentationLifecycle.endAppearance(chapterListPresented: showChapterList || temporaryCoverPresented) else { return }
             endReaderSession()
@@ -1886,7 +1876,7 @@ struct ReaderView: View {
             imageStyle: currentImageStyle,
             imageHeaders: imageRequestHeaders,
             imageColumnWidth: illustrationColumnWidth,
-            prioritizesSystemEdgeReturn: readerUsesBookReturn && motion.reducesMotion,
+            prioritizesSystemEdgeReturn: readerUsesBookReturn,
             onVisibleParagraph: { index in
                 guard didLandInitialPosition else { return }
                 if paragraphJumpRequest != nil {
@@ -3848,13 +3838,10 @@ struct ReaderView: View {
     }
 
     private var allowsNativeBookReturn: Bool {
-        if #available(iOS 18.0, *) {
-            return readerUsesBookReturn && ReaderSystemReturnPolicy.isEnabled(
-                isScroll: readerMode == .scroll, menuVisible: showOverlay,
-                blocked: showSettings || showChapterList || temporaryCoverPresented,
-                selectionEnabled: textSelectionEnabled)
-        }
-        return false
+        readerUsesBookReturn && ReaderSystemReturnPolicy.isEnabled(
+            isScroll: readerMode == .scroll, menuVisible: showOverlay,
+            blocked: showSettings || showChapterList || temporaryCoverPresented,
+            selectionEnabled: textSelectionEnabled)
     }
 
     private var readerOverlay: some View {
@@ -5803,6 +5790,9 @@ struct ReaderView: View {
 
     private func handleReaderTap(at location: CGPoint) {
         guard !textSelectionEnabled, !nativeMoreMenuPresentation.isActive else { return }
+        // The OS owns the leading edge for interactive pop. A tap or a short
+        // drag there must not fall through to the menu/page tap zones.
+        guard location.x > 24 else { return }
         let now = Date()
         guard now >= tapCooldownUntil else { return }
         tapCooldownUntil = now.addingTimeInterval(0.28)
@@ -7978,15 +7968,18 @@ struct ReaderIllustrationView: View {
 /// `.pageCurl` never pop the reader back to the root TabView ("书架/发现/设置").
 private struct ReaderNavigationPopLock: UIViewControllerRepresentable {
     let allowSystemReturn: Bool
+    let allowContentPopReturn: Bool
 
     func makeUIViewController(context: Context) -> LockViewController {
         let controller = LockViewController()
         controller.allowSystemReturn = allowSystemReturn
+        controller.allowContentPopReturn = allowContentPopReturn
         return controller
     }
 
     func updateUIViewController(_ uiViewController: LockViewController, context: Context) {
         uiViewController.allowSystemReturn = allowSystemReturn
+        uiViewController.allowContentPopReturn = allowContentPopReturn
         uiViewController.applyPopLock()
     }
 
@@ -7996,6 +7989,7 @@ private struct ReaderNavigationPopLock: UIViewControllerRepresentable {
 
     final class LockViewController: UIViewController {
         var allowSystemReturn = false
+        var allowContentPopReturn = false
         private weak var lockedNavigationController: UINavigationController?
 
         override func viewWillAppear(_ animated: Bool) {
@@ -8020,14 +8014,21 @@ private struct ReaderNavigationPopLock: UIViewControllerRepresentable {
         func applyPopLock() {
             guard let nav = navigationController else { return }
             lockedNavigationController = nav
-            if #available(iOS 18.0, *) {
-                nav.interactivePopGestureRecognizer?.isEnabled = allowSystemReturn
-            } else {
-                nav.interactivePopGestureRecognizer?.isEnabled = false
+            let edge = nav.interactivePopGestureRecognizer
+            if allowSystemReturn {
+                // Hiding the navigation bar leaves UIKit's built-in delegate
+                // attached; clearing it restores the same leading-edge return
+                // used by the rest of the app.
+                edge?.delegate = nil
             }
+            edge?.isEnabled = allowSystemReturn
             #if compiler(>=6.2)
             if #available(iOS 26.0, *) {
-                nav.interactiveContentPopGestureRecognizer?.isEnabled = allowSystemReturn
+                // Page turns own horizontal pan inside the page controller. Only
+                // continuous prose may use the full-content iOS 26 pop.
+                let content = nav.interactiveContentPopGestureRecognizer
+                if allowContentPopReturn { content?.delegate = nil }
+                content?.isEnabled = allowContentPopReturn
             }
             #endif
         }

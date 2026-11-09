@@ -10,7 +10,6 @@ struct RootTabView: View {
     @AppStorage("settings.secondaryAccentHex") private var secondaryAccentHex = "419BDC"
     @AppStorage(AppVisualTheme.selectionKey) private var visualTheme = AppVisualTheme.initialSelection.rawValue
     @AppStorage("settings.appearanceRevision") private var appearanceRevision = 0
-    @AppStorage(PerformanceMode.defaultsKey) private var performanceMode = false
     @Namespace private var tabSelection
     @State private var selectedTab = 0
     @State private var legacySearchRequest: UUID?
@@ -29,7 +28,6 @@ struct RootTabView: View {
         return navigationContent
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(AppRefreshRateKeeperView())
-        .overlay(alignment: .topLeading) { ReaderFrameHUD() }
         .safeAreaInset(edge: .bottom, spacing: 0) {
             // iOS 26 draws the bar itself, so without audio this inset was an
             // empty view that still joined every layout pass. Mount it only
@@ -73,17 +71,21 @@ struct RootTabView: View {
     /// 26 以下继续用自绘栏，避免出现无玻璃的纯色条。
     private var usesNativeTabs: Bool {
         #if compiler(>=6.2)
-        if #available(iOS 26.0, *), !performanceMode { return true }
+        if #available(iOS 26.0, *) { return true }
         #endif
         return false
     }
 
     @ViewBuilder private var navigationContent: some View {
-        if #available(iOS 26.0, *), !performanceMode {
+        #if compiler(>=6.2)
+        if #available(iOS 26.0, *) {
             nativeTabContent
         } else {
             legacyNavigationContent
         }
+        #else
+        legacyNavigationContent
+        #endif
     }
 
     /// 原生路径：三个常规 tab + 末尾的 .search 角色 tab。
@@ -120,47 +122,8 @@ struct RootTabView: View {
                 )
             }
         }
-        // 选中搜索时把系统栏收起来，只留一个「回到上次页面」的控件：
-        // 系统不会自己做这件事，必须显式隐藏 tabBar 并提供返回入口。
-        .toolbar(isSearching || appState.isTabChromeHidden ? .hidden : .visible, for: .tabBar)
-        .overlay(alignment: .bottomLeading) {
-            if isSearching {
-                // 用户口径：整条 tab 栏收向左，只保留对应 tab 的控件。系统
-                // TabView 没有“只留一个 item”的形态，因此收起后画一个和原
-                // tab 同图标同名的胶囊，点击回到该 tab。
-                Button {
-                    selectedTab = lastNonSearchTab
-                } label: {
-                    HStack(spacing: 8) {
-                        Image(systemName: collapsedSearchTab.symbol)
-                            .font(.system(size: 15, weight: .semibold))
-                        Text(collapsedSearchTab.title)
-                            .font(.system(size: 14, weight: .semibold))
-                    }
-                    .foregroundStyle(.primary)
-                    .padding(.horizontal, 16)
-                    .frame(height: 46)
-                    .background(.ultraThinMaterial, in: Capsule())
-                    .overlay(Capsule().strokeBorder(Color.primary.opacity(0.08), lineWidth: 0.6))
-                    .shadow(color: .black.opacity(0.12), radius: 8, y: 3)
-                }
-                .buttonStyle(.plain)
-                .padding(.leading, 16)
-                .padding(.bottom, 12)
-                .accessibilityIdentifier("search.collapsedReturn")
-                .accessibilityLabel("返回\(collapsedSearchTab.title)")
-            }
-        }
-    }
-
-    private var isSearching: Bool { selectedTab == 3 }
-
-    private var collapsedSearchTab: (title: String, symbol: String) {
-        switch lastNonSearchTab {
-        case 1: return (AppNavigationLabels.findBooks, AppNavigationLabels.findBooksSymbol)
-        case 2: return ("设置", "gearshape")
-        default: return ("主页", "house")
-        }
+        .modifier(TabBarMinimizeBehaviorModifier())
+        .toolbar(appState.isTabChromeHidden ? .hidden : .visible, for: .tabBar)
     }
 
     private var legacyNavigationContent: some View {
@@ -215,6 +178,22 @@ struct RootTabView: View {
             from: nil,
             for: nil
         )
+    }
+}
+
+/// iOS 26 minimizes the native tab bar as the active scroll view moves down.
+/// Keep this in one compatibility modifier so the deployment target stays iOS 16.
+private struct TabBarMinimizeBehaviorModifier: ViewModifier {
+    @ViewBuilder func body(content: Content) -> some View {
+        #if compiler(>=6.2)
+        if #available(iOS 26.0, *) {
+            content.tabBarMinimizeBehavior(.onScrollDown)
+        } else {
+            content
+        }
+        #else
+        content
+        #endif
     }
 }
 

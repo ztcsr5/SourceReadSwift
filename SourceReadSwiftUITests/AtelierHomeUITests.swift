@@ -9,9 +9,9 @@ final class AtelierHomeUITests: XCTestCase {
             try launch(app, theme: theme)
             let current = currentBook(app, title: "剑来")
             XCTAssertLessThanOrEqual(current.frame.height, 266, theme)
-            let search = app.buttons["bookshelf.globalSearch"]
+            let search = searchButton(app)
             XCTAssertTrue(search.isHittable, theme)
-            XCTAssertEqual(app.buttons.matching(identifier: "tabs.legacy.home").count, 1)
+            XCTAssertTrue(tab(app, title: "主页", legacyID: "tabs.legacy.home").exists, theme)
             capture(app, name: "atelier-home-" + theme + "-light")
             app.terminate()
         }
@@ -35,6 +35,20 @@ final class AtelierHomeUITests: XCTestCase {
         currentBook(app, title: "白昼之后")
         XCTAssertEqual(filters.frame.midY, originalY, accuracy: 2)
         capture(app, name: "atelier-home-pineMist-long-title")
+    }
+
+    private func tab(_ app: XCUIApplication, title: String, legacyID: String) -> XCUIElement {
+        let legacy = app.buttons[legacyID]
+        if legacy.exists { return legacy }
+        let native = app.tabBars.buttons[title]
+        return native.exists ? native : app.buttons[title]
+    }
+
+    private func searchButton(_ app: XCUIApplication) -> XCUIElement {
+        let legacy = app.buttons["bookshelf.globalSearch"]
+        if legacy.exists { return legacy }
+        let native = app.tabBars.buttons["全网搜书"]
+        return native.exists ? native : app.buttons["全网搜书"]
     }
 
     private func launch(_ app: XCUIApplication, theme: String) throws {

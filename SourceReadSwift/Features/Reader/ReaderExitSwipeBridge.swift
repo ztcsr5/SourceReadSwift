@@ -2,10 +2,13 @@ import SwiftUI
 import UIKit
 import OSLog
 
-/// Native edge return is safe in vertical prose, but must not steal page turns or text selection.
+/// Native edge return is the sole prose exit. Paged modes still reserve only
+/// the leading edge for navigation; their page pan remains inside the content.
 enum ReaderSystemReturnPolicy {
     static func isEnabled(isScroll: Bool, menuVisible: Bool, blocked: Bool, selectionEnabled: Bool) -> Bool {
-        !blocked && (menuVisible || (isScroll && !selectionEnabled))
+        _ = isScroll
+        _ = menuVisible
+        return !blocked && !selectionEnabled
     }
 }
 

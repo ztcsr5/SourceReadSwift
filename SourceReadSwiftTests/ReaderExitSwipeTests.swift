@@ -12,9 +12,9 @@ final class ReaderExitSwipeTests: XCTestCase {
         XCTAssertFalse(ReaderExitSwipePolicy.isEnabled(menuVisible: true, settingsVisible: false, coverPresented: true))
     }
 
-    func testNativeReturnAllowsProseButProtectsPagedReadingSelectionAndSettings() {
+    func testNativeReturnAllowsProseAndPagedButProtectsSelectionAndSettings() {
         XCTAssertTrue(ReaderSystemReturnPolicy.isEnabled(isScroll: true, menuVisible: false, blocked: false, selectionEnabled: false))
-        XCTAssertFalse(ReaderSystemReturnPolicy.isEnabled(isScroll: false, menuVisible: false, blocked: false, selectionEnabled: false))
+        XCTAssertTrue(ReaderSystemReturnPolicy.isEnabled(isScroll: false, menuVisible: false, blocked: false, selectionEnabled: false))
         XCTAssertTrue(ReaderSystemReturnPolicy.isEnabled(isScroll: false, menuVisible: true, blocked: false, selectionEnabled: false))
         XCTAssertFalse(ReaderSystemReturnPolicy.isEnabled(isScroll: true, menuVisible: false, blocked: false, selectionEnabled: true))
         XCTAssertFalse(ReaderSystemReturnPolicy.isEnabled(isScroll: true, menuVisible: true, blocked: true, selectionEnabled: false))
