@@ -129,6 +129,13 @@ struct GlobalSearchView: View {
 
     private func resultLink(_ entry: GlobalSearchEntry) -> some View {
         Button {
+            // 书签直接进阅读层，不再 push —— 阅读器是覆盖层。
+            if entry.kind == .bookmark,
+               let book = bookshelf.book(id: entry.target),
+               let bookmark = book.bookmarks?.first(where: { $0.id == entry.bookmarkID }) {
+                appState.readerOverlay = ReaderOverlayRequest(book: book, initialBookmark: bookmark)
+                return
+            }
             selectedEntry = entry
         } label: {
             HStack(spacing: 12) {

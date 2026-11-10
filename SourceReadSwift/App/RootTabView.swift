@@ -25,7 +25,16 @@ struct RootTabView: View {
         let _ = appearanceRevision
         let _ = accentHex
         let _ = secondaryAccentHex
-        return navigationContent
+        return ZStack {
+            navigationContent
+            // 阅读器是覆盖层，不是 navigationDestination。
+            // 主页（含 tab 栏、书架、滚动位置）全程留在内存里，返回只是移除上层，
+            // 因此没有 pop、没有 chrome 恢复、没有书架重建。
+            if let request = appState.readerOverlay {
+                ReaderOverlayLayer(request: request,
+                                   onClose: { appState.readerOverlay = nil })
+            }
+        }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(AppRefreshRateKeeperView())
         .safeAreaInset(edge: .bottom, spacing: 0) {
@@ -41,6 +50,7 @@ struct RootTabView: View {
                 }
             }
         }
+        .animation(.easeInOut(duration: 0.28), value: appState.readerOverlay?.id)
         .font(.system(.body, design: AppVisualTheme.current.fontDesign))
         .tint(AppTheme.accent)
         .onReceive(audioCoordinator.$currentBook.map { $0 != nil }.removeDuplicates()) { hasAudio = $0 }

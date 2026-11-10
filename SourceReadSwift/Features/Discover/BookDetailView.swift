@@ -392,7 +392,16 @@ struct BookDetailView: View {
 
     private func openReadingRoute(_ chapter: BookChapter, showsTitlePage: Bool = false) {
         guard readingRoute == nil else { return }
-        let route = ReadingRoute(chapter: chapter, showsTitlePage: false)
+        // 阅读器统一走覆盖层：详情页留在原地，返回只是移除上层，
+        // 不会出现 push/pop 那套 chrome 抢跑。
+        if let shelfBook = localShelfBook {
+            appState.readerOverlay = ReaderOverlayRequest(
+                book: shelfBook,
+                initialChapterIndex: chapter.index
+            )
+            return
+        }
+        let route = ReadingRoute(chapter: chapter, showsTitlePage: showsTitlePage)
         lastReadingRoute = route
         readingRoute = route
     }

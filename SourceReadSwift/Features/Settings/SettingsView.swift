@@ -454,8 +454,8 @@ struct ReadingHistoryView: View {
                 .padding(.vertical, 42)
             } else {
                 ForEach(history) { item in
-                    NavigationLink {
-                        BookshelfReaderGatewayView(book: item.asBookshelfBook)
+                    Button {
+                        appState.readerOverlay = ReaderOverlayRequest(book: item.asBookshelfBook)
                     } label: {
                         HStack(spacing: 12) {
                             AsyncBookCover(urlString: item.coverURL, width: 44, height: 60)
@@ -760,8 +760,8 @@ struct ReadingStatsView: View {
 
                 if let mostReadBook = summary.mostReadBook {
                     Section("阅读最多") {
-                        NavigationLink {
-                            BookshelfReaderGatewayView(book: mostReadBook)
+                        Button {
+                            appState.readerOverlay = ReaderOverlayRequest(book: mostReadBook)
                         } label: {
                             VStack(alignment: .leading, spacing: 6) {
                                 Text(mostReadBook.title)
@@ -778,8 +778,8 @@ struct ReadingStatsView: View {
 
                 Section("最近阅读") {
                     ForEach(summary.recentBooks) { book in
-                        NavigationLink {
-                            BookshelfReaderGatewayView(book: book)
+                        Button {
+                            appState.readerOverlay = ReaderOverlayRequest(book: book)
                         } label: {
                             VStack(alignment: .leading, spacing: 5) {
                                 HStack {

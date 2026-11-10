@@ -66,7 +66,6 @@ struct BookshelfView: View {
     private static let shelfScrollSpace = "bookshelf.scroll"
 
     private enum ContextualBookRoute {
-        case read(BookshelfBook, coverFrame: UIImage?)
         case detail(BookshelfBook, placement: String)
     }
 
@@ -298,15 +297,6 @@ struct BookshelfView: View {
             )) {
                 if let route = contextualBookRoute ?? lastContextualBookRoute {
                     switch route {
-                    case .read(let book, let coverFrame):
-                        BookshelfReaderGatewayView(book: book, onRequestExit: { contextualBookRoute = nil })
-                            // Zoom 先挂在 destination 本身上，再叠开场遮罩。
-                            // 反过来的顺序会让 opening presentation 成为
-                            // destination 的最外层，系统认不到 hero 转场，
-                            // 开卷就退化成普通 push。
-                            .bookHeroDestination("continue|" + book.id, in: bookHero)
-                            .readerOpeningPresentation(for: managedOpeningBook(book), coverFrame: coverFrame, usesDeskHero: true)
-                            .environment(\.readingCoverHandoff, readingDeskEnabled && floatingReadingDeskEnabled ? readingCoverHandoff : nil)
                     case .detail(let book, let placement):
                         detailDestination(book, placement: placement)
                     }
@@ -938,7 +928,12 @@ struct BookshelfView: View {
             guard contextualBookRoute == nil else { return }
             pinReturnOrder(placement: "continue")
             UIImpactFeedbackGenerator(style: .light).impactOccurred()
-            openContextualRoute(.read(book, coverFrame: readingCoverHandoff.frame(for: book)))
+            // 阅读器走覆盖层：主页不离开层级，于是没有 pop、没有 chrome 恢复、
+            // 没有书架重建。原来的 .read 路由已删除。
+            appState.readerOverlay = ReaderOverlayRequest(
+                book: book,
+                coverFrame: readingCoverHandoff.frame(for: book)
+            )
         } label: {
             Group {
                 if theme.homeComposition != .readingDesk, readingDeskEnabled {

@@ -49,6 +49,9 @@ final class AppState: ObservableObject {
     // Publishing every network log invalidated the entire app/reader subtree.
     var diagnostics: [DiagnosticEvent] = []
     @Published var isTabChromeHidden = false
+    /// 阅读器以覆盖层呈现，不再作为 NavigationStack 的 destination。
+    /// 主页因此永远活着：没有 pop、没有 chrome 恢复、没有书架重建。
+    @Published var readerOverlay: ReaderOverlayRequest?
     private var activeTabChromeOwners: Set<UUID> = []
     private var pendingChromeReveal: DispatchWorkItem?
 
