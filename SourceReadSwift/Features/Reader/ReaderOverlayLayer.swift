@@ -41,10 +41,14 @@ struct ReaderOverlayLayer: View {
             let cover = request.coverRect ?? defaultCoverRect(in: screen)
             let rect = ReaderTransitionPolicy.targetRect(cover: cover, screen: screen,
                                                          progress: transition.progress)
-            let scaleX = screen.width > 0 ? rect.width / screen.width : 1
-            let scaleY = screen.height > 0 ? rect.height / screen.height : 1
-            let corner = ReaderTransitionPolicy.cornerRadius(progress: transition.progress,
-                                                             compact: 12, full: 0)
+            let scaleX: CGFloat = screen.width > 0 ? rect.width / screen.width : 1
+            let scaleY: CGFloat = screen.height > 0 ? rect.height / screen.height : 1
+            let corner: CGFloat = ReaderTransitionPolicy.cornerRadius(progress: transition.progress,
+                                                                      compact: 12, full: 0)
+            let offsetX: CGFloat = rect.midX - screen.width / 2
+            let offsetY: CGFloat = rect.midY - screen.height / 2
+            let shadowOpacity: Double = 0.22 * Double(1 - transition.progress)
+            let shadowRadius: CGFloat = 24 * (1 - transition.progress)
 
             ZStack {
                 // 阅读内容始终按最终尺寸排版，只做整体缩放：
@@ -58,9 +62,8 @@ struct ReaderOverlayLayer: View {
                 .frame(width: screen.width, height: screen.height)
                 .clipShape(RoundedRectangle(cornerRadius: corner, style: .continuous))
                 .scaleEffect(x: scaleX, y: scaleY, anchor: .center)
-                .offset(x: rect.midX - screen.width / 2, y: rect.midY - screen.height / 2)
-                .shadow(color: .black.opacity(0.22 * (1 - transition.progress)),
-                        radius: 24 * (1 - transition.progress), x: 0, y: 8)
+                .offset(x: offsetX, y: offsetY)
+                .shadow(color: .black.opacity(shadowOpacity), radius: shadowRadius, x: 0, y: 8)
 
                 // 封面盖在上面淡出：进入时看到的是封面放大，落位后由正文接管。
                 if let image = request.coverImage,
