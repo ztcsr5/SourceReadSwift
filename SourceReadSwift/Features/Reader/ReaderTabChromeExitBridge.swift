@@ -70,11 +70,17 @@ final class ReaderTabChromeExitController: UIViewController {
         NavigationTrace.shared.mark("pop",
             "willDisappear interactive=\(transition.isInteractive) isPop=\(isPop)")
         guard isPop else { return }
-        prepareForExit()
-        NavigationTrace.shared.mark("pop", "pop 起点已归还 tab bar")
+        // 转场开始时**不**释放 tab chrome。
+        //
+        // 日志证据：在 pop 起点释放后 100 ms 内就会出现 cancelled=true，
+        // 于是 acquire 又把栏藏回去——一次没滑够距离的侧滑会让整条栏
+        // 「出现→消失」闪一遍。改成只在转场确认提交（非取消）后才释放，
+        // 取消的手势全程零变化。
         transition.animate(alongsideTransition: nil) { [weak self] context in
-            NavigationTrace.shared.mark("pop", "pop 结束 cancelled=\(context.isCancelled)")
-            self?.finishExit(cancelled: context.isCancelled)
+            NavigationTrace.shared.mark("pop", "pop 结束 cancelled=\(context.isCancelled)"
+                + (context.isCancelled ? "（未归还 tab bar）" : "（归还 tab bar）"))
+            guard let self, !context.isCancelled else { return }
+            self.prepareForExit()
         }
     }
 

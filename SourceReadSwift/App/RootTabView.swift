@@ -173,21 +173,22 @@ struct RootTabView: View {
     }
 }
 
-/// Tab 栏可见性交给导航栈，不再由 `AppState` 驱动。
+/// Tab 栏可见性必须由 `AppState` 驱动。
 ///
-/// 日志证据：每次侧滑在 `pop 起点已归还 tab bar` 之后 100 ms 内就出现
-/// `cancelled=true`，并立刻 `chrome acquire` 把栏重新藏起来。也就是说
-/// **只要在转场中途翻转 `isTabChromeHidden`，一次没滑够距离的手势就会让
-/// 整条栏闪一下再闪回去**——用户看到的就是「轻轻一碰，菜单闪一下」。
+/// 试过交给导航栈（destination 自己的 `.toolbar(.hidden, for: .tabBar)`）：
+/// iOS 26 上 tab 根视图的 `.automatic` 会压过 pushed destination 的 `.hidden`，
+/// 结果阅读页里整条栏浮在正文上。所以这里必须读 `isTabChromeHidden`。
 ///
-/// 推入阅读器时由 destination 自己的 `.toolbar(.hidden, for: .tabBar)`
-/// 隐藏，弹出时 UIKit 跟着 pop 一起把栏还回来；手势取消则全程无变化。
-/// `AppState.isTabChromeHidden` 仍保留，只用于音频条的安全区内边距。
+/// 闪动的根因不在这个开关，而在**什么时候**翻转它：转场中途翻转，一次没滑
+/// 够距离的手势就会让栏「出现→消失」。现在只在真正离开阅读器时才释放，
+/// 取消的手势一个字节都不碰（见 ReaderTabChromeExitBridge）。
 private struct NativeTabChromeVisibilityModifier: ViewModifier {
+    @EnvironmentObject private var appState: AppState
+
     func body(content: Content) -> some View {
-        // `.automatic` 同时保留 `.tabBarMinimizeBehavior(.onScrollDown)`：
+        // `.automatic` 保留 `.tabBarMinimizeBehavior(.onScrollDown)`；
         // 钉成 `.visible` 会让下滑收起彻底失效。
-        content.toolbar(.automatic, for: .tabBar)
+        content.toolbar(appState.isTabChromeHidden ? .hidden : .automatic, for: .tabBar)
     }
 }
 
