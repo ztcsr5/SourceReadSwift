@@ -56,9 +56,10 @@ struct ReaderOverlayLayer: View {
             let offsetY: CGFloat = rect.midY - screen.height / 2
             let shadowOpacity: Double = 0.22 * Double(1 - p)
             let shadowRadius: CGFloat = 24 * (1 - p)
-            // 正文未就绪时封面保持不透明：不允许出现空白 WebView，
-            // 也不允许封面在等待正文时消失。
-            let veilOpacity: Double = contentReady
+            // 封面/纸面一直盖到「正文就绪 **且** 几何基本落位」为止。
+            // 只判 contentReady 会在 p 还很小的时候就把遮罩淡出，
+            // 中间露出阅读器自己的空白背景——真机上那次浅色空白闪动就来自这里。
+            let veilOpacity: Double = (contentReady && p >= 0.62)
                 ? ReaderTransitionPolicy.coverOpacity(progress: p)
                 : 1
 

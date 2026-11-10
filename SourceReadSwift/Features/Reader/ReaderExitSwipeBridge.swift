@@ -89,6 +89,8 @@ final class ReaderExitSwipeController: UIViewController, UIGestureRecognizerDele
     private var onExit: () -> Void = {}
     private var onChanged: (CGFloat) -> Void = { _ in }
     private var onEnded: (CGFloat, CGFloat, Bool) -> Void = { _, _, _ in }
+    /// 本次手势是否被判定为纵向滚动（纵向占优时放弃返回，交给翻页/滚动）。
+    private var verticalDominant = false
     private(set) weak var prioritizedNavigationEdge: UIGestureRecognizer?
     #if DEBUG
     private(set) var fallbackMotionCount = 0
@@ -196,14 +198,29 @@ final class ReaderExitSwipeController: UIViewController, UIGestureRecognizerDele
     }
 
     func gestureRecognizerShouldBegin(_ gestureRecognizer: UIGestureRecognizer) -> Bool {
-        guard exitEnabled, !didExit, gestureRecognizer === edgePan, !hasActiveSystemReturn else { return false }
-        return ReaderExitSwipePolicy.isRightward(edgePan.velocity(in: edgePan.view))
+        guard exitEnabled, !didExit, gestureRecognizer === edgePan, !hasActiveSystemReturn else {
+            NavigationTrace.shared.mark("GEST", "shouldBegin 拒绝：enabled=\(exitEnabled) didExit=\(didExit) system=\(hasActiveSystemReturn)")
+            return false
+        }
+        // 不再用瞬时速度判定方向。
+        // `.began` 那一刻速度常常是 0 或噪声，isRightward 会随机为 false，
+        // 表现就是「有时完全没反应」。方向改在 `.changed` 里判断：
+        // 纵向占优就当取消，横向右才驱动转场，横向左直接忽略。
+        NavigationTrace.shared.mark("GEST", "shouldBegin 允许")
+        return true
     }
 
     func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldReceive touch: UITouch) -> Bool {
         guard exitEnabled, !didExit, view.window != nil,
               view.bounds.contains(touch.location(in: view)),
               parent?.presentedViewController == nil else { return false }
+        // 只接真正的左缘窄条（<32pt）。这是**收窄**，不是放宽：
+        // 正文中部的横向翻页不进入这个区域，因此返回手势不会抢翻页。
+        let location = touch.location(in: edgePan.view)
+        guard location.x <= 32 else {
+            NavigationTrace.shared.breadcrumb("GEST", "shouldReceive 忽略 x=\(Int(location.x))")
+            return false
+        }
         var candidate = touch.view
         while let touched = candidate {
             if touched is UIControl { return false }
@@ -215,14 +232,22 @@ final class ReaderExitSwipeController: UIViewController, UIGestureRecognizerDele
 
     func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer,
                            shouldBeRequiredToFailBy otherGestureRecognizer: UIGestureRecognizer) -> Bool {
+        // 这里曾经对所有后代识别器返回 true。
+        // 该方法的语义是「**我**是否必须等对方失败」，返回 true 等于让退出手势
+        // 排队等 WKWebView 的 pan 失败——而滚动 pan 往往要到手指抬起才失败，
+        // 于是退出几乎永远起不来；只有在 WebView pan 恰好快速失败（横向占优）时
+        // 才偶然生效。这就是「时灵时不灵」的直接原因。
+        //
+        // 返回 false：边缘手势不服从后代识别器。是否会抢翻页由 shouldReceive 的
+        // 32pt 边缘带守住，与优先级无关。
         if otherGestureRecognizer === navigationController?.interactivePopGestureRecognizer { return false }
         #if compiler(>=6.2)
         if #available(iOS 26.0, *), otherGestureRecognizer === navigationController?.interactiveContentPopGestureRecognizer { return false }
         #endif
-        // Dynamic priority prevents an edge-exit swipe from also turning a page.
-        guard exitEnabled, gestureRecognizer === edgePan,
-              let host = edgePan.view, let other = otherGestureRecognizer.view else { return false }
-        return otherGestureRecognizer !== edgePan && other.isDescendant(of: host)
+        if gestureRecognizer === edgePan, otherGestureRecognizer !== edgePan {
+            NavigationTrace.shared.breadcrumb("GEST", "不服从 \(type(of: otherGestureRecognizer))")
+        }
+        return false
     }
 
     @objc private func handlePan(_ gesture: UIScreenEdgePanGestureRecognizer) {
@@ -245,8 +270,23 @@ final class ReaderExitSwipeController: UIViewController, UIGestureRecognizerDele
         #endif
 
         // 实时位移交给覆盖层做跟手动画。只在真正可退出的路径上发。
-        if gesture.state == .changed, exitEnabled, !hasActiveSystemReturn {
-            onChanged(gesture.translation(in: gesture.view).x)
+        if gesture.state == .began {
+            verticalDominant = false
+            let t = gesture.translation(in: gesture.view)
+            NavigationTrace.shared.mark("GEST", "began t=(\(Int(t.x)),\(Int(t.y)))")
+            return
+        }
+        if gesture.state == .changed {
+            let t = gesture.translation(in: gesture.view)
+            let v = gesture.velocity(in: gesture.view)
+            // 纵向占优即视为滚动，不驱动返回，也不抢翻页。
+            if !verticalDominant, abs(t.y) > abs(t.x) {
+                verticalDominant = true
+                NavigationTrace.shared.mark("GEST", "纵向占优 → 放弃返回 t=(\(Int(t.x)),\(Int(t.y)))")
+            }
+            guard exitEnabled, !hasActiveSystemReturn, !verticalDominant, t.x > 0 else { return }
+            NavigationTrace.shared.breadcrumb("GEST", "changed dx=\(Int(t.x)) vx=\(Int(v.x))")
+            onChanged(t.x)
             return
         }
         guard gesture.state == .ended || gesture.state == .cancelled || gesture.state == .failed else { return }
@@ -254,9 +294,16 @@ final class ReaderExitSwipeController: UIViewController, UIGestureRecognizerDele
         let translation = gesture.translation(in: gesture.view)
         let velocity = gesture.velocity(in: gesture.view)
         let wasCancelled = (gesture.state == .cancelled || gesture.state == .failed)
-        onEnded(translation.x, velocity.x, wasCancelled)
+        let reason: String
+        if wasCancelled { reason = "系统取消" }
+        else if verticalDominant { reason = "纵向占优" }
+        else if velocity.x < -820 { reason = "反向甩动" }
+        else { reason = "正常松手" }
+        NavigationTrace.shared.mark("GEST",
+            "\(gesture.state == .ended ? "ended" : "cancelled") dx=\(Int(translation.x)) vx=\(Int(velocity.x)) → \(reason)")
+        onEnded(translation.x, velocity.x, wasCancelled || verticalDominant)
         // 系统取消必须走取消恢复，不能被当成正常松手。
-        guard gesture.state == .ended, !wasCancelled else { return }
+        guard gesture.state == .ended, !wasCancelled, !verticalDominant else { return }
         // 兼容既有调用方（ReaderView 仍依赖桥自己判定后 onExit）。
         // 覆盖层把 onExit 传成空闭包，改由 onEnded 驱动动画与关闭。
         completeSwipe(translation: translation, velocity: velocity, cancelled: false)
