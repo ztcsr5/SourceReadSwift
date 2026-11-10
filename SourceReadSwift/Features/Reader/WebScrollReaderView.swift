@@ -101,6 +101,7 @@ final class ReaderEdgeReturnWebView: WKWebView {
 /// * a tap becomes a zone event only when it is short, still and unambiguous,
 ///   which keeps scrolling from being mistaken for a page turn.
 struct WebScrollReaderView: UIViewRepresentable {
+    @Environment(\.nativeReaderSession) private var nativeSession
     let sections: [WebReaderSection]
     var contentFingerprint: String
     /// 换书 / 重进阅读器时的身份串。变了就把文档滚回顶部。
@@ -140,6 +141,7 @@ struct WebScrollReaderView: UIViewRepresentable {
     var prioritizesSystemEdgeReturn = false
     let onVisibleParagraph: (Int) -> Void
     var onVisiblePosition: ((Int, Int) -> Void)? = nil
+    var onPresented: (() -> Void)? = nil
     var onScrollInteractionChanged: ((Bool) -> Void)? = nil
     var onNearBottom: (() -> Void)? = nil
     var onReachTop: (() -> Void)? = nil
@@ -190,6 +192,8 @@ struct WebScrollReaderView: UIViewRepresentable {
         private var shellNavigation: WKNavigation?
         private var startupProbeTask: Task<Void, Never>?
         private var hasReportedPosition = false
+        private var hasPresented = false
+        private var presentationRequestKey: String?
         private(set) var startupRecoveryCount = 0
         private var lastStylePayload: WebReaderStylePayload?
         private var lastStyleInputs: [AnyHashable]?
@@ -262,6 +266,7 @@ struct WebScrollReaderView: UIViewRepresentable {
             webView.scrollView.delegate = self
             self.webView = webView
             lastSurfaceColor = view.surfaceColor
+            view.nativeSession?.recordWebView(webView)
 
             prepareBeforeNavigation?(webView)
             navigateToShell(webView: webView)
@@ -603,7 +608,14 @@ struct WebScrollReaderView: UIViewRepresentable {
                     let offset = (body["utf16Offset"] as? Int) ?? 0
                     view.onVisiblePosition?(flat, max(offset, 0))
                     view.onVisibleParagraph(flat)
+                    schedulePresentationAcknowledgement()
                 }
+            case "presented":
+                guard !hasPresented, pendingScrollKey == nil,
+                      reportingResetToken == view.resetToken,
+                      body["requestKey"] as? String == (appliedScrollKey ?? "") else { return }
+                hasPresented = true
+                view.onPresented?()
             case "near-bottom":
                 guard reportingResetToken == view.resetToken, pendingScrollKey == nil else { return }
                 let start = CACurrentMediaTime()
@@ -698,10 +710,35 @@ struct WebScrollReaderView: UIViewRepresentable {
         }
 
         private func navigateToShell(webView: WKWebView) {
+            view.nativeSession?.recordShellLoad()
+            hasPresented = false
+            presentationRequestKey = nil
             let navigationID = UUID()
             navigationToken = navigationID.uuidString
             shellNavigation = webView.loadHTMLString(WebReaderHTML.renderShell(for: navigationID), baseURL: nil)
             if !hasReportedPosition { scheduleStartupProbe(webView: webView) }
+        }
+
+        private func schedulePresentationAcknowledgement() {
+            guard !hasPresented, let webView else { return }
+            let key = expectedContentRevision + "|" + (appliedScrollKey ?? "")
+            guard presentationRequestKey != key else { return }
+            presentationRequestKey = key
+            let revision = WebReaderJavaScriptLiteral.string(expectedContentRevision)
+            let request = WebReaderJavaScriptLiteral.string(appliedScrollKey ?? "")
+            // Position reporting stays synchronous. Revealing the reader additionally waits for render opportunities.
+            let script = """
+                window.requestAnimationFrame(function() {
+                  window.requestAnimationFrame(function() {
+                    window.webkit.messageHandlers.reader.postMessage({type:"presented", revision:\(revision), requestKey:\(request)});
+                  });
+                });
+                """
+            webView.evaluateJavaScript(script) { [weak self] _, error in
+                guard let self, error != nil, self.presentationRequestKey == key else { return }
+                self.presentationRequestKey = nil
+                NavigationTrace.shared.mark("reader-session", "presentation acknowledgement unavailable")
+            }
         }
 
         private func scheduleStartupProbe(webView: WKWebView) {

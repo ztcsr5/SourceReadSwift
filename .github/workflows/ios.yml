@@ -155,6 +155,8 @@ jobs:
             -only-testing:SourceReadSwiftTests/ReaderTabChromeExitTests \
             -only-testing:SourceReadSwiftTests/ReaderExitSwipeTests \
             -only-testing:SourceReadSwiftTests/ReaderPanController119Tests \
+            -only-testing:SourceReadSwiftTests/ReaderNavigationSessionTests \
+            -only-testing:SourceReadSwiftTests/ReaderNativeNavigationTests \
             -destination-timeout 120 -test-timeouts-enabled YES -maximum-test-execution-time-allowance 120 \
             -resultBundlePath NativeTabResults.xcresult test-without-building 2>&1 | tee native-tab-test.log
       - name: Preserve iOS26 unit log before UI flows

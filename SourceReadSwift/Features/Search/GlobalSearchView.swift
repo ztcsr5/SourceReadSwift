@@ -129,11 +129,11 @@ struct GlobalSearchView: View {
 
     private func resultLink(_ entry: GlobalSearchEntry) -> some View {
         Button {
-            // 书签直接进阅读层，不再 push —— 阅读器是覆盖层。
+            // Bookmarks use the same native reader route as history and the shelf.
             if entry.kind == .bookmark,
                let book = bookshelf.book(id: entry.target),
                let bookmark = book.bookmarks?.first(where: { $0.id == entry.bookmarkID }) {
-                appState.readerOverlay = ReaderOverlayRequest(book: book, initialBookmark: bookmark)
+                appState.readerNavigation.open(.shelf(book, bookmark: bookmark))
                 return
             }
             selectedEntry = entry
@@ -164,7 +164,7 @@ struct GlobalSearchView: View {
         case .bookmark:
             if let book = bookshelf.book(id: entry.target),
                let bookmark = book.bookmarks?.first(where: { $0.id == entry.bookmarkID }) {
-                BookshelfReaderGatewayView(book: book, initialBookmark: bookmark)
+                Button("打开书签") { appState.readerNavigation.open(.shelf(book, bookmark: bookmark)) }
             } else { Text("这条书签已删除，请重新搜索。") }
         case .source: SourceManagerView(initialSearch: entry.target)
         case .setting:

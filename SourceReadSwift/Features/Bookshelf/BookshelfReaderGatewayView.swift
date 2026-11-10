@@ -4,7 +4,7 @@ struct BookshelfReaderGatewayView: View {
     @EnvironmentObject private var appState: AppState
     @Environment(\.dismiss) private var dismiss
     @Environment(\.readerOpeningManaged) private var readerOpeningManaged
-    @Environment(\.readerPresentedAsOverlay) private var presentedAsOverlay
+    @Environment(\.nativeReaderSession) private var nativeSession
     let book: BookshelfBook
     let onRequestExit: (() -> Void)?
     @State private var launchCursor: ReaderLaunchCursor
@@ -44,20 +44,19 @@ struct BookshelfReaderGatewayView: View {
 
     var body: some View {
         gatewayContent
-        .background(ReaderTabChromeExitBridge(owner: gatewayTabChromeOwner))
-        .toolbar(.hidden, for: .tabBar)
+        .background {
+            if nativeSession == nil { ReaderTabChromeExitBridge(owner: gatewayTabChromeOwner) }
+        }
         .environment(\.readerTemporaryCoverPresented, showSourceSwitcher)
         .onAppear {
-            NavigationTrace.shared.mark("reader", "gateway onAppear overlay=\(presentedAsOverlay)")
-            // 覆盖层路径完全不碰 tab chrome：主页常驻，没有"恢复"这回事。
-            // 只有旧的 NavigationStack 路径才需要隐藏/归还。
-            if !presentedAsOverlay {
+            NavigationTrace.shared.mark("reader", "gateway onAppear native=\(nativeSession != nil)")
+            if nativeSession == nil {
                 appState.acquireTabChromeHidden(owner: gatewayTabChromeOwner)
             }
         }
         .onDisappear {
-            NavigationTrace.shared.mark("reader", "gateway onDisappear overlay=\(presentedAsOverlay)")
-            if !presentedAsOverlay {
+            NavigationTrace.shared.mark("reader", "gateway onDisappear native=\(nativeSession != nil)")
+            if nativeSession == nil {
                 appState.releaseTabChromeHidden(owner: gatewayTabChromeOwner)
             }
         }
@@ -198,7 +197,7 @@ struct BookshelfReaderGatewayView: View {
         // Restore the tab bar before the pop transition starts. Waiting for
         // onDisappear leaves the bar missing for the first frames of the
         // returned shelf and makes the home screen look frozen.
-        appState.releaseTabChromeHidden(owner: gatewayTabChromeOwner)
+        if nativeSession == nil { appState.releaseTabChromeHidden(owner: gatewayTabChromeOwner) }
         // This view owns the shelf route; nested reader panels must never
         // supply the dismiss environment used to pop that route.
         if let onRequestExit { onRequestExit() }

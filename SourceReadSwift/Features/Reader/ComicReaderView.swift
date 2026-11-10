@@ -18,6 +18,8 @@ enum ComicReadingMode: String, CaseIterable, Identifiable {
 
 struct ComicReaderView: View {
     @EnvironmentObject private var appState: AppState
+    @Environment(\.nativeReaderSession) private var nativeSession
+    @Environment(\.readerNavigationIsTransitioning) private var navigationIsTransitioning
     @Environment(\.dismiss) private var dismiss
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.accessibilityReduceMotion) private var reducesMotion
@@ -179,7 +181,7 @@ struct ComicReaderView: View {
             }
 
             if showChrome {
-                chromeOverlay
+                chromeOverlay.opacity(navigationIsTransitioning ? 0 : 1)
             } else if !pages.isEmpty {
                 VStack {
                     if statusPosition == "top" || statusPosition == "both" {
@@ -242,13 +244,19 @@ struct ComicReaderView: View {
         .readerOpeningContentReady(!pages.isEmpty || errorMessage != nil)
         .toolbar(.hidden, for: .navigationBar)
         .hideRootTabBar()
+        .background(ReaderNativeLifecycleBridge(session: nativeSession,
+            allowsReturn: inspectedPage == nil && !showChapterDrawer, onExit: finishReader))
         .onDisappear {
-            guard inspectedPage == nil else { return }
-            flushComicPosition()
-            loadGeneration &+= 1
-            chapterTask?.cancel()
-            timeoutTask?.cancel()
+            guard inspectedPage == nil, nativeSession?.phase != .returning else { return }
+            finishReader()
         }
+    }
+
+    private func finishReader() {
+        flushComicPosition()
+        loadGeneration &+= 1
+        chapterTask?.cancel()
+        timeoutTask?.cancel()
     }
 
     // MARK: - Main Content Views
