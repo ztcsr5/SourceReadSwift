@@ -577,6 +577,13 @@ final class FloatingReadingDeskUITests: XCTestCase {
         if !returnButton.isHittable { app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.42)).tap() }
         XCTAssertTrue(returnButton.waitForExistence(timeout: 5))
         returnButton.tap()
+        // 阅读器现在是覆盖层，退出要等它真正卸载，而不是同步返回。
+        // 这是真实交互路径（点阅读器自己的返回按钮），不是绕过手势。
+        let gone = XCTNSPredicateExpectation(
+            predicate: NSPredicate(format: "exists == NO"),
+            object: element("reader.webScrollSurface"))
+        XCTAssertEqual(XCTWaiter.wait(for: [gone], timeout: 10), .completed,
+                       "覆盖层必须在返回后真正卸载")
     }
 
     private func assertReaderProse() {

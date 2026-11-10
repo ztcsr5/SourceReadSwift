@@ -4,15 +4,18 @@ import UIKit
 @testable import SourceReadSwift
 
 final class TabChromeRegressionTests: XCTestCase {
-    @MainActor func testOwnersCannotRevealChromeWhileAnotherReaderOwnsIt() {
+    @MainActor func testOwnersCannotRevealChromeWhileAnotherReaderOwnsIt() async throws {
         let app = AppState()
         let gateway = UUID(), reader = UUID()
         app.acquireTabChromeHidden(owner: gateway)
         app.acquireTabChromeHidden(owner: reader)
         app.releaseTabChromeHidden(owner: reader)
-        XCTAssertTrue(app.isTabChromeHidden)
+        XCTAssertTrue(app.isTabChromeHidden, "还剩一个 owner 时必须继续隐藏")
         app.releaseTabChromeHidden(owner: gateway)
-        XCTAssertFalse(app.isTabChromeHidden)
+        // 新契约：最后一个 owner 释放后进入挂起窗口，底栏不得立刻出现。
+        XCTAssertTrue(app.isTabChromeHidden, "挂起窗口内不得提前暴露底栏")
+        let revealed = await eventually(timeout: 2.0) { !app.isTabChromeHidden }
+        XCTAssertTrue(revealed, "窗口结束后必须显示底栏")
     }
 
     @MainActor func testCustomRootNeverRevealsASecondNativeBar() async throws {

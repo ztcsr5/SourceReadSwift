@@ -70,6 +70,7 @@ struct AtelierReadingCard: View {
 
     private var cover: some View {
         ShelfBookCover(book: book, width: coverHeight * 2 / 3, height: coverHeight, theme: theme)
+            .readerCoverAnchor(book.id)
             .bookHeroSource("continue|" + book.id, in: heroNamespace)
             .padding(16)
             .background {

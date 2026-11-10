@@ -35,8 +35,11 @@ struct ReadingHeroCard: View {
     @ViewBuilder var body: some View {
         if usesSpatialStyle && usesFloatingStyle {
             FloatingReadingDesk(book: book, heroNamespace: heroNamespace)
-        } else if let heroNamespace { card.bookHeroSource("continue|" + book.id, in: heroNamespace) }
-        else { card }
+        } else if let heroNamespace {
+            card.readerCoverAnchor(book.id).bookHeroSource("continue|" + book.id, in: heroNamespace)
+        } else {
+            card.readerCoverAnchor(book.id)
+        }
     }
 
     private var card: some View {

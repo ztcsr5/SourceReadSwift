@@ -60,8 +60,9 @@ struct ReaderExitSwipeBridge: UIViewControllerRepresentable {
     var prefersSystemReturn = false
     /// 拖拽过程中的实时位移（正数 = 向右）。覆盖层用它驱动跟手动画。
     var onChanged: (CGFloat) -> Void = { _ in }
-    /// 松手时的原始位移与速度（x 分量）。判定交给覆盖层，保持策略单一来源。
-    var onEnded: (CGFloat, CGFloat) -> Void = { _, _ in }
+    /// 松手时的原始位移、速度与「是否为系统取消」。
+    /// 判定交给覆盖层，保持策略单一来源；系统取消必须走取消恢复，不能当正常松手。
+    var onEnded: (CGFloat, CGFloat, Bool) -> Void = { _, _, _ in }
 
     func makeUIViewController(context: Context) -> ReaderExitSwipeController {
         let controller = ReaderExitSwipeController()
@@ -119,7 +120,7 @@ final class ReaderExitSwipeController: UIViewController, UIGestureRecognizerDele
     func configure(enabled: Bool, prefersSystemReturn: Bool = false,
                    onExit: @escaping () -> Void,
                    onChanged: @escaping (CGFloat) -> Void = { _ in },
-                   onEnded: @escaping (CGFloat, CGFloat) -> Void = { _, _ in }) {
+                   onEnded: @escaping (CGFloat, CGFloat, Bool) -> Void = { _, _, _ in }) {
         exitEnabled = enabled
         self.prefersSystemReturn = prefersSystemReturn
         self.onExit = onExit
@@ -252,10 +253,12 @@ final class ReaderExitSwipeController: UIViewController, UIGestureRecognizerDele
 
         let translation = gesture.translation(in: gesture.view)
         let velocity = gesture.velocity(in: gesture.view)
-        onEnded(translation.x, velocity.x)
+        let wasCancelled = (gesture.state == .cancelled || gesture.state == .failed)
+        onEnded(translation.x, velocity.x, wasCancelled)
+        // 系统取消必须走取消恢复，不能被当成正常松手。
+        guard gesture.state == .ended, !wasCancelled else { return }
         // 兼容既有调用方（ReaderView 仍依赖桥自己判定后 onExit）。
         // 覆盖层把 onExit 传成空闭包，改由 onEnded 驱动动画与关闭。
-        guard gesture.state == .ended else { return }
         completeSwipe(translation: translation, velocity: velocity, cancelled: false)
     }
 

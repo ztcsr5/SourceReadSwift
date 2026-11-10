@@ -21,7 +21,8 @@ extension EnvironmentValues {
     }
 }
 
-private struct ReaderOpeningReadyKey: PreferenceKey {
+/// 覆盖层需要读取这个信号判断正文是否真的就位，因此不再是 private。
+struct ReaderOpeningReadyKey: PreferenceKey {
     static let defaultValue = false
     static func reduce(value: inout Bool, nextValue: () -> Bool) {
         value = value || nextValue()

@@ -36,8 +36,11 @@ struct ForestReadingCard: View {
         // together with its page edge and shadow, rather than the raw bitmap.
         .padding(.horizontal, 6)
         .padding(.vertical, 10)
-        if let heroNamespace { cover.bookHeroSource("continue|" + book.id, in: heroNamespace) }
-        else { cover }
+        if let heroNamespace {
+            cover.readerCoverAnchor(book.id).bookHeroSource("continue|" + book.id, in: heroNamespace)
+        } else {
+            cover.readerCoverAnchor(book.id)
+        }
     }
 
     private var readingInformation: some View {

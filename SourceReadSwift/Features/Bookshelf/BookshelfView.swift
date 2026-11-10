@@ -1020,6 +1020,7 @@ struct BookshelfView: View {
             layout {
                 ShelfBookCover(book: book, width: 52, height: 72, theme: theme)
                     .environment(\.readingCoverHandoff, readingDeskEnabled ? readingCoverHandoff : nil)
+                    .readerCoverAnchor(book.id)
                     .bookHeroSource("list|" + book.id, in: bookHero)
                 VStack(alignment: .leading, spacing: 5) {
                     HStack(spacing: 5) {
@@ -1119,6 +1120,7 @@ struct BookshelfView: View {
             VStack(alignment: .leading, spacing: 8) {
                 ShelfBookCover(book: book, width: nil, height: 120, theme: theme)
                     .environment(\.readingCoverHandoff, readingDeskEnabled ? readingCoverHandoff : nil)
+                    .readerCoverAnchor(book.id)
                     .bookHeroSource("grid|" + book.id, in: bookHero)
 
                 VStack(alignment: .leading, spacing: 3) {

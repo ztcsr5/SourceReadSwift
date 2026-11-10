@@ -4,6 +4,7 @@ struct BookshelfReaderGatewayView: View {
     @EnvironmentObject private var appState: AppState
     @Environment(\.dismiss) private var dismiss
     @Environment(\.readerOpeningManaged) private var readerOpeningManaged
+    @Environment(\.readerPresentedAsOverlay) private var presentedAsOverlay
     let book: BookshelfBook
     let onRequestExit: (() -> Void)?
     @State private var launchCursor: ReaderLaunchCursor
@@ -47,12 +48,18 @@ struct BookshelfReaderGatewayView: View {
         .toolbar(.hidden, for: .tabBar)
         .environment(\.readerTemporaryCoverPresented, showSourceSwitcher)
         .onAppear {
-            NavigationTrace.shared.mark("reader", "gateway onAppear")
-            appState.acquireTabChromeHidden(owner: gatewayTabChromeOwner)
+            NavigationTrace.shared.mark("reader", "gateway onAppear overlay=\(presentedAsOverlay)")
+            // 覆盖层路径完全不碰 tab chrome：主页常驻，没有"恢复"这回事。
+            // 只有旧的 NavigationStack 路径才需要隐藏/归还。
+            if !presentedAsOverlay {
+                appState.acquireTabChromeHidden(owner: gatewayTabChromeOwner)
+            }
         }
         .onDisappear {
-            NavigationTrace.shared.mark("reader", "gateway onDisappear")
-            appState.releaseTabChromeHidden(owner: gatewayTabChromeOwner)
+            NavigationTrace.shared.mark("reader", "gateway onDisappear overlay=\(presentedAsOverlay)")
+            if !presentedAsOverlay {
+                appState.releaseTabChromeHidden(owner: gatewayTabChromeOwner)
+            }
         }
         .task {
             if let source = appState.sourceStore.source(for: currentBook.sourceURL)?.resolvingMediaKind(currentBook.mediaKind), source.sourceKind != .text {
