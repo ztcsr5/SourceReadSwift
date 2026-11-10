@@ -8067,12 +8067,17 @@ private struct ReaderNavigationPopLock: UIViewControllerRepresentable {
 
         func restorePopLock() {
             guard let nav = lockedNavigationController ?? navigationController else { return }
-            if let wasEnabled = popWasEnabled {
+            // 只在值真的变了才写。pop 收尾那一帧无条件重写 isEnabled，
+            // 会让 UIKit 认为手势被外部改动过，从而把正在收尾的转场判为需要
+            // 重新协商——这是「滑出去又弹回来」的第三个来源。
+            if let wasEnabled = popWasEnabled,
+               nav.interactivePopGestureRecognizer?.isEnabled != wasEnabled {
                 nav.interactivePopGestureRecognizer?.isEnabled = wasEnabled
             }
             #if compiler(>=6.2)
             if #available(iOS 26.0, *) {
-                if let wasEnabled = contentPopWasEnabled {
+                if let wasEnabled = contentPopWasEnabled,
+                   nav.interactiveContentPopGestureRecognizer?.isEnabled != wasEnabled {
                     nav.interactiveContentPopGestureRecognizer?.isEnabled = wasEnabled
                 }
             }
