@@ -107,12 +107,7 @@ final class AppFrameProfiler: ObservableObject {
         let duration = duration.isFinite ? min(max(duration, 0.01), 30) : 30
         deadline = CACurrentMediaTime() + duration
         let displayLink = CADisplayLink(target: self, selector: #selector(frame(_:)))
-        // 采样必须按设备上限要帧：沿用系统默认调度只会拿到 60Hz 回调，
-        // 会把「跑满 120」误判成「掉到 60」。
-        if #available(iOS 15.0, *) {
-            let rate = Float(maximum)
-            displayLink.preferredFrameRateRange = CAFrameRateRange(minimum: rate, maximum: rate, preferred: rate)
-        }
+        // Observe the system's chosen cadence; the diagnostic must not force the workload it measures.
         displayLink.add(to: .main, forMode: .common)
         link = displayLink
         isRecording = true
