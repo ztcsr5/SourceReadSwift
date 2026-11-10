@@ -30,14 +30,15 @@ final class TabChromeRegressionTests: XCTestCase {
         XCTAssertEqual(tabs.tabBar.items?[1].title, AppNavigationLabels.findBooks)
         XCTAssertNil(tabs.bottomAccessory, "No playback must not create a blank glass accessory")
         XCTAssertFalse(tabs.isTabBarHidden, "iOS 26 走系统栏，进阅读器之前它必须可见")
+        // 栏可见性已交给导航栈：没有推入 destination 时，owner 变化不得翻转
+        // 系统栏。否则一次没滑够距离的侧滑会让整条栏闪一下再闪回去。
         let owner = UUID()
         app.acquireTabChromeHidden(owner: owner)
-        let hidden = await eventually { tabs.isTabBarHidden }
-        XCTAssertTrue(hidden, "进入阅读器后系统栏必须隐藏")
+        try await Task.sleep(nanoseconds: 200_000_000)
+        XCTAssertFalse(tabs.isTabBarHidden, "无 destination 时 owner 不得改变系统栏可见性")
         XCTAssertTrue(tabs === self.tabs(in: window.rootViewController), "Visibility cannot replace the TabView/navigation tree")
         app.releaseTabChromeHidden(owner: owner)
-        let restored = await eventually { !app.isTabChromeHidden && !tabs.isTabBarHidden }
-        XCTAssertTrue(restored)
+        XCTAssertFalse(app.isTabChromeHidden)
         XCTAssertNil(tabs.bottomAccessory)
         #else
         throw XCTSkip("Requires Xcode26 SDK")

@@ -172,16 +172,21 @@ struct RootTabView: View {
     }
 }
 
-/// Toolbar visibility must be owned by each tab's content. Applying it only to
-/// the iOS 26 `TabView` leaves the controller's bar visible when a reader owns
-/// the chrome, and the reader then draws under a second bar.
+/// Tab 栏可见性交给导航栈，不再由 `AppState` 驱动。
+///
+/// 日志证据：每次侧滑在 `pop 起点已归还 tab bar` 之后 100 ms 内就出现
+/// `cancelled=true`，并立刻 `chrome acquire` 把栏重新藏起来。也就是说
+/// **只要在转场中途翻转 `isTabChromeHidden`，一次没滑够距离的手势就会让
+/// 整条栏闪一下再闪回去**——用户看到的就是「轻轻一碰，菜单闪一下」。
+///
+/// 推入阅读器时由 destination 自己的 `.toolbar(.hidden, for: .tabBar)`
+/// 隐藏，弹出时 UIKit 跟着 pop 一起把栏还回来；手势取消则全程无变化。
+/// `AppState.isTabChromeHidden` 仍保留，只用于音频条的安全区内边距。
 private struct NativeTabChromeVisibilityModifier: ViewModifier {
-    @EnvironmentObject private var appState: AppState
-
     func body(content: Content) -> some View {
-        // `.automatic` leaves the bar's minimize behavior intact. Pinning it
-        // to `.visible` kept the native bar expanded on every scroll.
-        content.toolbar(appState.isTabChromeHidden ? .hidden : .automatic, for: .tabBar)
+        // `.automatic` 同时保留 `.tabBarMinimizeBehavior(.onScrollDown)`：
+        // 钉成 `.visible` 会让下滑收起彻底失效。
+        content.toolbar(.automatic, for: .tabBar)
     }
 }
 
