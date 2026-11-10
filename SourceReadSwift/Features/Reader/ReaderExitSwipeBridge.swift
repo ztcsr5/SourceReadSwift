@@ -88,7 +88,7 @@ final class ReaderExitSwipeController: UIViewController, UIGestureRecognizerDele
     private var prefersSystemReturn = false
     private var onExit: () -> Void = {}
     private var onChanged: (CGFloat) -> Void = { _ in }
-    private var onEnded: (CGFloat, CGFloat) -> Void = { _, _ in }
+    private var onEnded: (CGFloat, CGFloat, Bool) -> Void = { _, _, _ in }
     private(set) weak var prioritizedNavigationEdge: UIGestureRecognizer?
     #if DEBUG
     private(set) var fallbackMotionCount = 0
