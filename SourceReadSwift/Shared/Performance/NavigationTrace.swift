@@ -26,12 +26,16 @@ final class NavigationTrace: ObservableObject {
     }
 
     @Published private(set) var entries: [Entry] = []
+    @Published private(set) var stallCount = 0
+    @Published private(set) var maxStallMS = 0.0
 
     private let storageKey = "settings.navigationTrace"
     private let limit = 4000
     private var origin = CACurrentMediaTime()
     private var timer: DispatchSourceTimer?
     private var lastTick = CACurrentMediaTime()
+    /// 最近几条事件，用来给停顿附上下文：卡之前最后在干什么。
+    private var breadcrumbs: [String] = []
 
     var isEnabled: Bool {
         UserDefaults.standard.bool(forKey: storageKey)
@@ -47,23 +51,31 @@ final class NavigationTrace: ObservableObject {
         origin = CACurrentMediaTime()
         lastTick = origin
         entries.removeAll(keepingCapacity: true)
+        breadcrumbs.removeAll(keepingCapacity: true)
+        stallCount = 0
+        maxStallMS = 0
 
-        // 50 ms 一跳的主线程心跳：迟到超过 100 ms 说明主线程被占住，
-        // 这就是「主页要等一会才能动」的直接证据。
+        // 50 ms 一跳的主线程心跳：迟到超过 80 ms 说明主线程被占住。
+        // 阈值取 80 而非 100，是因为 80ms 已经足以让一次转场掉帧。
         let source = DispatchSource.makeTimerSource(queue: .main)
         source.schedule(deadline: .now() + 0.05, repeating: 0.05, leeway: .milliseconds(5))
         source.setEventHandler { [weak self] in
             guard let self, self.isEnabled else { return }
             let now = CACurrentMediaTime()
             let gap = now - self.lastTick
-            if gap > 0.10 {
-                self.mark("stall", String(format: "主线程停顿 %.0f ms", (gap - 0.05) * 1000))
+            let blocked = (gap - 0.05) * 1000
+            if blocked >= 80 {
+                self.stallCount += 1
+                if blocked > self.maxStallMS { self.maxStallMS = blocked }
+                let since = self.breadcrumbs.suffix(4).joined(separator: " › ")
+                self.mark("STALL", String(format: "主线程停顿 %.0f ms", blocked)
+                          + (since.isEmpty ? "" : "  ← " + since))
             }
             self.lastTick = now
         }
         source.resume()
         timer = source
-        mark("trace", "开始记录")
+        mark("trace", "开始记录 " + deviceSummary)
     }
 
     func stop() {
@@ -73,6 +85,9 @@ final class NavigationTrace: ObservableObject {
 
     func clear() {
         entries.removeAll(keepingCapacity: true)
+        breadcrumbs.removeAll(keepingCapacity: true)
+        stallCount = 0
+        maxStallMS = 0
         origin = CACurrentMediaTime()
         lastTick = origin
     }
@@ -85,28 +100,72 @@ final class NavigationTrace: ObservableObject {
         if entries.count > limit {
             entries.removeFirst(entries.count - limit)
         }
+        breadcrumbs.append(category + ":" + text)
+        if breadcrumbs.count > 12 { breadcrumbs.removeFirst(breadcrumbs.count - 12) }
+    }
+
+    /// 只进入面包屑，不写时间线。用于高频事件（store 通知、滚动），
+    /// 避免刷屏，但仍然能出现在停顿的上下文里。
+    func breadcrumb(_ category: String, _ text: String) {
+        guard isEnabled else { return }
+        breadcrumbs.append(category + ":" + text)
+        if breadcrumbs.count > 12 { breadcrumbs.removeFirst(breadcrumbs.count - 12) }
+    }
+
+    var deviceSummary: String {
+        let info = Bundle.main.infoDictionary
+        let build = (info?["CFBundleVersion"] as? String) ?? "-"
+        let version = (info?["CFBundleShortVersionString"] as? String) ?? "-"
+        return "\(UIDevice.current.model) iOS \(UIDevice.current.systemVersion) · 纸间 \(version)(\(build))"
+    }
+
+    var summary: String {
+        String(format: "事件 %d 条 · 停顿 %d 次 · 最长 %.0f ms", entries.count, stallCount, maxStallMS)
     }
 
     var snapshot: String {
-        entries.map(\.line).joined(separator: "\n")
+        summary + "\n" + deviceSummary + "\n\n" + entries.map(\.line).joined(separator: "\n")
+    }
+
+    func snapshot(categories: Set<String>) -> String {
+        let filtered = categories.isEmpty ? entries : entries.filter { categories.contains($0.category) }
+        return summary + "\n" + deviceSummary + "\n\n" + filtered.map(\.line).joined(separator: "\n")
+    }
+
+    /// 时间线里出现过的分类，用于筛选条。
+    var categories: [String] {
+        var seen: [String] = []
+        for entry in entries where !seen.contains(entry.category) { seen.append(entry.category) }
+        return seen
     }
 }
 
-/// 设置 → 诊断 → 侧滑返回诊断。记录、查看、复制，全在 App 内闭环。
+/// 设置 → 诊断 → 侧滑返回诊断。记录、筛选、复制，全在 App 内闭环。
 struct NavigationTraceView: View {
     @ObservedObject private var trace = NavigationTrace.shared
     @State private var copied = false
+    @State private var filter: String?
 
     private var enabledBinding: Binding<Bool> {
         Binding(get: { trace.isEnabled }, set: { trace.setEnabled($0) })
+    }
+
+    private var visible: [NavigationTrace.Entry] {
+        let all = trace.entries
+        guard let filter else { return Array(all.suffix(600)) }
+        if filter == "STALL" { return Array(all.filter { $0.category == "STALL" }.suffix(600)) }
+        return Array(all.filter { $0.category == filter }.suffix(600))
     }
 
     var body: some View {
         List {
             Section {
                 Toggle("记录侧滑返回时间线", isOn: enabledBinding)
+                Text(trace.summary)
+                    .font(.system(.caption, design: .monospaced))
+                    .foregroundStyle(.secondary)
                 Button {
-                    UIPasteboard.general.string = trace.snapshot
+                    UIPasteboard.general.string = trace.snapshot(categories: filter.map { [$0] } ?? [])
                     copied = true
                 } label: {
                     Label(copied ? "已复制" : "复制全部记录", systemImage: "doc.on.doc")
@@ -114,16 +173,30 @@ struct NavigationTraceView: View {
                 .disabled(trace.entries.isEmpty)
                 Button("清空", role: .destructive) { trace.clear() }
             } footer: {
-                Text("开启后按相对秒数记录：pop 转场（是否交互、是否取消）、tab 栏所有权变化、书架投影是否重建、详情/阅读器出现与消失，以及主线程超过 100 ms 的停顿。复现一次问题后回到这里复制全文。")
+                Text("记录：pop 转场（是否交互/取消）、tab 栏所有权、书架投影、阅读器与详情进出、tab 切换、store 通知、主线程 ≥80ms 停顿（附前 4 条上下文）。复现一次问题后回来复制全文。")
             }
 
-            Section("时间线（最近 400 条）") {
-                if trace.entries.isEmpty {
+            Section {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 8) {
+                        chip("全部", tag: nil)
+                        chip("只有停顿", tag: "STALL")
+                        ForEach(trace.categories.filter { $0 != "STALL" }, id: \.self) { category in
+                            chip(category, tag: category)
+                        }
+                    }
+                    .padding(.vertical, 2)
+                }
+            }
+
+            Section("最近 600 条") {
+                if visible.isEmpty {
                     Text("暂无记录").foregroundStyle(.secondary)
                 } else {
-                    ForEach(Array(trace.entries.suffix(400))) { entry in
+                    ForEach(visible) { entry in
                         Text(entry.line)
-                            .font(.system(.caption, design: .monospaced))
+                            .font(.system(.caption2, design: .monospaced))
+                            .foregroundStyle(entry.category == "STALL" ? Color.orange : Color.primary)
                             .textSelection(.enabled)
                     }
                 }
@@ -132,5 +205,20 @@ struct NavigationTraceView: View {
         .navigationTitle("侧滑返回诊断")
         .navigationBarTitleDisplayMode(.inline)
         .onAppear { if trace.isEnabled { trace.start() } }
+    }
+
+    private func chip(_ title: String, tag: String?) -> some View {
+        let selected = filter == tag
+        return Button {
+            filter = tag
+        } label: {
+            Text(title)
+                .font(.caption.weight(.semibold))
+                .padding(.horizontal, 10)
+                .padding(.vertical, 5)
+                .background(selected ? Color.accentColor.opacity(0.18) : Color.secondary.opacity(0.12),
+                            in: Capsule())
+        }
+        .buttonStyle(.plain)
     }
 }

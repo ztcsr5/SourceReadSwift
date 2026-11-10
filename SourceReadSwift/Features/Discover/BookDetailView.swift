@@ -251,13 +251,18 @@ struct BookDetailView: View {
         }
         .task {
             if chapters.isEmpty, errorMessage == nil {
+                NavigationTrace.shared.mark("detail", "load 开始")
                 SourceSwitchCacheStore.shared.remember(books: availableSources + [book])
                 await load()
+                NavigationTrace.shared.mark("detail", "load 结束 chapters=\(chapters.count)")
             } else if needsTOCExpansion, let detail,
                       let source = appState.sourceStore.source(for: book.sourceUrl) {
+                NavigationTrace.shared.mark("detail", "extendTOC 开始")
                 await extendTOC(source: source, detail: detail, generation: loadGeneration)
+                NavigationTrace.shared.mark("detail", "extendTOC 结束")
             }
         }
+        .onAppear { NavigationTrace.shared.mark("detail", "onAppear chapters=\(chapters.count)") }
         .task(id: comicDownloadRequest) {
             if let request = comicDownloadRequest { await prepareComicDownload(request: request) }
         }

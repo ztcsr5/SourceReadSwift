@@ -1265,6 +1265,7 @@ struct ReaderView: View {
             )
         }
         .onAppear {
+            NavigationTrace.shared.mark("reader", "onAppear mode=\(readerModeRawValue)")
             // Dismissing the full-screen TOC must not replay initial position,
             // markReaderOpened or the initial synchronous pagination pass.
             isReaderVisible = true
@@ -1330,6 +1331,7 @@ struct ReaderView: View {
             if !isOpening { resumeReadingActivity() }
         }
         .onDisappear {
+            NavigationTrace.shared.mark("reader", "onDisappear")
             isReaderVisible = false
             pauseReadingActivity()
             // Ownership is visibility-scoped even for temporary covers.

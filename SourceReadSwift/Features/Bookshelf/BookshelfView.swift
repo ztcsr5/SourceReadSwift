@@ -185,6 +185,7 @@ struct BookshelfView: View {
                 isShelfVisible = false
             }
             .onReceive(appState.bookshelfStore.$books.dropFirst()) { _ in
+                NavigationTrace.shared.breadcrumb("store", "books")
                 // A pushed reader keeps this view in the hierarchy. Refreshing
                 // behind its opening transition re-sorted the shelf in the
                 // exact frames the hero zoom was settling.
@@ -197,10 +198,12 @@ struct BookshelfView: View {
                 Task { @MainActor in refreshShelfProjection() }
             }
             .onReceive(appState.bookshelfStore.$groups.dropFirst()) { _ in
+                NavigationTrace.shared.breadcrumb("store", "groups")
                 shelfDataRevision &+= 1
                 if !isShelfVisible { shelfProjectionNeedsRefresh = true }
             }
             .onReceive(appState.sourceStore.$sources) { _ in
+                NavigationTrace.shared.breadcrumb("store", "sources")
                 guard isShelfVisible, contextualBookRoute == nil else {
                     shelfProjectionNeedsRefresh = true
                     return

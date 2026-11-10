@@ -81,6 +81,7 @@ private struct ReaderOpeningPresentation: ViewModifier {
                     isWaiting: false, isReturning: true)
                     .environment(\.readingCoverHandoff, incomingCovers)),
                 onArrival: {
+                    NavigationTrace.shared.mark("open", "开场页落地")
                     didArrive = true
                     revealWhenReady()
                 }
@@ -93,6 +94,7 @@ private struct ReaderOpeningPresentation: ViewModifier {
 
     private func revealWhenReady() {
         guard !didReveal, didArrive, isContentReady else { return }
+        NavigationTrace.shared.mark("open", "正文已就绪，揭开开场页")
         withAnimation(motion.reducesMotion ? nil : .easeOut(duration: Self.revealDuration)) {
             didReveal = true
         }

@@ -45,6 +45,7 @@ struct RootTabView: View {
         .tint(AppTheme.accent)
         .onReceive(audioCoordinator.$currentBook.map { $0 != nil }.removeDuplicates()) { hasAudio = $0 }
         .onChange(of: selectedTab) { newValue in
+            NavigationTrace.shared.mark("tab", "selected=\(newValue)")
             if newValue != 3 { lastNonSearchTab = newValue }
             dismissKeyboard()
         }
