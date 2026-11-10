@@ -21,7 +21,7 @@ class ReaderDiagnosticsTests(unittest.TestCase):
         for case in ["testReaderSystemReturnCanCancelWithoutLosingItsSavedParagraph",
                      "testReaderSystemReturnCanCancelWithReducedMotion",
                      "testReaderLongEdgeReturnCompletesWithReducedMotion",
-                     "testHomeGlobalSearchFindsTheLocalBookAndOpensItsDetails",
+                     "testHomeGlobalSearchOnlyFindsAppFunctions",
                      "testContinuousChapterCrossingKeepsProseHeadingAndReopenedPositionTogether"]:
             self.assertIn(case, workflow)
         self.assertIn("ComicPagingBoundaryUITests", workflow)

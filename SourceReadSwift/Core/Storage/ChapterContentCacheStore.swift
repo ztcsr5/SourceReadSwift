@@ -16,6 +16,8 @@ struct ChapterContentCacheEntry: Identifiable, Codable, Hashable, Sendable {
     let payAction: String?
     let purifySignature: String
     let cachedAt: Date
+    /// Explicit offline downloads are not disposable reading-prefetch entries. Nil decodes old cache files.
+    let isOffline: Bool?
 
     /// Keep the memberwise construction stable across Swift toolchains.  A
     /// defaulted stored property is not consistently exposed by synthesized
@@ -35,7 +37,8 @@ struct ChapterContentCacheEntry: Identifiable, Codable, Hashable, Sendable {
         imageStyle: String? = nil,
         payAction: String? = nil,
         purifySignature: String,
-        cachedAt: Date
+        cachedAt: Date,
+        isOffline: Bool? = nil
     ) {
         self.key = key
         self.sourceURL = sourceURL
@@ -49,6 +52,7 @@ struct ChapterContentCacheEntry: Identifiable, Codable, Hashable, Sendable {
         self.payAction = payAction
         self.purifySignature = purifySignature
         self.cachedAt = cachedAt
+        self.isOffline = isOffline
     }
 
     var estimatedByteCount: Int {
@@ -81,9 +85,10 @@ final class ChapterContentCacheStore: ObservableObject {
         maxEntryCount: Int = 500
     ) {
         self.persistence = persistence
-        self.maxEntryCount = maxEntryCount
+        self.maxEntryCount = max(0, maxEntryCount)
         do {
-            entries = Array(try persistence.load().prefix(maxEntryCount))
+            entries = try persistence.load()
+            trimPrefetchEntries()
         } catch {
             lastError = error.localizedDescription
         }
@@ -164,7 +169,8 @@ final class ChapterContentCacheStore: ObservableObject {
                 imageStyle: entry.imageStyle,
                 payAction: entry.payAction,
                 purifySignature: entry.purifySignature,
-                cachedAt: date
+                cachedAt: date,
+                isOffline: entry.isOffline
             ),
             at: 0
         )
@@ -172,14 +178,16 @@ final class ChapterContentCacheStore: ObservableObject {
         persist()
     }
 
-    func save(_ content: ChapterContent, sourceURL: String, purifyRules: [String]) {
+    func save(_ content: ChapterContent, sourceURL: String, purifyRules: [String], retainOffline: Bool = false) {
         // Prefetch saves one chapter every few seconds while the reader is
         // scrolling. `AppState` does not observe this store, but an offscreen
         // settings/offline-cache screen would still be invalidated on every
         // write. Membership changes stay explicit; the offline list recomputes
         // when it appears instead of during reading.
+        let key = cacheKey(sourceURL: sourceURL, chapterURL: content.chapter.url)
+        let isOffline = retainOffline || entries.contains { $0.key == key && $0.isOffline == true }
         let entry = ChapterContentCacheEntry(
-            key: cacheKey(sourceURL: sourceURL, chapterURL: content.chapter.url),
+            key: key,
             sourceURL: sourceURL,
             chapterURL: content.chapter.url,
             bookURL: content.chapter.bookUrl,
@@ -190,22 +198,35 @@ final class ChapterContentCacheStore: ObservableObject {
             imageStyle: content.imageStyle,
             payAction: content.payAction,
             purifySignature: purifySignature(purifyRules),
-            cachedAt: Date()
+            cachedAt: Date(),
+            isOffline: isOffline ? true : nil
         )
         objectWillChange.send()
         entries.removeAll { $0.key == entry.key }
         entries.insert(entry, at: 0)
-        if entries.count > maxEntryCount {
-            entries.removeLast(entries.count - maxEntryCount)
-        }
+        trimPrefetchEntries()
         persist()
+    }
+
+    private func trimPrefetchEntries() {
+        var retainedPrefetchCount = 0
+        entries.removeAll { entry in
+            guard entry.isOffline != true else { return false }
+            retainedPrefetchCount += 1
+            return retainedPrefetchCount > maxEntryCount
+        }
+    }
+
+    /// Downloads only report durable success after the writer acknowledges the current snapshot.
+    func flush() async throws {
+        try await persistence.waitForPendingWrites()
     }
 
     func removeExpired(olderThanDays days: Int = 30) {
         let cutoff = Date().addingTimeInterval(-Double(days) * 24 * 60 * 60)
-        guard entries.contains(where: { $0.cachedAt < cutoff }) else { return }
+        guard entries.contains(where: { $0.isOffline != true && $0.cachedAt < cutoff }) else { return }
         objectWillChange.send()
-        entries.removeAll { $0.cachedAt < cutoff }
+        entries.removeAll { $0.isOffline != true && $0.cachedAt < cutoff }
         persist()
     }
 
@@ -286,6 +307,7 @@ struct ChapterContentCachePersistence: Sendable {
     // Shared across instances: reopening the cache flushes preceding writes,
     // and an older store cannot finish a write after a newer store cleared it.
     private static let diskQueue = DispatchQueue(label: "SourceReadSwift.chapter-cache.disk", qos: .utility)
+    private static let pendingWrites = PendingWrites()
     private let fileManager: FileManager
     private let fileName = "chapter_content_cache.json"
     private let rootURL: URL?
@@ -309,14 +331,58 @@ struct ChapterContentCachePersistence: Sendable {
     }
 
     func save(_ entries: [ChapterContentCacheEntry]) throws {
-        try Self.diskQueue.sync { try writeSnapshot(entries) }
+        try Self.diskQueue.sync {
+            try writeSnapshot(entries)
+            Self.pendingWrites.lastResults[try storageURL()] = Result<Void, Error>(catching: {})
+        }
     }
 
     /// Completion runs on the writer queue; UI clients must hop to MainActor.
     func saveInBackground(_ entries: [ChapterContentCacheEntry], completion: @escaping @Sendable (Result<Void, Error>) -> Void) {
-        Self.diskQueue.async {
-            completion(Result { try writeSnapshot(entries) })
+        let url: URL
+        do { url = try storageURL() }
+        catch { completion(.failure(error)); return }
+        Self.pendingWrites.lock.lock()
+        if var pending = Self.pendingWrites.snapshots[url] {
+            pending.entries = entries
+            pending.completions.append(completion)
+            Self.pendingWrites.snapshots[url] = pending
+        } else {
+            Self.pendingWrites.snapshots[url] = PendingSnapshot(entries: entries, completions: [completion])
+            Self.diskQueue.async {
+                Self.pendingWrites.lock.lock()
+                let pending = Self.pendingWrites.snapshots.removeValue(forKey: url)
+                Self.pendingWrites.lock.unlock()
+                guard let pending else { return }
+                let result = Result { try writeSnapshot(pending.entries) }
+                Self.pendingWrites.lastResults[url] = result
+                pending.completions.forEach { $0(result) }
+            }
         }
+        Self.pendingWrites.lock.unlock()
+    }
+
+    /// A serialization barrier reports the actual writer result without encoding the same book twice.
+    func waitForPendingWrites() async throws {
+        let url = try storageURL()
+        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+            Self.diskQueue.async {
+                let result = Self.pendingWrites.lastResults[url] ?? Result<Void, Error>(catching: {})
+                continuation.resume(with: result)
+            }
+        }
+    }
+
+    private struct PendingSnapshot {
+        var entries: [ChapterContentCacheEntry]
+        var completions: [@Sendable (Result<Void, Error>) -> Void]
+    }
+
+    private final class PendingWrites: @unchecked Sendable {
+        let lock = NSLock()
+        var snapshots: [URL: PendingSnapshot] = [:]
+        // Accessed only on diskQueue, including barriers.
+        var lastResults: [URL: Result<Void, Error>] = [:]
     }
 
     private func writeSnapshot(_ entries: [ChapterContentCacheEntry]) throws {
