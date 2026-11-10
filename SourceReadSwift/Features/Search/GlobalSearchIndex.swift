@@ -39,7 +39,7 @@ struct GlobalSearchIndex: Sendable {
     }
 
     static let settings: [GlobalSearchEntry] = [
-        .init(id: "settings.appearance", kind: .setting, title: "主题与外观", subtitle: "颜色 布局 动效 深色模式", target: "appearance"),
+        .init(id: "settings.appearance", kind: .setting, title: "主题与外观", subtitle: "颜色 布局 深色模式", target: "appearance"),
         .init(id: "settings.sources", kind: .setting, title: "书源管理", subtitle: "导入 登录 规则 检测", target: "sources"),
         .init(id: "settings.bookmarks", kind: .setting, title: "书签与摘录", subtitle: "阅读笔记 书摘 收藏", target: "bookmarks"),
         .init(id: "settings.history", kind: .setting, title: "阅读历史", subtitle: "最近阅读 记录", target: "history")

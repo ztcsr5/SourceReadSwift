@@ -6,8 +6,17 @@ enum ReaderNativePopPolicy {
     static func isPop(from source: UIViewController, to target: UIViewController?,
                       in navigation: UINavigationController, isInteractive: Bool) -> Bool {
         let stack = navigation.viewControllers
-        return source.isMovingFromParent || !stack.contains(where: { $0 === source })
-            || (isInteractive && target.map { target in stack.contains(where: { $0 === target }) } == true)
+        if source.isMovingFromParent || !stack.contains(where: { $0 === source }) {
+            return true
+        }
+        // A fast flick can finish before `isMovingFromParent` flips. Compare
+        // stack order instead so the tab chrome is released for animated and
+        // state-driven pops alike, while a push (target above source) is not.
+        guard let target,
+              let sourceIndex = stack.firstIndex(where: { $0 === source }),
+              let targetIndex = stack.firstIndex(where: { $0 === target }) else { return false }
+        _ = isInteractive
+        return targetIndex < sourceIndex
     }
 }
 
@@ -52,11 +61,19 @@ final class ReaderTabChromeExitController: UIViewController {
         super.viewWillDisappear(animated)
         guard let transition = transitionCoordinator,
               let source = transition.viewController(forKey: .from), belongs(to: source),
-              let navigation = source.navigationController ?? navigationController,
-              ReaderNativePopPolicy.isPop(from: source, to: transition.viewController(forKey: .to),
-                in: navigation, isInteractive: transition.isInteractive) else { return }
+              let navigation = source.navigationController ?? navigationController else {
+            NavigationTrace.shared.mark("pop", "willDisappear 没有转场上下文")
+            return
+        }
+        let isPop = ReaderNativePopPolicy.isPop(from: source, to: transition.viewController(forKey: .to),
+            in: navigation, isInteractive: transition.isInteractive)
+        NavigationTrace.shared.mark("pop",
+            "willDisappear interactive=\(transition.isInteractive) isPop=\(isPop)")
+        guard isPop else { return }
         prepareForExit()
+        NavigationTrace.shared.mark("pop", "pop 起点已归还 tab bar")
         transition.animate(alongsideTransition: nil) { [weak self] context in
+            NavigationTrace.shared.mark("pop", "pop 结束 cancelled=\(context.isCancelled)")
             self?.finishExit(cancelled: context.isCancelled)
         }
     }

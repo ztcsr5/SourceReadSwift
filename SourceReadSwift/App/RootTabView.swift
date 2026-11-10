@@ -80,8 +80,10 @@ struct RootTabView: View {
         #endif
     }
 
-    /// 原生路径：三个常规 tab + 末尾的 .search 角色 tab。
-    /// .search 角色由系统渲染成导航栏最右端的独立搜索按钮（Liquid Glass 自带玻璃与动效）。
+    /// 原生路径：三个常规 tab + 末尾的 `.search` 角色 tab。
+    /// `.search` 必须保留：iOS 26 靠它把整条 tab bar 在进入搜索时收成
+    /// 单个搜索按钮。搜索页里的输入框必须走 `.searchable`，系统才认得出
+    /// 「这是搜索」，否则点一下只弹键盘，栏不会收。
     @available(iOS 18.0, *)
     private var nativeTabContent: some View {
         TabView(selection: $selectedTab) {
@@ -99,6 +101,8 @@ struct RootTabView: View {
                 SettingsView()
                     .modifier(NativeTabChromeVisibilityModifier())
             }
+            // `.search` 角色 + 内容里的 `.searchable` = 点搜索 tab 时整条栏
+            // 收成一个搜索按钮，这是系统行为，不要自己画。
             Tab("搜索", systemImage: "magnifyingglass", value: 3, role: .search) {
                 GlobalSearchView(
                     bookshelf: appState.bookshelfStore,
@@ -175,7 +179,9 @@ private struct NativeTabChromeVisibilityModifier: ViewModifier {
     @EnvironmentObject private var appState: AppState
 
     func body(content: Content) -> some View {
-        content.toolbar(appState.isTabChromeHidden ? .hidden : .visible, for: .tabBar)
+        // `.automatic` leaves the bar's minimize behavior intact. Pinning it
+        // to `.visible` kept the native bar expanded on every scroll.
+        content.toolbar(appState.isTabChromeHidden ? .hidden : .automatic, for: .tabBar)
     }
 }
 

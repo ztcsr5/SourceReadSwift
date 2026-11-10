@@ -36,11 +36,11 @@ struct AppMotionPolicy: Equatable {
     }
 }
 
-/// Combines the system accessibility preference and the app's explicit opt-out.
+/// 动效不再可关闭：App 内「减少动态效果」开关已删除。
+/// `reducesMotion` 字段保留为恒 `false`，只是为了不改动 30 余处
+/// `motion.reducesMotion ? … : …` 调用点，行为上等同于恒常动效。
 @propertyWrapper struct AppMotion: DynamicProperty {
-    @Environment(\.accessibilityReduceMotion) private var systemReducesMotion
-    @AppStorage("settings.reducesMotion") private var appReducesMotion = false
-    var wrappedValue: AppMotionPolicy { AppMotionPolicy(reducesMotion: systemReducesMotion || appReducesMotion) }
+    var wrappedValue: AppMotionPolicy { AppMotionPolicy(reducesMotion: false) }
 }
 
 struct AppPressStyle: ButtonStyle {
@@ -63,15 +63,16 @@ struct BookOpenPressStyle: ButtonStyle {
 }
 
 /// Only the system navigation transition owns the hero and its interactive return.
+/// 开卷 zoom 不做任何降级开关：一旦被抑制，push 会静默退回普通滑入，
+/// 现场表现就是「点了书籍没有任何转场」。
 private struct BookHeroSource: ViewModifier {
     let id: String
     let namespace: Namespace.ID
-    @AppMotion private var motion
     @ViewBuilder func body(content: Content) -> some View {
         // The zoom handoff is a navigation transition, not part of the spatial
         // reading desk. Turning the desk off must not silently downgrade every
         // shelf -> detail push to a plain slide.
-        if #available(iOS 18.0, *), !motion.reducesMotion {
+        if #available(iOS 18.0, *) {
             content.matchedTransitionSource(id: id, in: namespace)
         } else { content }
     }
@@ -81,9 +82,8 @@ private struct BookHeroDestination: ViewModifier {
     let id: String
     let namespace: Namespace.ID
     let enabled: Bool
-    @AppMotion private var motion
     @ViewBuilder func body(content: Content) -> some View {
-        if #available(iOS 18.0, *), enabled, !motion.reducesMotion {
+        if #available(iOS 18.0, *), enabled {
             content.navigationTransition(.zoom(sourceID: id, in: namespace))
         } else { content }
     }

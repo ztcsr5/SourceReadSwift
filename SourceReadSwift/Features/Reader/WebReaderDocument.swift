@@ -1557,6 +1557,13 @@ enum WebReaderHTML {
         var dy = Math.abs(event.clientY - start.y);
         var held = performance.now() - start.at;
         if (dx > 10 || dy > 10 || held > 320) { return; }
+        // 左缘属于系统返回手势，不属于点击区：
+        //   · 从左侧窄条起手，哪怕一动不动也不当点击，否则轻碰边缘先闪一下菜单；
+        //   · 横向位移占优即视为拖拽（返回/翻页），不给点击机会。
+        // 之前只靠 Swift 侧 24pt 判定，手指稍微偏右就漏过去，正好复现
+        // 「轻轻一碰侧滑，阅读菜单闪一下」。
+        if (start.x <= 44) { return; }
+        if (dx > 6 && dx >= dy) { return; }
         if (Math.abs(window.scrollY - start.scrollY) > 1) { return; }
         if (state.selection) { return; }
         var selection = window.getSelection();

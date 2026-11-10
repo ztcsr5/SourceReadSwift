@@ -12,7 +12,6 @@ struct GlobalSearchView: View {
     /// tab 形态由系统栏收起/展开承担返回，不显示左上角关闭按钮。
     var showsCloseButton: Bool = true
     @Environment(\.dismiss) private var dismiss
-    @FocusState private var isFocused: Bool
     @State private var query = ""
     @State private var results: [GlobalSearchEntry] = []
     @State private var catalogRevision = 0
@@ -35,16 +34,6 @@ struct GlobalSearchView: View {
     var body: some View {
         NavigationStack {
             List {
-                Section {
-                    TextField("搜索应用功能", text: $query)
-                        .focused($isFocused)
-                        .textInputAutocapitalization(.never)
-                        .autocorrectionDisabled()
-                        .submitLabel(.search)
-                        .onSubmit { isFocused = false }
-                        .accessibilityIdentifier("globalSearch.query")
-                        .onChange(of: query) { if $0.count > 200 { query = String($0.prefix(200)) } }
-                }
                 if keyword.isEmpty {
                     Section("快捷入口") {
                         ForEach(GlobalSearchIndex.settings) { entry in resultLink(entry) }
@@ -67,21 +56,20 @@ struct GlobalSearchView: View {
                     }
                 }
             }
+            // 必须走系统 `.searchable`：iOS 26 的 `.search` tab 只认它。
+            // 自己塞一个 TextField，点下去只会弹键盘，整条 tab bar 不会收成
+            // 单个搜索按钮——这正是「点了搜索框栏不收」的原因。
+            .searchable(text: $query, prompt: "搜索应用功能")
+            .textInputAutocapitalization(.never)
+            .autocorrectionDisabled()
+            .onChange(of: query) { if $0.count > 200 { query = String($0.prefix(200)) } }
             .scrollDismissesKeyboard(.interactively)
             .navigationTitle("全局搜索")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                // 键盘上的「完成」是收键盘的正规入口：
-                // 之前用整块 TapGesture 收键盘，会把手点输入框的那一下也吃掉，导致无法输入。
-                ToolbarItemGroup(placement: .keyboard) {
-                    Spacer()
-                    Button("完成") { isFocused = false }
-                        .accessibilityIdentifier("globalSearch.dismissKeyboard")
-                }
                 if showsCloseButton {
                     ToolbarItem(placement: .cancellationAction) {
                         Button("关闭") {
-                            isFocused = false
                             if let onClose { onClose() } else { dismiss() }
                         }
                         .accessibilityIdentifier("globalSearch.close")
@@ -94,7 +82,7 @@ struct GlobalSearchView: View {
             )) {
                 if let selectedEntry { destination(selectedEntry) }
             }
-            .task { if autoFocus { isFocused = true } }
+            // 聚焦由系统的搜索会话管理；autoFocus 只保留参数以兼容 sheet 入口。
             .onReceive(sources.$sources.dropFirst()) { _ in catalogRevision &+= 1 }
             .task(id: catalogRevision) {
                 await rebuildCatalog(revision: catalogRevision)
@@ -141,7 +129,6 @@ struct GlobalSearchView: View {
 
     private func resultLink(_ entry: GlobalSearchEntry) -> some View {
         Button {
-            isFocused = false
             selectedEntry = entry
         } label: {
             HStack(spacing: 12) {

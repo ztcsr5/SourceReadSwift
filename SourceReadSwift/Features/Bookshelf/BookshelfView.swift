@@ -1,5 +1,6 @@
 import SwiftUI
 import UniformTypeIdentifiers
+import QuartzCore
 
 struct BookshelfView: View {
     var onRequestGlobalSearch: () -> Void = {}
@@ -14,6 +15,9 @@ struct BookshelfView: View {
     @State private var isImportingBook = false
     @State private var bookImportTask: Task<Void, Never>?
     @State private var contextualBookRoute: ContextualBookRoute?
+    /// Keep the destination content alive for the frame where SwiftUI
+    /// clears its presentation binding but UIKit is still popping.
+    @State private var lastContextualBookRoute: ContextualBookRoute?
     @State private var bookToRemove: BookshelfBook?
     @State private var shelfReturnOrder: [String] = []
     /// Cached result of `ShelfProjection`. Nil means the first pass still
@@ -122,11 +126,18 @@ struct BookshelfView: View {
     /// Called only when an input changed. Keeping the result in `@State` stops
     /// `pinReturnOrder` and the return transition from re-filtering the shelf.
     private func refreshShelfProjection() {
+        let started = CACurrentMediaTime()
         let next = makeShelfProjection()
         // `onAppear` runs on every tab return; assigning an equal array still
         // invalidates the whole shelf body and costs a second layout pass.
-        guard shelfProjection != next else { return }
+        guard shelfProjection != next else {
+            NavigationTrace.shared.mark("shelf", String(format: "projection unchanged %.1fms",
+                (CACurrentMediaTime() - started) * 1000))
+            return
+        }
         shelfProjection = next
+        NavigationTrace.shared.mark("shelf", String(format: "projection REBUILT %.1fms",
+            (CACurrentMediaTime() - started) * 1000))
     }
 
     var body: some View {
@@ -154,22 +165,25 @@ struct BookshelfView: View {
             }
             .onAppear {
                 isShelfVisible = true
-                if shelfProjection == nil {
-                    refreshShelfProjection()
-                    shelfProjectionNeedsRefresh = false
-                } else if shelfProjectionNeedsRefresh {
-                    // The shelf projection is visually identical unless
-                    // progress actually changed, and a frame of old metadata is
-                    // cheaper than a dropped animation frame.
-                    Task { @MainActor in
-                        try? await Task.sleep(nanoseconds: 120_000_000)
-                        guard isShelfVisible else { return }
-                        shelfProjectionNeedsRefresh = false
-                        refreshShelfProjection()
-                    }
-                }
+                NavigationTrace.shared.mark("shelf", "onAppear needsRefresh=\(shelfProjectionNeedsRefresh)")
+                // 返回主页时同步刷新，不再延时 120ms：延时版正好落在 pop 动画
+                // 结束、用户已经看得见主页的那几帧里，整片 LazyVStack 重建会让
+                // 每张卡的 AsyncBookCover 重跑 `.task`，表现成「主页要加载一下」。
+                // 同步版在转场起点就跑完；输入没变时 refreshShelfProjection
+                // 内部直接 return，不产生任何重建。
+                refreshShelfProjection()
+                shelfProjectionNeedsRefresh = false
+                // 主页可见时不允许任何 owner 继续藏着 tab bar。快速 pop 可能
+                // 跳过 gateway 的 onDisappear，owner 泄漏后导航栏就一直不回来。
+                appState.releaseTabChromeHidden(owner: nil)
+                // 释放上一轮为填 pop 首帧空窗而保留的 destination：留着它会让
+                // gateway 迟迟不拆，onDisappear 跟着推迟，导航栏更晚出现。
+                lastContextualBookRoute = nil
             }
-            .onDisappear { isShelfVisible = false }
+            .onDisappear {
+                NavigationTrace.shared.mark("shelf", "onDisappear")
+                isShelfVisible = false
+            }
             .onReceive(appState.bookshelfStore.$books.dropFirst()) { _ in
                 // A pushed reader keeps this view in the hierarchy. Refreshing
                 // behind its opening transition re-sorted the shelf in the
@@ -265,12 +279,16 @@ struct BookshelfView: View {
             .navigationDestination(isPresented: Binding(
                 get: { contextualBookRoute != nil }, set: { if !$0 { contextualBookRoute = nil } }
             )) {
-                if let route = contextualBookRoute {
+                if let route = contextualBookRoute ?? lastContextualBookRoute {
                     switch route {
                     case .read(let book, let coverFrame):
                         BookshelfReaderGatewayView(book: book, onRequestExit: { contextualBookRoute = nil })
-                            .readerOpeningPresentation(for: managedOpeningBook(book), coverFrame: coverFrame, usesDeskHero: true)
+                            // Zoom 先挂在 destination 本身上，再叠开场遮罩。
+                            // 反过来的顺序会让 opening presentation 成为
+                            // destination 的最外层，系统认不到 hero 转场，
+                            // 开卷就退化成普通 push。
                             .bookHeroDestination("continue|" + book.id, in: bookHero)
+                            .readerOpeningPresentation(for: managedOpeningBook(book), coverFrame: coverFrame, usesDeskHero: true)
                             .environment(\.readingCoverHandoff, readingDeskEnabled && floatingReadingDeskEnabled ? readingCoverHandoff : nil)
                     case .detail(let book, let placement):
                         detailDestination(book, placement: placement)
@@ -865,6 +883,12 @@ struct BookshelfView: View {
         refreshShelfProjection()
     }
 
+    private func openContextualRoute(_ route: ContextualBookRoute) {
+        guard contextualBookRoute == nil else { return }
+        lastContextualBookRoute = route
+        contextualBookRoute = route
+    }
+
     private func detailDestination(_ book: BookshelfBook, placement: String) -> some View {
         BookDetailView(book: book.asSearchBook)
             .bookHeroDestination(placement + "|" + book.id, in: bookHero)
@@ -897,7 +921,7 @@ struct BookshelfView: View {
             guard contextualBookRoute == nil else { return }
             pinReturnOrder(placement: "continue")
             UIImpactFeedbackGenerator(style: .light).impactOccurred()
-            contextualBookRoute = .read(book, coverFrame: readingCoverHandoff.frame(for: book))
+            openContextualRoute(.read(book, coverFrame: readingCoverHandoff.frame(for: book)))
         } label: {
             Group {
                 if theme.homeComposition != .readingDesk, readingDeskEnabled {
@@ -921,7 +945,7 @@ struct BookshelfView: View {
         Button {
             guard contextualBookRoute == nil else { return }
             pinReturnOrder(placement: "continue")
-            contextualBookRoute = .detail(book, placement: "continue")
+            openContextualRoute(.detail(book, placement: "continue"))
         } label: {
             Label("书籍详情", systemImage: "info.circle")
         }
@@ -1047,7 +1071,7 @@ struct BookshelfView: View {
         .contextMenu {
             Button {
                 pinReturnOrder(placement: "list")
-                contextualBookRoute = .detail(book, placement: "list")
+                openContextualRoute(.detail(book, placement: "list"))
             } label: {
                 Label("书籍详情", systemImage: "info.circle")
             }
@@ -1125,7 +1149,7 @@ struct BookshelfView: View {
         .contextMenu {
             Button {
                 pinReturnOrder(placement: "grid")
-                contextualBookRoute = .detail(book, placement: "grid")
+                openContextualRoute(.detail(book, placement: "grid"))
             } label: {
                 Label("书籍详情", systemImage: "info.circle")
             }

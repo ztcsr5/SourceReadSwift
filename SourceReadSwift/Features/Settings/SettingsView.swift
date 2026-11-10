@@ -233,6 +233,11 @@ struct SettingsView: View {
                         } label: {
                             Label("最近诊断 · 查看与复制", systemImage: "doc.text.magnifyingglass")
                         }
+                        NavigationLink {
+                            NavigationTraceView()
+                        } label: {
+                            Label("侧滑返回诊断 · 时间线", systemImage: "arrow.uturn.backward.circle")
+                        }
                     }
                 } header: {
                     Text("诊断")

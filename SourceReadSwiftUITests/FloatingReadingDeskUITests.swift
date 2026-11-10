@@ -15,8 +15,8 @@ final class FloatingReadingDeskUITests: XCTestCase {
         let search = globalSearchButton()
         XCTAssertTrue(search.isHittable)
         search.tap()
-        let query = app.textFields["globalSearch.query"]
-        XCTAssertTrue(query.waitForExistence(timeout: 5))
+        let query = globalSearchField()
+        XCTAssertTrue(query.exists)
         query.tap()
         query.typeText("剑来")
         let bookResult = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "globalSearch.result.book:")).firstMatch
@@ -280,7 +280,7 @@ final class FloatingReadingDeskUITests: XCTestCase {
         let search = globalSearchButton()
         XCTAssertTrue(search.isHittable)
         search.tap()
-        XCTAssertTrue(app.textFields["globalSearch.query"].waitForExistence(timeout: 1))
+        XCTAssertTrue(globalSearchField(timeout: 1).exists)
         capture("detail-first-pop-responsive-home")
     }
 
@@ -554,6 +554,14 @@ final class FloatingReadingDeskUITests: XCTestCase {
         if legacy.exists { return legacy }
         let native = app.tabBars.buttons["搜索"]
         return native.exists ? native : app.buttons["搜索"]
+    }
+
+    /// 搜索页改用系统 `.searchable` 后，输入框的 element type 变成 searchField。
+    /// 旧 identifier 只在 sheet 形态保留，按存在性二选一。
+    private func globalSearchField(timeout: TimeInterval = 5) -> XCUIElement {
+        let searchField = app.searchFields.firstMatch
+        if searchField.waitForExistence(timeout: timeout) { return searchField }
+        return app.textFields["globalSearch.query"]
     }
 
     private func rootTab(_ label: String, legacyID: String) -> XCUIElement {

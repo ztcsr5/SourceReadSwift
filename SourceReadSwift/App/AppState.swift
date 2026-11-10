@@ -134,6 +134,7 @@ final class AppState: ObservableObject {
 
     func acquireTabChromeHidden(owner: UUID) {
         activeTabChromeOwners.insert(owner)
+        NavigationTrace.shared.mark("chrome", "acquire \(owner.uuidString.prefix(8)) owners=\(activeTabChromeOwners.count)")
         if !isTabChromeHidden { isTabChromeHidden = true }
     }
 
@@ -144,6 +145,8 @@ final class AppState: ObservableObject {
             activeTabChromeOwners.removeAll()
         }
         let shouldHide = !activeTabChromeOwners.isEmpty
+        NavigationTrace.shared.mark("chrome",
+            "release \(owner.map { String($0.uuidString.prefix(8)) } ?? "all") owners=\(activeTabChromeOwners.count) hidden=\(shouldHide)")
         if isTabChromeHidden != shouldHide { isTabChromeHidden = shouldHide }
     }
 

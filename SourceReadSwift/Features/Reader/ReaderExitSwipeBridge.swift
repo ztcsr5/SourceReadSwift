@@ -41,6 +41,17 @@ enum ReaderExitSwipePolicy {
     }
 }
 
+/// The leading strip belongs to the system pop gesture. A tap or short drag
+/// that starts here must not reach the page/menu tap zones; 24 pt was narrower
+/// than a finger contact and made a light edge touch flash the reader menu.
+enum ReaderEdgeTapPolicy {
+    static let reservedLeadingWidth: CGFloat = 44
+
+    static func isReserved(_ location: CGPoint) -> Bool {
+        location.x.isFinite && location.x <= reservedLeadingWidth
+    }
+}
+
 /// Only the reader's hosting subtree receives the recognizer, never the window.
 /// Only allowed prose/menu routes enable it; page turns and selection remain protected.
 struct ReaderExitSwipeBridge: UIViewControllerRepresentable {

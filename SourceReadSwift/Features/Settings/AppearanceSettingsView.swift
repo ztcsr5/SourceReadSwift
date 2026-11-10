@@ -4,7 +4,6 @@ struct AppearanceSettingsView: View {
     @AppStorage("settings.themeMode") private var themeModeRawValue = ThemeMode.system.rawValue
     @AppStorage(AppVisualTheme.selectionKey) private var visualTheme = AppVisualTheme.initialSelection.rawValue
     @AppStorage("settings.appearanceRevision") private var appearanceRevision = 0
-    @AppStorage("settings.reducesMotion") private var reducesMotion = false
     @AppStorage("settings.readingDeskEnabled") private var readingDeskEnabled = true
 
     var body: some View {
@@ -33,12 +32,6 @@ struct AppearanceSettingsView: View {
                 Text("关闭后使用经典紧凑展示。书籍、阅读位置、主题和系统导航保持不变。")
                     .font(.caption).foregroundStyle(.secondary)
             } header: { Text("书籍展示") }
-            .listRowBackground(AppThemeRowSurface())
-            Section {
-                Toggle("减少 App 动态效果", isOn: $reducesMotion)
-                Text("同时尊重系统的“减弱动态效果”。关闭空间缩放和弹性反馈，不改变阅读进度或系统返回手势。")
-                    .font(.caption).foregroundStyle(.secondary)
-            } header: { Text("统一动效") }
             .listRowBackground(AppThemeRowSurface())
             Section("显示模式") {
                 Picker("明暗", selection: $themeModeRawValue) {

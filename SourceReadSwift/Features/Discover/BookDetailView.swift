@@ -36,6 +36,7 @@ struct BookDetailView: View {
         let showsTitlePage: Bool
     }
     @State private var readingRoute: ReadingRoute?
+    @State private var lastReadingRoute: ReadingRoute?
     @State private var selectedChapterIndexForReader = 0
     @State private var isExportingBook = false
     @State private var exportStatus: String?
@@ -260,8 +261,15 @@ struct BookDetailView: View {
         .task(id: comicDownloadRequest) {
             if let request = comicDownloadRequest { await prepareComicDownload(request: request) }
         }
-        .onChange(of: book.id) { _ in comicDownloadRequest = nil }
-        .onDisappear { comicDownloadRequest = nil }
+        .onChange(of: book.id) { _ in
+            comicDownloadRequest = nil
+            readingRoute = nil
+            lastReadingRoute = nil
+        }
+        .onDisappear {
+            NavigationTrace.shared.mark("detail", "onDisappear")
+            comicDownloadRequest = nil
+        }
         .alert(item: $activeDetailAlert) { alert in
             Alert(title: Text(alert.title), message: Text(alert.message),
                   dismissButton: .default(Text("好")))
@@ -269,7 +277,7 @@ struct BookDetailView: View {
         .navigationDestination(isPresented: Binding(
             get: { readingRoute != nil }, set: { if !$0 { readingRoute = nil } }
         )) {
-            if let route = readingRoute {
+            if let route = readingRoute ?? lastReadingRoute {
                 readDestination(route.chapter, usesDetailHero: true)
             }
         }
@@ -375,7 +383,9 @@ struct BookDetailView: View {
 
     private func openReadingRoute(_ chapter: BookChapter, showsTitlePage: Bool = false) {
         guard readingRoute == nil else { return }
-        readingRoute = ReadingRoute(chapter: chapter, showsTitlePage: false)
+        let route = ReadingRoute(chapter: chapter, showsTitlePage: false)
+        lastReadingRoute = route
+        readingRoute = route
     }
 
     /// This button owns only the detail's nested route, never the bookshelf route.

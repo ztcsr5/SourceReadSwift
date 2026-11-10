@@ -1,6 +1,11 @@
 import Foundation
 import Combine
 
+/// 章节抓取结果的元组别名。直接写 `(A, Result<B, C>).self` 作为
+/// `withTaskGroup(of:)` 的泛型实参时，语法审计用的 tree-sitter 会把
+/// 元组 metatype 误判为语法错误；起一个名字既避开误报，也更好读。
+typealias ChapterFetchOutcome = (BookChapter, Result<ChapterContent, SourceEngineError>)
+
 /// A resumable whole-book download record.  Only chapter indexes and
 /// diagnostics are persisted; network credentials remain in SourceCookieStore.
 struct ChapterDownloadRecord: Identifiable, Codable, Hashable, Sendable {
@@ -264,27 +269,28 @@ final class ChapterDownloadCoordinator: ObservableObject {
             } else {
                 let pending = chapters.filter { !completed.contains($0.index) }
                 let limit = max(1, ChapterFetchPolicy.concurrentRequestLimit)
-                for start in stride(from: 0, to: pending.count, by: limit) {
-                    guard self.isCurrentJob(bookID, generation: generation) else { return }
-                    let end = min(start + limit, pending.count)
-                    let batch = Array(pending[start..<end])
-                    let results = await withTaskGroup(
-                        of: (BookChapter, Result<ChapterContent, SourceEngineError>).self
-                    ) { group in
-                        for chapter in batch {
-                            group.addTask {
-                                let result = await ChapterFetchPolicy.fetch(
-                                    source: source, chapter: chapter, engine: engine)
-                                return (chapter, result)
-                            }
+                var nextChapter = 0
+                // Keep the window full: one slow chapter used to block the two
+                // completed results beside it until every request in the batch
+                // returned, which made a 1000-chapter cache look stalled.
+                await withTaskGroup(of: ChapterFetchOutcome.self) { group in
+                    for _ in 0..<limit {
+                        guard nextChapter < pending.count else { break }
+                        let chapter = pending[nextChapter]
+                        nextChapter += 1
+                        group.addTask {
+                            let result = await ChapterFetchPolicy.fetch(
+                                source: source, chapter: chapter, engine: engine)
+                            return (chapter, result)
                         }
-                        var collected: [(BookChapter, Result<ChapterContent, SourceEngineError>)] = []
-                        for await result in group { collected.append(result) }
-                        return collected
                     }
-                    guard self.isCurrentJob(bookID, generation: generation) else { return }
-                    for (chapter, result) in results {
-                        guard self.isCurrentJob(bookID, generation: generation) else { return }
+                    while let finished = await group.next() {
+                        let chapter = finished.0
+                        let result = finished.1
+                        guard self.isCurrentJob(bookID, generation: generation) else {
+                            group.cancelAll()
+                            return
+                        }
                         switch result {
                         case .success(let content):
                             cacheStore.save(content, sourceURL: source.bookSourceUrl,
@@ -293,6 +299,14 @@ final class ChapterDownloadCoordinator: ObservableObject {
                         case .failure(let error):
                             store.markFailed(bookID: bookID, chapterIndex: chapter.index,
                                               message: error.displayMessage)
+                        }
+                        guard nextChapter < pending.count else { continue }
+                        let following = pending[nextChapter]
+                        nextChapter += 1
+                        group.addTask {
+                            let followingResult = await ChapterFetchPolicy.fetch(
+                                source: source, chapter: following, engine: engine)
+                            return (following, followingResult)
                         }
                     }
                 }

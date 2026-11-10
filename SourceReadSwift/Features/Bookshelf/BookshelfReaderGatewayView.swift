@@ -47,9 +47,11 @@ struct BookshelfReaderGatewayView: View {
         .toolbar(.hidden, for: .tabBar)
         .environment(\.readerTemporaryCoverPresented, showSourceSwitcher)
         .onAppear {
+            NavigationTrace.shared.mark("reader", "gateway onAppear")
             appState.acquireTabChromeHidden(owner: gatewayTabChromeOwner)
         }
         .onDisappear {
+            NavigationTrace.shared.mark("reader", "gateway onDisappear")
             appState.releaseTabChromeHidden(owner: gatewayTabChromeOwner)
         }
         .task {
