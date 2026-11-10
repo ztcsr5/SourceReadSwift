@@ -149,7 +149,13 @@ extension View {
     }
 
     /// Applies navigation-bar visibility from a collapse flag.
+    ///
+    /// 未收起时必须用 `.automatic`，不能用 `.visible`。
+    /// `.visible` 是强制显示：侧滑返回一开始，主页把导航栏和右上角按钮
+    /// 一把按出来，手指还没滑完栏就浮在阅读页上了。`.automatic` 把「什么时候
+    /// 显示」交回导航栈，栏就跟着 pop 转场一起出现；而收起状态仍然用
+    /// `.hidden`，滚动收起的效果不受影响。
     func scrollCollapsedNavigationBar(_ collapsed: Bool) -> some View {
-        toolbar(collapsed ? .hidden : .visible, for: .navigationBar)
+        toolbar(collapsed ? .hidden : .automatic, for: .navigationBar)
     }
 }

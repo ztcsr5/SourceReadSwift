@@ -50,6 +50,7 @@ final class AppState: ObservableObject {
     var diagnostics: [DiagnosticEvent] = []
     @Published var isTabChromeHidden = false
     private var activeTabChromeOwners: Set<UUID> = []
+    private var pendingChromeReveal: DispatchWorkItem?
 
     init(
         sourceStore: SourceStore? = nil,
@@ -135,6 +136,13 @@ final class AppState: ObservableObject {
     func acquireTabChromeHidden(owner: UUID) {
         activeTabChromeOwners.insert(owner)
         NavigationTrace.shared.mark("chrome", "acquire \(owner.uuidString.prefix(8)) owners=\(activeTabChromeOwners.count)")
+        // 取消挂起的显示：转场中 destination 会被拆解再重建，中间那一小段
+        // owners 为空，若不撤销就会让整条栏闪一下。
+        if pendingChromeReveal != nil {
+            pendingChromeReveal?.cancel()
+            pendingChromeReveal = nil
+            NavigationTrace.shared.mark("chrome", "取消挂起的显示")
+        }
         if !isTabChromeHidden { isTabChromeHidden = true }
     }
 
@@ -147,7 +155,26 @@ final class AppState: ObservableObject {
         let shouldHide = !activeTabChromeOwners.isEmpty
         NavigationTrace.shared.mark("chrome",
             "release \(owner.map { String($0.uuidString.prefix(8)) } ?? "all") owners=\(activeTabChromeOwners.count) hidden=\(shouldHide)")
-        if isTabChromeHidden != shouldHide { isTabChromeHidden = shouldHide }
+        guard !shouldHide else {
+            pendingChromeReveal?.cancel()
+            pendingChromeReveal = nil
+            return
+        }
+        // 最后一个 owner 释放后不立刻显示栏，先挂起 350 ms。
+        //
+        // 日志证据：一次没滑够距离的侧滑，会在 100 ms 内 cancelled=true，
+        // 期间 destination 被拆解 → owners 归零 → 栏显示 → 重新 acquire →
+        // 栏又藏回去，肉眼就是「闪一下」。挂起窗口盖住整段转场，
+        // 真正退出时（没有重新 acquire）350 ms 后照常显示。
+        pendingChromeReveal?.cancel()
+        let work = DispatchWorkItem { [weak self] in
+            guard let self, self.activeTabChromeOwners.isEmpty else { return }
+            self.pendingChromeReveal = nil
+            NavigationTrace.shared.mark("chrome", "挂起结束，显示 tab bar")
+            if self.isTabChromeHidden { self.isTabChromeHidden = false }
+        }
+        pendingChromeReveal = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.35, execute: work)
     }
 
     func importSharedDocument(_ url: URL) {

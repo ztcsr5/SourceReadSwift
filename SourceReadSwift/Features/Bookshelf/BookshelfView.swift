@@ -173,18 +173,13 @@ struct BookshelfView: View {
                 // 内部直接 return，不产生任何重建。
                 refreshShelfProjection()
                 shelfProjectionNeedsRefresh = false
-                // 兜底：owner 泄漏时导航栏会一直不回来。但**不能**在转场中清，
-                // 否则一次没滑够距离的侧滑会让整条栏闪一下。推迟到转场确定结束
-                // 之后再清，泄漏照样修得掉，闪动不会发生。
-                Task { @MainActor in
-                    try? await Task.sleep(nanoseconds: 400_000_000)
-                    guard isShelfVisible else { return }
-                    appState.releaseTabChromeHidden(owner: nil)
-                }
-                // 注意：这里**不能**清 lastContextualBookRoute。它在 pop 起点被清掉
-                // 会让 destination 立刻拆解、gateway.onDisappear 落在转场里，
-                // 于是 tab bar 又在手势中途翻转一次——闪动原样复现。
-                // destination 由 SwiftUI 在转场结束后自行回收。
+                // 这里**不能**做「清空全部 owner」的兜底。
+                // 一次没滑够距离的侧滑会在 ~100ms 内取消，阅读器随即重新出现并
+                // acquire；若此时又跑一次 owner 全清，栏就会在阅读页里浮现出来。
+                // 跨时空的 owner 由 AppState 的 350ms 挂起窗口兜住。
+                //
+                // 同样不能清 lastContextualBookRoute：pop 起点清它会让 destination
+                // 立刻拆解、gateway.onDisappear 落进转场，等于换条路再闪一次。
             }
             .onDisappear {
                 NavigationTrace.shared.mark("shelf", "onDisappear")

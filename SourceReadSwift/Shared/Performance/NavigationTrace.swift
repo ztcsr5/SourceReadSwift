@@ -54,6 +54,8 @@ final class NavigationTrace: ObservableObject {
         breadcrumbs.removeAll(keepingCapacity: true)
         stallCount = 0
         maxStallMS = 0
+        lastNavHidden = nil
+        lastTabHidden = nil
 
         // 50 ms 一跳的主线程心跳：迟到超过 80 ms 说明主线程被占住。
         // 阈值取 80 而非 100，是因为 80ms 已经足以让一次转场掉帧。
@@ -71,11 +73,60 @@ final class NavigationTrace: ObservableObject {
                 self.mark("STALL", String(format: "主线程停顿 %.0f ms", blocked)
                           + (since.isEmpty ? "" : "  ← " + since))
             }
+            self.sampleChrome()
             self.lastTick = now
         }
         source.resume()
         timer = source
         mark("trace", "开始记录 " + deviceSummary)
+    }
+
+    // MARK: - 真实 chrome 状态采样
+    //
+    // 光看 SwiftUI 的调用顺序不够：要回答「栏到底在哪一刻真的变可见」，
+    // 只能直接读 UIKit 的 `isNavigationBarHidden` / `tabBar.isHidden`，
+    // 把变化时刻和时间线对齐。这样「提前浮出」就有了毫秒级证据。
+
+    private var lastNavHidden: Bool?
+    private var lastTabHidden: Bool?
+
+    private func sampleChrome() {
+        guard let scene = UIApplication.shared.connectedScenes
+                .compactMap({ $0 as? UIWindowScene }).first,
+              let window = scene.windows.first(where: { $0.isKeyWindow }) ?? scene.windows.first,
+              let root = window.rootViewController else { return }
+
+        if let nav = Self.firstNavigationController(in: root) {
+            let hidden = nav.isNavigationBarHidden || nav.navigationBar.isHidden
+            if hidden != lastNavHidden {
+                lastNavHidden = hidden
+                let depth = nav.viewControllers.count
+                mark("NAV", "navigationBar \(hidden ? "隐藏" : "显示") 栈深=\(depth)")
+            }
+        }
+        if let tabs = Self.firstTabBarController(in: root) {
+            let hidden = tabs.tabBar.isHidden
+            if hidden != lastTabHidden {
+                lastTabHidden = hidden
+                mark("TAB", "tabBar \(hidden ? "隐藏" : "显示")")
+            }
+        }
+    }
+
+    private static func firstNavigationController(in controller: UIViewController) -> UINavigationController? {
+        if let nav = controller as? UINavigationController { return nav }
+        for child in controller.children {
+            if let found = firstNavigationController(in: child) { return found }
+        }
+        return controller.presentedViewController.flatMap { firstNavigationController(in: $0) }
+    }
+
+    private static func firstTabBarController(in controller: UIViewController) -> UITabBarController? {
+        if let tabs = controller as? UITabBarController { return tabs }
+        for child in controller.children {
+            if let found = firstTabBarController(in: child) { return found }
+        }
+        return controller.presentedViewController.flatMap { firstTabBarController(in: $0) }
     }
 
     func stop() {
@@ -88,6 +139,8 @@ final class NavigationTrace: ObservableObject {
         breadcrumbs.removeAll(keepingCapacity: true)
         stallCount = 0
         maxStallMS = 0
+        lastNavHidden = nil
+        lastTabHidden = nil
         origin = CACurrentMediaTime()
         lastTick = origin
     }
