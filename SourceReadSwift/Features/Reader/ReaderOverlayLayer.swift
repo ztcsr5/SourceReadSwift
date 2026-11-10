@@ -40,6 +40,7 @@ struct ReaderOverlayLayer: View {
     @State private var screenWidth: CGFloat = 0
     /// 只允许一次关闭，避免 onExit 与 onEnded 双触发。
     @State private var didRequestClose = false
+    @State private var lastLoggedBucket = -1
 
     private var resolvedCoverRect: CGRect? {
         anchors.rect(for: request.book.id) ?? request.coverRect
@@ -68,12 +69,23 @@ struct ReaderOverlayLayer: View {
                 : 1
 
             ZStack {
+                // 不透明纸面兜底：阅读器自己也画纸面，但在它完成首次布局之前
+                // 这块底色保证任何瞬间都不会露出白屏或背后的主页。
+                RoundedRectangle(cornerRadius: corner, style: .continuous)
+                    .fill(Color(uiColor: .systemBackground))
+                    .frame(width: rect.width, height: rect.height)
+                    .scaleEffect(1, anchor: .center)
+                    .offset(x: offsetX, y: offsetY)
+
                 BookshelfReaderGatewayView(
                     book: request.book,
                     initialBookmark: request.initialBookmark,
                     initialChapterIndex: request.initialChapterIndex,
                     onRequestExit: close
                 )
+                // 稳定身份：兄弟节点的增减（例如遮罩淡出）不得导致阅读器被重建，
+                // 否则 WKWebView 会重载 —— 真机上「正文先出现、随即整屏变白」即此。
+                .id(request.id)
                 .frame(width: screen.width, height: screen.height)
                 // 真实挂载到达探针与 ready 信号：之前只有 navigationDestination
                 // 路径包了它，覆盖层路径缺失，导致 UI 回归无法观察到真实手势/就绪状态。
@@ -87,25 +99,23 @@ struct ReaderOverlayLayer: View {
                 .readerReadySignal { ready in
                     guard ready != contentReady else { return }
                     contentReady = ready
+                    NavigationTrace.shared.mark("overlay", "contentReady=\(ready)")
                 }
 
-                // 封面 / 纸面遮罩
-                if veilOpacity > 0.001 {
-                    Group {
-                        if let image = request.coverImage {
-                            Image(uiImage: image).resizable().scaledToFill()
-                        } else {
-                            // 没有封面图时用系统背景色（深色模式即深色），
-                            // 不要用 secondarySystemBackground —— 那是明显的浅灰，
-                            // 真机上就表现为「一片空白」。
-                            Color(uiColor: .systemBackground)
-                        }
+                // 封面 / 纸面遮罩：**常驻**，只用 opacity 收放。
+                // 之前用 `if veilOpacity > 0.001` 条件插入，遮罩消失会改变 ZStack
+                // 的子节点数量，让 SwiftUI 重新识别兄弟节点、重建阅读器。
+                Group {
+                    if let image = request.coverImage {
+                        Image(uiImage: image).resizable().scaledToFill()
+                    } else {
+                        Color(uiColor: .systemBackground)
                     }
-                    .frame(width: rect.width, height: rect.height)
-                    .clipShape(RoundedRectangle(cornerRadius: corner, style: .continuous))
-                    .opacity(veilOpacity)
-                    .allowsHitTesting(false)
                 }
+                .frame(width: rect.width, height: rect.height)
+                .clipShape(RoundedRectangle(cornerRadius: corner, style: .continuous))
+                .opacity(veilOpacity)
+                .allowsHitTesting(false)
             }
             .frame(width: screen.width, height: screen.height)
             .background(
@@ -148,6 +158,17 @@ struct ReaderOverlayLayer: View {
                 }
             }
             .onChange(of: screen.width) { screenWidth = $0 }
+            // 关键状态变化打点：真机上用「设置 → 侧滑返回诊断」直接读，
+            // 用来判定空白是遮罩没让开、还是阅读器被重建。
+            .onChange(of: transition.progress) { value in
+                let bucket = Int((value * 4).rounded())
+                guard bucket != lastLoggedBucket else { return }
+                lastLoggedBucket = bucket
+                NavigationTrace.shared.mark("overlay",
+                    String(format: "p=%.2f ready=%@ deadline=%@ cover=%@", value,
+                           contentReady ? "1" : "0", deadlinePassed ? "1" : "0",
+                           resolvedCoverRect == nil ? "nil" : "ok"))
+            }
         }
         .ignoresSafeArea()
         .background(Color(uiColor: .systemBackground).ignoresSafeArea())
