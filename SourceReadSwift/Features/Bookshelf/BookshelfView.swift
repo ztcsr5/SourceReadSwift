@@ -226,7 +226,14 @@ struct BookshelfView: View {
             }
             .navigationTitle("主页")
             .navigationBarTitleDisplayMode(theme.usesNeutralGlass ? .large : .inline)
-            .scrollCollapsedNavigationBar(collapsesShelfChrome)
+            // 阅读器接管 chrome 时，主页自己也必须把导航栏藏起来。
+            //
+            // 只靠 destination 上的 `.toolbar(.hidden, for: .navigationBar)`
+            // 是不够的：那条修饰符绑在 destination 的生命周期上，侧滑手势一开始
+            // SwiftUI 就拆掉 reader 子树，`.hidden` 随之消失，主页的
+            // `.automatic` 立刻生效——导航栏和右上角按钮在手指刚动时就整条弹出，
+            // 完全不等转场。把它挂到活过整个转场的主页根视图上，才藏得住。
+            .scrollCollapsedNavigationBar(collapsesShelfChrome || appState.isTabChromeHidden)
             .toolbar {
                 ToolbarItemGroup(placement: .navigationBarTrailing) {
 
