@@ -49,39 +49,26 @@ private struct ReaderOpeningPresentation: ViewModifier {
     }
 
     func body(content: Content) -> some View {
+        // 不再盖开场占位页。
+        //
+        // 实测：白卡 + 假骨架在 0.75–1.25s 占满屏幕，然后 0.18s 淡出，
+        // 这 0.18s 里占位页与真正的正文同时可见 —— 「第壹章」出现两次、
+        // 正文互相穿透，是整段里最丑的一帧，且没有任何设计价值。
+        //
+        // 现在直接让阅读层自己铺纸面背景，正文就绪后一次出现。
+        // 到达探针与 ready 信号保留，因为返回云面与交互解锁还依赖它们。
         content
-            .environment(\.readerOpeningManaged, !didReveal)
+            .environment(\.readerOpeningManaged, false)
             .environment(\.readerUsesBookReturn, true)
-            .allowsHitTesting(didReveal)
-            .accessibilityHidden(!didReveal)
-            .overlay {
-                if !didReveal {
-                    ReaderOpeningStatus(book: book, showsWait: didArrive)
-                        .toolbar(.hidden, for: .navigationBar)
-                        .overlay(alignment: .topLeading) {
-                            if didArrive {
-                                Button { dismiss() } label: {
-                                    Image(systemName: "chevron.backward")
-                                        .font(.body.weight(.semibold))
-                                        .frame(width: 44, height: 44)
-                                        .background(.thinMaterial, in: Circle())
-                                }
-                                .buttonStyle(BookOpenPressStyle())
-                                .accessibilityLabel("返回")
-                                .padding(16)
-                            }
-                        }
-                        .transition(.opacity)
-                }
-            }
+            .allowsHitTesting(true)
             .background(ReaderOpeningArrivalProbe(
-                canPrepareReturn: didReveal,
+                canPrepareReturn: true,
                 usesNativeDeskReturn: usesNativeDeskReturn,
                 returnSurface: AnyView(ReaderOpeningPage(book: book, coverFrame: coverFrame,
                     isWaiting: false, isReturning: true)
                     .environment(\.readingCoverHandoff, incomingCovers)),
                 onArrival: {
-                    NavigationTrace.shared.mark("open", "开场页落地")
+                    NavigationTrace.shared.mark("open", "阅读层落地")
                     didArrive = true
                     revealWhenReady()
                 }
@@ -94,10 +81,8 @@ private struct ReaderOpeningPresentation: ViewModifier {
 
     private func revealWhenReady() {
         guard !didReveal, didArrive, isContentReady else { return }
-        NavigationTrace.shared.mark("open", "正文已就绪，揭开开场页")
-        withAnimation(motion.reducesMotion ? nil : .easeOut(duration: Self.revealDuration)) {
-            didReveal = true
-        }
+        NavigationTrace.shared.mark("open", "正文已就绪")
+        didReveal = true
     }
 }
 
