@@ -34,6 +34,9 @@ struct ReaderOverlayLayer: View {
     @StateObject private var transition = ReaderTransition(reducesMotion: false)
 
     @State private var contentReady = false
+    /// 硬性截止：ready 信号可能因为偏好跨 NavigationStack 传不出来而永远不到，
+    /// 那时遮罩会把阅读器永久盖住（真机上就是"一直空白"）。到点必须让开。
+    @State private var deadlinePassed = false
     @State private var screenWidth: CGFloat = 0
     /// 只允许一次关闭，避免 onExit 与 onEnded 双触发。
     @State private var didRequestClose = false
@@ -56,10 +59,11 @@ struct ReaderOverlayLayer: View {
             let offsetY: CGFloat = rect.midY - screen.height / 2
             let shadowOpacity: Double = 0.22 * Double(1 - p)
             let shadowRadius: CGFloat = 24 * (1 - p)
-            // 封面/纸面一直盖到「正文就绪 **且** 几何基本落位」为止。
-            // 只判 contentReady 会在 p 还很小的时候就把遮罩淡出，
-            // 中间露出阅读器自己的空白背景——真机上那次浅色空白闪动就来自这里。
-            let veilOpacity: Double = (contentReady && p >= 0.62)
+            // 封面/纸面遮罩：正文就绪且几何落位后淡出。
+            // 但 ready 信号不是唯一出口——超过 1.2s 无条件让开，
+            // 否则信号一旦不到，阅读器会被永久盖住（真机"一直空白"即此）。
+            let readyEnough = (contentReady || deadlinePassed) && p >= 0.62
+            let veilOpacity: Double = readyEnough
                 ? ReaderTransitionPolicy.coverOpacity(progress: p)
                 : 1
 
@@ -91,7 +95,10 @@ struct ReaderOverlayLayer: View {
                         if let image = request.coverImage {
                             Image(uiImage: image).resizable().scaledToFill()
                         } else {
-                            Color(uiColor: .secondarySystemBackground)
+                            // 没有封面图时用系统背景色（深色模式即深色），
+                            // 不要用 secondarySystemBackground —— 那是明显的浅灰，
+                            // 真机上就表现为「一片空白」。
+                            Color(uiColor: .systemBackground)
                         }
                     }
                     .frame(width: rect.width, height: rect.height)
@@ -114,20 +121,31 @@ struct ReaderOverlayLayer: View {
                     onEnded: { dx, vx, wasCancelled in
                         let finish = !wasCancelled && ReaderTransitionPolicy.shouldDismiss(
                             translation: dx, velocity: vx, width: max(screenWidth, 1))
+                        NavigationTrace.shared.mark("overlay",
+                            "endDrag dx=\(Int(dx)) finish=\(finish) cancelled=\(wasCancelled)")
                         transition.endDrag(finish: finish) {
-                            anchors.endTransition()
                             close()
                         }
-                        if !finish { anchors.endTransition() }
+                        // 取消时不恢复源封面：阅读器还开着，恢复会让两个封面同屏。
+                        // 源封面只在覆盖层真正卸载后恢复（见 close()）。
                     }
                 )
             )
             .onAppear {
                 screenWidth = screen.width
                 transition.reducesMotion = systemReduceMotion
-                // 有真实封面位置才隐藏源封面；降级路径不动源视图。
-                if resolvedCoverRect != nil { anchors.beginTransition(bookID: request.book.id) }
+                // 源封面一律隐藏：拿不到矩形也不该让两个封面同屏。
+                anchors.beginTransition(bookID: request.book.id)
+                NavigationTrace.shared.mark("overlay",
+                    "onAppear coverRect=\(resolvedCoverRect == nil ? "nil" : "ok")")
                 transition.open()
+                // 硬性截止：ready 信号可能永远不到，不能把阅读器永久盖住。
+                Task { @MainActor in
+                    try? await Task.sleep(nanoseconds: 1_200_000_000)
+                    guard !deadlinePassed else { return }
+                    deadlinePassed = true
+                    NavigationTrace.shared.mark("overlay", "遮罩截止放行 ready=\(contentReady)")
+                }
             }
             .onChange(of: screen.width) { screenWidth = $0 }
         }
@@ -147,7 +165,13 @@ struct ReaderOverlayLayer: View {
     private func close() {
         guard !didRequestClose else { return }
         didRequestClose = true
-        anchors.endTransition()
+        NavigationTrace.shared.mark("overlay", "close")
+        // 先卸载覆盖层，再恢复源封面。
+        // 反过来做会让「过渡封面」与「源封面」在退出动画期间同屏，
+        // 真机看到的两张卡面就是这个顺序问题。
         onClose()
+        DispatchQueue.main.async {
+            ReaderCoverAnchorStore.shared.endTransition()
+        }
     }
 }
