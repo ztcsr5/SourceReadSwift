@@ -463,12 +463,17 @@ final class FloatingReadingDeskUITests: XCTestCase {
         app.terminate()
         try launch(theme: "classic", mode: "dark")
         capture("10-dark-home")
+        let pagerInDark = element("bookshelf.readingPager").exists
         app.terminate()
+        // 「减少 App 动态效果」已从 App 删除，`-settings.reducesMotion` 现在是
+        // 空操作。旧断言期望打开它之后翻页书台消失，那正是被删掉的行为。
+        // 新契约：这个启动参数不得再改变任何阅读台形态。
         try launch(theme: "classic", reducesMotion: true)
-        XCTAssertFalse(element("bookshelf.readingPager").exists)
+        XCTAssertEqual(element("bookshelf.readingPager").exists, pagerInDark,
+                       "动效开关已移除，-settings.reducesMotion 不得再改变阅读台形态")
         app.buttons["下一本最近阅读"].tap()
         assertCurrentBook("月亮与六便士")
-        capture("11-reduced-motion-stepper")
+        capture("11-motion-toggle-removed")
     }
 
     func testCollapsedShelfFiltersPreserveQueryAndThemeLayoutsHaveRealEntries() throws {
