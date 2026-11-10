@@ -61,6 +61,7 @@ struct BookEPUBWriter {
             try addEntry("OEBPS/cover.xhtml", data: Data(coverXHTML(book: book).utf8), to: archive)
         }
         for file in files {
+            try Task.checkCancellation()
             try addEntry("OEBPS/\(file.fileName)", data: Data(file.xhtml.utf8), to: archive)
         }
         return BookArchiveExport(url: url, format: .epub,

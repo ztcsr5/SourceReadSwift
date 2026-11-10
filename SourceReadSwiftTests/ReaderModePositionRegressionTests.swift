@@ -243,6 +243,7 @@ final class ReaderModePositionRegressionTests: XCTestCase {
     @MainActor func testWebScrollRestoresAndReportsInsideOneLongParagraph() async throws {
         var offset = -1
         var applied = false
+        var presented = false
         let text = String(repeating: "长段正文，模式切换不能回到段首。👩🏽‍💻", count: 150)
         let fixture = WebScrollReaderView(
             sections: [WebReaderSection(chapterIndex: 0, title: "长段落", paragraphs: [text, "末段"])],
@@ -253,6 +254,11 @@ final class ReaderModePositionRegressionTests: XCTestCase {
             scrollRequestKey: "restore-character-600", scrollTargetUTF16Offset: 600,
             animatedScrollDuration: 0, textSelectionEnabled: false,
             onVisibleParagraph: { _ in }, onVisiblePosition: { _, value in offset = value },
+            onPresented: {
+                XCTAssertTrue(applied, "Presentation cannot precede the requested character jump")
+                XCTAssertGreaterThan(offset, 500, "The rendered acknowledgement must refer to the restored location")
+                presented = true
+            },
             onScrollTargetApplied: { applied = true })
         let scene = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.first
         let previousKeyWindow = scene?.windows.first(where: \.isKeyWindow)
@@ -263,7 +269,7 @@ final class ReaderModePositionRegressionTests: XCTestCase {
         window.makeKeyAndVisible()
         defer { window.isHidden = true; previousKeyWindow?.makeKey() }
         for _ in 0..<600 {
-            if applied && offset > 0 { break }
+            if applied && offset > 0 && presented { break }
             try await Task.sleep(nanoseconds: 100_000_000)
         }
         if !applied || offset <= 500 {
@@ -277,6 +283,7 @@ final class ReaderModePositionRegressionTests: XCTestCase {
             }
         }
         XCTAssertTrue(applied, "The real WebKit document must acknowledge the character jump")
+        XCTAssertTrue(presented, "The actual WebKit document must reach its render acknowledgement")
         XCTAssertGreaterThan(offset, 500, "Paragraph zero must not silently restore to its start")
         XCTAssertLessThanOrEqual(offset, 600, "The visible line should contain the requested character")
     }
