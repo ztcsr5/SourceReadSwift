@@ -280,7 +280,11 @@ struct BookDetailView: View {
                   dismissButton: .default(Text("好")))
         }
         .navigationDestination(isPresented: Binding(
-            get: { readingRoute != nil }, set: { if !$0 { readingRoute = nil } }
+            get: { readingRoute != nil },
+            set: { presented in
+                NavigationTrace.shared.mark("route", "detail isPresented->\(presented)")
+                if !presented { readingRoute = nil }
+            }
         )) {
             if let route = readingRoute ?? lastReadingRoute {
                 readDestination(route.chapter, usesDetailHero: true)

@@ -288,7 +288,13 @@ struct BookshelfView: View {
                 .ignoresSafeArea()
             }
             .navigationDestination(isPresented: Binding(
-                get: { contextualBookRoute != nil }, set: { if !$0 { contextualBookRoute = nil } }
+                get: { contextualBookRoute != nil },
+                set: { presented in
+                    // 关键证据点：SwiftUI 若在手势中途就把这里置 false，
+                    // 它就会立刻恢复主页 chrome —— 这就是「一滑就浮出来」。
+                    NavigationTrace.shared.mark("route", "isPresented->\(presented)")
+                    if !presented { contextualBookRoute = nil }
+                }
             )) {
                 if let route = contextualBookRoute ?? lastContextualBookRoute {
                     switch route {
