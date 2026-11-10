@@ -932,7 +932,7 @@ struct BookshelfView: View {
             // 没有书架重建。原来的 .read 路由已删除。
             appState.readerOverlay = ReaderOverlayRequest(
                 book: book,
-                coverFrame: readingCoverHandoff.frame(for: book)
+                coverRect: readingCoverHandoff.frame(for: book)
             )
         } label: {
             Group {

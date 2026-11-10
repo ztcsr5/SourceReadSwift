@@ -58,15 +58,21 @@ struct ReaderExitSwipeBridge: UIViewControllerRepresentable {
     let enabled: Bool
     let onExit: () -> Void
     var prefersSystemReturn = false
+    /// 拖拽过程中的实时位移（正数 = 向右）。覆盖层用它驱动跟手动画。
+    var onChanged: (CGFloat) -> Void = { _ in }
+    /// 松手时的原始位移与速度（x 分量）。判定交给覆盖层，保持策略单一来源。
+    var onEnded: (CGFloat, CGFloat) -> Void = { _, _ in }
 
     func makeUIViewController(context: Context) -> ReaderExitSwipeController {
         let controller = ReaderExitSwipeController()
-        controller.configure(enabled: enabled, prefersSystemReturn: prefersSystemReturn, onExit: onExit)
+        controller.configure(enabled: enabled, prefersSystemReturn: prefersSystemReturn,
+                             onExit: onExit, onChanged: onChanged, onEnded: onEnded)
         return controller
     }
 
     func updateUIViewController(_ controller: ReaderExitSwipeController, context: Context) {
-        controller.configure(enabled: enabled, prefersSystemReturn: prefersSystemReturn, onExit: onExit)
+        controller.configure(enabled: enabled, prefersSystemReturn: prefersSystemReturn,
+                             onExit: onExit, onChanged: onChanged, onEnded: onEnded)
     }
 
     static func dismantleUIViewController(_ controller: ReaderExitSwipeController, coordinator: ()) {
@@ -80,6 +86,8 @@ final class ReaderExitSwipeController: UIViewController, UIGestureRecognizerDele
     private var didExit = false
     private var prefersSystemReturn = false
     private var onExit: () -> Void = {}
+    private var onChanged: (CGFloat) -> Void = { _ in }
+    private var onEnded: (CGFloat, CGFloat) -> Void = { _, _ in }
     private(set) weak var prioritizedNavigationEdge: UIGestureRecognizer?
     #if DEBUG
     private(set) var fallbackMotionCount = 0
@@ -108,10 +116,15 @@ final class ReaderExitSwipeController: UIViewController, UIGestureRecognizerDele
         #endif
     }
 
-    func configure(enabled: Bool, prefersSystemReturn: Bool = false, onExit: @escaping () -> Void) {
+    func configure(enabled: Bool, prefersSystemReturn: Bool = false,
+                   onExit: @escaping () -> Void,
+                   onChanged: @escaping (CGFloat) -> Void = { _ in },
+                   onEnded: @escaping (CGFloat, CGFloat) -> Void = { _, _ in }) {
         exitEnabled = enabled
         self.prefersSystemReturn = prefersSystemReturn
         self.onExit = onExit
+        self.onChanged = onChanged
+        self.onEnded = onEnded
         if !enabled { didExit = false }
         if isViewLoaded { attachIfNeeded() }
     }
@@ -229,9 +242,21 @@ final class ReaderExitSwipeController: UIViewController, UIGestureRecognizerDele
         default: break
         }
         #endif
+
+        // 实时位移交给覆盖层做跟手动画。只在真正可退出的路径上发。
+        if gesture.state == .changed, exitEnabled, !hasActiveSystemReturn {
+            onChanged(gesture.translation(in: gesture.view).x)
+            return
+        }
+        guard gesture.state == .ended || gesture.state == .cancelled || gesture.state == .failed else { return }
+
+        let translation = gesture.translation(in: gesture.view)
+        let velocity = gesture.velocity(in: gesture.view)
+        onEnded(translation.x, velocity.x)
+        // 兼容既有调用方（ReaderView 仍依赖桥自己判定后 onExit）。
+        // 覆盖层把 onExit 传成空闭包，改由 onEnded 驱动动画与关闭。
         guard gesture.state == .ended else { return }
-        completeSwipe(translation: gesture.translation(in: gesture.view),
-                      velocity: gesture.velocity(in: gesture.view), cancelled: false)
+        completeSwipe(translation: translation, velocity: velocity, cancelled: false)
     }
 
     func completeSwipe(translation: CGPoint, velocity: CGPoint, cancelled: Bool) {
