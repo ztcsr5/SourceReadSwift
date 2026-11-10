@@ -29,14 +29,12 @@ struct BookDetailView: View {
     @State private var isAscending = true
     @State private var showAllChapters = false
     @State private var showAudioPlayer = false
-    @State private var showComicReader = false
     @State private var showVideoPlayer = false
     private struct ReadingRoute {
         let chapter: BookChapter
         let showsTitlePage: Bool
     }
     @State private var readingRoute: ReadingRoute?
-    @State private var lastReadingRoute: ReadingRoute?
     @State private var selectedChapterIndexForReader = 0
     @State private var isExportingBook = false
     @State private var exportStatus: String?
@@ -269,7 +267,6 @@ struct BookDetailView: View {
         .onChange(of: book.id) { _ in
             comicDownloadRequest = nil
             readingRoute = nil
-            lastReadingRoute = nil
         }
         .onDisappear {
             NavigationTrace.shared.mark("detail", "onDisappear")
@@ -278,17 +275,6 @@ struct BookDetailView: View {
         .alert(item: $activeDetailAlert) { alert in
             Alert(title: Text(alert.title), message: Text(alert.message),
                   dismissButton: .default(Text("好")))
-        }
-        .navigationDestination(isPresented: Binding(
-            get: { readingRoute != nil },
-            set: { presented in
-                NavigationTrace.shared.mark("route", "detail isPresented->\(presented)")
-                if !presented { readingRoute = nil }
-            }
-        )) {
-            if let route = readingRoute ?? lastReadingRoute {
-                readDestination(route.chapter, usesDetailHero: true)
-            }
         }
         .sheet(item: $exportShareURL, onDismiss: {
             if let notice = pendingExportNotice {
@@ -313,21 +299,6 @@ struct BookDetailView: View {
         .sheet(isPresented: $showAudioPlayer) {
             AudioBookPlayerView()
         }
-        .fullScreenCover(isPresented: $showComicReader) {
-            if let source = appState.sourceStore.source(for: book.sourceUrl)?.resolvingMediaKind(detail?.mediaKind ?? book.mediaKind) {
-                ComicReaderView(
-                    bookID: appState.bookshelfStore.contains(book) ? book.id : "\(book.sourceUrl)|\(book.bookUrl)",
-                    bookTitle: book.name,
-                    source: source,
-                    initialChapterIndex: selectedChapterIndexForReader,
-                    chapters: chapters,
-                    engine: appState.engine,
-                    initialPageIndex: previewPosition.flatMap { $0.chapterIndex == selectedChapterIndexForReader ? $0.paragraphIndex : nil },
-                    initialComicPosition: previewPosition?.comicPosition,
-                    onPreviewPosition: recordPreviewPosition
-                )
-            }
-        }
         .fullScreenCover(isPresented: $showVideoPlayer) {
             if let source = appState.sourceStore.source(for: book.sourceUrl)?.resolvingMediaKind(detail?.mediaKind ?? book.mediaKind) {
                 VideoPlayerView(
@@ -343,7 +314,6 @@ struct BookDetailView: View {
         .onAppear { hasArrived = true }
         .onChange(of: readingRoute != nil) { if !$0 { promptToAddAfterPreviewIfNeeded() } }
         .onChange(of: showAllChapters) { if !$0 { promptToAddAfterPreviewIfNeeded() } }
-        .onChange(of: showComicReader) { if !$0 { promptToAddAfterPreviewIfNeeded() } }
         .modifier(ReaderPreviewShelfPrompt(isPresented: Binding(
             get: { readingRoute == nil && !showAllChapters && showAddAfterPreviewPrompt }, set: { showAddAfterPreviewPrompt = $0 }
         ), addBook: addCurrentBookToShelf))
@@ -357,68 +327,44 @@ struct BookDetailView: View {
         (!isBookInBookshelf && !hasStartedPreview) ? "开始阅读" : "继续阅读"
     }
 
-    private func titlePage(for target: BookChapter) -> some View {
-        BookTitlePage(book: displayBook, chapterCount: chapters.count, readLabel: readingActionLabel) {
-            readDestination(target, usesDetailHero: false)
+    @ViewBuilder private func readDestination(_ target: BookChapter, onExit: @escaping () -> Void) -> some View {
+        if let shelfBook = localShelfBook {
+            BookshelfReaderGatewayView(book: shelfBook, initialChapterIndex: target.index, onRequestExit: onExit)
+        } else if sourceKind == .comic,
+                  let source = appState.sourceStore.source(for: book.sourceUrl)?.resolvingMediaKind(detail?.mediaKind ?? book.mediaKind) {
+            ComicReaderView(bookID: readerBookID, bookTitle: book.name, source: source,
+                initialChapterIndex: target.index, chapters: chapters, engine: appState.engine,
+                initialPageIndex: previewPosition.flatMap { $0.chapterIndex == target.index ? $0.paragraphIndex : nil },
+                initialComicPosition: previewPosition?.comicPosition,
+                onPreviewPosition: recordPreviewPosition, onRequestExit: onExit)
+        } else {
+            let shelf = appState.bookshelfStore.book(id: readerBookID)
+            let preview = previewPosition.flatMap { $0.bookID == readerBookID && $0.chapterIndex == target.index ? $0 : nil }
+            ChapterLoadingView(bookID: readerBookID, sourceUrl: book.sourceUrl,
+                chapter: target, totalChapters: chapters.count, chapters: chapters,
+                initialParagraphIndex: shelf?.currentChapterIndex == target.index ? shelf?.currentParagraphIndex : preview?.paragraphIndex,
+                onPreviewPosition: recordPreviewPosition, onRequestExit: onExit)
         }
-        .onAppear { promptToAddAfterPreviewIfNeeded(onTitlePage: true) }
-        .modifier(ReaderPreviewShelfPrompt(isPresented: Binding(
-            get: { readingRoute?.showsTitlePage == true && showAddAfterPreviewPrompt },
-            set: { showAddAfterPreviewPrompt = $0 }
-        ), addBook: addCurrentBookToShelf))
-    }
-
-    @ViewBuilder private func readDestination(_ target: BookChapter, usesDetailHero: Bool) -> some View {
-        Group {
-            if let shelfBook = localShelfBook {
-                BookshelfReaderGatewayView(book: shelfBook, initialChapterIndex: target.index,
-                    onRequestExit: usesDetailHero ? closeDirectReadingRoute : nil)
-            } else {
-                let shelf = appState.bookshelfStore.book(id: readerBookID)
-                let preview = previewPosition.flatMap { $0.bookID == readerBookID && $0.chapterIndex == target.index ? $0 : nil }
-                ChapterLoadingView(bookID: readerBookID, sourceUrl: book.sourceUrl,
-                    chapter: target, totalChapters: chapters.count, chapters: chapters,
-                    initialParagraphIndex: shelf?.currentChapterIndex == target.index ? shelf?.currentParagraphIndex : preview?.paragraphIndex,
-                    onPreviewPosition: recordPreviewPosition, onRequestExit: usesDetailHero ? closeDirectReadingRoute : nil)
-            }
-        }
-        // Deep TOC scrolling or the title page has no visible detail hero source.
-        .readerOpeningPresentation(for: sourceKind == .text ? BookshelfBook(searchBook: displayBook) : nil,
-            coverFrame: coverHandoff.frame(for: BookshelfBook(searchBook: displayBook)), usesSystemReturnSurface: true)
-        .bookHeroDestination(readerHeroID, in: detailHero,
-            enabled: usesDetailHero && sourceKind == .text)
-        .environment(\.readingCoverHandoff, readingDeskEnabled ? coverHandoff : nil)
     }
 
     private func openReadingRoute(_ chapter: BookChapter, showsTitlePage: Bool = false) {
+        if appState.readerNavigation.returnToReader(bookID: readerBookID, chapterIndex: chapter.index) { return }
         guard readingRoute == nil else { return }
-        // 阅读器统一走覆盖层：详情页留在原地，返回只是移除上层，
-        // 不会出现 push/pop 那套 chrome 抢跑。
-        if let shelfBook = localShelfBook {
-            appState.readerOverlay = ReaderOverlayRequest(
-                book: shelfBook,
-                initialChapterIndex: chapter.index
-            )
-            return
+        let request = ReaderDestinationRequest(book: localShelfBook ?? BookshelfBook(searchBook: displayBook),
+            sourceID: readerHeroID, onReturn: {
+                readingRoute = nil
+                promptToAddAfterPreviewIfNeeded()
+            }) { close in
+                AnyView(readDestination(chapter, onExit: close))
+            }
+        if appState.readerNavigation.open(request) {
+            readingRoute = ReadingRoute(chapter: chapter, showsTitlePage: false)
         }
-        let route = ReadingRoute(chapter: chapter, showsTitlePage: showsTitlePage)
-        lastReadingRoute = route
-        readingRoute = route
-    }
-
-    /// This button owns only the detail's nested route, never the bookshelf route.
-    private func closeDirectReadingRoute() {
-        readingRoute = nil
     }
 
     private func readAction(_ target: BookChapter) -> some View {
         Button {
-            if sourceKind == .comic && localShelfBook == nil {
-                selectedChapterIndexForReader = target.index
-                showComicReader = true
-            } else {
-                openReadingRoute(target, showsTitlePage: shouldShowTitlePage)
-            }
+            openReadingRoute(target)
         } label: {
             Label(readingActionLabel, systemImage: "book")
                 .font(.subheadline.weight(.semibold))
@@ -576,8 +522,7 @@ struct BookDetailView: View {
     private var comicActionCard: some View {
         Button {
             UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-            selectedChapterIndexForReader = targetReadingChapter?.index ?? 0
-            showComicReader = true
+            if let chapter = targetReadingChapter { openReadingRoute(chapter) }
         } label: {
             HStack(spacing: 14) {
                 ZStack {
@@ -745,8 +690,7 @@ struct BookDetailView: View {
                     case .comic:
                         Button {
                             UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                            selectedChapterIndexForReader = chapter.index
-                            showComicReader = true
+                            openReadingRoute(chapter)
                         } label: {
                             HStack {
                                 Image(systemName: "photo.on.rectangle.angled")
@@ -1480,6 +1424,7 @@ struct ChapterLoadingView: View {
     @EnvironmentObject private var appState: AppState
     @Environment(\.dismiss) private var dismiss
     @Environment(\.readerOpeningManaged) private var readerOpeningManaged
+    @Environment(\.nativeReaderSession) private var nativeSession
     let bookID: String?
     let sourceUrl: String
     let chapter: BookChapter
@@ -1576,12 +1521,14 @@ struct ChapterLoadingView: View {
                 }
             }
         }
-        .background(ReaderTabChromeExitBridge(owner: chapterLoadingTabChromeOwner))
+        .background {
+            if nativeSession == nil { ReaderTabChromeExitBridge(owner: chapterLoadingTabChromeOwner) }
+        }
         .onAppear {
-            appState.acquireTabChromeHidden(owner: chapterLoadingTabChromeOwner)
+            if nativeSession == nil { appState.acquireTabChromeHidden(owner: chapterLoadingTabChromeOwner) }
         }
         .onDisappear {
-            appState.releaseTabChromeHidden(owner: chapterLoadingTabChromeOwner)
+            if nativeSession == nil { appState.releaseTabChromeHidden(owner: chapterLoadingTabChromeOwner) }
         }
         .overlay(alignment: .top) {
             if isCachingNext {
@@ -1906,7 +1853,6 @@ private struct BookDetailAllChaptersView: View {
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var appState: AppState
     let chapters: [BookChapter]
-    @State private var selectedChapterForReading: BookChapter? = nil
     let book: SearchBook
     let bookID: String
     /// Local imports resolve through the bookshelf record because they have no
@@ -1923,6 +1869,25 @@ private struct BookDetailAllChaptersView: View {
 
     private var filteredChapters: [BookChapter] {
         tocFilterCache.chapters(query: debouncedQuery, reversed: !isAscending, chapters: chapters)
+    }
+
+    private func openChapter(_ chapter: BookChapter) {
+        if appState.readerNavigation.returnToReader(bookID: bookID, chapterIndex: chapter.index) { return }
+        let titleBook = localBook ?? BookshelfBook(searchBook: book)
+        let request = ReaderDestinationRequest(book: titleBook, onReturn: onReaderReturn) { close in
+            if let localBook {
+                return AnyView(BookshelfReaderGatewayView(book: localBook, initialChapterIndex: chapter.index, onRequestExit: close))
+            }
+            if let source = appState.sourceStore.source(for: book.sourceUrl)?.resolvingMediaKind(book.mediaKind), source.sourceKind == .comic {
+                return AnyView(ComicReaderView(bookID: bookID, bookTitle: book.name, source: source,
+                    initialChapterIndex: chapter.index, chapters: chapters, engine: appState.engine,
+                    onPreviewPosition: onPreviewPosition, onRequestExit: close))
+            }
+            return AnyView(ChapterLoadingView(bookID: bookID, sourceUrl: book.sourceUrl,
+                chapter: chapter, totalChapters: chapters.count, chapters: chapters,
+                onPreviewPosition: onPreviewPosition, onRequestExit: close))
+        }
+        appState.readerNavigation.open(request)
     }
 
     var body: some View {
@@ -1976,7 +1941,7 @@ private struct BookDetailAllChaptersView: View {
                                     .foregroundStyle(.secondary)
                             }
                             Button {
-                                selectedChapterForReading = chapter
+                                openChapter(chapter)
                             } label: {
                                 HStack(spacing: 12) {
                                     Text("\(chapter.index + 1)")
@@ -2012,29 +1977,7 @@ private struct BookDetailAllChaptersView: View {
                 }
                 .listStyle(.plain)
                 .scrollDismissesKeyboard(.interactively)
-                .navigationDestination(isPresented: Binding(
-                    get: { selectedChapterForReading != nil },
-                    set: { if !$0 { selectedChapterForReading = nil } }
-                )) {
-                    if let chapter = selectedChapterForReading {
-                        if let shelfBook = localBook {
-                            BookshelfReaderGatewayView(book: shelfBook, initialChapterIndex: chapter.index)
-                        } else if let source = appState.sourceStore.source(for: book.sourceUrl)?.resolvingMediaKind(book.mediaKind), source.sourceKind == .comic {
-                            ComicReaderView(bookID: bookID, bookTitle: book.name, source: source,
-                                initialChapterIndex: chapter.index, chapters: chapters, engine: appState.engine,
-                                onPreviewPosition: onPreviewPosition)
-                        } else {
-                            ChapterLoadingView(
-                                bookID: bookID,
-                                sourceUrl: book.sourceUrl,
-                                chapter: chapter,
-                                totalChapters: chapters.count,
-                                chapters: chapters,
-                                onPreviewPosition: onPreviewPosition
-                            )
-                        }
-                    }
-                }
+
             }
             .task(id: query) {
                 if query.isEmpty {
@@ -2047,7 +1990,6 @@ private struct BookDetailAllChaptersView: View {
             }
             .navigationTitle("完整目录 (\(chapters.count) 章)")
             .navigationBarTitleDisplayMode(.inline)
-            .onChange(of: selectedChapterForReading != nil) { if !$0 { onReaderReturn() } }
             .modifier(ReaderPreviewShelfPrompt(isPresented: $addPrompt, addBook: addBook))
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {

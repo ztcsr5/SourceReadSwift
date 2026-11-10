@@ -212,7 +212,7 @@ final class ReaderSettingsFlowUITests: XCTestCase {
         let outcome = XCTWaiter.wait(for: [ready], timeout: 10)
         if outcome != .completed { capture("reader-settings-prose-startup-failure") }
         XCTAssertEqual(outcome, .completed,
-            "Actual prose not ready; recovery=\(element("reader.openingRecovery").exists); startup=\(surface.value ?? "unavailable")")
+            "Actual prose not ready; recovery=\(element("reader.openingRecovery").exists); startup=\(surface.value ?? "unavailable"); navigation=\(element("reader.navigationEvidence").label); session=\(element("reader.navigationEvidence").value ?? "unavailable")")
     }
 
     private func revealMenu() {
