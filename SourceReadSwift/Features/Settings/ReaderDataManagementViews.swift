@@ -45,8 +45,8 @@ struct ReaderBookmarksView: View {
                 ForEach(sections) { section in
                     Section(section.book.title) {
                         ForEach(section.bookmarks) { bookmark in
-                            NavigationLink {
-                                BookshelfReaderGatewayView(book: section.book, initialBookmark: bookmark)
+                            Button {
+                                appState.readerNavigation.open(.shelf(section.book, bookmark: bookmark))
                             } label: {
                                 VStack(alignment: .leading, spacing: 5) {
                                     Text(bookmark.chapterTitle)
@@ -183,13 +183,10 @@ struct OfflineChapterCacheView: View {
                             })
                             Group {
                                 if let cachedBook {
-                                    NavigationLink {
-                                        BookshelfReaderGatewayView(
-                                            book: cachedBook,
-                                            initialChapterIndex: entry.chapterIndex
-                                                ?? Int(entry.chapterURL.split(separator: "#").last ?? "")
-                                                ?? 0
-                                        )
+                                    Button {
+                                        appState.readerNavigation.open(.shelf(cachedBook,
+                                            chapterIndex: entry.chapterIndex
+                                                ?? Int(entry.chapterURL.split(separator: "#").last ?? "") ?? 0))
                                     } label: {
                                         cacheRow(entry)
                                     }
