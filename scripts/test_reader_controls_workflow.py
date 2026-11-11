@@ -78,7 +78,9 @@ class ReaderControlsWorkflowTests(unittest.TestCase):
             Release117ThemeCollaborationTests Release117ReaderPersonalizationTests Release117WallpaperEditorTests
             Release117ReadingHeroTests Release117MotionSystemTests Release117PolishTests ReaderSettingsStackTests
             FontImportRequestTests ReaderScrollCadenceTests ReaderBindingTests ReaderWorkbenchVisualTests
-            ReaderControlsMaterialTests ReaderTabChromeExitTests ReaderExitSwipeTests ReaderPanController119Tests'''.split()
+            ReaderControlsMaterialTests ReaderTabChromeExitTests ReaderExitSwipeTests ReaderPanController119Tests
+            ScrollChromeGateTests ShelfProjectionTests ReaderNavigationSessionTests ReaderNativeNavigationTests ReaderCompatibilityNavigationTests
+            OfflineTextRetentionTests ChapterCacheWriterPerformanceTests ReaderZoomSourceTests LocalEPUBBookParserTests ChapterFetchConcurrencyTests'''.split()
         actual = re.findall(r'-only-testing:SourceReadSwiftTests/(\w+)', self.step('iOS26 native tab runtime regression'))
         self.assertEqual(set(actual), set(expected))
 

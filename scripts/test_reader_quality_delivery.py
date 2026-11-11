@@ -54,6 +54,9 @@ class ReaderQualityDeliveryTests(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError, "iOS26 native tab runtime regression"):
             delivery.require_native_steps(jobs)
         jobs[1]["steps"][0]["conclusion"] = "success"
+        with self.assertRaisesRegex(RuntimeError, "twenty native reader return cycles"):
+            delivery.require_native_steps(jobs)
+        jobs[1]["steps"].append({"name": "Exercise twenty native reader return cycles on iOS26", "conclusion": "success"})
         delivery.require_native_steps(jobs)
 
     def test_bad_staging_hash_never_publishes_a_visible_ipa(self):

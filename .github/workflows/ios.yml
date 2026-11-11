@@ -22,6 +22,7 @@ on:
       - feat/**
       - native/**
       - develop
+      - '!codex/reader-quality-137-*'
   pull_request:
     branches:
       - main
@@ -155,7 +156,15 @@ jobs:
             -only-testing:SourceReadSwiftTests/ReaderTabChromeExitTests \
             -only-testing:SourceReadSwiftTests/ReaderExitSwipeTests \
             -only-testing:SourceReadSwiftTests/ReaderPanController119Tests \
-            -destination-timeout 120 -test-timeouts-enabled YES -maximum-test-execution-time-allowance 120 \
+            -only-testing:SourceReadSwiftTests/ReaderNavigationSessionTests \
+            -only-testing:SourceReadSwiftTests/ReaderNativeNavigationTests \
+            -only-testing:SourceReadSwiftTests/ReaderCompatibilityNavigationTests \
+            -only-testing:SourceReadSwiftTests/ReaderZoomSourceTests \
+            -only-testing:SourceReadSwiftTests/LocalEPUBBookParserTests \
+            -only-testing:SourceReadSwiftTests/ChapterFetchConcurrencyTests \
+            -only-testing:SourceReadSwiftTests/OfflineTextRetentionTests \
+            -only-testing:SourceReadSwiftTests/ChapterCacheWriterPerformanceTests \
+            -destination-timeout 120 -test-timeouts-enabled YES -maximum-test-execution-time-allowance 60 \
             -resultBundlePath NativeTabResults.xcresult test-without-building 2>&1 | tee native-tab-test.log
       - name: Preserve iOS26 unit log before UI flows
         if: ${{ always() && steps.native-build.outcome == 'success' && !inputs.reader_settings_only }}
@@ -217,15 +226,40 @@ jobs:
         run: |
           set -euo pipefail
           DEVICE_ID="$(cat native-device-id.txt)"
+          xcrun simctl io "$DEVICE_ID" recordVideo --codec=h264 native-reader-motion.mp4 > native-reader-video.log 2>&1 &
+          VIDEO_PID=$!
+          trap 'kill -INT "$VIDEO_PID" 2>/dev/null || true; wait "$VIDEO_PID" || true' EXIT
           xcodebuild -project SourceReadSwift.xcodeproj -scheme SourceReadSwift \
             -destination "id=$DEVICE_ID" CODE_SIGNING_ALLOWED=NO \
             -parallel-testing-enabled NO \
             -only-testing:SourceReadSwiftUITests/FloatingReadingDeskUITests/testReaderSystemReturnCanCancelWithoutLosingItsSavedParagraph \
             -only-testing:SourceReadSwiftUITests/FloatingReadingDeskUITests/testReaderSystemReturnCanCancelWithReducedMotion \
+            -only-testing:SourceReadSwiftUITests/FloatingReadingDeskUITests/testReaderFastNativeReturnCompletesFromProse \
             -only-testing:SourceReadSwiftUITests/FloatingReadingDeskUITests/testReaderLongEdgeReturnCompletesWithReducedMotion \
             -only-testing:SourceReadSwiftUITests/FloatingReadingDeskUITests/testFirstDetailEdgeReturnRestoresInteractiveHomeAndOnlyOneTabBar \
             -destination-timeout 120 -test-timeouts-enabled YES -maximum-test-execution-time-allowance 180 \
             -resultBundlePath NativeReaderGestureResults.xcresult test-without-building 2>&1 | tee native-reader-gesture-test.log
+      - name: Preserve iOS26 native return recording
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios26-reader-motion-${{ github.sha }}-attempt${{ github.run_attempt }}
+          path: |
+            native-reader-motion.mp4
+            native-reader-video.log
+          if-no-files-found: ignore
+          retention-days: 7
+      - name: Exercise twenty native reader return cycles on iOS26
+        if: ${{ !cancelled() && steps.native-build.outcome == 'success' }}
+        timeout-minutes: 18
+        run: |
+          set -euo pipefail
+          DEVICE_ID="$(cat native-device-id.txt)"
+          xcodebuild -project SourceReadSwift.xcodeproj -scheme SourceReadSwift \
+            -destination "id=$DEVICE_ID" CODE_SIGNING_ALLOWED=NO -parallel-testing-enabled NO \
+            -only-testing:SourceReadSwiftUITests/ReaderOverlayCycleUITests \
+            -test-timeouts-enabled YES -maximum-test-execution-time-allowance 900 \
+            -resultBundlePath NativeReaderCycleResults.xcresult test-without-building 2>&1 | tee native-reader-cycle-test.log
       - name: Export iOS26 attachments
         if: always()
         run: |
@@ -241,6 +275,9 @@ jobs:
           if [ -d NativeReaderGestureResults.xcresult ]; then
             xcrun xcresulttool export attachments --path NativeReaderGestureResults.xcresult --output-path native-ui-snapshots/gestures
           fi
+          if [ -d NativeReaderCycleResults.xcresult ]; then
+            xcrun xcresulttool export attachments --path NativeReaderCycleResults.xcresult --output-path native-ui-snapshots/cycles
+          fi
       - name: Preserve iOS26 runtime evidence
         if: always()
         uses: actions/upload-artifact@v4
@@ -252,11 +289,13 @@ jobs:
             native-reader-ui-test.log
             native-reader-continuity-test.log
             native-reader-gesture-test.log
+            native-reader-cycle-test.log
             native-boot.log
             NativeTabResults.xcresult
             NativeReaderUIResults.xcresult
             NativeReaderContinuityResults.xcresult
             NativeReaderGestureResults.xcresult
+            NativeReaderCycleResults.xcresult
             native-ui-snapshots
           retention-days: 7
       - name: Preserve compact iOS26 UI snapshots

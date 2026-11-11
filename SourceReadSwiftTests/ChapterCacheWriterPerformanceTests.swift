@@ -40,6 +40,35 @@ final class ChapterCacheWriterPerformanceTests: XCTestCase {
         XCTAssertEqual(try persistence.load().first?.paragraphs, entry.paragraphs)
     }
 
+    func testCoalescedWritesDeliverEveryAcknowledgementAndPropagateDiskFailure() async throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let persistence = ChapterContentCachePersistence(rootURL: root)
+        let callbacks = expectation(description: "Every save is acknowledged")
+        callbacks.expectedFulfillmentCount = 30
+        for index in 0..<30 {
+            let entry = ChapterContentCacheEntry(key: "source|1", sourceURL: "source", chapterURL: "1", bookURL: "book",
+                title: "Chapter \(index)", paragraphs: ["正文"], nextContentUrl: nil, purifySignature: "", cachedAt: Date())
+            persistence.saveInBackground([entry]) { result in
+                if case .failure(let error) = result { XCTFail("\(error)") }
+                callbacks.fulfill()
+            }
+        }
+        try await persistence.waitForPendingWrites()
+        await fulfillment(of: [callbacks], timeout: 5)
+        XCTAssertEqual(try persistence.load().first?.title, "Chapter 29")
+        let badRoot = root.appendingPathComponent("not-a-directory")
+        try Data([1]).write(to: badRoot)
+        let failed = ChapterContentCachePersistence(rootURL: badRoot)
+        failed.saveInBackground([]) { _ in }
+        do {
+            try await failed.waitForPendingWrites()
+            XCTFail("Disk failure must not be reported as a completed offline download")
+        } catch {
+            XCTAssertFalse((error as NSError).localizedDescription.isEmpty)
+        }
+    }
+
     func testQueuedDownloadTouchAndClearCannotResurrectOldCache() throws {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         defer { try? FileManager.default.removeItem(at: root) }
