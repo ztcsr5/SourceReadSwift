@@ -5,13 +5,35 @@ from pathlib import Path
 import unittest
 import subprocess
 import tempfile
+import io
+import json
+import zipfile
 from unittest.mock import patch
 import verify_reader_quality as quality
+import verify_reader_diagnostics as diagnostics
 from verify_reader_diagnostics import materialize_focused_tree
 from deliver_reader_quality import require_native_steps
-from verify_reader_diagnostics import failure_lines
+from verify_reader_diagnostics import failure_lines, collect_early_unit
 ROOT = Path(__file__).resolve().parents[1]
 class ReaderDiagnosticsTests(unittest.TestCase):
+    def test_early_feedback_selects_ios26_even_when_ios18_uploaded_first(self):
+        archive = io.BytesIO()
+        with zipfile.ZipFile(archive, "w") as bundle:
+            bundle.writestr("diagnostic-unit.log", "Fixture.swift:17: error: viewport failed\n")
+        artifacts = [
+            {"id": 18, "name": "reader-diag-unit-sha-ios18-attempt1", "expired": False},
+            {"id": 26, "name": "reader-diag-unit-sha-ios26-attempt1", "expired": False},
+        ]
+        with tempfile.TemporaryDirectory() as folder, patch.object(quality, "EVIDENCE", Path(folder)), \
+                patch.object(quality, "github") as github:
+            github.api.return_value = {"artifacts": artifacts}
+            github.signed_download.return_value = archive.getvalue()
+            report = collect_early_unit(1, {"head": "sha"})
+            github.signed_download.assert_called_once_with("actions/artifacts/26/zip")
+            self.assertEqual(report["runtime"], "26")
+            self.assertEqual(report["failures"], ["Fixture.swift:17: error: viewport failed"])
+            self.assertEqual(Path(report["path"]).read_text(), "Fixture.swift:17: error: viewport failed\n")
+
     def test_focused_job_cannot_start_on_every_push_or_package_an_ipa(self):
         workflow = (ROOT / ".github/workflows/reader-diagnostics.yml").read_text(encoding="utf8")
         self.assertIn("workflow_dispatch:", workflow)
@@ -21,12 +43,32 @@ class ReaderDiagnosticsTests(unittest.TestCase):
         for case in ["testReaderSystemReturnCanCancelWithoutLosingItsSavedParagraph",
                      "testReaderSystemReturnCanCancelWithReducedMotion",
                      "testReaderLongEdgeReturnCompletesWithReducedMotion",
-                     "testHomeGlobalSearchFindsTheLocalBookAndOpensItsDetails",
+                     "testHomeGlobalSearchOnlyFindsAppFunctions",
                      "testContinuousChapterCrossingKeepsProseHeadingAndReopenedPositionTogether"]:
             self.assertIn(case, workflow)
         self.assertIn("ComicPagingBoundaryUITests", workflow)
+        self.assertIn("max-parallel: 1", workflow)
+        self.assertIn("inputs.navigation_only && !inputs.ios26_only", workflow)
+        self.assertIn("-only-testing:SourceReadSwiftUITests/FloatingReadingDeskUITests/testReaderShortDefaultSpeedEdgeDragCancels", workflow)
+        self.assertIn("-only-testing:SourceReadSwiftUITests/ReaderOverlayCycleUITests", workflow)
         self.assertIn("-maximum-test-execution-time-allowance 60", workflow)
         self.assertIn("-maximum-test-execution-time-allowance 180", workflow)
+
+    def test_runtime_specific_dispatch_has_its_own_receipt_and_input(self):
+        with tempfile.TemporaryDirectory() as folder, \
+                patch.object(quality, "EVIDENCE", Path(folder)), \
+                patch.object(quality, "snapshot_tree", return_value=("full", [diagnostics.TEMPLATE])), \
+                patch.object(quality, "run_git", side_effect=["base", "f" * 40, ""]), \
+                patch.object(diagnostics, "materialize_focused_tree", return_value="focused"), \
+                patch.object(diagnostics, "read_diagnostics_status", return_value=[]), \
+                patch.object(diagnostics, "persist_diagnostic") as persist, \
+                patch.object(diagnostics.urllib.request, "urlopen") as open_dispatch:
+            open_dispatch.return_value.__enter__.return_value.status = 204
+            snapshot = diagnostics.snapshot_diagnostics(ios26_only=True)
+            request = open_dispatch.call_args.args[0]
+            self.assertEqual(json.loads(request.data)["inputs"], {"ios26_only": True, "zoom_experiment": False})
+            self.assertEqual(persist.call_args.args[1].name, "diagnostic-focused-ios26.json")
+            self.assertFalse(snapshot["dispatch_pending"])
     def test_failure_extraction_retains_assertions_without_exposing_urls(self):
         failure = b"Fixture.swift:39: error: XCTAssert failed https://fixture.invalid/private?token=not-real\nnormal line"
         self.assertEqual(failure_lines(failure), ["Fixture.swift:39: error: XCTAssert failed [url]"])
