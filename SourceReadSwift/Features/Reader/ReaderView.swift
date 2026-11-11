@@ -54,6 +54,9 @@ struct ReaderView: View {
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.readerOpeningManaged) private var readerOpeningManaged
     @Environment(\.readerUsesBookReturn) private var readerUsesBookReturn
+    @Environment(\.nativeReaderSession) private var nativeSession
+    @Environment(\.readerNavigationIsTransitioning) private var navigationIsTransitioning
+    @State private var hasInitializedNativePresentation = false
     @State private var hasResolvedOpeningPreview = false
     @State private var chromeState = ReaderChromeStateMachine()
     @State private var nativeMoreMenuPresentation = ReaderMenuPresentation()
@@ -928,6 +931,8 @@ struct ReaderView: View {
                 // A stalled restore is an actionable error, not permission to
                 // reveal or persist the unpositioned first page.
                 hasOpeningPositionTimedOut = true
+                nativeSession?.recordOpeningStage("position-timeout")
+                nativeSession?.recordReadyReceipt()
                 isRetryingOpeningPosition = false
             }
             .onPreferenceChange(ReaderPageContainerMetricsKey.self) { metrics in
@@ -990,6 +995,7 @@ struct ReaderView: View {
 
             if showOverlay && !showSettings {
                 readerOverlay
+                    .opacity(navigationIsTransitioning ? 0 : 1)
                     .transition(
                         .asymmetric(
                             insertion: .opacity.combined(with: .scale(scale: 0.98, anchor: .center)),
@@ -1110,14 +1116,21 @@ struct ReaderView: View {
         .background {
             GeometryReader { proxy in
                 Color.clear
-                    .preference(key: ReaderViewportSizePreferenceKey.self, value: proxy.size)
+                    .onAppear { updateViewportSize(proxy.size) }
+                    .onChange(of: proxy.size) { updateViewportSize($0) }
             }
             .ignoresSafeArea()
         }
         // Native interactive pop is the only return path. The fast custom
         // fallback dismissed the route without a UIKit transition, which tore
         // down the reader and rebuilt the tab chrome mid-swipe.
-        .background(ReaderNavigationPopLock(allowSystemReturn: allowsNativeBookReturn))
+        .background {
+            if nativeSession == nil { ReaderNavigationPopLock(allowSystemReturn: allowsNativeBookReturn) }
+        }
+        .background(ReaderNativeLifecycleBridge(session: nativeSession,
+            allowsReturn: allowsNativeBookReturn, onExit: endReaderSession,
+            onSelectChapter: { selectChapter(index: $0) }, renderedMenu: showOverlay,
+            transitioning: navigationIsTransitioning, scrollTarget: activeScrollTarget))
         // On a device the system edge recognizer is the only return path:
         // a second leading-edge recognizer turns a fast flick into a custom
         // dismiss, which tears down the route before the tab chrome can
@@ -1125,9 +1138,9 @@ struct ReaderView: View {
         // so the test-only fallback stays behind the native recognizer.
         .background {
             #if targetEnvironment(simulator)
-            ReaderExitSwipeBridge(enabled: allowsNativeBookReturn,
+            if nativeSession == nil { ReaderExitSwipeBridge(enabled: allowsNativeBookReturn,
                                   onExit: requestReaderExit,
-                                  prefersSystemReturn: true)
+                                  prefersSystemReturn: true) }
             #endif
         }
         .overlay(alignment: .topLeading) { ReaderFrameHUD() }
@@ -1266,9 +1279,17 @@ struct ReaderView: View {
         }
         .onAppear {
             NavigationTrace.shared.mark("reader", "onAppear mode=\(readerModeRawValue)")
+            nativeSession?.recordAppearance(managed: readerOpeningManaged)
             // Dismissing the full-screen TOC must not replay initial position,
             // markReaderOpened or the initial synchronous pagination pass.
             isReaderVisible = true
+            if nativeSession != nil {
+                guard !hasInitializedNativePresentation else {
+                    resumeReadingActivity()
+                    return
+                }
+                hasInitializedNativePresentation = true
+            }
             guard readerPresentationLifecycle.beginAppearance() else {
                 resumeReadingActivity()
                 return
@@ -1294,6 +1315,7 @@ struct ReaderView: View {
             if readerMode != .scroll { rebuildPagedBlocksCache() }
             readerContentFingerprint = makeContentFingerprint(content)
             let initial = initialAutoScrollTarget()
+            nativeSession?.recordOpeningCursor(requested: initialParagraphIndex, resolved: initial.paragraph)
             scrollParagraphTarget = initial.paragraph
             pagedPageIndex = initial.page
             if initial.paragraph > 0 {
@@ -1334,6 +1356,9 @@ struct ReaderView: View {
             NavigationTrace.shared.mark("reader", "onDisappear")
             isReaderVisible = false
             pauseReadingActivity()
+            // UIKit may deliver SwiftUI disappear before the interactive-pop phase callback.
+            // The native session is the sole owner of final cleanup, including that ordering.
+            if nativeSession != nil { return }
             // Ownership is visibility-scoped even for temporary covers.
                 // Cover presentation is not a reader exit. Keep the live session
             // and any selected chapter's download/pagination transaction alive.
@@ -1528,10 +1553,11 @@ struct ReaderView: View {
         // Overlay/settings transitions are driven at their mutation sites.
         // Keeping animation scoped there prevents a toolbar toggle from
         // implicitly animating the native text surface and page layout.
-        .onPreferenceChange(ReaderViewportSizePreferenceKey.self) { size in
-            guard size.width > 1, size.height > 1, size != viewportSize else { return }
-            viewportSize = size
-        }
+    }
+
+    private func updateViewportSize(_ size: CGSize) {
+        guard size.width > 1, size.height > 1, size != viewportSize else { return }
+        viewportSize = size
     }
 
     private func syncPerBookOverrideIfNeeded() {
@@ -1901,6 +1927,9 @@ struct ReaderView: View {
                 // the entire SwiftUI reader tree on every scroll callback.
                 scrollPositionTracker.flatIndex = index
                 scrollPositionTracker.utf16Offset = offset
+            },
+            onPresented: {
+                guard didLandInitialPosition else { return }
                 resolveOpeningPreview()
             },
             onScrollInteractionChanged: { active in
@@ -3156,8 +3185,7 @@ struct ReaderView: View {
 
     private func recordVisiblePageIdentity(_ key: String) {
         pageIdentityTracker.key = key
-        guard readerOpeningManaged || hasOpeningPositionTimedOut,
-              !hasResolvedOpeningPreview, pagedBlocksCache.indices.contains(pagedPageIndex) else { return }
+        guard !hasResolvedOpeningPreview, pagedBlocksCache.indices.contains(pagedPageIndex) else { return }
         let page = pagedBlocksCache[pagedPageIndex]
         guard !page.isPlaceholder, ReaderPageIdentity(page: page).key == key else { return }
         // UIKit can publish the identity from updateUIViewController.
@@ -5910,6 +5938,7 @@ struct ReaderView: View {
                 chromeState.toggleOverlay()
             }
         }
+        nativeSession?.recordMenuState(showOverlay)
     }
 
     private func presentOverlay() {
@@ -6427,7 +6456,7 @@ struct ReaderView: View {
             }
             .buttonStyle(.borderedProminent)
             .disabled(isRetryingOpeningPosition)
-            Button("返回") { dismiss() }.buttonStyle(.bordered)
+            Button("返回") { requestReaderExit() }.buttonStyle(.bordered)
         }
         .padding(24)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -6437,8 +6466,11 @@ struct ReaderView: View {
     }
 
     private func resolveOpeningPreview() {
-        guard readerOpeningManaged || hasOpeningPositionTimedOut, !hasResolvedOpeningPreview else { return }
+        // A render acknowledgement may open the native gate before this callback runs.
+        // Readiness is a property of the positioned content, independent of whether its cover is still visible.
+        guard !hasResolvedOpeningPreview else { return }
         hasResolvedOpeningPreview = true
+        nativeSession?.recordReadyReceipt()
         hasOpeningPositionTimedOut = false
         scheduleReadingPositionPersistence()
     }
