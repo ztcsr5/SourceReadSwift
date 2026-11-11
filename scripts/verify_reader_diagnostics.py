@@ -37,14 +37,14 @@ def failure_lines(payload: bytes) -> list[str]:
 
 
 def collect_early_unit(run_id: int, record: dict) -> dict | None:
-    """Read one bounded early log, even while the UI stage is still running."""
+    """Read the iOS26 early log; artifact upload order must not select another runtime."""
     folder = quality.EVIDENCE / record["head"] / "diagnostics"
     folder.mkdir(parents=True, exist_ok=True)
-    target = folder / "diagnostic-unit.log"
+    target = folder / "diagnostic-unit-ios26.log"
     if not target.exists():
         artifacts = quality.github.api(f"actions/runs/{run_id}/artifacts?per_page=50")["artifacts"]
         artifact = next((row for row in artifacts if not row["expired"]
-                         and row["name"].startswith("reader-diag-unit-" + record["head"])), None)
+                         and row["name"].startswith("reader-diag-unit-" + record["head"] + "-ios26-")), None)
         if artifact is None:
             return None
         archive_bytes = quality.github.signed_download(f"actions/artifacts/{artifact['id']}/zip")
@@ -54,7 +54,7 @@ def collect_early_unit(run_id: int, record: dict) -> dict | None:
                 raise RuntimeError("Diagnostic unit log exceeds 4 MiB bounded read")
             target.write_bytes(archive.read(member))
     payload = target.read_bytes()
-    return {"path": str(target), "bytes": len(payload), "sha256": hashlib.sha256(payload).hexdigest(),
+    return {"runtime": "26", "path": str(target), "bytes": len(payload), "sha256": hashlib.sha256(payload).hexdigest(),
             "failures": failure_lines(payload)}
 
 

@@ -1,16 +1,13 @@
 import XCTest
 
-/// 覆盖层进入/退出循环压测。
-///
-/// 目的：抓「第二次、第三次之后手势失效」这类识别器状态未复位的问题。
-/// 只走真实 UI 路径（点正在阅读卡进入、点阅读器返回按钮退出），不注入模拟事件。
+/// Exercises repeated native navigation using actual app controls and edge input.
 final class ReaderOverlayCycleUITests: XCTestCase {
     private var app: XCUIApplication!
 
     override func setUp() {
         continueAfterFailure = false
         app = XCUIApplication()
-        app.launchArguments = ["-settings.visualTheme", "classic",
+        app.launchArguments = ["--floating-desk-regression", "--desk-resume-paragraph", "-settings.visualTheme", "classic",
                                "-settings.readingDeskEnabled", "YES",
                                "-reader.mode", "scroll"]
         app.launch()
@@ -27,6 +24,37 @@ final class ReaderOverlayCycleUITests: XCTestCase {
             let surface = app.webViews.firstMatch
             XCTAssertTrue(surface.waitForExistence(timeout: 25),
                           "第 \(cycle) 次进入必须在超时内出现正文")
+            let evidence = app.otherElements["reader.navigationEvidence"]
+            XCTAssertTrue(evidence.waitForExistence(timeout: 10))
+            let ready = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
+                let value = evidence.value as? String ?? ""
+                return value.contains("phase=reading") && value.contains("web=1;loads=1;presented=true")
+            }, object: nil)
+            XCTAssertEqual(XCTWaiter.wait(for: [ready], timeout: 15), .completed)
+            let identity = evidence.value as? String
+            let motion = app.otherElements["reader.nativeBookGestureEvidence"]
+            XCTAssertTrue(motion.waitForExistence(timeout: 5))
+            let before = Int((motion.value as? String) ?? "") ?? (-1)
+            XCTAssertGreaterThanOrEqual(before, 0)
+            let edge = app.coordinate(withNormalizedOffset: CGVector(dx: 0.008, dy: 0.52))
+            edge.press(forDuration: 0.05,
+                thenDragTo: app.coordinate(withNormalizedOffset: CGVector(dx: 0.13, dy: 0.52)),
+                withVelocity: .slow, thenHoldForDuration: 0.8)
+            let cancelled = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
+                (evidence.value as? String) == identity && surface.isHittable
+            }, object: nil)
+            XCTAssertEqual(XCTWaiter.wait(for: [cancelled], timeout: 5), .completed,
+                           "Cancellation must preserve the session, WebView and shell navigation count")
+            let after = Int((motion.value as? String) ?? "") ?? (-1)
+            if after <= before {
+                let screenshot = XCTAttachment(screenshot: app.screenshot())
+                screenshot.name = "reader-cycle-\(cycle)-missing-native-motion"
+                screenshot.lifetime = .keepAlways
+                add(screenshot)
+                print("BOOK_NATIVE_CYCLE \(cycle) \(evidence.label) \(motion.label)")
+            }
+            XCTAssertGreaterThan(after, before,
+                                 "Cycle \(cycle) must cancel a moving native transition, not ignore the drag")
 
             let back = app.buttons["reader.returnToShelf"]
             if !back.isHittable {
