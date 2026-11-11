@@ -47,6 +47,70 @@ final class Release110RegressionTests: XCTestCase {
         XCTAssertEqual(context.evaluateScript("messages[messages.length - 1].requestKey")?.toString(), "new-toc")
     }
 
+    /// Real WebKit swallows an opening placement while a fresh document is
+    /// still laying out, and a later style/image pass can undo one that did
+    /// land. Either way the saved paragraph used to be acknowledged anyway.
+    func testOpeningPlacementSurvivesSwallowedScrollAndLateLayoutDrift() throws {
+        let shell = WebReaderHTML.shell
+        let motionStart = try XCTUnwrap(shell.range(of: "function stopScrollAnimation()")).lowerBound
+        let motionEnd = try XCTUnwrap(shell.range(of: "function pageStep(", range: motionStart..<shell.endIndex)).lowerBound
+        let jumpStart = try XCTUnwrap(shell.range(of: "function scrollToFlat(")).lowerBound
+        let jumpEnd = try XCTUnwrap(shell.range(of: "/// 回到文档顶端", range: jumpStart..<shell.endIndex)).lowerBound
+        let body = String(shell[motionStart..<motionEnd]) + String(shell[jumpStart..<jumpEnd])
+
+        func outcome(dropFirstScroll: Bool, driftAtFrame: Int?, targetTop: Double, viewport: Double) throws -> (Int, Int, Int) {
+            let context = try XCTUnwrap(JSContext())
+            var exception: String?
+            context.exceptionHandler = { _, value in exception = value?.toString() }
+            context.evaluateScript("""
+            var scrollAnimationGeneration = 0, frames = [], messages = [], frameIndex = 0;
+            var targetTop = \(targetTop), drift = \(driftAtFrame.map(String.init) ?? "-1"), drops = \(dropFirstScroll ? 1 : 0);
+            var performance = {now: function() { return 123; }};
+            var state = {revision: 'r', visible: -1, activeScrollKey: null};
+            var content = {querySelector: function() { return {getBoundingClientRect: function() {
+              return {top: targetTop - window.scrollY, bottom: targetTop - window.scrollY + 80}; }}; }};
+            var window = {scrollY: 0, innerHeight: \(viewport),
+              scrollTo: function(x, y) {
+                if (typeof x === 'object') { return; }
+                if (y > 0 && drops > 0) { drops -= 1; return; }
+                this.scrollY = y;
+              },
+              setTimeout: function(cb) { frames.push(cb); },
+              requestAnimationFrame: function(cb) { frames.push(cb); }};
+            function topInset() { return 0; }
+            function onScroll() {}
+            function post(m) { messages.push(m); }
+            function reportVisiblePosition() {}
+            """)
+            context.evaluateScript(body)
+            context.evaluateScript("scrollToFlat(30, false, 'opening', 'r', 0, true);")
+            context.evaluateScript("""
+            for (var round = 0; round < 400 && frames.length; round += 1) {
+              frames.shift()();
+              frameIndex += 1;
+              if (frameIndex === drift) { window.scrollY = 0; }
+            }
+            """)
+            XCTAssertNil(exception)
+            let applied = context.evaluateScript("messages.filter(function(m){return m.type==='scroll-applied';}).length")?.toInt32() ?? -1
+            let missed = context.evaluateScript("messages.filter(function(m){return m.type==='scroll-miss';}).length")?.toInt32() ?? -1
+            let y = context.evaluateScript("window.scrollY")?.toInt32() ?? -1
+            return (Int(y), Int(applied), Int(missed))
+        }
+
+        let swallowed = try outcome(dropFirstScroll: true, driftAtFrame: nil, targetTop: 3200, viewport: 852)
+        XCTAssertEqual(swallowed.0, 3200, "A swallowed first placement must be re-issued until the paragraph is visible")
+        XCTAssertEqual(swallowed.1, 1)
+
+        let drifted = try outcome(dropFirstScroll: true, driftAtFrame: 6, targetTop: 3200, viewport: 852)
+        XCTAssertEqual(drifted.0, 3200, "A late layout pass must not leave the opening on the wrong line")
+        XCTAssertEqual(drifted.1, 1)
+
+        let unreachable = try outcome(dropFirstScroll: false, driftAtFrame: nil, targetTop: 5000, viewport: 100)
+        XCTAssertEqual(unreachable.1, 0, "An unreachable target must never be acknowledged as positioned")
+        XCTAssertEqual(unreachable.2, 1, "An unreachable target reports a real miss instead of silence")
+    }
+
     func testWebSectionRevisionSeesMiddleParagraphChanges() {
         let old = WebReaderSection(chapterIndex: 1, title: "章", paragraphs: ["首", "旧", "尾"])
         let new = WebReaderSection(chapterIndex: 1, title: "章", paragraphs: ["首", "新", "尾"])

@@ -1,8 +1,54 @@
 import CoreGraphics
+import UIKit
 import XCTest
 @testable import SourceReadSwift
 
 final class ReaderSafeAreaResolverTests: XCTestCase {
+    @MainActor func testObserverDoesNotPublishAnIntermediateInsetAfterTheWindowReturnsToItsPriorLayout() async {
+        let window = ReaderInsetFixtureWindow(frame: CGRect(x: 0, y: 0, width: 393, height: 852))
+        let observer = ReaderSafeAreaObserver.ObserverView(frame: .zero)
+        var published: [ReaderSafeAreaResolver.Insets] = []
+        observer.onChange = { published.append($0) }
+        window.reportedInsets = UIEdgeInsets(top: 59, left: 0, bottom: 34, right: 0)
+        window.addSubview(observer)
+        observer.sampleInsets()
+        await drainMainQueue()
+        XCTAssertEqual(published, [.init(top: 59, bottom: 34)])
+
+        window.reportedInsets.top = 20
+        observer.sampleInsets()
+        window.reportedInsets.top = 59
+        observer.sampleInsets()
+        await drainMainQueue()
+        XCTAssertEqual(published, [.init(top: 59, bottom: 34)], "Do not publish the abandoned intermediate layout")
+    }
+
+    @MainActor func testObserverUsesTheNewWindowEvenIfItHasTheSamePendingInsets() async {
+        let frame = CGRect(x: 0, y: 0, width: 393, height: 852)
+        let original = ReaderInsetFixtureWindow(frame: frame)
+        let destination = ReaderInsetFixtureWindow(frame: frame)
+        let insets = UIEdgeInsets(top: 59, left: 0, bottom: 34, right: 0)
+        original.reportedInsets = insets
+        destination.reportedInsets = insets
+        let observer = ReaderSafeAreaObserver.ObserverView(frame: .zero)
+        var published: [ReaderSafeAreaResolver.Insets] = []
+        observer.onChange = { published.append($0) }
+        original.addSubview(observer)
+        observer.sampleInsets()
+        destination.addSubview(observer)
+        observer.sampleInsets()
+        await drainMainQueue()
+        XCTAssertTrue(observer.window === destination)
+        XCTAssertEqual(published, [.init(top: 59, bottom: 34)], "Moving windows must not strand the new sample")
+        withExtendedLifetime(original) {}
+    }
+
+    @MainActor private func drainMainQueue() async {
+        await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+            DispatchQueue.main.async { continuation.resume() }
+        }
+    }
+
     private func resolve(
         _ width: CGFloat,
         _ height: CGFloat,
@@ -76,4 +122,9 @@ final class ReaderSafeAreaResolverTests: XCTestCase {
         let insets = resolve(844, 390)
         XCTAssertEqual(insets.top, 0, accuracy: 0.01)
     }
+}
+
+private final class ReaderInsetFixtureWindow: UIWindow {
+    var reportedInsets: UIEdgeInsets = .zero
+    override var safeAreaInsets: UIEdgeInsets { reportedInsets }
 }

@@ -14,6 +14,54 @@ from playwright.sync_api import sync_playwright
 
 
 class ReaderJumpReportTests(unittest.TestCase):
+    def test_opening_jump_does_not_acknowledge_an_offscreen_cursor(self):
+        source = (Path(__file__).resolve().parents[1] /
+                  'SourceReadSwift/Features/Reader/WebReaderDocument.swift').read_text(encoding='utf8')
+        start = source.index('function scrollToFlat(')
+        end = source.index('/// 回到文档顶端', start)
+        scenario = """
+const messages = [], frames = [];
+const window = {scrollY: 0, innerHeight: 844, requestAnimationFrame: f => frames.push(f)};
+const state = {revision: 'first'};
+const content = {querySelector: () => ({getBoundingClientRect() {
+  return {top: 1800 - window.scrollY, bottom: 1820 - window.scrollY};
+}})};
+const topInset = () => 50, onScroll = () => {}, post = m => messages.push(m.type);
+const reportVisiblePosition = () => messages.push('visible');
+let acceptScroll = false, attempts = 0;
+const animateTo = target => { ++attempts; if (acceptScroll) window.scrollY = target; };
+"""
+        assertions = """
+function run(mode) {
+  state.revision = 'first';
+  window.scrollY = 0;
+  attempts = 0;
+  messages.length = frames.length = 0;
+  acceptScroll = false;
+  scrollToFlat(30, false, 'restore', 'first', 0, true);
+  const early = messages.slice();
+  acceptScroll = mode !== 'never';
+  if (mode === 'obsolete') state.revision = 'replaced';
+  for (let i = 0; i < 8 && frames.length; ++i) frames.shift()();
+  return {early, messages: messages.slice(), y: window.scrollY, attempts, pendingFrames: frames.length};
+}
+process.stdout.write(JSON.stringify(Object.fromEntries(
+  ['recovers', 'never', 'obsolete'].map(mode => [mode, run(mode)]))));
+"""
+        result = subprocess.run(['node', '-'], input=scenario + source[start:end] + assertions,
+                                text=True, encoding='utf8', capture_output=True, timeout=15)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        outcome = json.loads(result.stdout)
+        for mode, observed in outcome.items():
+            self.assertEqual(observed['early'], [], mode)
+            self.assertEqual(observed['pendingFrames'], 0, mode)
+        self.assertEqual(outcome['recovers']['messages'], ['scroll-applied', 'visible'])
+        self.assertEqual(outcome['recovers']['y'], 1750)
+        self.assertEqual(outcome['never']['attempts'], 4)
+        self.assertEqual(outcome['never']['messages'], ['scroll-miss'])
+        self.assertEqual(outcome['obsolete']['attempts'], 1)
+        self.assertEqual(outcome['obsolete']['messages'], [])
+
     def test_startup_probe_recovers_a_completed_empty_document(self):
         source = (Path(__file__).resolve().parents[1] /
                   'SourceReadSwift/Features/Reader/WebScrollReaderView.swift').read_text(encoding='utf8')
