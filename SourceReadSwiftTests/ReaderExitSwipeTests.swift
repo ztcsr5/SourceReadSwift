@@ -80,7 +80,8 @@ final class ReaderExitSwipeTests: XCTestCase {
         parent.view.addSubview(child)
         let pagePan = UIPanGestureRecognizer()
         child.addGestureRecognizer(pagePan)
-        XCTAssertTrue(controller.gestureRecognizer(controller.edgePan, shouldBeRequiredToFailBy: pagePan))
+        XCTAssertFalse(controller.gestureRecognizer(controller.edgePan, shouldBeRequiredToFailBy: pagePan),
+                       "The preserved legacy bridge no longer installs a global failure requirement")
         controller.configure(enabled: false, onExit: {})
         XCTAssertFalse(controller.edgePan.isEnabled)
         XCTAssertFalse(controller.gestureRecognizer(controller.edgePan, shouldBeRequiredToFailBy: pagePan))

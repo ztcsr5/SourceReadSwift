@@ -48,8 +48,10 @@ def select_reader_paths(paths):
                        ("SourceReadSwift/", "SourceReadSwiftTests/", "SourceReadSwiftUITests/")))
                    or (path.startswith("scripts/test_") and path.endswith(".py")) or path in
                    {".github/workflows/ios.yml", ".github/workflows/unsigned-ipa.yml", ".github/workflows/reader-diagnostics.yml", "project.yml", "SourceReadSwift/App/Info.plist",
-                    "scripts/prepare_model_image.py", "scripts/verify_reader_quality.py", "scripts/verify_reader_diagnostics.py",
+                    "scripts/prepare_model_image.py", "scripts/boot_native_simulator.py",
+                    "scripts/verify_reader_quality.py", "scripts/verify_reader_diagnostics.py",
                     "scripts/deliver_reader_quality.py",
+                    "scripts/fixtures/ReaderZoomExperimentUITests.swift",
                     "scripts/verify_device_ipa.py", "scripts/generate_master_app_icon.py",
                     "scripts/watch_reader_build.py",
                     "docs/project-audit-20261108/REVIEW.md", "docs/project-audit-20261108/NAVIGATION.md",

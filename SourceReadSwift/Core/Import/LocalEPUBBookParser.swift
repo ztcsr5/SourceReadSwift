@@ -481,9 +481,10 @@ struct LocalEPUBBookParser {
             let escaped = NSRegularExpression.escapedPattern(for: name)
             let pattern = "<\(escaped)(?:\\s[^>]*)?>([\\s\\S]*?)</\(escaped)>"
             if let raw = try? firstMatch(in: text, pattern: pattern) {
-                let cleaned = raw
-                    .replacingOccurrences(of: #"<[^>]+>"#, with: "", options: .regularExpression)
-                    .trimmingCharacters(in: .whitespacesAndNewlines)
+                // Decode XML/HTML character references exactly once after parsing markup.
+                // Stripping tags alone left exported titles such as A &amp; B visibly escaped.
+                guard let cleaned = try? SwiftSoup.parse(raw).text()
+                    .trimmingCharacters(in: .whitespacesAndNewlines) else { continue }
                 if !cleaned.isEmpty {
                     return cleaned
                 }
