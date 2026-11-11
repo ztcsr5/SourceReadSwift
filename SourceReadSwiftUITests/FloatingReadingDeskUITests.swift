@@ -197,7 +197,8 @@ final class FloatingReadingDeskUITests: XCTestCase {
         let saved = app.webViews.staticTexts.matching(
             NSPredicate(format: "label BEGINSWITH %@", "【已保存的阅读段落】")).firstMatch
         XCTAssertTrue(saved.waitForExistence(timeout: 10), "Web startup state: \(surface.value ?? "unavailable")")
-        XCTAssertTrue(surface.frame.intersects(saved.frame), "The saved paragraph must be in the actual viewport")
+        XCTAssertTrue(surface.frame.intersects(saved.frame),
+                      "The saved paragraph must be in the actual viewport; surface=\(surface.frame); saved=\(saved.frame); \(element("reader.navigationEvidence").label)")
         XCTAssertFalse(rootTab("主页", legacyID: "tabs.legacy.home").isHittable)
         capture("17-restored-paragraph")
         surface.swipeUp()
@@ -367,6 +368,27 @@ final class FloatingReadingDeskUITests: XCTestCase {
         try verifyNativeReturn(reducesMotion: false)
     }
 
+    func testReaderFastNativeReturnCompletesFromProse() throws {
+        try launch(theme: "classic", fixture: "--desk-resume-paragraph")
+        let entry = assertCurrentBook("剑来")
+        entry.tap()
+        let surface = element("reader.webScrollSurface")
+        XCTAssertTrue(surface.waitForExistence(timeout: 10))
+        let evidence = element("reader.navigationEvidence")
+        let ready = XCTNSPredicateExpectation(
+            predicate: NSPredicate(format: "value CONTAINS %@", "presented=true"), object: evidence)
+        XCTAssertEqual(XCTWaiter.wait(for: [ready], timeout: 10), .completed)
+        let edge = app.coordinate(withNormalizedOffset: CGVector(dx: 0.008, dy: 0.52))
+        edge.press(forDuration: 0.05,
+            thenDragTo: app.coordinate(withNormalizedOffset: CGVector(dx: 0.88, dy: 0.52)),
+            withVelocity: .default, thenHoldForDuration: 0.4)
+        let restored = XCTNSPredicateExpectation(predicate: NSPredicate(format: "hittable == YES"), object: entry)
+        XCTAssertEqual(XCTWaiter.wait(for: [restored], timeout: 5), .completed,
+                       "A fast native edge return must reveal the retained home; \(evidence.exists ? evidence.label : "reader closed")")
+        XCTAssertTrue(rootTab("主页", legacyID: "tabs.legacy.home").isHittable)
+        capture("reader-fast-native-return-home")
+    }
+
     func testReaderSystemReturnCanCancelWithReducedMotion() throws {
         try verifyNativeReturn(reducesMotion: true)
     }
@@ -375,7 +397,16 @@ final class FloatingReadingDeskUITests: XCTestCase {
         try verifyNativeReturn(reducesMotion: false, cancelFraction: 0.20)
     }
 
-    private func verifyNativeReturn(reducesMotion: Bool, cancelFraction: CGFloat = 0.13) throws {
+    func testNativeReturnCancellationWithImmediateSlowDrag() throws {
+        try verifyNativeReturn(reducesMotion: false, cancelFraction: 0.20, pressDuration: 0.05)
+    }
+
+    func testNativeReturnCancellationWithImmediateDefaultDrag() throws {
+        try verifyNativeReturn(reducesMotion: false, cancelFraction: 0.20, pressDuration: 0.05, velocity: .default)
+    }
+
+    private func verifyNativeReturn(reducesMotion: Bool, cancelFraction: CGFloat = 0.13,
+                                    pressDuration: TimeInterval = 0.05, velocity: XCUIGestureVelocity = .slow) throws {
         try launch(theme: "classic", reducesMotion: reducesMotion, fixture: "--desk-resume-paragraph")
         let entry = assertCurrentBook("剑来")
         entry.tap()
@@ -386,10 +417,10 @@ final class FloatingReadingDeskUITests: XCTestCase {
         XCTAssertFalse(element("reader.returnToShelf").isHittable, "Prose can return interactively without first opening its menu")
         let nativeEvidence = element("reader.nativeBookGestureEvidence")
         XCTAssertTrue(nativeEvidence.waitForExistence(timeout: 5))
-        let fallbackEvidence = element("reader.fallbackGestureEvidence")
-        XCTAssertTrue(fallbackEvidence.waitForExistence(timeout: 5))
-        let fallbackBefore = Int((fallbackEvidence.value as? String) ?? "") ?? (-1)
-        XCTAssertGreaterThanOrEqual(fallbackBefore, 0)
+        let sessionEvidence = element("reader.navigationEvidence")
+        XCTAssertTrue(sessionEvidence.waitForExistence(timeout: 5))
+        let sessionBefore = sessionEvidence.value as? String
+        XCTAssertTrue(sessionBefore?.contains("web=1;loads=1") == true)
         let motionBefore = Int((nativeEvidence.value as? String) ?? "") ?? (-1)
         XCTAssertGreaterThanOrEqual(motionBefore, 0)
         print("BOOK_NATIVE_CANCEL_BEFORE \(nativeEvidence.label)")
@@ -397,13 +428,12 @@ final class FloatingReadingDeskUITests: XCTestCase {
         // Let the document settle before synthesizing the edge drag; an
         // in-flight mount can swallow the first touch sequence.
         Thread.sleep(forTimeInterval: 0.4)
-        // Recording proved 40 px/s was ignored. Keep the recognized 250 px/s
-        // control, but release below the previous 16%-width commit distance.
-        // A 0.05 s press was too short for the system edge recognizer under
-        // XCUITest; 0.2 s still begins the pan without becoming a long press.
-        edge.press(forDuration: 0.2,
+        // Paired runs show the 0.2 s stationary press never starts UIKit's
+        // return, while 0.05 s starts and cancels with both slow/default drags.
+        // Keep the motion assertion: an ignored gesture is not cancellation.
+        edge.press(forDuration: pressDuration,
             thenDragTo: app.coordinate(withNormalizedOffset: CGVector(dx: cancelFraction, dy: 0.52)),
-            withVelocity: .slow, thenHoldForDuration: 0.8)
+            withVelocity: velocity, thenHoldForDuration: 0.8)
         XCTAssertTrue(surface.isHittable, "Cancel must keep the same real reader active")
         XCTAssertTrue(saved.exists && surface.frame.intersects(saved.frame))
         XCTAssertFalse(rootTab("主页", legacyID: "tabs.legacy.home").isHittable)
@@ -414,26 +444,17 @@ final class FloatingReadingDeskUITests: XCTestCase {
             // a truly ignored edge return still leaves the counter unchanged and
             // fails the assertion below.
             Thread.sleep(forTimeInterval: 0.3)
-            edge.press(forDuration: 0.2,
+            edge.press(forDuration: pressDuration,
                 thenDragTo: app.coordinate(withNormalizedOffset: CGVector(dx: cancelFraction, dy: 0.52)),
-                withVelocity: .slow, thenHoldForDuration: 0.8)
+                withVelocity: velocity, thenHoldForDuration: 0.8)
             XCTAssertTrue(surface.isHittable, "Cancel must keep the same real reader active")
             motionAfter = Int((nativeEvidence.value as? String) ?? "") ?? (-1)
         }
         print("BOOK_NATIVE_CANCEL_AFTER \(nativeEvidence.label)")
-        if reducesMotion {
-            let fallbackAfter = Int((fallbackEvidence.value as? String) ?? "") ?? (-1)
-            XCTAssertGreaterThanOrEqual(fallbackAfter, 0)
-            XCTAssertGreaterThan(motionAfter + fallbackAfter, motionBefore + fallbackBefore,
-                                 "Reduced motion still requires a real recognized native or fallback drag; stable ignored input is not cancellation")
-            print("BOOK_REDUCED_CANCEL_VERIFIED native_before=\(motionBefore) native_after=\(motionAfter) fallback_before=\(fallbackBefore) fallback_after=\(fallbackAfter)")
-        } else {
-            let fallbackAfter = Int((fallbackEvidence.value as? String) ?? "") ?? (-1)
-            XCTAssertGreaterThanOrEqual(fallbackAfter, 0)
-            XCTAssertTrue(motionAfter > motionBefore || fallbackAfter > fallbackBefore,
-                          "A real native or fallback gesture must move; an ignored drag is not cancellation")
-            print("BOOK_NATIVE_CANCEL_VERIFIED motion_before=\(motionBefore) motion_after=\(motionAfter) fallback_before=\(fallbackBefore) fallback_after=\(fallbackAfter)")
-        }
+        XCTAssertGreaterThan(motionAfter, motionBefore,
+                             "A real native gesture must move; an ignored drag is not cancellation; \(sessionEvidence.label)")
+        XCTAssertEqual(sessionEvidence.value as? String, sessionBefore,
+                       "Cancellation must retain the same presentation and one shell load")
         capture("18-reader-native-return-cancelled")
         edge.press(forDuration: 0.05,
             thenDragTo: app.coordinate(withNormalizedOffset: CGVector(dx: 0.88, dy: 0.52)),

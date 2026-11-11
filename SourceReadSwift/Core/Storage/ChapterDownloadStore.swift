@@ -253,7 +253,7 @@ final class ChapterDownloadCoordinator: ObservableObject {
             title: title,
             chapterCount: chapters.count,
             hasComicImageArchive: isComic ? true : nil,
-            cachedChapterIndexes: Array(completed)
+            cachedChapterIndexes: []
         )
         store.markRunning(bookID: bookID)
         let task = Task { @MainActor [weak self, weak store] in
@@ -267,6 +267,19 @@ final class ChapterDownloadCoordinator: ObservableObject {
                     await self.downloadComic(chapter, plan: (bookID, generation, source, engine))
                 }
             } else {
+                for chapter in chapters where completed.contains(chapter.index) {
+                    if let content = cacheStore.content(sourceURL: source.bookSourceUrl, chapter: chapter, purifyRules: purifyRules) {
+                        cacheStore.save(content, sourceURL: source.bookSourceUrl, purifyRules: purifyRules, retainOffline: true)
+                    }
+                }
+                do {
+                    try await cacheStore.flush()
+                    guard self.isCurrentJob(bookID, generation: generation) else { return }
+                    for index in completed { store.markCompleted(bookID: bookID, chapterIndex: index) }
+                } catch {
+                    guard self.isCurrentJob(bookID, generation: generation) else { return }
+                    for index in completed { store.markFailed(bookID: bookID, chapterIndex: index, message: "离线正文写入失败，请重试。") }
+                }
                 let pending = chapters.filter { !completed.contains($0.index) }
                 let limit = max(1, ChapterFetchPolicy.concurrentRequestLimit)
                 var nextChapter = 0
@@ -294,8 +307,16 @@ final class ChapterDownloadCoordinator: ObservableObject {
                         switch result {
                         case .success(let content):
                             cacheStore.save(content, sourceURL: source.bookSourceUrl,
-                                             purifyRules: purifyRules)
-                            store.markCompleted(bookID: bookID, chapterIndex: chapter.index)
+                                             purifyRules: purifyRules, retainOffline: true)
+                            do {
+                                try await cacheStore.flush()
+                                guard self.isCurrentJob(bookID, generation: generation) else { group.cancelAll(); return }
+                                store.markCompleted(bookID: bookID, chapterIndex: chapter.index)
+                            } catch {
+                                guard self.isCurrentJob(bookID, generation: generation) else { group.cancelAll(); return }
+                                store.markFailed(bookID: bookID, chapterIndex: chapter.index,
+                                                 message: "离线正文写入失败，请重试。")
+                            }
                         case .failure(let error):
                             store.markFailed(bookID: bookID, chapterIndex: chapter.index,
                                               message: error.displayMessage)

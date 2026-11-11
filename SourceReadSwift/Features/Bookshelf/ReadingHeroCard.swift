@@ -35,10 +35,8 @@ struct ReadingHeroCard: View {
     @ViewBuilder var body: some View {
         if usesSpatialStyle && usesFloatingStyle {
             FloatingReadingDesk(book: book, heroNamespace: heroNamespace)
-        } else if let heroNamespace {
-            card.readerCoverAnchor(book.id).bookHeroSource("continue|" + book.id, in: heroNamespace)
         } else {
-            card.readerCoverAnchor(book.id)
+            card
         }
     }
 
@@ -90,6 +88,10 @@ struct ReadingHeroCard: View {
         .transition(motion.reducesMotion ? .identity : .opacity.combined(with: .scale(scale: 0.96)))
         .animation(motion.animation(.expansion), value: book.id)
         .accessibilityHidden(true)
-        jacket
+        if let heroNamespace {
+            jacket.bookHeroSource("continue|" + book.id, in: heroNamespace)
+        } else {
+            jacket
+        }
     }
 }
