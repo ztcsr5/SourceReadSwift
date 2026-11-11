@@ -89,14 +89,14 @@ class MinimalPerformanceScopeTests(unittest.TestCase):
 
     def test_main_actor_store_bursts_do_not_spawn_one_task_per_mutation(self):
         app = read_source("SourceReadSwift/App/AppState.swift")
-        subscriptions = app.split("private func bindChildStores()", 1)[1].split("// MARK:", 1)[0]
+        subscriptions = app.split("private func bindChildStores()", 1)[1].split("func makeAppDataBackupSnapshot", 1)[0]
         self.assertExcludes("Task {", subscriptions)
         self.assertCountEqual(re.findall(r"(\w+)\.objectWillChange\s*\.sink", subscriptions), [
-            "sourceStore", "bookshelfStore", "purifyRuleStore", "chapterDownloadStore",
+            "sourceStore", "purifyRuleStore", "chapterDownloadStore",
             "rssArticleStateStore", "rssFeedCacheStore", "rssArticleContentCacheStore",
             "sourceHealthStore", "sourceDiagnosticHistoryStore",
         ])
-        self.assertEqual(subscriptions.count("scheduleStoreNotification()"), 9)
+        self.assertEqual(subscriptions.count("scheduleStoreNotification()"), 8)
 
     def test_progress_and_session_writes_are_ordered_off_main(self):
         persistence = read_source("SourceReadSwift/Core/Storage/BookshelfPersistence.swift")
@@ -121,10 +121,13 @@ class MinimalPerformanceScopeTests(unittest.TestCase):
     def test_global_notifications_keep_remaining_shared_subscriptions(self):
         app = read_source("SourceReadSwift/App/AppState.swift")
         self.assertContains("guard !hasPendingStoreNotification else { return }", app)
-        for store in ["bookshelfStore", "chapterDownloadStore"]:
+        for store in ["chapterDownloadStore"]:
             self.assertContains(f"{store}.objectWillChange", app)
         self.assertContains("scheduleStoreNotification()", app)
         self.assertExcludes("readingHistoryStore.objectWillChange", app)
+        self.assertExcludes("bookshelfStore.objectWillChange", app)
+        shelf = read_source("SourceReadSwift/Features/Bookshelf/BookshelfView.swift")
+        self.assertContains("appState.bookshelfStore.$books", shelf)
         settings = read_source("SourceReadSwift/Features/Settings/SettingsView.swift")
         self.assertContains("ReadingHistoryView(store: appState.readingHistoryStore)", settings)
         history_view = settings.split("struct ReadingHistoryView: View", 1)[1].split("var body:", 1)[0]
