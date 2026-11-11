@@ -1670,7 +1670,7 @@ enum WebReaderHTML {
         return low;
       }
 
-      function scrollToFlat(flat, animated, requestKey, revision, utf16Offset) {
+      function scrollToFlat(flat, animated, requestKey, revision, utf16Offset, verifiesOpeningPosition) {
         if (revision !== state.revision) { return; }
         state.activeScrollKey = requestKey;
         // Explicit chapter jumps cannot settle on a nearby old paragraph.
@@ -1681,12 +1681,16 @@ enum WebReaderHTML {
           post({ type: "scroll-miss", flat: flat });
           return;
         }
-        var rect = element.getBoundingClientRect();
-        if (utf16Offset > 0) { rect = textRectAt(element, utf16Offset) || rect; }
-        var target = Math.max(rect.top + window.scrollY - topInset(), 0);
+        var measure = function () {
+          var rect = element.getBoundingClientRect();
+          return utf16Offset > 0 ? textRectAt(element, utf16Offset) || rect : rect;
+        };
+        var position = function (duration) {
+          animateTo(Math.max(measure().top + window.scrollY - topInset(), 0), duration);
+        };
         // Always invalidate old motion, including a jump to the current line.
         // TOC/bookmark jumps stay atomic; speech keeps smooth progression.
-        animateTo(target, animated ? 300 : 0);
+        position(animated ? 300 : 0);
         var finish = function () {
           if (revision !== state.revision || requestKey !== state.activeScrollKey) { return; }
           state.visible = -1;
@@ -1698,7 +1702,33 @@ enum WebReaderHTML {
           reportVisiblePosition(performance.now(), true, false);
           window.requestAnimationFrame(onScroll);
         };
-        if (animated) { window.setTimeout(finish, 400); } else { finish(); }
+        if (animated) {
+          window.setTimeout(finish, 400);
+        } else if (verifiesOpeningPosition) {
+          // WebKit may ignore the first scroll while laying out a newly mounted document.
+          // Never publish a cursor or uncover the reader until that cursor is in the viewport.
+          var remainingPlacementFrames = 3;
+          var verifyPlacement = function () {
+            if (revision !== state.revision || requestKey !== state.activeScrollKey) { return; }
+            var rect = measure();
+            if (rect.bottom > rect.top && rect.bottom > topInset() && rect.top < window.innerHeight) {
+              finish();
+              return;
+            }
+            if (remainingPlacementFrames-- === 0) {
+              post({ type: "scroll-miss", flat: flat });
+              return;
+            }
+            window.requestAnimationFrame(function () {
+              if (revision !== state.revision || requestKey !== state.activeScrollKey) { return; }
+              position(0);
+              verifyPlacement();
+            });
+          };
+          verifyPlacement();
+        } else {
+          finish();
+        }
       }
 
       /// 回到文档顶端。换书/首次进书时调用：WKWebView 可能被复用，

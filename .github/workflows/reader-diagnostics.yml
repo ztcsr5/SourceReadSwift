@@ -4,9 +4,13 @@ on:
   workflow_dispatch:
     inputs:
       navigation_only:
-        description: Compare return input and in-app readiness serially on both runtimes
+        description: Compare return input and in-app readiness on sequential runtime runners
         type: boolean
         default: true
+      ios26_only:
+        description: Limit a runtime-specific reproduction to iOS 26 without changing release gates
+        type: boolean
+        default: false
       unit_only:
         description: Diagnose transport and theme changes without repeating already-passed UI flows
         type: boolean
@@ -20,7 +24,7 @@ jobs:
       fail-fast: false
       max-parallel: 1
       matrix:
-        runtime: ${{ inputs.navigation_only && fromJSON('["26", "18"]') || fromJSON('["26"]') }}
+        runtime: ${{ inputs.navigation_only && !inputs.ios26_only && fromJSON('["26", "18"]') || fromJSON('["26"]') }}
     runs-on: ${{ matrix.runtime == '26' && 'macos-26' || 'macos-15' }}
     timeout-minutes: 45
     env:
@@ -67,11 +71,31 @@ jobs:
             -only-testing:SourceReadSwiftTests/GlobalSearchIndexTests \
             -test-timeouts-enabled YES -maximum-test-execution-time-allowance 60 \
             -resultBundlePath DiagnosticUnit.xcresult test-without-building 2>&1 | tee diagnostic-unit.log
+      - name: Verify native reader hosting and export round trips
+        if: ${{ !cancelled() && steps.build.outcome == 'success' && inputs.navigation_only }}
+        timeout-minutes: 8
+        run: |
+          set -euo pipefail
+          DEVICE_ID="$(cat diagnostic-device.txt)"
+          xcodebuild -project SourceReadSwift.xcodeproj -scheme SourceReadSwift -destination "id=$DEVICE_ID" CODE_SIGNING_ALLOWED=NO -parallel-testing-enabled NO \
+            -only-testing:SourceReadSwiftTests/ReaderNavigationSessionTests \
+            -only-testing:SourceReadSwiftTests/ReaderNativeNavigationTests \
+            -only-testing:SourceReadSwiftTests/ReaderSafeAreaResolverTests \
+            -only-testing:SourceReadSwiftTests/ReaderCompatibilityNavigationTests \
+            -only-testing:SourceReadSwiftTests/ReaderModePositionRegressionTests \
+            -only-testing:SourceReadSwiftTests/ReaderZoomSourceTests \
+            -only-testing:SourceReadSwiftTests/ReaderOpeningTransitionTests \
+            -only-testing:SourceReadSwiftTests/BookExportRegressionTests \
+            -only-testing:SourceReadSwiftTests/LocalEPUBBookParserTests \
+            -only-testing:SourceReadSwiftTests/ChapterFetchConcurrencyTests \
+            -only-testing:SourceReadSwiftTests/OfflineTextRetentionTests \
+            -test-timeouts-enabled YES -maximum-test-execution-time-allowance 60 \
+            -resultBundlePath DiagnosticUnit.xcresult test-without-building 2>&1 | tee diagnostic-unit.log
       - name: Publish unit feedback before UI
-        if: ${{ always() && steps.build.outcome == 'success' && !inputs.navigation_only }}
+        if: ${{ always() && steps.build.outcome == 'success' }}
         uses: actions/upload-artifact@v4
         with:
-          name: reader-diag-unit-${{ github.sha }}-attempt${{ github.run_attempt }}
+          name: reader-diag-unit-${{ github.sha }}-ios${{ matrix.runtime }}-attempt${{ github.run_attempt }}
           path: diagnostic-unit.log
           if-no-files-found: error
           retention-days: 7
@@ -102,10 +126,26 @@ jobs:
           DEVICE_ID="$(cat diagnostic-device.txt)"
           xcodebuild -project SourceReadSwift.xcodeproj -scheme SourceReadSwift -destination "id=$DEVICE_ID" CODE_SIGNING_ALLOWED=NO -parallel-testing-enabled NO \
             -only-testing:SourceReadSwiftUITests/FloatingReadingDeskUITests/testReaderSystemReturnCanCancelWithoutLosingItsSavedParagraph \
+            -only-testing:SourceReadSwiftUITests/FloatingReadingDeskUITests/testReaderFastNativeReturnCompletesFromProse \
+            -only-testing:SourceReadSwiftUITests/FloatingReadingDeskUITests/testReaderShortDefaultSpeedEdgeDragCancels \
+            -only-testing:SourceReadSwiftUITests/FloatingReadingDeskUITests/testNativeReturnCancellationWithImmediateSlowDrag \
+            -only-testing:SourceReadSwiftUITests/FloatingReadingDeskUITests/testNativeReturnCancellationWithImmediateDefaultDrag \
             -only-testing:SourceReadSwiftUITests/FloatingReadingDeskUITests/testNativeReturnCancellationWithLongerSubthresholdDrag \
             -only-testing:SourceReadSwiftUITests/FloatingReadingDeskUITests/testFirstDetailEdgeReturnRestoresInteractiveHomeAndOnlyOneTabBar \
+            -only-testing:SourceReadSwiftUITests/ReaderSettingsFlowUITests/testBindingsAndAssistanceReturnToSettingsNotTheBookshelf \
+            -only-testing:SourceReadSwiftUITests/FloatingReadingDeskUITests/testContinueRestoresTheSavedParagraphInTheRealWebView \
             -test-timeouts-enabled YES -maximum-test-execution-time-allowance 180 \
             -resultBundlePath DiagnosticUI.xcresult test-without-building 2>&1 | tee diagnostic-ui.log
+      - name: Reproduce repeated native cancellation on iOS26
+        if: ${{ !cancelled() && steps.build.outcome == 'success' && inputs.navigation_only && matrix.runtime == '26' }}
+        timeout-minutes: 18
+        run: |
+          set -euo pipefail
+          DEVICE_ID="$(cat diagnostic-device.txt)"
+          xcodebuild -project SourceReadSwift.xcodeproj -scheme SourceReadSwift -destination "id=$DEVICE_ID" CODE_SIGNING_ALLOWED=NO -parallel-testing-enabled NO \
+            -only-testing:SourceReadSwiftUITests/ReaderOverlayCycleUITests \
+            -test-timeouts-enabled YES -maximum-test-execution-time-allowance 900 \
+            -resultBundlePath DiagnosticCycles.xcresult test-without-building 2>&1 | tee diagnostic-cycles.log
       - name: Export diagnostic attachments
         if: always()
         run: |
@@ -114,6 +154,9 @@ jobs:
           fi
           if [ -d DiagnosticUI.xcresult ]; then
             xcrun xcresulttool export attachments --path DiagnosticUI.xcresult --output-path diagnostic-snapshots/ui
+          fi
+          if [ -d DiagnosticCycles.xcresult ]; then
+            xcrun xcresulttool export attachments --path DiagnosticCycles.xcresult --output-path diagnostic-snapshots/cycles
           fi
       - name: Preserve diagnostic logs and results
         if: always()
@@ -124,6 +167,7 @@ jobs:
             diagnostic-*.log
             DiagnosticUnit.xcresult
             DiagnosticUI.xcresult
+            DiagnosticCycles.xcresult
           retention-days: 7
       - name: Preserve compact visual evidence
         if: always()
