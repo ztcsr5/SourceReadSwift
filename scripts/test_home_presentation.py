@@ -11,7 +11,7 @@ class HomePresentationTests(unittest.TestCase):
         card = source.split('private func heroCard', 1)[1].split('private func updateRow', 1)[0]
         self.assertIn('.contextMenu', card)
         self.assertNotIn('private func readingDeskMenu', card)
-        self.assertIn('contextualBookRoute = .read(book, coverFrame:', card)
+        self.assertIn('readerNavigation.open(.shelf(book, sourceID:', card)
         self.assertIn('bookToRemove = book', card)
         self.assertIn('readingDeskBookActions(book)', card)
 

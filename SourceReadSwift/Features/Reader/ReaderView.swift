@@ -54,6 +54,9 @@ struct ReaderView: View {
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.readerOpeningManaged) private var readerOpeningManaged
     @Environment(\.readerUsesBookReturn) private var readerUsesBookReturn
+    @Environment(\.nativeReaderSession) private var nativeSession
+    @Environment(\.readerNavigationIsTransitioning) private var navigationIsTransitioning
+    @State private var hasInitializedNativePresentation = false
     @State private var hasResolvedOpeningPreview = false
     @State private var chromeState = ReaderChromeStateMachine()
     @State private var nativeMoreMenuPresentation = ReaderMenuPresentation()
@@ -144,6 +147,7 @@ struct ReaderView: View {
     /// actual container size instead of using UIScreen.main, which describes
     /// the physical display and can be stale for the current scene.
     @State private var viewportSize: CGSize = .zero
+    @State private var measuredSafeInsets = ReaderSafeAreaResolver.Insets(top: 0, bottom: 0)
     @State private var foregroundReading = ForegroundReadingSession()
     @State private var isReaderVisible = false
     @State private var previousIdleTimerDisabled = false
@@ -928,6 +932,8 @@ struct ReaderView: View {
                 // A stalled restore is an actionable error, not permission to
                 // reveal or persist the unpositioned first page.
                 hasOpeningPositionTimedOut = true
+                nativeSession?.recordOpeningStage("position-timeout")
+                nativeSession?.recordReadyReceipt()
                 isRetryingOpeningPosition = false
             }
             .onPreferenceChange(ReaderPageContainerMetricsKey.self) { metrics in
@@ -990,6 +996,7 @@ struct ReaderView: View {
 
             if showOverlay && !showSettings {
                 readerOverlay
+                    .opacity(navigationIsTransitioning ? 0 : 1)
                     .transition(
                         .asymmetric(
                             insertion: .opacity.combined(with: .scale(scale: 0.98, anchor: .center)),
@@ -1114,10 +1121,19 @@ struct ReaderView: View {
             }
             .ignoresSafeArea()
         }
+        .background(ReaderSafeAreaObserver { insets in
+            if measuredSafeInsets != insets { measuredSafeInsets = insets }
+        })
         // Native interactive pop is the only return path. The fast custom
         // fallback dismissed the route without a UIKit transition, which tore
         // down the reader and rebuilt the tab chrome mid-swipe.
-        .background(ReaderNavigationPopLock(allowSystemReturn: allowsNativeBookReturn))
+        .background {
+            if nativeSession == nil { ReaderNavigationPopLock(allowSystemReturn: allowsNativeBookReturn) }
+        }
+        .background(ReaderNativeLifecycleBridge(session: nativeSession,
+            allowsReturn: allowsNativeBookReturn, onExit: endReaderSession,
+            onSelectChapter: { selectChapter(index: $0) }, renderedMenu: showOverlay,
+            transitioning: navigationIsTransitioning, scrollTarget: activeScrollTarget))
         // On a device the system edge recognizer is the only return path:
         // a second leading-edge recognizer turns a fast flick into a custom
         // dismiss, which tears down the route before the tab chrome can
@@ -1125,9 +1141,9 @@ struct ReaderView: View {
         // so the test-only fallback stays behind the native recognizer.
         .background {
             #if targetEnvironment(simulator)
-            ReaderExitSwipeBridge(enabled: allowsNativeBookReturn,
+            if nativeSession == nil { ReaderExitSwipeBridge(enabled: allowsNativeBookReturn,
                                   onExit: requestReaderExit,
-                                  prefersSystemReturn: true)
+                                  prefersSystemReturn: true) }
             #endif
         }
         .overlay(alignment: .topLeading) { ReaderFrameHUD() }
@@ -1266,9 +1282,17 @@ struct ReaderView: View {
         }
         .onAppear {
             NavigationTrace.shared.mark("reader", "onAppear mode=\(readerModeRawValue)")
+            nativeSession?.recordAppearance(managed: readerOpeningManaged)
             // Dismissing the full-screen TOC must not replay initial position,
             // markReaderOpened or the initial synchronous pagination pass.
             isReaderVisible = true
+            if nativeSession != nil {
+                guard !hasInitializedNativePresentation else {
+                    resumeReadingActivity()
+                    return
+                }
+                hasInitializedNativePresentation = true
+            }
             guard readerPresentationLifecycle.beginAppearance() else {
                 resumeReadingActivity()
                 return
@@ -1294,6 +1318,7 @@ struct ReaderView: View {
             if readerMode != .scroll { rebuildPagedBlocksCache() }
             readerContentFingerprint = makeContentFingerprint(content)
             let initial = initialAutoScrollTarget()
+            nativeSession?.recordOpeningCursor(requested: initialParagraphIndex, resolved: initial.paragraph)
             scrollParagraphTarget = initial.paragraph
             pagedPageIndex = initial.page
             if initial.paragraph > 0 {
@@ -1334,6 +1359,9 @@ struct ReaderView: View {
             NavigationTrace.shared.mark("reader", "onDisappear")
             isReaderVisible = false
             pauseReadingActivity()
+            // UIKit may deliver SwiftUI disappear before the interactive-pop phase callback.
+            // The native session is the sole owner of final cleanup, including that ordering.
+            if nativeSession != nil { return }
             // Ownership is visibility-scoped even for temporary covers.
                 // Cover presentation is not a reader exit. Keep the live session
             // and any selected chapter's download/pagination transaction alive.
@@ -1901,6 +1929,9 @@ struct ReaderView: View {
                 // the entire SwiftUI reader tree on every scroll callback.
                 scrollPositionTracker.flatIndex = index
                 scrollPositionTracker.utf16Offset = offset
+            },
+            onPresented: {
+                guard didLandInitialPosition else { return }
                 resolveOpeningPreview()
             },
             onScrollInteractionChanged: { active in
@@ -3156,8 +3187,7 @@ struct ReaderView: View {
 
     private func recordVisiblePageIdentity(_ key: String) {
         pageIdentityTracker.key = key
-        guard readerOpeningManaged || hasOpeningPositionTimedOut,
-              !hasResolvedOpeningPreview, pagedBlocksCache.indices.contains(pagedPageIndex) else { return }
+        guard !hasResolvedOpeningPreview, pagedBlocksCache.indices.contains(pagedPageIndex) else { return }
         let page = pagedBlocksCache[pagedPageIndex]
         guard !page.isPlaceholder, ReaderPageIdentity(page: page).key == key else { return }
         // UIKit can publish the identity from updateUIViewController.
@@ -3803,24 +3833,13 @@ struct ReaderView: View {
     /// 所有窗口取最大安全区：key window 可能是容器窗口（安全区为 0），
     /// 只取 key window 会让页眉直接压到状态栏下面。
     private var readerResolvedSafeInsets: ReaderSafeAreaResolver.Insets {
-        let scenes = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }
-        var windowTop: CGFloat = 0
-        var windowBottom: CGFloat = 0
-        var statusBarHeight: CGFloat = 0
-        for scene in scenes {
-            for window in scene.windows {
-                windowTop = max(windowTop, window.safeAreaInsets.top)
-                windowBottom = max(windowBottom, window.safeAreaInsets.bottom)
-            }
-            if let frame = scene.statusBarManager?.statusBarFrame {
-                statusBarHeight = max(statusBarHeight, frame.height)
-            }
-        }
-        return ReaderSafeAreaResolver.resolve(
-            windowTop: windowTop,
-            windowBottom: windowBottom,
-            statusBarHeight: statusBarHeight,
-            screenSize: UIScreen.main.bounds.size
+        // Querying the window/status-bar geometry while body is resolving its
+        // own statusBarHidden preference can re-enter the SwiftUI layout graph.
+        ReaderSafeAreaResolver.resolve(
+            windowTop: measuredSafeInsets.top,
+            windowBottom: measuredSafeInsets.bottom,
+            statusBarHeight: 0,
+            screenSize: effectiveViewportSize
         )
     }
 
@@ -5910,6 +5929,7 @@ struct ReaderView: View {
                 chromeState.toggleOverlay()
             }
         }
+        nativeSession?.recordMenuState(showOverlay)
     }
 
     private func presentOverlay() {
@@ -6427,7 +6447,7 @@ struct ReaderView: View {
             }
             .buttonStyle(.borderedProminent)
             .disabled(isRetryingOpeningPosition)
-            Button("返回") { dismiss() }.buttonStyle(.bordered)
+            Button("返回") { requestReaderExit() }.buttonStyle(.bordered)
         }
         .padding(24)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -6437,8 +6457,11 @@ struct ReaderView: View {
     }
 
     private func resolveOpeningPreview() {
-        guard readerOpeningManaged || hasOpeningPositionTimedOut, !hasResolvedOpeningPreview else { return }
+        // A render acknowledgement may open the native gate before this callback runs.
+        // Readiness is a property of the positioned content, independent of whether its cover is still visible.
+        guard !hasResolvedOpeningPreview else { return }
         hasResolvedOpeningPreview = true
+        nativeSession?.recordReadyReceipt()
         hasOpeningPositionTimedOut = false
         scheduleReadingPositionPersistence()
     }
