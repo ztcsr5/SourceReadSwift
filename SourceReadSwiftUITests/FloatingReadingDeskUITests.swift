@@ -197,7 +197,8 @@ final class FloatingReadingDeskUITests: XCTestCase {
         let saved = app.webViews.staticTexts.matching(
             NSPredicate(format: "label BEGINSWITH %@", "【已保存的阅读段落】")).firstMatch
         XCTAssertTrue(saved.waitForExistence(timeout: 10), "Web startup state: \(surface.value ?? "unavailable")")
-        XCTAssertTrue(surface.frame.intersects(saved.frame), "The saved paragraph must be in the actual viewport")
+        XCTAssertTrue(surface.frame.intersects(saved.frame),
+                      "The saved paragraph must be in the actual viewport; surface=\(surface.frame); saved=\(saved.frame); \(element("reader.navigationEvidence").label)")
         XCTAssertFalse(rootTab("主页", legacyID: "tabs.legacy.home").isHittable)
         capture("17-restored-paragraph")
         surface.swipeUp()
@@ -386,10 +387,10 @@ final class FloatingReadingDeskUITests: XCTestCase {
         XCTAssertFalse(element("reader.returnToShelf").isHittable, "Prose can return interactively without first opening its menu")
         let nativeEvidence = element("reader.nativeBookGestureEvidence")
         XCTAssertTrue(nativeEvidence.waitForExistence(timeout: 5))
-        let fallbackEvidence = element("reader.fallbackGestureEvidence")
-        XCTAssertTrue(fallbackEvidence.waitForExistence(timeout: 5))
-        let fallbackBefore = Int((fallbackEvidence.value as? String) ?? "") ?? (-1)
-        XCTAssertGreaterThanOrEqual(fallbackBefore, 0)
+        let sessionEvidence = element("reader.navigationEvidence")
+        XCTAssertTrue(sessionEvidence.waitForExistence(timeout: 5))
+        let sessionBefore = sessionEvidence.value as? String
+        XCTAssertTrue(sessionBefore?.contains("web=1;loads=1") == true)
         let motionBefore = Int((nativeEvidence.value as? String) ?? "") ?? (-1)
         XCTAssertGreaterThanOrEqual(motionBefore, 0)
         print("BOOK_NATIVE_CANCEL_BEFORE \(nativeEvidence.label)")
@@ -421,19 +422,10 @@ final class FloatingReadingDeskUITests: XCTestCase {
             motionAfter = Int((nativeEvidence.value as? String) ?? "") ?? (-1)
         }
         print("BOOK_NATIVE_CANCEL_AFTER \(nativeEvidence.label)")
-        if reducesMotion {
-            let fallbackAfter = Int((fallbackEvidence.value as? String) ?? "") ?? (-1)
-            XCTAssertGreaterThanOrEqual(fallbackAfter, 0)
-            XCTAssertGreaterThan(motionAfter + fallbackAfter, motionBefore + fallbackBefore,
-                                 "Reduced motion still requires a real recognized native or fallback drag; stable ignored input is not cancellation")
-            print("BOOK_REDUCED_CANCEL_VERIFIED native_before=\(motionBefore) native_after=\(motionAfter) fallback_before=\(fallbackBefore) fallback_after=\(fallbackAfter)")
-        } else {
-            let fallbackAfter = Int((fallbackEvidence.value as? String) ?? "") ?? (-1)
-            XCTAssertGreaterThanOrEqual(fallbackAfter, 0)
-            XCTAssertTrue(motionAfter > motionBefore || fallbackAfter > fallbackBefore,
-                          "A real native or fallback gesture must move; an ignored drag is not cancellation")
-            print("BOOK_NATIVE_CANCEL_VERIFIED motion_before=\(motionBefore) motion_after=\(motionAfter) fallback_before=\(fallbackBefore) fallback_after=\(fallbackAfter)")
-        }
+        XCTAssertGreaterThan(motionAfter, motionBefore,
+                             "A real native gesture must move; an ignored drag is not cancellation; \(sessionEvidence.label)")
+        XCTAssertEqual(sessionEvidence.value as? String, sessionBefore,
+                       "Cancellation must retain the same presentation and one shell load")
         capture("18-reader-native-return-cancelled")
         edge.press(forDuration: 0.05,
             thenDragTo: app.coordinate(withNormalizedOffset: CGVector(dx: 0.88, dy: 0.52)),
