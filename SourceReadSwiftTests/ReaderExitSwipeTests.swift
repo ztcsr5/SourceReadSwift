@@ -5,6 +5,17 @@ import WebKit
 @testable import SourceReadSwift
 
 final class ReaderExitSwipeTests: XCTestCase {
+    /// The failure that kept the native Zoom from ever asking for permission:
+    /// WKScrollView's inner pan and WebKit's highlight long-press both began in
+    /// the same 20 ms window, 8/20 and 5/20 rounds respectively, while the system
+    /// edge gesture never ran. Both must wait for it; taps must not.
+    func testOnlyDragRecognizersWaitForTheSystemEdgeReturn() {
+        XCTAssertTrue(ReaderEdgeReturnGesturePolicy.shouldWaitForSystemEdge(UIPanGestureRecognizer()))
+        XCTAssertTrue(ReaderEdgeReturnGesturePolicy.shouldWaitForSystemEdge(UILongPressGestureRecognizer()))
+        XCTAssertFalse(ReaderEdgeReturnGesturePolicy.shouldWaitForSystemEdge(UITapGestureRecognizer()))
+        XCTAssertFalse(ReaderEdgeReturnGesturePolicy.shouldWaitForSystemEdge(UIScreenEdgePanGestureRecognizer()))
+    }
+
     func testExitRequiresMenuAndNoSettingsOrCover() {
         XCTAssertTrue(ReaderExitSwipePolicy.isEnabled(menuVisible: true, settingsVisible: false, coverPresented: false))
         XCTAssertFalse(ReaderExitSwipePolicy.isEnabled(menuVisible: false, settingsVisible: false, coverPresented: false))
@@ -80,7 +91,8 @@ final class ReaderExitSwipeTests: XCTestCase {
         parent.view.addSubview(child)
         let pagePan = UIPanGestureRecognizer()
         child.addGestureRecognizer(pagePan)
-        XCTAssertTrue(controller.gestureRecognizer(controller.edgePan, shouldBeRequiredToFailBy: pagePan))
+        XCTAssertFalse(controller.gestureRecognizer(controller.edgePan, shouldBeRequiredToFailBy: pagePan),
+                       "The preserved legacy bridge no longer installs a global failure requirement")
         controller.configure(enabled: false, onExit: {})
         XCTAssertFalse(controller.edgePan.isEnabled)
         XCTAssertFalse(controller.gestureRecognizer(controller.edgePan, shouldBeRequiredToFailBy: pagePan))

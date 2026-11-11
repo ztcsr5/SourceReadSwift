@@ -14,7 +14,8 @@ struct SourceReadSwiftApp: App {
 
     var body: some Scene {
         WindowGroup {
-            RootTabView()
+            ReaderNavigationHost()
+                .ignoresSafeArea()
                 .environmentObject(appState)
                 .highRefreshRateSurface()
                 .modifier(AppColorSchemePreference(mode: ThemeMode(rawValue: themeModeRawValue) ?? .system))
@@ -23,6 +24,9 @@ struct SourceReadSwiftApp: App {
                 }
                 .onAppear {
                     FrameRateCoordinator.apply()
+                    #if DEBUG
+                    ReaderZoomExperiment.installIfRequested()
+                    #endif
                 }
                 .onReceive(NotificationCenter.default.publisher(for: UIScene.didActivateNotification)) { notification in
                     FrameRateCoordinator.apply(to: notification.object as? UIScene)
