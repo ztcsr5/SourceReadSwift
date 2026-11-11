@@ -212,7 +212,7 @@ final class ReaderSettingsFlowUITests: XCTestCase {
         let outcome = XCTWaiter.wait(for: [ready], timeout: 10)
         if outcome != .completed { capture("reader-settings-prose-startup-failure") }
         XCTAssertEqual(outcome, .completed,
-            "Actual prose not ready; recovery=\(element("reader.openingRecovery").exists); startup=\(surface.value ?? "unavailable")")
+            "Actual prose not ready; recovery=\(element("reader.openingRecovery").exists); startup=\(surface.value ?? "unavailable"); navigation=\(element("reader.navigationEvidence").label); session=\(element("reader.navigationEvidence").value ?? "unavailable")")
     }
 
     private func revealMenu() {
@@ -220,7 +220,7 @@ final class ReaderSettingsFlowUITests: XCTestCase {
         if !settings.isHittable {
             app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.42)).tap()
         }
-        XCTAssertTrue(settings.waitForExistence(timeout: 5))
+        XCTAssertTrue(settings.waitForExistence(timeout: 5), "Menu input: \(element("reader.navigationEvidence").label)")
         XCTAssertTrue(settings.isHittable)
     }
 

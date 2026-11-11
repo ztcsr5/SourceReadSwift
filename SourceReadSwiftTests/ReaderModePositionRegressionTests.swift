@@ -99,6 +99,133 @@ final class ReaderModePositionRegressionTests: XCTestCase {
         XCTAssertEqual(visiblePositions.first, 0)
     }
 
+    @MainActor func testOpeningWaitsForTheResolvedCursorBeforeMountingAndPresenting() async throws {
+        let presented = expectation(description: "Only positioned content may finish opening")
+        var receivedPresentation = false
+        var applied = false
+        var fixture = WebScrollReaderView(
+            sections: [WebReaderSection(chapterIndex: 0, title: "恢复位置",
+                paragraphs: (0..<60).map { "第\($0)段，首屏不能早于已保存位置的准备。" })],
+            contentFingerprint: "prepared-position-regression", fontSize: 20, lineSpacing: 8,
+            pagePadding: 20, letterSpacing: 0, paragraphSpacing: 12, paragraphIndent: 40,
+            titleSpacing: 16, footerHeight: 12, topInset: 50, textColor: .black,
+            highlightColor: .yellow, currentParagraphIndex: -1, scrollTarget: nil,
+            scrollRequestKey: nil, isOpeningPositionPrepared: false,
+            animatedScrollDuration: 0, textSelectionEnabled: false,
+            onVisibleParagraph: { _ in }, onPresented: {
+                XCTAssertTrue(applied, "An unpositioned first page must never satisfy readiness")
+                if !receivedPresentation { receivedPresentation = true; presented.fulfill() }
+            }, onScrollTargetApplied: { applied = true })
+        let coordinator = fixture.makeCoordinator()
+        let web = coordinator.makeWebView(initialView: fixture)
+        let close = mountReaderSurface(web)
+        defer { coordinator.tearDown(webView: web); close() }
+        var shellReady = false
+        for _ in 0..<300 {
+            shellReady = (try? await web.evaluateJavaScript("!!window.__reader")) as? Bool == true
+            if shellReady { break }
+            try await Task.sleep(nanoseconds: 20_000_000)
+        }
+        XCTAssertTrue(shellReady)
+        XCTAssertEqual(coordinator.contentMountCount, 0)
+        XCTAssertFalse(receivedPresentation)
+        _ = try await web.evaluateJavaScript("""
+            (() => {
+                const bridge = window.__reader;
+                const mount = bridge.setContent;
+                const jump = bridge.scrollToFlat;
+                let isMountTurn = false;
+                window.openingJumpTurns = [];
+                bridge.setContent = function(...args) {
+                    const result = mount.apply(this, args);
+                    isMountTurn = result === true;
+                    Promise.resolve().then(() => { isMountTurn = false; });
+                    return result;
+                };
+                bridge.scrollToFlat = function(...args) {
+                    window.openingJumpTurns.push(isMountTurn);
+                    return jump.apply(this, args);
+                };
+            })()
+            """)
+        fixture = WebScrollReaderView(
+            sections: fixture.sections, contentFingerprint: fixture.contentFingerprint,
+            fontSize: 20, lineSpacing: 8, pagePadding: 20, letterSpacing: 0,
+            paragraphSpacing: 12, paragraphIndent: 40, titleSpacing: 16, footerHeight: 12,
+            topInset: 50, textColor: .black, highlightColor: .yellow, currentParagraphIndex: -1,
+            scrollTarget: 30, scrollRequestKey: "prepared-paragraph-30", isOpeningPositionPrepared: true,
+            animatedScrollDuration: 0, textSelectionEnabled: false,
+            onVisibleParagraph: fixture.onVisibleParagraph, onPresented: fixture.onPresented,
+            onScrollTargetApplied: fixture.onScrollTargetApplied)
+        coordinator.update(view: fixture, webView: web)
+        await fulfillment(of: [presented], timeout: 10)
+        let visible = try await web.evaluateJavaScript("""
+            (() => {
+                const rect = document.querySelector('p[data-flat="30"]')?.getBoundingClientRect();
+                return !!rect && rect.top < window.innerHeight && rect.bottom > 0;
+            })()
+            """)
+        XCTAssertEqual(visible as? Bool, true)
+        XCTAssertEqual(coordinator.contentMountCount, 1)
+        let openingJumpTurns = try await web.evaluateJavaScript("JSON.stringify(window.openingJumpTurns)")
+        XCTAssertEqual(openingJumpTurns as? String, "[true]",
+                       "Opening must jump once, in the same JavaScript turn that mounted the prose")
+    }
+
+    @MainActor func testPrefetchBeforeFirstRenderAcknowledgementCannotStrandOpening() async throws {
+        let positioned = expectation(description: "Initial position is known before compositor frames")
+        let presented = expectation(description: "Latest mounted revision reaches presentation")
+        var reported = false
+        var receivedPresentation = false
+        let section = WebReaderSection(chapterIndex: 0, title: "第一章",
+            paragraphs: (0..<30).map { "第一章正文第\($0)段。" })
+        func makeSurface(_ sections: [WebReaderSection], fingerprint: String) -> WebScrollReaderView {
+            WebScrollReaderView(sections: sections, contentFingerprint: fingerprint,
+            fontSize: 20, lineSpacing: 8, pagePadding: 20, letterSpacing: 0,
+            paragraphSpacing: 12, paragraphIndent: 40, titleSpacing: 16, footerHeight: 12,
+            topInset: 50, textColor: .black, highlightColor: .yellow, currentParagraphIndex: -1,
+            scrollTarget: nil, scrollRequestKey: nil, animatedScrollDuration: 0, textSelectionEnabled: false,
+            onVisibleParagraph: { _ in
+                if !reported { reported = true; positioned.fulfill() }
+            }, onPresented: {
+                if !receivedPresentation { receivedPresentation = true; presented.fulfill() }
+            })
+        }
+        let fixture = makeSurface([section], fingerprint: "initial")
+        let coordinator = fixture.makeCoordinator()
+        let web = coordinator.makeWebView(initialView: fixture, prepareBeforeNavigation: { web in
+            web.configuration.userContentController.addUserScript(WKUserScript(source: """
+                window.heldReaderFrames = [];
+                window.requestAnimationFrame = function(callback) {
+                    window.heldReaderFrames.push(callback);
+                    return window.heldReaderFrames.length;
+                };
+                """, injectionTime: .atDocumentStart, forMainFrameOnly: true))
+        })
+        let close = mountReaderSurface(web)
+        defer { coordinator.tearDown(webView: web); close() }
+        await fulfillment(of: [positioned], timeout: 15)
+        XCTAssertFalse(receivedPresentation)
+        let appended = makeSurface([section, WebReaderSection(chapterIndex: 1, title: "第二章", paragraphs: ["预取正文"])],
+                                   fingerprint: "prefetched")
+        coordinator.update(view: appended, webView: web)
+        for _ in 0..<150 {
+            if coordinator.contentMountCount == 2 { break }
+            try await Task.sleep(nanoseconds: 20_000_000)
+        }
+        XCTAssertEqual(coordinator.contentMountCount, 2)
+        _ = try await web.evaluateJavaScript("""
+            (() => {
+                for (let pass = 0; pass < 4; pass++) {
+                    const callbacks = window.heldReaderFrames.splice(0);
+                    callbacks.forEach(callback => callback(performance.now()));
+                }
+            })()
+            """)
+        await fulfillment(of: [presented], timeout: 5)
+        XCTAssertTrue(receivedPresentation, "A superseded first-frame callback cannot leave a prepared reader covered")
+    }
+
     @MainActor func testChapterHeadingReportsItsOwnProseAcrossForwardAndReverseScroll() async throws {
         let opened = expectation(description: "The real WebKit document has visible prose")
         var hasOpened = false
@@ -243,6 +370,7 @@ final class ReaderModePositionRegressionTests: XCTestCase {
     @MainActor func testWebScrollRestoresAndReportsInsideOneLongParagraph() async throws {
         var offset = -1
         var applied = false
+        var presented = false
         let text = String(repeating: "长段正文，模式切换不能回到段首。👩🏽‍💻", count: 150)
         let fixture = WebScrollReaderView(
             sections: [WebReaderSection(chapterIndex: 0, title: "长段落", paragraphs: [text, "末段"])],
@@ -253,6 +381,11 @@ final class ReaderModePositionRegressionTests: XCTestCase {
             scrollRequestKey: "restore-character-600", scrollTargetUTF16Offset: 600,
             animatedScrollDuration: 0, textSelectionEnabled: false,
             onVisibleParagraph: { _ in }, onVisiblePosition: { _, value in offset = value },
+            onPresented: {
+                XCTAssertTrue(applied, "Presentation cannot precede the requested character jump")
+                XCTAssertGreaterThan(offset, 500, "The rendered acknowledgement must refer to the restored location")
+                presented = true
+            },
             onScrollTargetApplied: { applied = true })
         let scene = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.first
         let previousKeyWindow = scene?.windows.first(where: \.isKeyWindow)
@@ -263,7 +396,7 @@ final class ReaderModePositionRegressionTests: XCTestCase {
         window.makeKeyAndVisible()
         defer { window.isHidden = true; previousKeyWindow?.makeKey() }
         for _ in 0..<600 {
-            if applied && offset > 0 { break }
+            if applied && offset > 0 && presented { break }
             try await Task.sleep(nanoseconds: 100_000_000)
         }
         if !applied || offset <= 500 {
@@ -277,6 +410,7 @@ final class ReaderModePositionRegressionTests: XCTestCase {
             }
         }
         XCTAssertTrue(applied, "The real WebKit document must acknowledge the character jump")
+        XCTAssertTrue(presented, "The actual WebKit document must reach its render acknowledgement")
         XCTAssertGreaterThan(offset, 500, "Paragraph zero must not silently restore to its start")
         XCTAssertLessThanOrEqual(offset, 600, "The visible line should contain the requested character")
     }
