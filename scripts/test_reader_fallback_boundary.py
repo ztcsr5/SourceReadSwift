@@ -8,14 +8,15 @@ class ReaderFallbackBoundaryTests(unittest.TestCase):
     def test_enabled_native_flag_does_not_disable_the_fallback(self):
         source = (ROOT / "SourceReadSwift/Features/Reader/ReaderExitSwipeBridge.swift").read_text(encoding="utf8")
         self.assertIn("let needsFallback = exitEnabled\n", source)
-    def test_prose_call_site_can_enable_a_fallback_without_the_menu(self):
+    def test_native_reader_does_not_mount_the_legacy_fallback(self):
         source = (ROOT / "SourceReadSwift/Features/Reader/ReaderView.swift").read_text(encoding="utf8")
-        bridge = source.split(".background(ReaderExitSwipeBridge(", 1)[1].split("))", 1)[0]
-        self.assertIn("enabled: ReaderExitSwipePolicy.isProseFallbackEnabled(", bridge)
-        self.assertIn("allowsBookReturn: allowsNativeBookReturn", bridge)
+        self.assertIn("if nativeSession == nil { ReaderExitSwipeBridge", source)
+        router = (ROOT / "SourceReadSwift/Features/Reader/Navigation/ReaderNavigationRouter.swift").read_text(encoding="utf8")
+        self.assertIn("controller.preferredTransition = .zoom", router)
+        self.assertNotIn("ReaderExitSwipeBridge", router)
     def test_reduced_motion_cannot_pass_when_both_input_probes_are_zero(self):
         source = (ROOT / "SourceReadSwiftUITests/FloatingReadingDeskUITests.swift").read_text(encoding="utf8")
-        self.assertIn("motionAfter + fallbackAfter, motionBefore + fallbackBefore", source)
+        self.assertIn("XCTAssertEqual(sessionEvidence.value as? String, sessionBefore", source)
         self.assertIn("XCTAssertGreaterThan(motionAfter, motionBefore", source)
         bridge = (ROOT / "SourceReadSwift/Features/Reader/ReaderExitSwipeBridge.swift").read_text(encoding="utf8")
         self.assertIn("gesture.numberOfTouches > 0", bridge)

@@ -11,6 +11,7 @@ extension BookExportService {
         coverJPEG: Data?,
         totalChapterCount: Int = 0
     ) throws -> BookArchiveExport {
+        try Task.checkCancellation()
         guard !cachedChapters.isEmpty else { throw BookExportError.noContent }
         let total = max(totalChapterCount, cachedChapters.count)
         switch format {
@@ -59,34 +60,27 @@ enum BookExportChapterLoader {
         progress(completed, ordered.count)
 
         let limit = max(1, ChapterFetchPolicy.concurrentRequestLimit)
-        for start in stride(from: 0, to: missing.count, by: limit) {
-            guard !Task.isCancelled else { break }
-            let end = min(start + limit, missing.count)
-            let batch = Array(missing[start..<end])
-            let results = await withTaskGroup(
-                of: (BookChapter, Result<ChapterContent, SourceEngineError>).self
-            ) { group in
-                for chapter in batch {
-                    group.addTask {
-                        let result = await ChapterFetchPolicy.fetch(
-                            source: source, chapter: chapter, engine: engine)
-                        return (chapter, result)
-                    }
+        var cursor = 0
+        await withTaskGroup(of: ChapterFetchOutcome.self) { group in
+            for _ in 0..<limit {
+                guard cursor < missing.count else { break }
+                let chapter = missing[cursor]
+                cursor += 1
+                group.addTask { (chapter, await ChapterFetchPolicy.fetch(source: source, chapter: chapter, engine: engine)) }
+            }
+            while let (chapter, result) = await group.next() {
+                guard !Task.isCancelled else { group.cancelAll(); break }
+                if case .success(let content) = result {
+                    contentByURL[chapter.url] = content
+                    cacheStore.save(content, sourceURL: source.bookSourceUrl, purifyRules: purifyRules)
+                    completed += 1
                 }
-                var collected: [(BookChapter, Result<ChapterContent, SourceEngineError>)] = []
-                for await result in group { collected.append(result) }
-                return collected
+                progress(completed, ordered.count)
+                guard cursor < missing.count else { continue }
+                let next = missing[cursor]
+                cursor += 1
+                group.addTask { (next, await ChapterFetchPolicy.fetch(source: source, chapter: next, engine: engine)) }
             }
-
-            for (chapter, result) in results {
-                guard !Task.isCancelled else { break }
-                guard case .success(let content) = result else { continue }
-                contentByURL[chapter.url] = content
-                cacheStore.save(content, sourceURL: source.bookSourceUrl,
-                                purifyRules: purifyRules)
-                completed += 1
-            }
-            progress(completed, ordered.count)
         }
 
         return ordered.compactMap { contentByURL[$0.url] }
