@@ -14,7 +14,8 @@ struct SourceReadSwiftApp: App {
 
     var body: some Scene {
         WindowGroup {
-            RootTabView()
+            ReaderNavigationHost()
+                .ignoresSafeArea()
                 .environmentObject(appState)
                 .highRefreshRateSurface()
                 .modifier(AppColorSchemePreference(mode: ThemeMode(rawValue: themeModeRawValue) ?? .system))
