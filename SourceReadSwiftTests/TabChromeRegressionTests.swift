@@ -12,10 +12,7 @@ final class TabChromeRegressionTests: XCTestCase {
         app.releaseTabChromeHidden(owner: reader)
         XCTAssertTrue(app.isTabChromeHidden, "还剩一个 owner 时必须继续隐藏")
         app.releaseTabChromeHidden(owner: gateway)
-        // 新契约：最后一个 owner 释放后进入挂起窗口，底栏不得立刻出现。
-        XCTAssertTrue(app.isTabChromeHidden, "挂起窗口内不得提前暴露底栏")
-        let revealed = await eventually { !app.isTabChromeHidden }
-        XCTAssertTrue(revealed, "窗口结束后必须显示底栏")
+        XCTAssertFalse(app.isTabChromeHidden, "Last owner release must restore chrome synchronously")
     }
 
     @MainActor func testCustomRootNeverRevealsASecondNativeBar() async throws {
