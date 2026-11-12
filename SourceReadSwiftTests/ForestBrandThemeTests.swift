@@ -8,8 +8,12 @@ final class ForestBrandThemeTests: XCTestCase {
         let floating = AppVisualTheme.floatingBookThemes
         XCTAssertEqual(classic.first, .classic)
         XCTAssertEqual(floating.first, .forest)
-        XCTAssertEqual(Set(classic + floating), Set(AppVisualTheme.allCases))
-        XCTAssertEqual(classic.count + floating.count, AppVisualTheme.allCases.count)
+        let video = AppVisualTheme.videoGlassThemes
+        XCTAssertEqual(Set(classic + floating + video), Set(AppVisualTheme.allCases))
+        XCTAssertEqual(classic.count + floating.count + video.count, AppVisualTheme.allCases.count)
+        XCTAssertTrue(video.allSatisfy(\.isVideoGlass))
+        XCTAssertFalse(floating.contains(where: \.isVideoGlass))
+        XCTAssertFalse(classic.contains(where: \.isVideoGlass))
         XCTAssertNil(AppVisualTheme.forest.illustratedPaper)
         let assets = floating.compactMap { $0.illustratedPaper?.wallpaperAssetName }
         XCTAssertEqual(Set(assets).count, 4)
