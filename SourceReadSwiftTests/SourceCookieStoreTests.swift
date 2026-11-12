@@ -161,6 +161,56 @@ final class SourceCookieStoreTests: XCTestCase {
         XCTAssertFalse(URLSessionSourceNetworkClient.looksLikeCooldownPage("<html>" + String(repeating: "x", count: 800) + "alert(间隔)</html>"))
     }
 
+    /// The real kill-and-relaunch path: a fresh process builds a new store from
+    /// the same file, and the login cookie must still be sent on the next request.
+    /// Without this, an app restart looked logged-out while the disk file existed.
+    func testCookieSurvivesRelaunchThroughTheDefaultDiskStore() async throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        let location = directory.appendingPathComponent("cookies.json")
+        defer { try? FileManager.default.removeItem(at: directory) }
+
+        let loginURL = URL(string: "https://relaunch.fixture.invalid/login")!
+        let firstProcess = SourceCookieStore(storageURL: location)
+        await firstProcess.storeSetCookieHeaders(
+            ["Set-Cookie": "remember=me; Path=/; Domain=relaunch.fixture.invalid; HttpOnly"],
+            for: loginURL)
+        XCTAssertEqual(await firstProcess.cookieCount(), 1)
+
+        let relaunched = SourceCookieStore(storageURL: location)
+        let contentURL = URL(string: "https://relaunch.fixture.invalid/read/42")!
+        let header = await relaunched.cookieHeader(for: contentURL)
+        XCTAssertEqual(header, "remember=me", "Relaunch must reuse the persisted login cookie")
+        let cookies = await relaunched.allCookies()
+        XCTAssertEqual(cookies.count, 1)
+        XCTAssertTrue(cookies[0].isHTTPOnly)
+        XCTAssertEqual(await relaunched.hostsWithCookies(), ["relaunch.fixture.invalid"])
+        // Asserting the persisted record rather than the memory cache: the file is
+        // what the next process reads.
+        let data = try Data(contentsOf: location)
+        let records = try JSONDecoder().decode([String: [StoredCookieRecord]].self, from: data)
+        XCTAssertEqual(records["relaunch.fixture.invalid"]?.first?.name, "remember")
+    }
+
+    /// A cleared session must stay cleared after relaunch, otherwise clearing
+    /// cookies in the UI silently logs the user back in on next start.
+    func testClearedCookiesStayClearedAfterRelaunch() async throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        let location = directory.appendingPathComponent("cookies.json")
+        defer { try? FileManager.default.removeItem(at: directory) }
+
+        let url = URL(string: "https://logout.fixture.invalid/")!
+        let store = SourceCookieStore(storageURL: location)
+        await store.storeSetCookieHeaders(["Set-Cookie": "session=bye; Path=/"], for: url)
+        await store.clearAllCookies()
+
+        let relaunched = SourceCookieStore(storageURL: location)
+        let header = await relaunched.cookieHeader(for: url)
+        XCTAssertNil(header)
+        XCTAssertEqual(await relaunched.cookieCount(), 0)
+    }
+
     func testCookieStoredOnSubdomainAlsoServesThatSubdomain() async throws {
         let store = SourceCookieStore(storageURL: nil)
         let apiURL = URL(string: "https://m.example.com/api")!

@@ -6,25 +6,27 @@ import XCTest
 final class AtelierThemeTests: XCTestCase {
     func testAtelierPigmentsMatchTheSevenReferencePairsWithoutMixingThemes() throws {
         let referencePairs: [(AppVisualTheme, UInt32, UInt32)] = [
-            (.berryLake, 0x65020A, 0x18D5E7),
-            (.blushInk, 0xFF7CA2, 0x000000),
-            (.periwinkleCocoa, 0x7B88D7, 0x6D483B),
-            (.peachMoss, 0xFACBC6, 0x465C47),
-            (.inkViolet, 0x0B0C10, 0xA855F7),
-            (.pineMist, 0x3A6341, 0xE8E8E4),
-            (.kleinSage, 0x012696, 0xA4E2C6)
+            (.berryLake, 0x7A0A1E, 0x0F7C8C),
+            (.blushInk, 0xAE2253, 0x1F5041),
+            (.periwinkleCocoa, 0x39459B, 0x6D483B),
+            (.peachMoss, 0x8A4A3C, 0x2F5C3A),
+            (.inkViolet, 0x4A1D7A, 0x8A6100),
+            (.pineMist, 0x1F4A32, 0x9E5B4A),
+            (.kleinSage, 0x012696, 0x855A0C)
         ]
         XCTAssertEqual(AppVisualTheme.atelierThemes, referencePairs.map { $0.0 })
         for (theme, primary, secondary) in referencePairs {
             let palette = try XCTUnwrap(theme.atelierPalette)
             XCTAssertEqual(palette.primaryHex, primary, theme.title)
             XCTAssertEqual(palette.secondaryHex, secondary, theme.title)
-            if theme == .inkViolet {
-                XCTAssertEqual(palette.emphasisFillHex, 0xB873F8, "Star-violet controls need pressed-state contrast headroom")
-                XCTAssertEqual(palette.emphasisInkHex, primary)
-            } else {
-                XCTAssertTrue([primary, secondary].contains(palette.emphasisFillHex), theme.title)
-            }
+            // Emphasis fills carry the second hue (or a deepened shade of it so the
+            // pressed opacity still clears 4.5:1). They must never drift to the first hue.
+            let fillHue = hls(palette.emphasisFillHex).hue, secondHue = hls(secondary).hue
+            var fillGap = abs(fillHue - secondHue)
+            fillGap = min(fillGap, 360 - fillGap)
+            XCTAssertLessThanOrEqual(fillGap, 15, "\(theme.title) emphasis fill must stay in the secondary hue")
+            XCTAssertLessThanOrEqual(hls(palette.emphasisFillHex).lightness, hls(secondary).lightness + 0.001,
+                                     "\(theme.title) emphasis fill may only deepen, never lighten")
             XCTAssertGreaterThanOrEqual(contrast(palette.emphasisInkHex, palette.emphasisFillHex), 4.5, theme.title)
         }
         for theme in AppVisualTheme.allCases where !theme.isAtelier {
@@ -45,6 +47,42 @@ final class AtelierThemeTests: XCTestCase {
             XCTAssertFalse(AppThemeOrnament.hasArtwork(theme: theme, isCard: false))
             XCTAssertFalse(theme.supportsLiveGlass)
         }
+    }
+
+    /// 撞色主题的硬指标：两个控件色在色轮上真的分开，且都还能当文字用。
+    /// 只靠肉眼看截图不算验证，所以这里用十进制 HLS 与 WCAG 比值算。
+    func testClashingAccentPairsSeparateOnTheWheelAndStayReadable() {
+        for theme in AppVisualTheme.atelierThemes {
+            let primary = hls(theme.accentHex), secondary = hls(theme.secondaryHex)
+            var hueGap = abs(primary.hue - secondary.hue)
+            hueGap = min(hueGap, 360 - hueGap)
+            // 两色都要压在纸面上当正文墨色用，所以明度天然接近；
+            // 撞色靠色相分离与"各自都过 4.5:1"两条同时成立来表达，而不是靠亮度差。
+            XCTAssertGreaterThanOrEqual(hueGap, 120, "\(theme.title) needs a real hue clash")
+            XCTAssertGreaterThan(abs(primary.hue - secondary.hue), 0.5, "\(theme.title) must not reuse one hue")
+            let darkPrimary = hls(theme.darkAccentHex), darkSecondary = hls(theme.darkSecondaryHex)
+            var darkGap = abs(darkPrimary.hue - darkSecondary.hue)
+            darkGap = min(darkGap, 360 - darkGap)
+            XCTAssertGreaterThanOrEqual(darkGap, 120, "\(theme.title) dark pair needs a hue clash")
+            for (ink, paper) in [(theme.accentHex, theme.backgroundHex), (theme.accentHex, theme.cardHex),
+                                 (theme.secondaryHex, theme.backgroundHex), (theme.secondaryHex, theme.cardHex),
+                                 (theme.darkAccentHex, theme.darkBackgroundHex), (theme.darkAccentHex, theme.darkCardHex),
+                                 (theme.darkSecondaryHex, theme.darkBackgroundHex), (theme.darkSecondaryHex, theme.darkCardHex)] {
+                XCTAssertGreaterThanOrEqual(contrast(ink, paper), 4.5, "\(theme.title) ink \(ink) on \(paper)")
+            }
+        }
+    }
+
+    private func hls(_ rgb: UInt32) -> (hue: Double, lightness: Double) {
+        let red = Double((rgb >> 16) & 255) / 255, green = Double((rgb >> 8) & 255) / 255, blue = Double(rgb & 255) / 255
+        let high = max(red, green, blue), low = min(red, green, blue), delta = high - low
+        let lightness = (high + low) / 2
+        guard delta > 0 else { return (0, lightness) }
+        let hue: Double
+        if high == red { hue = 60 * (((green - blue) / delta).truncatingRemainder(dividingBy: 6)) }
+        else if high == green { hue = 60 * ((blue - red) / delta + 2) }
+        else { hue = 60 * ((red - green) / delta + 4) }
+        return (hue < 0 ? hue + 360 : hue, lightness)
     }
 
     func testBothAtelierAccentsRemainReadableOnPaperAndCardsInBothAppearances() {
@@ -74,8 +112,11 @@ final class AtelierThemeTests: XCTestCase {
                 let fill = resolvedHex(AppTheme.prominentFill, traits: traits)
                 let ink = resolvedHex(AppTheme.prominentInk, traits: traits)
                 if let palette = theme.atelierPalette {
-                    XCTAssertEqual(fill, palette.emphasisFillHex, theme.title)
-                    XCTAssertEqual(ink, palette.emphasisInkHex, theme.title)
+                    // 深色下按钮换成提亮的同色相；浅色下用压深的填充。
+                    let expectedFill = style == .dark ? palette.darkEmphasisFillHex : palette.emphasisFillHex
+                    let expectedInk = style == .dark ? palette.darkEmphasisInkHex : palette.emphasisInkHex
+                    XCTAssertEqual(fill, expectedFill, theme.title)
+                    XCTAssertEqual(ink, expectedInk, theme.title)
                     XCTAssertGreaterThanOrEqual(contrast(ink, fill), 4.5, theme.title)
                     if style == .dark {
                         XCTAssertGreaterThanOrEqual(contrast(fill, theme.darkCardHex), 3, theme.title)
@@ -93,16 +134,22 @@ final class AtelierThemeTests: XCTestCase {
         let pressedOpacities = [0.84, 0.88]
         for theme in AppVisualTheme.atelierThemes {
             let palette = try XCTUnwrap(theme.atelierPalette)
-            for paper in [theme.backgroundHex, theme.cardHex, theme.darkBackgroundHex, theme.darkCardHex] {
-                for opacity in pressedOpacities {
-                    let fill = blend(palette.emphasisFillHex, over: paper, opacity: opacity)
-                    let ink = blend(palette.emphasisInkHex, over: paper, opacity: opacity)
-                    XCTAssertGreaterThanOrEqual(contrast(ink, fill), 4.5, theme.title)
+            // 浅色填充只出现在浅色纸面，深色填充只出现在深色纸面；交叉组合不是真实场景。
+            for (fillHex, inkHex, papers) in [(palette.emphasisFillHex, palette.emphasisInkHex,
+                                               [theme.backgroundHex, theme.cardHex]),
+                                              (palette.darkEmphasisFillHex, palette.darkEmphasisInkHex,
+                                               [theme.darkBackgroundHex, theme.darkCardHex])] {
+                for paper in papers {
+                    for opacity in pressedOpacities {
+                        let fill = blend(fillHex, over: paper, opacity: opacity)
+                        let ink = blend(inkHex, over: paper, opacity: opacity)
+                        XCTAssertGreaterThanOrEqual(contrast(ink, fill), 4.5, theme.title)
+                    }
                 }
-            }
-            for opacity in [0.80, 0.85] {
-                let ink = blend(palette.emphasisInkHex, over: palette.emphasisFillHex, opacity: opacity)
-                XCTAssertGreaterThanOrEqual(contrast(ink, palette.emphasisFillHex), 4.5, theme.title)
+                for opacity in [0.80, 0.85] {
+                    let ink = blend(inkHex, over: fillHex, opacity: opacity)
+                    XCTAssertGreaterThanOrEqual(contrast(ink, fillHex), 4.5, theme.title)
+                }
             }
         }
     }

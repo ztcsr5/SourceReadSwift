@@ -36,6 +36,35 @@ struct ReaderBindingPreferences: Codable, Equatable, Sendable {
         "reader.headerTopGap": 0...24, "reader.headerOpacity": 0.35...1, "reader.footerHeight": 0...200,
         "reader.menuPaperOpacity": 0.85...1
     ]
+    /// Clamps a stored number into the documented range so a settings form
+    /// never presents a value the validator would later reject.
+    static func clamp(_ number: Double, forKey key: String) -> Double {
+        guard let range = ranges[key] else { return number.isFinite ? number : 0 }
+        guard number.isFinite else { return range.lowerBound }
+        return min(max(number, range.lowerBound), range.upperBound)
+    }
+
+    /// The appearance keys this screen owns, grouped the way the form shows them.
+    static let bodyKeys: [String] = [
+        "reader.fontFamily", "reader.fontSize", "reader.lineSpacing", "reader.letterSpacing",
+        "reader.paragraphSpacing", "reader.paragraphIndent", "reader.pagePadding"
+    ]
+    static let headingKeys: [String] = [
+        "reader.titleSpacing", "reader.chapterTitleSize", "reader.chapterTitleBold",
+        "reader.chapterTitleFamily", "reader.chapterDecoration", "reader.chapterAlignment",
+        "reader.chapterHeadingStyle"
+    ]
+    static let chromeKeys: [String] = [
+        "reader.headerFontSize", "reader.headerTopGap", "reader.headerOpacity",
+        "reader.footerHeight", "reader.footerShowTime", "reader.footerShowBatteryIcon",
+        "reader.footerShowBatteryPercent"
+    ]
+    static let surfaceKeys: [String] = [
+        "reader.background", "reader.customWallpaperFillMode", "reader.menuSurfaceStyle",
+        "reader.menuPaperOpacity", "reader.menuUsesWallpaper"
+    ]
+    static let appearanceKeys: [String] = bodyKeys + headingKeys + chromeKeys + surfaceKeys
+
     static func capture(_ defaults: UserDefaults) throws -> Self {
         var values = Self.defaults
         for (key, fallback) in Self.defaults {

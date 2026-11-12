@@ -1,378 +1,225 @@
-name: iOS
-run-name: "SourceRead 1.1.8 · Build 138 · iOS 完整验证 · #${{ github.run_number }}"
-
-concurrency:
-  group: ios-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
-
+name: Reader Failure Diagnostics
+run-name: "SourceRead 1.1.8 · Build 138 · 关键失败定向验证（非 IPA 门禁） · #${{ github.run_number }}"
 on:
   workflow_dispatch:
     inputs:
-      reader_settings_only:
-        description: Run the real reader settings UI reproduction without packaging
+      navigation_only:
+        description: Compare return input and in-app readiness on sequential runtime runners
+        type: boolean
+        default: true
+      ios26_only:
+        description: Limit a runtime-specific reproduction to iOS 26 without changing release gates
         type: boolean
         default: false
-      full_tests_only:
-        description: Run only the simulator build and full XCTest job
+      zoom_experiment:
+        description: Run only the three-condition Zoom experiment and independent WebKit positioning regression
         type: boolean
         default: false
-  push:
-    branches:
-      - main
-      - feat/**
-      - native/**
-      - develop
-  pull_request:
-    branches:
-      - main
-      - develop
-
+      unit_only:
+        description: Diagnose transport and theme changes without repeating already-passed UI flows
+        type: boolean
+        default: true
+concurrency:
+  group: reader-diagnostics-${{ github.ref }}
+  cancel-in-progress: false
 jobs:
-  native-tabs:
-    if: github.ref != 'refs/heads/codex/floating-reading-desk' && !inputs.full_tests_only
-    runs-on: ${{ (github.ref == 'refs/heads/codex/reader-motion-117' || inputs.reader_settings_only) && 'macos-26-intel' || 'macos-26' }}
-    timeout-minutes: 60
+  focused-ios26:
+    strategy:
+      fail-fast: false
+      max-parallel: 1
+      matrix:
+        runtime: ${{ inputs.navigation_only && !inputs.ios26_only && fromJSON('["26", "18"]') || fromJSON('["26"]') }}
+    runs-on: ${{ matrix.runtime == '26' && 'macos-26' || 'macos-15' }}
+    timeout-minutes: 65
     env:
-      DEVELOPER_DIR: /Applications/Xcode_26.2.app/Contents/Developer
+      DEVELOPER_DIR: ${{ matrix.runtime == '26' && '/Applications/Xcode_26.2.app/Contents/Developer' || '/Applications/Xcode_16.4.app/Contents/Developer' }}
+      DIAGNOSTIC_RUNTIME: ${{ matrix.runtime }}
     steps:
       - uses: actions/checkout@v5
-      - run: brew install xcodegen
-      - run: xcodegen generate
-      - name: Boot iOS26 simulator
-        timeout-minutes: 25
+      - name: Generate project
+        run: |
+          brew install xcodegen
+          if [ "${{ inputs.zoom_experiment }}" = "true" ]; then
+            cp scripts/fixtures/ReaderZoomExperimentUITests.swift SourceReadSwiftUITests/
+          fi
+          xcodegen generate
+      - name: Boot diagnostic simulator
+        timeout-minutes: 20
         run: |
           set -euo pipefail
-          RUNTIME_ID="$(xcrun simctl list runtimes -j | python3 -c 'import json,sys; print(next(r["identifier"] for r in json.load(sys.stdin)["runtimes"] if r.get("isAvailable") and r["version"].startswith("26.")))')"
-          python3 -u scripts/boot_native_simulator.py "$RUNTIME_ID" --output native-device-id.txt 2>&1 | tee native-boot.log
-      - name: Build iOS26 tests
-        id: native-build
-        timeout-minutes: 35
+          RUNTIME_ID="$(xcrun simctl list runtimes -j | python3 -c 'import json,sys,os; print(next(r["identifier"] for r in json.load(sys.stdin)["runtimes"] if r.get("isAvailable") and r["version"].startswith(os.environ["DIAGNOSTIC_RUNTIME"]+".")))')"
+          python3 -u scripts/boot_native_simulator.py "$RUNTIME_ID" --output diagnostic-device.txt 2>&1 | tee diagnostic-boot.log
+      - name: Compile app and tests
+        id: build
+        timeout-minutes: 20
         run: |
           set -euo pipefail
-          DEVICE_ID="$(cat native-device-id.txt)"
-          xcodebuild -project SourceReadSwift.xcodeproj -scheme SourceReadSwift \
-            -destination "id=$DEVICE_ID" CODE_SIGNING_ALLOWED=NO \
-            -parallel-testing-enabled NO build-for-testing 2>&1 | tee native-build.log
-      - name: iOS26 native tab runtime regression
-        if: ${{ !inputs.reader_settings_only }}
-        timeout-minutes: 15
+          DEVICE_ID="$(cat diagnostic-device.txt)"
+          xcodebuild -project SourceReadSwift.xcodeproj -scheme SourceReadSwift -destination "id=$DEVICE_ID" CODE_SIGNING_ALLOWED=NO -parallel-testing-enabled NO build-for-testing 2>&1 | tee diagnostic-build.log
+      - name: Verify transport focus and return policies
+        if: ${{ !inputs.navigation_only && !inputs.zoom_experiment }}
+        timeout-minutes: 8
         env:
           TEST_RUNNER_SOURCE_READ_COMIC_DIAGNOSTICS: "1"
         run: |
           set -euo pipefail
-          DEVICE_ID="$(cat native-device-id.txt)"
-          xcodebuild -project SourceReadSwift.xcodeproj -scheme SourceReadSwift \
-            -destination "id=$DEVICE_ID" CODE_SIGNING_ALLOWED=NO \
-            -parallel-testing-enabled NO -only-testing:SourceReadSwiftTests/TabChromeRegressionTests \
-            -only-testing:SourceReadSwiftTests/ReaderCoverTeardownTests \
-            -only-testing:SourceReadSwiftTests/AppLayoutDensityTests \
-            -only-testing:SourceReadSwiftTests/SourceOrganizationTests \
-            -only-testing:SourceReadSwiftTests/AggregateSourceRegressionTests \
-            -only-testing:SourceReadSwiftTests/UXXAggregatePipelineTests \
-            -only-testing:SourceReadSwiftTests/AudioBookPlaybackCoordinatorTests \
-            -only-testing:SourceReadSwiftTests/CloudTTSCompletionTests \
-            -only-testing:SourceReadSwiftTests/LocalVoiceLibraryTests \
-            -only-testing:SourceReadSwiftTests/AsyncTimeoutTests \
-            -only-testing:SourceReadSwiftTests/ReaderPerformancePolicyTests \
-            -only-testing:SourceReadSwiftTests/ReaderBackgroundChapterPrecacheTests \
-            -only-testing:SourceReadSwiftTests/ReaderOpeningTransitionTests \
-            -only-testing:SourceReadSwiftTests/BookExportRegressionTests \
-            -only-testing:SourceReadSwiftTests/HomeLayoutEvidenceTests \
-            -only-testing:SourceReadSwiftTests/AtelierThemeTests \
-            -only-testing:SourceReadSwiftTests/SourcePipelineTests \
-            -only-testing:SourceReadSwiftTests/SourceProxyConfigurationTests \
-            -only-testing:SourceReadSwiftTests/HaiKuoShiJieSourceAdapterTests \
-            -only-testing:SourceReadSwiftTests/HuaHuoBookSourceAdapterTests \
-            -only-testing:SourceReadSwiftTests/ReadingStatsSummaryTests \
-            -only-testing:SourceReadSwiftTests/SourceStoreTests/testMixedFormatImportPreservesEverySourceAndItsRules \
-            -only-testing:SourceReadSwiftTests/SourceStoreTests/testHuaHuoComicLibraryImportAndReloadPreserveMediaAndSharedScripts \
-            -only-testing:SourceReadSwiftTests/SourcePublisherLinksTests \
-            -only-testing:SourceReadSwiftTests/SourceVariablePersistenceTests \
-            -only-testing:SourceReadSwiftTests/SourceRateLimiterTests \
-            -only-testing:SourceReadSwiftTests/CookieHeaderParserTests \
-            -only-testing:SourceReadSwiftTests/AppDataBackupTests \
-            -only-testing:SourceReadSwiftTests/WebDAVCredentialStoreTests \
-            -only-testing:SourceReadSwiftTests/WebDAVSyncServiceTests \
-            -only-testing:SourceReadSwiftTests/CloudTTSCredentialsTests \
-            -only-testing:SourceReadSwiftTests/RSSArticleStateStoreTests \
-            -only-testing:SourceReadSwiftTests/SourceImportDownloaderTests \
-            -only-testing:SourceReadSwiftTests/SourceRequestTransportTests \
-            -only-testing:SourceReadSwiftTests/SourceCookieStoreTests \
-            -only-testing:SourceReadSwiftTests/RSSCachePersistenceTests \
-            -only-testing:SourceReadSwiftTests/RSSFeedCacheStoreTests \
-            -only-testing:SourceReadSwiftTests/RSSArticleContentCacheStoreTests \
-            -only-testing:SourceReadSwiftTests/GlobalSearchIndexTests \
-            -only-testing:SourceReadSwiftTests/ShelfProjectionTests \
-            -only-testing:SourceReadSwiftTests/ScrollChromeGateTests \
-            -only-testing:SourceReadSwiftTests/ForestBrandThemeTests \
-            -only-testing:SourceReadSwiftTests/FloatingReadingDeskTests \
-            -only-testing:SourceReadSwiftTests/ReaderTocPerformanceTests \
-            -only-testing:SourceReadSwiftTests/Release111RegressionTests/testReaderColdTOCLookupReadsTheOrderedSnapshotAndHonorsInvalidation \
-            -only-testing:SourceReadSwiftTests/OrderedReadingPersistenceTests/testRepeatedBookDetailRefreshPublishesAndWritesOnlyTheChangedSnapshot \
-            -only-testing:SourceReadSwiftTests/ContentImagePipelineRegressionTests \
+          DEVICE_ID="$(cat diagnostic-device.txt)"
+          xcodebuild -project SourceReadSwift.xcodeproj -scheme SourceReadSwift -destination "id=$DEVICE_ID" CODE_SIGNING_ALLOWED=NO -parallel-testing-enabled NO \
             -only-testing:SourceReadSwiftTests/RemoteComicImageTests \
-            -only-testing:SourceReadSwiftTests/ComicOfflineArchiveTests \
-            -only-testing:SourceReadSwiftTests/ComicStripLayoutTests \
-            -only-testing:SourceReadSwiftTests/ComicZoomInteractionTests \
-            -only-testing:SourceReadSwiftTests/LocalComicBookParserTests \
-            -only-testing:SourceReadSwiftTests/BlockingRuleExecutorTests \
-            -only-testing:SourceReadSwiftTests/ComicReadingPositionTests \
-            -only-testing:SourceReadSwiftTests/ChapterDownloadStoreTests \
-            -only-testing:SourceReadSwiftTests/ComicContentParserTests \
-            -only-testing:SourceReadSwiftTests/SourceEngineStage18FixtureTests \
-            -only-testing:SourceReadSwiftTests/WebReaderDocumentTests \
-            -only-testing:SourceReadSwiftTests/AppFrameProfilerTests \
+            -only-testing:SourceReadSwiftTests/AtelierThemeTests \
+            -only-testing:SourceReadSwiftTests/HomeLayoutEvidenceTests \
             -only-testing:SourceReadSwiftTests/Release116VisualTests \
-            -only-testing:SourceReadSwiftTests/ReaderModePositionRegressionTests \
-            -only-testing:SourceReadSwiftTests/ReaderPageHostingTests \
-            -only-testing:SourceReadSwiftTests/Release117DetailTests \
-            -only-testing:SourceReadSwiftTests/Release117ComicCompatibilityTests \
+            -only-testing:SourceReadSwiftTests/ReaderOpeningTransitionTests \
             -only-testing:SourceReadSwiftTests/Release117AppearanceTests \
-            -only-testing:SourceReadSwiftTests/Release117SearchProjectionTests \
-            -only-testing:SourceReadSwiftTests/Release117ChromeTests \
-            -only-testing:SourceReadSwiftTests/WebsiteSourceInferenceTests \
-            -only-testing:SourceReadSwiftTests/WebsiteSourceFamilyInferenceTests \
-            -only-testing:SourceReadSwiftTests/AIChatTests \
-            -only-testing:SourceReadSwiftTests/Release117PurificationTests \
-            -only-testing:SourceReadSwiftTests/PurifyRuleStoreTests \
-            -only-testing:SourceReadSwiftTests/VideoContentParserTests \
-            -only-testing:SourceReadSwiftTests/RuleEditorValidatorTests \
-            -only-testing:SourceReadSwiftTests/ContentParserTests \
-            -only-testing:SourceReadSwiftTests/LANWorkbenchTests \
-            -only-testing:SourceReadSwiftTests/ReadingNotesNavigationTests \
-            -only-testing:SourceReadSwiftTests/Release117ThemeCollaborationTests \
-            -only-testing:SourceReadSwiftTests/Release117ReaderPersonalizationTests \
-            -only-testing:SourceReadSwiftTests/Release117WallpaperEditorTests \
-            -only-testing:SourceReadSwiftTests/Release117ReadingHeroTests \
             -only-testing:SourceReadSwiftTests/Release117MotionSystemTests \
-            -only-testing:SourceReadSwiftTests/Release117PolishTests \
-            -only-testing:SourceReadSwiftTests/ReaderSettingsStackTests \
-            -only-testing:SourceReadSwiftTests/FontImportRequestTests \
-            -only-testing:SourceReadSwiftTests/ReaderScrollCadenceTests \
-            -only-testing:SourceReadSwiftTests/ReaderBindingTests \
-            -only-testing:SourceReadSwiftTests/ReaderWorkbenchVisualTests \
-            -only-testing:SourceReadSwiftTests/ReaderControlsMaterialTests \
-            -only-testing:SourceReadSwiftTests/ReaderTabChromeExitTests \
+            -only-testing:SourceReadSwiftTests/Release117ThemeCollaborationTests \
+            -only-testing:SourceReadSwiftTests/Release117DetailTests \
             -only-testing:SourceReadSwiftTests/ReaderExitSwipeTests \
-            -only-testing:SourceReadSwiftTests/ReaderPanController119Tests \
-            -destination-timeout 120 -test-timeouts-enabled YES -maximum-test-execution-time-allowance 120 \
-            -resultBundlePath NativeTabResults.xcresult test-without-building 2>&1 | tee native-tab-test.log
-      - name: Preserve iOS26 unit log before UI flows
-        if: ${{ always() && steps.native-build.outcome == 'success' && !inputs.reader_settings_only }}
-        uses: actions/upload-artifact@v4
-        with:
-          name: ios26-unit-log-${{ github.sha }}-attempt${{ github.run_attempt }}
-          path: native-tab-test.log
-          if-no-files-found: error
-          retention-days: 7
-      - name: Exercise real reader settings UI on iOS26
-        if: ${{ !cancelled() && steps.native-build.outcome == 'success' }}
-        timeout-minutes: 15
-        run: |
-          set -euo pipefail
-          DEVICE_ID="$(cat native-device-id.txt)"
-          xcodebuild -project SourceReadSwift.xcodeproj -scheme SourceReadSwift \
-            -destination "id=$DEVICE_ID" CODE_SIGNING_ALLOWED=NO \
-            -parallel-testing-enabled NO -only-testing:SourceReadSwiftUITests/ReaderSettingsFlowUITests \
-            -only-testing:SourceReadSwiftUITests/ComicReaderFlowUITests \
-            -only-testing:SourceReadSwiftUITests/FloatingReadingDeskUITests/testContinueRestoresTheSavedParagraphInTheRealWebView \
-            -destination-timeout 120 -test-timeouts-enabled YES -maximum-test-execution-time-allowance 180 \
-            -resultBundlePath NativeReaderUIResults.xcresult test-without-building 2>&1 | tee native-reader-ui-test.log
-      - name: Preserve iOS26 settings log before continuity
-        if: ${{ always() && steps.native-build.outcome == 'success' }}
-        uses: actions/upload-artifact@v4
-        with:
-          name: ios26-settings-log-${{ github.sha }}-attempt${{ github.run_attempt }}
-          path: native-reader-ui-test.log
-          if-no-files-found: error
-          retention-days: 7
-      - name: Exercise reader chapter continuity on iOS26
-        if: ${{ !cancelled() && steps.native-build.outcome == 'success' }}
+            -only-testing:SourceReadSwiftTests/GlobalSearchIndexTests \
+            -test-timeouts-enabled YES -maximum-test-execution-time-allowance 60 \
+            -resultBundlePath DiagnosticUnit.xcresult test-without-building 2>&1 | tee diagnostic-unit.log
+      - name: Verify native reader hosting and export round trips
+        if: ${{ !cancelled() && steps.build.outcome == 'success' && inputs.navigation_only && !inputs.zoom_experiment }}
+        # 13 unit classes, including 38 theme snapshot renders; 8 min was not enough headroom.
         timeout-minutes: 12
         run: |
           set -euo pipefail
-          DEVICE_ID="$(cat native-device-id.txt)"
-          xcodebuild -project SourceReadSwift.xcodeproj -scheme SourceReadSwift \
-            -destination "id=$DEVICE_ID" CODE_SIGNING_ALLOWED=NO \
-            -parallel-testing-enabled NO \
-            -only-testing:SourceReadSwiftUITests/ComicPagingBoundaryUITests \
-            -only-testing:SourceReadSwiftUITests/FloatingReadingDeskUITests/testCollapsedShelfFiltersPreserveQueryAndThemeLayoutsHaveRealEntries \
-            -only-testing:SourceReadSwiftUITests/FloatingReadingDeskUITests/testHomeGlobalSearchOnlyFindsAppFunctions \
-            -only-testing:SourceReadSwiftUITests/FloatingReadingDeskUITests/testDiscoverStartsWithoutAResultsHeadingAndUsesACompactMatchControl \
-            -only-testing:SourceReadSwiftUITests/FloatingReadingDeskUITests/testReadingDeskLongPressOffersTheSameBookActionsWithoutActivatingReader \
-            -only-testing:SourceReadSwiftUITests/FloatingReadingDeskUITests/testContinuousChapterCrossingKeepsProseHeadingAndReopenedPositionTogether \
-            -destination-timeout 120 -test-timeouts-enabled YES -maximum-test-execution-time-allowance 180 \
-            -resultBundlePath NativeReaderContinuityResults.xcresult test-without-building 2>&1 | tee native-reader-continuity-test.log
-      - name: Preserve iOS26 continuity log before gestures
-        if: ${{ always() && steps.native-build.outcome == 'success' }}
+          DEVICE_ID="$(cat diagnostic-device.txt)"
+          xcodebuild -project SourceReadSwift.xcodeproj -scheme SourceReadSwift -destination "id=$DEVICE_ID" CODE_SIGNING_ALLOWED=NO -parallel-testing-enabled NO \
+            -only-testing:SourceReadSwiftTests/ReaderNavigationSessionTests \
+            -only-testing:SourceReadSwiftTests/ReaderNativeNavigationTests \
+            -only-testing:SourceReadSwiftTests/ReaderSafeAreaResolverTests \
+            -only-testing:SourceReadSwiftTests/ReaderCompatibilityNavigationTests \
+            -only-testing:SourceReadSwiftTests/ReaderModePositionRegressionTests \
+            -only-testing:SourceReadSwiftTests/ReaderZoomSourceTests \
+            -only-testing:SourceReadSwiftTests/ReaderOpeningTransitionTests \
+            -only-testing:SourceReadSwiftTests/BookExportRegressionTests \
+            -only-testing:SourceReadSwiftTests/LocalEPUBBookParserTests \
+            -only-testing:SourceReadSwiftTests/ChapterFetchConcurrencyTests \
+            -only-testing:SourceReadSwiftTests/OfflineTextRetentionTests \
+            -only-testing:SourceReadSwiftTests/AtelierThemeTests \
+            -only-testing:SourceReadSwiftTests/VideoGlassThemeTests \
+            -only-testing:SourceReadSwiftTests/ReaderSettingsPageTests \
+            -only-testing:SourceReadSwiftTests/TxtChapterRuleLibraryTests \
+            -only-testing:SourceReadSwiftTests/SourceCookieStoreTests \
+            -only-testing:SourceReadSwiftTests/Release116VisualTests/testThemesChangeGeometryTypographyAndSurfaceNotOnlyAccent \
+            -only-testing:SourceReadSwiftTests/Release116VisualTests/testNewThemeDefaultAccentContrastInBothAppearances \
+            -test-timeouts-enabled YES -maximum-test-execution-time-allowance 60 \
+            -resultBundlePath DiagnosticUnit.xcresult test-without-building 2>&1 | tee diagnostic-unit.log
+      - name: Publish unit feedback before UI
+        if: ${{ always() && steps.build.outcome == 'success' && !inputs.zoom_experiment }}
         uses: actions/upload-artifact@v4
         with:
-          name: ios26-continuity-log-${{ github.sha }}-attempt${{ github.run_attempt }}
-          path: native-reader-continuity-test.log
+          name: reader-diag-unit-${{ github.sha }}-ios${{ matrix.runtime }}-attempt${{ github.run_attempt }}
+          path: diagnostic-unit.log
           if-no-files-found: error
           retention-days: 7
-      - name: Exercise reader return gestures on iOS26
-        if: ${{ !cancelled() && steps.native-build.outcome == 'success' }}
-        timeout-minutes: 8
+      - name: Verify the failed real navigation paths
+        if: ${{ !cancelled() && steps.build.outcome == 'success' && !inputs.unit_only && !inputs.navigation_only && !inputs.zoom_experiment }}
+        timeout-minutes: 12
         run: |
           set -euo pipefail
-          DEVICE_ID="$(cat native-device-id.txt)"
-          xcodebuild -project SourceReadSwift.xcodeproj -scheme SourceReadSwift \
-            -destination "id=$DEVICE_ID" CODE_SIGNING_ALLOWED=NO \
-            -parallel-testing-enabled NO \
+          DEVICE_ID="$(cat diagnostic-device.txt)"
+          xcodebuild -project SourceReadSwift.xcodeproj -scheme SourceReadSwift -destination "id=$DEVICE_ID" CODE_SIGNING_ALLOWED=NO -parallel-testing-enabled NO \
+            -only-testing:SourceReadSwiftUITests/FloatingReadingDeskUITests/testHomeGlobalSearchOnlyFindsAppFunctions \
+            -only-testing:SourceReadSwiftUITests/FloatingReadingDeskUITests/testFirstDetailEdgeReturnRestoresInteractiveHomeAndOnlyOneTabBar \
+            -only-testing:SourceReadSwiftUITests/FloatingReadingDeskUITests/testFirstReadingOpensProseAndLaterResumesDirectly \
+            -only-testing:SourceReadSwiftUITests/FloatingReadingDeskUITests/testCollapsedShelfFiltersPreserveQueryAndThemeLayoutsHaveRealEntries \
+            -only-testing:SourceReadSwiftUITests/ReaderSettingsFlowUITests/testSearchPreviewOpensDirectlyAndOffersToKeepReadingPositionOnExit \
+            -only-testing:SourceReadSwiftUITests/FloatingReadingDeskUITests/testReaderLongEdgeReturnCompletesWithReducedMotion \
             -only-testing:SourceReadSwiftUITests/FloatingReadingDeskUITests/testReaderSystemReturnCanCancelWithoutLosingItsSavedParagraph \
             -only-testing:SourceReadSwiftUITests/FloatingReadingDeskUITests/testReaderSystemReturnCanCancelWithReducedMotion \
-            -only-testing:SourceReadSwiftUITests/FloatingReadingDeskUITests/testReaderLongEdgeReturnCompletesWithReducedMotion \
-            -only-testing:SourceReadSwiftUITests/FloatingReadingDeskUITests/testFirstDetailEdgeReturnRestoresInteractiveHomeAndOnlyOneTabBar \
-            -destination-timeout 120 -test-timeouts-enabled YES -maximum-test-execution-time-allowance 180 \
-            -resultBundlePath NativeReaderGestureResults.xcresult test-without-building 2>&1 | tee native-reader-gesture-test.log
-      - name: Export iOS26 attachments
-        if: always()
-        run: |
-          if [ -d NativeTabResults.xcresult ]; then
-            xcrun xcresulttool export attachments --path NativeTabResults.xcresult --output-path native-ui-snapshots/unit
-          fi
-          if [ -d NativeReaderUIResults.xcresult ]; then
-            xcrun xcresulttool export attachments --path NativeReaderUIResults.xcresult --output-path native-ui-snapshots/reader
-          fi
-          if [ -d NativeReaderContinuityResults.xcresult ]; then
-            xcrun xcresulttool export attachments --path NativeReaderContinuityResults.xcresult --output-path native-ui-snapshots/continuity
-          fi
-          if [ -d NativeReaderGestureResults.xcresult ]; then
-            xcrun xcresulttool export attachments --path NativeReaderGestureResults.xcresult --output-path native-ui-snapshots/gestures
-          fi
-      - name: Preserve iOS26 runtime evidence
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: ios26-tab-evidence-${{ github.sha }}-attempt${{ github.run_attempt }}
-          path: |
-            native-tab-test.log
-            native-build.log
-            native-reader-ui-test.log
-            native-reader-continuity-test.log
-            native-reader-gesture-test.log
-            native-boot.log
-            NativeTabResults.xcresult
-            NativeReaderUIResults.xcresult
-            NativeReaderContinuityResults.xcresult
-            NativeReaderGestureResults.xcresult
-            native-ui-snapshots
-          retention-days: 7
-      - name: Preserve compact iOS26 UI snapshots
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: ios26-ui-snapshots-${{ github.sha }}-attempt${{ github.run_attempt }}
-          path: native-ui-snapshots
-          if-no-files-found: ignore
-          retention-days: 7
-  build:
-    if: github.ref != 'refs/heads/codex/floating-reading-desk'
-    runs-on: ${{ (github.ref == 'refs/heads/codex/reader-motion-117' || inputs.reader_settings_only) && 'macos-15-intel' || 'macos-15' }}
-    timeout-minutes: 60
-    steps:
-      - uses: actions/checkout@v5
-
-      - name: Install XcodeGen
-        run: brew install xcodegen
-
-      - name: Generate project
-        run: xcodegen generate
-
-      - name: Build
-        run: |
-          set -o pipefail
-          xcodebuild \
-            -project SourceReadSwift.xcodeproj \
-            -scheme SourceReadSwift \
-            -destination 'generic/platform=iOS Simulator' \
-            CODE_SIGNING_ALLOWED=NO \
-            build 2>&1 | tee xcodebuild-build.log
-
-      - name: Summarize build failure
-        if: failure()
-        run: |
-          if [ -f xcodebuild-build.log ]; then
-            grep -E "error:|fatal error:" xcodebuild-build.log | tail -n 80 | while IFS= read -r line; do
-              echo "::error::$line"
-            done
-            tail -n 220 xcodebuild-build.log
-          fi
-
-      - name: Test
-        env:
-          TEST_RUNNER_COMIC_CORPUS_PROBE: "1"
-          TEST_RUNNER_SOURCE_READ_COMIC_DIAGNOSTICS: "1"
+            -only-testing:SourceReadSwiftUITests/FloatingReadingDeskUITests/testContinuousChapterCrossingKeepsProseHeadingAndReopenedPositionTogether \
+            -only-testing:SourceReadSwiftUITests/ComicPagingBoundaryUITests \
+            -test-timeouts-enabled YES -maximum-test-execution-time-allowance 180 \
+            -resultBundlePath DiagnosticUI.xcresult test-without-building 2>&1 | tee diagnostic-ui.log
+      - name: Compare native cancellation and measured home readiness
+        if: ${{ !cancelled() && steps.build.outcome == 'success' && inputs.navigation_only && !inputs.zoom_experiment }}
+        # 12 real UI cases measured 630 s on iOS 26; a 10 min cap killed the run mid-case.
+        timeout-minutes: 24
         run: |
           set -euo pipefail
-          DEVICE_ID="$(xcrun simctl list devices available | awk -F '[()]' '/iPhone/ {print $2; exit}')"
-          if [ -z "$DEVICE_ID" ]; then
-            echo "No available iPhone simulator found"
-            xcrun simctl list devices available
-            exit 1
-          fi
-          TEST_SELECTION=(-only-testing:SourceReadSwiftTests -only-testing:SourceReadSwiftUITests)
-          if [ "${{ inputs.reader_settings_only }}" = "true" ]; then
-            TEST_SELECTION=(-only-testing:SourceReadSwiftUITests/ReaderSettingsFlowUITests)
-          fi
-          xcrun simctl bootstatus "$DEVICE_ID" -b
-          xcrun simctl spawn "$DEVICE_ID" log stream --level info --style compact \
-            --predicate 'subsystem == "com.edc21.SourceReadSwift.book-passage"' > reader-startup.log 2>&1 &
-          LOG_PID=$!
-          trap 'kill "$LOG_PID" 2>/dev/null || true; wait "$LOG_PID" || true' EXIT
-          xcodebuild \
-            -project SourceReadSwift.xcodeproj \
-            -scheme SourceReadSwift \
-            -destination "id=$DEVICE_ID" \
-            CODE_SIGNING_ALLOWED=NO \
-            -parallel-testing-enabled NO \
-            "${TEST_SELECTION[@]}" \
-            -resultBundlePath TestResults.xcresult \
-            test 2>&1 | tee xcodebuild-test.log
-      - name: Export test attachments
-        if: always()
+          DEVICE_ID="$(cat diagnostic-device.txt)"
+          xcodebuild -project SourceReadSwift.xcodeproj -scheme SourceReadSwift -destination "id=$DEVICE_ID" CODE_SIGNING_ALLOWED=NO -parallel-testing-enabled NO \
+            -only-testing:SourceReadSwiftUITests/FloatingReadingDeskUITests/testReaderSystemReturnCanCancelWithoutLosingItsSavedParagraph \
+            -only-testing:SourceReadSwiftUITests/FloatingReadingDeskUITests/testReaderFastNativeReturnCompletesFromProse \
+            -only-testing:SourceReadSwiftUITests/FloatingReadingDeskUITests/testReaderShortDefaultSpeedEdgeDragCancels \
+            -only-testing:SourceReadSwiftUITests/FloatingReadingDeskUITests/testNativeReturnCancellationWithImmediateSlowDrag \
+            -only-testing:SourceReadSwiftUITests/FloatingReadingDeskUITests/testNativeReturnCancellationWithImmediateDefaultDrag \
+            -only-testing:SourceReadSwiftUITests/FloatingReadingDeskUITests/testNativeReturnCancellationWithLongerSubthresholdDrag \
+            -only-testing:SourceReadSwiftUITests/FloatingReadingDeskUITests/testFirstDetailEdgeReturnRestoresInteractiveHomeAndOnlyOneTabBar \
+            -only-testing:SourceReadSwiftUITests/ReaderSettingsFlowUITests/testBindingsAndAssistanceReturnToSettingsNotTheBookshelf \
+            -only-testing:SourceReadSwiftUITests/FloatingReadingDeskUITests/testContinueRestoresTheSavedParagraphInTheRealWebView \
+            -only-testing:SourceReadSwiftUITests/FloatingReadingDeskUITests/testReopeningTheSameBookReusesTheParkedDocumentInTheRealApp \
+            -only-testing:SourceReadSwiftUITests/FloatingReadingDeskUITests/testDetailCoverSourceSurvivesRepeatedReaderRoundTrips \
+            -test-timeouts-enabled YES -maximum-test-execution-time-allowance 180 \
+            -resultBundlePath DiagnosticUI.xcresult test-without-building 2>&1 | tee diagnostic-ui.log
+      - name: Reproduce repeated native cancellation on iOS26
+        if: ${{ !cancelled() && steps.build.outcome == 'success' && inputs.navigation_only && matrix.runtime == '26' && !inputs.zoom_experiment }}
+        timeout-minutes: 18
         run: |
-          if [ -d TestResults.xcresult ]; then
-            xcrun xcresulttool export attachments --path TestResults.xcresult --output-path ui-snapshots
-          fi
-
-      - name: Summarize test failure
-        if: failure()
+          set -euo pipefail
+          DEVICE_ID="$(cat diagnostic-device.txt)"
+          xcodebuild -project SourceReadSwift.xcodeproj -scheme SourceReadSwift -destination "id=$DEVICE_ID" CODE_SIGNING_ALLOWED=NO -parallel-testing-enabled NO \
+            -only-testing:SourceReadSwiftUITests/ReaderOverlayCycleUITests \
+            -test-timeouts-enabled YES -maximum-test-execution-time-allowance 900 \
+            -resultBundlePath DiagnosticCycles.xcresult test-without-building 2>&1 | tee diagnostic-cycles.log
+      - name: Verify real viewport positioning independently
+        if: ${{ !cancelled() && steps.build.outcome == 'success' && inputs.zoom_experiment }}
+        timeout-minutes: 6
         run: |
-          if [ -f xcodebuild-test.log ]; then
-            grep -E "error:|fatal error:|failed:" xcodebuild-test.log | tail -n 80 | while IFS= read -r line; do
-              echo "::error::$line"
-            done
-            tail -n 220 xcodebuild-test.log
-          fi
-
-      - name: Summarize test run
-        if: success()
-        run: |
-          echo "## iOS XCTest" >> "$GITHUB_STEP_SUMMARY"
-          echo "- simulator build and XCTest completed successfully" >> "$GITHUB_STEP_SUMMARY"
-          if [ -f xcodebuild-test.log ]; then
-            grep -E "Test Suite|Executed [0-9]+ tests" xcodebuild-test.log | tail -n 12 >> "$GITHUB_STEP_SUMMARY" || true
-          fi
-
-      - name: Preserve native test evidence
-        if: always()
+          set -euo pipefail
+          DEVICE_ID="$(cat diagnostic-device.txt)"
+          xcodebuild -project SourceReadSwift.xcodeproj -scheme SourceReadSwift -destination "id=$DEVICE_ID" CODE_SIGNING_ALLOWED=NO -parallel-testing-enabled NO \
+            -only-testing:SourceReadSwiftTests/ReaderModePositionRegressionTests/testOpeningWaitsForTheResolvedCursorBeforeMountingAndPresenting \
+            -only-testing:SourceReadSwiftTests/ReaderModePositionRegressionTests/testPrefetchBeforeFirstRenderAcknowledgementCannotStrandOpening \
+            -test-timeouts-enabled YES -maximum-test-execution-time-allowance 90 \
+            -resultBundlePath DiagnosticUnit.xcresult test-without-building 2>&1 | tee diagnostic-unit.log
+      - name: Preserve independent viewport result before gesture experiment
+        if: ${{ always() && steps.build.outcome == 'success' && inputs.zoom_experiment }}
         uses: actions/upload-artifact@v4
         with:
-          name: ios-test-evidence-${{ github.sha }}
-          path: |
-            xcodebuild-build.log
-            xcodebuild-test.log
-            reader-startup.log
-            TestResults.xcresult
-            ui-snapshots
+          name: reader-diag-unit-${{ github.sha }}-ios${{ matrix.runtime }}-attempt${{ github.run_attempt }}
+          path: diagnostic-unit.log
+          if-no-files-found: error
           retention-days: 7
-      - name: Preserve compact UI snapshots
+      - name: Compare four edge-input scopes on the production WebKit page
+        if: ${{ !cancelled() && steps.build.outcome == 'success' && inputs.zoom_experiment }}
+        timeout-minutes: 55
+        run: |
+          set -euo pipefail
+          DEVICE_ID="$(cat diagnostic-device.txt)"
+          xcodebuild -project SourceReadSwift.xcodeproj -scheme SourceReadSwift -destination "id=$DEVICE_ID" CODE_SIGNING_ALLOWED=NO -parallel-testing-enabled NO \
+            -only-testing:SourceReadSwiftUITests/ReaderZoomExperimentUITests \
+            -test-timeouts-enabled YES -maximum-test-execution-time-allowance 1800 \
+            -resultBundlePath DiagnosticCycles.xcresult test-without-building 2>&1 | tee diagnostic-cycles.log
+      - name: Export diagnostic attachments
+        if: always()
+        run: |
+          if [ -d DiagnosticUnit.xcresult ]; then
+            xcrun xcresulttool export attachments --path DiagnosticUnit.xcresult --output-path diagnostic-snapshots/unit
+          fi
+          if [ -d DiagnosticUI.xcresult ]; then
+            xcrun xcresulttool export attachments --path DiagnosticUI.xcresult --output-path diagnostic-snapshots/ui
+          fi
+          if [ -d DiagnosticCycles.xcresult ]; then
+            xcrun xcresulttool export attachments --path DiagnosticCycles.xcresult --output-path diagnostic-snapshots/cycles
+          fi
+      - name: Preserve diagnostic logs and results
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: ios-ui-snapshots-${{ github.sha }}
-          path: ui-snapshots
-          if-no-files-found: ignore
+          name: reader-diagnostics-${{ github.sha }}-ios${{ matrix.runtime }}-attempt${{ github.run_attempt }}
+          path: |
+            diagnostic-*.log
+            DiagnosticUnit.xcresult
+            DiagnosticUI.xcresult
+            DiagnosticCycles.xcresult
+          retention-days: 7
+      - name: Preserve compact visual evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios26-ui-snapshots-${{ github.sha }}-diagnostics-ios${{ matrix.runtime }}-attempt${{ github.run_attempt }}
+          path: diagnostic-snapshots
           retention-days: 7

@@ -41,6 +41,11 @@ struct SettingsView: View {
                         Label("字体管理与自定义导入", systemImage: "textformat")
                     }
                     NavigationLink {
+                        ReaderSettingsPage()
+                    } label: {
+                        Label("阅读排版", systemImage: "text.alignleft")
+                    }
+                    NavigationLink {
                         TTSSettingsView()
                     } label: {
                         Label("朗读引擎与云端凭据", systemImage: "waveform")
@@ -94,6 +99,12 @@ struct SettingsView: View {
                         PurifyRulesView()
                     } label: {
                         Label("净化规则", systemImage: "wand.and.stars")
+                    }
+
+                    NavigationLink {
+                        TxtChapterRulesView()
+                    } label: {
+                        Label("TXT 目录规则", systemImage: "list.bullet.rectangle")
                     }
 
                     NavigationLink {
@@ -455,10 +466,11 @@ struct ReadingHistoryView: View {
             } else {
                 ForEach(history) { item in
                     Button {
-                        appState.readerOverlay = ReaderOverlayRequest(book: item.asBookshelfBook)
+                        appState.readerNavigation.open(.shelf(item.asBookshelfBook, sourceID: "history|" + item.id))
                     } label: {
                         HStack(spacing: 12) {
                             AsyncBookCover(urlString: item.coverURL, width: 44, height: 60)
+                                .readerZoomSource("history|" + item.id)
                             VStack(alignment: .leading, spacing: 5) {
                                 HStack {
                                     Text(item.title)
@@ -761,7 +773,7 @@ struct ReadingStatsView: View {
                 if let mostReadBook = summary.mostReadBook {
                     Section("阅读最多") {
                         Button {
-                            appState.readerOverlay = ReaderOverlayRequest(book: mostReadBook)
+                            appState.readerNavigation.open(.shelf(mostReadBook))
                         } label: {
                             VStack(alignment: .leading, spacing: 6) {
                                 Text(mostReadBook.title)
@@ -779,7 +791,7 @@ struct ReadingStatsView: View {
                 Section("最近阅读") {
                     ForEach(summary.recentBooks) { book in
                         Button {
-                            appState.readerOverlay = ReaderOverlayRequest(book: book)
+                            appState.readerNavigation.open(.shelf(book))
                         } label: {
                             VStack(alignment: .leading, spacing: 5) {
                                 HStack {
