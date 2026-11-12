@@ -5,8 +5,10 @@ import XCTest
 final class Release117ThemeCollaborationTests: XCTestCase {
     func testSurfacePolicyUsesRuntimeCapabilitiesAndAccessibilityRatherThanThemeSelection() {
         for theme in AppVisualTheme.allCases {
-            XCTAssertEqual(AppThemeSurfaceStyle.resolve(theme: theme, nativeGlassAvailable: false, reduceTransparency: false, increasedContrast: false), [AppVisualTheme.classic, .forest].contains(theme) ? .legacyMaterial : .paper)
-            XCTAssertEqual(AppThemeSurfaceStyle.resolve(theme: theme, nativeGlassAvailable: true, reduceTransparency: false, increasedContrast: false), [AppVisualTheme.classic, .forest].contains(theme) ? .nativeGlass : .paper)
+            // Forest / classic / 视频玻璃 opt into live sampling; every other theme stays opaque paper.
+            let live = theme.supportsLiveGlass
+            XCTAssertEqual(AppThemeSurfaceStyle.resolve(theme: theme, nativeGlassAvailable: false, reduceTransparency: false, increasedContrast: false), live ? .legacyMaterial : .paper, theme.title)
+            XCTAssertEqual(AppThemeSurfaceStyle.resolve(theme: theme, nativeGlassAvailable: true, reduceTransparency: false, increasedContrast: false), live ? .nativeGlass : .paper, theme.title)
             XCTAssertEqual(AppThemeSurfaceStyle.resolve(theme: theme, nativeGlassAvailable: true, reduceTransparency: true, increasedContrast: false), .paper)
             XCTAssertEqual(AppThemeSurfaceStyle.resolve(theme: theme, nativeGlassAvailable: true, reduceTransparency: false, increasedContrast: true), .paper)
         }
