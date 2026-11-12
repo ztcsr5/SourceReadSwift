@@ -9,11 +9,11 @@ struct ReaderFrameHUD: View {
     var body: some View {
         if profiler.isRecording {
             HStack(spacing: 10) {
-                Text(String(format: "%.0f Hz", profiler.liveHertz))
+                Text(String(format: "回调 %.0f Hz", profiler.liveHertz))
                     .font(.system(size: 15, weight: .semibold, design: .monospaced))
                 Text(String(format: "p99 %.1f ms", profiler.liveP99Milliseconds))
                     .font(.system(size: 12, weight: .medium, design: .monospaced))
-                Text("请求 \(Int(AppRefreshRateKeeper.currentHeldRate)) / 上限 \(profiler.screenMaximumHertz)")
+                Text("上限 \(profiler.screenMaximumHertz) Hz")
                     .font(.system(size: 11, weight: .regular, design: .monospaced))
                     .opacity(0.7)
             }
