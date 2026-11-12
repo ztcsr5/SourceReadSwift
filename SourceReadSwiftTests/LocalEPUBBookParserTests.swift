@@ -3,6 +3,22 @@ import ZIPFoundation
 @testable import SourceReadSwift
 
 final class LocalEPUBBookParserTests: XCTestCase {
+    func testMetadataDecodesCharacterReferencesOnceWithoutLosingLiteralEntities() throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let url = root.appendingPathComponent("entities.epub")
+        let archive = try XCTUnwrap(Archive(url: url, accessMode: .create))
+        try add("META-INF/container.xml", text: #"<container><rootfiles><rootfile full-path="book.opf"/></rootfiles></container>"#, to: archive)
+        try add("book.opf", text: #"<package><metadata><dc:title>A &amp; B &amp;lt;literal&amp;gt; &#x5C71;</dc:title><dc:creator>作者 &#38; 合著者</dc:creator><dc:language>zh&#45;CN</dc:language><dc:publisher>湖 &amp; 山</dc:publisher></metadata><manifest><item id="body" href="body.xhtml" media-type="application/xhtml+xml"/></manifest><spine><itemref idref="body"/></spine></package>"#, to: archive)
+        try add("body.xhtml", text: "<html><body><p>正文</p></body></html>", to: archive)
+        let book = try LocalEPUBBookParser().parse(fileURL: url)
+        XCTAssertEqual(book.title, "A & B &lt;literal&gt; 山")
+        XCTAssertEqual(book.author, "作者 & 合著者")
+        XCTAssertEqual(book.language, "zh-CN")
+        XCTAssertEqual(book.publisher, "湖 & 山")
+    }
+
     func testParsesMinimalEPUB() throws {
         let root = FileManager.default.temporaryDirectory
             .appendingPathComponent(UUID().uuidString, isDirectory: true)
