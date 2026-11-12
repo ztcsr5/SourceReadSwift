@@ -53,5 +53,5 @@ class SourceTransportBoundaryTests(unittest.TestCase):
     def test_global_search_selection_explicitly_releases_keyboard_focus(self):
         source = (ROOT / "SourceReadSwift/Features/Search/GlobalSearchView.swift").read_text(encoding="utf8")
         link = source.split('private func resultLink', 1)[1].split('@ViewBuilder', 1)[0]
-        self.assertTrue('isFocused = false' in link)
+        self.assertIn('UIResponder.resignFirstResponder', link)
         self.assertTrue('selectedEntry = entry' in link)

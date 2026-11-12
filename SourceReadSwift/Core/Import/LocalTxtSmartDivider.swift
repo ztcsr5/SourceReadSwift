@@ -11,6 +11,10 @@ struct LocalTxtSmartDivider {
 
     var mode: DividerMode = .smartChinese
     var customRegexPattern: String? = nil
+    /// Ordered rule library. Rules run highest priority first and the first hit
+    /// wins; an empty list means "fall back to `mode`". This is additive: every
+    /// existing call site that only sets `mode` keeps byte-identical behaviour.
+    var ruleLibrary: TxtChapterRuleLibrary = .disabled
 
     func divide(data: Data, fileName: String) -> LocalTextBook {
         let text = ResponseTextDecoder().decode(data: data, headers: [:])
@@ -115,8 +119,14 @@ struct LocalTxtSmartDivider {
         var currentVolume: String? = nil
         var hasDetectedHeading = false
 
+        // A user rule library takes over the whole decision: mixing "user rules
+        // for chapters" with "built-in volume pre-pass" splits one book's
+        // headings across two different vocabularies and produces phantom
+        // volume prefixes the user never wrote.
+        let libraryOwnsHeadings = ruleLibrary.affectsImport
+
         for line in lines {
-            if isVolumeHeading(line) {
+            if !libraryOwnsHeadings, isVolumeHeading(line) {
                 // If there were pending paragraphs, flush them into previous chapter
                 if !currentParagraphs.isEmpty {
                     chapters.append((currentTitle, currentParagraphs))
@@ -203,6 +213,13 @@ struct LocalTxtSmartDivider {
         guard trimmed.count <= 60, !trimmed.isEmpty else { return false }
 
         let range = NSRange(trimmed.startIndex..<trimmed.endIndex, in: trimmed)
+
+        // Rule library wins over the built-in heuristics when it is enabled and
+        // at least one enabled rule exists: the user asked for those rules to
+        // decide, and a silent fallthrough would make "关闭某条规则" do nothing.
+        if let libraryAnswer = ruleLibrary.classify(trimmed) {
+            return libraryAnswer
+        }
 
         // Custom regex override if provided
         if case .custom(let pattern) = mode,
