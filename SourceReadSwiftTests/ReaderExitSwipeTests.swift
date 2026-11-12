@@ -5,6 +5,86 @@ import WebKit
 @testable import SourceReadSwift
 
 final class ReaderExitSwipeTests: XCTestCase {
+    /// The failure that kept the native Zoom from ever asking for permission:
+    /// WKScrollView's inner pan and WebKit's highlight long-press both began in
+    /// the same 20 ms window, 8/20 and 5/20 rounds respectively, while the system
+    /// edge gesture never ran. Both must wait for it; taps must not.
+    func testOnlyDragRecognizersWaitForTheSystemEdgeReturn() {
+        XCTAssertTrue(ReaderEdgeReturnGesturePolicy.shouldWaitForSystemEdge(UIPanGestureRecognizer()))
+        XCTAssertTrue(ReaderEdgeReturnGesturePolicy.shouldWaitForSystemEdge(UILongPressGestureRecognizer()))
+        XCTAssertFalse(ReaderEdgeReturnGesturePolicy.shouldWaitForSystemEdge(UITapGestureRecognizer()))
+        XCTAssertFalse(ReaderEdgeReturnGesturePolicy.shouldWaitForSystemEdge(UIScreenEdgePanGestureRecognizer()))
+    }
+
+    /// The recognizers that actually stole the edge drag live on `WKContentView`
+    /// and the inner pan, neither of which is attached to `WKScrollView`. The
+    /// traversal must reach them; a depth-0 walk would keep the 17/80 failure.
+    @MainActor func testDragRecognizerWalkReachesNestedWebKitHosts() {
+        let root = UIView(frame: CGRect(x: 0, y: 0, width: 320, height: 640))
+        let content = UIView(frame: root.bounds)
+        let deep = UIView(frame: root.bounds)
+        root.addSubview(content)
+        content.addSubview(deep)
+        let scrollPan = UIPanGestureRecognizer()
+        let innerPan = UIPanGestureRecognizer()
+        let highlight = UILongPressGestureRecognizer()
+        let tap = UITapGestureRecognizer()
+        root.addGestureRecognizer(scrollPan)
+        content.addGestureRecognizer(innerPan)
+        deep.addGestureRecognizer(highlight)
+        deep.addGestureRecognizer(tap)
+
+        let reached = ReaderEdgeReturnWebView.dragRecognizers(in: root)
+        XCTAssertTrue(reached.contains { $0 === scrollPan })
+        XCTAssertTrue(reached.contains { $0 === innerPan }, "The inner WebKit pan must be reachable")
+        XCTAssertTrue(reached.contains { $0 === highlight }, "The highlight long-press must be reachable")
+        XCTAssertTrue(reached.contains { $0 === tap })
+
+        let gated = reached.filter { ReaderEdgeReturnGesturePolicy.shouldWaitForSystemEdge($0) }
+        XCTAssertEqual(gated.count, 3, "Only drag-like recognizers may wait on the system edge")
+        XCTAssertFalse(gated.contains { $0 === tap })
+    }
+
+    /// 100 controlled rounds: every ignored edge drag had the selection
+    /// highlight begin; none of the working drags did. Disabling it is only
+    /// legal when the reader has text selection switched off.
+    @MainActor func testSelectionHighlightIsOnlyDisabledWhileSelectionIsOff() {
+        XCTAssertTrue(ReaderEdgeReturnWebView.disablesSelectionHighlight(
+            scope: .webKitSubtreeWithoutHighlight, allowsSelectionHighlight: false))
+        XCTAssertTrue(ReaderEdgeReturnWebView.disablesSelectionHighlight(
+            scope: .highlightDisabledOnly, allowsSelectionHighlight: false))
+        XCTAssertFalse(ReaderEdgeReturnWebView.disablesSelectionHighlight(
+            scope: .webKitSubtreeWithoutHighlight, allowsSelectionHighlight: true),
+            "Text selection owns this recognizer; a selection-enabled reader must keep it")
+        XCTAssertFalse(ReaderEdgeReturnWebView.disablesSelectionHighlight(
+            scope: .webKitSubtree, allowsSelectionHighlight: false))
+    }
+
+    /// Four-condition run (80 rounds): F and G each passed 20/20 while D kept
+    /// failing 6/20. Production therefore ships F: subtree gate + highlight off.
+    @MainActor func testProductionEdgeGateKeepsTheSubtreeGateAndDropsTheHighlight() {
+        XCTAssertEqual(ReaderEdgeReturnWebView.edgeGateScope, .webKitSubtreeWithoutHighlight)
+        XCTAssertTrue(ReaderEdgeReturnWebView.disablesSelectionHighlight(
+            scope: ReaderEdgeReturnWebView.edgeGateScope, allowsSelectionHighlight: false))
+    }
+
+    /// The walk runs from `layoutSubviews`, so it must stay bounded even if a
+    /// future WebKit revision nests deeply.
+    @MainActor func testDragRecognizerWalkIsBounded() {
+        let root = UIView()
+        var current = root
+        for _ in 0..<12 {
+            let child = UIView()
+            current.addSubview(child)
+            if let last = current.superview { _ = last }
+            current = child
+        }
+        let deepGesture = UIPanGestureRecognizer()
+        current.addGestureRecognizer(deepGesture)
+        let reached = ReaderEdgeReturnWebView.dragRecognizers(in: root, depthLimit: 2, nodeLimit: 8)
+        XCTAssertFalse(reached.contains { $0 === deepGesture }, "Beyond the depth limit the walk must stop")
+    }
+
     func testExitRequiresMenuAndNoSettingsOrCover() {
         XCTAssertTrue(ReaderExitSwipePolicy.isEnabled(menuVisible: true, settingsVisible: false, coverPresented: false))
         XCTAssertFalse(ReaderExitSwipePolicy.isEnabled(menuVisible: false, settingsVisible: false, coverPresented: false))
@@ -80,7 +160,8 @@ final class ReaderExitSwipeTests: XCTestCase {
         parent.view.addSubview(child)
         let pagePan = UIPanGestureRecognizer()
         child.addGestureRecognizer(pagePan)
-        XCTAssertTrue(controller.gestureRecognizer(controller.edgePan, shouldBeRequiredToFailBy: pagePan))
+        XCTAssertFalse(controller.gestureRecognizer(controller.edgePan, shouldBeRequiredToFailBy: pagePan),
+                       "The preserved legacy bridge no longer installs a global failure requirement")
         controller.configure(enabled: false, onExit: {})
         XCTAssertFalse(controller.edgePan.isEnabled)
         XCTAssertFalse(controller.gestureRecognizer(controller.edgePan, shouldBeRequiredToFailBy: pagePan))

@@ -103,8 +103,11 @@ class FloatingDeskScopeTests(unittest.TestCase):
         self.assertNotIn('"作者未记录"', module)
         jacket = (ROOT / 'SourceReadSwift/Features/Bookshelf/EditorialBookJacket.swift').read_text(encoding='utf8')
         self.assertIn('EditorialBookJacket(height: height, palette: palette, stance: .shelf)', module)
-        self.assertIn('rotation3DEffect(.degrees(stance == .shelf ? -9 : stance == .floating ? -12 : -5)', jacket)
-        self.assertIn('rotationEffect(.degrees(stance == .shelf ? -3 : stance == .floating ? -4 : -2))', jacket)
+        self.assertIn('if stance == .shelf {', jacket)
+        shelf = jacket.split('if stance == .shelf {', 1)[1].split('} else {', 1)[0]
+        self.assertNotIn('rotation3DEffect', shelf)
+        self.assertIn('rotation3DEffect(.degrees(stance == .floating ? -12 : -5)', jacket)
+        self.assertIn('rotationEffect(.degrees(stance == .floating ? -4 : -2))', jacket)
         self.assertIn('ReadingDeskContent.contextLine(for: book)', module)
         fixture = (ROOT / 'SourceReadSwift/App/FloatingDeskRegressionLaunch.swift').read_text(encoding='utf8')
         self.assertNotIn('离线验收样本', fixture)
