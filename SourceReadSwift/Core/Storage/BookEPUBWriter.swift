@@ -17,6 +17,7 @@ struct BookEPUBWriter {
         coverJPEG: Data?,
         totalChapterCount: Int
     ) throws -> BookArchiveExport {
+        try Task.checkCancellation()
         guard !chapters.isEmpty else { throw BookExportError.noContent }
         let ordered = chapters.enumerated().sorted {
             if $0.element.chapter.index != $1.element.chapter.index {
@@ -25,6 +26,13 @@ struct BookEPUBWriter {
             return $0.offset < $1.offset
         }.map(\.element)
         let url = temporaryURL(for: book)
+        var completed = false
+        defer {
+            if !completed, FileManager.default.fileExists(atPath: url.path) {
+                do { try FileManager.default.removeItem(at: url) }
+                catch { NSLog("Incomplete EPUB cleanup failed: %ld", (error as NSError).code) }
+            }
+        }
         guard let archive = Archive(url: url, accessMode: .create) else {
             throw BookExportError.archiveCreationFailed
         }
@@ -36,8 +44,9 @@ struct BookEPUBWriter {
 
         let identifier = "urn:uuid:\(UUID().uuidString.lowercased())"
         let modified = ISO8601DateFormatter().string(from: Date())
-        let files = ordered.enumerated().map { offset, chapter in
-            ChapterFile(
+        let files = try ordered.enumerated().map { offset, chapter in
+            try Task.checkCancellation()
+            return ChapterFile(
                 id: String(format: "chapter-%04d", offset + 1),
                 fileName: String(format: "chapter-%04d.xhtml", offset + 1),
                 title: chapter.title,
@@ -61,8 +70,10 @@ struct BookEPUBWriter {
             try addEntry("OEBPS/cover.xhtml", data: Data(coverXHTML(book: book).utf8), to: archive)
         }
         for file in files {
+            try Task.checkCancellation()
             try addEntry("OEBPS/\(file.fileName)", data: Data(file.xhtml.utf8), to: archive)
         }
+        completed = true
         return BookArchiveExport(url: url, format: .epub,
             exportedChapterCount: ordered.count,
             totalChapterCount: max(totalChapterCount, ordered.count))
@@ -218,6 +229,7 @@ struct BookEPUBWriter {
         try archive.addEntry(with: name, type: .file, uncompressedSize: Int64(data.count),
             compressionMethod: compression,
             provider: { position, size in
+                try Task.checkCancellation()
                 let start = Int(position)
                 let end = min(start + size, data.count)
                 guard start < end else { return Data() }

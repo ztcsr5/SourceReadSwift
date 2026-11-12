@@ -62,10 +62,11 @@ struct BookExportService: Sendable {
         coverJPEG: Data?,
         totalChapterCount: Int = 0
     ) throws -> BookArchiveExport {
+        try Task.checkCancellation()
         guard !cachedChapters.isEmpty else { throw BookExportError.noContent }
 
         let ordered = Self.ordered(cachedChapters)
-        let text = plainText(book: book, cachedChapters: ordered, includeIntro: true)
+        let text = try plainText(book: book, cachedChapters: ordered, includeIntro: true)
         guard let textData = text.data(using: .utf8) else { throw BookExportError.noContent }
 
         let metadata = BookArchiveMetadata(
@@ -89,7 +90,13 @@ struct BookExportService: Sendable {
 
         let tempURL = FileManager.default.temporaryDirectory
             .appendingPathComponent(Self.fileName(for: book))
-        try? FileManager.default.removeItem(at: tempURL)
+        var completed = false
+        defer {
+            if !completed, FileManager.default.fileExists(atPath: tempURL.path) {
+                do { try FileManager.default.removeItem(at: tempURL) }
+                catch { NSLog("Incomplete ZIP cleanup failed: %ld", (error as NSError).code) }
+            }
+        }
         guard let archive = Archive(url: tempURL, accessMode: .create) else {
             throw BookExportError.archiveCreationFailed
         }
@@ -99,6 +106,7 @@ struct BookExportService: Sendable {
         }
         try addEntry("metadata.json", data: metadataData, to: archive)
 
+        completed = true
         return BookArchiveExport(url: tempURL,
             exportedChapterCount: ordered.count,
             totalChapterCount: max(totalChapterCount, ordered.count))
@@ -109,10 +117,11 @@ struct BookExportService: Sendable {
         cachedChapters: [ChapterContent],
         includeIntro: Bool = true
     ) throws -> URL {
-        let output = plainText(book: book, cachedChapters: Self.ordered(cachedChapters),
+        let output = try plainText(book: book, cachedChapters: Self.ordered(cachedChapters),
             includeIntro: includeIntro)
         let fileName = Self.uniqueFileName(for: book, extension: "txt")
         let tempURL = FileManager.default.temporaryDirectory.appendingPathComponent(fileName)
+        try Task.checkCancellation()
         try output.write(to: tempURL, atomically: true, encoding: .utf8)
         return tempURL
     }
@@ -124,6 +133,7 @@ struct BookExportService: Sendable {
             uncompressedSize: Int64(data.count),
             compressionMethod: .deflate,
             provider: { position, size in
+                try Task.checkCancellation()
                 let start = Int(position)
                 let end = min(start + size, data.count)
                 guard start < end else { return Data() }
@@ -136,7 +146,8 @@ struct BookExportService: Sendable {
         book: BookshelfBook,
         cachedChapters: [ChapterContent],
         includeIntro: Bool
-    ) -> String {
+    ) throws -> String {
+        try Task.checkCancellation()
         var output = ""
 
         output += "《\(book.title)》\n"
@@ -157,6 +168,7 @@ struct BookExportService: Sendable {
             output += "（暂无已缓存章节正文内容）\n"
         } else {
             for chapter in cachedChapters {
+                try Task.checkCancellation()
                 let chapterTitle = chapter.title.trimmingCharacters(in: .whitespacesAndNewlines)
                 let number = max(0, min(chapter.chapter.index, Int.max - 1)) + 1
                 output += "第 \(number) 章 \(chapterTitle)\n\n"
