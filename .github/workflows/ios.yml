@@ -22,6 +22,7 @@ on:
       - feat/**
       - native/**
       - develop
+      - '!codex/reader-quality-137-*'
   pull_request:
     branches:
       - main
@@ -31,7 +32,7 @@ jobs:
   native-tabs:
     if: github.ref != 'refs/heads/codex/floating-reading-desk' && !inputs.full_tests_only
     runs-on: ${{ (github.ref == 'refs/heads/codex/reader-motion-117' || inputs.reader_settings_only) && 'macos-26-intel' || 'macos-26' }}
-    timeout-minutes: 60
+    timeout-minutes: 90
     env:
       DEVELOPER_DIR: /Applications/Xcode_26.2.app/Contents/Developer
     steps:
@@ -155,7 +156,16 @@ jobs:
             -only-testing:SourceReadSwiftTests/ReaderTabChromeExitTests \
             -only-testing:SourceReadSwiftTests/ReaderExitSwipeTests \
             -only-testing:SourceReadSwiftTests/ReaderPanController119Tests \
-            -destination-timeout 120 -test-timeouts-enabled YES -maximum-test-execution-time-allowance 120 \
+            -only-testing:SourceReadSwiftTests/ReaderNavigationSessionTests \
+            -only-testing:SourceReadSwiftTests/ReaderNativeNavigationTests \
+            -only-testing:SourceReadSwiftTests/ReaderSafeAreaResolverTests \
+            -only-testing:SourceReadSwiftTests/ReaderCompatibilityNavigationTests \
+            -only-testing:SourceReadSwiftTests/ReaderZoomSourceTests \
+            -only-testing:SourceReadSwiftTests/LocalEPUBBookParserTests \
+            -only-testing:SourceReadSwiftTests/ChapterFetchConcurrencyTests \
+            -only-testing:SourceReadSwiftTests/OfflineTextRetentionTests \
+            -only-testing:SourceReadSwiftTests/ChapterCacheWriterPerformanceTests \
+            -destination-timeout 120 -test-timeouts-enabled YES -maximum-test-execution-time-allowance 60 \
             -resultBundlePath NativeTabResults.xcresult test-without-building 2>&1 | tee native-tab-test.log
       - name: Preserve iOS26 unit log before UI flows
         if: ${{ always() && steps.native-build.outcome == 'success' && !inputs.reader_settings_only }}
@@ -188,7 +198,7 @@ jobs:
           retention-days: 7
       - name: Exercise reader chapter continuity on iOS26
         if: ${{ !cancelled() && steps.native-build.outcome == 'success' }}
-        timeout-minutes: 12
+        timeout-minutes: 15
         run: |
           set -euo pipefail
           DEVICE_ID="$(cat native-device-id.txt)"
@@ -201,6 +211,9 @@ jobs:
             -only-testing:SourceReadSwiftUITests/FloatingReadingDeskUITests/testDiscoverStartsWithoutAResultsHeadingAndUsesACompactMatchControl \
             -only-testing:SourceReadSwiftUITests/FloatingReadingDeskUITests/testReadingDeskLongPressOffersTheSameBookActionsWithoutActivatingReader \
             -only-testing:SourceReadSwiftUITests/FloatingReadingDeskUITests/testContinuousChapterCrossingKeepsProseHeadingAndReopenedPositionTogether \
+            -only-testing:SourceReadSwiftUITests/FloatingReadingDeskUITests/testReaderReturnPreservesScrolledShelfAndSettingsStack \
+            -only-testing:SourceReadSwiftUITests/FloatingReadingDeskUITests/testReopeningTheSameBookReusesTheParkedDocumentInTheRealApp \
+            -only-testing:SourceReadSwiftUITests/FloatingReadingDeskUITests/testDetailCoverSourceSurvivesRepeatedReaderRoundTrips \
             -destination-timeout 120 -test-timeouts-enabled YES -maximum-test-execution-time-allowance 180 \
             -resultBundlePath NativeReaderContinuityResults.xcresult test-without-building 2>&1 | tee native-reader-continuity-test.log
       - name: Preserve iOS26 continuity log before gestures
@@ -217,15 +230,40 @@ jobs:
         run: |
           set -euo pipefail
           DEVICE_ID="$(cat native-device-id.txt)"
+          xcrun simctl io "$DEVICE_ID" recordVideo --codec=h264 native-reader-motion.mp4 > native-reader-video.log 2>&1 &
+          VIDEO_PID=$!
+          trap 'kill -INT "$VIDEO_PID" 2>/dev/null || true; wait "$VIDEO_PID" || true' EXIT
           xcodebuild -project SourceReadSwift.xcodeproj -scheme SourceReadSwift \
             -destination "id=$DEVICE_ID" CODE_SIGNING_ALLOWED=NO \
             -parallel-testing-enabled NO \
             -only-testing:SourceReadSwiftUITests/FloatingReadingDeskUITests/testReaderSystemReturnCanCancelWithoutLosingItsSavedParagraph \
             -only-testing:SourceReadSwiftUITests/FloatingReadingDeskUITests/testReaderSystemReturnCanCancelWithReducedMotion \
+            -only-testing:SourceReadSwiftUITests/FloatingReadingDeskUITests/testReaderFastNativeReturnCompletesFromProse \
             -only-testing:SourceReadSwiftUITests/FloatingReadingDeskUITests/testReaderLongEdgeReturnCompletesWithReducedMotion \
             -only-testing:SourceReadSwiftUITests/FloatingReadingDeskUITests/testFirstDetailEdgeReturnRestoresInteractiveHomeAndOnlyOneTabBar \
             -destination-timeout 120 -test-timeouts-enabled YES -maximum-test-execution-time-allowance 180 \
             -resultBundlePath NativeReaderGestureResults.xcresult test-without-building 2>&1 | tee native-reader-gesture-test.log
+      - name: Preserve iOS26 native return recording
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios26-reader-motion-${{ github.sha }}-attempt${{ github.run_attempt }}
+          path: |
+            native-reader-motion.mp4
+            native-reader-video.log
+          if-no-files-found: ignore
+          retention-days: 7
+      - name: Exercise twenty native reader return cycles on iOS26
+        if: ${{ !cancelled() && steps.native-build.outcome == 'success' }}
+        timeout-minutes: 18
+        run: |
+          set -euo pipefail
+          DEVICE_ID="$(cat native-device-id.txt)"
+          xcodebuild -project SourceReadSwift.xcodeproj -scheme SourceReadSwift \
+            -destination "id=$DEVICE_ID" CODE_SIGNING_ALLOWED=NO -parallel-testing-enabled NO \
+            -only-testing:SourceReadSwiftUITests/ReaderOverlayCycleUITests \
+            -test-timeouts-enabled YES -maximum-test-execution-time-allowance 900 \
+            -resultBundlePath NativeReaderCycleResults.xcresult test-without-building 2>&1 | tee native-reader-cycle-test.log
       - name: Export iOS26 attachments
         if: always()
         run: |
@@ -241,6 +279,9 @@ jobs:
           if [ -d NativeReaderGestureResults.xcresult ]; then
             xcrun xcresulttool export attachments --path NativeReaderGestureResults.xcresult --output-path native-ui-snapshots/gestures
           fi
+          if [ -d NativeReaderCycleResults.xcresult ]; then
+            xcrun xcresulttool export attachments --path NativeReaderCycleResults.xcresult --output-path native-ui-snapshots/cycles
+          fi
       - name: Preserve iOS26 runtime evidence
         if: always()
         uses: actions/upload-artifact@v4
@@ -252,11 +293,13 @@ jobs:
             native-reader-ui-test.log
             native-reader-continuity-test.log
             native-reader-gesture-test.log
+            native-reader-cycle-test.log
             native-boot.log
             NativeTabResults.xcresult
             NativeReaderUIResults.xcresult
             NativeReaderContinuityResults.xcresult
             NativeReaderGestureResults.xcresult
+            NativeReaderCycleResults.xcresult
             native-ui-snapshots
           retention-days: 7
       - name: Preserve compact iOS26 UI snapshots
@@ -270,7 +313,7 @@ jobs:
   build:
     if: github.ref != 'refs/heads/codex/floating-reading-desk'
     runs-on: ${{ (github.ref == 'refs/heads/codex/reader-motion-117' || inputs.reader_settings_only) && 'macos-15-intel' || 'macos-15' }}
-    timeout-minutes: 60
+    timeout-minutes: 90
     steps:
       - uses: actions/checkout@v5
 
@@ -375,4 +418,63 @@ jobs:
           name: ios-ui-snapshots-${{ github.sha }}
           path: ui-snapshots
           if-no-files-found: ignore
+          retention-days: 7
+
+  legacy-reader:
+    name: Legacy reader (iOS ${{ matrix.runtime }})
+    needs: [build, native-tabs]
+    if: ${{ github.event_name == 'workflow_dispatch' && !inputs.reader_settings_only && !inputs.full_tests_only }}
+    strategy:
+      fail-fast: false
+      max-parallel: 1
+      matrix:
+        runtime: ['16.4', '17.5']
+    runs-on: macos-15
+    timeout-minutes: 65
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_16.4.app/Contents/Developer
+      LEGACY_IOS_VERSION: ${{ matrix.runtime }}
+    steps:
+      - uses: actions/checkout@v5
+      - name: Prepare the exact legacy simulator runtime
+        timeout-minutes: 25
+        run: |
+          set -euo pipefail
+          test -x "$DEVELOPER_DIR/usr/bin/xcodebuild"
+          if ! xcrun simctl list runtimes -j | python3 -c 'import json,os,sys; sys.exit(not any(r.get("isAvailable") and r["version"] == os.environ["LEGACY_IOS_VERSION"] for r in json.load(sys.stdin)["runtimes"]))'; then
+            xcodebuild -downloadPlatform iOS -buildVersion "$LEGACY_IOS_VERSION" 2>&1 | tee legacy-runtime.log
+          fi
+          xcrun simctl list runtimes -j | python3 -c 'import json,os,sys; match = next((r["identifier"] for r in json.load(sys.stdin)["runtimes"] if r.get("isAvailable") and r["version"] == os.environ["LEGACY_IOS_VERSION"]), None); sys.exit("Requested legacy iOS simulator runtime unavailable: " + os.environ["LEGACY_IOS_VERSION"]) if match is None else print(match)' > legacy-runtime.txt
+      - name: Boot and compile for the legacy simulator
+        timeout-minutes: 27
+        run: |
+          set -euo pipefail
+          brew install xcodegen
+          xcodegen generate
+          python3 -u scripts/boot_native_simulator.py "$(cat legacy-runtime.txt)" --device-type com.apple.CoreSimulator.SimDeviceType.iPhone-14 --output legacy-device.txt 2>&1 | tee legacy-boot.log
+          DEVICE_ID="$(cat legacy-device.txt)"
+          xcodebuild -project SourceReadSwift.xcodeproj -scheme SourceReadSwift -destination "id=$DEVICE_ID" CODE_SIGNING_ALLOWED=NO -parallel-testing-enabled NO build-for-testing 2>&1 | tee legacy-build.log
+      - name: Verify legacy reader open cancel and return
+        timeout-minutes: 10
+        run: |
+          set -euo pipefail
+          DEVICE_ID="$(cat legacy-device.txt)"
+          xcodebuild -project SourceReadSwift.xcodeproj -scheme SourceReadSwift -destination "id=$DEVICE_ID" CODE_SIGNING_ALLOWED=NO -parallel-testing-enabled NO \
+            -only-testing:SourceReadSwiftTests/ReaderCompatibilityNavigationTests \
+            -only-testing:SourceReadSwiftTests/ReaderNativeNavigationTests \
+            -only-testing:SourceReadSwiftUITests/FloatingReadingDeskUITests/testContinueRestoresTheSavedParagraphInTheRealWebView \
+            -only-testing:SourceReadSwiftUITests/FloatingReadingDeskUITests/testReaderSystemReturnCanCancelWithoutLosingItsSavedParagraph \
+            -only-testing:SourceReadSwiftUITests/FloatingReadingDeskUITests/testReaderFastNativeReturnCompletesFromProse \
+            -only-testing:SourceReadSwiftUITests/FloatingReadingDeskUITests/testReopeningTheSameBookReusesTheParkedDocumentInTheRealApp \
+            -test-timeouts-enabled YES -maximum-test-execution-time-allowance 180 \
+            -resultBundlePath LegacyReaderResults.xcresult test-without-building 2>&1 | tee legacy-reader-test.log
+      - name: Preserve legacy reader evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-legacy-reader-${{ matrix.runtime }}-${{ github.sha }}-attempt${{ github.run_attempt }}
+          path: |
+            legacy-*.log
+            legacy-runtime.txt
+            LegacyReaderResults.xcresult
           retention-days: 7

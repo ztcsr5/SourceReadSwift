@@ -33,6 +33,11 @@ import UIKit
                     totalChapters: chapters.count, paragraphIndex: resumesLongChapter ? 12 : 0)
             }
         }
+        if ProcessInfo.processInfo.arguments.contains("--desk-shelf-scroll") {
+            for number in 1...24 {
+                shelf.addLocalTextBook(LocalTextBook(title: "书架回归第\(number)册", author: "纸间", chapters: chapters))
+            }
+        }
         return AppState(sourceStore: SourceStore(persistence: SourcePersistence(rootURL: root)), bookshelfStore: shelf,
             readingHistoryStore: ReadingHistoryStore(persistence: ReadingHistoryPersistence(rootURL: root)))
     }
