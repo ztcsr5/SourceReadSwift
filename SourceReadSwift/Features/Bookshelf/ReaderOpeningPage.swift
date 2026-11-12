@@ -87,62 +87,49 @@ private struct ReaderOpeningPresentation: ViewModifier {
     }
 }
 
-/// Keeps the destination recognisable while its actual saved position is prepared.
-/// Static type and paragraph scaffolding share the reader's paper; no logo or timer delays entry.
+/// Shows the actual book and restore operation while the positioned reader is prepared.
 struct ReaderOpeningStatus: View {
     let book: BookshelfBook
     let showsWait: Bool
     var chapterTitle: String? = nil
     @AppStorage("reader.background") private var paperRaw = ReaderBackground.white.rawValue
 
-    private var context: String {
-        let chapter = (chapterTitle ?? book.currentChapterTitle ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
-        if !chapter.isEmpty { return chapter }
-        return book.currentParagraphIndex == nil ? "准备开始阅读" : "回到上次阅读的位置"
-    }
-
     var body: some View {
         let paper = ReaderOverrideStore.shared.override(for: book.id)?.background
             ?? ReaderBackground(rawValue: paperRaw) ?? .paper
         let ink = paper.textColor(isNight: paper.isDark)
-        GeometryReader { geometry in
-            ScrollView {
-                VStack(alignment: .leading, spacing: 24) {
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text(book.title)
-                            .font(.title2.weight(.semibold))
-                            .fixedSize(horizontal: false, vertical: true)
-                            .accessibilityIdentifier("reader.openingTitle")
-                        if !book.author.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                            Text(book.author).font(.subheadline).foregroundStyle(ink.opacity(0.7))
-                        }
-                    }
-                    Rectangle().fill(ink.opacity(0.16)).frame(height: 1)
-                    Text(context).font(.headline).fixedSize(horizontal: false, vertical: true)
-                    VStack(alignment: .leading, spacing: 16) {
-                        ForEach(0..<7) { line in
-                            RoundedRectangle(cornerRadius: 4)
-                                .fill(ink.opacity(0.07))
-                                .frame(maxWidth: line == 3 || line == 6 ? geometry.size.width * 0.56 : .infinity)
-                                .frame(height: 8)
-                        }
-                    }
-                    .accessibilityHidden(true)
-                    Text(book.currentParagraphIndex == nil ? "正在准备正文" : "正在恢复阅读位置")
-                        .font(.footnote).foregroundStyle(ink.opacity(0.7))
-                        .opacity(showsWait ? 1 : 0)
-                        .accessibilityHidden(!showsWait)
-                        .accessibilityIdentifier("reader.openingProgress")
-                }
-                .padding(.horizontal, 32)
-                .padding(.top, 80)
-                .padding(.bottom, 32)
-                .frame(maxWidth: 560, alignment: .leading)
-                .frame(maxWidth: .infinity)
+        VStack(alignment: .leading, spacing: 24) {
+            Spacer(minLength: 48)
+            Image(systemName: "book.closed")
+                .font(.system(size: 32, weight: .regular))
+                .accessibilityHidden(true)
+            Text(book.title)
+                .font(.system(.largeTitle, design: .serif).weight(.semibold))
+                .fixedSize(horizontal: false, vertical: true)
+                .accessibilityIdentifier("reader.openingTitle")
+            if !book.author.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                Text(book.author).font(.subheadline).foregroundStyle(ink.opacity(0.72))
             }
+            Rectangle().fill(ink.opacity(0.16)).frame(height: 1)
+            if let chapter = chapterTitle ?? book.currentChapterTitle, !chapter.isEmpty {
+                Text(chapter).font(.headline)
+            }
+            HStack(spacing: 12) {
+                if showsWait { ProgressView().tint(ink) }
+                else { Color.clear.frame(width: 20, height: 20) }
+                Text(book.currentParagraphIndex == nil ? "正在准备正文" : "正在恢复阅读位置")
+                    .font(.subheadline)
+                    .opacity(showsWait ? 1 : 0)
+            }
+            .accessibilityIdentifier("reader.openingProgress")
+            Spacer(minLength: 48)
+            Text("纸间 · 阅读")
+                .font(.caption).foregroundStyle(ink.opacity(0.65))
         }
+        .padding(32)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
         .foregroundStyle(ink)
-        .background { paper.color(isNight: paper.isDark).ignoresSafeArea() }
+        .background(paper.color(isNight: paper.isDark).ignoresSafeArea())
         .environment(\.colorScheme, paper.isDark ? .dark : .light)
     }
 }
@@ -157,7 +144,18 @@ extension View {
 
     /// Report actual reader readiness, or an actionable error that must replace the cover.
     func readerOpeningContentReady(_ ready: Bool = true) -> some View {
-        preference(key: ReaderOpeningReadyKey.self, value: ready)
+        modifier(ReaderOpeningReadiness(ready: ready))
+    }
+}
+
+private struct ReaderOpeningReadiness: ViewModifier {
+    let ready: Bool
+    @Environment(\.nativeReaderSession) private var session
+
+    func body(content: Content) -> some View {
+        content.preference(key: ReaderOpeningReadyKey.self, value: ready)
+            .onAppear { if ready { session?.recordReadyReceipt() } }
+            .onChange(of: ready) { if $0 { session?.recordReadyReceipt() } }
     }
 }
 
