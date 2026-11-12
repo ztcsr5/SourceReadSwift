@@ -7,10 +7,11 @@ final class HomeLayoutEvidenceTests: XCTestCase {
     private static let originalThemes: [AppVisualTheme] = [.forest, .editorial, .blueprint, .folio]
     private static let initialAtelierThemes: [AppVisualTheme] = [.berryLake, .blushInk, .periwinkleCocoa, .peachMoss]
     private static let addedAtelierThemes: [AppVisualTheme] = [.inkViolet, .pineMist, .kleinSage]
+    private static let videoGlassThemes: [AppVisualTheme] = [.videoAurora, .videoEmber]
 
     func testHomeEvidenceGroupsCoverEveryRequestedThemeExactlyOnce() {
-        let grouped = Self.originalThemes + Self.initialAtelierThemes + Self.addedAtelierThemes
-        let expected = Self.originalThemes + AppVisualTheme.atelierThemes
+        let grouped = Self.originalThemes + Self.initialAtelierThemes + Self.addedAtelierThemes + Self.videoGlassThemes
+        let expected = Self.originalThemes + AppVisualTheme.atelierThemes + AppVisualTheme.videoGlassThemes
         XCTAssertEqual(grouped.map(\.rawValue).sorted(), expected.map(\.rawValue).sorted())
         XCTAssertEqual(Set(grouped.map(\.rawValue)).count, grouped.count)
     }
@@ -25,6 +26,12 @@ final class HomeLayoutEvidenceTests: XCTestCase {
 
     @MainActor func testAddedAtelierHomeLayoutsAtNarrowDarkAndAccessibleSizes() async throws {
         try await captureHomeLayouts(themes: Self.addedAtelierThemes)
+    }
+
+    /// 视频玻璃主题的首页也要在窄屏、深色和无障碍字号下真的渲染出来，
+    /// 否则动态背景层在真实布局里可能被裁掉或压住内容。
+    @MainActor func testVideoGlassHomeLayoutsAtNarrowDarkAndAccessibleSizes() async throws {
+        try await captureHomeLayouts(themes: Self.videoGlassThemes)
     }
 
     // Keep the same screenshot matrix and assertions within the existing per-test time limit.

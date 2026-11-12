@@ -7,9 +7,10 @@ import XCTest
 final class Release116VisualTests: XCTestCase {
     func testThemesChangeGeometryTypographyAndSurfaceNotOnlyAccent() {
         XCTAssertEqual(AppVisualTheme.allCases.map(\.rawValue),
-            ["forest", "classic", "botanical", "editorial", "coast", "rose", "graphite", "folio", "inkwash", "blueprint", "berryLake", "blushInk", "periwinkleCocoa", "peachMoss", "inkViolet", "pineMist", "kleinSage"])
-        XCTAssertEqual(Set(AppVisualTheme.allCases.map(\.radius)).count, 10)
-        XCTAssertEqual(Set(AppVisualTheme.allCases.map(\.backgroundHex)).count, 17)
+            ["forest", "classic", "botanical", "editorial", "coast", "rose", "graphite", "folio", "inkwash", "blueprint", "berryLake", "blushInk", "periwinkleCocoa", "peachMoss", "inkViolet", "pineMist", "kleinSage", "videoAurora", "videoEmber"])
+        // 视频玻璃沿用 18pt，与其他主题的圆角档位不重复计数。
+XCTAssertEqual(Set(AppVisualTheme.allCases.map(\.radius)).count, 10)
+        XCTAssertEqual(Set(AppVisualTheme.allCases.map(\.backgroundHex)).count, 19)
         XCTAssertEqual(AppVisualTheme.classic.preferenceKey("accent"), "settings.accentHex")
         XCTAssertNotEqual(AppVisualTheme.coast.preferenceKey("accent"), AppVisualTheme.rose.preferenceKey("accent"))
         XCTAssertEqual(AppVisualTheme.editorial.borderWidth, 1)
