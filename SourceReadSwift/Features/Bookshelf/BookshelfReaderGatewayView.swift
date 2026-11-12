@@ -4,9 +4,12 @@ struct BookshelfReaderGatewayView: View {
     @EnvironmentObject private var appState: AppState
     @Environment(\.dismiss) private var dismiss
     @Environment(\.readerOpeningManaged) private var readerOpeningManaged
-    @Environment(\.readerPresentedAsOverlay) private var presentedAsOverlay
+    @Environment(\.nativeReaderSession) private var nativeSession
     let book: BookshelfBook
     let onRequestExit: (() -> Void)?
+    /// A bookmark or an explicit chapter is a deliberate cursor: the caller
+    /// asked for that exact place, so the live shelf position must not win.
+    private let hasExplicitCursor: Bool
     @State private var launchCursor: ReaderLaunchCursor
     @State private var selectedRemoteParagraphIndex: Int?
 
@@ -34,6 +37,7 @@ struct BookshelfReaderGatewayView: View {
          onRequestExit: (() -> Void)? = nil) {
         self.book = book
         self.onRequestExit = onRequestExit
+        hasExplicitCursor = initialBookmark != nil || initialChapterIndex != nil
         _launchCursor = State(initialValue: ReaderLaunchCursor(book: book, bookmark: initialBookmark,
             requestedChapterIndex: initialChapterIndex))
     }
@@ -44,20 +48,19 @@ struct BookshelfReaderGatewayView: View {
 
     var body: some View {
         gatewayContent
-        .background(ReaderTabChromeExitBridge(owner: gatewayTabChromeOwner))
-        .toolbar(.hidden, for: .tabBar)
+        .background {
+            if nativeSession == nil { ReaderTabChromeExitBridge(owner: gatewayTabChromeOwner) }
+        }
         .environment(\.readerTemporaryCoverPresented, showSourceSwitcher)
         .onAppear {
-            NavigationTrace.shared.mark("reader", "gateway onAppear overlay=\(presentedAsOverlay)")
-            // 覆盖层路径完全不碰 tab chrome：主页常驻，没有"恢复"这回事。
-            // 只有旧的 NavigationStack 路径才需要隐藏/归还。
-            if !presentedAsOverlay {
+            NavigationTrace.shared.mark("reader", "gateway onAppear native=\(nativeSession != nil)")
+            if nativeSession == nil {
                 appState.acquireTabChromeHidden(owner: gatewayTabChromeOwner)
             }
         }
         .onDisappear {
-            NavigationTrace.shared.mark("reader", "gateway onDisappear overlay=\(presentedAsOverlay)")
-            if !presentedAsOverlay {
+            NavigationTrace.shared.mark("reader", "gateway onDisappear native=\(nativeSession != nil)")
+            if nativeSession == nil {
                 appState.releaseTabChromeHidden(owner: gatewayTabChromeOwner)
             }
         }
@@ -82,7 +85,7 @@ struct BookshelfReaderGatewayView: View {
         if book.sourceURL == "local://comic" {
             let localEngine = LocalComicSourceEngine(book: currentBook)
             return AnyView(ComicReaderView(bookID: book.id, bookTitle: currentBook.title,
-                source: LocalComicSourceEngine.source, initialChapterIndex: launchCursor.chapterIndex,
+                source: LocalComicSourceEngine.source, initialChapterIndex: resumeChapterIndex,
                 chapters: localEngine.chapters, engine: localEngine, onRequestExit: requestGatewayExit))
         } else if !localBookChapters.isEmpty {
             return AnyView(localReader)
@@ -108,6 +111,7 @@ struct BookshelfReaderGatewayView: View {
                 case .audio:
                     return AnyView(
                         AudioBookPlayerView()
+                            .readerOpeningContentReady()
                             .onAppear {
                                 let searchBook = SearchBook(
                                     name: currentBook.title,
@@ -153,6 +157,7 @@ struct BookshelfReaderGatewayView: View {
                             chapters: chapters,
                             engine: appState.engine
                         )
+                        .readerOpeningContentReady()
                     )
                 case .text:
                     break
@@ -198,7 +203,7 @@ struct BookshelfReaderGatewayView: View {
         // Restore the tab bar before the pop transition starts. Waiting for
         // onDisappear leaves the bar missing for the first frames of the
         // returned shelf and makes the home screen look frozen.
-        appState.releaseTabChromeHidden(owner: gatewayTabChromeOwner)
+        if nativeSession == nil { appState.releaseTabChromeHidden(owner: gatewayTabChromeOwner) }
         // This view owns the shelf route; nested reader panels must never
         // supply the dismiss environment used to pop that route.
         if let onRequestExit { onRequestExit() }
@@ -236,9 +241,28 @@ struct BookshelfReaderGatewayView: View {
         .pageBackground()
     }
 
+    /// Resume position for the live book. `launchCursor` is the request
+    /// snapshot, and that snapshot is stale whenever the reader crossed
+    /// chapters before returning, which is exactly what pulled a parked reader
+    /// back to its original chapter. `AppState` deliberately does not forward
+    /// progress writes, so reading the live store here cannot churn the body
+    /// while the reader scrolls, and `ReaderView` ignores a replay of content
+    /// it already shows.
+    private var resumeChapterIndex: Int {
+        if let selectedLocalChapterIndex { return selectedLocalChapterIndex }
+        guard !hasExplicitCursor else { return launchCursor.chapterIndex }
+        return max(currentBook.currentChapterIndex, 0)
+    }
+
+    private func resumeParagraphIndex(in chapter: Int) -> Int? {
+        guard !hasExplicitCursor else { return launchCursor.paragraph(in: chapter) }
+        let live = currentBook
+        return live.currentChapterIndex == chapter ? live.currentParagraphIndex : nil
+    }
+
     private var localReader: some View {
         let chapters = localBookChapters
-        let requestedIndex = selectedLocalChapterIndex ?? launchCursor.chapterIndex
+        let requestedIndex = resumeChapterIndex
         let safeIndex = min(max(requestedIndex, 0), max(chapters.count - 1, 0))
         let localChapter = chapters[safeIndex]
         let fallbackChapters = chapters.map {
@@ -250,7 +274,7 @@ struct BookshelfReaderGatewayView: View {
                 isVip: false
             )
         }
-        let storedParagraph = launchCursor.paragraph(in: safeIndex)
+        let storedParagraph = resumeParagraphIndex(in: safeIndex)
         let initialParagraphIndex = selectedLocalParagraphIndex ?? storedParagraph
         return ReaderView(
             bookID: book.id,
@@ -348,7 +372,7 @@ struct BookshelfReaderGatewayView: View {
     }
 
     private func openRestoredChapter(_ chapter: BookChapter) {
-        selectedRemoteParagraphIndex = launchCursor.paragraph(in: chapter.index)
+        selectedRemoteParagraphIndex = resumeParagraphIndex(in: chapter.index)
         selectedChapter = chapter
     }
 
@@ -357,6 +381,15 @@ struct BookshelfReaderGatewayView: View {
         guard activeBook.localChapters == nil, activeBook.localContent == nil else { return }
         guard selectedChapter == nil, errorMessage == nil else { return }
         guard let source = appState.sourceStore.source(for: activeBook.sourceURL)?.resolvingMediaKind(activeBook.mediaKind) else {
+            if activeBook.mediaKind == nil || activeBook.mediaKind == .text {
+                let cached = appState.chapterContentCacheStore.cachedChapters(
+                    sourceURL: activeBook.sourceURL, bookURL: activeBook.bookURL)
+                if let target = cached.first(where: { $0.index == resumeChapterIndex }) {
+                    chapters = cached
+                    openRestoredChapter(target)
+                    return
+                }
+            }
             errorMessage = "找不到书源：\(activeBook.sourceName)"
             return
         }
@@ -370,7 +403,7 @@ struct BookshelfReaderGatewayView: View {
         guard !Task.isCancelled, selectedChapter == nil,
               currentBook.sourceURL == activeBook.sourceURL, currentBook.bookURL == activeBook.bookURL else { return }
         if let cached = cachedTOC, !cached.chapters.isEmpty {
-            let targetIndex = launchCursor.chapterIndex
+            let targetIndex = resumeChapterIndex
             let target = cached.chapters.first(where: { $0.index == targetIndex })
             if let target {
                 chapters = cached.chapters
@@ -385,7 +418,7 @@ struct BookshelfReaderGatewayView: View {
             let archived = await appState.comicOfflineArchive.chapters(sourceURL: source.bookSourceUrl, bookURL: activeBook.bookURL)
             guard !Task.isCancelled, currentBook.id == activeBook.id,
                   currentBook.sourceURL == activeBook.sourceURL else { return }
-            if let target = archived.first(where: { $0.index == launchCursor.chapterIndex }) {
+            if let target = archived.first(where: { $0.index == resumeChapterIndex }) {
                 chapters = archived
                 openRestoredChapter(target)
                 return
@@ -398,7 +431,7 @@ struct BookshelfReaderGatewayView: View {
             bookURL: activeBook.bookURL
         )
         if !cached.isEmpty {
-            let targetIndex = launchCursor.chapterIndex
+            let targetIndex = resumeChapterIndex
             let target = cached.first(where: { $0.index == targetIndex })
             if let target {
                 self.chapters = cached
@@ -431,7 +464,7 @@ struct BookshelfReaderGatewayView: View {
             detail = loadedDetail
             // 首次从头开书先取目录头部；恢复非首章必须抓到真实目标，不能回退第一章。
             // 分页目录是串行抓取，30 页会让「进书」停在加载页上。
-            let targetIndex = launchCursor.chapterIndex
+            let targetIndex = resumeChapterIndex
             let pages = targetIndex > 0 ? 30 : 8
             let chapterResult = await AsyncTimeout.run(seconds: 20) {
                 await engine.getChapterList(source: source, book: loadedDetail, maxPages: pages)
@@ -467,7 +500,7 @@ struct BookshelfReaderGatewayView: View {
                     sourceURL: source.bookSourceUrl,
                     bookURL: activeBook.bookURL
                 )
-                let targetIndex = launchCursor.chapterIndex
+                let targetIndex = resumeChapterIndex
                 if let target = cached.first(where: { $0.index == targetIndex }) {
                     chapters = cached
                     openRestoredChapter(target)
@@ -482,7 +515,7 @@ struct BookshelfReaderGatewayView: View {
                 sourceURL: source.bookSourceUrl,
                 bookURL: activeBook.bookURL
             )
-            let targetIndex = launchCursor.chapterIndex
+            let targetIndex = resumeChapterIndex
             if let target = cached.first(where: { $0.index == targetIndex }) {
                 chapters = cached
                 openRestoredChapter(target)
