@@ -4,15 +4,7 @@ import UIKit
 import Combine
 @testable import SourceReadSwift
 
-/// 覆盖层路径下的 tab chrome 契约。
-///
-/// 新契约（为消除"一滑就浮现/闪一下"而刻意更改）：
-/// 1. 转场开始**不**释放所有权，底栏必须继续隐藏；
-/// 2. 最后一个 owner 释放后进入 350ms 挂起窗口，窗口内不得提前暴露底栏；
-/// 3. 窗口内若重新 acquire（手势取消），取消挂起，底栏保持隐藏；
-/// 4. 只有真正提交且窗口结束，才显示底栏。
-///
-/// 旧断言要求"释放早于 onDisappear"，那正是闪动的成因，已被替换。
+/// Legacy chrome ownership remains synchronous; native reader routes do not acquire it at all.
 final class ReaderTabChromeExitTests: XCTestCase {
     @MainActor func testInteractivePopIsRecognizedBeforeTheSourceLeavesTheStack() {
         let root = UIViewController(), reader = UIViewController(), pushed = UIViewController()
@@ -71,7 +63,7 @@ final class ReaderTabChromeExitTests: XCTestCase {
         XCTAssertTrue(source.hasDisappeared)
     }
 
-    @MainActor func testLastOwnerReleaseIsHeldForTheSettleWindow() async throws {
+    @MainActor func testLastOwnerReleaseHasNoTimerAndReacquisitionCannotBeOverridden() async throws {
         let app = AppState(), gateway = UUID(), reader = UUID()
         app.acquireTabChromeHidden(owner: gateway)
         app.acquireTabChromeHidden(owner: reader)
@@ -81,12 +73,12 @@ final class ReaderTabChromeExitTests: XCTestCase {
         XCTAssertTrue(app.isTabChromeHidden, "还剩一个 owner 时必须继续隐藏")
 
         app.releaseTabChromeHidden(owner: reader)
-        XCTAssertTrue(app.isTabChromeHidden, "挂起窗口内不得提前暴露底栏")
+        XCTAssertFalse(app.isTabChromeHidden, "Chrome must be ready at the completed return")
 
-        // 窗口内重新取得（等价于手势取消）→ 取消挂起，底栏保持隐藏。
+        // No delayed release may override a later reader owner.
         app.acquireTabChromeHidden(owner: gateway)
         try await Task.sleep(nanoseconds: 450_000_000)
-        XCTAssertTrue(app.isTabChromeHidden, "取消返回必须保持沉浸，不能被挂起窗口提前放出来")
+        XCTAssertTrue(app.isTabChromeHidden, "A later owner must retain chrome")
 
         app.releaseTabChromeHidden(owner: gateway)
         let revealed = try await waitUntil { !app.isTabChromeHidden }
@@ -107,7 +99,7 @@ final class ReaderTabChromeExitTests: XCTestCase {
         XCTAssertEqual(restores, 0, "已提交的退出不得被后续回调恢复")
 
         app.releaseTabChromeHidden(owner: unrelated)
-        XCTAssertTrue(app.isTabChromeHidden, "挂起窗口内仍保持隐藏")
+        XCTAssertFalse(app.isTabChromeHidden, "No extra settle timer is allowed after the final release")
         let revealed = try await waitUntil { !app.isTabChromeHidden }
         XCTAssertTrue(revealed)
     }
