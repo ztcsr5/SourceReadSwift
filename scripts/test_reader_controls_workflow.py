@@ -78,7 +78,9 @@ class ReaderControlsWorkflowTests(unittest.TestCase):
             Release117ThemeCollaborationTests Release117ReaderPersonalizationTests Release117WallpaperEditorTests
             Release117ReadingHeroTests Release117MotionSystemTests Release117PolishTests ReaderSettingsStackTests
             FontImportRequestTests ReaderScrollCadenceTests ReaderBindingTests ReaderWorkbenchVisualTests
-            ReaderControlsMaterialTests ReaderTabChromeExitTests ReaderExitSwipeTests ReaderPanController119Tests'''.split()
+            ReaderControlsMaterialTests ReaderTabChromeExitTests ReaderExitSwipeTests ReaderPanController119Tests
+            ScrollChromeGateTests ShelfProjectionTests ReaderNavigationSessionTests ReaderNativeNavigationTests ReaderSafeAreaResolverTests ReaderCompatibilityNavigationTests
+            OfflineTextRetentionTests ChapterCacheWriterPerformanceTests ReaderZoomSourceTests LocalEPUBBookParserTests ChapterFetchConcurrencyTests'''.split()
         actual = re.findall(r'-only-testing:SourceReadSwiftTests/(\w+)', self.step('iOS26 native tab runtime regression'))
         self.assertEqual(set(actual), set(expected))
 
@@ -116,6 +118,10 @@ class ReaderControlsWorkflowTests(unittest.TestCase):
             self.assertIn(f'-only-testing:SourceReadSwiftUITests/FloatingReadingDeskUITests/{case}', stage)
             self.assertNotIn(case, self.step('Exercise reader chapter continuity on iOS26'))
         self.assertIn('--output-path native-ui-snapshots/gestures', self.step('Export iOS26 attachments'))
+
+    def test_reader_round_trip_checks_scrolled_shelf_and_other_tab(self):
+        continuity = self.step('Exercise reader chapter continuity on iOS26')
+        self.assertIn('FloatingReadingDeskUITests/testReaderReturnPreservesScrolledShelfAndSettingsStack', continuity)
 
     def test_general_startup_logging_starts_after_the_simulator_is_booted(self):
         workflow = WORKFLOW.read_text(encoding='utf8')

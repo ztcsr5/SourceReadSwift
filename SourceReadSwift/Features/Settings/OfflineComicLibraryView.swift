@@ -33,8 +33,8 @@ struct OfflineComicLibraryView: View {
                 ForEach(editions) { edition in
                     Section(edition.record.title) {
                         ForEach(edition.chapters) { chapter in
-                            NavigationLink {
-                                reader(for: chapter, in: edition)
+                            Button {
+                                openReader(chapter, in: edition)
                             } label: {
                                 Label(chapter.title, systemImage: "photo.on.rectangle")
                             }
@@ -90,13 +90,19 @@ struct OfflineComicLibraryView: View {
         }
     }
 
-    private func reader(for chapter: BookChapter, in edition: Edition) -> some View {
+    private func openReader(_ chapter: BookChapter, in edition: Edition) {
         let record = edition.record
         let source = appState.sourceStore.source(for: record.sourceURL) ?? BookSource(
             bookSourceName: "离线漫画", bookSourceUrl: record.sourceURL, bookSourceType: 2
         )
-        return ComicReaderView(bookID: record.id, bookTitle: record.title, source: source,
-                               initialChapterIndex: chapter.index, chapters: edition.chapters, engine: appState.engine)
+        let book = appState.bookshelfStore.book(id: record.id) ?? BookshelfBook(searchBook: SearchBook(
+            name: record.title, author: "", coverUrl: nil, bookUrl: record.bookURL,
+            sourceName: source.bookSourceName, sourceUrl: record.sourceURL, mediaKind: .comic))
+        appState.readerNavigation.open(ReaderDestinationRequest(book: book) { close in
+            AnyView(ComicReaderView(bookID: record.id, bookTitle: record.title, source: source,
+                initialChapterIndex: chapter.index, chapters: edition.chapters, engine: appState.engine,
+                onRequestExit: close))
+        })
     }
 
     private func refresh() async {

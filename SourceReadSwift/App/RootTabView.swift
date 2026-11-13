@@ -12,6 +12,7 @@ struct RootTabView: View {
     @AppStorage("settings.appearanceRevision") private var appearanceRevision = 0
     @Namespace private var tabSelection
     @State private var selectedTab = 0
+    @State private var keepsShelfTabsExpanded = false
     @State private var legacySearchRequest: UUID?
     @State private var shouldFocusRequestedSearch = true
     @State private var showFullAudioPlayer = false
@@ -25,18 +26,8 @@ struct RootTabView: View {
         let _ = appearanceRevision
         let _ = accentHex
         let _ = secondaryAccentHex
-        return ZStack {
-            navigationContent
-            // 阅读器是覆盖层，不是 navigationDestination。
-            // 主页（含 tab 栏、书架、滚动位置）全程留在内存里，返回只是移除上层，
-            // 因此没有 pop、没有 chrome 恢复、没有书架重建。
-            if let request = appState.readerOverlay {
-                ReaderOverlayLayer(request: request,
-                                   onClose: { appState.readerOverlay = nil })
-            }
-        }
+        return navigationContent
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(AppRefreshRateKeeperView())
         .safeAreaInset(edge: .bottom, spacing: 0) {
             // iOS 26 draws the bar itself, so without audio this inset was an
             // empty view that still joined every layout pass. Mount it only
@@ -50,13 +41,13 @@ struct RootTabView: View {
                 }
             }
         }
-        .animation(.easeInOut(duration: 0.28), value: appState.readerOverlay?.id)
         .font(.system(.body, design: AppVisualTheme.current.fontDesign))
         .tint(AppTheme.accent)
         .onReceive(audioCoordinator.$currentBook.map { $0 != nil }.removeDuplicates()) { hasAudio = $0 }
         .onChange(of: selectedTab) { newValue in
             NavigationTrace.shared.mark("tab", "selected=\(newValue)")
             if newValue != 3 { lastNonSearchTab = newValue }
+            if newValue != 0 { keepsShelfTabsExpanded = false }
             dismissKeyboard()
         }
         .sheet(isPresented: $showFullAudioPlayer) { AudioBookPlayerView() }
@@ -99,7 +90,8 @@ struct RootTabView: View {
     private var nativeTabContent: some View {
         TabView(selection: $selectedTab) {
             Tab("主页", systemImage: "house", value: 0) {
-                BookshelfView(onRequestGlobalSearch: { selectedTab = 3 })
+                BookshelfView(onRequestGlobalSearch: { selectedTab = 3 },
+                    onRevealNavigation: { keepsShelfTabsExpanded = true })
                     .modifier(NativeTabChromeVisibilityModifier())
             }
             Tab(AppNavigationLabels.findBooks,
@@ -125,7 +117,7 @@ struct RootTabView: View {
                 .modifier(NativeTabChromeVisibilityModifier())
             }
         }
-        .modifier(TabBarMinimizeBehaviorModifier())
+        .modifier(TabBarMinimizeBehaviorModifier(keepsExpanded: keepsShelfTabsExpanded))
     }
 
     private var legacyNavigationContent: some View {
@@ -152,7 +144,7 @@ struct RootTabView: View {
     private var verificationRequestBinding: Binding<VerificationCodeRequest?> {
         Binding(
             get: {
-                isRunningUnitTests ? nil : verificationCoordinator.request
+                isRunningUnitTests || appState.isReaderPresented ? nil : verificationCoordinator.request
             },
             set: { verificationCoordinator.request = $0 }
         )
@@ -205,10 +197,13 @@ private struct NativeTabChromeVisibilityModifier: ViewModifier {
 /// iOS 26 minimizes the native tab bar as the active scroll view moves down.
 /// Keep this in one compatibility modifier so the deployment target stays iOS 16.
 private struct TabBarMinimizeBehaviorModifier: ViewModifier {
+    let keepsExpanded: Bool
+
     @ViewBuilder func body(content: Content) -> some View {
         #if compiler(>=6.2)
         if #available(iOS 26.0, *) {
-            content.tabBarMinimizeBehavior(.onScrollDown)
+            // An explicit reveal must not depend on which scroll view UIKit follows.
+            content.tabBarMinimizeBehavior(keepsExpanded ? .never : .onScrollDown)
         } else {
             content
         }
@@ -237,16 +232,17 @@ struct RootTabChromeVisibilityModifier: ViewModifier {
 
 struct HideRootTabBarModifier: ViewModifier {
     @EnvironmentObject private var appState: AppState
+    @Environment(\.nativeReaderSession) private var nativeSession
     @State private var token = UUID()
 
     func body(content: Content) -> some View {
         content
             .toolbar(.hidden, for: .tabBar)
             .onAppear {
-                appState.acquireTabChromeHidden(owner: token)
+                if nativeSession == nil { appState.acquireTabChromeHidden(owner: token) }
             }
             .onDisappear {
-                appState.releaseTabChromeHidden(owner: token)
+                if nativeSession == nil { appState.releaseTabChromeHidden(owner: token) }
             }
     }
 }
