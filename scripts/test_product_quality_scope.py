@@ -11,6 +11,7 @@ import unittest
 ROOT = Path(__file__).resolve().parents[1]
 APP = "SourceReadSwift/"
 READER = APP + "Features/Reader/ReaderView.swift"
+READER_WEB = APP + "Features/Reader/WebScrollReaderView.swift"
 SHELF = APP + "Features/Bookshelf/"
 DETAIL = APP + "Features/Discover/BookDetailView.swift"
 
@@ -121,7 +122,7 @@ class ProductQualityScopeTests(unittest.TestCase):
         mode = read_source(READER).split(".onChange(of: readerModeRawValue)", 1)[1].split(
             ".onChange(of: fontFamilyRawValue)", 1)[0]
         self.assertIn("visibleParagraphIndex = paragraph", mode)
-        self.assertIn("positionPersistTask?.cancel()", mode)
+        self.assertIn("positionPersistScheduler.cancel()", mode)
         self.assertIn("persistReadingPosition()", mode)
         self.assertNotIn("paragraphIndexOverride:", mode)
         self.assertIn("utf16Offset: anchor?.paragraphUTF16Offset", mode)
@@ -133,16 +134,18 @@ class ProductQualityScopeTests(unittest.TestCase):
         self.assertTrue(declaration.startswith(")"))
         self.assertNotRegex(reader, r"scheduleReadingPositionPersistence\(\s*paragraphIndex:")
         self.assertIn("persistReadingPosition()", declaration)
-        self.assertIn("guard !Task.isCancelled", declaration)
+        self.assertIn("positionPersistScheduler.schedule(", declaration)
+        scheduler = reader.split("final class ReaderPositionPersistScheduler", 1)[1]
+        self.assertIn("guard !Task.isCancelled", scheduler)
 
-    def test_cover_is_owned_by_navigation_destination_until_content_and_arrival(self):
-        opening = read_source(SHELF + "ReaderOpeningPage.swift")
+    def test_native_destination_waits_for_positioned_content_without_a_reveal_timer(self):
+        host = read_source(APP + "Features/Reader/Navigation/ReaderNavigationHost.swift")
         shelf = read_source(SHELF + "BookshelfView.swift")
-        self.assertIn("guard !didReveal, didArrive, isContentReady", opening)
-        self.assertIn("override func viewDidAppear", read_source(SHELF + "ReaderBookPassageController.swift"))
-        self.assertIn(r".environment(\.readerOpeningManaged, !didReveal)", opening)
-        self.assertNotIn("Task.sleep", opening)
-        self.assertIn(".readerOpeningPresentation(for: managedOpeningBook(book), coverFrame: coverFrame, usesDeskHero: true)", shelf)
+        self.assertIn(r".environment(\.readerOpeningManaged, !isReady)", host)
+        self.assertIn("onPreferenceChange(ReaderOpeningReadyKey.self)", host)
+        self.assertNotIn("Task.sleep", host)
+        self.assertNotIn("asyncAfter", host)
+        self.assertIn('readerNavigation.open(.shelf(book, sourceID: "continue|" + book.id))', shelf)
         self.assertNotIn("ReaderOpeningPage(", read_source(READER))
 
     def test_desk_keeps_the_large_cover_envelope_guard(self):
@@ -156,14 +159,14 @@ class ProductQualityScopeTests(unittest.TestCase):
     def test_desk_restores_native_hold_management_and_keeps_direct_reading(self):
         shelf = read_source(SHELF + "BookshelfView.swift")
         card = shelf.split("private func heroCard", 1)[1].split("private func updateRow", 1)[0]
-        self.assertIn("contextualBookRoute = .read(book, coverFrame: readingCoverHandoff.frame(for: book))", card)
+        self.assertIn('readerNavigation.open(.shelf(book, sourceID: "continue|" + book.id))', card)
         self.assertIn(".contextMenu", card)
         self.assertNotIn(".onLongPressGesture", card)
         self.assertIn("readingDeskEntry(book)", card)
         self.assertNotIn("readingDeskMenu(book)", card)
         self.assertEqual(card.count("readingDeskBookActions(book)"), 1)
         self.assertIn(".contextMenu", shelf.split("private func updateRow", 1)[1])
-        self.assertIn('contextualBookRoute = .detail(book, placement: "continue")', card)
+        self.assertIn('.detail(book, placement: "continue")', shelf)
 
     def test_detail_keeps_cache_actions_without_a_block_over_the_directory(self):
         detail = read_source(DETAIL)
@@ -176,7 +179,8 @@ class ProductQualityScopeTests(unittest.TestCase):
 
     def test_shell_retains_tabs_and_limits_hiding_to_readers(self):
         shell = read_source(APP + "App/RootTabView.swift")
-        self.assertEqual(shell.count("TabView(selection: $selectedTab)"), 1)
+        self.assertEqual(shell.count("TabView(selection: $selectedTab)"), 2)
+        self.assertNotIn("ReaderOverlayLayer(", shell)
         self.assertEqual(shell.count(".modifier(RootTabChromeVisibilityModifier())"), 3)
         visibility = shell.split("struct RootTabChromeVisibilityModifier", 1)[1].split("struct HideRootTabBarModifier", 1)[0]
         self.assertIn("content.toolbar(.hidden, for: .tabBar)", visibility)
@@ -201,10 +205,66 @@ class ProductQualityScopeTests(unittest.TestCase):
         gateway = read_source(SHELF + "BookshelfReaderGatewayView.swift")
         self.assertNotIn("prefetchChapterContent", gateway)
         self.assertIn("initialParagraphIndex: selectedRemoteParagraphIndex", gateway)
-        self.assertIn("launchCursor.paragraph(in: chapter.index)", gateway)
+        self.assertIn("resumeParagraphIndex(in: chapter.index)", gateway)
+
+    def test_scrolled_shelf_checks_collapsed_navigation_before_expanding_it(self):
+        ui = read_source("SourceReadSwiftUITests/FloatingReadingDeskUITests.swift")
+        scenario = ui.split("func testReaderReturnPreservesScrolledShelfAndSettingsStack", 1)[1].split("func testReadingDeskReaderAndReturnInTheRealApp", 1)[0]
+        frame = scenario.index("XCTAssertEqual(cover.frame.midY, origin.midY")
+        collapse = scenario.index("globalSearchButton().isHittable")
+        expand = scenario.index("scrollEnd.press")
+        home = scenario.index("XCTAssertTrue(restoredHome.isHittable")
+        settings = scenario.index("XCTAssertTrue(appearanceBar.waitForExistence", home)
+        self.assertLess(frame, collapse)
+        self.assertLess(collapse, expand)
+        self.assertLess(expand, home)
+        self.assertLess(home, settings)
+        self.assertNotIn('let settings = revealRootTab', scenario)
+        self.assertIn('for _ in 0..<3 where !settings.isHittable', scenario)
+
+    def test_scroll_surface_appearance_does_not_replay_an_old_jump(self):
+        reader = read_source(READER)
+        surface = reader.split("private var scrollReaderContent", 1)[1].split("// MARK: - Continuous chapter window", 1)[0]
+        self.assertNotIn("ParagraphJumpRequest(index: scrollParagraphTarget)", surface)
+        self.assertIn("paragraphJumpRequest = ParagraphJumpRequest(index: initial.paragraph)", reader)
+        self.assertIn("ParagraphJumpRequest(index: paragraph, utf16Offset: anchor?.paragraphUTF16Offset", reader)
+
+    def test_mounted_reader_ignores_live_progress_writes(self):
+        """Live progress must not feed a mounted reader. Every scroll write
+        re-renders the gateway; rebuilding `content` from the moving shelf
+        cursor reset the window and replayed the launch chapter on a parked
+        reader (CI 43318166559: crossed to chapter 3, reopened, landed on 2)."""
+        gateway = read_source(SHELF + "BookshelfReaderGatewayView.swift")
+        self.assertIn("@State private var surfaceChapterIndex: Int?", gateway)
+        self.assertIn("@State private var surfaceParagraphIndex: Int?", gateway)
+        self.assertIn("let requestedIndex = surfaceChapterIndex ?? resumeChapterIndex", gateway)
+        self.assertIn("let frozenParagraph = surfaceChapterIndex == safeIndex ? surfaceParagraphIndex : nil", gateway)
+        # Explicit navigation is the only writer of the surface cursor.
+        self.assertIn("moveSurfaceCursor(to:", gateway)
+        self.assertIn("if surfaceChapterIndex == nil {", gateway)
         chapter_loader = read_source(DETAIL).split("struct ChapterLoadingView", 1)[1]
         self.assertIn(".task(id: effectiveChapter)", chapter_loader)
         self.assertIn("guard !Task.isCancelled, effectiveChapter == targetChapter", chapter_loader)
+
+    def test_stalled_reader_mount_recovers_instead_of_stranding_prose(self):
+        """CI 43318166559 showed `paragraphs=0 building=1` behind a ready shell.
+        WebKit drops `evaluateJavaScript` completions when its content process
+        dies, so `isBuildingContent` stayed true and every later `update()`
+        returned before mounting. The watchdog must clear that state on its own
+        timer, because `update()` is exactly what stops being called."""
+        web = read_source(READER_WEB)
+        self.assertIn("private var contentBuildDeadline: CFTimeInterval = 0", web)
+        self.assertIn("private var contentBuildWatchdog: Task<Void, Never>?", web)
+        self.assertIn("scheduleContentBuildWatchdog(revision: revision, webView: webView)", web)
+        self.assertIn("self.recoverStalledContentBuildIfNeeded(webView: webView, force: true)", web)
+        self.assertIn("recoverStalledContentBuildIfNeeded(webView: WKWebView, force: Bool = false)", web)
+        # Recovery must clear the latch and force a remount, not merely log.
+        recovery = web.split("private func recoverStalledContentBuildIfNeeded", 1)[1]
+        self.assertIn("isBuildingContent = false", recovery)
+        self.assertIn("lastContentFingerprint = nil", recovery)
+        # A terminated content process invalidates any in-flight completion.
+        termination = web.split("func webViewWebContentProcessDidTerminate", 1)[1].split("private func activateDocumentIfNeeded", 1)[0]
+        self.assertIn("isBuildingContent = false", termination)
 
     def test_workbench_typography_and_classic_settings_keep_separate_boundaries(self):
         reader = read_source(READER)
@@ -217,7 +277,9 @@ class ProductQualityScopeTests(unittest.TestCase):
         cache = read_source(APP + "Core/Storage/ChapterDownloadStore.swift")
         self.assertIn("tasks[bookID]?.generation == generation", cache)
         self.assertIn("cacheStore.cachedChapterURLs(", cache)
-        self.assertIn("cachedChapterIndexes: Array(completed)", cache)
+        self.assertIn("cachedChapterIndexes: []", cache)
+        self.assertLess(cache.index("try await cacheStore.flush()"),
+                        cache.index("for index in completed { store.markCompleted"))
         self.assertGreaterEqual(cache.count("guard self.isCurrentJob(bookID, generation: generation)"), 2)
 
     def test_source_switch_validates_replacement_before_mutating_current_book(self):

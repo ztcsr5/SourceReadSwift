@@ -118,7 +118,11 @@ struct AppPagePaper: View {
     var body: some View {
         ZStack {
             AppTheme.background
-            if contrast != .increased, let asset = theme.illustratedPaper?.wallpaperAssetName {
+            // 视频玻璃主题自带动态背景；插画纸面与它在语义上冲突，故互斥。
+            if theme.isVideoGlass {
+                VideoGlassBackdrop(theme: theme)
+            }
+            if !theme.isVideoGlass, contrast != .increased, let asset = theme.illustratedPaper?.wallpaperAssetName {
                 ReaderIllustratedBackgroundView(name: asset, paper: AppTheme.background, night: scheme == .dark)
                     .id(asset)
                     .opacity(scheme == .dark ? 0.65 : 0.26)
