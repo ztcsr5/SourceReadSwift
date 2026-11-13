@@ -2,26 +2,21 @@ import SwiftUI
 import UIKit
 import QuartzCore
 
-/// 全应用把屏幕刷新率钉在设备上限（ProMotion 120Hz）。
+/// 全应用锁定设备物理最高刷新率（ProMotion 120Hz），不计较功耗、不随省电模式降频。
 ///
-/// iOS 的 ProMotion 是自适应的：没有持续要帧的请求时，系统会把刷新率降到 60/30/24。
-/// 只要有一个以最高刷新率运行的 CADisplayLink 主线程在跑，系统就会一直按最高档排帧，
-/// 于是触摸起手不再出现 60 → 120 的爬坡。
-///
-/// 挂在 App 根视图上常驻运行。代价是耗电（屏幕多刷一倍），按产品决策接受。
+/// iOS ProMotion 采用按需升频策略：无持续高刷请求时会自动退回 60Hz/30Hz/24Hz，导致滑卡、
+/// 点按与阅读滚动起手的前几帧出现掉帧阶跃。挂在根视图常驻 120Hz `CADisplayLink`
+/// 并配置 `CAFrameRateRange(min: rate, max: rate, preferred: rate)`，使系统渲染管线
+/// 全天候维持满帧排帧。
 final class AppRefreshRateKeeper: UIView {
     private var link: CADisplayLink?
 
-    /// Read by the frame HUD. This is the rate the app actually asked for,
-    /// which must be distinguished from the screen's reported ceiling.
     private(set) static var currentHeldRate: Float = 0
 
     var isHolding: Bool { link != nil }
     private(set) var heldRate: Float = 0
     private var observingResume = false
 
-    /// 从所有已连接场景里取最大的屏幕刷新率：
-    /// `UIScreen.main` 在新系统上可能返回 60，单看它会把上限误判成 60。
     private static func maximumRate() -> Float {
         let rates = UIApplication.shared.connectedScenes
             .compactMap { $0 as? UIWindowScene }
@@ -32,12 +27,9 @@ final class AppRefreshRateKeeper: UIView {
 
     func start() {
         let rate = Self.maximumRate()
-        // `makeUIView` can run before the scene is attached, where the screen
-        // still reports 60 Hz. Once `didMoveToWindow` runs the real screen is
-        // known, so restart the link instead of keeping the launch-time rate
-        // for the rest of the session.
         if let link {
-            if abs(link.preferredFrameRateRange.maximum - rate) < 0.5 { return }
+            if abs(link.preferredFrameRateRange.maximum - rate) < 0.5,
+               abs(link.preferredFrameRateRange.minimum - rate) < 0.5 { return }
             link.invalidate()
             self.link = nil
             heldRate = 0
@@ -70,13 +62,15 @@ final class AppRefreshRateKeeper: UIView {
         if window == nil { stop() } else { start() }
     }
 
-    /// 回到前台后系统会重新排帧，必须重新要一次 120，否则会停在 60。
     override func didMoveToSuperview() {
         super.didMoveToSuperview()
         guard !observingResume else { return }
         observingResume = true
         NotificationCenter.default.addObserver(
             self, selector: #selector(resume), name: UIApplication.didBecomeActiveNotification, object: nil
+        )
+        NotificationCenter.default.addObserver(
+            self, selector: #selector(resume), name: Notification.Name.NSProcessInfoPowerStateDidChange, object: nil
         )
     }
 
@@ -90,16 +84,12 @@ final class AppRefreshRateKeeper: UIView {
     }
 }
 
-/// 避免 CADisplayLink 强引用 target 形成循环。
 private final class WeakProxy: NSObject {
     weak var target: AnyObject?
     init(target: AnyObject) { self.target = target }
-    @objc func tick() {
-        // 空实现：链接本身的存在就是"持续要帧"的信号。
-    }
+    @objc func tick() {}
 }
 
-/// 把 keeper 挂进 SwiftUI 层级；根视图挂一次即可全应用生效。
 struct AppRefreshRateKeeperView: UIViewRepresentable {
     var enabled: Bool = true
 

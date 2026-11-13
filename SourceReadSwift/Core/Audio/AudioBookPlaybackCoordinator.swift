@@ -273,14 +273,24 @@ final class AudioBookPlaybackCoordinator: ObservableObject {
     }
 
     private func setupPlayer(with urlString: String) {
-        guard let url = URL(string: urlString.trimmingCharacters(in: .whitespacesAndNewlines)) else {
+        let directive = SourceURLDirectiveParser().parse(urlString.trimmingCharacters(in: .whitespacesAndNewlines))
+        guard let url = URL(string: directive.urlText) else {
             isLoading = false
             errorMessage = "音频链接无效，请刷新章节或更换书源"
             return
         }
         self.currentAudioURL = urlString
 
-        let asset = AVURLAsset(url: url)
+        var headers: [String: String] = [:]
+        if let source = currentSource {
+            headers = SourceRequestBuilder().imageRequestHeaders(for: source, chapterURL: currentChapter?.url)
+            headers["Accept"] = "*/*"
+        }
+        for (key, value) in directive.headers { headers[key] = value }
+        let assetOptions: [String: Any]? = headers.isEmpty
+            ? nil
+            : ["AVURLAssetHTTPHeaderFieldsKey": headers]
+        let asset = AVURLAsset(url: url, options: assetOptions)
         let item = AVPlayerItem(asset: asset)
         let loadID = chapterLoadID
 

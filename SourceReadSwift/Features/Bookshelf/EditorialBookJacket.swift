@@ -48,12 +48,13 @@ struct EditorialBookJacket<Cover: View>: View {
                 .accessibilityHidden(true)
         } else {
             jacket
-                .shadow(color: palette.shadow.opacity(contrast == .increased ? 0 : scheme == .dark ? 0.32 : 0.20),
-                    radius: stance == .floating ? 5 : 8, x: stance == .floating ? 3 : 2,
-                    y: stance == .floating ? 4 : 3)
+                .shadow(color: palette.shadow.opacity(contrast == .increased ? 0 : scheme == .dark ? 0.30 : 0.18),
+                    radius: stance == .floating ? 4 : 7, x: stance == .floating ? 2 : 2,
+                    y: stance == .floating ? 3 : 3)
                 .rotation3DEffect(.degrees(stance == .floating ? -12 : -5),
                     axis: (x: 0, y: 1, z: 0), perspective: 0.28)
                 .rotationEffect(.degrees(stance == .floating ? -4 : -2))
+                .compositingGroup()
                 .accessibilityHidden(true)
         }
     }

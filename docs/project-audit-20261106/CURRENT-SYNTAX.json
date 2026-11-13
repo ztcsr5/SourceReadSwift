@@ -1,93 +1,501 @@
 {
-  "baseline": "b10982da",
+  "baseline": "4bac7a0e",
   "files": [
     {
-      "path": "SourceReadSwift/App/AppRefreshRateKeeper.swift",
-      "sha256": "cbf1977b48766f71ffe08ca499f45c2fb7d2b147db9ed819f5c230c24603aa7f",
+      "path": "SourceReadSwift/App/AppState.swift",
+      "sha256": "5f0bfe218de44175c4206724f808e45f6fa22645858597a792221043c105599b",
+      "new_parser_errors": 0,
+      "snippets": []
+    },
+    {
+      "path": "SourceReadSwift/App/FloatingDeskRegressionLaunch.swift",
+      "sha256": "ca69ae066ad89e205537d9eb152b39ad2a1fb3f02f06d4cfcc591886dd75e5e6",
       "new_parser_errors": 0,
       "snippets": []
     },
     {
       "path": "SourceReadSwift/App/RootTabView.swift",
-      "sha256": "b9dd52695fbb9f282f0741db1442f1c1f0077df839841ca1c8520798a7565c68",
+      "sha256": "a53dc105ee4da2da5f4ab5f45f9e507a7d0aa7f6d139338cd0da51b7639c0c26",
+      "new_parser_errors": 0,
+      "snippets": []
+    },
+    {
+      "path": "SourceReadSwift/App/SourceReadSwiftApp.swift",
+      "sha256": "7b6a3a8ade74dc965fcdfaa37884f89b6e7fafceb6de4d05dbc5aa6e19e70692",
+      "new_parser_errors": 0,
+      "snippets": []
+    },
+    {
+      "path": "SourceReadSwift/Core/Import/LocalEPUBBookParser.swift",
+      "sha256": "7631184385ffec684c015036fc5a0dbf60f048961ec9380c31403fdc4191dbe8",
+      "new_parser_errors": 0,
+      "snippets": []
+    },
+    {
+      "path": "SourceReadSwift/Core/Import/LocalTextBookParser.swift",
+      "sha256": "210c169105929e200edd5cf49f736b494ab4b0587b55ae6f5701ecb0f8de19fb",
+      "new_parser_errors": 0,
+      "snippets": []
+    },
+    {
+      "path": "SourceReadSwift/Core/Import/LocalTxtSmartDivider.swift",
+      "sha256": "8a023917b5bf1204a132f6a75adf019efaad78bee2eea2fe252af434fa824984",
+      "new_parser_errors": 0,
+      "snippets": []
+    },
+    {
+      "path": "SourceReadSwift/Core/Import/TxtChapterRuleLibrary.swift",
+      "sha256": "69f5b7dedac1a7415824dce6ef76d6cada4b955870bc7d1490f8d566dd5192d0",
+      "new_parser_errors": 0,
+      "snippets": []
+    },
+    {
+      "path": "SourceReadSwift/Core/Storage/BookEPUBWriter.swift",
+      "sha256": "7fbf0d26d67c3fd59f31c9d272b56f3b5f387e324862450ef1ba5724719d638c",
+      "new_parser_errors": 0,
+      "snippets": []
+    },
+    {
+      "path": "SourceReadSwift/Core/Storage/BookExportFormats.swift",
+      "sha256": "614b8ff3e97d380471fa21cefda30f21ee5481d9b16f4743681d8365e10ab57b",
+      "new_parser_errors": 0,
+      "snippets": []
+    },
+    {
+      "path": "SourceReadSwift/Core/Storage/BookExportService.swift",
+      "sha256": "296a140ecd2e07ad29352cf4fa4a932f4e4cc46cb1677ea059331191d42cc861",
+      "new_parser_errors": 0,
+      "snippets": []
+    },
+    {
+      "path": "SourceReadSwift/Core/Storage/ChapterContentCacheStore.swift",
+      "sha256": "296e3f8a4b33466769f3fe8becc31760771893bb22176c70fc78f369768b7758",
+      "new_parser_errors": 0,
+      "snippets": []
+    },
+    {
+      "path": "SourceReadSwift/Core/Storage/ChapterDownloadStore.swift",
+      "sha256": "731668d7813cfcc802b6be5094183f3aa8aa2c96dda769900c98079050a254d2",
+      "new_parser_errors": 0,
+      "snippets": []
+    },
+    {
+      "path": "SourceReadSwift/Features/Bookshelf/AtelierReadingCard.swift",
+      "sha256": "87de7ff1428449a20419dea2d276eedf9851a9419c9c58f4fbf180fb77864eca",
+      "new_parser_errors": 0,
+      "snippets": []
+    },
+    {
+      "path": "SourceReadSwift/Features/Bookshelf/BookshelfReaderGatewayView.swift",
+      "sha256": "e786102e0d6b6a34e138b3d0b107c59f2b6059c025981b300f3011e64af3be2a",
       "new_parser_errors": 0,
       "snippets": []
     },
     {
       "path": "SourceReadSwift/Features/Bookshelf/BookshelfView.swift",
-      "sha256": "cb901827d9aff2d6940c9bbdc383a34b6c2d8c0bd4fc5a15df242172988339b7",
+      "sha256": "4f3a92e959a2e6dc0133ea3ddea42a36e94940acdd7d5c44006c81d0af00737d",
       "new_parser_errors": 0,
       "snippets": []
     },
     {
-      "path": "SourceReadSwift/Features/Bookshelf/FloatingReadingDesk.swift",
-      "sha256": "151bda89391f12e0bc64570fe77adab6b4793afeee6e93d0ecb3f4a5b79a2254",
+      "path": "SourceReadSwift/Features/Bookshelf/ForestReadingCard.swift",
+      "sha256": "2bb6bfcbd7dbbd51563d1d9b3e7646c2e7fa62228cf1c21feed466770b7df4cc",
       "new_parser_errors": 0,
       "snippets": []
     },
     {
-      "path": "SourceReadSwift/Features/Discover/DiscoverView.swift",
-      "sha256": "25f3182231e46a50fe5a889965f5ad4c428d0db045527020e179fd28581637c0",
+      "path": "SourceReadSwift/Features/Bookshelf/ReaderOpeningPage.swift",
+      "sha256": "54c8e95400852bbbd9deb28c865bf332d3c38e96586f9d94500a7b13bbe4bfbe",
       "new_parser_errors": 0,
       "snippets": []
     },
     {
-      "path": "SourceReadSwift/Features/Reader/ReaderChromeSurface.swift",
-      "sha256": "8e109e45d0f3d5c1207e5af1d1068d5e7481773475e70db5625e84fdb9bdd8ba",
+      "path": "SourceReadSwift/Features/Bookshelf/ReadingHeroCard.swift",
+      "sha256": "66c6fd52b1614e5c85acbf9322091c06447f7cf48a2cbd5b6f844b96d9dc2d17",
+      "new_parser_errors": 0,
+      "snippets": []
+    },
+    {
+      "path": "SourceReadSwift/Features/Bookshelf/ShelfChromeEvidence.swift",
+      "sha256": "c8fa7ebe50db02a928aaa9d82dc06ceb3b497d312e60146da86a138d0547ca52",
+      "new_parser_errors": 0,
+      "snippets": []
+    },
+    {
+      "path": "SourceReadSwift/Features/Discover/BookDetailView.swift",
+      "sha256": "55a27727e182a69c628b11bff82970e878ec18026c5525bec7372e316a3e087e",
+      "new_parser_errors": 0,
+      "snippets": []
+    },
+    {
+      "path": "SourceReadSwift/Features/Reader/ComicReaderView.swift",
+      "sha256": "780c4e03fddaeabc3011c3a15cc76d59fdfa50efb8b2562d7a62a44631a03670",
+      "new_parser_errors": 0,
+      "snippets": []
+    },
+    {
+      "path": "SourceReadSwift/Features/Reader/ComicStripReaderView.swift",
+      "sha256": "fd1f91d74c5feb6772a0367b0010fc3a901b92298fd6b0be1c0bae5ae542bb97",
+      "new_parser_errors": 0,
+      "snippets": []
+    },
+    {
+      "path": "SourceReadSwift/Features/Reader/Navigation/ReaderCompatibilityTransition.swift",
+      "sha256": "f65069e3024fbe0f41a6e546f9c99f960d22421428e4106849062e1fc68aa946",
+      "new_parser_errors": 0,
+      "snippets": []
+    },
+    {
+      "path": "SourceReadSwift/Features/Reader/Navigation/ReaderDestinationRequest.swift",
+      "sha256": "54fbfd75be23e5edd99e02986996e7c07da2fd6afd6cb11f42ac99b3b9c97023",
+      "new_parser_errors": 0,
+      "snippets": []
+    },
+    {
+      "path": "SourceReadSwift/Features/Reader/Navigation/ReaderEdgeInputTrace.swift",
+      "sha256": "6192d59b096134fc428dbc96e54f8ab719d6d98f92d38a05f8c3ceabfce48663",
+      "new_parser_errors": 0,
+      "snippets": []
+    },
+    {
+      "path": "SourceReadSwift/Features/Reader/Navigation/ReaderHostingEnvironment.swift",
+      "sha256": "653c643242eef9a4a42c78c22087b0d61cb0a0c2e3d85e92306df544c820f0e7",
+      "new_parser_errors": 0,
+      "snippets": []
+    },
+    {
+      "path": "SourceReadSwift/Features/Reader/Navigation/ReaderNavigationHost.swift",
+      "sha256": "3f2c116b36d466e657f7570c6327c84b659609856eb2d3b90012d1d63773c59c",
+      "new_parser_errors": 0,
+      "snippets": []
+    },
+    {
+      "path": "SourceReadSwift/Features/Reader/Navigation/ReaderNavigationRouter.swift",
+      "sha256": "589908159c560312171bd1dfb605ab2e6f06e5afc6a270f56b1f976744b0e798",
+      "new_parser_errors": 0,
+      "snippets": []
+    },
+    {
+      "path": "SourceReadSwift/Features/Reader/Navigation/ReaderNavigationSession.swift",
+      "sha256": "394859c637f51639216bb83ddbefc0f3781f0985ae151e3b0c7eafd56aa15bd1",
+      "new_parser_errors": 0,
+      "snippets": []
+    },
+    {
+      "path": "SourceReadSwift/Features/Reader/Navigation/ReaderZoomExperiment.swift",
+      "sha256": "50b07c5b2638a59e827e5d8f06ba2b3b99a2b0e9e799b079bc3e0ef93004b16b",
+      "new_parser_errors": 0,
+      "snippets": []
+    },
+    {
+      "path": "SourceReadSwift/Features/Reader/Navigation/ReaderZoomExperimentTrace.swift",
+      "sha256": "75efd47eb8e4f14253e87f8ab0e1a8ace04cf560b4e44a6dc202f14479096f50",
+      "new_parser_errors": 0,
+      "snippets": []
+    },
+    {
+      "path": "SourceReadSwift/Features/Reader/Navigation/ReaderZoomSource.swift",
+      "sha256": "a6b1ae689ad84c21ccfc3789da21bdd04309b13f4a0d84503af7dd9248be7bec",
+      "new_parser_errors": 0,
+      "snippets": []
+    },
+    {
+      "path": "SourceReadSwift/Features/Reader/ReaderBindingPreferences.swift",
+      "sha256": "df524cd93a9afbe02d25b6c22c270614c686ccd052689c552de8744e38e4ebd4",
       "new_parser_errors": 0,
       "snippets": []
     },
     {
       "path": "SourceReadSwift/Features/Reader/ReaderFrameHUD.swift",
-      "sha256": "38223bb8ae3dfd2d424c0b278d196f3880194a4213de320fdacf5378118f1c6a",
+      "sha256": "bf278cb9e4e65cdb52ea7d4134e58f01722d19ca4340990f09f816f050d938c3",
+      "new_parser_errors": 0,
+      "snippets": []
+    },
+    {
+      "path": "SourceReadSwift/Features/Reader/ReaderSafeAreaObserver.swift",
+      "sha256": "e9d3b2a9843d96a3f5902653a0eb8c41703d07179a57120ff65ebf3b03e38239",
+      "new_parser_errors": 0,
+      "snippets": []
+    },
+    {
+      "path": "SourceReadSwift/Features/Reader/ReaderView.swift",
+      "sha256": "6b3244b2dbd1976af354bb491cba9ab0e87721a0827ddd500a415a039c4df887",
       "new_parser_errors": 0,
       "snippets": []
     },
     {
       "path": "SourceReadSwift/Features/Reader/WebReaderDocument.swift",
-      "sha256": "60427a9e165ecdef53cc3574f4a2530ff1fdbd0e92ecbc005fdeb47c988f9565",
+      "sha256": "f73883a814641a4e711ee6154eb36f5b7f4a87fa88f11ba9b1af2590bcbb9c94",
+      "new_parser_errors": 0,
+      "snippets": []
+    },
+    {
+      "path": "SourceReadSwift/Features/Reader/WebScrollReaderView.swift",
+      "sha256": "c7b6f6ac6dc5ef494b115d3f211bc417dcde08c2ff7b48eea3e2699654c6a56d",
+      "new_parser_errors": 0,
+      "snippets": []
+    },
+    {
+      "path": "SourceReadSwift/Features/Search/GlobalSearchView.swift",
+      "sha256": "b0bd56c8f2e4d097d6325a124c58574f31cd532018c90fcacbcf69b58e6ace5f",
+      "new_parser_errors": 0,
+      "snippets": []
+    },
+    {
+      "path": "SourceReadSwift/Features/Settings/AppearanceSettingsView.swift",
+      "sha256": "751887c00754ab94d32d26ad4df19ad71818779141aa95f58a381e881fc955a4",
+      "new_parser_errors": 0,
+      "snippets": []
+    },
+    {
+      "path": "SourceReadSwift/Features/Settings/OfflineComicLibraryView.swift",
+      "sha256": "84ab2c6ff1e22e5d1f474f44f00bcfddd099c2beac34b32bdfe483d2c5a8e986",
+      "new_parser_errors": 0,
+      "snippets": []
+    },
+    {
+      "path": "SourceReadSwift/Features/Settings/ReaderDataManagementViews.swift",
+      "sha256": "764d5febc559d9c36ff22e26f7b694ed7626d9027f6c29eea30519c078482dbe",
+      "new_parser_errors": 0,
+      "snippets": []
+    },
+    {
+      "path": "SourceReadSwift/Features/Settings/ReaderSettingsPage.swift",
+      "sha256": "220de7c73e184263a80e6ac432df90b5b6d39fe191358e242358a1d2b4395926",
       "new_parser_errors": 0,
       "snippets": []
     },
     {
       "path": "SourceReadSwift/Features/Settings/SettingsView.swift",
-      "sha256": "393be38bdae7515e89885c9a0cba897b5aa0379101aaaf908d1fe511245dc1d0",
+      "sha256": "efaefd1dd0c33a0aa1bf675e7d328cdc05a151b7e4d3a54f716ad7492af50e50",
       "new_parser_errors": 0,
       "snippets": []
     },
     {
-      "path": "SourceReadSwift/Shared/DesignSystem/AppThemeSurface.swift",
-      "sha256": "a81f124a587a5cd8fbf1d00d6dd6bcdbe72ff19447a011f4707e3a15ab6a6a0b",
+      "path": "SourceReadSwift/Features/Settings/TxtChapterRulesView.swift",
+      "sha256": "85fac1b9f100a24017267cccf6a12cbad50bdd31c4a6f5b0f4e00f50ecdac664",
       "new_parser_errors": 0,
       "snippets": []
     },
     {
-      "path": "SourceReadSwift/Shared/DesignSystem/BrandGlass.swift",
-      "sha256": "99cf9a55b2067b9d6070e047801da40dc63a28c6ed826d753e73f4d34979dcac",
+      "path": "SourceReadSwift/Shared/DesignSystem/AppAtelierTheme.swift",
+      "sha256": "e8a2119929f5abd41bbd233c1a58adcf05f823ecc70f5239a888f04e6c727c68",
       "new_parser_errors": 0,
       "snippets": []
     },
     {
-      "path": "SourceReadSwift/Shared/DesignSystem/RootTabGlassSurface.swift",
-      "sha256": "b2f1a7d25880bbd8921aa783fe34375b5d7840539f2e73d5d812a9cc16c48bbe",
+      "path": "SourceReadSwift/Shared/DesignSystem/AppMotion.swift",
+      "sha256": "d23711d09794abdef9f5fee0dfc1c243f157f72fbdd87b9a1a2847cbc80f4a9c",
       "new_parser_errors": 0,
       "snippets": []
     },
     {
-      "path": "SourceReadSwift/Shared/Performance/PerformanceMode.swift",
-      "sha256": "c0fa0df1d23e9bb1053d812e6f96d99b3b25a14527c7d0eb1083114b81ce7420",
+      "path": "SourceReadSwift/Shared/DesignSystem/AppTheme.swift",
+      "sha256": "e1611c727565859c9976155b7b542c6e08847bfa285774488895e58705b3b018",
+      "new_parser_errors": 0,
+      "snippets": []
+    },
+    {
+      "path": "SourceReadSwift/Shared/DesignSystem/AppVisualTheme.swift",
+      "sha256": "c8e050405c1a8f9d57ee147978d2556c7121c3e6c8f31af42b37365d5467e553",
+      "new_parser_errors": 0,
+      "snippets": []
+    },
+    {
+      "path": "SourceReadSwift/Shared/DesignSystem/VideoGlassBackdrop.swift",
+      "sha256": "96bc25a6e37f37278767f6d6603723dad533fc355ab3d1bd76a81210d9158225",
+      "new_parser_errors": 0,
+      "snippets": []
+    },
+    {
+      "path": "SourceReadSwift/Shared/Performance/AppFrameProfiler.swift",
+      "sha256": "1f7f0252b75d7f852295efdd38ba15ae4afb6aef2c8acab3f6bf5714d18a35fe",
+      "new_parser_errors": 0,
+      "snippets": []
+    },
+    {
+      "path": "SourceReadSwiftTests/AtelierThemeTests.swift",
+      "sha256": "0aff2fb51498d8f482dd2466ea424cda832bf9a0713ca7b4a6dd17b3bac23f51",
+      "new_parser_errors": 0,
+      "snippets": []
+    },
+    {
+      "path": "SourceReadSwiftTests/BookExportRegressionTests.swift",
+      "sha256": "1e6b97667bde597b7e90c1405b66946ebdc1960e7e52b3193b61b65b7c4b78d9",
       "new_parser_errors": 0,
       "snippets": []
     },
     {
       "path": "SourceReadSwiftTests/ChapterCacheWriterPerformanceTests.swift",
-      "sha256": "b99480469f412f7e3334e88f4934b96138f0ac4e0c5472e1c865148f04d696db",
+      "sha256": "3dd6f05d79bf8ea55e6f6ca5c9bb6807bbba6d80fb88fc1d8bc98a061811fab0",
       "new_parser_errors": 0,
       "snippets": []
     },
     {
-      "path": "SourceReadSwiftTests/Release117SearchProjectionTests.swift",
-      "sha256": "0a4c11c579f86d645e4c72c1ae5b02610bc29fd8c2aed1cdf9838caa623c1b6b",
+      "path": "SourceReadSwiftTests/ChapterDownloadStoreTests.swift",
+      "sha256": "c61508bfe97f33814c0e1b15632893415fc991a757cc4ae530aa25f4a7ea54e7",
+      "new_parser_errors": 0,
+      "snippets": []
+    },
+    {
+      "path": "SourceReadSwiftTests/ChapterFetchConcurrencyTests.swift",
+      "sha256": "5d5fd7efa53376414b8c32c566a8522a513930eacfdcc7864035afd83dba5b58",
+      "new_parser_errors": 0,
+      "snippets": []
+    },
+    {
+      "path": "SourceReadSwiftTests/ForestBrandThemeTests.swift",
+      "sha256": "7cfc2042306e2571187a2e27aeb5698d545ce8c4208ce6786adbe4c5ce9daabf",
+      "new_parser_errors": 0,
+      "snippets": []
+    },
+    {
+      "path": "SourceReadSwiftTests/HomeLayoutEvidenceTests.swift",
+      "sha256": "769103c82d662c557e7299d373c9de8215c255463cfc34ef816d579d6d805fcc",
+      "new_parser_errors": 0,
+      "snippets": []
+    },
+    {
+      "path": "SourceReadSwiftTests/LocalEPUBBookParserTests.swift",
+      "sha256": "e1f5ca92fd3c78e26b3df5e35f6b26914742d097c19c044af58ca03fd069c778",
+      "new_parser_errors": 0,
+      "snippets": []
+    },
+    {
+      "path": "SourceReadSwiftTests/OfflineTextRetentionTests.swift",
+      "sha256": "8fbbfcd7395705fe460fd913250dc81124fa041c8184a855d1519cc51610054c",
+      "new_parser_errors": 0,
+      "snippets": []
+    },
+    {
+      "path": "SourceReadSwiftTests/ReaderCompatibilityNavigationTests.swift",
+      "sha256": "16e1454d76d4eb3809ff9a928e275405ef3c9da22af3ed5bebd7053aca3ba425",
+      "new_parser_errors": 0,
+      "snippets": []
+    },
+    {
+      "path": "SourceReadSwiftTests/ReaderExitSwipeTests.swift",
+      "sha256": "c0c98d559e1aa3d553f6f062966c73beabf6e152b7344b4e701de8566c703ec7",
+      "new_parser_errors": 0,
+      "snippets": []
+    },
+    {
+      "path": "SourceReadSwiftTests/ReaderModePositionRegressionTests.swift",
+      "sha256": "2369b9e03a95bd2dd1d60716a6dc78a09450bf0cb7cc0dc79fa20efe6594371a",
+      "new_parser_errors": 0,
+      "snippets": []
+    },
+    {
+      "path": "SourceReadSwiftTests/ReaderNativeNavigationTests.swift",
+      "sha256": "93bd5a03c97585c6068dfce522bdd6e6da5a2f35ab4f3b2d4042958e4526687f",
+      "new_parser_errors": 0,
+      "snippets": []
+    },
+    {
+      "path": "SourceReadSwiftTests/ReaderNavigationSessionTests.swift",
+      "sha256": "9cc55a46a93e72ef1538e05fac3abef1fa237679341ebbb409d294bab59a652d",
+      "new_parser_errors": 0,
+      "snippets": []
+    },
+    {
+      "path": "SourceReadSwiftTests/ReaderSafeAreaResolverTests.swift",
+      "sha256": "32c37655f9a64584269447c2f18e55e51370de753b8c1ae8367406f75794a320",
+      "new_parser_errors": 0,
+      "snippets": []
+    },
+    {
+      "path": "SourceReadSwiftTests/ReaderScrollSchedulingTests.swift",
+      "sha256": "6c05571dc081bc8c898ff9cddf056e4b59befe3f374d8c303461b2b96ac55406",
+      "new_parser_errors": 0,
+      "snippets": []
+    },
+    {
+      "path": "SourceReadSwiftTests/ReaderSettingsPageTests.swift",
+      "sha256": "b9b5856743a16e75926f3c78cae25144e38830b44e565f660593fa0f72b2e771",
+      "new_parser_errors": 0,
+      "snippets": []
+    },
+    {
+      "path": "SourceReadSwiftTests/ReaderTabChromeExitTests.swift",
+      "sha256": "79310201b946a4c48aef508df5b7cd4952f26d8585873b4e58799e7577a36add",
+      "new_parser_errors": 0,
+      "snippets": []
+    },
+    {
+      "path": "SourceReadSwiftTests/ReaderZoomSourceTests.swift",
+      "sha256": "b515fdfce4c4ae4ff350d9a8c115c6a8d15efa07418b2adcb449364364096a9e",
+      "new_parser_errors": 0,
+      "snippets": []
+    },
+    {
+      "path": "SourceReadSwiftTests/Release110RegressionTests.swift",
+      "sha256": "6924d0f7da7e65c3b1cdc8e28536df9f33b33094b6691281d2c577dc9601dcaa",
+      "new_parser_errors": 0,
+      "snippets": []
+    },
+    {
+      "path": "SourceReadSwiftTests/Release116VisualTests.swift",
+      "sha256": "350de766f47ca0a9d73b3af0ce4c6e40c6d171696049ccbf1523b56fa48daf4a",
+      "new_parser_errors": 0,
+      "snippets": []
+    },
+    {
+      "path": "SourceReadSwiftTests/Release117MotionSystemTests.swift",
+      "sha256": "6fe09a48ec7fc7522b354110cc0866cc6e2fa6d1ed60d3d3a818d1151435cad0",
+      "new_parser_errors": 0,
+      "snippets": []
+    },
+    {
+      "path": "SourceReadSwiftTests/Release117ThemeCollaborationTests.swift",
+      "sha256": "a424b8f8aac887b7697c81e1d858cefa123f28d6228e24d90f845f7a24c00d5c",
+      "new_parser_errors": 0,
+      "snippets": []
+    },
+    {
+      "path": "SourceReadSwiftTests/SourceCookieStoreTests.swift",
+      "sha256": "c234e1f6c44874759bcfbf85534dea3679ea7f021e298793760c7f7b33357dfd",
+      "new_parser_errors": 0,
+      "snippets": []
+    },
+    {
+      "path": "SourceReadSwiftTests/TabChromeRegressionTests.swift",
+      "sha256": "5a2929a61ca456f7e50d6319e20041d8a25d25bc25d53585704c9a0e15a6f362",
+      "new_parser_errors": 0,
+      "snippets": []
+    },
+    {
+      "path": "SourceReadSwiftTests/TxtChapterRuleLibraryTests.swift",
+      "sha256": "f94e5025a590a37396f760620a93bcd9c0175b1343972f9556c4e638757df10b",
+      "new_parser_errors": 0,
+      "snippets": []
+    },
+    {
+      "path": "SourceReadSwiftTests/VideoGlassThemeTests.swift",
+      "sha256": "225c94f0fd2855dc96ac8729337a91e07419359a5548cd953f8ec80540197060",
+      "new_parser_errors": 0,
+      "snippets": []
+    },
+    {
+      "path": "SourceReadSwiftTests/WebsiteSourceFamilyInferenceTests.swift",
+      "sha256": "0f7517c458e3b434b577c4b0d8a0b14ee6139ff7ae3937ecb77e7f1dcffcb292",
+      "new_parser_errors": 0,
+      "snippets": []
+    },
+    {
+      "path": "SourceReadSwiftUITests/FloatingReadingDeskUITests.swift",
+      "sha256": "3c17a7fdf1f2557df72fa4224d567da6cf546c7819694a36016222ee338418aa",
+      "new_parser_errors": 0,
+      "snippets": []
+    },
+    {
+      "path": "SourceReadSwiftUITests/ReaderOverlayCycleUITests.swift",
+      "sha256": "6b4ef42f119ac912b1efd1c90305e3f317af6abcda312845a909478eee009b87",
+      "new_parser_errors": 0,
+      "snippets": []
+    },
+    {
+      "path": "SourceReadSwiftUITests/ReaderSettingsFlowUITests.swift",
+      "sha256": "87d0347e5358d06b640406618e10411461c566727ff8924c845d3cdd6b8e7965",
       "new_parser_errors": 0,
       "snippets": []
     }

@@ -98,7 +98,7 @@ struct NativeReaderTextView: UIViewRepresentable {
         textView.canCancelContentTouches = true
         textView.textContainer.lineFragmentPadding = 0
         textView.contentInsetAdjustmentBehavior = .never
-        textView.layoutManager.allowsNonContiguousLayout = false
+        textView.layoutManager.allowsNonContiguousLayout = true
         textView.decelerationRate = .normal
         textView.setContentHuggingPriority(.defaultLow, for: .vertical)
         textView.setContentCompressionResistancePriority(.defaultLow, for: .vertical)
@@ -607,11 +607,11 @@ struct NativeReaderTextView: UIViewRepresentable {
                 textView.attributedText = result.text
                 textView.textColor = configuration.textColor
             }
-            // Force synchronous layout pass so contentSize.height is accurate and
-            // never causes rubber-banding bounces while content remains below.
-            textView.layoutManager.ensureLayout(for: textView.textContainer)
+            if textView.bounds.width > 0, textView.bounds.height > 0 {
+                let visibleRect = CGRect(origin: textView.contentOffset, size: textView.bounds.size)
+                textView.layoutManager.ensureLayout(forBoundingRect: visibleRect, in: textView.textContainer)
+            }
             textView.setNeedsLayout()
-            textView.layoutIfNeeded()
             if restartIllustrationLoads {
                 loadIllustrations(for: configuration, in: textView)
             }
@@ -785,7 +785,8 @@ struct NativeReaderTextView: UIViewRepresentable {
             guard !paragraphRanges.isEmpty, textView.bounds.height > 0 else { return nil }
             let length = textView.textStorage.length
             guard length > 0 else { return nil }
-            textView.layoutManager.ensureLayout(for: textView.textContainer)
+            let visibleRect = CGRect(origin: textView.contentOffset, size: textView.bounds.size)
+            textView.layoutManager.ensureLayout(forBoundingRect: visibleRect, in: textView.textContainer)
 
             let contentTop = textView.contentOffset.y + textView.textContainerInset.top
             let probe = CGPoint(x: 0, y: max(0, contentTop))
@@ -822,8 +823,11 @@ struct NativeReaderTextView: UIViewRepresentable {
             )
             guard let characterIndex = ReaderScrollAnchorPolicy.characterIndex(for: shifted, in: paragraphRanges),
                   textView.textStorage.length > 0 else { return }
-            textView.layoutManager.ensureLayout(for: textView.textContainer)
             let safeIndex = min(max(characterIndex, 0), textView.textStorage.length - 1)
+            textView.layoutManager.ensureLayout(
+                forCharacterRange: NSRange(location: 0, length: safeIndex + 1),
+                actualCharacterRange: nil
+            )
             let glyphIndex = textView.layoutManager.glyphIndexForCharacter(at: safeIndex)
             guard glyphIndex < textView.layoutManager.numberOfGlyphs else { return }
             let lineRect = textView.layoutManager.lineFragmentRect(forGlyphAt: glyphIndex, effectiveRange: nil)
@@ -907,8 +911,14 @@ struct NativeReaderTextView: UIViewRepresentable {
                 return false
             }
             textView.layoutIfNeeded()
-            textView.layoutManager.ensureLayout(for: textView.textContainer)
             let range = paragraphRanges[index]
+            let targetEnd = min(textView.textStorage.length, max(range.location + range.length, 1))
+            if targetEnd > 0 {
+                textView.layoutManager.ensureLayout(
+                    forCharacterRange: NSRange(location: 0, length: targetEnd),
+                    actualCharacterRange: nil
+                )
+            }
             let glyphRange = textView.layoutManager.glyphRange(forCharacterRange: range, actualCharacterRange: nil)
             let rect = textView.layoutManager.boundingRect(forGlyphRange: glyphRange, in: textView.textContainer)
 

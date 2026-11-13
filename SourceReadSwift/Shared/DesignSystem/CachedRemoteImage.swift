@@ -91,10 +91,11 @@ struct CachedRemoteImage<Placeholder: View>: View {
 
         if let cached = RemoteImageLoader.shared.cachedImage(for: url, maxPixelSize: maxPixelSize,
             reuseCoverBytes: reuseCoverBytes, headers: headers) {
+            if image === cached && loadedIdentifier == taskIdentifier { return }
             await MainActor.run {
                 guard !Task.isCancelled else { return }
-                image = cached
-                loadedIdentifier = taskIdentifier
+                if image !== cached { image = cached }
+                if loadedIdentifier != taskIdentifier { loadedIdentifier = taskIdentifier }
                 onSizeChange?(cached.size)
                 onImageLoad?(cached)
             }

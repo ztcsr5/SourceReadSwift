@@ -4,6 +4,7 @@ import QuartzCore
 
 struct BookshelfView: View {
     var onRequestGlobalSearch: () -> Void = {}
+    var onRevealNavigation: (() -> Void)? = nil
     @EnvironmentObject private var appState: AppState
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.dynamicTypeSize) private var typeSize
@@ -165,20 +166,11 @@ struct BookshelfView: View {
             .onAppear {
                 isShelfVisible = true
                 NavigationTrace.shared.mark("shelf", "onAppear needsRefresh=\(shelfProjectionNeedsRefresh)")
-                // 返回主页时同步刷新，不再延时 120ms：延时版正好落在 pop 动画
-                // 结束、用户已经看得见主页的那几帧里，整片 LazyVStack 重建会让
-                // 每张卡的 AsyncBookCover 重跑 `.task`，表现成「主页要加载一下」。
-                // 同步版在转场起点就跑完；输入没变时 refreshShelfProjection
-                // 内部直接 return，不产生任何重建。
-                refreshShelfProjection()
-                shelfProjectionNeedsRefresh = false
-                // 这里**不能**做「清空全部 owner」的兜底。
-                // 一次没滑够距离的侧滑会在 ~100ms 内取消，阅读器随即重新出现并
-                // acquire；若此时又跑一次 owner 全清，栏就会在阅读页里浮现出来。
-                // 跨时空的 owner 由 AppState 的 350ms 挂起窗口兜住。
-                //
-                // 同样不能清 lastContextualBookRoute：pop 起点清它会让 destination
-                // 立刻拆解、gateway.onDisappear 落进转场，等于换条路再闪一次。
+                // 仅在首次进入或底层数据确实变更后刷新，返回主页时不无故重建列表与排序。
+                if !appState.isReaderPresented, (shelfProjection == nil || shelfProjectionNeedsRefresh) {
+                    refreshShelfProjection()
+                    shelfProjectionNeedsRefresh = false
+                }
             }
             .onDisappear {
                 NavigationTrace.shared.mark("shelf", "onDisappear")
@@ -189,7 +181,7 @@ struct BookshelfView: View {
                 // A pushed reader keeps this view in the hierarchy. Refreshing
                 // behind its opening transition re-sorted the shelf in the
                 // exact frames the hero zoom was settling.
-                guard isShelfVisible, contextualBookRoute == nil else {
+                guard isShelfVisible, contextualBookRoute == nil, !appState.isReaderPresented else {
                     shelfProjectionNeedsRefresh = true
                     return
                 }
@@ -204,11 +196,25 @@ struct BookshelfView: View {
             }
             .onReceive(appState.sourceStore.$sources) { _ in
                 NavigationTrace.shared.breadcrumb("store", "sources")
-                guard isShelfVisible, contextualBookRoute == nil else {
+                guard isShelfVisible, contextualBookRoute == nil, !appState.isReaderPresented else {
                     shelfProjectionNeedsRefresh = true
                     return
                 }
                 refreshShelfProjection()
+            }
+            .onChange(of: appState.isReaderPresented) { presented in
+                if !presented {
+                    // 离开阅读器返回主页时，将正在阅读卡片复位到刚阅读的书籍（index 0），不发生错位挪移。
+                    deskReturnOrder = []
+                    shelfReturnOrder = []
+                    if let currentFirst = deskBooks.first?.id {
+                        readingBookID = currentFirst
+                    }
+                    if shelfProjectionNeedsRefresh {
+                        refreshShelfProjection()
+                        shelfProjectionNeedsRefresh = false
+                    }
+                }
             }
             .onChange(of: sortModeRawValue) { _ in clearReturnOrder() }
             .onChange(of: searchKeyword) { _ in clearReturnOrder() }
@@ -217,6 +223,12 @@ struct BookshelfView: View {
             .onChange(of: themeRaw) { _ in usesThemeShelfLayout = true }
             .background(bookshelfBackdrop)
             .overlay(alignment: .topTrailing) { shelfChromeReveal }
+            // Invisible probe: the detail-return report said 主页 appeared
+            // ~0.9 s after the content. Reading the real UINavigationBar here
+            // tells apart "bar still hidden", "alpha fading" and "body rebuilt".
+            .background(alignment: .topLeading) {
+                ShelfChromeEvidence().frame(width: 1, height: 1)
+            }
             .onChange(of: floatingReadingDeskEnabled) { isEnabled in
                 if !isEnabled { readingCoverHandoff.clear() }
             }
@@ -225,14 +237,7 @@ struct BookshelfView: View {
             }
             .navigationTitle("主页")
             .navigationBarTitleDisplayMode(theme.usesNeutralGlass ? .large : .inline)
-            // 阅读器接管 chrome 时，主页自己也必须把导航栏藏起来。
-            //
-            // 只靠 destination 上的 `.toolbar(.hidden, for: .navigationBar)`
-            // 是不够的：那条修饰符绑在 destination 的生命周期上，侧滑手势一开始
-            // SwiftUI 就拆掉 reader 子树，`.hidden` 随之消失，主页的
-            // `.automatic` 立刻生效——导航栏和右上角按钮在手指刚动时就整条弹出，
-            // 完全不等转场。把它挂到活过整个转场的主页根视图上，才藏得住。
-            .scrollCollapsedNavigationBar(collapsesShelfChrome || appState.isTabChromeHidden)
+            .scrollCollapsedNavigationBar(collapsesShelfChrome)
             .toolbar {
                 ToolbarItemGroup(placement: .navigationBarTrailing) {
 
@@ -354,6 +359,7 @@ struct BookshelfView: View {
             Button {
                 UIImpactFeedbackGenerator(style: .light).impactOccurred()
                 revealShelfChrome()
+                onRevealNavigation?()
             } label: {
                 Image(systemName: "chevron.down")
                     .font(.system(size: 13, weight: .bold))
@@ -743,7 +749,8 @@ struct BookshelfView: View {
                         return try LocalEPUBBookParser().parse(fileURL: localURL)
                     } else {
                         let data = try Data(contentsOf: localURL)
-                        return LocalTxtSmartDivider().divide(data: data, fileName: localURL.lastPathComponent)
+                        return LocalTxtSmartDivider(ruleLibrary: TxtChapterRuleLibrary.load())
+                            .divide(data: data, fileName: localURL.lastPathComponent)
                     }
                 }
                 let parsed = try await withTaskCancellationHandler(operation: {
@@ -866,22 +873,14 @@ struct BookshelfView: View {
     }
 
     private var deskBooks: [BookshelfBook] {
-        let books = ReadingDeskSelection.books(from: recentBooks)
-        return BookReturnOrder.restore(books, ids: deskReturnOrder) ?? books
+        ReadingDeskSelection.books(from: recentBooks)
     }
 
     private func pinReturnOrder(placement: String) {
-        // 返回首页时 onAppear 会再次调用；内容没变就不写 @State，
-        // 否则会多触发一整轮 body 求值，返回手感直接变卡。
-        if placement == "continue" {
-            let next = deskBooks.map(\.id)
-            guard deskReturnOrder != next else { return }
-            deskReturnOrder = next
-        } else {
-            let next = displayedShelfBooks.map(\.id)
-            guard shelfReturnOrder != next else { return }
-            shelfReturnOrder = next
-        }
+        guard placement != "continue" else { return }
+        let next = displayedShelfBooks.map(\.id)
+        guard shelfReturnOrder != next else { return }
+        shelfReturnOrder = next
     }
 
     private func clearReturnOrder() {
@@ -900,7 +899,6 @@ struct BookshelfView: View {
         BookDetailView(book: book.asSearchBook)
             .bookHeroDestination(placement + "|" + book.id, in: bookHero)
             .environment(\.readingCoverHandoff, readingDeskEnabled ? readingCoverHandoff : nil)
-            .onAppear { pinReturnOrder(placement: placement) }
     }
 
     @ViewBuilder private func bookDestination(_ book: BookshelfBook, placement: String) -> some View {
@@ -926,14 +924,9 @@ struct BookshelfView: View {
     private func readingDeskEntry(_ book: BookshelfBook) -> some View {
         Button {
             guard contextualBookRoute == nil else { return }
-            pinReturnOrder(placement: "continue")
             UIImpactFeedbackGenerator(style: .light).impactOccurred()
-            // 阅读器走覆盖层：主页不离开层级，于是没有 pop、没有 chrome 恢复、
-            // 没有书架重建。原来的 .read 路由已删除。
-            appState.readerOverlay = ReaderOverlayRequest(
-                book: book,
-                coverImage: readingCoverHandoff.frame(for: book)
-            )
+            readingBookID = book.id
+            appState.readerNavigation.open(.shelf(book, sourceID: "continue|" + book.id))
         } label: {
             Group {
                 if theme.homeComposition != .readingDesk, readingDeskEnabled {
@@ -1020,7 +1013,6 @@ struct BookshelfView: View {
             layout {
                 ShelfBookCover(book: book, width: 52, height: 72, theme: theme)
                     .environment(\.readingCoverHandoff, readingDeskEnabled ? readingCoverHandoff : nil)
-                    .readerCoverAnchor(book.id)
                     .bookHeroSource("list|" + book.id, in: bookHero)
                 VStack(alignment: .leading, spacing: 5) {
                     HStack(spacing: 5) {
@@ -1120,7 +1112,6 @@ struct BookshelfView: View {
             VStack(alignment: .leading, spacing: 8) {
                 ShelfBookCover(book: book, width: nil, height: 120, theme: theme)
                     .environment(\.readingCoverHandoff, readingDeskEnabled ? readingCoverHandoff : nil)
-                    .readerCoverAnchor(book.id)
                     .bookHeroSource("grid|" + book.id, in: bookHero)
 
                 VStack(alignment: .leading, spacing: 3) {

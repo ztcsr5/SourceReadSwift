@@ -18,7 +18,8 @@ struct AppMotionPolicy: Equatable {
     func animation(_ event: Event) -> Animation? {
         guard !reducesMotion else { return nil }
         switch event {
-        case .press, .background: return .easeInOut(duration: duration(event))
+        case .press: return .interactiveSpring(response: 0.12, dampingFraction: 0.88)
+        case .background: return .easeInOut(duration: duration(event))
         case .navigation: return .interactiveSpring(response: duration(event), dampingFraction: 0.90)
         case .expansion: return .interactiveSpring(response: duration(event), dampingFraction: 0.88)
         case .bookmark: return .spring(response: duration(event), dampingFraction: 0.82)
@@ -36,11 +37,10 @@ struct AppMotionPolicy: Equatable {
     }
 }
 
-/// 动效不再可关闭：App 内「减少动态效果」开关已删除。
-/// `reducesMotion` 字段保留为恒 `false`，只是为了不改动 30 余处
-/// `motion.reducesMotion ? … : …` 调用点，行为上等同于恒常动效。
+/// The system accessibility preference applies to every decorative animation.
 @propertyWrapper struct AppMotion: DynamicProperty {
-    var wrappedValue: AppMotionPolicy { AppMotionPolicy(reducesMotion: false) }
+    @Environment(\.accessibilityReduceMotion) private var reducesMotion
+    var wrappedValue: AppMotionPolicy { AppMotionPolicy(reducesMotion: reducesMotion) }
 }
 
 struct AppPressStyle: ButtonStyle {
@@ -68,13 +68,26 @@ struct BookOpenPressStyle: ButtonStyle {
 private struct BookHeroSource: ViewModifier {
     let id: String
     let namespace: Namespace.ID
+    private var usesReaderZoomHost: Bool {
+        id.hasPrefix("continue|") || id.hasPrefix("reader|") || id.hasPrefix("history|")
+    }
+
     @ViewBuilder func body(content: Content) -> some View {
-        // The zoom handoff is a navigation transition, not part of the spatial
-        // reading desk. Turning the desk off must not silently downgrade every
-        // shelf -> detail push to a plain slide.
-        if #available(iOS 18.0, *) {
-            content.matchedTransitionSource(id: id, in: namespace)
-        } else { content }
+        // 仅对直接打开阅读器的源（正在阅读主卡 / 详情封面 / 阅读历史）注册 ReaderZoomSource，
+        // 书架网格/列表与更新行只走 SwiftUI 原生 matchedTransitionSource，避免滚动期 UIHostingController 开销。
+        if usesReaderZoomHost {
+            if #available(iOS 18.0, *) {
+                content.readerZoomSource(id).matchedTransitionSource(id: id, in: namespace)
+            } else {
+                content.readerZoomSource(id)
+            }
+        } else {
+            if #available(iOS 18.0, *) {
+                content.matchedTransitionSource(id: id, in: namespace)
+            } else {
+                content
+            }
+        }
     }
 }
 

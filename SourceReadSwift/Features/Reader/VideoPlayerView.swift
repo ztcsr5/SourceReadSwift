@@ -528,9 +528,16 @@ struct VideoPlayerView: View {
                 self.isLoading = false
                 switch result {
                 case .success(let content):
-                    if let videoUrlString = VideoContentParser.parseVideoURL(from: content, chapterURL: chapter.url),
-                       let url = URL(string: videoUrlString) {
-                        self.setupPlayer(with: url)
+                    if let videoUrlString = VideoContentParser.parseVideoURL(from: content, chapterURL: chapter.url) {
+                        let directive = SourceURLDirectiveParser().parse(videoUrlString)
+                        if let url = URL(string: directive.urlText) {
+                            var headers = SourceRequestBuilder().imageRequestHeaders(for: source, chapterURL: chapter.url)
+                            headers["Accept"] = "*/*"
+                            for (key, value) in directive.headers { headers[key] = value }
+                            self.setupPlayer(with: url, headers: headers)
+                        } else {
+                            self.errorMessage = "未在当前剧集解析到有效视频流地址"
+                        }
                     } else {
                         self.errorMessage = "未在当前剧集解析到有效视频流地址"
                     }
@@ -541,10 +548,14 @@ struct VideoPlayerView: View {
         }
     }
 
-    private func setupPlayer(with url: URL) {
+    private func setupPlayer(with url: URL, headers: [String: String] = [:]) {
         cleanupPlayer()
 
-        let item = AVPlayerItem(url: url)
+        let assetOptions: [String: Any]? = headers.isEmpty
+            ? nil
+            : ["AVURLAssetHTTPHeaderFieldsKey": headers]
+        let asset = AVURLAsset(url: url, options: assetOptions)
+        let item = AVPlayerItem(asset: asset)
         let newPlayer = AVPlayer(playerItem: item)
         self.player = newPlayer
 

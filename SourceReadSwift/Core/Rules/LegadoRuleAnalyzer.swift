@@ -8,6 +8,9 @@ final class LegadoRuleAnalyzer {
     let executionContext: RuleExecutionContext
     private let htmlExtractor: HtmlRuleExtractor
     private let jsonExtractor: JSONRuleExtractor
+    private var cachedDocumentContent: String?
+    private var cachedDocumentBaseURL: String?
+    private var cachedDocument: Document?
 
     init(executionContext: RuleExecutionContext = RuleExecutionContext()) {
         self.executionContext = executionContext
@@ -37,7 +40,7 @@ final class LegadoRuleAnalyzer {
             return stringify(jsonExtractor.value(from: json, path: rule, variables: variables))
         }
         do {
-            let root = try SwiftSoup.parse(content, baseURL?.absoluteString ?? "http://localhost/")
+            let root = try parsedDocument(content: content, baseURL: baseURL)
             return try htmlExtractor.value(from: root, rule: rule, baseUrl: baseURL, variables: variables)
         } catch {
             executionContext.log("RuleAnalyzer string failed: \(error.localizedDescription)")
@@ -62,17 +65,10 @@ final class LegadoRuleAnalyzer {
             return value.isEmpty ? [] : [value]
         }
         if let json = jsonObject(content) {
-            // Delegate to `AnalyzeByJSonPath.getStringList` semantics: a
-            // successful `{$...}` inner-rule substitution is one element even
-            // when it contains newlines, while plain JSONPath selections keep
-            // one element per match.
             return jsonExtractor.stringList(from: json, rule: rule, variables: variables)
         }
         do {
-            let root = try SwiftSoup.parse(content, baseURL?.absoluteString ?? "http://localhost/")
-            // `AnalyzeByJSoup.getStringList` keeps one element per selected
-            // node.  Splitting the joined string on newlines would destroy
-            // node boundaries for `@textNodes` and multi-paragraph content.
+            let root = try parsedDocument(content: content, baseURL: baseURL)
             return try htmlExtractor.stringList(from: root, rule: rule, baseUrl: baseURL, variables: variables)
                 .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
                 .filter { !$0.isEmpty }
@@ -85,12 +81,26 @@ final class LegadoRuleAnalyzer {
     func elements(content: String, rule: String, baseURL: URL?, variables: [String: Any] = [:]) -> [Element] {
         setContent(content, baseURL: baseURL, variables: variables)
         do {
-            let root = try SwiftSoup.parse(content, baseURL?.absoluteString ?? "http://localhost/")
+            let root = try parsedDocument(content: content, baseURL: baseURL)
             return try htmlExtractor.select(from: root, rule: rule, baseUrl: baseURL)
         } catch {
             executionContext.log("RuleAnalyzer elements failed: \(error.localizedDescription)")
             return []
         }
+    }
+
+    private func parsedDocument(content: String, baseURL: URL?) throws -> Document {
+        let baseKey = baseURL?.absoluteString ?? "http://localhost/"
+        if let doc = cachedDocument,
+           cachedDocumentBaseURL == baseKey,
+           cachedDocumentContent == content {
+            return doc
+        }
+        let doc = try SwiftSoup.parse(content, baseKey)
+        cachedDocumentContent = content
+        cachedDocumentBaseURL = baseKey
+        cachedDocument = doc
+        return doc
     }
 
     private func evaluateJavaScript(_ rawRule: String, variables: [String: Any]) -> String {
@@ -104,9 +114,9 @@ final class LegadoRuleAnalyzer {
         executionContext.responseHandler = { urlText in
             source.flatMap { SynchronousSourceLoader().loadResponse(urlText: urlText, source: $0, cookieHeader: self.executionContext.string(for: "cookieHeader")) }
         }
-        let runtime = JSCoreRuntime(ajaxHandler: { urlText in
+        let runtime = executionContext.jsRuntime(ajaxHandler: { urlText in
             source.map { SynchronousSourceLoader().load(urlText: urlText, source: $0) } ?? ""
-        }, executionContext: executionContext)
+        })
         var bindings = executionContext.snapshot()
         variables.forEach { bindings[$0.key] = $0.value }
         switch runtime.evaluate(script, variables: bindings) {
@@ -121,10 +131,6 @@ final class LegadoRuleAnalyzer {
     }
 
     private func jsonObject(_ text: String) -> Any? {
-        // Keep the analyzer's format decision aligned with the network
-        // decoder.  Legacy sources frequently prepend a BOM/XSSI guard or
-        // wrap JSON in `<pre>`; rejecting those here made preview and runtime
-        // disagree even though ResponseFormatDetector already handled them.
         ResponseFormatDetector.jsonObject(from: text)
     }
 

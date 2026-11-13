@@ -23,6 +23,7 @@ PREFIXES = (
     "floating-desk-25-", "floating-desk-26-",
     "floating-desk-10-dark-", "floating-desk-11-", "floating-desk-16-",
     "floating-desk-17-", "floating-desk-cross-chapter-",
+    "floating-desk-reader-return-scrolled-shelf",
     "reader-more-open-5", "reader-more-dismissal-failure-", "reader-returned-root", "reader-curl-forward-",
     "reader-menu-real-", "reader-settings-real-home", "comic-", "cbz-",
 )

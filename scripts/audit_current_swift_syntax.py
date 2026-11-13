@@ -31,7 +31,7 @@ def main():
     arguments = argparse.ArgumentParser(description=__doc__)
     arguments.add_argument("baseline")
     baseline = arguments.parse_args().baseline
-    changed = subprocess.check_output(["git", "diff", "--name-only", baseline], cwd=ROOT).decode("utf8").splitlines()
+    changed = subprocess.check_output(["git", "diff", "--name-only", "--diff-filter=ACMRT", baseline], cwd=ROOT).decode("utf8").splitlines()
     changed += subprocess.check_output(["git", "ls-files", "--others", "--exclude-standard",
                                        "SourceReadSwift", "SourceReadSwiftTests", "SourceReadSwiftUITests"],
                                       cwd=ROOT).decode("utf8").splitlines()

@@ -185,18 +185,13 @@ struct AudioBookPlayerView: View {
     private var ambientBackground: some View {
         GeometryReader { proxy in
             if let coverUrl = coordinator.currentBook?.coverUrl, let url = URL(string: coverUrl) {
-                AsyncImage(url: url) { phase in
-                    if let image = phase.image {
-                        image
-                            .resizable()
-                            .scaledToFill()
-                            .frame(width: proxy.size.width, height: proxy.size.height)
-                            .blur(radius: 60)
-                            .opacity(0.25)
-                    } else {
-                        Color(.systemGroupedBackground)
-                    }
+                CachedRemoteImage(url: url, contentMode: .fill, maxPixelSize: 120) {
+                    Color(.systemGroupedBackground)
                 }
+                .frame(width: proxy.size.width, height: proxy.size.height)
+                .blur(radius: 26)
+                .opacity(0.28)
+                .drawingGroup(opaque: false)
             } else {
                 Color(.systemGroupedBackground)
             }

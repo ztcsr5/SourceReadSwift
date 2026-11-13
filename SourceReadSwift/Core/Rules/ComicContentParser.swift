@@ -27,7 +27,7 @@ struct ComicChapterResources: Sendable {
 enum ComicContentParser {
     private static let wrappedImage = try! NSRegularExpression(
         pattern: #"\[img\]([\s\S]*?)\[/img\]|!\[[^\]]*\]\(([^\s\)]+)\)"#, options: .caseInsensitive)
-    private static let pageContainers = ["pages", "images", "imageList", "list", "data", "result"]
+    private static let pageContainers = ["pages", "images", "imageList", "imgList", "pics", "picList", "chapters", "list", "data", "result"]
 
     static func parsePages(from content: ChapterContent, responseURL: URL? = nil) -> [ComicPage] {
         let base = responseURL?.absoluteString ?? content.chapter.url
@@ -87,6 +87,19 @@ enum ComicContentParser {
             return matches.compactMap { match in
                 let range = match.range(at: match.range(at: 1).location == NSNotFound ? 2 : 1)
                 return ComicImageRequest.resolve(ns.substring(with: range), base: base)
+            }
+        }
+        if let htmlRegex = try? NSRegularExpression(
+            pattern: #"<img\b[^>]*\b(?:data-original|data-src|data-lazy-src|data-url|src)\s*=\s*["']([^"']+)["']"#,
+            options: .caseInsensitive
+        ) {
+            let rawNS = text as NSString
+            let imgMatches = htmlRegex.matches(in: text, range: NSRange(location: 0, length: rawNS.length))
+            if !imgMatches.isEmpty {
+                return imgMatches.compactMap { match in
+                    let src = rawNS.substring(with: match.range(at: 1))
+                    return ComicImageRequest.resolve(src, base: base)
+                }
             }
         }
         guard !text.isEmpty, !text.contains(where: { $0.isWhitespace }), !text.contains("<"), !text.contains("[") else { return [] }

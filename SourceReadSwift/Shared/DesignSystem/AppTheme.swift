@@ -78,9 +78,8 @@ extension View {
         background(AppTheme.card, in: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
             .overlay {
                 RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                    .stroke(Color.primary.opacity(0.06), lineWidth: 0.8)
+                    .stroke(Color.primary.opacity(0.075), lineWidth: 0.75)
             }
-            .shadow(color: .black.opacity(0.04), radius: 4, x: 0, y: 2)
     }
 
     func glassCircle(material: Material = .ultraThinMaterial) -> some View {
@@ -118,7 +117,11 @@ struct AppPagePaper: View {
     var body: some View {
         ZStack {
             AppTheme.background
-            if contrast != .increased, let asset = theme.illustratedPaper?.wallpaperAssetName {
+            // 视频玻璃主题自带动态背景；插画纸面与它在语义上冲突，故互斥。
+            if theme.isVideoGlass {
+                VideoGlassBackdrop(theme: theme)
+            }
+            if !theme.isVideoGlass, contrast != .increased, let asset = theme.illustratedPaper?.wallpaperAssetName {
                 ReaderIllustratedBackgroundView(name: asset, paper: AppTheme.background, night: scheme == .dark)
                     .id(asset)
                     .opacity(scheme == .dark ? 0.65 : 0.26)

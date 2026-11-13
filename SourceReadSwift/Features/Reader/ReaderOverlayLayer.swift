@@ -87,9 +87,6 @@ struct ReaderOverlayLayer: View {
                 // 否则 WKWebView 会重载 —— 真机上「正文先出现、随即整屏变白」即此。
                 .id(request.id)
                 .frame(width: screen.width, height: screen.height)
-                // 真实挂载到达探针与 ready 信号：之前只有 navigationDestination
-                // 路径包了它，覆盖层路径缺失，导致 UI 回归无法观察到真实手势/就绪状态。
-                .readerOpeningPresentation(for: request.book, coverFrame: request.coverImage)
                 .clipShape(RoundedRectangle(cornerRadius: corner, style: .continuous))
                 .scaleEffect(x: scaleX, y: scaleY, anchor: .center)
                 .offset(x: offsetX, y: offsetY)
