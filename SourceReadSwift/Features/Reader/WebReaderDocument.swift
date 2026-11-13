@@ -1191,6 +1191,7 @@ enum WebReaderHTML {
         post({ type: "content-ready", total: payload.total });
         // A cover or cold compositor may defer both animation frames and
         // subsequent native bridge calls. A first mount can report immediately.
+        state.openingWatchToken = (state.openingWatchToken || 0) + 1;
         if (resetOpeningPosition) {
           resetScroll();
         } else {
@@ -1539,6 +1540,8 @@ enum WebReaderHTML {
       var pointer = null;
       window.addEventListener("pointerdown", function (event) {
         if (!event.isPrimary) { return; }
+        // A real touch owns the scroll position from here on.
+        state.openingWatchToken = (state.openingWatchToken || 0) + 1;
         pointer = {
           x: event.clientX,
           y: event.clientY,
@@ -1670,9 +1673,11 @@ enum WebReaderHTML {
         return low;
       }
 
-      function scrollToFlat(flat, animated, requestKey, revision, utf16Offset) {
+      function scrollToFlat(flat, animated, requestKey, revision, utf16Offset, verifiesOpeningPosition) {
         if (revision !== state.revision) { return; }
         state.activeScrollKey = requestKey;
+        // Any newer jump supersedes a previous opening drift guard.
+        state.openingWatchToken = (state.openingWatchToken || 0) + 1;
         // Explicit chapter jumps cannot settle on a nearby old paragraph.
         // A chapter heading intentionally shares the first paragraph's flat
         // index. Character anchors must resolve the paragraph, not that title.
@@ -1681,12 +1686,16 @@ enum WebReaderHTML {
           post({ type: "scroll-miss", flat: flat });
           return;
         }
-        var rect = element.getBoundingClientRect();
-        if (utf16Offset > 0) { rect = textRectAt(element, utf16Offset) || rect; }
-        var target = Math.max(rect.top + window.scrollY - topInset(), 0);
+        var measure = function () {
+          var rect = element.getBoundingClientRect();
+          return utf16Offset > 0 ? textRectAt(element, utf16Offset) || rect : rect;
+        };
+        var position = function (duration) {
+          animateTo(Math.max(measure().top + window.scrollY - topInset(), 0), duration);
+        };
         // Always invalidate old motion, including a jump to the current line.
         // TOC/bookmark jumps stay atomic; speech keeps smooth progression.
-        animateTo(target, animated ? 300 : 0);
+        position(animated ? 300 : 0);
         var finish = function () {
           if (revision !== state.revision || requestKey !== state.activeScrollKey) { return; }
           state.visible = -1;
@@ -1698,13 +1707,75 @@ enum WebReaderHTML {
           reportVisiblePosition(performance.now(), true, false);
           window.requestAnimationFrame(onScroll);
         };
-        if (animated) { window.setTimeout(finish, 400); } else { finish(); }
+        if (animated) {
+          window.setTimeout(finish, 400);
+        } else if (verifiesOpeningPosition) {
+          // WebKit may ignore the first scroll while a freshly mounted document
+          // is still settling its style and images. Three frames used to be
+          // enough only for the scroll itself: 4 of 20 controlled openings
+          // acknowledged a visible paragraph and then drifted back to
+          // `scrollY = 0`, leaving the saved paragraph 3069 pt below the
+          // viewport. Confirm with real geometry, retry on real frames, and —
+          // after acknowledgement — keep re-asserting the position while the
+          // opening is still covered so a later layout pass cannot undo it.
+          var remainingPlacementFrames = 24;
+          var verifyPlacement = function () {
+            if (revision !== state.revision || requestKey !== state.activeScrollKey) { return; }
+            var rect = measure();
+            if (rect.bottom > rect.top && rect.bottom > topInset() && rect.top < window.innerHeight) {
+              finish();
+              watchOpeningPlacement();
+              return;
+            }
+            if (remainingPlacementFrames-- === 0) {
+              post({ type: "scroll-miss", flat: flat, scrollY: window.scrollY, top: rect.top });
+              return;
+            }
+            window.requestAnimationFrame(function () {
+              if (revision !== state.revision || requestKey !== state.activeScrollKey) { return; }
+              position(0);
+              verifyPlacement();
+            });
+          };
+          var watchOpeningPlacement = function () {
+            // Bounded drift guard: fonts, images and a late style payload can
+            // reflow the document after acknowledgement and undo the opening
+            // placement. Only a real out-of-viewport geometry triggers another
+            // placement. A newer jump, any user touch, or the opening being
+            // dismissed ends the watch immediately so it can never fight the
+            // reader's own scrolling.
+            var remainingWatchFrames = 48;
+            state.openingWatchToken = (state.openingWatchToken || 0) + 1;
+            var watchToken = state.openingWatchToken;
+            var step = function () {
+              if (watchToken !== state.openingWatchToken) { return; }
+              if (revision !== state.revision || requestKey !== state.activeScrollKey) { return; }
+              if (remainingWatchFrames-- === 0) { return; }
+              var rect = measure();
+              if (rect.bottom > rect.top && rect.bottom > topInset() && rect.top < window.innerHeight) {
+                window.requestAnimationFrame(step);
+                return;
+              }
+              position(0);
+              window.requestAnimationFrame(step);
+            };
+            window.requestAnimationFrame(step);
+          };
+          verifyPlacement();
+        } else {
+          // Ordinary jumps keep their synchronous acknowledgement: a covered
+          // reader or a held-frame fixture must still commit its position
+          // without waiting for a compositor frame. Only the opening path,
+          // which the user is about to see, pays for geometry verification.
+          finish();
+        }
       }
 
       /// 回到文档顶端。换书/首次进书时调用：WKWebView 可能被复用，
       /// 上一本书的滚动位置会带进来，表现就是「第一次打开却看不见章标题」。
       function resetScroll() {
         stopScrollAnimation();
+        state.openingWatchToken = (state.openingWatchToken || 0) + 1;
         state.activeScrollKey = null;
         state.visible = -1;
         window.scrollTo(0, 0);
