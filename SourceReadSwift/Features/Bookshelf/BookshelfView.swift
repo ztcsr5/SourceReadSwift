@@ -141,7 +141,7 @@ struct BookshelfView: View {
             && lhs.currentParagraphIndex == rhs.currentParagraphIndex
             && lhs.comicPosition == rhs.comicPosition
             && lhs.isPinned == rhs.isPinned
-            && lhs.groupIDs == rhs.groupIDs
+            && lhs.groupName == rhs.groupName
     }
 
     private static func hasSameVisibleShelfState(_ lhs: [BookshelfBook]?, _ rhs: [BookshelfBook]) -> Bool {

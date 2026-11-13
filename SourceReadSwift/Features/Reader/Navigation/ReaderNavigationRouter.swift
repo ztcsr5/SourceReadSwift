@@ -182,7 +182,7 @@ final class ReaderNavigationRouter: NSObject, UINavigationControllerDelegate, UI
     private func configureTransition(_ controller: NativeReaderHostingController, sourceID: String?) {
         guard let navigation else { return }
         if #available(iOS 18.0, *),
-           ReaderZoomExperiment.isEnabled,
+           ProcessInfo.processInfo.arguments.contains("--reader-zoom-isolation"),
            let liveSource = ReaderZoomSources.shared.source(id: sourceID, window: navigation.view.window) {
             let options = UIViewController.Transition.ZoomOptions()
             options.interactiveDismissShouldBegin = { [weak controller] context in
