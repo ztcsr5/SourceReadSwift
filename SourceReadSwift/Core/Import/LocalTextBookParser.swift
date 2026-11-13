@@ -1,8 +1,12 @@
 import Foundation
 
 struct LocalTextBookParser {
+    /// Rules come from the persisted library so a drag-and-drop import and the
+    /// in-app importer cannot disagree about where chapters start.
+    var ruleLibrary: TxtChapterRuleLibrary = TxtChapterRuleLibrary.load()
+
     func parse(data: Data, fileName: String) -> LocalTextBook {
-        LocalTxtSmartDivider().divide(data: data, fileName: fileName)
+        LocalTxtSmartDivider(ruleLibrary: ruleLibrary).divide(data: data, fileName: fileName)
     }
 
     private func splitChapters(lines: [String], fallbackText: String) -> [LocalTextChapter] {
