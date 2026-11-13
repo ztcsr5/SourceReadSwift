@@ -141,8 +141,15 @@ final class ReaderNavigationRouter: NSObject, UINavigationControllerDelegate, UI
                 if reader.presentingViewController == nil { self?.finish(reader) }
                 else { reader.session.didAppear() }
             }
-        } else {
-            navigation?.popViewController(animated: animated)
+        } else if let navigation {
+            navigation.popViewController(animated: animated)
+            if navigation.topViewController === reader, navigation.transitionCoordinator == nil {
+                if #available(iOS 18.0, *) { reader.preferredTransition = nil }
+                navigation.popViewController(animated: false)
+                if !navigation.viewControllers.contains(reader) {
+                    finish(reader)
+                }
+            }
         }
     }
 
@@ -202,6 +209,9 @@ final class ReaderNavigationRouter: NSObject, UINavigationControllerDelegate, UI
         // or errored reader must still run its committed exit and release the view.
         if let returning, isReusable(controller) {
             releaseDormant()
+            if #available(iOS 18.0, *) {
+                controller.preferredTransition = nil
+            }
             controller.session.parkForReuse()
             controller.setParked(true)
             dormant = DormantReader(controller: controller, request: returning, sourceID: returning.sourceID,

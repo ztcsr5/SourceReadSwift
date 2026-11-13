@@ -117,17 +117,25 @@ private final class ReaderCompatibilityAnimator: NSObject, UIViewControllerAnima
     }
 
     func animateTransition(using context: UIViewControllerContextTransitioning) {
-        guard let from = context.view(forKey: .from), let to = context.view(forKey: .to),
-              let target = context.viewController(forKey: .to) else {
+        let toView = context.view(forKey: .to) ?? (isOpening ? context.viewController(forKey: .to)?.view : nil)
+        let fromView = context.view(forKey: .from) ?? (!isOpening ? context.viewController(forKey: .from)?.view : nil)
+        guard let page = isOpening ? toView : fromView else {
             context.completeTransition(false)
             onComplete()
             return
         }
         let container = context.containerView
-        let page = isOpening ? to : from
-        if isOpening { container.addSubview(to) }
-        else { container.insertSubview(to, belowSubview: from) }
-        to.frame = context.finalFrame(for: target)
+        if isOpening {
+            if page.superview !== container { container.addSubview(page) }
+            if let target = context.viewController(forKey: .to) {
+                page.frame = context.finalFrame(for: target)
+            }
+        } else if let to = toView {
+            if to.superview == nil { container.insertSubview(to, belowSubview: page) }
+            if let target = context.viewController(forKey: .to) {
+                to.frame = context.finalFrame(for: target)
+            }
+        }
         if reducesMotion {
             animateFade(page: page, context: context)
             return
@@ -165,7 +173,7 @@ private final class ReaderCompatibilityAnimator: NSObject, UIViewControllerAnima
             page.alpha = 1
             cover?.alpha = sourceAlpha
             coverSnapshot?.removeFromSuperview()
-            if self.isOpening && !succeeded { to.removeFromSuperview() }
+            if self.isOpening && !succeeded { page.removeFromSuperview() }
             context.completeTransition(succeeded)
             self.onComplete()
         }

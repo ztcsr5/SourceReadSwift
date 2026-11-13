@@ -50,6 +50,19 @@ final class NativeReaderHostingController: UIHostingController<AnyView> {
     @available(*, unavailable)
     required init?(coder aDecoder: NSCoder) { fatalError("Native readers are created with a navigation session") }
 
+    override func viewWillAppear(_ animated: Bool) {
+        super.viewWillAppear(animated)
+        guard !isBeingDismissed, !isMovingFromParent else { return }
+        if let transition = transitionCoordinator {
+            transition.animate(alongsideTransition: nil) { [weak self] context in
+                guard let self, !context.isCancelled else { return }
+                self.session.didAppear()
+            }
+        } else {
+            session.didAppear()
+        }
+    }
+
     override func viewDidAppear(_ animated: Bool) {
         super.viewDidAppear(animated)
         session.didAppear()
@@ -62,6 +75,10 @@ final class NativeReaderHostingController: UIHostingController<AnyView> {
         // A settings cover has a different destination; it is not a reader exit.
         guard isLeaving else { return }
         if let transition = transitionCoordinator {
+            transition.notifyWhenInteractionChanges { [weak self] context in
+                guard let self, context.isCancelled else { return }
+                self.session.didAppear()
+            }
             transition.animate(alongsideTransition: nil) { [weak self] context in
                 guard let self else { return }
                 if context.isCancelled { self.session.didAppear() }

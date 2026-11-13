@@ -204,9 +204,8 @@ struct BookshelfView: View {
             }
             .onChange(of: appState.isReaderPresented) { presented in
                 if !presented {
-                    // 离开阅读器返回主页时，将正在阅读卡片复位到刚阅读的书籍（index 0），不发生错位挪移。
+                    // 离开阅读器返回主页时，将正在阅读卡片复位到刚阅读的书籍（index 0），同时保留已钉住的书架返回槽位顺序。
                     deskReturnOrder = []
-                    shelfReturnOrder = []
                     if let currentFirst = deskBooks.first?.id {
                         readingBookID = currentFirst
                     }
@@ -899,6 +898,7 @@ struct BookshelfView: View {
         BookDetailView(book: book.asSearchBook)
             .bookHeroDestination(placement + "|" + book.id, in: bookHero)
             .environment(\.readingCoverHandoff, readingDeskEnabled ? readingCoverHandoff : nil)
+            .onAppear { pinReturnOrder(placement: placement) }
     }
 
     @ViewBuilder private func bookDestination(_ book: BookshelfBook, placement: String) -> some View {

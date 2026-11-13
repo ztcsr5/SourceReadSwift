@@ -686,6 +686,7 @@ struct ReaderView: View {
     /// `readerSessionEnded` stays false: the same view tree is presented again.
     private func parkReaderSession() {
         guard !readerSessionEnded else { return }
+        chromeState.closeAll()
         quiesceReaderSession()
         isReaderVisible = false
     }
@@ -1016,6 +1017,7 @@ struct ReaderView: View {
             if showOverlay && !showSettings {
                 readerOverlay
                     .opacity(navigationIsTransitioning ? 0 : 1)
+                    .allowsHitTesting(!navigationIsTransitioning)
                     .transition(
                         .asymmetric(
                             insertion: .opacity.combined(with: .scale(scale: 0.98, anchor: .center)),
