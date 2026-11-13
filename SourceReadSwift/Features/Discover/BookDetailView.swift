@@ -3,6 +3,7 @@ import UIKit
 
 struct BookDetailView: View {
     @EnvironmentObject private var appState: AppState
+    @Environment(\.dismiss) private var dismiss
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Namespace private var detailHero
     @AppMotion private var motion

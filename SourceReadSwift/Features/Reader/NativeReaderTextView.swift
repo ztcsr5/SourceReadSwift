@@ -825,8 +825,7 @@ struct NativeReaderTextView: UIViewRepresentable {
                   textView.textStorage.length > 0 else { return }
             let safeIndex = min(max(characterIndex, 0), textView.textStorage.length - 1)
             textView.layoutManager.ensureLayout(
-                forCharacterRange: NSRange(location: 0, length: safeIndex + 1),
-                actualCharacterRange: nil
+                forCharacterRange: NSRange(location: 0, length: safeIndex + 1)
             )
             let glyphIndex = textView.layoutManager.glyphIndexForCharacter(at: safeIndex)
             guard glyphIndex < textView.layoutManager.numberOfGlyphs else { return }
@@ -915,8 +914,7 @@ struct NativeReaderTextView: UIViewRepresentable {
             let targetEnd = min(textView.textStorage.length, max(range.location + range.length, 1))
             if targetEnd > 0 {
                 textView.layoutManager.ensureLayout(
-                    forCharacterRange: NSRange(location: 0, length: targetEnd),
-                    actualCharacterRange: nil
+                    forCharacterRange: NSRange(location: 0, length: targetEnd)
                 )
             }
             let glyphRange = textView.layoutManager.glyphRange(forCharacterRange: range, actualCharacterRange: nil)
