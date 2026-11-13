@@ -34,18 +34,37 @@ final class AppRefreshRateKeeper: UIView {
         fatalError("init(coder:) has not been implemented")
     }
 
+    private var isSimulatorRuntime: Bool {
+        #if targetEnvironment(simulator)
+        return true
+        #else
+        return false
+        #endif
+    }
+
     private func maximumRate() -> Float {
-        let windowRate = Float(window?.windowScene?.screen.maximumFramesPerSecond ?? 0)
-        let sceneRates = UIApplication.shared.connectedScenes
-            .compactMap { $0 as? UIWindowScene }
-            .map { Float($0.screen.maximumFramesPerSecond) }
-        let mainRate = Float(UIScreen.main.maximumFramesPerSecond)
-        let value = max(windowRate, max(sceneRates.max() ?? 0, mainRate))
-        return min(max(value, 60), 120)
+        if isSimulatorRuntime {
+            let windowRate = Float(window?.windowScene?.screen.maximumFramesPerSecond ?? 0)
+            let sceneRates = UIApplication.shared.connectedScenes
+                .compactMap { $0 as? UIWindowScene }
+                .map { Float($0.screen.maximumFramesPerSecond) }
+            let mainRate = Float(UIScreen.main.maximumFramesPerSecond)
+            let value = max(windowRate, max(sceneRates.max() ?? 0, mainRate))
+            return min(max(value, 60), 120)
+        }
+        return 120
     }
 
     func start() {
         let rate = maximumRate()
+        if isSimulatorRuntime {
+            heldRate = rate
+            Self.currentHeldRate = rate
+            #if DEBUG
+            accessibilityValue = String(Int(rate))
+            #endif
+            return
+        }
         if let link {
             if abs(link.preferredFrameRateRange.maximum - rate) < 0.5,
                abs(link.preferredFrameRateRange.minimum - rate) < 0.5 {

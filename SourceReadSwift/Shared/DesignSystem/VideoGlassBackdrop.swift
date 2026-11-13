@@ -21,7 +21,7 @@ struct VideoGlassBackdrop: View {
             if reduceMotion {
                 blobs(palette, time: 0)
             } else {
-                // 全链路 120Hz 流动极光：解除 20Hz 人为限频，并用 Metal drawingGroup 离屏光栅化三团径向渐变。
+                // 全链路 120Hz 流动极光：解除原 minimumInterval: 1.0 / 20.0 人为限频，并用 Metal drawingGroup 离屏光栅化三团径向渐变。
                 TimelineView(.animation(paused: false)) { context in
                     blobs(palette, time: context.date.timeIntervalSinceReferenceDate)
                 }

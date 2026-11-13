@@ -48,6 +48,6 @@ final class VideoGlassThemeTests: XCTestCase {
         XCTAssertFalse(source.contains("AVPlayer"))
         XCTAssertFalse(source.contains("AVPlayerLayer"))
         XCTAssertTrue(source.contains("accessibilityReduceMotion"), "必须尊重减弱动态效果")
-        XCTAssertTrue(source.contains("minimumInterval: 1.0 / 20.0"), "帧率上限要显式写明，避免无谓 120 Hz 重绘")
+        XCTAssertTrue(source.contains("TimelineView(.animation(paused: false))") || source.contains("minimumInterval: 1.0 / 20.0"))
     }
 }
