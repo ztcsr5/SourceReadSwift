@@ -3,7 +3,8 @@ import UIKit
 
 /// All reader entry points share a native presentation transaction, including entries in sheets.
 @MainActor
-final class ReaderNavigationRouter: NSObject, UINavigationControllerDelegate, UIAdaptivePresentationControllerDelegate {
+final class ReaderNavigationRouter: NSObject, UINavigationControllerDelegate, UIAdaptivePresentationControllerDelegate,
+                                    UIGestureRecognizerDelegate {
     private weak var navigation: ReaderNavigationController?
     private weak var appState: AppState?
     private var request: ReaderDestinationRequest?
@@ -15,7 +16,14 @@ final class ReaderNavigationRouter: NSObject, UINavigationControllerDelegate, UI
     private var isModal = false
     private var compatibility: ReaderCompatibilityTransition?
     private var nativePopWasEnabled: Bool?
+    private var stackPopState: StackPopState?
     private var environment = ReaderHostingEnvironment(values: EnvironmentValues())
+
+    private struct StackPopState {
+        let edgeWasEnabled: Bool
+        weak var edgeDelegate: UIGestureRecognizerDelegate?
+        let contentWasEnabled: Bool?
+    }
 
     /// A returned reader keeps its live WebView for exactly one book. Reopening
     /// that book must not reload the shell, re-lay-out the document or re-resolve
@@ -110,10 +118,11 @@ final class ReaderNavigationRouter: NSObject, UINavigationControllerDelegate, UI
         if isReused {
             controller.prepareForRepresentation()
         }
+        let presenter = presentedController(in: navigation)
+        isModal = presenter != nil
         configureTransition(controller, sourceID: request.sourceID)
 
-        if let presenter = presentedController(in: navigation) {
-            isModal = true
+        if let presenter {
             controller.modalPresentationStyle = .fullScreen
             if let compatibility {
                 controller.transitioningDelegate = compatibility
@@ -124,9 +133,7 @@ final class ReaderNavigationRouter: NSObject, UINavigationControllerDelegate, UI
             presenter.present(controller, animated: !UIAccessibility.isReduceMotionEnabled)
             controller.presentationController?.delegate = self
         } else {
-            isModal = false
-            compatibility?.attach(to: navigation.view,
-                                  beginReturn: { [weak self] in self?.close() })
+            if compatibility != nil { prepareStackPop(in: navigation) }
             navigation.pushViewController(controller, animated: !UIAccessibility.isReduceMotionEnabled)
         }
         NavigationTrace.shared.mark("reader-session", "open \(session.id.uuidString.prefix(8)) modal=\(isModal)")
@@ -205,10 +212,10 @@ final class ReaderNavigationRouter: NSObject, UINavigationControllerDelegate, UI
             if let liveSource = ReaderZoomSources.shared.source(id: sourceID, window: navigation.view.window) {
                 controller.session.recordZoomSource(liveSource)
             }
-            if nativePopWasEnabled == nil {
+            if isModal {
                 nativePopWasEnabled = navigation.interactivePopGestureRecognizer?.isEnabled
+                navigation.interactivePopGestureRecognizer?.isEnabled = false
             }
-            navigation.interactivePopGestureRecognizer?.isEnabled = false
             compatibility = ReaderCompatibilityTransition(session: controller.session,
                 source: { [weak navigation, weak controller] in
                     let resolved = ReaderZoomSources.shared.source(id: sourceID, window: navigation?.view.window)
@@ -218,10 +225,82 @@ final class ReaderNavigationRouter: NSObject, UINavigationControllerDelegate, UI
         }
     }
 
+    private func prepareStackPop(in navigation: ReaderNavigationController) {
+        guard let edge = navigation.interactivePopGestureRecognizer else { return }
+        stackPopState = StackPopState(edgeWasEnabled: edge.isEnabled, edgeDelegate: edge.delegate,
+                                      contentWasEnabled: contentPop(in: navigation)?.isEnabled)
+        enableStackPop(in: navigation)
+    }
+
+    private func enableStackPop(in navigation: UINavigationController) {
+        guard stackPopState != nil, let edge = navigation.interactivePopGestureRecognizer else { return }
+        // The outer stack hides its bar. Keep UIKit's edge recognizer and animator,
+        // but apply the reader's return gate instead of the bar's gate.
+        if edge.delegate !== self { edge.delegate = self }
+        if !edge.isEnabled { edge.isEnabled = true }
+        // The iOS 26 full-content gesture competes with horizontal page turns.
+        if let content = contentPop(in: navigation), content.isEnabled { content.isEnabled = false }
+    }
+
+    private func restoreStackPop() {
+        guard let state = stackPopState else { return }
+        stackPopState = nil
+        guard let navigation else { return }
+        if let edge = navigation.interactivePopGestureRecognizer {
+            edge.delegate = state.edgeDelegate
+            if edge.isEnabled != state.edgeWasEnabled { edge.isEnabled = state.edgeWasEnabled }
+        }
+        if let wasEnabled = state.contentWasEnabled, let content = contentPop(in: navigation),
+           content.isEnabled != wasEnabled {
+            content.isEnabled = wasEnabled
+        }
+    }
+
+    private func contentPop(in navigation: UINavigationController) -> UIGestureRecognizer? {
+        #if compiler(>=6.2)
+        if #available(iOS 26.0, *) { return navigation.interactiveContentPopGestureRecognizer }
+        #endif
+        return nil
+    }
+
+    func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldReceive touch: UITouch) -> Bool {
+        guard let surface = gestureRecognizer.view else { return false }
+        let x = touch.location(in: surface).x
+        let distance = surface.effectiveUserInterfaceLayoutDirection == .rightToLeft
+            ? surface.bounds.maxX - x : x - surface.bounds.minX
+        // Keep a leading-edge start even when UIKit implements the recognizer as a pan.
+        return distance >= 0 && distance <= ReaderEdgeTapPolicy.reservedLeadingWidth
+    }
+
+    func gestureRecognizerShouldBegin(_ gestureRecognizer: UIGestureRecognizer) -> Bool {
+        guard stackPopState != nil, let navigation, let reader,
+              gestureRecognizer === navigation.interactivePopGestureRecognizer,
+              navigation.viewControllers.count > 1, navigation.topViewController === reader,
+              navigation.transitionCoordinator == nil, navigation.presentedViewController == nil,
+              reader.presentedViewController == nil else { return false }
+        guard reader.session.phase == .reading, reader.session.allowsReturn else { return false }
+        if let pan = gestureRecognizer as? UIPanGestureRecognizer, pan.numberOfTouches > 0 {
+            let translation = pan.translation(in: navigation.view)
+            let movement = translation == .zero ? pan.velocity(in: navigation.view) : translation
+            let trailing = navigation.view.effectiveUserInterfaceLayoutDirection == .rightToLeft ? -movement.x : movement.x
+            if movement != .zero { return trailing > abs(movement.y) }
+        }
+        return true
+    }
+
+    func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer,
+                           shouldBeRequiredToFailBy otherGestureRecognizer: UIGestureRecognizer) -> Bool {
+        guard gestureRecognizer === navigation?.interactivePopGestureRecognizer,
+              otherGestureRecognizer !== gestureRecognizer, otherGestureRecognizer is UIPanGestureRecognizer,
+              let readerView = reader?.viewIfLoaded, let otherView = otherGestureRecognizer.view else { return false }
+        return otherView.isDescendant(of: readerView)
+    }
+
     private func finish(_ controller: NativeReaderHostingController) {
         guard reader === controller else { return }
         compatibility?.detach()
         compatibility = nil
+        restoreStackPop()
         if let nativePopWasEnabled { navigation?.interactivePopGestureRecognizer?.isEnabled = nativePopWasEnabled }
         nativePopWasEnabled = nil
         let returning = request
@@ -290,6 +369,7 @@ final class ReaderNavigationRouter: NSObject, UINavigationControllerDelegate, UI
         guard let reader, !isModal else { return }
         if navigationController.viewControllers.contains(where: { $0 === reader }) {
             reader.session.didAppear()
+            enableStackPop(in: navigationController)
         } else {
             finish(reader)
         }
@@ -299,12 +379,8 @@ final class ReaderNavigationRouter: NSObject, UINavigationControllerDelegate, UI
     func navigationController(_ navigationController: UINavigationController,
                               animationControllerFor operation: UINavigationController.Operation,
                               from fromVC: UIViewController, to toVC: UIViewController) -> UIViewControllerAnimatedTransitioning? {
-        compatibility?.animator(isOpening: operation == .push)
-    }
-
-    func navigationController(_ navigationController: UINavigationController,
-                              interactionControllerFor animationController: UIViewControllerAnimatedTransitioning) -> UIViewControllerInteractiveTransitioning? {
-        compatibility?.interaction
+        guard operation == .push, toVC === reader else { return nil }
+        return compatibility?.animator(isOpening: true)
     }
 
     func presentationControllerDidDismiss(_ presentationController: UIPresentationController) {

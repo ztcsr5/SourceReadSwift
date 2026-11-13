@@ -14,6 +14,12 @@ class ReaderFallbackBoundaryTests(unittest.TestCase):
         router = (ROOT / "SourceReadSwift/Features/Reader/Navigation/ReaderNavigationRouter.swift").read_text(encoding="utf8")
         self.assertIn("controller.preferredTransition = .zoom", router)
         self.assertNotIn("ReaderExitSwipeBridge", router)
+    def test_pushed_reader_keeps_custom_opening_but_uses_system_pop(self):
+        router = (ROOT / "SourceReadSwift/Features/Reader/Navigation/ReaderNavigationRouter.swift").read_text(encoding="utf8")
+        self.assertNotIn("compatibility?.attach(to: navigation.view", router)
+        self.assertIn("compatibility?.attach(to: controller.view", router)
+        self.assertIn("guard operation == .push, toVC === reader else { return nil }", router)
+        self.assertIn("return compatibility?.animator(isOpening: true)", router)
     def test_reduced_motion_cannot_pass_when_both_input_probes_are_zero(self):
         source = (ROOT / "SourceReadSwiftUITests/FloatingReadingDeskUITests.swift").read_text(encoding="utf8")
         self.assertIn("XCTAssertEqual(sessionEvidence.value as? String, sessionBefore", source)

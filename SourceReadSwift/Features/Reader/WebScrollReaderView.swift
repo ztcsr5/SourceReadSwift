@@ -138,15 +138,15 @@ final class ReaderEdgeReturnWebView: WKWebView {
                     + (navigation?.viewIfLoaded?.gestureRecognizers ?? [])
                 let customEdge = candidates
                     .compactMap { $0 as? UIScreenEdgePanGestureRecognizer }
-                    .first(where: { $0.isEnabled && $0 !== navigation?.interactivePopGestureRecognizer })
+                    .first(where: { $0.isEnabled && $0.name == ReaderCompatibilityTransition.edgeGestureName })
                 if let edgeReturn = customEdge ?? navigation?.interactivePopGestureRecognizer,
                    let gestureHost = edgeReturn.view, isDescendant(of: gestureHost) {
                     // WebKit can install new recognizers later (highlight,
                     // selection, find-in-page). Re-running is cheap:
                     // `require(toFail:)` on an already gated pair is a no-op.
                     prioritizedEdgeReturn = edgeReturn
-                    // This public recognizer handles only the leading edge. Do
-                    // not depend on iOS 26's full-content pop or replace delegates.
+                    // Only the modal reader's named edge may override the system edge.
+                    // Waiting for a full-content pop would compete with reading gestures.
                     switch Self.edgeGateScope {
                     case .webKitSubtree:
                         gateEveryDragRecognizer(below: edgeReturn)

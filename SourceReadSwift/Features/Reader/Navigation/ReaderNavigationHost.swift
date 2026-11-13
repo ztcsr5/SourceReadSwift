@@ -139,7 +139,7 @@ private struct ReaderHostedDestination: View {
                 }
             }
             .background(paper.color(isNight: paper.isDark).ignoresSafeArea())
-            .background(ReaderNativeArrivalObserver())
+            .background(ReaderNativeArrivalObserver(session: session))
             .overlay(alignment: .topTrailing) {
                 ReaderNavigationEvidence(session: session).frame(width: 1, height: 1)
             }
@@ -160,10 +160,13 @@ private struct ReaderHostedDestination: View {
 }
 
 private struct ReaderNativeArrivalObserver: UIViewControllerRepresentable {
+    let session: ReaderNavigationSession
+
     func makeUIViewController(context: Context) -> ReaderBookPassageController {
         let controller = ReaderBookPassageController()
         controller.usesNativeDeskReturn = true
         controller.canPrepareReturn = true
+        controller.onInteractivePop = { [weak session] in session?.recordInteractivePopBegin() }
         return controller
     }
     func updateUIViewController(_ controller: ReaderBookPassageController, context: Context) {}

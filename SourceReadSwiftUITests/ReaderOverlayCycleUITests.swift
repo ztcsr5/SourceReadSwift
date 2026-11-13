@@ -31,7 +31,7 @@ final class ReaderOverlayCycleUITests: XCTestCase {
         let entry = app.buttons["bookshelf.continue." + bookID]
 
         var missingNativeMotion: [Int] = []
-        var missingSystemZoom: [Int] = []
+        var missingSystemPop: [Int] = []
         // 封面宿主身份：每轮读出全部 `<id>=created/alive`。同一个 id 的
         // created 只要在 20 轮里涨过，就说明源视图被真正销毁重建，返回时
         // 必然出现"空白后再加载"。alive==0 则是登记过的 view 已经死掉。
@@ -84,7 +84,8 @@ final class ReaderOverlayCycleUITests: XCTestCase {
             XCTAssertTrue(motion.waitForExistence(timeout: 5))
             let before = Int((motion.value as? String) ?? "") ?? (-1)
             XCTAssertGreaterThanOrEqual(before, 0)
-            let zoomBefore = zoomBeginCount(in: evidence.label)
+            let popBefore = gestureCount("interactivePops", in: evidence.label)
+            let zoomBefore = gestureCount("zoomBegins", in: evidence.label)
             let edge = app.coordinate(withNormalizedOffset: CGVector(dx: 0.008, dy: 0.52))
             edge.press(forDuration: 0.05,
                 thenDragTo: app.coordinate(withNormalizedOffset: CGVector(dx: 0.13, dy: 0.52)),
@@ -103,25 +104,22 @@ final class ReaderOverlayCycleUITests: XCTestCase {
             XCTAssertEqual(cancelledOutcome, .completed,
                            "Cancellation must preserve the session, WebView and shell navigation count")
             let after = Int((motion.value as? String) ?? "") ?? (-1)
-            let zoomAfter = zoomBeginCount(in: evidence.label)
+            let popAfter = gestureCount("interactivePops", in: evidence.label)
+            let zoomAfter = gestureCount("zoomBegins", in: evidence.label)
             let hasNativeMotion = after > before
-            let hasExpectedZoom: Bool
-            if #available(iOS 18.0, *) {
-                hasExpectedZoom = zoomBefore >= 0 && zoomAfter > zoomBefore
-            } else {
-                hasExpectedZoom = true
-            }
-            let firstGestureFailure = missingNativeMotion.isEmpty && missingSystemZoom.isEmpty
+            let hasSystemPop = popBefore >= 0 && popAfter == popBefore + 1
+                && zoomBefore >= 0 && zoomAfter == zoomBefore
+            let firstGestureFailure = missingNativeMotion.isEmpty && missingSystemPop.isEmpty
             if !hasNativeMotion { missingNativeMotion.append(cycle) }
-            if !hasExpectedZoom { missingSystemZoom.append(cycle) }
-            if firstGestureFailure && (!hasNativeMotion || !hasExpectedZoom) {
+            if !hasSystemPop { missingSystemPop.append(cycle) }
+            if firstGestureFailure && (!hasNativeMotion || !hasSystemPop) {
                 let screenshot = XCTAttachment(screenshot: app.screenshot())
                 screenshot.name = "reader-cycle-\(cycle)-missing-native-return"
                 screenshot.lifetime = .keepAlways
                 add(screenshot)
                 print("BOOK_NATIVE_CYCLE \(cycle) \(evidence.label) \(motion.label)")
             }
-            print("BOOK_NATIVE_CYCLE_RESULT \(cycle) motion=\(hasNativeMotion) zoom=\(hasExpectedZoom)")
+            print("BOOK_NATIVE_CYCLE_RESULT \(cycle) motion=\(hasNativeMotion) pop=\(hasSystemPop)")
             XCTAssertTrue(saved.exists && surface.frame.intersects(saved.frame), "Cycle \(cycle) must retain the saved paragraph")
 
             let back = app.buttons["reader.returnToShelf"]
@@ -149,8 +147,8 @@ final class ReaderOverlayCycleUITests: XCTestCase {
             .map { "cycle \($0.key): \($0.value)" }
             .joined(separator: " | ")
         print("BOOK_COVER_HOSTS \(hostsDump)")
-        XCTAssertTrue(missingNativeMotion.isEmpty && missingSystemZoom.isEmpty,
-                      "All 20 cycles must cancel real transitions; motion missing: \(missingNativeMotion); Zoom missing: \(missingSystemZoom)")
+        XCTAssertTrue(missingNativeMotion.isEmpty && missingSystemPop.isEmpty,
+                      "All 20 cycles must cancel real system pops; motion missing: \(missingNativeMotion); pop missing: \(missingSystemPop)")
         // 20 次进出里同一本书的封面源宿主创建次数必须恒定。涨了就是源视图被
         // 销毁重建（返回后"空白再加载"的成因）；一次都没读到说明探针没挂上。
         XCTAssertEqual(coverSourceByCycle.count, 20,
@@ -239,8 +237,9 @@ final class ReaderOverlayCycleUITests: XCTestCase {
         return nil
     }
 
-    private func zoomBeginCount(in label: String) -> Int {
-        let field = label.split(separator: ";").first { $0.hasPrefix("zoomBegins=") }
-        return field.flatMap { Int($0.dropFirst("zoomBegins=".count)) } ?? -1
+    private func gestureCount(_ name: String, in label: String) -> Int {
+        let prefix = name + "="
+        let field = label.split(separator: ";").first { $0.hasPrefix(prefix) }
+        return field.flatMap { Int($0.dropFirst(prefix.count)) } ?? -1
     }
 }

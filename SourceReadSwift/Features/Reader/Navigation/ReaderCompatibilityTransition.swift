@@ -3,6 +3,7 @@ import UIKit
 /// iOS 16/17 compatibility uses UIKit's transition context and cancellation, never a timed unmount.
 @MainActor
 final class ReaderCompatibilityTransition: NSObject, UIViewControllerTransitioningDelegate, UIGestureRecognizerDelegate {
+    nonisolated static let edgeGestureName = "reader.compatibilityReturn"
     let session: ReaderNavigationSession
     let source: () -> UIView?
     private let reducesMotion: @MainActor () -> Bool
@@ -17,6 +18,7 @@ final class ReaderCompatibilityTransition: NSObject, UIViewControllerTransitioni
         self.source = source
         self.reducesMotion = reducesMotion
         super.init()
+        edge.name = Self.edgeGestureName
         edge.edges = .left
         edge.delegate = self
         edge.maximumNumberOfTouches = 1

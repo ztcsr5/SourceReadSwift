@@ -612,7 +612,19 @@ final class FloatingReadingDeskUITests: XCTestCase {
         XCTAssertEqual(XCTWaiter.wait(for: [restored], timeout: 5), .completed,
                        "A fast native edge return must reveal the retained home; \(evidence.exists ? evidence.label : "reader closed")")
         XCTAssertTrue(rootTab("主页", legacyID: "tabs.legacy.home").isHittable)
-        capture("reader-fast-native-return-home")
+        entry.tap()
+        let reopened = XCTNSPredicateExpectation(predicate: NSPredicate(format: "hittable == YES"), object: surface)
+        XCTAssertEqual(XCTWaiter.wait(for: [reopened], timeout: 10), .completed,
+                       "The first tap after returning must reopen the reader")
+        let reopenedSession = evidence.value as? String
+        XCTAssertNotNil(reopenedSession)
+        let center = app.coordinate(withNormalizedOffset: CGVector(dx: 0.30, dy: 0.52))
+        center.press(forDuration: 0.05,
+            thenDragTo: app.coordinate(withNormalizedOffset: CGVector(dx: 0.88, dy: 0.52)),
+            withVelocity: .default, thenHoldForDuration: 0.4)
+        XCTAssertTrue(surface.isHittable, "A horizontal pan that starts inside the prose must not leave the reader")
+        XCTAssertEqual(evidence.value as? String, reopenedSession)
+        capture("reader-fast-native-return-reopened")
     }
 
     func testReaderSystemReturnCanCancelWithReducedMotion() throws {
